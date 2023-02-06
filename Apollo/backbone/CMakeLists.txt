@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.16.3)
+project(itvm_example)
+
+unset(TVM_LIBRARY CACHE)
+execute_process(COMMAND bash -c "python3 -c 'import tvm;print(tvm.__file__)' | grep tvm | xargs dirname | tr -d '\n'" OUTPUT_VARIABLE HDPL_TOOLCHAIN_ITVM_INSTALL)
+find_library(TVM_LIBRARY NAMES tvm PATHS ${HDPL_TOOLCHAIN_ITVM_INSTALL} NO_DEFAULT_PATH)
+if(TVM_LIBRARY STREQUAL "TVM_LIBRARY-NOTFOUND" )
+  set(HDPL_TOOLCHAIN_ITVM_INSTALL "${HDPL_TOOLCHAIN_ITVM_INSTALL}/../../build/install")
+  find_library(TVM_LIBRARY NAMES tvm PATHS ${HDPL_TOOLCHAIN_ITVM_INSTALL}/lib NO_DEFAULT_PATH)
+endif()
+include_directories(${HDPL_TOOLCHAIN_ITVM_INSTALL}/include)
+message(STATUS "HDPL_TOOLCHAIN DIR: ${HDPL_TOOLCHAIN_ITVM_INSTALL}")
+
+add_definitions(-w)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -O2")
+add_executable(hdpl_backbone_run hdpl_backbone_run.cc)
+target_link_libraries(hdpl_backbone_run ${TVM_LIBRARY} -pthread dl gomp)
