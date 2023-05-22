@@ -1,0 +1,62 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.3.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: debug-statements
+    -   id: double-quote-string-fixer
+    -   id: requirements-txt-fixer
+-   repo: https://github.com/asottile/setup-cfg-fmt
+    rev: v1.20.1
+    hooks:
+    -   id: setup-cfg-fmt
+-   repo: https://github.com/asottile/reorder_python_imports
+    rev: v3.1.0
+    hooks:
+    -   id: reorder-python-imports
+        args: [--py36-plus]
+-   repo: https://github.com/asottile/add-trailing-comma
+    rev: v2.2.3
+    hooks:
+    -   id: add-trailing-comma
+        args: [--py36-plus]
+-   repo: https://github.com/asottile/pyupgrade
+    rev: v2.34.0
+    hooks:
+    -   id: pyupgrade
+        args: [--py36-plus]
+-   repo: https://github.com/pre-commit/mirrors-autopep8
+    rev: v1.6.0
+    hooks:
+    -   id: autopep8
+-   repo: https://github.com/PyCQA/flake8
+    rev: 4.0.1
+    hooks:
+    -   id: flake8
+        args: [--max-line-length, '140']
+        files: ^tests/
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v0.961
+    hooks:
+    -   id: mypy
+        args: [--python-version, '3.6',
+               --allow-subclassing-any, --ignore-missing-imports,
+               --allow-untyped-decorators,
+               --strict, --disable-error-code, type-arg, --show-error-codes]
+        files: ^tests/
+        additional_dependencies: [types-all]
+-   repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.8.0.4
+    hooks:
+    -   id: shellcheck
+-   repo: https://github.com/pocc/pre-commit-hooks
+    rev: v1.3.5
+    hooks:
+      - id: clang-format
+        args: [--style=file, -i]
+      - id: cppcheck
+        args: [--std=c++11, --language=c++]
+      - id: cpplint
+        args: ["--filter=-legal/copyright,-build/c++11", --linelength=120]
