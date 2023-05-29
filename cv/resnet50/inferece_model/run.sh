@@ -11,7 +11,7 @@ CPU_COUNT=$(grep 'physical id' /proc/cpuinfo | sort | uniq | wc -l)
 if [ -z "${IS_DEV}" ]; then
   IMAGE_COUNT=50000
 else
-  IMAGE_COUNT=50
+  IMAGE_COUNT=80
 fi
 if [ -d preprocessed ]; then
   PREPROCESSED=$(find ./preprocessed -name "*.JPEG" | wc -l)

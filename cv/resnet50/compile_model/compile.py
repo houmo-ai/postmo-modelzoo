@@ -20,12 +20,16 @@ def get_onnx_module():
 def compile():
     # Compile model
     filename = 'resnet50'
+    batch = 16
     onnxfile = get_onnx_module()
     onnx_model = onnx.load(onnxfile)
     input_name = onnx_model.graph.input[0].name
     input_format = 'YUV422SP'
     dims = onnx_model.graph.input[0].type.tensor_type.shape.dim
-    input_shape = (1, dims[1].dim_value, dims[2].dim_value, dims[3].dim_value)
+    input_shape = (
+        batch, dims[1].dim_value,
+        dims[2].dim_value, dims[3].dim_value,
+    )
     print('input name:', input_name)
     print('input shape:', input_shape)
 
@@ -39,7 +43,6 @@ def compile():
         graph, lib, params = relay.build(mod, 'hdpl --host=llvm')
 
     # store model as one fusedop
-#    tcim.store_model(filename, graph, params, lib)
     rt_opt = '-resizer'
     tcim.store_as_fusedop(filename, graph, params, shape_dict, lib, rt_opt)
 
