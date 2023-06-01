@@ -3,7 +3,9 @@ import os
 import onnx
 import torch
 import torchvision.transforms as transforms
+from hmquant.api import quant_single_input_onnx_network
 from hmquant.api import quant_single_onnx_network
+from hmquant.configs.api_config import BaseHoumoConfig
 from hmquant.tools.dataset.preprocess.transform import RGB2YUV
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 from torchvision.datasets.folder import pil_loader
@@ -11,7 +13,9 @@ from torchvision.datasets.folder import pil_loader
 
 def calibrate():
     env_dict = os.environ
-    onnx_model_path = os.path.join(env_dict.get('MODEL_PATH'), 'resnet50.onnx')
+    onnx_model_path = os.path.join(
+        env_dict.get('MODEL_PATH'), 'mobilenet_v2.onnx',
+    )
 
     def unsqueeze(x):
         return torch.unsqueeze(x, 0)
@@ -25,7 +29,7 @@ def calibrate():
 
     image_root = os.path.join(env_dict.get('DATASETS_PATH'), 'imagenet')
     calib_image_files = [
-        'ILSVRC2012_val_00000016.JPEG',
+        'ILSVRC2012_val_00000036.JPEG',
     ]
     calib_images = [
         pil_loader(os.path.join(image_root, img_path))
@@ -57,9 +61,10 @@ def calibrate():
     # Remove quanttool only op
     remove_node_ids = sequencer.find_node_by_classes(['ToYuv', 'HMQuantize'])
     if len(remove_node_ids) > 0:
+        print(f'Remove {remove_node_ids}')
         sequencer.remove_nodes(remove_node_ids)
     sequencer.save_onnx(
-        'quant_resnet50.onnx',
+        'quant_mobilenet_v2.onnx',
         save_out_tensor=False,
         save_params_npy=True,
     )

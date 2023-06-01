@@ -21,13 +21,13 @@ def get_args() -> argparse.Namespace:
         '--model-path',
         dest='model_path',
         type=str,
-        default='./quant_resnet50.onnx',
+        default='./quant_mobilenet_v2.onnx',
         help='path to the model root path',
     )
     parser.add_argument(
         '--output',
         type=str,
-        default='resnet50',
+        default='mobilenet_v2',
         help='output houmo model path',
     )
     parser.add_argument(
@@ -68,6 +68,7 @@ def compile(args=None):
         graph, lib, params = relay.build(mod, 'hdpl --host=llvm')
 
     # store model as one fusedop
+    #tcim.store_model(filename, graph, params, lib)
     rt_opt = '-resizer'
     tcim.store_as_fusedop(filename, graph, params, shape_dict, lib, rt_opt)
 

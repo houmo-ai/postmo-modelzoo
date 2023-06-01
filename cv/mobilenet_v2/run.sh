@@ -14,7 +14,7 @@ cd prepare_model
 cd ..
 
 cd compile_model
-./run.sh --batch 4
+./run.sh --batch 1
 cd ..
 
 cd inferece_model

@@ -29,5 +29,5 @@ message(STATUS "HDPL_TOOLCHAIN DIR: ${HDPL_TOOLCHAIN_ITVM_INSTALL}")
 
 add_definitions(-w)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -O2")
-add_executable(hdpl_resnet50_run hdpl_resnet50_run.cc)
-target_link_libraries(hdpl_resnet50_run ${TVM_LIBRARY} ${HDPL_LIBRARY} -pthread dl gomp)
+add_executable(hdpl_classification hdpl_classification.cc)
+target_link_libraries(hdpl_classification ${TVM_LIBRARY} ${HDPL_LIBRARY} -pthread dl gomp)

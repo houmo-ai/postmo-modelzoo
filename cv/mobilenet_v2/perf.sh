@@ -14,7 +14,7 @@ cd prepare_model
 cd ..
 
 cd compile_model
-./run.sh --batch 28
+./run.sh --batch 1
 cd ..
 
 cd ../../utils/tcimexec/
@@ -27,4 +27,4 @@ if [ -c /dev/hmcl_feature_in ]; then
   export HDPL_PLATFORM=ASIC
 fi
 
-tcimexec --model "${SCRIPT_DIR}/compile_model/resnet50" --iterations 1000
+tcimexec --model "${SCRIPT_DIR}/compile_model/mobilenet_v2" --iterations 1000
