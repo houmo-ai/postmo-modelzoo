@@ -12,6 +12,7 @@
   - [准备数据集和模型](#33-准备数据集和模型)
   - [执行推理](#35-执行推理)
   - [一键运行](#36-一键运行)
+  - [性能评测](#37-性能评测)
 - [免责声明](#6免责声明)
 
 ## 1.模型说明
@@ -72,6 +73,22 @@ Accuracy:  top1: 75.68%, top5: 92.696%
 ### 3.6 一键运行
 
 以上 3.3~3.5 的步骤也可以通过运行cd imodelzoo/cv/resnet50/ && bash run.sh 来实现一键执行
+
+### 3.7 性能评测
+
+```bash
+bash perf.sh
+```
+
+结果：
+
+```bash
+Input input.1: (28, 224, 224, 3), uint8
+========= RUN 1000 ROUNDS =======
+Inference time cost total = 4720125us
+Inference time cost per frame = 4720us
+Average Throughput(QPS): 5932.2fps
+```
 
 ## 4.免责声明
 
