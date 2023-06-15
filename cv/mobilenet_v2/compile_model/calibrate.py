@@ -29,7 +29,7 @@ def calibrate():
 
     image_root = os.path.join(env_dict.get('DATASETS_PATH'), 'imagenet')
     calib_image_files = [
-        'ILSVRC2012_val_00000036.JPEG',
+        'ILSVRC2012_val_00000011.JPEG',
     ]
     calib_images = [
         pil_loader(os.path.join(image_root, img_path))

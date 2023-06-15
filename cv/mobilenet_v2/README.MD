@@ -67,7 +67,7 @@ bash run.sh
 结果：
 
 ```bash
-Accuracy:  top1: 75.434%, top5: 92.696%
+Accuracy:  top1: 70.858%, top5: 89.836%
 ```
 
 ### 3.6 一键运行
