@@ -16,7 +16,7 @@ if [ -n "${IS_DEV}" ]; then
 fi
 
 if [ -z "$HDPL_TOOLCHAIN_ITVM_INSTALL" ]; then
-  HDPL_TOOLCHAIN_ITVM_INSTALL="$(pip3 show houmo-tvm | grep Location: | awk '{print($2)}')/tvm"
+  HDPL_TOOLCHAIN_ITVM_INSTALL="$(pip3 show houmo-tcim | grep Location: | awk '{print($2)}')/tvm"
 fi
 if [ -z "$HDPL_TOOLCHAIN_ITVM_INSTALL" ]; then
   HDPL_TOOLCHAIN_ITVM_INSTALL="$(python3 -c 'import site;print(site.getsitepackages()[0])')/tvm"

@@ -63,7 +63,7 @@ def main(args: Any = None) -> None:
 
 def sub_process_dataset(image_path_list: List[Tuple[str, str]]):
     for output_file_path, src_file_path in image_path_list:
-        resnet50_proprecess(output_file_path, src_file_path)
+        mobilenetv2_proprecess(output_file_path, src_file_path)
 
 
 def precess_dataset(output_path: str, imagenet_path: str, count: int, process_count: int) -> None:
@@ -92,7 +92,7 @@ def precess_dataset(output_path: str, imagenet_path: str, count: int, process_co
         sub_proc.join()
 
 
-def resnet50_proprecess(output_path: str, image_path: str) -> None:
+def mobilenetv2_proprecess(output_path: str, image_path: str) -> None:
     """
     Prepare image for inputing to the neural network.
     """

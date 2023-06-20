@@ -60,7 +60,7 @@ bash run.sh --batch 4
 ### 3.5 执行推理
 
 ```bash
-cd inferece_model
+cd inference_model
 bash run.sh
 ```
 

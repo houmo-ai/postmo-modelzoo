@@ -17,5 +17,5 @@ cd compile_model
 ./run.sh --batch 1
 cd ..
 
-cd inferece_model
+cd inference_model
 ./run.sh
