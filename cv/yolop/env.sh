@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 PROJ_ROOT_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." || exit ; pwd)
 
-if [ -n "${TVM_ROOT}" ]; then
+if [ -n "${IDNNL_TEST_DATA_SET}" ]; then
   # whether is development environment
   export IS_DEV=1
 fi
@@ -12,7 +12,9 @@ if [ -z ${IS_DEV} ]; then
 fi
 
 if [ -n "${IS_DEV}" ]; then
-  HDPL_TOOLCHAIN_ITVM_INSTALL="$TVM_ROOT/build/install/"
+  if [ -z "$HDPL_TOOLCHAIN_ITVM_INSTALL" ]; then
+    HDPL_TOOLCHAIN_ITVM_INSTALL="$TVM_ROOT/build/install/"
+  fi
 fi
 
 if [ -z "$HDPL_TOOLCHAIN_ITVM_INSTALL" ]; then
@@ -21,15 +23,15 @@ fi
 if [ -z "$HDPL_TOOLCHAIN_ITVM_INSTALL" ]; then
   HDPL_TOOLCHAIN_ITVM_INSTALL="$(python3 -c 'import site;print(site.getsitepackages()[0])')/tvm"
 fi
-if [ ! -f "${HDPL_TOOLCHAIN_ITVM_INSTALL}/libtvm.so" ]; then
-  echo "Could not found houmo tvm installed dir"
-fi
 export HDPL_TOOLCHAIN_ITVM_INSTALL
 
 #数据集路径
-export DATASETS_PATH=$PROJ_ROOT_PATH/data/datasets
-export MODEL_PATH=$PROJ_ROOT_PATH/data/models
-
+if [[ -z "${DATASETS_PATH}" ]]; then
+  export DATASETS_PATH=$PROJ_ROOT_PATH/data/datasets
+fi
+if [[ -z "${MODEL_PATH}" ]]; then
+  export MODEL_PATH=$PROJ_ROOT_PATH/data/models
+fi
 
 echo "HOUMO_PATH is ${HOUMO_PATH}"
 echo "HDPL_TOOLCHAIN_ITVM_INSTALL is ${HDPL_TOOLCHAIN_ITVM_INSTALL}"

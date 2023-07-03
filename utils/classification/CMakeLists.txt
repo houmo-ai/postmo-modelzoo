@@ -1,8 +1,7 @@
-cmake_minimum_required(VERSION 3.16.3)
+cmake_minimum_required(VERSION 3.8)
 project(houmo_demo)
 
 unset(TVM_LIBRARY CACHE)
-set(HDPL_TOOLCHAIN_ITVM_INSTALL "../../../../itvm/build/install")
 if(DEFINED ENV{HDPL_TOOLCHAIN_ITVM_INSTALL})
   message(STATUS "HDPL_TOOLCHAIN_ITVM_INSTALL: " $ENV{HDPL_TOOLCHAIN_ITVM_INSTALL})
   set(HDPL_TOOLCHAIN_ITVM_INSTALL $ENV{HDPL_TOOLCHAIN_ITVM_INSTALL})
@@ -28,6 +27,6 @@ message(STATUS "HDPL_TOOLCHAIN DIR: ${HDPL_TOOLCHAIN_ITVM_INSTALL}")
 
 
 add_definitions(-w)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -O2")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O2")
 add_executable(hdpl_classification hdpl_classification.cc)
 target_link_libraries(hdpl_classification ${TVM_LIBRARY} ${HDPL_LIBRARY} -pthread dl gomp)

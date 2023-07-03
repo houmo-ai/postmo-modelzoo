@@ -72,7 +72,7 @@ Accuracy:  top1: 75.68%, top5: 92.696%
 
 ### 3.6 一键运行
 
-以上 3.3~3.5 的步骤也可以通过运行cd imodelzoo/cv/resnet50/ && bash run.sh 来实现一键执行
+以上 3.3~3.5 的步骤也可以通过运行cd imodelzoo/cv/resnet50/ && bash eval.sh 来实现一键执行
 
 ### 3.7 性能评测
 

@@ -72,7 +72,7 @@ Accuracy:  top1: 70.858%, top5: 89.836%
 
 ### 3.6 一键运行
 
-以上 3.3~3.5 的步骤也可以通过运行cd imodelzoo/cv/mobilenet_v2/ && bash run.sh 来实现一键执行
+以上 3.3~3.5 的步骤也可以通过运行cd imodelzoo/cv/mobilenet_v2/ && bash eval.sh 来实现一键执行
 
 ### 3.7 性能评测
 

@@ -27,4 +27,10 @@ if [ -c /dev/hmcl_feature_in ]; then
   export HDPL_PLATFORM=ASIC
 fi
 
-tcimexec --model "${SCRIPT_DIR}/compile_model/resnet50" --iterations 1000
+if [ -z "${IS_DEBUG}" ]; then
+  ITERATION=1000
+else
+  ITERATION=1
+fi
+
+tcimexec --model "${SCRIPT_DIR}/compile_model/resnet50" --iterations ${ITERATION}

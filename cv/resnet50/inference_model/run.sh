@@ -5,10 +5,10 @@ set -e
 cd "${SCRIPT_DIR}"
 
 CPU_COUNT=$(grep 'physical id' /proc/cpuinfo | sort | uniq | wc -l)
-if [ -z "${IS_DEV}" ]; then
+if [ -z "${IS_DEBUG}" ]; then
   IMAGE_COUNT=50000
 else
-  IMAGE_COUNT=80
+  IMAGE_COUNT=10
 fi
 if [ -d preprocessed ]; then
   PREPROCESSED=$(find ./preprocessed -name "*.JPEG" | wc -l)

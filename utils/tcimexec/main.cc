@@ -11,6 +11,7 @@
 #include <tvm/runtime/registry.h>
 #include <unistd.h>
 
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -120,8 +121,8 @@ int main(int argc, char *argv[]) {
     }
     std::cout << "), " << input_data.DataType() << std::endl;
   }
-  auto start = std::chrono::system_clock::now();
   size_t eval_round = arguments.iterations;
+  auto start = std::chrono::system_clock::now();
   if (arguments.is_fused) {
     module.RunRounds(eval_round);
   } else {
@@ -132,14 +133,15 @@ int main(int argc, char *argv[]) {
   auto finish = std::chrono::system_clock::now();
   auto duration =
       std::chrono::duration_cast<std::chrono::microseconds>(finish - start);
-  auto total_time = (duration.count());
-  std::cout << "\033[0;31mInference time cost total = " << (total_time) << "us"
+  int64_t total_time = duration.count();
+  std::cout << "\033[0;31mInference time cost total = " << total_time << "us"
             << "\033[0m" << std::endl;
-  std::cout << "\033[0;31mInference time cost per frame = "
-            << (total_time / eval_round) << "us"
+  std::cout << "\033[0;31mInference time cost per frame = " << std::fixed
+            << std::setprecision(1) << 1.0 * total_time / eval_round << "us"
             << "\033[0m" << std::endl;
-  std::cout << "\033[0;32mAverage Throughput(QPS): "
-            << (1000000.0 / (duration.count() / eval_round)) * batch << "fps"
+  std::cout << "\033[0;32mAverage Throughput(QPS): " << std::fixed
+            << std::setprecision(2) << (1.0e6 * eval_round / total_time * batch)
+            << "fps"
             << "\033[0m" << std::endl;
   return 0;
 }
