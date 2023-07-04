@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 set -e
 
 if [ -z "${MODEL_PATH}" ]; then
@@ -16,7 +17,7 @@ then
   echo "mobilenet_v2.onnx already exists."
 else
   echo "Downloading mobilenet_v2.onnx file"
-  wget -O mobilenet_v2.onnx http://10.10.1.53:8082/artifactory/model_zoo2/haomo/mobilenetv2/mobilenet_v2.onnx
+  python3 "${SCRIPT_DIR}/gen_onnx_model.py"
 fi
 
 if [ ! -f "${DATASETS_PATH}/imagenet/ILSVRC2012_val_00000001.JPEG" ];
