@@ -33,6 +33,9 @@ if [[ -z "${MODEL_PATH}" ]]; then
   export MODEL_PATH=$PROJ_ROOT_PATH/data/models
 fi
 
+# set hal library log level
+export HM800_HAL_CONSOLE_LEVEL=0
+
 echo "HOUMO_PATH is ${HOUMO_PATH}"
 echo "HDPL_TOOLCHAIN_ITVM_INSTALL is ${HDPL_TOOLCHAIN_ITVM_INSTALL}"
 echo "PROJ_ROOT_PATH is ${PROJ_ROOT_PATH}"
