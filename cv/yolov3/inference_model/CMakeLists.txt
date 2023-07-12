@@ -28,7 +28,7 @@ message(STATUS "HDPL_TOOLCHAIN DIR: ${HDPL_TOOLCHAIN_ITVM_INSTALL}")
 
 add_definitions(-w)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -O2 -fsanitize=address -O1 -fno-omit-frame-pointer -g")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -O2")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O2")
 file(GLOB HDPL_YOLOV3_SRCS *.cc)
 add_executable(hdpl_yolov3 ${HDPL_YOLOV3_SRCS})
 target_link_libraries(hdpl_yolov3 ${TVM_LIBRARY} ${HDPL_LIBRARY} -pthread dl gomp)
