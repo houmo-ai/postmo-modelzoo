@@ -49,7 +49,6 @@ def compile(args=None):
     onnxfile = args.model_path
     onnx_model = onnx.load(onnxfile)
     input_name = onnx_model.graph.input[0].name
-    input_format = 'YUV422SP'
     dims = onnx_model.graph.input[0].type.tensor_type.shape.dim
     input_shape = (
         batch, dims[1].dim_value,

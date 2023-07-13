@@ -49,7 +49,6 @@ def compile(args=None):
     onnxfile = args.model_path
     onnx_model = onnx.load(onnxfile)
     input_name = onnx_model.graph.input[0].name
-    input_format = 'YUV422SP'
     dims = onnx_model.graph.input[0].type.tensor_type.shape.dim
     input_shape = (
         batch, dims[1].dim_value,
@@ -68,9 +67,8 @@ def compile(args=None):
         graph, lib, params = relay.build(mod, 'hdpl --host=llvm')
 
     # store model as one fusedop
-    tcim.store_model(filename, graph, params, lib)
-    #rt_opt = '-resizer'
-    #tcim.store_as_fusedop(filename, graph, params, shape_dict, lib, rt_opt)
+    rt_opt = '-resizer'
+    tcim.store_as_fusedop(filename, graph, params, shape_dict, lib, rt_opt, 1)
 
     print(filename, ' saved as one fusedop model.')
 

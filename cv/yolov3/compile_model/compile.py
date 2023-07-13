@@ -66,25 +66,10 @@ def compile(args=None):
     mod = relay.frontend.from_hmonnx(
         onnx_model, shape_dict, type_dict, resizer_attr=resizer_attr,
     )
-    composite_partition = tvm.transform.Sequential(
-        [
-            hdpl.transform.RewriteConv2dCSplit(),
-            relay.transform.FoldExplicitReLU(),
-            relay.transform.SimplifyInference(),
-            relay.transform.FoldConstant(),
-            relay.transform.FoldScaleAxis(),
-            relay.transform.CanonicalizeOps(),
-            relay.transform.FoldConstant(),
-            relay.transform.InferType(),
-        ],
-    )
-    with tvm.transform.PassContext(opt_level=3, disabled_pass=['AlterOpLayout']):
-        mod = composite_partition(mod)
     with relay.build_config(opt_level=3):
         graph, lib, params = relay.build(mod, 'hdpl --host=llvm')
 
     # store model as one fusedop
-    # tcim.store_model(filename, graph, params, lib)
     rt_opt = '-resizer'
     tcim.store_as_fusedop(filename, graph, params, shape_dict, lib, rt_opt)
 
