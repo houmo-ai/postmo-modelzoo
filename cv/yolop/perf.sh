@@ -8,7 +8,6 @@ cd "${SCRIPT_DIR}"
 # shellcheck source=/dev/null
 source ./env.sh
 
-
 cd prepare_model
 ./run.sh
 cd ..
