@@ -67,8 +67,14 @@ def compile(args=None):
         graph, lib, params = relay.build(mod, 'hdpl --host=llvm')
 
     # store model as one fusedop
-    rt_opt = '-resizer'
+    # rt_opt = '-resizer'
+    rt_opt = ""
     tcim.store_as_fusedop(filename, graph, params, shape_dict, lib, rt_opt, 1)
+
+    # filename = "yolop"
+    # rt_opt = ""
+    # tcim.store_as_fusedop(filename, graph, params, shape_dict, lib, rt_opt, 1)
+
 
     print(filename, ' saved as one fusedop model.')
 

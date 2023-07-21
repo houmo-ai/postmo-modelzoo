@@ -12,11 +12,13 @@ cd prepare_model
 ./run.sh
 cd ..
 
+export HDPL_PLATFORM=ISIM
+
 cd compile_model
 ./run.sh --batch 1
 cd ..
 
-cd ../../utils/tcimexec/
+cd ../../utils/multi_stream_tcim_exec/
 ./build.sh
 PATH="$(pwd):${PATH}"
 export PATH
@@ -32,4 +34,4 @@ else
   ITERATION=1
 fi
 
-tcimexec --model "${SCRIPT_DIR}/compile_model/yolop" --iterations ${ITERATION}
+mult_stream_tcimexec --model "${SCRIPT_DIR}/compile_model/yolop" --iterations ${ITERATION}
