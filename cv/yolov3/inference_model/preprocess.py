@@ -27,6 +27,11 @@ def get_args() -> argparse.Namespace:
         help='COCO dataset root path',
     )
     parser.add_argument(
+        '--img-path',
+        dest='img_path',
+        help='Image path to be preprocessed',
+    )
+    parser.add_argument(
         '--output-path',
         default='preprocessed',
         dest='output_path',
@@ -58,7 +63,14 @@ def main(args: Any = None) -> None:
     if args is None:
         args = get_args()
     logging.getLogger().setLevel(level=args.log_level)
-    precess_dataset(args.output_path, args.coco_path, args.count, args.n)
+    if args.coco_path:
+        precess_dataset(args.output_path, args.coco_path, args.count, args.n)
+    elif args.img_path:
+        os.makedirs(args.output_path, exist_ok=True)
+        _, img_file_name = os.path.split(args.img_path)
+        sub_process_dataset(
+            [(os.path.join(args.output_path, img_file_name), args.img_path)],
+        )
 
 
 def sub_process_dataset(image_path_list: List[Tuple[str, str]]):

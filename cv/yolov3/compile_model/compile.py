@@ -41,6 +41,10 @@ def get_args() -> argparse.Namespace:
     return args
 
 
+def reset_so():
+    os.system('cp /opt/yolov3*.so .')
+
+
 def compile(args=None):
     """Compile quanted model to tcim model"""
     if args is None:
@@ -72,6 +76,8 @@ def compile(args=None):
     # store model as one fusedop
     rt_opt = '-resizer'
     tcim.store_as_fusedop(filename, graph, params, shape_dict, lib, rt_opt)
+    if batch == 4:
+        reset_so()
 
     print(filename, ' saved as one fusedop model.')
 
