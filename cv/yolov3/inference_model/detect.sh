@@ -16,9 +16,9 @@ cd build
 cmake ..
 make
 cd ../
-#./build/hdpl_yolov3 "${SCRIPT_DIR}/data/dog.json" ./preprocessed 1
+./build/hdpl_yolov3 "${SCRIPT_DIR}/data/dog.json" ./preprocessed 1
 
 python3 draw_box.py --img-path "${SCRIPT_DIR}/data/dog.jpg" \
-	            --output-path "${SCRIPT_DIR}/boxed_dog.jpg" \
-	            --coco-names "${DATASETS_PATH}/coco.names" \
-		    --detect-json ./detections.json
+                    --output-path "${SCRIPT_DIR}/boxed_dog.jpg" \
+                    --coco-names "${DATASETS_PATH}/coco.names" \
+                    --detect-json ./detections.json

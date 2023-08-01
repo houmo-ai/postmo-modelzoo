@@ -182,8 +182,9 @@ box get_yolo_box(const float *x, int *biases, int n, int index, int i, int j,
   return b;
 }
 
-int get_yolo_detections(layer l, int w, int h, int netw, int neth, float thresh,
-                        int *map, int relative, detection *dets) {
+int get_yolo_detections(layer l, int w, int h, int netw, int neth,
+                        float conf_thresh, int *map, int relative,
+                        detection *dets) {
   int i, j, n, b;
   const float *predictions = l.output;
   int count = 0;
@@ -194,7 +195,7 @@ int get_yolo_detections(layer l, int w, int h, int netw, int neth, float thresh,
       for (n = 0; n < l.n; ++n) {
         int obj_index = entry_index(l, b, n * l.w * l.h + i, 4);
         float objectness = predictions[obj_index];
-        if (objectness <= thresh) continue;
+        if (objectness <= conf_thresh) continue;
         int box_index = entry_index(l, b, n * l.w * l.h + i, 0);
         dets[count].bbox =
             get_yolo_box(predictions, l.biases, l.mask[n], box_index, col, row,
@@ -207,7 +208,7 @@ int get_yolo_detections(layer l, int w, int h, int netw, int neth, float thresh,
           // printf("class_index is %d\r\n",class_index);
           float prob = objectness * predictions[class_index];
           // printf("++count=%d j=%d\r\n",count,j);
-          dets[count].prob[j] = (prob > thresh) ? prob : 0;
+          dets[count].prob[j] = (prob > conf_thresh) ? prob : 0;
           // printf("++after count\r\n");
         }
         ++count;
@@ -219,33 +220,33 @@ int get_yolo_detections(layer l, int w, int h, int netw, int neth, float thresh,
 }
 
 void fill_network_boxes(const std::vector<layer> &layers_params, int img_w,
-                        int img_h, int net_w, int net_h, float thresh,
-                        float hier, int *map, int relative, detection *dets) {
+                        int img_h, int net_w, int net_h, float conf_thresh,
+                        int *map, int relative, detection *dets) {
   int j;
   for (j = 0; j < layers_params.size(); ++j) {
     layer l = layers_params[j];
-    int count = get_yolo_detections(l, img_w, img_h, net_w, net_h, thresh, map,
-                                    relative, dets);
+    int count = get_yolo_detections(l, img_w, img_h, net_w, net_h, conf_thresh,
+                                    map, relative, dets);
     dets += count;
   }
 }
 
 detection *get_network_boxes(const std::vector<layer> &layers_params, int img_w,
-                             int img_h, int net_w, int net_h, float thresh,
-                             float hier, int *map, int relative, int *num) {
+                             int img_h, int net_w, int net_h, float conf_thresh,
+                             int *map, int relative, int *num) {
   // make network boxes
-  detection *dets = make_network_boxes(layers_params, thresh, num);
+  detection *dets = make_network_boxes(layers_params, conf_thresh, num);
 
   // fill network boxes
-  fill_network_boxes(layers_params, img_w, img_h, net_w, net_h, thresh, hier,
+  fill_network_boxes(layers_params, img_w, img_h, net_w, net_h, conf_thresh,
                      map, relative, dets);
   return dets;
 }
 
 // get detection result
 detection *get_detections(std::vector<Blob<float> *> blobs, int img_w,
-                          int img_h, int net_w, int net_h, float thresh,
-                          int classes, int *nboxes) {
+                          int img_h, int net_w, int net_h, float nms_thresh,
+                          float conf_thresh, int classes, int *nboxes) {
   std::vector<layer> layers_params;
   layers_params.clear();
   for (int i = 0; i < blobs.size(); ++i) {
@@ -259,7 +260,7 @@ detection *get_detections(std::vector<Blob<float> *> blobs, int img_w,
 
   // get network boxes
   detection *dets = get_network_boxes(layers_params, img_w, img_h, net_w, net_h,
-                                      thresh, hier_thresh, 0, relative, nboxes);
+                                      conf_thresh, 0, relative, nboxes);
 
   // release layer memory
   for (int index = 0; index < layers_params.size(); ++index) {

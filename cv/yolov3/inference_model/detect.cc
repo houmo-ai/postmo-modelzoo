@@ -79,10 +79,10 @@ bool CaltulateDetection(std::vector<DetectInfo> *detections,
                         const ImageInfo &image_info,
                         const std::vector<OutInfo> &infos) {
   detection *dets = NULL;
-  float m_thresh = 0.5;
+  float nms_thresh = 0.5;
   int m_classes = 80;  // coco classes
   int nboxes = 0;
-  float thresh = 0.45;
+  float conf_thresh = 0.001;
   std::vector<Blob<float> *> m_blobs_;
   for (size_t n = 0; n < infos.size(); n++) {
     m_blobs_.push_back(new Blob<float>);
@@ -93,7 +93,7 @@ bool CaltulateDetection(std::vector<DetectInfo> *detections,
     m_blobs_[i]->data_ = infos[i].tvm_fmt_out.data();
   }
   dets = get_detections(m_blobs_, image_info.width, image_info.height, 416, 416,
-                        m_thresh, m_classes, &nboxes);
+                        nms_thresh, conf_thresh, m_classes, &nboxes);
   for (auto m : m_blobs_) delete m;
 
   // deal with results
@@ -102,7 +102,7 @@ bool CaltulateDetection(std::vector<DetectInfo> *detections,
     int const obj_id = max_index(dets[i].prob, m_classes);
     float const prob = dets[i].prob[obj_id];
 
-    if (prob > thresh) {
+    if (prob > conf_thresh) {
       // x, y from get_detections are the center point of the object
       // convert the center point to the left top point
       float obj_x = std::max(0., (b.x - b.w / 2.) * image_info.width);

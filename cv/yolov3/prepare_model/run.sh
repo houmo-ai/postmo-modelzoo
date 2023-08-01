@@ -16,5 +16,5 @@ then
   echo "yolov3.onnx already exists."
 else
   echo "Downloading yolov3.onnx file"
-  wget -q -O yolov3.onnx http://10.10.1.53:8082/artifactory/model_zoo/yolov3/yolov3.onnx
+  wget -q -O yolov3.onnx http://10.10.1.53:8082/artifactory/model_zoo2/houmo/yolov3/yolov3_416x416.onnx
 fi
