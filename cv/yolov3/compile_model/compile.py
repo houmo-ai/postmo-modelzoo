@@ -64,7 +64,7 @@ def compile(args=None):
     print('input shape:', input_shape)
 
     convert_config = {'layout': 'NHWC'}
-    type_dict = {input_name: 'int8'}
+    type_dict = {input_name: 'uint8'}
     shape_dict = {input_name: input_shape}
     resizer_attr = ResizerAttr(enfold=1)
     mod = relay.frontend.from_hmonnx(
