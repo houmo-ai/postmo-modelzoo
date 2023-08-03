@@ -4,7 +4,10 @@ set -e
 
 cd "${SCRIPT_DIR}"
 
-CPU_COUNT=$(grep 'physical id' /proc/cpuinfo | sort | uniq | wc -l)
+CPU_COUNT=$(grep 'processor' /proc/cpuinfo | sort | uniq | wc -l)
+if [ "${CPU_COUNT}" == "0" ]; then
+  CPU_COUNT=1
+fi
 if [ -z "${IS_DEBUG}" ]; then
   IMAGE_COUNT=500
 else
