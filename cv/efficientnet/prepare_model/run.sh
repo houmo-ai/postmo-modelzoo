@@ -17,7 +17,11 @@ then
   echo "efficientnet_b0_224x224.onnx already exists."
 else
   echo "Downloading efficientnet_b0_224x224.onnx file"
-  python3 "${SCRIPT_DIR}/gen_onnx_model.py"
+  if [ -z "${IS_DEBUG}" ]; then
+    python3 "${SCRIPT_DIR}/gen_onnx_model.py"
+  else
+    wget http://10.10.1.53:8082/artifactory/model_zoo2/haomo/efficientnet/efficientnet_b0_224x224.onnx
+  fi
 fi
 
 if [ ! -f "${DATASETS_PATH}/imagenet/ILSVRC2012_val_00000001.JPEG" ];
