@@ -33,4 +33,4 @@ else
   ITERATION=1
 fi
 
-tcimexec --model "${SCRIPT_DIR}/compile_model/resnet50" --iterations ${ITERATION}
+tcimexec --model "${SCRIPT_DIR}/compile_model/resnet50" --iterations ${ITERATION} --power
