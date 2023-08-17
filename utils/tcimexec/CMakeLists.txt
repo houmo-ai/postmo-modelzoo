@@ -27,12 +27,6 @@ message(STATUS "HDPL_TOOLCHAIN DIR: ${HDPL_TOOLCHAIN_ITVM_INSTALL}")
 
 
 add_definitions(-w)
-
-add_executable(tcimexec main.cc)
-if (HAL)
-  add_definitions(-DHAL)
-  target_link_directories(tcimexec PUBLIC ${HDPL_INSTALL_PATH}/lib)
-  target_link_libraries(tcimexec hm800_hal)
-endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O2")
+add_executable(tcimexec main.cc)
 target_link_libraries(tcimexec ${TVM_LIBRARY} ${HDPL_LIBRARY} -pthread dl gomp)

@@ -17,12 +17,7 @@
 #include <map>
 #include <sstream>
 #include <string>
-#include <thread>
 #include <vector>
-
-#if HAL
-#include "hm800_hal.h"
-#endif
 
 #include "hdpl/hdpl_runtime.h"
 
@@ -31,7 +26,6 @@ struct CliArguments {
   size_t warm_up = 10;
   size_t iterations = 10;
   bool is_fused = false;
-  bool monitor_power = false;
 };
 
 /**
@@ -46,12 +40,6 @@ bool IsFileExists(std::string file_path) {
   return f.good();
 }
 
-#if HAL
-void MonitorPower(std::vector<hm800_power_data> *data_vec, bool *stop_flag,
-                  bool *started_flag);
-void DumpPowerInfo(const std::vector<struct hm800_power_data> &data_vec);
-#endif
-
 /**
  * @brief Parse cmdline arguments to struct *arguments
  *
@@ -64,38 +52,35 @@ void DumpPowerInfo(const std::vector<struct hm800_power_data> &data_vec);
 bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
   int option_idx = 0;
   struct option long_options[] = {
-      {"help", 0, 0, 'h'},       {"model", 1, 0, 'm'}, {"warm_up", 1, 0, 'w'},
-      {"iterations", 1, 0, 'i'}, {"power", 0, 0, 'p'},
+      {"help", 0, 0, 'h'},
+      {"model", 1, 0, 'm'},
+      {"warm_up", 1, 0, 'w'},
+      {"iterations", 1, 0, 'i'},
   };
   while (true) {
-    int ch = getopt_long(argc, argv, "hm:w:i:p", long_options, &option_idx);
+    int ch = getopt_long(argc, argv, "hm:w:i:", long_options, &option_idx);
     if (ch == -1) {
       break;
     }
     switch (ch) {
-      case 'h':
-        std::cout << "Usage: -h" << std::endl;
-        break;
-      case 'm':
-        std::cout << "Model: " << optarg << std::endl;
-        arguments->model_path = std::string(optarg);
-        break;
-      case 'w':
-        std::cout << "warm up: " << optarg << std::endl;
-        arguments->warm_up = atoi(optarg);
-        break;
-      case 'i':
-        std::cout << "iterations: " << optarg << std::endl;
-        arguments->iterations = atoi(optarg);
-        break;
-      case 'p':
-        std::cout << "enable monitor power" << std::endl;
-        arguments->monitor_power = true;
-        break;
-      default:
-        std::cerr << "Unsupported option: " << static_cast<char>(ch)
-                  << std::endl;
-        return false;
+    case 'h':
+      std::cout << "Usage: -h" << std::endl;
+      break;
+    case 'm':
+      std::cout << "Model: " << optarg << std::endl;
+      arguments->model_path = std::string(optarg);
+      break;
+    case 'w':
+      std::cout << "warm up: " << optarg << std::endl;
+      arguments->warm_up = atoi(optarg);
+      break;
+    case 'i':
+      std::cout << "iterations: " << optarg << std::endl;
+      arguments->iterations = atoi(optarg);
+      break;
+    default:
+      std::cerr << "Unsupported option: " << static_cast<char>(ch) << std::endl;
+      return false;
     }
   }
   if (IsFileExists(arguments->model_path + "_fused_op.so")) {
@@ -137,21 +122,6 @@ int main(int argc, char *argv[]) {
     std::cout << "), " << input_data.DataType() << std::endl;
   }
   size_t eval_round = arguments.iterations;
-
-#if HAL
-  std::vector<struct hm800_power_data> power_data_vec;
-  bool stop_flag = false;
-  bool started_flag = false;
-  std::vector<std::thread> threads;
-  if (arguments.monitor_power) {
-    std::thread monitor_th(
-        [&] { MonitorPower(&power_data_vec, &stop_flag, &started_flag); });
-    threads.push_back(std::move(monitor_th));
-  }
-  while (!started_flag) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  }
-#endif
   auto start = std::chrono::system_clock::now();
   if (arguments.is_fused) {
     module.RunRounds(eval_round);
@@ -161,13 +131,6 @@ int main(int argc, char *argv[]) {
   }
   hdplDeviceSynchronize();
   auto finish = std::chrono::system_clock::now();
-
-#if HAL
-  stop_flag = true;
-  for (auto &th : threads) {
-    th.join();
-  }
-#endif
   auto duration =
       std::chrono::duration_cast<std::chrono::microseconds>(finish - start);
   int64_t total_time = duration.count();
@@ -180,89 +143,5 @@ int main(int argc, char *argv[]) {
             << std::setprecision(2) << (1.0e6 * eval_round / total_time * batch)
             << "fps"
             << "\033[0m" << std::endl;
-#if HAL
-  LOG(DEBUG) << "Power data point: " << power_data_vec.size();
-  DumpPowerInfo(power_data_vec);
-#endif
   return 0;
 }
-
-#if HAL
-void MonitorPower(std::vector<struct hm800_power_data> *data_vec,
-                  bool *stop_flag, bool *started_flag) {
-  uint64_t vir_fd = 0;
-  int32_t hmcl_ret = 0;
-  hmcl_ret = hm800_usr_cmd_open_2(&vir_fd);
-  if (hmcl_ret != 0) {
-    LOG(ERROR) << "hm800_usr_cmd_open_2 failed with " << hmcl_ret;
-    return;
-  }
-  struct hm800_power_data power_data;
-  *started_flag = true;
-  while (!(*stop_flag)) {
-    hmcl_ret = hm800_get_power_2(vir_fd, &power_data);
-    if (hmcl_ret == 0) {
-      data_vec->push_back(power_data);
-    } else {
-      LOG(ERROR) << "hm800_get_power_2 failed with " << hmcl_ret;
-      break;
-    }
-  }
-  hm800_usr_cmd_close_2(vir_fd);
-}
-
-void DumpPowerInfo(const std::vector<struct hm800_power_data> &data_vec) {
-  size_t data_length = data_vec.size();
-  size_t effective_length = ceil(0.9 * data_length);
-  size_t start_idx = (data_length - effective_length) / 2;
-  struct hm800_power_data *sum_data =
-      (struct hm800_power_data *)calloc(1, sizeof(struct hm800_power_data));
-  for (size_t idx = start_idx; idx < effective_length + start_idx; idx++) {
-    sum_data->ai_core_module_power += data_vec[idx].ai_core_module_power;
-    sum_data->igital_core_module_power +=
-        data_vec[idx].igital_core_module_power;
-    sum_data->gddr_module_power += data_vec[idx].gddr_module_power;
-    sum_data->noc_top_module_power += data_vec[idx].noc_top_module_power;
-    sum_data->pcie_module_power += data_vec[idx].pcie_module_power;
-    sum_data->video_codec_module_power +=
-        data_vec[idx].video_codec_module_power;
-    sum_data->jpeg_codec_module_power += data_vec[idx].jpeg_codec_module_power;
-    sum_data->io_module_power += data_vec[idx].io_module_power;
-    sum_data->low_speed_efuse_module_power +=
-        data_vec[idx].low_speed_efuse_module_power;
-    sum_data->all_modules_power += data_vec[idx].all_modules_power;
-  }
-  std::cout << "\033[0;32mAverage total consumption: "
-            << 1. * sum_data->all_modules_power / effective_length << "W"
-            << "\033[0m" << std::endl;
-  std::cout << "\033[0;32mAverage AiCore consumption: "
-            << 1. * sum_data->ai_core_module_power / effective_length << "W"
-            << "\033[0m" << std::endl;
-  std::cout << "\033[0;32mAverage Digital consumption: "
-            << 1. * sum_data->igital_core_module_power / effective_length << "W"
-            << "\033[0m" << std::endl;
-  std::cout << "\033[0;32mAverage GDDR consumption: "
-            << 1. * sum_data->gddr_module_power / effective_length << "W"
-            << "\033[0m" << std::endl;
-  std::cout << "\033[0;32mAverage NOC&TOP consumption: " << std::fixed
-            << 1. * sum_data->noc_top_module_power / effective_length << "W"
-            << "\033[0m" << std::endl;
-  std::cout << "\033[0;32mAverage PCIE consumption: "
-            << 1. * sum_data->pcie_module_power / effective_length << "W"
-            << "\033[0m" << std::endl;
-  std::cout << "\033[0;32mAverage Video Codec consumption: "
-            << 1. * sum_data->video_codec_module_power / effective_length << "W"
-            << "\033[0m" << std::endl;
-  std::cout << "\033[0;32mAverage Jpeg Codec consumption: "
-            << 1. * sum_data->jpeg_codec_module_power / effective_length << "W"
-            << "\033[0m" << std::endl;
-  std::cout << "\033[0;32mAverage IO consumption: "
-            << 1. * sum_data->io_module_power / effective_length << "W"
-            << "\033[0m" << std::endl;
-  std::cout << "\033[0;32mAverage Lower Speed Efuse consumption: "
-            << 1. * sum_data->low_speed_efuse_module_power / effective_length
-            << "W"
-            << "\033[0m" << std::endl;
-  free(sum_data);
-}
-#endif
