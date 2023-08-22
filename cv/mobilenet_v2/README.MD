@@ -35,13 +35,19 @@
 ```bash
 # 下载仓库
 git clone 本仓库
-cd imodelzoo/cv/mobilenet_v2/
+cd imodelzoo
 ```
 
 在开始运行代码前需要先检查 `env.sh` 里的环境变量，根据数据集实际路径修改 `env.sh` 内的 `DATASETS_PATH`, 并且执行以下命令：
 
 ```bash
 source env.sh
+```
+
+设置完成后进入模型目录：
+
+```bash
+cd cv/mobilenet_v2/
 ```
 
 ### 3.3 准备数据集和模型

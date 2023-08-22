@@ -6,7 +6,7 @@ set -e
 cd "${SCRIPT_DIR}"
 
 # shellcheck source=/dev/null
-source ./env.sh
+# source ./env.sh
 
 cd prepare_model
 ./run.sh
@@ -33,4 +33,4 @@ else
   ITERATION=1
 fi
 
-mult_stream_tcimexec --model "${SCRIPT_DIR}/compile_model/efficientnet" --iterations ${ITERATION}
+multi_stream_tcimexec --model "${SCRIPT_DIR}/compile_model/efficientnet" --iterations ${ITERATION}

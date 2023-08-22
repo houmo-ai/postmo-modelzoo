@@ -1,0 +1,66 @@
+# Build & install directories
+build/
+bin/
+output/
+out/
+
+# media files
+*.jpg
+*.png
+*.jpeg
+*.JPEG
+*.bmp
+*.h264
+
+# Compressed files
+*.zip
+*.7z
+*.rar
+*.gz
+*.tgz
+*.bz
+*.tar
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+*.ko
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+*.bin
+
+# vim temporary files
+*.swp
+*.swo
+
+# Visual Studio Code
+.vscode
+
+# Python type checking
+.mypy_cache/
+.pyre/
+
+# temp file
+*~
+
+

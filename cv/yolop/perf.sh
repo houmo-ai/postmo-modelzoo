@@ -6,7 +6,7 @@ set -e
 cd "${SCRIPT_DIR}"
 
 # shellcheck source=/dev/null
-source ./env.sh
+# source ./env.sh
 
 cd prepare_model
 ./run.sh
@@ -31,7 +31,7 @@ fi
 if [ -z "${IS_DEBUG}" ]; then
   ITERATION=1000
 else
-  ITERATION=1
+  ITERATION=1i
 fi
 
-mult_stream_tcimexec --model "${SCRIPT_DIR}/compile_model/yolop" --iterations ${ITERATION}
+multi_stream_tcimexec --model "${SCRIPT_DIR}/compile_model/yolop" --iterations ${ITERATION}

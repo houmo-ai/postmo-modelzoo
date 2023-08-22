@@ -1,32 +1,28 @@
 cmake_minimum_required(VERSION 3.8)
-project(houmo_demo)
+project(multi_stream_tcimexec)
 
-unset(TVM_LIBRARY CACHE)
-if(DEFINED ENV{HDPL_TOOLCHAIN_ITVM_INSTALL})
-  message(STATUS "HDPL_TOOLCHAIN_ITVM_INSTALL: " $ENV{HDPL_TOOLCHAIN_ITVM_INSTALL})
-  set(HDPL_TOOLCHAIN_ITVM_INSTALL $ENV{HDPL_TOOLCHAIN_ITVM_INSTALL})
-endif()
-find_library(TVM_LIBRARY NAMES tvm PATHS ${HDPL_TOOLCHAIN_ITVM_INSTALL} NO_DEFAULT_PATH)
-if(NOT DEFINED ${TVM_LIBRARY})
-  find_library(TVM_LIBRARY NAMES tvm PATHS ${HDPL_TOOLCHAIN_ITVM_INSTALL}/lib NO_DEFAULT_PATH)
-endif()
+set(TCIM_PATH $ENV{TCIM_PATH})
+set(HOUMO_PATH $ENV{HOUMO_PATH})
 
-if(DEFINED ENV{HOUMO_PATH})
-  set(HDPL_INSTALL_PATH $ENV{HOUMO_PATH})
-else()
-  set(HDPL_INSTALL_PATH $ENV{HDPL_PATH})
-endif()
+set(TCIM_INC_PATH $ENV{TCIM_INC_PATH})
+set(TCIM_LIB_PATH $ENV{TCIM_LIB_PATH})
+set(HDPL_INC_PATH $ENV{HDPL_INC_PATH})
+set(HDPL_LIB_PATH $ENV{HDPL_LIB_PATH})
 
-if(NOT DEFINED ${HDPL_LIBRARY})
-  find_library(HDPL_LIBRARY NAMES hdplrt PATHS ${HDPL_INSTALL_PATH}/lib NO_DEFAULT_PATH)
-endif()
-
-include_directories(${HDPL_INSTALL_PATH}/include)
-include_directories(${HDPL_TOOLCHAIN_ITVM_INSTALL}/include)
-message(STATUS "HDPL_TOOLCHAIN DIR: ${HDPL_TOOLCHAIN_ITVM_INSTALL}")
-
-
+# build definitions
 add_definitions(-w)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O2")
-add_executable(mult_stream_tcimexec main.cc)
-target_link_libraries(mult_stream_tcimexec ${TVM_LIBRARY} ${HDPL_LIBRARY} -pthread dl gomp)
+
+# include paths
+include_directories(${TCIM_INC_PATH})
+include_directories(${HDPL_INC_PATH})
+
+# lib paths
+find_library(TCIM_LIBRARY NAMES tvm PATHS ${TCIM_LIB_PATH} NO_DEFAULT_PATH)
+find_library(HDPL_LIBRARY NAMES hdplrt PATHS ${HDPL_LIB_PATH} NO_DEFAULT_PATH)
+message("TCIM_LIBRARY is ${TCIM_LIBRARY}")
+message("HDPL_LIBRARY is ${HDPL_LIBRARY}")
+
+add_executable(${CMAKE_PROJECT_NAME} main.cc)
+target_link_libraries(${CMAKE_PROJECT_NAME} ${TCIM_LIBRARY} ${HDPL_LIBRARY} pthread dl gomp)
+install(TARGETS ${CMAKE_PROJECT_NAME} DESTINATION .)
