@@ -7,6 +7,7 @@ if [[ -z $HOUMO_PATH ]]; then
 fi
 if [[ -z $TCIM_PATH ]]; then
   export TCIM_PATH=$(python3 -c "import tvm; print(tvm.__path__[0])")
+  # export TCIM_PATH=$(python3 -c 'import site;print(site.getsitepackages()[0])')/tvm
 fi
 
 # paths for c/c++ compiling
