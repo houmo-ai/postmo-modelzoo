@@ -11,7 +11,7 @@ fi
 if [ -z "${IS_DEBUG}" ]; then
   IMAGE_COUNT=5000
 else
-  IMAGE_COUNT=1
+  IMAGE_COUNT=5
 fi
 if [ -d preprocessed ]; then
   PREPROCESSED=$(find ./preprocessed -name "*.jpg" | wc -l)

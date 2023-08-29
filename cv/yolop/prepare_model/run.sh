@@ -13,5 +13,5 @@ then
   echo "yolop.onnx already exists."
 else
   echo "Downloading yolop.onnx file"
-  wget -O yolop.onnx http://10.10.1.53:8082/artifactory/model_zoo2/yolop/yolop-192-320-without_postprocess.onnx
+  wget -q -O yolop.onnx http://10.10.1.53:8082/artifactory/model_zoo2/yolop/yolop-192-320-without_postprocess.onnx
 fi

@@ -41,10 +41,6 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def reset_so():
-    os.system('cp /opt/yolov3*.so .')
-
-
 def compile(args=None):
     """Compile quanted model to tcim model"""
     if args is None:
@@ -60,15 +56,16 @@ def compile(args=None):
         batch, dims[1].dim_value,
         dims[2].dim_value, dims[3].dim_value,
     )
+    # TODO: remove the next clause after quantool release 1.2
+    input_shape = (batch, 3, 416, 416)
     print('input name:', input_name)
     print('input shape:', input_shape)
 
     convert_config = {'layout': 'NHWC'}
     type_dict = {input_name: 'uint8'}
     shape_dict = {input_name: input_shape}
-    resizer_attr = ResizerAttr(enfold=1)
     mod = relay.frontend.from_hmonnx(
-        onnx_model, shape_dict, type_dict, resizer_attr=resizer_attr,
+        onnx_model, shape_dict, type_dict, resizer_attr=None,
     )
     with relay.build_config(opt_level=3):
         graph, lib, params = relay.build(mod, 'hdpl --host=llvm')
@@ -76,8 +73,6 @@ def compile(args=None):
     # store model as one fusedop
     rt_opt = '-resizer'
     tcim.store_as_fusedop(filename, graph, params, shape_dict, lib, rt_opt)
-    if batch == 4:
-        reset_so()
 
     print(filename, ' saved as one fusedop model.')
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import logging
+import math
 import multiprocessing as mp
 import os
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Generator
 from typing import List
 from typing import Tuple
 
+import cv2
 import numpy as np
 
 logging.basicConfig(
@@ -98,6 +100,7 @@ def precess_dataset(output_path: str, coco_path: str, count: int, process_count:
                 coco_image_path_root, img_info['file_name'],
             )
             output_file_path = os.path.join(output_path, img_info['file_name'])
+            print(src_file_path)
             image_path_list.append((output_file_path, src_file_path))
             preprocessed_count += 1
     print(f'preprocessed_count: {preprocessed_count}')
@@ -118,11 +121,55 @@ def yolov3_proprecess(proprecess_func, output_path: str, image_path: str) -> Non
     """
     Prepare image for inputing to the neural network.
     """
-    import cv2
-    img = cv2.imread(image_path)
+    from PIL import Image
+    img = Image.open(image_path).convert('RGB')
     img = proprecess_func(img)
+    from hmquant.tools.dataset.preprocess.transform import RGB2YUV
+    import torch
+    rgb2yuv = RGB2YUV()
+    img = img.astype(np.float32)
+    img = torch.from_numpy(img)
+    img = rgb2yuv(img).numpy()
     img = img.astype(np.uint8)
     img.tofile(output_path)
+
+
+def letterbox(im, new_shape=(416, 416), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
+    # Resize and pad image while meeting stride-multiple constraints
+    shape = im.shape[:2]  # current shape [height, width]
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape)
+
+    # Scale ratio (new / old)
+    r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
+    if not scaleup:  # only scale down, do not scale up (for better val mAP)
+        r = min(r, 1.0)
+
+    # Compute padding
+    ratio = r, r  # width, height ratios
+    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
+    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - \
+        new_unpad[1]  # wh padding
+    if auto:  # minimum rectangle
+        dw, dh = np.mod(dw, stride), np.mod(dh, stride)  # wh padding
+    elif scaleFill:  # stretch
+        dw, dh = 0.0, 0.0
+        new_unpad = (new_shape[1], new_shape[0])
+        ratio = new_shape[1] / shape[1], new_shape[0] / \
+            shape[0]  # width, height ratios
+
+    dw /= 2  # divide padding into 2 sides
+    dh /= 2
+
+    if shape[::-1] != new_unpad:  # resize
+        im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
+    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
+    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+    im = cv2.copyMakeBorder(
+        im, top, bottom, left, right,
+        cv2.BORDER_CONSTANT, value=color,
+    )  # add border
+    return im, ratio, (dw, dh)
 
 
 class HmYuvInt8YoloV3:
@@ -130,38 +177,32 @@ class HmYuvInt8YoloV3:
     def __init__(self, image_size: Tuple[int, int] = (416, 416)) -> None:
         self._image_size = image_size
 
-    def _letterbox_image(self, img, inp_dim):
-        '''resize image with unchanged aspect ratio using padding'''
-        import cv2
-        img_w, img_h = img.shape[1], img.shape[0]
-        w, h = inp_dim
-        new_w = int(img_w * min(w/img_w, h/img_h))
-        new_h = int(img_h * min(w/img_w, h/img_h))
-        resized_image = cv2.resize(
-            img, (new_w, new_h), interpolation=cv2.INTER_CUBIC,
-        )
-        canvas = np.full((inp_dim[1], inp_dim[0], 3), 128)
-        canvas[
-            (h-new_h)//2:(h-new_h)//2 + new_h, (w-new_w) //
-            2:(w-new_w)//2 + new_w, :
-        ] = resized_image
-        return canvas
-
     def __call__(self, img):
         """
         Prepare image for inputting to the neural network.
 
         Returns a Variable
         """
-        img = (self._letterbox_image(img, self._image_size))
-        img = img[:, :, ::-1].transpose((2, 0, 1)).copy()
-        R = img[:1, :, :]
-        GB = img[1:, :, :]
-        GB = np.transpose(GB, (1, 2, 0))
-        GB = np.resize(GB, (2, self._image_size[0], self._image_size[1]))
-        img = np.concatenate((R, GB), axis=0)
-        img = np.resize(img, (self._image_size[0], self._image_size[1], 3))
-        img = img - 128
+        img = np.array(img)
+        self.img_shape = []
+        imh, imw, imc = img.shape  # original shape
+
+        r = self._image_size[0] / max(imh, imw)
+        if r != 1:  # if sizes are not equal
+            interp = cv2.INTER_LINEAR if (r > 1) else cv2.INTER_AREA
+            img = cv2.resize(
+                img, (math.ceil(imw * r), math.ceil(imh * r)), interpolation=interp,
+            )
+
+        h, w = img.shape[:2]
+
+        # shape = self.batch_shapes[self.batch[index]] #if self.rect else self.input_shape
+        # Padded resize
+        img, ratio, pad = letterbox(
+            img, self._image_size[0], stride=32, auto=False, scaleup=False,
+        )
+        img = img.transpose((2, 0, 1))
+        img = np.ascontiguousarray(img)
         return img
 
 
