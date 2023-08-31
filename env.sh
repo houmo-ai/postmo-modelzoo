@@ -9,6 +9,9 @@ if [[ -z $TCIM_PATH ]]; then
   export TCIM_PATH=$(python3 -c "import tvm; print(tvm.__path__[0])")
   # export TCIM_PATH=$(python3 -c 'import site;print(site.getsitepackages()[0])')/tvm
 fi
+if [[ -z $QUANTOOL_PATH ]]; then
+  export QUANTOOL_PATH=/opt/houmoquantool
+fi
 
 # paths for c/c++ compiling
 export TCIM_INC_PATH=$TCIM_PATH/include
@@ -17,9 +20,8 @@ export HDPL_INC_PATH=$HOUMO_PATH/include
 export HDPL_LIB_PATH=$HOUMO_PATH/lib
 
 # paths for runtime
-export LD_LIBRARY_PATH=$HDPL_LIB_PATH:$TCIM_LIB_PATH:$LD_LIBRARY_PATH
-export PYTHONPATH=$TCIM_PATH:$PYTHONPATH
-
+export LD_LIBRARY_PATH=$HDPL_LIB_PATH:$TCIM_LIB_PATH
+export PYTHONPATH=$TCIM_PATH:$MODELZOO_PATH
 
 # data and model path
 if [[ -z $DATASETS_PATH ]]; then
@@ -40,6 +42,7 @@ export HM800_HAL_CONSOLE_LEVEL=0
 echo "[Please check the following path. Unset the environment variable if you want to use the default path!]"
 echo "HOUMO_PATH is $HOUMO_PATH"
 echo "TCIM_PATH is $TCIM_PATH"
+echo "QUANTOOL_PATH is $QUANTOOL_PATH"
 echo "MODELZOO_PATH is $MODELZOO_PATH"
 echo "DATASETS_PATH is $DATASETS_PATH"
 echo "MODEL_PATH is $MODEL_PATH"
