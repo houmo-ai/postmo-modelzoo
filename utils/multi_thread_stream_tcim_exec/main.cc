@@ -1,6 +1,6 @@
 // Copyright (c) 2022 The Houmo.ai Authors. All rights reserved.
 /*!
- * \file hdpl_resnet50_run.cc
+ * \file main.cc
  */
 #include <getopt.h>
 #include <stdio.h>
@@ -146,35 +146,27 @@ class Barrier {
   std::mutex mtx_;
 };
 
-int SetInput(tvm::hdpl::Module &module) {
-  int batch = 1;
-  int tvm_input_count = module.GetInputNum();
-  std::vector<int> input_idx_vec;
-  for (int idx = 0; idx < tvm_input_count; idx++) {
-    if (!module.IsParams(idx)) {
-      input_idx_vec.push_back(idx);
-    }
+std::map<std::string, tvm::runtime::NDArray> user_datas;
+
+void SetInput(tvm::hdpl::Module &module, std::vector<std::string> &input_names) {
+  for (auto input_name : input_names) {
+    // tvm::runtime::NDArray input_data = module.GetInputByName(input_name);
+    // TODO: copy your data if you want to use a real one
+    module.SetInput(input_name, user_datas[input_name]);
   }
-  std::cout << "Count of Input: " << input_idx_vec.size() << std::endl;
-  for (int input_idx : input_idx_vec) {
-    std::string input_name = module.GetInputNameByIndex(input_idx);
-    tvm::runtime::NDArray input_data = module.GetInputByName(input_name);
-    // TODO: copy your data if you want to use a real one 
-    module.SetInput(input_name, input_data);
-    std::cout << "Input " << input_name << ": (";
-    auto input_shape = input_data.Shape();
-    for (size_t shape_idx = 0; shape_idx < input_shape.size(); shape_idx++) {
-      if (shape_idx != 0) {
-        std::cout << ", ";
-      } else {
-        batch = input_shape.data()[0];
-      }
-      std::cout << input_shape.data()[shape_idx];
-    }
-    std::cout << "), " << input_data.DataType() << std::endl;
+}
+
+void SetAffinity(int core_id) {
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(core_id, &cpuset);
+  //sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpuset);
+
+  if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0) {
+      perror("pthread_setaffinity_np");
+      exit(EXIT_FAILURE);
   }
-  return batch;
-}    
+}
 
 int main(int argc, char *argv[]) {
   CliArguments arguments;
@@ -182,14 +174,14 @@ int main(int argc, char *argv[]) {
   std::cout << "model: " << arguments.model_path << std::endl;
   std::cout << "thread: " << arguments.thread << std::endl;
   std::cout << "stream: " << arguments.stream << std::endl;
-  
+
   // multi_stream
   int stream_num = arguments.stream;
   int thread_num = arguments.thread;
   std::vector<hdplStream_t> streams;
   std::vector<std::thread> threads;
   std::vector<tvm::hdpl::Module> modules;
-  std::vector<std::vector<high_resolution_clock::time_point>> timers(thread_num);
+  std::vector<std::vector<std::string>> input_names(thread_num);
   size_t batch = 1;
 
   // create streams
@@ -202,44 +194,98 @@ int main(int argc, char *argv[]) {
     auto t1 = GetTime::Now();
     printf("===> hdplStreamCreate %d:%x, cost %fms...\n", i, s, GetTime::DurationMs(t0, t1)); 
   }
-  
+
+  //SetAffinity(5);
+
   // create modules and set stream
   for (int i = 0; i < thread_num; i++) {
     auto t0 = GetTime::Now();
     modules.push_back(tvm::hdpl::LoadModelPackage(arguments.model_path));
     auto t1 = GetTime::Now();
-    printf("===> module %x created on thread %d, cost %fms...\n", modules[i], i, GetTime::DurationMs(t0, t1)); 
+    printf("===> module %x created on thread %d, cost %fms...\n", modules[i], i, GetTime::DurationMs(t0, t1));
 
     modules[i].SetStream(streams[i]);
     auto t2 = GetTime::Now();
-    printf("===> module %x set to stream %x, cost %fms...\n", modules[i], streams[i], GetTime::DurationMs(t1, t2)); 
-    batch = SetInput(modules[i]);
-    auto t3 = GetTime::Now();
-    printf("===> module %x set input data, cost %fms...\n", modules[i], GetTime::DurationMs(t2, t3)); 
+    printf("===> module %x set to stream %x, cost %fms...\n", modules[i], streams[i], GetTime::DurationMs(t1, t2));
+
+    int tvm_input_count = modules[i].GetInputNum();
+    for (int idx = 0; idx < tvm_input_count; idx++) {
+      if (!modules[i].IsParams(idx)) {
+        std::string input_name = modules[i].GetInputNameByIndex(idx);
+        input_names[i].push_back(input_name);
+      }
+    }
+    std::cout << "Count of Input: " << input_names[i].size() << std::endl;
+    for (auto input_name : input_names[i]) {
+      tvm::runtime::NDArray input_data = modules[i].GetInputByName(input_name);
+      auto data = tvm::runtime::NDArray::Empty(
+        input_data.Shape(), input_data.DataType(), {kDLCPU, 0});
+      user_datas[input_name] = data;
+
+      std::cout << "Input " << input_name << ": (";
+      auto input_shape = input_data.Shape();
+      for (size_t shape_idx = 0; shape_idx < input_shape.size(); shape_idx++) {
+        if (shape_idx != 0) {
+          std::cout << ", ";
+        } else {
+          batch = input_shape.data()[0];
+        }
+        std::cout << input_shape.data()[shape_idx];
+      }
+      std::cout << "), " << input_data.DataType() << std::endl;
+    }
+    // modules[i].Run();
+    int tvm_output_count = modules[i].GetOutputNum();
+    std::cout << "Count of Output: " << tvm_output_count << std::endl;
+    for (int idx = 0; idx < tvm_output_count; idx++) {
+      auto output_name = modules[i].GetOutputNameByIndex(idx);
+      tvm::runtime::NDArray output_data = modules[i].GetOutputByName(output_name);
+      std::cout << "Output " << output_name << ": (";
+      auto output_shape = output_data.Shape();
+      for (size_t shape_idx = 0; shape_idx < output_shape.size(); shape_idx++) {
+        if (shape_idx != 0) {
+          std::cout << ", ";
+        }
+        std::cout << output_shape.data()[shape_idx];
+      }
+      std::cout << "), " << output_data.DataType() << std::endl;
+    }
   }
 
   Barrier barrier(thread_num);
   // create threads
   for (int i = 0; i < thread_num; i++) {
     threads.push_back(
-      std::thread([](int t_id, int loop, tvm::hdpl::Module &module, hdplStream_t &stream, Barrier &barrier) {
+      std::thread([](int t_id, int loop, tvm::hdpl::Module &module, std::vector<std::string> &input_names,
+        hdplStream_t &stream, Barrier &barrier) {
+        // SetAffinity(t_id);
         barrier.barrier();
         printf("===> thread %d infer start...\n", t_id);
         auto start = GetTime::Now();
         for (int i = 0; i < loop; i++){
+          auto t0 = GetTime::Now();
+          SetInput(module, input_names);
+          auto t1 = GetTime::Now();
           module.Run();
-          //printf("===> thread %d module run %d times...\n", t_id, i+1);
+          auto t2 = GetTime::Now();
+          auto result = module.GetOutput(0);
+          auto t3 = GetTime::Now();
+          auto d1 = GetTime::DurationMs(t0, t1);
+          auto d2 = GetTime::DurationMs(t1, t2);
+          auto d3 = GetTime::DurationMs(t2, t3);
+          printf("===> thread %d module run %d times, setinput %.3fms, run %.3fms, getoutput %.3fms...\n", t_id, i+1, d1, d2, d3);
         }
         hdplStreamSynchronize(stream);
         auto finish = GetTime::Now();
-        printf("===> thread %d infer %d times cost %fms\n", t_id, loop, GetTime::DurationMs(start, finish)); 
+        printf("===> thread %d infer %d times cost %.3fms\n", t_id, loop, GetTime::DurationMs(start, finish));
         barrier.barrier();
-    },
-    i,
-    arguments.iterations,
-    std::ref(modules[i]),
-    std::ref(streams[i]),
-    std::ref(barrier)));
+      },
+      i,
+      arguments.iterations,
+      std::ref(modules[i]),
+      std::ref(input_names[i]),
+      std::ref(streams[i]),
+      std::ref(barrier)));
   }
 
   barrier.wait();
