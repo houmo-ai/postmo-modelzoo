@@ -4,6 +4,7 @@ set -e
 
 cd "${SCRIPT_DIR}"
 
+export HDPL_PLATFORM=ISIM
 python3 calibrate.py
 export SMPLAN_RESIZER_PARALLEL=1
 python3 compile.py "$@"

@@ -26,7 +26,18 @@ def calibrate():
             unsqueeze,
         ],
     )
-    image_root = os.path.join(env_dict.get('DATASETS_PATH'), 'COCO', 'val2017')
+    image_root = os.path.join(
+        env_dict.get(
+            'DATASETS_PATH',
+        ), 'coco2017', 'val2017',
+    )
+    if not os.path.exists(image_root):
+        image_root = os.path.join(
+            env_dict.get(
+                'DATASETS_PATH',
+            ), 'COCO', 'val2017',
+        )
+
     calib_image_files = [
         '000000000139.jpg',
         '000000000285.jpg',

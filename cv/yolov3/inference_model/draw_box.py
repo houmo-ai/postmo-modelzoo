@@ -54,9 +54,25 @@ def draw_bbox(output_path, img_path, dets, coco_names_path):
     }
     default_color = [127, 127, 255]
     rec_image = cv2.imread(img_path)
+
+    def std_dim(dim_value, min_value, max_value):
+        ret_dim = dim_value
+        if dim_value < min_value:
+            dim_value = min_value + 1
+        if dim_value > max_value:
+            dim_value = max_value - 1
+        return dim_value
+
     for det in dets:
         img_id, l, t, w, h, prob, clazz = tuple(det)
+        if prob <= 0.7:
+            continue
+        print(prob, clazz, l, t, w, h)
         x1, y1, x2, y2 = int(l+0.5), int(t+0.5), int(l+w+0.5), int(t+h+0.5)
+        x1 = std_dim(x1, 0, rec_image.shape[1])
+        y1 = std_dim(y1, 0, rec_image.shape[0])
+        x2 = std_dim(x2, 0, rec_image.shape[1])
+        y2 = std_dim(y2, 0, rec_image.shape[0])
         rec_image = cv2.rectangle(
             rec_image, (x1, y1), (x2, y2), color_map.get(
                 clazz, default_color,

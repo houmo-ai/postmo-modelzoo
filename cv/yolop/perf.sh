@@ -12,7 +12,6 @@ cd prepare_model
 ./run.sh
 cd ..
 
-export HDPL_PLATFORM=ISIM
 
 cd compile_model
 ./run.sh --batch 1

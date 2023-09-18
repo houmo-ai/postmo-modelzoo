@@ -19,9 +19,15 @@ else
   PREPROCESSED=0
 fi
 
+COCO_PATH="${DATASETS_PATH}/coco2017"
+
+if [[ ! -f "${COCO_PATH}" ]];then
+  COCO_PATH="${DATASETS_PATH}/COCO"
+fi
+
 if [ ${PREPROCESSED} -lt ${IMAGE_COUNT} ]; then
   python3 preprocess.py --output-path ./preprocessed \
-          --coco-path "${DATASETS_PATH}/COCO" \
+          --coco-path "${COCO_PATH}" \
           --count ${IMAGE_COUNT} \
           -n "${CPU_COUNT}"
 fi
@@ -35,7 +41,7 @@ cd build
 cmake ..
 make
 cd ../
-./build/hdpl_yolov3 "${DATASETS_PATH}/COCO/annotations/instances_val2017.json" ./preprocessed ${IMAGE_COUNT}
+./build/hdpl_yolov3 "${COCO_PATH}/annotations/instances_val2017.json" ./preprocessed ${IMAGE_COUNT}
 if pip3 show pycocotools; then
-  ./cal_meanap.py --predict-result ./detections.json --coco-path "${DATASETS_PATH}/COCO"
+  ./cal_meanap.py --predict-result ./detections.json --coco-path "${COCO_PATH}"
 fi
