@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 export MODELZOO_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")" || exit ; pwd)
 
+# set hal library log level
+export HM800_HAL_CONSOLE_LEVEL=0
+
 # main path
 if [[ -z $HOUMO_PATH ]]; then
   export HOUMO_PATH=/usr/local/houmo
@@ -35,9 +38,6 @@ fi
 if [[ -z $HDPL_PLATFORM ]]; then
   export HDPL_PLATFORM=ISIM
 fi
-
-# set hal library log level
-export HM800_HAL_CONSOLE_LEVEL=0
 
 echo "[Please check the following path. Unset the environment variable if you want to use the default path!]"
 echo "HOUMO_PATH is $HOUMO_PATH"

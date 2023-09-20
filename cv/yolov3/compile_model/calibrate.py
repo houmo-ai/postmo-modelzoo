@@ -48,18 +48,6 @@ def calibrate():
         '000000001584.jpg',
         '000000001675.jpg',
         '000000001761.jpg',
-        '000000001818.jpg',
-        '000000001993.jpg',
-        '000000002006.jpg',
-        '000000002149.jpg',
-        '000000002153.jpg',
-        '000000002157.jpg',
-        '000000002261.jpg',
-        '000000002299.jpg',
-        '000000002431.jpg',
-        '000000002473.jpg',
-        '000000002532.jpg',
-        '000000002587.jpg',
     ]
     calib_images = [
         pil_loader(os.path.join(image_root, img_path))
@@ -90,14 +78,12 @@ def calibrate():
     sequencer = quant_single_onnx_network(
         quanttool_config, calib_dataset, onnx_model_path, device='cpu',
     )
-    # Remove quanttool only op
-    remove_node_ids = sequencer.find_node_by_classes(['ToYuv', 'HMQuantize'])
-    if len(remove_node_ids) > 0:
-        sequencer.remove_nodes(remove_node_ids)
+
     sequencer.save_onnx(
         'quant_yolov3.onnx',
         save_out_tensor=False,
         save_params_npy=True,
+        save_special_onnx=True
     )
 
 

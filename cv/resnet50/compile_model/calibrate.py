@@ -1,12 +1,14 @@
 import os
+import time
 
 import onnx
 import torch
 import torchvision.transforms as transforms
-from hmquant.api import quant_single_onnx_network
-from hmquant.tools.dataset.preprocess.transform import RGB2YUV
+from hmquant.api import quant_single_onnx_network, convert_profiling, quantize_profiling
+# from hmquant.tools.dataset.preprocess.transform import RGB2YUV
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 from torchvision.datasets.folder import pil_loader
+from hmquant.configs.api_config import *
 
 
 def calibrate():
@@ -51,18 +53,43 @@ def calibrate():
         },
         'graph_opt_cfg': {},
     }
+
+    onnx_input = [{"input.1": calib_dataset[0].numpy()}]
+
+    t0 = time.time()
+    print("====> start to quant onnx network...", flush=True)
     sequencer = quant_single_onnx_network(
-        quanttool_config, calib_dataset, onnx_model_path, device='cpu',
+        quanttool_config,
+        calib_dataset,
+        onnx_model_path,
+        device='cpu',
+        analyze=True
     )
-    # Remove quanttool only op
-    remove_node_ids = sequencer.find_node_by_classes(['ToYuv', 'HMQuantize'])
-    if len(remove_node_ids) > 0:
-        sequencer.remove_nodes(remove_node_ids)
+    t1 = time.time()
+    print(f"====> complete quant onnx network, cost {(t1-t0)*1000:.3f}ms", flush=True)
+
+    print("====> start to convert profiling...", flush=True)
+    convert_profiling(onnx_model_path, onnx_input, quanttool_config, onnx_input)
+    t2 = time.time()
+    print(f"====> complete convert profiling, cost {(t2-t1)*1000:.3f}ms", flush=True)
+
+    print("====> start to quantize profiling...", flush=True)
+    quantize_profiling(sequencer, onnx_input)
+    t3 = time.time()
+    print(f"====> complete quantize profiling, cost {(t3-t2)*1000:.3f}ms", flush=True)
+
+    t4 = time.time()
+    print("====> start to save quantized model...", flush=True)
     sequencer.save_onnx(
         'quant_resnet50.onnx',
         save_out_tensor=False,
         save_params_npy=True,
+        save_special_onnx=True
     )
+
+    t5 = time.time()
+    print(f"====> complete save quantized model, cost {(t5-t4)*1000:.3f}ms", flush=True)
+    print(f"====> calibrate success, cost {(t5-t0)*1000:.3f}ms", flush=True)
 
 
 if __name__ == '__main__':

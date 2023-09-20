@@ -56,14 +56,12 @@ def calibrate():
     sequencer = quant_single_onnx_network(
         quanttool_config, calib_dataset, onnx_model_path, device='cpu',
     )
-    # Remove quanttool only op
-    remove_node_ids = sequencer.find_node_by_classes(['ToYuv', 'HMQuantize'])
-    if len(remove_node_ids) > 0:
-        sequencer.remove_nodes(remove_node_ids)
+
     sequencer.save_onnx(
         'hmquant_efficient_with_act.onnx',
         save_out_tensor=False,
         save_params_npy=True,
+        save_special_onnx=True
     )
 
 

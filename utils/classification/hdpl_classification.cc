@@ -143,12 +143,14 @@ int main(int argc, char *argv[]) {
   int total_data_count = 0;
   int good_data_count = 0;
   int good5_data_count = 0;
+  int file_cnt = 0;
   std::vector<std::string> current_inputs;
-  for (size_t file_idx = 0; file_idx < file_names.size(); file_idx++) {
-    std::string input_file_name = file_names[file_idx];
-    current_inputs.push_back(input_file_name);
+  //for (size_t file_idx = 0; file_idx < input_map.size(); file_idx++) {
+  for (const auto &file_name : input_map) {
+    current_inputs.push_back(file_name.first);
+    file_cnt++;
     // If it is not enough data to combine a batch and not the last data
-    if (current_inputs.size() < batch && file_idx != file_names.size() - 1) {
+    if (current_inputs.size() < batch && file_cnt != input_map.size() - 1) {
       continue;
     }
     HDPLRuntime_SetParam(&module, input_info.input_name, current_inputs,
@@ -229,6 +231,7 @@ bool PreloadInputFile(
   for (std::string input_file_name : input_files) {
     std::string input_file_path = input_file_root_path + "/" + input_file_name;
     std::ifstream inFile(input_file_path, std::ios::in | std::ios::binary);
+    if (!inFile.good()) continue;
     tvm::runtime::NDArray image = tvm::runtime::NDArray::Empty(
         {1, 224, 224, 3}, tvm::DataType::Int(8), {kDLCPU, 0});
     int file_size = 1 * 224 * 224 * 3;
