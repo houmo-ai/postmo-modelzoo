@@ -13,19 +13,20 @@ cd prepare_model
 cd ..
 
 cd compile_model
-./run.sh --batch 1
+./run.sh --batch 1 --mode perf
 cd ..
 
-cd ../../utils/multi_stream_tcim_exec/
+cd ../../utils/aottcimexec/
 ./build.sh
 PATH="$(pwd):${PATH}"
 export PATH
+export HDPL_STREAM_TIME_OUT=600000
 cd -
 
 if [ -z "${IS_DEBUG}" ]; then
-  ITERATION=200
+  ITERATION=400
 else
   ITERATION=1
 fi
 
-multi_stream_tcimexec --model "${SCRIPT_DIR}/compile_model/efficientnet" --iterations ${ITERATION}
+tcimexec --model "${SCRIPT_DIR}/compile_model/tcim_efficientnet" --iterations ${ITERATION}

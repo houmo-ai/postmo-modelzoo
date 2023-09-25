@@ -10,7 +10,7 @@ cd prepare_model
 cd ..
 
 cd compile_model
-./run.sh --batch 1 --mode eval
+./run.sh
 cd ..
 
 cd inference_model

@@ -30,9 +30,9 @@ if [ -c /dev/hmcl_feature_in ]; then
   export HDPL_PLATFORM=ASIC
 fi
 
-cd ../../../utils/classification
+cd ../../../utils/aotclassification
 bash build.sh
-PATH="$(pwd):${PATH}"
+PATH="$(pwd)/build:${PATH}"
 export PATH
 cd -
-hdpl_classification --model ../compile_model/efficientnet --label "${DATASETS_PATH}/ILSVRC2012_val_labels.txt" --data_root ./preprocessed --count ${IMAGE_COUNT}
+hdpl_classification --model ../compile_model/tcim_efficientnet --label "${DATASETS_PATH}/ILSVRC2012_val_labels.txt" --data_root ./preprocessed --count ${IMAGE_COUNT}

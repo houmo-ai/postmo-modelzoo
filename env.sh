@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
-export MODELZOO_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")" || exit ; pwd)
+MODELZOO_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")" || exit ; pwd)
+export MODELZOO_PATH
 
 # set hal library log level
 export HM800_HAL_CONSOLE_LEVEL=0
 
 # main path
 if [[ -z $HOUMO_PATH ]]; then
-  export HOUMO_PATH=/usr/local/houmo
+  HOUMO_PATH=/usr/local/houmo
+  export HOUMO_PATH
 fi
+export PATH=${HOUMO_PATH}/bin:${PATH}
 if [[ -z $TCIM_PATH ]]; then
-  export TCIM_PATH=$(python3 -c "import tvm; print(tvm.__path__[0])")
-  # export TCIM_PATH=$(python3 -c 'import site;print(site.getsitepackages()[0])')/tvm
+  TCIM_PATH=$(python3 -c "import tvm; print(tvm.__path__[0])")
+  export TCIM_PATH
 fi
 if [[ -z $QUANTOOL_PATH ]]; then
   export QUANTOOL_PATH=/opt/houmoquantool

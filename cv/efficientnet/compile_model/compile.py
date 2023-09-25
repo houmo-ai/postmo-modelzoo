@@ -9,6 +9,8 @@ import tvm
 import tvm.relay as relay
 import tvm.tcim as tcim
 from tvm.relay import param_dict
+from tvm.relay.backend import Executor
+from tvm.relay.backend import Runtime
 
 
 def get_args() -> argparse.Namespace:
@@ -33,6 +35,12 @@ def get_args() -> argparse.Namespace:
         default=1,
         help='Set batch size for implicit batch houmo model',
     )
+    parser.add_argument(
+        '--mode',
+        type=str,
+        default='eval',
+        help='Set batch size for implicit batch houmo model',
+    )
     args = parser.parse_args()
     return args
 
@@ -54,11 +62,32 @@ def compile(args=None):
         onnx_model, shape_dict, type_dict,
         layout=layout_dict, resizer_attr=None, convert_config=None,
     )
-    with relay.build_config(opt_level=3):
-        graph, lib, params = relay.build(mod, 'hdpl --host=llvm')
-    print('compile model done.')
+    executor = Executor('aot')
+    target = tvm.target.Target('hdpl', host='c')
+    if args.mode == 'eval':
+        compile_config = {
+            'tcim.fuse_strategy': 0,
+            'tcim.gen_intrinsic': 1,
+            'tcim.codegen_pic': False,
+            'tcim.use_convadd': False,
+            'tcim.sync_strategy': 1,
+        }
+    else:
+        compile_config = {
+            'tcim.fuse_strategy': 0,
+            'tcim.gen_intrinsic': 1,
+            'tcim.codegen_pic': False,
+            'tcim.use_convadd': False,
+            'tcim.sync_strategy': 1,
+            'tcim.for_benchmark': True,
+            'tcim.multi_stream': 4,
+        }
 
-    tcim.store_model(filename, graph, params, lib)
+    with tvm.transform.PassContext(opt_level=3, config=compile_config):
+        graph, lib, params = relay.build(
+            mod, target, executor=executor, mod_name=filename,
+        )
+    tcim.store_so(filename, lib, hdplcc_options=['-O2'])
     print('store model done.')
 
 
