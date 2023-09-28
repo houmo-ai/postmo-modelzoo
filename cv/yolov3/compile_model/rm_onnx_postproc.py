@@ -112,7 +112,7 @@ config = {
         'onnx::Transpose_555',
     ],
     'delete_node_type': [
-        'RAW:HMConstant',
+        'RAW:HMConstant', 'BaseConstant',
     ],
 }
 

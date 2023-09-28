@@ -18,7 +18,7 @@ then
   echo "pointpillars_pfe.onnx already exists."
 else
   echo "Downloading pointpillars_pfe.onnx file"
-  wget -O pointpillars_pfe.onnx http://10.10.1.53:8082/artifactory/hdpl_test_data/quant_models/apollo/pointpillar/modified_pfe_1.onnx
+  wget -O pointpillars_pfe.onnx http://10.10.1.53:8082/artifactory/hdpl_test_data/quant_models/apollo/pointpillar/0926modified_pfe_1.onnx
 fi
 
 if [ -f "pointpillars_rpn.onnx" ];
@@ -26,10 +26,7 @@ then
   echo "pointpillars_rpn.onnx already exists."
 else
   echo "Downloading pointpillars_pfe.onnx file"
-  wget -O rpn.tar http://10.10.1.53:8082/artifactory/hdpl_test_data/quant_models/apollo/pointpillar/pointpillars_rpn_464_0423_v2.tar
-  tar xf rpn.tar
-  mv pointpillars_rpn_464_0423_v2/rpn.onnx pointpillars_rpn.onnx
-  rm -rf rpn.tar pointpillars_rpn_464_0423_v2
+  wget -O pointpillars_rpn.onnx http://10.10.1.53:8082/artifactory/hdpl_test_data/quant_models/apollo/pointpillar/0926rpn.onnx
 fi
 
 cd "${SCRIPT_DIR}"

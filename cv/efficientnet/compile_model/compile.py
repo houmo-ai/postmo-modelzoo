@@ -67,20 +67,20 @@ def compile(args=None):
     if args.mode == 'eval':
         compile_config = {
             'tcim.fuse_strategy': 0,
-            'tcim.gen_intrinsic': 1,
-            'tcim.codegen_pic': False,
-            'tcim.use_convadd': False,
+            'tcim.spec_batch_num': 4,
+            'tcim.input_data_fmt': 'YUV422SP',
             'tcim.sync_strategy': 1,
         }
     else:
         compile_config = {
             'tcim.fuse_strategy': 0,
+            'tcim.spec_batch_num': 4,
+            'tcim.input_data_fmt': 'YUV422SP',
             'tcim.gen_intrinsic': 1,
             'tcim.codegen_pic': False,
             'tcim.use_convadd': False,
             'tcim.sync_strategy': 1,
             'tcim.for_benchmark': True,
-            'tcim.multi_stream': 4,
         }
 
     with tvm.transform.PassContext(opt_level=3, config=compile_config):

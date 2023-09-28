@@ -26,15 +26,15 @@ if [[ ! -f "${COCO_PATH}" ]];then
 fi
 
 if [ ${PREPROCESSED} -lt ${IMAGE_COUNT} ]; then
+  OLD_HDPL_PLATFORM=${HDPL_PLATFORM}
+  export HDPL_PLATFORM=ISIM
   python3 preprocess.py --output-path ./preprocessed \
           --coco-path "${COCO_PATH}" \
           --count ${IMAGE_COUNT} \
           -n "${CPU_COUNT}"
+  export HDPL_PLATFORM=${OLD_HDPL_PLATFORM}
 fi
 
-if [ -c /dev/hmcl_feature_in ]; then
-  export HDPL_PLATFORM=ASIC
-fi
 
 mkdir -p build
 cd build
