@@ -5,7 +5,7 @@ version = ""
 if len(sys.argv) > 1:
     version = sys.argv[1]
 include_list = []
-exclude_list = ["pack.sh", "pack.py", "run_all.sh"]
+exclude_list = ["pack.sh", "pack.py", "run_all.sh", "env_dev.sh"]
 dir_name = "houmo-modelzoo"
 
 # include项

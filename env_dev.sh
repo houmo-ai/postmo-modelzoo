@@ -8,28 +8,21 @@ export HMASSIST_PATH
 export HM800_HAL_CONSOLE_LEVEL=0
 
 # main path
-if [[ -z $HOUMO_PATH ]]; then
-  HOUMO_PATH=/usr/local/houmo
-  export HOUMO_PATH
-fi
-
-if [[ -z $TCIM_PATH ]]; then
-  TCIM_PATH=$(python3 -c "import tvm; print(tvm.__path__[0])")
-  export TCIM_PATH
-fi
-if [[ -z $QUANTOOL_PATH ]]; then
-  export QUANTOOL_PATH=/opt/houmoquantool
-fi
+export HOUMO_PATH=/usr/local/houmo
+export TCIM_PATH=$(python3 -c "import tvm; print(tvm.__path__[0])")
+export QUANTOOL_PATH=$MODELZOO_PATH/../../quantool
 
 # paths for c/c++ compiling
 export TCIM_INC_PATH=$TCIM_PATH/include
 export TCIM_LIB_PATH=$TCIM_PATH
 export HDPL_INC_PATH=$HOUMO_PATH/include
 export HDPL_LIB_PATH=$HOUMO_PATH/lib
+export CLANG_PATH=$HOUMO_PATH
+export HDPL_PATH=$HOUMO_PATH
 
 # paths for runtime
 export LD_LIBRARY_PATH=$HDPL_LIB_PATH:$TCIM_LIB_PATH
-export PYTHONPATH=$TCIM_PATH:$MODELZOO_PATH
+export PYTHONPATH=$TCIM_PATH:$MODELZOO_PATH:$QUANTOOL_PATH
 export PATH=$HOUMO_PATH/bin:$HMASSIST_PATH:$PATH
 
 # data and model path

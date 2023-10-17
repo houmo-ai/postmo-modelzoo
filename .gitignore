@@ -3,6 +3,7 @@ build/
 bin/
 output/
 out/
+__pycache__/
 
 # media files
 *.jpg
@@ -11,6 +12,10 @@ out/
 *.JPEG
 *.bmp
 *.h264
+
+# Data files
+*.npy
+*.log
 
 # Compressed files
 *.zip
@@ -48,6 +53,9 @@ out/
 *.out
 *.app
 *.bin
+
+# Model files
+*.onnx
 
 # vim temporary files
 *.swp
