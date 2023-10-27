@@ -166,6 +166,9 @@ class H30Exec(Basehmexec, ABC):
         mod = relay.frontend.from_hmonnx(
             onnx_model, shape_dict, type_dict, resizer_attr=None, convert_config=convert_config,
         )
+        
+        if not config:
+            config = {"tcim.for_benchmark": True}
 
         logger.info("build_config={}".format(config))
         

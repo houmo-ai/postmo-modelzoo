@@ -1,0 +1,60 @@
+model: {
+  framework: onnx,
+  name: regnet,
+  save_dir: ./output,
+  weight: ./regnet_x_400mf.onnx,
+  inputs: [
+    {
+      name: input,
+      shape: [1, 3, 224, 224],
+      layout: NCHW,
+      format: RGB,
+      src_format: YUV422,
+      resize: ,
+      crop: ,
+      dtype: uint8,
+      mean: [ 0.485, 0.456, 0.406 ],
+      std: [ 0.229, 0.224, 0.225 ],
+      data_path: ../../data/datasets/imagenet/ILSVRC2012_val_00000016.JPEG,  # 用于比较各阶段输出的相似度，空表示采用随机数，默认随机数，可缺省
+    }
+  ],
+  impl_class: ,
+}
+
+quant: {
+  # ptq_cfg_path: /workspace/platform/toolchain/imodelzoo/cv/resnet50/compile_model/quant_config.py,
+  calib_dir: ,
+  calib_num: 20,
+  preproc_module: ,
+  preproc_class: ,
+  debug_level: 1,
+  calib_method: ,
+  skip_layer_idxes: [ ],
+  skip_layer_types: [ ],
+  skip_layer_names: [ ],
+}
+
+build: {
+  target: H30,
+  mode: AOT,
+  opt_level: 0,
+}
+
+demo: {
+  data_dir: ../../data/datasets/imagenet,
+  num: 1,
+}
+
+perf: {
+  data_dir: ,
+  test_num: 1000,
+  mode: throughput,
+  end2end: ,
+}
+
+accuracy: {
+  data_dir: ../../data/datasets/imagenet,
+  test_num: 1,
+  dataset_class: Dataset,
+}
+
