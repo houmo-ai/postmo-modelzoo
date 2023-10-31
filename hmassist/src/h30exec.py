@@ -83,7 +83,7 @@ class H30Exec(Basehmexec, ABC):
             }
         else:
             quanttool_config = self.quant["ptq_cfg_path"]
-    
+
         # 删除列表中的空项
         del calib_dataset[calib_num:self.quant["calib_num"]]
 
@@ -147,7 +147,7 @@ class H30Exec(Basehmexec, ABC):
             convert_profiling(self.weight, [in_datas], quanttool_config, [in_datas])
             quantize_profiling(sequencer, [in_datas])
         self.layer_compare_span = time.time() - t_start
-        print("quantize cost {}s, layer compare cost {}s".format(self.quantize_span, self.layer_compare_span))
+        logger.info("quantize cost {}s, layer compare cost {}s".format(self.quantize_span, self.layer_compare_span))
 
     def build(self, config=None):
         """build relay quant
@@ -157,21 +157,26 @@ class H30Exec(Basehmexec, ABC):
         logger.info("################  build started  ######################")
         type_dict = {}
         shape_dict = {}
-        t_start = time.time()
-        convert_config = {'layout': 'NHWC'}
-        for input in self.inputs: 
+        convert_config = {}
+        layout_dict = {}
+        for input in self.inputs:
+            layout_dict[input["name"]] = "NHWC"
             type_dict[input["name"]] = input["dtype"]
             shape_dict[input["name"]] = input["shape"]
+        convert_config = {'layout': 'NHWC'}
+        # convert_config["transpose_axes"] = (0, 2, 3, 1)
+        t_start = time.time()
         onnx_model = onnx.load(self.quant_model_path)
         mod = relay.frontend.from_hmonnx(
-            onnx_model, shape_dict, type_dict, resizer_attr=None, convert_config=convert_config,
+            onnx_model, shape_dict, type_dict, layout_dict, resizer_attr=None,
+            convert_config=convert_config,
         )
-        
+
         if not config:
-            config = {"tcim.for_benchmark": True}
+            config = {"tcim.sync_strategy": 0, "tcim.for_benchmark": True}
 
         logger.info("build_config={}".format(config))
-        
+
         if self.build_mode == "AOT":
             from tvm.relay.backend import Executor
             import tvm
@@ -182,8 +187,9 @@ class H30Exec(Basehmexec, ABC):
                 graph, lib, params = relay.build(
                     mod, target, executor=executor, mod_name=self.model_name,
                 )
+            # host_target="arm64"
             tcim.store_so(self.model_name, lib, workspace_dir=self.model_dir, hdplcc_options=['-O2'])
-            print('{} saved as aot model in {}'.format(self.model_name, self.model_dir))
+            logger.info('{} saved as aot model in {}'.format(self.model_name, self.model_dir))
 
         elif self.build_mode == "JIT":
             with relay.build_config(opt_level=3):
@@ -191,11 +197,11 @@ class H30Exec(Basehmexec, ABC):
             # store model as one fusedop
             rt_opt = '-resizer'
             tcim.store_as_fusedop(self.model_name, graph, params, shape_dict, lib, rt_opt)
-            print(self.model_name, ' saved as one fusedop model')
+            logger.info(self.model_name, ' saved as one fusedop model')
 
         logger.info("################  build finished  ######################")
         self.build_span = time.time() - t_start
-        print("build cost {}s".format(self.build_span))
+        logger.info("build cost {}s".format(self.build_span))
 
     def load(self):
         if self.build_mode == "AOT":
@@ -225,12 +231,17 @@ class H30Exec(Basehmexec, ABC):
         output_num = self.module.get_num_outputs()
         for id in range(0, output_num):
             name = self.module.get_output_name_by_index(id)
-            output_data = self.module.get_output_by_name(name).numpy()
+            if self.is_fixed_out:
+                output_data = self.module.get_output_by_name(name).numpy()
+            else:
+                output_data = self.module.get_float_output_by_name(name).numpy()
+            if (len(output_data.shape) == 4):
+                # toolchain output is NHWC
+                output_data = np.transpose(output_data, (0, 3, 1, 2))
             outputs[name] = output_data
-            print("output[{}] name is {}".format(id, name))
 
         return outputs
-    
+
     def perf(self, test_num):
         modelzoo_path = os.getenv('MODELZOO_PATH')
         if self.build_mode == "AOT":
@@ -241,24 +252,53 @@ class H30Exec(Basehmexec, ABC):
             exec = "tcimexec"
         cmd = "cd {}/utils/{} && ./tcimexec --model {} --iterations {}".format(
             modelzoo_path, exec, model_path, test_num)
-        print(cmd)
+        logger.info(cmd)
         os.system(cmd)
-    
-    def get_golden_input(self):
+
+    def get_golden_inputs(self):
         datas = {}
         for input in self.inputs:
             input_data_path = os.path.join(self.result_dir, 'hmquant_' + self.model_name 
-                                            + '_' + input["name"] + '_input.npy')
-            input_data = np.load(input_data_path)
-            if input["layout"] == "NCHW":
+                                           + '_' + input["name"] + '_input.npy')
+            input_data = np.load(input_data_path).astype('uint8')
+            # if input["layout"] == "NCHW":
                 # NCHW -> NHWC
-                input_data = np.transpose(input_data, (0, 2, 3, 1))
-            print("input[{}] shape = {}".format(input["name"], input_data.shape))
+                # input_data = np.transpose(input_data, (0, 2, 3, 1))
+            logger.info("golden input[{}] shape = {}, dtype = {}".format(input["name"], input_data.shape, input_data.dtype))
             datas[input["name"]] = input_data
-        return datas        
+        return datas
+
+    def get_golden_output(self, name):
+        golden_output_path = os.path.join(self.golden_data_path, name + '.npy')
+        if os.path.exists(golden_output_path):
+            golden_output = np.load(golden_output_path, allow_pickle=True).item().get("output_tensor")
+            # if (len(golden_output.shape) == 4):
+            #     # toolchain output is NHWC
+            #     golden_output = np.transpose(golden_output, (0, 2, 3, 1))
+            return golden_output
+        else:
+            logger.warning("compare canceled while golden data not found -> {}".format(golden_output_path))
+            return None
 
     def get_version(self):
         raise NotImplemented
+
+    def print_input_info(self):
+        input_num = self.module.get_num_inputs()
+        logger.info("model input num = {}".format(input_num))
+        for id in range(0, input_num):
+            name = self.module.get_input_name_by_index(id)
+            # name = self.module.get_input_name(id)
+            input_data = self.module.get_input_by_name(name).numpy()
+        logger.info("model input[{}] shape = {}, dtype = {}".format(name, input_data.shape, input_data.dtype))
+
+    def print_output_info(self):
+        output_num = self.module.get_num_outputs()
+        logger.info("model output num = {}".format(output_num))
+        for id in range(0, output_num):
+            name = self.module.get_output_name_by_index(id)
+            output_data = self.module.get_output_by_name(name).numpy()
+        logger.info("model output[{}] shape = {}, dtype = {}".format(name, output_data.shape, output_data.dtype))
 
     @property
     def freq(self):

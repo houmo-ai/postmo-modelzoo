@@ -133,24 +133,30 @@ def test(cfg, backend):
         hmexec = get_executor(cfg)
         hmexec.backend = backend
         hmexec.load()
-        in_datas = hmexec.get_golden_input()
+        # hmexec.print_input_info()
+        hmexec.print_output_info()
+        in_datas = hmexec.get_golden_inputs()
+        hmexec.set_fixed_out(True)
         tcim_outputs = hmexec.infer(in_datas)
-        print("model output num = ", len(tcim_outputs))
         model_name = hmexec.model_name
         # save and compare
         for output_name, output_data in tcim_outputs.items():
-            print("output[{}] shape = {}".format(output_name, output_data.shape))
-            golden_output_path = os.path.join(hmexec.golden_data_path, output_name + '.npy')
+            logger.info("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
             tcim_output_path = os.path.join(hmexec.result_dir, 'tcim_{}_{}_output.npy'.format(model_name, output_name))
             np.save(tcim_output_path, output_data)
             logger.info("fixed output[{}] saved in {}".format(output_name, tcim_output_path))
-            if os.path.exists(golden_output_path):
-                golden_output = np.load(golden_output_path, allow_pickle=True).item().get("output_tensor")
-                cosine_dist = cosine_distance(golden_output, output_data)
-                logger.info("[compare] {} vs quant output [{}] similarity={:.6f}".format(hmexec.target, output_name, cosine_dist))
-            else:
-                logger.warning("compare canceled while golden data not found -> {}".format(golden_output_path))
-
+            golden_output = hmexec.get_golden_output(output_name)
+            if golden_output is not None:
+                if golden_output.shape == output_data.shape:
+                    cosine_dist = cosine_distance(golden_output, output_data)
+                    # print("golden_output=", golden_output)
+                    # print("output_data=", output_data)
+                    is_match = (golden_output == output_data).all()
+                    logger.info("[compare] {} vs quant output [{}] match={}, similarity={:.6f}"
+                                .format(hmexec.target, output_name, is_match, cosine_dist))
+                else:
+                    logger.error("[compare] {} vs quant output [{}] shape not equal {} vs {}"
+                                 .format(hmexec.target, output_name, output_data.shape, golden_output.shape))
         logger.info("success")
     except Exception as e:
         logger.error("{}".format(traceback.format_exc()))
@@ -166,21 +172,20 @@ def demo(cfg, backend):
             exit(-1)
         model = get_model(cfg, backend=backend)
         data_dir = cfg["demo"]["data_dir"]
-        num = cfg["demo"]["num"]
-        test_num = cfg["accuracy"]["test_num"]
+        test_num = cfg["demo"]["test_num"]
 
         file_list = []
         for filename in os.listdir(data_dir):
             _, ext = os.path.splitext(filename)
             if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
                 file_list.append(os.path.join(data_dir, filename))
-                if len(file_list) == num:
+                if len(file_list) == test_num:
                     break
 
         if backend == "onnx":
             model.load_json(hmexec.original_json_path)
         elif backend == "asic":
-            model.load()
+            model.executor.load()
         else:
             logger.error("Not support target({})".format(hmexec.target))
             exit(-1)
@@ -188,8 +193,8 @@ def demo(cfg, backend):
         for filepath in file_list:
             model.demo(filepath)
         print("demo success")
-        logger.info("[infer] average cost {:.6f}ms".format(model.ave_latency_ms))
-        logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
+        logger.info("[infer] average cost {:.3f}ms".format(model.ave_latency_ms))
+        logger.info("[end2end] average cost: {:.3f}ms".format(model.end2end_latency_ms))
         logger.info("success")
     except Exception as e:
         logger.error("{}".format(traceback.format_exc()))
@@ -230,7 +235,7 @@ def accuracy(cfg, dtype, backend):
         if backend == "onnx":
             model.load_json(model.executor.original_json_path)
         elif backend == "asic":
-            model.load()
+            model.load(model.executor.model_dir)
         else:
             logger.error("Not support target({})".format(model.executor.target))
             exit(-1)
@@ -343,7 +348,7 @@ if __name__ == "__main__":
     # check files
     check_file_exist(args.config)
     basename, _ = os.path.splitext(os.path.basename(args.config))
-    set_logger(args.type, args.log_dir, basename)
+    # set_logger(args.type, args.log_dir, basename)
 
     # default config
     if args.backend is None:

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import abc
+import time
 from utils import logger
 
 class BaseModel(object, metaclass=abc.ABCMeta):
@@ -12,7 +13,6 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         self.inputs = kwargs["inputs"]   # multi-input
         self.dataset = kwargs["dataset"]
         self.test_num = kwargs["test_num"]
-        self.infer = self.executor
         self.target = kwargs["target"]
         # self.dtype = kwargs["dtype"]
         self.backend = kwargs["backend"]
@@ -21,18 +21,25 @@ class BaseModel(object, metaclass=abc.ABCMeta):
 
         self.total = 0
         self.time_span = 0
+        self._ave_latency_ms = 0
+        self._end2end_latency_ms = 0
 
-        # self.infer.backend = self.backend
+        # self.executor.backend = self.backend
 
     def load(self, model_path):
         """加载so模型
         :param model_path: 模型目录
         :return:
         """
-        self.infer.load(model_path)
+        self.executor.load(model_path)
 
     @staticmethod
     def data_transform(x, shape):
+        """data transform
+        :param x: pillow
+        :param shape: tuple
+        :return: torch.Tensor(NCHW, float32)
+        """
         import torchvision.transforms as transforms
         from utils.transform import ToTensorNotNormal
         import torch
@@ -47,33 +54,34 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             ],
         )
         return transform(x)
-    
+
     @staticmethod
     def build_config():
         logger.warning("can not find hm_model.build_config, use default")
         return None
 
-    def _preprocess(self, cv_image):
-        """内部预处理调用
-        :param cv_image: opencv image
+    def _preprocess(self, data):
+        """data transform
+        :param data:
         :return:
         """
         pass
 
     def _postprocess(self, outputs, img=None):
-        """内部后处理调用
-        :param outputs: 模型推理输出
-        :param cv_image: 原图像
+        """
+        :param outputs: model outputs dict
+        :param img: origin image
         :return:
         """
         pass
 
-    def inference(self, img):
-        """推理接口，目前仅支持batch1
-        :param cv_image: opencv image
-        :return:
-        """
-        pass
+    def inference(self, input_data):
+        start = time.time()
+        outputs = self.executor.infer(input_data)
+        cost = time.time() - start
+        self._ave_latency_ms += (cost * 1000)
+        self.total += 1
+        return outputs
 
     def evaluate(self):
         """模型指标评估"""
@@ -89,10 +97,12 @@ class BaseModel(object, metaclass=abc.ABCMeta):
 
     @property
     def ave_latency_ms(self):
-        """模型芯片内部推理时间, 不是严格准确，仅供参考"""
-        pass
+        if self.total == 0:
+            return 0
+        return self._ave_latency_ms / self.total
 
     @property
     def end2end_latency_ms(self):
-        """python推理时间, 包括数据传入传出、预处理、后处理时间"""
-        pass
+        if self.total == 0:
+            return 0
+        return self._end2end_latency_ms / self.total
