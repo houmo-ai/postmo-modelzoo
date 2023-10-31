@@ -26,6 +26,7 @@ struct CliArguments {
   size_t warm_up = 10;
   size_t iterations = 10;
   bool is_fused = false;
+  bool host_loop = false;
 };
 
 /**
@@ -52,35 +53,39 @@ bool IsFileExists(std::string file_path) {
 bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
   int option_idx = 0;
   struct option long_options[] = {
-      {"help", 0, 0, 'h'},
-      {"model", 1, 0, 'm'},
-      {"warm_up", 1, 0, 'w'},
-      {"iterations", 1, 0, 'i'},
+      {"help", 0, 0, 'h'},      {"model", 1, 0, 'm'},
+      {"warm_up", 1, 0, 'w'},   {"iterations", 1, 0, 'i'},
+      {"host_loop", 0, 0, 'c'},
   };
   while (true) {
-    int ch = getopt_long(argc, argv, "hm:w:i:", long_options, &option_idx);
+    int ch = getopt_long(argc, argv, "hm:w:i:c", long_options, &option_idx);
     if (ch == -1) {
       break;
     }
     switch (ch) {
-    case 'h':
-      std::cout << "Usage: -h" << std::endl;
-      break;
-    case 'm':
-      std::cout << "Model: " << optarg << std::endl;
-      arguments->model_path = std::string(optarg);
-      break;
-    case 'w':
-      std::cout << "warm up: " << optarg << std::endl;
-      arguments->warm_up = atoi(optarg);
-      break;
-    case 'i':
-      std::cout << "iterations: " << optarg << std::endl;
-      arguments->iterations = atoi(optarg);
-      break;
-    default:
-      std::cerr << "Unsupported option: " << static_cast<char>(ch) << std::endl;
-      return false;
+      case 'h':
+        std::cout << "Usage: -h" << std::endl;
+        break;
+      case 'm':
+        std::cout << "Model: " << optarg << std::endl;
+        arguments->model_path = std::string(optarg);
+        break;
+      case 'w':
+        std::cout << "warm up: " << optarg << std::endl;
+        arguments->warm_up = atoi(optarg);
+        break;
+      case 'i':
+        std::cout << "iterations: " << optarg << std::endl;
+        arguments->iterations = atoi(optarg);
+        break;
+      case 'c':
+        std::cout << "cpu loop set " << std::endl;
+        arguments->host_loop = true;
+        break;
+      default:
+        std::cerr << "Unsupported option: " << static_cast<char>(ch)
+                  << std::endl;
+        return false;
     }
   }
   if (IsFileExists(arguments->model_path + "_fused_op.so")) {
@@ -123,11 +128,12 @@ int main(int argc, char *argv[]) {
   }
   size_t eval_round = arguments.iterations;
   auto start = std::chrono::system_clock::now();
-  if (arguments.is_fused) {
+  if (arguments.is_fused && !arguments.host_loop) {
     module.RunRounds(eval_round);
   } else {
-    eval_round = 1;
-    module.Run();
+    for (size_t idx = 0; idx < eval_round; idx++) {
+      module.Run();
+    }
   }
   hdplDeviceSynchronize();
   auto finish = std::chrono::system_clock::now();

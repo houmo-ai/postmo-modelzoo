@@ -5,9 +5,7 @@ set -e
 
 cd "${SCRIPT_DIR}"
 
-# shellcheck source=/dev/null
-
-python3 store_cruise_go_vehicle.py
+python3 store_tracking.py
 
 cd ../../utils/tcimexec/
 ./build.sh
@@ -25,4 +23,4 @@ else
   ITERATION=1
 fi
 
-tcimexec --model "${SCRIPT_DIR}/libcruise_go_vehicle" --iterations ${ITERATION}
+tcimexec --model "${SCRIPT_DIR}/tracking" --iterations ${ITERATION} --host_loop

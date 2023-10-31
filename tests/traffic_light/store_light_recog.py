@@ -1,9 +1,10 @@
 import os
-import onnx
+
 import numpy as np
+import onnx
 import tvm
-import tvm.relay as relay
 import tvm.contrib.graph_executor as runtime
+import tvm.relay as relay
 def get_onnx_module():
     if not os.path.exists('traffic_light_recog.zip'):
         os.system('curl -upublic:Password@123 \
@@ -11,7 +12,7 @@ def get_onnx_module():
             -o traffic_light_recog.zip')
     if not os.path.exists('traffic_light_recog'):
         os.system('unzip traffic_light_recog.zip')
-    return "./traffic_light_recog/hmquant_traffic_light_recog_with_act.onnx"
+    return './traffic_light_recog/hmquant_traffic_light_recog_with_act.onnx'
 
 if __name__ == '__main__':
     #Compile model
@@ -19,26 +20,26 @@ if __name__ == '__main__':
     onnx_model = onnx.load(onnxfile)
     input_name = onnx_model.graph.input[0].name
     input_shape = (1, 3, 96, 96)
-    print("input name:",input_name)
+    print('input name:',input_name)
 
     graph = onnx_model.graph
     print(graph.output)
 
     resizer_attr = None
 
-    type_dict={input_name:"uint8"}
+    type_dict={input_name:'uint8'}
     shape_dict = {input_name: input_shape}
     mod = relay.frontend.from_hmonnx(onnx_model, shape_dict, type_dict, resizer_attr=None)
     with relay.build_config(opt_level=3):
-        graph, lib, params = relay.build(mod, "hdpl --host=llvm")
-    print("build model done.")
+        graph, lib, params = relay.build(mod, 'hdpl --host=llvm')
+    print('build model done.')
 
     from tvm.relay import param_dict
-    filename = "liblight_recog"
-    lib.export_library(filename + ".so", tvm.contrib.cc.create_shared)
-    with open(filename + ".json", "w") as fp:
+    filename = 'liblight_recog'
+    lib.export_library(filename + '.so', tvm.contrib.cc.create_shared)
+    with open(filename + '.json', 'w') as fp:
       fp.write(graph)
     params_ba = param_dict.save_param_dict(params)
-    with open(filename + ".params", "wb") as fp:
+    with open(filename + '.params', 'wb') as fp:
       fp.write(params_ba)
     print('tvm runtime saved')

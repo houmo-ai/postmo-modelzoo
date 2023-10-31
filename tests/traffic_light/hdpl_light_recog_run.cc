@@ -2,21 +2,20 @@
 /*!
  * \file hdpl_traffic_light_recog_run.cc
  */
-#include <unistd.h>
-#include <cassert>
-#include <iostream>
-#include <sstream>
-#include <string>
 #include <tvm/runtime/executor_info.h>
 #include <tvm/runtime/hdpl/hdpl_runtime.h>
 #include <tvm/runtime/module.h>
 #include <tvm/runtime/packed_func.h>
 #include <tvm/runtime/registry.h>
+#include <unistd.h>
 
-using namespace tvm;
-using namespace tvm::relay;
+#include <cassert>
+#include <iostream>
+#include <sstream>
+#include <string>
 
-void ReadDataFromFile(const std::string file_name, int8_t* data, uint32_t num) {
+void ReadDataFromFile(const std::string& file_name, int8_t* data,
+                      uint32_t num) {
   DLOG(INFO) << "ReadDataFromFile, file_name = " << file_name;
   const char* filename = file_name.c_str();
   FILE* fp = fopen(filename, "r");
@@ -25,7 +24,8 @@ void ReadDataFromFile(const std::string file_name, int8_t* data, uint32_t num) {
     int x;
     int res = fscanf(fp, "%d", &x);
     if (res < 0) {
-      DLOG(INFO) << "Length of file is: " << i << ", less than length parameter: " << num;
+      DLOG(INFO) << "Length of file is: " << i
+                 << ", less than length parameter: " << num;
       fclose(fp);
       return;
     }
@@ -34,8 +34,10 @@ void ReadDataFromFile(const std::string file_name, int8_t* data, uint32_t num) {
 
   fclose(fp);
 }
-void RunGolden(runtime::NDArray output, std::string path, std::string file) {
-  file = path + "light_recog_golden_txt/" + file + "_npy_output.txt";
+void RunGolden(tvm::runtime::NDArray output, const std::string& path,
+               const std::string& file_name) {
+  std::string file =
+      path + "light_recog_golden_txt/" + file_name + "_npy_output.txt";
   auto tensor = const_cast<DLTensor*>(output.operator->());
   int size = 1;
   for (int i = 0; i < tensor->ndim; ++i) {
@@ -45,7 +47,7 @@ void RunGolden(runtime::NDArray output, std::string path, std::string file) {
   ReadDataFromFile(file, host_out.data(), size);
   for (int i = 0; i < size; i++) {
     // printf("i:%d\n value:%d\n", i, ((int8_t *)tensor->data)[i]);
-    assert(host_out[i] == ((int8_t*)tensor->data)[i]);
+    assert(host_out[i] == (reinterpret_cast<int8_t*>(tensor->data))[i]);
   }
 }
 void NCHW2NHWC(int8_t* input, int8_t* output, int n, int h, int w, int c) {
@@ -62,7 +64,8 @@ void NCHW2NHWC(int8_t* input, int8_t* output, int n, int h, int w, int c) {
   }
 }
 void HDPLRuntimeLightRecog() {
-  runtime::NDArray feature = runtime::NDArray::Empty({1, 3, 96, 96}, DataType::Int(8), {kDLCPU, 0});
+  tvm::runtime::NDArray feature = tvm::runtime::NDArray::Empty(
+      {1, 3, 96, 96}, tvm::DataType::Int(8), {kDLCPU, 0});
   auto pA = static_cast<int8_t*>(feature->data);
   int size = 3 * 96 * 96;
   ReadDataFromFile("traffic_light_recog/recog_input_golden.txt", pA, size);
@@ -76,7 +79,7 @@ void HDPLRuntimeLightRecog() {
 }
 int main() {
   std::string module = "liblight_recog.so";
-  if(access(module.c_str(), F_OK) != -1) {
+  if (access(module.c_str(), F_OK) != -1) {
     HDPLRuntimeLightRecog();
   }
   std::cout << "======ok=====" << std::endl;

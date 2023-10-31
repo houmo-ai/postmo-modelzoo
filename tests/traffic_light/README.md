@@ -12,4 +12,3 @@ light_recog
 
 3. remove the Intermediate file
   rm -rf CMakeFiles liblight_recog.* Makefile CMakeCache.txt  cmake_install.cmake hdpl_light_recog_run *.bin traffic_light_recog.zip traffic_light_recog
-
