@@ -86,7 +86,7 @@ def check_config(cfg, phase="build"):
     #         logger.error("calib_method({}) must be in {}".format(calib_method, calib_method_lists))
     #         return False
 
-    if phase == "build":
+    if phase == "quant":
         weight = cfg["model"]["weight"]
         if not os.path.exists(weight):
             logger.error("The model weight not exist -> {}".format(weight))
@@ -235,8 +235,8 @@ def check_demo_config(cfg):
         logger.error("Not found key(data_dir) in config[demo]")
         return False
 
-    if "num" not in cfg["demo"]:
-        logger.error("Not found key(num) in config[demo]")
+    if "test_num" not in cfg["demo"]:
+        logger.error("Not found key(test_num) in config[demo]")
         return False
 
     if "impl_class" not in cfg["model"]:
@@ -248,13 +248,13 @@ def check_demo_config(cfg):
         logger.error("Not found data_dir -> {}".format(data_dir))
         return False
 
-    num = cfg["demo"]["num"]
-    if not isinstance(num, int):
-        logger.error("Not found demo_num type not int, -> {}".format(num))
+    test_num = cfg["demo"]["test_num"]
+    if not isinstance(test_num, int):
+        logger.error("demo test_num type not int, -> {}".format(test_num))
         return False
 
-    if num < 0:
-        logger.error("Not found demo_num must be >= 0, -> {}".format(num))
+    if test_num < 0:
+        logger.error("demo test_num must be >= 0, -> {}".format(test_num))
         return False
 
     if not cfg["model"]["impl_class"]:

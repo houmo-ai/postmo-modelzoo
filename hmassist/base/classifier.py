@@ -37,28 +37,8 @@ class Classifier(BaseModel, ABC):
             exit(-1)
         return outputs
 
-    @property
-    def ave_latency_ms(self):
-        if self.total == 0:
-            return 0
-        return self._infer_latency_ms / self.total
-
-    @property
-    def end2end_latency_ms(self):
-        if self.total == 0:
-            return 0
-        return self._end2end_latency_ms / self.total
-
     def load(self):
-        self.infer.load()
-
-    def inference(self, input_data):
-        infer_start = time.time()
-        outputs = self.infer.infer(input_data)
-        infer_cost = time.time() - infer_start
-        self._infer_latency_ms += (infer_cost * 1000)
-        self.total += 1
-        return outputs
+        self.executor.load()
 
     def evaluate(self):
         """ top-k
@@ -114,7 +94,7 @@ class Classifier(BaseModel, ABC):
         output_data = self._postprocess(output_data, img)
         max_idx = np.argmax(output_data, axis=1).flatten()[0]
         max_prob = output_data[0][max_idx].flatten()[0]
-        
+
         end2end_cost = time.time() - end2end_start
         self._end2end_latency_ms += (end2end_cost * 1000)
         logger.info("predict cls = {}, prob = {:.6f}".format(max_idx, max_prob))

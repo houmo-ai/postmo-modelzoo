@@ -19,15 +19,16 @@ if include_cmd == "":
 exclude_cmd = " --exclude=.git*"
 for file in exclude_list:
     exclude_cmd += " --exclude=" + dir_name + "/" + file
-  
+
+cmd = "git clone http://jenkinspublic:hmCI2%4022!@gerrit.houmo.ai/toolchain/imodelzoo " + dir_name
+os.system(cmd)
+
 # tar
 postfix = ""
 if version != "":
     postfix = "_" + version
-tar_cmd = '''tar -czf ''' + dir_name + postfix + ".tar.gz " + exclude_cmd + include_cmd
-print(tar_cmd)
+cmd = 'tar -czf ' + dir_name + postfix + ".tar.gz " + exclude_cmd + include_cmd
+print(cmd)
 
-os.system("git clone ssh://gerrit.houmo.ai:29418/toolchain/imodelzoo -b master " + dir_name)
-os.system(tar_cmd)
+os.system(cmd)
 print("tar done.")
-

@@ -1,12 +1,12 @@
 model: {
   framework: onnx,
-  name: resnet50,
+  name: yolop,
   save_dir: ./output,
-  weight: ../../data/models/resnet50.onnx,
+  weight: ./yolop.onnx,
   inputs: [
     {
-      name: input.1,
-      shape: [1, 3, 224, 224],
+      name: images,
+      shape: [1, 3, 384, 640],
       layout: NCHW,
       format: RGB,
       src_format: YUV422,
@@ -15,19 +15,19 @@ model: {
       dtype: uint8,
       mean: [ 0.485, 0.456, 0.406 ],
       std: [ 0.229, 0.224, 0.225 ],
-      data_path: ../../data/datasets/imagenet/ILSVRC2012_val_00000016.JPEG,  # 用于比较各阶段输出的相似度，空表示采用随机数，默认随机数，可缺省
+      data_path: ../../data/pic/lane.jpg,
     }
   ],
-  impl_class: Resnet50,
+  impl_class: YoloP,
 }
 
 quant: {
-  # ptq_cfg_path: ./compile_model/quant_config.py,
+  ptq_cfg_path: ,
   calib_dir:
   {
-    input.1: ../../data/datasets/imagenet,
+    images: ../../data/datasets/bdd100k/images/100k/val,
   },
-  calib_num: 20,
+  calib_num: 30,
   preproc_module: ,
   preproc_class: ,
   debug_level: 1,
@@ -44,8 +44,8 @@ build: {
 }
 
 demo: {
-  data_dir: ../../data/datasets/imagenet,
-  test_num: 1,
+  data_dir: ../../data/datasets/bdd100k/images/100k/val,
+  test_num: 10,
 }
 
 perf: {
@@ -56,7 +56,7 @@ perf: {
 }
 
 accuracy: {
-  data_dir: ../../data/datasets/imagenet,
+  data_dir: ../../data/datasets/bdd100k/images/100k/val,
   test_num: 1,
   dataset_class: Dataset,
 }

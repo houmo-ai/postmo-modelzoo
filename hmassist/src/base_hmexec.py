@@ -31,7 +31,6 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
         self.inputs = cfg["model"]["inputs"]
         self.num_inputs = len(self.inputs)
         self.model_name = cfg["model"]["name"]
-        self.quant_model_path = 'quant_' + self.model_name + '.onnx'
         # quant params
         self.preproc_module = self.quant["preproc_module"]
         self.preproc_class = self.quant["preproc_class"]
@@ -46,6 +45,7 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
         self.cur_dir = os.path.abspath("./")
         self.model_dir = os.path.abspath(os.path.join(self.cfg["model"]["save_dir"], self.target))
         self.result_dir = os.path.abspath(os.path.join(self.model_dir, "result"))
+        self.quant_model_path = os.path.abspath(os.path.join(self.result_dir, 'hmquant_' + self.model_name + '_with_act.onnx'))
         self.golden_data_path = os.path.abspath(os.path.join(self.result_dir, 'hmquant_' + self.model_name + '_with_act'))
         self.backend = "asic"
         if not os.path.exists(self.result_dir):
@@ -64,10 +64,14 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
         self.iss_simu_span = 0
         self.layer_compare_span = 0
         self.iss_layerwise_dump_span = 0
+        self.is_fixed_out = False
 
     @staticmethod
     def set_env():
         raise NotImplementedError
+    
+    def set_fixed_out(self, flag):
+        self.is_fixed_out = flag
 
     def get_dataset(self):
         quant_data_dir = self.quant["data_dir"]
@@ -144,7 +148,7 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
         import torchvision.transforms as transforms
         from utils.transform import ToTensorNotNormal
         import torch
-        
+
         if filepath:   # 指定输入数据
             logger.info("data[{}] will use file: {}".format(name, filepath))
             data = pil_loader(filepath)
@@ -166,7 +170,6 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
                 logger.error("Not support dtype -> {}".format(dtype))
                 exit(-1)
         return data
-
 
     def get_datas(self, file_path=None, transform=None, to_tensor=False):
         """ 生成模型输入数据
