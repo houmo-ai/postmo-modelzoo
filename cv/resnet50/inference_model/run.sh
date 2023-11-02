@@ -30,9 +30,9 @@ if [ ${PREPROCESSED} -lt ${IMAGE_COUNT} ]; then
 fi
 
 
-cd ../../../utils/classification
+cd ../../../utils/aotclassification
 bash build.sh
 PATH="$(pwd):${PATH}"
 export PATH
 cd -
-hdpl_classification --model ../compile_model/resnet50 --label "${DATASETS_PATH}/ILSVRC2012_val_labels.txt" --data_root ./preprocessed --count ${IMAGE_COUNT}
+hdpl_classification --model ../compile_model/tcim_resnet50 --label "${DATASETS_PATH}/ILSVRC2012_val_labels.txt" --data_root ./preprocessed --count ${IMAGE_COUNT}

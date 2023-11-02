@@ -30,7 +30,7 @@ fi
 if [ -z "${IS_DEBUG}" ]; then
   ITERATION=1000
 else
-  ITERATION=1i
+  ITERATION=1
 fi
 
 multi_stream_tcimexec --model "${SCRIPT_DIR}/compile_model/yolop" --iterations ${ITERATION}

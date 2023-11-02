@@ -56,7 +56,7 @@ def compile(args=None):
     input_name = onnx_model.graph.input[0].name
     print('input name:', input_name)
     type_dict = {input_name: 'uint8'}
-    shape_dict = {input_name: (batch, 3, 224, 224)}
+    shape_dict = {input_name: (1, 3, 224, 224)}
     layout_dict = {input_name, 'NHWC'}
     mod = relay.frontend.from_hmonnx(
         onnx_model, shape_dict, type_dict,
@@ -66,19 +66,16 @@ def compile(args=None):
     target = tvm.target.Target('hdpl', host='c')
     if args.mode == 'eval':
         compile_config = {
-            'tcim.fuse_strategy': 0,
-            'tcim.spec_batch_num': 4,
-            'tcim.input_data_fmt': 'YUV422SP',
+            'tcim.gen_intrinsic': 1,
             'tcim.sync_strategy': 1,
+            'tcim.for_benchmark': True,
         }
     else:
         compile_config = {
             'tcim.fuse_strategy': 0,
-            'tcim.spec_batch_num': 4,
+            'tcim.spec_batch_num': batch,
             'tcim.input_data_fmt': 'YUV422SP',
             'tcim.gen_intrinsic': 1,
-            'tcim.codegen_pic': False,
-            'tcim.use_convadd': False,
             'tcim.sync_strategy': 1,
             'tcim.for_benchmark': True,
         }

@@ -11,6 +11,8 @@ import tvm.tcim as tcim
 from tvm import te
 from tvm.contrib import graph_executor
 from tvm.contrib import hdpl_graph_executor
+from tvm.relay.backend import Executor
+from tvm.relay.backend import Runtime
 from tvm.relay.frontend.hmonnx import ResizerAttr
 
 
@@ -33,7 +35,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         '--batch',
         type=int,
-        default=28,
+        default=1,
         help='Set batch size for implicit batch houmo model',
     )
     args = parser.parse_args()
@@ -56,20 +58,39 @@ def compile(args=None):
     )
     print('input name:', input_name)
     print('input shape:', input_shape)
-
     convert_config = {'layout': 'NHWC'}
     type_dict = {input_name: 'uint8'}
     shape_dict = {input_name: input_shape}
     mod = relay.frontend.from_hmonnx(
         onnx_model, shape_dict, type_dict, resizer_attr=None, convert_config=convert_config,
     )
-    with relay.build_config(opt_level=3):
-        graph, lib, params = relay.build(mod, 'hdpl --host=llvm')
+    executor = Executor('aot')
+    if batch == 1:
+        compile_config = {
+            'tcim.fuse_strategy': 1,
+            'tcim.gen_intrinsic': 1,
+            'tcim.schedule_strategy': 1,
+            'tcim.for_benchmark': True,
+            'tcim.core_num': 1,
+            'tcim.sync_strategy': 1,
+        }
+    else:
+        compile_config = {
+            'tcim.fuse_strategy': 1,
+            'tcim.gen_intrinsic': 2,
+            'tcim.schedule_strategy': 2,
+            'tcim.use_convaddrelu': True,
+            'tcim.for_benchmark': True,
+            'tcim.core_num': 4,
+            'tcim.sync_strategy': 1,
+        }
+    target = tvm.target.Target('hdpl', host='c')
+    with tvm.transform.PassContext(opt_level=3, config=compile_config):
+        graph, lib, params = relay.build(
+            mod, target, executor=executor, mod_name='resnet50',
+        )
 
-    # store model as one fusedop
-    rt_opt = '-resizer'
-    tcim.store_as_fusedop(filename, graph, params, shape_dict, lib, rt_opt)
-
+    tcim.store_so(filename, lib)
     print(filename, ' saved as one fusedop model.')
 
 
