@@ -13,7 +13,7 @@ cd prepare_model
 cd ..
 
 cd compile_model
-./run.sh --batch 1 --mode perf
+./run.sh --batch 4 --mode perf
 cd ..
 
 cd ../../utils/aottcimexec/
@@ -24,7 +24,7 @@ export HDPL_STREAM_TIME_OUT=600000
 cd -
 
 if [ -z "${IS_DEBUG}" ]; then
-  ITERATION=400
+  ITERATION=1000
 else
   ITERATION=1
 fi
