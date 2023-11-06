@@ -187,8 +187,13 @@ class H30Exec(Basehmexec, ABC):
                 graph, lib, params = relay.build(
                     mod, target, executor=executor, mod_name=self.model_name,
                 )
-            # host_target="arm64"
-            tcim.store_so(self.model_name, lib, workspace_dir=self.model_dir, hdplcc_options=['-O2'])
+            if os.getenv("TCIM_CROSS_COMPILE"):
+                logger.info("cross compile enabled as aarch64")
+                model_name = self.model_name + "_aarch64"
+                tcim.store_so(model_name, lib, hdplcc_options=['-O2'], host_target="arm64")
+            else:
+                model_name = self.model_name
+                tcim.store_so(model_name, lib, hdplcc_options=['-O2'])
             logger.info('{} saved as aot model in {}'.format(self.model_name, self.model_dir))
 
         elif self.build_mode == "JIT":
