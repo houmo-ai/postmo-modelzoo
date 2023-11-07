@@ -17,7 +17,7 @@ def calibrate():
         env_dict.get('MODEL_PATH'), 'yolop.onnx',
     )
 
-    calib_dataset = [torch.randint(0, 200, (1, 3, 192, 320))]
+    calib_dataset = [torch.randint(0, 200, (1, 3, 192, 320)).float()]
 
     quanttool_config = {
         'inputs_cfg': {
@@ -45,7 +45,7 @@ def calibrate():
         'quant_yolop.onnx',
         save_out_tensor=False,
         save_params_npy=True,
-        save_special_onnx=True
+        save_special_onnx=True,
     )
 
 

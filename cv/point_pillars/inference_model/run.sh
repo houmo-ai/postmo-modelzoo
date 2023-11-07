@@ -19,4 +19,11 @@ make
 PATH="$(pwd):${PATH}"
 export PATH
 cd -
-hdpl_pointpillars_run
+
+if [ -z "${IS_DEBUG}" ]; then
+  ITERATION=200
+else
+  ITERATION=1
+fi
+
+hdpl_pointpillars_run ${ITERATION}

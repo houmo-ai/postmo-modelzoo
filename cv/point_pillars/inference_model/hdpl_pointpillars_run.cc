@@ -125,7 +125,7 @@ static tvm::hdpl::Module rpn_stream3 = tvm::hdpl::LoadModelPackage(
     "../compile_model/tcim_pointpillars_rpn", "aot");
 
 // run voxelization
-void runVoxelization(int point_num) {
+void runVoxelization(int point_num, size_t test_count) {
   int point_dim_num = kNumPointFeature;
   // build points
   void* host_point = malloc(point_num * point_dim_num * sizeof(point_dim_num));
@@ -1003,7 +1003,6 @@ void runVoxelization(int point_num) {
   int left_pillar_count = 9226;
 
   // auto pfe_start = std::chrono::system_clock::now();
-  int test_count = 222;
   std::cout << "start run point_pillars" << std::endl;
   auto start = std::chrono::system_clock::now();
 #if RUN_VOXEL
@@ -1335,7 +1334,8 @@ void runVoxelization(int point_num) {
       std::chrono::duration_cast<std::chrono::microseconds>(finish - start);
   auto total_time = (duration.count());
   printf(
-      "point_pillars test count %d cost %fms each time stream_num %d fps %d \n",
+      "point_pillars test count %zu cost %fms each time stream_num %d fps %d "
+      "\n",
       test_count, total_time / 1000.0 / test_count, 4,
       1000 / (total_time / 1000 / test_count) * 4);
   std::cout << "end run point_pillars" << std::endl;
@@ -1431,8 +1431,12 @@ void runVoxelization(int point_num) {
   hdplFree(out_box_num_device);
 }
 
-int main() {
+int main(int argc, char* argv[]) {
   int point_num = 54908;
-  runVoxelization(point_num);
+  size_t test_count = 1;
+  if (argc == 2) {
+    test_count = atoi(argv[1]);
+  }
+  runVoxelization(point_num, test_count);
   return 0;
 }
