@@ -4,26 +4,29 @@ export MODELZOO_PATH
 HMASSIST_PATH=$MODELZOO_PATH/hmassist
 export HMASSIST_PATH
 
+pip3 install PrettyTable
+
 # set hal library log level
 export HM800_HAL_CONSOLE_LEVEL=0
 
+export CMAKE_CONFIG_PATH=$MODELZOO_PATH/develop.cmake
+
 # main path
-export HOUMO_PATH=/usr/local/houmo
-export TCIM_PATH=$(python3 -c "import tvm; print(tvm.__path__[0])")
 export QUANTOOL_PATH=$MODELZOO_PATH/../../quantool
+HDPL_TOOLCHAIN_ITVM_INSTALL=$TVM_ROOT/build/install
 
 # paths for c/c++ compiling
-export TCIM_INC_PATH=$TCIM_PATH/include
-export TCIM_LIB_PATH=$TCIM_PATH
-export HDPL_INC_PATH=$HOUMO_PATH/include
-export HDPL_LIB_PATH=$HOUMO_PATH/lib
-export CLANG_PATH=$HOUMO_PATH
-export HDPL_PATH=$HOUMO_PATH
+export TCIM_INC_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/include
+export TCIM_LIB_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/lib
+export IDNNL_INC_PATH=$IDNNL_PATH/include
+export IDNNL_LIB_PATH=$IDNNL_PATH/lib
+export HDPL_INC_PATH=$HDPL_PATH/include
+export HDPL_LIB_PATH=$HDPL_PATH/lib
+export CLANG_LIB_PATH=$CLANG_PATH/lib
 
 # paths for runtime
-export LD_LIBRARY_PATH=$HDPL_LIB_PATH:$TCIM_LIB_PATH
-export PYTHONPATH=$TCIM_PATH:$MODELZOO_PATH:$QUANTOOL_PATH
-export PATH=$HOUMO_PATH/bin:$HMASSIST_PATH:$PATH
+export PYTHONPATH=$MODELZOO_PATH:$QUANTOOL_PATH:$PYTHONPATH
+export PATH=$HMASSIST_PATH:$PATH
 
 # data and model path
 if [[ -z $DATASETS_PATH ]]; then

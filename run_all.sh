@@ -8,11 +8,16 @@ cd "${SCRIPT_PATH}"
 
 # set modelzoo env
 export TCIM_INC_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/include
-export HDPL_INC_PATH=$HDPL_PATH/include
 export TCIM_LIB_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/lib
+export HDPL_INC_PATH=$HDPL_PATH/include
 export HDPL_LIB_PATH=$HDPL_PATH/lib
+export IDNNL_INC_PATH=$IDNNL_PATH/include
+export IDNNL_LIB_PATH=$IDNNL_PATH/lib
+
 echo "HDPL_TOOLCHAIN_ITVM_INSTALL is $HDPL_TOOLCHAIN_ITVM_INSTALL"
 echo "HDPL_PATH is $HDPL_PATH"
+
+export CMAKE_CONFIG_PATH=$SCRIPT_PATH/develop.cmake
 
 if [[ -z "${DATASETS_PATH}" ]]; then
   export DATASETS_PATH=$SCRIPT_PATH/data/datasets

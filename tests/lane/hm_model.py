@@ -9,25 +9,32 @@ import torch
 import time
 import torchvision
 
-class YoloP(Detector):
+class Lane(Detector):
 
-    # @staticmethod
-    # def data_transform(x, shape):
-    #     img = cv2.cvtColor(np.array(x), cv2.COLOR_RGB2BGR)
-    #     img, _, _ = letterbox(img, (384, 640), stride=64, auto=False)
-    #     img = np.transpose(img, (2, 0, 1)).astype(np.float32)
-    #     from utils.transform import ToTensorNotNormal
-    #     to_tensor = ToTensorNotNormal()
-    #     img = to_tensor(img)
-    #     from utils.transform import RGB2YUV
-    #     rgb2yuv = RGB2YUV(fmt="422")
-    #     img = rgb2yuv(img)
-    #     print(img.shape, img.dtype)
-    #     return img.unsqueeze(0)
+    @staticmethod
+    def data_transform(x, shape):
+        """data transform
+        :param x: pillow
+        :param shape: tuple
+        :return: torch.Tensor(NCHW, float32)
+        """
+        import torchvision.transforms as transforms
+        from utils.transform import ToTensorNotNormal
+        import torch
+        def unsqueeze(x):
+            return torch.unsqueeze(x, 0)
+        _, _, h, w = shape
+        transform = transforms.Compose(
+            [
+                transforms.Resize((720, 1280)),
+                ToTensorNotNormal(), unsqueeze,
+            ],
+        )
+        return transform(x)
 
     # @staticmethod
     # def build_config():
-    #     return {}
+    #     return {"tcim.fuse_strategy": 1, "tcim.codegen_pic": True, "tcim.core_mask": 0b11111}
 
     def _preprocess(self, img):
         img, _, _ = letterbox(img, (384, 640), stride=64, auto=False)
@@ -100,17 +107,10 @@ class YoloP(Detector):
         input_data = self._preprocess(cv_image)
         t2 = time.time()
         # self.executor.set_fixed_out(True)
-        output_datas = self.inference(input_data)
+        output_data = self.inference(input_data)
         t3 = time.time()
-        boxes, da_seg_out, ll_seg_out = self._postprocess(output_datas, cv_image)
+        boxes, da_seg_out, ll_seg_out = self._postprocess(output_data, cv_image)
         t4 = time.time()
-
-        # save golden
-        # input_data.tofile(os.path.join(self.executor.result_dir, "{}_input.bin".format(filename)))
-        # for output_name, output_data in output_datas.items():
-        #     print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-        #     output_data.tofile(os.path.join(self.executor.result_dir, "{}_{}_output.bin".format(filename, output_name)))
-        #     print("output[{}] saved in {}".format(output_name, self.executor.result_dir))
 
         # resize & normalize
         canvas, r, dw, dh, new_unpad_w, new_unpad_h = self.resize_unscale(cv_image, (384, 640))
