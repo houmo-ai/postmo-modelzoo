@@ -90,7 +90,7 @@ def compile(args=None):
             mod, target, executor=executor, mod_name='resnet50',
         )
 
-    tcim.store_so(filename, lib)
+    tcim.store_so(filename, lib, hdplcc_options=['-O2'])
     print(filename, ' saved as one fusedop model.')
 
 

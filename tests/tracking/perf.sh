@@ -5,6 +5,7 @@ set -e
 
 cd "${SCRIPT_DIR}"
 
+export HDPL_PLATFORM=ISIM
 python3 store_tracking.py
 
 cd ../../utils/tcimexec/
@@ -13,7 +14,7 @@ PATH="$(pwd):${PATH}"
 export PATH
 cd -
 
-if [ -c /dev/hmcl_feature_in ]; then
+if [ -c /dev/hm_host_pcie ]; then
   export HDPL_PLATFORM=ASIC
 fi
 
