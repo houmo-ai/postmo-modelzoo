@@ -69,7 +69,7 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
     @staticmethod
     def set_env():
         raise NotImplementedError
-    
+
     def set_fixed_out(self, flag):
         self.is_fixed_out = flag
 

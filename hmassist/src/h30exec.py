@@ -38,6 +38,12 @@ class H30Exec(Basehmexec, ABC):
             dtype = _input["dtype"]
             shape = self.shape_dict[name]
             calib_dir = None
+            n, c, h, w = shape
+            if "src_size" in self.inputs[0]:
+                src_size = self.inputs[0]["src_size"]
+            else:
+                src_size = [w, h]
+            input_shape = n, c, src_size[1], src_size[0]
             if self.quant["calib_dir"]:
                 if name in self.quant["calib_dir"]:
                     calib_dir = self.quant["calib_dir"][name]
@@ -55,24 +61,29 @@ class H30Exec(Basehmexec, ABC):
                     calib_num = len(calib_files[name])
                 for i in range(calib_num):
                     calib_dataset[i][name] = torch.tensor(
-                        self.get_data(name, dtype, shape, calib_files[name][i], data_transform))
+                        self.get_data(name, dtype, input_shape, calib_files[name][i], data_transform))
             else:
                 for i in range(calib_num):
                     calib_dataset[i][name] = torch.tensor(
-                        self.get_data(name, dtype, shape, None, None))
+                        self.get_data(name, dtype, input_shape, None, None))
 
         if not "ptq_cfg_path" in self.quant or not self.quant["ptq_cfg_path"]:
             n, c, h, w = self.inputs[0]["shape"]
+            if "src_crop" in self.inputs[0]:
+                src_crop = self.inputs[0]["src_crop"]
+            else:
+                src_crop = [0, 0, h, w]
             quanttool_config = {
                 'inputs_cfg': {
                     self.inputs[0]["name"]: {
                         'data_format': self.inputs[0]["format"],
                         'first_layer_weight_denorm_mean': self.inputs[0]["mean"],
                         'first_layer_weight_denorm_std': self.inputs[0]["std"],
-                        'resizer_crop': {'top': 0, 'left': 0, 'height': h, 'width': w},
+                        'resizer_crop': {'left': src_crop[0], 'top': src_crop[1],
+                                         'width': src_crop[2], 'height': src_crop[3]},
                         'resizer_resize': {
-                            'height': h,
                             'width': w,
+                            'height': h,
                             'align_corners': False,
                             'method': 'bilinear',
                         },
@@ -83,6 +94,7 @@ class H30Exec(Basehmexec, ABC):
             }
         else:
             quanttool_config = self.quant["ptq_cfg_path"]
+        print(quanttool_config, flush=True)
 
         # 删除列表中的空项
         del calib_dataset[calib_num:self.quant["calib_num"]]
@@ -102,8 +114,6 @@ class H30Exec(Basehmexec, ABC):
 
         sequencer.save_onnx(
             self.quant_model_path,
-            save_out_tensor=False,
-            save_params_npy=True,
             save_special_onnx=True
         )
 
@@ -144,7 +154,7 @@ class H30Exec(Basehmexec, ABC):
         t_start = time.time()
         if self.quant["debug_level"] == 1:
             from hmquant.api import convert_profiling, quantize_profiling
-            convert_profiling(self.weight, [in_datas], quanttool_config, [in_datas])
+            # convert_profiling(self.weight, [in_datas], quanttool_config, [in_datas])
             quantize_profiling(sequencer, [in_datas])
         self.layer_compare_span = time.time() - t_start
         logger.info("quantize cost {}s, layer compare cost {}s".format(self.quantize_span, self.layer_compare_span))
@@ -163,7 +173,7 @@ class H30Exec(Basehmexec, ABC):
             layout_dict[input["name"]] = "NHWC"
             type_dict[input["name"]] = input["dtype"]
             shape_dict[input["name"]] = input["shape"]
-        convert_config = {'layout': 'NHWC'}
+        convert_config = {'layout': 'NCHW'}
         # convert_config["transpose_axes"] = (0, 2, 3, 1)
         t_start = time.time()
         onnx_model = onnx.load(self.quant_model_path)
@@ -173,7 +183,8 @@ class H30Exec(Basehmexec, ABC):
         )
 
         if not config:
-            config = {"tcim.sync_strategy": 0, "tcim.for_benchmark": True}
+            config = {"tcim.fuse_strategy": 1, "tcim.codegen_pic": True, "tcim.for_benchmark": True}
+            # config = {"tcim.for_benchmark": True}
 
         logger.info("build_config={}".format(config))
 
@@ -190,10 +201,10 @@ class H30Exec(Basehmexec, ABC):
             if os.getenv("TCIM_CROSS_COMPILE"):
                 logger.info("cross compile enabled as aarch64")
                 model_name = self.model_name + "_aarch64"
-                tcim.store_so(model_name, lib, hdplcc_options=['-O2'], host_target="arm64")
+                tcim.store_so(model_name, lib, self.result_dir, hdplcc_options=['-O2'], host_target="arm64")
             else:
                 model_name = self.model_name
-                tcim.store_so(model_name, lib, hdplcc_options=['-O2'])
+                tcim.store_so(model_name, lib, self.result_dir, hdplcc_options=['-O2'])
             logger.info('{} saved as aot model in {}'.format(self.model_name, self.model_dir))
 
         elif self.build_mode == "JIT":
@@ -240,9 +251,9 @@ class H30Exec(Basehmexec, ABC):
                 output_data = self.module.get_output_by_name(name).numpy()
             else:
                 output_data = self.module.get_float_output_by_name(name).numpy()
-            if (len(output_data.shape) == 4):
+            # if (len(output_data.shape) == 4):
                 # toolchain output is NHWC
-                output_data = np.transpose(output_data, (0, 3, 1, 2))
+                # output_data = np.transpose(output_data, (0, 3, 1, 2))
             outputs[name] = output_data
 
         return outputs

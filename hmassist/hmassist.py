@@ -56,7 +56,8 @@ def get_model(cfg, backend=None):
                          .format(dataset_class))
             exit(-1)
     except Exception as e:
-        logger.warning("can not find hm_dataset.py, use default model will not support accuracy")
+        logger.warning("can not find hm_dataset.py, use default model will not support accuracy: {}"
+                       .format(e))
         dataset = None
 
     try:
@@ -77,7 +78,8 @@ def get_model(cfg, backend=None):
                          .format(model_impl_class))
             exit(-1)
     except Exception as e:
-        logger.warning("can not find hm_model.py, use default model will not support demo/perf/accuracy")
+        logger.warning("can not find hm_model.py, use default model will not support demo/perf/accuracy: {}"
+                       .format(e))
         model = BaseModel(
             executor=hmexec,
             inputs=hmexec.inputs,
@@ -136,24 +138,38 @@ def test(cfg, backend):
         # hmexec.print_input_info()
         hmexec.print_output_info()
         in_datas = hmexec.get_golden_inputs()
-        hmexec.set_fixed_out(True)
         tcim_outputs = hmexec.infer(in_datas)
+        hmexec.set_fixed_out(True)
+        tcim_fixed_outputs = hmexec.infer(in_datas)
         model_name = hmexec.model_name
         # save and compare
+        for input_name, input_data in in_datas.items():
+            input_data.tofile(os.path.join(hmexec.result_dir, "{}_input.bin".format(input_name)))
         for output_name, output_data in tcim_outputs.items():
+            # 临时添加NCHW
+            # output_data = np.transpose(output_data, (0, 2, 3, 1))
+            # save fixed result
+            fixed_output_data = tcim_fixed_outputs[output_name]
             logger.info("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-            tcim_output_path = os.path.join(hmexec.result_dir, 'tcim_{}_{}_output.npy'.format(model_name, output_name))
-            np.save(tcim_output_path, output_data)
-            logger.info("fixed output[{}] saved in {}".format(output_name, tcim_output_path))
+            fixed_output_data.tofile(os.path.join(hmexec.result_dir, "{}_output_fixed.bin".format(output_name)))
+            fixed_output_data.tofile(os.path.join(hmexec.result_dir, "{}_output_fixed.txt".format(output_name)), sep="\n")
+            np.save(os.path.join(hmexec.result_dir, 'tcim_{}_{}_output_fixed.npy'.format(model_name, output_name)), fixed_output_data)
+            # save origin result
+            output_data.tofile(os.path.join(hmexec.result_dir, "{}_output.bin".format(output_name)))
+            output_data.tofile(os.path.join(hmexec.result_dir, "{}_output.txt".format(output_name)), sep="\n")
+            np.save(os.path.join(hmexec.result_dir, 'tcim_{}_{}_output.npy'.format(model_name, output_name)), output_data)
+            logger.info("output[{}] saved in {}".format(output_name, hmexec.result_dir))
             golden_output = hmexec.get_golden_output(output_name)
             if golden_output is not None:
                 if golden_output.shape == output_data.shape:
-                    cosine_dist = cosine_distance(golden_output, output_data)
+                    cosine_dist1 = cosine_distance(golden_output, output_data)
+                    cosine_dist2 = cosine_distance(golden_output, fixed_output_data)
                     # print("golden_output=", golden_output)
                     # print("output_data=", output_data)
-                    is_match = (golden_output == output_data).all()
-                    logger.info("[compare] {} vs quant output [{}] match={}, similarity={:.6f}"
-                                .format(hmexec.target, output_name, is_match, cosine_dist))
+                    is_match1 = (golden_output == output_data).all()
+                    is_match2 = (golden_output == fixed_output_data).all()
+                    logger.info("[compare] {} vs quant output [{}] match={}, similarity={:.6f}, fixed match={}, similarity={:.6f}"
+                                .format(hmexec.target, output_name, is_match1, cosine_dist1, is_match2, cosine_dist2))
                 else:
                     logger.error("[compare] {} vs quant output [{}] shape not equal {} vs {}"
                                  .format(hmexec.target, output_name, output_data.shape, golden_output.shape))
@@ -175,12 +191,19 @@ def demo(cfg, backend):
         test_num = cfg["demo"]["test_num"]
 
         file_list = []
-        for filename in os.listdir(data_dir):
-            _, ext = os.path.splitext(filename)
+        if os.path.isfile(data_dir):
+            _, ext = os.path.splitext(data_dir)
             if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
-                file_list.append(os.path.join(data_dir, filename))
-                if len(file_list) == test_num:
-                    break
+                file_list.append(data_dir)
+            else:
+                logger.error("file type not support -> {}".format(data_dir))
+        elif os.path.isdir(data_dir):
+            for filename in os.listdir(data_dir):
+                _, ext = os.path.splitext(filename)
+                if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
+                    file_list.append(os.path.join(data_dir, filename))
+                    if len(file_list) == test_num:
+                        break
 
         if backend == "onnx":
             model.load_json(hmexec.original_json_path)
