@@ -5,9 +5,9 @@ import abc
 import cv2
 import importlib
 import numpy as np
-from utils import logger
-from utils.enum_type import PaddingMode
-from utils.preprocess import calc_padding_size, default_preprocess
+from ..utils import logger
+from ..utils.enum_type import PaddingMode
+from ..utils.preprocess import calc_padding_size, default_preprocess
 from collections import namedtuple, OrderedDict
 import torch
 import torchvision.transforms as transforms
@@ -146,7 +146,6 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
         @return: numpy
         """
         import torchvision.transforms as transforms
-        from utils.transform import ToTensorNotNormal
         import torch
 
         if filepath:   # 指定输入数据
@@ -183,12 +182,12 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
         # in_datas = OrderedDict()  # 保证输入顺序一致
         in_datas = {}
         for idx, _input in enumerate(self.inputs):
-            
+
             name = _input["name"]
             format = _input["format"]
             dtype = _input["dtype"]
             shape = self.shape_dict[name]
-            
+
             in_datas[name] = self.get_data(name, dtype, shape, file_path, transform)
 
             if to_tensor:

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import os
-from base.base_dataset import BaseDataset
-from utils import logger
+from .base_dataset import BaseDataset
+from ..utils import logger
 
 
 class COCO2017Val(BaseDataset):

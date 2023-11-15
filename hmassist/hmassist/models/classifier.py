@@ -9,8 +9,8 @@ import cv2
 import tqdm
 
 from .base_model import BaseModel
-from utils import logger
-from utils.preprocess import default_preprocess
+from ..utils import logger
+from ..utils.preprocess import default_preprocess
 from torchvision.datasets.folder import pil_loader
 
 class Classifier(BaseModel, ABC):

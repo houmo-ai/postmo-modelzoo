@@ -4,8 +4,8 @@ import os
 import pickle
 import json
 import numpy as np
-from utils.dist_metrics import cosine_distance
-from utils import logger
+from .dist_metrics import cosine_distance
+from . import logger
 
 
 def compare_dump_out(chip_dump_path, iss_fixed_dump_path, cpu_fixed_dump_path):

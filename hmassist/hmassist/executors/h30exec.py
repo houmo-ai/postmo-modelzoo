@@ -6,8 +6,8 @@ import numpy as np
 from abc import ABC
 from prettytable import PrettyTable
 from collections import OrderedDict
-from utils import logger
-from utils.enum_type import PaddingMode
+from ..utils import logger
+from ..utils.enum_type import PaddingMode
 from .base_hmexec import Basehmexec
 import onnx
 import torch
@@ -72,7 +72,7 @@ class H30Exec(Basehmexec, ABC):
             if "src_crop" in self.inputs[0]:
                 src_crop = self.inputs[0]["src_crop"]
             else:
-                src_crop = [0, 0, h, w]
+                src_crop = [0, 0, w, h]
             quanttool_config = {
                 'inputs_cfg': {
                     self.inputs[0]["name"]: {
@@ -109,7 +109,7 @@ class H30Exec(Basehmexec, ABC):
             debug=None,
             model_name=self.model_name,
             with_label=False,
-            requant_dispatch=False,
+            requant_dispatch=True,
         )
 
         sequencer.save_onnx(
@@ -169,16 +169,24 @@ class H30Exec(Basehmexec, ABC):
         shape_dict = {}
         convert_config = {}
         layout_dict = {}
-        for input in self.inputs:
-            layout_dict[input["name"]] = "NHWC"
-            type_dict[input["name"]] = input["dtype"]
-            shape_dict[input["name"]] = input["shape"]
-        convert_config = {'layout': 'NCHW'}
+        # convert_config = {'layout': 'NCHW'}
         # convert_config["transpose_axes"] = (0, 2, 3, 1)
         t_start = time.time()
         onnx_model = onnx.load(self.quant_model_path)
+        for input in onnx_model.graph.input:
+            dims = input.type.tensor_type.shape.dim
+            for i in self.inputs:
+                if i["name"] == input.name:
+                    batch = i["shape"][0]
+                    type_dict[input.name] = i["dtype"]
+            input_shape = (
+                batch, dims[1].dim_value,
+                dims[2].dim_value, dims[3].dim_value,
+            )
+            shape_dict[input.name] = input_shape
+
         mod = relay.frontend.from_hmonnx(
-            onnx_model, shape_dict, type_dict, layout_dict, resizer_attr=None,
+            onnx_model, shape_dict, type_dict, resizer_attr=None,
             convert_config=convert_config,
         )
 
@@ -201,10 +209,10 @@ class H30Exec(Basehmexec, ABC):
             if os.getenv("TCIM_CROSS_COMPILE"):
                 logger.info("cross compile enabled as aarch64")
                 model_name = self.model_name + "_aarch64"
-                tcim.store_so(model_name, lib, self.result_dir, hdplcc_options=['-O2'], host_target="arm64")
+                tcim.store_so(model_name, lib, self.result_dir + "/../build", hdplcc_options=['-O2'], host_target="arm64")
             else:
                 model_name = self.model_name
-                tcim.store_so(model_name, lib, self.result_dir, hdplcc_options=['-O2'])
+                tcim.store_so(model_name, lib, self.result_dir + "/../build", hdplcc_options=['-O2'])
             logger.info('{} saved as aot model in {}'.format(self.model_name, self.model_dir))
 
         elif self.build_mode == "JIT":
@@ -306,7 +314,7 @@ class H30Exec(Basehmexec, ABC):
             name = self.module.get_input_name_by_index(id)
             # name = self.module.get_input_name(id)
             input_data = self.module.get_input_by_name(name).numpy()
-        logger.info("model input[{}] shape = {}, dtype = {}".format(name, input_data.shape, input_data.dtype))
+            logger.info("model input[{}] shape = {}, dtype = {}".format(name, input_data.shape, input_data.dtype))
 
     def print_output_info(self):
         output_num = self.module.get_num_outputs()
@@ -314,7 +322,7 @@ class H30Exec(Basehmexec, ABC):
         for id in range(0, output_num):
             name = self.module.get_output_name_by_index(id)
             output_data = self.module.get_output_by_name(name).numpy()
-        logger.info("model output[{}] shape = {}, dtype = {}".format(name, output_data.shape, output_data.dtype))
+            logger.info("model output[{}] shape = {}, dtype = {}".format(name, output_data.shape, output_data.dtype))
 
     @property
     def freq(self):

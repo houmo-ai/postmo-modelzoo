@@ -1,30 +1,31 @@
 model: {
   framework: onnx,
-  name: lane_512x1536,
+  name: yolov5s_aiin,
   save_dir: ./output,
-  weight: ./apollo_lane_1536x512.onnx,
+  weight: ./yolov5s_aiin_clip.onnx,
   inputs: [
     {
-      name: data,
-      shape: [1, 3, 512, 1536],
+      name: images,
+      shape: [1, 3, 384, 640],
       layout: NCHW,
-      format: BGR,
+      format: RGB,
       src_format: YUV422,
       resize: ,
       crop: ,
       dtype: uint8,
-      mean: [ 0.373, 0.388, 0.376 ],
-      std: [ 0.004, 0.004, 0.004 ],
-      data_path: /workspace/platform/toolchain/imodelzoo/data/datasets/imagenet/ILSVRC2012_val_00000016.JPEG,
+      mean: [ 0.485, 0.456, 0.406 ],
+      std: [ 0.229, 0.224, 0.225 ],
+      data_path: ./road/output_0001.jpg,
     }
   ],
-  impl_class: ,
+  impl_class: YoloV5,
 }
 
 quant: {
+  ptq_cfg_path: ./quant_config.py,
   calib_dir:
   {
-    data: ./lane_data,
+    images: ./road,
   },
   calib_num: 20,
   preproc_module: ,
@@ -42,8 +43,8 @@ build: {
 }
 
 demo: {
-  data_dir: /workspace/platform/toolchain/imodelzoo/data/datasets/imagenet,
-  num: 1,
+  data_dir: ./road,
+  test_num: 10,
 }
 
 perf: {
@@ -54,8 +55,8 @@ perf: {
 }
 
 accuracy: {
-  data_dir: /workspace/platform/toolchain/imodelzoo/data/datasets/imagenet,
-  test_num: 1,
+  data_dir: ../../data/datasets/coco2017/val2017,
+  test_num: 10,
   dataset_class: Dataset,
 }
 

@@ -5,23 +5,28 @@ import os
 import cv2
 import torch
 import tqdm
+import numpy as np
+# from ..utils.preprocess import letterbox
+from ..utils.box_utils import letterbox
+from ..utils.transform import BGR2YUV
 
 from .base_model import BaseModel
-from utils.postprocess import (
+from ..utils.postprocess import (
     non_max_suppression,
     scale_coords,
 )
-from utils.metrics import (
+from ..utils.metrics import (
     coco_eval,
     detection_txt2json,
     detections2txt,
 )
-from utils import logger
+from ..utils import logger
 
 class Detector(BaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+        self._input_size = (640, 640)
         self._iou_threshold = 0.45
         self._conf_threshold = 0.25
 
@@ -31,16 +36,20 @@ class Detector(BaseModel):
     def set_conf_threshold(self, conf_threshold=0.25):
         self._conf_threshold = conf_threshold
 
+    def _preprocess(self, img):
+        img, _, _ = letterbox(img, self._input_size, stride=64, auto=False)
+        img = np.transpose(img, (2, 0, 1)).astype(np.float32)
+        rgb2yuv_func = BGR2YUV(fmt="422")
+        img = rgb2yuv_func(torch.tensor(img))
+        # img = (img.float() / 255.0).numpy().astype(np.float32)
+        return np.expand_dims(img.numpy().astype(np.uint8), 0)
+
     def _postprocess(self, outputs, cv_image=None):
         if len(outputs) == 4 or len(outputs) == 1:
             outputs = outputs[0]
-        elif len(outputs) == 3:
-            logger.error("Not support yet.")
-            exit(-1)
-        else:
-            logger.error("Output num error -> {}".format(len(outputs)))
-            exit(-1)
-        outputs = torch.from_numpy(outputs)
+        # add yolo process
+        outputs = self.yolo_detect(outputs)
+        # outputs = torch.from_numpy(outputs)
         outputs = non_max_suppression(outputs, self._conf_threshold, self._iou_threshold)
         outputs = outputs[0]  # bs=1
         outputs[:, :4] = scale_coords(self._input_size, outputs[:, :4], cv_image.shape).round()
@@ -83,27 +92,3 @@ class Detector(BaseModel):
             "map50": "{:.6f}".format(map50),
             "latency": "{:.6f}".format(self.ave_latency_ms)
         }
-
-    def demo(self, img_path):
-        if not os.path.exists(img_path):
-            logger.error("The img path not exist -> {}".format(img_path))
-            exit(-1)
-        filename = os.path.basename(img_path)
-        logger.info("process: {}".format(img_path))
-
-        save_results = "vis_{}_{}".format(self.backend, self.dtype)
-        if not os.path.exists(save_results):
-            os.makedirs(save_results)
-
-        cv_image = cv2.imread(img_path)
-        if cv_image is None:
-            logger.error("Failed to decode img by opencv -> {}".format(img_path))
-            exit(-1)
-
-        detections = self.inference(cv_image)
-
-        for det in detections:
-            (x1, y1, x2, y2), conf, cls = list(map(int, det[0:4])), det[4], int(det[5])
-            cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 0, 255), 2, 8)
-            logger.info("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(cls)))
-        cv2.imwrite(os.path.join(save_results, filename), cv_image)

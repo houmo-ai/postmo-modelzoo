@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
-from utils.glog_format import GLogFormatterWithColor
-
+from .glog_format import GLogFormatterWithColor
 
 logger = logging.getLogger()
 

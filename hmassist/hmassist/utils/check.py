@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-from utils import logger
+from . import logger
 from enum import Enum
 
 

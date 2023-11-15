@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 import torchvision
 
-from utils import logger
+from . import logger
 
 
 def crop_mask(masks, boxes):

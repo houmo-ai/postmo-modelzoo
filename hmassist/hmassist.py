@@ -8,18 +8,18 @@ import argparse
 import importlib
 import logging
 import time
-from utils import logger
-from utils.glog_format import GLogFormatter
-from utils.parser import read_yaml_to_dict
-from utils.dist_metrics import cosine_distance
-from utils.check import (
+from hmassist.utils import logger
+from hmassist.utils.glog_format import GLogFormatter
+from hmassist.utils.parser import read_yaml_to_dict
+from hmassist.utils.dist_metrics import cosine_distance
+from hmassist.utils.check import (
     check_config,
     check_demo_config,
     check_accuracy_config,
     check_file_exist
 )
-from src.h30exec import H30Exec
-from base.base_model import BaseModel
+from hmassist.executors.h30exec import H30Exec
+from hmassist.models.base_model import BaseModel
 
 def set_logger(op, log_dir, filename):
     if not os.path.exists(log_dir):

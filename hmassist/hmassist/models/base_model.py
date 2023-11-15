@@ -2,7 +2,8 @@
 
 import abc
 import time
-from utils import logger
+from ..utils import logger
+from ..utils.transform import ToTensorNotNormal
 
 class BaseModel(object, metaclass=abc.ABCMeta):
     """模型描述基类，提供2个功能，demo和eval
@@ -41,7 +42,6 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         :return: torch.Tensor(NCHW, float32)
         """
         import torchvision.transforms as transforms
-        from utils.transform import ToTensorNotNormal
         import torch
         logger.warning("can not find hm_model.data_transform, use default")
         def unsqueeze(x):

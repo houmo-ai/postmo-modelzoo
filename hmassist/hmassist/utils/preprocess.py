@@ -2,8 +2,8 @@
 
 import cv2
 import numpy as np
-from utils import logger
-from utils.enum_type import PaddingMode
+from . import logger
+from .enum_type import PaddingMode
 
 def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
     """

@@ -9,8 +9,8 @@ import torch
 import traceback
 import numpy as np
 from pathlib import Path
-from utils.postprocess import xyxy2xywh
-from utils import logger
+from .postprocess import xyxy2xywh
+from . import logger
 
 
 def smooth(y, f=0.05):
