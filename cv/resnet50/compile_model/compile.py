@@ -67,12 +67,12 @@ def compile(args=None):
     executor = Executor('aot')
     if batch == 1:
         compile_config = {
-            'tcim.fuse_strategy': 1,
-            'tcim.gen_intrinsic': 1,
-            'tcim.schedule_strategy': 1,
+            'tcim.fuse_strategy': 0,
+            'tcim.gen_intrinsic': 2,
             'tcim.for_benchmark': True,
             'tcim.core_num': 1,
             'tcim.sync_strategy': 1,
+            'tcim.codegen_pic': False,
         }
     else:
         compile_config = {
@@ -83,6 +83,7 @@ def compile(args=None):
             'tcim.for_benchmark': True,
             'tcim.core_num': 4,
             'tcim.sync_strategy': 1,
+            'tcim.codegen_pic': False,
         }
     target = tvm.target.Target('hdpl', host='c')
     with tvm.transform.PassContext(opt_level=3, config=compile_config):

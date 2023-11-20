@@ -66,18 +66,16 @@ def compile(args=None):
     target = tvm.target.Target('hdpl', host='c')
     if args.mode == 'eval':
         compile_config = {
-            'tcim.gen_intrinsic': 1,
+            'tcim.gen_intrinsic': 2,
             'tcim.sync_strategy': 1,
-            'tcim.for_benchmark': True,
+            'tcim.codegen_pic': False,
         }
     else:
         compile_config = {
-            'tcim.fuse_strategy': 0,
             'tcim.spec_batch_num': batch,
-            'tcim.input_data_fmt': 'YUV422SP',
-            'tcim.gen_intrinsic': 1,
-            'tcim.sync_strategy': 1,
+            'tcim.gen_intrinsic': 0,
             'tcim.for_benchmark': True,
+            'tcim.sync_strategy': 1,
         }
 
     with tvm.transform.PassContext(opt_level=3, config=compile_config):
