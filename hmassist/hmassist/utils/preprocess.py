@@ -48,6 +48,15 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleF
     return im, ratio, (dw, dh)
 
 
+def centercrop(im, size):
+    h, w = im.shape[:2]
+    h1 = round((h - size[0]) / 2)
+    h2 = h1 + size[0]
+    w1 = round((w - size[1]) / 2)
+    w2 = w1 + size[1]
+    cropped = im[h1:h2, w1:w2]
+    return cropped
+
 def calc_padding_size(im, target_size, padding_mode):
     top, bottom, left, right = 0, 0, 0, 0
     tw, th = target_size

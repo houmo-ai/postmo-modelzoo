@@ -7,92 +7,99 @@ from abc import ABC
 from prettytable import PrettyTable
 from collections import OrderedDict
 from ..utils import logger
-from ..utils.enum_type import PaddingMode
-from .base_hmexec import Basehmexec
+from ..utils.utils import get_random_data
+from .base_exec import BaseExec
 import onnx
 import torch
+import tvm
 import tvm.relay as relay
 import tvm.tcim as tcim
 
-
-class H30Exec(Basehmexec, ABC):
+class H30Exec(BaseExec, ABC):
     def __init__(self, cfg: dict):
         super(H30Exec, self).__init__(cfg)
+        self.model_path = os.path.join(self.model_dir, self.model_name)
 
-        self.model_path = os.path.join(self.model_dir, "{}".format(self.model_name))
-
-    @staticmethod
-    def set_env():
-        pass
-
-    def quantize(self, data_transform):
+    def quantize(self, get_input_datas):
         logger.info("################  ptq quantize started  ######################")
         t_start = time.time()
-        calib_files = {}
+        calib_files = []
         calib_dataset = [dict() for i in range(self.quant["calib_num"])]
         calib_num = self.quant["calib_num"]
+        quanttool_config = {'inputs_cfg': {}}
+        # quanttool_config['graph_opt_cfg'] = {}
+
+        # 准备量化数据集
+        calib_dir = self.quant["calib_dir"]
+        if calib_dir:
+            if os.path.isdir(calib_dir):
+                filelist = os.listdir(calib_dir)
+            elif os.path.isfile(calib_dir):
+                filelist = [calib_dir]
+                calib_num = 1
+            else:
+                logger.error(f"unknown calib_dir: {calib_dir}")
+                exit(-1)
+            for filename in filelist:
+                _, ext = os.path.splitext(filename)
+                if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP", ".bin"]:
+                    calib_files.append(filename)
+                    if len(calib_files) == calib_num:
+                        break
+            if len(calib_files) < self.quant["calib_num"]:
+                logger.warning("calib_dir only has {} files, but calib_num is {}."
+                    .format(len(calib_files), self.quant["calib_num"]))
+                calib_num = len(calib_files)
+            for id in range(calib_num):
+                logger.info("calib file: {}".format(calib_files[id]))
+                inputs = get_input_datas(calib_dir, calib_files[id])
+                for name, data in inputs.items():
+                    # data = np.transpose(data, (2, 0, 1))  # CHW
+                    data = np.expand_dims(data, axis=0)  # NCHW
+                    calib_dataset[id][name] = torch.tensor(data.astype(np.float32))
 
         for _input in self.inputs:
             name = _input["name"]
-            calib_files[name] = []
-            dtype = _input["dtype"]
             shape = self.shape_dict[name]
-            calib_dir = None
             n, c, h, w = shape
-            if "src_size" in self.inputs[0]:
-                src_size = self.inputs[0]["src_size"]
-            else:
-                src_size = [w, h]
-            input_shape = n, c, src_size[1], src_size[0]
-            if self.quant["calib_dir"]:
-                if name in self.quant["calib_dir"]:
-                    calib_dir = self.quant["calib_dir"][name]
-            if calib_dir:
-                filelist = os.listdir(calib_dir)
-                for filename in filelist:
-                    _, ext = os.path.splitext(filename)
-                    if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP", ".bin"]:
-                        calib_files[name].append(os.path.join(calib_dir, filename))
-                        if len(calib_files[name]) == calib_num:
-                            break
-                if len(calib_files[name]) < self.quant["calib_num"]:
-                    logger.warning("calib_dir[{}] only has {} files, but calib_num is {}."
-                                .format(name, len(calib_files[name]), self.quant["calib_num"]))
-                    calib_num = len(calib_files[name])
-                for i in range(calib_num):
-                    calib_dataset[i][name] = torch.tensor(
-                        self.get_data(name, dtype, input_shape, calib_files[name][i], data_transform))
-            else:
-                for i in range(calib_num):
-                    calib_dataset[i][name] = torch.tensor(
-                        self.get_data(name, dtype, input_shape, None, None))
 
-        if not "ptq_cfg_path" in self.quant or not self.quant["ptq_cfg_path"]:
-            n, c, h, w = self.inputs[0]["shape"]
-            if "src_crop" in self.inputs[0]:
-                src_crop = self.inputs[0]["src_crop"]
-            else:
-                src_crop = [0, 0, w, h]
-            quanttool_config = {
-                'inputs_cfg': {
-                    self.inputs[0]["name"]: {
-                        'data_format': self.inputs[0]["format"],
-                        'first_layer_weight_denorm_mean': self.inputs[0]["mean"],
-                        'first_layer_weight_denorm_std': self.inputs[0]["std"],
-                        'resizer_crop': {'left': src_crop[0], 'top': src_crop[1],
-                                         'width': src_crop[2], 'height': src_crop[3]},
-                        'resizer_resize': {
-                            'width': w,
-                            'height': h,
-                            'align_corners': False,
-                            'method': 'bilinear',
-                        },
-                        'toYUV_format': self.inputs[0]["src_format"],
-                    },
-                },
-                'graph_opt_cfg': {},
-            }
-        else:
+            if "ptq_cfg_path" not in self.quant or not self.quant["ptq_cfg_path"]:
+                # 准备量化参数
+                logger.info("using quanttool_config from config.yml")
+                quanttool_config['inputs_cfg'][name] = {}
+                input_cfg = quanttool_config['inputs_cfg'][name]
+                input_cfg['data_format'] = _input["format"]
+                input_cfg['first_layer_weight_denorm_mean'] = _input["mean"]
+                input_cfg['first_layer_weight_denorm_std'] = _input["std"]
+                if "image" in self.inputs[0]:
+                    if "size" in self.inputs[0]["image"] and self.inputs[0]["image"]["size"]:
+                        image_size = self.inputs[0]["image"]["size"]
+                    else:
+                        image_size = [h, w]
+                    if "crop" in self.inputs[0]["image"] and self.inputs[0]["image"]["crop"]:
+                        image_crop = self.inputs[0]["image"]["crop"]
+                    else:
+                        image_crop = [0, 0, image_size[0], image_size[1]]
+                    input_cfg['resizer_crop'] = {'top': image_crop[0],
+                                                 'left': image_crop[1],
+                                                 'height': image_crop[2],
+                                                 'width': image_crop[3]}
+                    input_cfg['resizer_resize'] = {'width': w,
+                                                   'height': h,
+                                                   'align_corners': False,
+                                                   'method': 'bilinear'}
+                    input_cfg['toYUV_format'] = _input["image"]["format"]
+
+            if calib_dir is None:
+                for id in range(calib_num):
+                    dtype = _input["dtype"]
+                    input_shape = n, c, image_size[0], image_size[1]
+                    logger.warning("data[{}] will use random data".format(name))
+                    calib_dataset[id][name] = torch.tensor(
+                        get_random_data(name, dtype, input_shape))
+
+        if "ptq_cfg_path" in self.quant and self.quant["ptq_cfg_path"]:
+            logger.info("using quanttool_config from {}".format(self.quant["ptq_cfg_path"]))
             quanttool_config = self.quant["ptq_cfg_path"]
         print(quanttool_config, flush=True)
 
@@ -112,37 +119,41 @@ class H30Exec(Basehmexec, ABC):
             requant_dispatch=True,
         )
 
-        sequencer.save_onnx(
-            self.quant_model_path,
-            save_special_onnx=True
-        )
+        # sequencer.save_onnx(
+        #     self.quant_model_path,
+        #     save_special_onnx=True
+        # )
 
         logger.info("################  ptq quantize finished  ######################")
         self.quantize_span = time.time() - t_start
 
         # gen golden data
-        in_datas = {}
-        for _input in self.inputs:
-            name = _input["name"]
-            dtype = _input["dtype"]
-            shape = self.shape_dict[name]
-            if "data_path" in _input:
-                file_path = _input["data_path"]
-            else:
-                file_path = None
-            in_datas[name] = self.get_data(name, dtype, shape, file_path, data_transform).astype("float32")
-
-        quant_datas = {}
-        for name, data in in_datas.items():
-            # golden_input_path = os.path.join(golden_data_path, name + '.npy')
-            # np.save(golden_data_path + name + '.npy', data)
-            # data.tofile(golden_data_path + name + '.bin', data)
-            quant_datas[name] = torch.tensor(data)
+        inputs = {}
+        if "data_path" in _input and _input["data_path"]:
+            dir, file = os.path.split(_input["data_path"])
+            inputs = get_input_datas(dir, file)
+            for name, data in inputs.items():
+                # golden_input_path = os.path.join(golden_data_path, name + '.npy')
+                # np.save(golden_data_path + name + '.npy', data)
+                # data.tofile(golden_data_path + name + '.bin', data)
+                data = np.expand_dims(data, axis=0)  # NCHW
+                inputs[name] = torch.tensor(data.astype("float32"))
+        else:
+            for _input in self.inputs:
+                name = _input["name"]
+                dtype = _input["dtype"]
+                shape = self.shape_dict[name]
+                for id in range(calib_num):
+                    dtype = _input["dtype"]
+                    input_shape = n, c, image_size[0], image_size[1]
+                    logger.warning("data[{}] will use random data".format(name))
+                    inputs[name] = torch.tensor(
+                        get_random_data(name, dtype, input_shape))
 
         from hmquant.api import generate_golden
         generate_golden(
             sequencer=sequencer,
-            calibset=quant_datas,
+            calibset=inputs,
             save_path=self.result_dir,
             model_name=self.model_name,
             batch_size=1,
@@ -154,8 +165,8 @@ class H30Exec(Basehmexec, ABC):
         t_start = time.time()
         if self.quant["debug_level"] == 1:
             from hmquant.api import convert_profiling, quantize_profiling
-            # convert_profiling(self.weight, [in_datas], quanttool_config, [in_datas])
-            quantize_profiling(sequencer, [in_datas])
+            # convert_profiling(self.weight, [in_datas], quanttool_config, [inputs])
+            quantize_profiling(sequencer, [inputs])
         self.layer_compare_span = time.time() - t_start
         logger.info("quantize cost {}s, layer compare cost {}s".format(self.quantize_span, self.layer_compare_span))
 
@@ -169,6 +180,7 @@ class H30Exec(Basehmexec, ABC):
         shape_dict = {}
         convert_config = {}
         layout_dict = {}
+        batch = 1
         # convert_config = {'layout': 'NCHW'}
         # convert_config["transpose_axes"] = (0, 2, 3, 1)
         t_start = time.time()
@@ -192,20 +204,19 @@ class H30Exec(Basehmexec, ABC):
 
         if not config:
             config = {"tcim.fuse_strategy": 1, "tcim.codegen_pic": True, "tcim.for_benchmark": True}
-            # config = {"tcim.for_benchmark": True}
+            # "tcim.mem_plan_strategy": "linearscan"
 
         logger.info("build_config={}".format(config))
 
         if self.build_mode == "AOT":
-            from tvm.relay.backend import Executor
-            import tvm
-            executor = Executor('aot')
+            executor = relay.backend.Executor('aot')
             target = tvm.target.Target('hdpl', host='c')
 
             with tvm.transform.PassContext(opt_level=3, config=config):
                 graph, lib, params = relay.build(
                     mod, target, executor=executor, mod_name=self.model_name,
                 )
+
             if os.getenv("TCIM_CROSS_COMPILE"):
                 logger.info("cross compile enabled as aarch64")
                 model_name = self.model_name + "_aarch64"
@@ -217,7 +228,7 @@ class H30Exec(Basehmexec, ABC):
 
         elif self.build_mode == "JIT":
             with relay.build_config(opt_level=3):
-                graph, lib, params = relay.build(mod, 'hdpl --host=llvm')
+                graph, lib, params = tvm.relay.build(mod, 'hdpl --host=llvm')
             # store model as one fusedop
             rt_opt = '-resizer'
             tcim.store_as_fusedop(self.model_name, graph, params, shape_dict, lib, rt_opt)
@@ -235,19 +246,20 @@ class H30Exec(Basehmexec, ABC):
         else:
             logger.error("unsupoorted build mode ", self.build_mode)
 
-    def infer(self, in_datas):
+    def infer(self, inputs):
         """ infer one time """
         for input in self.inputs:
-            if type(in_datas) == dict:
-                input_data = in_datas[input["name"]]
+            if type(inputs) == dict:
+                input_data = inputs[input["name"]]
             else:
-                input_data = in_datas
+                input_data = inputs
+            # print(input_data.shape, input_data.dtype)
             if self.build_mode == "AOT":
-                if input["src_format"] in ["YUV420", "YUV422", "YUV444"]:
-                    src_format = input["src_format"] + 'SP'
+                if input["image"]["format"] in ["YUV420", "YUV422", "YUV444"]:
+                    image_format = input["image"]["format"] + 'SP'
                 else:
-                    src_format = input["src_format"]
-                self.module.set_input(input["name"], input_data, src_format)
+                    image_format = input["image"]["format"]
+                self.module.set_input(input["name"], input_data, image_format)
             else:
                 self.module.set_input(input["name"], input_data)
         self.module.run()
@@ -279,15 +291,24 @@ class H30Exec(Basehmexec, ABC):
         logger.info(cmd)
         os.system(cmd)
 
+    def _preprocess(self, inputs):
+        datas = {}
+        for input in self.inputs:
+            if input["image"]["format"] in ["YUV420", "YUV422", "YUV444"]:
+                from ..utils.transform import BGR2YUV
+                rgb2yuv_func = BGR2YUV(fmt="422")
+                image = rgb2yuv_func(torch.tensor(inputs[input["name"]])).numpy()  # HWC
+                datas[input["name"]] = np.expand_dims(image, 0).astype(np.uint8)  # NHWC
+            else:
+                datas[input["name"]] = inputs[input["name"]]
+        return datas
+
     def get_golden_inputs(self):
         datas = {}
         for input in self.inputs:
             input_data_path = os.path.join(self.result_dir, 'hmquant_' + self.model_name 
                                            + '_' + input["name"] + '_input.npy')
-            input_data = np.load(input_data_path).astype('uint8')
-            # if input["layout"] == "NCHW":
-                # NCHW -> NHWC
-                # input_data = np.transpose(input_data, (0, 2, 3, 1))
+            input_data = np.load(input_data_path).astype(np.uint8)
             logger.info("golden input[{}] shape = {}, dtype = {}".format(input["name"], input_data.shape, input_data.dtype))
             datas[input["name"]] = input_data
         return datas
@@ -296,9 +317,6 @@ class H30Exec(Basehmexec, ABC):
         golden_output_path = os.path.join(self.golden_data_path, name + '.npy')
         if os.path.exists(golden_output_path):
             golden_output = np.load(golden_output_path, allow_pickle=True).item().get("output_tensor")
-            # if (len(golden_output.shape) == 4):
-            #     # toolchain output is NHWC
-            #     golden_output = np.transpose(golden_output, (0, 2, 3, 1))
             return golden_output
         else:
             logger.warning("compare canceled while golden data not found -> {}".format(golden_output_path))
@@ -312,9 +330,8 @@ class H30Exec(Basehmexec, ABC):
         logger.info("model input num = {}".format(input_num))
         for id in range(0, input_num):
             name = self.module.get_input_name_by_index(id)
-            # name = self.module.get_input_name(id)
-            input_data = self.module.get_input_by_name(name).numpy()
-            logger.info("model input[{}] shape = {}, dtype = {}".format(name, input_data.shape, input_data.dtype))
+            # input_data = self.module.get_input(id).numpy()
+            # logger.info("model input[{}] shape = {}, dtype = {}".format(name, input_data.shape, input_data.dtype))
 
     def print_output_info(self):
         output_num = self.module.get_num_outputs()

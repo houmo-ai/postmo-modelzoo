@@ -15,7 +15,7 @@ include_directories(${TCIM_INC_PATH})
 include_directories(${HDPL_INC_PATH})
 
 # lib paths
-find_library(TCIM_LIBRARY NAMES tvm PATHS ${TCIM_LIB_PATH} NO_DEFAULT_PATH)
+find_library(TCIM_LIBRARY NAMES tvm_runtime PATHS ${TCIM_LIB_PATH} NO_DEFAULT_PATH)
 find_library(HDPL_LIBRARY NAMES hdplrt PATHS ${HDPL_LIB_PATH} NO_DEFAULT_PATH)
 find_library(IDNNL_LIBRARY NAMES idnnl PATHS ${HDPL_LIB_PATH} NO_DEFAULT_PATH)
 message("TCIM_LIBRARY is ${TCIM_LIBRARY}")

@@ -4,8 +4,6 @@ export MODELZOO_PATH
 HMASSIST_PATH=$MODELZOO_PATH/hmassist
 export HMASSIST_PATH
 
-pip3 install PrettyTable
-
 # set hal library log level
 export HM800_HAL_CONSOLE_LEVEL=0
 
@@ -25,7 +23,7 @@ export HDPL_LIB_PATH=$HDPL_PATH/lib
 export CLANG_LIB_PATH=$CLANG_PATH/lib
 
 # paths for runtime
-export PYTHONPATH=$MODELZOO_PATH:$QUANTOOL_PATH:$PYTHONPATH
+export PYTHONPATH=$HMASSIST_PATH:$QUANTOOL_PATH:$PYTHONPATH
 export PATH=$HMASSIST_PATH:$PATH
 
 # data and model path
@@ -36,9 +34,13 @@ if [[ -z $MODEL_PATH ]]; then
   export MODEL_PATH=$MODELZOO_PATH/data/models
 fi
 
-# default platform is isim
+# use asic if detected
 if [[ -z $HDPL_PLATFORM ]]; then
-  export HDPL_PLATFORM=ISIM
+  if [ -c /dev/hm_host_pcie ]; then
+    export HDPL_PLATFORM=ASIC
+  else
+    export HDPL_PLATFORM=ISIM
+  fi
 fi
 
 echo "[Please check the following path. Unset the environment variable if you want to use the default path!]"

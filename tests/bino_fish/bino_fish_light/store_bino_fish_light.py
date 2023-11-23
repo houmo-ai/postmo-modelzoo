@@ -22,13 +22,13 @@ def get_args() -> argparse.Namespace:
         '--model-path',
         dest='model_path',
         type=str,
-        default='./output/H30/result/hmquant_hm_yolov8_with_act.onnx',
+        default='output/H30/result/hmquant_bino_fish_light_with_act.onnx',
         help='path to the model root path',
     )
     parser.add_argument(
         '--output',
         type=str,
-        default='hm_yolov8',
+        default='bino_fish_light',
         help='output houmo model path',
     )
     parser.add_argument(
@@ -50,19 +50,22 @@ def compile(args=None):
     batch = args.batch
     onnxfile = args.model_path
     onnx_model = onnx.load(onnxfile)
-    input_name = onnx_model.graph.input[0].name
-    dims = onnx_model.graph.input[0].type.tensor_type.shape.dim
-    input_shape = (
-        batch, dims[1].dim_value,
-        dims[2].dim_value, dims[3].dim_value,
-    )
-    # TODO: remove the next clause after quantool release 1.2
-    print('input name:', input_name)
-    print('input shape:', input_shape)
+    type_dict = {}
+    shape_dict = {}
+    for input in onnx_model.graph.input:
+        input_name = input.name
+        dims = input.type.tensor_type.shape.dim
+        input_shape = (
+            batch, dims[1].dim_value,
+            dims[2].dim_value, dims[3].dim_value,
+        )
+        print('input name:', input_name)
+        print('input shape:', input_shape)
 
-    convert_config = {'layout': 'NHWC'}
-    type_dict = {input_name: 'uint8'}
-    shape_dict = {input_name: input_shape}
+        # convert_config = {'layout': 'NHWC'}
+        # type_dict[input_name] = 'uint8'
+        shape_dict[input_name] = input_shape
+
     mod = relay.frontend.from_hmonnx(
         onnx_model, shape_dict, type_dict, resizer_attr=None,
     )
@@ -71,7 +74,11 @@ def compile(args=None):
     executor = Executor('aot')
     target = tvm.target.Target('hdpl', host='c')
     #compile_config = {}
-    compile_config = {"tcim.for_benchmark": True,}
+    compile_config = {"tcim.for_benchmark": True,
+                      "tcim.fuse_strategy": 1, 
+                      "tcim.codegen_pic": True,
+                      "tcim.mem_plan_strategy": "linearscan"
+                      }
 
     with tvm.transform.PassContext(opt_level=3, config=compile_config):
         graph, lib, params = relay.build(
@@ -83,11 +90,11 @@ def compile(args=None):
 
 
 if __name__ == '__main__':
-    model_name = 'hm_yolov8'
+    model_name = 'bino_fish_light'
     local_path = model_name
-    quant_path = 'hm_yolov8_golden.zip'
+    quant_path = 'output/H30/result/hmquant_bino_fish_light_with_act.onnx'
     if not os.path.exists(quant_path):
-        os.system('wget http://10.10.1.53:8082/artifactory/toolchain/support/models/yolov8/hm_yolov8_golden.zip')
+        os.system('wget http://10.10.1.53:8082/artifactory/toolchain/support/models/bino_fish/bino_fish_light_golden_20231204.zip')
         os.system('mkdir -p output/H30/result')
-        os.system('unzip -d output/H30/result hm_yolov8_golden.zip')
+        os.system('unzip -d output/H30/result bino_fish_light_golden_20231204.zip')
     compile()

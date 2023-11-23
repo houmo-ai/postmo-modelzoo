@@ -85,7 +85,6 @@ class YoloV5(Detector):
         output = []
 
         for i, name in enumerate(feats):
-            print(name)
             data = torch.tensor(feats[name])
             assert len(data.shape) == 5
 

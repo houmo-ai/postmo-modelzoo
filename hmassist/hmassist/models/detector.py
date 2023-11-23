@@ -6,11 +6,8 @@ import cv2
 import torch
 import tqdm
 import numpy as np
-# from ..utils.preprocess import letterbox
-from ..utils.box_utils import letterbox
-from ..utils.transform import BGR2YUV
 
-from .base_model import BaseModel
+from ..models.base_model import BaseModel
 from ..utils.postprocess import (
     non_max_suppression,
     scale_coords,
@@ -26,7 +23,6 @@ class Detector(BaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._input_size = (640, 640)
         self._iou_threshold = 0.45
         self._conf_threshold = 0.25
 
@@ -36,15 +32,27 @@ class Detector(BaseModel):
     def set_conf_threshold(self, conf_threshold=0.25):
         self._conf_threshold = conf_threshold
 
-    def _preprocess(self, img):
-        img, _, _ = letterbox(img, self._input_size, stride=64, auto=False)
-        img = np.transpose(img, (2, 0, 1)).astype(np.float32)
-        rgb2yuv_func = BGR2YUV(fmt="422")
-        img = rgb2yuv_func(torch.tensor(img))
-        # img = (img.float() / 255.0).numpy().astype(np.float32)
-        return np.expand_dims(img.numpy().astype(np.uint8), 0)
+    def get_input_datas(self, filedir, filename):
+        if len(self.inputs) > 1:
+            logger.error(f"default only support 1 input, now is {len(self.inputs)}")
+        from torchvision.datasets.folder import pil_loader
+        # data = pil_loader(os.path.join(filedir, filename))
+        data = cv2.imread(os.path.join(filedir, filename))
+        inputs = {self.inputs[0]["name"]: data}
+        return self._preprocess(inputs)
 
-    def _postprocess(self, outputs, cv_image=None):
+    def _preprocess(self, inputs):
+        datas = {}
+        for name, data in inputs.items():
+            from ..utils import utils
+            from ..utils.box_utils import letterbox
+            image = utils.to_opencv(data)
+            image, _, _ = letterbox(image, self._input_size, stride=64, auto=False)  # HWC
+            image = np.transpose(image, (2, 0, 1)).astype(np.float32)  # CHW
+            datas[name] = image
+        return datas
+
+    def _postprocess(self, outputs, image=None):
         if len(outputs) == 4 or len(outputs) == 1:
             outputs = outputs[0]
         # add yolo process
@@ -52,7 +60,7 @@ class Detector(BaseModel):
         # outputs = torch.from_numpy(outputs)
         outputs = non_max_suppression(outputs, self._conf_threshold, self._iou_threshold)
         outputs = outputs[0]  # bs=1
-        outputs[:, :4] = scale_coords(self._input_size, outputs[:, :4], cv_image.shape).round()
+        outputs[:, :4] = scale_coords(self._input_size, outputs[:, :4], image.shape).round()
         return outputs.numpy()
 
     def evaluate(self):

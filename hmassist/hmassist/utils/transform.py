@@ -112,8 +112,8 @@ class RGB2YUV:
         self.formatter = YUVFormat(fmt, interpolation)
 
     def __call__(self, img: torch.Tensor) -> Any:
-        self.M.to(img.device)
-        self.b.to(img.device)
+        # self.M.to(img.device)
+        # self.b.to(img.device)
         result = torch.einsum("ij,jhw->ihw", [self.M, img])
         result = result + self.b
         result.clip_(0, 255).round_()
@@ -135,8 +135,8 @@ class BGR2YUV:
         self.formatter = YUVFormat(fmt, interpolation)
 
     def __call__(self, img: torch.Tensor) -> Any:
-        self.M.to(img.device)
-        self.b.to(img.device)
+        # self.M.to(img.device)
+        # self.b.to(img.device)
         result = torch.einsum("ij,jhw->ihw", [self.M, img])
         result = result + self.b
         result.clip_(0, 255).round_()
@@ -144,7 +144,7 @@ class BGR2YUV:
         # Change YUV store format
         result = self.formatter(result)
         return result
-    
+
 def _is_numpy(img: Any) -> bool:
     return isinstance(img, np.ndarray)
 

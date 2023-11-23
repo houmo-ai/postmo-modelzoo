@@ -1,63 +1,38 @@
 #!/usr/bin/env python3
 
-from base.classifier import Classifier
-from utils import logger
-from utils.postprocess import softmax
+from hmassist.models.classifier import Classifier
+from hmassist.utils.postprocess import softmax
+from hmassist.utils.preprocess import centercrop
 import numpy as np
+import cv2
 
 class Resnet50(Classifier):
 
     @staticmethod
-    def data_transform(x, shape):
-        import torchvision.transforms as transforms
-        from utils.transform import ToTensorNotNormal
-        import torch
-        def unsqueeze(x):
-            return torch.unsqueeze(x, 0)
-        transform = transforms.Compose(
-            [
-                transforms.Resize(256), transforms.CenterCrop(224),
-                ToTensorNotNormal(), unsqueeze,
-            ],
-        )
-        return transform(x)
-    
-    @staticmethod
     def build_config():
         return {
-            'tcim.fuse_strategy': 0, #1
-            'tcim.gen_intrinsic': 1, #0
+            'tcim.fuse_strategy': 0,
+            'tcim.gen_intrinsic': 2,
             'tcim.codegen_pic': False,
-            'tcim.use_convadd': False,
             'tcim.sync_strategy': 1,
+            'tcim.core_num': 1,
             'tcim.for_benchmark': True,
             # 'tcim.multi_stream': 4,
         }
 
-    def _preprocess(self, img):
-        import torchvision.transforms as transforms
-        from utils.transform import RGB2YUV
-        from utils.transform import ToTensorNotNormal
-        transform = transforms.Compose(
-            [
-                transforms.Resize(256), transforms.CenterCrop(224),
-                ToTensorNotNormal(), RGB2YUV(), 
-            ],
-        )
-
-        img = transform(img)
-        img = np.expand_dims(img.numpy().astype(np.uint8), 0)
-        return img
-
-    def _postprocess(self, outputs, img=None):
-        if len(outputs) != 1:
-            logger.error("only support signal output, please check")
-            exit(-1)
-        # outputs = outputs[0]  # [bs, num_cls] or [bs, num_cls, 1, 1]
-        for _, name in enumerate(outputs):
-            bs = outputs[name].shape[0]
-            if bs != 1:
-                logger.error("only support bs=1, please check")
-                exit(-1)
-            out_data = softmax(outputs[name])
-        return out_data
+    def _preprocess(self, inputs):
+        assert(len(inputs) == 1)
+        datas = {}
+        resize_size = 256
+        crop_size = 224
+        for name, data in inputs.items():
+            if data.shape[1] > data.shape[0]:
+                h = resize_size
+                w = round(data.shape[1] / data.shape[0] * resize_size)
+            else:
+                h = round(data.shape[0] / data.shape[1] * resize_size)
+                w = resize_size
+            data = cv2.resize(data, (w, h))  # HWC
+            data = centercrop(data, (crop_size, crop_size))
+            datas[name] = np.transpose(data, (2, 0, 1)).astype(np.float32)  # CHW
+        return datas

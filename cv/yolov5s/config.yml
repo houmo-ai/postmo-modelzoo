@@ -9,9 +9,11 @@ model: {
       shape: [1, 3, 640, 640],
       layout: NCHW,
       format: RGB,
-      src_format: YUV422,
-      resize: ,
-      crop: ,
+      image: {
+        format: YUV422,
+        # size: [720, 1280],
+        # crop: [0, 0, 720, 1280]
+      },
       dtype: uint8,
       mean: [ 0, 0, 0 ],
       std: [ 1, 1, 1 ],
@@ -22,14 +24,9 @@ model: {
 }
 
 quant: {
-  # ptq_cfg_path: /workspace/platform/toolchain/imodelzoo/cv/resnet50/compile_model/quant_config.py,
-  calib_dir:
-  {
-    images: ../../data/datasets/coco2017/val2017,
-  },
+  # ptq_cfg_path: ,
+  calib_dir: ../../data/datasets/coco2017/val2017,
   calib_num: 20,
-  preproc_module: ,
-  preproc_class: ,
   debug_level: 1,
   calib_method: ,
   skip_layer_idxes: [ ],
@@ -56,7 +53,7 @@ perf: {
 
 accuracy: {
   data_dir: ../../data/datasets/coco2017/val2017,
-  test_num: 10,
+  test_num: 20,
   dataset_class: Dataset,
 }
 

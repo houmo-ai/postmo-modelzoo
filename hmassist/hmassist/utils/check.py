@@ -94,26 +94,7 @@ def check_config(cfg, phase="build"):
 
     # 多输入且不使用随机数据的情况下必须定义预处理
     input_lists = cfg["model"]["inputs"]
-
-    # 以下情况必须设置自定义预处理:
-    # 1.多输入指定量化数据目录，表示量化使用指定数据
-    preproc_class = cfg["quant"]["preproc_class"]
-    preproc_module = cfg["quant"]["preproc_module"]
     calib_dir = cfg["quant"]["calib_dir"]
-    # if len(input_lists) > 1 and calib_dir and not preproc_class:
-    #     logger.error("preprocess_class must be set in multi-input model")
-    #     return False
-    # # 2.某输入为非图像数据，且指定输入数据，表示推理仿真使用指定数据
-    # for _input in input_lists:
-    #     if _input["format"] == "None" and _input["data_path"] and not preproc_class:
-    #         logger.error("There is non-image data, while specifying the input data_path,"
-    #                      "preprocess_class must be configured")
-    #         return False
-
-    if preproc_class:
-        if not preproc_module:
-            logger.error("preprocess_module must be set to fine preprocess_class")
-            return False
 
     for _input in input_lists:
         layout = _input["layout"]

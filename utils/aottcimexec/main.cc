@@ -138,6 +138,27 @@ int main(int argc, char *argv[]) {
     }
     std::cout << "), " << input_data.DataType() << std::endl;
   }
+
+  // get output info
+  int tvm_output_count = module.GetOutputNum();
+  std::cout << "Count of Output: " << tvm_output_count << std::endl;
+  for (int idx = 0; idx < tvm_output_count; idx++) {
+    auto output_name = module.GetOutputNameByIndex(idx);
+    tvm::runtime::NDArray data = module.GetOutputByName(output_name);
+    // auto output_data = tvm::runtime::NDArray::Empty(data.Shape(), data.DataType(), {kDLHDPL, 0});
+    // outputTensor[i] = const_cast<DLTensor*>(output_data.operator->());
+    int data_size = 1;
+    std::cout << "Output " << output_name << ": (";
+    for (size_t shape_idx = 0; shape_idx < data.Shape().size(); shape_idx++) {
+      if (shape_idx != 0) {
+        std::cout << ", ";
+      }
+      std::cout << data.Shape().data()[shape_idx];
+      data_size *= data.Shape().data()[shape_idx];
+    }
+    std::cout << "), " << data.DataType() << std::endl;
+  }
+
   size_t eval_round = arguments.iterations;
   module.Run(arguments.warm_up);
   auto start = std::chrono::system_clock::now();

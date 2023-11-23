@@ -13,19 +13,19 @@ model: {
       resize: ,
       crop: ,
       dtype: uint8,
-      mean: [ 0.485, 0.456, 0.406 ],
-      std: [ 0.229, 0.224, 0.225 ],
-      data_path: ./road/output_0001.jpg,
+      mean: [ 0, 0, 0 ],
+      std: [ 1, 1, 1 ],
+      data_path: ./hmtest/image/output_0001.jpg,
     }
   ],
   impl_class: YoloV5,
 }
 
 quant: {
-  ptq_cfg_path: ./quant_config.py,
+  # ptq_cfg_path: ./quant_config.py,
   calib_dir:
   {
-    images: ./road,
+    images: ./hmtest/image,
   },
   calib_num: 20,
   preproc_module: ,
@@ -43,7 +43,7 @@ build: {
 }
 
 demo: {
-  data_dir: ./road,
+  data_dir: ./hmtest/image,
   test_num: 10,
 }
 

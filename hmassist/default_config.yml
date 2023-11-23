@@ -1,39 +1,39 @@
 # 模型量化编译配置文件
 
 model: {
-  # 模型框架，必须设置, 目前仅支持onnx
+  # 【必填】模型框架, 目前仅支持onnx
   framework: onnx,
 
-  # 编译后模型名，必须设置
+  # 【必填】编译后模型名，必须设置
   name: ,
 
-  # 量化文件以及各种过程文件保存路径
+  # 【必填】量化文件以及各种过程文件保存路径
   save_dir: ./output,
 
-  # 模型权重路径，必须设置
+  # 【必填】模型权重路径
   weight: ,
 
-  # 模型输入配置，存在多个输入，注意顺序
+  # 【必填】模型输入配置
   # 目前不能分别设置多个输入的NHWC->NCHW的转换, 必须相同
   inputs: [
     {
-      name: input.1, # 输入名称
-      shape: [1, 3, 224, 224], # 原模型输入形状
-      layout: NCHW,  # 输入数据布局，支持 NCHW，NHWC, 默认NCHW；可缺省；暂不支持其它布局
-      # 训练模型的输入，Feature结尾表示非图片数据，RGB/BGR/YUV表示图片数据
+      name: input.1, # 【必填】输入名称
+      shape: [1, 3, 224, 224], # 【必填】原模型输入形状
+      layout: NCHW,  # 【必填】输入数据布局，支持 NCHW，NHWC
+      # 【必填】训练模型的输入，Feature结尾表示非图片数据，RGB/BGR/YUV表示图片数据
       # 可选的Feature类型为Int8Feature,Uint8Feature,Int16Feature,Float16Feature,Float32Feature,Float64Feature
       # 可选的图像类型为RGB,YUV444,YUV422,YUV420
       format: RGB,
-      # 输入到芯片的源输入类型
-      src_format: YUV422,
-      resize: ,
-      crop: ,
-      # 模型原始输入数据类型(预处理之前)，支持数据类型uint8, float32, int16, float16
-      # 可缺省, 缺省情况下，若输入为图片数据则为uint8, 否则为float32
-      dtype: uint8,
-      mean: [ 0.0, 0.0, 0.0 ],   # 输入均值，留空表示为0，也可缺省，支持broadcast
-      std: [ 1.0, 1.0, 1.0 ],   # 输入标准差，留空表示为1，也可缺省，支持broadcast
-      data_path: ,  # 用于比较各阶段输出的相似度，空表示采用随机数，默认随机数，可缺省
+      # 【可选】如果输入为图像，可利用芯片resizer做部分前处理，依次为crop->resize->pad
+      image: {
+        format: YUV422, # 支持YUV422/YUV420/YUV444
+        size: [224, 224], # [height, width]
+        crop: [0, 0, 224, 224], # [top, left, height, width]
+      },
+      dtype: uint8, # 【必填】模型原始输入数据类型(预处理之前)，支持数据类型uint8, float32, int16, float16
+      mean: [ 0.0, 0.0, 0.0 ],   # 【可选】输入除以255后的均值，默认为0，支持broadcast
+      std: [ 1.0, 1.0, 1.0 ],   # 【可选】输入除以255后的标准差，默认为1，支持broadcast
+      data_path: ,  # 【可选】用于生成golden数据比对，默认随机数
     }
   ],
 
@@ -41,76 +41,70 @@ model: {
   impl_class: ,
 }
 
-# 执行quant时必须设置以下字段
+# 【quant必填】
 quant: {
-  # 量化配置文件，可选
+  # 【可选】量化配置文件
   ptq_cfg_path: ,
-  # 量化输入数据路径, 需要按输入名字典配置，留空表示使用随机数据(必须设置)
+
+  # 【必填】量化输入数据路径, 留空表示使用随机数据
   calib_dir: ,
-  # 量化使用的数据数量
+
+  # 【必填】量化使用的数据数量
   calib_num: ,
 
-  # 用户自定义量化函数，若不配置此项，则使用默认前处理，必须与yml配置文件同级目录(暂不支持)
-  # 以下情况必须设置自定义预处理:
-  # 1.多输入指定量化数据目录，表示量化使用指定数据
-  # 2.某输入为非图像数据，且指定输入数据，表示推理仿真使用指定数据
-  preproc_module: ,
-  preproc_class: ,
-
-  # 量化调试等级
-  # 0 - no response
-  # 1 - print laywise compare
+  # 【必填】量化调试等级0:no response; 1:print laywise compare
   debug_level: 1,
 
-  # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm"(暂不支持)
+  # 【可选】校准方法 "kl", "min_max", "percentile_0.99..", "l2norm"(暂不支持), 默认min_max
   calib_method: ,
+
+  # 【可选】混合量化(暂不支持)
+  skip_layer_idxes: [ ],
+  skip_layer_types: [ ],
+  skip_layer_names: [ ],
 }
 
-# 执行build时必须设置以下字段
+# 【build必填】
 build: {
-  # 目标平台，必须设置，目前仅支持H30
+  # 【必填】目标平台，目前仅支持H30
   target: H30,
-
-  # 编译模式，目前支持JIT和AOT，JIT后继逐渐废弃，默认为AOT
-  mode: JIT,
 
   # 编译优化等级, 缺省默认为0(暂不支持)
   opt_level: 0,
 }
 
-# 执行demo时必须设置以下字段
+# 【demo必填】
 demo: {
-  # 指定demo的测试数据路径(必须设置)
+  # 【必填】指定demo的测试数据路径
   data_dir: ,
-  
-  # demo测试样例数，实际测试数为数据路径内数据数与本数的较小者，配置0为数据路径内所有数据
+
+  # 【必填】demo测试样例数，实际测试数为数据路径内数据数与本数的较小者，配置0为数据路径内所有数据
   test_num: 20,
 }
 
-# 执行perf时必须设置以下字段
+# 【perf必填】
 perf: {
-  # 指定性能测试使用的数据路径，不设置则使用随机数（目前仅支持使用随机数）
+  # 【可选】指定性能测试使用的数据路径，不设置则使用随机数（目前仅支持使用随机数）
   data_dir: ,
 
-  # 性能测试样例数(必须设置)
+  # 【必填】性能测试样例数
   test_num: 10,
 
-  # 性能测试模式(目前仅支持throughput)，支持throughput和latency
+  # 【必填】性能测试模式(目前仅支持throughput)，支持throughput和latency
   mode: throughput,
 
-  # 性能测试是否包含前后处理，默认为false(暂不支持)
+  # 【可选】性能测试是否包含前后处理，默认为false(暂不支持)
   end2end: ,
 }
 
-# 执行accuracy时必须设置以下字段
+# 【accuracy必填】
 accuracy: {
-  # 精度测试的数据集路径(必须设置)
+  # 【必填】精度测试的数据集路径
   data_dir: ,
-
-  # test精度测试样例数，实际测试数为数据集内数据数与本数的较小者，不设置或者配置0为数据集内所有数据
+  # 【必填】test精度测试样例数，实际测试数为数据集内数据数与本数的较小者，配置0为数据集内所有数据
   test_num: 0,
 
-  # 数据集python处理类(定义在PYTHONPATH可搜索路径下hm_dataset.py中，accuracy必须设置)
+  # 【必填】数据集python处理类(定义在PYTHONPATH可搜索路径下hm_dataset.py中)
   dataset_class: ,
 }
 

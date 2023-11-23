@@ -4,8 +4,6 @@ export MODELZOO_PATH
 HMASSIST_PATH=$MODELZOO_PATH/hmassist
 export HMASSIST_PATH
 
-pip3 install PrettyTable
-
 export CMAKE_CONFIG_PATH=$MODELZOO_PATH/release.cmake
 
 # set hal library log level
@@ -41,9 +39,13 @@ if [[ -z $MODEL_PATH ]]; then
   export MODEL_PATH=$MODELZOO_PATH/data/models
 fi
 
-# default platform is isim
+# use asic if detected
 if [[ -z $HDPL_PLATFORM ]]; then
-  export HDPL_PLATFORM=ISIM
+  if [ -c /dev/hm_host_pcie ]; then
+    export HDPL_PLATFORM=ASIC
+  else
+    export HDPL_PLATFORM=ISIM
+  fi
 fi
 
 echo "[Please check the following path. Unset the environment variable if you want to use the default path!]"

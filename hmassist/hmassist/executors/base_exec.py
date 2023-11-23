@@ -17,7 +17,7 @@ from torchvision.datasets.folder import pil_loader
 #                              "padding_mode", "padding_value", "enable_aipp", "support"])
 
 
-class Basehmexec(object, metaclass=abc.ABCMeta):
+class BaseExec(object, metaclass=abc.ABCMeta):
     """base hmexec"""
 
     def __init__(self, cfg: dict):
@@ -31,9 +31,6 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
         self.inputs = cfg["model"]["inputs"]
         self.num_inputs = len(self.inputs)
         self.model_name = cfg["model"]["name"]
-        # quant params
-        self.preproc_module = self.quant["preproc_module"]
-        self.preproc_class = self.quant["preproc_class"]
         # build params
         if "mode" in cfg["build"]:
             self.build_mode = cfg["build"]["mode"]
@@ -66,8 +63,24 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
         self.iss_layerwise_dump_span = 0
         self.is_fixed_out = False
 
-    @staticmethod
-    def set_env():
+    def quantize(self):
+        """quantize"""
+        logger.error("BaseExec not support quantize")
+        raise NotImplementedError
+
+    def build(self):
+        """build"""
+        logger.error("BaseExec not support build")
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def load(self):
+        """ inference """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def infer(self):
+        """ inference """
         raise NotImplementedError
 
     def set_fixed_out(self, flag):
@@ -86,8 +99,9 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
     def set_input_infos(self):
         for idx, _input in enumerate(self.inputs):
             shape = _input["shape"]
-            n, c, h, w = shape
-            if _input["layout"] == "NHWC":
+            if _input["layout"] == "NCHW":
+                n, c, h, w = shape
+            elif _input["layout"] == "NHWC":
                 n, h, w, c = shape
 
             if "dtype" not in _input:
@@ -104,27 +118,6 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
             if not _input["std"]:
                 _input["std"] = [1.0 for _ in range(c)]
 
-    @property
-    def has_custom_preprocess(self):
-        return True if self.preproc_class else False
-
-    def set_custom_preprocess(self):
-        """检查是否存在自定义预处理
-         1.多输入情况需要自定义
-         2.默认预处理不能满足的情况
-        """
-        # 自定义预处理
-        if self.preproc_class:
-            m = importlib.import_module(self.preproc_module)
-            if hasattr(m, self.preproc_class):
-                # 实例化预处理对象
-                self.preproc_class = getattr(m, self.preproc_class)(
-                    self.inputs, self.quant["calib_num"], self.quant["data_dir"])
-            else:
-                logger.error("{}.py has no class named {}".format(
-                    self.preproc_module, self.preproc_class))
-                exit(-1)
-
     @staticmethod
     def check_not_exist(filepath):
         if not os.path.exists(filepath):
@@ -136,64 +129,6 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
         if data.dtype != target_dtype:
             logger.error("input({}) dtype mismatch {} vs {}".format(name, data.dtype, target_dtype))
             exit(-1)
-
-    def get_data(self, name, dtype, shape, filepath=None, transform=None):
-        """ 生成数据
-        @param name: data name
-        @param dtype: data type
-        @param shape: data shape
-        @param filepath: data file path
-        @return: numpy
-        """
-        import torchvision.transforms as transforms
-        import torch
-
-        if filepath:   # 指定输入数据
-            logger.info("data[{}] will use file: {}".format(name, filepath))
-            data = pil_loader(filepath)
-            if transform:
-                data = np.array(transform(data, shape))
-        else:   # 未指定输入数据，生成随机数
-            logger.warning("data[{}] will use random data".format(name))
-            n, c, h, w = shape
-
-            if dtype == "float32":
-                data = np.random.rand(n, c, h, w).astype(dtype=dtype)   # 数值范围[0, 1)
-            elif dtype == "float16":
-                data = np.random.rand(n, c, h, w).astype(dtype=dtype)   # 数值范围[0, 1)
-            elif dtype == "int16":
-                data = np.random.randint(low=-(2**15), high=2**15-1, size=(n, c, h, w), dtype=dtype)
-            elif dtype == "uint8":
-                data = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=dtype)
-            else:
-                logger.error("Not support dtype -> {}".format(dtype))
-                exit(-1)
-        return data
-
-    def get_datas(self, file_path=None, transform=None, to_tensor=False):
-        """ 生成模型输入数据
-        @param filepath:  外部指定数据
-        @param force_float:  强制输出float数据
-        @param force_cr:　是否强制使能CR
-        @param force_random:  是否强制使用随机数据，主要用于生成量化数据
-        @param to_file:
-        @return:
-        """
-        # in_datas = OrderedDict()  # 保证输入顺序一致
-        in_datas = {}
-        for idx, _input in enumerate(self.inputs):
-
-            name = _input["name"]
-            format = _input["format"]
-            dtype = _input["dtype"]
-            shape = self.shape_dict[name]
-
-            in_datas[name] = self.get_data(name, dtype, shape, file_path, transform)
-
-            if to_tensor:
-                in_datas[name] = torch.tensor(in_datas[name])
-
-        return in_datas
 
     def set_quantize_cfg(self, in_datas):
         """ quantization config
@@ -237,22 +172,12 @@ class Basehmexec(object, metaclass=abc.ABCMeta):
             quantize_config["float_list"].extend(skip_layer_names)
         return quantize_config, norm
 
-    def save_compare_layer_outputs(self):
-        """tvm float vs fixed """
+    @abc.abstractmethod
+    def print_input_info(self):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def quantize(self):
-        """relay quantize"""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def build(self):
-        """relay build"""
-        raise NotImplementedError
-
-    def infer(self):
-        """ inference on chip/sdk_iss """
+    def print_output_info(self):
         raise NotImplementedError
 
     def get_relay_mac(self):

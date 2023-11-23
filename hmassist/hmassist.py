@@ -18,7 +18,8 @@ from hmassist.utils.check import (
     check_accuracy_config,
     check_file_exist
 )
-from hmassist.executors.h30exec import H30Exec
+from hmassist.executors.h30_exec import H30Exec
+from hmassist.executors.onnx_exec import OnnxExec
 from hmassist.models.base_model import BaseModel
 
 def set_logger(op, log_dir, filename):
@@ -34,6 +35,7 @@ def get_executor(cfg):
     target = cfg["build"]["target"]
     if target == ("H30"):
         return H30Exec(cfg)
+        # return OnnxExec(cfg)
     else:
         logger.error("Not support target -> {}".format(target))
         exit(-1)
@@ -98,7 +100,7 @@ def quantize(cfg):
     try:
         logger.info("{}".format(cfg))
         model = get_model(cfg)
-        model.executor.quantize(model.data_transform)
+        model.executor.quantize(model.get_input_datas)
     except Exception as e:
         logger.error("{}".format(traceback.format_exc()))
         logger.error("HmAssist failed to ptq quantize -> {}".format(e))
@@ -135,25 +137,20 @@ def test(cfg, backend):
         hmexec = get_executor(cfg)
         hmexec.backend = backend
         hmexec.load()
-        # hmexec.print_input_info()
+        hmexec.print_input_info()
         hmexec.print_output_info()
-        in_datas = hmexec.get_golden_inputs()
-        tcim_outputs = hmexec.infer(in_datas)
+        inputs = hmexec.get_golden_inputs()
         hmexec.set_fixed_out(True)
-        tcim_fixed_outputs = hmexec.infer(in_datas)
+        outputs = hmexec.infer(inputs)
         model_name = hmexec.model_name
         # save and compare
-        for input_name, input_data in in_datas.items():
+        for input_name, input_data in inputs.items():
             input_data.tofile(os.path.join(hmexec.result_dir, "{}_input.bin".format(input_name)))
-        for output_name, output_data in tcim_outputs.items():
+        for output_name, output_data in outputs.items():
             # 临时添加NCHW
             # output_data = np.transpose(output_data, (0, 2, 3, 1))
             # save fixed result
-            fixed_output_data = tcim_fixed_outputs[output_name]
             logger.info("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-            fixed_output_data.tofile(os.path.join(hmexec.result_dir, "{}_output_fixed.bin".format(output_name)))
-            fixed_output_data.tofile(os.path.join(hmexec.result_dir, "{}_output_fixed.txt".format(output_name)), sep="\n")
-            np.save(os.path.join(hmexec.result_dir, 'tcim_{}_{}_output_fixed.npy'.format(model_name, output_name)), fixed_output_data)
             # save origin result
             output_data.tofile(os.path.join(hmexec.result_dir, "{}_output.bin".format(output_name)))
             output_data.tofile(os.path.join(hmexec.result_dir, "{}_output.txt".format(output_name)), sep="\n")
@@ -162,14 +159,10 @@ def test(cfg, backend):
             golden_output = hmexec.get_golden_output(output_name)
             if golden_output is not None:
                 if golden_output.shape == output_data.shape:
-                    cosine_dist1 = cosine_distance(golden_output, output_data)
-                    cosine_dist2 = cosine_distance(golden_output, fixed_output_data)
-                    # print("golden_output=", golden_output)
-                    # print("output_data=", output_data)
-                    is_match1 = (golden_output == output_data).all()
-                    is_match2 = (golden_output == fixed_output_data).all()
-                    logger.info("[compare] {} vs quant output [{}] match={}, similarity={:.6f}, fixed match={}, similarity={:.6f}"
-                                .format(hmexec.target, output_name, is_match1, cosine_dist1, is_match2, cosine_dist2))
+                    cosine_dist = cosine_distance(golden_output, output_data)
+                    is_match = (golden_output == output_data).all()
+                    logger.info("[compare] {} vs quant output [{}] match={}, similarity={:.6f}"
+                                .format(hmexec.target, output_name, is_match, cosine_dist))
                 else:
                     logger.error("[compare] {} vs quant output [{}] shape not equal {} vs {}"
                                  .format(hmexec.target, output_name, output_data.shape, golden_output.shape))
@@ -258,7 +251,7 @@ def accuracy(cfg, dtype, backend):
         if backend == "onnx":
             model.load_json(model.executor.original_json_path)
         elif backend == "asic":
-            model.load(model.executor.model_dir)
+            model.load()
         else:
             logger.error("Not support target({})".format(model.executor.target))
             exit(-1)

@@ -17,20 +17,6 @@ class YoloV5(Detector):
         super().__init__(**kwargs)
 
     # @staticmethod
-    # def data_transform(x, shape):
-    #     img = cv2.cvtColor(np.array(x), cv2.COLOR_RGB2BGR)
-    #     img, _, _ = letterbox(img, (384, 640), stride=64, auto=False)
-    #     img = np.transpose(img, (2, 0, 1)).astype(np.float32)
-    #     from utils.transform import ToTensorNotNormal
-    #     to_tensor = ToTensorNotNormal()
-    #     img = to_tensor(img)
-    #     from utils.transform import RGB2YUV
-    #     rgb2yuv = RGB2YUV(fmt="422")
-    #     img = rgb2yuv(img)
-    #     print(img.shape, img.dtype)
-    #     return img.unsqueeze(0)
-
-    # @staticmethod
     # def build_config():
     #     return {}
 
@@ -51,7 +37,7 @@ class YoloV5(Detector):
         filename = os.path.basename(img_path)
         print("process: {}".format(img_path))
 
-        save_results = "demo_results".format(self.backend)
+        save_results = "demo_results"
         if not os.path.exists(save_results):
             os.makedirs(save_results)
 
@@ -60,14 +46,10 @@ class YoloV5(Detector):
             print("[error] Failed to decode img by opencv -> {}".format(img_path))
             exit(-1)
 
-        t1 = time.time()
-        input_data = self._preprocess(cv_image)
-        t2 = time.time()
-        # self.executor.set_fixed_out(True)
-        output_datas = self.inference(input_data)
-        t3 = time.time()
-        boxes = self._postprocess(output_datas, cv_image)
-        t4 = time.time()
+        inputs = {self.inputs[0]["name"]: cv_image}
+        inputs = self._preprocess(inputs)
+        outputs = self.inference(inputs)
+        boxes = self._postprocess(outputs, cv_image)
 
         print("box num = {}".format(len(boxes)))
         for det in boxes:
@@ -81,7 +63,6 @@ class YoloV5(Detector):
         output = []
 
         for i, name in enumerate(feats):
-            print(name)
             data = torch.tensor(feats[name])
             assert len(data.shape) == 5
 

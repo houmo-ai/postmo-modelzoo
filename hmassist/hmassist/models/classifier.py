@@ -8,34 +8,40 @@ import os
 import cv2
 import tqdm
 
-from .base_model import BaseModel
+from ..models.base_model import BaseModel
 from ..utils import logger
-from ..utils.preprocess import default_preprocess
-from torchvision.datasets.folder import pil_loader
 
 class Classifier(BaseModel, ABC):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        n, c, h, w = self.inputs[0]["shape"]
-        if self.inputs[0]["layout"] == "NHWC":
-            n, h, w, c = self.inputs[0]["shape"]
-        self._input_size = (w, h)
-        self._infer_latency_ms = 0
-        self._end2end_latency_ms = 0
 
-    def _preprocess(self, img):
-        return default_preprocess()
+    def get_input_datas(self, filedir, filename):
+        if len(self.inputs) > 1:
+            logger.error(f"default only support 1 input, now is {len(self.inputs)}")
+        data = cv2.imread(os.path.join(filedir, filename))
+        inputs = {self.inputs[0]["name"]: data}
+        return self._preprocess(inputs)
 
-    def _postprocess(self, outputs, cv_image=None):
+    def _preprocess(self, inputs):
+        datas = {}
+        for name, data in inputs.items():
+            data = cv2.resize(data, (self._input_size[1], self._input_size[0]))  # HWC
+            datas[name] = np.transpose(data, (2, 0, 1)).astype(np.float32)  # CHW
+        return datas
+
+    def _postprocess(self, outputs, image=None):
         if len(outputs) != 1:
-            logger.error("only support signal output, please check")
+            print("only support signal output, please check")
             exit(-1)
-        outputs = outputs[0]
-        bs = outputs.shape[0]
-        if bs != 1:
-            logger.error("only support bs=1, please check")
-            exit(-1)
-        return outputs
+        datas = {}
+        for name, data in outputs.items():
+            bs = data.shape[0]
+            if bs != 1:
+                print("only support bs=1, please check")
+                exit(-1)
+            from hmassist.utils.postprocess import softmax
+            datas[name] = softmax(data)
+        return datas
 
     def load(self):
         self.executor.load()
@@ -53,21 +59,23 @@ class Classifier(BaseModel, ABC):
         top1, top5 = 0, 0
         total_num = len(img_paths)
         for idx, img_path in enumerate(tqdm.tqdm(img_paths)):
-            img = pil_loader(img_path)
+            img = cv2.imread(img_path)
             if img is None:
                 logger.warning("Failed to load image -> {}".format(img_path))
                 continue
-            input_data = self._preprocess(img)
-            output_data = self.inference(input_data)
-            output_data = self._postprocess(output_data, img)
-            idxes = np.argsort(-output_data, axis=1, kind="quicksort").flatten()[0:k]  # 降序
-            logger.info("pred = {}, gt = {}".format(idxes, labels[idx]))
-            if labels[idx] == idxes[0]:
-                top1 += 1
-                top5 += 1
-                continue
-            if labels[idx] in idxes:
-                top5 += 1
+            inputs = {self.inputs[0]["name"]: img}
+            inputs = self._preprocess(inputs)
+            outputs = self.inference(inputs)
+            outputs = self._postprocess(outputs, img)
+            for name, output in outputs.items():
+                idxes = np.argsort(-output, axis=1, kind="quicksort").flatten()[0:k]  # 降序
+                logger.info("image:{}, pred = {}, gt = {}".format(img_path, idxes, labels[idx]))
+                if labels[idx] == idxes[0]:
+                    top1 += 1
+                    top5 += 1
+                    continue
+                if labels[idx] in idxes:
+                    top5 += 1
         top1, top5 = float(top1)/total_num, float(top5)/total_num
         return {
             "input_size": "{}x{}x{}x{}".format(1, 3, self._input_size[1], self._input_size[0]),
@@ -83,17 +91,38 @@ class Classifier(BaseModel, ABC):
             logger.error("The img path not exist -> {}".format(img_path))
             exit(-1)
         logger.info("process: {}".format(img_path))
-        img = pil_loader(img_path)
+        img = cv2.imread(img_path)
+        inputs = {self.inputs[0]["name"]: img}
+        inputs = self._preprocess(inputs)
+
+        from torchvision.datasets.folder import pil_loader
+        data1 = pil_loader(img_path)
+        import torchvision.transforms as transforms
+        from hmassist.utils.transform import RGB2YUV
+        from hmassist.utils.transform import ToTensorNotNormal
+        transform = transforms.Compose(
+            [
+                transforms.Resize(256), transforms.CenterCrop(224),
+                ToTensorNotNormal(), 
+                # RGB2YUV(),
+            ],
+        )
+        a = transform(data1)
+        a = np.expand_dims(a.numpy().astype(np.uint8), 0)
+        datas = {}
+        for input in self.inputs:
+            datas[input["name"]] = a
+
         if img is None:
             logger.error("Failed to load image -> {}".format(img_path))
             exit(-1)
         end2end_start = time.time()
 
-        input_data = self._preprocess(img)
-        output_data = self.inference(input_data)
-        output_data = self._postprocess(output_data, img)
-        max_idx = np.argmax(output_data, axis=1).flatten()[0]
-        max_prob = output_data[0][max_idx].flatten()[0]
+        outputs = self.inference(inputs)
+        outputs = self._postprocess(outputs, img)
+        for name, data in outputs.items():
+            max_idx = np.argmax(data, axis=1).flatten()[0]
+            max_prob = data.flatten()[max_idx]
 
         end2end_cost = time.time() - end2end_start
         self._end2end_latency_ms += (end2end_cost * 1000)

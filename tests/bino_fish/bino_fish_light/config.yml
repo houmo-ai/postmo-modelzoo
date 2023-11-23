@@ -1,31 +1,31 @@
 model: {
   framework: onnx,
-  name: hm_yolov8,
+  name: bino_fish_light,
   save_dir: ./output,
-  weight: ./yolov8.onnx,
+  weight: ./bino_fish_light.onnx,
   inputs: [
     {
       name: images,
-      shape: [1, 3, 640, 640],
+      shape: [1, 3, 384, 640],
       layout: NCHW,
       format: RGB,
       src_format: YUV422,
       resize: ,
       crop: ,
       dtype: uint8,
-      mean: [ 0.485, 0.456, 0.406 ],
-      std: [ 0.229, 0.224, 0.225 ],
-      data_path: ../../data/datasets/coco2017/val2017/000000000139.jpg,
+      mean: [ 0, 0, 0 ],
+      std: [ 1, 1, 1 ],
+      data_path: ,
     }
   ],
-  impl_class: ,
+  impl_class: YoloV5,
 }
 
 quant: {
-  # ptq_cfg_path: /workspace/platform/toolchain/imodelzoo/cv/resnet50/compile_model/quant_config.py,
+  # ptq_cfg_path: ./quant_config.py,
   calib_dir:
   {
-    images: ../../data/datasets/coco2017/val2017,
+    images: ./hmtest/image,
   },
   calib_num: 20,
   preproc_module: ,
@@ -44,7 +44,7 @@ build: {
 
 demo: {
   data_dir: ../../data/datasets/coco2017/val2017,
-  num: 10,
+  test_num: 10,
 }
 
 perf: {
