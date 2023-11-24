@@ -10,10 +10,10 @@ cd prepare_model
 cd ..
 
 cd compile_model
-./run.sh --batch 24
+./run.sh --batch 1
 cd ..
 
-cd ../../utils/aottcimexec/
+cd ../../utils/threadtcimexec/
 ./build.sh
 PATH="$(pwd):${PATH}"
 export PATH
@@ -30,4 +30,4 @@ else
 fi
 
 export HDPL_STREAM_TIME_OUT=150000
-tcimexec --model "${SCRIPT_DIR}/compile_model/tcim_resnet50" --iterations ${ITERATION}
+e2etcimexec --model "${SCRIPT_DIR}/compile_model/tcim_resnet50" --iterations ${ITERATION} "$@"
