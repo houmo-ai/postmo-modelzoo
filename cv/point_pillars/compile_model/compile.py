@@ -68,7 +68,7 @@ def compile_pfe(args=None):
     executor = Executor('aot')
     compile_config = {
         'tcim.fuse_strategy': 1,
-        'tcim.codegen_pic': False,
+        'tcim.codegen_pic': True,
         'tcim.sync_strategy': 0,
     }
     target = tvm.target.Target('hdpl', host='c')
@@ -105,7 +105,7 @@ def compile_rpn(args=None):
         'tcim.fuse_strategy': 1,
         'tcim.gen_intrinsic': False,
         'tcim.sync_strategy': 0,
-        'tcim.codegen_pic': False,
+        'tcim.codegen_pic': True,
         'tcim.for_benchmark': False,
         'tcim.core_num': 1,
     }
