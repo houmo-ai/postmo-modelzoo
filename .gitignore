@@ -12,10 +12,13 @@ __pycache__/
 *.JPEG
 *.bmp
 *.h264
+*.svg
 
 # Data files
 *.npy
 *.log
+*.hir
+*.dot
 
 # Compressed files
 *.zip

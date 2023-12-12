@@ -26,7 +26,7 @@ class YoloP(Detector):
     #     return img.unsqueeze(0)
 
     # @staticmethod
-    # def build_config():
+    # def build_options():
     #     return {}
 
     def _preprocess(self, img):

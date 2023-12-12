@@ -9,7 +9,7 @@ import cv2
 class Resnet50(Classifier):
 
     @staticmethod
-    def build_config():
+    def build_options():
         return {
             'tcim.fuse_strategy': 0,
             'tcim.gen_intrinsic': 2,
@@ -32,7 +32,9 @@ class Resnet50(Classifier):
             else:
                 h = round(data.shape[0] / data.shape[1] * resize_size)
                 w = resize_size
-            data = cv2.resize(data, (w, h))  # HWC
+            data = cv2.resize(data, (w, h))  # HWC uint8
+            data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
             data = centercrop(data, (crop_size, crop_size))
-            datas[name] = np.transpose(data, (2, 0, 1)).astype(np.float32)  # CHW
+            data = np.transpose(data, (2, 0, 1))  # CHW uint8
+            datas[name] = np.expand_dims(data, axis=0)  # NCHW uint8
         return datas

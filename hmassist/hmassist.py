@@ -8,19 +8,22 @@ import argparse
 import importlib
 import logging
 import time
+import torch
 from hmassist.utils import logger
 from hmassist.utils.glog_format import GLogFormatter
 from hmassist.utils.parser import read_yaml_to_dict
 from hmassist.utils.dist_metrics import cosine_distance
+from hmassist.utils.utils import get_random_data
 from hmassist.utils.check import (
     check_config,
     check_demo_config,
     check_accuracy_config,
-    check_file_exist
+    check_args
 )
 from hmassist.executors.h30_exec import H30Exec
 from hmassist.executors.onnx_exec import OnnxExec
 from hmassist.models.base_model import BaseModel
+
 
 def set_logger(op, log_dir, filename):
     if not os.path.exists(log_dir):
@@ -31,23 +34,31 @@ def set_logger(op, log_dir, filename):
     file_handler.setFormatter(GLogFormatter())
     logger.addHandler(file_handler)
 
+
+def save_data(data, dir, name):
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    data.tofile(os.path.join(dir, "{}.bin".format(name)))
+    data.tofile(os.path.join(dir, "{}.txt".format(name)), sep="\n")
+    np.save(os.path.join(dir, '{}.npy'.format(name)), data)
+
+
 def get_executor(cfg):
-    target = cfg["build"]["target"]
-    if target == ("H30"):
+    target = cfg["target"]
+    if target == "H30":
         return H30Exec(cfg)
-        # return OnnxExec(cfg)
+    elif target == "onnx":
+        return OnnxExec(cfg)
     else:
         logger.error("Not support target -> {}".format(target))
         exit(-1)
 
-def get_model(cfg, backend=None):
-    if "impl_class" in cfg["model"]:
-        model_impl_class = cfg["model"]["impl_class"]
-    else:
-        model_impl_class = None
-    hmexec = get_executor(cfg)
-    dataset_class = cfg["accuracy"]["dataset_class"]
-    data_dir = cfg["accuracy"]["data_dir"]
+
+def get_model(cfg):
+    model_impl_class = cfg["model"].get("impl_class", None)
+    executor = get_executor(cfg)
+    dataset_class = cfg["accuracy"].get("dataset_class", None)
+    data_dir = cfg["accuracy"].get("data_dir", None)
     try:
         m = importlib.import_module("hm_dataset")
         if hasattr(m, dataset_class):
@@ -67,13 +78,9 @@ def get_model(cfg, backend=None):
         if hasattr(m, model_impl_class):
             # 实例化预处理对象
             model = getattr(m, model_impl_class)(
-                executor=hmexec,
-                inputs=hmexec.inputs,
+                executor=executor,
                 dataset=dataset,
-                test_num=0,
-                target=hmexec.target,
                 # dtype=dtype,   # int8/fp32
-                backend=backend
             )
         else:
             logger.error("hm_model.py has no class named {}, please check your config"
@@ -83,201 +90,186 @@ def get_model(cfg, backend=None):
         logger.warning("can not find hm_model.py, use default model will not support demo/perf/accuracy: {}"
                        .format(e))
         model = BaseModel(
-            executor=hmexec,
-            inputs=hmexec.inputs,
+            executor=executor,
             dataset=dataset,
-            test_num=0,
-            target=hmexec.target,
             # dtype=dtype,   # int8/fp32
-            backend=backend
             )
     # del sys.modules["hm_model"]
     # del sys.modules["hm_dataset"]
 
     return model
 
+
 def quantize(cfg):
-    try:
-        logger.info("{}".format(cfg))
-        model = get_model(cfg)
-        model.executor.quantize(model.get_input_datas)
-    except Exception as e:
-        logger.error("{}".format(traceback.format_exc()))
-        logger.error("HmAssist failed to ptq quantize -> {}".format(e))
+    logger.info("{}".format(cfg))
+    model = get_model(cfg)
+    model.executor.quantize(model.get_input_datas)
+
 
 def build(cfg):
-    try:
-        logger.info("{}".format(cfg))
-        model = get_model(cfg)       
-        model.executor.build(model.build_config())
-
-        # hmexec.model_analysis()
-        # hmexec.compress_analysis()
-        # hmexec.get_profile_info()
-        # hmexec.get_relay_mac()  # print mac/flops/cycles info
-        # hmexec.get_device_type()  # print op backend info
-
-        # print span
-        # header = ["Phase", "Span/s"]
-        # table = PrettyTable(header)
-        # table.add_row(["ptq", "{:.3f}".format(hmexec.quantize_span)])
-        # table.add_row(["build", "{:.3f}".format(hmexec.build_span)])
-        # table.add_row(["infer", "{:.3f}".format(hmexec.iss_simu_span)])
-        # logger.info("\n{}".format(table))
-    except Exception as e:
-        logger.error("{}".format(traceback.format_exc()))
-        logger.error("HmAssist failed to build -> {}".format(e))
-
-def test(cfg, backend):
-    try:
-        if backend not in ["asic", "onnx"]:
-            logger.error("infer phase only support asic and onnx")
-            exit(-1)
-        logger.info("{}".format(cfg))
-        hmexec = get_executor(cfg)
-        hmexec.backend = backend
-        hmexec.load()
-        hmexec.print_input_info()
-        hmexec.print_output_info()
-        inputs = hmexec.get_golden_inputs()
-        hmexec.set_fixed_out(True)
-        outputs = hmexec.infer(inputs)
-        model_name = hmexec.model_name
-        # save and compare
-        for input_name, input_data in inputs.items():
-            input_data.tofile(os.path.join(hmexec.result_dir, "{}_input.bin".format(input_name)))
-        for output_name, output_data in outputs.items():
-            # 临时添加NCHW
-            # output_data = np.transpose(output_data, (0, 2, 3, 1))
-            # save fixed result
-            logger.info("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-            # save origin result
-            output_data.tofile(os.path.join(hmexec.result_dir, "{}_output.bin".format(output_name)))
-            output_data.tofile(os.path.join(hmexec.result_dir, "{}_output.txt".format(output_name)), sep="\n")
-            np.save(os.path.join(hmexec.result_dir, 'tcim_{}_{}_output.npy'.format(model_name, output_name)), output_data)
-            logger.info("output[{}] saved in {}".format(output_name, hmexec.result_dir))
-            golden_output = hmexec.get_golden_output(output_name)
-            if golden_output is not None:
-                if golden_output.shape == output_data.shape:
-                    cosine_dist = cosine_distance(golden_output, output_data)
-                    is_match = (golden_output == output_data).all()
-                    logger.info("[compare] {} vs quant output [{}] match={}, similarity={:.6f}"
-                                .format(hmexec.target, output_name, is_match, cosine_dist))
-                else:
-                    logger.error("[compare] {} vs quant output [{}] shape not equal {} vs {}"
-                                 .format(hmexec.target, output_name, output_data.shape, golden_output.shape))
-        logger.info("success")
-    except Exception as e:
-        logger.error("{}".format(traceback.format_exc()))
-        logger.error("HmAssist failed to infer -> {}".format(e))
-
-def demo(cfg, backend):
-    try:
-        if backend not in ["asic", "onnx"]:
-            logger.error("demo phase only support asic and onnx")
-            exit(-1)
-        logger.info(cfg)
-        if not check_demo_config(cfg):
-            exit(-1)
-        model = get_model(cfg, backend=backend)
-        data_dir = cfg["demo"]["data_dir"]
-        test_num = cfg["demo"]["test_num"]
-
-        file_list = []
-        if os.path.isfile(data_dir):
-            _, ext = os.path.splitext(data_dir)
-            if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
-                file_list.append(data_dir)
-            else:
-                logger.error("file type not support -> {}".format(data_dir))
-        elif os.path.isdir(data_dir):
-            for filename in os.listdir(data_dir):
-                _, ext = os.path.splitext(filename)
-                if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
-                    file_list.append(os.path.join(data_dir, filename))
-                    if len(file_list) == test_num:
-                        break
-
-        if backend == "onnx":
-            model.load_json(hmexec.original_json_path)
-        elif backend == "asic":
-            model.executor.load()
-        else:
-            logger.error("Not support target({})".format(hmexec.target))
-            exit(-1)
-
-        for filepath in file_list:
-            model.demo(filepath)
-        print("demo success")
-        logger.info("[infer] average cost {:.3f}ms".format(model.ave_latency_ms))
-        logger.info("[end2end] average cost: {:.3f}ms".format(model.end2end_latency_ms))
-        logger.info("success")
-    except Exception as e:
-        logger.error("{}".format(traceback.format_exc()))
-        logger.error("HmAssist failed to demo -> {}".format(e))
-
-def perf(cfg, backend):
-    if backend not in ["asic", "onnx"]:
-        logger.error("perf phase only support asic and onnx")
-        exit(-1)
     logger.info("{}".format(cfg))
-    model = get_model(cfg, backend=backend)
+    model = get_model(cfg)   
+    model.executor.build(model.build_options())
+
+    # compare golden data
+    model.load()
+    model.executor.print_input_info()
+    model.executor.print_output_info()
+    logger.info("start compare golden data...")
+    save_dir = os.path.join(model.executor.result_dir, "tcim")
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    inputs = model.executor.get_golden_inputs()
+    if inputs is not None:
+        for input_name, input_data in inputs.items():
+            input_data.tofile(os.path.join(save_dir, "{}_input.bin".format(input_name)))
+        model.executor.set_fixed_out(True)
+        outputs = model.executor.infer(inputs)
+        # 临时添加NCHW
+        # output_data = np.transpose(output_data, (0, 2, 3, 1))
+    for output_name, output_data in outputs.items():
+        logger.info("{} output[{}] shape = {}, dtype = {}".format(model.target, output_name,
+                                                                  output_data.shape, output_data.dtype))
+        save_data(output_data, save_dir, output_name)
+        logger.info("tcim outputs saved in {}".format(save_dir))
+        golden_output = model.executor.get_golden_output(output_name)
+        is_match = (output_data == golden_output).all()
+        cosine_dist = cosine_distance(output_data, golden_output)
+        logger.info("[compare] {} vs quant output [{}] match={}, similarity={:.6f}"
+                    .format(model.target, output_name, is_match, cosine_dist))
+    logger.info("build completed")
+
+
+def test(cfg):
+    logger.info("{}".format(cfg))
+    model = get_model(cfg)
+    model.load()
+    model.executor.print_input_info()
+    model.executor.print_output_info()
+    data_path = cfg["test"].get("data_path")
+    if data_path:
+        dir, file = os.path.split(data_path)
+        inputs = model.get_input_datas(dir, file)
+    else:
+        inputs = {}
+        for _input in model.inputs:
+            name = _input["name"]
+            dtype = _input["dtype"]
+            logger.warning("data[{}] will use random data".format(name))
+            inputs[name] = get_random_data(name, dtype, model.input_shape)
+    inputs = model.executor._preprocess(inputs)
+    model.executor.set_fixed_out(False)
+    outputs = model.executor.infer(inputs)
+
+    # save datas
+    save_dir = os.path.join(model.executor.result_dir, "test")
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    for input_name, input_data in inputs.items():
+        save_data(input_data, save_dir, input_name + "_input")
+    for output_name, output_data in outputs.items():
+        # 临时添加NCHW
+        # output_data = np.transpose(output_data, (0, 2, 3, 1))
+        logger.info("{} output[{}] shape = {}, dtype = {}".format(model.target, output_name, output_data.shape, output_data.dtype))
+        save_data(output_data, save_dir, output_name)
+    logger.info("test outputs saved in {}".format(save_dir))
+
+    # compare to framework output
+    if model.target in ["H30",]:
+        for output_name, output_data in outputs.items():
+            output_data_path = os.path.join(model.compare_dir, "test", output_name + '.npy')
+            if os.path.exists(output_data_path):
+                compare_data = np.load(output_data_path)
+                logger.info("{} output[{}] shape = {}, dtype = {}".format(model.framework, output_name,
+                                                                          output_data.shape, output_data.dtype))
+            else:
+                logger.warning("compare canceled while {} output not found -> {}".format(model.framework))
+                return None
+            is_match = (output_data == compare_data).all()
+            cosine_dist = cosine_distance(output_data, compare_data)
+            logger.info("[compare] {} vs {} output [{}] match={}, similarity={:.6f}"
+                        .format(model.target, model.framework, output_name, is_match, cosine_dist))
+    logger.info("test completed")
+
+
+def demo(cfg):
+    logger.info(cfg)
+    if not check_demo_config(cfg):
+        exit(-1)
+    model = get_model(cfg)
+    data_dir = cfg["demo"]["data_dir"]
+    test_num = cfg["demo"]["test_num"]
+
+    file_list = []
+    if os.path.isfile(data_dir):
+        _, ext = os.path.splitext(data_dir)
+        if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
+            file_list.append(data_dir)
+        else:
+            logger.error("file type not support -> {}".format(data_dir))
+    elif os.path.isdir(data_dir):
+        for filename in os.listdir(data_dir):
+            _, ext = os.path.splitext(filename)
+            if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
+                file_list.append(os.path.join(data_dir, filename))
+                if len(file_list) == test_num:
+                    break
+
+    model.load()
+
+    for filepath in file_list:
+        model.demo(filepath)
+    logger.info("[infer] average cost {:.3f}ms".format(model.ave_latency_ms))
+    logger.info("[end2end] average cost: {:.3f}ms".format(model.end2end_latency_ms))
+    logger.info("demo completed")
+
+
+def perf(cfg):
+    logger.info("{}".format(cfg))
+    model = get_model(cfg)
     test_num = cfg["perf"]["test_num"]
     model.executor.perf(test_num)
-    logger.info("success")
+    logger.info("perf completed")
 
-def accuracy(cfg, dtype, backend):
-    try:
-        # logging.getLogger("").setLevel(logging.WARNING)
-        if backend not in ["asic", "onnx"]:
-            logger.error("accuracy phase only support asic and onnx")
-            exit(-1)
-        if not check_accuracy_config(cfg):
-            exit(-1)
-        model = get_model(cfg, backend=backend)
 
-        data_dir = cfg["accuracy"]["data_dir"]
-        test_num = cfg["accuracy"]["test_num"]
-        dataset_class = cfg["accuracy"]["dataset_class"]
+def accuracy(cfg):
+    # logging.getLogger("").setLevel(logging.WARNING)
+    if not check_accuracy_config(cfg):
+        exit(-1)
+    model = get_model(cfg)
 
-        m = importlib.import_module("hm_dataset")
-        if hasattr(m, dataset_class):
-            # 实例化预处理对象
-            dataset = getattr(m, dataset_class)(data_dir)
-        else:
-            logger.error("hm_dataset.py has no class named {}".format(dataset_class))
-            exit(-1)
+    data_dir = cfg["accuracy"]["data_dir"]
+    test_num = cfg["accuracy"]["test_num"]
+    dataset_class = cfg["accuracy"]["dataset_class"]
 
-        if backend == "onnx":
-            model.load_json(model.executor.original_json_path)
-        elif backend == "asic":
-            model.load()
-        else:
-            logger.error("Not support target({})".format(model.executor.target))
-            exit(-1)
+    m = importlib.import_module("hm_dataset")
+    if hasattr(m, dataset_class):
+        # 实例化预处理对象
+        dataset = getattr(m, dataset_class)(data_dir)
+    else:
+        logger.error("hm_dataset.py has no class named {}".format(dataset_class))
+        exit(-1)
 
-        res = model.evaluate()
-        logger.info("[infer] average cost {:.6f}ms".format(model.ave_latency_ms))
-        logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
-        logger.info("{}".format(res))
-        logger.info("success")
-        return res
-    except Exception as e:
-        logger.error("{}".format(traceback.format_exc()))
-        logger.error("HmAssist failed to accuracy -> {}".format(e))
+    model.load()
 
-def run(config_filepath, phase, dtype, target, backend):
+    res = model.evaluate(test_num)
+    logger.info("[infer] average cost {:.6f}ms".format(model.ave_latency_ms))
+    logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
+    logger.info("{}".format(res))
+    logger.info("accuracy test completed")
+    return res
+
+
+def run(config_path, phase, dtype, target):
     # 补充自定义预处理文件所在目录，必须与配置文件同目录
-    config_abspath = os.path.abspath(config_filepath)
+    config_abspath = os.path.abspath(config_path)
     config_dir = os.path.dirname(config_abspath)
     sys.path.insert(0, config_dir)  # 自定义模块环境变量
 
     config = read_yaml_to_dict(config_abspath)
     if not check_config(config, phase):
         exit(-1)
-    # 更新target，优先使用命令行
-    if target is not None:
-        config["build"]["target"] = target
+    config["target"] = target
 
     res = dict()
     if phase == "quant":
@@ -285,13 +277,13 @@ def run(config_filepath, phase, dtype, target, backend):
     elif phase == "build":
         build(config)
     elif phase == "test":
-        test(config, backend)
+        test(config)
     elif phase == "demo":
-        demo(config, backend)
+        demo(config)
     elif phase == "perf":
-        perf(config, backend)
+        perf(config)
     elif phase == "accuracy":
-        res = accuracy(config, dtype, backend)
+        res = accuracy(config)
     else:
         logger.error("Not support operation -> {}".format(phase))
 
@@ -336,6 +328,20 @@ def benchmark(mapping_file, dtype, target, backend):
         logger.info("Finish {}".format(model_name))
     f.close()
     logger.info("\n{}".format(table))
+
+    # hmexec.model_analysis()
+    # hmexec.compress_analysis()
+    # hmexec.get_profile_info()
+    # hmexec.get_relay_mac()  # print mac/flops/cycles info
+    # hmexec.get_device_type()  # print op backend info
+
+    # print span
+    # header = ["Phase", "Span/s"]
+    # table = PrettyTable(header)
+    # table.add_row(["ptq", "{:.3f}".format(hmexec.quantize_span)])
+    # table.add_row(["build", "{:.3f}".format(hmexec.build_span)])
+    # table.add_row(["infer", "{:.3f}".format(hmexec.iss_simu_span)])
+    # logger.info("\n{}".format(table))
     logger.info("success")
 
 
@@ -343,40 +349,24 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HmAssist Tool")
     parser.add_argument("type", type=str,
                         choices=("quant", "build", "test", "demo", "perf", "accuracy"),
-                        help="Please specify a operator")
-    parser.add_argument("--config", "-c", type=str, required=True,
-                        help="Please specify a configuration file")
+                        help="Please specify an operation")
     parser.add_argument("--target", type=str, required=True,
-                        choices=("H30"),
+                        choices=("H30", "onnx"),
                         help="Please specify a chip target")
-    parser.add_argument("--dtype", "-t", type=str, default="int8", choices=("int8", "fp32"),
+    parser.add_argument("--config", "-c", type=str, default="config.yml",
+                        help="Please specify a configuration file, default is config.yml")
+    parser.add_argument("--dtype", "-t", type=str, default="int8",
+                        choices=("int8", "fp32"),
                         help="Please specify one of them, default is int8")
-    parser.add_argument("--backend", type=str,
-                        default="asic", choices=("asic", "onnx"), 
-                        help="Please specify one of them")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default is ./logs")
 
     args = parser.parse_args()
-
     print(args)
-
-    # check files
-    check_file_exist(args.config)
-    basename, _ = os.path.splitext(os.path.basename(args.config))
-    # set_logger(args.type, args.log_dir, basename)
-
-    # default config
-    if args.backend is None:
-        backend = "asic"
-    else:
-        backend = args.backend
+    check_args(args)
 
     # TODO: get version
     VERSION = "v0.1.0"
     logger.info("{} with HmAssist version: {}".format(args.type, VERSION))
 
-    if args.type == "benchmark":
-        benchmark(args.config, args.dtype, args.target, backend)
-    else:
-        run(args.config, args.type, args.dtype, args.target, backend)
+    run(args.config, args.type, args.dtype, args.target)

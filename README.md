@@ -6,28 +6,43 @@ houmo-modelzoo是为用户快速将模型移植到后摩鸿途H30芯片产品而
 
 ## 目录
 
-|目录|说明|备注|
-|---|---|---|
-|cv|计算机视觉相关模型支持||
-|data|评估使用的模型和数据||
-|utils|评估使用的工具||
-|hmodel|QAT使用的源码||
 
-## 网络支持列表和链接
+| 目录     | 说明                 | 备注         |
+| -------- | -------------------- | ------------ |
+| cv       | 计算机视觉相关模型   |              |
+| data     | 评估使用的模型和数据 |              |
+| hmodel   | 量化模型配置和工具   | QAT量化使用  |
+| hmassist | 参数化评估辅助工具   | 一键完成评估 |
+| utils    | C++评估工具和源码    |              |
 
-### CV：
+## 模型支持列表
 
-#### Detection:
+### ComputerVision：
 
-| MODELS                         |
-| ----------------------------   |
-| [YOLOV3](cv/yolov3)            |
-| [YOLOP](cv/yolop)              |
 
-#### Classification:
+| MODELS                          | ptq | qat | py-demo | cpp-demo | accuracy |
+| ------------------------------- | --- | --- | ------- | -------- | -------- |
+| [resnet50](cv/resnet50)         | yes | yes | yes     | yes      | yes      |
+| [yolov5s](cv/yolov5s)           | yes | x   | yes     | x        | x        |
+| [yolov3](cv/yolov3)             | yes | x   | x       | yes      | x        |
+| [mobilenetv2](cv/mobilenet_v2)  | yes | x   | yes     | x        | yes      |
+| [efficientnet](cv/efficientnet) | yes | x   | x       | x        | x        |
+| [vit](cv/vit)                   | yes | x   | x       | x        | x        |
 
-| MODELS                                 |
-| ------------------------------------   |
-| [Mobilenetv2](cv/mobilenet_v2)         |
-| [Resnet50](cv/resnet50)                |
-| [Efficientnet](cv/efficientnet)        |
+### AutoDrive:
+
+
+| MODELS                          | ptq | qat | py-demo | cpp-demo | accuracy |
+| ------------------------------- | --- | --- | ------- | -------- | -------- |
+| [yolop](cv/yolop)               | yes | yes | yes     | x        | x        |
+| [pointpillars](cv/pointpillars) | yes | x   | x       | yes      | yes      |
+
+## C++评估工具
+
+
+| PROJECT                                                                         | 说明                 |
+| ------------------------------------------------------------------------------- | -------------------- |
+| [classification](uilts/aotlassification)                                        | imagenet分类精度测试 |
+| [tcimexec](uilts/aottcimexec)                                                   | 单线程性能测试       |
+| [threadtcimexec](uilts/aottcimexec)                                             |                      |
+| [multi_thread_stream_tcim_exec](uilts/multi_thread_stream_tcim_execaottcimexec) | 多线程性能测试       |

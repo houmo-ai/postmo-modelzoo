@@ -9,7 +9,7 @@ import cv2
 import tqdm
 
 from ..models.base_model import BaseModel
-from ..utils import logger
+from ..utils import logger, utils
 
 class Classifier(BaseModel, ABC):
     def __init__(self, **kwargs):
@@ -25,8 +25,11 @@ class Classifier(BaseModel, ABC):
     def _preprocess(self, inputs):
         datas = {}
         for name, data in inputs.items():
-            data = cv2.resize(data, (self._input_size[1], self._input_size[0]))  # HWC
-            datas[name] = np.transpose(data, (2, 0, 1)).astype(np.float32)  # CHW
+            data = utils.to_opencv(data)
+            data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
+            data = cv2.resize(data, (self._input_size[1], self._input_size[0]))  # HWC uint8
+            data = np.transpose(data, (2, 0, 1))  # CHW uint8
+            datas[name] = np.expand_dims(data, axis=0)  # NCHW uint8
         return datas
 
     def _postprocess(self, outputs, image=None):
@@ -46,14 +49,14 @@ class Classifier(BaseModel, ABC):
     def load(self):
         self.executor.load()
 
-    def evaluate(self):
+    def evaluate(self, test_num):
         """ top-k
         """
         if not self.dataset:
             logger.error("The dataset is null")
             exit(-1)
 
-        img_paths, labels = self.dataset.get_datas(num=self.test_num)
+        img_paths, labels = self.dataset.get_datas(num=test_num)
 
         k = 5
         top1, top5 = 0, 0
@@ -78,7 +81,7 @@ class Classifier(BaseModel, ABC):
                     top5 += 1
         top1, top5 = float(top1)/total_num, float(top5)/total_num
         return {
-            "input_size": "{}x{}x{}x{}".format(1, 3, self._input_size[1], self._input_size[0]),
+            "input_shape": "{}".format(self.input_shape),
             "dataset": self.dataset.dataset_name,
             "num": total_num,
             "top1": "{:.6f}".format(top1),
@@ -95,23 +98,23 @@ class Classifier(BaseModel, ABC):
         inputs = {self.inputs[0]["name"]: img}
         inputs = self._preprocess(inputs)
 
-        from torchvision.datasets.folder import pil_loader
-        data1 = pil_loader(img_path)
-        import torchvision.transforms as transforms
-        from hmassist.utils.transform import RGB2YUV
-        from hmassist.utils.transform import ToTensorNotNormal
-        transform = transforms.Compose(
-            [
-                transforms.Resize(256), transforms.CenterCrop(224),
-                ToTensorNotNormal(), 
-                # RGB2YUV(),
-            ],
-        )
-        a = transform(data1)
-        a = np.expand_dims(a.numpy().astype(np.uint8), 0)
-        datas = {}
-        for input in self.inputs:
-            datas[input["name"]] = a
+        # from torchvision.datasets.folder import pil_loader
+        # data1 = pil_loader(img_path)
+        # import torchvision.transforms as transforms
+        # from hmassist.utils.transform import RGB2YUV
+        # from hmassist.utils.transform import ToTensorNotNormal
+        # transform = transforms.Compose(
+        #     [
+        #         transforms.Resize(256), transforms.CenterCrop(224),
+        #         ToTensorNotNormal(), 
+        #         # RGB2YUV(),
+        #     ],
+        # )
+        # a = transform(data1)
+        # a = np.expand_dims(a.numpy().astype(np.uint8), 0)
+        # datas = {}
+        # for input in self.inputs:
+        #     datas[input["name"]] = a
 
         if img is None:
             logger.error("Failed to load image -> {}".format(img_path))

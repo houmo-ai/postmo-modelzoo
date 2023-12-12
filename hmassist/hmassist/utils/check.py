@@ -45,16 +45,6 @@ def check_config(cfg, phase="build"):
         logger.error("The key(weight) must be in cfg[model]")
         return False
 
-    if "target" not in cfg["build"]:
-        logger.error("The key(target) must be in cfg")
-        return False
-
-    target = cfg["build"]["target"]
-    target_lists = ["H30"]
-    if target not in target_lists:
-        logger.error("target({}) not in {}".format(target, target_lists))
-        return False
-
     if "calib_dir" not in cfg["quant"]:
         logger.error("The key(calib_dir) must be in cfg[build][quant]")
         return False
@@ -154,11 +144,6 @@ def check_config(cfg, phase="build"):
             logger.error("format({}) must be in {}".format(format, format_lists))
             return False
 
-        if _input["data_path"]:
-            if not os.path.exists(_input["data_path"]):
-                logger.error("data_path not exist -> {}".format(_input["data_path"]))
-                return False
-
     # TODO
     # 检查是否缺少关键字
 
@@ -245,7 +230,8 @@ def check_demo_config(cfg):
     return True
 
 
-def check_file_exist(filepath):
-    if not os.path.exists(filepath):
-        logger.error("Not found file -> {}".format(filepath))
+def check_args(args):
+    if not os.path.exists(args.config):
+        logger.error("Not found file -> {}".format(args.config))
         exit(-1)
+

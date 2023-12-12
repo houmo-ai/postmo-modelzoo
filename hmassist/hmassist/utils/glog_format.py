@@ -48,18 +48,18 @@ class GLogFormatter(logging.Formatter):
 
 class GLogFormatterWithColor(logging.Formatter):
     LEVEL_MAP = {
-        logging.FATAL: 'F',  # FATAL is alias of CRITICAL
-        logging.ERROR: 'E',
-        logging.WARN: 'W',
-        logging.INFO: 'I',
-        logging.DEBUG: 'D'
+        logging.FATAL: 'FATAL',  # FATAL is alias of CRITICAL
+        logging.ERROR: 'ERROR',
+        logging.WARN: 'WARN',
+        logging.INFO: 'INFO',
+        logging.DEBUG: 'DEBUG'
     }
 
-    green = "\x1b[32;20m"
-    grey = "\x1b[38;20m"
-    yellow = "\x1b[33;20m"
-    red = "\x1b[31;20m"
-    bold_red = "\x1b[31;1m"
+    green = "\x1b[92;20m"
+    grey = "\x1b[98;20m"
+    yellow = "\x1b[93;20m"
+    red = "\x1b[91;20m"
+    bold_red = "\x1b[91;1m"
     reset = "\x1b[0m"
 
     COLOR_FORMATS = {
@@ -80,12 +80,12 @@ class GLogFormatterWithColor(logging.Formatter):
             level = '?'
         date = time.localtime(record.created)
         date_usec = (record.created - int(record.created)) * 1e6
-        record_message = '%c%d%02d%02d %02d:%02d:%02d.%06d %s %s:%d] %s' % (
-            level, date.tm_year, date.tm_mon, date.tm_mday, date.tm_hour, date.tm_min,
+        record_message = '%02d:%02d:%02d.%06d %s:%d [%s] %s' % (
+            date.tm_hour, date.tm_min,
             date.tm_sec, date_usec,
-            record.process if record.process is not None else '?????',
             record.filename,
             record.lineno,
+            level,
             format_message(record)
         )
         record_message = GLogFormatterWithColor.COLOR_FORMATS[record.levelno] + record_message + "\x1b[0m"

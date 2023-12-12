@@ -14,28 +14,33 @@ class BaseModel(object, metaclass=abc.ABCMeta):
     def __init__(self, **kwargs):
         """"""
         self.executor = kwargs["executor"]
-        self.inputs = kwargs["inputs"]   # multi-input
         self.dataset = kwargs["dataset"]
-        self.test_num = kwargs["test_num"]
-        self.target = kwargs["target"]
-        # self.dtype = kwargs["dtype"]
-        self.backend = kwargs["backend"]
+        self.model = self.executor.model
+        self.target = self.executor.target
+        self.framework = self.model["framework"]
+        self.inputs = self.model["inputs"]
+        self.name = self.model["name"]
+        self.compare_dir = os.path.abspath(os.path.join(self.model["save_dir"], self.framework, "result"))
 
         self.total = 0
         self.time_span = 0
         self._infer_latency_ms = 0
         self._end2end_latency_ms = 0
-        # self.executor.backend = self.backend
 
-        if self.inputs[0]["layout"] == "NCHW":
-            n, c, h, w = self.inputs[0]["shape"]
-        elif self.inputs[0]["layout"] == "NHWC":
-            n, h, w, c = self.inputs[0]["shape"]
-        if "image" in self.inputs[0] and "size" in self.inputs[0]["image"] \
-            and self.inputs[0]["image"]["size"]:
-            self._input_size = self.inputs[0]["image"]["size"]
-        else:
-            self._input_size = [h, w]
+        for input in self.inputs:
+            if input["layout"] == "ND":
+                self.input_shape = input["shape"]
+                break
+            if input["layout"] == "NCHW":
+                n, c, h, w = input["shape"]
+            elif input["layout"] == "NHWC":
+                n, h, w, c = input["shape"]
+            if "image" in input:
+                size = input["image"].get("size", None)
+            if size:
+                self.input_shape = [n, c, size[0], size[1]]
+            else:
+                self.input_shape = [n, c, h, w]
 
     def load(self):
         """加载so模型
@@ -45,8 +50,8 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         self.executor.load()
 
     @staticmethod
-    def build_config():
-        logger.warning("can not find hm_model.build_config, use BaseModel.build_config")
+    def build_options():
+        logger.warning("can not find hm_model.build_options, use BaseModel.build_options")
         return None
 
     def get_input_datas(self, filedir, filename):
@@ -57,7 +62,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         in_datas = {self.inputs[0]["name"]: data}
         return self._preprocess(in_datas)
 
-    def _preprocess(self, inputs, resize=False):
+    def _preprocess(self, inputs):
         """_preprocess
         :param inputs: model inputs dict
         :return: numpy dict, CHW
@@ -66,10 +71,13 @@ class BaseModel(object, metaclass=abc.ABCMeta):
 
         datas = {}
         for name, data in inputs.items():
-            # from ..utils import utils
-            # image = utils.to_pillow(data)
+            from ..utils import utils
+            data = utils.to_opencv(data)
+            # convert to 
+            data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
             data = cv2.resize(data, (self._input_size[1], self._input_size[0]))
-            datas[name] = np.transpose(data, (2, 0, 1)).astype(np.float32)  # CHW
+            data = np.transpose(data, (2, 0, 1))  # CHW uint8
+            datas[name] = np.expand_dims(data, axis=0)  # NCHW uint8
         return datas
 
     def _postprocess(self, outputs, image=None):

@@ -22,7 +22,7 @@ def get_args() -> argparse.Namespace:
         '--model-path',
         dest='model_path',
         type=str,
-        default='./hmquant_lane_512x1536_with_act.onnx',
+        default='./output/H30/result/hmquant_lane_512x1536_with_act.onnx',
         help='path to the model root path',
     )
     parser.add_argument(
@@ -85,7 +85,9 @@ def compile(args=None):
 if __name__ == '__main__':
     model_name = 'lane_512x1536'
     local_path = model_name
-    quant_path = 'hmquant_lane_512x1536_with_act.onnx'
-    # if not os.path.exists(quant_path):
-        # os.system('wget http://10.10.1.53:8082/artifactory/model_zoo2/houmo/yolov5/yolov5s_640x640_without_ptprocess.onnx')
+    quant_path = 'hm_lane_golden_720p.zip'
+    if not os.path.exists(quant_path):
+        os.system('wget http://10.10.1.53:8082/artifactory/toolchain/support/models/lane/hm_lane_golden_720p.zip')
+        os.system('mkdir -p output/H30/result')
+        os.system('unzip -d output/H30/result hm_lane_golden_720p.zip')
     compile()

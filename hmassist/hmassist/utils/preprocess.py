@@ -3,7 +3,6 @@
 import cv2
 import numpy as np
 from . import logger
-from .enum_type import PaddingMode
 
 def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
     """
@@ -135,7 +134,7 @@ def calc_padding_size2(im, target_size, padding_mode):
     return padding_size, size
 
 
-def resize(im, size, resize_type=0, padding_value=128, padding_mode=PaddingMode.LEFT_TOP,
+def resize(im, size, resize_type=0, padding_value=128, padding_mode=0,
            interpolation=cv2.INTER_LINEAR):
     """opencv resize封装，目前仅支持双线性差值
     :param im:
@@ -167,7 +166,7 @@ def resize(im, size, resize_type=0, padding_value=128, padding_mode=PaddingMode.
 
 
 def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=False, use_resize=True, resize_type=0,
-                       interpolation=cv2.INTER_LINEAR, padding_value=128, padding_mode=PaddingMode.LEFT_TOP):
+                       interpolation=cv2.INTER_LINEAR, padding_value=128, padding_mode=0):
     """默认预处理函数
     :param im: BGR or GRAY图像
     :param size:

@@ -184,6 +184,8 @@ int main(int argc, char *argv[]) {
     // load model
     tvm::hdpl::Module module = tvm::hdpl::LoadModelPackage(arguments.model_path, "aot");
     modules.push_back(std::move(module));
+    auto size = module.GetGlobalMemSize();
+    std::cout << "model memsize = " << size << std::endl;
   }
     
   // get input info && set input

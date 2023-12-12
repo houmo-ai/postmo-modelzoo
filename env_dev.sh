@@ -36,7 +36,7 @@ fi
 
 # use asic if detected
 if [[ -z $HDPL_PLATFORM ]]; then
-  if [ -c /dev/hm_host_pcie ]; then
+  if [ -c /dev/hm_host_pcie* ]; then
     export HDPL_PLATFORM=ASIC
   else
     export HDPL_PLATFORM=ISIM

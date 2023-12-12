@@ -2,19 +2,8 @@
 
 import os
 import abc
-import cv2
-import importlib
 import numpy as np
 from ..utils import logger
-from ..utils.enum_type import PaddingMode
-from ..utils.preprocess import calc_padding_size, default_preprocess
-from collections import namedtuple, OrderedDict
-import torch
-import torchvision.transforms as transforms
-from torchvision.datasets.folder import pil_loader
-
-# Input = namedtuple("Input", ["idx", "name", "shape", "mean", "std", "layout", "format", "resize_type",
-#                              "padding_mode", "padding_value", "enable_aipp", "support"])
 
 
 class BaseExec(object, metaclass=abc.ABCMeta):
@@ -22,29 +11,31 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
     def __init__(self, cfg: dict):
         """init"""
-        self.cfg = cfg
+        # self.cfg = cfg
         self.model = cfg["model"]
-        self.quant = cfg["quant"]
+        self.quant_cfg = cfg["quant"]
+        self.build_cfg = cfg["build"]
+        # self.test = cfg["test"]
+        # self.demo = cfg["demo"]
+        # self.perf = cfg["perf"]
+        # self.accuracy = cfg["accuracy"]
         # model params
-        self.framework = cfg["model"]["framework"]
-        self.weight = cfg["model"]["weight"]
-        self.inputs = cfg["model"]["inputs"]
+        self.target = cfg["target"]
+        self.framework = self.model["framework"]
+        self.weight = self.model["weight"]
+        self.inputs = self.model["inputs"]
         self.num_inputs = len(self.inputs)
-        self.model_name = cfg["model"]["name"]
-        # build params
-        if "mode" in cfg["build"]:
-            self.build_mode = cfg["build"]["mode"]
-        else:
-            self.build_mode = "AOT"
-        self.target = cfg["build"]["target"]
-        self.opt_level = cfg["build"].get("opt_level", 2)
+        self.model_name = self.model["name"]
+        # default params
+        self.build_mode = self.build_cfg.get("mode", "AOT")
+        self.opt_level = self.build_cfg.get("opt_level", 2)
         # other params
         self.cur_dir = os.path.abspath("./")
-        self.model_dir = os.path.abspath(os.path.join(self.cfg["model"]["save_dir"], self.target))
-        self.result_dir = os.path.abspath(os.path.join(self.model_dir, "result"))
+        self.model_dir = os.path.abspath(os.path.join(cfg["model"]["save_dir"], self.target))
+        self.result_dir = os.path.join(self.model_dir, "result")
+        self.test_dir = os.path.join(self.result_dir, "test")
         self.quant_model_path = os.path.abspath(os.path.join(self.result_dir, 'hmquant_' + self.model_name + '_with_act.onnx'))
         self.golden_data_path = os.path.abspath(os.path.join(self.result_dir, 'hmquant_' + self.model_name + '_with_act'))
-        self.backend = "asic"
         if not os.path.exists(self.result_dir):
             os.makedirs(self.result_dir)
         logger.info("model output dir -> {}".format(self.model_dir))
@@ -65,7 +56,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
     def quantize(self):
         """quantize"""
-        logger.error("BaseExec not support quantize")
+        logger.error("BaseExec not support quant")
         raise NotImplementedError
 
     def build(self):
@@ -113,10 +104,11 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             self.shape_dict[_input["name"]] = (n, c, h, w)
             self.dtype_dict[_input["name"]] = _input["dtype"]
 
-            if not _input["mean"]:
-                _input["mean"] = [0.0 for _ in range(c)]
-            if not _input["std"]:
-                _input["std"] = [1.0 for _ in range(c)]
+            # 对mean和std进行广播
+            if "mean" in _input and _input["mean"] and len(_input["mean"]) == 1:
+                _input["mean"] = [_input["mean"] for _ in range(c)]
+            if "std" in _input and _input["std"] and len(_input["std"]) == 1:
+                _input["std"] = [_input["std"] for _ in range(c)]
 
     @staticmethod
     def check_not_exist(filepath):
@@ -129,6 +121,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         if data.dtype != target_dtype:
             logger.error("input({}) dtype mismatch {} vs {}".format(name, data.dtype, target_dtype))
             exit(-1)
+
+    def gen_golden(self):
+        raise NotImplementedError
 
     def set_quantize_cfg(self, in_datas):
         """ quantization config
@@ -172,13 +167,17 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             quantize_config["float_list"].extend(skip_layer_names)
         return quantize_config, norm
 
-    @abc.abstractmethod
     def print_input_info(self):
-        raise NotImplementedError
+        input_num = len(self.input_info)
+        logger.info("{} input num = {}:".format(self.target, input_num))
+        for _input in self.input_info:
+            logger.info("{} input[{}] shape = {}, dtype = {}".format(self.target, _input["name"], _input["shape"], _input["dtype"]))
 
-    @abc.abstractmethod
     def print_output_info(self):
-        raise NotImplementedError
+        output_num = len(self.output_info)
+        logger.info("{} output num = {}:".format(self.target, output_num))
+        for output in self.output_info:
+            logger.info("{} output[{}] shape = {}, dtype = {}".format(self.target, output["name"], output["shape"], output["dtype"]))
 
     def get_relay_mac(self):
         """get relay func MAC count"""

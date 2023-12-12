@@ -1,0 +1,62 @@
+model: {
+  framework: onnx,
+  name: pfe_1,
+  save_dir: ./output,
+  weight: ../../data/models/resnet50.onnx,
+  inputs: [
+    {
+      name: voxels,
+      shape: [1, 64, 224, 224],
+      layout: NCHW,
+      format: RGB,
+      dtype: uint8,
+      data_path: ../../data/datasets/imagenet/ILSVRC2012_val_00000016.JPEG,  # 用于比较各阶段输出的相似度，空表示采用随机数，默认随机数，可缺省
+    },
+    {
+      name: coors,
+      shape: [1, 64, 224, 224],
+      layout: NCHW,
+      format: RGB,
+      dtype: uint8,
+      data_path: ../../data/datasets/imagenet/ILSVRC2012_val_00000016.JPEG,  # 用于比较各阶段输出的相似度，空表示采用随机数，默认随机数，可缺省
+    }
+  ],
+  impl_class: ,
+}
+
+quant: {
+  # ptq_cfg_path: ./compile_model/quant_config.py,
+  calib_dir: ../../data/datasets/imagenet,
+  calib_num: 20,
+  preproc_module: ,
+  preproc_class: ,
+  debug_level: 1,
+  calib_method: ,
+  skip_layer_idxes: [ ],
+  skip_layer_types: [ ],
+  skip_layer_names: [ ],
+}
+
+build: {
+  target: H30,
+  opt_level: 0,
+}
+
+demo: {
+  data_dir: ../../data/datasets/imagenet,
+  test_num: 10,
+}
+
+perf: {
+  data_dir: ,
+  test_num: 1000,
+  mode: throughput,
+  end2end: ,
+}
+
+accuracy: {
+  data_dir: ../../data/datasets/imagenet,
+  test_num: 1,
+  dataset_class: Dataset,
+}
+

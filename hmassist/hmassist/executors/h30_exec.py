@@ -4,16 +4,15 @@ import time
 import os
 import numpy as np
 from abc import ABC
-from prettytable import PrettyTable
-from collections import OrderedDict
-from ..utils import logger
-from ..utils.utils import get_random_data
-from .base_exec import BaseExec
 import onnx
 import torch
+import re
 import tvm
 import tvm.relay as relay
 import tvm.tcim as tcim
+from ..utils import logger
+from ..utils.utils import get_random_data
+from .base_exec import BaseExec
 
 class H30Exec(BaseExec, ABC):
     def __init__(self, cfg: dict):
@@ -24,13 +23,13 @@ class H30Exec(BaseExec, ABC):
         logger.info("################  ptq quantize started  ######################")
         t_start = time.time()
         calib_files = []
-        calib_dataset = [dict() for i in range(self.quant["calib_num"])]
-        calib_num = self.quant["calib_num"]
+        calib_dataset = [dict() for i in range(self.quant_cfg["calib_num"])]
+        calib_num = self.quant_cfg["calib_num"]
         quanttool_config = {'inputs_cfg': {}}
         # quanttool_config['graph_opt_cfg'] = {}
 
         # 准备量化数据集
-        calib_dir = self.quant["calib_dir"]
+        calib_dir = self.quant_cfg["calib_dir"]
         if calib_dir:
             if os.path.isdir(calib_dir):
                 filelist = os.listdir(calib_dir)
@@ -46,16 +45,17 @@ class H30Exec(BaseExec, ABC):
                     calib_files.append(filename)
                     if len(calib_files) == calib_num:
                         break
-            if len(calib_files) < self.quant["calib_num"]:
+            if len(calib_files) < self.quant_cfg["calib_num"]:
                 logger.warning("calib_dir only has {} files, but calib_num is {}."
-                    .format(len(calib_files), self.quant["calib_num"]))
+                    .format(len(calib_files), self.quant_cfg["calib_num"]))
                 calib_num = len(calib_files)
+                logger.info("calib num: {}".format(calib_num))
             for id in range(calib_num):
-                logger.info("calib file: {}".format(calib_files[id]))
+                logger.debug("calib file: {}".format(calib_files[id]))
                 inputs = get_input_datas(calib_dir, calib_files[id])
                 for name, data in inputs.items():
                     # data = np.transpose(data, (2, 0, 1))  # CHW
-                    data = np.expand_dims(data, axis=0)  # NCHW
+                    # data = np.expand_dims(data, axis=0)  # NCHW
                     calib_dataset[id][name] = torch.tensor(data.astype(np.float32))
 
         for _input in self.inputs:
@@ -63,7 +63,7 @@ class H30Exec(BaseExec, ABC):
             shape = self.shape_dict[name]
             n, c, h, w = shape
 
-            if "ptq_cfg_path" not in self.quant or not self.quant["ptq_cfg_path"]:
+            if "ptq_cfg_path" not in self.quant_cfg or not self.quant_cfg["ptq_cfg_path"]:
                 # 准备量化参数
                 logger.info("using quanttool_config from config.yml")
                 quanttool_config['inputs_cfg'][name] = {}
@@ -98,13 +98,13 @@ class H30Exec(BaseExec, ABC):
                     calib_dataset[id][name] = torch.tensor(
                         get_random_data(name, dtype, input_shape))
 
-        if "ptq_cfg_path" in self.quant and self.quant["ptq_cfg_path"]:
-            logger.info("using quanttool_config from {}".format(self.quant["ptq_cfg_path"]))
-            quanttool_config = self.quant["ptq_cfg_path"]
-        print(quanttool_config, flush=True)
+        if "ptq_cfg_path" in self.quant_cfg and self.quant_cfg["ptq_cfg_path"]:
+            logger.info("using quanttool_config from {}".format(self.quant_cfg["ptq_cfg_path"]))
+            quanttool_config = self.quant_cfg["ptq_cfg_path"]
+        logger.info(quanttool_config)
 
         # 删除列表中的空项
-        del calib_dataset[calib_num:self.quant["calib_num"]]
+        del calib_dataset[calib_num:self.quant_cfg["calib_num"]]
 
         from hmquant.api import quant_single_onnx_network
         sequencer = quant_single_onnx_network(
@@ -119,6 +119,7 @@ class H30Exec(BaseExec, ABC):
             requant_dispatch=True,
         )
 
+        # sequencer.save_pkl(self.result_dir, self.model_name)
         # sequencer.save_onnx(
         #     self.quant_model_path,
         #     save_special_onnx=True
@@ -129,31 +130,13 @@ class H30Exec(BaseExec, ABC):
 
         # gen golden data
         inputs = {}
-        if "data_path" in _input and _input["data_path"]:
-            dir, file = os.path.split(_input["data_path"])
-            inputs = get_input_datas(dir, file)
-            for name, data in inputs.items():
-                # golden_input_path = os.path.join(golden_data_path, name + '.npy')
-                # np.save(golden_data_path + name + '.npy', data)
-                # data.tofile(golden_data_path + name + '.bin', data)
-                data = np.expand_dims(data, axis=0)  # NCHW
-                inputs[name] = torch.tensor(data.astype("float32"))
-        else:
-            for _input in self.inputs:
-                name = _input["name"]
-                dtype = _input["dtype"]
-                shape = self.shape_dict[name]
-                for id in range(calib_num):
-                    dtype = _input["dtype"]
-                    input_shape = n, c, image_size[0], image_size[1]
-                    logger.warning("data[{}] will use random data".format(name))
-                    inputs[name] = torch.tensor(
-                        get_random_data(name, dtype, input_shape))
+        # for _input in self.inputs:
+        #     inputs[_input["name"]] = calib_dataset[0]["name"]
 
         from hmquant.api import generate_golden
         generate_golden(
             sequencer=sequencer,
-            calibset=inputs,
+            calibset=calib_dataset[0],
             save_path=self.result_dir,
             model_name=self.model_name,
             batch_size=1,
@@ -163,18 +146,14 @@ class H30Exec(BaseExec, ABC):
         logger.info("golden data saved in -> {}".format(self.golden_data_path))
 
         t_start = time.time()
-        if self.quant["debug_level"] == 1:
+        if self.quant_cfg["debug_level"] == 1:
             from hmquant.api import convert_profiling, quantize_profiling
             # convert_profiling(self.weight, [in_datas], quanttool_config, [inputs])
-            quantize_profiling(sequencer, [inputs])
+            quantize_profiling(sequencer, [calib_dataset[0]])
         self.layer_compare_span = time.time() - t_start
         logger.info("quantize cost {}s, layer compare cost {}s".format(self.quantize_span, self.layer_compare_span))
 
-    def build(self, config=None):
-        """build relay quant
-        @param in_datas:  infer data
-        @return:
-        """
+    def build(self, build_options=None):
         logger.info("################  build started  ######################")
         type_dict = {}
         shape_dict = {}
@@ -202,17 +181,17 @@ class H30Exec(BaseExec, ABC):
             convert_config=convert_config,
         )
 
-        if not config:
-            config = {"tcim.fuse_strategy": 1, "tcim.codegen_pic": True, "tcim.for_benchmark": True}
+        if not build_options:
+            build_options = {"tcim.fuse_strategy": 1, "tcim.codegen_pic": True, "tcim.for_benchmark": True}
             # "tcim.mem_plan_strategy": "linearscan"
 
-        logger.info("build_config={}".format(config))
+        logger.info("build_options={}".format(build_options))
 
         if self.build_mode == "AOT":
             executor = relay.backend.Executor('aot')
             target = tvm.target.Target('hdpl', host='c')
 
-            with tvm.transform.PassContext(opt_level=3, config=config):
+            with tvm.transform.PassContext(opt_level=3, config=build_options):
                 graph, lib, params = relay.build(
                     mod, target, executor=executor, mod_name=self.model_name,
                 )
@@ -244,12 +223,16 @@ class H30Exec(BaseExec, ABC):
         elif self.build_mode == "JIT":
             self.module = tcim.load_model(self.model_name)
         else:
-            logger.error("unsupoorted build mode ", self.build_mode)
+            logger.error("unsuported build mode ", self.build_mode)
+            return -1
+        self.input_info = self.get_input_info()
+        self.output_info = self.get_output_info()
+        logger.info("H30 model loaded")
 
     def infer(self, inputs):
         """ infer one time """
         for input in self.inputs:
-            if type(inputs) == dict:
+            if isinstance(inputs, dict):
                 input_data = inputs[input["name"]]
             else:
                 input_data = inputs
@@ -295,10 +278,19 @@ class H30Exec(BaseExec, ABC):
         datas = {}
         for input in self.inputs:
             if input["image"]["format"] in ["YUV420", "YUV422", "YUV444"]:
-                from ..utils.transform import BGR2YUV
-                rgb2yuv_func = BGR2YUV(fmt="422")
-                image = rgb2yuv_func(torch.tensor(inputs[input["name"]])).numpy()  # HWC
-                datas[input["name"]] = np.expand_dims(image, 0).astype(np.uint8)  # NHWC
+                data = torch.tensor(inputs[input["name"]].astype(np.float32))  # NHWC float32
+                data = torch.squeeze(data, 0)  # HWC float32
+                format = re.sub("YUV", "", input["image"]["format"])
+                if input["format"] == "BGR":
+                    from ..utils.transform import BGR2YUV
+                    rgb2yuv_func = BGR2YUV(fmt=format)
+                elif input["format"] == "RGB":
+                    from ..utils.transform import RGB2YUV
+                    rgb2yuv_func = RGB2YUV(fmt=format)
+                else:
+                    logger.error("not support format {}".format(input["image"]))
+                image = torch.unsqueeze(rgb2yuv_func(data), 0).numpy()  # NHWC float32
+                datas[input["name"]] = image.astype(np.uint8)
             else:
                 datas[input["name"]] = inputs[input["name"]]
         return datas
@@ -308,9 +300,13 @@ class H30Exec(BaseExec, ABC):
         for input in self.inputs:
             input_data_path = os.path.join(self.result_dir, 'hmquant_' + self.model_name 
                                            + '_' + input["name"] + '_input.npy')
-            input_data = np.load(input_data_path).astype(np.uint8)
-            logger.info("golden input[{}] shape = {}, dtype = {}".format(input["name"], input_data.shape, input_data.dtype))
-            datas[input["name"]] = input_data
+            if os.path.exists(input_data_path):
+                input_data = np.load(input_data_path).astype(np.uint8)
+                logger.info("golden input[{}] shape = {}, dtype = {}".format(input["name"], input_data.shape, input_data.dtype))
+                datas[input["name"]] = input_data
+            else:
+                logger.warning("compare canceled while golden input not found -> {}".format(input_data_path))
+                return None
         return datas
 
     def get_golden_output(self, name):
@@ -319,27 +315,53 @@ class H30Exec(BaseExec, ABC):
             golden_output = np.load(golden_output_path, allow_pickle=True).item().get("output_tensor")
             return golden_output
         else:
-            logger.warning("compare canceled while golden data not found -> {}".format(golden_output_path))
+            logger.warning("compare canceled while golden output not found -> {}".format(golden_output_path))
             return None
+
+    def gen_golden(self, inputs):
+        from hmodel.utils.general import load_pkl_model
+        qmodel = os.path.join(self.result_dir, self.model_name)
+        sequencer = load_pkl_model(qmodel)
+        from hmquant.api import generate_golden
+        generate_golden(
+            sequencer=sequencer,
+            calibset=inputs,
+            save_path=self.test_dir,
+            model_name=self.model_name,
+            batch_size=1,
+            device="cpu"
+        )
+
+        logger.info("golden data saved in -> {}".format(self.test_dir))
 
     def get_version(self):
         raise NotImplemented
 
-    def print_input_info(self):
+    def get_input_info(self):
+        input_infos = []
         input_num = self.module.get_num_inputs()
-        logger.info("model input num = {}".format(input_num))
         for id in range(0, input_num):
+            input_info = {}
             name = self.module.get_input_name_by_index(id)
             # input_data = self.module.get_input(id).numpy()
-            # logger.info("model input[{}] shape = {}, dtype = {}".format(name, input_data.shape, input_data.dtype))
+            input_info["name"] = name
+            input_info["shape"] = None
+            input_info["dtype"] = None
+            input_infos.append(input_info)
+        return input_infos
 
-    def print_output_info(self):
+    def get_output_info(self):
+        output_infos = []
         output_num = self.module.get_num_outputs()
-        logger.info("model output num = {}".format(output_num))
         for id in range(0, output_num):
+            output_info = {}
             name = self.module.get_output_name_by_index(id)
             output_data = self.module.get_output_by_name(name).numpy()
-            logger.info("model output[{}] shape = {}, dtype = {}".format(name, output_data.shape, output_data.dtype))
+            output_info["name"] = name
+            output_info["shape"] = output_data.shape
+            output_info["dtype"] = output_data.dtype
+            output_infos.append(output_info)
+        return output_infos
 
     @property
     def freq(self):

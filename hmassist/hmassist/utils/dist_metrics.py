@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
-
+from .utils import logger
 
 def cosine_distance(data1, data2):
     """余弦距离
@@ -9,6 +9,9 @@ def cosine_distance(data1, data2):
     :param data2:
     :return:
     """
+    if data1.shape != data2.shape:
+        logger.error("shape not equal {} vs {}".format(data1.shape, data2.shape))
+        return -1
     v1_d = data1.flatten().astype("float64")
     v2_d = data2.flatten().astype("float64")
     assert len(v1_d) == len(v2_d), "v1 dim must be == v2 dim"

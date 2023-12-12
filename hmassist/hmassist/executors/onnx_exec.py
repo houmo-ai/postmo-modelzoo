@@ -3,10 +3,7 @@
 import os
 import numpy as np
 from abc import ABC
-import onnx
 import onnxruntime
-import torch
-import torchvision
 from .base_exec import BaseExec
 from ..utils import logger
 
@@ -17,63 +14,52 @@ class OnnxExec(BaseExec, ABC):
 
     def load(self):
         self.module = onnxruntime.InferenceSession(self.weight)
-        self.input_names = self.get_input_name()
-        self.output_names = self.get_output_name()
+        self.input_info = self.get_input_info()
+        self.output_info = self.get_output_info()
+        logger.info("onnx model loaded")
 
     def infer(self, inputs):
         """ infer one time """
         outputs = {}
         datas = self.module.run(None, inputs)
-        for id, name in enumerate(self.output_names):
-            outputs[name] = datas[id]
+        for id, output in enumerate(self.output_info):
+            outputs[output["name"]] = datas[id]
         return outputs
 
     def _preprocess(self, inputs):
         datas = {}
         for input in self.inputs:
             if input["image"]["crop"]:
-                pass
+                pass  # TODO
             if input["image"]["size"]:
-                pass
-            if input["image"]["format"] in ["YUV420", "YUV422", "YUV444"]:
-                datas[input["name"]] = np.expand_dims(inputs[input["name"]], 0).astype(np.uint8)  # NHWC
-            else:
-                datas[input["name"]] = inputs[input["name"]]
+                pass  # TODO
+            data = inputs[input["name"]].astype(np.float32)
+            data /= 255
+            if input["mean"]:
+                for ch in range(input["shape"][1]):
+                    data[0][ch] -= input["mean"][ch]
+            if input["std"]:
+                for ch in range(input["shape"][1]):
+                    data[0][ch] /= input["std"][ch]
+            datas[input["name"]] = data
         return datas
 
-    def get_golden_inputs(self):
-        datas = {}
-        for input in self.inputs:
-            input_data_path = os.path.join(self.result_dir, 'hmquant_' + self.model_name 
-                                           + '_' + input["name"] + '_input.npy')
-            input_data = np.load(input_data_path).astype(np.float32)
-            logger.info("golden input[{}] shape = {}, dtype = {}".format(input["name"], input_data.shape, input_data.dtype))
-            datas[input["name"]] = input_data
-        return datas
-
-    def get_golden_output(self, name):
-        golden_output_path = os.path.join(self.golden_data_path, name + '.npy')
-        if os.path.exists(golden_output_path):
-            golden_output = np.load(golden_output_path, allow_pickle=True).item().get("output_tensor")
-            return golden_output
-        else:
-            logger.warning("compare canceled while golden data not found -> {}".format(golden_output_path))
-            return None
-
-    def print_input_info(self):
-        logger.info("input_names: {}".format(self.input_names))
-
-    def print_output_info(self):
-        logger.info("output_names: {}".format(self.output_names))
-
-    def get_input_name(self):
-        input_name = []
+    def get_input_info(self):
+        input_infos = []
         for node in self.module.get_inputs():
-            input_name.append(node.name)
-        return input_name
+            input_info = {}
+            input_info["name"] = node.name
+            input_info["dtype"] = node.type
+            input_info["shape"] = node.shape
+            input_infos.append(input_info)
+        return input_infos
 
-    def get_output_name(self):
-        output_name = []
+    def get_output_info(self):
+        output_infos = []
         for node in self.module.get_outputs():
-            output_name.append(node.name)
-        return output_name
+            output_info = {}
+            output_info["name"] = node.name
+            output_info["dtype"] = node.type
+            output_info["shape"] = node.shape
+            output_infos.append(output_info)
+        return output_infos

@@ -1,11 +1,12 @@
 #!/bin/bash
 
-log_highlight() {
-  echo -e "\e[30;31m"$1"$(tput sgr0)"
-}
+target=H30
+if [ "$1" ]; then
+  target=$1
+fi
 
 mkdir -p logs
-LOG_FILE="logs/hmassist-perf-H30-$(date "+%Y-%m-%d-%H-%M-%S").log"
+LOG_FILE="logs/hmassist-perf-$target-$(date "+%Y-%m-%d-%H-%M-%S").log"
 
-echo "python3 $MODELZOO_PATH/hmassist/hmassist.py perf --target H30 -c config.yml 2>&1 | tee $LOG_FILE"
-python3 $MODELZOO_PATH/hmassist/hmassist.py perf --target H30 -c config.yml 2>&1 | tee $LOG_FILE
+echo "python3 $MODELZOO_PATH/hmassist/hmassist.py perf --target $target 2>&1 | tee $LOG_FILE"
+python3 $MODELZOO_PATH/hmassist/hmassist.py perf --target $target 2>&1 | tee $LOG_FILE

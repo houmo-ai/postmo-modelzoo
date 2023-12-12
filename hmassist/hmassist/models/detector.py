@@ -47,8 +47,10 @@ class Detector(BaseModel):
             from ..utils import utils
             from ..utils.box_utils import letterbox
             image = utils.to_opencv(data)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             image, _, _ = letterbox(image, self._input_size, stride=64, auto=False)  # HWC
-            image = np.transpose(image, (2, 0, 1)).astype(np.float32)  # CHW
+            image = np.transpose(image, (2, 0, 1))  # CHW .astype(np.float32)
+            image = np.expand_dims(image, axis=0)  # NCHW
             datas[name] = image
         return datas
 
