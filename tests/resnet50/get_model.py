@@ -12,11 +12,19 @@ def get_args() -> argparse.Namespace:
         default='all',
         help='model_type to get',
     )
+    parser.add_argument(
+        '--model_dir',
+        dest='model_dir',
+        type=str,
+        default='output/H30/result',
+        help='model_path to get',
+    )
     args = parser.parse_args()
     return args
 
 if __name__ == '__main__':
     args = get_args()
+    model_dir = args.model_dir
     if args.model_type == "raw" or args.model_type == "all":
         # import torch
         # import torchvision
@@ -27,10 +35,10 @@ if __name__ == '__main__':
             os.system('wget http://10.10.1.53:8082/artifactory/toolchain/release/models/resnet50/resnet50.onnx')
 
     if args.model_type == "quant" or args.model_type == "all":
-        if not os.path.exists("output/H30/result/hmquant_resnet50_with_act.onnx"):
+        if not os.path.exists(os.path.join(model_dir,"hmquant_resnet50_with_act.onnx")):
             if not os.path.exists("resnet50_golden_20231218.zip"):
                 os.system('wget http://10.10.1.53:8082/artifactory/toolchain/release/models/resnet50/resnet50_golden_20231218.zip')
-            os.system('mkdir -p output/H30/result')
-            os.system('unzip -d output/H30/result resnet50_golden_20231218.zip')
+            os.system('mkdir -p ' + model_dir)
+            os.system('unzip -d ' + model_dir + ' resnet50_golden_20231218.zip')
 
     # onnx.utils.extract_model("resnet50.onnx", "resnet50_clip.onnx", input_names=[''], output_names=[''], check_model=True)

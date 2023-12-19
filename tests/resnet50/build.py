@@ -13,11 +13,11 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_path',
-        dest='model_path',
+        '--model_dir',
+        dest='model_dir',
         type=str,
-        default='output/H30/result/hmquant_resnet50_with_act.onnx',
-        help='path to the model path',
+        default='output/H30/result',
+        help='path to the model dir',
     )
     parser.add_argument(
         '--model_name',
@@ -49,14 +49,14 @@ def build(args):
     image_format = 'YUV422SP'
     model_name = args.model_name
     batch = args.batch
-    model_path = args.model_path
     stage = args.stage
-    model_dir = os.path.dirname(model_path)
+    model_dir = args.model_dir
+    onnx_name = "hmquant_" + model_name + "_with_act.onnx"
     shape_dict = {}
     layout_dict = {}
     convert_config = {}
     
-    onnx_model = onnx.load(model_path)
+    onnx_model = onnx.load(os.path.join(model_dir,onnx_name))
     inputs = onnx_model.graph.input
 
     if stage == 'build' or stage == 'all':

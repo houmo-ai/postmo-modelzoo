@@ -1,0 +1,13 @@
+name: imodelzoo
+version_path: imodelzoo/version.cfg
+path: modules/imodelzoo
+is_real_path: true
+is_structure: false
+os_type:
+  ubuntu_20.04:
+    resnet50:
+      - tests/resnet50/tcim_resnet50.so
+      - tests/resnet50/build.py
+    resnet50_gloden:
+      - tests/resnet50/output/hmquant_resnet50_input.1_input.npy
+      - tests/resnet50/output/hmquant_resnet50_with_act
