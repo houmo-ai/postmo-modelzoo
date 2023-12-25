@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+pip3 install onnx_graphsurgeon -i https://pypi.ngc.nvidia.com
+
 MODELZOO_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")" || exit ; pwd)
 export MODELZOO_PATH
 HMASSIST_PATH=$MODELZOO_PATH/hmassist
