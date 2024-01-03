@@ -92,6 +92,7 @@
       "nn.hm_relu_86",
       "hm_reduce_mean_87",
       "qnn.hm_conv2d_88",
+      "replace_shape_89",
       "hm_reshape_90",
       "op.hm_store_91"
     ],
@@ -185,6 +186,7 @@
       86,
       87,
       88,
+      89,
       90,
       91
     ],
@@ -311,10 +313,11 @@
     "subgraph_type": 3,
     "ops_inter_names": [
       "qnn.hm_conv2d_88",
+      "replace_shape_89",
       "hm_reshape_90",
       "op.hm_store_91"
     ],
-    "ops_id": [88, 90, 91],
+    "ops_id": [88, 89, 90, 91],
     "axis": [1],
     "tiling_num_per_axis": [1]
   }
