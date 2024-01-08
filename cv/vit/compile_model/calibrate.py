@@ -73,6 +73,7 @@ def calibrate():
         onnx_model_path,
         device='cpu',
         analyze=False,
+        requant_dispatch=True
     )
     sequencer.save_onnx(
         'quant_vit.onnx',

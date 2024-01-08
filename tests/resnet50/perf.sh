@@ -5,23 +5,23 @@ set -e
 
 cd "${SCRIPT_DIR}"
 
-# shellcheck source=/dev/null
-# source ./env.sh
-
-
 cd prepare_model
 ./run.sh
 cd ..
 
 cd compile_model
-./run.sh --batch 4
+./run.sh --batch 24
 cd ..
 
-cd ../../utils/tcimexec/
+cd ../../utils/aottcimexec/
 ./build.sh
 PATH="$(pwd):${PATH}"
 export PATH
 cd -
+
+if [ -c /dev/hm_host_pcie ]; then
+  export HDPL_PLATFORM=ASIC
+fi
 
 if [ -z "${IS_DEBUG}" ]; then
   ITERATION=1000
@@ -29,4 +29,5 @@ else
   ITERATION=1
 fi
 
-tcimexec --model "${SCRIPT_DIR}/compile_model/yolov3" --iterations ${ITERATION} --host_loop
+export HDPL_STREAM_TIME_OUT=150000
+tcimexec --model "${SCRIPT_DIR}/compile_model/tcim_resnet50" --iterations ${ITERATION}

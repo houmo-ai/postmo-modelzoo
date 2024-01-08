@@ -17,7 +17,6 @@ model: {
       dtype: uint8,
       mean: [ 0, 0, 0 ],
       std: [ 1, 1, 1 ],
-      data_path: ../../data/datasets/coco2017/val2017/000000000139.jpg,
     }
   ],
   impl_class: YoloV5,
@@ -25,7 +24,7 @@ model: {
 
 quant: {
   # ptq_cfg_path: ,
-  calib_dir: ../../data/datasets/coco2017/val2017,
+  calib_dir: coco2017/val2017,
   calib_num: 20,
   debug_level: 1,
   calib_method: ,
@@ -35,12 +34,15 @@ quant: {
 }
 
 build: {
-  target: H30,
   opt_level: 0,
 }
 
+test: {
+  data_path: coco2017/val2017/000000000139.jpg,
+}
+
 demo: {
-  data_dir: ../../data/datasets/coco2017/val2017,
+  data_dir: coco2017/val2017,
   test_num: 10,
 }
 

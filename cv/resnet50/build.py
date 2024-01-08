@@ -52,10 +52,8 @@ def compile(args=None):
     inputs = onnx_model.graph.input
     for input in inputs:
         dims = input.type.tensor_type.shape.dim
-        input_shape = (
-            batch * dims[0].dim_value, dims[1].dim_value,
-            dims[2].dim_value, dims[3].dim_value,
-        )
+        input_shape = [dim.dim_value for dim in dims]
+        input_shape[0] *= batch
         print('input name:', input.name)
         print('input shape:', input_shape)
         shape_dict[input.name] = input_shape
@@ -68,7 +66,7 @@ def compile(args=None):
     compile_config = {
         'tcim.fuse_strategy': 1,
         'tcim.codegen_pic': True,
-        "tcim.for_benchmark": True
+        'tcim.for_benchmark': True
     }
     target = tvm.target.Target('hdpl', host='c')
     with tvm.transform.PassContext(opt_level=3, config=compile_config):

@@ -16,4 +16,5 @@ hmquant.sh
 hmbuild.sh
 hmtest.sh
 hmdemo.sh
+hmperf.sh
 hmaccuracy.sh

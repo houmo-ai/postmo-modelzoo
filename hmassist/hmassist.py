@@ -16,9 +16,11 @@ from hmassist.utils.dist_metrics import cosine_distance
 from hmassist.utils.utils import get_random_data
 from hmassist.utils.check import (
     check_config,
+    check_test_config,
     check_demo_config,
     check_accuracy_config,
-    check_args
+    check_args,
+    check_datapath
 )
 from hmassist.executors.h30_exec import H30Exec
 from hmassist.executors.onnx_exec import OnnxExec
@@ -58,7 +60,9 @@ def get_model(cfg):
     model_impl_class = cfg["model"].get("impl_class", None)
     executor = get_executor(cfg)
     dataset_class = cfg["accuracy"].get("dataset_class", None)
-    data_dir = cfg["accuracy"].get("data_dir", None)
+    if not check_datapath(cfg["accuracy"], "data_dir"):
+        return -1
+    data_dir = cfg["accuracy"].get("data_dir")
     try:
         m = importlib.import_module("hm_dataset")
         if hasattr(m, dataset_class):
@@ -142,6 +146,8 @@ def build(cfg):
 
 def test(cfg):
     logger.info("{}".format(cfg))
+    if not check_test_config(cfg):
+        exit(-1)
     model = get_model(cfg)
     model.load()
     model.executor.print_input_info()

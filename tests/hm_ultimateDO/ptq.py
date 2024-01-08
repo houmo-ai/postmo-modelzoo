@@ -3,7 +3,7 @@ import torch
 import torchvision.transforms as transforms
 from torchvision.datasets.folder import pil_loader
 import argparse
-from hmquant.api import quant_single_onnx_network, quantize_profiling, generate_golden
+from hmquant.api import quant_single_onnx_network, generate_golden
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 
 
@@ -114,7 +114,6 @@ def calibrate(args=None):
         calib_dataset,
         model_path,
         device='cpu',
-        analyze=True
     )
 
     print("start save model and generate golden...")
@@ -127,8 +126,8 @@ def calibrate(args=None):
         device="cpu"
     )
 
-    print("start quantize profiling...")
-    quantize_profiling(sequencer, calib_dataset)
+    # print("start quantize profiling...")
+    # quantize_profiling(sequencer, calib_dataset)
     print("calibrate completed")
 
 

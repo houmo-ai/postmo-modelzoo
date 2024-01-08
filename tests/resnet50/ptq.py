@@ -93,7 +93,6 @@ def calibrate(args=None):
         calib_dataset,
         onnx_model_path,
         device='cpu',
-        analyze=True
     )
 
     print("start save model and generate golden...")
@@ -106,8 +105,8 @@ def calibrate(args=None):
         device="cpu"
     )
 
-    print("start quantize profiling...")
-    quantize_profiling(sequencer, [onnx_input])
+    # print("start quantize profiling...")
+    # quantize_profiling(sequencer, [onnx_input])
     print("calibrate completed")
 
 

@@ -2,7 +2,7 @@ model: {
   framework: onnx,
   name: resnet50,
   save_dir: ./output,
-  weight: ../../data/models/resnet50.onnx,
+  weight: ./resnet50.onnx,
   inputs: [
     {
       name: input.1,
@@ -24,7 +24,7 @@ model: {
 
 quant: {
   # ptq_cfg_path: ./compile_model/quant_config.py,
-  calib_dir: ../../data/datasets/imagenet,
+  calib_dir: imagenet,
   calib_num: 20,
   debug_level: 1,
   calib_method: ,
@@ -35,23 +35,23 @@ build: {
 }
 
 test: {
-  data_path: ../../data/datasets/imagenet/ILSVRC2012_val_00000016.JPEG,
+  data_path: imagenet/ILSVRC2012_val_00000016.JPEG,
 }
 
 demo: {
-  data_dir: ../../data/datasets/imagenet,
+  data_dir: imagenet,
   test_num: 10,
 }
 
 perf: {
-  data_dir: ,
+  # data_dir: imagenet,
   test_num: 1000,
   mode: throughput,
   end2end: ,
 }
 
 accuracy: {
-  data_dir: ../../data/datasets/imagenet,
+  data_dir: imagenet,
   test_num: 0,
   dataset_class: Dataset,
 }

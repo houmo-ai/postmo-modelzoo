@@ -23,13 +23,13 @@ def get_args() -> argparse.Namespace:
         '--model-path',
         dest='model_path',
         type=str,
-        default='./quant_vit.onnx',
+        default='./quant_resnet50.onnx',
         help='path to the model root path',
     )
     parser.add_argument(
         '--output',
         type=str,
-        default='vit',
+        default='resnet50',
         help='output houmo model path',
     )
     parser.add_argument(
@@ -53,8 +53,7 @@ def compile(args=None):
     input_name = onnx_model.graph.input[0].name
     dims = onnx_model.graph.input[0].type.tensor_type.shape.dim
     input_shape = (
-        #batch, dims[1].dim_value,
-        dims[0].dim_value, dims[1].dim_value,
+        batch, dims[1].dim_value,
         dims[2].dim_value, dims[3].dim_value,
     )
     print('input name:', input_name)
@@ -68,29 +67,31 @@ def compile(args=None):
     executor = Executor('aot')
     if batch == 1:
         compile_config = {
-            'tcim.fuse_strategy': 1,
-            'tcim.gen_intrinsic': 0,
-            'tcim.sync_strategy': 0,
+            'tcim.fuse_strategy': 0,
+            'tcim.gen_intrinsic': 2,
             'tcim.for_benchmark': True,
-            'tcim.spec_batch_num': batch,
-            "tcim.special_model_name": "vit_small"
+            'tcim.core_num': 1,
+            'tcim.sync_strategy': 1,
+            'tcim.codegen_pic': False,
         }
     else:
         compile_config = {
             'tcim.fuse_strategy': 1,
-            'tcim.gen_intrinsic': 0,
-            'tcim.sync_strategy': 0,
+            'tcim.gen_intrinsic': 2,
+            'tcim.schedule_strategy': 2,
+            'tcim.use_convaddrelu': True,
             'tcim.for_benchmark': True,
-            'tcim.spec_batch_num': batch,
-            "tcim.special_model_name": "vit_small"
+            'tcim.core_num': 4,
+            'tcim.sync_strategy': 1,
+            'tcim.codegen_pic': False,
         }
     target = tvm.target.Target('hdpl', host='c')
     with tvm.transform.PassContext(opt_level=3, config=compile_config):
         graph, lib, params = relay.build(
-            mod, target, executor=executor, mod_name='vit',
+            mod, target, executor=executor, mod_name='resnet50',
         )
 
-    tcim.store_so(filename, lib, 'vit', hdplcc_options=['-O2'])
+    tcim.store_so(filename, lib, hdplcc_options=['-O2'])
     print(filename, ' saved as one fusedop model.')
 
 

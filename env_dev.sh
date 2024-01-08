@@ -8,6 +8,7 @@ export HMASSIST_PATH
 
 # set hal library log level
 export HM800_HAL_CONSOLE_LEVEL=0
+export HDPL_STREAM_TIME_OUT=30000
 
 export CMAKE_CONFIG_PATH=$MODELZOO_PATH/develop.cmake
 

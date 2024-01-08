@@ -48,6 +48,7 @@ def check_config(cfg, phase="build"):
     if "calib_dir" not in cfg["quant"]:
         logger.error("The key(calib_dir) must be in cfg[build][quant]")
         return False
+    check_datapath(cfg["quant"], "calib_dir")
 
     if "calib_num" not in cfg["quant"]:
         logger.error("The key(calib_num) must be in cfg[build][quant]")
@@ -150,6 +151,11 @@ def check_config(cfg, phase="build"):
     return True
 
 
+def check_test_config(cfg):
+    if not check_datapath(cfg["test"], "data_path"):
+        return False
+
+
 def check_accuracy_config(cfg):
     if "accuracy" not in cfg:
         logger.error("Not found key(accuracy) in config")
@@ -157,6 +163,9 @@ def check_accuracy_config(cfg):
 
     if "data_dir" not in cfg["accuracy"]:
         logger.error("Not found key(data_dir) in config[accuracy]")
+        return False
+
+    if not check_datapath(cfg["accuracy"], "data_dir"):
         return False
 
     if "test_num" not in cfg["accuracy"]:
@@ -200,6 +209,8 @@ def check_demo_config(cfg):
     if "data_dir" not in cfg["demo"]:
         logger.error("Not found key(data_dir) in config[demo]")
         return False
+    if not check_datapath(cfg["demo"], "data_dir"):
+        return False
 
     if "test_num" not in cfg["demo"]:
         logger.error("Not found key(test_num) in config[demo]")
@@ -207,11 +218,6 @@ def check_demo_config(cfg):
 
     if "impl_class" not in cfg["model"]:
         logger.error("Not found key(impl_class) in config[model]")
-        return False
-
-    data_dir = cfg["demo"]["data_dir"]
-    if not os.path.exists(data_dir):
-        logger.error("Not found data_dir -> {}".format(data_dir))
         return False
 
     test_num = cfg["demo"]["test_num"]
@@ -235,3 +241,17 @@ def check_args(args):
         logger.error("Not found file -> {}".format(args.config))
         exit(-1)
 
+
+def check_datapath(cfg, key):
+    if key in cfg:
+        if cfg[key] is None:
+            logger.error("{} can not be None".format(key))
+            return False
+        if not os.path.exists(cfg[key]):
+            comp_path = os.path.join(os.environ.get('DATASETS_PATH'), cfg[key])
+            if os.path.exists(comp_path):
+                cfg[key] = comp_path
+            else:
+                logger.error("{} not found -> {}".format(key, cfg[key]))
+                return False
+        return True

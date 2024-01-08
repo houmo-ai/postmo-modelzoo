@@ -5,7 +5,7 @@ import onnx
 import cv2
 import torch
 import torchvision.transforms as transforms
-from hmquant.api import quant_single_onnx_network, convert_profiling, quantize_profiling, generate_golden
+from hmquant.api import quant_single_onnx_network, generate_golden
 from hmquant.tools.dataset.preprocess.transform import BGR2YUV
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 from torchvision.datasets.folder import pil_loader
@@ -59,7 +59,6 @@ def calibrate():
         calib_dataset,
         onnx_model_path,
         device='cpu',
-        analyze=True
     )
 
     #sequencer.save_onnx(

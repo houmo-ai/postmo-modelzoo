@@ -102,14 +102,14 @@ config = {
         'images',
     ],
     'output': {
-        'onnx::Shape_406': {'dtype': 'int8', 'shape': [1, 255, 52, 52]},
-        'onnx::Shape_472': {'dtype': 'int8', 'shape': [1, 255, 26, 26]},
-        'onnx::Reshape_538': {'dtype': 'int8', 'shape': [1, 255, 13, 13]},
+        'Conv_249': {'dtype': 'int8', 'shape': [1, 255, 52, 52]},
+        'Conv_303': {'dtype': 'int8', 'shape': [1, 255, 26, 26]},
+        'Conv_357': {'dtype': 'int8', 'shape': [1, 255, 13, 13]},
     },
     'delete_node': [
-        'onnx::Transpose_429',
-        'onnx::Transpose_495',
-        'onnx::Transpose_555',
+        'Reshape_266',
+        'Reshape_320',
+        'Reshape_358',
     ],
     'delete_node_type': [
         'RAW:HMConstant', 'BaseConstant',

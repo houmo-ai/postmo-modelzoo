@@ -5,7 +5,6 @@ import torch
 import torchvision.transforms as transforms
 from hmquant.api import quant_single_input_onnx_network
 from hmquant.api import quant_single_onnx_network
-from hmquant.configs.api_config import BaseHoumoConfig
 from hmquant.tools.dataset.preprocess.transform import RGB2YUV
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 from torchvision.datasets.folder import pil_loader

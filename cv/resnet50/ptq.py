@@ -3,7 +3,7 @@ import torch
 import torchvision.transforms as transforms
 from torchvision.datasets.folder import pil_loader
 import argparse
-from hmquant.api import quant_single_onnx_network, quantize_profiling, generate_golden
+from hmquant.api import quant_single_onnx_network, generate_golden  # quantize_profiling
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 
 
@@ -34,7 +34,6 @@ def calibrate(args=None):
     output_path = 'output/H30/result'
 
     env_dict = os.environ
-    onnx_model_path = os.path.join(env_dict.get('MODEL_PATH'), model_path)
 
     def unsqueeze(x):
         return torch.unsqueeze(x, 0)
@@ -91,9 +90,8 @@ def calibrate(args=None):
     sequencer = quant_single_onnx_network(
         quanttool_config,
         calib_dataset,
-        onnx_model_path,
+        model_path,
         device='cpu',
-        analyze=True
     )
 
     print("start save model and generate golden...")
@@ -106,8 +104,8 @@ def calibrate(args=None):
         device="cpu"
     )
 
-    print("start quantize profiling...")
-    quantize_profiling(sequencer, [onnx_input])
+    # print("start quantize profiling...")
+    # quantize_profiling(sequencer, [onnx_input])
     print("calibrate completed")
 
 

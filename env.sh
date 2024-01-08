@@ -10,6 +10,7 @@ export CMAKE_CONFIG_PATH=$MODELZOO_PATH/release.cmake
 
 # set hal library log level
 export HM800_HAL_CONSOLE_LEVEL=0
+export HDPL_STREAM_TIME_OUT=30000
 
 # main path
 if [[ -z $HOUMO_PATH ]]; then

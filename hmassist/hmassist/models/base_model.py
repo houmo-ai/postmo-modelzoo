@@ -36,11 +36,13 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             elif input["layout"] == "NHWC":
                 n, h, w, c = input["shape"]
             if "image" in input:
-                size = input["image"].get("size", None)
+                size = input["image"].get("size", [h, w])
             if size:
                 self.input_shape = [n, c, size[0], size[1]]
+                self._input_size = size
             else:
                 self.input_shape = [n, c, h, w]
+                self._input_size = [h, w]
 
     def load(self):
         """加载so模型

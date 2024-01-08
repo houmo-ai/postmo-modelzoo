@@ -4,7 +4,7 @@ import time
 import onnx
 import torch
 import torchvision.transforms as transforms
-from hmquant.api import quant_single_onnx_network # quantize_profiling
+from hmquant.api import quant_single_onnx_network
 # from hmquant.tools.dataset.preprocess.transform import RGB2YUV
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 from torchvision.datasets.folder import pil_loader
@@ -66,6 +66,11 @@ def calibrate():
     )
     t1 = time.time()
     print(f"====> complete quant onnx network, cost {(t1-t0)*1000:.3f}ms", flush=True)
+
+    # print("====> start to convert profiling...", flush=True)
+    # convert_profiling(onnx_model_path, onnx_input, quanttool_config, onnx_input)
+    # t2 = time.time()
+    # print(f"====> complete convert profiling, cost {(t2-t1)*1000:.3f}ms", flush=True)
 
     # print("====> start to quantize profiling...", flush=True)
     # quantize_profiling(sequencer, onnx_input)

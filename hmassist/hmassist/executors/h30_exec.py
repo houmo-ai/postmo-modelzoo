@@ -112,7 +112,6 @@ class H30Exec(BaseExec, ABC):
             calibration_data=calib_dataset,
             onnx_model_or_path=self.weight,
             device='cpu',
-            analyze=True,
             debug=None,
             model_name=self.model_name,
             with_label=False,
@@ -147,9 +146,9 @@ class H30Exec(BaseExec, ABC):
 
         t_start = time.time()
         if self.quant_cfg["debug_level"] == 1:
-            from hmquant.api import convert_profiling, quantize_profiling
-            # convert_profiling(self.weight, [in_datas], quanttool_config, [inputs])
-            quantize_profiling(sequencer, [calib_dataset[0]])
+            logger.warning("quantize profiling is not available now.")
+        #     from hmquant.api import quantize_profiling
+        #     quantize_profiling(sequencer, [calib_dataset[0]])
         self.layer_compare_span = time.time() - t_start
         logger.info("quantize cost {}s, layer compare cost {}s".format(self.quantize_span, self.layer_compare_span))
 
@@ -269,6 +268,9 @@ class H30Exec(BaseExec, ABC):
         else:
             model_path = os.path.join(self.cur_dir, self.model_name)
             exec = "tcimexec"
+        if os.environ.get("HDPL_PLATFORM") == "ISIM":
+            test_num = 1
+            logger.warning("test num set to 1 because HDPL_PLATFORM=ISIM may take a lot of time.")
         cmd = "cd {}/utils/{} && ./tcimexec --model {} --iterations {}".format(
             modelzoo_path, exec, model_path, test_num)
         logger.info(cmd)
