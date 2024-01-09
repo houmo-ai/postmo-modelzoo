@@ -159,6 +159,7 @@ int main(int argc, char *argv[]) {
     std::cout << "), " << data.DataType() << std::endl;
   }
 
+  module.Prepare();
   size_t eval_round = arguments.iterations;
   module.Run(arguments.warm_up);
   auto start = std::chrono::system_clock::now();
