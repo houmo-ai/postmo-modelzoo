@@ -121,6 +121,7 @@ def build(args):
             'tcim.codegen_pic': False,
             "tcim.for_benchmark": True,
             "tcim.core_num": core_num,
+            "tcim.opt_layout": 0b101,
         }
         # workaround for build for asic and run will by sync time out
         if (not isinstance(platform_env_val, type(None))) and platform_env_val == "ASIC":
