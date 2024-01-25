@@ -22,13 +22,13 @@ def get_args() -> argparse.Namespace:
         '--model-path',
         dest='model_path',
         type=str,
-        default='./hmquant_bicubic_pp_x3_with_act.onnx',
+        default='./hmquant_bicubic_pp_with_act.onnx',
         help='path to the model root path',
     )
     parser.add_argument(
         '--output',
         type=str,
-        default='bicubic_pp_x3',
+        default='bicubic_pp',
         help='output houmo model path',
     )
     parser.add_argument(
@@ -60,12 +60,11 @@ def compile(args=None):
     print('input name:', input_name)
     print('input shape:', input_shape)
 
-    convert_config = {'layout': 'NCHW'}
-    # convert_config = {"transpose_axes": [0, 3, 1, 2]}
+    convert_config = {'layout': 'NHWC'}
     type_dict = {input_name: 'uint8'}
     shape_dict = {input_name: input_shape}
     mod = relay.frontend.from_hmonnx(
-        onnx_model, shape_dict, type_dict, resizer_attr=None,
+        onnx_model, shape_dict, type_dict, resizer_attr=None, convert_config=convert_config
     )
 
     from tvm.relay.backend import Executor
@@ -84,10 +83,11 @@ def compile(args=None):
 
 
 if __name__ == '__main__':
-    model_name = 'bicubic_pp_x3'
+    model_name = 'bicubic_pp'
     local_path = model_name
-    quant_path = 'hmquant_bicubic_pp_x3.zip'
+    quant_path = 'bicubic_pp.zip'
     if not os.path.exists(quant_path):
-        os.system('wget http://10.10.1.53:8082/artifactory/toolchain/support/models/bicubic_pp_x3/hmquant_bicubic_pp_x3.zip')
-        os.system('unzip hmquant_bicubic_pp_x3.zip')
+        os.system('curl -upublic:Password@123 \
+            http://10.10.1.53:8082/artifactory/hdpl_test_data/quant_models/bicubic_pp.zip -o bicubic_pp.zip')
+        os.system('unzip -o bicubic_pp.zip')
     compile()
