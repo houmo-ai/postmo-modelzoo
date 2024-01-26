@@ -1,0 +1,246 @@
+cv_efficientnet:
+  include:
+    - cv/efficientnet
+  exclude:
+    - cv/efficientnet/README.MD
+  example_case:
+    - cv_efficientnet_eval:
+        script: cv/efficientnet/eval.sh
+        args: null
+    - cv_efficientnet_perf:
+        script: cv/efficientnet/perf.sh
+        args: null
+  test:
+    - cv_efficientnet_eval
+    - cv_efficientnet_perf
+cv_mobilenet_v2:
+  include:
+    - cv/mobilenet_v2
+  exclude:
+    - cv/mobilenet_v2/README.MD
+  example_case:
+    - cv_mobilenet_v2_eval:
+        script: cv/mobilenet_v2/eval.sh
+        args: null
+    - cv_mobilenet_v2_perf:
+        script: cv/mobilenet_v2/perf.sh
+        args: null
+  test:
+    - cv_mobilenet_v2_eval
+    - cv_mobilenet_v2_perf
+cv_point_pillars:
+  include:
+    - cv/point_pillars
+  exclude:
+    - cv/point_pillars/README.MD
+    - cv/point_pillars/CPPLINT.cfg
+  example_case:
+    - cv_point_pillars_perf:
+        script: cv/point_pillars/perf.sh
+        args: null
+  test:
+    - cv_point_pillars_perf
+cv_resnet50:
+  include:
+    - cv/resnet50
+  exclude:
+    - cv/resnet50/README.MD
+  example_case:
+    - cv_resnet50_perf:
+        script: cv/resnet50/perf.sh
+        args: null
+    - cv_resnet50_eval:
+        script: cv/resnet50/eval.sh
+        args: null
+    - cv_resnet50_ddr:
+        script: cv/resnet50/profiling_ddr.sh
+        args: null
+    - cv_resnet50_test:
+        script: cv/resnet50/test.sh
+        args: null
+  test:
+    - cv_resnet50_perf
+    - cv_resnet50_eval
+    - cv_resnet50_ddr
+    - cv_resnet50_test
+cv_vit:
+  include:
+    - cv/vit
+  exclude: null
+  example_case:
+    - cv_vit_perf:
+        script: cv/vit/run_perf.sh
+        args: null
+  test:
+    - cv_vit_perf
+cv_yolop:
+  include:
+    - cv/yolop
+  exclude:
+    - cv/yolop/README.MD
+  example_case:
+    - cv_yolop_perf:
+        script: cv/yolop/run_perf.sh
+        args: null
+  test:
+    - cv_yolop_perf
+cv_yolov3:
+  include:
+    - cv/yolov3
+  exclude:
+    - cv/yolov3/README.MD
+  example_case:
+    - cv_yolov3_perf:
+        script: cv/yolov3/perf.sh
+        args: null
+    - cv_yolov3_eval:
+        script: cv/yolov3/eval.sh
+        args: null
+    - cv_yolov3_detect:
+        script: cv/yolov3/detect.sh
+        args: null
+  test:
+    - cv_yolov3_perf
+    - cv_yolov3_eval
+    - cv_yolov3_detect
+cv_yolov3_jit:
+  include:
+    - cv/yolov3_jit
+  exclude: null
+  example_case:
+    - cv_yolov3_jit_perf:
+        script: cv/yolov3_jit/perf.sh
+        args: null
+  test:
+    - cv_yolov3_jit_perf
+tests_cruise_cutin_vehicle:
+  include:
+    - tests/cruise_cutin_vehicle
+  exclude:
+    - tests/cruise_cutin_vehicle/README.md
+  example_case:
+    - tests_cruise_cutin_vehicle_perf:
+        script: tests/cruise_cutin_vehicle/run_perf.sh
+        args: null
+    test:
+      - tests_cruise_cutin_vehicle_perf
+tests_cruise_go_vehicle:
+  include:
+    - tests/cruise_go_vehicle
+  exclude:
+    - tests/cruise_go_vehicle/README.md
+  example_case:
+    - tests_cruise_go_vehicle_perf:
+        script: tests/cruise_go_vehicle/run_perf.sh
+        args: null
+    test:
+      - tests_cruise_go_vehicle_perf
+tests_fastbev2d:
+  include:
+    - tests/fastbev2d
+  exclude: null
+  example_case:
+    - tests_fastbev2d_perf:
+        script: tests/fastbev2d/perf.sh
+        args: null
+    test:
+      - tests_fastbev2d_perf
+tests_fastbev3d:
+  include:
+    - tests/fastbev3d
+  exclude: null
+  example_case:
+    - tests_fastbev3d_perf:
+        script: tests/fastbev3d/perf.sh
+        args: null
+    test:
+      - tests_fastbev3d_perf
+tests_lane:
+  include:
+    - tests/lane
+  exclude:
+    - tests/lane/README.md
+  example_case:
+    - tests_lane_calibrate:
+        script: tests/lane/calibrate.py
+        args: null
+    test:
+      - tests_lane_calibrate
+tests_resizer:
+  include:
+    - tests/resizer
+  exclude:
+    - tests/resizer/README.md
+  example_case:
+    - tests_resizer_perf:
+        script: tests/resizer/perf.sh
+        args: null
+    test:
+      - tests_resizer_perf
+tests_resnet50_576_1024:
+  include:
+    - tests/resnet50_576_1024
+  exclude:
+    - tests/resnet50_576_1024/README.md
+  example_case:
+    - tests_resnet50_576_1024_perf:
+        script: tests/resnet50_576_1024/perf.sh
+        args: null
+    - tests_resnet50_576_1024_ddr:
+        script: tests/resnet50_576_1024/profiling_ddr.sh
+        args: null
+    test:
+      - tests_resnet50_576_1024_perf
+      - tests_resnet50_576_1024_ddr
+tests_tracking:
+  include:
+    - tests/tracking
+  exclude: null
+  example_case:
+    - tests_tracking_perf:
+        script: tests/tracking/perf.sh
+        args: null
+    test:
+      - tests_tracking_perf
+tests_traffic_light:
+  include:
+    - tests/traffic_light
+  exclude:
+    - tests/traffic_light/README.md
+  example_case:
+    - tests_traffic_light_perf:
+        script: tests/traffic_light/perf.sh
+        args: null
+    test:
+      - tests_traffic_light_perf
+tests_yolop_576_1024:
+  include:
+    - tests/yolop_576_1024
+  exclude:
+    - tests/yolop_576_1024/README.md
+  example_case:
+    - tests_yolop_576_1024_perf:
+        script: tests/yolop_576_1024/perf.sh
+        args: null
+    test:
+      - tests_yolop_576_1024_perf
+tests_yolov5s:
+  include:
+    - tests/yolov5s
+  exclude: null
+  example_case:
+    - tests_yolov5s_perf:
+        script: tests/yolov5s/perf.sh
+        args: null
+    test:
+      - tests_yolov5s_perf
+utils:
+  include:
+    - utils
+  exclude: null
+  example_case: null
+  test:
+    - cv_efficientnet_eval
+    - cv_efficientnet_perf
+    - cv_mobilenet_v2_eval
+    - cv_mobilenet_v2_perf
