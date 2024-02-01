@@ -32,7 +32,7 @@ def check_config(cfg, phase="build"):
     if framework not in framework_lists:
         logger.error("framework({}) must be in {}".format(framework, framework_lists))
         return False
-    
+
     if "quant" not in cfg:
         logger.error("The key(quant) must be in cfg")
         return False
@@ -154,6 +154,7 @@ def check_config(cfg, phase="build"):
 def check_test_config(cfg):
     if not check_datapath(cfg["test"], "data_path"):
         return False
+    return True
 
 
 def check_accuracy_config(cfg):
@@ -254,4 +255,4 @@ def check_datapath(cfg, key):
             else:
                 logger.error("{} not found -> {}".format(key, cfg[key]))
                 return False
-        return True
+    return True

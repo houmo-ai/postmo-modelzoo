@@ -59,23 +59,6 @@ def get_executor(cfg):
 def get_model(cfg):
     model_impl_class = cfg["model"].get("impl_class", None)
     executor = get_executor(cfg)
-    dataset_class = cfg["accuracy"].get("dataset_class", None)
-    if not check_datapath(cfg["accuracy"], "data_dir"):
-        return -1
-    data_dir = cfg["accuracy"].get("data_dir")
-    try:
-        m = importlib.import_module("hm_dataset")
-        if hasattr(m, dataset_class):
-            # 实例化预处理对象
-            dataset = getattr(m, dataset_class)(data_dir)
-        else:
-            logger.error("hm_dataset.py has no class named {}, please check your config"
-                         .format(dataset_class))
-            exit(-1)
-    except Exception as e:
-        logger.warning("can not find hm_dataset.py, use default model will not support accuracy: {}"
-                       .format(e))
-        dataset = None
 
     try:
         m = importlib.import_module("hm_model")
@@ -83,7 +66,7 @@ def get_model(cfg):
             # 实例化预处理对象
             model = getattr(m, model_impl_class)(
                 executor=executor,
-                dataset=dataset,
+                dataset=None,
                 # dtype=dtype,   # int8/fp32
             )
         else:
@@ -95,7 +78,7 @@ def get_model(cfg):
                        .format(e))
         model = BaseModel(
             executor=executor,
-            dataset=dataset,
+            dataset=None,
             # dtype=dtype,   # int8/fp32
             )
     # del sys.modules["hm_model"]
@@ -131,6 +114,7 @@ def build(cfg):
         outputs = model.executor.infer(inputs)
         # 临时添加NCHW
         # output_data = np.transpose(output_data, (0, 2, 3, 1))
+    sum_cos = 0.0
     for output_name, output_data in outputs.items():
         logger.info("{} output[{}] shape = {}, dtype = {}".format(model.target, output_name,
                                                                   output_data.shape, output_data.dtype))
@@ -139,8 +123,10 @@ def build(cfg):
         golden_output = model.executor.get_golden_output(output_name)
         is_match = (output_data == golden_output).all()
         cosine_dist = cosine_distance(output_data, golden_output)
+        sum_cos += cosine_dist
         logger.info("[compare] {} vs quant output [{}] match={}, similarity={:.6f}"
                     .format(model.target, output_name, is_match, cosine_dist))
+    logger.info("[compare] {} vs quant output average similarity={:.6f}".format(model.target, sum_cos/len(outputs)))
     logger.info("build completed")
 
 
@@ -182,6 +168,7 @@ def test(cfg):
 
     # compare to framework output
     if model.target in ["H30",]:
+        sum_cos = 0.0
         for output_name, output_data in outputs.items():
             output_data_path = os.path.join(model.compare_dir, "test", output_name + '.npy')
             if os.path.exists(output_data_path):
@@ -193,8 +180,10 @@ def test(cfg):
                 return None
             is_match = (output_data == compare_data).all()
             cosine_dist = cosine_distance(output_data, compare_data)
+            sum_cos += cosine_dist
             logger.info("[compare] {} vs {} output [{}] match={}, similarity={:.6f}"
                         .format(model.target, model.framework, output_name, is_match, cosine_dist))
+        logger.info("[compare] {} vs {} output average similarity={:.6f}".format(model.target, model.framework, sum_cos/len(outputs)))
     logger.info("test completed")
 
 
@@ -244,21 +233,33 @@ def accuracy(cfg):
         exit(-1)
     model = get_model(cfg)
 
-    data_dir = cfg["accuracy"]["data_dir"]
-    test_num = cfg["accuracy"]["test_num"]
-    dataset_class = cfg["accuracy"]["dataset_class"]
-
-    m = importlib.import_module("hm_dataset")
-    if hasattr(m, dataset_class):
-        # 实例化预处理对象
-        dataset = getattr(m, dataset_class)(data_dir)
-    else:
-        logger.error("hm_dataset.py has no class named {}".format(dataset_class))
+    dataset_class = cfg["accuracy"].get("dataset_class", None)
+    if not check_datapath(cfg["accuracy"], "data_dir"):
+        return -1
+    data_dir = cfg["accuracy"].get("data_dir")
+    try:
+        m = importlib.import_module("hm_dataset")
+        if hasattr(m, dataset_class):
+            # 实例化预处理对象
+            dataset = getattr(m, dataset_class)(data_dir)
+        else:
+            logger.error("hm_dataset.py has no class named {}, please check your config"
+                         .format(dataset_class))
+            exit(-1)
+    except Exception as e:
+        logger.error("can not find hm_dataset.py, use default model will not support accuracy: {}"
+                       .format(e))
         exit(-1)
 
+    model.test_num = cfg["accuracy"]["test_num"]
+    if os.environ.get("HDPL_PLATFORM") == "ISIM":
+        if model.test_num > 20 or model.test_num == 0:
+            model.test_num = 20
+            logger.warning("test num set to 20 because HDPL_PLATFORM=ISIM may take a lot of time.")
+    model.dataset = dataset
     model.load()
 
-    res = model.evaluate(test_num)
+    res = model.evaluate()
     logger.info("[infer] average cost {:.6f}ms".format(model.ave_latency_ms))
     logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
     logger.info("{}".format(res))
@@ -266,32 +267,33 @@ def accuracy(cfg):
     return res
 
 
-def run(config_path, phase, dtype, target):
+def run(args):
     # 补充自定义预处理文件所在目录，必须与配置文件同目录
-    config_abspath = os.path.abspath(config_path)
+    config_abspath = os.path.abspath(args.config)
     config_dir = os.path.dirname(config_abspath)
     sys.path.insert(0, config_dir)  # 自定义模块环境变量
 
     config = read_yaml_to_dict(config_abspath)
-    if not check_config(config, phase):
+    if not check_config(config, args.type):
         exit(-1)
-    config["target"] = target
+    config["target"] = args.target
+    config['model']['batch'] = args.batch
 
     res = dict()
-    if phase == "quant":
+    if args.type == "quant":
         quantize(config)
-    elif phase == "build":
+    elif args.type == "build":
         build(config)
-    elif phase == "test":
+    elif args.type == "test":
         test(config)
-    elif phase == "demo":
+    elif args.type == "demo":
         demo(config)
-    elif phase == "perf":
+    elif args.type == "perf":
         perf(config)
-    elif phase == "accuracy":
+    elif args.type == "accuracy":
         res = accuracy(config)
     else:
-        logger.error("Not support operation -> {}".format(phase))
+        logger.error("Not support operation -> {}".format(args.type))
 
     sys.path.remove(config_dir)
     return res
@@ -355,17 +357,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HmAssist Tool")
     parser.add_argument("type", type=str,
                         choices=("quant", "build", "test", "demo", "perf", "accuracy"),
-                        help="Please specify an operation")
+                        help="Specify an operation")
     parser.add_argument("--target", type=str, required=True,
                         choices=("H30", "onnx"),
-                        help="Please specify a chip target")
-    parser.add_argument("--config", "-c", type=str, default="config.yml",
-                        help="Please specify a configuration file, default is config.yml")
-    parser.add_argument("--dtype", "-t", type=str, default="int8",
-                        choices=("int8", "fp32"),
-                        help="Please specify one of them, default is int8")
-    parser.add_argument("--log_dir", type=str, default="./logs",
-                        help="Please specify a log dir, default is ./logs")
+                        help="Specify a chip target")
+    parser.add_argument("--config", type=str, default="config.yml",
+                        help="Specify a config file, default is config.yml")
+    parser.add_argument("--batch", type=int, default=1,
+                        help="Specify batch size, default is 1")
+    # parser.add_argument("--dtype", type=str, default="int8",
+    #                     choices=("int8", "fp32"),
+    #                     help="Please specify one of them, default is int8")
+    # parser.add_argument("--demo.test_num", type=int, default=-1,
+    #                     help="Specify the test number in demo, default is the config in the config file")
+    # parser.add_argument("--perf.test_num", type=int, default=-1,
+    #                     help="Specify the test number in perf, default is the config in the config file")
+    # parser.add_argument("--accuracy.test_num", type=int, default=-1,
+    #                     help="Specify the test number in accuracy, default is the config in the config file")
 
     args = parser.parse_args()
     print(args)
@@ -375,4 +383,4 @@ if __name__ == "__main__":
     VERSION = "v0.1.0"
     logger.info("{} with HmAssist version: {}".format(args.type, VERSION))
 
-    run(args.config, args.type, args.dtype, args.target)
+    run(args)

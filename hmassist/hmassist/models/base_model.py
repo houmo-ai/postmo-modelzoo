@@ -35,6 +35,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 n, c, h, w = input["shape"]
             elif input["layout"] == "NHWC":
                 n, h, w, c = input["shape"]
+            size = None
             if "image" in input:
                 size = input["image"].get("size", [h, w])
             if size:

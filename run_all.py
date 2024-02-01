@@ -1,3 +1,4 @@
+import os
 import argparse
 import subprocess
 import yaml
@@ -13,13 +14,20 @@ def parseArgs():
 
 def runAll():
     cmd = "bash run_all.sh"
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,encoding='utf-8')
-    (out, _) = proc.communicate()
-    if proc.returncode != 0:
-        msg = cmd + "\n" + out
-        raise RuntimeError(msg)
+    print("------------- run_all start ------------")
+    result = os.system(cmd)
+    if result == 0:
+        print("------------- run_all success ------------")
     else:
-        print("------------- test all case success ------------")
+        raise RuntimeError("run_all fail, error={}". format(result))
+
+    # proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,encoding='utf-8')
+    # (out, _) = proc.communicate()
+    # if proc.returncode != 0:
+    #     msg = cmd + "\n" + out
+    #     raise RuntimeError(msg)
+    # else:
+    #     print("------------- test all case success ------------")
 
 def readFile(diff_file):
     try:
@@ -101,17 +109,27 @@ def runCase(allUnitDict):
             argStr = ""
             for arg in args:
                 argStr = aargStr + arg + " "
-            cmd = "bash " + script + " " +argStr
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,encoding='utf-8')
-        (out, _) = proc.communicate()
-        if proc.returncode != 0:
-            msg = "command is:" + cmd + "\n" + out
-            raise RuntimeError(msg)
-        else:
+            cmd = "bash " + script + " " + argStr
+
+        print("------------- test " + caseName + " start ------------")
+        result = os.system(cmd)
+        if result == 0:
             print("------------- test " + caseName + " success ------------")
+        else:
+            raise RuntimeError("test " + caseName + " fail, error={}". format(result))
+
+        # proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,encoding='utf-8')
+        # (out, _) = proc.communicate()
+        # if proc.returncode != 0:
+        #     msg = "command is:" + cmd + "\n" + out
+        #     raise RuntimeError(msg)
+        # else:
+        #     print("------------- test " + caseName + " success ------------")
 
 
 def runWithDiff(allArgs):
+    os.environ["DATASETS_PATH"] = os.path.join(os.environ["MODELZOO_PATH"], "data/datasets")
+    print("DATASETS_PATH={}".format(os.environ["DATASETS_PATH"]))
     allTestModules = set()
     allTestUnits = set()
     allUnitDict = {}

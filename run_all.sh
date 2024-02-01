@@ -19,12 +19,8 @@ echo "HDPL_PATH is $HDPL_PATH"
 
 export CMAKE_CONFIG_PATH=$SCRIPT_PATH/develop.cmake
 
-if [[ -z "${DATASETS_PATH}" ]]; then
-  export DATASETS_PATH=$SCRIPT_PATH/data/datasets
-fi
-if [[ -z "${MODEL_PATH}" ]]; then
-  export MODEL_PATH=$SCRIPT_PATH/data/models
-fi
+export DATASETS_PATH=$SCRIPT_PATH/data/datasets
+export MODEL_PATH=$SCRIPT_PATH/data/models
 
 # For bash 4.4+, must not be in posix mode, may use temporary files
 # perf_scripts=()
@@ -42,23 +38,24 @@ fi
   # bash "${script}"
 # done
 
-bash ./cv/yolov3/perf.sh
-bash ./cv/mobilenet_v2/perf.sh
-bash ./cv/yolop/perf.sh
-bash ./cv/resnet50/perf.sh
-bash ./cv/point_pillars/perf.sh
-bash ./cv/efficientnet/perf.sh
-bash ./tests/tracking/perf.sh
-bash ./tests/resizer/perf.sh
-bash ./tests/traffic_light/perf.sh
-bash ./tests/fastbev2d/perf.sh
+# bash ./models/backbone/resnet50/perf.sh
+bash ./models/backbone/mobilenetv2/perf.sh
+bash ./models/backbone/efficientnet/perf.sh
+bash ./models/backbone/vit/perf.sh
+bash ./models/autodrive/yolop/perf.sh
+bash ./models/autodrive/pointpillars/perf.sh
+bash ./models/detection/yolov5s/perf.sh
+bash ./models/detection/yolov3/perf.sh
+# bash ./models/backbone/resnet50/eval.sh
+bash ./models/backbone/efficientnet/eval.sh
+bash ./models/backbone/mobilenetv2/eval.sh
+# bash ./tests/tracking/perf.sh
+# bash ./tests/resizer/perf.sh
+# bash ./tests/traffic_light/perf.sh
+# bash ./tests/fastbev2d/perf.sh
 # bash ./tests/resnet50_576_1024/perf.sh
-bash ./tests/yolov5s/perf.sh
-bash ./tests/fastbev3d/perf.sh
-bash ./tests/resnet50/perf.sh
-bash ./tests/yolop_576_1024/perf.sh
-bash ./cv/yolov3/eval.sh
-bash ./cv/mobilenet_v2/eval.sh
-# bash ./cv/resnet50/eval.sh
-bash ./cv/efficientnet/eval.sh
+# bash ./tests/yolov5s/perf.sh
+# bash ./tests/fastbev3d/perf.sh
+# bash ./tests/resnet50/perf.sh
+# bash ./tests/yolop_576_1024/perf.sh
 # bash ./tests/resnet50/eval.sh

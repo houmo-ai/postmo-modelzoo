@@ -146,9 +146,8 @@ class H30Exec(BaseExec, ABC):
 
         t_start = time.time()
         if self.quant_cfg["debug_level"] == 1:
-            logger.warning("quantize profiling is not available now.")
-        #     from hmquant.api import quantize_profiling
-        #     quantize_profiling(sequencer, [calib_dataset[0]])
+            from hmquant.api import quantize_profiling
+            quantize_profiling(sequencer, [calib_dataset[0]])
         self.layer_compare_span = time.time() - t_start
         logger.info("quantize cost {}s, layer compare cost {}s".format(self.quantize_span, self.layer_compare_span))
 
@@ -156,21 +155,16 @@ class H30Exec(BaseExec, ABC):
         logger.info("################  build started  ######################")
         type_dict = {}
         shape_dict = {}
-        convert_config = {}
-        layout_dict = {}
-        batch = 1
-        # convert_config = {'layout': 'NCHW'}
-        # convert_config["transpose_axes"] = (0, 2, 3, 1)
+        convert_config = {'layout': 'NHWC'}
         t_start = time.time()
         onnx_model = onnx.load(self.quant_model_path)
         for input in onnx_model.graph.input:
             dims = input.type.tensor_type.shape.dim
             for i in self.inputs:
                 if i["name"] == input.name:
-                    batch = i["shape"][0]
                     type_dict[input.name] = i["dtype"]
             input_shape = (
-                batch, dims[1].dim_value,
+                self.batch * dims[0].dim_value, dims[1].dim_value,
                 dims[2].dim_value, dims[3].dim_value,
             )
             shape_dict[input.name] = input_shape
@@ -195,7 +189,7 @@ class H30Exec(BaseExec, ABC):
                     mod, target, executor=executor, mod_name=self.model_name,
                 )
 
-            if os.getenv("TCIM_CROSS_COMPILE"):
+            if os.getenv("TCIM_CROSS_COMPILE") == 1:
                 logger.info("cross compile enabled as aarch64")
                 model_name = self.model_name + "_aarch64"
                 tcim.store_so(model_name, lib, self.result_dir + "/../build", hdplcc_options=['-O2'], host_target="arm64")
@@ -253,9 +247,8 @@ class H30Exec(BaseExec, ABC):
                 output_data = self.module.get_output_by_name(name).numpy()
             else:
                 output_data = self.module.get_float_output_by_name(name).numpy()
-            # if (len(output_data.shape) == 4):
-                # toolchain output is NHWC
-                # output_data = np.transpose(output_data, (0, 3, 1, 2))
+            if (len(output_data.shape) == 4):  # toolchain output is NHWC
+                output_data = np.transpose(output_data, (0, 3, 1, 2))
             outputs[name] = output_data
 
         return outputs

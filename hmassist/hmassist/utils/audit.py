@@ -179,9 +179,6 @@ def audit(model_name, mode="dichotomy"):
     history = {}
 
     result, cos_dist, name, shape = audit_submodel(model_name, model_path, input_names, nodes_list[right], right)
-    if result:
-        logger.info("The inference result is correct!")
-        return -1
     history[right] = (result, cos_dist, name, shape)
     print("cur: [{}, {}] history: {}".format(left, right, history))
 

@@ -4,8 +4,8 @@ import sys
 version = ""
 if len(sys.argv) > 1:
     version = sys.argv[1]
-include_list = []
-exclude_list = ["pack.sh", "pack.py", "run_all.sh", "env_dev.sh", "tests", "develop.cmake"]
+include_list = ["data", "hmassist", "hmodel", "models", "utils", "release.cmake", "requirements.txt", "env.sh"]
+exclude_list = []
 dir_name = "houmo-modelzoo"
 
 # include项

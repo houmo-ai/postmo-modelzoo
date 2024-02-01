@@ -6,7 +6,9 @@ export MODELZOO_PATH
 HMASSIST_PATH=$MODELZOO_PATH/hmassist
 export HMASSIST_PATH
 
+export HMASSIST_TARGET=H30
 export CMAKE_CONFIG_PATH=$MODELZOO_PATH/release.cmake
+export MODELZOO_URL=http://10.10.1.53:8082/artifactory/toolchain
 
 # set hal library log level
 export HM800_HAL_CONSOLE_LEVEL=0
@@ -52,6 +54,7 @@ if [[ -z $HDPL_PLATFORM ]]; then
 fi
 
 echo "[Please check the following path. Unset the environment variable if you want to use the default path!]"
+echo "HMASSIST_TARGET is $HMASSIST_TARGET"
 echo "HOUMO_PATH is $HOUMO_PATH"
 echo "TCIM_PATH is $TCIM_PATH"
 echo "QUANTOOL_PATH is $QUANTOOL_PATH"

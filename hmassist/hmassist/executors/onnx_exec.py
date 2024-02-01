@@ -29,10 +29,11 @@ class OnnxExec(BaseExec, ABC):
     def _preprocess(self, inputs):
         datas = {}
         for input in self.inputs:
-            if input["image"]["crop"]:
-                pass  # TODO
-            if input["image"]["size"]:
-                pass  # TODO
+            # TODO: raw image crop and resize
+            # if input["image"]["crop"]:
+            #     pass
+            # if input["image"]["size"]:
+            #     pass
             data = inputs[input["name"]].astype(np.float32)
             data /= 255
             if input["mean"]:

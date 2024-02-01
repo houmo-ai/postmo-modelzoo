@@ -21,27 +21,36 @@ class COCO2017Val(BaseDataset):
             logger.error("annotations_file not exist -> {}".format(self._annotations_file))
             exit(-1)
 
-        self._filepath = os.path.join(self._root_path, "..", "val2017.txt")
-        if not os.path.exists(self._filepath):
-            logger.error("filepath not exist -> {}".format(self._filepath))
-            exit(-1)
-        with open(self._filepath, "r") as f:
-            lines = f.readlines()
-
         self._label_files = list()
         self._img_files = list()
         self._image_ids = list()
-        for line in lines:
-            sub_path = line.strip()
-            basename = os.path.basename(sub_path)
-            filename, ext = os.path.splitext(basename)
-            img_path = os.path.join(self._root_path, "..", sub_path)
-            if not os.path.exists(img_path):
-                logger.warning("img_path not exist -> {}".format(img_path))
-                continue
-            self._img_files.append(img_path)
-            self._image_ids.append(int(filename))
+
+        self._filepath = os.path.join(self._root_path, "..", "val2017.txt")
+        if os.path.exists(self._filepath):
+            with open(self._filepath, "r") as f:
+                lines = f.readlines()
+                for line in lines:
+                    sub_path = line.strip()
+                    basename = os.path.basename(sub_path)
+                    filename, ext = os.path.splitext(basename)
+                    img_path = os.path.join(self._root_path, "..", sub_path)
+                    if not os.path.exists(img_path):
+                        logger.warning("img_path not exist -> {}".format(img_path))
+                        continue
+                    self._img_files.append(img_path)
+                    self._image_ids.append(int(filename))
+        elif os.path.isdir(self._root_path):
+            logger.warning("filepath not exist -> {}, using {} files directly".format(self._filepath, self._root_path))
+            for filepath in os.listdir(self._root_path):
+                basename = os.path.basename(filepath)
+                filename, ext = os.path.splitext(basename)
+                if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
+                    self._img_files.append(os.path.join(self._root_path, basename))
+                    self._image_ids.append(int(filename))
+        
         self._total_num = len(self._img_files)
+        if (self._total_num < 5000):
+            logger.warning("test number is less than 5000, using incomplete validation sets may result in inaccurate results.")
 
     @property
     def annotations_file(self):
@@ -76,7 +85,7 @@ class COCO2017Val(BaseDataset):
 
     @property
     def dataset_name(self):
-        return "coco_2017Val"
+        return "coco2017"
 
 
 class COCO2014Val(BaseDataset):

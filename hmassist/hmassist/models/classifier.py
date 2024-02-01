@@ -49,14 +49,14 @@ class Classifier(BaseModel, ABC):
     def load(self):
         self.executor.load()
 
-    def evaluate(self, test_num):
+    def evaluate(self):
         """ top-k
         """
         if not self.dataset:
             logger.error("The dataset is null")
             exit(-1)
 
-        img_paths, labels = self.dataset.get_datas(num=test_num)
+        img_paths, labels = self.dataset.get_datas(num=self.test_num)
 
         k = 5
         top1, top5 = 0, 0
@@ -66,10 +66,17 @@ class Classifier(BaseModel, ABC):
             if img is None:
                 logger.warning("Failed to load image -> {}".format(img_path))
                 continue
+
+            end2end_start = time.time()
+
             inputs = {self.inputs[0]["name"]: img}
             inputs = self._preprocess(inputs)
             outputs = self.inference(inputs)
             outputs = self._postprocess(outputs, img)
+
+            end2end_cost = time.time() - end2end_start
+            self._end2end_latency_ms += (end2end_cost * 1000)
+
             for name, output in outputs.items():
                 idxes = np.argsort(-output, axis=1, kind="quicksort").flatten()[0:k]  # 降序
                 logger.info("image:{}, pred = {}, gt = {}".format(img_path, idxes, labels[idx]))
@@ -95,6 +102,7 @@ class Classifier(BaseModel, ABC):
             exit(-1)
         logger.info("process: {}".format(img_path))
         img = cv2.imread(img_path)
+        end2end_start = time.time()
         inputs = {self.inputs[0]["name"]: img}
         inputs = self._preprocess(inputs)
 
@@ -119,7 +127,6 @@ class Classifier(BaseModel, ABC):
         if img is None:
             logger.error("Failed to load image -> {}".format(img_path))
             exit(-1)
-        end2end_start = time.time()
 
         outputs = self.inference(inputs)
         outputs = self._postprocess(outputs, img)

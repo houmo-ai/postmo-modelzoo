@@ -4,6 +4,7 @@ bin/
 output/
 out/
 __pycache__/
+hir_log/
 
 # media files
 *.jpg
