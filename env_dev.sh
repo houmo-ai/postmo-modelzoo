@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 pip3 install onnx_graphsurgeon -i https://pypi.ngc.nvidia.com
 
-MODELZOO_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")" || exit ; pwd)
+__dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+MODELZOO_PATH=${__dir}
 export MODELZOO_PATH
 HMASSIST_PATH=$MODELZOO_PATH/hmassist
 export HMASSIST_PATH
@@ -26,7 +27,11 @@ export HDPL_LIB_PATH=$HDPL_PATH/lib
 export CLANG_LIB_PATH=$CLANG_PATH/lib
 
 # paths for runtime
-export PYTHONPATH=$HMASSIST_PATH:$QUANTOOL_PATH:$PYTHONPATH
+if [[ -d ${QUANTOOL_PATH} ]]; then
+  export PYTHONPATH=$HMASSIST_PATH:$QUANTOOL_PATH:$PYTHONPATH
+else
+  export PYTHONPATH=$HMASSIST_PATH:$PYTHONPATH
+fi
 export PATH=$HMASSIST_PATH:$PATH
 
 # data and model path
