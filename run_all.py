@@ -105,7 +105,7 @@ def runCase(allUnitDict):
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,encoding='utf-8')
         (out, _) = proc.communicate()
         if proc.returncode != 0:
-            msg = "command is:" cmd + "\n" + out
+            msg = "command is:" + cmd + "\n" + out
             raise RuntimeError(msg)
         else:
             print("------------- test " + caseName + " success ------------")

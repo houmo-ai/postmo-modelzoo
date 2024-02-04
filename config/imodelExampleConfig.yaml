@@ -122,8 +122,8 @@ tests_cruise_cutin_vehicle:
     - tests_cruise_cutin_vehicle_perf:
         script: tests/cruise_cutin_vehicle/run_perf.sh
         args: null
-    test:
-      - tests_cruise_cutin_vehicle_perf
+  test:
+    - tests_cruise_cutin_vehicle_perf
 tests_cruise_go_vehicle:
   include:
     - tests/cruise_go_vehicle
@@ -133,8 +133,8 @@ tests_cruise_go_vehicle:
     - tests_cruise_go_vehicle_perf:
         script: tests/cruise_go_vehicle/run_perf.sh
         args: null
-    test:
-      - tests_cruise_go_vehicle_perf
+  test:
+    - tests_cruise_go_vehicle_perf
 tests_fastbev2d:
   include:
     - tests/fastbev2d
@@ -143,8 +143,8 @@ tests_fastbev2d:
     - tests_fastbev2d_perf:
         script: tests/fastbev2d/perf.sh
         args: null
-    test:
-      - tests_fastbev2d_perf
+  test:
+    - tests_fastbev2d_perf
 tests_fastbev3d:
   include:
     - tests/fastbev3d
@@ -153,8 +153,8 @@ tests_fastbev3d:
     - tests_fastbev3d_perf:
         script: tests/fastbev3d/perf.sh
         args: null
-    test:
-      - tests_fastbev3d_perf
+  test:
+    - tests_fastbev3d_perf
 tests_lane:
   include:
     - tests/lane
@@ -164,8 +164,8 @@ tests_lane:
     - tests_lane_calibrate:
         script: tests/lane/calibrate.py
         args: null
-    test:
-      - tests_lane_calibrate
+  test:
+    - tests_lane_calibrate
 tests_resizer:
   include:
     - tests/resizer
@@ -175,8 +175,8 @@ tests_resizer:
     - tests_resizer_perf:
         script: tests/resizer/perf.sh
         args: null
-    test:
-      - tests_resizer_perf
+  test:
+    - tests_resizer_perf
 tests_resnet50_576_1024:
   include:
     - tests/resnet50_576_1024
@@ -189,9 +189,9 @@ tests_resnet50_576_1024:
     - tests_resnet50_576_1024_ddr:
         script: tests/resnet50_576_1024/profiling_ddr.sh
         args: null
-    test:
-      - tests_resnet50_576_1024_perf
-      - tests_resnet50_576_1024_ddr
+  test:
+    - tests_resnet50_576_1024_perf
+    - tests_resnet50_576_1024_ddr
 tests_tracking:
   include:
     - tests/tracking
@@ -200,8 +200,8 @@ tests_tracking:
     - tests_tracking_perf:
         script: tests/tracking/perf.sh
         args: null
-    test:
-      - tests_tracking_perf
+  test:
+    - tests_tracking_perf
 tests_traffic_light:
   include:
     - tests/traffic_light
@@ -211,8 +211,8 @@ tests_traffic_light:
     - tests_traffic_light_perf:
         script: tests/traffic_light/perf.sh
         args: null
-    test:
-      - tests_traffic_light_perf
+  test:
+    - tests_traffic_light_perf
 tests_yolop_576_1024:
   include:
     - tests/yolop_576_1024
@@ -222,8 +222,8 @@ tests_yolop_576_1024:
     - tests_yolop_576_1024_perf:
         script: tests/yolop_576_1024/perf.sh
         args: null
-    test:
-      - tests_yolop_576_1024_perf
+  test:
+    - tests_yolop_576_1024_perf
 tests_yolov5s:
   include:
     - tests/yolov5s
@@ -232,8 +232,8 @@ tests_yolov5s:
     - tests_yolov5s_perf:
         script: tests/yolov5s/perf.sh
         args: null
-    test:
-      - tests_yolov5s_perf
+  test:
+    - tests_yolov5s_perf
 utils:
   include:
     - utils
