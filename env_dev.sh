@@ -15,7 +15,9 @@ export CMAKE_CONFIG_PATH=$MODELZOO_PATH/develop.cmake
 
 # main path
 export QUANTOOL_PATH=$MODELZOO_PATH/../../quantool
-HDPL_TOOLCHAIN_ITVM_INSTALL=$TVM_ROOT/build/install
+if [[ -z $HDPL_TOOLCHAIN_ITVM_INSTALL ]] && [[ -z ${TVM_ROOT} ]] && [[ -d ${TVM_ROOT} ]]; then
+  HDPL_TOOLCHAIN_ITVM_INSTALL=$TVM_ROOT/build/install
+fi
 
 # paths for c/c++ compiling
 export TCIM_INC_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/include
