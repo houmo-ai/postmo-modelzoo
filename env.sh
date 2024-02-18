@@ -25,7 +25,7 @@ fi
 
 # paths for c/c++ compiling
 export TCIM_INC_PATH=$TCIM_PATH/include
-export TCIM_LIB_PATH=$TCIM_PATH
+export TCIM_LIB_PATH=$TCIM_PATH/lib
 export HDPL_INC_PATH=$HOUMO_PATH/include
 export HDPL_LIB_PATH=$HOUMO_PATH/lib
 
