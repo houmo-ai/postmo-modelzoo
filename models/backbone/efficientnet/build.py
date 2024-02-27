@@ -33,6 +33,13 @@ def get_args() -> argparse.Namespace:
         default=1,
         help='batch size',
     )
+    parser.add_argument(
+        '--stage',
+        dest='stage',
+        type=str,
+        default="all",
+        help='build stage choise=["build", "test", "all"]',
+    )
     args = parser.parse_args()
     return args
 
@@ -42,6 +49,7 @@ def build(args=None):
     image_format = 'YUV422SP'
     model_name = args.model_name
     batch = args.batch
+    stage = args.stage
     model_path = args.model_path
     model_dir = os.path.dirname(model_path)
     shape_dict = {}
@@ -50,62 +58,64 @@ def build(args=None):
 
     onnx_model = onnx.load(model_path)
     inputs = onnx_model.graph.input
-    for input in inputs:
-        dims = input.type.tensor_type.shape.dim
-        input_shape = [dim.dim_value for dim in dims]
-        input_shape[0] *= batch
-        print('input name:', input.name)
-        print('input shape:', input_shape)
-        shape_dict[input.name] = input_shape
+    if stage == 'build' or stage == 'all':
+        for input in inputs:
+            dims = input.type.tensor_type.shape.dim
+            input_shape = [dim.dim_value for dim in dims]
+            input_shape[0] *= batch
+            print('input name:', input.name)
+            print('input shape:', input_shape)
+            shape_dict[input.name] = input_shape
 
-    mod = relay.frontend.from_hmonnx(
-        onnx_model, shape_dict, layout=layout_dict,
-        resizer_attr=None, convert_config=convert_config,
-    )
-    executor = Executor('aot')
-    compile_config = {
-        'tcim.fuse_strategy': 1,
-        'tcim.codegen_pic': True,
-        'tcim.for_benchmark': True,
-        'tcim.spec_batch_num': batch,
-    }
-    target = tvm.target.Target('hdpl', host='c')
-    with tvm.transform.PassContext(opt_level=3, config=compile_config):
-        graph, lib, params = relay.build(
-            mod, target, executor=executor, mod_name=model_name,
+        mod = relay.frontend.from_hmonnx(
+            onnx_model, shape_dict, layout=layout_dict,
+            resizer_attr=None, convert_config=convert_config,
         )
-    tcim.store_so(model_name, lib)
-    print('tcim model ' + model_name + ' saved.')
+        executor = Executor('aot')
+        compile_config = {
+            "tcim.gen_intrinsic" : 2,
+            "tcim.sync_strategy": 1,
+            "tcim.codegen_pic": False,
+            "tcim.for_benchmark": True
+        }
+        target = tvm.target.Target('hdpl', host='c')
+        with tvm.transform.PassContext(opt_level=3, config=compile_config):
+            graph, lib, params = relay.build(
+                mod, target, executor=executor, mod_name=model_name,
+            )
+        tcim.store_so(model_name, lib)
+        print('tcim model ' + model_name + ' saved.')
 
     # compare with golden
-    module = tcim.load_so(model_name)
-    for input in inputs:
-        input_file_name = 'hmquant_' + model_name + '_' + input.name + '_input.npy'
-        input_data_path = os.path.join(model_dir, input_file_name)
-        input_data = np.load(input_data_path).astype("int8")
-        print("input[{}] shape = {}, dtype = {}".format(input.name, input_data.shape, input_data.dtype))
-        module.set_input(input.name, input_data, image_format)
+    if stage == 'test' or stage == 'all':
+        module = tcim.load_so(model_name)
+        for input in inputs:
+            input_file_name = 'hmquant_' + model_name + '_' + input.name + '_input.npy'
+            input_data_path = os.path.join(model_dir, input_file_name)
+            input_data = np.load(input_data_path).astype("int8")
+            print("input[{}] shape = {}, dtype = {}".format(input.name, input_data.shape, input_data.dtype))
+            module.set_input(input.name, input_data, image_format)
 
-    module.run()
+        module.run()
 
-    output_num = module.get_num_outputs()
-    for id in range(0, output_num):
-        output_name = module.get_output_name_by_index(id)
-        output_data = module.get_output_by_name(output_name).numpy()
-        print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-        output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_with_act', output_name + '.npy')
-        if os.path.exists(output_data_path):
-            golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
-        else:
-            print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
-        if golden_output.shape == output_data.shape:
-            cosine_dist = cosine_distance(golden_output, output_data)
-            is_match = (golden_output == output_data).all()
-            print("[compare] golden output [{}] match={}, similarity={:.6f}"
-                        .format(output_name, is_match, cosine_dist))
-        else:
-            print("[compare] golden output [{}] shape not match {} vs {}"
-                         .format(output_name, golden_output.shape, output_data.shape))
+        output_num = module.get_num_outputs()
+        for id in range(0, output_num):
+            output_name = module.get_output_name_by_index(id)
+            output_data = module.get_output_by_name(output_name).numpy()
+            print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
+            output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_with_act', output_name + '.npy')
+            if os.path.exists(output_data_path):
+                golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
+            else:
+                print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
+            if golden_output.shape == output_data.shape:
+                cosine_dist = cosine_distance(golden_output, output_data)
+                is_match = (golden_output == output_data).all()
+                print("[compare] golden output [{}] match={}, similarity={:.6f}"
+                            .format(output_name, is_match, cosine_dist))
+            else:
+                print("[compare] golden output [{}] shape not match {} vs {}"
+                            .format(output_name, golden_output.shape, output_data.shape))
 
 
 if __name__ == '__main__':

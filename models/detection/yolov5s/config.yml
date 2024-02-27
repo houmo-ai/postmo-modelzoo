@@ -2,7 +2,7 @@ model: {
   framework: onnx,
   name: yolov5s,
   save_dir: ./output,
-  weight: ./yolov5s_clip.onnx,
+  weight: ./yolov5s_640x640_clip.onnx,
   inputs: [
     {
       name: images,
@@ -53,7 +53,7 @@ perf: {
   end2end: ,
 }
 
-accuracy: {
+eval: {
   data_dir: coco2017/val2017,
   test_num: 0,
   dataset_class: Dataset,

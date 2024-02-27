@@ -15,7 +15,7 @@ def get_args() -> argparse.Namespace:
         '--model_path',
         dest='model_path',
         type=str,
-        default='yolov3_clip.onnx',
+        default='yolov3_640x640_clip.onnx',
         help='path to the model path',
     )
     parser.add_argument(
@@ -42,7 +42,7 @@ def calibrate(args=None):
         from hmassist.utils.box_utils import letterbox
         image = cv2.imread(filepath)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image, _, _ = letterbox(image, [416, 416], stride=64, auto=False)  # HWC
+        image, _, _ = letterbox(image, [640, 640], stride=64, auto=False)  # HWC
         image = np.transpose(image, (2, 0, 1))  # CHW .astype(np.float32)
         image = np.expand_dims(image, axis=0)  # NCHW
         data = torch.tensor(image.astype(np.float32))
@@ -50,7 +50,7 @@ def calibrate(args=None):
 
     calib_num = 20
     calib_files = []
-    calib_dir = os.path.join(env_dict.get('DATASETS_PATH'), 'imagenet')
+    calib_dir = os.path.join(env_dict.get('DATASETS_PATH'), 'coco2017/val2017')
     file_list = os.listdir(calib_dir)
     for filename in file_list:
         _, ext = os.path.splitext(filename)
@@ -73,10 +73,10 @@ def calibrate(args=None):
                 'data_format': 'RGB',
                 'first_layer_weight_denorm_mean': [0, 0, 0],
                 'first_layer_weight_denorm_std': [1, 1, 1],
-                'resizer_crop': {'top': 0, 'left': 0, 'height': 416, 'width': 416},
+                'resizer_crop': {'top': 0, 'left': 0, 'height': 640, 'width': 640},
                 'resizer_resize': {
-                    'height': 416,
-                    'width': 416,
+                    'height': 640,
+                    'width': 640,
                     'align_corners': False,
                     'method': 'bilinear',
                 },

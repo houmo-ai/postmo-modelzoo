@@ -8,17 +8,9 @@ import cv2
 
 class Resnet50(Classifier):
 
-    @staticmethod
-    def build_options():
-        return {
-            'tcim.fuse_strategy': 0,
-            'tcim.gen_intrinsic': 2,
-            'tcim.codegen_pic': False,
-            'tcim.sync_strategy': 1,
-            'tcim.core_num': 1,
-            'tcim.for_benchmark': True,
-            # 'tcim.multi_stream': 4,
-        }
+    # def build_options(self):
+    #     return {
+    #     }
 
     def _preprocess(self, inputs):
         assert(len(inputs) == 1)

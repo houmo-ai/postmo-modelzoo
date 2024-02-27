@@ -9,4 +9,4 @@ python3 get_model.py --type raw
 hmquant.sh
 hmbuild.sh
 hmdemo.sh
-hmaccuracy.sh
+hmeval.sh

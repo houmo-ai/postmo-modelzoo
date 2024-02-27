@@ -169,10 +169,11 @@ int main(int argc, char *argv[]) {
   auto duration =
       std::chrono::duration_cast<std::chrono::microseconds>(finish - start);
   int64_t total_time = duration.count();
+  float latency = 1.0 * total_time / eval_round / 1000;
   std::cout << "\033[0;31mInference time cost total = " << total_time << "us"
             << "\033[0m" << std::endl;
   std::cout << "\033[0;31mInference time cost per frame = " << std::fixed
-            << std::setprecision(1) << 1.0 * total_time / eval_round << "us"
+            << std::setprecision(3) << latency << "ms"
             << "\033[0m" << std::endl;
   float qps = 1.0e6 * eval_round / total_time * batch;
   std::cout << "\033[0;32mAverage Throughput(QPS): " << std::fixed
@@ -181,12 +182,13 @@ int main(int argc, char *argv[]) {
   if (arguments.output.size() != 0) {
     std::cout << "Save result to: " << arguments.output << std::endl;
     std::fstream result_file(arguments.output.c_str(), std::ios::out);
-    result_file << "{" << std::endl;
-    result_file << "  \"batch\": " << batch << "," << std::endl;
-    result_file << "  \"shape\": " << input_shapes << "," << std::endl;
-    result_file << "  \"iterations\": " << eval_round << "," << std::endl;
-    result_file << "  \"qps\": " << qps << std::endl;
-    result_file << "}" << std::endl;
+    // result_file << "{" << std::endl;
+    result_file << "batch: " << batch  << std::endl;
+    result_file << "shape: " << input_shapes << std::endl;
+    result_file << "iterations: " << eval_round << std::endl;
+    result_file << "latency: " << latency << std::endl;
+    result_file << "qps: " << qps << std::endl;
+    // result_file << "}" << std::endl;
     result_file.close();
   }
   return 0;

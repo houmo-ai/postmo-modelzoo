@@ -20,7 +20,7 @@ class ILSVRC2012(BaseDataset):
         self._batch_idx = 0
         self._batch_size = batch_size
         self._data_root_path = root_path
-        self._val_file = os.path.join(self._data_root_path, "val_map.txt")
+        self._val_file = os.path.join(self._data_root_path, "../val.txt")
         if not os.path.exists(self._val_file):
             logger.error("Not found val file -> {}".format(self._val_file))
             exit(-1)
@@ -63,7 +63,7 @@ class ILSVRC2012(BaseDataset):
 
     @property
     def dataset_name(self):
-        return "ILSVRC_2012Val"
+        return "ILSVRC2012"
 
 
 class ILSVRC2015(ILSVRC2012):

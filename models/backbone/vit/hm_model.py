@@ -8,13 +8,13 @@ import cv2
 
 class Vit(Classifier):
 
-    @staticmethod
-    def build_options():
+    def build_options(self):
         return {
-            'tcim.fuse_strategy': 1,
-            'tcim.codegen_pic': True,
-            'tcim.for_benchmark': True,
-            'tcim.special_model_name': "vit_small"
+            "tcim.fuse_strategy": 1,
+            "tcim.gen_intrinsic": 0,
+            "tcim.sync_strategy": 0,
+            "tcim.for_benchmark": True,
+            "tcim.special_model_name" : "vit_small"
         }
 
     def _preprocess(self, inputs):

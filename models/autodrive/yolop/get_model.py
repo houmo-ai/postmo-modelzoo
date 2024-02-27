@@ -26,6 +26,18 @@ if __name__ == '__main__':
     args = get_args()
     quant_model_dir = args.quant_model_dir
     model_type = args.model_type
+    raw_name = "yolop_384x640.onnx"
+    quant_name = "hmquant_yolop_20240305.zip"
+
     if model_type == "raw" or model_type == "all":
-        if not os.path.exists("yolop.onnx"):
-            os.system('wget http://10.10.1.53:8082/artifactory/toolchain/release/models/yolop/yolop.onnx')
+        if not os.path.exists(raw_name):
+            url = os.path.join(os.environ.get("MODELZOO_URL"), "models/yolop", raw_name)
+            os.system('wget ' + url)
+
+    if model_type == "quant" or model_type == "all":
+        if not os.path.exists(os.path.join(quant_model_dir, "hmquant_yolop_with_act.onnx")):
+            if not os.path.exists(quant_name):
+                url = os.path.join(os.environ.get("MODELZOO_URL"), "models/yolop", quant_name)
+                os.system('wget ' + url)
+            os.system('mkdir -p ' + quant_model_dir)
+            os.system('unzip -d ' + quant_model_dir + ' ' + quant_name)

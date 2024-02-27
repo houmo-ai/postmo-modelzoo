@@ -78,7 +78,7 @@ python3 build.py
 ### 3.4 执行推理
 
 ```bash
-hmaccuracy.sh
+hmeval.sh
 ```
 
 结果：

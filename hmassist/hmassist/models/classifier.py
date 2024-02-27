@@ -79,7 +79,7 @@ class Classifier(BaseModel, ABC):
 
             for name, output in outputs.items():
                 idxes = np.argsort(-output, axis=1, kind="quicksort").flatten()[0:k]  # 降序
-                logger.info("image:{}, pred = {}, gt = {}".format(img_path, idxes, labels[idx]))
+                logger.debug("image:{}, pred = {}, gt = {}".format(img_path, idxes, labels[idx]))
                 if labels[idx] == idxes[0]:
                     top1 += 1
                     top5 += 1
@@ -88,12 +88,11 @@ class Classifier(BaseModel, ABC):
                     top5 += 1
         top1, top5 = float(top1)/total_num, float(top5)/total_num
         return {
-            "input_shape": "{}".format(self.input_shape),
+            "shape": [self.inputs[0]["shape"]],
             "dataset": self.dataset.dataset_name,
-            "num": total_num,
-            "top1": "{:.6f}".format(top1),
-            "top5": "{:.6f}".format(top5),
-            "latency": "{:.6f}".format(self.ave_latency_ms)
+            "test_num": total_num,
+            "accuracy": {"top1": top1, "top5": top5},
+            "latency": self.ave_latency_ms
         }
 
     def demo(self, img_path):

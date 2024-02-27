@@ -10,8 +10,7 @@ import torchvision
 
 class YoloP(Detector):
 
-    # @staticmethod
-    # def build_options():
+    # def build_options(self):
     #     return {}
 
     def _postprocess(self, outputs, img=None):

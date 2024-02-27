@@ -68,10 +68,9 @@ def build(args):
     if stage == 'build' or stage == 'all':
         for input in inputs:
             dims = input.type.tensor_type.shape.dim
-            input_shape = (
-                batch * dims[0].dim_value, dims[1].dim_value,
-                12032, dims[3].dim_value,
-            )
+            input_shape = [dim.dim_value for dim in dims]
+            input_shape[0] *= batch
+            input_shape[2] = 12032
             print('input name:', input.name)
             print('input shape:', input_shape)
             shape_dict[input.name] = input_shape

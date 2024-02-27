@@ -1,9 +1,43 @@
 import os
 import onnx
+import argparse
+
+def get_args() -> argparse.Namespace:
+    """Parse commandline."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--type',
+        dest='model_type',
+        type=str,
+        default='all',
+        help='which model type to get, choise in [raw, quant, all]',
+    )
+    parser.add_argument(
+        '--quant_model_dir',
+        dest='quant_model_dir',
+        type=str,
+        default='output/H30/result',
+        help='where to save quant_model',
+    )
+    args = parser.parse_args()
+    return args
 
 if __name__ == '__main__':
-    if not os.path.exists("yolov3_clip.onnx"):
-        if not os.path.exists("yolov3_416x416.onnx"):
-            os.system('wget http://10.10.1.53:8082/artifactory/model_zoo2/houmo/yolov3/yolov3_416x416.onnx')
-        onnx.utils.extract_model("yolov3_416x416.onnx", "yolov3_clip.onnx", input_names=['images'], 
-            output_names=['onnx::Slice_497', 'onnx::Slice_431', 'onnx::Slice_557'], check_model=True)
+    args = get_args()
+    quant_model_dir = args.quant_model_dir
+    model_type = args.model_type
+    raw_name = "yolov3_640x640_clip.onnx"
+    quant_name = "hmquant_yolov3_20240304.zip"
+
+    if model_type == "raw" or model_type == "all":
+        if not os.path.exists(raw_name):
+            url = os.path.join(os.environ.get("MODELZOO_URL"), "models/yolov3", raw_name)
+            os.system('wget ' + url)
+
+    if model_type == "quant" or model_type == "all":
+        if not os.path.exists(os.path.join(quant_model_dir, "hmquant_yolov3_with_act.onnx")):
+            if not os.path.exists(quant_name):
+                url = os.path.join(os.environ.get("MODELZOO_URL"), "models/yolov3", quant_name)
+                os.system('wget ' + url)
+            os.system('mkdir -p ' + quant_model_dir)
+            os.system('unzip -d ' + quant_model_dir + ' ' + quant_name)

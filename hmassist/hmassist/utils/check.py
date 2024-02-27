@@ -157,36 +157,36 @@ def check_test_config(cfg):
     return True
 
 
-def check_accuracy_config(cfg):
-    if "accuracy" not in cfg:
-        logger.error("Not found key(accuracy) in config")
+def check_eval_config(cfg):
+    if "eval" not in cfg:
+        logger.error("Not found key(eval) in config")
         return False
 
-    if "data_dir" not in cfg["accuracy"]:
-        logger.error("Not found key(data_dir) in config[accuracy]")
+    if "data_dir" not in cfg["eval"]:
+        logger.error("Not found key(data_dir) in config[eval]")
         return False
 
-    if not check_datapath(cfg["accuracy"], "data_dir"):
+    if not check_datapath(cfg["eval"], "data_dir"):
         return False
 
-    if "test_num" not in cfg["accuracy"]:
-        logger.error("Not found key(test_num) in config[accuracy]")
+    if "test_num" not in cfg["eval"]:
+        logger.error("Not found key(test_num) in config[eval]")
         return False
 
-    if "dataset_class" not in cfg["accuracy"]:
-        logger.error("Not found key(dataset_cls) in config[accuracy]")
+    if "dataset_class" not in cfg["eval"]:
+        logger.error("Not found key(dataset_cls) in config[eval]")
         return False
 
     if "impl_class" not in cfg["model"]:
         logger.error("Not found key(impl_class) in config[model]")
         return False
 
-    data_dir = cfg["accuracy"]["data_dir"]
+    data_dir = cfg["eval"]["data_dir"]
     if not os.path.exists(data_dir):
         logger.error("Not found data_dir -> {}".format(data_dir))
         return False
 
-    num = cfg["accuracy"]["test_num"]
+    num = cfg["eval"]["test_num"]
     if not isinstance(num, int):
         logger.error("Not found test_num type not int, -> {}".format(num))
         return False

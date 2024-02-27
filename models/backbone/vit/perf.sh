@@ -7,5 +7,5 @@ cd "${SCRIPT_DIR}"
 
 python3 get_model.py --type raw
 hmquant.sh
-hmbuild.sh --batch 4
+hmbuild.sh
 hmperf.sh

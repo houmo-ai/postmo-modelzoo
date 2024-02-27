@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 target=$HMASSIST_TARGET
 
@@ -19,7 +20,7 @@ if [ "$found_target" == false ]; then
 fi
 
 mkdir -p logs
-LOG_FILE="logs/hmassist-accuracy-$target-$(date "+%Y-%m-%d-%H-%M-%S").log"
+LOG_FILE="logs/hmassist-eval-$target-$(date "+%Y-%m-%d-%H-%M-%S").log"
 
-echo "python3 $MODELZOO_PATH/hmassist/hmassist.py accuracy $param 2>&1 | tee $LOG_FILE"
-python3 $MODELZOO_PATH/hmassist/hmassist.py accuracy $param 2>&1 | tee $LOG_FILE
+echo "python3 $MODELZOO_PATH/hmassist/hmassist.py eval $param 2>&1 | tee $LOG_FILE"
+python3 $MODELZOO_PATH/hmassist/hmassist.py eval $param 2>&1 | tee $LOG_FILE

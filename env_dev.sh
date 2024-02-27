@@ -9,7 +9,7 @@ export HMASSIST_PATH
 
 export HMASSIST_TARGET=H30
 export CMAKE_CONFIG_PATH=$MODELZOO_PATH/develop.cmake
-export MODELZOO_URL=http://10.10.1.53:8082/artifactory/toolchain
+export MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo
 
 # set hal library log level
 export HM800_HAL_CONSOLE_LEVEL=0

@@ -94,8 +94,8 @@ perf: {
   end2end: ,
 }
 
-# 【accuracy必填】
-accuracy: {
+# 【eval必填】
+eval: {
   # 【必填】精度测试的数据集路径
   data_dir: ,
   # 【必填】test精度测试样例数，实际测试数为数据集内数据数与本数的较小者，配置0为数据集内所有数据

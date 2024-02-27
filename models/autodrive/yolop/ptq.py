@@ -14,7 +14,7 @@ def get_args() -> argparse.Namespace:
         '--model_path',
         dest='model_path',
         type=str,
-        default='yolop.onnx',
+        default='yolop_384x640.onnx',
         help='path to the model path',
     )
     parser.add_argument(

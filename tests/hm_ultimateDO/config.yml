@@ -48,7 +48,7 @@ perf: {
   end2end: ,
 }
 
-accuracy: {
+eval: {
   data_dir: ../../data/datasets/imagenet,
   test_num: 1,
   dataset_class: Dataset,

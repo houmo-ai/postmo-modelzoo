@@ -26,15 +26,18 @@ if __name__ == '__main__':
     args = get_args()
     quant_model_dir = args.quant_model_dir
     model_type = args.model_type
+    raw_name = "resnet50.onnx"
+    quant_name = "hmquant_resnet50_20240304.zip"
+
     if model_type == "raw" or model_type == "all":
-        if not os.path.exists("resnet50.onnx"):
-            url = os.path.join(os.environ.get("MODELZOO_URL"), "release/models/resnet50/resnet50.onnx")
+        if not os.path.exists(raw_name):
+            url = os.path.join(os.environ.get("MODELZOO_URL"), "models/resnet50", raw_name)
             os.system('wget ' + url)
 
     if model_type == "quant" or model_type == "all":
         if not os.path.exists(os.path.join(quant_model_dir, "hmquant_resnet50_with_act.onnx")):
-            if not os.path.exists("resnet50_golden_20231218.zip"):
-                url = os.path.join(os.environ.get("MODELZOO_URL"), "release/models/resnet50/resnet50_golden_20231218.zip")
+            if not os.path.exists(quant_name):
+                url = os.path.join(os.environ.get("MODELZOO_URL"), "models/resnet50", quant_name)
                 os.system('wget ' + url)
             os.system('mkdir -p ' + quant_model_dir)
-            os.system('unzip -d ' + quant_model_dir + ' resnet50_golden_20231218.zip')
+            os.system('unzip -d ' + quant_model_dir + ' ' + quant_name)

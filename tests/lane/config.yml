@@ -53,7 +53,7 @@ perf: {
   end2end: ,
 }
 
-accuracy: {
+eval: {
   data_dir: /workspace/platform/toolchain/imodelzoo/data/datasets/imagenet,
   test_num: 1,
   dataset_class: Dataset,

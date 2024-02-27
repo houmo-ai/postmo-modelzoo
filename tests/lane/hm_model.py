@@ -32,8 +32,7 @@ class Lane(Detector):
         )
         return transform(x)
 
-    # @staticmethod
-    # def build_options():
+    # def build_options(self):
     #     return {"tcim.fuse_strategy": 1, "tcim.codegen_pic": True, "tcim.core_mask": 0b11111}
 
     def _preprocess(self, img):

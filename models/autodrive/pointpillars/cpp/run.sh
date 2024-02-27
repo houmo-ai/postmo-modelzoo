@@ -4,6 +4,10 @@ set -e
 
 cd "${SCRIPT_DIR}"
 
-ITERATION=1
+if [ $HDPL_PLATFORM == "ASIC" ]; then
+  ITERATION=200
+else
+  ITERATION=1
+fi
 
 ./demo_tcim_pointpillars ${ITERATION}

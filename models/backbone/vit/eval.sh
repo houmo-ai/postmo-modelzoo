@@ -5,8 +5,7 @@ set -e
 
 cd "${SCRIPT_DIR}"
 
-python3 get_model.py --type raw
-hmquant.sh
+python3 get_model.py --type quant
 hmbuild.sh
 hmdemo.sh
-hmaccuracy.sh
+hmeval.sh

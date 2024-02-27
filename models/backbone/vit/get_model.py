@@ -26,13 +26,18 @@ if __name__ == '__main__':
     args = get_args()
     quant_model_dir = args.quant_model_dir
     model_type = args.model_type
-    if model_type == "raw" or model_type == "all":
-        if not os.path.exists("vit.onnx"):
-            os.system('wget http://10.10.1.53:8082/artifactory/toolchain/release/models/vit/vit.onnx')
+    raw_name = "vit.onnx"
+    quant_name = "hmquant_vit_20240305.zip"
 
-    # if model_type == "quant" or model_type == "all":
-    #     if not os.path.exists(os.path.join(quant_model_dir, "hmquant_resnet50_with_act.onnx")):
-    #         if not os.path.exists("resnet50_golden_20231218.zip"):
-    #             os.system('wget http://10.10.1.53:8082/artifactory/toolchain/release/models/resnet50/resnet50_golden_20231218.zip')
-    #         os.system('mkdir -p ' + quant_model_dir)
-    #         os.system('unzip -d ' + quant_model_dir + ' resnet50_golden_20231218.zip')
+    if model_type == "raw" or model_type == "all":
+        if not os.path.exists(raw_name):
+            url = os.path.join(os.environ.get("MODELZOO_URL"), "models/vit", raw_name)
+            os.system('wget ' + url)
+
+    if model_type == "quant" or model_type == "all":
+        if not os.path.exists(os.path.join(quant_model_dir, "hmquant_vit_with_act.onnx")):
+            if not os.path.exists(quant_name):
+                url = os.path.join(os.environ.get("MODELZOO_URL"), "models/vit", quant_name)
+                os.system('wget ' + url)
+            os.system('mkdir -p ' + quant_model_dir)
+            os.system('unzip -d ' + quant_model_dir + ' ' + quant_name)

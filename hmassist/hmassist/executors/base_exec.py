@@ -18,7 +18,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.test_cfg = cfg["test"]
         self.demo_cfg = cfg["demo"]
         self.perf_cfg = cfg["perf"]
-        self.acc_cfg = cfg["accuracy"]
+        self.acc_cfg = cfg["eval"]
+        self.batch = cfg["batch"]
         # model params
         self.target = cfg["target"]
         self.framework = self.model["framework"]
@@ -26,7 +27,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.inputs = self.model["inputs"]
         self.num_inputs = len(self.inputs)
         self.model_name = self.model["name"]
-        self.batch = self.model["batch"]
         # default params
         self.build_mode = self.build_cfg.get("mode", "AOT")
         self.opt_level = self.build_cfg.get("opt_level", 2)

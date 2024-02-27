@@ -52,8 +52,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         """
         self.executor.load()
 
-    @staticmethod
-    def build_options():
+    def build_options(self):
         logger.warning("can not find hm_model.build_options, use BaseModel.build_options")
         return None
 

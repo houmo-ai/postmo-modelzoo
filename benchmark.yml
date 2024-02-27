@@ -1,0 +1,10 @@
+# model list
+models: {
+  resnet50: {location: models/backbone/resnet50, batch: 1, core_num: 1, quant: True},
+  mobilenetv2: {location: models/backbone/mobilenetv2, batch: 1, core_num: 1, quant: True},
+  efficientnet: {location: models/backbone/efficientnet, batch: 1, core_num: 1, quant: True},
+  vit: {location: models/backbone/vit, batch: 1, core_num: 1, quant: False, eval: False, onnx: False},
+  yolov5s: {location: models/detection/yolov5s, batch: 1, core_num: 1, quant: True},
+  yolov3: {location: models/detection/yolov3, batch: 1, core_num: 1, quant: True},
+  yolop: {location: models/autodrive/yolop, batch: 1, core_num: 1, quant: True, eval: False},
+}

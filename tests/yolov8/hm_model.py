@@ -16,8 +16,7 @@ class YoloV5(Detector):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    # @staticmethod
-    # def build_options():
+    # def build_options(self):
     #     return {}
 
     def _postprocess(self, outputs, cv_image=None):

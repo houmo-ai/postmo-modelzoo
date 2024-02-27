@@ -15,12 +15,12 @@ class YoloV3(Detector):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._iou_threshold = 0.45
-        self._conf_threshold = 0.25
 
-    # @staticmethod
-    # def build_options():
-    #     return {}
+    @staticmethod
+    def build_options():
+        return {
+            "tcim.for_benchmark": True
+        }
 
     def _postprocess(self, outputs, cv_image=None):
         assert len(outputs) == 3
@@ -32,6 +32,8 @@ class YoloV3(Detector):
         return outputs.numpy()
 
     def demo(self, img_path):
+        self._iou_threshold = 0.45
+        self._conf_threshold = 0.1
         if not os.path.exists(img_path):
             print("[error] The img path not exist -> {}".format(img_path))
             exit(-1)

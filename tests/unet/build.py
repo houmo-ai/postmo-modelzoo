@@ -76,8 +76,8 @@ def compile(args=None):
         graph, lib, params = relay.build(
             mod, target, executor=executor, mod_name=model_name,
         )
-    tcim.store_so(model_name, lib, "output/H30/build", hdplcc_options=['-O2'], host_target="arm64")
-    print(model_name, ' saved as a aot model.')
+    tcim.store_so(model_name, lib, "output/H30/build", hdplcc_options=['-O2'])
+    print(model_name, 'saved as a aot model.')
 
     # compare with golden
     module = tcim.load_so(model_name)

@@ -26,15 +26,19 @@ if __name__ == '__main__':
     args = get_args()
     quant_model_dir = args.quant_model_dir
     model_type = args.model_type
+    raw_name = "efficientnet_b0_224x224.onnx"
+    quant_name = "hmquant_efficientnet_20240304.zip"
+
     if model_type == "raw" or model_type == "all":
-        if not os.path.exists("efficientnet_b0_224x224.onnx"):
-            url = os.path.join(os.environ.get("MODELZOO_URL"), "release/models/efficientnet/efficientnet_b0_224x224.onnx")
+        if not os.path.exists(raw_name):
+            url = os.path.join(os.environ.get("MODELZOO_URL"), "models/efficientnet", raw_name)
             os.system('wget ' + url)
 
-    # if model_type == "quant" or model_type == "all":
-    #     if not os.path.exists(os.path.join(quant_model_dir, "hmquant_efficientnet_with_act.onnx")):
-    #         if not os.path.exists("resnet50_golden_20231218.zip"):
-    #             url = os.path.join(os.environ.get("MODELZOO_URL"), "release/models/efficientnet/efficientnet_b0_224x224.onnx")
-    #             os.system('wget ' + url)
-    #         os.system('mkdir -p ' + quant_model_dir)
-    #         os.system('unzip -d ' + quant_model_dir + ' resnet50_golden_20231218.zip')
+    if model_type == "quant" or model_type == "all":
+        if not os.path.exists(os.path.join(quant_model_dir, "hmquant_efficientnet_with_act.onnx")):
+            if not os.path.exists(quant_name):
+                url = os.path.join(os.environ.get("MODELZOO_URL"), "models/efficientnet", quant_name)
+                os.system('wget ' + url)
+            os.system('mkdir -p ' + quant_model_dir)
+            os.system('unzip -d ' + quant_model_dir + ' ' + quant_name)
+

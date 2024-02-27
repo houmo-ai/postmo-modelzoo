@@ -8,16 +8,12 @@ import cv2
 
 class Efficientnet(Classifier):
 
-    @staticmethod
-    def build_options():
+    def build_options(self):
         return {
-            'tcim.fuse_strategy': 0,
-            'tcim.gen_intrinsic': 2,
-            'tcim.codegen_pic': False,
-            'tcim.sync_strategy': 1,
-            'tcim.core_num': 1,
-            'tcim.for_benchmark': True,
-            # 'tcim.multi_stream': 4,
+            "tcim.gen_intrinsic" : 2,
+            "tcim.sync_strategy": 1,
+            "tcim.codegen_pic": False,
+            "tcim.for_benchmark": True
         }
 
     def _preprocess(self, inputs):

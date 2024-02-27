@@ -50,7 +50,7 @@ perf: {
   end2end: ,
 }
 
-accuracy: {
+eval: {
   data_dir: ../../data/datasets/bdd100k/images/100k/val,
   test_num: 1,
   dataset_class: Dataset,

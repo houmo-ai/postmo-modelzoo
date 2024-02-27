@@ -9,6 +9,7 @@ import importlib
 import logging
 import time
 import torch
+import subprocess
 from hmassist.utils import logger
 from hmassist.utils.glog_format import GLogFormatter
 from hmassist.utils.parser import read_yaml_to_dict
@@ -18,7 +19,7 @@ from hmassist.utils.check import (
     check_config,
     check_test_config,
     check_demo_config,
-    check_accuracy_config,
+    check_eval_config,
     check_args,
     check_datapath
 )
@@ -73,27 +74,31 @@ def get_model(cfg):
             logger.error("hm_model.py has no class named {}, please check your config"
                          .format(model_impl_class))
             exit(-1)
+        del sys.modules["hm_model"]
     except Exception as e:
-        logger.warning("can not find hm_model.py, use default model will not support demo/perf/accuracy: {}"
+        logger.warning("can not find hm_model.py, use default model will not support demo/perf/eval: {}"
                        .format(e))
         model = BaseModel(
             executor=executor,
             dataset=None,
             # dtype=dtype,   # int8/fp32
             )
-    # del sys.modules["hm_model"]
-    # del sys.modules["hm_dataset"]
 
     return model
 
 
 def quantize(cfg):
+    if not check_config(cfg):
+        exit(-1)
     logger.info("{}".format(cfg))
     model = get_model(cfg)
     model.executor.quantize(model.get_input_datas)
+    del model
 
 
 def build(cfg):
+    if not check_config(cfg):
+        exit(-1)
     logger.info("{}".format(cfg))
     model = get_model(cfg)   
     model.executor.build(model.build_options())
@@ -109,6 +114,7 @@ def build(cfg):
     inputs = model.executor.get_golden_inputs()
     if inputs is not None:
         for input_name, input_data in inputs.items():
+            input_data = np.concatenate([input_data for i in range(model.executor.batch)], axis=0)
             input_data.tofile(os.path.join(save_dir, "{}_input.bin".format(input_name)))
         model.executor.set_fixed_out(True)
         outputs = model.executor.infer(inputs)
@@ -121,6 +127,7 @@ def build(cfg):
         save_data(output_data, save_dir, output_name)
         logger.info("tcim outputs saved in {}".format(save_dir))
         golden_output = model.executor.get_golden_output(output_name)
+        golden_output = np.concatenate([golden_output for i in range(model.executor.batch)], axis=0)
         is_match = (output_data == golden_output).all()
         cosine_dist = cosine_distance(output_data, golden_output)
         sum_cos += cosine_dist
@@ -128,6 +135,7 @@ def build(cfg):
                     .format(model.target, output_name, is_match, cosine_dist))
     logger.info("[compare] {} vs quant output average similarity={:.6f}".format(model.target, sum_cos/len(outputs)))
     logger.info("build completed")
+    del model
 
 
 def test(cfg):
@@ -185,6 +193,7 @@ def test(cfg):
                         .format(model.target, model.framework, output_name, is_match, cosine_dist))
         logger.info("[compare] {} vs {} output average similarity={:.6f}".format(model.target, model.framework, sum_cos/len(outputs)))
     logger.info("test completed")
+    del model
 
 
 def demo(cfg):
@@ -217,26 +226,30 @@ def demo(cfg):
     logger.info("[infer] average cost {:.3f}ms".format(model.ave_latency_ms))
     logger.info("[end2end] average cost: {:.3f}ms".format(model.end2end_latency_ms))
     logger.info("demo completed")
+    del model
 
 
 def perf(cfg):
+    if not check_config(cfg):
+        exit(-1)
     logger.info("{}".format(cfg))
     model = get_model(cfg)
     test_num = cfg["perf"]["test_num"]
     model.executor.perf(test_num)
-    logger.info("perf completed")
+    logger.info("perf test completed")
+    del model
 
 
-def accuracy(cfg):
+def eval(cfg):
     # logging.getLogger("").setLevel(logging.WARNING)
-    if not check_accuracy_config(cfg):
+    if not check_eval_config(cfg):
         exit(-1)
     model = get_model(cfg)
 
-    dataset_class = cfg["accuracy"].get("dataset_class", None)
-    if not check_datapath(cfg["accuracy"], "data_dir"):
+    dataset_class = cfg["eval"].get("dataset_class", None)
+    if not check_datapath(cfg["eval"], "data_dir"):
         return -1
-    data_dir = cfg["accuracy"].get("data_dir")
+    data_dir = cfg["eval"].get("data_dir")
     try:
         m = importlib.import_module("hm_dataset")
         if hasattr(m, dataset_class):
@@ -246,12 +259,13 @@ def accuracy(cfg):
             logger.error("hm_dataset.py has no class named {}, please check your config"
                          .format(dataset_class))
             exit(-1)
+        del sys.modules["hm_dataset"]
     except Exception as e:
-        logger.error("can not find hm_dataset.py, use default model will not support accuracy: {}"
+        logger.error("can not find hm_dataset.py, use default model will not support eval: {}"
                        .format(e))
-        exit(-1)
+        return -1
 
-    model.test_num = cfg["accuracy"]["test_num"]
+    model.test_num = cfg["eval"]["test_num"]
     if os.environ.get("HDPL_PLATFORM") == "ISIM":
         if model.test_num > 20 or model.test_num == 0:
             model.test_num = 20
@@ -263,7 +277,11 @@ def accuracy(cfg):
     logger.info("[infer] average cost {:.6f}ms".format(model.ave_latency_ms))
     logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
     logger.info("{}".format(res))
-    logger.info("accuracy test completed")
+    logger.info("eval test completed")
+
+    with open('hmresult.txt', 'w') as file:
+        file.write("{}\n".format(res))
+    del model
     return res
 
 
@@ -274,12 +292,9 @@ def run(args):
     sys.path.insert(0, config_dir)  # 自定义模块环境变量
 
     config = read_yaml_to_dict(config_abspath)
-    if not check_config(config, args.type):
-        exit(-1)
     config["target"] = args.target
-    config['model']['batch'] = args.batch
+    config['batch'] = args.batch
 
-    res = dict()
     if args.type == "quant":
         quantize(config)
     elif args.type == "build":
@@ -290,73 +305,109 @@ def run(args):
         demo(config)
     elif args.type == "perf":
         perf(config)
-    elif args.type == "accuracy":
-        res = accuracy(config)
+    elif args.type == "eval":
+        eval(config)
+    elif args.type == "benchmark":
+        benchmark(config)
     else:
         logger.error("Not support operation -> {}".format(args.type))
 
     sys.path.remove(config_dir)
-    return res
 
 
-def benchmark(mapping_file, dtype, target, backend):
+def benchmark(config):
     import csv
     from prettytable import PrettyTable
 
-    header = ["ModelName", "InputSize", "Dataset", "Num", "Acc./mAP.", "Latency(ms)"]
+    header = ["ModelName", "Shape", "Dataset", "Batch", "CoreNum",  "Accuracy(onnx)",
+              "Accuracy({})".format(config['target']), "AccRelError", "Latency(ms)", "Qps"]
     table = PrettyTable(header)
-    csv_filepath = "benchmark_{}_{}_{}.csv".format(backend, dtype, target)
-    f = open(csv_filepath, "w")
+    t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+    if not os.path.exists("reports"):
+        os.mkdir("reports")
+    report_file = "reports/benchmark_{}.csv".format(t)
+    f = open(report_file, "w")
     f_csv = csv.writer(f)
     f_csv.writerow(header)
 
-    check_file_exist(mapping_file)
-    models_dict = read_yaml_to_dict(mapping_file)["models"]
     root = os.getcwd()
-    for model_name in models_dict:
-        logger.info("Process {}".format(model_name))
-        config_filepath = models_dict[model_name]
-        config_abspath = os.path.abspath(config_filepath)
-        config_dir = os.path.dirname(config_abspath)
+    logger.info(config["models"])
+    for model_name in config["models"]:
+        core_num = 1
+        perf_result = {}
+        eval_result = {}
+        onnx_result = {}
+        os.chdir(config["models"][model_name]["location"])
+        os.system("python3 get_model.py")
+        if "quant" not in config["models"][model_name] or config["models"][model_name]["quant"]:
+            os.system("hmquant.sh")
+        os.system("hmbuild.sh")
+        os.system("hmperf.sh")
+        perf_result = read_yaml_to_dict("hmresult.txt")
+        if "eval" not in config["models"][model_name] or config["models"][model_name]["eval"]:
+            status = os.system("hmeval.sh")
+            logger.info("status={}".format(status))
+            if status != -1:
+                eval_result = read_yaml_to_dict("hmresult.txt")
+        if "onnx" not in config["models"][model_name] or config["models"][model_name]["onnx"]:
+            if os.system("hmeval.sh --target onnx") != -1:
+                onnx_result = read_yaml_to_dict("hmresult.txt")
 
-        os.chdir(config_dir)  # 切换至模型目录
-        res = run(config_abspath, "accuracy", dtype, target, backend)
-        # logger.info("{}".format(res))
-        os.chdir(root)  # 切换根目录
+        shapes = perf_result["shape"]
+        acc_result_onnx = ""
+        acc_result_hdpl = ""
+        acc_result_err = ""
+        dataset = ""
+        if "eval" in onnx_result:
+            last = list(onnx_result["eval"])[-1]
+            for acc in onnx_result["eval"]:
+                acc_result_onnx += "{}: {:.3f}".format(acc, onnx_result["eval"][acc])
+                if acc != last:
+                    acc_result_onnx += "\n"
+        else:
+            acc_result_onnx = "NotTest"
+        if "dataset" in onnx_result:  
+            dataset = onnx_result["dataset"]
+        else:
+            dataset = "NotTest"
+        if "eval" in eval_result: 
+            for acc in eval_result["eval"]:
+                acc_result_hdpl += "{}: {:.3f}".format(acc, eval_result["eval"][acc])
+                if acc != last:
+                    acc_result_hdpl += "\n"
+                if onnx_result["eval"][acc] != 0:
+                    acc_err = eval_result["eval"][acc] / onnx_result["eval"][acc] - 1
+                    acc_result_err += "{}: {:.3f}".format(acc, acc_err)
+                if acc != last:
+                    acc_result_err += "\n"
+        else:
+            acc_result_hdpl = "NotTest"
+            acc_result_err = "NotTest"
 
-        row = list()
-        if "top1" in res:
-            row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}".format(res["top1"], res["top5"]), res["latency"]]
-        elif "map" in res:
-            row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}".format(res["map"], res["map50"]), res["latency"]]
-        elif "easy" in res:
-            row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}/{}".format(res["easy"], res["medium"], res["hard"]), res["latency"]]
+        row = [model_name, shapes, dataset, config['batch'], core_num,
+               acc_result_onnx, acc_result_hdpl, acc_result_err,
+               "{:.3f}".format(perf_result["latency"]),
+               "{:.2f}".format(perf_result["qps"])]
         table.add_row(row)
         f_csv.writerow(row)
-        logger.info("Finish {}".format(model_name))
+        logger.info("<=== Benchmark {} completed".format(model_name))
+        os.chdir(root)
     f.close()
     logger.info("\n{}".format(table))
-
-    # hmexec.model_analysis()
-    # hmexec.compress_analysis()
-    # hmexec.get_profile_info()
-    # hmexec.get_relay_mac()  # print mac/flops/cycles info
-    # hmexec.get_device_type()  # print op backend info
 
     # print span
     # header = ["Phase", "Span/s"]
     # table = PrettyTable(header)
     # table.add_row(["ptq", "{:.3f}".format(hmexec.quantize_span)])
     # table.add_row(["build", "{:.3f}".format(hmexec.build_span)])
-    # table.add_row(["infer", "{:.3f}".format(hmexec.iss_simu_span)])
     # logger.info("\n{}".format(table))
-    logger.info("success")
+    logger.info("benchmark completed")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HmAssist Tool")
     parser.add_argument("type", type=str,
-                        choices=("quant", "build", "test", "demo", "perf", "accuracy"),
+                        choices=("quant", "build", "test", "demo", "perf", "eval", "benchmark"),
                         help="Specify an operation")
     parser.add_argument("--target", type=str, required=True,
                         choices=("H30", "onnx"),
@@ -372,8 +423,8 @@ if __name__ == "__main__":
     #                     help="Specify the test number in demo, default is the config in the config file")
     # parser.add_argument("--perf.test_num", type=int, default=-1,
     #                     help="Specify the test number in perf, default is the config in the config file")
-    # parser.add_argument("--accuracy.test_num", type=int, default=-1,
-    #                     help="Specify the test number in accuracy, default is the config in the config file")
+    # parser.add_argument("--eval.test_num", type=int, default=-1,
+    #                     help="Specify the test number in eval, default is the config in the config file")
 
     args = parser.parse_args()
     print(args)

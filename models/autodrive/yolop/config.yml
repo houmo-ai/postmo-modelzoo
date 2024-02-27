@@ -2,7 +2,7 @@ model: {
   framework: onnx,
   name: yolop,
   save_dir: ./output,
-  weight: ./yolop.onnx,
+  weight: ./yolop_384x640.onnx,
   inputs: [
     {
       name: images,
@@ -53,7 +53,7 @@ perf: {
   end2end: ,
 }
 
-accuracy: {
+eval: {
   data_dir: bdd100k/images/100k/val,
   test_num: 0,
   dataset_class: Dataset,

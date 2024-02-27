@@ -31,8 +31,7 @@ class YoloV5(Detector):
     #     print(img.shape, img.dtype)
     #     return img.unsqueeze(0)
 
-    # @staticmethod
-    # def build_options():
+    # def build_options(self):
     #     return {}
 
     def _postprocess(self, outputs, cv_image=None):

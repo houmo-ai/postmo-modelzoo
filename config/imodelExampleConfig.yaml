@@ -29,9 +29,13 @@ backbone_efficientnet:
     - backbone_efficientnet_perf:
         script: models/backbone/efficientnet/perf.sh
         args: null
+    - backbone_efficientnet_test:
+        script: models/backbone/efficientnet/test.sh
+        args: null
   test:
     - backbone_efficientnet_eval
     - backbone_efficientnet_perf
+    - backbone_efficientnet_test
 backbone_mobilenetv2:
   include:
     - models/backbone/mobilenetv2
@@ -44,9 +48,13 @@ backbone_mobilenetv2:
     - backbone_mobilenetv2_perf:
         script: models/backbone/mobilenetv2/perf.sh
         args: null
+    - backbone_mobilenetv2_test:
+        script: models/backbone/mobilenetv2/test.sh
+        args: null
   test:
     - backbone_mobilenetv2_eval
     - backbone_mobilenetv2_perf
+    - backbone_mobilenetv2_test
 backbone_vit:
   include:
     - models/backbone/vit
@@ -110,9 +118,13 @@ detection_yolov5s:
     - detection_yolov5s_perf:
         script: models/detection/yolov5s/perf.sh
         args: null
+    - detection_yolov5s_test:
+        script: models/detection/yolov5s/test.sh
+        args: null
   test:
     - detection_yolov5s_eval
     - detection_yolov5s_perf
+    - detection_yolov5s_test
 utils:
   include:
     - utils

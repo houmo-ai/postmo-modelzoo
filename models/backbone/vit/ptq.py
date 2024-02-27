@@ -47,7 +47,7 @@ def calibrate(args=None):
 
     calib_num = 20
     calib_files = []
-    calib_dir = os.path.join(env_dict.get('DATASETS_PATH'), 'imagenet')
+    calib_dir = os.path.join(env_dict.get('DATASETS_PATH'), 'imagenet/ILSVRC2012_img_val')
     file_list = os.listdir(calib_dir)
     for filename in file_list:
         _, ext = os.path.splitext(filename)
