@@ -27,7 +27,7 @@ def get_args() -> argparse.Namespace:
         '--model_name',
         dest='model_name',
         type=str,
-        default='petr_part2',
+        default='detr3d_part2',
         help='output houmo model name',
     )
     parser.add_argument(
@@ -74,6 +74,9 @@ def build(args):
             shape_dict[input.name] = input_shape
             # layout_dict[input.name] = 'NHWC'
 
+        shape_dict['weight'] = [6, 256, 4, 900]
+        shape_dict['mask'] = [6, 4, 1, 900]
+
         mod = relay.frontend.from_hmonnx(
             onnx_model, shape_dict, layout=layout_dict,
             resizer_attr=None, convert_config=convert_config,
@@ -81,17 +84,15 @@ def build(args):
         executor = Executor('aot')
         compile_config = {
             "tcim.fuse_strategy": 4,
-            "tcim.special_model_name": "petr_part2",
+            "tcim.gen_intrinsic": 0,
+            "tcim.sync_strategy": 1,
+            "tcim.special_model_name" : "detr",
             "tcim.for_benchmark": True,
-            "tcim.sync_strategy" : 1,
             "tcim.mem_plan_strategy": "linearscan",
-            "tcim.opt_layout": 0xffff,
-            "tcim.codegen_pic": True,
-            "tcim.linearscan_strategy": 1
+            "tcim.opt_layout": 0xffff
         }
         if batch > 1:
             compile_config["tcim.spec_batch_num"] = batch
-        #     compile_config["tcim.multi_stream"] = batch
         print(compile_config)
         target = tvm.target.Target('hdpl', host='c')
         with tvm.transform.PassContext(opt_level=3, config=compile_config):

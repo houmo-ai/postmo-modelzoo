@@ -84,11 +84,13 @@ def build(args):
             "tcim.sync_strategy": 1,
             "tcim.mem_plan_strategy": "linearscan",
             "tcim.for_benchmark": True,
-            "tcim.spec_batch_num": batch,
             "tcim.codegen_pic": True,
             "tcim.use_convaddrelu": True,
-            "tcim.special_model_name": "petr_part2"
+            "tcim.special_model_name": "petr_part2",
+            "tcim.linearscan_strategy": 1
         }
+        if batch > 1:
+            compile_config["tcim.spec_batch_num"] = batch
         target = tvm.target.Target('hdpl', host='c')
         with tvm.transform.PassContext(opt_level=3, config=compile_config):
             graph, lib, params = relay.build(

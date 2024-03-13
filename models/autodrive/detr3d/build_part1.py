@@ -27,7 +27,7 @@ def get_args() -> argparse.Namespace:
         '--model_name',
         dest='model_name',
         type=str,
-        default='petr_part2',
+        default='detr3d_part1',
         help='output houmo model name',
     )
     parser.add_argument(
@@ -52,19 +52,17 @@ def build(args):
     # build model
     image_format = "ND"
     model_name = args.model_name
-    batch = args.batch
+    batch = args.batch * 6
     stage = args.stage
     model_dir = args.model_dir
     quant_name = "hmquant_" + model_name + "_with_act"
     onnx_name = quant_name + ".onnx"
     shape_dict = {}
     layout_dict = None
-    convert_config = None
-    # convert_config['layout'] = 'NHWC'
+    convert_config = {'layout': 'NHWC'}
 
     onnx_model = onnx.load(os.path.join(model_dir, onnx_name))
     inputs = onnx_model.graph.input
-
     if stage == 'build' or stage == 'all':
         for input in inputs:
             dims = input.type.tensor_type.shape.dim
@@ -72,7 +70,6 @@ def build(args):
             print('input name:', input.name)
             print('input shape:', input_shape)
             shape_dict[input.name] = input_shape
-            # layout_dict[input.name] = 'NHWC'
 
         mod = relay.frontend.from_hmonnx(
             onnx_model, shape_dict, layout=layout_dict,
@@ -81,24 +78,20 @@ def build(args):
         executor = Executor('aot')
         compile_config = {
             "tcim.fuse_strategy": 4,
-            "tcim.special_model_name": "petr_part2",
-            "tcim.for_benchmark": True,
-            "tcim.sync_strategy" : 1,
+            "tcim.sync_strategy": 1,
             "tcim.mem_plan_strategy": "linearscan",
-            "tcim.opt_layout": 0xffff,
+            "tcim.for_benchmark": True,
             "tcim.codegen_pic": True,
-            "tcim.linearscan_strategy": 1
+            "tcim.use_convaddrelu": True
         }
         if batch > 1:
             compile_config["tcim.spec_batch_num"] = batch
-        #     compile_config["tcim.multi_stream"] = batch
-        print(compile_config)
         target = tvm.target.Target('hdpl', host='c')
         with tvm.transform.PassContext(opt_level=3, config=compile_config):
             graph, lib, params = relay.build(
                 mod, target, executor=executor, mod_name=model_name,
             )
-        tcim.store_so(model_name, lib)
+        tcim.store_so(model_name, lib, hdplcc_options=["-O2"])
         print(model_name, 'saved as a aot model.')
 
     # compare with golden
@@ -108,7 +101,6 @@ def build(args):
             input_file_name = 'hmquant_' + model_name + '_' + input.name + '_input.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype("int8")
-            # input_data = np.transpose(input_data, (0, 2, 3, 1))
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
             logger.info("input[{}] shape = {}, dtype = {}".format(input.name, input_data.shape, input_data.dtype))
             module.set_input(input.name, input_data, image_format)
@@ -120,6 +112,8 @@ def build(args):
             output_name = module.get_output_name_by_index(id)
             output_data = module.get_output_by_name(output_name).numpy()
             logger.info("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
+            if len(output_data.shape) == 4:
+                output_data = np.transpose(output_data, (0, 3, 1, 2))
             output_data_path = os.path.join(model_dir, quant_name, output_name + '.npy')
             if os.path.exists(output_data_path):
                 golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")

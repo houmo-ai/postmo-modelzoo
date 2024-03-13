@@ -3,18 +3,21 @@
 import numpy as np
 from .utils import logger
 
-def cosine_distance(data1, data2):
+def cosine_distance(data1, data2, check_shape=True):
     """余弦距离
     :param data1:
     :param data2:
     :return:
     """
-    if data1.shape != data2.shape:
-        logger.error("shape not equal {} vs {}".format(data1.shape, data2.shape))
-        return -1
+    if check_shape:
+        if data1.shape != data2.shape:
+            logger.error("shape not equal {} vs {}".format(data1.shape, data2.shape))
+            return -1
     v1_d = data1.flatten().astype("float64")
     v2_d = data2.flatten().astype("float64")
-    assert len(v1_d) == len(v2_d), "v1 dim must be == v2 dim"
+    if len(v1_d) != len(v2_d):
+        logger.error("v1 dim {} != v2 dim {}".format(len(v1_d), len(v2_d)))
+        return -1
     v1_d[v1_d == np.inf] = np.finfo(np.float16).max
     v2_d[v2_d == np.inf] = np.finfo(np.float16).max
     v1_d[v1_d == -np.inf] = np.finfo(np.float16).min

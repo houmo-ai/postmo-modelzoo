@@ -87,6 +87,28 @@ autodrive_yolop:
         args: null
   test:
     - autodrive_yolop_perf
+autodrive_petr:
+  include:
+    - models/autodrive/petr
+  exclude:
+    - models/autodrive/petr/README.MD
+  example_case:
+    - autodrive_petr_perf:
+        script: models/autodrive/petr/perf.sh
+        args: null
+  test:
+    - autodrive_petr_perf
+autodrive_detr3d:
+  include:
+    - models/autodrive/detr3d
+  exclude:
+    - models/autodrive/detr3d/README.MD
+  example_case:
+    - autodrive_detr3d_perf:
+        script: models/autodrive/detr3d/perf.sh
+        args: null
+  test:
+    - autodrive_detr3d_perf
 detection_yolov3:
   include:
     - models/detection/yolov3
@@ -134,3 +156,14 @@ utils:
     - backbone_resnet50_perf
     - autodrive_yolop_perf
     - detection_yolov5s_perf
+hmassist:
+  include:
+    - hmassist
+  exclude:
+    - hmassist/README.MD
+  example_case: null
+  test:
+    - backbone_resnet50_perf
+    - backbone_resnet50_eval
+    - detection_yolov5s_perf
+    - detection_yolov5s_eval
