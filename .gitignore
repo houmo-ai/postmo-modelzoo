@@ -21,7 +21,6 @@ reports/
 *.log
 *.hir
 *.dot
-*.txt
 *.bin
 
 # Compressed files

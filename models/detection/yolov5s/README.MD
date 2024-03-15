@@ -2,74 +2,21 @@
 
 本示例展示如何把量化后的YOLOv5s模型编译，部署到鸿途H30芯片的设备上。
 
-## 目录
-
-- [模型说明](#1模型说明)
-- [前置条件](#2前置条件)
-- [快速开始](#3快速开始)
-  - [环境准备](#31-环境准备)
-  - [准备数据集和模型](#32-准备数据集和模型)
-  - [裁剪并编译模型](#33-裁剪并编译模型)
-  - [执行推理](#34-执行推理)
-  - [一键运行](#35-一键运行)
-  - [性能评测](#36-性能评测)
-- [免责声明](#4免责声明)
+[TOC]
 
 ## 1.模型说明
 
 本例使用的 YOLOv5s 实现来源 github 开源项目[https://github.com/ultralytics/yolov3](https://github.com/ultralytics/yolov5)的v9.0 tag。模型代码导出后，再去除掉yolo相关的节点，细节见量化工具文档。
 
-## 2.前置条件
+## 2.快速开始
 
-环境中完成工具链基础包，TCIM包部署以及量化工具包的部署
+请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
 
-## 3.快速开始
+## 3.参考结果
 
-### 3.1 环境准备
-
-在开始运行代码前需要先检查 `env.sh` 里的环境变量，根据数据集实际路径修改 `env.sh` 内的 `DATASETS_PATH`, 并且执行以下命令：
-
+### 3.1精度结果
 ```bash
-source env.sh
-```
-
-设置完成后进入模型目录：
-
-```bash
-cd cv/yolov3/
-```
-
-### 3.2 准备数据集和模型
-
-1. 准备coco验证集放到data/datasets/coco2017目录下，仓库中已有少量数据供简单验证，如果需要测试真实精度需要自行下载完整数据集
-
-2. 下载原始模型，如已有模型可跳过此步
-
-```bash
-cd prepare_model
-bash run.sh
-```
-
-### 3.3 量化，裁剪并编译模型
-
-```bash
-cd compile_model
-bash run.sh --batch 1
-```
-
-### 3.4 执行推理
-
-```bash
-cd inference_model
-bash run.sh
-```
-
-结果：
-
-```bash
-16:42:38.726537 hmassist.py:270 [INFO] {'input_size': '1x3x640x640', 'dataset': 'coco2017', 'num': 5000, 'map': '0.330505', 'map50': '0.539248', 'latency': '16.531443'}
-16:42:38.726550 hmassist.py:271 [INFO] accuracy test completed
-...
+ hmassist.py:270 [INFO] {'input_size': '1x3x640x640', 'dataset': 'coco2017', 'num': 5000, 'map': '0.330505', 'map50': '0.539248', 'latency': '16.531443'}
  Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.331
  Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.539
  Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.357
@@ -84,17 +31,7 @@ bash run.sh
  Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.611
 ```
 
-### 3.5 一键运行
-
-以上 3.2~3.4 的步骤也可以通过运行cd cv/yolov3/ && bash eval.sh 来实现一键执行
-
-### 3.6 性能评测
-
-```bash
-bash perf.sh
-```
-
-结果：
+### 3.2性能结果
 
 ```bash
 Input data: (4, 640, 640, 3), int8

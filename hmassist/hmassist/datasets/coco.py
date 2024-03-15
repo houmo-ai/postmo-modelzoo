@@ -47,10 +47,8 @@ class COCO2017Val(BaseDataset):
                 if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
                     self._img_files.append(os.path.join(self._root_path, basename))
                     self._image_ids.append(int(filename))
-        
-        self._total_num = len(self._img_files)
-        if (self._total_num < 5000):
-            logger.warning("test number is less than 5000, using incomplete validation sets may result in inaccurate results.")
+
+        self._total_num = len(self._image_ids)
 
     @property
     def annotations_file(self):

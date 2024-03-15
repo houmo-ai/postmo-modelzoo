@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+TEST_MODEL=$MODELZOO_PATH/models/backbone/resnet50/tcim_resnet50
+TEST_DATA=$MODELZOO_PATH/data/imagenet/ILSVRC2012_img_val
+TEST_SAMPLES=1
+TEST_LOOPS=1
+TEST_WARMUP=1
+TEST_BATCH=1
+TEST_THREAD=1
+
+./tcim_perf -m $TEST_MODEL -d $TEST_DATA -s $TEST_SAMPLES -l $TEST_LOOPS -w $TEST_WARMUP -b $TEST_BATCH -t $TEST_THREAD

@@ -117,7 +117,10 @@ def build(cfg):
             input_data = np.concatenate([input_data for i in range(model.executor.batch)], axis=0)
             input_data.tofile(os.path.join(save_dir, "{}_input.bin".format(input_name)))
         model.executor.set_fixed_out(True)
+        start = time.time()
         outputs = model.executor.infer(inputs)
+        cost = time.time() - start
+        logger.info("[infer] cost {:.3f}ms".format(cost * 1000))
         # 临时添加NCHW
         # output_data = np.transpose(output_data, (0, 2, 3, 1))
     sum_cos = 0.0
@@ -159,7 +162,10 @@ def test(cfg):
             inputs[name] = get_random_data(name, dtype, model.input_shape)
     inputs = model.executor._preprocess(inputs)
     model.executor.set_fixed_out(False)
+    start = time.time()
     outputs = model.executor.infer(inputs)
+    cost = time.time() - start
+    logger.info("[infer] cost {:.3f}ms".format(cost * 1000))
 
     # save datas
     save_dir = os.path.join(model.executor.result_dir, "test")
@@ -274,12 +280,12 @@ def eval(cfg):
     model.load()
 
     res = model.evaluate()
-    logger.info("[infer] average cost {:.6f}ms".format(model.ave_latency_ms))
-    logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
+    logger.info("[infer] average cost {:.3f}ms".format(model.ave_latency_ms))
+    logger.info("[end2end] average cost: {:.3f}ms".format(model.end2end_latency_ms))
     logger.info("{}".format(res))
     logger.info("eval test completed")
 
-    with open('hmresult.txt', 'w') as file:
+    with open('output/hmeval.txt', 'w') as file:
         file.write("{}\n".format(res))
     del model
     return res
@@ -294,6 +300,8 @@ def run(args):
     config = read_yaml_to_dict(config_abspath)
     config["target"] = args.target
     config['batch'] = args.batch
+    config['thread_num'] = args.thread_num
+    config['core_num'] = args.core_num
 
     if args.type == "quant":
         quantize(config)
@@ -320,48 +328,80 @@ def benchmark(config):
     from prettytable import PrettyTable
 
     header = ["ModelName", "Shape", "Dataset", "Batch", "CoreNum",  "Accuracy(onnx)",
-              "Accuracy({})".format(config['target']), "AccRelError", "Latency(ms)", "Qps"]
+              "Accuracy({})".format(config['target']), "AccRelError", "Latency(ms)", "Throughput(qps)"]
     table = PrettyTable(header)
     t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
     if not os.path.exists("reports"):
         os.mkdir("reports")
-    report_file = "reports/benchmark_{}.csv".format(t)
-    f = open(report_file, "w")
-    f_csv = csv.writer(f)
-    f_csv.writerow(header)
+    report_file = os.path.abspath("reports/benchmark_{}.csv".format(t))
+    with open(report_file, "w") as f:
+        f_csv = csv.writer(f)
+        f_csv.writerow(header)
 
     root = os.getcwd()
     logger.info(config["models"])
     for model_name in config["models"]:
+        batch = 1
         core_num = 1
+        thread_num = 1
+        if "batch" in config["models"][model_name]:
+            batch = config["models"][model_name]["batch"]
+        if "core_num" in config["models"][model_name]:
+            core_num = config["models"][model_name]["core_num"]
+        if "thread_num" in config["models"][model_name]:
+            thread_num = config["models"][model_name]["thread_num"]
         perf_result = {}
         eval_result = {}
         onnx_result = {}
         os.chdir(config["models"][model_name]["location"])
+        # get model
         os.system("python3 get_model.py")
+        # quant
         if "quant" not in config["models"][model_name] or config["models"][model_name]["quant"]:
             os.system("hmquant.sh")
-        os.system("hmbuild.sh")
-        os.system("hmperf.sh")
-        perf_result = read_yaml_to_dict("hmresult.txt")
+        # build
+        os.system("hmbuild.sh --core_num {} --batch {}".format(core_num, batch))
+        # perf
+        if os.path.exists("output/hmperf.txt"):
+            os.remove("output/mperf.txt")
+        os.system("hmperf.sh --thread_num {}".format(thread_num))
+        if os.path.exists("output/hmperf.txt"):
+            perf_result = read_yaml_to_dict("output/hmperf.txt")
+        # eval
         if "eval" not in config["models"][model_name] or config["models"][model_name]["eval"]:
-            status = os.system("hmeval.sh")
-            logger.info("status={}".format(status))
-            if status != -1:
-                eval_result = read_yaml_to_dict("hmresult.txt")
+            if os.path.exists("output/hmeval.txt"):
+                os.remove("output/hmeval.txt")
+            os.system("hmeval.sh")
+            if os.path.exists("output/hmeval.txt"):
+                eval_result = read_yaml_to_dict("output/hmeval.txt")
         if "onnx" not in config["models"][model_name] or config["models"][model_name]["onnx"]:
-            if os.system("hmeval.sh --target onnx") != -1:
-                onnx_result = read_yaml_to_dict("hmresult.txt")
+            if os.path.exists("output/hmeval.txt"):
+                os.remove("output/hmeval.txt")
+            os.system("hmeval.sh --target onnx")
+            if os.path.exists("output/hmeval.txt"):
+                onnx_result = read_yaml_to_dict("output/hmeval.txt")
 
-        shapes = perf_result["shape"]
+        if "shape" in perf_result:
+            shapes = perf_result["shape"]
+        else:
+            shapes = "NotTest"
+        if "avg_latency" in perf_result:
+            avg_latency = perf_result["avg_latency"]
+        else:
+            avg_latency = "NotTest"
+        if "qps" in perf_result:
+            throughput = perf_result["qps"]
+        else:
+            throughput = "NotTest"
+        
         acc_result_onnx = ""
         acc_result_hdpl = ""
         acc_result_err = ""
         dataset = ""
-        if "eval" in onnx_result:
-            last = list(onnx_result["eval"])[-1]
-            for acc in onnx_result["eval"]:
-                acc_result_onnx += "{}: {:.3f}".format(acc, onnx_result["eval"][acc])
+        if "accuracy" in onnx_result:
+            last = list(onnx_result["accuracy"])[-1]
+            for acc in onnx_result["accuracy"]:
+                acc_result_onnx += "{}: {:.3f}".format(acc, onnx_result["accuracy"][acc])
                 if acc != last:
                     acc_result_onnx += "\n"
         else:
@@ -370,13 +410,13 @@ def benchmark(config):
             dataset = onnx_result["dataset"]
         else:
             dataset = "NotTest"
-        if "eval" in eval_result: 
-            for acc in eval_result["eval"]:
-                acc_result_hdpl += "{}: {:.3f}".format(acc, eval_result["eval"][acc])
+        if "accuracy" in eval_result: 
+            for acc in eval_result["accuracy"]:
+                acc_result_hdpl += "{}: {:.3f}".format(acc, eval_result["accuracy"][acc])
                 if acc != last:
                     acc_result_hdpl += "\n"
-                if onnx_result["eval"][acc] != 0:
-                    acc_err = eval_result["eval"][acc] / onnx_result["eval"][acc] - 1
+                if onnx_result["accuracy"][acc] != 0:
+                    acc_err = eval_result["accuracy"][acc] / onnx_result["accuracy"][acc] - 1
                     acc_result_err += "{}: {:.3f}".format(acc, acc_err)
                 if acc != last:
                     acc_result_err += "\n"
@@ -384,15 +424,16 @@ def benchmark(config):
             acc_result_hdpl = "NotTest"
             acc_result_err = "NotTest"
 
-        row = [model_name, shapes, dataset, config['batch'], core_num,
+        row = [model_name, shapes, dataset, batch, core_num,
                acc_result_onnx, acc_result_hdpl, acc_result_err,
-               "{:.3f}".format(perf_result["latency"]),
-               "{:.2f}".format(perf_result["qps"])]
+               "{:.3f}".format(avg_latency),
+               "{:.2f}".format(throughput)]
         table.add_row(row)
-        f_csv.writerow(row)
+        with open(report_file, "a") as f:
+            f_csv = csv.writer(f)
+            f_csv.writerow(row)
         logger.info("<=== Benchmark {} completed".format(model_name))
         os.chdir(root)
-    f.close()
     logger.info("\n{}".format(table))
 
     # print span
@@ -415,7 +456,11 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="config.yml",
                         help="Specify a config file, default is config.yml")
     parser.add_argument("--batch", type=int, default=1,
-                        help="Specify batch size, default is 1")
+                        help="Specify batch size in build, default is 1")
+    parser.add_argument("--core_num", type=int, default=1,
+                        help="Specify core number in build, default is 1")
+    parser.add_argument("--thread_num", type=int, default=1,
+                        help="Specify thread number in perf, default is 1")
     # parser.add_argument("--dtype", type=str, default="int8",
     #                     choices=("int8", "fp32"),
     #                     help="Please specify one of them, default is int8")

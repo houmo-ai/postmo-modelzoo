@@ -189,8 +189,8 @@ class H30Exec(BaseExec, ABC):
                     mod, target, executor=executor, mod_name=self.model_name,
                 )
 
-            if os.getenv("TCIM_CROSS_COMPILE") == 1:
-                logger.info("cross compile enabled as aarch64")
+            if os.getenv("TCIM_CROSS_COMPILE") == '1':
+                logger.info("cross compile enabled as aarch64 while TCIM_CROSS_COMPILE=1")
                 model_name = self.model_name + "_aarch64"
                 tcim.store_so(model_name, lib, self.result_dir + "/../build", hdplcc_options=['-O2'], host_target="arm64")
             else:
@@ -257,15 +257,15 @@ class H30Exec(BaseExec, ABC):
         modelzoo_path = os.getenv('MODELZOO_PATH')
         if self.build_mode == "AOT":
             model_path = os.path.join(self.cur_dir, "tcim_" + self.model_name)
-            exec = "aottcimexec"
+            exec = "tcim_perf"
         else:
             model_path = os.path.join(self.cur_dir, self.model_name)
             exec = "tcimexec"
         if os.environ.get("HDPL_PLATFORM") == "ISIM":
             test_num = 1
             logger.warning("test num set to 1 because HDPL_PLATFORM=ISIM may take a lot of time.")
-        cmd = "cd {}/utils/{} && ./tcimexec --model {} --iterations {} --output {}".format(
-            modelzoo_path, exec, model_path, test_num, os.path.join(self.cur_dir, "hmresult.txt"))
+        cmd = "cd {}/utils/{} && ./{} --model {} --loops {} --threads {} --output {}".format(
+            modelzoo_path, exec, exec, model_path, test_num, self.perf_cfg["thread_num"], os.path.join(self.cur_dir, "output/hmperf.txt"))
         logger.info(cmd)
         os.system(cmd)
 

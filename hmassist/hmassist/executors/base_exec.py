@@ -20,6 +20,10 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.perf_cfg = cfg["perf"]
         self.acc_cfg = cfg["eval"]
         self.batch = cfg["batch"]
+        if "thread_num" in cfg:
+            self.perf_cfg["thread_num"] = cfg["thread_num"]
+        else:
+            self.perf_cfg["thread_num"] = 1
         # model params
         self.target = cfg["target"]
         self.framework = self.model["framework"]
@@ -50,9 +54,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
         self.quantize_span = 0
         self.build_span = 0
-        self.iss_simu_span = 0
         self.layer_compare_span = 0
-        self.iss_layerwise_dump_span = 0
         self.is_fixed_out = False
 
     def quantize(self):

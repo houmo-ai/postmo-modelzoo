@@ -22,7 +22,7 @@
 #include <thread>
 #include "hdpl/hdpl_runtime.h"
 
-#define SAVE_DATA 1
+#define SAVE_DATA 0
 
 struct CliArguments {
   std::string model_path;

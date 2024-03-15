@@ -17,7 +17,7 @@ export HDPL_STREAM_TIME_OUT=30000
 
 # main path
 export QUANTOOL_PATH=$MODELZOO_PATH/../../quantool
-if [[ -z $HDPL_TOOLCHAIN_ITVM_INSTALL ]] && [[ -z ${TVM_ROOT} ]] && [[ -d ${TVM_ROOT} ]]; then
+if [[ -z $HDPL_TOOLCHAIN_ITVM_INSTALL ]] && [[ -d ${TVM_ROOT} ]]; then
   HDPL_TOOLCHAIN_ITVM_INSTALL=$TVM_ROOT/build/install
 fi
 
