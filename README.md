@@ -107,6 +107,8 @@ cd models/backbone/resnet50
 2. 如果需要自己量化，需要下载原始模型，对于有些存在不支持算子的模型，可能需要修改或者裁剪
 3. 如果仅评估模型精度和性能，可以直接下载提供的量化模型
 
+可以通过get_model.py脚本获取准备好的模型并进行修改，如果下载地址无法访问，请与我们联系。
+
 ```bash
 python3 get_model.py
 ```
@@ -116,6 +118,32 @@ python3 get_model.py
 ```bash
 python3 get_model.py --type raw
 ```
+
+### 一键模型评估
+
+提供一键评估脚本方便用户进行模型评估，一般分为性能和精度两个评估脚本。大部分模型使用hmassist工具进行评估，少量hmassist模型使用API接口的方式，部分模型还不支持数据集精度评估，支持情况请查看`模型示例列表`章节。
+
+如果需要按步骤评估，可以参考后面的`使用TCIM API接口评估`和`使用hmassist工具评估`章节。
+
+#### 性能评估
+
+可以通过每个模型下的perf.sh脚本一键执行性能测试：
+
+```bash
+bash perf.sh
+```
+
+执行完成后会打印模型推理延迟、吞吐量等信息。
+
+#### 精度评估
+
+可以通过每个模型下的eval.sh脚本一键执行精度测试：
+
+```bash
+bash eval.sh
+```
+
+执行完成后会打印模型的数据集精度信息。
 
 ### 使用TCIM API接口评估
 
@@ -164,6 +192,16 @@ Epoch: [0][ 3/13]        Time  0.123 ( 0.383)        Data  0.001 ( 0.116)       
 
 ```bash
 python3 build.py
+```
+
+#### 性能测试
+
+使用性能基准测试工具进行性能测试，以评估模型在多batch、多线程等不同方式下的推理性能。进入utils/tcim_perf目录，修改run.sh脚本中的参数，包括模型路径、线程数、测试数等，然后执行：
+
+```bash
+cd utils/tcim_perf
+./build.sh
+./run.sh
 ```
 
 ### 使用hmassist工具评估
@@ -217,16 +255,17 @@ hmdemo.sh
 
 #### 性能测试
 
-使用指定的方式进行性能测试，以评估模型在不用使用方式下的推理性能, 可通过`--thread_num`参数配置线程数。执行前需要先执行utils/tcim_perf下的build.sh，然后执行hmperf.sh：
+使用指定的方式进行性能测试，以评估模型在不用使用方式下的推理性能, 可通过`--thread_num`参数配置线程数。执行前需要先执行utils/tcim_perf下的build.sh
+
+```bash
+cd utils/tcim_perf
+./build.sh
+```
+
+执行hmperf.sh：
 
 ```bash
 hmperf.sh
-```
-
-可以通过每个模型下的perf.sh脚本一键执行性能测试：
-
-```bash
-bash perf.sh
 ```
 
 #### 精度测试
@@ -234,14 +273,8 @@ bash perf.sh
 使用指定的数据集进行精度测试，以评估模型在数据集下的推理精度。支持指定目标为onnx，用于比较与原始onnx模型的精度差异。精度测试方法由用户自己实现，需要在hm_model.py文件中定义模型处理类并实现前后处理接口，同时在hm_dataset.py文件中定义数据库处理类，可以从已有的实现类中继承。通过执行hmeval.sh脚本实现：
 
 ```bash
-hmperf.sh --target onnx
-hmperf.sh
-```
-
-可以通过每个模型下的eval.sh脚本一键执行精度测试：
-
-```bash
-bash eval.sh
+hmeval.sh --target onnx
+hmeval.sh
 ```
 
 #### 批量基准测试
@@ -262,7 +295,7 @@ models: {
 hmbenchmark.sh
 ```
 
-部分模型执行结果如下（模型性能结果根据平台不同会有差异）：
+执行完成会在log中打印报告，同时在reports目录中保存csv文件。部分模型执行结果如下（模型性能结果根据平台不同会有差异）：
 
 |  ModelName   |      Shape       |  Dataset   | Batch | CoreNum | Accuracy(onnx)        | Accuracy(H30)         | AccRelError             | Latency(ms) |   Qps   |
 | ------------ | ---------------- | ---------- | ----- | ------- | --------------------- | --------------------- | ----------------------- | ----------- | ------- |
