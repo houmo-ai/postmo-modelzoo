@@ -6,8 +6,25 @@ is_structure: false
 os_type:
   ubuntu_20.04:
     resnet50:
-      - tests/resnet50/tcim_resnet50.so
-      - tests/resnet50/build.py
+      - models/backbone/resnet50/tcim_resnet50.so
+      - models/backbone/resnet50/build.py
     resnet50_gloden:
-      - tests/resnet50/output/hmquant_resnet50_input.1_input.npy
-      - tests/resnet50/output/hmquant_resnet50_with_act
+      - models/backbone/resnet50/output/H30/result/hmquant_resnet50_input.1_input.npy
+      - models/backbone/resnet50/output/H30/result/hmquant_resnet50_with_act
+    yolov5s:
+      - models/detection/yolov5s/tcim_yolov5s.so
+      - models/detection/yolov5s/build.py
+    yolov5s_gloden:
+      - models/detection/yolov5s/output/H30/result/hmquant_yolov5s_with_act
+      - models/detection/yolov5s/output/H30/result/hmquant_yolov5s_images_input.npy
+    petr:
+      - models/autodrive/petr/tcim_petr_part1.so
+      - models/autodrive/petr/tcim_petr_part2.so
+      - models/autodrive/petr/build.py
+      - models/autodrive/petr/build_part1.py
+      - models/autodrive/petr/build_part2.py
+    petr_gloden:
+      - models/autodrive/petr/output/H30/result/hmquant_petr_part1_img_input.npy
+      - models/autodrive/petr/output/H30/result/hmquant_petr_part1_with_act
+      - models/autodrive/petr/output/H30/result/hmquant_petr_part2_pts_bbox_head_transformer_reshape_0_reshape_input.npy
+      - models/autodrive/petr/output/H30/result/hmquant_petr_part2_with_act
