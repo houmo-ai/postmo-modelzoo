@@ -38,7 +38,8 @@ export MODEL_PATH=$SCRIPT_PATH/data/models
   # bash "${script}"
 # done
 
-# bash ./models/backbone/resnet50/perf.sh
+# to test
+bash ./models/backbone/resnet50/perf.sh
 bash ./models/backbone/mobilenetv2/perf.sh
 bash ./models/backbone/efficientnet/perf.sh
 bash ./models/backbone/vit/perf.sh
@@ -46,9 +47,28 @@ bash ./models/autodrive/yolop/perf.sh
 bash ./models/autodrive/pointpillars/perf.sh
 bash ./models/detection/yolov5s/perf.sh
 bash ./models/detection/yolov3/perf.sh
-# bash ./models/backbone/resnet50/eval.sh
-bash ./models/backbone/efficientnet/eval.sh
+bash ./models/autodrive/petr/perf.sh
+bash ./models/autodrive/detr3d/perf.sh
+
+bash ./models/backbone/resnet50/eval.sh
 bash ./models/backbone/mobilenetv2/eval.sh
+bash ./models/backbone/efficientnet/eval.sh
+bash ./models/backbone/vit/eval.sh
+bash ./models/detection/yolov5s/eval.sh
+bash ./models/detection/yolov3/eval.sh
+
+bash ./models/backbone/resnet50/test.sh
+bash ./models/backbone/mobilenetv2/test.sh
+bash ./models/backbone/efficientnet/test.sh
+bash ./models/detection/yolov5s/test.sh
+bash ./models/detection/yolov3/test.sh
+bash ./models/autodrive/yolop/test.sh
+
+# not test
+# bash ./models/backbone/vit/test.sh
+# bash ./models/backbone/resnet50/eval.sh
+# bash ./models/backbone/efficientnet/test.sh
+# bash ./models/backbone/mobilenetv2/test.sh
 # bash ./tests/tracking/perf.sh
 # bash ./tests/resizer/perf.sh
 # bash ./tests/traffic_light/perf.sh

@@ -27,13 +27,13 @@ if __name__ == '__main__':
     quant_model_dir = args.quant_model_dir
     model_type = args.model_type
     raw_name = "detr3d.onnx"
-    quant_name = "hmquant_detr3d_20240313.zip"
+    quant_name = "hmquant_detr3d_20240328.zip"
 
     if model_type == "raw" or model_type == "all":
         pass
-        if not os.path.exists(raw_name):
-            url = os.path.join(os.environ.get("MODELZOO_URL"), "models/detr3d", raw_name)
-            os.system('wget ' + url)
+        # if not os.path.exists(raw_name):
+        #     url = os.path.join(os.environ.get("MODELZOO_URL"), "models/detr3d", raw_name)
+        #     os.system('wget ' + url)
 
     if model_type == "quant" or model_type == "all":
         if not os.path.exists(os.path.join(quant_model_dir, "hmquant_detr3d_part1_with_act.onnx")):

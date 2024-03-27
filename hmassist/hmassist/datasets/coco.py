@@ -27,6 +27,7 @@ class COCO2017Val(BaseDataset):
 
         self._filepath = os.path.join(self._root_path, "..", "val2017.txt")
         if os.path.exists(self._filepath):
+            logger.info("coco2017 dataset using files in {}".format(self._filepath))
             with open(self._filepath, "r") as f:
                 lines = f.readlines()
                 for line in lines:
@@ -40,7 +41,7 @@ class COCO2017Val(BaseDataset):
                     self._img_files.append(img_path)
                     self._image_ids.append(int(filename))
         elif os.path.isdir(self._root_path):
-            logger.warning("filepath not exist -> {}, using {} files directly".format(self._filepath, self._root_path))
+            logger.info("coco2017 dataset using files in {}".format(self._root_path))
             for filepath in os.listdir(self._root_path):
                 basename = os.path.basename(filepath)
                 filename, ext = os.path.splitext(basename)

@@ -1,5 +1,6 @@
 import os
 import torch
+import numpy as np
 import torchvision.transforms as transforms
 from torchvision.datasets.folder import pil_loader
 import argparse
@@ -35,19 +36,21 @@ def calibrate(args=None):
 
     env_dict = os.environ
 
-    def unsqueeze(x):
-        return torch.unsqueeze(x, 0)
-
-    calib_transform = transforms.Compose(
-        [
-            transforms.Resize(256), transforms.CenterCrop(224),
-            ToTensorNotNormal(), unsqueeze,
-        ],
-    )
+    def preprocess(filepath):
+        import cv2
+        from hmassist.utils import utils
+        from hmassist.utils.box_utils import letterbox
+        image = cv2.imread(filepath)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image, _, _ = letterbox(image, [384, 640], stride=64, auto=False)  # HWC
+        image = np.transpose(image, (2, 0, 1))  # CHW .astype(np.float32)
+        image = np.expand_dims(image, axis=0)  # NCHW
+        data = torch.tensor(image.astype(np.float32))
+        return data
 
     calib_num = 20
     calib_files = []
-    calib_dir = os.path.join(env_dict.get('DATASETS_PATH'), 'imagenet')
+    calib_dir = os.path.join(env_dict.get('DATASETS_PATH'), 'coco2017/val2017')
     file_list = os.listdir(calib_dir)
     for filename in file_list:
         _, ext = os.path.splitext(filename)
@@ -59,22 +62,21 @@ def calibrate(args=None):
     #     'ILSVRC2012_val_00000016.JPEG',
     # ]
     print("calib_files =", calib_files)
-    calib_images = [
-        pil_loader(os.path.join(calib_dir, file_path))
+    calib_dataset = [
+        preprocess(os.path.join(calib_dir, file_path))
         for file_path in calib_files
     ]
-    calib_dataset = [calib_transform(data) for data in calib_images]
 
     quanttool_config = {
         'inputs_cfg': {
             'ALL': {
                 'data_format': 'RGB',
-                'first_layer_weight_denorm_mean': [0.485, 0.456, 0.406],
-                'first_layer_weight_denorm_std': [0.229, 0.224, 0.225],
-                'resizer_crop': {'top': 0, 'left': 0, 'height': 224, 'width': 224},
+                'first_layer_weight_denorm_mean': [0, 0, 0],
+                'first_layer_weight_denorm_std': [1, 1, 1],
+                'resizer_crop': {'top': 0, 'left': 0, 'height': 384, 'width': 640},
                 'resizer_resize': {
-                    'height': 224,
-                    'width': 224,
+                    'height': 384,
+                    'width': 640,
                     'align_corners': False,
                     'method': 'bilinear',
                 },
@@ -84,7 +86,7 @@ def calibrate(args=None):
         'graph_opt_cfg': {},
     }
 
-    onnx_input = {"input.1": calib_dataset[0]}
+    onnx_input = calib_dataset[0]
 
     print("start calibrating...")
     sequencer = quant_single_onnx_network(

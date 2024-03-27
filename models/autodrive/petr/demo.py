@@ -12,7 +12,7 @@ import pickle
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-import tvm.tcim as tcim
+import tcim
 from hmassist.utils.transform import BGR2YUV
 from hmassist.utils.dist_metrics import cosine_distance
 # from vis import vis_src_imgs, vis_bboxes, vis_src_imgs_and_bboxes
@@ -27,6 +27,21 @@ src_imgs = {
     4: '../../../data/datasets/nuscenes/samples/CAM_BACK_LEFT/n015-2018-07-11-11-54-16+0800__CAM_BACK_LEFT__1531281439797423.jpg',
     5: '../../../data/datasets/nuscenes/samples/CAM_BACK_RIGHT/n015-2018-07-11-11-54-16+0800__CAM_BACK_RIGHT__1531281439777893.jpg'
 }
+
+
+def get_args() -> argparse.Namespace:
+    """Parse commandline."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--batch',
+        dest='batch',
+        type=int,
+        default=4,
+        help='batch size',
+    )
+    args = parser.parse_args()
+    return args
+
 
 def vis_src_imgs():
     img_front_left = mpimg.imread(src_imgs[2])
@@ -427,7 +442,7 @@ def get_bboxes(preds_dicts, img_metas, max_num=300, score_threshold=0.6, num_cla
 
 
 def infer(inputs, batch=1):
-    part1 = tcim.load_so("petr_part1")
+    part1 = tcim.runtime.load("petr_part1.hmm.so")
     #input_name = onnx_model.graph.input[0].name
     for name in inputs:
         input_data = inputs[name]
@@ -444,7 +459,7 @@ def infer(inputs, batch=1):
         part1.set_input(name, input_data, "YUV422SP")
     
     #import pdb;pdb.set_trace()
-    part2 = tcim.load_so("petr_part2")
+    part2 = tcim.runtime.load("petr_part2.hmm.so")
     part2_input_name = "pts_bbox_head_transformer_reshape_0_reshape"
     
     round_num = 1
@@ -479,7 +494,7 @@ def infer(inputs, batch=1):
     return outputs
 
 
-def demo():
+def demo(batch=1):
     class_names = [
       'car', 'truck', 'trailer', 'bus', 'construction_vehicle', 'bicycle',
       'motorcycle', 'pedestrian', 'traffic_cone', 'barrier']
@@ -510,7 +525,7 @@ def demo():
     # cosine_dist = cosine_distance(input_data, input_data0, check_shape=False)
     # print("input_data_ref shape={}, cosine_dist={}".format(input_data.shape, cosine_dist))
 
-    outputs = infer(inputs, batch=4)
+    outputs = infer(inputs, batch)
 
     reference = torch.from_numpy(np.load("reference.npy")) # 固定值
     # ref_out_0 = np.load("out_0.npy") # 输出1
@@ -537,6 +552,9 @@ def demo():
 
     # batch_size is 1
     bboxes, scores, labels = bbox_list[0]
+    print(bboxes)
+    print(scores)
+    print(labels)
     # vis_src_imgs()
     # vis_bboxes(bboxes, labels, colors_vis, set_axis_equal=False)
     vis_src_imgs_and_bboxes(bboxes, labels, colors_vis)
@@ -544,4 +562,5 @@ def demo():
 
 
 if __name__ == '__main__':
-    demo()
+    args = get_args()
+    demo(args.batch)

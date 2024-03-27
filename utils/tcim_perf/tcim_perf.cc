@@ -281,8 +281,6 @@ int main(int argc, char *argv[]) {
     modules.push_back(std::move(module));
   }
   std::cout << "module loaded: " << model_path << std::endl;
-  // auto size = modules[0].GetMemSize();
-  // std::cout << "model memsize = " << size[0] << "," << size[1] << "," << size[2] << "," << size[3] << std::endl;
 
   //SetAffinity(5);
 
@@ -334,7 +332,7 @@ int main(int argc, char *argv[]) {
     int j = i % thread_num;
     queue_info.queue.push(input_datas[j]);
   }
-  std::cout << "request queue size is " << queue_info.queue.size() << std::endl;
+  std::cout << "sample queue size is " << queue_info.queue.size() << std::endl;
 
   Barrier barrier(thread_num);
 
@@ -380,9 +378,8 @@ int main(int argc, char *argv[]) {
       auto cost = GET_COST(start, end);
       thread_info.total_cost += cost;
       if (thread_info.max_cost < cost) thread_info.max_cost = cost;
-      printf("===> thread %d infer %d times cost %.3fms\n", tid, thread_info.loop_num, cost/1000.0);
+      // printf("===> thread %d infer %d times cost %.3fms\n", tid, thread_info.loop_num, cost/1000.0);
     }
-    // hdplStreamSynchronize(*stream);
     barrier.barrier();
   };
 

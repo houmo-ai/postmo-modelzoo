@@ -8,8 +8,7 @@ import onnx
 import torch
 import re
 import tvm
-import tvm.relay as relay
-import tvm.tcim as tcim
+import tcim
 from ..utils import logger
 from ..utils.utils import get_random_data
 from .base_exec import BaseExec
@@ -158,69 +157,39 @@ class H30Exec(BaseExec, ABC):
         convert_config = {'layout': 'NHWC'}
         t_start = time.time()
         onnx_model = onnx.load(self.quant_model_path)
-        for input in onnx_model.graph.input:
-            dims = input.type.tensor_type.shape.dim
-            for i in self.inputs:
-                if i["name"] == input.name:
-                    type_dict[input.name] = i["dtype"]
-            input_shape = (
-                self.batch * dims[0].dim_value, dims[1].dim_value,
-                dims[2].dim_value, dims[3].dim_value,
-            )
-            shape_dict[input.name] = input_shape
-
-        mod = relay.frontend.from_hmonnx(
-            onnx_model, shape_dict, type_dict, resizer_attr=None,
-            convert_config=convert_config,
-        )
-
         if not build_options:
-            build_options = {"tcim.fuse_strategy": 1, "tcim.codegen_pic": True, "tcim.for_benchmark": True}
-            # "tcim.mem_plan_strategy": "linearscan"
+            build_options = {}
+        if self.batch > 1:
+            build_options["tcim.spec_batch_num"] = self.batch
 
         logger.info("build_options={}".format(build_options))
 
-        if self.build_mode == "AOT":
-            executor = relay.backend.Executor('aot')
-            target = tvm.target.Target('hdpl', host='c')
-
-            with tvm.transform.PassContext(opt_level=3, config=build_options):
-                graph, lib, params = relay.build(
-                    mod, target, executor=executor, mod_name=self.model_name,
-                )
-
-            if os.getenv("TCIM_CROSS_COMPILE") == '1':
-                logger.info("cross compile enabled as aarch64 while TCIM_CROSS_COMPILE=1")
-                model_name = self.model_name + "_aarch64"
-                tcim.store_so(model_name, lib, self.result_dir + "/../build", hdplcc_options=['-O2'], host_target="arm64")
-            else:
-                model_name = self.model_name
-                tcim.store_so(model_name, lib, self.result_dir + "/../build", hdplcc_options=['-O2'])
-            logger.info('{} saved as aot model in {}'.format(self.model_name, self.model_dir))
-
-        elif self.build_mode == "JIT":
-            with relay.build_config(opt_level=3):
-                graph, lib, params = tvm.relay.build(mod, 'hdpl --host=llvm')
-            # store model as one fusedop
-            rt_opt = '-resizer'
-            tcim.store_as_fusedop(self.model_name, graph, params, shape_dict, lib, rt_opt)
-            logger.info(self.model_name, ' saved as one fusedop model')
+        if os.getenv("TCIM_CROSS_COMPILE") == '1':
+            logger.info("cross compile enabled as aarch64 while TCIM_CROSS_COMPILE=1")
+            model_name = self.model_name + "_aarch64"
+            hdplcc_options = [
+              "--target=aarch64-linux-gnu",
+              "--sysroot=/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/libc",
+              "-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0",
+              "-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0/aarch64-linux-gnu",
+            ]
+            tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, target_host="arm64", hdplcc_options=hdplcc_options)
+        else:
+            model_name = self.model_name
+            tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, compiler_cfg=build_options)
+        print(model_name + ' build completed.')
+        
+        logger.info('{} saved as aot model in {}'.format(self.model_name, self.model_dir))
 
         logger.info("################  build finished  ######################")
         self.build_span = time.time() - t_start
         logger.info("build cost {}s".format(self.build_span))
 
     def load(self):
-        if self.build_mode == "AOT":
-            self.module = tcim.load_so(self.model_name)
-        elif self.build_mode == "JIT":
-            self.module = tcim.load_model(self.model_name)
-        else:
-            logger.error("unsuported build mode ", self.build_mode)
-            return -1
+        self.module = tcim.runtime.load(self.model_name + ".hmm.so")
         self.input_info = self.get_input_info()
         self.output_info = self.get_output_info()
-        logger.info("H30 model loaded")
+        logger.info("{} model loaded".format(self.model_name))
 
     def infer(self, inputs):
         """ infer one time """
@@ -230,14 +199,11 @@ class H30Exec(BaseExec, ABC):
             else:
                 input_data = inputs
             # print(input_data.shape, input_data.dtype)
-            if self.build_mode == "AOT":
-                if input["image"]["format"] in ["YUV420", "YUV422", "YUV444"]:
-                    image_format = input["image"]["format"] + 'SP'
-                else:
-                    image_format = input["image"]["format"]
-                self.module.set_input(input["name"], input_data, image_format)
+            if input["image"]["format"] in ["YUV420", "YUV422", "YUV444"]:
+                image_format = input["image"]["format"] + 'SP'
             else:
-                self.module.set_input(input["name"], input_data)
+                image_format = input["image"]["format"]
+            self.module.set_input(input["name"], input_data, image_format)
         self.module.run()
         outputs = {}
         output_num = self.module.get_num_outputs()
@@ -255,16 +221,12 @@ class H30Exec(BaseExec, ABC):
 
     def perf(self, test_num):
         modelzoo_path = os.getenv('MODELZOO_PATH')
-        if self.build_mode == "AOT":
-            model_path = os.path.join(self.cur_dir, "tcim_" + self.model_name)
-            exec = "tcim_perf"
-        else:
-            model_path = os.path.join(self.cur_dir, self.model_name)
-            exec = "tcimexec"
+        model_path = os.path.join(self.cur_dir, self.model_name + ".hmm")
+        exec = "tcim_perf"
         if os.environ.get("HDPL_PLATFORM") == "ISIM":
             test_num = 1
             logger.warning("test num set to 1 because HDPL_PLATFORM=ISIM may take a lot of time.")
-        cmd = "cd {}/utils/{} && ./{} --model {} --loops {} --threads {} --output {}".format(
+        cmd = "cd {}/utils/{} && ./{} --model {} --samples {} --threads {} --output {}".format(
             modelzoo_path, exec, exec, model_path, test_num, self.perf_cfg["thread_num"], os.path.join(self.cur_dir, "output/hmperf.txt"))
         logger.info(cmd)
         os.system(cmd)
@@ -276,14 +238,8 @@ class H30Exec(BaseExec, ABC):
                 data = torch.tensor(inputs[input["name"]].astype(np.float32))  # NHWC float32
                 data = torch.squeeze(data, 0)  # HWC float32
                 format = re.sub("YUV", "", input["image"]["format"])
-                if input["format"] == "BGR":
-                    from ..utils.transform import BGR2YUV
-                    rgb2yuv_func = BGR2YUV(fmt=format)
-                elif input["format"] == "RGB":
-                    from ..utils.transform import RGB2YUV
-                    rgb2yuv_func = RGB2YUV(fmt=format)
-                else:
-                    logger.error("not support format {}".format(input["image"]))
+                from ..utils.transform import RGB2YUV
+                rgb2yuv_func = RGB2YUV(fmt=format)
                 image = torch.unsqueeze(rgb2yuv_func(data), 0).numpy()  # NHWC float32
                 datas[input["name"]] = image.astype(np.uint8)
             else:
@@ -307,8 +263,8 @@ class H30Exec(BaseExec, ABC):
     def get_golden_output(self, name):
         golden_output_path = os.path.join(self.golden_data_path, name + '.npy')
         if os.path.exists(golden_output_path):
-            golden_output = np.load(golden_output_path, allow_pickle=True).item().get("output_tensor")
-            return golden_output
+            output_data = np.load(golden_output_path, allow_pickle=True).item().get("output_tensor")
+            return output_data
         else:
             logger.warning("compare canceled while golden output not found -> {}".format(golden_output_path))
             return None
@@ -338,10 +294,10 @@ class H30Exec(BaseExec, ABC):
         for id in range(0, input_num):
             input_info = {}
             name = self.module.get_input_name_by_index(id)
-            # input_data = self.module.get_input(id).numpy()
+            input_data = self.module.get_input(id).numpy()
             input_info["name"] = name
-            input_info["shape"] = None
-            input_info["dtype"] = None
+            input_info["shape"] = input_data.shape
+            input_info["dtype"] = input_data.dtype
             input_infos.append(input_info)
         return input_infos
 

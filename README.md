@@ -49,15 +49,15 @@ houmo-modelzoo提供的模型示例如下，编译示例每个都提供，其他
 
 | models                                       | type      | raw | quant | ptq | qat | pydemo | c++demo | eval |
 | -------------------------------------------- | --------- | --- | ----- | --- | --- | ------ | ------- | ---- |
-| [resnet50](models/backbone/resnet50)         | backbone  | yes | yes   | yes | yes | yes    | yes     | yes  |
+| [resnet50](models/backbone/resnet50)         | backbone  | yes | yes   | yes | yes | yes    | x       | yes  |
 | [mobilenetv2](models/backbone/mobilenet_v2)  | backbone  | yes | yes   | yes | x   | yes    | x       | yes  |
-| [efficientnet](models/backbone/efficientnet) | backbone  | yes | yes   | yes | x   | x      | x       | yes  |
+| [efficientnet](models/backbone/efficientnet) | backbone  | yes | yes   | yes | x   | yes    | x       | yes  |
 | [yolov5s](models/detection/yolov5s)          | detection | yes | yes   | yes | x   | yes    | x       | yes  |
-| [yolov3](models/detection/yolov3)            | detection | yes | yes   | yes | x   | x      | yes     | yes  |
+| [yolov3](models/detection/yolov3)            | detection | yes | yes   | yes | x   | yes    | x       | yes  |
 | [yolop](models/autodrive/yolop)              | autodrive | yes | yes   | yes | yes | yes    | x       | x    |
 | [pointpillars](models/autodrive/pointpillars)| autodrive | x   | yes   | x   | x   | x      | yes     | x    |
-| [petr](models/autodrive/petr)                | autodrive | x   | yes   | x   | x   | x      | x       | x    |
-| [detr3d](models/autodrive/petr)              | autodrive | x   | yes   | x   | x   | x      | x       | x    |
+| [petr](models/autodrive/petr)                | autodrive | x   | yes   | x   | x   | yes    | x       | x    |
+| [detr3d](models/autodrive/petr)              | autodrive | x   | yes   | x   | x   | yes    | x       | x    |
 
 ## C++评估工具列表
 

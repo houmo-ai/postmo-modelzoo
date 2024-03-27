@@ -7,11 +7,11 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--stage',
-        dest='stage',
+        '--model_dir',
+        dest='model_dir',
         type=str,
-        default="all",
-        help='build stage choise=["build", "test", "all"]',
+        default='output/H30/result',
+        help='path to the model dir',
     )
     parser.add_argument(
         '--batch',
@@ -20,10 +20,19 @@ def get_args() -> argparse.Namespace:
         default=4,
         help='batch size',
     )
+    parser.add_argument(
+        '--stage',
+        dest='stage',
+        type=str,
+        default="all",
+        help='build stage choise=["build", "test", "all"]',
+    )
     args = parser.parse_args()
     return args
 
 if __name__ == '__main__':
     args = get_args()
-    os.system("python3 build_part1.py --stage {} --batch {}".format(args.stage, args.batch))
-    os.system("python3 build_part2.py --stage {} --batch {}".format(args.stage, args.batch))
+    if os.system("python3 build_part1.py --stage {} --batch {} --model_dir {}".format(args.stage, args.batch, args.model_dir)):
+        exit(-1)
+    if os.system("python3 build_part2.py --stage {} --batch {} --model_dir {}".format(args.stage, args.batch, args.model_dir)):
+        exit(-1)

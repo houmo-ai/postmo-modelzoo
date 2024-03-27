@@ -2,10 +2,7 @@ import os
 import numpy as np
 import onnx
 import argparse
-import tvm
-import tvm.relay as relay
-import tvm.tcim as tcim
-from tvm.relay.backend import Executor
+import tcim
 from hmassist.utils.dist_metrics import cosine_distance
 
 
@@ -13,11 +10,11 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_path',
-        dest='model_path',
+        '--model_dir',
+        dest='model_dir',
         type=str,
-        default='output/H30/result/hmquant_vit_with_act.onnx',
-        help='path to the model path',
+        default='output/H30/result',
+        help='path to the model dir',
     )
     parser.add_argument(
         '--model_name',
@@ -46,59 +43,54 @@ def get_args() -> argparse.Namespace:
 
 def build(args=None):
     # build model
-    image_format = 'YUV422SP'
+    format = 'YUV422SP'
     model_name = args.model_name
     batch = args.batch
     stage = args.stage
-    model_path = args.model_path
+    model_dir = args.model_dir
+    quant_name = "hmquant_" + model_name + "_with_act"
+    onnx_name = quant_name + ".onnx"
+    model_path = os.path.join(model_dir, onnx_name)
     model_dir = os.path.dirname(model_path)
-    shape_dict = {}
-    layout_dict = {}
-    convert_config = {'layout': 'NHWC'}
 
+    # 1. build model
     onnx_model = onnx.load(model_path)
     inputs = onnx_model.graph.input
     if stage == 'build' or stage == 'all':
-        for input in inputs:
-            dims = input.type.tensor_type.shape.dim
-            input_shape = [dim.dim_value for dim in dims]
-            input_shape[0] *= batch
-            print('input name:', input.name)
-            print('input shape:', input_shape)
-            shape_dict[input.name] = input_shape
-
-        mod = relay.frontend.from_hmonnx(
-            onnx_model, shape_dict, layout=layout_dict,
-            resizer_attr=None, convert_config=convert_config,
-        )
-        executor = Executor('aot')
         compile_config = {
-            "tcim.fuse_strategy": 1,
-            "tcim.gen_intrinsic": 0,
-            "tcim.sync_strategy": 0,
-            "tcim.for_benchmark": True,
             "tcim.special_model_name" : "vit_small"
         }
-        target = tvm.target.Target('hdpl', host='c')
-        with tvm.transform.PassContext(opt_level=3, config=compile_config):
-            graph, lib, params = relay.build(
-                mod, target, executor=executor, mod_name=model_name,
-            )
-        tcim.store_so(model_name, lib)
-        print('tcim model ' + model_name + ' saved.')
+        if batch > 1:
+            compile_config["tcim.spec_batch_num"] = batch
+        tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, compiler_cfg=compile_config)
+        print(model_name + ' build completed.')
 
-    # compare with golden
+    # 2. test model
     if stage == 'test' or stage == 'all':
-        module = tcim.load_so(model_name)
+        # 2.1 load model
+        module = tcim.runtime.load(model_name + ".hmm.so")
+
+        # 2.2 set input with golden
+        input_num = module.get_num_inputs()
+        assert(len(inputs) == input_num)
         for input in inputs:
-            input_file_name = 'hmquant_' + model_name + '_' + input.name + '_input.npy'
+            input_name = input.name
+            # id = module.get_input_index(input_name)
+            # name = module.get_input_name_by_index(id)
+            input_info = module.get_input(0).numpy()
+            print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype, format))
+            input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype("int8")
-            print("input[{}] shape = {}, dtype = {}".format(input.name, input_data.shape, input_data.dtype))
-            module.set_input(input.name, input_data, image_format)
+            input_data = np.concatenate([input_data for i in range(batch)], axis=0)
+            print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
+            module.set_input(input_name, input_data, format)
 
+        # 2.3 infer model
         module.run()
 
+        # 2.4. get output and compare with golden
+        result_check = True
         output_num = module.get_num_outputs()
         for id in range(0, output_num):
             output_name = module.get_output_name_by_index(id)
@@ -107,16 +99,23 @@ def build(args=None):
             output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_with_act', output_name + '.npy')
             if os.path.exists(output_data_path):
                 golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
+                golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
             else:
+                result_check = False
                 print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
             if golden_output.shape == output_data.shape:
                 cosine_dist = cosine_distance(golden_output, output_data)
                 is_match = (golden_output == output_data).all()
                 print("[compare] golden output [{}] match={}, similarity={:.6f}"
                             .format(output_name, is_match, cosine_dist))
+                if cosine_dist < 0.99:
+                    result_check = False
             else:
+                result_check = False
                 print("[compare] golden output [{}] shape not match {} vs {}"
                             .format(output_name, golden_output.shape, output_data.shape))
+        if not result_check:
+            exit(-1)
 
 
 if __name__ == '__main__':

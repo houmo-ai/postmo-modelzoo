@@ -36,6 +36,9 @@ class OnnxExec(BaseExec, ABC):
             #     pass
             data = inputs[input["name"]].astype(np.float32)
             data /= 255
+            if input["format"] == "BGR":
+                import cv2
+                data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
             if input["mean"]:
                 for ch in range(input["shape"][1]):
                     data[0][ch] -= input["mean"][ch]

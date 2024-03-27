@@ -130,6 +130,7 @@ def build(cfg):
         save_data(output_data, save_dir, output_name)
         logger.info("tcim outputs saved in {}".format(save_dir))
         golden_output = model.executor.get_golden_output(output_name)
+        logger.info("golden output[{}] shape = {}, dtype = {}".format(output_name, golden_output.shape, golden_output.dtype))
         golden_output = np.concatenate([golden_output for i in range(model.executor.batch)], axis=0)
         is_match = (output_data == golden_output).all()
         cosine_dist = cosine_distance(output_data, golden_output)
@@ -363,7 +364,7 @@ def benchmark(config):
         os.system("hmbuild.sh --core_num {} --batch {}".format(core_num, batch))
         # perf
         if os.path.exists("output/hmperf.txt"):
-            os.remove("output/mperf.txt")
+            os.remove("output/hmperf.txt")
         os.system("hmperf.sh --thread_num {}".format(thread_num))
         if os.path.exists("output/hmperf.txt"):
             perf_result = read_yaml_to_dict("output/hmperf.txt")

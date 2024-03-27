@@ -31,9 +31,9 @@ if __name__ == '__main__':
 
     if model_type == "raw" or model_type == "all":
         pass
-        if not os.path.exists(raw_name):
-            url = os.path.join(os.environ.get("MODELZOO_URL"), "models/petr", raw_name)
-            os.system('wget ' + url)
+        # if not os.path.exists(raw_name):
+        #     url = os.path.join(os.environ.get("MODELZOO_URL"), "models/petr", raw_name)
+        #     os.system('wget ' + url)
 
     if model_type == "quant" or model_type == "all":
         if not os.path.exists(os.path.join(quant_model_dir, "hmquant_petr_with_act.onnx")):

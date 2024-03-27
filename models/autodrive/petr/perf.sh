@@ -10,7 +10,11 @@ fi
 
 cd "${SCRIPT_DIR}"
 
+batch=4
+if [ "$1" ]; then
+  batch=$1
+fi
+
 python3 get_model.py
-python3 build_part1.py --stage build
-python3 build_part2.py --stage build
-python3 demo.py
+python3 build.py --batch $batch
+python3 demo.py --batch $batch
