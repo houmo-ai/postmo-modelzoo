@@ -130,8 +130,8 @@ def build(cfg):
         save_data(output_data, save_dir, output_name)
         logger.info("tcim outputs saved in {}".format(save_dir))
         golden_output = model.executor.get_golden_output(output_name)
-        logger.info("golden output[{}] shape = {}, dtype = {}".format(output_name, golden_output.shape, golden_output.dtype))
         golden_output = np.concatenate([golden_output for i in range(model.executor.batch)], axis=0)
+        logger.info("golden output[{}] shape = {}, dtype = {}".format(output_name, golden_output.shape, golden_output.dtype))
         is_match = (output_data == golden_output).all()
         cosine_dist = cosine_distance(output_data, golden_output)
         sum_cos += cosine_dist

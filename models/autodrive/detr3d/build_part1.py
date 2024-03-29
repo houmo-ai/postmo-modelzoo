@@ -58,9 +58,8 @@ def build(args=None):
     model_dir = os.path.dirname(model_path)
 
     # 1. build model
-    onnx_model = onnx.load(model_path)
-    inputs = onnx_model.graph.input
     if stage == 'build' or stage == 'all':
+        onnx_model = onnx.load(model_path)
         compile_config = {
             "tcim.fuse_strategy": 4,
             "tcim.sync_strategy": 1,
@@ -81,12 +80,9 @@ def build(args=None):
 
         # 2.2 set input with golden
         input_num = module.get_num_inputs()
-        assert(len(inputs) == input_num)
-        for input in inputs:
-            input_name = input.name
-            # id = module.get_input_index(input_name)
-            # name = module.get_input_name_by_index(id)
-            input_info = module.get_input(0).numpy()
+        for id in range(input_num):
+            input_name = module.get_input_name_by_index(id)
+            input_info = module.get_input_by_name(input_name).numpy()
             print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype, format))
             input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
