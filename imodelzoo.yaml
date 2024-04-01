@@ -17,17 +17,6 @@ os_type:
     yolov5s_gloden:
       - models/detection/yolov5s/output/H30/result/hmquant_yolov5s_with_act
       - models/detection/yolov5s/output/H30/result/hmquant_yolov5s_images_input.npy
-    petr:
-      - models/autodrive/petr/petr_part1.hmm.so
-      - models/autodrive/petr/petr_part2.hmm.so
-      - models/autodrive/petr/build.py
-      - models/autodrive/petr/build_part1.py
-      - models/autodrive/petr/build_part2.py
-    petr_gloden:
-      - models/autodrive/petr/output/H30/result/hmquant_petr_part1_img_input.npy
-      - models/autodrive/petr/output/H30/result/hmquant_petr_part1_with_act
-      - models/autodrive/petr/output/H30/result/hmquant_petr_part2_pts_bbox_head_transformer_reshape_0_reshape_input.npy
-      - models/autodrive/petr/output/H30/result/hmquant_petr_part2_with_act
   ubuntu_18.04:
     resnet50:
       - models/backbone/resnet50/resnet50.hmm.so
@@ -41,14 +30,3 @@ os_type:
     yolov5s_gloden:
       - models/detection/yolov5s/output/H30/result/hmquant_yolov5s_with_act
       - models/detection/yolov5s/output/H30/result/hmquant_yolov5s_images_input.npy
-    petr:
-      - models/autodrive/petr/petr_part1.hmm.so
-      - models/autodrive/petr/petr_part2.hmm.so
-      - models/autodrive/petr/build.py
-      - models/autodrive/petr/build_part1.py
-      - models/autodrive/petr/build_part2.py
-    petr_gloden:
-      - models/autodrive/petr/output/H30/result/hmquant_petr_part1_img_input.npy
-      - models/autodrive/petr/output/H30/result/hmquant_petr_part1_with_act
-      - models/autodrive/petr/output/H30/result/hmquant_petr_part2_pts_bbox_head_transformer_reshape_0_reshape_input.npy
-      - models/autodrive/petr/output/H30/result/hmquant_petr_part2_with_act
