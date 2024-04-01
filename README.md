@@ -159,33 +159,6 @@ python3 ptq.py
 
 量化后的模型和golden数据以onnx模型和npy数据的形式默认放在output/H30/result目录下。量化完成后会进行profile，以表格的形式打印逐层相似度，重点关注输出层的余弦相似度是否符合预期。如果余弦相似度较低，可考虑该结果是否适合使用余弦相似度进行评价，进一步测试模型实际精度。如果确实是量化精度降低较多，可考虑更换量化数据和参数，以及混合量化，QAT训练等方式进一步提升。
 
-#### QAT量化
-
-（Quantization Aware Training）是一种模型量化方法，它允许在训练过程中对模型进行量化。这种方法通过在训练集中插入伪量化节点，并训练模型以减少基础模型推理结果与伪量化节点推理结果之间的差异，从而在训练过程中逐渐量化模型。
-
-QAT训练需要使用带Nvidia GPU的机器，安装好cuda驱动，nvidia-smi确认安装正常。启动Docker时增加 --gpus all选项将GPU映射进docker，同时增加--shm-size 10g选项增大shared memory，实际大小取决于模型大小、训练图像的数量、batch数等，需要自行调整。检查torch和torchvision版本是否与cuda版本匹配。
-
-将imagenet的训练集和验证集数据放到$DATASETS_PATH/imagenet目录下train和val目录中，注意数据是以分类名为文件夹存放的。
-
-可通过qat.sh脚本直接运行，可通过脚本中参数修改数据集路径和训练batch数等，目前默认batch数为8。
-
-```bash
-bash qat.sh
-```
-
-参考结果：
-
-```bash
-=> using pre-trained model 'resnet50'
-calibrating
-0it [00:20, ?it/s]
-Epoch: [0][ 0/13]        Time  1.153 ( 1.153)        Data  0.461 ( 0.461)        Loss 3.6372e-01 (3.6372e-01)        Acc@1  75.00 ( 75.00)        Acc@5 100.00 (100.00)
-Epoch: [0][ 1/13]        Time  0.130 ( 0.641)        Data  0.001 ( 0.231)        Loss 1.0830e-01 (2.3601e-01)        Acc@1 100.00 ( 87.50)        Acc@5 100.00 (100.00)
-Epoch: [0][ 2/13]        Time  0.124 ( 0.469)        Data  0.001 ( 0.155)        Loss 9.9412e-03 (1.6065e-01)        Acc@1 100.00 ( 91.67)        Acc@5 100.00 (100.00)
-Epoch: [0][ 3/13]        Time  0.123 ( 0.383)        Data  0.001 ( 0.116)        Loss 1.4792e+00 (4.9029e-01)        Acc@1  87.50 ( 90.62)        Acc@5  87.50 ( 96.88)
-...
-```
-
 #### 编译
 
 将量化模型编译为在芯片上运行的模型。可通过`--batch`参数配置batch数，通过build.py脚本执行：
