@@ -12,7 +12,7 @@ export MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo/release
 
 # set hal library log level
 export HM800_HAL_CONSOLE_LEVEL=0
-export HDPL_STREAM_TIME_OUT=30000
+export HDPL_API_TIMEOUT=30000
 
 # main path
 if [[ -z $HOUMO_PATH ]]; then
@@ -32,7 +32,7 @@ export HDPL_INC_PATH=$HOUMO_PATH/include
 export HDPL_LIB_PATH=$HOUMO_PATH/lib
 
 # paths for runtime
-export LD_LIBRARY_PATH=$HDPL_LIB_PATH:$TCIM_LIB_PATH
+export LD_LIBRARY_PATH=$HDPL_LIB_PATH:$TCIM_LIB_PATH:$HM800_HAL_PATH/hal/lib:$LD_LIBRARY_PATH
 export PYTHONPATH=$HMASSIST_PATH:$PYTHONPATH
 export PATH=$HOUMO_PATH/bin:$HMASSIST_PATH:$PATH
 
