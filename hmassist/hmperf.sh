@@ -22,8 +22,8 @@ if [ "$found_target" == false ]; then
   param="--target $target $@"
 fi
 
-cd $MODELZOO_PATH/utils/aottcimexec/
-if [ ! -f "tcimexec" ]; then
+cd $MODELZOO_PATH/utils/tcim_perf/
+if [ ! -f "tcim_perf" ]; then
   ./build.sh
 fi
 cd -
