@@ -42,7 +42,7 @@ def get_args() -> argparse.Namespace:
 
 
 def build(args=None):
-    # build model
+    """build and test houmo model."""
     format = 'YUV422SP'
     model_name = args.model_name
     batch = args.batch
@@ -56,10 +56,24 @@ def build(args=None):
     # 1. build model
     if stage == 'build' or stage == 'all':
         onnx_model = onnx.load(model_path)
-        compile_config={}
-        if batch > 1:
-            compile_config["tcim.spec_batch_num"] = batch
-        tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, compiler_cfg=compile_config)
+        compile_config={
+            "tcim.fuse_strategy": 0,
+            "tcim.gen_intrinsic": 2,
+            "tcim.schedule_strategy": 2,
+            "tcim.sync_strategy": 1,
+            "tcim.use_convadd": True,
+            "tcim.codegen_pic": False
+        }
+        if batch % 4 == 0:
+            compile_config["tcim.core_num"] = 4
+        input_cfg = {}
+        inputs = onnx_model.graph.input
+        for input in inputs:
+            dims = input.type.tensor_type.shape.dim
+            input_shape = [dim.dim_value for dim in dims]
+            input_shape[0] *= batch
+            input_cfg[input.name] = tcim.HMInput(shape=input_shape)
+        tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=compile_config)
         print(model_name + ' build completed.')
 
     # 2. test model

@@ -4,9 +4,9 @@ prettytable
 torch==1.12.1
 torchvision==0.13.1
 onnx==1.12.0
-onnxruntime==1.9.0
+onnxruntime
 tqdm
-pyyaml==6.0
+pyyaml
 xlsxwriter
-pycocotools==2.0.4
+pycocotools
 onnx_graphsurgeon

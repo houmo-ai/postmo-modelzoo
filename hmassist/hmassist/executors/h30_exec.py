@@ -152,15 +152,20 @@ class H30Exec(BaseExec, ABC):
 
     def build(self, build_options=None):
         logger.info("################  build started  ######################")
-        type_dict = {}
-        shape_dict = {}
-        convert_config = {'layout': 'NHWC'}
         t_start = time.time()
         onnx_model = onnx.load(self.quant_model_path)
         if not build_options:
             build_options = {}
-        if self.batch > 1:
-            build_options["tcim.spec_batch_num"] = self.batch
+        build_options={}
+        if self.batch % 4 == 0:
+            build_options["tcim.core_num"] = 4
+        input_cfg = {}
+        inputs = onnx_model.graph.input
+        for input in inputs:
+            dims = input.type.tensor_type.shape.dim
+            input_shape = [dim.dim_value for dim in dims]
+            input_shape[0] *= self.batch
+            input_cfg[input.name] = tcim.HMInput(shape=input_shape)
 
         logger.info("build_options={}".format(build_options))
 
@@ -173,13 +178,14 @@ class H30Exec(BaseExec, ABC):
               "-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0",
               "-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0/aarch64-linux-gnu",
             ]
-            tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, target_host="arm64", hdplcc_options=hdplcc_options)
+            tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=build_options,
+                                         target_host="arm64", hdplcc_options=hdplcc_options)
         else:
             model_name = self.model_name
-            tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, compiler_cfg=build_options)
+            tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=build_options)
         print(model_name + ' build completed.')
         
-        logger.info('{} saved as aot model in {}'.format(self.model_name, self.model_dir))
+        logger.info('{} saved in {}'.format(self.model_name, self.model_dir))
 
         logger.info("################  build finished  ######################")
         self.build_span = time.time() - t_start
@@ -254,6 +260,7 @@ class H30Exec(BaseExec, ABC):
                                            + '_' + input["name"] + '_input.npy')
             if os.path.exists(input_data_path):
                 input_data = np.load(input_data_path).astype(np.uint8)
+                input_data = np.concatenate([input_data for i in range(self.batch)], axis=0)
                 logger.info("golden input[{}] shape = {}, dtype = {}".format(input["name"], input_data.shape, input_data.dtype))
                 datas[input["name"]] = input_data
             else:
@@ -265,6 +272,7 @@ class H30Exec(BaseExec, ABC):
         golden_output_path = os.path.join(self.golden_data_path, name + '.npy')
         if os.path.exists(golden_output_path):
             output_data = np.load(golden_output_path, allow_pickle=True).item().get("output_tensor")
+            output_data = np.concatenate([output_data for i in range(self.batch)], axis=0)
             return output_data
         else:
             logger.warning("compare canceled while golden output not found -> {}".format(golden_output_path))

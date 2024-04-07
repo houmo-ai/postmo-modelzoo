@@ -114,7 +114,6 @@ def build(cfg):
     inputs = model.executor.get_golden_inputs()
     if inputs is not None:
         for input_name, input_data in inputs.items():
-            input_data = np.concatenate([input_data for i in range(model.executor.batch)], axis=0)
             input_data.tofile(os.path.join(save_dir, "{}_input.bin".format(input_name)))
         model.executor.set_fixed_out(True)
         start = time.time()
@@ -130,7 +129,6 @@ def build(cfg):
         save_data(output_data, save_dir, output_name)
         logger.info("tcim outputs saved in {}".format(save_dir))
         golden_output = model.executor.get_golden_output(output_name)
-        golden_output = np.concatenate([golden_output for i in range(model.executor.batch)], axis=0)
         logger.info("golden output[{}] shape = {}, dtype = {}".format(output_name, golden_output.shape, golden_output.dtype))
         is_match = (output_data == golden_output).all()
         cosine_dist = cosine_distance(output_data, golden_output)
@@ -191,7 +189,7 @@ def test(cfg):
                 logger.info("{} output[{}] shape = {}, dtype = {}".format(model.framework, output_name,
                                                                           output_data.shape, output_data.dtype))
             else:
-                logger.warning("compare canceled while {} output not found -> {}".format(model.framework))
+                logger.warning("compare canceled while {} output not found -> {}".format(model.framework, output_data_path))
                 return None
             is_match = (output_data == compare_data).all()
             cosine_dist = cosine_distance(output_data, compare_data)
@@ -328,7 +326,7 @@ def benchmark(config):
     import csv
     from prettytable import PrettyTable
 
-    header = ["ModelName", "Shape", "Dataset", "Batch", "CoreNum",  "Accuracy(onnx)",
+    header = ["ModelName", "Shape", "Dataset", "CoreNum", "Batch", "ThreadNum", "Accuracy(onnx)",
               "Accuracy({})".format(config['target']), "AccRelError", "Latency(ms)", "Throughput(qps)"]
     table = PrettyTable(header)
     t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
@@ -365,7 +363,7 @@ def benchmark(config):
         # perf
         if os.path.exists("output/hmperf.txt"):
             os.remove("output/hmperf.txt")
-        os.system("hmperf.sh --thread_num {}".format(thread_num))
+        os.system("hmperf.sh --batch {} --thread_num {}".format(batch, thread_num))
         if os.path.exists("output/hmperf.txt"):
             perf_result = read_yaml_to_dict("output/hmperf.txt")
         # eval
@@ -425,7 +423,7 @@ def benchmark(config):
             acc_result_hdpl = "NotTest"
             acc_result_err = "NotTest"
 
-        row = [model_name, shapes, dataset, batch, core_num,
+        row = [model_name, shapes, dataset, core_num, batch, thread_num,
                acc_result_onnx, acc_result_hdpl, acc_result_err,
                "{:.3f}".format(avg_latency),
                "{:.2f}".format(throughput)]
@@ -436,13 +434,6 @@ def benchmark(config):
         logger.info("<=== Benchmark {} completed".format(model_name))
         os.chdir(root)
     logger.info("\n{}".format(table))
-
-    # print span
-    # header = ["Phase", "Span/s"]
-    # table = PrettyTable(header)
-    # table.add_row(["ptq", "{:.3f}".format(hmexec.quantize_span)])
-    # table.add_row(["build", "{:.3f}".format(hmexec.build_span)])
-    # logger.info("\n{}".format(table))
     logger.info("benchmark completed")
 
 
@@ -477,7 +468,7 @@ if __name__ == "__main__":
     check_args(args)
 
     # TODO: get version
-    VERSION = "v0.1.0"
+    VERSION = "v0.2.0"
     logger.info("{} with HmAssist version: {}".format(args.type, VERSION))
 
     run(args)
