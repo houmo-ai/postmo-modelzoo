@@ -76,8 +76,8 @@ def get_model(cfg):
             exit(-1)
         del sys.modules["hm_model"]
     except Exception as e:
-        logger.warning("can not find hm_model.py, use default model will not support demo/perf/eval: {}"
-                       .format(e))
+        logger.warning("can not load impl class: {}, use default model will not support demo/perf/eval: {}"
+                       .format(model_impl_class, e))
         model = BaseModel(
             executor=executor,
             dataset=None,
@@ -100,7 +100,7 @@ def build(cfg):
     if not check_config(cfg):
         exit(-1)
     logger.info("{}".format(cfg))
-    model = get_model(cfg)   
+    model = get_model(cfg)
     model.executor.build(model.build_options())
 
     # compare golden data
@@ -327,7 +327,7 @@ def benchmark(config):
     from prettytable import PrettyTable
 
     header = ["ModelName", "Shape", "Dataset", "CoreNum", "Batch", "ThreadNum", "Accuracy(onnx)",
-              "Accuracy({})".format(config['target']), "AccRelError", "Latency(ms)", "Throughput(qps)"]
+              "Accuracy({})".format(config['target']), "AccRelError", "Latency(ms)", "Throughput"]
     table = PrettyTable(header)
     t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
     if not os.path.exists("reports"):

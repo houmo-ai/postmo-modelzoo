@@ -85,8 +85,12 @@ autodrive_yolop:
     - autodrive_yolop_perf:
         script: models/autodrive/yolop/perf.sh
         args: null
+    - backbone_yolop_test:
+        script: models/autodrive/yolop/test.sh
+        args: null
   test:
     - autodrive_yolop_perf
+    - autodrive_yolop_test
 autodrive_petr:
   include:
     - models/autodrive/petr

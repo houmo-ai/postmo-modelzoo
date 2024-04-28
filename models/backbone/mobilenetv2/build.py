@@ -43,7 +43,6 @@ def get_args() -> argparse.Namespace:
 
 def build(args=None):
     """build and test houmo model."""
-    format = 'YUV422SP'
     model_name = args.model_name
     batch = args.batch
     stage = args.stage
@@ -55,7 +54,14 @@ def build(args=None):
 
     # 1. build model
     onnx_model = onnx.load(model_path)
-    compile_config={}
+    compile_config = {
+        "tcim.fuse_strategy": 0,
+        "tcim.gen_intrinsic": 2,
+        "tcim.schedule_strategy": 2,
+        "tcim.sync_strategy": 1,
+        "tcim.use_convadd": True,
+        "tcim.codegen_pic": False
+    }
     if batch % 4 == 0:
         compile_config["tcim.core_num"] = 4
     input_cfg = {}
@@ -71,20 +77,21 @@ def build(args=None):
     # 2. test model
     if stage == 'test' or stage == 'all':
         # 2.1 load model
-        module = tcim.runtime.load(model_name + ".hmm.so")
+        module = tcim.runtime.load(model_name + ".hmm")
 
         # 2.2 set input with golden
         input_num = module.get_num_inputs()
         for id in range(input_num):
-            input_name = module.get_input_name_by_index(id)
-            input_info = module.get_input_by_name(input_name).numpy()
-            print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype, format))
+            input_name = module.get_input_name(id)
+            input_info = module.get_input_info(input_name)
+            print("input_info[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape,
+                                                                         input_info.dtype, input_info.format.name))
             input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype("int8")
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
             print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
-            module.set_input(input_name, input_data, format)
+            module.set_input(input_name, input_data)
 
         # 2.3 infer model
         module.run()
@@ -92,9 +99,12 @@ def build(args=None):
         # 2.4. get output and compare with golden
         result_check = True
         output_num = module.get_num_outputs()
-        for id in range(0, output_num):
-            output_name = module.get_output_name_by_index(id)
-            output_data = module.get_output_by_name(output_name).numpy()
+        for id in range(output_num):
+            output_name = module.get_output_name(id)
+            output_info = module.get_output_info(output_name, is_quanted=True)
+            print("output_info[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape,
+                                                                               output_info.dtype, output_info.format.name))
+            output_data = module.get_output(output_name, is_quanted=True)
             print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
             output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_with_act', output_name + '.npy')
             if os.path.exists(output_data_path):
@@ -115,6 +125,7 @@ def build(args=None):
                 print("[compare] golden output [{}] shape not match {} vs {}"
                             .format(output_name, golden_output.shape, output_data.shape))
         if not result_check:
+            print("[error] result check failed.")
             exit(-1)
 
 

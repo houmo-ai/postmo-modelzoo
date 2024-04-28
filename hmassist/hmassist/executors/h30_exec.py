@@ -7,7 +7,6 @@ from abc import ABC
 import onnx
 import torch
 import re
-import tvm
 import tcim
 from ..utils import logger
 from ..utils.utils import get_random_data
@@ -156,7 +155,6 @@ class H30Exec(BaseExec, ABC):
         onnx_model = onnx.load(self.quant_model_path)
         if not build_options:
             build_options = {}
-        build_options={}
         if self.batch % 4 == 0:
             build_options["tcim.core_num"] = 4
         input_cfg = {}
@@ -169,20 +167,22 @@ class H30Exec(BaseExec, ABC):
 
         logger.info("build_options={}".format(build_options))
 
+        hdplcc_options = []
+        # hdplcc_options.append("-O2")
+
         if os.getenv("TCIM_CROSS_COMPILE") == '1':
             logger.info("cross compile enabled as aarch64 while TCIM_CROSS_COMPILE=1")
             model_name = self.model_name + "_aarch64"
-            hdplcc_options = [
-              "--target=aarch64-linux-gnu",
-              "--sysroot=/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/libc",
-              "-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0",
-              "-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0/aarch64-linux-gnu",
-            ]
+            hdplcc_options.append("--target=aarch64-linux-gnu")
+            hdplcc_options.append("--sysroot=/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/libc")
+            hdplcc_options.append("-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0")
+            hdplcc_options.append("-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0/aarch64-linux-gnu")
             tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=build_options,
                                          target_host="arm64", hdplcc_options=hdplcc_options)
         else:
             model_name = self.model_name
-            tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=build_options)
+            tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=build_options,
+                                         hdplcc_options=hdplcc_options)
         print(model_name + ' build completed.')
         
         logger.info('{} saved in {}'.format(self.model_name, self.model_dir))
@@ -205,20 +205,16 @@ class H30Exec(BaseExec, ABC):
             else:
                 input_data = inputs
             # print(input_data.shape, input_data.dtype)
-            if input["image"]["format"] in ["YUV420", "YUV422", "YUV444"]:
-                image_format = input["image"]["format"] + 'SP'
-            else:
-                image_format = input["image"]["format"]
-            self.module.set_input(input["name"], input_data, image_format)
+            self.module.set_input(input["name"], input_data)
         self.module.run()
         outputs = {}
         output_num = self.module.get_num_outputs()
         for id in range(0, output_num):
-            name = self.module.get_output_name_by_index(id)
+            name = self.module.get_output_name(id)
             if self.is_fixed_out:
-                output_data = self.module.get_output_by_name(name).numpy()
+                output_data = self.module.get_output(name, is_quanted=True)
             else:
-                output_data = self.module.get_float_output_by_name(name).numpy()
+                output_data = self.module.get_output(name, is_quanted=False)
             if (len(output_data.shape) == 4):  # toolchain output is NHWC
                 output_data = np.transpose(output_data, (0, 3, 1, 2))
             outputs[name] = output_data
@@ -302,11 +298,12 @@ class H30Exec(BaseExec, ABC):
         input_num = self.module.get_num_inputs()
         for id in range(0, input_num):
             input_info = {}
-            name = self.module.get_input_name_by_index(id)
-            input_data = self.module.get_input(id).numpy()
+            name = self.module.get_input_name(id)
+            input_data = self.module.get_input_info(name)
             input_info["name"] = name
             input_info["shape"] = input_data.shape
             input_info["dtype"] = input_data.dtype
+            input_info["format"] = input_data.format
             input_infos.append(input_info)
         return input_infos
 
@@ -315,11 +312,12 @@ class H30Exec(BaseExec, ABC):
         output_num = self.module.get_num_outputs()
         for id in range(0, output_num):
             output_info = {}
-            name = self.module.get_output_name_by_index(id)
-            output_data = self.module.get_output_by_name(name).numpy()
+            name = self.module.get_output_name(id)
+            output_data = self.module.get_output_info(name, is_quanted=True)
             output_info["name"] = name
             output_info["shape"] = output_data.shape
             output_info["dtype"] = output_data.dtype
+            output_info["format"] = output_data.format
             output_infos.append(output_info)
         return output_infos
 

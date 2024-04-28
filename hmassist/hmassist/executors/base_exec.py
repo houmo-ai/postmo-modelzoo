@@ -174,13 +174,17 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         input_num = len(self.input_info)
         logger.info("{} input num = {}:".format(self.target, input_num))
         for _input in self.input_info:
-            logger.info("{} input[{}] shape = {}, dtype = {}".format(self.target, _input["name"], _input["shape"], _input["dtype"]))
+            logger.info("{} input[{}] shape = {}, dtype = {}, format = {}".format(self.target, _input["name"],
+                                                                                  _input["shape"], _input["dtype"],
+                                                                                  _input["format"].name))
 
     def print_output_info(self):
         output_num = len(self.output_info)
         logger.info("{} output num = {}:".format(self.target, output_num))
-        for output in self.output_info:
-            logger.info("{} output[{}] shape = {}, dtype = {}".format(self.target, output["name"], output["shape"], output["dtype"]))
+        for _output in self.output_info:
+            logger.info("{} output[{}] shape = {}, dtype = {}, format = {}".format(self.target, _output["name"],
+                                                                                   _output["shape"], _output["dtype"],
+                                                                                   _output["format"].name))
 
     def get_relay_mac(self):
         """get relay func MAC count"""

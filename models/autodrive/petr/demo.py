@@ -442,51 +442,39 @@ def get_bboxes(preds_dicts, img_metas, max_num=300, score_threshold=0.6, num_cla
 
 
 def infer(inputs, batch=1):
-    part1 = tcim.runtime.load("petr_part1.hmm.so")
-    #input_name = onnx_model.graph.input[0].name
+    part1 = tcim.runtime.load("petr_part1.hmm")
     for name in inputs:
         input_data = inputs[name]
-        # input_data_shape0 = [batch_num, 3, 320, 800]
-        # data_dir = local_path
-        # model_name = "petr_qat_part1"
-        # input_data_file_name = os.path.join(data_dir, 'petr_batch_input.npy')
-        # input_data = np.load(input_data_file_name, allow_pickle = True).astype('uint8')
-        # batch_input_data = input_data
-        # for idx in range(1, (batch_num // 6)):
-        #     batch_input_data = np.vstack((batch_input_data, input_data))
-        # print("batch_input_data shape : ", batch_input_data.shape)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
-        part1.set_input(name, input_data, "YUV422SP")
-    
-    #import pdb;pdb.set_trace()
-    part2 = tcim.runtime.load("petr_part2.hmm.so")
+        part1.set_input(name, input_data)
+
+    part2 = tcim.runtime.load("petr_part2.hmm")
     part2_input_name = "pts_bbox_head_transformer_reshape_0_reshape"
-    
-    round_num = 1
+
     run_count = 50
     if os.getenv("HDPL_PLATFORM") == "ISIM":
         run_count = 1
     import time
     start_time = time.time()
     for i in range(run_count):
-        part1.run(round_num)
-        part1.sync_run()
-        part1_output = part1.get_dev_output("pts_bbox_head_transformer_reshape_0_reshape")
+        part1.run()
+        part1.sync()
+        part1_output = part1.get_dev_output(part2_input_name)
         part2.set_input(part2_input_name, part1_output)
-        part2.run(round_num)
-        part2.sync_run()
+        part2.run()
+        part2.sync()
     total_time = time.time() - start_time
 
     outputs = []
     for i in range(part2.get_num_outputs()):
-        output_name = part2.get_output_name_by_index(i)
-        output = part2.get_output(i).numpy()  # .astype('int32')
+        output_name = part2.get_output_name(i)
+        output = part2.get_output(output_name, is_quanted=True)
         outputs.append(output)
         print("output[{}] name: {}, shape: {}".format(i, output_name, output.shape))
 
     print("=========run done=======")
     print("++++++++++++ total time is {} +++++++++++++++++".format(total_time))
-    res_latency_per_batch = ((total_time) * 1000 / round_num / run_count) / batch
+    res_latency_per_batch = ((total_time) * 1000 / run_count) / batch
     throughput_per_six_batch = 1000 / res_latency_per_batch
     print('\033[92;20mInference average latency: %.3fms \033[0m' % res_latency_per_batch)
     print('\033[92;20mInference Throughput(QPS): %.2ffps \033[0m' % (throughput_per_six_batch))
@@ -519,20 +507,9 @@ def demo(batch=1):
     inputs = {"img": input_data}
     print("input_data shape={}".format(input_data.shape))
 
-    # input_data_file_name = 'petr_qat_part1_auto_export/petr_batch_input.npy'
-    # input_data0 = np.load(input_data_file_name, allow_pickle = True).astype('uint8')
-    # inputs = {"img": input_data0}
-    # cosine_dist = cosine_distance(input_data, input_data0, check_shape=False)
-    # print("input_data_ref shape={}, cosine_dist={}".format(input_data.shape, cosine_dist))
-
     outputs = infer(inputs, batch)
 
     reference = torch.from_numpy(np.load("reference.npy")) # 固定值
-    # ref_out_0 = np.load("out_0.npy") # 输出1
-    # ref_out_1 = np.load("out_1.npy") # 输出2
-    # cosine_dist0 = cosine_distance(outputs[0][:1], ref_out_0)
-    # cosine_dist1 = cosine_distance(outputs[1][:1], ref_out_1)
-    # print("cosine_dist: {}, {}".format(cosine_dist0, cosine_dist1))
     out_0 = torch.from_numpy(outputs[0][:1])
     out_1 = torch.from_numpy(outputs[1][:1])
 

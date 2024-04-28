@@ -8,7 +8,9 @@ export HMASSIST_PATH
 
 export HMASSIST_TARGET=H30
 export CMAKE_CONFIG_PATH=$MODELZOO_PATH/release.cmake
-export MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo/release
+if [[ -z $MODELZOO_URL ]]; then
+  export MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo/release
+fi
 
 # set hal library log level
 export HM800_HAL_CONSOLE_LEVEL=0
@@ -32,7 +34,7 @@ export HDPL_INC_PATH=$HOUMO_PATH/include
 export HDPL_LIB_PATH=$HOUMO_PATH/lib
 
 # paths for runtime
-export LD_LIBRARY_PATH=$HDPL_LIB_PATH:$TCIM_LIB_PATH:$HM800_HAL_PATH/hal/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$HDPL_LIB_PATH:$TCIM_LIB_PATH:$LD_LIBRARY_PATH
 export PYTHONPATH=$HMASSIST_PATH:$PYTHONPATH
 export PATH=$HOUMO_PATH/bin:$HMASSIST_PATH:$PATH
 

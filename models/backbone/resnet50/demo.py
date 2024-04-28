@@ -1,66 +1,72 @@
-import os
-import cv2
 import numpy as np
-import tvm.tcim as tcim
-
-module = tcim.load_so("resnet50")
-
-img_path = "../../data/datasets/imagenet/ILSVRC2012_val_00000004.JPEG"
-if not os.path.exists(img_path):
-    print("The img path not exist -> {}".format(img_path))
-    exit(-1)
-print("process: {}".format(img_path))
-img = cv2.imread(img_path)
-if img is None:
-    print("Failed to load image -> {}".format(img_path))
-    exit(-1)
-if img.shape[1] > img.shape[0]:
-    h = 256
-    w = round(img.shape[1] / img.shape[0] * 256)
-else:
-    h = round(img.shape[0] / img.shape[1] * 256)
-    w = 256
-img = cv2.resize(img, (w, h))  # HWC
-h1 = round((h-224)/2)
-h2 = h1 + 224
-w1 = round((w-224)/2)
-w2 = w1 + 224
-img = img[h1:h2, w1:w2]
-img = np.transpose(img, (2, 0, 1)).astype(np.float32)  # CHW
-from hmassist.utils.transform import BGR2YUV
+import cv2
 import torch
-rgb2yuv_func = BGR2YUV(fmt="422")
-img0 = rgb2yuv_func(torch.tensor(img)).numpy()  # HWC
-# img = np.transpose(img, (2, 0, 1))  # CHW
-img0 = np.expand_dims(img0, 0).astype(np.uint8)  # NCHW
+import tcim
 
-from torchvision.datasets.folder import pil_loader
-img1 = pil_loader(img_path)
-import torchvision.transforms as transforms
-from hmassist.utils.transform import RGB2YUV
-from hmassist.utils.transform import ToTensorNotNormal
-transform = transforms.Compose(
-    [
-        transforms.Resize(256), transforms.CenterCrop(224),
-        ToTensorNotNormal(), RGB2YUV(),
-    ],
-)
-img1 = transform(img1)
-img1 = np.expand_dims(img1.numpy().astype(np.uint8), 0)
 
-module.set_input("input.1", img0, "YUV422SP")
-module.run()
+def softmax(x, axis=1):
+    """
+    :param x: input array
+    :param axis: softmax axis
+    :return: result of softmax
+    """
+    e_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
+    return e_x / np.sum(e_x, axis=axis, keepdims=True)
 
-outputs = {}
-output_num = module.get_num_outputs()
-for id in range(0, output_num):
-    name = module.get_output_name_by_index(id)
-    outputs[name] = module.get_float_output_by_name(name).numpy()
 
-# postprocess
-for name, data in outputs.items():
-    from hmassist.utils.postprocess import softmax
-    output = softmax(data)
-    max_idx = np.argmax(output, axis=1).flatten()[0]
-    max_prob = output.flatten()[max_idx]
-    print("predict cls = {}, prob = {:.6f}".format(max_idx, max_prob))
+if __name__ == '__main__':
+    print("resnet50 demo start...")
+    print("tcim runtime version: {}".format(tcim.runtime.get_version()))
+
+    # 1. load model
+    module = tcim.runtime.load("resnet50.hmm")
+
+    # 2. preprocess
+    input_data = cv2.imread("../../../data/datasets/imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000003.JPEG")
+    input_data = cv2.cvtColor(input_data, cv2.COLOR_BGR2RGB)
+    input_data = cv2.resize(input_data, (224, 224))  # HWC uint8
+    input_data = np.transpose(input_data, (2, 0, 1))  # CHW uint8
+    input_data = np.expand_dims(input_data, axis=0)  # NCHW uint8
+    input_data = torch.tensor(input_data.astype(np.float32))  # NHWC float32
+    input_data = torch.squeeze(input_data, 0)  # HWC float32
+    from hmassist.utils.transform import BGR2YUV
+    rgb2yuv_func = BGR2YUV(fmt='YUV422')
+    input_data = torch.unsqueeze(rgb2yuv_func(input_data), 0).numpy()  # NHWC float32
+    input_data = input_data.astype(np.uint8)
+
+    # 3. set input
+    input_num = module.get_num_inputs()
+    for id in range(0, input_num):
+        input_name = module.get_input_name(id)
+        input_info = module.get_input_info(input_name)
+        print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype,
+                                                                     input_info.format.name))
+        module.set_input(input_name, input_data)
+
+    # 4. run
+    module.run()
+
+    # 5. get output
+    result_check = True
+    output_num = module.get_num_outputs()
+    for id in range(0, output_num):
+        output_name = module.get_output_name(id)
+        output_info = module.get_output_info(output_name, is_quanted=False)
+        print("output[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape, output_info.dtype,
+                                                                      output_info.format.name))
+        output_data = module.get_output(output_name, is_quanted=False)
+
+    # 6. postprocess
+    output_data = softmax(output_data)
+    topk = 5
+    pred_list = np.argsort(-output_data, axis=1, kind="quicksort").flatten()[0:topk]
+    prob_list = output_data.flatten()
+    for i, id in enumerate(pred_list):
+        print("top {}: predict cls = {}, prob = {:.6f}".format(i+1, id, prob_list[id]))
+
+    expected = 230
+    if (pred_list[0] != expected):
+        print("[error] predict result != {}".format(expected))
+        exit(-1)
+
+    print("resnet50 demo completed.")

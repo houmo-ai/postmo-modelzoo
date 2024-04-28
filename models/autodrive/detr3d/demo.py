@@ -374,7 +374,7 @@ def get_bboxes(preds_dicts, img_metas, max_num=300, score_threshold=0.6, num_cla
 
 
 def infer(inputs, batch=1):
-    part1 = tcim.runtime.load("detr3d_part1.hmm.so")
+    part1 = tcim.runtime.load("detr3d_part1.hmm")
     #input_name = onnx_model.graph.input[0].name
     for name in inputs:
         input_data = inputs[name]
@@ -388,37 +388,36 @@ def infer(inputs, batch=1):
         #     batch_input_data = np.vstack((batch_input_data, input_data))
         # print("batch_input_data shape : ", batch_input_data.shape)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
-        part1.set_input(name, input_data, "YUV422SP")
+        part1.set_input(name, input_data)
     
     #import pdb;pdb.set_trace()
     part2 = tcim.runtime.load("detr3d_part2.hmm.so")
     part2_input_name = "pts_bbox_head_transformer_reshape_0_reshape"
     
-    round_num = 1
     run_count = 50
     if os.getenv("HDPL_PLATFORM") == "ISIM":
         run_count = 1
     
     start_time = time.time()
     for i in range(run_count):
-        part1.run(round_num)
-        part1.sync_run()
+        part1.run()
+        part1.sync()
         # part1_output = petr_part1.get_dev_output("pts_bbox_head_transformer_reshape_0_reshape")
         # part2.set_input(part2_input_name, part1_output)
-        part2.run(round_num)
-        part2.sync_run()
+        part2.run()
+        part2.sync()
     total_time = time.time() - start_time
 
     outputs = []
     for i in range(part2.get_num_outputs()):
-        output_name = part2.get_output_name_by_index(i)
-        output = part2.get_output(i).numpy()  # .astype('int32')
+        output_name = part2.get_output_name(i)
+        output = part2.get_output(output_name, is_quanted=True)
         outputs.append(output)
         print("output[{}] name: {}, shape: {}".format(i, output_name, output.shape))
 
     print("=========run done=======")
     print("++++++++++++ total time is {} +++++++++++++++++".format(total_time))
-    res_latency_per_batch = ((total_time) * 1000 / round_num / run_count) / batch
+    res_latency_per_batch = ((total_time) * 1000 / run_count) / batch
     throughput_per_six_batch = 1000 / res_latency_per_batch
     print('\033[92;20mInference average latency: %.3fms \033[0m' % res_latency_per_batch)
     print('\033[92;20mInference Throughput(QPS): %.2ffps \033[0m' % (throughput_per_six_batch))

@@ -416,16 +416,16 @@ int main(int argc, char *argv[]) {
   float avg_cost = total_cost / test_num;
   float qps = (1000.0 / (total_cost / test_num)) * batch;
 
-  std::cout << "\033[0;31mInference average latency: "
-            << avg_latency << "ms" << "\033[0m" << std::endl;
-  std::cout << "\033[0;31mInference max latency: "
-            << max_latency << "ms" << "\033[0m" << std::endl;
-  std::cout << "\033[0;31mInference Throughput total cost: "
-            << total_cost << "ms" << "\033[0m" << std::endl;
-  std::cout << "\033[0;31mInference Throughput average cost: "
-            << avg_cost << "ms" << "\033[0m" << std::endl;
-  std::cout << "\033[0;32mInference Throughput(QPS): "
-            << qps << "\033[0m" << std::endl;
+  std::cout << "\x1b[91;20mInference average latency: "
+            << avg_latency << "ms" << "\x1b[0m" << std::endl;
+  std::cout << "\x1b[91;20mInference max latency: "
+            << max_latency << "ms" << "\x1b[0m" << std::endl;
+  std::cout << "\x1b[91;20mInference Throughput total cost: "
+            << total_cost << "ms" << "\x1b[0m" << std::endl;
+  std::cout << "\x1b[91;20mInference Throughput average cost: "
+            << avg_cost << "ms" << "\x1b[0m" << std::endl;
+  std::cout << "\x1b[92;20mInference Throughput(QPS): "
+            << qps << "\x1b[0m" << std::endl;
 
   if (output_file.size() != 0) {
     std::cout << "Save result to: " << output_file << std::endl;

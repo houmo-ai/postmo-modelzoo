@@ -98,7 +98,9 @@ def build_and_test(model_name, model_path):
     #     'tcim.codegen_pic': True,
     #     "tcim.for_benchmark": True
     # }
-    compile_config = {"tcim.fuse_strategy": 1, "tcim.gen_intrinsic": 0, "tcim.sync_strategy": 1, "tcim.mem_plan_strategy": "linearscan"}
+    # compile_config = {"tcim.fuse_strategy": 1, "tcim.gen_intrinsic": 0, "tcim.sync_strategy": 1, "tcim.mem_plan_strategy": "linearscan"}
+    compile_config = {}
+
     target = tvm.target.Target('hdpl', host='c')
     with tvm.transform.PassContext(opt_level=4, config=compile_config):
         graph, lib, params = relay.build(
@@ -178,7 +180,8 @@ def audit(model_name, mode="dichotomy"):
     right = len(nodes_list) - 1
     history = {}
 
-    result, cos_dist, name, shape = audit_submodel(model_name, model_path, input_names, nodes_list[right], right)
+    output_names = nodes_list[right].replace("/", "_")
+    result, cos_dist, name, shape = audit_submodel(model_name, model_path, input_names, output_names, right)
     history[right] = (result, cos_dist, name, shape)
     print("cur: [{}, {}] history: {}".format(left, right, history))
 
@@ -192,7 +195,8 @@ def audit(model_name, mode="dichotomy"):
             # break the loop if the mid node is tested
             if history.get(mid) is not None:
                 break
-            result, cos_dist, name, shape = audit_submodel(model_name, model_path, input_names, nodes_list[mid], mid)
+            output_names = nodes_list[mid].replace("/", "_")
+            result, cos_dist, name, shape = audit_submodel(model_name, model_path, input_names, output_names, mid)
             history[mid] = (result, cos_dist, name, shape)
             print("cur: [{}, {}] history: {}".format(left, right, history))
             if result:
