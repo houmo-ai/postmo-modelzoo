@@ -3,13 +3,15 @@
 from hmassist.models.detector import Detector
 from hmassist.utils.preprocess import letterbox
 from hmassist.utils.postprocess import non_max_suppression, scale_coords
-# from hmassist.utils.box_utils import non_max_suppression, scale_coords
+from ultralytics.utils.plotting import Annotator, colors
+from hmassist.datasets.coco import coco80_labels
+
 import numpy as np
 import os
 import cv2
 import torch
 import time
-import torchvision
+
 
 class YoloV5(Detector):
 
@@ -58,9 +60,16 @@ class YoloV5(Detector):
         print("box num = {}".format(len(boxes)))
         for det in boxes:
             (x1, y1, x2, y2), conf, cls = list(map(int, det[0:4])), det[4], int(det[5])
-            cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 0, 255), 1, 8)
-            print("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(cls)))
-        cv2.imwrite(os.path.join(save_results, filename), cv_image)
+            # cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 0, 255), 1, 8)
+            from ultralytics.utils.plotting import Annotator, colors
+            from hmassist.datasets.coco import coco80_labels
+            label = coco80_labels[cls] + " {:.2f}".format(conf)
+            annotator = Annotator(cv_image, line_width=2, example=str(cls))
+            annotator.box_label((x1, y1, x2, y2), label, color=colors(cls, True))
+            print("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(cls)), flush=True)
+        save_path = os.path.join(save_results, filename)
+        cv2.imwrite(save_path, cv_image)
+        print("demo results saved to", save_path)
 
     def yolo_detect(self, feats):
         # in.shape = out.shape: 1x3x80x80x85 1x3x40x40x85 1x3x20x20x85

@@ -14,6 +14,7 @@ import tvm.tcim as tcim
 from tvm.relay.backend import Executor
 from hmassist.utils.dist_metrics import cosine_distance
 from hmassist.utils import logger
+from hmassist.utils.utils import sanitize_name
 
 def get_args():
     """Parse commandline"""
@@ -180,7 +181,7 @@ def audit(model_name, mode="dichotomy"):
     right = len(nodes_list) - 1
     history = {}
 
-    output_names = nodes_list[right].replace("/", "_")
+    output_names = sanitize_name(nodes_list[right])
     result, cos_dist, name, shape = audit_submodel(model_name, model_path, input_names, output_names, right)
     history[right] = (result, cos_dist, name, shape)
     print("cur: [{}, {}] history: {}".format(left, right, history))
@@ -195,7 +196,7 @@ def audit(model_name, mode="dichotomy"):
             # break the loop if the mid node is tested
             if history.get(mid) is not None:
                 break
-            output_names = nodes_list[mid].replace("/", "_")
+            output_names = sanitize_name(nodes_list[mid])
             result, cos_dist, name, shape = audit_submodel(model_name, model_path, input_names, output_names, mid)
             history[mid] = (result, cos_dist, name, shape)
             print("cur: [{}, {}] history: {}".format(left, right, history))

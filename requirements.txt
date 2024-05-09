@@ -10,3 +10,4 @@ pyyaml
 xlsxwriter
 pycocotools
 onnx_graphsurgeon
+ultralytics

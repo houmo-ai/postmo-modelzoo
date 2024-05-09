@@ -182,9 +182,9 @@ class H30Exec(BaseExec, ABC):
         else:
             model_name = self.model_name
             tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=build_options,
-                                         hdplcc_options=hdplcc_options)
+                                         hdplcc_options=hdplcc_options)  # output_layout={"layout": "NCHW"}
         print(model_name + ' build completed.')
-        
+
         logger.info('{} saved in {}'.format(self.model_name, self.model_dir))
 
         logger.info("################  build finished  ######################")

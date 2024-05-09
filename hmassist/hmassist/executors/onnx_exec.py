@@ -8,6 +8,18 @@ from .base_exec import BaseExec
 from ..utils import logger
 
 
+from enum import IntEnum
+
+
+class Format(IntEnum):
+    YUV420SP = 0
+    YUV422SP = 1
+    YUV444SP = 2
+    RGB888 = 3
+    BGR888 = 4
+    ND = 5
+
+
 class OnnxExec(BaseExec, ABC):
     def __init__(self, cfg: dict):
         super(OnnxExec, self).__init__(cfg)
@@ -55,6 +67,7 @@ class OnnxExec(BaseExec, ABC):
             input_info["name"] = node.name
             input_info["dtype"] = node.type
             input_info["shape"] = node.shape
+            input_info["format"] = Format.RGB888
             input_infos.append(input_info)
         return input_infos
 
@@ -65,5 +78,6 @@ class OnnxExec(BaseExec, ABC):
             output_info["name"] = node.name
             output_info["dtype"] = node.type
             output_info["shape"] = node.shape
+            output_info["format"] = Format.ND
             output_infos.append(output_info)
         return output_infos

@@ -71,3 +71,7 @@ def get_md5(data):
     md5 = hashlib.md5()
     md5.update(data)
     return md5.hexdigest()
+
+
+def sanitize_name(name: str):
+    return name.replace(":", "_").replace("/", "_")

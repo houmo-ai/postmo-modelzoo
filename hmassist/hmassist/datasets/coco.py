@@ -5,6 +5,90 @@ from .base_dataset import BaseDataset
 from ..utils import logger
 
 
+coco80_labels = [
+    "person",
+    "bicycle",
+    "car",
+    "motorbike",
+    "aeroplane",
+    "bus",
+    "train",
+    "truck",
+    "boat",
+    "traffic light",
+    "fire hydrant",
+    "stop sign",
+    "parking meter",
+    "bench",
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+    "backpack",
+    "umbrella",
+    "handbag",
+    "tie",
+    "suitcase",
+    "frisbee",
+    "skis",
+    "snowboard",
+    "sports ball",
+    "kite",
+    "baseball bat",
+    "baseball glove",
+    "skateboard",
+    "surfboard",
+    "tennis racket",
+    "bottle",
+    "wine glass",
+    "cup",
+    "fork",
+    "knife",
+    "spoon",
+    "bowl",
+    "banana",
+    "apple",
+    "sandwich",
+    "orange",
+    "broccoli",
+    "carrot",
+    "hot dog",
+    "pizza",
+    "donut",
+    "cake",
+    "chair",
+    "sofa",
+    "pottedplant",
+    "bed",
+    "diningtable",
+    "toilet",
+    "tvmonitor",
+    "laptop",
+    "mouse",
+    "remote",
+    "keyboard",
+    "cell phone",
+    "microwave",
+    "oven",
+    "toaster",
+    "sink",
+    "refrigerator",
+    "book",
+    "clock",
+    "vase",
+    "scissors",
+    "teddy bear",
+    "hair drier",
+    "toothbrush",
+]
+
+
 class COCO2017Val(BaseDataset):
     """提供图片path和label
     """
@@ -12,18 +96,28 @@ class COCO2017Val(BaseDataset):
         self._root_path = root_path
         self._batch_size = batch_size
         if not os.path.exists(self._root_path):
-            logger.error("root_path not exits -> {}".format(self._root_path))
+            logger.error("root path not exits -> {}".format(self._root_path))
             exit(-1)
 
         self._annotations_file = os.path.join(self._root_path, "..", "annotations", "instances_val2017.json")
         self._annotations_kpt = os.path.join(self._root_path, "..", "annotations", "person_keypoints_val2017.json")
         if not os.path.exists(self._annotations_file):
-            logger.error("annotations_file not exist -> {}".format(self._annotations_file))
+            logger.error("annotations file not exist -> {}".format(self._annotations_file))
             exit(-1)
 
-        self._label_files = list()
+        # self._label_files = list()
         self._img_files = list()
         self._image_ids = list()
+
+        self._label_file = os.path.join(self._root_path, "..", "annotations", "coco.names")
+        if os.path.exists(self._label_file):
+            self._labels = list()
+            with open(self._label_file, 'r') as file:
+                for line in file:
+                    self._labels.append(line.strip())
+        else:
+            logger.warning("labels file not exist -> {}, using default labels.".format(self._label_file))
+            self._labels = coco80_labels
 
         self._filepath = os.path.join(self._root_path, "..", "val2017.txt")
         if os.path.exists(self._filepath):

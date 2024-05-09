@@ -26,6 +26,7 @@ from hmassist.utils.check import (
 from hmassist.executors.h30_exec import H30Exec
 from hmassist.executors.onnx_exec import OnnxExec
 from hmassist.models.base_model import BaseModel
+from hmassist.utils.utils import sanitize_name
 
 
 def set_logger(op, log_dir, filename):
@@ -114,7 +115,8 @@ def build(cfg):
     inputs = model.executor.get_golden_inputs()
     if inputs is not None:
         for input_name, input_data in inputs.items():
-            input_data.tofile(os.path.join(save_dir, "{}_input.bin".format(input_name)))
+            input_save_name = sanitize_name(input_name)
+            input_data.tofile(os.path.join(save_dir, "{}_input.bin".format(input_save_name)))
         model.executor.set_fixed_out(True)
         start = time.time()
         outputs = model.executor.infer(inputs)
@@ -122,19 +124,21 @@ def build(cfg):
         logger.info("[infer] cost {:.3f}ms".format(cost * 1000))
         # 临时添加NCHW
         # output_data = np.transpose(output_data, (0, 2, 3, 1))
+    logger.info("tcim inputs saved in {}".format(save_dir))
     sum_cos = 0.0
     for output_name, output_data in outputs.items():
         logger.info("{} output[{}] shape = {}, dtype = {}".format(model.target, output_name,
                                                                   output_data.shape, output_data.dtype))
-        save_data(output_data, save_dir, output_name)
-        logger.info("tcim outputs saved in {}".format(save_dir))
-        golden_output = model.executor.get_golden_output(output_name)
+        output_save_name = sanitize_name(output_name)
+        save_data(output_data, save_dir, output_save_name)
+        golden_output = model.executor.get_golden_output(output_save_name)
         logger.info("golden output[{}] shape = {}, dtype = {}".format(output_name, golden_output.shape, golden_output.dtype))
         is_match = (output_data == golden_output).all()
         cosine_dist = cosine_distance(output_data, golden_output)
         sum_cos += cosine_dist
         logger.info("[compare] {} vs quant output [{}] match={}, similarity={:.6f}"
                     .format(model.target, output_name, is_match, cosine_dist))
+    logger.info("tcim outputs saved in {}".format(save_dir))
     logger.info("[compare] {} vs quant output average similarity={:.6f}".format(model.target, sum_cos/len(outputs)))
     logger.info("build completed")
     del model
@@ -176,14 +180,16 @@ def test(cfg):
         # 临时添加NCHW
         # output_data = np.transpose(output_data, (0, 2, 3, 1))
         logger.info("{} output[{}] shape = {}, dtype = {}".format(model.target, output_name, output_data.shape, output_data.dtype))
-        save_data(output_data, save_dir, output_name)
+        output_save_name = sanitize_name(output_name)
+        save_data(output_data, save_dir, output_save_name)
     logger.info("test outputs saved in {}".format(save_dir))
 
     # compare to framework output
     if model.target in ["H30",]:
         sum_cos = 0.0
         for output_name, output_data in outputs.items():
-            output_data_path = os.path.join(model.compare_dir, "test", output_name + '.npy')
+            output_save_name = sanitize_name(output_name)
+            output_data_path = os.path.join(model.compare_dir, "test", output_save_name + '.npy')
             if os.path.exists(output_data_path):
                 compare_data = np.load(output_data_path)
                 logger.info("{} output[{}] shape = {}, dtype = {}".format(model.framework, output_name,

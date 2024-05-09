@@ -79,7 +79,7 @@ def build(args=None):
             input_name = module.get_input_name(id)
             input_info = module.get_input_info(input_name)
             print("input_info[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape,
-                                                                         input_info.dtype, input_info.format))
+                                                                         input_info.dtype, input_info.format.name))
             input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype("int8")
@@ -97,7 +97,7 @@ def build(args=None):
             output_name = module.get_output_name(id)
             output_info = module.get_output_info(output_name, is_quanted=True)
             print("output_info[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape,
-                                                                               output_info.dtype, output_info.format))
+                                                                               output_info.dtype, output_info.format.name))
             output_data = module.get_output(output_name, is_quanted=True)
             print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
             output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_with_act', output_name + '.npy')

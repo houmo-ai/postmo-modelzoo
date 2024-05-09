@@ -6,6 +6,7 @@ out/
 __pycache__/
 hir_log/
 reports/
+customized/
 
 # media files
 *.jpg
