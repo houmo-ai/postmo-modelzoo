@@ -54,14 +54,7 @@ def build(args=None):
 
     # 1. build model
     onnx_model = onnx.load(model_path)
-    compile_config = {
-        "tcim.fuse_strategy": 0,
-        "tcim.gen_intrinsic": 2,
-        "tcim.schedule_strategy": 2,
-        "tcim.sync_strategy": 1,
-        "tcim.use_convadd": True,
-        "tcim.codegen_pic": False
-    }
+    compile_config = {}
     if batch % 4 == 0:
         compile_config["tcim.core_num"] = 4
     input_cfg = {}

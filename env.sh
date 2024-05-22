@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-pip3 install onnx_graphsurgeon -i https://pypi.ngc.nvidia.com
-pip3 install ultralytics
 
 MODELZOO_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")" || exit ; pwd)
 export MODELZOO_PATH

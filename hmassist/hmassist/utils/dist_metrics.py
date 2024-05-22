@@ -24,4 +24,7 @@ def cosine_distance(data1, data2, check_shape=True):
     v2_d[v2_d == -np.inf] = np.finfo(np.float16).min
     v1_norm = v1_d / np.linalg.norm(v1_d)
     v2_norm = v2_d / np.linalg.norm(v2_d)
-    return np.dot(v1_norm, v2_norm)
+    cosine_dist = np.dot(v1_norm, v2_norm)
+    if np.isnan(cosine_dist):
+        return -1
+    return cosine_dist

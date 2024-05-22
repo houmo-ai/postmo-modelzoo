@@ -21,6 +21,12 @@
 #include "hdpl/hdpl_runtime_api.h"
 #include "tcim/tcim_runtime.h"
 
+#define MEM_CHECK 0  // enable memory check, it may effect the performance
+
+#if MEM_CHECK
+#include <sys/resource.h>
+#endif
+
 #define GET_TIME() std::chrono::system_clock::now()
 #define GET_COST(start, end) std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
 
@@ -192,26 +198,38 @@ class Barrier {
   void barrier() {
     std::unique_lock<std::mutex> lock(mtx_);
     count_++;
+    cond0_.notify_all();
     cond_.wait(lock);
   }
 
-  void wait() {
+  bool wait(int timeout = 0) {
     std::unique_lock<std::mutex> lock(mtx_);
+    int time = 0;
     while (count_ < dest_) {
-      lock.unlock();
-      std::this_thread::sleep_for(std::chrono::milliseconds(5));
-      lock.lock();
+      if (timeout == 0) {
+        cond0_.wait(lock);
+      } else {
+        lock.unlock();
+        time += 10;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        lock.lock();
+        if (time >= timeout) {
+          return false;
+        }
+      }
     }
     cond_.notify_all();
+    return true;
   }
 
   void barrier_and_wait() {
     std::unique_lock<std::mutex> lock(mtx_);
     count_++;
-    while (count_ < dest_) {
-      lock.unlock();
-      std::this_thread::sleep_for(std::chrono::milliseconds(5));
-      lock.lock();
+    if (count_ < dest_) {
+      cond_.wait(lock);
+    } else {
+      cond_.notify_all();
+      cond0_.notify_all();
     }
   }
   
@@ -223,7 +241,7 @@ class Barrier {
  protected:
   int count_ = 0;
   int dest_ = 0;
-  std::condition_variable cond_;
+  std::condition_variable cond_, cond0_;
   std::mutex mtx_;
 };
 
@@ -349,11 +367,11 @@ int main(int argc, char *argv[]) {
       auto input_datas = queue_info.queue.front();
       queue_info.queue.pop();
       lock.unlock();
-      void* stream;
+      hdplStream_t stream;
       auto status = hdplStreamCreate(&stream);
       thread_info.module->SetStream(stream);
       for (auto& input_data : input_datas) {
-        thread_info.module->SetInput(input_data.first, input_data.second);
+        // thread_info.module->SetInput(input_data.first, input_data.second);
       }
       auto start = GET_TIME();
       thread_info.module->Run(false, thread_info.loop_num);
@@ -395,6 +413,18 @@ int main(int argc, char *argv[]) {
   barrier.wait();
   barrier.reset();
   auto start = GET_TIME();
+#if MEM_CHECK
+  do {
+    struct rusage usage;
+    if (getrusage(RUSAGE_SELF, &usage) == -1) {
+      perror("getrusage");
+      return -1;
+    }
+    auto cur = GET_TIME();
+    auto cost = GET_COST(start, cur);
+    printf("run %.3fs, rss %ldKB\n", cost / 1000000.0, usage.ru_maxrss);
+  } while (!barrier.wait(1000));
+#endif
   barrier.wait();
   auto end = GET_TIME();
 

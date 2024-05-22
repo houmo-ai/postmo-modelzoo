@@ -1,3 +1,4 @@
+--extra-index-url https://pypi.ngc.nvidia.com
 numpy
 opencv-python
 prettytable
@@ -9,5 +10,5 @@ tqdm
 pyyaml
 xlsxwriter
 pycocotools
-onnx_graphsurgeon
 ultralytics
+onnx_graphsurgeon==0.3.27

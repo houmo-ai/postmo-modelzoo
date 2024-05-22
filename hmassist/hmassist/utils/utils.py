@@ -73,5 +73,51 @@ def get_md5(data):
     return md5.hexdigest()
 
 
+def get_file_md5(file_path):
+    import hashlib
+    hash_md5 = hashlib.md5()
+    with open(file_path, "rb") as file:
+        for chunk in iter(lambda: file.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
+def get_file_from_jfrog(file_path):
+    import requests
+    import os
+    # response = requests.head(url)
+    # url_md5 = response.headers.get('Content-MD5')
+    modelzoo_url = os.environ.get("MODELZOO_URL")
+    jfrog_base = os.path.dirname(os.path.dirname(modelzoo_url))
+    response = requests.get(jfrog_base + '/api/storage/houmo/release/' + file_path)
+    if response.status_code == 200:
+        url_md5 = response.json()['checksums']['md5']
+    else:
+        print("failed to retrieve MD5. status code:", response.status_code)
+        return
+    file_name = os.path.basename(file_path)
+    if os.path.exists(file_name):
+        from hmassist.utils.utils import get_file_md5
+        if (get_file_md5(file_name) == url_md5):
+            print(url_md5, file_name, "already exists.")
+            return
+    if os.path.exists(file_name):
+        os.system("rm " + file_name)
+    cmd = "wget " + modelzoo_url + "/" + file_path
+    os.system(cmd)
+    # from tqdm import tqdm
+    # desc = "downloading " + file_name
+    # progress_bar = tqdm(initial=0, unit='B', unit_divisor=1024, unit_scale=True, desc=desc)
+    # url = os.environ.get("MODELZOO_URL") + file_path
+    # response = requests.get(url, stream=True)
+    # with open(file_name, 'ab') as fp:
+    #     for chunk in response.iter_content(chunk_size=10*1024*1024):
+    #         if chunk:
+    #             fp.write(chunk)
+    #             progress_bar.update(len(chunk))
+    # progress_bar.close()
+    print(file_name, "download success.")
+
+
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")

@@ -9,14 +9,7 @@ import cv2
 class MobilenetV2(Classifier):
 
     def build_options(self):
-        return {
-            "tcim.fuse_strategy": 0,
-            "tcim.gen_intrinsic": 2,
-            "tcim.schedule_strategy": 2,
-            "tcim.sync_strategy": 1,
-            "tcim.use_convadd": True,
-            "tcim.codegen_pic": False
-        }
+        return {}
 
     def _preprocess(self, inputs):
         assert(len(inputs) == 1)

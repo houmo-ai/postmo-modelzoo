@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 pip3 install onnx_graphsurgeon -i https://pypi.ngc.nvidia.com
+pip3 install ultralytics pycocotools
 
 __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 MODELZOO_PATH=${__dir}

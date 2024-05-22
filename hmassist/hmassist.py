@@ -411,18 +411,21 @@ def benchmark(config):
                     acc_result_onnx += "\n"
         else:
             acc_result_onnx = "NotTest"
-        if "dataset" in onnx_result:  
+        if "dataset" in onnx_result:
             dataset = onnx_result["dataset"]
         else:
             dataset = "NotTest"
-        if "accuracy" in eval_result: 
+        if "accuracy" in eval_result:
+            last = list(eval_result["accuracy"])[-1]
             for acc in eval_result["accuracy"]:
                 acc_result_hdpl += "{}: {:.3f}".format(acc, eval_result["accuracy"][acc])
                 if acc != last:
                     acc_result_hdpl += "\n"
-                if onnx_result["accuracy"][acc] != 0:
+                if "accuracy" in onnx_result and onnx_result["accuracy"][acc] != 0:
                     acc_err = eval_result["accuracy"][acc] / onnx_result["accuracy"][acc] - 1
                     acc_result_err += "{}: {:.3f}".format(acc, acc_err)
+                else:
+                    acc_result_err = "NotTest"
                 if acc != last:
                     acc_result_err += "\n"
         else:

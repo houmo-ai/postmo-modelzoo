@@ -1,6 +1,7 @@
 import os
 import onnx
 import argparse
+from hmassist.utils.utils import get_file_from_jfrog
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -22,23 +23,20 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
+
 if __name__ == '__main__':
     args = get_args()
     quant_model_dir = args.quant_model_dir
     model_type = args.model_type
-    raw_name = "efficientnet_b0_224x224.onnx"
-    quant_name = "hmquant_efficientnet_20240304.zip"
+    raw_path = "models/efficientnet/efficientnet_b0_224x224.onnx"
+    quant_path = "models/efficientnet/hmquant_efficientnet_20240304.zip"
 
     if model_type == "raw" or model_type == "all":
-        if not os.path.exists(raw_name):
-            url = os.path.join(os.environ.get("MODELZOO_URL"), "models/efficientnet", raw_name)
-            os.system('wget ' + url)
+        get_file_from_jfrog(raw_path)
 
     if model_type == "quant" or model_type == "all":
-        if not os.path.exists(os.path.join(quant_model_dir, "hmquant_efficientnet_with_act.onnx")):
-            if not os.path.exists(quant_name):
-                url = os.path.join(os.environ.get("MODELZOO_URL"), "models/efficientnet", quant_name)
-                os.system('wget ' + url)
-            os.system('mkdir -p ' + quant_model_dir)
-            os.system('unzip -d ' + quant_model_dir + ' ' + quant_name)
+        get_file_from_jfrog(quant_path)
+        quant_name = os.path.basename(quant_path)
+        os.system('mkdir -p ' + quant_model_dir)
+        os.system('unzip -o -d ' + quant_model_dir + ' ' + quant_name)
 
