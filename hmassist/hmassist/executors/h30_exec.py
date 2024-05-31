@@ -207,6 +207,7 @@ class H30Exec(BaseExec, ABC):
             # print(input_data.shape, input_data.dtype)
             self.module.set_input(input["name"], input_data)
         self.module.run()
+        self.module.sync()
         outputs = {}
         output_num = self.module.get_num_outputs()
         for id in range(0, output_num):
@@ -236,7 +237,8 @@ class H30Exec(BaseExec, ABC):
 
     def _preprocess(self, inputs):
         datas = {}
-        for input in self.inputs:
+        for i, input in enumerate(self.inputs):
+            dtype = self.input_info[i]["dtype"]
             if input["image"]["format"] in ["YUV420", "YUV422", "YUV444"]:
                 data = torch.tensor(inputs[input["name"]].astype(np.float32))  # NHWC float32
                 data = torch.squeeze(data, 0)  # HWC float32
@@ -244,20 +246,21 @@ class H30Exec(BaseExec, ABC):
                 from ..utils.transform import RGB2YUV
                 rgb2yuv_func = RGB2YUV(fmt=format)
                 image = torch.unsqueeze(rgb2yuv_func(data), 0).numpy()  # NHWC float32
-                datas[input["name"]] = image.astype(np.uint8)
+                datas[input["name"]] = image.astype(dtype)
             else:
-                datas[input["name"]] = inputs[input["name"]]
+                datas[input["name"]] = inputs[input["name"]].astype(dtype)
         return datas
 
     def get_golden_inputs(self):
         datas = {}
-        for input in self.inputs:
+        for i, input in enumerate(self.inputs):
             input_data_path = os.path.join(self.result_dir, 'hmquant_' + self.model_name 
                                            + '_' + input["name"] + '_input.npy')
             if os.path.exists(input_data_path):
-                input_data = np.load(input_data_path).astype(np.uint8)
-                input_data = np.concatenate([input_data for i in range(self.batch)], axis=0)
+                input_data = np.load(input_data_path)
                 logger.info("golden input[{}] shape = {}, dtype = {}".format(input["name"], input_data.shape, input_data.dtype))
+                input_data = input_data.astype(self.input_info[i]["dtype"])
+                input_data = np.concatenate([input_data for i in range(self.batch)], axis=0)
                 datas[input["name"]] = input_data
             else:
                 logger.warning("compare canceled while golden input not found -> {}".format(input_data_path))

@@ -43,6 +43,8 @@ static constexpr int gridZSize = (kMaxZRange - kMinZRange) / kPillarZSize;
 static constexpr int rpnOutputWidth = 116;
 static constexpr int rpnOutputHeight = 116;
 #define ROUND_UP(A, B) ((((A) + (B) - (1)) / (B)) * B)
+
+
 template <typename point_data_type>
 bool readPointFile(const std::string& filename, int pointDim,
                    void* point_buffer) {
@@ -108,21 +110,21 @@ void SaveInt8MemoryToFile(const T* memory, size_t size,
 #define POST_S1 1
 
 static tvm::hdpl::Module pfe1_aot_module = tvm::hdpl::LoadModelPackage(
-    "../tcim_pfe_1", "aot");
+    "../pfe_1.hmm", "aot");
 static tvm::hdpl::Module pfe1_aot_module_s1 = tvm::hdpl::LoadModelPackage(
-    "../tcim_pfe_1", "aot");
+    "../pfe_1.hmm", "aot");
 static tvm::hdpl::Module pfe1_aot_module_s2 = tvm::hdpl::LoadModelPackage(
-    "../tcim_pfe_1", "aot");
+    "../pfe_1.hmm", "aot");
 static tvm::hdpl::Module pfe1_aot_module_s3 = tvm::hdpl::LoadModelPackage(
-    "../tcim_pfe_1", "aot");
+    "../pfe_1.hmm", "aot");
 static tvm::hdpl::Module rpn_stream0 = tvm::hdpl::LoadModelPackage(
-    "../tcim_rpn", "aot");
+    "../rpn.hmm", "aot");
 static tvm::hdpl::Module rpn_stream1 = tvm::hdpl::LoadModelPackage(
-    "../tcim_rpn", "aot");
+    "../rpn.hmm", "aot");
 static tvm::hdpl::Module rpn_stream2 = tvm::hdpl::LoadModelPackage(
-    "../tcim_rpn", "aot");
+    "../rpn.hmm", "aot");
 static tvm::hdpl::Module rpn_stream3 = tvm::hdpl::LoadModelPackage(
-    "../tcim_rpn", "aot");
+    "../rpn.hmm", "aot");
 
 // run voxelization
 void runVoxelization(int point_num, size_t test_count) {

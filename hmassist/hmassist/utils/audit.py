@@ -115,9 +115,11 @@ def build_and_test(model_name, model_path):
     result = False
     module = tcim.load_so(model_name)
     for input in inputs:
-        input_file_name = 'hmquant_' + model_name + '_' + input.name + '_input.npy'
-        input_data_path = os.path.join(model_dir, input_file_name)
-        input_data = np.load(input_data_path).astype("int8")
+        input_file_name = 'hmquant_' + model_name + '_' + input.name + '_input'
+        input_data_path = os.path.join(model_dir, '{}.npy'.format(input_file_name))
+        input_data = np.load(input_data_path).astype("uint8")
+        input_data.tofile("{}.txt".format(input_file_name), sep="\n")
+        input_data.tofile("{}.bin".format(input_file_name))
         print("input[{}] shape = {}, dtype = {}".format(input.name, input_data.shape, input_data.dtype))
         module.set_input(input.name, input_data, image_format)
 
@@ -131,10 +133,12 @@ def build_and_test(model_name, model_path):
     if len(output_data.shape) == 4:
         output_data = np.transpose(output_data, (0, 3, 1, 2))
     output_data.tofile("{}.txt".format(output_name), sep="\n")
+    output_data.tofile("{}.bin".format(output_name))
     output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_with_act', output_name + '.npy')
     if os.path.exists(output_data_path):
         golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
         golden_output.tofile("{}_golden.txt".format(output_name), sep="\n")
+        golden_output.tofile("{}_golden.bin".format(output_name))
     else:
         print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
     if golden_output.shape == output_data.shape:

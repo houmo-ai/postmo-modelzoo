@@ -126,6 +126,7 @@ def build(cfg):
         # output_data = np.transpose(output_data, (0, 2, 3, 1))
     logger.info("tcim inputs saved in {}".format(save_dir))
     sum_cos = 0.0
+    result_check = True
     for output_name, output_data in outputs.items():
         logger.info("{} output[{}] shape = {}, dtype = {}".format(model.target, output_name,
                                                                   output_data.shape, output_data.dtype))
@@ -138,8 +139,13 @@ def build(cfg):
         sum_cos += cosine_dist
         logger.info("[compare] {} vs quant output [{}] match={}, similarity={:.6f}"
                     .format(model.target, output_name, is_match, cosine_dist))
+        if cosine_dist < 0.99:
+            result_check = False
     logger.info("tcim outputs saved in {}".format(save_dir))
     logger.info("[compare] {} vs quant output average similarity={:.6f}".format(model.target, sum_cos/len(outputs)))
+    if not result_check:
+        print("[error] result check failed.")
+        exit(-1)
     logger.info("build completed")
     del model
 

@@ -65,7 +65,7 @@ def build(args=None):
         input_shape[0] *= batch
         input_cfg[input.name] = tcim.HMInput(shape=input_shape)
     tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=compile_config)
-    print(model_name + ' build completed.')
+    print(model_name, 'build completed.')
 
     # 2. test model
     if stage == 'test' or stage == 'all':
@@ -81,13 +81,14 @@ def build(args=None):
                                                                          input_info.dtype, input_info.format.name))
             input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
-            input_data = np.load(input_data_path).astype("int8")
+            input_data = np.load(input_data_path).astype(input_info.dtype)
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
             print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
             module.set_input(input_name, input_data)
 
         # 2.3 infer model
         module.run()
+        module.sync()
 
         # 2.4. get output and compare with golden
         result_check = True
@@ -106,6 +107,7 @@ def build(args=None):
             else:
                 result_check = False
                 print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
+                continue
             if golden_output.shape == output_data.shape:
                 cosine_dist = cosine_distance(golden_output, output_data)
                 is_match = (golden_output == output_data).all()

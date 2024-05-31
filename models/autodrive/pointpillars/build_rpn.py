@@ -2,10 +2,7 @@ import os
 import numpy as np
 import onnx
 import argparse
-import tvm
-import tvm.relay as relay
-import tvm.tcim as tcim
-from tvm.relay.backend import Executor
+import tcim
 from hmassist.utils.dist_metrics import cosine_distance
 
 import logging
@@ -49,35 +46,18 @@ def get_args() -> argparse.Namespace:
 
 
 def build(args):
-    # build model
-    image_format = "ND"
     model_name = args.model_name
     batch = args.batch
     stage = args.stage
     model_dir = args.model_dir
     quant_name = "hmquant_" + model_name + "_with_act"
     onnx_name = quant_name + ".onnx"
-    shape_dict = {}
-    layout_dict = {}
-    convert_config = {}
+    model_path = os.path.join(model_dir, onnx_name)
+    model_dir = os.path.dirname(model_path)
 
-    onnx_model = onnx.load(os.path.join(model_dir, onnx_name))
-    inputs = onnx_model.graph.input
+    # 1. build model
     if stage == 'build' or stage == 'all':
-        for input in inputs:
-            dims = input.type.tensor_type.shape.dim
-            input_shape = [dim.dim_value for dim in dims]
-            input_shape[0] *= batch
-            print('input name:', input.name)
-            print('input shape:', input_shape)
-            shape_dict[input.name] = input_shape
-            # layout_dict[input.name] = 'NHWC'
-
-        mod = relay.frontend.from_hmonnx(
-            onnx_model, shape_dict, layout=layout_dict,
-            resizer_attr=None, convert_config=convert_config,
-        )
-        executor = Executor('aot')
+        onnx_model = onnx.load(model_path)
         compile_config = {
             'tcim.fuse_strategy': 1,
             'tcim.gen_intrinsic': False,
@@ -86,45 +66,73 @@ def build(args):
             'tcim.for_benchmark': False,
             'tcim.core_num': 1,
         }
-        target = tvm.target.Target('hdpl', host='c')
-        with tvm.transform.PassContext(opt_level=3, config=compile_config):
-            graph, lib, params = relay.build(
-                mod, target, executor=executor, mod_name=model_name,
-            )
-        tcim.store_so(model_name, lib)
-        print(model_name, 'saved as a aot model.')
-
-    # compare with golden
-    if stage == 'test' or stage == 'all':
-        module = tcim.load_so(model_name)
+        output_layout={"layout": "NCHW"}
+        input_cfg = {}
+        inputs = onnx_model.graph.input
         for input in inputs:
+            dims = input.type.tensor_type.shape.dim
+            input_shape = [dim.dim_value for dim in dims]
+            input_shape[0] *= batch
+            input_cfg[input.name] = tcim.HMInput(shape=input_shape)
+        tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=compile_config, output_layout=output_layout)
+        print(model_name, 'build completed.')
+
+    # 2. test model
+    if stage == 'test' or stage == 'all':
+        # 2.1 load model
+        module = tcim.runtime.load(model_name + ".hmm")
+        # module = tcim.runtime.load("tcim_" + model_name)
+
+        # 2.2 set input with golden
+        input_num = module.get_num_inputs()
+        for id in range(input_num):
+            input_name = module.get_input_name(id)
+            input_info = module.get_input_info(input_name)
+            print("input_info[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape,
+                                                                         input_info.dtype, input_info.format.name))
             input_file_name = 'bev_input.npy'
             input_data_path = os.path.join(model_dir, "hmquant_pfe_1_with_act", input_file_name)
-            input_data = np.load(input_data_path, allow_pickle=True).item().get("output_tensor").astype("int8")
-            logger.info("input[{}] shape = {}, dtype = {}".format(input.name, input_data.shape, input_data.dtype))
-            input_data = np.transpose(input_data, (0, 2, 3, 1))
-            module.set_input(input.name, input_data, image_format)
+            # input_data = np.load(input_data_path, allow_pickle=True).item().get("output_tensor").astype(input_info.dtype)
+            # print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
+            # input_data = np.transpose(input_data, (0, 2, 3, 1))
+            # module.set_input(input_name, input_data)
 
+        # 2.3 infer model
         module.run()
+        module.sync()
 
+        # 2.4 get output and compare with golden
+        result_check = True
         output_num = module.get_num_outputs()
-        for id in range(0, output_num):
-            output_name = module.get_output_name_by_index(id)
-            output_data = module.get_output_by_name(output_name).numpy()
-            logger.info("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-            output_data_path = os.path.join(model_dir, quant_name, output_name + '.npy')
+        for id in range(output_num):
+            output_name = module.get_output_name(id)
+            output_info = module.get_output_info(output_name, is_quanted=True)
+            print("output_info[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape,
+                                                                               output_info.dtype, output_info.format.name))
+            output_data = module.get_output(output_name, is_quanted=True)
+            print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
+            output_data_path = os.path.join(model_dir, quant_name, '143.npy')
             if os.path.exists(output_data_path):
                 golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
-                if golden_output.shape == output_data.shape:
-                    cosine_dist = cosine_distance(golden_output, output_data)
-                    is_match = (golden_output == output_data).all()
-                    logger.info("[compare] golden output [{}] match={}, similarity={:.6f}"
-                                .format(output_name, is_match, cosine_dist))
-                else:
-                    logger.error("[compare] golden output [{}] shape not match {} vs {}"
-                                 .format(output_name, golden_output.shape, output_data.shape))
+                output_data = np.transpose(output_data, (0, 3, 1, 2))[:,:,0:1984,:]
             else:
-                logger.warning("compare canceled while golden data not found -> {}".format(output_data_path))
+                result_check = False
+                print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
+                continue
+            if golden_output.shape == output_data.shape:
+                cosine_dist = cosine_distance(golden_output, output_data)
+                is_match = (golden_output == output_data).all()
+                print("[compare] golden output [{}] match={}, similarity={:.6f}"
+                            .format(output_name, is_match, cosine_dist))
+                if cosine_dist < 0.99:
+                    result_check = False
+            else:
+                result_check = False
+                print("[compare] golden output [{}] shape not match {} vs {}"
+                            .format(output_name, golden_output.shape, output_data.shape))
+        if not result_check:
+            print("[error] result check failed.")
+            exit(-1)
 
 
 if __name__ == '__main__':
