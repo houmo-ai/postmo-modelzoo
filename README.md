@@ -58,6 +58,7 @@ houmo-modelzoo提供的模型示例如下，编译示例每个都提供，其他
 | [pointpillars](models/autodrive/pointpillars)| autodrive | x   | yes   | x   | x   | x      | yes     | x    |
 | [petr](models/autodrive/petr)                | autodrive | x   | yes   | x   | x   | yes    | x       | x    |
 | [detr3d](models/autodrive/petr)              | autodrive | x   | yes   | x   | x   | yes    | x       | x    |
+| [qwen](models/llm/qwen)                      | llm       | x   | yes   | x   | x   | yes    | x       | x    |
 
 ## C++评估工具列表
 

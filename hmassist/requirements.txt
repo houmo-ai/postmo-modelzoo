@@ -8,3 +8,6 @@ pyyaml==6.0
 xlsxwriter
 pycocotools==2.0.4
 onnx_graphsurgeon
+transformers
+jinja2
+loguru

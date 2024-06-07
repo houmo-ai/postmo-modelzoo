@@ -8,10 +8,7 @@ import time
 import onnx
 import onnx_graphsurgeon as gs
 from prettytable import PrettyTable
-import tvm
-import tvm.relay as relay
-import tvm.tcim as tcim
-from tvm.relay.backend import Executor
+import tcim
 from hmassist.utils.dist_metrics import cosine_distance
 from hmassist.utils import logger
 from hmassist.utils.utils import sanitize_name
@@ -20,10 +17,9 @@ def get_args():
     """Parse commandline"""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_name',
-        dest='model_name',
+        '--model',
+        dest='model',
         type=str,
-        default='cruise_cutin',
         help='input image size',
     )
     parser.add_argument(
@@ -31,7 +27,7 @@ def get_args():
         dest='batch',
         type=int,
         default=1,
-        help='Set batch size for implicit batch houmo model',
+        help='batch size',
     )
     parser.add_argument(
         '--mode',
@@ -59,107 +55,81 @@ def get_nodes_by_topo_order(model):
     print(nodes_list)
     return nodes_list
 
-
-# Get all input node names in the model
-def get_input_node_names_info(mode_path):
-    inputs = {}
-    for ins in model.graph.input:
-        shape = str(ins.type.tensor_type.shape.dim)
-        inputs[ins.name] = [int(s) for s in shape.split() if s.isdigit()]
-    return inputs
-
-
 def build_and_test(model_name, model_path):
     # build model
-    image_format = 'YUV422SP'
-    # batch = args.batch
-    shape_dict = {}
-    layout_dict = {}
-    convert_config = {}
-    convert_config["layout"] = "NHWC"
-
     onnx_model = onnx.load(model_path)
-    inputs = onnx_model.graph.input
+    compile_config = {
+        "tcim.codegen_pic": True,
+        "tcim.use_convadd": True,
+        "tcim.fuse_strategy": 1,
+        'tcim.special_model_name':'bino_fish_part2',
+        "tcim.gen_intrinsic": 1,
+        "tcim.mem_plan_strategy": "linearscan",
+    }
+    tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, compiler_cfg=compile_config)
+    print(model_name, 'build completed.')
+
     model_dir = os.path.dirname(model_path)
+    module = tcim.runtime.load(model_name + ".hmm")
 
-    for input in inputs:
-        dims = input.type.tensor_type.shape.dim
-        input_shape = [dim.dim_value for dim in dims]
-        print('input name:', input.name)
-        print('input shape:', input_shape)
-        shape_dict[input.name] = input_shape
-
-    mod = relay.frontend.from_hmonnx(
-        onnx_model, shape_dict, layout=layout_dict,
-        resizer_attr=None, convert_config=convert_config,
-    )
-    executor = Executor('aot')
-    # compile_config = {
-    #     'tcim.fuse_strategy': 1,
-    #     'tcim.codegen_pic': True,
-    #     "tcim.for_benchmark": True
-    # }
-    # compile_config = {"tcim.fuse_strategy": 1, "tcim.gen_intrinsic": 0, "tcim.sync_strategy": 1, "tcim.mem_plan_strategy": "linearscan"}
-    compile_config = {}
-
-    target = tvm.target.Target('hdpl', host='c')
-    with tvm.transform.PassContext(opt_level=4, config=compile_config):
-        graph, lib, params = relay.build(
-            mod, target, executor=executor, mod_name=model_name,
-        )
-    tcim.store_so(model_name, lib)
-    print(model_name, 'saved as a aot model.')
+    # set input with golden
+    input_num = module.get_num_inputs()
+    for id in range(input_num):
+        input_name = module.get_input_name(id)
+        input_info = module.get_input_info(input_name)
+        print("input_info[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape,
+                                                                        input_info.dtype, input_info.format.name))
+        input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
+        input_data_path = os.path.join(model_dir, input_file_name)
+        input_data = np.load(input_data_path).astype(input_info.dtype)
+        # input_data = np.concatenate([input_data for i in range(batch)], axis=0)
+        print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
+        module.set_input(input_name, input_data)
 
     # compare with golden
-    cosine_dist = 0.0
-    result = False
-    module = tcim.load_so(model_name)
-    for input in inputs:
-        input_file_name = 'hmquant_' + model_name + '_' + input.name + '_input'
-        input_data_path = os.path.join(model_dir, '{}.npy'.format(input_file_name))
-        input_data = np.load(input_data_path).astype("uint8")
-        input_data.tofile("{}.txt".format(input_file_name), sep="\n")
-        input_data.tofile("{}.bin".format(input_file_name))
-        print("input[{}] shape = {}, dtype = {}".format(input.name, input_data.shape, input_data.dtype))
-        module.set_input(input.name, input_data, image_format)
-
     module.run()
+    module.sync()
 
+    # get output and compare with golden
+    result_check = True
     output_num = module.get_num_outputs()
-    assert output_num == 1
-    output_name = module.get_output_name_by_index(0)
-    output_data = module.get_output_by_name(output_name).numpy()
-    print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-    if len(output_data.shape) == 4:
-        output_data = np.transpose(output_data, (0, 3, 1, 2))
-    output_data.tofile("{}.txt".format(output_name), sep="\n")
-    output_data.tofile("{}.bin".format(output_name))
-    output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_with_act', output_name + '.npy')
-    if os.path.exists(output_data_path):
-        golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
-        golden_output.tofile("{}_golden.txt".format(output_name), sep="\n")
-        golden_output.tofile("{}_golden.bin".format(output_name))
-    else:
-        print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
-    if golden_output.shape == output_data.shape:
-        cosine_dist = cosine_distance(golden_output, output_data)
-        is_match = (golden_output == output_data).all()
-        print("[compare] golden output [{}] match={}, similarity={:.6f}"
-                    .format(output_name, is_match, cosine_dist))
-        if cosine_dist >= 0.99:
-            result = True
-        if len(output_data.flatten()) == 1:
-            result = is_match
-    else:
-        print("[compare] golden output [{}] shape not match {} vs {}"
-                        .format(output_name, golden_output.shape, output_data.shape))
+    for id in range(output_num):
+        output_name = module.get_output_name(id)
+        output_info = module.get_output_info(output_name, is_quanted=True)
+        print("output_info[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape,
+                                                                            output_info.dtype, output_info.format.name))
+        output_data = module.get_output(output_name, is_quanted=True)
+        print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
+        if len(output_data.shape) == 4:
+            output_data = np.transpose(output_data, (0, 3, 1, 2))
+        print("output[{}] transpose to {}".format(output_name, output_data.shape))
 
-    return result, cosine_dist, output_name, output_data.shape
+        output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_with_act', output_name + '.npy')
+        if os.path.exists(output_data_path):
+            golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
+            # golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
+        else:
+            result_check = False
+            print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
+            continue
+        if golden_output.shape == output_data.shape:
+            cosine_dist = cosine_distance(golden_output, output_data)
+            is_match = (golden_output == output_data).all()
+            print("[compare] golden output [{}] match={}, similarity={:.6f}"
+                .format(output_name, is_match, cosine_dist))
+            if cosine_dist < 0.99:
+                result_check = False
+        else:
+            result_check = False
+            print("[compare] golden output [{}] shape not match {} vs {}"
+                .format(output_name, golden_output.shape, output_data.shape))
+
+    return result_check, cosine_dist, output_name, output_data.shape
 
 
 # extract the submodel end with specified node index end_node_idx,
 # build the submodel and compare the output with golden data
-# return True if the result is 
+# return True if the result is
 def audit_submodel(model_name, mode_path, input_names, output_names, end_node_idx):
     # The model is run with incorrect output result compared with golden data
     output_path = os.path.join(os.path.dirname(mode_path), str(end_node_idx) + "_" + output_names + ".onnx")
@@ -231,4 +201,4 @@ def audit(model_name, mode="dichotomy"):
 
 if __name__ == "__main__":
     args = get_args()
-    audit(args.model_name, args.mode)
+    audit(args.model, args.mode)
