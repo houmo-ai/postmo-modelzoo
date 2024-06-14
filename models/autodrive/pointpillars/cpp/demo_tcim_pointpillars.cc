@@ -307,7 +307,6 @@ void runVoxelization(int point_num, size_t test_count) {
   hdplMalloc(&pfe1_output_addr_s2, 12032 * 64);
   void* pfe1_output_addr_s3 = nullptr;
   hdplMalloc(&pfe1_output_addr_s3, 12032 * 64);
-  void* pfe1_output_ptr_s1[] = {pfe1_output_addr_s1};
 
   void* scatter_out_ddr = nullptr;
   int scatter_output_size = h * w * 64;
@@ -704,6 +703,15 @@ void runVoxelization(int point_num, size_t test_count) {
              sizeof(bbox_preds_scale) / sizeof(bbox_preds_scale[0]) * 4,
              hdplMemcpyHostToDevice);
 
+  free(anchors_px_);
+  free(anchors_py_);
+  free(anchors_pz_);
+  free(anchors_dx_);
+  free(anchors_dy_);
+  free(anchors_dz_);
+  free(anchors_ro_);
+  free(anchors_diagonal_);
+
   tvm::runtime::NDArray::Container* data = new tvm::runtime::NDArray::Container(
       static_cast<void*>(voxel_device), {1, 12032, 20, 64},
       tvm::DataType::Int(8), {kDLHDPL, 0});
@@ -863,40 +871,43 @@ void runVoxelization(int point_num, size_t test_count) {
                                 kMaxNumPillars, workspace);
   int size = 0;
   idnnlGetGMWorkspaceSize(workspace, &size);
-  size = 100 * 1024 * 1024;  // todo need fix
+  printf("GMWorkspaceSize: %d\n", size);
+  // size = 105 * 1024 * 1024;  // todo need fix
   void* workspace_gm_addr = nullptr;
-  uint64_t ddr_reserve_start = 0;
-  uint64_t ddr_free_start = 0;
-  uint64_t ddr_gm_size = 0;
-  hdplReservedMemGetInfo(&ddr_reserve_start, &ddr_free_start, &ddr_gm_size);
-  workspace_gm_addr =
-      reinterpret_cast<void*>(ddr_reserve_start + 580 * 1024 * 1024);
-  std::cout << "workspace size s0 " << 4 * size / 1024 / 1024 << std::endl;
-  printf("workspace_gm_addr 0x%p\n", workspace_gm_addr);
+  // uint64_t ddr_reserve_start = 0;
+  // uint64_t ddr_free_start = 0;
+  // uint64_t ddr_gm_size = 0;
+  // hdplReservedMemGetInfo(&ddr_reserve_start, &ddr_free_start, &ddr_gm_size);
+  // workspace_gm_addr =
+  //     reinterpret_cast<void*>(ddr_reserve_start + 580 * 1024 * 1024);
+  // std::cout << "workspace size s0 " << 4 * size / 1024 / 1024 << std::endl;
+  // printf("workspace_gm_addr 0x%p\n", workspace_gm_addr);
+  hdplReservedMemAlloc(&workspace_gm_addr, size);
   idnnlSetGMWorkspace(workspace, workspace_gm_addr);
 
-  void* workspace_gm_addr_s1 =
-      reinterpret_cast<char*>(workspace_gm_addr) + 105 * 1024 * 1024;
+  void* workspace_gm_addr_s1 = nullptr;
+      // reinterpret_cast<char*>(workspace_gm_addr) + 105 * 1024 * 1024;
   idnnlWorkspaceDescriptor_t workspace_s1;
   idnnlCreateWorkspaceDescriptor(&workspace_s1);
+  hdplReservedMemAlloc(&workspace_gm_addr_s1, size);
   // hdplMalloc(&workspace_gm_addr_s1, size);
-  printf("workspace_gm_addr_s1 %p\n", workspace_gm_addr_s1);
   idnnlSetGMWorkspace(workspace_s1, workspace_gm_addr_s1);
 
-  void* workspace_gm_addr_s2 =
-      reinterpret_cast<char*>(workspace_gm_addr_s1) + 105 * 1024 * 1024;
+  void* workspace_gm_addr_s2 = nullptr;
+      // reinterpret_cast<char*>(workspace_gm_addr_s1) + 105 * 1024 * 1024;
   idnnlWorkspaceDescriptor_t workspace_s2;
   idnnlCreateWorkspaceDescriptor(&workspace_s2);
+  hdplReservedMemAlloc(&workspace_gm_addr_s2, size);
   // hdplMalloc(&workspace_gm_addr_s2, size);
-  printf("workspace_gm_addr_s2 %p\n", workspace_gm_addr_s2);
   idnnlSetGMWorkspace(workspace_s2, workspace_gm_addr_s2);
 
-  void* workspace_gm_addr_s3 =
-      reinterpret_cast<char*>(workspace_gm_addr_s2) + 105 * 1024 * 1024;
+  void* workspace_gm_addr_s3 = nullptr;
+      // reinterpret_cast<char*>(workspace_gm_addr_s2) + 105 * 1024 * 1024;
   idnnlWorkspaceDescriptor_t workspace_s3;
   idnnlCreateWorkspaceDescriptor(&workspace_s3);
+  hdplReservedMemAlloc(&workspace_gm_addr_s3, size);
   // hdplMalloc(&workspace_gm_addr_s2, size);
-  printf("workspace_gm_addr_s3 %p\n", workspace_gm_addr_s3);
+  // printf("workspace_gm_addr_s3 %p\n", workspace_gm_addr_s3);
   idnnlSetGMWorkspace(workspace_s3, workspace_gm_addr_s3);
 
   // scatter_stream0
@@ -1399,24 +1410,44 @@ void runVoxelization(int point_num, size_t test_count) {
   hdplFree(point_device);
   hdplFree(voxel_device);
   hdplFree(voxel_device_s1);
+  hdplFree(voxel_device_s2);
+  hdplFree(voxel_device_s3);
   hdplFree(coors_device_s0);
   hdplFree(coors_device_s1);
+  hdplFree(coors_device_s2);
+  hdplFree(coors_device_s3);
   hdplFree(num_per_pillar_device);
   hdplFree(num_per_pillar_device_s1);
-  hdplFree(workspace_gm_addr);
-  hdplFree(workspace_gm_addr_s1);
+  hdplFree(num_per_pillar_device_s2);
+  hdplFree(num_per_pillar_device_s3);
+  hdplReservedMemFree(workspace_gm_addr);
+  hdplReservedMemFree(workspace_gm_addr_s1);
+  hdplReservedMemFree(workspace_gm_addr_s2);
+  hdplReservedMemFree(workspace_gm_addr_s3);
   hdplFree(pfe1_output_addr);
   hdplFree(pfe1_output_addr_s1);
+  hdplFree(pfe1_output_addr_s2);
+  hdplFree(pfe1_output_addr_s3);
   hdplFree(scatter_out_ddr);
   hdplFree(scatter_out_ddr_s1);
+  hdplFree(scatter_out_ddr_s2);
+  hdplFree(scatter_out_ddr_s3);
   hdplFree(scatter_in_ddr);
   hdplFree(scatter_in_ddr_s1);
-  hdplFree(dir_cls_preds_ddr);
+  hdplFree(scatter_in_ddr_s2);
+  hdplFree(scatter_in_ddr_s3);
   hdplFree(bbox_preds_ddr);
-  hdplFree(cls_scores_ddr);
-  hdplFree(dir_cls_preds_ddr_s1);
   hdplFree(bbox_preds_ddr_s1);
+  hdplFree(bbox_preds_ddr_s2);
+  hdplFree(bbox_preds_ddr_s3);
+  hdplFree(cls_scores_ddr);
   hdplFree(cls_scores_ddr_s1);
+  hdplFree(cls_scores_ddr_s2);
+  hdplFree(cls_scores_ddr_s3);
+  hdplFree(dir_cls_preds_ddr);
+  hdplFree(dir_cls_preds_ddr_s1);
+  hdplFree(dir_cls_preds_ddr_s2);
+  hdplFree(dir_cls_preds_ddr_s3);
   hdplFree(post_workspace_addr);
   hdplFree(anchors_px_device);
   hdplFree(anchors_py_device);
