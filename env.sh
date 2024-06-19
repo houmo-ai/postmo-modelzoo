@@ -8,7 +8,7 @@ export HMASSIST_PATH
 export HMASSIST_TARGET=H30
 export CMAKE_CONFIG_PATH=$MODELZOO_PATH/release.cmake
 if [[ -z $MODELZOO_URL ]]; then
-  export MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo/release
+  export MODELZOO_URL=ftp://221.226.128.58:33021/release
 fi
 
 # set hal library log level
