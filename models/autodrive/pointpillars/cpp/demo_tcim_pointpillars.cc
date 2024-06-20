@@ -1462,6 +1462,14 @@ void runVoxelization(int point_num, size_t test_count) {
   hdplFree(bbox_scalar_device);
   hdplFree(out_box_device);
   hdplFree(out_box_num_device);
+  hdplStreamDestroy(stream0_);
+  hdplStreamDestroy(stream1_);
+  hdplStreamDestroy(stream2_);
+  hdplStreamDestroy(stream3_);
+  idnnlDestroy(handle0);
+  idnnlDestroy(handle1);
+  idnnlDestroy(handle2);
+  idnnlDestroy(handle3);
 }
 
 int main(int argc, char* argv[]) {
