@@ -44,6 +44,7 @@ struct CliArguments {
 typedef struct {
   tcim::Module* module;
   int loop_num;
+  int sample_cnt;
   uint32_t max_cost;
   uint32_t total_cost;
 } ThreadInfo;
@@ -54,8 +55,8 @@ typedef struct {
   std::condition_variable cond;
 } QueueInfo;
 
-std::mutex mutex;
-std::condition_variable cond;
+// std::mutex mutex;
+// std::condition_variable cond;
 
 /**
  * @brief whether the file exists
@@ -277,6 +278,10 @@ int main(int argc, char *argv[]) {
   int loop_num = arguments.loops;
   int warm_up = arguments.warm_up;
 
+  if (sample_num < thread_num) {
+    std::cout << "[warn] the perf result may not be accurate while samples < threads" << std::endl;
+  }
+
   std::vector<std::thread> threads;
   std::vector<tcim::Module> modules;
   std::vector<std::map<std::string, tcim::Tensor>> input_datas;
@@ -376,6 +381,7 @@ int main(int argc, char *argv[]) {
       auto start = GET_TIME();
       thread_info.module->Run(false, thread_info.loop_num);
       thread_info.module->Sync();
+      thread_info.sample_cnt++;
       hdplStreamDestroy(stream);
 #if SAVE_DATA
       hdplStreamSynchronize(*stream);
@@ -398,6 +404,7 @@ int main(int argc, char *argv[]) {
       if (thread_info.max_cost < cost) thread_info.max_cost = cost;
       // printf("===> thread %d infer %d times cost %.3fms\n", tid, thread_info.loop_num, cost/1000.0);
     }
+    printf("===> thread %d completed, %d samples tested.\n", tid, thread_info.sample_cnt);
     barrier.barrier();
   };
 
@@ -405,6 +412,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < thread_num; i++) {
     thread_info[i].module = &modules[i];
     thread_info[i].loop_num = loop_num;
+    thread_info[i].sample_cnt = 0;
     thread_info[i].max_cost = 0;
     thread_info[i].total_cost = 0;
     threads.push_back(std::thread(thread_func, i, std::ref(thread_info[i]), std::ref(queue_info), std::ref(barrier)));

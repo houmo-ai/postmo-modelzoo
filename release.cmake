@@ -13,6 +13,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O2")
 # include paths
 include_directories(${TCIM_INC_PATH})
 include_directories(${HDPL_INC_PATH})
+include_directories($ENV{MODELZOO_PATH}/utils/common)
 
 # lib paths
 find_library(TCIM_LIBRARY NAMES tvm_runtime PATHS ${TCIM_LIB_PATH} NO_DEFAULT_PATH)
