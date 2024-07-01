@@ -154,12 +154,15 @@ detection_yolov5s:
 utils:
   include:
     - utils
+    - release.cmake
+    - env.sh
   exclude: null
   example_case: null
   test:
     - backbone_resnet50_perf
     - autodrive_yolop_perf
     - detection_yolov5s_perf
+    - autodrive_pointpillars_perf
 hmassist:
   include:
     - hmassist
