@@ -87,21 +87,22 @@ def get_file_from_jfrog(file_path):
     import os
     modelzoo_url = os.environ.get("MODELZOO_URL")
     file_name = os.path.basename(file_path)
-    # jfrog_base = os.path.dirname(os.path.dirname(modelzoo_url))
-    # response = requests.get(jfrog_base + '/api/storage/houmo/release/' + file_path)
-    # if response.status_code == 200:
-    #     url_md5 = response.json()['checksums']['md5']
-    #     if os.path.exists(file_name):
-    #         from hmassist.utils.utils import get_file_md5
-    #         if (get_file_md5(file_name) == url_md5):
-    #             print(url_md5, file_name, "already exists.")
-    #             return
-    # else:
-    #     print("failed to retrieve MD5. status code:", response.status_code)
-    # if os.path.exists(file_name):
-    #     os.system("rm " + file_name)
-    cmd = "wget -N --ftp-user=ftp001 --ftp-password=3tIx7oMi@R " + modelzoo_url + "/" + file_path
+    jfrog_base = os.path.dirname(os.path.dirname(modelzoo_url))
+    response = requests.get(jfrog_base + '/api/storage/houmo/release/' + file_path)
+    if response.status_code == 200:
+        url_md5 = response.json()['checksums']['md5']
+        if os.path.exists(file_name):
+            from hmassist.utils.utils import get_file_md5
+            if (get_file_md5(file_name) == url_md5):
+                print(url_md5, file_name, "already exists.")
+                return
+    else:
+        print("failed to retrieve MD5. status code:", response.status_code)
+    if os.path.exists(file_name):
+        os.system("rm " + file_name)
+    # cmd = "wget -N --ftp-user=ftp001 --ftp-password=3tIx7oMi@R " + modelzoo_url + "/" + file_path
     print("downloading", file_name)
+    cmd = "wget " + modelzoo_url + "/" + file_path
     os.system(cmd)
 
 

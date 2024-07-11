@@ -23,7 +23,7 @@ def get_args() -> argparse.Namespace:
         '--model_name',
         dest='model_name',
         type=str,
-        default='qwen2',
+        default='qwen',
         help='output houmo model name',
     )
     parser.add_argument(
@@ -95,7 +95,7 @@ def build(args=None):
             input_name = module.get_input_name(id)
             input_info = module.get_input_info(input_name)
             print("input_info[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape,
-                                                                         input_info.dtype, input_info.format.name))
+                                                                              input_info.dtype, input_info.format.name))
             input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype(input_info.dtype)
@@ -129,13 +129,13 @@ def build(args=None):
                 cosine_dist = cosine_distance(golden_output, output_data)
                 is_match = (golden_output == output_data).all()
                 print("[compare] golden output [{}] match={}, similarity={:.6f}"
-                            .format(output_name, is_match, cosine_dist))
+                      .format(output_name, is_match, cosine_dist))
                 if cosine_dist < 0.99:
                     result_check = False
             else:
                 result_check = False
                 print("[compare] golden output [{}] shape not match {} vs {}"
-                            .format(output_name, golden_output.shape, output_data.shape))
+                      .format(output_name, golden_output.shape, output_data.shape))
         if not result_check:
             print("[error] result check failed.")
             exit(-1)

@@ -23,7 +23,7 @@ def get_args() -> argparse.Namespace:
         '--model_name',
         dest='model_name',
         type=str,
-        default='qwen2',
+        default='qwen',
         help='output houmo model name',
     )
     parser.add_argument(
@@ -44,55 +44,6 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def pre_setting(model_dir):
-    layer = "all"
-    os.environ['AOT_COMPILE_NO_FORMAT'] = '1'
-    import glob
-    from pprint import pprint
-    data = dict()
-    for file in glob.glob(os.path.join(model_dir, "hmquant_qwen2_with_act/*.npy")):
-        layer_name = os.path.split(file)[-1].replace(".npy", "")
-        data[layer_name] = file
-    data["all"] = os.path.join(model_dir, "hmquant_qwen2_with_act/layers0_resadd2.npy")
-    if layer == "all":
-        os.environ.pop("HM_TCIM_VAR_COUNTER", None)
-    if layer not in data:
-        pprint(data)
-    envs = {
-        "layers0_attn_rmsnorm": "%1",            # pass
-        "layers0_attn_q_proj.fc.0": "%6",        # pass
-        "layers0_attn_q_proj.fc.1": "%11",       # pass
-        "layers0_attn_q_proj": "%15",            # pass
-        "layers0_attn_k_proj.fc.1": "%22",       # pass
-        "layers0_attn_k_proj.fc.0": "%19",       # pass
-        "layers0_attn_k_proj": "%26",            # pass
-        "layers0_attn_v_proj": "%40",            # pass
-        "layers0_attn_k_reshape": "%27",         # pass
-        "layers0_k_apply_rotary": "%28",         # pass
-        "layers0_attn_q_transpose": "%29",       # pass
-        "layers0_attn_k_transpose": "%30",       # pass
-        "layers0_attn_qk_matmul_concat": "%31",  # accepted fail
-        "layers0_attn_softmax": "%42",           # pass
-        "layers0_attn_concat": "%44",            # pass
-        "layers0_resadd1": "%61",                # pass, first c8t8
-        "layers0_glu": "%81",                    # pass
-        "layers0_dense_4h_to_h": "%132",         # pass
-        "layers0_resadd2": "%133",               # pass, second c8t8
-    }
-    print(f"layer_idx  : {envs[layer] if layer != 'all' else '%'}")
-    print(f"layer_name : {layer}")
-    if layer != "all":
-        if os.environ.get("HM_TCIM_VAR_COUNTER", "") == "":
-            if layer in envs:
-                os.environ["HM_TCIM_VAR_COUNTER"] = envs[layer]
-            else:
-                ir_file = "hmquant_qwen_with_act/model_ir.txt"
-                if os.path.exists(ir_file):
-                    with open(ir_file) as f:
-                        print(f.read())
-                assert 0, "Please set HM_TCIM_VAR_COUNTER currently"
-
-
 def build(args=None):
     """build and test houmo model."""
     model_name = args.model_name
@@ -105,7 +56,7 @@ def build(args=None):
     model_path = os.path.join(model_dir, onnx_name)
     model_dir = os.path.dirname(model_path)
 
-    pre_setting(model_dir)
+    os.environ['AOT_COMPILE_NO_FORMAT'] = '1'
 
     # 1. build model
     if stage == 'build' or stage == 'all':
@@ -133,7 +84,7 @@ def build(args=None):
         weight_path = os.path.join(model_dir, "../weight.npy")
         data_dict = np.load(weight_path, allow_pickle=True).item()
         tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
-                                    inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen_group_")
+                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen_group_")
         print(part_name, 'build completed.')
 
     # 2. test model, prefill model should run first to make the correct result
@@ -143,7 +94,7 @@ def build(args=None):
         module_prefill = tcim.runtime.load("qwen_prefill.hmm", weight_manager=weight_manager)
         module = tcim.runtime.load(part_name + ".hmm", weight_manager=weight_manager)
 
-        # 2.2 set input with golden
+        # 2.2 set input with golden, run prefill first
         input_num = module_prefill.get_num_inputs()
         for id in range(input_num):
             input_name = module_prefill.get_input_name(id)
@@ -159,7 +110,7 @@ def build(args=None):
             input_name = module.get_input_name(id)
             input_info = module.get_input_info(input_name)
             print("input_info[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape,
-                                                                         input_info.dtype, input_info.format.name))
+                                                                              input_info.dtype, input_info.format.name))
             input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype(input_info.dtype)
@@ -167,7 +118,7 @@ def build(args=None):
             print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
             module.set_input(input_name, input_data)
 
-        # 2.3 infer model
+        # 2.3 infer model, run prefill first
         module_prefill.run()
         module.run()
         module.sync()
@@ -183,8 +134,6 @@ def build(args=None):
             output_data = module.get_output(output_name, is_quanted=True)
             print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
             output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_' + output_name + '_output.npy')
-            # out_shape = [1, 1, 1, 4096]
-            # output_golden = output_golden.reshape(out_shape)
             if os.path.exists(output_data_path):
                 golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
                 golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
@@ -196,13 +145,13 @@ def build(args=None):
                 cosine_dist = cosine_distance(golden_output, output_data)
                 is_match = (golden_output == output_data).all()
                 print("[compare] golden output [{}] match={}, similarity={:.6f}"
-                            .format(output_name, is_match, cosine_dist))
+                      .format(output_name, is_match, cosine_dist))
                 if cosine_dist < 0.99:
                     result_check = False
             else:
                 result_check = False
                 print("[compare] golden output [{}] shape not match {} vs {}"
-                            .format(output_name, golden_output.shape, output_data.shape))
+                      .format(output_name, golden_output.shape, output_data.shape))
         if not result_check:
             print("[error] result check failed.")
             exit(-1)

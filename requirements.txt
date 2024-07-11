@@ -12,3 +12,6 @@ xlsxwriter
 pycocotools
 ultralytics
 onnx_graphsurgeon==0.3.27
+transformers
+jinja2
+loguru
