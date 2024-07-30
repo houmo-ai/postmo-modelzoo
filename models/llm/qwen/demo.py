@@ -15,53 +15,6 @@ import tcim
 TOKENIZER_PATH = "qwen1.5-7b-chat-hf"
 
 
-def run_model_decode(model, input_data, valid_length, valid_length_input):
-    input_name0 = "input"
-    # input_name1 = "valid_length"
-    # input_name2 = "current_length"
-    input_data0 = input_data
-    # input_data1 = np.array([valid_length - 1]).astype("int16")
-    # input_data2 = np.array([1]).astype("int16")
-    model.set_input(input_name0, input_data0)
-    valid_length_input.add(1)
-    # model.set_input(input_name1, input_data1)
-    # model.set_input(input_name2, input_data2)
-    model.run()
-    # model.sync()
-
-
-def run_model_prefill(model, input_data, current_length, valid_length=0):
-    input_name0 = "input"
-    input_name1 = "valid_length"
-    input_name2 = "current_length"
-    input_data0 = input_data
-    input_data1 = np.array([valid_length]).astype("int16")
-    input_data2 = np.array([current_length]).astype("int16")
-
-    model.set_input(input_name0, input_data0)
-    model.set_input(input_name1, input_data1)
-    model.set_input(input_name2, input_data2)
-    model.run()
-    model.sync()
-
-
-def run_model_decode_head(model):
-    model.run()
-    model.sync()
-    output = model.get_output("lm_head", True)
-    return output
-
-
-def run_model_prefill_head(model, gather_index):
-    input1_name = "seq_length"
-    input1_data = np.array([gather_index]).astype("int16")
-    model.set_input(input1_name, input1_data)
-    model.run()
-    model.sync()
-    output = model.get_output("lm_head", True)
-    return output
-
-
 class HmQwen:
 
     def __init__(self):
@@ -79,7 +32,7 @@ class HmQwen:
         embedding_weight = torch.load("output/H30/result/qwen15_quant_embedding.pth", map_location="cpu")
         self.embedding_weight = embedding_weight.reshape(-1, 4096)
 
-    def chat(self, question, prefill_length=256):
+    def chat(self, question, prefill_length=256, decode_length=2048):
         logger.success("question:")
         print("\033[1;95m{}\033[0m".format(question))
         start_time = time.time()
@@ -114,11 +67,21 @@ class HmQwen:
             _pad_embeds = torch.zeros(1, prefill_length - effective_length, inputs_embeds.size(-1),
                                     dtype=inputs_embeds.dtype, device=inputs_embeds.device)
             input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(4, 64, 4096) # [256, 1, 4096] ==> [4, 64, 4096]
-            run_model_prefill(self.prefill_model, input_data, current_length, valid_length)
+            valid_length_data = np.array([valid_length]).astype("int16")
+            current_length_data = np.array([current_length]).astype("int16")
+            self.prefill_model.set_input("input", input_data)
+            self.prefill_model.set_input("valid_length", valid_length_data)
+            self.prefill_model.set_input("current_length", current_length_data)
+            self.prefill_model.run()
+            self.prefill_model.sync()
 
         prefill_output_addr = self.prefill_model.get_dev_output("layers31_resadd2")
         self.prefill_head_model.set_input("layers31_resadd2", prefill_output_addr)
-        input_data = run_model_prefill_head(self.prefill_head_model, gather_index)
+        seq_length_data = np.array([gather_index]).astype("int16")
+        self.prefill_head_model.set_input("seq_length", seq_length_data)
+        self.prefill_head_model.run()
+        self.prefill_head_model.sync()
+        input_data = self.prefill_head_model.get_output("lm_head", True)
         next_id = input_data.argmax(-1)
         prefill_response = self.qwen1_5tokenizer.decode(next_id.tolist())
         prefill_time = time.time() - start_time
@@ -127,12 +90,14 @@ class HmQwen:
         input_data = F.embedding(next_id.unsqueeze(0), self.embedding_weight).reshape(1, 1, -1)
         all_response = prefill_response
         context_length = input_echo_len
-        input_data2 = np.array([1]).astype("int16")
-        self.decode_model.set_input("current_length", input_data2)
+        # set decode input
         input_data1 = np.array([context_length - 2]).astype("int16")
         self.decode_model.set_input("valid_length", input_data1)
-        valid_length_input = self.decode_model.get_dev_input("valid_length")
-        valid_length_input.set_stream(self.stream)
+        input_data2 = np.array([1]).astype("int16")
+        self.decode_model.set_input("current_length", input_data2)
+        # valid_length_input = self.decode_model.get_dev_input("valid_length")
+        # valid_length_input.set_stream(self.stream)
+        # set decode_head input
         decode_output = self.decode_model.get_dev_output("layers31_resadd2")
         self.decode_head_model.set_input("layers31_resadd2", decode_output)
         decode_count = 0
@@ -140,11 +105,19 @@ class HmQwen:
         print("\033[1;95m{}".format(prefill_response), end="", flush=True)
         start_time = time.time()
         while True:
-            if context_length > 2048:
-                logger.info(f"context length greater than 2048, break!")
+            if context_length > decode_length:
+                logger.info(f"context length greater than", decode_length, "break!")
                 break
-            run_model_decode(self.decode_model, input_data, context_length, valid_length_input)
-            input_data = run_model_decode_head(self.decode_head_model)
+
+            self.decode_model.set_input("input", input_data)
+            valid_length_data = np.array([context_length - 1]).astype("int16")
+            self.decode_model.set_input("valid_length", valid_length_data)
+            # valid_length_input.add(1)
+            self.decode_model.run()
+            self.decode_head_model.run()
+            self.decode_head_model.sync()
+            input_data = self.decode_head_model.get_output("lm_head", True)
+
             next_id = input_data.argmax(-1)
             decode_response = self.qwen1_5tokenizer.decode(next_id.tolist())
             if decode_response == self.qwen1_5tokenizer.eos_token:
@@ -156,6 +129,7 @@ class HmQwen:
             context_length = context_length + 1
             decode_count += 1
             print(decode_response, end="", flush=True)
+
         decode_time = time.time() - start_time
         self.stream.yield_()
         print("\033[0m")

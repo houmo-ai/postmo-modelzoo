@@ -21,6 +21,13 @@ def get_args() -> argparse.Namespace:
         help='batch size',
     )
     parser.add_argument(
+        '--core',
+        dest='core',
+        type=int,
+        default=4,
+        help='core number',
+    )
+    parser.add_argument(
         '--stage',
         dest='stage',
         type=str,
@@ -33,11 +40,15 @@ def get_args() -> argparse.Namespace:
 if __name__ == '__main__':
     args = get_args()
     curdir = os.getcwd()
-    if os.system("python3 build_prefill.py --stage {}".format(args.stage)):
+    if os.system("python3 build_prefill.py --stage {} --model_dir {} --core {}"
+                 .format(args.stage, args.model_dir, args.core)):
         exit(-1)
-    if os.system("python3 build_decode.py --stage {}".format(args.stage)):
+    if os.system("python3 build_decode.py --stage {} --model_dir {} --core {}"
+                 .format(args.stage, args.model_dir, args.core)):
         exit(-1)
-    if os.system("python3 build_prefill_head.py --stage {}".format(args.stage)):
+    if os.system("python3 build_prefill_head.py --stage {} --model_dir {} --core {}"
+                 .format(args.stage, args.model_dir, args.core)):
         exit(-1)
-    if os.system("python3 build_decode_head.py --stage {}".format(args.stage)):
+    if os.system("python3 build_decode_head.py --stage {} --model_dir {} --core {}"
+                 .format(args.stage, args.model_dir, args.core)):
         exit(-1)

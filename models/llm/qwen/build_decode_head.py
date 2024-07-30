@@ -16,7 +16,7 @@ def get_args() -> argparse.Namespace:
         '--model_dir',
         dest='model_dir',
         type=str,
-        default='output/H30/result/decoder_head',
+        default='output/H30/result',
         help='path to the model dir',
     )
     parser.add_argument(
@@ -34,6 +34,13 @@ def get_args() -> argparse.Namespace:
         help='batch size',
     )
     parser.add_argument(
+        '--core',
+        dest='core',
+        type=int,
+        default=4,
+        help='core number',
+    )
+    parser.add_argument(
         '--stage',
         dest='stage',
         type=str,
@@ -48,8 +55,9 @@ def build(args=None):
     """build and test houmo model."""
     model_name = args.model_name
     batch = args.batch
+    core_num = args.core
     stage = args.stage
-    model_dir = args.model_dir
+    model_dir = os.path.join(args.model_dir, "decoder_head")
     part_name = "qwen_decode_head"
     quant_name = "hmquant_" + model_name + "_with_act"
     onnx_name = quant_name + ".onnx"
@@ -61,18 +69,24 @@ def build(args=None):
         onnx_model = onnx.load(model_path)
         compile_config = {
             "tcim.gen_intrinsic": 0,
-            "tcim.special_model_name": "vit_small",
             "tcim.sync_strategy": 0,
-            "tcim.core_num": 4,
+            "tcim.special_model_name": "vit_small",
             "tcim.batch_num": 1,
-            "tcim.batch_used_core_num": 4,
-            "tcim.1batch_4core": True,
             "tcim.codegen_pic": True,
             "tcim.mem_plan_strategy": "linearscan",
             "tcim.split_const" : True
         }
-        if batch % 4 == 0:
+        if core_num == 4:
             compile_config["tcim.core_num"] = 4
+            compile_config["tcim.batch_used_core_num"] = 4
+            compile_config["tcim.1batch_4core"] = True
+        elif core_num == 2:
+            compile_config["tcim.core_num"] = 2,
+            compile_config["tcim.batch_used_core_num"] = 2
+            compile_config["tcim.1batch_2core"] = True
+        else:
+            print("[error] not support core =", core_num)
+            exit(-1)
         input_cfg = {}
         inputs = onnx_model.graph.input
         for input in inputs:
