@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-target=$HMASSIST_TARGET
+target=$HOUMO_TARGET
 
 cd $MODELZOO_PATH/utils/tcim_perf/
 if [ ! -f "tcim_perf" ]; then

@@ -661,9 +661,6 @@ class PointPillars {
   }
 
   void Run() {
-    static int s_round = 1;
-    std::cout << "\rpointpillars run start " << s_round;
-
     // Voxelization
     idnnlRvvVoxelization(
       handle_,
@@ -711,8 +708,10 @@ class PointPillars {
       preds_scalar_.tdesc_, preds_scalar_.mdesc_,
       kNumClass, kNumAnchor, kNumOutputBoxFeature, kNumBoxCorners,
       score_threshold, nms_overlap_threshold);
+  }
+
+  void Sync() {
     hdplStreamSynchronize(stream_);
-    s_round++;
   }
 
   void CheckResult() {
@@ -875,6 +874,7 @@ int main(int argc, char* argv[]) {
       if (thread_info.max_cost < cost) thread_info.max_cost = cost;
       thread_info.sample_cnt++;
     }
+    pp->Sync();
 
     printf("\n===> thread %d completed. %d sampels tested.\n", tid, thread_info.sample_cnt);
     barrier.barrier();

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-target=$HMASSIST_TARGET
+target=$HOUMO_TARGET
 
 found_target=false
 argc=$#

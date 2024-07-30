@@ -14,7 +14,7 @@ def get_args() -> argparse.Namespace:
         '--model_path',
         dest='model_path',
         type=str,
-        default='efficientnet_b0_224x224.onnx',
+        default=os.path.join(os.getenv("MODEL_PATH", default=""), 'efficientnet_b0_224x224.onnx'),
         help='path to the model path',
     )
     parser.add_argument(

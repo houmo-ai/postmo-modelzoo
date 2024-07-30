@@ -28,6 +28,12 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.target = cfg["target"]
         self.framework = self.model["framework"]
         self.weight = self.model["weight"]
+        if not os.path.exists(self.weight):
+            weight = os.path.join(os.getenv("MODEL_PATH", default=""), self.weight)
+            if not os.path.exists(weight):
+                logger.fatal("{} or {} not exist.".format(self.weight, weight))
+                exit(-1)
+            self.weight = weight
         self.inputs = self.model["inputs"]
         self.num_inputs = len(self.inputs)
         self.model_name = self.model["name"]

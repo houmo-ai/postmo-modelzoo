@@ -2,17 +2,17 @@ model: {
   framework: onnx,
   name: unet,
   save_dir: ./output,
-  weight: ./unet_512x1024.onnx,
+  weight: ./unet_1024x2048.onnx,
   inputs: [
     {
       name: input,
-      shape: [1, 3, 1024, 2048],
+      shape: [1, 3, 256, 256],
       layout: NCHW,
       format: RGB,
       image: {
         format: YUV422,
-        size: [1024, 2048],
-        crop: [0, 0, 1024, 2048],
+        # size: [1024, 2048],
+        # crop: [0, 0, 1024, 2048],
       },
       dtype: uint8,
       mean: [ 0.485, 0.456, 0.406 ],

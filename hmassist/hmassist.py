@@ -49,7 +49,7 @@ def save_data(data, dir, name):
 
 def get_executor(cfg):
     target = cfg["target"]
-    if target == "H30":
+    if target == "houmo":
         return H30Exec(cfg)
     elif target == "onnx":
         return OnnxExec(cfg)
@@ -283,7 +283,7 @@ def eval(cfg):
         return -1
 
     model.test_num = cfg["eval"]["test_num"]
-    if os.environ.get("HDPL_PLATFORM") == "ISIM":
+    if not os.environ.get("HDPL_PLATFORM") == "ASIC":
         if model.test_num > 20 or model.test_num == 0:
             model.test_num = 20
             logger.warning("test num set to 20 because HDPL_PLATFORM=ISIM may take a lot of time.")
@@ -458,7 +458,7 @@ if __name__ == "__main__":
                         choices=("quant", "build", "test", "demo", "perf", "eval", "benchmark"),
                         help="Specify an operation")
     parser.add_argument("--target", type=str, required=True,
-                        choices=("H30", "onnx"),
+                        choices=("houmo", "onnx"),
                         help="Specify a chip target")
     parser.add_argument("--config", type=str, default="config.yml",
                         help="Specify a config file, default is config.yml")

@@ -8,10 +8,12 @@ export MODELZOO_PATH
 HMASSIST_PATH=$MODELZOO_PATH/hmassist
 export HMASSIST_PATH
 
-export HMASSIST_TARGET=H30
+if [[ -z $HOUMO_TARGET ]]; then
+  export HOUMO_TARGET=houmo
+fi
 export CMAKE_CONFIG_PATH=$MODELZOO_PATH/develop.cmake
 if [[ -z $MODELZOO_URL ]]; then
-  export MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo/release
+  export MODELZOO_URL=http://10.10.1.53:8082/artifactory/toolchain/release
 fi
 
 # set hal library log level
@@ -46,7 +48,7 @@ if [[ -z $DATASETS_PATH ]]; then
   export DATASETS_PATH=$MODELZOO_PATH/data/datasets
 fi
 if [[ -z $MODEL_PATH ]]; then
-  export MODEL_PATH=$MODELZOO_PATH/data/models
+  export MODEL_PATH=$MODELZOO_PATH/models
 fi
 
 # use asic if detected
@@ -59,7 +61,7 @@ if [[ -z $HDPL_PLATFORM ]]; then
 fi
 
 echo "[Please check the following path. Unset the environment variable if you want to use the default path!]"
-echo "HMASSIST_TARGET is $HMASSIST_TARGET"
+echo "HOUMO_TARGET is $HOUMO_TARGET"
 echo "HOUMO_PATH is $HOUMO_PATH"
 echo "TCIM_PATH is $TCIM_PATH"
 echo "QUANTOOL_PATH is $QUANTOOL_PATH"

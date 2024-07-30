@@ -16,7 +16,7 @@ def get_args() -> argparse.Namespace:
         '--model_dir',
         dest='model_dir',
         type=str,
-        default='output',
+        default='output/H30/result',
         help='path to the model dir',
     )
     parser.add_argument(
@@ -74,9 +74,14 @@ def build(args):
         )
         executor = Executor('aot')
         compile_config = {
-            'tcim.fuse_strategy': 1,
-            'tcim.codegen_pic': True,
+            # 'tcim.fuse_strategy': 1,
+            # 'tcim.codegen_pic': True,
+            # "tcim.for_benchmark": True,
+            # "tcim.mem_plan_strategy": "linearscan"
             "tcim.for_benchmark": True,
+            "tcim.fuse_strategy": 1,
+            "tcim.gen_intrinsic": 0,
+            "tcim.sync_strategy": 1,
             "tcim.mem_plan_strategy": "linearscan"
         }
         target = tvm.target.Target('hdpl', host='c')
@@ -84,7 +89,7 @@ def build(args):
             graph, lib, params = relay.build(
                 mod, target, executor=executor, mod_name=model_name,
             )
-        tcim.store_so(model_name, lib)
+        tcim.store_so(model_name, lib, "output", hdplcc_options=["-O2"])
         print(model_name, ' saved as a aot model.')
 
     # compare with golden

@@ -157,4 +157,6 @@ def main(allArgs=None):
         raise Exception("script type is not recognition, begin exit")
 
 if __name__ == "__main__":
+    os.environ['MODELZOO_URL'] = "http://10.10.1.53:8082/artifactory/toolchain/release"
+    os.environ['MODEL_PATH'] = "/data02/modelzoo_ci/models"
     main()

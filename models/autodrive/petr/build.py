@@ -10,7 +10,7 @@ def get_args() -> argparse.Namespace:
         '--model_dir',
         dest='model_dir',
         type=str,
-        default='output/H30/result',
+        default=os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result'),
         help='path to the model dir',
     )
     parser.add_argument(

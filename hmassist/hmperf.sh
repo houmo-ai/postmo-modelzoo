@@ -4,7 +4,7 @@ set -e
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 set -e
 
-target=$HMASSIST_TARGET
+target=$HOUMO_TARGET
 
 found_target=false
 argc=$#

@@ -114,7 +114,7 @@ cd models/backbone/resnet50
 python3 get_model.py
 ```
 
-可以通过type参数控制下载模型的类型，raw为原始模型，quant为量化模型，all为全部下载，默认为all。原始模型放在当前目录，量化模型放在output/H30/result目录（注：重新执行量化后会覆盖该量化模型）。如：
+可以通过type参数控制下载模型的类型，raw为原始模型，quant为量化模型，all为全部下载，默认为all。下载的模型默认放在MODEL_PATH环境变量定义的目录，量化模型将解压到output/houmo/result目录（注：重新量化后会覆盖该量化模型，可重新执行获取脚本恢复）。如：
 
 ```bash
 python3 get_model.py --type raw
@@ -158,7 +158,7 @@ bash eval.sh
 python3 ptq.py
 ```
 
-量化后的模型和golden数据以onnx模型和npy数据的形式默认放在output/H30/result目录下。量化完成后会进行profile，以表格的形式打印逐层相似度，重点关注输出层的余弦相似度是否符合预期。如果余弦相似度较低，可考虑该结果是否适合使用余弦相似度进行评价，进一步测试模型实际精度。如果确实是量化精度降低较多，可考虑更换量化数据和参数，以及混合量化，QAT训练等方式进一步提升。
+量化后的模型和golden数据以onnx模型和npy数据的形式默认放在output/houmo/result目录下。量化完成后会进行profile，以表格的形式打印逐层相似度，重点关注输出层的余弦相似度是否符合预期。如果余弦相似度较低，可考虑该结果是否适合使用余弦相似度进行评价，进一步测试模型实际精度。如果确实是量化精度降低较多，可考虑更换量化数据和参数，以及混合量化，QAT训练等方式进一步提升。
 
 #### 编译
 
@@ -197,7 +197,7 @@ hmassist工具基于TCIM API接口通过yaml配置文件和python脚本定义模
 hmquant.sh
 ```
 
-量化后的模型和golden数据以onnx模型和npy数据的形式默认放在output/H30/result目录下。量化完成后会进行profile，以表格的形式打印逐层相似度，重点关注输出层的余弦相似度是否符合预期。如果余弦相似度较低，可考虑该结果是否适合使用余弦相似度进行评价，进一步测试模型实际精度。如果确实是量化精度降低较多，可考虑更换量化数据和参数，以及混合量化，QAT训练等方式进一步提升。
+量化后的模型和golden数据以onnx模型和npy数据的形式默认放在output/houmo/result目录下。量化完成后会进行profile，以表格的形式打印逐层相似度，重点关注输出层的余弦相似度是否符合预期。如果余弦相似度较低，可考虑该结果是否适合使用余弦相似度进行评价，进一步测试模型实际精度。如果确实是量化精度降低较多，可考虑更换量化数据和参数，以及混合量化，QAT训练等方式进一步提升。
 
 #### 编译
 
@@ -271,7 +271,7 @@ hmbenchmark.sh
 
 执行完成会在log中打印报告，同时在reports目录中保存csv文件。部分模型执行结果如下（模型性能结果根据平台不同会有差异）：
 
-|  ModelName   |      Shape       |  Dataset   | Batch | CoreNum | Accuracy(onnx)        | Accuracy(H30)         | AccRelError             | Latency(ms) |   Qps   |
+|  ModelName   |      Shape       |  Dataset   | Batch | CoreNum | Accuracy(onnx)        | Accuracy(houmo)       | AccRelError             | Latency(ms) |   Qps   |
 | ------------ | ---------------- | ---------- | ----- | ------- | --------------------- | --------------------- | ----------------------- | ----------- | ------- |
 |   resnet50   | [1, 224, 224, 3] | ILSVRC2012 |   1   |    1    | top1:0.753 top5:0.925 | top1:0.719 top5:0.923 | top1:-0.046 top5:-0.002 |    0.752    | 1330.47 |
 |   yolov5s    | [1, 640, 640, 3] |  coco2017  |   1   |    1    | map:0.362 map50:0.557 | map:0.333 map50:0.542 | map:-0.079 map50:-0.026 |    4.415    |  226.50 |
