@@ -9,72 +9,72 @@ os_type:
       - models/backbone/resnet50/resnet50.hmm.so
       - models/backbone/resnet50/build.py
     resnet50_gloden:
-      - models/backbone/resnet50/output/H30/result/hmquant_resnet50_input.1_input.npy
-      - models/backbone/resnet50/output/H30/result/hmquant_resnet50_with_act
+      - models/backbone/resnet50/output/houmo/result/hmquant_resnet50_input.1_input.npy
+      - models/backbone/resnet50/output/houmo/result/hmquant_resnet50_with_act
     efficientnet:
       - models/backbone/efficientnet/efficientnet.hmm.so
       - models/backbone/efficientnet/build.py
     efficientnet_gloden:
-      - models/backbone/efficientnet/output/H30/result/hmquant_efficientnet_input.1_input.npy
-      - models/backbone/efficientnet/output/H30/result/hmquant_efficientnet_with_act
+      - models/backbone/efficientnet/output/houmo/result/hmquant_efficientnet_input.1_input.npy
+      - models/backbone/efficientnet/output/houmo/result/hmquant_efficientnet_with_act
     mobilenetv2:
       - models/backbone/mobilenetv2/mobilenetv2.hmm.so
       - models/backbone/mobilenetv2/build.py
     mobilenetv2_gloden:
-      - models/backbone/mobilenetv2/output/H30/result/hmquant_mobilenetv2_input_input.npy
-      - models/backbone/mobilenetv2/output/H30/result/hmquant_mobilenetv2_with_act
+      - models/backbone/mobilenetv2/output/houmo/result/hmquant_mobilenetv2_input_input.npy
+      - models/backbone/mobilenetv2/output/houmo/result/hmquant_mobilenetv2_with_act
     yolov3:
       - models/detection/yolov3/yolov3.hmm.so
       - models/detection/yolov3/build.py
     yolov3_gloden:
-      - models/detection/yolov3/output/H30/result/hmquant_yolov3_images_input.npy
-      - models/detection/yolov3/output/H30/result/hmquant_yolov3_with_act
+      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_images_input.npy
+      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_with_act
     yolov5s:
       - models/detection/yolov5s/yolov5s.hmm.so
       - models/detection/yolov5s/build.py
     yolov5s_gloden:
-      - models/detection/yolov5s/output/H30/result/hmquant_yolov5s_with_act
-      - models/detection/yolov5s/output/H30/result/hmquant_yolov5s_images_input.npy
+      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_with_act
+      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_images_input.npy
     yolop:
       - models/autodrive/yolop/yolop.hmm.so
       - models/autodrive/yolop/build.py
     yolop_gloden:
-      - models/autodrive/yolop/output/H30/result/hmquant_yolop_images_input.npy
-      - models/autodrive/yolop/output/H30/result/hmquant_yolop_with_act
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_images_input.npy
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_with_act
   ubuntu_18.04:
     resnet50:
       - models/backbone/resnet50/resnet50.hmm.so
       - models/backbone/resnet50/build.py
     resnet50_gloden:
-      - models/backbone/resnet50/output/H30/result/hmquant_resnet50_input.1_input.npy
-      - models/backbone/resnet50/output/H30/result/hmquant_resnet50_with_act
+      - models/backbone/resnet50/output/houmo/result/hmquant_resnet50_input.1_input.npy
+      - models/backbone/resnet50/output/houmo/result/hmquant_resnet50_with_act
     efficientnet:
       - models/backbone/efficientnet/efficientnet.hmm.so
       - models/backbone/efficientnet/build.py
     efficientnet_gloden:
-      - models/backbone/efficientnet/output/H30/result/hmquant_efficientnet_input.1_input.npy
-      - models/backbone/efficientnet/output/H30/result/hmquant_efficientnet_with_act
+      - models/backbone/efficientnet/output/houmo/result/hmquant_efficientnet_input.1_input.npy
+      - models/backbone/efficientnet/output/houmo/result/hmquant_efficientnet_with_act
     mobilenetv2:
       - models/backbone/mobilenetv2/mobilenetv2.hmm.so
       - models/backbone/mobilenetv2/build.py
     mobilenetv2_gloden:
-      - models/backbone/mobilenetv2/output/H30/result/hmquant_mobilenetv2_input_input.npy
-      - models/backbone/mobilenetv2/output/H30/result/hmquant_mobilenetv2_with_act
+      - models/backbone/mobilenetv2/output/houmo/result/hmquant_mobilenetv2_input_input.npy
+      - models/backbone/mobilenetv2/output/houmo/result/hmquant_mobilenetv2_with_act
     yolov5s:
       - models/detection/yolov5s/yolov5s.hmm.so
       - models/detection/yolov5s/build.py
     yolov5s_gloden:
-      - models/detection/yolov5s/output/H30/result/hmquant_yolov5s_with_act
-      - models/detection/yolov5s/output/H30/result/hmquant_yolov5s_images_input.npy
+      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_with_act
+      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_images_input.npy
     yolov3:
       - models/detection/yolov3/yolov3.hmm.so
       - models/detection/yolov3/build.py
     yolov3_gloden:
-      - models/detection/yolov3/output/H30/result/hmquant_yolov3_images_input.npy
-      - models/detection/yolov3/output/H30/result/hmquant_yolov3_with_act
+      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_images_input.npy
+      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_with_act
     yolop:
       - models/autodrive/yolop/yolop.hmm.so
       - models/autodrive/yolop/build.py
     yolop_gloden:
-      - models/autodrive/yolop/output/H30/result/hmquant_yolop_images_input.npy
-      - models/autodrive/yolop/output/H30/result/hmquant_yolop_with_act
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_images_input.npy
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_with_act

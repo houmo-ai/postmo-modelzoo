@@ -191,7 +191,7 @@ def test(cfg):
     logger.info("test outputs saved in {}".format(save_dir))
 
     # compare to framework output
-    if model.target in ["H30",]:
+    if model.target in ["houmo",]:
         sum_cos = 0.0
         for output_name, output_data in outputs.items():
             output_save_name = sanitize_name(output_name)
