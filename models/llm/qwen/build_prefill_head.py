@@ -74,15 +74,15 @@ def build(args=None):
             "tcim.batch_num": 1,
             "tcim.codegen_pic": True,
             "tcim.mem_plan_strategy": "linearscan",
+            "tcim.large_split_maxsize": True,
             "tcim.split_const" : True
         }
         if core_num == 4:
             compile_config["tcim.core_num"] = 4
             compile_config["tcim.batch_used_core_num"] = 4
             compile_config["tcim.1batch_4core"] = True
-            compile_config["tcim.large_split_maxsize"] = True
         elif core_num == 2:
-            compile_config["tcim.core_num"] = 2,
+            compile_config["tcim.core_num"] = 2
             compile_config["tcim.batch_used_core_num"] = 2
             compile_config["tcim.1batch_2core"] = True
         else:

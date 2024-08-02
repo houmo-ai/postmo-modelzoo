@@ -71,18 +71,19 @@ def build(args=None):
         onnx_model = onnx.load(model_path)
         compile_config = {
             "tcim.gen_intrinsic": 1,
-            "tcim.sync_strategy": 1,
+            "tcim.sync_strategy": 0,
+            "tcim.fuse_strategy": 1,
             "tcim.special_model_name": "vit_small",
             "tcim.batch_num": 1,
             "tcim.codegen_pic": True,
             "tcim.mem_plan_strategy": "linearscan",
+            "tcim.large_split_maxsize": True,
             "tcim.split_const" : True,
         }
         if core_num == 4:
             compile_config["tcim.core_num"] = 4
             compile_config["tcim.batch_used_core_num"] = 4
             compile_config["tcim.1batch_4core"] = True
-            compile_config["tcim.large_split_maxsize"] = True
         elif core_num == 2:
             compile_config["tcim.core_num"] = 2
             compile_config["tcim.batch_used_core_num"] = 2

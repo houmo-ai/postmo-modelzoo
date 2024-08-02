@@ -117,6 +117,7 @@ class HmQwen:
             self.decode_head_model.run()
             self.decode_head_model.sync()
             input_data = self.decode_head_model.get_output("lm_head", True)
+            decode_count += 1
 
             next_id = input_data.argmax(-1)
             decode_response = self.qwen1_5tokenizer.decode(next_id.tolist())
@@ -127,7 +128,6 @@ class HmQwen:
             input_data = F.embedding(next_id.unsqueeze(0), self.embedding_weight).reshape(1, 1, -1)
             all_response = all_response + decode_response
             context_length = context_length + 1
-            decode_count += 1
             print(decode_response, end="", flush=True)
 
         decode_time = time.time() - start_time

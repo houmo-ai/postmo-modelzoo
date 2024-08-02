@@ -105,8 +105,8 @@ def get_file_from_jfrog(file_path, save_dir=""):
                 return save_path
     else:
         print("failed to retrieve MD5. status code:", response.status_code)
-    if os.path.exists(file_name):
-        os.system("rm " + file_name)
+    if os.path.exists(save_path):
+        os.system("rm " + save_path)
     # cmd = "wget -N --ftp-user=ftp001 --ftp-password=3tIx7oMi@R " + modelzoo_url + "/" + file_path
     print("downloading", file_name)
     cmd = "wget -c " + modelzoo_url + "/" + file_path + " -O " + save_path

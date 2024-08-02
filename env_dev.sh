@@ -48,7 +48,12 @@ if [[ -z $DATASETS_PATH ]]; then
   export DATASETS_PATH=$MODELZOO_PATH/data/datasets
 fi
 if [[ -z $MODEL_PATH ]]; then
-  export MODEL_PATH=$MODELZOO_PATH/models
+  CI_MODEL_PATH=/data02/modelzoo_ci/models
+  if test -d $CI_MODEL_PATH; then
+    export MODEL_PATH=$CI_MODEL_PATH
+  else
+    export MODEL_PATH=$MODELZOO_PATH/models
+  fi
 fi
 
 # use asic if detected

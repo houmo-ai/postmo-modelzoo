@@ -81,7 +81,7 @@ def build(args=None):
             compile_config["tcim.batch_used_core_num"] = 4
             compile_config["tcim.1batch_4core"] = True
         elif core_num == 2:
-            compile_config["tcim.core_num"] = 2,
+            compile_config["tcim.core_num"] = 2
             compile_config["tcim.batch_used_core_num"] = 2
             compile_config["tcim.1batch_2core"] = True
         else:
