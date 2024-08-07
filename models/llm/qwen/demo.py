@@ -32,7 +32,7 @@ class HmQwen:
         embedding_weight = torch.load("output/H30/result/qwen15_quant_embedding.pth", map_location="cpu")
         self.embedding_weight = embedding_weight.reshape(-1, 4096)
 
-    def chat(self, question, prefill_length=256, decode_length=2048):
+    def chat(self, question, prefill_length=256, decode_length=1024):
         logger.success("question:")
         print("\033[1;95m{}\033[0m".format(question))
         start_time = time.time()
