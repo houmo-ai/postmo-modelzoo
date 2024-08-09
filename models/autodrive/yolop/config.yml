@@ -31,7 +31,6 @@ quant: {
 }
 
 build: {
-  target: H30,
   opt_level: 0,
   input_layout: ,
   output_layout: NHWC,

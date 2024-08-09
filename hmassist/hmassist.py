@@ -23,7 +23,7 @@ from hmassist.utils.check import (
     check_args,
     check_datapath
 )
-from hmassist.executors.h30_exec import H30Exec
+from hmassist.executors.xh1_exec import XH1Exec
 from hmassist.executors.onnx_exec import OnnxExec
 from hmassist.models.base_model import BaseModel
 from hmassist.utils.utils import sanitize_name
@@ -50,7 +50,7 @@ def save_data(data, dir, name):
 def get_executor(cfg):
     target = cfg["target"]
     if target == "houmo":
-        return H30Exec(cfg)
+        return XH1Exec(cfg)
     elif target == "onnx":
         return OnnxExec(cfg)
     else:

@@ -27,9 +27,9 @@ hmassist
 HmAssist支持5种基础功能，分别是量化、编译、推理测试、结果展示、性能测试、精度测试。
 
 ```
-hmassist.py [-h] --config CONFIG [--target {H30}]
+hmassist.py [-h] --config CONFIG [--target {houmo}]
                    [--backend {chip,onnx}] [--log_dir LOG_DIR]
-                   {quant,build,test,demo,perf,accuracy}
+                   {quant,build,test,demo,perf,eval}
 其中log_dir默认为logs，可缺省
 ```
 
@@ -87,7 +87,7 @@ Compiling the model to tcim_resnet50.so ...
 执行hminfer.sh，执行成功打印如下，目前golden数据比对结果还有点问题
 
 ```shell
-[compare] H30 vs quant output [495] similarity=0.572020
+[compare] houmo vs quant output [495] similarity=0.572020
 success
 
 input[input.1] shape = (1, 224, 224, 3)

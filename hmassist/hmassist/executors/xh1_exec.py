@@ -12,12 +12,16 @@ from ..utils import logger
 from ..utils.utils import get_random_data
 from .base_exec import BaseExec
 
-class H30Exec(BaseExec, ABC):
+class XH1Exec(BaseExec, ABC):
     def __init__(self, cfg: dict):
-        super(H30Exec, self).__init__(cfg)
+        super(XH1Exec, self).__init__(cfg)
         self.model_path = os.path.join(self.model_dir, self.model_name)
 
     def quantize(self, get_input_datas):
+        import platform
+        arch = platform.machine()
+        if arch != "x86_64":
+            logger.error(f"quant not support platform: {arch}")
         logger.info("################  ptq quantize started  ######################")
         t_start = time.time()
         calib_files = []

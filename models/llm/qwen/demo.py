@@ -13,7 +13,7 @@ import tcim
 
 
 TOKENIZER_PATH = "qwen1.5-7b-chat-hf"
-
+EMBEDDING_PATH = os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result', 'qwen15_quant_embedding.pth')
 
 class HmQwen:
 
@@ -29,7 +29,7 @@ class HmQwen:
         self.decode_head_model.set_stream(self.stream)
         self.prefill_head_model.set_stream(self.stream)
         self.qwen1_5tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH, trust_remote_code=True)
-        embedding_weight = torch.load("output/H30/result/qwen15_quant_embedding.pth", map_location="cpu")
+        embedding_weight = torch.load(EMBEDDING_PATH, map_location="cpu")
         self.embedding_weight = embedding_weight.reshape(-1, 4096)
 
     def chat(self, question, prefill_length=256, decode_length=1024):

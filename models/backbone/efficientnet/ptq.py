@@ -14,7 +14,7 @@ def get_args() -> argparse.Namespace:
         '--model_path',
         dest='model_path',
         type=str,
-        default=os.path.join(os.getenv("MODEL_PATH", default=""), 'efficientnet_b0_224x224.onnx'),
+        default=os.path.join(os.getenv("MODEL_PATH", ""), 'efficientnet_b0_224x224.onnx'),
         help='path to the model path',
     )
     parser.add_argument(
@@ -24,6 +24,13 @@ def get_args() -> argparse.Namespace:
         default='efficientnet',
         help='model name',
     )
+    parser.add_argument(
+        '--model_dir',
+        dest='model_dir',
+        type=str,
+        default=os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result'),
+        help='path to the quanted model dir',
+    )
     args = parser.parse_args()
     return args
 
@@ -31,7 +38,7 @@ def get_args() -> argparse.Namespace:
 def calibrate(args=None):
     model_path = args.model_path
     model_name = args.model_name
-    output_path = 'output/H30/result'
+    output_path = args.model_dir
 
     env_dict = os.environ
 

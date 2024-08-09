@@ -25,6 +25,13 @@ def get_args() -> argparse.Namespace:
         default='yolop',
         help='model name',
     )
+    parser.add_argument(
+        '--model_dir',
+        dest='model_dir',
+        type=str,
+        default=os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result'),
+        help='path to the quanted model dir',
+    )
     args = parser.parse_args()
     return args
 
@@ -32,7 +39,7 @@ def get_args() -> argparse.Namespace:
 def calibrate(args=None):
     model_path = args.model_path
     model_name = args.model_name
-    output_path = 'output/H30/result'
+    output_path = args.model_dir
 
     env_dict = os.environ
 
