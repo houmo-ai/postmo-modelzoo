@@ -36,7 +36,7 @@ python3 get_model.py --type quant
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py38-x86.64 /bin/bash
 ```
 
-进入docker后source环境变量，并进入/hmdd/models/llm/qwen_mix目录，执行ptq.sh脚本
+进入docker后source环境变量，并进入/hmdd/models/llm/qwen_mix目录，执行ptq.sh脚本。（注：可通过修改脚本中的MODEL_DIR修改模型位置，运行中需要连接网络以下载wikitext2数据集，如无法连接可打开注释下载wikitext2_cache.zip）
 
 ```bash
 source env.sh

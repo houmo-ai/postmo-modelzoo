@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-MODEL_DIR=/data01/datasets/qwen1.5-7b-chat-hf
+MODEL_DIR=qwen1.5-7b-chat-hf
 HMLLMQUANT_DIR=/usr/local/src/hmllmquant
 
 export PYTHONPATH=:$HMLLMQUANT_DIR:$PYTHONPATH
@@ -11,7 +11,8 @@ mkdir -p weights
 batch=1
 
 # download wikitext2 cache if you can't download it directly
-# wget $MODEL_PATH/models/qwen/wikitext2_cache.zip
+# wget $MODELZOO_URL/models/qwen/wikitext2_cache.zip
+# unzip wikitext2_cache.zip
 
 python3 $HMLLMQUANT_DIR/scripts/generate_smooth_f.py --model $MODEL_DIR \
         --seed=2024 --rotate --a_bits=8 --k_bits=8 \
