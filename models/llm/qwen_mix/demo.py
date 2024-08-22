@@ -83,6 +83,7 @@ class HmQwen:
             self.prefill_part2_model.set_input("valid_length", valid_length_data)
             self.prefill_part2_model.set_input("current_length", current_length_data)
             self.prefill_part2_model.run()
+            self.prefill_part2_model.sync()
 
         prefill_part2_output = self.prefill_part2_model.get_dev_output("model_layers_31_resadd2")
         self.prefill_head_model.set_input("layers31_resadd2", prefill_part2_output)

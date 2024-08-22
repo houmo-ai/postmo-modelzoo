@@ -102,7 +102,7 @@ def build(args=None):
         weight_path = os.path.join(model_dir, "../weight.npy")
         data_dict = np.load(weight_path, allow_pickle=True).item()
         tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
-                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen_group_")
+                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen_group_part1_")
         print(part_name, 'build completed.')
 
     # 2. test model
