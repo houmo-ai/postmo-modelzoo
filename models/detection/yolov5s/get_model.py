@@ -37,7 +37,7 @@ if __name__ == '__main__':
     model_type = args.model_type
     model_dir = args.model_dir
     raw_path = "models/yolov5s/yolov5s_640x640.onnx"
-    quant_path = "models/yolov5s/hmquant_yolov5s_20240304.zip"
+    quant_path = "models/yolov5s/hmquant_yolov5s_20240827.zip"
 
     if model_type == "raw" or model_type == "all":
         file_path = get_file_from_jfrog(raw_path, model_dir)

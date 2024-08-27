@@ -272,9 +272,10 @@ class XH1Exec(BaseExec, ABC):
         return datas
 
     def get_golden_output(self, name):
-        golden_output_path = os.path.join(self.golden_data_path, name + '.npy')
+        golden_output_path = os.path.join(self.golden_data_path, 'hmquant_' + self.model_name 
+                                          + '_' + name + '_output.npy')
         if os.path.exists(golden_output_path):
-            output_data = np.load(golden_output_path, allow_pickle=True).item().get("output_tensor")
+            output_data = np.load(golden_output_path)
             output_data = np.concatenate([output_data for i in range(self.batch)], axis=0)
             return output_data
         else:

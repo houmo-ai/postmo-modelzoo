@@ -56,20 +56,22 @@ def extract_model(src, dest, input_names, output_names):
 if __name__ == '__main__':
     args = get_args()
     curdir = os.getcwd()
-    prefill_model = os.path.join(args.model_dir, "prefill/hmquant_qwen_with_act.onnx")
-    prefill_model_part1 = os.path.join(args.model_dir, "prefill/hmquant_qwen_part1_with_act.onnx")
-    prefill_model_part2 = os.path.join(args.model_dir, "prefill/hmquant_qwen_part2_with_act.onnx")
-    decode_model = os.path.join(args.model_dir, "decoder/hmquant_qwen_with_act.onnx")
-    decode_model_part1 = os.path.join(args.model_dir, "decoder/hmquant_qwen_part1_with_act.onnx")
-    decode_model_part2 = os.path.join(args.model_dir, "decoder/hmquant_qwen_part2_with_act.onnx")
-    extract_model(prefill_model, prefill_model_part1, input_names=['input_1', 'valid_length', 'current_length'], 
-            output_names=['model_layers_15_resadd2'])
-    extract_model(prefill_model, prefill_model_part2, input_names=['model_layers_15_resadd2', 'valid_length', 'current_length'], 
-            output_names=['model_layers_31_resadd2'])
-    extract_model(decode_model, decode_model_part1, input_names=['input_1', 'valid_length', 'current_length'], 
-            output_names=['model_layers_15_resadd2'])
-    extract_model(decode_model, decode_model_part2, input_names=['model_layers_15_resadd2', 'valid_length', 'current_length'], 
-            output_names=['model_layers_31_resadd2'])
+
+    if args.stage == "build" or args.stage == "all":
+        prefill_model = os.path.join(args.model_dir, "prefill/hmquant_qwen_with_act.onnx")
+        prefill_model_part1 = os.path.join(args.model_dir, "prefill/hmquant_qwen_part1_with_act.onnx")
+        prefill_model_part2 = os.path.join(args.model_dir, "prefill/hmquant_qwen_part2_with_act.onnx")
+        decode_model = os.path.join(args.model_dir, "decoder/hmquant_qwen_with_act.onnx")
+        decode_model_part1 = os.path.join(args.model_dir, "decoder/hmquant_qwen_part1_with_act.onnx")
+        decode_model_part2 = os.path.join(args.model_dir, "decoder/hmquant_qwen_part2_with_act.onnx")
+        extract_model(prefill_model, prefill_model_part1, input_names=['input_1', 'valid_length', 'current_length'], 
+                output_names=['model_layers_15_resadd2'])
+        extract_model(prefill_model, prefill_model_part2, input_names=['model_layers_15_resadd2', 'valid_length', 'current_length'], 
+                output_names=['model_layers_31_resadd2'])
+        extract_model(decode_model, decode_model_part1, input_names=['input_1', 'valid_length', 'current_length'], 
+                output_names=['model_layers_15_resadd2'])
+        extract_model(decode_model, decode_model_part2, input_names=['model_layers_15_resadd2', 'valid_length', 'current_length'], 
+                output_names=['model_layers_31_resadd2'])
 
     if os.system("python3 build_prefill_part1.py --stage {} --model_dir {} --core {}"
                  .format(args.stage, args.model_dir, args.core)):

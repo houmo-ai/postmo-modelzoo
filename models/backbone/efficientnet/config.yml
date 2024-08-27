@@ -10,7 +10,7 @@ model: {
       layout: NCHW,
       format: RGB,
       image: {
-        format: YUV422,
+        format: YUV420,
         size: ,
         crop: ,
       },

@@ -104,9 +104,9 @@ def build(args=None):
             if (len(output_data.shape) == 4):  # toolchain output is NHWC
                 output_data = np.transpose(output_data, (0, 3, 1, 2))
                 print("output[{}] transpose to {}".format(output_name, output_data.shape))
-            output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_with_act', output_name + '.npy')
+            output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_' + output_name + '_output.npy')
             if os.path.exists(output_data_path):
-                golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
+                golden_output = np.load(output_data_path)
                 golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
             else:
                 result_check = False

@@ -101,9 +101,9 @@ def build(args=None):
                                                                                output_info.dtype, output_info.format.name))
             output_data = module.get_output(output_name, is_quanted=True)
             print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-            output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_with_act', output_name + '.npy')
+            output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_' + output_name + '_output.npy')
             if os.path.exists(output_data_path):
-                golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
+                golden_output = np.load(output_data_path)
                 golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
             else:
                 result_check = False

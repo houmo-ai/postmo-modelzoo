@@ -53,20 +53,21 @@ def build(args=None):
     model_dir = os.path.dirname(model_path)
 
     # 1. build model
-    onnx_model = onnx.load(model_path)
-    compile_config={}
-    convert_config = {'layout': 'NHWC'}
-    if batch % 4 == 0:
-        compile_config["tcim.core_num"] = 4
-    input_cfg = {}
-    inputs = onnx_model.graph.input
-    for input in inputs:
-        dims = input.type.tensor_type.shape.dim
-        input_shape = [dim.dim_value for dim in dims]
-        input_shape[0] *= batch
-        input_cfg[input.name] = tcim.HMInput(shape=input_shape)
-    tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=compile_config, convert_config=convert_config)
-    print(model_name, 'build completed.')
+    if stage == 'build' or stage == 'all':
+        onnx_model = onnx.load(model_path)
+        compile_config={}
+        convert_config = {'layout': 'NHWC'}
+        if batch % 4 == 0:
+            compile_config["tcim.core_num"] = 4
+        input_cfg = {}
+        inputs = onnx_model.graph.input
+        for input in inputs:
+            dims = input.type.tensor_type.shape.dim
+            input_shape = [dim.dim_value for dim in dims]
+            input_shape[0] *= batch
+            input_cfg[input.name] = tcim.HMInput(shape=input_shape)
+        tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=compile_config, convert_config=convert_config)
+        print(model_name, 'build completed.')
 
     # 2. test model
     if stage == 'test' or stage == 'all':
@@ -101,9 +102,9 @@ def build(args=None):
                                                                                output_info.dtype, output_info.format.name))
             output_data = module.get_output(output_name, is_quanted=True)
             print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-            output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_with_act', output_name + '.npy')
+            output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_' + output_name + '_output.npy')
             if os.path.exists(output_data_path):
-                golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
+                golden_output = np.load(output_data_path)
                 golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
             else:
                 result_check = False

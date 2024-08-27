@@ -56,26 +56,13 @@ bash ./models/backbone/efficientnet/eval.sh
 bash ./models/backbone/vit/eval.sh
 bash ./models/detection/yolov5s/eval.sh
 bash ./models/detection/yolov3/eval.sh
+bash ./models/autodrive/yolop/eval.sh
 
 bash ./models/backbone/resnet50/test.sh
 bash ./models/backbone/mobilenetv2/test.sh
 bash ./models/backbone/efficientnet/test.sh
+bash ./models/backbone/vit/test.sh
 bash ./models/detection/yolov5s/test.sh
 bash ./models/detection/yolov3/test.sh
 bash ./models/autodrive/yolop/test.sh
 
-# not test
-# bash ./models/backbone/vit/test.sh
-# bash ./models/backbone/resnet50/eval.sh
-# bash ./models/backbone/efficientnet/test.sh
-# bash ./models/backbone/mobilenetv2/test.sh
-# bash ./tests/tracking/perf.sh
-# bash ./tests/resizer/perf.sh
-# bash ./tests/traffic_light/perf.sh
-# bash ./tests/fastbev2d/perf.sh
-# bash ./tests/resnet50_576_1024/perf.sh
-# bash ./tests/yolov5s/perf.sh
-# bash ./tests/fastbev3d/perf.sh
-# bash ./tests/resnet50/perf.sh
-# bash ./tests/yolop_576_1024/perf.sh
-# bash ./tests/resnet50/eval.sh

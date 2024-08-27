@@ -19,12 +19,12 @@ class HmQwen:
 
     def __init__(self):
         weight_manager = tcim.runtime.create_weight_manager()
-        self.decode_part1_model = tcim.runtime.load("qwen_decode_part1.hmm", weight_manager=weight_manager)
-        self.decode_part2_model = tcim.runtime.load("qwen_decode_part2.hmm", weight_manager=weight_manager)
         self.prefill_part1_model = tcim.runtime.load("qwen_prefill_part1.hmm", weight_manager=weight_manager)
         self.prefill_part2_model = tcim.runtime.load("qwen_prefill_part2.hmm", weight_manager=weight_manager)
-        self.decode_head_model = tcim.runtime.load("qwen_decode_head.hmm", weight_manager=weight_manager)
         self.prefill_head_model = tcim.runtime.load("qwen_prefill_head.hmm", weight_manager=weight_manager)
+        self.decode_part1_model = tcim.runtime.load("qwen_decode_part1.hmm", weight_manager=weight_manager)
+        self.decode_part2_model = tcim.runtime.load("qwen_decode_part2.hmm", weight_manager=weight_manager)
+        self.decode_head_model = tcim.runtime.load("qwen_decode_head.hmm", weight_manager=weight_manager)
         self.stream = tcim.runtime.Stream()
         self.decode_part1_model.set_stream(self.stream)
         self.decode_part2_model.set_stream(self.stream)
