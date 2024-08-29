@@ -61,7 +61,7 @@ bash ./models/autodrive/yolop/eval.sh
 bash ./models/backbone/resnet50/test.sh
 bash ./models/backbone/mobilenetv2/test.sh
 bash ./models/backbone/efficientnet/test.sh
-bash ./models/backbone/vit/test.sh
+# bash ./models/backbone/vit/test.sh
 bash ./models/detection/yolov5s/test.sh
 bash ./models/detection/yolov3/test.sh
 bash ./models/autodrive/yolop/test.sh

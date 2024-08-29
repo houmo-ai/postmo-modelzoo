@@ -42,7 +42,7 @@ def get_args() -> argparse.Namespace:
 
 
 def build(args=None):
-    # build model
+    """build and test houmo model."""
     model_name = args.model_name
     batch = args.batch
     stage = args.stage
@@ -55,7 +55,7 @@ def build(args=None):
     # 1. build model
     if stage == 'build' or stage == 'all':
         onnx_model = onnx.load(model_path)
-        compile_config={}
+        compile_config = {}
         if batch % 4 == 0:
             compile_config["tcim.core_num"] = 4
         input_cfg = {}
