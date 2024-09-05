@@ -37,8 +37,8 @@ if __name__ == '__main__':
     model_type = args.model_type
     model_dir = args.model_dir
     raw_path = "models/qwen/qwen.onnx"
-    quant_path = "models/qwen/hmquant_qwen_mix_2048t_20240816.zip"
-    weight_path = "models/qwen/hmquant_qwen_mix_2048t_20240816_weight.zip"
+    quant_path = "models/qwen/hmquant_qwen_mix_2048t_20240829.zip"
+    weight_path = "models/qwen/hmquant_qwen_mix_2048t_weight_20240829.zip"
 
     if model_type == "raw" or model_type == "all":
         # get_file_from_jfrog(raw_path, model_dir)
