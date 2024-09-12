@@ -85,6 +85,12 @@ hmquant.sh
 hmbuild.sh
 ```
 
+如果使用交叉编译工具链编译aarch64平台的模型，可以在编译之前定义环境变量TCIM_CROSS_COMPILE，编译完成后将模型拷贝到aarch64平台推理。
+
+```bash
+export TCIM_CROSS_COMPILE=1
+```
+
 ### 推理测试
 
 使用配置文件中的指定数据对芯片模型进行推理测试，若先指定target为onnx，则将结果与onnx结果进行比对：

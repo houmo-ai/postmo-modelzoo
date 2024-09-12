@@ -32,7 +32,6 @@ if __name__ == '__main__':
     from hmassist.utils.transform import BGR2YUV
     rgb2yuv_func = BGR2YUV(fmt='YUV422')
     input_data = torch.unsqueeze(rgb2yuv_func(input_data), 0).numpy()  # NHWC float32
-    input_data = input_data.astype(np.uint8)
 
     # 3. set input
     input_num = module.get_num_inputs()
@@ -41,7 +40,7 @@ if __name__ == '__main__':
         input_info = module.get_input_info(input_name)
         print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype,
                                                                      input_info.format.name))
-        module.set_input(input_name, input_data)
+        module.set_input(input_name, input_data.astype(input_info.dtype))
 
     # 4. run
     module.run()
