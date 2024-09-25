@@ -58,12 +58,12 @@ if __name__ == '__main__':
     curdir = os.getcwd()
 
     if args.stage == "build" or args.stage == "all":
-        prefill_model = os.path.join(args.model_dir, "prefill/hmquant_qwen_with_act.onnx")
-        prefill_model_part1 = os.path.join(args.model_dir, "prefill/hmquant_qwen_part1_with_act.onnx")
-        prefill_model_part2 = os.path.join(args.model_dir, "prefill/hmquant_qwen_part2_with_act.onnx")
-        decode_model = os.path.join(args.model_dir, "decoder/hmquant_qwen_with_act.onnx")
-        decode_model_part1 = os.path.join(args.model_dir, "decoder/hmquant_qwen_part1_with_act.onnx")
-        decode_model_part2 = os.path.join(args.model_dir, "decoder/hmquant_qwen_part2_with_act.onnx")
+        prefill_model = os.path.join(args.model_dir, "prefill/hmquant_qwen2_with_act.onnx")
+        prefill_model_part1 = os.path.join(args.model_dir, "prefill/hmquant_qwen2_part1_with_act.onnx")
+        prefill_model_part2 = os.path.join(args.model_dir, "prefill/hmquant_qwen2_part2_with_act.onnx")
+        decode_model = os.path.join(args.model_dir, "decoder/hmquant_qwen2_with_act.onnx")
+        decode_model_part1 = os.path.join(args.model_dir, "decoder/hmquant_qwen2_part1_with_act.onnx")
+        decode_model_part2 = os.path.join(args.model_dir, "decoder/hmquant_qwen2_part2_with_act.onnx")
         if os.path.exists(prefill_model):
             extract_model(prefill_model, prefill_model_part1, input_names=['input_1', 'valid_length', 'current_length'],
                     output_names=['model_layers_15_resadd2'])
@@ -75,12 +75,12 @@ if __name__ == '__main__':
             extract_model(decode_model, decode_model_part2, input_names=['model_layers_15_resadd2', 'valid_length', 'current_length'],
                     output_names=['model_layers_31_resadd2'])
 
-    if os.system("python3 build_prefill_part1.py --stage {} --model_dir {} --core {}"
-                 .format(args.stage, args.model_dir, args.core)):
-        exit(-1)
-    if os.system("python3 build_prefill_part2.py --stage {} --model_dir {} --core {}"
-                 .format(args.stage, args.model_dir, args.core)):
-        exit(-1)
+    # if os.system("python3 build_prefill_part1.py --stage {} --model_dir {} --core {}"
+    #              .format(args.stage, args.model_dir, args.core)):
+    #     exit(-1)
+    # if os.system("python3 build_prefill_part2.py --stage {} --model_dir {} --core {}"
+    #              .format(args.stage, args.model_dir, args.core)):
+    #     exit(-1)
     if os.system("python3 build_decode_part1.py --stage {} --model_dir {} --core {}"
                  .format(args.stage, args.model_dir, args.core)):
         exit(-1)

@@ -6,7 +6,6 @@ import numpy as np
 import onnx
 import argparse
 import tcim
-from hmassist.utils.dist_metrics import cosine_distance
 
 
 def get_args() -> argparse.Namespace:
@@ -84,10 +83,10 @@ def build(args=None):
             compile_config["tcim.batch_used_core_num"] = 4
             compile_config["tcim.1batch_4core"] = True
             # compile_config["tcim.schedule_strategy"] = 3
-        # elif core_num == 2:
-        #     compile_config["tcim.core_num"] = 2
-        #     compile_config["tcim.batch_used_core_num"] = 2
-        #     compile_config["tcim.1batch_2core"] = True
+        elif core_num == 2:
+            compile_config["tcim.core_num"] = 2
+            compile_config["tcim.batch_used_core_num"] = 2
+            compile_config["tcim.1batch_2core"] = True
         else:
             print("[error] not support core =", core_num)
             exit(-1)
@@ -101,6 +100,30 @@ def build(args=None):
             input_cfg[input.name] = tcim.HMInput(shape=input_shape)
         weight_path = os.path.join(model_dir, "../weight.npy")
         data_dict = np.load(weight_path, allow_pickle=True).item()
+        kvcache_path = os.path.join(model_dir, '../kvcache.npy')
+        if os.path.exists(kvcache_path):
+            kvcache_data_dict = np.load(kvcache_path, allow_pickle=True).item()
+            data_dict.update(kvcache_data_dict)
+        constant_path = os.path.join(model_dir, '../constant.npy')
+        if os.path.exists(kvcache_path):
+            constant_data_dict = np.load(constant_path, allow_pickle=True).item()
+            data_dict.update(constant_data_dict)
+        data_dict['_constant48.value_q'] = data_dict['_constant16.value_q']
+        data_dict['_constant49.value_q'] = data_dict['_constant17.value_q']
+        data_dict['_constant50.value_q'] = data_dict['_constant18.value_q']
+        data_dict['_constant51.value_q'] = data_dict['_constant19.value_q']
+        data_dict['_constant52.value_q'] = data_dict['_constant20.value_q']
+        data_dict['_constant53.value_q'] = data_dict['_constant21.value_q']
+        data_dict['_constant54.value_q'] = data_dict['_constant22.value_q']
+        data_dict['_constant55.value_q'] = data_dict['_constant23.value_q']
+        data_dict['_constant56.value_q'] = data_dict['_constant24.value_q']
+        data_dict['_constant57.value_q'] = data_dict['_constant25.value_q']
+        data_dict['_constant58.value_q'] = data_dict['_constant26.value_q']
+        data_dict['_constant59.value_q'] = data_dict['_constant27.value_q']
+        data_dict['_constant60.value_q'] = data_dict['_constant28.value_q']
+        data_dict['_constant61.value_q'] = data_dict['_constant29.value_q']
+        data_dict['_constant62.value_q'] = data_dict['_constant30.value_q']
+        data_dict['_constant63.value_q'] = data_dict['_constant31.value_q']
         tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
                                      inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen_group_part2_")
         print(part_name, 'build completed.')
@@ -170,6 +193,7 @@ def build(args=None):
                 print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
                 continue
             if golden_output.shape == output_data.shape:
+                from hmassist.utils.dist_metrics import cosine_distance
                 cosine_dist = cosine_distance(golden_output, output_data)
                 is_match = (golden_output == output_data).all()
                 print("[compare] golden output [{}] match={}, similarity={:.6f}"

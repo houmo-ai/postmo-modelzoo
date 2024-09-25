@@ -6,7 +6,6 @@ import numpy as np
 import onnx
 import argparse
 import tcim
-from hmassist.utils.dist_metrics import cosine_distance
 
 
 def get_args() -> argparse.Namespace:
@@ -94,8 +93,18 @@ def build(args=None):
             input_shape = [dim.dim_value for dim in dims]
             input_shape[0] *= batch
             input_cfg[input.name] = tcim.HMInput(shape=input_shape)
-        tcim.build.build_from_hmonnx(onnx_model, model_name=part_name, compiler_cfg=compile_config, inputs=input_cfg,
-                                     hdplcc_options=["-O2"], const_weight_prefix="qwen_head_group_")
+        weight_path = os.path.join(model_dir, "../weight.npy")
+        data_dict = np.load(weight_path, allow_pickle=True).item()
+        kvcache_path = os.path.join(model_dir, '../kvcache.npy')
+        if os.path.exists(kvcache_path):
+            kvcache_data_dict = np.load(kvcache_path, allow_pickle=True).item()
+            data_dict.update(kvcache_data_dict)
+        constant_path = os.path.join(model_dir, '../constant.npy')
+        if os.path.exists(kvcache_path):
+            constant_data_dict = np.load(constant_path, allow_pickle=True).item()
+            data_dict.update(constant_data_dict)
+        tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
+                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen_head_group_")
         print(part_name, 'build completed.')
 
     # 2. test model
@@ -143,6 +152,7 @@ def build(args=None):
                 print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
                 continue
             if golden_output.shape == output_data.shape:
+                from hmassist.utils.dist_metrics import cosine_distance
                 cosine_dist = cosine_distance(golden_output, output_data)
                 is_match = (golden_output == output_data).all()
                 print("[compare] golden output [{}] match={}, similarity={:.6f}"

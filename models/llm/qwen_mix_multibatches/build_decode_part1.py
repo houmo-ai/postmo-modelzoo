@@ -67,8 +67,10 @@ def build(args=None):
 
     # 1. build model
     if stage == 'build' or stage == 'all':
+        print("\n===> build model:", part_name)
         onnx_model = onnx.load(model_path)
         compile_config = {
+            'tcim.fuse_strategy': 1,
             "tcim.gen_intrinsic": 1,
             "tcim.sync_strategy": 0,
             "tcim.special_model_name": "vit_small",
@@ -82,7 +84,6 @@ def build(args=None):
             compile_config["tcim.core_num"] = 4
             compile_config["tcim.batch_used_core_num"] = 4
             compile_config["tcim.1batch_4core"] = True
-            # compile_config["tcim.schedule_strategy"] = 3
         elif core_num == 2:
             compile_config["tcim.core_num"] = 2
             compile_config["tcim.batch_used_core_num"] = 2
@@ -92,13 +93,14 @@ def build(args=None):
             exit(-1)
         input_cfg = {}
         inputs = onnx_model.graph.input
-        for input in inputs:
+        for i, input in enumerate(inputs):
             dims = input.type.tensor_type.shape.dim
             input_shape = [dim.dim_value for dim in dims]
-            if len(input_shape) == 0:
-                input_shape = [1]
-            input_cfg[input.name] = tcim.HMInput(shape=input_shape)
-        weight_path = os.path.join(model_dir, "../weight.npy")
+            if i <= 2:
+                input_cfg[input.name] = tcim.HMInput(shape=input_shape, dtype='int16')
+            else:
+                input_cfg[input.name] = tcim.HMInput(shape=input_shape, layout='NCHW')
+        weight_path = os.path.join(model_dir, '../weight.npy')
         data_dict = np.load(weight_path, allow_pickle=True).item()
         kvcache_path = os.path.join(model_dir, '../kvcache.npy')
         if os.path.exists(kvcache_path):
@@ -108,34 +110,18 @@ def build(args=None):
         if os.path.exists(kvcache_path):
             constant_data_dict = np.load(constant_path, allow_pickle=True).item()
             data_dict.update(constant_data_dict)
-        data_dict['_constant32.value_q'] = data_dict['_constant0.value_q']
-        data_dict['_constant33.value_q'] = data_dict['_constant1.value_q']
-        data_dict['_constant34.value_q'] = data_dict['_constant2.value_q']
-        data_dict['_constant35.value_q'] = data_dict['_constant3.value_q']
-        data_dict['_constant36.value_q'] = data_dict['_constant4.value_q']
-        data_dict['_constant37.value_q'] = data_dict['_constant5.value_q']
-        data_dict['_constant38.value_q'] = data_dict['_constant6.value_q']
-        data_dict['_constant39.value_q'] = data_dict['_constant7.value_q']
-        data_dict['_constant40.value_q'] = data_dict['_constant8.value_q']
-        data_dict['_constant41.value_q'] = data_dict['_constant9.value_q']
-        data_dict['_constant42.value_q'] = data_dict['_constant10.value_q']
-        data_dict['_constant43.value_q'] = data_dict['_constant11.value_q']
-        data_dict['_constant44.value_q'] = data_dict['_constant12.value_q']
-        data_dict['_constant45.value_q'] = data_dict['_constant13.value_q']
-        data_dict['_constant46.value_q'] = data_dict['_constant14.value_q']
-        data_dict['_constant47.value_q'] = data_dict['_constant15.value_q']
         tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
                                      inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen_group_part1_")
         print(part_name, 'build completed.')
 
     # 2. test model, prefill model should run first to make the correct result
     if stage == 'test' or stage == 'all':
+        print("\n===> test model:", part_name)
         # 2.1 load model
         weight_manager = tcim.runtime.create_weight_manager()
         # module_prefill = tcim.runtime.load("qwen_prefill.hmm", weight_manager=weight_manager)
         module = tcim.runtime.load(part_name + ".hmm", weight_manager=weight_manager)
         current_length = 0
-
 
         # 2.2 set input with golden, run prefill first
         # input_num = module_prefill.get_num_inputs()
@@ -203,7 +189,7 @@ def build(args=None):
                       .format(output_name, golden_output.shape, output_data.shape))
         if not result_check:
             print("[error] result check failed.")
-            # exit(-1)
+            exit(-1)
 
 
 if __name__ == '__main__':

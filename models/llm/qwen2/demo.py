@@ -10,11 +10,13 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer
 import time
 import tcim
+import threading
+import queue
 import argparse
 
 
-TOKENIZER_PATH = "qwen1.5-7b-chat-hf"
-EMBEDDING_PATH = os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result', 'qwen15_quant_embedding.pt')
+TOKENIZER_PATH = "qwen2-7b-instruct-hf"
+EMBEDDING_PATH = os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result', 'quant_embedding.pt')
 
 
 def get_args() -> argparse.Namespace:
@@ -31,34 +33,59 @@ def get_args() -> argparse.Namespace:
         '--decode',
         dest='decode_length',
         type=int,
-        default=4096,
+        default=2048,
         help='decode max length',
     )
     args = parser.parse_args()
     return args
 
+
 class HmQwen:
 
-    def __init__(self, prefill_length, decode_length):
+    def __init__(self, prefill_length, decode_length, batch=1):
+        self.batch = batch
         self.prefill_length = prefill_length
         self.decode_length = decode_length
-        weight_manager = tcim.runtime.create_weight_manager()
-        self.prefill_part1_model = tcim.runtime.load("qwen_prefill_part1.hmm", weight_manager=weight_manager)
-        self.prefill_part2_model = tcim.runtime.load("qwen_prefill_part2.hmm", weight_manager=weight_manager)
-        self.prefill_head_model = tcim.runtime.load("qwen_prefill_head.hmm", weight_manager=weight_manager)
-        self.decode_part1_model = tcim.runtime.load("qwen_decode_part1.hmm", weight_manager=weight_manager)
-        self.decode_part2_model = tcim.runtime.load("qwen_decode_part2.hmm", weight_manager=weight_manager)
-        self.decode_head_model = tcim.runtime.load("qwen_decode_head.hmm", weight_manager=weight_manager)
-        self.stream = tcim.runtime.Stream()
-        self.decode_part1_model.set_stream(self.stream)
-        self.decode_part2_model.set_stream(self.stream)
+        reuse_inputs = [i for i in range(3, 3+28*batch)]
+        weight_manager = tcim.runtime.create_weight_manager(0)
+        self.prefill_part1_model = tcim.runtime.load("qwen2_prefill_part1.hmm", weight_manager=weight_manager)
+        self.prefill_part2_model = tcim.runtime.load("qwen2_prefill_part2.hmm", weight_manager=weight_manager)
+        self.prefill_head_model = tcim.runtime.load("qwen2_prefill_head.hmm", weight_manager=weight_manager)
+        self.decode_part1_model = tcim.runtime.load("qwen2_decode_part1.hmm", weight_manager=weight_manager, reuse_inputs=reuse_inputs)
+        self.decode_part2_model = tcim.runtime.load("qwen2_decode_part2.hmm", weight_manager=weight_manager, reuse_inputs=reuse_inputs)
+        self.decode_head_model = tcim.runtime.load("qwen2_decode_head.hmm", weight_manager=weight_manager)
+        self.stream = tcim.runtime.Stream(0)
         self.prefill_part1_model.set_stream(self.stream)
         self.prefill_part2_model.set_stream(self.stream)
-        self.decode_head_model.set_stream(self.stream)
         self.prefill_head_model.set_stream(self.stream)
+        self.decode_part1_model.set_stream(self.stream)
+        self.decode_part2_model.set_stream(self.stream)
+        self.decode_head_model.set_stream(self.stream)
+        # set kvcache input
+        for i in range(14):
+            kcache = self.prefill_part1_model.get_dev_input(f'model_layers_{i}_self_attn_kcache_input')
+            self.decode_part1_model.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
+            vcache = self.prefill_part1_model.get_dev_input(f'model_layers_{i}_self_attn_vcache_input')
+            self.decode_part1_model.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
+        for i in range(14, 28):
+            kcache = self.prefill_part2_model.get_dev_input(f'model_layers_{i}_self_attn_kcache_input')
+            self.decode_part2_model.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
+            vcache = self.prefill_part2_model.get_dev_input(f'model_layers_{i}_self_attn_vcache_input')
+            self.decode_part2_model.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
+        # set decode input
+        current_length_input_1 = np.array([1]).astype("int16")
+        self.decode_part1_model.set_input("current_length", current_length_input_1)
+        self.decode_part2_model.set_input("current_length", current_length_input_1)
+        decode_part1_output = self.decode_part1_model.get_dev_output("model_layers_13_resadd2")
+        self.decode_part2_model.set_input("model_layers_13_resadd2", decode_part1_output)
+        decode_part2_output = self.decode_part2_model.get_dev_output('model_layers_27_resadd2')
+        self.decode_head_model.set_input("head_gather", decode_part2_output)
+        # current_length_input_0 = np.array([0]).astype('int16')
+        # self.decode_head_model.set_input('current_length', current_length_input_0)
+
         self.tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH, trust_remote_code=True)
         embedding_weight = torch.load(EMBEDDING_PATH, map_location="cpu")
-        self.embedding_weight = embedding_weight.reshape(-1, 4096)
+        self.embedding_weight = embedding_weight.reshape(-1, 3584)
 
     def chat(self, question):
         logger.success("question:")
@@ -80,8 +107,8 @@ class HmQwen:
             logger.error(f"Question long than {self.decode_length}, please shorten it!")
             return f"Question long than {self.decode_length}, please shorten it!"
 
-        prefill_part1_output = self.prefill_part1_model.get_dev_output("model_layers_15_resadd2")
-        self.prefill_part2_model.set_input("model_layers_15_resadd2", prefill_part1_output)
+        prefill_part1_output = self.prefill_part1_model.get_dev_output("model_layers_13_resadd2")
+        self.prefill_part2_model.set_input("model_layers_13_resadd2", prefill_part1_output)
 
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
         for round in range(prefill_loop_round):
@@ -97,8 +124,8 @@ class HmQwen:
             effective_length = input_ids.size(-1)
             _pad_embeds = torch.zeros(1, self.prefill_length - effective_length, inputs_embeds.size(-1),
                                     dtype=inputs_embeds.dtype, device=inputs_embeds.device)
-            # [256, 1, 4096] ==> [4, 64, 4096]
-            input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(4, self.prefill_length // 4, 4096)
+             # [256, 1, 3584] ==> [4, 64, 3584]
+            input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(4, self.prefill_length // 4, 3584)
             valid_length_data = np.array([valid_length]).astype("int16")
             current_length_data = np.array([current_length]).astype("int16")
             self.prefill_part1_model.set_input("input_1", input_data)
@@ -110,8 +137,8 @@ class HmQwen:
             self.prefill_part2_model.run()
             self.prefill_part2_model.sync()
 
-        prefill_part2_output = self.prefill_part2_model.get_dev_output("model_layers_31_resadd2")
-        self.prefill_head_model.set_input("model_layers_31_resadd2", prefill_part2_output)
+        prefill_part2_output = self.prefill_part2_model.get_dev_output("model_layers_27_resadd2")
+        self.prefill_head_model.set_input("model_layers_27_resadd2", prefill_part2_output)
         seq_length_data = np.array([gather_index]).astype("int16")
         self.prefill_head_model.set_input("current_length", seq_length_data)
         self.prefill_head_model.run()
@@ -129,16 +156,7 @@ class HmQwen:
         context_length_input = np.array([context_length - 2]).astype("int16")
         self.decode_part1_model.set_input("valid_length", context_length_input)
         self.decode_part2_model.set_input("valid_length", context_length_input)
-        current_length_input_1 = np.array([1]).astype("int16")
-        self.decode_part1_model.set_input("current_length", current_length_input_1)
-        self.decode_part2_model.set_input("current_length", current_length_input_1)
-        # set decode_head input
-        decode_part1_output = self.decode_part1_model.get_dev_output("model_layers_15_resadd2")
-        self.decode_part2_model.set_input("model_layers_15_resadd2", decode_part1_output)
-        decode_part2_output = self.decode_part2_model.get_dev_output("model_layers_31_resadd2")
-        self.decode_head_model.set_input("model_layers_31_resadd2", decode_part2_output)
-        current_length_input_0 = np.array([0]).astype("int16")
-        self.decode_head_model.set_input("current_length", current_length_input_0)
+        
         decode_count = 0
         logger.success("response:")
         print("\033[1;95m{}".format(prefill_response), end="", flush=True)

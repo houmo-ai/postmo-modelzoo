@@ -28,14 +28,7 @@ python3 get_model.py --type raw
 python3 get_model.py --type quant
 ```
 
-当前版本可用量化模型支持情况
-
-| models                                       | 4core | 2core | prefill | decode |
-| -------------------------------------------- | ----- | ----- | ------- | ------ |
-| hmquant_qwen1.5_mix_128_4096_20240909.zip    | yes   | no    | 128     | 4096   |
-| hmquant_qwen1.5_mix_64_4096_20240914.zip     | yes   | yes   | 64      | 4096   |
-
-### 2.2 量化
+### 2.2 量化（暂不支持）
 
 量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上。参考命令：
 
@@ -65,28 +58,18 @@ bash ptq.sh
 
 ### 2.3 编译
 
-将量化模型编译为在芯片上运行的模型。
+将量化模型编译为在芯片上运行的模型。执行脚本：
 
 ```bash
 python3 build.py
 ```
 
-可以通过参数选择推理使用的核数，默认为4，如果选择2核编译，通过参数指定：
-
-```bash
-python3 build.py --core 2
-```
-
-**注：并非所有模型都可以使用2核编译，对于decode长度为4096的模型，prefill长度只能为64。当前可用模型为hmquant_qwen1.5_mix_64_4096_20240914.zip**
-
 ### 2.3 演示
 
-Qwen模型使用python API进行演示，同时输出性能结果。
-
-使用不同的量化模型，需要指定不同的prefill长度和decode长度，默认为256/4096 tokens。如果选择64/4096 tokens的模型，推理时需要通过参数指定：
+Qwen模型使用python API进行演示，同时输出性能结果。执行脚本：
 
 ```bash
-python3 demo.py --prefill 64 --decode 4096
+python3 demo.py
 ```
 
 ### 2.4 一键评估

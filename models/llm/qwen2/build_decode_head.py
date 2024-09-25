@@ -22,7 +22,7 @@ def get_args() -> argparse.Namespace:
         '--model_name',
         dest='model_name',
         type=str,
-        default='qwen',
+        default='qwen2',
         help='output houmo model name',
     )
     parser.add_argument(
@@ -43,7 +43,7 @@ def get_args() -> argparse.Namespace:
         '--stage',
         dest='stage',
         type=str,
-        default="build",
+        default="all",
         help='build stage choise=["build", "test", "all"]',
     )
     args = parser.parse_args()
@@ -56,33 +56,31 @@ def build(args=None):
     batch = args.batch
     core_num = args.core
     stage = args.stage
-    model_dir = os.path.join(args.model_dir, "decoder")
-    part_name = "qwen_decode_part1"
-    quant_name = "hmquant_qwen_part1_with_act"
+    model_dir = os.path.join(args.model_dir, "decoder_head")
+    part_name = "qwen2_decode_head"
+    quant_name = "hmquant_" + model_name + "_with_act"
     onnx_name = quant_name + ".onnx"
     model_path = os.path.join(model_dir, onnx_name)
     model_dir = os.path.dirname(model_path)
 
-    os.environ['AOT_COMPILE_NO_FORMAT'] = '1'
-
     # 1. build model
     if stage == 'build' or stage == 'all':
+        print("\n===> build model:", part_name)
         onnx_model = onnx.load(model_path)
         compile_config = {
-            "tcim.gen_intrinsic": 1,
+            'tcim.fuse_strategy': 1,
+            "tcim.gen_intrinsic": 0,
             "tcim.sync_strategy": 0,
             "tcim.special_model_name": "vit_small",
             "tcim.batch_num": 1,
             "tcim.codegen_pic": True,
             "tcim.mem_plan_strategy": "linearscan",
-            "tcim.large_split_maxsize": True,
             "tcim.split_const" : True
         }
         if core_num == 4:
             compile_config["tcim.core_num"] = 4
             compile_config["tcim.batch_used_core_num"] = 4
             compile_config["tcim.1batch_4core"] = True
-            # compile_config["tcim.schedule_strategy"] = 3
         elif core_num == 2:
             compile_config["tcim.core_num"] = 2
             compile_config["tcim.batch_used_core_num"] = 2
@@ -95,8 +93,7 @@ def build(args=None):
         for input in inputs:
             dims = input.type.tensor_type.shape.dim
             input_shape = [dim.dim_value for dim in dims]
-            if len(input_shape) == 0:
-                input_shape = [1]
+            input_shape[0] *= batch
             input_cfg[input.name] = tcim.HMInput(shape=input_shape)
         weight_path = os.path.join(model_dir, "../weight.npy")
         data_dict = np.load(weight_path, allow_pickle=True).item()
@@ -108,46 +105,17 @@ def build(args=None):
         if os.path.exists(kvcache_path):
             constant_data_dict = np.load(constant_path, allow_pickle=True).item()
             data_dict.update(constant_data_dict)
-        data_dict['_constant32.value_q'] = data_dict['_constant0.value_q']
-        data_dict['_constant33.value_q'] = data_dict['_constant1.value_q']
-        data_dict['_constant34.value_q'] = data_dict['_constant2.value_q']
-        data_dict['_constant35.value_q'] = data_dict['_constant3.value_q']
-        data_dict['_constant36.value_q'] = data_dict['_constant4.value_q']
-        data_dict['_constant37.value_q'] = data_dict['_constant5.value_q']
-        data_dict['_constant38.value_q'] = data_dict['_constant6.value_q']
-        data_dict['_constant39.value_q'] = data_dict['_constant7.value_q']
-        data_dict['_constant40.value_q'] = data_dict['_constant8.value_q']
-        data_dict['_constant41.value_q'] = data_dict['_constant9.value_q']
-        data_dict['_constant42.value_q'] = data_dict['_constant10.value_q']
-        data_dict['_constant43.value_q'] = data_dict['_constant11.value_q']
-        data_dict['_constant44.value_q'] = data_dict['_constant12.value_q']
-        data_dict['_constant45.value_q'] = data_dict['_constant13.value_q']
-        data_dict['_constant46.value_q'] = data_dict['_constant14.value_q']
-        data_dict['_constant47.value_q'] = data_dict['_constant15.value_q']
         tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
-                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen_group_part1_")
+                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen2_head_group_")
         print(part_name, 'build completed.')
 
-    # 2. test model, prefill model should run first to make the correct result
+    # 2. test model
     if stage == 'test' or stage == 'all':
+        print("\n===> test model:", part_name)
         # 2.1 load model
-        weight_manager = tcim.runtime.create_weight_manager()
-        # module_prefill = tcim.runtime.load("qwen_prefill.hmm", weight_manager=weight_manager)
-        module = tcim.runtime.load(part_name + ".hmm", weight_manager=weight_manager)
-        current_length = 0
+        module = tcim.runtime.load(part_name + ".hmm")
 
-
-        # 2.2 set input with golden, run prefill first
-        # input_num = module_prefill.get_num_inputs()
-        # for id in range(input_num):
-        #     input_name = module_prefill.get_input_name(id)
-        #     input_info = module_prefill.get_input_info(input_name)
-        #     input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
-        #     input_data_path = os.path.join(model_dir, "../prefill", input_file_name)
-        #     input_data = np.load(input_data_path).astype(input_info.dtype)
-        #     input_data = np.concatenate([input_data for i in range(batch)], axis=0)
-        #     module_prefill.set_input(input_name, input_data)
-
+        # 2.2 set input with golden
         input_num = module.get_num_inputs()
         for id in range(input_num):
             input_name = module.get_input_name(id)
@@ -157,14 +125,14 @@ def build(args=None):
             input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype(input_info.dtype)
+            # current_length - 1 
             if input_name == 'current_length':
-                current_length = input_data[0]
+                input_data = np.array(input_data - 1).astype(input_info.dtype)
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
             print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
             module.set_input(input_name, input_data)
 
-        # 2.3 infer model, run prefill first
-        # module_prefill.run()
+        # 2.3 infer model
         module.run()
         module.sync()
 
@@ -178,12 +146,9 @@ def build(args=None):
                                                                                output_info.dtype, output_info.format.name))
             output_data = module.get_output(output_name, is_quanted=True)
             print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-            # only compare [1,current_length,4096]
-            output_data = output_data[:1, :current_length, :]
             output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_' + output_name + '_output.npy')
             if os.path.exists(output_data_path):
                 golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
-                golden_output = golden_output[:1, :current_length, :]
                 golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
             else:
                 result_check = False
@@ -203,9 +168,10 @@ def build(args=None):
                       .format(output_name, golden_output.shape, output_data.shape))
         if not result_check:
             print("[error] result check failed.")
-            # exit(-1)
+            exit(-1)
 
 
 if __name__ == '__main__':
     args = get_args()
     build(args)
+

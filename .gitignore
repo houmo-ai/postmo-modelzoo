@@ -64,6 +64,9 @@ tmp_*/
 
 # Model files
 *.onnx
+*.pt
+*.pth
+*.hmm
 
 # vim temporary files
 *.swp
