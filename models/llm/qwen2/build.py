@@ -75,12 +75,12 @@ if __name__ == '__main__':
             extract_model(decode_model, decode_model_part2, input_names=['model_layers_15_resadd2', 'valid_length', 'current_length'],
                     output_names=['model_layers_31_resadd2'])
 
-    # if os.system("python3 build_prefill_part1.py --stage {} --model_dir {} --core {}"
-    #              .format(args.stage, args.model_dir, args.core)):
-    #     exit(-1)
-    # if os.system("python3 build_prefill_part2.py --stage {} --model_dir {} --core {}"
-    #              .format(args.stage, args.model_dir, args.core)):
-    #     exit(-1)
+    if os.system("python3 build_prefill_part1.py --stage {} --model_dir {} --core {}"
+                 .format(args.stage, args.model_dir, args.core)):
+        exit(-1)
+    if os.system("python3 build_prefill_part2.py --stage {} --model_dir {} --core {}"
+                 .format(args.stage, args.model_dir, args.core)):
+        exit(-1)
     if os.system("python3 build_decode_part1.py --stage {} --model_dir {} --core {}"
                  .format(args.stage, args.model_dir, args.core)):
         exit(-1)

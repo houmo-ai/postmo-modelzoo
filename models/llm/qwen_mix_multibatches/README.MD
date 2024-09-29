@@ -36,11 +36,11 @@ python3 get_model.py --type quant
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py38-x86.64 /bin/bash
 ```
 
-进入docker后source环境变量，并进入/hmdd/models/llm/qwen_mix目录，执行ptq.sh脚本。（注：可通过修改脚本中的MODEL_DIR修改模型位置，运行中需要连接网络以下载wikitext2数据集，如无法连接可打开注释下载wikitext2_cache.zip）
+进入docker后source环境变量，并进入/hmdd/models/llm/qwen_mix_multibatches目录，执行ptq.sh脚本。（注：可通过修改脚本中的MODEL_DIR修改模型位置，运行中需要连接网络以下载wikitext2数据集，如无法连接可打开注释下载wikitext2_cache.zip）
 
 ```bash
 source env.sh
-cd /hmdd/models/llm/qwen_mix
+cd /hmdd/models/llm/qwen_mix_multibatches
 bash ptq.sh
 ```
 
@@ -85,36 +85,86 @@ bash perf.sh
 ### 3.1 演示结果
 
 ```bash
+[session1]:
 question:
-请介绍一下存算一体技术的优势
-
+请介绍一下存算一体技术的优势。
 response:
-存算一体技术是一种新兴的计算技术，它将存储和计算功能整合到一个单一的硬件系统中，以提高计算效率和性能。以下是存算一体技术的一些主要优势：
+存算一体技术是一种新兴的计算技术，它将存储和计算功能集成在一起，以提高计算效率和性能。以下是存算一体技术的一些优势：
 
-1. **性能提升**：传统的计算系统通常将存储和计算分开，导致数据传输和处理的延迟。存算一体将这些功能集成在一起，减少了数据传输的时间，从而提高了整体性能。例如，当进行大量数据处理时，可以减少等待数据传输的时间，提高计算速度。
+1. 提高性能：存算一体技术通过将内存和处理器集成在同一块芯片上，减少了数据传输时间。相比于传统的CPU和内存分开设计，数据可以在处理器内部快速访问，减少了延迟，从而提高了计算速度。
+...
 
-2. **简化系统架构**：传统的计算系统需要额外的存储设备和网络连接，而存算一体减少了这些组件，使得系统设计和维护更加简单。这可以降低系统故障率和成本。
+total: 363 tokens, cost 76.478 s
+prefill time: 883.224 ms, 1.13 tokens/s
+decode average time: 203.654 ms, 4.91 tokens/s
+end2end average time: 210.684 ms, 4.75 tokens/s
 
-3. **能源效率**：存算一体通常使用专用的处理器和存储芯片，这些芯片在设计时优化了能源效率。这意味着系统在运行时能消耗更少的电力，对于数据中心的能源管理具有积极影响。
+[session2]:
+question:
+你是谁？
+response:
+我是阿里云推出的一种超大规模语言模型，我叫通义千问。
+total: 17 tokens, cost 5.749 s
+prefill time: 309.794 ms, 3.23 tokens/s
+decode average time: 213.097 ms, 4.69 tokens/s
+end2end average time: 338.174 ms, 2.96 tokens/s
 
-4. **更低的成本**：由于减少了存储和计算的独立设备，存算一体可以降低硬件成本。对于大规模计算任务，这可以显著降低总体成本。
+[session3]:
+question:
+1+1=?
+response:
+1+1=2
+total: 5 tokens, cost 3.226 s
+prefill time: 307.919 ms, 3.25 tokens/s
+decode average time: 250.056 ms, 4.00 tokens/s
+end2end average time: 645.260 ms, 1.55 tokens/s
 
-5. **加速AI和机器学习**：对于人工智能和机器学习应用，存算一体可以提供更快的计算能力，因为AI和机器学习需要大量的数据处理和模型训练。这种集成可以减少训练时间，提高模型的性能。
+[session4]:
+question:
+Introduce yourself in 200 words.
+response:
+Hello! I'm an AI language model, so I don't have a personal identity in the traditional sense. However, I'm designed to assist and communicate with humans. My name is Qwen, short for Question-Answering Wenfei, and I'm part of Alibaba Cloud, a leading technology company based in China.
+...
 
-6. **云计算的扩展性**：在云环境中，存算一体可以提供更好的性能，因为数据和计算都在同一硬件上进行，减少了网络延迟和资源争用。
+total: 185 tokens, cost 40.682 s
+prefill time: 307.939 ms, 3.25 tokens/s
+decode average time: 204.404 ms, 4.89 tokens/s
+end2end average time: 219.901 ms, 4.55 tokens/s
 
-7. **数据安全**：在某些情况下，将计算和存储在同一个物理设备上可以提高安全性，因为数据不需在不同设备之间传输，减少了数据泄露的风险。
+[session5]:
+question:
+人类的本质是什么?
+response:
+人类的本质是一个复杂且多维的问题，涉及到哲学、心理学、生物学、社会学等多个领域。从不同的角度和理论，人类的本质可以有不同的解释。
+...
 
-然而，存算一体技术并非适用于所有场景，它可能在特定应用中面临一些挑战，比如功耗和散热问题。总体而言，存算一体技术为数据中心和云计算提供了更高效、更经济的计算解决方案。
+total: 347 tokens, cost 74.624 s
+prefill time: 306.883 ms, 3.26 tokens/s
+decode average time: 204.317 ms, 4.89 tokens/s
+end2end average time: 215.055 ms, 4.65 tokens/s
+
+[session6]:
+question:
+意识是大脑的产物还是独立于大脑存在的实体?
+response:
+这是一个哲学和神经科学领域长期争论的问题，目前并没有一个明确的答案。不同的观点和理论提出了不同的解释。
+...
+
+total: 177 tokens, cost 42.118 s
+prefill time: 309.417 ms, 3.23 tokens/s
+decode average time: 204.346 ms, 4.89 tokens/s
+end2end average time: 237.952 ms, 4.20 tokens/s
+
 ```
 
 ### 3.2 性能结果
 
 ```bash
-total: 416 tokens, cost 65.007 s
-prefill time: 427.573 ms, 2.34 tokens/s
-decode average time: 155.590 ms, 6.43 tokens/s
-end2end average time: 156.266 ms, 6.40 tokens/s
+[summary]:
+total: 1458 tokens, cost 76.450 s
+prefill average time: 404.196 ms, 2.47 tokens/s
+decode average time: 50.982 ms, 19.61 tokens/s
+end2end average time: 52.435 ms, 19.07 tokens/s
 ```
 
 ## 4 免责声明

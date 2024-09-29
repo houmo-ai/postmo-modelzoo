@@ -24,7 +24,7 @@ def get_args() -> argparse.Namespace:
         '--prefill',
         dest='prefill_length',
         type=int,
-        default=256,
+        default=128,
         help='prefill max length',
     )
     parser.add_argument(

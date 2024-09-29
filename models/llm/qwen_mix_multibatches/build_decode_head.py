@@ -101,7 +101,7 @@ def build(args=None):
             kvcache_data_dict = np.load(kvcache_path, allow_pickle=True).item()
             data_dict.update(kvcache_data_dict)
         constant_path = os.path.join(model_dir, '../constant.npy')
-        if os.path.exists(kvcache_path):
+        if os.path.exists(constant_path):
             constant_data_dict = np.load(constant_path, allow_pickle=True).item()
             data_dict.update(constant_data_dict)
         tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,

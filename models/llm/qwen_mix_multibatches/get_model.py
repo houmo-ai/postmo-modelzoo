@@ -37,8 +37,7 @@ if __name__ == '__main__':
     model_type = args.model_type
     model_dir = args.model_dir
     raw_path = "models/qwen/qwen.onnx"
-    quant_path = "models/qwen/hmquant_qwen_mix_2048t_20240829.zip"
-    weight_path = "models/qwen/hmquant_qwen_mix_2048t_weight_20240829.zip"
+    quant_path = "models/qwen/hmquant_qwen_mix_256_2048_4batch_20240904.zip"
 
     if model_type == "raw" or model_type == "all":
         # get_file_from_jfrog(raw_path, model_dir)
@@ -46,8 +45,5 @@ if __name__ == '__main__':
 
     if model_type == "quant" or model_type == "all":
         file_path = get_file_from_jfrog(quant_path, model_dir)
-        os.system('mkdir -p ' + quant_model_dir)
-        os.system('unzip -o -d ' + quant_model_dir + ' ' + file_path)
-        file_path = get_file_from_jfrog(weight_path, model_dir)
         os.system('mkdir -p ' + quant_model_dir)
         os.system('unzip -o -d ' + quant_model_dir + ' ' + file_path)

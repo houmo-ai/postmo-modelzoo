@@ -21,7 +21,11 @@ exclude_cmd = " --exclude=.git*"
 for file in exclude_list:
     exclude_cmd += " --exclude=" + dir_name + "/" + file
 
-cmd = "git clone http://jenkinspublic:hmCI2%4022!@gerrit.houmo.ai/toolchain/imodelzoo " + dir_name
+from git import Repo
+repo = Repo('.')
+branch_name = repo.active_branch.name
+cmd = f"git clone -b {branch_name} http://jenkinspublic:hmCI2%4022!@gerrit.houmo.ai/toolchain/imodelzoo {dir_name}"
+print(cmd)
 os.system(cmd)
 
 # tar

@@ -10,10 +10,6 @@ class Efficientnet(Classifier):
 
     def build_options(self):
         return {
-            "tcim.gen_intrinsic" : 2,
-            "tcim.sync_strategy": 1,
-            "tcim.codegen_pic": False,
-            "tcim.for_benchmark": True
         }
 
     def _preprocess(self, inputs):
