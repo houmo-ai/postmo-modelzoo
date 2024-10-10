@@ -26,7 +26,7 @@ def get_args() -> argparse.Namespace:
         '--prefill',
         dest='prefill_length',
         type=int,
-        default=256,
+        default=128,
         help='prefill max length',
     )
     parser.add_argument(
@@ -63,15 +63,15 @@ class HmQwen:
         self.decode_head_model.set_stream(self.stream)
         # set kvcache input
         for i in range(14):
-            kcache = self.prefill_part1_model.get_dev_input(f'model_layers_{i}_self_attn_kcache_input')
-            self.decode_part1_model.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
-            vcache = self.prefill_part1_model.get_dev_input(f'model_layers_{i}_self_attn_vcache_input')
-            self.decode_part1_model.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
+            k_cache_name = f"model_layers_{i}_self_attn_kcache_input"
+            v_cache_name = f"model_layers_{i}_self_attn_vcache_input"
+            self.decode_part1_model.set_input(k_cache_name, self.prefill_part1_model.get_dev_input(k_cache_name))
+            self.decode_part1_model.set_input(v_cache_name, self.prefill_part1_model.get_dev_input(v_cache_name))
         for i in range(14, 28):
-            kcache = self.prefill_part2_model.get_dev_input(f'model_layers_{i}_self_attn_kcache_input')
-            self.decode_part2_model.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
-            vcache = self.prefill_part2_model.get_dev_input(f'model_layers_{i}_self_attn_vcache_input')
-            self.decode_part2_model.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
+            k_cache_name = f"model_layers_{i}_self_attn_kcache_input"
+            v_cache_name = f"model_layers_{i}_self_attn_vcache_input"
+            self.decode_part2_model.set_input(k_cache_name, self.prefill_part2_model.get_dev_input(k_cache_name))
+            self.decode_part2_model.set_input(v_cache_name, self.prefill_part2_model.get_dev_input(v_cache_name))
         # set decode input
         current_length_input_1 = np.array([1]).astype("int16")
         self.decode_part1_model.set_input("current_length", current_length_input_1)
