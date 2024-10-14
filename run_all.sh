@@ -66,3 +66,5 @@ bash ./models/detection/yolov5s/test.sh
 bash ./models/detection/yolov3/test.sh
 bash ./models/autodrive/yolop/test.sh
 
+bash ./tests/qwen2_2blocks/test.sh --core 4
+bash ./tests/qwen2_2blocks/test.sh --core 2

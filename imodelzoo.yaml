@@ -41,6 +41,21 @@ os_type:
     yolop_gloden:
       - models/autodrive/yolop/output/houmo/result/hmquant_yolop_images_input.npy
       - models/autodrive/yolop/output/houmo/result/hmquant_yolop_with_act
+    qwen2_2block:
+      - tests/qwen2_2blocks/qwen2_decode_2block_4cores.hmm.so
+      - tests/qwen2_2blocks/qwen2_decode_2block_4cores_weights_0.so
+      - tests/qwen2_2blocks/qwen2_decode_2block_2cores.hmm.so
+      - tests/qwen2_2blocks/qwen2_decode_2block_2cores_weights_0.so
+      - tests/qwen2_2blocks/build.py
+    qwen2_2block_gloden:
+      - tests/qwen2_2blocks/input_1.npy
+      - tests/qwen2_2blocks/current_length.npy
+      - tests/qwen2_2blocks/valid_length.npy
+      - tests/qwen2_2blocks/model_layers_0_self_attn_kcache_input.npy
+      - tests/qwen2_2blocks/model_layers_0_self_attn_vcache_input.npy
+      - tests/qwen2_2blocks/model_layers_1_self_attn_kcache_input.npy
+      - tests/qwen2_2blocks/model_layers_1_self_attn_vcache_input.npy
+      - tests/qwen2_2blocks/model_layers_1_resadd2.npy
   ubuntu_18.04:
     resnet50:
       - models/backbone/resnet50/resnet50.hmm.so
@@ -78,3 +93,18 @@ os_type:
     yolop_gloden:
       - models/autodrive/yolop/output/houmo/result/hmquant_yolop_images_input.npy
       - models/autodrive/yolop/output/houmo/result/hmquant_yolop_with_act
+    qwen2_2block:
+      - tests/qwen2_2blocks/qwen2_decode_2block_4cores.hmm.so
+      - tests/qwen2_2blocks/qwen2_decode_2block_4cores_weights_0.so
+      - tests/qwen2_2blocks/qwen2_decode_2block_2cores.hmm.so
+      - tests/qwen2_2blocks/qwen2_decode_2block_2cores_weights_0.so
+      - tests/qwen2_2blocks/build.py
+    qwen2_2block_gloden:
+      - tests/qwen2_2blocks/input_1.npy
+      - tests/qwen2_2blocks/current_length.npy
+      - tests/qwen2_2blocks/valid_length.npy
+      - tests/qwen2_2blocks/model_layers_0_self_attn_kcache_input.npy
+      - tests/qwen2_2blocks/model_layers_0_self_attn_vcache_input.npy
+      - tests/qwen2_2blocks/model_layers_1_self_attn_kcache_input.npy
+      - tests/qwen2_2blocks/model_layers_1_self_attn_vcache_input.npy
+      - tests/qwen2_2blocks/model_layers_1_resadd2.npy

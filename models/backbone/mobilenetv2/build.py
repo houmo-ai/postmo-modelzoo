@@ -31,6 +31,13 @@ def get_args() -> argparse.Namespace:
         help='batch size',
     )
     parser.add_argument(
+        '--core',
+        dest='core',
+        type=int,
+        default=1,
+        help='core number',
+    )
+    parser.add_argument(
         '--stage',
         dest='stage',
         type=str,

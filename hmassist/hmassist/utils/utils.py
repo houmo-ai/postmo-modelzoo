@@ -85,7 +85,11 @@ def get_file_md5(file_path):
 def get_file_from_jfrog(file_path, save_dir=""):
     import requests
     import os
-    modelzoo_url = os.environ.get("MODELZOO_URL")
+    if "http://" in file_path or "https://" in file_path:
+        url, file_path = file_path.split("artifactory/")
+        modelzoo_url = url + "artifactory/"
+    else:
+        modelzoo_url = os.environ.get("MODELZOO_URL")
     file_name = os.path.basename(file_path)
     if save_dir == "":
         save_dir = os.getenv("MODEL_PATH", default="")
@@ -108,8 +112,9 @@ def get_file_from_jfrog(file_path, save_dir=""):
     if os.path.exists(save_path):
         os.system("rm " + save_path)
     # cmd = "wget -N --ftp-user=ftp001 --ftp-password=3tIx7oMi@R " + modelzoo_url + "/" + file_path
-    print("downloading", file_name)
-    cmd = "wget -c " + modelzoo_url + "/" + file_path + " -O " + save_path
+    cmd = "wget -c " + os.path.join(modelzoo_url, file_path) + " -O " + save_path
+    print(cmd)
+    print("downloading", file_name, flush=True)
     os.system(cmd)
     return save_path
 

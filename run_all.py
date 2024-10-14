@@ -36,7 +36,7 @@ def readFile(diff_file):
             allLines = content.strip().split("\n")
             return allLines
     except FileNotFoundError:
-        raise FileNotFoundError(f"File '{filename}' does not exist.")
+        raise FileNotFoundError(f"File '{diff_file}' does not exist.")
 
 def readWithYaml(config):
     try:
@@ -103,13 +103,14 @@ def runCase(allUnitDict):
         if script == None or len(script) == 0:
             print("case " + caseName + "is not excute, " + caseName + " end")
             continue
-        if args == None or len(args) == 0:
-            cmd = "bash " + script
-        else:
-            argStr = ""
-            for arg in args:
-                argStr = aargStr + arg + " "
-            cmd = "bash " + script + " " + argStr
+        cmd = "bash " + script
+        # if args == None or len(args) == 0:
+        #     cmd = "bash " + script
+        # else:
+        #     argStr = ""
+        #     for arg in args:
+        #         argStr = argStr + arg + " "
+        #     cmd = "bash " + script + " " + argStr
 
         print("------------- test " + caseName + " start ------------")
         result = os.system(cmd)

@@ -14,18 +14,25 @@ def get_args() -> argparse.Namespace:
         help='path to the model dir',
     )
     parser.add_argument(
-        '--stage',
-        dest='stage',
-        type=str,
-        default="all",
-        help='build stage choise=["build", "test", "all"]',
-    )
-    parser.add_argument(
         '--batch',
         dest='batch',
         type=int,
         default=1,
         help='batch size',
+    )
+    parser.add_argument(
+        '--core',
+        dest='core',
+        type=int,
+        default=1,
+        help='core number',
+    )
+    parser.add_argument(
+        '--stage',
+        dest='stage',
+        type=str,
+        default="all",
+        help='build stage choise=["build", "test", "all"]',
     )
     args = parser.parse_args()
     return args

@@ -151,6 +151,21 @@ detection_yolov5s:
     - detection_yolov5s_eval
     - detection_yolov5s_perf
     - detection_yolov5s_test
+tests_qwen2_2blocks:
+  include:
+    - tests/qwen2_2blocks
+  exclude:
+    - tests/qwen2_2blocks/README.MD
+  example_case:
+    - qwen2_2blocks_4core_test:
+        script: tests/qwen2_2blocks/test.sh --core 4
+        args: null
+    - qwen2_2blocks_2core_test:
+        script: tests/qwen2_2blocks/test.sh --core 2
+        args: null
+  test:
+    - qwen2_2blocks_4core_test
+    - qwen2_2blocks_2core_test
 utils:
   include:
     - utils
