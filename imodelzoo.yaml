@@ -10,37 +10,45 @@ os_type:
       - models/backbone/resnet50/build.py
     resnet50_gloden:
       - models/backbone/resnet50/output/houmo/result/hmquant_resnet50_input.1_input.npy
-      - models/backbone/resnet50/output/houmo/result/hmquant_resnet50_with_act
+      - models/backbone/resnet50/output/houmo/result/hmquant_resnet50_495_output.npy
     efficientnet:
       - models/backbone/efficientnet/efficientnet.hmm.so
       - models/backbone/efficientnet/build.py
     efficientnet_gloden:
       - models/backbone/efficientnet/output/houmo/result/hmquant_efficientnet_input.1_input.npy
-      - models/backbone/efficientnet/output/houmo/result/hmquant_efficientnet_with_act
+      - models/backbone/efficientnet/output/houmo/result/hmquant_efficientnet_715_output.npy
     mobilenetv2:
       - models/backbone/mobilenetv2/mobilenetv2.hmm.so
       - models/backbone/mobilenetv2/build.py
     mobilenetv2_gloden:
       - models/backbone/mobilenetv2/output/houmo/result/hmquant_mobilenetv2_input_input.npy
-      - models/backbone/mobilenetv2/output/houmo/result/hmquant_mobilenetv2_with_act
+      - models/backbone/mobilenetv2/output/houmo/result/hmquant_mobilenetv2_536_output.npy
     yolov3:
       - models/detection/yolov3/yolov3.hmm.so
       - models/detection/yolov3/build.py
     yolov3_gloden:
       - models/detection/yolov3/output/houmo/result/hmquant_yolov3_images_input.npy
-      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_with_act
+      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_output0_output.npy
+      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_output1_output.npy
+      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_output2_output.npy
     yolov5s:
       - models/detection/yolov5s/yolov5s.hmm.so
       - models/detection/yolov5s/build.py
     yolov5s_gloden:
-      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_with_act
       - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_images_input.npy
+      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_340_output.npy
+      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_378_output.npy
+      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_416_output.npy
     yolop:
       - models/autodrive/yolop/yolop.hmm.so
       - models/autodrive/yolop/build.py
     yolop_gloden:
       - models/autodrive/yolop/output/houmo/result/hmquant_yolop_images_input.npy
-      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_with_act
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_feat0_output.npy
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_feat1_output.npy
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_feat2_output.npy
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_lane_line_seg_output.npy
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_drive_area_seg_output.npy
     qwen2_2block:
       - tests/qwen2_2blocks/qwen2_decode_2block_4cores.hmm.so
       - tests/qwen2_2blocks/qwen2_decode_2block_4cores_weights_0.so
@@ -62,37 +70,45 @@ os_type:
       - models/backbone/resnet50/build.py
     resnet50_gloden:
       - models/backbone/resnet50/output/houmo/result/hmquant_resnet50_input.1_input.npy
-      - models/backbone/resnet50/output/houmo/result/hmquant_resnet50_with_act
+      - models/backbone/resnet50/output/houmo/result/hmquant_resnet50_495_output.npy
     efficientnet:
       - models/backbone/efficientnet/efficientnet.hmm.so
       - models/backbone/efficientnet/build.py
     efficientnet_gloden:
       - models/backbone/efficientnet/output/houmo/result/hmquant_efficientnet_input.1_input.npy
-      - models/backbone/efficientnet/output/houmo/result/hmquant_efficientnet_with_act
+      - models/backbone/efficientnet/output/houmo/result/hmquant_efficientnet_715_output.npy
     mobilenetv2:
       - models/backbone/mobilenetv2/mobilenetv2.hmm.so
       - models/backbone/mobilenetv2/build.py
     mobilenetv2_gloden:
       - models/backbone/mobilenetv2/output/houmo/result/hmquant_mobilenetv2_input_input.npy
-      - models/backbone/mobilenetv2/output/houmo/result/hmquant_mobilenetv2_with_act
-    yolov5s:
-      - models/detection/yolov5s/yolov5s.hmm.so
-      - models/detection/yolov5s/build.py
-    yolov5s_gloden:
-      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_with_act
-      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_images_input.npy
+      - models/backbone/mobilenetv2/output/houmo/result/hmquant_mobilenetv2_536_output.npy
     yolov3:
       - models/detection/yolov3/yolov3.hmm.so
       - models/detection/yolov3/build.py
     yolov3_gloden:
       - models/detection/yolov3/output/houmo/result/hmquant_yolov3_images_input.npy
-      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_with_act
+      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_output0_output.npy
+      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_output1_output.npy
+      - models/detection/yolov3/output/houmo/result/hmquant_yolov3_output2_output.npy
+    yolov5s:
+      - models/detection/yolov5s/yolov5s.hmm.so
+      - models/detection/yolov5s/build.py
+    yolov5s_gloden:
+      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_images_input.npy
+      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_340_output.npy
+      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_378_output.npy
+      - models/detection/yolov5s/output/houmo/result/hmquant_yolov5s_416_output.npy
     yolop:
       - models/autodrive/yolop/yolop.hmm.so
       - models/autodrive/yolop/build.py
     yolop_gloden:
       - models/autodrive/yolop/output/houmo/result/hmquant_yolop_images_input.npy
-      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_with_act
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_feat0_output.npy
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_feat1_output.npy
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_feat2_output.npy
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_lane_line_seg_output.npy
+      - models/autodrive/yolop/output/houmo/result/hmquant_yolop_drive_area_seg_output.npy
     qwen2_2block:
       - tests/qwen2_2blocks/qwen2_decode_2block_4cores.hmm.so
       - tests/qwen2_2blocks/qwen2_decode_2block_4cores_weights_0.so
