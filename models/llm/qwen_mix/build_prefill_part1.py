@@ -67,6 +67,7 @@ def build(args=None):
 
     # 1. build model
     if stage == 'build' or stage == 'all':
+        print(f"<=== {part_name} build start...")
         onnx_model = onnx.load(model_path)
         compile_config = {
             "tcim.gen_intrinsic": 1,
@@ -110,10 +111,12 @@ def build(args=None):
             data_dict.update(constant_data_dict)
         tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
                                      inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen_group_part1_")
-        print(part_name, 'build completed.')
+        print(f"<=== {part_name} build success.")
+
 
     # 2. test model
     if stage == 'test' or stage == 'all':
+        print(f"\n===> {part_name} test start...")
         # 2.1 load model
         module = tcim.runtime.load(part_name + ".hmm")
         current_length = 0
@@ -173,7 +176,8 @@ def build(args=None):
                       .format(output_name, golden_output.shape, output_data.shape))
         if not result_check:
             print("[error] result check failed.")
-            # exit(-1)
+            exit(-1)
+        print(f"<=== {part_name} test success.")
 
 
 if __name__ == '__main__':

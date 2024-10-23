@@ -45,7 +45,8 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def build(args):
+def build(args=None):
+    """build and test houmo model."""
     model_name = args.model_name
     batch = args.batch
     stage = args.stage
@@ -57,6 +58,7 @@ def build(args):
 
     # 1. build model
     if stage == 'build' or stage == 'all':
+        print(f"<=== {model_name} build start...")
         onnx_model = onnx.load(model_path)
         compile_config = {
             'tcim.fuse_strategy': 1,
@@ -75,13 +77,13 @@ def build(args):
             input_shape[0] *= batch
             input_cfg[input.name] = tcim.HMInput(shape=input_shape)
         tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=compile_config, output_layout=output_layout)
-        print(model_name, 'build completed.')
+        print(f"<=== {model_name} build success.")
 
     # 2. test model
     if stage == 'test' or stage == 'all':
+        print(f"\n===> {model_name} test start...")
         # 2.1 load model
         module = tcim.runtime.load(model_name + ".hmm")
-        # module = tcim.runtime.load("tcim_" + model_name)
 
         # 2.2 set input with golden
         input_num = module.get_num_inputs()
@@ -133,6 +135,7 @@ def build(args):
         if not result_check:
             print("[error] result check failed.")
             exit(-1)
+        print(f"<=== {model_name} test success.")
 
 
 if __name__ == '__main__':

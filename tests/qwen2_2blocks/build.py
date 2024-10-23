@@ -64,9 +64,13 @@ def build(args=None):
 
     os.environ['AOT_COMPILE_NO_FORMAT'] = '1'
 
+    if core_num != 4 and core_num != 2:
+        print("[error] not support core =", core_num)
+        exit(-1)
+
     # 1. build model
     if stage == 'build' or stage == 'all':
-        print("\n===> build model:", part_name)
+        print(f"\n===> {part_name} build start...")
         onnx_model = onnx.load(model_path)
         compile_config = {
             'tcim.fuse_strategy': 1,
@@ -111,11 +115,11 @@ def build(args=None):
             data_dict.update(constant_data_dict)
         tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
                                      inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix=part_name+"_")
-        print(part_name, 'build completed.')
+        print(f"<=== {part_name} build success.")
 
     # 2. test model, prefill model should run first to make the correct result
     if stage == 'test' or stage == 'all':
-        print("\n===> test model:", part_name)
+        print(f"\n===> {part_name} test start...")
         # 2.1 load model
         weight_manager = tcim.runtime.create_weight_manager()
         # module_prefill = tcim.runtime.load("qwen_prefill.hmm", weight_manager=weight_manager)
@@ -177,7 +181,7 @@ def build(args=None):
         if not result_check:
             print("[error] result check failed.")
             exit(-1)
-
+        print(f"<=== {part_name} test success.")
 
 if __name__ == '__main__':
     args = get_args()

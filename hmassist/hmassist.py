@@ -109,14 +109,13 @@ def build(cfg):
     model.executor.print_input_info()
     model.executor.print_output_info()
     logger.info("start compare golden data...")
-    save_dir = os.path.join(model.executor.result_dir, "tcim")
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    if not os.path.exists(model.executor.build_save_dir):
+        os.makedirs(model.executor.build_save_dir)
     inputs = model.executor.get_golden_inputs()
     if inputs is not None:
         for input_name, input_data in inputs.items():
             input_save_name = sanitize_name(input_name)
-            input_data.tofile(os.path.join(save_dir, "{}_input.bin".format(input_save_name)))
+            input_data.tofile(os.path.join(model.executor.build_save_dir, "{}.bin".format(input_save_name)))
         model.executor.set_fixed_out(True)
         start = time.time()
         outputs = model.executor.infer(inputs)
@@ -124,14 +123,14 @@ def build(cfg):
         logger.info("[infer] cost {:.3f}ms".format(cost * 1000))
         # 临时添加NCHW
         # output_data = np.transpose(output_data, (0, 2, 3, 1))
-    logger.info("tcim inputs saved in {}".format(save_dir))
+    logger.info("tcim inputs saved in {}".format(model.executor.build_save_dir))
     sum_cos = 0.0
     result_check = True
     for output_name, output_data in outputs.items():
         logger.info("{} output[{}] shape = {}, dtype = {}".format(model.target, output_name,
                                                                   output_data.shape, output_data.dtype))
         output_save_name = sanitize_name(output_name)
-        save_data(output_data, save_dir, output_save_name)
+        save_data(output_data, model.executor.build_save_dir, output_save_name)
         golden_output = model.executor.get_golden_output(output_save_name)
         logger.info("golden output[{}] shape = {}, dtype = {}".format(output_name, golden_output.shape, golden_output.dtype))
         is_match = (output_data == golden_output).all()
@@ -141,7 +140,7 @@ def build(cfg):
                     .format(model.target, output_name, is_match, cosine_dist))
         if cosine_dist < 0.99:
             result_check = False
-    logger.info("tcim outputs saved in {}".format(save_dir))
+    logger.info("tcim outputs saved in {}".format(model.executor.build_save_dir))
     logger.info("[compare] {} vs quant output average similarity={:.6f}".format(model.target, sum_cos/len(outputs)))
     if not result_check:
         print("[error] result check failed.")
@@ -321,10 +320,17 @@ def run(args):
     elif args.type == "test":
         test(config)
     elif args.type == "demo":
+        if args.test_num != -1:
+            config['demo']['test_num'] = args.test_num
         demo(config)
     elif args.type == "perf":
+        if args.test_num != -1:
+            config['perf']['test_num'] = args.test_num
+        config['perf']['infer_only'] = args.infer_only
         perf(config)
     elif args.type == "eval":
+        if args.test_num != -1:
+            config['eval']['test_num'] = args.test_num
         eval(config)
     elif args.type == "benchmark":
         benchmark(config)
@@ -375,7 +381,7 @@ def benchmark(config):
         # perf
         if os.path.exists("output/hmperf.txt"):
             os.remove("output/hmperf.txt")
-        os.system("hmperf.sh --batch {} --thread_num {}".format(batch, thread_num))
+        os.system("hmperf.sh --batch {} --thread_num {} --infer_only".format(batch, thread_num))
         if os.path.exists("output/hmperf.txt"):
             perf_result = read_yaml_to_dict("output/hmperf.txt")
         # eval
@@ -468,15 +474,10 @@ if __name__ == "__main__":
                         help="Specify core number in build, default is 1")
     parser.add_argument("--thread_num", type=int, default=1,
                         help="Specify thread number in perf, default is 1")
-    # parser.add_argument("--dtype", type=str, default="int8",
-    #                     choices=("int8", "fp32"),
-    #                     help="Please specify one of them, default is int8")
-    # parser.add_argument("--demo.test_num", type=int, default=-1,
-    #                     help="Specify the test number in demo, default is the config in the config file")
-    # parser.add_argument("--perf.test_num", type=int, default=-1,
-    #                     help="Specify the test number in perf, default is the config in the config file")
-    # parser.add_argument("--eval.test_num", type=int, default=-1,
-    #                     help="Specify the test number in eval, default is the config in the config file")
+    parser.add_argument("--test_num", type=int, default=-1,
+                        help="Specify the test number in demo, default is the config in the config file")
+    parser.add_argument("--infer_only", action='store_true', default=False,
+                        help="Specify if only test infer while perfing, default is False")
 
     args = parser.parse_args()
     print(args)

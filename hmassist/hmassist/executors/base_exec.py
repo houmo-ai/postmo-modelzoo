@@ -46,6 +46,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.result_dir = os.path.join(self.model_dir, "result")
         self.test_dir = os.path.join(self.result_dir, "test")
         self.quant_model_path = os.path.abspath(os.path.join(self.result_dir, 'hmquant_' + self.model_name + '_with_act.onnx'))
+        self.build_save_dir = os.path.join(self.result_dir, "tcim")
         self.golden_data_path = self.result_dir
         if not os.path.exists(self.result_dir):
             os.makedirs(self.result_dir)

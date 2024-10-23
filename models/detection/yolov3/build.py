@@ -61,8 +61,9 @@ def build(args=None):
 
     # 1. build model
     if stage == 'build' or stage == 'all':
+        print(f"<=== {model_name} build start...")
         onnx_model = onnx.load(model_path)
-        compile_config={}
+        compile_config = {}
         convert_config = {'layout': 'NHWC'}
         if batch % 4 == 0:
             compile_config["tcim.core_num"] = 4
@@ -74,10 +75,11 @@ def build(args=None):
             input_shape[0] *= batch
             input_cfg[input.name] = tcim.HMInput(shape=input_shape)
         tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=compile_config, convert_config=convert_config)
-        print(model_name, 'build completed.')
+        print(f"<=== {model_name} build success.")
 
     # 2. test model
     if stage == 'test' or stage == 'all':
+        print(f"\n===> {model_name} test start...")
         # 2.1 load model
         module = tcim.runtime.load(model_name + ".hmm")
 
@@ -131,6 +133,7 @@ def build(args=None):
         if not result_check:
             print("[error] result check failed.")
             exit(-1)
+        print(f"<=== {model_name} test success.")
 
 
 if __name__ == '__main__':

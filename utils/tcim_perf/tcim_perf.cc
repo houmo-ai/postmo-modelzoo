@@ -18,6 +18,14 @@
 #include <mutex>
 #include <condition_variable>
 
+#if (__GNUC__ < 8)
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#else
+#include <filesystem>
+namespace fs = std::filesystem;
+#endif
+
 #include "hdpl/hdpl_runtime_api.h"
 #include "tcim/tcim_runtime.h"
 
@@ -26,6 +34,14 @@
 #if MEM_CHECK
 #include <sys/resource.h>
 #endif
+
+#define COLOR_RED     "\x1b[91;20m"
+#define COLOR_GREEN   "\x1b[92;20m"
+#define COLOR_YELLOW  "\x1b[93;20m"
+#define COLOR_BLUE    "\x1b[94;20m"
+#define COLOR_MAGENT  "\x1b[95;20m"
+#define COLOR_CYAN    "\x1b[96;20m"
+#define COLOR_RESET   "\x1b[0m"
 
 #define GET_TIME() std::chrono::system_clock::now()
 #define GET_COST(start, end) std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
@@ -37,26 +53,46 @@ struct CliArguments {
   size_t batch = 1;
   size_t warm_up = 1;
   size_t threads = 1;
+  size_t devices = 1;
   size_t loops = 1;
   size_t samples = 1;
+  bool infer_only = false;
 };
 
+
 typedef struct {
-  tcim::Module* module;
-  int loop_num;
-  int sample_cnt;
-  uint32_t max_cost;
-  uint32_t total_cost;
+  std::string model_path;
+  std::shared_ptr<tcim::Module::WeightManager> wm;
+  int loop_num = 0;
+  int sample_cnt = 0;
+  int warm_up = 0;
+  bool infer_only = false;
+  uint32_t infer_max_cost = 0;
+  uint32_t infer_total_cost = 0;
+  uint32_t input_max_cost = 0;
+  uint32_t input_total_cost = 0;
+  uint32_t output_max_cost = 0;
+  uint32_t output_total_cost = 0;
+  uint32_t e2e_max_cost = 0;
+  uint32_t e2e_total_cost = 0;
 } ThreadInfo;
 
+
 typedef struct {
-  std::queue<std::map<std::string, tcim::Tensor>> queue;
+  uint64_t req_id;
+  std::map<std::string, tcim::Tensor> data_in;
+  std::map<std::string, tcim::Tensor> data_out;
+  std::map<std::string, tcim::Tensor> ref_out;
+} Task;
+
+
+typedef struct {
+  std::queue<Task> queue;
   std::mutex mutex;
   std::condition_variable cond;
-} QueueInfo;
+  // std::map<std::string, tcim::TensorInfo> info_map;
+} TaskQueue;
 
-// std::mutex mutex;
-// std::condition_variable cond;
 
 /**
  * @brief whether the file exists
@@ -135,11 +171,13 @@ bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
       {"batch", 1, 0, 'b'},
       {"loops", 1, 0, 'l'},
       {"threads", 1, 0, 't'},
+      {"devices", 1, 0, 'v'},
       {"samples", 1, 0, 's'},
-      {"output", 1, 0, 'o'}
+      {"output", 1, 0, 'o'},
+      {"infer_only", 1, 0, 'y'}
   };
   while (true) {
-    int ch = getopt_long(argc, argv, "hm:d:w:b:l:t:s:o:", long_options, &option_idx);
+    int ch = getopt_long(argc, argv, "hm:d:w:b:t:v:l:s:o:y:", long_options, &option_idx);
     if (ch == -1) {
       break;
     }
@@ -162,6 +200,9 @@ bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
     case 't':
       arguments->threads = atoi(optarg);
       break;
+    case 'v':
+      arguments->devices = atoi(optarg);
+      break;
     case 'l':
       arguments->loops = atoi(optarg);
       break;
@@ -170,6 +211,9 @@ bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
       break;
     case 'o':
       arguments->output = optarg;
+      break;
+    case 'y':
+      arguments->infer_only = optarg;
       break;
     default:
       std::cerr << "Unsupported option: " << static_cast<char>(ch) << std::endl;
@@ -261,13 +305,6 @@ void SetAffinity(int core_id) {
 int main(int argc, char *argv[]) {
   CliArguments arguments;
   ParseArgs(&arguments, argc, argv);
-  std::cout << "model: " << arguments.model_path << std::endl;
-  std::cout << "data: " << arguments.data_path << std::endl;
-  std::cout << "samples: " << arguments.samples << std::endl;
-  std::cout << "loops: " << arguments.loops << std::endl;
-  std::cout << "warmup: " << arguments.warm_up << std::endl;
-  std::cout << "batch: " << arguments.batch << std::endl;
-  std::cout << "threads: " << arguments.threads << std::endl;
 
   std::string model_path = arguments.model_path;
   std::string data_path = arguments.data_path;
@@ -275,152 +312,257 @@ int main(int argc, char *argv[]) {
   int batch = arguments.batch;
   int sample_num = arguments.samples;
   int thread_num = arguments.threads;
+  int device_num = arguments.devices;
   int loop_num = arguments.loops;
   int warm_up = arguments.warm_up;
+  bool infer_only = arguments.infer_only;
+  bool is_result_check = true;
+
+  if (infer_only) is_result_check = false;
+
+  if (auto platform = std::getenv("HDPL_PLATFORM")) {
+    if (strcmp(platform, "ASIC")) {
+      thread_num = 1;
+      device_num = 1;
+    }
+  } else {  // HDPL_PLATFORM not set
+    thread_num = 1;
+    device_num = 1;
+  }
+
+  std::cout << "model: " << model_path << std::endl;
+  std::cout << "data: " << data_path << std::endl;
+  std::cout << "samples: " << sample_num << std::endl;
+  std::cout << "loops: " << loop_num << std::endl;
+  std::cout << "warmup: " << warm_up << std::endl;
+  std::cout << "batch: " << batch << std::endl;
+  std::cout << "threads: " << thread_num << std::endl;
+  std::cout << "devices: " << device_num << std::endl;
+  std::cout << "infer_only: " << infer_only << std::endl;
 
   if (sample_num < thread_num) {
-    std::cout << "[warn] the perf result may not be accurate while samples < threads" << std::endl;
+    std::cout << COLOR_YELLOW << "[warn] the perf result may not be accurate while samples < threads"
+              << COLOR_RESET << std::endl;
   }
 
-  std::vector<std::thread> threads;
-  std::vector<tcim::Module> modules;
-  std::vector<std::map<std::string, tcim::Tensor>> input_datas;
-  ThreadInfo thread_info[thread_num];
+  TaskQueue qin;
+  TaskQueue qout;
 
-  char fileName[256];
-  char *imageData = NULL;
-  int fileLen = 0;
-  // 640x384_422sp.yuv
-  // read_file(arguments.data_path.c_str(), &imageData, &fileLen);
-  // printf("file_len %d\n", fileLen);
-
-  for (int i = 0; i < thread_num; i++) {
-    // load model
-    auto module = tcim::Module::LoadFromFile(model_path);
-    if (!module) {
-      std::cout << "load model " << model_path << " fail, exit..." << std::endl;
-      exit(-1);
-    }
-    modules.push_back(std::move(module));
+  // get module input & output info
+  auto module = tcim::Module::LoadFromFile(model_path);
+  if (!module) {
+    std::cout << COLOR_RED << "[error] load model " << model_path << " fail, exit..."
+              << COLOR_RESET << std::endl;
+    exit(-1);
   }
-  std::cout << "module loaded: " << model_path << std::endl;
 
-  //SetAffinity(5);
-
-  QueueInfo queue_info;
-
-  // prepare input data
-  int input_num = modules[0].GetInputNum();
+  // prepare input & output data
+  std::map<std::string, tcim::Tensor> input_datas;
+  std::map<std::string, tcim::Tensor> output_golden;
+  int input_num = module.GetInputNum();
   std::cout << "Count of Input: " << input_num << std::endl;
   for (int idx = 0; idx < input_num; idx++) {
-    auto input_name = modules[0].GetInputName(idx);
+    auto input_name = module.GetInputName(idx);
     tcim::TensorInfo input_info;
-    modules[0].GetInputInfo(input_name, input_info, tcim::CPU);
+    module.GetInputInfo(input_name, input_info, tcim::CPU);
     std::cout << "Input[" << idx << "] name: " << input_name << ", " << input_info << std::endl;
-    for (int i = 0; i < thread_num; i++) {
-      auto data = malloc(input_info.MemSize());
-      tcim::Tensor input_data(input_info, data, input_info.MemSize());
-      std::map<std::string, tcim::Tensor> tensor_map;
-      tensor_map.insert(std::pair<std::string, tcim::Tensor>(input_name, input_data));
-      input_datas.push_back(tensor_map);
+    auto data_file = data_path + "/" + input_name + ".bin";
+    void* data_ptr = nullptr;
+    int len = 0;
+    bool is_file_read = false;
+    if (std::filesystem::exists(data_file)) {
+      if (read_file(data_file.c_str(), (char**)&data_ptr, &len)) {
+        std::cout << COLOR_YELLOW << "[warn] Read input data file " << data_file
+                  << " fail. Use random data and result check will be skipped."
+                  << COLOR_RESET << std::endl;
+        is_result_check = false;
+      } else {
+        is_file_read = true;
+      }
+    } else {
+      std::cout << COLOR_YELLOW << "[warn] Input data file " << data_file
+                << " not exist. Use random data and result check will be skipped."
+                << COLOR_RESET << std::endl;
+      is_result_check = false;
     }
+    if (!is_file_read) {
+      len = input_info.MemSize();
+      data_ptr = malloc(len);
+    }
+    len = input_info.MemSize(); // 暂不支持不同大小生成tensor
+    input_datas.insert(std::pair<std::string, tcim::Tensor>(input_name, tcim::Tensor(input_info, data_ptr, len)));
   }
 
-  // prepare output data
-  int output_num = modules[0].GetOutputNum();
+  int output_num = module.GetOutputNum();
   std::cout << "Count of Output: " << output_num << std::endl;
   for (int idx = 0; idx < output_num; idx++) {
-    auto output_name = modules[0].GetOutputName(idx);
+    auto output_name = module.GetOutputName(idx);
     tcim::TensorInfo output_info;
-    modules[0].GetOutputInfo(output_name, output_info, tcim::CPU, true);
-    auto data = malloc(output_info.MemSize());
-    std::cout << "Output[" << idx << "] name: " << output_name << ", " << output_info << std::endl;
-    tcim::Tensor output_data(output_info, data, output_info.MemSize());
-#if SAVE_DATA
-    snprintf(fileName, sizeof(fileName), "%s_output.bin", output_name.c_str());
-    write_file(fileName, (char*)output_data->data, data_size);
-#endif
-  }
-
-  for (int i = 0; i < thread_num; i++) {
-    auto start = GET_TIME();
-    modules[i].Run(false, warm_up);
-    modules[i].Sync();
-    auto end = GET_TIME();
-    float cost = GET_COST(start, end) / 1000.0 / warm_up;
-    std::cout << "Thread " << i << " Warm Up " << warm_up << " average cost " << cost << "ms" << std::endl;
+    module.GetOutputInfo(output_name, output_info, tcim::CPU, true);
+    std::cout << "Output[" << output_name << "] " << output_info << std::endl;
+    auto data_file = data_path + "/" + output_name + ".bin";
+    void* data_ptr = nullptr;
+    int len = 0;
+    bool is_file_read = false;
+    if (std::filesystem::exists(data_file)) {
+      if (read_file(data_file.c_str(), (char**)&data_ptr, &len)) {
+        std::cout << COLOR_YELLOW << "[warn] Read output data file " << data_file
+                  << " fail. Result check will be skipped." << COLOR_RESET << std::endl;
+        is_result_check = false;
+      } else {
+        is_file_read = true;
+      }
+    } else {
+      std::cout << COLOR_YELLOW << "[warn] Output data file " << data_file
+                << " not exist. Result check will be skipped." << COLOR_RESET << std::endl;
+      is_result_check = false;
+    }
+    if (!is_file_read) {
+      len = output_info.MemSize();
+      data_ptr = malloc(len);
+    }
+    len = output_info.MemSize(); // 暂不支持不同大小生成tensor
+    output_golden.insert(std::pair<std::string, tcim::Tensor>(output_name, tcim::Tensor(output_info, data_ptr, len)));
   }
 
   for (int i = 0; i < sample_num; i++) {
-    int j = i % thread_num;
-    queue_info.queue.push(input_datas[j]);
+    Task task;
+    task.req_id = i;
+    task.data_in = input_datas;
+    task.ref_out = output_golden;
+    std::map<std::string, tcim::Tensor> output_datas;
+    for (auto& output : output_golden) {
+      auto& info = output.second.Info();
+      auto tensor = tcim::Tensor(info, malloc(info.MemSize()), info.MemSize());
+      output_datas.insert(std::pair<std::string, tcim::Tensor>(output.first, tensor));
+    }
+    task.data_out = output_datas;
+    qin.queue.push(task);
   }
-  std::cout << "sample queue size is " << queue_info.queue.size() << std::endl;
+  std::cout << "sample queue size is " << qin.queue.size() << std::endl;
 
-  Barrier barrier(thread_num);
+  auto thread_func = [](int tid,
+                        int did,
+                        ThreadInfo& info,
+                        TaskQueue& qin,
+                        TaskQueue& qout,
+                        Barrier& barrier) {
+    auto start = GET_TIME();
+    auto end = GET_TIME();
+    float cost = 0.0;
+    // load model
+    start = GET_TIME();
+    auto module = tcim::Module::LoadFromFile(info.model_path, info.wm.get());
+    end = GET_TIME();
+    cost = GET_COST(start, end) / 1000.0 / info.warm_up;
+    if (!module) {
+      std::cerr << COLOR_RED << "Device " << did << " Thread " << tid << " load model "
+                << info.model_path << " fail." << COLOR_RESET << std::endl;
+      exit(-1);
+    }
+    std::cout << "Device " << did << " Thread " << tid << " " << info.model_path 
+              << " model loaded. Cost " << cost << " ms." << std::endl;
 
-  auto thread_func = [](int tid, ThreadInfo& thread_info, QueueInfo& queue_info, Barrier& barrier) {
-    // SetAffinity(t_id);
+    // create a stream and set to the module
+    hdplSetDevice(did);
+    hdplStream_t stream;
+    hdplStreamCreate(&stream);
+    module.SetStream(stream);
+
+    // warm up
+    start = GET_TIME();
+    module.Run(false, info.warm_up);
+    module.Sync();
+    hdplStreamYield(stream);
+    end = GET_TIME();
+    cost = GET_COST(start, end) / 1000.0 / info.warm_up;
+    std::cout << "Device " << did << " Thread " << tid << " Warm Up " << info.warm_up 
+              << " average cost " << cost << " ms." << std::endl;
+
+    // wait until all threads ready
     barrier.barrier();
-    printf("===> thread %d infer start...\n", tid);
+    std::cout << "Device " << did << " Thread " << tid << " infer start..." << std::endl;
+    int count = 0;
+
     while (true) {
-      std::unique_lock<std::mutex> lock(queue_info.mutex);
-      if (queue_info.queue.empty()) {
-        lock.unlock();
+      std::unique_lock<std::mutex> lock_in(qin.mutex);
+      if (qin.queue.empty()) {
+        lock_in.unlock();
         break;
       }
-      auto input_datas = queue_info.queue.front();
-      queue_info.queue.pop();
-      lock.unlock();
-      hdplStream_t stream;
-      auto status = hdplStreamCreate(&stream);
-      thread_info.module->SetStream(stream);
-      for (auto& input_data : input_datas) {
-        // thread_info.module->SetInput(input_data.first, input_data.second);
+      auto task = qin.queue.front();
+      qin.queue.pop();
+      lock_in.unlock();
+
+      start = GET_TIME();
+      if (!info.infer_only) {
+        for (auto& tensor : task.data_in) {
+          module.SetInput(tensor.first, tensor.second);
+        }
       }
-      auto start = GET_TIME();
-      thread_info.module->Run(false, thread_info.loop_num);
-      thread_info.module->Sync();
-      thread_info.sample_cnt++;
-      hdplStreamDestroy(stream);
-#if SAVE_DATA
-      hdplStreamSynchronize(*stream);
-      int tvm_output_count = module.GetOutputNum();
-      for (int idx = 0; idx < tvm_output_count; idx++) {
-        auto output_name = module.GetOutputNameByIndex(idx);
-        tvm::runtime::NDArray output_data = module.GetOutputByName(output_name);
-        // auto output_shape = output_data.Shape();
-        // int data_size = 1;
-        // for (size_t shape_idx = 0; shape_idx < output_shape.size(); shape_idx++) {
-        //   data_size *= output_shape.data()[shape_idx];
-        // }
-        snprintf(fileName, sizeof(fileName), "thread_%d_run_%d_%s_output.bin", tid, i, output_name.c_str());
-        write_file(fileName, (char*)output_data->data, datasize[idx]);
+      auto input_end = GET_TIME();
+      cost = GET_COST(start, input_end);
+      info.input_total_cost += cost;
+      if (info.input_max_cost < cost) info.input_max_cost = cost;
+
+      module.Run(false, info.loop_num);
+      module.Sync();
+      hdplStreamYield(stream);
+      auto infer_end = GET_TIME();
+      cost = GET_COST(input_end, infer_end);
+      info.infer_total_cost += cost;
+      if (info.infer_max_cost < cost) info.infer_max_cost = cost;
+
+      if (!info.infer_only) {
+        for (auto& tensor : task.data_out) {
+          module.GetOutput(tensor.first, tensor.second);
+        }
       }
-#endif
-      auto end = GET_TIME();
-      auto cost = GET_COST(start, end);
-      thread_info.total_cost += cost;
-      if (thread_info.max_cost < cost) thread_info.max_cost = cost;
-      // printf("===> thread %d infer %d times cost %.3fms\n", tid, thread_info.loop_num, cost/1000.0);
+      end = GET_TIME();
+      cost = GET_COST(infer_end, end);
+      info.output_total_cost += cost;
+      if (info.output_max_cost < cost) info.output_max_cost = cost;
+
+      cost = GET_COST(start, end);
+      info.e2e_total_cost += cost;
+      if (info.e2e_max_cost < cost) info.e2e_max_cost = cost;
+
+      if (!info.infer_only) {
+        std::unique_lock<std::mutex> lock_out(qout.mutex);
+        qout.queue.push(task);
+        lock_out.unlock();
+      }
+      count++;
     }
-    printf("===> thread %d completed, %d samples tested.\n", tid, thread_info.sample_cnt);
+    info.sample_cnt = count;
+    std::cout << "Device " << did << " Thread " << tid << " completed. "
+              << info.sample_cnt << " samples tested." << std::endl;
     barrier.barrier();
   };
 
   // create threads
-  for (int i = 0; i < thread_num; i++) {
-    thread_info[i].module = &modules[i];
-    thread_info[i].loop_num = loop_num;
-    thread_info[i].sample_cnt = 0;
-    thread_info[i].max_cost = 0;
-    thread_info[i].total_cost = 0;
-    threads.push_back(std::thread(thread_func, i, std::ref(thread_info[i]), std::ref(queue_info), std::ref(barrier)));
+  std::vector<std::thread> threads;
+  Barrier barrier(thread_num * device_num);
+  ThreadInfo thread_info[thread_num * device_num];
+  for (int did = 0; did < device_num; did++) {
+    std::shared_ptr<tcim::Module::WeightManager> wm(tcim::Module::CreateWeightManager(did));
+    for (int tid = 0; tid < thread_num; tid++) {
+      ThreadInfo* info = &thread_info[did * thread_num + tid];
+      info->model_path = model_path;
+      info->wm = wm;
+      info->loop_num = loop_num;
+      info->infer_only = infer_only;
+      info->warm_up = warm_up;
+      int id = did * thread_num + tid;
+      threads.push_back(std::thread(thread_func, id, did, std::ref(*info), std::ref(qin),
+                                    std::ref(qout), std::ref(barrier)));
+    }
   }
 
   barrier.wait();
   barrier.reset();
   auto start = GET_TIME();
+
 #if MEM_CHECK
   do {
     struct rusage usage;
@@ -433,37 +575,110 @@ int main(int argc, char *argv[]) {
     printf("run %.3fs, rss %ldKB\n", cost / 1000000.0, usage.ru_maxrss);
   } while (!barrier.wait(1000));
 #endif
+
   barrier.wait();
   auto end = GET_TIME();
 
+  // wait all threads done
   for (auto & t: threads) {
     t.join();
   }
 
-  uint32_t max_cost = 0;
-  uint32_t total_latency = 0;
-  for (int i = 0; i < thread_num; i++) {
-    if (thread_info[i].max_cost > max_cost) max_cost = thread_info[i].max_cost;
-    total_latency += thread_info[i].total_cost;
+  // check result
+  if (is_result_check) {
+    bool result = true;
+    while (!qout.queue.empty()) {
+      auto task = qout.queue.front();
+      qout.queue.pop();
+      
+      for (auto& output : task.data_out) {
+        auto data1 = (char*)output.second.Data();
+        auto data2 = (char*)task.ref_out.at(output.first).Data();
+        // int len = output.second.Info().MemSize();
+        int len = 1;
+        for (auto& shape : output.second.Info().Shape()) {
+          len *= shape;
+        }
+        if (memcmp(data1, data2, len)) {
+          int err = 0;
+          for (int i = 0; i < len; i++) {
+            if (data1[i] != data2[i]) {
+              err++;
+            }
+          }
+          std::cout << COLOR_RED << "[error] req: " << task.req_id << ", output: "
+                    << output.first << " result check failed (" << len - err << "/" << len << ")"
+                    << COLOR_RESET << std::endl;
+          std::stringstream ss;
+          ss << arguments.output << '/req_' << task.req_id << '_' << output.first << '.bin';
+          write_file(ss.str().c_str(), data1, len);
+          result = false;
+        }
+        free(data1);
+      }
+    }
+    if (result) {
+      std::cout << COLOR_GREEN << "Result check passed." << COLOR_RESET << std::endl;
+    }
+  } else {
+    std::cout << COLOR_YELLOW << "[warn] Result check skipped." << COLOR_RESET << std::endl;
+  }
+
+  uint32_t infer_max_cost = 0;
+  uint32_t infer_total_cost = 0;
+  uint32_t input_max_cost = 0;
+  uint32_t input_total_cost = 0;
+  uint32_t output_max_cost = 0;
+  uint32_t output_total_cost = 0;
+  uint32_t e2e_max_cost = 0;
+  uint32_t e2e_total_cost = 0;
+  for (int i = 0; i < thread_num * device_num; i++) {
+    if (thread_info[i].infer_max_cost > infer_max_cost) infer_max_cost = thread_info[i].infer_max_cost;
+    infer_total_cost += thread_info[i].infer_total_cost;
+    if (thread_info[i].input_max_cost > input_max_cost) input_max_cost = thread_info[i].input_max_cost;
+    input_total_cost += thread_info[i].input_total_cost;
+    if (thread_info[i].output_max_cost > output_max_cost) output_max_cost = thread_info[i].output_max_cost;
+    output_total_cost += thread_info[i].output_total_cost;
+    if (thread_info[i].e2e_max_cost > e2e_max_cost) e2e_max_cost = thread_info[i].e2e_max_cost;
+    e2e_total_cost += thread_info[i].e2e_total_cost;
   }
 
   int test_num = loop_num * sample_num;
-  float avg_latency = total_latency / test_num / 1000.0;
-  float max_latency = max_cost / loop_num / 1000.0;
+  float infer_avg_latency = infer_total_cost / test_num / 1000.0;
+  float infer_max_latency = infer_max_cost / 1000.0;
+  float input_avg_latency = input_total_cost / test_num / 1000.0;
+  float input_max_latency = input_max_cost / 1000.0;
+  float output_avg_latency = output_total_cost / test_num / 1000.0;
+  float output_max_latency = output_max_cost / 1000.0;
+  float e2e_avg_latency = e2e_total_cost / test_num / 1000.0;
+  float e2e_max_latency = e2e_max_cost / 1000.0;
   float total_cost = GET_COST(start, end) / 1000.0;
   float avg_cost = total_cost / test_num;
   float qps = (1000.0 / (total_cost / test_num)) * batch;
 
-  std::cout << "\x1b[91;20mInference average latency: "
-            << avg_latency << "ms" << "\x1b[0m" << std::endl;
-  std::cout << "\x1b[91;20mInference max latency: "
-            << max_latency << "ms" << "\x1b[0m" << std::endl;
-  std::cout << "\x1b[91;20mInference Throughput total cost: "
-            << total_cost << "ms" << "\x1b[0m" << std::endl;
-  std::cout << "\x1b[91;20mInference Throughput average cost: "
-            << avg_cost << "ms" << "\x1b[0m" << std::endl;
-  std::cout << "\x1b[92;20mInference Throughput(QPS): "
-            << qps << "\x1b[0m" << std::endl;
+  std::cout << COLOR_RED << std::fixed << std::setprecision(3) << "[latency] Inference "
+            << "\tavg: " << infer_avg_latency << " ms,"
+            << "\tmax: " << infer_max_latency << " ms"
+            << COLOR_RESET  << std::endl;
+  std::cout << COLOR_RED << std::fixed << std::setprecision(3) << "[latency] Input "
+            << "\tavg: " << input_avg_latency << " ms,"
+            << "\tmax: " << input_max_latency << " ms"
+            << COLOR_RESET  << std::endl;
+  std::cout << COLOR_RED << std::fixed << std::setprecision(3) << "[latency] Output "
+            << "\tavg: " << output_avg_latency << " ms,"
+            << "\tmax: " << output_max_latency << " ms"
+            << COLOR_RESET  << std::endl;
+  std::cout << COLOR_RED << std::fixed << std::setprecision(3) << "[latency] End2End "
+            << "\tavg: " << e2e_avg_latency << " ms,"
+            << "\tmax: " << e2e_max_latency << " ms"
+            << COLOR_RESET << std::endl;
+  std::cout << COLOR_GREEN << std::fixed << std::setprecision(3) << "[Throughput] total: "
+            << total_cost << " ms, "
+            << "tavg: " << avg_cost << " ms"
+            << COLOR_RESET << std::endl;
+  std::cout << COLOR_GREEN << std::fixed << std::setprecision(3) << "[Throughput] qps: "
+            << qps
+            << COLOR_RESET << std::endl;
 
   if (output_file.size() != 0) {
     std::cout << "Save result to: " << output_file << std::endl;
@@ -471,14 +686,14 @@ int main(int argc, char *argv[]) {
     result_file << "batch: " << batch << std::endl;
     result_file << "thread_num: " << thread_num << std::endl;
     result_file << "shape: [";
-    for (auto it = input_datas[0].begin(); it != input_datas[0].end(); ++it) {
-      result_file << it->second.Info().Shape() << ",";
+    for (auto& input : input_datas) {
+      result_file << input.second.Info().Shape() << ",";
     }
     result_file << "]" << std::endl;
     result_file << "loop_num: " << loop_num << std::endl;
     result_file << "sample_num: " << sample_num << std::endl;
-    result_file << "avg_latency: " << avg_latency << std::endl;
-    result_file << "max_latency: " << max_latency << std::endl;
+    result_file << "avg_latency: " << infer_avg_latency << std::endl;
+    result_file << "max_latency: " << infer_max_latency << std::endl;
     result_file << "qps: " << qps << std::endl;
     result_file.close();
   }
