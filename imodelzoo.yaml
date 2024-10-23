@@ -56,14 +56,14 @@ os_type:
       - tests/qwen2_2blocks/qwen2_decode_2block_2cores_weights_0.so
       - tests/qwen2_2blocks/build.py
     qwen2_2block_gloden:
-      - tests/qwen2_2blocks/input_1.npy
-      - tests/qwen2_2blocks/current_length.npy
-      - tests/qwen2_2blocks/valid_length.npy
-      - tests/qwen2_2blocks/model_layers_0_self_attn_kcache_input.npy
-      - tests/qwen2_2blocks/model_layers_0_self_attn_vcache_input.npy
-      - tests/qwen2_2blocks/model_layers_1_self_attn_kcache_input.npy
-      - tests/qwen2_2blocks/model_layers_1_self_attn_vcache_input.npy
-      - tests/qwen2_2blocks/model_layers_1_resadd2.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/input_1.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/current_length.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/valid_length.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/model_layers_0_self_attn_kcache_input.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/model_layers_0_self_attn_vcache_input.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/model_layers_1_self_attn_kcache_input.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/model_layers_1_self_attn_vcache_input.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/model_layers_1_resadd2.npy
   ubuntu_18.04:
     resnet50:
       - models/backbone/resnet50/resnet50.hmm.so
@@ -116,11 +116,11 @@ os_type:
       - tests/qwen2_2blocks/qwen2_decode_2block_2cores_weights_0.so
       - tests/qwen2_2blocks/build.py
     qwen2_2block_gloden:
-      - tests/qwen2_2blocks/input_1.npy
-      - tests/qwen2_2blocks/current_length.npy
-      - tests/qwen2_2blocks/valid_length.npy
-      - tests/qwen2_2blocks/model_layers_0_self_attn_kcache_input.npy
-      - tests/qwen2_2blocks/model_layers_0_self_attn_vcache_input.npy
-      - tests/qwen2_2blocks/model_layers_1_self_attn_kcache_input.npy
-      - tests/qwen2_2blocks/model_layers_1_self_attn_vcache_input.npy
-      - tests/qwen2_2blocks/model_layers_1_resadd2.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/input_1.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/current_length.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/valid_length.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/model_layers_0_self_attn_kcache_input.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/model_layers_0_self_attn_vcache_input.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/model_layers_1_self_attn_kcache_input.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/model_layers_1_self_attn_vcache_input.npy
+      - tests/qwen2_2blocks/qwen2_decode_2block/model_layers_1_resadd2.npy
