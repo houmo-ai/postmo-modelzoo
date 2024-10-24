@@ -101,7 +101,7 @@ class HmQwen:
             input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(4, self.prefill_length // 4, 4096)
             valid_length_data = np.array([valid_length]).astype("int16")
             current_length_data = np.array([current_length]).astype("int16")
-            self.prefill_part1_model.set_input("input_1", input_data)
+            self.prefill_part1_model.set_input("input_1", input_data.numpy())
             self.prefill_part1_model.set_input("valid_length", valid_length_data)
             self.prefill_part1_model.set_input("current_length", current_length_data)
             self.prefill_part2_model.set_input("valid_length", valid_length_data)
@@ -148,7 +148,7 @@ class HmQwen:
                 logger.info(f"context length greater than {self.decode_length}, break!")
                 break
 
-            self.decode_part1_model.set_input("input_1", input_data)
+            self.decode_part1_model.set_input("input_1", input_data.numpy())
             valid_length_data = np.array([context_length - 1]).astype("int16")
             self.decode_part1_model.set_input("valid_length", valid_length_data)
             self.decode_part2_model.set_input("valid_length", valid_length_data)

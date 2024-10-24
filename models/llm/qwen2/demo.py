@@ -26,15 +26,22 @@ def get_args() -> argparse.Namespace:
         '--prefill',
         dest='prefill_length',
         type=int,
-        default=256,
+        default=128,
         help='prefill max length',
     )
     parser.add_argument(
         '--decode',
         dest='decode_length',
         type=int,
-        default=2048,
+        default=4096,
         help='decode max length',
+    )
+    parser.add_argument(
+        '--nblocks',
+        dest='nblocks',
+        type=int,
+        default=28,
+        help='block number',
     )
     args = parser.parse_args()
     return args
@@ -42,7 +49,7 @@ def get_args() -> argparse.Namespace:
 
 class HmQwen:
 
-    def __init__(self, prefill_length, decode_length, batch=1):
+    def __init__(self, prefill_length, decode_length, batch=1, nblocks=28):
         self.batch = batch
         self.prefill_length = prefill_length
         self.decode_length = decode_length
@@ -62,12 +69,12 @@ class HmQwen:
         self.decode_part2_model.set_stream(self.stream)
         self.decode_head_model.set_stream(self.stream)
         # set kvcache input
-        for i in range(14):
+        for i in range(nblocks//2):
             kcache = self.prefill_part1_model.get_dev_input(f'model_layers_{i}_self_attn_kcache_input')
             self.decode_part1_model.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
             vcache = self.prefill_part1_model.get_dev_input(f'model_layers_{i}_self_attn_vcache_input')
             self.decode_part1_model.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
-        for i in range(14, 28):
+        for i in range(nblocks//2, nblocks):
             kcache = self.prefill_part2_model.get_dev_input(f'model_layers_{i}_self_attn_kcache_input')
             self.decode_part2_model.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
             vcache = self.prefill_part2_model.get_dev_input(f'model_layers_{i}_self_attn_vcache_input')
@@ -76,10 +83,10 @@ class HmQwen:
         current_length_input_1 = np.array([1]).astype("int16")
         self.decode_part1_model.set_input("current_length", current_length_input_1)
         self.decode_part2_model.set_input("current_length", current_length_input_1)
-        decode_part1_output = self.decode_part1_model.get_dev_output("model_layers_13_resadd2")
-        self.decode_part2_model.set_input("model_layers_13_resadd2", decode_part1_output)
-        decode_part2_output = self.decode_part2_model.get_dev_output('model_layers_27_resadd2')
-        self.decode_head_model.set_input("head_gather", decode_part2_output)
+        decode_part1_output = self.decode_part1_model.get_dev_output(f"model_layers_{nblocks//2-1}_resadd2")
+        self.decode_part2_model.set_input(f"model_layers_{nblocks//2-1}_resadd2", decode_part1_output)
+        decode_part2_output = self.decode_part2_model.get_dev_output(f'model_layers_{nblocks-1}_resadd2')
+        self.decode_head_model.set_input(f"model_layers_{nblocks-1}_resadd2", decode_part2_output)
         # current_length_input_0 = np.array([0]).astype('int16')
         # self.decode_head_model.set_input('current_length', current_length_input_0)
 
@@ -87,7 +94,7 @@ class HmQwen:
         embedding_weight = torch.load(EMBEDDING_PATH, map_location="cpu")
         self.embedding_weight = embedding_weight.reshape(-1, 3584)
 
-    def chat(self, question):
+    def chat(self, question, nblocks=28):
         logger.success("question:")
         print("\033[1;95m{}\033[0m".format(question))
         start_time = time.time()
@@ -107,8 +114,8 @@ class HmQwen:
             logger.error(f"Question long than {self.decode_length}, please shorten it!")
             return f"Question long than {self.decode_length}, please shorten it!"
 
-        prefill_part1_output = self.prefill_part1_model.get_dev_output("model_layers_13_resadd2")
-        self.prefill_part2_model.set_input("model_layers_13_resadd2", prefill_part1_output)
+        prefill_part1_output = self.prefill_part1_model.get_dev_output(f"model_layers_{nblocks//2-1}_resadd2")
+        self.prefill_part2_model.set_input(f"model_layers_{nblocks//2-1}_resadd2", prefill_part1_output)
 
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
         for round in range(prefill_loop_round):
@@ -128,7 +135,7 @@ class HmQwen:
             input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(4, self.prefill_length // 4, 3584)
             valid_length_data = np.array([valid_length]).astype("int16")
             current_length_data = np.array([current_length]).astype("int16")
-            self.prefill_part1_model.set_input("input_1", input_data)
+            self.prefill_part1_model.set_input("input_1", input_data.numpy())
             self.prefill_part1_model.set_input("valid_length", valid_length_data)
             self.prefill_part1_model.set_input("current_length", current_length_data)
             self.prefill_part2_model.set_input("valid_length", valid_length_data)
@@ -137,8 +144,8 @@ class HmQwen:
             self.prefill_part2_model.run()
             self.prefill_part2_model.sync()
 
-        prefill_part2_output = self.prefill_part2_model.get_dev_output("model_layers_27_resadd2")
-        self.prefill_head_model.set_input("model_layers_27_resadd2", prefill_part2_output)
+        prefill_part2_output = self.prefill_part2_model.get_dev_output(f"model_layers_{nblocks-1}_resadd2")
+        self.prefill_head_model.set_input(f"model_layers_{nblocks-1}_resadd2", prefill_part2_output)
         seq_length_data = np.array([gather_index]).astype("int16")
         self.prefill_head_model.set_input("current_length", seq_length_data)
         self.prefill_head_model.run()
@@ -166,7 +173,7 @@ class HmQwen:
                 logger.info(f"context length greater than {self.decode_length}, break!")
                 break
 
-            self.decode_part1_model.set_input("input_1", input_data)
+            self.decode_part1_model.set_input("input_1", input_data.numpy())
             valid_length_data = np.array([context_length - 1]).astype("int16")
             self.decode_part1_model.set_input("valid_length", valid_length_data)
             self.decode_part2_model.set_input("valid_length", valid_length_data)
@@ -198,11 +205,11 @@ class HmQwen:
 if __name__ == "__main__":
 
     args = get_args()
-    hmqwen = HmQwen(args.prefill_length, args.decode_length)
+    hmqwen = HmQwen(args.prefill_length, args.decode_length, nblocks=args.nblocks)
     question = "请介绍一下存算一体技术的优势"
 
     start_time = time.time()
-    response, tokens, prefill_time, decode_time = hmqwen.chat(question)
+    response, tokens, prefill_time, decode_time = hmqwen.chat(question, nblocks=args.nblocks)
     total_time = time.time() - start_time
 
     logger.success("total: {} tokens, cost {:.3f} s".format(tokens, total_time))

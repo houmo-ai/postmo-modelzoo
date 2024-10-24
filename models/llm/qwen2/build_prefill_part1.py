@@ -43,7 +43,7 @@ def get_args() -> argparse.Namespace:
         '--stage',
         dest='stage',
         type=str,
-        default="build",
+        default="all",
         help='build stage choise=["build", "test", "all"]',
     )
     args = parser.parse_args()
@@ -57,8 +57,8 @@ def build(args=None):
     core_num = args.core
     stage = args.stage
     model_dir = os.path.join(args.model_dir, "prefill")
-    part_name = "qwen2_prefill_part1"
-    quant_name = "hmquant_qwen2_part1_with_act"
+    part_name = f"{model_name}_prefill_part1"
+    quant_name = f"hmquant_{model_name}_part1_with_act"
     onnx_name = quant_name + ".onnx"
     model_path = os.path.join(model_dir, onnx_name)
     model_dir = os.path.dirname(model_path)
@@ -71,14 +71,15 @@ def build(args=None):
         onnx_model = onnx.load(model_path)
         compile_config = {
             "tcim.gen_intrinsic": 1,
-            "tcim.sync_strategy": 0,
-            'tcim.fuse_strategy': 1,
+            "tcim.sync_strategy": 1,
             "tcim.special_model_name": "vit_small",
             "tcim.batch_num": 1,
             "tcim.codegen_pic": True,
             "tcim.mem_plan_strategy": "linearscan",
+            "tcim.linearscan_long_live": 10,
             "tcim.large_split_maxsize": True,
-            "tcim.split_const" : True,
+            "tcim.split_const": True,
+            # "tcim.spill_as_error": True
         }
         if core_num == 4:
             compile_config["tcim.core_num"] = 4
@@ -88,8 +89,7 @@ def build(args=None):
             compile_config["tcim.core_num"] = 2
             compile_config["tcim.batch_used_core_num"] = 2
             compile_config["tcim.1batch_2core"] = True
-            compile_config["tcim.linearscan_long_live"] = 15
-            compile_config["tcim.spill_as_error"] = True
+            compile_config['tcim.strict_2core_sm_plan'] = True
         else:
             print("[error] not support core =", core_num)
             exit(-1)
@@ -104,16 +104,8 @@ def build(args=None):
                 input_cfg[input.name] = tcim.HMInput(shape=input_shape, layout='NCHW')
         weight_path = os.path.join(model_dir, "../weight.npy")
         data_dict = np.load(weight_path, allow_pickle=True).item()
-        kvcache_path = os.path.join(model_dir, '../kvcache.npy')
-        if os.path.exists(kvcache_path):
-            kvcache_data_dict = np.load(kvcache_path, allow_pickle=True).item()
-            data_dict.update(kvcache_data_dict)
-        constant_path = os.path.join(model_dir, '../constant.npy')
-        if os.path.exists(kvcache_path):
-            constant_data_dict = np.load(constant_path, allow_pickle=True).item()
-            data_dict.update(constant_data_dict)
         tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
-                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen2_group_part1_")
+                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix=f"{model_name}_part1_")
         print(f"<=== {part_name} build success.")
 
     # 2. test model
@@ -157,7 +149,7 @@ def build(args=None):
             output_data = output_data[:1, :current_length, :]
             output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_' + output_name + '_output.npy')
             if os.path.exists(output_data_path):
-                golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
+                golden_output = np.load(output_data_path)
                 golden_output = golden_output[:1, :current_length, :]
                 golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
             else:

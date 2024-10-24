@@ -10,13 +10,13 @@
 
 ## 2 快速开始
 
-目前Qwen2模型仅提供python脚本编译方式。
+目前Qwen2模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译，通过binary_convert转换后使用。
 
 ### 2.1 获取模型和数据
 
 通过get_model脚本下载模型，可通过参数选择下载原始模型或量化模型。
 
-如果需要自己量化，可选择下载原始模型：
+如果需要自己量化，可选择下载原始模型和wikitext2数据集：
 
 ```bash
 python3 get_model.py --type raw
@@ -28,7 +28,7 @@ python3 get_model.py --type raw
 python3 get_model.py --type quant
 ```
 
-### 2.2 量化（暂不支持）
+### 2.2 量化
 
 量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上。参考命令：
 
@@ -36,22 +36,26 @@ python3 get_model.py --type quant
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py38-x86.64 /bin/bash
 ```
 
-进入docker后source环境变量，并进入/hmdd/models/llm/qwen_mix目录，执行ptq.sh脚本。（注：可通过修改脚本中的MODEL_DIR修改模型位置，运行中需要连接网络以下载wikitext2数据集，如无法连接可打开注释下载wikitext2_cache.zip）
+进入docker后source环境变量，并进入`/hmdd/models/llm/qwen2`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为128和4096，可通过ptq.py中的prefill_shape和cache_len参数修改。不同编译模式下支持的上下文长度组合为：
+| cores | batch | prefill | decode |
+| ----- | ----- | ------- | ------ |
+| 4     | 1     | 256     | 2048   |
+| 4     | 1     | 128     | 4096   |
+| 2     | 1     | 64      | 4096   |
+| 4     | 4     | 256     | 2048   |
 
 ```bash
 source env.sh
 cd /hmdd/models/llm/qwen2
-bash ptq.sh
+python3 ptq.py
 ```
 
-编译完成的模型存放在output/$HOUMO_TARGET/result目录：
+量化完成的模型存放在`output/$HOUMO_TARGET/result`目录：
 
 ```bash
 .
 |-- decoder
-|-- decoder_head
 |-- prefill
-|-- prefill_head
 |-- quant_embedding.pt
 `-- weight.npy
 ```
@@ -64,9 +68,21 @@ bash ptq.sh
 python3 build.py
 ```
 
+编译好的模型存放在当前目录，包括6个文件：
+qwen2_prefill_part1.hmm
+qwen2_prefill_part2.hmm
+qwen2_prefill_head.hmm
+qwen2_decode_part1.hmm
+qwen2_decode_part2.hmm
+qwen2_decode_head.hmm
+
 ### 2.3 演示
 
-Qwen模型使用python API进行演示，同时输出性能结果。执行脚本：
+Qwen2模型使用python API进行演示
+
+1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下，也可通过demo中的`EMBEDDING_PATH`变量指定位置
+
+2. 执行脚本，推理完成将输出性能结果。
 
 ```bash
 python3 demo.py
@@ -88,31 +104,32 @@ bash perf.sh
 question:
 请介绍一下存算一体技术的优势
 response:
-存算一体技术是一种将计算和存储功能集成在同一芯片上的技术。这种技术的优势主要体现在以下几个方面：
+存算一体技术是一种将存储和计算功能集成在一起的架构，它在多个方面展现出显著的优势：
 
-1. **性能提升**：存算一体技术能够实现数据的就近处理，减少数据在内存和处理器之间的传输延迟，从而提升计算效率和性能。特别是在处理大规模数据集或高并发场景时，存算一体技术能够显著提升处理速度。
+1. **性能提升**：存算一体架构通过将数据存储和处理操作在同一节点上进行，减少了数据传输的时间，从而显著提升了整体性能。这种架构减少了延迟，使得数据处理更加高效。
 
-2. **功耗降低**：由于减少了数据传输的次数，存算一体技术能够有效降低系统的整体功耗。这对于数据中心和边缘计算设备来说尤为重要，有助于实现更节能的计算环境。
+2. **成本效益**：通过减少硬件组件和网络需求，存算一体技术降低了总体拥有成本（TCO）。它通过整合存储和计算资源，减少了数据中心的占地面积和能源消耗，从而节省了基础设施成本。
 
-3. **成本节约**：通过减少硬件组件的数量，存算一体技术能够降低系统的整体成本。同时，由于性能的提升，可能需要更少的硬件资源来完成相同或更高的计算任务，进一步节省成本。
+3. **灵活性和可扩展性**：这种架构允许在存储和计算之间更自由地分配资源，可以根据应用需求进行动态调整。它支持水平扩展，即通过增加更多的存储或计算节点来增加整体容量和性能，而不需要重新设计整个系统。
 
-4. **简化系统设计**：存算一体技术使得系统设计更为简单，减少了系统架构的复杂性。这对于开发和维护系统来说是一个巨大的优势，能够加速产品的上市时间。
+4. **简化管理**：存算一体技术简化了系统管理，因为管理和维护的组件数量减少了。这降低了管理复杂度，提高了运维效率。
 
-5. **适应性增强**：在某些应用场景中，存算一体技术能够提供更好的数据处理能力，特别是在需要实时处理和高响应速度的场景下，如自动驾驶、实时数据分析等。
+5. **数据安全**：在某些存算一体解决方案中，数据在存储和处理过程中保持在本地，减少了数据在网络传输中的风险，增强了数据保护和隐私。
 
-6. **安全性提升**：通过将数据存储和处理紧密集成，存算一体技术有助于减少数据在传输过程中的暴露，从而提升数据安全性。
+6. **适应性**：存算一体架构能够更好地适应各种工作负载，无论是大数据分析、机器学习、实时处理还是其他计算密集型任务，都能提供高性能和高效率。
 
-存算一体技术的这些优势使得它在云计算、人工智能、物联网等领域具有广泛的应用前景。随着技术的不断进步，存算一体技术有望在更多场景中发挥重要作用。
+7. **能源效率**：通过减少数据移动和优化资源使用，存算一体技术提高了能源效率，有助于实现绿色数据中心的目标。
 
+总之，存算一体技术通过整合存储和计算资源，提供了高性能、低成本、灵活可扩展、易于管理、安全可靠和能源效率高的解决方案，是现代数据中心和云计算环境中的重要技术趋势。
 ```
 
 ### 3.2 性能结果
 
 ```bash
-total: 331 tokens, cost 38.525 s
-prefill time: 332.867 ms, 3.00 tokens/s
-decode average time: 115.720 ms, 8.64 tokens/s
-end2end average time: 116.391 ms, 8.59 tokens/s
+total: 363 tokens, cost 47.154 s
+prefill time: 288.581 ms, 3.47 tokens/s
+decode average time: 129.447 ms, 7.73 tokens/s
+end2end average time: 129.900 ms, 7.70 tokens/s
 ```
 
 ## 4 免责声明
