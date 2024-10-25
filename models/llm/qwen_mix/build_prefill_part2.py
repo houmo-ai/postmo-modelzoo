@@ -70,8 +70,8 @@ def build(args=None):
         onnx_model = onnx.load(model_path)
         compile_config = {
             "tcim.gen_intrinsic": 1,
-            "tcim.sync_strategy": 0,
-            # "tcim.fuse_strategy": 1,
+            "tcim.sync_strategy": 1,
+            "tcim.fuse_strategy": 1,
             "tcim.special_model_name": "vit_small",
             "tcim.batch_num": 1,
             "tcim.codegen_pic": True,
