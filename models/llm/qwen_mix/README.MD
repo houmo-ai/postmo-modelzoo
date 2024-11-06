@@ -51,7 +51,7 @@ cd /hmdd/models/llm/qwen_mix
 bash ptq.sh
 ```
 
-编译完成的模型存放在output/$HOUMO_TARGET/result目录：
+编译完成的模型存放在output/$HOUMO_TARGET/result目录，目录结构如下：
 
 ```bash
 .
@@ -62,6 +62,13 @@ bash ptq.sh
 |-- quant_embedding.pt
 `-- weight.npy
 ```
+
+注：由于量化得到的模型与直接提供的量化后模型有偏差，需要进行如下修改：
+1. 量化得到的模型目录下无weight.npy，需要将prefill/weight.npy拷贝到此目录
+2. 将quant_embedding.pt重命名为qwen15_quant_embedding.pt，或者修改demo.py中的EMBEDDING_PATH的路径
+3. 将demo.py中prefill_head_model和decode_head_model的set_input函数中的"model_layers_31_resadd2"修改为"layers31_resadd2"
+4. 将demo.py中self.decode_head_model.set_input("current_length", current_length_input_0)这句注释掉
+5. 将demo.py中prefill_head_model和decode_head_model的get_output函数中的"lm_head_add_list_0"修改为"output"
 
 ### 2.3 编译
 

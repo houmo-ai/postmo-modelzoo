@@ -41,8 +41,9 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 | ----- | ----- | ------- | ------ |
 | 4     | 1     | 256     | 2048   |
 | 4     | 1     | 128     | 4096   |
+| 2     | 1     | 128     | 2048   |
 | 2     | 1     | 64      | 4096   |
-| 4     | 4     | 256     | 2048   |
+| 4     | 4     | 128     | 2048   |
 
 ```bash
 source env.sh

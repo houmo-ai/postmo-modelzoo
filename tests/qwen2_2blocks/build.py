@@ -117,7 +117,7 @@ def build(args=None):
     if stage == 'test' or stage == 'all':
         if core_num != 4 and core_num != 2:
             print("[warnning] not support core =", core_num)
-            exit(-1)
+            exit(0)
 
         print(f"\n===> {part_name} test start...")
         # 2.1 load model

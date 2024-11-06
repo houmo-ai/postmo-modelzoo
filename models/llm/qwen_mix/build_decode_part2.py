@@ -106,25 +106,26 @@ def build(args=None):
             kvcache_data_dict = np.load(kvcache_path, allow_pickle=True).item()
             data_dict.update(kvcache_data_dict)
         constant_path = os.path.join(model_dir, '../constant.npy')
-        if os.path.exists(kvcache_path):
+        if os.path.exists(constant_path):
             constant_data_dict = np.load(constant_path, allow_pickle=True).item()
             data_dict.update(constant_data_dict)
-        data_dict['_constant48.value_q'] = data_dict['_constant16.value_q']
-        data_dict['_constant49.value_q'] = data_dict['_constant17.value_q']
-        data_dict['_constant50.value_q'] = data_dict['_constant18.value_q']
-        data_dict['_constant51.value_q'] = data_dict['_constant19.value_q']
-        data_dict['_constant52.value_q'] = data_dict['_constant20.value_q']
-        data_dict['_constant53.value_q'] = data_dict['_constant21.value_q']
-        data_dict['_constant54.value_q'] = data_dict['_constant22.value_q']
-        data_dict['_constant55.value_q'] = data_dict['_constant23.value_q']
-        data_dict['_constant56.value_q'] = data_dict['_constant24.value_q']
-        data_dict['_constant57.value_q'] = data_dict['_constant25.value_q']
-        data_dict['_constant58.value_q'] = data_dict['_constant26.value_q']
-        data_dict['_constant59.value_q'] = data_dict['_constant27.value_q']
-        data_dict['_constant60.value_q'] = data_dict['_constant28.value_q']
-        data_dict['_constant61.value_q'] = data_dict['_constant29.value_q']
-        data_dict['_constant62.value_q'] = data_dict['_constant30.value_q']
-        data_dict['_constant63.value_q'] = data_dict['_constant31.value_q']
+        if '_constant16.value_q' in data_dict: # workaround
+            data_dict['_constant48.value_q'] = data_dict['_constant16.value_q']
+            data_dict['_constant49.value_q'] = data_dict['_constant17.value_q']
+            data_dict['_constant50.value_q'] = data_dict['_constant18.value_q']
+            data_dict['_constant51.value_q'] = data_dict['_constant19.value_q']
+            data_dict['_constant52.value_q'] = data_dict['_constant20.value_q']
+            data_dict['_constant53.value_q'] = data_dict['_constant21.value_q']
+            data_dict['_constant54.value_q'] = data_dict['_constant22.value_q']
+            data_dict['_constant55.value_q'] = data_dict['_constant23.value_q']
+            data_dict['_constant56.value_q'] = data_dict['_constant24.value_q']
+            data_dict['_constant57.value_q'] = data_dict['_constant25.value_q']
+            data_dict['_constant58.value_q'] = data_dict['_constant26.value_q']
+            data_dict['_constant59.value_q'] = data_dict['_constant27.value_q']
+            data_dict['_constant60.value_q'] = data_dict['_constant28.value_q']
+            data_dict['_constant61.value_q'] = data_dict['_constant29.value_q']
+            data_dict['_constant62.value_q'] = data_dict['_constant30.value_q']
+            data_dict['_constant63.value_q'] = data_dict['_constant31.value_q']
         tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
                                      inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix="qwen_group_part2_")
         print(f"<=== {part_name} build success.")
