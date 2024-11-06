@@ -109,6 +109,16 @@ os_type:
       - models/autodrive/yolop/output/houmo/result/hmquant_yolop_feat2_output.npy
       - models/autodrive/yolop/output/houmo/result/hmquant_yolop_lane_line_seg_output.npy
       - models/autodrive/yolop/output/houmo/result/hmquant_yolop_drive_area_seg_output.npy
+    qwen_1block:
+      - tests/qwen_1block/qwen_decode_1block_4cores.hmm.so
+      - tests/qwen_1block/qwen_decode_1block_2cores.hmm.so
+      - tests/qwen_1block/qwen_decode_1block_1cores.hmm.so
+      - tests/qwen_1block/build.py
+    qwen_1block_gloden:
+      - tests/qwen_1block/qwen/hmquant_qwen_input_input.npy
+      - tests/qwen_1block/qwen/hmquant_qwen_current_length_input.npy
+      - tests/qwen_1block/qwen/hmquant_qwen_valid_length_input.npy
+      - tests/qwen_1block/qwen/hmquant_qwen_layers0_resadd2_output.npy
     qwen2_2block:
       - tests/qwen2_2blocks/qwen2_decode_2block_4cores.hmm.so
       - tests/qwen2_2blocks/qwen2_decode_2block_4cores_weights_0.so

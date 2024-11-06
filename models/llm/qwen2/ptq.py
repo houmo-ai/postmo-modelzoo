@@ -1,6 +1,6 @@
 import torch, argparse,os
 import hmquant.llm.llm_utils  as utils
-from hmquant.llm.quant_pipeline.qwen_quant_pipline import QwenQuantPipline
+from hmquant.llm.llm_api import QwenQuantPipline
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 DATASETS_PATH = os.getenv('DATASETS_PATH', '')

@@ -64,10 +64,6 @@ def build(args=None):
 
     os.environ['AOT_COMPILE_NO_FORMAT'] = '1'
 
-    if core_num != 4 and core_num != 2:
-        print("[error] not support core =", core_num)
-        exit(-1)
-
     # 1. build model
     if stage == 'build' or stage == 'all':
         print(f"\n===> {part_name} build start...")
@@ -119,6 +115,10 @@ def build(args=None):
 
     # 2. test model, prefill model should run first to make the correct result
     if stage == 'test' or stage == 'all':
+        if core_num != 4 and core_num != 2:
+            print("[warnning] not support core =", core_num)
+            exit(-1)
+
         print(f"\n===> {part_name} test start...")
         # 2.1 load model
         weight_manager = tcim.runtime.create_weight_manager()
@@ -172,7 +172,7 @@ def build(args=None):
                 is_match = (golden_output == output_data).all()
                 print("[compare] golden output [{}] match={}, similarity={:.6f}"
                       .format(output_name, is_match, cosine_dist))
-                if cosine_dist < 0.99:
+                if cosine_dist < 0.999:
                     result_check = False
             else:
                 result_check = False

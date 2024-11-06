@@ -65,7 +65,7 @@ def build(args=None):
 
     # 1. build model
     if stage == 'build' or stage == 'all':
-        print(f"<=== {part_name} build start...")
+        print(f"\n===> {part_name} build start...")
         onnx_model = onnx.load(model_path)
         compile_config = {
             "tcim.gen_intrinsic": 0,
