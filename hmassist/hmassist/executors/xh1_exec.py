@@ -7,7 +7,6 @@ from abc import ABC
 import onnx
 import torch
 import re
-import tcim
 from ..utils import logger
 from ..utils.utils import get_random_data
 from .base_exec import BaseExec
@@ -22,6 +21,7 @@ class XH1Exec(BaseExec, ABC):
         arch = platform.machine()
         if arch != "x86_64":
             logger.error(f"quant not support platform: {arch}")
+            exit(0)
         logger.info("################  ptq quantize started  ######################")
         t_start = time.time()
         calib_files = []
@@ -155,6 +155,7 @@ class XH1Exec(BaseExec, ABC):
 
     def build(self, build_options=None):
         logger.info("################  build started  ######################")
+        import tcim
         t_start = time.time()
         onnx_model = onnx.load(self.quant_model_path)
         if not build_options:
@@ -182,11 +183,11 @@ class XH1Exec(BaseExec, ABC):
             hdplcc_options.append("-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0")
             hdplcc_options.append("-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0/aarch64-linux-gnu")
             tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=build_options,
-                                         target_host="arm64", hdplcc_options=hdplcc_options)
+                                         target_host="arm64", hdplcc_options=hdplcc_options, lite=True)
         else:
             model_name = self.model_name
             tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=build_options,
-                                         hdplcc_options=hdplcc_options)  # output_layout={"layout": "NCHW"}
+                                         hdplcc_options=hdplcc_options, lite=True)  # output_layout={"layout": "NCHW"}
         print(model_name + ' build completed.')
 
         logger.info('{} saved in {}'.format(self.model_name, self.model_dir))
@@ -196,12 +197,14 @@ class XH1Exec(BaseExec, ABC):
         logger.info("build cost {}s".format(self.build_span))
 
     def load(self):
-        self.module = tcim.runtime.load(self.model_name + ".hmm.so")
+        import tcim_lite
+        self.module = tcim_lite.runtime.load(self.model_name + ".hmm")
         self.input_info = self.get_input_info()
         self.output_info = self.get_output_info()
         logger.info("{} model loaded".format(self.model_name))
 
     def infer(self, inputs):
+        import tcim_lite
         """ infer one time """
         for input in self.inputs:
             if isinstance(inputs, dict):
@@ -217,9 +220,9 @@ class XH1Exec(BaseExec, ABC):
         for id in range(0, output_num):
             name = self.module.get_output_name(id)
             if self.is_fixed_out:
-                output_data = self.module.get_output(name, is_quanted=True)
+                output_data = self.module.get_output(name).numpy()
             else:
-                output_data = self.module.get_output(name, is_quanted=False)
+                output_data = self.module.get_output(name).numpy()
             if (len(output_data.shape) == 4):  # toolchain output is NHWC
                 output_data = np.transpose(output_data, (0, 3, 1, 2))
             outputs[name] = output_data
@@ -323,7 +326,7 @@ class XH1Exec(BaseExec, ABC):
         for id in range(0, output_num):
             output_info = {}
             name = self.module.get_output_name(id)
-            output_data = self.module.get_output_info(name, is_quanted=True)
+            output_data = self.module.get_output_info(name)
             output_info["name"] = name
             output_info["shape"] = output_data.shape
             output_info["dtype"] = output_data.dtype

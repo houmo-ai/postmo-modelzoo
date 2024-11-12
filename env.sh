@@ -29,14 +29,14 @@ if [[ -z $TCIM_PATH ]]; then
 fi
 
 # paths for c/c++ compiling
-export TCIM_INC_PATH=$TCIM_PATH/include
-export TCIM_LIB_PATH=$TCIM_PATH/lib
+export TCIM_INC_PATH=$TCIM_LITE/include
+export TCIM_LIB_PATH=$TCIM_LITE/lib
 export HDPL_INC_PATH=$HOUMO_PATH/include
 export HDPL_LIB_PATH=$HOUMO_PATH/lib
 
 # paths for runtime
 export LD_LIBRARY_PATH=$HDPL_LIB_PATH:$TCIM_LIB_PATH:$LD_LIBRARY_PATH
-export PYTHONPATH=$HMASSIST_PATH:$PYTHONPATH
+export PYTHONPATH=$HMASSIST_PATH:$TCIM_LITE/python:$PYTHONPATH
 export PATH=$HOUMO_PATH/bin:$HMASSIST_PATH:$PATH
 
 # data and model path

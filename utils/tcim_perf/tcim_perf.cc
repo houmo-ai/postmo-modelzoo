@@ -62,7 +62,7 @@ struct CliArguments {
 
 typedef struct {
   std::string model_path;
-  std::shared_ptr<tcim::Module::WeightManager> wm;
+  tcim::Module::WeightManager weight_manager;
   int loop_num = 0;
   int sample_cnt = 0;
   int warm_up = 0;
@@ -363,13 +363,12 @@ int main(int argc, char *argv[]) {
   std::cout << "Count of Input: " << input_num << std::endl;
   for (int idx = 0; idx < input_num; idx++) {
     auto input_name = module.GetInputName(idx);
-    tcim::TensorInfo input_info;
-    module.GetInputInfo(input_name, input_info, tcim::CPU);
+    auto input_info = module.GetInputInfo(input_name);
     std::cout << "Input[" << idx << "] name: " << input_name << ", " << input_info << std::endl;
     auto data_file = data_path + "/" + input_name + ".bin";
     void* data_ptr = nullptr;
     int len = 0;
-    bool is_file_read = false;
+    auto tensor = tcim::Tensor::CreateHostTensor(input_info, input_info.MemSize());
     if (std::filesystem::exists(data_file)) {
       if (read_file(data_file.c_str(), (char**)&data_ptr, &len)) {
         std::cout << COLOR_YELLOW << "[warn] Read input data file " << data_file
@@ -377,7 +376,8 @@ int main(int argc, char *argv[]) {
                   << COLOR_RESET << std::endl;
         is_result_check = false;
       } else {
-        is_file_read = true;
+        memcpy(tensor.Data(), data_ptr, tensor.Info().MemSize());
+        free(data_ptr);
       }
     } else {
       std::cout << COLOR_YELLOW << "[warn] Input data file " << data_file
@@ -385,44 +385,34 @@ int main(int argc, char *argv[]) {
                 << COLOR_RESET << std::endl;
       is_result_check = false;
     }
-    if (!is_file_read) {
-      len = input_info.MemSize();
-      data_ptr = malloc(len);
-    }
-    len = input_info.MemSize(); // 暂不支持不同大小生成tensor
-    input_datas.insert(std::pair<std::string, tcim::Tensor>(input_name, tcim::Tensor(input_info, data_ptr, len)));
+    input_datas.insert(std::pair<std::string, tcim::Tensor>(input_name, tensor));
   }
 
   int output_num = module.GetOutputNum();
   std::cout << "Count of Output: " << output_num << std::endl;
   for (int idx = 0; idx < output_num; idx++) {
     auto output_name = module.GetOutputName(idx);
-    tcim::TensorInfo output_info;
-    module.GetOutputInfo(output_name, output_info, tcim::CPU, true);
+    auto output_info = module.GetOutputInfo(output_name);
     std::cout << "Output[" << output_name << "] " << output_info << std::endl;
     auto data_file = data_path + "/" + output_name + ".bin";
     void* data_ptr = nullptr;
     int len = 0;
-    bool is_file_read = false;
+    auto tensor = tcim::Tensor::CreateHostTensor(output_info, output_info.MemSize());
     if (std::filesystem::exists(data_file)) {
       if (read_file(data_file.c_str(), (char**)&data_ptr, &len)) {
         std::cout << COLOR_YELLOW << "[warn] Read output data file " << data_file
                   << " fail. Result check will be skipped." << COLOR_RESET << std::endl;
         is_result_check = false;
       } else {
-        is_file_read = true;
+        memcpy(tensor.Data(), data_ptr, tensor.Info().MemSize());
+        free(data_ptr);
       }
     } else {
       std::cout << COLOR_YELLOW << "[warn] Output data file " << data_file
                 << " not exist. Result check will be skipped." << COLOR_RESET << std::endl;
       is_result_check = false;
     }
-    if (!is_file_read) {
-      len = output_info.MemSize();
-      data_ptr = malloc(len);
-    }
-    len = output_info.MemSize(); // 暂不支持不同大小生成tensor
-    output_golden.insert(std::pair<std::string, tcim::Tensor>(output_name, tcim::Tensor(output_info, data_ptr, len)));
+    output_golden.insert(std::pair<std::string, tcim::Tensor>(output_name, tensor));
   }
 
   for (int i = 0; i < sample_num; i++) {
@@ -433,7 +423,7 @@ int main(int argc, char *argv[]) {
     std::map<std::string, tcim::Tensor> output_datas;
     for (auto& output : output_golden) {
       auto& info = output.second.Info();
-      auto tensor = tcim::Tensor(info, malloc(info.MemSize()), info.MemSize());
+      auto tensor = tcim::Tensor::CreateHostTensor(info, info.MemSize());
       output_datas.insert(std::pair<std::string, tcim::Tensor>(output.first, tensor));
     }
     task.data_out = output_datas;
@@ -452,7 +442,8 @@ int main(int argc, char *argv[]) {
     float cost = 0.0;
     // load model
     start = GET_TIME();
-    auto module = tcim::Module::LoadFromFile(info.model_path, info.wm.get());
+    auto option = tcim::Module::Option(info.weight_manager);
+    auto module = tcim::Module::LoadFromFile(info.model_path, option);
     end = GET_TIME();
     cost = GET_COST(start, end) / 1000.0 / info.warm_up;
     if (!module) {
@@ -464,19 +455,18 @@ int main(int argc, char *argv[]) {
               << " model loaded. Cost " << cost << " ms." << std::endl;
 
     // create a stream and set to the module
-    hdplSetDevice(did);
-    hdplStream_t stream;
-    hdplStreamCreate(&stream);
+    tcim::Stream stream;
     module.SetStream(stream);
 
     // warm up
     start = GET_TIME();
-    module.Run(false, info.warm_up);
+    for (int i = 0; i < info.warm_up; i++) {
+      module.Run(false);
+    }
     module.Sync();
-    hdplStreamYield(stream);
     end = GET_TIME();
     cost = GET_COST(start, end) / 1000.0 / info.warm_up;
-    std::cout << "Device " << did << " Thread " << tid << " Warm Up " << info.warm_up 
+    std::cout << "Device " << did << " Thread " << tid << " Warm Up " << info.warm_up
               << " average cost " << cost << " ms." << std::endl;
 
     // wait until all threads ready
@@ -504,10 +494,10 @@ int main(int argc, char *argv[]) {
       cost = GET_COST(start, input_end);
       info.input_total_cost += cost;
       if (info.input_max_cost < cost) info.input_max_cost = cost;
-
-      module.Run(false, info.loop_num);
+      tcim::Module::RunOption run_option;
+      run_option.Rounds(info.loop_num);
+      module.Run(false, run_option);
       module.Sync();
-      hdplStreamYield(stream);
       auto infer_end = GET_TIME();
       cost = GET_COST(input_end, infer_end);
       info.infer_total_cost += cost;
@@ -545,11 +535,11 @@ int main(int argc, char *argv[]) {
   Barrier barrier(thread_num * device_num);
   ThreadInfo thread_info[thread_num * device_num];
   for (int did = 0; did < device_num; did++) {
-    std::shared_ptr<tcim::Module::WeightManager> wm(tcim::Module::CreateWeightManager(did));
+    auto weight_manager = tcim::Module::WeightManager::CreateWeightManager(did);
     for (int tid = 0; tid < thread_num; tid++) {
       ThreadInfo* info = &thread_info[did * thread_num + tid];
       info->model_path = model_path;
-      info->wm = wm;
+      info->weight_manager = weight_manager;
       info->loop_num = loop_num;
       info->infer_only = infer_only;
       info->warm_up = warm_up;
@@ -614,7 +604,6 @@ int main(int argc, char *argv[]) {
           write_file(ss.str().c_str(), data1, len);
           result = false;
         }
-        free(data1);
       }
     }
     if (result) {
@@ -674,7 +663,7 @@ int main(int argc, char *argv[]) {
             << COLOR_RESET << std::endl;
   std::cout << COLOR_GREEN << std::fixed << std::setprecision(3) << "[Throughput] total: "
             << total_cost << " ms, "
-            << "tavg: " << avg_cost << " ms"
+            << "avg: " << avg_cost << " ms"
             << COLOR_RESET << std::endl;
   std::cout << COLOR_GREEN << std::fixed << std::setprecision(3) << "[Throughput] qps: "
             << qps

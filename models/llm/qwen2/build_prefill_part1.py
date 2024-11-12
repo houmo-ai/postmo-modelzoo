@@ -5,7 +5,6 @@ import os
 import numpy as np
 import onnx
 import argparse
-import tcim
 
 
 def get_args() -> argparse.Namespace:
@@ -67,6 +66,7 @@ def build(args=None):
 
     # 1. build model
     if stage == 'build' or stage == 'all':
+        import tcim
         print(f"\n===> {part_name} build start...")
         onnx_model = onnx.load(model_path)
         compile_config = {
@@ -102,17 +102,18 @@ def build(args=None):
                 input_cfg[input.name] = tcim.HMInput(shape=input_shape)
             else:
                 input_cfg[input.name] = tcim.HMInput(shape=input_shape, layout='NCHW')
-        weight_path = os.path.join(model_dir, "../weight.npy")
+        weight_path = os.path.join(model_dir, '../weight.npy')
         data_dict = np.load(weight_path, allow_pickle=True).item()
         tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
-                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix=f"{model_name}_part1_")
+                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix=f"{model_name}_part1_", lite=True)
         print(f"<=== {part_name} build success.")
 
     # 2. test model
     if stage == 'test' or stage == 'all':
+        import tcim_lite
         print(f"\n===> {part_name} test start...")
         # 2.1 load model
-        module = tcim.runtime.load(part_name + ".hmm")
+        module = tcim_lite.runtime.load(part_name + ".hmm")
         current_length = 0
 
         # 2.2 set input with golden
@@ -140,10 +141,10 @@ def build(args=None):
         output_num = module.get_num_outputs()
         for id in range(output_num):
             output_name = module.get_output_name(id)
-            output_info = module.get_output_info(output_name, is_quanted=True)
+            output_info = module.get_output_info(output_name)
             print("output_info[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape,
                                                                                output_info.dtype, output_info.format.name))
-            output_data = module.get_output(output_name, is_quanted=True)
+            output_data = module.get_output(output_name).numpy()
             print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
             # only compare [1,current_length,4096]
             output_data = output_data[:1, :current_length, :]
@@ -162,7 +163,7 @@ def build(args=None):
                 is_match = (golden_output == output_data).all()
                 print("[compare] golden output [{}] match={}, similarity={:.6f}"
                       .format(output_name, is_match, cosine_dist))
-                if cosine_dist < 0.99:
+                if cosine_dist < 0.999:
                     result_check = False
             else:
                 result_check = False

@@ -9,8 +9,8 @@ from loguru import logger
 import torch.nn.functional as F
 from transformers import AutoTokenizer
 import time
-import tcim
 
+import tcim_lite as tcim
 
 TOKENIZER_PATH = "qwen1.5-7b-chat-hf"
 EMBEDDING_PATH = os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result', 'qwen15_quant_embedding.pth')
@@ -18,12 +18,13 @@ EMBEDDING_PATH = os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result',
 class HmQwen:
 
     def __init__(self):
-        weight_manager = tcim.runtime.create_weight_manager()
-        self.decode_model = tcim.runtime.load("qwen_decode.hmm", weight_manager=weight_manager)
-        self.prefill_model = tcim.runtime.load("qwen_prefill.hmm", weight_manager=weight_manager)
-        self.decode_head_model = tcim.runtime.load("qwen_decode_head.hmm", weight_manager=weight_manager)
-        self.prefill_head_model = tcim.runtime.load("qwen_prefill_head.hmm", weight_manager=weight_manager)
-        self.stream = tcim.runtime.Stream()
+        weight_manager = tcim.runtime.WeightManager(0)
+        option = tcim.runtime.Option(weight_manager)
+        self.decode_model = tcim.runtime.load("qwen_decode.hmm", option = option)
+        self.prefill_model = tcim.runtime.load("qwen_prefill.hmm", option = option)
+        self.decode_head_model = tcim.runtime.load("qwen_decode_head.hmm", option = option)
+        self.prefill_head_model = tcim.runtime.load("qwen_prefill_head.hmm", option = option)
+        self.stream = tcim.runtime.Stream(auto_yield = True)
         self.decode_model.set_stream(self.stream)
         self.prefill_model.set_stream(self.stream)
         self.decode_head_model.set_stream(self.stream)
@@ -69,19 +70,19 @@ class HmQwen:
             input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(4, 64, 4096) # [256, 1, 4096] ==> [4, 64, 4096]
             valid_length_data = np.array([valid_length]).astype("int16")
             current_length_data = np.array([current_length]).astype("int16")
-            self.prefill_model.set_input("input", input_data)
+            self.prefill_model.set_input("input", input_data.numpy())
             self.prefill_model.set_input("valid_length", valid_length_data)
             self.prefill_model.set_input("current_length", current_length_data)
             self.prefill_model.run()
             self.prefill_model.sync()
 
-        prefill_output_addr = self.prefill_model.get_dev_output("layers31_resadd2")
-        self.prefill_head_model.set_input("layers31_resadd2", prefill_output_addr)
+        prefill_output = self.prefill_model.get_output("layers31_resadd2", tcim.runtime.Device.HDPL)
+        self.prefill_head_model.set_input("layers31_resadd2", prefill_output)
         seq_length_data = np.array([gather_index]).astype("int16")
         self.prefill_head_model.set_input("seq_length", seq_length_data)
         self.prefill_head_model.run()
         self.prefill_head_model.sync()
-        input_data = self.prefill_head_model.get_output("lm_head", True)
+        input_data = self.prefill_head_model.get_output("lm_head").numpy()
         next_id = input_data.argmax(-1)
         prefill_response = self.qwen1_5tokenizer.decode(next_id.tolist())
         prefill_time = time.time() - start_time
@@ -91,14 +92,9 @@ class HmQwen:
         all_response = prefill_response
         context_length = input_echo_len
         # set decode input
-        input_data1 = np.array([context_length - 2]).astype("int16")
-        self.decode_model.set_input("valid_length", input_data1)
-        input_data2 = np.array([1]).astype("int16")
-        self.decode_model.set_input("current_length", input_data2)
-        # valid_length_input = self.decode_model.get_dev_input("valid_length")
-        # valid_length_input.set_stream(self.stream)
+        self.decode_model.set_input("current_length", np.array([1]).astype("int16"))
         # set decode_head input
-        decode_output = self.decode_model.get_dev_output("layers31_resadd2")
+        decode_output = self.decode_model.get_output("layers31_resadd2", tcim.runtime.Device.HDPL)
         self.decode_head_model.set_input("layers31_resadd2", decode_output)
         decode_count = 0
         logger.success("response:")
@@ -109,14 +105,13 @@ class HmQwen:
                 logger.info(f"context length greater than", decode_length, "break!")
                 break
 
-            self.decode_model.set_input("input", input_data)
+            self.decode_model.set_input("input", input_data.numpy())
             valid_length_data = np.array([context_length - 1]).astype("int16")
             self.decode_model.set_input("valid_length", valid_length_data)
-            # valid_length_input.add(1)
             self.decode_model.run()
             self.decode_head_model.run()
             self.decode_head_model.sync()
-            input_data = self.decode_head_model.get_output("lm_head", True)
+            input_data = self.decode_head_model.get_output("lm_head").numpy()
             decode_count += 1
 
             next_id = input_data.argmax(-1)
@@ -131,7 +126,6 @@ class HmQwen:
             print(decode_response, end="", flush=True)
 
         decode_time = time.time() - start_time
-        self.stream.yield_()
         print("\033[0m")
 
         return all_response, decode_count + 1, prefill_time, decode_time
@@ -151,5 +145,3 @@ if __name__ == "__main__":
     logger.success("decode average time: {:.3f} ms, {:.2f} tokens/s".format(decode_latency, 1000 / decode_latency))
     res_latency = total_time * 1000 / tokens
     logger.success("end2end average time: {:.3f} ms, {:.2f} tokens/s".format(res_latency, 1000 / res_latency))
-
-    del hmqwen

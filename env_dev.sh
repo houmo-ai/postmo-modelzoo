@@ -27,8 +27,11 @@ if [[ -z $HDPL_TOOLCHAIN_ITVM_INSTALL ]] && [[ -d ${TVM_ROOT} ]]; then
 fi
 
 # paths for c/c++ compiling
-export TCIM_INC_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/include
-export TCIM_LIB_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/lib
+if [[ -z $TCIM_LITE ]]; then
+  export TCIM_LITE=$PWD/../../tcim_runtime_lite/output
+fi
+export TCIM_INC_PATH=$TCIM_LITE/include
+export TCIM_LIB_PATH=$TCIM_LITE/lib
 export IDNNL_INC_PATH=$IDNNL_PATH/include
 export IDNNL_LIB_PATH=$IDNNL_PATH/lib
 export HDPL_INC_PATH=$HDPL_PATH/include
@@ -37,10 +40,11 @@ export CLANG_LIB_PATH=$CLANG_PATH/lib
 
 # paths for runtime
 if [[ -d ${QUANTOOL_PATH} ]]; then
-  export PYTHONPATH=$HMASSIST_PATH:$QUANTOOL_PATH:$PYTHONPATH
+  export PYTHONPATH=$HMASSIST_PATH:$TCIM_LITE/python:$QUANTOOL_PATH:$PYTHONPATH
 else
-  export PYTHONPATH=$HMASSIST_PATH:$PYTHONPATH
+  export PYTHONPATH=$HMASSIST_PATH:$TCIM_LITE/python:$PYTHONPATH
 fi
+export LD_LIBRARY_PATH=$TCIM_LITE/lib:$LD_LIBRARY_PATH
 export PATH=$HMASSIST_PATH:$PATH
 
 # data and model path

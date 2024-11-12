@@ -9,10 +9,11 @@ from loguru import logger
 import torch.nn.functional as F
 from transformers import AutoTokenizer
 import time
-import tcim
 import threading
 import queue
 import argparse
+
+import tcim_lite as tcim
 
 
 TOKENIZER_PATH = "qwen2-7b-instruct-hf"
@@ -53,14 +54,18 @@ class HmQwen:
         self.batch = batch
         self.prefill_length = prefill_length
         self.decode_length = decode_length
-        reuse_inputs = [i for i in range(3, 3+28*batch)]
-        weight_manager = tcim.runtime.create_weight_manager(0)
-        self.prefill_part1_model = tcim.runtime.load("qwen2_prefill_part1.hmm", weight_manager=weight_manager)
-        self.prefill_part2_model = tcim.runtime.load("qwen2_prefill_part2.hmm", weight_manager=weight_manager)
-        self.prefill_head_model = tcim.runtime.load("qwen2_prefill_head.hmm", weight_manager=weight_manager)
-        self.decode_part1_model = tcim.runtime.load("qwen2_decode_part1.hmm", weight_manager=weight_manager, reuse_inputs=reuse_inputs)
-        self.decode_part2_model = tcim.runtime.load("qwen2_decode_part2.hmm", weight_manager=weight_manager, reuse_inputs=reuse_inputs)
-        self.decode_head_model = tcim.runtime.load("qwen2_decode_head.hmm", weight_manager=weight_manager)
+        weight_manager = tcim.runtime.WeightManager(0)
+        option1 = tcim.runtime.Option(weight_manager)
+        option2 = tcim.runtime.Option(weight_manager)
+        dummy_tensor_names = [f'model_layers_{i}_self_attn_kcache_input' for i in range(nblocks)]
+        dummy_tensor_names += [f'model_layers_{i}_self_attn_vcache_input' for i in range(nblocks)]
+        option2.set_dummy_tensors(dummy_tensor_names)
+        self.prefill_part1_model = tcim.runtime.load("qwen2_prefill_part1.hmm", option = option1)
+        self.prefill_part2_model = tcim.runtime.load("qwen2_prefill_part2.hmm", option = option1)
+        self.prefill_head_model = tcim.runtime.load("qwen2_prefill_head.hmm", option = option1)
+        self.decode_part1_model = tcim.runtime.load("qwen2_decode_part1.hmm", option = option2)
+        self.decode_part2_model = tcim.runtime.load("qwen2_decode_part2.hmm", option = option2)
+        self.decode_head_model = tcim.runtime.load("qwen2_decode_head.hmm", option = option1)
         self.stream = tcim.runtime.Stream(0)
         self.prefill_part1_model.set_stream(self.stream)
         self.prefill_part2_model.set_stream(self.stream)
@@ -70,25 +75,23 @@ class HmQwen:
         self.decode_head_model.set_stream(self.stream)
         # set kvcache input
         for i in range(nblocks//2):
-            kcache = self.prefill_part1_model.get_dev_input(f'model_layers_{i}_self_attn_kcache_input')
+            kcache = self.prefill_part1_model.get_input(f'model_layers_{i}_self_attn_kcache_input')
             self.decode_part1_model.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
-            vcache = self.prefill_part1_model.get_dev_input(f'model_layers_{i}_self_attn_vcache_input')
+            vcache = self.prefill_part1_model.get_input(f'model_layers_{i}_self_attn_vcache_input')
             self.decode_part1_model.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
         for i in range(nblocks//2, nblocks):
-            kcache = self.prefill_part2_model.get_dev_input(f'model_layers_{i}_self_attn_kcache_input')
+            kcache = self.prefill_part2_model.get_input(f'model_layers_{i}_self_attn_kcache_input')
             self.decode_part2_model.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
-            vcache = self.prefill_part2_model.get_dev_input(f'model_layers_{i}_self_attn_vcache_input')
+            vcache = self.prefill_part2_model.get_input(f'model_layers_{i}_self_attn_vcache_input')
             self.decode_part2_model.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
         # set decode input
         current_length_input_1 = np.array([1]).astype("int16")
         self.decode_part1_model.set_input("current_length", current_length_input_1)
         self.decode_part2_model.set_input("current_length", current_length_input_1)
-        decode_part1_output = self.decode_part1_model.get_dev_output(f"model_layers_{nblocks//2-1}_resadd2")
+        decode_part1_output = self.decode_part1_model.get_output(f"model_layers_{nblocks//2-1}_resadd2", tcim.runtime.Device.HDPL)
         self.decode_part2_model.set_input(f"model_layers_{nblocks//2-1}_resadd2", decode_part1_output)
-        decode_part2_output = self.decode_part2_model.get_dev_output(f'model_layers_{nblocks-1}_resadd2')
+        decode_part2_output = self.decode_part2_model.get_output(f'model_layers_{nblocks-1}_resadd2', tcim.runtime.Device.HDPL)
         self.decode_head_model.set_input(f"model_layers_{nblocks-1}_resadd2", decode_part2_output)
-        # current_length_input_0 = np.array([0]).astype('int16')
-        # self.decode_head_model.set_input('current_length', current_length_input_0)
 
         self.tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH, trust_remote_code=True)
         embedding_weight = torch.load(EMBEDDING_PATH, map_location="cpu")
@@ -114,7 +117,7 @@ class HmQwen:
             logger.error(f"Question long than {self.decode_length}, please shorten it!")
             return f"Question long than {self.decode_length}, please shorten it!"
 
-        prefill_part1_output = self.prefill_part1_model.get_dev_output(f"model_layers_{nblocks//2-1}_resadd2")
+        prefill_part1_output = self.prefill_part1_model.get_output(f"model_layers_{nblocks//2-1}_resadd2", tcim.runtime.Device.HDPL)
         self.prefill_part2_model.set_input(f"model_layers_{nblocks//2-1}_resadd2", prefill_part1_output)
 
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
@@ -144,13 +147,13 @@ class HmQwen:
             self.prefill_part2_model.run()
             self.prefill_part2_model.sync()
 
-        prefill_part2_output = self.prefill_part2_model.get_dev_output(f"model_layers_{nblocks-1}_resadd2")
+        prefill_part2_output = self.prefill_part2_model.get_output(f"model_layers_{nblocks-1}_resadd2", tcim.runtime.Device.HDPL)
         self.prefill_head_model.set_input(f"model_layers_{nblocks-1}_resadd2", prefill_part2_output)
         seq_length_data = np.array([gather_index]).astype("int16")
         self.prefill_head_model.set_input("current_length", seq_length_data)
         self.prefill_head_model.run()
         self.prefill_head_model.sync()
-        input_data = self.prefill_head_model.get_output("lm_head_add_list_0", True)
+        input_data = self.prefill_head_model.get_output("lm_head_add_list_0").numpy()
         next_id = input_data.argmax(-1)
         prefill_response = self.tokenizer.decode(next_id.tolist())
         prefill_time = time.time() - start_time
@@ -159,10 +162,6 @@ class HmQwen:
         input_data = F.embedding(next_id.unsqueeze(0), self.embedding_weight).reshape(1, 1, -1)
         all_response = prefill_response
         context_length = input_echo_len
-        # set decode input
-        context_length_input = np.array([context_length - 2]).astype("int16")
-        self.decode_part1_model.set_input("valid_length", context_length_input)
-        self.decode_part2_model.set_input("valid_length", context_length_input)
         
         decode_count = 0
         logger.success("response:")
@@ -181,7 +180,7 @@ class HmQwen:
             self.decode_part2_model.run()
             self.decode_head_model.run()
             self.decode_head_model.sync()
-            input_data = self.decode_head_model.get_output("lm_head_add_list_0", True)
+            input_data = self.decode_head_model.get_output("lm_head_add_list_0").numpy()
             decode_count += 1
 
             next_id = input_data.argmax(-1)
@@ -218,5 +217,3 @@ if __name__ == "__main__":
     logger.success("decode average time: {:.3f} ms, {:.2f} tokens/s".format(decode_latency, 1000 / decode_latency))
     res_latency = total_time * 1000 / tokens
     logger.success("end2end average time: {:.3f} ms, {:.2f} tokens/s".format(res_latency, 1000 / res_latency))
-
-    del hmqwen

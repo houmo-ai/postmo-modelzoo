@@ -123,7 +123,7 @@ def build(cfg):
         logger.info("[infer] cost {:.3f}ms".format(cost * 1000))
         # 临时添加NCHW
         # output_data = np.transpose(output_data, (0, 2, 3, 1))
-    logger.info("tcim inputs saved in {}".format(model.executor.build_save_dir))
+    logger.info("inputs saved in {}".format(model.executor.build_save_dir))
     sum_cos = 0.0
     result_check = True
     for output_name, output_data in outputs.items():
@@ -140,7 +140,7 @@ def build(cfg):
                     .format(model.target, output_name, is_match, cosine_dist))
         if cosine_dist < 0.99:
             result_check = False
-    logger.info("tcim outputs saved in {}".format(model.executor.build_save_dir))
+    logger.info("outputs saved in {}".format(model.executor.build_save_dir))
     logger.info("[compare] {} vs quant output average similarity={:.6f}".format(model.target, sum_cos/len(outputs)))
     if not result_check:
         print("[error] result check failed.")

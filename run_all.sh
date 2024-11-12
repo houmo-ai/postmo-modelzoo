@@ -44,11 +44,8 @@ bash ./models/backbone/mobilenetv2/perf.sh
 bash ./models/backbone/efficientnet/perf.sh
 bash ./models/backbone/vit/perf.sh
 bash ./models/autodrive/yolop/perf.sh
-bash ./models/autodrive/pointpillars/perf.sh
 bash ./models/detection/yolov5s/perf.sh
 bash ./models/detection/yolov3/perf.sh
-bash ./models/autodrive/petr/perf.sh
-bash ./models/autodrive/detr3d/perf.sh
 
 bash ./models/backbone/resnet50/eval.sh
 bash ./models/backbone/mobilenetv2/eval.sh

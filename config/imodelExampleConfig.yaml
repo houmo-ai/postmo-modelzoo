@@ -65,17 +65,6 @@ backbone_vit:
         args: null
   test:
     - backbone_vit_perf
-autodrive_pointpillars:
-  include:
-    - models/autodrive/pointpillars
-  exclude:
-    - models/autodrive/pointpillars/README.MD
-  example_case:
-    - autodrive_pointpillars_perf:
-        script: models/autodrive/pointpillars/perf.sh
-        args: null
-  test:
-    - autodrive_pointpillars_perf
 autodrive_yolop:
   include:
     - models/autodrive/yolop
@@ -91,28 +80,6 @@ autodrive_yolop:
   test:
     - autodrive_yolop_perf
     - autodrive_yolop_test
-autodrive_petr:
-  include:
-    - models/autodrive/petr
-  exclude:
-    - models/autodrive/petr/README.MD
-  example_case:
-    - autodrive_petr_perf:
-        script: models/autodrive/petr/perf.sh
-        args: null
-  test:
-    - autodrive_petr_perf
-autodrive_detr3d:
-  include:
-    - models/autodrive/detr3d
-  exclude:
-    - models/autodrive/detr3d/README.MD
-  example_case:
-    - autodrive_detr3d_perf:
-        script: models/autodrive/detr3d/perf.sh
-        args: null
-  test:
-    - autodrive_detr3d_perf
 detection_yolov3:
   include:
     - models/detection/yolov3

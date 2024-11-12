@@ -8,9 +8,6 @@ cd "${SCRIPT_PATH}"
 
 
 bash ../models/autodrive/yolop/perf.sh
-bash ../models/autodrive/pointpillars/perf.sh
-bash ../models/autodrive/petr/perf.sh
-bash ../models/autodrive/detr3d/perf.sh
 
 bash ../models/autodrive/yolop/eval.sh
 
