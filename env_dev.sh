@@ -73,6 +73,7 @@ echo "[Please check the following path. Unset the environment variable if you wa
 echo "HOUMO_TARGET is $HOUMO_TARGET"
 echo "HOUMO_PATH is $HOUMO_PATH"
 echo "TCIM_PATH is $TCIM_PATH"
+echo "TCIM_LITE is $TCIM_LITE"
 echo "QUANTOOL_PATH is $QUANTOOL_PATH"
 echo "MODELZOO_PATH is $MODELZOO_PATH"
 echo "DATASETS_PATH is $DATASETS_PATH"

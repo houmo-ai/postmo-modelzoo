@@ -7,8 +7,8 @@ SCRIPT_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")"; pwd)
 cd "${SCRIPT_PATH}"
 
 # set modelzoo env
-export TCIM_INC_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/include
-export TCIM_LIB_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/lib
+# export TCIM_INC_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/include
+# export TCIM_LIB_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/lib
 export HDPL_INC_PATH=$HDPL_PATH/include
 export HDPL_LIB_PATH=$HDPL_PATH/lib
 export IDNNL_INC_PATH=$IDNNL_PATH/include

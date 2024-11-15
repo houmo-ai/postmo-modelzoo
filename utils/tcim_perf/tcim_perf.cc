@@ -369,7 +369,7 @@ int main(int argc, char *argv[]) {
     void* data_ptr = nullptr;
     int len = 0;
     auto tensor = tcim::Tensor::CreateHostTensor(input_info, input_info.MemSize());
-    if (std::filesystem::exists(data_file)) {
+    if (fs::exists(data_file)) {
       if (read_file(data_file.c_str(), (char**)&data_ptr, &len)) {
         std::cout << COLOR_YELLOW << "[warn] Read input data file " << data_file
                   << " fail. Use random data and result check will be skipped."
@@ -398,7 +398,7 @@ int main(int argc, char *argv[]) {
     void* data_ptr = nullptr;
     int len = 0;
     auto tensor = tcim::Tensor::CreateHostTensor(output_info, output_info.MemSize());
-    if (std::filesystem::exists(data_file)) {
+    if (fs::exists(data_file)) {
       if (read_file(data_file.c_str(), (char**)&data_ptr, &len)) {
         std::cout << COLOR_YELLOW << "[warn] Read output data file " << data_file
                   << " fail. Result check will be skipped." << COLOR_RESET << std::endl;
