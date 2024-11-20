@@ -46,6 +46,4 @@ if __name__ == '__main__':
             output_names=['340', '378', '416'], check_model=True)
 
     if model_type == "quant" or model_type == "all":
-        file_path = get_file_from_jfrog(quant_path, model_dir)
-        os.system('mkdir -p ' + quant_model_dir)
-        os.system('unzip -o -d ' + quant_model_dir + ' ' + file_path)
+        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)

@@ -145,6 +145,10 @@ def runWithDiff(allArgs):
     for testUnit in allTestUnits:
         unitDict = getUnitDict(testUnit,yamlData)
         allUnitDict.update(unitDict)
+    os.system("pip3 install -r requirements.txt")
+    print("test modules:", allTestModules)
+    print("test units:", allTestUnits)
+    print("test cases:", allUnitDict)
     runCase(allUnitDict)
 
 def main(allArgs=None):

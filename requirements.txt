@@ -15,3 +15,5 @@ onnx_graphsurgeon
 transformers
 jinja2
 loguru
+modelscope
+gitpython

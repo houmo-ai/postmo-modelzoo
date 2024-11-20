@@ -7,20 +7,7 @@ SCRIPT_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")"; pwd)
 cd "${SCRIPT_PATH}"
 
 # set modelzoo env
-# export TCIM_INC_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/include
-# export TCIM_LIB_PATH=$HDPL_TOOLCHAIN_ITVM_INSTALL/lib
-export HDPL_INC_PATH=$HDPL_PATH/include
-export HDPL_LIB_PATH=$HDPL_PATH/lib
-export IDNNL_INC_PATH=$IDNNL_PATH/include
-export IDNNL_LIB_PATH=$IDNNL_PATH/lib
-
-echo "HDPL_TOOLCHAIN_ITVM_INSTALL is $HDPL_TOOLCHAIN_ITVM_INSTALL"
-echo "HDPL_PATH is $HDPL_PATH"
-
-export CMAKE_CONFIG_PATH=$SCRIPT_PATH/develop.cmake
-
-export DATASETS_PATH=$SCRIPT_PATH/data/datasets
-export MODEL_PATH=$SCRIPT_PATH/data/models
+source env_dev.sh
 
 # For bash 4.4+, must not be in posix mode, may use temporary files
 # perf_scripts=()

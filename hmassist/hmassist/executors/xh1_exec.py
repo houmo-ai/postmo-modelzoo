@@ -222,7 +222,7 @@ class XH1Exec(BaseExec, ABC):
             if self.is_fixed_out:
                 output_data = self.module.get_output(name).numpy()
             else:
-                output_data = self.module.get_output(name).numpy()
+                output_data = self.module.get_output(name).dequant().numpy()
             if (len(output_data.shape) == 4):  # toolchain output is NHWC
                 output_data = np.transpose(output_data, (0, 3, 1, 2))
             outputs[name] = output_data

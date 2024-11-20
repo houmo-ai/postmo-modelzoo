@@ -103,18 +103,18 @@ if __name__ == '__main__':
         head_input_names = [f'model_layers_{nblocks-1}_resadd2', 'current_length']
         head_output_names = ['lm_head_add_list_0']
         if args.batch == 1:
-            for i in range(nblocks):
+            for i in range(nblocks//2):
                 part1_input_names.append(f'model_layers_{i}_self_attn_kcache_input')
                 part1_input_names.append(f'model_layers_{i}_self_attn_vcache_input')
-                part2_input_names.append(f'model_layers_{i}_self_attn_kcache_input')
-                part2_input_names.append(f'model_layers_{i}_self_attn_vcache_input')
+                part2_input_names.append(f'model_layers_{i+nblocks//2}_self_attn_kcache_input')
+                part2_input_names.append(f'model_layers_{i+nblocks//2}_self_attn_vcache_input')
         elif args.batch == 4:
-            for i in range(nblocks):
+            for i in range(nblocks//2):
                 for j in range(args.batch):
                     part1_input_names.append(f'model_layers_{i}_self_attn_kcache_input_batch{j}')
                     part1_input_names.append(f'model_layers_{i}_self_attn_vcache_input_batch{j}')
-                    part2_input_names.append(f'model_layers_{i}_self_attn_kcache_input_batch{j}')
-                    part2_input_names.append(f'model_layers_{i}_self_attn_vcache_input_batch{j}')
+                    part2_input_names.append(f'model_layers_{i+nblocks//2}_self_attn_kcache_input_batch{j}')
+                    part2_input_names.append(f'model_layers_{i+nblocks//2}_self_attn_vcache_input_batch{j}')
         else:
             print(f"[error] batch = {args.batch} not supported.")
             exit(-1)

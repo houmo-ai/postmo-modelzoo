@@ -43,6 +43,4 @@ if __name__ == '__main__':
         get_file_from_jfrog(raw_path, model_dir)
 
     if model_type == "quant" or model_type == "all":
-        file_path = get_file_from_jfrog(quant_path, model_dir)
-        os.system('mkdir -p ' + quant_model_dir)
-        os.system('unzip -o -d ' + quant_model_dir + ' ' + file_path)
+        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)

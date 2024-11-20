@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-pip3 install onnx_graphsurgeon -i https://pypi.ngc.nvidia.com
-pip3 install ultralytics pycocotools
+pip3 install -r requirements.txt
 
 __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 MODELZOO_PATH=${__dir}
 export MODELZOO_PATH
 HMASSIST_PATH=$MODELZOO_PATH/hmassist
 export HMASSIST_PATH
+export CMAKE_CONFIG_PATH=$MODELZOO_PATH/develop.cmake
 
 if [[ -z $HOUMO_TARGET ]]; then
   export HOUMO_TARGET=houmo
 fi
-export CMAKE_CONFIG_PATH=$MODELZOO_PATH/develop.cmake
+
 if [[ -z $MODELZOO_URL ]]; then
   export MODELZOO_URL=http://10.10.1.53:8082/artifactory/toolchain/release
 fi

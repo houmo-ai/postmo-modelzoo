@@ -368,7 +368,7 @@ int main(int argc, char *argv[]) {
     auto data_file = data_path + "/" + input_name + ".bin";
     void* data_ptr = nullptr;
     int len = 0;
-    auto tensor = tcim::Tensor::CreateHostTensor(input_info, input_info.MemSize());
+    auto tensor = tcim::Tensor::CreateHostTensor(input_info);
     if (fs::exists(data_file)) {
       if (read_file(data_file.c_str(), (char**)&data_ptr, &len)) {
         std::cout << COLOR_YELLOW << "[warn] Read input data file " << data_file
@@ -397,7 +397,7 @@ int main(int argc, char *argv[]) {
     auto data_file = data_path + "/" + output_name + ".bin";
     void* data_ptr = nullptr;
     int len = 0;
-    auto tensor = tcim::Tensor::CreateHostTensor(output_info, output_info.MemSize());
+    auto tensor = tcim::Tensor::CreateHostTensor(output_info);
     if (fs::exists(data_file)) {
       if (read_file(data_file.c_str(), (char**)&data_ptr, &len)) {
         std::cout << COLOR_YELLOW << "[warn] Read output data file " << data_file
@@ -423,7 +423,7 @@ int main(int argc, char *argv[]) {
     std::map<std::string, tcim::Tensor> output_datas;
     for (auto& output : output_golden) {
       auto& info = output.second.Info();
-      auto tensor = tcim::Tensor::CreateHostTensor(info, info.MemSize());
+      auto tensor = tcim::Tensor::CreateHostTensor(info);
       output_datas.insert(std::pair<std::string, tcim::Tensor>(output.first, tensor));
     }
     task.data_out = output_datas;

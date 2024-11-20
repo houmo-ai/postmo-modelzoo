@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
+pip3 install -r requirements.txt
 
 MODELZOO_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")" || exit ; pwd)
 export MODELZOO_PATH
 HMASSIST_PATH=$MODELZOO_PATH/hmassist
 export HMASSIST_PATH
+export CMAKE_CONFIG_PATH=$MODELZOO_PATH/release.cmake
 
 if [[ -z $HOUMO_TARGET ]]; then
   export HOUMO_TARGET=houmo
 fi
-export CMAKE_CONFIG_PATH=$MODELZOO_PATH/release.cmake
+
 if [[ -z $MODELZOO_URL ]]; then
   export MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo/release
 fi
@@ -28,6 +30,11 @@ if [[ -z $TCIM_PATH ]]; then
   export TCIM_PATH
 fi
 
+if [[ -z $TCIM_LITE ]]; then
+  TCIM_LITE=$HOUMO_PATH
+  export TCIM_PATH
+fi
+
 # paths for c/c++ compiling
 export TCIM_INC_PATH=$TCIM_LITE/include
 export TCIM_LIB_PATH=$TCIM_LITE/lib
@@ -35,7 +42,7 @@ export HDPL_INC_PATH=$HOUMO_PATH/include
 export HDPL_LIB_PATH=$HOUMO_PATH/lib
 
 # paths for runtime
-export LD_LIBRARY_PATH=$HDPL_LIB_PATH:$TCIM_LIB_PATH:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$TCIM_LITE/lib:$TCIM_PATH/lib:$LD_LIBRARY_PATH
 export PYTHONPATH=$HMASSIST_PATH:$TCIM_LITE/python:$PYTHONPATH
 export PATH=$HOUMO_PATH/bin:$HMASSIST_PATH:$PATH
 
@@ -43,6 +50,7 @@ export PATH=$HOUMO_PATH/bin:$HMASSIST_PATH:$PATH
 if [[ -z $DATASETS_PATH ]]; then
   export DATASETS_PATH=$MODELZOO_PATH/data/datasets
 fi
+
 if [[ -z $MODEL_PATH ]]; then
   export MODEL_PATH=$MODELZOO_PATH/models
 fi
