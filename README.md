@@ -55,7 +55,6 @@ houmo-modelzoo提供的模型示例如下，编译示例每个都提供，其他
 | [yolov5s](models/detection/yolov5s)          | detection | yes | yes   | yes | x   | yes    | x       | yes  |
 | [yolov3](models/detection/yolov3)            | detection | yes | yes   | yes | x   | yes    | x       | yes  |
 | [yolop](models/autodrive/yolop)              | autodrive | yes | yes   | yes | yes | yes    | x       | x    |
-| [qwen](models/llm/qwen)                      | llm       | x   | yes   | x   | x   | yes    | x       | x    |
 | [qwen2](models/llm/qwen2)                    | llm       | yes | yes   | yes | x   | yes    | x       | x    |
 
 ## C++评估工具列表

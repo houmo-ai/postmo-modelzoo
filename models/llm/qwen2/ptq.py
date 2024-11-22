@@ -4,6 +4,7 @@ from hmquant.llm.llm_api import QwenQuantPipline
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 DATASETS_PATH = os.getenv('DATASETS_PATH', '')
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', '')
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -23,7 +24,7 @@ def parse_args():
     parser.add_argument("--n_calib", type=int, default=16)
     # 2. export
     parser.add_argument("--model_name", type=str, default="qwen2")
-    parser.add_argument("--save_path",type=str,default="output/houmo/result")
+    parser.add_argument("--save_path",type=str,default=f"output/{HOUMO_TARGET}/result")
     parser.add_argument("--prefill_shape", type=int, nargs='+', default=[4, 32], help="List of integers for prefill shape")
     parser.add_argument("--cache_len", type=int, default=4096)
     parser.add_argument("--multi_batch",action="store_true",default=False,help="weather use multi batch for export")
@@ -34,7 +35,7 @@ def parse_args():
     """  args below are for debug, please not used """
     parser.add_argument("--blocks", default=28, type=int)
     parser.add_argument("--decoder_shape", type=int, nargs='+', default=[1, 1], help="List of integers for decoder shape")
-    parser.add_argument("--gptq",type=str2bool,default=True,help="weather use gptq to quant weight") # boost precision
+    parser.add_argument("--gptq",type=str2bool,default=False,help="weather use gptq to quant weight") # boost precision
     parser.add_argument("--cache_2_input",type=str2bool,default=True)
     parser.add_argument("--rotate_ov",type=str2bool,default=True,help="weather rotate o_proj and v_proj")
     parser.add_argument("--rotate_pre_rope",type=str2bool,default=False,help="weather rotate acts before rope")
@@ -60,4 +61,14 @@ if __name__ == "__main__":
         utils.eval_ppl(qmodel, tokenizer, disk_file=args.wikitext_local)
         ques_res = qmodel.stream_chat(tokenizer,"hello")
     # 2. export model
-    quant_pipline.export_llm(qmodel, tokenizer, args, save_path=args.save_path,model_name=args.model_name)
+    quant_pipline.export_llm(qmodel, tokenizer, args)
+
+    # 3. chat
+    if not args.cache_2_input:
+        while True:
+            prompt = input("\n你的问题：")
+            prompt = prompt.replace("\\n", "\n")
+            quant_pipline.chat(prompt,args)
+
+    # 4. generate golden
+    quant_pipline.generate_golden(args, save_path=args.save_path, model_name=args.model_name)
