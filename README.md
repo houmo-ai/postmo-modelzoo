@@ -55,13 +55,8 @@ houmo-modelzoo提供的模型示例如下，编译示例每个都提供，其他
 | [yolov5s](models/detection/yolov5s)          | detection | yes | yes   | yes | x   | yes    | x       | yes  |
 | [yolov3](models/detection/yolov3)            | detection | yes | yes   | yes | x   | yes    | x       | yes  |
 | [yolop](models/autodrive/yolop)              | autodrive | yes | yes   | yes | yes | yes    | x       | x    |
-| [pointpillars](models/autodrive/pointpillars)| autodrive | x   | yes   | x   | x   | x      | yes     | x    |
-| [petr](models/autodrive/petr)                | autodrive | x   | yes   | x   | x   | yes    | x       | x    |
-| [detr3d](models/autodrive/petr)              | autodrive | x   | yes   | x   | x   | yes    | x       | x    |
 | [qwen](models/llm/qwen)                      | llm       | x   | yes   | x   | x   | yes    | x       | x    |
-| [qwen_mix](models/llm/qwen_mix)              | llm       | x   | yes   | x   | x   | yes    | x       | x    |
-| [qwen_mix_multibatches](models/llm/qwen_mix_multibatches) | llm | x | yes | x | x  | yes    | x       | x    |
-| [qwen2](models/llm/qwen2)                    | llm       | x   | yes   | x   | x   | yes    | x       | x    |
+| [qwen2](models/llm/qwen2)                    | llm       | yes | yes   | yes | x   | yes    | x       | x    |
 
 ## C++评估工具列表
 
@@ -111,16 +106,30 @@ cd models/backbone/resnet50
 2. 如果需要自己量化，需要下载原始模型，对于有些存在不支持算子的模型，可能需要修改或者裁剪
 3. 如果仅评估模型精度和性能，可以直接下载提供的量化模型
 
-可以通过get_model.py脚本获取准备好的模型并进行修改，如果下载地址无法访问，请与我们联系。
+通过get_model脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。模型提供的模型类型请查看`模型示例列表`章节，如果下载地址无法访问，请与我们联系。
 
-```bash
-python3 get_model.py
-```
-
-可以通过type参数控制下载模型的类型，raw为原始模型，quant为量化模型，all为全部下载，默认为all。下载的模型默认放在MODEL_PATH环境变量定义的目录，量化模型将解压到output/houmo/result目录（注：重新量化后会覆盖该量化模型，可重新执行获取脚本恢复）。如：
+如果需要自己量化，可选择下载原始模型，下载后的模型存放在当前目录：
 
 ```bash
 python3 get_model.py --type raw
+```
+
+如果仅编译芯片模型，可选择下载量化模型，下载后的模型存放在`output/$HOUMO_TARGET/result`目录（注意相同模型会覆盖，请自行保存）：
+
+```bash
+python3 get_model.py --type quant
+```
+
+如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
+
+```bash
+python3 get_model.py --type hmm
+```
+
+也可以直接下载以上所有模型和数据集（注意相同模型会覆盖，请自行保存）：
+
+```bash
+python3 get_model.py
 ```
 
 ### 一键模型评估

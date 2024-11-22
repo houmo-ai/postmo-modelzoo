@@ -8,6 +8,8 @@ hir_log/
 reports/
 customized/
 tmp_*/
+model/
+datasets/
 
 # media files
 *.jpg
@@ -61,12 +63,16 @@ tmp_*/
 *.exe
 *.out
 *.app
+*.whl
+*.run
+*.deb
 
 # Model files
 *.onnx
 *.pt
 *.pth
 *.hmm
+*.safetensors*
 
 # vim temporary files
 *.swp

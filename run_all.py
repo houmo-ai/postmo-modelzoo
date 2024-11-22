@@ -129,8 +129,6 @@ def runCase(allUnitDict):
 
 
 def runWithDiff(allArgs):
-    os.environ["DATASETS_PATH"] = os.path.join(os.environ["MODELZOO_PATH"], "data/datasets")
-    print("DATASETS_PATH={}".format(os.environ["DATASETS_PATH"]))
     allTestModules = set()
     allTestUnits = set()
     allUnitDict = {}
@@ -154,9 +152,7 @@ def runWithDiff(allArgs):
 def main(allArgs=None):
     if allArgs == None:
         allArgs = parseArgs()
-    if allArgs.type == "all":
-        runAll()
-    elif allArgs.type == "diff_file":
+    if allArgs.type == "diff_file":
         runWithDiff(allArgs)
     else:
         raise Exception("script type is not recognition, begin exit")

@@ -172,3 +172,32 @@ hmassist:
     - backbone_resnet50_eval
     - detection_yolov5s_perf
     - detection_yolov5s_eval
+all:
+  include:
+    - run_all.py
+  exclude: null
+  example_case: null
+  test:
+    - backbone_resnet50_perf
+    - backbone_resnet50_eval
+    - backbone_resnet50_test
+    - backbone_efficientnet_eval
+    - backbone_efficientnet_perf
+    - backbone_efficientnet_test
+    - backbone_mobilenetv2_eval
+    - backbone_mobilenetv2_perf
+    - backbone_mobilenetv2_test
+    - backbone_vit_perf
+    - autodrive_yolop_perf
+    - autodrive_yolop_test
+    - detection_yolov3_eval
+    - detection_yolov3_perf
+    - detection_yolov3_test
+    - detection_yolov5s_perf
+    - detection_yolov5s_eval
+    - detection_yolov5s_test
+    - qwen_1block_4core_test
+    - qwen_1block_2core_test
+    - qwen_1block_1core_test
+    - qwen2_2blocks_4core_test
+    - qwen2_2blocks_2core_test

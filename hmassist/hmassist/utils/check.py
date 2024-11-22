@@ -46,16 +46,16 @@ def check_config(cfg, phase="build"):
         return False
 
     if "calib_dir" not in cfg["quant"]:
-        logger.error("The key(calib_dir) must be in cfg[build][quant]")
+        logger.error("The key(calib_dir) must be in cfg[quant]")
         return False
     check_datapath(cfg["quant"], "calib_dir")
 
     if "calib_num" not in cfg["quant"]:
-        logger.error("The key(calib_num) must be in cfg[build][quant]")
+        logger.error("The key(calib_num) must be in cfg[quant]")
         return False
 
     if "debug_level" not in cfg["quant"]:
-        logger.error("The key(debug_level) must be in cfg[build][quant]")
+        logger.error("The key(debug_level) must be in cfg[quant]")
         return False
 
     debug_level = cfg["quant"]["debug_level"]
@@ -65,7 +65,7 @@ def check_config(cfg, phase="build"):
         return False
 
     if "calib_method" not in cfg["quant"]:
-        logger.error("The key(calib_method) must be in cfg[build][quant]")
+        logger.error("The key(calib_method) must be in cfg[quant]")
         return False
 
     # calib_method = cfg["quant"]["calib_method"]

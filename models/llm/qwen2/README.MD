@@ -14,18 +14,31 @@
 
 ### 2.1 获取模型和数据
 
-通过get_model脚本下载模型，可通过参数选择下载原始模型或量化模型。
+通过get_model脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
 
-如果需要自己量化，可选择下载原始模型和wikitext2数据集：
+如果需要自己量化，可选择下载原始模型和wikitext2数据集，下载后的模型存放在qwen2-7b-instruct-hf目录：
 
 ```bash
 python3 get_model.py --type raw
+python3 get_model.py --type dataset
 ```
 
-如果仅编译芯片模型，可选择下载量化模型：
+如果仅编译芯片模型，可选择下载量化模型，下载后的模型存放在`output/$HOUMO_TARGET/result`目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
 python3 get_model.py --type quant
+```
+
+如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
+
+```bash
+python3 get_model.py --type hmm
+```
+
+也可以直接下载以上所有模型和数据集（注意相同模型会覆盖，请自行保存）：
+
+```bash
+python3 get_model.py
 ```
 
 ### 2.2 量化
