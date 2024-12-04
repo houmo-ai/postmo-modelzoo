@@ -27,11 +27,13 @@ if [[ -z $HDPL_TOOLCHAIN_ITVM_INSTALL ]] && [[ -d ${TVM_ROOT} ]]; then
 fi
 
 # paths for c/c++ compiling
-if [[ -z $TCIM_LITE ]]; then
-  export TCIM_LITE=$PWD/../../tcim_runtime_lite/output
+if [[ $TCIM_LITE ]]; then
+  export TCIM_RUNTIME_PATH=$TCIM_LITE
+else
+  export TCIM_RUNTIME_PATH=$TCIM_RUNTIME_PATH/output
 fi
-export TCIM_INC_PATH=$TCIM_LITE/include
-export TCIM_LIB_PATH=$TCIM_LITE/lib
+export TCIM_INC_PATH=$TCIM_RUNTIME_PATH/include
+export TCIM_LIB_PATH=$TCIM_RUNTIME_PATH/lib
 export IDNNL_INC_PATH=$IDNNL_PATH/include
 export IDNNL_LIB_PATH=$IDNNL_PATH/lib
 export HDPL_INC_PATH=$HDPL_PATH/include
@@ -40,11 +42,11 @@ export CLANG_LIB_PATH=$CLANG_PATH/lib
 
 # paths for runtime
 if [[ -d ${QUANTOOL_PATH} ]]; then
-  export PYTHONPATH=$HMASSIST_PATH:$TCIM_LITE/python:$QUANTOOL_PATH:$PYTHONPATH
+  export PYTHONPATH=$HMASSIST_PATH:$TCIM_RUNTIME_PATH/python:$QUANTOOL_PATH:$PYTHONPATH
 else
-  export PYTHONPATH=$HMASSIST_PATH:$TCIM_LITE/python:$PYTHONPATH
+  export PYTHONPATH=$HMASSIST_PATH:$TCIM_RUNTIME_PATH/python:$PYTHONPATH
 fi
-export LD_LIBRARY_PATH=$TCIM_LITE/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$TCIM_RUNTIME_PATH/lib:$LD_LIBRARY_PATH
 export PATH=$HMASSIST_PATH:$PATH
 
 # data and model path
@@ -73,7 +75,7 @@ echo "[Please check the following path. Unset the environment variable if you wa
 echo "HOUMO_TARGET is $HOUMO_TARGET"
 echo "HOUMO_PATH is $HOUMO_PATH"
 echo "TCIM_PATH is $TCIM_PATH"
-echo "TCIM_LITE is $TCIM_LITE"
+echo "TCIM_RUNTIME_PATH is $TCIM_RUNTIME_PATH"
 echo "QUANTOOL_PATH is $QUANTOOL_PATH"
 echo "MODELZOO_PATH is $MODELZOO_PATH"
 echo "DATASETS_PATH is $DATASETS_PATH"

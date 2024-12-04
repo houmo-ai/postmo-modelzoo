@@ -130,7 +130,11 @@ def build(cfg):
         logger.info("{} output[{}] shape = {}, dtype = {}".format(model.target, output_name,
                                                                   output_data.shape, output_data.dtype))
         output_save_name = sanitize_name(output_name)
-        save_data(output_data, model.executor.build_save_dir, output_save_name)
+        if len(output_data.shape) == 4:
+            # save as NHWC to support c++ compare
+            save_data(np.transpose(output_data, (0, 2, 3, 1)), model.executor.build_save_dir, output_save_name)
+        else:
+            save_data(output_data, model.executor.build_save_dir, output_save_name)
         golden_output = model.executor.get_golden_output(output_save_name)
         logger.info("golden output[{}] shape = {}, dtype = {}".format(output_name, golden_output.shape, golden_output.dtype))
         is_match = (output_data == golden_output).all()

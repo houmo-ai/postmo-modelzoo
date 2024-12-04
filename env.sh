@@ -30,20 +30,20 @@ if [[ -z $TCIM_PATH ]]; then
   export TCIM_PATH
 fi
 
-if [[ -z $TCIM_LITE ]]; then
-  TCIM_LITE=$HOUMO_PATH
-  export TCIM_PATH
+if [[ -z $TCIM_RUNTIME_PATH ]]; then
+  TCIM_RUNTIME_PATH=$HOUMO_PATH
+  export TCIM_RUNTIME_PATH
 fi
 
 # paths for c/c++ compiling
-export TCIM_INC_PATH=$TCIM_LITE/include
-export TCIM_LIB_PATH=$TCIM_LITE/lib
+export TCIM_INC_PATH=$TCIM_RUNTIME_PATH/include
+export TCIM_LIB_PATH=$TCIM_RUNTIME_PATH/lib
 export HDPL_INC_PATH=$HOUMO_PATH/include
 export HDPL_LIB_PATH=$HOUMO_PATH/lib
 
 # paths for runtime
-export LD_LIBRARY_PATH=$TCIM_LITE/lib:$TCIM_PATH/lib:$LD_LIBRARY_PATH
-export PYTHONPATH=$HMASSIST_PATH:$TCIM_LITE/python:$PYTHONPATH
+export LD_LIBRARY_PATH=$TCIM_RUNTIME_PATH/lib:$TCIM_PATH/lib:$LD_LIBRARY_PATH
+export PYTHONPATH=$HMASSIST_PATH:$TCIM_RUNTIME_PATH/python:$PYTHONPATH
 export PATH=$HOUMO_PATH/bin:$HMASSIST_PATH:$PATH
 
 # data and model path
@@ -68,7 +68,7 @@ echo "[Please check the following path. Unset the environment variable if you wa
 echo "HOUMO_TARGET is $HOUMO_TARGET"
 echo "HOUMO_PATH is $HOUMO_PATH"
 echo "TCIM_PATH is $TCIM_PATH"
-echo "TCIM_LITE is $TCIM_LITE"
+echo "TCIM_RUNTIME_PATH is $TCIM_RUNTIME_PATH"
 echo "QUANTOOL_PATH is $QUANTOOL_PATH"
 echo "MODELZOO_PATH is $MODELZOO_PATH"
 echo "DATASETS_PATH is $DATASETS_PATH"

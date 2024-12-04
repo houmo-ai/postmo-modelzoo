@@ -238,7 +238,7 @@ class XH1Exec(BaseExec, ABC):
             logger.warning("test num set to 1 because HDPL_PLATFORM=ISIM may take a lot of time.")
         cmd = "cd {}/utils/{} && ./{} --model {} --data {} --samples {} --threads {} --batch {} --output {}".format(
             modelzoo_path, exec, exec, model_path, self.build_save_dir, test_num, self.perf_cfg["thread_num"], self.batch,
-            os.path.join(self.cur_dir, "output/hmperf.txt"))
+            os.path.join(self.cur_dir, "output"))
         if self.perf_cfg['infer_only']:
             cmd += " --infer_only true"
         logger.info(cmd)

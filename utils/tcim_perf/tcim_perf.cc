@@ -5,7 +5,7 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <unistd.h>
-
+#include <iomanip>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -49,7 +49,7 @@ namespace fs = std::filesystem;
 struct CliArguments {
   std::string model_path;
   std::string data_path;
-  std::string output;
+  std::string output_path;
   size_t batch = 1;
   size_t warm_up = 1;
   size_t threads = 1;
@@ -210,7 +210,7 @@ bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
       arguments->samples = atoi(optarg);
       break;
     case 'o':
-      arguments->output = optarg;
+      arguments->output_path = optarg;
       break;
     case 'y':
       arguments->infer_only = optarg;
@@ -308,7 +308,7 @@ int main(int argc, char *argv[]) {
 
   std::string model_path = arguments.model_path;
   std::string data_path = arguments.data_path;
-  std::string output_file = arguments.output;
+  std::string output_path = arguments.output_path;
   int batch = arguments.batch;
   int sample_num = arguments.samples;
   int thread_num = arguments.threads;
@@ -363,7 +363,7 @@ int main(int argc, char *argv[]) {
   std::cout << "Count of Input: " << input_num << std::endl;
   for (int idx = 0; idx < input_num; idx++) {
     auto input_name = module.GetInputName(idx);
-    auto input_info = module.GetInputInfo(input_name);
+    auto input_info = module.GetInputInfo(input_name).AsContiguous();
     std::cout << "Input[" << idx << "] name: " << input_name << ", " << input_info << std::endl;
     auto data_file = data_path + "/" + input_name + ".bin";
     void* data_ptr = nullptr;
@@ -376,7 +376,7 @@ int main(int argc, char *argv[]) {
                   << COLOR_RESET << std::endl;
         is_result_check = false;
       } else {
-        memcpy(tensor.Data(), data_ptr, tensor.Info().MemSize());
+        memcpy(tensor.Data(), data_ptr, tensor.Info().Size());
         free(data_ptr);
       }
     } else {
@@ -392,7 +392,7 @@ int main(int argc, char *argv[]) {
   std::cout << "Count of Output: " << output_num << std::endl;
   for (int idx = 0; idx < output_num; idx++) {
     auto output_name = module.GetOutputName(idx);
-    auto output_info = module.GetOutputInfo(output_name);
+    auto output_info = module.GetOutputInfo(output_name).AsContiguous();
     std::cout << "Output[" << output_name << "] " << output_info << std::endl;
     auto data_file = data_path + "/" + output_name + ".bin";
     void* data_ptr = nullptr;
@@ -404,7 +404,7 @@ int main(int argc, char *argv[]) {
                   << " fail. Result check will be skipped." << COLOR_RESET << std::endl;
         is_result_check = false;
       } else {
-        memcpy(tensor.Data(), data_ptr, tensor.Info().MemSize());
+        memcpy(tensor.Data(), data_ptr, tensor.Info().Size());
         free(data_ptr);
       }
     } else {
@@ -580,15 +580,11 @@ int main(int argc, char *argv[]) {
     while (!qout.queue.empty()) {
       auto task = qout.queue.front();
       qout.queue.pop();
-      
+
       for (auto& output : task.data_out) {
         auto data1 = (char*)output.second.Data();
         auto data2 = (char*)task.ref_out.at(output.first).Data();
-        // int len = output.second.Info().MemSize();
-        int len = 1;
-        for (auto& shape : output.second.Info().Shape()) {
-          len *= shape;
-        }
+        int len = output.second.Info().Size();
         if (memcmp(data1, data2, len)) {
           int err = 0;
           for (int i = 0; i < len; i++) {
@@ -600,7 +596,8 @@ int main(int argc, char *argv[]) {
                     << output.first << " result check failed (" << len - err << "/" << len << ")"
                     << COLOR_RESET << std::endl;
           std::stringstream ss;
-          ss << arguments.output << '/req_' << task.req_id << '_' << output.first << '.bin';
+          ss << output_path << "/result_" << task.req_id << '_' << output.first << ".bin";
+          std::cout << "Save result to: " << ss.str() << std::endl;
           write_file(ss.str().c_str(), data1, len);
           result = false;
         }
@@ -645,31 +642,32 @@ int main(int argc, char *argv[]) {
   float avg_cost = total_cost / test_num;
   float qps = (1000.0 / (total_cost / test_num)) * batch;
 
-  std::cout << COLOR_RED << std::fixed << std::setprecision(3) << "[latency] Inference "
-            << "\tavg: " << infer_avg_latency << " ms,"
-            << "\tmax: " << infer_max_latency << " ms"
+  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3) << "[latency] Inference "
+            << "\tavg: " << std::setw(7) << infer_avg_latency << " ms,"
+            << "\tmax: " << std::setw(7) << infer_max_latency << " ms"
             << COLOR_RESET  << std::endl;
-  std::cout << COLOR_RED << std::fixed << std::setprecision(3) << "[latency] Input "
-            << "\tavg: " << input_avg_latency << " ms,"
-            << "\tmax: " << input_max_latency << " ms"
+  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3) << "[latency] Input "
+            << "\tavg: " << std::setw(7) << input_avg_latency << " ms,"
+            << "\tmax: " << std::setw(7) << input_max_latency << " ms"
             << COLOR_RESET  << std::endl;
-  std::cout << COLOR_RED << std::fixed << std::setprecision(3) << "[latency] Output "
-            << "\tavg: " << output_avg_latency << " ms,"
-            << "\tmax: " << output_max_latency << " ms"
+  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3) << "[latency] Output "
+            << "\tavg: " << std::setw(7) << output_avg_latency << " ms,"
+            << "\tmax: " << std::setw(7) << output_max_latency << " ms"
             << COLOR_RESET  << std::endl;
-  std::cout << COLOR_RED << std::fixed << std::setprecision(3) << "[latency] End2End "
-            << "\tavg: " << e2e_avg_latency << " ms,"
-            << "\tmax: " << e2e_max_latency << " ms"
+  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3) << "[latency] End2End "
+            << "\tavg: " << std::setw(7) << e2e_avg_latency << " ms,"
+            << "\tmax: " << std::setw(7) << e2e_max_latency << " ms"
             << COLOR_RESET << std::endl;
-  std::cout << COLOR_GREEN << std::fixed << std::setprecision(3) << "[Throughput] total: "
+  std::cout << COLOR_MAGENT << std::fixed << std::setprecision(3) << "[Throughput] total: "
             << total_cost << " ms, "
             << "avg: " << avg_cost << " ms"
             << COLOR_RESET << std::endl;
-  std::cout << COLOR_GREEN << std::fixed << std::setprecision(3) << "[Throughput] qps: "
+  std::cout << COLOR_MAGENT << std::fixed << std::setprecision(3) << "[Throughput] qps: "
             << qps
             << COLOR_RESET << std::endl;
 
-  if (output_file.size() != 0) {
+  if (output_path.size() != 0) {
+    std::string output_file = output_path + "/hmperf.txt";
     std::cout << "Save result to: " << output_file << std::endl;
     std::fstream result_file(output_file.c_str(), std::ios::out);
     result_file << "batch: " << batch << std::endl;
