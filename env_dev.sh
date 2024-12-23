@@ -1,52 +1,42 @@
 #!/usr/bin/env bash
 pip3 install -r requirements.txt
+pip3 uninstall houmo-tcim2
 
 __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-MODELZOO_PATH=${__dir}
-export MODELZOO_PATH
-HMASSIST_PATH=$MODELZOO_PATH/hmassist
-export HMASSIST_PATH
+export MODELZOO_PATH=${__dir}
+export HMASSIST_PATH=$MODELZOO_PATH/hmassist
 export CMAKE_CONFIG_PATH=$MODELZOO_PATH/develop.cmake
 
 if [[ -z $HOUMO_TARGET ]]; then
   export HOUMO_TARGET=houmo
 fi
-
 if [[ -z $MODELZOO_URL ]]; then
   export MODELZOO_URL=http://10.10.1.53:8082/artifactory/toolchain/release
 fi
 
-# set hal library log level
-export HM800_HAL_CONSOLE_LEVEL=0
-export HDPL_API_TIMEOUT=30000
-
 # main path
-export QUANTOOL_PATH=$MODELZOO_PATH/../../quantool
-if [[ -z $HDPL_TOOLCHAIN_ITVM_INSTALL ]] && [[ -d ${TVM_ROOT} ]]; then
-  HDPL_TOOLCHAIN_ITVM_INSTALL=$TVM_ROOT/build/install
+unset HOUMO_PATH
+export HMCC_PATH=/develop02/yan.cao/hmcc
+if [[ -z $TCIM_RUNTIME_PATH ]]; then
+  export TCIM_RUNTIME_PATH=$HMCC_PATH/builds/tcim_lite
 fi
 
-# paths for c/c++ compiling
-if [[ $TCIM_LITE ]]; then
-  export TCIM_RUNTIME_PATH=$TCIM_LITE
-else
-  export TCIM_RUNTIME_PATH=$TCIM_RUNTIME_PATH/output
-fi
-export TCIM_INC_PATH=$TCIM_RUNTIME_PATH/include
-export TCIM_LIB_PATH=$TCIM_RUNTIME_PATH/lib
-export IDNNL_INC_PATH=$IDNNL_PATH/include
-export IDNNL_LIB_PATH=$IDNNL_PATH/lib
-export HDPL_INC_PATH=$HDPL_PATH/include
-export HDPL_LIB_PATH=$HDPL_PATH/lib
-export CLANG_LIB_PATH=$CLANG_PATH/lib
+# paths for build
+export HMCC_SOURCE_PATH=$HMCC_PATH
+export HMCC_BUILD_PATH=$HMCC_PATH/builds/debugo3_clang
+export HDPLCC_PATH=$HMCC_PATH/builds/hdpl_cc
+export HDPL_LIB_PATH=$HMCC_PATH/builds/hdpl_lib
+export ISIM_PATH=$HMCC_PATH/builds/isim
+export HAL_DRIVER_PATH=$HMCC_PATH/builds/hal_driver
+export PYTHONPATH=$HMCC_BUILD_PATH/tools/hmcc/python_packages/hmcc:$HMCC_PATH/compiler/python:$PYTHONPATH
+export PATH=$HMCC_BUILD_PATH/bin:$HMCC_PATH/compiler/tools/hdpl-compile:$HDPLCC_PATH/bin:$PATH
 
 # paths for runtime
-if [[ -d ${QUANTOOL_PATH} ]]; then
-  export PYTHONPATH=$HMASSIST_PATH:$TCIM_RUNTIME_PATH/python:$QUANTOOL_PATH:$PYTHONPATH
-else
-  export PYTHONPATH=$HMASSIST_PATH:$TCIM_RUNTIME_PATH/python:$PYTHONPATH
-fi
-export LD_LIBRARY_PATH=$TCIM_RUNTIME_PATH/lib:$LD_LIBRARY_PATH
+export PYTHONPATH=$TCIM_RUNTIME_PATH/python:$PYTHONPATH
+export LD_LIBRARY_PATH=$HMCC_BUILD_PATH/lib:$TCIM_RUNTIME_PATH/lib:$HDPL_LIB_PATH/lib:$ISIM_PATH/lib:$LD_LIBRARY_PATH
+
+# paths for hmassist
+export PYTHONPATH=$HMASSIST_PATH:$PYTHONPATH
 export PATH=$HMASSIST_PATH:$PATH
 
 # data and model path
@@ -74,9 +64,8 @@ fi
 echo "[Please check the following path. Unset the environment variable if you want to use the default path!]"
 echo "HOUMO_TARGET is $HOUMO_TARGET"
 echo "HOUMO_PATH is $HOUMO_PATH"
-echo "TCIM_PATH is $TCIM_PATH"
+echo "HMCC_PATH is $HMCC_PATH"
 echo "TCIM_RUNTIME_PATH is $TCIM_RUNTIME_PATH"
-echo "QUANTOOL_PATH is $QUANTOOL_PATH"
 echo "MODELZOO_PATH is $MODELZOO_PATH"
 echo "DATASETS_PATH is $DATASETS_PATH"
 echo "MODEL_PATH is $MODEL_PATH"

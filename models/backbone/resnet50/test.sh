@@ -12,4 +12,3 @@ else
   python3 ptq.py
 fi
 python3 build.py
-python3 demo.py

@@ -120,12 +120,6 @@ class XH1Exec(BaseExec, ABC):
             requant_dispatch=True,
         )
 
-        # sequencer.save_pkl(self.result_dir, self.model_name)
-        # sequencer.save_onnx(
-        #     self.quant_model_path,
-        #     save_special_onnx=True
-        # )
-
         logger.info("################  ptq quantize finished  ######################")
         self.quantize_span = time.time() - t_start
 
@@ -134,85 +128,61 @@ class XH1Exec(BaseExec, ABC):
         # for _input in self.inputs:
         #     inputs[_input["name"]] = calib_dataset[0]["name"]
 
+        t_start = time.time()
+        if self.quant_cfg["debug_level"] == 1:
+            from hmquant.api import quantize_profiling
+            quantize_profiling(sequencer, [calib_dataset[0]])
+        self.layer_compare_span = time.time() - t_start
+
         from hmquant.api import generate_golden
         generate_golden(
             sequencer=sequencer,
             calibset=calib_dataset[0],
-            save_path=self.result_dir,
+            save_path=self.quant_dir,
             model_name=self.model_name,
             batch_size=1,
             device="cpu"
         )
 
         logger.info("golden data saved in -> {}".format(self.golden_data_path))
-
-        t_start = time.time()
-        if self.quant_cfg["debug_level"] == 1:
-            from hmquant.api import quantize_profiling
-            quantize_profiling(sequencer, [calib_dataset[0]])
-        self.layer_compare_span = time.time() - t_start
         logger.info("quantize cost {}s, layer compare cost {}s".format(self.quantize_span, self.layer_compare_span))
 
-    def build(self, build_options=None):
+    def build(self):
         logger.info("################  build started  ######################")
         import tcim
         t_start = time.time()
-        onnx_model = onnx.load(self.quant_model_path)
-        if not build_options:
-            build_options = {}
-        if self.batch % 4 == 0:
-            build_options["tcim.core_num"] = 4
-        input_cfg = {}
-        inputs = onnx_model.graph.input
-        for input in inputs:
-            dims = input.type.tensor_type.shape.dim
-            input_shape = [dim.dim_value for dim in dims]
-            input_shape[0] *= self.batch
-            input_cfg[input.name] = tcim.HMInput(shape=input_shape)
-
-        logger.info("build_options={}".format(build_options))
-
-        hdplcc_options = []
-        # hdplcc_options.append("-O2")
-
-        if os.getenv("TCIM_CROSS_COMPILE") == '1':
-            logger.info("cross compile enabled as aarch64 while TCIM_CROSS_COMPILE=1")
-            model_name = self.model_name + "_aarch64"
-            hdplcc_options.append("--target=aarch64-linux-gnu")
-            hdplcc_options.append("--sysroot=/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/libc")
-            hdplcc_options.append("-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0")
-            hdplcc_options.append("-I/opt/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/include/c++/7.5.0/aarch64-linux-gnu")
-            tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=build_options,
-                                         target_host="arm64", hdplcc_options=hdplcc_options, lite=True)
-        else:
-            model_name = self.model_name
-            tcim.build.build_from_hmonnx(onnx_model, model_name=model_name, inputs=input_cfg, compiler_cfg=build_options,
-                                         hdplcc_options=hdplcc_options, lite=True)  # output_layout={"layout": "NCHW"}
-        print(model_name + ' build completed.')
+        tcim.build_from_hmonnx(
+            self.quant_model_path,
+            model_name=self.model_name,
+            ncore=self.ncore,
+            legacy=True,
+            output_dir=self.model_dir,
+            work_dir=self.build_dir
+        )
+        print(self.model_name + ' build completed.')
 
         logger.info('{} saved in {}'.format(self.model_name, self.model_dir))
 
         logger.info("################  build finished  ######################")
         self.build_span = time.time() - t_start
-        logger.info("build cost {}s".format(self.build_span))
+        logger.info("build cost {} s".format(self.build_span))
 
     def load(self):
         import tcim_lite
-        self.module = tcim_lite.runtime.load(self.model_name + ".hmm")
-        self.input_info = self.get_input_info()
-        self.output_info = self.get_output_info()
+        self.module = tcim_lite.runtime.load(os.path.join(self.model_dir, self.model_name + ".hmm"))
+        self.input_infos = self.get_input_info()
+        self.output_infos = self.get_output_info()
         logger.info("{} model loaded".format(self.model_name))
 
     def infer(self, inputs):
-        import tcim_lite
         """ infer one time """
+        import tcim_lite
         for input in self.inputs:
             if isinstance(inputs, dict):
                 input_data = inputs[input["name"]]
             else:
                 input_data = inputs
-            # print(input_data.shape, input_data.dtype)
-            self.module.set_input(input["name"], input_data)
+            self.module.set_input(input["name"], tcim_lite.runtime.Tensor(self.input_infos[input["name"]], input_data))
         self.module.run()
         self.module.sync()
         outputs = {}
@@ -222,22 +192,20 @@ class XH1Exec(BaseExec, ABC):
             if self.is_fixed_out:
                 output_data = self.module.get_output(name).numpy()
             else:
-                output_data = self.module.get_output(name).dequant().numpy()
-            if (len(output_data.shape) == 4):  # toolchain output is NHWC
-                output_data = np.transpose(output_data, (0, 3, 1, 2))
+                output_data = self.module.get_output(name).cast(np.float32).numpy()
             outputs[name] = output_data
 
         return outputs
 
     def perf(self, test_num):
         modelzoo_path = os.getenv('MODELZOO_PATH')
-        model_path = os.path.join(self.cur_dir, self.model_name + ".hmm")
+        model_path = os.path.join(self.model_dir, self.model_name + ".hmm")
         exec = "tcim_perf"
         if os.environ.get("HDPL_PLATFORM") == "ISIM":
             test_num = 1
             logger.warning("test num set to 1 because HDPL_PLATFORM=ISIM may take a lot of time.")
         cmd = "cd {}/utils/{} && ./{} --model {} --data {} --samples {} --threads {} --batch {} --output {}".format(
-            modelzoo_path, exec, exec, model_path, self.build_save_dir, test_num, self.perf_cfg["thread_num"], self.batch,
+            modelzoo_path, exec, exec, model_path, self.build_dir, test_num, self.perf_cfg["thread_num"], self.batch,
             os.path.join(self.cur_dir, "output"))
         if self.perf_cfg['infer_only']:
             cmd += " --infer_only true"
@@ -246,8 +214,8 @@ class XH1Exec(BaseExec, ABC):
 
     def _preprocess(self, inputs):
         datas = {}
-        for i, input in enumerate(self.inputs):
-            dtype = self.input_info[i]["dtype"]
+        for input in self.inputs:
+            dtype = self.input_infos[input["name"]].dtype
             if input["image"]["format"] in ["YUV420", "YUV422", "YUV444"]:
                 data = torch.tensor(inputs[input["name"]].astype(np.float32))  # NHWC float32
                 data = torch.squeeze(data, 0)  # HWC float32
@@ -262,13 +230,13 @@ class XH1Exec(BaseExec, ABC):
 
     def get_golden_inputs(self):
         datas = {}
-        for i, input in enumerate(self.inputs):
-            input_data_path = os.path.join(self.result_dir, 'hmquant_' + self.model_name 
+        for input in self.inputs:
+            input_data_path = os.path.join(self.quant_dir, 'hmquant_' + self.model_name 
                                            + '_' + input["name"] + '_input.npy')
             if os.path.exists(input_data_path):
                 input_data = np.load(input_data_path)
                 logger.info("golden input[{}] shape = {}, dtype = {}".format(input["name"], input_data.shape, input_data.dtype))
-                input_data = input_data.astype(self.input_info[i]["dtype"])
+                input_data = input_data.astype(self.input_infos[input["name"]].dtype)
                 input_data = np.concatenate([input_data for i in range(self.batch)], axis=0)
                 datas[input["name"]] = input_data
             else:
@@ -289,7 +257,7 @@ class XH1Exec(BaseExec, ABC):
 
     def gen_golden(self, inputs):
         from hmodel.utils.general import load_pkl_model
-        qmodel = os.path.join(self.result_dir, self.model_name)
+        qmodel = os.path.join(self.quant_dir, self.model_name)
         sequencer = load_pkl_model(qmodel)
         from hmquant.api import generate_golden
         generate_golden(
@@ -307,32 +275,40 @@ class XH1Exec(BaseExec, ABC):
         raise NotImplemented
 
     def get_input_info(self):
-        input_infos = []
-        input_num = self.module.get_num_inputs()
-        for id in range(0, input_num):
-            input_info = {}
-            name = self.module.get_input_name(id)
-            input_data = self.module.get_input_info(name)
-            input_info["name"] = name
-            input_info["shape"] = input_data.shape
-            input_info["dtype"] = input_data.dtype
-            input_info["format"] = input_data.format
-            input_infos.append(input_info)
+        input_infos = {}
+        # input_num = self.module.get_num_inputs()
+        for input in self.inputs:
+            # name = self.module.get_input_name(id)
+            input_info = self.module.get_input_info(input["name"])
+            input_infos[input["name"]] = input_info
         return input_infos
 
     def get_output_info(self):
-        output_infos = []
+        output_infos = {}
         output_num = self.module.get_num_outputs()
         for id in range(0, output_num):
             output_info = {}
             name = self.module.get_output_name(id)
-            output_data = self.module.get_output_info(name)
-            output_info["name"] = name
-            output_info["shape"] = output_data.shape
-            output_info["dtype"] = output_data.dtype
-            output_info["format"] = output_data.format
-            output_infos.append(output_info)
+            output_info = self.module.get_output_info(name)
+            output_infos[name] = output_info
         return output_infos
+    
+    def print_input_info(self):
+        input_num = len(self.input_infos)
+        logger.info("{} input num = {}:".format(self.target, input_num))
+        for name, _input in self.input_infos.items():
+            _input = self.input_infos[name]
+            logger.info("{} input[{}] shape = {}, dtype = {}, format = {}".format(self.target, name,
+                                                                                  _input.shape, _input.dtype,
+                                                                                  _input.format.name))
+
+    def print_output_info(self):
+        output_num = len(self.output_infos)
+        logger.info("{} output num = {}:".format(self.target, output_num))
+        for name, _output in self.output_infos.items():
+            logger.info("{} output[{}] shape = {}, dtype = {}, format = {}".format(self.target, name,
+                                                                                   _output.shape, _output.dtype,
+                                                                                   _output.format.name))
 
     @property
     def freq(self):

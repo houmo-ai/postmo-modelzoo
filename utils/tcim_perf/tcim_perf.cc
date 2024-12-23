@@ -11,6 +11,7 @@
 #include <iostream>
 #include <map>
 #include <sstream>
+#include <cstring>
 #include <string>
 #include <vector>
 #include <queue>
@@ -26,7 +27,6 @@ namespace fs = std::experimental::filesystem;
 namespace fs = std::filesystem;
 #endif
 
-#include "hdpl/hdpl_runtime_api.h"
 #include "tcim/tcim_runtime.h"
 
 #define MEM_CHECK 0  // enable memory check, it may effect the performance
@@ -120,7 +120,7 @@ int read_file(const char *fileName, char **fileData, int *fileLen)
 
   *fileData = (char *)malloc(fileSize);
   if (*fileData == NULL) {
-    printf("malloc fileData size:%ld fialed\n", fileSize);
+    printf("malloc fileData size:%ld failed\n", fileSize);
     fclose(file);
     return -1;
   }

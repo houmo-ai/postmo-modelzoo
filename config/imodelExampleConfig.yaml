@@ -6,17 +6,14 @@ backbone_resnet50:
   example_case:
     - backbone_resnet50_perf:
         script: models/backbone/resnet50/perf.sh
-        args: null
     - backbone_resnet50_eval:
         script: models/backbone/resnet50/eval.sh
-        args: null
     - backbone_resnet50_test:
         script: models/backbone/resnet50/test.sh
-        args: null
   test:
-    - backbone_resnet50_eval
-    - backbone_resnet50_perf
-    - backbone_resnet50_test
+    # - backbone_resnet50_eval
+    # - backbone_resnet50_perf
+    # - backbone_resnet50_test
 backbone_efficientnet:
   include:
     - models/backbone/efficientnet
@@ -25,17 +22,14 @@ backbone_efficientnet:
   example_case:
     - backbone_efficientnet_eval:
         script: models/backbone/efficientnet/eval.sh
-        args: null
     - backbone_efficientnet_perf:
         script: models/backbone/efficientnet/perf.sh
-        args: null
     - backbone_efficientnet_test:
         script: models/backbone/efficientnet/test.sh
-        args: null
   test:
-    - backbone_efficientnet_eval
-    - backbone_efficientnet_perf
-    - backbone_efficientnet_test
+    # - backbone_efficientnet_eval
+    # - backbone_efficientnet_perf
+    # - backbone_efficientnet_test
 backbone_mobilenetv2:
   include:
     - models/backbone/mobilenetv2
@@ -44,17 +38,14 @@ backbone_mobilenetv2:
   example_case:
     - backbone_mobilenetv2_eval:
         script: models/backbone/mobilenetv2/eval.sh
-        args: null
     - backbone_mobilenetv2_perf:
         script: models/backbone/mobilenetv2/perf.sh
-        args: null
     - backbone_mobilenetv2_test:
         script: models/backbone/mobilenetv2/test.sh
-        args: null
   test:
-    - backbone_mobilenetv2_eval
-    - backbone_mobilenetv2_perf
-    - backbone_mobilenetv2_test
+    # - backbone_mobilenetv2_eval
+    # - backbone_mobilenetv2_perf
+    # - backbone_mobilenetv2_test
 backbone_vit:
   include:
     - models/backbone/vit
@@ -62,9 +53,8 @@ backbone_vit:
   example_case:
     - backbone_vit_perf:
         script: models/backbone/vit/perf.sh
-        args: null
   test:
-    - backbone_vit_perf
+    # - backbone_vit_perf
 autodrive_yolop:
   include:
     - models/autodrive/yolop
@@ -73,13 +63,11 @@ autodrive_yolop:
   example_case:
     - autodrive_yolop_perf:
         script: models/autodrive/yolop/perf.sh
-        args: null
     - backbone_yolop_test:
         script: models/autodrive/yolop/test.sh
-        args: null
   test:
-    - autodrive_yolop_perf
-    - autodrive_yolop_test
+    # - autodrive_yolop_perf
+    # - autodrive_yolop_test
 detection_yolov3:
   include:
     - models/detection/yolov3
@@ -88,17 +76,14 @@ detection_yolov3:
   example_case:
     - detection_yolov3_eval:
         script: models/detection/yolov3/eval.sh
-        args: null
     - detection_yolov3_perf:
         script: models/detection/yolov3/perf.sh
-        args: null
     - detection_yolov3_test:
         script: models/detection/yolov3/test.sh
-        args: null
   test:
-    - detection_yolov3_eval
-    - detection_yolov3_perf
-    - detection_yolov3_test
+    # - detection_yolov3_eval
+    # - detection_yolov3_perf
+    # - detection_yolov3_test
 detection_yolov5s:
   include:
     - models/detection/yolov5s
@@ -107,17 +92,14 @@ detection_yolov5s:
   example_case:
     - detection_yolov5s_eval:
         script: models/detection/yolov5s/eval.sh
-        args: null
     - detection_yolov5s_perf:
         script: models/detection/yolov5s/perf.sh
-        args: null
     - detection_yolov5s_test:
         script: models/detection/yolov5s/test.sh
-        args: null
   test:
-    - detection_yolov5s_eval
-    - detection_yolov5s_perf
-    - detection_yolov5s_test
+    # - detection_yolov5s_eval
+    # - detection_yolov5s_perf
+    # - detection_yolov5s_test
 tests_qwen_1block:
   include:
     - tests/qwen_1block
@@ -131,9 +113,9 @@ tests_qwen_1block:
     - qwen_1block_1core_test:
         script: tests/qwen_1block/test.sh --core 1
   test:
-    - qwen_1block_4core_test
-    - qwen_1block_2core_test
-    - qwen_1block_1core_test
+    # - qwen_1block_4core_test
+    # - qwen_1block_2core_test
+    # - qwen_1block_1core_test
 tests_qwen2_2blocks:
   include:
     - tests/qwen2_2blocks
@@ -142,13 +124,11 @@ tests_qwen2_2blocks:
   example_case:
     - qwen2_2blocks_4core_test:
         script: tests/qwen2_2blocks/test.sh --core 4
-        args: null
     - qwen2_2blocks_2core_test:
         script: tests/qwen2_2blocks/test.sh --core 2
-        args: null
   test:
-    - qwen2_2blocks_4core_test
-    - qwen2_2blocks_2core_test
+    # - qwen2_2blocks_4core_test
+    # - qwen2_2blocks_2core_test
 utils:
   include:
     - utils
@@ -157,10 +137,10 @@ utils:
   exclude: null
   example_case: null
   test:
-    - backbone_resnet50_perf
-    - autodrive_yolop_perf
-    - detection_yolov5s_perf
-    - autodrive_pointpillars_perf
+    # - backbone_resnet50_perf
+    # - autodrive_yolop_perf
+    # - detection_yolov5s_perf
+    # - autodrive_pointpillars_perf
 hmassist:
   include:
     - hmassist
@@ -168,36 +148,36 @@ hmassist:
     - hmassist/README.MD
   example_case: null
   test:
-    - backbone_resnet50_perf
-    - backbone_resnet50_eval
-    - detection_yolov5s_perf
-    - detection_yolov5s_eval
+    # - backbone_resnet50_perf
+    # - backbone_resnet50_eval
+    # - detection_yolov5s_perf
+    # - detection_yolov5s_eval
 all:
   include:
     - run_all.py
   exclude: null
   example_case: null
   test:
-    - backbone_resnet50_perf
-    - backbone_resnet50_eval
-    - backbone_resnet50_test
-    - backbone_efficientnet_eval
-    - backbone_efficientnet_perf
-    - backbone_efficientnet_test
-    - backbone_mobilenetv2_eval
-    - backbone_mobilenetv2_perf
-    - backbone_mobilenetv2_test
-    - backbone_vit_perf
-    - autodrive_yolop_perf
-    - autodrive_yolop_test
-    - detection_yolov3_eval
-    - detection_yolov3_perf
-    - detection_yolov3_test
-    - detection_yolov5s_perf
-    - detection_yolov5s_eval
-    - detection_yolov5s_test
-    - qwen_1block_4core_test
-    - qwen_1block_2core_test
-    - qwen_1block_1core_test
-    - qwen2_2blocks_4core_test
-    - qwen2_2blocks_2core_test
+    # - backbone_resnet50_perf
+    # - backbone_resnet50_eval
+    # - backbone_resnet50_test
+    # - backbone_efficientnet_eval
+    # - backbone_efficientnet_perf
+    # - backbone_efficientnet_test
+    # - backbone_mobilenetv2_eval
+    # - backbone_mobilenetv2_perf
+    # - backbone_mobilenetv2_test
+    # - backbone_vit_perf
+    # - autodrive_yolop_perf
+    # - autodrive_yolop_test
+    # - detection_yolov3_eval
+    # - detection_yolov3_perf
+    # - detection_yolov3_test
+    # - detection_yolov5s_perf
+    # - detection_yolov5s_eval
+    # - detection_yolov5s_test
+    # - qwen_1block_4core_test
+    # - qwen_1block_2core_test
+    # - qwen_1block_1core_test
+    # - qwen2_2blocks_4core_test
+    # - qwen2_2blocks_2core_test

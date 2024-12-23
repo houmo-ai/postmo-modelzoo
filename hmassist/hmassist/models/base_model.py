@@ -20,7 +20,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         self.framework = self.model["framework"]
         self.inputs = self.model["inputs"]
         self.name = self.model["name"]
-        self.compare_dir = os.path.abspath(os.path.join(self.model["save_dir"], self.framework, "result"))
+        self.compare_dir = os.path.abspath(os.path.join(self.model["save_dir"], self.framework))
 
         self.total = 0
         self.time_span = 0

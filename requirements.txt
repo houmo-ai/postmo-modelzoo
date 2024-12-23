@@ -1,4 +1,6 @@
 --extra-index-url https://pypi.ngc.nvidia.com
+onnx_graphsurgeon
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
 numpy
 opencv-python
 prettytable
@@ -11,7 +13,6 @@ pyyaml
 xlsxwriter
 pycocotools
 ultralytics
-onnx_graphsurgeon
 transformers
 jinja2
 loguru

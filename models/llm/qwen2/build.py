@@ -1,7 +1,10 @@
 import os
 import numpy as np
+import time
 import onnx
 import argparse
+
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 
 
 def get_args() -> argparse.Namespace:
@@ -11,14 +14,14 @@ def get_args() -> argparse.Namespace:
         '--model_dir',
         dest='model_dir',
         type=str,
-        default=os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result'),
+        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
         help='path to the model dir',
     )
     parser.add_argument(
         '--model_name',
         dest='model_name',
         type=str,
-        default='qwen2',
+        default='qwen',
         help='output houmo model name',
     )
     parser.add_argument(
@@ -29,8 +32,8 @@ def get_args() -> argparse.Namespace:
         help='batch size',
     )
     parser.add_argument(
-        '--core',
-        dest='core',
+        '--ncore',
+        dest='ncore',
         type=int,
         default=4,
         help='core number',
@@ -48,6 +51,13 @@ def get_args() -> argparse.Namespace:
         type=str,
         default="all",
         help='build stage choise=["build", "test", "all"]',
+    )
+    parser.add_argument(
+        '--output_dir',
+        dest='output_dir',
+        type=str,
+        default=os.path.join('output', HOUMO_TARGET),
+        help='build output dir',
     )
     args = parser.parse_args()
     return args
@@ -80,77 +90,153 @@ def save_submodel_golden(model_dir, model_name, submodel_name, output_names):
             print(f"{os.path.basename(save_path2)} saved in {os.path.dirname(save_path2)}")
 
 
+def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
+    import tcim
+    start = time.time()
+    print(f"\n===> {model_name} build start...")
+    decode_model = os.path.join(model_dir, model_path)
+    tcim.build_from_hmonnx(
+        decode_model,
+        weights=os.path.join(model_dir, "weight.npy"),
+        model_name=model_name,
+        ncore=ncore,
+        output_dir=output_dir,
+        work_dir=os.path.join(output_dir, "tcim")
+    )
+    profile["build"] = time.time() - start
+    print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
+
+
+def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
+    import tcim_lite
+    print(f"\n===> {model_name} test start...")
+    # load model
+    model_path = os.path.join(output_dir, f"{model_name}.hmm")
+    start = time.time()
+    module = tcim_lite.runtime.load(model_path)
+    profile["load"] = time.time() - start
+    print(f'{model_name} load completed in {profile["load"]:.3f} s.', flush=True)
+
+    # set input
+    current_length = 0
+    profile["set_input"] = 0
+    input_num = module.get_num_inputs()
+    for id in range(input_num):
+        input_name = module.get_input_name(id)
+        input_info = module.get_input_info(input_name)
+        print("input_info[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape,
+                                                                            input_info.dtype, input_info.format.name))
+        if prefix is None:
+            prefix = model_name
+        input_file_name = 'hmquant_' + prefix + '_' + input_name + '_input.npy'
+        input_data_path = os.path.join(model_dir, input_file_name)
+        input_data = np.load(input_data_path).astype(input_info.dtype)
+        if input_name == 'current_length':
+            current_length = input_data[0]
+        input_data = np.concatenate([input_data for i in range(batch)], axis=0)
+        print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
+        start = time.time()
+        module.set_input(input_name, input_data)
+        profile["set_input"] += time.time() - start
+    print(f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.')
+
+    # infer model
+    start = time.time()
+    module.run()
+    module.sync()
+    profile["infer"] = time.time() - start
+    print(f'{model_name} infer completed in {profile["infer"]*1000:.3f} ms.')
+
+    # get output and compare with golden
+    profile["get_output"] = 0
+    result_check = True
+    output_num = module.get_num_outputs()
+    for id in range(output_num):
+        output_name = module.get_output_name(id)
+        output_info = module.get_output_info(output_name)
+        print("output_info[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape,
+                                                                            output_info.dtype, output_info.format.name))
+        start = time.time()       
+        output_data = module.get_output(output_name).numpy()
+        profile["get_output"] += time.time() - start
+        print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
+        # only compare [1,current_length,4096]
+        output_data = output_data[:1, :current_length, :]
+        output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_' + output_name + '_output.npy')
+        if os.path.exists(output_data_path):
+            golden_output = np.load(output_data_path)
+            golden_output = golden_output[:1, :current_length, :]
+            golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
+        else:
+            result_check = False
+            print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
+            continue
+        if golden_output.shape == output_data.shape:
+            from hmassist.utils.dist_metrics import cosine_distance
+            cosine_dist = cosine_distance(golden_output, output_data)
+            is_match = (golden_output == output_data).all()
+            print("[compare] golden output [{}] match={}, similarity={:.6f}"
+                    .format(output_name, is_match, cosine_dist))
+            if cosine_dist < 0.999:
+                result_check = False
+        else:
+            result_check = False
+            print("[compare] golden output [{}] shape not match {} vs {}"
+                    .format(output_name, golden_output.shape, output_data.shape))
+    print(f'{model_name} {model_part} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.')
+    if not result_check:
+        print("[error] result check failed.")
+        exit(-1)
+    print(f"<=== {model_name} {model_part} test success.")
+
+
 if __name__ == '__main__':
     args = get_args()
     curdir = os.getcwd()
+    model_dir = args.model_dir
     model_name = args.model_name
     nblocks = args.nblocks
+    output_dir = args.output_dir
+    ncore = args.ncore
+    batch = args.batch
+    profile = {}
 
-    if args.stage == "build" or args.stage == "all":
-        # model split
-        prefill_model = os.path.join(args.model_dir, f"prefill/hmquant_{model_name}_with_act.onnx")
-        prefill_model_part1 = os.path.join(args.model_dir, f"prefill/hmquant_{model_name}_part1_with_act.onnx")
-        prefill_model_part2 = os.path.join(args.model_dir, f"prefill/hmquant_{model_name}_part2_with_act.onnx")
-        prefill_model_head = os.path.join(args.model_dir, f"prefill/hmquant_{model_name}_head_with_act.onnx")
-        decode_model = os.path.join(args.model_dir, f"decoder/hmquant_{model_name}_with_act.onnx")
-        decode_model_part1 = os.path.join(args.model_dir, f"decoder/hmquant_{model_name}_part1_with_act.onnx")
-        decode_model_part2 = os.path.join(args.model_dir, f"decoder/hmquant_{model_name}_part2_with_act.onnx")
-        decode_model_head = os.path.join(args.model_dir, f"decoder/hmquant_{model_name}_head_with_act.onnx")
-        part1_input_names = ['input_1', 'valid_length', 'current_length']
-        part1_output_names = [f'model_layers_{nblocks//2-1}_resadd2']
-        part2_input_names = [f'model_layers_{nblocks//2-1}_resadd2', 'valid_length', 'current_length']
-        part2_output_names = [f'model_layers_{nblocks-1}_resadd2']
-        head_input_names = [f'model_layers_{nblocks-1}_resadd2', 'current_length']
-        head_output_names = ['lm_head_add_list_0']
-        if args.batch == 1:
-            for i in range(nblocks//2):
-                part1_input_names.append(f'model_layers_{i}_self_attn_kcache_input')
-                part1_input_names.append(f'model_layers_{i}_self_attn_vcache_input')
-                part2_input_names.append(f'model_layers_{i+nblocks//2}_self_attn_kcache_input')
-                part2_input_names.append(f'model_layers_{i+nblocks//2}_self_attn_vcache_input')
-        elif args.batch == 4:
-            for i in range(nblocks//2):
-                for j in range(args.batch):
-                    part1_input_names.append(f'model_layers_{i}_self_attn_kcache_input_batch{j}')
-                    part1_input_names.append(f'model_layers_{i}_self_attn_vcache_input_batch{j}')
-                    part2_input_names.append(f'model_layers_{i+nblocks//2}_self_attn_kcache_input_batch{j}')
-                    part2_input_names.append(f'model_layers_{i+nblocks//2}_self_attn_vcache_input_batch{j}')
-        else:
-            print(f"[error] batch = {args.batch} not supported.")
-            exit(-1)
-        if os.path.exists(prefill_model) and not os.path.exists(prefill_model_part1):
-            extract_model(prefill_model, prefill_model_part1, input_names=part1_input_names,
-                output_names=part1_output_names)
-            extract_model(prefill_model, prefill_model_part2, input_names=part2_input_names,
-                output_names=part2_output_names)
+    # split prefill into 2 parts: nohead and head
+    prefill_model = os.path.join(model_dir, f"prefill/hmquant_{model_name}_with_act.onnx")
+    prefill_model_nohead = os.path.join(model_dir, f"prefill/hmquant_{model_name}_nohead_with_act.onnx")
+    prefill_model_head = os.path.join(model_dir, f"prefill/hmquant_{model_name}_head_with_act.onnx")
+    nohead_input_names = ['input_1', 'valid_length', 'current_length']
+    nohead_output_names = [f'model_layers_{nblocks-1}_resadd2']
+    head_input_names = [f'model_layers_{nblocks-1}_resadd2', 'current_length']
+    head_output_names = ['lm_head_add_list_0']
+    if not os.path.exists(prefill_model_nohead) or not os.path.exists(prefill_model_head):
+        if os.path.exists(prefill_model):
+            extract_model(prefill_model, prefill_model_nohead, input_names=nohead_input_names,
+                output_names=nohead_output_names)
             extract_model(prefill_model, prefill_model_head, input_names=head_input_names,
                 output_names=head_output_names)
-            save_submodel_golden(args.model_dir, model_name, "prefill", part1_output_names+part2_output_names)
-        if os.path.exists(decode_model) and not os.path.exists(decode_model_part1):
-            extract_model(decode_model, decode_model_part1, input_names=part1_input_names,
-                output_names=part1_output_names)
-            extract_model(decode_model, decode_model_part2, input_names=part2_input_names,
-                output_names=part2_output_names)
-            extract_model(decode_model, decode_model_head, input_names=head_input_names,
-                output_names=head_output_names)
-            save_submodel_golden(args.model_dir, model_name, "decoder", part1_output_names+part2_output_names)
-        print(f"{model_name} model split commpleted.")
+            save_submodel_golden(model_dir, model_name, "prefill", nohead_output_names)
+        else:
+            print(f"[error] {prefill_model} not exist.")
+            exit(-1)
 
-    if os.system("python3 build_prefill_part1.py --stage {} --model_dir {} --model_name {} --core {}"
-                 .format(args.stage, args.model_dir, model_name, args.core)):
-        exit(-1)
-    if os.system("python3 build_prefill_part2.py --stage {} --model_dir {} --model_name {} --core {}"
-                 .format(args.stage, args.model_dir, model_name, args.core)):
-        exit(-1)
-    if os.system("python3 build_decode_part1.py --stage {} --model_dir {} --model_name {} --core {}"
-                 .format(args.stage, args.model_dir, model_name, args.core)):
-        exit(-1)
-    if os.system("python3 build_decode_part2.py --stage {} --model_dir {} --model_name {} --core {}"
-                 .format(args.stage, args.model_dir, model_name, args.core)):
-        exit(-1)
-    if os.system("python3 build_prefill_head.py --stage {} --model_dir {} --model_name {} --core {}"
-                 .format(args.stage, args.model_dir, model_name, args.core)):
-        exit(-1)
-    if os.system("python3 build_decode_head.py --stage {} --model_dir {} --model_name {} --core {}"
-                 .format(args.stage, args.model_dir, model_name, args.core)):
-        exit(-1)
+    # build model
+    if args.stage == "build" or args.stage == "all":
+        model_part = "prefill_nohead"
+        model_path = f"prefill/hmquant_{model_name}_nohead_with_act.onnx"
+        build(model_part, model_dir, model_path, output_dir, profile, ncore)
+        model_part = "prefill_head"
+        model_path = f"prefill/hmquant_{model_name}_head_with_act.onnx"
+        build(model_part, model_dir, model_path, output_dir, profile, ncore)
+        model_part = "decode"
+        model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
+        build(model_part, model_dir, model_path, output_dir, profile, ncore)
+
+    # test model
+    if args.stage == 'test' or args.stage == 'all':
+        model_part = "prefill_nohead"
+        test(model_part, model_dir, output_dir, profile, prefix=model_name)
+        model_part = "prefill_head"
+        test(model_part, model_dir, output_dir, profile, prefix=model_name)
+        model_part = "decode"
+        test(model_part, model_dir, output_dir, profile, prefix=model_name)

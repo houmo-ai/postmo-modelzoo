@@ -1,50 +1,45 @@
 #!/usr/bin/env bash
 pip3 install -r requirements.txt
 
-MODELZOO_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")" || exit ; pwd)
-export MODELZOO_PATH
-HMASSIST_PATH=$MODELZOO_PATH/hmassist
-export HMASSIST_PATH
+# main path
+export MODELZOO_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")" || exit ; pwd)
+export HMASSIST_PATH=$MODELZOO_PATH/hmassist
 export CMAKE_CONFIG_PATH=$MODELZOO_PATH/release.cmake
 
 if [[ -z $HOUMO_TARGET ]]; then
   export HOUMO_TARGET=houmo
 fi
 
+if [[ -z $HOUMO_PATH ]]; then
+  echo "[warn] HOUMO_PATH not set. use default."
+  export HOUMO_PATH=/usr/local/houmo
+fi
+
+if [[ -z $TCIM_RUNTIME_PATH ]]; then
+echo "[warn] TCIM_RUNTIME_PATH not set. use default."
+  export TCIM_RUNTIME_PATH=$HOUMO_PATH
+fi
+
 if [[ -z $MODELZOO_URL ]]; then
   export MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo/release
 fi
 
-# set hal library log level
-export HM800_HAL_CONSOLE_LEVEL=0
-export HDPL_API_TIMEOUT=30000
+export TCIM_RUNTIME_PATH=$HOUMO_PATH
 
-# main path
-if [[ -z $HOUMO_PATH ]]; then
-  HOUMO_PATH=/usr/local/houmo
-  export HOUMO_PATH
-fi
-
-if [[ -z $TCIM_PATH ]]; then
-  TCIM_PATH=$(python3 -c "import tvm; print(tvm.__path__[0])")
-  export TCIM_PATH
-fi
-
-if [[ -z $TCIM_RUNTIME_PATH ]]; then
-  TCIM_RUNTIME_PATH=$HOUMO_PATH
-  export TCIM_RUNTIME_PATH
-fi
+# paths for build
+export PATH=$HOUMO_PATH/bin:$PATH
 
 # paths for c/c++ compiling
 export TCIM_INC_PATH=$TCIM_RUNTIME_PATH/include
 export TCIM_LIB_PATH=$TCIM_RUNTIME_PATH/lib
-export HDPL_INC_PATH=$HOUMO_PATH/include
-export HDPL_LIB_PATH=$HOUMO_PATH/lib
 
 # paths for runtime
-export LD_LIBRARY_PATH=$TCIM_RUNTIME_PATH/lib:$TCIM_PATH/lib:$LD_LIBRARY_PATH
-export PYTHONPATH=$HMASSIST_PATH:$TCIM_RUNTIME_PATH/python:$PYTHONPATH
-export PATH=$HOUMO_PATH/bin:$HMASSIST_PATH:$PATH
+export PYTHONPATH=$TCIM_RUNTIME_PATH/python:$PYTHONPATH
+export LD_LIBRARY_PATH=$HOUMO_PATH/lib:$LD_LIBRARY_PATH
+
+# paths for hmassist
+export PYTHONPATH=$HMASSIST_PATH:$PYTHONPATH
+export PATH=$HMASSIST_PATH:$PATH
 
 # data and model path
 if [[ -z $DATASETS_PATH ]]; then
@@ -52,7 +47,12 @@ if [[ -z $DATASETS_PATH ]]; then
 fi
 
 if [[ -z $MODEL_PATH ]]; then
-  export MODEL_PATH=$MODELZOO_PATH/models
+  CI_MODEL_PATH=/data02/modelzoo_ci/models
+  if test -d $CI_MODEL_PATH; then
+    export MODEL_PATH=$CI_MODEL_PATH
+  else
+    export MODEL_PATH=$MODELZOO_PATH/models
+  fi
 fi
 
 # use asic if detected
@@ -67,9 +67,8 @@ fi
 echo "[Please check the following path. Unset the environment variable if you want to use the default path!]"
 echo "HOUMO_TARGET is $HOUMO_TARGET"
 echo "HOUMO_PATH is $HOUMO_PATH"
-echo "TCIM_PATH is $TCIM_PATH"
+echo "HOUMO_SDK_PATH is $HOUMO_SDK_PATH"
 echo "TCIM_RUNTIME_PATH is $TCIM_RUNTIME_PATH"
-echo "QUANTOOL_PATH is $QUANTOOL_PATH"
 echo "MODELZOO_PATH is $MODELZOO_PATH"
 echo "DATASETS_PATH is $DATASETS_PATH"
 echo "MODEL_PATH is $MODEL_PATH"

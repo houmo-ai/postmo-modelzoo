@@ -38,18 +38,18 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.num_inputs = len(self.inputs)
         self.model_name = self.model["name"]
         # default params
-        self.build_mode = self.build_cfg.get("mode", "AOT")
+        self.ncore = self.build_cfg.get("ncore", 1)
         self.opt_level = self.build_cfg.get("opt_level", 2)
         # other params
         self.cur_dir = os.path.abspath("./")
         self.model_dir = os.path.abspath(os.path.join(cfg["model"]["save_dir"], self.target))
-        self.result_dir = os.path.join(self.model_dir, "result")
-        self.test_dir = os.path.join(self.result_dir, "test")
-        self.quant_model_path = os.path.abspath(os.path.join(self.result_dir, 'hmquant_' + self.model_name + '_with_act.onnx'))
-        self.build_save_dir = os.path.join(self.result_dir, "tcim")
-        self.golden_data_path = self.result_dir
-        if not os.path.exists(self.result_dir):
-            os.makedirs(self.result_dir)
+        self.quant_dir = os.path.join(self.model_dir, "hmquant")
+        self.test_dir = os.path.join(self.model_dir, "test")
+        self.quant_model_path = os.path.abspath(os.path.join(self.quant_dir, 'hmquant_' + self.model_name + '_with_act.onnx'))
+        self.build_dir = os.path.join(self.model_dir, "tcim")
+        self.golden_data_path = self.quant_dir
+        if not os.path.exists(self.quant_dir):
+            os.makedirs(self.quant_dir)
         logger.info("model output dir -> {}".format(self.model_dir))
 
         self.shape_dict = dict()
@@ -178,20 +178,10 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         return quantize_config, norm
 
     def print_input_info(self):
-        input_num = len(self.input_info)
-        logger.info("{} input num = {}:".format(self.target, input_num))
-        for _input in self.input_info:
-            logger.info("{} input[{}] shape = {}, dtype = {}, format = {}".format(self.target, _input["name"],
-                                                                                  _input["shape"], _input["dtype"],
-                                                                                  _input["format"].name))
+        pass
 
     def print_output_info(self):
-        output_num = len(self.output_info)
-        logger.info("{} output num = {}:".format(self.target, output_num))
-        for _output in self.output_info:
-            logger.info("{} output[{}] shape = {}, dtype = {}, format = {}".format(self.target, _output["name"],
-                                                                                   _output["shape"], _output["dtype"],
-                                                                                   _output["format"].name))
+        pass
 
     def get_relay_mac(self):
         """get relay func MAC count"""

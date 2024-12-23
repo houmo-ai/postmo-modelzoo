@@ -77,7 +77,9 @@ def getTestUnit(testModule,yamlData):
     for key, value in yamlData.items():
         if key != testModule:
             continue
-        unitTests.update(value.get("test"))
+        testcase = value.get("test", None)
+        if testcase is not None:
+            unitTests.update(value.get("test"))
 
     return unitTests
 

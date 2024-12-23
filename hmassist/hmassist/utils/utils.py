@@ -123,7 +123,7 @@ def get_file_from_jfrog(file_path, save_dir="", extract_dir=None):
     need_download = True
     if "http://" in file_path or "https://" in file_path:
         url, file_path = file_path.split("artifactory/")
-        modelzoo_url = url + "artifactory/"
+        modelzoo_url = url + "artifactory"
     else:
         modelzoo_url = os.environ.get("MODELZOO_URL")
     file_name = os.path.basename(file_path)
@@ -132,7 +132,7 @@ def get_file_from_jfrog(file_path, save_dir="", extract_dir=None):
     else:
         os.makedirs(save_dir, exist_ok=True)
     save_path = f"{save_dir}/{file_name}"
-    jfrog_base, jfrog_tail = modelzoo_url.split("artifactory/")
+    jfrog_base, jfrog_tail = modelzoo_url.split("artifactory")
     jfrog_base = jfrog_base + "artifactory"
     file_info_path = f"{jfrog_base}/api/storage/{jfrog_tail}/{file_path}"
     response = requests.get(file_info_path)

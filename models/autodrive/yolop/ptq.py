@@ -7,6 +7,10 @@ import argparse
 from hmquant.api import quant_single_onnx_network, generate_golden, quantize_profiling
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+MODEL_PATH = os.getenv("MODEL_PATH", '')
+DATASETS_PATH = os.getenv('DATASETS_PATH', '')
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -15,7 +19,7 @@ def get_args() -> argparse.Namespace:
         '--model_path',
         dest='model_path',
         type=str,
-        default=os.path.join(os.getenv("MODEL_PATH", default=""), 'yolop_384x640.onnx'),
+        default=os.path.join(MODEL_PATH, 'yolop_384x640.onnx'),
         help='path to the model path',
     )
     parser.add_argument(
@@ -29,7 +33,7 @@ def get_args() -> argparse.Namespace:
         '--model_dir',
         dest='model_dir',
         type=str,
-        default=os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result'),
+        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
         help='path to the quanted model dir',
     )
     args = parser.parse_args()
@@ -40,8 +44,6 @@ def calibrate(args=None):
     model_path = args.model_path
     model_name = args.model_name
     output_path = args.model_dir
-
-    env_dict = os.environ
 
     def preprocess(filepath):
         import cv2
@@ -57,7 +59,7 @@ def calibrate(args=None):
 
     calib_num = 20
     calib_files = []
-    calib_dir = os.path.join(env_dict.get('DATASETS_PATH'), 'coco2017/val2017')
+    calib_dir = os.path.join(DATASETS_PATH, 'coco2017/val2017')
     file_list = os.listdir(calib_dir)
     for filename in file_list:
         _, ext = os.path.splitext(filename)

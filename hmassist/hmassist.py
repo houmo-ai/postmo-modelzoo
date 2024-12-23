@@ -102,20 +102,20 @@ def build(cfg):
         exit(-1)
     logger.info("{}".format(cfg))
     model = get_model(cfg)
-    model.executor.build(model.build_options())
+    model.executor.build()
 
     # compare golden data
     model.load()
     model.executor.print_input_info()
     model.executor.print_output_info()
     logger.info("start compare golden data...")
-    if not os.path.exists(model.executor.build_save_dir):
-        os.makedirs(model.executor.build_save_dir)
+    if not os.path.exists(model.executor.build_dir):
+        os.makedirs(model.executor.build_dir)
     inputs = model.executor.get_golden_inputs()
     if inputs is not None:
         for input_name, input_data in inputs.items():
             input_save_name = sanitize_name(input_name)
-            input_data.tofile(os.path.join(model.executor.build_save_dir, "{}.bin".format(input_save_name)))
+            input_data.tofile(os.path.join(model.executor.build_dir, "{}.bin".format(input_save_name)))
         model.executor.set_fixed_out(True)
         start = time.time()
         outputs = model.executor.infer(inputs)
@@ -123,7 +123,7 @@ def build(cfg):
         logger.info("[infer] cost {:.3f}ms".format(cost * 1000))
         # 临时添加NCHW
         # output_data = np.transpose(output_data, (0, 2, 3, 1))
-    logger.info("inputs saved in {}".format(model.executor.build_save_dir))
+    logger.info("inputs saved in {}".format(model.executor.build_dir))
     sum_cos = 0.0
     result_check = True
     for output_name, output_data in outputs.items():
@@ -132,9 +132,9 @@ def build(cfg):
         output_save_name = sanitize_name(output_name)
         if len(output_data.shape) == 4:
             # save as NHWC to support c++ compare
-            save_data(np.transpose(output_data, (0, 2, 3, 1)), model.executor.build_save_dir, output_save_name)
+            save_data(np.transpose(output_data, (0, 2, 3, 1)), model.executor.build_dir, output_save_name)
         else:
-            save_data(output_data, model.executor.build_save_dir, output_save_name)
+            save_data(output_data, model.executor.build_dir, output_save_name)
         golden_output = model.executor.get_golden_output(output_save_name)
         logger.info("golden output[{}] shape = {}, dtype = {}".format(output_name, golden_output.shape, golden_output.dtype))
         is_match = (output_data == golden_output).all()
@@ -144,7 +144,7 @@ def build(cfg):
                     .format(model.target, output_name, is_match, cosine_dist))
         if cosine_dist < 0.99:
             result_check = False
-    logger.info("outputs saved in {}".format(model.executor.build_save_dir))
+    logger.info("outputs saved in {}".format(model.executor.build_dir))
     logger.info("[compare] {} vs quant output average similarity={:.6f}".format(model.target, sum_cos/len(outputs)))
     if not result_check:
         print("[error] result check failed.")
@@ -180,7 +180,7 @@ def test(cfg):
     logger.info("[infer] cost {:.3f}ms".format(cost * 1000))
 
     # save datas
-    save_dir = os.path.join(model.executor.result_dir, "test")
+    save_dir = os.path.join(model.executor.test_dir)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     for input_name, input_data in inputs.items():

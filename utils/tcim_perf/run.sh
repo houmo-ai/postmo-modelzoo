@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-TEST_MODEL=$MODELZOO_PATH/models/backbone/resnet50/resnet50.hmm
+TEST_MODEL=$MODELZOO_PATH/models/backbone/resnet50/output/houmo/resnet50.hmm
 TEST_DATA=$MODELZOO_PATH/data/imagenet/ILSVRC2012_img_val
 TEST_SAMPLES=1000
 TEST_LOOPS=1

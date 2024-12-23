@@ -6,6 +6,10 @@ import argparse
 from hmquant.api import quant_single_onnx_network, generate_golden, quantize_profiling
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+MODEL_PATH = os.getenv("MODEL_PATH", '')
+DATASETS_PATH = os.getenv('DATASETS_PATH', '')
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -14,7 +18,7 @@ def get_args() -> argparse.Namespace:
         '--model_path',
         dest='model_path',
         type=str,
-        default=os.path.join(os.getenv("MODEL_PATH", default=""), 'vit.onnx'),
+        default=os.path.join(MODEL_PATH, 'vit.onnx'),
         help='path to the model path',
     )
     parser.add_argument(
@@ -28,7 +32,7 @@ def get_args() -> argparse.Namespace:
         '--model_dir',
         dest='model_dir',
         type=str,
-        default=os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result'),
+        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
         help='path to the quanted model dir',
     )
     args = parser.parse_args()
@@ -39,8 +43,6 @@ def calibrate(args=None):
     model_path = args.model_path
     model_name = args.model_name
     output_path = args.model_dir
-
-    env_dict = os.environ
 
     def unsqueeze(x):
         return torch.unsqueeze(x, 0)
@@ -54,7 +56,7 @@ def calibrate(args=None):
 
     calib_num = 20
     calib_files = []
-    calib_dir = os.path.join(env_dict.get('DATASETS_PATH'), 'imagenet/ILSVRC2012_img_val')
+    calib_dir = os.path.join(DATASETS_PATH, 'imagenet/ILSVRC2012_img_val')
     file_list = os.listdir(calib_dir)
     for filename in file_list:
         _, ext = os.path.splitext(filename)
@@ -100,6 +102,10 @@ def calibrate(args=None):
         device='cpu',
     )
 
+    print("start quantize profiling...")
+    quantize_profiling(sequencer, [onnx_input])
+    print("calibrate completed.")
+
     print("start save model and generate golden...")
     generate_golden(
         sequencer=sequencer,
@@ -109,10 +115,7 @@ def calibrate(args=None):
         batch_size=1,
         device="cpu"
     )
-
-    print("start quantize profiling...")
-    quantize_profiling(sequencer, [onnx_input])
-    print("calibrate completed")
+    print("save model and generate golden completed.")
 
 
 if __name__ == '__main__':
