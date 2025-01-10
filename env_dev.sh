@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-pip3 install -r requirements.txt
-pip3 uninstall houmo-tcim2
+sudo pip3 install -r requirements.txt
+sudo pip3 uninstall -y houmo-tcim2
 
 __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 export MODELZOO_PATH=${__dir}

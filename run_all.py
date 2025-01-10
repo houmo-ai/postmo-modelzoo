@@ -162,4 +162,7 @@ def main(allArgs=None):
 if __name__ == "__main__":
     os.environ['MODELZOO_URL'] = "http://10.10.1.53:8082/artifactory/toolchain/release"
     os.environ['MODEL_PATH'] = "/data02/modelzoo_ci/models"
+    os.system("wget http://10.10.1.53:8082/artifactory/toolchain/support/xh2_extra_libs.zip")
+    os.system("unzip xh2_extra_libs.zip -d xh2_extra_libs")
+    os.system("cp xh2_extra_libs/* /usr/local/houmo/lib")
     main()
