@@ -12,31 +12,34 @@ class BaseExec(object, metaclass=abc.ABCMeta):
     def __init__(self, cfg: dict):
         """init"""
         # self.cfg = cfg
-        self.model = cfg["model"]
+        self.model_cfg = cfg["model"]
         self.quant_cfg = cfg["quant"]
         self.build_cfg = cfg["build"]
         self.test_cfg = cfg["test"]
         self.demo_cfg = cfg["demo"]
         self.perf_cfg = cfg["perf"]
-        self.acc_cfg = cfg["eval"]
+        self.eval_cfg = cfg["eval"]
         self.batch = cfg["batch"]
+
+        # config from cmd
+        self.target = cfg["target"]
         if "thread_num" in cfg:
             self.perf_cfg["thread_num"] = cfg["thread_num"]
         else:
             self.perf_cfg["thread_num"] = 1
+
         # model params
         self.target = cfg["target"]
-        self.framework = self.model["framework"]
-        self.weight = self.model["weight"]
+        self.framework = self.model_cfg["framework"]
+        self.weight = self.model_cfg["weight"]
         if not os.path.exists(self.weight):
             weight = os.path.join(os.getenv("MODEL_PATH", default=""), self.weight)
             if not os.path.exists(weight):
-                logger.warning("{} or {} not exist.".format(self.weight, weight))
-                # exit(-1)
+                raise RuntimeError(f"{self.weight} or {weight} not exist.")
             self.weight = weight
-        self.inputs = self.model["inputs"]
+        self.inputs = self.model_cfg["inputs"]
         self.num_inputs = len(self.inputs)
-        self.model_name = self.model["name"]
+        self.model_name = self.model_cfg["name"]
         # default params
         self.ncore = self.build_cfg.get("ncore", 1)
         self.opt_level = self.build_cfg.get("opt_level", 2)

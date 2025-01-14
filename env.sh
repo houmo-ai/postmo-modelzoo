@@ -1,22 +1,29 @@
 #!/usr/bin/env bash
-pip3 install -r requirements.txt
 
 # main path
-export MODELZOO_PATH=$(cd "$(dirname "${BASH_SOURCE[0]}")" || exit ; pwd)
+__dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+export MODELZOO_PATH=${__dir}
 export HMASSIST_PATH=$MODELZOO_PATH/hmassist
 export CMAKE_CONFIG_PATH=$MODELZOO_PATH/release.cmake
 
+# install requirements
+pip3 install -r $MODELZOO_PATH/requirements.txt
+
+# common define
+PRINT_GREEN() { echo -e "\033[1;32m$@\033[0m"; }
+PRINT_YELLOW() { echo -e "\033[1;33m$@\033[0m"; }
+
 if [[ -z $HOUMO_TARGET ]]; then
-  export HOUMO_TARGET=houmo
+  export HOUMO_TARGET=xh1
 fi
 
 if [[ -z $HOUMO_PATH ]]; then
-  echo "[warn] HOUMO_PATH not set. use default."
+  PRINT_YELLOW "[warn] HOUMO_PATH not set. use default."
   export HOUMO_PATH=/usr/local/houmo
 fi
 
 if [[ -z $TCIM_RUNTIME_PATH ]]; then
-echo "[warn] TCIM_RUNTIME_PATH not set. use default."
+  PRINT_YELLOW "[warn] TCIM_RUNTIME_PATH not set. use default."
   export TCIM_RUNTIME_PATH=$HOUMO_PATH
 fi
 
@@ -28,10 +35,6 @@ export TCIM_RUNTIME_PATH=$HOUMO_PATH
 
 # paths for build
 export PATH=$HOUMO_PATH/bin:$PATH
-
-# paths for c/c++ compiling
-export TCIM_INC_PATH=$TCIM_RUNTIME_PATH/include
-export TCIM_LIB_PATH=$TCIM_RUNTIME_PATH/lib
 
 # paths for runtime
 export PYTHONPATH=$TCIM_RUNTIME_PATH/python:$PYTHONPATH
@@ -64,15 +67,15 @@ if [[ -z $HDPL_PLATFORM ]]; then
   fi
 fi
 
-echo "[Please check the following path. Unset the environment variable if you want to use the default path!]"
-echo "HOUMO_TARGET is $HOUMO_TARGET"
-echo "HOUMO_PATH is $HOUMO_PATH"
-echo "HOUMO_SDK_PATH is $HOUMO_SDK_PATH"
-echo "TCIM_RUNTIME_PATH is $TCIM_RUNTIME_PATH"
-echo "MODELZOO_PATH is $MODELZOO_PATH"
-echo "DATASETS_PATH is $DATASETS_PATH"
-echo "MODEL_PATH is $MODEL_PATH"
-echo "PYTHONPATH is $PYTHONPATH"
-echo "LD_LIBRARY_PATH is $LD_LIBRARY_PATH"
-echo "PATH is $PATH"
-echo "HDPL_PLATFORM is $HDPL_PLATFORM"
+PRINT_GREEN "[Please check the following path. Unset the environment variable if you want to use the default path!]"
+PRINT_GREEN "HOUMO_TARGET is $HOUMO_TARGET"
+PRINT_GREEN "HOUMO_PATH is $HOUMO_PATH"
+PRINT_GREEN "HOUMO_SDK_PATH is $HOUMO_SDK_PATH"
+PRINT_GREEN "TCIM_RUNTIME_PATH is $TCIM_RUNTIME_PATH"
+PRINT_GREEN "MODELZOO_PATH is $MODELZOO_PATH"
+PRINT_GREEN "DATASETS_PATH is $DATASETS_PATH"
+PRINT_GREEN "MODEL_PATH is $MODEL_PATH"
+PRINT_GREEN "PYTHONPATH is $PYTHONPATH"
+PRINT_GREEN "LD_LIBRARY_PATH is $LD_LIBRARY_PATH"
+PRINT_GREEN "PATH is $PATH"
+PRINT_GREEN "HDPL_PLATFORM is $HDPL_PLATFORM"

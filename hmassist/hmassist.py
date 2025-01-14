@@ -49,7 +49,7 @@ def save_data(data, dir, name):
 
 def get_executor(cfg):
     target = cfg["target"]
-    if target == "houmo":
+    if target == "houmo" or target == "xh1":
         return XH1Exec(cfg)
     elif target == "onnx":
         return OnnxExec(cfg)
@@ -468,7 +468,7 @@ if __name__ == "__main__":
                         choices=("quant", "build", "test", "demo", "perf", "eval", "benchmark"),
                         help="Specify an operation")
     parser.add_argument("--target", type=str, required=True,
-                        choices=("houmo", "onnx"),
+                        choices=("houmo", "onnx", "xh1"),
                         help="Specify a chip target")
     parser.add_argument("--config", type=str, default="config.yml",
                         help="Specify a config file, default is config.yml")

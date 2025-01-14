@@ -3,6 +3,9 @@ import onnx
 import argparse
 from hmassist.utils.utils import get_file_from_jfrog
 
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -17,7 +20,7 @@ def get_args() -> argparse.Namespace:
         '--quant_model_dir',
         dest='quant_model_dir',
         type=str,
-        default=os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result'),
+        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
         help='where to save quant_model',
     )
     parser.add_argument(

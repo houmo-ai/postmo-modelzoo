@@ -32,8 +32,14 @@ os.system(cmd)
 postfix = ""
 if version != "":
     postfix = "_" + version
-cmd = 'tar -czf ' + dir_name + postfix + ".tar.gz " + exclude_cmd + include_cmd
+cmd = f"tar -czf {dir_name}{postfix}.tar.gz {exclude_cmd} {include_cmd}"
+print(cmd)
+os.system(cmd)
+print("tar {dir_name}{postfix} done.")
+
+# houmo-examples
+cmd = f"cd imodelzoo && mv examples houmo-examples && zip houmo-examples_v{version}.zip -r houmo-examples && mv houmo-examples_v{version}.zip .."
 print(cmd)
 
 os.system(cmd)
-print("tar done.")
+print("zip houmo-examples_v{version} done.")

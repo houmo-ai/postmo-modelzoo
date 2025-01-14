@@ -155,9 +155,11 @@ class XH1Exec(BaseExec, ABC):
             self.quant_model_path,
             model_name=self.model_name,
             ncore=self.ncore,
+            batch=self.batch,
             legacy=True,
             output_dir=self.model_dir,
-            work_dir=self.build_dir
+            work_dir=self.build_dir,
+            opt_level=f"O{self.opt_level}",
         )
         print(self.model_name + ' build completed.')
 

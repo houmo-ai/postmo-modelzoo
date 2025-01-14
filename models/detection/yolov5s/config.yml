@@ -34,7 +34,7 @@ quant: {
 }
 
 build: {
-  opt_level: 0,
+  opt_level: 2,
 }
 
 test: {

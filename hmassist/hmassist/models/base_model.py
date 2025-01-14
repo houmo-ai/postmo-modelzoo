@@ -15,12 +15,12 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         """"""
         self.executor = kwargs["executor"]
         self.dataset = kwargs["dataset"]
-        self.model = self.executor.model
+        self.model_cfg = self.executor.model_cfg
         self.target = self.executor.target
-        self.framework = self.model["framework"]
-        self.inputs = self.model["inputs"]
-        self.name = self.model["name"]
-        self.compare_dir = os.path.abspath(os.path.join(self.model["save_dir"], self.framework))
+        self.framework = self.model_cfg["framework"]
+        self.inputs = self.model_cfg["inputs"]
+        self.name = self.model_cfg["name"]
+        self.compare_dir = os.path.abspath(os.path.join(self.model_cfg["save_dir"], self.framework))
 
         self.total = 0
         self.time_span = 0
