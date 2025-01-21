@@ -18,3 +18,9 @@ jinja2
 loguru
 modelscope
 gitpython
+
+# asr
+torchaudio==2.4.0
+openai-whisper
+langid
+librosa

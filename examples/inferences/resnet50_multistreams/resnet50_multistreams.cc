@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::thread> threads;
 
   // 1. input preprocess
-  std::string data_path = "../data/snake.jpg";
+  std::string data_path = "../../data/snake.jpg";
   if (!fs::exists(data_path)) {
     std::cerr << data_path << "not exist." << std::endl;
     exit(-1);

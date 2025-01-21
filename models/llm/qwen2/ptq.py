@@ -24,7 +24,7 @@ def parse_args():
     parser.add_argument("--n_calib", type=int, default=16)
     # 2. export
     parser.add_argument("--model_name", type=str, default="qwen2")
-    parser.add_argument("--save_path",type=str,default=f"output/{HOUMO_TARGET}/result")
+    parser.add_argument("--save_path",type=str,default=f"output/{HOUMO_TARGET}/hmquant")
     parser.add_argument("--prefill_shape", type=int, nargs='+', default=[4, 32], help="List of integers for prefill shape")
     parser.add_argument("--cache_len", type=int, default=4096)
     parser.add_argument("--multi_batch",action="store_true",default=False,help="weather use multi batch for export")

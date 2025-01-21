@@ -35,11 +35,11 @@ if version != "":
 cmd = f"tar -czf {dir_name}{postfix}.tar.gz {exclude_cmd} {include_cmd}"
 print(cmd)
 os.system(cmd)
-print("tar {dir_name}{postfix} done.")
+print(f"tar {dir_name}{postfix} done.")
 
 # houmo-examples
-cmd = f"cd imodelzoo && mv examples houmo-examples && zip houmo-examples_v{version}.zip -r houmo-examples && mv houmo-examples_v{version}.zip .."
+cmd = f"cd {dir_name} && mv examples houmo-examples && zip houmo-examples{postfix}.zip -r houmo-examples && mv houmo-examples{postfix}.zip .."
 print(cmd)
 
 os.system(cmd)
-print("zip houmo-examples_v{version} done.")
+print(f"zip houmo-examples{postfix} done.")

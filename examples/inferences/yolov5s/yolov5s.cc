@@ -276,7 +276,7 @@ int main() {
 
   // 3. input preprocess
   YoloV5 yolov5;
-  std::string data_path = "../data/000000000139.jpg";
+  std::string data_path = "../../data/000000000139.jpg";
   if (!fs::exists(data_path)) {
     std::cerr << data_path << " not exist." << std::endl;
     exit(-1);

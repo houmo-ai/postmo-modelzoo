@@ -1,10 +1,10 @@
-#!/usr/bin/python3
-# -*- coding: utf-8 -*-
-
 import os
 import numpy as np
+import time
 import onnx
 import argparse
+
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 
 
 def get_args() -> argparse.Namespace:
@@ -14,14 +14,14 @@ def get_args() -> argparse.Namespace:
         '--model_dir',
         dest='model_dir',
         type=str,
-        default=os.path.join('output', os.getenv('HOUMO_TARGET', ''), 'result'),
+        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
         help='path to the model dir',
     )
     parser.add_argument(
         '--model_name',
         dest='model_name',
         type=str,
-        default='qwen2',
+        default='sd_unet',
         help='output houmo model name',
     )
     parser.add_argument(
@@ -32,11 +32,18 @@ def get_args() -> argparse.Namespace:
         help='batch size',
     )
     parser.add_argument(
-        '--core',
-        dest='core',
+        '--ncore',
+        dest='ncore',
         type=int,
         default=4,
         help='core number',
+    )
+    parser.add_argument(
+        '--nblocks',
+        dest='nblocks',
+        type=int,
+        default=28,
+        help='block number',
     )
     parser.add_argument(
         '--stage',
@@ -45,75 +52,59 @@ def get_args() -> argparse.Namespace:
         default="all",
         help='build stage choise=["build", "test", "all"]',
     )
+    parser.add_argument(
+        '--output_dir',
+        dest='output_dir',
+        type=str,
+        default=os.path.join('output', HOUMO_TARGET),
+        help='build output dir',
+    )
     args = parser.parse_args()
-    return args
+    return args  
 
 
-def build(args=None):
-    """build and test houmo model."""
+if __name__ == '__main__':
+    args = get_args()
+    curdir = os.getcwd()
+    model_dir = args.model_dir
     model_name = args.model_name
+    nblocks = args.nblocks
+    output_dir = args.output_dir
+    ncore = args.ncore
     batch = args.batch
-    core_num = args.core
     stage = args.stage
-    model_dir = os.path.join(args.model_dir, "decoder")
-    part_name = f"{model_name}_decode_part1"
-    quant_name = f"hmquant_{model_name}_part1_with_act"
-    onnx_name = quant_name + ".onnx"
-    model_path = os.path.join(model_dir, onnx_name)
-    model_dir = os.path.dirname(model_path)
-
-    os.environ['AOT_COMPILE_NO_FORMAT'] = '1'
+    profile = {}
 
     # 1. build model
     if stage == 'build' or stage == 'all':
         import tcim
-        print(f"\n===> {part_name} build start...")
-        onnx_model = onnx.load(model_path)
-        compile_config = {
-            "tcim.gen_intrinsic": 1,
-            "tcim.sync_strategy": 0,
-            "tcim.special_model_name": "vit_small",
-            "tcim.batch_num": 1,
-            "tcim.codegen_pic": True,
-            "tcim.mem_plan_strategy": "linearscan",
-            "tcim.large_split_maxsize": True,
-            "tcim.split_const": True
-        }
-        if core_num == 4:
-            compile_config["tcim.core_num"] = 4
-            compile_config["tcim.batch_used_core_num"] = 4
-            compile_config["tcim.1batch_4core"] = True
-        elif core_num == 2:
-            compile_config["tcim.core_num"] = 2
-            compile_config["tcim.batch_used_core_num"] = 2
-            compile_config["tcim.1batch_2core"] = True
-        else:
-            print("[error] not support core =", core_num)
-            exit(-1)
-        input_cfg = {}
-        inputs = onnx_model.graph.input
-        for i, input in enumerate(inputs):
-            dims = input.type.tensor_type.shape.dim
-            input_shape = [dim.dim_value for dim in dims]
-            if i <= 2:
-                input_cfg[input.name] = tcim.HMInput(shape=input_shape)
-            else:
-                input_cfg[input.name] = tcim.HMInput(shape=input_shape, layout='NCHW')
-        weight_path = os.path.join(model_dir, '../weight.npy')
-        data_dict = np.load(weight_path, allow_pickle=True).item()
-        tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
-                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix=f"{model_name}_part1_", lite=True)
-        print(f"<=== {part_name} build success.")
-
+        start = time.time()
+        print(f"\n===> {model_name} build start...")
+        onnx_model = os.path.join(model_dir, f"hmquant_{model_name}_with_act.onnx")
+        tcim.build_from_hmonnx(
+            onnx_model,
+            model_name=model_name,
+            ncore=ncore,
+            output_dir=output_dir,
+            opt_level="O1",
+            work_dir=os.path.join(output_dir, "tcim")
+        )
+        profile["build"] = time.time() - start
+        print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
     # 2. test model
     if stage == 'test' or stage == 'all':
         import tcim_lite
-        print(f"\n===> {part_name} test start...")
+        print(f"\n===> {model_name} test start...")
         # 2.1 load model
-        module = tcim_lite.runtime.load(part_name + ".hmm")
-        current_length = 0
+        model_path = os.path.join(output_dir, f"{model_name}.hmm")
+        start = time.time()
+        module = tcim_lite.runtime.load(model_path)
+        profile["load"] = time.time() - start
+        print(f'{model_name} load completed in {profile["load"]:.3f} s.', flush=True)
 
+        # 2.2 set input
+        profile["set_input"] = 0
         input_num = module.get_num_inputs()
         for id in range(input_num):
             input_name = module.get_input_name(id)
@@ -123,28 +114,33 @@ def build(args=None):
             input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype(input_info.dtype)
-            if input_name == 'current_length':
-                current_length = input_data[0]
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
             print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
+            start = time.time()
             module.set_input(input_name, input_data)
+            profile["set_input"] += time.time() - start
+        print(f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.')
 
         # 2.3 infer model
+        start = time.time()
         module.run()
         module.sync()
+        profile["infer"] = time.time() - start
+        print(f'{model_name} infer completed in {profile["infer"]*1000:.3f} ms.')
 
         # 2.4. get output and compare with golden
+        profile["get_output"] = 0
         result_check = True
         output_num = module.get_num_outputs()
         for id in range(output_num):
             output_name = module.get_output_name(id)
             output_info = module.get_output_info(output_name)
             print("output_info[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape,
-                                                                               output_info.dtype, output_info.format.name))
+                                                                                output_info.dtype, output_info.format.name))
+            start = time.time()       
             output_data = module.get_output(output_name).numpy()
+            profile["get_output"] += time.time() - start
             print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-            # only compare [1,current_length,4096]
-            output_data = output_data[:1, :current_length, :]
             output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_' + output_name + '_output.npy')
             if os.path.exists(output_data_path):
                 golden_output = np.load(output_data_path)
@@ -159,19 +155,15 @@ def build(args=None):
                 cosine_dist = cosine_distance(golden_output, output_data)
                 is_match = (golden_output == output_data).all()
                 print("[compare] golden output [{}] match={}, similarity={:.6f}"
-                      .format(output_name, is_match, cosine_dist))
+                        .format(output_name, is_match, cosine_dist))
                 if cosine_dist < 0.999:
                     result_check = False
             else:
                 result_check = False
                 print("[compare] golden output [{}] shape not match {} vs {}"
-                      .format(output_name, golden_output.shape, output_data.shape))
+                        .format(output_name, golden_output.shape, output_data.shape))
+        print(f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.')
         if not result_check:
             print("[error] result check failed.")
             exit(-1)
-        print(f"<=== {part_name} test success.")
-
-
-if __name__ == '__main__':
-    args = get_args()
-    build(args)
+        print(f"<=== {model_name} test success.")

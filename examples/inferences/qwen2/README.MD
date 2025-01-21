@@ -21,12 +21,9 @@
     - windows环境将bin目录下dll库以及houmo_drv包bin目录下的cyghm800_hal.dll拷贝到python/tcim_lite目录下
 
 3. 将编译并转换好的模型文件拷贝到当前目录，包括6个文件：
-    qwen2_prefill_part1.hmm
-    qwen2_prefill_part2.hmm
+    qwen2_prefill_body.hmm
     qwen2_prefill_head.hmm
-    qwen2_decode_part1.hmm
-    qwen2_decode_part2.hmm
-    qwen2_decode_head.hmm
+    qwen2_decode.hmm
 
 4. 将quant_embedding.pth文件拷贝到当前目录，该文件存在于量化模型目录下
 

@@ -1,0 +1,7 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+torch
+torchaudio
+openai-whisper
+langid
+librosa
+# git+https://github.com/wenet-e2e/wenet.git

@@ -27,9 +27,9 @@ backbone_efficientnet:
     - backbone_efficientnet_test:
         script: models/backbone/efficientnet/test.sh
   test:
-    # - backbone_efficientnet_eval
-    # - backbone_efficientnet_perf
-    # - backbone_efficientnet_test
+    - backbone_efficientnet_eval
+    - backbone_efficientnet_perf
+    - backbone_efficientnet_test
 backbone_mobilenetv2:
   include:
     - models/backbone/mobilenetv2
@@ -160,9 +160,9 @@ all:
     - backbone_resnet50_perf
     - backbone_resnet50_eval
     - backbone_resnet50_test
-    # - backbone_efficientnet_eval
-    # - backbone_efficientnet_perf
-    # - backbone_efficientnet_test
+    - backbone_efficientnet_eval
+    - backbone_efficientnet_perf
+    - backbone_efficientnet_test
     - backbone_mobilenetv2_eval
     - backbone_mobilenetv2_perf
     - backbone_mobilenetv2_test

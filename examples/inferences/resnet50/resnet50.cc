@@ -63,7 +63,7 @@ int main() {
   }
 
   // 3. input preprocess
-  std::string data_path = "../data/snake.jpg";
+  std::string data_path = "../../data/snake.jpg";
   if (!fs::exists(data_path)) {
     std::cerr << data_path << "not exist." << std::endl;
     exit(-1);

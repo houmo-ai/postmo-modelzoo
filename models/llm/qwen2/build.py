@@ -21,7 +21,7 @@ def get_args() -> argparse.Namespace:
         '--model_name',
         dest='model_name',
         type=str,
-        default='qwen',
+        default='qwen2',
         help='output houmo model name',
     )
     parser.add_argument(
@@ -121,14 +121,14 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     # set input
     current_length = 0
     profile["set_input"] = 0
+    if prefix is None:
+        prefix = model_name
     input_num = module.get_num_inputs()
     for id in range(input_num):
         input_name = module.get_input_name(id)
         input_info = module.get_input_info(input_name)
         print("input_info[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape,
-                                                                            input_info.dtype, input_info.format.name))
-        if prefix is None:
-            prefix = model_name
+                                                                          input_info.dtype, input_info.format.name))
         input_file_name = 'hmquant_' + prefix + '_' + input_name + '_input.npy'
         input_data_path = os.path.join(model_dir, input_file_name)
         input_data = np.load(input_data_path).astype(input_info.dtype)
@@ -157,16 +157,18 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         output_info = module.get_output_info(output_name)
         print("output_info[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape,
                                                                             output_info.dtype, output_info.format.name))
-        start = time.time()       
+        start = time.time()
         output_data = module.get_output(output_name).numpy()
         profile["get_output"] += time.time() - start
         print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
         # only compare [1,current_length,4096]
-        output_data = output_data[:1, :current_length, :]
-        output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_' + output_name + '_output.npy')
+        if model_name == "qwen2_prefill_body":
+            output_data = output_data[:1, :current_length, :]
+        output_data_path = os.path.join(model_dir, 'hmquant_' + prefix + '_' + output_name + '_output.npy')
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
-            golden_output = golden_output[:1, :current_length, :]
+            if model_name == "qwen2_prefill_body":
+                golden_output = golden_output[:1, :current_length, :]
             golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
         else:
             result_check = False
@@ -202,42 +204,45 @@ if __name__ == '__main__':
     batch = args.batch
     profile = {}
 
-    # split prefill into 2 parts: nohead and head
+    # split prefill into 2 parts: body and head
     prefill_model = os.path.join(model_dir, f"prefill/hmquant_{model_name}_with_act.onnx")
-    prefill_model_nohead = os.path.join(model_dir, f"prefill/hmquant_{model_name}_nohead_with_act.onnx")
+    prefill_model_body = os.path.join(model_dir, f"prefill/hmquant_{model_name}_body_with_act.onnx")
     prefill_model_head = os.path.join(model_dir, f"prefill/hmquant_{model_name}_head_with_act.onnx")
-    nohead_input_names = ['input_1', 'valid_length', 'current_length']
-    nohead_output_names = [f'model_layers_{nblocks-1}_resadd2']
+    body_input_names = ['input_1', 'valid_length', 'current_length']
+    body_output_names = [f'model_layers_{nblocks-1}_resadd2']
     head_input_names = [f'model_layers_{nblocks-1}_resadd2', 'current_length']
     head_output_names = ['lm_head_add_list_0']
-    if not os.path.exists(prefill_model_nohead) or not os.path.exists(prefill_model_head):
+    if not os.path.exists(prefill_model_body) or not os.path.exists(prefill_model_head):
         if os.path.exists(prefill_model):
-            extract_model(prefill_model, prefill_model_nohead, input_names=nohead_input_names,
-                output_names=nohead_output_names)
+            extract_model(prefill_model, prefill_model_body, input_names=body_input_names,
+                output_names=body_output_names)
             extract_model(prefill_model, prefill_model_head, input_names=head_input_names,
                 output_names=head_output_names)
-            save_submodel_golden(model_dir, model_name, "prefill", nohead_output_names)
+            save_submodel_golden(model_dir, model_name, "prefill", body_output_names)
         else:
             print(f"[error] {prefill_model} not exist.")
             exit(-1)
 
     # build model
     if args.stage == "build" or args.stage == "all":
-        model_part = "prefill_nohead"
-        model_path = f"prefill/hmquant_{model_name}_nohead_with_act.onnx"
+        model_part = "qwen2_prefill_body"
+        model_path = f"prefill/hmquant_{model_name}_body_with_act.onnx"
         build(model_part, model_dir, model_path, output_dir, profile, ncore)
-        model_part = "prefill_head"
+        model_part = "qwen2_prefill_head"
         model_path = f"prefill/hmquant_{model_name}_head_with_act.onnx"
         build(model_part, model_dir, model_path, output_dir, profile, ncore)
-        model_part = "decode"
+        model_part = "qwen2_decode"
         model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
         build(model_part, model_dir, model_path, output_dir, profile, ncore)
 
     # test model
     if args.stage == 'test' or args.stage == 'all':
-        model_part = "prefill_nohead"
-        test(model_part, model_dir, output_dir, profile, prefix=model_name)
-        model_part = "prefill_head"
-        test(model_part, model_dir, output_dir, profile, prefix=model_name)
-        model_part = "decode"
-        test(model_part, model_dir, output_dir, profile, prefix=model_name)
+        model_part = "qwen2_prefill_body"
+        part_dir = os.path.join(model_dir, "prefill")
+        test(model_part, part_dir, output_dir, profile, prefix=model_name)
+        model_part = "qwen2_prefill_head"
+        part_dir = os.path.join(model_dir, "prefill")
+        test(model_part, part_dir, output_dir, profile, prefix=model_name)
+        model_part = "qwen2_decode"
+        part_dir = os.path.join(model_dir, "decoder")
+        test(model_part, part_dir, output_dir, profile, prefix=model_name)

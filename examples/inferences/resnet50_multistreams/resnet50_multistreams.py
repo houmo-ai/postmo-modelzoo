@@ -39,7 +39,7 @@ def get_args() -> argparse.Namespace:
 
 
 if __name__ == '__main__':
-    sys.path.insert(0, "../common/python")
+    sys.path.insert(0, "../../common/python")
     print("\n===> resnet50_multistreams python example start...")
     print("tcim runtime version: {}".format(tcim.runtime.get_version()))
 
@@ -64,7 +64,7 @@ if __name__ == '__main__':
         exit(-1)
 
     # 1. input preprocess
-    input_data = cv2.imread("../data/snake.jpg")
+    input_data = cv2.imread("../../data/snake.jpg")
     input_data = cv2.resize(input_data, (224, 224))  # HWC uint8
     input_data = np.transpose(input_data, (2, 0, 1))  # CHW uint8
     input_data = np.expand_dims(input_data, axis=0)  # NCHW uint8

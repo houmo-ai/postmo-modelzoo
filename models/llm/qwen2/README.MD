@@ -10,7 +10,7 @@
 
 ## 2 快速开始
 
-目前Qwen2模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译，通过binary_convert转换后使用。
+目前Qwen2模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
 
 ### 2.1 获取模型和数据
 
@@ -23,7 +23,7 @@ python3 get_model.py --type raw
 python3 get_model.py --type dataset
 ```
 
-如果仅编译芯片模型，可选择下载量化模型，下载后的模型存放在`output/$HOUMO_TARGET/result`目录（注意相同模型会覆盖，请自行保存）：
+如果仅编译芯片模型，可选择下载量化模型，下载后的模型存放在`output/$HOUMO_TARGET/hmquant`目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
 python3 get_model.py --type quant
@@ -46,7 +46,7 @@ python3 get_model.py
 量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上。参考命令：
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py38-x86.64 /bin/bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py39-x86.64 /bin/bash
 ```
 
 进入docker后source环境变量，并进入`/hmdd/models/llm/qwen2`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为128和4096，可通过ptq.py中的prefill_shape和cache_len参数修改。不同编译模式下支持的上下文长度组合为：
@@ -64,7 +64,7 @@ cd /hmdd/models/llm/qwen2
 python3 ptq.py
 ```
 
-量化完成的模型存放在`output/$HOUMO_TARGET/result`目录：
+量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录：
 
 ```bash
 .
@@ -82,13 +82,10 @@ python3 ptq.py
 python3 build.py
 ```
 
-编译好的模型存放在当前目录，包括6个文件：
-qwen2_prefill_part1.hmm
-qwen2_prefill_part2.hmm
+编译好的模型存放在当前目录，包括3个文件：
+qwen2_prefill_body.hmm
 qwen2_prefill_head.hmm
-qwen2_decode_part1.hmm
-qwen2_decode_part2.hmm
-qwen2_decode_head.hmm
+qwen2_decode.hmm
 
 ### 2.3 演示
 
@@ -104,10 +101,10 @@ python3 demo.py
 
 ### 2.4 一键评估
 
-以上步骤可以通过perf.sh脚本一键执行：
+以上步骤可以通过test.sh脚本一键执行：
 
 ```bash
-bash perf.sh
+bash test.sh
 ```
 
 ## 3 参考结果

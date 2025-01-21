@@ -332,7 +332,7 @@ class YoloV5:
     
 
 if __name__ == '__main__':
-    sys.path.insert(0, "../common/python")
+    sys.path.insert(0, "../../common/python")
     print("\n===> yolov5s python example start...")
     print("tcim runtime version: {}".format(tcim.runtime.get_version()))
 
@@ -341,7 +341,7 @@ if __name__ == '__main__':
 
     # 2. preprocess
     yolov5 = YoloV5()
-    img_path = "../data/000000000139.jpg"
+    img_path = "../../data/000000000139.jpg"
     cv_image = cv2.imread(img_path)
     input_data = yolov5.preprocess(cv_image)
     input_data = torch.tensor(input_data.astype(np.float32))  # NHWC float32
