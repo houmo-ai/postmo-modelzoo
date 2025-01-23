@@ -54,6 +54,6 @@ if __name__ == '__main__':
 
     if model_type == "quant" or model_type == "all":
         get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
- 
+
     if model_type == "hmm" or model_type == "all":
-        get_file_from_jfrog(hmm_path, model_dir, ".")
+        get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))

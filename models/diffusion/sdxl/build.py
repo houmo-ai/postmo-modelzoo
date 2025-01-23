@@ -1,8 +1,10 @@
 import os
 import numpy as np
 import time
-import onnx
 import argparse
+
+import logging
+logging.basicConfig(level="ERROR")
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 
@@ -39,13 +41,6 @@ def get_args() -> argparse.Namespace:
         help='core number',
     )
     parser.add_argument(
-        '--nblocks',
-        dest='nblocks',
-        type=int,
-        default=28,
-        help='block number',
-    )
-    parser.add_argument(
         '--stage',
         dest='stage',
         type=str,
@@ -60,7 +55,7 @@ def get_args() -> argparse.Namespace:
         help='build output dir',
     )
     args = parser.parse_args()
-    return args  
+    return args
 
 
 if __name__ == '__main__':
@@ -68,7 +63,6 @@ if __name__ == '__main__':
     curdir = os.getcwd()
     model_dir = args.model_dir
     model_name = args.model_name
-    nblocks = args.nblocks
     output_dir = args.output_dir
     ncore = args.ncore
     batch = args.batch
@@ -78,8 +72,8 @@ if __name__ == '__main__':
     # 1. build model
     if stage == 'build' or stage == 'all':
         import tcim
-        start = time.time()
         print(f"\n===> {model_name} build start...")
+        start = time.time()
         onnx_model = os.path.join(model_dir, f"hmquant_{model_name}_with_act.onnx")
         tcim.build_from_hmonnx(
             onnx_model,
@@ -137,14 +131,13 @@ if __name__ == '__main__':
             output_info = module.get_output_info(output_name)
             print("output_info[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape,
                                                                                 output_info.dtype, output_info.format.name))
-            start = time.time()       
+            start = time.time()
             output_data = module.get_output(output_name).numpy()
             profile["get_output"] += time.time() - start
             print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
             output_data_path = os.path.join(model_dir, 'hmquant_' + model_name + '_' + output_name + '_output.npy')
             if os.path.exists(output_data_path):
                 golden_output = np.load(output_data_path)
-                golden_output = golden_output[:1, :current_length, :]
                 golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
             else:
                 result_check = False

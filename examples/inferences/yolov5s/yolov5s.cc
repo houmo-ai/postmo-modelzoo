@@ -281,11 +281,12 @@ int main() {
     std::cerr << data_path << " not exist." << std::endl;
     exit(-1);
   }
+
   cv::Mat img_rgb;
   cv::Mat img_yuv;
   cv::Mat img_raw = cv::imread(data_path);
-  ImageProc::BgrToRgb((int8_t *)(img_rgb.data), img_rgb.rows, img_rgb.cols);
   img_rgb = letterbox(img_raw, 640, 640);
+  ImageProc::BgrToRgb((int8_t *)(img_rgb.data), img_rgb.rows, img_rgb.cols);
   cv::cvtColor(img_rgb, img_yuv, cv::COLOR_RGB2YUV_I420);
   int size = 640*640*3;
   ImageProc::I420To420sp((uint8_t *)input_map.at("images").Data(), (uint8_t *)img_yuv.data, size);
@@ -313,7 +314,8 @@ int main() {
 
   // 7. get output
   for (auto& output : output_map) {
-    module.GetOutput(output.first, output.second);
+    auto output_tensor = module.GetOutput(output.first);
+    output_tensor.CastTo(output.second);
   }
 
   // 8. postprocess

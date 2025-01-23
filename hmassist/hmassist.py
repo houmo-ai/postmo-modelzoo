@@ -113,6 +113,7 @@ def build(cfg):
         os.makedirs(model.executor.build_dir)
     inputs = model.executor.get_golden_inputs()
     if inputs is not None:
+        # save input data for result check in tcim_perf
         for input_name, input_data in inputs.items():
             input_save_name = sanitize_name(input_name)
             input_data.tofile(os.path.join(model.executor.build_dir, "{}.bin".format(input_save_name)))
@@ -121,20 +122,16 @@ def build(cfg):
         outputs = model.executor.infer(inputs)
         cost = time.time() - start
         logger.info("[infer] cost {:.3f}ms".format(cost * 1000))
-        # 临时添加NCHW
-        # output_data = np.transpose(output_data, (0, 2, 3, 1))
     logger.info("inputs saved in {}".format(model.executor.build_dir))
+
     sum_cos = 0.0
     result_check = True
     for output_name, output_data in outputs.items():
         logger.info("{} output[{}] shape = {}, dtype = {}".format(model.target, output_name,
                                                                   output_data.shape, output_data.dtype))
+        # save output data for result check in tcim_perf
         output_save_name = sanitize_name(output_name)
-        if len(output_data.shape) == 4:
-            # save as NHWC to support c++ compare
-            save_data(np.transpose(output_data, (0, 2, 3, 1)), model.executor.build_dir, output_save_name)
-        else:
-            save_data(output_data, model.executor.build_dir, output_save_name)
+        save_data(output_data, model.executor.build_dir, output_save_name)
         golden_output = model.executor.get_golden_output(output_save_name)
         logger.info("golden output[{}] shape = {}, dtype = {}".format(output_name, golden_output.shape, golden_output.dtype))
         is_match = (output_data == golden_output).all()
