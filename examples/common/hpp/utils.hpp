@@ -7,8 +7,11 @@
 #include <sstream>
 #include <string>
 
+
 #define GET_TIME() std::chrono::system_clock::now()
 #define GET_COST(start, end) std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+
+#define TO_EVEN(n) (n & ~1)
 
 
 class Utils {

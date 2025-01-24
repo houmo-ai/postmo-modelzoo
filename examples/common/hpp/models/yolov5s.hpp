@@ -1,27 +1,8 @@
-// Copyright (c) 2022 The Houmo.ai Authors. All rights reserved.
-
-#include <iostream>
-#include <sstream>
-#include <string>
-
-#if (__GNUC__ < 8 && !defined(_MSC_VER))
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#else
-#include <filesystem>
-namespace fs = std::filesystem;
-#endif
+#include <vector>
 
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
-
-#include "tcim/tcim_runtime.h"
-
-#include "imageproc.hpp"
-#include "threads.hpp"
-#include "utils.hpp"
-
 
 struct Box {
   int x1{0};
@@ -52,7 +33,7 @@ typedef struct {
   std::string name; // cls_name
   Box box;
   float mask[32]{};
-} Detection;
+} DetectResult;
 
 typedef struct {
   float* data{nullptr};
@@ -73,13 +54,13 @@ float bbox_overlap(const Box &vi, const Box &vo) {
   return dist;
 }
 
-int non_max_suppression(std::vector<Detection> &detections, const float iou_threshold) {
+int non_max_suppression(std::vector<DetectResult> &detections, const float iou_threshold) {
   // sort
   std::sort(detections.begin(), detections.end(),
-            [](const Detection &d1, const Detection &d2) { return d1.conf > d2.conf; });
+            [](const DetectResult &d1, const DetectResult &d2) { return d1.conf > d2.conf; });
 
   // nms
-  std::vector<Detection> keep_detections;
+  std::vector<DetectResult> keep_detections;
   bool *suppressed = new bool[detections.size()];
   memset(suppressed, 0, sizeof(bool) * detections.size());
   const int num_detections = detections.size();
@@ -133,8 +114,8 @@ cv::Mat letterbox(cv::Mat &img, int height, int width) {
 class YoloV5 {
  public:
 
-  std::vector<Detection> postprocess(const cv::Mat &image, std::vector<DetectOutput> outputs) {
-    std::vector<Detection> detections;
+  std::vector<DetectResult> postprocess(const cv::Mat &image, std::vector<DetectOutput> outputs) {
+    std::vector<DetectResult> detections;
     static float anchors[18] = {10, 13, 16, 30, 33, 23, 30, 61, 62, 45, 59, 119, 116, 90, 156, 198, 373, 326};
 
     float scale = (float)input_sizes_[0] / std::max(image.rows, image.cols);
@@ -203,7 +184,7 @@ class YoloV5 {
               x2 = x2 >= image.cols ? image.cols - 1 : x2;
               y2 = y2 >= image.rows ? image.rows - 1 : y2;
 
-              Detection detection;
+              DetectResult detection;
               detection.box.x1 = x1;
               detection.box.y1 = y1;
               detection.box.x2 = x2;
@@ -233,126 +214,3 @@ private:
   const int num_anchors_{25200};
   const int num_classes_{80};
 };
-
-
-int main() {
-  printf("\n===> yolov5s c++ example start...\n");
-  printf("tcim version: %s\n", tcim::GetVersion().c_str());
-
-  // 1. load model
-  std::cout << "LoadFromFile yolov5s" << std::endl;
-  std::string model_path = "yolov5s.hmm";
-  if (!fs::exists(model_path)) {
-    std::cerr << model_path << " not exist. you should run build.py in yolov5s example first." << std::endl;
-    exit(-1);
-  }
-  auto module = tcim::Module::LoadFromFile(model_path);
-  if (!module) {
-    std::cerr << " load model " << model_path << " fail." << std::endl;
-    exit(-1);
-  }
-  printf("model %s loaded.\n", model_path.c_str());
-
-  // 2. get input info
-  std::map<std::string, tcim::Tensor> input_map;
-  int input_num = module.GetInputNum();
-  std::cout << "Count of Input: " << input_num << std::endl;
-  for (int idx = 0; idx < input_num; idx++) {
-    auto input_name = module.GetInputName(idx);
-    auto input_info = module.GetInputInfo(input_name).AsContiguous();
-    std::cout << "Input[" << input_name << "] " << input_info << std::endl;
-    auto input_tensor = tcim::Tensor::CreateHostTensor(input_info);
-    input_map.insert(std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
-  }
-
-  // 3. input preprocess
-  YoloV5 yolov5;
-  std::string data_path = "../../data/000000000139.jpg";
-  if (!fs::exists(data_path)) {
-    std::cerr << data_path << " not exist." << std::endl;
-    exit(-1);
-  }
-
-  cv::Mat img_rgb;
-  cv::Mat img_yuv;
-  cv::Mat img_raw = cv::imread(data_path);
-  img_rgb = letterbox(img_raw, 640, 640);
-  // cv::resize(img_raw, img_raw, cv::Size(1920, 1080));
-  // img_rgb = img_raw.clone();
-  ImageProc::BgrToRgb((int8_t *)(img_rgb.data), img_rgb.rows, img_rgb.cols);
-  cv::cvtColor(img_rgb, img_yuv, cv::COLOR_RGB2YUV_I420);
-  int size = 640 * 640 * 3;
-  // int size = 1080 * 1920 * 3;
-  ImageProc::I420To420sp((uint8_t *)input_map.at("images").Data(), (uint8_t *)img_yuv.data, size);
-  auto it = input_map.find("dyn_info");
-  if (it != input_map.end()) {
-    int32_t dyn_info[10] = {0, 0, 1080, 1920, 360, 640, 140, 0, 140, 0};
-    memcpy(it->second.Data(), dyn_info, 10 * sizeof(int32_t));
-  }
-
-  // 4. get output info
-  std::map<std::string, tcim::Tensor> output_map;
-  int output_num = module.GetOutputNum();
-  std::cout << "Count of Output: " << output_num << std::endl;
-  for (int idx = 0; idx < output_num; idx++) {
-    auto output_name = module.GetOutputName(idx);
-    auto output_info = module.GetOutputInfo(output_name).AsContiguous().AsType(tcim::FLOAT32);
-    std::cout << "Output[" << output_name << "] " << output_info << std::endl;
-    auto output_tensor = tcim::Tensor::CreateHostTensor(output_info);
-    output_map.insert(std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
-  }
-
-  // 5. set input
-  for (const auto& input : input_map) {
-    module.SetInput(input.first, input.second);
-  }
-
-  // 6. run and sync
-  module.Run();
-  module.Sync();
-
-  // 7. get output
-  for (auto& output : output_map) {
-    auto output_tensor = module.GetOutput(output.first);
-    output_tensor.CastTo(output.second);
-  }
-
-  // 8. postprocess
-  std::vector<DetectOutput> outputs;
-  for (auto& output : output_map) {
-    DetectOutput out;
-    out.data = (float*)output.second.Data();
-    auto shape = output.second.Info().Shape();
-    out.num_anchors = shape[1] * shape[2] * shape[3];
-    out.stride = 640 / shape[2];
-    outputs.emplace_back(out);
-  }
-
-  auto detections = yolov5.postprocess(img_raw, outputs);
-
-  // 9. print and draw
-  printf("detect num: %d\n", (int)detections.size());
-  for (const auto& detection : detections) {
-    printf("box[%d, %d, %d, %d], conf:%f, cls:%d\n",
-           detection.box.x1, detection.box.y1, detection.box.x2, detection.box.y2, detection.conf, detection.cls);
-    cv::rectangle(img_raw, cv::Point(detection.box.x1, detection.box.y1),
-                  cv::Point(detection.box.x2, detection.box.y2), cv::Scalar(0, 0, 255), 2);
-  }
-  fs::path file_path(data_path);
-  fs::path result_path("demo_results/cpp");
-  if (!fs::exists(result_path)) {
-    fs::create_directory("demo_results/cpp");
-  }
-  fs::path result_file = result_path / file_path.filename();
-  cv::imwrite(result_file.string().c_str(), img_raw);
-  printf("demo results saved to %s\n", result_file.string().c_str());
-
-  // check result, modify it when you change model or data
-  if (detections.size() != 17) {
-    std::cout << "detect num != 17" << std::endl;
-    exit(-1);
-  }
-  
-  printf("<=== yolov5s c++ example completed.\n\n");
-  return 0;
-}

@@ -8,8 +8,6 @@ hir_log/
 reports/
 customized/
 tmp_*/
-model/
-datasets/
 
 # media files
 *.jpg

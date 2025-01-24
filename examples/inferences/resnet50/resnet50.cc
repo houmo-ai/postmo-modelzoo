@@ -18,8 +18,8 @@ namespace fs = std::filesystem;
 
 #include "tcim/tcim_runtime.h"
 
+#include "datasets/imagenet.hpp"
 #include "imageproc.hpp"
-#include "imagenet.hpp"
 #include "threads.hpp"
 #include "utils.hpp"
 

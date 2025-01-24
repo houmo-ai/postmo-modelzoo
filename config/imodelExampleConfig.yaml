@@ -176,8 +176,10 @@ hmassist:
   test:
     - backbone_resnet50_perf
     - backbone_resnet50_eval
+    - backbone_resnet50_test
     - detection_yolov5s_perf
     - detection_yolov5s_eval
+    - detection_yolov5s_test
 
 # examples
 inferences_resnet50:
@@ -220,6 +222,16 @@ inferences_yolov5s:
         script: examples/inferences/yolov5s/run.sh
   test:
     - inferences_yolov5s_test
+scenes_video_detect:
+  include:
+    - examples/scenes/video_detect
+  exclude:
+    - examples/scenes/video_detect/README.MD
+  example_case:
+    - scenes_video_detect_test:
+        script: examples/scenes/video_detect/run.sh
+  test:
+    # - scenes_video_detect_test
 
 all:
   include:
@@ -260,3 +272,4 @@ all:
     - inferences_resnet50_multistreams_test
     - inferences_resnet50_pipeline_test
     - inferences_yolov5s_test
+    # - scenes_video_detect_test
