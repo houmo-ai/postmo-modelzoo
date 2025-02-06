@@ -14,6 +14,25 @@
 
 目前wenet模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
 
+本示例除runtime基本环境外，还需要依赖以下python库：
+
+1. torchaudio
+2. openai-whisper
+3. langid
+4. librosa
+
+可通过以下命令安装：
+
+```bash
+pip3 install -r requirements.txt
+```
+
+此外如果没有安装libsndfile，需要自行安装。ubuntu系统下可通过以下命令安装：
+
+```bash
+apt-get install libsndfile1
+```
+
 ### 2.1 获取模型和数据
 
 如果仅编译芯片模型，可选择下载量化模型，下载后的模型存放在`output/$HOUMO_TARGET/hmquant`目录（注意相同模型会覆盖，请自行保存）：
