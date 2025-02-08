@@ -106,19 +106,9 @@ def build(args=None):
             input_name = module.get_input_name(id)
             input_info = module.get_input_info(input_name)
             print(f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}")
-            if input_name.endswith(".y"):
-                name, _ = input_name.split(".y")
-            elif input_name.endswith(".uv"):
-                name, _ = input_name.split(".uv")
-            else:
-                name = input_name
-            input_file_name = 'hmquant_' + model_name + '_' + name + '_input.npy'
+            input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype(input_info.dtype)
-            if input_name.endswith(".y"):
-                input_data = input_data[:, 0, :, :]
-            elif input_name.endswith(".uv"):
-                input_data = input_data[:, 1:3, :, :]
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
             print(f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}")
             start = time.time()
@@ -171,12 +161,13 @@ def build(args=None):
             if golden_output.shape == output_data.shape and golden_dequanted.shape == dequanted_data.shape:
                 from hmassist.utils.dist_metrics import cosine_distance
                 cosine_dist1 = cosine_distance(golden_output, output_data)
-                is_match = (golden_output == output_data).all()
-                print(f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist1:.6f}")
+                is_match1 = (golden_output == output_data).all()
+                print(f"[compare] golden output [{output_name}] match={is_match1}, similarity={cosine_dist1:.6f}")
                 cosine_dist2 = cosine_distance(golden_dequanted, dequanted_data)
-                is_match = (golden_dequanted == dequanted_data).all()
-                print(f"[compare] dequanted golden output [{output_name}] match={is_match}, similarity={cosine_dist2:.6f}")
-                
+                is_match2 = (golden_dequanted == dequanted_data).all()
+                print(f"[compare] dequanted golden output [{output_name}] match={is_match2}, similarity={cosine_dist2:.6f}")
+                if is_match1 and is_match2:
+                    continue
                 if cosine_dist1 < 0.999 or cosine_dist2 < 0.999:
                     result_check &= False
             else:

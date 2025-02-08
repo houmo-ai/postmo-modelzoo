@@ -356,11 +356,6 @@ if __name__ == '__main__':
     for id in range(0, input_num):
         input_name = module.get_input_name(id)
         input_info = module.get_input_info(input_name)
-        if input_name.endswith(".y"):
-            input_name, _ = input_name.split(".y")
-        elif input_name.endswith(".uv"):
-            continue
-        input_info = module.get_input_info(input_name)
         print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype,
                                                                      input_info.format.name))
         module.set_input(input_name, tcim.runtime.Tensor(input_info, input_data))
@@ -407,5 +402,7 @@ if __name__ == '__main__':
     save_path = os.path.join(save_results, filename)
     cv2.imwrite(save_path, cv_image)
     print("demo results saved to", save_path)
+    # check result, modify it when you change model or data
+    assert(len(boxes) == 16 or len(boxes) == 17)
 
     print("<=== yolov5s python example completed.\n")

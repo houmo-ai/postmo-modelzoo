@@ -31,10 +31,6 @@ if __name__ == '__main__':
     input_num = module.get_num_inputs()
     for id in range(0, input_num):
         input_name = module.get_input_name(id)
-        if input_name.endswith(".y"):
-            input_name, _ = input_name.split(".y")
-        elif input_name.endswith(".uv"):
-            continue
         input_info = module.get_input_info(input_name)
         print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype,
                                                                      input_info.format.name))
@@ -62,7 +58,7 @@ if __name__ == '__main__':
     prob_list = output_data.flatten()
     for i, id in enumerate(pred_list):
         print("top{}: predict cls = {}, prob = {:.6f}".format(i+1, id, prob_list[id]))
-
+    # check result, modify it when you change model or data
     assert(pred_list[0] == 65)
 
     print("<=== resnet50 python example completed.\n")

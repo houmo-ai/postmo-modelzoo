@@ -1,3 +1,4 @@
+# modelzoo
 backbone_resnet50:
   include:
     - models/backbone/resnet50
@@ -177,12 +178,46 @@ hmassist:
     - backbone_resnet50_eval
     - detection_yolov5s_perf
     - detection_yolov5s_eval
+
+# examples
+inferences_resnet50:
+  include:
+    - examples/inferences/resnet50
+  exclude:
+    - examples/inferences/resnet50/README.MD
+  example_case:
+    - inferences_resnet50_test:
+        script: examples/inferences/resnet50/run.sh
+  test:
+    - inferences_resnet50_test
+inferences_resnet50_multistreams:
+  include:
+    - examples/inferences/resnet50_multistreams
+  exclude:
+    - examples/inferences/resnet50_multistreams/README.MD
+  example_case:
+    - inferences_resnet50_multistreams_test:
+        script: examples/inferences/resnet50_multistreams/run.sh
+  test:
+    - inferences_resnet50_multistreams_test
+inferences_yolov5s:
+  include:
+    - examples/inferences/yolov5s
+  exclude:
+    - examples/inferences/yolov5s/README.MD
+  example_case:
+    - inferences_yolov5s_test:
+        script: examples/inferences/yolov5s/run.sh
+  test:
+    - inferences_yolov5s_test
+
 all:
   include:
     - run_all.py
   exclude: null
   example_case: null
   test:
+    # modelzoo
     - backbone_resnet50_perf
     - backbone_resnet50_eval
     - backbone_resnet50_test
@@ -210,3 +245,7 @@ all:
     # - qwen_1block_1core_test
     # - qwen2_2blocks_4core_test
     # - qwen2_2blocks_2core_test
+    # examples
+    - inferences_resnet50_test
+    - inferences_resnet50_multistreams_test
+    - inferences_yolov5s_test

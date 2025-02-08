@@ -171,12 +171,13 @@ def build(args=None):
             if golden_output.shape == output_data.shape and golden_dequanted.shape == dequanted_data.shape:
                 from hmassist.utils.dist_metrics import cosine_distance
                 cosine_dist1 = cosine_distance(golden_output, output_data)
-                is_match = (golden_output == output_data).all()
-                print(f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist1:.6f}")
+                is_match1 = (golden_output == output_data).all()
+                print(f"[compare] golden output [{output_name}] match={is_match1}, similarity={cosine_dist1:.6f}")
                 cosine_dist2 = cosine_distance(golden_dequanted, dequanted_data)
-                is_match = (golden_dequanted == dequanted_data).all()
-                print(f"[compare] dequanted golden output [{output_name}] match={is_match}, similarity={cosine_dist2:.6f}")
-                
+                is_match2 = (golden_dequanted == dequanted_data).all()
+                print(f"[compare] dequanted golden output [{output_name}] match={is_match2}, similarity={cosine_dist2:.6f}")
+                if is_match1 and is_match2:
+                    continue
                 if cosine_dist1 < 0.999 or cosine_dist2 < 0.999:
                     result_check &= False
             else:

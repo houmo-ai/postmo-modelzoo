@@ -31,14 +31,12 @@ if [[ -z $MODELZOO_URL ]]; then
   export MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo/release
 fi
 
-export TCIM_RUNTIME_PATH=$HOUMO_PATH
-
 # paths for build
 export PATH=$HOUMO_PATH/bin:$PATH
 
 # paths for runtime
 export PYTHONPATH=$TCIM_RUNTIME_PATH/python:$PYTHONPATH
-export LD_LIBRARY_PATH=$HOUMO_PATH/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$TCIM_RUNTIME_PATH/lib:$HOUMO_PATH/lib:$LD_LIBRARY_PATH
 
 # paths for hmassist
 export PYTHONPATH=$HMASSIST_PATH:$PYTHONPATH
@@ -67,7 +65,7 @@ if [[ -z $HDPL_PLATFORM ]]; then
   fi
 fi
 
-PRINT_GREEN "[Please check the following path. Unset the environment variable if you want to use the default path!]"
+PRINT_YELLOW "[Please check the following path. Unset the env and source again if you want to use the default path!]"
 PRINT_GREEN "HOUMO_TARGET is $HOUMO_TARGET"
 PRINT_GREEN "HOUMO_PATH is $HOUMO_PATH"
 PRINT_GREEN "HOUMO_SDK_PATH is $HOUMO_SDK_PATH"

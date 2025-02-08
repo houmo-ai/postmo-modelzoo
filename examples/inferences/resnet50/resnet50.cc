@@ -48,15 +48,7 @@ int main() {
   std::cout << "Count of Input: " << input_num << std::endl;
   for (int idx = 0; idx < input_num; idx++) {
     auto input_name = module.GetInputName(idx);
-    tcim::TensorInfo input_info;
-    if (input_name.size() >= 2 && input_name.substr(input_name.size() - 2) == ".y") {
-      input_name = input_name.substr(0, input_name.size() - 2);
-      input_info = module.GetInputInfo(input_name);
-    } else if (input_name.size() >= 3 && input_name.substr(input_name.size() - 3) == ".uv") {
-      continue;
-    } else {
-      input_info = module.GetInputInfo(input_name).AsContiguous();
-    }
+    auto input_info = module.GetInputInfo(input_name).AsContiguous();
     std::cout << "Input[" << input_name << "] " << input_info << std::endl;
     auto input_tensor = tcim::Tensor::CreateHostTensor(input_info);
     input_map.insert(std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
@@ -121,6 +113,7 @@ int main() {
                 << sort_pairs[i].second << " Conf=" << static_cast<int>(sort_pairs[i].first)
                 << ", Label=[" << Imagenet::GetLabel(sort_pairs[i].second) << "]" << std::endl;
     }
+    // check result, modify it when you change model or data
     if (sort_pairs[0].second != 65) {
       std::cout << "top1 != 65" << std::endl;
       exit(-1);

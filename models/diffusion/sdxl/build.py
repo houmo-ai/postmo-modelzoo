@@ -149,6 +149,8 @@ if __name__ == '__main__':
                 is_match = (golden_output == output_data).all()
                 print("[compare] golden output [{}] match={}, similarity={:.6f}"
                         .format(output_name, is_match, cosine_dist))
+                if is_match:
+                    continue
                 if cosine_dist < 0.999:
                     result_check = False
             else:

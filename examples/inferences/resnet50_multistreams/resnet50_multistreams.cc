@@ -179,15 +179,7 @@ int main(int argc, char *argv[]) {
     // std::cout << "Count of Input: " << input_num << std::endl;
     for (int idx = 0; idx < input_num; idx++) {
       auto input_name = module.GetInputName(idx);
-      tcim::TensorInfo input_info;
-      if (input_name.size() >= 2 && input_name.substr(input_name.size() - 2) == ".y") {
-        input_name = input_name.substr(0, input_name.size() - 2);
-        input_info = module.GetInputInfo(input_name);
-      } else if (input_name.size() >= 3 && input_name.substr(input_name.size() - 3) == ".uv") {
-        continue;
-      } else {
-        input_info = module.GetInputInfo(input_name).AsContiguous();
-      }
+      auto input_info = module.GetInputInfo(input_name).AsContiguous();
       std::cout << "Input[" << input_name << "] " << input_info << std::endl;
       qin.info_map[input_name] = input_info;
     }
@@ -222,7 +214,8 @@ int main(int argc, char *argv[]) {
 
       // 3.6.2 set input to the module
       for (auto& info : qin.info_map) {
-        auto input_tensor = tcim::Tensor::CreateHostTensor(info.second, info.second.Size(), input_map[""].get());
+        auto size = info.second.MemSize();
+        auto input_tensor = tcim::Tensor::CreateHostTensor(info.second, size, input_map[""].get());
         module.SetInput(info.first, input_tensor);
       }
 
@@ -234,7 +227,7 @@ int main(int argc, char *argv[]) {
       TaskInfo tinfo;
       tinfo.req_id = req_id;
       for (auto& info : qout.info_map) {
-        auto size = info.second.Size();
+        auto size = info.second.MemSize();
         auto data = malloc(size);
         std::shared_ptr<void> data_ptr(data, free);
         auto output_tensor = tcim::Tensor::CreateHostTensor(info.second, size, data);
@@ -296,6 +289,7 @@ int main(int argc, char *argv[]) {
                 << ", Label=[" << Imagenet::GetLabel(top1) << "]" << std::endl;
     }
 
+    // check result, modify it when you change model or data
     if (top1 != 65) {
       std::cout << "top1 != 65" << std::endl;
       exit(-1);

@@ -1,6 +1,6 @@
 # Efficientnet
 
-本示例展示如何把efficientnet模型量化，编译，最后部署到鸿途H30芯片的设备上。
+本示例展示如何把efficientnet模型量化，编译，最后部署到后摩芯片的设备上。
 
 [TOC]
 

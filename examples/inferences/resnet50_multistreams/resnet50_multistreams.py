@@ -101,10 +101,6 @@ if __name__ == '__main__':
         input_num = module.get_num_inputs()
         for id in range(0, input_num):
             input_name = module.get_input_name(id)
-            if input_name.endswith(".y"):
-                input_name, _ = input_name.split(".y")
-            elif input_name.endswith(".uv"):
-                continue
             input_info = module.get_input_info(input_name)
             print("input[{}] shape = {}, dtype = {}, format = {}"
                   .format(input_name,
@@ -172,6 +168,7 @@ if __name__ == '__main__':
             pred = np.argsort(-output_data, axis=1, kind="quicksort").flatten()[0]
             prob_list = output_data.flatten()
             print("sample {} top1: predict cls = {}, prob = {:.6f}".format(req_id, pred, prob_list[pred]))
+            # check result, modify it when you change model or data
             assert(pred == 65)
 
     print("<=== resnet50_multistreams python example completed.\n")

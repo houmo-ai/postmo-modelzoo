@@ -1,12 +1,12 @@
 # YOLOv5s
 
-本示例展示如何把量化后的YOLOv5s模型编译，部署到鸿途H30芯片的设备上。
+本示例展示如何把量化后的YOLOv5s模型编译，部署到后摩芯片的设备上。
 
 [TOC]
 
 ## 1.模型说明
 
-本例使用的 YOLOv5s 实现来源 github 开源项目[https://github.com/ultralytics/yolov3](https://github.com/ultralytics/yolov5)的v9.0 tag。模型代码导出后，再去除掉yolo相关的节点，细节见量化工具文档。
+本例使用的 YOLOv5s 实现来源 github 开源项目[https://github.com/ultralytics/yolov5](https://github.com/ultralytics/yolov5)的v9.0 tag。模型代码导出后，再去除掉yolo相关的节点，细节见量化工具文档。
 
 ## 2.快速开始
 
