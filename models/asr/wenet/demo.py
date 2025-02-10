@@ -117,7 +117,6 @@ def model_val(
     ):  
     stride = model_cfg["stride"]
     tgt_size = 1500
-    input_scale = 0.1865
     window_size = model_cfg["window_size"]
     window_shift = model_cfg["window_shift"]
     ck_len = ((stride - 1) * 4 + 7 - 1) * window_shift + window_size
@@ -156,10 +155,14 @@ def model_val(
             # get mask attn
             mask_attn = (1 - mask_cnn) * -128
             mask_attn = mask_attn.unsqueeze(1)
-            input_npy = np.round(ck_feat.unsqueeze(0).numpy() / input_scale).clip(-128, 127)
+            input_info_i8 = onnx_encoder_model.get_input_info("input")
+            input_info_f32 = input_info_i8.astype(np.float32)
+            input_tensor_f32 = tcim.runtime.Tensor(input_info_f32, ck_feat.unsqueeze(0).numpy())
+            input_tensor = tcim.runtime.Tensor(input_info_i8)
+            input_tensor_f32.cast_to(input_tensor)
 
             # set input
-            onnx_encoder_model.set_input("input", input_npy.astype(np.int8))
+            onnx_encoder_model.set_input("input", input_tensor)
             onnx_encoder_model.set_input("mask_attn", mask_attn.numpy().astype(np.int8))
             onnx_encoder_model.set_input("mask_cnn", mask_cnn.numpy().astype(np.int8))
 
