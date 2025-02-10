@@ -20,7 +20,7 @@ ENTER_DOCKER() {
 echo "start container named \"$CONTAINER_NAME\" with image $IMAGE_NAME"
 
 # 1. 挂载路径设置，容器内路径相同
-VOLUME_HOME="/hmdd"
+VOLUME_HOME="/hmdd_${VERSION}"
 
 # 2. [非必要]处理命令行参数，可选参数只有"restart"
 if [ $# -gt 0 ]; then

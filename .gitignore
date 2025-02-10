@@ -26,6 +26,7 @@ datasets/
 *.hir
 *.dot
 *.bin
+*.json
 
 # Compressed files
 *.zip

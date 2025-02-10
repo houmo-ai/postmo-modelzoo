@@ -65,18 +65,13 @@ class HmQwen:
         dummy_tensor_names = [f'model_layers_{i}_self_attn_kcache_input' for i in range(nblocks)]
         dummy_tensor_names += [f'model_layers_{i}_self_attn_vcache_input' for i in range(nblocks)]
         option2.set_dummy_tensors(dummy_tensor_names)
-        self.prefill_body_model = tcim.runtime.load(os.path.join(model_dir, "qwen2_prefill_body.hmm"), option = option1)
-        self.prefill_head_model = tcim.runtime.load(os.path.join(model_dir, "qwen2_prefill_head.hmm"), option = option1)
+        self.prefill_model = tcim.runtime.load(os.path.join(model_dir, "qwen2_prefill.hmm"), option = option1)
         self.decode_model = tcim.runtime.load(os.path.join(model_dir, "qwen2_decode.hmm"), option = option2)
-        self.stream = tcim.runtime.Stream(0)
-        self.prefill_body_model.set_stream(self.stream)
-        self.prefill_head_model.set_stream(self.stream)
-        self.decode_model.set_stream(self.stream)
         # set kvcache input
         for i in range(nblocks):
-            kcache = self.prefill_body_model.get_input(f'model_layers_{i}_self_attn_kcache_input')
+            kcache = self.prefill_model.get_input(f'model_layers_{i}_self_attn_kcache_input')
             self.decode_model.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
-            vcache = self.prefill_body_model.get_input(f'model_layers_{i}_self_attn_vcache_input')
+            vcache = self.prefill_model.get_input(f'model_layers_{i}_self_attn_vcache_input')
             self.decode_model.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
         # set decode input
         current_length_input_1 = np.array([1]).astype("int16")
@@ -86,12 +81,12 @@ class HmQwen:
         embedding_weight = torch.load(EMBEDDING_PATH, map_location="cpu")
         self.embedding_weight = embedding_weight.reshape(-1, 3584)
 
-    def chat(self, question, nblocks=28):
+    def chat(self, question):
         logger.success("question:")
         print("\033[1;95m{}\033[0m".format(question))
         start_time = time.time()
         messages = [
-            {'role': 'system', 'content': 'You are a helpful assistant.'},
+            {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": question,}
         ]
         text = self.tokenizer.apply_chat_template(
@@ -111,7 +106,6 @@ class HmQwen:
             valid_length = round * self.prefill_length
             if round == prefill_loop_round - 1:
                 current_length = input_echo_len - round * self.prefill_length
-                # gather_index = current_length - 1
                 input_ids = all_input_ids[:, round * self.prefill_length: input_echo_len]
             else:
                 current_length = self.prefill_length
@@ -124,19 +118,13 @@ class HmQwen:
             input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(4, self.prefill_length // 4, 3584)
             valid_length_data = np.array([valid_length]).astype("int16")
             current_length_data = np.array([current_length]).astype("int16")
-            self.prefill_body_model.set_input("input_1", input_data.numpy())
-            self.prefill_body_model.set_input("valid_length", valid_length_data)
-            self.prefill_body_model.set_input("current_length", current_length_data)
-            self.prefill_body_model.run()
-            self.prefill_body_model.sync()
+            self.prefill_model.set_input("input_1", input_data.numpy())
+            self.prefill_model.set_input("valid_length", valid_length_data)
+            self.prefill_model.set_input("current_length", current_length_data)
+            self.prefill_model.run()
+            self.prefill_model.sync()
 
-        prefill_body_output = self.prefill_body_model.get_output(f"model_layers_{nblocks-1}_resadd2", tcim.runtime.Device.HDPL) 
-        self.prefill_head_model.set_input(f"model_layers_{nblocks-1}_resadd2", prefill_body_output)
-        seq_length_data = np.array([current_length]).astype("int16")
-        self.prefill_head_model.set_input("current_length", seq_length_data)
-        self.prefill_head_model.run()
-        self.prefill_head_model.sync()
-        input_data = self.prefill_head_model.get_output("lm_head_add_list_0").numpy()
+        input_data = self.prefill_model.get_output("lm_head_add_list_0").numpy()
         next_id = input_data.argmax(-1)
         prefill_response = self.tokenizer.decode(next_id.tolist())
         prefill_time = time.time() - start_time
@@ -187,7 +175,7 @@ if __name__ == "__main__":
     question = "请介绍一下存算一体技术的优势"
 
     start_time = time.time()
-    response, tokens, prefill_time, decode_time = hmqwen.chat(question, nblocks=args.nblocks)
+    response, tokens, prefill_time, decode_time = hmqwen.chat(question)
     total_time = time.time() - start_time
 
     logger.success(f"total: {tokens} tokens, cost {total_time:.3f} s")

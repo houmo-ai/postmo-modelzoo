@@ -63,33 +63,6 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def extract_model(src, dest, input_names, output_names):
-    import onnx_graphsurgeon
-    model = onnx.load(src)
-    graph = onnx_graphsurgeon.import_onnx(model)
-    tensors = graph.tensors()
-    print(f"inputs: {input_names}")
-    print(f"outputs: {output_names}")
-    graph.inputs = [tensors[in_t.strip()] for in_t in input_names]
-    graph.outputs = [tensors[out_t.strip()] for out_t in output_names]
-    graph.cleanup()
-    onnx.save(onnx_graphsurgeon.export_onnx(graph), dest)
-    print(f"extracted model saved in", dest)
-
-
-def save_submodel_golden(model_dir, model_name, submodel_name, output_names):
-    for name in output_names:
-        file_path = os.path.join(model_dir, f"{submodel_name}/hmquant_{model_name}_with_act/{name}.npy")
-        if os.path.exists(file_path):
-            data = np.load(file_path, allow_pickle=True).item().get("output_tensor")
-            save_path1 = os.path.join(model_dir, f"{submodel_name}/hmquant_{model_name}_{name}_input.npy")
-            save_path2 = os.path.join(model_dir, f"{submodel_name}/hmquant_{model_name}_{name}_output.npy")
-            np.save(save_path1, data)
-            np.save(save_path2, data)
-            print(f"{os.path.basename(save_path1)} saved in {os.path.dirname(save_path1)}")
-            print(f"{os.path.basename(save_path2)} saved in {os.path.dirname(save_path2)}")
-
-
 def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
     import tcim
     start = time.time()
@@ -119,7 +92,6 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     print(f'{model_name} load completed in {profile["load"]:.3f} s.', flush=True)
 
     # set input
-    current_length = 0
     profile["set_input"] = 0
     if prefix is None:
         prefix = model_name
@@ -132,8 +104,6 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         input_file_name = 'hmquant_' + prefix + '_' + input_name + '_input.npy'
         input_data_path = os.path.join(model_dir, input_file_name)
         input_data = np.load(input_data_path).astype(input_info.dtype)
-        if input_name == 'current_length':
-            current_length = input_data[0]
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
         print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
         start = time.time()
@@ -161,14 +131,9 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         output_data = module.get_output(output_name).numpy()
         profile["get_output"] += time.time() - start
         print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-        # only compare [1,current_length,4096]
-        if model_name == "qwen2_prefill_body":
-            output_data = output_data[:1, :current_length, :]
         output_data_path = os.path.join(model_dir, 'hmquant_' + prefix + '_' + output_name + '_output.npy')
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
-            if model_name == "qwen2_prefill_body":
-                golden_output = golden_output[:1, :current_length, :]
             golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
         else:
             result_check = False
@@ -186,11 +151,11 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
             result_check = False
             print("[compare] golden output [{}] shape not match {} vs {}"
                     .format(output_name, golden_output.shape, output_data.shape))
-    print(f'{model_name} {model_part} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.')
+    print(f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.')
     if not result_check:
         print("[error] result check failed.")
         exit(-1)
-    print(f"<=== {model_name} {model_part} test success.")
+    print(f"<=== {model_name} test success.")
 
 
 if __name__ == '__main__':
@@ -204,45 +169,16 @@ if __name__ == '__main__':
     batch = args.batch
     profile = {}
 
-    # split prefill into 2 parts: body and head
-    prefill_model = os.path.join(model_dir, f"prefill/hmquant_{model_name}_with_act.onnx")
-    prefill_model_body = os.path.join(model_dir, f"prefill/hmquant_{model_name}_body_with_act.onnx")
-    prefill_model_head = os.path.join(model_dir, f"prefill/hmquant_{model_name}_head_with_act.onnx")
-    body_input_names = ['input_1', 'valid_length', 'current_length']
-    body_output_names = [f'model_layers_{nblocks-1}_resadd2']
-    head_input_names = [f'model_layers_{nblocks-1}_resadd2', 'current_length']
-    head_output_names = ['lm_head_add_list_0']
-    if not os.path.exists(prefill_model_body) or not os.path.exists(prefill_model_head):
-        if os.path.exists(prefill_model):
-            extract_model(prefill_model, prefill_model_body, input_names=body_input_names,
-                output_names=body_output_names)
-            extract_model(prefill_model, prefill_model_head, input_names=head_input_names,
-                output_names=head_output_names)
-            save_submodel_golden(model_dir, model_name, "prefill", body_output_names)
-        else:
-            print(f"[error] {prefill_model} not exist.")
-            exit(-1)
-
     # build model
     if args.stage == "build" or args.stage == "all":
-        model_part = "qwen2_prefill_body"
-        model_path = f"prefill/hmquant_{model_name}_body_with_act.onnx"
-        build(model_part, model_dir, model_path, output_dir, profile, ncore)
-        model_part = "qwen2_prefill_head"
-        model_path = f"prefill/hmquant_{model_name}_head_with_act.onnx"
-        build(model_part, model_dir, model_path, output_dir, profile, ncore)
-        model_part = "qwen2_decode"
+        model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
+        build("qwen2_prefill", model_dir, model_path, output_dir, profile, ncore)
         model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
-        build(model_part, model_dir, model_path, output_dir, profile, ncore)
+        build("qwen2_decode", model_dir, model_path, output_dir, profile, ncore)
 
     # test model
     if args.stage == 'test' or args.stage == 'all':
-        model_part = "qwen2_prefill_body"
         part_dir = os.path.join(model_dir, "prefill")
-        test(model_part, part_dir, output_dir, profile, prefix=model_name)
-        model_part = "qwen2_prefill_head"
-        part_dir = os.path.join(model_dir, "prefill")
-        test(model_part, part_dir, output_dir, profile, prefix=model_name)
-        model_part = "qwen2_decode"
+        test("qwen2_prefill", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "decoder")
-        test(model_part, part_dir, output_dir, profile, prefix=model_name)
+        test("qwen2_decode", part_dir, output_dir, profile, prefix=model_name)
