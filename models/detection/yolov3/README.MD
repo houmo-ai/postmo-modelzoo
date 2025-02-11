@@ -10,7 +10,54 @@
 
 ## 2.快速开始
 
-请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
+可以通过perf.sh和eval.sh脚本一键执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
+
+### 2.1 性能评估
+
+```bash
+bash perf.sh
+```
+
+执行完成后会打印模型推理延迟、吞吐量等信息。
+
+#### 2.2 精度评估
+
+```bash
+bash eval.sh
+```
+
+执行完成后会打印模型的数据集精度信息。
+
+## 3.参考结果
+
+### 3.1精度结果
+
+```bash
+{'shape': [[1, 3, 640, 640]], 'dataset': 'coco2017', 'test_num': 32, 'accuracy': {'map': 0.534, 'map50': 0.736}, 'latency': 16.361}
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.534
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.737
+ Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.580
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.410
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.614
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.692
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.416
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.625
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.642
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.452
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.698
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.758
+```
+
+### 3.2性能结果
+
+```bash
+[latency] Inference 	avg:  13.097 ms,	max:  13.981 ms
+[latency] Input 	avg:   0.683 ms,	max:   1.093 ms
+[latency] Output 	avg:   5.250 ms,	max:   7.312 ms
+[latency] End2End 	avg:  19.032 ms,	max:  22.002 ms
+[Throughput] total: 19038.312 ms, avg: 19.038 ms
+[Throughput] qps: 52.526
+```
 
 ## 3.免责声明
 

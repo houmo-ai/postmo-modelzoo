@@ -12,7 +12,25 @@
 
 ## 2.快速开始
 
-请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
+可以通过perf.sh和eval.sh脚本一键执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
+
+### 2.1 性能评估
+
+```bash
+bash perf.sh
+```
+
+执行完成后会打印模型推理延迟、吞吐量等信息。
+
+#### 2.2 精度评估
+
+```bash
+bash eval.sh
+```
+
+执行完成后会打印模型的数据集精度信息。
+
+#### 2.3 精度优化（暂不支持）
 
 yolop模型PTQ量化精度下降较多，建议使用QAT方式进行量化。
 
@@ -51,10 +69,12 @@ Detect: P(0.084)  R(0.893)  mAP@0.5(0.767)  mAP@0.5:0.95(0.438)
 ### 3.1性能结果
 
 ```bash
-Input images: (1, 192, 320, 3), uint8
-Inference time cost total = 115161us
-Inference time cost per frame = 115161us
-Average Throughput(QPS): 8.6835fps
+[latency] Inference 	avg:  10.181 ms,	max:  10.543 ms
+[latency] Input 	avg:   0.542 ms,	max:   0.966 ms
+[latency] Output 	avg:   2.168 ms,	max:   2.930 ms
+[latency] End2End 	avg:  12.893 ms,	max:  14.012 ms
+[Throughput] total: 1290.311 ms, avg: 12.903 ms
+[Throughput] qps: 77.501
 ```
 
 ## 4.免责声明

@@ -6,13 +6,16 @@
 
 ## 1.模型说明
 
-本例使用的 YOLOv8m 实现来源 github 开源项目[https://github.com/ultralytics/ultralytics/tree/v8.2.0](https://github.com/ultralytics/ultralytics/tree/v8.2.0)。模型代码导出后，再去除掉yolo相关的节点，细节见量化工具文档。
+本例使用的 YOLOv8m 实现来源 github 开源项目[https://github.com/ultralytics/ultralytics/tree/v8.2.0](https://github.com/ultralytics/ultralytics/tree/v8.2.0)。
 
 下载模型后可使用ultralytics工具导出为onnx模型，执行命令：
 ```bash
 pip3 install ultralytics
 yolo export model=yolov8m.pt format=onnx imgsz=640,640 opset=11
 ```
+
+由于最后yolo检测部分以及检测框和置信度2个不同类型输出融合会显著降低ptq量化的精度，所以建议截取2个分支yolo前的模型进行量化，相关截取操作在get_model.py中。
+如果想继续提升精度，还可以参考yolov5s将不同尺度的检测结果分别量化，或使用混合精度的方法，具体可参考量化相关文档。
 
 ## 2.快速开始
 
@@ -38,6 +41,7 @@ bash eval.sh
 
 ### 3.1精度结果
 ```bash
+{'shape': [[1, 3, 640, 640]], 'dataset': 'coco2017', 'test_num': 32, 'accuracy': {'map': 0.596, 'map50': 0.814}, 'latency': 12.198}
  Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.621
  Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.821
  Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.670
@@ -55,12 +59,12 @@ bash eval.sh
 ### 3.2性能结果
 
 ```bash
-[latency] Inference 	avg:  11.748 ms,	max:  12.349 ms
-[latency] Input 	avg:   0.676 ms,	max:   1.155 ms
-[latency] Output 	avg:   0.846 ms,	max:   1.438 ms
-[latency] End2End 	avg:  13.272 ms,	max:  14.933 ms
-[Throughput] total: 13277.102 ms, avg: 13.277 ms
-[Throughput] qps: 75.318
+[latency] Inference 	avg:  10.852 ms,	max:  11.462 ms
+[latency] Input 	avg:   0.658 ms,	max:   1.105 ms
+[latency] Output 	avg:   1.087 ms,	max:   2.257 ms
+[latency] End2End 	avg:  12.599 ms,	max:  14.822 ms
+[Throughput] total: 12604.206 ms, avg: 12.604 ms
+[Throughput] qps: 79.339
 ```
 
 ## 4.免责声明

@@ -8,6 +8,8 @@
 
 houmo-modelzoo是为用户快速将模型移植到后摩鸿途系列芯片产品而开发的模型库，为用户提供量化、编译、精度和性能评估等一整套代码和工具，降低用户的学习和开发成本。
 
+目前仅支持linux平台。
+
 houmo-modelzoo目录结果如下，其中README.md为本说明文件：
 
 ```bash
@@ -43,19 +45,39 @@ houmo-modelzoo目录结果如下，其中README.md为本说明文件：
 | requirements.txt | python环境依赖           |
 | env.sh           | modelzoo环境配置脚本     |
 
+## 软件依赖
+
+示例中使用了一些第三方库实现程序编译、图像和数据处理、结果显示等功能，需要安装第三方软件，请自行安装。
+以下为公共依赖，每个示例可能有其他依赖，请参考各示例的README.md文件。
+
+- CMake（建议3.16以上版本），主要用于c++示例编译
+  - linux下可通过apt等包管理工具直接安装
+- OpenCV库（4.x版本），主要用于c++示例图像读取和处理，结果渲染显示
+  - linux下可通过apt等包管理工具直接安装
+
+python依赖可通过requirements.txt安装：
+
+```bash
+pip install -r requirements.txt
+```
+
 ## 模型示例列表
 
-houmo-modelzoo提供的模型示例如下，编译示例每个都提供，其他支持情况见下表，其中raw表示提供原始模型，quant表示提供量化后模型，ptq表示提供ptq量化示例，qat表示提供qat训练示例，pydemo表示提供python端到端demo，c++demo表示提供c++端到端demo，eval表示提供精度评估
+houmo-modelzoo提供的模型示例如下，编译示例每个都提供，其他支持情况见下表，其中raw表示提供原始模型，quant表示提供量化后模型，ptq表示提供ptq量化示例，qat表示提供qat训练示例，demo表示提供python端到端demo，eval表示提供精度评估，perf表示提供性能评估
 
-| models                                       | type      | raw | quant | ptq | qat | pydemo | c++demo | eval |
-| -------------------------------------------- | --------- | --- | ----- | --- | --- | ------ | ------- | ---- |
-| [resnet50](models/backbone/resnet50)         | backbone  | yes | yes   | yes | yes | yes    | x       | yes  |
-| [mobilenetv2](models/backbone/mobilenet_v2)  | backbone  | yes | yes   | yes | x   | yes    | x       | yes  |
-| [efficientnet](models/backbone/efficientnet) | backbone  | yes | yes   | yes | x   | yes    | x       | yes  |
-| [yolov5s](models/detection/yolov5s)          | detection | yes | yes   | yes | x   | yes    | x       | yes  |
-| [yolov3](models/detection/yolov3)            | detection | yes | yes   | yes | x   | yes    | x       | yes  |
-| [yolop](models/autodrive/yolop)              | autodrive | yes | yes   | yes | yes | yes    | x       | x    |
-| [qwen2](models/llm/qwen2)                    | llm       | yes | yes   | yes | x   | yes    | x       | x    |
+| models                                       | type      | raw | quant | ptq | qat | demo | eval | perf |
+| -------------------------------------------- | --------- | --- | ----- | --- | --- | ---- | ---- | ---- |
+| [resnet50](models/backbone/resnet50)         | backbone  | yes | yes   | yes | yes | yes  | yes  | yes  |
+| [mobilenetv2](models/backbone/mobilenet_v2)  | backbone  | yes | yes   | yes | x   | yes  | yes  | yes  |
+| [efficientnet](models/backbone/efficientnet) | backbone  | yes | yes   | yes | x   | yes  | yes  | yes  |
+| [yolov8m](models/detection/yolov8m)          | detection | yes | yes   | yes | x   | yes  | yes  | yes  |
+| [yolov5s](models/detection/yolov5s)          | detection | yes | yes   | yes | x   | yes  | yes  | yes  |
+| [yolov3](models/detection/yolov3)            | detection | yes | yes   | yes | x   | yes  | yes  | yes  |
+| [yolop](models/autodrive/yolop)              | autodrive | yes | yes   | yes | yes | yes  | x    | yes  |
+| [wenet](models/asr/wenet)                    | asr       | x   | yes   | x   | x   | yes  | x    | x    |
+| [qwen2](models/llm/qwen2)                    | llm       | yes | yes   | yes | x   | yes  | x    | x    |
+| [qwen2.5](models/llm/qwen2.5)                | llm       | yes | yes   | yes | x   | yes  | x    | x    |
+| [sdxl](models/diffusion/sdxl)                | diffusion | x   | yes   | yes | x   | x    | x    | x    |
 
 ## C++评估工具列表
 

@@ -42,6 +42,7 @@ pip install -r requirements.txt
 | --------------------- | ---------------------------------------- |
 | resnet50              | resnet50图像输入模型推理示例               |
 | resnet50_multistreams | resnet50图像输入模型多stream推理示例       |
+| resnet50_pipeline     | resnet50图像输入模型pipeline推理示例       |
 | qwen2                 | qwen2 混合量化模型推理示例                 |
 
 ## 快速上手
