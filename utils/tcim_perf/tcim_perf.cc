@@ -302,6 +302,16 @@ void SetAffinity(int core_id) {
   }
 }
 
+std::string SanitizeName(const std::string& name) {
+  std::string output = name;
+  for (char &c : output) {
+    if (c == '/' || c == '-' || c == '#') {
+      c = '_';
+    }
+  }
+  return output;
+}
+
 int main(int argc, char *argv[]) {
   CliArguments arguments;
   ParseArgs(&arguments, argc, argv);
@@ -394,7 +404,7 @@ int main(int argc, char *argv[]) {
     auto output_name = module.GetOutputName(idx);
     auto output_info = module.GetOutputInfo(output_name).AsContiguous();
     std::cout << "Output[" << output_name << "] " << output_info << std::endl;
-    auto data_file = data_path + "/" + output_name + ".bin";
+    auto data_file = data_path + "/" + SanitizeName(output_name) + ".bin";
     void* data_ptr = nullptr;
     int len = 0;
     auto tensor = tcim::Tensor::CreateHostTensor(output_info);

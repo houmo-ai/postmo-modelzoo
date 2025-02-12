@@ -1,0 +1,61 @@
+model: {
+  framework: onnx,
+  name: yolov8m,
+  save_dir: ./output,
+  weight: ./yolov8m_640x640_clip.onnx,
+  inputs: [
+    {
+      name: images,
+      shape: [1, 3, 640, 640],
+      layout: NCHW,
+      format: RGB,
+      image: {
+        format: YUV420,
+        # size: [720, 1280],
+        # crop: [0, 0, 720, 1280]
+      },
+      dtype: uint8,
+      mean: [ 0, 0, 0 ],
+      std: [ 1, 1, 1 ],
+    }
+  ],
+  impl_class: YoloV8,
+}
+
+quant: {
+  # ptq_cfg_path: ,
+  calib_dir: coco2017/val2017,
+  calib_num: 20,
+  debug_level: 1,
+  calib_method: ,
+  skip_layer_idxes: [ ],
+  skip_layer_types: [ ],
+  skip_layer_names: [ ],
+}
+
+build: {
+  opt_level: 2,
+}
+
+test: {
+  data_path: coco2017/val2017/000000000139.jpg,
+}
+
+demo: {
+  data_dir: coco2017/val2017,
+  test_num: 10,
+}
+
+perf: {
+  data_dir: ,
+  test_num: 1000,
+  mode: throughput,
+  end2end: ,
+}
+
+eval: {
+  data_dir: coco2017/val2017,
+  test_num: 0,
+  dataset_class: Dataset,
+}
+

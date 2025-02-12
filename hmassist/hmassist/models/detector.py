@@ -22,9 +22,12 @@ from ..utils import logger
 class Detector(BaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
         self._iou_threshold = 0.45
         self._conf_threshold = 0.25
+        self._nc = 80
+        self._feats = [(80, 80), (40, 40), (20, 20)]  # hw
+        self._strides = [8, 16, 32]
+        self._anchor_points, self._stride_tensor = self._make_anchors(self._feats, self._strides)
 
     def set_iou_threshold(self, iou_threshold=0.45):
         self._iou_threshold = iou_threshold
@@ -114,3 +117,17 @@ class Detector(BaseModel):
             "accuracy": {"map": _map, "map50": map50},
             "latency": self.ave_latency_ms
         }
+        
+    @staticmethod
+    def _make_anchors(feats, strides, grid_cell_offset=0.5):
+        """Generate anchors from features."""
+        anchor_points, stride_tensor = [], []
+        assert feats is not None
+        for i, stride in enumerate(strides):
+            h, w = feats[i]
+            sx = torch.arange(end=w, dtype=torch.float) + grid_cell_offset  # shift x
+            sy = torch.arange(end=h, dtype=torch.float) + grid_cell_offset  # shift y
+            sy, sx = torch.meshgrid(sy, sx)
+            anchor_points.append(torch.stack((sx, sy), -1).view(-1, 2))
+            stride_tensor.append(torch.full((h * w, 1), stride, dtype=torch.float))
+        return torch.cat(anchor_points), torch.cat(stride_tensor)
