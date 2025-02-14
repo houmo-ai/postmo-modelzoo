@@ -1,10 +1,32 @@
 import os
 import numpy as np
 import time
-import onnx
 import argparse
 
+import logging
+logging.basicConfig(level="ERROR")
+
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+
+def sanitize_name(name: str):
+    return name.replace(":", "_").replace("/", "_")
+
+def cosine_distance(data1, data2):
+    if data1.shape != data2.shape:
+        print(f"[error] shape not equal {data1.shape} vs {data2.shape}")
+        return -1
+    v1_d = data1.flatten().astype("float64")
+    v2_d = data2.flatten().astype("float64")
+    v1_d[v1_d == np.inf] = np.finfo(np.float16).max
+    v2_d[v2_d == np.inf] = np.finfo(np.float16).max
+    v1_d[v1_d == -np.inf] = np.finfo(np.float16).min
+    v2_d[v2_d == -np.inf] = np.finfo(np.float16).min
+    v1_norm = v1_d / np.linalg.norm(v1_d)
+    v2_norm = v2_d / np.linalg.norm(v2_d)
+    cosine_dist = np.dot(v1_norm, v2_norm)
+    if np.isnan(cosine_dist):
+        return -1
+    return cosine_dist
 
 
 def get_args() -> argparse.Namespace:
@@ -101,8 +123,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         input_info = module.get_input_info(input_name)
         print("input_info[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape,
                                                                           input_info.dtype, input_info.format.name))
-        input_file_name = 'hmquant_' + prefix + '_' + input_name + '_input.npy'
-        input_data_path = os.path.join(model_dir, input_file_name)
+        input_data_path = os.path.join(model_dir, f"hmquant_{model_name}_{sanitize_name(input_name)}_input.npy")
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
         print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
@@ -140,7 +161,6 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
             print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
             continue
         if golden_output.shape == output_data.shape:
-            from hmassist.utils.dist_metrics import cosine_distance
             cosine_dist = cosine_distance(golden_output, output_data)
             is_match = (golden_output == output_data).all()
             print("[compare] golden output [{}] match={}, similarity={:.6f}"

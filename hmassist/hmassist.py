@@ -121,10 +121,11 @@ def build(cfg):
         start = time.time()
         outputs = model.executor.infer(inputs)
         cost = time.time() - start
+        model.executor.set_fixed_out(False)
+        dequanted_outputs = model.executor.infer(inputs)
         logger.info("[infer] cost {:.3f}ms".format(cost * 1000))
     logger.info("inputs saved in {}".format(model.executor.build_dir))
 
-    sum_cos = 0.0
     result_check = True
     for output_name, output_data in outputs.items():
         logger.info("{} output[{}] shape = {}, dtype = {}".format(model.target, output_name,
@@ -132,21 +133,37 @@ def build(cfg):
         # save output data for result check in tcim_perf
         output_save_name = sanitize_name(output_name)
         save_data(output_data, model.executor.build_dir, output_save_name)
-        golden_output = model.executor.get_golden_output(output_save_name)
-        logger.info("golden output[{}] shape = {}, dtype = {}".format(output_name, golden_output.shape, golden_output.dtype))
-        is_match = (output_data == golden_output).all()
-        cosine_dist = cosine_distance(output_data, golden_output)
-        sum_cos += cosine_dist
-        logger.info("[compare] {} vs quant output [{}] match={}, similarity={:.6f}"
-                    .format(model.target, output_name, is_match, cosine_dist))
-        if cosine_dist < 0.99:
-            result_check = False
+            
+        golden_output_path = os.path.join(model.executor.golden_data_path, f'hmquant_{model.executor.model_name}_{output_save_name}_output.npy')
+        if os.path.exists(golden_output_path):
+            golden_output = np.load(golden_output_path)
+            golden_output = np.concatenate([golden_output for i in range(model.executor.batch)], axis=0)
+            logger.info("golden output[{}] shape = {}, dtype = {}".format(output_name, golden_output.shape, golden_output.dtype))
+            cosine_dist1 = cosine_distance(golden_output, output_data)
+            is_match1 = (golden_output == output_data).all()
+            logger.info(f"[compare] golden output [{output_name}] match={is_match1}, similarity={cosine_dist1:.6f}")
+        else:
+            logger.warning("compare canceled while golden output not found -> {}".format(golden_output_path))
+        dequanted_output_path = os.path.join(model.executor.golden_data_path, f'hmquant_{model.executor.model_name}_{output_save_name}_dequant_output.npy')
+        if os.path.exists(dequanted_output_path):
+            golden_dequant_output = np.load(dequanted_output_path)
+            golden_dequant_output = np.concatenate([golden_dequant_output for i in range(model.executor.batch)], axis=0)
+            logger.info("golden dequant output[{}] shape = {}, dtype = {}".format(output_name, golden_dequant_output.shape, golden_dequant_output.dtype))
+            cosine_dist2 = cosine_distance(golden_dequant_output, dequanted_outputs[output_name])
+            is_match2 = (golden_dequant_output == dequanted_outputs[output_name]).all()
+            logger.info(f"[compare] dequanted golden output [{output_name}] match={is_match1}, similarity={cosine_dist1:.6f}")
+        else:
+            logger.warning("dequanted compare canceled while golden output not found -> {}".format(golden_dequant_output))
+        
+        if is_match1 and is_match2:
+            continue
+        if cosine_dist1 < 0.999 or cosine_dist2 < 0.999:
+            result_check &= False
     logger.info("outputs saved in {}".format(model.executor.build_dir))
-    logger.info("[compare] {} vs quant output average similarity={:.6f}".format(model.target, sum_cos/len(outputs)))
     if not result_check:
-        print("[error] result check failed.")
+        logger.error("result check failed.")
         exit(-1)
-    logger.info("build completed")
+    logger.info(f"{model.executor.model_name} build completed.")
     del model
 
 
@@ -183,8 +200,6 @@ def test(cfg):
     for input_name, input_data in inputs.items():
         save_data(input_data, save_dir, input_name + "_input")
     for output_name, output_data in outputs.items():
-        # 临时添加NCHW
-        # output_data = np.transpose(output_data, (0, 2, 3, 1))
         logger.info("{} output[{}] shape = {}, dtype = {}".format(model.target, output_name, output_data.shape, output_data.dtype))
         output_save_name = sanitize_name(output_name)
         save_data(output_data, save_dir, output_save_name)
@@ -220,6 +235,10 @@ def demo(cfg):
     model = get_model(cfg)
     data_dir = cfg["demo"]["data_dir"]
     test_num = cfg["demo"]["test_num"]
+    if not os.environ.get("HDPL_PLATFORM") == "ASIC":
+        if test_num > 10 or test_num == 0:
+            test_num = 10
+            logger.warning("test num set to 10 because HDPL_PLATFORM=ISIM may take a lot of time.")
 
     file_list = []
     if os.path.isfile(data_dir):
@@ -284,9 +303,9 @@ def eval(cfg):
 
     model.test_num = cfg["eval"]["test_num"]
     if not os.environ.get("HDPL_PLATFORM") == "ASIC":
-        if model.test_num > 20 or model.test_num == 0:
-            model.test_num = 20
-            logger.warning("test num set to 20 because HDPL_PLATFORM=ISIM may take a lot of time.")
+        if model.test_num > 10 or model.test_num == 0:
+            model.test_num = 10
+            logger.warning("test num set to 10 because HDPL_PLATFORM=ISIM may take a lot of time.")
     model.dataset = dataset
     model.load()
 
@@ -481,7 +500,7 @@ if __name__ == "__main__":
                         help="Specify if only test infer while perfing, default is False")
 
     args = parser.parse_args()
-    print(args)
+    logger.info(args)
     check_args(args)
 
     # TODO: get version

@@ -11,6 +11,9 @@ from ..utils import logger
 from ..utils.utils import get_random_data
 from .base_exec import BaseExec
 
+import logging
+logging.basicConfig(level="ERROR")
+
 class XH1Exec(BaseExec, ABC):
     def __init__(self, cfg: dict):
         super(XH1Exec, self).__init__(cfg)
@@ -161,10 +164,8 @@ class XH1Exec(BaseExec, ABC):
             work_dir=self.build_dir,
             opt_level=f"O{self.opt_level}",
         )
-        print(self.model_name + ' build completed.')
 
         logger.info('{} saved in {}'.format(self.model_name, self.model_dir))
-
         logger.info("################  build finished  ######################")
         self.build_span = time.time() - t_start
         logger.info("build cost {} s".format(self.build_span))

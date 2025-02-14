@@ -89,7 +89,7 @@ def calibrate(args=None):
                     'align_corners': False,
                     'method': 'bilinear',
                 },
-                'toYUV_format': 'YUV422',
+                'toYUV_format': 'YUV420',
             },
         },
         'graph_opt_cfg': {},

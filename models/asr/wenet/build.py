@@ -8,6 +8,26 @@ logging.basicConfig(level="ERROR")
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 
+def sanitize_name(name: str):
+    return name.replace(":", "_").replace("/", "_")
+
+def cosine_distance(data1, data2):
+    if data1.shape != data2.shape:
+        print(f"[error] shape not equal {data1.shape} vs {data2.shape}")
+        return -1
+    v1_d = data1.flatten().astype("float64")
+    v2_d = data2.flatten().astype("float64")
+    v1_d[v1_d == np.inf] = np.finfo(np.float16).max
+    v2_d[v2_d == np.inf] = np.finfo(np.float16).max
+    v1_d[v1_d == -np.inf] = np.finfo(np.float16).min
+    v2_d[v2_d == -np.inf] = np.finfo(np.float16).min
+    v1_norm = v1_d / np.linalg.norm(v1_d)
+    v2_norm = v2_d / np.linalg.norm(v2_d)
+    cosine_dist = np.dot(v1_norm, v2_norm)
+    if np.isnan(cosine_dist):
+        return -1
+    return cosine_dist
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -106,19 +126,8 @@ def build(args=None):
             input_name = module.get_input_name(id)
             input_info = module.get_input_info(input_name)
             print(f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}")
-            if input_name.endswith(".y"):
-                name, _ = input_name.split(".y")
-            elif input_name.endswith(".uv"):
-                name, _ = input_name.split(".uv")
-            else:
-                name = input_name
-            input_file_name = 'hmquant_' + model_name + '_' + name + '_input.npy'
-            input_data_path = os.path.join(model_dir, input_file_name)
+            input_data_path = os.path.join(model_dir, f"hmquant_{model_name}_{sanitize_name(input_name)}_input.npy")
             input_data = np.load(input_data_path).astype(input_info.dtype)
-            if input_name.endswith(".y"):
-                input_data = input_data[:, 0, :, :]
-            elif input_name.endswith(".uv"):
-                input_data = input_data[:, 1:3, :, :]
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
             print(f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}")
             start = time.time()
@@ -153,23 +162,22 @@ def build(args=None):
             dequanted_data = dequanted_data.numpy()
             print(f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}")
             print(f"dequanted output[{output_name}] shape = {dequanted_data.shape}, dtype = {dequanted_data.dtype}")
-            output_data_path = os.path.join(model_dir, f'hmquant_{model_name}_{output_name}_output.npy')
-            dequanted_data_path = os.path.join(model_dir, f'hmquant_{model_name}_{output_name}_dequant_output.npy')
+            output_data_path = os.path.join(model_dir, f'hmquant_{model_name}_{sanitize_name(output_name)}_output.npy')
+            dequanted_data_path = os.path.join(model_dir, f'hmquant_{model_name}_{sanitize_name(output_name)}_dequant_output.npy')
             if os.path.exists(output_data_path) and os.path.exists(dequanted_data_path):
                 golden_output = np.load(output_data_path)
                 golden_dequanted = np.load(dequanted_data_path)
                 golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
                 golden_dequanted = np.concatenate([golden_dequanted for i in range(batch)], axis=0)
             elif not os.path.exists(output_data_path):
-                print("[warning] compare canceled while golden data not found -> {output_data_path}")
+                print(f"[warning] compare canceled while golden data not found -> {output_data_path}")
                 result_check &= False
                 continue
             elif not os.path.exists(dequanted_data_path):
-                print("[warning] compare canceled while golden data not found -> {dequanted_data_path}")
+                print(f"[warning] compare canceled while golden data not found -> {dequanted_data_path}")
                 result_check &= False
                 continue
             if golden_output.shape == output_data.shape and golden_dequanted.shape == dequanted_data.shape:
-                from hmassist.utils.dist_metrics import cosine_distance
                 cosine_dist1 = cosine_distance(golden_output, output_data)
                 is_match1 = (golden_output == output_data).all()
                 print(f"[compare] golden output [{output_name}] match={is_match1}, similarity={cosine_dist1:.6f}")
