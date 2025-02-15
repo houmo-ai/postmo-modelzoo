@@ -200,6 +200,16 @@ inferences_resnet50_multistreams:
         script: examples/inferences/resnet50_multistreams/run.sh
   test:
     - inferences_resnet50_multistreams_test
+inferences_resnet50_pipeline:
+  include:
+    - examples/inferences/resnet50_pipeline
+  exclude:
+    - examples/inferences/resnet50_pipeline/README.MD
+  example_case:
+    - inferences_resnet50_pipeline_test:
+        script: examples/inferences/resnet50_pipeline/run.sh
+  test:
+    - inferences_resnet50_pipeline_test
 inferences_yolov5s:
   include:
     - examples/inferences/yolov5s
@@ -248,4 +258,5 @@ all:
     # examples
     - inferences_resnet50_test
     - inferences_resnet50_multistreams_test
+    - inferences_resnet50_pipeline_test
     - inferences_yolov5s_test

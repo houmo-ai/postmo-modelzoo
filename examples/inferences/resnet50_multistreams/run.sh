@@ -18,6 +18,5 @@ cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH -DCMAKE_BUILD_TYPE=Release ..
 make -j
 make install
 
-export LD_LIBRARY_PATH=$TCIM_PATH/lib:$HOUMO_PATH/lib:$LD_LIBRARY_PATH
 cd $WORK_PATH
 ./example_resnet50_multistreams $@

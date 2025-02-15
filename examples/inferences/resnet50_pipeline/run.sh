@@ -7,9 +7,6 @@ cd "${WORK_PATH}" || exit 1
 # get test model
 python3 get_model.py
 
-# python example
-python3 resnet50.py
-
 # c++ example
 mkdir -p build
 cd build || exit 1
@@ -19,4 +16,4 @@ make -j
 make install
 
 cd $WORK_PATH
-./example_resnet50
+./example_resnet50_pipeline
