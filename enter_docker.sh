@@ -1,8 +1,8 @@
 #! /bin/bash
 
 # 0. 必要变量
-VERSION=daily
-IMAGE_NAME="harbor.houmo.ai/toolchain/release:daily-ubuntu20.04-py39-x86.64.latest"
+VERSION=develop
+IMAGE_NAME="harbor.houmo.ai/toolchain/release:develop-ubuntu20.04-py39-x86.64.latest"
 CONTAINER_NAME="$(whoami).hmdd_${VERSION}"
 CONTAINER_HOME="/container/$(whoami)"
 USER_CONFIG="-v /develop02:/develop02"

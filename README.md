@@ -50,9 +50,7 @@ houmo-modelzoo目录结果如下，其中README.md为本说明文件：
 示例中使用了一些第三方库实现程序编译、图像和数据处理、结果显示等功能，需要安装第三方软件，请自行安装。
 以下为公共依赖，每个示例可能有其他依赖，请参考各示例的README.md文件。
 
-- CMake（建议3.16以上版本），主要用于c++示例编译
-  - linux下可通过apt等包管理工具直接安装
-- OpenCV库（4.x版本），主要用于c++示例图像读取和处理，结果渲染显示
+- CMake（建议3.16.3以上版本），主要用于tcim_perf工具编译
   - linux下可通过apt等包管理工具直接安装
 
 python依赖可通过requirements.txt安装：
@@ -240,15 +238,33 @@ hmquant.sh
 hmbuild.sh
 ```
 
+编译完成后会自动使用量化生成的golden数据进行比对，以确定编译结果是否正确。运行成功后关键结果如下：
+
+```bash
+xh1 output[495] shape = (1, 1000), dtype = int8
+golden output[495] shape = (1, 1000), dtype = int8
+[compare] golden output [495] match=True, similarity=1.000000
+golden dequant output[495] shape = (1, 1000), dtype = float32
+[compare] dequanted golden output [495] match=True, similarity=1.000000
+```
+
 编译后的模型放在当前目录下。编译完成后会使用量化产生的golden输入进行推理，然后与量化产生的golden输出进行比对，如果余弦相似度高于0.999一般认为编译过程结果正确，模型可以使用。
 
 #### 测试
 
-使用指定的测试输入对模型推理结果进行测试。支持指定目标为onnx，用于比较结果是否与onnx推理结果一致。如果先指定目标为onnx，会调用onnx runtime进行推理并保存结果。然后指定目标为后摩芯片，使用相同的输入调用后摩芯片进行推理，将结果与onnx runtime的结果进行余弦相似度进行比较，以确定模型转换的正确性和精度。通过执行hmtest.sh脚本实现：
+使用指定的测试输入对模型推理结果进行测试。支持指定目标为onnx，用于比较结果是否与onnx推理结果一致。如果先指定目标为onnx，会调用onnx runtime进行推理并保存结果。然后指定目标为后摩芯片，使用相同的输入调用后摩芯片进行推理，将结果与onnx runtime的结果进行余弦相似度和欧式距离比较，以确定模型转换的正确性和精度。如果量化时data_path设置相同的数据，也可以同时比较量化结果。通过执行hmtest.sh脚本实现：
 
 ```bash
 hmtest.sh --target onnx
 hmtest.sh
+```
+
+运行成功后关键结果如下，这里可能出现hmquant和xh1结果不完全匹配的情况，这是因为前处理所用的opencv的rgb->yuv转换和芯片不一致导致，并不是量化和芯片结果不一致。量化和芯片结果是否一致可通过编译过程的golden数据比对来确认。
+
+```bash
+[compare] output [495] onnx vs hmquant similarity=0.988059, euclid_dist=17.626165
+[compare] output [495] hmquant vs xh1 similarity=0.995269, euclid_dist=10.300049
+[compare] output [495] onnx vs xh1 similarity=0.980979, euclid_dist=21.250584
 ```
 
 #### 结果展示
@@ -275,6 +291,17 @@ cd utils/tcim_perf
 hmperf.sh
 ```
 
+运行成功后关键结果如下：
+
+```bash
+[latency] Inference 	avg:   2.155 ms,	max:   2.464 ms
+[latency] Input 	avg:   0.365 ms,	max:   0.430 ms
+[latency] Output 	avg:   0.203 ms,	max:   0.407 ms
+[latency] End2End 	avg:   2.726 ms,	max:   3.038 ms
+[Throughput] total: 2728.361 ms, avg: 2.728 ms
+[Throughput] qps: 366.520
+```
+
 #### 精度测试
 
 使用指定的数据集进行精度测试，以评估模型在数据集下的推理精度。支持指定目标为onnx，用于比较与原始onnx模型的精度差异。精度测试方法由用户自己实现，需要在hm_model.py文件中定义模型处理类并实现前后处理接口，同时在hm_dataset.py文件中定义数据库处理类，可以从已有的实现类中继承。通过执行hmeval.sh脚本实现：
@@ -282,6 +309,12 @@ hmperf.sh
 ```bash
 hmeval.sh --target onnx
 hmeval.sh
+```
+
+运行成功后关键结果如下：
+
+```bash
+{'shape': [[1, 3, 224, 224]], 'dataset': 'ILSVRC2012', 'test_num': 20, 'accuracy': {'top1': 0.7, 'top5': 0.95}, 'latency': 2.4702072143554688}
 ```
 
 #### 批量基准测试

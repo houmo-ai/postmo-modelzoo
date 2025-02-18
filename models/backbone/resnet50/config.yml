@@ -23,11 +23,12 @@ model: {
 }
 
 quant: {
-  # ptq_cfg_path: ./compile_model/quant_config.py,
+  ptq_cfg_path: ,
   calib_dir: imagenet/ILSVRC2012_img_val,
   calib_num: 20,
   debug_level: 1,
   calib_method: ,
+  data_path: imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000016.JPEG,
 }
 
 build: {
@@ -44,10 +45,7 @@ demo: {
 }
 
 perf: {
-  # data_dir: imagenet/ILSVRC2012_img_val,
   test_num: 1000,
-  mode: throughput,
-  end2end: ,
 }
 
 eval: {

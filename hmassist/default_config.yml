@@ -1,7 +1,7 @@
 # 模型量化编译配置文件
 
 model: {
-  # 【必填】模型框架, 目前仅支持onnx
+  # 【quant必填】模型框架, 目前仅支持onnx
   framework: onnx,
 
   # 【必填】编译后模型名，必须设置
@@ -10,7 +10,7 @@ model: {
   # 【必填】量化文件以及各种过程文件保存路径
   save_dir: ./output,
 
-  # 【必填】模型权重路径
+  # 【quant必填】模型权重路径
   weight: ,
 
   # 【必填】模型输入配置
@@ -26,7 +26,7 @@ model: {
       format: RGB,
       # 【可选】如果输入为图像，可利用芯片resizer做部分前处理，依次为crop->resize->pad
       image: {
-        format: YUV422, # 支持YUV422/YUV420/YUV444
+        format: YUV420, # 支持YUV420/YUV422/YUV444
         size: [224, 224], # [height, width]
         crop: [0, 0, 224, 224], # [top, left, height, width]
       },
@@ -42,32 +42,35 @@ model: {
 
 # 【quant必填】
 quant: {
-  # 【可选】量化配置文件
+  # 【可选】量化配置文件, 默认不使用
   ptq_cfg_path: ,
 
-  # 【必填】量化输入数据路径, 留空表示使用随机数据
+  # 【可选】量化输入数据路径, 默认表示使用随机数据
   calib_dir: ,
 
-  # 【必填】量化使用的数据数量
+  # 【可选】量化使用的数据数量, 配置0或默认使用量化数据路径下所有数据，
   calib_num: ,
 
-  # 【必填】量化调试等级0:no response; 1:print laywise compare
+  # 【可选】量化调试等级0:no response; 1:print laywise compare, 默认为1
   debug_level: 1,
 
   # 【可选】校准方法 "kl", "min_max", "percentile_0.99..", "l2norm"(暂不支持), 默认min_max
   calib_method: ,
+
+  # 【可选】量化golden使用的数据, 默认表示使用第一组量化数据
+  data_path: ,
+}
+
+# 【build必填】
+build: {
+  # 编译优化等级, 默认为2
+  opt_level: 2,
 }
 
 # 【test必填】
 test: {
   # 【可选】用于test数据比对，默认随机数
   data_path: ,
-}
-
-# 【build必填】
-build: {
-  # 编译优化等级, 缺省默认为0(暂不支持)
-  opt_level: 0,
 }
 
 # 【demo必填】
@@ -81,23 +84,18 @@ demo: {
 
 # 【perf必填】
 perf: {
-  # 【可选】指定性能测试使用的数据路径，不设置则使用随机数（目前仅支持使用随机数）
-  data_dir: ,
-
   # 【必填】性能测试样例数
   test_num: 10,
 
-  # 【必填】性能测试模式(目前仅支持throughput)，支持throughput和latency
-  mode: throughput,
-
-  # 【可选】性能测试是否包含前后处理，默认为false(暂不支持)
-  end2end: ,
+  # 【可选】性能测试是否不包含数据传输，默认为False
+  infer_only: False,
 }
 
 # 【eval必填】
 eval: {
   # 【必填】精度测试的数据集路径
   data_dir: ,
+
   # 【必填】test精度测试样例数，实际测试数为数据集内数据数与本数的较小者，配置0为数据集内所有数据
   test_num: 0,
 

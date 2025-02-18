@@ -23,14 +23,12 @@ model: {
 }
 
 quant: {
-  # ptq_cfg_path: ,
+  ptq_cfg_path: ,
   calib_dir: coco2017/val2017,
   calib_num: 20,
   debug_level: 1,
   calib_method: ,
-  skip_layer_idxes: [ ],
-  skip_layer_types: [ ],
-  skip_layer_names: [ ],
+  data_path: coco2017/val2017/000000000139.jpg,
 }
 
 build: {
