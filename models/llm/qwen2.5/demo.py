@@ -32,7 +32,7 @@ def get_args() -> argparse.Namespace:
         '--prefill',
         dest='prefill_length',
         type=int,
-        default=128,
+        default=256,
         help='prefill max length',
     )
     parser.add_argument(
@@ -124,7 +124,7 @@ class HmQwen:
             self.prefill_model.run()
             self.prefill_model.sync()
 
-        input_data = self.prefill_model.get_output("lm_head_add_list_0").numpy()
+        input_data = self.prefill_model.get_output("output").numpy()
         next_id = input_data.argmax(-1)
         prefill_response = self.tokenizer.decode(next_id.tolist())
         prefill_time = time.time() - start_time
@@ -139,7 +139,7 @@ class HmQwen:
         print("\033[1;95m{}".format(prefill_response), end="", flush=True)
         start_time = time.time()
         while True:
-            if context_length > self.decode_length:
+            if context_length >= self.decode_length:
                 logger.info(f"context length greater than {self.decode_length}, break!")
                 break
 
@@ -148,7 +148,7 @@ class HmQwen:
             self.decode_model.set_input("valid_length", valid_length_data)
             self.decode_model.run()
             self.decode_model.sync()
-            input_data = self.decode_model.get_output("lm_head_add_list_0").numpy()
+            input_data = self.decode_model.get_output("output").numpy()
             decode_count += 1
 
             next_id = input_data.argmax(-1)

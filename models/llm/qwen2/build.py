@@ -93,7 +93,7 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
-        model_name=model_name,
+        output_name=model_name,
         ncore=ncore,
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim"),
@@ -121,9 +121,8 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     for id in range(input_num):
         input_name = module.get_input_name(id)
         input_info = module.get_input_info(input_name)
-        print("input_info[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape,
-                                                                          input_info.dtype, input_info.format.name))
-        input_data_path = os.path.join(model_dir, f"hmquant_{model_name}_{sanitize_name(input_name)}_input.npy")
+        print(f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}")
+        input_data_path = os.path.join(model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy")
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
         print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
@@ -146,13 +145,12 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     for id in range(output_num):
         output_name = module.get_output_name(id)
         output_info = module.get_output_info(output_name)
-        print("output_info[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape,
-                                                                            output_info.dtype, output_info.format.name))
+        print(f"output_info[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}")
         start = time.time()
         output_data = module.get_output(output_name).numpy()
         profile["get_output"] += time.time() - start
         print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-        output_data_path = os.path.join(model_dir, 'hmquant_' + prefix + '_' + output_name + '_output.npy')
+        output_data_path = os.path.join(model_dir, f'hmquant_{prefix}_{sanitize_name(output_name)}_output.npy')
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
             golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)

@@ -32,7 +32,7 @@ def get_args() -> argparse.Namespace:
         '--prefill',
         dest='prefill_length',
         type=int,
-        default=128,
+        default=256,
         help='prefill max length',
     )
     parser.add_argument(
@@ -114,7 +114,7 @@ class HmQwen:
             effective_length = input_ids.size(-1)
             _pad_embeds = torch.zeros(1, self.prefill_length - effective_length, inputs_embeds.size(-1),
                                       dtype=inputs_embeds.dtype, device=inputs_embeds.device)
-             # [256, 1, 3584] ==> [4, 64, 3584]
+            # [256, 1, 3584] ==> [4, 64, 3584]
             input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(4, self.prefill_length // 4, 3584)
             valid_length_data = np.array([valid_length]).astype("int16")
             current_length_data = np.array([current_length]).astype("int16")
@@ -124,7 +124,7 @@ class HmQwen:
             self.prefill_model.run()
             self.prefill_model.sync()
 
-        input_data = self.prefill_model.get_output("lm_head_add_list_0").numpy()
+        input_data = self.prefill_model.get_output("output").numpy()
         next_id = input_data.argmax(-1)
         prefill_response = self.tokenizer.decode(next_id.tolist())
         prefill_time = time.time() - start_time
@@ -139,7 +139,7 @@ class HmQwen:
         print("\033[1;95m{}".format(prefill_response), end="", flush=True)
         start_time = time.time()
         while True:
-            if context_length > self.decode_length:
+            if context_length >= self.decode_length:
                 logger.info(f"context length greater than {self.decode_length}, break!")
                 break
 
@@ -148,7 +148,7 @@ class HmQwen:
             self.decode_model.set_input("valid_length", valid_length_data)
             self.decode_model.run()
             self.decode_model.sync()
-            input_data = self.decode_model.get_output("lm_head_add_list_0").numpy()
+            input_data = self.decode_model.get_output("output").numpy()
             decode_count += 1
 
             next_id = input_data.argmax(-1)
