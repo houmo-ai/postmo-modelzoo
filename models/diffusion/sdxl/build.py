@@ -97,7 +97,7 @@ if __name__ == '__main__':
         onnx_model = os.path.join(model_dir, f"hmquant_{model_name}_with_act.onnx")
         tcim.build_from_hmonnx(
             onnx_model,
-            model_name=model_name,
+            output_name=model_name,
             ncore=ncore,
             output_dir=output_dir,
             opt_level="O1",

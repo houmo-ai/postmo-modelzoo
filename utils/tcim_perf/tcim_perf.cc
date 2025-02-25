@@ -386,7 +386,7 @@ int main(int argc, char *argv[]) {
                   << COLOR_RESET << std::endl;
         is_result_check = false;
       } else {
-        memcpy(tensor.Data(), data_ptr, tensor.Info().Size());
+        memcpy(tensor.Data(), data_ptr, tensor.Info().MemSize());
         free(data_ptr);
       }
     } else {
@@ -414,7 +414,7 @@ int main(int argc, char *argv[]) {
                   << " fail. Result check will be skipped." << COLOR_RESET << std::endl;
         is_result_check = false;
       } else {
-        memcpy(tensor.Data(), data_ptr, tensor.Info().Size());
+        memcpy(tensor.Data(), data_ptr, tensor.Info().MemSize());
         free(data_ptr);
       }
     } else {
@@ -594,7 +594,7 @@ int main(int argc, char *argv[]) {
       for (auto& output : task.data_out) {
         auto data1 = (char*)output.second.Data();
         auto data2 = (char*)task.ref_out.at(output.first).Data();
-        int len = output.second.Info().Size();
+        int len = output.second.Info().MemSize();
         if (memcmp(data1, data2, len)) {
           int err = 0;
           for (int i = 0; i < len; i++) {

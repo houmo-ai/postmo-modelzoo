@@ -48,7 +48,7 @@ def get_model(cfg):
     executor = get_executor(cfg)
 
     try:
-        m = importlib.import_module("hm_model")
+        m = importlib.import_module("model")
         if hasattr(m, model_impl_class):
             # 实例化预处理对象
             model = getattr(m, model_impl_class)(
@@ -57,11 +57,11 @@ def get_model(cfg):
                 # dtype=dtype,   # int8/fp32
             )
         else:
-            logger.error(f"hm_model.py has no class named {model_impl_class}, please check your config")
+            logger.error(f"model.py has no class named {model_impl_class}, please check your config")
             exit(-1)
-        del sys.modules["hm_model"]
+        del sys.modules["model"]
     except Exception as e:
-        logger.warning(f"can not load impl class: {model_impl_class}, use default model will not support demo/perf/eval: {e}")
+        logger.warning(f"can not load impl class: {model_impl_class}, use default model will not support demo/eval: {e}")
         model = BaseModel(executor=executor, dataset=None)
 
     return model
@@ -127,7 +127,7 @@ def build(cfg):
             logger.info(f"golden dequant output[{output_name}] shape = {golden_dequant_output.shape}, dtype = {golden_dequant_output.dtype}")
             cosine_dist2 = cosine_distance(golden_dequant_output, dequanted_outputs[output_name])
             is_match2 = (golden_dequant_output == dequanted_outputs[output_name]).all()
-            logger.info(f"[compare] dequanted golden output [{output_name}] match={is_match1}, similarity={cosine_dist1:.6f}")
+            logger.info(f"[compare] dequanted golden output [{output_name}] match={is_match2}, similarity={cosine_dist2:.6f}")
         else:
             logger.warning(f"dequanted compare canceled while golden output not found -> {golden_dequant_output}")
         
@@ -270,17 +270,17 @@ def eval(cfg):
     dataset_class = cfg["eval"].get("dataset_class", None)
     data_dir = cfg["eval"].get("data_dir")
     try:
-        m = importlib.import_module("hm_dataset")
+        m = importlib.import_module("dataset")
         if hasattr(m, dataset_class):
             # 实例化预处理对象
             dataset = getattr(m, dataset_class)(data_dir)
         else:
-            logger.error(f"hm_dataset.py has no class named {dataset_class}, please check your config")
+            logger.error(f"dataset.py has no class named {dataset_class}, please check your config")
             exit(-1)
-        del sys.modules["hm_dataset"]
+        del sys.modules["dataset"]
     except Exception as e:
-        logger.error(f"can not find hm_dataset.py, use default model will not support eval: {e}")
-        exit(-1)
+        logger.error(f"can not find dataset.py, use default model will not support eval: {e}")
+        return -1
 
     model.test_num = cfg["eval"]["test_num"]
     if not os.environ.get("HDPL_PLATFORM") == "ASIC":
@@ -490,7 +490,7 @@ if __name__ == "__main__":
         exit(-1)
 
     # TODO: get version
-    version = "v0.2.0"
-    logger.info(f"{args.type} with HmAssist version: {version}")
+    # VERSION = "v2.0.0"
+    # logger.info("{} with HmAssist version: {}".format(args.type, VERSION))
 
     run(args)

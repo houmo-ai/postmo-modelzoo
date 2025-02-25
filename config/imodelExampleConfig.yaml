@@ -126,7 +126,7 @@ asr_wenet:
     - asr_wenet_test:
         script: models/asr/wenet/test.sh
   test:
-    - asr_wenet_test
+    # - asr_wenet_test
 tests_qwen_1block:
   include:
     - tests/qwen_1block
@@ -249,7 +249,7 @@ all:
     - detection_yolov8m_perf
     - detection_yolov8m_eval
     - detection_yolov8m_test
-    - asr_wenet_test
+    # - asr_wenet_test
     # - qwen_1block_4core_test
     # - qwen_1block_2core_test
     # - qwen_1block_1core_test

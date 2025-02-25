@@ -158,7 +158,7 @@ class XH1Exec(BaseExec, ABC):
         t_start = time.time()
         tcim.build_from_hmonnx(
             self.quant_model_path,
-            model_name=self.model_name,
+            output_name=self.model_name,
             ncore=self.ncore,
             batch=self.batch,
             legacy=True,
