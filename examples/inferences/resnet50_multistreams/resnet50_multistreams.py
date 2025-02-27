@@ -138,7 +138,7 @@ if __name__ == '__main__':
             # 3.5.4 get output and push to the output queue
             output_datas = {}
             for output_name in output_infos:
-                output_datas[output_name] = module.get_output(output_name, output_infos[output_name]).cast(np.float32).numpy()
+                output_datas[output_name] = module.get_output(output_name, output_infos[output_name]).astype(np.float32).numpy()
             qout.put((req_id, output_datas))
             count += 1
             print("thread {} on device {} run sample {} end.".format(tid, did, req_id))

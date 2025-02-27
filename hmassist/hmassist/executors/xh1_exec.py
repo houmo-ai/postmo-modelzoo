@@ -197,7 +197,7 @@ class XH1Exec(BaseExec, ABC):
             if self.is_fixed_out:
                 output_data = self.module.get_output(name).numpy()
             else:
-                output_data = self.module.get_output(name).cast(np.float32).numpy()
+                output_data = self.module.get_output(name).astype(np.float32).numpy()
             outputs[name] = output_data
 
         return outputs
