@@ -189,14 +189,26 @@ bash eval.sh
 python3 ptq.py
 ```
 
+如果输入是图像，可以开启硬件crop/resize/pad，通过`--input_shape`指定输入尺寸，`--dynamic_resize`开启动态resize功能：
+
+```bash
+python3 ptq.py --input_shape=1,3,1080,1920 --dynamic_resize
+```
+
 量化后的模型和golden数据以onnx模型和npy数据的形式默认放在output/houmo/result目录下。量化完成后会进行profile，以表格的形式打印逐层相似度，重点关注输出层的余弦相似度是否符合预期。如果余弦相似度较低，可考虑该结果是否适合使用余弦相似度进行评价，进一步测试模型实际精度。如果确实是量化精度降低较多，可考虑更换量化数据和参数，以及混合量化，QAT训练等方式进一步提升。
 
 #### 编译
 
-将量化模型编译为在芯片上运行的模型。可通过`--batch`参数配置batch数，通过build.py脚本执行：
+将量化模型编译为在芯片上运行的模型。通过build.py脚本执行：
 
 ```bash
 python3 build.py
+```
+
+如果输入是图像，可以开启动态crop/resize/pad，通过`--input_shape`指定输入尺寸，`--dynamic_resize`开启动态resize功能（需要与量化过程配置相同）：
+
+```bash
+python3 build.py --input_shape=1,3,1080,1920 --dynamic_resize
 ```
 
 #### 性能测试

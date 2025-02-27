@@ -158,7 +158,7 @@ def model_val(
             input_info_i8 = onnx_encoder_model.get_input_info("input")
             input_info_f32 = input_info_i8.astype(np.float32)
             input_tensor_f32 = tcim.runtime.Tensor(input_info_f32, ck_feat.unsqueeze(0).numpy())
-            input_tensor = tcim.runtime.Tensor(input_info_i8)
+            input_tensor = tcim.runtime.Tensor(input_info_i8).to_host(to_contiguous=True)
             input_tensor_f32.cast_to(input_tensor)
 
             # set input

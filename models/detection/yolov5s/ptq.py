@@ -30,6 +30,19 @@ def get_args() -> argparse.Namespace:
         help='model name',
     )
     parser.add_argument(
+        '--input_shape',
+        dest='input_shape',
+        type=lambda s:[int(item) for item in s.split(',')],
+        default=[1,3,224,224],
+        help='new input shape if want change',
+    )
+    parser.add_argument(
+        '--dynamic_resize',
+        dest='dynamic_resize',
+        action='store_true',
+        help='whether to set dynamic crop/resize/pad',
+    )
+    parser.add_argument(
         '--model_dir',
         dest='model_dir',
         type=str,
@@ -44,6 +57,8 @@ def calibrate(args=None):
     model_path = args.model_path
     model_name = args.model_name
     output_path = args.model_dir
+    input_shape = args.input_shape
+    dynamic_resize = args.dynamic_resize
 
     def preprocess(filepath):
         import cv2
@@ -51,7 +66,7 @@ def calibrate(args=None):
         from hmassist.utils.box_utils import letterbox
         image = cv2.imread(filepath)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image, _, _ = letterbox(image, [640, 640], stride=64, auto=False)  # HWC
+        image, _, _ = letterbox(image, [input_shape[2], input_shape[3]], stride=64, auto=False)  # HWC
         image = np.transpose(image, (2, 0, 1))  # CHW .astype(np.float32)
         image = np.expand_dims(image, axis=0)  # NCHW
         data = torch.tensor(image.astype(np.float32))
@@ -82,7 +97,7 @@ def calibrate(args=None):
                 'data_format': 'RGB',
                 'first_layer_weight_denorm_mean': [0, 0, 0],
                 'first_layer_weight_denorm_std': [1, 1, 1],
-                'resizer_crop': {'top': 0, 'left': 0, 'height': 640, 'width': 640},
+                'resizer_crop': {'top': 0, 'left': 0, 'height': input_shape[2], 'width': input_shape[3]},
                 'resizer_resize': {
                     'height': 640,
                     'width': 640,
@@ -94,6 +109,9 @@ def calibrate(args=None):
         },
         'graph_opt_cfg': {},
     }
+    
+    if dynamic_resize:
+        quanttool_config['inputs_cfg']['ALL']['fold'] = False
 
     onnx_input = calib_dataset[0]
 
@@ -122,5 +140,11 @@ def calibrate(args=None):
 
 
 if __name__ == '__main__':
+    import platform
+    arch = platform.machine()
+    if arch != "x86_64":
+        print(f"[error] hmquant not support platform: {arch}")
+        exit(0)
     args = get_args()
+    print(args)
     calibrate(args)
