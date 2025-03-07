@@ -18,6 +18,24 @@ HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 EMBEDDING_PATH = os.path.join('output', HOUMO_TARGET, 'hmquant', 'quant_embedding.pt')
 
 
+def is_chinese_char(cp):
+    if (
+        (cp >= 0x4E00 and cp <= 0x9FFF)
+        or (cp >= 0x3400 and cp <= 0x4DBF)  #
+        or (cp >= 0x20000 and cp <= 0x2A6DF)  #
+        or (cp >= 0x2A700 and cp <= 0x2B73F)  #
+        or (cp >= 0x2B740 and cp <= 0x2B81F)  #
+        or (cp >= 0x2B820 and cp <= 0x2CEAF)  #
+        or (cp >= 0xF900 and cp <= 0xFAFF)
+        or (cp >= 0x2F800 and cp <= 0x2FA1F)  #
+        or (0x0041 <= cp and cp <= 0x005A)
+        or (0x0061 <= cp and cp <= 0x007A)
+    ):  #
+        return True
+
+    return False
+
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -85,7 +103,7 @@ class HmQwen:
         embedding_weight = torch.load(EMBEDDING_PATH, map_location="cpu")
         self.embedding_weight = embedding_weight.reshape(-1, 3584)
 
-    def chat(self, question):
+    def chat(self, question, nblocks=28):
         logger.success("question:")
         print("\033[1;95m{}\033[0m".format(question))
         start_time = time.time()
@@ -98,13 +116,14 @@ class HmQwen:
             tokenize=False,
             add_generation_prompt=True
         )
-        inputs = self.tokenizer(text, return_tensors="pt")
+        inputs = self.tokenizer(text, return_tensors="pt", add_special_tokens=False)
+        text = self.tokenizer.batch_decode(inputs.input_ids)[0]
         all_input_ids = inputs["input_ids"]
         input_echo_len = all_input_ids.numel()
         if input_echo_len >= self.decode_length:
             logger.error(f"Question long than {self.decode_length}, please shorten it!")
             return f"Question long than {self.decode_length}, please shorten it!"
-        
+
         # clear kcache_history_sum before prefill
         for i in range(self.nblocks):
             kcache_history_sum = self.prefill_model.get_input(f'model_layers_{i}_self_attn_kcache_history_sum')
@@ -138,14 +157,18 @@ class HmQwen:
         next_id = input_data.argmax(-1)
         prefill_response = self.tokenizer.decode(next_id.tolist())
         prefill_time = time.time() - start_time
-
+        chat_history_ids = all_input_ids[0]
         next_id = torch.from_numpy(next_id)
+
+        chat_history_ids = torch.cat([chat_history_ids, next_id], dim=-1)
         input_data = F.embedding(next_id.unsqueeze(0), self.embedding_weight).reshape(1, 1, -1)
         all_response = prefill_response
         context_length = input_echo_len
 
         decode_count = 0
         logger.success("response:")
+        prefill_response = self.tokenizer.decode(chat_history_ids.tolist())[len(text):]
+        text += prefill_response
         print("\033[1;95m{}".format(prefill_response), end="", flush=True)
         start_time = time.time()
         while True:
@@ -162,15 +185,21 @@ class HmQwen:
             decode_count += 1
 
             next_id = input_data.argmax(-1)
-            decode_response = self.tokenizer.decode(next_id.tolist()[0])
-            if decode_response == self.tokenizer.eos_token:
+            next_id = torch.from_numpy(next_id)
+            chat_history_ids = torch.cat([chat_history_ids, next_id], dim=-1)
+
+            decode_response = self.tokenizer.decode(chat_history_ids.tolist())[len(text):]
+            if next_id == self.tokenizer.eos_token_id:
+                print(decode_response[:-19], end="",flush=True)
                 break
 
-            next_id = torch.from_numpy(next_id)
+            if decode_response != '' and is_chinese_char(ord(decode_response[-1])):
+                print(decode_response, end="", flush=True)
+                text += decode_response
+
             input_data = F.embedding(next_id.unsqueeze(0), self.embedding_weight).reshape(1, 1, -1)
             all_response = all_response + decode_response
             context_length = context_length + 1
-            print(decode_response, end="", flush=True)
 
         decode_time = time.time() - start_time
         print("\033[0m")
@@ -185,7 +214,7 @@ if __name__ == "__main__":
     question = "请介绍一下存算一体技术的优势"
 
     start_time = time.time()
-    response, tokens, prefill_time, decode_time = hmqwen.chat(question)
+    response, tokens, prefill_time, decode_time = hmqwen.chat(question, nblocks=args.nblocks)
     total_time = time.time() - start_time
 
     logger.success(f"total: {tokens} tokens, cost {total_time:.3f} s")
