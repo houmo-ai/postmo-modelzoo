@@ -373,7 +373,7 @@ if __name__ == '__main__':
         output_info = module.get_output_info(output_name).astype(np.float32)
         print("output[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape, output_info.dtype,
                                                                       output_info.format.name))
-        output_data = module.get_output(output_name).cast(np.float32).numpy()
+        output_data = module.get_output(output_name).astype(np.float32).numpy()
         outputs.append(output_data)
 
     # 6. postprocess

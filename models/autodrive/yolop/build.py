@@ -99,7 +99,7 @@ def build(args=None):
         start = time.time()
         tcim.build_from_hmonnx(
             onnx_path,
-            model_name=model_name,
+            output_name=model_name,
             ncore=ncore,
             legacy=True,
             output_dir=output_dir,

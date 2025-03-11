@@ -13,7 +13,7 @@ def get_args() -> argparse.Namespace:
         '--type',
         dest='model_type',
         type=str,
-        default='all',
+        default='quant',
         help='which model type to get, choise in [raw, quant, all]',
     )
     parser.add_argument(

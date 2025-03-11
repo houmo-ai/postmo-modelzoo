@@ -4,10 +4,8 @@ import numpy as np
 from .utils import logger
 
 def cosine_distance(data1, data2, check_shape=True):
-    """余弦距离
-    :param data1:
-    :param data2:
-    :return:
+    """
+    余弦距离
     """
     if check_shape:
         if data1.shape != data2.shape:
@@ -28,3 +26,14 @@ def cosine_distance(data1, data2, check_shape=True):
     if np.isnan(cosine_dist):
         return -1
     return cosine_dist
+
+
+def euclid_distance(data1, data2, check_shape=True):
+    """
+    欧氏距离
+    """
+    if check_shape:
+        if data1.shape != data2.shape:
+            logger.error("shape not equal {} vs {}".format(data1.shape, data2.shape))
+            return -1
+    return np.linalg.norm(data1 - data2)

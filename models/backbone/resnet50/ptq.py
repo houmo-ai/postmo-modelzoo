@@ -29,6 +29,19 @@ def get_args() -> argparse.Namespace:
         help='model name',
     )
     parser.add_argument(
+        '--input_shape',
+        dest='input_shape',
+        type=lambda s:[int(item) for item in s.split(',')],
+        default=[1,3,224,224],
+        help='new input shape if want change',
+    )
+    parser.add_argument(
+        '--dynamic_resize',
+        dest='dynamic_resize',
+        action='store_true',
+        help='whether to set dynamic crop/resize/pad',
+    )
+    parser.add_argument(
         '--model_dir',
         dest='model_dir',
         type=str,
@@ -43,13 +56,15 @@ def calibrate(args=None):
     model_path = args.model_path
     model_name = args.model_name
     output_path = args.model_dir
+    input_shape = args.input_shape
+    dynamic_resize = args.dynamic_resize
 
     def unsqueeze(x):
         return torch.unsqueeze(x, 0)
 
     calib_transform = transforms.Compose(
         [
-            transforms.Resize(256), transforms.CenterCrop(224),
+            transforms.Resize((input_shape[2], input_shape[3])),
             ToTensorNotNormal(), unsqueeze,
         ],
     )
@@ -80,7 +95,7 @@ def calibrate(args=None):
                 'data_format': 'RGB',
                 'first_layer_weight_denorm_mean': [0.485, 0.456, 0.406],
                 'first_layer_weight_denorm_std': [0.229, 0.224, 0.225],
-                'resizer_crop': {'top': 0, 'left': 0, 'height': 224, 'width': 224},
+                'resizer_crop': {'top': 0, 'left': 0, 'height': input_shape[2], 'width': input_shape[3]},
                 'resizer_resize': {
                     'height': 224,
                     'width': 224,
@@ -92,6 +107,9 @@ def calibrate(args=None):
         },
         'graph_opt_cfg': {},
     }
+    
+    if dynamic_resize:
+        quanttool_config['inputs_cfg']['ALL']['fold'] = False
 
     onnx_input = {"input.1": calib_dataset[0]}
 
@@ -120,5 +138,11 @@ def calibrate(args=None):
 
 
 if __name__ == '__main__':
+    import platform
+    arch = platform.machine()
+    if arch != "x86_64":
+        print(f"[error] hmquant not support platform: {arch}")
+        exit(0)
     args = get_args()
+    print(args)
     calibrate(args)

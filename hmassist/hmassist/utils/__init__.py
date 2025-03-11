@@ -9,7 +9,7 @@ console_handler.setFormatter(GLogFormatterWithColor())
 # set base logger
 root_logger = logging.getLogger()
 root_logger.addHandler(console_handler)
-root_logger.setLevel(logging.WARNING)
+root_logger.setLevel(logging.ERROR)
 
 logger = logging.getLogger("hmassist")
 logger.setLevel(logging.INFO)

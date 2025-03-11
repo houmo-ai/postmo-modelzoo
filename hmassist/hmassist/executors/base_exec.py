@@ -11,7 +11,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
     def __init__(self, cfg: dict):
         """init"""
-        # self.cfg = cfg
         self.model_cfg = cfg["model"]
         self.quant_cfg = cfg["quant"]
         self.build_cfg = cfg["build"]
@@ -29,7 +28,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             self.perf_cfg["thread_num"] = 1
 
         # model params
-        self.target = cfg["target"]
         self.framework = self.model_cfg["framework"]
         self.weight = self.model_cfg["weight"]
         if not os.path.exists(self.weight):

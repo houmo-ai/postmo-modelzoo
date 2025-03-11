@@ -4,7 +4,6 @@ import time
 import os
 import numpy as np
 from abc import ABC
-import onnx
 import torch
 import re
 from ..utils import logger
@@ -59,8 +58,6 @@ class XH1Exec(BaseExec, ABC):
                 logger.debug("calib file: {}".format(calib_files[id]))
                 inputs = get_input_datas(calib_dir, calib_files[id])
                 for name, data in inputs.items():
-                    # data = np.transpose(data, (2, 0, 1))  # CHW
-                    # data = np.expand_dims(data, axis=0)  # NCHW
                     calib_dataset[id][name] = torch.tensor(data.astype(np.float32))
 
         for _input in self.inputs:
@@ -68,7 +65,7 @@ class XH1Exec(BaseExec, ABC):
             shape = self.shape_dict[name]
             n, c, h, w = shape
 
-            if "ptq_cfg_path" not in self.quant_cfg or not self.quant_cfg["ptq_cfg_path"]:
+            if self.quant_cfg["ptq_cfg_path"] == "none":
                 # 准备量化参数
                 logger.info("using quanttool_config from config.yml")
                 quanttool_config['inputs_cfg'][name] = {}
@@ -103,7 +100,7 @@ class XH1Exec(BaseExec, ABC):
                     calib_dataset[id][name] = torch.tensor(
                         get_random_data(name, dtype, input_shape))
 
-        if "ptq_cfg_path" in self.quant_cfg and self.quant_cfg["ptq_cfg_path"]:
+        if self.quant_cfg["ptq_cfg_path"] != "none":
             logger.info("using quanttool_config from {}".format(self.quant_cfg["ptq_cfg_path"]))
             quanttool_config = self.quant_cfg["ptq_cfg_path"]
         logger.info(quanttool_config)
@@ -127,28 +124,33 @@ class XH1Exec(BaseExec, ABC):
         self.quantize_span = time.time() - t_start
 
         # gen golden data
-        inputs = {}
-        # for _input in self.inputs:
-        #     inputs[_input["name"]] = calib_dataset[0]["name"]
+        data_path = self.quant_cfg.get("data_path")
+        input_datas = {}
+        if data_path == "default":
+            input_datas = calib_dataset[0]
+        else:
+            inputs = get_input_datas("", data_path)
+            for name, data in inputs.items():
+                input_datas[name] = torch.tensor(data.astype(np.float32))
 
         t_start = time.time()
         if self.quant_cfg["debug_level"] == 1:
             from hmquant.api import quantize_profiling
-            quantize_profiling(sequencer, [calib_dataset[0]])
+            quantize_profiling(sequencer, [input_datas])
         self.layer_compare_span = time.time() - t_start
 
         from hmquant.api import generate_golden
         generate_golden(
             sequencer=sequencer,
-            calibset=calib_dataset[0],
+            calibset=input_datas,
             save_path=self.quant_dir,
             model_name=self.model_name,
             batch_size=1,
             device="cpu"
         )
 
-        logger.info("golden data saved in -> {}".format(self.golden_data_path))
-        logger.info("quantize cost {}s, layer compare cost {}s".format(self.quantize_span, self.layer_compare_span))
+        logger.info(f"golden data saved in -> {self.golden_data_path}")
+        logger.info(f"quantize cost {self.quantize_span:.3f} s, layer compare cost {self.layer_compare_span:.3f} s")
 
     def build(self):
         logger.info("################  build started  ######################")
@@ -156,7 +158,7 @@ class XH1Exec(BaseExec, ABC):
         t_start = time.time()
         tcim.build_from_hmonnx(
             self.quant_model_path,
-            model_name=self.model_name,
+            output_name=self.model_name,
             ncore=self.ncore,
             batch=self.batch,
             legacy=True,
@@ -168,7 +170,7 @@ class XH1Exec(BaseExec, ABC):
         logger.info('{} saved in {}'.format(self.model_name, self.model_dir))
         logger.info("################  build finished  ######################")
         self.build_span = time.time() - t_start
-        logger.info("build cost {} s".format(self.build_span))
+        logger.info(f"build cost {self.build_span:.3f} s")
 
     def load(self):
         import tcim_lite
@@ -195,7 +197,7 @@ class XH1Exec(BaseExec, ABC):
             if self.is_fixed_out:
                 output_data = self.module.get_output(name).numpy()
             else:
-                output_data = self.module.get_output(name).cast(np.float32).numpy()
+                output_data = self.module.get_output(name).astype(np.float32).numpy()
             outputs[name] = output_data
 
         return outputs
@@ -243,7 +245,7 @@ class XH1Exec(BaseExec, ABC):
                 input_data = np.concatenate([input_data for i in range(self.batch)], axis=0)
                 datas[input["name"]] = input_data
             else:
-                logger.warning("compare canceled while golden input not found -> {}".format(input_data_path))
+                logger.warning(f"compare canceled while golden input not found -> {input_data_path}")
                 return None
         return datas
 
@@ -255,7 +257,7 @@ class XH1Exec(BaseExec, ABC):
             output_data = np.concatenate([output_data for i in range(self.batch)], axis=0)
             return output_data
         else:
-            logger.warning("compare canceled while golden output not found -> {}".format(golden_output_path))
+            logger.warning(f"compare canceled while golden output not found -> {golden_output_path}")
             return None
 
     def gen_golden(self, inputs):
