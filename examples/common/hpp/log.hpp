@@ -3,6 +3,9 @@
  * \file log.hpp
  */
 
+#ifndef __LOG_HPP__
+#define __LOG_HPP__
+
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -52,3 +55,6 @@ class Logger {
 #define LOG_WARN    Logger() << COLOR_YELLOW << "[warn] "
 #define LOG_INFO    Logger() << COLOR_CYAN << "[info] "
 #define LOG_DEBUG   Logger() << COLOR_MAGENT << "[debug] "
+
+
+#endif // __LOG_HPP__

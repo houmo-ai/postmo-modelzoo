@@ -3,6 +3,9 @@
  * \file utils.hpp
  */
 
+#ifndef __UTILS_HPP__
+#define __UTILS_HPP__
+
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -63,3 +66,5 @@ class Utils {
   }
 };
 
+
+#endif // __UTILS_HPP__

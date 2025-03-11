@@ -3,6 +3,9 @@
  * \file threads.hpp
  */
 
+#ifndef __THREADS_HPP__
+#define __THREADS_HPP__
+
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -53,3 +56,5 @@ class Barrier {
   std::mutex mtx_;
 };
 
+
+#endif // __THREADS_HPP__

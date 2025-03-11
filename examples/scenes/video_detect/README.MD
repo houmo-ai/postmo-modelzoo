@@ -79,19 +79,19 @@ frame size is 1920 x 1080
 [info] <=== PushStream thread exit. 2 frames received.
 [info] ===> get frame thread EOS received.
 [info] <=== GetFrame thread exit. 2 frames received.
-detect thread 0 run sample 0 end. cost 12.066000 ms.
+[debug] detect thread 0 run sample 0 end. cost 12.066000 ms.
 detect num: 11
 demo results saved to demo_results/0.jpg
-classify thread 0 run sample 0 obj 0 end. cost 2.918000 ms.
+[debug] classify thread 0 run sample 0 obj 0 end. cost 2.918000 ms.
 sample 0 box[314, 596, 638, 842], det[conf:0.917086, cls:2], cls[id:656, conf:12.269067, lable:[minivan]]
-classify thread 0 run sample 0 obj 1 end. cost 2.581000 ms.
+[debug] classify thread 0 run sample 0 obj 1 end. cost 2.581000 ms.
 sample 0 box[729, 302, 891, 427], det[conf:0.813372, cls:2], cls[id:713, conf:10.568404, lable:[photocopier]]
-classify thread 0 run sample 0 obj 2 end. cost 2.608000 ms.
+[debug] classify thread 0 run sample 0 obj 2 end. cost 2.608000 ms.
 sample 0 box[330, 966, 762, 1067], det[conf:0.801487, cls:2], cls[id:545, conf:10.932832, lable:[electric fan, blower]]
-classify thread 0 run sample 0 obj 3 end. cost 2.706000 ms.
+[debug] classify thread 0 run sample 0 obj 3 end. cost 2.706000 ms.
 sample 0 box[427, 358, 639, 510], det[conf:0.797969, cls:2], cls[id:817, conf:11.054308, lable:[sports car, sport car]]
-detect thread 0 run sample 1 end. cost 12.081000 ms.
-classify thread 0 run sample 0 obj 4 end. cost 2.562000 ms.
+[debug] detect thread 0 run sample 1 end. cost 12.081000 ms.
+[debug] classify thread 0 run sample 0 obj 4 end. cost 2.562000 ms.
 sample 0 box[806, 378, 1039, 600], det[conf:0.692485, cls:7], cls[id:656, conf:9.961025, lable:[minivan]]
 ...
 [info] ===> detect thread EOS received.

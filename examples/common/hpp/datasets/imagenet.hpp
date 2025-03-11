@@ -3,6 +3,9 @@
  * \file imagenet.hpp
  */
 
+#ifndef __IMAGENET_HPP__
+#define __IMAGENET_HPP__
+
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -1018,3 +1021,6 @@ class Imagenet {
     return labels[id];
   }
 };
+
+
+#endif // __IMAGENET_HPP__

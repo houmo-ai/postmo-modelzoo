@@ -1,3 +1,11 @@
+// Copyright (c) 2022 The Houmo.ai Authors. All rights reserved.
+/*!
+ * \file infer_module.hpp
+ */
+
+#ifndef __INFER_MODULE_HPP__
+#define __INFER_MODULE_HPP__
+
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -66,3 +74,6 @@ class InferModule {
   std::map<std::string, tcim::TensorInfo> input_info_map_;
   std::map<std::string, tcim::TensorInfo> output_info_map_;
 };
+
+
+#endif // __INFER_MODULE_HPP__

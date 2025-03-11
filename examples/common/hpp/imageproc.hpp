@@ -3,6 +3,9 @@
  * \file imageproc.hpp
  */
 
+#ifndef __IMAGEPROC_HPP__
+#define __IMAGEPROC_HPP__
+
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -34,3 +37,5 @@ class ImageProc {
   }
 };
 
+
+#endif // __IMAGEPROC_HPP__

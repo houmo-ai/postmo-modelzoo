@@ -35,7 +35,7 @@ extern "C" {
 #include "threads.hpp"
 #include "utils.hpp"
 #include "log.hpp"
-#include "infer_module.h"
+#include "infer_module.hpp"
 #include "video_decoder.h"
 
 
@@ -103,13 +103,13 @@ void PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info, Barrier& bar
   }
 
   if (video_stream_index == -1) {
-    printf("can't find video stream\n");
+    LOG_ERROR << "can't find video stream";
     avformat_close_input(&format_ctx);
     return;
   }
 
   AVCodecParameters *codecParameters = format_ctx->streams[video_stream_index]->codecpar;
-  printf("frame size is %d x %d\n", codecParameters->width, codecParameters->height);
+  LOG_INFO << "frame size is " << codecParameters->width << " x " <<  codecParameters->height;
   auto& width = decoder.GetWidth();
   width = codecParameters->width;
   auto& height = decoder.GetHeight();
@@ -119,7 +119,7 @@ void PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info, Barrier& bar
 
   packet = av_packet_alloc();
   if (packet == NULL) {
-    printf("packet failed\n");
+    LOG_ERROR << "packet failed";
     avformat_close_input(&format_ctx);
     return;
   }
@@ -158,7 +158,7 @@ void PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info, Barrier& bar
       rcv_I_slice_flag = 1;
 
     if (rcv_I_slice_flag != 1) {
-      printf("skip non-key frame\n");
+      LOG_DEBUG << "skip non-key frame";
       av_packet_unref(packet);
       continue;
     }
@@ -192,17 +192,16 @@ void GetFrame(VideoDecoder& decoder, TaskQueue& qout, Barrier& barrier) {
   int ret = 0;
   int count = 0;
 
+  FrameDevice device = HDPL;
+
   barrier.barrier();
-  int decode_size = decoder.GetHeight() * decoder.GetWidth() * 3 / 2;
+  int height = decoder.GetHeight();
+  int width = decoder.GetWidth();
+
+  std::vector<DecodeData> frm_data(2);
 
   while (1) {
-    auto buffer = tcim::Buffer::CreateHostBuffer(decode_size);
-
-    DecodeData decoded;
-    decoded.data = buffer.Data();
-    decoded.len = decode_size;
-    ret = decoder.PullData(decoded);
-
+    ret = decoder.PullData(frm_data, device);
     if (ret == VIDEO_DECODER_EOS) {
       TaskInfo task_info;
       task_info.is_end = true;
@@ -214,8 +213,28 @@ void GetFrame(VideoDecoder& decoder, TaskQueue& qout, Barrier& barrier) {
     }
     if (ret != VIDEO_DECODER_OK) {
       LOG_ERROR << "decoder pull data fail: " << ret;
-      return;
+      continue;
     }
+
+    tcim::Buffer y_buf;
+    tcim::Buffer uv_buf;
+    tcim::Tensor yuv_tensor;
+    tcim::Tensor y_tensor;
+    tcim::Tensor uv_tensor;
+    auto yuv_info = tcim::TensorInfo::CreateYUVInfo(height, width, tcim::YUV420SP);
+    LOG_INFO << yuv_info;
+    if (device == CPU) {
+      yuv_tensor = tcim::Tensor::CreateHostTensor(yuv_info);
+      y_buf = tcim::Buffer::CreateHostBuffer(frm_data[0].len, frm_data[0].data);
+      uv_buf = tcim::Buffer::CreateHostBuffer(frm_data[1].len, frm_data[1].data);
+    } else {
+      yuv_tensor = tcim::Tensor::CreateDeviceTensor(yuv_info);
+      y_buf = tcim::Buffer::CreateDeviceBuffer(frm_data[0].data, frm_data[0].len, 0, "");
+      uv_buf = tcim::Buffer::CreateDeviceBuffer(frm_data[1].data, frm_data[1].len, 0, "");
+    }
+    yuv_tensor.SplitYUV(y_tensor, uv_tensor);
+    y_buf.CopyTo(y_tensor.Buffer());
+    uv_buf.CopyTo(uv_tensor.Buffer());
 
     count++;
     decoder.ReleaseBuf();
@@ -234,24 +253,7 @@ void GetFrame(VideoDecoder& decoder, TaskQueue& qout, Barrier& barrier) {
     // push input data to det queue
     TaskInfo task_info;
     task_info.req_id = fid++;
-    task_info.image = buffer;
-
-#if 0
-    // task_info.input_map["image.y"] = data_ptr;
-    if (decoded.size() == 2) {
-      auto y_buf = tcim::Buffer::CreateDeviceBuffer(decoded[0].data, (size_t)decoded[0].len, 0);
-      auto y_cloned = y_buf.Clone();
-      y_buf.CopyTo(y_cloned);
-      auto uv_buf = tcim::Buffer::CreateDeviceBuffer(decoded[1].data, (size_t)decoded[1].len, 0);
-      auto uv_cloned = uv_buf.Clone();
-      uv_buf.CopyTo(uv_cloned);
-      task_info.input_map["image.y"] = y_buf;
-      task_info.input_map["image.uv"] = uv_buf;
-    } else {
-      printf("[error] decode buffer should be 2.\n");
-      return;
-    }
-#endif
+    task_info.image = yuv_tensor.Buffer();
 
     bool print_flag = true;
     while (1) {
@@ -260,7 +262,7 @@ void GetFrame(VideoDecoder& decoder, TaskQueue& qout, Barrier& barrier) {
       int size = qout.queue.size();
       if (size <= 10) {
         qout.queue.push(task_info);
-        printf("decoder pull data req_id %d, queue size %d.\n", task_info.req_id, size);
+        LOG_DEBUG << "decoder pull data req_id " << task_info.req_id << ", queue size " << size;
         qout.cond.notify_all();
         lock.unlock();
         print_flag = true;
@@ -317,7 +319,10 @@ void detect(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& bar
     std::map<std::string, tcim::Tensor> output_map;
 
     // prepare input
-    auto input_info = input_infos[image_input_name].AsContiguous();
+    auto input_info = input_infos[image_input_name];
+    if (task_info.image.Device() == tcim::CPU) {
+      input_info = input_info.AsContiguous();
+    }
     input_map[image_input_name] = tcim::Tensor(input_info, task_info.image);
     auto it = input_infos.find(dyn_info_name);
     if (it != input_infos.end()) {
@@ -350,15 +355,24 @@ void detect(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& bar
 
     auto end = GET_TIME();
     auto cost = GET_COST(start, end) / 1000.0;
-    printf("detect thread %d run sample %lld end. cost %f ms.\n", infer_info.id, task_info.req_id, cost);
+    LOG_DEBUG << "detect thread " << infer_info.id << " run sample " << task_info.req_id
+              << " end. cost " << cost << " ms.";
 
     count++;
 
     // postprocess
-    cv::Mat nv12(1080 * 3 / 2, 1920, CV_8UC1, input_map[image_input_name].Data());
+    tcim::Tensor tensor;
+    if (task_info.image.Device() == tcim::HDPL) {
+      auto info = input_map[image_input_name].Info().AsContiguous();
+      tensor = tcim::Tensor::CreateHostTensor(info);
+      input_map[image_input_name].CopyTo(tensor);
+    } else {
+      tensor = input_map[image_input_name];
+    }
+    cv::Mat nv12(1080 * 3 / 2, 1920, CV_8UC1, tensor.Data());
     cv::Mat rgb;
-    cv::cvtColor(nv12, rgb, cv::COLOR_YUV2RGB_NV12);
     cv::Mat bgr;
+    cv::cvtColor(nv12, rgb, cv::COLOR_YUV2RGB_NV12);
     cv::cvtColor(rgb, bgr, cv::COLOR_BGR2RGB);
 
     std::vector<DetectOutput> outputs;
@@ -388,7 +402,7 @@ void detect(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& bar
     }
     fs::path result_file = result_path / file_path.filename();
     cv::imwrite(result_file.string().c_str(), bgr);
-    printf("demo results saved to %s\n", result_file.string().c_str());
+    LOG_DEBUG << "demo results saved to " << result_file.string();
 
     // send to classify threads
     for (const auto& detection : detections) {
@@ -403,7 +417,8 @@ void detect(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& bar
       int size = qout.queue.size();
       if (size <= 10) {
         qout.queue.push(task_info);
-        printf("detect push task req_id %d, queue size %d.\n", task_info.req_id, size);
+        LOG_DEBUG << "detect push task req_id " << task_info.req_id
+                  << ", queue size " << size;
         qout.cond.notify_all();
         lock.unlock();
         print_flag = true;
@@ -417,7 +432,8 @@ void detect(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& bar
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
   }
-  LOG_INFO << "<=== detect thread " << infer_info.id << " completed. " << count << " sampels tested.";
+  LOG_INFO << "<=== detect thread " << infer_info.id << " completed. "
+           << count << " sampels tested.";
 }
 
 
@@ -454,7 +470,10 @@ void classify(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& b
 
     for (auto& obj : task_info.objs) {
       // prepare input
-      auto input_info = input_infos[image_input_name].AsContiguous();
+      auto input_info = input_infos[image_input_name];
+      if (task_info.image.Device() == tcim::CPU) {
+        input_info = input_info.AsContiguous();
+      }
       input_map[image_input_name] = tcim::Tensor(input_info, task_info.image);
       auto it = input_infos.find(dyn_info_name);
       if (it != input_infos.end()) {
@@ -500,15 +519,16 @@ void classify(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& b
 
       auto end = GET_TIME();
       auto cost = GET_COST(start, end) / 1000.0;
-      printf("classify thread %d run sample %lld obj %d end. cost %f ms.\n", infer_info.id, task_info.req_id, det_cnt, cost);
+      LOG_DEBUG << "classify thread " << infer_info.id << " run sample " << task_info.req_id << " obj "
+                <<  det_cnt << " end. cost " << cost << " ms.";
       det_cnt++;
 
       auto cls = resnet50.postprocess(static_cast<float*>(output_map.begin()->second.Data()), 1000);
 
       // print
       printf("sample %lld box[%d, %d, %d, %d], det[conf:%f, cls:%d], cls[id:%d, conf:%f, lable:[%s]]\n",
-              task_info.req_id, obj.det.box.x1, obj.det.box.y1, obj.det.box.x2, obj.det.box.y2,
-              obj.det.conf, obj.det.cls, cls[0].index, cls[0].conf, Imagenet::GetLabel(cls[0].index).c_str());
+             task_info.req_id, obj.det.box.x1, obj.det.box.y1, obj.det.box.x2, obj.det.box.y2,
+             obj.det.conf, obj.det.cls, cls[0].index, cls[0].conf, Imagenet::GetLabel(cls[0].index).c_str());
     }
     count++;
   }
