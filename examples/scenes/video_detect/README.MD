@@ -8,7 +8,7 @@
 
 本示例以后摩视频解码+yolov5s检测模型推理+resnet50分类模型推理为例展示视频检测推理Pipeline的基本使用方式。
 
-本示例仅支持c++。
+本示例仅支持c++。由于后摩视频解码暂不支持windows，因此本示例不支持windows。
 
 ## 软件依赖
 
@@ -110,10 +110,4 @@ linux下执行：
 
 ```bash
 bash run.sh
-```
-
-windows下执行：
-
-```bash
-bash run.bat
 ```

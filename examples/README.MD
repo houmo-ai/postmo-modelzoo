@@ -23,6 +23,8 @@ TCIM Examples 展示TCIM API的使用方式，包括调用编译API编译模型�
 示例中使用了一些第三方库实现程序编译、图像和数据处理、结果显示等功能，需要安装第三方软件，请自行安装。
 以下为公共依赖，每个示例可能有其他依赖，请参考各示例的README.md文件。
 
+- Python（3.9以上版本，需要和houmo-tcim-runtime支持的版本一致）
+  - windows下将python可执行程序目录设置为环境变量PYTHON_DIR
 - CMake（建议3.16.3以上版本），主要用于c++示例编译
   - linux下可通过apt等包管理工具直接安装
   - windows下可下载安装包安装，将bin目录设置为环境变量CMAKE_DIR
@@ -36,14 +38,18 @@ python依赖可通过requirements.txt安装：
 pip install -r requirements.txt
 ```
 
+此外，示例运行需要依赖houmo-tcim-runtime，参考后摩大道软件平台快速入门配置runtime环境。
+
 ## 示例列表
 
-| 示例名                | 说明                                     |
-| --------------------- | ---------------------------------------- |
-| resnet50              | resnet50图像输入模型推理示例               |
-| resnet50_multistreams | resnet50图像输入模型多stream推理示例       |
-| resnet50_pipeline     | resnet50图像输入模型pipeline推理示例       |
-| qwen2                 | qwen2 混合量化模型推理示例                 |
+| 示例名                | 目录        | 说明                                         |
+| --------------------- | ---------- | -------------------------------------------- |
+| resnet50              | inferences | resnet50图像输入分类模型推理示例               |
+| yolov5s               | inferences | yolov5s图像输入目标检测模型推理示例            |
+| resnet50_multistreams | inferences | resnet50图像输入模型多stream推理示例           |
+| resnet50_pipeline     | inferences | resnet50图像输入模型pipeline推理示例           |
+| qwen2                 | inferences | qwen2 大语言模型推理示例                       |
+| video_detect          | scenes     | 视频解码+yolov5s检测+resnet50分类多阶段推理示例 |
 
 ## 快速上手
 

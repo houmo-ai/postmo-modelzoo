@@ -97,7 +97,6 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
         ncore=ncore,
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim"),
-        io_layout="any"
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)

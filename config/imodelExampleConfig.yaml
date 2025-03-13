@@ -182,6 +182,17 @@ hmassist:
     - detection_yolov5s_test
 
 # examples
+examples_common:
+  include:
+    - examples/common
+  exclude: null
+  example_case: null
+  test:
+    - inferences_resnet50_test
+    - inferences_resnet50_multistreams_test
+    - inferences_resnet50_pipeline_test
+    - inferences_yolov5s_test
+    # - scenes_video_detect_test
 inferences_resnet50:
   include:
     - examples/inferences/resnet50
