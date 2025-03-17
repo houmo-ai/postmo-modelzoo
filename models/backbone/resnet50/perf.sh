@@ -10,7 +10,6 @@ fi
 
 cd "${SCRIPT_DIR}"
 
-python3 get_model.py
-hmquant.sh
+python3 get_model.py --type quant
 hmbuild.sh
 hmperf.sh

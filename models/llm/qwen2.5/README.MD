@@ -52,11 +52,8 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 进入docker后source环境变量，并进入`/hmdd/models/llm/qwen2.5`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为128和4096，可通过ptq.py中的prefill_shape和cache_len参数修改。不同编译模式下支持的上下文长度组合为：
 | cores | batch | prefill | decode |
 | ----- | ----- | ------- | ------ |
-| 4     | 1     | 256     | 2048   |
-| 4     | 1     | 128     | 4096   |
-| 2     | 1     | 128     | 2048   |
-| 2     | 1     | 64      | 4096   |
-| 4     | 4     | 128     | 2048   |
+| 4     | 1     | 256     | 4096   |
+| 2     | 1     | 256     | 4096   |
 
 ```bash
 source env.sh

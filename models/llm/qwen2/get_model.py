@@ -42,8 +42,8 @@ if __name__ == '__main__':
     DATASETS_PATH = os.getenv('DATASETS_PATH', '.')
     MODEL_PATH = os.getenv('MODEL_PATH', '.')
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
-    quant_path = "models/qwen2/hmquant_qwen2_256_4096_20250221.zip"
-    hmm_path = "models/qwen2/hmm_qwen2_256_4096_20250222.zip"
+    quant_path = "models/qwen2/hmquant_qwen2_256_4096_20250317.zip"
+    hmm_path = "models/qwen2/hmm_qwen2_256_4096_4cores_20250317.zip"
 
     if model_type == "dataset" or model_type == "all":
         get_file_from_jfrog(wiki_path, model_dir, DATASETS_PATH)

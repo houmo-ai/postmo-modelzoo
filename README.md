@@ -61,21 +61,22 @@ pip install -r requirements.txt
 
 ## 模型示例列表
 
-houmo-modelzoo提供的模型示例如下，编译示例每个都提供，其他支持情况见下表，其中raw表示提供原始模型，quant表示提供量化后模型，ptq表示提供ptq量化示例，qat表示提供qat训练示例，demo表示提供python端到端demo，eval表示提供精度评估，perf表示提供性能评估
+houmo-modelzoo提供的模型示例如下，编译示例每个都提供，其他支持情况见下表，其中raw表示提供原始预训练模型，quant表示提供预量化模型，hmm表示提供预编译模型，ptq表示提供ptq量化示例，qat表示提供qat训练示例，demo表示提供python端到端demo，eval表示提供精度评估，perf表示提供性能评估
 
-| models                                       | type      | raw | quant | ptq | qat | demo | eval | perf |
-| -------------------------------------------- | --------- | --- | ----- | --- | --- | ---- | ---- | ---- |
-| [resnet50](models/backbone/resnet50)         | backbone  | yes | yes   | yes | yes | yes  | yes  | yes  |
-| [mobilenetv2](models/backbone/mobilenet_v2)  | backbone  | yes | yes   | yes | x   | yes  | yes  | yes  |
-| [efficientnet](models/backbone/efficientnet) | backbone  | yes | yes   | yes | x   | yes  | yes  | yes  |
-| [yolov8m](models/detection/yolov8m)          | detection | yes | yes   | yes | x   | yes  | yes  | yes  |
-| [yolov5s](models/detection/yolov5s)          | detection | yes | yes   | yes | x   | yes  | yes  | yes  |
-| [yolov3](models/detection/yolov3)            | detection | yes | yes   | yes | x   | yes  | yes  | yes  |
-| [yolop](models/autodrive/yolop)              | autodrive | yes | yes   | yes | yes | yes  | x    | yes  |
-| [wenet](models/asr/wenet)                    | asr       | x   | yes   | x   | x   | yes  | x    | x    |
-| [qwen2](models/llm/qwen2)                    | llm       | yes | yes   | yes | x   | yes  | x    | x    |
-| [qwen2.5](models/llm/qwen2.5)                | llm       | yes | yes   | yes | x   | yes  | x    | x    |
-| [sdxl](models/diffusion/sdxl)                | diffusion | x   | yes   | yes | x   | x    | x    | x    |
+| models                                       | type      | raw | quant | hmm | ptq | qat | demo | eval | perf |
+| -------------------------------------------- | --------- | --- | ----- | --- | --- | --- | ---- | ---- | ---- |
+| [resnet50](models/backbone/resnet50)         | backbone  | yes | yes   | x   | yes | yes | yes  | yes  | yes  |
+| [mobilenetv2](models/backbone/mobilenet_v2)  | backbone  | yes | yes   | x   | yes | x   | yes  | yes  | yes  |
+| [efficientnet](models/backbone/efficientnet) | backbone  | yes | yes   | x   | yes | x   | yes  | yes  | yes  |
+| [yolov8m](models/detection/yolov8m)          | detection | yes | yes   | x   | yes | x   | yes  | yes  | yes  |
+| [yolov5s](models/detection/yolov5s)          | detection | yes | yes   | x   | yes | x   | yes  | yes  | yes  |
+| [yolov3](models/detection/yolov3)            | detection | yes | yes   | x   | yes | x   | yes  | yes  | yes  |
+| [yolop](models/autodrive/yolop)              | autodrive | yes | yes   | x   | yes | yes | yes  | x    | yes  |
+| [wenet](models/asr/wenet)                    | asr       | x   | yes   | x   | x   | x   | yes  | x    | x    |
+| [qwen2](models/llm/qwen2)                    | llm       | yes | yes   | yes | yes | x   | yes  | x    | x    |
+| [qwen2.5](models/llm/qwen2.5)                | llm       | yes | yes   | yes | yes | x   | yes  | x    | x    |
+| [deepseek](models/llm/deepseek)              | llm       | yes | yes   | yes | x   | x   | yes  | x    | x    |
+| [sdxl](models/diffusion/sdxl)                | diffusion | x   | yes   | x   | yes | x   | x    | x    | x    |
 
 ## C++评估工具列表
 
