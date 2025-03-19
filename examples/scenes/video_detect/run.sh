@@ -19,6 +19,6 @@ cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH -DCMAKE_BUILD_TYPE=Release ..
 make -j
 make install
 
-export LD_LIBRARY_PATH=$HOUMO_PATH/lib:$HOUMO_SDK_PATH/hal/lib:$HOUMO_EXAMPLES_PATH/3rdparty/install/ffmpeg/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$HOUMO_PATH/lib:$HOUMO_SDK_PATH/hal/lib:$LD_LIBRARY_PATH
 cd $WORK_PATH
 ./example_video_detect
