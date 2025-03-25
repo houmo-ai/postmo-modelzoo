@@ -432,7 +432,7 @@ int main(int argc, char *argv[]) {
     task.ref_out = output_golden;
     std::map<std::string, tcim::Tensor> output_datas;
     for (auto& output : output_golden) {
-      auto& info = output.second.Info();
+      auto info = output.second.Info().AsContiguous();
       auto tensor = tcim::Tensor::CreateHostTensor(info);
       output_datas.insert(std::pair<std::string, tcim::Tensor>(output.first, tensor));
     }

@@ -187,7 +187,7 @@ class XH1Exec(BaseExec, ABC):
                 input_data = inputs[input["name"]]
             else:
                 input_data = inputs
-            self.module.set_input(input["name"], tcim_lite.runtime.Tensor(self.input_infos[input["name"]], input_data))
+            self.module.set_input(input["name"], input_data)
         self.module.run()
         self.module.sync()
         outputs = {}

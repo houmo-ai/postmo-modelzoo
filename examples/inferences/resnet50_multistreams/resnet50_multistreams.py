@@ -101,7 +101,7 @@ if __name__ == '__main__':
         input_num = module.get_num_inputs()
         for id in range(0, input_num):
             input_name = module.get_input_name(id)
-            input_info = module.get_input_info(input_name)
+            input_info = module.get_input_info(input_name).ascontiguous()
             print("input[{}] shape = {}, dtype = {}, format = {}"
                   .format(input_name,
                           input_info.shape,
@@ -113,7 +113,7 @@ if __name__ == '__main__':
         output_num = module.get_num_outputs()
         for id in range(0, output_num):
             output_name = module.get_output_name(id)
-            output_info = module.get_output_info(output_name)
+            output_info = module.get_output_info(output_name).ascontiguous()
             print("output[{}] shape = {}, dtype = {}, format = {}"
                   .format(output_name,
                           output_info.shape,
@@ -129,7 +129,7 @@ if __name__ == '__main__':
 
             # 3.5.2 set input to the module
             for input_name in input_infos:
-                module.set_input(input_name, tcim.runtime.Tensor(input_infos[input_name], input_datas[0]))
+                module.set_input(input_name, input_datas[0])
 
             # 3.5.3 run and sync
             module.run()

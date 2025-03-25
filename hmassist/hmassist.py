@@ -316,7 +316,7 @@ def run(args):
     
     # import pprint
     # pprint.pprint(config.dump())
-    logger.debug(f"config:\n{dump_yaml(config)}")
+    logger.info(f"config:\n{dump_yaml(config)}")
 
     if args.type == "quant":
         quantize(config)
