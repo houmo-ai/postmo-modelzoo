@@ -12,5 +12,5 @@ if __name__ == '__main__':
         os.environ["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
     HOUMO_TARGET = os.environ.get('HOUMO_TARGET', 'houmo')
     model_dir = os.path.join(HOUMO_EXAMPLES_PATH, "models")
-    hmm_path = "models/qwen2/hmm_qwen2_256_4096_20250222.zip"
+    hmm_path = "models/qwen2/hmm_qwen2_256_4096_4cores_20250317.zip"
     get_file_from_jfrog(hmm_path, model_dir, "./")

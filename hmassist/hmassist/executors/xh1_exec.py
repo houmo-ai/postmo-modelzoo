@@ -10,8 +10,6 @@ from ..utils import logger
 from ..utils.utils import get_random_data
 from .base_exec import BaseExec
 
-import logging
-logging.basicConfig(level="ERROR")
 
 class XH1Exec(BaseExec, ABC):
     def __init__(self, cfg: dict):

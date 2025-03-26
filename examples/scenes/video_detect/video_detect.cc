@@ -87,14 +87,31 @@ void PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info, Barrier& bar
    */
   int video_stream_index = -1;
 
+#if LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58, 9, 100)
+  av_register_all();
+#endif
+  avformat_network_init();
+
+  // av_log_set_level(AV_LOG_DEBUG);
+
   /* open stream */
   ret = avformat_open_input(&format_ctx, stream_info.stream_path.c_str(), NULL, NULL);
   if (ret < 0) {
-    LOG_ERROR << "open stream " << stream_info.stream_path << " failed: " << ret;
+    char error_buf[AV_ERROR_MAX_STRING_SIZE];
+    av_strerror(ret, error_buf, sizeof(error_buf));
+    LOG_ERROR << "open stream " << stream_info.stream_path << " failed: " << error_buf;
+    return;
+  }
+  LOG_INFO << "open stream " << stream_info.stream_path << " completed.";
+
+  ret = avformat_find_stream_info(format_ctx, NULL);
+  if (ret < 0) {
+    char error_buf[AV_ERROR_MAX_STRING_SIZE];
+    av_strerror(ret, error_buf, sizeof(error_buf));
+    LOG_ERROR << "find stream info failed: " << error_buf;
     return;
   }
 
-  avformat_find_stream_info(format_ctx, NULL);
   for (int i = 0; i < format_ctx->nb_streams; i++) {
     if (format_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
       video_stream_index = i;
@@ -146,7 +163,9 @@ void PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info, Barrier& bar
           ret = -1;
         }
       } else {
-        LOG_ERROR << "av_read_frame fail: " << ret;
+        char error_buf[AV_ERROR_MAX_STRING_SIZE];
+        av_strerror(ret, error_buf, sizeof(error_buf));
+        LOG_ERROR << "av_read_frame fail: " << error_buf;
         ret = -1;
       }
       /* exit loop */
