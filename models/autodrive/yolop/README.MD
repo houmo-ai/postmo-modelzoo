@@ -30,43 +30,19 @@ bash eval.sh
 
 执行完成后会打印模型的数据集精度信息。
 
-#### 2.3 精度优化（暂不支持）
+#### 2.3 结果演示
 
-yolop模型PTQ量化精度下降较多，建议使用QAT方式进行量化。
-
-将bdd100k的数据集数据放到$DATASETS_PATH/bdd100k目录下，包含bdd100k/images/100k，det_annotations，da_seg_annotations，ll_seg_annotations这几个子目录。
-
-可通过qat.sh脚本直接运行，可通过修改train_yolop.py脚本中的cfg.TRAIN.BATCH_SIZE_PER_GPU参数修改batch等参数，目前默认值BATCH_SIZE_PER_GPU=8。
+本示例依赖hmassist演示结果，在编译完成的基础上执行：
 
 ```bash
-./qat.sh
+hmdemo.sh
 ```
 
-注：如果遇到报错RuntimeError: result type Float can't be cast to the desired output type long int
-修改/hmodel/thirdparty/YOLOP/lib/core/postprocess.py第30行加上.long()，修改后为：
-
-```python
-gain = torch.ones(7, device=targets.device).long()
-```
-
-QAT训练参考结果：
-
-```bash
-...
-=> loaded checkpoint '/root/.cache/torch/hub/checkpoints/End-to-end.pth' 
-building database...
-...
-...
-Results saved to runs/BddDataset/_2023-09-06-20-33/visualization
-Epoch: [10]    Loss(0.497)
-Driving area Segment: Acc(0.974)    IOU (0.859)    mIOU(0.914)
-Lane line Segment: Acc(0.643)    IOU (0.281)  mIOU(0.633)
-Detect: P(0.084)  R(0.893)  mAP@0.5(0.767)  mAP@0.5:0.95(0.438)
-```
+执行完成后会打印模型的检测结果信息，图片结果将保存在demo_results目录。
 
 ## 3.参考结果
 
-### 3.1性能结果
+### 3.1 性能结果
 
 ```bash
 [latency] Inference 	avg:  10.181 ms,	max:  10.543 ms

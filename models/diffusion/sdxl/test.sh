@@ -5,6 +5,8 @@ set -e
 
 cd "${SCRIPT_DIR}"
 
+pip3 install -r requirements.txt
 python3 get_model.py
 python3 build.py
-# python3 demo.py
+python3 get_model.py --type raw
+python3 demo.py

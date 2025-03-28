@@ -24,3 +24,7 @@ torchaudio==2.4.0
 openai-whisper
 langid
 librosa
+
+# diffusion
+diffusers
+peft

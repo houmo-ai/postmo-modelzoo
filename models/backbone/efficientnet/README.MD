@@ -25,15 +25,7 @@ torch.onnx.export(efficientnet, input, 'efficientnet_b0_224x224.onnx', opset_ver
 
 可以通过perf.sh和eval.sh脚本一键执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
 
-### 2.1 性能评估
-
-```bash
-bash perf.sh
-```
-
-执行完成后会打印模型推理延迟、吞吐量等信息。
-
-#### 2.2 精度评估
+### 2.1 精度评估
 
 ```bash
 bash eval.sh
@@ -41,14 +33,32 @@ bash eval.sh
 
 执行完成后会打印模型的数据集精度信息。
 
+### 2.2 性能评估
+
+```bash
+bash perf.sh
+```
+
+执行完成后会打印模型推理延迟、吞吐量等信息。
+
+### 2.3 结果演示
+
+本示例依赖hmassist演示结果，在编译完成的基础上执行：
+
+```bash
+hmdemo.sh
+```
+
+执行完成后会打印模型的分类结果信息。
+
 ## 3.参考结果
 
-### 3.1精度结果
+### 3.1 精度结果
 ```bash
 {'shape': [[1, 3, 224, 224]], 'dataset': 'ILSVRC2012', 'test_num': 20, 'accuracy': {'top1': 0.5, 'top5': 0.7}, 'latency': 5.595}
 ```
 
-### 3.2性能结果
+### 3.2 性能结果
 
 ```bash
 [latency] Inference 	avg:   1.846 ms,	max:   2.300 ms

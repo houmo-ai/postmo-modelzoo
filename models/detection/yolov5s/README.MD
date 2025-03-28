@@ -21,15 +21,7 @@ yolo export model=yolov5s.pt format=onnx imgsz=640,640 opset=11
 
 可以通过perf.sh和eval.sh脚本一键执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
 
-### 2.1 性能评估
-
-```bash
-bash perf.sh
-```
-
-执行完成后会打印模型推理延迟、吞吐量等信息。
-
-#### 2.2 精度评估
+### 2.1 精度评估
 
 ```bash
 bash eval.sh
@@ -37,9 +29,27 @@ bash eval.sh
 
 执行完成后会打印模型的数据集精度信息。
 
+### 2.2 性能评估
+
+```bash
+bash perf.sh
+```
+
+执行完成后会打印模型推理延迟、吞吐量等信息。
+
+### 2.3 结果演示
+
+本示例依赖hmassist演示结果，在编译完成的基础上执行：
+
+```bash
+hmdemo.sh
+```
+
+执行完成后会打印模型的检测结果信息，图片结果将保存在demo_results目录。
+
 ## 3.参考结果
 
-### 3.1精度结果
+### 3.1 精度结果
 
 ```bash
 {'input_size': '1x3x640x640', 'dataset': 'coco2017', 'num': 5000, 'map': '0.469', 'map50': '0.674', 'latency': '6.958'}
@@ -57,7 +67,7 @@ bash eval.sh
  Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.676
 ```
 
-### 3.2性能结果
+### 3.2 性能结果
 
 ```bash
 [latency] Inference 	avg:   3.128 ms,	max:   3.594 ms
