@@ -22,6 +22,11 @@ class XH1Exec(BaseExec, ABC):
         if arch != "x86_64":
             logger.error(f"quant not support platform: {arch}")
             exit(0)
+        if not os.path.exists(self.weight):
+            weight = os.path.join(os.getenv("HOUMO_MODEL_PATH", default=""), self.weight)
+            if not os.path.exists(weight):
+                raise RuntimeError(f"{self.weight} or {weight} not exist.")
+            self.weight = weight
         logger.info("################  ptq quantize started  ######################")
         t_start = time.time()
         calib_files = []
@@ -201,14 +206,14 @@ class XH1Exec(BaseExec, ABC):
         return outputs
 
     def perf(self, test_num):
-        modelzoo_path = os.getenv('MODELZOO_PATH')
+        HOUMO_MODELZOO_PATH = os.getenv('HOUMO_MODELZOO_PATH')
         model_path = os.path.join(self.model_dir, self.model_name + ".hmm")
         exec = "tcim_perf"
         if os.environ.get("HDPL_PLATFORM") == "ISIM":
             test_num = 1
             logger.warning("test num set to 1 because HDPL_PLATFORM=ISIM may take a lot of time.")
         cmd = "cd {}/utils/{} && ./{} --model {} --data {} --samples {} --threads {} --batch {} --output {}".format(
-            modelzoo_path, exec, exec, model_path, self.build_dir, test_num, self.perf_cfg["thread_num"], self.batch,
+            HOUMO_MODELZOO_PATH, exec, exec, model_path, self.build_dir, test_num, self.perf_cfg["thread_num"], self.batch,
             os.path.join(self.cur_dir, "output"))
         if self.perf_cfg['infer_only']:
             cmd += " --infer_only true"

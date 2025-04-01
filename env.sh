@@ -2,12 +2,12 @@
 
 # main path
 __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-export MODELZOO_PATH=${__dir}
-export HMASSIST_PATH=$MODELZOO_PATH/hmassist
-export CMAKE_CONFIG_PATH=$MODELZOO_PATH/release.cmake
+export HOUMO_MODELZOO_PATH=${__dir}
+export HMASSIST_PATH=$HOUMO_MODELZOO_PATH/hmassist
+export CMAKE_CONFIG_PATH=$HOUMO_MODELZOO_PATH/release.cmake
 
 # install requirements
-pip3 install -r $MODELZOO_PATH/requirements.txt
+pip3 install -r $HOUMO_MODELZOO_PATH/requirements.txt
 
 # common define
 PRINT_GREEN() { echo -e "\033[1;32m$@\033[0m"; }
@@ -27,8 +27,8 @@ if [[ -z $TCIM_RUNTIME_PATH ]]; then
   export TCIM_RUNTIME_PATH=$HOUMO_PATH
 fi
 
-if [[ -z $MODELZOO_URL ]]; then
-  export MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo/release
+if [[ -z $HOUMO_MODELZOO_URL ]]; then
+  export HOUMO_MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo/release
 fi
 
 # paths for build
@@ -43,16 +43,16 @@ export PYTHONPATH=$HMASSIST_PATH:$PYTHONPATH
 export PATH=$HMASSIST_PATH:$PATH
 
 # data and model path
-if [[ -z $DATASETS_PATH ]]; then
-  export DATASETS_PATH=$MODELZOO_PATH/data/datasets
+if [[ -z $HOUMO_DATASETS_PATH ]]; then
+  export HOUMO_DATASETS_PATH=$HOUMO_MODELZOO_PATH/data/datasets
 fi
 
-if [[ -z $MODEL_PATH ]]; then
+if [[ -z $HOUMO_MODEL_PATH ]]; then
   CI_MODEL_PATH=/data02/modelzoo_ci/models
   if test -d $CI_MODEL_PATH; then
-    export MODEL_PATH=$CI_MODEL_PATH
+    export HOUMO_MODEL_PATH=$CI_MODEL_PATH
   else
-    export MODEL_PATH=$MODELZOO_PATH/models
+    export HOUMO_MODEL_PATH=$HOUMO_MODELZOO_PATH/models
   fi
 fi
 
@@ -70,9 +70,9 @@ PRINT_GREEN "HOUMO_TARGET is $HOUMO_TARGET"
 PRINT_GREEN "HOUMO_PATH is $HOUMO_PATH"
 PRINT_GREEN "HOUMO_SDK_PATH is $HOUMO_SDK_PATH"
 PRINT_GREEN "TCIM_RUNTIME_PATH is $TCIM_RUNTIME_PATH"
-PRINT_GREEN "MODELZOO_PATH is $MODELZOO_PATH"
-PRINT_GREEN "DATASETS_PATH is $DATASETS_PATH"
-PRINT_GREEN "MODEL_PATH is $MODEL_PATH"
+PRINT_GREEN "HOUMO_MODELZOO_PATH is $HOUMO_MODELZOO_PATH"
+PRINT_GREEN "HOUMO_DATASETS_PATH is $HOUMO_DATASETS_PATH"
+PRINT_GREEN "HOUMO_MODEL_PATH is $HOUMO_MODEL_PATH"
 PRINT_GREEN "PYTHONPATH is $PYTHONPATH"
 PRINT_GREEN "LD_LIBRARY_PATH is $LD_LIBRARY_PATH"
 PRINT_GREEN "PATH is $PATH"

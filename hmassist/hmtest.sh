@@ -22,8 +22,8 @@ fi
 mkdir -p logs
 LOG_FILE="logs/hmassist-test-$target-$(date "+%Y-%m-%d-%H-%M-%S").log"
 
-echo "python3 $MODELZOO_PATH/hmassist/hmassist.py test $param 2>&1 | tee $LOG_FILE"
-python3 $MODELZOO_PATH/hmassist/hmassist.py test $param 2>&1 | tee $LOG_FILE
+echo "python3 $HOUMO_MODELZOO_PATH/hmassist/hmassist.py test $param 2>&1 | tee $LOG_FILE"
+python3 $HOUMO_MODELZOO_PATH/hmassist/hmassist.py test $param 2>&1 | tee $LOG_FILE
 status=${PIPESTATUS[0]}
 if [ $status -ne 0 ]; then
   exit $status

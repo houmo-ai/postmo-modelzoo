@@ -25,6 +25,11 @@ class OnnxExec(BaseExec, ABC):
         super(OnnxExec, self).__init__(cfg)
 
     def load(self):
+        if not os.path.exists(self.weight):
+            weight = os.path.join(os.getenv("HOUMO_MODEL_PATH", default=""), self.weight)
+            if not os.path.exists(weight):
+                raise RuntimeError(f"{self.weight} or {weight} not exist.")
+            self.weight = weight
         self.module = onnxruntime.InferenceSession(self.weight)
         self.input_info = self.get_input_info()
         self.output_info = self.get_output_info()

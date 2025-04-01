@@ -11,7 +11,7 @@ def check_quant_config(cfg):
         return False
     if not check_key(cfg["model"], "weight"):
         return False
-    if not check_path(cfg["model"], "weight", "MODEL_PATH"):
+    if not check_path(cfg["model"], "weight", "HOUMO_MODEL_PATH"):
         return False
     if not check_key(cfg["model"], "inputs"):
         return False
@@ -52,9 +52,9 @@ def check_quant_config(cfg):
         return False
     if not check_path(cfg["quant"], "ptq_cfg_path", "", "none"):
         return False
-    if not check_path(cfg["quant"], "calib_dir", "DATASETS_PATH", "default"):
+    if not check_path(cfg["quant"], "calib_dir", "HOUMO_DATASETS_PATH", "default"):
         return False
-    if not check_path(cfg["quant"], "data_path", "DATASETS_PATH", "default"):
+    if not check_path(cfg["quant"], "data_path", "HOUMO_DATASETS_PATH", "default"):
         return False
     if not check_key(cfg["quant"], "calib_num", 0):
         return False
@@ -86,7 +86,7 @@ def check_build_config(cfg):
 def check_test_config(cfg):
     if not check_key(cfg, "test"):
         return False
-    if not check_path(cfg["test"], "data_path", "DATASETS_PATH"):
+    if not check_path(cfg["test"], "data_path", "HOUMO_DATASETS_PATH"):
         return False
     return True
 
@@ -98,7 +98,7 @@ def check_demo_config(cfg):
         return False
     if not check_key(cfg, "demo"):
         return False
-    if not check_path(cfg["demo"], "data_dir", "DATASETS_PATH"):
+    if not check_path(cfg["demo"], "data_dir", "HOUMO_DATASETS_PATH"):
         return False
     if not check_key(cfg["demo"], "test_num"):
         return False
@@ -122,7 +122,7 @@ def check_eval_config(cfg):
         return False
     if not check_key(cfg, "eval"):
         return False
-    if not check_path(cfg["eval"], "data_dir", "DATASETS_PATH"):
+    if not check_path(cfg["eval"], "data_dir", "HOUMO_DATASETS_PATH"):
         return False
     if not check_key(cfg["eval"], "test_num"):
         return False

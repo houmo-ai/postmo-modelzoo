@@ -39,14 +39,14 @@ if __name__ == '__main__':
     quant_model_dir = args.quant_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
-    DATASETS_PATH = os.getenv('DATASETS_PATH', '.')
-    MODEL_PATH = os.getenv('MODEL_PATH', '.')
+    HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
+    HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
     quant_path = "models/qwen2/hmquant_qwen2_256_4096_20250317.zip"
     hmm_path = "models/qwen2/hmm_qwen2_256_4096_4cores_20250317.zip"
 
     if model_type == "dataset" or model_type == "all":
-        get_file_from_jfrog(wiki_path, model_dir, DATASETS_PATH)
+        get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
 
     if model_type == "raw" or model_type == "all":
         from modelscope import snapshot_download

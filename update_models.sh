@@ -13,7 +13,7 @@ UPDATE_HMQUANT() {
     hmquant=hmquant_${name}${size}_${date}.zip
     pushd $dir/$name/output/$target/hmquant
     zip -r ${hmquant} * -x hmquant_${name}_with_act/*
-    curl -u${user}:${pwd} -T ${hmquant} $MODELZOO_URL/models/$name/${hmquant}
+    curl -u${user}:${pwd} -T ${hmquant} $HOUMO_MODELZOO_URL/models/$name/${hmquant}
     popd
 }
 
@@ -24,7 +24,7 @@ UPDATE_HMQUANT_LM() {
     hmquant=hmquant_${name}${size}_${date}.zip
     pushd $dir/$name/output/$target/hmquant
     zip -r ${hmquant} * -x prefill/hmquant_${name}_with_act/* -x decoder/hmquant_${name}_with_act/*
-    curl -u${user}:${pwd} -T ${hmquant} $MODELZOO_URL/models/$name/${hmquant}
+    curl -u${user}:${pwd} -T ${hmquant} $HOUMO_MODELZOO_URL/models/$name/${hmquant}
     popd
 }
 
@@ -36,7 +36,7 @@ UPDATE_HMM_LM() {
     hmm=hmm_${name}${size}${ncore}_${date}.zip
     pushd $dir/$name/output/$target
     zip -r ${hmm} *.hmm hmquant/quant_embedding.pt
-    curl -u${user}:${pwd} -T ${hmm} $MODELZOO_URL/models/$name/${hmm}
+    curl -u${user}:${pwd} -T ${hmm} $HOUMO_MODELZOO_URL/models/$name/${hmm}
     popd
 }
 

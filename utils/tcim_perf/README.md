@@ -67,7 +67,7 @@
 
 ### 2.1 环境准备
 
-进入modelzoo根目录，先检查 `env.sh` 里的环境变量，根据模型实际路径修改 `env.sh` 内的 `MODEL_PATH`, 并且执行以下命令：
+进入modelzoo根目录，先检查 `env.sh` 里的环境变量，根据模型实际路径修改 `env.sh` 内的 `HOUMO_MODEL_PATH`, 并且执行以下命令：
 
 ```bash
 source env.sh

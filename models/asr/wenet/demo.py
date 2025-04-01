@@ -16,8 +16,8 @@ from wenet.utils.init_tokenizer import init_tokenizer
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
-MODELZOO_PATH = os.getenv('MODELZOO_PATH', '../../..')
-INPUT_FILE = os.path.join(MODELZOO_PATH, 'data/audio/4s.wav')
+HOUMO_MODELZOO_PATH = os.getenv('HOUMO_MODELZOO_PATH', '../../..')
+INPUT_FILE = os.path.join(HOUMO_MODELZOO_PATH, 'data/audio/4s.wav')
 
 
 from wenet.transformer.search import (

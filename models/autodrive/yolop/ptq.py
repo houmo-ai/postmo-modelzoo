@@ -8,8 +8,8 @@ from hmquant.api import quant_single_onnx_network, generate_golden, quantize_pro
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
-MODEL_PATH = os.getenv("MODEL_PATH", '')
-DATASETS_PATH = os.getenv('DATASETS_PATH', '')
+HOUMO_MODEL_PATH = os.getenv("HOUMO_MODEL_PATH", '')
+HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '')
 
 
 def get_args() -> argparse.Namespace:
@@ -19,7 +19,7 @@ def get_args() -> argparse.Namespace:
         '--model_path',
         dest='model_path',
         type=str,
-        default=os.path.join(MODEL_PATH, 'yolop_384x640.onnx'),
+        default=os.path.join(HOUMO_MODEL_PATH, 'yolop_384x640.onnx'),
         help='path to the model path',
     )
     parser.add_argument(
@@ -59,7 +59,7 @@ def calibrate(args=None):
 
     calib_num = 20
     calib_files = []
-    calib_dir = os.path.join(DATASETS_PATH, 'coco2017/val2017')
+    calib_dir = os.path.join(HOUMO_DATASETS_PATH, 'coco2017/val2017')
     file_list = os.listdir(calib_dir)
     for filename in file_list:
         _, ext = os.path.splitext(filename)

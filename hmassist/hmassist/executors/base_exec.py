@@ -30,11 +30,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         # model params
         self.framework = self.model_cfg["framework"]
         self.weight = self.model_cfg["weight"]
-        if not os.path.exists(self.weight):
-            weight = os.path.join(os.getenv("MODEL_PATH", default=""), self.weight)
-            if not os.path.exists(weight):
-                raise RuntimeError(f"{self.weight} or {weight} not exist.")
-            self.weight = weight
         self.inputs = self.model_cfg["inputs"]
         self.num_inputs = len(self.inputs)
         self.model_name = self.model_cfg["name"]

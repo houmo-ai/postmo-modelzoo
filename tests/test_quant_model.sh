@@ -3,12 +3,12 @@
 set -e
 
 model_case=(
-    $MODELZOO_PATH/models/backbone/resnet50
-    $MODELZOO_PATH/models/backbone/mobilenetv2
-    $MODELZOO_PATH/models/backbone/efficientnet
-    $MODELZOO_PATH/models/detection/yolov3
-    $MODELZOO_PATH/models/detection/yolov5s
-    $MODELZOO_PATH/models/autodrive/yolop
+    $HOUMO_MODELZOO_PATH/models/backbone/resnet50
+    $HOUMO_MODELZOO_PATH/models/backbone/mobilenetv2
+    $HOUMO_MODELZOO_PATH/models/backbone/efficientnet
+    $HOUMO_MODELZOO_PATH/models/detection/yolov3
+    $HOUMO_MODELZOO_PATH/models/detection/yolov5s
+    $HOUMO_MODELZOO_PATH/models/autodrive/yolop
 )
 
 for case in "${model_case[@]}"

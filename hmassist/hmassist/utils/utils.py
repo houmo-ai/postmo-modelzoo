@@ -125,10 +125,10 @@ def get_file_from_jfrog(file_path, save_dir="", extract_dir=None):
         url, file_path = file_path.split("artifactory/")
         modelzoo_url = url + "artifactory"
     else:
-        modelzoo_url = os.environ.get("MODELZOO_URL")
+        modelzoo_url = os.environ.get("HOUMO_MODELZOO_URL")
     file_name = os.path.basename(file_path)
     if save_dir == "":
-        save_dir = os.getenv("MODEL_PATH", default="./")
+        save_dir = os.getenv("HOUMO_MODEL_PATH", default="./")
     else:
         os.makedirs(save_dir, exist_ok=True)
     save_path = f"{save_dir}/{file_name}"

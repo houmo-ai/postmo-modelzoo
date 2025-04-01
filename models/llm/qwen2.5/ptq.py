@@ -3,7 +3,7 @@ import hmquant.llm.llm_utils  as utils
 from hmquant.llm.llm_api import QwenQuantPipline
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-DATASETS_PATH = os.getenv('DATASETS_PATH', '')
+HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '')
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', '')
 
 def str2bool(v):
@@ -29,7 +29,7 @@ def parse_args():
     parser.add_argument("--cache_len", type=int, default=4096)
     parser.add_argument("--multi_batch",action="store_true",default=False,help="weather use multi batch for export")
     # 3. others
-    parser.add_argument("--wikitext_local",type=str,default=os.path.join(DATASETS_PATH,"wikitext-2-raw-v1"),help="if has local wikitext, set it here")
+    parser.add_argument("--wikitext_local",type=str,default=os.path.join(HOUMO_DATASETS_PATH,"wikitext-2-raw-v1"),help="if has local wikitext, set it here")
     parser.add_argument("--eval_ppl",action="store_true",default=False)
 
     """  args below are for debug, please not used """
