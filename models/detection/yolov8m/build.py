@@ -61,6 +61,19 @@ def get_args() -> argparse.Namespace:
         help='core number',
     )
     parser.add_argument(
+        '--input_shape',
+        dest='input_shape',
+        type=lambda s:[int(item) for item in s.split(',')],
+        default=None,
+        help='new input shape if want change',
+    )
+    parser.add_argument(
+        '--dynamic_resize',
+        dest='dynamic_resize',
+        action='store_true',
+        help='set dynamic crop/resize/pad',
+    )
+    parser.add_argument(
         '--stage',
         dest='stage',
         type=str,
@@ -74,6 +87,12 @@ def get_args() -> argparse.Namespace:
         default=os.path.join('output', HOUMO_TARGET),
         help='build output dir',
     )
+    parser.add_argument(
+        '--verbose',
+        dest='verbose',
+        action='store_true',
+        help='print details',
+    )
     args = parser.parse_args()
     return args
 
@@ -84,13 +103,21 @@ def build(args=None):
     model_name = args.model_name
     batch = args.batch
     ncore = args.ncore
+    input_shape = args.input_shape
+    enable_dynamic_image_resize = args.dynamic_resize
     stage = args.stage
     output_dir= args.output_dir
+    verbose = args.verbose
     quant_name = "hmquant_" + model_name + "_with_act"
     onnx_name = quant_name + ".onnx"
     onnx_path = os.path.join(model_dir, onnx_name)
     hmm_path = os.path.join(output_dir, f"{model_name}.hmm")
     profile = {}
+    
+    # arg check
+    if enable_dynamic_image_resize:
+        if input_shape is None:
+            raise RuntimeError("input_shape should be set when dynamic_resize is set.")
 
     # 1. build model
     if stage == 'build' or stage == 'all':
@@ -101,9 +128,9 @@ def build(args=None):
             onnx_path,
             output_name=model_name,
             ncore=ncore,
-            legacy=True,
             output_dir=output_dir,
-            work_dir=os.path.join(output_dir, "tcim")
+            work_dir=os.path.join(output_dir, "tcim"),
+            enable_dynamic_image_resize=enable_dynamic_image_resize,
         )
         profile["build"] = time.time() - start
         print(f'{model_name} build completed in {profile["build"]:.3f} s.')
@@ -126,9 +153,14 @@ def build(args=None):
             input_name = module.get_input_name(id)
             input_info = module.get_input_info(input_name)
             print(f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}")
-            input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
-            input_data_path = os.path.join(model_dir, input_file_name)
-            input_data = np.load(input_data_path).astype(input_info.dtype)
+            if input_name == "dyn_info":
+                crop = [0, 0, input_shape[2], input_shape[3]]  # y1, x1, h, w
+                resize = [640, 640]  # h, w
+                pad = [0, 0, 0, 0]  # top, left, bottom, right
+                input_data = np.concatenate((crop, resize, pad))
+            else:
+                input_data_path = os.path.join(model_dir, f"hmquant_{model_name}_{sanitize_name(input_name)}_input.npy")
+                input_data = np.load(input_data_path).astype(input_info.dtype)
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
             print(f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}")
             start = time.time()

@@ -7,7 +7,7 @@ from . import logger
 def check_quant_config(cfg):
     if not check_key(cfg, "model"):
         return False
-    if not check_value(cfg["model"], "framework", ["onnx"]):
+    if not check_key(cfg["model"], "framework", None, None, ["onnx"]):
         return False
     if not check_key(cfg["model"], "weight"):
         return False
@@ -16,19 +16,17 @@ def check_quant_config(cfg):
     if not check_key(cfg["model"], "inputs"):
         return False
     for _input in cfg["model"]["inputs"]:
-        if not check_value(_input, "layout", ["NCHW", "NHWC"]):
+        if not check_key(_input, "layout", None, None, ["NCHW", "NHWC"]):
             return False
         if not check_key(_input, "shape"):
             return False
-        if not check_value(_input, "dtype", ["uint8", "float32", "int16", "float16"]):
+        if not check_key(_input, "dtype", None, None, ["uint8", "float32", "int16", "float16"]):
             return False
-        if not check_key(_input, "format"):
-            return False
-        if not check_value(_input, "format", ["RGB", "BGR", "GRAY"]):
+        if not check_key(_input, "format", None, None, ["RGB", "BGR", "GRAY"]):
             return False
         if not check_key(_input, "layout"):
             return False
-        
+
         if _input["layout"] == "NHWC":
             c = _input["shape"][-1]
         else:
@@ -58,11 +56,11 @@ def check_quant_config(cfg):
         return False
     if not check_key(cfg["quant"], "calib_num", 0):
         return False
-    if not check_key(cfg["quant"], "debug_level", 1):
+    if not check_key(cfg["quant"], "debug_level", 1, None, [0, 1]):
         return False
-    if not check_value(cfg["quant"], "debug_level", [0, 1]):
+    if not check_key(cfg["quant"], "mix_search", False, None, [True, False]):
         return False
-    if not check_key(cfg["quant"], "calib_method", "min_max"):
+    if not check_key(cfg["quant"], "calib_method", "minmax"): # ["kl", "minmax", "percent-0.99", "mse", "ema", "aciq"]
         return False
     return True
 
@@ -76,9 +74,9 @@ def check_build_config(cfg):
         return False
     if not check_key(cfg, "build"):
         return False
-    if not check_key(cfg["build"], "opt_level", 2):
+    if not check_key(cfg["build"], "ncore", 1, None, [1, 2, 4]):
         return False
-    if not check_value(cfg["build"], "opt_level", [0, 1, 2]):
+    if not check_key(cfg["build"], "opt_level", 2, None, [0, 1, 2]):
         return False
     return True
 
@@ -100,7 +98,7 @@ def check_demo_config(cfg):
         return False
     if not check_path(cfg["demo"], "data_dir", "HOUMO_DATASETS_PATH"):
         return False
-    if not check_key(cfg["demo"], "test_num"):
+    if not check_key(cfg["demo"], "test_num", 0):
         return False
     return True
 
@@ -108,7 +106,7 @@ def check_demo_config(cfg):
 def check_perf_config(cfg):
     if not check_key(cfg, "perf"):
         return False
-    if not check_key(cfg["perf"], "test_num"):
+    if not check_key(cfg["perf"], "test_num", 0):
         return False
     if not check_key(cfg["perf"], "infer_only", False):
         return False
@@ -124,7 +122,7 @@ def check_eval_config(cfg):
         return False
     if not check_path(cfg["eval"], "data_dir", "HOUMO_DATASETS_PATH"):
         return False
-    if not check_key(cfg["eval"], "test_num"):
+    if not check_key(cfg["eval"], "test_num", 0):
         return False
     if not check_key(cfg["eval"], "dataset_class"):
         return False
@@ -136,22 +134,27 @@ def check_file(file):
         logger.error("File not found -> {}".format(file))
         return False
     return True
-        
-        
-def check_key(cfg, key, default=None):
+
+
+def check_key(cfg, key, default=None, type=None, value_list=None):
+    # 如果default为None则不存在时报错
+    print(key, cfg.get(key), default)
     if cfg.get(key) is None:
         if default is None:
             logger.error(f"key({key}) not found in {cfg}.")
             return False
         else:
             cfg[key] = default
-    return True
-
-
-def check_value(cfg, key, value_list):
-    if not check_key(cfg, key):
-        return False
-    if cfg[key] not in value_list:
+    if type is not None:
+        print(key, type(cfg[key]))
+        if isinstance(type, list):
+            if type(cfg[key]) not in type:
+                logger.error(f"key({key}) type({type(cfg[key])}) must be in {type}.")
+                return False
+        elif type(cfg[key]) != type:
+            logger.error(f"key({key}) type({type(cfg[key])}) must be {type}.")
+            return False
+    if value_list is not None and cfg[key] not in value_list:
         logger.error(f"key({key}) value({cfg[key]}) must be in {value_list}.")
         return False
     return True

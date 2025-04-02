@@ -30,8 +30,12 @@ class XH1Exec(BaseExec, ABC):
         logger.info("################  ptq quantize started  ######################")
         t_start = time.time()
         calib_files = []
-        calib_dataset = [dict() for i in range(self.quant_cfg["calib_num"])]
-        calib_num = self.quant_cfg["calib_num"]
+        calib_dataset = []
+        dynamic_resize = self.model_cfg.get("dynamic_resize")
+        calib_num = self.quant_cfg.get("calib_num")
+        calib_method = self.quant_cfg.get("calib_method")
+        mix_search = self.quant_cfg.get("mix_search")
+        
         quanttool_config = {'inputs_cfg': {}}
         # quanttool_config['graph_opt_cfg'] = {}
 
@@ -50,18 +54,20 @@ class XH1Exec(BaseExec, ABC):
                 _, ext = os.path.splitext(filename)
                 if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP", ".bin"]:
                     calib_files.append(filename)
-                    if len(calib_files) == calib_num:
+                    if calib_num > 0 and len(calib_files) >= calib_num:
                         break
             if len(calib_files) < self.quant_cfg["calib_num"]:
                 logger.warning("calib_dir only has {} files, but calib_num is {}."
                     .format(len(calib_files), self.quant_cfg["calib_num"]))
-                calib_num = len(calib_files)
-                logger.info("calib num: {}".format(calib_num))
+            calib_num = len(calib_files)
+            logger.info(f"calib num: {calib_num}")
+            logger.debug(f"calib file: {calib_files}")
             for id in range(calib_num):
-                logger.debug("calib file: {}".format(calib_files[id]))
                 inputs = get_input_datas(calib_dir, calib_files[id])
+                calib_data = {}
                 for name, data in inputs.items():
-                    calib_dataset[id][name] = torch.tensor(data.astype(np.float32))
+                    calib_data[name] = torch.tensor(data.astype(np.float32))
+                    calib_dataset.append(calib_data)
 
         for _input in self.inputs:
             name = _input["name"]
@@ -73,6 +79,8 @@ class XH1Exec(BaseExec, ABC):
                 logger.info("using quanttool_config from config.yml")
                 quanttool_config['inputs_cfg'][name] = {}
                 input_cfg = quanttool_config['inputs_cfg'][name]
+                if dynamic_resize:
+                    input_cfg['fold'] = False
                 input_cfg['data_format'] = _input["format"]
                 input_cfg['first_layer_weight_denorm_mean'] = _input["mean"]
                 input_cfg['first_layer_weight_denorm_std'] = _input["std"]
@@ -96,20 +104,21 @@ class XH1Exec(BaseExec, ABC):
                     input_cfg['toYUV_format'] = _input["image"]["format"]
 
             if calib_dir is None:
+                if calib_num <= 0 or calib_num > 100:
+                    logger.warning(f"calib_num can't be {calib_num} while calib_dir is None, reset to 1.")
+                    calib_num = 1
+                logger.info(f"calib num: {calib_num}")
+                logger.warning("calibrate will use random data while calib_dir is None.")
                 for id in range(calib_num):
                     dtype = _input["dtype"]
                     input_shape = n, c, image_size[0], image_size[1]
-                    logger.warning("data[{}] will use random data".format(name))
-                    calib_dataset[id][name] = torch.tensor(
-                        get_random_data(name, dtype, input_shape))
+                    calib_data[name] = torch.tensor(get_random_data(name, dtype, input_shape))
+                    calib_dataset.append(calib_data)
 
         if self.quant_cfg["ptq_cfg_path"] != "none":
             logger.info("using quanttool_config from {}".format(self.quant_cfg["ptq_cfg_path"]))
             quanttool_config = self.quant_cfg["ptq_cfg_path"]
         logger.info(quanttool_config)
-
-        # 删除列表中的空项
-        del calib_dataset[calib_num:self.quant_cfg["calib_num"]]
 
         from hmquant.api import quant_single_onnx_network
         sequencer = quant_single_onnx_network(
@@ -121,6 +130,8 @@ class XH1Exec(BaseExec, ABC):
             model_name=self.model_name,
             with_label=False,
             requant_dispatch=True,
+            mix_search=mix_search,
+            calib_method=calib_method,
         )
 
         logger.info("################  ptq quantize finished  ######################")
@@ -156,20 +167,22 @@ class XH1Exec(BaseExec, ABC):
         logger.info(f"quantize cost {self.quantize_span:.3f} s, layer compare cost {self.layer_compare_span:.3f} s")
 
     def build(self):
+        dynamic_resize = self.model_cfg.get("dynamic_resize")
+        ncore = self.build_cfg.get("ncore")
+        opt_level = self.build_cfg.get("opt_level")
         logger.info("################  build started  ######################")
         import tcim
         t_start = time.time()
         tcim.build_from_hmonnx(
             self.quant_model_path,
             output_name=self.model_name,
-            ncore=self.ncore,
+            ncore=ncore,
             batch=self.batch,
-            legacy=True,
             output_dir=self.model_dir,
             work_dir=self.build_dir,
-            opt_level=f"O{self.opt_level}",
+            opt_level=f"O{opt_level}",
+            enable_dynamic_image_resize=dynamic_resize
         )
-
         logger.info('{} saved in {}'.format(self.model_name, self.model_dir))
         logger.info("################  build finished  ######################")
         self.build_span = time.time() - t_start
@@ -182,15 +195,21 @@ class XH1Exec(BaseExec, ABC):
         self.output_infos = self.get_output_info()
         logger.info("{} model loaded".format(self.model_name))
 
-    def infer(self, inputs):
+    def infer(self, input_datas):
         """ infer one time """
-        import tcim_lite
-        for input in self.inputs:
-            if isinstance(inputs, dict):
-                input_data = inputs[input["name"]]
+        for name in self.input_infos:
+            if name == "dyn_info":
+                shape = self.inputs[0]["shape"]  # 默认单图像输入，取图像shape
+                crop = [0, 0, shape[2], shape[3]]  # y1, x1, h, w
+                resize = [shape[2], shape[3]]  # h, w
+                pad = [0, 0, 0, 0]  # top, left, bottom, right
+                input_data = np.concatenate((crop, resize, pad))
             else:
-                input_data = inputs
-            self.module.set_input(input["name"], input_data)
+                if isinstance(input_datas, dict):
+                    input_data = input_datas[name]
+                else:
+                    input_data = input_datas
+            self.module.set_input(name, input_data)
         self.module.run()
         self.module.sync()
         outputs = {}
@@ -284,17 +303,17 @@ class XH1Exec(BaseExec, ABC):
 
     def get_input_info(self):
         input_infos = {}
-        # input_num = self.module.get_num_inputs()
-        for input in self.inputs:
-            # name = self.module.get_input_name(id)
-            input_info = self.module.get_input_info(input["name"])
-            input_infos[input["name"]] = input_info
+        input_num = self.module.get_num_inputs()
+        for id in range(input_num):
+            name = self.module.get_input_name(id)
+            input_info = self.module.get_input_info(name)
+            input_infos[name] = input_info
         return input_infos
 
     def get_output_info(self):
         output_infos = {}
         output_num = self.module.get_num_outputs()
-        for id in range(0, output_num):
+        for id in range(output_num):
             output_info = {}
             name = self.module.get_output_name(id)
             output_info = self.module.get_output_info(name)

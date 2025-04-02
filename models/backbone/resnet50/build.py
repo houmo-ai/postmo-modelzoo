@@ -128,7 +128,6 @@ def build(args=None):
             onnx_path,
             output_name=model_name,
             ncore=ncore,
-            legacy=True,
             output_dir=output_dir,
             work_dir=os.path.join(output_dir, "tcim"),
             enable_dynamic_image_resize=enable_dynamic_image_resize,

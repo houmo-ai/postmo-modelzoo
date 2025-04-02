@@ -30,6 +30,19 @@ def get_args() -> argparse.Namespace:
         help='model name',
     )
     parser.add_argument(
+        '--input_shape',
+        dest='input_shape',
+        type=lambda s:[int(item) for item in s.split(',')],
+        default=[1,3,640,640],
+        help='new input shape if want change',
+    )
+    parser.add_argument(
+        '--dynamic_resize',
+        dest='dynamic_resize',
+        action='store_true',
+        help='whether to set dynamic crop/resize/pad',
+    )
+    parser.add_argument(
         '--model_dir',
         dest='model_dir',
         type=str,
@@ -44,6 +57,9 @@ def calibrate(args=None):
     model_path = args.model_path
     model_name = args.model_name
     output_path = args.model_dir
+    input_shape = args.input_shape
+    dynamic_resize = args.dynamic_resize
+    
 
     def preprocess(filepath):
         import cv2
@@ -94,6 +110,9 @@ def calibrate(args=None):
         },
         'graph_opt_cfg': {},
     }
+    
+    if dynamic_resize:
+        quanttool_config['inputs_cfg']['ALL']['fold'] = False
 
     onnx_input = calib_dataset[0]
 
@@ -104,7 +123,7 @@ def calibrate(args=None):
         model_path,
         device='cpu',
     )
-    
+
     print("start quantize profiling...")
     quantize_profiling(sequencer, [onnx_input])
     print("calibrate completed.")
@@ -122,5 +141,11 @@ def calibrate(args=None):
 
 
 if __name__ == '__main__':
+    import platform
+    arch = platform.machine()
+    if arch != "x86_64":
+        print(f"[error] hmquant not support platform: {arch}")
+        exit(0)
     args = get_args()
+    print(args)
     calibrate(args)

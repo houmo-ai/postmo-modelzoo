@@ -27,11 +27,13 @@ quant: {
   calib_dir: coco2017/val2017,
   calib_num: 20,
   debug_level: 1,
-  calib_method: ,
+  mix_search: False,
+  calib_method: minmax,
   data_path: coco2017/val2017/000000000139.jpg,
 }
 
 build: {
+  ncore: 1,
   opt_level: 2,
 }
 
@@ -45,10 +47,7 @@ demo: {
 }
 
 perf: {
-  data_dir: ,
   test_num: 1000,
-  mode: throughput,
-  end2end: ,
 }
 
 eval: {

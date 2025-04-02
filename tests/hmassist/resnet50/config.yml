@@ -19,7 +19,7 @@ model: {
       std: [ 0.229, 0.224, 0.225 ],
     }
   ],
-  dynamic_resize: False,
+  dynamic_resize: True,
   impl_class: Resnet50,
 }
 
@@ -28,13 +28,13 @@ quant: {
   calib_dir: imagenet/ILSVRC2012_img_val,
   calib_num: 20,
   debug_level: 1,
-  mix_search: False,
-  calib_method: minmax,
+  mix_search: True,
+  calib_method: ,
   data_path: imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000016.JPEG,
 }
 
 build: {
-  ncore: 1,
+  ncore: 2,
   opt_level: 2,
 }
 

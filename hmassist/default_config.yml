@@ -36,6 +36,9 @@ model: {
     }
   ],
 
+  # 【可选】是否开启动态crop/resize/pad，默认为False
+  dynamic_resize: False,
+
   # 模型的python处理类(定义在PYTHONPATH可搜索路径下hm_model.py中，demo/accuracy必须设置)
   impl_class: ,
 }
@@ -48,13 +51,16 @@ quant: {
   # 【可选】量化输入数据路径, 默认表示使用随机数据
   calib_dir: ,
 
-  # 【可选】量化使用的数据数量, 配置0或默认使用量化数据路径下所有数据，
+  # 【可选】量化使用的数据数量, 配置0或默认使用量化数据路径下所有数据
   calib_num: ,
 
   # 【可选】量化调试等级0:no response; 1:print laywise compare, 默认为1
   debug_level: 1,
 
-  # 【可选】校准方法 "kl", "min_max", "percentile_0.99..", "l2norm"(暂不支持), 默认min_max
+  # 【可选】是否开启混合量化，默认为False，表示使用纯int8量化
+  mix_search: False,
+
+  # 【可选】校准方法["kl", "minmax", "percent-0.99", "mse", "ema", "aciq"], 默认minmax
   calib_method: ,
 
   # 【可选】量化golden使用的数据, 默认表示使用第一组量化数据
@@ -63,7 +69,9 @@ quant: {
 
 # 【build必填】
 build: {
-  # 编译优化等级, 默认为2
+  # 【可选】推理占用的核数，xh1支持[1,2,4]，默认为1
+  ncore: 1,
+  # 【可选】编译优化等级, 默认为2
   opt_level: 2,
 }
 

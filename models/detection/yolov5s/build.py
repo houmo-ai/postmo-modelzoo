@@ -128,7 +128,6 @@ def build(args=None):
             onnx_path,
             output_name=model_name,
             ncore=ncore,
-            legacy=True,
             output_dir=output_dir,
             work_dir=os.path.join(output_dir, "tcim"),
             enable_dynamic_image_resize=enable_dynamic_image_resize,
@@ -159,7 +158,6 @@ def build(args=None):
                 resize = [640, 640]  # h, w
                 pad = [0, 0, 0, 0]  # top, left, bottom, right
                 input_data = np.concatenate((crop, resize, pad)).astype(input_info.dtype)
-                print(input_data)
             else:
                 input_data_path = os.path.join(model_dir, f"hmquant_{model_name}_{sanitize_name(input_name)}_input.npy")
                 input_data = np.load(input_data_path).astype(input_info.dtype)

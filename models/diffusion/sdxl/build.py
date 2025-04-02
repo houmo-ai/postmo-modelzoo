@@ -177,6 +177,5 @@ if __name__ == '__main__':
                         .format(output_name, golden_output.shape, output_data.shape))
         print(f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.')
         if not result_check:
-            print("[error] result check failed.")
-            exit(-1)
+            raise RuntimeError("[error] result check failed.")
         print(f"<=== {model_name} test success.")

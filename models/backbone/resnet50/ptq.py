@@ -111,7 +111,7 @@ def calibrate(args=None):
     if dynamic_resize:
         quanttool_config['inputs_cfg']['ALL']['fold'] = False
 
-    onnx_input = {"input.1": calib_dataset[0]}
+    onnx_input = calib_dataset[0]
 
     print("start calibrating...")
     sequencer = quant_single_onnx_network(

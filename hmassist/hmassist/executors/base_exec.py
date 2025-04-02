@@ -33,9 +33,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.inputs = self.model_cfg["inputs"]
         self.num_inputs = len(self.inputs)
         self.model_name = self.model_cfg["name"]
-        # default params
-        self.ncore = self.build_cfg.get("ncore", 1)
-        self.opt_level = self.build_cfg.get("opt_level", 2)
         # other params
         self.cur_dir = os.path.abspath("./")
         self.model_dir = os.path.abspath(os.path.join(cfg["model"]["save_dir"], self.target))

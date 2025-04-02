@@ -74,6 +74,12 @@ def get_args() -> argparse.Namespace:
         default=os.path.join('output', HOUMO_TARGET),
         help='build output dir',
     )
+    parser.add_argument(
+        '--verbose',
+        dest='verbose',
+        action='store_true',
+        help='print details',
+    )
     args = parser.parse_args()
     return args
 
@@ -86,6 +92,7 @@ def build(args=None):
     ncore = args.ncore
     stage = args.stage
     output_dir= args.output_dir
+    verbose = args.verbose
     quant_name = "hmquant_" + model_name + "_with_act"
     onnx_name = quant_name + ".onnx"
     onnx_path = os.path.join(model_dir, onnx_name)
@@ -101,7 +108,6 @@ def build(args=None):
             onnx_path,
             output_name=model_name,
             ncore=ncore,
-            legacy=True,
             output_dir=output_dir,
             work_dir=os.path.join(output_dir, "tcim")
         )
@@ -186,8 +192,16 @@ def build(args=None):
                 print(f"[compare] dequanted golden output [{output_name}] match={is_match2}, similarity={cosine_dist2:.6f}")
                 if is_match1 and is_match2:
                     continue
-                if cosine_dist1 < 0.999 or cosine_dist2 < 0.999:
+                if cosine_dist1 < 0.999:
                     result_check &= False
+                    if verbose:
+                        print("output_data:\n", output_data)
+                        print("golden_output:\n", golden_output)
+                if cosine_dist2 < 0.999:
+                    result_check &= False
+                    if verbose:
+                        print("dequanted_data:\n", dequanted_data)
+                        print("golden_dequanted:\n", golden_dequanted)
             else:
                 result_check &= False
                 print(f"[compare] golden output [{output_name}] shape not match {golden_output.shape} vs {output_data.shape},",
@@ -195,11 +209,11 @@ def build(args=None):
         print(f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.')
         print(f'{model_name} {output_num} dequants completed in {profile["dequant"]*1000:.3f} ms.')
         if not result_check:
-            print("[error] result check failed.")
-            exit(-1)
+            raise RuntimeError("[error] result check failed.")
         print(f"<=== {model_name} test success.")
 
 
 if __name__ == '__main__':
     args = get_args()
+    print(args)
     build(args)

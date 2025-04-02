@@ -19,6 +19,7 @@ model: {
       std: [ 0.229, 0.224, 0.225 ],
     }
   ],
+  dynamic_resize: False,
   impl_class: MobilenetV2,
 }
 
@@ -27,11 +28,13 @@ quant: {
   calib_dir: imagenet/ILSVRC2012_img_val,
   calib_num: 20,
   debug_level: 1,
-  calib_method: ,
+  mix_search: False,
+  calib_method: minmax,
   data_path: imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000016.JPEG,
 }
 
 build: {
+  ncore: 1,
   opt_level: 2,
 }
 
@@ -45,10 +48,7 @@ demo: {
 }
 
 perf: {
-  # data_dir: imagenet/ILSVRC2012_img_val,
   test_num: 1000,
-  mode: throughput,
-  end2end: ,
 }
 
 eval: {
