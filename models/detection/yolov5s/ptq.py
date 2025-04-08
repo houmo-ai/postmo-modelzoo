@@ -33,7 +33,7 @@ def get_args() -> argparse.Namespace:
         '--input_shape',
         dest='input_shape',
         type=lambda s:[int(item) for item in s.split(',')],
-        default=[1,3,224,224],
+        default=[1,3,640,640],
         help='new input shape if want change',
     )
     parser.add_argument(
@@ -109,7 +109,7 @@ def calibrate(args=None):
         },
         'graph_opt_cfg': {},
     }
-    
+
     if dynamic_resize:
         quanttool_config['inputs_cfg']['ALL']['fold'] = False
 
