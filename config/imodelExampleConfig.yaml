@@ -64,7 +64,7 @@ autodrive_yolop:
   example_case:
     - autodrive_yolop_perf:
         script: models/autodrive/yolop/perf.sh
-    - backbone_yolop_test:
+    - autodrive_yolop_test:
         script: models/autodrive/yolop/test.sh
   test:
     - autodrive_yolop_perf

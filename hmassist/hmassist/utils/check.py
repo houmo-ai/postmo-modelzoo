@@ -138,7 +138,6 @@ def check_file(file):
 
 def check_key(cfg, key, default=None, type=None, value_list=None):
     # 如果default为None则不存在时报错
-    print(key, cfg.get(key), default)
     if cfg.get(key) is None:
         if default is None:
             logger.error(f"key({key}) not found in {cfg}.")
@@ -146,7 +145,6 @@ def check_key(cfg, key, default=None, type=None, value_list=None):
         else:
             cfg[key] = default
     if type is not None:
-        print(key, type(cfg[key]))
         if isinstance(type, list):
             if type(cfg[key]) not in type:
                 logger.error(f"key({key}) type({type(cfg[key])}) must be in {type}.")
