@@ -4,7 +4,7 @@ import time
 import argparse
 
 import logging
-logging.basicConfig(level="ERROR")
+logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 

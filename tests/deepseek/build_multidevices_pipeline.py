@@ -8,8 +8,10 @@ logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 
+
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
+
 
 def cosine_distance(data1, data2):
     if data1.shape != data2.shape:
@@ -27,6 +29,34 @@ def cosine_distance(data1, data2):
     if np.isnan(cosine_dist):
         return -1
     return cosine_dist
+
+
+def save_submodel_golden(model_dir, model_name, submodel_name, output_names):
+    for name in output_names:
+        file_path = os.path.join(model_dir, f"{submodel_name}/hmquant_{model_name}_with_act/{name}.npy")
+        print(file_path)
+        if os.path.exists(file_path):
+            data = np.load(file_path, allow_pickle=True).item().get("output_tensor")
+            save_path1 = os.path.join(model_dir, f"{submodel_name}/hmquant_{model_name}_{name}_input.npy")
+            save_path2 = os.path.join(model_dir, f"{submodel_name}/hmquant_{model_name}_{name}_output.npy")
+            np.save(save_path1, data)
+            np.save(save_path2, data)
+            print(f"{os.path.basename(save_path1)} saved in {os.path.dirname(save_path1)}")
+            print(f"{os.path.basename(save_path2)} saved in {os.path.dirname(save_path2)}")
+            
+            
+def extract_model(src, dest, input_names, output_names):
+    import onnx_graphsurgeon
+    model = onnx.load(src)
+    graph = onnx_graphsurgeon.import_onnx(model)
+    tensors = graph.tensors()
+    print(f"inputs: {input_names}")
+    print(f"outputs: {output_names}")
+    graph.inputs = [tensors[in_t.strip()] for in_t in input_names]
+    graph.outputs = [tensors[out_t.strip()] for out_t in output_names]
+    graph.cleanup()
+    onnx.save(onnx_graphsurgeon.export_onnx(graph), dest)
+    print(f"extracted model saved in", dest)
 
 
 def get_args() -> argparse.Namespace:
@@ -85,6 +115,30 @@ def get_args() -> argparse.Namespace:
     return args
 
 
+def clip(raw_path, part1_path, part2_path):
+    if not os.path.exists(part1_path):
+        input_names = ['input_1', 'valid_length', 'current_length']
+        for i in range(24):
+            input_names.append(f'model_layers_{i}_self_attn_kcache_input')
+            input_names.append(f'model_layers_{i}_self_attn_vcache_input')
+            input_names.append(f'model_layers_{i}_self_attn_kcache_history_sum')
+        # onnx.utils.extract_model(raw_path, part1_path, input_names=input_names, 
+        #                          output_names=['model_layers_23_resadd2'], check_model=True)
+        extract_model(raw_path, part1_path, input_names=input_names, 
+                      output_names=['model_layers_23_resadd2'])
+        save_submodel_golden(model_dir, 'deepseek', "prefill", ['model_layers_23_resadd2'])
+    if not os.path.exists(part2_path):
+        input_names = ['model_layers_23_resadd2', 'valid_length', 'current_length']
+        for i in range(24, 48):
+            input_names.append(f'model_layers_{i}_self_attn_kcache_input')
+            input_names.append(f'model_layers_{i}_self_attn_vcache_input')
+            input_names.append(f'model_layers_{i}_self_attn_kcache_history_sum')
+        # onnx.utils.extract_model(raw_path, part2_path, input_names=input_names, 
+        #                          output_names=['Output_lm_head_add_list_1'], check_model=True)
+        extract_model(raw_path, part2_path, input_names=input_names, 
+                      output_names=['Output_lm_head_add_list_1'])
+
+
 def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
     import tcim
     start = time.time()
@@ -95,9 +149,9 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
         weights=os.path.join(model_dir, "weight.npy"),
         output_name=model_name,
         ncore=ncore,
+        llm_opt=True,
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim"),
-        llm_opt=True,
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
@@ -109,11 +163,13 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     # load model
     model_path = os.path.join(output_dir, f"{model_name}.hmm")
     start = time.time()
-    module = tcim_lite.runtime.load(model_path)
+    option = tcim_lite.runtime.Option(0)
+    module = tcim_lite.runtime.load(model_path, option)
     profile["load"] = time.time() - start
     print(f'{model_name} load completed in {profile["load"]:.3f} s.', flush=True)
 
     # set input
+    current_length = 0
     profile["set_input"] = 0
     if prefix is None:
         prefix = model_name
@@ -124,6 +180,9 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         print(f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}")
         input_data_path = os.path.join(model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy")
         input_data = np.load(input_data_path).astype(input_info.dtype)
+        if input_name == 'current_length':
+            current_length = input_data[0]
+            print("current_length is", current_length)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
         print(f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}")
         start = time.time()
@@ -148,11 +207,15 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         print(f"output_info[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}")
         start = time.time()
         output_data = module.get_output(output_name).numpy()
+        if len(output_data.shape) == 3:
+            output_data = output_data[:1, :current_length, :]
         profile["get_output"] += time.time() - start
         print(f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}")
         output_data_path = os.path.join(model_dir, f'hmquant_{prefix}_{sanitize_name(output_name)}_output.npy')
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
+            if len(golden_output.shape) == 3:
+                golden_output = golden_output[:1, :current_length, :]
             golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
         else:
             result_check = False
@@ -186,17 +249,33 @@ if __name__ == '__main__':
     ncore = args.ncore
     batch = args.batch
     profile = {}
+ 
+    # clip model to 2 parts
+    raw_path = os.path.join(model_dir, "prefill/hmquant_deepseek_with_act.onnx")
+    part1_path = os.path.join(model_dir, "prefill/hmquant_deepseek_part1_with_act.onnx")
+    part2_path = os.path.join(model_dir, "prefill/hmquant_deepseek_part2_with_act.onnx")
+    clip(raw_path, part1_path, part2_path)
+    raw_path = os.path.join(model_dir, "decoder/hmquant_deepseek_with_act.onnx")
+    part1_path = os.path.join(model_dir, "decoder/hmquant_deepseek_part1_with_act.onnx")
+    part2_path = os.path.join(model_dir, "decoder/hmquant_deepseek_part2_with_act.onnx")
+    clip(raw_path, part1_path, part2_path)
 
     # build model
     if args.stage == "build" or args.stage == "all":
-        model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
-        build("deepseek_prefill", model_dir, model_path, output_dir, profile, ncore)
-        model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
-        build("deepseek_decode", model_dir, model_path, output_dir, profile, ncore)
+        model_path = f"prefill/hmquant_{model_name}_part1_with_act.onnx"
+        build("deepseek_prefill_part1", model_dir, model_path, output_dir, profile, ncore)
+        model_path = f"prefill/hmquant_{model_name}_part2_with_act.onnx"
+        build("deepseek_prefill_part2", model_dir, model_path, output_dir, profile, ncore)
+        model_path = f"decoder/hmquant_{model_name}_part1_with_act.onnx"
+        build("deepseek_decode_part1", model_dir, model_path, output_dir, profile, ncore)
+        model_path = f"decoder/hmquant_{model_name}_part2_with_act.onnx"
+        build("deepseek_decode_part2", model_dir, model_path, output_dir, profile, ncore)
 
     # test model
     if args.stage == 'test' or args.stage == 'all':
         part_dir = os.path.join(model_dir, "prefill")
-        test("deepseek_prefill", part_dir, output_dir, profile, prefix=model_name)
+        test("deepseek_prefill_part1", part_dir, output_dir, profile, prefix=model_name)
+        test("deepseek_prefill_part2", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "decoder")
-        test("deepseek_decode", part_dir, output_dir, profile, prefix=model_name)
+        test("deepseek_decode_part1", part_dir, output_dir, profile, prefix=model_name)
+        test("deepseek_decode_part2", part_dir, output_dir, profile, prefix=model_name)

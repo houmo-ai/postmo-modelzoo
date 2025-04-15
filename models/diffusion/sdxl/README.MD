@@ -6,7 +6,7 @@
 
 ## 1 模型说明
 
-本例使用的 sdxl 实现来源于[https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)。
+本例使用的 sdxl 实现来源于[https://modelscope.cn/models/stabilityai/stable-diffusion-xl-base-1.0](https://modelscope.cn/models/stabilityai/stable-diffusion-xl-base-1.0)。
 
 ## 2 快速开始
 
@@ -65,6 +65,8 @@ python3 get_model.py --type raw
 ```bash
 python3 demo.py
 ```
+
+**注：demo运行过程中如果报找不到文件错误，如`OSError: Error no file named model.safetensors found in directory stable-diffusion-xl-base-1.0/text_encoder.`，可能是原始模型没有下载完全，请使用get_model.py脚本重新下载或者尝试手动下载缺少的文件。**
 
 ### 2.4 一键评估
 
