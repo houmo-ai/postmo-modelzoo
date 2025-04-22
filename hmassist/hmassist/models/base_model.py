@@ -52,12 +52,12 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         """
         self.executor.load()
 
-    def build_options(self):
-        logger.warning("can not find hm_model.build_options, use BaseModel.build_options")
-        return None
+    # def build_options(self):
+    #     logger.warning("can not find model.build_options, use BaseModel.build_options")
+    #     return None
 
     def get_input_datas(self, filedir, filename):
-        # logger.warning("can not find hm_model.get_input_datas, use BaseModel.get_input_datas")
+        # logger.warning("can not find model.get_input_datas, use BaseModel.get_input_datas")
         if len(self.inputs) > 1:
             logger.error(f"default only support 1 input, now is {len(self.inputs)}")
         data = cv2.imread(os.path.join(filedir, filename))
@@ -69,7 +69,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         :param inputs: model inputs dict
         :return: numpy dict, CHW
         """
-        logger.warning("can not find hm_model._preprocess, use BaseModel._preprocess")
+        logger.warning("can not find model._preprocess, use BaseModel._preprocess")
 
         datas = {}
         for name, data in inputs.items():
@@ -88,7 +88,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         :param img: origin image
         :return: numpy dict
         """
-        logger.warning("can not find hm_model._postprocess, use BaseModel._postprocess")
+        logger.warning("can not find model._postprocess, use BaseModel._postprocess")
         return outputs
 
     def inference(self, inputs):
@@ -102,7 +102,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
 
     def evaluate(self):
         """模型指标评估"""
-        logger.error("can not find hm_model.evaluate, exit")
+        logger.error("can not find model.evaluate, exit")
         exit(-1)
 
     def demo(self, inputs):
@@ -111,7 +111,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         :param img_path: 图片路径
         :return:
         """
-        logger.error("can not find hm_model.demo, exit")
+        logger.error("can not find model.demo, exit")
         exit(-1)
 
     @property

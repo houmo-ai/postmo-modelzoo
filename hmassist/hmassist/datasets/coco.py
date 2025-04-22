@@ -92,7 +92,7 @@ coco80_labels = [
 class COCO2017Val(BaseDataset):
     """提供图片path和label
     """
-    def __init__(self, root_path, batch_size=1):
+    def __init__(self, root_path, batch_size=1, test_num=0):
         self._root_path = root_path
         self._batch_size = batch_size
         if not os.path.exists(self._root_path):
@@ -136,13 +136,15 @@ class COCO2017Val(BaseDataset):
                     self._image_ids.append(int(filename))
         elif os.path.isdir(self._root_path):
             logger.info("coco2017 dataset using files in {}".format(self._root_path))
-            for filepath in os.listdir(self._root_path):
+            files = sorted(os.listdir(self._root_path))  # 保证每次取的数据一致
+            for filepath in files:
                 basename = os.path.basename(filepath)
                 filename, ext = os.path.splitext(basename)
                 if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
                     self._img_files.append(os.path.join(self._root_path, basename))
                     self._image_ids.append(int(filename))
-
+                    if test_num != 0 and len(self._image_ids) == test_num:
+                        break
         self._total_num = len(self._image_ids)
 
     @property

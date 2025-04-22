@@ -223,10 +223,10 @@ def demo(cfg):
     model = get_model(cfg)
     data_dir = cfg["demo"]["data_dir"]
     test_num = cfg["demo"]["test_num"]
-    if not os.environ.get("HDPL_PLATFORM") == "ASIC":
-        if test_num > 10 or test_num == 0:
-            test_num = 10
-            logger.warning("test num set to 10 because HDPL_PLATFORM=ISIM may take a lot of time.")
+    # if not os.environ.get("HDPL_PLATFORM") == "ASIC":
+    #     if test_num > 10 or test_num == 0:
+    #         test_num = 10
+    #         logger.warning("test num set to 10 because HDPL_PLATFORM=ISIM may take a lot of time.")
 
     file_list = []
     if os.path.isfile(data_dir):
@@ -242,7 +242,7 @@ def demo(cfg):
                 file_list.append(os.path.join(data_dir, filename))
                 if len(file_list) == test_num:
                     break
-
+    file_list.sort()
     model.load()
 
     for filepath in file_list:
@@ -269,11 +269,12 @@ def eval(cfg):
     model = get_model(cfg)
     dataset_class = cfg["eval"].get("dataset_class", None)
     data_dir = cfg["eval"].get("data_dir")
+    model.test_num = cfg["eval"].get("test_num", 0)
     try:
         m = importlib.import_module("dataset")
         if hasattr(m, dataset_class):
             # 实例化预处理对象
-            dataset = getattr(m, dataset_class)(data_dir)
+            dataset = getattr(m, dataset_class)(data_dir, test_num=model.test_num)
         else:
             logger.error(f"dataset.py has no class named {dataset_class}, please check your config")
             exit(-1)
@@ -282,11 +283,10 @@ def eval(cfg):
         logger.error(f"can not find dataset.py, use default model will not support eval: {e}")
         return -1
 
-    model.test_num = cfg["eval"]["test_num"]
-    if not os.environ.get("HDPL_PLATFORM") == "ASIC":
-        if model.test_num > 10 or model.test_num == 0:
-            model.test_num = 10
-            logger.warning("test num set to 10 because HDPL_PLATFORM=ISIM may take a lot of time.")
+    # if not os.environ.get("HDPL_PLATFORM") == "ASIC":
+    #     if model.test_num > 10 or model.test_num == 0:
+    #         model.test_num = 10
+    #         logger.warning("test num set to 10 because HDPL_PLATFORM=ISIM may take a lot of time.")
     model.dataset = dataset
     model.load()
 
