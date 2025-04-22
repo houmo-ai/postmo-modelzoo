@@ -53,7 +53,7 @@ perf: {
 
 eval: {
   data_dir: imagenet/ILSVRC2012_img_val,
-  test_num: 0,
+  test_num: 10,
   dataset_class: Dataset,
 }
 

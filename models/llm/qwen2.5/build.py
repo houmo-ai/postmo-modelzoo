@@ -179,6 +179,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
 
 if __name__ == '__main__':
     args = get_args()
+    print(args)
     curdir = os.getcwd()
     model_dir = args.model_dir
     model_name = args.model_name
@@ -190,6 +191,11 @@ if __name__ == '__main__':
 
     # build model
     if args.stage == "build" or args.stage == "all":
+        import platform
+        arch = platform.machine()
+        if arch != "x86_64":
+            print(f"[error] tcim not support platform: {arch}")
+            exit(0)
         model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
         build("qwen2.5_prefill", model_dir, model_path, output_dir, profile, ncore)
         model_path = f"decoder/hmquant_{model_name}_with_act.onnx"

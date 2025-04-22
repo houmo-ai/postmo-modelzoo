@@ -80,6 +80,7 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == '__main__':
     args = get_args()
+    print(args)
     curdir = os.getcwd()
     model_dir = args.model_dir
     model_name = args.model_name
@@ -91,6 +92,11 @@ if __name__ == '__main__':
 
     # 1. build model
     if stage == 'build' or stage == 'all':
+        import platform
+        arch = platform.machine()
+        if arch != "x86_64":
+            print(f"[error] tcim not support platform: {arch}")
+            exit(0)
         import tcim
         print(f"\n===> {model_name} build start...")
         start = time.time()

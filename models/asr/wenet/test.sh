@@ -10,7 +10,9 @@ fi
 
 cd "${SCRIPT_DIR}"
 
-
-python3 get_model.py --type quant
-python3 build.py
-python3 demo.py
+arch=$(uname -m)
+if [ "$arch" = "x86_64" ]; then
+  python3 get_model.py
+  python3 build.py
+  python3 demo.py
+fi

@@ -31,14 +31,14 @@ def cosine_distance(data1, data2):
     return cosine_dist
 
 
-def save_submodel_golden(model_dir, model_name, submodel_name, output_names):
+def save_submodel_golden(model_dir, model_name, output_names):
     for name in output_names:
-        file_path = os.path.join(model_dir, f"{submodel_name}/hmquant_{model_name}_with_act/{name}.npy")
+        file_path = os.path.join(model_dir, f"hmquant_{model_name}_with_act/{name}.npy")
         print(file_path)
         if os.path.exists(file_path):
             data = np.load(file_path, allow_pickle=True).item().get("output_tensor")
-            save_path1 = os.path.join(model_dir, f"{submodel_name}/hmquant_{model_name}_{name}_input.npy")
-            save_path2 = os.path.join(model_dir, f"{submodel_name}/hmquant_{model_name}_{name}_output.npy")
+            save_path1 = os.path.join(model_dir, f"hmquant_{model_name}_{name}_input.npy")
+            save_path2 = os.path.join(model_dir, f"hmquant_{model_name}_{name}_output.npy")
             np.save(save_path1, data)
             np.save(save_path2, data)
             print(f"{os.path.basename(save_path1)} saved in {os.path.dirname(save_path1)}")
@@ -46,6 +46,7 @@ def save_submodel_golden(model_dir, model_name, submodel_name, output_names):
             
             
 def extract_model(src, dest, input_names, output_names):
+    import onnx
     import onnx_graphsurgeon
     model = onnx.load(src)
     graph = onnx_graphsurgeon.import_onnx(model)
@@ -94,7 +95,7 @@ def get_args() -> argparse.Namespace:
         '--nblocks',
         dest='nblocks',
         type=int,
-        default=28,
+        default=48,
         help='block number',
     )
     parser.add_argument(
@@ -115,28 +116,29 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def clip(raw_path, part1_path, part2_path):
-    if not os.path.exists(part1_path):
-        input_names = ['input_1', 'valid_length', 'current_length']
-        for i in range(24):
-            input_names.append(f'model_layers_{i}_self_attn_kcache_input')
-            input_names.append(f'model_layers_{i}_self_attn_vcache_input')
-            input_names.append(f'model_layers_{i}_self_attn_kcache_history_sum')
-        # onnx.utils.extract_model(raw_path, part1_path, input_names=input_names, 
-        #                          output_names=['model_layers_23_resadd2'], check_model=True)
-        extract_model(raw_path, part1_path, input_names=input_names, 
-                      output_names=['model_layers_23_resadd2'])
-        save_submodel_golden(model_dir, 'deepseek', "prefill", ['model_layers_23_resadd2'])
-    if not os.path.exists(part2_path):
-        input_names = ['model_layers_23_resadd2', 'valid_length', 'current_length']
-        for i in range(24, 48):
-            input_names.append(f'model_layers_{i}_self_attn_kcache_input')
-            input_names.append(f'model_layers_{i}_self_attn_vcache_input')
-            input_names.append(f'model_layers_{i}_self_attn_kcache_history_sum')
-        # onnx.utils.extract_model(raw_path, part2_path, input_names=input_names, 
-        #                          output_names=['Output_lm_head_add_list_1'], check_model=True)
-        extract_model(raw_path, part2_path, input_names=input_names, 
-                      output_names=['Output_lm_head_add_list_1'])
+def clip(raw_path, part1_path, part2_path, nblocks):
+    dir_name = os.path.dirname(raw_path)
+    mid_layer_id = 25
+    mid_layer_name = f'model_layers_{mid_layer_id}_resadd2'
+    save_submodel_golden(dir_name, 'deepseek', [mid_layer_name])
+    input_names = ['input_1', 'valid_length', 'current_length']
+    for i in range(mid_layer_id+1):
+        input_names.append(f'model_layers_{i}_self_attn_kcache_input')
+        input_names.append(f'model_layers_{i}_self_attn_vcache_input')
+        input_names.append(f'model_layers_{i}_self_attn_kcache_history_sum')
+    # onnx.utils.extract_model(raw_path, part1_path, input_names=input_names, 
+    #                          output_names=[mid_layer_name], check_model=True)
+    extract_model(raw_path, part1_path, input_names=input_names, 
+                    output_names=[mid_layer_name])
+    input_names = [mid_layer_name, 'valid_length', 'current_length']
+    for i in range(mid_layer_id+1, nblocks):
+        input_names.append(f'model_layers_{i}_self_attn_kcache_input')
+        input_names.append(f'model_layers_{i}_self_attn_vcache_input')
+        input_names.append(f'model_layers_{i}_self_attn_kcache_history_sum')
+    # onnx.utils.extract_model(raw_path, part2_path, input_names=input_names, 
+    #                          output_names=['Output_lm_head_add_list_1'], check_model=True)
+    extract_model(raw_path, part2_path, input_names=input_names, 
+                    output_names=['Output_lm_head_add_list_1'])
 
 
 def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
@@ -254,11 +256,11 @@ if __name__ == '__main__':
     raw_path = os.path.join(model_dir, "prefill/hmquant_deepseek_with_act.onnx")
     part1_path = os.path.join(model_dir, "prefill/hmquant_deepseek_part1_with_act.onnx")
     part2_path = os.path.join(model_dir, "prefill/hmquant_deepseek_part2_with_act.onnx")
-    clip(raw_path, part1_path, part2_path)
+    clip(raw_path, part1_path, part2_path, nblocks)
     raw_path = os.path.join(model_dir, "decoder/hmquant_deepseek_with_act.onnx")
     part1_path = os.path.join(model_dir, "decoder/hmquant_deepseek_part1_with_act.onnx")
     part2_path = os.path.join(model_dir, "decoder/hmquant_deepseek_part2_with_act.onnx")
-    clip(raw_path, part1_path, part2_path)
+    clip(raw_path, part1_path, part2_path, nblocks)
 
     # build model
     if args.stage == "build" or args.stage == "all":

@@ -53,7 +53,7 @@ perf: {
 
 eval: {
   data_dir: bdd100k/images/100k/val,
-  test_num: 0,
+  test_num: 10,
   dataset_class: Dataset,
 }
 

@@ -10,6 +10,9 @@ fi
 
 cd "${SCRIPT_DIR}"
 
-python3 get_model.py --type quant
-hmbuild.sh
-hmperf.sh
+arch=$(uname -m)
+if [ "$arch" = "x86_64" ]; then
+  python3 get_model.py --type quant
+  hmbuild.sh
+  hmperf.sh
+fi

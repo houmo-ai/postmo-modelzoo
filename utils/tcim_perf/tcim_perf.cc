@@ -465,8 +465,8 @@ int main(int argc, char *argv[]) {
               << " model loaded. Cost " << cost << " ms." << std::endl;
 
     // create a stream and set to the module
-    tcim::Stream stream;
-    module.SetStream(stream);
+    // tcim::Stream stream;
+    // module.SetStream(stream);
 
     // warm up
     start = GET_TIME();

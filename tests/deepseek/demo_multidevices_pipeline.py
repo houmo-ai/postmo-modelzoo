@@ -78,6 +78,7 @@ class HmQwen:
         self.prefill_length = prefill_length
         self.decode_length = decode_length
         self.nblocks = nblocks
+        self.mid_layer_id = 25
         weight_manager_0 = tcim.runtime.WeightManager(0)
         weight_manager_1 = tcim.runtime.WeightManager(3)
         option1_0 = tcim.runtime.Option(weight_manager_0)
@@ -94,14 +95,14 @@ class HmQwen:
         self.decode_model_part1 = tcim.runtime.load(os.path.join(model_dir, "deepseek_decode_part1.hmm"), option = option2_0)
         self.decode_model_part2 = tcim.runtime.load(os.path.join(model_dir, "deepseek_decode_part2.hmm"), option = option2_1)
         # set kvcache input
-        for i in range(nblocks // 2):
+        for i in range(self.mid_layer_id+1):
             kcache = self.prefill_model_part1.get_input(f'model_layers_{i}_self_attn_kcache_input')
             self.decode_model_part1.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
             vcache = self.prefill_model_part1.get_input(f'model_layers_{i}_self_attn_vcache_input')
             self.decode_model_part1.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
             kcache_history_sum = self.prefill_model_part1.get_input(f'model_layers_{i}_self_attn_kcache_history_sum')
             self.decode_model_part1.set_input(f'model_layers_{i}_self_attn_kcache_history_sum', kcache_history_sum)
-        for i in range(nblocks // 2, nblocks):
+        for i in range(self.mid_layer_id+1, nblocks):
             kcache = self.prefill_model_part2.get_input(f'model_layers_{i}_self_attn_kcache_input')
             self.decode_model_part2.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
             vcache = self.prefill_model_part2.get_input(f'model_layers_{i}_self_attn_vcache_input')
@@ -139,11 +140,11 @@ class HmQwen:
             return f"Question long than {self.decode_length}, please shorten it!"
 
         # clear kcache_history_sum before prefill
-        for i in range(self.nblocks // 2):
+        for i in range(self.mid_layer_id+1):
             kcache_history_sum = self.prefill_model_part1.get_input(f'model_layers_{i}_self_attn_kcache_history_sum')
             kcache_history_sum_init = np.zeros(kcache_history_sum.info.shape, dtype=kcache_history_sum.info.dtype)
             self.prefill_model_part1.set_input(f'model_layers_{i}_self_attn_kcache_history_sum', kcache_history_sum_init)
-        for i in range(self.nblocks // 2, self.nblocks):
+        for i in range(self.mid_layer_id+1, self.nblocks):
             kcache_history_sum = self.prefill_model_part2.get_input(f'model_layers_{i}_self_attn_kcache_history_sum')
             kcache_history_sum_init = np.zeros(kcache_history_sum.info.shape, dtype=kcache_history_sum.info.dtype)
             self.prefill_model_part2.set_input(f'model_layers_{i}_self_attn_kcache_history_sum', kcache_history_sum_init)
@@ -170,8 +171,8 @@ class HmQwen:
             self.prefill_model_part1.set_input("current_length", current_length_data)
             self.prefill_model_part1.run()
             self.prefill_model_part1.sync()
-            prefill_part1_output = self.prefill_model_part1.get_output("model_layers_23_resadd2")
-            self.prefill_model_part2.set_input("model_layers_23_resadd2", prefill_part1_output)
+            prefill_part1_output = self.prefill_model_part1.get_output("model_layers_25_resadd2")
+            self.prefill_model_part2.set_input("model_layers_25_resadd2", prefill_part1_output)
             self.prefill_model_part2.set_input("valid_length", valid_length_data)
             self.prefill_model_part2.set_input("current_length", current_length_data)
             self.prefill_model_part2.run()
@@ -207,8 +208,8 @@ class HmQwen:
             self.decode_model_part1.set_input("valid_length", valid_length_data)
             self.decode_model_part1.run()
             self.decode_model_part1.sync()
-            decode_part1_output = self.decode_model_part1.get_output("model_layers_23_resadd2")
-            self.decode_model_part2.set_input("model_layers_23_resadd2", decode_part1_output)
+            decode_part1_output = self.decode_model_part1.get_output("model_layers_25_resadd2")
+            self.decode_model_part2.set_input("model_layers_25_resadd2", decode_part1_output)
             self.decode_model_part2.set_input("valid_length", valid_length_data)
             self.decode_model_part2.run()
             self.decode_model_part2.sync()

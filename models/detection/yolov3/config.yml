@@ -52,7 +52,7 @@ perf: {
 
 eval: {
   data_dir: coco2017/val2017,
-  test_num: 0,
+  test_num: 10,
   dataset_class: Dataset,
 }
 

@@ -4,7 +4,7 @@ import time
 import argparse
 
 import logging
-logging.basicConfig(level="ERROR")
+logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 
@@ -214,6 +214,11 @@ def build(args=None):
 
 
 if __name__ == '__main__':
+    import platform
+    arch = platform.machine()
+    if arch != "x86_64":
+        print(f"[error] tcim not support platform: {arch}")
+        exit(0)
     args = get_args()
     print(args)
     build(args)

@@ -132,6 +132,8 @@ class XH1Exec(BaseExec, ABC):
             requant_dispatch=True,
             mix_search=mix_search,
             calib_method=calib_method,
+            # method="all",
+            # use_gptq=True,
         )
 
         logger.info("################  ptq quantize finished  ######################")
@@ -167,6 +169,11 @@ class XH1Exec(BaseExec, ABC):
         logger.info(f"quantize cost {self.quantize_span:.3f} s, layer compare cost {self.layer_compare_span:.3f} s")
 
     def build(self):
+        import platform
+        arch = platform.machine()
+        if arch != "x86_64":
+            logger.error(f"build not support platform: {arch}")
+            exit(0)
         dynamic_resize = self.model_cfg.get("dynamic_resize")
         ncore = self.build_cfg.get("ncore")
         opt_level = self.build_cfg.get("opt_level")

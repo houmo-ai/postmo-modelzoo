@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
+set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-set -e
 
 cd "${SCRIPT_DIR}"
 
-python3 get_model.py --type all
-python3 ptq.py
-python3 build.py
-hmdemo.sh
+arch=$(uname -m)
+if [ "$arch" = "x86_64" ]; then
+  python3 get_model.py
+  python3 ptq.py
+  python3 build.py
+  hmdemo.sh
+fi

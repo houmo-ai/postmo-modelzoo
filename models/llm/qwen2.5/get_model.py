@@ -13,8 +13,8 @@ def get_args() -> argparse.Namespace:
         '--type',
         dest='model_type',
         type=str,
-        default='all',
-        help='which resource to get, choise in [dataset, raw, quant, hmm, all]',
+        default='quant',
+        help='which resource to get, choise in [raw, quant, hmm, all]',
     )
     parser.add_argument(
         '--quant_model_dir',
@@ -45,10 +45,8 @@ if __name__ == '__main__':
     quant_path = "models/qwen2.5/hmquant_qwen2.5_256_4096_20250317.zip"
     hmm_path = "models/qwen2.5/hmm_qwen2.5_256_4096_4cores_20250317.zip"
 
-    if model_type == "dataset" or model_type == "all":
-        get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
-
     if model_type == "raw" or model_type == "all":
+        get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
         from modelscope import snapshot_download
         snapshot_download('qwen/qwen2.5-7b-instruct', local_dir='qwen2.5-7b-instruct-hf')
 

@@ -5,7 +5,10 @@ set -e
 
 cd "${SCRIPT_DIR}"
 
-python3 get_model.py --type raw
-hmquant.sh
-hmbuild.sh
-hmeval.sh
+arch=$(uname -m)
+if [ "$arch" = "x86_64" ]; then
+  python3 get_model.py
+  hmquant.sh
+  hmbuild.sh
+  hmeval.sh
+fi

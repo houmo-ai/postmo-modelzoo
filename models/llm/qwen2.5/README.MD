@@ -20,7 +20,6 @@
 
 ```bash
 python3 get_model.py --type raw
-python3 get_model.py --type dataset
 ```
 
 如果仅编译芯片模型，可选择下载量化模型，下载后的模型存放在`output/$HOUMO_TARGET/hmquant`目录（注意相同模型会覆盖，请自行保存）：
