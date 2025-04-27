@@ -9,4 +9,4 @@ include_directories($ENV{HOUMO_MODELZOO_PATH}/utils/common)
 # lib paths
 link_directories($ENV{HOUMO_PATH}/lib)
 link_directories($ENV{HOUMO_SDK_PATH}/hal/lib)
-set(TCIM_LIBRARY "-ltcim_runtime_lite -lhdplrt -lai_core -lriscv -lhdplrt_asic -lhm800_hal")
+set(TCIM_LIBRARY "-ltcim_runtime_lite")

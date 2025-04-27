@@ -11,7 +11,6 @@ PRINT_YELLOW() { echo -e "\033[1;33m$@\033[0m"; }
 __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 export HOUMO_MODELZOO_PATH=${__dir}
 export HMASSIST_PATH=$HOUMO_MODELZOO_PATH/hmassist
-export CMAKE_CONFIG_PATH=$HOUMO_MODELZOO_PATH/release.cmake
 
 if [[ -z $HOUMO_TARGET ]]; then
   export HOUMO_TARGET=xh1

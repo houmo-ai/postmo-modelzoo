@@ -4,7 +4,6 @@
 __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 export HOUMO_MODELZOO_PATH=${__dir}
 export HMASSIST_PATH=$HOUMO_MODELZOO_PATH/hmassist
-export CMAKE_CONFIG_PATH=$HOUMO_MODELZOO_PATH/release.cmake
 
 # install requirements
 pip3 install -r $HOUMO_MODELZOO_PATH/requirements.txt

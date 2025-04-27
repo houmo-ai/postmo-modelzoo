@@ -8,7 +8,7 @@ from .base_dataset import BaseDataset
 
 
 class VOC2007(BaseDataset):
-    def __init__(self, root_path, batch_size=1):
+    def __init__(self, root_path, batch_size=1, test_num=0):
         self._dataset_name = "voc2007"
         self._root_path = root_path
         self._batch_size = batch_size

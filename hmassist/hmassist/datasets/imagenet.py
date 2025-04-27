@@ -9,7 +9,7 @@ class ILSVRC2012(BaseDataset):
     """
     ILSVRC2012 val
     """
-    def __init__(self, root_path, batch_size=1):
+    def __init__(self, root_path, batch_size=1, test_num=0):
         """
         :param root_path:
         :param batch_size:
