@@ -4,7 +4,7 @@ import sys
 version = ""
 if len(sys.argv) > 1:
     version = sys.argv[1]
-include_list = ["data", "hmassist", "hmodel", "models", "utils/common", "utils/tcim_perf", "release.cmake",
+include_list = ["data", "hmassist", "hmodel", "models", "utils/common", "utils/tcim_perf", "utils/release.cmake",
                 "requirements.txt", "env.sh", "benchmark.yml", "README.md"]
 exclude_list = ['models/backbone/vit']
 dir_name = "houmo-modelzoo"
