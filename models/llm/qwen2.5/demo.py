@@ -144,7 +144,7 @@ class HmQwen:
             self.prefill_model.run()
             self.prefill_model.sync()
 
-        input_data = self.prefill_model.get_output("output").numpy()
+        input_data = self.prefill_model.get_output("Output_lm_head_add_list_0").numpy()
         next_id = input_data.argmax(-1)
         prefill_response = self.tokenizer.decode(next_id.tolist())
         prefill_time = time.time() - start_time
@@ -174,7 +174,7 @@ class HmQwen:
             self.decode_model.set_input("valid_length", valid_length_data)
             self.decode_model.run()
             self.decode_model.sync()
-            input_data = self.decode_model.get_output("output").numpy()
+            input_data = self.decode_model.get_output("Output_lm_head_add_list_0").numpy()
             decode_count += 1
 
             next_id = input_data.argmax(-1)

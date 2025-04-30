@@ -97,7 +97,6 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
         ncore=ncore,
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim"),
-        op_version={'Gather':1},
         llm_opt=True,
     )
     profile["build"] = time.time() - start
