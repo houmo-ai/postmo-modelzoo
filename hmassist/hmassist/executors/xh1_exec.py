@@ -128,8 +128,6 @@ class XH1Exec(BaseExec, ABC):
             device='cpu',
             debug=None,
             model_name=self.model_name,
-            with_label=False,
-            requant_dispatch=True,
             mix_search=mix_search,
             calib_method=calib_method,
             # method="all",

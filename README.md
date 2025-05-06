@@ -73,7 +73,6 @@ houmo-modelzoo提供的模型示例如下，编译示例每个都提供，其他
 | [yolov3](models/detection/yolov3)            | detection | yes | yes   | x   | yes | x   | yes  | yes  | yes  |
 | [yolop](models/autodrive/yolop)              | autodrive | yes | yes   | x   | yes | yes | yes  | x    | yes  |
 | [wenet](models/asr/wenet)                    | asr       | x   | yes   | x   | x   | x   | yes  | x    | x    |
-| [qwen2](models/llm/qwen2)                    | llm       | yes | yes   | yes | yes | x   | yes  | x    | x    |
 | [qwen2.5](models/llm/qwen2.5)                | llm       | yes | yes   | yes | yes | x   | yes  | x    | x    |
 | [deepseek](models/llm/deepseek)              | llm       | yes | yes   | yes | x   | x   | yes  | x    | x    |
 | [sdxl](models/diffusion/sdxl)                | diffusion | x   | yes   | x   | yes | x   | x    | x    | x    |

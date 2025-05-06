@@ -11,7 +11,6 @@ PRINT_YELLOW() { echo -e "\033[1;33m$@\033[0m"; }
 __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 export HOUMO_MODELZOO_PATH=${__dir}
 export HMASSIST_PATH=$HOUMO_MODELZOO_PATH/hmassist
-export CMAKE_CONFIG_PATH=$HOUMO_MODELZOO_PATH/release.cmake
 
 if [[ -z $HOUMO_TARGET ]]; then
   export HOUMO_TARGET=xh1
@@ -35,7 +34,7 @@ export HDPL_LIB_PATH=$HMCC_PATH/builds/hdpl_lib
 export ISIM_PATH=$HMCC_PATH/builds/isim
 export HAL_DRIVER_PATH=$HMCC_PATH/builds/hal_driver
 export PYTHONPATH=$HMCC_BUILD_PATH/tools/hmcc/python_packages/hmcc:$HMCC_PATH/compiler/python:$PYTHONPATH
-export PATH=$HMCC_BUILD_PATH/bin:$HMCC_PATH/compiler/tools/hdpl-compile:$HDPLCC_PATH/bin:$PATH
+# export PATH=$HMCC_BUILD_PATH/bin:$HMCC_PATH/compiler/tools/hdpl-compile:$HDPLCC_PATH/bin:$PATH
 
 # paths for runtime
 export PYTHONPATH=$TCIM_RUNTIME_PATH/python:$PYTHONPATH

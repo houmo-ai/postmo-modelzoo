@@ -7,7 +7,7 @@ class BaseDataset(object, metaclass=abc.ABCMeta):
     """提供图片path和label
     """
     @abc.abstractmethod
-    def __init__(self, root_path, batch_size=1):
+    def __init__(self, root_path, batch_size=1, test_num=0):
         self._dataset_name = ""
 
     @abc.abstractmethod

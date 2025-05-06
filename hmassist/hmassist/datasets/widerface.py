@@ -6,7 +6,7 @@ from ..utils import logger
 
 
 class WiderFace(BaseDataset):
-    def __init__(self, root_path, batch_size=1):
+    def __init__(self, root_path, batch_size=1, test_num=0):
         self._root_path = root_path
         if not os.path.exists(self._root_path):
             logger.error("root_path not exits -> {}".format(self._root_path))
