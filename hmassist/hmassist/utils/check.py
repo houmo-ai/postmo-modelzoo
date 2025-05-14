@@ -58,7 +58,7 @@ def check_quant_config(cfg):
         return False
     if not check_key(cfg["quant"], "debug_level", 1, None, [0, 1]):
         return False
-    if not check_key(cfg["quant"], "mix_search", False, None, [True, False]):
+    if not check_key(cfg["quant"], "precision", "auto", None, ["auto", "int8", "int16"]):
         return False
     if not check_key(cfg["quant"], "calib_method", "minmax"): # ["kl", "minmax", "percent-0.99", "mse", "ema", "aciq"]
         return False

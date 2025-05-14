@@ -313,12 +313,14 @@ def run(args):
     config['batch'] = args.batch
     config['thread_num'] = args.thread_num
     config['core_num'] = args.core_num
-    
+
     # import pprint
     # pprint.pprint(config.dump())
     logger.info(f"config:\n{dump_yaml(config)}")
 
     if args.type == "quant":
+        if args.precision is not None:
+            config['quant']['precision'] = args.precision
         quantize(config)
     elif args.type == "build":
         build(config)
@@ -473,6 +475,8 @@ if __name__ == "__main__":
                         help="Specify a chip target")
     parser.add_argument("--config", type=str, default="config.yml",
                         help="Specify a config file, default is config.yml")
+    parser.add_argument("--precision", type=str, default=None,
+                        help="Specify precision in quant, default is quant.precision in the config file")
     parser.add_argument("--batch", type=int, default=1,
                         help="Specify batch size in build, default is 1")
     parser.add_argument("--core_num", type=int, default=1,
@@ -480,7 +484,7 @@ if __name__ == "__main__":
     parser.add_argument("--thread_num", type=int, default=1,
                         help="Specify thread number in perf, default is 1")
     parser.add_argument("--test_num", type=int, default=-1,
-                        help="Specify the test number in demo, default is the config in the config file")
+                        help="Specify the test number in demo, default is demo.test_num in the config file")
     parser.add_argument("--infer_only", action='store_true', default=False,
                         help="Specify if only test infer while perfing, default is False")
 

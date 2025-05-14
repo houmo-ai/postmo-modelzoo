@@ -27,7 +27,7 @@ quant: {
   calib_dir: coco2017/val2017,
   calib_num: 20,
   debug_level: 1,
-  mix_search: False,
+  precision: int8,
   calib_method: minmax,
   data_path: coco2017/val2017/000000000139.jpg,
 }

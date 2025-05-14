@@ -28,7 +28,7 @@ quant: {
   calib_dir: imagenet/ILSVRC2012_img_val,
   calib_num: 20,
   debug_level: 1,
-  mix_search: False,
+  mix_search: auto,
   calib_method: minmax,
   data_path: imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000016.JPEG,
 }

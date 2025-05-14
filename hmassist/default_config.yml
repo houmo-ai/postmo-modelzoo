@@ -57,8 +57,8 @@ quant: {
   # 【可选】量化调试等级0:no response; 1:print laywise compare, 默认为1
   debug_level: 1,
 
-  # 【可选】是否开启混合量化，默认为False，表示使用纯int8量化
-  mix_search: False,
+  # 【可选】量化数据精度，支持[auto, int8, int16]，默认为auto，表示自动搜索
+  precision: auto,
 
   # 【可选】校准方法["kl", "minmax", "percent-0.99", "mse", "ema", "aciq"], 默认minmax
   calib_method: ,

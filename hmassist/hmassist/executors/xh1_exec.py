@@ -34,8 +34,14 @@ class XH1Exec(BaseExec, ABC):
         dynamic_resize = self.model_cfg.get("dynamic_resize")
         calib_num = self.quant_cfg.get("calib_num")
         calib_method = self.quant_cfg.get("calib_method")
-        mix_search = self.quant_cfg.get("mix_search")
-        
+        precision = self.quant_cfg.get("precision")
+        mix_search = False
+        method = "smart"
+        if precision in ["auto", "int16"]:
+            mix_search = True
+        if precision == "int16":
+            method = "all"
+
         quanttool_config = {'inputs_cfg': {}}
         # quanttool_config['graph_opt_cfg'] = {}
 
@@ -130,7 +136,7 @@ class XH1Exec(BaseExec, ABC):
             model_name=self.model_name,
             mix_search=mix_search,
             calib_method=calib_method,
-            # method="all",
+            method=method,
             # use_gptq=True,
         )
 
@@ -162,6 +168,7 @@ class XH1Exec(BaseExec, ABC):
             batch_size=1,
             device="cpu"
         )
+        sequencer.save_pkl(self.quant_dir, self.model_name)
 
         logger.info(f"golden data saved in -> {self.golden_data_path}")
         logger.info(f"quantize cost {self.quantize_span:.3f} s, layer compare cost {self.layer_compare_span:.3f} s")

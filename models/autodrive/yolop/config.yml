@@ -27,6 +27,7 @@ quant: {
   calib_dir: bdd100k/images/100k/val,
   calib_num: 30,
   debug_level: 1,
+  precision: int8,
   calib_method: ,
   data_path: bdd100k/images/100k/val/b1d7b3ac-995f9d8a.jpg,
 }
