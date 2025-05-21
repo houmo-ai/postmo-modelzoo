@@ -85,7 +85,9 @@ class HmQwen:
         dummy_tensor_names += [f'model_layers_{i}_self_attn_vcache_input' for i in range(nblocks)]
         option2.set_dummy_tensors(dummy_tensor_names)
         self.prefill_model = tcim.runtime.load(os.path.join(model_dir, "qwen3_prefill.hmm"), option = option1)
+        print("prefill model loaded.")
         self.decode_model = tcim.runtime.load(os.path.join(model_dir, "qwen3_decode.hmm"), option = option2)
+        print("decode model loaded.")
         # set kvcache input
         for i in range(nblocks):
             kcache = self.prefill_model.get_input(f'model_layers_{i}_self_attn_kcache_input')
@@ -171,7 +173,7 @@ class HmQwen:
                 break
 
             self.decode_model.set_input("input_1", input_data.numpy())
-            valid_length_data = np.array([context_length - 1]).astype("int16")
+            valid_length_data = np.array(context_length - 1).astype("int16")
             self.decode_model.set_input("valid_length", valid_length_data)
             self.decode_model.run()
             self.decode_model.sync()

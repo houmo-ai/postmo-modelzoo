@@ -179,7 +179,7 @@ class HmQwen:
                 break
 
             self.decode_model.set_input("input_1", input_data.numpy())
-            valid_length_data = np.array([context_length]).astype("int16")
+            valid_length_data = np.array(context_length).astype("int16")
             self.decode_model.set_input("valid_length", valid_length_data)
             self.decode_model.run()
             self.decode_model.sync()
