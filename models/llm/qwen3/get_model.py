@@ -45,15 +45,17 @@ if __name__ == '__main__':
     quant_path = "models/qwen3/hmquant_qwen3_256_8k_20250514.zip"
     hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250514.zip"
 
-    if model_type == "raw" or model_type == "all":
+    if model_type in ["raw", "all"]:
         get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
-        from modelscope import snapshot_download
-        snapshot_download('qwen/qwen3-8b', local_dir='qwen3-8b')
+        ignore_patterns = []
     else:
-        snapshot_download('qwen/qwen3-8b', local_dir='qwen3-8b', ignore_patterns=["*.safetensors"])
+        ignore_patterns = ["*.safetensors"]
 
-    if model_type == "quant" or model_type == "all":
+    from modelscope import snapshot_download
+    snapshot_download('qwen/qwen3-8b', local_dir='qwen3-8b', ignore_patterns=ignore_patterns)
+
+    if model_type in ["quant", "all"]:
         get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
 
-    if model_type == "hmm" or model_type == "all":
+    if model_type in ["hmm", "all"]:
         get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
