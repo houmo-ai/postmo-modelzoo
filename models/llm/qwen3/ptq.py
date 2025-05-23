@@ -33,7 +33,7 @@ def parse_args():
     parser.add_argument("--eval_ppl",action="store_true",default=False)
 
     """  args below are for debug, please not used """
-    parser.add_argument("--blocks", default=28, type=int)
+    parser.add_argument("--blocks", default=36, type=int)
     parser.add_argument("--decoder_shape", type=int, nargs='+', default=[1, 1], help="List of integers for decoder shape")
     parser.add_argument("--gptq",type=str2bool,default=False,help="weather use gptq to quant weight") # boost precision
     parser.add_argument("--cache_2_input",type=str2bool,default=True)
