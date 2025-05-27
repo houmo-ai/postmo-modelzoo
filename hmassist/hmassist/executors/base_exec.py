@@ -19,6 +19,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.perf_cfg = cfg["perf"]
         self.eval_cfg = cfg["eval"]
         self.batch = cfg["batch"]
+        self.j =  cfg["build"].get('j', None)
 
         # config from cmd
         self.target = cfg["target"]

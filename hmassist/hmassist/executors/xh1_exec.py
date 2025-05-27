@@ -185,6 +185,9 @@ class XH1Exec(BaseExec, ABC):
         logger.info("################  build started  ######################")
         import tcim
         t_start = time.time()
+        kwargs = {}
+        if self.j:
+            kwargs["j"] = self.j
         tcim.build_from_hmonnx(
             self.quant_model_path,
             output_name=self.model_name,
@@ -193,8 +196,10 @@ class XH1Exec(BaseExec, ABC):
             output_dir=self.model_dir,
             work_dir=self.build_dir,
             opt_level=f"O{opt_level}",
-            enable_dynamic_image_resize=dynamic_resize
+            enable_dynamic_image_resize=dynamic_resize,
+            **kwargs
         )
+
         logger.info('{} saved in {}'.format(self.model_name, self.model_dir))
         logger.info("################  build finished  ######################")
         self.build_span = time.time() - t_start

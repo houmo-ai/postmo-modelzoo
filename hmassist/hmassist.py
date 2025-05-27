@@ -313,7 +313,8 @@ def run(args):
     config['batch'] = args.batch
     config['thread_num'] = args.thread_num
     config['core_num'] = args.core_num
-
+    if args.j:
+        config["build"]["j"] = args.j
     # import pprint
     # pprint.pprint(config.dump())
     logger.info(f"config:\n{dump_yaml(config)}")
@@ -487,6 +488,8 @@ if __name__ == "__main__":
                         help="Specify the test number in demo, default is demo.test_num in the config file")
     parser.add_argument("--infer_only", action='store_true', default=False,
                         help="Specify if only test infer while perfing, default is False")
+    parser.add_argument("--j", type=int, default=None,
+                        help="Specify the thread number in build, default is None")
 
     args = parser.parse_args()
     logger.info(args)
