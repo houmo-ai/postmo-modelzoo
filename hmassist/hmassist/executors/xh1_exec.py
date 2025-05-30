@@ -37,9 +37,12 @@ class XH1Exec(BaseExec, ABC):
         precision = self.quant_cfg.get("precision")
         mix_search = False
         method = "smart"
-        if precision in ["auto", "int16"]:
+        use_gptq = False
+        if precision == "auto":
             mix_search = True
-        if precision == "int16":
+            use_gptq = True
+        elif precision == "int16":
+            mix_search = True
             method = "all"
 
         quanttool_config = {'inputs_cfg': {}}
@@ -137,7 +140,8 @@ class XH1Exec(BaseExec, ABC):
             mix_search=mix_search,
             calib_method=calib_method,
             method=method,
-            # use_gptq=True,
+            use_gptq=use_gptq,
+            mix_calib_samples=4,
         )
 
         logger.info("################  ptq quantize finished  ######################")

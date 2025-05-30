@@ -73,6 +73,7 @@ data/
 *.pth
 *.hmm
 *.safetensors*
+*.torchscript*
 
 # vim temporary files
 *.swp
