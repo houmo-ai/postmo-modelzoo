@@ -239,6 +239,7 @@ int main(int argc, char *argv[]) {
       lock_out.unlock();
       count++;
       printf("thread %d on device %d run sample %lld end.\n", tid, did, req_id);
+      std::this_thread::yield();
     }
 
     printf("thread %d on device %d completed. %d sampels tested.\n", tid, did, count);

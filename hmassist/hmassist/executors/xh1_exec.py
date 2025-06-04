@@ -52,7 +52,7 @@ class XH1Exec(BaseExec, ABC):
         calib_dir = self.quant_cfg["calib_dir"]
         if calib_dir:
             if os.path.isdir(calib_dir):
-                filelist = os.listdir(calib_dir)
+                filelist = sorted(os.listdir(calib_dir))  # 保证每次取的数据一致
             elif os.path.isfile(calib_dir):
                 filelist = [calib_dir]
                 calib_num = 1
