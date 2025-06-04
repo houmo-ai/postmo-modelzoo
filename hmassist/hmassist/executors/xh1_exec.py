@@ -134,7 +134,7 @@ class XH1Exec(BaseExec, ABC):
             cfg=quanttool_config,
             calibration_data=calib_dataset,
             onnx_model_or_path=self.weight,
-            device='cpu',
+            device="cuda" if torch.cuda.is_available() else "cpu",
             debug=None,
             model_name=self.model_name,
             mix_search=mix_search,
@@ -160,7 +160,7 @@ class XH1Exec(BaseExec, ABC):
         t_start = time.time()
         if self.quant_cfg["debug_level"] == 1:
             from hmquant.api import quantize_profiling
-            quantize_profiling(sequencer, [input_datas])
+            quantize_profiling(sequencer, [input_datas], device="cuda" if torch.cuda.is_available() else "cpu")
         self.layer_compare_span = time.time() - t_start
 
         from hmquant.api import generate_golden
@@ -170,7 +170,7 @@ class XH1Exec(BaseExec, ABC):
             save_path=self.quant_dir,
             model_name=self.model_name,
             batch_size=1,
-            device="cpu"
+            device="cuda" if torch.cuda.is_available() else "cpu"
         )
         sequencer.save_pkl(self.quant_dir, self.model_name)
 
@@ -263,8 +263,8 @@ class XH1Exec(BaseExec, ABC):
                 data = torch.tensor(inputs[input["name"]].astype(np.float32))  # NHWC float32
                 data = torch.squeeze(data, 0)  # HWC float32
                 format = re.sub("YUV", "", input["image"]["format"])
-                from ..utils.transform import RGB2YUV
-                rgb2yuv_func = RGB2YUV(fmt=format)
+                from ..utils.transform import RGB2YUV, BGR2YUV
+                rgb2yuv_func = RGB2YUV(fmt=format) if input["format"] == "RGB" else BGR2YUV(fmt=format)
                 image = torch.unsqueeze(rgb2yuv_func(data), 0).numpy()  # NHWC float32
                 datas[input["name"]] = image.astype(dtype)
             else:

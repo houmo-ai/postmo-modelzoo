@@ -72,11 +72,15 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         logger.warning("can not find model._preprocess, use BaseModel._preprocess")
 
         datas = {}
-        for name, data in inputs.items():
+        # for name, data in inputs.items():
+        for input_info in self.inputs:
+            name = input_info['name']
+            data = inputs[name]
             from ..utils import utils
             data = utils.to_opencv(data)
             # convert to 
-            data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
+            if input_info['format'] == "RGB":
+                data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
             data = cv2.resize(data, (self._input_size[1], self._input_size[0]))
             data = np.transpose(data, (2, 0, 1))  # CHW uint8
             datas[name] = np.expand_dims(data, axis=0)  # NCHW uint8
