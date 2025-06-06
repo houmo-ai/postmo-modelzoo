@@ -35,15 +35,6 @@ class XH1Exec(BaseExec, ABC):
         calib_num = self.quant_cfg.get("calib_num")
         calib_method = self.quant_cfg.get("calib_method")
         precision = self.quant_cfg.get("precision")
-        mix_search = False
-        method = "smart"
-        use_gptq = False
-        if precision == "auto":
-            mix_search = True
-            use_gptq = True
-        elif precision == "int16":
-            mix_search = True
-            method = "all"
 
         quanttool_config = {'inputs_cfg': {}}
         # quanttool_config['graph_opt_cfg'] = {}
@@ -137,10 +128,10 @@ class XH1Exec(BaseExec, ABC):
             device="cuda" if torch.cuda.is_available() else "cpu",
             debug=None,
             model_name=self.model_name,
-            mix_search=mix_search,
             calib_method=calib_method,
-            method=method,
-            use_gptq=use_gptq,
+            mix_search=False if precision == 'int8' else True,
+            method="all" if precision == 'int16' else "smart",
+            use_gptq=True if precision == 'auto' else False,
             mix_calib_samples=4,
         )
 
