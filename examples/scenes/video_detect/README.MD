@@ -8,6 +8,8 @@
 
 本示例以后摩视频解码+yolov5s检测模型推理+resnet50分类模型推理为例展示视频检测推理Pipeline的基本使用方式。
 
+本示例提供Resize解码输出功能: 默认开启，将后摩视频解码输出resize为yolov5s输入大小，支持的解码输出最大尺寸为3840x2160。
+
 本示例仅支持c++。由于后摩视频解码暂不支持windows，因此本示例不支持windows。
 
 ## 软件依赖
@@ -42,12 +44,16 @@ python3 get_model.py
 - cls_thread_num：分类线程数
 - frame_limit：取视频流的前n帧，0表示所有（ISIM下推理性能低，默认设置为2）
 
+可通过控制编译提供的-D参数ENABLE_RESIZER来开关Resize解码输出功能:
+- -DENABLE_RESIZER=ON: 开启Resize解码输出功能
+- -DENABLE_RESIZER=OFF: 关闭Resize解码输出功能
+
 使用runtime c++ API进行模型推理，并输出结果：
 
 ```bash
 mkdir build
 cd build
-cmake -DCMAKE_INSTALL_PREFIX=../
+cmake -DCMAKE_INSTALL_PREFIX=../ -DENABLE_RESIZER=ON
 make -j
 make install
 cd ..
@@ -109,5 +115,8 @@ sample 0 box[806, 378, 1039, 600], det[conf:0.692485, cls:7], cls[id:656, conf:9
 linux下执行：
 
 ```bash
+# (默认)开启Resize解码输出功能
 bash run.sh
+# 关闭Resize解码输出功能
+bash run.sh disable_resizer
 ```

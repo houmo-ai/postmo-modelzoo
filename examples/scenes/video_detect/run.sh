@@ -8,6 +8,11 @@ if [[ -z $HOUMO_EXAMPLES_PATH ]]; then
   export HOUMO_EXAMPLES_PATH=$WORK_PATH/../..
 fi
 
+RESIZER_SWITCH=ON
+if [ "$1" = "disable_resizer" ]; then
+  RESIZER_SWITCH=OFF
+fi
+
 # get test model
 python3 get_model.py
 
@@ -15,7 +20,7 @@ python3 get_model.py
 mkdir -p build
 cd build || exit 1
 
-cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH -DENABLE_RESIZER=$RESIZER_SWITCH -DCMAKE_BUILD_TYPE=Release ..
 make -j
 make install
 

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16.3)
 project(example_video_detect)
 
+option(ENABLE_RESIZER "Enable resizer to process decoded images automatically" ON)
+
 set(TCIM_RUNTIME_PATH $ENV{TCIM_RUNTIME_PATH})
 set(HOUMO_SDK_PATH $ENV{HOUMO_SDK_PATH})
 set(HOUMO_EXAMPLES_PATH $ENV{HOUMO_EXAMPLES_PATH})
@@ -30,6 +32,10 @@ endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 
 add_executable(${CMAKE_PROJECT_NAME} video_detect.cc)
+
+if(ENABLE_RESIZER)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE RESIZER)
+endif()
 
 target_link_libraries(${CMAKE_PROJECT_NAME} ${TCIM_LIBRARY})
 target_link_libraries(${CMAKE_PROJECT_NAME} ${HAL_CODEC_LIBRARY})

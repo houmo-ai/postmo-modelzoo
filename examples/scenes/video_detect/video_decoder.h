@@ -2,9 +2,12 @@
 #include <sstream>
 #include <string>
 
+#include "tcim/tcim_imageops.h"
 #include "hm_vpu_hal.h"
 #include "log.hpp"
 #include "utils.hpp"
+
+// #define SAVE_IMGS  // save image
 
 #define PUSH_LAST_STREAM_DATA_COMPLETE    (0x5a5a)
 #define V4L2_PIX_FMT_HEVC   v4l2_fourcc('H', 'E', 'V', 'C')  /* HEVC aka H.265 */
@@ -12,6 +15,10 @@
 #define VIDEO_DECODER_ERR -1
 #define VIDEO_DECODER_OK  0
 #define VIDEO_DECODER_EOS 1
+
+// the maximum size supported by resizer
+#define RESIZER_MAX_WIDTH 3840
+#define RESIZER_MAX_HEIGHT 2160
 
 typedef enum {
   CPU = 0,
@@ -23,6 +30,13 @@ typedef struct {
   size_t len = 0;
 } DecodeData;
 
+typedef struct {
+  tcim::ImageOps::Resizer* resizer = nullptr;
+  int64_t max_height = 0;
+  int64_t max_width = 0;
+  int64_t md_height = 0;
+  int64_t md_width = 0;
+} ImgResizer;
 
 class VideoDecoder {
  public:
@@ -32,6 +46,9 @@ class VideoDecoder {
     if (HmCodecDecOpen(0, 0, in_fmt, out_fmt, &vir_fd_)) {
       LOG_ERROR << "open vpu device fail. pid=" << getpid();
     }
+#ifdef RESIZER
+    img_resizer_.resizer = new tcim::ImageOps::Resizer();
+#endif
   }
 
   ~VideoDecoder() {
@@ -48,6 +65,9 @@ class VideoDecoder {
         free(host_data_[i]);
       }
     }
+#ifdef RESIZER
+    delete img_resizer_.resizer;
+#endif
     return ret;
   }
 
@@ -127,6 +147,32 @@ class VideoDecoder {
     return height_;
   }
 
+#ifdef RESIZER
+  int SetModelInfo(const int64_t& width, const int64_t& heigth) {
+    img_resizer_.md_width = width;
+    img_resizer_.md_height = heigth;
+
+    return VIDEO_DECODER_OK;
+  }
+
+  int SetResizer(tcim::ImageOps::Resizer::Option& option) {
+    int ret = 0;
+    ret = img_resizer_.resizer->Init(option);
+    if (ret != 0) {
+      LOG_ERROR << "init resizer fail!";
+      return VIDEO_DECODER_ERR;
+    }
+    img_resizer_.max_width = option.max_w;
+    img_resizer_.max_height = option.max_h;
+
+    return VIDEO_DECODER_OK;
+  }
+
+  ImgResizer& GetResizer() {
+    return img_resizer_;
+  }
+#endif
+
  protected:
   decoder_input_fmt_type GetInputFormat(const std::string& input_fmt) {
     decoder_input_fmt_type type = H264;
@@ -159,6 +205,9 @@ class VideoDecoder {
   int32_t input_stream_fps = 30;
   uint64_t vir_fd_ = 0;
   struct planes_info buf_info_;
+#ifdef RESIZER
+  ImgResizer img_resizer_;
+#endif
   void* host_data_[2] = {nullptr};
   int width_ = 0;
   int height_ = 0;

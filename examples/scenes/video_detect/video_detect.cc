@@ -67,6 +67,25 @@ typedef struct {
   int id = 0;
 } InferInfo;
 
+int SaveImgs(int height, int width, void* data_ptr, std::string file_name)
+{
+  cv::Mat nv12(height * 3 / 2, width, CV_8UC1, data_ptr);
+  cv::Mat rgb;
+  cv::cvtColor(nv12, rgb, cv::COLOR_YUV2RGB_NV12);
+  cv::Mat bgr;
+  cv::cvtColor(rgb, bgr, cv::COLOR_BGR2RGB);
+
+  fs::path file_path(file_name + ".jpg");
+  fs::path result_path("debug_results");
+  if (!fs::exists(result_path)) {
+    fs::create_directory("debug_results");
+  }
+  fs::path result_file = result_path / file_path.filename();
+  cv::imwrite(result_file.string().c_str(), bgr);
+
+  return VIDEO_DECODER_OK;
+}
+
 void PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info, Barrier& barrier)
 {
   AVFormatContext *format_ctx = NULL;
@@ -131,6 +150,26 @@ void PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info, Barrier& bar
   width = codecParameters->width;
   auto& height = decoder.GetHeight();
   height = codecParameters->height;
+
+#ifdef RESIZER
+  if (width > RESIZER_MAX_WIDTH || height > RESIZER_MAX_HEIGHT) {
+    LOG_ERROR << "the decoded outputs exceeds the upper limit supported by resizer.";
+    avformat_close_input(&format_ctx);
+    return;
+  }
+  // create a resizer to process decoded outputs
+  auto option = tcim::ImageOps::Resizer::Option(tcim::DataFmt::YUV420SP, 0);
+  auto md_width = decoder.GetResizer().md_width;
+  auto md_height = decoder.GetResizer().md_width;
+  int64_t max_width = width < md_width ? md_width : width;
+  int64_t max_height = height < md_height ? md_height : height;
+  option.SetMaxSize(max_width, max_height);
+  if (decoder.SetResizer(option) != VIDEO_DECODER_OK) {
+      LOG_ERROR << "create resizer fail.";
+      avformat_close_input(&format_ctx);
+      return;
+  }
+#endif
 
   barrier.barrier();
 
@@ -216,6 +255,7 @@ void GetFrame(VideoDecoder& decoder, TaskQueue& qout, Barrier& barrier) {
   barrier.barrier();
   int height = decoder.GetHeight();
   int width = decoder.GetWidth();
+  LOG_INFO << "===> decoder heigth:" << height << ", width:" << width;
 
   std::vector<DecodeData> frm_data(2);
 
@@ -240,8 +280,8 @@ void GetFrame(VideoDecoder& decoder, TaskQueue& qout, Barrier& barrier) {
     tcim::Tensor yuv_tensor;
     tcim::Tensor y_tensor;
     tcim::Tensor uv_tensor;
-    auto yuv_info = tcim::TensorInfo::CreateYUVInfo(height, width, tcim::YUV420SP);
-    LOG_INFO << yuv_info;
+    auto yuv_info = tcim::TensorInfo::CreateYUVInfo(width, height, tcim::YUV420SP);
+    LOG_INFO << "-->> decoded yuv info:" << yuv_info;
     if (device == CPU) {
       yuv_tensor = tcim::Tensor::CreateHostTensor(yuv_info);
       y_buf = tcim::Buffer::CreateHostBuffer(frm_data[0].len, frm_data[0].data);
@@ -255,24 +295,49 @@ void GetFrame(VideoDecoder& decoder, TaskQueue& qout, Barrier& barrier) {
     y_buf.CopyTo(y_tensor.Buffer());
     uv_buf.CopyTo(uv_tensor.Buffer());
 
+#ifdef RESIZER
+    auto img_resizer = decoder.GetResizer();
+    auto md_heigth = img_resizer.md_height;
+    auto md_width = img_resizer.md_width;
+    tcim::Tensor resized_yuv_tensor;
+    auto resized_yuv_info = tcim::TensorInfo::CreateYUVInfo(
+      md_width, md_heigth, tcim::YUV420SP);
+    LOG_INFO << "-->> resized yuv info:" << resized_yuv_info;
+    if (device == CPU) {
+      resized_yuv_tensor = tcim::Tensor::CreateHostTensor(resized_yuv_info);
+    } else {
+      resized_yuv_tensor = tcim::Tensor::CreateDeviceTensor(resized_yuv_info);
+    }
+    tcim::ImageOps::RectRoi roi(0, 0, width, height);
+    tcim::ImageOps::Resizer::RunOption run_opt(roi);
+    run_opt.interp_mode = tcim::ImageOps::Resizer::EnInterpMode::Nearest;
+    img_resizer.resizer->Run(yuv_tensor, resized_yuv_tensor, run_opt, true);
+
+#ifdef SAVE_IMGS
+    auto decoded_tensor = yuv_tensor.ToHost(true);
+    auto resized_tensor = resized_yuv_tensor.ToHost(true);
+
+    std::string decoded_file_name = "decoded_" + std::to_string(fid);
+    SaveImgs(height, width, decoded_tensor.Data(), decoded_file_name);
+    LOG_INFO << "save the decoded image, file_path:" << decoded_file_name;
+
+    std::string resized_file_name = "resized_" + std::to_string(fid);
+    SaveImgs(md_heigth, md_width, resized_tensor.Data(), resized_file_name);
+    LOG_INFO << "save the resized image, file_path:" << resized_file_name;
+#endif
+#endif
+
     count++;
     decoder.ReleaseBuf();
-
-#if 0 // save image
-    cv::Mat nv12(decoder.GetHeight() * 3 / 2, decoder.GetWidth(), CV_8UC1, data);
-    cv::Mat rgb;
-    cv::cvtColor(nv12, rgb, cv::COLOR_YUV2RGB_NV12);
-    cv::Mat bgr;
-    cv::cvtColor(rgb, bgr, cv::COLOR_BGR2RGB);
-    std::string file_path = std::to_string(fid) + ".jpg";
-    cv::imwrite(file_path, bgr);
-    printf("%s saved.\n", file_path.c_str());
-#endif
 
     // push input data to det queue
     TaskInfo task_info;
     task_info.req_id = fid++;
+#ifdef RESIZER
+    task_info.image = resized_yuv_tensor.Buffer();
+#else
     task_info.image = yuv_tensor.Buffer();
+#endif
 
     bool print_flag = true;
     while (1) {
@@ -584,7 +649,7 @@ int main(int argc, char **argv)
   std::string format;
   if (postfix == ".h264") {
     format = "H264";
-  } else if (postfix == ".h264") {
+  } else if (postfix == ".h265") {
     format = "H265";
   } else {
     LOG_ERROR << "file format not supported: " << stream_path;
@@ -627,6 +692,9 @@ int main(int argc, char **argv)
   VideoDecoder decoder(format, "NV12M");
   Barrier barrier2(2);
   PushStreamInfo stream_info = {stream_path, frame_limit};
+#ifdef RESIZER
+  decoder.SetModelInfo(1920, 1080);  // yolov5s input shape (width, height)
+#endif
   // create push stream thread
   threads.emplace_back(std::thread(&PushStream, std::ref(decoder), std::ref(stream_info), std::ref(barrier2)));
   // create rcv frame thread
