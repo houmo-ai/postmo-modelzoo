@@ -174,14 +174,13 @@ class YoloV5:
         self._image_size = image_size
         self._conf_threshold = conf_threshold
         self._iou_threshold = iou_threshold
-        
+
     def preprocess(self, image):
-        out = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        out, _, _ = letterbox(out, self._image_size, stride=64, auto=False)  # HWC
+        out, _, _ = letterbox(image, self._image_size, stride=64, auto=False)  # HWC
         out = np.transpose(out, (2, 0, 1))  # CHW .astype(np.float32)
         out = np.expand_dims(out, axis=0)  # NCHW
         return out
-    
+
     def yolo_detect(self, feats):
         # in.shape = out.shape: 1x3x80x80x85 1x3x40x40x85 1x3x20x20x85
         output = []
@@ -403,6 +402,6 @@ if __name__ == '__main__':
     cv2.imwrite(save_path, cv_image)
     print("demo results saved to", save_path)
     # check result, modify it when you change model or data
-    assert(len(boxes) == 16 or len(boxes) == 17)
+    assert(len(boxes) == 20)
 
     print("<=== yolov5s python example completed.\n")

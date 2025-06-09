@@ -35,12 +35,6 @@ class XH1Exec(BaseExec, ABC):
         calib_num = self.quant_cfg.get("calib_num")
         calib_method = self.quant_cfg.get("calib_method")
         precision = self.quant_cfg.get("precision")
-        mix_search = False
-        method = "smart"
-        if precision in ["auto", "int16"]:
-            mix_search = True
-        if precision == "int16":
-            method = "all"
 
         quanttool_config = {'inputs_cfg': {}}
         # quanttool_config['graph_opt_cfg'] = {}
@@ -49,7 +43,7 @@ class XH1Exec(BaseExec, ABC):
         calib_dir = self.quant_cfg["calib_dir"]
         if calib_dir:
             if os.path.isdir(calib_dir):
-                filelist = os.listdir(calib_dir)
+                filelist = sorted(os.listdir(calib_dir))  # 保证每次取的数据一致
             elif os.path.isfile(calib_dir):
                 filelist = [calib_dir]
                 calib_num = 1
@@ -131,13 +125,14 @@ class XH1Exec(BaseExec, ABC):
             cfg=quanttool_config,
             calibration_data=calib_dataset,
             onnx_model_or_path=self.weight,
-            device='cpu',
+            device="cuda" if torch.cuda.is_available() else "cpu",
             debug=None,
             model_name=self.model_name,
-            mix_search=mix_search,
             calib_method=calib_method,
-            method=method,
-            # use_gptq=True,
+            mix_search=False if precision == 'int8' else True,
+            method="all" if precision == 'int16' else "smart",
+            use_gptq=True if precision == 'auto' else False,
+            mix_calib_samples=4,
         )
 
         logger.info("################  ptq quantize finished  ######################")
@@ -156,7 +151,7 @@ class XH1Exec(BaseExec, ABC):
         t_start = time.time()
         if self.quant_cfg["debug_level"] == 1:
             from hmquant.api import quantize_profiling
-            quantize_profiling(sequencer, [input_datas])
+            quantize_profiling(sequencer, [input_datas], device="cuda" if torch.cuda.is_available() else "cpu")
         self.layer_compare_span = time.time() - t_start
 
         from hmquant.api import generate_golden
@@ -166,7 +161,7 @@ class XH1Exec(BaseExec, ABC):
             save_path=self.quant_dir,
             model_name=self.model_name,
             batch_size=1,
-            device="cpu"
+            device="cuda" if torch.cuda.is_available() else "cpu"
         )
         sequencer.save_pkl(self.quant_dir, self.model_name)
 
@@ -264,8 +259,8 @@ class XH1Exec(BaseExec, ABC):
                 data = torch.tensor(inputs[input["name"]].astype(np.float32))  # NHWC float32
                 data = torch.squeeze(data, 0)  # HWC float32
                 format = re.sub("YUV", "", input["image"]["format"])
-                from ..utils.transform import RGB2YUV
-                rgb2yuv_func = RGB2YUV(fmt=format)
+                from ..utils.transform import RGB2YUV, BGR2YUV
+                rgb2yuv_func = RGB2YUV(fmt=format) if input["format"] == "RGB" else BGR2YUV(fmt=format)
                 image = torch.unsqueeze(rgb2yuv_func(data), 0).numpy()  # NHWC float32
                 datas[input["name"]] = image.astype(dtype)
             else:

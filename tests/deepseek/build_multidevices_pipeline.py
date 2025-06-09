@@ -2,16 +2,57 @@ import os
 import numpy as np
 import time
 import argparse
+import onnx
+
+import json
 
 import logging
 logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 
-
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
 
+def get_value_info_by_name(onnx_model: onnx.ModelProto, name: str):
+    for input_ in onnx_model.graph.input:
+        if input_.name == name:
+            return input_
+    for output in onnx_model.graph.output:
+        if output.name == name:
+            return output
+    for value_info in onnx_model.graph.value_info:
+        if value_info.name == name:
+            return value_info
+    return None
+
+def get_tensor_from_initializer(onnx_model: onnx.ModelProto, name: str):
+    for init in onnx_model.graph.initializer:
+        if init.name == name:
+            return onnx.numpy_helper.to_array(init)
+    return np.array([])
+
+def get_shape_by_name(onnx_model: onnx.ModelProto, name: str):
+    # search
+    value_info = get_value_info_by_name(onnx_model, name)
+    if value_info is not None:
+        shape = [d.dim_value if d.dim_value > 0 else 1 for d in value_info.type.tensor_type.shape.dim]
+        return shape
+    tensor = get_tensor_from_initializer(onnx_model, name)
+    shape = list(tensor.shape)
+    return shape
+
+def get_node_by_output(onnx_model: onnx.ModelProto, name: str):
+    for node in onnx_model.graph.node:
+        if name in node.output:
+            return node
+    return None
+
+def get_attribute(node, attr_name, default_value=None):
+    found = [attr for attr in node.attribute if attr.name == attr_name]
+    if found:
+        return onnx.helper.get_attribute_value(found[0])
+    return default_value
 
 def cosine_distance(data1, data2):
     if data1.shape != data2.shape:
@@ -45,7 +86,7 @@ def save_submodel_golden(model_dir, model_name, output_names):
             print(f"{os.path.basename(save_path2)} saved in {os.path.dirname(save_path2)}")
             
             
-def extract_model(src, dest, input_names, output_names):
+def extract_model(src, dest, input_names, output_names, metadata_entrys=None):
     import onnx
     import onnx_graphsurgeon
     model = onnx.load(src)
@@ -56,8 +97,73 @@ def extract_model(src, dest, input_names, output_names):
     graph.inputs = [tensors[in_t.strip()] for in_t in input_names]
     graph.outputs = [tensors[out_t.strip()] for out_t in output_names]
     graph.cleanup()
-    onnx.save(onnx_graphsurgeon.export_onnx(graph), dest)
+    dst_model = onnx_graphsurgeon.export_onnx(graph)
+
+    if metadata_entrys is None:
+        metadata_entrys = {}
+        for dst_out in dst_model.graph.output:
+            block_shape = get_shape_by_name(dst_model, dst_out.name)
+            pre_node = get_node_by_output(dst_model, dst_out.name)
+            scale = get_attribute(pre_node, "output_scale")
+            assert scale is not None, f"scale not find, this is unreasonable!"
+            zero_point = get_attribute(pre_node, "output_zero_point")
+            assert zero_point is not None, f"zero not find, this is unreasonable!"
+            src_dtype = "float32"
+            dst_dtype = get_attribute(pre_node, "output_dtype").decode('utf-8')
+            assert dst_dtype in ['int32', 'int16', 'int8'], f"dst_dtype should be int32, int16 or int8, but is {dst_dtype}"
+            dst_min = 2**(int(dst_dtype[3:]) - 1) * -1
+            dst_max = 2**(int(dst_dtype[3:]) - 1) - 1
+            entry_info = {
+                "block_shape": block_shape,
+                "scale": scale,
+                "zero_point": zero_point,
+                "src_dtype": src_dtype,
+                "dst_dtype": dst_dtype,
+                "dst_min": dst_min,
+                "dst_max": dst_max
+            }
+            entry_info_json = json.dumps(entry_info)
+            metadata_entry = onnx.StringStringEntryProto(key="houmo.quant.info", value=entry_info_json)
+            metadata_entrys[dst_out.name] = metadata_entry
+
+    # add input metadata_props
+    for dst_input in dst_model.graph.input:
+        finish_flag = False
+        for src_input in model.graph.input:
+            if src_input.name != dst_input.name:
+                continue
+            for metadata_prop in src_input.metadata_props:
+                dst_input.metadata_props.append(metadata_prop)
+            finish_flag = True
+            break
+        if not finish_flag:
+            assert metadata_entrys is not None, f"Process input:{dst_input.name}, metadata_entrys not should is None!"
+            if dst_input.name in list(metadata_entrys.keys()):
+                dst_input.metadata_props.append(metadata_entrys[dst_input.name])
+            else:
+                raise ValueError(f"ERR: this model input:{dst_input.name} not found metadata_prop info!")   
+
+    # add output metadata_props
+    for dst_output in dst_model.graph.output:
+        finish_flag = False
+        for src_output in model.graph.output:
+            if src_output.name != dst_output.name:
+                continue
+            for metadata_prop in src_output.metadata_props:
+                dst_output.metadata_props.append(metadata_prop)
+            finish_flag = True
+            break
+        if not finish_flag:
+            assert metadata_entrys is not None, f"Process output:{dst_output.name}, metadata_entrys not should is None!"
+            if dst_output.name in list(metadata_entrys.keys()):
+                dst_output.metadata_props.append(metadata_entrys[dst_output.name])
+            else:
+                raise ValueError(f"ERR: this model output:{dst_output.name} not found metadata_prop info!") 
+
+    onnx.save(dst_model, dest)
+    
     print(f"extracted model saved in", dest)
+    return metadata_entrys
 
 
 def get_args() -> argparse.Namespace:
@@ -128,8 +234,8 @@ def clip(raw_path, part1_path, part2_path, nblocks):
         input_names.append(f'model_layers_{i}_self_attn_kcache_history_sum')
     # onnx.utils.extract_model(raw_path, part1_path, input_names=input_names, 
     #                          output_names=[mid_layer_name], check_model=True)
-    extract_model(raw_path, part1_path, input_names=input_names, 
-                    output_names=[mid_layer_name])
+    metadata_entrys = extract_model(raw_path, part1_path, input_names=input_names, 
+                    output_names=[mid_layer_name], metadata_entrys=None)
     input_names = [mid_layer_name, 'valid_length', 'current_length']
     for i in range(mid_layer_id+1, nblocks):
         input_names.append(f'model_layers_{i}_self_attn_kcache_input')
@@ -138,7 +244,7 @@ def clip(raw_path, part1_path, part2_path, nblocks):
     # onnx.utils.extract_model(raw_path, part2_path, input_names=input_names, 
     #                          output_names=['Output_lm_head_add_list_1'], check_model=True)
     extract_model(raw_path, part2_path, input_names=input_names, 
-                    output_names=['Output_lm_head_add_list_1'])
+                    output_names=['Output_lm_head_add_list_1'], metadata_entrys=metadata_entrys)
 
 
 def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):

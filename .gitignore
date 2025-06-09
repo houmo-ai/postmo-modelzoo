@@ -8,6 +8,7 @@ hir_log/
 reports/
 customized/
 tmp_*/
+data/
 
 # media files
 *.jpg
@@ -72,6 +73,7 @@ tmp_*/
 *.pth
 *.hmm
 *.safetensors*
+*.torchscript*
 
 # vim temporary files
 *.swp
