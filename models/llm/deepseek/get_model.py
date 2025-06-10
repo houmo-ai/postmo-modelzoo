@@ -42,8 +42,11 @@ if __name__ == '__main__':
     HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
-    quant_path = "models/deepseek/hmquant_deepseek_256_4096_20250317.zip"
-    hmm_path = "models/deepseek/hmm_deepseek_256_4096_4cores_20250317.zip"
+    if HOUMO_TARGET == "xh1":
+        quant_path = "models/deepseek/hmquant_deepseek_256_4096_20250317.zip"
+        hmm_path = "models/deepseek/hmm_deepseek_256_4096_4cores_20250317.zip"
+    elif HOUMO_TARGET == "xh2":
+        hmm_path = "models_outdated/deepseek/hmm_xh2_deepseek_7b_256_2k_2cores_20250627.zip"
 
     if model_type == "raw" or model_type == "all":
         get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)

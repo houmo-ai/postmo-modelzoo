@@ -42,8 +42,12 @@ if __name__ == '__main__':
     HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
-    quant_path = "models/qwen3/hmquant_qwen3_256_8k_20250603.zip"
-    hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250603.zip"
+    if HOUMO_TARGET == "xh1":
+        quant_path = "models/qwen3/hmquant_qwen3_256_8k_20250603.zip"
+        hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250603.zip"
+    elif HOUMO_TARGET == "xh2":
+        quant_path = "models/qwen3/hmquant_xh2_qwen3_256_2k_20250627.zip"
+        hmm_path = "models_outdated/qwen3/hmm_xh2_qwen3_256_8k_2cores_20250627.zip"
 
     if model_type in ["raw", "all"]:
         get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)

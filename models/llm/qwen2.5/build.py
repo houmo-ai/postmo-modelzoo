@@ -6,7 +6,8 @@ import argparse
 import logging
 logging.basicConfig(level="INFO")
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
 
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
@@ -57,7 +58,7 @@ def get_args() -> argparse.Namespace:
         '--ncore',
         dest='ncore',
         type=int,
-        default=4,
+        default=HOUMO_CORE_NUM,
         help='core number',
     )
     parser.add_argument(
@@ -95,6 +96,7 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
         weights=os.path.join(model_dir, "weight.npy"),
         output_name=model_name,
         ncore=ncore,
+        target=HOUMO_TARGET,
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim"),
         llm_opt=True,
