@@ -25,7 +25,7 @@ def cosine_distance(data1, data2, check_shape=True):
     cosine_dist = np.dot(v1_norm, v2_norm)
     if np.isnan(cosine_dist):
         return -1
-    return cosine_dist
+    return float(cosine_dist)
 
 
 def euclid_distance(data1, data2, check_shape=True):
@@ -37,3 +37,7 @@ def euclid_distance(data1, data2, check_shape=True):
             logger.error("shape not equal {} vs {}".format(data1.shape, data2.shape))
             return -1
     return np.linalg.norm(data1 - data2)
+
+
+def relative_euclidean_distance(x, y):
+    return float(abs((np.sum(x**2) / np.sum(y**2) + np.finfo(np.float64).eps) - 1.0))

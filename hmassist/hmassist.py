@@ -6,12 +6,13 @@ import numpy as np
 import argparse
 import importlib
 import logging
+import torch
 import time
 from hmassist.utils import check
 from hmassist.utils import logger
 from hmassist.utils.glog_format import GLogFormatter
-from hmassist.utils.parser import read_yaml_to_dict, dump_yaml
-from hmassist.utils.dist_metrics import cosine_distance, euclid_distance
+from hmassist.utils.parser import read_yaml_to_dict, dump_yaml, save_dict_to_yaml
+from hmassist.utils.dist_metrics import cosine_distance, euclid_distance, relative_euclidean_distance
 from hmassist.utils.utils import get_random_data
 from hmassist.executors.xh1_exec import XH1Exec
 from hmassist.executors.onnx_exec import OnnxExec
@@ -22,12 +23,12 @@ from hmassist.utils.utils import sanitize_name
 HOUMO_TARGET_LIST=["houmo", "xh1"]
 
 
-def save_data(data, dir, name):
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    data.tofile(os.path.join(dir, f"{name}.bin"))
-    data.tofile(os.path.join(dir, f"{name}.txt"), sep="\n")
-    np.save(os.path.join(dir, f'{name}.npy'), data)
+def save_data(data, _dir, name):
+    if not os.path.exists(_dir):
+        os.makedirs(_dir)
+    data.tofile(os.path.join(_dir, f"{name}.bin"))
+    data.tofile(os.path.join(_dir, f"{name}.txt"), sep="\n")
+    np.save(os.path.join(_dir, f'{name}.npy'), data)
 
 
 def get_executor(cfg):
@@ -103,6 +104,9 @@ def build(cfg):
         logger.info(f"[infer] cost {cost * 1000:.3f} ms")
     logger.info(f"inputs saved in {model.executor.build_dir}")
 
+    new_res = dict()
+    if os.path.exists(model.executor.summary_result_path):
+        new_res = read_yaml_to_dict(model.executor.summary_result_path)
     result_check = True
     for output_name, output_data in outputs.items():
         logger.info(f"{model.target} output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}")
@@ -117,6 +121,7 @@ def build(cfg):
             logger.info(f"golden output[{output_name}] shape = {golden_output.shape}, dtype = {golden_output.dtype}")
             cosine_dist1 = cosine_distance(golden_output, output_data)
             is_match1 = (golden_output == output_data).all()
+            new_res["build"][output_name] = {"quant": {"cosine_similarity": cosine_dist1, "match": bool(is_match1)}}
             logger.info(f"[compare] golden output [{output_name}] match={is_match1}, similarity={cosine_dist1:.6f}")
         else:
             logger.warning(f"compare canceled while golden output not found -> {golden_output_path}")
@@ -127,6 +132,7 @@ def build(cfg):
             logger.info(f"golden dequant output[{output_name}] shape = {golden_dequant_output.shape}, dtype = {golden_dequant_output.dtype}")
             cosine_dist2 = cosine_distance(golden_dequant_output, dequanted_outputs[output_name])
             is_match2 = (golden_dequant_output == dequanted_outputs[output_name]).all()
+            new_res["build"][output_name].update({"dequant": {"cosine_similarity": cosine_dist2, "match": bool(is_match2)}})
             logger.info(f"[compare] dequanted golden output [{output_name}] match={is_match2}, similarity={cosine_dist2:.6f}")
         else:
             logger.warning(f"dequanted compare canceled while golden output not found -> {golden_dequant_output}")
@@ -135,6 +141,7 @@ def build(cfg):
             continue
         if cosine_dist1 < 0.999 or cosine_dist2 < 0.999:
             result_check &= False
+    save_dict_to_yaml(new_res, model.executor.summary_result_path)
     logger.info(f"outputs saved in {model.executor.build_dir}")
     if not result_check:
         logger.error("result check failed.")
@@ -152,8 +159,8 @@ def test(cfg):
     model.executor.print_output_info()
     data_path = cfg["test"].get("data_path")
     if data_path:
-        dir, file = os.path.split(data_path)
-        inputs = model.get_input_datas(dir, file)
+        _dir, file = os.path.split(data_path)
+        inputs = model.get_input_datas(_dir, file)
     else:
         inputs = {}
         for _input in model.inputs:
@@ -161,57 +168,78 @@ def test(cfg):
             dtype = _input["dtype"]
             logger.warning(f"data[{name}] will use random data")
             inputs[name] = get_random_data(name, dtype, model.input_shape)
-    inputs = model.executor._preprocess(inputs)
-    model.executor.set_fixed_out(False)
-    start = time.time()
-    outputs = model.executor.infer(inputs)
-    cost = time.time() - start
-    logger.info(f"[infer] cost {cost * 1000:.3f} ms")
+            
+    input_tensors = [torch.from_numpy(inputs[key]) for key in inputs]
 
-    # save datas
     save_dir = os.path.join(model.executor.test_dir)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    for input_name, input_data in inputs.items():
-        save_data(input_data, save_dir, input_name + "_input")
-    for output_name, output_data in outputs.items():
-        logger.info(f"{model.target} output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}")
-        output_save_name = sanitize_name(output_name)
-        save_data(output_data, save_dir, output_save_name)
+        
+    # save quant input datas
+    for key in inputs:
+        save_data(inputs[key], save_dir, f"{key}_quant_input")
+            
+    # onnx
+    onnx_exec = OnnxExec(cfg)
+    onnx_exec.load()
+    onnx_inputs = onnx_exec._preprocess(inputs)
+    onnx_outputs = onnx_exec.infer(onnx_inputs)
+    # save onnx input datas
+    for input_name, input_data in onnx_inputs.items():
+        save_data(input_data, save_dir, f"{input_name}_onnx_input")
+        
+    # chip and quantized
+    chip_inputs = model.executor._preprocess(inputs)
+    # save chip input datas
+    for input_name, input_data in chip_inputs.items():
+        save_data(input_data, save_dir, f"{input_name}_chip_input")
+    model.executor.set_fixed_out(False)
+    sequencer_outputs = model.executor.gen_golden(input_tensors)
+    start = time.time()
+    chip_outputs = model.executor.infer(chip_inputs)
+    cost = time.time() - start
+    logger.info(f"[infer] cost {cost * 1000:.3f} ms")
+
+    def save_output(outputs, save_dir, prefix):
+        for name, array in outputs.items():
+            logger.info(f"{prefix} output[{name}] shape = {array.shape}, dtype = {array.dtype}")
+            new_name = sanitize_name(name)
+            save_data(array, save_dir, f"{prefix}_{new_name}")
+    
+    save_output(chip_outputs, save_dir, model.target)
+    save_output(sequencer_outputs, save_dir, "quantized")
+    save_output(onnx_outputs, save_dir, "onnx")
     logger.info(f"test outputs saved in {save_dir}")
 
     if model.target in HOUMO_TARGET_LIST:
-        # compare to quant output and framework output
-        for output_name, output_data in outputs.items():
-            output_save_name = sanitize_name(output_name)
-            hmquant_data_path = os.path.join(model.executor.golden_data_path, f'hmquant_{model.executor.model_name}_{output_save_name}_dequant_output.npy')
-            raw_data_path = os.path.join(model.compare_dir, "test", output_save_name + '.npy')
-            if os.path.exists(hmquant_data_path):
-                hmquant_data = np.load(hmquant_data_path)
-                logger.info(f"hmquant output[{output_name}] shape = {hmquant_data.shape}, dtype = {hmquant_data.dtype}")
-            else:
-                hmquant_data = None
-                logger.warning(f"compare canceled while hmquant output not found -> {hmquant_data_path}")
-            if os.path.exists(raw_data_path):
-                raw_data = np.load(raw_data_path)
-                logger.info(f"{model.framework} output[{output_name}] shape = {raw_data.shape}, dtype = {raw_data.dtype}")
-            else:
-                raw_data = None
-                logger.warning(f"compare canceled while {model.framework} output not found -> {raw_data_path}")
+        # onnx vs quantized vs chip
+        new_res = dict()
+        if os.path.exists(model.executor.summary_result_path):
+            new_res = read_yaml_to_dict(model.executor.summary_result_path)
+        new_res["test"] = dict()
+        for output_name in onnx_outputs:
+            assert output_name in chip_outputs
+            assert output_name in sequencer_outputs
+            onnx_output = onnx_outputs[output_name]
+            chip_output = chip_outputs[output_name]
+            sequencer_output = sequencer_outputs[output_name]
             
-            if hmquant_data is not None:
-                if raw_data is not None:
-                    cosine_dist = cosine_distance(hmquant_data, raw_data)
-                    euclid_dist = euclid_distance(hmquant_data, raw_data)
-                    logger.info(f"[compare] output [{output_name}] {model.framework} vs hmquant similarity={cosine_dist:.6f}, euclid_dist={euclid_dist:.6f}")
-                cosine_dist = cosine_distance(output_data, hmquant_data)
-                euclid_dist = euclid_distance(output_data, hmquant_data)
-                logger.info(f"[compare] output [{output_name}] hmquant vs {model.target} similarity={cosine_dist:.6f}, euclid_dist={euclid_dist:.6f}")
-            if raw_data is not None:
-                cosine_dist = cosine_distance(output_data, raw_data)
-                euclid_dist = euclid_distance(output_data, raw_data)
-                logger.info(f"[compare] output [{output_name}] {model.framework} vs {model.target} similarity={cosine_dist:.6f}, euclid_dist={euclid_dist:.6f}")
+            onnx_quantized_cosine_dist = cosine_distance(sequencer_output, onnx_output)
+            onnx_quantized_euclid_dist = relative_euclidean_distance(sequencer_output, onnx_output)
+            logger.info(f"[compare] output [{output_name}] {model.framework} vs hmquant similarity={onnx_quantized_cosine_dist:.6f}, euclid_dist={onnx_quantized_euclid_dist:.6f}")
+            new_res["test"][output_name] = {"onnx_vs_hmquant": {"cosine_dist": onnx_quantized_cosine_dist, "euclid_dist": onnx_quantized_euclid_dist}}
             
+            onnx_chip_cosine_dist = cosine_distance(chip_output, onnx_output)
+            onnx_chip_euclid_dist = relative_euclidean_distance(chip_output, onnx_output)
+            logger.info(f"[compare] output [{output_name}] {model.framework} vs {model.target} similarity={onnx_chip_cosine_dist:.6f}, euclid_dist={onnx_chip_euclid_dist:.6f}")
+            new_res["test"][output_name].update({"onnx_vs_chip": {"cosine_dist": onnx_chip_cosine_dist, "euclid_dist": onnx_chip_euclid_dist}})
+            
+            quantized_chip_cosine_dist = cosine_distance(chip_output, sequencer_output)
+            quantized_chip_euclid_dist = relative_euclidean_distance(chip_output, sequencer_output)
+            logger.info(f"[compare] output [{output_name}] hmquant vs {model.target} similarity={quantized_chip_cosine_dist:.6f}, euclid_dist={quantized_chip_euclid_dist:.6f}")
+            new_res["test"][output_name].update({"hmquant_vs_chip": {"cosine_dist": quantized_chip_cosine_dist, "euclid_dist": quantized_chip_euclid_dist}})
+            
+        save_dict_to_yaml(new_res, model.executor.summary_result_path)        
     logger.info("test completed")
     del model
 
@@ -295,7 +323,14 @@ def eval(cfg):
     logger.info(f"[end2end] average cost: {model.end2end_latency_ms:.3f} ms")
     logger.info(f"{res}")
     logger.info("eval test completed")
-
+    # save data to result.yaml
+    new_res = dict()
+    if os.path.exists(model.executor.summary_result_path):
+        new_res = read_yaml_to_dict(model.executor.summary_result_path)
+    shape = res["shape"]
+    res["shape"] = shape[0]
+    new_res["eval"] = res
+    save_dict_to_yaml(new_res, model.executor.summary_result_path)
     with open('output/hmeval.txt', 'w') as file:
         file.write(f"{res}\n")
     del model
@@ -313,8 +348,11 @@ def run(args):
     config['batch'] = args.batch
     config['thread_num'] = args.thread_num
     config['core_num'] = args.core_num
+    config['result_path'] = args.result_path
+
     if args.j:
         config["build"]["j"] = args.j
+    
     # import pprint
     # pprint.pprint(config.dump())
     logger.info(f"config:\n{dump_yaml(config)}")
@@ -488,8 +526,13 @@ if __name__ == "__main__":
                         help="Specify the test number in demo, default is demo.test_num in the config file")
     parser.add_argument("--infer_only", action='store_true', default=False,
                         help="Specify if only test infer while perfing, default is False")
+<<<<<<< HEAD
     parser.add_argument("--j", type=int, default=None,
                         help="Specify the thread number in build, default is None")
+=======
+    parser.add_argument("--result_path", type=str, default="result.yaml",
+                        help="Specify a result file path, default is result.yaml")
+>>>>>>> 85de493... ✨HMSW-1947: 1. supported summary info save in yaml; 2. test supported onnx/sequencer/hmm infer by data
 
     args = parser.parse_args()
     logger.info(args)

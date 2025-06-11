@@ -107,7 +107,7 @@ class RGB2YUV:
         Mb = M_RGB2YUV[version]
 
         self.M = torch.Tensor(Mb[0:3]).T
-        self.b = torch.Tensor(Mb[3]).T
+        self.b = torch.Tensor(Mb[3])
         self.b = self.b.view(3, 1, 1)
         self.formatter = YUVFormat(fmt, interpolation)
 

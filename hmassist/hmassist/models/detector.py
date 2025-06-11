@@ -114,7 +114,7 @@ class Detector(BaseModel):
             "shape": [self.inputs[0]["shape"]],
             "dataset": self.dataset.dataset_name,
             "test_num": len(img_paths),
-            "accuracy": {"map": _map, "map50": map50},
+            "accuracy": {"map": float(_map), "map50": float(map50)},
             "latency": self.ave_latency_ms
         }
         

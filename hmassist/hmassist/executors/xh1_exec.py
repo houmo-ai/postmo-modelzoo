@@ -1,20 +1,36 @@
 #!/usr/bin/env python  
-
+import pickle
 import time
 import os
+import yaml
 import numpy as np
-from abc import ABC
 import torch
 import re
+from abc import ABC
 from ..utils import logger
 from ..utils.utils import get_random_data
+from ..utils.parser import read_yaml_to_dict, save_dict_to_yaml
 from .base_exec import BaseExec
+# from hmquant import logger
 
 
 class XH1Exec(BaseExec, ABC):
     def __init__(self, cfg: dict):
         super(XH1Exec, self).__init__(cfg)
         self.model_path = os.path.join(self.model_dir, self.model_name)
+        self.summary_result_path = cfg["result_path"]
+        self.sequencer = None
+        # save model info to result.yaml
+        res = dict()
+        if os.path.exists(self.summary_result_path):
+            res = read_yaml_to_dict(self.summary_result_path)
+        res["model"] = {
+            "framework": cfg["model"]["framework"],
+            "name": cfg["model"]["name"],
+            "path": cfg["model"]["weight"],
+            "inputs": cfg["model"]["inputs"]
+        }
+        save_dict_to_yaml(res, self.summary_result_path)
 
     def quantize(self, get_input_datas):
         import platform
@@ -151,10 +167,19 @@ class XH1Exec(BaseExec, ABC):
         t_start = time.time()
         if self.quant_cfg["debug_level"] == 1:
             from hmquant.api import quantize_profiling
-            quantize_profiling(sequencer, [input_datas], device="cuda" if torch.cuda.is_available() else "cpu")
+            res = quantize_profiling(sequencer, [input_datas], device="cuda" if torch.cuda.is_available() else "cpu", 
+                                     only_onodes=False, return_o_metric=True)
+            res = {out_name: {k: float(v) if isinstance(v, np.float64) else v for k, v in metrics.items()} for out_name, metrics in res.items()}     
+            new_res = dict()
+            if os.path.exists(self.summary_result_path):
+                new_res = read_yaml_to_dict(self.summary_result_path)
+            new_res["quant"] = res
+            new_res["quant"]["time"] = self.quantize_span
+            save_dict_to_yaml(new_res, self.summary_result_path)    
         self.layer_compare_span = time.time() - t_start
 
         from hmquant.api import generate_golden
+        sequencer.save_pkl(self.quant_dir, self.model_name)
         generate_golden(
             sequencer=sequencer,
             calibset=input_datas,
@@ -163,7 +188,6 @@ class XH1Exec(BaseExec, ABC):
             batch_size=1,
             device="cuda" if torch.cuda.is_available() else "cpu"
         )
-        sequencer.save_pkl(self.quant_dir, self.model_name)
 
         logger.info(f"golden data saved in -> {self.golden_data_path}")
         logger.info(f"quantize cost {self.quantize_span:.3f} s, layer compare cost {self.layer_compare_span:.3f} s")
@@ -198,6 +222,12 @@ class XH1Exec(BaseExec, ABC):
         logger.info('{} saved in {}'.format(self.model_name, self.model_dir))
         logger.info("################  build finished  ######################")
         self.build_span = time.time() - t_start
+        new_res = dict()
+        if os.path.exists(self.summary_result_path):
+            new_res = read_yaml_to_dict(self.summary_result_path)
+        new_res["build"] = dict()
+        new_res["build"]["time"] = self.build_span
+        save_dict_to_yaml(new_res, self.summary_result_path)
         logger.info(f"build cost {self.build_span:.3f} s")
 
     def load(self):
@@ -206,7 +236,7 @@ class XH1Exec(BaseExec, ABC):
         self.input_infos = self.get_input_info()
         self.output_infos = self.get_output_info()
         logger.info("{} model loaded".format(self.model_name))
-
+            
     def infer(self, input_datas):
         """ infer one time """
         for name in self.input_infos:
@@ -243,14 +273,34 @@ class XH1Exec(BaseExec, ABC):
         if os.environ.get("HDPL_PLATFORM") == "ISIM":
             test_num = 1
             logger.warning("test num set to 1 because HDPL_PLATFORM=ISIM may take a lot of time.")
+        save_dir = os.path.join(self.cur_dir, "output")
         cmd = "cd {}/utils/{} && ./{} --model {} --data {} --samples {} --threads {} --batch {} --output {}".format(
             HOUMO_MODELZOO_PATH, exec, exec, model_path, self.build_dir, test_num, self.perf_cfg["thread_num"], self.batch,
-            os.path.join(self.cur_dir, "output"))
+            save_dir)
         if self.perf_cfg['infer_only']:
             cmd += " --infer_only true"
         logger.info(cmd)
         os.system(cmd)
-
+        # save data to result.yaml
+        perf_txt_path = os.path.join(save_dir, "hmperf.txt")
+        if not os.path.exists(perf_txt_path):
+            logger.error(f"{perf_txt_path} not exist")
+            return
+        with open(perf_txt_path, "r") as f:
+            lines = f.readlines()
+        new_res = dict()
+        if os.path.exists(self.summary_result_path):
+            new_res = read_yaml_to_dict(self.summary_result_path)
+        new_res["perf"] = dict()
+        new_res["perf"]["batch"] = lines[0].strip().split(" ")[-1]
+        new_res["perf"]["thread_num"] = lines[1].strip().split(" ")[-1]  
+        new_res["perf"]["loop_num"] = lines[3].strip().split(" ")[-1]
+        new_res["perf"]["sample_num"] = lines[4].strip().split(" ")[-1]   
+        new_res["perf"]["avg_latency"] = lines[5].strip().split(" ")[-1]   
+        new_res["perf"]["max_latency"] = lines[6].strip().split(" ")[-1]
+        new_res["perf"]["qps"] = lines[7].strip().split(" ")[-1]
+        save_dict_to_yaml(new_res, self.summary_result_path)
+            
     def _preprocess(self, inputs):
         datas = {}
         for input in self.inputs:
@@ -260,8 +310,8 @@ class XH1Exec(BaseExec, ABC):
                 data = torch.squeeze(data, 0)  # HWC float32
                 format = re.sub("YUV", "", input["image"]["format"])
                 from ..utils.transform import RGB2YUV, BGR2YUV
-                rgb2yuv_func = RGB2YUV(fmt=format) if input["format"] == "RGB" else BGR2YUV(fmt=format)
-                image = torch.unsqueeze(rgb2yuv_func(data), 0).numpy()  # NHWC float32
+                to_yuv_func = RGB2YUV(fmt=format) if input["format"] == "RGB" else BGR2YUV(fmt=format)
+                image = torch.unsqueeze(to_yuv_func(data), 0).numpy()  # NHWC float32
                 datas[input["name"]] = image.astype(dtype)
             else:
                 datas[input["name"]] = inputs[input["name"]].astype(dtype)
@@ -270,8 +320,7 @@ class XH1Exec(BaseExec, ABC):
     def get_golden_inputs(self):
         datas = {}
         for input in self.inputs:
-            input_data_path = os.path.join(self.quant_dir, 'hmquant_' + self.model_name 
-                                           + '_' + input["name"] + '_input.npy')
+            input_data_path = os.path.join(self.quant_dir, 'hmquant_' + self.model_name + '_' + input["name"] + '_input.npy')
             if os.path.exists(input_data_path):
                 input_data = np.load(input_data_path)
                 logger.info("golden input[{}] shape = {}, dtype = {}".format(input["name"], input_data.shape, input_data.dtype))
@@ -280,7 +329,7 @@ class XH1Exec(BaseExec, ABC):
                 datas[input["name"]] = input_data
             else:
                 logger.warning(f"compare canceled while golden input not found -> {input_data_path}")
-                return None
+                return None 
         return datas
 
     def get_golden_output(self, name):
@@ -294,21 +343,21 @@ class XH1Exec(BaseExec, ABC):
             logger.warning(f"compare canceled while golden output not found -> {golden_output_path}")
             return None
 
-    def gen_golden(self, inputs):
-        from hmodel.utils.general import load_pkl_model
-        qmodel = os.path.join(self.quant_dir, self.model_name)
-        sequencer = load_pkl_model(qmodel)
-        from hmquant.api import generate_golden
-        generate_golden(
-            sequencer=sequencer,
-            calibset=inputs,
-            save_path=self.test_dir,
-            model_name=self.model_name,
-            batch_size=1,
-            device="cpu"
-        )
-
-        logger.info("golden data saved in -> {}".format(self.test_dir))
+    def gen_golden(self, input_tensors: list):
+        if self.sequencer is None:
+            sequencer_model_path = f"{os.path.join(self.quant_dir, self.model_name)}.pkl"
+            if not os.path.exists(sequencer_model_path):
+                logger.error(f"Sequencer model not exist: {sequencer_model_path}")
+                exit(-1)
+            from hmquant.api import quant_single_onnx_network
+            with open(sequencer_model_path, "rb") as f:
+                self.sequencer = pickle.load(f)
+            logger.info("load quantized model successfully.")
+        if not self.is_fixed_out:
+            self.sequencer.set_ops_mode("quant_forward")
+            # self.sequencer.set_ops_mode("hardware_forward") # without dequant
+        outputs = self.sequencer.forward(*input_tensors, get_output_dict=True)
+        return {key:outputs[key].detach().cpu().numpy() for key in outputs}
 
     def get_version(self):
         raise NotImplemented
@@ -337,17 +386,15 @@ class XH1Exec(BaseExec, ABC):
         logger.info("{} input num = {}:".format(self.target, input_num))
         for name, _input in self.input_infos.items():
             _input = self.input_infos[name]
-            logger.info("{} input[{}] shape = {}, dtype = {}, format = {}".format(self.target, name,
-                                                                                  _input.shape, _input.dtype,
-                                                                                  _input.format.name))
+            logger.info("{} input[{}] shape = {}, dtype = {}, format = {}".format(
+                self.target, name, _input.shape, _input.dtype, _input.format.name))
 
     def print_output_info(self):
         output_num = len(self.output_infos)
         logger.info("{} output num = {}:".format(self.target, output_num))
         for name, _output in self.output_infos.items():
-            logger.info("{} output[{}] shape = {}, dtype = {}, format = {}".format(self.target, name,
-                                                                                   _output.shape, _output.dtype,
-                                                                                   _output.format.name))
+            logger.info("{} output[{}] shape = {}, dtype = {}, format = {}".format(
+                self.target, name, _output.shape, _output.dtype, _output.format.name))
 
     @property
     def freq(self):

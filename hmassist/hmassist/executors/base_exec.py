@@ -126,7 +126,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             logger.error("input({}) dtype mismatch {} vs {}".format(name, data.dtype, target_dtype))
             exit(-1)
 
-    def gen_golden(self):
+    def gen_golden(self, inputs):
         raise NotImplementedError
 
     def set_quantize_cfg(self, in_datas):

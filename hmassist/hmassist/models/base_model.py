@@ -46,9 +46,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 self._input_size = [h, w]
 
     def load(self):
-        """加载so模型
-        :param model_path: 模型目录
-        :return:
+        """load hm model
         """
         self.executor.load()
 
