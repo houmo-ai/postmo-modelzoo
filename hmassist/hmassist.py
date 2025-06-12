@@ -526,13 +526,10 @@ if __name__ == "__main__":
                         help="Specify the test number in demo, default is demo.test_num in the config file")
     parser.add_argument("--infer_only", action='store_true', default=False,
                         help="Specify if only test infer while perfing, default is False")
-<<<<<<< HEAD
     parser.add_argument("--j", type=int, default=None,
                         help="Specify the thread number in build, default is None")
-=======
     parser.add_argument("--result_path", type=str, default="result.yaml",
                         help="Specify a result file path, default is result.yaml")
->>>>>>> 85de493... ✨HMSW-1947: 1. supported summary info save in yaml; 2. test supported onnx/sequencer/hmm infer by data
 
     args = parser.parse_args()
     logger.info(args)
