@@ -2,20 +2,13 @@ import argparse
 import json
 import math
 import os
+import sys
 import time
+import platform
 import numpy as np
 import onnx
-import tcim
 import multiprocessing
-from tcim.test_utils.onnx_builder.onnx_builder import (
-    GLOBAL_XH1_ONNX_DOMAIN,
-    GLOBAL_XH1_ONNX_VERSION,
-    make_model,
-    make_tensor,
-)
-from tcim.test_utils.onnx_builder.xh1_op_builder import make_base_cimd_conv2d_node
 import tcim_lite
-
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements,too-many-arguments
 
@@ -55,8 +48,6 @@ class Xh1ConvUtil:
 
 
 def run_model_wrapper(tid, did, model_path, wm, input_datas, round_num, barrier, verbose):
-    import tcim_lite
-
     # load model, create a stream and set to the model
     option = tcim_lite.runtime.Option(wm)
     model = tcim_lite.runtime.load(model_path, option=option)
@@ -202,6 +193,8 @@ if __name__ == "__main__":
     print("#########################################")
     print()
 
+    platform_name = platform.machine()
+
     output_dir = os.path.join(args.work_dir, "output")
     build_tmp_dir = os.path.join(args.work_dir, "tcim_temp")
     os.makedirs(output_dir, exist_ok=True)
@@ -214,8 +207,33 @@ if __name__ == "__main__":
     if os.path.exists(hmm_path):
         print(f"Skipping model generation since model already exists in {hmm_path}.")
         args.skip_build = True
+    elif platform_name != "x86_64":
+        print(f"Skipping model generation since the current platform is {platform_name}.")
+        args.skip_build = True
+
+        # download the compiled model for inference
+        HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../..')
+        sys.path.append(f'{HOUMO_EXAMPLES_PATH}/common/python')
+        from utils import get_file_from_jfrog
+
+        if "HOUMO_MODELZOO_URL" not in os.environ:
+            os.environ["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
+        HOUMO_TARGET = os.environ.get('HOUMO_TARGET', 'houmo')
+        model_dir = os.path.join(HOUMO_EXAMPLES_PATH, "models")
+        zipped_hmm_path = "models/computing_perf/hmm_xh1_conv_4cores_20250613.zip"
+        get_file_from_jfrog(zipped_hmm_path, model_dir, "./")
+
     if not args.skip_build:
-        print("Generating onnx model")
+        import tcim
+        from tcim.test_utils.onnx_builder.onnx_builder import (
+            GLOBAL_XH1_ONNX_DOMAIN,
+            GLOBAL_XH1_ONNX_VERSION,
+            make_model,
+            make_tensor,
+        )
+        from tcim.test_utils.onnx_builder.xh1_op_builder import make_base_cimd_conv2d_node
+
+        print("Generating onnx model...")
         hmonnx_model, tops_per_sample = gen_conv_model_and_tops()
         model_path = os.path.join(args.work_dir, f"{MODEL_NAME}.onnx")
         print(f"Model generated successfully, saving to {model_path}.")
