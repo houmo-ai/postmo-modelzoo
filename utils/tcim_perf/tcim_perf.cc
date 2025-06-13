@@ -452,8 +452,10 @@ int main(int argc, char *argv[]) {
     float cost = 0.0;
     // load model
     start = GET_TIME();
+    std::unique_lock<std::mutex> lock_xx(qin.mutex);
     auto option = tcim::Module::Option(info.weight_manager);
     auto module = tcim::Module::LoadFromFile(info.model_path, option);
+    lock_xx.unlock();
     end = GET_TIME();
     cost = GET_COST(start, end) / 1000.0 / info.warm_up;
     if (!module) {
