@@ -94,7 +94,7 @@ def get_file_from_jfrog(file_path, save_dir, extract_dir=None):
             with zipfile.ZipFile(save_path, "r") as zip:
                 print("extract to %s" % extract_dir)
                 zip.extractall(path=extract_dir)
-        elif save_path.rfind('.tar') > 0:
+        elif save_path.rfind('.tar') > 0 or save_path.rfind('.tgz') > 0:
             with tarfile.open(save_path, "r:gz") as tar:
                 print("extract to %s" % extract_dir)
                 tar.extractall(path=extract_dir)

@@ -8,59 +8,45 @@
 
 TCIM Examples 以yolov5s模型为例展示TCIM API推理的基本使用方式。
 
-1. build.py 展示模型编译过程，包括：
-    - 量化后模型加载和编译
-    - 芯片模型加载和golden数据验证
-2. yolov5s.py 展示python下单线程推理过程，包括：
+1. yolov5s.py 展示python下单线程推理过程，包括：
     - python单线程推理，使用默认stream（无需指定）
-3. yolov5s.cc 展示c++下单线程推理过程，包括：
+2. yolov5s.cc 展示c++下单线程推理过程，包括：
     - c++下单线程推理，使用默认stream（无需指定）
+
+对于yolov5s模型中的后处理部分，本示例提供两种实现方法：
+1. （默认）基于代码实现后处理逻辑。
+2. 将yolov5s后处理部分独立为一个onnx模型，使用onnxruntime推理得到结果。
+
+其中方法2在本示例中仅提供Linux系统运行方法，如需在windows系统中运行可自行安装配置onnxruntime环境，则可使用相同步骤运行方法2示例。
 
 ## 软件依赖
 
-本示例依赖opencv库进行图像预处理和可视化，依赖ultralytics进行数据可视化。
+本示例依赖opencv库进行图像预处理和可视化，依赖ultralytics进行数据可视化，依赖onnxruntime库推理yolov5s后处理模型。
 
-## 快速上手
+## 快速开始
 
-### 获取芯片模型
-
-可以通过以下两种方式获取芯片模型：
-
-1. 自行编译：通过原始模型或量化模型，经过tcim工具链编译生成，具体可参考houmo-modelzoo
-2. 直接下载：通过get_model.py脚本下载预编译的模型
+1. 获取模型文件，执行：
 
 ```bash
+# 后处理实现为方法1
 python3 get_model.py
+# 后处理实现为方法2 (仅支持Linux)
+python3 get_model.py --enable_ort
 ```
 
-### 模型python推理
-
-使用runtime python API进行模型推理，并输出结果：
+2. 执行python演示程序，执行命令：
 
 ```bash
+# 后处理实现为方法1
 python3 yolov5s.py
+# 后处理实现为方法2 (仅支持Linux)
+python3 yolov5s.py --enable_ort
 ```
 
-推理完成后会进行后处理，获得分类结果，执行成功输出以下打印：
+3. 编译并执行c++演示程序，执行命令：
 
 ```bash
-input[images] shape = [1, 640, 640, 3], dtype = <class 'numpy.int8'>, format = YUV420SP
-output[340] shape = [1, 3, 80, 80, 85], dtype = <class 'numpy.float32'>, format = ND
-output[378] shape = [1, 3, 40, 40, 85], dtype = <class 'numpy.float32'>, format = ND
-output[416] shape = [1, 3, 20, 20, 85], dtype = <class 'numpy.float32'>, format = ND
-box num = 18
-x1:0, y1:164, x2:161, y2:264, conf:0.901221, cls:62
-x1:288, y1:219, x2:357, y2:319, conf:0.857656, cls:56
-x1:561, y1:210, x2:638, y2:280, conf:0.777500, cls:62
-...
-```
-检测效果图片保存在demo_results/python目录下。
-
-### 模型c++推理
-
-使用runtime c++ API进行模型推理，并输出结果：
-
-```bash
+# 后处理实现为方法1
 mkdir build
 cd build
 cmake -DCMAKE_INSTALL_PREFIX=../
@@ -70,20 +56,60 @@ cd ..
 ./example_yolov5s
 ```
 
-推理完成后会进行后处理，获得分类结果，执行成功输出以下打印：
+```bash
+# 后处理实现为方法2 (仅支持Linux)
+mkdir build
+cd build
+cmake -DENABLE_ORT=ON -DCMAKE_INSTALL_PREFIX=../
+make -j
+make install
+cd ..
+./example_yolov5s --enable_ort
+```
+
+## 参考结果
+
+### Python示例结果
+
+Python演示程序推理完成后会进行后处理，获得分类结果，执行成功输出以下打印：
+
+```bash
+input[images] shape = [1, 640, 640, 3], dtype = <class 'numpy.int8'>, format = YUV420SP
+output[340] shape = [1, 3, 80, 80, 85], dtype = <class 'numpy.float32'>, format = ND
+output[378] shape = [1, 3, 40, 40, 85], dtype = <class 'numpy.float32'>, format = ND
+output[416] shape = [1, 3, 20, 20, 85], dtype = <class 'numpy.float32'>, format = ND
+box num = 20
+x1:9, y1:166, x2:149, y2:264, conf:0.915732, cls:62
+x1:291, y1:218, x2:356, y2:317, conf:0.871175, cls:56
+x1:414, y1:156, x2:466, y2:298, conf:0.789320, cls:0
+x1:556, y1:211, x2:642, y2:287, conf:0.767701, cls:62
+...
+x1:383, y1:170, x2:407, y2:216, conf:0.265686, cls:58
+demo results saved to demo_results/python/000000000139.jpg
+<=== yolov5s python example completed.
+```
+检测效果图片保存在demo_results/python目录下。
+
+### C++示例结果
+
+C++演示程序推理完成后会进行后处理，获得分类结果，执行成功输出以下打印：
 
 ```bash
 Count of Input: 1
-Input[images] TensorInfo: shape: [1,640,640,3], dtype: INT8, format: YUV420SP, size: 1228800, memsize: 1228800
+Input[images] TensorInfo: shape: [1,640,640,3], stride: [614400,640,1,614400,640,2,1,409600], dtype: UINT8, format: YUV420SP, size: 614400, memsize: 614400
 Count of Output: 3
-Output[340] TensorInfo: shape: [1,3,80,80,85], dtype: FLOAT32, format: ND, size: 6528000, memsize: 6528000
-Output[378] TensorInfo: shape: [1,3,40,40,85], dtype: FLOAT32, format: ND, size: 1632000, memsize: 1632000
-Output[416] TensorInfo: shape: [1,3,20,20,85], dtype: FLOAT32, format: ND, size: 408000, memsize: 408000
-detect num: 15
-box[0, 164, 160, 264], conf:0.893384, cls:62
-box[294, 220, 350, 319], conf:0.835627, cls:56
-box[560, 201, 638, 288], conf:0.800825, cls:62
-box[446, 120, 461, 141], conf:0.695586, cls:74
+Output[340] TensorInfo: shape: [1,3,80,80,85], stride: [], dtype: FLOAT32, format: ND, size: 6528000, memsize: 6528000
+Output[378] TensorInfo: shape: [1,3,40,40,85], stride: [], dtype: FLOAT32, format: ND, size: 1632000, memsize: 1632000
+Output[416] TensorInfo: shape: [1,3,20,20,85], stride: [], dtype: FLOAT32, format: ND, size: 408000, memsize: 408000
+detect num: 17
+box[10, 167, 150, 265], conf:0.923558, cls:62
+box[294, 218, 352, 317], conf:0.856569, cls:56
+box[417, 155, 464, 299], conf:0.790732, cls:0
+box[558, 210, 639, 286], conf:0.706285, cls:62
+...
+box[240, 194, 253, 212], conf:0.258923, cls:75
+demo results saved to demo_results/cpp/000000000139.jpg
+<=== yolov5s c++ example completed.
 ```
 检测效果图片保存在demo_results/cpp目录下。
 
@@ -96,7 +122,10 @@ box[446, 120, 461, 141], conf:0.695586, cls:74
 linux下执行：
 
 ```bash
+# 后处理实现为方法1
 bash run.sh
+# 后处理实现为方法2
+bash run.sh enable_ort
 ```
 
 windows下执行：

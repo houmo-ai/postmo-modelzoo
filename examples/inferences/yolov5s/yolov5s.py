@@ -3,6 +3,7 @@ import sys
 import numpy as np
 import logging
 import time
+import argparse
 
 import cv2
 import torch
@@ -92,6 +93,33 @@ coco80_labels = [
     "hair drier",
     "toothbrush",
 ]
+
+
+def get_args() -> argparse.Namespace:
+    """Parse commandline."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--enable_ort', action="store_true", help="use onnxruntime to post process.")
+    args = parser.parse_args()
+    return args
+
+
+def infer_detect_onnx(onnx_path, inputs_list):
+    import onnxruntime as ort
+
+    session = ort.InferenceSession(onnx_path)
+    input_names = list()
+    input_dict = dict()
+    for idx, input in enumerate(session.get_inputs()):
+        input_name = input.name
+        input_dict[input_name] = inputs_list[idx]
+        input_names.append(input_name)
+
+    outputs = session.run(None, input_dict)
+    print("post-processing model output num:", len(outputs))
+    tensor_res = torch.tensor(outputs[0])
+
+    return tensor_res
+
 
 def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
     """
@@ -328,12 +356,13 @@ class YoloV5:
         coords[:, :4] /= gain
         # clip_coords(coords, img0_shape)
         return coords
-    
+
 
 if __name__ == '__main__':
+    args = get_args()
     sys.path.insert(0, "../../common/python")
     print("\n===> yolov5s python example start...")
-    print("tcim runtime version: {}".format(tcim.runtime.get_version()))
+    print("tcim runtime version: {}, enable ort: {}.".format(tcim.runtime.get_version(), args.enable_ort))
 
     # 1. load model
     module = tcim.runtime.load("yolov5s.hmm")
@@ -377,13 +406,20 @@ if __name__ == '__main__':
 
     # 6. postprocess
     assert len(outputs) == 3
-    outputs = yolov5.yolo_detect(outputs)
+    if args.enable_ort:
+        # 6.1 use onnxruntime to post process
+        onnx_path = "./yolov5s_640x640_postprocess.onnx"
+        outputs = infer_detect_onnx(onnx_path, outputs)
+    else:
+        # 6.2 use torch func to post process
+        outputs = yolov5.yolo_detect(outputs)
+
     outputs = yolov5.non_max_suppression(outputs)
     outputs = outputs[0]  # bs=1
     image_size = (cv_image.shape[0], cv_image.shape[1])
     outputs[:, :4] = yolov5.scale_coords(outputs[:, :4], image_size).round()
     boxes = outputs.numpy()
-    
+
     # 7. print and draw
     print("box num = {}".format(len(boxes)))
     for det in boxes:
