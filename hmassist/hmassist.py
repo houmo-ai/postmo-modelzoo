@@ -169,7 +169,7 @@ def test(cfg):
             logger.warning(f"data[{name}] will use random data")
             inputs[name] = get_random_data(name, dtype, model.input_shape)
             
-    input_tensors = [torch.from_numpy(inputs[key]) for key in inputs]
+    input_tensors = [torch.from_numpy(np.concatenate([inputs[key] for _ in range(model.executor.model_input_batch)], axis=0)) for key in inputs]
 
     save_dir = os.path.join(model.executor.test_dir)
     if not os.path.exists(save_dir):
@@ -183,6 +183,10 @@ def test(cfg):
     onnx_exec = OnnxExec(cfg)
     onnx_exec.load()
     onnx_inputs = onnx_exec._preprocess(inputs)
+    for key in onnx_inputs:
+        data = onnx_inputs[key]
+        batch_datas = np.concatenate([data for _ in range(onnx_exec.model_input_batch)], axis=0)
+        onnx_inputs[key] = batch_datas
     onnx_outputs = onnx_exec.infer(onnx_inputs)
     # save onnx input datas
     for input_name, input_data in onnx_inputs.items():
@@ -190,6 +194,22 @@ def test(cfg):
         
     # chip and quantized
     chip_inputs = model.executor._preprocess(inputs)
+    for key in chip_inputs:
+        data = chip_inputs[key].flatten()
+        size = data.shape[0]
+        fmt = model.executor.inputs[0]["image"]["format"]
+        if fmt == "YUV444":
+            valid_size = size
+        elif fmt == "YUV422":
+            valid_size = size * 3 // 2
+        elif fmt == "YUV420":
+            valid_size = size // 2
+        vaild_data = data[:valid_size]
+        batch_datas = np.zeros([model.executor.model_input_batch * model.executor.batch, valid_size], dtype=np.uint8)
+        for idx in range(model.executor.model_input_batch * model.executor.batch):
+            batch_datas[idx, :] = vaild_data
+        chip_inputs[key] = batch_datas
+
     # save chip input datas
     for input_name, input_data in chip_inputs.items():
         save_data(input_data, save_dir, f"{input_name}_chip_input")
@@ -220,9 +240,10 @@ def test(cfg):
         for output_name in onnx_outputs:
             assert output_name in chip_outputs
             assert output_name in sequencer_outputs
-            onnx_output = onnx_outputs[output_name]
-            chip_output = chip_outputs[output_name]
-            sequencer_output = sequencer_outputs[output_name]
+            # 所有batch都是相同数据，仅取batch0作为比较即可
+            onnx_output = onnx_outputs[output_name][0]
+            chip_output = chip_outputs[output_name][0]
+            sequencer_output = sequencer_outputs[output_name][0]
             
             onnx_quantized_cosine_dist = cosine_distance(sequencer_output, onnx_output)
             onnx_quantized_euclid_dist = relative_euclidean_distance(sequencer_output, onnx_output)
@@ -251,6 +272,8 @@ def demo(cfg):
     model = get_model(cfg)
     data_dir = cfg["demo"]["data_dir"]
     test_num = cfg["demo"]["test_num"]
+    batch = model.executor.model_input_batch * model.executor.batch
+    
     # if not os.environ.get("HDPL_PLATFORM") == "ASIC":
     #     if test_num > 10 or test_num == 0:
     #         test_num = 10
@@ -273,8 +296,16 @@ def demo(cfg):
     file_list.sort()
     model.load()
 
+    files = list()
     for filepath in file_list:
-        model.demo(filepath)
+        files.append(filepath)
+        if len(files) < batch:
+            continue
+        model.demo(files)
+        files.clear()
+    # 不足1batch
+    if len(files) != 0:
+        model.demo(files)
     logger.info(f"[infer] average cost {model.ave_latency_ms:.3f} ms")
     logger.info(f"[end2end] average cost: {model.end2end_latency_ms:.3f} ms")
     logger.info("demo completed")

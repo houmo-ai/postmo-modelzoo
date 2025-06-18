@@ -24,54 +24,81 @@ class YoloV3(Detector):
             "tcim.for_benchmark": True
         }
 
-    def _postprocess(self, outputs, cv_image=None):
+    def _postprocess(self, outputs, cv_images):
         assert len(outputs) == 3
         # add yolo process
         outputs = self.yolo_detect(outputs)
         outputs = non_max_suppression(outputs, self._conf_threshold, self._iou_threshold)
-        outputs = outputs[0]  # bs=1
-        outputs[:, :4] = scale_coords(self._input_size, outputs[:, :4], cv_image.shape).round()
-        return outputs.numpy()
+        batch = len(outputs)
+        for idx in range(batch):
+            outputs[idx][:, :4] = scale_coords(self._input_size, outputs[idx][:, :4], cv_images[idx].shape).round()
+            outputs[idx] = outputs[idx].numpy()
+        return outputs
 
-    def demo(self, img_path):
+    def demo(self, img_paths: list):
         self._iou_threshold = 0.45
         self._conf_threshold = 0.1
-        if not os.path.exists(img_path):
-            print("[error] The img path not exist -> {}".format(img_path))
-            exit(-1)
-        filename = os.path.basename(img_path)
-        print("process: {}".format(img_path))
 
         save_results = "demo_results"
         if not os.path.exists(save_results):
             os.makedirs(save_results)
 
-        cv_image = cv2.imread(img_path)
-        if cv_image is None:
-            print("[error] Failed to decode img by opencv -> {}".format(img_path))
-            exit(-1)
+        def show_results(cv_images, detections, filenames, valid_len=None):
+            if valid_len is None:
+                valid_len = len(cv_images)
+            for idx, boxes in enumerate(detections):
+                if idx == valid_len:
+                    break
+                print("box num = {}".format(len(boxes)))
+                for det in boxes:
+                    (x1, y1, x2, y2), conf, cls = list(map(int, det[0:4])), det[4], int(det[5])
+                    label = coco80_labels[cls] + " {:.2f}".format(conf)
+                    annotator = Annotator(cv_image, line_width=2, example=str(cls))
+                    annotator.box_label((x1, y1, x2, y2), label, color=colors(cls, True))
+                    print("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(cls)), flush=True)
+                save_path = os.path.join(save_results, filenames[idx])
+                cv2.imwrite(save_path, cv_images[idx])
+                print("demo results saved to", save_path)
+                
+        batch = self.executor.model_input_batch * self.executor.batch
+        batch_datas = []
+        cv_images = []
+        filenames = []
+        end2end_start = time.time() 
+        for img_path in img_paths:
+            if not os.path.exists(img_path):
+                print("[error] The img path not exist -> {}".format(img_path))
+                exit(-1)
+            filename = os.path.basename(img_path)
+            print("process: {}".format(img_path))
 
-        end2end_start = time.time()
+            cv_image = cv2.imread(img_path)
+            if cv_image is None:
+                print("[error] Failed to decode img by opencv -> {}".format(img_path))
+                exit(-1)
 
-        inputs = {self.inputs[0]["name"]: cv_image}
-        inputs = self._preprocess(inputs)
-        outputs = self.inference(inputs)
-        boxes = self._postprocess(outputs, cv_image)
+            inputs = {self.inputs[0]["name"]: cv_image}
+            inputs = self._preprocess(inputs)
+            batch_datas.append(inputs)
+            cv_images.append(cv_image)
+            filenames.append(filename)
+            if len(batch_datas) < batch:
+                continue
+            outputs = self.inference(batch_datas)
+            boxes = self._postprocess(outputs, cv_images)
+            show_results(cv_images, boxes, filenames)
+        
+        # 不足1batch
+        if len(batch_datas) != 0:
+            valid_len = len(batch_datas)
+            for _ in range(batch - valid_len):
+                batch_datas.append(batch_datas[-1])
+            outputs = self.inference(batch_datas)
+            detections = self._postprocess(outputs, cv_images)
+            show_results(cv_images, detections, filenames, valid_len)
 
         end2end_cost = time.time() - end2end_start
         self._end2end_latency_ms += (end2end_cost * 1000)
-
-        print("box num = {}".format(len(boxes)))
-        for det in boxes:
-            (x1, y1, x2, y2), conf, cls = list(map(int, det[0:4])), det[4], int(det[5])
-            # cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 0, 255), 1, 8)
-            label = coco80_labels[cls] + " {:.2f}".format(conf)
-            annotator = Annotator(cv_image, line_width=2, example=str(cls))
-            annotator.box_label((x1, y1, x2, y2), label, color=colors(cls, True))
-            print("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(cls)), flush=True)
-        save_path = os.path.join(save_results, filename)
-        cv2.imwrite(save_path, cv_image)
-        print("demo results saved to", save_path)
 
     def yolo_detect(self, feats):
         # in.shape = out.shape: 1x3x80x80x85 1x3x40x40x85 1x3x20x20x85
@@ -86,7 +113,6 @@ class YoloV3(Detector):
 
             data[..., 0:2] = (data[..., 0:2] * 2 - 0.5 + grid) * self.stride[i]  # xy
             data[..., 2:4] = (data[..., 2:4] * 2) ** 2 * anchor_grid  # wh
-
 
             output.append(data.reshape(bs, -1, no))
 

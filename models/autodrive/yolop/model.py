@@ -13,7 +13,7 @@ class YoloP(Detector):
     # def build_options(self):
     #     return {}
 
-    def _postprocess(self, outputs, img=None):
+    def _postprocess(self, outputs, cv_images=None):
         def make_grid(nx=20, ny=20):
             xv, yv = np.meshgrid(np.arange(nx), np.arange(ny))
             return np.stack((xv, yv), 2).reshape(1, 1, ny, nx, 2).astype(np.float32)
@@ -42,103 +42,105 @@ class YoloP(Detector):
                                              outputs["feat2"]],
                                              stride, grid, anchor_grid)
 
-        # det_out = torch.from_numpy(det_out).float()
-        boxes = self.non_max_suppression(det_out)[0]  # [n,6] [x1,y1,x2,y2,conf,cls]
-        boxes = boxes.cpu().numpy().astype(np.float32)
-
-        if boxes.shape[0] == 0:
-            print("no bounding boxes detected.")
-            return
-        print(f"detect {boxes.shape[0]} bounding boxes.")
+        detections = self.non_max_suppression(det_out)
+        detections = [boxes.cpu().numpy().astype(np.float32) for boxes in detections]
 
         da_seg_out = outputs["drive_area_seg"]
         ll_seg_out = outputs["lane_line_seg"]
 
-        return boxes, da_seg_out, ll_seg_out
+        return detections, da_seg_out, ll_seg_out
 
-    def demo(self, img_path):
-        if not os.path.exists(img_path):
-            print("[error] The img path not exist -> {}".format(img_path))
-            exit(-1)
-        filename = os.path.basename(img_path)
-        print("process: {}".format(img_path))
-
+    def demo(self, img_paths: list):
         save_results = "demo_results"
         if not os.path.exists(save_results):
             os.makedirs(save_results)
+        
+        def postprocess2(cv_image, boxes, da_seg_out, ll_seg_out, filename):
+            # resize & normalize
+            canvas, r, dw, dh, new_unpad_w, new_unpad_h = self.resize_unscale(cv_image, (384, 640))
+            height, width, _ = cv_image.shape
 
-        cv_image = cv2.imread(img_path)
-        if cv_image is None:
-            print("[error] Failed to decode img by opencv -> {}".format(img_path))
-            exit(-1)
+            # scale coords to original size.
+            boxes[:, 0] -= dw
+            boxes[:, 1] -= dh
+            boxes[:, 2] -= dw
+            boxes[:, 3] -= dh
+            boxes[:, :4] /= r
 
-        t1 = time.time()
-        inputs = {self.inputs[0]["name"]: cv_image}
-        input_data = self._preprocess(inputs)
-        t2 = time.time()
-        # self.executor.set_fixed_out(True)
-        output_datas = self.inference(input_data)
-        t3 = time.time()
-        boxes, da_seg_out, ll_seg_out = self._postprocess(output_datas, cv_image)
-        t4 = time.time()
+            # select da & ll segment area.
+            da_seg_out = da_seg_out[:, :, dh:dh + new_unpad_h, dw:dw + new_unpad_w]
+            ll_seg_out = ll_seg_out[:, :, dh:dh + new_unpad_h, dw:dw + new_unpad_w]
 
-        # save golden
-        # input_data.tofile(os.path.join(self.executor.result_dir, "{}_input.bin".format(filename)))
-        # for output_name, output_data in output_datas.items():
-        #     print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
-        #     output_data.tofile(os.path.join(self.executor.result_dir, "{}_{}_output.bin".format(filename, output_name)))
-        #     print("output[{}] saved in {}".format(output_name, self.executor.result_dir))
+            da_seg_mask = np.argmax(da_seg_out, axis=1)[0]  # (0|1)
+            ll_seg_mask = np.argmax(ll_seg_out, axis=1)[0]  # (0|1)
 
-        # resize & normalize
-        canvas, r, dw, dh, new_unpad_w, new_unpad_h = self.resize_unscale(cv_image, (384, 640))
-        height, width, _ = cv_image.shape
+            color_area = np.zeros((new_unpad_h, new_unpad_w, 3), dtype=np.uint8)
+            color_area[da_seg_mask == 1] = [0, 255, 0]
+            color_area[ll_seg_mask == 1] = [255, 0, 0]
+            color_seg = color_area
 
-        # scale coords to original size.
-        boxes[:, 0] -= dw
-        boxes[:, 1] -= dh
-        boxes[:, 2] -= dw
-        boxes[:, 3] -= dh
-        boxes[:, :4] /= r
+            # convert to BGR
+            color_seg = color_seg[..., ::-1]
+            color_mask = np.mean(color_seg, 2)
+            img_merge = canvas[dh:dh + new_unpad_h, dw:dw + new_unpad_w, :]
+            img_merge = img_merge[:, :, ::-1]
 
-        # select da & ll segment area.
-        da_seg_out = da_seg_out[:, :, dh:dh + new_unpad_h, dw:dw + new_unpad_w]
-        ll_seg_out = ll_seg_out[:, :, dh:dh + new_unpad_h, dw:dw + new_unpad_w]
+            # merge: resize to original size
+            img_merge[color_mask != 0] = img_merge[color_mask != 0] * 0.5 + color_seg[color_mask != 0] * 0.5
+            img_merge = img_merge.astype(np.uint8)
+            img_merge = cv2.resize(img_merge, (width, height), interpolation=cv2.INTER_LINEAR)
+            for i in range(boxes.shape[0]):
+                x1, y1, x2, y2, conf, label = boxes[i]
+                x1, y1, x2, y2, label = int(x1), int(y1), int(x2), int(y2), int(label)
+                print("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(label)))
+                img_merge = cv2.rectangle(img_merge, (x1, y1), (x2, y2), (0, 255, 0), 2, 2)
 
-        da_seg_mask = np.argmax(da_seg_out, axis=1)[0]  # (?,?) (0|1)
-        ll_seg_mask = np.argmax(ll_seg_out, axis=1)[0]  # (?,?) (0|1)
+            save_merge_path = os.path.join(save_results, filename)
+            print("result saved in {}".format(save_merge_path))
+            cv2.imwrite(save_merge_path, img_merge)
+        
+        batch = self.executor.model_input_batch * self.executor.batch
+        batch_datas = []
+        cv_images = []
+        filenames = []
+        for img_path in img_paths:
+            if not os.path.exists(img_path):
+                print("[error] The img path not exist -> {}".format(img_path))
+                exit(-1)
+            filename = os.path.basename(img_path)
+            print("process: {}".format(img_path))
 
-        color_area = np.zeros((new_unpad_h, new_unpad_w, 3), dtype=np.uint8)
-        color_area[da_seg_mask == 1] = [0, 255, 0]
-        color_area[ll_seg_mask == 1] = [255, 0, 0]
-        color_seg = color_area
-
-        # convert to BGR
-        color_seg = color_seg[..., ::-1]
-        color_mask = np.mean(color_seg, 2)
-        img_merge = canvas[dh:dh + new_unpad_h, dw:dw + new_unpad_w, :]
-        img_merge = img_merge[:, :, ::-1]
-
-        # merge: resize to original size
-        img_merge[color_mask != 0] = \
-            img_merge[color_mask != 0] * 0.5 + color_seg[color_mask != 0] * 0.5
-        img_merge = img_merge.astype(np.uint8)
-        img_merge = cv2.resize(img_merge, (width, height),
-                               interpolation=cv2.INTER_LINEAR)
-        for i in range(boxes.shape[0]):
-            x1, y1, x2, y2, conf, label = boxes[i]
-            x1, y1, x2, y2, label = int(x1), int(y1), int(x2), int(y2), int(label)
-            print("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(label)))
-            img_merge = cv2.rectangle(img_merge, (x1, y1), (x2, y2), (0, 255, 0), 2, 2)
-
-        t5 = time.time()
-
-        print("preprocess cost {:.3f}ms, infer cost {:.3f}ms, postprocess cost {:.3f}ms, demoprocess cost {:.3f}ms"
-              .format((t2-t1)*1000, (t3-t2)*1000, (t4-t3)*1000, (t5-t4)*1000))
-
-        save_merge_path = os.path.join(save_results, filename)
-        print("result saved in {}".format(save_merge_path))
-        cv2.imwrite(save_merge_path, img_merge)
-
+            cv_image = cv2.imread(img_path)
+            if cv_image is None:
+                print("[error] Failed to decode img by opencv -> {}".format(img_path))
+                exit(-1)
+            
+            inputs = {self.inputs[0]["name"]: cv_image}
+            input_data = self._preprocess(inputs)
+            batch_datas.append(input_data)
+            cv_images.append(cv_image)
+            filenames.append(filename)
+            if len(batch_datas) < batch:
+                continue
+            output_datas = self.inference(batch_datas)
+            boxes, da_seg_out, ll_seg_out = self._postprocess(output_datas)
+            for idx in range(batch):
+                postprocess2(cv_images[idx], boxes[idx], da_seg_out[idx:idx+1, :, :, :], ll_seg_out[idx:idx+1, :, :, :], filenames[idx])
+            batch_datas.clear()
+            cv_images.clear()
+            filenames.clear()
+            
+        # 不足1batch
+        if len(batch_datas) != 0:
+            valid_len = len(batch_datas)
+            for _ in range(batch - valid_len):
+                batch_datas.append(batch_datas[-1])
+            output_datas = self.inference(batch_datas)
+            boxes, da_seg_out, ll_seg_out = self._postprocess(output_datas)
+            for idx in range(valid_len):
+                postprocess2(cv_images[idx], boxes[idx], da_seg_out[idx:idx+1, :, :, :], ll_seg_out[idx:idx+1, :, :, :], filenames[idx])
+            
+    
     def _post_process_anchor(self, feat_list, stride, grid, anchor_grid):
         z = list()
         for i, feat in enumerate(feat_list):

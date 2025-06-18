@@ -11,7 +11,6 @@ from ..utils import logger
 from ..utils.utils import get_random_data
 from ..utils.parser import read_yaml_to_dict, save_dict_to_yaml
 from .base_exec import BaseExec
-# from hmquant import logger
 
 
 class XH1Exec(BaseExec, ABC):
@@ -31,6 +30,7 @@ class XH1Exec(BaseExec, ABC):
             "inputs": cfg["model"]["inputs"]
         }
         save_dict_to_yaml(res, self.summary_result_path)
+        self.model_input_batch = self.inputs[0]["shape"][0]
 
     def quantize(self, get_input_datas):
         import platform
@@ -57,34 +57,7 @@ class XH1Exec(BaseExec, ABC):
 
         # 准备量化数据集
         calib_dir = self.quant_cfg["calib_dir"]
-        if calib_dir:
-            if os.path.isdir(calib_dir):
-                filelist = sorted(os.listdir(calib_dir))  # 保证每次取的数据一致
-            elif os.path.isfile(calib_dir):
-                filelist = [calib_dir]
-                calib_num = 1
-            else:
-                logger.error(f"unknown calib_dir: {calib_dir}")
-                exit(-1)
-            for filename in filelist:
-                _, ext = os.path.splitext(filename)
-                if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP", ".bin"]:
-                    calib_files.append(filename)
-                    if calib_num > 0 and len(calib_files) >= calib_num:
-                        break
-            if len(calib_files) < self.quant_cfg["calib_num"]:
-                logger.warning("calib_dir only has {} files, but calib_num is {}."
-                    .format(len(calib_files), self.quant_cfg["calib_num"]))
-            calib_num = len(calib_files)
-            logger.info(f"calib num: {calib_num}")
-            logger.debug(f"calib file: {calib_files}")
-            for id in range(calib_num):
-                inputs = get_input_datas(calib_dir, calib_files[id])
-                calib_data = {}
-                for name, data in inputs.items():
-                    calib_data[name] = torch.tensor(data.astype(np.float32))
-                    calib_dataset.append(calib_data)
-
+        
         for _input in self.inputs:
             name = _input["name"]
             shape = self.shape_dict[name]
@@ -109,27 +82,76 @@ class XH1Exec(BaseExec, ABC):
                         image_crop = self.inputs[0]["image"]["crop"]
                     else:
                         image_crop = [0, 0, image_size[0], image_size[1]]
-                    input_cfg['resizer_crop'] = {'top': image_crop[0],
-                                                 'left': image_crop[1],
-                                                 'height': image_crop[2],
-                                                 'width': image_crop[3]}
-                    input_cfg['resizer_resize'] = {'width': w,
-                                                   'height': h,
-                                                   'align_corners': False,
-                                                   'method': 'bilinear'}
+                    input_cfg['resizer_crop'] = {'top': image_crop[0], 'left': image_crop[1], 'height': image_crop[2], 'width': image_crop[3]}
+                    input_cfg['resizer_resize'] = {'width': w, 'height': h, 'align_corners': False, 'method': 'bilinear'}
                     input_cfg['toYUV_format'] = _input["image"]["format"]
 
+            # 未配置量化数据，采用随机数据
             if calib_dir is None:
                 if calib_num <= 0 or calib_num > 100:
                     logger.warning(f"calib_num can't be {calib_num} while calib_dir is None, reset to 1.")
                     calib_num = 1
                 logger.info(f"calib num: {calib_num}")
                 logger.warning("calibrate will use random data while calib_dir is None.")
-                for id in range(calib_num):
+                for _ in range(calib_num):
                     dtype = _input["dtype"]
                     input_shape = n, c, image_size[0], image_size[1]
                     calib_data[name] = torch.tensor(get_random_data(name, dtype, input_shape))
                     calib_dataset.append(calib_data)
+            else:
+                if os.path.isdir(calib_dir):
+                    filelist = sorted(os.listdir(calib_dir))  # 保证每次取的数据一致
+                elif os.path.isfile(calib_dir):
+                    filelist = [calib_dir]
+                    calib_num = 1
+                else:
+                    logger.error(f"unknown calib_dir: {calib_dir}")
+                    exit(-1)
+                for filename in filelist:
+                    _, ext = os.path.splitext(filename)
+                    if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP", ".bin"]:
+                        calib_files.append(filename)
+                        if calib_num > 0 and len(calib_files) >= calib_num:
+                            break
+                if len(calib_files) < self.quant_cfg["calib_num"]:
+                    logger.warning("calib_dir only has {} files, but calib_num is {}."
+                        .format(len(calib_files), self.quant_cfg["calib_num"]))
+                calib_num = len(calib_files)
+
+                logger.debug(f"calib file: {calib_files}")
+                new_calib_num = calib_num // n
+                logger.info(f"calib num: {new_calib_num if calib_num > n else 1}")                                
+                for c in range(new_calib_num):
+                    batch_datas = dict()
+                    for i in range(n):
+                        idx = c * n + i
+                        in_datas = get_input_datas(calib_dir, calib_files[idx])  # {"input_name": np.ndarray} NCHW
+                        for key in in_datas:
+                            if key in batch_datas:
+                                batch_datas[key].append(in_datas[key])
+                            else:
+                                batch_datas[key] = [in_datas[key]]
+                    calib_data = dict()            
+                    for key in batch_datas:
+                        calib_data[key] = torch.from_numpy(np.concatenate(batch_datas[key], axis=0))
+                    calib_dataset.append(calib_data)
+                if calib_num < n:
+                    # 数据不足1batch，复制最后1份数据
+                    batch_datas = dict()
+                    for idx in range(calib_num):
+                        in_datas = get_input_datas(calib_dir, calib_files[idx])  # {"input_name": np.ndarray} NCHW
+                        for key in in_datas:
+                            if key in batch_datas:
+                                batch_datas[key].append(in_datas[key])
+                            else:
+                                batch_datas[key] = [in_datas[key]]
+                    for key in batch_datas:
+                        last_data = batch_datas[key][-1].copy()
+                        for idx in range(n - calib_num):
+                            batch_datas[key].append(last_data)
+                        calib_data = dict()
+                        calib_data[key] = torch.from_numpy(np.concatenate(batch_datas[key], axis=0))
+                        calib_dataset.append(calib_data)
 
         if self.quant_cfg["ptq_cfg_path"] != "none":
             logger.info("using quanttool_config from {}".format(self.quant_cfg["ptq_cfg_path"]))
@@ -139,7 +161,7 @@ class XH1Exec(BaseExec, ABC):
         from hmquant.api import quant_single_onnx_network
         sequencer = quant_single_onnx_network(
             cfg=quanttool_config,
-            calibration_data=calib_dataset,
+            calibration_data=calib_dataset,  # 输入的batch可决定量化后模型输入batch
             onnx_model_or_path=self.weight,
             device="cuda" if torch.cuda.is_available() else "cpu",
             debug=None,
@@ -161,14 +183,23 @@ class XH1Exec(BaseExec, ABC):
             input_datas = calib_dataset[0]
         else:
             inputs = get_input_datas("", data_path)
-            for name, data in inputs.items():
-                input_datas[name] = torch.tensor(data.astype(np.float32))
-
+            for key in inputs:
+                n, c, h, w = self.shape_dict[key]
+                input_datas[key] = torch.from_numpy(np.concatenate([inputs[key].astype(np.float32) for _ in range(n)], axis=0))
+                
         t_start = time.time()
         if self.quant_cfg["debug_level"] == 1:
             from hmquant.api import quantize_profiling
-            res = quantize_profiling(sequencer, [input_datas], device="cuda" if torch.cuda.is_available() else "cpu", 
-                                     only_onodes=False, return_o_metric=True)
+            res = quantize_profiling(
+                sequencer=sequencer, 
+                sequencer_input=[input_datas], 
+                device="cuda" if torch.cuda.is_available() else "cpu", 
+                mode=0,
+                quant_mode="quant_forward",
+                fix_topk=True,
+                only_onodes=False,
+                return_o_metric=True
+            )
             res = {out_name: {k: float(v) if isinstance(v, np.float64) else v for k, v in metrics.items()} for out_name, metrics in res.items()}     
             new_res = dict()
             if os.path.exists(self.summary_result_path):
@@ -180,13 +211,22 @@ class XH1Exec(BaseExec, ABC):
 
         from hmquant.api import generate_golden
         sequencer.save_pkl(self.quant_dir, self.model_name)
-        generate_golden(
+        golden_input_path, _, golden_onnx_path = generate_golden(
             sequencer=sequencer,
             calibset=input_datas,
             save_path=self.quant_dir,
             model_name=self.model_name,
-            batch_size=1,
-            device="cuda" if torch.cuda.is_available() else "cpu"
+            batch_size=self.model_input_batch,
+            device="cuda" if torch.cuda.is_available() else "cpu",
+            mode="hardware_forward",
+            input_types=["int8"],
+            output_types=["int8"],
+            separate_weight=False,
+            save_output=True,
+            use_cache_hard_drive=False,
+            save_model_output=False,
+            set_golden_filename_prefix=False,
+            save_special_onnx=False,
         )
 
         logger.info(f"golden data saved in -> {self.golden_data_path}")
@@ -248,7 +288,7 @@ class XH1Exec(BaseExec, ABC):
                 input_data = np.concatenate((crop, resize, pad))
             else:
                 if isinstance(input_datas, dict):
-                    input_data = input_datas[name]
+                    input_data = input_datas[name]  
                 else:
                     input_data = input_datas
             self.module.set_input(name, input_data)
@@ -256,8 +296,8 @@ class XH1Exec(BaseExec, ABC):
         self.module.sync()
         outputs = {}
         output_num = self.module.get_num_outputs()
-        for id in range(0, output_num):
-            name = self.module.get_output_name(id)
+        for idx in range(0, output_num):
+            name = self.module.get_output_name(idx)
             if self.is_fixed_out:
                 output_data = self.module.get_output(name).numpy()
             else:
@@ -275,7 +315,7 @@ class XH1Exec(BaseExec, ABC):
             logger.warning("test num set to 1 because HDPL_PLATFORM=ISIM may take a lot of time.")
         save_dir = os.path.join(self.cur_dir, "output")
         cmd = "cd {}/utils/{} && ./{} --model {} --data {} --samples {} --threads {} --batch {} --output {}".format(
-            HOUMO_MODELZOO_PATH, exec, exec, model_path, self.build_dir, test_num, self.perf_cfg["thread_num"], self.batch,
+            HOUMO_MODELZOO_PATH, exec, exec, model_path, self.build_dir, test_num, self.perf_cfg["thread_num"], self.batch * self.model_input_batch,
             save_dir)
         if self.perf_cfg['infer_only']:
             cmd += " --infer_only true"
@@ -285,7 +325,7 @@ class XH1Exec(BaseExec, ABC):
         perf_txt_path = os.path.join(save_dir, "hmperf.txt")
         if not os.path.exists(perf_txt_path):
             logger.error(f"{perf_txt_path} not exist")
-            return
+            exit(-1)
         with open(perf_txt_path, "r") as f:
             lines = f.readlines()
         new_res = dict()
@@ -303,18 +343,18 @@ class XH1Exec(BaseExec, ABC):
             
     def _preprocess(self, inputs):
         datas = {}
-        for input in self.inputs:
-            dtype = self.input_infos[input["name"]].dtype
-            if input["image"]["format"] in ["YUV420", "YUV422", "YUV444"]:
-                data = torch.tensor(inputs[input["name"]].astype(np.float32))  # NHWC float32
-                data = torch.squeeze(data, 0)  # HWC float32
-                format = re.sub("YUV", "", input["image"]["format"])
+        for _input in self.inputs:
+            dtype = self.input_infos[_input["name"]].dtype
+            if _input["image"]["format"] in ["YUV420", "YUV422", "YUV444"]:
+                data = torch.from_numpy(inputs[_input["name"]].astype(np.float32))  # NHWC float32
+                data = torch.squeeze(data, dim=0)  # HWC float32
+                _format = re.sub("YUV", "", _input["image"]["format"])
                 from ..utils.transform import RGB2YUV, BGR2YUV
-                to_yuv_func = RGB2YUV(fmt=format) if input["format"] == "RGB" else BGR2YUV(fmt=format)
+                to_yuv_func = RGB2YUV(fmt=_format) if _input["format"] == "RGB" else BGR2YUV(fmt=_format)
                 image = torch.unsqueeze(to_yuv_func(data), 0).numpy()  # NHWC float32
-                datas[input["name"]] = image.astype(dtype)
+                datas[_input["name"]] = image.astype(dtype)
             else:
-                datas[input["name"]] = inputs[input["name"]].astype(dtype)
+                datas[_input["name"]] = inputs[_input["name"]].astype(dtype)
         return datas
 
     def get_golden_inputs(self):

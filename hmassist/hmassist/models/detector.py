@@ -57,16 +57,17 @@ class Detector(BaseModel):
             datas[name] = image
         return datas
 
-    def _postprocess(self, outputs, image=None):
+    def _postprocess(self, outputs, cv_images: list):
         if len(outputs) == 4 or len(outputs) == 1:
             outputs = outputs[0]
         # add yolo process
-        outputs = self.yolo_detect(outputs)
-        # outputs = torch.from_numpy(outputs)
+        outputs = self.yolo_detect(outputs)  # return torch.Tensor
         outputs = non_max_suppression(outputs, self._conf_threshold, self._iou_threshold)
-        outputs = outputs[0]  # bs=1
-        outputs[:, :4] = scale_coords(self._input_size, outputs[:, :4], image.shape).round()
-        return outputs.numpy()
+        batch = len(outputs)
+        for idx in range(batch):
+            outputs[idx][:, :4] = scale_coords(self._input_size, outputs[idx][:, :4], cv_images[idx].shape).round()
+            outputs[idx] = outputs[idx].numpy()
+        return outputs
 
     def evaluate(self):
         if not self.dataset:
@@ -76,6 +77,7 @@ class Detector(BaseModel):
         self._iou_threshold = 0.65
         self._conf_threshold = 0.01
 
+        batch = self.executor.model_input_batch * self.executor.batch
         img_paths = self.dataset.get_datas(num=self.test_num)
 
         save_results = os.path.join("output", self.target, "result/eval_results")
@@ -84,34 +86,51 @@ class Detector(BaseModel):
             shutil.rmtree(save_results)  # 禁用断点续测
         os.makedirs(save_results)
 
+        label_paths = []
+        batch_datas = []
+        cv_images = []
+        end2end_start = time.time()
         for idx, img_path in enumerate(tqdm.tqdm(img_paths)):
             basename = os.path.basename(img_path)
             filename, ext = os.path.splitext(basename)
             label_path = os.path.join(save_results, "{}.txt".format(filename))
-            # if os.path.exists(label_path):  # 如果已经存在结果，就不再做，用于断点续测
-            #     continue
             img = cv2.imread(img_path)
             if img is None:
                 logger.warning("Failed to decode img by opencv -> {}".format(img_path))
                 continue
-
-            end2end_start = time.time()
-
             inputs = {self.inputs[0]["name"]: img}
             inputs = self._preprocess(inputs)
-            outputs = self.inference(inputs)
-            detections = self._postprocess(outputs, img)
-
-            end2end_cost = time.time() - end2end_start
-            self._end2end_latency_ms += (end2end_cost * 1000)
-
-            detections2txt(detections, label_path)
-
+            batch_datas.append(inputs)
+            label_paths.append(label_path)
+            cv_images.append(img)
+            if len(batch_datas) != batch:
+                continue
+            outputs = self.inference(batch_datas)  # {output_name: output}
+            detections = self._postprocess(outputs, cv_images)
+            for bs in range(batch):  
+                detections2txt(detections[bs], label_paths[bs])
+            batch_datas.clear()
+            label_paths.clear()
+            cv_images.clear()
+        # 不足1batch
+        if len(batch_datas) != 0:
+            valid_len = len(batch_datas)
+            for _ in range(batch - valid_len):
+                batch_datas.append(batch_datas[-1])
+                cv_images.append(cv_images[-1])
+            outputs = self.inference(batch_datas)
+            detections = self._postprocess(outputs, cv_images)
+            for idx in range(valid_len):
+                detections2txt(detections[idx], label_paths[idx])
+        
+        end2end_cost = time.time() - end2end_start
+        self._end2end_latency_ms += (end2end_cost * 1000)
         pred_json = "pred.json"
         detection_txt2json(save_results, pred_json)
         _map, map50 = coco_eval(pred_json, self.dataset.annotations_file, self.dataset.image_ids)
+        _, C, H, W = self.inputs[0]["shape"]
         return {
-            "shape": [self.inputs[0]["shape"]],
+            "shape": [batch, C, H, W],
             "dataset": self.dataset.dataset_name,
             "test_num": len(img_paths),
             "accuracy": {"map": float(_map), "map50": float(map50)},

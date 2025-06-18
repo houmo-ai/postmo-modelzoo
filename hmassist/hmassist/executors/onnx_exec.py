@@ -23,6 +23,7 @@ class Format(IntEnum):
 class OnnxExec(BaseExec, ABC):
     def __init__(self, cfg: dict):
         super(OnnxExec, self).__init__(cfg)
+        self.model_input_batch = self.inputs[0]["shape"][0]
 
     def load(self):
         if not os.path.exists(self.weight):

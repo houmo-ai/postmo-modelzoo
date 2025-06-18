@@ -93,10 +93,25 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         logger.warning("can not find model._postprocess, use BaseModel._postprocess")
         return outputs
 
-    def inference(self, inputs):
-        inputs = self.executor._preprocess(inputs)
+    def inference(self, inputs: list):
+        batch = len(inputs)
+        N, C, H, W = self.input_shape
+        size = C * H * W
+        fmt = self.inputs[0]["image"]["format"]
+        if fmt == "YUV444":
+            valid_size = size
+        elif fmt == "YUV422":
+            valid_size = size * 3 // 2
+        elif fmt == "YUV420":
+            valid_size = size // 2
+        in_datas = np.zeros([batch, valid_size], dtype=np.uint8)
+        for idx, input_data in enumerate(inputs):
+            preprocessed_data = self.executor._preprocess(input_data)
+            data = list(preprocessed_data.values())[0]
+            data = data.flatten()
+            in_datas[idx, :] = data[0:valid_size]
         start = time.time()
-        outputs = self.executor.infer(inputs)
+        outputs = self.executor.infer(in_datas)
         cost = time.time() - start
         self._infer_latency_ms += (cost * 1000)
         self.total += 1

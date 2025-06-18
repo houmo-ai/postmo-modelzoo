@@ -38,10 +38,6 @@ class Classifier(BaseModel, ABC):
             exit(-1)
         datas = {}
         for name, data in outputs.items():
-            bs = data.shape[0]
-            if bs != 1:
-                print("only support bs=1, please check")
-                exit(-1)
             from hmassist.utils.postprocess import softmax
             datas[name] = softmax(data)
         return datas
@@ -56,83 +52,101 @@ class Classifier(BaseModel, ABC):
             logger.error("The dataset is null")
             exit(-1)
 
+        batch = self.executor.model_input_batch * self.executor.batch
         img_paths, labels = self.dataset.get_datas(num=self.test_num)
 
+        def topk(outputs, k, top1, top5, valid_len=None):
+            for _, output in outputs.items():
+                if valid_len is None:
+                    valid_len = output.shape[0]
+                idxes = np.argsort(-output, axis=1, kind="quicksort")[:, 0:k]  # 降序
+                for bs in range(valid_len):
+                    logger.debug("image:{}, pred = {}, gt = {}".format(img_paths[bs], idxes[bs, 0], labels[bs]))
+                    if labels[bs] == idxes[bs, 0]:
+                        top1 += 1
+                        top5 += 1
+                        continue
+                    if labels[bs] in idxes[bs, :]:
+                        top5 += 1
+            return top1, top5
+            
         k = 5
         top1, top5 = 0, 0
         total_num = len(img_paths)
+        batch_datas = []
+        end2end_start = time.time()
         for idx, img_path in enumerate(tqdm.tqdm(img_paths)):
             img = cv2.imread(img_path)
             if img is None:
                 logger.warning("Failed to load image -> {}".format(img_path))
                 continue
-
-            end2end_start = time.time()
-
             inputs = {self.inputs[0]["name"]: img}
             inputs = self._preprocess(inputs)
-            outputs = self.inference(inputs)
-            outputs = self._postprocess(outputs, img)
+            batch_datas.append(inputs)
+            if len(batch_datas) != batch:
+                continue
+            outputs = self.inference(batch_datas)
+            outputs = self._postprocess(outputs)
+            batch_datas.clear()
+            top1, top5 = topk(outputs, k, top1, top5)
+     
+        # 不足1batch
+        if len(batch_datas) != 0:
+            valid_len = len(batch_datas)
+            for _ in range(batch - valid_len):
+                batch_datas.append(batch_datas[-1])
+            outputs = self.inference(batch_datas)
+            outputs = self._postprocess(outputs)
+            top1, top5 = topk(outputs, k, top1, top5, valid_len)
 
-            end2end_cost = time.time() - end2end_start
-            self._end2end_latency_ms += (end2end_cost * 1000)
-
-            for name, output in outputs.items():
-                idxes = np.argsort(-output, axis=1, kind="quicksort").flatten()[0:k]  # 降序
-                logger.debug("image:{}, pred = {}, gt = {}".format(img_path, idxes, labels[idx]))
-                if labels[idx] == idxes[0]:
-                    top1 += 1
-                    top5 += 1
-                    continue
-                if labels[idx] in idxes:
-                    top5 += 1
+        end2end_cost = time.time() - end2end_start
+        self._end2end_latency_ms += (end2end_cost * 1000)            
         top1, top5 = float(top1)/total_num, float(top5)/total_num
+        _, C, H, W = self.inputs[0]["shape"]
         return {
-            "shape": [self.inputs[0]["shape"]],
+            "shape": [batch, C, H, W],
             "dataset": self.dataset.dataset_name,
             "test_num": total_num,
             "accuracy": {"top1": top1, "top5": top5},
             "latency": self.ave_latency_ms
         }
 
-    def demo(self, img_path):
-        if not os.path.exists(img_path):
-            logger.error("The img path not exist -> {}".format(img_path))
-            exit(-1)
-        logger.info("process: {}".format(img_path))
-        img = cv2.imread(img_path)
+    def demo(self, file_list: list):
+        valid_len = len(file_list)
+        batch = self.executor.model_input_batch * self.executor.batch
+        assert isinstance(file_list, list)
+        assert len(self.inputs) == 1
+        input_name = self.inputs[0]["name"]
+        batch_datas = []
         end2end_start = time.time()
-        inputs = {self.inputs[0]["name"]: img}
-        inputs = self._preprocess(inputs)
+        for img_path in file_list:
+            if not os.path.exists(img_path):
+                logger.error("The img path not exist -> {}".format(img_path))
+                exit(-1)
+            logger.info("process: {}".format(img_path))
+            img = cv2.imread(img_path)
+            if img is None:
+                logger.error("Failed to load image -> {}".format(img_path))
+                exit(-1)
+            inputs = {input_name: img}
+            inputs = self._preprocess(inputs)
+            batch_datas.append(inputs)
 
-        # from torchvision.datasets.folder import pil_loader
-        # data1 = pil_loader(img_path)
-        # import torchvision.transforms as transforms
-        # from hmassist.utils.transform import RGB2YUV
-        # from hmassist.utils.transform import ToTensorNotNormal
-        # transform = transforms.Compose(
-        #     [
-        #         transforms.Resize(256), transforms.CenterCrop(224),
-        #         ToTensorNotNormal(), 
-        #         # RGB2YUV(),
-        #     ],
-        # )
-        # a = transform(data1)
-        # a = np.expand_dims(a.numpy().astype(np.uint8), 0)
-        # datas = {}
-        # for input in self.inputs:
-        #     datas[input["name"]] = a
-
-        if img is None:
-            logger.error("Failed to load image -> {}".format(img_path))
-            exit(-1)
-
-        outputs = self.inference(inputs)
+        # 不足1batch，最后1份数据填充
+        if len(batch_datas) != 0 and valid_len < batch:
+            for _ in range(batch - valid_len):
+                batch_datas.append(batch_datas[-1])
+                
+        outputs = self.inference(batch_datas)
         outputs = self._postprocess(outputs, img)
-        for name, data in outputs.items():
-            max_idx = np.argmax(data, axis=1).flatten()[0]
-            max_prob = data.flatten()[max_idx]
+        for _, data in outputs.items():
+            max_idx = np.argmax(data, axis=1).flatten()  # bs, 1
+            for bs, idx in enumerate(max_idx):
+                if bs == valid_len:
+                    break
+                max_prob = data[bs, idx]
+                logger.info("predict cls = {}, prob = {:.6f}".format(idx, max_prob))
 
         end2end_cost = time.time() - end2end_start
         self._end2end_latency_ms += (end2end_cost * 1000)
-        logger.info("predict cls = {}, prob = {:.6f}".format(max_idx, max_prob))
+        
