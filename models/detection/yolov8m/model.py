@@ -88,6 +88,7 @@ class YoloV8(Detector):
             valid_len = len(batch_datas)
             for _ in range(batch - valid_len):
                 batch_datas.append(batch_datas[-1])
+                cv_images.append(cv_images[-1])
             outputs = self.inference(batch_datas)
             detections = self._postprocess(outputs, cv_images)
             show_results(cv_images, detections, filenames, valid_len)
