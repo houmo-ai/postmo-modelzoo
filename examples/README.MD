@@ -42,14 +42,15 @@ pip install -r requirements.txt
 
 ## 示例列表
 
-| 示例名                | 目录        | 说明                                         |
-| --------------------- | ---------- | -------------------------------------------- |
-| resnet50              | inferences | resnet50图像输入分类模型推理示例               |
-| yolov5s               | inferences | yolov5s图像输入目标检测模型推理示例            |
-| resnet50_multistreams | inferences | resnet50图像输入模型多stream推理示例           |
-| resnet50_pipeline     | inferences | resnet50图像输入模型pipeline推理示例           |
-| qwen2                 | inferences | qwen2 大语言模型推理示例                       |
-| video_detect          | scenes     | 视频解码+yolov5s检测+resnet50分类多阶段推理示例 |
+| 示例名                | 目录        | 说明                                         | 支持的芯片类型  |
+| --------------------- | ---------- | -------------------------------------------- | -------------- |
+| resnet50              | inferences | resnet50图像输入分类模型推理示例               | 2core/4core    |
+| yolov5s               | inferences | yolov5s图像输入目标检测模型推理示例            | 2core/4core    |
+| resnet50_multistreams | inferences | resnet50图像输入模型多stream推理示例           | 2core/4core   |
+| resnet50_pipeline     | inferences | resnet50图像输入模型pipeline推理示例           | 2core/4core   |
+| qwen2                 | inferences | qwen2 大语言模型推理示例                       | 4core         |
+| qwen3                 | inferences | qwen3 大语言模型推理示例                       | 2core/4core   |
+| video_detect          | scenes     | 视频解码+yolov5s检测+resnet50分类多阶段推理示例 | 2core/4core   |
 
 ## 快速上手
 
