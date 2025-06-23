@@ -67,6 +67,7 @@ typedef struct {
   int sample_cnt = 0;
   int warm_up = 0;
   bool infer_only = false;
+  bool is_result_check = true;
   uint32_t infer_max_cost = 0;
   uint32_t infer_total_cost = 0;
   uint32_t input_max_cost = 0;
@@ -76,6 +77,11 @@ typedef struct {
   uint32_t e2e_max_cost = 0;
   uint32_t e2e_total_cost = 0;
 } ThreadInfo;
+
+typedef struct {
+  std::vector<tcim::Stream> streams;
+  std::vector<int> counts;  // 用来保存各stream下计数
+} StreamInfo;
 
 
 typedef struct {
@@ -425,18 +431,23 @@ int main(int argc, char *argv[]) {
     output_golden.insert(std::pair<std::string, tcim::Tensor>(output_name, tensor));
   }
 
+  std::map<std::string, tcim::Tensor> output_datas;
   for (int i = 0; i < sample_num; i++) {
     Task task;
     task.req_id = i;
     task.data_in = input_datas;
     task.ref_out = output_golden;
-    std::map<std::string, tcim::Tensor> output_datas;
-    for (auto& output : output_golden) {
-      auto info = output.second.Info().AsContiguous();
-      auto tensor = tcim::Tensor::CreateHostTensor(info);
-      output_datas.insert(std::pair<std::string, tcim::Tensor>(output.first, tensor));
+    if (!infer_only) {
+      for (auto& output : output_golden) {
+        auto info = output.second.Info().AsContiguous();
+        if (is_result_check) {
+          output_datas.clear();
+          auto tensor = tcim::Tensor::CreateHostTensor(info);
+          output_datas.insert(std::pair<std::string, tcim::Tensor>(output.first, tensor));
+        }
+      }
+      task.data_out = output_datas;
     }
-    task.data_out = output_datas;
     qin.queue.push(task);
   }
   std::cout << "sample queue size is " << qin.queue.size() << std::endl;
@@ -444,6 +455,7 @@ int main(int argc, char *argv[]) {
   auto thread_func = [](int tid,
                         int did,
                         ThreadInfo& info,
+                        StreamInfo& stream_info,
                         TaskQueue& qin,
                         TaskQueue& qout,
                         Barrier& barrier) {
@@ -466,10 +478,6 @@ int main(int argc, char *argv[]) {
     std::cout << "Device " << did << " Thread " << tid << " " << info.model_path 
               << " model loaded. Cost " << cost << " ms." << std::endl;
 
-    // create a stream and set to the module
-    // tcim::Stream stream;
-    // module.SetStream(stream);
-
     // warm up
     start = GET_TIME();
     for (int i = 0; i < info.warm_up; i++) {
@@ -485,15 +493,26 @@ int main(int argc, char *argv[]) {
     barrier.barrier();
     std::cout << "Device " << did << " Thread " << tid << " infer start..." << std::endl;
     int count = 0;
+    int stream_id = -1;
 
     while (true) {
       std::unique_lock<std::mutex> lock_in(qin.mutex);
+      if (stream_id != -1) {
+        stream_info.counts[stream_id]--;
+      }
       if (qin.queue.empty()) {
         lock_in.unlock();
         break;
       }
       auto task = qin.queue.front();
       qin.queue.pop();
+      stream_id = 0;
+      for (int i = 1; i < stream_info.counts.size(); i++) {
+        if (stream_info.counts[i] < stream_info.counts[stream_id]) {
+          stream_id = i;
+        }
+      }
+      stream_info.counts[stream_id]++;
       lock_in.unlock();
 
       start = GET_TIME();
@@ -508,6 +527,7 @@ int main(int argc, char *argv[]) {
       if (info.input_max_cost < cost) info.input_max_cost = cost;
       tcim::Module::RunOption run_option;
       run_option.Rounds(info.loop_num);
+      module.SetStream(stream_info.streams[stream_id]);
       module.Run(false, run_option);
       module.Sync();
       auto infer_end = GET_TIME();
@@ -517,7 +537,11 @@ int main(int argc, char *argv[]) {
 
       if (!info.infer_only) {
         for (auto& tensor : task.data_out) {
-          module.GetOutput(tensor.first, tensor.second);
+          if (info.is_result_check) {
+            module.GetOutput(tensor.first, tensor.second);
+          } else {
+            module.GetOutput(tensor.first);
+          }
         }
       }
       end = GET_TIME();
@@ -546,6 +570,9 @@ int main(int argc, char *argv[]) {
   std::vector<std::thread> threads;
   Barrier barrier(thread_num * device_num);
   ThreadInfo thread_info[thread_num * device_num];
+  StreamInfo stream_info;
+  stream_info.counts.resize(4);
+  stream_info.streams.resize(4);
   for (int did = 0; did < device_num; did++) {
     auto weight_manager = tcim::Module::WeightManager::CreateWeightManager(did);
     for (int tid = 0; tid < thread_num; tid++) {
@@ -554,10 +581,11 @@ int main(int argc, char *argv[]) {
       info->weight_manager = weight_manager;
       info->loop_num = loop_num;
       info->infer_only = infer_only;
+      info->is_result_check = is_result_check;
       info->warm_up = warm_up;
       int id = did * thread_num + tid;
-      threads.push_back(std::thread(thread_func, id, did, std::ref(*info), std::ref(qin),
-                                    std::ref(qout), std::ref(barrier)));
+      threads.push_back(std::thread(thread_func, id, did, std::ref(*info), std::ref(stream_info),
+                                    std::ref(qin), std::ref(qout), std::ref(barrier)));
     }
   }
 
