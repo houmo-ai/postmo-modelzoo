@@ -6,6 +6,7 @@ import yaml
 import numpy as np
 import torch
 import re
+from datetime import datetime
 from abc import ABC
 from ..utils import logger
 from ..utils.utils import get_random_data
@@ -320,6 +321,7 @@ class XH1Exec(BaseExec, ABC):
         if self.perf_cfg['infer_only']:
             cmd += " --infer_only true"
         logger.info(cmd)
+        run_time = datetime.now().strftime("%Y%m%d%H%M%S")
         os.system(cmd)
         # save data to result.yaml
         perf_txt_path = os.path.join(save_dir, "hmperf.txt")
@@ -331,14 +333,17 @@ class XH1Exec(BaseExec, ABC):
         new_res = dict()
         if os.path.exists(self.summary_result_path):
             new_res = read_yaml_to_dict(self.summary_result_path)
-        new_res["perf"] = dict()
-        new_res["perf"]["batch"] = lines[0].strip().split(" ")[-1]
-        new_res["perf"]["thread_num"] = lines[1].strip().split(" ")[-1]  
-        new_res["perf"]["loop_num"] = lines[3].strip().split(" ")[-1]
-        new_res["perf"]["sample_num"] = lines[4].strip().split(" ")[-1]   
-        new_res["perf"]["avg_latency"] = lines[5].strip().split(" ")[-1]   
-        new_res["perf"]["max_latency"] = lines[6].strip().split(" ")[-1]
-        new_res["perf"]["qps"] = lines[7].strip().split(" ")[-1]
+        if "perf" not in new_res:
+            new_res["perf"] = dict()
+        new_res["perf"][run_time] = dict()
+        new_res["perf"][run_time]["batch"] = int(lines[0].strip().split(" ")[-1])
+        new_res["perf"][run_time]["thread_num"] = int(lines[1].strip().split(" ")[-1])
+        new_res["perf"][run_time]["loop_num"] = int(lines[3].strip().split(" ")[-1])
+        new_res["perf"][run_time]["sample_num"] = int(lines[4].strip().split(" ")[-1])
+        new_res["perf"][run_time]["avg_latency"] = float(lines[5].strip().split(" ")[-1]) 
+        new_res["perf"][run_time]["max_latency"] = float(lines[6].strip().split(" ")[-1])
+        new_res["perf"][run_time]["qps"] = float(lines[7].strip().split(" ")[-1])
+        new_res["perf"][run_time]["cmd"] = cmd
         save_dict_to_yaml(new_res, self.summary_result_path)
             
     def _preprocess(self, inputs):
