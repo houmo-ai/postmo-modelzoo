@@ -1,6 +1,6 @@
 # Qwen2.5-VL(通义千问2.5-VL)
 
-本示例展示如何把Qwen3模型量化和编译，部署到后摩鸿途芯片的设备上。
+本示例展示如何把Qwen2.5VL模型量化和编译，部署到后摩鸿途芯片的设备上。
 
 [TOC]
 
@@ -10,13 +10,13 @@
 
 ## 2 快速开始
 
-目前Qwen3模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
+目前Qwen2.5VL模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
 
 ### 2.1 获取模型和数据
 
-通过get_model脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
+通过get_model脚本下载模型，可通过参数选择下载量化模型或芯片模型。
 
-如果需要自己量化，可选择下载原始模型和wikitext2数据集，下载后的模型存放在qwen3-8b目录：
+目前暂时不支持用户自己量化。
 
 ```bash
 python3 get_model.py --type raw
@@ -76,16 +76,16 @@ question:
 https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg
 请描述图片内容。
 response:
-图片中展示了一位女士和她的狗在海滩上互动的场景。女士坐在沙滩上，狗坐在她旁边，两者都面带微笑。图片的背景是日出或日落，天空呈现出淡蓝色和橙色的渐变，沙滩和海水的交界处也呈现出橙色的渐变。图片的构图和构图都显得和谐，给人一种宁静和愉悦的感觉。
+这张图片展示了一位女士和她的狗在海滩上玩耍的场景。女士坐在沙滩上，狗坐在她对面，似乎在进行某种游戏。女士穿着格子衬衫和黑色裤子，狗戴着项圈。背景是海滩，海水和天空。
 ```
 
 ### 3.2 性能结果
 
 ```bash
-total: 86 tokens, cost 6.641 s
-visual + prefill time: 2539.945 ms, 0.39 tokens/s
-decode average time: 48.243 ms, 20.73 tokens/s
-end2end average time: 77.216 ms, 12.95 tokens/s
+total: 55 tokens, cost 5.036 s
+visual + prefill time: 2397.724 ms, 0.42 tokens/s
+decode average time: 48.854 ms, 20.47 tokens/s
+end2end average time: 91.561 ms, 10.92 tokens/s
 ```
 
 ## 4 免责声明
