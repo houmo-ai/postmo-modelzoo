@@ -3,6 +3,7 @@ import argparse
 import subprocess
 import yaml
 
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 
 def parseArgs():
     parser = argparse.ArgumentParser()
@@ -145,7 +146,10 @@ def runWithDiff(allArgs):
     for testUnit in allTestUnits:
         unitDict = getUnitDict(testUnit,yamlData)
         allUnitDict.update(unitDict)
-    os.system("pip3 install -r requirements.txt")
+    if HOUMO_TARGET == "xh1":
+        os.system("pip3 install -r requirements-xh1.txt")
+    else:
+        os.system("pip3 install -r requirements-xh2.txt")
     print("test modules:", allTestModules)
     print("test units:", allTestUnits)
     print("test cases:", allUnitDict)
