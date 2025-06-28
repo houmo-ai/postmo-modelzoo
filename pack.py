@@ -7,7 +7,7 @@ if len(sys.argv) > 1:
 include_list = ["data", "hmassist", "hmodel", "models", "utils/common", "utils/tcim_perf", "utils/release.cmake",
                 "requirements.txt", "env.sh", "benchmark.yml", "README.md"]
 exclude_list = ['models/backbone/vit']
-dir_name = "houmo-modelzoo"
+dir_name = os.path.basename(os.getcwd())
 
 # include项
 include_cmd = ""
@@ -21,24 +21,18 @@ exclude_cmd = " --exclude=.git*"
 for file in exclude_list:
     exclude_cmd += " --exclude=" + dir_name + "/" + file
 
-from git import Repo
-repo = Repo('.')
-branch_name = repo.active_branch.name
-cmd = f"rm -rf {dir_name} && git clone -b {branch_name} http://jenkinspublic:hmCI2%4022!@gerrit.houmo.ai/toolchain/imodelzoo {dir_name}"
-print(cmd)
-os.system(cmd)
-cmd = f"cd {dir_name} && git submodule set-url hmodel/xh2 http://jenkinspublic:hmCI2%4022!@gerrit.houmo.ai/a/houmoquantization/xh2modelzoo"
-print(cmd)
-os.system(cmd)
-cmd = f"git submodule update --init && cd hmodel/xh2 && git checkout ${branch_name}"
-print(cmd)
-os.system(cmd)
+# from git import Repo
+# repo = Repo('.')
+# branch_name = repo.active_branch.name
+# cmd = f"git clone -b {branch_name} http://jenkinspublic:hmCI2%4022!@gerrit.houmo.ai/toolchain/imodelzoo {dir_name}"
+# print(cmd)
+# os.system(cmd)
 
 # tar
 postfix = ""
 if version != "":
     postfix = "_" + version
-cmd = f"tar -czf {dir_name}{postfix}.tar.gz {exclude_cmd} {include_cmd}"
+cmd = f"cd .. && tar -czf {dir_name}{postfix}.tar.gz {exclude_cmd} {include_cmd}"
 print(cmd)
 os.system(cmd)
 print(f"tar {dir_name}{postfix} done.")
