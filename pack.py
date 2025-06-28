@@ -24,7 +24,13 @@ for file in exclude_list:
 from git import Repo
 repo = Repo('.')
 branch_name = repo.active_branch.name
-cmd = f"git clone -b {branch_name} http://jenkinspublic:hmCI2%4022!@gerrit.houmo.ai/toolchain/imodelzoo {dir_name}"
+cmd = f"rm -rf {dir_name} && git clone -b {branch_name} http://jenkinspublic:hmCI2%4022!@gerrit.houmo.ai/toolchain/imodelzoo {dir_name}"
+print(cmd)
+os.system(cmd)
+cmd = f"cd {dir_name} && git submodule set-url hmodel/xh2 http://jenkinspublic:hmCI2%4022!@gerrit.houmo.ai/a/houmoquantization/xh2modelzoo"
+print(cmd)
+os.system(cmd)
+cmd = f"git submodule update --init && cd hmodel/xh2 && git checkout ${branch_name}"
 print(cmd)
 os.system(cmd)
 
