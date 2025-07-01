@@ -74,9 +74,11 @@ houmo-modelzoo提供的模型示例如下，编译示例每个都提供，其他
 | [yolop](models/autodrive/yolop)              | autodrive | yes | yes   | x   | yes | yes  | x    | yes  |
 | [wenet](models/asr/wenet)                    | asr       | x   | yes   | x   | x   | yes  | x    | x    |
 | [qwen2.5](models/llm/qwen2.5)                | llm       | yes | yes   | yes | yes | yes  | x    | x    |
-| [qwen3](models/llm/qwen3)                    | llm       | yes | yes   | yes | yes | yes  | x    | x    |
+| [qwen3-8b](models/llm/qwen3)                 | llm       | yes | yes   | yes | yes | yes  | x    | x    |
+| [qwen3-14b](models/llm/qwen3-14b)            | llm       | yes | yes   | yes | yes | yes  | x    | x    |
 | [deepseek](models/llm/deepseek)              | llm       | yes | yes   | yes | x   | yes  | x    | x    |
 | [sdxl](models/diffusion/sdxl)                | diffusion | x   | yes   | x   | yes | x    | x    | x    |
+| [sd3](models/diffusion/sd3)                  | diffusion | x   | yes   | x   | yes | x    | x    | x    |
 
 ## C++评估工具列表
 
