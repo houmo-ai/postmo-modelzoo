@@ -55,6 +55,9 @@ if [[ -z $HOUMO_MODEL_PATH ]]; then
   fi
 fi
 
+# paths for xh2 modelzoo
+export PYTHONPATH=$HOUMO_MODELZOO_PATH/hmodel/xh2:$PYTHONPATH
+
 # use asic if detected
 if [[ -z $HDPL_PLATFORM ]]; then
   if ls /dev/ | grep -q 'hmcl_client_mgr'; then
