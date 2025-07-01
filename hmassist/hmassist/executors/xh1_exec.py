@@ -40,7 +40,7 @@ class XH1Exec(BaseExec, ABC):
             logger.error(f"quant not support platform: {arch}")
             exit(0)
         if not os.path.exists(self.weight):
-            weight = os.path.join(os.getenv("HOUMO_MODEL_PATH", default=""), self.weight)
+            weight = os.path.join(os.getenv("HOUMO_MODEL_PATH", "."), self.weight)
             if not os.path.exists(weight):
                 raise RuntimeError(f"{self.weight} or {weight} not exist.")
             self.weight = weight

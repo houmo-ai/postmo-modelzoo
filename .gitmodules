@@ -1,3 +1,3 @@
 [submodule "hmodel/xh2"]
 	path = hmodel/xh2
-	url = ssh://yan.cao@gerrit.houmo.ai:29418/houmoquantization/xh2modelzoo
+	url = ssh://gerrit.houmo.ai:29418/houmoquantization/xh2modelzoo

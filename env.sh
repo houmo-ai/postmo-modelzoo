@@ -6,15 +6,11 @@ export HOUMO_MODELZOO_PATH=${__dir}
 export HMASSIST_PATH=$HOUMO_MODELZOO_PATH/hmassist
 
 # install requirements
-pip3 install -r $HOUMO_MODELZOO_PATH/requirements.txt
+# pip3 install -r $HOUMO_MODELZOO_PATH/requirements.txt
 
 # common define
 PRINT_GREEN() { echo -e "\033[1;32m$@\033[0m"; }
 PRINT_YELLOW() { echo -e "\033[1;33m$@\033[0m"; }
-
-if [[ -z $HOUMO_TARGET ]]; then
-  export HOUMO_TARGET=xh1
-fi
 
 if [[ -z $HOUMO_PATH ]]; then
   PRINT_YELLOW "[warn] HOUMO_PATH not set. use default."
@@ -50,8 +46,6 @@ if [[ -z $HOUMO_MODEL_PATH ]]; then
   CI_MODEL_PATH=/data02/modelzoo_ci/models
   if test -d $CI_MODEL_PATH; then
     export HOUMO_MODEL_PATH=$CI_MODEL_PATH
-  else
-    export HOUMO_MODEL_PATH=$HOUMO_MODELZOO_PATH/models
   fi
 fi
 

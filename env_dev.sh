@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # install requirements
-sudo pip3 install -r requirements.txt
+# sudo pip3 install -r requirements.txt
 sudo pip3 uninstall -y houmo-tcim2
 
 # common define
@@ -12,9 +12,6 @@ __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 export HOUMO_MODELZOO_PATH=${__dir}
 export HMASSIST_PATH=$HOUMO_MODELZOO_PATH/hmassist
 
-if [[ -z $HOUMO_TARGET ]]; then
-  export HOUMO_TARGET=xh1
-fi
 if [[ -z $HOUMO_MODELZOO_URL ]]; then
   export HOUMO_MODELZOO_URL=http://10.10.1.53:8082/artifactory/toolchain/release
 fi
@@ -52,8 +49,6 @@ if [[ -z $HOUMO_MODEL_PATH ]]; then
   CI_MODEL_PATH=/data02/modelzoo_ci/models
   if test -d $CI_MODEL_PATH; then
     export HOUMO_MODEL_PATH=$CI_MODEL_PATH
-  else
-    export HOUMO_MODEL_PATH=$HOUMO_MODELZOO_PATH/models
   fi
 fi
 

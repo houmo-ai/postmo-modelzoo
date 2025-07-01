@@ -66,7 +66,7 @@ def get_file_from_jfrog(file_path, save_dir, extract_dir=None):
         modelzoo_url = os.environ.get("HOUMO_MODELZOO_URL")
     file_name = os.path.basename(file_path)
     if save_dir == "":
-        save_dir = os.getenv("HOUMO_MODEL_PATH", default="")
+        save_dir = os.getenv("HOUMO_MODEL_PATH", ".")
     else:
         os.makedirs(save_dir, exist_ok=True)
     save_path = f"{save_dir}/{file_name}"

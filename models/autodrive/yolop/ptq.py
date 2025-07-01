@@ -7,9 +7,9 @@ import argparse
 from hmquant.api import quant_single_onnx_network, generate_golden, quantize_profiling
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
-HOUMO_MODEL_PATH = os.getenv("HOUMO_MODEL_PATH", '')
-HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '')
+HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_MODEL_PATH = os.getenv("HOUMO_MODEL_PATH", '.')
+HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
 
 
 def get_args() -> argparse.Namespace:

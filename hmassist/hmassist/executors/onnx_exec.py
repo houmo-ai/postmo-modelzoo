@@ -27,7 +27,7 @@ class OnnxExec(BaseExec, ABC):
 
     def load(self):
         if not os.path.exists(self.weight):
-            weight = os.path.join(os.getenv("HOUMO_MODEL_PATH", default=""), self.weight)
+            weight = os.path.join(os.getenv("HOUMO_MODEL_PATH", "."), self.weight)
             if not os.path.exists(weight):
                 raise RuntimeError(f"{self.weight} or {weight} not exist.")
             self.weight = weight
