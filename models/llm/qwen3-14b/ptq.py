@@ -22,7 +22,7 @@ if HOUMO_TARGET == 'xh1':
 
     def parse_args():
         parser = argparse.ArgumentParser(description="Quant Qwen3")
-        parser.add_argument("--model", type=str, default="qwen3-8b", help="path to model")
+        parser.add_argument("--model", type=str, default="qwen3-14b", help="path to model")
         # 1. quant
         parser.add_argument("--quant_config", type=str, default="quant_config.py")
         parser.add_argument("--n_calib", type=int, default=16)
@@ -88,7 +88,7 @@ elif HOUMO_TARGET == 'xh2':
     def parse_args():
         parser = argparse.ArgumentParser(description="Quant Qwen3")
         parser.add_argument("--debug", action="store_true", help="debug mode")
-        parser.add_argument("--model", type=str, default="qwen3-8b")
+        parser.add_argument("--model", type=str, default="qwen3-14b")
         parser.add_argument("--context-length", type=int, default=8192, help="max sequence length")
         parser.add_argument("--input-sequence-length", type=int, default=256, help="input sequence length")
         parser.add_argument("--quant-type", default="w8a8_sefp", help="quant type, default is w8a8")
@@ -122,9 +122,9 @@ elif HOUMO_TARGET == 'xh2':
         with TimeProfiler("convert", logger), MemoryTracker("cuda:0", "convert", logger):
             LLMConverter.from_pretrained(hf_model_path, "Qwen3ForCausalLM_legacy", config, str(work_dir))
         shutil.move(work_dir / "hmonnx/prefill", work_dir / "hmquant/prefill")
-        shutil.move(work_dir / "hmquant/prefill/qwen3-8b-XH2a-8k-w8a8_sefp_prefill.onnx", work_dir / "hmquant/prefill/hmquant_qwen3_with_act.onnx")
+        shutil.move(work_dir / "hmquant/prefill/qwen3-14b-XH2a-8k-w8a8_sefp_prefill.onnx", work_dir / "hmquant/prefill/hmquant_qwen3_with_act.onnx")
         shutil.move(work_dir / "hmonnx/decode", work_dir / "hmquant/decoder")
-        shutil.move(work_dir / "hmquant/decoder/qwen3-8b-XH2a-8k-w8a8_sefp_decode.onnx", work_dir / "hmquant/decoder/hmquant_qwen3_with_act.onnx")
+        shutil.move(work_dir / "hmquant/decoder/qwen3-14b-XH2a-8k-w8a8_sefp_decode.onnx", work_dir / "hmquant/decoder/hmquant_qwen3_with_act.onnx")
         shutil.move(work_dir / "token_embedding.pt", work_dir / "hmquant/quant_embedding.pt")
         shutil.rmtree(work_dir / "hmonnx")
         shutil.rmtree(work_dir / "hf_config")
