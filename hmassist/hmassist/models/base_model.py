@@ -27,17 +27,18 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         self._infer_latency_ms = 0
         self._end2end_latency_ms = 0
 
-        for input in self.inputs:
-            if input["layout"] == "ND":
-                self.input_shape = input["shape"]
+        for _input in self.inputs:
+            if _input["layout"] == "ND":
+                self.input_shape = _input["shape"]
                 break
-            if input["layout"] == "NCHW":
-                n, c, h, w = input["shape"]
-            elif input["layout"] == "NHWC":
-                n, h, w, c = input["shape"]
+            if _input["layout"] == "NCHW":
+                n, c, h, w = _input["shape"]
+            elif _input["layout"] == "NHWC":
+                n, h, w, c = _input["shape"]
+            
             size = None
-            if "image" in input:
-                size = input["image"].get("size", [h, w])
+            if "image" in _input:
+                size = _input["image"].get("size", [h, w])
             if size:
                 self.input_shape = [n, c, size[0], size[1]]
                 self._input_size = size
@@ -70,7 +71,6 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         logger.warning("can not find model._preprocess, use BaseModel._preprocess")
 
         datas = {}
-        # for name, data in inputs.items():
         for input_info in self.inputs:
             name = input_info['name']
             data = inputs[name]

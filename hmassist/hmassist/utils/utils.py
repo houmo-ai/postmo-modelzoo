@@ -3,6 +3,7 @@
 import os
 import sys
 import time
+import numpy as np
 from ..utils import logger
 
 
@@ -42,16 +43,15 @@ def get_random_data(dtype, shape):
     @return: numpy
     """
     import numpy as np
-    n, c, h, w = shape
 
     if dtype == "float32":
-        data = np.random.rand(n, c, h, w).astype(dtype=dtype)   # 数值范围[0, 1)
+        data = np.random.rand(*shape).astype(dtype=dtype)   # 数值范围[0, 1)
     elif dtype == "float16":
-        data = np.random.rand(n, c, h, w).astype(dtype=dtype)   # 数值范围[0, 1)
+        data = np.random.rand(*shape).astype(dtype=dtype)   # 数值范围[0, 1)
     elif dtype == "int16":
-        data = np.random.randint(low=-(2**15), high=2**15-1, size=(n, c, h, w), dtype=dtype)
+        data = np.random.randint(low=-(2**15), high=2**15-1, size=shape, dtype=dtype)
     elif dtype == "uint8":
-        data = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=dtype)
+        data = np.random.randint(low=0, high=255, size=shape, dtype=dtype)
     else:
         logger.error("Not support dtype -> {}".format(dtype))
         exit(-1)
@@ -167,3 +167,14 @@ def get_file_from_jfrog(file_path, save_dir="", extract_dir=None):
 
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
+
+
+def load_npz(npz_path):
+    in_datas = dict()
+    with np.load(npz_path) as data:
+        keys = data.files
+        for key in keys:
+            x = data[key]
+            in_datas[key] = x.copy()
+    return in_datas
+

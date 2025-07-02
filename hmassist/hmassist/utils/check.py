@@ -16,17 +16,18 @@ def check_quant_config(cfg):
     if not check_key(cfg["model"], "inputs"):
         return False
     for _input in cfg["model"]["inputs"]:
-        if not check_key(_input, "layout", None, None, ["NCHW", "NHWC"]):
+        if not check_key(_input, "layout", None, None, ["NCHW", "NHWC", "ND"]):
             return False
         if not check_key(_input, "shape"):
             return False
         if not check_key(_input, "dtype", None, None, ["uint8", "float32", "int16", "float16"]):
             return False
-        if not check_key(_input, "format", None, None, ["RGB", "BGR", "GRAY"]):
+        if not check_key(_input, "format", None, None, ["RGB", "BGR", "GRAY", 
+                                                        "Float16Feature", "Float32Feature", "Float64Feature",
+                                                        "Uint8Feature", "Int16Feature", "Int8Feature"]):
             return False
         if not check_key(_input, "layout"):
             return False
-
         if _input["layout"] == "NHWC":
             c = _input["shape"][-1]
         else:
@@ -84,7 +85,7 @@ def check_build_config(cfg):
 def check_test_config(cfg):
     if not check_key(cfg, "test"):
         return False
-    if not check_path(cfg["test"], "data_path", "HOUMO_DATASETS_PATH"):
+    if not check_path(cfg["test"], "data_path", "HOUMO_DATASETS_PATH", "none"):
         return False
     return True
 

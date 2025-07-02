@@ -13,7 +13,7 @@ from hmassist.utils import logger
 from hmassist.utils.glog_format import GLogFormatter
 from hmassist.utils.parser import read_yaml_to_dict, dump_yaml, save_dict_to_yaml
 from hmassist.utils.dist_metrics import cosine_distance, euclid_distance, relative_euclidean_distance
-from hmassist.utils.utils import get_random_data
+from hmassist.utils.utils import get_random_data, load_npz
 from hmassist.executors.xh1_exec import XH1Exec
 from hmassist.executors.onnx_exec import OnnxExec
 from hmassist.models.base_model import BaseModel
@@ -158,18 +158,24 @@ def test(cfg):
     model.executor.print_input_info()
     model.executor.print_output_info()
     data_path = cfg["test"].get("data_path")
-    if data_path:
-        _dir, file = os.path.split(data_path)
-        inputs = model.get_input_datas(_dir, file)
+    if data_path != "none":
+        if model.executor.is_npz:
+            inputs = load_npz(data_path)
+        else:
+            _dir, file = os.path.split(data_path)
+            inputs = model.get_input_datas(_dir, file)
     else:
-        inputs = {}
+        inputs = dict()
         for _input in model.inputs:
             name = _input["name"]
             dtype = _input["dtype"]
-            logger.warning(f"data[{name}] will use random data")
-            inputs[name] = get_random_data(name, dtype, model.input_shape)
-            
-    input_tensors = [torch.from_numpy(np.concatenate([inputs[key] for _ in range(model.executor.model_input_batch)], axis=0)) for key in inputs]
+            logger.warning(f"input[{name}] will use random data")
+            inputs[name] = get_random_data(dtype, model.input_shape)
+    
+    if not model.executor.is_npz:   
+        input_tensors = [torch.from_numpy(np.concatenate([inputs[key] for _ in range(model.executor.model_input_batch)], axis=0)) for key in inputs]
+    else:
+        input_tensors = [torch.from_numpy(inputs[key]) for key in inputs]
 
     save_dir = os.path.join(model.executor.test_dir)
     if not os.path.exists(save_dir):
@@ -182,33 +188,40 @@ def test(cfg):
     # onnx
     onnx_exec = OnnxExec(cfg)
     onnx_exec.load()
-    onnx_inputs = onnx_exec._preprocess(inputs)
-    for key in onnx_inputs:
-        data = onnx_inputs[key]
-        batch_datas = np.concatenate([data for _ in range(onnx_exec.model_input_batch)], axis=0)
-        onnx_inputs[key] = batch_datas
+    if not model.executor.is_npz:
+        onnx_inputs = onnx_exec._preprocess(inputs)
+        for key in onnx_inputs:
+            data = onnx_inputs[key]
+            batch_datas = np.concatenate([data for _ in range(onnx_exec.model_input_batch)], axis=0)
+            onnx_inputs[key] = batch_datas
+    else:
+        onnx_inputs = inputs
     onnx_outputs = onnx_exec.infer(onnx_inputs)
     # save onnx input datas
     for input_name, input_data in onnx_inputs.items():
         save_data(input_data, save_dir, f"{input_name}_onnx_input")
         
     # chip and quantized
-    chip_inputs = model.executor._preprocess(inputs)
-    for key in chip_inputs:
-        data = chip_inputs[key].flatten()
-        size = data.shape[0]
-        fmt = model.executor.inputs[0]["image"]["format"]
-        if fmt == "YUV444":
-            valid_size = size
-        elif fmt == "YUV422":
-            valid_size = size * 3 // 2
-        elif fmt == "YUV420":
-            valid_size = size // 2
-        vaild_data = data[:valid_size]
-        batch_datas = np.zeros([model.executor.model_input_batch * model.executor.batch, valid_size], dtype=np.uint8)
-        for idx in range(model.executor.model_input_batch * model.executor.batch):
-            batch_datas[idx, :] = vaild_data
-        chip_inputs[key] = batch_datas
+    if not model.executor.is_npz:
+        chip_inputs = model.executor._preprocess(inputs)
+        for key in chip_inputs:
+            data = chip_inputs[key].flatten()
+            size = data.shape[0]
+            fmt = model.executor.inputs[0]["image"]["format"]
+            if fmt == "YUV444":
+                valid_size = size
+            elif fmt == "YUV422":
+                valid_size = size * 3 // 2
+            elif fmt == "YUV420":
+                valid_size = size // 2
+            vaild_data = data[:valid_size]
+            batch_datas = np.zeros([model.executor.model_input_batch * model.executor.batch, valid_size], dtype=np.uint8)
+            for idx in range(model.executor.model_input_batch * model.executor.batch):
+                batch_datas[idx, :] = vaild_data
+            chip_inputs[key] = batch_datas
+    else:
+        inputs = {name: np.repeat(inputs[name], repeats=model.executor.batch, axis=0)  for name in inputs}
+        chip_inputs = inputs
 
     # save chip input datas
     for input_name, input_data in chip_inputs.items():
@@ -267,9 +280,12 @@ def test(cfg):
 
 def demo(cfg):
     logger.info(cfg)
+    model = get_model(cfg)
+    if model.executor.is_npz:
+        logger.error("Model demo with npz as input is not supported yet")
+        exit(-1)
     if not check.check_demo_config(cfg):
         exit(-1)
-    model = get_model(cfg)
     data_dir = cfg["demo"]["data_dir"]
     test_num = cfg["demo"]["test_num"]
     batch = model.executor.model_input_batch * model.executor.batch
@@ -323,9 +339,12 @@ def perf(cfg):
 
 
 def eval(cfg):
+    model = get_model(cfg)
+    if model.executor.is_npz:
+        logger.error("Model eval with npz as input is not supported yet")
+        exit(-1)
     if not check.check_eval_config(cfg):
         exit(-1)
-    model = get_model(cfg)
     dataset_class = cfg["eval"].get("dataset_class", None)
     data_dir = cfg["eval"].get("data_dir")
     model.test_num = cfg["eval"].get("test_num", 0)

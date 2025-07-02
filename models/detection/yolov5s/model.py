@@ -51,7 +51,7 @@ class YoloV5(Detector):
                     from ultralytics.utils.plotting import Annotator, colors
                     from hmassist.datasets.coco import coco80_labels
                     label = coco80_labels[cls] + " {:.2f}".format(conf)
-                    annotator = Annotator(cv_image, line_width=2, example=str(cls))
+                    annotator = Annotator(cv_images[idx], line_width=2, example=str(cls))
                     annotator.box_label((x1, y1, x2, y2), label, color=colors(cls, True))
                     print("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(cls)), flush=True)
                 save_path = os.path.join(save_results, filenames[idx])
@@ -83,11 +83,11 @@ class YoloV5(Detector):
                 continue
             outputs = self.inference(batch_datas)
             detections = self._postprocess(outputs, cv_images)
+            show_results(cv_images, detections, filenames)
             cv_images.clear()
             batch_datas.clear()
             filenames.clear()
-            show_results(cv_images, detections, filenames)
-            
+
         # 不足1batch
         if len(batch_datas) != 0:
             valid_len = len(batch_datas)

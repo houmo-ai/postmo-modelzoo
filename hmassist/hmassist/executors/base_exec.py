@@ -15,9 +15,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.quant_cfg = cfg["quant"]
         self.build_cfg = cfg["build"]
         self.test_cfg = cfg["test"]
-        self.demo_cfg = cfg["demo"]
+        self.demo_cfg = cfg.get("demo")
         self.perf_cfg = cfg["perf"]
-        self.eval_cfg = cfg["eval"]
+        self.eval_cfg = cfg.get("eval")
         self.batch = cfg["batch"]
         self.j =  cfg["build"].get('j', None)
 
@@ -94,18 +94,21 @@ class BaseExec(object, metaclass=abc.ABCMeta):
     def set_input_infos(self):
         for idx, _input in enumerate(self.inputs):
             shape = _input["shape"]
-            if _input["layout"] == "NCHW":
-                n, c, h, w = shape
-            elif _input["layout"] == "NHWC":
-                n, h, w, c = shape
-
             if "dtype" not in _input:
                 if _input["format"] == "None":
                     _input["dtype"] = "float32"
                 else:
                     _input["dtype"] = "uint8"
 
-            self.shape_dict[_input["name"]] = (n, c, h, w)
+            if _input["layout"] == "NCHW":
+                n, c, h, w = shape
+            elif _input["layout"] == "NHWC":
+                n, h, w, c = shape
+                shape = (n, c, w, h)
+            elif _input["layout"] == "ND":
+                pass
+
+            self.shape_dict[_input["name"]] = shape
             self.dtype_dict[_input["name"]] = _input["dtype"]
 
             # 对mean和std进行广播

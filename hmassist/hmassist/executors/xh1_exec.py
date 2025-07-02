@@ -9,7 +9,7 @@ import re
 from datetime import datetime
 from abc import ABC
 from ..utils import logger
-from ..utils.utils import get_random_data
+from ..utils.utils import get_random_data, load_npz
 from ..utils.parser import read_yaml_to_dict, save_dict_to_yaml
 from .base_exec import BaseExec
 
@@ -32,7 +32,11 @@ class XH1Exec(BaseExec, ABC):
         }
         save_dict_to_yaml(res, self.summary_result_path)
         self.model_input_batch = self.inputs[0]["shape"][0]
-
+        self.is_npz = False
+        if len(self.inputs) > 1 or self.inputs[0]["format"] in ["Int8Feature", "Uint8Feature", "Int16Feature", 
+                                   "Float16Feature", "Float32Feature", "Float64Feature"]:
+            self.is_npz = True
+    
     def quantize(self, get_input_datas):
         import platform
         arch = platform.machine()
@@ -46,117 +50,128 @@ class XH1Exec(BaseExec, ABC):
             self.weight = weight
         logger.info("################  ptq quantize started  ######################")
         t_start = time.time()
-        calib_files = []
-        calib_dataset = []
         dynamic_resize = self.model_cfg.get("dynamic_resize")
-        calib_num = self.quant_cfg.get("calib_num")
-        calib_method = self.quant_cfg.get("calib_method")
-        precision = self.quant_cfg.get("precision")
-
-        quanttool_config = {'inputs_cfg': {}}
+        quanttool_config = {'inputs_cfg': dict()}
         # quanttool_config['graph_opt_cfg'] = {}
 
         # 准备量化数据集
-        calib_dir = self.quant_cfg["calib_dir"]
-        
-        for _input in self.inputs:
-            name = _input["name"]
-            shape = self.shape_dict[name]
-            n, c, h, w = shape
-
-            if self.quant_cfg["ptq_cfg_path"] == "none":
-                # 准备量化参数
-                logger.info("using quanttool_config from config.yml")
-                quanttool_config['inputs_cfg'][name] = {}
-                input_cfg = quanttool_config['inputs_cfg'][name]
-                if dynamic_resize:
-                    input_cfg['fold'] = False
-                input_cfg['data_format'] = _input["format"]
+        ptq_cfg_path = self.quant_cfg.get("ptq_cfg_path")
+        if ptq_cfg_path != "none":
+            logger.info("using quanttool_config from {}".format(ptq_cfg_path))
+            quanttool_config = ptq_cfg_path
+        else:
+            logger.info("using quanttool_config from config.yml")
+            inputs_cfg = dict()
+            for _input in self.inputs:
+                name = _input["name"]
+                shape = self.shape_dict[name]
+                data_format = _input["format"]
+                input_cfg = dict()
+                input_cfg["first_layer_weight_denorm_mean"] = None
+                input_cfg["first_layer_weight_denorm_std"] = None
+                input_cfg['data_format'] = data_format
+                if self.is_npz:
+                    logger.info(f"input[name] is feature_or_tensor")
+                    inputs_cfg[name] = input_cfg
+                    continue
+                N, C, H, W = shape
                 input_cfg['first_layer_weight_denorm_mean'] = _input["mean"]
                 input_cfg['first_layer_weight_denorm_std'] = _input["std"]
-                if "image" in self.inputs[0]:
-                    if "size" in self.inputs[0]["image"] and self.inputs[0]["image"]["size"]:
-                        image_size = self.inputs[0]["image"]["size"]
-                    else:
-                        image_size = [h, w]
-                    if "crop" in self.inputs[0]["image"] and self.inputs[0]["image"]["crop"]:
-                        image_crop = self.inputs[0]["image"]["crop"]
-                    else:
-                        image_crop = [0, 0, image_size[0], image_size[1]]
-                    input_cfg['resizer_crop'] = {'top': image_crop[0], 'left': image_crop[1], 'height': image_crop[2], 'width': image_crop[3]}
-                    input_cfg['resizer_resize'] = {'width': w, 'height': h, 'align_corners': False, 'method': 'bilinear'}
-                    input_cfg['toYUV_format'] = _input["image"]["format"]
+                yuv_format = _input["image"]["format"]
+                input_cfg['fold'] = not dynamic_resize
+                if "image" in _input:
+                    resizer_info = _input["image"]
+                    resizer_size = resizer_info.get("size")
+                    resizer_crop = resizer_info.get("crop")
+                    if resizer_size is None or not isinstance(resizer_size, list) \
+                        or len(resizer_size) != 2:
+                        resizer_size = [H, W]
+                    if resizer_crop is None or not isinstance(resizer_crop, list) \
+                        or len(resizer_crop) != 4:
+                        resizer_crop = [0, 0, H, W]
+                    input_cfg['resizer_crop'] = {'top': resizer_crop[0], 'left': resizer_crop[1], 'height': resizer_crop[2], 'width': resizer_crop[3]}
+                    input_cfg['resizer_resize'] = {'width': W, 'height': H, 'align_corners': False, 'method': 'bilinear'}
+                    input_cfg['toYUV_format'] = yuv_format
+                inputs_cfg[name] = input_cfg
+            quanttool_config["inputs_cfg"].update(inputs_cfg)
 
-            # 未配置量化数据，采用随机数据
-            if calib_dir is None:
-                if calib_num <= 0 or calib_num > 100:
-                    logger.warning(f"calib_num can't be {calib_num} while calib_dir is None, reset to 1.")
-                    calib_num = 1
-                logger.info(f"calib num: {calib_num}")
-                logger.warning("calibrate will use random data while calib_dir is None.")
-                for _ in range(calib_num):
+        calib_num = self.quant_cfg.get("calib_num")
+        calib_method = self.quant_cfg.get("calib_method")
+        precision = self.quant_cfg.get("precision")
+        calib_files = []
+        calib_dataset = []
+        calib_dir = self.quant_cfg["calib_dir"]     
+        if calib_dir == "default":
+            if calib_num <= 0 or calib_num > 100:
+                logger.warning(f"calib_num can't be {calib_num} while calib_dir is None, reset to 1.")
+                calib_num = 1
+            logger.info(f"calib num: {calib_num}")
+            logger.warning("calibrate will use random data while calib_dir is None.")
+            
+            for _ in range(calib_num):
+                calib_data = dict()
+                for _input in self.inputs:
+                    name = _input["name"]
                     dtype = _input["dtype"]
-                    input_shape = n, c, image_size[0], image_size[1]
-                    calib_data[name] = torch.tensor(get_random_data(name, dtype, input_shape))
-                    calib_dataset.append(calib_data)
+                    shape = _input["shape"]
+                    if self.is_npz:
+                        calib_data[name] = torch.from_numpy(get_random_data(dtype, shape))
+                    else:
+                        N, C, H, W = shape
+                        resizer_crop = quanttool_config["inputs_cfg"][name]["resizer_crop"]
+                        input_shape = [N, C, resizer_crop["height"], resizer_crop["width"]]
+                        calib_data[name] = torch.from_numpy(get_random_data(name, dtype, input_shape))
+                calib_dataset.append(calib_data)   
+        else:
+            if os.path.isdir(calib_dir):
+                filelist = sorted(os.listdir(calib_dir))  # 保证每次取的数据一致
+            elif os.path.isfile(calib_dir):
+                filelist = [calib_dir]
+                calib_num = 1
             else:
-                if os.path.isdir(calib_dir):
-                    filelist = sorted(os.listdir(calib_dir))  # 保证每次取的数据一致
-                elif os.path.isfile(calib_dir):
-                    filelist = [calib_dir]
-                    calib_num = 1
-                else:
-                    logger.error(f"unknown calib_dir: {calib_dir}")
-                    exit(-1)
-                for filename in filelist:
-                    _, ext = os.path.splitext(filename)
-                    if ext in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP", ".bin"]:
-                        calib_files.append(filename)
-                        if calib_num > 0 and len(calib_files) >= calib_num:
-                            break
-                if len(calib_files) < self.quant_cfg["calib_num"]:
-                    logger.warning("calib_dir only has {} files, but calib_num is {}."
-                        .format(len(calib_files), self.quant_cfg["calib_num"]))
-                calib_num = len(calib_files)
-
+                logger.error(f"unknown calib_dir: {calib_dir}")
+                exit(-1)   
+            for filename in filelist:
+                _, ext = os.path.splitext(filename)
+                if ext.lower() in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP", ".npz"]:
+                    calib_files.append(filename)
+                    if calib_num > 0 and len(calib_files) >= calib_num:
+                        break                   
+            if len(calib_files) < calib_num:
+                logger.warning("calib_dir only has {} files, but calib_num is {}.".format(len(calib_files), calib_num))
+            calib_num = len(calib_files)
+            
+            if not self.is_npz:
+                # 单输入图像
+                padd_len = calib_num % self.model_input_batch
+                for _ in range(padd_len):
+                    calib_files.append(calib_files[-1])
+                calib_num = len(calib_files) // self.model_input_batch
                 logger.debug(f"calib file: {calib_files}")
-                new_calib_num = calib_num // n
-                logger.info(f"calib num: {new_calib_num if calib_num > n else 1}")                                
-                for c in range(new_calib_num):
+                logger.info(f"calib num: {calib_num}")
+                for c in range(calib_num):
                     batch_datas = dict()
-                    for i in range(n):
-                        idx = c * n + i
+                    for i in range(self.model_input_batch):
+                        idx = c * self.model_input_batch + i
                         in_datas = get_input_datas(calib_dir, calib_files[idx])  # {"input_name": np.ndarray} NCHW
                         for key in in_datas:
                             if key in batch_datas:
                                 batch_datas[key].append(in_datas[key])
                             else:
                                 batch_datas[key] = [in_datas[key]]
+                        batch_datas[key] = torch.from_numpy(np.concatenate(batch_datas[key], axis=0))
+                    calib_dataset.append(batch_datas)
+            else:
+                logger.debug(f"calib file: {calib_files}")
+                logger.info(f"calib num: {calib_num}")
+                for c in range(calib_num):
+                    # 单输入非图像 or 多输入都直接读npz(处理后数据)
+                    batch_datas = load_npz(os.path.join(calib_dir, calib_files[c]))            
                     calib_data = dict()            
                     for key in batch_datas:
-                        calib_data[key] = torch.from_numpy(np.concatenate(batch_datas[key], axis=0))
+                        calib_data[key] = torch.from_numpy(batch_datas[key])
                     calib_dataset.append(calib_data)
-                if calib_num < n:
-                    # 数据不足1batch，复制最后1份数据
-                    batch_datas = dict()
-                    for idx in range(calib_num):
-                        in_datas = get_input_datas(calib_dir, calib_files[idx])  # {"input_name": np.ndarray} NCHW
-                        for key in in_datas:
-                            if key in batch_datas:
-                                batch_datas[key].append(in_datas[key])
-                            else:
-                                batch_datas[key] = [in_datas[key]]
-                    for key in batch_datas:
-                        last_data = batch_datas[key][-1].copy()
-                        for idx in range(n - calib_num):
-                            batch_datas[key].append(last_data)
-                        calib_data = dict()
-                        calib_data[key] = torch.from_numpy(np.concatenate(batch_datas[key], axis=0))
-                        calib_dataset.append(calib_data)
-
-        if self.quant_cfg["ptq_cfg_path"] != "none":
-            logger.info("using quanttool_config from {}".format(self.quant_cfg["ptq_cfg_path"]))
-            quanttool_config = self.quant_cfg["ptq_cfg_path"]
+                
         logger.info(quanttool_config)
 
         from hmquant.api import quant_single_onnx_network
@@ -183,10 +198,17 @@ class XH1Exec(BaseExec, ABC):
         if data_path == "default":
             input_datas = calib_dataset[0]
         else:
-            inputs = get_input_datas("", data_path)
-            for key in inputs:
-                n, c, h, w = self.shape_dict[key]
-                input_datas[key] = torch.from_numpy(np.concatenate([inputs[key].astype(np.float32) for _ in range(n)], axis=0))
+            if self.is_npz:
+                # 单输入输入为非图像 or 多输入
+                _, ext = os.path.splitext(os.path.basename(data_path))
+                assert ext == ".npz", f"data_path: {data_path}"
+                input_datas = load_npz(data_path)
+            else:
+                # 单输入且输入为图像
+                inputs = get_input_datas("", data_path)
+                for key in inputs:
+                    input_datas[key] = np.concatenate([inputs[key] for _ in range(self.model_input_batch)], axis=0)
+            input_datas = {key: torch.from_numpy(input_datas[key]) for key in input_datas}
                 
         t_start = time.time()
         if self.quant_cfg["debug_level"] == 1:
@@ -289,7 +311,7 @@ class XH1Exec(BaseExec, ABC):
                 input_data = np.concatenate((crop, resize, pad))
             else:
                 if isinstance(input_datas, dict):
-                    input_data = input_datas[name]  
+                    input_data = input_datas[name]
                 else:
                     input_data = input_datas
             self.module.set_input(name, input_data)
