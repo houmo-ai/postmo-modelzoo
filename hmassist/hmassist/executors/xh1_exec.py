@@ -386,14 +386,15 @@ class XH1Exec(BaseExec, ABC):
 
     def get_golden_inputs(self):
         datas = {}
-        for input in self.inputs:
-            input_data_path = os.path.join(self.quant_dir, 'hmquant_' + self.model_name + '_' + input["name"] + '_input.npy')
+        for _input in self.inputs:
+            name = _input["name"]
+            input_data_path = os.path.join(self.quant_dir, 'hmquant_' + self.model_name + '_' + name + '_input.npy')
             if os.path.exists(input_data_path):
                 input_data = np.load(input_data_path)
-                logger.info("golden input[{}] shape = {}, dtype = {}".format(input["name"], input_data.shape, input_data.dtype))
-                input_data = input_data.astype(self.input_infos[input["name"]].dtype)
+                logger.info("golden input[{}] shape = {}, dtype = {}".format(name, input_data.shape, input_data.dtype))
+                input_data = input_data.astype(self.input_infos[name].dtype)
                 input_data = np.concatenate([input_data for i in range(self.batch)], axis=0)
-                datas[input["name"]] = input_data
+                datas[name] = input_data
             else:
                 logger.warning(f"compare canceled while golden input not found -> {input_data_path}")
                 return None 

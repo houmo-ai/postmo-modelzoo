@@ -156,7 +156,7 @@ def test(cfg):
     model = get_model(cfg)
     model.load()
     model.executor.print_input_info()
-    model.executor.print_output_info()
+    model.executor.print_output_info()     
     data_path = cfg["test"].get("data_path")
     if data_path != "none":
         if model.executor.is_npz:
@@ -171,11 +171,23 @@ def test(cfg):
             dtype = _input["dtype"]
             logger.warning(f"input[{name}] will use random data")
             inputs[name] = get_random_data(dtype, model.input_shape)
-    
+
+    chip_inputs = dict()
     if not model.executor.is_npz:   
         input_tensors = [torch.from_numpy(np.concatenate([inputs[key] for _ in range(model.executor.model_input_batch)], axis=0)) for key in inputs]
     else:
-        input_tensors = [torch.from_numpy(inputs[key]) for key in inputs]
+        import tcim_lite as tcim
+        input_info_quanted = model.executor.get_input_info()
+        input_tensors = list()
+        for name in input_info_quanted:
+            dtype = model.executor.dtype_dict[name]
+            input_info = input_info_quanted[name].astype(np.dtype(dtype).type)
+            input_tensor = tcim.runtime.Tensor(input_info, inputs[name])
+            input_tensor_quanted = tcim.runtime.Tensor(input_info_quanted[name]).to_host(to_contiguous=True)
+            input_tensor.cast_to(input_tensor_quanted)
+            input_tensor_quanted_numpy = input_tensor_quanted.numpy()
+            input_tensors.append(torch.from_numpy(inputs[name]))
+            chip_inputs[name] = np.repeat(input_tensor_quanted_numpy, repeats=model.executor.batch, axis=0)
 
     save_dir = os.path.join(model.executor.test_dir)
     if not os.path.exists(save_dir):
@@ -219,9 +231,9 @@ def test(cfg):
             for idx in range(model.executor.model_input_batch * model.executor.batch):
                 batch_datas[idx, :] = vaild_data
             chip_inputs[key] = batch_datas
-    else:
-        inputs = {name: np.repeat(inputs[name], repeats=model.executor.batch, axis=0)  for name in inputs}
-        chip_inputs = inputs
+    # else:
+    #     inputs = {name: np.repeat(inputs[name], repeats=model.executor.batch, axis=0)  for name in inputs}
+    #     chip_inputs = inputs
 
     # save chip input datas
     for input_name, input_data in chip_inputs.items():
