@@ -1,4 +1,4 @@
-# DeepSeek R1
+# DeepSeek R1 Qwen3 8b
 
 本示例展示如何把DeepSeek模型量化和编译，部署到后摩鸿途芯片的设备上。
 
@@ -6,7 +6,8 @@
 
 ## 1 模型说明
 
-本例使用的 DeepSeek 实现来源于[https://modelscope.cn/models/deepseek-ai/DeepSeek-R1](https://modelscope.cn/models/deepseek-ai/DeepSeek-R1)。
+本例使用的 DeepSeek 实现来源于[https://modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B](https://modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B)。
+本例只适用于xh2。
 
 ## 2 快速开始
 
@@ -40,7 +41,7 @@ python3 get_model.py --type hmm
 python3 get_model.py
 ```
 
-### 2.2 量化（暂不支持）
+### 2.2 量化
 
 量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上。参考命令：
 
@@ -63,7 +64,6 @@ python3 ptq.py
 |-- decoder
 |-- prefill
 |-- quant_embedding.pt
-`-- weight.npy
 ```
 
 ### 2.3 编译

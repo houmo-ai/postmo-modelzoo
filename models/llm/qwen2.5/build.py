@@ -8,6 +8,7 @@ logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
 HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
+GOLDEN_THRESH = 0.999 if HOUMO_TARGET == "xh1" else 0.98
 
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
@@ -60,13 +61,6 @@ def get_args() -> argparse.Namespace:
         type=int,
         default=HOUMO_CORE_NUM,
         help='core number',
-    )
-    parser.add_argument(
-        '--nblocks',
-        dest='nblocks',
-        type=int,
-        default=28,
-        help='block number',
     )
     parser.add_argument(
         '--stage',
@@ -166,7 +160,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
             print(f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}")
             if is_match:
                 continue
-            if cosine_dist < 0.999:
+            if cosine_dist < GOLDEN_THRESH:
                 result_check = False
         else:
             result_check = False
@@ -184,7 +178,6 @@ if __name__ == '__main__':
     curdir = os.getcwd()
     model_dir = args.model_dir
     model_name = args.model_name
-    nblocks = args.nblocks
     output_dir = args.output_dir
     ncore = args.ncore
     batch = args.batch

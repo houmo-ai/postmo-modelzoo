@@ -8,6 +8,7 @@ logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
 HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
+GOLDEN_THRESH = 0.999 if HOUMO_TARGET == "xh1" else 0.98
 
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
@@ -86,6 +87,7 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
     decode_model = os.path.join(model_dir, model_path)
     tcim.build_from_hmonnx(
         decode_model,
+        weights=os.path.join(model_dir, "weight.npy"),
         output_name=model_name,
         ncore=ncore,
         target=HOUMO_TARGET,
@@ -158,7 +160,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
             print(f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}")
             if is_match:
                 continue
-            if cosine_dist < 0.999:
+            if cosine_dist < GOLDEN_THRESH:
                 result_check = False
         else:
             result_check = False

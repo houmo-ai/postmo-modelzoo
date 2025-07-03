@@ -4,7 +4,7 @@ set -e
 target=$HOUMO_TARGET
 user=$1
 pwd=$2
-date=20250625
+date=20250702
 
 UPDATE_HMQUANT() {
     dir=$1
@@ -56,17 +56,13 @@ UPDATE_HMM_LM() {
 # UPDATE_HMQUANT "models/asr/wenet" "wenet"
 # UPDATE_HMQUANT "models/diffusion/sdxl" "sdxl"
 
-# UPDATE_HMQUANT_LM "models/llm/qwen2.5" "qwen2.5" "7b_256_8k"
-# UPDATE_HMQUANT_LM "models/llm/deepseek" "deepseek" "8b_256_8k"
-# UPDATE_HMQUANT_LM "models/llm/qwen3" "qwen3" "8b_256_2k"
-# UPDATE_HMQUANT_LM "models/llm/qwen3-14b" "qwen3" "14b_256_2k"
-
-# UPDATE_HMM_LM "models/llm/qwen2.5" "qwen2.5" "7b_256_8k" "4cores"
-# UPDATE_HMM_LM "models/llm/deepseek" "deepseek" "8b_256_8k" "4cores"
-# UPDATE_HMM_LM "models/llm/qwen3" "qwen3" "8b_256_8k" "4cores"
+# UPDATE_HMQUANT_LM "models/llm/qwen2.5" "qwen2.5" "256_4k"
+# UPDATE_HMQUANT_LM "models/llm/deepseek" "deepseek" "8b_256_2k"
+# UPDATE_HMQUANT_LM "models/llm/qwen3" "qwen3" "256_8k"
 
 # UPDATE_HMM_LM "models/llm/qwen3" "qwen3" "8b_256_8k" "2cores"
 # UPDATE_HMM_LM "models/llm/qwen3" "qwen3" "8b_256_2k" "2cores"
+# UPDATE_HMM_LM "models/llm/deepseek" "deepseek" "8b_256_2k" "2cores"
 # UPDATE_HMM_LM "models/llm/qwen3-14b" "qwen3" "14b_256_8k" "2cores"
 # UPDATE_HMM_LM "models/llm/qwen3-14b" "qwen3" "14b_256_2k" "2cores"
 # UPDATE_HMM_LM "models/llm/qwen3-32b" "qwen3" "32b_256_2k" "2cores"

@@ -7,6 +7,7 @@
 ## 1 模型说明
 
 本例使用的 sdxl 实现来源于[https://modelscope.cn/models/stabilityai/stable-diffusion-xl-base-1.0](https://modelscope.cn/models/stabilityai/stable-diffusion-xl-base-1.0)。
+本例只适用于xh1。
 
 ## 2 快速开始
 

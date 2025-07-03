@@ -7,6 +7,7 @@
 ## 1 模型说明
 
 本例使用的模型实现来源于[https://modelscope.cn/models/Qwen/Qwen3-14B](https://modelscope.cn/models/Qwen/Qwen3-14B)。
+本例只适用于xh2。
 
 ## 2 快速开始
 

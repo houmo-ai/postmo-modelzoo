@@ -7,6 +7,7 @@
 ## 1 模型说明
 
 本例使用的 sd3 实现来源于[https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers](https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers)。
+本例只适用于xh2。
 
 ## 2 快速开始
 
