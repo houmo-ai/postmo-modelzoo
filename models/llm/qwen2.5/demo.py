@@ -325,8 +325,7 @@ class HmQwenXh2:
             input_data = self.decode.get_output(self.decode.get_output_name(0)).numpy()
             decode_count += 1
 
-            scale = 100000
-            next_id = (input_data * scale).astype('int32').argmax(-1)[0]
+            next_id = input_data.astype(np.float32).argmax(-1)[0]
             next_id = torch.from_numpy(next_id)
             if next_id == self.tokenizer.eos_token_id:
                 print(decode_response, end="",flush=True)
