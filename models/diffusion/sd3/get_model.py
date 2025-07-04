@@ -39,7 +39,7 @@ if __name__ == '__main__':
     quant_model_dir = args.quant_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
-    hmm_path = "models/sd3/hmm_xh2_sd3_2cores_20250703.zip"
+    hmm_path = "models/sd3/hmm_xh2_sd3_2cores_20250704.zip"
 
     if model_type in ["raw", "all"]:
         from modelscope import snapshot_download
