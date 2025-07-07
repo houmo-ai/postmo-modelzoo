@@ -202,6 +202,71 @@ def xywh2xyxy(x):
     y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
     return y
 
+def non_max_suppression_scale_kpt(pred,
+                                  image,
+                                  target_shape,
+                                  conf_threshold=0.25,
+                                  iou_thres=0.45):
+    def iou(box1, box2):
+        def area_box(box):
+            return (box[2] - box[0]) * (box[3] - box[1])
+
+        left   = max(box1[0], box2[0])
+        top    = max(box1[1], box2[1])
+        right  = min(box1[2], box2[2])
+        bottom = min(box1[3], box2[3])
+        cross  = max((right-left), 0) * max((bottom-top), 0)
+        union  = area_box(box1) + area_box(box2) - cross
+        if cross == 0 or union == 0:
+            return 0
+        return cross / union
+    boxes = []
+    pred = pred.unsqueeze(0)
+    (img_h, img_w) = image.shape[:2]
+    (target_w, target_h) = target_shape
+    scale = min(target_w / img_w, target_h / img_h)
+    new_w = int(img_w * scale)
+    new_h = int(img_h * scale)
+    pad_w = (target_w - new_w) // 2
+    pad_h = (target_h - new_h) // 2
+    for img_id, box_id in zip(*np.where(pred[...,4] > conf_threshold)):
+        item = pred[img_id, box_id]
+        cx, cy, w, h, conf = item[:5]
+        left    = cx - w * 0.5
+        top     = cy - h * 0.5
+        right   = cx + w * 0.5
+        bottom  = cy + h * 0.5
+        keypoints = item[5:].reshape(-1, 3)
+        keypoints[:, 0] = (keypoints[:, 0] - pad_w) / scale
+        keypoints[:, 1] = (keypoints[:, 1] - pad_h) / scale
+        boxes.append([left, top, right, bottom, conf, *keypoints.reshape(-1).tolist()])
+    if not boxes:
+        return boxes
+    boxes = np.array(boxes)
+
+    lr = boxes[:,[0, 2]]
+    tb = boxes[:,[1, 3]]
+    boxes[:,[0,2]] = (lr - pad_w) / scale
+    boxes[:,[1,3]] = (tb - pad_h) / scale
+    boxes = sorted(boxes.tolist(), key=lambda x:x[4], reverse=True)
+    if not boxes:
+        return boxes
+    remove_flags = [False] * len(boxes)
+
+    keep_boxes = []
+    for i, ibox in enumerate(boxes):
+        if remove_flags[i]:
+            continue
+
+        keep_boxes.append(ibox)
+        for j in range(i + 1, len(boxes)):
+            if remove_flags[j]:
+                continue
+
+            jbox = boxes[j]
+            if iou(ibox, jbox) > iou_thres:
+                remove_flags[j] = True
+    return keep_boxes
 
 def non_max_suppression2(
         prediction,

@@ -121,6 +121,12 @@ def detections2txt(detections, filepath):
             text = "{} {} {} {} {} {}\n".format(conf, cls, x1, y1, x2, y2)
             f.write(text)
 
+def estimations2txt(estimations, filepath):
+    with open(filepath, "w") as f:
+        for est in estimations:
+            (x1, y1, x2, y2), conf, kps = est[0:4], est[4], est[5:]
+            text = "{} {} {} {} {} {}\n".format(conf, x1, y1, x2, y2, " ".join(map(str, kps)))
+            f.write(text)
 
 def detections_mask2json(detections, contours_lists: list, filepath):
     with open(filepath, "w") as f:
@@ -255,6 +261,42 @@ def detection_txt2json(save_results, pred_json, to_coco91=True):
         json.dump(pred_list, f)
     logger.info("Write pred results to json file -> {}".format(pred_json))
 
+def estimation_txt2json(save_results, pred_json):
+    """将检测的txt结果转为coco json
+    JSON format [{"image_id": 42, "category_id": 18, "bbox": [258.15, 41.29, 348.26, 243.78], "score": 0.236}, ...]
+    :param save_results:
+    :param pred_json:
+    :param to_coco91:
+    :return:
+    """
+    label_files = os.listdir(save_results)
+    pred_list = list()
+    for filename in label_files:
+        name, ext = os.path.splitext(filename)
+        if ext != ".txt":
+            continue
+        image_id = int(name)
+        with open(os.path.join(save_results, filename), "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                conf, x1, y1, x2, y2, *keypoints = line.strip().split()
+                keypoints = list(map(float, keypoints))
+                conf = float(conf)
+                x1 = int(float(x1))
+                y1 = int(float(y1))
+                x2 = int(float(x2))
+                y2 = int(float(y2))
+                category_id = 1
+                pred_list.append({
+                    "image_id": image_id,
+                    "category_id": category_id,
+                    "bbox": [x1, y1, x2, y2],
+                    "score": conf,
+                    "keypoints": keypoints
+                })
+    with open(pred_json, "w") as f:
+        json.dump(pred_list, f)
+    logger.info("Write pred results to json file -> {}".format(pred_json))
 
 def coco_eval(pred_json, anno_json, image_ids, iou_type="bbox"):
     """ coco 评估方法
