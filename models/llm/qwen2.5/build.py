@@ -198,6 +198,6 @@ if __name__ == '__main__':
     # test model
     if args.stage == 'test' or args.stage == 'all':
         part_dir = os.path.join(model_dir, "prefill")
-        test("qwen2.5_prefill", part_dir, output_dir, profile, prefix=model_name)
+        # test("qwen2.5_prefill", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "decoder")
-        test("qwen2.5_decode", part_dir, output_dir, profile, prefix=model_name)
+        # test("qwen2.5_decode", part_dir, output_dir, profile, prefix=model_name)

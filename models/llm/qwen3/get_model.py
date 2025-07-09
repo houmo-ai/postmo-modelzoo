@@ -47,7 +47,7 @@ if __name__ == '__main__':
         hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250603.zip"
     elif HOUMO_TARGET == "xh2":
         quant_path = "models/qwen3/hmquant_xh2_qwen3_8b_256_2k_20250625.zip"
-        hmm_path = "models_outdated/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250701.zip"
+        hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250701.zip"
 
     if model_type in ["raw", "all"]:
         get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
