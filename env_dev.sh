@@ -57,7 +57,9 @@ export PYTHONPATH=$HOUMO_MODELZOO_PATH/hmodel/xh2:$PYTHONPATH
 
 # use asic if detected
 if [[ -z $HDPL_PLATFORM ]]; then
-  if ls /dev/ | grep -q 'hmcl_client_mgr'; then
+  if { [[ "$HOUMO_TARGET" == "xh1" ]] && ls /dev/ | grep -q 'hmcl_client_mgr'; } ||
+    { [[ "$HOUMO_TARGET" == "xh2" ]] && ls /dev/ | grep -q 'xh2a'; }
+  then
     export HDPL_PLATFORM=ASIC
   else
     export HDPL_PLATFORM=ISIM
