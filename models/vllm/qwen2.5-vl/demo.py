@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+import argparse
 from loguru import logger
 logging.basicConfig(level=logging.ERROR)
 import warnings
@@ -14,24 +15,58 @@ from qwen_vl_utils import process_vision_info
 from processing_qwen2_5_vl import Qwen2_5_VLProcessor
 from utils import get_rope_index, QRawToYuv
 
-TOKENIZER_PATH = "qwen2.5vl-3b"
+TOKENIZER_PATH = "qwen2.5-vl-3b"
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 EMBEDDING_PATH = os.path.join('output', HOUMO_TARGET, 'hmquant', 'quant_embedding.pt')
+
+def get_args() -> argparse.Namespace:
+    """Parse commandline."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--model_dir',
+        dest='model_dir',
+        type=str,
+        default=os.path.join('output', HOUMO_TARGET),
+        help='houmo model dir',
+    )
+    parser.add_argument(
+        '--prefill',
+        dest='prefill_shape',
+        type=list,
+        default=(1, 256),
+        help='prefill max length',
+    )
+    parser.add_argument(
+        '--decode',
+        dest='decode_length',
+        type=int,
+        default=2048,
+        help='decode max length',
+    )
+    parser.add_argument(
+        '--model_size',
+        dest='model_size',
+        type=str,
+        default="3b",
+        choices=["3b", "7b"],
+        help='model size',
+    )
+    args = parser.parse_args()
+    return args
 
 class Qwen25VL:
     def __init__(
             self,
             model_dir,
-            processor,
             cache_len=2048,
             device="cpu",
             prefill_shape=(1, 256),
             window_size=112,
             spatial_merge_size=2,
             patch_size=14,
-            blocks=36, # 3B is 36 Blocks, 7B is 28 Blocks):
+            model_size="3b", # 3B is 36 Blocks, 7B is 28 Blocks):
         ):
-        self.processor = processor
+        self.processor = Qwen2_5_VLProcessor.from_pretrained(TOKENIZER_PATH)
         self.cache_len = cache_len
         self.device = torch.device(device)
         self.prefill_shape = torch.Size(prefill_shape)
@@ -41,7 +76,10 @@ class Qwen25VL:
         self.spatial_merge_size = spatial_merge_size
         self.patch_size = patch_size
         self.spatial_merge_unit = self.spatial_merge_size * self.spatial_merge_size
-        self.blocks = blocks
+        if model_size == "3b":
+            self.blocks = 36
+        elif model_size == "7b":
+            self.blocks = 28
         self.eos_token_id = [151645, 151643]
         # set mode
         self.rgb2yuv = QRawToYuv(input_color_type="RGB", toYUV_format="YUV444")
@@ -182,7 +220,7 @@ class Qwen25VL:
         self.vit_model.run()
         self.vit_model.sync()
         # vit_model_output = self.vit_model.get_output("output").numpy().astype(np.int16)
-        vit_model_output = self.vit_model.get_output("Output_getitem_2").numpy().astype(np.int16)
+        vit_model_output = self.vit_model.get_output(self.vit_model.get_output_name(0)).numpy().astype(np.int16)
         vit_model_outputs.append(torch.tensor(vit_model_output))
         #del self.vit_model
         return torch.cat(vit_model_outputs, dim=0)
@@ -258,16 +296,16 @@ class Qwen25VL:
                 self.prefill_model.set_input("current_length", prefill_inputs['current_length'].numpy())
                 self.prefill_model.run()
                 self.prefill_model.sync()
-                prefill_output = self.prefill_model.get_output("Output_lm_head_requant")
+                prefill_output = self.prefill_model.get_output(self.prefill_model.get_output_name(0))
         else:
             pre_gen_nums = 0
-            
+
         current_length = current_length % self.prefill_len
         prefill_shape = list(self.prefill_shape)
         prefill_shape.append(self.hidden_dims)
         x = torch.zeros(prefill_shape, dtype=torch.long)
         x[:, :current_length] = inputs_embeds[:, -current_length:]
-        
+
         x_time = torch.zeros(self.prefill_len, dtype=torch.long)
         x_hight = torch.zeros(self.prefill_len, dtype=torch.long)
         x_width = torch.zeros(self.prefill_len, dtype=torch.long)
@@ -292,7 +330,7 @@ class Qwen25VL:
         self.prefill_model.set_input("current_length", prefill_inputs['current_length'].numpy())
         self.prefill_model.run()
         self.prefill_model.sync()
-        prefill_output = self.prefill_model.get_output("Output_lm_head_requant")
+        prefill_output = self.prefill_model.get_output(self.prefill_model.get_output_name(0))
         next_id = prefill_output.numpy().argmax(-1)
         return prefill_output, next_id, valid_length, current_length
 
@@ -334,7 +372,7 @@ class Qwen25VL:
         self.decode_model.set_input("current_length", decoder_inputs['current_length'].numpy())
         self.decode_model.run()
         self.decode_model.sync()
-        decoder_output = self.decode_model.get_output("Output_lm_head_requant")
+        decoder_output = self.decode_model.get_output(self.decode_model.get_output_name(0))
         self.next_id = decoder_output.numpy().argmax(-1)
         if self.next_id.item() in self.eos_token_id:
             return None
@@ -343,10 +381,8 @@ class Qwen25VL:
         return next_str
 
 if __name__ == "__main__":
-    # default processer
-    processor = Qwen2_5_VLProcessor.from_pretrained("qwen2.5-vl-3b")
-    model_dir = os.path.join('output', HOUMO_TARGET)
-    qwen25vl = Qwen25VL(model_dir, processor)
+    args = get_args()
+    qwen25vl = Qwen25VL(model_dir=args.model_dir, prefill_shape=args.prefill_shape, cache_len=args.decode_length, model_size=args.model_size)
     image_dir = "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg"
     start_time = time.time()
     qwen25vl.chat_vit_prefill(image_dir, prompt='请描述图片内容。')

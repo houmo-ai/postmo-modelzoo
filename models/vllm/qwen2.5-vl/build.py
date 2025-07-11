@@ -61,11 +61,12 @@ def get_args() -> argparse.Namespace:
         help='core number',
     )
     parser.add_argument(
-        '--nblocks',
-        dest='nblocks',
-        type=int,
-        default=36,
-        help='block number',
+        '--model_size',
+        dest='model_size',
+        type=str,
+        default="3b",
+        choices=["3b", "7b"],
+        help='model size',
     )
     parser.add_argument(
         '--stage',
@@ -183,7 +184,10 @@ if __name__ == '__main__':
     curdir = os.getcwd()
     model_dir = args.model_dir
     model_name = args.model_name
-    nblocks = args.nblocks
+    if args.model_size == "3b":
+        nblocks = 36
+    elif args.model_size == "7b":
+        nblocks = 28
     output_dir = args.output_dir
     ncore = args.ncore
     batch = args.batch

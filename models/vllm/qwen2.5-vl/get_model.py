@@ -30,6 +30,14 @@ def get_args() -> argparse.Namespace:
         default='',
         help='where to save downloaded model',
     )
+    parser.add_argument(
+        '--model_size',
+        dest='model_size',
+        type=str,
+        default="3b",
+        choices=["3b", "7b"],
+        help='model size',
+    )
     args = parser.parse_args()
     return args
 
@@ -43,7 +51,9 @@ if __name__ == '__main__':
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
     quant_path = "models/qwen2.5-vl/hmquant_qwen2.5-vl_256_2k_20250626.zip"
+    quant_path_7b = "models/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_7b_256_2k_20250711.zip"
     hmm_path = "models/qwen2.5-vl/hmm_qwen2.5-vl_256_2k_4cores_20250626.zip"
+    hmm_path_7b = "models/qwen2.5vl/hmm_xh1_qwen2.5vl_7b_256_2k_4cores_20250711.zip"
 
     if model_type in ["raw", "all"]:
         get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
@@ -55,7 +65,15 @@ if __name__ == '__main__':
     snapshot_download('Qwen/Qwen2.5-VL-3B-Instruct', local_dir='qwen2.5-vl-3b', ignore_patterns=ignore_patterns)
 
     if model_type in ["quant", "all"]:
-        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        if args.model_size == "3b":
+            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        elif args.model_size == "7b":
+            get_file_from_jfrog(quant_path_7b, model_dir, quant_model_dir)
+
 
     if model_type in ["hmm", "all"]:
-        get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        if args.model_size == "3b":
+            get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        elif args.model_size == "7b":
+            get_file_from_jfrog(hmm_path_7b, model_dir, os.path.join('output', HOUMO_TARGET))
+
