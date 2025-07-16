@@ -38,6 +38,19 @@ extern "C" {
 #include "infer_module.hpp"
 #include "video_decoder.h"
 
+#ifdef RK_DECODER
+#include "h264.h"
+#include "rk_type.h"
+#include "rk_mpi.h"
+#include "mpp_frame.h"
+
+// #define DUMP_RK_DECODED_DATA  // save rk decoded results
+#endif
+
+#define DECODER_QUEUE_SIZE 20
+#define INFERENCE_QUEUE_SIZE 10
+
+// #define DUMP_HM_DECODED_DATA  // save hm decoded results
 
 typedef struct ObjInfo {
   DetectResult det;
@@ -49,6 +62,11 @@ typedef struct {
   std::vector<ObjInfo> objs;
   uint64_t req_id;
   bool is_end = false;
+#ifdef RK_DECODER
+  // only used in rk decoder
+  std::shared_ptr<void> buffer;
+  size_t buffer_length;
+#endif
 } TaskInfo;
 
 typedef struct {
@@ -67,8 +85,7 @@ typedef struct {
   int id = 0;
 } InferInfo;
 
-int SaveImgs(int height, int width, void* data_ptr, std::string file_name)
-{
+int SaveImgs(int height, int width, void* data_ptr, std::string folder_name, std::string file_name) {
   cv::Mat nv12(height * 3 / 2, width, CV_8UC1, data_ptr);
   cv::Mat rgb;
   cv::cvtColor(nv12, rgb, cv::COLOR_YUV2RGB_NV12);
@@ -76,15 +93,194 @@ int SaveImgs(int height, int width, void* data_ptr, std::string file_name)
   cv::cvtColor(rgb, bgr, cv::COLOR_BGR2RGB);
 
   fs::path file_path(file_name + ".jpg");
-  fs::path result_path("debug_results");
+  fs::path result_path(folder_name);
   if (!fs::exists(result_path)) {
-    fs::create_directory("debug_results");
+    fs::create_directory(folder_name);
   }
   fs::path result_file = result_path / file_path.filename();
   cv::imwrite(result_file.string().c_str(), bgr);
 
   return VIDEO_DECODER_OK;
 }
+
+#ifdef RK_DECODER
+void PushRKStream(PushStreamInfo& stream_info, TaskQueue& qout, Barrier& barrier) {
+  // when iteration is greater than 1, reusing the decoded data
+  int iteration = 1;
+  H264DataSource* data_source = H264DataSource::CreateH264Source(stream_info.stream_path, iteration);
+  MppCtx ctx          = NULL;
+  MppApi *mpi         = NULL;
+  MppBuffer frm_buf   = NULL;
+  MppDecCfg cfg       = NULL;
+  MPP_RET ret         = MPP_OK;
+  MppCodingType type  = MppCodingType::MPP_VIDEO_CodingAVC;
+
+  ret = mpp_create(&ctx, &mpi);
+  if (ret) {
+    LOG_ERROR << "[RK Decoder] mpp_create failed!";
+    return;
+  }
+  ret = mpp_init(ctx, MPP_CTX_DEC, type);
+  if (ret) {
+    LOG_ERROR << "[RK Decoder] mpp_init failed!";
+    return;
+  }
+  mpp_dec_cfg_init(&cfg);
+  // get default config from decoder context
+  ret = mpi->control(ctx, MPP_DEC_GET_CFG, cfg);
+  if (ret) {
+    LOG_ERROR << "[RK Decoder] " << ctx << " failed to get decoder cfg, ret " << ret;
+    return;
+  }
+
+  barrier.barrier();
+  LOG_INFO << "[RK Decoder] mpp ctx " << ctx << " start to decode stream...";
+
+  uint64_t fid = 0;
+  while(true){
+    uint8_t *data = nullptr;
+    MppPacket packet = NULL;
+    int32_t data_length = 0;
+    ret = mpp_packet_init(&packet, NULL, 0);
+    if (ret) {
+      LOG_ERROR << "[RK Decoder] mpp_packet_init failed!";
+      break;
+    }
+    if (!data_source->GetData(&data, &data_length)) {
+      LOG_WARN << "[RK Decoder] No data in data source at all for.";
+      break;
+    }
+
+    mpp_packet_set_data(packet, data);
+    mpp_packet_set_size(packet, data_length);
+    mpp_packet_set_pos(packet, data);
+    mpp_packet_set_length(packet, data_length);
+    ret = mpi->decode_put_packet(ctx, packet);
+    if (MPP_OK != ret) {
+      LOG_ERROR << "[RK Decoder] " << ctx << " mpp decode_put_packet failed, ret " << ret;
+      continue;
+    }
+
+    while(true) {
+      MppFrame frame = NULL;
+      RK_S32 times = 30;
+      do {
+        ret = mpi->decode_get_frame(ctx, &frame);
+        if (MPP_ERR_TIMEOUT == ret) {
+          times--;
+        } else {
+          break;
+        }
+      } while (times > 0);
+      if (frame) {
+        if (mpp_frame_get_info_change(frame)) {
+          RK_U32 width = mpp_frame_get_width(frame);
+          RK_U32 height = mpp_frame_get_height(frame);
+          RK_U32 hor_stride = mpp_frame_get_hor_stride(frame);
+          RK_U32 ver_stride = mpp_frame_get_ver_stride(frame);
+          RK_U32 buf_size = mpp_frame_get_buf_size(frame);
+          LOG_INFO << "[RK Decoder] frame info change: width = " << width
+                    << ", height = " << height
+                    << ", hor_stride = " << hor_stride
+                    << ", ver_stride = " << ver_stride
+                    << ", buf_size = " << buf_size;
+          ret = mpi->control(ctx, MPP_DEC_SET_INFO_CHANGE_READY, NULL);
+          if (ret) {
+            LOG_ERROR << "[RK Decoder] " << ctx << " info change ready failed, ret " << ret;
+          }
+        } else {
+          // drop Frames
+          // if (fid % 6 != 0) {
+          //   fid++;
+          //   mpp_frame_deinit(&frame);
+          //   continue;
+          // }
+          MppBuffer buffer = NULL;
+          RK_U8 *base = NULL;
+          buffer = mpp_frame_get_buffer(frame);
+          if (NULL == buffer) {
+            break;
+          }
+
+          RK_U32 width = mpp_frame_get_width(frame);
+          RK_U32 height = mpp_frame_get_height(frame);
+          RK_U32 hor_stride = mpp_frame_get_hor_stride(frame);
+          RK_U32 ver_stride = mpp_frame_get_ver_stride(frame);
+          base = (RK_U8 *)mpp_buffer_get_ptr(buffer);
+          RK_U32 buf_size = mpp_frame_get_buf_size(frame);
+
+          // copy the decoded result to a contiguous buffer
+          RK_U32 i;
+          RK_U8 *base_y = base;
+          RK_U8 *base_c = base + hor_stride * ver_stride;
+          size_t frame_size = (height * 3 / 2) * width;
+          auto result = std::shared_ptr<void>(malloc(frame_size), free);
+          memcpy(result.get(), base_y, (width * height));
+          memcpy(result.get() + (width * height), base_c, (width * height/2));
+
+          // construct TaskInfo for inference
+          TaskInfo task_info;
+          task_info.req_id = fid++;
+          task_info.buffer = result;
+          task_info.buffer_length = frame_size;
+
+          bool print_flag = true;
+          while (1) {
+            std::unique_lock<std::mutex> lock(qout.mutex);
+            // check if det queue is too full
+            int size = qout.queue.size();
+            if (size <= DECODER_QUEUE_SIZE) {
+              qout.queue.push(task_info);
+              qout.cond.notify_all();
+              lock.unlock();
+              break;
+            }
+            if (print_flag) {
+              LOG_WARN << "[RK Decoder] push rk stream queue size " << size << " exceed 20, push stream suspended.";
+              print_flag = false;
+            }
+            lock.unlock();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          }
+        }
+        mpp_frame_deinit(&frame);
+      } else {
+        break;
+      }
+    }
+    if (packet) {
+      mpp_packet_deinit(&packet);
+      packet = NULL;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(40));
+  }
+
+  // construct eos TaskInfo
+  TaskInfo task_info;
+  task_info.req_id = fid++;
+  task_info.is_end = true;
+  {
+    std::unique_lock<std::mutex> lock(qout.mutex);
+    qout.queue.push(task_info);
+    LOG_INFO << "===> [RK Decoder] push eos task, req_id " << task_info.req_id;
+    qout.cond.notify_all();
+    lock.unlock();
+  }
+
+  ret = mpi->reset(ctx);
+  if (ret) {
+    LOG_ERROR << "[RK Decoder] " << ctx << " mpp reset failed, ret:" << ret;
+    return;
+  }
+  if (ctx) {
+    mpp_destroy(ctx);
+    ctx = NULL;
+  }
+  delete data_source;
+
+  LOG_INFO << "<=== PushRKStream thread exit. " << --fid << " frames received.";
+}
+#endif
 
 void PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info, Barrier& barrier)
 {
@@ -313,19 +509,19 @@ void GetFrame(VideoDecoder& decoder, TaskQueue& qout, Barrier& barrier) {
     run_opt.interp_mode = tcim::ImageOps::Resizer::EnInterpMode::Nearest;
     img_resizer.resizer->Run(yuv_tensor, resized_yuv_tensor, run_opt, true);
 
-#ifdef SAVE_IMGS
+#ifdef DUMP_HM_DECODED_DATA
     auto decoded_tensor = yuv_tensor.ToHost(true);
     auto resized_tensor = resized_yuv_tensor.ToHost(true);
 
     std::string decoded_file_name = "decoded_" + std::to_string(fid);
-    SaveImgs(height, width, decoded_tensor.Data(), decoded_file_name);
+    SaveImgs(height, width, decoded_tensor.Data(), "debug_results", decoded_file_name);
     LOG_INFO << "save the decoded image, file_path:" << decoded_file_name;
 
     std::string resized_file_name = "resized_" + std::to_string(fid);
-    SaveImgs(md_heigth, md_width, resized_tensor.Data(), resized_file_name);
+    SaveImgs(md_heigth, md_width, resized_tensor.Data(), "debug_results", resized_file_name);
     LOG_INFO << "save the resized image, file_path:" << resized_file_name;
-#endif
-#endif
+#endif  // DUMP_HM_DECODED_DATA
+#endif  // RESIZER
 
     count++;
     decoder.ReleaseBuf();
@@ -337,14 +533,14 @@ void GetFrame(VideoDecoder& decoder, TaskQueue& qout, Barrier& barrier) {
     task_info.image = resized_yuv_tensor.Buffer();
 #else
     task_info.image = yuv_tensor.Buffer();
-#endif
+#endif // RESIZER
 
     bool print_flag = true;
     while (1) {
       std::unique_lock<std::mutex> lock(qout.mutex);
       // check if det queue is too full
       int size = qout.queue.size();
-      if (size <= 10) {
+      if (size <= DECODER_QUEUE_SIZE) {
         qout.queue.push(task_info);
         LOG_DEBUG << "decoder pull data req_id " << task_info.req_id << ", queue size " << size;
         qout.cond.notify_all();
@@ -353,7 +549,7 @@ void GetFrame(VideoDecoder& decoder, TaskQueue& qout, Barrier& barrier) {
         break;
       }
       if (print_flag) {
-        LOG_WARN << "det queue size " << size << " exceed 10, get frame suspended.";
+        LOG_WARN << "det queue size " << size << " exceed 20, get frame suspended.";
         print_flag = false;
       }
       lock.unlock();
@@ -368,16 +564,19 @@ void GetFrame(VideoDecoder& decoder, TaskQueue& qout, Barrier& barrier) {
 // define detect thread
 void detect(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& barrier) {
   YoloV5 yolov5;
+  // {cropX, cropY, crop height, crop width, resize heigth, resize width, pad top, pad left, pad bottom, pad right}
   int32_t dyn_info[10] = {0, 0, 1080, 1920, 360, 640, 140, 0, 140, 0};
-  // wait until all threads ready
-  barrier.barrier();
+
   int count = 0;
   auto& module = infer_info.module;
   std::string image_input_name = "images";
   std::string dyn_info_name = "dyn_info";
   auto& input_infos = module.GetInputInfoMap();
   auto& output_infos = module.GetOutputInfoMap();
-  LOG_INFO << "detect thread " << infer_info.id << " infer start...";
+
+  // wait until all threads ready
+  barrier.barrier();
+  LOG_INFO << "detect thread, moudle " << infer_info.id << " infer start...";
 
   // detect loop
   while (true) {
@@ -402,12 +601,38 @@ void detect(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& bar
     std::map<std::string, tcim::Tensor> input_map;
     std::map<std::string, tcim::Tensor> output_map;
 
-    // prepare input
+#ifdef RK_DECODER
+#ifdef DUMP_RK_DECODED_DATA
+    std::string decoded_file_name = "rk_" + std::to_string(task_info.req_id);
+    SaveImgs(1080, 1920, task_info.buffer.get(), "decoder_results", decoded_file_name);
+    LOG_INFO << "save the decoded image, file_path:" << decoded_file_name;
+#endif  // DUMP_RK_DECODED_DATA
+
+    // create a tensor for rk decoded data
+    auto input_info = input_infos[image_input_name];
+    tcim::Tensor decoded_host_tensor;
+    if (input_info.MemSize() > task_info.buffer_length) {
+      decoded_host_tensor = tcim::Tensor::CreateHostTensor(input_info);
+      memcpy(decoded_host_tensor.Data(), task_info.buffer.get(),
+             task_info.buffer_length);
+    } else {
+      decoded_host_tensor = tcim::Tensor::CreateHostTensor(
+          input_info, input_info.MemSize(), task_info.buffer.get());
+    }
+    task_info.image = decoded_host_tensor.Buffer();
+
+    // prepare image input
+    input_map[image_input_name] = decoded_host_tensor;
+#else  // !RK_DECODER
+    // prepare image input
     auto input_info = input_infos[image_input_name];
     if (task_info.image.Device() == tcim::CPU) {
       input_info = input_info.AsContiguous();
     }
     input_map[image_input_name] = tcim::Tensor(input_info, task_info.image);
+#endif  // RK_DECODER
+
+    // prepare dyn_info input
     auto it = input_infos.find(dyn_info_name);
     if (it != input_infos.end()) {
       input_map[dyn_info_name] = tcim::Tensor::CreateHostTensor(it->second.AsContiguous());
@@ -445,6 +670,9 @@ void detect(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& bar
     count++;
 
     // postprocess
+#ifdef RK_DECODER
+    tcim::Tensor tensor = input_map[image_input_name];
+#else  // !RK_DECODER
     tcim::Tensor tensor;
     if (task_info.image.Device() == tcim::HDPL) {
       auto info = input_map[image_input_name].Info().AsContiguous();
@@ -453,6 +681,7 @@ void detect(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& bar
     } else {
       tensor = input_map[image_input_name];
     }
+#endif  // RK_DECODER
     cv::Mat nv12(1080 * 3 / 2, 1920, CV_8UC1, tensor.Data());
     cv::Mat rgb;
     cv::Mat bgr;
@@ -472,7 +701,7 @@ void detect(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& bar
     auto detections = yolov5.postprocess(bgr, outputs);
 
     // print and draw
-    printf("detect num: %d\n", (int)detections.size());
+    LOG_INFO << "detect num:" << detections.size();
     for (const auto& detection : detections) {
       // printf("box[%d, %d, %d, %d], conf:%f, cls:%d\n", detection.box.x1, detection.box.y1,
       //        detection.box.x2, detection.box.y2, detection.conf, detection.cls);
@@ -499,9 +728,9 @@ void detect(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& bar
       std::unique_lock<std::mutex> lock(qout.mutex);
       // check if cls queue is too full
       int size = qout.queue.size();
-      if (size <= 10) {
+      if (size <= INFERENCE_QUEUE_SIZE) {
         qout.queue.push(task_info);
-        LOG_DEBUG << "detect push task req_id " << task_info.req_id
+        LOG_DEBUG << "detect push task req_id " << task_info.req_id << ", obj num " << task_info.objs.size()
                   << ", queue size " << size;
         qout.cond.notify_all();
         lock.unlock();
@@ -530,7 +759,9 @@ void classify(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& b
   std::string dyn_info_name = "dyn_info";
   auto& input_infos = module.GetInputInfoMap();
   auto& output_infos = module.GetOutputInfoMap();
-  LOG_INFO << "classify thread " << infer_info.id << " infer start...";
+
+  barrier.barrier();
+  LOG_INFO << "classify thread, module " << infer_info.id << " infer start...";
 
   // classify loop
   while (true) {
@@ -559,6 +790,7 @@ void classify(InferInfo& infer_info, TaskQueue& qin, TaskQueue& qout, Barrier& b
         input_info = input_info.AsContiguous();
       }
       input_map[image_input_name] = tcim::Tensor(input_info, task_info.image);
+
       auto it = input_infos.find(dyn_info_name);
       if (it != input_infos.end()) {
         input_map[dyn_info_name] = tcim::Tensor::CreateHostTensor(it->second.AsContiguous());
@@ -657,7 +889,8 @@ int main(int argc, char **argv)
   }
 
   // create infer threads
-  Barrier barrier(det_thread_num);
+  int infer_thread_num = det_thread_num + cls_thread_num;
+  Barrier barrier(infer_thread_num);
   std::vector<InferInfo> det_infer_infos(det_thread_num);
   std::vector<InferInfo> cls_infer_infos(cls_thread_num);
 
@@ -689,16 +922,21 @@ int main(int argc, char **argv)
   wm.~WeightManager();
   barrier.wait();
 
-  VideoDecoder decoder(format, "NV12M");
-  Barrier barrier2(2);
   PushStreamInfo stream_info = {stream_path, frame_limit};
+#ifdef RK_DECODER
+  Barrier barrier2(1);
+  threads.emplace_back(std::thread(&PushRKStream, std::ref(stream_info), std::ref(q_det), std::ref(barrier2)));
+#else
+  Barrier barrier2(2);
+  VideoDecoder decoder(format, "NV12M");
 #ifdef RESIZER
   decoder.SetModelInfo(1920, 1080);  // yolov5s input shape (width, height)
-#endif
+#endif  // RESIZER
   // create push stream thread
   threads.emplace_back(std::thread(&PushStream, std::ref(decoder), std::ref(stream_info), std::ref(barrier2)));
   // create rcv frame thread
   threads.emplace_back(std::thread(&GetFrame, std::ref(decoder), std::ref(q_det), std::ref(barrier2)));
+#endif  // RK_DECODER
   barrier2.wait();
 
   for (auto & t: threads) {

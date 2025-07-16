@@ -1,3 +1,6 @@
+#ifndef EXAMPLES_SCENES_VIDEO_DETECT_VIDEO_DECODER_H_
+#define EXAMPLES_SCENES_VIDEO_DETECT_VIDEO_DECODER_H_
+
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -6,8 +9,6 @@
 #include "hm_vpu_hal.h"
 #include "log.hpp"
 #include "utils.hpp"
-
-// #define SAVE_IMGS  // save image
 
 #define PUSH_LAST_STREAM_DATA_COMPLETE    (0x5a5a)
 #define V4L2_PIX_FMT_HEVC   v4l2_fourcc('H', 'E', 'V', 'C')  /* HEVC aka H.265 */
@@ -212,3 +213,4 @@ class VideoDecoder {
   int width_ = 0;
   int height_ = 0;
 };
+#endif  // EXAMPLES_SCENES_VIDEO_DETECT_VIDEO_DECODER_H_
