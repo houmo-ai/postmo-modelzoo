@@ -28,3 +28,6 @@ librosa
 # diffusion
 diffusers
 peft
+
+# qwen-vl
+qwen_vl_utils
