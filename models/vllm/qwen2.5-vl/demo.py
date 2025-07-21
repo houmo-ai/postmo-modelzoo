@@ -116,6 +116,8 @@ class Qwen25VL:
                 ],
             }
         ]
+        if image_dir:
+            messages[0]["content"][0]["image"] = image_dir
         return messages
 
     def preprocess(self, prompt, image_dir):
@@ -123,13 +125,16 @@ class Qwen25VL:
         text = self.processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
-        image_inputs, video_inputs = process_vision_info(messages)
-        resized_image_inputs = []
-        for image_input in image_inputs:
-            resized_image_input = image_input.resize((644, 364))
-            resized_image_inputs.append(resized_image_input)
+        resized_image_inputs = None
+        video_inputs = None
+        if image_dir:
+            image_inputs, video_inputs = process_vision_info(messages)
+            resized_image_inputs = []
+            for image_input in image_inputs:
+                resized_image_input = image_input.resize((644, 364))
+                resized_image_inputs.append(resized_image_input)
         inputs = self.processor(
-            text=[text],    
+            text=[text],
             images=resized_image_inputs,
             videos=video_inputs,
             padding=True,
@@ -226,18 +231,21 @@ class Qwen25VL:
         return torch.cat(vit_model_outputs, dim=0)
 
     def preprocess_prefill(self, inputs, image_features):
+        image_grid_thw = None
         input_ids = inputs["input_ids"].cpu()
         inputs_embeds = F.embedding(input_ids, self.embedding).cpu()
         mask = input_ids == 151655  # <image> token id
         mask_unsqueezed = mask.unsqueeze(-1)
         mask_expanded = mask_unsqueezed.expand_as(inputs_embeds)
         image_mask = mask_expanded
-        image_features = image_features.type(torch.long)
-        inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_features)
+        if image_features is not None:
+            image_features = image_features.type(torch.long)
+            inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_features)
+            image_grid_thw = inputs["image_grid_thw"]
 
         position_ids, rope_deltas = get_rope_index(
             input_ids,
-            inputs["image_grid_thw"],
+            image_grid_thw,
             None, # video_grid_thw is None
             None,
             inputs["attention_mask"].cpu(),
@@ -247,7 +255,7 @@ class Qwen25VL:
         hight_position_ids = position_ids[1][0]
         width_position_ids = position_ids[2][0]
         return inputs_embeds, time_position_ids, hight_position_ids, width_position_ids, rope_deltas
-    
+
     def create_prefill_inputs(self, inputs_embeds, time_position_ids, hight_position_ids, width_position_ids, pre_gen_idx):
         x = inputs_embeds[
             :,
@@ -383,8 +391,10 @@ class Qwen25VL:
 if __name__ == "__main__":
     args = get_args()
     qwen25vl = Qwen25VL(model_dir=args.model_dir, prefill_shape=args.prefill_shape, cache_len=args.decode_length, model_size=args.model_size)
+    # image_dir = None
     image_dir = "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg"
     start_time = time.time()
+    # qwen25vl.chat_vit_prefill(image_dir, prompt='你好，你是谁。')
     qwen25vl.chat_vit_prefill(image_dir, prompt='请描述图片内容。')
     visual_prefill_time = time.time() - start_time
     decode_count = 0
