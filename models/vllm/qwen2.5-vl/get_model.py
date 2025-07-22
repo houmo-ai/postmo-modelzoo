@@ -1,5 +1,5 @@
 import os
-import onnx
+import torch
 import argparse
 from hmassist.utils.utils import get_file_from_jfrog
 
@@ -41,6 +41,12 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
+def remove_hmquant_logo():
+    embedding_path = "output/{}/hmquant/quant_embedding.pt".format(HOUMO_TARGET)
+    embedding = torch.load(embedding_path)
+    os.remove(embedding_path)
+    new_embedding = embedding.data.clone()
+    torch.save(new_embedding, embedding_path)
 
 if __name__ == '__main__':
     args = get_args()
@@ -77,3 +83,4 @@ if __name__ == '__main__':
         elif args.model_size == "7b":
             get_file_from_jfrog(hmm_path_7b, model_dir, os.path.join('output', HOUMO_TARGET))
 
+    remove_hmquant_logo()
