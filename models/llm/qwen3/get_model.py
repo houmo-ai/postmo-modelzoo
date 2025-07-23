@@ -33,7 +33,6 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
-
 if __name__ == '__main__':
     args = get_args()
     quant_model_dir = args.quant_model_dir
@@ -46,8 +45,8 @@ if __name__ == '__main__':
         quant_path = "models/qwen3/hmquant_qwen3_256_8k_20250603.zip"
         hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250603.zip"
     elif HOUMO_TARGET == "xh2":
-        quant_path = "models/qwen3/hmquant_xh2_qwen3_8b_256_2k_20250625.zip"
-        hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250701.zip"
+        quant_path = "models/qwen3/hmquant_xh2_qwen3_8b_256_2k_20250723.zip"
+        hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250723.zip"
 
     if model_type in ["raw", "all"]:
         get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
