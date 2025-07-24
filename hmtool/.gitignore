@@ -1,0 +1,7 @@
+models
+build
+dist
+*.egg-info
+*.pyc
+*.so
+__pycache__
