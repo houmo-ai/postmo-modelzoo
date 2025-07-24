@@ -51,5 +51,9 @@ cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH -DENABLE_RESIZER=$RESIZER_SWITCH -DENABL
 make -j
 make install
 
+if [ "$RK_DECODER_SWITCH" = "ON" ]; then
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+fi
+
 cd $WORK_PATH
 ./example_video_detect

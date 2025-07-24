@@ -65,6 +65,9 @@ cd ..
 ./example_video_detect
 ```
 
+如果使用RK解码方案，则需在执行C++演示程序前，设置环境变量：
+`export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib`
+
 #### 2.3 参考结果
 
 模型推理完成后会进行后处理，获得分类结果，执行成功输出以下打印：
