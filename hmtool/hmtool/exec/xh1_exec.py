@@ -131,7 +131,7 @@ class Xh1Exec(BaseExec):
             new_input_cfg["fold"] = self.resizer_mode in [2, 3]  # 可量化内部判断
             if resize_type == 1:
                 # padding 
-                padding_values = input_cfg.get["padding_values"]
+                padding_values = input_cfg["padding_values"]
                 padding_values = [v - 128 for v in padding_values]  # 需要减128、
                 new_input_cfg["resizer_pad"] = {"value": padding_values}
             quant_cfg["inputs_cfg"][input_name].update(new_input_cfg)
