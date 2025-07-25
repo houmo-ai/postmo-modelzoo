@@ -31,6 +31,7 @@ class Xh2Exec(BaseExec):
         self.quant_onnx_model_path = os.path.join(self.save_dir, "xh2", f"{self.model_name}_xh2.onnx")
         self.golden_dir = os.path.join(self.quant_output_dir, "golden")
         self.quant_advance_cfg = self.quant_cfg.get("config", dict())
+        self.upgrade_opset_version()
   
     def get_quant_cfg(self) -> dict:
         return dict()
@@ -38,11 +39,36 @@ class Xh2Exec(BaseExec):
     def get_quant_dataset(self):
         """提供量化数据"""
         return dict()
-        
+    
+    def upgrade_opset_version(self):
+        import onnx
+        from onnx import version_converter
+        model = onnx.load(self.model_path)
+        # 遍历模型中的 opset_import 字段（可能有多个域）
+        opset_version = None
+        for opset in model.opset_import:
+            if opset.domain == "":  # 主域（默认的 ONNX operator set）
+                opset_version = opset.version
+                break
+        if opset_version is None:
+            logger.warning(f"Not found onnx opset version: {self.model_path}")
+            return
+        min_opset_version = 11
+        if opset_version < min_opset_version:
+            new_model_path = self.model_path.replace(".onnx", "_opset11.onnx")
+            if not os.path.exists(new_model_path):
+                new_model = version_converter.convert_version(model, min_opset_version)
+                onnx.save(new_model, new_model_path)
+                logger.info(
+                    f"Upgrade onnx opset {opset_version} to {min_opset_version}, and save new onnx to: {new_model_path}")
+            self.model_path = new_model_path
+            
     def quantize(self):
         """quantize the model"""
         if not os.path.exists(self.quant_output_dir):
             os.makedirs(self.quant_output_dir)
+        # 检查opset_version
+        
         from xhquant.api import (
             DeviceType,
             HMONNXGoldenInference,
