@@ -56,7 +56,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.use_random_data = self.calib_data is None
         # 图像单输入，非图像or多输入必须是npz数据
         self.is_image_single_input = (not self.is_multi_input_model and self.data_formats[0] is not None)
-        self.onnx_inputs_info = get_onnx_inputs_info(self.model_path)
+        self.onnx_inputs_info, self.onnx_outputs_info = get_onnx_inputs_info(self.model_path)
         self.onnx_is_static = True
         for input_name in self.inputs_name:
             onnx_shape = self.onnx_inputs_info[input_name]["shape"]
@@ -69,6 +69,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                     if val != cfg_shape[idx]:
                         logger.error(f"onnx shape {onnx_shape} is not equal to cfg shape {cfg_shape}")
                         exit(-1)
+        self.outputs_name = list()
+        for name in self.onnx_outputs_info:
+            self.outputs_name.append(name)
         self.demo_cfg = cfg.get("demo", dict())
         self.eval_cfg = cfg.get("eval", dict())
 

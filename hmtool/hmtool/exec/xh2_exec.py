@@ -97,7 +97,8 @@ class Xh2Exec(BaseExec):
             device_type=DeviceType.XH2a,
             out_hmonnx_file=self.quant_onnx_model_path,
             quant_config=quant_config,
-            input_names=self.inputs_name
+            input_names=self.inputs_name,
+            output_names=self.outputs_name
         )
         # 生成芯片所需格式模型
         session = HMONNXGoldenInference(self.quant_onnx_model_path)

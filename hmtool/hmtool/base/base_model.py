@@ -63,13 +63,14 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             data_format = input_cfg["data_format"]
             mean = input_cfg["mean"]
             std = input_cfg["std"]
-            toYUV_format = input_cfg["toYUV_format"]
-            max_input_size = input_cfg["max_input_size"]
             resize_type = input_cfg["resize_type"]
             padding_mode = input_cfg.get("padding_mode")
             padding_values = input_cfg.get("padding_values")
             N, C, H, W = input_shape
-            if self.resizer_mode in [1, 2] or self.backend == "onnx":
+            if self.resizer_mode in [1, 2]:
+                resizer_cfg = input_cfg["resizer"]
+                toYUV_format = resizer_cfg["toYUV_format"]
+                max_input_size = resizer_cfg["max_input_size"]
                 # 动态resizer
                 im, dyn_info = xh1_preprocess(
                     cv_image, 
@@ -77,28 +78,30 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                     max_input_size,
                     mean=mean, 
                     std=std,
-                    use_resize=self.backend in ["onnx", "xh2"], 
-                    use_norm=self.backend == "onnx", 
-                    use_rgb=(self.backend in ["onnx", "xh2"] and data_format == "RGB"), 
+                    use_resize=False, 
+                    use_norm=False, 
+                    use_rgb=False, 
                     resize_type=resize_type, 
                     padding_mode=padding_mode,
                     padding_values=padding_values, 
-                    is_onnx=self.backend in ["onnx", "xh2"],
+                    is_onnx=False,
                     to_YUV=self.backend == "xh1",
                     fmt=toYUV_format
                 )
-            elif self.resizer_mode == 3:
+            elif self.resizer_mode == 3 or self.backend == "onnx":
                 # 静态resizer
                 im = default_preprocess(
                     cv_image,
                     (W, H),
-                    mean=None, 
-                    std=None, 
-                    use_norm=False, 
-                    use_resize=True,
-                    use_rgb=False, 
-                    resize_type=0,
-                    to_YUV=True,
+                    mean=mean, 
+                    std=std, 
+                    use_norm=self.backend in ["onnx", "xh2"], 
+                    use_resize=self.backend in ["onnx", "xh2"],
+                    use_rgb=(self.backend in ["onnx", "xh2"] and data_format == "RGB"),
+                    resize_type=resize_type,
+                    padding_mode=padding_mode,
+                    padding_value=padding_values,
+                    to_YUV=self.backend == "xh1",
                     fmt=toYUV_format
                 )
                 dyn_info = None
