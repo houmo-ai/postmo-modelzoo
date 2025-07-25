@@ -67,7 +67,24 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             padding_mode = input_cfg.get("padding_mode")
             padding_values = input_cfg.get("padding_values")
             N, C, H, W = input_shape
-            if self.resizer_mode in [1, 2]:
+            if self.resizer_mode == 0 or self.backend in ["onnx", "xh2"]:
+                # 静态resizer
+                im = default_preprocess(
+                    cv_image,
+                    (W, H),
+                    mean=mean, 
+                    std=std, 
+                    use_norm=True, 
+                    use_resize=True,
+                    use_rgb=data_format == "RGB",
+                    resize_type=resize_type,
+                    padding_mode=padding_mode,
+                    padding_value=padding_values
+                )
+                if self.backend == "xh2":
+                    im = im.astype(np.float16)
+                dyn_info = None
+            elif self.resizer_mode in [1, 2, 3]:
                 resizer_cfg = input_cfg["resizer"]
                 toYUV_format = resizer_cfg["toYUV_format"]
                 max_input_size = resizer_cfg["max_input_size"]
@@ -78,36 +95,19 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                     max_input_size,
                     mean=mean, 
                     std=std,
-                    use_resize=False, 
+                    use_resize=self.resizer_mode == 3, 
                     use_norm=False, 
                     use_rgb=False, 
                     resize_type=resize_type, 
                     padding_mode=padding_mode,
                     padding_values=padding_values, 
                     is_onnx=False,
-                    to_YUV=self.backend == "xh1",
+                    to_YUV=True,
                     fmt=toYUV_format
                 )
-            elif self.resizer_mode == 3 or self.backend == "onnx":
-                # 静态resizer
-                im = default_preprocess(
-                    cv_image,
-                    (W, H),
-                    mean=mean, 
-                    std=std, 
-                    use_norm=self.backend in ["onnx", "xh2"], 
-                    use_resize=self.backend in ["onnx", "xh2"],
-                    use_rgb=(self.backend in ["onnx", "xh2"] and data_format == "RGB"),
-                    resize_type=resize_type,
-                    padding_mode=padding_mode,
-                    padding_value=padding_values,
-                    to_YUV=self.backend == "xh1",
-                    fmt=toYUV_format
-                )
-                dyn_info = None
-            if self.backend in ["onnx", "xh2"]:
+            if self.backend in ["onnx", "xh2"] or self.resizer_mode == 0:
                 new_datas[in_name] = np.ascontiguousarray(im)
-            elif self.backend == "xh1":
+            elif self.backend == "xh1" and self.resizer_mode in [1, 2, 3]:
                 yuv_pad = im.detach().cpu().numpy().flatten()
                 if toYUV_format == "YUV420SP":
                     valid_len = yuv_pad.size // 2
@@ -122,8 +122,6 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                     if self.resizer_mode == 2:
                         dyn_info = dyn_info.flatten()
                     new_datas[f"resizer_crop_{in_name}"] = dyn_info
-            elif self.backend == "xh2":
-                raise NotImplementedError
             return new_datas
         
     def run(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:

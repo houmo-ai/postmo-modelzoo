@@ -18,6 +18,15 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.target = cfg["target"]
         self.model_cfg = cfg.get("model")
         self.model_path = self.model_cfg.get("model_path")
+        HOUMO_MODEL_PATH = os.environ.get(
+            "HOUMO_MODEL_PATH", "/usr/local/src/houmo-modelzoo/models")
+        if self.model_path is None and not os.path.isfile(self.model_path):
+            new_model_path = os.path.join(HOUMO_MODEL_PATH, self.model_path)
+            if not os.path.isfile(new_model_path):
+                logger.error(f"Not found model_path: {self.model_path}")
+                exit(-1)
+            self.model_path = new_model_path
+        logger.info(f"model_path: {self.model_path}")
         self.model_name = self.model_cfg.get("name", "model")
         self.save_dir = self.model_cfg.get("save_dir")
         self.inputs_cfg = self.model_cfg.get("inputs")
@@ -177,7 +186,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             backend=backend,
         )
     
-    def get_dataset(self):
+    def get_dataset(self, data_dir):
         """获取数据集"""
         dataset_module = self.eval_cfg.get("dataset_module")
         dataset_cls = self.eval_cfg.get("dataset_cls")
@@ -187,10 +196,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         module_path = f"{dataset_module}.py"
         if not os.path.exists(module_path):
             logger.error(f"dataset_module not exists -> {dataset_module}")
-            exit(-1)
-        data_dir = self.eval_cfg.get("data_dir", "")
-        if not os.path.exists(data_dir):
-            logger.error(f"data_dir not exists -> {data_dir}")
             exit(-1)
         Dataset = self.import_py_module_from_file(module_path, dataset_cls)
         logger.info(f"from {dataset_module} import {dataset_cls} successfully")

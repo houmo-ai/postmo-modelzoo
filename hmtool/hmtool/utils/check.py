@@ -18,11 +18,7 @@ def check_cfg(cfg):
     save_dir = model_cfg.get("save_dir")
     if save_dir is None:
         logger.error("save_dir not found")
-        exit(-1)
-    model_path = model_cfg.get("model_path")
-    if model_path is None or not os.path.exists(model_path):
-        logger.error(f"model_path not found -> {model_path}")
-        exit(-1)  
+        exit(-1) 
     inputs_cfg = model_cfg.get("inputs")
     for input_name, input_cfg in inputs_cfg.items():
         input_cfg = inputs_cfg[input_name]

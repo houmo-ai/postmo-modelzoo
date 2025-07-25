@@ -311,14 +311,16 @@ class Xh1Exec(BaseExec):
         if self.quant_cfg is None:
             logger.error("quant info not found")
             exit(-1)
-        calib_data = self.quant_cfg.get("calib_data")
-        if calib_data is not None:
-            if not os.path.isdir(calib_data):
-                logger.error("calib_data must be a directory")
+        if self.calib_data is not None:
+            HOUMO_DATASETS_PATH = os.environ.get(
+                "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets")
+            HM_calib_data = os.path.join(HOUMO_DATASETS_PATH, self.calib_data)
+            if not os.path.isdir(self.calib_data) and not os.path.isdir(HM_calib_data):
+                logger.error("calib_data must be a exist directory")
                 exit(-1)
-            if not os.path.exists(calib_data):
-                logger.error("calib_data not exist")
-                exit(-1)
+            if not os.path.isdir(self.calib_data):
+                self.calib_data = HM_calib_data
+            logger.info(f"calib_data: {self.calib_data}")
             
         from hmquant.api import quant_single_onnx_network, generate_golden, quantize_profiling
         t_start = time.time()
@@ -679,12 +681,15 @@ class Xh1Exec(BaseExec):
             logger.error("demo config not found")
             exit(-1)
         data_dir = self.demo_cfg.get("data_dir", "")
-        if not os.path.exists(data_dir):
-            logger.error(f"demo data_dir not exist -> {data_dir}")
+        HOUMO_DATASETS_PATH = os.environ.get(
+            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets")
+        HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
+        if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
+            logger.error("data_dir must be a exist directory")
             exit(-1)
         if not os.path.isdir(data_dir):
-            logger.error(f"demo data_dir is not a directory -> {data_dir}")
-            exit(-1)
+            data_dir = HM_data_dir
+        logger.info(f"[demo] data_dir: {data_dir}")
         test_num = self.demo_cfg.get("num", 0)
         if not isinstance(test_num, int):
             logger.error(f"test_num must be int -> {test_num}")
@@ -715,12 +720,15 @@ class Xh1Exec(BaseExec):
             logger.error("demo config not found")
             exit(-1)
         data_dir = self.eval_cfg.get("data_dir", "")
-        if not os.path.exists(data_dir):
-            logger.error(f"data_dir not exist -> {data_dir}")
+        HOUMO_DATASETS_PATH = os.environ.get(
+            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets")
+        HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
+        if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
+            logger.error("data_dir must be a exist directory")
             exit(-1)
         if not os.path.isdir(data_dir):
-            logger.error(f"data_dir is not a directory -> {data_dir}")
-            exit(-1)
+            data_dir = HM_data_dir
+        logger.info(f"[eval] data_dir: {data_dir}")
         num = self.eval_cfg.get("num", 0)
         if not isinstance(num, int):
             logger.error(f"eval test_num must be int -> {num}")
@@ -729,7 +737,7 @@ class Xh1Exec(BaseExec):
             logger.error(f"eval test_num must >= 0 -> {num}")
             exit(-1)
         # 获取dataset
-        dataset = self.get_dataset()
+        dataset = self.get_dataset(data_dir)
         # 获取模型
         model = self.get_model(backend)
         model_path = self.model_path if backend == "onnx" else self.hmm_path

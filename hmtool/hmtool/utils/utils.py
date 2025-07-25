@@ -12,6 +12,10 @@ import onnx
 from onnx import TensorProto
 
 
+HOUMO_JFROG_IP = os.getenv("HOUMO_JFROG_IP", "139.224.0.199")
+HOUMO_JFROG_PORT = os.getenv("HOUMO_JFROG_PORT", "8082")
+HOUMO_MODELZOO_URL = f"http://{HOUMO_JFROG_IP}:{HOUMO_JFROG_PORT}/artifactory/houmo/release"
+
 SUPPORT_IMAGE_FORMATS = [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]
 SUPPORT_BACKEND = ["xh1", "xh2", "onnx"]
 
@@ -82,7 +86,7 @@ torch_to_numpy_dtype = {
     torch.float32: np.float32,
     torch.float64: np.float64,
     torch.float16: np.float16,
-    torch.bfloat16: np.float16,  # numpy doesn't support bfloat16 directly
+    torch.bfloat16: np.float16,  # numpy doesn"t support bfloat16 directly
     torch.uint8: np.uint8,
     torch.int8: np.int8,
     torch.int16: np.int16,
@@ -152,23 +156,22 @@ def get_file_from_jfrog(file_path, save_dir="", extract_dir=None):
         url, file_path = file_path.split("artifactory/")
         modelzoo_url = url + "artifactory"
     else:
-        modelzoo_url = os.environ.get("HOUMO_MODELZOO_URL")
+        modelzoo_url = os.environ.get("HOUMO_MODELZOO_URL", HOUMO_MODELZOO_URL)
     file_name = os.path.basename(file_path)
     if save_dir == "":
         save_dir = os.getenv("HOUMO_MODEL_PATH", default="./")
     else:
         os.makedirs(save_dir, exist_ok=True)
-    save_path = f"{save_dir}/{file_name}"
+    save_path = os.path.join(save_dir, file_name)
     jfrog_base, jfrog_tail = modelzoo_url.split("artifactory")
     jfrog_base = jfrog_base + "artifactory"
     file_info_path = f"{jfrog_base}/api/storage/{jfrog_tail}/{file_path}"
     response = requests.get(file_info_path)
     if response.status_code == 200:
-        url_md5 = response.json()['checksums']['md5']
-        if os.path.exists(save_path):
-            if (get_file_md5(save_path) == url_md5):
-                print(url_md5, save_path, "already exists.")
-                need_download = True
+        url_md5 = response.json()["checksums"]["md5"]
+        if os.path.exists(save_path) and get_file_md5(save_path) == url_md5:
+            print(url_md5, save_path, "already exists.")
+            need_download = False
     else:
         print("failed to retrieve MD5. status code:", response.status_code)
 
@@ -179,12 +182,12 @@ def get_file_from_jfrog(file_path, save_dir="", extract_dir=None):
         assert(download_file(url, save_path=save_path))
 
     if extract_dir is not None:
-        if save_path.rfind('.zip') > 0:
+        if save_path.rfind(".zip") > 0:
             import zipfile
             with zipfile.ZipFile(save_path, "r") as zip:
                 print("extract to %s" % extract_dir)
                 zip.extractall(path=extract_dir)
-        elif save_path.rfind('.tar') > 0:
+        elif save_path.rfind(".tar") > 0:
             import tarfile
             with tarfile.open(save_path, "r:gz") as tar:
                 print("extract to %s" % extract_dir)
