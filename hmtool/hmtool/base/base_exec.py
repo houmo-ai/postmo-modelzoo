@@ -181,6 +181,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         logger.info(f"from {model_impl_module} import {model_impl_cls} successfully")
         return Model(
             inputs_cfg=self.inputs_cfg,
+            is_image_single_input=self.is_image_single_input,
             resizer_mode=self.resizer_mode,
             roi_num=self.roi_num,
             backend=backend,

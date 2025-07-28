@@ -18,6 +18,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         self.engine = None
         self.inputs_cfg = kwargs["inputs_cfg"]
         self.inputs_name = list(self.inputs_cfg.keys())
+        self.is_image_single_input = kwargs["is_image_single_input"]
         self.resizer_mode = kwargs.get("resizer_mode", 0)
         self.roi_num = kwargs.get("roi_num", 1)
         self.backend = kwargs["backend"]
@@ -46,13 +47,18 @@ class BaseModel(object, metaclass=abc.ABCMeta):
 
     def preprocess(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         """模型前处理"""
-        if self.resizer_mode not in [1, 2, 3]:
-            # 单输入非图像or多输入，输入数据为外部预处理后数据
+        if not self.is_image_single_input:
+            # 单输入非图像or多输入，输入数据为外部预处理后数据        
             if self.backend == "onnx":
                 return in_datas
-            if self.backend in ["xh1"]:
-                # TODO 需要量化
-                raise NotImplementedError
+            elif self.backend in ["xh1"]:
+                for input_name in in_datas:
+                    in_data = in_datas[input_name]
+                    in_datas[input_name] = self.engine.quantize(input_name, in_data)
+                return in_datas
+            else:
+                logger.error(f"Not support backend: {self.backend}")
+                exit(-1)
         else:
             new_datas = dict()
             # 单输入图像，可由内部预处理来支持
@@ -61,52 +67,37 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             input_cfg = self.inputs_cfg[in_name]
             input_shape = input_cfg["shape"]
             data_format = input_cfg["data_format"]
-            mean = input_cfg["mean"]
-            std = input_cfg["std"]
+            mean = input_cfg.get("mean")
+            std = input_cfg.get("std")
             resize_type = input_cfg["resize_type"]
             padding_mode = input_cfg.get("padding_mode")
             padding_values = input_cfg.get("padding_values")
             N, C, H, W = input_shape
-            if self.resizer_mode == 0 or self.backend in ["onnx", "xh2"]:
-                # 静态resizer
-                im = default_preprocess(
-                    cv_image,
-                    (W, H),
-                    mean=mean, 
-                    std=std, 
-                    use_norm=True, 
-                    use_resize=True,
-                    use_rgb=data_format == "RGB",
-                    resize_type=resize_type,
-                    padding_mode=padding_mode,
-                    padding_value=padding_values
-                )
-                if self.backend == "xh2":
-                    im = im.astype(np.float16)
-                dyn_info = None
-            elif self.resizer_mode in [1, 2, 3]:
-                resizer_cfg = input_cfg["resizer"]
-                toYUV_format = resizer_cfg["toYUV_format"]
-                max_input_size = resizer_cfg["max_input_size"]
-                # 动态resizer
-                im, dyn_info = xh1_preprocess(
-                    cv_image, 
-                    input_shape, 
-                    max_input_size,
-                    mean=mean, 
-                    std=std,
-                    use_resize=self.resizer_mode == 3, 
-                    use_norm=False, 
-                    use_rgb=False, 
-                    resize_type=resize_type, 
-                    padding_mode=padding_mode,
-                    padding_values=padding_values, 
-                    is_onnx=False,
-                    to_YUV=True,
-                    fmt=toYUV_format
-                )
-            if self.backend in ["onnx", "xh2"] or self.resizer_mode == 0:
-                new_datas[in_name] = np.ascontiguousarray(im)
+            resizer_cfg = input_cfg.get("resizer", dict())
+            toYUV_format = resizer_cfg.get("toYUV_format", None)
+            max_input_size = resizer_cfg.get("max_input_size", (H, W))
+            im, dyn_info = xh1_preprocess(
+                cv_image, 
+                input_shape, 
+                max_input_size,
+                mean=mean, 
+                std=std,
+                use_resize=self.resizer_mode in [0, 3] or self.backend == "onnx", 
+                use_norm=self.resizer_mode == 0 or self.backend == "onnx", 
+                use_rgb=data_format == "RGB" and (self.resizer_mode == 0 or self.backend == "onnx"),
+                resize_type=resize_type, 
+                padding_mode=padding_mode,
+                padding_values=padding_values, 
+                is_onnx=self.resizer_mode == 0 or self.backend == "onnx",  # 静态resizer，在非量化阶段需要转YUV，不能设置is_onnx=True
+                to_YUV=self.resizer_mode in [1, 2, 3],
+                fmt=toYUV_format
+            )
+            if self.backend == "onnx":
+                new_datas[in_name] = im.detach().cpu().numpy()
+            elif self.backend == "xh2":
+                new_datas[in_name] = im.detach().cpu().numpy().astype(np.float16)
+            elif self.backend == "xh1" and self.resizer_mode == 0:
+                new_datas[in_name] = self.engine.quantize(in_name, im.detach().cpu().numpy())
             elif self.backend == "xh1" and self.resizer_mode in [1, 2, 3]:
                 yuv_pad = im.detach().cpu().numpy().flatten()
                 if toYUV_format == "YUV420SP":

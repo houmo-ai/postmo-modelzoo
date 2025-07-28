@@ -183,9 +183,11 @@ def xh1_preprocess(
     height, width = cv_image.shape[:2]
     if height > max_height or width > max_width:
         # 等比例缩放至最大输入内
-        padding_size, size, _ = calc_padding_size((height, width), (max_width, max_height), padding_mode=0)
-        height, width = size  # 更新宽高
-        cv_image = cv2.resize(cv_image, (width, height))
+        # padding_size, size, _ = calc_padding_size((height, width), (max_width, max_height), padding_mode=0)
+        # cv_image = cv2.resize(cv_image, (width, height))
+        # 长宽各自缩放
+        cv_image = cv2.resize(cv_image, (W, H))
+        height, width, _ = cv_image.shape  # 更新宽高
     # 动态resizer需要全为偶数，一般图片宽高为偶数
     if height % 2 == 1:
         height -= 1
@@ -198,7 +200,7 @@ def xh1_preprocess(
     im = default_preprocess(cv_image, (W, H), mean, std, use_norm=use_norm, use_rgb=use_rgb, use_resize=use_resize,
                             resize_type=resize_type, padding_mode=padding_mode, padding_value=padding_values)
     if is_onnx:
-        return im, list()
+        return torch.from_numpy(im), list()
     crop_height, crop_width = cv_image.shape[:2]
     padding_im = np.zeros((1, C, max_height, max_width), dtype=np.uint8)
     padding_im[:, :, 0:crop_height, 0:crop_width] = im         

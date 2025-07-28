@@ -89,17 +89,16 @@ class Xh1Exec(BaseExec):
             input_cfg = self.inputs_cfg[input_name]
             input_shape = input_cfg["shape"]
             data_format = input_cfg["data_format"]
-            quant_cfg["inputs_cfg"] = {
-                input_name: {
-                    "data_format": self.dtype_transform(self.onnx_inputs_info[input_name]["dtype"]),
-                    "first_layer_weight_denorm_mean": None,
-                    "first_layer_weight_denorm_std": None,
-                }
+            quant_cfg["inputs_cfg"][input_name] = {
+                "data_format": self.dtype_transform(self.onnx_inputs_info[input_name]["dtype"]),
+                "first_layer_weight_denorm_mean": None,
+                "first_layer_weight_denorm_std": None
             }
+
             # 非图像or多输入跳过
             if not self.is_image_single_input or self.resizer_mode == 0:
                 continue
-            
+            N, C, H, W = input_shape
             new_input_cfg = dict()
             new_input_cfg["data_format"] = data_format
             # mean/std
@@ -110,10 +109,10 @@ class Xh1Exec(BaseExec):
             new_input_cfg["first_layer_weight_denorm_mean"] = mean_values
             new_input_cfg["first_layer_weight_denorm_std"] = std_values
             # toYUV_format
-            toYUV_format = input_cfg["resizer"]["toYUV_format"]
+            resizer_cfg = input_cfg["resizer"]
+            toYUV_format = resizer_cfg["toYUV_format"]
             new_input_cfg["toYUV_format"] = toYUV_format[0:6]  # 去掉SP
-            N, C, H, W = input_shape
-            insert_pad_scatter = input_cfg.get("insert_pad_scatter", False)
+            insert_pad_scatter = resizer_cfg.get("insert_pad_scatter", False)
             if insert_pad_scatter not in [False, True]:
                 logger.error(f"Not support insert_pad_scatter: {insert_pad_scatter} yet")
                 exit(-1)
@@ -149,20 +148,14 @@ class Xh1Exec(BaseExec):
             input_cfg = self.inputs_cfg[input_name]
             input_shape = input_cfg["shape"]
             N, C, H, W = input_shape
-            if self.resizer_mode != 0:
-                max_input_size = self.max_inputs_size[input_name]
-                max_height, max_width = max_input_size
-            else:
-                max_height, max_width = H, W
             mean = input_cfg["mean"]
             std = input_cfg["std"]
             resize_type = input_cfg["resize_type"]
             padding_mode = input_cfg.get("padding_mode")
             padding_values = input_cfg.get("padding_values")
-            
-            if N > 1 and self.resizer_mode in [1, 2]:
-                logger.error(f"model_input_batch > 1 is not supported dynamic resizer")
-                exit(-1)
+            resizer_cfg = input_cfg.get("resizer", dict())
+            max_input_size = resizer_cfg.get("max_input_size", (H, W))
+            max_height, max_width = max_input_size
             if self.use_random_data:
                 # 随机图像，不管动态静态都以max_input_size来crop
                 in_datas = dict()
@@ -222,49 +215,21 @@ class Xh1Exec(BaseExec):
                         if cv_image is None:
                             logger.warning(f"{filepath} not exists or decode failed")
                             continue
-                        if self.resizer_mode == 0:
-                            im = default_preprocess(
-                                cv_image,
-                                (W, H),
-                                mean=mean, 
-                                std=std, 
-                                use_norm=True, 
-                                use_resize=True,
-                                use_rgb=data_format == "RGB",  # 对灰度无效
-                                resize_type=resize_type,
-                                padding_mode=padding_mode,
-                                padding_value=padding_values
-                            )
-                            im = torch.from_numpy(im)
-                            dyn_info = None
-                        elif self.resizer_mode in [1, 2]:
-                            im, dyn_info = xh1_preprocess(
-                                cv_image, 
-                                input_shape, 
-                                max_input_size, 
-                                mean=None, 
-                                std=None, 
-                                use_norm=False, 
-                                use_resize=False,
-                                use_rgb=True,  # 对灰度无效
-                                resize_type=resize_type, 
-                                padding_mode=padding_mode, 
-                                is_onnx=False
-                            )
-                        elif self.resizer_mode == 3:
-                            # 直接将数据缩放只输入size
-                            im = default_preprocess(
-                                cv_image,
-                                (W, H),
-                                mean=None, 
-                                std=None, 
-                                use_norm=False, 
-                                use_resize=True,
-                                use_rgb=True,  # 对灰度无效
-                                resize_type=0
-                            )
-                            im = torch.from_numpy(im)
-                            dyn_info = None
+                        
+                        im, dyn_info = xh1_preprocess(
+                            cv_image, 
+                            input_shape, 
+                            max_input_size,
+                            mean=mean, 
+                            std=std, 
+                            use_norm=self.resizer_mode == 0, 
+                            use_resize=self.resizer_mode in [0, 3],
+                            use_rgb=data_format == "RGB" or self.resizer_mode in [1, 2, 3],  # 对灰度无效
+                            resize_type=resize_type, 
+                            padding_mode=padding_mode, 
+                            padding_values=padding_values,
+                            is_onnx=self.resizer_mode in [0, 3],
+                        )
                         dyn_infos.append(dyn_info)
                         batch_datas.append(im)
                     in_datas[input_name] = torch.cat(batch_datas, dim=0)
@@ -303,6 +268,7 @@ class Xh1Exec(BaseExec):
                         assert onnx_dtype == in_data.dtype, "npz data dtype must be equal to onnx input dtype"
                         assert batch == self.model_inputs_batch[input_name], "npz data batch must be equal to onnx input batch"
                         in_datas[input_name] = torch.from_numpy(in_datas[input_name])
+                    logger.info(f"Processing calibration npz data {idx}...")
                     yield in_datas
         
     def quantize(self):
@@ -481,15 +447,21 @@ class Xh1Exec(BaseExec):
             # 单输入图像
             input_name = self.inputs_name[0]
             input_cfg = self.inputs_cfg[input_name]
-            data_format = input_cfg["data_format"]
-            use_rgb = True if data_format == "RGB" else False
             input_shape = input_cfg["shape"]
+            N, C, H, W = input_shape
+            data_format = input_cfg["data_format"]
             mean = input_cfg["mean"]
             std = input_cfg["std"]
             resize_type = input_cfg["resize_type"]
             padding_mode = input_cfg.get("padding_mode")
             padding_values = input_cfg.get("padding_values")
-            toYUV_format = input_cfg.get("toYUV_format")
+            reszier_cfg = input_cfg.get("resizer", dict())
+            toYUV_format = reszier_cfg.get("toYUV_format")
+            if self.resizer_mode != 0:
+                max_input_size = self.max_inputs_size[input_name]
+                max_height, max_width = max_input_size
+            else:
+                max_height, max_width = H, W
             if ext not in SUPPORT_IMAGE_FORMATS:
                 logger.error(f"Not support image: {data_path}")
                 exit(-1)
@@ -503,7 +475,6 @@ class Xh1Exec(BaseExec):
             # 获取编译后模型batch
             hmm_batch = xh1_infer.inputs_info[input_name].shape[0]
             # onnx
-            N, C, H, W = input_shape
             onnx_data = default_preprocess(
                 cv_image, 
                 (W, H), 
@@ -511,53 +482,35 @@ class Xh1Exec(BaseExec):
                 std=std, 
                 use_norm=True, 
                 use_resize=True, 
-                use_rgb=use_rgb,
+                use_rgb=data_format == "RGB",
                 resize_type=resize_type, 
                 padding_mode=padding_mode, 
                 padding_value=padding_values,
             )
-            if self.model_input_batch > 1:
-                onnx_data = np.repeat(onnx_data, repeats=self.model_input_batch, axis=0)
+            onnx_data = np.repeat(onnx_data, repeats=self.model_input_batch, axis=0)
             onnx_in_datas[input_name] = onnx_data  # np.ndarray
-            
-            if self.resizer_mode in [1, 2]:
-                max_input_size = input_cfg["max_input_size"]
-                yuv_pad_hwc, dyn_info = xh1_preprocess(
-                    cv_image, 
-                    input_shape, 
-                    max_input_size, 
-                    mean=mean, 
-                    std=std, 
-                    use_norm=False, 
-                    use_resize=False, 
-                    use_rgb=False,
-                    resize_type=resize_type, 
-                    padding_mode=padding_mode, 
-                    padding_values=padding_values,
-                    is_onnx=False, 
-                    to_YUV=True,
-                    fmt=toYUV_format
-                )
-            elif self.resizer_mode == 3:
-                yuv_pad_hwc = default_preprocess(
-                    cv_image, 
-                    (W, H), 
-                    mean=None,
-                    std=None, 
-                    use_norm=False, 
-                    use_resize=True, 
-                    use_rgb=False,
-                    resize_type=0,
-                    to_YUV=True,
-                    fmt=toYUV_format
-                )
-            
+
+            yuv_pad_hwc, dyn_info = xh1_preprocess(
+                cv_image, 
+                input_shape, 
+                (max_height, max_width),
+                mean=mean, 
+                std=std, 
+                use_norm=self.resizer_mode == 0, 
+                use_resize=self.resizer_mode in [0, 3],
+                use_rgb=data_format == "RGB" and self.resizer_mode == 0,  # 对灰度无效
+                resize_type=resize_type, 
+                padding_mode=padding_mode, 
+                padding_values=padding_values,
+                is_onnx=self.resizer_mode in [0],  # 静态resizer，在非量化阶段需要转YUV，不能设置is_onnx=True
+                to_YUV=self.resizer_mode in [1, 2, 3],
+                fmt=toYUV_format
+            )    
             if self.resizer_mode in [1, 2, 3]:
                 # 使用resizer
                 h, w, c = yuv_pad_hwc.shape
                 yuv_pad = yuv_pad_hwc.view(1, c, h, w)
-                if self.model_input_batch > 1:
-                    yuv_pad = yuv_pad.repeat_interleave(self.model_input_batch, dim=0)
+                yuv_pad = yuv_pad.repeat_interleave(self.model_input_batch, dim=0)
                 hmquant_in_datas[input_name] = yuv_pad.contiguous() # torch.Tensor
                 # xh1
                 yuv_pad = yuv_pad_hwc.detach().cpu().numpy().flatten()
@@ -569,8 +522,7 @@ class Xh1Exec(BaseExec):
                     valid_len = yuv_pad.size
                 yuv = yuv_pad[:valid_len].copy()
                 yuv = yuv.reshape(1, -1)
-                if hmm_batch > 1:
-                    yuv = np.repeat(yuv, repeats=hmm_batch, axis=0) 
+                yuv = np.repeat(yuv, repeats=hmm_batch, axis=0) 
                 xh1_in_datas[input_name] = np.ascontiguousarray(yuv)   # np.ndarray
             elif self.resizer_mode == 0:
                 # 禁用resizer
@@ -606,6 +558,7 @@ class Xh1Exec(BaseExec):
                 in_data = in_datas[input_name]
                 in_data = np.repeat(in_data, repeats=self.build_batch, axis=0)
                 in_data_quanted = xh1_infer.quantize(input_name, in_data)
+                logger.info(f"Hmquant input[{input_name}] quantize data_dtype: {in_data.dtype} -> {in_data_quanted.dtype}")
                 hmquant_in_datas[input_name] = torch.from_numpy(in_data_quanted[0:self.model_inputs_batch[input_name], ...])
                 xh1_in_datas[input_name] = in_data_quanted
 
@@ -616,24 +569,38 @@ class Xh1Exec(BaseExec):
         res_info = {"compare": {t_start: dict()}}
         res_info["compare"][t_start]["data_path"] = data_path
         # 计算相似度
-        header = ["name", "onnx vs hmquant", "onnx vs xh1", "hmquant vs xh1"]
+        header = ["name", "onnx vs hmquant", "onnx vs xh1", "hmquant vs xh1", "MD5[hmquant vs xh1]"]
         table = PrettyTable(header)
         table.title = "Cosine Distance"
         for output_name in onnx_outputs:
+            # onnx
             onnx_output = onnx_outputs[output_name]
+            onnx_output = np.repeat(onnx_output, repeats=self.build_batch, axis=0)
+            # hmquant
             hmquant_output = hmquant_outputs[output_name]
+            hmquant_output = np.repeat(hmquant_output, repeats=self.build_batch, axis=0)
+            hmquant_output_dequanted = xh1_infer.dequantize(output_name, hmquant_output)
+            logger.info(f"Hmquant output[{output_name}] quantize data_dtype: {hmquant_output.dtype} -> {hmquant_output_dequanted.dtype}")
+            # xh1
             xh1_output_dequanted = xh1_outputs_dequanted[output_name]
-            xh1_output_dequanted = xh1_output_dequanted[0:self.model_input_batch, ...]
-            onnx_vs_hmquant = cosine_distance(onnx_output, hmquant_output)
+            # compare
+            onnx_vs_hmquant = cosine_distance(onnx_output, hmquant_output_dequanted)
             onnx_vs_xh1 = cosine_distance(onnx_output, xh1_output_dequanted)
-            hmquant_vs_xh1 = cosine_distance(hmquant_output, xh1_output_dequanted)
-            table.add_row([output_name, f"{onnx_vs_hmquant:.6f}", f"{onnx_vs_xh1:.6f}", f"{hmquant_vs_xh1:.6f}"])
+            hmquant_vs_xh1 = cosine_distance(hmquant_output_dequanted, xh1_output_dequanted)
+            table.add_row([
+                output_name, 
+                f"{onnx_vs_hmquant:.6f}", 
+                f"{onnx_vs_xh1:.6f}", 
+                f"{hmquant_vs_xh1:.6f}", 
+                "ok" if get_md5(hmquant_output_dequanted) == get_md5(xh1_output_dequanted) else "fail"])
+            
             res_info["compare"][t_start][output_name] = {
                 "onnx_vs_hmquant": float(onnx_vs_hmquant),
                 "onnx_vs_xh1": float(onnx_vs_xh1),
                 "hmquant_vs_xh1": float(hmquant_vs_xh1),
+                "MD5": "ok" if get_md5(hmquant_output_dequanted) == get_md5(xh1_output_dequanted) else "fail",
             }
-        logger.info(f"\n{table}")
+        logger.info(f"Compare...\n{table}")
         return res_info
         
     def perf(self, warmup_num, sample_num, loop_num=1, device_num=1, thread_num=1):

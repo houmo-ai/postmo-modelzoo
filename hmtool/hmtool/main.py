@@ -39,6 +39,7 @@ def main():
     quant_parser = subparsers.add_parser("quant", parents=[parent_parser0, parent_parser1], help="Quantize a model")
     # build
     build_parser = subparsers.add_parser("build", parents=[parent_parser0, parent_parser1], help="Build a model")
+    build_parser.add_argument("--batch", type=int, required=False, default=1, help="Specify a build batch")
     build_parser.add_argument("--ncore", type=int, required=False, choices=(1, 2, 4), help="Specify a ncore, ")
     build_parser.add_argument("--opt_level", type=int, required=False, choices=(0, 1, 2), help="Specify a opt_level")
     # compare
@@ -71,6 +72,11 @@ def main():
     
     cfg["target"] = target
     if current_command == "build":
+        batch = args.batch
+        if batch < 1:
+            logger.error("Batch must be greater than 0")
+            exit(1)
+        cfg["build"]["batch"] = batch
         ncore = args.ncore
         opt_level = args.opt_level
         if opt_level is not None:

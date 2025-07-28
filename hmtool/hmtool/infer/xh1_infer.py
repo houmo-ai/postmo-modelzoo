@@ -72,3 +72,12 @@ class Xh1Infer(BaseInfer, ABC):
         in_tensor = tcim_lite.runtime.Tensor(input_info).to_host(to_contiguous=True)
         in_tensor_dequanted.cast_to(in_tensor)
         return in_tensor.numpy()
+    
+    def dequantize(self, output_name: str, out_data: np.ndarray) -> np.ndarray:
+        output_info = self.engine.get_output_info(output_name)
+        output_info_dequanted = output_info.astype(np.float32)
+        out_tensor_quanted = tcim_lite.runtime.Tensor(output_info, out_data)
+        out_tensor = tcim_lite.runtime.Tensor(output_info_dequanted).to_host(to_contiguous=True)
+        out_tensor_quanted.cast_to(out_tensor)
+        return out_tensor.numpy()
+        
