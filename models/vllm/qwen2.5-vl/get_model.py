@@ -68,14 +68,16 @@ if __name__ == '__main__':
         ignore_patterns = ["*.safetensors"]
 
     from modelscope import snapshot_download
-    snapshot_download('Qwen/Qwen2.5-VL-3B-Instruct', local_dir='qwen2.5-vl-3b', ignore_patterns=ignore_patterns)
+    if args.model_size == "3b":
+        snapshot_download('Qwen/Qwen2.5-VL-3B-Instruct', local_dir='qwen2.5-vl-3b', ignore_patterns=ignore_patterns)
+    elif args.model_size == "7b":
+        snapshot_download('Qwen/Qwen2.5-VL-7B-Instruct', local_dir='qwen2.5-vl-7b', ignore_patterns=ignore_patterns)
 
     if model_type in ["quant", "all"]:
         if args.model_size == "3b":
             get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
         elif args.model_size == "7b":
             get_file_from_jfrog(quant_path_7b, model_dir, quant_model_dir)
-
 
     if model_type in ["hmm", "all"]:
         if args.model_size == "3b":

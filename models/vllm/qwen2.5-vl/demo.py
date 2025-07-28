@@ -15,7 +15,7 @@ from qwen_vl_utils import process_vision_info
 from processing_qwen2_5_vl import Qwen2_5_VLProcessor
 from utils import get_rope_index, QRawToYuv
 
-TOKENIZER_PATH = "qwen2.5-vl-3b"
+TOKENIZER_PATH = "qwen2.5-vl"
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 EMBEDDING_PATH = os.path.join('output', HOUMO_TARGET, 'hmquant', 'quant_embedding.pt')
 
@@ -66,7 +66,7 @@ class Qwen25VL:
             patch_size=14,
             model_size="3b", # 3B is 36 Blocks, 7B is 28 Blocks):
         ):
-        self.processor = Qwen2_5_VLProcessor.from_pretrained(TOKENIZER_PATH)
+        self.processor = Qwen2_5_VLProcessor.from_pretrained(TOKENIZER_PATH + f"-{model_size}")
         self.cache_len = cache_len
         self.device = torch.device(device)
         self.prefill_shape = torch.Size(prefill_shape)
