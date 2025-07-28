@@ -492,8 +492,8 @@ int main(int argc, char* argv[]) {
   printf("demo results saved to %s\n", result_file.string().c_str());
 
   // check result, modify it when you change model or data
-  if (detections.size() != 17) {
-    std::cout << "detect num != 17" << std::endl;
+  if (detections.size() != 18) {
+    std::cout << "detect num != 18" << std::endl;
     exit(-1);
   }
   
