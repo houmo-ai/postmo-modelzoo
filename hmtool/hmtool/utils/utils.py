@@ -83,16 +83,16 @@ def load_npz(npz_path):
 
 
 torch_to_numpy_dtype = {
-    torch.float32: np.float32,
-    torch.float64: np.float64,
-    torch.float16: np.float16,
-    torch.bfloat16: np.float16,  # numpy doesn"t support bfloat16 directly
-    torch.uint8: np.uint8,
-    torch.int8: np.int8,
-    torch.int16: np.int16,
-    torch.int32: np.int32,
-    torch.int64: np.int64,
-    torch.bool: np.bool_,
+    torch.float32: "float32",
+    torch.float64: "float64",
+    torch.float16: "float16",
+    torch.bfloat16: "bfloat16",  # numpy doesn"t support bfloat16 directly
+    torch.uint8: "uint8",
+    torch.int8: "int8",
+    torch.int16: "int16",
+    torch.int32: "int32",
+    torch.int64: "int64",
+    torch.bool: "bool",
 }
 
 def str_to_torch_dtype(dtype_str):

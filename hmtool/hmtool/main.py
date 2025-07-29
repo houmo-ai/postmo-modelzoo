@@ -9,6 +9,7 @@ from .utils import logger
 from .utils.utils import read_yaml_to_dict, save_dict_to_yaml
 from .utils.logging_format import LoggingFormatter 
 from .utils.check import check_cfg
+from .base.base_exec import BaseExec
 from ._version import __commit__, __version__, __build_time__
 
 
@@ -20,48 +21,64 @@ def set_logger(op, log_dir, filename):
     file_handler = logging.FileHandler(filepath)
     file_handler.setFormatter(LoggingFormatter())
     logger.addHandler(file_handler)
-    
-    
+
+
 def main():
     # 父解析器
     parent_parser0 = argparse.ArgumentParser(add_help=False)
     parent_parser1 = argparse.ArgumentParser(add_help=False)
     parent_parser2 = argparse.ArgumentParser(add_help=False)
+    parent_parser3 = argparse.ArgumentParser(add_help=False)
     parent_parser0.add_argument("--config", "-c", type=str, required=True, help="config file path")
-    parent_parser0.add_argument("--result_path", type=str, required=False, default="result.yml", help="Specify a result path")
     parent_parser1.add_argument("--target", "-t", type=str, required=True, choices=("xh1", "xh2"), help="Specify a chip target")
     parent_parser2.add_argument("--onnx", action="store_true", help="Specify onnx model as the backend")
+    parent_parser3.add_argument("--result_path", type=str, required=False, default="result.yml", help="Specify a result path")
     
     # 主解析器
     parser = argparse.ArgumentParser(description="HouMo Model Assist Tool")
     subparsers = parser.add_subparsers(dest="command", required=True, help="qunat build compare perf demo eval")
     # quant
-    quant_parser = subparsers.add_parser("quant", parents=[parent_parser0, parent_parser1], help="Quantize a model")
+    quant_parser = subparsers.add_parser("quant", parents=[parent_parser0, parent_parser1, parent_parser3], help="Quantize a model")
     # build
-    build_parser = subparsers.add_parser("build", parents=[parent_parser0, parent_parser1], help="Build a model")
+    build_parser = subparsers.add_parser("build", parents=[parent_parser0, parent_parser1, parent_parser3], help="Build a model")
     build_parser.add_argument("--batch", type=int, required=False, default=1, help="Specify a build batch")
     build_parser.add_argument("--ncore", type=int, required=False, choices=(1, 2, 4), help="Specify a ncore, ")
     build_parser.add_argument("--opt_level", type=int, required=False, choices=(0, 1, 2), help="Specify a opt_level")
     # compare
-    compare_parser = subparsers.add_parser("compare", parents=[parent_parser0, parent_parser1], help="Compare onnx/hmquant/chip")
+    compare_parser = subparsers.add_parser("compare", parents=[parent_parser0, parent_parser1, parent_parser3], help="Compare onnx/hmquant/chip")
     compare_parser.add_argument("--data_path", "-d", type=str, required=True, help="Specify a data path, image or npz")
     # perf
-    perf_parser = subparsers.add_parser("perf", parents=[parent_parser0, parent_parser1], help="Test model performance")
+    perf_parser = subparsers.add_parser("perf", parents=[parent_parser3], help="Test model performance")
+    perf_parser.add_argument("--model",   "-m", type=str, required=True, help="Specify model path")
     perf_parser.add_argument("--warmup",   "-wn", type=int, required=True, help="Specify warnup num")
     perf_parser.add_argument("--sample",   "-sn", type=int, required=True, help="Specify sample num")
     perf_parser.add_argument("--loop_num", "-ln", type=int, required=False, default=1, help="Specify loop num")
     perf_parser.add_argument("--thread",   "-tn", type=int, required=False, default=1, help="Specify thread num")
     perf_parser.add_argument("--device",   "-dn", type=int, required=False, default=1, help="Specify device num")
     # demo
-    demo_parser = subparsers.add_parser("demo", parents=[parent_parser0, parent_parser1, parent_parser2], help="Run model demo")
+    demo_parser = subparsers.add_parser("demo", parents=[parent_parser0, parent_parser1, parent_parser2, parent_parser3], help="Run model demo")
     # evaluate
-    evaluate_parser = subparsers.add_parser("eval", parents=[parent_parser0, parent_parser1, parent_parser2], help="Run model evaluate")
-    
+    evaluate_parser = subparsers.add_parser("eval", parents=[parent_parser0, parent_parser1, parent_parser2, parent_parser3], help="Run model evaluate")
     args = parser.parse_args()
-    current_command = args.command
-    target = args.target
-    logger.info(f"Hmtool version: {__version__}, commit: {__commit__}, build time: {__build_time__}")
     
+    logger.info(f"Hmtool version: {__version__}, commit: {__commit__}, build time: {__build_time__}")
+
+    # 存在结果信息，先读回来更新后再存
+    res_info = dict()
+    if os.path.exists(args.result_path):
+        res_info = read_yaml_to_dict(args.result_path)
+
+    # perf
+    current_command = args.command
+    if current_command == "perf":
+        new_res_info = BaseExec.perf(args.model, args.warmup, args.sample, args.loop_num, args.device, args.thread)
+        if "perf" in res_info:
+            res_info["perf"].update(new_res_info["perf"])
+        else:
+            res_info.update(new_res_info)
+        exit(0)
+
+    target = args.target
     # set_logger(current_command, "log", "config")    
     cfg_path = args.config
     if not os.path.exists(cfg_path):
@@ -108,27 +125,19 @@ def main():
     elif current_command == "compare":
         data_path = args.data_path
         new_res_info = hm_exec.compare(data_path)
-    elif current_command == "perf":
-        new_res_info = hm_exec.perf(args.warmup, args.sample, args.loop_num, args.device, args.thread)
     elif current_command == "demo":
         hm_exec.demo(backend=backend)
     elif current_command == "eval":
         hm_exec.evaluate(backend=backend)
     else:
-        raise NotImplementedError
-    
-    # 存在结果信息，先读回来更新后再存
-    res_info = dict()
-    if os.path.exists(args.result_path):
-        res_info = read_yaml_to_dict(args.result_path)
+        raise NotImplementedError  
+
     if current_command == "compare" and "compare" in res_info:
         res_info["compare"].update(new_res_info["compare"])
-    elif current_command == "perf" and "perf" in res_info:
-        res_info["perf"].update(new_res_info["perf"])
     else:
         res_info.update(new_res_info)
     save_dict_to_yaml(res_info, args.result_path)    
-    
+
 
 if __name__ == "__main__":
     main()

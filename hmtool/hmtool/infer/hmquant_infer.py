@@ -5,7 +5,6 @@ import onnxruntime as ort
 from abc import ABC
 from ..base.base_infer import BaseInfer
 from ..utils import logger
-from ..utils.utils import torch_to_numpy_dtype
 
 
 class HmQuantInfer(BaseInfer, ABC):
@@ -21,7 +20,7 @@ class HmQuantInfer(BaseInfer, ABC):
             self.engine = pickle.load(f)
         # self.engine.set_ops_mode("quant_forward")
         self.engine.set_ops_mode("hardware_forward")
-        logger.info("load hmquant model successfully.")
+        logger.info("load Xh1Hmquant model successfully.")
         graph_input_nodes = self.engine.graph_input_nodes
         graph_output_nodes = self.engine.graph_output_nodes
                 

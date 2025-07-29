@@ -1,6 +1,7 @@
 import os
 import cv2
 import time
+import json
 import torch
 import numpy as np
 from datetime import datetime
@@ -44,18 +45,14 @@ class Xh1Exec(BaseExec):
             enable_static_resizer = resizer_cfg.get("enable_static_resizer", False)
             self.enable_static_resizers.append(enable_static_resizer)
             self.max_inputs_size[input_name] = max_input_size
-        # xh1 resizer工作模式
-        # 0 - 输入为非图像数据or多输入情况，禁用resizer，相当于非图像输入
-        # 1 - 全动态resizer，参数为10个值[y, x, height, width, h, w, top, left, bottom, right]
-        # 2 - crop部分动态resizer, 参数为4个值[y, x, height, width]
-        # 3 - 静态resizer，使用场景几乎没有，不建议用
-        self.resizer_mode = 0
         if self.is_image_single_input and len(self.resizers_cfg[0]) != 0:
             # 单输入图像且设置了resizer参数
             if self.resize_types[0] == 0:
                 self.resizer_mode = 2 if not self.enable_static_resizers[0] else 3
             elif self.resize_types[0] == 1:
                 self.resizer_mode = 1
+            # 更新custom_msg
+            self.custom_msg[self.inputs_name[0]]["resizer_mode"] = self.resizer_mode
         logger.info(f"resizer_mode: {self.resizer_mode}")
         # roi模式
         # 0 - 1图n框
@@ -71,7 +68,7 @@ class Xh1Exec(BaseExec):
         if self.resizer_mode == 2 and (self.roi_num > 1 or self.build_batch > 1 or self.model_input_batch > 1):
             logger.error("Not support roi_num > 1 or batch > 1 yet, when resizer_mode == 2")
             exit(-1)
-
+        
     def get_quant_cfg(self) -> dict:
         # 设置量化日志输出
         log_dir = os.path.join(self.save_dir, "xh1", "logs")
@@ -350,6 +347,7 @@ class Xh1Exec(BaseExec):
             work_dir=self.build_output_dir,
             enable_dynamic_image_resize=self.resizer_mode in [1],
             one_img_multi_roi=self.roi_num > 1,
+            custom_msg=json.dumps(self.custom_msg, ensure_ascii=False)
         )
         span = time.time() - t_start
         res_info = {"build": {"time": span}}
@@ -602,115 +600,5 @@ class Xh1Exec(BaseExec):
             }
         logger.info(f"Compare...\n{table}")
         return res_info
-        
-    def perf(self, warmup_num, sample_num, loop_num=1, device_num=1, thread_num=1):
-        from ..python import perf
-        inputs_hw = dict()  # 收集图像输入的HW
-        for input_name in self.inputs_cfg:
-            input_cfg = self.inputs_cfg[input_name]
-            if self.is_image_single_input:
-                inputs_hw[input_name] = input_cfg["shape"][2:]
-        
-        # TODO 使用golden数据
-        perf_info = perf.CModelRunner(
-            self.hmm_path, sample_num, thread_num, 
-            device_num, loop_num, warmup_num, inputs_hw)
-        t_start = datetime.now().strftime("%Y%m%d%H%M%S")
-        res_info = {
-            "perf": {
-                t_start: {
-                    "params": {
-                        "hmm_path": self.hmm_path,
-                        "thread_num": thread_num,
-                        "device_num": device_num,
-                        "loop_num": loop_num,
-                        "warmup_num": warmup_num,
-                        "sample_num": sample_num,
-                    },
-                    "perf_info": {
-                        "input_avg_latency": perf_info.input_avg_latency,
-                        "input_max_latency": perf_info.input_max_latency,
-                        "infer_avg_latency": perf_info.infer_avg_latency,
-                        "infer_max_latency": perf_info.infer_max_latency,
-                        "output_avg_latency": perf_info.output_avg_latency,
-                        "output_max_latency": perf_info.output_max_latency,
-                        "avg_cost": perf_info.avg_cost,
-                        "qps": perf_info.qps
-                    }
-                }
-            }
-        }
-        return res_info
-    
-    def demo(self, backend):
-        """Demo入口"""
-        if not self.demo_cfg:
-            logger.error("demo config not found")
-            exit(-1)
-        data_dir = self.demo_cfg.get("data_dir", "")
-        HOUMO_DATASETS_PATH = os.environ.get(
-            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets")
-        HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
-        if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
-            logger.error("data_dir must be a exist directory")
-            exit(-1)
-        if not os.path.isdir(data_dir):
-            data_dir = HM_data_dir
-        logger.info(f"[demo] data_dir: {data_dir}")
-        test_num = self.demo_cfg.get("num", 0)
-        if not isinstance(test_num, int):
-            logger.error(f"test_num must be int -> {test_num}")
-            exit(-1)
-        if test_num < 0:
-            logger.error(f"test_num must >= 0 -> {test_num}")
-            exit(-1)
-        filenames = os.listdir(data_dir)
-        data_num = len(filenames)
-        if test_num > 0 and test_num < data_num:
-            filenames = filenames[:test_num]
-        filepaths = list()
-        for filename in filenames:
-            filepath = os.path.join(data_dir, filename)
-            if not os.path.exists(filepath):
-                logger.warning(f"filepath not exists -> {filepath}")
-                continue
-            filepaths.append(filepath)
-        model = self.get_model(backend)
-        model_path = self.model_path if backend == "onnx" else self.hmm_path
-        model.load(model_path)
-        model.demo(filepaths)
-        model.unload()
-    
-    def evaluate(self, backend):
-        """评估入口"""
-        if not self.eval_cfg:
-            logger.error("demo config not found")
-            exit(-1)
-        data_dir = self.eval_cfg.get("data_dir", "")
-        HOUMO_DATASETS_PATH = os.environ.get(
-            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets")
-        HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
-        if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
-            logger.error("data_dir must be a exist directory")
-            exit(-1)
-        if not os.path.isdir(data_dir):
-            data_dir = HM_data_dir
-        logger.info(f"[eval] data_dir: {data_dir}")
-        num = self.eval_cfg.get("num", 0)
-        if not isinstance(num, int):
-            logger.error(f"eval test_num must be int -> {num}")
-            exit(-1)
-        if num < 0:
-            logger.error(f"eval test_num must >= 0 -> {num}")
-            exit(-1)
-        # 获取dataset
-        dataset = self.get_dataset(data_dir)
-        # 获取模型
-        model = self.get_model(backend)
-        model_path = self.model_path if backend == "onnx" else self.hmm_path
-        model.load(model_path)
-        res = model.evaluate(dataset, num)
-        model.unload()
-        logger.info(f"{res}")
         
         

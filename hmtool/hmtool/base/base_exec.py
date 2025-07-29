@@ -3,6 +3,7 @@ import os
 import sys
 import importlib
 import numpy as np
+from datetime import datetime
 from ..utils import logger
 from ..utils.utils import get_onnx_inputs_info
 
@@ -65,6 +66,19 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.use_random_data = self.calib_data is None
         # 图像单输入，非图像or多输入必须是npz数据
         self.is_image_single_input = (not self.is_multi_input_model and self.data_formats[0] is not None)
+        # resizer工作模式
+        # 0 - 输入为非图像数据or多输入情况，禁用resizer，相当于非图像输入
+        # 1 - 全动态resizer，参数为10个值[y, x, height, width, h, w, top, left, bottom, right]
+        # 2 - crop部分动态resizer, 参数为4个值[y, x, height, width]
+        # 3 - 静态resizer，使用场景几乎没有，不建议用
+        self.resizer_mode = 0
+        self.custom_msg = dict()
+        for name in self.inputs_cfg:
+            input_cfg = self.inputs_cfg[name]
+            self.custom_msg[name] = dict(
+                shape=input_cfg["shape"],
+                resizer_mode=self.resizer_mode
+            )
         self.onnx_inputs_info, self.onnx_outputs_info = get_onnx_inputs_info(self.model_path)
         self.onnx_is_static = True
         for input_name in self.inputs_name:
@@ -140,16 +154,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
     def perf(self):
         """模型性能测试"""
         pass
-
-    @abc.abstractmethod
-    def demo(self, backend):
-        """模型演示"""
-        pass
-
-    @abc.abstractmethod
-    def evaluate(self, backend):
-        """模型数据集评估"""
-        pass
     
     @staticmethod
     def import_py_module_from_file(module_path: str, module_cls: str):
@@ -201,4 +205,110 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         Dataset = self.import_py_module_from_file(module_path, dataset_cls)
         logger.info(f"from {dataset_module} import {dataset_cls} successfully")
         return Dataset(root_path=data_dir)
+
+    def demo(self, backend):
+        """Demo入口"""
+        if not self.demo_cfg:
+            logger.error("demo config not found")
+            exit(-1)
+        data_dir = self.demo_cfg.get("data_dir", "")
+        HOUMO_DATASETS_PATH = os.environ.get(
+            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets")
+        HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
+        if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
+            logger.error("data_dir must be a exist directory")
+            exit(-1)
+        if not os.path.isdir(data_dir):
+            data_dir = HM_data_dir
+        logger.info(f"[demo] data_dir: {data_dir}")
+        test_num = self.demo_cfg.get("num", 0)
+        if not isinstance(test_num, int):
+            logger.error(f"test_num must be int -> {test_num}")
+            exit(-1)
+        if test_num < 0:
+            logger.error(f"test_num must >= 0 -> {test_num}")
+            exit(-1)
+        filenames = os.listdir(data_dir)
+        data_num = len(filenames)
+        if test_num > 0 and test_num < data_num:
+            filenames = filenames[:test_num]
+        filepaths = list()
+        for filename in filenames:
+            filepath = os.path.join(data_dir, filename)
+            if not os.path.exists(filepath):
+                logger.warning(f"filepath not exists -> {filepath}")
+                continue
+            filepaths.append(filepath)
+        model = self.get_model(backend)
+        model_path = self.model_path if backend == "onnx" else self.hmm_path
+        model.load(model_path)
+        model.demo(filepaths)
+        model.unload()
     
+    def evaluate(self, backend):
+        """评估入口"""
+        if not self.eval_cfg:
+            logger.error("demo config not found")
+            exit(-1)
+        data_dir = self.eval_cfg.get("data_dir", "")
+        HOUMO_DATASETS_PATH = os.environ.get(
+            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets")
+        HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
+        if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
+            logger.error("data_dir must be a exist directory")
+            exit(-1)
+        if not os.path.isdir(data_dir):
+            data_dir = HM_data_dir
+        logger.info(f"[eval] data_dir: {data_dir}")
+        num = self.eval_cfg.get("num", 0)
+        if not isinstance(num, int):
+            logger.error(f"eval test_num must be int -> {num}")
+            exit(-1)
+        if num < 0:
+            logger.error(f"eval test_num must >= 0 -> {num}")
+            exit(-1)
+        # 获取dataset
+        dataset = self.get_dataset(data_dir)
+        # 获取模型
+        model = self.get_model(backend)
+        model_path = self.model_path if backend == "onnx" else self.hmm_path
+        model.load(model_path)
+        res = model.evaluate(dataset, num)
+        model.unload()
+        logger.info(f"{res}")
+        
+    @staticmethod
+    def perf(model_path, warmup_num, sample_num, loop_num=1, device_num=1, thread_num=1):
+        from ..python import perf        
+        # TODO 使用golden数据
+        perf_info = perf.CModelRunner(
+            model_path, sample_num, thread_num, 
+            device_num, loop_num, warmup_num)
+        t_start = datetime.now().strftime("%Y%m%d%H%M%S")
+        res_info = {
+            "perf": {
+                t_start: {
+                    "params": {
+                        "hmm_path": model_path,
+                        "thread_num": thread_num,
+                        "device_num": device_num,
+                        "loop_num": loop_num,
+                        "warmup_num": warmup_num,
+                        "sample_num": sample_num,
+                    },
+                    "perf_info": {
+                        "input_avg_latency": perf_info.input_avg_latency,
+                        "input_max_latency": perf_info.input_max_latency,
+                        "infer_avg_latency": perf_info.infer_avg_latency,
+                        "infer_max_latency": perf_info.infer_max_latency,
+                        "output_avg_latency": perf_info.output_avg_latency,
+                        "output_max_latency": perf_info.output_max_latency,
+                        "avg_cost": perf_info.avg_cost,
+                        "qps": perf_info.qps
+                    }
+                }
+            }
+        }
+        return res_info
+
+

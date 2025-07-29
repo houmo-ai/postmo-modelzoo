@@ -8,11 +8,11 @@
 #include <iostream>
 #include <map>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <pybind11/cast.h>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 #include <queue>
-#include <spdlog/logging.h>
 #include <sstream>
 #include <stdio.h>
 #include <string>
@@ -48,6 +48,7 @@ namespace fs = std::filesystem;
 #define GET_COST(start, end) \
     std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
 
+using json = nlohmann::json;
 namespace py = pybind11;
 
 typedef struct {
@@ -262,8 +263,7 @@ perfInfo_t ModelRunner(
     int thread_num,
     int device_num,
     int loop_num,
-    int warm_up,
-    std::map<std::string, std::vector<int32_t>> inputs_hw) {
+    int warm_up) {
 
     if (auto platform = std::getenv("HDPL_PLATFORM")) {
         if (strcmp(platform, "ASIC")) {
@@ -317,13 +317,16 @@ perfInfo_t ModelRunner(
         input_datas.insert(std::pair<std::string, tcim::Tensor>(input_name, tensor));
     }
 
+    std::string custom_msg_str = module.GetCustomMsg();
+    json custom_msg = json::parse(custom_msg_str);
+
     if (inputs.size() > 0) {
         for (auto &item : inputs) {
             std::string dyn_info_name = "resizer_crop_" + item.first;
-            auto shape = inputs[item.first].shape;
+            auto &raw_input_shape = custom_msg[item.first]["shape"];
+            auto &shape = inputs[item.first].shape;
             assert(shape.size() == 4);
-            assert(inputs_hw.count(item.first) > 0);
-            auto input_hw = inputs_hw[item.first];
+            assert(raw_input_shape.size() == 4);
             for (int idx = 0; idx < input_num; ++idx) {
                 auto input_name = module.GetInputName(idx);
                 auto input_info = module.GetInputInfo(input_name).AsContiguous();
@@ -337,8 +340,8 @@ perfInfo_t ModelRunner(
                 data[2] = shape[2];
                 data[3] = shape[3];
                 if (dyn_shape[0] == 10) {
-                    data[4] = input_hw[0];
-                    data[5] = input_hw[1];
+                    data[4] = raw_input_shape[2];
+                    data[5] = raw_input_shape[3];
                     data[6] = 0;
                     data[7] = 0;
                     data[8] = 0;

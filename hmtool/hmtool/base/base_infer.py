@@ -6,6 +6,7 @@ class BaseInfer(object, metaclass=abc.ABCMeta):
         self.total = 0
         self.engine = None
         self.backend = "onnx"  # onnx/hmquant/xh1/xh2
+        self.device = "cpu"
 
     @abc.abstractmethod
     def load(self, model_path):

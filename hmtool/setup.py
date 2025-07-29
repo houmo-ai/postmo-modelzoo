@@ -6,7 +6,7 @@ from setuptools import setup, find_packages, Extension
 
 
 def get_version():
-    return "0.0.1"
+    return "2.4.2"
 
 
 def get_build_time():
@@ -42,7 +42,7 @@ ext_modules = [
         include_dirs=[
             pybind11.get_include(),
             os.path.join(HOUMO_PATH, "include"),
-            "3rdparty/spdlog/include"
+            "3rdparty/nlohmann/include"
         ],
         library_dirs=[
             os.path.join(HOUMO_PATH, "lib")
