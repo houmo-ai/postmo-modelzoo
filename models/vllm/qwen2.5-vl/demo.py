@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import tcim_lite as tcim
-from qwen_vl_utils import process_vision_info
+from PIL import Image
 from processing_qwen2_5_vl import Qwen2_5_VLProcessor
 from utils import get_rope_index, QRawToYuv
 
@@ -128,11 +128,20 @@ class Qwen25VL:
         resized_image_inputs = None
         video_inputs = None
         if image_dir:
-            image_inputs, video_inputs = process_vision_info(messages)
             resized_image_inputs = []
-            for image_input in image_inputs:
-                resized_image_input = image_input.resize((644, 364))
-                resized_image_inputs.append(resized_image_input)
+            try:
+                from qwen_vl_utils import process_vision_info
+                image_inputs, video_inputs = process_vision_info(messages)
+                for image_input in image_inputs:
+                    resized_image_input = image_input.resize((644, 364))
+                    resized_image_inputs.append(resized_image_input)
+            except:
+                for content in messages[0]['content']:
+                    if content['type']=='image':
+                        image_input = Image.open(content['image'])
+                        resized_image_input = image_input.resize((644, 364))
+                        resized_image_inputs.append(resized_image_input)
+
         inputs = self.processor(
             text=[text],
             images=resized_image_inputs,
@@ -392,7 +401,7 @@ if __name__ == "__main__":
     args = get_args()
     qwen25vl = Qwen25VL(model_dir=args.model_dir, prefill_shape=args.prefill_shape, cache_len=args.decode_length, model_size=args.model_size)
     # image_dir = None
-    image_dir = "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg"
+    image_dir = "../../../data/pic/beach.jpeg"
     start_time = time.time()
     # qwen25vl.chat_vit_prefill(image_dir, prompt='你好，你是谁。')
     qwen25vl.chat_vit_prefill(image_dir, prompt='请描述图片内容。')
