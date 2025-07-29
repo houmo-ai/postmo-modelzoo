@@ -12,4 +12,7 @@ if [ "$arch" = "x86_64" ]; then
 else
   python3 get_model.py --type hmm
 fi
+
+pip3 install -r requirements.txt
+
 python3 demo.py
