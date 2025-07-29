@@ -57,6 +57,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.build_span = 0
         self.layer_compare_span = 0
         self.is_fixed_out = False
+        self.is_npz = False
 
     def quantize(self):
         """quantize"""
