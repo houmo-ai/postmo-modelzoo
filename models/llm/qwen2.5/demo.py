@@ -82,18 +82,18 @@ class HmQwen:
         option2 = tcim.runtime.Option(weight_manager)
         dummy_tensor_names = [f'model_layers_{i}_self_attn_kcache_input' for i in range(nblocks)]
         dummy_tensor_names += [f'model_layers_{i}_self_attn_vcache_input' for i in range(nblocks)]
-        dummy_tensor_names += [f'model_layers_{i}_self_attn_kcache_history_sum' for i in range(nblocks)]
+        # dummy_tensor_names += [f'model_layers_{i}_self_attn_kcache_history_sum' for i in range(nblocks)]
         option2.set_dummy_tensors(dummy_tensor_names)
-        self.prefill_model = tcim.runtime.load(os.path.join(model_dir, "deepseek_prefill.hmm"), option = option1)
-        self.decode_model = tcim.runtime.load(os.path.join(model_dir, "deepseek_decode.hmm"), option = option2)
+        self.prefill_model = tcim.runtime.load(os.path.join(model_dir, "qwen2.5_prefill.hmm"), option = option1)
+        self.decode_model = tcim.runtime.load(os.path.join(model_dir, "qwen2.5_decode.hmm"), option = option2)
         # set kvcache input
         for i in range(nblocks):
             kcache = self.prefill_model.get_input(f'model_layers_{i}_self_attn_kcache_input')
             self.decode_model.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
             vcache = self.prefill_model.get_input(f'model_layers_{i}_self_attn_vcache_input')
             self.decode_model.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
-            kcache_history_sum = self.prefill_model.get_input(f'model_layers_{i}_self_attn_kcache_history_sum')
-            self.decode_model.set_input(f'model_layers_{i}_self_attn_kcache_history_sum', kcache_history_sum)
+            # kcache_history_sum = self.prefill_model.get_input(f'model_layers_{i}_self_attn_kcache_history_sum')
+            # self.decode_model.set_input(f'model_layers_{i}_self_attn_kcache_history_sum', kcache_history_sum)
         # set decode input
         current_length_input_1 = np.array([1]).astype("int16")
         self.decode_model.set_input("current_length", current_length_input_1)
@@ -124,10 +124,10 @@ class HmQwen:
             return f"Question long than {self.decode_length}, please shorten it!"
 
         # clear kcache_history_sum before prefill
-        for i in range(self.nblocks):
-            kcache_history_sum = self.prefill_model.get_input(f'model_layers_{i}_self_attn_kcache_history_sum')
-            kcache_history_sum_init = np.zeros(kcache_history_sum.info.shape, dtype=kcache_history_sum.info.dtype)
-            self.prefill_model.set_input(f'model_layers_{i}_self_attn_kcache_history_sum', kcache_history_sum_init)
+        # for i in range(self.nblocks):
+        #     kcache_history_sum = self.prefill_model.get_input(f'model_layers_{i}_self_attn_kcache_history_sum')
+        #     kcache_history_sum_init = np.zeros(kcache_history_sum.info.shape, dtype=kcache_history_sum.info.dtype)
+        #     self.prefill_model.set_input(f'model_layers_{i}_self_attn_kcache_history_sum', kcache_history_sum_init)
 
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
         for round in range(prefill_loop_round):
