@@ -153,7 +153,7 @@ def build(args=None):
             input_name = module.get_input_name(id)
             input_info = module.get_input_info(input_name)
             print(f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}")
-            if input_name == "dyn_info":
+            if "resizer_crop_" in input_name:
                 crop = [0, 0, input_shape[2], input_shape[3]]  # y1, x1, h, w
                 resize = [640, 640]  # h, w
                 pad = [0, 0, 0, 0]  # top, left, bottom, right

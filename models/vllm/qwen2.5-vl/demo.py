@@ -264,7 +264,6 @@ class Qwen25VL:
         hight_position_ids = position_ids[1][0]
         width_position_ids = position_ids[2][0]
         return inputs_embeds, time_position_ids, hight_position_ids, width_position_ids, rope_deltas
-
     def create_prefill_inputs(self, inputs_embeds, time_position_ids, hight_position_ids, width_position_ids, pre_gen_idx):
         x = inputs_embeds[
             :,

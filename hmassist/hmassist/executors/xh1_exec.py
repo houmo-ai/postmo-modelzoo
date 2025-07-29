@@ -303,9 +303,10 @@ class XH1Exec(BaseExec, ABC):
     def infer(self, input_datas):
         """ infer one time """
         for name in self.input_infos:
-            if name == "dyn_info":
+            if "resizer_crop_" in name:
                 shape = self.inputs[0]["shape"]  # 默认单图像输入，取图像shape
-                crop = [0, 0, shape[2], shape[3]]  # y1, x1, h, w
+                size = self.inputs[0]["image"]["size"]
+                crop = [0, 0, size[0], size[1]]  # y1, x1, h, w
                 resize = [shape[2], shape[3]]  # h, w
                 pad = [0, 0, 0, 0]  # top, left, bottom, right
                 input_data = np.concatenate((crop, resize, pad))

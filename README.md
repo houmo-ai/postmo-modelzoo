@@ -80,6 +80,7 @@ houmo-modelzoo提供的模型示例如下，编译和性能评估示例每个都
 | [deepseek](models/llm/deepseek-r1-qwen3-8b)  | llm       | xh2     | x     | yes  | x    |
 | [sdxl](models/diffusion/sdxl)                | diffusion | xh1     | x     | yes  | x    |
 | [sd3](models/diffusion/sd3)                  | diffusion | xh2     | x     | yes  | x    |
+| [qwen2.5-vl](models/vllm/qwen2.5-vl)         | vllm      | xh1     | x     | yes  | x    |
                                                                     
 ## C++评估工具列表
 

@@ -17,22 +17,31 @@
 
 通过get_model脚本下载模型，可通过参数选择下载量化模型或芯片模型。
 
-目前暂时不支持用户自己量化。
+可以选择下载量化后模型，目前暂时不支持用户自己量化。
 
 ```bash
-python3 get_model.py --type raw
+# 3b模型
+python3 get_model.py --type quant
+# 7b模型
+python3 get_model.py --type quant --model_size 7b
 ```
 
 如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
+# 3b模型
 python3 get_model.py --type hmm
+# 7b模型
+python3 get_model.py --type hmm --model_size 7b
 ```
 
 也可以直接下载以上所有模型和数据集（注意相同模型会覆盖，请自行保存）：
 
 ```bash
+# 3b模型
 python3 get_model.py
+# 7b模型
+python3 get_model.py --model_size 7b
 ```
 
 ### 2.2 编译
@@ -40,7 +49,10 @@ python3 get_model.py
 将量化模型编译为在芯片上运行的模型。执行脚本：
 
 ```bash
+# 3b模型
 python3 build.py
+# 7b模型
+python3 build.py --model_size 7b
 ```
 
 编译好的模型存放在当前目录，包括2个文件：
@@ -56,8 +68,13 @@ Qwen2模型使用python API进行演示
 
 2. 执行脚本，推理完成将输出性能结果。
 
+3. 注意：由于ubuntu18.04下qwen_vl_utils无法正常安装，导致无法正常运行。
+
 ```bash
+# 3b模型
 python3 demo.py
+# 7b模型
+python3 demo.py --model_size 7b
 ```
 
 ### 2.4 一键评估
