@@ -4,6 +4,11 @@ set -e
 WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${WORK_PATH}" || exit 1
 
+RESIZE_TYPE=0
+if [ "$1" = "1" ]; then
+  RESIZE_TYPE=1
+fi
+
 if [[ -z $HOUMO_EXAMPLES_PATH ]]; then
   export HOUMO_EXAMPLES_PATH=$WORK_PATH/../..
 fi
@@ -20,4 +25,4 @@ make -j
 make install
 
 cd $WORK_PATH
-./multibatch_example
+./multibatch_example $RESIZE_TYPE

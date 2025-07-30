@@ -11,6 +11,9 @@ MultiBatch Example以yolov5s模型和resnet50模型为例，展示TCIM API多bat
 1. yolov5s模型展示了N-N多batch动态resizer使用方式，即模型的图像输入batch数量为N，对应的resizer_crop输入batch数量也为N。
 
 2. resnet50模型展示了1-N多batch动态resizer使用方式，即模型的图像输入batch数量为1，对应的resizer_crop输入batch数量为N。以resnet50为例说明，其resizer_crop输入batch为4表示一次推理可配置4组resizer_crop信息，实现对4个ROI分类的效果。
+    - 基于resnet50模型，提供两种resize图片的示例方法：等比例缩放ROI，非等比例缩放ROI。示例程序中默认使用等比例缩放，示例程序支持通过入参设置resize图片类型:
+        - `0`: (默认)代表等比例缩放ROI。
+        - `1`: 代表非等比例缩放ROI。
 
 当前示例仅支持Linux系统。
 
@@ -35,7 +38,10 @@ cmake -DCMAKE_INSTALL_PREFIX=../ ..
 make -j
 make install
 cd ..
+# 等比例缩放ROI
 ./multibatch_example
+# 非等比例缩放ROI
+./multibatch_example 1
 ```
 
 ## 参考结果
@@ -145,5 +151,8 @@ yolov5s的多Batch检测效果图片保存在./demo_results/目录下。
 Linux下执行：
 
 ```bash
+# 等比例缩放ROI
 bash run.sh
+# 非等比例缩放ROI
+bash run.sh 1
 ```

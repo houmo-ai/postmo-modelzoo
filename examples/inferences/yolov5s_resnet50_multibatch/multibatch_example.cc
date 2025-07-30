@@ -354,7 +354,7 @@ int classify(int batch_num, std::string model_path,
     for (int det_idx = 0; det_idx < detections.size(); det_idx++) {
       printf(
           "batch[%d] detection[%d] box[%d, %d, %d, %d], det[conf:%f, cls:%d], "
-          "cls[id:%d], conf:%f, lable:[%s]]\n",
+          "cls[id:%d], conf:%f, label:[%s]]\n",
           ipt_idx, det_idx, detections[det_idx].box.x1,
           detections[det_idx].box.y1, detections[det_idx].box.x2,
           detections[det_idx].box.y2, detections[det_idx].conf,
@@ -369,14 +369,14 @@ int classify(int batch_num, std::string model_path,
 }
 
 int main(int argc, char *argv[]) {
-  // 0: scaling resize, 1: non-scaling resize
-  int resize_type = 1;
-  // if (argc == 2) {
-  //   resize_type = std::stoi(argv[1]);
-  //   LOG_INFO << "set resize_type:" << resize_type;
-  // }
+  // 0: proportional scaling, 1: non-proportional scaling
+  int resize_type = 0;
+  if (argc == 2) {
+    resize_type = std::stoi(argv[1]);
+    LOG_INFO << "set resize type:" << resize_type;
+  }
   LOG_INFO << "===> multibatch c++ example start, tcim version: "
-           << tcim::GetVersion().c_str();
+           << tcim::GetVersion().c_str() << ", resize type:" << resize_type;
 
   std::string yolov5s_md_path = "yolov5s_xh1_b4_1core_O2.hmm";
   std::string resnet50_md_path = "resnet50_roi4_b1_xh1_O2.hmm";
