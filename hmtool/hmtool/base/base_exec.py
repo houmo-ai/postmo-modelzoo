@@ -3,6 +3,7 @@ import os
 import sys
 import importlib
 import numpy as np
+from pathlib import Path
 from datetime import datetime
 from ..utils import logger
 from ..utils.utils import get_onnx_inputs_info
@@ -18,17 +19,17 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.device = "cpu"
         self.target = cfg["target"]
         self.model_cfg = cfg.get("model")
-        self.model_path = self.model_cfg.get("model_path")
-        HOUMO_MODEL_PATH = os.environ.get(
-            "HOUMO_MODEL_PATH", "/usr/local/src/houmo-modelzoo/models")
-        if self.model_path is None and not os.path.isfile(self.model_path):
+        self.model_path = self.model_cfg.get("model_path", "")
+        HOUMO_MODEL_PATH = os.environ.get("HOUMO_MODEL_PATH", "")
+        if not os.path.isfile(self.model_path):
             new_model_path = os.path.join(HOUMO_MODEL_PATH, self.model_path)
             if not os.path.isfile(new_model_path):
                 logger.error(f"Not found model_path: {self.model_path}")
                 exit(-1)
             self.model_path = new_model_path
         logger.info(f"model_path: {self.model_path}")
-        self.model_name = self.model_cfg.get("name", "model")
+        self.model_name = self.model_cfg.get("name", "model")  # 编译后模型名称
+        self.model_dir_name = Path.cwd().name  # 模型所在目录名称
         self.save_dir = self.model_cfg.get("save_dir")
         self.inputs_cfg = self.model_cfg.get("inputs")
         self.model_inputs_batch = dict()
@@ -148,11 +149,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def compare(self):
         """模型相似度比较"""
-        pass
-    
-    @abc.abstractmethod
-    def perf(self):
-        """模型性能测试"""
         pass
     
     @staticmethod

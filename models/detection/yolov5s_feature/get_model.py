@@ -15,8 +15,8 @@ def get_args() -> argparse.Namespace:
         '--type',
         dest='model_type',
         type=str,
-        default='quant',
-        help='which resource to get, choise in [raw, quant, hmm, all]',
+        default='raw',
+        help='which model type to get, choise in [raw, quant, build, all]',
     )
     parser.add_argument(
         '--quant_model_dir',
@@ -24,6 +24,13 @@ def get_args() -> argparse.Namespace:
         type=str,
         default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
         help='where to save quant_model',
+    )
+    parser.add_argument(
+        '--build_model_dir',
+        dest='build_model_dir',
+        type=str,
+        default=os.path.join('output', HOUMO_TARGET),
+        help='where to save build_model',
     )
     parser.add_argument(
         '--model_dir',
@@ -39,21 +46,28 @@ def get_args() -> argparse.Namespace:
 if __name__ == '__main__':
     args = get_args()
     quant_model_dir = args.quant_model_dir
+    build_model_dir = args.build_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
-    HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
-    HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
-    wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
-    quant_path = "models/deepseek/hmquant_xh2_deepseek_8b_256_2k_20250702.zip"
-    hmm_path = "models/deepseek/hmm_xh2_deepseek_8b_256_2k_2cores_20250702.zip"
+
+    model_name = "yolov5s_feature"
+    ncore = 1
+    batch = 1
+    opt_level = "O2"
+    version = "v2.4.2"
+    target = HOUMO_TARGET
+    raw_path = f"models/yolov5s/yolov5s_640x640.onnx"
+    quant_path = f"models/{model_name}/hmquant_{model_name}_{target}_{version}.tar.xz"
+    build_path = f"models/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type == "raw" or model_type == "all":
-        get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
-        from modelscope import snapshot_download
-        snapshot_download('deepseek-ai/DeepSeek-R1-0528-Qwen3-8B', local_dir='DeepSeek-R1-0528-Qwen3-8B')
+        file_path = get_file_from_jfrog(raw_path, model_dir)
+        extract_path = os.path.join(os.path.dirname(file_path), "yolov5s_640x640_clip.onnx")
+        onnx.utils.extract_model(file_path, extract_path, input_names=['images'], 
+            output_names=['340', '378', '416'], check_model=True)
 
     if model_type == "quant" or model_type == "all":
         get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
 
-    if model_type == "hmm" or model_type == "all":
-        get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+    if model_type == "build" or model_type == "all":
+        get_file_from_jfrog(build_path, model_dir, build_model_dir)

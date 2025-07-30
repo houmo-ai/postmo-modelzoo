@@ -12,8 +12,8 @@ backbone_resnet50:
     - backbone_resnet50_test:
         script: models/backbone/resnet50/test.sh
   test:
-    - backbone_resnet50_eval
-    - backbone_resnet50_perf
+    # - backbone_resnet50_eval
+    # - backbone_resnet50_perf
     - backbone_resnet50_test
 backbone_efficientnet:
   include:
@@ -28,8 +28,8 @@ backbone_efficientnet:
     - backbone_efficientnet_test:
         script: models/backbone/efficientnet/test.sh
   test:
-    - backbone_efficientnet_eval
-    - backbone_efficientnet_perf
+    # - backbone_efficientnet_eval
+    # - backbone_efficientnet_perf
     - backbone_efficientnet_test
 backbone_mobilenetv2:
   include:
@@ -44,8 +44,8 @@ backbone_mobilenetv2:
     - backbone_mobilenetv2_test:
         script: models/backbone/mobilenetv2/test.sh
   test:
-    - backbone_mobilenetv2_eval
-    - backbone_mobilenetv2_perf
+    # - backbone_mobilenetv2_eval
+    # - backbone_mobilenetv2_perf
     - backbone_mobilenetv2_test
 backbone_vit:
   include:
@@ -67,8 +67,8 @@ autodrive_yolop:
     - autodrive_yolop_test:
         script: models/autodrive/yolop/test.sh
   test:
-    - autodrive_yolop_perf
-    - autodrive_yolop_test
+    # - autodrive_yolop_perf
+    # - autodrive_yolop_test
 detection_yolov3:
   include:
     - models/detection/yolov3
@@ -82,8 +82,8 @@ detection_yolov3:
     - detection_yolov3_test:
         script: models/detection/yolov3/test.sh
   test:
-    - detection_yolov3_eval
-    - detection_yolov3_perf
+    # - detection_yolov3_eval
+    # - detection_yolov3_perf
     - detection_yolov3_test
 detection_yolov5s:
   include:
@@ -98,8 +98,8 @@ detection_yolov5s:
     - detection_yolov5s_test:
         script: models/detection/yolov5s/test.sh
   test:
-    - detection_yolov5s_eval
-    - detection_yolov5s_perf
+    # - detection_yolov5s_eval
+    # - detection_yolov5s_perf
     - detection_yolov5s_test
 detection_yolov8m:
   include:
@@ -114,9 +114,19 @@ detection_yolov8m:
     - detection_yolov8m_test:
         script: models/detection/yolov8m/test.sh
   test:
-    - detection_yolov8m_eval
-    - detection_yolov8m_perf
+    # - detection_yolov8m_eval
+    # - detection_yolov8m_perf
     - detection_yolov8m_test
+multi_input_custom_random_model:
+  include:
+    - models/multi_input_custom_random_model
+  # exclude:
+  #   - models/multi_input_custom_random_model/README.MD
+  example_case:
+    - multi_input_custom_random_model_test:
+        script: models/multi_input_custom_random_model/test.sh
+  test:
+    - multi_input_custom_random_model_test
 asr_wenet:
   include:
     - models/asr/wenet

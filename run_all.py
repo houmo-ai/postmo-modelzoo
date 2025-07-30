@@ -166,7 +166,12 @@ def main(allArgs=None):
 if __name__ == "__main__":
     os.environ['HOUMO_MODELZOO_URL'] = "http://10.10.1.53:8082/artifactory/toolchain/release"
     os.environ['HOUMO_MODEL_PATH'] = "/data02/modelzoo_ci/models"
-    os.system("wget http://10.10.1.53:8082/artifactory/toolchain/support/xh2_extra_libs.zip")
-    os.system("unzip xh2_extra_libs.zip -d xh2_extra_libs")
-    os.system("cp xh2_extra_libs/* /usr/local/houmo/lib")
+    os.system("cd hmtool && chmod +x install.sh && ./install.sh")
+    HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH")
+    imagenet_dir = os.path.join(HOUMO_DATASETS_PATH, "imagenet")
+    os.system(f"cp data/datasets/imagenet/synset_1000.txt {imagenet_dir}")
+    os.system(f"cp data/datasets/imagenet/val.txt {imagenet_dir}")
+    # os.system("wget http://10.10.1.53:8082/artifactory/toolchain/support/xh2_extra_libs.zip")
+    # os.system("unzip xh2_extra_libs.zip -d xh2_extra_libs")
+    # os.system("cp xh2_extra_libs/* /usr/local/houmo/lib")
     main()

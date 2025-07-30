@@ -88,5 +88,12 @@ data/
 
 # temp file
 *~
-
+results_*
+result.yml
+vis*
+pred*
+*.npz
+*.tar.xz
+*.tar.gz
+*.zip
 

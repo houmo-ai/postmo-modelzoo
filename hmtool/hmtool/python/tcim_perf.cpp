@@ -327,25 +327,47 @@ perfInfo_t ModelRunner(
             auto &shape = inputs[item.first].shape;
             assert(shape.size() == 4);
             assert(raw_input_shape.size() == 4);
+            std::string dyn_info_str;
             for (int idx = 0; idx < input_num; ++idx) {
                 auto input_name = module.GetInputName(idx);
                 auto input_info = module.GetInputInfo(input_name).AsContiguous();
                 if (dyn_info_name != input_name)
                     continue;
-                auto dyn_shape = input_info.Shape();
+                auto dyn_shape = input_info.Shape();  // bs*10 or bs4
                 auto tensor = input_datas[input_name];
                 int32_t *data = (int32_t *)tensor.Data();
-                data[0] = 0;
-                data[1] = 0;
-                data[2] = shape[2];
-                data[3] = shape[3];
-                if (dyn_shape[0] == 10) {
-                    data[4] = raw_input_shape[2];
-                    data[5] = raw_input_shape[3];
-                    data[6] = 0;
-                    data[7] = 0;
-                    data[8] = 0;
-                    data[9] = 0;
+                assert(dyn_shape.size() == 2 || dyn_shape.size() == 1);
+                int32_t batch = 1;
+                int32_t step = 4;
+                if (dyn_shape.size() == 2) {
+                    batch = dyn_shape[0];
+                    step = dyn_shape[1];
+                }
+                for (int n = 0; n < batch; ++n) {
+                    data[n * step + 0] = 0;
+                    data[n * step + 1] = 0;
+                    data[n * step + 2] = shape[2];
+                    data[n * step + 3] = shape[3];
+                    dyn_info_str = std::to_string(data[n * step + 0]) + ", " +
+                                   std::to_string(data[n * step + 1]) + ", " +
+                                   std::to_string(data[n * step + 2]) + ", " +
+                                   std::to_string(data[n * step + 3]);
+                    if (step == 10) {
+                        data[n * step + 4] = raw_input_shape[2];
+                        data[n * step + 5] = raw_input_shape[3];
+                        data[n * step + 6] = 0;
+                        data[n * step + 7] = 0;
+                        data[n * step + 8] = 0;
+                        data[n * step + 9] = 0;
+                        dyn_info_str += ", " +
+                                        std::to_string(data[n * step + 4]) + ", " +
+                                        std::to_string(data[n * step + 5]) + ", " +
+                                        std::to_string(data[n * step + 6]) + ", " +
+                                        std::to_string(data[n * step + 7]) + ", " +
+                                        std::to_string(data[n * step + 8]) + ", " +
+                                        std::to_string(data[n * step + 9]);
+                    }
+                    printf("[DynamicInfo] %s: idx: %d, info: %s\n", input_name.c_str(), n, dyn_info_str.c_str());
                 }
             }
         }

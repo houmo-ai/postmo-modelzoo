@@ -6,8 +6,10 @@ import torch
 import numpy as np
 from datetime import datetime
 from prettytable import PrettyTable
+from importlib.metadata import version, PackageNotFoundError
 from ..utils import logger
-from ..utils.utils import get_md5, SUPPORT_IMAGE_FORMATS, load_npz
+from ..utils.utils import get_md5, get_file_md5, \
+    SUPPORT_IMAGE_FORMATS, load_npz, compress_folder_to_tar_xz_with_progress, compress_file_to_tar_xz_with_progress
 from ..utils.preprocess import xh1_preprocess, default_preprocess 
 from ..utils.dist_metrics import cosine_distance
 from ..base.base_exec import BaseExec
@@ -15,6 +17,15 @@ from ..infer.xh1_infer import Xh1Infer
 from ..infer.onnx_infer import OnnxInfer
 from ..infer.hmquant_infer import HmQuantInfer
 
+
+def get_hmquant_version():
+    """获取hmquant版本"""
+    try:
+        v = version("hmquant-xh1")  # 替换成你想查的包名
+        return v
+    except PackageNotFoundError:
+        return "hmquant-xh1 not installed"
+    
 
 class Xh1Exec(BaseExec):
     def __init__(self, cfg: dict) -> None:
@@ -328,6 +339,14 @@ class Xh1Exec(BaseExec):
         sequencer.save_pkl(self.quant_output_dir, f"{self.model_name}_xh1_b{self.model_input_batch}")
         res["time"] = span
         res_info = {"quant": res, "model": self.model_cfg}
+        # 压缩量化产物
+        compress = os.environ.get("HMTOOL_COMPRESS", "0")
+        if compress == "1":
+            logger.info("Compressing quant output...")
+            compress_quant_output_path = os.path.join(self.save_dir, "xh1", f"hmquant_{self.model_dir_name}_xh1_v{get_hmquant_version()}.tar.xz")
+            compress_folder_to_tar_xz_with_progress(self.quant_output_dir, compress_quant_output_path)
+            logger.info(f"MD5: {get_file_md5(compress_quant_output_path)}, save path: {compress_quant_output_path}")
+            logger.info(f"Compressing quant output done.")
         return res_info
 
     def build(self):
@@ -351,6 +370,16 @@ class Xh1Exec(BaseExec):
         )
         span = time.time() - t_start
         res_info = {"build": {"time": span}}
+        # 压缩编译后产物
+        compress = os.environ.get("HMTOOL_COMPRESS", "0")
+        if compress == "1":
+            logger.info("Compressing hmmodel...")
+            compress_hmm_path = os.path.join(
+                self.save_dir, "xh1", 
+                f"{self.model_dir_name}_xh1_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{get_hmquant_version()}.tar.xz")
+            compress_file_to_tar_xz_with_progress(self.hmm_path, compress_hmm_path)
+            logger.info(f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}")
+            logger.info(f"Compressing hmmodel done.")
         return res_info
     
     def check_golden(self):
@@ -358,7 +387,8 @@ class Xh1Exec(BaseExec):
         xh1.load(self.hmm_path)
         in_datas = dict()
         for input_name in self.inputs_cfg:
-            golden_input_path = os.path.join(self.quant_output_dir, f"hmquant_{self.model_name}_{input_name}_input.npy")
+            new_input_name = input_name.replace("/", "_")
+            golden_input_path = os.path.join(self.quant_output_dir, f"hmquant_{self.model_name}_{new_input_name}_input.npy")
             golden_input = np.load(golden_input_path)
             # 编译时多batch，需要复制数据
             if self.build_batch > 1:
@@ -366,7 +396,7 @@ class Xh1Exec(BaseExec):
             in_datas[input_name] = golden_input
             if self.resizer_mode in [1, 2]:
                 # 编译后模型多batch，dynamic_resizer数据需要复制
-                golden_dyn_info_input_path = os.path.join(self.quant_output_dir, f"hmquant_{self.model_name}_resizer_crop_{input_name}_input.npy")
+                golden_dyn_info_input_path = os.path.join(self.quant_output_dir, f"hmquant_{self.model_name}_resizer_crop_{new_input_name}_input.npy")
                 golden_dyn_input = np.load(golden_dyn_info_input_path)
                 repeats = 1
                 if self.roi_num > 1:  # 1图n框
@@ -383,8 +413,9 @@ class Xh1Exec(BaseExec):
         table = PrettyTable(header)
         table.title = "xh1 vs hmquant"
         for output_name in outputs:
-            golden_output_path = os.path.join(self.quant_output_dir, f"hmquant_{self.model_name}_{output_name}_output.npy")
-            golden_output_dequant_path = os.path.join(self.quant_output_dir, f"hmquant_{self.model_name}_{output_name}_dequant_output.npy")
+            new_output_name = output_name.replace("/", "_")
+            golden_output_path = os.path.join(self.quant_output_dir, f"hmquant_{self.model_name}_{new_output_name}_output.npy")
+            golden_output_dequant_path = os.path.join(self.quant_output_dir, f"hmquant_{self.model_name}_{new_output_name}_dequant_output.npy")
             golden_output = np.load(golden_output_path)
             golden_output_dequanted = np.load(golden_output_dequant_path)
             repeats = 1
@@ -557,7 +588,7 @@ class Xh1Exec(BaseExec):
                 in_data = np.repeat(in_data, repeats=self.build_batch, axis=0)
                 in_data_quanted = xh1_infer.quantize(input_name, in_data)
                 logger.info(f"Hmquant input[{input_name}] quantize data_dtype: {in_data.dtype} -> {in_data_quanted.dtype}")
-                hmquant_in_datas[input_name] = torch.from_numpy(in_data_quanted[0:self.model_inputs_batch[input_name], ...])
+                hmquant_in_datas[input_name] = torch.from_numpy(in_data_quanted[0:self.model_inputs_batch[input_name], ...]).type(torch.int64)
                 xh1_in_datas[input_name] = in_data_quanted
 
         onnx_outputs = onnx_infer.run(onnx_in_datas)

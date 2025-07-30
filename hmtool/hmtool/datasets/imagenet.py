@@ -20,7 +20,7 @@ class ILSVRC2012(BaseDataset):
             logger.error(f"Not found val file -> {self.val_file}")
             exit(-1)
         if not os.path.exists(self.label_file):
-            logger.error("Not found val file -> {self.label_file}")
+            logger.error(f"Not found val file -> {self.label_file}")
             exit(-1)
 
         self.mapping = dict()

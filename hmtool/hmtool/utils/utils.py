@@ -6,15 +6,21 @@ import yaml
 import time
 import json
 import hashlib
+import lzma
+import tarfile
 import torch
 import numpy as np
 import onnx
 from onnx import TensorProto
+from pathlib import Path
+from tqdm import tqdm
 
 
 HOUMO_JFROG_IP = os.getenv("HOUMO_JFROG_IP", "139.224.0.199")
 HOUMO_JFROG_PORT = os.getenv("HOUMO_JFROG_PORT", "8082")
-HOUMO_MODELZOO_URL = f"http://{HOUMO_JFROG_IP}:{HOUMO_JFROG_PORT}/artifactory/houmo/release"
+assert HOUMO_JFROG_IP in ["139.224.0.199", "10.10.1.53"]
+BASENAME = "houmo" if HOUMO_JFROG_IP == "139.224.0.199" else "toolchain"
+HOUMO_MODELZOO_URL = f"http://{HOUMO_JFROG_IP}:{HOUMO_JFROG_PORT}/artifactory/{BASENAME}/release"
 
 SUPPORT_IMAGE_FORMATS = [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]
 SUPPORT_BACKEND = ["xh1", "xh2", "onnx"]
@@ -187,9 +193,65 @@ def get_file_from_jfrog(file_path, save_dir="", extract_dir=None):
             with zipfile.ZipFile(save_path, "r") as zip:
                 print("extract to %s" % extract_dir)
                 zip.extractall(path=extract_dir)
-        elif save_path.rfind(".tar") > 0:
+        elif save_path.rfind(".tar.gz") > 0:
             import tarfile
             with tarfile.open(save_path, "r:gz") as tar:
                 print("extract to %s" % extract_dir)
                 tar.extractall(path=extract_dir)
+        elif save_path.rfind(".tar.xz") > 0:
+            import tarfile
+            with tarfile.open(save_path, "r:xz") as tar:
+                print("extract to %s" % extract_dir)
+                tar.extractall(path=extract_dir)
     return save_path
+
+
+class ProgressFile:
+    def __init__(self, fileobj, pbar):
+        self.fileobj = fileobj
+        self.pbar = pbar
+
+    def read(self, size=-1):
+        data = self.fileobj.read(size)
+        self.pbar.update(len(data))
+        return data
+
+
+def compress_folder_to_tar_xz_with_progress(folder_path: str, output_path: str, preset=9):
+    """
+    压缩 folder_path 为 .tar.xz 文件，支持 tar -xvf 解压，
+    并用 tqdm 显示压缩进度。
+    """
+    # 统计所有待压缩文件大小
+    file_list = []
+    total_size = 0
+    for root, _, files in os.walk(folder_path):
+        for file in files:
+            if file.endswith(".pkl"):
+                continue  # 跳过 .pkl 文件
+            full_path = os.path.join(root, file)
+            file_list.append(full_path)
+            total_size += os.path.getsize(full_path)
+
+    with lzma.open(output_path, "wb", preset=preset | lzma.PRESET_EXTREME) as lzma_file:
+        with tarfile.open(fileobj=lzma_file, mode="w|") as tar:
+            with tqdm(total=total_size, unit="B", unit_scale=True, desc="Compressing") as pbar:
+                for file_path in file_list:
+                    arcname = os.path.relpath(file_path, start=os.path.dirname(folder_path))
+                    tarinfo = tar.gettarinfo(file_path, arcname)
+                    with open(file_path, "rb") as f:
+                        tar.addfile(tarinfo, fileobj=ProgressFile(f, pbar))
+
+
+def compress_file_to_tar_xz_with_progress(file_path: str, output_path: str, preset=9):
+    """
+    将单个文件压缩成 .tar.xz，支持 tar -xvf 解压，显示压缩进度。
+    """
+    total_size = os.path.getsize(file_path)
+    with lzma.open(output_path, "wb", preset=preset | lzma.PRESET_EXTREME) as lzma_file:
+        with tarfile.open(fileobj=lzma_file, mode="w|") as tar:
+            with tqdm(total=total_size, unit="B", unit_scale=True, desc="Compressing") as pbar:
+                tarinfo = tar.gettarinfo(file_path, arcname=os.path.basename(file_path))
+                with open(file_path, "rb") as f:
+                    tar.addfile(tarinfo, fileobj=ProgressFile(f, pbar))
+                    

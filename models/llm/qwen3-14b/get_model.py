@@ -1,9 +1,11 @@
 import os
 import onnx
 import argparse
-from hmassist.utils.utils import get_file_from_jfrog
+from hmtool.utils.utils import get_file_from_jfrog
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh1')
+assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
