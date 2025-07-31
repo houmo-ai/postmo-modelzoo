@@ -68,7 +68,7 @@ autodrive_yolop:
         script: models/autodrive/yolop/test.sh
   test:
     # - autodrive_yolop_perf
-    # - autodrive_yolop_test
+    - autodrive_yolop_test
 detection_yolov3:
   include:
     - models/detection/yolov3
