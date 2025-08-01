@@ -45,7 +45,7 @@ if __name__ == '__main__':
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
     if HOUMO_TARGET == "xh1":
         quant_path = "models/qwen3/hmquant_qwen3_256_8k_20250603.zip"
-        hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250603.zip"
+        hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250728.zip"
     elif HOUMO_TARGET == "xh2":
         quant_path = "models/qwen3/hmquant_xh2_qwen3_8b_256_2k_20250723.zip"
         hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250723.zip"

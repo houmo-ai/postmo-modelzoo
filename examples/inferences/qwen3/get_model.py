@@ -1,12 +1,10 @@
 import os
-import sys
-import onnx
 import argparse
+from hmatc.utils.utils import get_file_from_jfrog
 
 HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '..')
-sys.path.append(f'{HOUMO_EXAMPLES_PATH}/common/python')
-from utils import get_file_from_jfrog
-
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh1')
+assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -21,14 +19,19 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
-
 if __name__ == '__main__':
     args = get_args()
     if "HOUMO_MODELZOO_URL" not in os.environ:
         os.environ["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
-    HOUMO_TARGET = os.environ.get('HOUMO_TARGET', 'houmo')
     model_dir = os.path.join(HOUMO_EXAMPLES_PATH, "models")
-    hmm_path = "models/qwen3/hmm_qwen3_256_8k_"+ str(args.ncore) +"cores_20250603.zip"
+
+    if HOUMO_TARGET == "xh1":
+        if args.ncore == 2:
+            hmm_path = "models/qwen3/hmm_qwen3_256_8k_2cores_20250603.zip"
+        elif args.ncore == 4:
+            hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250728.zip"
+    elif HOUMO_TARGET == "xh2":
+        hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250723.zip"
 
     from modelscope import snapshot_download
     snapshot_download('qwen/qwen3-8b', local_dir='qwen3-8b', ignore_patterns=["*.safetensors"])

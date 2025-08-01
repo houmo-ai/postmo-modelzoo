@@ -145,7 +145,6 @@ class HmQwen:
             self.prefill_model.run()
             self.prefill_model.sync()
 
-        input_echo_len = current_length_data
         input_data = self.prefill_model.get_output("Output_lm_head_add_list_0").numpy()
         next_id = input_data.argmax(-1)
         prefill_response = self.tokenizer.decode(next_id.tolist())
