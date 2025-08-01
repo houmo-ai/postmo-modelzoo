@@ -2,7 +2,7 @@
 
 set -e  # 出错就退出
 
-PACKAGE_NAME="hmtool"
+PACKAGE_NAME="hmatc"
 
 # 清理旧构建产物
 rm -rf build dist 

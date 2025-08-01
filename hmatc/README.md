@@ -11,22 +11,22 @@ python setup.py install
 
 ### 量化
 ```bash
-hmexec quant -c config.yml -t xh1
+hmatc quant -c config.yml -t xh1
 ```
 
 ### 编译
 ```bash
-hmexec build -c config.yml -t xh1
+hmatc build -c config.yml -t xh1
 ```
 
 ### 比较
 ```bash
-hmexec compare -c config.yml -t xh1 --data_path your_img_or_npz_path
+hmatc compare -c config.yml -t xh1 --data_path your_img_or_npz_path
 ```
 
 ### 性能
 ```bash
-hmexec perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
+hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
 ```
 
 ### 模型演示
@@ -34,8 +34,8 @@ hmexec perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
 需要用户实现模型实现，可参考`modelzoo`中示例
 
 ```bash
-hmexec demo -c config.yml -t xh1         # 芯片
-hmexec demo -c config.yml -t xh1 --onnx  # onnx
+hmatc demo -c config.yml -t xh1         # 芯片
+hmatc demo -c config.yml -t xh1 --onnx  # onnx
 ```
 
 ### 模型评估
@@ -43,8 +43,8 @@ hmexec demo -c config.yml -t xh1 --onnx  # onnx
 同**模型演示**需要用户实现模型实现，可参考`modelzoo`中示例
 
 ```bash
-hmexec eval -c config.yml -t xh1         # 芯片
-hmexec eval -c config.yml -t xh1 --onnx  # onnx
+hmatc eval -c config.yml -t xh1         # 芯片
+hmatc eval -c config.yml -t xh1 --onnx  # onnx
 ```
 
 ## 配置文件

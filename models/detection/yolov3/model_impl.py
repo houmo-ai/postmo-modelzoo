@@ -4,10 +4,10 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from typing import Dict, Any
-from hmtool.utils import logger
-from hmtool.base.base_model import BaseModel
-from hmtool.utils.postprocess import non_max_suppression, scale_coords
-from hmtool.utils.metrics import detections2txt, detection_txt2json, coco_eval
+from hmatc.utils import logger
+from hmatc.base.base_model import BaseModel
+from hmatc.utils.postprocess import non_max_suppression, scale_coords
+from hmatc.utils.metrics import detections2txt, detection_txt2json, coco_eval
 
 
 class YoloV3(BaseModel):

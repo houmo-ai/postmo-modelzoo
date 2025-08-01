@@ -9,8 +9,8 @@ arch=$(uname -m)
 if [ "$arch" = "x86_64" ]; then
   python3 export_onnx.py
   python3 gen_data.py
-  hmexec quant   -c config.yml
-  hmexec build   -c config.yml
-  hmexec compare -c config.yml -t xh1 --data_path data/0.npz
-  hmexec perf    -c config.yml -wn 1 -sn 1 -tn 1
+  hmatc quant   -c config.yml
+  hmatc build   -c config.yml
+  hmatc compare -c config.yml -t xh1 --data_path data/0.npz
+  hmatc perf    -c config.yml -wn 1 -sn 1 -tn 1
 fi

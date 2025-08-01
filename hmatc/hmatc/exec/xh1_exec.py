@@ -340,7 +340,7 @@ class Xh1Exec(BaseExec):
         res["time"] = span
         res_info = {"quant": res, "model": self.model_cfg}
         # 压缩量化产物
-        compress = os.environ.get("HMTOOL_COMPRESS", "0")
+        compress = os.environ.get("HMATC_COMPRESS", "0")
         if compress == "1":
             logger.info("Compressing quant output...")
             compress_quant_output_path = os.path.join(self.save_dir, "xh1", f"hmquant_{self.model_dir_name}_xh1_v{get_hmquant_version()}.tar.xz")
@@ -371,7 +371,7 @@ class Xh1Exec(BaseExec):
         span = time.time() - t_start
         res_info = {"build": {"time": span}}
         # 压缩编译后产物
-        compress = os.environ.get("HMTOOL_COMPRESS", "0")
+        compress = os.environ.get("HMATC_COMPRESS", "0")
         if compress == "1":
             logger.info("Compressing hmmodel...")
             compress_hmm_path = os.path.join(

@@ -25,7 +25,7 @@ def get_git_commit():
 
 
 commit = get_git_commit()
-with open(os.path.join("hmtool", "_version.py"), "w") as f:
+with open(os.path.join("hmatc", "_version.py"), "w") as f:
     f.write(f"__version__ = '{get_version()}'\n")
     f.write(f"__commit__ = '{commit}'\n")
     f.write(f"__build_time__ = '{get_build_time()}'\n")  # 新增时间字段
@@ -37,8 +37,8 @@ if not HOUMO_PATH :
 
 ext_modules = [
     Extension(
-        name="hmtool.python.perf",
-        sources=["hmtool/python/tcim_perf.cpp"],
+        name="hmatc.python.perf",
+        sources=["hmatc/python/tcim_perf.cpp"],
         include_dirs=[
             pybind11.get_include(),
             os.path.join(HOUMO_PATH, "include"),
@@ -63,17 +63,17 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="hmtool",
+    name="hmatc",
     version=get_version(),
     author="HouMo-Tech",
     author_email="weiguo.xing@houmo.ai",
     description="HouMo Model Assist Toolkit",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="http://10.10.1.58/weiguo.xing/hmtool",
+    url="http://10.10.1.58/weiguo.xing/hmatc",
     packages=find_packages(),
     package_data={
-        "hmtool": ["python/*.so"],
+        "hmatc": ["python/*.so"],
     },
     ext_modules=ext_modules,
     classifiers=[
@@ -85,7 +85,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "hmexec = hmtool:main",
+            "hmatc = hmatc:main",
         ],
     },
 )

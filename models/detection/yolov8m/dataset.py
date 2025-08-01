@@ -1,4 +1,4 @@
-from hmtool.datasets.coco import COCO2017Val
+from hmatc.datasets.coco import COCO2017Val
 
 
 class Dataset(COCO2017Val):

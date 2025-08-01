@@ -63,7 +63,7 @@ def main():
     evaluate_parser = subparsers.add_parser("eval", parents=[parent_parser0, parent_parser1, parent_parser2, parent_parser3], help="Run model evaluate")
     args = parser.parse_args()
     
-    logger.info(f"Hmtool version: {__version__}, commit: {__commit__}, build time: {__build_time__}")
+    logger.info(f"Hmatc version: {__version__}, commit: {__commit__}, build time: {__build_time__}")
 
     # 存在结果信息，先读回来更新后再存
     res_info = dict()

@@ -1,0 +1,22 @@
+services:
+  xh1:
+    image: weiguo_env:u2004_develop_20250721
+    tty: true
+    restart: always
+    working_dir: /workspaces
+    privileged: true
+    ports:
+      - 8022:22
+    volumes:
+      - /data/xingwg:/workspaces
+
+  xh2:
+    image: weiguo_env:xh2_base
+    tty: true
+    restart: always
+    working_dir: /workspaces
+    privileged: true
+    ports:
+      - 8023:22
+    volumes:
+      - /data/xingwg:/workspaces

@@ -1,4 +1,4 @@
-from hmtool.datasets.imagenet import ILSVRC2012
+from hmatc.datasets.imagenet import ILSVRC2012
 
 
 class Dataset(ILSVRC2012):

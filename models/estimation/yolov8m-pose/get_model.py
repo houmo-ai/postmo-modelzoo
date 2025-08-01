@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 import onnx
 import onnx_graphsurgeon as osg
-from hmtool.utils.utils import get_file_from_jfrog
+from hmatc.utils.utils import get_file_from_jfrog
 
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh1')

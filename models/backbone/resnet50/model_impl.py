@@ -2,10 +2,10 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 from typing import Dict, Any
-from hmtool.utils import logger
-from hmtool.utils.postprocess import softmax
-from hmtool.base.base_model import BaseModel
-from hmtool.datasets.imagenet import ILSVRC2012_LABELS
+from hmatc.utils import logger
+from hmatc.utils.postprocess import softmax
+from hmatc.base.base_model import BaseModel
+from hmatc.datasets.imagenet import ILSVRC2012_LABELS
 
 
 class ResNet50(BaseModel):

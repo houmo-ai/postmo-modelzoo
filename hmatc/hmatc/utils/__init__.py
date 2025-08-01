@@ -11,7 +11,6 @@ console_handler.setFormatter(LoggingFormatterWithColor())
 # root_logger.addHandler(console_handler)
 # root_logger.setLevel(logging.INFO)
 
-# logger = logging.getLogger("hmtool")
 logger = logging.getLogger()
 logger.addHandler(console_handler)
 logger.setLevel(logging.INFO)
