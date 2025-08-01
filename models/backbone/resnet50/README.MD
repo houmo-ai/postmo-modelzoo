@@ -20,30 +20,43 @@ torch.onnx.export(model, dummy_input, 'resnet50.onnx', export_params=True, opset
 
 ## 2.快速开始
 
-可以通过perf.sh和eval.sh脚本一键执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
+可以通过hmatc工具执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
 
-### 2.1 精度评估
+### 2.1 量化
 
 ```bash
-bash eval.sh
+hmatc quant -c config.yml -t xh1       # 芯片
+```
+
+### 2.2 编译
+
+```bash
+hmatc build -c config.yml -t xh1       # 芯片
+```
+
+### 2.3 精度评估
+
+```bash
+hmatc eval -c config.yml -t xh1          # 芯片
+hmatc eval -c config.yml -t xh1  --onnx  # onnx
 ```
 
 执行完成后会打印模型的数据集精度信息。
 
-### 2.2 性能评估
+### 2.4 性能评估
 
 ```bash
-bash perf.sh
+hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
 
-### 2.3 结果演示
+### 2.5 结果演示
 
-本示例依赖hmassist演示结果，在编译完成的基础上执行：
+本示例依赖hmatc演示结果，在编译完成的基础上执行：
 
 ```bash
-hmdemo.sh
+hmatc demo -c config.yml -t xh1
 ```
 
 执行完成后会打印模型的分类结果信息。
@@ -52,18 +65,21 @@ hmdemo.sh
 
 ### 3.1 精度结果
 ```bash
-{'shape': [[1, 3, 224, 224]], 'dataset': 'ILSVRC2012', 'test_num': 20, 'accuracy': {'top1': 0.7, 'top5': 0.95}, 'latency': 2.364}
+# onnx
+'input_size': [1, 3, 224, 224], 'dataset': 'ILSVRC_2012Val', 'num': 20, 'top1_acc': '0.700000', 'latency_ms': '6.009829'
+# xh1
+'input_size': [1, 3, 224, 224], 'dataset': 'ILSVRC_2012Val', 'num': 20, 'top1_acc': '0.700000', 'latency_ms': '3.432298'
 ```
 
 ### 3.2 性能结果
 
 ```bash
-[latency] Inference 	avg:   2.204 ms,	max:   2.479 ms
-[latency] Input 	avg:   0.364 ms,	max:   0.641 ms
-[latency] Output 	avg:   0.202 ms,	max:   0.346 ms
-[latency] End2End 	avg:   2.772 ms,	max:   3.345 ms
-[Throughput] total: 2774.798 ms, avg: 2.775 ms
-[Throughput] qps: 360.387
+[latency] Inference     avg:   3.301 ms,        max:   4.397 ms
+[latency] Input         avg:   1.235 ms,        max:   2.669 ms
+[latency] Output        avg:   0.000 ms,        max:   0.000 ms
+[latency] End2End       avg:   4.537 ms,        max:   7.038 ms
+[Throughput] total: 569.853 ms, avg: 0.570 ms
+[Throughput] qps: 1754.839
 ```
 
 ## 4.免责声明
