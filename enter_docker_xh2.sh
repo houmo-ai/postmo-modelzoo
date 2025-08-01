@@ -3,7 +3,7 @@
 # 0. 必要变量
 VERSION=develop
 IMAGE_NAME="harbor.houmo.ai/toolchain/release:Dadao-xh2-${VERSION}-ubuntu20.04-x86.64.latest"
-CONTAINER_NAME="$(whoami).Dadao_xh2_${VERSION}"
+CONTAINER_NAME="$(whoami).HoumoDadao_xh2_${VERSION}"
 CONTAINER_HOME="/container/$(whoami)"
 USER_CONFIG="-v /develop02:/develop02 -v /data:/data"
 
@@ -21,7 +21,7 @@ ENTER_DOCKER() {
 PRINT_BLUE "start container named \"$CONTAINER_NAME\" with image $IMAGE_NAME"
 
 # 1. 挂载路径设置，容器内路径相同
-VOLUME_HOME="/Dadao_xh2_${VERSION}"
+VOLUME_HOME="/HoumoDadao_xh2_${VERSION}"
 
 # 2. [非必要]处理命令行参数，可选参数只有"restart"
 if [ $# -gt 0 ]; then
