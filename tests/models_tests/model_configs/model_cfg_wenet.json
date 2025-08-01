@@ -1,0 +1,46 @@
+{
+    "obsolete": false,
+    "model_dir": "models/asr/wenet",
+    "support_platform": ["x86_64"],
+    "support_core_num": null,
+    "support_backend": ["xh1"],
+    "support_flow": ["get_model", "compile", "demo", "perf"],
+    "support_hmassist": null,
+    "perf_metrics": {
+        "xh1":{
+            "x86_64": 57.918
+        }
+    },
+    "eval_threshold": null,
+    "get_model_params": {
+        "type": ["default", "quant", "all"],
+        "quant_model_dir": ["default", "", "./"],
+        "model_dir": ["default", "", "./"]
+    },
+    "compile_params": {
+        "model_dir": ["default", ""],
+        "model_name": ["default", ""],
+        "batch": ["default"],
+        "ncore": ["default"],
+        "stage": ["default"],
+        "output_dir": ["default"],
+        "verbose": ["default"]
+    },
+    "demo_params": {
+        "model_path": ["default", ""],
+        "config": ["default", ""],
+        "test_data": ["default"],
+        "log_file": ["default"],
+        "pe_enc": ["default"],
+        "batch_size": ["default"],
+        "data_type": ["default"],
+        "beam_size": ["default"],
+        "device": ["default"],
+        "verbose": ["default"],
+        "fast": ["default"],
+        "use_chunk_model": ["default"],
+        "calib_data_path": ["default"],
+        "infer_mode": ["default"]
+    },
+    "perf_params": "demo"
+}

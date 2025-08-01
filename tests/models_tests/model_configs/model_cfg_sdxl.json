@@ -1,0 +1,42 @@
+{
+    "obsolete": false,
+    "model_dir": "models/diffusion/sdxl",
+    "support_platform": ["x86_64", "aarch64"],
+    "support_core_num": {
+        "xh1": [2, 4]
+    },
+    "support_backend": ["xh1"],
+    "support_model_type": ["raw", "hmm", "all"],
+    "support_flow": ["get_model", "compile", "demo"],
+    "support_hmassist": null,
+    "perf_metrics": {
+        "default": 100,
+        "1core": 100,
+        "2core": 200,
+        "4core": 400
+    },
+    "eval_threshold": null,
+    "get_model_params": {
+        "type": ["default", "raw", "quant", "hmm", "all"],
+        "quant_model_dir": ["default", "", "./"],
+        "model_dir": ["default", "", "./"]
+    },
+    "compile_params": {
+        "model_dir": ["default", ""],
+        "model_name": ["default", ""],
+        "batch": ["default"],
+        "ncore": ["default"],
+        "stage": ["default"],
+        "output_dir": ["default"]
+    },
+    "demo_params": {
+        "model_path": ["default", ""],
+        "sdxl_ckpt": ["default", ""],
+        "lora_weights": ["default"],
+        "test_num": ["default"],
+        "nstep": ["default"],
+        "eta": ["default"],
+        "prompt": ["default"],
+        "neg_prompt": ["default"]
+    }
+}

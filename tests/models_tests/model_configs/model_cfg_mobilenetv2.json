@@ -1,0 +1,118 @@
+{
+    "obsolete": false,
+    "model_dir": "models/backbone/mobilenetv2",
+    "support_platform": ["x86_64"],
+    "support_core_num": {
+        "xh1": [1]
+    },
+    "support_backend": ["xh1"],
+    "support_flow": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"],
+    "support_hmassist": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"],
+    "perf_metrics": {
+        "xh1":{
+            "x86_64": 2124.906
+        }
+    },
+    "eval_threshold": {
+        "top1_acc": 0.95
+    },
+    "get_model_params": {
+        "type": ["default", "raw", "quant", "all"],
+        "quant_model_dir": ["default", "", "./"],
+        "model_dir": ["default", "", "./"]
+    },
+    "quant_params": {
+        "model_path": ["default", ""],
+        "model_name": ["default", ""],
+        "input_shape": ["default"],
+        "dynamic_resize": ["default"],
+        "model_dir": ["default"]
+    },
+    "compile_params": {
+        "model_dir": ["default", ""],
+        "model_name": ["default", ""],
+        "batch": ["default"],
+        "ncore": ["default"],
+        "input_shape": ["default"],
+        "dynamic_resize": ["default"],
+        "stage": ["default"],
+        "output_dir": ["default"],
+        "verbose": ["default"]
+    },
+    "hmquant_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"],
+                "target": ["xh1"]
+            },
+            "optional": {
+                "result_path": ["default"]
+            }
+        }
+    },
+    "hmbuild_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"],
+                "target": ["xh1", "xh2"]
+            },
+            "optional": {
+                "result_path": ["default"],
+                "ncore": ["default", "1", "2", "4"],
+                "opt_level": ["default", "0", "1", "2"]
+            }
+        }
+    },
+    "hmdemo_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"],
+                "target": ["xh1"]
+            },
+            "optional": {
+                "result_path": ["default"],
+                "onnx": ["default"]
+            }
+        }
+    },
+    "hmperf_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"],
+                "target": ["xh1"],
+                "warmup": ["1", "10"],
+                "sample": ["1", "1000"]
+            },
+            "optional": {
+                "result_path": ["default"],
+                "loop_num": ["default"],
+                "thread": ["default", "4"],
+                "device": ["default"]
+            }
+        }
+    },
+    "hmeval_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"],
+                "target": ["xh1"]
+            },
+            "optional": {
+                "result_path": ["default"],
+                "onnx": ["default"]
+            }
+        }
+    },
+    "hmcompare_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"],
+                "target": ["xh1"],
+                "data_path": ["./imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG"]
+            },
+            "optional": {
+                "result_path": ["default"]
+            }
+        }
+    }
+}

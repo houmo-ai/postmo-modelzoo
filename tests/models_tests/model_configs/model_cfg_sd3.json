@@ -1,0 +1,28 @@
+{
+    "obsolete": false,
+    "model_dir": "models/diffusion/sd3",
+    "support_platform": ["x86_64"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_backend": ["xh2"],
+    "support_flow": ["get_model", "demo"],
+    "support_hmassist": null,
+    "perf_metrics": {
+        "xh2": null
+    },
+    "eval_threshold": null,
+    "get_model_params": {
+        "type": ["default", "raw", "hmm", "all"],
+        "quant_model_dir": ["default", "", "./"],
+        "model_dir": ["default", "", "./"]
+    },
+    "demo_params": {
+        "model_path": ["default", ""],
+        "sd3_ckpt": ["default", ""],
+        "test_num": ["default"],
+        "nstep": ["default"],
+        "prompt": ["default"],
+        "neg_prompt": ["default"]
+    }
+}

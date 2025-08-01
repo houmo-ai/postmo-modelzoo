@@ -1,0 +1,42 @@
+{
+    "obsolete": false,
+    "model_dir": "models/llm/deepseek-r1-qwen3-8b",
+    "support_platform": ["x86_64", "aarch64"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_backend": ["xh2"],
+    "support_flow": ["get_model", "compile", "demo"],
+    "support_hmassist": null,
+    "perf_metrics": {
+        "xh2": null
+    },
+    "eval_threshold": null,
+    "get_model_params": {
+        "type": ["default", "raw", "quant", "hmm", "all"],
+        "quant_model_dir": ["default", "", "./"],
+        "model_dir": ["default", "", "./"]
+    },
+    "quant_params": {
+        "debug": ["default"],
+        "model": ["default"],
+        "context-length": ["default"],
+        "input-sequence-length": ["default"],
+        "quant-type": ["default"],
+        "quant-weight": ["default"]
+    },
+    "compile_params": {
+        "model_dir": ["default"],
+        "model_name": ["default"],
+        "batch": ["default"],
+        "ncore": ["default"],
+        "stage": ["default"],
+        "output_dir": ["default"]
+    },
+    "demo_params": {
+        "model_dir": ["default"],
+        "prefill": ["default"],
+        "decode": ["default"],
+        "nblocks": ["default"]
+    }
+}

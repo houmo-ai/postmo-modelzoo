@@ -1,0 +1,63 @@
+{
+    "obsolete": false,
+    "model_dir": "models/llm/qwen3",
+    "support_platform": ["x86_64"],
+    "support_core_num": {
+        "xh1": [4],
+        "xh2": [2]
+    },
+    "support_backend": ["xh1", "xh2"],
+    "support_flow": ["get_model", "compile", "demo", "perf"],
+    "support_hmassist": null,
+    "perf_metrics": {
+        "xh1":{
+            "x86_64": {
+                "prefill": 1.34,
+                "decode": 10.59,
+                "end2end": 10.53
+            }
+        }
+    },
+    "eval_threshold": null,
+    "get_model_params": {
+        "type": ["default", "raw", "quant", "hmm", "all"],
+        "quant_model_dir": ["default", "", "./"],
+        "model_dir": ["default", "", "./"]
+    },
+    "quant_params": {
+        "model": ["default"],
+        "quant_config": ["default"],
+        "n_calib": ["default"],
+        "model_name": ["default"],
+        "save_path": ["default"],
+        "prefill_shape": ["default"],
+        "cache_len": ["default"],
+        "multi_batch": ["default"],
+        "wikitext_local": ["default"],
+        "eval_ppl": ["default"],
+        "blocks": ["default"],
+        "decoder_shape": ["default"],
+        "gptq": ["default"],
+        "cache_2_input": ["default"],
+        "rotate_ov": ["default"],
+        "rotate_pre_rope": ["default"],
+        "rotate_post_rope": ["default"],
+        "use_klt": ["default"],
+        "compile_mode": ["default"]
+    },
+    "compile_params": {
+        "model_dir": ["default"],
+        "model_name": ["default"],
+        "batch": ["default"],
+        "ncore": ["default"],
+        "stage": ["default"],
+        "output_dir": ["default"]
+    },
+    "demo_params": {
+        "model_dir": ["default"],
+        "prefill": ["default"],
+        "decode": ["default"],
+        "nblocks": ["default"]
+    },
+    "perf_params": "demo"
+}

@@ -1,0 +1,38 @@
+{
+    "obsolete": false,
+    "model_dir": "models/vllm/qwen2.5-vl",
+    "support_platform": ["x86_64", "aarch64"],
+    "support_core_num": {
+        "xh1": [4]
+    },
+    "support_backend": ["xh1"],
+    "support_flow": ["get_model", "compile", "demo"],
+    "support_hmassist": null,
+    "perf_metrics": {
+        "default": 100,
+        "1core": 100,
+        "2core": 200,
+        "4core": 400
+    },
+    "eval_threshold": null,
+    "get_model_params": {
+        "type": ["default", "raw", "quant", "hmm", "all"],
+        "quant_model_dir": ["default", "", "./"],
+        "model_dir": ["default", "", "./"]
+    },
+    "compile_params": {
+        "model_dir": ["default"],
+        "model_name": ["default"],
+        "batch": ["default"],
+        "ncore": ["default"],
+        "model_size": ["default"],
+        "stage": ["default"],
+        "output_dir": ["default"]
+    },
+    "demo_params": {
+        "model_dir": ["default"],
+        "prefill": ["default"],
+        "decode": ["default"],
+        "nblocks": ["default"]
+    }
+}
