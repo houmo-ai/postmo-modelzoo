@@ -6,7 +6,7 @@ from setuptools import setup, find_packages, Extension
 
 
 def get_version():
-    return "2.4.2"
+    return os.environ.get("HOUMO_VERSION", "0.0.0.dev")
 
 
 def get_build_time():
@@ -31,9 +31,9 @@ with open(os.path.join("hmatc", "_version.py"), "w") as f:
     f.write(f"__build_time__ = '{get_build_time()}'\n")  # 新增时间字段
     
 
-HOUMO_PATH = os.environ.get("HOUMO_PATH")
-if not HOUMO_PATH :
-    raise Exception("Please set HOUMO_PATH")
+TCIM_RUNTIME_PATH = os.environ.get("TCIM_RUNTIME_PATH")
+if not TCIM_RUNTIME_PATH :
+    raise Exception("Please set TCIM_RUNTIME_PATH")
 
 ext_modules = [
     Extension(
@@ -41,11 +41,11 @@ ext_modules = [
         sources=["hmatc/python/tcim_perf.cpp"],
         include_dirs=[
             pybind11.get_include(),
-            os.path.join(HOUMO_PATH, "include"),
+            os.path.join(TCIM_RUNTIME_PATH, "include"),
             "3rdparty/nlohmann/include"
         ],
         library_dirs=[
-            os.path.join(HOUMO_PATH, "lib")
+            os.path.join(TCIM_RUNTIME_PATH, "lib")
         ],
         libraries=["tcim_runtime_lite"],
         language="c++",
@@ -65,9 +65,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="hmatc",
     version=get_version(),
-    author="HouMo-Tech",
+    author="Houmo",
     author_email="weiguo.xing@houmo.ai",
-    description="HouMo Model Assist Toolkit",
+    description="Houmo Model Assist Toolkit",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="http://10.10.1.58/weiguo.xing/hmatc",

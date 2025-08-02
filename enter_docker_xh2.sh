@@ -2,7 +2,7 @@
 
 # 0. 必要变量
 VERSION=develop
-IMAGE_NAME="harbor.houmo.ai/toolchain/release:Dadao-xh2-${VERSION}-ubuntu20.04-x86.64.latest"
+IMAGE_NAME="harbor.houmo.ai/toolchain/release:Dadao-xh2-${VERSION}-ubuntu24.04-x86.64.latest"
 CONTAINER_NAME="$(whoami).HoumoDadao_xh2_${VERSION}"
 CONTAINER_HOME="/container/$(whoami)"
 USER_CONFIG="-v /develop02:/develop02 -v /data:/data"
@@ -28,6 +28,7 @@ if [ $# -gt 0 ]; then
   if [ "$1" == "restart" ]; then
     PRINT_BLUE "docker stop $CONTAINER_NAME"
     docker stop $CONTAINER_NAME >/dev/null
+    PRINT_BLUE "docker rm $CONTAINER_NAME"
     docker rm $CONTAINER_NAME >/dev/null
   else
     PRINT_RED "unknown argument"; exit
