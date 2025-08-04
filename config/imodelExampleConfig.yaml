@@ -191,10 +191,10 @@ hmassist:
     - detection_yolov5s_eval
     - detection_yolov5s_test
 
-# examples
-examples_common:
+# apis
+apis_common:
   include:
-    - examples/common
+    - apis/common
   exclude: null
   example_case: null
   test:
@@ -205,52 +205,52 @@ examples_common:
     # - scenes_video_detect_test
 inferences_resnet50:
   include:
-    - examples/inferences/resnet50
+    - apis/inferences/resnet50
   exclude:
-    - examples/inferences/resnet50/README.MD
+    - apis/inferences/resnet50/README.MD
   example_case:
     - inferences_resnet50_test:
-        script: examples/inferences/resnet50/run.sh
+        script: apis/inferences/resnet50/run.sh
   test:
     - inferences_resnet50_test
 inferences_resnet50_multistreams:
   include:
-    - examples/inferences/resnet50_multistreams
+    - apis/inferences/resnet50_multistreams
   exclude:
-    - examples/inferences/resnet50_multistreams/README.MD
+    - apis/inferences/resnet50_multistreams/README.MD
   example_case:
     - inferences_resnet50_multistreams_test:
-        script: examples/inferences/resnet50_multistreams/run.sh
+        script: apis/inferences/resnet50_multistreams/run.sh
   test:
     - inferences_resnet50_multistreams_test
 inferences_resnet50_pipeline:
   include:
-    - examples/inferences/resnet50_pipeline
+    - apis/inferences/resnet50_pipeline
   exclude:
-    - examples/inferences/resnet50_pipeline/README.MD
+    - apis/inferences/resnet50_pipeline/README.MD
   example_case:
     - inferences_resnet50_pipeline_test:
-        script: examples/inferences/resnet50_pipeline/run.sh
+        script: apis/inferences/resnet50_pipeline/run.sh
   test:
     - inferences_resnet50_pipeline_test
 inferences_yolov5s:
   include:
-    - examples/inferences/yolov5s
+    - apis/inferences/yolov5s
   exclude:
-    - examples/inferences/yolov5s/README.MD
+    - apis/inferences/yolov5s/README.MD
   example_case:
     - inferences_yolov5s_test:
-        script: examples/inferences/yolov5s/run.sh
+        script: apis/inferences/yolov5s/run.sh
   test:
     - inferences_yolov5s_test
 scenes_video_detect:
   include:
-    - examples/scenes/video_detect
+    - apis/scenes/video_detect
   exclude:
-    - examples/scenes/video_detect/README.MD
+    - apis/scenes/video_detect/README.MD
   example_case:
     - scenes_video_detect_test:
-        script: examples/scenes/video_detect/run.sh
+        script: apis/scenes/video_detect/run.sh
   test:
     # - scenes_video_detect_test
 
