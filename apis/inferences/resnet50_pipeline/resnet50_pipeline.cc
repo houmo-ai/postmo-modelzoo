@@ -84,6 +84,12 @@ bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
   printf("\n===> resnet50_pipeline c++ example start...\n");
+  const char* houmo_target_env = getenv("HOUMO_TARGET");
+  std::string houmo_target = houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
+  if (houmo_target != "xh1") {
+    std::cerr << "Not support houmo target:" << houmo_target << std::endl;
+    exit(-1);
+  }
   printf("tcim version: %s\n", tcim::GetVersion().c_str());
 
   // set the parameters

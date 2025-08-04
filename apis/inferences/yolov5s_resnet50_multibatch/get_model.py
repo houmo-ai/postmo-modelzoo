@@ -11,6 +11,9 @@ if __name__ == '__main__':
         os.environ["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
     HOUMO_TARGET = os.environ.get('HOUMO_TARGET', 'houmo')
 
+    if HOUMO_TARGET != "xh1":
+        print("Error: not support houmo target", HOUMO_TARGET)
+        sys.exit(-1)
     model_dir = os.path.join(HOUMO_EXAMPLES_PATH, "models")
     dataset_path = "models/datasets/images_1920x1080.zip"
     get_file_from_jfrog(dataset_path, model_dir, "./")

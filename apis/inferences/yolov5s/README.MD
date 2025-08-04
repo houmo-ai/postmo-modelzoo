@@ -19,6 +19,8 @@ TCIM Examples 以yolov5s模型为例展示TCIM API推理的基本使用方式。
 
 其中方法2在本示例中仅提供Linux系统运行方法，如需在windows系统中运行可自行安装配置onnxruntime环境，则可使用相同步骤运行方法2示例。
 
+注：本示例中的C++示例仅支持后摩Target为XH1。
+
 ## 软件依赖
 
 本示例依赖opencv库进行图像预处理和可视化，依赖ultralytics进行数据可视化，依赖onnxruntime库推理yolov5s后处理模型。

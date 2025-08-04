@@ -97,11 +97,17 @@ bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
   printf("\n===> resnet50_multistreams c++ example start...\n");
-  printf("tcim version: %s\n", tcim::GetVersion().c_str());
+  const char* houmo_target_env = getenv("HOUMO_TARGET");
+  std::string houmo_target = houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
+  if (houmo_target != "xh1") {
+    std::cerr << "Not support houmo target:" << houmo_target << std::endl;
+    exit(-1);
+  }
+  printf("tcim version: %s, houmo target: %s \n", tcim::GetVersion().c_str(), houmo_target.c_str());
 
   // set the parameters
   CliArguments arguments;
-  arguments.model_path = "resnet50.hmm";
+  arguments.model_path = "./resnet50.hmm";
   arguments.device_num = 1;
   arguments.thread_num = 4;
   arguments.sample_num = 10;

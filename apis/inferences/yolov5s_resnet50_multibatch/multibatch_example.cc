@@ -369,6 +369,13 @@ int classify(int batch_num, std::string model_path,
 }
 
 int main(int argc, char *argv[]) {
+  const char* houmo_target_env = getenv("HOUMO_TARGET");
+  std::string houmo_target = houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
+  if (houmo_target != "xh1") {
+    std::cerr << "Not support houmo target:" << houmo_target << std::endl;
+    exit(-1);
+  }
+
   // 0: proportional scaling, 1: non-proportional scaling
   int resize_type = 0;
   if (argc == 2) {

@@ -362,22 +362,36 @@ if __name__ == '__main__':
     args = get_args()
     sys.path.insert(0, "../../common/python")
     print("\n===> yolov5s python example start...")
-    print("tcim runtime version: {}, enable ort: {}.".format(tcim.runtime.get_version(), args.enable_ort))
+    houmo_target = os.getenv("HOUMO_TARGET", "houmo")
+    print(f"tcim runtime version: {tcim.runtime.get_version()}, houmo target: {houmo_target}, enable ort: {args.enable_ort}")
 
     # 1. load model
-    module = tcim.runtime.load("yolov5s.hmm")
+    model_path = "./yolov5s.hmm"
+    if houmo_target == "xh2":
+        model_path = "./yolov5s_clip_xh2_b1_1core.hmm"
+    module = tcim.runtime.load(model_path)
 
     # 2. preprocess
     yolov5 = YoloV5()
     img_path = "../../data/000000000139.jpg"
     cv_image = cv2.imread(img_path)
-    input_data = yolov5.preprocess(cv_image)
-    input_data = torch.tensor(input_data.astype(np.float32))  # NHWC float32
-    input_data = torch.squeeze(input_data, 0)  # HWC float32
-    from transform import BGR2YUV
-    rgb2yuv_func = BGR2YUV(fmt='YUV420')
-    input_data = torch.unsqueeze(rgb2yuv_func(input_data), 0).numpy()  # NHWC float32
-    input_data = input_data.astype(np.uint8)
+    if houmo_target == "xh1":
+        input_data = yolov5.preprocess(cv_image)
+        input_data = torch.tensor(input_data.astype(np.float32))  # NHWC float32
+        input_data = torch.squeeze(input_data, 0)  # HWC float32
+        from transform import BGR2YUV
+        rgb2yuv_func = BGR2YUV(fmt='YUV420')
+        input_data = torch.unsqueeze(rgb2yuv_func(input_data), 0).numpy()  # NHWC float32
+        input_data = input_data.astype(np.uint8)
+    elif houmo_target == "xh2":
+        input_data, _, _ = letterbox(cv_image, (640, 640), stride=64, auto=False)
+        input_data = cv2.cvtColor(input_data, cv2.COLOR_BGR2RGB)
+        mean_arr = np.array([0.0, 0.0, 0.0])
+        std_arr = np.array([255.0, 255.0, 255.0])
+        input_data = (input_data - mean_arr) / std_arr
+        input_data = np.transpose(input_data, (2, 0, 1))  # CHW float32
+        input_data = np.expand_dims(input_data, axis=0)
+        input_data = input_data.astype(np.float16)
 
     # 3. set input
     input_num = module.get_num_inputs()
@@ -438,6 +452,9 @@ if __name__ == '__main__':
     cv2.imwrite(save_path, cv_image)
     print("demo results saved to", save_path)
     # check result, modify it when you change model or data
-    assert(len(boxes) == 20)
+    if houmo_target == "xh1":
+        assert(len(boxes) == 20)
+    elif houmo_target == "xh2":
+        assert(len(boxes) == 21)
 
     print("<=== yolov5s python example completed.\n")

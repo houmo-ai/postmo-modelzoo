@@ -364,6 +364,12 @@ class YoloV5 {
 
 int main(int argc, char* argv[]) {
   printf("\n===> yolov5s c++ example start...\n");
+  const char* houmo_target_env = getenv("HOUMO_TARGET");
+  std::string houmo_target = houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
+  if (houmo_target != "xh1") {
+    std::cerr << "Not support houmo target:" << houmo_target << std::endl;
+    exit(-1);
+  }
 
   bool enable_ort = false;
 #ifdef ENABLE_ORT

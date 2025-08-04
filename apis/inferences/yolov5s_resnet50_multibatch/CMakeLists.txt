@@ -6,7 +6,6 @@ set(HOUMO_SDK_PATH $ENV{HOUMO_SDK_PATH})
 set(HOUMO_EXAMPLES_PATH $ENV{HOUMO_EXAMPLES_PATH})
 
 find_library(TCIM_LIBRARY NAMES tcim_runtime_lite PATHS ${TCIM_RUNTIME_PATH}/lib NO_DEFAULT_PATH)
-find_library(HAL_LIBRARY NAMES hm800_hal PATHS ${HOUMO_SDK_PATH}/hal/lib NO_DEFAULT_PATH)
 find_package(OpenCV REQUIRED)
 
 include_directories(
@@ -32,7 +31,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 add_executable(${CMAKE_PROJECT_NAME} multibatch_example.cc)
 
 target_link_libraries(${CMAKE_PROJECT_NAME} ${TCIM_LIBRARY})
-target_link_libraries(${CMAKE_PROJECT_NAME} ${HAL_LIBRARY})
 target_link_libraries(${CMAKE_PROJECT_NAME} ${OpenCV_LIBS})
 
 if(MSVC)

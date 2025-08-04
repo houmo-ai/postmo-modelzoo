@@ -8,13 +8,12 @@
 
 TCIM Examples 以resnet50模型为例展示TCIM API推理的基本使用方式。
 
-1. build.py 展示模型编译过程，包括：
-    - 量化后模型加载和编译
-    - 芯片模型加载和golden数据验证
-2. resnet50.py 展示python下单线程推理过程，包括：
+1. resnet50.py 展示python下单线程推理过程，包括：
     - python单线程推理，使用默认stream（无需指定）
-3. resnet50.cc 展示c++下单线程推理过程，包括：
+2. resnet50.cc 展示c++下单线程推理过程，包括：
     - c++下单线程推理，使用默认stream（无需指定）
+
+注：本示例中的C++示例仅支持后摩Target为XH1。
 
 ## 软件依赖
 

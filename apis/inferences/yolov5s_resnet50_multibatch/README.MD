@@ -15,7 +15,7 @@ MultiBatch Example以yolov5s模型和resnet50模型为例，展示TCIM API多bat
         - `0`: (默认)代表等比例缩放ROI。
         - `1`: 代表非等比例缩放ROI。
 
-当前示例仅支持Linux系统。
+注：当前示例仅支持Linux系统，仅支持后摩Target为XH1。
 
 ## 软件依赖
 

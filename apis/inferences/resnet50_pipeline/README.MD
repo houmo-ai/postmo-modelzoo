@@ -16,6 +16,8 @@ resnet50.cc 展示c++下pipeline推理过程，包括：
 - infer线程设置device侧输入和输出，然后执行推理
 - d2h线程将device侧输出数据拷贝到host侧
 
+注：本示例仅支持后摩Target为XH1。
+
 ## 软件依赖
 
 除TCIM Examples公用依赖外，本示例没有其他依赖。

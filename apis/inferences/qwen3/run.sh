@@ -29,7 +29,7 @@ if [ "$arch" = "aarch64" ]; then
   # get test model: 2 cores
   python3 get_model.py --ncore 2
 else
-  # get test model: 4 cores
+  # get test model
   python3 get_model.py
 fi
 
