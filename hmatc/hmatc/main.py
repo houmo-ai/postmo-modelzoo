@@ -73,7 +73,7 @@ def main():
     # perf
     current_command = args.command
     if current_command == "perf" and args.model is not None:
-        new_res_info = BaseExec.perf(args.model, args.warmup, args.sample, args.loop_num, args.device, args.thread)
+        new_res_info = BaseExec.model_perf(args.model, args.warmup, args.sample, args.loop_num, args.device, args.thread)
         if "perf" in res_info:
             res_info["perf"].update(new_res_info["perf"])
         else:
@@ -138,7 +138,9 @@ def main():
                 exit(-1)
         new_res_info = hm_exec.compare(data_path)
     elif current_command == "perf":
-        new_res_info = hm_exec.perf(hm_exec.hmm_path, args.warmup, args.sample, args.loop_num, args.device, args.thread)
+        new_res_info = hm_exec.model_perf(
+            hm_exec.hmm_path, args.warmup, args.sample, 
+            args.loop_num, args.device, args.thread)
     elif current_command == "demo":
         hm_exec.demo(backend=backend)
     elif current_command == "eval":

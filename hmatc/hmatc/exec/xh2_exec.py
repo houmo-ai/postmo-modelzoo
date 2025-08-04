@@ -19,15 +19,17 @@ from ..infer.xhquant_infer import Xh2HmQuantInfer
 class Xh2Exec(BaseExec):
     def __init__(self, cfg: dict) -> None:
         super().__init__(cfg)
+        self.quant_type = "w8a8h1_sefp"
         self.hmm_batch = self.build_batch * self.model_input_batch
-        self.hmm_name = f"{self.model_name}_xh2_b{self.hmm_batch}"
+        self.hmm_name = f"{self.model_name}_xh2_b{self.hmm_batch}_{self.build_ncore}ncore_{self.build_opt_level}"
         self.hmm_save_dir = os.path.join(self.save_dir, "xh2")
         if not os.path.exists(self.hmm_save_dir):
             os.makedirs(self.hmm_save_dir)
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
         self.quant_output_dir = os.path.join(self.save_dir, "xh2", "hmquant")
         self.build_output_dir = os.path.join(self.save_dir, "xh2", "tcim")
-        self.quant_onnx_model_path = os.path.join(self.save_dir, "xh2", f"{self.model_name}_xh2.onnx")
+        self.hmonnx_name = f"{self.model_name}_xh2_{self.quant_type}"
+        self.quant_onnx_model_path = os.path.join(self.save_dir, "xh2", f"{self.hmonnx_name}.onnx")
         self.golden_dir = os.path.join(self.quant_output_dir, "golden")
         self.quant_advance_cfg = self.quant_cfg.get("config", dict())
         self.upgrade_opset_version()
@@ -76,10 +78,8 @@ class Xh2Exec(BaseExec):
             convert_onnx_to_hmonnx,
             create_quant_config
         )
-        quant_type = "w8a8h1_sefp"
-        quant_scheme = QuantScheme(
-            target_device=DeviceType.XH2a, 
-            quant_type=quant_type)
+        
+        quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=self.quant_type)
         quant_config = create_quant_config(quant_scheme)
         
         in_datas = list()
@@ -136,7 +136,7 @@ class Xh2Exec(BaseExec):
             output_dir=self.hmm_save_dir,
             work_dir=self.build_output_dir,
             enable_dynamic_image_resize=False,
-            custom_msg=self.custom_msg,
+            # custom_msg=self.custom_msg,
         )
         span = time.time() - t_start
         res_info = {"build": {"time": span}}
@@ -147,7 +147,8 @@ class Xh2Exec(BaseExec):
         xh2.load(self.hmm_path)
         in_datas = dict()
         for input_name in self.inputs_cfg:
-            golden_input_path = os.path.join(self.golden_dir, "step_0", f"hmquant_{self.model_name}_xh2_{input_name}_input.npy")
+            new_name = input_name.replace("/", "_")
+            golden_input_path = os.path.join(self.golden_dir, "step_0", f"hmquant_{self.hmonnx_name}_{input_name}_input.npy")
             golden_input = np.load(golden_input_path)
             logger.info(f"Load golden: {golden_input_path}")
             logger.info(f"[input] name: {input_name}, shape: {list(golden_input.shape)}, stype: {golden_input.dtype}")
@@ -160,7 +161,8 @@ class Xh2Exec(BaseExec):
         table = PrettyTable(header)
         table.title = "xh2 vs hmquant"
         for output_name in outputs:
-            golden_output_path = os.path.join(self.golden_dir, "step_0", f"hmquant_{self.model_name}_xh2_{output_name}_output.npy")
+            new_name = output_name.replace("/", "_")
+            golden_output_path = os.path.join(self.golden_dir, "step_0", f"hmquant_{self.hmonnx_name}_{new_name}_output.npy")
             golden_output = np.load(golden_output_path)
             logger.info(f"Load golden: {golden_output_path}")
             logger.info(f"[output] name: {output_name}, shape: {list(golden_output.shape)}, dtype: {golden_output.dtype}")
@@ -276,4 +278,10 @@ class Xh2Exec(BaseExec):
             }
         logger.info(f"\n{table}")
         return res_info
+
+    def demo(self, backend):
+        raise NotImplementedError
+    
+    def evaluate(self, backend):
+        raise NotImplementedError
 

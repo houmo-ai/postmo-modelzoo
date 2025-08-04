@@ -274,7 +274,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         logger.info(f"{res}")
         
     @staticmethod
-    def perf(model_path, warmup_num, sample_num, loop_num=1, device_num=1, thread_num=1):
+    def model_perf(model_path, warmup_num, sample_num, loop_num=1, device_num=1, thread_num=1):
         from ..python import perf        
         # TODO 使用golden数据
         perf_info = perf.CModelRunner(

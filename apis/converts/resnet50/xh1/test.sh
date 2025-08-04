@@ -16,7 +16,7 @@ declare -A action_map=(
 action_num="${action_map[$action]:-0}"
 
 if [[ $action_num > 0 ]]; then
-  python3 get_model.py
+  python3 ../get_model.py
   python3 ptq.py
 fi
 if [[ $action_num > 1 ]]; then
