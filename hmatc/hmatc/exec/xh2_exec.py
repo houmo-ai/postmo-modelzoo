@@ -278,10 +278,3 @@ class Xh2Exec(BaseExec):
             }
         logger.info(f"\n{table}")
         return res_info
-
-    def demo(self, backend):
-        raise NotImplementedError
-    
-    def evaluate(self, backend):
-        raise NotImplementedError
-

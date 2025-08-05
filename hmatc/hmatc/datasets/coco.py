@@ -33,7 +33,7 @@ class COCO2017Val(BaseDataset):
             image_id = int(image["id"])
             img_path = os.path.join(self.root_path, "val2017", filename)
             if not os.path.exists(img_path):
-                logger.warning(f"img_path not exist -> {img_path}")
+                # logger.warning(f"img_path not exist -> {img_path}")
                 continue
             basename, _ = os.path.splitext(os.path.basename(img_path))
             self.image_ids_dict[basename] = image_id

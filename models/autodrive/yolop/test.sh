@@ -10,7 +10,7 @@ if [ "$arch" = "x86_64" ]; then
   python3 get_model.py
   hmatc quant   -c config.yml
   hmatc build   -c config.yml
-  hmatc compare -c config.yml -t xh1 --data_path bdd100k/images/100k/val/b1c9c847-3bda4659.jpg
+  hmatc compare -c config.yml --data_path bdd100k/images/100k/val/b1c9c847-3bda4659.jpg
   hmatc perf    -c config.yml -wn 1 -sn 1 -tn 1
   hmatc demo    -c config.yml
   hmatc demo    -c config.yml --onnx

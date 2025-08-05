@@ -8,6 +8,7 @@ from ..utils import logger
 from ..utils.utils import SUPPORT_BACKEND
 from ..utils.preprocess import xh1_preprocess, default_preprocess
 from ..infer.xh1_infer import Xh1Infer
+from ..infer.xh2_infer import Xh2Infer
 from ..infer.onnx_infer import OnnxInfer
 
 
@@ -30,8 +31,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         elif self.backend == "xh1":
             self.engine = Xh1Infer()
         elif self.backend == "xh2":
-            logger.error("Xh2 not implemented")
-            exit(-1)
+            self.engine = Xh2Infer()
         else:
             logger.error(f"Not support backend: {self.backend}")
             exit(-1)

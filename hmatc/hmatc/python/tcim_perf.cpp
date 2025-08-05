@@ -317,10 +317,10 @@ perfInfo_t ModelRunner(
         input_datas.insert(std::pair<std::string, tcim::Tensor>(input_name, tensor));
     }
 
-    std::string custom_msg_str = module.GetCustomMsg();
-    json custom_msg = json::parse(custom_msg_str);
-
     if (inputs.size() > 0) {
+        // 如果存在输入为pic，则必然存在resizer，必然有custom_msg可取
+        std::string custom_msg_str = module.GetCustomMsg();
+        json custom_msg = json::parse(custom_msg_str);
         for (auto &item : inputs) {
             std::string dyn_info_name = "resizer_crop_" + item.first;
             auto &raw_input_shape = custom_msg[item.first]["shape"];
