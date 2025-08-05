@@ -25,6 +25,7 @@ namespace fs = std::filesystem;
 #include "tcim/tcim_runtime.h"
 #include "utils.hpp"
 
+
 std::vector<std::vector<DetectResult>> detect(
     int batch_num, std::string model_path,
     const std::vector<cv::Mat> &cv_images) {
@@ -60,23 +61,34 @@ std::vector<std::vector<DetectResult>> detect(
     auto input_name = module.GetInputName(idx);
     auto input_info = module.GetInputInfo(input_name).AsContiguous();
     LOG_INFO << "Input[" << input_name << "] " << input_info;
-    auto input_tensor = tcim::Tensor::CreateHostTensor(input_info);
-    input_map.insert(
-        std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
+    tcim::Tensor input_tensor;
     if (input_name == img_str) {
+      // get device tensor
+      input_tensor = module.GetInput(input_name);
+      // get image info: width & height
       input_img_width = input_info.Shape()[3];
       input_img_height = input_info.Shape()[2];
+    } else {
+      input_tensor = tcim::Tensor::CreateHostTensor(input_info);
     }
+    input_map.insert(
+        std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
   }
 
   // 3. preprocess input images and then copy to input tensor
+  auto yuv_info = tcim::TensorInfo::CreateYUVInfo(
+    input_img_width, input_img_height, tcim::YUV420SP);
   size_t size = input_img_height * input_img_width * 3;
   for (int idx = 0; idx < batch_num; idx++) {
     cv::Mat img_yuv;
+    auto yuv_tensor = tcim::Tensor::CreateHostTensor(yuv_info);
+    // convert image from bgr to yuv420sp
     cv::cvtColor(cv_images[idx], img_yuv, cv::COLOR_BGR2YUV_I420);
     ImageProc::I420To420sp(
-        (uint8_t *)input_map.at(img_str).Data() + idx * (size / 2),
-        (uint8_t *)img_yuv.data, size);
+      (uint8_t*)yuv_tensor.Data(), (uint8_t*)img_yuv.data, size);
+    auto batch_tensor = input_map[img_str].SelectBatch({idx});
+    // copy image data H2D
+    yuv_tensor.CopyTo(batch_tensor);
   }
   auto it = input_map.find(resizer_crop_str);
   if (it != input_map.end()) {
