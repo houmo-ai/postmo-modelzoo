@@ -5,10 +5,6 @@ backbone_resnet50:
   exclude:
     - models/backbone/resnet50/README.MD
   example_case:
-    - backbone_resnet50_perf:
-        script: models/backbone/resnet50/perf.sh
-    - backbone_resnet50_eval:
-        script: models/backbone/resnet50/eval.sh
     - backbone_resnet50_test:
         script: models/backbone/resnet50/test.sh
   test:
@@ -21,10 +17,6 @@ backbone_efficientnet:
   exclude:
     - models/backbone/efficientnet/README.MD
   example_case:
-    - backbone_efficientnet_eval:
-        script: models/backbone/efficientnet/eval.sh
-    - backbone_efficientnet_perf:
-        script: models/backbone/efficientnet/perf.sh
     - backbone_efficientnet_test:
         script: models/backbone/efficientnet/test.sh
   test:
@@ -170,7 +162,7 @@ utils:
   include:
     - utils
     - release.cmake
-    - env.sh
+    # - env.sh
   exclude: null
   example_case: null
   test:

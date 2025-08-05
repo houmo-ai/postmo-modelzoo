@@ -54,7 +54,7 @@ if HOUMO_TARGET == 'xh1':
             args.decoder_shape = [1,1]
         return args
 
-    def main(args):
+    def main():
         args = parse_args()
         model, tokenizer = AutoModelForCausalLM.from_pretrained(args.model), AutoTokenizer.from_pretrained(args.model)
         quant_pipline = QwenQuantPipline()
@@ -77,58 +77,36 @@ if HOUMO_TARGET == 'xh1':
         quant_pipline.generate_golden(args, save_path=args.save_path, model_name=args.model_name)
 
 elif HOUMO_TARGET == 'xh2':
-    import shutil
-    from xh_model_zoo.xh_llm import LLMConverter
-    from xh_model_zoo.xh_llm.models.qwen2 import Qwen2ConvertConfig
-
-    from xhquant.api import DeviceType, xhquant_init, QuantScheme, get_root_logger  # isort:skip
-    from xh_model_zoo.utils.memory_tracker import MemoryTracker  # isort:skip
-    from xh_model_zoo.utils.time_profiler import TimeProfiler  # isort:skip
+    from quant_pipline import quant_llm, export_llm, move_llm
 
     def parse_args():
-        parser = argparse.ArgumentParser(description="Quant Qwen3")
-        parser.add_argument("--debug", action="store_true", help="debug mode")
+        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("--model", type=str, default="qwen3-14b")
-        parser.add_argument("--context-length", type=int, default=8192, help="max sequence length")
+        parser.add_argument("--out-dir", type=str, default="work_dirs/")
+        parser.add_argument("--skip-quarot", action="store_true", help="skip_quarot")
+        parser.add_argument("--skip-gptq", action="store_true", help="skip_quarot")
+        parser.add_argument("--w-bits", type=int, default=4)
+        parser.add_argument("--seed", type=int, default=1024)
+        parser.add_argument("--resume", action="store_true", help="resume from the cache")
+        # parser.add_argument("--tie-embed_head", action="store_true", help="tie_embed_head")
+        parser.add_argument("--debug", action="store_true", help="debug mode")
+        parser.add_argument("--context-length", type=int, default=2048, help="max sequence length")
         parser.add_argument("--input-sequence-length", type=int, default=256, help="input sequence length")
-        parser.add_argument("--quant-type", default="w8a8_sefp", help="quant type, default is w8a8")
+        parser.add_argument("--quant-type", default="w4a8_ssfp", help="quant type, default is w4a8_ssfp")
         parser.add_argument(
             "--quant-weight",
             type=str,
-            default=None,
+            default="work_dirs/qwen3-14b_quarot_gptq/quarot_gptq-state-dict.safetensors",
             help="quant weight path, for example: gptq or quarot, if empty, use w8a8",
         )
         args = parser.parse_args()
         return args
 
-    def main(args):
-        hf_model_path = args.model
-        quant_type = args.quant_type
-        quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
-        config = Qwen2ConvertConfig(
-            batch_size=1,
-            context_length=args.context_length,
-            input_sequence_length=args.input_sequence_length,
-            quant_scheme=quant_scheme,
-            quant_weight=args.quant_weight,
-        )
-
-        prefix = f"xh2"
-        work_dir = Path("output") / prefix
-        work_dir.mkdir(exist_ok=True, parents=True)
-        log_file = work_dir / "convert.log"
-        xhquant_init(log_file, debug=args.debug)
-        logger = get_root_logger()
-        with TimeProfiler("convert", logger), MemoryTracker("cuda:0", "convert", logger):
-            LLMConverter.from_pretrained(hf_model_path, "Qwen3ForCausalLM_legacy", config, str(work_dir))
-        shutil.move(work_dir / "hmonnx/prefill", work_dir / "hmquant/prefill")
-        shutil.move(work_dir / "hmquant/prefill/qwen3-14b-XH2a-8k-w8a8_sefp_prefill.onnx", work_dir / "hmquant/prefill/hmquant_qwen3_with_act.onnx")
-        shutil.move(work_dir / "hmonnx/decode", work_dir / "hmquant/decoder")
-        shutil.move(work_dir / "hmquant/decoder/qwen3-14b-XH2a-8k-w8a8_sefp_decode.onnx", work_dir / "hmquant/decoder/hmquant_qwen3_with_act.onnx")
-        shutil.move(work_dir / "token_embedding.pt", work_dir / "hmquant/quant_embedding.pt")
-        shutil.rmtree(work_dir / "hmonnx")
-        shutil.rmtree(work_dir / "hf_config")
+    def main():
+        args = parse_args()
+        quant_llm(args)
+        export_llm(args)
+        move_llm(args)
 
 if __name__ == "__main__":
-    args = parse_args()
-    main(args)
+    main()
