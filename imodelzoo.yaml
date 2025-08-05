@@ -6,10 +6,10 @@ is_structure: false
 os_type:
   ubuntu_20.04:
     examples:
-      - apis/
-      - models/
-      - data/
-      - hmodel/
+      - apis
+      - models
+      - data
+      - hmodel
       - env.sh
   ubuntu_18.04:
     examples:

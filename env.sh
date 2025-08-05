@@ -2,11 +2,7 @@
 
 # main path
 __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-export HOUMO_MODELZOO_PATH=${__dir}
-export HMASSIST_PATH=$HOUMO_MODELZOO_PATH/hmassist
-
-# install requirements
-# pip3 install -r $HOUMO_MODELZOO_PATH/requirements.txt
+export HOUMO_EXAMPLES_PATH=${__dir}
 
 # common define
 PRINT_GREEN() { echo -e "\033[1;32m$@\033[0m"; }
@@ -30,16 +26,11 @@ fi
 export PATH=$HOUMO_PATH/bin:$PATH
 
 # paths for runtime
-export PYTHONPATH=$TCIM_RUNTIME_PATH/python:$PYTHONPATH
 export LD_LIBRARY_PATH=$TCIM_RUNTIME_PATH/lib:$HOUMO_PATH/lib:$LD_LIBRARY_PATH
-
-# paths for hmassist
-export PYTHONPATH=$HMASSIST_PATH:$PYTHONPATH
-export PATH=$HMASSIST_PATH:$PATH
 
 # data and model path
 if [[ -z $HOUMO_DATASETS_PATH ]]; then
-  export HOUMO_DATASETS_PATH=$HOUMO_MODELZOO_PATH/data/datasets
+  export HOUMO_DATASETS_PATH=$HOUMO_EXAMPLES_PATH/data/datasets
 fi
 
 if [[ -z $HOUMO_MODEL_PATH ]]; then
@@ -50,7 +41,7 @@ if [[ -z $HOUMO_MODEL_PATH ]]; then
 fi
 
 # paths for xh2 modelzoo
-export PYTHONPATH=$HOUMO_MODELZOO_PATH/hmodel/xh2:$PYTHONPATH
+export PYTHONPATH=$HOUMO_EXAMPLES_PATH/hmodel/xh2:$PYTHONPATH
 
 # use asic if detected
 if [[ -z $HDPL_PLATFORM ]]; then
@@ -68,7 +59,7 @@ PRINT_GREEN "HOUMO_TARGET is $HOUMO_TARGET"
 PRINT_GREEN "HOUMO_PATH is $HOUMO_PATH"
 PRINT_GREEN "HOUMO_SDK_PATH is $HOUMO_SDK_PATH"
 PRINT_GREEN "TCIM_RUNTIME_PATH is $TCIM_RUNTIME_PATH"
-PRINT_GREEN "HOUMO_MODELZOO_PATH is $HOUMO_MODELZOO_PATH"
+PRINT_GREEN "HOUMO_EXAMPLES_PATH is $HOUMO_EXAMPLES_PATH"
 PRINT_GREEN "HOUMO_DATASETS_PATH is $HOUMO_DATASETS_PATH"
 PRINT_GREEN "HOUMO_MODEL_PATH is $HOUMO_MODEL_PATH"
 PRINT_GREEN "PYTHONPATH is $PYTHONPATH"

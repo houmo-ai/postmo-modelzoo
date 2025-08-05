@@ -1,4 +1,4 @@
-# houmo-modelzoo
+# houmo-examples
 
 ## 目录
 
@@ -6,44 +6,31 @@
 
 ## 概述
 
-houmo-modelzoo是为用户快速将模型移植到后摩鸿途系列芯片产品而开发的模型库，为用户提供量化、编译、精度和性能评估等一整套代码和工具，降低用户的学习和开发成本。
+houmo-examples是为用户快速将模型和应用移植到后摩芯片上而提供的示例库，为用户提供量化、编译、精度和性能评估、应用部署等一整套代码和工具，降低用户的学习和开发成本。
 
 目前仅支持linux平台。
 
-houmo-modelzoo目录结果如下，其中README.md为本说明文件：
+houmo-examples目录结果如下，其中README.md为本说明文件：
 
 ```bash
 |-- README.md
+|-- apis
 |-- models
 |-- data
 |-- hmodel
-|-- hmassist
-|-- utils
-|-- benchmark.yml
-|-- release.cmake
-|-- requirements.txt
 `-- env.sh
-
 ```
 
-主要目录说明如下：
+主要目录和文件说明如下：
 
-| 目录     | 说明                                     |
-| -------- | --------------------------------------- |
+| 目录     | 说明                                        |
+| -------- | ------------------------------------------- |
+| apis     | API示例，接口按主要用途分文件夹存放         |
 | models   | 模型示例，模型按照主要用途分文件夹存放      |
-| data     | 评估使用的数据文件，如数据集等             |
-| hmodel   | 量化模型配置和工具，目前主要是QAT训练使用   |
-| hmassist | 参数化评估辅助工具，通过配置文件实现快速评估 |
-| utils    | C++测试工具和源码                         |
+| data     | 评估使用的数据文件，如数据集等              |
+| hmodel   | 量化模型配置和工具，主要用于大模型和QAT训练 |
+| env.sh   | 环境配置脚本                                |
 
-其他文件说明如下：
-
-| 目录             | 说明                     |
-| ---------------- | ----------------------- |
-| benchmark.yml    | 模型基准测试配置文件      |
-| release.cmake    | c++环境cmake配置文件     |
-| requirements.txt | python环境依赖           |
-| env.sh           | modelzoo环境配置脚本     |
 
 ## 软件依赖
 
@@ -59,304 +46,43 @@ python依赖可通过requirements.txt安装：
 pip install -r requirements.txt
 ```
 
-## 模型示例列表
-
-houmo-modelzoo提供的模型示例如下，编译和性能评估示例每个都提供，其他支持情况见下表，quant表示提供量化示例，demo表示提供python端到端demo，eval表示提供精度评估
-
-| models                                       | type      | target  | quant | demo | eval |
-| -------------------------------------------- | --------- | ------- | ----- | ---- | ---- |
-| [resnet50](models/backbone/resnet50)         | backbone  | xh1     | yes   | yes  | yes  |
-| [mobilenetv2](models/backbone/mobilenet_v2)  | backbone  | xh1     | yes   | yes  | yes  |
-| [efficientnet](models/backbone/efficientnet) | backbone  | xh1     | yes   | yes  | yes  |
-| [yolov8m](models/detection/yolov8m)          | detection | xh1     | yes   | yes  | yes  |
-| [yolov5s](models/detection/yolov5s)          | detection | xh1     | yes   | yes  | yes  |
-| [yolov3](models/detection/yolov3)            | detection | xh1     | yes   | yes  | yes  |
-| [yolop](models/autodrive/yolop)              | autodrive | xh1     | yes   | yes  | x    |
-| [wenet](models/asr/wenet)                    | asr       | xh1     | x     | yes  | x    |
-| [qwen2.5](models/llm/qwen2.5)                | llm       | xh1/xh2 | yes   | yes  | x    |
-| [qwen3-8b](models/llm/qwen3)                 | llm       | xh1/xh2 | yes   | yes  | x    |
-| [qwen3-14b](models/llm/qwen3-14b)            | llm       | xh2     | yes   | yes  | x    |
-| [deepseek](models/llm/deepseek)              | llm       | xh1     | x     | yes  | x    |
-| [deepseek](models/llm/deepseek-r1-qwen3-8b)  | llm       | xh2     | x     | yes  | x    |
-| [sdxl](models/diffusion/sdxl)                | diffusion | xh1     | x     | yes  | x    |
-| [sd3](models/diffusion/sd3)                  | diffusion | xh2     | x     | yes  | x    |
-| [qwen2.5-vl](models/vllm/qwen2.5-vl)         | vllm      | xh1     | x     | yes  | x    |
-                                                                    
-## C++评估工具列表
-
-| PROJECT                                                                         | 说明                 |
-| ------------------------------------------------------------------------------- | -------------------- |
-| [tcim_perf](uilts/tcim_perf)                                                    | 性能基准测试工具      |
-
-## 快速上手
-
-### 概述
-
-houmo-modelzoo中的模型提供两种方式作为示例，用户可以根据需求和习惯选用：
-
-1. 接口方式
-
-通过直接调用tcim API接口方式，可以对量化、编译和运行细节做更定制化的修改。目前提供的示例脚本主要有：
-- ptq.py 对模型进行PTQ量化，保存量化后模型和golden数据
-- qat.py 对模型进行QAT训练，保存量化后模型
-- build.py 对量化模型进行编译，生成可在后摩鸿途系列芯片上运行的模型，然后使用该模型推理并与golden数据进行比对
-- demo.py 对模型进行芯片上推理，并展示结果
-
-2. 工具方式
-
-通过模型评估辅助工具hmassist，可以对一些常见公版模型做一键评估，了解模型的支持程度、性能、精度等基本信息。对于符合条件的自定义模型，也只需要做少量修改即可适配，可大幅提升模型的评估效率。
-
-### 准备环境
-
-houmo-modelzoo依赖后摩大道其他组件运行，包括量化工具quantool、编译运行工具tcim、houmo-toolchain、芯片驱动等，需要先加载安装相关软件，初次使用推荐采用后摩大道提供的docker镜像。
-
-软件安装好后，需要配置开发运行环境。先检查根目录 `env.sh` 里的环境变量，根据实际情况修改，例如如果要更换数据集路径则修改`HOUMO_DATASETS_PATH`变量。修改完成后执行以下命令：
-
-```bash
-source env.sh
-```
-
-运行完成后会打印主要的环境变量，请再次检查环境变量是否与预期一致。注意`HDPL_PLATFORM`指示当前运行环境，如果为`ASIC`表示在芯片上运行，如果为`ISIM`表示在模拟器上运行。初始时脚本会自动检测是否是芯片环境，可以通过手动修改该环境变量来切换。
-
-设置完成后进入模型目录，以resnet50为例：
-
-```bash
-cd models/backbone/resnet50
-```
-
-### 获取模型和数据
-
-1. 准备量化和评估使用的数据集，以resnet50需要的imagenet数据集为例，将imagenet验证集放到data/datasets/imagenet目录下，仓库中已有少量数据供简单验证，如果需要测试真实精度需要自行下载完整数据集
-2. 如果需要自己量化，需要下载原始模型，对于有些存在不支持算子的模型，可能需要修改或者裁剪
-3. 如果仅评估模型精度和性能，可以直接下载提供的量化模型
-
-通过get_model脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。模型提供的模型类型请查看`模型示例列表`章节，如果下载地址无法访问，请与我们联系。
-
-如果需要自己量化，可选择下载原始模型，下载后的模型存放在当前目录：
-
-```bash
-python3 get_model.py --type raw
-```
-
-如果仅编译芯片模型，可选择下载量化模型，下载后的模型存放在`output/$HOUMO_TARGET/result`目录（注意相同模型会覆盖，请自行保存）：
-
-```bash
-python3 get_model.py --type quant
-```
-
-如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
-
-```bash
-python3 get_model.py --type hmm
-```
-
-也可以直接下载以上所有模型和数据集（注意相同模型会覆盖，请自行保存）：
-
-```bash
-python3 get_model.py
-```
-
-### 一键模型评估
-
-提供一键评估脚本方便用户进行模型评估，一般分为性能和精度两个评估脚本。大部分模型使用hmassist工具进行评估，少量hmassist模型使用API接口的方式，部分模型还不支持数据集精度评估，支持情况请查看`模型示例列表`章节。
-
-如果需要按步骤评估，可以参考后面的`使用TCIM API接口评估`和`使用hmassist工具评估`章节。
-
-#### 性能评估
-
-可以通过每个模型下的perf.sh脚本一键执行性能测试：
-
-```bash
-bash perf.sh
-```
-
-执行完成后会打印模型推理延迟、吞吐量等信息。
-
-#### 精度评估
-
-可以通过每个模型下的eval.sh脚本一键执行精度测试：
-
-```bash
-bash eval.sh
-```
-
-执行完成后会打印模型的数据集精度信息。
-
-### 使用TCIM API接口评估
-
-直接使用TCIM API接口进行模型转换和评估，API接口参考《TCIM API手册》。以resnet50为例，hmassist的使用过程如下：
-
-#### PTQ量化
-
-（Post-Training Quantization）量化是一种在神经网络模型训练完成后进行的量化方法。将浮点权重映射到较低比特宽度的定点表示，例如8位或4位整数。量化过程涉及将原始浮点权重（如float32）映射到int8区间[-128,127]，并计算每个通道的缩放因子（scale）和偏移量（zero_point）。通过ptq.py脚本执行：
-
-```bash
-python3 ptq.py
-```
-
-如果输入是图像，可以开启硬件crop/resize/pad，通过`--input_shape`指定输入尺寸，`--dynamic_resize`开启动态resize功能：
-
-```bash
-python3 ptq.py --input_shape=1,3,1080,1920 --dynamic_resize
-```
-
-量化后的模型和golden数据以onnx模型和npy数据的形式默认放在output/houmo/result目录下。量化完成后会进行profile，以表格的形式打印逐层相似度，重点关注输出层的余弦相似度是否符合预期。如果余弦相似度较低，可考虑该结果是否适合使用余弦相似度进行评价，进一步测试模型实际精度。如果确实是量化精度降低较多，可考虑更换量化数据和参数，以及混合量化，QAT训练等方式进一步提升。
-
-#### 编译
-
-将量化模型编译为在芯片上运行的模型。通过build.py脚本执行：
-
-```bash
-python3 build.py
-```
-
-如果输入是图像，可以开启动态crop/resize/pad，通过`--input_shape`指定输入尺寸，`--dynamic_resize`开启动态resize功能（需要与量化过程配置相同）：
-
-```bash
-python3 build.py --input_shape=1,3,1080,1920 --dynamic_resize
-```
-
-#### 性能测试
-
-使用性能基准测试工具进行性能测试，以评估模型在多batch、多线程等不同方式下的推理性能。进入utils/tcim_perf目录，修改run.sh脚本中的参数，包括模型路径、线程数、测试数等，然后执行：
-
-```bash
-cd utils/tcim_perf
-./build.sh
-./run.sh
-```
-
-### 使用hmassist工具评估
-
-hmassist工具基于TCIM API接口通过yaml配置文件和python脚本定义模型参数和处理方式，包括三种文件：
-
-1. 模型配置文件[必选]，文件名默认config.yml, 定义模型参数和各过程处理参数，以及自定义处理模块的名称。具体配置请参考hmassist/default_config.yml
-2. 模型处理文件[可选]，文件名必须hm_model.py, 里面定义模型处理类，包括前处理、编译参数、后处理、demo和精度处理等方法，可继承hmassist/models下基类
-3. 数据集处理文件[可选]，文件名必须hm_dataset.py，里面定义数据集处理类，包括从数据集获取样本、标注和精度评估等方法，可继承hmassist/datasets下基类
-4. 量化参数文件[可选]，文件路径由模型配置文件quant字段ptq_cfg_path参数配置，里面定义量化配置
-
-以resnet50为例，hmassist的使用过程如下：
-
-#### 量化
-
-将原始浮点模型量化为定点，以便在芯片上部署。目前hmassist工具仅支持ptq量化，在模型配置文件中quant字段配置量化参数，然后执行hmquant.sh脚本：
-
-```bash
-hmquant.sh
-```
-
-量化后的模型和golden数据以onnx模型和npy数据的形式默认放在output/houmo/result目录下。量化完成后会进行profile，以表格的形式打印逐层相似度，重点关注输出层的余弦相似度是否符合预期。如果余弦相似度较低，可考虑该结果是否适合使用余弦相似度进行评价，进一步测试模型实际精度。如果确实是量化精度降低较多，可考虑更换量化数据和参数，以及混合量化，QAT训练等方式进一步提升。
-
-#### 编译
-
-将量化模型编译为在芯片上运行的模型。在模型配置文件中build字段配置编译参数，可通过`--batch`参数配置batch数，然后执行hmbuild.sh脚本：
-
-```bash
-hmbuild.sh
-```
-
-编译完成后会自动使用量化生成的golden数据进行比对，以确定编译结果是否正确。运行成功后关键结果如下：
-
-```bash
-xh1 output[495] shape = (1, 1000), dtype = int8
-golden output[495] shape = (1, 1000), dtype = int8
-[compare] golden output [495] match=True, similarity=1.000000
-golden dequant output[495] shape = (1, 1000), dtype = float32
-[compare] dequanted golden output [495] match=True, similarity=1.000000
-```
-
-编译后的模型放在当前目录下。编译完成后会使用量化产生的golden输入进行推理，然后与量化产生的golden输出进行比对，如果余弦相似度高于0.999一般认为编译过程结果正确，模型可以使用。
-
-#### 测试
-
-使用指定的测试输入对模型推理结果进行测试。支持指定目标为onnx，用于比较结果是否与onnx推理结果一致。如果先指定目标为onnx，会调用onnx runtime进行推理并保存结果。然后指定目标为后摩芯片，使用相同的输入调用后摩芯片进行推理，将结果与onnx runtime的结果进行余弦相似度和欧式距离比较，以确定模型转换的正确性和精度。如果量化时data_path设置相同的数据，也可以同时比较量化结果。通过执行hmtest.sh脚本实现：
-
-```bash
-hmtest.sh --target onnx
-hmtest.sh
-```
-
-运行成功后关键结果如下，这里可能出现hmquant和xh1结果不完全匹配的情况，这是因为前处理所用的opencv的rgb->yuv转换和芯片不一致导致，并不是量化和芯片结果不一致。量化和芯片结果是否一致可通过编译过程的golden数据比对来确认。
-
-```bash
-[compare] output [495] onnx vs hmquant similarity=0.988059, euclid_dist=17.626165
-[compare] output [495] hmquant vs xh1 similarity=0.995269, euclid_dist=10.300049
-[compare] output [495] onnx vs xh1 similarity=0.980979, euclid_dist=21.250584
-```
-
-#### 结果展示
-
-使用指定的测试输入进行模型推理，并加上前后处理和可视化，使用户可以直观的观察推理结果。支持指定目标为onnx，用于比较推理效果是否与onnx一致。展示方法由用户自己实现，需要在hm_model.py文件中定义模型处理类并实现前后处理、demo等接口，可以从已有的实现类中继承。通过执行hmdemo.sh脚本实现：
-
-```bash
-hmdemo.sh --target onnx
-hmdemo.sh
-```
-
-#### 性能测试
-
-使用指定的方式进行性能测试，以评估模型在不用使用方式下的推理性能, 可通过`--thread_num`参数配置线程数。执行前需要先执行utils/tcim_perf下的build.sh
-
-```bash
-cd utils/tcim_perf
-./build.sh
-```
-
-执行hmperf.sh：
-
-```bash
-hmperf.sh
-```
-
-运行成功后关键结果如下：
-
-```bash
-[latency] Inference 	avg:   2.155 ms,	max:   2.464 ms
-[latency] Input 	avg:   0.365 ms,	max:   0.430 ms
-[latency] Output 	avg:   0.203 ms,	max:   0.407 ms
-[latency] End2End 	avg:   2.726 ms,	max:   3.038 ms
-[Throughput] total: 2728.361 ms, avg: 2.728 ms
-[Throughput] qps: 366.520
-```
-
-#### 精度测试
-
-使用指定的数据集进行精度测试，以评估模型在数据集下的推理精度。支持指定目标为onnx，用于比较与原始onnx模型的精度差异。精度测试方法由用户自己实现，需要在hm_model.py文件中定义模型处理类并实现前后处理接口，同时在hm_dataset.py文件中定义数据库处理类，可以从已有的实现类中继承。通过执行hmeval.sh脚本实现：
-
-```bash
-hmeval.sh --target onnx
-hmeval.sh
-```
-
-运行成功后关键结果如下：
-
-```bash
-{'shape': [[1, 3, 224, 224]], 'dataset': 'ILSVRC2012', 'test_num': 20, 'accuracy': {'top1': 0.7, 'top5': 0.95}, 'latency': 2.4702072143554688}
-```
-
-#### 批量基准测试
-
-使用指定的参数对一组模型进行性能和精度测试，生成测试报告。测试的模型和参数定义在benchmark.yml文件中，内容如下：
-
-```yml
-models: {
-  resnet50: {location: models/backbone/resnet50, batch: 1, core_num: 1},
-  mobilenetv2: {location: models/backbone/mobilenetv2, batch: 1, core_num: 1},
-  ...
-}
-```
-
-通过hmbenchmark.sh脚本执行：
-
-```bash
-hmbenchmark.sh
-```
-
-执行完成会在log中打印报告，同时在reports目录中保存csv文件。部分模型执行结果如下（模型性能结果根据平台不同会有差异）：
-
-|  ModelName   |      Shape       |  Dataset   | Batch | CoreNum | Accuracy(onnx)        | Accuracy(houmo)       | AccRelError             | Latency(ms) |   Qps   |
-| ------------ | ---------------- | ---------- | ----- | ------- | --------------------- | --------------------- | ----------------------- | ----------- | ------- |
-|   resnet50   | [1, 224, 224, 3] | ILSVRC2012 |   1   |    1    | top1:0.753 top5:0.925 | top1:0.719 top5:0.923 | top1:-0.046 top5:-0.002 |    0.752    | 1330.47 |
-|   yolov5s    | [1, 640, 640, 3] |  coco2017  |   1   |    1    | map:0.362 map50:0.557 | map:0.333 map50:0.542 | map:-0.079 map50:-0.026 |    4.415    |  226.50 |
-|    yolov3    | [1, 640, 640, 3] |  coco2017  |   1   |    1    | map:0.412 map50:0.615 | map:0.373 map50:0.607 | map:-0.094 map50:-0.014 |    27.496   |  36.37  |
-|    yolop     | [1, 384, 640, 3] |  NotTest   |   1   |    1    | NotTest               | NotTest               | NotTest                 |    43.674   |  22.90  |
+## API示例
+
+API示例列表如下，type列为示例类型，其中convert表示模型转换，inference表示模型推理，scenes表示应用场景。language列为支持的编程语言，target列为支持的芯片平台
+
+| example name                 | path                                        | type      | language   | target  |
+| ---------------------------- | ------------------------------------------- | --------- | ---------- | ------- |
+| resnet50量化编译             | apis/converts/resnet50                      | convert   | python     | xh1/xh2 |
+| resnet50单线程推理           | apis/inferences/resnet50                    | inference | python/c++ | xh1/xh2 |
+| yolov5s单线程推理            | apis/inferences/yolov5s                     | inference | python/c++ | xh1/xh2 |
+| resnet50多线程多stream推理   | apis/inferences/resnet50_multistreams       | inference | c++        | xh1     |
+| resnet50流水推理             | apis/inferences/resnet50_pipeline           | inference | c++        | xh1     |
+| yolov5s_resnet50多batch推理  | apis/inferences/yolov5s_resnet50_multibatch | inference | c++        | xh1     |
+| 视频流目标检测分析           | apis/scenes/video_detect                    | scenes    | c++        | xh1     |
+
+**注：c++推理暂不支持xh2平台**
+
+## 模型示例
+
+模型示例主要依赖hmatc工具完成评估功能，可通过每个模型示例下的test.sh脚本一键执行，也可参考脚本中的命令分步执行，相关参数在config.yml配置。
+
+模型示例列表如下，type列为模型类型，target列为支持的芯片平台，quant表示提供量化示例，build表示提供编译示例，demo表示提供python端到端demo，eval表示提供精度评估
+
+| models               | path                            | type      | target  | quant | build | demo | eval |
+| -------------------- | ------------------------------- | --------- | ------- | ----- | ----- | ---- | ---- |
+| resnet50             | models/backbone/resnet50        | backbone  | xh1     | yes   | yes   | yes  | yes  |
+| mobilenetv2          | models/backbone/mobilenet_v2    | backbone  | xh1     | yes   | yes   | yes  | yes  |
+| efficientnet         | models/backbone/efficientnet    | backbone  | xh1     | yes   | yes   | yes  | yes  |
+| yolov8m              | models/detection/yolov8m        | detection | xh1     | yes   | yes   | yes  | yes  |
+| yolov5s              | models/detection/yolov5s        | detection | xh1     | yes   | yes   | yes  | yes  |
+| yolov3               | models/detection/yolov3         | detection | xh1     | yes   | yes   | yes  | yes  |
+| yolop                | models/autodrive/yolop          | autodrive | xh1     | yes   | yes   | yes  | x    |
+| wenet                | models/asr/wenet                | asr       | xh1     | x     | yes   | yes  | x    |
+| qwen2.5              | models/llm/qwen2.5              | llm       | xh1/xh2 | yes   | yes   | yes  | x    |
+| qwen3-8b             | models/llm/qwen3                | llm       | xh1/xh2 | yes   | yes   | yes  | x    |
+| qwen3-14b            | models/llm/qwen3-14b            | llm       | xh2     | yes   | yes   | yes  | x    |
+| deepseek             | models/llm/deepseek             | llm       | xh1     | x     | yes   | yes  | x    |
+| deepseek-r1-0528     | models/llm/deepseek-r1-qwen3-8b | llm       | xh2     | yes   | yes   | yes  | x    |
+| sdxl                 | models/diffusion/sdxl           | diffusion | xh1     | x     | yes   | yes  | x    |
+| sd3                  | models/diffusion/sd3            | diffusion | xh2     | x     | yes   | yes  | x    |
+| qwen2.5-vl           | models/vllm/qwen2.5-vl          | vllm      | xh1     | x     | yes   | yes  | x    |

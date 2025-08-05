@@ -3,9 +3,9 @@
 # 0. 必要变量
 VERSION=develop
 IMAGE_NAME="harbor.houmo.ai/toolchain/release:${VERSION}-ubuntu20.04-py39-x86.64.latest"
-CONTAINER_NAME="$(whoami).hmdd_${VERSION}"
+CONTAINER_NAME="$(whoami).HoumoDadao_xh1_${VERSION}"
 CONTAINER_HOME="/container/$(whoami)"
-USER_CONFIG="-v /develop02:/develop02"
+USER_CONFIG="-v /develop02:/develop02 -v /data:/data"
 
 PRINT_RED() { echo -e "\033[1;31m$@\033[0m"; }
 PRINT_GREEN() { echo -e "\033[1;32m$@\033[0m"; }
@@ -21,14 +21,19 @@ ENTER_DOCKER() {
 PRINT_BLUE "start container named \"$CONTAINER_NAME\" with image $IMAGE_NAME"
 
 # 1. 挂载路径设置，容器内路径相同
-VOLUME_HOME="/hmdd_${VERSION}"
+VOLUME_HOME="/HoumoDadao_xh1_${VERSION}"
 
 # 2. [非必要]处理命令行参数，可选参数只有"restart"
 if [ $# -gt 0 ]; then
   if [ "$1" == "restart" ]; then
-    PRINT_BLUE "docker stop $CONTAINER_NAME"
-    docker stop $CONTAINER_NAME >/dev/null
-    docker rm $CONTAINER_NAME >/dev/null
+    if docker ps -a | grep -q $CONTAINER_NAME; then 
+      PRINT_BLUE "docker stop $CONTAINER_NAME"
+      docker stop $CONTAINER_NAME >/dev/null
+      PRINT_BLUE "docker rm $CONTAINER_NAME"
+      docker rm $CONTAINER_NAME >/dev/null
+    else
+      PRINT_BLUE "container not found"; 
+    fi
   else
     PRINT_RED "unknown argument"; exit
   fi
