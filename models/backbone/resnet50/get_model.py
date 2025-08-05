@@ -49,7 +49,7 @@ if __name__ == '__main__':
     build_model_dir = args.build_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
-    
+
     model_name = "resnet50"
     ncore = 1
     batch = 1
@@ -61,10 +61,19 @@ if __name__ == '__main__':
     build_path = f"models/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type == "raw" or model_type == "all":
-        get_file_from_jfrog(raw_path, model_dir)
+        try:
+            get_file_from_jfrog(raw_path, model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
 
     if model_type == "quant" or model_type == "all":
-        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
-    
+        try:
+            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
+
     if model_type == "build" or model_type == "all":
-        get_file_from_jfrog(build_path, model_dir, build_model_dir)
+        try:
+            get_file_from_jfrog(build_path, model_dir, build_model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")

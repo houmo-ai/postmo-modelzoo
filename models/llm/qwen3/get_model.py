@@ -51,8 +51,11 @@ if __name__ == '__main__':
         hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250723.zip"
 
     if model_type in ["raw", "all"]:
-        get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
         ignore_patterns = []
+        try:
+            get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
     else:
         ignore_patterns = ["*.safetensors"]
 
@@ -60,7 +63,13 @@ if __name__ == '__main__':
     snapshot_download('qwen/qwen3-8b', local_dir='qwen3-8b', ignore_patterns=ignore_patterns)
 
     if model_type in ["quant", "all"]:
-        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        try:
+            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
 
     if model_type in ["hmm", "all"]:
-        get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        try:
+            get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")

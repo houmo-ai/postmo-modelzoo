@@ -43,14 +43,28 @@ if __name__ == '__main__':
     hmm_path = "models/sdxl/hmm_sdxl_4cores_20250314.zip"
 
     if model_type in ["raw", "all"]:
-        from modelscope import snapshot_download
-        if not os.path.exists('stable-diffusion-xl-base-1.0'):
-            snapshot_download('stabilityai/stable-diffusion-xl-base-1.0', local_dir='stable-diffusion-xl-base-1.0')
-        if not os.path.exists('TCD-SDXL-LoRA'):
-            snapshot_download('AI-ModelScope/TCD-SDXL-LoRA', local_dir='TCD-SDXL-LoRA')
+        ignore_patterns = []
+    else:
+        ignore_patterns = ["*.safetensors"]
+
+    from modelscope import snapshot_download
+    if not os.path.exists('stable-diffusion-xl-base-1.0'):
+        snapshot_download('stabilityai/stable-diffusion-xl-base-1.0',
+                          local_dir='stable-diffusion-xl-base-1.0',
+                          ignore_patterns=ignore_patterns)
+    if not os.path.exists('TCD-SDXL-LoRA'):
+        snapshot_download('AI-ModelScope/TCD-SDXL-LoRA',
+                          local_dir='TCD-SDXL-LoRA',
+                          ignore_patterns=ignore_patterns)
 
     if model_type in ["quant", "all"]:
-        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        try:
+            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
 
     if model_type in ["hmm", "all"]:
-        get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        try:
+            get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")

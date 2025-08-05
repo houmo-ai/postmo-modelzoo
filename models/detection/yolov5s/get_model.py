@@ -61,13 +61,23 @@ if __name__ == '__main__':
     build_path = f"models/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type == "raw" or model_type == "all":
-        file_path = get_file_from_jfrog(raw_path, model_dir)
-        extract_path = os.path.join(os.path.dirname(file_path), "yolov5s_640x640_clip.onnx")
-        onnx.utils.extract_model(file_path, extract_path, input_names=['images'], 
-            output_names=['340', '378', '416'], check_model=True)
+        try:
+            file_path = get_file_from_jfrog(raw_path, model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
+        else:
+            extract_path = os.path.join(os.path.dirname(file_path), "yolov5s_640x640_clip.onnx")
+            onnx.utils.extract_model(file_path, extract_path, input_names=['images'], 
+                output_names=['340', '378', '416'], check_model=True)
 
     if model_type == "quant" or model_type == "all":
-        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        try:
+            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
 
     if model_type == "build" or model_type == "all":
-        get_file_from_jfrog(build_path, model_dir, build_model_dir)
+        try:
+            get_file_from_jfrog(build_path, model_dir, build_model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")

@@ -2,12 +2,19 @@
     "obsolete": false,
     "model_dir": "models/detection/yolov5s",
     "support_platform": ["x86_64"],
+    "support_backend": ["xh1", "xh2"],
     "support_core_num": {
-        "xh1": [1]
+        "xh1": [1],
+        "xh2": null
     },
-    "support_backend": ["xh1"],
-    "support_flow": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"],
-    "support_hmassist": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"],
+    "support_flow": {
+        "xh1": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"],
+        "xh2": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"]
+    },
+    "support_hmassist": {
+        "xh1": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"],
+        "xh2": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
+    },
     "perf_metrics": {
         "xh1":{
             "x86_64": 1215.371
@@ -18,9 +25,16 @@
         "map50_95": 0.90
     },
     "get_model_params": {
-        "type": ["default", "raw", "quant", "all"],
-        "quant_model_dir": ["default", "", "./"],
-        "model_dir": ["default", "", "./"]
+        "xh1": {
+            "type": ["default", "raw", "quant", "all"],
+            "quant_model_dir": ["default", "", "./"],
+            "model_dir": ["default", "", "./"]
+        },
+        "xh2": {
+            "type": ["default", "raw", "all"],
+            "quant_model_dir": ["default", "", "./"],
+            "model_dir": ["default", "", "./"]
+        }
     },
     "quant_params": {
         "model_path": ["default", ""],

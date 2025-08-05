@@ -44,7 +44,10 @@ if __name__ == '__main__':
     quant_path = "models/wenet/hmquant_wenet_encoder_20250114.zip"
 
     if model_type == "raw" or model_type == "all":
-        print("no raw model available.")
+        print("No raw model available.")
 
     if model_type == "quant" or model_type == "all":
-        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        try:
+            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")

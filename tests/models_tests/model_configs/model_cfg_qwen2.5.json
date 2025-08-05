@@ -2,12 +2,15 @@
     "obsolete": false,
     "model_dir": "models/llm/qwen2.5",
     "support_platform": ["x86_64"],
+    "support_backend": ["xh1", "xh2"],
     "support_core_num": {
         "xh1": [4],
         "xh2": [2]
     },
-    "support_backend": ["xh1", "xh2"],
-    "support_flow": ["get_model", "compile", "demo", "perf"],
+    "support_flow": {
+        "xh1": ["get_model", "compile", "demo", "perf"],
+        "xh2": ["get_model", "compile", "demo", "perf"]
+    },
     "support_hmassist": null,
     "perf_metrics": {
         "xh1":{
@@ -20,9 +23,16 @@
     },
     "eval_threshold": null,
     "get_model_params": {
-        "type": ["default", "raw", "quant", "hmm", "all"],
-        "quant_model_dir": ["default", "", "./"],
-        "model_dir": ["default", "", "./"]
+        "xh1": {
+            "type": ["default", "raw", "quant", "hmm", "all"],
+            "quant_model_dir": ["default", "", "./"],
+            "model_dir": ["default", "", "./"]
+        },
+        "xh2": {
+            "type": ["default", "quant", "hmm", "all"],
+            "quant_model_dir": ["default", "", "./"],
+            "model_dir": ["default", "", "./"]
+        }
     },
     "quant_params": {
         "model": ["default"],

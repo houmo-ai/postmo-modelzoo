@@ -28,7 +28,7 @@
 
 1. 获取原始模型
 2. 根据模型json配置文件中的`hmquant_params`配置或`quant_params`配置，生成量化测试的所有测试参数。其中，`hmquant_params`配置用于hmatc，`quant_params`配置用于`ptq.py`脚本。
-3. 对原始模型进行量化得到量化模型 (优先使用`hmexec quant`，如模型不支持hmatc则使用`ptq.py`)
+3. 对原始模型进行量化得到量化模型 (优先使用`hmatc quant`，如模型不支持hmatc则使用`ptq.py`)
 4. 校验量化过程中是否存在`fail`字样，不存在且量化正常结束则认为量化测试通过。
 
 #### 2.1.3 compile
@@ -37,7 +37,7 @@
 
 1. 获取量化模型
 2. 根据模型json配置文件中的`hmbuild_params`配置或`compile_params`配置，生成编译测试的所有测试参数。其中，`hmbuild_params`配置用于hmatc，`compile_params`配置用于`build.py`脚本。
-3. 将量化模型编译为可在后摩设备执行的编译模型 (优先使用`hmexec build`，如模型不支持hmatc则使用`build.py`)
+3. 将量化模型编译为可在后摩设备执行的编译模型 (优先使用`hmatc build`，如模型不支持hmatc则使用`build.py`)
 4. 对编译模型进行golden结果校验，编译正常执行且golden结果校验通过，认为编译测试通过。
 
 #### 2.1.4 demo
@@ -46,7 +46,7 @@
 
 1. 获取编译后模型，如不支持则获取量化后模型进行编译
 2. 根据模型json配置文件中的`hmdemo_params`配置或`demo_params`配置，生成模型推理测试的所有测试参数。其中，`hmdemo_params`配置用于hmatc，`demo_params`配置用于`demo.py`脚本。
-3. 执行模型推理 (优先使用`hmexec demo`，如模型不支持hmatc则使用`demo.py`)
+3. 执行模型推理 (优先使用`hmatc demo`，如模型不支持hmatc则使用`demo.py`)
 4. 校验模型推理过程是否正常结束，正常结束则认为测试通过。
 
 #### 2.1.5 compare
@@ -55,7 +55,7 @@
 
 1. 获取量化后模型，通过hmatc进行编译
 2. 根据模型json配置文件中的`hmcompare_params`配置，生成模型结果正确性测试的所有测试参数。其中，`hmcompare_params`配置用于hmatc。
-3. 通过hmatc的`hmexec compare`命令，执行模型推理并验证结果正确性。
+3. 通过hmatc的`hmatc compare`命令，执行模型推理并验证结果正确性。
 4. 校验步骤3是否正常结束，正常结束则认为测试通过。
 
 #### 2.1.6 perf
@@ -64,7 +64,7 @@
 
 1. 获取编译后模型，如不支持则获取量化后模型进行编译
 2. 根据模型json配置文件中的`hmperf_params`配置或`perf_params`配置，生成模型性能测试的所有测试参数。其中，`hmperf_params`配置用于hmatc，`perf_params`配置用于`demo.py`脚本 (当前llm模型用例中均通过`demo.py`脚本执行并统计性能数据)。
-3. 执行模型性能测试 (优先使用`hmexec perf`，如模型不支持hmatc则使用`demo.py`)
+3. 执行模型性能测试 (优先使用`hmatc perf`，如模型不支持hmatc则使用`demo.py`)
 4. 获取模型性能测试的性能结果，读取模型配置文件中的`perf_metrics`参数获取benchmark性能数据，比较性能测试结果是否存在显著下降，若性能无显著下降且性能测试正式结束则认为性能测试通过。
 
 #### 2.1.7 eval
@@ -73,7 +73,7 @@
 
 1. 获取编译后模型，如不支持则获取量化后模型进行编译
 2. 根据模型json配置文件中的`hmeval_params`配置，生成模型精度测试的所有测试参数。其中，`hmeval_params`配置用于hmatc。
-3. 通过hmatc的`hmexec eval`命令，执行模型精度测试。
+3. 通过hmatc的`hmatc eval`命令，执行模型精度测试。
 4. 获取模型精度测试的map结果，读取模型配置文件中的`eval_threshold`参数获取精度阈值，比较`hm map >= (onnx map * threshold)`，若精度无显著下降且精度测试正式结束则认为精度测试通过。
 
 ### 2.2 测试文件说明
@@ -103,34 +103,37 @@
 "support_backend": ["xh1"],
 // (必需)get_model.py脚本中支持的hmm模型core数量: 1, 2, 4 ...
 "support_core_num": {
-    "xh1": [1],
-    "xh2": null
+    "xh1": [1]
 },
 // (必需)模型用例支持的测试类型:
 // "get_model": (必需)模型用例中包含get_model.py脚本
 // "quant": 符合下述任一情况即认为支持：
 //     1) 模型用例中包含ptq.py且可基于后摩设备量化。
-//     2) 模型用例支持hmatc的quant命令行: hmexec quant。
+//     2) 模型用例支持hmatc的quant命令行: hmatc quant。
 // "compile": 符合下述任一情况即认为支持：
 //     1) 模型用例中包含build.py可在linux x86_64成功编译量化后模型。
-//     2) 模型用例支持hmatc的build命令行: hmexec build。
+//     2) 模型用例支持hmatc的build命令行: hmatc build。
 // "demo": 符合下述任一情况即认为支持：
 //     1) 模型用例中包含demo.py可成功执行推理。
-//     2) 模型用例支持hmatc的demo命令行: hmexec demo。
+//     2) 模型用例支持hmatc的demo命令行: hmatc demo。
 // "compare": 模型用例支持hmatc的copmare命令行。
 // "perf": 符合下述任一情况即认为支持：
 //     1) 模型用例中包含demo.py且计算并打印了性能数据(prefill, decode, end2end)。
-//     2) 模型用例支持hmatc的perf命令行: hmexec perf。
+//     2) 模型用例支持hmatc的perf命令行: hmatc perf。
 // "eval": 模型用例支持hmatc的eval命令行。
-"support_flow": ["get_model", "quant", "compile", "demo", "perf", "compare", "eval"],
+"support_flow": {
+    "xh1": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"]
+},
 // (必需)模型用例支持的hmatc功能:
-// "hmquant": 模型用例支持hmatc量化: hmexec quant
-// "hmbuild": 模型用例支持hmatc编译: hmexec build
-// "hmdemo": 模型用例支持hmatc推理: hmexec demo
-// "hmcompare": 模型用例支持hmatc比较推理结果: hmexec compare
-// "hmeval": 模型用例支持hmatc评估精度: hmexec eval
-// "hmperf": 模型用例支持hmatc评估性能: hmexec perf
-"support_hmassist": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"],
+// "hmquant": 模型用例支持hmatc量化: hmatc quant
+// "hmbuild": 模型用例支持hmatc编译: hmatc build
+// "hmdemo": 模型用例支持hmatc推理: hmatc demo
+// "hmcompare": 模型用例支持hmatc比较推理结果: hmatc compare
+// "hmeval": 模型用例支持hmatc评估精度: hmatc eval
+// "hmperf": 模型用例支持hmatc评估性能: hmatc perf
+"support_hmassist": {
+    "xh1": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
+},
 // (可选)模型性能benchmark，用于性能测试。如果support_flow中支持perf，则此配置为必需。
 "perf_metrics": {
     "xh1":{
@@ -144,9 +147,11 @@
 },
 // (必需)get_model测试中，get_model.py脚本支持的入参及对应待测的参数。
 "get_model_params": {
-    "type": ["default", "raw", "quant", "all"],
-    "quant_model_dir": ["default", "", "./"],
-    "model_dir": ["default", "", "./"]
+    "xh1": {
+        "type": ["default", "raw", "quant", "all"],
+        "quant_model_dir": ["default", "", "./"],
+        "model_dir": ["default", "", "./"]
+    }
 },
 // (可选)quant测试中，如通过ptq.py脚本量化模型，则此配置为必需。
 // ptq.py脚本支持的入参及对应待测的参数。
@@ -181,7 +186,7 @@
 // (可选)perf测试中，如通过demo.py脚本评估模型性能，则此配置为必需，无需修改配置值。
 "perf_params": "demo"，
 // (可选)quant测试中，如通过hmatc quant命令行量化模型，则此配置为必需。
-// hmexec quant支持的入参及对应待测的参数。
+// hmatc quant支持的入参及对应待测的参数。
 "hmquant_params": {
     "params": {
         "required": {
@@ -194,7 +199,7 @@
     }
 },
 // (可选)compile测试中，如通过hmatc build命令行编译模型，则此配置为必需。
-// hmexec build支持的入参及对应待测的参数。
+// hmatc build支持的入参及对应待测的参数。
 "hmbuild_params": {
     "params": {
         "required": {
@@ -209,7 +214,7 @@
     }
 },
 // (可选)demo测试中，如通过hmatc demo命令行执行推理，则此配置为必需。
-// hmexec demo支持的入参及对应待测的参数。
+// hmatc demo支持的入参及对应待测的参数。
 "hmdemo_params": {
     "params": {
         "required": {
@@ -223,7 +228,7 @@
     }
 },
 // (可选)perf测试中，如通过hmatc perf命令行评估模型性能，则此配置为必需。
-// hmexec perf支持的入参及对应待测的参数。
+// hmatc perf支持的入参及对应待测的参数。
 "hmperf_params": {
     "params": {
         "required": {
@@ -241,7 +246,7 @@
     }
 },
 // (可选)如支持eval测试类型，则此配置为必需。
-// 用于eval测试中，hmexec eval支持的入参及对应待测的参数。
+// 用于eval测试中, hmatc eval支持的入参及对应待测的参数。
 "hmeval_params": {
     "params": {
         "required": {
@@ -255,7 +260,7 @@
     }
 },
 // (可选)如支持compare测试类型，则此配置为必需。
-// 用于compare测试中，hmexec compare支持的入参及对应待测的参数。
+// 用于compare测试中, hmatc compare支持的入参及对应待测的参数。
 "hmcompare_params": {
     "params": {
         "required": {

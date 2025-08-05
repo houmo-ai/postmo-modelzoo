@@ -64,8 +64,11 @@ if __name__ == '__main__':
     hmm_path_7b = "models/qwen2.5vl/hmm_xh1_qwen2.5vl_7b_256_2k_4cores_20250711.zip"
 
     if model_type in ["raw", "all"]:
-        get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
         ignore_patterns = []
+        try:
+            get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
     else:
         ignore_patterns = ["*.safetensors"]
 
@@ -77,14 +80,26 @@ if __name__ == '__main__':
 
     if model_type in ["quant", "all"]:
         if args.model_size == "3b":
-            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+            try:
+                get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+            except Exception as e:
+                print(f"Model doesn't exist, error msg: {e}")
         elif args.model_size == "7b":
-            get_file_from_jfrog(quant_path_7b, model_dir, quant_model_dir)
+            try:
+                get_file_from_jfrog(quant_path_7b, model_dir, quant_model_dir)
+            except Exception as e:
+                print(f"Model doesn't exist, error msg: {e}")
 
     if model_type in ["hmm", "all"]:
         if args.model_size == "3b":
-            get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+            try:
+                get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+            except Exception as e:
+                print(f"Model doesn't exist, error msg: {e}")
         elif args.model_size == "7b":
-            get_file_from_jfrog(hmm_path_7b, model_dir, os.path.join('output', HOUMO_TARGET))
+            try:
+                get_file_from_jfrog(hmm_path_7b, model_dir, os.path.join('output', HOUMO_TARGET))
+            except Exception as e:
+                print(f"Model doesn't exist, error msg: {e}")
 
     remove_hmquant_logo()

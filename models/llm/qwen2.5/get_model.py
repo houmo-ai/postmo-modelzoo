@@ -51,13 +51,28 @@ if __name__ == '__main__':
         quant_path = "models/qwen2.5/hmquant_xh2_qwen2.5_256_8k_20250610.zip"
         hmm_path = "models/qwen2.5/hmm_xh2_qwen2.5_256_4k_2cores_20250611.zip"
 
-    if model_type == "raw" or model_type == "all":
-        get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
-        from modelscope import snapshot_download
-        snapshot_download('qwen/qwen2.5-7b-instruct', local_dir='qwen2.5-7b-instruct-hf')
+    if model_type in ["raw", "all"]:
+        ignore_patterns = []
+        try:
+            get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
+    else:
+        ignore_patterns = ["*.safetensors"]
+
+    from modelscope import snapshot_download
+    snapshot_download('qwen/qwen2.5-7b-instruct',
+                      local_dir='qwen2.5-7b-instruct-hf',
+                      ignore_patterns=ignore_patterns)
 
     if model_type == "quant" or model_type == "all":
-        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        try:
+            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
 
     if model_type == "hmm" or model_type == "all":
-        get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        try:
+            get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")

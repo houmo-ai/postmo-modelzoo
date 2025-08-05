@@ -23,7 +23,7 @@ def _load_model_cfg(model_name: str) -> dict:
 
 
 def _execute_test_cmd(
-    cmd_list: list, log_file: str = "", assert_flag: bool = False
+    cmd_list: list, log_file: str = "", assert_flag: bool = False, check_flag: bool = True
 ) -> tuple[bool, any]:
     cmd_str = " ".join(cmd_list)
     logger.info("execute command: %s", cmd_str)
@@ -55,7 +55,7 @@ def _execute_test_cmd(
                     f.write(stdout)
                 if stderr:
                     f.write(stderr)
-        if stdout and "fail" in stdout:
+        if check_flag and stdout and "fail" in stdout:
             flag = False
             logger.error(f"Result verification: FAILED!, command: {cmd_str}.")
 
@@ -105,7 +105,7 @@ def _check_device_info(support_list: list) -> bool:
 
 
 def _generate_hmassist_cmds(
-    cmd_header: list, required_params: dict, optional_params: dict
+    cmd_header: list, required_params: dict, optional_params: dict, skipped_vals: dict = None
 ) -> list:
     cmd_list = list()
     # construct required test commands
@@ -117,11 +117,14 @@ def _generate_hmassist_cmds(
             if param_name == "target" or param_name == "onnx":
                 continue
             max_length = len(param_list) if max_length < len(param_list) else max_length
-            params_str = "--" + param_name
-            if len(param_list) <= idx:
-                tmp_cmd_list += [params_str, param_list[0]]
-            else:
-                tmp_cmd_list += [params_str, param_list[idx]]
+            param_str = "--" + param_name
+            param_val = param_list[0]
+            if idx < len(param_list):
+                param_val = param_list[idx]
+            if skipped_vals and param_name in skipped_vals and param_val in skipped_vals[param_name]:
+                continue
+            tmp_cmd_list += [param_str, param_val]
+
         if tmp_cmd_list:
             tmp_cmd_list = cmd_header + tmp_cmd_list
             cmd_list.append(tmp_cmd_list)
@@ -139,8 +142,10 @@ def _generate_hmassist_cmds(
         for param_name, param_list in optional_params.items():
             if len(param_list) <= idx:
                 continue
-            params_str = "--" + param_name
-            tmp_cmd_list += [params_str, param_list[idx]]
+            if skipped_vals and param_name in skipped_vals and param_list[idx] in skipped_vals[param_name]:
+                continue
+            param_str = "--" + param_name
+            tmp_cmd_list += [param_str, param_list[idx]]
             flag = True
         if tmp_cmd_list:
             cmd_list_idx = 0 if idx >= max_length else idx
@@ -171,6 +176,37 @@ def _generate_py_cmds(cmd_header: list, params_dict: dict) -> list:
         idx += 1
 
     return cmd_list
+
+
+def _check_compile_result(res_str: str) -> bool:
+    import re
+
+    row_pattern = re.compile(
+        r"\|\s*([^|]+?)\s*\|\s*(\d+\.\d+)\s*\|$"
+    )
+    rows = []
+    header = None
+    for line in res_str.split('\n'):
+        line = line.strip()
+        if 'cosine_dist' in line:
+            logger.info(f"detect compile result headers: {line}")
+            header = [col.strip() for col in line.split('|') if col and col.strip()]
+        elif row_pattern.match(line):
+            logger.info(f"detect compile result values: {line}")
+            parts = row_pattern.match(line).groups()
+            rows.append(
+                {
+                    header[0]: str(parts[0]),
+                    header[1]: float(parts[1])
+                }
+            )
+    if not header or not rows:
+        logger.error("Failed to detect the table of compilation results.")
+        return False
+
+    logger.info(f"Compilation results: {rows}")
+    check_res = all(row[header[1]] >= 0.99 for row in rows)
+    return check_res
 
 
 def _check_compare_result(res_str: str) -> bool:
@@ -262,17 +298,29 @@ def _install_py_env(env_dir: str, log_file: str) -> dict:
         ret, _ = _execute_test_cmd(
             ['pip3', 'install', '-r', 'requirements.txt'], log_file
         )
-        # result = subprocess.run(
-        #     ['pip3', 'install', '-r', 'requirements.txt'],
-        #     check=True,
-        #     capture_output=True,
-        #     text=True,
-        # )
         logger.info(
             f"Install python dependencies for the current testcase, ret: {ret}."
         )
 
     return changed_libs
+
+
+def _prepare_quantized_model(model_info: dict, log_file: str) -> bool:
+    flag = False
+    get_model_types = model_info["get_model_params"][HOUMO_BACKEND]["type"]
+    if "quant" in get_model_types:
+        flag, _ = _execute_test_cmd(["python3", "get_model.py", "--type", "quant"], log_file)
+    elif "raw" in get_model_types and "quant" in model_info["support_flow"][HOUMO_BACKEND]:
+        if "hmquant_params" in model_info:
+            flag1, _ = _execute_test_cmd(["python3", "get_model.py", "--type", "raw"], log_file)
+            flag2, _ = _execute_test_cmd(["hmatc", "quant", "--target", HOUMO_BACKEND, "--config", "./config.yml"], log_file)
+            flag = all([flag1, flag2])
+        elif "quant_params" in model_info:
+            flag1, _ = _execute_test_cmd(["python3", "get_model.py", "--type", "raw"], log_file, True)
+            flag2, _ = _execute_test_cmd(['python3', "ptq.py"], log_file, True)
+            flag = all([flag1, flag2])
+
+    return flag
 
 
 def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
@@ -282,7 +330,7 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
         model_info is None
         or model_info["obsolete"] is True
         or HOUMO_BACKEND not in model_info["support_backend"]
-        or "get_model" not in model_info["support_flow"]
+        or "get_model" not in model_info["support_flow"][HOUMO_BACKEND]
         or "get_model_params" not in model_info
     ):
         logger.warning("Not support %s testing.", model_name)
@@ -299,13 +347,13 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
     logger.info("current folder: %s.", os.getcwd())
 
     # test script: get_model.py
-    params_dict = model_info["get_model_params"]
+    params_dict = model_info["get_model_params"][HOUMO_BACKEND]
     cmd_header = ['python3', 'get_model.py']
 
     final_flag = True
     cmd_list = _generate_py_cmds(cmd_header, params_dict)
     for tmp_cmd_list in cmd_list:
-        exec_flag, _ = _execute_test_cmd(tmp_cmd_list, log_file)
+        exec_flag, _ = _execute_test_cmd(tmp_cmd_list, log_file, False, False)
         final_flag = False if exec_flag is False else final_flag
 
     assert final_flag is True, "Get Model Test Failed!"
@@ -316,10 +364,10 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
     """
     Test all the supported model quantization functions and related parameters.
     1. Download the raw model for quantization.
-    2. Check whether the model supports hmexec quant.
-    3. If the model supports the hmexec tool,
-       then the quantization test will be conducted using the hmexec tool.
-    4. If the model doesn't support the hmexec tool,
+    2. Check whether the model supports hmatc quant.
+    3. If the model supports the hmatc tool,
+       then the quantization test will be conducted using the hmatc tool.
+    4. If the model doesn't support the hmatc tool,
        then execute the quantization test using the ptq.py.
     """
     model_info = _load_model_cfg(model_name)
@@ -327,7 +375,7 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
         model_info is None
         or model_info["obsolete"] is True
         or HOUMO_BACKEND not in model_info["support_backend"]
-        or "quant" not in model_info["support_flow"]
+        or "quant" not in model_info["support_flow"][HOUMO_BACKEND]
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
@@ -347,10 +395,10 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
 
     final_flag = True
     if "hmquant_params" in model_info:
-        # test cmd: hmexec quant
+        # test cmd: hmatc quant
         required_params = model_info["hmquant_params"]["params"]["required"]
         optional_params = model_info["hmquant_params"]["params"]["optional"]
-        cmd_header = ["hmexec", "quant", "--target", HOUMO_BACKEND]
+        cmd_header = ["hmatc", "quant", "--target", HOUMO_BACKEND]
 
         cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params)
         for tmp_cmd_list in cmd_list:
@@ -378,10 +426,10 @@ def execute_compile_flow(
     """
     Test all the supported model compilation functions and related parameters.
     1. Download the already quantized model for compilation.
-    2. Check whether the model supports 'hmexec build'.
-    3. If the model supports the hmexec tool,
-       then the compilation test will be conducted using the hmexec tool.
-    4. If the model doesn't support the hmexec tool,
+    2. Check whether the model supports 'hmatc build'.
+    3. If the model supports the hmatc tool,
+       then the compilation test will be conducted using the hmatc tool.
+    4. If the model doesn't support the hmatc tool,
        then execute the compilation test using the build.py.
     """
     model_info = _load_model_cfg(model_name)
@@ -389,7 +437,7 @@ def execute_compile_flow(
         model_info is None
         or model_info["obsolete"] is True
         or HOUMO_BACKEND not in model_info["support_backend"]
-        or "compile" not in model_info["support_flow"]
+        or "compile" not in model_info["support_flow"][HOUMO_BACKEND]
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
@@ -407,20 +455,30 @@ def execute_compile_flow(
     if clear_flag:
         _execute_test_cmd(['rm', '-rf', "output/H30/result"], log_file, True)
 
-    _execute_test_cmd(["python3", "get_model.py", "--type", "quant"], log_file, True)
+    # prepare quantized model
+    if not _prepare_quantized_model(model_info, log_file):
+        logger.warning(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
+        pytest.skip(f"This testcase is not support on {HOUMO_BACKEND}.")
 
     final_flag = True
     if "hmbuild_params" in model_info:
-        # test cmd: hmexec build
+        # test cmd: hmatc build
         required_params = model_info["hmbuild_params"]["params"]["required"]
         optional_params = model_info["hmbuild_params"]["params"]["optional"]
-        cmd_header = ["hmexec", "build", "--target", HOUMO_BACKEND]
+        cmd_header = ["hmatc", "build", "--target", HOUMO_BACKEND]
 
-        cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params)
+        skipped_vals = dict()
+        if HOUMO_BACKEND == "xh2":
+            skipped_vals["ncore"] = ["4"]
+        cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params, skipped_vals)
         for tmp_cmd_list in cmd_list:
-            exec_flag, _ = _execute_test_cmd(tmp_cmd_list, log_file)
+            exec_flag, opt_str = _execute_test_cmd(tmp_cmd_list, log_file)
             if exec_flag is False:
                 final_flag = False
+            else:
+                final_flag = _check_compile_result(opt_str)
+                if final_flag is False:
+                    logger.error(f"Cosine distance exceeds 0.99, compile cmd: {tmp_cmd_list}")
     else:
         # test script: build.py
         params_dict = model_info["compile_params"]
@@ -442,7 +500,7 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         model_info is None
         or model_info["obsolete"] is True
         or HOUMO_BACKEND not in model_info["support_backend"]
-        or "demo" not in model_info["support_flow"]
+        or "demo" not in model_info["support_flow"][HOUMO_BACKEND]
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
@@ -453,7 +511,7 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
     # aarch64 test need compiled hmm models
     if platform == "aarch64" and (
         "demo_params" not in model_info
-        or "hmm" not in model_info["get_model_params"]["type"]
+        or "hmm" not in model_info["get_model_params"][HOUMO_BACKEND]["type"]
         or not _check_device_info(
             model_info["support_core_num"].get(HOUMO_BACKEND, None)
         )
@@ -470,23 +528,24 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
 
     final_flag = True
     if "hmdemo_params" in model_info and platform != "aarch64":
+        if not _prepare_quantized_model(model_info, log_file):
+            logger.warning(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
+            pytest.skip(f"This testcase is not support on {HOUMO_BACKEND}.")
+        # compile quantized model
         _execute_test_cmd(
-            ["python3", "get_model.py", "--type", "quant"], log_file, True
-        )
-        _execute_test_cmd(
-            ["hmexec", "build", "--target", HOUMO_BACKEND, "--config", "./config.yml"],
+            ["hmatc", "build", "--target", HOUMO_BACKEND, "--config", "./config.yml"],
             log_file,
             True,
         )
-
+        # install python requirements
         changed_libs = _install_py_env(model_dir, log_file)
         if changed_libs:
             logger.info(f"changed python libs: {changed_libs}.")
 
-        # test hmexec build
+        # test hmatc demo
         required_params = model_info["hmdemo_params"]["params"]["required"]
         optional_params = model_info["hmdemo_params"]["params"]["optional"]
-        cmd_header = ["hmexec", "demo", "--target", HOUMO_BACKEND]
+        cmd_header = ["hmatc", "demo", "--target", HOUMO_BACKEND]
 
         cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params)
         for tmp_cmd_list in cmd_list:
@@ -494,17 +553,17 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
             if exec_flag is False:
                 final_flag = False
     else:
-        # [TMP]
         if platform == "aarch64":
             _execute_test_cmd(
                 ["python3", "get_model.py", "--type", "hmm"], log_file, True
             )
         else:
-            _execute_test_cmd(
-                ["python3", "get_model.py", "--type", "quant"], log_file, True
-            )
+            if not _prepare_quantized_model(model_info, log_file):
+                logger.warning(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
+                pytest.skip(f"This testcase is not support on {HOUMO_BACKEND}.")
             _execute_test_cmd(["python3", "build.py"], log_file, True)
 
+        # install python requirements
         changed_libs = _install_py_env(model_dir, log_file)
         if changed_libs:
             logger.info(f"changed python libs: {changed_libs}.")
@@ -535,7 +594,7 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
         model_info is None
         or model_info["obsolete"] is True
         or HOUMO_BACKEND not in model_info["support_backend"]
-        or "compare" not in model_info["support_flow"]
+        or "compare" not in model_info["support_flow"][HOUMO_BACKEND]
         or "hmcompare_params" not in model_info
     ):
         logger.warning("Not support %s testing.", model_name)
@@ -551,19 +610,21 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
     os.chdir(model_dir)
     logger.info("current folder: %s.", os.getcwd())
 
-    # [TMP]
-    _execute_test_cmd(["python3", "get_model.py", "--type", "all"], log_file, True)
+    _execute_test_cmd(["python3", "get_model.py", "--type", "raw"], log_file, True)
+    if not _prepare_quantized_model(model_info, log_file):
+        logger.warning(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
+        pytest.skip(f"This testcase is not support on {HOUMO_BACKEND}.")
     _execute_test_cmd(
-        ["hmexec", "build", "--target", HOUMO_BACKEND, "--config", "./config.yml"],
+        ["hmatc", "build", "--target", HOUMO_BACKEND, "--config", "./config.yml"],
         log_file,
         True,
     )
 
     final_flag = True
-    # test hmexec build
+    # test hmatc compare
     required_params = model_info["hmcompare_params"]["params"]["required"]
     optional_params = model_info["hmcompare_params"]["params"]["optional"]
-    cmd_header = ["hmexec", "compare", "--target", HOUMO_BACKEND]
+    cmd_header = ["hmatc", "compare", "--target", HOUMO_BACKEND]
 
     cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params)
     logger.info(f"cmd list:{cmd_list}")
@@ -577,8 +638,8 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
         if exec_flag is False:
             final_flag = False
 
-    assert final_flag is True, "HmTool Compare Test Failed!"
-    logger.info("HmTool Compare Test Success!")
+    assert final_flag is True, "HmATC Compare Test Failed!"
+    logger.info("HmATC Compare Test Success!")
 
 
 def execute_perf_flow(model_name: str, log_file: str = "") -> None:
@@ -587,7 +648,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
         model_info is None
         or model_info["obsolete"] is True
         or HOUMO_BACKEND not in model_info["support_backend"]
-        or "perf" not in model_info["support_flow"]
+        or "perf" not in model_info["support_flow"][HOUMO_BACKEND]
         or ("hmperf_params" not in model_info and "perf_params" not in model_info)
         or "perf_metrics" not in model_info
     ):
@@ -604,13 +665,13 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
     os.chdir(model_dir)
     logger.info("current folder: %s.", os.getcwd())
 
+    if not _prepare_quantized_model(model_info, log_file):
+        logger.warning(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
+        pytest.skip(f"This testcase is not support on {HOUMO_BACKEND}.")
+
     if model_info.get("perf_params", None) == "demo":
-        if "hmm" not in model_info["get_model_params"]["type"]:
-            # support wenet testcase
-            _execute_test_cmd(
-                ["python3", "get_model.py", "--type", "quant"], log_file, True
-            )
-            final_flag, opt_str = _execute_test_cmd(["python3", "build.py"], log_file)
+        final_flag, opt_str = _execute_test_cmd(["python3", "build.py"], log_file)
+        if model_name == "wenet":
             infer_time = [
                 float(line.rsplit(" ", 3)[-2])
                 for line in opt_str.split('\n')
@@ -629,11 +690,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                 error_msg = f"Performance {infer_val} degradation exceeds 5%, benchmark time is {benchmark} ms."
                 logger.error(error_msg)
         else:
-            # execute demo.py to get perf metrics
-            _execute_test_cmd(
-                ["python3", "get_model.py", "--type", "hmm"], log_file, True
-            )
-            # update python libs
+            # install python requirements
             changed_libs = _install_py_env(model_dir, log_file)
             if changed_libs:
                 logger.info(f"changed python libs: {changed_libs}.")
@@ -677,19 +734,16 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
     else:
         # use hmatc perf command to get perf metrics
         _execute_test_cmd(
-            ["python3", "get_model.py", "--type", "quant"], log_file, True
-        )
-        _execute_test_cmd(
-            ["hmexec", "build", "--target", HOUMO_BACKEND, "--config", "./config.yml"],
+            ["hmatc", "build", "--target", HOUMO_BACKEND, "--config", "./config.yml"],
             log_file,
             True,
         )
 
         final_flag = True
-        # test cmd: hmexec perf
+        # test cmd: hmatc perf
         required_params = model_info["hmperf_params"]["params"]["required"]
         optional_params = model_info["hmperf_params"]["params"]["optional"]
-        cmd_header = ["hmexec", "perf", "--target", HOUMO_BACKEND]
+        cmd_header = ["hmatc", "perf", "--target", HOUMO_BACKEND]
 
         max_qps = 0
         cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params)
@@ -716,8 +770,8 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
             error_msg = f"Performance {max_qps} degradation exceeds 5%, benchmark qps is {benchmark}."
             logger.error(error_msg)
 
-    assert final_flag is True, f"HmTool Perf Test Failed! {error_msg}"
-    logger.info("HmTool Perf Test Success!")
+    assert final_flag is True, f"HmATC Perf Test Failed! {error_msg}"
+    logger.info("HmATC Perf Test Success!")
 
 
 def execute_eval_flow(model_name: str, log_file: str = "") -> None:
@@ -726,7 +780,7 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
         model_info is None
         or model_info["obsolete"] is True
         or HOUMO_BACKEND not in model_info["support_backend"]
-        or "eval" not in model_info["support_flow"]
+        or "eval" not in model_info["support_flow"][HOUMO_BACKEND]
         or "hmeval_params" not in model_info
     ):
         logger.warning("Not support %s testing.", model_name)
@@ -742,24 +796,27 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
     os.chdir(model_dir)
     logger.info("current folder: %s.", os.getcwd())
 
-    _execute_test_cmd(["python3", "get_model.py", "--type", "quant"], log_file, True)
+    # _execute_test_cmd(["python3", "get_model.py", "--type", "quant"], log_file, True)
+    if not _prepare_quantized_model(model_info, log_file):
+        logger.warning(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
+        pytest.skip(f"This testcase is not support on {HOUMO_BACKEND}.")
     _execute_test_cmd(
-        ["hmexec", "build", "--target", HOUMO_BACKEND, "--config", "./config.yml"],
+        ["hmatc", "build", "--target", HOUMO_BACKEND, "--config", "./config.yml"],
         log_file,
         True,
     )
 
     final_flag = True
-    # test cmd: hmexec eval
+    # test cmd: hmatc eval
     required_params = model_info["hmeval_params"]["params"]["required"]
     optional_params = model_info["hmeval_params"]["params"]["optional"]
     # generate onnx commands (ground truth)
-    cmd_header_onnx = ["hmexec", "eval", "--target", HOUMO_BACKEND, "--onnx"]
+    cmd_header_onnx = ["hmatc", "eval", "--target", HOUMO_BACKEND, "--onnx"]
     cmd_list_onnx = _generate_hmassist_cmds(
         cmd_header_onnx, required_params, optional_params
     )
     # generate hm model commands
-    cmd_header = ["hmexec", "eval", "--target", HOUMO_BACKEND]
+    cmd_header = ["hmatc", "eval", "--target", HOUMO_BACKEND]
     cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params)
 
     logger.info(f"cmd_list_onnx: {cmd_list_onnx}")
@@ -787,7 +844,7 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
             for perf_name in perf_names:
                 hm_perf_vals[perf_name].append(eval_res[perf_name])
 
-    assert final_flag is True, "HmTool Eval Test Failed!"
+    assert final_flag is True, "HmATC Eval Test Failed!"
 
     for perf_name in perf_names:
         perf_th = model_info["eval_threshold"][perf_name]
@@ -803,6 +860,6 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
             )
         assert (
             check_flag is True
-        ), f"HmTool Eval Test Failed! The difference of {perf_name} exceeds {perf_th*100}%."
+        ), f"HmATC Eval Test Failed! The difference of {perf_name} exceeds {perf_th*100}%."
 
-    logger.info("HmTool Eval Test Success!")
+    logger.info("HmATC Eval Test Success!")

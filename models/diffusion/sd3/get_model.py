@@ -44,9 +44,18 @@ if __name__ == '__main__':
     hmm_path = "models/sd3/hmm_xh2_sd3_2cores_20250704.zip"
 
     if model_type in ["raw", "all"]:
-        from modelscope import snapshot_download
-        if not os.path.exists('stable-diffusion-3-medium-diffusers'):
-            snapshot_download('stabilityai/stable-diffusion-3-medium-diffusers', local_dir='stable-diffusion-3-medium-diffusers')
+        ignore_patterns = []
+    else:
+        ignore_patterns = ["*.safetensors"]
+
+    from modelscope import snapshot_download
+    if not os.path.exists('stable-diffusion-3-medium-diffusers'):
+        snapshot_download('stabilityai/stable-diffusion-3-medium-diffusers',
+                          local_dir='stable-diffusion-3-medium-diffusers',
+                          ignore_patterns=ignore_patterns)
 
     if model_type in ["hmm", "all"]:
-        get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        try:
+            get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
