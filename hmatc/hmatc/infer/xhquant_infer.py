@@ -42,9 +42,9 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         outputs = self.engine.run(in_datas) 
         self.time_span += (time.time() - t_start) * 1000
         if len(self.output_names) == 1:
-            outputs = {self.output_names[0]: outputs.detach().cpu().numpy()}
+            outputs = {self.output_names[0]: outputs.detach().cpu().numpy().astype(np.float32)}
             return outputs
-        return {output_name: outputs[idx].detach().cpu().numpy() for idx, output_name in enumerate(self.output_names)}
+        return {output_name: outputs[idx].detach().cpu().numpy().astype(np.float32) for idx, output_name in enumerate(self.output_names)}
 
     def unload(self):
         pass

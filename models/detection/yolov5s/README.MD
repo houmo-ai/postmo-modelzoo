@@ -19,63 +19,72 @@ yolo export model=yolov5s.pt format=onnx imgsz=640,640 opset=11
 
 ## 2.快速开始
 
-可以通过perf.sh和eval.sh脚本一键执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
+可以通过hmatc工具执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
 
 ### 2.1 精度评估
 
+### 2.1 量化
+
 ```bash
-bash eval.sh
+hmatc quant -c config.yml -t xh1       # 芯片
+```
+
+### 2.2 编译
+
+```bash
+hmatc build -c config.yml -t xh1       # 芯片
+```
+
+### 2.3 精度评估
+
+```bash
+hmatc eval -c config.yml -t xh1          # 芯片
+hmatc eval -c config.yml -t xh1  --onnx  # onnx
 ```
 
 执行完成后会打印模型的数据集精度信息。
 
-### 2.2 性能评估
+### 2.4 性能评估
 
 ```bash
-bash perf.sh
+hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
 
-### 2.3 结果演示
+### 2.5 结果演示
 
-本示例依赖hmassist演示结果，在编译完成的基础上执行：
+本示例依赖hmatc演示结果，在编译完成的基础上执行：
 
 ```bash
-hmdemo.sh
+# xh1
+hmatc demo -c config.yml -t xh1
+# onnx
+hmatc demo -c config.yml -t xh1 --onnx
 ```
 
-执行完成后会打印模型的检测结果信息，图片结果将保存在demo_results目录。
+执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh1/vis_onnx目录。
 
 ## 3.参考结果
 
 ### 3.1 精度结果
 
 ```bash
-{'input_size': '1x3x640x640', 'dataset': 'coco2017', 'num': 5000, 'map': '0.469', 'map50': '0.674', 'latency': '6.958'}
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.469
- Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.674
- Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.517
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.322
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.573
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.634
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.379
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.534
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.542
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.359
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.635
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.676
+# xh1
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.453027', 'map50': '0.674942', 'latency': '12.775548'
+# onnx
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.488072', 'map50': '0.680723', 'latency': '34.872219'
 ```
 
 ### 3.2 性能结果
 
 ```bash
-[latency] Inference 	avg:   3.128 ms,	max:   3.594 ms
-[latency] Input 	avg:   0.380 ms,	max:   0.713 ms
-[latency] Output 	avg:   3.425 ms,	max:   5.555 ms
-[latency] End2End 	avg:   6.934 ms,	max:   9.826 ms
-[Throughput] total: 6937.970 ms, avg: 6.938 ms
-[Throughput] qps: 144.134
+[latency] Inference     avg:  17.110 ms,        max:  19.207 ms
+[latency] Input         avg:   1.280 ms,        max:   2.774 ms
+[latency] Output        avg:   0.000 ms,        max:   0.000 ms
+[latency] End2End       avg:  18.391 ms,        max:  21.662 ms
+[Throughput] total: 2308.951 ms, avg: 2.309 ms
+[Throughput] qps: 433.097
 ```
 
 ## 4.免责声明

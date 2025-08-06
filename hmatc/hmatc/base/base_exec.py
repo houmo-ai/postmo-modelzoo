@@ -78,7 +78,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             input_cfg = self.inputs_cfg[name]
             self.custom_msg[name] = dict(
                 shape=input_cfg["shape"],
-                resizer_mode=self.resizer_mode
+                resizer_mode=self.resizer_mode,
+                input_cfg=input_cfg
             )
         self.roi_num = 1
         self.onnx_inputs_info, self.onnx_outputs_info = get_onnx_inputs_info(self.model_path)

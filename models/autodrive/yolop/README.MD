@@ -12,45 +12,54 @@
 
 ## 2.快速开始
 
-可以通过perf.sh和eval.sh脚本一键执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
+可以通过hmatc工具一键执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
 
-### 2.1 性能评估
+### 2.1 量化
 
 ```bash
-bash perf.sh
+hmatc quant -c config.yml -t xh1       # 芯片
 ```
 
-执行完成后会打印模型推理延迟、吞吐量等信息。
-
-#### 2.2 精度评估
+### 2.2 编译
 
 ```bash
-bash eval.sh
+hmatc build -c config.yml -t xh1       # 芯片
 ```
 
 执行完成后会打印模型的数据集精度信息。
 
-#### 2.3 结果演示
-
-本示例依赖hmassist演示结果，在编译完成的基础上执行：
+### 2.3 性能评估
 
 ```bash
-hmdemo.sh
+hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
 ```
 
-执行完成后会打印模型的检测结果信息，图片结果将保存在demo_results目录。
+执行完成后会打印模型推理延迟、吞吐量等信息。
+
+### 2.4 结果演示
+
+本示例依赖hmatc演示结果，在编译完成的基础上执行：
+
+```bash
+# xh1
+hmatc demo -c config.yml -t xh1
+# onnx
+hmatc demo -c config.yml -t xh1 --onnx
+```
+
+执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh1/vis_onnx目录。
 
 ## 3.参考结果
 
 ### 3.1 性能结果
 
 ```bash
-[latency] Inference 	avg:  10.181 ms,	max:  10.543 ms
-[latency] Input 	avg:   0.542 ms,	max:   0.966 ms
-[latency] Output 	avg:   2.168 ms,	max:   2.930 ms
-[latency] End2End 	avg:  12.893 ms,	max:  14.012 ms
-[Throughput] total: 1290.311 ms, avg: 12.903 ms
-[Throughput] qps: 77.501
+[latency] Inference     avg:  16.789 ms,        max:  18.061 ms
+[latency] Input         avg:   0.738 ms,        max:   2.871 ms
+[latency] Output        avg:   0.000 ms,        max:   0.008 ms
+[latency] End2End       avg:  17.528 ms,        max:  20.895 ms
+[Throughput] total: 2200.308 ms, avg: 2.200 ms
+[Throughput] qps: 454.482
 ```
 
 ## 4.免责声明

@@ -5,9 +5,11 @@ import time
 import torch
 import numpy as np
 from datetime import datetime
+from importlib.metadata import version, PackageNotFoundError
 from prettytable import PrettyTable
 from ..utils import logger
-from ..utils.utils import get_md5, SUPPORT_IMAGE_FORMATS, load_npz, str_to_torch_dtype
+from ..utils.utils import get_md5, SUPPORT_IMAGE_FORMATS, load_npz, str_to_torch_dtype, get_file_md5, \
+    compress_folder_to_tar_xz_with_progress, compress_file_to_tar_xz_with_progress
 from ..utils.preprocess import default_preprocess 
 from ..utils.dist_metrics import cosine_distance
 from ..base.base_exec import BaseExec
@@ -16,12 +18,21 @@ from ..infer.onnx_infer import OnnxInfer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
 
 
+def get_hmquant_version():
+    """获取hmquant版本"""
+    try:
+        v = version("hmquant_xh2")  # 替换成你想查的包名
+        return v
+    except PackageNotFoundError:
+        return "hmquant_xh2 not installed"
+    
+    
 class Xh2Exec(BaseExec):
     def __init__(self, cfg: dict) -> None:
         super().__init__(cfg)
         self.quant_type = "w8a8h1_sefp"
         self.hmm_batch = self.build_batch * self.model_input_batch
-        self.hmm_name = f"{self.model_name}_xh2_b{self.hmm_batch}_{self.build_ncore}ncore_{self.build_opt_level}"
+        self.hmm_name = f"{self.model_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}"
         self.hmm_save_dir = os.path.join(self.save_dir, "xh2")
         if not os.path.exists(self.hmm_save_dir):
             os.makedirs(self.hmm_save_dir)
@@ -29,7 +40,7 @@ class Xh2Exec(BaseExec):
         self.quant_output_dir = os.path.join(self.save_dir, "xh2", "hmquant")
         self.build_output_dir = os.path.join(self.save_dir, "xh2", "tcim")
         self.hmonnx_name = f"{self.model_name}_xh2_{self.quant_type}"
-        self.quant_onnx_model_path = os.path.join(self.save_dir, "xh2", f"{self.hmonnx_name}.onnx")
+        self.quant_onnx_model_path = os.path.join(self.quant_output_dir, f"{self.hmonnx_name}.onnx")
         self.golden_dir = os.path.join(self.quant_output_dir, "golden")
         self.quant_advance_cfg = self.quant_cfg.get("config", dict())
         self.upgrade_opset_version()
@@ -113,6 +124,14 @@ class Xh2Exec(BaseExec):
         for idx, in_data in enumerate(in_datas):
             in_datas[idx] = in_data.half().to(self.device)
         session(*in_datas)   # 
+        # 压缩量化产物
+        compress = os.environ.get("HMATC_COMPRESS", "0")
+        if compress == "1":
+            logger.info("Compressing quant output...")
+            compress_quant_output_path = os.path.join(self.save_dir, "xh2", f"hmquant_{self.model_dir_name}_xh2_v{get_hmquant_version()}.tar.xz")
+            compress_folder_to_tar_xz_with_progress(self.quant_output_dir, compress_quant_output_path)
+            logger.info(f"MD5: {get_file_md5(compress_quant_output_path)}, save path: {compress_quant_output_path}")
+            logger.info(f"Compressing quant output done.")
         span = time.time() - t_start
         res = dict()
         res["time"] = span
@@ -139,6 +158,16 @@ class Xh2Exec(BaseExec):
             # custom_msg=self.custom_msg,
         )
         span = time.time() - t_start
+        # 压缩编译后产物
+        compress = os.environ.get("HMATC_COMPRESS", "0")
+        if compress == "1":
+            logger.info("Compressing hmmodel...")
+            compress_hmm_path = os.path.join(
+                self.save_dir, "xh2", 
+                f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{get_hmquant_version()}.tar.xz")
+            compress_file_to_tar_xz_with_progress(self.hmm_path, compress_hmm_path)
+            logger.info(f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}")
+            logger.info(f"Compressing hmmodel done.")
         res_info = {"build": {"time": span}}
         return res_info
     
@@ -178,6 +207,7 @@ class Xh2Exec(BaseExec):
                 "golden_md5": golden_output_md5,
                 "cosine_dist": float(dist),
             }
+        logger.warning("The quantized model currently produces incorrect inference results on the CPU, making the output data unreliable for comparison.")
         logger.info(f"Check golden...\n{table}")
         return res_info
        
@@ -276,5 +306,6 @@ class Xh2Exec(BaseExec):
                 "onnx_vs_xh2": float(onnx_vs_xh1),
                 "hmquant_vs_xh2": float(hmquant_vs_xh1),
             }
+        logger.warning("The quantized model currently produces incorrect inference results on the CPU, making the output data unreliable for comparison.")
         logger.info(f"\n{table}")
         return res_info
