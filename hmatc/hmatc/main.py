@@ -44,6 +44,7 @@ def main():
     build_parser.add_argument("--batch", type=int, required=False, default=1, help="Specify a build batch")
     build_parser.add_argument("--ncore", type=int, required=False, choices=(1, 2, 4), help="Specify a ncore, ")
     build_parser.add_argument("--opt_level", type=int, required=False, choices=(0, 1, 2), help="Specify a opt_level")
+    build_parser.add_argument("--roi_num", type=int, required=False, default=1, help="Specify a roi_num")
     # compare
     compare_parser = subparsers.add_parser("compare", parents=[parent_parser0, parent_parser1, parent_parser3], help="Compare onnx/hmquant/chip")
     compare_parser.add_argument("--data_path", "-d", type=str, required=True, help="Specify a data path, image or npz")
@@ -94,8 +95,17 @@ def main():
         batch = args.batch
         if batch < 1:
             logger.error("Batch must be greater than 0")
-            exit(1)
-        cfg["build"]["batch"] = batch
+            exit(-1)
+        if batch > 1:
+            cfg["build"]["batch"] = batch
+        roi_num = args.roi_num
+        if batch > 1 and roi_num != 1:
+            logger.error("batch > 1, roi_num must be == 1")
+            exit(-1)
+        if batch == 1 and roi_num < 1:
+            logger.error("batch == 1, roi_num must be >= 1")
+            exit(-1)
+        cfg["build"]["roi_num"] = roi_num
         ncore = args.ncore
         opt_level = args.opt_level
         if opt_level is not None:

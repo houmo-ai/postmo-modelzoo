@@ -74,11 +74,11 @@ API示例列表如下，type列为示例类型，其中convert表示模型转换
 
 | models               | path                            | type      | target  | quant | build | demo | eval |
 | -------------------- | ------------------------------- | --------- | ------- | ----- | ----- | ---- | ---- |
-| resnet50             | models/backbone/resnet50        | backbone  | xh1     | yes   | yes   | yes  | yes  |
-| mobilenetv2          | models/backbone/mobilenet_v2    | backbone  | xh1     | yes   | yes   | yes  | yes  |
+| resnet50             | models/backbone/resnet50        | backbone  | xh1/xh2 | yes   | yes   | yes  | yes  |
+| mobilenetv2          | models/backbone/mobilenet_v2    | backbone  | xh1/xh2 | yes   | yes   | yes  | yes  |
 | efficientnet         | models/backbone/efficientnet    | backbone  | xh1     | yes   | yes   | yes  | yes  |
-| yolov8m              | models/detection/yolov8m        | detection | xh1     | yes   | yes   | yes  | yes  |
-| yolov5s              | models/detection/yolov5s        | detection | xh1     | yes   | yes   | yes  | yes  |
+| yolov8m              | models/detection/yolov8m        | detection | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolov5s              | models/detection/yolov5s        | detection | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov3               | models/detection/yolov3         | detection | xh1     | yes   | yes   | yes  | yes  |
 | yolop                | models/autodrive/yolop          | autodrive | xh1     | yes   | yes   | yes  | x    |
 | wenet                | models/asr/wenet                | asr       | xh1     | x     | yes   | yes  | x    |

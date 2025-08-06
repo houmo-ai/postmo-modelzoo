@@ -3,6 +3,7 @@
 # houmo-tcim-runtime-xh1
 opencv-python-headless
 numpy
+prettytable
 onnx
 onnxruntime
 pycocotools
