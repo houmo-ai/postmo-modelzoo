@@ -12,9 +12,16 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        '--model_dir',
+        dest='model_dir',
+        type=str,
+        default='',
+        help='where to save downloaded model',
+    )
+    parser.add_argument(
         '--enable_ort',
         action="store_true",
-        help="install onnxruntime environment to support post-processing model inference."
+        help="install onnxruntime environment to support post-processing model inference.",
     )
     args = parser.parse_args()
     return args
@@ -25,11 +32,7 @@ def execute_cmd(cmd, shell=False):
 
     try:
         result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-            shell=shell
+            cmd, capture_output=True, text=True, check=True, shell=shell
         )
         return result.stdout
     except Exception as e:
@@ -56,9 +59,16 @@ def install_ort_env(third_party_dir, ort_pkg_name):
 if __name__ == '__main__':
     args = get_args()
     if "HOUMO_MODELZOO_URL" not in os.environ:
-        os.environ["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
+        os.environ["HOUMO_MODELZOO_URL"] = (
+            "http://139.224.0.199:8082/artifactory/houmo/release"
+        )
     HOUMO_TARGET = os.environ.get('HOUMO_TARGET', 'houmo')
-    model_dir = os.path.join(HOUMO_EXAMPLES_PATH, "models")
+
+    model_dir = (
+        os.path.join(HOUMO_EXAMPLES_PATH, "models")
+        if not args.model_dir
+        else args.model_dir
+    )
     if HOUMO_TARGET == "xh1":
         hmm_path = "models/yolov5s/hmm_yolov5s_20250113.zip"
     elif HOUMO_TARGET == "xh2":
@@ -77,7 +87,9 @@ if __name__ == '__main__':
         elif platform_name == "aarch64":
             ort_env_str = "aarch64"
         else:
-            print(f"Current platform is {platform_name} and does not support onnxruntime c++ env.")
+            print(
+                f"Current platform is {platform_name} and does not support onnxruntime c++ env."
+            )
             exit(0)
 
         third_party_dir = os.path.join(model_dir, "3rdparty")
@@ -85,5 +97,5 @@ if __name__ == '__main__':
         ort_pkg_path = "models/3rdparty/" + ort_pkg_name + ".tgz"
         get_file_from_jfrog(ort_pkg_path, third_party_dir, third_party_dir)
 
-        if not os.path.exists(third_party_dir+"/onnxruntime"):
+        if not os.path.exists(third_party_dir + "/onnxruntime"):
             install_ort_env(third_party_dir, ort_pkg_name)

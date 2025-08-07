@@ -10,6 +10,14 @@ os.environ["HOUMO_MODELZOO_URL"] = (
     "http://10.10.1.53:8082/artifactory/toolchain/release"
 )
 os.environ["HOUMO_DATASETS_PATH"] = f"{script_dir}/../data/datasets/"
+os.environ["IMODELZOO_MODELS_PATH"] = f"{script_dir}/models/"
+os.makedirs(f"{script_dir}/models/", exist_ok=True)
+
+
+def pytest_configure(config):
+    shared_markers = ["imodelzoo"]
+    for markers in shared_markers:
+        config.addinivalue_line("markers", markers)
 
 
 @pytest.fixture(autouse=True)

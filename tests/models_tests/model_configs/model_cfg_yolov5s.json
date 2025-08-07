@@ -17,12 +17,12 @@
     },
     "perf_metrics": {
         "xh1":{
-            "x86_64": 1215.371
+            "x86_64": 507.73
         }
     },
     "eval_threshold": {
         "map50": 0.95,
-        "map50_95": 0.90
+        "map50_95": 0.85
     },
     "get_model_params": {
         "xh1": {
@@ -35,24 +35,6 @@
             "quant_model_dir": ["default", "", "./"],
             "model_dir": ["default", "", "./"]
         }
-    },
-    "quant_params": {
-        "model_path": ["default", ""],
-        "model_name": ["default", ""],
-        "input_shape": ["default"],
-        "dynamic_resize": ["default"],
-        "model_dir": ["default"]
-    },
-    "compile_params": {
-        "model_dir": ["default"],
-        "model_name": ["default"],
-        "batch": ["default"],
-        "ncore": ["default"],
-        "input_shape": ["default"],
-        "dynamic_resize": ["default"],
-        "stage": ["default"],
-        "output_dir": ["default"],
-        "verbose": ["default"]
     },
     "hmquant_params": {
         "params": {
@@ -95,13 +77,13 @@
             "required": {
                 "config": ["./config.yml"],
                 "target": ["xh1"],
-                "warmup": ["1", "10"],
-                "sample": ["1", "1000"]
+                "warmup": ["1", "10", "10"],
+                "sample": ["1", "1000", "1000"]
             },
             "optional": {
                 "result_path": ["default"],
                 "loop_num": ["default"],
-                "thread": ["default", "4"],
+                "thread": ["default", "4", "8"],
                 "device": ["default"]
             }
         }

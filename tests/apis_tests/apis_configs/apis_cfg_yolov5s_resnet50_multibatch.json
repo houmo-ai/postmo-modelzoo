@@ -1,0 +1,17 @@
+{
+    "obsolete": false,
+    "example_dir": "apis/inferences/yolov5s_resnet50_multibatch",
+    "support_platform": ["x86_64"],
+    "support_backend": {
+        "xh1": ["cpp"]
+    },
+    "support_core_num": {
+        "xh1": [1]
+    },
+    "get_model_params": null,
+    "py_example_params": null,
+    "cpp_example_params": {
+        "name": "multibatch_example",
+        "#resize_type": ["default", "0", "1"]
+    }
+}

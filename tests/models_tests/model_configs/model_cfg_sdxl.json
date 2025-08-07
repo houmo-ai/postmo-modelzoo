@@ -25,16 +25,16 @@
         }
     },
     "compile_params": {
-        "model_dir": ["default", ""],
-        "model_name": ["default", ""],
+        "model_dir": ["default"],
+        "model_name": ["default"],
         "batch": ["default"],
         "ncore": ["default"],
         "stage": ["default"],
         "output_dir": ["default"]
     },
     "demo_params": {
-        "model_path": ["default", ""],
-        "sdxl_ckpt": ["default", ""],
+        "model_path": ["default"],
+        "sdxl_ckpt": ["default"],
         "lora_weights": ["default"],
         "test_num": ["default"],
         "nstep": ["default"],

@@ -1,4 +1,5 @@
-# modelzoo
+###### modelzoo ######
+# args: all, quant, compile, demo, compare, eval, perf
 backbone_resnet50:
   include:
     - models/backbone/resnet50
@@ -6,10 +7,10 @@ backbone_resnet50:
     - models/backbone/resnet50/README.MD
   example_case:
     - backbone_resnet50_test:
-        script: models/backbone/resnet50/test.sh
+        test_type: models_tests
+        script: resnet50
+        args: all
   test:
-    # - backbone_resnet50_eval
-    # - backbone_resnet50_perf
     - backbone_resnet50_test
 backbone_efficientnet:
   include:
@@ -18,10 +19,10 @@ backbone_efficientnet:
     - models/backbone/efficientnet/README.MD
   example_case:
     - backbone_efficientnet_test:
-        script: models/backbone/efficientnet/test.sh
+        test_type: models_tests
+        script: efficientnet
+        args: all
   test:
-    # - backbone_efficientnet_eval
-    # - backbone_efficientnet_perf
     - backbone_efficientnet_test
 backbone_mobilenetv2:
   include:
@@ -29,37 +30,23 @@ backbone_mobilenetv2:
   exclude:
     - models/backbone/mobilenetv2/README.MD
   example_case:
-    - backbone_mobilenetv2_eval:
-        script: models/backbone/mobilenetv2/eval.sh
-    - backbone_mobilenetv2_perf:
-        script: models/backbone/mobilenetv2/perf.sh
     - backbone_mobilenetv2_test:
-        script: models/backbone/mobilenetv2/test.sh
+        test_type: models_tests
+        script: mobilenetv2
+        args: all
   test:
-    # - backbone_mobilenetv2_eval
-    # - backbone_mobilenetv2_perf
     - backbone_mobilenetv2_test
-backbone_vit:
-  include:
-    - models/backbone/vit
-  exclude: null
-  example_case:
-    - backbone_vit_perf:
-        script: models/backbone/vit/perf.sh
-  test:
-    # - backbone_vit_perf
 autodrive_yolop:
   include:
     - models/autodrive/yolop
   exclude:
     - models/autodrive/yolop/README.MD
   example_case:
-    - autodrive_yolop_perf:
-        script: models/autodrive/yolop/perf.sh
     - autodrive_yolop_test:
-        script: models/autodrive/yolop/test.sh
+        test_type: models_tests
+        script: yolop
+        args: all
   test:
-    # - autodrive_yolop_perf
     - autodrive_yolop_test
 detection_yolov3:
   include:
@@ -67,15 +54,11 @@ detection_yolov3:
   exclude:
     - models/detection/yolov3/README.MD
   example_case:
-    - detection_yolov3_eval:
-        script: models/detection/yolov3/eval.sh
-    - detection_yolov3_perf:
-        script: models/detection/yolov3/perf.sh
     - detection_yolov3_test:
-        script: models/detection/yolov3/test.sh
+        test_type: models_tests
+        script: yolov3
+        args: all
   test:
-    # - detection_yolov3_eval
-    # - detection_yolov3_perf
     - detection_yolov3_test
 detection_yolov5s:
   include:
@@ -83,15 +66,11 @@ detection_yolov5s:
   exclude:
     - models/detection/yolov5s/README.MD
   example_case:
-    - detection_yolov5s_eval:
-        script: models/detection/yolov5s/eval.sh
-    - detection_yolov5s_perf:
-        script: models/detection/yolov5s/perf.sh
     - detection_yolov5s_test:
-        script: models/detection/yolov5s/test.sh
+        test_type: models_tests
+        script: yolov5s
+        args: all
   test:
-    # - detection_yolov5s_eval
-    # - detection_yolov5s_perf
     - detection_yolov5s_test
 detection_yolov8m:
   include:
@@ -99,21 +78,16 @@ detection_yolov8m:
   exclude:
     - models/detection/yolov8m/README.MD
   example_case:
-    - detection_yolov8m_eval:
-        script: models/detection/yolov8m/eval.sh
-    - detection_yolov8m_perf:
-        script: models/detection/yolov8m/perf.sh
     - detection_yolov8m_test:
-        script: models/detection/yolov8m/test.sh
+        test_type: models_tests
+        script: yolov8m
+        args: all
   test:
-    # - detection_yolov8m_eval
-    # - detection_yolov8m_perf
     - detection_yolov8m_test
 multi_input_custom_random_model:
   include:
     - models/multi_input_custom_random_model
-  # exclude:
-  #   - models/multi_input_custom_random_model/README.MD
+  exclude: null
   example_case:
     - multi_input_custom_random_model_test:
         script: models/multi_input_custom_random_model/test.sh
@@ -126,38 +100,11 @@ asr_wenet:
     - models/asr/wenet/README.MD
   example_case:
     - asr_wenet_test:
-        script: models/asr/wenet/test.sh
+        test_type: models_tests
+        script: wenet
+        args: all
   test:
     - asr_wenet_test
-tests_qwen_1block:
-  include:
-    - tests/qwen_1block
-  exclude:
-    - tests/qwen_1block/README.MD
-  example_case:
-    - qwen_1block_4core_test:
-        script: tests/qwen_1block/test.sh --core 4
-    - qwen_1block_2core_test:
-        script: tests/qwen_1block/test.sh --core 2
-    - qwen_1block_1core_test:
-        script: tests/qwen_1block/test.sh --core 1
-  test:
-    # - qwen_1block_4core_test
-    # - qwen_1block_2core_test
-    # - qwen_1block_1core_test
-tests_qwen2_2blocks:
-  include:
-    - tests/qwen2_2blocks
-  exclude:
-    - tests/qwen2_2blocks/README.MD
-  example_case:
-    - qwen2_2blocks_4core_test:
-        script: tests/qwen2_2blocks/test.sh --core 4
-    - qwen2_2blocks_2core_test:
-        script: tests/qwen2_2blocks/test.sh --core 2
-  test:
-    # - qwen2_2blocks_4core_test
-    # - qwen2_2blocks_2core_test
 utils:
   include:
     - utils
@@ -166,35 +113,25 @@ utils:
   exclude: null
   example_case: null
   test:
-    - backbone_resnet50_perf
-    - autodrive_yolop_perf
-    - detection_yolov5s_perf
-hmassist:
-  include:
-    - hmassist
-  exclude:
-    - hmassist/README.MD
-  example_case: null
-  test:
-    - backbone_resnet50_perf
-    - backbone_resnet50_eval
     - backbone_resnet50_test
-    - detection_yolov5s_perf
-    - detection_yolov5s_eval
     - detection_yolov5s_test
+    - autodrive_yolop_test
 
-# apis
-apis_common:
+###### hmatc ######
+hmatc:
   include:
-    - apis/common
-  exclude: null
+    - hmatc
+  exclude:
+    - hmatc/README.MD
+    - hmatc/.clang-format
   example_case: null
   test:
-    - inferences_resnet50_test
-    - inferences_resnet50_multistreams_test
-    - inferences_resnet50_pipeline_test
-    - inferences_yolov5s_test
-    # - scenes_video_detect_test
+    # test models
+    - backbone_resnet50_test
+    - detection_yolov5s_test
+    - autodrive_yolop_test
+
+###### apis ######
 inferences_resnet50:
   include:
     - apis/inferences/resnet50
@@ -202,9 +139,23 @@ inferences_resnet50:
     - apis/inferences/resnet50/README.MD
   example_case:
     - inferences_resnet50_test:
-        script: apis/inferences/resnet50/run.sh
+        test_type: apis_tests
+        script: resnet50 and inference
+        args: all
   test:
     - inferences_resnet50_test
+inferences_yolov5s:
+  include:
+    - apis/inferences/yolov5s
+  exclude:
+    - apis/inferences/yolov5s/README.MD
+  example_case:
+    - inferences_yolov5s_test:
+        test_type: apis_tests
+        script: yolov5s and inference
+        args: all
+  test:
+    - inferences_yolov5s_test
 inferences_resnet50_multistreams:
   include:
     - apis/inferences/resnet50_multistreams
@@ -212,7 +163,9 @@ inferences_resnet50_multistreams:
     - apis/inferences/resnet50_multistreams/README.MD
   example_case:
     - inferences_resnet50_multistreams_test:
-        script: apis/inferences/resnet50_multistreams/run.sh
+        test_type: apis_tests
+        script: resnet50 and multistreams
+        args: all
   test:
     - inferences_resnet50_multistreams_test
 inferences_resnet50_pipeline:
@@ -222,19 +175,23 @@ inferences_resnet50_pipeline:
     - apis/inferences/resnet50_pipeline/README.MD
   example_case:
     - inferences_resnet50_pipeline_test:
-        script: apis/inferences/resnet50_pipeline/run.sh
+        test_type: apis_tests
+        script: resnet50 and pipeline
+        args: all
   test:
     - inferences_resnet50_pipeline_test
-inferences_yolov5s:
+inferences_yolov5s_resnet50_multibatch:
   include:
-    - apis/inferences/yolov5s
+    - apis/inferences/yolov5s_resnet50_multibatch
   exclude:
-    - apis/inferences/yolov5s/README.MD
+    - apis/inferences/yolov5s_resnet50_multibatch/README.MD
   example_case:
-    - inferences_yolov5s_test:
-        script: apis/inferences/yolov5s/run.sh
+    - inferences_yolov5s_resnet50_multibatch_test:
+        test_type: apis_tests
+        script: yolov5s and resnet50 and multibatch
+        args: all
   test:
-    - inferences_yolov5s_test
+    - inferences_yolov5s_resnet50_multibatch_test
 scenes_video_detect:
   include:
     - apis/scenes/video_detect
@@ -242,40 +199,45 @@ scenes_video_detect:
     - apis/scenes/video_detect/README.MD
   example_case:
     - scenes_video_detect_test:
-        script: apis/scenes/video_detect/run.sh
+        test_type: apis_tests
+        script: video_detect
+        args: all
   test:
-    # - scenes_video_detect_test
+    - scenes_video_detect_test
+apis_common:
+  include:
+    - apis/common
+  exclude: null
+  example_case: null
+  test:
+    - inferences_resnet50_test
+    - inferences_yolov5s_test
+    - inferences_resnet50_multistreams_test
+    - inferences_resnet50_pipeline_test
+    - inferences_yolov5s_resnet50_multibatch_test
+    - scenes_video_detect_test
 
+###### all ######
 all:
   include:
     - run_all.py
   exclude: null
   example_case: null
   test:
-    # modelzoo
-    # - backbone_resnet50_perf
-    # - backbone_resnet50_eval
-    # - backbone_resnet50_test
-    # - backbone_efficientnet_eval
-    # - backbone_efficientnet_perf
-    # - backbone_efficientnet_test
-    # - backbone_mobilenetv2_eval
-    # - backbone_mobilenetv2_perf
-    # - backbone_mobilenetv2_test
-    # - autodrive_yolop_perf
-    # - autodrive_yolop_test
-    # - detection_yolov3_eval
-    # - detection_yolov3_perf
-    # - detection_yolov3_test
-    # - detection_yolov5s_perf
-    # - detection_yolov5s_eval
-    # - detection_yolov5s_test
-    # - detection_yolov8m_perf
-    # - detection_yolov8m_eval
-    # - detection_yolov8m_test
+    ### modelzoo ###
+    - backbone_resnet50_test
+    - backbone_efficientnet_test
+    - backbone_mobilenetv2_test
+    - autodrive_yolop_test
+    - detection_yolov3_test
+    - detection_yolov5s_test
+    - detection_yolov8m_test
     # - asr_wenet_test
-    # examples
+    ### apis ###
     # - inferences_resnet50_test
+    # - inferences_yolov5s_test
     # - inferences_resnet50_multistreams_test
     # - inferences_resnet50_pipeline_test
-    # - inferences_yolov5s_test
+    # - inferences_yolov5s_resnet50_multibatch_test
+    # - scenes_video_detect_test
+    ### hmatc ###

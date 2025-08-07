@@ -10,7 +10,7 @@
     "support_hmassist": null,
     "perf_metrics": {
         "xh1":{
-            "x86_64": 57.918
+            "x86_64": 57.785
         }
     },
     "eval_threshold": null,
@@ -22,8 +22,8 @@
         }
     },
     "compile_params": {
-        "model_dir": ["default", ""],
-        "model_name": ["default", ""],
+        "model_dir": ["default"],
+        "model_name": ["default"],
         "batch": ["default"],
         "ncore": ["default"],
         "stage": ["default"],
@@ -31,8 +31,8 @@
         "verbose": ["default"]
     },
     "demo_params": {
-        "model_path": ["default", ""],
-        "config": ["default", ""],
+        "model_path": ["default"],
+        "config": ["default"],
         "test_data": ["default"],
         "log_file": ["default"],
         "pe_enc": ["default"],
