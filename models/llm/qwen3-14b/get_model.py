@@ -32,6 +32,14 @@ def get_args() -> argparse.Namespace:
         default='',
         help='where to save downloaded model',
     )
+    parser.add_argument(
+        '--ndevice',
+        dest='ndevice',
+        type=int,
+        default=1,
+        choices=[1, 2],
+        help='device number',
+    )
     args = parser.parse_args()
     return args
 
@@ -48,7 +56,10 @@ if __name__ == '__main__':
         print("[error] not support xh1.")
     elif HOUMO_TARGET == "xh2":
         quant_path = "models/qwen3/hmquant_xh2_qwen3_14b_256_2k_20250625.zip"
-        hmm_path = "models/qwen3/hmm_xh2_qwen3_14b_256_8k_2cores_20250701.zip"
+        if args.ndevice == 1:
+            hmm_path = "models/qwen3/hmm_xh2_qwen3_14b_256_8k_2cores_20250701.zip"
+        elif args.ndevice == 2:
+            hmm_path = "models/qwen3/hmm_xh2_qwen3_14b_256_2k_2cores_2devices_202508013.zip"
 
     if model_type in ["raw", "all"]:
         ignore_patterns = []
