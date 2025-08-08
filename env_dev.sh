@@ -2,15 +2,14 @@
 
 # install requirements
 # sudo pip3 install -r requirements.txt
-sudo pip3 uninstall -y houmo-tcim2
+# sudo pip3 uninstall -y houmo-tcim2
 
 # common define
 PRINT_GREEN() { echo -e "\033[1;32m$@\033[0m"; }
 PRINT_YELLOW() { echo -e "\033[1;33m$@\033[0m"; }
 
 __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-export HOUMO_MODELZOO_PATH=${__dir}
-export HMASSIST_PATH=$HOUMO_MODELZOO_PATH/hmassist
+export HOUMO_EXAMPLES_PATH=${__dir}
 
 if [[ -z $HOUMO_MODELZOO_URL ]]; then
   export HOUMO_MODELZOO_URL=http://10.10.1.53:8082/artifactory/toolchain/release
@@ -37,13 +36,9 @@ export PYTHONPATH=$HMCC_BUILD_PATH/tools/hmcc/python_packages/hmcc:$HMCC_PATH/co
 export PYTHONPATH=$TCIM_RUNTIME_PATH/python:$PYTHONPATH
 export LD_LIBRARY_PATH=$HMCC_BUILD_PATH/lib:$TCIM_RUNTIME_PATH/lib:$HDPL_LIB_PATH/lib:$ISIM_PATH/lib:$LD_LIBRARY_PATH
 
-# paths for hmassist
-export PYTHONPATH=$HMASSIST_PATH:$PYTHONPATH
-export PATH=$HMASSIST_PATH:$PATH
-
 # data and model path
 if [[ -z $HOUMO_DATASETS_PATH ]]; then
-  export HOUMO_DATASETS_PATH=$HOUMO_MODELZOO_PATH/data/datasets
+  export HOUMO_DATASETS_PATH=$HOUMO_EXAMPLES_PATH/data/datasets
 fi
 if [[ -z $HOUMO_MODEL_PATH ]]; then
   CI_MODEL_PATH=/data02/modelzoo_ci/models
@@ -53,7 +48,7 @@ if [[ -z $HOUMO_MODEL_PATH ]]; then
 fi
 
 # paths for xh2 modelzoo
-export PYTHONPATH=$HOUMO_MODELZOO_PATH/hmodel/xh2:$PYTHONPATH
+export PYTHONPATH=$HOUMO_EXAMPLES_PATH/hmodel/xh2:$PYTHONPATH
 export HF_ENDPOINT=https://hf-mirror.com
 
 # use asic if detected
@@ -72,7 +67,7 @@ PRINT_GREEN "HOUMO_TARGET is $HOUMO_TARGET"
 PRINT_GREEN "HOUMO_PATH is $HOUMO_PATH"
 PRINT_GREEN "HMCC_PATH is $HMCC_PATH"
 PRINT_GREEN "TCIM_RUNTIME_PATH is $TCIM_RUNTIME_PATH"
-PRINT_GREEN "HOUMO_MODELZOO_PATH is $HOUMO_MODELZOO_PATH"
+PRINT_GREEN "HOUMO_EXAMPLES_PATH is $HOUMO_EXAMPLES_PATH"
 PRINT_GREEN "HOUMO_DATASETS_PATH is $HOUMO_DATASETS_PATH"
 PRINT_GREEN "HOUMO_MODEL_PATH is $HOUMO_MODEL_PATH"
 PRINT_GREEN "PYTHONPATH is $PYTHONPATH"
