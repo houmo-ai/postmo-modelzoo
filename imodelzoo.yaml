@@ -11,6 +11,8 @@ os_type:
       - data
       - hmodel
       - env.sh
+      - requirements.txt
+      - README.md
   ubuntu_18.04:
     examples:
       - examples/
