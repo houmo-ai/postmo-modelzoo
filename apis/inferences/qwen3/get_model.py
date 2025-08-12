@@ -31,7 +31,7 @@ if __name__ == '__main__':
         elif args.ncore == 4:
             hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250728.zip"
     elif HOUMO_TARGET == "xh2":
-        hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250723.zip"
+        hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250808.zip"
 
     from modelscope import snapshot_download
     snapshot_download('qwen/qwen3-8b', local_dir='qwen3-8b', ignore_patterns=["*.safetensors"])

@@ -4,7 +4,7 @@ set -e
 target=$HOUMO_TARGET
 user=$1
 pwd=$2
-date=20250702
+date=20250808
 
 UPDATE_HMQUANT() {
     dir=$1
@@ -25,7 +25,7 @@ UPDATE_HMQUANT_LM() {
     size=$3
     hmquant=hmquant_${target}_${name}_${size}_${date}.zip
     pushd $dir/output/$target/hmquant
-    echo "zip -r ${hmquant} * -x prefill/hmquant_${name}_with_act/* -x decoder/hmquant_${name}_with_act/*"
+    echo "zip -r ${hmquant} prefill decoder quant_embedding.pt -x prefill/hmquant_${name}_with_act/* -x decoder/hmquant_${name}_with_act/*"
     zip -r ${hmquant} * -x prefill/hmquant_${name}_with_act/* -x decoder/hmquant_${name}_with_act/*
     echo "curl -u${user}:${pwd} -T ${hmquant} $HOUMO_MODELZOO_URL/models/$name/${hmquant}"
     curl -u${user}:${pwd} -T ${hmquant} $HOUMO_MODELZOO_URL/models/$name/${hmquant}
@@ -58,7 +58,7 @@ UPDATE_HMM_LM() {
 
 # UPDATE_HMQUANT_LM "models/llm/qwen2.5" "qwen2.5" "256_4k"
 # UPDATE_HMQUANT_LM "models/llm/deepseek" "deepseek" "8b_256_2k"
-# UPDATE_HMQUANT_LM "models/llm/qwen3" "qwen3" "256_8k"
+# UPDATE_HMQUANT_LM "models/llm/qwen3" "qwen3" "8b_256_2k"
 
 # UPDATE_HMM_LM "models/llm/qwen3" "qwen3" "8b_256_8k" "2cores"
 # UPDATE_HMM_LM "models/llm/qwen3" "qwen3" "8b_256_2k" "2cores"
