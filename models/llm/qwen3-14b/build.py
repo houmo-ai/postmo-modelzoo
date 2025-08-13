@@ -74,7 +74,7 @@ def get_args() -> argparse.Namespace:
         dest='ndevice',
         type=int,
         default=None,
-        choices=[2],
+        choices=[1, 2],
         help='device number',
     )
     parser.add_argument(
