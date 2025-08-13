@@ -105,7 +105,7 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore, ndevice
         if batch:
             kwargs["modify_llm"]["batch"] = batch
         if context_length:
-            kwargs["modify_llm"]["context_length"] = context_length
+            kwargs["modify_llm"]["context-length"] = context_length
 
     start = time.time()
     print(f"\n===> {model_name} build start...")
