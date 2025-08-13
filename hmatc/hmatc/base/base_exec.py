@@ -246,7 +246,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
     def evaluate(self, backend):
         """评估入口"""
         if not self.eval_cfg:
-            logger.error("demo config not found")
+            logger.error("eval config not found")
             exit(-1)
         data_dir = self.eval_cfg.get("data_dir", "")
         HOUMO_DATASETS_PATH = os.environ.get(

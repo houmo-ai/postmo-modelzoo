@@ -13,7 +13,7 @@ from loguru import logger
 import tcim_lite as tcim
 
 
-TOKENIZER_PATH = "qwen3-8b"
+TOKENIZER_PATH = "qwen3-14b"
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
 EMBEDDING_PATH = os.path.join('output', HOUMO_TARGET, 'hmquant', 'quant_embedding.pt')
 
@@ -66,6 +66,14 @@ def get_args() -> argparse.Namespace:
         type=int,
         default=40,
         help='block number',
+    )
+    parser.add_argument(
+        '--ndevice',
+        dest='ndevice',
+        type=int,
+        default=1,
+        choices=[1, 2],
+        help='device number',
     )
     args = parser.parse_args()
     return args
@@ -207,12 +215,19 @@ class HmQwen:
 
 class HmQwenXh2:
 
-    def __init__(self, model_dir, prefill_length, decode_length, batch=1, nblocks=28):
+    def __init__(self, model_dir, prefill_length, decode_length, batch=1, nblocks=28, ndevice=1):
         self.batch = batch
         self.prefill_length = prefill_length
         self.decode_length = decode_length
         self.nblocks = nblocks
-        weight_manager = tcim.runtime.WeightManager(0)
+        self.ndevice = ndevice
+        if self.ndevice==1:
+            weight_manager = tcim.runtime.WeightManager(0)
+        elif self.ndevice==2:
+            dev_manager = tcim.runtime.DevManager([1,0], "Xh2HalBackend")
+            weight_manager = tcim.runtime.WeightManager(dev_manager)
+        else:
+            raise ValueError("Unsupport device number!")
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
         dummy_tensor_names = [f'model_layers_{i}_self_attn_kcache_input' for i in range(nblocks)]
@@ -227,7 +242,7 @@ class HmQwenXh2:
         #     vcache = self.prefill.get_input(f'model_layers_{i}_self_attn_vcache_input')
         #     self.decode.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
         for i in range(3, 2 * nblocks + 3):
-            cache = self.prefill.get_input(self.prefill.get_input_name(i))
+            cache = self.prefill.get_dev_input(self.prefill.get_input_name(i))
             self.decode.set_input(self.decode.get_input_name(i), cache)
         # set decode input
         current_length_input_1 = np.array([1]).astype("int32")
@@ -285,7 +300,7 @@ class HmQwenXh2:
             self.prefill.run()
             self.prefill.sync()
 
-        input_data = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
+        input_data = self.prefill.get_output(self.prefill.get_output_name(0)).to_host().numpy()
         next_id = input_data.argmax(-1)[0]
         prefill_response = self.tokenizer.decode(next_id)
         prefill_time = time.time() - start_time
@@ -317,7 +332,7 @@ class HmQwenXh2:
             self.decode.set_input(valid_length_name, valid_length_data)
             self.decode.run()
             self.decode.sync()
-            input_data = self.decode.get_output(self.decode.get_output_name(0)).numpy()
+            input_data = self.decode.get_output(self.decode.get_output_name(0)).to_host().numpy()
             decode_count += 1
 
             next_id = input_data.astype(np.float32).argmax(-1)[0]
