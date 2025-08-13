@@ -1,9 +1,11 @@
-import time
 import os
+import time
+from abc import ABC
+
 import onnx
 import onnxruntime as ort
 from onnx import mapping
-from abc import ABC
+
 from ..base.base_infer import BaseInfer
 from ..utils import logger
 
@@ -17,7 +19,9 @@ class OnnxInfer(BaseInfer, ABC):
         self.inputs_batch = dict()
         
     def load(self, model_path):
-        assert os.path.exists(model_path)
+        if not os.path.exists(model_path):
+            logger.error(f"model path: {model_path} not exists.")
+            exit(-1)
         self.engine = ort.InferenceSession(model_path)
         logger.info("load onnx model successfully.")
         for idx, tensor in enumerate(self.engine.get_inputs()):

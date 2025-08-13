@@ -1,8 +1,10 @@
-import time
 import os
 import pickle
-import onnxruntime as ort
+import time
 from abc import ABC
+
+import onnxruntime as ort
+
 from ..base.base_infer import BaseInfer
 from ..utils import logger
 
@@ -14,7 +16,9 @@ class HmQuantInfer(BaseInfer, ABC):
         self.model_ext = ".pkl"
 
     def load(self, model_path):
-        assert os.path.exists(model_path)
+        if not os.path.exists(model_path):
+            logger.error(f"model path: {model_path} not exists.")
+            exit(-1)
         from hmquant.api import quant_single_onnx_network
         with open(model_path, "rb") as f:
             self.engine = pickle.load(f)

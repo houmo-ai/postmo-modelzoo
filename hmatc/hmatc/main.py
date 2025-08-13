@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
-import os
-import logging
-import time
-import json
 import argparse
-from .utils import logger
-from .utils.utils import read_yaml_to_dict, save_dict_to_yaml
-from .utils.logging_format import LoggingFormatter 
-from .utils.check import check_cfg
+import json
+import logging
+import os
+import time
+
+from ._version import __build_time__, __commit__, __version__
 from .base.base_exec import BaseExec
-from ._version import __commit__, __version__, __build_time__
+from .utils import logger
+from .utils.check import check_cfg
+from .utils.logging_format import LoggingFormatter
+from .utils.utils import read_yaml_to_dict, save_dict_to_yaml
 
 
 def set_logger(op, log_dir, filename):
@@ -39,17 +40,20 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True, help="qunat build compare perf demo eval")
     # quant
     quant_parser = subparsers.add_parser("quant", parents=[parent_parser0, parent_parser1, parent_parser3], help="Quantize a model")
+    # model config
+    model_cfg_parent = argparse.ArgumentParser(add_help=False)
+    model_cfg_parent.add_argument("--batch", type=int, required=False, default=1, help="Specify a build batch")
+    model_cfg_parent.add_argument("--ncore", type=int, required=False, choices=(1, 2, 4), help="Specify a ncore")
+    model_cfg_parent.add_argument("--opt_level", type=int, required=False, choices=(0, 1, 2), help="Specify a opt_level")
+    model_cfg_parent.add_argument("--roi_num", type=int, required=False, default=1, help="Specify a roi_num, only for xh1 yet")
     # build
-    build_parser = subparsers.add_parser("build", parents=[parent_parser0, parent_parser1, parent_parser3], help="Build a model")
-    build_parser.add_argument("--batch", type=int, required=False, default=1, help="Specify a build batch")
-    build_parser.add_argument("--ncore", type=int, required=False, choices=(1, 2, 4), help="Specify a ncore, ")
-    build_parser.add_argument("--opt_level", type=int, required=False, choices=(0, 1, 2), help="Specify a opt_level")
-    build_parser.add_argument("--roi_num", type=int, required=False, default=1, help="Specify a roi_num")
+    build_parser = subparsers.add_parser("build", parents=[parent_parser0, parent_parser1, parent_parser3, model_cfg_parent], help="Build a model")
+    
     # compare
-    compare_parser = subparsers.add_parser("compare", parents=[parent_parser0, parent_parser1, parent_parser3], help="Compare onnx/hmquant/chip")
+    compare_parser = subparsers.add_parser("compare", parents=[parent_parser0, parent_parser1, parent_parser3, model_cfg_parent], help="Compare onnx/hmquant/chip")
     compare_parser.add_argument("--data_path", "-d", type=str, required=True, help="Specify a data path, image or npz")
     # perf
-    perf_parser = subparsers.add_parser("perf", parents=[parent_parser1, parent_parser3], help="Test model performance")
+    perf_parser = subparsers.add_parser("perf", parents=[parent_parser1, parent_parser3, model_cfg_parent], help="Test model performance")
     exclusive_group = perf_parser.add_mutually_exclusive_group(required=True)
     exclusive_group.add_argument("--config", "-c", type=str, help="Specify config file path")
     exclusive_group.add_argument("--model",  "-m", type=str, help="Specify model path")
@@ -59,9 +63,9 @@ def main():
     perf_parser.add_argument("--thread",   "-tn", type=int, required=False, default=1, help="Specify thread num")
     perf_parser.add_argument("--device",   "-dn", type=int, required=False, default=1, help="Specify device num")
     # demo
-    demo_parser = subparsers.add_parser("demo", parents=[parent_parser0, parent_parser1, parent_parser2, parent_parser3], help="Run model demo")
+    demo_parser = subparsers.add_parser("demo", parents=[parent_parser0, parent_parser1, parent_parser2, parent_parser3, model_cfg_parent], help="Run model demo")
     # evaluate
-    evaluate_parser = subparsers.add_parser("eval", parents=[parent_parser0, parent_parser1, parent_parser2, parent_parser3], help="Run model evaluate")
+    evaluate_parser = subparsers.add_parser("eval", parents=[parent_parser0, parent_parser1, parent_parser2, parent_parser3, model_cfg_parent], help="Run model evaluate")
     args = parser.parse_args()
     
     logger.info(f"Hmatc version: {__version__}, commit: {__commit__}, build time: {__build_time__}")
@@ -71,7 +75,7 @@ def main():
     if os.path.exists(args.result_path):
         res_info = read_yaml_to_dict(args.result_path)
 
-    # perf
+    # 直接指定模型的perf可跳过配置文件
     current_command = args.command
     if current_command == "perf" and args.model is not None:
         new_res_info = BaseExec.model_perf(args.model, args.warmup, args.sample, args.loop_num, args.device, args.thread)
@@ -90,28 +94,33 @@ def main():
     cfg = read_yaml_to_dict(cfg_path)
     check_cfg(cfg)
     
+    # 命令行参数更新至配置文件
     cfg["target"] = target
-    if current_command == "build":
+    if current_command in ["build", "perf", "compare", "demo", "eval"]:
         batch = args.batch
+        ncore = args.ncore
+        opt_level = args.opt_level
+        roi_num = args.roi_num
         if batch < 1:
             logger.error("Batch must be greater than 0")
             exit(-1)
         if batch > 1:
             cfg["build"]["batch"] = batch
-        roi_num = args.roi_num
-        if batch > 1 and roi_num != 1:
+        if batch > 1 and roi_num != 1 and target == "xh1":
             logger.error("batch > 1, roi_num must be == 1")
             exit(-1)
-        if batch == 1 and roi_num < 1:
+        if batch == 1 and roi_num < 1 and target == "xh1":
             logger.error("batch == 1, roi_num must be >= 1")
             exit(-1)
-        cfg["build"]["roi_num"] = roi_num
-        ncore = args.ncore
-        opt_level = args.opt_level
+        if roi_num > 1 and target == "xh1":
+            cfg["build"]["roi_num"] = roi_num
         if opt_level is not None:
             cfg["build"]["opt_level"] = opt_level
         if ncore is not None:
-            cfg["build"]["ncore"] = ncore
+            if ncore == 4 and target == "xh2":
+                logger.error("ncore == 4, target must be xh1")
+                exit(-1)
+            cfg["build"]["ncore"] = ncore              
     logger.info(f"\n{json.dumps(cfg, indent=2, sort_keys=False)}")
     hm_exec = None
     if target == "xh1":

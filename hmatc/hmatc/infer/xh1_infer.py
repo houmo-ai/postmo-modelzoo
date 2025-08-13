@@ -1,8 +1,10 @@
-import time
 import os
-import tcim_lite
-import numpy as np
+import time
 from abc import ABC
+
+import numpy as np
+import tcim_lite
+
 from ..base.base_infer import BaseInfer
 from ..utils import logger
 
@@ -16,7 +18,9 @@ class Xh1Infer(BaseInfer, ABC):
         self.inputs_batch = dict()
 
     def load(self, model_path):
-        assert os.path.exists(model_path)
+        if not os.path.exists(model_path):
+            logger.error(f"model path: {model_path} not exists.")
+            exit(-1)
         logger.info(f"load model from {model_path}")
         self.engine = tcim_lite.runtime.load(model_path)
         logger.info("load xh1 model successfully.")

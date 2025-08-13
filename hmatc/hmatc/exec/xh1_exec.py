@@ -1,21 +1,25 @@
-import os
-import cv2
-import time
 import json
-import torch
-import numpy as np
+import os
+import time
 from datetime import datetime
+from importlib.metadata import PackageNotFoundError, version
+
+import cv2
+import numpy as np
+import torch
 from prettytable import PrettyTable
-from importlib.metadata import version, PackageNotFoundError
-from ..utils import logger
-from ..utils.utils import get_md5, get_file_md5, \
-    SUPPORT_IMAGE_FORMATS, load_npz, compress_folder_to_tar_xz_with_progress, compress_file_to_tar_xz_with_progress
-from ..utils.preprocess import xh1_preprocess, default_preprocess 
-from ..utils.dist_metrics import cosine_distance
+
 from ..base.base_exec import BaseExec
-from ..infer.xh1_infer import Xh1Infer
-from ..infer.onnx_infer import OnnxInfer
 from ..infer.hmquant_infer import HmQuantInfer
+from ..infer.onnx_infer import OnnxInfer
+from ..infer.xh1_infer import Xh1Infer
+from ..utils import logger
+from ..utils.dist_metrics import cosine_distance
+from ..utils.preprocess import default_preprocess, xh1_preprocess
+from ..utils.utils import (SUPPORT_IMAGE_FORMATS,
+                           compress_file_to_tar_xz_with_progress,
+                           compress_folder_to_tar_xz_with_progress,
+                           get_file_md5, get_md5, load_npz)
 
 
 def get_hmquant_version():
@@ -31,11 +35,6 @@ class Xh1Exec(BaseExec):
     def __init__(self, cfg: dict) -> None:
         super().__init__(cfg)
         self.hmm_batch = self.build_batch * self.model_input_batch
-        self.hmm_name = f"{self.model_name}_xh1_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}"
-        self.hmm_save_dir = os.path.join(self.save_dir, "xh1")
-        if not os.path.exists(self.hmm_save_dir):
-            os.makedirs(self.hmm_save_dir)
-        self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
         self.quant_output_dir = os.path.join(self.save_dir, "xh1", "hmquant")
         self.build_output_dir = os.path.join(self.save_dir, "xh1", "tcim")
         self.quant_sequencer_model_path = os.path.join(
@@ -79,6 +78,25 @@ class Xh1Exec(BaseExec):
         if self.resizer_mode == 2 and (self.roi_num > 1 or self.build_batch > 1 or self.model_input_batch > 1):
             logger.error("Not support roi_num > 1 or batch > 1 yet, when resizer_mode == 2")
             exit(-1)
+        if self.resizer_mode == 3:
+            self.roi_num = 1
+        
+        prefix = "dynamic"
+        if self.resizer_mode == 0:
+            self.roi_num = 0
+            prefix = ""
+        elif self.resizer_mode == 1:
+            prefix = "dynamic_v2"
+        elif self.resizer_mode == 2:
+            prefix = "dynamic_v1"
+        elif self.resizer_mode == 3:
+            self.roi_num = 1
+            prefix = "static"
+        self.hmm_name = f"{self.model_name}_xh1_b{self.hmm_batch}_{self.roi_num}roi_{self.build_ncore}core_{self.build_opt_level}_{prefix}"
+        self.hmm_save_dir = os.path.join(self.save_dir, "xh1")
+        if not os.path.exists(self.hmm_save_dir):
+            os.makedirs(self.hmm_save_dir)
+        self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
         
     def get_quant_cfg(self) -> dict:
         # 设置量化日志输出
@@ -296,7 +314,8 @@ class Xh1Exec(BaseExec):
                 self.calib_data = HM_calib_data
             logger.info(f"calib_data: {self.calib_data}")
             
-        from hmquant.api import quant_single_onnx_network, generate_golden, quantize_profiling
+        from hmquant.api import (generate_golden, quant_single_onnx_network,
+                                 quantize_profiling)
         t_start = time.time()
         sequencer = quant_single_onnx_network(
             cfg=self.get_quant_cfg(),
@@ -409,6 +428,13 @@ class Xh1Exec(BaseExec):
         res_info = dict()       
         # TODO 图像输入目前暂不支持多batch
         outputs, outputs_dequanted = xh1.run(in_datas)
+        repeats = 1
+        if self.build_batch > 1 and self.roi_num == 1:
+            # n图n框，且编译batch>1
+            repeats = self.build_batch
+        elif self.roi_num > 1:
+            # 1图n框
+            repeats = self.roi_num
         header = ["name",  "cosine_dist", "MD5", "cosine_dist[dequanted]", "MD5[dequanted]"]
         table = PrettyTable(header)
         table.title = "xh1 vs hmquant"
@@ -418,13 +444,6 @@ class Xh1Exec(BaseExec):
             golden_output_dequant_path = os.path.join(self.quant_output_dir, f"hmquant_{self.model_name}_{new_output_name}_dequant_output.npy")
             golden_output = np.load(golden_output_path)
             golden_output_dequanted = np.load(golden_output_dequant_path)
-            repeats = 1
-            if self.build_batch > 1 and self.roi_num == 1:
-                # n图n框，且编译batch>1
-                repeats = self.build_batch
-            elif self.roi_num > 1:
-                # 1图n框
-                repeats = self.roi_num
             golden_output = np.repeat(golden_output, repeats=repeats, axis=0)
             golden_output_dequanted = np.repeat(golden_output_dequanted, repeats=repeats, axis=0)
             golden_output_md5 = get_md5(golden_output)
@@ -594,7 +613,13 @@ class Xh1Exec(BaseExec):
         onnx_outputs = onnx_infer.run(onnx_in_datas)
         hmquant_outputs = hmquant_infer.run(hmquant_in_datas)
         _, xh1_outputs_dequanted = xh1_infer.run(xh1_in_datas)
-        
+        repeats = 1
+        if self.build_batch > 1 and self.roi_num == 1:
+            # n图n框，且编译batch>1
+            repeats = self.build_batch
+        elif self.roi_num > 1:
+            # 1图n框
+            repeats = self.roi_num
         res_info = {"compare": {t_start: dict()}}
         res_info["compare"][t_start]["data_path"] = data_path
         # 计算相似度
@@ -604,10 +629,10 @@ class Xh1Exec(BaseExec):
         for output_name in onnx_outputs:
             # onnx
             onnx_output = onnx_outputs[output_name]
-            onnx_output = np.repeat(onnx_output, repeats=self.build_batch, axis=0)
+            onnx_output = np.repeat(onnx_output, repeats=repeats, axis=0)
             # hmquant
             hmquant_output = hmquant_outputs[output_name]
-            hmquant_output = np.repeat(hmquant_output, repeats=self.build_batch, axis=0)
+            hmquant_output = np.repeat(hmquant_output, repeats=repeats, axis=0)
             hmquant_output_dequanted = xh1_infer.dequantize(output_name, hmquant_output)
             logger.info(f"Hmquant output[{output_name}] quantize data_dtype: {hmquant_output.dtype} -> {hmquant_output_dequanted.dtype}")
             # xh1

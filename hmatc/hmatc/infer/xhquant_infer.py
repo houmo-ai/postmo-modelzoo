@@ -1,10 +1,12 @@
-import time
 import os
-import torch
-import numpy as np
+import time
 from abc import ABC
 from typing import Dict
+
+import numpy as np
+import torch
 from xhquant.api import HMONNXInference, xhquant_init
+
 from ..base.base_infer import BaseInfer
 from ..utils import logger
 from ..utils.utils import torch_to_numpy_dtype
@@ -20,7 +22,9 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         xhquant_init(None, debug=False)
 
     def load(self, model_path):
-        assert os.path.exists(model_path)
+        if not os.path.exists(model_path):
+            logger.error(f"model path: {model_path} not exists.")
+            exit(-1)
         self.engine = HMONNXInference(model_path)
         # self.engine.to_fast_mode()
         self.engine.to(torch.device(self.device))
