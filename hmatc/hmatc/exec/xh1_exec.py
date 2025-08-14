@@ -80,19 +80,19 @@ class Xh1Exec(BaseExec):
             exit(-1)
         if self.resizer_mode == 3:
             self.roi_num = 1
-        
-        prefix = "dynamic"
         if self.resizer_mode == 0:
-            self.roi_num = 0
+            roi_tag = ""
             prefix = ""
         elif self.resizer_mode == 1:
-            prefix = "dynamic_v2"
+            roi_tag = f"_{self.roi_num}roi"
+            prefix = "_dynamic_v2"
         elif self.resizer_mode == 2:
-            prefix = "dynamic_v1"
+            roi_tag = f"_{self.roi_num}roi"
+            prefix = "_dynamic_v1"
         elif self.resizer_mode == 3:
-            self.roi_num = 1
-            prefix = "static"
-        self.hmm_name = f"{self.model_name}_xh1_b{self.hmm_batch}_{self.roi_num}roi_{self.build_ncore}core_{self.build_opt_level}_{prefix}"
+            roi_tag = "_1roi"
+            prefix = "_static"
+        self.hmm_name = f"{self.model_name}_xh1_b{self.hmm_batch}{roi_tag}_{self.build_ncore}core_{self.build_opt_level}{prefix}"
         self.hmm_save_dir = os.path.join(self.save_dir, "xh1")
         if not os.path.exists(self.hmm_save_dir):
             os.makedirs(self.hmm_save_dir)
