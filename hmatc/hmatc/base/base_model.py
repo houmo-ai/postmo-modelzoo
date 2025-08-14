@@ -110,8 +110,6 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 new_datas[in_name] = np.ascontiguousarray(yuv)
                 if self.resizer_mode in [1, 2]:
                     dyn_info = dyn_info.detach().cpu().numpy()
-                    if self.resizer_mode == 2:
-                        dyn_info = dyn_info.flatten()
                     new_datas[f"resizer_crop_{in_name}"] = dyn_info
             return new_datas
         

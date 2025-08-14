@@ -74,7 +74,9 @@ public:
         }
         // 初始化一个完整的空闲块（覆盖整个内存池）
         for (int i = 0; i < block_num_; ++i) {
-            free_bufs_.push(buf_.GetSubBuffer(block_size_, i * block_size_));
+            auto block_buf = buf_.GetSubBuffer(block_size_, i * block_size_);
+            free_bufs_.push(block_buf);
+            block_free_status_[ptr_to_string(block_buf.Data())] = true;
         }
     }
     /**
@@ -97,6 +99,7 @@ public:
             if (!free_bufs_.empty()) {
                 buffer = free_bufs_.front();
                 free_bufs_.pop();
+                block_free_status_[ptr_to_string(buffer.Data())] = false;
                 allocated_blocks_++;
                 rw_mtx_.unlock();
                 return buffer;
@@ -115,7 +118,24 @@ public:
      * @param buffer
      */
     void Free(const tcim::Buffer &buffer) {
+        if (buffer.Size() == 0) {
+            return;
+        }
+        std::string key = ptr_to_string(buffer.Data());
         rw_mtx_.lock();
+        // 外部创建的buffer，不处理
+        if (block_free_status_.find(key) == block_free_status_.end()) {
+            rw_mtx_.unlock();
+            printf("[BufferPool] Buffer is external\n");
+            return;
+        }
+        // 已经释放，重复释放直接return
+        if (block_free_status_[key]) {
+            rw_mtx_.unlock();
+            printf("[BufferPool] Buffer has been freed\n");
+            return;
+        }
+        block_free_status_[key] = true;
         free_bufs_.push(buffer);
         allocated_blocks_--;  // 释放时减少计数
         rw_mtx_.unlock();
@@ -135,6 +155,14 @@ public:
     }
 
 private:
+    template <typename T>
+    std::string ptr_to_string(T *p) {
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%p", (void *)p);
+        return std::string(buf);
+    }
+
+private:
     int32_t allocated_blocks_ = 0;  // 新增统计变量
     int32_t block_size_ = 0;
     int32_t block_num_ = 0;
@@ -142,6 +170,7 @@ private:
     int64_t total_size_ = 0;
     tcim::Buffer buf_;   // 总内存
     std::mutex rw_mtx_;  // 内存操作锁
+    std::unordered_map<std::string, bool> block_free_status_;
     std::queue<tcim::Buffer> free_bufs_;
 };
 
@@ -157,6 +186,18 @@ public:
      * @param mem_type 内存类型
      */
     BufferPool(std::vector<BufferPoolCfg> &cfgs, memType_t mem_type, int32_t device_id = 0) {
+        // 参数违法检查
+        if (cfgs.empty()) {
+            throw std::runtime_error("[BufferPool] BufferPool: cfgs is empty");
+        }
+        if (mem_type != DRM && mem_type != HOST && mem_type != RESERVED) {
+            throw std::runtime_error("[BufferPool] Invalid memType");
+        }
+        for (auto &cfg : cfgs) {
+            if (cfg.size <= 0) {
+                throw std::runtime_error("[BufferPool] BufferPoolCfg size must be greater than 0");
+            }
+        }
         // 升序排序
         std::sort(cfgs.begin(), cfgs.end(), [](const BufferPoolCfg &a, const BufferPoolCfg &b) {
             return ALIGN4K(a.size) < ALIGN4K(b.size);

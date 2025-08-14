@@ -1,5 +1,5 @@
 
-# Hmtool
+# Hmatc
 
 ## 安装
 
@@ -122,27 +122,29 @@ quant:
   #####################
   # [可选] 混合量化配置，此处仅作为示例，请根据实际情况配置
   config:
-    # [可选] 混合量化auto搜索的配置
+    # [可选] 混合量化配置
     mix_search:
-      # [可选] 是否开启激活值混合量化，默认false
-      activation_mix: false
-      # [可选] 混合量化的搜索方法，可选all、topk、smart、smart_v2，默认smart
-      # all            表示全int16
-      # smart/smart_v2 表示搜索更具敏感性分析结果进行分配
-      # topk           表示直接将敏感度的较高的前(#top_k_ratio)设为int16类型
-      #  仅对activation有效
-      method: smart
-      # [可选] 是否开启权重混合量化，默认false
-      weight_mix: false
-      # [可选] 混合量化过程中用来校准的样本数，默认1
-      mix_calib_samples: 1
-      # [可选] 混合量化过程提前停止的容忍次数，默认5
-      patience: 5
-      # [可选] weight混合量化的阈值, 越小越多 conv\linear的权重设为int16. 默认0.0004
-      w_thresh_ratio: 0.0004
+      # [可选] 激活值混合量化相关配置
+      activation:
+        # [可选] 混合量化的搜索方法，可选all、auto，默认auto
+        # all       表示全int16
+        # auto      表示搜索更具敏感性分析结果进行分配
+        method:
+          name: auto
+          # 默认0.99
+          target_cos: 0.99
+        # [可选] 混合量化过程中用来校准的样本数，默认1，建议8
+        calib_samples: 1
+      # [可选] 权重混合量化相关配置
+      weight:
+        # [可选] weight混合量化的阈值, 越小越多 conv\linear的权重设为int16. 默认0.0004
+        w_thresh_ratio: 0.0004
     advanced_cfg:
-      # [可选] 是否使用GPTQ进行量化
-      gptq: false 
+      # [可选] 是否使用GPTQ进行量化, 默认false
+      gptq: false
+    # 混合量化关心算子列表，设置后该算子往后的全部算子都会被设置为高bit量化，默认为空
+    mix_attn_out: 
+  
     # [可选] 按节点量化，优先级最高
     node_wise_cfg:
       node_name0:

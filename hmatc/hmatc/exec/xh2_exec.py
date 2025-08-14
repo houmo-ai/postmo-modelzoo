@@ -207,7 +207,6 @@ class Xh2Exec(BaseExec):
                 "golden_md5": golden_output_md5,
                 "cosine_dist": float(dist),
             }
-        logger.warning("The quantized model currently produces incorrect inference results on the CPU, making the output data unreliable for comparison.")
         logger.info(f"Check golden...\n{table}")
         return res_info
        
@@ -306,6 +305,5 @@ class Xh2Exec(BaseExec):
                 "onnx_vs_xh2": float(onnx_vs_xh1),
                 "hmquant_vs_xh2": float(hmquant_vs_xh1),
             }
-        logger.warning("The quantized model currently produces incorrect inference results on the CPU, making the output data unreliable for comparison.")
         logger.info(f"\n{table}")
         return res_info

@@ -42,6 +42,19 @@ class Xh1Exec(BaseExec):
         self.quant_onnx_model_path = os.path.join(
             self.quant_output_dir, "hmquant_" + self.model_name + "_with_act.onnx")
         self.quant_advance_cfg = self.quant_cfg.get("config", dict())
+        mix_search_cfg = self.quant_advance_cfg.get("mix_search", dict())
+        if "activation" in mix_search_cfg:
+            activation_cfg = mix_search_cfg["activation"]
+            if "method" in activation_cfg:
+                activation_method_cfg = activation_cfg["method"]
+                method_name = activation_method_cfg.get("name")
+                if method_name is None:
+                    self.quant_advance_cfg["activation"]["method"] = {"name": "auto"}
+                if method_name not in ["all", "auto"]:
+                    logger.error("activation_mix method must be all or auto")
+                    exit(-1) 
+            else:
+                self.quant_advance_cfg["activation"]["method"] = {"name": "auto"}
         self.enable_static_resizers = list()
         self.max_inputs_size = dict()
         self.resizers_cfg = list()
@@ -73,10 +86,6 @@ class Xh1Exec(BaseExec):
             exit(-1)
         if self.roi_num > 1 and self.hmm_batch > 1:
             logger.error("Not support roi_num > 1, when model_input_batch > 1 or build_batch > 1")
-            exit(-1)
-        # 暂不支持
-        if self.resizer_mode == 2 and (self.roi_num > 1 or self.build_batch > 1 or self.model_input_batch > 1):
-            logger.error("Not support roi_num > 1 or batch > 1 yet, when resizer_mode == 2")
             exit(-1)
         if self.resizer_mode == 3:
             self.roi_num = 1
@@ -157,7 +166,7 @@ class Xh1Exec(BaseExec):
             if resize_type == 1:
                 # padding 
                 padding_values = input_cfg["padding_values"]
-                padding_values = [v - 128 for v in padding_values]  # 需要减128、
+                padding_values = [v - 128 for v in padding_values]  # 需要减128
                 new_input_cfg["resizer_pad"] = {"value": padding_values}
             quant_cfg["inputs_cfg"][input_name].update(new_input_cfg)
         return quant_cfg
@@ -191,7 +200,7 @@ class Xh1Exec(BaseExec):
                         in_datas[f"resizer_crop_{input_name}"] = \
                             torch.Tensor([0, 0, max_height, max_width, H, W, 0, 0, 0, 0]).type(torch.int32).view(1, -1)
                     elif self.resizer_mode == 2:
-                        in_datas[f"resizer_crop_{input_name}"] = torch.Tensor([0, 0, max_height, max_width]).type(torch.int32)
+                        in_datas[f"resizer_crop_{input_name}"] = torch.Tensor([0, 0, max_height, max_width]).type(torch.int32).view(1, -1)
                     if self.resizer_mode == 0:
                         cv_image = in_data[0].permute(1, 2, 0).contiguous().detach().cpu().numpy()
                         im = default_preprocess(
@@ -261,9 +270,6 @@ class Xh1Exec(BaseExec):
                     in_datas[input_name] = torch.cat(batch_datas, dim=0)
                     if self.resizer_mode in [1, 2]:
                         batch_dyninfos = torch.cat(dyn_infos, dim=0)
-                        # dyn_info暂时不支持batch，先去掉batch维度
-                        if self.resizer_mode == 2:
-                            batch_dyninfos = batch_dyninfos.view(-1)
                         in_datas[f"resizer_crop_{input_name}"] = batch_dyninfos
                     yield in_datas
         else:
@@ -425,8 +431,7 @@ class Xh1Exec(BaseExec):
                 golden_dyn_input = np.repeat(golden_dyn_input, repeats=repeats, axis=0)
                 in_datas[f"resizer_crop_{input_name}"] = golden_dyn_input
         
-        res_info = dict()       
-        # TODO 图像输入目前暂不支持多batch
+        res_info = dict()
         outputs, outputs_dequanted = xh1.run(in_datas)
         repeats = 1
         if self.build_batch > 1 and self.roi_num == 1:
@@ -589,10 +594,6 @@ class Xh1Exec(BaseExec):
                     # n图n框
                     hmquant_dyn_info = dyn_info.repeat_interleave(self.model_input_batch, dim=0)
                     xh1_dyn_info = dyn_info.repeat_interleave(hmm_batch, dim=0)
-                # dyn_info暂时不支持batch，先去掉batch维度
-                if self.resizer_mode == 2:
-                    hmquant_dyn_info = hmquant_dyn_info.view(-1)
-                    xh1_dyn_info = xh1_dyn_info.view(-1)
                 hmquant_in_datas[f"resizer_crop_{input_name}"] = hmquant_dyn_info
                 xh1_in_datas[f"resizer_crop_{input_name}"] = xh1_dyn_info.detach().cpu().numpy()
         else:
@@ -657,4 +658,4 @@ class Xh1Exec(BaseExec):
         logger.info(f"Compare...\n{table}")
         return res_info
         
-        
+                
