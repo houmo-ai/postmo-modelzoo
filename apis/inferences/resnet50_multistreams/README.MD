@@ -14,7 +14,6 @@ Resnet50 Multistreams Example 以resnet50模型为例展示TCIM API在多设备�
 4. 支持配置多线程，每个线程使用1个stream
 5. 支持配置多设备，每个设备使用相同数量的线程
 
-注：本示例仅支持后摩Target为XH1。
 
 ## 软件依赖
 

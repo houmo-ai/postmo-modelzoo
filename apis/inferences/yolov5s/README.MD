@@ -19,7 +19,6 @@ TCIM Examples 以yolov5s模型为例展示TCIM API推理的基本使用方式。
 
 其中方法2在本示例中仅提供Linux系统运行方法，如需在windows系统中运行可自行安装配置onnxruntime环境，则可使用相同步骤运行方法2示例。
 
-注：本示例中的C++示例仅支持后摩Target为XH1。
 
 ## 软件依赖
 
@@ -32,7 +31,7 @@ TCIM Examples 以yolov5s模型为例展示TCIM API推理的基本使用方式。
 ```bash
 # 后处理实现为方法1
 python3 get_model.py
-# 后处理实现为方法2 (仅支持Linux)
+# 后处理实现为方法2 (仅支持Linux)，其中将安装执行C++示例所需的onnxruntime环境
 python3 get_model.py --enable_ort
 ```
 
@@ -66,6 +65,10 @@ cmake -DENABLE_ORT=ON -DCMAKE_INSTALL_PREFIX=../
 make -j
 make install
 cd ..
+# 将onnxruntime的动态库路径加入LD_LIBRARY_PATH，执行C++用例时需要依赖
+WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+export LD_LIBRARY_PATH=$WORK_PATH/../../models/3rdparty/onnxruntime/lib:$LD_LIBRARY_PATH
+# 执行C++示例
 ./example_yolov5s --enable_ort
 ```
 
@@ -81,12 +84,12 @@ output[340] shape = [1, 3, 80, 80, 85], dtype = <class 'numpy.float32'>, format 
 output[378] shape = [1, 3, 40, 40, 85], dtype = <class 'numpy.float32'>, format = ND
 output[416] shape = [1, 3, 20, 20, 85], dtype = <class 'numpy.float32'>, format = ND
 box num = 20
-x1:9, y1:166, x2:149, y2:264, conf:0.915732, cls:62
-x1:291, y1:218, x2:356, y2:317, conf:0.871175, cls:56
-x1:414, y1:156, x2:466, y2:298, conf:0.789320, cls:0
-x1:556, y1:211, x2:642, y2:287, conf:0.767701, cls:62
+x1:7, y1:169, x2:153, y2:261, conf:0.898910, cls:62
+x1:293, y1:217, x2:353, y2:318, conf:0.855038, cls:56
+x1:412, y1:155, x2:465, y2:298, conf:0.804303, cls:0
+x1:557, y1:211, x2:640, y2:285, conf:0.754565, cls:62
 ...
-x1:383, y1:170, x2:407, y2:216, conf:0.265686, cls:58
+x1:241, y1:195, x2:252, y2:213, conf:0.251770, cls:75
 demo results saved to demo_results/python/000000000139.jpg
 <=== yolov5s python example completed.
 ```
@@ -104,12 +107,12 @@ Output[340] TensorInfo: shape: [1,3,80,80,85], stride: [], dtype: FLOAT32, forma
 Output[378] TensorInfo: shape: [1,3,40,40,85], stride: [], dtype: FLOAT32, format: ND, size: 1632000, memsize: 1632000
 Output[416] TensorInfo: shape: [1,3,20,20,85], stride: [], dtype: FLOAT32, format: ND, size: 408000, memsize: 408000
 detect num: 17
-box[10, 167, 150, 265], conf:0.923558, cls:62
-box[294, 218, 352, 317], conf:0.856569, cls:56
-box[417, 155, 464, 299], conf:0.790732, cls:0
-box[558, 210, 639, 286], conf:0.706285, cls:62
+box[6, 169, 152, 260], conf:0.898910, cls:62
+box[292, 217, 352, 317], conf:0.855038, cls:56
+box[412, 155, 465, 298], conf:0.804303, cls:0
+box[556, 211, 639, 284], conf:0.754565, cls:62
 ...
-box[240, 194, 253, 212], conf:0.258923, cls:75
+box[241, 195, 252, 212], conf:0.251770, cls:75
 demo results saved to demo_results/cpp/000000000139.jpg
 <=== yolov5s c++ example completed.
 ```
