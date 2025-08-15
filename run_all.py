@@ -69,10 +69,12 @@ def addCiMarker(test_type: str, filter_str: str):
             for idx, line in enumerate(lines):
                 line = line.strip()
                 for func in funcs:
-                    if func in line:
+                    func_str = "def " + func + "("
+                    if func_str in line:
                         func_indexes.append(idx)
                         break
         for idx in reversed(func_indexes):
+            logger.info(f"Add ci marker to testcase func:{lines[idx]}")
             lines.insert(idx, "@pytest.mark.imodelzoo\n")
         with open(file_path, 'w', encoding='utf-8') as f:
             f.writelines(lines)
