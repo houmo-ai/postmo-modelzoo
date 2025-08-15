@@ -52,17 +52,17 @@ API示例列表如下，type列为示例类型，其中convert表示模型转换
 
 量化和编译示例仅支持在量化工具和编译器支持的平台上运行，部署示例支持情况还受到其他交付件的限制，如固件类型（如芯片解码的示例只能在VPU固件上运行，大模型只能在非VPU固件上运行）、硬件规格（如2核芯片只能运行2核以下编译的模型），具体请查看示例内readme文件。
 
-| example name                 | path                                        | type      | language   | target  | platform    |
-| ---------------------------- | ------------------------------------------- | --------- | ---------- | ------- | ----------- |
-| resnet50量化编译             | apis/converts/resnet50                      | convert   | python     | xh1/xh2 | x64         |
-| resnet50单线程推理           | apis/inferences/resnet50                    | inference | python/c++ | xh1/xh2 | x64/aarch64 |
-| yolov5s单线程推理            | apis/inferences/yolov5s                     | inference | python/c++ | xh1/xh2 | x64/aarch64 |
-| resnet50多线程多stream推理   | apis/inferences/resnet50_multistreams       | inference | c++        | xh1     | x64/aarch64 |
-| resnet50流水推理             | apis/inferences/resnet50_pipeline           | inference | c++        | xh1     | x64/aarch64 |
-| yolov5s_resnet50多batch推理  | apis/inferences/yolov5s_resnet50_multibatch | inference | c++        | xh1     | x64/aarch64 |
-| 视频流目标检测分析           | apis/scenes/video_detect                    | scenes    | c++        | xh1     | x64/aarch64 |
+| example name                 | path                                        | type      | language   | target  |    arch     |      os     |
+| ---------------------------- | ------------------------------------------- | --------- | ---------- | ------- | ----------- | ----------- |
+| resnet50量化编译             | apis/converts/resnet50                      | convert   | python     | xh1/xh2 | x64         |  win/linux  |
+| qwen3单线程推理              | apis/inferences/qwen3                       | inference | python     | xh1/xh2 | x64/aarch64 |  win/linux  |
+| resnet50单线程推理           | apis/inferences/resnet50                    | inference | python/c++ | xh1/xh2 | x64/aarch64 |  win/linux  |
+| yolov5s单线程推理            | apis/inferences/yolov5s                     | inference | python/c++ | xh1/xh2 | x64/aarch64 |  win/linux  |
+| resnet50多线程多stream推理   | apis/inferences/resnet50_multistreams       | inference | c++        | xh1/xh2 | x64/aarch64 |  win/linux  |
+| resnet50流水推理             | apis/inferences/resnet50_pipeline           | inference | c++        | xh1/xh2 | x64/aarch64 |  win/linux  |
+| yolov5s_resnet50多batch推理  | apis/inferences/yolov5s_resnet50_multibatch | inference | c++        | xh1     | x64/aarch64 |  linux      |
+| 视频流目标检测分析           | apis/scenes/video_detect                    | scenes    | c++        | xh1     | x64/aarch64 |  linux      |
 
-**注：由于xh2暂不支持resizer，以上所有c++推理示例暂不支持xh2平台**
 
 ## 模型示例
 
