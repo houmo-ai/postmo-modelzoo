@@ -213,7 +213,7 @@ def format_number(n):
     elif n >= 1024:
         return f"{n // 1024}k"
     else:
-        return str(n)
+        return f"0k"
 
 def move_llm(args):
     work_dir = Path(args.out_dir)

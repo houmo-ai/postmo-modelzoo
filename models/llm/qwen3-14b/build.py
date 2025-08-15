@@ -119,6 +119,7 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore, ndevice
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim"),
         llm_opt=True,
+        j=24,
         **kwargs
     )
     profile["build"] = time.time() - start

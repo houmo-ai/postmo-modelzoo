@@ -52,7 +52,7 @@ def get_args() -> argparse.Namespace:
         '--batch',
         dest='batch',
         type=int,
-        default=1,
+        default=None,
         help='batch size',
     )
     parser.add_argument(
@@ -61,6 +61,21 @@ def get_args() -> argparse.Namespace:
         type=int,
         default=HOUMO_CORE_NUM,
         help='core number',
+    )
+    parser.add_argument(
+        '--context_length',
+        dest='context_length',
+        type=int,
+        default=None,
+        help='context_length',
+    )
+    parser.add_argument(
+        '--ndevice',
+        dest='ndevice',
+        type=int,
+        default=None,
+        choices=[1, 2],
+        help='device number',
     )
     parser.add_argument(
         '--stage',
@@ -80,8 +95,18 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
+def build(model_name, model_dir, model_path, output_dir, profile, ncore, ndevice, context_length, batch=None):
     import tcim
+    if HOUMO_TARGET == "xh2":
+        kwargs = {}
+        kwargs["modify_llm"] = {}
+        if ndevice:
+            kwargs["ndevice"] = ndevice
+        if batch:
+            kwargs["modify_llm"]["batch"] = batch
+        if context_length:
+            kwargs["modify_llm"]["context-length"] = context_length
+
     start = time.time()
     print(f"\n===> {model_name} build start...")
     decode_model = os.path.join(model_dir, model_path)
@@ -94,10 +119,10 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim"),
         llm_opt=True,
+        **kwargs
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
-
 
 def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     import tcim_lite
@@ -181,6 +206,8 @@ if __name__ == '__main__':
     output_dir = args.output_dir
     ncore = args.ncore
     batch = args.batch
+    ndevice = args.ndevice
+    context_length = args.context_length
     profile = {}
 
     # build model
@@ -191,13 +218,13 @@ if __name__ == '__main__':
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
         model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
-        build("qwen2.5_prefill", model_dir, model_path, output_dir, profile, ncore)
+        build("qwen2.5_prefill", model_dir, model_path, output_dir, profile, ncore, ndevice, context_length)
         model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
-        build("qwen2.5_decode", model_dir, model_path, output_dir, profile, ncore)
+        build("qwen2.5_decode", model_dir, model_path, output_dir, profile, ncore, ndevice, context_length, batch)
 
     # test model
     if args.stage == 'test' or args.stage == 'all':
         part_dir = os.path.join(model_dir, "prefill")
-        # test("qwen2.5_prefill", part_dir, output_dir, profile, prefix=model_name)
+        test("qwen2.5_prefill", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "decoder")
-        # test("qwen2.5_decode", part_dir, output_dir, profile, prefix=model_name)
+        test("qwen2.5_decode", part_dir, output_dir, profile, prefix=model_name)
