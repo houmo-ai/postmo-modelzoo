@@ -33,6 +33,7 @@ make install
 
 cd $WORK_PATH
 if [ "$ORT_SWITCH" = "ON" ]; then
+    export LD_LIBRARY_PATH=$WORK_PATH/../../models/3rdparty/onnxruntime/lib:$LD_LIBRARY_PATH
     ./example_yolov5s --enable_ort
 else
     ./example_yolov5s

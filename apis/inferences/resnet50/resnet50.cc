@@ -190,7 +190,7 @@ int main() {
     }
   }
   // check result, modify it when you change model or data
-  if (houmo_target == "xh1" && top1 != 65) {
+  if (top1 != 65) {
     std::cout << "top1 != 65" << std::endl;
     exit(-1);
   }
