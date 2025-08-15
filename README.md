@@ -68,6 +68,24 @@ pip install -r requirements.txt
 此外，示例运行需要依赖houmo-tcim-runtime，参考后摩大道软件平台快速入门配置runtime环境。
 
 
+## API示例
+
+API示例列表如下，type列为示例类型，其中convert表示模型转换，inference表示模型推理，scenes表示应用场景。language列为支持的编程语言，target列为支持的芯片平台。
+
+量化和编译示例仅支持在量化工具和编译器支持的平台上运行，部署示例支持情况还受到其他交付件的限制，如固件类型（如芯片解码的示例只能在VPU固件上运行，大模型只能在非VPU固件上运行）、硬件规格（如2核芯片只能运行2核以下编译的模型），具体请查看示例内readme文件。
+
+| example name                 | path                                        | type      | language   | target  |    arch     |      os     |
+| ---------------------------- | ------------------------------------------- | --------- | ---------- | ------- | ----------- | ----------- |
+| resnet50量化编译             | apis/converts/resnet50                      | convert   | python     | xh1/xh2 | x64         |  win/linux  |
+| qwen3单线程推理              | apis/inferences/qwen3                       | inference | python     | xh1/xh2 | x64/aarch64 |  win/linux  |
+| resnet50单线程推理           | apis/inferences/resnet50                    | inference | python/c++ | xh1/xh2 | x64/aarch64 |  win/linux  |
+| yolov5s单线程推理            | apis/inferences/yolov5s                     | inference | python/c++ | xh1/xh2 | x64/aarch64 |  win/linux  |
+| resnet50多线程多stream推理   | apis/inferences/resnet50_multistreams       | inference | c++        | xh1/xh2 | x64/aarch64 |  win/linux  |
+| resnet50流水推理             | apis/inferences/resnet50_pipeline           | inference | c++        | xh1/xh2 | x64/aarch64 |  win/linux  |
+| yolov5s_resnet50多batch推理  | apis/inferences/yolov5s_resnet50_multibatch | inference | c++        | xh1     | x64/aarch64 |  linux      |
+| 视频流目标检测分析           | apis/scenes/video_detect                    | scenes    | c++        | xh1     | x64/aarch64 |  linux      |
+
+
 ## 模型示例
 
 模型示例主要依赖hmatc工具完成评估功能，可通过每个模型示例下的test.sh脚本一键执行，也可参考脚本中的命令分步执行，相关参数在config.yml配置。
