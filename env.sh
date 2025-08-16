@@ -41,7 +41,7 @@ if [[ -z $HOUMO_MODEL_PATH ]]; then
 fi
 
 # paths for xh2 modelzoo
-export PYTHONPATH=$HOUMO_EXAMPLES_PATH/hmodel/xh2:$PYTHONPATH
+export PYTHONPATH=$HOUMO_EXAMPLES_PATH/apis/common/python:$HOUMO_EXAMPLES_PATH/hmodel/xh2:$PYTHONPATH
 export HF_ENDPOINT=https://hf-mirror.com
 
 # use asic if detected

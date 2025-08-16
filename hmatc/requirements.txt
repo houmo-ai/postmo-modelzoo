@@ -1,7 +1,7 @@
 # hmquant-xh1
 # houmo-tcim-xh1
 # houmo-tcim-runtime-xh1
-opencv-python-headless==4.6.0.66
+# opencv-python-headless==4.6.0.66
 numpy
 prettytable
 onnx

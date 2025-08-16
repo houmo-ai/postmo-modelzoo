@@ -1,10 +1,12 @@
 #!/bin/bash
 set -e
 
+export HOUMO_MODELZOO_URL=http://10.10.1.53:8082/artifactory/toolchain/release
+
 target=$HOUMO_TARGET
 user=$1
 pwd=$2
-date=20250808
+date=20250815
 
 UPDATE_HMQUANT() {
     dir=$1

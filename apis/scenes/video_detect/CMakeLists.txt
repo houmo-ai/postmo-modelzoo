@@ -21,7 +21,7 @@ endif()
 include_directories(${TCIM_RUNTIME_PATH}/include)
 include_directories(${HOUMO_SDK_PATH}/hal/include/drm)
 include_directories(${HOUMO_SDK_PATH}/hal/include/codec)
-include_directories(${HOUMO_EXAMPLES_PATH}/common/hpp)
+include_directories(${HOUMO_EXAMPLES_PATH}/apis/common/hpp)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 if(ENABLE_RK_DECODER)

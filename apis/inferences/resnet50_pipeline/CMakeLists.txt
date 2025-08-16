@@ -8,7 +8,7 @@ find_library(TCIM_LIBRARY NAMES tcim_runtime_lite PATHS ${TCIM_RUNTIME_PATH}/lib
 find_package(OpenCV REQUIRED)
 
 include_directories(${TCIM_RUNTIME_PATH}/include)
-include_directories(${HOUMO_EXAMPLES_PATH}/common/hpp)
+include_directories(${HOUMO_EXAMPLES_PATH}/apis/common/hpp)
 include_directories(${OpenCV_INCLUDE_DIRS})
 message("OpenCV_INCLUDE_DIRS=${OpenCV_INCLUDE_DIRS}")
 message("TCIM_RUNTIME_PATH=${TCIM_RUNTIME_PATH}")

@@ -10,7 +10,7 @@ import tcim_lite as tcim
 if __name__ == '__main__':
     sys.path.insert(0, "../../common/python")
     print("\n===> resnet50 python example start...")
-    houmo_target = os.getenv("HOUMO_TARGET", "houmo")
+    houmo_target = os.getenv("HOUMO_TARGET")
     print(f"tcim runtime version: {tcim.runtime.get_version()}, houmo target: {houmo_target}")
 
     # 1. load model
