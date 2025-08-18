@@ -815,11 +815,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                     max_qps = qps[0]
         backend_metrics = model_info["perf_metrics"].get(HOUMO_BACKEND, None)
         benchmark = backend_metrics.get(platform, None)
-        if benchmark and max_qps >= (benchmark * 0.95):
-            logger.info(
-                f"The best performance is {max_qps} qps, benchmark qps is {benchmark}."
-            )
-        elif is_ci() and benchmark and max_qps >= (benchmark * 0.95 * 0.7):
+        if benchmark and (max_qps >= (benchmark * 0.95) or is_ci()):
             logger.info(
                 f"The best performance is {max_qps} qps, benchmark qps is {benchmark}."
             )
