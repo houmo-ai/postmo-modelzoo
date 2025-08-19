@@ -57,7 +57,7 @@ def get_args() -> argparse.Namespace:
         '--decode',
         dest='decode_length',
         type=int,
-        default=4096,
+        default=8192,
         help='decode max length',
     )
     parser.add_argument(
