@@ -3,12 +3,8 @@
 import os
 import sys
 import numpy as np
-import shutil
-import urllib.request
-import tarfile
-import zipfile
 import logging
-import time
+from tqdm import tqdm
 
 
 logger = logging.getLogger()
@@ -17,6 +13,7 @@ logger.setLevel(logging.INFO)
 
 def get_file_md5(file_path):
     import hashlib
+
     hash_md5 = hashlib.md5()
     with open(file_path, "rb") as file:
         for chunk in iter(lambda: file.read(4096), b""):
@@ -24,40 +21,50 @@ def get_file_md5(file_path):
     return hash_md5.hexdigest()
 
 
-start_time = time.time()
-def download_file(url, save_path):
-    def reporthook(block_num, block_size, total_size):
-        global start_time
-        if total_size is None:
-            total_size = total_size
-            start_time = time.time()
-            print("download begin...")
-        elif total_size != -1:
-            downloaded = block_num * block_size
-            if downloaded < total_size:
-                try:
-                    speed = downloaded / (time.time() - start_time)
-                    remaining_time = (total_size - downloaded) / speed
-                    percent = int((downloaded / total_size) * 100)
-                    sys.stdout.write("\r[{:<50}] {:>3}% speed: {:.2f}KB/s last: {:.2f}s".format(
-                        "=" * percent + " " * (100 - percent), percent, speed / 1024, remaining_time))
-                    sys.stdout.flush()
-                except ZeroDivisionError:
-                    pass
-            else:
-                print("\ndownload finished.")
-    if not os.path.exists(save_path):
-        print("download from %s to %s" % (url, save_path))
-        urllib.request.urlretrieve(url, save_path, reporthook=reporthook)
-        return True
-    else:
-        print("local file %s has already exsit" % save_path)
-    return False
+def download_file(url, save_path, file_name, file_size, chunk_size=1024 * 1024):
+    if os.path.exists(save_path):
+        print("local file %s has already exist" % save_path)
+        return False
+    if file_size <= 0 or len(file_name) == 0:
+        print(f"Invalid file info, file name {file_name}, file size: {file_size}")
+        return False
+
+    import requests
+
+    try:
+        with requests.get(url, stream=True) as response:
+            response.raise_for_status()
+
+            # 创建进度条
+            with tqdm(
+                total=file_size,
+                unit='B',
+                unit_scale=True,
+                unit_divisor=4096,
+                desc=file_name,
+            ) as pbar:
+                with open(save_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:  # 过滤掉保持连接的空块
+                            f.write(chunk)
+                            pbar.update(len(chunk))
+
+            print(f"download {save_path} finished.")
+            return True
+    except requests.exceptions.RequestException as e:
+        print(f"download {save_path} failed, error msg: {str(e)}")
+        if os.path.exists(save_path) and os.path.getsize(save_path) != file_size:
+            os.remove(save_path)
+        return False
+    except Exception as e:
+        print(f"download {save_path} failed, unknown err: {str(e)}")
+        return False
 
 
 def get_file_from_jfrog(file_path, save_dir, extract_dir=None):
     import requests
     import os
+
     need_download = True
     if "http://" in file_path or "https://" in file_path:
         url, file_path = file_path.split("artifactory/")
@@ -69,33 +76,46 @@ def get_file_from_jfrog(file_path, save_dir, extract_dir=None):
         save_dir = os.getenv("HOUMO_MODEL_PATH", ".")
     else:
         os.makedirs(save_dir, exist_ok=True)
-    save_path = f"{save_dir}/{file_name}"
+    save_path = os.path.join(save_dir, file_name)
     jfrog_base, jfrog_tail = modelzoo_url.split("artifactory/")
     jfrog_base = jfrog_base + "artifactory"
     file_info_path = f"{jfrog_base}/api/storage/{jfrog_tail}/{file_path}"
+    file_size = 0
     response = requests.get(file_info_path)
     if response.status_code == 200:
         url_md5 = response.json()['checksums']['md5']
-        if os.path.exists(save_path):
-            if (get_file_md5(save_path) == url_md5):
-                print(url_md5, save_path, "already exists.")
-                need_download = False
+        file_size = int(response.json()["size"])
+        if os.path.exists(save_path) and get_file_md5(save_path) == url_md5:
+            print(url_md5, save_path, "already exists.")
+            need_download = False
     else:
         print("failed to retrieve MD5. status code:", response.status_code)
+        return ""
 
     if need_download:
         if os.path.exists(save_path):
             os.remove(save_path)
         url = f"{modelzoo_url}/{file_path}"
-        assert(download_file(url, save_path=save_path))
+        if download_file(url, save_path, file_name, file_size) is False:
+            return ""
 
     if extract_dir is not None:
-        if save_path.rfind('.zip') > 0:
+        if save_path.rfind(".zip") > 0:
+            import zipfile
+
             with zipfile.ZipFile(save_path, "r") as zip:
                 print("extract to %s" % extract_dir)
                 zip.extractall(path=extract_dir)
-        elif save_path.rfind('.tar') > 0 or save_path.rfind('.tgz') > 0:
+        elif save_path.rfind(".tar.gz") > 0:
+            import tarfile
+
             with tarfile.open(save_path, "r:gz") as tar:
+                print("extract to %s" % extract_dir)
+                tar.extractall(path=extract_dir)
+        elif save_path.rfind(".tar.xz") > 0:
+            import tarfile
+
+            with tarfile.open(save_path, "r:xz") as tar:
                 print("extract to %s" % extract_dir)
                 tar.extractall(path=extract_dir)
     return save_path
