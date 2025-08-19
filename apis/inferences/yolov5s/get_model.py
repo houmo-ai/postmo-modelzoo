@@ -4,7 +4,7 @@ import platform
 import argparse
 
 HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../..')
-sys.path.append(f'{HOUMO_EXAMPLES_PATH}/common/python')
+sys.path.append(f'{HOUMO_EXAMPLES_PATH}/apis/common/python')
 from utils import get_file_from_jfrog
 
 

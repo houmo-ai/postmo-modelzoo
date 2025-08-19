@@ -11,6 +11,7 @@ onnxruntime
 tqdm
 pyyaml
 xlsxwriter
+requests
 pycocotools
 ultralytics
 transformers

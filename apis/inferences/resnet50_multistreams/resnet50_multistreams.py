@@ -41,7 +41,7 @@ def get_args() -> argparse.Namespace:
 if __name__ == '__main__':
     sys.path.insert(0, "../../common/python")
     print("\n===> resnet50_multistreams python example start...")
-    houmo_target = os.getenv("HOUMO_TARGET", "houmo")
+    houmo_target = os.getenv("HOUMO_TARGET")
     print(f"tcim runtime version: {tcim.runtime.get_version()}, houmo target: {houmo_target}")
 
     # set the parameters

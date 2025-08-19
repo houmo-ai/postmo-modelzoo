@@ -362,7 +362,7 @@ if __name__ == '__main__':
     args = get_args()
     sys.path.insert(0, "../../common/python")
     print("\n===> yolov5s python example start...")
-    houmo_target = os.getenv("HOUMO_TARGET", "houmo")
+    houmo_target = os.getenv("HOUMO_TARGET")
     print(f"tcim runtime version: {tcim.runtime.get_version()}, houmo target: {houmo_target}, enable ort: {args.enable_ort}")
 
     # 1. load model
