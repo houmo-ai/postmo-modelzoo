@@ -35,32 +35,38 @@ int GetTopk(int topk, std::vector<std::pair<T, int>> sort_pairs) {
             });
 
   for (int i = 0; i < topk; ++i) {
-    std::cout << "top" << (i + 1) << ": Index=" << sort_pairs[i].second
-              << " Conf=" << sort_pairs[i].first << ", Label=["
-              << Imagenet::GetLabel(sort_pairs[i].second) << "]" << std::endl;
+    LOG_INFO("TOP {}: Index={}, Conf={}, Label=[{}]", (i + 1),
+             sort_pairs[i].second, sort_pairs[i].first,
+             Imagenet::GetLabel(sort_pairs[i].second));
   }
 
   return sort_pairs[0].second;
 }
 
-std::vector<uint8_t> readBinaryFile(const std::string& file_path) {
+std::string TensorInfo2Str(const tcim::TensorInfo& tensor_info) {
+  std::stringstream ss;
+  ss << tensor_info;
+  return ss.str();
+}
+
+std::vector<uint8_t> ReadBinaryFile(const std::string& file_path) {
   std::ifstream file(file_path,
                      std::ios::in | std::ios::binary | std::ios::ate);
   if (!file.is_open()) {
-    std::cerr << "Can not open file:" << file_path << std::endl;
+    LOG_ERROR("Can not open file {}.", file_path);
     return {};  // 空文件
   }
   // get file size
   std::streamsize size = file.tellg();
   if (size <= 0) {
-    std::cerr << "File content is null." << std::endl;
+    LOG_ERROR("File content is null.");
     return {};  // 空文件
   }
 
   file.seekg(0, std::ios::beg);
   std::vector<uint8_t> buffer(size);
   if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
-    std::cerr << "Failed to load file:" << file_path << std::endl;
+    LOG_ERROR("Failed to read model file {}.", file_path);
     return {};  // 空文件
   }
 
@@ -70,19 +76,18 @@ std::vector<uint8_t> readBinaryFile(const std::string& file_path) {
 PooledModule* LoadModelFromFile(ModulePool* module_pool,
                                 std::string model_path) {
   if (!fs::exists(model_path)) {
-    std::cerr
-        << model_path
-        << " not exist. you should run build.py in resnet50 example first."
-        << std::endl;
+    LOG_ERROR("Model file {} doesn't exist.", model_path);
     return nullptr;
   }
 
   auto pooled_md = module_pool->Load(model_path);
   if (pooled_md == nullptr) {
-    std::cerr << "load model " << model_path << " fail." << std::endl;
+    LOG_ERROR("Failed to load model {}.", model_path);
     return nullptr;
   }
-  std::cout << "load model " << model_path << std::endl;
+  LOG_INFO("Load model {} and pool it into {}.", model_path,
+           reinterpret_cast<void*>(pooled_md));
+
   return pooled_md;
 }
 
@@ -90,16 +95,18 @@ PooledModule* LoadModelFromBuffer(ModulePool* module_pool,
                                   std::string model_name, void* model_data,
                                   int len) {
   if (model_data == nullptr or len <= 0) {
-    std::cerr << "Invalid model data ptr or model length!" << std::endl;
+    LOG_ERROR("Invalid model data ptr or model length {}!", len);
     return nullptr;
   }
 
   auto pooled_md = module_pool->Load(model_name, model_data, len);
   if (pooled_md == nullptr) {
-    std::cerr << "load model " << model_name << " fail." << std::endl;
+    LOG_ERROR("Failed to load model {} from buffer {}!", model_name,
+              model_data);
     return nullptr;
   }
-  std::cout << "load model " << model_name << " success." << std::endl;
+  LOG_INFO("Load model {} from buffer and pool it into {}.", model_name,
+           reinterpret_cast<void*>(pooled_md));
   return pooled_md;
 }
 
@@ -119,17 +126,17 @@ int ObserveInference(ModulePool* pool_ptr,
 
 int ExecuteClassifyModel(PooledModule* pooled_md, std::string data_path,
                          int task_num) {
-  std::cout << "start execute model, thread id:" << std::this_thread::get_id()
-            << std::endl;
+  LOG_WARNING("===> Start to execute classify model, pooled module is ({}){}.",
+              reinterpret_cast<void*>(pooled_md), pooled_md->GetPooledMdName());
 
   // 1. prepare input tensors
   std::map<std::string, tcim::Tensor> input_map;
   int input_num = pooled_md->GetInputNum();
-  std::cout << "Count of Input: " << input_num << std::endl;
+  LOG_INFO("Count of Input: {}.", input_num);
   for (int idx = 0; idx < input_num; idx++) {
     auto input_name = pooled_md->GetInputName(idx);
     auto input_info = pooled_md->GetInputInfo(input_name, true);
-    std::cout << "Input[" << input_name << "] " << input_info << std::endl;
+    LOG_INFO("  Input[{}] {}.", input_name, TensorInfo2Str(input_info));
     tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info);
     input_map.insert(
         std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
@@ -137,7 +144,7 @@ int ExecuteClassifyModel(PooledModule* pooled_md, std::string data_path,
 
   // 2. preprocess input image
   if (!fs::exists(data_path)) {
-    std::cerr << data_path << "not exist." << std::endl;
+    LOG_ERROR("Input data {} doesn't exist.", data_path);
     return -1;
   }
   cv::Mat img_rgb;
@@ -153,11 +160,11 @@ int ExecuteClassifyModel(PooledModule* pooled_md, std::string data_path,
   // 3. prepare input tensors
   std::map<std::string, tcim::Tensor> output_map;
   int output_num = pooled_md->GetOutputNum();
-  std::cout << "Count of Output: " << output_num << std::endl;
+  LOG_INFO("Count of Output: {}.", output_num);
   for (int idx = 0; idx < output_num; idx++) {
     auto output_name = pooled_md->GetOutputName(idx);
     auto output_info = pooled_md->GetOutputInfo(output_name, true);
-    std::cout << "Output[" << output_name << "] " << output_info << std::endl;
+    LOG_INFO("  Output[{}] {}", output_name, TensorInfo2Str(output_info));
     auto output_tensor = tcim::Tensor::CreateHostTensor(output_info);
     output_map.insert(
         std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
@@ -181,29 +188,31 @@ int ExecuteClassifyModel(PooledModule* pooled_md, std::string data_path,
 
     // 6. check result (modify it when you change model or data)
     if (top1 != 65) {
-      std::cout << "top1 != 65" << std::endl;
+      LOG_ERROR("Top1 is {}, the expected value is 65.", top1);
       return -1;
     }
 
     task_num--;
   }
 
+  LOG_WARNING("<=== End to execute classify model, pooled module is ({}){}.",
+              reinterpret_cast<void*>(pooled_md), pooled_md->GetPooledMdName());
   return 0;
 }
 
 int ExecuteDetectModel(PooledModule* pooled_md, std::string data_path,
                        int task_num) {
-  std::cout << "start execute yolov5s model, thread id:"
-            << std::this_thread::get_id() << std::endl;
+  LOG_WARNING("===> Start to execute detection model, pooled module is ({}){}.",
+              reinterpret_cast<void*>(pooled_md), pooled_md->GetPooledMdName());
 
   // 1. prepare input tensors
   std::map<std::string, tcim::Tensor> input_map;
   int input_num = pooled_md->GetInputNum();
-  std::cout << "Count of Input: " << input_num << std::endl;
+  LOG_INFO("Count of Input: {}.", input_num);
   for (int idx = 0; idx < input_num; idx++) {
     auto input_name = pooled_md->GetInputName(idx);
     auto input_info = pooled_md->GetInputInfo(input_name, true);
-    std::cout << "Input[" << input_name << "] " << input_info << std::endl;
+    LOG_INFO("  Input[{}] {}", input_name, TensorInfo2Str(input_info));
     tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info);
     input_map.insert(
         std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
@@ -211,7 +220,7 @@ int ExecuteDetectModel(PooledModule* pooled_md, std::string data_path,
 
   // 2. preprocess input image
   if (!fs::exists(data_path)) {
-    std::cerr << data_path << "not exist." << std::endl;
+    LOG_ERROR("Input data {} doesn't exist.", data_path);
     return -1;
   }
   cv::Mat img_raw = cv::imread(data_path);
@@ -233,11 +242,11 @@ int ExecuteDetectModel(PooledModule* pooled_md, std::string data_path,
   std::map<std::string, tcim::Tensor> output_map;
   std::map<std::string, tcim::Tensor> output_map_f32;
   int output_num = pooled_md->GetOutputNum();
-  std::cout << "Count of Output: " << output_num << std::endl;
+  LOG_INFO("Count of Output: {}.", output_num);
   for (int idx = 0; idx < output_num; idx++) {
     auto output_name = pooled_md->GetOutputName(idx);
     auto output_info = pooled_md->GetOutputInfo(output_name, true);
-    std::cout << "Output[" << output_name << "] " << output_info << std::endl;
+    LOG_INFO("  Output[{}] {}", output_name, TensorInfo2Str(output_info));
     auto output_tensor = tcim::Tensor::CreateHostTensor(output_info);
     output_map.insert(
         std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
@@ -265,71 +274,67 @@ int ExecuteDetectModel(PooledModule* pooled_md, std::string data_path,
     YoloV5 yolov5;
     auto detections = yolov5.postprocess(img_raw, outputs);
 
-    // 6. print and draw
-    std::cout << "detection thread id:" << std::this_thread::get_id()
-              << ", detect num:" << detections.size() << std::endl;
+    // 6. print
+    LOG_INFO("detect num {}.", detections.size());
     for (const auto& detection : detections) {
-      printf("box[%d, %d, %d, %d], conf:%f, cls:%d\n", detection.box.x1,
-             detection.box.y1, detection.box.x2, detection.box.y2,
-             detection.conf, detection.cls);
+      LOG_DEBUG("  box[{}, {}, {}, {}], conf:{}, cls:{}.", detection.box.x1,
+                detection.box.y1, detection.box.x2, detection.box.y2,
+                detection.conf, detection.cls);
     }
 
     // check result
     if (detections.size() != 17) {
-      std::cerr << "[Error] detection result wrong, detect num != 17"
-                << std::endl;
+      LOG_ERROR("detect num is {}, the expected value is 17.",
+                detections.size());
       return -1;
     }
 
     task_num--;
   }
 
+  LOG_WARNING("<=== End to execute detection model, pooled module is ({}){}.",
+              reinterpret_cast<void*>(pooled_md), pooled_md->GetPooledMdName());
   return 0;
 }
 
 int main() {
-  std::cout << "===> module pool c++ example start..." << std::endl;
+  LOG_WARNING("===> module pool c++ example start...");
   const char* houmo_target_env = getenv("HOUMO_TARGET");
   std::string houmo_target =
       houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
   if (houmo_target != "xh1") {
-    std::cerr << "Unsupported backend " << houmo_target << std::endl;
+    LOG_ERROR("Unsupported backend {}.", houmo_target);
     exit(-1);
   }
-  std::cout << "tcim version:" << tcim::GetVersion()
-            << ", houmo target:" << houmo_target << std::endl;
+  LOG_INFO("tcim version:{}, houmo target:{}.", tcim::GetVersion(),
+           houmo_target);
 
   int core_num = 4;
-  int md_num = 8;
+  int pooled_md_num = 8;
   int inference_thread_num = 16;
   int infer_task_num = 500;
   auto pool_ptr = ModulePool::Init(core_num);
 
   // 1. load model
   // 1.1 prepare model file
-  std::cout << "Load models: resnet50 & yolov5s" << std::endl;
   std::string resnet50_path = "./resnet50.hmm";
   std::string yolov5s_path = "./yolov5s.hmm";
-  if (houmo_target == "xh2") {
-    resnet50_path = "./resnet50_xh2_b1_1core.hmm";
-    yolov5s_path = "./yolov5s_clip_xh2_b1_1core.hmm";
-  }
   // 1.2 prepare model buffer
   std::string resnet50_name = "resnet50_b1_1core";
   std::string yolov5s_name = "yolov5s_b1_1core";
-  std::vector<uint8_t> resnet50_buffer = readBinaryFile(resnet50_path);
-  std::vector<uint8_t> yolov5s_buffer = readBinaryFile(yolov5s_path);
+  std::vector<uint8_t> resnet50_buffer = ReadBinaryFile(resnet50_path);
+  std::vector<uint8_t> yolov5s_buffer = ReadBinaryFile(yolov5s_path);
   // 1.3 load model from file
   std::vector<std::future<PooledModule*>> resnet50_load_res;
   std::vector<std::future<PooledModule*>> yolov5s_load_res;
-  for (int i = 0; i < md_num; i++) {
+  for (int i = 0; i < pooled_md_num; i++) {
     resnet50_load_res.emplace_back(std::async(
         std::launch::async, LoadModelFromFile, pool_ptr, resnet50_path));
     yolov5s_load_res.emplace_back(std::async(
         std::launch::async, LoadModelFromFile, pool_ptr, yolov5s_path));
   }
   // 1.4 load model from buffer
-  for (int i = 0; i < md_num; i++) {
+  for (int i = 0; i < pooled_md_num; i++) {
     resnet50_load_res.emplace_back(std::async(
         std::launch::async, LoadModelFromBuffer, pool_ptr, resnet50_name,
         resnet50_buffer.data(), resnet50_buffer.size()));
@@ -355,12 +360,11 @@ int main() {
   }
   if (resnet50_pooled_mds.size() != resnet50_load_res.size() or
       yolov5s_pooled_mds.size() != yolov5s_load_res.size()) {
-    std::cerr << "Load models failed." << std::endl;
+    LOG_ERROR("Load models failed.");
     exit(-1);
   }
-  std::cout << "Get pooled modules, resnet50 num is "
-            << resnet50_pooled_mds.size() << ", yolov5s num is "
-            << yolov5s_pooled_mds.size() << std::endl;
+  LOG_INFO("Get pooled modules, resnet50 num is {}, yolov5s num is {}.",
+           resnet50_pooled_mds.size(), yolov5s_pooled_mds.size());
 
   bool stop_flag = false;
   int interval = 1000;  // 1000ms
@@ -391,15 +395,15 @@ int main() {
     int tmp_yolov5s_res = yolov5s_execute_res[i].get();
     if (tmp_resnet50_res != 0) {
       res_flag = false;
-      std::cout << "execute resnet50 thread " << i << " failed" << std::endl;
+      LOG_ERROR("Execute classify thread {} failed.", i);
     }
     if (tmp_yolov5s_res != 0) {
       res_flag = false;
-      std::cout << "execute yolov5s thread " << i << " failed" << std::endl;
+      LOG_ERROR("Execute detection thread {} failed.", i);
     }
   }
   if (!res_flag) {
-    std::cerr << "Execute models failed." << std::endl;
+    LOG_ERROR("Execute models failed.");
   }
 
   stop_flag = true;
@@ -414,6 +418,6 @@ int main() {
   auto pool_stats = pool_ptr->GetStats(true);
   delete pool_ptr;
 
-  printf("<=== module pool c++ example completed.\n\n");
+  LOG_WARNING("<=== module pool c++ example completed.");
   return 0;
 }

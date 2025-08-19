@@ -1,5 +1,9 @@
-#pragma once
+#ifndef _APIS_COMMON_HPP_LOGGING_H_
+#define _APIS_COMMON_HPP_LOGGING_H_
+
 #include <string>
+
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 
 #include "spdlog/pattern_formatter.h"
 #include "spdlog/sinks/rotating_file_sink.h"
@@ -85,35 +89,73 @@ static void print_stacktrace() {
     }                                                \
   } while (0)
 
-static void InitGoogleLogging() {
-  auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-  std::vector<spdlog::sink_ptr> sinks{console_sink};
-  auto logger = std::make_shared<spdlog::logger>(CONSOLE_LOGGER, sinks.begin(),
-                                                 sinks.end());
-  spdlog::register_logger(logger);
-  spdlog::set_default_logger(logger);
-  spdlog::set_pattern("%^%L%Y%m%d %T.%6f %t %s:%#] %v%$");
-  // LOG_INFO("SPDLOG Version: {}.{}.{}", SPDLOG_VER_MAJOR, SPDLOG_VER_MINOR,
-  //          SPDLOG_VER_PATCH);
-}
-
-static void InitGoogleLogging(const std::string &logpath,
-                              size_t rotating_file_size,
-                              size_t rotating_file_num, bool alsologtostderr) {
-  auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-  std::vector<spdlog::sink_ptr> sinks{console_sink};
-  std::string logger_name = FILE_LOGGER;
-  if (alsologtostderr) {
-    auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-        logpath, rotating_file_size, rotating_file_num);
-    sinks.emplace_back(file_sink);
-    logger_name = DEFAULT_LOGGER;
+class SpdLogger {
+ public:
+  SpdLogger() {
+    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    std::vector<spdlog::sink_ptr> sinks{console_sink};
+    auto logger = std::make_shared<spdlog::logger>(CONSOLE_LOGGER,
+                                                   sinks.begin(), sinks.end());
+    spdlog::register_logger(logger);
+    spdlog::set_default_logger(logger);
+    auto log_level = get_spdlog_level();
+    spdlog::set_level(log_level);
+    spdlog::set_pattern("%^%L%Y%m%d %T.%6f %t %s:%#] %v%$");
   }
-  auto logger =
-      std::make_shared<spdlog::logger>(logger_name, sinks.begin(), sinks.end());
-  spdlog::register_logger(logger);
-  spdlog::set_default_logger(logger);
-  spdlog::set_pattern("%^%L%Y%m%d %T.%6f %t %s:%#] %v%$");
-  // LOG_INFO("SPDLOG Version: {}.{}.{}", SPDLOG_VER_MAJOR, SPDLOG_VER_MINOR,
-  //          SPDLOG_VER_PATCH);
-}
+
+  SpdLogger(const std::string &logpath, size_t rotating_file_size,
+            size_t rotating_file_num, bool alsologtostderr) {
+    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    std::vector<spdlog::sink_ptr> sinks{console_sink};
+    std::string logger_name = FILE_LOGGER;
+    if (alsologtostderr) {
+      auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+          logpath, rotating_file_size, rotating_file_num);
+      sinks.emplace_back(file_sink);
+      logger_name = DEFAULT_LOGGER;
+    }
+    auto logger = std::make_shared<spdlog::logger>(logger_name, sinks.begin(),
+                                                   sinks.end());
+    spdlog::register_logger(logger);
+    spdlog::set_default_logger(logger);
+    auto log_level = get_spdlog_level();
+    spdlog::set_level(log_level);
+    spdlog::set_pattern("%^%L%Y%m%d %T.%6f %t %s:%#] %v%$");
+    // LOG_INFO("SPDLOG Version: {}.{}.{}", SPDLOG_VER_MAJOR, SPDLOG_VER_MINOR,
+    //          SPDLOG_VER_PATCH);
+  }
+
+  spdlog::level::level_enum get_spdlog_level() {
+    // 读取环境变量 SPDLOG_LEVEL
+    const char *env_level = std::getenv("HM_SPDLOG_LEVEL");
+    if (!env_level) {
+      return spdlog::level::info;  // default level
+    }
+
+    std::string level_str = env_level;
+    for (char &c : level_str) c = tolower(c);
+
+    if (level_str == "trace") return spdlog::level::trace;
+    if (level_str == "debug") return spdlog::level::debug;
+    if (level_str == "info") return spdlog::level::info;
+    if (level_str == "warn") return spdlog::level::warn;
+    if (level_str == "error") return spdlog::level::err;
+    if (level_str == "critical") return spdlog::level::critical;
+    if (level_str == "off") return spdlog::level::off;
+
+    return spdlog::level::info;
+  }
+};
+
+template <typename T = int>
+class AutoLoggerInitHelper {
+ public:
+  static SpdLogger logger;
+};
+
+template <typename T>
+SpdLogger AutoLoggerInitHelper<T>::logger;
+
+template class AutoLoggerInitHelper<int>;
+
+#endif  // _APIS_COMMON_HPP_LOGGING_H_
