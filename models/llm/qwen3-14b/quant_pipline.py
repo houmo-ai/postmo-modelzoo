@@ -223,7 +223,7 @@ def move_llm(args):
     shutil.move(work_dir / hmm_model_dir / "hmonnx/prefill", dest_dir / "hmquant/prefill")
     move_models(dest_dir, "prefill")
     shutil.move(work_dir / hmm_model_dir / "hmonnx/decode", dest_dir / "hmquant/decoder")
-    move_models(dest_dir, "decoder", "decode")
+    move_models(dest_dir, "decoder", "decoder")
     shutil.move(work_dir / hmm_model_dir / "token_embedding.pt", dest_dir / "hmquant/quant_embedding.pt")
     logger.info(msg_output_format("Start remove work_dir: {}".format(work_dir)))
     shutil.rmtree(work_dir)
