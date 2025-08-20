@@ -311,6 +311,7 @@ class PooledModule {
 
  private:
   bool CheckModulePool();
+  bool CheckTensorsDevice(const std::map<std::string, tcim::Tensor>& tensors);
 
   std::string model_name_ = "";
   tcim::Module* module_ = nullptr;
@@ -373,6 +374,14 @@ tcim::Status PooledModule::Infer(
     LOG_ERROR("Please initialize the ModulePool first.");
     return tcim::Status::UNINITIALIZED;
   }
+  if (!CheckTensorsDevice(inputs)) {
+    LOG_ERROR("The tensor device in the inputs must be the same.");
+    return tcim::Status::INVALID_ARGUMENT;
+  }
+  if (!CheckTensorsDevice(outputs)) {
+    LOG_ERROR("The tensor device in the outputs must be the same.");
+    return tcim::Status::INVALID_ARGUMENT;
+  }
 
   RunTask task(model_name_, module_, inputs, outputs, option);
 
@@ -423,6 +432,26 @@ PooledMdStats PooledModule::GetStats(bool is_print) {
 std::string PooledModule::GetPooledMdName() { return model_name_; }
 
 bool PooledModule::CheckModulePool() { return module_pool_ == nullptr; }
+
+bool PooledModule::CheckTensorsDevice(
+    const std::map<std::string, tcim::Tensor>& tensors) {
+  if (tensors.empty()) {
+    return false;
+  }
+
+  tcim::Device device;
+  int idx = 0;
+  for (const auto& pair : tensors) {
+    if (idx == 0) {
+      device = pair.second.Device();
+    } else if (device != pair.second.Device()) {
+      return false;
+    }
+    idx++;
+  }
+
+  return true;
+}
 
 ModulePool* ModulePool::module_pool_ = nullptr;
 std::once_flag ModulePool::flag_;
@@ -741,6 +770,8 @@ void ModulePool::InferThread(int stream_id,
           reinterpret_cast<void*>(module_exec));
     }
 
+    auto outputs_device = task.outputs.begin()->second.Device();
+
     tcim::Module* module;
     {
       std::unique_lock<std::mutex> module_queue_lock(*(module_exec->mutex));
@@ -754,9 +785,9 @@ void ModulePool::InferThread(int stream_id,
       module_queue_lock.unlock();
       LOG_DEBUG(
           "---> InferThread stream {}, get module:{}, module queue size:{}, "
-          "ready to execute.",
-          stream_id, reinterpret_cast<void*>(module),
-          module_exec->queue.size());
+          "outputs device: {}, ready to execute.",
+          stream_id, reinterpret_cast<void*>(module), module_exec->queue.size(),
+          static_cast<int>(outputs_device));
     }
     module->SetStream(stream);
 
@@ -765,19 +796,28 @@ void ModulePool::InferThread(int stream_id,
       module->SetInput(input.first, input.second);
     }
 
-    // 6. run and sync
+    if (outputs_device == tcim::Device::HDPL) {
+      // 6. set output
+      for (auto& output : task.outputs) {
+        module->SetOutput(output.first, output.second);
+      }
+    }
+
+    // 7. run and sync
     module->Run();
     module->Sync();
 
-    // 7. get output
-    for (auto& output : task.outputs) {
-      module->GetOutput(output.first, output.second);
+    if (outputs_device == tcim::Device::CPU) {
+      // 8. get output
+      for (auto& output : task.outputs) {
+        module->GetOutput(output.first, output.second);
+      }
     }
 
     std::lock_guard<std::mutex> run_lock(*task.mutex);
     task.cv->notify_one();
 
-    // release module
+    // 9. release module
     {
       std::lock_guard<std::mutex> module_manager_lock(module_manager_mutex_);
       std::lock_guard<std::mutex> module_lock(*(module_exec->mutex));

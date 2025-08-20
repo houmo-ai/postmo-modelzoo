@@ -2,7 +2,7 @@ import pytest
 import os
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-os.environ['HOUMO_EXAMPLES_PATH'] = f"{script_dir}/../../apis"
+os.environ['HOUMO_EXAMPLES_PATH'] = f"{script_dir}/../.."
 
 
 def pytest_configure(config):

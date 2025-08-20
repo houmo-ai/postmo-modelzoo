@@ -35,7 +35,7 @@ if __name__ == '__main__':
             "http://139.224.0.199:8082/artifactory/houmo/release"
         )
     model_dir = (
-        os.path.join(HOUMO_EXAMPLES_PATH, "models")
+        os.path.join(HOUMO_EXAMPLES_PATH, "apis/models")
         if not args.model_dir
         else args.model_dir
     )

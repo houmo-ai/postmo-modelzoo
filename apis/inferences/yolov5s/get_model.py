@@ -65,7 +65,7 @@ if __name__ == '__main__':
     HOUMO_TARGET = os.environ.get('HOUMO_TARGET', 'houmo')
 
     model_dir = (
-        os.path.join(HOUMO_EXAMPLES_PATH, "models")
+        os.path.join(HOUMO_EXAMPLES_PATH, "apis/models")
         if not args.model_dir
         else args.model_dir
     )

@@ -54,20 +54,20 @@ std::vector<uint8_t> ReadBinaryFile(const std::string& file_path) {
                      std::ios::in | std::ios::binary | std::ios::ate);
   if (!file.is_open()) {
     LOG_ERROR("Can not open file {}.", file_path);
-    return {};  // 空文件
+    return {};
   }
   // get file size
   std::streamsize size = file.tellg();
   if (size <= 0) {
     LOG_ERROR("File content is null.");
-    return {};  // 空文件
+    return {};
   }
 
   file.seekg(0, std::ios::beg);
   std::vector<uint8_t> buffer(size);
   if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
     LOG_ERROR("Failed to read model file {}.", file_path);
-    return {};  // 空文件
+    return {};
   }
 
   return buffer;
@@ -159,15 +159,22 @@ int ExecuteClassifyModel(PooledModule* pooled_md, std::string data_path,
 
   // 3. prepare input tensors
   std::map<std::string, tcim::Tensor> output_map;
+  std::map<std::string, tcim::Tensor> output_host_map;
   int output_num = pooled_md->GetOutputNum();
   LOG_INFO("Count of Output: {}.", output_num);
   for (int idx = 0; idx < output_num; idx++) {
     auto output_name = pooled_md->GetOutputName(idx);
-    auto output_info = pooled_md->GetOutputInfo(output_name, true);
+    auto output_info = pooled_md->GetOutputInfo(output_name, false);
     LOG_INFO("  Output[{}] {}", output_name, TensorInfo2Str(output_info));
-    auto output_tensor = tcim::Tensor::CreateHostTensor(output_info);
+    // create device tensor to stroe inference results
+    auto output_tensor = tcim::Tensor::CreateDeviceTensor(output_info);
     output_map.insert(
         std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
+    // create host tensor to get inference results
+    auto output_host_info = output_info.AsContiguous();
+    auto output_host_tensor = tcim::Tensor::CreateHostTensor(output_host_info);
+    output_host_map.insert(
+        std::pair<std::string, tcim::Tensor>(output_name, output_host_tensor));
   }
 
   while (task_num > 0) {
@@ -178,9 +185,11 @@ int ExecuteClassifyModel(PooledModule* pooled_md, std::string data_path,
     int top1 = 0;
     const int topk = 1;
     for (auto& output : output_map) {
+      output.second.CopyTo(output_host_map[output.first]);
       std::vector<std::pair<int, int>> sort_pairs;
       for (int i = 0; i < 1000; ++i) {
-        int8_t tmp_val = static_cast<int8_t*>(output.second.Data())[i];
+        int8_t tmp_val =
+            static_cast<int8_t*>(output_host_map[output.first].Data())[i];
         sort_pairs.emplace_back(static_cast<int>(tmp_val), i);
       }
       top1 = GetTopk(topk, sort_pairs);

@@ -9,7 +9,7 @@ find_package(OpenCV REQUIRED)
 
 include_directories(
 	${TCIM_RUNTIME_PATH}/include
-	${HOUMO_EXAMPLES_PATH}/common/hpp
+	${HOUMO_EXAMPLES_PATH}/apis/common/hpp
 	${OpenCV_INCLUDE_DIRS}
 )
 message("OpenCV_INCLUDE_DIRS=${OpenCV_INCLUDE_DIRS}")

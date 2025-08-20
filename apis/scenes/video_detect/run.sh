@@ -37,7 +37,7 @@ WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${WORK_PATH}" || exit 1
 
 if [[ -z $HOUMO_EXAMPLES_PATH ]]; then
-  export HOUMO_EXAMPLES_PATH=$WORK_PATH/../..
+  export HOUMO_EXAMPLES_PATH=$WORK_PATH/../../..
 fi
 
 # get test model
