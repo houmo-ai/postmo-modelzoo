@@ -12,7 +12,7 @@
 using namespace std::chrono;
 
 // 模拟工作线程
-void worker(BufferPool &pool, int thread_id, size_t size) {
+void worker(BufferPool &pool, int32_t thread_id, size_t size) {
     size_t block_size = ALIGN4K(size);
     tcim::Buffer buf_host = tcim::Buffer::CreateHostBuffer(block_size);
     memset(buf_host.Data(), thread_id, buf_host.Size());
@@ -76,7 +76,8 @@ int main() {
     BufferPool pool(cfgs, HOST);
 
     // 启动多个线程并发消费
-    std::vector<std::thread> threads;
+    std::vector<std::thread>
+        threads;
     for (int t = 0; t < cfgs.size(); ++t) {
         size_t block_size = cfgs[t].size;
         threads.emplace_back(worker, std::ref(pool), t * 2 + 0, block_size);
