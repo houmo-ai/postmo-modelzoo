@@ -170,12 +170,14 @@ def export_llm(args):
     target_device = DeviceType.XH2a
     quant_type = args.quant_type
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
+    model_dir = os.path.join(args.out_dir, "{}_quarot_gptq".format(args.model))
+    quant_weight = os.path.join(model_dir, "quarot_gptq-state-dict.safetensors")
     config = Qwen2ConvertConfig(
         batch_size=1,
         context_length=args.context_length,
         input_sequence_length=args.input_sequence_length,
         quant_scheme=quant_scheme,
-        quant_weight=args.quant_weight,
+        quant_weight=quant_weight,
     )
 
     prefix = f"{model_name}-{target_device}-{args.context_length//1024}k-{quant_type}"
@@ -223,7 +225,7 @@ def move_llm(args):
     shutil.move(work_dir / hmm_model_dir / "hmonnx/prefill", dest_dir / "hmquant/prefill")
     move_models(dest_dir, "prefill")
     shutil.move(work_dir / hmm_model_dir / "hmonnx/decode", dest_dir / "hmquant/decoder")
-    move_models(dest_dir, "decoder", "decode")
+    move_models(dest_dir, "decoder", "decoder")
     shutil.move(work_dir / hmm_model_dir / "token_embedding.pt", dest_dir / "hmquant/quant_embedding.pt")
     logger.info(msg_output_format("Start remove work_dir: {}".format(work_dir)))
     shutil.rmtree(work_dir)
