@@ -8,25 +8,24 @@ from datetime import datetime
 from importlib.metadata import version, PackageNotFoundError
 from prettytable import PrettyTable
 from ..utils import logger
-from ..utils.utils import get_md5, SUPPORT_IMAGE_FORMATS, load_npz, str_to_torch_dtype, get_file_md5, \
-    compress_folder_to_tar_xz_with_progress, compress_file_to_tar_xz_with_progress
-from ..utils.preprocess import default_preprocess 
+from ..utils.utils import (
+    get_md5,
+    SUPPORT_IMAGE_FORMATS,
+    load_npz,
+    str_to_torch_dtype,
+    get_file_md5,
+    compress_folder_to_tar_xz_with_progress,
+    compress_file_to_tar_xz_with_progress,
+)
+from ..utils.preprocess import default_preprocess
 from ..utils.dist_metrics import cosine_distance
+from ..utils.utils import get_hmquant_xh2_version as get_hmquant_version
 from ..base.base_exec import BaseExec
 from ..infer.xh2_infer import Xh2Infer
 from ..infer.onnx_infer import OnnxInfer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
 
 
-def get_hmquant_version():
-    """获取hmquant版本"""
-    try:
-        v = version("hmquant_xh2")  # 替换成你想查的包名
-        return v
-    except PackageNotFoundError:
-        return "hmquant_xh2 not installed"
-    
-    
 class Xh2Exec(BaseExec):
     def __init__(self, cfg: dict) -> None:
         super().__init__(cfg)
@@ -40,21 +39,24 @@ class Xh2Exec(BaseExec):
         self.quant_output_dir = os.path.join(self.save_dir, "xh2", "hmquant")
         self.build_output_dir = os.path.join(self.save_dir, "xh2", "tcim")
         self.hmonnx_name = f"{self.model_name}_xh2_{self.quant_type}"
-        self.quant_onnx_model_path = os.path.join(self.quant_output_dir, f"{self.hmonnx_name}.onnx")
+        self.quant_onnx_model_path = os.path.join(
+            self.quant_output_dir, f"{self.hmonnx_name}.onnx"
+        )
         self.golden_dir = os.path.join(self.quant_output_dir, "golden")
         self.quant_advance_cfg = self.quant_cfg.get("config", dict())
         self.upgrade_opset_version()
-  
+
     def get_quant_cfg(self) -> dict:
         return dict()
-    
+
     def get_quant_dataset(self):
         """提供量化数据"""
         return dict()
-    
+
     def upgrade_opset_version(self):
         import onnx
         from onnx import version_converter
+
         model = onnx.load(self.model_path)
         # 遍历模型中的 opset_import 字段（可能有多个域）
         opset_version = None
@@ -72,27 +74,30 @@ class Xh2Exec(BaseExec):
                 new_model = version_converter.convert_version(model, min_opset_version)
                 onnx.save(new_model, new_model_path)
                 logger.info(
-                    f"Upgrade onnx opset {opset_version} to {min_opset_version}, and save new onnx to: {new_model_path}")
+                    f"Upgrade onnx opset {opset_version} to {min_opset_version}, and save new onnx to: {new_model_path}"
+                )
             self.model_path = new_model_path
-            
+
     def quantize(self):
         """quantize the model"""
         if not os.path.exists(self.quant_output_dir):
             os.makedirs(self.quant_output_dir)
         # 检查opset_version
-        
+
         from xhquant.api import (
             DeviceType,
             HMONNXGoldenInference,
             HMONNXInference,
             QuantScheme,
             convert_onnx_to_hmonnx,
-            create_quant_config
+            create_quant_config,
         )
-        
-        quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=self.quant_type)
+
+        quant_scheme = QuantScheme(
+            target_device=DeviceType.XH2a, quant_type=self.quant_type
+        )
         quant_config = create_quant_config(quant_scheme)
-        
+
         in_datas = list()
         for input_name in self.inputs_cfg:
             input_cfg = self.inputs_cfg[input_name]
@@ -108,7 +113,7 @@ class Xh2Exec(BaseExec):
             out_hmonnx_file=self.quant_onnx_model_path,
             quant_config=quant_config,
             input_names=self.inputs_name,
-            output_names=self.outputs_name
+            output_names=self.outputs_name,
         )
         # 生成芯片所需格式模型
         session = HMONNXGoldenInference(self.quant_onnx_model_path)
@@ -123,14 +128,22 @@ class Xh2Exec(BaseExec):
         # to float16
         for idx, in_data in enumerate(in_datas):
             in_datas[idx] = in_data.half().to(self.device)
-        session(*in_datas)   # 
+        session(*in_datas)  #
         # 压缩量化产物
         compress = os.environ.get("HMATC_COMPRESS", "0")
         if compress == "1":
             logger.info("Compressing quant output...")
-            compress_quant_output_path = os.path.join(self.save_dir, "xh2", f"hmquant_{self.model_dir_name}_xh2_v{get_hmquant_version()}.tar.xz")
-            compress_folder_to_tar_xz_with_progress(self.quant_output_dir, compress_quant_output_path)
-            logger.info(f"MD5: {get_file_md5(compress_quant_output_path)}, save path: {compress_quant_output_path}")
+            compress_quant_output_path = os.path.join(
+                self.save_dir,
+                "xh2",
+                f"hmquant_{self.model_dir_name}_xh2_v{get_hmquant_version()}.tar.xz",
+            )
+            compress_folder_to_tar_xz_with_progress(
+                self.quant_output_dir, compress_quant_output_path
+            )
+            logger.info(
+                f"MD5: {get_file_md5(compress_quant_output_path)}, save path: {compress_quant_output_path}"
+            )
             logger.info(f"Compressing quant output done.")
         span = time.time() - t_start
         res = dict()
@@ -143,6 +156,7 @@ class Xh2Exec(BaseExec):
         if not os.path.exists(self.build_output_dir):
             os.makedirs(self.build_output_dir)
         import tcim
+
         t_start = time.time()
         tcim.build_from_hmonnx(
             self.quant_onnx_model_path,
@@ -163,38 +177,54 @@ class Xh2Exec(BaseExec):
         if compress == "1":
             logger.info("Compressing hmmodel...")
             compress_hmm_path = os.path.join(
-                self.save_dir, "xh2", 
-                f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{get_hmquant_version()}.tar.xz")
+                self.save_dir,
+                "xh2",
+                f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{get_hmquant_version()}.tar.xz",
+            )
             compress_file_to_tar_xz_with_progress(self.hmm_path, compress_hmm_path)
-            logger.info(f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}")
+            logger.info(
+                f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}"
+            )
             logger.info(f"Compressing hmmodel done.")
         res_info = {"build": {"time": span}}
         return res_info
-    
+
     def check_golden(self):
         xh2 = Xh2Infer()
         xh2.load(self.hmm_path)
         in_datas = dict()
         for input_name in self.inputs_cfg:
             new_name = input_name.replace("/", "_")
-            golden_input_path = os.path.join(self.golden_dir, "step_0", f"hmquant_{self.hmonnx_name}_{input_name}_input.npy")
+            golden_input_path = os.path.join(
+                self.golden_dir,
+                "step_0",
+                f"hmquant_{self.hmonnx_name}_{input_name}_input.npy",
+            )
             golden_input = np.load(golden_input_path)
             logger.info(f"Load golden: {golden_input_path}")
-            logger.info(f"[input] name: {input_name}, shape: {list(golden_input.shape)}, stype: {golden_input.dtype}")
+            logger.info(
+                f"[input] name: {input_name}, shape: {list(golden_input.shape)}, stype: {golden_input.dtype}"
+            )
             golden_input = np.repeat(golden_input, self.build_batch, axis=0)
             in_datas[input_name] = golden_input
 
         res_info = dict()
         outputs, _ = xh2.run(in_datas)
-        header = ["name",  "cosine_dist"]
+        header = ["name", "cosine_dist"]
         table = PrettyTable(header)
         table.title = "xh2 vs hmquant"
         for output_name in outputs:
             new_name = output_name.replace("/", "_")
-            golden_output_path = os.path.join(self.golden_dir, "step_0", f"hmquant_{self.hmonnx_name}_{new_name}_output.npy")
+            golden_output_path = os.path.join(
+                self.golden_dir,
+                "step_0",
+                f"hmquant_{self.hmonnx_name}_{new_name}_output.npy",
+            )
             golden_output = np.load(golden_output_path)
             logger.info(f"Load golden: {golden_output_path}")
-            logger.info(f"[output] name: {output_name}, shape: {list(golden_output.shape)}, dtype: {golden_output.dtype}")
+            logger.info(
+                f"[output] name: {output_name}, shape: {list(golden_output.shape)}, dtype: {golden_output.dtype}"
+            )
             golden_output = np.repeat(golden_output, repeats=self.build_batch, axis=0)
             golden_output_md5 = get_md5(golden_output)
             output = outputs[output_name]
@@ -209,7 +239,7 @@ class Xh2Exec(BaseExec):
             }
         logger.info(f"Check golden...\n{table}")
         return res_info
-       
+
     def compare(self, data_path: str):
         t_start = datetime.now().strftime("%Y%m%d%H%M%S")
         # onnx
@@ -221,7 +251,7 @@ class Xh2Exec(BaseExec):
         # xh2
         xh2_infer = Xh2Infer()
         xh2_infer.load(self.hmm_path)
-        
+
         onnx_in_datas = dict()
         hmquant_in_datas = dict()
         xh2_in_datas = dict()
@@ -243,7 +273,10 @@ class Xh2Exec(BaseExec):
             if not os.path.exists(data_path):
                 logger.error(f"Not found data_path: {data_path}")
                 exit(-1)
-            cv_image = cv2.imread(data_path, cv2.IMREAD_COLOR if data_format != "GRAY" else cv2.IMREAD_GRAYSCALE)
+            cv_image = cv2.imread(
+                data_path,
+                cv2.IMREAD_COLOR if data_format != "GRAY" else cv2.IMREAD_GRAYSCALE,
+            )
             if cv_image is None:
                 logger.error("Failed to decode image")
                 exit(-1)
@@ -252,15 +285,15 @@ class Xh2Exec(BaseExec):
             # preprocess
             N, C, H, W = input_shape
             onnx_data = default_preprocess(
-                cv_image, 
-                (W, H), 
-                mean=mean, 
-                std=std, 
-                use_norm=True, 
-                use_resize=True, 
+                cv_image,
+                (W, H),
+                mean=mean,
+                std=std,
+                use_norm=True,
+                use_resize=True,
                 use_rgb=data_format == "RGB",
-                resize_type=resize_type, 
-                padding_mode=padding_mode, 
+                resize_type=resize_type,
+                padding_mode=padding_mode,
                 padding_value=padding_values,
             )
             # onnx
@@ -270,7 +303,9 @@ class Xh2Exec(BaseExec):
             # hmquant
             hmquant_in_datas[input_name] = torch.from_numpy(onnx_data_fp16).cpu()
             # xh2
-            xh2_in_datas[input_name] = np.repeat(onnx_data_fp16, repeats=self.build_batch, axis=0)
+            xh2_in_datas[input_name] = np.repeat(
+                onnx_data_fp16, repeats=self.build_batch, axis=0
+            )
         else:
             # 单输入非图像or多输入
             in_datas = load_npz(data_path)
@@ -279,12 +314,14 @@ class Xh2Exec(BaseExec):
                 in_data = in_datas[input_name]
                 in_data_fp16 = in_data.astype(np.float16).copy()
                 hmquant_in_datas[input_name] = torch.from_numpy(in_data_fp16)
-                xh2_in_datas[input_name] = np.repeat(in_data_fp16, self.build_batch, axis=0)
-        
+                xh2_in_datas[input_name] = np.repeat(
+                    in_data_fp16, self.build_batch, axis=0
+                )
+
         onnx_outputs = onnx_infer.run(onnx_in_datas)
         hmquant_outputs = hmquant_infer.run(hmquant_in_datas)
         _, xh2_outputs_dequanted = xh2_infer.run(xh2_in_datas)
-        
+
         res_info = {"compare": {t_start: dict()}}
         res_info["compare"][t_start]["data_path"] = data_path
         # 计算相似度
@@ -295,11 +332,20 @@ class Xh2Exec(BaseExec):
             onnx_output = onnx_outputs[output_name]
             hmquant_output = hmquant_outputs[output_name]
             xh2_output_dequanted = xh2_outputs_dequanted[output_name]
-            xh2_output_dequanted = np.split(xh2_output_dequanted, self.build_batch, axis=0)[0]
+            xh2_output_dequanted = np.split(
+                xh2_output_dequanted, self.build_batch, axis=0
+            )[0]
             onnx_vs_hmquant = cosine_distance(onnx_output, hmquant_output)
             onnx_vs_xh1 = cosine_distance(onnx_output, xh2_output_dequanted)
             hmquant_vs_xh1 = cosine_distance(hmquant_output, xh2_output_dequanted)
-            table.add_row([output_name, f"{onnx_vs_hmquant:.6f}", f"{onnx_vs_xh1:.6f}", f"{hmquant_vs_xh1:.6f}"])
+            table.add_row(
+                [
+                    output_name,
+                    f"{onnx_vs_hmquant:.6f}",
+                    f"{onnx_vs_xh1:.6f}",
+                    f"{hmquant_vs_xh1:.6f}",
+                ]
+            )
             res_info["compare"][t_start][output_name] = {
                 "onnx_vs_hmquant": float(onnx_vs_hmquant),
                 "onnx_vs_xh2": float(onnx_vs_xh1),

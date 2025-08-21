@@ -14,6 +14,7 @@ import onnx
 from onnx import TensorProto
 from pathlib import Path
 from tqdm import tqdm
+from importlib.metadata import PackageNotFoundError, version
 
 
 HOUMO_JFROG_IP = os.getenv("HOUMO_JFROG_IP", "139.224.0.199")
@@ -55,6 +56,33 @@ def get_file_md5(file_path):
         for chunk in iter(lambda: file.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
+
+def get_hmquant_xh1_version():
+    """获取hmquant版本"""
+    try:
+        v = version("hmquant-xh1")  # 替换成你想查的包名
+        return v
+    except PackageNotFoundError:
+        return "unknown"
+
+
+def get_hmquant_xh2_version():
+    """获取hmquant版本"""
+    try:
+        v = version("hmquant_xh2")  # 替换成你想查的包名
+        return v
+    except PackageNotFoundError:
+        return "unknown"
+
+
+def get_package_version(package_name: str):
+    """获取hmquant版本"""
+    try:
+        v = version(package_name)  # 替换成你想查的包名
+        return v
+    except PackageNotFoundError:
+        return f"{package_name} not installed"
 
 
 def get_onnx_inputs_info(onnx_path):
@@ -142,12 +170,12 @@ def download_file(url, save_path, file_name, file_size, chunk_size=1024 * 1024):
             # 创建进度条
             with tqdm(
                 total=file_size,
-                unit='B',
+                unit="B",
                 unit_scale=True,
                 unit_divisor=4096,
                 desc=file_name,
             ) as pbar:
-                with open(save_path, 'wb') as f:
+                with open(save_path, "wb") as f:
                     for chunk in response.iter_content(chunk_size=chunk_size):
                         if chunk:  # 过滤掉保持连接的空块
                             f.write(chunk)

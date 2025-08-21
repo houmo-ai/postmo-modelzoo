@@ -46,7 +46,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             self.resize_types.append(self.inputs_cfg[input_name].get("resize_type"))
         self.is_multi_input_model = len(self.inputs_cfg) > 1
         # 检查必须保证每个输入的batch相同
-        self.model_input_batch = self.model_inputs_batch[self.inputs_name[0]]  # 用户配置的输入batch
+        self.model_input_batch = self.model_inputs_batch[
+            self.inputs_name[0]
+        ]  # 用户配置的输入batch
         if self.is_multi_input_model:
             for idx in range(1, len(self.inputs_name)):
                 batch = self.model_inputs_batch[self.inputs_name[idx]]
@@ -55,7 +57,14 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                     exit(-1)
         self.quant_cfg = cfg.get("quant")
         self.calib_method = self.quant_cfg.get("calib_method", "minmax")
-        if self.calib_method not in ["minmax", "kl", "percent-0.99", "mse", "ema", "aciq"]:
+        if self.calib_method not in [
+            "minmax",
+            "kl",
+            "percent-0.99",
+            "mse",
+            "ema",
+            "aciq",
+        ]:
             logger.error(f"calib_method {self.calib_method} is not supported")
             exit(-1)
         self.calib_data = self.quant_cfg["calib_data"]
@@ -66,7 +75,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.build_opt_level = f"O{self.build_opt_level}"
         self.use_random_data = self.calib_data is None
         # 图像单输入，非图像or多输入必须是npz数据
-        self.is_image_single_input = (not self.is_multi_input_model and self.data_formats[0] is not None)
+        self.is_image_single_input = (
+            not self.is_multi_input_model and self.data_formats[0] is not None
+        )
         # resizer工作模式
         # 0 - 输入为非图像数据or多输入情况，禁用resizer，相当于非图像输入
         # 1 - 全动态resizer，参数为10个值[y, x, height, width, h, w, top, left, bottom, right]
@@ -79,21 +90,30 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             self.custom_msg[name] = dict(
                 shape=input_cfg["shape"],
                 resizer_mode=self.resizer_mode,
-                input_cfg=input_cfg
+                input_cfg=input_cfg,
             )
         self.roi_num = 1
-        self.onnx_inputs_info, self.onnx_outputs_info = get_onnx_inputs_info(self.model_path)
+        self.onnx_inputs_info, self.onnx_outputs_info = get_onnx_inputs_info(
+            self.model_path
+        )
         self.onnx_is_static = True
         for input_name in self.inputs_name:
             onnx_shape = self.onnx_inputs_info[input_name]["shape"]
             cfg_shape = self.inputs_cfg[input_name]["shape"]
             for idx, val in enumerate(onnx_shape):
-                if val < 0 or val is None or isinstance(val, str) or not isinstance(val, int):
+                if (
+                    val < 0
+                    or val is None
+                    or isinstance(val, str)
+                    or not isinstance(val, int)
+                ):
                     self.onnx_is_static = False
                 else:
                     # 检查配置的shape和onnx是否一致
                     if val != cfg_shape[idx]:
-                        logger.error(f"onnx shape {onnx_shape} is not equal to cfg shape {cfg_shape}")
+                        logger.error(
+                            f"onnx shape {onnx_shape} is not equal to cfg shape {cfg_shape}"
+                        )
                         exit(-1)
         self.outputs_name = list()
         for name in self.onnx_outputs_info:
@@ -122,9 +142,13 @@ class BaseExec(object, metaclass=abc.ABCMeta):
     @staticmethod
     def gen_random_data(shape, dtype):
         if dtype == "float32":
-            random_data = np.random.uniform(low=0, high=128, size=shape).astype(dtype=dtype)  # 数值范围[0, 128)
+            random_data = np.random.uniform(low=0, high=128, size=shape).astype(
+                dtype=dtype
+            )  # 数值范围[0, 128)
         elif dtype == "float16":
-            random_data = np.random.uniform(low=0, high=128, size=shape).astype(dtype=dtype)  # 数值范围[0, 128)
+            random_data = np.random.uniform(low=0, high=128, size=shape).astype(
+                dtype=dtype
+            )  # 数值范围[0, 128)
         elif dtype == "int16":
             random_data = np.random.randint(low=0, high=128, size=shape, dtype=dtype)
         elif dtype == "int32":
@@ -137,12 +161,12 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             logger.error(f"Not support dtype: {dtype}")
             exit(-1)
         return random_data
-    
+
     @abc.abstractmethod
     def quantize(self):
         """模型量化"""
         pass
-    
+
     @abc.abstractmethod
     def build(self):
         """模型编译"""
@@ -152,7 +176,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
     def compare(self):
         """模型相似度比较"""
         pass
-    
+
     @staticmethod
     def import_py_module_from_file(module_path: str, module_cls: str):
         module_name = os.path.splitext(os.path.basename(module_path))[1]
@@ -178,7 +202,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         model_impl_module_path = f"{model_impl_module}.py"
         if not os.path.exists(model_impl_module_path):
             logger.error(f"model_impl_module not exists -> {model_impl_module_path}")
-            exit(-1) 
+            exit(-1)
         Model = self.import_py_module_from_file(model_impl_module_path, model_impl_cls)
         logger.info(f"from {model_impl_module} import {model_impl_cls} successfully")
         return Model(
@@ -188,7 +212,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             roi_num=self.roi_num,
             backend=backend,
         )
-    
+
     def get_dataset(self, data_dir):
         """获取数据集"""
         dataset_module = self.eval_cfg.get("dataset_module")
@@ -208,24 +232,25 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         """Demo入口"""
         if not self.demo_cfg:
             logger.error("demo config not found")
-            exit(-1)
+            return {}
         data_dir = self.demo_cfg.get("data_dir", "")
         HOUMO_DATASETS_PATH = os.environ.get(
-            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets")
+            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets"
+        )
         HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
         if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
             logger.error("data_dir must be a exist directory")
-            exit(-1)
+            return {}
         if not os.path.isdir(data_dir):
             data_dir = HM_data_dir
         logger.info(f"[demo] data_dir: {data_dir}")
         test_num = self.demo_cfg.get("num", 0)
         if not isinstance(test_num, int):
             logger.error(f"test_num must be int -> {test_num}")
-            exit(-1)
+            return {}
         if test_num < 0:
             logger.error(f"test_num must >= 0 -> {test_num}")
-            exit(-1)
+            return {}
         filenames = os.listdir(data_dir)
         data_num = len(filenames)
         if test_num > 0 and test_num < data_num:
@@ -242,29 +267,30 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         model.load(model_path)
         model.demo(filepaths)
         model.unload()
-    
+
     def evaluate(self, backend):
         """评估入口"""
         if not self.eval_cfg:
             logger.error("eval config not found")
-            exit(-1)
+            return {}
         data_dir = self.eval_cfg.get("data_dir", "")
         HOUMO_DATASETS_PATH = os.environ.get(
-            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets")
+            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets"
+        )
         HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
         if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
             logger.error("data_dir must be a exist directory")
-            exit(-1)
+            return {}
         if not os.path.isdir(data_dir):
             data_dir = HM_data_dir
         logger.info(f"[eval] data_dir: {data_dir}")
         num = self.eval_cfg.get("num", 0)
         if not isinstance(num, int):
             logger.error(f"eval test_num must be int -> {num}")
-            exit(-1)
+            return {}
         if num < 0:
             logger.error(f"eval test_num must >= 0 -> {num}")
-            exit(-1)
+            return {}
         # 获取dataset
         dataset = self.get_dataset(data_dir)
         # 获取模型
@@ -274,14 +300,18 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         res = model.evaluate(dataset, num)
         model.unload()
         logger.info(f"{res}")
-        
+        return res
+
     @staticmethod
-    def model_perf(model_path, warmup_num, sample_num, loop_num=1, device_num=1, thread_num=1):
-        from ..python import perf        
+    def model_perf(
+        model_path, warmup_num, sample_num, loop_num=1, device_num=1, thread_num=1
+    ):
+        from ..python import perf
+
         # TODO 使用golden数据
         perf_info = perf.CModelRunner(
-            model_path, sample_num, thread_num, 
-            device_num, loop_num, warmup_num)
+            model_path, sample_num, thread_num, device_num, loop_num, warmup_num
+        )
         t_start = datetime.now().strftime("%Y%m%d%H%M%S")
         res_info = {
             "perf": {
@@ -302,11 +332,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                         "output_avg_latency": perf_info.output_avg_latency,
                         "output_max_latency": perf_info.output_max_latency,
                         "avg_cost": perf_info.avg_cost,
-                        "qps": perf_info.qps
-                    }
+                        "qps": perf_info.qps,
+                    },
                 }
             }
         }
         return res_info
-
-

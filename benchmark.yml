@@ -1,18 +1,29 @@
 # model list
-models: {
+models:
   # location: [str] the config file path
-  # batch: [int] batch size, default:1
-  # core_num: [int] core number of each module infer, default:1
-  # quant: [bool] if need quant process, default:True
-  # eval: [bool] if need eval process, default:True
-  # onnx: [bool] if need eval process via onnx runtime, default:True
-  resnet50: {location: models/backbone/resnet50},
-  resnet50_t4: {location: models/backbone/resnet50, thread_num: 4, quant: False, eval: False, onnx: False},
-  # resnet50_b6: {location: models/backbone/resnet50, batch: 6, quant: False, eval: False, onnx: False},
-  # resnet50_b6t4: {location: models/backbone/resnet50, batch: 6, thread_num: 4, quant: False, eval: False, onnx: False},
-  mobilenetv2: {location: models/backbone/mobilenetv2},
-  efficientnet: {location: models/backbone/efficientnet},
-  yolov5s: {location: models/detection/yolov5s},
-  yolov3: {location: models/detection/yolov3},
-  yolop: {location: models/autodrive/yolop, eval: False, onnx: False},
-}
+  # config: [str] the model config file path, default: config.yml
+  # batch: [int] batch size, default: 1
+  # ncore: [int] core number of each module infer, default: 1
+  # thread_num: [int] thread number of each module infer, default: 8
+  resnet50: 
+    location: models/backbone/resnet50
+  resnet50_t4: 
+    location: models/backbone/resnet50
+    thread_num: 4 
+  resnet50_b6: 
+    location: models/backbone/resnet50
+    batch: 6
+  resnet50_b6t4: 
+    location: models/backbone/resnet50
+    batch: 6
+    thread_num: 4
+  mobilenetv2: 
+    location: models/backbone/mobilenetv2
+  efficientnet: 
+    location: models/backbone/efficientnet
+  yolov5s:
+    location: models/detection/yolov5s
+  yolov3:
+    location: models/detection/yolov3
+  yolop: 
+    location: models/autodrive/yolop
