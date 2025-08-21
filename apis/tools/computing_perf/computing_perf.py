@@ -23,7 +23,15 @@ class Xh1ConvUtil:
                 return 1
             if 6 <= align_kernel_size:
                 return 8
-            return 2 if (align_kernel_size == 4 and input_channel <= 64 and output_channel <= 64) else 4
+            return (
+                2
+                if (
+                    align_kernel_size == 4
+                    and input_channel <= 64
+                    and output_channel <= 64
+                )
+                else 4
+            )
 
         align_kernel_size = max(kernel_size[0], kernel_size[1])
         co_align_val = 64
@@ -35,19 +43,36 @@ class Xh1ConvUtil:
     @staticmethod
     def get_padding_for_same_fmap_size(input_feature_size, kernel_size, stride):
         total_pad_lower_bound = tuple(
-            math.ceil(input_feature_size[i] / stride[i] - 1) * stride[i] + kernel_size[i] - input_feature_size[i]
+            math.ceil(input_feature_size[i] / stride[i] - 1) * stride[i]
+            + kernel_size[i]
+            - input_feature_size[i]
             for i in range(2)
         )
-        total_pad_upper_bound = tuple(total_pad_lower_bound[i] + stride[i] - 1 for i in range(2))
-        total_pad_h = total_pad_lower_bound[0] if total_pad_lower_bound[0] >= 0 else total_pad_upper_bound[0]
-        total_pad_w = total_pad_lower_bound[1] if total_pad_lower_bound[1] >= 0 else total_pad_upper_bound[1]
-        padding_low = (max(0, math.floor(total_pad_h / 2)), max(0, math.floor(total_pad_w / 2)))
+        total_pad_upper_bound = tuple(
+            total_pad_lower_bound[i] + stride[i] - 1 for i in range(2)
+        )
+        total_pad_h = (
+            total_pad_lower_bound[0]
+            if total_pad_lower_bound[0] >= 0
+            else total_pad_upper_bound[0]
+        )
+        total_pad_w = (
+            total_pad_lower_bound[1]
+            if total_pad_lower_bound[1] >= 0
+            else total_pad_upper_bound[1]
+        )
+        padding_low = (
+            max(0, math.floor(total_pad_h / 2)),
+            max(0, math.floor(total_pad_w / 2)),
+        )
         padding_high = (total_pad_h - padding_low[0], total_pad_w - padding_low[1])
         assert len(set(padding_low)) == len(set(padding_high)) == 1
         return padding_low[0], padding_high[0]
 
 
-def run_model_wrapper(tid, did, model_path, wm, input_datas, round_num, barrier, verbose):
+def run_model_wrapper(
+    tid, did, model_path, wm, input_datas, round_num, barrier, verbose
+):
     # load model, create a stream and set to the model
     option = tcim_lite.runtime.Option(wm)
     model = tcim_lite.runtime.load(model_path, option=option)
@@ -69,12 +94,20 @@ def run_model_wrapper(tid, did, model_path, wm, input_datas, round_num, barrier,
 
 
 def run_multi_streams(
-    hmm_path: str, input_shapes, process_num: int, round_num: int, device_id: int, verbose: bool = False
+    hmm_path: str,
+    input_shapes,
+    process_num: int,
+    round_num: int,
+    device_id: int,
+    verbose: bool = False,
 ):
     # pylint: disable=unused-argument,unused-variable,too-many-locals,redefined-outer-name
 
     # 1. prepare input data
-    input_datas = [np.random.randint(-128, 128, input_shape, dtype=np.int8) for input_shape in input_shapes]
+    input_datas = [
+        np.random.randint(-128, 128, input_shape, dtype=np.int8)
+        for input_shape in input_shapes
+    ]
 
     # 2. define barrier
     barrier = multiprocessing.Barrier(process_num)
@@ -85,7 +118,17 @@ def run_multi_streams(
     for _ in range(process_num):
         wm = tcim_lite.runtime.WeightManager(device_id)
         p = multiprocessing.Process(
-            target=run_model_wrapper, args=(tid, device_id, hmm_path, wm, input_datas, round_num, barrier, verbose)
+            target=run_model_wrapper,
+            args=(
+                tid,
+                device_id,
+                hmm_path,
+                wm,
+                input_datas,
+                round_num,
+                barrier,
+                verbose,
+            ),
         )
         processes.append(p)
         tid += 1
@@ -112,7 +155,9 @@ def gen_conv_model_and_tops():
     kernel_size = (3, 3)
     stride = (1, 1)
     num_layers = 64
-    padding = Xh1ConvUtil.get_padding_for_same_fmap_size(feature_size, kernel_size, stride)
+    padding = Xh1ConvUtil.get_padding_for_same_fmap_size(
+        feature_size, kernel_size, stride
+    )
     input_name = "input"
 
     input_tensor = make_tensor(input_name, (batch_size, *feature_size, channel), dtype)
@@ -125,7 +170,9 @@ def gen_conv_model_and_tops():
     bias_shape = (weight_shape[-1],)
     kp_shape = Xh1ConvUtil.get_kp_shape(kernel_size, channel, channel)
     ko_shape = (weight_shape[-1],)
-    weight_data = np.random.randint(low=-128, high=128, size=weight_shape, dtype=np.int8)
+    weight_data = np.random.randint(
+        low=-128, high=128, size=weight_shape, dtype=np.int8
+    )
     bias_data = np.random.randint(low=-128, high=128, size=bias_shape, dtype=np.int16)
     kp_data = np.random.randint(low=0, high=5, size=kp_shape, dtype=np.int8)
     ko_data = np.random.randint(low=0, high=5, size=ko_shape, dtype=np.int8)
@@ -180,9 +227,15 @@ def gen_conv_model_and_tops():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--work-dir", type=str, default="./xh1_perf_test", help="work dir.")
-    parser.add_argument("--device-id", type=int, default=0, help="the device id to run the test on.")
-    parser.add_argument("--skip-build", action="store_true", help="skip model building.")
+    parser.add_argument(
+        "--work-dir", type=str, default="./xh1_perf_test", help="work dir."
+    )
+    parser.add_argument(
+        "--device-id", type=int, default=0, help="the device id to run the test on."
+    )
+    parser.add_argument(
+        "--skip-build", action="store_true", help="skip model building."
+    )
     parser.add_argument("--skip-run", action="store_true", help="skip model running.")
     args = parser.parse_args()
 
@@ -208,18 +261,22 @@ if __name__ == "__main__":
         print(f"Skipping model generation since model already exists in {hmm_path}.")
         args.skip_build = True
     elif platform_name != "x86_64":
-        print(f"Skipping model generation since the current platform is {platform_name}.")
+        print(
+            f"Skipping model generation since the current platform is {platform_name}."
+        )
         args.skip_build = True
 
         # download the compiled model for inference
-        HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../..')
-        sys.path.append(f'{HOUMO_EXAMPLES_PATH}/apis/common/python')
+        HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../..")
+        sys.path.append(f"{HOUMO_EXAMPLES_PATH}/apis/common/python")
         from utils import get_file_from_jfrog
 
         if "HOUMO_MODELZOO_URL" not in os.environ:
-            os.environ["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
-        HOUMO_TARGET = os.environ.get('HOUMO_TARGET', 'houmo')
-        model_dir = os.path.join(HOUMO_EXAMPLES_PATH, "models")
+            os.environ["HOUMO_MODELZOO_URL"] = (
+                "http://139.224.0.199:8082/artifactory/houmo/release"
+            )
+        HOUMO_TARGET = os.environ.get("HOUMO_TARGET", "houmo")
+        model_dir = os.path.join(HOUMO_EXAMPLES_PATH, "apis/models")
         zipped_hmm_path = "models/computing_perf/hmm_xh1_conv_4cores_20250613.zip"
         get_file_from_jfrog(zipped_hmm_path, model_dir, "./")
 
@@ -231,7 +288,9 @@ if __name__ == "__main__":
             make_model,
             make_tensor,
         )
-        from tcim.test_utils.onnx_builder.xh1_op_builder import make_base_cimd_conv2d_node
+        from tcim.test_utils.onnx_builder.xh1_op_builder import (
+            make_base_cimd_conv2d_node,
+        )
 
         print("Generating onnx model...")
         hmonnx_model, tops_per_sample = gen_conv_model_and_tops()
@@ -260,12 +319,18 @@ if __name__ == "__main__":
         print("=========================================")
         print(f"Running model {hmm_path}")
         if not os.path.exists(hmm_path):
-            raise FileNotFoundError(f"Model file {hmm_path} not found, please re-run the build step.")
+            raise FileNotFoundError(
+                f"Model file {hmm_path} not found, please re-run the build step."
+            )
         json_path = os.path.join(build_tmp_dir, "model.json")
         with open(json_path, "r", encoding="utf-8") as f:
             model_info = json.load(f)
-            input_shapes = [input_info["shape"] for input_info in model_info["Model"]["inputs"]]
-            input_names = [input_info["name"] for input_info in model_info["Model"]["inputs"]]
+            input_shapes = [
+                input_info["shape"] for input_info in model_info["Model"]["inputs"]
+            ]
+            input_names = [
+                input_info["name"] for input_info in model_info["Model"]["inputs"]
+            ]
         PROCESS_NUM = 4
         # warm up
         _ = run_multi_streams(
@@ -285,10 +350,14 @@ if __name__ == "__main__":
             device_id=args.device_id,
             verbose=True,
         )
-        print(f"Model run successfully on device {args.device_id}, elapsed time: {elapsed_time:.2f} seconds.")
+        print(
+            f"Model run successfully on device {args.device_id}, elapsed time: {elapsed_time:.2f} seconds."
+        )
         model_tops_path = os.path.join(build_tmp_dir, f"{MODEL_NAME}_tops.txt")
         with open(model_tops_path, "r", encoding="utf-8") as f:
             tops_per_sample = json.load(f)
 
         print("=========================================")
-        print(f"Performance is {tops_per_sample * PROCESS_NUM * SAMPLE_NUM_PER_THREAD / elapsed_time:.2f} TOPS.\n")
+        print(
+            f"Performance is {tops_per_sample * PROCESS_NUM * SAMPLE_NUM_PER_THREAD / elapsed_time:.2f} TOPS.\n"
+        )

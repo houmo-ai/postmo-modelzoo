@@ -10,7 +10,7 @@ if [ "$1" = "1" ]; then
 fi
 
 if [[ -z $HOUMO_EXAMPLES_PATH ]]; then
-  export HOUMO_EXAMPLES_PATH=$WORK_PATH/../..
+  export HOUMO_EXAMPLES_PATH=$WORK_PATH/../../..
 fi
 
 # get example models and data
