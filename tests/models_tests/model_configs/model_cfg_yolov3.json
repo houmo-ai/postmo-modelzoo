@@ -2,22 +2,23 @@
     "obsolete": false,
     "model_dir": "models/detection/yolov3",
     "support_platform": ["x86_64"],
-    "support_backend": ["xh1", "xh2"],
+    "support_backend": ["xh1"],
     "support_core_num": {
         "xh1": [1],
         "xh2": null
     },
     "support_flow": {
-        "xh1": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"],
-        "xh2": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"]
+        "xh1": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"]
     },
     "support_hmassist": {
-        "xh1": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"],
-        "xh2": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
+        "xh1": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
     },
     "perf_metrics": {
         "xh1":{
             "x86_64": 128.087
+        },
+        "xh2":{
+            "x86_64": 20
         }
     },
     "eval_threshold": {

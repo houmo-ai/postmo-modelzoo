@@ -104,7 +104,7 @@ def load_json(json_path: str) -> dict:
     if not os.path.exists(json_path):
         return None
 
-    with open(json_path, 'r', encoding='utf-8') as f:
+    with open(json_path, "r", encoding="utf-8") as f:
         json_info = json.load(f)
     logger.info(f"Loaded config file {json_path}")
 
@@ -144,7 +144,7 @@ def execute_test_cmd(
         logger.error(f"Failed to execute command: {cmd_str}, unknown error: {e}")
     finally:
         if log_file:
-            with open(log_file, "a", encoding='utf-8') as f:
+            with open(log_file, "a", encoding="utf-8") as f:
                 if stdout:
                     f.write(stdout)
                 if stderr:
@@ -169,7 +169,7 @@ def get_platform(support_list: list) -> str:
     machine = platform.machine()
     logger.info(f"Only supports Linux system, current system is {system}.")
 
-    if system == 'Linux' and machine in support_list:
+    if system == "Linux" and machine in support_list:
         return machine
     return None
 
@@ -179,11 +179,13 @@ def check_device_info(support_list: list) -> bool:
         logger.error("No support hmm models.")
         return False
 
+    core_num_str = "Core_Num" if HOUMO_BACKEND == "xh2" else "Core Num"
     exec_flag, opt_str = execute_test_cmd(["hm_smi", "-a"])
+
     lines = [
         line.split(":", 1)[-1].strip()
-        for line in opt_str.split('\n')
-        if "Core Num" in line
+        for line in opt_str.split("\n")
+        if core_num_str in line
     ]
     if exec_flag and lines and len(set(lines)) == 1:
         device_core_num = int(lines[0])
@@ -202,11 +204,14 @@ def check_device_info(support_list: list) -> bool:
 
 
 def check_vpu_status() -> bool:
+    if HOUMO_BACKEND != "xh1":
+        return False
+
     exec_flag, opt_str = execute_test_cmd(["hm_smi", "-a"])
     if exec_flag:
         lines = [
             line.split(":", 1)[-1].strip()
-            for line in opt_str.split('\n')
+            for line in opt_str.split("\n")
             if "Used" in line
         ]
         used_mem = float(lines[0][:-2]) if len(lines) > 0 and "MB" in lines[0] else 0
@@ -221,13 +226,13 @@ def install_py_env(env_dir: str, log_file: str) -> dict:
     """Install python env according to requirements.txt."""
     # get current python env
     pip_res = subprocess.run(
-        ['pip3', 'list'],
+        ["pip3", "list"],
         check=True,
         text=True,
         capture_output=True,
     )
     py_env_dict = dict()
-    for line in pip_res.stdout.split('\n'):
+    for line in pip_res.stdout.split("\n"):
         line = line.strip()
         if "Package" in line or "--" in line:
             continue
@@ -242,7 +247,7 @@ def install_py_env(env_dir: str, log_file: str) -> dict:
         with open(rqmt_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                if not line or line.startswith('#') or "http" in line:
+                if not line or line.startswith("#") or "http" in line:
                     continue
                 lib_name = line
                 if "==" in line:
@@ -251,7 +256,7 @@ def install_py_env(env_dir: str, log_file: str) -> dict:
 
         os.chdir(env_dir)
         ret, _ = execute_test_cmd(
-            ['pip3', 'install', '-r', 'requirements.txt'], log_file
+            ["pip3", "install", "-r", "requirements.txt"], log_file
         )
         logger.info(
             f"Install python dependencies for the current testcase, ret: {ret}."

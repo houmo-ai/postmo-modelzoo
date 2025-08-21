@@ -77,7 +77,7 @@ def _test_get_model(example_info: dict, platform: str, log_file: str) -> bool:
     max_core_num = 2 if platform == "aarch64" else 0
     model_set_dir = os.path.join(MODELS_PATH, example_info["example_dir"])
     params_dict = example_info["get_model_params"][HOUMO_BACKEND]
-    cmd_header = ['python3', "get_model.py", "--model_dir", model_set_dir]
+    cmd_header = ["python3", "get_model.py", "--model_dir", model_set_dir]
     cmd_list = _generate_cmds(cmd_header, params_dict, max_core_num)
 
     lock_file = model_set_dir + "/lock.lock"
@@ -162,7 +162,7 @@ def execute_apis_examples(example_name: str, log_file: str):
             logger.info(f"changed python libs: {changed_libs}.")
 
         params_dict = example_info["py_example_params"]
-        cmd_header = ['python3', params_dict["name"]]
+        cmd_header = ["python3", params_dict["name"]]
         cmd_list = _generate_cmds(cmd_header, params_dict)
         for tmp_cmd_list in cmd_list:
             exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)

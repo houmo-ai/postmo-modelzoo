@@ -3,8 +3,8 @@
     "example_dir": "apis/inferences/resnet50_multistreams",
     "support_platform": ["x86_64"],
     "support_backend": {
-        "xh1": ["python", "cpp"], 
-        "xh2": ["python"]
+        "xh1": ["python", "cpp"],
+        "xh2": ["python", "cpp"]
     },
     "support_core_num": {
         "xh1": [4],

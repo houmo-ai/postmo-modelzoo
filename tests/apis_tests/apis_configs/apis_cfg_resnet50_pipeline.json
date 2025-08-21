@@ -3,10 +3,12 @@
     "example_dir": "apis/inferences/resnet50_pipeline",
     "support_platform": ["x86_64"],
     "support_backend": {
-        "xh1": ["cpp"]
+        "xh1": ["cpp"],
+        "xh2": ["cpp"]
     },
     "support_core_num": {
-        "xh1": [1]
+        "xh1": [1],
+        "xh2": [1]
     },
     "get_model_params": null,
     "py_example_params": null,

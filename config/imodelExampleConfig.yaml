@@ -217,6 +217,37 @@ apis_common:
     - inferences_yolov5s_resnet50_multibatch_test
     - scenes_video_detect_test
 
+###### tests ######
+models_tests:
+  include:
+    - tests/models_tests
+  exclude:
+    - tests/models_tests/README.md
+    - tests/models_tests/__init__.py
+  example_case: null
+  test:
+    - backbone_resnet50_test
+    - backbone_efficientnet_test
+    - backbone_mobilenetv2_test
+    - autodrive_yolop_test
+    - detection_yolov3_test
+    - detection_yolov5s_test
+    - detection_yolov8m_test
+
+apis_tests:
+  include:
+    - tests/apis_tests
+  exclude:
+    - tests/apis_tests/__init__.py
+  example_case: null
+  test:
+    - inferences_resnet50_test
+    - inferences_yolov5s_test
+    - inferences_resnet50_multistreams_test
+    - inferences_resnet50_pipeline_test
+    - inferences_yolov5s_resnet50_multibatch_test
+    - scenes_video_detect_test
+
 ###### all ######
 all:
   include:
