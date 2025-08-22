@@ -170,12 +170,14 @@ def export_llm(args):
     target_device = DeviceType.XH2a
     quant_type = args.quant_type
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
+    model_dir = os.path.join(args.out_dir, "{}_quarot_gptq".format(args.model))
+    quant_weight = os.path.join(model_dir, "quarot_gptq-state-dict.safetensors")
     config = Qwen2ConvertConfig(
         batch_size=1,
         context_length=args.context_length,
         input_sequence_length=args.input_sequence_length,
         quant_scheme=quant_scheme,
-        quant_weight=args.quant_weight,
+        quant_weight=quant_weight,
     )
 
     prefix = f"{model_name}-{target_device}-{args.context_length//1024}k-{quant_type}"
@@ -193,7 +195,7 @@ def export_llm(args):
             raise ValueError("Unsupported model architecture") 
         LLMConverter.from_pretrained(hf_model_path, architecture, config, str(work_dir))
 
-def move_models(work_dir: Path, source: str = "prefill", model : str = "prefill", target_name: str = "hmquant_qwen3_with_act.onnx"):
+def move_models(work_dir: Path, source: str = "prefill", model : str = "prefill", target_name: str = "hmquant_deepseek_with_act.onnx"):
     source_dir = work_dir / "hmquant/{}".format(source)
     matched_files = list(source_dir.glob("*{}.onnx".format(model)))
     

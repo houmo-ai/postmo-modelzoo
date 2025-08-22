@@ -88,17 +88,10 @@ elif HOUMO_TARGET == 'xh2':
         parser.add_argument("--w-bits", type=int, default=4)
         parser.add_argument("--seed", type=int, default=1024)
         parser.add_argument("--resume", action="store_true", help="resume from the cache")
-        # parser.add_argument("--tie-embed_head", action="store_true", help="tie_embed_head")
         parser.add_argument("--debug", action="store_true", help="debug mode")
         parser.add_argument("--context-length", type=int, default=2048, help="max sequence length")
         parser.add_argument("--input-sequence-length", type=int, default=256, help="input sequence length")
         parser.add_argument("--quant-type", default="w4a8_ssfp", help="quant type, default is w4a8_ssfp")
-        parser.add_argument(
-            "--quant-weight",
-            type=str,
-            default="work_dirs/qwen3-14b_quarot_gptq/quarot_gptq-state-dict.safetensors",
-            help="quant weight path, for example: gptq or quarot, if empty, use w8a8",
-        )
         args = parser.parse_args()
         return args
 

@@ -170,12 +170,14 @@ def export_llm(args):
     target_device = DeviceType.XH2a
     quant_type = args.quant_type
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
+    model_dir = os.path.join(args.out_dir, "{}_quarot_gptq".format(args.model))
+    quant_weight = os.path.join(model_dir, "quarot_gptq-state-dict.safetensors")
     config = Qwen2ConvertConfig(
         batch_size=1,
         context_length=args.context_length,
         input_sequence_length=args.input_sequence_length,
         quant_scheme=quant_scheme,
-        quant_weight=args.quant_weight,
+        quant_weight=quant_weight,
     )
 
     prefix = f"{model_name}-{target_device}-{args.context_length//1024}k-{quant_type}"
