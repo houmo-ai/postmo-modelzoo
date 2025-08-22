@@ -171,7 +171,7 @@ class HmQwen:
                 break
 
             self.decode_model.set_input("input_1", input_data.numpy())
-            valid_length_data = np.array(context_length - 1).astype("int16")
+            valid_length_data = np.array(context_length).astype("int16")
             self.decode_model.set_input("valid_length", valid_length_data)
             self.decode_model.run()
             self.decode_model.sync()
@@ -312,7 +312,7 @@ class HmQwenXh2:
             input_name = self.decode.get_input_name(0)
             valid_length_name = self.decode.get_input_name(1)
             self.decode.set_input(input_name, input_data.numpy())
-            valid_length_data = np.array(context_length - 1).astype("int32")
+            valid_length_data = np.array(context_length).astype("int32")
             self.decode.set_input(valid_length_name, valid_length_data)
             self.decode.run()
             self.decode.sync()
