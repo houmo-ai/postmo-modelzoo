@@ -23,7 +23,7 @@ def msg_output_format(title):
     return title
 
 def quant_llm(args):
-    out_dir = Path(args.out_dir)
+    out_dir = Path(args.work_dir)
     hf_model_dir = args.model
 
     hf_model_path = osp.normpath(osp.abspath(args.model))
@@ -170,7 +170,8 @@ def export_llm(args):
     target_device = DeviceType.XH2a
     quant_type = args.quant_type
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
-    model_dir = os.path.join(args.out_dir, "{}_quarot_gptq".format(args.model))
+    model_name = os.path.basename(args.model)
+    model_dir = os.path.join(args.work_dir, "{}_quarot_gptq".format(model_name))
     quant_weight = os.path.join(model_dir, "quarot_gptq-state-dict.safetensors")
     config = Qwen2ConvertConfig(
         batch_size=1,
@@ -218,9 +219,10 @@ def format_number(n):
         return f"0k"
 
 def move_llm(args):
-    work_dir = Path(args.out_dir)
-    dest_dir = Path("output/xh2")
-    hmm_model_dir = "{}-XH2a-{}-{}".format(args.model, format_number(args.context_length), args.quant_type)
+    work_dir = Path(args.work_dir)
+    dest_dir = Path(args.out_dir)
+    model_name = os.path.basename(args.model)
+    hmm_model_dir = "{}-XH2a-{}-{}".format(model_name, format_number(args.context_length), args.quant_type)
     logger.info(msg_output_format("Start move from {} to {}").format(work_dir / hmm_model_dir, dest_dir))
     shutil.move(work_dir / hmm_model_dir / "hmonnx/prefill", dest_dir / "hmquant/prefill")
     move_models(dest_dir, "prefill")
