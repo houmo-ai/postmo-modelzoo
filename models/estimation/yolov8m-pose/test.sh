@@ -1,46 +1,19 @@
 #!/usr/bin/env bash
-
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 set -e
 
-cd $HOUMO_MODELZOO_PATH/utils/tcim_perf
-if [ ! -f tcim_perf ]; then
-  ./build.sh
-fi
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 cd "${SCRIPT_DIR}"
 
-action="${1:-all}"
-
-declare -A action_map=(
-  ["quant"]=1
-  ["build"]=2
-  ["perf"]=3
-  ["test"]=4
-  ["demo"]=5
-  ["eval"]=6
-  ["all"]=9
-)
-
-action_num="${action_map[$action]:-0}"
-
-if [[ $action_num > 0 ]]; then
+arch=$(uname -m)
+if [ "$arch" = "x86_64" ]; then
   python3 get_model.py
-  hmquant.sh
-fi
-if [[ $action_num > 1 ]]; then
-  hmbuild.sh
-fi
-if [[ $action_num > 2 ]]; then
-  hmperf.sh
-fi
-if [[ $action_num > 3 ]]; then
-  hmtest.sh --target onnx
-  hmtest.sh
-fi
-if [[ $action_num -eq 5 || $action_num -eq 9 ]]; then
-  hmdemo.sh
-fi
-if [[ $action_num -eq 6 || $action_num -eq 9 ]]; then
-  hmeval.sh
+  hmatc quant   -c config.yml
+  hmatc build   -c config.yml
+  hmatc compare -c config.yml --data_path coco2017/val2017/000000000139.jpg
+  hmatc perf    -c config.yml -wn 1 -sn 1 -tn 1
+  hmatc demo    -c config.yml
+  hmatc demo    -c config.yml --onnx
+  hmatc eval    -c config.yml
+  hmatc eval    -c config.yml --onnx
 fi

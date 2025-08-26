@@ -3,6 +3,7 @@ import os
 import sys
 import importlib
 import numpy as np
+import torch
 from pathlib import Path
 from datetime import datetime
 from ..utils import logger
@@ -15,8 +16,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         Args:
             cfg (dict): 来自配置文件
         """
-        # self.device = "cuda" if torch.cuda.is_available() else "cpu",
-        self.device = "cpu"
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Using device: {self.device}")
         self.target = cfg["target"]
         self.model_cfg = cfg.get("model")
         self.model_path = self.model_cfg.get("model_path", "")

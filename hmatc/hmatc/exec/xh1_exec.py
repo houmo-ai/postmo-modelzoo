@@ -1,13 +1,11 @@
 import json
 import os
 import time
-from datetime import datetime
-
 import cv2
 import numpy as np
 import torch
+from datetime import datetime
 from prettytable import PrettyTable
-
 from ..base.base_exec import BaseExec
 from ..infer.hmquant_infer import HmQuantInfer
 from ..infer.onnx_infer import OnnxInfer
@@ -106,6 +104,7 @@ class Xh1Exec(BaseExec):
         if not os.path.exists(self.hmm_save_dir):
             os.makedirs(self.hmm_save_dir)
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
+        self.onnx_in_datas = list()  # 存储onnx输入数据
 
     def get_quant_cfg(self) -> dict:
         # 设置量化日志输出
@@ -194,6 +193,7 @@ class Xh1Exec(BaseExec):
 
     def get_quant_dataset(self):
         """提供量化数据"""
+        self.onnx_in_datas.clear()
         input_name = self.inputs_name[0]
         input_cfg = self.inputs_cfg[input_name]
         calib_num = self.quant_cfg.get("calib_num")
@@ -212,76 +212,33 @@ class Xh1Exec(BaseExec):
             resizer_cfg = input_cfg.get("resizer", dict())
             max_input_size = resizer_cfg.get("max_input_size", (H, W))
             max_height, max_width = max_input_size
+            filenames = (
+                ["random.jpg"] * calib_num
+                if self.use_random_data
+                else os.listdir(self.calib_data)
+            )
             if self.use_random_data:
-                # 随机图像，不管动态静态都以max_input_size来crop
-                in_datas = dict()
-                for idx in range(calib_num):
-                    in_data = torch.randint(
-                        low=0,
-                        high=255,
-                        size=(N, C, max_height, max_width),
-                        dtype=torch.uint8,
-                    )
-                    if self.resizer_mode == 1:
-                        in_datas[f"resizer_crop_{input_name}"] = (
-                            torch.Tensor(
-                                [0, 0, max_height, max_width, H, W, 0, 0, 0, 0]
-                            )
-                            .type(torch.int32)
-                            .view(1, -1)
-                        )
-                    elif self.resizer_mode == 2:
-                        in_datas[f"resizer_crop_{input_name}"] = (
-                            torch.Tensor([0, 0, max_height, max_width])
-                            .type(torch.int32)
-                            .view(1, -1)
-                        )
-                    if self.resizer_mode == 0:
-                        cv_image = (
-                            in_data[0]
-                            .permute(1, 2, 0)
-                            .contiguous()
-                            .detach()
-                            .cpu()
-                            .numpy()
-                        )
-                        im = default_preprocess(
-                            cv_image,
-                            (W, H),
-                            mean=mean,
-                            std=std,
-                            use_norm=True,
-                            use_resize=True,
-                            use_rgb=data_format == "RGB",  # 对灰度无效
-                            resize_type=resize_type,
-                            padding_mode=padding_mode,
-                            padding_value=padding_values,
-                        )
-                        in_data = torch.from_numpy(im)
-                    in_datas[input_name] = in_data
-                    logger.info(f"Processing calibration random data {idx}...")
-                    yield in_datas
-            else:
-                # 真实图像
-                filenames = os.listdir(self.calib_data)
-                # 填充图片
-                padding_len = len(filenames) % N
-                for idx in range(padding_len):
-                    filenames.append(filenames[0])
-                # 切分图片
-                actual_calib_num = len(filenames) // N
-                if actual_calib_num < calib_num:
-                    logger.warning(
-                        f"The number of calibration data is less than the number of calibration samples"
-                    )
-                    calib_num = actual_calib_num
-                in_datas = dict()
-                for idx in range(calib_num):
-                    batch_filenames = filenames[idx * N : (idx + 1) * N]
-                    batch_datas = list()
-                    dyn_infos = list()
-                    logger.info(f"Processing calibration data {idx}...")
-                    for filename in batch_filenames:
+                logger.warning("Using random data for calibration")
+            # 填充图片
+            padding_len = len(filenames) % N
+            for idx in range(padding_len):
+                filenames.append(filenames[0])
+            # 切分图片
+            actual_calib_num = len(filenames) // N
+            if actual_calib_num < calib_num:
+                logger.warning(
+                    f"The number of calibration data is less than the number of calibration samples"
+                )
+                calib_num = actual_calib_num
+            in_datas = dict()
+            for idx in range(calib_num):
+                batch_filenames = filenames[idx * N : (idx + 1) * N]
+                batch_datas = list()
+                dyn_infos = list()
+                batch_onnx_datas = list()
+                logger.info(f"Processing calibration data {idx}...")
+                for filename in batch_filenames:
+                    if not self.use_random_data:
                         _, ext = os.path.splitext(filename)
                         if ext not in SUPPORT_IMAGE_FORMATS:
                             logger.warning(f"Not supported ext: {ext}")
@@ -294,29 +251,61 @@ class Xh1Exec(BaseExec):
                         if cv_image is None:
                             logger.warning(f"{filepath} not exists or decode failed")
                             continue
-
-                        im, dyn_info = xh1_preprocess(
-                            cv_image,
-                            input_shape,
-                            max_input_size,
-                            mean=mean,
-                            std=std,
-                            use_norm=self.resizer_mode == 0,
-                            use_resize=self.resizer_mode in [0, 3],
-                            use_rgb=data_format == "RGB"
-                            or self.resizer_mode in [1, 2, 3],  # 对灰度无效
-                            resize_type=resize_type,
-                            padding_mode=padding_mode,
-                            padding_values=padding_values,
-                            is_onnx=self.resizer_mode in [0, 3],
+                    else:
+                        # 直接用resizer输入大小生成随机图
+                        cv_image = torch.randint(
+                            low=0,
+                            high=255,
+                            size=(max_height, max_width, C),
+                            dtype=torch.uint8,
                         )
-                        dyn_infos.append(dyn_info)
-                        batch_datas.append(im)
-                    in_datas[input_name] = torch.cat(batch_datas, dim=0)
-                    if self.resizer_mode in [1, 2]:
-                        batch_dyninfos = torch.cat(dyn_infos, dim=0)
-                        in_datas[f"resizer_crop_{input_name}"] = batch_dyninfos
-                    yield in_datas
+                    # resizer in [0, 1, 2, 3]
+                    im, dyn_info = xh1_preprocess(
+                        cv_image,
+                        input_shape,
+                        max_input_size,
+                        mean=mean,
+                        std=std,
+                        use_norm=self.resizer_mode == 0,
+                        use_resize=self.resizer_mode in [0, 3],
+                        use_rgb=data_format == "RGB"
+                        or self.resizer_mode in [1, 2, 3],  # 对灰度无效
+                        resize_type=resize_type,
+                        padding_mode=padding_mode,
+                        padding_values=padding_values,
+                        is_onnx=self.resizer_mode in [0, 3],
+                    )
+                    # onnx
+                    onnx_im, _ = xh1_preprocess(
+                        cv_image,
+                        input_shape,
+                        max_input_size,
+                        mean=mean,
+                        std=std,
+                        use_norm=True,
+                        use_resize=True,
+                        use_rgb=data_format == "RGB",
+                        resize_type=resize_type,
+                        padding_mode=padding_mode,
+                        padding_values=padding_values,
+                        is_onnx=True,
+                    )
+                    batch_onnx_datas.append(onnx_im)
+                    dyn_infos.append(dyn_info)
+                    batch_datas.append(im)
+                self.onnx_in_datas.append(
+                    {
+                        input_name: torch.cat(batch_onnx_datas, dim=0)
+                        .detach()
+                        .cpu()
+                        .numpy()
+                    }
+                )
+                in_datas[input_name] = torch.cat(batch_datas, dim=0)
+                if self.resizer_mode in [1, 2]:
+                    batch_dyninfos = torch.cat(dyn_infos, dim=0)
+                    in_datas[f"resizer_crop_{input_name}"] = batch_dyninfos
+                yield in_datas
         else:
             # 单输入且输入为非图像 or 多输入
             in_datas = dict()
@@ -375,9 +364,24 @@ class Xh1Exec(BaseExec):
         from hmquant.api import (
             generate_golden,
             quant_single_onnx_network,
+            convert_profiling,
             quantize_profiling,
         )
 
+        calib_dataset = self.get_quant_dataset()
+        in_datas = next(calib_dataset)
+        onnx_in_datas = (
+            self.onnx_in_datas[0] if self.is_image_single_input else in_datas
+        )
+        # 打印前端转换对比结果
+        convert_profiling(
+            self.model_path,
+            onnx_input=[onnx_in_datas],
+            cfg=self.get_quant_cfg(),
+            sequencer_input=[in_datas],
+            save_tmp_path=self.quant_output_dir,
+            device=self.device,
+        )
         t_start = time.time()
         sequencer = quant_single_onnx_network(
             cfg=self.get_quant_cfg(),
@@ -386,12 +390,11 @@ class Xh1Exec(BaseExec):
             device=self.device,
         )
         span = time.time() - t_start
-        calib_dataset = self.get_quant_dataset()
-        in_datas = next(calib_dataset)
+        # 打印量化前后的对比结果
         res = quantize_profiling(
             sequencer,
             [in_datas],
-            device="cpu",
+            device=self.device,
             mode=0,  # 0：累积误差  1：单算子对比
             quant_mode="quant_forward",
             return_o_metric=True,
@@ -411,7 +414,7 @@ class Xh1Exec(BaseExec):
             save_path=self.quant_output_dir,
             model_name=self.model_name,
             batch_size=self.model_inputs_batch,
-            device="cpu",
+            device=self.device,
             mode="hardware_forward",
             input_types=["int8"],
             output_types=["int8"],

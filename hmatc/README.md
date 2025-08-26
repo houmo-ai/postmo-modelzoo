@@ -143,7 +143,7 @@ quant:
       # [可选] 是否使用GPTQ进行量化, 默认false
       gptq: false
     # 混合量化关心算子列表，设置后该算子往后的全部算子都会被设置为高bit量化，默认为空
-    mix_attn_out: 
+    mix_attn_outs: 
   
     # [可选] 按节点量化，优先级最高
     node_wise_cfg:

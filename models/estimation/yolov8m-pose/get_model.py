@@ -1,12 +1,10 @@
 import os
-import argparse
-import numpy as np
 import onnx
-import onnx_graphsurgeon as osg
+import argparse
 from hmatc.utils.utils import get_file_from_jfrog
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh1')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh1")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
@@ -14,97 +12,89 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--type',
-        dest='model_type',
+        "--type",
+        dest="model_type",
         type=str,
-        default='raw',
-        help='which model type to get, choise in [raw, quant, all]',
+        default="raw",
+        help="which model type to get, choise in [raw, quant, build, all]",
     )
     parser.add_argument(
-        '--quant_model_dir',
-        dest='quant_model_dir',
+        "--quant_model_dir",
+        dest="quant_model_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
-        help='where to save quant_model',
+        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        help="where to save quant_model",
     )
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--build_model_dir",
+        dest="build_model_dir",
         type=str,
-        default='.',
-        help='where to save downloaded model',
+        default=os.path.join("output", HOUMO_TARGET),
+        help="where to save build_model",
+    )
+    parser.add_argument(
+        "--model_dir",
+        dest="model_dir",
+        type=str,
+        default="",
+        help="where to save downloaded model",
     )
     args = parser.parse_args()
     return args
 
-def clip_model():
-    model = onnx.load("yolov8m-pose.onnx")
 
-    # 创建新的输出张量
-    new_output1 = osg.Variable(
-        name="output1",
-        dtype=np.float32,
-        shape=[1, 51, 8400]
-    )
-    new_output2 = osg.Variable(
-        name="output2",
-        dtype=np.float32,
-        shape=[1, 1, 4, 8400]
-    )
-    new_output3 = osg.Variable(
-        name="output3",
-        dtype=np.float32,
-        shape=[1, 1, 8400]
-    )
-    # 创建 Graph 对象
-    graph = osg.import_onnx(model)
-    for output in graph.outputs:
-        if output.name == "output0":
-            graph.outputs.remove(output)
-
-    for node in graph.nodes:
-        if node.name == "/model.22/Reshape_6":
-            graph.nodes.remove(node)
-    for node in graph.nodes:
-        if node.name == "/model.22/dfl/Reshape_1":
-            graph.nodes.remove(node)
-    for node in graph.nodes:
-        if node.name == "/model.22/Concat_7":
-            graph.nodes.remove(node)
-
-    for node in graph.nodes:
-        if node.name == "/model.22/Concat":
-            node.outputs.clear()
-            node.outputs.append(new_output1)
-            graph.outputs.append(new_output1)
-        if node.name == "/model.22/dfl/conv/Conv":
-            node.outputs.clear()
-            node.outputs.append(new_output2)
-            graph.outputs.append(new_output2)
-        if node.name == "/model.22/Sigmoid":
-            node.outputs.clear()
-            node.outputs.append(new_output3)
-            graph.outputs.append(new_output3)
-    graph.cleanup()
-    graph.toposort()
-
-    # 保存修改后的模型
-    new_model = osg.export_onnx(graph)
-    onnx.save(new_model, "yolov8m-pose-clip.onnx")
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     quant_model_dir = args.quant_model_dir
+    build_model_dir = args.build_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
-    raw_path = "http://10.10.1.53:8082/artifactory/toolchain/support/custom/saimo/yolov8m-pose.onnx"
-    quant_path = "models/yolov8m/hmquant_yolov8m_20250315.zip"
-    yolov8s_pose_data = "http://10.10.1.53:8082/artifactory/toolchain/support/custom/yolov8_pose_data.tar.gz"
+
+    model_name = "yolov8m-pose"
+    ncore = 1
+    batch = 1
+    opt_level = "O2"
+    version = "v2.4.2"
+    target = HOUMO_TARGET
+    raw_path = f"models/{model_name}/yolov8m-pose.onnx"
+    quant_path = f"models/{model_name}/hmquant_{model_name}_{target}_{version}.tar.xz"
+    build_path = f"models/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type == "raw" or model_type == "all":
-        file_path = get_file_from_jfrog(raw_path, model_dir)
-        get_file_from_jfrog(yolov8s_pose_data, model_dir, extract_dir="./")
-    # if model_type == "quant" or model_type == "all":
-    #     get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
-    clip_model()
+        try:
+            file_path = get_file_from_jfrog(raw_path, model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
+        else:
+            extract_path = os.path.join(
+                os.path.dirname(file_path), "yolov8m-pose_clip.onnx"
+            )
+            onnx.utils.extract_model(
+                file_path,
+                extract_path,
+                input_names=["images"],
+                output_names=[
+                    "/model.22/cv2.0/cv2.0.2/Conv_output_0",
+                    "/model.22/cv2.1/cv2.1.2/Conv_output_0",
+                    "/model.22/cv2.2/cv2.2.2/Conv_output_0",
+                    "/model.22/cv3.0/cv3.0.2/Conv_output_0",
+                    "/model.22/cv3.1/cv3.1.2/Conv_output_0",
+                    "/model.22/cv3.2/cv3.2.2/Conv_output_0",
+                    "/model.22/cv4.0/cv4.0.2/Conv_output_0",
+                    "/model.22/cv4.1/cv4.1.2/Conv_output_0",
+                    "/model.22/cv4.2/cv4.2.2/Conv_output_0",
+                ],
+                check_model=True,
+            )
+
+    if model_type == "quant" or model_type == "all":
+        try:
+            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
+
+    if model_type == "build" or model_type == "all":
+        try:
+            get_file_from_jfrog(build_path, model_dir, build_model_dir)
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
