@@ -24,6 +24,7 @@ from ..base.base_exec import BaseExec
 from ..infer.xh2_infer import Xh2Infer
 from ..infer.onnx_infer import OnnxInfer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
+from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
 
 
 class Xh2Exec(BaseExec):
@@ -45,6 +46,9 @@ class Xh2Exec(BaseExec):
         self.golden_dir = os.path.join(self.quant_output_dir, "golden")
         self.quant_advance_cfg = self.quant_cfg.get("config", dict())
         self.upgrade_opset_version()
+        #hmatc onnx optimizer initialization
+        if 'app_onnx_opt' in cfg['model']:
+            self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
 
     def get_quant_cfg(self) -> dict:
         return dict()
@@ -83,6 +87,11 @@ class Xh2Exec(BaseExec):
         if not os.path.exists(self.quant_output_dir):
             os.makedirs(self.quant_output_dir)
         # 检查opset_version
+
+        if hasattr(self, 'ApplicationOnnxOpt'):
+            self.ApplicationOnnxOpt.opt()
+            if hasattr(self.ApplicationOnnxOpt, 'opt_model_path'):
+                self.model_path = self.ApplicationOnnxOpt.opt_model_path
 
         from xhquant.api import (
             DeviceType,

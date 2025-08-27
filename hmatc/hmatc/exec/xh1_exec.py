@@ -22,6 +22,7 @@ from ..utils.utils import (
     get_md5,
     load_npz,
 )
+from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
 
 
 class Xh1Exec(BaseExec):
@@ -105,6 +106,9 @@ class Xh1Exec(BaseExec):
             os.makedirs(self.hmm_save_dir)
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
         self.onnx_in_datas = list()  # 存储onnx输入数据
+        #hmatc onnx optimizer initialization
+        if 'app_onnx_opt' in cfg['model']:
+            self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
 
     def get_quant_cfg(self) -> dict:
         # 设置量化日志输出
@@ -360,6 +364,11 @@ class Xh1Exec(BaseExec):
             if not os.path.isdir(self.calib_data):
                 self.calib_data = HM_calib_data
             logger.info(f"calib_data: {self.calib_data}")
+
+        if hasattr(self, 'ApplicationOnnxOpt'):
+            self.ApplicationOnnxOpt.opt()
+            if hasattr(self.ApplicationOnnxOpt, 'opt_model_path'):
+                self.model_path = self.ApplicationOnnxOpt.opt_model_path
 
         from hmquant.api import (
             generate_golden,
