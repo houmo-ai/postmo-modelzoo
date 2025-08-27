@@ -196,7 +196,7 @@ def export_llm(args):
             raise ValueError("Unsupported model architecture") 
         LLMConverter.from_pretrained(hf_model_path, architecture, config, str(work_dir))
 
-def move_models(work_dir: Path, source: str = "prefill", model : str = "prefill", target_name: str = "hmquant_qwen2.5_with_act.onnx"):
+def move_models(work_dir: Path, source: str = "prefill", model : str = "prefill", target_name: str = "hmquant_qwen3_with_act.onnx"):
     source_dir = work_dir / "hmquant/{}".format(source)
     matched_files = list(source_dir.glob("*{}.onnx".format(model)))
     
@@ -222,12 +222,13 @@ def move_llm(args):
     work_dir = Path(args.work_dir)
     dest_dir = Path(args.out_dir)
     model_name = os.path.basename(args.model)
+    hm_model_name = "hmquant_{}_with_act.onnx".format(args.model_name)
     hmm_model_dir = "{}-XH2a-{}-{}".format(model_name, format_number(args.context_length), args.quant_type)
     logger.info(msg_output_format("Start move from {} to {}").format(work_dir / hmm_model_dir, dest_dir))
     shutil.move(work_dir / hmm_model_dir / "hmonnx/prefill", dest_dir / "hmquant/prefill")
-    move_models(dest_dir, "prefill")
+    move_models(dest_dir, "prefill", target_name = hm_model_name)
     shutil.move(work_dir / hmm_model_dir / "hmonnx/decode", dest_dir / "hmquant/decoder")
-    move_models(dest_dir, "decoder", "decoder")
+    move_models(dest_dir, "decoder", "decoder", target_name = hm_model_name)
     shutil.move(work_dir / hmm_model_dir / "token_embedding.pt", dest_dir / "hmquant/quant_embedding.pt")
     logger.info(msg_output_format("Start remove work_dir: {}".format(work_dir)))
     shutil.rmtree(work_dir)
