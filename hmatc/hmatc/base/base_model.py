@@ -12,6 +12,28 @@ from ..infer.xh2_infer import Xh2Infer
 from ..infer.onnx_infer import OnnxInfer
 
 
+COLORS = [
+    (0, 0, 255),
+    (0, 255, 0),
+    (255, 0, 0),
+    (169, 169, 169),
+    (0, 0, 139),
+    (0, 69, 255),
+    (30, 105, 210),
+    (10, 215, 255),
+    (0, 255, 255),
+    (0, 128, 128),
+    (144, 238, 144),
+    (139, 139, 0),
+    (230, 216, 173),
+    (130, 0, 75),
+    (128, 0, 128),
+    (203, 192, 255),
+    (147, 20, 255),
+    (238, 130, 238),
+]
+
+
 class BaseModel(object, metaclass=abc.ABCMeta):
     def __init__(self, **kwargs):
         self.time_span = 0
@@ -35,7 +57,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         else:
             logger.error(f"Not support backend: {self.backend}")
             exit(-1)
-        
+
     def load(self, model_path: str):
         """模型加载"""
         model_name = os.path.basename(model_path)
@@ -48,7 +70,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
     def preprocess(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         """模型前处理"""
         if not self.is_image_single_input:
-            # 单输入非图像or多输入，输入数据为外部预处理后数据        
+            # 单输入非图像or多输入，输入数据为外部预处理后数据
             if self.backend == "onnx":
                 return in_datas
             elif self.backend in ["xh1"]:
@@ -77,27 +99,32 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             toYUV_format = resizer_cfg.get("toYUV_format", None)
             max_input_size = resizer_cfg.get("max_input_size", (H, W))
             im, dyn_info = xh1_preprocess(
-                cv_image, 
-                input_shape, 
+                cv_image,
+                input_shape,
                 max_input_size,
-                mean=mean, 
+                mean=mean,
                 std=std,
-                use_resize=self.resizer_mode in [0, 3] or self.backend == "onnx", 
-                use_norm=self.resizer_mode == 0 or self.backend == "onnx", 
-                use_rgb=data_format == "RGB" and (self.resizer_mode == 0 or self.backend == "onnx"),
-                resize_type=resize_type, 
+                use_resize=self.resizer_mode in [0, 3] or self.backend == "onnx",
+                use_norm=self.resizer_mode == 0 or self.backend == "onnx",
+                use_rgb=data_format == "RGB"
+                and (self.resizer_mode == 0 or self.backend == "onnx"),
+                resize_type=resize_type,
                 padding_mode=padding_mode,
-                padding_values=padding_values, 
-                is_onnx=self.resizer_mode == 0 or self.backend == "onnx",  # 静态resizer，在非量化阶段需要转YUV，不能设置is_onnx=True
+                padding_values=padding_values,
+                is_onnx=self.resizer_mode == 0
+                or self.backend
+                == "onnx",  # 静态resizer，在非量化阶段需要转YUV，不能设置is_onnx=True
                 to_YUV=self.resizer_mode in [1, 2, 3],
-                fmt=toYUV_format
+                fmt=toYUV_format,
             )
             if self.backend == "onnx":
                 new_datas[in_name] = im.detach().cpu().numpy()
             elif self.backend == "xh2":
                 new_datas[in_name] = im.detach().cpu().numpy().astype(np.float16)
             elif self.backend == "xh1" and self.resizer_mode == 0:
-                new_datas[in_name] = self.engine.quantize(in_name, im.detach().cpu().numpy())
+                new_datas[in_name] = self.engine.quantize(
+                    in_name, im.detach().cpu().numpy()
+                )
             elif self.backend == "xh1" and self.resizer_mode in [1, 2, 3]:
                 yuv_pad = im.detach().cpu().numpy().flatten()
                 if toYUV_format == "YUV420SP":
@@ -112,22 +139,28 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                     dyn_info = dyn_info.detach().cpu().numpy()
                     new_datas[f"resizer_crop_{in_name}"] = dyn_info
             return new_datas
-        
+
     def run(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         """模型推理"""
         prerpcessed_in_datas = self.preprocess(in_datas)
         # 多batch直接复制数据，以及后续reszier信息的复制
         for name in prerpcessed_in_datas:
             in_data = prerpcessed_in_datas[name]
-            if self.backend == "xh1" and name.startswith("resizer_crop_") and self.roi_num > 1:
-                prerpcessed_in_datas[name] = np.repeat(in_data, repeats=self.roi_num, axis=0)
+            if (
+                self.backend == "xh1"
+                and name.startswith("resizer_crop_")
+                and self.roi_num > 1
+            ):
+                prerpcessed_in_datas[name] = np.repeat(
+                    in_data, repeats=self.roi_num, axis=0
+                )
                 continue
             batch = self.engine.inputs_batch[name]
             prerpcessed_in_datas[name] = np.repeat(in_data, repeats=batch, axis=0)
         t = time.time()
         # 推理
         outs = self.engine.run(prerpcessed_in_datas)
-        self.time_span += (time.time() - t)
+        self.time_span += time.time() - t
         # xh1同时输出量化和反量化结果，只取反量化后的
         if isinstance(outs, tuple):
             outs = outs[1]
@@ -138,21 +171,23 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         outs = self.postprocess(outs, in_datas)
         self.total += 1
         return outs
-    
+
     @abc.abstractmethod
-    def postprocess(self, outs: Dict[str, np.ndarray], in_datas: Dict[str, np.ndarray]) -> Any:
+    def postprocess(
+        self, outs: Dict[str, np.ndarray], in_datas: Dict[str, np.ndarray]
+    ) -> Any:
         """模型后处理"""
         pass
 
     def unload(self):
         """模型卸载"""
         pass
-    
+
     @abc.abstractmethod
     def demo(self, filepaths: list):
         """模型演示"""
         pass
-    
+
     @abc.abstractmethod
     def evaluate(self, dataset, num=0):
         """模型评估"""

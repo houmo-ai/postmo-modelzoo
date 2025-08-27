@@ -84,7 +84,7 @@ def run_benchmark(models, target):
         acc_onnx = 0.0
         acc_chip = 0.0
         acc_err = 0.0
-        ave_latency = (0.0,)
+        ave_latency = 0.0
         throughput = 0.0
 
         location_ok = os.path.exists(location)
