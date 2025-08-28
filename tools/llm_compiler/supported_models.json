@@ -1,0 +1,35 @@
+{
+    "qwen2.5": {
+        "7b": {
+            "support_backends": ["xh1", "xh2"],
+            "path": "models/llm/qwen2.5",
+            "raw": "llm/Qwen2.5-7B-Instruct"
+        }
+    },
+    "qwen3": {
+        "8b": {
+            "support_backends": ["xh1", "xh2"],
+            "path": "models/llm/qwen3",
+            "raw": "llm/Qwen3-8B"
+        },
+        "14b": {
+            "support_backends": ["xh2"],
+            "path": "models/llm/qwen3-14b",
+            "raw": "llm/Qwen3-14B"
+        }
+    },
+    "deepseek-r1-qwen": {
+        "7b": {
+            "support_backends": ["xh1"],
+            "path": "models/llm/deepseek",
+            "raw": "llm/DeepSeek-R1-Distill-Qwen-7B"
+        }
+    },
+    "deepseek-r1-qwen3": {
+        "8b": {
+            "support_backends": ["xh2"],
+            "path": "models/llm/deepseek-r1-qwen3-8b",
+            "raw": "llm/DeepSeek-R1-0528-Qwen3-8B"
+        }
+    }
+}

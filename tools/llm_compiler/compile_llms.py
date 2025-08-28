@@ -1,0 +1,820 @@
+import os
+import docker
+import argparse
+import json
+import logging
+import time
+from datetime import datetime
+from typing import List, Dict, Optional, Tuple
+import subprocess
+from compiler_utils import (
+    setup_logging,
+    execute_cmd,
+    compress_to_zip,
+)
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Compile LLMs")
+    parser.add_argument(
+        "-name",
+        "--model_name",
+        required=True,
+        type=str,
+        help="(required) model name, example: qwen3",
+    )
+    parser.add_argument(
+        "-size",
+        "--model_size",
+        required=True,
+        type=str,
+        help="(required) model size, example: 8b, 14b",
+    )
+    parser.add_argument(
+        "-v",
+        "--version",
+        required=True,
+        type=str,
+        help="Houmo Dadao software version, example: 0.3.0, 2.4.2",
+    )
+    parser.add_argument(
+        "-t",
+        "--target",
+        type=str,
+        default="xh2",
+        help="Houmo backend, support: xh1, xh2.",
+    )
+    parser.add_argument(
+        "-qm",
+        "--quant_model_path",
+        type=str,
+        default="",
+        help="Quantized model path",
+    )
+    parser.add_argument(
+        "-pl",
+        "--prefill_length",
+        type=int,
+        default=256,
+        help="Prefill length, recommend to use the default value 256.",
+    )
+    parser.add_argument(
+        "-dl",
+        "--context_length",
+        type=int,
+        default=2048,
+        help="Context length, default is 2048(2k).",
+    )
+    parser.add_argument(
+        "-b",
+        "--batch",
+        type=int,
+        default=1,
+        help="batch number, default is 1.",
+    )
+    parser.add_argument(
+        "-dn",
+        "--device_num",
+        type=int,
+        default=1,
+        help="The number of device, default is 1.",
+    )
+    parser.add_argument(
+        "-cn",
+        "--core_num",
+        type=int,
+        default=1,
+        help="The number of core, default is 1. The maximum value is 4.",
+    )
+    parser.add_argument(
+        "-up",
+        "--upload",
+        action="store_true",
+        help="Upload quantized/compiled model to JFrog (default is False).",
+    )
+    parser.add_argument(
+        "-r",
+        "--result_dir",
+        type=str,
+        default="./",
+        help="The path for storing the results.",
+    )
+
+    args = parser.parse_args()
+    return args
+
+
+def _check_folder(folder_path):
+    if not os.path.isdir(folder_path):
+        logger.error(f"Missing folder {folder_path}.")
+        return False
+    return True
+
+
+def _check_file(file_path):
+    if not os.path.isfile(file_path):
+        logger.error(f"Missing file {file_path}")
+        return False
+    return True
+
+
+def _check_quant_folder(target, quant_model, model_name):
+    import glob
+
+    # folders
+    decoder_dir = os.path.join(quant_model, "decoder")
+    prefill_dir = os.path.join(quant_model, "prefill")
+    folder_list = [decoder_dir, prefill_dir]
+    # files
+    embedding_file = os.path.join(quant_model, "quant_embedding.pt")
+    decoder_file = os.path.join(decoder_dir, f"hmquant_{model_name}_with_act.onnx")
+    prefill_file = os.path.join(prefill_dir, f"hmquant_{model_name}_with_act.onnx")
+    file_list = [embedding_file, decoder_file, prefill_file]
+    if target == "xh1":
+        weight_file = os.path.join(quant_model, "weight.npy")
+        file_list.append(weight_file)
+    if all(_check_folder(ele) for ele in folder_list) is False:
+        return False
+    if all(_check_file(ele) for ele in file_list) is False:
+        return False
+    if target == "xh2":
+        decoder_external = list(glob.glob(decoder_dir + "/*_decoder_external_data"))
+        prefill_external = list(glob.glob(prefill_dir + "/*_prefill_external_data"))
+        if len(decoder_external) == 0 or len(prefill_external) == 0:
+            logger.error("Missing external data.")
+            return False
+
+    return True
+
+
+def _check_args(args: dict):
+    from packaging import version
+
+    # only support xh2 now
+    if args.target not in ["xh1", "xh2"]:
+        logger.error(f"Invalid houmo target {args.target}.")
+        return False
+
+    # if args.target == "xh1" and len(args.quant_model_path) == 0:
+    #     logger.error(
+    #         "xh1 does not support quantization, "
+    #         "please set the quantized model path using -qm/--quant_model_paths."
+    #     )
+    #     return False
+
+    if args.quant_model_path and (
+        not os.path.exists(args.quant_model_path)
+        or not os.path.isdir(args.quant_model_path)
+    ):
+        logger.error(f"Invliad quant model folder {args.quant_model_path}")
+        return False
+
+    if (
+        args.quant_model_path
+        and _check_quant_folder(args.target, args.quant_model_path, args.model_name)
+        is False
+    ):
+        return False
+
+    if args.core_num <= 0 or args.core_num > 4:
+        logger.error(f"Invalid core_num {args.core_num}, only supports [1, 4].")
+        return False
+
+    if args.device_num <= 0 or args.device_num > 32:
+        logger.error(f"Invalid device_num {args.device_num}, only supports [1, 32].")
+        return False
+
+    if args.batch <= 0 or args.batch > 32:
+        logger.error(f"Invalid batch number {args.batch}, only supports [1, 32].")
+        return False
+
+    try:
+        xh1_min_ver = version.parse("2.4.2")
+        xh2_min_ver = version.parse("0.3.0")
+        ver = version.parse(args.version)
+        if (args.target == "xh1" and ver < xh1_min_ver) or (
+            args.target == "xh2" and ver < xh2_min_ver
+        ):
+            logger.error(f"Unsupported version {args.version} on {args.target}.")
+            return False
+    except version.InvalidVersion as e:
+        logger.error(f"Invalid version {args.version}, error msg: {str(e)}")
+        return False
+
+    if args.context_length % 1024 != 0:
+        logger.error(
+            f"Invalid context_length {args.context_length}, it needs to be divisible by 1024."
+        )
+        return False
+
+    logger.info(
+        "\n***** Compilation Configs *****\n"
+        "-- Model name: %s \n"
+        "-- Model size: %s \n"
+        "-- DaDao Software version: %s \n"
+        "-- Quantized model path: %s \n"
+        "-- Prefill length: %s \n"
+        "-- Context length: %s \n"
+        "-- Houmo target: %s \n"
+        "-- Batch: %d \n"
+        "-- Device num: %d \n"
+        "-- Core num: %d \n"
+        "-- Save results to %s",
+        args.model_name,
+        args.model_size,
+        args.version,
+        args.quant_model_path,
+        args.prefill_length,
+        args.context_length,
+        args.target,
+        args.batch,
+        args.device_num,
+        args.core_num,
+        args.result_dir,
+    )
+
+    return True
+
+
+class DockerExecutor:
+    def __init__(
+        self,
+        image: str,
+        container_name: str,
+        host_log_path: str = "",
+        container_workdir: str = "/hmdd",
+        keep_container: bool = False,
+    ):
+        """
+        Init Docker Executor
+
+        :param image: the name of docker image
+        :param container_name: the name of container
+        :param host_log_path: the path of log file on host
+        :param container_workdir: the work directory in container
+        :param keep_container: do not remove the container
+        """
+        self.image = image
+        self.container_name = container_name
+        self.container_workdir = container_workdir
+        self.keep_container = keep_container
+
+        # init docker client
+        try:
+            self.client = docker.from_env()
+            # check docker connection
+            self.client.ping()
+        except Exception as e:
+            raise Exception(f"Cannot connect to docker engine: {str(e)}")
+
+        self.container = None
+        self.log_file = (
+            host_log_path if host_log_path else f"./{self.container_name}.log"
+        )
+
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+
+    def pull_image(self) -> None:
+        try:
+            self.client.images.get(self.image)
+            self.logger.info(f"Use local docker image: {self.image}")
+        except docker.errors.ImageNotFound:
+            self.logger.info(f"Pulling docker image: {self.image}")
+            try:
+                self.client.images.pull(self.image)
+                self.logger.info(f"Pull image {self.image} successed.")
+            except Exception as e:
+                raise Exception(
+                    f"Failed to pull image, please check image name: {str(e)}"
+                )
+
+    def start_container(
+        self,
+        volumes: Optional[Dict] = None,
+        environment: Optional[Dict] = None,
+        network_mode: str = "bridge",
+    ) -> None:
+        self.logger.info(f"Start container: {self.container_name}")
+
+        default_volumes = {}
+        if volumes:
+            default_volumes.update(volumes)
+
+        default_env = {"PS1": "$ "}
+        device_requests = list()
+        if environment:
+            default_env.update(environment)
+            device_requests = [
+                # -1表示所有可用GPU
+                docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])
+            ]
+
+        try:
+            self.container = self.client.containers.create(
+                image=self.image,
+                name=self.container_name,
+                volumes=default_volumes,
+                environment=default_env,
+                working_dir=self.container_workdir,
+                tty=True,  # 分配伪终端，确保命令正确执行
+                stdin_open=True,  # 保持标准输入打开
+                network_mode=network_mode,
+                command="/bin/bash",  # 启动bash保持容器运行
+                shm_size="64g",  # 配置共享内存大小
+                # 配置GPU映射，对应--gpus all参数
+                device_requests=device_requests,
+            )
+            self.container.start()
+            self.logger.info(f"Successfully started container {self.container_name}.")
+
+            # 等待容器启动
+            time.sleep(2)
+
+            if environment:
+                # verify gpu configs
+                self._verify_configuration()
+
+        except Exception as e:
+            self.logger.error(
+                f"The container {self.container_name} failed to start, error msg: {str(e)}"
+            )
+            if self.container:
+                try:
+                    self.container.remove(force=True)
+                except:
+                    pass
+            raise
+
+    def _verify_configuration(self) -> None:
+        """Verify whether the shared memory and GPU configuration is effective"""
+        try:
+            self.logger.info("Verify GPU configuration...")
+            gpu_exec = self.client.api.exec_create(
+                self.container.id, "nvidia-smi", tty=True
+            )
+            gpu_output = "\n".join(
+                [
+                    line.decode("utf-8").strip()
+                    for line in self.client.api.exec_start(gpu_exec["Id"], stream=True)
+                ]
+            )
+            self.logger.info(f"GPU Info:\n{gpu_output}")
+
+            self.logger.info("Verify the shared memory configuration...")
+            # 查看共享内存大小
+            shm_exec = self.client.api.exec_create(
+                self.container.id, "df -h /dev/shm", tty=True
+            )
+            shm_output = "\n".join(
+                [
+                    line.decode("utf-8").strip()
+                    for line in self.client.api.exec_start(shm_exec["Id"], stream=True)
+                ]
+            )
+            self.logger.info(f"Shared memory information:\n{shm_output}")
+
+        except Exception as e:
+            self.logger.error(
+                f"An error occurred during configuration verification: {str(e)}"
+            )
+
+    def execute_command(self, cmd: str) -> Tuple[int, str]:
+        if not self.container:
+            raise Exception("The container has not been started.")
+
+        output = []
+        try:
+            escaped_cmd = cmd.replace("'", "'\\''")
+            wrapped_cmd = f"/bin/bash -c '{escaped_cmd}'"
+
+            # 1. create a docker instance
+            exec_instance = self.client.api.exec_create(
+                self.container.id,
+                wrapped_cmd,
+                workdir=self.container_workdir,
+                tty=True,  # 为执行命令分配TTY
+            )
+            # 2. start streaming output
+            result = self.client.api.exec_start(
+                exec_instance["Id"], stream=True, tty=True  # 匹配TTY设置
+            )
+
+            # 3. handle the output stream
+            for line in result:
+                output_line = line.decode("utf-8", errors="replace").strip()
+                output.append(output_line)
+                print(output_line)  # print to the console
+
+            # 4. after the command is executed, query the exit code
+            exit_code = self.client.api.exec_inspect(exec_instance["Id"])["ExitCode"]
+
+            return exit_code, "\n".join(output)
+
+        except Exception as e:
+            error_msg = (
+                f"An error occurred when executing commands in container: {str(e)}"
+            )
+            output.append(error_msg)
+            self.logger.error(error_msg)
+            return -1, "\n".join(output)
+
+    def execute_commands(
+        self, commands: List[str], stop_on_error: bool = True
+    ) -> List[Dict]:
+        self.command_results = []
+
+        with open(self.log_file, "a", encoding="utf-8") as f:
+            start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            header = f"\n{'='*60}\nStart executing the command set - {start_time}\nTotal command number: {len(commands)}\n{'='*60}\n"
+            self.logger.info("\n" + header.strip())
+
+            for i, cmd in enumerate(commands, 1):
+                cmd_start_time = datetime.now()
+                self.logger.info(
+                    f"\n{'#'*40}\nExecute command {i}/{len(commands)}: {cmd}\nStart time: {cmd_start_time.strftime('%Y-%m-%d %H:%M:%S')}\n{'#'*40}"
+                )
+
+                exit_code, output = self.execute_command(cmd)
+                # self.logger.info(output)
+
+                cmd_end_time = datetime.now()
+                duration = (cmd_end_time - cmd_start_time).total_seconds()
+                result = {
+                    "command": cmd,
+                    "index": i,
+                    "exit_code": exit_code,
+                    "start_time": cmd_start_time,
+                    "end_time": cmd_end_time,
+                    "duration_seconds": duration,
+                    "success": exit_code == 0,
+                }
+                self.command_results.append(result)
+
+                result_msg = f"Command {i} has been completed, exit code: {exit_code}, cost: {duration:.2f} seconds."
+                self.logger.info(result_msg)
+
+                if stop_on_error and exit_code != 0:
+                    error_msg = "The command execution failed and stop_on_error is set to True. Therefore, no further commands will be executed."
+                    self.logger.warning(error_msg)
+                    break
+
+            end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            footer = f"\n{'='*60}\nCommand set execution completed - {end_time}\nSuccess: {sum(1 for r in self.command_results if r['success'])}/{len(self.command_results)}\n{'='*60}\n"
+            self.logger.info("\n" + footer.strip())
+
+        self.logger.info(
+            f"All commands in Docker have been executed, the logs have been saved to: {self.log_file}"
+        )
+        return self.command_results
+
+    def stop_and_remove_container(self) -> None:
+        if self.container and not self.keep_container:
+            try:
+                self.container.stop()
+                self.logger.info(f"Container {self.container_name} has stopped.")
+                self.container.remove()
+                self.logger.info(f"Container {self.container_name} has been removed.")
+            except Exception as e:
+                self.logger.error(
+                    f"Error occurred when stopping or removing the container: {str(e)}"
+                )
+        elif self.keep_container:
+            self.logger.info(
+                f"keep_container=True, container {self.container_name} has been reserved."
+            )
+        else:
+            self.logger.warning("There is no operable container.")
+
+    def __enter__(self):
+        self.pull_image()
+        self.start_container()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop_and_remove_container()
+        if exc_type:
+            self.logger.error(f"Error occurred: {exc_val}")
+        return False
+
+
+def _need_quantized(target, quant_model):
+    # if target == "xh1":
+    #     return False
+
+    if os.path.exists(quant_model):
+        return False
+
+    return True
+
+
+def _upload_model(
+    date_str: str,
+    model_name: str,
+    model_file: str,
+    file_name: str,
+    local_md5: str,
+    log_file: str,
+) -> str:
+    import requests
+
+    # Jfrog folder path
+    MODELZOO_URL = "http://10.10.1.53:8082/artifactory/AutoGeneratedModels"
+    jfrog_file_path = f"{MODELZOO_URL}/{model_name}/{date_str}/{file_name}"
+
+    jfrog_base, jfrog_tail = MODELZOO_URL.split("artifactory/")
+    jfrog_base = jfrog_base + "artifactory"
+    file_info_path = (
+        f"{jfrog_base}/api/storage/{jfrog_tail}/{model_name}/{date_str}/{file_name}"
+    )
+    response = requests.get(file_info_path)
+    if response.status_code == 200:
+        url_md5 = response.json()['checksums']['md5']
+        if local_md5 == url_md5:
+            logger.info(f"{jfrog_file_path} ({url_md5}) already exists.")
+            return jfrog_file_path
+
+    cmds = ["curl", "-u", "modelrobot:123@abAB", "-T", model_file, jfrog_file_path]
+    ret = execute_cmd(cmds, log_file)
+    if ret:
+        return jfrog_file_path
+    return None
+
+
+def _get_md5sum(model_file):
+    if not os.path.isfile(model_file):
+        logger.error(f"Error: {model_file} not exist.")
+        return None
+
+    try:
+        result = subprocess.run(
+            ['md5sum', model_file],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        md5_sum = result.stdout.split()[0]
+        return md5_sum
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to execute md5sum: {e.stderr}")
+        return None
+    except Exception as e:
+        logger.error(f"Unknown error: {str(e)}")
+        return None
+
+
+def _update_model_table(new_model):
+    import pandas as pd
+
+    model_csv = f"{script_dir}/published_models.csv"
+    try:
+        model_df = pd.read_csv(model_csv)
+        target_md5 = new_model["model_md5sum"]
+        target_jfrog_path = new_model["model_path"]
+        condition_contains = model_df['model_path'].str.contains(
+            target_jfrog_path, na=False
+        )
+        condition_md5_mismatch = model_df['model_md5sum'] != target_md5
+        rows_to_delete = condition_contains & condition_md5_mismatch
+        model_df = model_df[~rows_to_delete]
+
+        new_model_df = pd.DataFrame(new_model, index=[0])
+        model_df = pd.concat([model_df, new_model_df], ignore_index=True)
+        model_df.to_csv(model_csv, index=False)
+        logger.info(f"Append a new model {new_model} into {model_csv}.")
+        return True
+    except Exception as e:
+        logger.error(f"Error occurred: {str(e)}")
+    return False
+
+
+def _publish_model(
+    date_str: str,
+    quant_file_name: str,
+    host_model_dir: str,
+    host_result_dir: str,
+    model_name: str,
+    host_log_file: str,
+    extensions: list = list(),
+) -> Tuple[str, str]:
+    compressed_model = f"{host_result_dir}/{quant_file_name}"
+    if os.path.exists(compressed_model):
+        logger.warning(
+            f"The compressed model file already exists. Please clean it up first: {compressed_model}"
+        )
+    else:
+        logger.info(f"Compress model folder {host_model_dir} -> {compressed_model}")
+        ret = compress_to_zip(host_model_dir, compressed_model, extensions)
+        if ret is False:
+            return None, None
+    model_md5 = _get_md5sum(compressed_model)
+    model_jfrog_path = _upload_model(
+        date_str,
+        model_name,
+        compressed_model,
+        quant_file_name,
+        model_md5,
+        host_log_file,
+    )
+    logger.info(f"Publish info: Jfrog path: {model_jfrog_path}, md5sum: {model_md5}")
+
+    return model_md5, model_jfrog_path
+
+
+if __name__ == "__main__":
+    global logger
+    args = parse_args()
+
+    host_result_dir = args.result_dir
+    os.makedirs(host_result_dir, exist_ok=True)
+    log_dir = host_result_dir + "/logs"
+    os.makedirs(log_dir, exist_ok=True)
+    host_log_file = setup_logging(log_dir)
+    logger = logging.getLogger(__name__)
+
+    # check the validity of parameters
+    if _check_args(args) is False:
+        exit(1)
+    # load parameters
+    model_name = args.model_name
+    model_size = args.model_size
+    host_quant_model = args.quant_model_path
+    target = args.target
+    version = args.version
+    prefill_len = args.prefill_length
+    context_len = args.context_length
+    device_num = args.device_num
+    core_num = args.core_num
+    batch = args.batch
+
+    # get the information of supported models
+    with open("./supported_models.json", 'r', encoding='utf-8') as md_file:
+        model_info = json.load(md_file)
+    try:
+        if target not in model_info[model_name][model_size]["support_backends"]:
+            logger.error(f"{model_name} {model_size} does not support {target}.")
+            exit(2)
+        model_dir = model_info[model_name][model_size]["path"]  # releative path
+        raw_model_path = model_info[model_name][model_size]["raw"]  # releative path
+    except Exception as e:
+        logger.error(
+            f"Unsupported model {model_name} {model_size}, error msg: {str(e)}"
+        )
+        exit(2)
+
+    quant_flag = _need_quantized(target, host_quant_model)
+
+    ###### Docker Executor ######
+    # The folder that stores the original model structure and weights (10.64.35.39)
+    host_model_zoo = "/data/gexinyu_workspace/modelzoo"
+    # construct docker image name
+    system = "ubuntu20.04" if target == "xh1" else "ubuntu24.04"
+    image_name = f"harbor.houmo.ai/toolchain/release:Dadao-{target}-v{version}-{system}-x86.64.latest"
+    # set container configs
+    container_home = "/hmdd/compiler"
+    container_name = f"compiler_{target}_{version}-{int(time.time())}"
+    container_result_dir = f"{container_home}/results"
+    container_log_file = container_home + "/logs/" + host_log_file.rsplit("/", 1)[-1]
+    # construct the commands to be executed in the container
+    commands = ["echo 'Hi LLM Compiler!'"]
+    if quant_flag:
+        # quant command
+        container_quant_res = f"{container_result_dir}/quant_results"
+        quant_cmd = f"python3 execute_quantization.py -t {target} -m {model_dir} -n {model_name} -raw {raw_model_path} -b {batch} -pl {prefill_len} -cl {context_len} -r {container_quant_res} -log {container_log_file}"
+        commands.append(
+            f"cd /hmdd/compiler/imodelzoo/tools/llm_compiler && {quant_cmd}"
+        )
+        quant_model = f"{container_quant_res}/hmquant"  # container path
+    else:
+        quant_model = f"{container_home}/quant_model"  # container path
+    # compile command
+    ontainer_compile_res = f"{container_result_dir}/compile_results"
+    compile_cmd = f"python3 execute_compilation.py -n {model_name} -m {model_dir} -qm {quant_model} -b {batch} -cn {core_num} -r {ontainer_compile_res} -log {container_log_file}"
+    if "deepseek" not in model_name:
+        compile_cmd += f" -cl {context_len} -dn {device_num}"
+    commands.append(f"cd /hmdd/compiler/imodelzoo/tools/llm_compiler && {compile_cmd}")
+
+    # create a docker executor
+    docker_exec = DockerExecutor(
+        image=image_name,
+        container_name=container_name,
+        host_log_path=host_log_file,
+        container_workdir=container_home,
+        keep_container=True,
+    )
+    # create a result folder for the current container
+    host_result_dir += f"/{container_name}"
+    os.makedirs(host_result_dir, exist_ok=True)
+    docker_flag = True
+    try:
+        docker_exec.pull_image()
+        # map the current directory of the host to the container
+        volumes = {
+            # map imodelzoo folder
+            os.path.abspath(f"{script_dir}/../../"): {
+                "bind": f"{container_home}/imodelzoo",
+                "mode": "rw",
+            },
+            # map original models folder
+            host_model_zoo: {
+                "bind": "/modelzoo",
+                "mode": "rw",
+            },
+            # map results folder
+            os.path.abspath(host_result_dir): {
+                "bind": container_result_dir,
+                "mode": "rw",
+            },
+            # map logs folder
+            os.path.abspath(log_dir): {
+                "bind": f"{container_home}/logs",
+                "mode": "rw",
+            },
+        }
+        if quant_flag:
+            gpu_env = {
+                "NVIDIA_VISIBLE_DEVICES": "all",  # 可见所有GPU
+                "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",  # GPU能力
+            }
+            docker_exec.start_container(volumes=volumes, environment=gpu_env)
+        else:
+            volumes[os.path.abspath(host_quant_model)] = {
+                "bind": f"{container_home}/quant_model",
+                "mode": "rw",
+            }
+            docker_exec.start_container(volumes=volumes)
+        cmds_res = docker_exec.execute_commands(commands, stop_on_error=True)
+        for res in cmds_res:
+            if res.get("exit_code", -1) != 0:
+                docker_flag = False
+                break
+    except Exception as e:
+        docker_flag = False
+        logger.error(f"Error occurred: {str(e)}")
+    finally:
+        docker_exec.stop_and_remove_container()
+
+    md5sum_quant = None
+    jfrog_path_quant = None
+    if docker_flag and args.upload is True:
+        current_dt = datetime.now()
+        current_ts = str(current_dt.timestamp())
+        today = current_dt.strftime("%Y%m%d")
+        context_str = str(int(context_len / 1024)) + "k"
+        if quant_flag:
+            # publish quantized model (will upload to Jfrog)
+            host_quant_dir = host_result_dir + "/quant_results/hmquant"
+            quant_file_name = f"hmquant_{target}_{model_name}_{model_size}_{prefill_len}_{context_str}_{current_ts}.zip"
+            md5sum_quant, jfrog_path_quant = _publish_model(
+                today,
+                quant_file_name,
+                host_quant_dir,
+                host_result_dir,
+                model_name,
+                host_log_file,
+            )
+        # publish compiled model (will upload to Jfrog)
+        host_compile_dir = host_result_dir + "/compile_results"
+        chip_str = f"{device_num}chips" if device_num > 1 else f"{device_num}chip"
+        core_str = f"{core_num}cores" if core_num > 1 else f"{core_num}core"
+        compiled_file_name = f"hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_str}_b{batch}_{chip_str}_{core_str}_{current_ts}.zip"
+        md5sum_compile, jfrog_path_compile = _publish_model(
+            today,
+            compiled_file_name,
+            host_compile_dir,
+            host_result_dir,
+            model_name,
+            host_log_file,
+            [".hmm"],
+        )
+        if jfrog_path_compile is None or md5sum_compile is None:
+            logger.error(f"Failed to publish compiled model {host_compile_dir}.")
+            exit(3)
+
+        # update published model table: published_models.csv
+        publish_dt = current_dt.strftime("%Y%m%d %H:%M:%S")
+        model_id = f"{os.getpid()}-{current_ts}"
+        version_str = f"v{version}"
+        new_model = {
+            "model_id": model_id,
+            "model_name": model_name,
+            "model_size": model_size,
+            "prefill_length": prefill_len,
+            "context_length": context_len,
+            "version": version_str,
+            "target": target,
+            "device_num": device_num,
+            "core_num": core_num,
+            "publish_time": publish_dt,
+            "model_md5sum": md5sum_compile,
+            "quant_model_md5sum": md5sum_quant,
+            "model_path": jfrog_path_compile,
+            "quant_model_path": jfrog_path_quant,
+        }
+        ret = _update_model_table(new_model)
+        if ret is False:
+            exit(4)
