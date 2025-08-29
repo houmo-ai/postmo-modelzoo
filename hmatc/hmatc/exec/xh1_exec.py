@@ -263,7 +263,6 @@ class Xh1Exec(BaseExec):
                             size=(max_height, max_width, C),
                             dtype=torch.uint8,
                         )
-                    # resizer in [0, 1, 2, 3]
                     im, dyn_info = xh1_preprocess(
                         cv_image,
                         input_shape,
@@ -272,8 +271,7 @@ class Xh1Exec(BaseExec):
                         std=std,
                         use_norm=self.resizer_mode == 0,
                         use_resize=self.resizer_mode in [0, 3],
-                        use_rgb=data_format == "RGB"
-                        or self.resizer_mode in [1, 2, 3],  # 对灰度无效
+                        use_rgb=data_format == "RGB",
                         resize_type=resize_type,
                         padding_mode=padding_mode,
                         padding_values=padding_values,
