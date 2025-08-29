@@ -61,7 +61,7 @@ def parse_args():
         help="Prefill length, recommend to use the default value 256.",
     )
     parser.add_argument(
-        "-dl",
+        "-cl",
         "--context_length",
         type=int,
         default=2048,

@@ -84,8 +84,8 @@ def main(args) -> int:
         args.model_name,
         args.model_path,
         args.quant_model_path,
-        args.context_length or -1,
-        args.device_num or -1,
+        args.context_length,
+        args.device_num,
         args.batch,
         args.core_num,
         args.result_dir,
@@ -116,9 +116,9 @@ def main(args) -> int:
     ]
 
     if args.device_num:
-        cmds.append(["--ndevice", str(args.device_num)])
+        cmds += ["--ndevice", str(args.device_num)]
     if args.context_length:
-        cmds.append(["--context_length", str(args.context_length)])
+        cmds += ["--context_length", str(args.context_length)]
 
     ret = execute_cmd(cmds, args.log_file)
 

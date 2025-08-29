@@ -133,7 +133,10 @@ def execute_cmd(cmd_list: list, log_file: str = None) -> bool:
         flag = False
         logger.error(f"Failed to execute command: {cmd_str}, unknown error: {e}")
         if log_file:
-            subprocess_logger.write(sys.stderr)
+            if process.stdout:
+                subprocess_logger.write(process.stdout)
+            if process.stderr:
+                subprocess_logger.write(process.stderr)
 
     return flag
 
