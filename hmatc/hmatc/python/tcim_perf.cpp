@@ -310,7 +310,8 @@ perfInfo_t ModelRunner(
         input.shape = input_info.Shape();
         input.fmt = input_info.Format();
         input.idx = idx;
-        if (input.fmt == tcim::DataFmt::YUV420SP) {
+        if (input.fmt == tcim::DataFmt::YUV420SP || input.fmt == tcim::DataFmt::YUV422SP ||
+            input.fmt == tcim::DataFmt::YUV444SP) {
             input.is_pic = true;
             inputs[input_name] = input;
         }

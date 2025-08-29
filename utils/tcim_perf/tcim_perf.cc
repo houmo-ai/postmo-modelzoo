@@ -5,19 +5,21 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <iomanip>
+
 #include <chrono>
+#include <condition_variable>
+#include <cstring>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <map>
-#include <sstream>
-#include <cstring>
-#include <string>
-#include <vector>
-#include <queue>
-#include <thread>
 #include <mutex>
-#include <condition_variable>
+#include <nlohmann/json.hpp>
+#include <queue>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
 
 #if (__GNUC__ < 8)
 #include <experimental/filesystem>
@@ -36,16 +38,19 @@ namespace fs = std::filesystem;
 #include <sys/resource.h>
 #endif
 
-#define COLOR_RED     "\x1b[91;20m"
-#define COLOR_GREEN   "\x1b[92;20m"
-#define COLOR_YELLOW  "\x1b[93;20m"
-#define COLOR_BLUE    "\x1b[94;20m"
-#define COLOR_MAGENT  "\x1b[95;20m"
-#define COLOR_CYAN    "\x1b[96;20m"
-#define COLOR_RESET   "\x1b[0m"
+#define COLOR_RED "\x1b[91;20m"
+#define COLOR_GREEN "\x1b[92;20m"
+#define COLOR_YELLOW "\x1b[93;20m"
+#define COLOR_BLUE "\x1b[94;20m"
+#define COLOR_MAGENT "\x1b[95;20m"
+#define COLOR_CYAN "\x1b[96;20m"
+#define COLOR_RESET "\x1b[0m"
 
 #define GET_TIME() std::chrono::system_clock::now()
-#define GET_COST(start, end) std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+#define GET_COST(start, end) \
+  std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+
+using json = nlohmann::json;
 
 struct CliArguments {
   std::string model_path;
@@ -59,7 +64,6 @@ struct CliArguments {
   size_t samples = 1;
   bool infer_only = false;
 };
-
 
 typedef struct {
   std::string model_path;
@@ -79,7 +83,6 @@ typedef struct {
   uint32_t e2e_total_cost = 0;
 } ThreadInfo;
 
-
 typedef struct {
   uint64_t req_id;
   std::map<std::string, tcim::Tensor> data_in;
@@ -87,14 +90,12 @@ typedef struct {
   std::map<std::string, tcim::Tensor> ref_out;
 } Task;
 
-
 typedef struct {
   std::queue<Task> queue;
   std::mutex mutex;
   std::condition_variable cond;
   // std::map<std::string, tcim::TensorInfo> info_map;
 } TaskQueue;
-
 
 /**
  * @brief whether the file exists
@@ -108,9 +109,8 @@ bool IsFileExists(std::string file_path) {
   return f.good();
 }
 
-int read_file(const char *fileName, char **fileData, int *fileLen) 
-{
-  FILE *file = fopen(fileName, "rb"); 
+int read_file(const char *fileName, char **fileData, int *fileLen) {
+  FILE *file = fopen(fileName, "rb");
   if (file == NULL) {
     perror("open file failed\n");
     return -1;
@@ -128,7 +128,8 @@ int read_file(const char *fileName, char **fileData, int *fileLen)
   }
   long readSize = fread(*fileData, 1, fileSize, file);
   if (readSize != fileSize) {
-    printf("readSize(%ld) != fileSize(%ld), read %s failed!\n", readSize, fileSize, fileName);
+    printf("readSize(%ld) != fileSize(%ld), read %s failed!\n", readSize,
+           fileSize, fileName);
     fclose(file);
     return -1;
   }
@@ -137,16 +138,16 @@ int read_file(const char *fileName, char **fileData, int *fileLen)
   return 0;
 }
 
-int write_file(const char *fileName, char *fileData, int fileLen) 
-{
-  FILE *file = fopen(fileName, "wb"); 
+int write_file(const char *fileName, char *fileData, int fileLen) {
+  FILE *file = fopen(fileName, "wb");
   if (file == NULL) {
     perror("open file failed\n");
     return -1;
   }
   long writeSize = fwrite(fileData, 1, fileLen, file);
   if (writeSize != fileLen) {
-    printf("writeSize(%ld) != fileLen(%d), write %s failed!\n", writeSize, fileLen, fileName);
+    printf("writeSize(%ld) != fileLen(%d), write %s failed!\n", writeSize,
+           fileLen, fileName);
     fclose(file);
     return -1;
   }
@@ -166,60 +167,54 @@ int write_file(const char *fileName, char *fileData, int fileLen)
 bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
   int option_idx = 0;
   struct option long_options[] = {
-      {"help", 0, 0, 'h'},
-      {"model", 1, 0, 'm'},
-      {"data", 1, 0, 'd'},
-      {"warm_up", 1, 0, 'w'},
-      {"batch", 1, 0, 'b'},
-      {"loops", 1, 0, 'l'},
-      {"threads", 1, 0, 't'},
-      {"devices", 1, 0, 'v'},
-      {"samples", 1, 0, 's'},
-      {"output", 1, 0, 'o'},
-      {"infer_only", 1, 0, 'y'}
-  };
+      {"help", 0, 0, 'h'},    {"model", 1, 0, 'm'},     {"data", 1, 0, 'd'},
+      {"warm_up", 1, 0, 'w'}, {"batch", 1, 0, 'b'},     {"loops", 1, 0, 'l'},
+      {"threads", 1, 0, 't'}, {"devices", 1, 0, 'v'},   {"samples", 1, 0, 's'},
+      {"output", 1, 0, 'o'},  {"infer_only", 1, 0, 'y'}};
   while (true) {
-    int ch = getopt_long(argc, argv, "hm:d:w:b:t:v:l:s:o:y:", long_options, &option_idx);
+    int ch = getopt_long(argc, argv, "hm:d:w:b:t:v:l:s:o:y:", long_options,
+                         &option_idx);
     if (ch == -1) {
       break;
     }
     switch (ch) {
-    case 'h':
-      std::cout << "Usage: -h" << std::endl;
-      break;
-    case 'm':
-      arguments->model_path = std::string(optarg);
-      break;
-    case 'd':
-      arguments->data_path = std::string(optarg);
-      break;
-    case 'w':
-      arguments->warm_up = atoi(optarg);
-      break;
-    case 'b':
-      arguments->batch = atoi(optarg);
-      break;
-    case 't':
-      arguments->threads = atoi(optarg);
-      break;
-    case 'v':
-      arguments->devices = atoi(optarg);
-      break;
-    case 'l':
-      arguments->loops = atoi(optarg);
-      break;
-    case 's':
-      arguments->samples = atoi(optarg);
-      break;
-    case 'o':
-      arguments->output_path = optarg;
-      break;
-    case 'y':
-      arguments->infer_only = optarg;
-      break;
-    default:
-      std::cerr << "Unsupported option: " << static_cast<char>(ch) << std::endl;
-      return false;
+      case 'h':
+        std::cout << "Usage: -h" << std::endl;
+        break;
+      case 'm':
+        arguments->model_path = std::string(optarg);
+        break;
+      case 'd':
+        arguments->data_path = std::string(optarg);
+        break;
+      case 'w':
+        arguments->warm_up = atoi(optarg);
+        break;
+      case 'b':
+        arguments->batch = atoi(optarg);
+        break;
+      case 't':
+        arguments->threads = atoi(optarg);
+        break;
+      case 'v':
+        arguments->devices = atoi(optarg);
+        break;
+      case 'l':
+        arguments->loops = atoi(optarg);
+        break;
+      case 's':
+        arguments->samples = atoi(optarg);
+        break;
+      case 'o':
+        arguments->output_path = optarg;
+        break;
+      case 'y':
+        arguments->infer_only = optarg;
+        break;
+      default:
+        std::cerr << "Unsupported option: " << static_cast<char>(ch)
+                  << std::endl;
+        return false;
     }
   }
   return true;
@@ -240,7 +235,7 @@ std::ostream &operator<<(std::ostream &out, const std::vector<T> &vec) {
 
 class Barrier {
  public:
-  Barrier(int dest): dest_(dest) {}
+  Barrier(int dest) : dest_(dest) {}
 
   void barrier() {
     std::unique_lock<std::mutex> lock(mtx_);
@@ -279,7 +274,7 @@ class Barrier {
       cond0_.notify_all();
     }
   }
-  
+
   void reset() {
     std::unique_lock<std::mutex> lock(mtx_);
     count_ = 0;
@@ -296,15 +291,15 @@ void SetAffinity(int core_id) {
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
   CPU_SET(core_id, &cpuset);
-  //sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpuset);
+  // sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpuset);
 
   if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0) {
-      perror("pthread_setaffinity_np");
-      exit(EXIT_FAILURE);
+    perror("pthread_setaffinity_np");
+    exit(EXIT_FAILURE);
   }
 }
 
-std::string SanitizeName(const std::string& name) {
+std::string SanitizeName(const std::string &name) {
   std::string output = name;
   for (char &c : output) {
     if (c == '/' || c == '-' || c == '#') {
@@ -353,7 +348,9 @@ int main(int argc, char *argv[]) {
   std::cout << "infer_only: " << infer_only << std::endl;
 
   if (sample_num < thread_num) {
-    std::cout << COLOR_YELLOW << "[warn] the perf result may not be accurate while samples < threads"
+    std::cout << COLOR_YELLOW
+              << "[warn] the perf result may not be accurate while samples "
+                 "< threads"
               << COLOR_RESET << std::endl;
   }
 
@@ -363,28 +360,33 @@ int main(int argc, char *argv[]) {
   // get module input & output info
   auto module = tcim::Module::LoadFromFile(model_path);
   if (!module) {
-    std::cout << COLOR_RED << "[error] load model " << model_path << " fail, exit..."
-              << COLOR_RESET << std::endl;
+    std::cout << COLOR_RED << "[error] load model " << model_path
+              << " fail, exit..." << COLOR_RESET << std::endl;
     exit(-1);
   }
 
   // prepare input & output data
+  std::vector<std::string> image_input_names;
   std::map<std::string, tcim::Tensor> input_datas;
   std::map<std::string, tcim::Tensor> output_golden;
+  std::string custom_msg_str = module.GetCustomMsg();
   int input_num = module.GetInputNum();
   std::cout << "Count of Input: " << input_num << std::endl;
   for (int idx = 0; idx < input_num; idx++) {
     auto input_name = module.GetInputName(idx);
     auto input_info = module.GetInputInfo(input_name).AsContiguous();
-    std::cout << "Input[" << idx << "] name: " << input_name << ", " << input_info << std::endl;
+    auto fmt = input_info.Format();
+    std::cout << "Input[" << idx << "] name: " << input_name << ", "
+              << input_info << std::endl;
     auto data_file = data_path + "/" + input_name + ".bin";
-    void* data_ptr = nullptr;
+    void *data_ptr = nullptr;
     int len = 0;
     auto tensor = tcim::Tensor::CreateHostTensor(input_info);
     if (fs::exists(data_file)) {
-      if (read_file(data_file.c_str(), (char**)&data_ptr, &len)) {
+      if (read_file(data_file.c_str(), (char **)&data_ptr, &len)) {
         std::cout << COLOR_YELLOW << "[warn] Read input data file " << data_file
-                  << " fail. Use random data and result check will be skipped."
+                  << " fail. Use random data and result check will be "
+                     "skipped."
                   << COLOR_RESET << std::endl;
         is_result_check = false;
       } else {
@@ -393,11 +395,53 @@ int main(int argc, char *argv[]) {
       }
     } else {
       std::cout << COLOR_YELLOW << "[warn] Input data file " << data_file
-                << " not exist. Use random data and result check will be skipped."
+                << " not exist. Use random data and result check will be "
+                   "skipped."
                 << COLOR_RESET << std::endl;
       is_result_check = false;
     }
-    input_datas.insert(std::pair<std::string, tcim::Tensor>(input_name, tensor));
+    if (fmt == tcim::DataFmt::YUV420SP || fmt == tcim::DataFmt::YUV422SP ||
+        fmt == tcim::DataFmt::YUV444SP) {
+      image_input_names.emplace_back(input_name);
+    }
+    input_datas.insert(
+        std::pair<std::string, tcim::Tensor>(input_name, tensor));
+  }
+
+  for (auto &name : image_input_names) {
+    std::string dyn_name = "resizer_crop_" + name;
+    if (input_datas.count(dyn_name) != 1) continue;
+    assert(!custom_msg_str.empty());
+    json custom_msg = json::parse(custom_msg_str);
+    auto img_shape = module.GetInputInfo(name).Shape();
+    auto dyn_shape = module.GetInputInfo(dyn_name).Shape();
+    auto &model_input_shape = custom_msg[name]["shape"];
+    assert(img_shape.size() == 4);
+    assert(model_input_shape.size() == 4);
+    assert(dyn_shape.size() == 2 || dyn_shape.size() == 1);
+    int32_t *dyn_data = (int32_t *)(input_datas[dyn_name].Data());
+    int32_t batch = 1;
+    int32_t step = 4;
+    if (dyn_shape.size() == 2) {
+      batch = dyn_shape[0];
+      step = dyn_shape[1];
+    } else if (dyn_shape.size() == 1) {
+      step = dyn_shape[0];
+    }
+    for (int i = 0; i < batch; ++i) {
+      dyn_data[i * step + 0] = 0;
+      dyn_data[i * step + 1] = 0;
+      dyn_data[i * step + 2] = img_shape[2];
+      dyn_data[i * step + 3] = img_shape[3];
+      if (step == 10) {
+        dyn_data[i * step + 4] = model_input_shape[2];
+        dyn_data[i * step + 5] = model_input_shape[3];
+        dyn_data[i * step + 6] = 0;
+        dyn_data[i * step + 7] = 0;
+        dyn_data[i * step + 8] = 0;
+        dyn_data[i * step + 9] = 0;
+      }
+    }
   }
 
   int output_num = module.GetOutputNum();
@@ -407,13 +451,14 @@ int main(int argc, char *argv[]) {
     auto output_info = module.GetOutputInfo(output_name).AsContiguous();
     std::cout << "Output[" << output_name << "] " << output_info << std::endl;
     auto data_file = data_path + "/" + SanitizeName(output_name) + ".bin";
-    void* data_ptr = nullptr;
+    void *data_ptr = nullptr;
     int len = 0;
     auto tensor = tcim::Tensor::CreateHostTensor(output_info);
     if (fs::exists(data_file)) {
-      if (read_file(data_file.c_str(), (char**)&data_ptr, &len)) {
-        std::cout << COLOR_YELLOW << "[warn] Read output data file " << data_file
-                  << " fail. Result check will be skipped." << COLOR_RESET << std::endl;
+      if (read_file(data_file.c_str(), (char **)&data_ptr, &len)) {
+        std::cout << COLOR_YELLOW << "[warn] Read output data file "
+                  << data_file << " fail. Result check will be skipped."
+                  << COLOR_RESET << std::endl;
         is_result_check = false;
       } else {
         memcpy(tensor.Data(), data_ptr, tensor.Info().MemSize());
@@ -421,10 +466,12 @@ int main(int argc, char *argv[]) {
       }
     } else {
       std::cout << COLOR_YELLOW << "[warn] Output data file " << data_file
-                << " not exist. Result check will be skipped." << COLOR_RESET << std::endl;
+                << " not exist. Result check will be skipped." << COLOR_RESET
+                << std::endl;
       is_result_check = false;
     }
-    output_golden.insert(std::pair<std::string, tcim::Tensor>(output_name, tensor));
+    output_golden.insert(
+        std::pair<std::string, tcim::Tensor>(output_name, tensor));
   }
 
   std::map<std::string, tcim::Tensor> output_datas;
@@ -434,12 +481,13 @@ int main(int argc, char *argv[]) {
     task.data_in = input_datas;
     task.ref_out = output_golden;
     if (!infer_only) {
-      for (auto& output : output_golden) {
+      for (auto &output : output_golden) {
         auto info = output.second.Info().AsContiguous();
         if (is_result_check) {
           output_datas.clear();
           auto tensor = tcim::Tensor::CreateHostTensor(info);
-          output_datas.insert(std::pair<std::string, tcim::Tensor>(output.first, tensor));
+          output_datas.insert(
+              std::pair<std::string, tcim::Tensor>(output.first, tensor));
         }
       }
       task.data_out = output_datas;
@@ -448,13 +496,9 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "sample queue size is " << qin.queue.size() << std::endl;
 
-  auto thread_func = [](int tid,
-                        int did,
-                        ThreadInfo& info,
-                        StreamEngine& engine,
-                        TaskQueue& qin,
-                        TaskQueue& qout,
-                        Barrier& barrier) {
+  auto thread_func = [](int tid, int did, ThreadInfo &info,
+                        StreamEngine &engine, TaskQueue &qin, TaskQueue &qout,
+                        Barrier &barrier) {
     auto start = GET_TIME();
     auto end = GET_TIME();
     float cost = 0.0;
@@ -467,14 +511,21 @@ int main(int argc, char *argv[]) {
     end = GET_TIME();
     cost = GET_COST(start, end) / 1000.0 / info.warm_up;
     if (!module) {
-      std::cerr << COLOR_RED << "Device " << did << " Thread " << tid << " load model "
-                << info.model_path << " fail." << COLOR_RESET << std::endl;
+      std::cerr << COLOR_RED << "Device " << did << " Thread " << tid
+                << " load model " << info.model_path << " fail." << COLOR_RESET
+                << std::endl;
       exit(-1);
     }
-    std::cout << "Device " << did << " Thread " << tid << " " << info.model_path 
+    std::cout << "Device " << did << " Thread " << tid << " " << info.model_path
               << " model loaded. Cost " << cost << " ms." << std::endl;
 
     // warm up
+    std::unique_lock<std::mutex> lock_in(qin.mutex);
+    auto task0 = qin.queue.front();
+    for (auto &tensor : task0.data_in) {
+      module.SetInput(tensor.first, tensor.second);
+    }
+    lock_in.unlock();
     start = GET_TIME();
     for (int i = 0; i < info.warm_up; i++) {
       module.Run(false);
@@ -482,12 +533,14 @@ int main(int argc, char *argv[]) {
     module.Sync();
     end = GET_TIME();
     cost = GET_COST(start, end) / 1000.0 / info.warm_up;
-    std::cout << "Device " << did << " Thread " << tid << " Warm Up " << info.warm_up
-              << " average cost " << cost << " ms." << std::endl;
+    std::cout << "Device " << did << " Thread " << tid << " Warm Up "
+              << info.warm_up << " average cost " << cost << " ms."
+              << std::endl;
 
     // wait until all threads ready
     barrier.barrier();
-    std::cout << "Device " << did << " Thread " << tid << " infer start..." << std::endl;
+    std::cout << "Device " << did << " Thread " << tid << " infer start..."
+              << std::endl;
     int count = 0;
     int stream_id = -1;
 
@@ -503,7 +556,7 @@ int main(int argc, char *argv[]) {
 
       start = GET_TIME();
       if (!info.infer_only) {
-        for (auto& tensor : task.data_in) {
+        for (auto &tensor : task.data_in) {
           module.SetInput(tensor.first, tensor.second);
         }
       }
@@ -522,7 +575,7 @@ int main(int argc, char *argv[]) {
       if (info.infer_max_cost < cost) info.infer_max_cost = cost;
 
       if (!info.infer_only) {
-        for (auto& tensor : task.data_out) {
+        for (auto &tensor : task.data_out) {
           if (info.is_result_check) {
             module.GetOutput(tensor.first, tensor.second);
           } else {
@@ -560,7 +613,7 @@ int main(int argc, char *argv[]) {
   for (int did = 0; did < device_num; did++) {
     auto weight_manager = tcim::Module::WeightManager::CreateWeightManager(did);
     for (int tid = 0; tid < thread_num; tid++) {
-      ThreadInfo* info = &thread_info[did * thread_num + tid];
+      ThreadInfo *info = &thread_info[did * thread_num + tid];
       info->model_path = model_path;
       info->weight_manager = weight_manager;
       info->loop_num = loop_num;
@@ -568,8 +621,9 @@ int main(int argc, char *argv[]) {
       info->is_result_check = is_result_check;
       info->warm_up = warm_up;
       int id = did * thread_num + tid;
-      threads.push_back(std::thread(thread_func, id, did, std::ref(*info), std::ref(engine),
-                                    std::ref(qin), std::ref(qout), std::ref(barrier)));
+      threads.push_back(std::thread(thread_func, id, did, std::ref(*info),
+                                    std::ref(engine), std::ref(qin),
+                                    std::ref(qout), std::ref(barrier)));
     }
   }
 
@@ -594,7 +648,7 @@ int main(int argc, char *argv[]) {
   auto end = GET_TIME();
 
   // wait all threads done
-  for (auto & t: threads) {
+  for (auto &t : threads) {
     t.join();
   }
 
@@ -605,9 +659,9 @@ int main(int argc, char *argv[]) {
       auto task = qout.queue.front();
       qout.queue.pop();
 
-      for (auto& output : task.data_out) {
-        auto data1 = (char*)output.second.Data();
-        auto data2 = (char*)task.ref_out.at(output.first).Data();
+      for (auto &output : task.data_out) {
+        auto data1 = (char *)output.second.Data();
+        auto data2 = (char *)task.ref_out.at(output.first).Data();
         int len = output.second.Info().MemSize();
         if (memcmp(data1, data2, len)) {
           int err = 0;
@@ -616,11 +670,13 @@ int main(int argc, char *argv[]) {
               err++;
             }
           }
-          std::cout << COLOR_RED << "[error] req: " << task.req_id << ", output: "
-                    << output.first << " result check failed (" << len - err << "/" << len << ")"
-                    << COLOR_RESET << std::endl;
+          std::cout << COLOR_RED << "[error] req: " << task.req_id
+                    << ", output: " << output.first << " result check failed ("
+                    << len - err << "/" << len << ")" << COLOR_RESET
+                    << std::endl;
           std::stringstream ss;
-          ss << output_path << "/result_" << task.req_id << '_' << output.first << ".bin";
+          ss << output_path << "/result_" << task.req_id << '_' << output.first
+             << ".bin";
           std::cout << "Save result to: " << ss.str() << std::endl;
           write_file(ss.str().c_str(), data1, len);
           result = false;
@@ -628,10 +684,12 @@ int main(int argc, char *argv[]) {
       }
     }
     if (result) {
-      std::cout << COLOR_GREEN << "Result check passed." << COLOR_RESET << std::endl;
+      std::cout << COLOR_GREEN << "Result check passed." << COLOR_RESET
+                << std::endl;
     }
   } else {
-    std::cout << COLOR_YELLOW << "[warn] Result check skipped." << COLOR_RESET << std::endl;
+    std::cout << COLOR_YELLOW << "[warn] Result check skipped." << COLOR_RESET
+              << std::endl;
   }
 
   uint32_t infer_max_cost = 0;
@@ -643,13 +701,17 @@ int main(int argc, char *argv[]) {
   uint32_t e2e_max_cost = 0;
   uint32_t e2e_total_cost = 0;
   for (int i = 0; i < thread_num * device_num; i++) {
-    if (thread_info[i].infer_max_cost > infer_max_cost) infer_max_cost = thread_info[i].infer_max_cost;
+    if (thread_info[i].infer_max_cost > infer_max_cost)
+      infer_max_cost = thread_info[i].infer_max_cost;
     infer_total_cost += thread_info[i].infer_total_cost;
-    if (thread_info[i].input_max_cost > input_max_cost) input_max_cost = thread_info[i].input_max_cost;
+    if (thread_info[i].input_max_cost > input_max_cost)
+      input_max_cost = thread_info[i].input_max_cost;
     input_total_cost += thread_info[i].input_total_cost;
-    if (thread_info[i].output_max_cost > output_max_cost) output_max_cost = thread_info[i].output_max_cost;
+    if (thread_info[i].output_max_cost > output_max_cost)
+      output_max_cost = thread_info[i].output_max_cost;
     output_total_cost += thread_info[i].output_total_cost;
-    if (thread_info[i].e2e_max_cost > e2e_max_cost) e2e_max_cost = thread_info[i].e2e_max_cost;
+    if (thread_info[i].e2e_max_cost > e2e_max_cost)
+      e2e_max_cost = thread_info[i].e2e_max_cost;
     e2e_total_cost += thread_info[i].e2e_total_cost;
   }
 
@@ -666,29 +728,31 @@ int main(int argc, char *argv[]) {
   float avg_cost = total_cost / test_num;
   float qps = (1000.0 / (total_cost / test_num)) * batch;
 
-  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3) << "[latency] Inference "
+  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3)
+            << "[latency] Inference "
             << "\tavg: " << std::setw(7) << infer_avg_latency << " ms,"
             << "\tmax: " << std::setw(7) << infer_max_latency << " ms"
-            << COLOR_RESET  << std::endl;
-  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3) << "[latency] Input "
+            << COLOR_RESET << std::endl;
+  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3)
+            << "[latency] Input "
             << "\tavg: " << std::setw(7) << input_avg_latency << " ms,"
             << "\tmax: " << std::setw(7) << input_max_latency << " ms"
-            << COLOR_RESET  << std::endl;
-  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3) << "[latency] Output "
+            << COLOR_RESET << std::endl;
+  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3)
+            << "[latency] Output "
             << "\tavg: " << std::setw(7) << output_avg_latency << " ms,"
             << "\tmax: " << std::setw(7) << output_max_latency << " ms"
-            << COLOR_RESET  << std::endl;
-  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3) << "[latency] End2End "
+            << COLOR_RESET << std::endl;
+  std::cout << COLOR_CYAN << std::fixed << std::setprecision(3)
+            << "[latency] End2End "
             << "\tavg: " << std::setw(7) << e2e_avg_latency << " ms,"
             << "\tmax: " << std::setw(7) << e2e_max_latency << " ms"
             << COLOR_RESET << std::endl;
-  std::cout << COLOR_MAGENT << std::fixed << std::setprecision(3) << "[Throughput] total: "
-            << total_cost << " ms, "
-            << "avg: " << avg_cost << " ms"
-            << COLOR_RESET << std::endl;
-  std::cout << COLOR_MAGENT << std::fixed << std::setprecision(3) << "[Throughput] qps: "
-            << qps
-            << COLOR_RESET << std::endl;
+  std::cout << COLOR_MAGENT << std::fixed << std::setprecision(3)
+            << "[Throughput] total: " << total_cost << " ms, "
+            << "avg: " << avg_cost << " ms" << COLOR_RESET << std::endl;
+  std::cout << COLOR_MAGENT << std::fixed << std::setprecision(3)
+            << "[Throughput] qps: " << qps << COLOR_RESET << std::endl;
 
   if (output_path.size() != 0) {
     std::string output_file = output_path + "/hmperf.txt";
@@ -697,7 +761,7 @@ int main(int argc, char *argv[]) {
     result_file << "batch: " << batch << std::endl;
     result_file << "thread_num: " << thread_num << std::endl;
     result_file << "shape: [";
-    for (auto& input : input_datas) {
+    for (auto &input : input_datas) {
       result_file << input.second.Info().Shape() << ",";
     }
     result_file << "]" << std::endl;
