@@ -77,25 +77,28 @@ pip install -r requirements.txt
 
 量化和编译功能仅支持在量化工具和编译器支持的平台上运行，其中大模型量化需要使用GPU。涉及到模型推理相关的功能（如perf/demo/eval等）最好使用后摩芯片平台运行，运行时需要关注其他限制，如固件类型（如大模型只能在非VPU固件上运行），硬件规格（如2核芯片只能运行2核以下编译的模型）。如果没有安装后摩芯片可以通过`export HDPL_PLATFORM=ISIM`指定模拟器运行，速度较慢。
 
-| models               | path        | target  | quant | build | demo | eval |
-| -------------------- | ----------- | ------- | ----- | ----- | ---- | ---- |
-| resnet50             | backbone    | xh1/xh2 | yes   | yes   | yes  | yes  |
-| mobilenetv2          | backbone    | xh1/xh2 | yes   | yes   | yes  | yes  |
-| efficientnet         | backbone    | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov3               | detection   | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov5s              | detection   | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov5s_feature      | detection   | xh1     | yes   | yes   | yes  | yes  |
-| yolov8m              | detection   | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov8m-pose         | estimation  | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolop                | autodrive   | xh1/xh2 | yes   | yes   | yes  | x    |
-| wenet                | asr         | xh1     | x     | yes   | yes  | x    |
-| qwen2.5              | llm         | xh1/xh2 | yes   | yes   | yes  | x    |
-| qwen3                | llm         | xh1/xh2 | yes   | yes   | yes  | x    |
-| qwen3-14b            | llm         | xh2     | yes   | yes   | yes  | x    |
-| deepseek             | llm         | xh1     | x     | yes   | yes  | x    |
-| deepseek-r1-qwen3-8b | llm         | xh2     | yes   | yes   | yes  | x    |
-| sdxl                 | diffusion   | xh1     | x     | yes   | yes  | x    |
-| qwen2.5-vl           | vllm        | xh1     | x     | yes   | yes  | x    |
+| models               | path          | target  | quant | build | demo | eval |
+| -------------------- | ------------- | ------- | ----- | ----- | ---- | ---- |
+| resnet50             | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
+| mobilenetv2          | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
+| efficientnet         | backbone      | xh1     | yes   | yes   | yes  | yes  |
+| ViT-B-16             | backbone      | xh1     | yes   | yes   | yes  | yes  |
+| yolov3               | detection     | xh1     | yes   | yes   | yes  | yes  |
+| yolov5s              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolov5s_feature      | detection     | xh1     | yes   | yes   | yes  | yes  |
+| yolov8m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolov8m-pose         | estimation    | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolov8m-seg          | segmentation  | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolop                | autodrive     | xh1/xh2 | yes   | yes   | yes  | x    |
+| LPRNet               | ocr           | xh1     | yes   | yes   | yes  | yes  |
+| wenet                | asr           | xh1     | x     | yes   | yes  | x    |
+| qwen2.5              | llm           | xh1/xh2 | yes   | yes   | yes  | x    |
+| qwen3                | llm           | xh1/xh2 | yes   | yes   | yes  | x    |
+| qwen3-14b            | llm           | xh2     | yes   | yes   | yes  | x    |
+| deepseek             | llm           | xh1     | x     | yes   | yes  | x    |
+| deepseek-r1-qwen3-8b | llm           | xh2     | yes   | yes   | yes  | x    |
+| sdxl                 | diffusion     | xh1     | x     | yes   | yes  | x    |
+| qwen2.5-vl           | vllm          | xh1     | x     | yes   | yes  | x    |
 
 
 ## API示例

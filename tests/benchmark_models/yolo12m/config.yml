@@ -1,10 +1,10 @@
 model:
-  name: yolov3
+  name: yolo12m
   save_dir: output
-  model_path: yolov3_640x640_clip.onnx
+  model_path: yolo12m.onnx
   inputs:
     images:
-      shape: [1, 3, 640, 640]  # NCHW
+      shape: [1, 3, 640, 640]
       data_format: RGB
       mean: [0.0, 0.0, 0.0]
       std: [255.0, 255.0, 255.0]
@@ -15,16 +15,17 @@ model:
         toYUV_format: YUV420SP
         max_input_size: [1080, 1920]  # HW
   model_impl_module: model_impl
-  model_impl_cls: YoloV3
-
+  model_impl_cls: YoloV8
+  
 quant:
   calib_data: coco2017/val2017
-  calib_num: 50
+  calib_num: 200
 
 build:
   ncore: 1
   opt_level: 2
-  
+
+
 demo:
   data_dir: coco2017/val2017
   num: 10
@@ -34,4 +35,3 @@ eval:
   num: 0
   dataset_module: dataset
   dataset_cls: Dataset
-

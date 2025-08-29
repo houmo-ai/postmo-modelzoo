@@ -90,10 +90,7 @@ model:
         #            一般为码流的最大可能分辨率较好 
         max_input_size: [1080, 1920]  # HW
         # [可选] 输入为图像时可设置，表示使用静态resizer，默认不使用
-        #     慎用，这个方式仅在下列情况下可用：
-        #     1. 实际应用场景中输入的图像分辨率固定，
-        #     2. resize_type为0
-        #     3. max_input_size和原模型shape必须一致
+        #     慎用，在实际应用场景中输入的图像分辨率固定
         enable_static_resizer: false
         # [可选] 当输入为图像且输入size较小时需要设置为true，反之false，默认为false
         insert_pad_scatter: false

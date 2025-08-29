@@ -5,25 +5,32 @@ models:
   # batch: [int] batch size, default: 1
   # ncore: [int] core number of each module infer, default: 1
   # thread_num: [int] thread number of each module infer, default: 8
+  resnet50_b8: 
+    location: models/backbone/resnet50
+    batch: 8
   resnet50: 
     location: models/backbone/resnet50
-  resnet50_t4: 
-    location: models/backbone/resnet50
-    thread_num: 4 
-  resnet50_b6: 
-    location: models/backbone/resnet50
-    batch: 6
-  resnet50_b6t4: 
-    location: models/backbone/resnet50
-    batch: 6
-    thread_num: 4
   mobilenetv2: 
     location: models/backbone/mobilenetv2
   efficientnet: 
     location: models/backbone/efficientnet
   yolov5s:
     location: models/detection/yolov5s
+  yolov5s_b4:
+    location: models/detection/yolov5s
+    batch: 4
   yolov3:
     location: models/detection/yolov3
   yolop: 
     location: models/autodrive/yolop
+  ViT-B-16: 
+    location: models/backbone/ViT-B-16
+  yolov8m:
+    location: models/detection/yolov8m
+  yolov8m-pose:
+    location: models/estimation/yolov8m-pose
+  yolov8m-seg:
+    location: models/segmentation/yolov8m_seg
+  LPRNet:
+    location: models/ocr/lprnet
+  

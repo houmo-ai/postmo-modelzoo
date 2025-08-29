@@ -6,6 +6,8 @@ import logging
 import os
 import time
 import shutil
+import pandas as pd
+from io import StringIO
 from prettytable import PrettyTable
 from ._version import __build_time__, __commit__, __version__
 from .base.base_exec import BaseExec
@@ -31,7 +33,7 @@ def set_logger(op, log_dir, filename):
     logger.addHandler(file_handler)
 
 
-def run_benchmark(models, target):
+def run_benchmark(models, target, hmquant_version, hmcc_version, enbale_static=False):
     header = [
         "ModelName",
         "Shape",
@@ -40,6 +42,7 @@ def run_benchmark(models, target):
         "CoreNum",
         "Batch",
         "ThreadNum",
+        "Resizer",
         "HmquantVersion",
         "CompilerVersion",
         "Accuracy[onnx]",
@@ -48,29 +51,10 @@ def run_benchmark(models, target):
         "Latency[ms]",
         "Throughput",
     ]
-    # 获取量化工具版本
-    hmquant_version = "unknown"
-    if target == "xh1":
-        hmquant_version = get_hmquant_xh1_version()
-    elif target == "xh2":
-        hmquant_version = get_hmquant_xh2_version()
-    if hmquant_version == "unknown":
-        logger.error(f"Not found hmquant version for {target}")
-        exit(-1)
-    # 获取编译器版本
-    hmcc_version = get_package_version(f"houmo-tcim-{target}")
-    if hmcc_version == "unknown":
-        logger.error(f"Not found hmcc version for {target}")
-        exit(-1)
     table = PrettyTable(header)
     table.title = f"HouMo Model Benchmark Report"
-    t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-    if not os.path.exists("reports"):
-        os.makedirs("reports")
-    report_file = os.path.abspath(
-        os.path.join("reports", f"benchmark_v{hmquant_version}_v{hmcc_version}_{t}.csv")
-    )
-
+    if target == "xh2" and enbale_static:
+        return table
     root = os.getcwd()
     models = models["models"]
     for model_name in models:
@@ -81,11 +65,11 @@ def run_benchmark(models, target):
         ncore = model_cfg.get("ncore", 1)
         thread_num = model_cfg.get("thread_num", 8 if target == "xh1" else 4)
         enable_eval = model_cfg.get("eval", True)
-        acc_onnx = 0.0
-        acc_chip = 0.0
-        acc_err = 0.0
-        ave_latency = 0.0
-        throughput = 0.0
+        acc_onnx = "N/A"
+        acc_chip = "N/A"
+        acc_err = "N/A"
+        ave_latency = "N/A"
+        throughput = "N/A"
 
         location_ok = os.path.exists(location)
         if not location_ok:
@@ -124,6 +108,20 @@ def run_benchmark(models, target):
                 cfg["target"] = target
                 cfg["build"]["ncore"] = ncore
                 cfg["build"]["batch"] = batch
+                if enbale_static:
+                    inputs_cfg = cfg["model"]["inputs"]
+                    if len(inputs_cfg) > 1:
+                        continue
+                    input_name = list(inputs_cfg.keys())[0]
+                    input_cfg = inputs_cfg[input_name]
+                    resizer_cfg = input_cfg.get("resizer")
+                    if resizer_cfg is None:
+                        continue
+                    if resizer_cfg.get("enable_static_resizer", False):
+                        continue
+                    cfg["model"]["inputs"][input_name]["resizer"][
+                        "enable_static_resizer"
+                    ] = True
                 logger.info(f"\n{json.dumps(cfg, indent=2, sort_keys=False)}")
                 if target == "xh1":
                     from .exec.xh1_exec import Xh1Exec
@@ -135,12 +133,23 @@ def run_benchmark(models, target):
                     hm_exec = Xh2Exec(cfg)
             else:
                 logger.error(f"{cfg_path} not exists")
+        resizer_mode = hm_exec.resizer_mode
+        if resizer_mode == 0:
+            resizer_mode = "N/A"
+        elif resizer_mode == 1:
+            resizer_mode = "Dynamic_v2"
+        elif resizer_mode == 2:
+            resizer_mode = "Dynamic_v1"
+        elif resizer_mode == 3:
+            resizer_mode = "Static"
+        else:
+            resizer_mode = "unknown"
         # 量化
         quantize_ok = False
         if cfg_ok and hm_exec is not None:
             try:
-                hm_exec.quantize()
-                quantize_ok = True
+                res = hm_exec.quantize()
+                quantize_ok = bool(res)
                 logger.info(f"Quantize {model_name} done.")
             except Exception as e:
                 logger.error(f"quantize failed: {model_name}\nException: {e}")
@@ -164,13 +173,14 @@ def run_benchmark(models, target):
                     hm_exec.hmm_path, warmup, sample, loop_num, device, thread_num
                 )
                 perf_info = list(perf_info["perf"].values())[0]["perf_info"]
-                ave_latency = perf_info["avg_cost"]
-                throughput = perf_info["qps"]
+                ave_latency = f"{perf_info['avg_cost']:.3f}"
+                throughput = f"{perf_info['qps']:.2f}"
                 logger.info(f"perf done: {model_name}")
             except Exception as e:
                 logger.error(f"perf failed: {model_name}\nException: {e}")
 
         # onnx 数据集评估
+        onnx_info = dict()
         if build_ok and enable_eval:
             try:
                 # 删除缓存
@@ -182,6 +192,7 @@ def run_benchmark(models, target):
                 logger.error(f"onnx eval failed: {model_name}\nException: {e}")
                 onnx_info = dict()
         # xh1/xh2 数据集评估
+        chip_info = dict()
         if build_ok and enable_eval:
             try:
                 shutil.rmtree(f"results_{target}", ignore_errors=True)
@@ -193,14 +204,15 @@ def run_benchmark(models, target):
                 chip_info = dict()
 
         # 计算相对误差"
-        if "top1_acc" in onnx_info:
-            top1_onnx = float(onnx_info["top1_acc"])
-            top1_chip = float(chip_info["top1_acc"])
-            top1_err = top1_chip / top1_onnx - 1
-            acc_onnx = f"{top1_onnx*100:.2f}"
-            acc_chip = f"{top1_chip*100:.2f}"
-            acc_err = f"{top1_err*100:.2f}%"
-        elif "map50" in onnx_info:
+        if onnx_info and ("top1_acc" in onnx_info or "acc" in onnx_info):
+            key = "acc" if "acc" in onnx_info else "top1_acc"
+            acc_onnx = float(onnx_info[key])
+            acc_chip = float(chip_info[key])
+            acc_err = acc_chip / acc_onnx - 1
+            acc_onnx = f"{acc_onnx*100:.2f}"
+            acc_chip = f"{acc_chip*100:.2f}"
+            acc_err = f"{acc_err*100:.2f}%"
+        elif onnx_info and "map50" in onnx_info:
             map50_onnx = float(onnx_info["map50"])
             map50_chip = float(chip_info["map50"])
             map50_err = map50_chip / map50_onnx - 1
@@ -209,12 +221,14 @@ def run_benchmark(models, target):
             map50_95_err = map50_95_chip / map50_95_onnx - 1
             acc_onnx = f"{map50_onnx*100:.2f}/{map50_95_onnx*100:.2f}"
             acc_chip = f"{map50_chip*100:.2f}/{map50_95_chip*100:.2f}"
-            acc_err = f"{map50_err*100:.2f}/{map50_95_err*100:.2f}%"
+            acc_err = f"{map50_err*100:.2f}%/{map50_95_err*100:.2f}%"
 
-        input_size = "x".join(map(str, hm_exec.inputs_shape[0]))
-        for idx in range(1, len(hm_exec.inputs_shape)):
-            input_size += "\n"
-            input_size += "x".join(map(str, hm_exec.inputs_shape[idx]))
+        input_size = "N/A"
+        if hm_exec is not None:
+            input_size = "x".join(map(str, hm_exec.inputs_shape[0]))
+            for idx in range(1, len(hm_exec.inputs_shape)):
+                input_size += "\n"
+                input_size += "x".join(map(str, hm_exec.inputs_shape[idx]))
 
         table.add_row(
             [
@@ -225,21 +239,19 @@ def run_benchmark(models, target):
                 ncore,
                 batch,
                 thread_num,
+                resizer_mode,
                 hmquant_version,
                 hmcc_version,
                 acc_onnx,
                 acc_chip,
                 acc_err,
-                f"{ave_latency:.3f}",
-                f"{throughput:.2f}",
+                ave_latency,
+                throughput,
             ]
         )
         # 切回根目录
         os.chdir(root)
-    logger.info(f"\n{table}")
-    with open(report_file, "w", encoding="utf-8", newline="") as f:
-        f.write(table.get_csv_string())
-    logger.info("Benchmark done.")
+    return table
 
 
 def main():
@@ -405,8 +417,48 @@ def main():
     # 处理批量模型benchmark
     current_command = args.command
     if current_command == "benchmark":
+        # 获取量化工具版本
+        hmquant_version = "unknown"
+        if target == "xh1":
+            hmquant_version = get_hmquant_xh1_version()
+        elif target == "xh2":
+            hmquant_version = get_hmquant_xh2_version()
+        if hmquant_version == "unknown":
+            logger.error(f"Not found hmquant version for {target}")
+            exit(-1)
+        # 获取编译器版本
+        hmcc_version = get_package_version(f"houmo-tcim-{target}")
+        if hmcc_version == "unknown":
+            logger.error(f"Not found hmcc version for {target}")
+            exit(-1)
         models = read_yaml_to_dict(args.config)
-        run_benchmark(models, args.target)
+        t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+        if not os.path.exists("reports"):
+            os.makedirs("reports")
+        report_file = os.path.abspath(
+            os.path.join(
+                "reports",
+                f"benchmark_{args.target}_v{hmquant_version}_v{hmcc_version}_{t}.csv",
+            )
+        )
+        table = run_benchmark(models, args.target, hmquant_version, hmcc_version)
+        table_static = run_benchmark(
+            models, args.target, hmquant_version, hmcc_version, enbale_static=True
+        )
+        combined_table = PrettyTable()
+        combined_table.title = table.title
+        combined_table.field_names = table.field_names
+        table_kv = dict()
+        for row in table_static.rows:
+            table_kv[row[0]] = row
+        for row in table.rows:
+            combined_table.add_row(row)
+            if row[0] in table_kv:
+                combined_table.add_row(table_kv[row[0]])
+        logger.info(f"\n{combined_table}")
+        with open(report_file, "w", encoding="utf-8", newline="") as f:
+            f.write(combined_table.get_csv_string())
+        logger.info("Benchmark done.")
         exit(0)
 
     # 存在结果信息，先读回来更新后再存

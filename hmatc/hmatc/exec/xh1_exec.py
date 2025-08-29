@@ -12,7 +12,7 @@ from ..infer.onnx_infer import OnnxInfer
 from ..infer.xh1_infer import Xh1Infer
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
-from ..utils.preprocess import default_preprocess, xh1_preprocess
+from ..utils.preprocess import default_preprocess, xh1_preprocess, calc_padding_size
 from ..utils.utils import get_hmquant_xh1_version as get_hmquant_version
 from ..utils.utils import (
     SUPPORT_IMAGE_FORMATS,
@@ -68,9 +68,12 @@ class Xh1Exec(BaseExec):
         if self.is_image_single_input and len(self.resizers_cfg[0]) != 0:
             # 单输入图像且设置了resizer参数
             if self.resize_types[0] == 0:
-                self.resizer_mode = 2 if not self.enable_static_resizers[0] else 3
+                self.resizer_mode = 2  # no padding
             elif self.resize_types[0] == 1:
-                self.resizer_mode = 1
+                self.resizer_mode = 1  # padding
+            # 如果使用静态更新为3
+            if self.enable_static_resizers[0]:
+                self.resizer_mode = 3
             # 更新custom_msg
             self.custom_msg[self.inputs_name[0]]["resizer_mode"] = self.resizer_mode
         logger.info(f"resizer_mode: {self.resizer_mode}")
@@ -106,8 +109,8 @@ class Xh1Exec(BaseExec):
             os.makedirs(self.hmm_save_dir)
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
         self.onnx_in_datas = list()  # 存储onnx输入数据
-        #hmatc onnx optimizer initialization
-        if 'app_onnx_opt' in cfg['model']:
+        # hmatc onnx optimizer initialization
+        if "app_onnx_opt" in cfg["model"]:
             self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
 
     def get_quant_cfg(self) -> dict:
@@ -150,6 +153,7 @@ class Xh1Exec(BaseExec):
             new_input_cfg["first_layer_weight_denorm_std"] = std_values
             # toYUV_format
             resizer_cfg = input_cfg["resizer"]
+            max_input_size = resizer_cfg["max_input_size"]
             toYUV_format = resizer_cfg["toYUV_format"]
             new_input_cfg["toYUV_format"] = toYUV_format[0:6]  # 去掉SP
             insert_pad_scatter = resizer_cfg.get("insert_pad_scatter", False)
@@ -167,15 +171,24 @@ class Xh1Exec(BaseExec):
                 "method": "bilinear",
             }
             resize_type = input_cfg["resize_type"]
+            max_height, max_width = max_input_size
+            nh, nw = H, W
+            # onnx输入大于max_input_size，影响static_resizer crop
+            if H > max_height or W > max_width:
+                # 等比例缩放至最大输入内
+                padding_size, size, _ = calc_padding_size(
+                    (H, W), (max_width, max_height), padding_mode=0
+                )
+                nh, nw = size
             new_input_cfg["resizer_crop"] = {
                 "top": 0,
                 "left": 0,
-                "height": H,
-                "width": W,
+                "height": nh,
+                "width": nw,
             }
             new_input_cfg["dynamic_crop"] = self.resizer_mode in [1, 2]
             new_input_cfg["fold"] = self.resizer_mode in [2, 3]  # 可量化内部判断
-            if resize_type == 1:
+            if resize_type == 1 and self.resizer_mode == 1:
                 # padding
                 padding_values = input_cfg["padding_values"]
                 if len(padding_values) == 3:
@@ -275,7 +288,7 @@ class Xh1Exec(BaseExec):
                         resize_type=resize_type,
                         padding_mode=padding_mode,
                         padding_values=padding_values,
-                        is_onnx=self.resizer_mode in [0, 3],
+                        is_onnx=self.resizer_mode == 0,
                     )
                     # onnx
                     onnx_im, _ = xh1_preprocess(
@@ -350,7 +363,7 @@ class Xh1Exec(BaseExec):
         # quant info
         if self.quant_cfg is None:
             logger.error("quant info not found")
-            exit(-1)
+            return dict()
         if self.calib_data is not None:
             HOUMO_DATASETS_PATH = os.environ.get(
                 "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets"
@@ -358,14 +371,14 @@ class Xh1Exec(BaseExec):
             HM_calib_data = os.path.join(HOUMO_DATASETS_PATH, self.calib_data)
             if not os.path.isdir(self.calib_data) and not os.path.isdir(HM_calib_data):
                 logger.error("calib_data must be a exist directory")
-                exit(-1)
+                return dict()
             if not os.path.isdir(self.calib_data):
                 self.calib_data = HM_calib_data
             logger.info(f"calib_data: {self.calib_data}")
 
-        if hasattr(self, 'ApplicationOnnxOpt'):
+        if hasattr(self, "ApplicationOnnxOpt"):
             self.ApplicationOnnxOpt.opt()
-            if hasattr(self.ApplicationOnnxOpt, 'opt_model_path'):
+            if hasattr(self.ApplicationOnnxOpt, "opt_model_path"):
                 self.model_path = self.ApplicationOnnxOpt.opt_model_path
 
         from hmquant.api import (
@@ -377,9 +390,12 @@ class Xh1Exec(BaseExec):
 
         calib_dataset = self.get_quant_dataset()
         in_datas = next(calib_dataset)
-        onnx_in_datas = (
-            self.onnx_in_datas[0] if self.is_image_single_input else in_datas
-        )
+        onnx_in_datas = dict()
+        if self.is_image_single_input:
+            onnx_in_datas = self.onnx_in_datas[0]
+        else:
+            for key in in_datas:
+                onnx_in_datas[key] = in_datas[key].detach().cpu().numpy()
         # 打印前端转换对比结果
         convert_profiling(
             self.model_path,
@@ -668,12 +684,11 @@ class Xh1Exec(BaseExec):
                 std=std,
                 use_norm=self.resizer_mode == 0,
                 use_resize=self.resizer_mode in [0, 3],
-                use_rgb=data_format == "RGB" and self.resizer_mode == 0,  # 对灰度无效
+                use_rgb=data_format == "RGB" and self.resizer_mode == 0,
                 resize_type=resize_type,
                 padding_mode=padding_mode,
                 padding_values=padding_values,
-                is_onnx=self.resizer_mode
-                in [0],  # 静态resizer，在非量化阶段需要转YUV，不能设置is_onnx=True
+                is_onnx=self.resizer_mode == 0,
                 to_YUV=self.resizer_mode in [1, 2, 3],
                 fmt=toYUV_format,
             )
@@ -739,9 +754,43 @@ class Xh1Exec(BaseExec):
                 ).type(torch.int64)
                 xh1_in_datas[input_name] = in_data_quanted
 
+        # 存输入数据
+        input_data_dir = os.path.join(self.save_dir, "xh1", "datas", "input")
+        if not os.path.exists(input_data_dir):
+            os.makedirs(input_data_dir)
+
+        def save_input(runner, datas):
+            for key in datas:
+                bin_name = f"{runner}_input_{key}.bin"
+                txt_name = f"{runner}_input_{key}.txt"
+                npy_name = f"{runner}_input_{key}.npy"
+                data = datas[key]
+                if isinstance(data, torch.Tensor):
+                    data = data.detach().cpu().numpy()
+                data.tofile(os.path.join(input_data_dir, bin_name))
+                data.tofile(os.path.join(input_data_dir, txt_name), sep="\n")
+                np.save(os.path.join(input_data_dir, npy_name), data)
+
+        output_data_dir = os.path.join(self.save_dir, "xh1", "datas", "output")
+        if not os.path.exists(output_data_dir):
+            os.makedirs(output_data_dir)
+
+        def save_output(runner, key, data):
+            bin_name = f"{runner}_output_{key}.bin"
+            txt_name = f"{runner}_output_{key}.txt"
+            npy_name = f"{runner}_output_{key}.npy"
+            data.tofile(os.path.join(output_data_dir, bin_name))
+            data.tofile(os.path.join(output_data_dir, txt_name), sep="\n")
+            np.save(os.path.join(output_data_dir, npy_name), data)
+
+        save_input("onnx", onnx_in_datas)
+        save_input("xh1", xh1_in_datas)
+        save_input("hmquant", hmquant_in_datas)
+
         onnx_outputs = onnx_infer.run(onnx_in_datas)
         hmquant_outputs = hmquant_infer.run(hmquant_in_datas)
         _, xh1_outputs_dequanted = xh1_infer.run(xh1_in_datas)
+
         repeats = 1
         if self.build_batch > 1 and self.roi_num == 1:
             # n图n框，且编译batch>1
@@ -762,18 +811,22 @@ class Xh1Exec(BaseExec):
         table = PrettyTable(header)
         table.title = "Cosine Distance"
         for output_name in onnx_outputs:
+            new_output_name = output_name.replace("/", "_")
             # onnx
             onnx_output = onnx_outputs[output_name]
             onnx_output = np.repeat(onnx_output, repeats=repeats, axis=0)
+            save_output("onnx", new_output_name, onnx_output)
             # hmquant
             hmquant_output = hmquant_outputs[output_name]
             hmquant_output = np.repeat(hmquant_output, repeats=repeats, axis=0)
             hmquant_output_dequanted = xh1_infer.dequantize(output_name, hmquant_output)
+            save_output("hmquant", new_output_name, hmquant_output_dequanted)
             logger.info(
                 f"Hmquant output[{output_name}] quantize data_dtype: {hmquant_output.dtype} -> {hmquant_output_dequanted.dtype}"
             )
             # xh1
             xh1_output_dequanted = xh1_outputs_dequanted[output_name]
+            save_output("xh1", new_output_name, xh1_output_dequanted)
             # compare
             onnx_vs_hmquant = cosine_distance(onnx_output, hmquant_output_dequanted)
             onnx_vs_xh1 = cosine_distance(onnx_output, xh1_output_dequanted)

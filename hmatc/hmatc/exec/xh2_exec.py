@@ -46,8 +46,8 @@ class Xh2Exec(BaseExec):
         self.golden_dir = os.path.join(self.quant_output_dir, "golden")
         self.quant_advance_cfg = self.quant_cfg.get("config", dict())
         self.upgrade_opset_version()
-        #hmatc onnx optimizer initialization
-        if 'app_onnx_opt' in cfg['model']:
+        # hmatc onnx optimizer initialization
+        if "app_onnx_opt" in cfg["model"]:
             self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
 
     def get_quant_cfg(self) -> dict:
@@ -88,9 +88,9 @@ class Xh2Exec(BaseExec):
             os.makedirs(self.quant_output_dir)
         # 检查opset_version
 
-        if hasattr(self, 'ApplicationOnnxOpt'):
+        if hasattr(self, "ApplicationOnnxOpt"):
             self.ApplicationOnnxOpt.opt()
-            if hasattr(self.ApplicationOnnxOpt, 'opt_model_path'):
+            if hasattr(self.ApplicationOnnxOpt, "opt_model_path"):
                 self.model_path = self.ApplicationOnnxOpt.opt_model_path
 
         from xhquant.api import (
