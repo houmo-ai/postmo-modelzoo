@@ -199,11 +199,11 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         model_impl_cls = self.model_cfg.get("model_impl_cls")
         if model_impl_module is None or model_impl_cls is None:
             logger.error("model_impl_module or model_impl_cls is None")
-            exit(-1)
+            return None
         model_impl_module_path = f"{model_impl_module}.py"
         if not os.path.exists(model_impl_module_path):
             logger.error(f"model_impl_module not exists -> {model_impl_module_path}")
-            exit(-1)
+            return None
         Model = self.import_py_module_from_file(model_impl_module_path, model_impl_cls)
         logger.info(f"from {model_impl_module} import {model_impl_cls} successfully")
         return Model(
@@ -220,11 +220,11 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         dataset_cls = self.eval_cfg.get("dataset_cls")
         if dataset_module is None or dataset_cls is None:
             logger.error("dataset_module or dataset_cls is None")
-            exit(-1)
+            return None
         module_path = f"{dataset_module}.py"
         if not os.path.exists(module_path):
             logger.error(f"dataset_module not exists -> {dataset_module}")
-            exit(-1)
+            return None
         Dataset = self.import_py_module_from_file(module_path, dataset_cls)
         logger.info(f"from {dataset_module} import {dataset_cls} successfully")
         return Dataset(root_path=data_dir)
@@ -252,6 +252,10 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         if test_num < 0:
             logger.error(f"test_num must >= 0 -> {test_num}")
             return {}
+        model = self.get_model(backend)
+        if model is None:
+            logger.error("Failed to get model")
+            return {}
         filenames = os.listdir(data_dir)
         data_num = len(filenames)
         if test_num > 0 and test_num < data_num:
@@ -263,7 +267,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 logger.warning(f"filepath not exists -> {filepath}")
                 continue
             filepaths.append(filepath)
-        model = self.get_model(backend)
         model_path = self.model_path if backend == "onnx" else self.hmm_path
         model.load(model_path)
         model.demo(filepaths)
@@ -294,8 +297,14 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             return {}
         # 获取dataset
         dataset = self.get_dataset(data_dir)
+        if dataset is None:
+            logger.error("get_dataset failed")
+            return {}
         # 获取模型
         model = self.get_model(backend)
+        if model is None:
+            logger.error("Failed to get model")
+            return {}
         model_path = self.model_path if backend == "onnx" else self.hmm_path
         model.load(model_path)
         res = model.evaluate(dataset, num)

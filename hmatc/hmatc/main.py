@@ -79,7 +79,7 @@ def run_benchmark(models, target):
         cfg_path = model_cfg.get("config", "config.yml")
         batch = model_cfg.get("batch", 1)
         ncore = model_cfg.get("ncore", 1)
-        thread_num = model_cfg.get("thread_num", 8)
+        thread_num = model_cfg.get("thread_num", 8 if target == "xh1" else 4)
         enable_eval = model_cfg.get("eval", True)
         acc_onnx = 0.0
         acc_chip = 0.0
