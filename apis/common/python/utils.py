@@ -40,7 +40,7 @@ def download_file(url, save_path, file_name, file_size, chunk_size=1024 * 1024):
                 total=file_size,
                 unit='B',
                 unit_scale=True,
-                unit_divisor=4096,
+                unit_divisor=1024,
                 desc=file_name,
             ) as pbar:
                 with open(save_path, 'wb') as f:
