@@ -124,6 +124,18 @@ def main(args) -> int:
 
     if not ret:
         return 1
+
+    embed_dir = f"{output_dir}/hmquant"
+    os.makedirs(embed_dir, exist_ok=True)
+    execute_cmd(
+        [
+            "cp",
+            "-a",
+            f"{args.quant_model_path}/quant_embedding.pt",
+            f"{embed_dir}/",
+        ],
+        args.log_file,
+    )
     return 0
 
 

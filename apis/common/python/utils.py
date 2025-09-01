@@ -96,6 +96,8 @@ def get_file_from_jfrog(file_path, save_dir, extract_dir=None):
         if os.path.exists(save_path):
             os.remove(save_path)
         url = f"{modelzoo_url}/{file_path}"
+        if modelzoo_url.endswith('/'):
+            url = f"{modelzoo_url}{file_path}"
         if download_file(url, save_path, file_name, file_size) is False:
             return ""
 
