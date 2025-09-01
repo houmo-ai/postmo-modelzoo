@@ -121,9 +121,9 @@ if __name__ == '__main__':
             file_path = get_file_from_jfrog(raw_path, model_dir)
         except Exception as e:
             print(f"Model doesn't exist, error msg: {e}")
-        else:
-            new_file_path = os.path.join(os.path.dirname(file_path), "yolop_384x640_focus2conv.onnx")
-            focus2conv(file_path, new_file_path)
+        # else:
+        #     new_file_path = os.path.join(os.path.dirname(file_path), "yolop_384x640_focus2conv.onnx")
+        #     focus2conv(file_path, new_file_path)
 
     if model_type == "quant" or model_type == "all":
         try:

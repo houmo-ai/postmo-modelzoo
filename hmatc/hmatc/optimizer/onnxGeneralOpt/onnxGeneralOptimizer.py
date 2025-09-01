@@ -63,6 +63,8 @@ class OnnxGeneralOptimizer(OnnxBaseOptimizer):
     @classmethod
     def opt_loop(cls, onnx_model):
         #onnx_model = replace_Div_of_Mul(onnx_model)
+        onnx_model = replace_focus_layer_of_Conv(onnx_model)
+        #onnx_model = fusion_focus_layer_of_Conv(onnx_model)
         onnx_model = replace_GatherUnsqueeze_of_Slice(onnx_model)
         onnx_model = delete_useless_pool(onnx_model)
         onnx_model = replace_MaxPool1D_of_MaxPool2D(onnx_model)
