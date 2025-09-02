@@ -1,10 +1,9 @@
-import time
 import os
-import torch
+import time
 import numpy as np
+import torch
 from abc import ABC
 from typing import Dict
-from xhquant.api import HMONNXInference, xhquant_init
 from ..base.base_infer import BaseInfer
 from ..utils import logger
 from ..utils.utils import torch_to_numpy_dtype
@@ -17,10 +16,16 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         self.model_ext = ".onnx"
         self.input_names = list()
         self.output_names = list()
+        from xhquant.api import xhquant_init
+
         xhquant_init(None, debug=False)
 
     def load(self, model_path):
-        assert os.path.exists(model_path)
+        if not os.path.exists(model_path):
+            logger.error(f"model path: {model_path} not exists.")
+            exit(-1)
+        from xhquant.api import HMONNXInference
+
         self.engine = HMONNXInference(model_path)
         # self.engine.to_fast_mode()
         self.engine.to(torch.device(self.device))
@@ -30,21 +35,30 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
 
         for idx, name in enumerate(self.input_names):
             info = self.engine.get_input(name)
-            logger.info(f"[Xh2Hmquant] input{info.name} shape = {list(info.shape)}  dtype = {torch_to_numpy_dtype[info.dtype]}")
+            logger.info(
+                f"[Xh2Hmquant] input{info.name} shape = {list(info.shape)}  dtype = {torch_to_numpy_dtype[info.dtype]}"
+            )
 
         for idx, name in enumerate(self.output_names):
             info = self.engine.get_output(name)
-            logger.info(f"[Xh2Hmquant] output{info.name} shape = {list(info.shape)} dtype = {torch_to_numpy_dtype[info.dtype]}")
-                                  
+            logger.info(
+                f"[Xh2Hmquant] output{info.name} shape = {list(info.shape)} dtype = {torch_to_numpy_dtype[info.dtype]}"
+            )
+
     def run(self, in_datas: dict) -> Dict[str, np.ndarray]:
         self.total += 1
         t_start = time.time()
-        outputs = self.engine.run(in_datas) 
+        outputs = self.engine.run(in_datas)
         self.time_span += (time.time() - t_start) * 1000
         if len(self.output_names) == 1:
-            outputs = {self.output_names[0]: outputs.detach().cpu().numpy().astype(np.float32)}
+            outputs = {
+                self.output_names[0]: outputs.detach().cpu().numpy().astype(np.float32)
+            }
             return outputs
-        return {output_name: outputs[idx].detach().cpu().numpy().astype(np.float32) for idx, output_name in enumerate(self.output_names)}
+        return {
+            output_name: outputs[idx].detach().cpu().numpy().astype(np.float32)
+            for idx, output_name in enumerate(self.output_names)
+        }
 
     def unload(self):
         pass
