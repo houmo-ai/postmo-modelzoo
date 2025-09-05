@@ -324,10 +324,29 @@ perfInfo_t ModelRunner(
         json custom_msg = json::parse(custom_msg_str);
         for (auto &item : inputs) {
             std::string dyn_info_name = "resizer_crop_" + item.first;
-            auto &raw_input_shape = custom_msg[item.first]["shape"];
+            auto &model_input_shape = custom_msg[item.first]["shape"];
             auto &shape = inputs[item.first].shape;
             assert(shape.size() == 4);
-            assert(raw_input_shape.size() == 4);
+            assert(model_input_shape.size() == 4);
+            int32_t RESIZER_IMAGE_INPUT_H = shape[2];
+            int32_t RESIZER_IMAGE_INPUT_W = shape[3];
+            int32_t MODEL_INPUT_H = model_input_shape[2];
+            int32_t MODEL_INPUT_W = model_input_shape[3];
+            // 随机数的情况下，默认是crop全图，会出现缩放倍数超过[1/16, 32)
+            int32_t RESIZER_CROP_H = RESIZER_IMAGE_INPUT_H;
+            int32_t RESIZER_CROP_W = RESIZER_IMAGE_INPUT_W;
+            if (RESIZER_IMAGE_INPUT_H >= MODEL_INPUT_H) {  // 下采样
+                if ((float)RESIZER_IMAGE_INPUT_H / MODEL_INPUT_H > 16.0f)
+                    RESIZER_CROP_H = MODEL_INPUT_H * 16;
+            } else {  // 上采样
+                assert(float(MODEL_INPUT_H) / RESIZER_IMAGE_INPUT_H < 32.0f);
+            }
+            if (RESIZER_IMAGE_INPUT_W >= MODEL_INPUT_W) {
+                if ((float)RESIZER_IMAGE_INPUT_W / MODEL_INPUT_W > 16.0f)
+                    RESIZER_CROP_W = MODEL_INPUT_W * 16;
+            } else {
+                assert(float(MODEL_INPUT_W) / RESIZER_IMAGE_INPUT_W < 32.0f);
+            }
             std::string dyn_info_str;
             for (int idx = 0; idx < input_num; ++idx) {
                 auto input_name = module.GetInputName(idx);
@@ -347,15 +366,15 @@ perfInfo_t ModelRunner(
                 for (int n = 0; n < batch; ++n) {
                     data[n * step + 0] = 0;
                     data[n * step + 1] = 0;
-                    data[n * step + 2] = shape[2];
-                    data[n * step + 3] = shape[3];
+                    data[n * step + 2] = RESIZER_CROP_H;
+                    data[n * step + 3] = RESIZER_CROP_W;
                     dyn_info_str = std::to_string(data[n * step + 0]) + ", " +
                                    std::to_string(data[n * step + 1]) + ", " +
                                    std::to_string(data[n * step + 2]) + ", " +
                                    std::to_string(data[n * step + 3]);
                     if (step == 10) {
-                        data[n * step + 4] = raw_input_shape[2];
-                        data[n * step + 5] = raw_input_shape[3];
+                        data[n * step + 4] = MODEL_INPUT_H;
+                        data[n * step + 5] = MODEL_INPUT_W;
                         data[n * step + 6] = 0;
                         data[n * step + 7] = 0;
                         data[n * step + 8] = 0;

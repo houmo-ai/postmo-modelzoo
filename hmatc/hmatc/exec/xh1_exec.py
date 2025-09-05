@@ -108,7 +108,6 @@ class Xh1Exec(BaseExec):
         if not os.path.exists(self.hmm_save_dir):
             os.makedirs(self.hmm_save_dir)
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
-        self.onnx_in_datas = list()  # 存储onnx输入数据
         # hmatc onnx optimizer initialization
         if "app_onnx_opt" in cfg["model"]:
             self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
@@ -210,11 +209,20 @@ class Xh1Exec(BaseExec):
 
     def get_quant_dataset(self):
         """提供量化数据"""
-        self.onnx_in_datas.clear()
+        onnx_datasets = list()
+        calib_datasets = list()
         input_name = self.inputs_name[0]
         input_cfg = self.inputs_cfg[input_name]
         calib_num = self.quant_cfg.get("calib_num")
         data_format = input_cfg.get("data_format")
+        filenames = (
+            ["random"] * calib_num
+            if self.use_random_data
+            else os.listdir(self.calib_data)
+        )
+        filenames.sort()
+        if self.use_random_data:
+            logger.warning("Using random data for calibration")
         if self.is_image_single_input:
             # 单输入且输入为图像
             input_name = self.inputs_name[0]
@@ -229,13 +237,6 @@ class Xh1Exec(BaseExec):
             resizer_cfg = input_cfg.get("resizer", dict())
             max_input_size = resizer_cfg.get("max_input_size", (H, W))
             max_height, max_width = max_input_size
-            filenames = (
-                ["random.jpg"] * calib_num
-                if self.use_random_data
-                else os.listdir(self.calib_data)
-            )
-            if self.use_random_data:
-                logger.warning("Using random data for calibration")
             # 填充图片
             padding_len = len(filenames) % N
             for idx in range(padding_len):
@@ -247,12 +248,12 @@ class Xh1Exec(BaseExec):
                     f"The number of calibration data is less than the number of calibration samples"
                 )
                 calib_num = actual_calib_num
-            in_datas = dict()
             for idx in range(calib_num):
                 batch_filenames = filenames[idx * N : (idx + 1) * N]
                 batch_datas = list()
                 dyn_infos = list()
                 batch_onnx_datas = list()
+                in_datas = dict()
                 logger.info(f"Processing calibration data {idx}...")
                 for filename in batch_filenames:
                     if not self.use_random_data:
@@ -269,13 +270,13 @@ class Xh1Exec(BaseExec):
                             logger.warning(f"{filepath} not exists or decode failed")
                             continue
                     else:
-                        # 直接用resizer输入大小生成随机图
-                        cv_image = torch.randint(
+                        cv_image = np.random.randint(
                             low=0,
                             high=255,
                             size=(max_height, max_width, C),
-                            dtype=torch.uint8,
+                            dtype=np.uint8,
                         )
+
                     im, dyn_info = xh1_preprocess(
                         cv_image,
                         input_shape,
@@ -305,42 +306,34 @@ class Xh1Exec(BaseExec):
                         padding_values=padding_values,
                         is_onnx=True,
                     )
+                    onnx_im = onnx_im.detach().cpu().numpy()
                     batch_onnx_datas.append(onnx_im)
                     dyn_infos.append(dyn_info)
                     batch_datas.append(im)
-                self.onnx_in_datas.append(
-                    {
-                        input_name: torch.cat(batch_onnx_datas, dim=0)
-                        .detach()
-                        .cpu()
-                        .numpy()
-                    }
+                onnx_datasets.append(
+                    {input_name: np.concatenate(batch_onnx_datas, axis=0)}
                 )
                 in_datas[input_name] = torch.cat(batch_datas, dim=0)
                 if self.resizer_mode in [1, 2]:
                     batch_dyninfos = torch.cat(dyn_infos, dim=0)
                     in_datas[f"resizer_crop_{input_name}"] = batch_dyninfos
-                yield in_datas
+                calib_datasets.append(in_datas)
         else:
             # 单输入且输入为非图像 or 多输入
-            in_datas = dict()
-            if self.use_random_data:
-                for idx in range(calib_num):
+            if len(filenames) < calib_num:
+                logger.warning(
+                    f"The number of calibration data is less than the number of calibration samples"
+                )
+                calib_num = len(filenames)
+            for idx in range(calib_num):
+                if self.use_random_data:
+                    in_datas = dict()
                     for input_name in self.inputs_cfg:
                         dtype = self.onnx_inputs_info[input_name]["dtype"]
                         input_shape = self.inputs_cfg[input_name]["shape"]
                         data = self.gen_random_data(input_shape, dtype)
                         in_datas[input_name] = torch.from_numpy(data)
-                    logger.info(f"Processing calibration random data {idx}...")
-                    yield in_datas
-            else:
-                filenames = os.listdir(self.calib_data)
-                if len(filenames) < calib_num:
-                    logger.warning(
-                        f"The number of calibration data is less than the number of calibration samples"
-                    )
-                    calib_num = len(filenames)
-                for idx in range(calib_num):
+                else:
                     filename = filenames[idx]
                     data_path = os.path.join(self.calib_data, filename)
                     in_datas = load_npz(data_path)
@@ -355,8 +348,11 @@ class Xh1Exec(BaseExec):
                             batch == self.model_inputs_batch[input_name]
                         ), "npz data batch must be equal to onnx input batch"
                         in_datas[input_name] = torch.from_numpy(in_datas[input_name])
-                    logger.info(f"Processing calibration npz data {idx}...")
-                    yield in_datas
+                calib_datasets.append(in_datas)
+                onnx_datasets.append(
+                    {key: in_datas[key].detach().cpu().numpy() for key in in_datas}
+                )
+        return calib_datasets, onnx_datasets
 
     def quantize(self):
         """quantize the model"""
@@ -388,14 +384,9 @@ class Xh1Exec(BaseExec):
             quantize_profiling,
         )
 
-        calib_dataset = self.get_quant_dataset()
-        in_datas = next(calib_dataset)
-        onnx_in_datas = dict()
-        if self.is_image_single_input:
-            onnx_in_datas = self.onnx_in_datas[0]
-        else:
-            for key in in_datas:
-                onnx_in_datas[key] = in_datas[key].detach().cpu().numpy()
+        calib_datasets, onnx_datasets = self.get_quant_dataset()
+        in_datas = calib_datasets[0]
+        onnx_in_datas = onnx_datasets[0]
         # 打印前端转换对比结果
         convert_profiling(
             self.model_path,
@@ -408,7 +399,7 @@ class Xh1Exec(BaseExec):
         t_start = time.time()
         sequencer = quant_single_onnx_network(
             cfg=self.get_quant_cfg(),
-            calibration_data=self.get_quant_dataset(),
+            calibration_data=calib_datasets,
             onnx_model_or_path=self.model_path,
             device=self.device,
         )
@@ -661,9 +652,10 @@ class Xh1Exec(BaseExec):
             # 获取编译后模型batch
             hmm_batch = xh1_infer.inputs_info[input_name].shape[0]
             # onnx
-            onnx_data = default_preprocess(
-                cv_image,
-                (W, H),
+            onnx_data, _ = xh1_preprocess(
+                cv_image.copy(),
+                input_shape,
+                max_input_size,
                 mean=mean,
                 std=std,
                 use_norm=True,
@@ -671,9 +663,12 @@ class Xh1Exec(BaseExec):
                 use_rgb=data_format == "RGB",
                 resize_type=resize_type,
                 padding_mode=padding_mode,
-                padding_value=padding_values,
+                padding_values=padding_values,
+                is_onnx=True,
             )
-            onnx_data = np.repeat(onnx_data, repeats=self.model_input_batch, axis=0)
+            onnx_data = np.repeat(
+                onnx_data.detach().cpu().numpy(), repeats=self.model_input_batch, axis=0
+            )
             onnx_in_datas[input_name] = onnx_data  # np.ndarray
 
             yuv_pad_hwc, dyn_info = xh1_preprocess(
