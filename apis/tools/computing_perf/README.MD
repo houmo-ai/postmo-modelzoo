@@ -25,46 +25,46 @@ python3 computing_perf.py
 基于Linux x86_64平台的执行结果
 
 ```bash
-#########################################
-##  AI core compute performance test   ##
-#########################################
+Model run successfully on device 0, elapsed time: 11.82 seconds.
 
-=========================================
-Generating onnx model
-Model generated successfully, saving to ./xh1_perf_test/xh1_conv.onnx.
-=========================================
-Building model with tcim in output dir: ./xh1_perf_test/output
-Model built successfully.
-=========================================
-Running model ./xh1_perf_test/output/xh1_conv.hmm
-thread 2 on device 0 load model done.
-thread 0 on device 0 load model done.
-thread 1 on device 0 load model done.
-thread 3 on device 0 load model done.
-Model run successfully on device 0, elapsed time: 5.70 seconds.
-=========================================
-Performance is 222.19 TOPS.
+============================================================
+           Performance Test Summary
+============================================================
+Model Parameter           |           Value
+------------------------------------------------------------
+Number of Conv2d Layers   |              64
+Batch Size                |               1
+Input Channels            |             256
+Output Channels           |             256
+Feature Map Size          |      [256, 256]
+Kernel Shape              |          [3, 3]
+------------------------------------------------------------
+Computing amount          |          4.9478 TOPs/sample
+Test time                 |         11.8197 seconds
+PERFORMANCE               |          214.33 TOPS
+============================================================
 ```
 
 基于Linux aarch64平台的执行结果
 
 ```bash
-#########################################
-##  AI core compute performance test   ##
-#########################################
-
-=========================================
-Skipping model generation since the current platform is aarch64.
-download from http://139.224.0.199:8082/artifactory/houmo/release/models/computing_perf/hmm_xh1_conv_4cores_20250613.zip to /usr/local/src/houmo-examples/models/hmm_xh1_conv_4cores_20250613.zip
-download finished.
-extract to ./
-=========================================
-Running model ./xh1_perf_test/output/xh1_conv.hmm
-thread 2 on device 0 load model done.
-thread 1 on device 0 load model done.
-thread 0 on device 0 load model done.
-thread 3 on device 0 load model done.
 Model run successfully on device 0, elapsed time: 15.48 seconds.
-=========================================
-Performance is 81.84 TOPS.
+
+============================================================
+           Performance Test Summary
+============================================================
+Model Parameter           |           Value
+------------------------------------------------------------
+Number of Conv2d Layers   |              64
+Batch Size                |               1
+Input Channels            |             256
+Output Channels           |             256
+Feature Map Size          |      [256, 256]
+Kernel Shape              |          [3, 3]
+------------------------------------------------------------
+Computing amount          |          4.9478 TOPs/sample
+Test time                 |         15.4792 seconds
+PERFORMANCE               |           81.84 TOPS
+============================================================
+
 ```
