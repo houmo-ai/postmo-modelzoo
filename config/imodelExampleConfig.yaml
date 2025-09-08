@@ -129,7 +129,6 @@ hmatc:
     # test models
     - backbone_resnet50_test
     - detection_yolov5s_test
-    # - autodrive_yolop_test
 
 ###### apis ######
 inferences_resnet50:
@@ -229,7 +228,6 @@ models_tests:
     - backbone_resnet50_test
     - backbone_efficientnet_test
     - backbone_mobilenetv2_test
-    - autodrive_yolop_test
     - detection_yolov3_test
     - detection_yolov5s_test
     - detection_yolov8m_test

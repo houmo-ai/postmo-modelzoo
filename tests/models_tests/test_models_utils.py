@@ -111,7 +111,7 @@ def _check_compile_result(res_str: str) -> bool:
     import re
 
     if HOUMO_BACKEND == "xh2":
-        row_pattern = re.compile(r"\|\s*([^|]+?)\s*\|\s*(\d+\.\d+)\s*\|$")
+        row_pattern = re.compile(r"\|\s*([\w\-/.]+)\s*\|\s*(\d+\.\d+)\s*\|$")
     else:
         row_pattern = re.compile(
             r"^\|\s*([^|]+?)\s*\|\s*(\d+\.\d+)\s*\|\s*(\w+)\s*\|\s*(\d+\.\d+)\s*\|\s*(\w+)\s*\|$"
@@ -369,7 +369,7 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
             exec_flag, _ = execute_test_cmd(tmp_cmd_list, "", False, False)
             final_flag = False if exec_flag is False else final_flag
 
-    display_ci_logs(log_file, "get_model", model_name, final_flag)
+    # display_ci_logs(log_file, "get_model", model_name, final_flag)
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
     assert final_flag is True, "Get Model Test Failed!"
@@ -446,7 +446,7 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
             if exec_flag is False:
                 final_flag = False
 
-    display_ci_logs(log_file, "quant", model_name, final_flag)
+    # display_ci_logs(log_file, "quant", model_name, final_flag)
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
     assert final_flag is True, "Quantization Test Failed!"
@@ -533,7 +533,7 @@ def execute_compile_flow(
             if exec_flag is False:
                 final_flag = False
 
-    display_ci_logs(log_file, "compile", model_name, final_flag)
+    # display_ci_logs(log_file, "compile", model_name, final_flag)
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
     assert final_flag is True, "Compilation Test Failed!"
@@ -585,7 +585,7 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         dst_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
         move_models_res(current_folder, dst_folder)
 
-        display_ci_logs(log_file, "demo", model_name, False)
+        # display_ci_logs(log_file, "demo", model_name, False)
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
         logger.warning(f"Skip demo testcase {model_name} on CI ISIM.")
@@ -631,7 +631,7 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
                 ["pip3", "install", lib_name + "==" + lib_ver], log_file, True
             )
 
-    display_ci_logs(log_file, "demo", model_name, final_flag)
+    # display_ci_logs(log_file, "demo", model_name, final_flag)
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
     assert final_flag is True, "Demo Test Failed!"
@@ -680,7 +680,7 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
         dst_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
         move_models_res(current_folder, dst_folder)
 
-        display_ci_logs(log_file, "compare", model_name, False)
+        # display_ci_logs(log_file, "compare", model_name, False)
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
         logger.warning(f"Skip compare testcase {model_name} on CI ISIM.")
@@ -707,7 +707,7 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
         if exec_flag is False:
             final_flag = False
 
-    display_ci_logs(log_file, "compare", model_name, final_flag)
+    # display_ci_logs(log_file, "compare", model_name, final_flag)
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
     assert final_flag is True, "HmATC Compare Test Failed!"
@@ -747,7 +747,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
         dst_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
         move_models_res(current_folder, dst_folder)
 
-        display_ci_logs(log_file, "perf", model_name, False)
+        # display_ci_logs(log_file, "perf", model_name, False)
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
         logger.warning(f"Skip perf testcase {model_name} on CI ISIM.")
@@ -852,7 +852,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
             error_msg = f"Performance {max_qps} degradation exceeds 5%, benchmark qps is {benchmark}."
             logger.error(error_msg)
 
-    display_ci_logs(log_file, "perf", model_name, final_flag)
+    # display_ci_logs(log_file, "perf", model_name, final_flag)
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
     assert final_flag is True, f"HmATC Perf Test Failed! {error_msg}"
@@ -891,7 +891,7 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
         dst_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
         move_models_res(current_folder, dst_folder)
 
-        display_ci_logs(log_file, "eval", model_name, False)
+        # display_ci_logs(log_file, "eval", model_name, False)
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
         logger.warning(f"Skip perf testcase {model_name} on CI ISIM.")
@@ -939,7 +939,7 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
                 hm_perf_vals[perf_name].append(eval_res[perf_name])
 
     if final_flag is False:
-        display_ci_logs(log_file, "eval", model_name, final_flag)
+        # display_ci_logs(log_file, "eval", model_name, final_flag)
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
     assert final_flag is True, "HmATC Eval Test Failed!"
@@ -961,7 +961,7 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
             )
             logger.warning(f"remove folder: {os.getcwd()}.")
             shutil.rmtree(os.getcwd())
-            display_ci_logs(log_file, "eval", model_name, final_flag)
+            # display_ci_logs(log_file, "eval", model_name, final_flag)
         assert (
             check_flag is True
         ), f"HmATC Eval Test Failed! The difference of {perf_name} exceeds {perf_th*100}%."

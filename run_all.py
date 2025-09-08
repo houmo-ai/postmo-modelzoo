@@ -256,5 +256,6 @@ if __name__ == "__main__":
     # install pytest in release docker
     os.system("pip3 install pytest")
     os.system("pip3 install pytest-xdist")
+    os.system("pip3 install pytest-dependency")
 
     main()
