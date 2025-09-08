@@ -147,7 +147,7 @@ class HmQwen:
             input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(4, self.prefill_length // 4, 5120)
             valid_length_data = np.array([valid_length]).astype("int16")
             current_length_data = np.array([current_length]).astype("int16")
-            self.prefill_model.set_input("input_1", input_data.numpy()) # 
+            self.prefill_model.set_input("input_1", input_data.numpy())
             self.prefill_model.set_input("valid_length", valid_length_data)
             self.prefill_model.set_input("current_length", current_length_data)
             self.prefill_model.run()
@@ -294,7 +294,7 @@ class HmQwenXh2:
             input_name = self.prefill.get_input_name(0)
             valid_length_name = self.prefill.get_input_name(1)
             current_length_name = self.prefill.get_input_name(2)
-            self.prefill.set_input(input_name, input_data.numpy())
+            self.prefill.set_input(input_name, input_data.to(torch.float16).numpy())
             self.prefill.set_input(valid_length_name, valid_length_data)
             self.prefill.set_input(current_length_name, current_length_data)
             self.prefill.run()
@@ -327,7 +327,7 @@ class HmQwenXh2:
 
             input_name = self.decode.get_input_name(0)
             valid_length_name = self.decode.get_input_name(1)
-            self.decode.set_input(input_name, input_data.numpy())
+            self.decode.set_input(input_name, input_data.to(torch.float16).numpy())
             valid_length_data = np.array(context_length).astype("int32")
             self.decode.set_input(valid_length_name, valid_length_data)
             self.decode.run()
