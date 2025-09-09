@@ -33,7 +33,9 @@ def set_logger(op, log_dir, filename):
     logger.addHandler(file_handler)
 
 
-def run_benchmark(models, target, hmquant_version, hmcc_version, enbale_static=False):
+def run_benchmark(
+    models, target, hmquant_version, hmcc_version, device_id=0, enbale_static=False
+):
     header = [
         "ModelName",
         "Shape",
@@ -104,33 +106,36 @@ def run_benchmark(models, target, hmquant_version, hmcc_version, enbale_static=F
             if os.path.exists(cfg_path):
                 cfg_ok = True
                 cfg = read_yaml_to_dict(cfg_path)
-                check_cfg(cfg)
-                cfg["target"] = target
-                cfg["build"]["ncore"] = ncore
-                cfg["build"]["batch"] = batch
-                if enbale_static:
-                    inputs_cfg = cfg["model"]["inputs"]
-                    if len(inputs_cfg) > 1:
-                        continue
-                    input_name = list(inputs_cfg.keys())[0]
-                    input_cfg = inputs_cfg[input_name]
-                    resizer_cfg = input_cfg.get("resizer")
-                    if resizer_cfg is None:
-                        continue
-                    if resizer_cfg.get("enable_static_resizer", False):
-                        continue
-                    cfg["model"]["inputs"][input_name]["resizer"][
-                        "enable_static_resizer"
-                    ] = True
-                logger.info(f"\n{json.dumps(cfg, indent=2, sort_keys=False)}")
-                if target == "xh1":
-                    from .exec.xh1_exec import Xh1Exec
+                if not check_cfg(cfg):
+                    logger.error(f"{cfg_path} is not valid")
+                    cfg_ok = False
+                if cfg_ok:
+                    cfg["target"] = target
+                    cfg["build"]["ncore"] = ncore
+                    cfg["build"]["batch"] = batch
+                    if enbale_static:
+                        inputs_cfg = cfg["model"]["inputs"]
+                        if len(inputs_cfg) > 1:
+                            continue
+                        input_name = list(inputs_cfg.keys())[0]
+                        input_cfg = inputs_cfg[input_name]
+                        resizer_cfg = input_cfg.get("resizer")
+                        if resizer_cfg is None:
+                            continue
+                        if resizer_cfg.get("enable_static_resizer", False):
+                            continue
+                        cfg["model"]["inputs"][input_name]["resizer"][
+                            "enable_static_resizer"
+                        ] = True
+                    logger.info(f"\n{json.dumps(cfg, indent=2, sort_keys=False)}")
+                    if target == "xh1":
+                        from .exec.xh1_exec import Xh1Exec
 
-                    hm_exec = Xh1Exec(cfg)
-                elif target == "xh2":
-                    from .exec.xh2_exec import Xh2Exec
+                        hm_exec = Xh1Exec(cfg)
+                    elif target == "xh2":
+                        from .exec.xh2_exec import Xh2Exec
 
-                    hm_exec = Xh2Exec(cfg)
+                        hm_exec = Xh2Exec(cfg)
             else:
                 logger.error(f"{cfg_path} not exists")
         resizer_mode = hm_exec.resizer_mode
@@ -168,9 +173,8 @@ def run_benchmark(models, target, hmquant_version, hmcc_version, enbale_static=F
                 warmup = 10
                 sample = 1000
                 loop_num = 1
-                device = 1
                 perf_info = hm_exec.model_perf(
-                    hm_exec.hmm_path, warmup, sample, loop_num, device, thread_num
+                    hm_exec.hmm_path, warmup, sample, loop_num, device_id, thread_num
                 )
                 perf_info = list(perf_info["perf"].values())[0]["perf_info"]
                 ave_latency = f"{perf_info['avg_cost']:.3f}"
@@ -196,7 +200,7 @@ def run_benchmark(models, target, hmquant_version, hmcc_version, enbale_static=F
         if build_ok and enable_eval:
             try:
                 shutil.rmtree(f"results_{target}", ignore_errors=True)
-                chip_info = hm_exec.evaluate(backend=target)
+                chip_info = hm_exec.evaluate(backend=target, device_id=device_id)
                 if not chip_info:
                     logger.error(f"{target} eval failed: {model_name}")
             except Exception as e:
@@ -261,6 +265,7 @@ def main():
     parent_target = argparse.ArgumentParser(add_help=False)
     parent_onnx = argparse.ArgumentParser(add_help=False)
     parent_result_path = argparse.ArgumentParser(add_help=False)
+    parent_device_id = argparse.ArgumentParser(add_help=False)
     parent_config.add_argument(
         "--config", "-c", type=str, required=True, help="config file path"
     )
@@ -282,6 +287,13 @@ def main():
         required=False,
         default="result.yml",
         help="Specify a result path",
+    )
+    parent_device_id.add_argument(
+        "--device_id",
+        type=int,
+        required=False,
+        default=0,
+        help="Specify a device",
     )
     # 主解析器
     parser = argparse.ArgumentParser(description="HouMo Model Assist Tool")
@@ -319,7 +331,13 @@ def main():
     # build
     build_parser = subparsers.add_parser(
         "build",
-        parents=[parent_config, parent_target, parent_result_path, model_cfg_parent],
+        parents=[
+            parent_config,
+            parent_target,
+            parent_result_path,
+            model_cfg_parent,
+            parent_device_id,
+        ],
         help="Build a model",
     )
 
@@ -339,7 +357,7 @@ def main():
     # perf
     perf_parser = subparsers.add_parser(
         "perf",
-        parents=[parent_target, parent_result_path, model_cfg_parent],
+        parents=[parent_target, parent_result_path, model_cfg_parent, parent_device_id],
         help="Test model performance",
     )
     exclusive_group = perf_parser.add_mutually_exclusive_group(required=True)
@@ -369,14 +387,14 @@ def main():
         default=1,
         help="Specify thread num",
     )
-    perf_parser.add_argument(
-        "--device",
-        "-dn",
-        type=int,
-        required=False,
-        default=1,
-        help="Specify device num",
-    )
+    # perf_parser.add_argument(
+    #     "--device",
+    #     "-dn",
+    #     type=int,
+    #     required=False,
+    #     default=1,
+    #     help="Specify device num",
+    # )
     # demo
     demo_parser = subparsers.add_parser(
         "demo",
@@ -386,6 +404,7 @@ def main():
             parent_onnx,
             parent_result_path,
             model_cfg_parent,
+            parent_device_id,
         ],
         help="Run model demo",
     )
@@ -398,13 +417,14 @@ def main():
             parent_onnx,
             parent_result_path,
             model_cfg_parent,
+            parent_device_id,
         ],
         help="Run model evaluate",
     )
     # benchmark
     benchmark_parser = subparsers.add_parser(
         "benchmark",
-        parents=[parent_config, parent_target, parent_result_path],
+        parents=[parent_config, parent_target, parent_result_path, parent_device_id],
         help="Run model benchmark",
     )
 
@@ -441,9 +461,16 @@ def main():
                 f"benchmark_{args.target}_v{hmquant_version}_v{hmcc_version}_{t}.csv",
             )
         )
-        table = run_benchmark(models, args.target, hmquant_version, hmcc_version)
+        table = run_benchmark(
+            models, args.target, hmquant_version, hmcc_version, args.device_id
+        )
         table_static = run_benchmark(
-            models, args.target, hmquant_version, hmcc_version, enbale_static=True
+            models,
+            args.target,
+            hmquant_version,
+            hmcc_version,
+            args.device_id,
+            enbale_static=True,
         )
         combined_table = PrettyTable()
         combined_table.title = table.title
@@ -473,7 +500,7 @@ def main():
             args.warmup,
             args.sample,
             args.loop_num,
-            args.device,
+            args.device_id,
             args.thread,
         )
         if "perf" in res_info:
@@ -489,7 +516,9 @@ def main():
         logger.error("Config file not found")
         exit(1)
     cfg = read_yaml_to_dict(cfg_path)
-    check_cfg(cfg)
+    if not check_cfg(cfg):
+        logger.error("Config file error")
+        exit(-1)
 
     # 命令行参数更新至配置文件
     cfg["target"] = target
@@ -543,7 +572,7 @@ def main():
     elif current_command == "build":
         new_res_info = hm_exec.build()
         logger.info(f"Build {hm_exec.model_name} done.")
-        new_res_info["build"].update(hm_exec.check_golden())
+        new_res_info["build"].update(hm_exec.check_golden(args.device_id))
     elif current_command == "compare":
         data_path = args.data_path
         if not os.path.exists(data_path):
@@ -562,13 +591,13 @@ def main():
             args.warmup,
             args.sample,
             args.loop_num,
-            args.device,
+            args.device_id,
             args.thread,
         )
     elif current_command == "demo":
-        hm_exec.demo(backend=backend)
+        hm_exec.demo(backend=backend, device_id=args.device_id)
     elif current_command == "eval":
-        hm_exec.evaluate(backend=backend)
+        hm_exec.evaluate(backend=backend, device_id=args.device_id)
     else:
         raise NotImplementedError
 

@@ -1,5 +1,6 @@
 import abc
 
+
 class BaseInfer(object, metaclass=abc.ABCMeta):
     def __init__(self, **kwargs):
         self.time_span = 0
@@ -9,7 +10,7 @@ class BaseInfer(object, metaclass=abc.ABCMeta):
         self.device = "cpu"
 
     @abc.abstractmethod
-    def load(self, model_path):
+    def load(self, model_path, device_id=0):
         raise NotImplementedError
 
     @abc.abstractmethod

@@ -58,14 +58,14 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             logger.error(f"Not support backend: {self.backend}")
             exit(-1)
 
-    def load(self, model_path: str):
+    def load(self, model_path: str, device_id=0):
         """模型加载"""
         model_name = os.path.basename(model_path)
         _, ext = os.path.splitext(model_name)
         if ext != self.engine.model_ext:
             logger.error(f"{model_name} is not {self.engine.model_ext}")
             exit(-1)
-        self.engine.load(model_path)
+        self.engine.load(model_path, device_id=device_id)
 
     def preprocess(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         """模型前处理"""

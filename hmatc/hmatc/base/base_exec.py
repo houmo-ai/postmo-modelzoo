@@ -229,7 +229,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         logger.info(f"from {dataset_module} import {dataset_cls} successfully")
         return Dataset(root_path=data_dir)
 
-    def demo(self, backend):
+    def demo(self, backend, device_id=0):
         """Demo入口"""
         if not self.demo_cfg:
             logger.error("demo config not found")
@@ -268,11 +268,11 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 continue
             filepaths.append(filepath)
         model_path = self.model_path if backend == "onnx" else self.hmm_path
-        model.load(model_path)
+        model.load(model_path, device_id)
         model.demo(filepaths)
         model.unload()
 
-    def evaluate(self, backend):
+    def evaluate(self, backend, device_id=0):
         """评估入口"""
         if not self.eval_cfg:
             logger.error("eval config not found")
@@ -306,7 +306,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             logger.error("Failed to get model")
             return {}
         model_path = self.model_path if backend == "onnx" else self.hmm_path
-        model.load(model_path)
+        model.load(model_path, device_id)
         res = model.evaluate(dataset, num)
         model.unload()
         logger.info(f"{res}")
@@ -314,13 +314,13 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
     @staticmethod
     def model_perf(
-        model_path, warmup_num, sample_num, loop_num=1, device_num=1, thread_num=1
+        model_path, warmup_num, sample_num, loop_num=1, device_id=1, thread_num=1
     ):
         from ..python import perf
 
         # TODO 使用golden数据
         perf_info = perf.CModelRunner(
-            model_path, sample_num, thread_num, device_num, loop_num, warmup_num
+            model_path, sample_num, thread_num, device_id, loop_num, warmup_num
         )
         t_start = datetime.now().strftime("%Y%m%d%H%M%S")
         res_info = {
@@ -329,7 +329,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                     "params": {
                         "hmm_path": model_path,
                         "thread_num": thread_num,
-                        "device_num": device_num,
+                        "device_num": device_id,
                         "loop_num": loop_num,
                         "warmup_num": warmup_num,
                         "sample_num": sample_num,

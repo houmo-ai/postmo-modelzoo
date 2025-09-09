@@ -500,9 +500,9 @@ class Xh1Exec(BaseExec):
             logger.info(f"Compressing hmmodel done.")
         return res_info
 
-    def check_golden(self):
+    def check_golden(self, device_id=0):
         xh1 = Xh1Infer()
-        xh1.load(self.hmm_path)
+        xh1.load(self.hmm_path, device_id=device_id)
         in_datas = dict()
         for input_name in self.inputs_cfg:
             new_input_name = input_name.replace("/", "_")

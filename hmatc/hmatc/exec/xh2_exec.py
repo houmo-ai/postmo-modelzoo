@@ -198,9 +198,9 @@ class Xh2Exec(BaseExec):
         res_info = {"build": {"time": span}}
         return res_info
 
-    def check_golden(self):
+    def check_golden(self, device_id=0):
         xh2 = Xh2Infer()
-        xh2.load(self.hmm_path)
+        xh2.load(self.hmm_path, device_id=device_id)
         in_datas = dict()
         for input_name in self.inputs_cfg:
             new_name = input_name.replace("/", "_")

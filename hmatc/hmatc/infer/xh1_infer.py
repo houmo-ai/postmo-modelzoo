@@ -17,13 +17,18 @@ class Xh1Infer(BaseInfer, ABC):
         self.inputs_info = dict()
         self.inputs_batch = dict()
 
-    def load(self, model_path):
+    def load(self, model_path, device_id=0):
         if not os.path.exists(model_path):
             logger.error(f"model path: {model_path} not exists.")
             exit(-1)
+        if device_id >= tcim_lite.runtime.get_device_num():
+            logger.error(f"device_id: {device_id} out of range")
+            exit(-1)
         logger.info(f"load model from {model_path}")
-        self.engine = tcim_lite.runtime.load(model_path)
-        logger.info("load xh1 model successfully.")
+        wm = tcim_lite.runtime.WeightManager(device_id)
+        option = tcim_lite.runtime.Option(wm)
+        self.engine = tcim_lite.runtime.load(model_path, option=option)
+        logger.info(f"load {self.backend} model successfully.")
         # 获取模型输入输出信息
         input_num = self.engine.get_num_inputs()
         for idx in range(input_num):
@@ -33,8 +38,14 @@ class Xh1Infer(BaseInfer, ABC):
             dtype = np.dtype(input_info.dtype).name
             fmt = input_info.format.name
             self.inputs_info[input_name] = input_info
-            self.inputs_batch[input_name] = 1 if input_name.startswith("resizer_crop_") and len(shape) == 1 else shape[0]
-            logger.info(f"[{self.backend}] input[{input_name}] shape = {shape}, dtype = {dtype}, format = {fmt}")
+            self.inputs_batch[input_name] = (
+                1
+                if input_name.startswith("resizer_crop_") and len(shape) == 1
+                else shape[0]
+            )
+            logger.info(
+                f"[{self.backend}] input[{input_name}] shape = {shape}, dtype = {dtype}, format = {fmt}"
+            )
         output_num = self.engine.get_num_outputs()
         for idx in range(output_num):
             output_name = self.engine.get_output_name(idx)
@@ -42,8 +53,10 @@ class Xh1Infer(BaseInfer, ABC):
             shape = list(output_info.shape)
             dtype = np.dtype(output_info.dtype).name
             fmt = output_info.format.name
-            logger.info(f"[{self.backend}] output[{output_name}] shape = {shape}, dtype = {dtype}, format = {fmt}")
-            
+            logger.info(
+                f"[{self.backend}] output[{output_name}] shape = {shape}, dtype = {dtype}, format = {fmt}"
+            )
+
     def run(self, in_datas: dict):
         # set input
         for input_name in in_datas:
@@ -67,7 +80,7 @@ class Xh1Infer(BaseInfer, ABC):
 
     def unload(self):
         pass
-    
+
     def quantize(self, input_name: str, in_data: np.ndarray) -> np.ndarray:
         # 若是非图像输入，需要对输入数据进行量化
         input_info = self.inputs_info[input_name]
@@ -76,12 +89,13 @@ class Xh1Infer(BaseInfer, ABC):
         in_tensor = tcim_lite.runtime.Tensor(input_info).to_host(to_contiguous=True)
         in_tensor_dequanted.cast_to(in_tensor)
         return in_tensor.numpy()
-    
+
     def dequantize(self, output_name: str, out_data: np.ndarray) -> np.ndarray:
         output_info = self.engine.get_output_info(output_name)
         output_info_dequanted = output_info.astype(np.float32)
         out_tensor_quanted = tcim_lite.runtime.Tensor(output_info, out_data)
-        out_tensor = tcim_lite.runtime.Tensor(output_info_dequanted).to_host(to_contiguous=True)
+        out_tensor = tcim_lite.runtime.Tensor(output_info_dequanted).to_host(
+            to_contiguous=True
+        )
         out_tensor_quanted.cast_to(out_tensor)
         return out_tensor.numpy()
-        

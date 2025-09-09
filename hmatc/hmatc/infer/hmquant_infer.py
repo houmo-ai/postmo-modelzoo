@@ -17,7 +17,7 @@ class HmQuantInfer(BaseInfer, ABC):
         self.device = "cpu"
         logger.info(f"Using device: {self.device}")
 
-    def load(self, model_path):
+    def load(self, model_path, device_id=0):
         if not os.path.exists(model_path):
             logger.error(f"model path: {model_path} not exists.")
             exit(-1)

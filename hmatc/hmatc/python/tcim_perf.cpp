@@ -261,14 +261,16 @@ perfInfo_t ModelRunner(
     const std::string &model_path,
     int sample_num,
     int thread_num,
-    int device_num,
+    int device_id,
     int loop_num,
     int warm_up) {
 
+    int device_num = 1;
     if (auto platform = std::getenv("HDPL_PLATFORM")) {
         if (strcmp(platform, "ASIC")) {
             thread_num = 1;
             device_num = 1;
+            device_id = 0;
         }
     }
 
@@ -277,8 +279,14 @@ perfInfo_t ModelRunner(
     std::cout << "loops: " << loop_num << std::endl;
     std::cout << "warmup: " << warm_up << std::endl;
     std::cout << "threads: " << thread_num << std::endl;
-    std::cout << "devices: " << device_num << std::endl;
+    // std::cout << "devices: " << device_num << std::endl;
+    std::cout << "device_id: " << device_id << std::endl;
 
+    if (device_id >= tcim::GetDeviceNum()) {
+        std::cout << COLOR_RED << "[error] device_id >= device_num" << COLOR_RESET
+                  << std::endl;
+        exit(-1);
+    }
     if (sample_num < thread_num) {
         std::cout
             << COLOR_YELLOW
@@ -513,22 +521,24 @@ perfInfo_t ModelRunner(
     StreamInfo stream_info;
     stream_info.counts.resize(4);
     stream_info.streams.resize(4);
-    for (int did = 0; did < device_num; did++) {
-        auto weight_manager = tcim::Module::WeightManager::CreateWeightManager(did);
-        for (int tid = 0; tid < thread_num; tid++) {
-            ThreadInfo *info = &thread_info[did * thread_num + tid];
-            info->model_path = model_path;
-            info->weight_manager = weight_manager;
-            info->loop_num = loop_num;
-            info->infer_only = true;
-            info->is_result_check = false;
-            info->warm_up = warm_up;
-            int id = did * thread_num + tid;
-            threads.push_back(std::thread(thread_func, id, did, std::ref(*info),
-                                          std::ref(stream_info), std::ref(qin),
-                                          std::ref(qout), std::ref(barrier)));
-        }
+    // for (int did = 0; did < device_num; did++) {
+    int did = device_id;
+    auto weight_manager = tcim::Module::WeightManager::CreateWeightManager(did);
+    for (int tid = 0; tid < thread_num; tid++) {
+        // ThreadInfo *info = &thread_info[did * thread_num + tid];
+        ThreadInfo *info = &thread_info[tid];
+        info->model_path = model_path;
+        info->weight_manager = weight_manager;
+        info->loop_num = loop_num;
+        info->infer_only = true;
+        info->is_result_check = false;
+        info->warm_up = warm_up;
+        // int idx = did * thread_num + tid;
+        threads.push_back(std::thread(thread_func, tid, did, std::ref(*info),
+                                      std::ref(stream_info), std::ref(qin),
+                                      std::ref(qout), std::ref(barrier)));
     }
+    // }
     barrier.wait();
     barrier.reset();
     auto start = GET_TIME();

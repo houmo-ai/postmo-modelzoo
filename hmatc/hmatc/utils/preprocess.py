@@ -219,11 +219,12 @@ def xh1_preprocess(
     _, nc, nh, nw = im.shape
     max_height, max_width = max_input_size
     if nh > max_height or nw > max_width:
-        # 等比例缩放至最大输入内
-        padding_size, size, _ = calc_padding_size(
-            (nh, nw), (max_width, max_height), padding_mode=0
-        )
-        nh, nw = size
+        nh, nw = H, W
+        if resize_type == 1:
+            padding_size, size, _ = calc_padding_size(
+                (nh, nw), (max_width, max_height), padding_mode=0
+            )
+            nh, nw = size
         im = torch.nn.functional.interpolate(
             torch.from_numpy(im), size=(nh, nw), mode="bilinear", align_corners=False
         )
