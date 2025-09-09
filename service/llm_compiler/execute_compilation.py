@@ -85,8 +85,8 @@ def main(args) -> int:
         args.model_path,
         args.quant_model_path,
         args.context_length,
-        args.device_num,
         args.batch,
+        args.device_num,
         args.core_num,
         args.result_dir,
     )
@@ -107,18 +107,17 @@ def main(args) -> int:
         args.quant_model_path,
         "--model_name",
         args.model_name,
+        "--context_length",
+        str(args.context_length),
         "--batch",
         str(args.batch),
         "--ncore",
         str(args.core_num),
+        "--ndevice",
+        str(args.device_num),
         "--output_dir",
         output_dir,
     ]
-
-    if args.device_num:
-        cmds += ["--ndevice", str(args.device_num)]
-    if args.context_length:
-        cmds += ["--context_length", str(args.context_length)]
 
     ret = execute_cmd(cmds, args.log_file)
 

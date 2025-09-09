@@ -66,6 +66,21 @@ def get_args() -> argparse.Namespace:
         help="core number",
     )
     parser.add_argument(
+        "--context_length",
+        dest="context_length",
+        type=int,
+        default=None,
+        help="context_length",
+    )
+    parser.add_argument(
+        "--ndevice",
+        dest="ndevice",
+        type=int,
+        default=None,
+        choices=[1, 2],
+        help="device number",
+    )
+    parser.add_argument(
         "--stage",
         dest="stage",
         type=str,
@@ -83,11 +98,32 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
+def build(
+    model_name,
+    model_dir,
+    model_path,
+    output_dir,
+    profile,
+    ncore,
+    ndevice,
+    context_length,
+    batch=None,
+):
     import tcim
 
+    kwargs = {}
+    if HOUMO_TARGET == "xh2":
+        kwargs["modify_llm"] = {}
+        # kwargs["enable_xh2_stable_output"] = True
+        if ndevice:
+            kwargs["ndevice"] = ndevice
+        if batch:
+            kwargs["modify_llm"]["batch"] = batch
+        if context_length:
+            kwargs["modify_llm"]["context-length"] = context_length
+
     start = time.time()
-    print(f"\n===> {model_name} build start...")
+    print(f"\n===> {model_name} build start...\n kwargs: {kwargs}")
     decode_model = os.path.join(model_dir, model_path)
     tcim.build_from_hmonnx(
         decode_model,
@@ -98,6 +134,7 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim"),
         llm_opt=True,
+        **kwargs,
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
@@ -210,6 +247,8 @@ if __name__ == "__main__":
     output_dir = args.output_dir
     ncore = args.ncore
     batch = args.batch
+    ndevice = args.ndevice
+    context_length = args.context_length
     profile = {}
 
     # build model
@@ -221,9 +260,28 @@ if __name__ == "__main__":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
         model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
-        build("deepseek_prefill", model_dir, model_path, output_dir, profile, ncore)
+        build(
+            "deepseek_prefill",
+            model_dir,
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+            ndevice,
+            context_length,
+        )
         model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
-        build("deepseek_decode", model_dir, model_path, output_dir, profile, ncore)
+        build(
+            "deepseek_decode",
+            model_dir,
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+            ndevice,
+            context_length,
+            batch,
+        )
 
     # test model
     if args.stage == "test" or args.stage == "all":

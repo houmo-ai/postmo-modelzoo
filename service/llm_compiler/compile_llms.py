@@ -125,24 +125,45 @@ def _check_file(file_path):
 def _get_jfrog_info(jfrog_url, model_name):
     import requests
 
-    url_suffix = jfrog_url.split(f"{model_name}/")[-1]
-    jfrog_base, jfrog_tail = MODELZOO_URL.split("artifactory/")
+    jfrog_base, jfrog_tail = jfrog_url.split("artifactory/")
+    logger.info(f"_get_jfrog_info, jfrog_base: {jfrog_base}, jfrog_tail:{jfrog_tail}")
     jfrog_base = jfrog_base + "artifactory"
-    file_info_path = f"{jfrog_base}/api/storage/{jfrog_tail}/{model_name}/{url_suffix}"
+    file_info_path = f"{jfrog_base}/api/storage/{jfrog_tail}"
     response = requests.get(file_info_path)
+    logger.info(
+        f"_get_jfrog_info, ret: {response.status_code}, file_info_path:{file_info_path}"
+    )
     if response.status_code == 200:
         return True
 
     return False
 
 
-def _check_quant_model(quant_model_url, target, quant_model, model_name):
-    import sys
-    import glob
-    from utils import get_file_from_jfrog
+def _check_model_source(quant_model_path):
+    # 如果需要额外处理Jfrog上的量化压缩包，在此处增加类型判断
+    if "http" in quant_model_path:
+        return "jfrog"
+    return "local"
 
-    sys.path.append(f"{script_dir}/../../apis/common/python")
-    get_file_from_jfrog(quant_model_url, quant_model, quant_model)
+
+def _check_quant_model(quant_model_path, target, quant_model, model_name):
+    import glob
+
+    quant_model_src = _check_model_source(quant_model_path)
+    extract_dir = (
+        quant_model if quant_model_src == "jfrog" else f"{quant_model}/original_folder"
+    )
+    if quant_model_src in ["jfrog"]:
+        # quant model path is Jfrog url
+        import sys
+
+        sys.path.append(f"{script_dir}/../../apis/common/python")
+        from utils import get_file_from_jfrog
+
+        get_file_from_jfrog(quant_model_path, quant_model, extract_dir)
+
+        if os.path.exists(f"{extract_dir}/hmquant"):
+            quant_model = os.path.join(extract_dir, "hmquant")
 
     # folders
     decoder_dir = os.path.join(quant_model, "decoder")
@@ -157,17 +178,17 @@ def _check_quant_model(quant_model_url, target, quant_model, model_name):
         weight_file = os.path.join(quant_model, "weight.npy")
         file_list.append(weight_file)
     if all(_check_folder(ele) for ele in folder_list) is False:
-        return False
+        return None
     if all(_check_file(ele) for ele in file_list) is False:
-        return False
+        return None
     if target == "xh2":
-        decoder_external = list(glob.glob(decoder_dir + "/*_decoder_external_data"))
+        decoder_external = list(glob.glob(decoder_dir + "/*_external_data"))
         prefill_external = list(glob.glob(prefill_dir + "/*_prefill_external_data"))
         if len(decoder_external) == 0 or len(prefill_external) == 0:
             logger.error("Missing external data.")
-            return False
+            return None
 
-    return True
+    return quant_model
 
 
 def _check_args(args: dict):
@@ -180,6 +201,7 @@ def _check_args(args: dict):
 
     if (
         args.quant_model_path
+        and "http" in args.quant_model_path
         and _get_jfrog_info(args.quant_model_path, args.model_name) is False
     ):
         logger.error(f"Invalid quant model path {args.quant_model_path}")
@@ -285,18 +307,12 @@ class DockerExecutor:
         self.logger.setLevel(logging.INFO)
 
     def pull_image(self) -> None:
+        self.logger.info(f"Pulling docker image: {self.image}")
         try:
-            self.client.images.get(self.image)
-            self.logger.info(f"Use local docker image: {self.image}")
-        except docker.errors.ImageNotFound:
-            self.logger.info(f"Pulling docker image: {self.image}")
-            try:
-                self.client.images.pull(self.image)
-                self.logger.info(f"Pull image {self.image} successed.")
-            except Exception as e:
-                raise Exception(
-                    f"Failed to pull image, please check image name: {str(e)}"
-                )
+            self.client.images.pull(self.image)
+            self.logger.info(f"Pull image {self.image} successed.")
+        except Exception as e:
+            raise Exception(f"Failed to pull image, please check image name: {str(e)}")
 
     def start_container(
         self,
@@ -306,7 +322,10 @@ class DockerExecutor:
     ) -> None:
         self.logger.info(f"Start container: {self.container_name}")
 
-        default_volumes = {}
+        default_volumes = {
+            "/etc/timezone": {"bind": "/etc/timezone", "mode": "ro"},  # 只读模式
+            "/etc/localtime": {"bind": "/etc/localtime", "mode": "ro"},  # 只读模式
+        }
         if volumes:
             default_volumes.update(volumes)
 
@@ -650,6 +669,12 @@ if __name__ == "__main__":
     with open("./supported_models.json", 'r', encoding='utf-8') as md_file:
         model_info = json.load(md_file)
     try:
+        if model_name not in model_info:
+            logger.error(f"Unsupport model {model_name}.")
+            exit(2)
+        if model_size not in model_info[model_name]:
+            logger.error(f"Unsupport model size {model_name} {model_size}.")
+            exit(2)
         if target not in model_info[model_name][model_size]["support_backends"]:
             logger.error(f"{model_name} {model_size} does not support {target}.")
             exit(2)
@@ -666,26 +691,30 @@ if __name__ == "__main__":
     host_result_dir += f"/{container_name}"
     os.makedirs(host_result_dir, exist_ok=True)
 
-    host_quant_model = f"{host_result_dir}/quant_results"
+    host_quant_model = (
+        f"{host_result_dir}/quant_results"
+        if "http" in quant_model_path
+        else quant_model_path
+    )
     quant_flag = True if not quant_model_path else False
-    if os.path.exists(os.path.join(host_quant_model, "hmquant")):
-        host_quant_model = os.path.join(host_quant_model, "hmquant")
-    if (
-        quant_flag is False
-        and _check_quant_model(quant_model_path, target, host_quant_model, model_name)
-        is False
-    ):
-        logger.error(
-            f"Invalid quant file {quant_model_path}, please check file content."
+    if quant_flag is False:
+        host_quant_model = _check_quant_model(
+            quant_model_path, target, host_quant_model, model_name
         )
-        exit(3)
+        if host_quant_model is None:
+            logger.error(
+                f"Invalid quant file {quant_model_path}, please check file content."
+            )
+            exit(3)
 
     ###### Docker Executor ######
     # The folder that stores the original model structure and weights (10.64.35.39)
     host_model_zoo = "/data/gexinyu_workspace/modelzoo"
     # construct docker image name
     system = "ubuntu20.04" if target == "xh1" else "ubuntu24.04"
-    image_name = f"harbor.houmo.ai/toolchain/release:Dadao-{target}-v{version}-{system}-x86.64.latest"
+    image_name = (
+        f"harbor.houmo.ai/toolchain/release:Dadao-{target}-v{version}-{system}-x86.64"
+    )
     # set container configs
     container_home = "/hmdd/compiler"
     container_result_dir = f"{container_home}/results"
@@ -697,17 +726,17 @@ if __name__ == "__main__":
         container_quant_res = f"{container_result_dir}/quant_results"
         quant_cmd = f"python3 execute_quantization.py -t {target} -m {model_dir} -n {model_name} -raw {raw_model_path} -b {batch} -pl {prefill_len} -cl {context_len} -r {container_quant_res} -log {container_log_file}"
         commands.append(
-            f"cd /hmdd/compiler/imodelzoo/tools/llm_compiler && {quant_cmd}"
+            f"cd /hmdd/compiler/imodelzoo/service/llm_compiler && {quant_cmd}"
         )
         quant_model = f"{container_quant_res}/hmquant"
     else:
         quant_model = f"{container_home}/quant_model"
     # compile command
     container_compile_res = f"{container_result_dir}/compile_results"
-    compile_cmd = f"python3 execute_compilation.py -n {model_name} -m {model_dir} -qm {quant_model} -b {batch} -cn {core_num} -r {container_compile_res} -log {container_log_file}"
-    if "deepseek" not in model_name:
-        compile_cmd += f" -cl {context_len} -dn {device_num}"
-    commands.append(f"cd /hmdd/compiler/imodelzoo/tools/llm_compiler && {compile_cmd}")
+    compile_cmd = f"python3 execute_compilation.py -n {model_name} -m {model_dir} -qm {quant_model} -cl {context_len} -dn {device_num} -b {batch} -cn {core_num} -r {container_compile_res} -log {container_log_file}"
+    commands.append(
+        f"cd /hmdd/compiler/imodelzoo/service/llm_compiler && {compile_cmd}"
+    )
 
     # create a docker executor
     docker_exec = DockerExecutor(
@@ -715,7 +744,7 @@ if __name__ == "__main__":
         container_name=container_name,
         host_log_path=host_log_file,
         container_workdir=container_home,
-        keep_container=True,
+        keep_container=False,
     )
     docker_flag = True
     try:
@@ -766,10 +795,13 @@ if __name__ == "__main__":
     finally:
         docker_exec.stop_and_remove_container()
 
-    jfrog_path_quant = args.quant_model_path
+    jfrog_path_quant = (
+        args.quant_model_path if "http" in args.quant_model_path else None
+    )
+    md5sum_quant = None
     if docker_flag and args.upload is True:
         current_dt = datetime.now()
-        current_ts = str(current_dt.timestamp())
+        current_ts = current_dt.strftime("%Y%m%d_%H%M%S")
         today = current_dt.strftime("%Y%m%d")
         context_str = str(int(context_len / 1024)) + "k"
         if quant_flag:
@@ -784,7 +816,7 @@ if __name__ == "__main__":
                 model_name,
                 host_log_file,
             )
-        else:
+        elif jfrog_path_quant:
             compressed_quant_file = (
                 f"{host_result_dir}/quant_results/"
                 + quant_model_path.rsplit("/", 1)[-1]
