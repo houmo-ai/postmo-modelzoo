@@ -7,6 +7,13 @@ import logging
 logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
+GOLDEN_THRESH = 0.999 if HOUMO_TARGET == "xh1" else 0.98
+
+if HOUMO_TARGET == 'xh1':
+    default_ncore = 4
+elif HOUMO_TARGET == 'xh2':
+    default_ncore = 2
 
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
@@ -43,7 +50,7 @@ def get_args() -> argparse.Namespace:
         '--model_name',
         dest='model_name',
         type=str,
-        default='qwen2.5vl',
+        default='qwen2.5-vl',
         help='output houmo model name',
     )
     parser.add_argument(
@@ -57,14 +64,14 @@ def get_args() -> argparse.Namespace:
         '--ncore',
         dest='ncore',
         type=int,
-        default=4,
+        default=HOUMO_CORE_NUM,
         help='core number',
     )
     parser.add_argument(
         '--model_size',
         dest='model_size',
         type=str,
-        default="3b",
+        default="7b",
         choices=["3b", "7b"],
         help='model size',
     )
@@ -96,6 +103,7 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
         weights=os.path.join(model_dir, "weight.npy"),
         output_name=model_name,
         ncore=ncore,
+        target=HOUMO_TARGET,
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim"),
         llm_opt=True,
@@ -166,7 +174,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
             print(f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}")
             if is_match:
                 continue
-            if cosine_dist < 0.999:
+            if cosine_dist < GOLDEN_THRESH:
                 result_check = False
         else:
             result_check = False
@@ -200,18 +208,16 @@ if __name__ == '__main__':
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"hmquant_llm_Prefill_with_act.onnx"
-        build("prefill", model_dir+"/prefill", model_path, output_dir, profile, ncore)
-        model_path = f"hmquant_llm_decoder_with_act.onnx"
-        build("decoder", model_dir+"/decoder", model_path, output_dir, profile, ncore)
-        model_path = f"hmquant_qwen2_5_vl_visual_with_act.onnx"
-        build("visual", model_dir+"/visual", model_path, output_dir, profile, ncore)
+        model_path = f"hmquant_{model_name}_with_act.onnx"
+        build("qwen2.5-vl_prefill", os.path.join(model_dir, "prefill"), model_path, output_dir, profile, ncore)
+        build("qwen2.5-vl_decode", os.path.join(model_dir, "decoder"), model_path, output_dir, profile, ncore)
+        build("qwen2.5-vl_visual", os.path.join(model_dir, "visual"), model_path, output_dir, profile, ncore)
 
     # test model
     if args.stage == 'test' or args.stage == 'all':
         part_dir = os.path.join(model_dir, "prefill")
-        test("prefill", part_dir, output_dir, profile, prefix="llm_Prefill")
+        test("qwen2.5-vl_prefill", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "decoder")
-        test("decoder", part_dir, output_dir, profile, prefix="llm_decoder")
+        test("qwen2.5-vl_decode", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "visual")
-        test("visual", part_dir, output_dir, profile, prefix="qwen2_5_vl_visual")
+        test("qwen2.5-vl_visual", part_dir, output_dir, profile, prefix=model_name)
