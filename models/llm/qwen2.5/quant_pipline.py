@@ -196,7 +196,7 @@ def export_llm(args):
             raise ValueError("Unsupported model architecture") 
         LLMConverter.from_pretrained(hf_model_path, architecture, config, str(work_dir))
 
-def move_models(work_dir: Path, source: str = "prefill", model : str = "prefill", target_name: str = "hmquant_qwen3_with_act.onnx"):
+def move_models(work_dir: Path, source: str = "prefill", model : str = "prefill", target_name: str = "hmquant_qwen2.5_with_act.onnx"):
     source_dir = work_dir / "hmquant/{}".format(source)
     matched_files = list(source_dir.glob("*{}.onnx".format(model)))
     
