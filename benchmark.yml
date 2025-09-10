@@ -8,6 +8,7 @@ models:
   resnet50_b8: 
     location: models/backbone/resnet50
     batch: 8
+    eval: false
   resnet50: 
     location: models/backbone/resnet50
   mobilenetv2: 
@@ -19,16 +20,20 @@ models:
   yolov5s_b4:
     location: models/detection/yolov5s
     batch: 4
+    eval: false
   yolov3:
     location: models/detection/yolov3
   yolop: 
     location: models/autodrive/yolop
+    eval: false
   ViT-B-16: 
     location: models/backbone/ViT-B-16
   yolov8m:
     location: models/detection/yolov8m
   yolov8m-pose:
     location: models/estimation/yolov8m-pose
+  yolo12m:
+    location: models/detection/yolo12m
   yolov8m-seg:
     location: models/segmentation/yolov8m_seg
   LPRNet:

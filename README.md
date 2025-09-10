@@ -87,6 +87,7 @@ pip install -r requirements.txt
 | yolov5s              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov5s_feature      | detection     | xh1     | yes   | yes   | yes  | yes  |
 | yolov8m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolo12m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m-pose         | estimation    | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m-seg          | segmentation  | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolop                | autodrive     | xh1/xh2 | yes   | yes   | yes  | x    |
