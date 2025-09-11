@@ -163,31 +163,47 @@ def compress_to_zip(folder_path: str, output_path: str, extensions=None) -> bool
 
     # 规范化文件夹路径（去除末尾的斜杠）
     folder_path = os.path.normpath(folder_path)
-
+    cpp_suffix = ".cpp"
     try:
-        # 创建ZIP文件
+        files_to_zip = list()
+        for root, dirs, files in os.walk(folder_path):
+            relative_path = os.path.relpath(root, folder_path)
+            for file in files:
+                # 获取文件名和扩展名
+                file_name = file
+                file_ext = os.path.splitext(file_name)[1].lower()
+
+                # 检查是否符合条件
+                if extensions and file_ext not in extensions and file_ext != cpp_suffix:
+                    continue
+                tcim_flag = True if "tcim" in root.split(os.sep) else False
+                if (
+                    extensions
+                    and ".hmm" in extensions
+                    and file_ext == ".hmm"
+                    and tcim_flag
+                ):
+                    # skip tcim/*.hmm
+                    continue
+                if tcim_flag and (
+                    not file_name.endswith(cpp_suffix)
+                    or file_name.count(cpp_suffix) != 1
+                ):
+                    continue
+
+                # 源文件完整路径
+                file_path = os.path.join(root, file)
+                # 计算在zip中的相对路径（不含根目录）
+                arcname = os.path.join(relative_path, file)
+                files_to_zip.append((file_path, arcname))
+
+        if len(files_to_zip) == 0:
+            logger.warning(f"Warning: Specified type of file not found.({extensions})")
+            return False
+
         with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            file_count = 0
-            # 遍历文件夹内所有内容
-            for root, dirs, files in os.walk(folder_path):
-                for file in files:
-                    file_ext = os.path.splitext(file)[1].lower()
-                    if extensions and file_ext not in extensions:
-                        continue
-
-                    file_path = os.path.join(root, file)
-                    arcname = os.path.relpath(file_path, os.path.dirname(folder_path))
-                    zipf.write(file_path, arcname)
-                    file_count += 1
-
-            if file_count == 0:
-                logger.warning(
-                    f"Warning: Specified type of file not found.({extensions})"
-                )
-                # 移除空的zip文件
-                os.remove(output_path)
-                return False
-
+            for file_path, arcname in files_to_zip:
+                zipf.write(file_path, arcname)
         logger.info(
             f"Compresss Done, save compressed file to {os.path.abspath(output_path)}"
         )
