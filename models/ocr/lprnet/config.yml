@@ -1,0 +1,43 @@
+model: 
+  name: lprnet_24x94_2dmaxpool
+  save_dir: output
+  model_path: lprnet_24x94_2dmaxpool.onnx
+  inputs:
+    input:
+      shape: [1, 3, 24, 94]
+      data_format: BGR
+      mean: [ 127.5, 127.5, 127.5 ]
+      std: [ 127.5, 127.5, 127.5 ]
+      resize_type: 0
+      padding_model:
+      padding_values:
+      resizer: 
+        toYUV_format: YUV420SP
+        max_input_size: [24, 94]
+        enable_static_resizer: true
+        insert_pad_scatter: false
+  app_onnx_opt: 
+    optimizer: true
+    log_level: 0
+  model_impl_module: model
+  model_impl_cls: LPRNet
+quant:
+  calib_data: ./base_yolov5lprnet/rec_images/lprnet_quant_images
+  calib_num: 69
+
+build: 
+  ncore: 1
+  opt_level: 2
+  batch: 1
+  roi_num: 1
+
+demo: 
+  data_dir: ./base_yolov5lprnet/rec_images/test
+  num: 10
+
+eval:
+  data_dir: ./base_yolov5lprnet/rec_images/val
+  num: 0
+  dataset_cls: CCPD2019SubDataSet
+  dataset_module: dataset
+
