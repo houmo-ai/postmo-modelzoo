@@ -93,6 +93,46 @@ multi_input_custom_random_model:
         script: models/multi_input_custom_random_model/test.sh
   test:
     - multi_input_custom_random_model_test
+ViT-B-16:
+  include:
+    - ../models/backbone/ViT-B-16
+  exclude:
+    - ../models/backbone/ViT-B-16/README.MD
+  example_case:
+    - ViT-B-16_test:
+        script: ../models/backbone/ViT-B-16/test.sh
+  test:
+    - ViT-B-16_test
+yolo12m:
+  include:
+    - ../models/detection/yolo12m
+  exclude: 
+    - ../models/detection/yolo12m/README.MD
+  example_case:
+    - yolo12m_test:
+        script: ../models/detection/yolo12m/test.sh
+  test:
+    - yolo12m_test
+yolov8m-pose:
+  include:
+    - ../models/estimation/yolov8m-pose
+  exclude:
+    - ../models/estimation/yolov8m-pose/README.MD
+  example_case:
+    - yolov8m-pose_test:
+        script: ../models/estimation/yolov8m-pose/test.sh
+  test:
+    - yolov8m-pose_test
+yolov8m_seg:
+  include:
+    - ../models/segmentation/yolov8m_seg
+  exclude:
+    - ../models/segmentation/yolov8m_seg/README.MD
+  example_case:
+    - yolov8m_seg_test:
+        script: ../models/segmentation/yolov8m_seg/test.sh
+  test:
+    - yolov8m_seg_test
 asr_wenet:
   include:
     - models/asr/wenet
@@ -131,6 +171,17 @@ hmatc:
     - detection_yolov5s_test
     # - autodrive_yolop_test
 
+tools_computing_perf:
+  include:
+    - ../apis/tools/computing_perf
+  exclude:
+    - ../apis/tools/computing_perf/README.MD
+  example_case: 
+    - tools_computing_perf_test:
+        script: ../apis/tools/computing_perf/run.sh
+  test:
+    - tools_computing_perf_test
+
 ###### apis ######
 inferences_resnet50:
   include:
@@ -156,6 +207,16 @@ inferences_yolov5s:
         args: all
   test:
     - inferences_yolov5s_test
+inferences_yolov5s_dynamic:
+  include:
+    - ../apis/inferences/yolov5s_dynamic
+  exclude:
+    - ../apis/inferences/yolov5s_dynamic/README.MD
+  example_case:
+    - inferences_yolov5s_dynamic_test:
+        script: ../apis/inferences/yolov5s_dynamic/run.sh
+  test:
+    - inferences_yolov5s_dynamic_test
 inferences_resnet50_multistreams:
   include:
     - apis/inferences/resnet50_multistreams

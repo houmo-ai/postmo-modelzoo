@@ -483,6 +483,10 @@ if __name__ == "__main__":
     if target not in ["xh1", "xh2"]:
         raise ValueError("HOUMO_TARGET must be xh1 or xh2")
 
+    if os.getenv("HDPL_PLATFORM", "ASIC") == "ISIM":
+        print("ISIM does not support this tool.")
+        exit(0)
+
     MODEL_NAME = f"{target}_conv"
     print("#########################################")
     print("##  AI core compute performance test   ##")
@@ -508,7 +512,7 @@ if __name__ == "__main__":
         )
         args.skip_build = True
         # download the compiled model for inference
-        HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../.."))
+        HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../..")
         from hmatc.utils.utils import get_file_from_jfrog
 
         if "HOUMO_MODELZOO_URL" not in os.environ:
@@ -564,7 +568,7 @@ if __name__ == "__main__":
             input_names = [
                 input_info["name"] for input_info in model_info["Model"]["inputs"]
             ]
-        PROCESS_NUM = 4
+        PROCESS_NUM = 2 * int(os.getenv("HOUMO_CORE_NUM", "2"))
         # warm up
         _ = run_multi_streams(
             hmm_path=hmm_path,
