@@ -3,8 +3,8 @@ import sys
 import platform
 import argparse
 
-HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../..')
-sys.path.append(f'{HOUMO_EXAMPLES_PATH}/apis/common/python')
+HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../..")
+sys.path.append(f"{HOUMO_EXAMPLES_PATH}/apis/common/python")
 from utils import get_file_from_jfrog
 
 
@@ -56,7 +56,7 @@ def install_ort_env(third_party_dir, ort_pkg_name):
         print(f"Failed to configure the ORT C++ environment, error: {e}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     if "HOUMO_MODELZOO_URL" not in os.environ:
         os.environ["HOUMO_MODELZOO_URL"] = (

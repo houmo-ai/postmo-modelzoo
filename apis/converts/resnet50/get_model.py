@@ -1,15 +1,17 @@
 import os
 import sys
 
-HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../..')
-sys.path.append(f'{HOUMO_EXAMPLES_PATH}/apis/common/python')
+HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../..")
+sys.path.append(f"{HOUMO_EXAMPLES_PATH}/apis/common/python")
 from utils import get_file_from_jfrog
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if "HOUMO_MODELZOO_URL" not in os.environ:
-        os.environ["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
-    HOUMO_TARGET = os.environ.get('HOUMO_TARGET', 'houmo')
+        os.environ["HOUMO_MODELZOO_URL"] = (
+            "http://139.224.0.199:8082/artifactory/houmo/release"
+        )
+    HOUMO_TARGET = os.environ.get("HOUMO_TARGET")
     model_dir = os.path.join(HOUMO_EXAMPLES_PATH, "apis/models")
     raw_path = "models/resnet50/resnet50.onnx"
     get_file_from_jfrog(raw_path, model_dir, "./")

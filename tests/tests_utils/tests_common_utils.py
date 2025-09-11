@@ -11,7 +11,7 @@ import time
 import threading
 import sys
 
-HOUMO_BACKEND = os.getenv("HOUMO_TARGET", "xh1")
+HOUMO_BACKEND = os.getenv("HOUMO_TARGET")
 SKIP_INFER = os.getenv("SKIP_INFER", None)
 HDPL_PLATFORM = os.getenv("HDPL_PLATFORM", "")
 MODELS_PATH = os.getenv("IMODELZOO_MODELS_PATH", "./")

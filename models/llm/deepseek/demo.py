@@ -370,7 +370,7 @@ class HmQwenXh2:
             input_name = self.prefill.get_input_name(0)
             valid_length_name = self.prefill.get_input_name(1)
             current_length_name = self.prefill.get_input_name(2)
-            self.prefill.set_input(input_name, input_data.numpy())
+            self.prefill.set_input(input_name, input_data.to(torch.float16).numpy())
             self.prefill.set_input(valid_length_name, valid_length_data)
             self.prefill.set_input(current_length_name, current_length_data)
             self.prefill.run()
@@ -405,7 +405,7 @@ class HmQwenXh2:
 
             input_name = self.decode.get_input_name(0)
             valid_length_name = self.decode.get_input_name(1)
-            self.decode.set_input(input_name, input_data.numpy())
+            self.decode.set_input(input_name, input_data.to(torch.float16).numpy())
             valid_length_data = np.array(context_length - 1).astype("int32")
             self.decode.set_input(valid_length_name, valid_length_data)
             self.decode.run()
