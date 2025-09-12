@@ -32,6 +32,13 @@ def get_args() -> argparse.Namespace:
         default='',
         help='where to save downloaded model',
     )
+    parser.add_argument(
+        '--batch',
+        dest='batch',
+        type=int,
+        default=1,
+        help='batch size',
+    )
     args = parser.parse_args()
     return args
 
@@ -48,7 +55,12 @@ if __name__ == '__main__':
         hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250728.zip"
     elif HOUMO_TARGET == "xh2":
         quant_path = "models/qwen3/hmquant_xh2_qwen3_8b_256_2k_20250808.zip"
-        hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250808.zip"
+        if args.batch == 1:
+            hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250808.zip"
+        elif args.batch == 2:
+            hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_2k_2batch_2cores_20250912.zip"
+        elif args.batch == 4:
+            hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_2k_4batch_2cores_20250912.zip"
 
     if model_type in ["raw", "all"]:
         ignore_patterns = []
