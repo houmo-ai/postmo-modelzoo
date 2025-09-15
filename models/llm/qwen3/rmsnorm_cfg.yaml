@@ -1,0 +1,5 @@
+rmsnorm_update_cfg:
+  compute_mode: fast
+  customize_pre_sub_exp:
+    model.layers.0.input_layernorm: 10
+    # model.layers.1.input_layernorm: 20

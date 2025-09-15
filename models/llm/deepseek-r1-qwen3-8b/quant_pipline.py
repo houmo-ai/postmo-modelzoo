@@ -173,12 +173,17 @@ def export_llm(args):
     model_name = os.path.basename(args.model)
     model_dir = os.path.join(args.work_dir, "{}_quarot_gptq".format(model_name))
     quant_weight = os.path.join(model_dir, "quarot_gptq-state-dict.safetensors")
+    if args.rmsnorm_mode == "fast":
+        update_cfg = "rmsnorm_cfg.yaml"
+    elif args.rmsnorm_mode == "normal":
+        update_cfg = None
     config = Qwen2ConvertConfig(
         batch_size=1,
         context_length=args.context_length,
         input_sequence_length=args.input_sequence_length,
         quant_scheme=quant_scheme,
         quant_weight=quant_weight,
+        update_cfg=update_cfg
     )
 
     prefix = f"{model_name}-{target_device}-{args.context_length//1024}k-{quant_type}"
