@@ -50,12 +50,12 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.model_input_batch = self.model_inputs_batch[
             self.inputs_name[0]
         ]  # 用户配置的输入batch
-        if self.is_multi_input_model:
-            for idx in range(1, len(self.inputs_name)):
-                batch = self.model_inputs_batch[self.inputs_name[idx]]
-                if self.model_input_batch != batch:
-                    logger.error("all input batch must be same")
-                    exit(-1)
+        # if self.is_multi_input_model:
+        #     for idx in range(1, len(self.inputs_name)):
+        #         batch = self.model_inputs_batch[self.inputs_name[idx]]
+        #         if self.model_input_batch != batch:
+        #             logger.error("all input batch must be same")
+        #             exit(-1)
         self.quant_cfg = cfg.get("quant")
         self.calib_method = self.quant_cfg.get("calib_method", "minmax")
         if self.calib_method not in [
@@ -153,6 +153,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         elif dtype == "int16":
             random_data = np.random.randint(low=0, high=128, size=shape, dtype=dtype)
         elif dtype == "int32":
+            random_data = np.random.randint(low=0, high=128, size=shape, dtype=dtype)
+        elif dtype == "int64":
             random_data = np.random.randint(low=0, high=128, size=shape, dtype=dtype)
         elif dtype == "uint8":
             random_data = np.random.randint(low=0, high=255, size=shape, dtype=dtype)

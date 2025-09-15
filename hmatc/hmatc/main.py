@@ -7,6 +7,7 @@ import os
 import time
 import shutil
 import pandas as pd
+import platform
 from io import StringIO
 from prettytable import PrettyTable
 from ._version import __build_time__, __commit__, __version__
@@ -21,6 +22,7 @@ from .utils.utils import (
     get_hmquant_xh2_version,
     get_package_version,
 )
+from .onnx_tool import model_profile
 
 
 def set_logger(op, log_dir, filename):
@@ -33,229 +35,611 @@ def set_logger(op, log_dir, filename):
     logger.addHandler(file_handler)
 
 
-def run_benchmark(
-    models, target, hmquant_version, hmcc_version, device_id=0, enbale_static=False
+def run_model(
+    location,
+    cfg_path,
+    target,
+    batch_num=1,
+    core_num=1,
+    thread_num=1,
+    device_id=0,
+    enbale_quantize=True,
+    enable_build=True,
+    enable_eval=True,
+    enable_onnx_eval=True,
+    enable_chip_eval=True,
+    enable_static=False,
 ):
-    header = [
+    model_infos = dict(
+        input_size="N/A",
+        dataset="N/A",
+        dataset_num="N/A",
+        GOPs=0,
+        target=target,
+        batch_num=batch_num,
+        core_num=core_num,
+        thread_num=thread_num,
+        resizer="N/A",
+        acc_onnx="N/A",
+        acc_chip="N/A",
+        acc_err="N/A",
+        ave_latency="N/A",
+        throughput="N/A",
+        enable_static=False,
+        msg="ok",
+    )
+
+    if not os.path.exists(location):
+        # 尝试到环境变量HOUMO_MODEL_PATH下寻找
+        new_location = os.path.join(os.environ.get("HOUMO_MODEL_PATH", ""), location)
+        if os.path.exists(new_location):
+            location = new_location
+        else:
+            msg = f"Not found model: {new_location}"
+            logger.error(msg)
+            model_infos["msg"] = msg
+            return model_infos
+    root = os.getcwd()
+    os.chdir(location)
+
+    # 下载模型
+    try:
+        os.system("python3 get_model.py")
+        logger.info(f"Download done.")
+    except Exception as e:
+        msg = f"Download failed:\nException: {e}"
+        logger.error(msg)
+        model_infos["msg"] = msg
+        os.chdir(root)
+        return model_infos
+
+    # 解析cfg
+    if not os.path.exists(cfg_path):
+        msg = f"{cfg_path} not exists"
+        logger.error(msg)
+        model_infos["msg"] = msg
+        os.chdir(root)
+        return model_infos
+
+    cfg = read_yaml_to_dict(cfg_path)
+    if not check_cfg(cfg):
+        msg = f"{cfg_path} is not valid"
+        logger.error(msg)
+        model_infos["msg"] = msg
+        os.chdir(root)
+        return model_infos
+
+    cfg["target"] = target
+    cfg["build"]["ncore"] = core_num
+    cfg["build"]["batch"] = batch_num
+    inputs_cfg = cfg["model"]["inputs"]
+    input_name = list(inputs_cfg.keys())[0]
+    if enable_static:
+        if (
+            len(inputs_cfg) == 1
+            and "resizer" in inputs_cfg[input_name]
+            and not inputs_cfg[input_name]["resizer"].get(
+                "enable_static_resizer", False
+            )
+        ):
+            cfg["model"]["inputs"][input_name]["resizer"][
+                "enable_static_resizer"
+            ] = True
+            model_infos["enable_static"] = True
+        else:
+            logger.info("static_resizer is disabled")
+            os.chdir(root)
+            return model_infos
+    logger.info(f"\n{json.dumps(cfg, indent=2, sort_keys=False)}")
+
+    hm_exec = None
+    try:
+        if target == "xh1":
+            from .exec.xh1_exec import Xh1Exec
+
+            hm_exec = Xh1Exec(cfg)
+        elif target == "xh2":
+            from .exec.xh2_exec import Xh2Exec
+
+            hm_exec = Xh2Exec(cfg)
+    except Exception as e:
+        msg = f"Failed to create hm_exec: \n{e}"
+        logger.error(msg)
+        model_infos["msg"] = msg
+        os.chdir(root)
+        return model_infos
+
+    input_size = "x".join(map(str, hm_exec.inputs_shape[0]))
+    for idx in range(1, len(hm_exec.inputs_shape)):
+        input_size += "\n"
+        input_size += "x".join(map(str, hm_exec.inputs_shape[idx]))
+    model_infos["input_size"] = input_size
+    macs = model_profile(hm_exec.model_path)
+    model_infos["GOPs"] = f"{macs * 2 * batch_num / 1e9:.2f}"
+
+    resizer_mode = hm_exec.resizer_mode
+    if resizer_mode == 0:
+        resizer_mode = "N/A"
+    elif resizer_mode == 1:
+        resizer_mode = "Dynamic_v2"
+    elif resizer_mode == 2:
+        resizer_mode = "Dynamic_v1"
+    elif resizer_mode == 3:
+        resizer_mode = "Static"
+    else:
+        resizer_mode = "unknown"
+    model_infos["resizer"] = resizer_mode
+    platform_arch = platform.machine().lower()
+
+    # 量化
+    if hm_exec is not None and platform_arch == "x86_64" and enbale_quantize:
+        try:
+            res = hm_exec.quantize()
+            if not res:
+                msg = "Quantize failed."
+                logger.error(msg)
+                model_infos["msg"] = msg
+                os.chdir(root)
+                return model_infos
+            logger.info(f"Quantize done.")
+        except Exception as e:
+            msg = f"Quantize failed:\nException: {e}"
+            logger.error(msg)
+            model_infos["msg"] = msg
+            os.chdir(root)
+            return model_infos
+    # 编译
+    if platform_arch == "x86_64" and enable_build:
+        try:
+            hm_exec.build()
+            logger.info(f"Build done.")
+        except Exception as e:
+            msg = f"Build failed:\nException: {e}"
+            logger.error(msg)
+            model_infos["msg"] = msg
+            os.chdir(root)
+            return model_infos
+
+    if platform_arch != "x86_64" and not os.path.exists(hm_exec.hmm_path):
+        msg = (
+            f"[{platform_arch}] HMM model does not exist, and path: {hm_exec.hmm_path}."
+        )
+        logger.error(msg)
+        model_infos["msg"] = msg
+        os.chdir(root)
+        return model_infos
+
+    # 性能测试
+    try:
+        warmup = 10
+        sample = 1000
+        loop_num = 1
+        perf_info = hm_exec.model_perf(
+            hm_exec.hmm_path, warmup, sample, loop_num, device_id, thread_num
+        )
+        perf_info = list(perf_info["perf"].values())[0]["perf_info"]
+        model_infos["ave_latency"] = f"{perf_info['avg_cost'] / batch_num:.2f}"
+        model_infos["throughput"] = f"{perf_info['qps'] * batch_num:.2f}"
+        logger.info(f"Performance done.")
+    except Exception as e:
+        msg = f"Performance failed:\nException: {e}"
+        logger.error(msg)
+        model_infos["msg"] = msg
+        os.chdir(root)
+        return model_infos
+
+    # onnx 数据集评估
+    onnx_info = dict()
+    if enable_onnx_eval and enable_eval and "eval" in cfg:
+        try:
+            # 删除缓存
+            shutil.rmtree("results_onnx", ignore_errors=True)
+            onnx_info = hm_exec.evaluate(backend="onnx")
+            if not onnx_info:
+                msg = f"onnx eval failed:\nException: {e}"
+                model_infos["msg"] = msg
+                logger.error(msg)
+        except Exception as e:
+            msg = f"onnx eval failed:\nException: {e}"
+            logger.error(msg)
+            model_infos["msg"] = msg
+            onnx_info = dict()
+
+    # xh1/xh2 数据集评估
+    chip_info = dict()
+    if enable_chip_eval and enable_eval and "eval" in cfg:
+        try:
+            shutil.rmtree(f"results_{target}", ignore_errors=True)
+            chip_info = hm_exec.evaluate(backend=target, device_id=device_id)
+            if not chip_info:
+                msg = f"{target} eval failed"
+                logger.error(msg)
+                model_infos["msg"] = msg
+        except Exception as e:
+            msg = f"{target} eval failed:\nException: {e}"
+            logger.error(msg)
+            model_infos["msg"] = msg
+            chip_info = dict()
+
+    model_infos["dataset"] = onnx_info.get("dataset", "N/A")
+    model_infos["dataset_num"] = onnx_info.get("num", "N/A")
+    # 计算相对误差"
+    if onnx_info and ("top1_acc" in onnx_info or "acc" in onnx_info):
+        key = "acc" if "acc" in onnx_info else "top1_acc"
+        acc_onnx = float(onnx_info[key])
+        acc_chip = float(chip_info[key])
+        acc_err = acc_chip / acc_onnx - 1
+        model_infos["acc_onnx"] = f"{acc_onnx*100:.2f}"
+        model_infos["acc_chip"] = f"{acc_chip*100:.2f}"
+        model_infos["acc_err"] = f"{acc_err*100:.2f}%"
+    elif onnx_info and "map50" in onnx_info:
+        map50_onnx = float(onnx_info["map50"])
+        map50_chip = float(chip_info["map50"])
+        map50_err = map50_chip / map50_onnx - 1
+        map50_95_onnx = float(onnx_info["map50_95"])
+        map50_95_chip = float(chip_info["map50_95"])
+        map50_95_err = map50_95_chip / map50_95_onnx - 1
+        model_infos["acc_onnx"] = f"{map50_95_onnx*100:.2f}/{map50_onnx*100:.2f}"
+        model_infos["acc_chip"] = f"{map50_95_chip*100:.2f}/{map50_chip*100:.2f}"
+        model_infos["acc_err"] = f"{map50_95_err*100:.2f}%/{map50_err*100:.2f}%"
+
+    os.chdir(root)
+    return model_infos
+
+
+def run_benchmark_v1(
+    config_path: str,
+    target: str,
+    device_id: int = 0,
+):
+    # 获取量化工具版本
+    hmquant_version = "N/A"
+    if target == "xh1":
+        hmquant_version = get_hmquant_xh1_version()
+    elif target == "xh2":
+        hmquant_version = get_hmquant_xh2_version()
+    # 获取编译器版本
+    hmcc_version = get_package_version(f"houmo-tcim-{target}")
+    runtime_version = get_package_version(f"houmo_tcim_runtime_{target}")
+    if runtime_version == "N/A":
+        logger.error(f"Not found houmo_tcim_runtime_{target}")
+        exit(-1)
+    models = read_yaml_to_dict(config_path)
+    t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+    os.makedirs("reports", exist_ok=True)
+    report_file = os.path.abspath(
+        os.path.join(
+            "reports",
+            f"benchmark_{target}_v{runtime_version}_{platform.machine().lower()}_{t}.xlsx",
+        )
+    )
+
+    headers = [
         "ModelName",
         "Shape",
         "Dataset",
         "DatasetNum",
+        "GOPs",
+        "Platform",
         "CoreNum",
-        "Batch",
+        "BatchNum",
         "ThreadNum",
         "Resizer",
         "HmquantVersion",
         "CompilerVersion",
+        "RuntimeVersion",
         "Accuracy[onnx]",
         f"Accuracy[{target}]",
         "AccRelError",
         "Latency[ms]",
         "Throughput",
     ]
-    table = PrettyTable(header)
+
+    table = PrettyTable(headers)
     table.title = f"HouMo Model Benchmark Report"
-    if target == "xh2" and enbale_static:
-        return table
-    root = os.getcwd()
+    # 遍历每个模型
     models = models["models"]
     for model_name in models:
         model_cfg = models[model_name]
         location = model_cfg["location"]
         cfg_path = model_cfg.get("config", "config.yml")
-        batch = model_cfg.get("batch", 1)
-        ncore = model_cfg.get("ncore", 1)
-        thread_num = model_cfg.get("thread_num", 8 if target == "xh1" else 4)
-        enable_eval = model_cfg.get("eval", True)
-        acc_onnx = "N/A"
-        acc_chip = "N/A"
-        acc_err = "N/A"
-        ave_latency = "N/A"
-        throughput = "N/A"
-
-        location_ok = os.path.exists(location)
-        if not location_ok:
-            # 尝试到环境变量HOUMO_MODEL_PATH下寻找
-            new_location = os.path.join(
-                os.environ.get("HOUMO_MODEL_PATH", ""), location
-            )
-            if os.path.exists(new_location):
-                location = new_location
-                location_ok = True
-            else:
-                logger.error(f"Not found model: {new_location}")
-
-        if location_ok:
-            # 切换工作目录至model目录
-            os.chdir(location)
-
-        # 下载模型
-        download_ok = False
-        if location_ok:
-            try:
-                os.system("python3 get_model.py")
-                logger.info(f"Download model: {model_name} done.")
-                download_ok = True
-            except Exception as e:
-                logger.error(f"download model failed: {model_name}\nException: {e}")
-
-        # 检查配置文件是否存在
-        cfg_ok = False
-        hm_exec = None
-        if download_ok:
-            if os.path.exists(cfg_path):
-                cfg_ok = True
-                cfg = read_yaml_to_dict(cfg_path)
-                if not check_cfg(cfg):
-                    logger.error(f"{cfg_path} is not valid")
-                    cfg_ok = False
-                if cfg_ok:
-                    cfg["target"] = target
-                    cfg["build"]["ncore"] = ncore
-                    cfg["build"]["batch"] = batch
-                    if enbale_static:
-                        inputs_cfg = cfg["model"]["inputs"]
-                        if len(inputs_cfg) > 1:
-                            continue
-                        input_name = list(inputs_cfg.keys())[0]
-                        input_cfg = inputs_cfg[input_name]
-                        resizer_cfg = input_cfg.get("resizer")
-                        if resizer_cfg is None:
-                            continue
-                        if resizer_cfg.get("enable_static_resizer", False):
-                            continue
-                        cfg["model"]["inputs"][input_name]["resizer"][
-                            "enable_static_resizer"
-                        ] = True
-                    logger.info(f"\n{json.dumps(cfg, indent=2, sort_keys=False)}")
-                    if target == "xh1":
-                        from .exec.xh1_exec import Xh1Exec
-
-                        hm_exec = Xh1Exec(cfg)
-                    elif target == "xh2":
-                        from .exec.xh2_exec import Xh2Exec
-
-                        hm_exec = Xh2Exec(cfg)
-            else:
-                logger.error(f"{cfg_path} not exists")
-        resizer_mode = hm_exec.resizer_mode
-        if resizer_mode == 0:
-            resizer_mode = "N/A"
-        elif resizer_mode == 1:
-            resizer_mode = "Dynamic_v2"
-        elif resizer_mode == 2:
-            resizer_mode = "Dynamic_v1"
-        elif resizer_mode == 3:
-            resizer_mode = "Static"
-        else:
-            resizer_mode = "unknown"
-        # 量化
-        quantize_ok = False
-        if cfg_ok and hm_exec is not None:
-            try:
-                res = hm_exec.quantize()
-                quantize_ok = bool(res)
-                logger.info(f"Quantize {model_name} done.")
-            except Exception as e:
-                logger.error(f"quantize failed: {model_name}\nException: {e}")
-        # 编译
-        build_ok = False
-        if quantize_ok:
-            try:
-                hm_exec.build()
-                build_ok = True
-                logger.info(f"Build {model_name} done.")
-            except Exception as e:
-                logger.error(f"build failed: {model_name}\nException: {e}")
-        # 性能测试
-        if build_ok:
-            try:
-                warmup = 10
-                sample = 1000
-                loop_num = 1
-                perf_info = hm_exec.model_perf(
-                    hm_exec.hmm_path, warmup, sample, loop_num, device_id, thread_num
-                )
-                perf_info = list(perf_info["perf"].values())[0]["perf_info"]
-                ave_latency = f"{perf_info['avg_cost']:.3f}"
-                throughput = f"{perf_info['qps']:.2f}"
-                logger.info(f"perf done: {model_name}")
-            except Exception as e:
-                logger.error(f"perf failed: {model_name}\nException: {e}")
-
-        # onnx 数据集评估
-        onnx_info = dict()
-        if build_ok and enable_eval:
-            try:
-                # 删除缓存
-                shutil.rmtree("results_onnx", ignore_errors=True)
-                onnx_info = hm_exec.evaluate(backend="onnx")
-                if not onnx_info:
-                    logger.error(f"onnx eval failed: {model_name}")
-            except Exception as e:
-                logger.error(f"onnx eval failed: {model_name}\nException: {e}")
-                onnx_info = dict()
-        # xh1/xh2 数据集评估
-        chip_info = dict()
-        if build_ok and enable_eval:
-            try:
-                shutil.rmtree(f"results_{target}", ignore_errors=True)
-                chip_info = hm_exec.evaluate(backend=target, device_id=device_id)
-                if not chip_info:
-                    logger.error(f"{target} eval failed: {model_name}")
-            except Exception as e:
-                logger.error(f"{target} eval failed: {model_name}\nException: {e}")
-                chip_info = dict()
-
-        # 计算相对误差"
-        if onnx_info and ("top1_acc" in onnx_info or "acc" in onnx_info):
-            key = "acc" if "acc" in onnx_info else "top1_acc"
-            acc_onnx = float(onnx_info[key])
-            acc_chip = float(chip_info[key])
-            acc_err = acc_chip / acc_onnx - 1
-            acc_onnx = f"{acc_onnx*100:.2f}"
-            acc_chip = f"{acc_chip*100:.2f}"
-            acc_err = f"{acc_err*100:.2f}%"
-        elif onnx_info and "map50" in onnx_info:
-            map50_onnx = float(onnx_info["map50"])
-            map50_chip = float(chip_info["map50"])
-            map50_err = map50_chip / map50_onnx - 1
-            map50_95_onnx = float(onnx_info["map50_95"])
-            map50_95_chip = float(chip_info["map50_95"])
-            map50_95_err = map50_95_chip / map50_95_onnx - 1
-            acc_onnx = f"{map50_onnx*100:.2f}/{map50_95_onnx*100:.2f}"
-            acc_chip = f"{map50_chip*100:.2f}/{map50_95_chip*100:.2f}"
-            acc_err = f"{map50_err*100:.2f}%/{map50_95_err*100:.2f}%"
-
-        input_size = "N/A"
-        if hm_exec is not None:
-            input_size = "x".join(map(str, hm_exec.inputs_shape[0]))
-            for idx in range(1, len(hm_exec.inputs_shape)):
-                input_size += "\n"
-                input_size += "x".join(map(str, hm_exec.inputs_shape[idx]))
-
-        table.add_row(
-            [
-                model_name,
-                input_size,
-                onnx_info.get("dataset", "N/A"),
-                onnx_info.get("num", "N/A"),
-                ncore,
-                batch,
-                thread_num,
-                resizer_mode,
-                hmquant_version,
-                hmcc_version,
-                acc_onnx,
-                acc_chip,
-                acc_err,
-                ave_latency,
-                throughput,
-            ]
+        core_num = int(os.getenv("HOUMO_CORE_NUM", 4 if "xh1" == target else 2))
+        enable_eval = (
+            model_cfg.get("eval", True)
+            if platform.machine().lower() == "x86_64"
+            else False  # TODO 需要在非x86环境跑eval再修改
         )
-        # 切回根目录
-        os.chdir(root)
-    return table
+
+        def run_all(enable_static):
+            _all_model_infos = list()
+            if enable_static and target == "xh2":
+                return _all_model_infos
+            model_infos = run_model(
+                location,
+                cfg_path,
+                target,
+                batch_num=1,
+                core_num=1,
+                thread_num=1,
+                enable_eval=enable_eval,
+                enbale_quantize=True,
+                enable_build=True,
+                enable_static=enable_static,
+                device_id=device_id,
+            )
+            _all_model_infos.append(model_infos)
+            model_infos = run_model(
+                location,
+                cfg_path,
+                target,
+                batch_num=1,
+                core_num=1,
+                thread_num=core_num * 2,
+                enable_eval=enable_eval,
+                enable_build=False,
+                enbale_quantize=False,
+                enable_chip_eval=False,
+                enable_onnx_eval=False,
+                enable_static=enable_static,
+                device_id=device_id,
+            )
+            _all_model_infos.append(model_infos)
+            if core_num // 2 == 2:
+                model_infos = run_model(
+                    location,
+                    cfg_path,
+                    target,
+                    batch_num=1,
+                    core_num=core_num // 2,
+                    thread_num=1,
+                    enable_eval=enable_eval,
+                    enbale_quantize=False,
+                    enable_build=True,
+                    enable_chip_eval=False,
+                    enable_onnx_eval=False,
+                    enable_static=enable_static,
+                    device_id=device_id,
+                )
+                _all_model_infos.append(model_infos)
+            model_infos = run_model(
+                location,
+                cfg_path,
+                target,
+                batch_num=1,
+                core_num=core_num,
+                thread_num=1,
+                enable_eval=enable_eval,
+                enbale_quantize=False,
+                enable_build=True,
+                enable_chip_eval=False,
+                enable_onnx_eval=False,
+                enable_static=enable_static,
+                device_id=device_id,
+            )
+            _all_model_infos.append(model_infos)
+            model_infos = run_model(
+                location,
+                cfg_path,
+                target,
+                batch_num=2,
+                core_num=1,
+                thread_num=1,
+                enable_eval=enable_eval,
+                enbale_quantize=False,
+                enable_build=True,
+                enable_chip_eval=False,
+                enable_onnx_eval=False,
+                enable_static=enable_static,
+                device_id=device_id,
+            )
+            _all_model_infos.append(model_infos)
+            model_infos = run_model(
+                location,
+                cfg_path,
+                target,
+                batch_num=4,
+                core_num=1,
+                thread_num=1,
+                enable_eval=enable_eval,
+                enbale_quantize=False,
+                enable_build=True,
+                enable_chip_eval=False,
+                enable_onnx_eval=False,
+                enable_static=enable_static,
+                device_id=device_id,
+            )
+            _all_model_infos.append(model_infos)
+            return _all_model_infos
+
+        all_model_infos = run_all(enable_static=False)
+        all_model_infos_static = run_all(enable_static=True)
+
+        def add_rows(_all_model_infos, static_mode=False):
+            for model_infos in _all_model_infos:
+                if static_mode and not model_infos["enable_static"]:
+                    continue
+                table.add_row(
+                    [
+                        model_name,
+                        model_infos["input_size"],
+                        model_infos["dataset"],
+                        model_infos["dataset_num"],
+                        model_infos["GOPs"],
+                        platform.machine().lower(),
+                        model_infos["core_num"],
+                        model_infos["batch_num"],
+                        model_infos["thread_num"],
+                        model_infos["resizer"],
+                        hmquant_version,
+                        hmcc_version,
+                        runtime_version,
+                        model_infos["acc_onnx"],
+                        model_infos["acc_chip"],
+                        model_infos["acc_err"],
+                        model_infos["ave_latency"],
+                        model_infos["throughput"],
+                    ]
+                )
+
+        add_rows(all_model_infos)
+        add_rows(all_model_infos_static, static_mode=True)
+    logger.info(f"\n{table}")
+    df = pd.DataFrame(table.rows, columns=table.field_names)
+    with pd.ExcelWriter(report_file, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Sheet1")
+        workbook = writer.book
+        worksheet = writer.sheets["Sheet1"]
+        text_fmt = workbook.add_format({"num_format": "@"})
+
+        def set_column_text_format(column_name):
+            col_idx = df.columns.get_loc(column_name)
+            excel_idx = chr(ord("A") + col_idx)
+            worksheet.set_column(f"{excel_idx}:{excel_idx}", None, text_fmt)
+
+        set_column_text_format("Accuracy[onnx]")
+        set_column_text_format(f"Accuracy[{target}]")
+        set_column_text_format("AccRelError")
+
+    logger.info("Benchmark done.")
+
+
+def run_benchmark_v2(
+    config_path: str,
+    target: str,
+    device_id: int = 0,
+):
+    # 获取量化工具版本
+    hmquant_version = "N/A"
+    if target == "xh1":
+        hmquant_version = get_hmquant_xh1_version()
+    elif target == "xh2":
+        hmquant_version = get_hmquant_xh2_version()
+    # 获取编译器版本
+    hmcc_version = get_package_version(f"houmo-tcim-{target}")
+    runtime_version = get_package_version(f"houmo_tcim_runtime_{target}")
+    if runtime_version == "N/A":
+        logger.error(f"Not found houmo_tcim_runtime_{target}")
+        exit(-1)
+    models = read_yaml_to_dict(config_path)
+    t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+    os.makedirs("reports", exist_ok=True)
+    report_file = os.path.abspath(
+        os.path.join(
+            "reports",
+            f"benchmark_{target}_v{runtime_version}_{platform.machine().lower()}_{t}.xlsx",
+        )
+    )
+
+    headers = [
+        "ModelName",
+        "Shape",
+        "Dataset",
+        "DatasetNum",
+        "GOPs",
+        "Platform",
+        "CoreNum",
+        "BatchNum",
+        "ThreadNum",
+        "Resizer",
+        "HmquantVersion",
+        "CompilerVersion",
+        "RuntimeVersion",
+        "Accuracy[onnx]",
+        f"Accuracy[{target}]",
+        "AccRelError",
+        "Latency[ms]",
+        "Throughput",
+    ]
+
+    table = PrettyTable(headers)
+    table.title = f"HouMo Model Benchmark Report"
+    # 遍历每个模型
+    models = models["models"]
+    for model_name in models:
+        model_cfg = models[model_name]
+        location = model_cfg["location"]
+        cfg_path = model_cfg.get("config", "config.yml")
+        exec_cfgs = model_cfg.get("exec_cfgs", list())
+
+        def run_all(enable_static):
+            _all_model_infos = list()
+            if enable_static and target == "xh2":
+                return _all_model_infos
+            for exec_cfg in exec_cfgs:
+                batch_num = exec_cfg.get("batch_num", 1)
+                core_num = exec_cfg.get("core_num", 1)
+                thread_num = exec_cfg.get("thread_num", 1)
+                enable_eval = (
+                    exec_cfg.get("enable_eval", False)
+                    if platform.machine().lower() == "x86_64"
+                    else False  # TODO 需要在非x86环境跑eval再修改
+                )
+                model_infos = run_model(
+                    location,
+                    cfg_path,
+                    target,
+                    batch_num=batch_num,
+                    core_num=core_num,
+                    thread_num=thread_num,
+                    enable_eval=enable_eval,
+                    enbale_quantize=True,
+                    enable_build=True,
+                    enable_static=enable_static,
+                    device_id=device_id,
+                )
+                _all_model_infos.append(model_infos)
+            return _all_model_infos
+
+        all_model_infos = run_all(enable_static=False)
+        all_model_infos_static = run_all(enable_static=True)
+
+        def add_rows(_all_model_infos, static_mode=False):
+            for model_infos in _all_model_infos:
+                if static_mode and not model_infos["enable_static"]:
+                    continue
+                table.add_row(
+                    [
+                        model_name,
+                        model_infos["input_size"],
+                        model_infos["dataset"],
+                        model_infos["dataset_num"],
+                        model_infos["GOPs"],
+                        platform.machine().lower(),
+                        model_infos["core_num"],
+                        model_infos["batch_num"],
+                        model_infos["thread_num"],
+                        model_infos["resizer"],
+                        hmquant_version,
+                        hmcc_version,
+                        runtime_version,
+                        model_infos["acc_onnx"],
+                        model_infos["acc_chip"],
+                        model_infos["acc_err"],
+                        model_infos["ave_latency"],
+                        model_infos["throughput"],
+                    ]
+                )
+
+        add_rows(all_model_infos)
+        add_rows(all_model_infos_static, static_mode=True)
+    logger.info(f"\n{table}")
+    df = pd.DataFrame(table.rows, columns=table.field_names)
+    with pd.ExcelWriter(report_file, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Sheet1")
+        workbook = writer.book
+        worksheet = writer.sheets["Sheet1"]
+        text_fmt = workbook.add_format({"num_format": "@"})
+
+        def set_column_text_format(column_name):
+            col_idx = df.columns.get_loc(column_name)
+            excel_idx = chr(ord("A") + col_idx)
+            worksheet.set_column(f"{excel_idx}:{excel_idx}", None, text_fmt)
+
+        set_column_text_format("Accuracy[onnx]")
+        set_column_text_format(f"Accuracy[{target}]")
+        set_column_text_format("AccRelError")
+
+    logger.info("Benchmark done.")
 
 
 def main():
@@ -387,14 +771,6 @@ def main():
         default=1,
         help="Specify thread num",
     )
-    # perf_parser.add_argument(
-    #     "--device",
-    #     "-dn",
-    #     type=int,
-    #     required=False,
-    #     default=1,
-    #     help="Specify device num",
-    # )
     # demo
     demo_parser = subparsers.add_parser(
         "demo",
@@ -437,55 +813,7 @@ def main():
     # 处理批量模型benchmark
     current_command = args.command
     if current_command == "benchmark":
-        # 获取量化工具版本
-        hmquant_version = "unknown"
-        if target == "xh1":
-            hmquant_version = get_hmquant_xh1_version()
-        elif target == "xh2":
-            hmquant_version = get_hmquant_xh2_version()
-        if hmquant_version == "unknown":
-            logger.error(f"Not found hmquant version for {target}")
-            exit(-1)
-        # 获取编译器版本
-        hmcc_version = get_package_version(f"houmo-tcim-{target}")
-        if hmcc_version == "unknown":
-            logger.error(f"Not found hmcc version for {target}")
-            exit(-1)
-        models = read_yaml_to_dict(args.config)
-        t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-        if not os.path.exists("reports"):
-            os.makedirs("reports")
-        report_file = os.path.abspath(
-            os.path.join(
-                "reports",
-                f"benchmark_{args.target}_v{hmquant_version}_v{hmcc_version}_{t}.csv",
-            )
-        )
-        table = run_benchmark(
-            models, args.target, hmquant_version, hmcc_version, args.device_id
-        )
-        table_static = run_benchmark(
-            models,
-            args.target,
-            hmquant_version,
-            hmcc_version,
-            args.device_id,
-            enbale_static=True,
-        )
-        combined_table = PrettyTable()
-        combined_table.title = table.title
-        combined_table.field_names = table.field_names
-        table_kv = dict()
-        for row in table_static.rows:
-            table_kv[row[0]] = row
-        for row in table.rows:
-            combined_table.add_row(row)
-            if row[0] in table_kv:
-                combined_table.add_row(table_kv[row[0]])
-        logger.info(f"\n{combined_table}")
-        with open(report_file, "w", encoding="utf-8", newline="") as f:
-            f.write(combined_table.get_csv_string())
-        logger.info("Benchmark done.")
+        run_benchmark_v2(args.config, args.target, args.device_id)
         exit(0)
 
     # 存在结果信息，先读回来更新后再存

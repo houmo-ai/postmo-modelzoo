@@ -64,7 +64,7 @@ def get_hmquant_xh1_version():
         v = version("hmquant-xh1")  # 替换成你想查的包名
         return v
     except PackageNotFoundError:
-        return "unknown"
+        return "N/A"
 
 
 def get_hmquant_xh2_version():
@@ -73,7 +73,7 @@ def get_hmquant_xh2_version():
         v = version("hmquant_xh2")  # 替换成你想查的包名
         return v
     except PackageNotFoundError:
-        return "unknown"
+        return "N/A"
 
 
 def get_package_version(package_name: str):
@@ -82,7 +82,7 @@ def get_package_version(package_name: str):
         v = version(package_name)  # 替换成你想查的包名
         return v
     except PackageNotFoundError:
-        return f"{package_name} not installed"
+        return "N/A"
 
 
 def get_onnx_inputs_info(onnx_path):

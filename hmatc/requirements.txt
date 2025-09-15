@@ -10,5 +10,7 @@ pycocotools
 pillow
 pyyaml
 pybind11
+tabulate
+xlsxwriter
 torch>=2.4.0
 torchvision>=0.19.0

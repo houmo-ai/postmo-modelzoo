@@ -4,7 +4,7 @@ import argparse
 from hmatc.utils.utils import get_file_from_jfrog
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh1')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh1")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
@@ -12,38 +12,38 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--type',
-        dest='model_type',
+        "--type",
+        dest="model_type",
         type=str,
-        default='raw',
-        help='which model type to get, choise in [raw, quant, build, all]',
+        default="raw",
+        help="which model type to get, choise in [raw, quant, build, all]",
     )
     parser.add_argument(
-        '--quant_model_dir',
-        dest='quant_model_dir',
+        "--quant_model_dir",
+        dest="quant_model_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
-        help='where to save quant_model',
+        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        help="where to save quant_model",
     )
     parser.add_argument(
-        '--build_model_dir',
-        dest='build_model_dir',
+        "--build_model_dir",
+        dest="build_model_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET),
-        help='where to save build_model',
+        default=os.path.join("output", HOUMO_TARGET),
+        help="where to save build_model",
     )
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--model_dir",
+        dest="model_dir",
         type=str,
-        default='',
-        help='where to save downloaded model',
+        default="",
+        help="where to save downloaded model",
     )
     args = parser.parse_args()
     return args
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     quant_model_dir = args.quant_model_dir
     build_model_dir = args.build_model_dir
@@ -66,9 +66,19 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"Model doesn't exist, error msg: {e}")
         else:
-            extract_path = os.path.join(os.path.dirname(file_path), "yolov8m_640x640_clip.onnx")
-            onnx.utils.extract_model(file_path, extract_path, input_names=['images'], 
-                output_names=['/model.22/Sigmoid_output_0', '/model.22/dfl/Reshape_1_output_0'], check_model=True)
+            extract_path = os.path.join(
+                os.path.dirname(file_path), "yolov8m_640x640_clip.onnx"
+            )
+            onnx.utils.extract_model(
+                file_path,
+                extract_path,
+                input_names=["images"],
+                output_names=[
+                    "/model.22/Sigmoid_output_0",
+                    "/model.22/dfl/Reshape_1_output_0",
+                ],
+                check_model=True,
+            )
 
     if model_type == "quant" or model_type == "all":
         try:

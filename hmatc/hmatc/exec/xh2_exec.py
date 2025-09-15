@@ -112,7 +112,7 @@ class Xh2Exec(BaseExec):
             input_cfg = self.inputs_cfg[input_name]
             shape = input_cfg["shape"]
             dtype_str = self.onnx_inputs_info[input_name]["dtype"]
-            in_datas.append(torch.randn(shape, dtype=str_to_torch_dtype(dtype_str)))
+            in_datas.append(torch.from_numpy(self.gen_random_data(shape, dtype_str)))
         # 量化以及HMONNX导出
         t_start = time.time()
         convert_onnx_to_hmonnx(

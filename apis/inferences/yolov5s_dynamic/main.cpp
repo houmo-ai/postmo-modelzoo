@@ -155,7 +155,7 @@ int main() {
     printf("Model Version: %s\n", module.GetModelVersion().c_str());
     printf("Model CoreNum: %d\n", module.GetCoreNum());
     printf("Model InputNum: %d\n", module.GetInputNum());
-    printf("Model OutputNum: %d\n", module.GetInputNum());
+    printf("Model OutputNum: %d\n", module.GetOutputNum());
     for (int i = 0; i < module.GetInputNum(); ++i) {
         std::string name = module.GetInputName(i);
         auto info = module.GetInputInfo(name);
