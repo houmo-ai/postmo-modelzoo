@@ -79,6 +79,11 @@ def run_model(
             logger.error(msg)
             model_infos["msg"] = msg
             return model_infos
+    if core_num > int(os.getenv("HOUMO_CORE_NUM", 4 if target == "xh1" else 2)):
+        msg = f"{target} core_num must less than {os.getenv('HOUMO_CORE_NUM', 4 if target == 'xh1' else 2)}"
+        logger.error(msg)
+        model_infos["msg"] = msg
+        return model_infos
     root = os.getcwd()
     os.chdir(location)
 

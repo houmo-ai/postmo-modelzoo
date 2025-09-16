@@ -19,7 +19,7 @@ model:
 
 quant:
   calib_data: coco2017/val2017
-  calib_num: 200
+  calib_num: 50
 
 build:
   ncore: 1
