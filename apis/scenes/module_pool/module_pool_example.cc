@@ -74,13 +74,15 @@ std::vector<uint8_t> ReadBinaryFile(const std::string& file_path) {
 }
 
 PooledModule* LoadModelFromFile(ModulePool* module_pool,
-                                std::string model_path) {
+                                std::string model_path,
+                                tcim::Module::WeightManager& wm) {
   if (!fs::exists(model_path)) {
     LOG_ERROR("Model file {} doesn't exist.", model_path);
     return nullptr;
   }
 
-  auto pooled_md = module_pool->Load(model_path);
+  tcim::Module::Option option(wm);
+  auto pooled_md = module_pool->Load(model_path, option);
   if (pooled_md == nullptr) {
     LOG_ERROR("Failed to load model {}.", model_path);
     return nullptr;
@@ -93,13 +95,14 @@ PooledModule* LoadModelFromFile(ModulePool* module_pool,
 
 PooledModule* LoadModelFromBuffer(ModulePool* module_pool,
                                   std::string model_name, void* model_data,
-                                  int len) {
+                                  int len, tcim::Module::WeightManager& wm) {
   if (model_data == nullptr or len <= 0) {
     LOG_ERROR("Invalid model data ptr or model length {}!", len);
     return nullptr;
   }
 
-  auto pooled_md = module_pool->Load(model_name, model_data, len);
+  tcim::Module::Option option(wm);
+  auto pooled_md = module_pool->Load(model_name, model_data, len, option);
   if (pooled_md == nullptr) {
     LOG_ERROR("Failed to load model {} from buffer {}!", model_name,
               model_data);
@@ -318,6 +321,8 @@ int main() {
   LOG_INFO("tcim version:{}, houmo target:{}.", tcim::GetVersion(),
            houmo_target);
 
+  int device_id = 0;
+
   int core_num = 4;
   int pooled_md_num = 8;
   int inference_thread_num = 16;
@@ -333,23 +338,25 @@ int main() {
   std::string yolov5s_name = "yolov5s_b1_1core";
   std::vector<uint8_t> resnet50_buffer = ReadBinaryFile(resnet50_path);
   std::vector<uint8_t> yolov5s_buffer = ReadBinaryFile(yolov5s_path);
+  auto res50_wm = tcim::Module::WeightManager::CreateWeightManager(device_id);
+  auto yolov5s_wm = tcim::Module::WeightManager::CreateWeightManager(device_id);
   // 1.3 load model from file
   std::vector<std::future<PooledModule*>> resnet50_load_res;
   std::vector<std::future<PooledModule*>> yolov5s_load_res;
   for (int i = 0; i < pooled_md_num; i++) {
     resnet50_load_res.emplace_back(std::async(
-        std::launch::async, LoadModelFromFile, pool_ptr, resnet50_path));
+        std::launch::async, LoadModelFromFile, pool_ptr, resnet50_path, std::ref(res50_wm)));
     yolov5s_load_res.emplace_back(std::async(
-        std::launch::async, LoadModelFromFile, pool_ptr, yolov5s_path));
+        std::launch::async, LoadModelFromFile, pool_ptr, yolov5s_path, std::ref(yolov5s_wm)));
   }
   // 1.4 load model from buffer
   for (int i = 0; i < pooled_md_num; i++) {
     resnet50_load_res.emplace_back(std::async(
         std::launch::async, LoadModelFromBuffer, pool_ptr, resnet50_name,
-        resnet50_buffer.data(), resnet50_buffer.size()));
+        resnet50_buffer.data(), resnet50_buffer.size(), std::ref(res50_wm)));
     yolov5s_load_res.emplace_back(
         std::async(std::launch::async, LoadModelFromBuffer, pool_ptr,
-                   yolov5s_name, yolov5s_buffer.data(), yolov5s_buffer.size()));
+                   yolov5s_name, yolov5s_buffer.data(), yolov5s_buffer.size(), std::ref(yolov5s_wm)));
   }
   std::vector<PooledModule*> resnet50_pooled_mds;
   std::vector<PooledModule*> yolov5s_pooled_mds;
