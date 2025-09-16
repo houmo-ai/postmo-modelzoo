@@ -8,13 +8,18 @@ export HOUMO_EXAMPLES_PATH=${__dir}
 PRINT_GREEN() { echo -e "\033[1;32m$@\033[0m"; }
 PRINT_YELLOW() { echo -e "\033[1;33m$@\033[0m"; }
 
+if [[ -z $HOUMO_SDK_PATH ]]; then
+  PRINT_YELLOW "[warn] HOUMO_SDK_PATH not set. use default /usr/local/houmo-sdk."
+  export HOUMO_PATH=/usr/local/houmo-sdk
+fi
+
 if [[ -z $HOUMO_PATH ]]; then
-  PRINT_YELLOW "[warn] HOUMO_PATH not set. use default."
+  PRINT_YELLOW "[warn] HOUMO_PATH not set. use default /usr/local/houmo."
   export HOUMO_PATH=/usr/local/houmo
 fi
 
 if [[ -z $TCIM_RUNTIME_PATH ]]; then
-  PRINT_YELLOW "[warn] TCIM_RUNTIME_PATH not set. use default."
+  PRINT_YELLOW "[warn] TCIM_RUNTIME_PATH not set. use default $HOUMO_PATH."
   export TCIM_RUNTIME_PATH=$HOUMO_PATH
 fi
 
@@ -26,7 +31,7 @@ fi
 export PATH=$HOUMO_PATH/bin:$PATH
 
 # paths for runtime
-export LD_LIBRARY_PATH=$TCIM_RUNTIME_PATH/lib:$HOUMO_PATH/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$TCIM_RUNTIME_PATH/lib:$HOUMO_PATH/lib:$HOUMO_SDK_PATH/hal/lib:$LD_LIBRARY_PATH
 
 # data and model path
 if [[ -z $HOUMO_DATASETS_PATH ]]; then
