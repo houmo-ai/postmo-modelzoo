@@ -77,6 +77,17 @@ def parse_args():
     return args
 
 
+def _check_golden(dir_path: str):
+    import glob
+
+    decoder_golden = list(glob.glob(dir_path + "/decoder/hmquant_*.npy"))
+    prefill_golden = list(glob.glob(dir_path + "/prefill/hmquant_*.npy"))
+
+    if len(decoder_golden) > 0 and len(prefill_golden) > 0:
+        return True
+    return False
+
+
 def main(args) -> int:
     logger.info(
         "Model name: %s, Model path: %s, Quant model path: %s, Context length: %d, "
@@ -98,11 +109,14 @@ def main(args) -> int:
     output_dir = args.result_dir
     os.makedirs(output_dir, exist_ok=True)
 
+    os.environ["HDPL_PLATFORM"] = "ISIM"
+
+    stage = "all" if _check_golden(args.quant_model_path) else "build"
     cmds = [
         "python3",
         "build.py",
         "--stage",
-        "build",
+        stage,
         "--model_dir",
         args.quant_model_path,
         "--model_name",
