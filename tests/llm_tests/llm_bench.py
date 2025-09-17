@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import os
 import re
-import sys
 import math
 import time
 import argparse
@@ -33,6 +32,12 @@ def is_valid_char(cp):
 
     return False
 
+import random
+def generate_random_digit_string(length=1000):
+    random_digits = [str(random.randint(0, 9)) for _ in range(length)]
+    return ''.join(random_digits)
+
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -42,7 +47,7 @@ def get_args() -> argparse.Namespace:
         type=str,
         default="qwen3-8b",
         help='tokenizer dir',
-    )       
+    )
     parser.add_argument(
         '--embedding_path',
         dest='embedding_path',
@@ -65,24 +70,30 @@ def get_args() -> argparse.Namespace:
         help='houmo decode model path',
     )
     parser.add_argument(
-        '--forbid_flush',
-        dest='forbid_flush',
-        action="store_true",
-        help='forbid flush print n batch',
+        '--isq',
+        dest='isq',
+        type=int,
+        default=2048,
+        help='input seq length',
+    )
+    parser.add_argument(
+        '--osq',
+        dest='osq',
+        type=int,
+        default=1024,
+        help='output seq length',
     )
     args = parser.parse_args()
     return args
 
 
 class HmQwenXh2:
-    def __init__(self, prefill_path, decode_path, embedding_path, tokenizer_dir, forbid_flush=True):
+    def __init__(self, prefill_path, decode_path, embedding_path, tokenizer_dir):
         weight_manager = tcim.runtime.WeightManager(0)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
         self.prefill = tcim.runtime.load(prefill_path, option=option1)
-        print("prefill model loaded")
         self.decode = tcim.runtime.load(decode_path, option=option2)
-        print("decode model loaded")
         self.nblocks = self.get_nblocks()
         dummy_tensor_names = [
             f'model_layers_{i}_self_attn_kcache_input' for i in range(self.nblocks)
@@ -95,23 +106,9 @@ class HmQwenXh2:
         self.embedding_len = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[2]
         self.context_max_length = self.decode.get_input_info(self.prefill.get_input_name(3)).shape[2]
         self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
-        self.flush = not forbid_flush
         self.next_ids = [0] * self.batch
-        self.current_questions = [""] * self.batch
         self.current_echo_lens = [0] * self.batch
-        self.current_responses = [""] * self.batch
-        self.decode_break = [False] * self.batch
-        self.chat_history_ids = [[]] * self.batch
-        self.colors = [
-            {"color": "\033[94m"},
-            {"color": "\033[92m"},
-            {"color": "\033[91m"},
-            {"color": "\033[95m"},
-            {"color": "\033[93m"},
-            {"color": "\033[96m"},
-            {"color": "\033[33m"},
-            {"color": "\033[35m"}
-        ]
+
         # set decode input
         for b in range(self.batch):
             index = 2 if b == 0 else 2 * self.nblocks * b + 3 + 2 * b - 1
@@ -130,31 +127,11 @@ class HmQwenXh2:
         count = sum(1 for item in input_names if re.match(pattern, item))
         return count
 
-    def preprocess_prefill(self, question):
-        message = [
-            {'role': 'system', 'content': 'You are a helpful assistant.'},
-            {'role': 'user', 'content': question},
-        ]
-        text = self.tokenizer.apply_chat_template(
-                message,
-                tokenize=False,
-                add_generation_prompt=True,
-                enable_thinking=False
-        )
+    def preprocess_prefill(self, isq):
+        text = generate_random_digit_string(isq)
         input = self.tokenizer(text, return_tensors='pt')
         all_input_id = input['input_ids']
         return all_input_id
-
-    def show_response(self):
-        if self.flush:
-            sys.stdout.write("\033[2J\033[H")
-            sys.stdout.flush()
-            print("=== 后摩多batch模型推理展示 ===")
-            for i in range(self.batch):
-                color = self.colors[i]
-                status = "✓" if self.decode_break[i] else "●"
-                print(f"{color['color']}{"quesion: "}{self.current_questions[i]} {status}:{'\033[0m'}")
-                print(f"  {self.current_responses[i]}")
 
     def run_prefill(self, b, all_input_id):
         decode_input_index_start = 2 * self.nblocks * b + 3 + 2 * b  if b > 0 else 3
@@ -197,10 +174,8 @@ class HmQwenXh2:
         input_data = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
         prefill_time = time.time() - prefill_start_time
         next_id = input_data.argmax(-1)[0]
-        prefill_response = self.tokenizer.decode(next_id.tolist())
         next_id = torch.from_numpy(next_id)
-        self.chat_history_ids[b] = torch.cat([all_input_id.reshape(-1), next_id], dim=-1)
-        return prefill_time, input_echo_len, prefill_response, next_id
+        return prefill_time, input_echo_len, next_id
 
     def run_decode(self, input_datas):
         input_name = self.decode.get_input_name(0)
@@ -217,28 +192,18 @@ class HmQwenXh2:
         decode_time = time.time() - decode_start_time
         return decode_time, input_datas
 
-    def chat(self, questions):    
-        max_decode_count = 0
-        all_questions = []
-        all_responses = []
+    def chat(self, isq, osq):
         input_echo_lens = []
         all_prefill_time = 0
         all_decode_time = 0
+        print("total prefill count:", isq)
         for b in range(self.batch):
-            question = questions.pop(0)
-            self.current_questions[b] = question
-            all_input_id = self.preprocess_prefill(question)
-            prefill_time, input_echo_len, prefill_response, next_id = self.run_prefill(b, all_input_id)
+            all_input_id = self.preprocess_prefill(isq)
+            prefill_time, input_echo_len, next_id = self.run_prefill(b, all_input_id)
             all_prefill_time += prefill_time
             self.next_ids[b] = next_id
-            self.current_responses[b] = prefill_response
             self.current_echo_lens[b] = input_echo_len
-        slide_len = 10  # sliding window length for decode
-        skip_tokens = [0] * self.batch
-        decode_responses = [''] * self.batch
-        last_responses = [self.tokenizer.decode(
-            self.chat_history_ids[b].tolist()[-slide_len:],
-        ) for b in range(self.batch)]
+            input_echo_lens.append(input_echo_len)
         input_datas = [
             F.embedding(
                 self.next_ids[b].unsqueeze(0),
@@ -246,59 +211,18 @@ class HmQwenXh2:
             ).reshape(1, -1).float().numpy() for b in range(self.batch)
         ]
         self.context_lengths = self.current_echo_lens
-        self.show_response()
-
-        while not all(self.decode_break[:self.batch]):
+        count = 0
+        print("total decode count:", osq)
+        while count < osq - 1:
             decode_time, input_datas = self.run_decode(np.array(input_datas))
-            max_decode_count += 1
             all_decode_time += decode_time
             self.next_ids = [input_datas[b].argmax(-1) for b in range(self.batch)]
             self.next_ids = [torch.from_numpy(next_id) for next_id in self.next_ids]
             for b in range(self.batch):
-                if self.context_lengths[b] + 1 >= self.context_max_length:
-                    self.decode_break[b] = True
-                if self.next_ids[b] == self.tokenizer.eos_token_id:
-                    self.current_responses[b] += decode_responses[b]
-                    self.decode_break[b] = True
-                else:
                     self.context_lengths[b] += 1
-                if not self.decode_break[b]:
-                    self.chat_history_ids[b] = torch.cat([self.chat_history_ids[b], self.next_ids[b]], dim=-1)
-                    decode_responses[b] = self.tokenizer.decode(
-                        self.chat_history_ids[b].tolist()[-(slide_len+1)-skip_tokens[b]:],
-                    )[len(last_responses[b]):]
-                else:
-                    decode_responses[b] = ''
-                if decode_responses[b] != '' and is_valid_char(ord(decode_responses[b][-1])):
-                    self.current_responses[b] += decode_responses[b]
-                    last_responses[b] = self.tokenizer.decode(
-                        self.chat_history_ids[b].tolist()[-slide_len:],
-                    )
-                    skip_tokens[b] = 0
-                else:
-                    skip_tokens[b] += 1
-            self.show_response()
-            for b in range(self.batch):
-                if self.decode_break[b] == True and len(questions) != 0:
-                    question = questions.pop(0)
-                    all_questions.append(self.current_questions[b])
-                    all_responses.append(self.current_responses[b])
-                    input_echo_lens.append(self.current_echo_lens[b])
-                    self.current_questions[b] = question
-                    all_input_id = self.preprocess_prefill(question)
-                    prefill_time, input_echo_len, prefill_response, next_id = self.run_prefill(b, all_input_id)
-                    all_prefill_time += prefill_time
-                    self.next_ids[b] = next_id
-                    self.current_responses[b] = prefill_response
-                    self.current_echo_lens[b] = input_echo_len
-                    self.context_lengths[b] = input_echo_len
-                    self.decode_break[b] = False
-                    skip_tokens[b] = 0
-                    last_responses[b] = self.tokenizer.decode(self.chat_history_ids[b].tolist()[-slide_len:])
-
             input_datas = []
             for b in range(self.batch):
-                next_id = torch.from_numpy(np.array(self.next_ids[b]))
+                next_id = torch.from_numpy(np.asarray(self.next_ids[b]))
                 input_datas.append(
                     F.embedding(
                         next_id.unsqueeze(
@@ -306,28 +230,17 @@ class HmQwenXh2:
                         ), self.embedding_weight,
                     ).reshape(1, -1).float().numpy(),
                 )
-        sys.stdout.write("\033[0m")
-        sys.stdout.flush()
-        for b in range(self.batch):
-            all_questions.append(self.current_questions[b])
-            all_responses.append(self.current_responses[b])
-            input_echo_lens.append(self.current_echo_lens[b])
-        return self.batch, all_questions, all_responses, sum(input_echo_lens), max_decode_count*self.batch, all_prefill_time, all_decode_time
+            count += 1
+        return self.batch, sum(input_echo_lens), count*self.batch, all_prefill_time, all_decode_time
 
 
 if __name__ == "__main__":
     args = get_args()
     if HOUMO_TARGET == 'xh2':
-        hmqwen = HmQwenXh2(args.prefill_path, args.decode_path, args.embedding_path, args.tokenizer_dir, forbid_flush=args.forbid_flush)
-    questions = ["1+1=?", "你好", "写一个冷笑话", "请介绍一下时间晶体","请介绍一下存算一体技术的优势"]
-    start_time = time.time()
-    batch, questions, responses, input_tokens, decode_tokens, prefill_time, decode_time = hmqwen.chat(questions)
-    for i in range(len(questions)):
-        print(f"{"\033[35m"}{"Question{}:".format(i)}")
-        print(f"{"\033[96m"}{questions[i]}")
-        print(f"{"\033[35m"}{"Response{}:".format(i)}")
-        print(f"{"\033[96m"}{responses[i]}")
+        hmqwen = HmQwenXh2(args.prefill_path, args.decode_path, args.embedding_path, args.tokenizer_dir)
 
+    start_time = time.time()
+    batch, input_tokens, decode_tokens, prefill_time, decode_time = hmqwen.chat(args.isq, args.osq)
     total_time = time.time() - start_time
 
     logger.success(f"batch: {batch} input: {input_tokens} tokens, generate: {decode_tokens + batch} tokens, total cost {total_time:.3f} s")
