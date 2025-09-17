@@ -367,7 +367,7 @@ if __name__ == "__main__":
     if HOUMO_TARGET == 'xh1':
         hmqwen = HmQwen(args.model_dir, args.prefill_length, args.decode_length, nblocks=args.nblocks)
     elif HOUMO_TARGET == 'xh2':
-        hmqwen = HmQwenXh2(args.model_dir, args.prefill_length, args.decode_length, nblocks=args.nblocks)
+        hmqwen = HmQwenXh2(args.model_dir, args.prefill_length, args.decode_length, nblocks=args.nblocks, ndevice=args.ndevice)
     question = "请介绍一下存算一体技术的优势"
 
     start_time = time.time()
