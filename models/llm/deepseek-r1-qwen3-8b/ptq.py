@@ -1,7 +1,6 @@
 import argparse
 import os
 from quant_pipline import quant_llm, export_llm, move_llm
-
 HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '')
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', '')
 
@@ -31,7 +30,11 @@ def parse_args():
     parser.add_argument("--input-sequence-length", type=int, default=256, help="input sequence length")
     parser.add_argument("--quant-type", default="w4a8_ssfp", help="quant type, default is w4a8_ssfp")
     parser.add_argument("--rmsnorm-mode", default="normal", choices=["normal", "fast"], help="rmsnorm mode, default is normal")
+    parser.add_argument("--gptqmodel",action="store_true",default=False)
+    parser.add_argument("--calibration-dataset", type=str, default=None, help="customized calibrate dataset, should be a json file")
     args = parser.parse_args()
+    if args.calibration_dataset and not args.gptqmodel:
+        parser.error("If the calibration dataset feature (--calibration-dataset) is enabled, the --gptqmodel parameter must be provided")
     return args
 
 def main():
