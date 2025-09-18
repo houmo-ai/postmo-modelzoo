@@ -10,6 +10,7 @@ import lzma
 import tarfile
 import torch
 import numpy as np
+import random
 import onnx
 from onnx import TensorProto
 from pathlib import Path
@@ -116,6 +117,16 @@ def load_npz(npz_path):
             x = data[key]
             in_datas[key] = x.copy()
     return in_datas
+
+
+def set_random_seed(seed=1234):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 torch_to_numpy_dtype = {

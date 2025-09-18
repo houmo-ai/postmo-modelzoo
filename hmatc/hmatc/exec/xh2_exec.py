@@ -93,14 +93,18 @@ class Xh2Exec(BaseExec):
             if hasattr(self.ApplicationOnnxOpt, "opt_model_path"):
                 self.model_path = self.ApplicationOnnxOpt.opt_model_path
 
-        from xhquant.api import (
-            DeviceType,
-            HMONNXGoldenInference,
-            HMONNXInference,
-            QuantScheme,
-            convert_onnx_to_hmonnx,
-            create_quant_config,
-        )
+        try:
+            from xhquant.api import (
+                DeviceType,
+                HMONNXGoldenInference,
+                HMONNXInference,
+                QuantScheme,
+                convert_onnx_to_hmonnx,
+                create_quant_config,
+            )
+        except ImportError:
+            logger.error("Not found xhquant module, and please install xhquant.")
+            exit(-1)
 
         quant_scheme = QuantScheme(
             target_device=DeviceType.XH2a, quant_type=self.quant_type
@@ -164,7 +168,12 @@ class Xh2Exec(BaseExec):
     def build(self):
         if not os.path.exists(self.build_output_dir):
             os.makedirs(self.build_output_dir)
-        import tcim
+
+        try:
+            import tcim
+        except ImportError:
+            logger.error("Not found tcim module, and please install tcim first!")
+            exit(-1)
 
         t_start = time.time()
         tcim.build_from_hmonnx(

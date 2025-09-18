@@ -1,12 +1,15 @@
 import os
 import time
-from abc import ABC
-
 import numpy as np
-import tcim_lite
-
+from abc import ABC
 from ..base.base_infer import BaseInfer
 from ..utils import logger
+
+try:
+    import tcim_lite
+except ImportError:
+    logger.error("Not found tcim_lite module, and please install tcim_lite first.")
+    exit(-1)
 
 
 class Xh1Infer(BaseInfer, ABC):
@@ -21,6 +24,7 @@ class Xh1Infer(BaseInfer, ABC):
         if not os.path.exists(model_path):
             logger.error(f"model path: {model_path} not exists.")
             exit(-1)
+
         if device_id >= tcim_lite.runtime.get_device_num():
             logger.error(f"device_id: {device_id} out of range")
             exit(-1)

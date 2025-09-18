@@ -1,15 +1,17 @@
 import os
 import time
-from abc import ABC
-from typing import Dict
-
 import numpy as np
 import torch
-from xhquant.api import HMONNXInference, xhquant_init
-
+from abc import ABC
+from typing import Dict
 from ..base.base_infer import BaseInfer
 from ..utils import logger
 from ..utils.utils import torch_to_numpy_dtype
+try:
+    from xhquant.api import HMONNXInference, xhquant_init
+except ImportError:
+    logger.error("Please install xhquant first.")
+    exit(-1)
 
 
 class Xh2HmQuantInfer(BaseInfer, ABC):

@@ -21,6 +21,7 @@ from .utils.utils import (
     get_hmquant_xh1_version,
     get_hmquant_xh2_version,
     get_package_version,
+    set_random_seed,
 )
 from .onnx_tool import model_profile
 
@@ -814,7 +815,8 @@ def main():
     logger.info(
         f"Hmatc version: {__version__}, commit: {__commit__}, build time: {__build_time__}"
     )
-
+    # 设置随机种子
+    set_random_seed(1234)
     # 处理批量模型benchmark
     current_command = args.command
     if current_command == "benchmark":

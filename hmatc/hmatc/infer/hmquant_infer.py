@@ -21,7 +21,11 @@ class HmQuantInfer(BaseInfer, ABC):
         if not os.path.exists(model_path):
             logger.error(f"model path: {model_path} not exists.")
             exit(-1)
-        from hmquant.api import quant_single_onnx_network
+        try:
+            from hmquant.api import quant_single_onnx_network
+        except ImportError:
+            logger.error("Not found hmquant module, and please install hmquant first.")
+            exit(-1)
 
         with open(model_path, "rb") as f:
             self.engine = pickle.load(f)
