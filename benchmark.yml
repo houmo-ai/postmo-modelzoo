@@ -2,28 +2,117 @@
 models:
   # location: [str] the config file path
   # config: [str] the model config file path, default: config.yml
-  # batch: [int] batch size, default: 1
-  # ncore: [int] core number of each module infer, default: 1
-  # thread_num: [int] thread number of each module infer, default: 8
+  # exec_cfgs: [{batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}, ...] the model execution configs
+  # batch_num: [int] run batch num, default: 1
+  # core_num: [int] run core num, default: 1
+  # thread_num: [int] run thread num, default: 1
+  # enable_eval: [bool] whether to enable eval, default: false
   resnet50: 
     location: models/backbone/resnet50
-  resnet50_t4: 
-    location: models/backbone/resnet50
-    thread_num: 4 
-  resnet50_b6: 
-    location: models/backbone/resnet50
-    batch: 6
-  resnet50_b6t4: 
-    location: models/backbone/resnet50
-    batch: 6
-    thread_num: 4
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
   mobilenetv2: 
     location: models/backbone/mobilenetv2
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
   efficientnet: 
     location: models/backbone/efficientnet
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
   yolov5s:
     location: models/detection/yolov5s
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
   yolov3:
     location: models/detection/yolov3
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
   yolop: 
     location: models/autodrive/yolop
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
+  ViT-B-16: 
+    location: models/backbone/ViT-B-16
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
+  yolov8m:
+    location: models/detection/yolov8m
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
+  yolov8m-pose:
+    location: models/estimation/yolov8m-pose
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
+  yolo12m:
+    location: models/detection/yolo12m
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
+  yolov8m-seg:
+    location: models/segmentation/yolov8m_seg
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
+  LPRNet:
+    location: models/ocr/lprnet
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
+  

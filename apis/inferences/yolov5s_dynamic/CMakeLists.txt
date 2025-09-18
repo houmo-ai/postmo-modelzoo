@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16.3)
-project(example_yolov5s)
+project(example_yolov5s_dynamic)
 
 option(ENABLE_ORT "Whether it supports the onnxruntime c++ environment" OFF)
 

@@ -47,13 +47,19 @@ if __name__ == '__main__':
     quant_path = "models/deepseek/hmquant_deepseek_256_8192_20250322.zip"
     hmm_path = "models/deepseek/hmm_deepseek_256_8192_4cores_20250322.zip"
 
-    if model_type == "raw" or model_type == "all":
+    if model_type in ["raw", "all"]:
+        ignore_patterns = []
         get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
-        from modelscope import snapshot_download
-        snapshot_download('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B', local_dir='DeepSeek-R1-Distill-Qwen-7B')
+    else:
+        ignore_patterns = ["*.safetensors"]
 
-    if model_type == "quant" or model_type == "all":
+    from modelscope import snapshot_download
+    snapshot_download('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B',
+                      local_dir='DeepSeek-R1-Distill-Qwen-7B',
+                      ignore_patterns=ignore_patterns)
+
+    if model_type in ["quant", "all"]:
         get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
 
-    if model_type == "hmm" or model_type == "all":
+    if model_type in ["hmm", "all"]:
         get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))

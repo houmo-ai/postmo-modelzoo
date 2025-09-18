@@ -96,4 +96,7 @@ pred*
 *.tar.xz
 *.tar.gz
 *.zip
-
+output*
+wiki*
+.msc
+.mv

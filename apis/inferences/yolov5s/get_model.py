@@ -12,14 +12,14 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--model_dir",
+        dest="model_dir",
         type=str,
-        default='',
-        help='where to save downloaded model',
+        default="",
+        help="where to save downloaded model",
     )
     parser.add_argument(
-        '--enable_ort',
+        "--enable_ort",
         action="store_true",
         help="install onnxruntime environment to support post-processing model inference.",
     )
@@ -62,7 +62,7 @@ if __name__ == "__main__":
         os.environ["HOUMO_MODELZOO_URL"] = (
             "http://139.224.0.199:8082/artifactory/houmo/release"
         )
-    HOUMO_TARGET = os.environ.get('HOUMO_TARGET', 'houmo')
+    HOUMO_TARGET = os.environ.get("HOUMO_TARGET", "houmo")
 
     model_dir = (
         os.path.join(HOUMO_EXAMPLES_PATH, "apis/models")

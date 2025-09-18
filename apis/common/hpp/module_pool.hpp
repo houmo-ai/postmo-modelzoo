@@ -160,12 +160,6 @@ class ModulePool {
    */
   ModulePoolStats GetStats(bool is_print = false);
   /**
-   * @brief Get the HM device ID of the specified model.
-   * @param module_name model name, used to specify the model.
-   * @return Device ID.
-   */
-  int32_t GetDeviceId(const std::string& module_name);
-  /**
    * @brief Get the number of loaded models of the specified model.
    * @param module_name model name, used to specify the model.
    * @return The number of loaded models.
@@ -191,19 +185,15 @@ class ModulePool {
   ModulePool(const ModulePool&) = delete;
   ModulePool& operator=(const ModulePool&) = delete;
 
-  bool CheckDeviceId(const int& device_id);
-  int LoadModule(bool is_file, const int& device_id,
+  int LoadModule(bool is_file,
                  const std::string& module_name,
                  const tcim::Module::Option& option,
                  const void* model_data = nullptr, const int& len = 0);
   static void InferThread(int stream_id, std::shared_ptr<InferTaskQueue> qin);
 
   std::mutex module_mutex_;
-  std::mutex module_dev_mutex_;
   std::mutex infer_stats_mutex_;
   std::map<std::string, std::vector<tcim::Module*>> module_map_;
-  std::map<std::string, tcim::Module::WeightManager> module_wm_map_;
-  std::map<std::string, int32_t> module_device_map_;
   std::map<std::string, MdInferStats*> infer_stats_map_;
 
   static ModulePool* module_pool_;
@@ -516,13 +506,7 @@ PooledModule* ModulePool::Load(const std::string& module_name,
     return nullptr;
   }
 
-  int device_id = option.device_id;
-  if (device_id < 0) {
-    LOG_ERROR("Invalid module option, device id is {}.", device_id);
-    return nullptr;
-  }
-
-  auto ret = LoadModule(false, device_id, module_name, option, model_data, len);
+  auto ret = LoadModule(false, module_name, option, model_data, len);
   if (ret != tcim::Status::OK) {
     LOG_ERROR("Load model ({}){} failed, length is {}.", model_data,
               module_name, len);
@@ -543,13 +527,7 @@ PooledModule* ModulePool::Load(const std::string& model_path,
     return nullptr;
   }
 
-  int device_id = option.device_id;
-  if (device_id < 0) {
-    LOG_ERROR("Invalid module option, device id is {}.", device_id);
-    return nullptr;
-  }
-
-  auto ret = LoadModule(true, device_id, model_path, option);
+  auto ret = LoadModule(true, model_path, option);
   if (ret != tcim::Status::OK) {
     LOG_ERROR("Load model {} failed.", model_path);
     return nullptr;
@@ -560,14 +538,6 @@ PooledModule* ModulePool::Load(const std::string& model_path,
       model_path, module_map_[model_path].back(), module_pool_, infer_queue_);
 
   return pooled_md;
-}
-
-int32_t ModulePool::GetDeviceId(const std::string& module_name) {
-  std::lock_guard<std::mutex> module_dev_lock(module_dev_mutex_);
-  if (module_device_map_.find(module_name) == module_device_map_.end()) {
-    return -1;
-  }
-  return module_device_map_[module_name];
 }
 
 int32_t ModulePool::GetLoadedModuleNum(const std::string& module_name) {
@@ -663,57 +633,27 @@ int ModulePool::UpdateInferStats(const std::string& module_name,
   return 0;
 }
 
-bool ModulePool::CheckDeviceId(const int& device_id) {
-  std::lock_guard<std::mutex> module_dev_lock(module_dev_mutex_);
-  if (module_device_map_.empty()) {
-    return true;
-  }
-  for (const auto& pair : module_device_map_) {
-    if (pair.second != device_id) {
-      return false;
-    }
-  }
-  return true;
-}
-
-int ModulePool::LoadModule(bool is_file, const int& device_id,
+int ModulePool::LoadModule(bool is_file,
                            const std::string& module_name,
                            const tcim::Module::Option& option,
                            const void* model_data, const int& len) {
   std::lock_guard<std::mutex> module_lock(module_mutex_);
 
-  if (!CheckDeviceId(device_id)) {
-    LOG_ERROR("Invalid device id {}.", device_id);
-    return -1;
-  }
-
   int module_num = module_map_[module_name].size();
   if (module_num < module_max_num_) {
-    tcim::Module::WeightManager wm;
     if (module_num == 0) {
       // the first time to load model
-      wm = tcim::Module::WeightManager::CreateWeightManager(device_id);
-      module_wm_map_[module_name] = wm;
-      {
-        std::lock_guard<std::mutex> module_dev_lock(module_dev_mutex_);
-        module_device_map_[module_name] = device_id;
-      }
       {
         std::lock_guard<std::mutex> infer_stats_lock(infer_stats_mutex_);
         infer_stats_map_[module_name] = new MdInferStats();
       }
-    } else {
-      wm = module_wm_map_[module_name];
     }
-    tcim::Module::Option option_new(device_id);
-    option_new = option;
-    option_new.weight_manager = wm;
     tcim::Status ret;
     tcim::Module* module = new tcim::Module();
     if (is_file) {
-      ret = module->LoadModel(module_name, option_new);
+      ret = module->LoadModel(module_name, option);
     } else {
-      ret = module->LoadModel(model_data, len, option_new);
+      ret = module->LoadModel(model_data, len, option);
     }
     if (ret != tcim::Status::OK) {
       return ret;

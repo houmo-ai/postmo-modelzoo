@@ -271,6 +271,7 @@ class HmQwen:
 
         return all_response, decode_count + 1, prefill_time, decode_time
 
+
 if __name__ == "__main__":
 
     args = get_args()

@@ -130,9 +130,8 @@ int postprocess(const std::vector<cv::Mat> &imgs, const std::vector<tcim::Tensor
 }
 
 int main() {
-    const std::string model_path = "/data/repo/imodelzoo/models/detection/yolov5s/output/xh1/yolov5s_clip_xh1_b1_1roi_1core_O2_dynamic_v2.hmm";
-    const std::string img_path = "/data/repo/imodelzoo/data/datasets/coco2017/val2017/000000000139.jpg";
-    const std::string input_name = "images";
+    const std::string model_path = "yolov5s_clip_xh1_b1_1roi_1core_O2_dynamic_v2.hmm";
+    const std::string img_path = "../../data/000000000139.jpg";
     // 读图
     cv::Mat img = cv::imread(img_path);
     if (img.empty()) {
@@ -156,7 +155,7 @@ int main() {
     printf("Model Version: %s\n", module.GetModelVersion().c_str());
     printf("Model CoreNum: %d\n", module.GetCoreNum());
     printf("Model InputNum: %d\n", module.GetInputNum());
-    printf("Model OutputNum: %d\n", module.GetInputNum());
+    printf("Model OutputNum: %d\n", module.GetOutputNum());
     for (int i = 0; i < module.GetInputNum(); ++i) {
         std::string name = module.GetInputName(i);
         auto info = module.GetInputInfo(name);

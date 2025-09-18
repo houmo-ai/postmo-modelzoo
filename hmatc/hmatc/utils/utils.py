@@ -10,6 +10,7 @@ import lzma
 import tarfile
 import torch
 import numpy as np
+import random
 import onnx
 from onnx import TensorProto
 from pathlib import Path
@@ -64,7 +65,7 @@ def get_hmquant_xh1_version():
         v = version("hmquant-xh1")  # 替换成你想查的包名
         return v
     except PackageNotFoundError:
-        return "unknown"
+        return "N/A"
 
 
 def get_hmquant_xh2_version():
@@ -73,7 +74,7 @@ def get_hmquant_xh2_version():
         v = version("hmquant_xh2")  # 替换成你想查的包名
         return v
     except PackageNotFoundError:
-        return "unknown"
+        return "N/A"
 
 
 def get_package_version(package_name: str):
@@ -82,7 +83,7 @@ def get_package_version(package_name: str):
         v = version(package_name)  # 替换成你想查的包名
         return v
     except PackageNotFoundError:
-        return f"{package_name} not installed"
+        return "N/A"
 
 
 def get_onnx_inputs_info(onnx_path):
@@ -116,6 +117,16 @@ def load_npz(npz_path):
             x = data[key]
             in_datas[key] = x.copy()
     return in_datas
+
+
+def set_random_seed(seed=1234):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 torch_to_numpy_dtype = {
@@ -172,7 +183,7 @@ def download_file(url, save_path, file_name, file_size, chunk_size=1024 * 1024):
                 total=file_size,
                 unit="B",
                 unit_scale=True,
-                unit_divisor=4096,
+                unit_divisor=1024,
                 desc=file_name,
             ) as pbar:
                 with open(save_path, "wb") as f:

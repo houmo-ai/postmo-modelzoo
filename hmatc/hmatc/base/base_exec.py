@@ -3,6 +3,7 @@ import os
 import sys
 import importlib
 import numpy as np
+import torch
 from pathlib import Path
 from datetime import datetime
 from ..utils import logger
@@ -15,8 +16,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         Args:
             cfg (dict): 来自配置文件
         """
-        # self.device = "cuda" if torch.cuda.is_available() else "cpu",
         self.device = "cpu"
+        logger.info(f"Using device: {self.device}")
         self.target = cfg["target"]
         self.model_cfg = cfg.get("model")
         self.model_path = self.model_cfg.get("model_path", "")
@@ -49,12 +50,12 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.model_input_batch = self.model_inputs_batch[
             self.inputs_name[0]
         ]  # 用户配置的输入batch
-        if self.is_multi_input_model:
-            for idx in range(1, len(self.inputs_name)):
-                batch = self.model_inputs_batch[self.inputs_name[idx]]
-                if self.model_input_batch != batch:
-                    logger.error("all input batch must be same")
-                    exit(-1)
+        # if self.is_multi_input_model:
+        #     for idx in range(1, len(self.inputs_name)):
+        #         batch = self.model_inputs_batch[self.inputs_name[idx]]
+        #         if self.model_input_batch != batch:
+        #             logger.error("all input batch must be same")
+        #             exit(-1)
         self.quant_cfg = cfg.get("quant")
         self.calib_method = self.quant_cfg.get("calib_method", "minmax")
         if self.calib_method not in [
@@ -153,6 +154,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             random_data = np.random.randint(low=0, high=128, size=shape, dtype=dtype)
         elif dtype == "int32":
             random_data = np.random.randint(low=0, high=128, size=shape, dtype=dtype)
+        elif dtype == "int64":
+            random_data = np.random.randint(low=0, high=128, size=shape, dtype=dtype)
         elif dtype == "uint8":
             random_data = np.random.randint(low=0, high=255, size=shape, dtype=dtype)
         elif dtype == "bool":
@@ -198,11 +201,11 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         model_impl_cls = self.model_cfg.get("model_impl_cls")
         if model_impl_module is None or model_impl_cls is None:
             logger.error("model_impl_module or model_impl_cls is None")
-            exit(-1)
+            return None
         model_impl_module_path = f"{model_impl_module}.py"
         if not os.path.exists(model_impl_module_path):
             logger.error(f"model_impl_module not exists -> {model_impl_module_path}")
-            exit(-1)
+            return None
         Model = self.import_py_module_from_file(model_impl_module_path, model_impl_cls)
         logger.info(f"from {model_impl_module} import {model_impl_cls} successfully")
         return Model(
@@ -219,16 +222,16 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         dataset_cls = self.eval_cfg.get("dataset_cls")
         if dataset_module is None or dataset_cls is None:
             logger.error("dataset_module or dataset_cls is None")
-            exit(-1)
+            return None
         module_path = f"{dataset_module}.py"
         if not os.path.exists(module_path):
             logger.error(f"dataset_module not exists -> {dataset_module}")
-            exit(-1)
+            return None
         Dataset = self.import_py_module_from_file(module_path, dataset_cls)
         logger.info(f"from {dataset_module} import {dataset_cls} successfully")
         return Dataset(root_path=data_dir)
 
-    def demo(self, backend):
+    def demo(self, backend, device_id=0):
         """Demo入口"""
         if not self.demo_cfg:
             logger.error("demo config not found")
@@ -251,6 +254,10 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         if test_num < 0:
             logger.error(f"test_num must >= 0 -> {test_num}")
             return {}
+        model = self.get_model(backend)
+        if model is None:
+            logger.error("Failed to get model")
+            return {}
         filenames = os.listdir(data_dir)
         data_num = len(filenames)
         if test_num > 0 and test_num < data_num:
@@ -262,13 +269,12 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 logger.warning(f"filepath not exists -> {filepath}")
                 continue
             filepaths.append(filepath)
-        model = self.get_model(backend)
         model_path = self.model_path if backend == "onnx" else self.hmm_path
-        model.load(model_path)
+        model.load(model_path, device_id)
         model.demo(filepaths)
         model.unload()
 
-    def evaluate(self, backend):
+    def evaluate(self, backend, device_id=0):
         """评估入口"""
         if not self.eval_cfg:
             logger.error("eval config not found")
@@ -293,10 +299,16 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             return {}
         # 获取dataset
         dataset = self.get_dataset(data_dir)
+        if dataset is None:
+            logger.error("get_dataset failed")
+            return {}
         # 获取模型
         model = self.get_model(backend)
+        if model is None:
+            logger.error("Failed to get model")
+            return {}
         model_path = self.model_path if backend == "onnx" else self.hmm_path
-        model.load(model_path)
+        model.load(model_path, device_id)
         res = model.evaluate(dataset, num)
         model.unload()
         logger.info(f"{res}")
@@ -304,13 +316,13 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
     @staticmethod
     def model_perf(
-        model_path, warmup_num, sample_num, loop_num=1, device_num=1, thread_num=1
+        model_path, warmup_num, sample_num, loop_num=1, device_id=1, thread_num=1
     ):
         from ..python import perf
 
         # TODO 使用golden数据
         perf_info = perf.CModelRunner(
-            model_path, sample_num, thread_num, device_num, loop_num, warmup_num
+            model_path, sample_num, thread_num, device_id, loop_num, warmup_num
         )
         t_start = datetime.now().strftime("%Y%m%d%H%M%S")
         res_info = {
@@ -319,7 +331,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                     "params": {
                         "hmm_path": model_path,
                         "thread_num": thread_num,
-                        "device_num": device_num,
+                        "device_num": device_id,
                         "loop_num": loop_num,
                         "warmup_num": warmup_num,
                         "sample_num": sample_num,

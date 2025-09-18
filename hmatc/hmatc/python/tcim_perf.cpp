@@ -261,14 +261,16 @@ perfInfo_t ModelRunner(
     const std::string &model_path,
     int sample_num,
     int thread_num,
-    int device_num,
+    int device_id,
     int loop_num,
     int warm_up) {
 
+    int device_num = 1;
     if (auto platform = std::getenv("HDPL_PLATFORM")) {
         if (strcmp(platform, "ASIC")) {
             thread_num = 1;
             device_num = 1;
+            device_id = 0;
         }
     }
 
@@ -277,8 +279,14 @@ perfInfo_t ModelRunner(
     std::cout << "loops: " << loop_num << std::endl;
     std::cout << "warmup: " << warm_up << std::endl;
     std::cout << "threads: " << thread_num << std::endl;
-    std::cout << "devices: " << device_num << std::endl;
+    // std::cout << "devices: " << device_num << std::endl;
+    std::cout << "device_id: " << device_id << std::endl;
 
+    if (device_id >= tcim::GetDeviceNum()) {
+        std::cout << COLOR_RED << "[error] device_id >= device_num" << COLOR_RESET
+                  << std::endl;
+        exit(-1);
+    }
     if (sample_num < thread_num) {
         std::cout
             << COLOR_YELLOW
@@ -324,10 +332,29 @@ perfInfo_t ModelRunner(
         json custom_msg = json::parse(custom_msg_str);
         for (auto &item : inputs) {
             std::string dyn_info_name = "resizer_crop_" + item.first;
-            auto &raw_input_shape = custom_msg[item.first]["shape"];
+            auto &model_input_shape = custom_msg[item.first]["shape"];
             auto &shape = inputs[item.first].shape;
             assert(shape.size() == 4);
-            assert(raw_input_shape.size() == 4);
+            assert(model_input_shape.size() == 4);
+            int32_t RESIZER_IMAGE_INPUT_H = shape[2];
+            int32_t RESIZER_IMAGE_INPUT_W = shape[3];
+            int32_t MODEL_INPUT_H = model_input_shape[2];
+            int32_t MODEL_INPUT_W = model_input_shape[3];
+            // 随机数的情况下，默认是crop全图，会出现缩放倍数超过[1/16, 32)
+            int32_t RESIZER_CROP_H = RESIZER_IMAGE_INPUT_H;
+            int32_t RESIZER_CROP_W = RESIZER_IMAGE_INPUT_W;
+            if (RESIZER_IMAGE_INPUT_H >= MODEL_INPUT_H) {  // 下采样
+                if ((float)RESIZER_IMAGE_INPUT_H / MODEL_INPUT_H > 16.0f)
+                    RESIZER_CROP_H = MODEL_INPUT_H * 16;
+            } else {  // 上采样
+                assert(float(MODEL_INPUT_H) / RESIZER_IMAGE_INPUT_H < 32.0f);
+            }
+            if (RESIZER_IMAGE_INPUT_W >= MODEL_INPUT_W) {
+                if ((float)RESIZER_IMAGE_INPUT_W / MODEL_INPUT_W > 16.0f)
+                    RESIZER_CROP_W = MODEL_INPUT_W * 16;
+            } else {
+                assert(float(MODEL_INPUT_W) / RESIZER_IMAGE_INPUT_W < 32.0f);
+            }
             std::string dyn_info_str;
             for (int idx = 0; idx < input_num; ++idx) {
                 auto input_name = module.GetInputName(idx);
@@ -347,15 +374,15 @@ perfInfo_t ModelRunner(
                 for (int n = 0; n < batch; ++n) {
                     data[n * step + 0] = 0;
                     data[n * step + 1] = 0;
-                    data[n * step + 2] = shape[2];
-                    data[n * step + 3] = shape[3];
+                    data[n * step + 2] = RESIZER_CROP_H;
+                    data[n * step + 3] = RESIZER_CROP_W;
                     dyn_info_str = std::to_string(data[n * step + 0]) + ", " +
                                    std::to_string(data[n * step + 1]) + ", " +
                                    std::to_string(data[n * step + 2]) + ", " +
                                    std::to_string(data[n * step + 3]);
                     if (step == 10) {
-                        data[n * step + 4] = raw_input_shape[2];
-                        data[n * step + 5] = raw_input_shape[3];
+                        data[n * step + 4] = MODEL_INPUT_H;
+                        data[n * step + 5] = MODEL_INPUT_W;
                         data[n * step + 6] = 0;
                         data[n * step + 7] = 0;
                         data[n * step + 8] = 0;
@@ -494,22 +521,24 @@ perfInfo_t ModelRunner(
     StreamInfo stream_info;
     stream_info.counts.resize(4);
     stream_info.streams.resize(4);
-    for (int did = 0; did < device_num; did++) {
-        auto weight_manager = tcim::Module::WeightManager::CreateWeightManager(did);
-        for (int tid = 0; tid < thread_num; tid++) {
-            ThreadInfo *info = &thread_info[did * thread_num + tid];
-            info->model_path = model_path;
-            info->weight_manager = weight_manager;
-            info->loop_num = loop_num;
-            info->infer_only = true;
-            info->is_result_check = false;
-            info->warm_up = warm_up;
-            int id = did * thread_num + tid;
-            threads.push_back(std::thread(thread_func, id, did, std::ref(*info),
-                                          std::ref(stream_info), std::ref(qin),
-                                          std::ref(qout), std::ref(barrier)));
-        }
+    // for (int did = 0; did < device_num; did++) {
+    int did = device_id;
+    auto weight_manager = tcim::Module::WeightManager::CreateWeightManager(did);
+    for (int tid = 0; tid < thread_num; tid++) {
+        // ThreadInfo *info = &thread_info[did * thread_num + tid];
+        ThreadInfo *info = &thread_info[tid];
+        info->model_path = model_path;
+        info->weight_manager = weight_manager;
+        info->loop_num = loop_num;
+        info->infer_only = true;
+        info->is_result_check = false;
+        info->warm_up = warm_up;
+        // int idx = did * thread_num + tid;
+        threads.push_back(std::thread(thread_func, tid, did, std::ref(*info),
+                                      std::ref(stream_info), std::ref(qin),
+                                      std::ref(qout), std::ref(barrier)));
     }
+    // }
     barrier.wait();
     barrier.reset();
     auto start = GET_TIME();

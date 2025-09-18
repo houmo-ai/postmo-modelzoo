@@ -93,14 +93,18 @@ class Xh2Exec(BaseExec):
             if hasattr(self.ApplicationOnnxOpt, "opt_model_path"):
                 self.model_path = self.ApplicationOnnxOpt.opt_model_path
 
-        from xhquant.api import (
-            DeviceType,
-            HMONNXGoldenInference,
-            HMONNXInference,
-            QuantScheme,
-            convert_onnx_to_hmonnx,
-            create_quant_config,
-        )
+        try:
+            from xhquant.api import (
+                DeviceType,
+                HMONNXGoldenInference,
+                HMONNXInference,
+                QuantScheme,
+                convert_onnx_to_hmonnx,
+                create_quant_config,
+            )
+        except ImportError:
+            logger.error("Not found xhquant module, and please install xhquant.")
+            exit(-1)
 
         quant_scheme = QuantScheme(
             target_device=DeviceType.XH2a, quant_type=self.quant_type
@@ -112,7 +116,7 @@ class Xh2Exec(BaseExec):
             input_cfg = self.inputs_cfg[input_name]
             shape = input_cfg["shape"]
             dtype_str = self.onnx_inputs_info[input_name]["dtype"]
-            in_datas.append(torch.randn(shape, dtype=str_to_torch_dtype(dtype_str)))
+            in_datas.append(torch.from_numpy(self.gen_random_data(shape, dtype_str)))
         # 量化以及HMONNX导出
         t_start = time.time()
         convert_onnx_to_hmonnx(
@@ -164,7 +168,12 @@ class Xh2Exec(BaseExec):
     def build(self):
         if not os.path.exists(self.build_output_dir):
             os.makedirs(self.build_output_dir)
-        import tcim
+
+        try:
+            import tcim
+        except ImportError:
+            logger.error("Not found tcim module, and please install tcim first!")
+            exit(-1)
 
         t_start = time.time()
         tcim.build_from_hmonnx(
@@ -198,9 +207,9 @@ class Xh2Exec(BaseExec):
         res_info = {"build": {"time": span}}
         return res_info
 
-    def check_golden(self):
+    def check_golden(self, device_id=0):
         xh2 = Xh2Infer()
-        xh2.load(self.hmm_path)
+        xh2.load(self.hmm_path, device_id=device_id)
         in_datas = dict()
         for input_name in self.inputs_cfg:
             new_name = input_name.replace("/", "_")

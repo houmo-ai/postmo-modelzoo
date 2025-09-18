@@ -97,8 +97,9 @@ def get_args() -> argparse.Namespace:
 
 def build(model_name, model_dir, model_path, output_dir, profile, ncore, ndevice, context_length, batch=None):
     import tcim
+
+    kwargs = {}
     if HOUMO_TARGET == "xh2":
-        kwargs = {}
         kwargs["modify_llm"] = {}
         if ndevice:
             kwargs["ndevice"] = ndevice

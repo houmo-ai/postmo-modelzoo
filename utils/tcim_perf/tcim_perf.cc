@@ -419,6 +419,25 @@ int main(int argc, char *argv[]) {
     assert(img_shape.size() == 4);
     assert(model_input_shape.size() == 4);
     assert(dyn_shape.size() == 2 || dyn_shape.size() == 1);
+    int32_t RESIZER_IMAGE_INPUT_H = img_shape[2];
+    int32_t RESIZER_IMAGE_INPUT_W = img_shape[3];
+    int32_t MODEL_INPUT_H = model_input_shape[2];
+    int32_t MODEL_INPUT_W = model_input_shape[3];
+    // 随机数的情况下，默认是crop全图，会出现缩放倍数超过[1/16, 32)
+    int32_t RESIZER_CROP_H = RESIZER_IMAGE_INPUT_H;
+    int32_t RESIZER_CROP_W = RESIZER_IMAGE_INPUT_W;
+    if (RESIZER_IMAGE_INPUT_H >= MODEL_INPUT_H) {  // 下采样
+      if ((float)RESIZER_IMAGE_INPUT_H / MODEL_INPUT_H > 16.0f)
+        RESIZER_CROP_H = MODEL_INPUT_H * 16;
+    } else {  // 上采样
+      assert(float(MODEL_INPUT_H) / RESIZER_IMAGE_INPUT_H < 32.0f);
+    }
+    if (RESIZER_IMAGE_INPUT_W >= MODEL_INPUT_W) {
+      if ((float)RESIZER_IMAGE_INPUT_W / MODEL_INPUT_W > 16.0f)
+        RESIZER_CROP_W = MODEL_INPUT_W * 16;
+    } else {
+      assert(float(MODEL_INPUT_W) / RESIZER_IMAGE_INPUT_W < 32.0f);
+    }
     int32_t *dyn_data = (int32_t *)(input_datas[dyn_name].Data());
     int32_t batch = 1;
     int32_t step = 4;
@@ -431,11 +450,11 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < batch; ++i) {
       dyn_data[i * step + 0] = 0;
       dyn_data[i * step + 1] = 0;
-      dyn_data[i * step + 2] = img_shape[2];
-      dyn_data[i * step + 3] = img_shape[3];
+      dyn_data[i * step + 2] = RESIZER_CROP_H;
+      dyn_data[i * step + 3] = RESIZER_CROP_W;
       if (step == 10) {
-        dyn_data[i * step + 4] = model_input_shape[2];
-        dyn_data[i * step + 5] = model_input_shape[3];
+        dyn_data[i * step + 4] = MODEL_INPUT_H;
+        dyn_data[i * step + 5] = MODEL_INPUT_W;
         dyn_data[i * step + 6] = 0;
         dyn_data[i * step + 7] = 0;
         dyn_data[i * step + 8] = 0;
