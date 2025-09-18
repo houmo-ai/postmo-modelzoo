@@ -20,12 +20,12 @@
 python3 computing_perf.py
 ```
 
-## 3.测试结果
+## 3. XH1 测试结果
 
 基于Linux x86_64平台的执行结果
 
 ```bash
-Model run successfully on device 0, elapsed time: 11.82 seconds.
+Model run successfully on device 0, elapsed time: 11.86 seconds.
 
 ============================================================
            Performance Test Summary
@@ -40,15 +40,15 @@ Feature Map Size          |      [256, 256]
 Kernel Shape              |          [3, 3]
 ------------------------------------------------------------
 Computing amount          |          4.9478 TOPs/sample
-Test time                 |         11.8197 seconds
-PERFORMANCE               |          214.33 TOPS
+Test time                 |         11.8627 seconds
+PERFORMANCE               |          213.55 TOPS
 ============================================================
 ```
 
 基于Linux aarch64平台的执行结果
 
 ```bash
-Model run successfully on device 0, elapsed time: 15.48 seconds.
+Model run successfully on device 0, elapsed time: 31.93 seconds.
 
 ============================================================
            Performance Test Summary
@@ -63,8 +63,8 @@ Feature Map Size          |      [256, 256]
 Kernel Shape              |          [3, 3]
 ------------------------------------------------------------
 Computing amount          |          4.9478 TOPs/sample
-Test time                 |         15.4792 seconds
-PERFORMANCE               |           81.84 TOPS
+Test time                 |         31.9305 seconds
+PERFORMANCE               |           79.34 TOPS
 ============================================================
 
 ```

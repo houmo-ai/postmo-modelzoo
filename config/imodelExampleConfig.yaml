@@ -182,6 +182,17 @@ tools_computing_perf:
   test:
     - tools_computing_perf_test
 
+tools_bandwidth_perf:
+  include:
+    - ../apis/tools/bandwidth_perf
+  exclude:
+    - ../apis/tools/bandwidth_perf/README.MD
+  example_case: 
+    - tools_bandwidth_perf_test:
+        script: ../apis/tools/bandwidth_perf/run.sh
+  test:
+    - tools_bandwidth_perf_test
+
 ###### apis ######
 inferences_resnet50:
   include:
