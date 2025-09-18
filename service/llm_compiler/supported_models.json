@@ -10,7 +10,7 @@
         "8b": {
             "support_backends": ["xh1", "xh2"],
             "path": "models/llm/qwen3",
-            "raw": "llm/Qwen3-8B"
+            "raw": "llm/qwen3_8b"
         },
         "14b": {
             "support_backends": ["xh2"],

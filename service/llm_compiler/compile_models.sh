@@ -49,7 +49,7 @@ for item in "${models[@]}"; do
         result_dir="/data/services/model_results/${model_name}_${model_size}"
         cmd+=" --result_dir $result_dir"
     fi
-    cmd+=" -up"
+    cmd+=" -up -compile"
 
     # 执行命令
     echo -e "\n执行命令: $cmd"

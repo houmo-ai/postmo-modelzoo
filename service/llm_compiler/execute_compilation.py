@@ -12,6 +12,13 @@ logger = logging.getLogger(__name__)
 def parse_args():
     parser = argparse.ArgumentParser(description="Compile LLMs")
     parser.add_argument(
+        "task_id",
+        nargs='?',
+        default=None,
+        help="Task ID (optional positional argument)",
+    )
+
+    parser.add_argument(
         "-n",
         "--model_name",
         required=True,
@@ -102,12 +109,18 @@ def main(args) -> int:
         args.result_dir,
     )
 
+    model_name = "deepseek" if "deepseek" in args.model_name else args.model_name
+
     model_dir = f"{script_dir}/../../" + args.model_path
     os.chdir(model_dir)
     logger.info("Current dir: %s", os.getcwd())
 
     output_dir = args.result_dir
-    os.makedirs(output_dir, exist_ok=True)
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except FileNotFoundError as e:
+        logger.info(f"error create folder failed: {e}")
+        return -1
 
     os.environ["HDPL_PLATFORM"] = "ISIM"
 
@@ -120,7 +133,7 @@ def main(args) -> int:
         "--model_dir",
         args.quant_model_path,
         "--model_name",
-        args.model_name,
+        model_name,
         "--context_length",
         str(args.context_length),
         "--batch",

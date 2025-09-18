@@ -64,6 +64,7 @@ def check_quant_model(quant_model_path: str, quant_model: str, model_name: str) 
     if target is None:
         return False
 
+    model_name = "deepseek" if "deepseek" in model_name else model_name
     quant_model_src = _check_model_source(quant_model_path)
     if quant_model_src in ["jfrog"]:
         # quant model path is Jfrog url
@@ -95,8 +96,9 @@ def check_quant_model(quant_model_path: str, quant_model: str, model_name: str) 
     if all(_check_file(ele) for ele in file_list) is False:
         return False
     if target == "xh2":
-        decoder_external = list(glob.glob(decoder_dir + "/*_decode_external_data"))
-        prefill_external = list(glob.glob(prefill_dir + "/*_prefill_external_data"))
+        #遇到量化压缩包中的文件，名字不叫_decode_external_data, 改成下面的适配相关的压缩包
+        decoder_external = list(glob.glob(decoder_dir + "/*external_data"))
+        prefill_external = list(glob.glob(prefill_dir + "/*external_data"))
         if len(decoder_external) == 0 or len(prefill_external) == 0:
             logger.error("Missing external data.")
             return False

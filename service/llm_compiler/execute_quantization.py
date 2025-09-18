@@ -13,6 +13,13 @@ logger = logging.getLogger(__name__)
 def parse_args():
     parser = argparse.ArgumentParser(description="Compile LLMs")
     parser.add_argument(
+        "task_id",
+        nargs='?',
+        default=None,
+        help="Task ID (optional positional argument)",
+    )
+
+    parser.add_argument(
         "-t",
         "--target",
         required=True,
@@ -121,7 +128,7 @@ def main(args) -> int:
     if os.path.exists("./requirements.txt"):
         os.system("pip3 install -r requirements.txt")
 
-    model_name = args.model_name
+    model_name = "deepseek" if "deepseek" in args.model_name else args.model_name
     raw_model = f"/modelzoo/{args.raw_model_path}"
     output_dir = args.result_dir
     os.makedirs(output_dir, exist_ok=True)
