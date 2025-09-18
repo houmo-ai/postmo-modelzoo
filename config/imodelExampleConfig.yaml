@@ -113,6 +113,16 @@ yolo12m:
         script: ../models/detection/yolo12m/test.sh
   test:
     - yolo12m_test
+yolov5s_feature:
+  include:
+    - ../models/detection/yolov5s_feature
+  exclude:
+    - ../models/detection/yolov5s_feature/README.MD
+  example_case:
+    - yolov8m_seg_test:
+        script: ../models/detection/yolov5s_feature/test.sh
+  test:
+    - yolov5s_feature_test
 yolov8m-pose:
   include:
     - ../models/estimation/yolov8m-pose

@@ -377,12 +377,16 @@ class Xh1Exec(BaseExec):
             if hasattr(self.ApplicationOnnxOpt, "opt_model_path"):
                 self.model_path = self.ApplicationOnnxOpt.opt_model_path
 
-        from hmquant.api import (
-            generate_golden,
-            quant_single_onnx_network,
-            convert_profiling,
-            quantize_profiling,
-        )
+        try:
+            from hmquant.api import (
+                generate_golden,
+                quant_single_onnx_network,
+                convert_profiling,
+                quantize_profiling,
+            )
+        except ImportError:
+            logger.error("Not found hmquant module, and please install hmquant first")
+            exit(-1)
 
         calib_datasets, onnx_datasets = self.get_quant_dataset()
         in_datas = calib_datasets[0]
@@ -465,7 +469,11 @@ class Xh1Exec(BaseExec):
     def build(self):
         if not os.path.exists(self.build_output_dir):
             os.makedirs(self.build_output_dir)
-        import tcim
+        try:
+            import tcim
+        except ImportError:
+            logger.error("Not found tcim module, and please install tcim first!")
+            exit(-1)
 
         t_start = time.time()
         tcim.build_from_hmonnx(
@@ -636,6 +644,7 @@ class Xh1Exec(BaseExec):
                 max_height, max_width = max_input_size
             else:
                 max_height, max_width = H, W
+                max_input_size = (max_height, max_width)
             if ext not in SUPPORT_IMAGE_FORMATS:
                 logger.error(f"Not support image: {data_path}")
                 exit(-1)
@@ -674,7 +683,7 @@ class Xh1Exec(BaseExec):
             yuv_pad_hwc, dyn_info = xh1_preprocess(
                 cv_image,
                 input_shape,
-                (max_height, max_width),
+                max_input_size,
                 mean=mean,
                 std=std,
                 use_norm=self.resizer_mode == 0,
