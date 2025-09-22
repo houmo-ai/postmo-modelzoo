@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+import sys
 import math
 import time
 import argparse
@@ -73,7 +74,7 @@ def get_args() -> argparse.Namespace:
         '--isq',
         dest='isq',
         type=int,
-        default=2048,
+        default=1024,
         help='input seq length',
     )
     parser.add_argument(
@@ -144,7 +145,7 @@ class HmQwenXh2:
         input_echo_len = all_input_id.numel()
         if input_echo_len >= self.context_max_length:
             logger.error(f"Question long than {self.context_max_length}, please shorten it!")
-            return f"Question long than {self.context_max_length}, please shorten it!"
+            sys.exit(1)
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
         prefill_start_time = time.time()
         for round in range(prefill_loop_round):
@@ -196,7 +197,7 @@ class HmQwenXh2:
         input_echo_lens = []
         all_prefill_time = 0
         all_decode_time = 0
-        print("total prefill count:", isq)
+        logger.info("total prefill count:{}".format(isq))
         for b in range(self.batch):
             all_input_id = self.preprocess_prefill(isq)
             prefill_time, input_echo_len, next_id = self.run_prefill(b, all_input_id)
@@ -212,7 +213,7 @@ class HmQwenXh2:
         ]
         self.context_lengths = self.current_echo_lens
         count = 0
-        print("total decode count:", osq)
+        logger.info("total decode count:{}".format(osq))
         while count < osq - 1:
             decode_time, input_datas = self.run_decode(np.array(input_datas))
             all_decode_time += decode_time
@@ -240,12 +241,12 @@ if __name__ == "__main__":
         hmqwen = HmQwenXh2(args.prefill_path, args.decode_path, args.embedding_path, args.tokenizer_dir)
 
     start_time = time.time()
-    batch, input_tokens, decode_tokens, prefill_time, decode_time = hmqwen.chat(args.isq, args.osq)
+    batch, input_tokens, output_tokens, prefill_time, decode_time = hmqwen.chat(args.isq, args.osq)
     total_time = time.time() - start_time
 
-    logger.success(f"batch: {batch} input: {input_tokens} tokens, generate: {decode_tokens + batch} tokens, total cost {total_time:.3f} s")
-    logger.success(f"prefill time: {prefill_time * 1000:.3f} ms, {input_tokens / prefill_time:.2f} tokens/s")
-    decode_latency = decode_time * 1000 / (decode_tokens)
-    logger.success(f"decode average time: {decode_latency:.3f} ms, {1000 / decode_latency:.2f} tokens/s")
-    res_latency = total_time * 1000 / (decode_tokens + batch)
-    logger.success(f"end2end average time: {res_latency:.3f} ms, {1000 / res_latency:.2f} tokens/s")
+    logger.success(f"Batch: {batch}, Total Input: {input_tokens} tokens, Output {output_tokens + batch} tokens, Prefill Cost: {prefill_time:.3f} seconds, Decode Cost: {decode_time:.3f} seconds")
+    logger.success(f"Prefill Speed: {input_tokens / prefill_time:.2f} tokens/s")
+    logger.success(f"TTFT (Time to First Token): {prefill_time * 1000:.3f} ms")
+    logger.success(f"TPOT (Time Per Output Token): {(output_tokens) / decode_time:.2f} tokens/s")
+    logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
+    logger.success(f"TPS (Tokens Per Second): {(output_tokens + batch) / total_time:.2f} tokens/s")

@@ -471,13 +471,13 @@ if __name__ == "__main__":
             break
         print(next_str, end='', flush=True)
     print('\033[0m')
-    decode_tokens = decode_count + 1
+    output_tokens = decode_count + 1
     decode_time = time.time() - start_time - visual_prefill_time
     total_time = time.time() - start_time
-    logger.success(f"input: {input_tokens} tokens, output: {decode_tokens} tokens, cost {total_time:.3f} s")
-    logger.success(f"visual time: {vit_time * 1000:.3f} ms")
-    logger.success(f"prefill time: {prefill_time * 1000:.3f} ms, {input_tokens / prefill_time:.2f} tokens/s")
-    decode_latency = decode_time * 1000 / (decode_tokens - 1)
-    logger.success(f"decode average time: {decode_latency:.3f} ms, {1000 / decode_latency:.2f} tokens/s")
-    res_latency = total_time * 1000 / decode_tokens
-    logger.success(f"end2end average time: {res_latency:.3f} ms, {1000 / res_latency:.2f} tokens/s")
+    logger.success(f"Total Images: {len(image_dir)}, Total Input: {input_tokens} tokens, Output {output_tokens} tokens, Vision Cost {vit_time*1000:.3f} ms, Prefill Cost {prefill_time*1000:.3f} ms, Decode Cost {decode_time*1000:.3f} ms")
+    logger.success(f"Vision Cost {vit_time/len(image_dir)*1000:.3f} ms/per image")
+    logger.success(f"Prefill Speed: {input_tokens / prefill_time:.2f} tokens/s")
+    logger.success(f"TTFT (Time to First Token): {visual_prefill_time * 1000:.3f} ms")
+    logger.success(f"TPOT (Time Per Output Token): {(output_tokens - 1) / decode_time:.2f} tokens/s")
+    logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
+    logger.success(f"TPS (Tokens Per Second): {output_tokens / total_time:.2f} tokens/s")
