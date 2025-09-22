@@ -1,4 +1,6 @@
 import os
+import re
+import sys
 import time
 import logging
 import argparse
@@ -15,9 +17,7 @@ from PIL import Image
 from processing_qwen2_5_vl import Qwen2_5_VLProcessor
 from utils import get_rope_index, QRawToYuv
 
-TOKENIZER_PATH = "qwen2.5-vl"
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
-EMBEDDING_PATH = os.path.join('output', HOUMO_TARGET, 'hmquant', 'quant_embedding.pt')
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh2')
 
 if HOUMO_TARGET == 'xh1':
     TARGET_TYPE = torch.long
@@ -28,33 +28,39 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        '--tokenizer_dir',
+        dest='tokenizer_dir',
         type=str,
-        default=os.path.join('output', HOUMO_TARGET),
-        help='houmo model dir',
+        default="qwen2.5-vl",
+        help='tokenizer dir',
     )
     parser.add_argument(
-        '--prefill',
-        dest='prefill_shape',
-        type=list,
-        default=(1, 256),
-        help='prefill max length',
-    )
-    parser.add_argument(
-        '--decode',
-        dest='decode_length',
-        type=int,
-        default=2048,
-        help='decode max length',
-    )
-    parser.add_argument(
-        '--model_size',
-        dest='model_size',
+        '--embedding_path',
+        dest='embedding_path',
         type=str,
-        default="7b",
-        choices=["3b", "7b"],
-        help='model size',
+        default=os.path.join('output', HOUMO_TARGET, 'hmquant', 'quant_embedding.pt'),
+        help='houmo embedding weight path',
+    )
+    parser.add_argument(
+        '--vit_path',
+        dest='vit_path',
+        type=str,
+        default=os.path.join('output', HOUMO_TARGET, "qwen2.5-vl_visual.hmm"),
+        help='houmo visual model path',
+    )
+    parser.add_argument(
+        '--prefill_path',
+        dest='prefill_path',
+        type=str,
+        default=os.path.join('output', HOUMO_TARGET, "qwen2.5-vl_prefill.hmm"),
+        help='houmo prefill model path',
+    )
+    parser.add_argument(
+        '--decode_path',
+        dest='decode_path',
+        type=str,
+        default=os.path.join('output', HOUMO_TARGET, "qwen2.5-vl_decode.hmm"),
+        help='houmo decode model path',
     )
     args = parser.parse_args()
     return args
@@ -62,53 +68,66 @@ def get_args() -> argparse.Namespace:
 class Qwen25VL:
     def __init__(
             self,
-            model_dir,
-            cache_len=2048,
-            device="cpu",
-            prefill_shape=(1, 256),
+            vit_path,
+            prefill_path,
+            decode_path,
+            tokenizer_dir,
+            embedding_path,
             window_size=112,
             spatial_merge_size=2,
             patch_size=14,
-            model_size="3b", # 3B is 36 Blocks, 7B is 28 Blocks):
         ):
-        self.processor = Qwen2_5_VLProcessor.from_pretrained(TOKENIZER_PATH + f"-{model_size}")
-        self.cache_len = cache_len
-        self.device = torch.device(device)
-        self.prefill_shape = torch.Size(prefill_shape)
-        self.prefill_len = self.prefill_shape.numel()
-
-        self.window_size = window_size
-        self.spatial_merge_size = spatial_merge_size
-        self.patch_size = patch_size
-        self.spatial_merge_unit = self.spatial_merge_size * self.spatial_merge_size
-        if model_size == "3b":
-            self.blocks = 36
-        elif model_size == "7b":
-            self.blocks = 28
-        self.eos_token_id = [151645, 151643]
-        # set mode
-        self.rgb2yuv = QRawToYuv(input_color_type="RGB", toYUV_format="YUV444")
         weight_manager = tcim.runtime.WeightManager(0)
         option0 = tcim.runtime.Option(weight_manager)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
-
-        self.vit_model = tcim.runtime.load(os.path.join(model_dir, "qwen2.5-vl_visual.hmm"), option=option0)
-        dummy_tensor_names = [f'model_layers_{i}_self_attn_kcache_input' for i in range(self.blocks)]
-        dummy_tensor_names += [f'model_layers_{i}_self_attn_vcache_input' for i in range(self.blocks)]
+        self.vit_model = tcim.runtime.load(os.path.join(vit_path), option=option0)
+        logger.info("vit model loaded")
+        self.prefill = tcim.runtime.load(os.path.join(prefill_path), option=option1)
+        logger.info("prefill model loaded")
+        self.nblocks = self.get_nblocks()
+        dummy_tensor_names = [f'model_layers_{i}_self_attn_kcache_input' for i in range(self.nblocks)]
+        dummy_tensor_names += [f'model_layers_{i}_self_attn_vcache_input' for i in range(self.nblocks)]
         option2.set_dummy_tensors(dummy_tensor_names)
-        self.prefill_model = tcim.runtime.load(os.path.join(model_dir, "qwen2.5-vl_prefill.hmm"), option=option1)
-        self.decode_model = tcim.runtime.load(os.path.join(model_dir, "qwen2.5-vl_decode.hmm"), option=option2)
-        for i in range(self.blocks):
-            kcache = self.prefill_model.get_input(f"model_layers_{i}_self_attn_kcache_input")
-            vcache = self.prefill_model.get_input(f"model_layers_{i}_self_attn_vcache_input")
-            self.decode_model.set_input(f"model_layers_{i}_self_attn_kcache_input", kcache)
-            self.decode_model.set_input(f"model_layers_{i}_self_attn_vcache_input", vcache)
-        self.decode_model.set_input("current_length", np.array([1]).astype('int16'))
-        self.embedding = torch.load(EMBEDDING_PATH, weights_only=False)
+        self.decode = tcim.runtime.load(os.path.join(decode_path), option=option2)
+        logger.info("decode model loaded")
+        self.processor = Qwen2_5_VLProcessor.from_pretrained(tokenizer_dir)
+        self.device = torch.device("cpu")
+        if HOUMO_TARGET == 'xh1':
+            prefill_shape = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[:3]
+        if HOUMO_TARGET == 'xh2':
+            prefill_shape = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[:2]
+        self.prefill_shape = torch.Size(prefill_shape)
+        self.prefill_len = self.prefill_shape.numel()
+        self.window_size = window_size
+        self.spatial_merge_size = spatial_merge_size
+        self.patch_size = patch_size
+        self.spatial_merge_unit = self.spatial_merge_size * self.spatial_merge_size
+        self.eos_token_id = [151645, 151643]
+        # set mode
+        self.rgb2yuv = QRawToYuv(input_color_type="RGB", toYUV_format="YUV444")
+
+
+        self.embedding_len = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[2]
+        self.context_max_length = self.decode.get_input_info(self.decode.get_input_name(6)).shape[2]
+        for i in range(self.nblocks):
+            kcache = self.prefill.get_input(f"model_layers_{i}_self_attn_kcache_input")
+            vcache = self.prefill.get_input(f"model_layers_{i}_self_attn_vcache_input")
+            self.decode.set_input(f"model_layers_{i}_self_attn_kcache_input", kcache)
+            self.decode.set_input(f"model_layers_{i}_self_attn_vcache_input", vcache)
+        self.decode.set_input("current_length", np.array([1]).astype('int16'))
+        self.embedding = torch.load(embedding_path, weights_only=False)
         if HOUMO_TARGET == 'xh2':
             self.embedding = self.embedding.weight
         self.hidden_dims = self.embedding.shape[-1]
+
+    def get_nblocks(self):
+        input_names = []
+        for i in range(self.prefill.get_num_inputs()):
+            input_names.append(self.prefill.get_input_name(i))
+        pattern = r'^model_layers_(\d+)_self_attn_kcache_input$'
+        count = sum(1 for item in input_names if re.match(pattern, item))
+        return count
 
     def create_template(self, prompt, image_dir):
         content_list = []
@@ -237,9 +256,9 @@ class Qwen25VL:
         def run_visual(self, inputs):
             vit_model_outputs = list()
             for batch in range(inputs["hidden_states"] .shape[0]):
-                self.vit_model.set_input(self.vit_model.get_input_name(0), inputs["hidden_states"].numpy().astype(np.uint8))
-                self.vit_model.set_input(self.vit_model.get_input_name(1), inputs["window_index"].numpy().astype(np.int32))
-                self.vit_model.set_input(self.vit_model.get_input_name(2), inputs["window_mask"].numpy().astype(np.int16))
+                self.vit_model.set_input(self.vit_model.get_input_name(0), inputs["hidden_states"][batch].unsqueeze(0).numpy().astype(np.uint8))
+                self.vit_model.set_input(self.vit_model.get_input_name(1), inputs["window_index"][batch].numpy().astype(np.int32))
+                self.vit_model.set_input(self.vit_model.get_input_name(2), inputs["window_mask"][batch].numpy().astype(np.int16))
                 self.vit_model.run()
                 self.vit_model.sync()
                 # vit_model_output = self.vit_model.get_output("output").numpy().astype(np.int16)
@@ -287,6 +306,7 @@ class Qwen25VL:
         hight_position_ids = position_ids[1][0]
         width_position_ids = position_ids[2][0]
         return inputs_embeds, time_position_ids, hight_position_ids, width_position_ids, rope_deltas
+
     def create_prefill_inputs(self, inputs_embeds, time_position_ids, hight_position_ids, width_position_ids, pre_gen_idx):
         x = inputs_embeds[
             :,
@@ -323,19 +343,22 @@ class Qwen25VL:
 
     def run_prefill(self, inputs_embeds, time_position_ids, hight_position_ids, width_position_ids):
         current_length = inputs_embeds.shape[1]
+        if current_length >= self.context_max_length:
+            logger.error(f"Question long than {self.context_max_length}, please shorten it!")
+            sys.exit(1)
         if current_length > self.prefill_len:
             pre_gen_nums = current_length // self.prefill_len
             for pre_gen_idx in range(pre_gen_nums):
                 prefill_inputs = self.create_prefill_inputs(inputs_embeds, time_position_ids, hight_position_ids, width_position_ids, pre_gen_idx)
-                self.prefill_model.set_input(self.prefill_model.get_input_name(0), prefill_inputs['input_1'].detach().numpy())
-                self.prefill_model.set_input(self.prefill_model.get_input_name(1), prefill_inputs['time_position_ids'].detach().numpy())
-                self.prefill_model.set_input(self.prefill_model.get_input_name(2), prefill_inputs['hight_position_ids'].detach().numpy())
-                self.prefill_model.set_input(self.prefill_model.get_input_name(3), prefill_inputs['width_position_ids'].detach().numpy())
-                self.prefill_model.set_input(self.prefill_model.get_input_name(4), prefill_inputs['valid_length'].detach().numpy())
-                self.prefill_model.set_input(self.prefill_model.get_input_name(5), prefill_inputs['current_length'].detach().numpy())
-                self.prefill_model.run()
-                self.prefill_model.sync()
-                prefill_output = self.prefill_model.get_output(self.prefill_model.get_output_name(0))
+                self.prefill.set_input(self.prefill.get_input_name(0), prefill_inputs['input_1'].detach().numpy())
+                self.prefill.set_input(self.prefill.get_input_name(1), prefill_inputs['time_position_ids'].detach().numpy())
+                self.prefill.set_input(self.prefill.get_input_name(2), prefill_inputs['hight_position_ids'].detach().numpy())
+                self.prefill.set_input(self.prefill.get_input_name(3), prefill_inputs['width_position_ids'].detach().numpy())
+                self.prefill.set_input(self.prefill.get_input_name(4), prefill_inputs['valid_length'].detach().numpy())
+                self.prefill.set_input(self.prefill.get_input_name(5), prefill_inputs['current_length'].detach().numpy())
+                self.prefill.run()
+                self.prefill.sync()
+                prefill_output = self.prefill.get_output(self.prefill.get_output_name(0))
         else:
             pre_gen_nums = 0
 
@@ -361,17 +384,17 @@ class Qwen25VL:
             hight_position_ids=x_hight,
             width_position_ids=x_width,
         )
-        self.prefill_model.set_input(self.prefill_model.get_input_name(0), prefill_inputs['input_1'].detach().numpy())
-        self.prefill_model.set_input(self.prefill_model.get_input_name(1), prefill_inputs['time_position_ids'].detach().numpy())
-        self.prefill_model.set_input(self.prefill_model.get_input_name(2), prefill_inputs['hight_position_ids'].detach().numpy())
-        self.prefill_model.set_input(self.prefill_model.get_input_name(3), prefill_inputs['width_position_ids'].detach().numpy())
-        self.prefill_model.set_input(self.prefill_model.get_input_name(4), prefill_inputs['valid_length'].detach().numpy())
-        self.prefill_model.set_input(self.prefill_model.get_input_name(5), prefill_inputs['current_length'].detach().numpy())
-        self.prefill_model.run()
-        self.prefill_model.sync()
-        prefill_output = self.prefill_model.get_output(self.prefill_model.get_output_name(0))
+        self.prefill.set_input(self.prefill.get_input_name(0), prefill_inputs['input_1'].detach().numpy())
+        self.prefill.set_input(self.prefill.get_input_name(1), prefill_inputs['time_position_ids'].detach().numpy())
+        self.prefill.set_input(self.prefill.get_input_name(2), prefill_inputs['hight_position_ids'].detach().numpy())
+        self.prefill.set_input(self.prefill.get_input_name(3), prefill_inputs['width_position_ids'].detach().numpy())
+        self.prefill.set_input(self.prefill.get_input_name(4), prefill_inputs['valid_length'].detach().numpy())
+        self.prefill.set_input(self.prefill.get_input_name(5), prefill_inputs['current_length'].detach().numpy())
+        self.prefill.run()
+        self.prefill.sync()
+        prefill_output = self.prefill.get_output(self.prefill.get_output_name(0))
         next_id = prefill_output.numpy().argmax(-1)
-        return prefill_output, next_id, valid_length, current_length
+        return next_id, valid_length, current_length
 
     def chat_vit_prefill(
             self,
@@ -381,17 +404,24 @@ class Qwen25VL:
     ):
         image_features=None
         inputs = self.preprocess(prompt, image_dir)
+        start_time = time.time()
         if image_dir != None:
             visual_inputs = self.preprocess_visual(inputs)
             image_features = self.run_visual(visual_inputs)
+        vit_time = time.time() - start_time
         inputs_embeds, time_position_ids, hight_position_ids, width_position_ids, self.rope_deltas = self.preprocess_prefill(inputs, image_features)
-        prefill_output, self.next_id, valid_length, current_length = self.run_prefill(inputs_embeds, time_position_ids, hight_position_ids, width_position_ids)
+        start_time = time.time()
+        self.next_id, valid_length, current_length = self.run_prefill(inputs_embeds, time_position_ids, hight_position_ids, width_position_ids)
+        prefill_time = time.time() - start_time
         next_str = self.processor.tokenizer.decode(torch.tensor(self.next_id.item()))
-        print(f'\033[1;95m{next_str}', end='', flush=True)
+        logger.success("response:")
+        print("\033[1;95m{}".format(next_str), end="", flush=True)
         self.context_length = valid_length + current_length + 1
+        return vit_time, prefill_time, inputs_embeds.shape[1]
 
     def chat_decoder(self):
-        if self.context_length >= self.cache_len:
+        if self.context_length >= self.context_max_length:
+            logger.error(f"Context length long than {self.context_max_length}, stop run decode model!")
             return None
         decoder_pids = self.context_length + self.rope_deltas.item() - 1
         x = F.embedding(torch.from_numpy(self.next_id).unsqueeze(0), self.embedding)
@@ -405,15 +435,15 @@ class Qwen25VL:
         )
         if HOUMO_TARGET == "xh2":
             decoder_inputs['input_1'] = decoder_inputs['input_1'].squeeze(0)
-        self.decode_model.set_input(self.decode_model.get_input_name(0), decoder_inputs['input_1'].detach().numpy())
-        self.decode_model.set_input(self.decode_model.get_input_name(1), decoder_inputs['time_position_ids'].detach().numpy())
-        self.decode_model.set_input(self.decode_model.get_input_name(2), decoder_inputs['hight_position_ids'].detach().numpy())
-        self.decode_model.set_input(self.decode_model.get_input_name(3), decoder_inputs['width_position_ids'].detach().numpy())
-        self.decode_model.set_input(self.decode_model.get_input_name(4), decoder_inputs['valid_length'].detach().numpy())
-        self.decode_model.set_input(self.decode_model.get_input_name(5), decoder_inputs['current_length'].detach().numpy())
-        self.decode_model.run()
-        self.decode_model.sync()
-        decoder_output = self.decode_model.get_output(self.decode_model.get_output_name(0))
+        self.decode.set_input(self.decode.get_input_name(0), decoder_inputs['input_1'].detach().numpy())
+        self.decode.set_input(self.decode.get_input_name(1), decoder_inputs['time_position_ids'].detach().numpy())
+        self.decode.set_input(self.decode.get_input_name(2), decoder_inputs['hight_position_ids'].detach().numpy())
+        self.decode.set_input(self.decode.get_input_name(3), decoder_inputs['width_position_ids'].detach().numpy())
+        self.decode.set_input(self.decode.get_input_name(4), decoder_inputs['valid_length'].detach().numpy())
+        self.decode.set_input(self.decode.get_input_name(5), decoder_inputs['current_length'].detach().numpy())
+        self.decode.run()
+        self.decode.sync()
+        decoder_output = self.decode.get_output(self.decode.get_output_name(0))
         self.next_id = decoder_output.numpy().argmax(-1)
         if self.next_id.item() in self.eos_token_id:
             return None
@@ -423,12 +453,15 @@ class Qwen25VL:
 
 if __name__ == "__main__":
     args = get_args()
-    qwen25vl = Qwen25VL(model_dir=args.model_dir, prefill_shape=args.prefill_shape, cache_len=args.decode_length, model_size=args.model_size)
+    qwen25vl = Qwen25VL(args.vit_path, args.prefill_path, args.decode_path, args.tokenizer_dir, args.embedding_path)
     # image_dir = None
     image_dir = ["../../../data/pic/beach.jpeg", "../../../data/pic/lane.jpg"]
     start_time = time.time()
     # qwen25vl.chat_vit_prefill(image_dir, prompt='你好，你是谁。')
-    qwen25vl.chat_vit_prefill(image_dir, prompt='请描述图片内容。')
+    prompt = "请描述图片内容。"
+    logger.success("question:")
+    print("\033[1;95m{}\033[0m".format(prompt))
+    vit_time, prefill_time, input_tokens = qwen25vl.chat_vit_prefill(image_dir, prompt=prompt)
     visual_prefill_time = time.time() - start_time
     decode_count = 0
     while(True):
@@ -438,12 +471,13 @@ if __name__ == "__main__":
             break
         print(next_str, end='', flush=True)
     print('\033[0m')
-    tokens = decode_count + 1
+    decode_tokens = decode_count + 1
     decode_time = time.time() - start_time - visual_prefill_time
     total_time = time.time() - start_time
-    logger.success(f"total: {tokens} tokens, cost {total_time:.3f} s")
-    logger.success(f"visual + prefill time: {visual_prefill_time * 1000:.3f} ms, {1 / visual_prefill_time:.2f} tokens/s")
-    decode_latency = decode_time * 1000 / (tokens - 1)
+    logger.success(f"input: {input_tokens} tokens, output: {decode_tokens} tokens, cost {total_time:.3f} s")
+    logger.success(f"visual time: {vit_time * 1000:.3f} ms")
+    logger.success(f"prefill time: {prefill_time * 1000:.3f} ms, {input_tokens / prefill_time:.2f} tokens/s")
+    decode_latency = decode_time * 1000 / (decode_tokens - 1)
     logger.success(f"decode average time: {decode_latency:.3f} ms, {1000 / decode_latency:.2f} tokens/s")
-    res_latency = total_time * 1000 / tokens
+    res_latency = total_time * 1000 / decode_tokens
     logger.success(f"end2end average time: {res_latency:.3f} ms, {1000 / res_latency:.2f} tokens/s")
