@@ -1,4 +1,5 @@
 #include "h264.h"
+
 #include "log.hpp"
 
 extern "C" {
@@ -92,7 +93,7 @@ H264DataSource *H264DataSource::CreateH264Source(std::string h264_path,
     }
   }
   data_source->_data_num = iterations * data_source->_dataptr_list.size();
-  // LOG_INFO << "After CreateH264Source:" << data_source->_data_num;
+  // LOG_INFO("After CreateH264Source: {}", data_source->_data_num);
   return data_source;
 }
 

@@ -13,45 +13,19 @@
 #include <vector>
 
 #include "detect_frames.h"
-#include "video_codec.h"
+#include "jpeg_codec.h"
 
 int main(int argc, char **argv) {
   std::string det_model_path = "yolov5s.hmm";
   std::string cls_model_path = "resnet50.hmm";
-  std::string stream_path = "../../data/1080P_traffic_4s.h264";
   int det_thread_num = 1;
   int cls_thread_num = 2;
-  size_t frame_limit = 0;
 
   std::vector<std::thread> threads;
+  TaskQueue q_enc;
   TaskQueue q_det;
   TaskQueue q_cls;
   TaskQueue q_out;
-
-  if (auto platform = std::getenv("HDPL_PLATFORM")) {
-    if (!strcmp(platform, "ISIM")) {
-      det_thread_num = 1;
-      cls_thread_num = 1;
-      frame_limit = 2;
-      LOG_WARNING("det_thread_num set to {} while HDPL_PLATFORM=ISIM",
-                  det_thread_num);
-      LOG_WARNING("cls_thread_num set to {} while HDPL_PLATFORM=ISIM",
-                  cls_thread_num);
-      LOG_WARNING("frame_limit set to {} while HDPL_PLATFORM=ISIM",
-                  frame_limit);
-    }
-  }
-
-  auto postfix = stream_path.substr(stream_path.size() - 5);
-  std::string format;
-  if (postfix == ".h264") {
-    format = "H264";
-  } else if (postfix == ".h265") {
-    format = "H265";
-  } else {
-    LOG_ERROR("file format not supported: {}", stream_path);
-    exit(-1);
-  }
 
   // create infer threads
   int infer_thread_num = det_thread_num + cls_thread_num;
@@ -89,28 +63,39 @@ int main(int argc, char **argv) {
   wm.~WeightManager();
   barrier.wait();
 
-  VideoCodec codec;
-  PushStreamInfo stream_info = {stream_path, frame_limit};
-#ifdef RK_DECODER
-  Barrier barrier2(1);
-  threads.emplace_back(std::thread(&VideoCodec::PushRKStream, &codec,
-                                   std::ref(stream_info), std::ref(q_det),
-                                   std::ref(barrier2)));
-#else
+  // JPEG codec params
+  int encode_num = 20;
+  int width = 640;
+  int height = 426;
+  std::string data_path = "../../data/000000000139.jpg";
+
+  const int y_size = width * height;
+  const int uv_size = y_size / 2;
+  const int yuv_total_size = y_size + uv_size;
+
+  cv::Mat img_rgb;
+  cv::Mat img_yuv;
+  img_rgb = cv::imread(data_path);
+  ImageProc::BgrToRgb((int8_t *)(img_rgb.data), img_rgb.rows, img_rgb.cols);
+  cv::cvtColor(img_rgb, img_yuv, cv::COLOR_RGB2YUV_I420);
+  int size = width * height * 3;
+  char *yuv_buffer = (char *)(malloc(yuv_total_size));
+  ImageProc::I420To420sp((uint8_t *)yuv_buffer, (uint8_t *)img_yuv.data, size);
+
+  JpegCodec codec;
   Barrier barrier2(2);
-  VideoDecoder decoder(format, "NV12M");
-#ifdef RESIZER
+  JpegEncoder encoder("NV12M", "JPEG", width, height);
+  JpegDecoder decoder("JPEG", "NV12M");
   decoder.SetModelInfo(1920, 1080);  // yolov5s input shape (width, height)
-#endif  // RESIZER
-  // create push stream thread
-  threads.emplace_back(std::thread(&VideoCodec::PushStream, &codec,
-                                   std::ref(decoder), std::ref(stream_info),
-                                   std::ref(barrier2)));
-  // create rcv frame thread
-  threads.emplace_back(std::thread(&VideoCodec::GetFrame, &codec,
-                                   std::ref(decoder), std::ref(q_det),
-                                   std::ref(barrier2)));
-#endif  // RK_DECODER
+
+  // create jpeg encoder thread
+  threads.emplace_back(std::thread(&JpegCodec::EncodeImage, &codec,
+                                   std::ref(encoder), yuv_buffer, encode_num,
+                                   std::ref(q_enc), std::ref(barrier2)));
+  // create jpeg decoder thread
+  threads.emplace_back(std::thread(
+      &JpegCodec::DecodeImage, &codec, std::ref(decoder), width, height,
+      std::ref(q_enc), std::ref(q_det), std::ref(barrier2)));
   barrier2.wait();
 
   for (auto &t : threads) {

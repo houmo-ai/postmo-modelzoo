@@ -6,11 +6,15 @@
 
 ## 概述
 
-本示例以视频解码+yolov5s检测模型推理+resnet50分类模型推理为例展示视频检测推理Pipeline的基本使用方式。
+本示例展示了两种编解码场景：
+- 视频解码+yolov5s检测模型推理+resnet50分类模型推理，展示视频检测推理Pipeline的基本使用方式。
+- JPEG图像编解码+yolov5s检测模型推理+resnet50分类模型推理，展示JPEG编解码+推理Pipeline的基本使用方式。
 
 对于视频解码，本示例提供两种实现方案：
-- （默认）后摩视频解码。在本方案中，提供Resize解码输出功能: 默认开启，将后摩视频解码输出resize为yolov5s输入大小 1080x1920，支持的解码输出最大尺寸为3840x2160。
-- Rockchip视频解码（后文均简称RK解码）。
+- （默认）后摩视频解码。在本方案中，提供Resize视频解码输出功能: 默认开启，将后摩视频解码输出resize为yolov5s输入大小 1080x1920，支持的解码输出最大尺寸为3840x2160。
+- Rockchip视频解码（后文均简称RK视频解码）。
+
+本示例默认执行场景：后摩视频解码并Resize解码输出，Resize后图像用于yolov5s检测模型推理+resnet50分类模型推理。如需运行其他场景，可通过一键执行脚本的参数控制，或修改编译参数控制。
 
 本示例仅支持c++。由于后摩视频解码暂不支持windows，因此本示例不支持windows。
 
@@ -43,13 +47,17 @@ python3 get_model.py
 - `cls_thread_num`：分类线程数
 - `frame_limit`：取视频流的前n帧，0表示所有（ISIM下推理性能低，默认设置为2）
 
-可通过控制编译提供的-D参数`ENABLE_RESIZER`来开关Resize解码输出功能:
-- `-DENABLE_RESIZER=ON`: 开启Resize解码输出功能
-- `-DENABLE_RESIZER=OFF`: 关闭Resize解码输出功能
+可通过控制编译提供的-D参数`ENABLE_RESIZER`来开关Resize视频解码输出功能:
+- `-DENABLE_RESIZER=ON`: 开启Resize视频解码输出功能
+- `-DENABLE_RESIZER=OFF`: 关闭Resize视频解码输出功能
 
-可通过控制编译提供的-D参数`ENABLE_RK_DECODER`来开关RK解码:
-- `-DENABLE_RK_DECODER=ON`: 开启RK解码（同时会关闭后摩解码）
-- `-DENABLE_RK_DECODER=OFF`: 关闭RK解码（同时会开启后摩解码）
+可通过控制编译提供的-D参数`ENABLE_RK_DECODER`来开关RK视频解码:
+- `-DENABLE_RK_DECODER=ON`: 开启RK视频解码（同时会关闭后摩视频解码）
+- `-DENABLE_RK_DECODER=OFF`: 关闭RK视频解码（同时会开启后摩视频解码）
+
+可通过控制编译提供的-D参数`ENABLE_JPEG`来开关RK解码:
+- `-DENABLE_JPEG=ON`: 开启JPEG编解码（同时会关闭后摩解码）
+- `-DENABLE_JPEG=OFF`: 开启JPEG编解码（同时会开启后摩解码）
 
 *注：无需修改或配置上述变量，程序默认也可运行。*
 
@@ -58,7 +66,7 @@ python3 get_model.py
 ```bash
 mkdir build
 cd build
-cmake -DCMAKE_INSTALL_PREFIX=../ -DENABLE_RESIZER=ON -DENABLE_RK_DECODER=OFF ..
+cmake -DCMAKE_INSTALL_PREFIX=../ -DENABLE_RESIZER=ON -DENABLE_RK_DECODER=OFF -DENABLE_JPEG=OFF ..
 make -j
 make install
 cd ..
@@ -258,6 +266,60 @@ sample 97 box[1424, 129, 1490, 184], det[conf:0.284296, cls:2], cls[id:766, conf
 [info] <=== classify thread 0 completed. 50 sampels tested.
 ```
 
+```bash
+# Linux aarch64 环境，使用JPEG图像编解码
+Count of Input: 2
+Input[images] TensorInfo: shape: [1,3,1080,1920], stride: [2073600,1920,1,1036800,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
+Input[dyn_info] TensorInfo: shape: [10], stride: [4], dtype: INT32, format: ND, size: 40, memsize: 40
+Count of Output: 3
+Output[340] TensorInfo: shape: [1,3,80,80,85], stride: [2457600,819200,10240,128,1], dtype: INT8, format: ND, size: 2457557, memsize: 2457600, quant_info: size=1 [0, 0.00780907]
+Output[378] TensorInfo: shape: [1,3,40,40,85], stride: [614400,204800,5120,128,1], dtype: INT8, format: ND, size: 614357, memsize: 614400, quant_info: size=1 [0, 0.00783619]
+Output[416] TensorInfo: shape: [1,3,20,20,85], stride: [153600,51200,2560,128,1], dtype: INT8, format: ND, size: 153557, memsize: 153600, quant_info: size=1 [0, 0.00785193]
+I20250922 15:57:03.958438 40282 jpeg_detect.cc:43] thread 0 model loaded: yolov5s.hmm.
+Count of Input: 2
+Input[input.1] TensorInfo: shape: [1,3,1080,1920], stride: [2073600,1920,1,1036800,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
+Input[dyn_info] TensorInfo: shape: [10], stride: [4], dtype: INT32, format: ND, size: 40, memsize: 40
+Count of Output: 1
+Output[495] TensorInfo: shape: [1,1000], stride: [1024,1], dtype: INT8, format: ND, size: 1000, memsize: 1024, quant_info: size=1 [0, 0.121476]
+I20250922 15:57:04.181274 40282 jpeg_detect.cc:56] thread 0 model loaded: resnet50.hmm.
+Count of Input: 2
+Input[input.1] TensorInfo: shape: [1,3,1080,1920], stride: [2073600,1920,1,1036800,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
+Input[dyn_info] TensorInfo: shape: [10], stride: [4], dtype: INT32, format: ND, size: 40, memsize: 40
+Count of Output: 1
+Output[495] TensorInfo: shape: [1,1000], stride: [1024,1], dtype: INT8, format: ND, size: 1000, memsize: 1024, quant_info: size=1 [0, 0.121476]
+I20250922 15:57:04.247911 40282 jpeg_detect.cc:56] thread 1 model loaded: resnet50.hmm.
+I20250922 15:57:04.258720 40297 detect_frames.cc:214] classify thread, module 0 infer start...
+I20250922 15:57:04.258725 40290 detect_frames.cc:20] detect thread, moudle 0 infer start...
+I20250922 15:57:04.258728 40298 detect_frames.cc:214] classify thread, module 1 infer start...
+I20250922 15:57:04.314933 40309 jpeg_codec.cc:5] ===> EncodeImage thread start, ready to push 20 images.
+I20250922 15:57:04.355386 40309 jpeg_codec.h:91] get encoded data 1, stamp 916, planes 1, length 39794.
+I20250922 15:57:04.355801 40309 jpeg_codec.cc:62] Jpeg encoder push encoded data 0, queue size 0.
+I20250922 15:57:04.355920 40310 jpeg_codec.h:176] Jpeg decoder 368376140688 push data, size: 39794.
+I20250922 15:57:04.358020 40309 jpeg_codec.h:91] get encoded data 2, stamp 3549, planes 1, length 39794.
+I20250922 15:57:04.358870 40309 jpeg_codec.cc:62] Jpeg encoder push encoded data 1, queue size 0.
+I20250922 15:57:04.361510 40309 jpeg_codec.h:91] get encoded data 3, stamp 7040, planes 1, length 39794.
+I20250922 15:57:04.362420 40309 jpeg_codec.cc:62] Jpeg encoder push encoded data 2, queue size 1.
+I20250922 15:57:04.365075 40309 jpeg_codec.h:91] get encoded data 4, stamp 10604, planes 1, length 39794.
+I20250922 15:57:04.366015 40309 jpeg_codec.cc:62] Jpeg encoder push encoded data 3, queue size 2.
+I20250922 15:57:04.367726 40310 jpeg_codec.h:182] Jpeg decoder 368376140688 pull data.
+I20250922 15:57:04.368690 40309 jpeg_codec.h:91] get encoded data 5, stamp 14219, planes 1, length 39794.
+I20250922 15:57:04.369858 40309 jpeg_codec.cc:62] Jpeg encoder push encoded data 4, queue size 3.
+I20250922 15:57:04.371160 40310 jpeg_codec.h:217] get frame 1, stamp 3111, planes 2, total length 410880.
+-->> decoded yuv info:TensorInfo: shape: [3,426,640], stride: [640,1,640,2,1,272640], dtype: UINT8, format: YUV420SP, size: 408960, memsize: 408960
+I20250922 15:57:04.372662 40309 jpeg_codec.h:91] get encoded data 6, stamp 18191, planes 1, length 39794.
+I20250922 15:57:04.373657 40309 jpeg_codec.cc:62] Jpeg encoder push encoded data 5, queue size 4.
+I20250922 15:57:04.374217 40310 jpeg_codec.cc:174] -->> resized yuv info: height=1080, width=1920.
+......
+I20250922 15:56:07.653195 39610 detect_frames.cc:292] classify thread 0 run sample 19 obj 12 end. cost 3.043 ms.
+I20250922 15:56:07.653901 39610 detect_frames.cc:300] sample 19 box[1033, 444, 1104, 563], det[conf:0.3794272, cls:58], cls[id:741, conf:6.3167477, lable:[prayer rug, prayer mat]]
+I20250922 15:56:07.657508 39610 detect_frames.cc:292] classify thread 0 run sample 19 obj 13 end. cost 2.956 ms.
+I20250922 15:56:07.657695 39610 detect_frames.cc:300] sample 19 box[1369, 924, 1919, 1071], det[conf:0.28132197, cls:60], cls[id:626, conf:7.410031, lable:[lighter, light, igniter, ignitor]]
+I20250922 15:56:07.660861 39610 detect_frames.cc:292] classify thread 0 run sample 19 obj 14 end. cost 3.093 ms.
+I20250922 15:56:07.661239 39610 detect_frames.cc:300] sample 19 box[999, 467, 1050, 552], det[conf:0.2585618, cls:58], cls[id:885, conf:5.34494, lable:[velvet]]
+I20250922 15:56:07.661484 39610 detect_frames.cc:225] ===> classify thread EOS received.
+I20250922 15:56:07.661882 39610 detect_frames.cc:309] <=== classify thread 0 completed. 10 sampels tested.
+```
+
 检测效果图片保存在demo_results目录下。
 
 ### 3. 一键执行
@@ -267,11 +329,12 @@ sample 97 box[1424, 129, 1490, 184], det[conf:0.284296, cls:2], cls[id:766, conf
 linux下执行：
 
 ```bash
-# (默认) 使用后摩解码+开启Resize解码输出功能
+# (默认) 使用后摩视频解码+开启Resize视频解码输出功能
 bash run.sh
-# 使用后摩解码+关闭Resize解码输出功能
+# 使用后摩视频解码+关闭Resize视频解码输出功能
 bash run.sh --disable_resizer
-
-# 使用RK解码（主机上需已安装mpp库）
+# 使用RK视频解码（主机上需已安装mpp库）
 bash run.sh --enable_rk_decoder
+# 运行JPEG图像编解码示例
+bash run.sh --enable_jpeg
 ```
