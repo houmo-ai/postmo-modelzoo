@@ -423,7 +423,7 @@ class DockerExecutor:
                 time.sleep(2)
 
                 # 执行第一个命令：创建container_workdir目录并修改所有权
-                exec_cmd1 = f"mkdir -p {self.container_workdir} && chown {host_uid}:{host_gid} {self.container_workdir}"
+                exec_cmd1 = f"mkdir -p {self.container_workdir} && chown {host_uid}:{host_gid} {self.container_workdir} && mkdir /.cache && chmod 777 -R /.cache"
                 exec_id1 = self.client.api.exec_create(
                     self.container.id,
                     cmd=["bash", "-c", exec_cmd1],
@@ -448,7 +448,7 @@ class DockerExecutor:
                 )
                 ret = self.client.api.exec_start(exec_id2["Id"])
                 self.logger.info(
-                    f"The user {host_username} has been created and given sudo privileges."
+                    f"The user {host_username} has been created and given sudo privileges with /.cache created in cmd1."
                 )
 
                 if environment:

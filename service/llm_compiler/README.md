@@ -4,6 +4,12 @@
 
 支持的大模型及规格见：supported_models.json
 
+## 环境依赖
+
+依赖的python三方库已在requirements.txt中列出。
+
+在当前目录 `service/llm_compiler/` 下执行 `pip3 install -r requirements.txt` 即可安装所有依赖的库。
+
 ## 使用方法
 
 在当前目录 `service/llm_compiler/` 下执行python脚本 `compile_llms.py`，并传入编译模型所需参数，即可进行模型编译。
