@@ -45,7 +45,7 @@ def gptq_quant_llm(args):
         calibration_dataset = load_dataset('wikitext', 'wikitext-2-raw-v1', split='train').select(range(512))["text"]
 
     # 量化配置
-    quant_config = QuantizeConfig(bits=4, group_size=64,sym=True,mse=True,rotation='hadamard')
+    quant_config = QuantizeConfig(bits=4, group_size=64,sym=True,mse=2.4,damp_percent=0.01,rotation='hadamard')
     # 载入模型
     model = GPTQModel.load(args.model, quant_config)
 
