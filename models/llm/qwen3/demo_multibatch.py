@@ -80,9 +80,9 @@ class HmQwenXh2:
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
         self.prefill = tcim.runtime.load(prefill_path, option=option1)
-        print("prefill model loaded")
+        logger.info("prefill model loaded")
         self.decode = tcim.runtime.load(decode_path, option=option2)
-        print("decode model loaded")
+        logger.info("decode model loaded")
         self.nblocks = self.get_nblocks()
         dummy_tensor_names = [
             f'model_layers_{i}_self_attn_kcache_input' for i in range(self.nblocks)
@@ -93,7 +93,7 @@ class HmQwenXh2:
         option1.set_dummy_tensors(dummy_tensor_names)
         self.prefill_length = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[1]
         self.embedding_len = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[2]
-        self.context_max_length = self.decode.get_input_info(self.prefill.get_input_name(3)).shape[2]
+        self.context_max_length = self.decode.get_input_info(self.decode.get_input_name(3)).shape[2]
         self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
         self.flush = not forbid_flush
         self.next_ids = [0] * self.batch
@@ -167,7 +167,7 @@ class HmQwenXh2:
         input_echo_len = all_input_id.numel()
         if input_echo_len >= self.context_max_length:
             logger.error(f"Question long than {self.context_max_length}, please shorten it!")
-            return f"Question long than {self.context_max_length}, please shorten it!"
+            sys.exit(1)
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
         prefill_start_time = time.time()
         for round in range(prefill_loop_round):
