@@ -29,7 +29,7 @@ def get_args() -> argparse.Namespace:
         '--model_dir',
         dest='model_dir',
         type=str,
-        default='',
+        default='./',
         help='where to save downloaded model',
     )
     args = parser.parse_args()
@@ -44,8 +44,8 @@ if __name__ == '__main__':
     HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
-    quant_path = "models/deepseek/hmquant_deepseek_256_8192_20250322.zip"
-    hmm_path = "models/deepseek/hmm_deepseek_256_8192_4cores_20250322.zip"
+    quant_path = "models/deepseek/hmquant_deepseek_256_8192_20250922.zip"
+    hmm_path = "models/deepseek/hmm_deepseek_256_8192_4cores_20250922.zip"
 
     if model_type in ["raw", "all"]:
         ignore_patterns = []
@@ -54,8 +54,8 @@ if __name__ == '__main__':
         ignore_patterns = ["*.safetensors"]
 
     from modelscope import snapshot_download
-    snapshot_download('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B',
-                      local_dir='DeepSeek-R1-Distill-Qwen-7B',
+    snapshot_download("deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+                      local_dir=f"{model_dir}/DeepSeek-R1-Distill-Qwen-7B",
                       ignore_patterns=ignore_patterns)
 
     if model_type in ["quant", "all"]:
