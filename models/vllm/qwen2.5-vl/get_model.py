@@ -53,8 +53,8 @@ if __name__ == '__main__':
     if HOUMO_TARGET == "xh1":
         quant_path_3b = "models_outdated/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_3b_256_2k_20250903.zip"
         quant_path_7b = "models_outdated/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_7b_256_2k_20250903.zip"
-        hmm_path_3b = "models/qwen2.5-vl/hmm_xh1_qwen2.5-vl_3b_256_2k_4cores_20250903.zip"
-        hmm_path_7b = "models/qwen2.5-vl/hmm_xh1_qwen2.5-vl_7b_256_2k_4cores_20250903.zip"
+        hmm_path_3b = "models/qwen2.5-vl/hmm_xh1_qwen2.5-vl_3b_256_2k_4cores_20250923.zip"
+        hmm_path_7b = "models/qwen2.5-vl/hmm_xh1_qwen2.5-vl_7b_256_2k_4cores_20250923.zip"
     elif HOUMO_TARGET == "xh2":
         quant_path_7b = "models_outdated/qwen2.5-vl/hmquant_xh2_qwen2.5-vl_7b_256_2k_20250908.zip"
         hmm_path_7b = "models/qwen2.5-vl/hmm_xh2_qwen2.5-vl_7b_256_2k_2cores_20250908.zip"

@@ -92,8 +92,7 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
-
-def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
+def build_llm(model_name, model_dir, model_path, output_dir, profile, ncore=1):
     import tcim
     start = time.time()
     print(f"\n===> {model_name} build start...")
@@ -111,6 +110,22 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
+def build_vit(model_name, model_dir, model_path, output_dir, profile, ncore=1):
+    import tcim
+    start = time.time()
+    print(f"\n===> {model_name} build start...")
+    decode_model = os.path.join(model_dir, model_path)
+    tcim.build_from_hmonnx(
+        decode_model,
+        weights=os.path.join(model_dir, "weight.npy"),
+        output_name=model_name,
+        ncore=ncore,
+        target=HOUMO_TARGET,
+        output_dir=output_dir,
+        work_dir=os.path.join(output_dir, "tcim"),
+    )
+    profile["build"] = time.time() - start
+    print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     import tcim_lite
@@ -209,9 +224,9 @@ if __name__ == '__main__':
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
         model_path = f"hmquant_{model_name}_with_act.onnx"
-        build("qwen2.5-vl_prefill", os.path.join(model_dir, "prefill"), model_path, output_dir, profile, ncore)
-        build("qwen2.5-vl_decode", os.path.join(model_dir, "decoder"), model_path, output_dir, profile, ncore)
-        build("qwen2.5-vl_visual", os.path.join(model_dir, "visual"), model_path, output_dir, profile, ncore)
+        build_llm("qwen2.5-vl_prefill", os.path.join(model_dir, "prefill"), model_path, output_dir, profile, ncore)
+        build_llm("qwen2.5-vl_decode", os.path.join(model_dir, "decoder"), model_path, output_dir, profile, ncore)
+        build_vit("qwen2.5-vl_visual", os.path.join(model_dir, "visual"), model_path, output_dir, profile, ncore)
 
     # test model
     if args.stage == 'test' or args.stage == 'all':

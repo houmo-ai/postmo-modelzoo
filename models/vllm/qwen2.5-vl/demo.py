@@ -93,10 +93,7 @@ class Qwen25VL:
         logger.info("decode model loaded")
         self.processor = Qwen2_5_VLProcessor.from_pretrained(tokenizer_dir)
         self.device = torch.device("cpu")
-        if HOUMO_TARGET == 'xh1':
-            prefill_shape = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[:3]
-        if HOUMO_TARGET == 'xh2':
-            prefill_shape = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[:2]
+        prefill_shape = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[:2]
         self.prefill_shape = torch.Size(prefill_shape)
         self.prefill_len = self.prefill_shape.numel()
         self.window_size = window_size
@@ -109,7 +106,10 @@ class Qwen25VL:
 
 
         self.embedding_len = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[2]
-        self.context_max_length = self.decode.get_input_info(self.decode.get_input_name(6)).shape[2]
+        if HOUMO_TARGET == 'xh1':
+            self.context_max_length = self.decode.get_input_info(self.decode.get_input_name(6)).shape[3]
+        elif HOUMO_TARGET == 'xh2':
+            self.context_max_length = self.decode.get_input_info(self.decode.get_input_name(6)).shape[2]
         for i in range(self.nblocks):
             kcache = self.prefill.get_input(f"model_layers_{i}_self_attn_kcache_input")
             vcache = self.prefill.get_input(f"model_layers_{i}_self_attn_vcache_input")
@@ -256,7 +256,7 @@ class Qwen25VL:
         def run_visual(self, inputs):
             vit_model_outputs = list()
             for batch in range(inputs["hidden_states"] .shape[0]):
-                self.vit_model.set_input(self.vit_model.get_input_name(0), inputs["hidden_states"][batch].unsqueeze(0).numpy().astype(np.uint8))
+                self.vit_model.set_input(self.vit_model.get_input_name(0), inputs["hidden_states"][batch].numpy().astype(np.uint8))
                 self.vit_model.set_input(self.vit_model.get_input_name(1), inputs["window_index"][batch].numpy().astype(np.int32))
                 self.vit_model.set_input(self.vit_model.get_input_name(2), inputs["window_mask"][batch].numpy().astype(np.int16))
                 self.vit_model.run()

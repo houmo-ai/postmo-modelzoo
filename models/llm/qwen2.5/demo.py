@@ -97,7 +97,7 @@ class HmQwen:
         prefill_input_shape = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape
         self.prefill_length = prefill_input_shape[1]*prefill_input_shape[0]
         self.embedding_len = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[2]
-        self.context_max_length = self.decode.get_input_info(self.decode.get_input_name(3)).shape[2]
+        self.context_max_length = self.decode.get_input_info(self.decode.get_input_name(3)).shape[3]
         self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
         # set kvcache input
         for i in range(self.nblocks):
