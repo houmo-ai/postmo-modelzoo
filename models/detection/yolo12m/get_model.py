@@ -1,11 +1,15 @@
 import os
 import onnx
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog
+from pathlib import Path
+from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh1")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
+runtime_version = runtime_version.split(".dev")[0]
 
 
 def get_args() -> argparse.Namespace:
@@ -22,7 +26,7 @@ def get_args() -> argparse.Namespace:
         "--quant_model_dir",
         dest="quant_model_dir",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        default=os.path.join("output", HOUMO_TARGET),
         help="where to save quant_model",
     )
     parser.add_argument(
@@ -54,7 +58,7 @@ if __name__ == "__main__":
     ncore = 1
     batch = 1
     opt_level = "O2"
-    version = "v2.4.2"
+    version = f"v{runtime_version}"
     target = HOUMO_TARGET
     raw_path = f"models/{model_name}/yolo12m.onnx"
     quant_path = f"models/{model_name}/hmquant_{model_name}_{target}_{version}.tar.xz"

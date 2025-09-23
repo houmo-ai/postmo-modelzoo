@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import os
-import sys
 import yaml
 import time
 import json
@@ -12,10 +11,14 @@ import torch
 import numpy as np
 import random
 import onnx
+import fnmatch
+import requests
 from onnx import TensorProto
 from pathlib import Path
 from tqdm import tqdm
 from importlib.metadata import PackageNotFoundError, version
+from requests.auth import HTTPBasicAuth
+from urllib.parse import urljoin
 
 
 HOUMO_JFROG_IP = os.getenv("HOUMO_JFROG_IP", "139.224.0.199")
@@ -224,6 +227,7 @@ def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) ->
     jfrog_base = jfrog_base + "artifactory"
     file_info_path = f"{jfrog_base}/api/storage/{jfrog_tail}/{file_path}"
     file_size = 0
+    print(f"Get file from jfrog: {file_info_path}")
     response = requests.get(file_info_path)
     if response.status_code == 200:
         url_md5 = response.json()["checksums"]["md5"]
@@ -232,7 +236,7 @@ def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) ->
             print(url_md5, save_path, "already exists.")
             need_download = False
     else:
-        print("failed to retrieve MD5. status code:", response.status_code)
+        print("Failed to retrieve MD5. status code:", response.status_code)
         return ""
 
     if need_download:
@@ -276,22 +280,58 @@ class ProgressFile:
 
 
 def compress_folder_to_tar_xz_with_progress(
-    folder_path: str, output_path: str, preset=9
+    folder_path: str, output_path: str, exclude=None, preset=9
 ):
     """
     压缩 folder_path 为 .tar.xz 文件，支持 tar -xvf 解压，
     并用 tqdm 显示压缩进度。
+
+    Args:
+        folder_path: 要压缩的文件夹路径
+        output_path: 输出文件路径
+        exclude: 要排除的文件或目录模式列表，支持通配符
+        preset: 压缩级别 (0-9)
     """
+    if exclude is None:
+        exclude = []
+
     # 统计所有待压缩文件大小
     file_list = []
     total_size = 0
-    for root, _, files in os.walk(folder_path):
+    folder_abs_path = os.path.abspath(folder_path)
+
+    for root, dirs, files in os.walk(folder_path):
+        # 排除目录
+        dirs[:] = [
+            d
+            for d in dirs
+            if not any(
+                fnmatch.fnmatch(os.path.join(root, d), pattern)
+                or fnmatch.fnmatch(d, pattern)
+                for pattern in exclude
+            )
+        ]
+
         for file in files:
-            if file.endswith(".pkl"):
-                continue  # 跳过 .pkl 文件
             full_path = os.path.join(root, file)
+            rel_path = os.path.relpath(full_path, folder_abs_path)
+
+            # 检查是否应该排除
+            should_exclude = any(
+                fnmatch.fnmatch(full_path, pattern)
+                or fnmatch.fnmatch(rel_path, pattern)
+                or fnmatch.fnmatch(file, pattern)
+                for pattern in exclude
+            )
+
+            if should_exclude:
+                continue
+
             file_list.append(full_path)
             total_size += os.path.getsize(full_path)
+
+    # 确保输出目录存在
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
     with lzma.open(output_path, "wb", preset=preset | lzma.PRESET_EXTREME) as lzma_file:
         with tarfile.open(fileobj=lzma_file, mode="w|") as tar:
@@ -299,8 +339,9 @@ def compress_folder_to_tar_xz_with_progress(
                 total=total_size, unit="B", unit_scale=True, desc="Compressing"
             ) as pbar:
                 for file_path in file_list:
+                    # 计算相对路径（相对于文件夹的父目录）
                     arcname = os.path.relpath(
-                        file_path, start=os.path.dirname(folder_path)
+                        file_path, start=os.path.dirname(folder_abs_path)
                     )
                     tarinfo = tar.gettarinfo(file_path, arcname)
                     with open(file_path, "rb") as f:
@@ -320,3 +361,143 @@ def compress_file_to_tar_xz_with_progress(file_path: str, output_path: str, pres
                 tarinfo = tar.gettarinfo(file_path, arcname=os.path.basename(file_path))
                 with open(file_path, "rb") as f:
                     tar.addfile(tarinfo, fileobj=ProgressFile(f, pbar))
+
+
+def compress_files_to_tar_xz_with_progress(file_paths, output_path, preset=9):
+    """
+    将多个文件/目录压缩成 .tar.xz，支持 tar -xvf 解压，显示压缩进度。
+
+    Args:
+        file_paths: 要压缩的文件/目录路径列表
+        output_path: 输出压缩文件路径
+        preset: xz压缩预设 (0-9)
+    """
+    # 计算总大小
+    total_size = 0
+    for file_path in file_paths:
+        if os.path.isfile(file_path):
+            total_size += os.path.getsize(file_path)
+        elif os.path.isdir(file_path):
+            for root, dirs, files in os.walk(file_path):
+                for file in files:
+                    total_size += os.path.getsize(os.path.join(root, file))
+
+    with lzma.open(output_path, "wb", preset=preset | lzma.PRESET_EXTREME) as lzma_file:
+        with tarfile.open(fileobj=lzma_file, mode="w") as tar:
+            with tqdm(
+                total=total_size, unit="B", unit_scale=True, desc="Compressing"
+            ) as pbar:
+                for file_path in file_paths:
+                    # 添加文件或目录到tar
+                    if os.path.isfile(file_path):
+                        arcname = os.path.basename(file_path)
+                        tarinfo = tar.gettarinfo(file_path, arcname=arcname)
+                        with open(file_path, "rb") as f:
+                            tar.addfile(tarinfo, ProgressFile(f, pbar))
+                    elif os.path.isdir(file_path):
+                        # 添加目录及其内容
+                        arcname = os.path.basename(file_path)
+                        tar.add(
+                            file_path,
+                            arcname=arcname,
+                            filter=lambda info: (
+                                (
+                                    pbar.update(os.path.getsize(info.name))
+                                    if info.isfile()
+                                    else None
+                                ),
+                                info,
+                            )[1],
+                        )
+
+
+def upload_file_to_artifactory(
+    file_path, upload_url, username="public", password="Password@123", max_retries=3
+):
+    """
+    上传文件到 Artifactory 服务器，包含校验和验证
+
+    Args:
+        file_path (str): 要上传的本地文件路径
+        upload_url (str): 目标上传地址（完整URL）
+        username (str): 认证用户名（默认：public）
+        password (str): 认证密码（默认：Password@123）
+        max_retries (int): 失败最大重试次数（默认：3次）
+
+    Returns:
+        bool: 上传成功返回True，失败返回False
+    """
+    BASE_URL = "http://10.10.1.53:8082/artifactory/toolchain/release/"
+    upload_url = os.path.join(BASE_URL, upload_url)
+    # 检查文件是否存在
+    if not os.path.isfile(file_path):
+        print(f"Not found file: {file_path}")
+        return False
+
+    # 计算文件的 MD5 和 SHA1 校验和
+    def calculate_checksums(filepath):
+        import hashlib
+
+        md5_hash = hashlib.md5()
+        sha1_hash = hashlib.sha1()
+
+        with open(filepath, "rb") as f:
+            # 分块读取文件以计算校验和
+            for chunk in iter(lambda: f.read(4096), b""):
+                md5_hash.update(chunk)
+                sha1_hash.update(chunk)
+
+        return md5_hash.hexdigest(), sha1_hash.hexdigest()
+
+    try:
+        md5, sha1 = calculate_checksums(file_path)
+        print(f"Calaculate checksum file: MD5={md5}, SHA1={sha1}")
+    except Exception as e:
+        print(f"Failed to calaculate checksum file: {str(e)}")
+        return False
+
+    # 准备认证参数
+    auth = HTTPBasicAuth(username, password)
+
+    # 读取文件内容（二进制模式）
+    with open(file_path, "rb") as file:
+        file_data = file.read()
+
+    # 请求头设置，包含校验和信息
+    headers = {
+        "Content-Type": "application/octet-stream",
+        "X-Checksum-Md5": md5,
+        "X-Checksum-Sha1": sha1,
+    }
+
+    # 重试机制
+    for attempt in range(max_retries):
+        try:
+            response = requests.put(
+                url=upload_url,
+                data=file_data,
+                headers=headers,
+                auth=auth,
+                timeout=30,  # 设置超时时间（秒）
+            )
+
+            # 检查响应状态
+            if response.status_code in [200, 201]:
+                print(f"Upload: {upload_url}, done.")
+                return True
+            else:
+                print(
+                    f"Upload fail (try {attempt + 1}/{max_retries}): HTTP {response.status_code} - {response.text}"
+                )
+
+        except requests.exceptions.RequestException as e:
+            print(f"Network error (try {attempt + 1}/{max_retries}) : {str(e)}")
+
+        # 如果不是最后一次尝试，则等待后重试
+        if attempt < max_retries - 1:
+            wait_time = 2**attempt  # 指数退避策略
+            print(f"Waiting {wait_time}s retry...")
+            time.sleep(wait_time)
+
+    print(f"Upload file failed, retry times: {max_retries}")
+    return False

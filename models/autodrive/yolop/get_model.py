@@ -3,11 +3,15 @@ import onnx
 import onnx_graphsurgeon as gs
 import numpy as np
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog
+from pathlib import Path
+from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh1')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh1")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
+runtime_version = runtime_version.split(".dev")[0]
 
 
 def focus2conv(model_path, new_model_path):
@@ -23,38 +27,44 @@ def focus2conv(model_path, new_model_path):
         if node.name == "/model.0/conv/conv/Conv":
             first_conv_node = node
 
-    weight = np.array([ [[[1, 0], [0, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 0]]],
-                        [[[0, 0], [0, 0]], [[1, 0], [0, 0]], [[0, 0], [0, 0]]],
-                        [[[0, 0], [0, 0]], [[0, 0], [0, 0]], [[1, 0], [0, 0]]],
-
-                        [[[0, 1], [0, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 0]]],
-                        [[[0, 0], [0, 0]], [[0, 1], [0, 0]], [[0, 0], [0, 0]]],
-                        [[[0, 0], [0, 0]], [[0, 0], [0, 0]], [[0, 1], [0, 0]]],
-
-                        [[[0, 0], [1, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 0]]],
-                        [[[0, 0], [0, 0]], [[0, 0], [1, 0]], [[0, 0], [0, 0]]],
-                        [[[0, 0], [0, 0]], [[0, 0], [0, 0]], [[0, 0], [1, 0]]],
-
-                        [[[0, 0], [0, 1]], [[0, 0], [0, 0]], [[0, 0], [0, 0]]],
-                        [[[0, 0], [0, 0]], [[0, 0], [0, 1]], [[0, 0], [0, 0]]],
-                        [[[0, 0], [0, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 1]]] ], dtype=np.float32)
+    weight = np.array(
+        [
+            [[[1, 0], [0, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 0]]],
+            [[[0, 0], [0, 0]], [[1, 0], [0, 0]], [[0, 0], [0, 0]]],
+            [[[0, 0], [0, 0]], [[0, 0], [0, 0]], [[1, 0], [0, 0]]],
+            [[[0, 1], [0, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 0]]],
+            [[[0, 0], [0, 0]], [[0, 1], [0, 0]], [[0, 0], [0, 0]]],
+            [[[0, 0], [0, 0]], [[0, 0], [0, 0]], [[0, 1], [0, 0]]],
+            [[[0, 0], [1, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 0]]],
+            [[[0, 0], [0, 0]], [[0, 0], [1, 0]], [[0, 0], [0, 0]]],
+            [[[0, 0], [0, 0]], [[0, 0], [0, 0]], [[0, 0], [1, 0]]],
+            [[[0, 0], [0, 1]], [[0, 0], [0, 0]], [[0, 0], [0, 0]]],
+            [[[0, 0], [0, 0]], [[0, 0], [0, 1]], [[0, 0], [0, 0]]],
+            [[[0, 0], [0, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 1]]],
+        ],
+        dtype=np.float32,
+    )
 
     input_tensor = graph.inputs[0]
     weight_const = gs.Constant(name="focus_weight", values=weight)
-    output_tensor = gs.Variable(name="focus_out", dtype=np.float32, shape=[1, 12, 192, 320])
+    output_tensor = gs.Variable(
+        name="focus_out", dtype=np.float32, shape=[1, 12, 192, 320]
+    )
     first_conv_node.inputs[0] = output_tensor
 
-    focus_node = gs.Node(op="Conv",
-                        name="focus",
-                        inputs=[input_tensor, weight_const],
-                        outputs=[output_tensor],
-                        attrs={
-                            "kernel_shape": [2, 2],
-                            "strides": [2, 2], 
-                            "pads": [0, 0, 0, 0], 
-                            "dilations": [1, 1],
-                            "group": 1
-                        })
+    focus_node = gs.Node(
+        op="Conv",
+        name="focus",
+        inputs=[input_tensor, weight_const],
+        outputs=[output_tensor],
+        attrs={
+            "kernel_shape": [2, 2],
+            "strides": [2, 2],
+            "pads": [0, 0, 0, 0],
+            "dilations": [1, 1],
+            "group": 1,
+        },
+    )
 
     graph.nodes.append(focus_node)
     # 清理 & 保存
@@ -68,38 +78,38 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--type',
-        dest='model_type',
+        "--type",
+        dest="model_type",
         type=str,
-        default='raw',
-        help='which model type to get, choise in [raw, quant, build, all]',
+        default="raw",
+        help="which model type to get, choise in [raw, quant, build, all]",
     )
     parser.add_argument(
-        '--quant_model_dir',
-        dest='quant_model_dir',
+        "--quant_model_dir",
+        dest="quant_model_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
-        help='where to save quant_model',
+        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        help="where to save quant_model",
     )
     parser.add_argument(
-        '--build_model_dir',
-        dest='build_model_dir',
+        "--build_model_dir",
+        dest="build_model_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET),
-        help='where to save build_model',
+        default=os.path.join("output", HOUMO_TARGET),
+        help="where to save build_model",
     )
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--model_dir",
+        dest="model_dir",
         type=str,
-        default='',
-        help='where to save downloaded model',
+        default="",
+        help="where to save downloaded model",
     )
     args = parser.parse_args()
     return args
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     quant_model_dir = args.quant_model_dir
     build_model_dir = args.build_model_dir
@@ -110,7 +120,7 @@ if __name__ == '__main__':
     ncore = 1
     batch = 1
     opt_level = "O2"
-    version = "v2.4.2"
+    version = f"v{runtime_version}"
     target = HOUMO_TARGET
     raw_path = f"models/{model_name}/yolop_384x640.onnx"
     quant_path = f"models/{model_name}/hmquant_{model_name}_{target}_{version}.tar.xz"
