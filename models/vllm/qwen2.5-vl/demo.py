@@ -455,9 +455,11 @@ if __name__ == "__main__":
     args = get_args()
     qwen25vl = Qwen25VL(args.vit_path, args.prefill_path, args.decode_path, args.tokenizer_dir, args.embedding_path)
     # image_dir = None
-    image_dir = ["../../../data/pic/beach.jpeg", "../../../data/pic/lane.jpg"]
+    image_dir = ["../../../data/pic/beach.jpeg"]
+    # image_dir = ["../../../data/pic/beach.jpeg", "../../../data/pic/lane.jpg"]
+    image_num = 0 if not image_dir else len(image_dir)
     start_time = time.time()
-    # qwen25vl.chat_vit_prefill(image_dir, prompt='你好，你是谁。')
+    # prompt="你好，你是谁。"
     prompt = "请描述图片内容。"
     logger.success("question:")
     print("\033[1;95m{}\033[0m".format(prompt))
@@ -474,8 +476,9 @@ if __name__ == "__main__":
     output_tokens = decode_count + 1
     decode_time = time.time() - start_time - visual_prefill_time
     total_time = time.time() - start_time
-    logger.success(f"Total Images: {len(image_dir)}, Total Input: {input_tokens} tokens, Output {output_tokens} tokens, Vision Cost {vit_time*1000:.3f} ms, Prefill Cost {prefill_time*1000:.3f} ms, Decode Cost {decode_time*1000:.3f} ms")
-    logger.success(f"Vision Cost {vit_time/len(image_dir)*1000:.3f} ms/per image")
+    logger.success(f"Total Images: {image_num}, Total Input: {input_tokens} tokens, Output {output_tokens} tokens, Vision Cost {vit_time * 1000:.3f} ms, Prefill Cost {prefill_time * 1000:.3f} ms, Decode Cost {decode_time * 1000:.3f} ms")
+    if image_num:
+        logger.success(f"Vision Cost {vit_time / image_num * 1000:.3f} ms/image")
     logger.success(f"Prefill Speed: {input_tokens / prefill_time:.2f} tokens/s")
     logger.success(f"TTFT (Time to First Token): {visual_prefill_time * 1000:.3f} ms")
     logger.success(f"TPOT (Time Per Output Token): {(output_tokens - 1) / decode_time:.2f} tokens/s")

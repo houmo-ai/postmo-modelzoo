@@ -62,7 +62,7 @@ def get_args() -> argparse.Namespace:
         '--decode_path',
         dest='decode_path',
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, "deepseek3_decode.hmm"),
+        default=os.path.join('output', HOUMO_TARGET, "deepseek_decode.hmm"),
         help='houmo decode model path',
     )
     parser.add_argument(
