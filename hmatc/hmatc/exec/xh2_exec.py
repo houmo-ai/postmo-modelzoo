@@ -1,34 +1,34 @@
 import os
-import cv2
 import shutil
 import time
-import torch
-import numpy as np
 from datetime import datetime
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
+
+import cv2
+import numpy as np
+import torch
 from prettytable import PrettyTable
-from ..utils import logger
-from ..utils.utils import (
-    get_md5,
-    SUPPORT_IMAGE_FORMATS,
-    load_npz,
-    str_to_torch_dtype,
-    get_file_md5,
-    compress_folder_to_tar_xz_with_progress,
-    compress_files_to_tar_xz_with_progress,
-)
-from ..utils.preprocess import default_preprocess
-from ..utils.dist_metrics import cosine_distance
-from ..utils.utils import (
-    get_hmquant_xh2_version,
-    get_package_version,
-    upload_file_to_artifactory,
-)
+
 from ..base.base_exec import BaseExec
-from ..infer.xh2_infer import Xh2Infer
 from ..infer.onnx_infer import OnnxInfer
+from ..infer.xh2_infer import Xh2Infer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
 from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
+from ..utils import logger
+from ..utils.dist_metrics import cosine_distance
+from ..utils.preprocess import default_preprocess
+from ..utils.utils import (
+    SUPPORT_IMAGE_FORMATS,
+    compress_files_to_tar_xz_with_progress,
+    compress_folder_to_tar_xz_with_progress,
+    get_file_md5,
+    get_hmquant_xh2_version,
+    get_md5,
+    get_package_version,
+    load_npz,
+    str_to_torch_dtype,
+    upload_file_to_artifactory,
+)
 
 
 class Xh2Exec(BaseExec):
@@ -43,9 +43,12 @@ class Xh2Exec(BaseExec):
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
         self.quant_output_dir = os.path.join(self.save_dir, "xh2", "hmquant")
         self.build_output_dir = os.path.join(self.save_dir, "xh2", "tcim")
-        self.hmonnx_name = f"{self.model_name}_xh2_{self.quant_type}"
+        self.hmonnx_name = f"{self.model_name}"
         self.quant_onnx_model_path = os.path.join(
             self.quant_output_dir, f"{self.hmonnx_name}.onnx"
+        )
+        self.new_quant_onnx_model_path = os.path.join(
+            self.quant_output_dir, f"hmquant_{self.hmonnx_name}_with_act.onnx"
         )
         self.golden_dir = os.path.join(self.quant_output_dir, "golden")
         self.quant_advance_cfg = self.quant_cfg.get("config", dict())
@@ -137,15 +140,21 @@ class Xh2Exec(BaseExec):
         session.to(self.device)
         session.save_golden = True
         session.golden_dir = self.golden_dir
-        if not os.path.exists(self.golden_dir):
-            os.makedirs(self.golden_dir)
-        else:
+        if os.path.exists(self.golden_dir):
             shutil.rmtree(self.golden_dir)
         session.step = 0
         # to float16
         for idx, in_data in enumerate(in_datas):
             in_datas[idx] = in_data.half().to(self.device)
         session(*in_datas)  #
+        if os.path.exists(self.quant_onnx_model_path):
+            os.remove(self.quant_onnx_model_path)
+        shutil.copytree(
+            os.path.join(self.golden_dir, "step_0"),
+            self.quant_output_dir,
+            dirs_exist_ok=True,
+        )
+        shutil.rmtree(self.golden_dir)
         # 压缩量化产物
         compress = os.environ.get("HMATC_COMPRESS", "0")
         if compress == "1" and self.enable_upload:
@@ -159,7 +168,7 @@ class Xh2Exec(BaseExec):
             compress_folder_to_tar_xz_with_progress(
                 self.quant_output_dir,
                 compress_quant_output_path,
-                exclude=["*_with_act.onnx"],
+                # exclude=["*_with_act.onnx"],
             )
             logger.info(
                 f"MD5: {get_file_md5(compress_quant_output_path)}, save path: {compress_quant_output_path}"
@@ -174,7 +183,7 @@ class Xh2Exec(BaseExec):
         res = dict()
         res["time"] = span
         res_info = {"quant": res, "model": self.model_cfg}
-        logger.info(f"Quantize done. and save hmonnx: {self.quant_onnx_model_path}")
+        logger.info(f"Quantize done. and save hmonnx: {self.new_quant_onnx_model_path}")
         return res_info
 
     def build(self):
@@ -189,7 +198,7 @@ class Xh2Exec(BaseExec):
 
         t_start = time.time()
         tcim.build_from_hmonnx(
-            self.quant_onnx_model_path,
+            self.new_quant_onnx_model_path,
             output_name=self.hmm_name,
             ncore=self.build_ncore,
             opt_level=self.build_opt_level,
@@ -242,9 +251,8 @@ class Xh2Exec(BaseExec):
         for input_name in self.inputs_cfg:
             new_name = input_name.replace("/", "_")
             golden_input_path = os.path.join(
-                self.golden_dir,
-                "step_0",
-                f"hmquant_{self.hmonnx_name}_{input_name}_input.npy",
+                self.quant_output_dir,
+                f"hmquant_{self.model_name}_{input_name}_input.npy",
             )
             golden_input = np.load(golden_input_path)
             logger.info(f"Load golden: {golden_input_path}")
@@ -262,9 +270,8 @@ class Xh2Exec(BaseExec):
         for output_name in outputs:
             new_name = output_name.replace("/", "_")
             golden_output_path = os.path.join(
-                self.golden_dir,
-                "step_0",
-                f"hmquant_{self.hmonnx_name}_{new_name}_output.npy",
+                self.quant_output_dir,
+                f"hmquant_{self.model_name}_{new_name}_output.npy",
             )
             golden_output = np.load(golden_output_path)
             logger.info(f"Load golden: {golden_output_path}")
@@ -293,7 +300,7 @@ class Xh2Exec(BaseExec):
         onnx_infer.load(self.model_path)
         # hmquant
         hmquant_infer = Xh2HmQuantInfer()
-        hmquant_infer.load(self.quant_onnx_model_path)
+        hmquant_infer.load(self.new_quant_onnx_model_path)
         # xh2
         xh2_infer = Xh2Infer()
         xh2_infer.load(self.hmm_path)

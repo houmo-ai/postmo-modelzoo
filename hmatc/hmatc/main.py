@@ -250,7 +250,7 @@ def run_model(
             shutil.rmtree("results_onnx", ignore_errors=True)
             onnx_info = hm_exec.evaluate(backend="onnx")
             if not onnx_info:
-                msg = f"onnx eval failed:\nException: {e}"
+                msg = f"onnx eval failed"
                 model_infos["msg"] = msg
                 logger.error(msg)
         except Exception as e:
