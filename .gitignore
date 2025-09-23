@@ -1,5 +1,6 @@
 # Build & install directories
 build/
+build_ndk/
 bin/
 output/
 out/
@@ -9,6 +10,7 @@ reports/
 customized/
 tmp_*/
 data/
+toolchains/
 
 # media files
 *.jpg

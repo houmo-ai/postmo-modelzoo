@@ -1,6 +1,6 @@
 # TCIM性能测试工具
 
-本代码用于在后摩鸿途系列芯片的设备上测试TCIM模型推理性能。
+本代码用于在后摩鸿途系列芯片的设备上测试TCIM模型推理性能。当前支持linux和android native环境（使用adb运行）。
 
 ## 目录
 
@@ -15,9 +15,9 @@
 
 ### 1.1 文件说明
 
-| 文件名      | 说明                                     |
-| ---------- | ---------------------------------------- |
-|tcim_perf.cc|主文件，实现TCIM模型推理流程                |
+| 文件名       | 说明                                     |
+| ------------ | ---------------------------------------- |
+| tcim_perf.cc | 主文件，实现TCIM模型推理流程             |
 
 ### 1.2 流程说明
 
@@ -34,7 +34,7 @@
 ### 1.3 参数说明
 
 - --model, -m: 指定模型路径
-- --data, -d: 指定测试数据路径，若不指定则使用随机数
+- --input, -i: 指定测试数据路径，若不指定则使用随机数
 - --warm_up, -w: 指定warm up次数
 - --batch, -b: 指定batch数
 - --threads, -t: 指定线程数
@@ -57,7 +57,7 @@
 
 #### 1.4.3 吞吐&时延测试
 
-测试模型的吞吐和时延的整体表现，适合评估对时延有限制下追求最大吞吐量的业务场景。可使用`--batch`和`--threads`自由配置batch和线程数，以及在编译时选择核数，绘制ROC曲线并找到合适的组合。
+测试模型的吞吐和时延的整体表现，适合评估对时延有限制下追求最大吞吐量的业务场景。可使用`--batch`和`--threads`配置batch和线程数，以及在编译时选择核数，绘制ROC曲线并找到合适的组合。
 
 #### 1.4.4 仅推理测试
 
@@ -67,27 +67,44 @@
 
 ### 2.1 环境准备
 
-进入modelzoo根目录，先检查 `env.sh` 里的环境变量，根据模型实际路径修改 `env.sh` 内的 `HOUMO_MODEL_PATH`, 并且执行以下命令：
+进入houmo-examples根目录，先检查 `env.sh` 里的环境变量，并且执行以下命令：
 
 ```bash
 source env.sh
 ```
 
-设置完成后进入程序目录：
+如果需要使用其他平台编译链进行交叉编译需要自行下载交叉编译链并设置TCIM_RUNTIME_PATH到目标平台runtime库目录, 以android平台为例：
+
+下载官方NDK[https://developer.android.google.cn/ndk/downloads/index.html?hl=ro]解压到toolchains目录下（也可通过NDK_PATH自由指定路径）。
+
+本例在android-ndk-r28c版本上验证通过，用户的环境如果不一致请自行修改适配。
+
+设置完成后进入程序目录编译：
 
 ```bash
-cd utils/tcim_perf/
-```
-
-### 2.2 一键运行
-
-执行build脚本编译
-
-```bash
+cd tools/tcim_perf/
 ./build.sh
 ```
 
-执行run脚本运行，可通过命令行参数修改模型路径、执行次数、线程数和stream数等，目前只支持线程数与stream数相同，即每个推理module使用1个stream
+如果是编译android版本请执行：
+
+```bash
+./build_ndk.sh
+```
+
+编译生成tcim_perf可执行文件在tools/bin目录下。
+
+### 2.2 一键运行
+
+通过命令行参数修改模型路径、执行次数、线程数和stream数等，目前只支持线程数与stream数相同，即每个推理module使用1个stream。
+
+如果是在android adb环境执行，需要先将tcim_perf可执行文件和模型等拷贝到adb环境中，将runtime和hal库路径加入到LD_LIBRARY_PATH，然后执行：
+
+```bash
+tcim_perf -m xxx.hmm
+```
+
+可将参数配置在run脚本中直接运行：
 
 ```bash
 ./run.sh

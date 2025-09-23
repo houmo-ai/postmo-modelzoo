@@ -21,7 +21,7 @@
 #include <thread>
 #include <vector>
 
-#if (__GNUC__ < 8)
+#if (__GNUC__ < 8) && 0
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
 #else
@@ -29,14 +29,10 @@ namespace fs = std::experimental::filesystem;
 namespace fs = std::filesystem;
 #endif
 
-#include "stream_engine.hpp"
+#include "../common/npy.hpp"
+#include "../common/stream_engine.hpp"
 #include "tcim/tcim_runtime.h"
 
-#define MEM_CHECK 0  // enable memory check, it may effect the performance
-
-#if MEM_CHECK
-#include <sys/resource.h>
-#endif
 
 #define COLOR_RED "\x1b[91;20m"
 #define COLOR_GREEN "\x1b[92;20m"
@@ -54,7 +50,8 @@ using json = nlohmann::json;
 
 struct CliArguments {
   std::string model_path;
-  std::string data_path;
+  std::string model_name;
+  std::string input_path = ".";
   std::string output_path;
   size_t batch = 1;
   size_t warm_up = 1;
@@ -109,52 +106,6 @@ bool IsFileExists(std::string file_path) {
   return f.good();
 }
 
-int read_file(const char *fileName, char **fileData, int *fileLen) {
-  FILE *file = fopen(fileName, "rb");
-  if (file == NULL) {
-    perror("open file failed\n");
-    return -1;
-  }
-
-  fseek(file, 0, SEEK_END);
-  long fileSize = ftell(file);
-  fseek(file, 0, SEEK_SET);
-
-  *fileData = (char *)malloc(fileSize);
-  if (*fileData == NULL) {
-    printf("malloc fileData size:%ld failed\n", fileSize);
-    fclose(file);
-    return -1;
-  }
-  long readSize = fread(*fileData, 1, fileSize, file);
-  if (readSize != fileSize) {
-    printf("readSize(%ld) != fileSize(%ld), read %s failed!\n", readSize,
-           fileSize, fileName);
-    fclose(file);
-    return -1;
-  }
-  *fileLen = fileSize;
-  fclose(file);
-  return 0;
-}
-
-int write_file(const char *fileName, char *fileData, int fileLen) {
-  FILE *file = fopen(fileName, "wb");
-  if (file == NULL) {
-    perror("open file failed\n");
-    return -1;
-  }
-  long writeSize = fwrite(fileData, 1, fileLen, file);
-  if (writeSize != fileLen) {
-    printf("writeSize(%ld) != fileLen(%d), write %s failed!\n", writeSize,
-           fileLen, fileName);
-    fclose(file);
-    return -1;
-  }
-  fclose(file);
-  return 0;
-}
-
 /**
  * @brief Parse cmdline arguments to struct *arguments
  *
@@ -167,12 +118,12 @@ int write_file(const char *fileName, char *fileData, int fileLen) {
 bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
   int option_idx = 0;
   struct option long_options[] = {
-      {"help", 0, 0, 'h'},    {"model", 1, 0, 'm'},     {"data", 1, 0, 'd'},
+      {"help", 0, 0, 'h'},    {"model", 1, 0, 'm'},     {"input", 1, 0, 'i'},
       {"warm_up", 1, 0, 'w'}, {"batch", 1, 0, 'b'},     {"loops", 1, 0, 'l'},
-      {"threads", 1, 0, 't'}, {"devices", 1, 0, 'v'},   {"samples", 1, 0, 's'},
-      {"output", 1, 0, 'o'},  {"infer_only", 1, 0, 'y'}};
+      {"threads", 1, 0, 't'}, {"devices", 1, 0, 'd'},   {"samples", 1, 0, 's'},
+      {"output", 1, 0, 'o'},  {"infer_only", 1, 0, 'y'},{"name", 1, 0, 'n'}};
   while (true) {
-    int ch = getopt_long(argc, argv, "hm:d:w:b:t:v:l:s:o:y:", long_options,
+    int ch = getopt_long(argc, argv, "hm:i:w:b:t:d:l:s:o:y:n:", long_options,
                          &option_idx);
     if (ch == -1) {
       break;
@@ -184,8 +135,11 @@ bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
       case 'm':
         arguments->model_path = std::string(optarg);
         break;
-      case 'd':
-        arguments->data_path = std::string(optarg);
+      case 'n':
+        arguments->model_name = std::string(optarg);
+        break;
+      case 'i':
+        arguments->input_path = std::string(optarg);
         break;
       case 'w':
         arguments->warm_up = atoi(optarg);
@@ -196,7 +150,7 @@ bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
       case 't':
         arguments->threads = atoi(optarg);
         break;
-      case 'v':
+      case 'd':
         arguments->devices = atoi(optarg);
         break;
       case 'l':
@@ -287,17 +241,17 @@ class Barrier {
   std::mutex mtx_;
 };
 
-void SetAffinity(int core_id) {
-  cpu_set_t cpuset;
-  CPU_ZERO(&cpuset);
-  CPU_SET(core_id, &cpuset);
-  // sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpuset);
+// void SetAffinity(int core_id) {
+//   cpu_set_t cpuset;
+//   CPU_ZERO(&cpuset);
+//   CPU_SET(core_id, &cpuset);
+//   //sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpuset);
 
-  if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0) {
-    perror("pthread_setaffinity_np");
-    exit(EXIT_FAILURE);
-  }
-}
+//   if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0) {
+//       perror("pthread_setaffinity_np");
+//       exit(EXIT_FAILURE);
+//   }
+// }
 
 std::string SanitizeName(const std::string &name) {
   std::string output = name;
@@ -314,8 +268,9 @@ int main(int argc, char *argv[]) {
   ParseArgs(&arguments, argc, argv);
 
   std::string model_path = arguments.model_path;
-  std::string data_path = arguments.data_path;
+  std::string input_path = arguments.input_path;
   std::string output_path = arguments.output_path;
+  std::string model_name = arguments.model_name;
   int batch = arguments.batch;
   int sample_num = arguments.samples;
   int thread_num = arguments.threads;
@@ -324,21 +279,33 @@ int main(int argc, char *argv[]) {
   int warm_up = arguments.warm_up;
   bool infer_only = arguments.infer_only;
   bool is_result_check = true;
+  auto start = GET_TIME();
+  auto end = GET_TIME();
+  auto cost = GET_COST(start, end);
 
   if (infer_only) is_result_check = false;
+  if (auto target = std::getenv("HOUMO_TARGET")) {
+    if (!strcmp(target, "xh2")) {
+      is_result_check = false;
+      std::cout << COLOR_YELLOW
+                << "[warn] xh2 not support result check."
+                << COLOR_RESET << std::endl;
+    }
+  }
 
   if (auto platform = std::getenv("HDPL_PLATFORM")) {
-    if (strcmp(platform, "ASIC")) {
+    if (!strcmp(platform, "ISIM")) {
       thread_num = 1;
-      device_num = 1;
+      sample_num = 1;
+      std::cout << COLOR_YELLOW
+                << "[warn] threads and samples set to 1 while HDPL_PLATFORM=ISIM."
+                << COLOR_RESET << std::endl;
     }
-  } else {  // HDPL_PLATFORM not set
-    thread_num = 1;
-    device_num = 1;
   }
 
   std::cout << "model: " << model_path << std::endl;
-  std::cout << "data: " << data_path << std::endl;
+  std::cout << "name: " << model_name << std::endl;
+  std::cout << "input: " << input_path << std::endl;
   std::cout << "samples: " << sample_num << std::endl;
   std::cout << "loops: " << loop_num << std::endl;
   std::cout << "warmup: " << warm_up << std::endl;
@@ -358,10 +325,26 @@ int main(int argc, char *argv[]) {
   TaskQueue qout;
 
   // get module input & output info
-  auto module = tcim::Module::LoadFromFile(model_path);
-  if (!module) {
-    std::cout << COLOR_RED << "[error] load model " << model_path
-              << " fail, exit..." << COLOR_RESET << std::endl;
+  tcim::Module::WeightManager weight_manager;
+  if (device_num > 1) {
+    std::cout << COLOR_YELLOW << "create device manager. device num = " << device_num
+              << COLOR_RESET << std::endl;
+    std::vector<int> device_vec;
+    for (int i = 0; i < device_num; i++) {
+        device_vec.push_back(i);
+    }
+    tcim::DevManager dev_manager = tcim::DevManager::Create(device_vec, "xh2");
+    weight_manager = tcim::Module::WeightManager::CreateWeightManager(dev_manager);
+  } else {
+    std::cout << COLOR_YELLOW << "create weight manager. device num = " << device_num
+              << COLOR_RESET << std::endl;
+    weight_manager = tcim::Module::WeightManager::CreateWeightManager(0);
+  }
+  auto option = tcim::Module::Option(weight_manager);
+  auto module = tcim::Module::LoadFromFile(model_path, option);
+  if (module.GetInitStatus() != tcim::OK) {
+    std::cout << COLOR_RED << "[error] load model " << model_path << " fail, exit..."
+              << COLOR_RESET << std::endl;
     exit(-1);
   }
 
@@ -374,32 +357,29 @@ int main(int argc, char *argv[]) {
   std::cout << "Count of Input: " << input_num << std::endl;
   for (int idx = 0; idx < input_num; idx++) {
     auto input_name = module.GetInputName(idx);
-    auto input_info = module.GetInputInfo(input_name).AsContiguous();
-    auto fmt = input_info.Format();
-    std::cout << "Input[" << idx << "] name: " << input_name << ", "
-              << input_info << std::endl;
-    auto data_file = data_path + "/" + input_name + ".bin";
-    void *data_ptr = nullptr;
+    auto input_info = module.GetInputInfo(input_name);
+    std::cout << "Input[" << idx << "] name: " << input_name << ", " << input_info << std::endl;
+    auto data_file = input_path + "/hmquant_" + model_name + "_" + SanitizeName(input_name) + "_input.npy";
+    void* data_ptr = nullptr;
     int len = 0;
+    input_info = input_info.AsContiguous();
     auto tensor = tcim::Tensor::CreateHostTensor(input_info);
-    if (fs::exists(data_file)) {
-      if (read_file(data_file.c_str(), (char **)&data_ptr, &len)) {
-        std::cout << COLOR_YELLOW << "[warn] Read input data file " << data_file
-                  << " fail. Use random data and result check will be "
-                     "skipped."
+    if (input_name == "valid_length" || input_name == "current_length") {
+      if (fs::exists(data_file)) {
+        std::vector<size_t> shape;
+        bool fortran_order;
+        std::vector<int32_t> data;
+        npy::LoadArrayFromNumpy(data_file, shape, fortran_order, data);
+        std::cout << input_name << ": " << data[0] << std::endl;
+        memcpy(tensor.Data(), &data[0], tensor.Info().MemSize());
+      } else {
+        std::cout << COLOR_YELLOW << "[warn] Input data file " << data_file
+                  << " not exist. Use random data and result check will be skipped."
                   << COLOR_RESET << std::endl;
         is_result_check = false;
-      } else {
-        memcpy(tensor.Data(), data_ptr, tensor.Info().MemSize());
-        free(data_ptr);
       }
-    } else {
-      std::cout << COLOR_YELLOW << "[warn] Input data file " << data_file
-                << " not exist. Use random data and result check will be "
-                   "skipped."
-                << COLOR_RESET << std::endl;
-      is_result_check = false;
     }
+    auto fmt = input_info.Format();
     if (fmt == tcim::DataFmt::YUV420SP || fmt == tcim::DataFmt::YUV422SP ||
         fmt == tcim::DataFmt::YUV444SP) {
       image_input_names.emplace_back(input_name);
@@ -419,25 +399,6 @@ int main(int argc, char *argv[]) {
     assert(img_shape.size() == 4);
     assert(model_input_shape.size() == 4);
     assert(dyn_shape.size() == 2 || dyn_shape.size() == 1);
-    int32_t RESIZER_IMAGE_INPUT_H = img_shape[2];
-    int32_t RESIZER_IMAGE_INPUT_W = img_shape[3];
-    int32_t MODEL_INPUT_H = model_input_shape[2];
-    int32_t MODEL_INPUT_W = model_input_shape[3];
-    // 随机数的情况下，默认是crop全图，会出现缩放倍数超过[1/16, 32)
-    int32_t RESIZER_CROP_H = RESIZER_IMAGE_INPUT_H;
-    int32_t RESIZER_CROP_W = RESIZER_IMAGE_INPUT_W;
-    if (RESIZER_IMAGE_INPUT_H >= MODEL_INPUT_H) {  // 下采样
-      if ((float)RESIZER_IMAGE_INPUT_H / MODEL_INPUT_H > 16.0f)
-        RESIZER_CROP_H = MODEL_INPUT_H * 16;
-    } else {  // 上采样
-      assert(float(MODEL_INPUT_H) / RESIZER_IMAGE_INPUT_H < 32.0f);
-    }
-    if (RESIZER_IMAGE_INPUT_W >= MODEL_INPUT_W) {
-      if ((float)RESIZER_IMAGE_INPUT_W / MODEL_INPUT_W > 16.0f)
-        RESIZER_CROP_W = MODEL_INPUT_W * 16;
-    } else {
-      assert(float(MODEL_INPUT_W) / RESIZER_IMAGE_INPUT_W < 32.0f);
-    }
     int32_t *dyn_data = (int32_t *)(input_datas[dyn_name].Data());
     int32_t batch = 1;
     int32_t step = 4;
@@ -450,11 +411,11 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < batch; ++i) {
       dyn_data[i * step + 0] = 0;
       dyn_data[i * step + 1] = 0;
-      dyn_data[i * step + 2] = RESIZER_CROP_H;
-      dyn_data[i * step + 3] = RESIZER_CROP_W;
+      dyn_data[i * step + 2] = img_shape[2];
+      dyn_data[i * step + 3] = img_shape[3];
       if (step == 10) {
-        dyn_data[i * step + 4] = MODEL_INPUT_H;
-        dyn_data[i * step + 5] = MODEL_INPUT_W;
+        dyn_data[i * step + 4] = model_input_shape[2];
+        dyn_data[i * step + 5] = model_input_shape[3];
         dyn_data[i * step + 6] = 0;
         dyn_data[i * step + 7] = 0;
         dyn_data[i * step + 8] = 0;
@@ -467,30 +428,29 @@ int main(int argc, char *argv[]) {
   std::cout << "Count of Output: " << output_num << std::endl;
   for (int idx = 0; idx < output_num; idx++) {
     auto output_name = module.GetOutputName(idx);
-    auto output_info = module.GetOutputInfo(output_name).AsContiguous();
+    auto output_info = module.GetOutputInfo(output_name);
     std::cout << "Output[" << output_name << "] " << output_info << std::endl;
-    auto data_file = data_path + "/" + SanitizeName(output_name) + ".bin";
-    void *data_ptr = nullptr;
+    auto data_file = input_path + "/hmquant_" + model_name + "_" + SanitizeName(output_name) + "_output.npy";
+    void* data_ptr = nullptr;
     int len = 0;
+    output_info = output_info.AsContiguous();
     auto tensor = tcim::Tensor::CreateHostTensor(output_info);
-    if (fs::exists(data_file)) {
-      if (read_file(data_file.c_str(), (char **)&data_ptr, &len)) {
-        std::cout << COLOR_YELLOW << "[warn] Read output data file "
-                  << data_file << " fail. Result check will be skipped."
-                  << COLOR_RESET << std::endl;
-        is_result_check = false;
+    if (is_result_check) {
+      if (fs::exists(data_file)) {
+        std::vector<size_t> shape;
+        bool fortran_order;
+        std::vector<int32_t> data;
+        npy::LoadArrayFromNumpy(data_file, shape, fortran_order, data);
+        memcpy(tensor.Data(), &data[0], tensor.Info().MemSize());
       } else {
-        memcpy(tensor.Data(), data_ptr, tensor.Info().MemSize());
-        free(data_ptr);
+        std::cout << COLOR_YELLOW << "[warn] Output data file " << data_file
+                  << " not exist. Result check will be skipped." << COLOR_RESET
+                  << std::endl;
+        is_result_check = false;
       }
-    } else {
-      std::cout << COLOR_YELLOW << "[warn] Output data file " << data_file
-                << " not exist. Result check will be skipped." << COLOR_RESET
-                << std::endl;
-      is_result_check = false;
+      output_golden.insert(
+          std::pair<std::string, tcim::Tensor>(output_name, tensor));
     }
-    output_golden.insert(
-        std::pair<std::string, tcim::Tensor>(output_name, tensor));
   }
 
   std::map<std::string, tcim::Tensor> output_datas;
@@ -515,9 +475,26 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "sample queue size is " << qin.queue.size() << std::endl;
 
-  auto thread_func = [](int tid, int did, ThreadInfo &info,
-                        StreamEngine &engine, TaskQueue &qin, TaskQueue &qout,
-                        Barrier &barrier) {
+  for (auto& tensor : input_datas) {
+    module.SetInput(tensor.first, tensor.second);
+  }
+  start = GET_TIME();
+  for (int i = 0; i < warm_up; i++) {
+    module.Run(false);
+  }
+  module.Sync();
+  end = GET_TIME();
+  cost = GET_COST(start, end) / 1000.0 / warm_up;
+  std::cout << "Main Thread " << " Warm Up " << warm_up
+            << " average cost " << cost << " ms." << std::endl;
+
+  auto thread_func = [](int tid,
+                        int did,
+                        ThreadInfo& info,
+                        StreamEngine& engine,
+                        TaskQueue& qin,
+                        TaskQueue& qout,
+                        Barrier& barrier) {
     auto start = GET_TIME();
     auto end = GET_TIME();
     float cost = 0.0;
@@ -626,45 +603,29 @@ int main(int argc, char *argv[]) {
 
   // create threads
   std::vector<std::thread> threads;
-  Barrier barrier(thread_num * device_num);
-  ThreadInfo thread_info[thread_num * device_num];
+  Barrier barrier(thread_num);
+  ThreadInfo thread_info[thread_num];
   StreamEngine engine(4);
-  for (int did = 0; did < device_num; did++) {
-    auto weight_manager = tcim::Module::WeightManager::CreateWeightManager(did);
-    for (int tid = 0; tid < thread_num; tid++) {
-      ThreadInfo *info = &thread_info[did * thread_num + tid];
-      info->model_path = model_path;
-      info->weight_manager = weight_manager;
-      info->loop_num = loop_num;
-      info->infer_only = infer_only;
-      info->is_result_check = is_result_check;
-      info->warm_up = warm_up;
-      int id = did * thread_num + tid;
-      threads.push_back(std::thread(thread_func, id, did, std::ref(*info),
-                                    std::ref(engine), std::ref(qin),
-                                    std::ref(qout), std::ref(barrier)));
-    }
+  int did = 0;
+  for (int tid = 0; tid < thread_num; tid++) {
+    ThreadInfo *info = &thread_info[tid];
+    info->model_path = model_path;
+    info->weight_manager = weight_manager;
+    info->loop_num = loop_num;
+    info->infer_only = infer_only;
+    info->is_result_check = is_result_check;
+    info->warm_up = warm_up;
+    threads.push_back(std::thread(thread_func, tid, did, std::ref(*info),
+                                  std::ref(engine), std::ref(qin),
+                                  std::ref(qout), std::ref(barrier)));
   }
 
   barrier.wait();
   barrier.reset();
-  auto start = GET_TIME();
-
-#if MEM_CHECK
-  do {
-    struct rusage usage;
-    if (getrusage(RUSAGE_SELF, &usage) == -1) {
-      perror("getrusage");
-      return -1;
-    }
-    auto cur = GET_TIME();
-    auto cost = GET_COST(start, cur);
-    printf("run %.3fs, rss %ldKB\n", cost / 1000000.0, usage.ru_maxrss);
-  } while (!barrier.wait(1000));
-#endif
+  start = GET_TIME();
 
   barrier.wait();
-  auto end = GET_TIME();
+  end = GET_TIME();
 
   // wait all threads done
   for (auto &t : threads) {
@@ -693,11 +654,6 @@ int main(int argc, char *argv[]) {
                     << ", output: " << output.first << " result check failed ("
                     << len - err << "/" << len << ")" << COLOR_RESET
                     << std::endl;
-          std::stringstream ss;
-          ss << output_path << "/result_" << task.req_id << '_' << output.first
-             << ".bin";
-          std::cout << "Save result to: " << ss.str() << std::endl;
-          write_file(ss.str().c_str(), data1, len);
           result = false;
         }
       }
@@ -711,6 +667,13 @@ int main(int argc, char *argv[]) {
               << std::endl;
   }
 
+  if (auto platform = std::getenv("HDPL_PLATFORM")) {
+    if (!strcmp(platform, "ISIM")) {
+      std::cout << COLOR_YELLOW << "[warn] The performance results are simulated while HDPL_PLATFORM=ISIM." << COLOR_RESET
+                << std::endl;
+    }
+  }
+
   uint32_t infer_max_cost = 0;
   uint32_t infer_total_cost = 0;
   uint32_t input_max_cost = 0;
@@ -719,7 +682,7 @@ int main(int argc, char *argv[]) {
   uint32_t output_total_cost = 0;
   uint32_t e2e_max_cost = 0;
   uint32_t e2e_total_cost = 0;
-  for (int i = 0; i < thread_num * device_num; i++) {
+  for (int i = 0; i < thread_num; i++) {
     if (thread_info[i].infer_max_cost > infer_max_cost)
       infer_max_cost = thread_info[i].infer_max_cost;
     infer_total_cost += thread_info[i].infer_total_cost;

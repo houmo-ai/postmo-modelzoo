@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # 0. 必要变量
-VERSION=v0.3.0
+VERSION=v0.3.1
 IMAGE_NAME="harbor.houmo.ai/toolchain/release:Dadao-xh2-${VERSION}-ubuntu24.04-x86.64.latest"
 CONTAINER_NAME="$(whoami).HoumoDadao_xh2_${VERSION}"
 CONTAINER_HOME="/container/$(whoami)"

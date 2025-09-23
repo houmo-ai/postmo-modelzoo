@@ -28,7 +28,7 @@ if [[ -z $HOUMO_MODELZOO_URL ]]; then
 fi
 
 # paths for build
-export PATH=$HOUMO_PATH/bin:$PATH
+export PATH=$HOUMO_EXAMPLES_PATH/tools/bin:$HOUMO_PATH/bin:$PATH
 
 # paths for runtime
 export LD_LIBRARY_PATH=$TCIM_RUNTIME_PATH/lib:$HOUMO_PATH/lib:$HOUMO_SDK_PATH/hal/lib:$LD_LIBRARY_PATH

@@ -1,8 +1,9 @@
 #! /bin/bash
 
 # 0. 必要变量
-VERSION=develop
-IMAGE_NAME="harbor.houmo.ai/toolchain/release:${VERSION}-ubuntu20.04-py39-x86.64.latest"
+VERSION=v2.5.0_1804
+# IMAGE_NAME="harbor.houmo.ai/toolchain/release:${VERSION}-ubuntu20.04-py39-x86.64.latest"
+IMAGE_NAME="harbor.houmo.ai/toolchain/release:Dadao-xh1-v2.5.0-ubuntu18.04-x86.64.2025_09_10_13_15_23"
 CONTAINER_NAME="$(whoami).HoumoDadao_xh1_${VERSION}"
 CONTAINER_HOME="/container/$(whoami)"
 USER_CONFIG="-v /develop02:/develop02 -v /data:/data"
@@ -50,6 +51,7 @@ fi
 # 3. 以后台状态创建容器，并挂载第1步设置的路径
 PRINT_BLUE "docker pull $IMAGE_NAME";
 docker pull $IMAGE_NAME >/dev/null
+# docker run --rm --privileged --network=host --pid=host -v $(pwd):$VOLUME_HOME --name $CONTAINER_NAME -v $HOME:$HOME -itd -u $(id -u):$(id -g) $IMAGE_NAME bash
 docker run --privileged --network=host --pid=host \
   -v $(pwd):$VOLUME_HOME -v $HOME:$HOME $USER_CONFIG \
   --name $CONTAINER_NAME -w $VOLUME_HOME -itd -u $(id -u):$(id -g) $IMAGE_NAME >/dev/null
