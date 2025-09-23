@@ -15,11 +15,15 @@ from ..utils.utils import (
     str_to_torch_dtype,
     get_file_md5,
     compress_folder_to_tar_xz_with_progress,
-    compress_file_to_tar_xz_with_progress,
+    compress_files_to_tar_xz_with_progress,
 )
 from ..utils.preprocess import default_preprocess
 from ..utils.dist_metrics import cosine_distance
-from ..utils.utils import get_hmquant_xh2_version as get_hmquant_version
+from ..utils.utils import (
+    get_hmquant_xh2_version,
+    get_package_version,
+    upload_file_to_artifactory,
+)
 from ..base.base_exec import BaseExec
 from ..infer.xh2_infer import Xh2Infer
 from ..infer.onnx_infer import OnnxInfer
@@ -144,18 +148,26 @@ class Xh2Exec(BaseExec):
         session(*in_datas)  #
         # 压缩量化产物
         compress = os.environ.get("HMATC_COMPRESS", "0")
-        if compress == "1":
+        if compress == "1" and self.enable_upload:
             logger.info("Compressing quant output...")
-            compress_quant_output_path = os.path.join(
-                self.save_dir,
-                "xh2",
-                f"hmquant_{self.model_dir_name}_xh2_v{get_hmquant_version()}.tar.xz",
-            )
+            runtime_version = get_package_version(f"houmo_tcim_runtime_xh2")
+            runtime_version = runtime_version.split(".dev")[0]
+            with open(os.path.join(self.quant_output_dir, "VERSION.txt"), "w") as f:
+                f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")
+            filename = f"hmquant_{self.model_dir_name}_xh2_v{runtime_version}.tar.xz"
+            compress_quant_output_path = os.path.join(self.save_dir, "xh2", filename)
             compress_folder_to_tar_xz_with_progress(
-                self.quant_output_dir, compress_quant_output_path
+                self.quant_output_dir,
+                compress_quant_output_path,
+                exclude=["*_with_act.onnx"],
             )
             logger.info(
                 f"MD5: {get_file_md5(compress_quant_output_path)}, save path: {compress_quant_output_path}"
+            )
+            upload_file_to_artifactory(
+                compress_quant_output_path,
+                f"models/{self.model_dir_name}/{filename}",
+                max_retries=3,
             )
             logger.info(f"Compressing quant output done.")
         span = time.time() - t_start
@@ -192,16 +204,32 @@ class Xh2Exec(BaseExec):
         span = time.time() - t_start
         # 压缩编译后产物
         compress = os.environ.get("HMATC_COMPRESS", "0")
-        if compress == "1":
+        if compress == "1" and self.enable_upload:
             logger.info("Compressing hmmodel...")
+            hmcc_version = get_package_version(f"houmo-tcim-xh2")
+            runtime_version = get_package_version(f"houmo_tcim_runtime_xh2")
+            with open(os.path.join(self.save_dir, "xh2", "VERSION.txt"), "w") as f:
+                f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")
+                f.write(f"tcim_version: {hmcc_version}\n")
+                f.write(f"tcim_runtime_version: {runtime_version}\n")
+            runtime_version = runtime_version.split(".dev")[0]
+            filename = f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{get_hmquant_xh2_version()}.tar.xz"
             compress_hmm_path = os.path.join(
                 self.save_dir,
                 "xh2",
-                f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{get_hmquant_version()}.tar.xz",
+                filename,
             )
-            compress_file_to_tar_xz_with_progress(self.hmm_path, compress_hmm_path)
+            compress_files_to_tar_xz_with_progress(
+                [self.hmm_path, os.path.join(self.save_dir, "xh2", "VERSION.txt")],
+                compress_hmm_path,
+            )
             logger.info(
                 f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}"
+            )
+            upload_file_to_artifactory(
+                compress_hmm_path,
+                f"models/{self.model_dir_name}/{filename}",
+                max_retries=3,
             )
             logger.info(f"Compressing hmmodel done.")
         res_info = {"build": {"time": span}}
@@ -354,20 +382,20 @@ class Xh2Exec(BaseExec):
                 xh2_output_dequanted, self.build_batch, axis=0
             )[0]
             onnx_vs_hmquant = cosine_distance(onnx_output, hmquant_output)
-            onnx_vs_xh1 = cosine_distance(onnx_output, xh2_output_dequanted)
-            hmquant_vs_xh1 = cosine_distance(hmquant_output, xh2_output_dequanted)
+            onnx_vs_xh2 = cosine_distance(onnx_output, xh2_output_dequanted)
+            hmquant_vs_xh2 = cosine_distance(hmquant_output, xh2_output_dequanted)
             table.add_row(
                 [
                     output_name,
                     f"{onnx_vs_hmquant:.6f}",
-                    f"{onnx_vs_xh1:.6f}",
-                    f"{hmquant_vs_xh1:.6f}",
+                    f"{onnx_vs_xh2:.6f}",
+                    f"{hmquant_vs_xh2:.6f}",
                 ]
             )
             res_info["compare"][t_start][output_name] = {
                 "onnx_vs_hmquant": float(onnx_vs_hmquant),
-                "onnx_vs_xh2": float(onnx_vs_xh1),
-                "hmquant_vs_xh2": float(hmquant_vs_xh1),
+                "onnx_vs_xh2": float(onnx_vs_xh2),
+                "hmquant_vs_xh2": float(hmquant_vs_xh2),
             }
         logger.info(f"\n{table}")
         return res_info

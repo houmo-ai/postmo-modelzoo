@@ -55,7 +55,7 @@ models:
   yolop: 
     location: models/autodrive/yolop
     exec_cfgs: 
-      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 1}
       - {batch_num: 1, core_num: 1, thread_num: 4}
       - {batch_num: 1, core_num: 2, thread_num: 1}
       - {batch_num: 1, core_num: 4, thread_num: 1}
@@ -115,4 +115,12 @@ models:
       - {batch_num: 1, core_num: 4, thread_num: 1}
       - {batch_num: 2, core_num: 1, thread_num: 1}
       - {batch_num: 4, core_num: 1, thread_num: 1}
-  
+  multi_input_custom_random_model:
+    location: models/multi_input_custom_random_model
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}

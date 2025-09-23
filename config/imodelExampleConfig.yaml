@@ -86,11 +86,11 @@ detection_yolov8m:
     - detection_yolov8m_test
 multi_input_custom_random_model:
   include:
-    - models/multi_input_custom_random_model
+    - ../models/multi_input_custom_random_model
   exclude: null
   example_case:
     - multi_input_custom_random_model_test:
-        script: models/multi_input_custom_random_model/test.sh
+        script: ../models/multi_input_custom_random_model/test.sh
   test:
     - multi_input_custom_random_model_test
 ViT-B-16:

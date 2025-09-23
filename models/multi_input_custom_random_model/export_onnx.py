@@ -7,7 +7,7 @@ class CustomMultiInputModel(torch.nn.Module):
 
     def forward(self, x, y):
         return x + y
-    
+
 
 x = torch.randn(1, 4, 4, dtype=torch.float32)
 y = torch.randn(1, 4, 4, dtype=torch.float32)

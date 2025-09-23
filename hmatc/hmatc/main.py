@@ -8,6 +8,7 @@ import time
 import shutil
 import pandas as pd
 import platform
+import torch
 from io import StringIO
 from prettytable import PrettyTable
 from ._version import __build_time__, __commit__, __version__
@@ -50,6 +51,9 @@ def run_model(
     enable_onnx_eval=True,
     enable_chip_eval=True,
     enable_static=False,
+    enable_cuda=False,
+    enable_upload=False,
+    enable_delete=False,
 ):
     model_infos = dict(
         input_size="N/A",
@@ -154,7 +158,11 @@ def run_model(
         model_infos["msg"] = msg
         os.chdir(root)
         return model_infos
-
+    if enable_cuda and target == "xh1" and torch.cuda.is_available():
+        hm_exec.device = "cuda"
+    hm_exec.enable_upload = enable_upload
+    if enable_delete:
+        shutil.rmtree(os.path.join(hm_exec.save_dir, target), ignore_errors=True)
     input_size = "x".join(map(str, hm_exec.inputs_shape[0]))
     for idx in range(1, len(hm_exec.inputs_shape)):
         input_size += "\n"
@@ -293,226 +301,11 @@ def run_model(
     return model_infos
 
 
-def run_benchmark_v1(
+def run_benchmark(
     config_path: str,
     target: str,
     device_id: int = 0,
-):
-    # 获取量化工具版本
-    hmquant_version = "N/A"
-    if target == "xh1":
-        hmquant_version = get_hmquant_xh1_version()
-    elif target == "xh2":
-        hmquant_version = get_hmquant_xh2_version()
-    # 获取编译器版本
-    hmcc_version = get_package_version(f"houmo-tcim-{target}")
-    runtime_version = get_package_version(f"houmo_tcim_runtime_{target}")
-    if runtime_version == "N/A":
-        logger.error(f"Not found houmo_tcim_runtime_{target}")
-        exit(-1)
-    models = read_yaml_to_dict(config_path)
-    t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-    os.makedirs("reports", exist_ok=True)
-    report_file = os.path.abspath(
-        os.path.join(
-            "reports",
-            f"benchmark_{target}_v{runtime_version}_{platform.machine().lower()}_{t}.xlsx",
-        )
-    )
-
-    headers = [
-        "ModelName",
-        "Shape",
-        "Dataset",
-        "DatasetNum",
-        "GOPs",
-        "Platform",
-        "CoreNum",
-        "BatchNum",
-        "ThreadNum",
-        "Resizer",
-        "HmquantVersion",
-        "CompilerVersion",
-        "RuntimeVersion",
-        "Accuracy[onnx]",
-        f"Accuracy[{target}]",
-        "AccRelError",
-        "Latency[ms]",
-        "Throughput",
-    ]
-
-    table = PrettyTable(headers)
-    table.title = f"HouMo Model Benchmark Report"
-    # 遍历每个模型
-    models = models["models"]
-    for model_name in models:
-        model_cfg = models[model_name]
-        location = model_cfg["location"]
-        cfg_path = model_cfg.get("config", "config.yml")
-        core_num = int(os.getenv("HOUMO_CORE_NUM", 4 if "xh1" == target else 2))
-        enable_eval = (
-            model_cfg.get("eval", True)
-            if platform.machine().lower() == "x86_64"
-            else False  # TODO 需要在非x86环境跑eval再修改
-        )
-
-        def run_all(enable_static):
-            _all_model_infos = list()
-            if enable_static and target == "xh2":
-                return _all_model_infos
-            model_infos = run_model(
-                location,
-                cfg_path,
-                target,
-                batch_num=1,
-                core_num=1,
-                thread_num=1,
-                enable_eval=enable_eval,
-                enbale_quantize=True,
-                enable_build=True,
-                enable_static=enable_static,
-                device_id=device_id,
-            )
-            _all_model_infos.append(model_infos)
-            model_infos = run_model(
-                location,
-                cfg_path,
-                target,
-                batch_num=1,
-                core_num=1,
-                thread_num=core_num * 2,
-                enable_eval=enable_eval,
-                enable_build=False,
-                enbale_quantize=False,
-                enable_chip_eval=False,
-                enable_onnx_eval=False,
-                enable_static=enable_static,
-                device_id=device_id,
-            )
-            _all_model_infos.append(model_infos)
-            if core_num // 2 == 2:
-                model_infos = run_model(
-                    location,
-                    cfg_path,
-                    target,
-                    batch_num=1,
-                    core_num=core_num // 2,
-                    thread_num=1,
-                    enable_eval=enable_eval,
-                    enbale_quantize=False,
-                    enable_build=True,
-                    enable_chip_eval=False,
-                    enable_onnx_eval=False,
-                    enable_static=enable_static,
-                    device_id=device_id,
-                )
-                _all_model_infos.append(model_infos)
-            model_infos = run_model(
-                location,
-                cfg_path,
-                target,
-                batch_num=1,
-                core_num=core_num,
-                thread_num=1,
-                enable_eval=enable_eval,
-                enbale_quantize=False,
-                enable_build=True,
-                enable_chip_eval=False,
-                enable_onnx_eval=False,
-                enable_static=enable_static,
-                device_id=device_id,
-            )
-            _all_model_infos.append(model_infos)
-            model_infos = run_model(
-                location,
-                cfg_path,
-                target,
-                batch_num=2,
-                core_num=1,
-                thread_num=1,
-                enable_eval=enable_eval,
-                enbale_quantize=False,
-                enable_build=True,
-                enable_chip_eval=False,
-                enable_onnx_eval=False,
-                enable_static=enable_static,
-                device_id=device_id,
-            )
-            _all_model_infos.append(model_infos)
-            model_infos = run_model(
-                location,
-                cfg_path,
-                target,
-                batch_num=4,
-                core_num=1,
-                thread_num=1,
-                enable_eval=enable_eval,
-                enbale_quantize=False,
-                enable_build=True,
-                enable_chip_eval=False,
-                enable_onnx_eval=False,
-                enable_static=enable_static,
-                device_id=device_id,
-            )
-            _all_model_infos.append(model_infos)
-            return _all_model_infos
-
-        all_model_infos = run_all(enable_static=False)
-        all_model_infos_static = run_all(enable_static=True)
-
-        def add_rows(_all_model_infos, static_mode=False):
-            for model_infos in _all_model_infos:
-                if static_mode and not model_infos["enable_static"]:
-                    continue
-                table.add_row(
-                    [
-                        model_name,
-                        model_infos["input_size"],
-                        model_infos["dataset"],
-                        model_infos["dataset_num"],
-                        model_infos["GOPs"],
-                        platform.machine().lower(),
-                        model_infos["core_num"],
-                        model_infos["batch_num"],
-                        model_infos["thread_num"],
-                        model_infos["resizer"],
-                        hmquant_version,
-                        hmcc_version,
-                        runtime_version,
-                        model_infos["acc_onnx"],
-                        model_infos["acc_chip"],
-                        model_infos["acc_err"],
-                        model_infos["ave_latency"],
-                        model_infos["throughput"],
-                    ]
-                )
-
-        add_rows(all_model_infos)
-        add_rows(all_model_infos_static, static_mode=True)
-    logger.info(f"\n{table}")
-    df = pd.DataFrame(table.rows, columns=table.field_names)
-    with pd.ExcelWriter(report_file, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Sheet1")
-        workbook = writer.book
-        worksheet = writer.sheets["Sheet1"]
-        text_fmt = workbook.add_format({"num_format": "@"})
-
-        def set_column_text_format(column_name):
-            col_idx = df.columns.get_loc(column_name)
-            excel_idx = chr(ord("A") + col_idx)
-            worksheet.set_column(f"{excel_idx}:{excel_idx}", None, text_fmt)
-
-        set_column_text_format("Accuracy[onnx]")
-        set_column_text_format(f"Accuracy[{target}]")
-        set_column_text_format("AccRelError")
-
-    logger.info("Benchmark done.")
-
-
-def run_benchmark_v2(
-    config_path: str,
-    target: str,
-    device_id: int = 0,
+    enable_cuda: bool = False,
 ):
     # 获取量化工具版本
     hmquant_version = "N/A"
@@ -575,6 +368,8 @@ def run_benchmark_v2(
                 batch_num = exec_cfg.get("batch_num", 1)
                 core_num = exec_cfg.get("core_num", 1)
                 thread_num = exec_cfg.get("thread_num", 1)
+                enable_upload = exec_cfg.get("enable_upload", False)
+                enable_delete = exec_cfg.get("enable_delete", False)
                 enable_eval = (
                     exec_cfg.get("enable_eval", False)
                     if platform.machine().lower() == "x86_64"
@@ -592,6 +387,9 @@ def run_benchmark_v2(
                     enable_build=True,
                     enable_static=enable_static,
                     device_id=device_id,
+                    enable_cuda=enable_cuda,
+                    enable_upload=enable_upload and not enable_static,
+                    enable_delete=enable_delete and not enable_static,
                 )
                 _all_model_infos.append(model_infos)
             return _all_model_infos
@@ -656,6 +454,7 @@ def main():
     parent_onnx = argparse.ArgumentParser(add_help=False)
     parent_result_path = argparse.ArgumentParser(add_help=False)
     parent_device_id = argparse.ArgumentParser(add_help=False)
+    parent_cuda = argparse.ArgumentParser(add_help=False)
     parent_config.add_argument(
         "--config", "-c", type=str, required=True, help="config file path"
     )
@@ -685,6 +484,11 @@ def main():
         default=0,
         help="Specify a device",
     )
+    parent_cuda.add_argument(
+        "--cuda",
+        action="store_true",
+        help="Enable cuda quantization",
+    )
     # 主解析器
     parser = argparse.ArgumentParser(description="HouMo Model Assist Tool")
     subparsers = parser.add_subparsers(
@@ -693,7 +497,7 @@ def main():
     # quant
     quant_parser = subparsers.add_parser(
         "quant",
-        parents=[parent_config, parent_target, parent_result_path],
+        parents=[parent_config, parent_target, parent_result_path, parent_cuda],
         help="Quantize a model",
     )
     # model config
@@ -730,7 +534,6 @@ def main():
         ],
         help="Build a model",
     )
-
     # compare
     compare_parser = subparsers.add_parser(
         "compare",
@@ -806,7 +609,13 @@ def main():
     # benchmark
     benchmark_parser = subparsers.add_parser(
         "benchmark",
-        parents=[parent_config, parent_target, parent_result_path, parent_device_id],
+        parents=[
+            parent_config,
+            parent_target,
+            parent_result_path,
+            parent_device_id,
+            parent_cuda,
+        ],
         help="Run model benchmark",
     )
 
@@ -820,7 +629,7 @@ def main():
     # 处理批量模型benchmark
     current_command = args.command
     if current_command == "benchmark":
-        run_benchmark_v2(args.config, args.target, args.device_id)
+        run_benchmark(args.config, args.target, args.device_id, args.cuda)
         exit(0)
 
     # 存在结果信息，先读回来更新后再存
@@ -903,6 +712,8 @@ def main():
         backend = "onnx"
     # 执行对应的命令
     if current_command == "quant":
+        if args.cuda and target == "xh1" and torch.cuda.is_available():
+            hm_exec.device = "cuda"
         new_res_info = hm_exec.quantize()
     elif current_command == "build":
         new_res_info = hm_exec.build()

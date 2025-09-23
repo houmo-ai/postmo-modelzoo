@@ -4,6 +4,7 @@ import time
 import cv2
 import numpy as np
 import torch
+import shutil
 from datetime import datetime
 from prettytable import PrettyTable
 from ..base.base_exec import BaseExec
@@ -13,10 +14,14 @@ from ..infer.xh1_infer import Xh1Infer
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
 from ..utils.preprocess import default_preprocess, xh1_preprocess, calc_padding_size
-from ..utils.utils import get_hmquant_xh1_version as get_hmquant_version
+from ..utils.utils import (
+    get_hmquant_xh1_version,
+    get_package_version,
+    upload_file_to_artifactory,
+)
 from ..utils.utils import (
     SUPPORT_IMAGE_FORMATS,
-    compress_file_to_tar_xz_with_progress,
+    compress_files_to_tar_xz_with_progress,
     compress_folder_to_tar_xz_with_progress,
     get_file_md5,
     get_md5,
@@ -400,6 +405,7 @@ class Xh1Exec(BaseExec):
             save_tmp_path=self.quant_output_dir,
             device=self.device,
         )
+        logger.info(f"Using {self.device} quantization...")
         t_start = time.time()
         sequencer = quant_single_onnx_network(
             cfg=self.get_quant_cfg(),
@@ -450,18 +456,27 @@ class Xh1Exec(BaseExec):
         res_info = {"quant": res, "model": self.model_cfg}
         # 压缩量化产物
         compress = os.environ.get("HMATC_COMPRESS", "0")
-        if compress == "1":
+        if compress == "1" and self.enable_upload:
             logger.info("Compressing quant output...")
-            compress_quant_output_path = os.path.join(
-                self.save_dir,
-                "xh1",
-                f"hmquant_{self.model_dir_name}_xh1_v{get_hmquant_version()}.tar.xz",
-            )
+            # 写入各版本信息
+            runtime_version = get_package_version(f"houmo_tcim_runtime_xh1")
+            runtime_version = runtime_version.split(".dev")[0]
+            with open(os.path.join(self.quant_output_dir, "VERSION.txt"), "w") as f:
+                f.write(f"hmquant_version: {get_hmquant_xh1_version()}\n")
+            filename = f"hmquant_{self.model_dir_name}_xh1_v{runtime_version}.tar.xz"
+            compress_quant_output_path = os.path.join(self.save_dir, "xh1", filename)
             compress_folder_to_tar_xz_with_progress(
-                self.quant_output_dir, compress_quant_output_path
+                self.quant_output_dir,
+                compress_quant_output_path,
+                exclude=["*.pkl", "tmp_model.onnx"],
             )
             logger.info(
                 f"MD5: {get_file_md5(compress_quant_output_path)}, save path: {compress_quant_output_path}"
+            )
+            upload_file_to_artifactory(
+                compress_quant_output_path,
+                f"models/{self.model_dir_name}/{filename}",
+                max_retries=3,
             )
             logger.info(f"Compressing quant output done.")
         return res_info
@@ -494,16 +509,32 @@ class Xh1Exec(BaseExec):
         res_info = {"build": {"time": span}}
         # 压缩编译后产物
         compress = os.environ.get("HMATC_COMPRESS", "0")
-        if compress == "1":
+        if compress == "1" and self.enable_upload:
             logger.info("Compressing hmmodel...")
+            hmcc_version = get_package_version(f"houmo-tcim-xh1")
+            runtime_version = get_package_version(f"houmo_tcim_runtime_xh1")
+            with open(os.path.join(self.save_dir, "xh1", "VERSION.txt"), "w") as f:
+                f.write(f"hmquant_version: {get_hmquant_xh1_version()}\n")
+                f.write(f"tcim_version: {hmcc_version}\n")
+                f.write(f"tcim_runtime_version: {runtime_version}\n")
+            runtime_version = runtime_version.split(".dev")[0]
+            filename = f"{self.model_dir_name}_xh1_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{runtime_version}.tar.xz"
             compress_hmm_path = os.path.join(
                 self.save_dir,
                 "xh1",
-                f"{self.model_dir_name}_xh1_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{get_hmquant_version()}.tar.xz",
+                filename,
             )
-            compress_file_to_tar_xz_with_progress(self.hmm_path, compress_hmm_path)
+            compress_files_to_tar_xz_with_progress(
+                [self.hmm_path, os.path.join(self.save_dir, "xh1", "VERSION.txt")],
+                compress_hmm_path,
+            )
             logger.info(
                 f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}"
+            )
+            upload_file_to_artifactory(
+                compress_hmm_path,
+                f"models/{self.model_dir_name}/{filename}",
+                max_retries=3,
             )
             logger.info(f"Compressing hmmodel done.")
         return res_info

@@ -54,21 +54,14 @@ if __name__ == "__main__":
     model_type = args.model_type
     model_dir = args.model_dir
 
-    model_name = "yolov3"
+    model_name = "multi_input_custom_random_model"
     ncore = 1
     batch = 1
     opt_level = "O2"
     version = f"v{runtime_version}"
     target = HOUMO_TARGET
-    raw_path = f"models/{model_name}/yolov3_640x640_clip.onnx"
     quant_path = f"models/{model_name}/hmquant_{model_name}_{target}_{version}.tar.xz"
     build_path = f"models/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
-
-    if model_type == "raw" or model_type == "all":
-        try:
-            get_file_from_jfrog(raw_path, model_dir)
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
 
     if model_type == "quant" or model_type == "all":
         try:
