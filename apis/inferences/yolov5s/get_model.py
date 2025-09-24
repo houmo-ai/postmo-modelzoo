@@ -92,7 +92,7 @@ if __name__ == "__main__":
             )
             exit(0)
 
-        third_party_dir = os.path.join(model_dir, "3rdparty")
+        third_party_dir = os.path.join(HOUMO_EXAMPLES_PATH, "apis/models/3rdparty")
         ort_pkg_name = "onnxruntime-linux-" + ort_env_str + "-1.22.0"
         ort_pkg_path = "models/3rdparty/" + ort_pkg_name + ".tgz"
         get_file_from_jfrog(ort_pkg_path, third_party_dir, third_party_dir)

@@ -1,10 +1,9 @@
 import os
-import onnx
 import argparse
 from hmatc.utils.utils import get_file_from_jfrog
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh1')
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
@@ -26,10 +25,16 @@ def get_args() -> argparse.Namespace:
         help='where to save quant_model',
     )
     parser.add_argument(
+        "--build_model_dir",
+        dest="build_model_dir",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET),
+    )
+    parser.add_argument(
         '--model_dir',
         dest='model_dir',
         type=str,
-        default='',
+        default='.',
         help='where to save downloaded model',
     )
     parser.add_argument(
@@ -42,9 +47,11 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
+
 if __name__ == '__main__':
     args = get_args()
     quant_model_dir = args.quant_model_dir
+    build_model_dir = args.build_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
     HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
@@ -64,24 +71,20 @@ if __name__ == '__main__':
 
     if model_type in ["raw", "all"]:
         ignore_patterns = []
-        try:
-            get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+        get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
     else:
         ignore_patterns = ["*.safetensors"]
 
     from modelscope import snapshot_download
-    snapshot_download('qwen/qwen3-8b', local_dir='qwen3-8b', ignore_patterns=ignore_patterns)
+
+    snapshot_download(
+        'qwen/qwen3-8b',
+        local_dir=f'{model_dir}/qwen3-8b',
+        ignore_patterns=ignore_patterns,
+    )
 
     if model_type in ["quant", "all"]:
-        try:
-            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
 
     if model_type in ["hmm", "all"]:
-        try:
-            get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+        get_file_from_jfrog(hmm_path, model_dir, build_model_dir)

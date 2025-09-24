@@ -131,7 +131,7 @@
 // "hmcompare": 模型用例支持hmatc比较推理结果: hmatc compare
 // "hmeval": 模型用例支持hmatc评估精度: hmatc eval
 // "hmperf": 模型用例支持hmatc评估性能: hmatc perf
-"support_hmassist": {
+"support_hmatc": {
     "xh1": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
 },
 // (可选)模型性能benchmark，用于性能测试。如果support_flow中支持perf，则此配置为必需。

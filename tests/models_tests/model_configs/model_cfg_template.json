@@ -9,7 +9,7 @@
     "support_flow": {
         "xh1": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"]
     },
-    "support_hmassist": {
+    "support_hmatc": {
         "xh1": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
     },
     "perf_metrics": {
@@ -18,8 +18,10 @@
         }
     },
     "eval_threshold": {
-        "map50": 0.95,
-        "map50-95": 0.90
+        "xh1":{
+            "map50": 0.95,
+            "map50-95": 0.90
+	}
     },
     "get_model_params": {
         "xh1": {

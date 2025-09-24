@@ -1,6 +1,7 @@
 {
     "obsolete": false,
     "model_dir": "models/backbone/efficientnet",
+    "model_type": "cv",
     "support_platform": ["x86_64"],
     "support_backend": ["xh1"],
     "support_core_num": {
@@ -10,7 +11,7 @@
     "support_flow": {
         "xh1": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"]
     },
-    "support_hmassist": {
+    "support_hmatc": {
         "xh1": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
     },
     "perf_metrics": {
@@ -26,77 +27,88 @@
     },
     "get_model_params": {
         "xh1": {
-            "type": ["default", "raw", "quant", "all"],
-            "quant_model_dir": ["default", "", "./"],
-            "model_dir": ["default", "", "./"]
+            "type": ["raw", "quant"],
+            "model_dir": ["cached_models", "cached_models"]
         },
         "xh2": {
-            "type": ["default", "raw", "all"],
-            "quant_model_dir": ["default", "", "./"],
-            "model_dir": ["default", "", "./"]
+            "type": ["raw"],
+            "model_dir": ["cached_models"]
         }
     },
     "hmquant_params": {
         "params": {
             "required": {
-                "config": ["./config.yml"],
-                "target": ["xh1"]
+                "config": ["./config.yml"]
             },
             "optional": {
-                "result_path": ["default"]
+                "target": [null],
+                "result_path": [null]
             }
         }
     },
     "hmbuild_params": {
-        "params": {
+        "xh1": {
             "required": {
-                "config": ["./config.yml"],
-                "target": ["xh1", "xh2"]
+                "config": ["./config.yml", "./config.yml", "./config.yml", "./config.yml"]
             },
             "optional": {
-                "result_path": ["default"],
-                "ncore": ["default", "1", "2", "4"],
-                "opt_level": ["default", "0", "1", "2"]
+                "result_path": [null, null, null, null],
+                "batch": [null, "1", "2", "4"],
+                "ncore": [null, "1", "2", "4"],
+                "opt_level": [null, "0", "1", "2"],
+                "roi_num": [null, null, null, null]
+            }
+        },
+        "xh2": {
+            "required": {
+                "config": ["./config.yml", "./config.yml", "./config.yml"]
+            },
+            "optional": {
+                "result_path": [null, null, null],
+                "batch": [null, "1", "1"],
+                "ncore": [null, "1", "2"],
+                "opt_level": ["0", "1", "2"],
+                "roi_num": [null, null, null]
             }
         }
     },
     "hmdemo_params": {
         "params": {
             "required": {
-                "config": ["./config.yml"],
-                "target": ["xh1"]
+                "config": ["./config.yml"]
             },
             "optional": {
-                "result_path": ["default"],
-                "onnx": ["default"]
+                "target": [null],
+                "result_path": [null],
+                "onnx": [null]
             }
         }
     },
     "hmperf_params": {
         "params": {
             "required": {
-                "config": ["./config.yml"],
-                "target": ["xh1"],
+                "config": ["./config.yml", "./config.yml", "./config.yml"],
                 "warmup": ["1", "10", "10"],
                 "sample": ["1", "1000", "1000"]
             },
             "optional": {
-                "result_path": ["default"],
-                "loop_num": ["default"],
-                "thread": ["default", "4", "8"],
-                "device": ["default"]
+                "target": [null, null, null],
+                "result_path": [null, null, null],
+                "loop_num": [null, null, null],
+                "thread": ["1", "4", "8"],
+                "device": [null, null, null]
             }
         }
     },
     "hmeval_params": {
         "params": {
             "required": {
-                "config": ["./config.yml"],
-                "target": ["xh1"]
+                "config": ["./config.yml"]
             },
             "optional": {
-                "result_path": ["default"],
-                "onnx": ["default"]
+                "target": [null],
+                "result_path": [null],
+                "onnx": [null]
             }
         }
     },
@@ -104,11 +116,11 @@
         "params": {
             "required": {
                 "config": ["./config.yml"],
-                "target": ["xh1"],
                 "data_path": ["./imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG"]
             },
             "optional": {
-                "result_path": ["default"]
+                "target": [null],
+                "result_path": [null]
             }
         }
     }

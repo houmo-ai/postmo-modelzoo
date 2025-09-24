@@ -42,6 +42,14 @@ def test_backbone_resnet50_compare(setup_logging):
     assert True
 
 
+@pytest.mark.vit
+@pytest.mark.compare
+def test_backbone_vit_compare(setup_logging):
+    model_name = "vit"
+    _compare_func(model_name, setup_logging)
+    assert True
+
+
 @pytest.mark.yolov3
 @pytest.mark.compare
 def test_detection_yolov3_compare(setup_logging):
@@ -54,6 +62,14 @@ def test_detection_yolov3_compare(setup_logging):
 @pytest.mark.compare
 def test_detection_yolov5s_compare(setup_logging):
     model_name = "yolov5s"
+    _compare_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov5s_feature
+@pytest.mark.compare
+def test_detection_yolov5s_feature_compare(setup_logging):
+    model_name = "yolov5s_feature"
     _compare_func(model_name, setup_logging)
     assert True
 

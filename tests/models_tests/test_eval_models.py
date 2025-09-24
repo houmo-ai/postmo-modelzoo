@@ -34,6 +34,14 @@ def test_backbone_resnet50_eval(setup_logging):
     assert True
 
 
+@pytest.mark.vit
+@pytest.mark.eval
+def test_backbone_vit_eval(setup_logging):
+    model_name = "vit"
+    _eval_func(model_name, setup_logging)
+    assert True
+
+
 @pytest.mark.yolov3
 @pytest.mark.eval
 def test_detection_yolov3_eval(setup_logging):
@@ -46,6 +54,14 @@ def test_detection_yolov3_eval(setup_logging):
 @pytest.mark.eval
 def test_detection_yolov5s_eval(setup_logging):
     model_name = "yolov5s"
+    _eval_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov5s_feature
+@pytest.mark.eval
+def test_detection_yolov5s_feature_eval(setup_logging):
+    model_name = "yolov5s_feature"
     _eval_func(model_name, setup_logging)
     assert True
 

@@ -51,9 +51,9 @@ def log_softmax(x, axis=-1):
     # 计算softmax部分
     exp_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
     sum_exp_x = np.sum(exp_x, axis=axis, keepdims=True)
-    softmax_x = exp_x / sum_exp_x  
+    softmax_x = exp_x / sum_exp_x
     # 对softmax结果取对数得到log_softmax
-    #return softmax_x
+    # return softmax_x
     return np.log(softmax_x + 1e-5)
 
 
@@ -109,12 +109,12 @@ def feature_extraction(
 
 
 def model_val(
-        onnx_encoder_model,
-        model_cfg,
-        args,
-        blank_id,
-        tokenizer,
-    ):  
+    onnx_encoder_model,
+    model_cfg,
+    args,
+    blank_id,
+    tokenizer,
+):
     stride = model_cfg["stride"]
     tgt_size = 1500
     window_size = model_cfg["window_size"]
@@ -157,8 +157,12 @@ def model_val(
             mask_attn = mask_attn.unsqueeze(1)
             input_info_i8 = onnx_encoder_model.get_input_info("input")
             input_info_f32 = input_info_i8.astype(np.float32)
-            input_tensor_f32 = tcim.runtime.Tensor(input_info_f32, ck_feat.unsqueeze(0).numpy())
-            input_tensor = tcim.runtime.Tensor(input_info_i8).to_host(to_contiguous=True)
+            input_tensor_f32 = tcim.runtime.Tensor(
+                input_info_f32, ck_feat.unsqueeze(0).numpy()
+            )
+            input_tensor = tcim.runtime.Tensor(input_info_i8).to_host(
+                to_contiguous=True
+            )
             input_tensor_f32.cast_to(input_tensor)
 
             # set input
@@ -176,9 +180,13 @@ def model_val(
             for id in range(0, output_num):
                 output_name = onnx_encoder_model.get_output_name(id)
                 if output_name == "output":
-                    output_npy_predict = onnx_encoder_model.get_output(output_name).cast(np.float32).numpy()
+                    output_npy_predict = (
+                        onnx_encoder_model.get_output(output_name)
+                        .cast(np.float32)
+                        .numpy()
+                    )
 
-            ctc_output = log_softmax(output_npy_predict,-1)
+            ctc_output = log_softmax(output_npy_predict, -1)
             ctc_lens = mask_cnn.sum(-1).squeeze(0).int()
 
             if args.infer_mode == 0:
@@ -199,10 +207,17 @@ def model_val(
 
 def get_args():
     parser = argparse.ArgumentParser(description="recognize with your model")
-    parser.add_argument("--model_path", type=str, default=1, help="model path")
+    parser.add_argument(
+        "--model_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, f"wenet_encoder.hmm"),
+        help="model path",
+    )
     parser.add_argument("--config", type=str, default="train.yaml", help="config file")
     parser.add_argument("--test_data", default="data.list", help="test data file")
-    parser.add_argument("--log_file", type=str, default="stream_val.log", help="log file")
+    parser.add_argument(
+        "--log_file", type=str, default="stream_val.log", help="log file"
+    )
     parser.add_argument("--pe_enc", type=str, default=None, help="pe encoder")
     parser.add_argument("--batch_size", type=int, default=1, help="asr result file")
     parser.add_argument(
@@ -222,7 +237,7 @@ def get_args():
     parser.add_argument("--infer_mode", type=int, default=1, help="infer mode")
     args = parser.parse_args()
     return args
-    
+
 
 if __name__ == "__main__":
     args = get_args()
@@ -254,21 +269,22 @@ if __name__ == "__main__":
 
     tokenizer = init_tokenizer(configs)
     _, blank_id = get_blank_id(configs, tokenizer.symbol_table)
-    
+
     model_config = {
         "stride": 16,
         "window_size": 400,
         "window_shift": 160,
-        "tgt_size": 1500
+        "tgt_size": 1500,
     }
 
     if args.calib_data_path:
         import shutil
+
         if os.path.exists(args.calib_data_path):
             shutil.rmtree(args.calib_data_path)
         os.makedirs(args.calib_data_path, exist_ok=True)
 
-    model_path = os.path.join("output", HOUMO_TARGET, f"wenet_encoder.hmm")
+    model_path = args.model_path
     if not os.path.exists(model_path):
         print(f"Model file {model_path} not found.")
         exit(-1)

@@ -42,6 +42,14 @@ def test_backbone_resnet50_perf(setup_logging):
     assert True
 
 
+@pytest.mark.vit
+@pytest.mark.perf
+def test_backbone_vit_perf(setup_logging):
+    model_name = "vit"
+    _perf_func(model_name, setup_logging)
+    assert True
+
+
 @pytest.mark.yolov3
 @pytest.mark.perf
 def test_detection_yolov3_perf(setup_logging):
@@ -54,6 +62,14 @@ def test_detection_yolov3_perf(setup_logging):
 @pytest.mark.perf
 def test_detection_yolov5s_perf(setup_logging):
     model_name = "yolov5s"
+    _perf_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov5s_feature
+@pytest.mark.perf
+def test_detection_yolov5s_feature_perf(setup_logging):
+    model_name = "yolov5s_feature"
     _perf_func(model_name, setup_logging)
     assert True
 
@@ -74,10 +90,26 @@ def test_llm_deepseek_perf(setup_logging):
     assert True
 
 
+@pytest.mark.deepseek_r1_qwen3_8b
+@pytest.mark.perf
+def test_llm_deepseek_r1_qwen3_8b_perf(setup_logging):
+    model_name = "deepseek-r1-qwen3-8b"
+    _perf_func(model_name, setup_logging)
+    assert True
+
+
 @pytest.mark.qwen3
 @pytest.mark.perf
 def test_llm_qwen3_perf(setup_logging):
     model_name = 'qwen3'
+    _perf_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.qwen3_14b
+@pytest.mark.perf
+def test_llm_qwen3_14b_perf(setup_logging):
+    model_name = "qwen3-14b"
     _perf_func(model_name, setup_logging)
     assert True
 

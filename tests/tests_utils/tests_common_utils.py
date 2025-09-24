@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import logging
 import json
@@ -9,14 +10,26 @@ from glob import glob
 import enum
 import time
 import threading
-import sys
+from enum import Enum, unique
 
-HOUMO_BACKEND = os.getenv("HOUMO_TARGET")
-SKIP_INFER = os.getenv("SKIP_INFER", None)
+
+HOUMO_BACKEND = os.getenv("HOUMO_TARGET", "xh1")
+# ON: quant&compile, OFF:inference
+SEPARATE_TEST = os.getenv("SKIP_INFER", None)
+# 编译量化在一台机器，推理在另一台机器，两个机器共享指定目录
 HDPL_PLATFORM = os.getenv("HDPL_PLATFORM", "")
-MODELS_PATH = os.getenv("IMODELZOO_MODELS_PATH", "./")
-CI_MODELS_RES_PATH = os.path.dirname(os.path.abspath(__file__)) + "/../model_results"
+MODELS_PATH = os.path.abspath(os.getenv("IMODELZOO_MODELS_PATH", "./"))
+MODELS_RES_DIR = os.path.abspath(
+    os.path.dirname(os.path.abspath(__file__)) + f"/../model_results_{HOUMO_BACKEND}"
+)
 logger = logging.getLogger(__name__)
+
+
+@unique
+class TCaseType(Enum):
+    DEFAULT = 0
+    SEPARATE_NO_INFER = 1
+    SEPARATE_INFER = 2
 
 
 class ModelResourceLock:
@@ -134,7 +147,7 @@ class SubprocessLogger:
         :param message: 要输出的消息
         :param stream: 输出到屏幕的流（stdout或stderr）
         """
-        if not message:
+        if not message or "MB/s" in message:  # or "kB/s" in message:
             return
 
         # 添加时间戳
@@ -222,15 +235,21 @@ def execute_test_cmd(
             logger.error(
                 f"Failed to execute command: {cmd_str}, error code: {return_code}"
             )
-        else:
-            if check_flag and len(stdout_res) > 0 and "fail" in stdout_res[0]:
-                flag = False
-                logger.error(f"Result verification: FAILED!, command: {cmd_str}.")
+        elif (
+            check_flag
+            and len(stdout_res) > 0
+            and ("fail" in stdout_res[0] or "[error]" in stdout_res[0])
+        ):
+            flag = False
+            logger.error(f"Result verification: FAILED!, command: {cmd_str}.")
 
     except Exception as e:
         flag = False
         logger.error(f"Failed to execute command: {cmd_str}, unknown error: {e}")
         subprocess_logger.write(sys.stderr)
+
+    if flag is False:
+        reset_chips()
 
     if assert_flag:
         if flag is False:
@@ -254,6 +273,30 @@ def get_platform(support_list: list) -> str:
     if system == "Linux" and machine in support_list:
         return machine
     return None
+
+
+def check_gpu() -> dict:
+    result = {"has_gpu": False, "gpu_info": []}
+
+    try:
+        nvidia_smi_output = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader,nounits"],
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        # 如果命令成功执行，说明有NVIDIA GPU且驱动正常
+        for line in nvidia_smi_output.strip().split("\n"):
+            if line:
+                result["has_gpu"] = True
+                result["gpu_info"].append(f"NVIDIA (nvidia-smi): {line.strip()}")
+    except subprocess.CalledProcessError:
+        # 命令执行失败，可能没有NVIDIA GPU或驱动未安装
+        pass
+    except FileNotFoundError:
+        # nvidia-smi不存在，可能没有NVIDIA GPU
+        pass
+
+    return result
 
 
 def check_device_info(support_list: list) -> bool:
@@ -347,16 +390,20 @@ def install_py_env(env_dir: str, log_file: str) -> dict:
     return changed_libs
 
 
-def is_ci() -> bool:
-    if SKIP_INFER and SKIP_INFER in ["OFF", "ON"]:
+def is_separate() -> bool:
+    if SEPARATE_TEST and SEPARATE_TEST in ["OFF", "ON"]:
         return True
     return False
 
 
-def check_ci_simulator() -> bool:
-    if is_ci() and HDPL_PLATFORM == "ISIM":
-        return True
-    return False
+def get_test_type():
+    if is_separate():
+        if HDPL_PLATFORM == "ISIM":
+            return TCaseType.SEPARATE_NO_INFER
+        else:
+            return TCaseType.SEPARATE_INFER
+
+    return TCaseType.DEFAULT
 
 
 def move_models_res(src_path: str, dst_path: str) -> bool:
@@ -398,20 +445,29 @@ def move_models_res(src_path: str, dst_path: str) -> bool:
 
 def restore_models_res(src_folder: str, dst_folder: str) -> bool:
     if not os.path.isdir(src_folder):
+        logger.info(f"Failed to restore result: {src_folder} -> {dst_folder}")
         return False
+    logger.info(f"Restore result: {src_folder} -> {dst_folder}")
     os.makedirs(dst_folder, exist_ok=True)
 
     for item in os.listdir(src_folder):
         src_path = os.path.join(src_folder, item)
         dst_path = os.path.join(dst_folder, item)
 
+        # 跳过.lock后缀的文件
+        if os.path.isfile(src_path) and item.endswith(".lock"):
+            continue
+
         if os.path.isdir(src_path):
-            restore_models_res(src_path, dst_path)
-        else:
+            logger.info(f"Restore folder: {src_path} -> {dst_path}")
             if os.path.exists(dst_path):
-                os.remove(dst_path)
-            shutil.copy2(src_path, dst_path)
+                shutil.rmtree(dst_path)
+            shutil.copytree(src_path, dst_path, copy_function=shutil.copy2)
+        elif os.path.isfile(src_path):
             logger.info(f"Restore file: {src_path} -> {dst_path}")
+            shutil.copy2(src_path, dst_path)
+        else:
+            logger.warning(f"Skip result file: {src_path}")
 
 
 def prepare_test_folder(model_dir: str, test_type: str):
@@ -425,13 +481,23 @@ def prepare_test_folder(model_dir: str, test_type: str):
     os.chdir(test_folder)
 
 
-def display_ci_logs(
+def reset_chips():
+    logger.warning("Ready to reset chips.")
+    cmd = "/usr/local/houmo-sdk/hal/utility/ipu_reset"
+    if HOUMO_BACKEND != "xh2" or not os.path.exists(cmd):
+        cmd = "/usr/local/houmo-sdk/scripts/reset_aicore.sh"
+    os.system(cmd)
+
+
+def display_to_console(
     log_file: str,
     test_type: str,
     model_name: str,
     res_flag: bool,
     force_print: bool = False,
 ):
-    if check_ci_simulator() and (res_flag is False or force_print is True):
+    if get_test_type() != TCaseType.DEFAULT and (
+        res_flag is False or force_print is True
+    ):
         _, log_str = execute_test_cmd(["cat", log_file])
         print(f"[execute {test_type} flow: {model_name}]\n {log_str}")

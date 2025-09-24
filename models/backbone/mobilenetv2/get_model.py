@@ -1,11 +1,11 @@
 import os
-import onnx
+import sys
 import argparse
 from pathlib import Path
 from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh1")
+HOUMO_TARGET = os.getenv("HOUMO_TARGET", "houmo")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
@@ -20,7 +20,7 @@ def get_args() -> argparse.Namespace:
         dest="model_type",
         type=str,
         default="raw",
-        help="which model type to get, choise in [raw, quant, build, all]",
+        help="which model type to get, choise in [raw, quant, hmm, all]",
     )
     parser.add_argument(
         "--quant_model_dir",
@@ -64,20 +64,15 @@ if __name__ == "__main__":
     quant_path = f"models/{model_name}/hmquant_{model_name}_{target}_{version}.tar.xz"
     build_path = f"models/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
-    if model_type == "raw" or model_type == "all":
-        try:
-            get_file_from_jfrog(raw_path, model_dir)
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+    if model_type in ["raw", "all"] and not get_file_from_jfrog(raw_path, model_dir):
+        sys.exit(1)
 
-    if model_type == "quant" or model_type == "all":
-        try:
-            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+    if model_type in ["quant", "all"] and not get_file_from_jfrog(
+        quant_path, model_dir, quant_model_dir
+    ):
+        sys.exit(1)
 
-    if model_type == "build" or model_type == "all":
-        try:
-            get_file_from_jfrog(build_path, model_dir, build_model_dir)
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+    if model_type in ["hmm", "all"] and not get_file_from_jfrog(
+        build_path, model_dir, build_model_dir
+    ):
+        sys.exit(1)

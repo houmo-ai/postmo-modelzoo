@@ -1,59 +1,68 @@
 {
     "obsolete": false,
     "model_dir": "models/llm/qwen3-14b",
+    "model_type": "llm",
     "support_platform": ["x86_64"],
     "support_backend": ["xh2"],
     "support_core_num": {
         "xh2": [2]
     },
     "support_flow": {
-        "xh2": ["get_model", "compile", "demo"]
+        "xh2": ["get_model", "compile", "demo", "perf"]
     },
-    "support_hmassist": null,
+    "support_hmatc": null,
     "perf_metrics": {
-        "xh2": null
+        "xh2": {
+            "x86_64": {
+                "prefill": 33.05,
+                "decode": 8.74,
+                "end2end": 8.66
+            }
+        }
     },
-    "eval_threshold": null,
     "get_model_params": {
         "xh2": {
-            "type": ["default", "quant", "hmm", "all"],
-            "quant_model_dir": ["default", "", "./"],
-            "model_dir": ["default", "", "./"]
+            "type": ["raw", "quant", "hmm"],
+            "quant_model_dir": [null, "cached_models/hmquant_xh2", null],
+            "build_model_dir": [null, null, "cached_models/hmm_xh2"],
+            "model_dir": ["cached_models", "cached_models", "cached_models"]
         }
     },
     "quant_params": {
-        "model": ["default"],
-        "quant_config": ["default"],
-        "n_calib": ["default"],
-        "model_name": ["default"],
-        "save_path": ["default"],
-        "prefill_shape": ["default"],
-        "cache_len": ["default"],
-        "multi_batch": ["default"],
-        "wikitext_local": ["default"],
-        "eval_ppl": ["default"],
-        "blocks": ["default"],
-        "decoder_shape": ["default"],
-        "gptq": ["default"],
-        "cache_2_input": ["default"],
-        "rotate_ov": ["default"],
-        "rotate_pre_rope": ["default"],
-        "rotate_post_rope": ["default"],
-        "use_klt": ["default"],
-        "compile_mode": ["default"]
+        "xh2": {
+            "model": ["cached_models/qwen3-14b"],
+            "out-dir": ["cached_results/hmquant_xh2_2k"],
+            "skip-quarot": [null],
+            "skip-gptq": [null],
+            "w-bits": [null],
+            "seed": [null],
+            "resume": [null],
+            "debug": [null],
+            "context-length": ["2048"],
+            "input-sequence-length": [null],
+            "quant-type": [null]
+        }
     },
     "compile_params": {
-        "model_dir": ["default"],
-        "model_name": ["default"],
-        "batch": ["default"],
-        "ncore": ["default"],
-        "stage": ["default"],
-        "output_dir": ["default"]
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_2k"],
+            "model_name": [null],
+            "batch": [null],
+            "ncore": [null],
+            "ndevice": [null],
+            "stage": ["build"],
+            "context_length": ["2048"],
+            "output_dir": ["cached_results/hmm_xh2_2k"]
+        }
     },
     "demo_params": {
-        "model_dir": ["default"],
-        "prefill": ["default"],
-        "decode": ["default"],
-        "nblocks": ["default"]
-    }
+        "xh2": {
+            "tokenizer_dir": ["cached_models/qwen3-14b"],
+            "embedding_path": ["cached_results/hmm_xh2_2k/hmquant/quant_embedding.pt"],
+            "prefill_path": ["cached_results/hmm_xh2_2k/qwen3_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_2k/qwen3_decode.hmm"],
+            "ndevice": ["1"]
+        }
+    },
+    "perf_params": "demo"
 }

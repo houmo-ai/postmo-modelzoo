@@ -3,6 +3,7 @@ import os
 import logging
 import shutil
 from ..tests_utils.tests_common_utils import *
+import glob
 
 
 logger = logging.getLogger(__name__)
@@ -85,22 +86,80 @@ def _generate_hmassist_cmds(
     return final_cmd_list
 
 
-def _generate_py_cmds(cmd_header: list, params_dict: dict) -> list:
-    cmd_list = [cmd_header]
+def _generate_hmatc_cmds(
+    cmd_header: list,
+    required_params: dict,
+    optional_params: dict,
+    skipped_vals: dict = None,
+) -> list:
+    merged_params = required_params.copy()
+    merged_params.update(optional_params)
 
-    idx = 1
+    cmd_list = list()
+    # construct required test commands
+    idx = 0
+    flag = True
+    while flag:
+        flag = False
+        tmp_cmd_list = list()
+        for param_name, param_list in merged_params.items():
+            if (
+                param_name == "onnx"
+                or len(param_list) <= idx
+                or param_list[idx] is None
+                or param_list[idx] == "default"
+            ):
+                continue
+            param_val = param_list[idx]
+            if (
+                skipped_vals
+                and param_name in skipped_vals
+                and param_val in skipped_vals[param_name]
+            ):
+                continue
+            param_str = "--" + param_name
+            tmp_cmd_list += [param_str, param_val]
+            flag = True
+
+        if tmp_cmd_list:
+            tmp_cmd_list = cmd_header + tmp_cmd_list
+            cmd_list.append(tmp_cmd_list)
+        idx += 1
+
+    return cmd_list
+
+
+def _generate_py_cmds(
+    cmd_header: list,
+    params_dict: dict,
+    skip_default: bool = True,
+    model_dir: str = None,
+    res_dir: str = None,
+) -> list:
+
+    cmd_list = [cmd_header] if skip_default else list()
+    idx = 1 if skip_default else 0
     flag = True
     while flag:
         flag = False
         tmp_cmd_list = list()
         for param_name, param_list in params_dict.items():
             params_str = "--" + param_name
-            if len(param_list) <= idx or param_list[idx] == "default":
+            if (
+                len(param_list) <= idx
+                or param_list[idx] is None
+                or param_list[idx] == "default"
+            ):
                 continue
-            tmp_cmd_list += [params_str, param_list[idx]]
+            param_val = param_list[idx]
+            if model_dir and "cached_models" in param_list[idx]:
+                param_val = param_list[idx].replace("cached_models", model_dir)
+            if res_dir and "cached_results" in param_list[idx]:
+                param_val = param_list[idx].replace("cached_results", res_dir)
+            tmp_cmd_list += [params_str, param_val]
             flag = True
         if tmp_cmd_list:
-            tmp_cmd_list = cmd_list[0] + tmp_cmd_list
+            tmp_cmd_list = cmd_header + tmp_cmd_list
             cmd_list.append(tmp_cmd_list)
         idx += 1
 
@@ -141,9 +200,8 @@ def _check_compile_result(res_str: str) -> bool:
 
     logger.info(f"Compilation results: {rows}")
     compile_th = 0.99
-    # [TMP]
     if HOUMO_BACKEND == "xh2":
-        compile_th = 0.4
+        compile_th = 0.9
     check_res = all(row[header[1]] >= compile_th for row in rows)
     if check_res is True and HOUMO_BACKEND == "xh1":
         check_res = all(row[header[3]] >= compile_th for row in rows)
@@ -187,7 +245,7 @@ def _check_compare_result(res_str: str) -> bool:
     compare_th = 1.0
     # [TMP]
     if HOUMO_BACKEND == "xh2":
-        compare_th = 0.05
+        compare_th = 0.9
     check_res = all(row[header[3]] >= compare_th for row in rows)
     return check_res
 
@@ -213,37 +271,179 @@ def _process_eval_result(res_str: str, perf_names: list) -> dict:
     return eval_res
 
 
-def _prepare_quantized_model(model_info: dict, log_file: str) -> bool:
-    logger.info("Start to prepare quantized model for compiling.")
+def _get_param_value(params, target_param):
+    for i in range(len(params)):
+        if params[i] == target_param:
+            if i + 1 < len(params):
+                return params[i + 1]
+            break
+    return None
+
+
+def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
+    if get_test_type() == TCaseType.SEPARATE_INFER:
+        logger.warning(
+            "Skip the step of preparing quantized llm model in the SPEARATE INFER stage."
+        )
+        return True
+
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
+    lock_file_dst = model_res_dir + "/lock.lock"
+    lock_file_src = model_set_dir + "/lock.lock"
+    quant_params = model_info["quant_params"][HOUMO_BACKEND]
     flag = False
+
+    logger.info("Start to quant llm model for compiling.")
+    if (
+        quant_params
+        and "quant" in model_info["support_flow"][HOUMO_BACKEND]
+        and check_gpu()["has_gpu"] is True
+    ):
+        for idx, tmp_model_dir in enumerate(quant_params["out-dir"]):
+            quant_res_dir = tmp_model_dir.replace("cached_results", model_res_dir)
+            if quant_res_dir and os.path.exists(quant_res_dir):
+                logger.warning(
+                    f"Skip the step of preparing quantized llm model {quant_res_dir} in the SPEARATE NO INFER stage."
+                )
+                flag = True
+                continue
+            # download raw model files
+            with ModelResourceLock(
+                lock_file_src, ModelResourceLock.LockMode.WRITE, "model downloading"
+            ):
+                execute_test_cmd(
+                    [
+                        "python3",
+                        "get_model.py",
+                        "--model_dir",
+                        model_set_dir,
+                        "--type",
+                        "raw",
+                    ],
+                    "",
+                    True,
+                )
+
+            with ModelResourceLock(
+                lock_file_dst, ModelResourceLock.LockMode.WRITE, "model quantizing"
+            ):
+                # quant model
+                model_dir = quant_params["model"][idx]
+                if "cached_models" in quant_params["model"][idx]:
+                    model_dir = quant_params["model"][idx].replace(
+                        "cached_models", model_set_dir
+                    )
+                elif "cached_results" in quant_params["model"][idx]:
+                    model_dir = quant_params["model"][idx].replace(
+                        "cached_results", model_res_dir
+                    )
+                cmds = [
+                    "python3",
+                    "ptq.py",
+                    "--model",
+                    model_dir,
+                    "--context-length",
+                    quant_params["context-length"][idx],
+                ]
+                if HOUMO_BACKEND == "xh1":
+                    cmds += ["--save_path", quant_res_dir]
+                else:
+                    cmds += ["--out-dir", quant_res_dir]
+                flag, _ = execute_test_cmd(cmds, log_file)
+                if flag is True:
+                    tmp_res_dir = f"{quant_res_dir}/hmquant"
+                    os.system(f"mv {tmp_res_dir} {quant_res_dir}")
+                else:
+                    return flag
+
+        return flag
+
+    compile_params = model_info["compile_params"][HOUMO_BACKEND]
+    for idx, tmp_model_dir in enumerate(compile_params["model_dir"]):
+        quant_res_dir = tmp_model_dir.replace("cached_results", model_res_dir)
+        if quant_res_dir and os.path.exists(quant_res_dir):
+            logger.warning(
+                f"Skip the step of preparing quantized llm model {quant_res_dir} in the SPEARATE NO INFER stage."
+            )
+            continue
+
+        logger.info("Start to download quantized llm model for compiling.")
+        if "quant" in model_info["get_model_params"][HOUMO_BACKEND]["type"]:
+            # download quantized model file
+            with ModelResourceLock(
+                lock_file_src, ModelResourceLock.LockMode.WRITE, "model downloading"
+            ):
+                with ModelResourceLock(
+                    lock_file_dst,
+                    ModelResourceLock.LockMode.WRITE,
+                    "model downloading",
+                ):
+                    flag, _ = execute_test_cmd(
+                        [
+                            "python3",
+                            "get_model.py",
+                            "--model_dir",
+                            model_set_dir,
+                            "--quant_model_dir",
+                            quant_res_dir,
+                            "--type",
+                            "quant",
+                        ]
+                    )
+                    if flag is False:
+                        return flag
+        else:
+            logger.warning("Not support downloading quantized model file.")
+    return flag
+
+
+def _prepare_quantized_cv_model(model_info: dict, log_file: str) -> bool:
+    logger.info("Start to prepare quantized cv model for compiling.")
+    flag = True
+    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     get_model_types = model_info["get_model_params"][HOUMO_BACKEND]["type"]
 
     # get model
-    quant_flag = True
+    lock_file = model_res_dir + "/lock.lock"
     if "quant" in get_model_types and "hmquant_params" not in model_info:
-        lock_file = model_set_dir + "/lock.lock"
-        with ModelResourceLock(
-            lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
-        ):
-            flag, _ = execute_test_cmd(
-                [
-                    "python3",
-                    "get_model.py",
-                    "--model_dir",
-                    model_set_dir,
-                    "--type",
-                    "quant",
-                ]
-            )
-            quant_flag = False
-    elif (
+        compiled_ipt_dirs = model_info["compile_params"][HOUMO_BACKEND]["model_dir"]
+        for idx, tmp_model_dir in enumerate(compiled_ipt_dirs):
+            quant_res_dir = tmp_model_dir
+            if "cached_results" in tmp_model_dir:
+                quant_res_dir = tmp_model_dir.replace("cached_results", model_res_dir)
+            elif "cached_models" in tmp_model_dir:
+                quant_res_dir = tmp_model_dir.replace("cached_models", model_set_dir)
+            if os.path.exists(quant_res_dir):
+                continue
+
+            with ModelResourceLock(
+                lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
+            ):
+                flag, _ = execute_test_cmd(
+                    [
+                        "python3",
+                        "get_model.py",
+                        "--model_dir",
+                        model_set_dir,
+                        "--type",
+                        "quant",
+                        "--quant_model_dir",
+                        quant_res_dir,
+                    ]
+                )
+                if flag is False:
+                    break
+        return flag
+
+    if (
         "raw" in get_model_types
         and "quant" in model_info["support_flow"][HOUMO_BACKEND]
     ):
-        lock_file = model_set_dir + "/lock.lock"
+        lock_md_file = model_set_dir + "/lock.lock"
         with ModelResourceLock(
-            lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
+            lock_md_file, ModelResourceLock.LockMode.WRITE, "model downloading"
         ):
             flag, _ = execute_test_cmd(
                 [
@@ -255,13 +455,11 @@ def _prepare_quantized_model(model_info: dict, log_file: str) -> bool:
                     "raw",
                 ]
             )
+        if flag is False:
+            return False
 
+    # copy model files to work dir
     os.system(f"cp -ar {model_set_dir}/* ./")
-    if quant_flag is False:
-        return flag
-    if flag is False:
-        return False
-
     # quant raw model
     if "hmquant_params" in model_info:
         flag, _ = execute_test_cmd(
@@ -281,49 +479,189 @@ def _prepare_quantized_model(model_info: dict, log_file: str) -> bool:
     return flag
 
 
-def _prepare_compiled_model(model_info: dict, platform: str, log_file: str) -> bool:
-    if is_ci() is True and check_ci_simulator() is False:
-        logger.warning("Skip the step of preparing compiled model on ci asic.")
+def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) -> bool:
+    if get_test_type() == TCaseType.SEPARATE_INFER:
+        logger.warning(
+            "Skip the step of preparing compiled model in the SPEARATE INFER stage."
+        )
         return True
 
-    if check_ci_simulator() is True:
-        dst_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
-        if os.path.exists(dst_folder):
-            logger.warning("Skip the step of preparing compiled model on ci isim.")
-            return True
-
-    logger.info("Start to prepare compiled model for inference.")
-    if platform == "aarch64":
-        model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-        lock_file = model_set_dir + "/lock.lock"
-        with ModelResourceLock(
-            lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
+    compile_params = model_info["compile_params"][HOUMO_BACKEND]
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
+    flag = True
+    for idx, tmp_model_dir in enumerate(compile_params["model_dir"]):
+        quant_res_dir = tmp_model_dir.replace("cached_results", model_res_dir)
+        compile_res_dir = compile_params["output_dir"][idx].replace(
+            "cached_results", model_res_dir
+        )
+        embedding_path = f"{compile_res_dir}/hmquant/quant_embedding.pt"
+        if not os.path.exists(embedding_path) and os.path.exists(
+            f"{quant_res_dir}/quant_embedding.pt"
         ):
-            execute_test_cmd(
-                [
-                    "python3",
-                    "get_model.py",
-                    "--model_dir",
-                    model_set_dir,
-                    "--type",
-                    "hmm",
-                ],
-                "",
-                True,
+            os.makedirs(f"{compile_res_dir}/hmquant/", exist_ok=True)
+            os.system(
+                f"cp {quant_res_dir}/quant_embedding.pt {compile_res_dir}/hmquant/"
             )
-            os.system(f"cp -ar {model_set_dir}/* ./")
+        if get_test_type() in [TCaseType.SEPARATE_NO_INFER, TCaseType.DEFAULT]:
+            hmm_files = glob.glob(os.path.join(compile_res_dir, "*.hmm"))
+            if (
+                os.path.exists(compile_res_dir)
+                and os.path.exists(embedding_path)
+                and len(hmm_files) > 0
+            ):
+                logger.warning(
+                    f"Skip the step of preparing compiled model {compile_res_dir}."
+                )
+                continue
+
+        logger.info("Start to prepare compiled llm model for inference.")
+        lock_file = model_res_dir + "/lock.lock"
+        if (
+            platform != "aarch64"
+            and "compile" in model_info["support_flow"][HOUMO_BACKEND]
+            and check_gpu()["has_gpu"] is True
+            and _prepare_quantized_llm_model(model_info, log_file)
+        ):
+            with ModelResourceLock(
+                lock_file, ModelResourceLock.LockMode.WRITE, "model compiling"
+            ):
+                cmd_list = [
+                    "python3",
+                    "build.py",
+                    "--model_dir",
+                    quant_res_dir,
+                    "--output_dir",
+                    compile_res_dir,
+                    "--stage",
+                    "build",
+                ]
+                if HOUMO_BACKEND == "xh2":
+                    cmd_list += [
+                        "--context_length",
+                        compile_params["context_length"][idx],
+                    ]
+                flag, _ = execute_test_cmd(
+                    cmd_list,
+                    log_file,
+                )
+            if os.path.exists(f"{quant_res_dir}/quant_embedding.pt"):
+                os.makedirs(f"{compile_res_dir}/hmquant/", exist_ok=True)
+                os.system(
+                    f"cp {quant_res_dir}/quant_embedding.pt {compile_res_dir}/hmquant/"
+                )
+            if flag is False:
+                break
+            else:
+                continue
+
+        flag = False
+        if "hmm" in model_info["get_model_params"][HOUMO_BACKEND]["type"]:
+            lock_file_src = model_set_dir + "/lock.lock"
+            with ModelResourceLock(
+                lock_file_src, ModelResourceLock.LockMode.WRITE, "model downloading"
+            ):
+                with ModelResourceLock(
+                    lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
+                ):
+                    flag, _ = execute_test_cmd(
+                        [
+                            "python3",
+                            "get_model.py",
+                            "--model_dir",
+                            model_set_dir,
+                            "--build_model_dir",
+                            compile_res_dir,
+                            "--type",
+                            "hmm",
+                        ]
+                    )
+                if flag is False:
+                    break
+                else:
+                    continue
+
+    return flag
+
+
+def _prepare_compiled_cv_model(model_info: dict, platform: str, log_file: str) -> bool:
+    if get_test_type() == TCaseType.SEPARATE_INFER:
+        logger.warning(
+            "Skip the step of preparing compiled model in the SPEARATE INFER stage."
+        )
+        return True
+
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
+    if "compile_params" in model_info:
+        compile_res_dir = model_info["compile_params"][HOUMO_BACKEND]["output_dir"][0]
+        compile_res_dir = compile_res_dir.replace("cached_results", model_res_dir)
+    else:
+        compile_res_dir = os.path.join(model_res_dir, "output", HOUMO_BACKEND)
+    # if get_test_type() == TCaseType.SEPARATE_NO_INFER:
+    if os.path.exists(compile_res_dir):
+        logger.warning("Skip the step of preparing compiled model.")
+        return True
+
+    logger.info("Start to prepare compiled cv model for inference.")
+    if platform == "aarch64":
+        lock_file_src = model_set_dir + "/lock.lock"
+        lock_file_dst = model_res_dir + "/lock.lock"
+        with ModelResourceLock(
+            lock_file_src, ModelResourceLock.LockMode.WRITE, "model downloading"
+        ):
+            with ModelResourceLock(
+                lock_file_dst, ModelResourceLock.LockMode.WRITE, "model downloading"
+            ):
+                execute_test_cmd(
+                    [
+                        "python3",
+                        "get_model.py",
+                        "--model_dir",
+                        model_set_dir,
+                        "--build_model_dir",
+                        compile_res_dir,
+                        "--type",
+                        "hmm",
+                    ],
+                    "",
+                    True,
+                )
+        os.system(f"cp -ar {compile_res_dir} ./")
         return True
     # platform != "aarch64"
-    if not _prepare_quantized_model(model_info, log_file):
+    if not _prepare_quantized_cv_model(model_info, log_file):
         return False
     if "hmbuild_params" in model_info:
         execute_test_cmd(
-            ["hmatc", "build", "--target", HOUMO_BACKEND, "--config", "./config.yml"],
+            [
+                "hmatc",
+                "build",
+                "--target",
+                HOUMO_BACKEND,
+                "--config",
+                "./config.yml",
+            ],
             log_file,
             True,
         )
     else:
-        execute_test_cmd(["python3", "build.py"], log_file, True)
+        model_dir = model_info["compile_params"][HOUMO_BACKEND]["model_dir"][0].replace(
+            "cached_results", model_res_dir
+        )
+        execute_test_cmd(
+            [
+                "python3",
+                "build.py",
+                "--model_dir",
+                model_dir,
+                "--output_dir",
+                compile_res_dir,
+            ],
+            log_file,
+            True,
+        )
+
     return True
 
 
@@ -339,8 +677,8 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
-    if is_ci() and check_ci_simulator() is False:
-        skip_msg = f"This get_model testcase of {model_name} has already been run in the CI simulator."
+    if get_test_type() == TCaseType.SEPARATE_INFER:
+        skip_msg = f"This get_model testcase of {model_name} has already been run in the SEPARATE INFER stage."
         logger.warning(skip_msg)
         pytest.skip(skip_msg)
     platform = get_platform(model_info["support_platform"])
@@ -357,19 +695,23 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
     # test script: get_model.py
     params_dict = model_info["get_model_params"][HOUMO_BACKEND]
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-    cmd_header = ["python3", "get_model.py", "--model_dir", model_set_dir]
+    cmd_header = ["python3", "get_model.py"]
 
     final_flag = True
-    cmd_list = _generate_py_cmds(cmd_header, params_dict)
+    cmd_list = _generate_py_cmds(
+        cmd_header,
+        params_dict,
+        skip_default=False,
+        model_dir=model_set_dir,
+    )
     lock_file = model_set_dir + "/lock.lock"
     with ModelResourceLock(
         lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
     ):
         for tmp_cmd_list in cmd_list:
-            exec_flag, _ = execute_test_cmd(tmp_cmd_list, "", False, False)
+            exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file, False, False)
             final_flag = False if exec_flag is False else final_flag
 
-    # display_ci_logs(log_file, "get_model", model_name, final_flag)
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
     assert final_flag is True, "Get Model Test Failed!"
@@ -395,10 +737,18 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
-    if is_ci() and check_ci_simulator() is False:
-        skip_msg = f"This quant testcase of {model_name} has already been run in the CI simulator."
+    if get_test_type() == TCaseType.SEPARATE_INFER:
+        skip_msg = f"This quant testcase of {model_name} has already been run in the SEPARATE INFER stage."
         logger.warning(skip_msg)
         pytest.skip(skip_msg)
+    model_type = model_info.get("model_type", "cv")
+    if (
+        model_type == "llm"
+        and get_test_type() != TCaseType.SEPARATE_INFER
+        and check_gpu()["has_gpu"] is False
+    ):
+        logger.warning(f"{model_name} testcase requires GPU.")
+        pytest.skip(f"{model_name} testcase requires GPU.")
     platform = get_platform(model_info["support_platform"])
     if platform is None or platform == "aarch64":
         logger.warning(f"Not support {model_name} testing on {platform}.")
@@ -421,7 +771,8 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
             "",
             True,
         )
-        os.system(f"cp -ar {model_set_dir}/* ./")
+        if model_type == "cv":
+            os.system(f"cp -ar {model_set_dir}/* ./")
 
     final_flag = True
     if "hmquant_params" in model_info:
@@ -430,23 +781,44 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
         optional_params = model_info["hmquant_params"]["params"]["optional"]
         cmd_header = ["hmatc", "quant", "--target", HOUMO_BACKEND]
 
-        cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params)
+        cmd_list = _generate_hmatc_cmds(cmd_header, required_params, optional_params)
+        logger.info(f"cmd list: {cmd_list}")
         for tmp_cmd_list in cmd_list:
             exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
             if exec_flag is False:
                 final_flag = False
     else:
+        model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         # test script: ptq.py
-        params_dict = model_info["compile_params"]
+        params_dict = model_info["quant_params"][HOUMO_BACKEND]
         cmd_header = ["python3", "ptq.py"]
 
-        cmd_list = _generate_py_cmds(cmd_header, params_dict)
-        for tmp_cmd_list in cmd_list:
-            exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
-            if exec_flag is False:
-                final_flag = False
+        cmd_list = _generate_py_cmds(
+            cmd_header,
+            params_dict,
+            skip_default=False,
+            model_dir=model_set_dir,
+            res_dir=model_res_dir,
+        )
 
-    # display_ci_logs(log_file, "quant", model_name, final_flag)
+        lock_file_res = model_res_dir + "/lock.lock"
+        with ModelResourceLock(
+            lock_file_res, ModelResourceLock.LockMode.WRITE, "model quantizing"
+        ):
+            for tmp_cmd_list in cmd_list:
+                quant_res_dir = _get_param_value(tmp_cmd_list, "--out-dir")
+                if os.path.exists(quant_res_dir):
+                    shutil.rmtree(quant_res_dir, ignore_errors=True)
+                    # [TMP]
+                    # continue
+                exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
+                if exec_flag is False:
+                    final_flag = False
+                else:
+                    tmp_res_dir = f"{quant_res_dir}/hmquant"
+                    os.system(f"mv {tmp_res_dir}/* {quant_res_dir}/")
+                    os.system(f"rm -rf {tmp_res_dir}")
+
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
     assert final_flag is True, "Quantization Test Failed!"
@@ -474,10 +846,18 @@ def execute_compile_flow(
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
-    if is_ci() and check_ci_simulator() is False:
-        skip_msg = f"This compile testcase of {model_name} has already been run in the CI simulator."
+    if get_test_type() == TCaseType.SEPARATE_INFER:
+        skip_msg = f"This compile testcase of {model_name} has already been run in the SEPARATE NO INFER stage."
         logger.warning(skip_msg)
         pytest.skip(skip_msg)
+    model_type = model_info.get("model_type", "cv")
+    if (
+        model_type == "llm"
+        and get_test_type() != TCaseType.SEPARATE_INFER
+        and check_gpu()["has_gpu"] is False
+    ):
+        logger.warning(f"{model_name} testcase requires GPU.")
+        pytest.skip(f"{model_name} testcase requires GPU.")
     platform = get_platform(model_info["support_platform"])
     if platform is None or platform == "aarch64":
         logger.warning(f"Not support {model_name} testing on {platform}.")
@@ -493,25 +873,31 @@ def execute_compile_flow(
         execute_test_cmd(["rm", "-rf", "output/H30/result"], log_file, True)
 
     # prepare quantized model
-    if not _prepare_quantized_model(model_info, log_file):
+    if (
+        model_type == "cv" and not _prepare_quantized_cv_model(model_info, log_file)
+    ) or (
+        model_type == "llm" and not _prepare_quantized_llm_model(model_info, log_file)
+    ):
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
-        logger.warning(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
-        pytest.skip(f"This testcase is not support on {HOUMO_BACKEND}.")
+        skip_msg = f"Not support {model_name} testing on {HOUMO_BACKEND}."
+        logger.warning(skip_msg)
+        pytest.skip(skip_msg)
 
     final_flag = True
     if "hmbuild_params" in model_info:
         # test cmd: hmatc build
-        required_params = model_info["hmbuild_params"]["params"]["required"]
-        optional_params = model_info["hmbuild_params"]["params"]["optional"]
+        required_params = model_info["hmbuild_params"][HOUMO_BACKEND]["required"]
+        optional_params = model_info["hmbuild_params"][HOUMO_BACKEND]["optional"]
         cmd_header = ["hmatc", "build", "--target", HOUMO_BACKEND]
 
         skipped_vals = dict()
         if HOUMO_BACKEND == "xh2":
             skipped_vals["ncore"] = ["4"]
-        cmd_list = _generate_hmassist_cmds(
+        cmd_list = _generate_hmatc_cmds(
             cmd_header, required_params, optional_params, skipped_vals
         )
+        logger.info(f"cmd list: {cmd_list}")
         for tmp_cmd_list in cmd_list:
             exec_flag, opt_str = execute_test_cmd(tmp_cmd_list, log_file)
             if exec_flag is False:
@@ -524,16 +910,44 @@ def execute_compile_flow(
                     )
     else:
         # test script: build.py
-        params_dict = model_info["compile_params"]
+        params_dict = model_info["compile_params"][HOUMO_BACKEND]
         cmd_header = ["python3", "build.py"]
 
-        cmd_list = _generate_py_cmds(cmd_header, params_dict)
-        for tmp_cmd_list in cmd_list:
-            exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
-            if exec_flag is False:
-                final_flag = False
+        model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+        model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
+        cmd_list = _generate_py_cmds(
+            cmd_header,
+            params_dict,
+            skip_default=False,
+            model_dir=model_set_dir,
+            res_dir=model_res_dir,
+        )
 
-    # display_ci_logs(log_file, "compile", model_name, final_flag)
+        lock_file_res = model_res_dir + "/lock.lock"
+        with ModelResourceLock(
+            lock_file_res, ModelResourceLock.LockMode.WRITE, "model compiling"
+        ):
+            for tmp_cmd_list in cmd_list:
+                compile_res_dir = _get_param_value(tmp_cmd_list, "--output_dir")
+                if compile_res_dir and os.path.exists(compile_res_dir):
+                    shutil.rmtree(compile_res_dir, ignore_errors=True)
+                    # [TMP]
+                    # continue
+                model_dir = _get_param_value(tmp_cmd_list, "--model_dir")
+                if not os.path.exists(model_dir):
+                    logger.warning(f"Skip compilation test {tmp_cmd_list}")
+                    continue
+                exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
+                if exec_flag is False:
+                    final_flag = False
+                if compile_res_dir and os.path.exists(
+                    f"{model_dir}/quant_embedding.pt"
+                ):
+                    os.makedirs(f"{compile_res_dir}/hmquant/", exist_ok=True)
+                    os.system(
+                        f"cp {model_dir}/quant_embedding.pt {compile_res_dir}/hmquant/"
+                    )
+
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
     assert final_flag is True, "Compilation Test Failed!"
@@ -550,6 +964,7 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
+    model_type = model_info.get("model_type", "cv")
     platform = get_platform(model_info["support_platform"])
     if platform is None:
         logger.warning(f"Not support {model_name} testing on {platform}.")
@@ -576,22 +991,30 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
     current_folder = os.getcwd()
     logger.info("current folder: %s.", current_folder)
 
-    if not _prepare_compiled_model(model_info, platform, log_file):
+    model_type = model_info.get("model_type", "cv")
+    if (
+        model_type == "cv"
+        and not _prepare_compiled_cv_model(model_info, platform, log_file)
+    ) or (
+        model_type == "llm"
+        and not _prepare_compiled_llm_model(model_info, platform, log_file)
+    ):
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
-        logger.warning(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
-        pytest.skip(f"This testcase is not support on {HOUMO_BACKEND}.")
-    if check_ci_simulator() is True:
-        dst_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
-        move_models_res(current_folder, dst_folder)
+        pytest.skip(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
+    if get_test_type() == TCaseType.SEPARATE_NO_INFER:
+        if model_type == "cv":
+            dst_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
+            move_models_res(current_folder, dst_folder)
 
-        # display_ci_logs(log_file, "demo", model_name, False)
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
-        logger.warning(f"Skip demo testcase {model_name} on CI ISIM.")
-        pytest.skip(f"Skip demo testcase {model_name} on CI ISIM.")
-    if is_ci() and check_ci_simulator() is False:
-        src_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
+        logger.warning(
+            f"Skip demo testcase {model_name} in the SEPARATE NO INFER stage."
+        )
+        pytest.skip(f"Skip demo testcase {model_name} in the SEPARATE NO INFER stage.")
+    if model_type == "cv" and get_test_type() == TCaseType.SEPARATE_INFER:
+        src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         restore_models_res(src_folder, current_folder)
 
     # install python requirements
@@ -606,21 +1029,35 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         optional_params = model_info["hmdemo_params"]["params"]["optional"]
         cmd_header = ["hmatc", "demo", "--target", HOUMO_BACKEND]
 
-        cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params)
+        cmd_list = _generate_hmatc_cmds(cmd_header, required_params, optional_params)
+        logger.info(f"cmd list: {cmd_list}")
         for tmp_cmd_list in cmd_list:
             exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
             if exec_flag is False:
                 final_flag = False
     else:
         # test script: demo.py
-        params_dict = model_info["demo_params"]
+        params_dict = model_info["demo_params"][HOUMO_BACKEND]
         cmd_header = ["python3", "demo.py"]
 
-        cmd_list = _generate_py_cmds(cmd_header, params_dict)
-        for tmp_cmd_list in cmd_list:
-            exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
-            if exec_flag is False:
-                final_flag = False
+        model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+        model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
+        cmd_list = _generate_py_cmds(
+            cmd_header,
+            params_dict,
+            skip_default=False,
+            model_dir=model_set_dir,
+            res_dir=model_res_dir,
+        )
+        logger.info(f"demo flow cmd_list:{cmd_list}")
+        lock_file_res = model_res_dir + "/lock.lock"
+        with ModelResourceLock(
+            lock_file_res, ModelResourceLock.LockMode.WRITE, "execute model demo.py"
+        ):
+            for tmp_cmd_list in cmd_list:
+                exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
+                if exec_flag is False:
+                    final_flag = False
 
     # restore python env
     for lib_name, lib_ver in changed_libs.items():
@@ -631,7 +1068,6 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
                 ["pip3", "install", lib_name + "==" + lib_ver], log_file, True
             )
 
-    # display_ci_logs(log_file, "demo", model_name, final_flag)
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
     assert final_flag is True, "Demo Test Failed!"
@@ -661,32 +1097,43 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
     current_folder = os.getcwd()
     logger.info("current folder: %s.", current_folder)
 
+    model_type = model_info.get("model_type", "cv")
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+
     lock_file = model_set_dir + "/lock.lock"
     with ModelResourceLock(
         lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
     ):
         execute_test_cmd(
-            ["python3", "get_model.py", "--model_dir", model_set_dir, "--type", "raw"],
+            [
+                "python3",
+                "get_model.py",
+                "--model_dir",
+                model_set_dir,
+                "--type",
+                "raw",
+            ],
             "",
             True,
         )
-    if not _prepare_compiled_model(model_info, platform, log_file):
+
+    if model_type == "cv" and not _prepare_compiled_cv_model(
+        model_info, platform, log_file
+    ):
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
-        logger.warning(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
-        pytest.skip(f"This testcase is not support on {HOUMO_BACKEND}.")
-    if check_ci_simulator() is True:
-        dst_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
+        pytest.skip(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
+    if get_test_type() == TCaseType.SEPARATE_NO_INFER:
+        dst_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         move_models_res(current_folder, dst_folder)
 
-        # display_ci_logs(log_file, "compare", model_name, False)
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
-        logger.warning(f"Skip compare testcase {model_name} on CI ISIM.")
-        pytest.skip(f"Skip compare testcase {model_name} on CI ISIM.")
-    if is_ci() and check_ci_simulator() is False:
-        src_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
+        skip_msg = f"Skip compare testcase {model_name} in the SEPARATE NO INFER stage."
+        logger.warning(skip_msg)
+        pytest.skip(skip_msg)
+    if get_test_type() == TCaseType.SEPARATE_INFER:
+        src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         restore_models_res(src_folder, current_folder)
 
     final_flag = True
@@ -695,7 +1142,7 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
     optional_params = model_info["hmcompare_params"]["params"]["optional"]
     cmd_header = ["hmatc", "compare", "--target", HOUMO_BACKEND]
 
-    cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params)
+    cmd_list = _generate_hmatc_cmds(cmd_header, required_params, optional_params)
     logger.info(f"cmd list:{cmd_list}")
     for tmp_cmd_list in cmd_list:
         exec_flag, out_str = execute_test_cmd(tmp_cmd_list, log_file)
@@ -707,7 +1154,6 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
         if exec_flag is False:
             final_flag = False
 
-    # display_ci_logs(log_file, "compare", model_name, final_flag)
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
     assert final_flag is True, "HmATC Compare Test Failed!"
@@ -726,6 +1172,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
+    model_type = model_info.get("model_type", "cv")
     platform = get_platform(model_info["support_platform"])
     if platform is None or platform == "aarch64":
         logger.warning(f"Not support {model_name} testing on {platform}.")
@@ -738,22 +1185,31 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
     current_folder = os.getcwd()
     logger.info("current folder: %s.", current_folder)
 
-    if not _prepare_compiled_model(model_info, platform, log_file):
+    model_type = model_info.get("model_type", "cv")
+    if (
+        model_type == "cv"
+        and not _prepare_compiled_cv_model(model_info, platform, log_file)
+    ) or (
+        model_type == "llm"
+        and not _prepare_compiled_llm_model(model_info, platform, log_file)
+    ):
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
-        logger.warning(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
-        pytest.skip(f"This testcase is not support on {HOUMO_BACKEND}.")
-    if check_ci_simulator() is True:
-        dst_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
-        move_models_res(current_folder, dst_folder)
+        skip_msg = f"Not support {model_name} testing on {HOUMO_BACKEND}."
+        logger.warning(skip_msg)
+        pytest.skip(skip_msg)
+    if get_test_type() == TCaseType.SEPARATE_NO_INFER:
+        if model_type == "cv":
+            dst_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
+            move_models_res(current_folder, dst_folder)
 
-        # display_ci_logs(log_file, "perf", model_name, False)
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
-        logger.warning(f"Skip perf testcase {model_name} on CI ISIM.")
-        pytest.skip(f"Skip perf testcase {model_name} on CI ISIM.")
-    if is_ci() and check_ci_simulator() is False:
-        src_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
+        skip_msg = f"Skip perf testcase {model_name} in the SEPARATE NO INFER stage."
+        logger.warning(skip_msg)
+        pytest.skip(skip_msg)
+    if model_type == "cv" and get_test_type() == TCaseType.SEPARATE_INFER:
+        src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         restore_models_res(src_folder, current_folder)
 
     final_flag = True
@@ -762,8 +1218,15 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
         changed_libs = install_py_env(current_folder, log_file)
         if changed_libs:
             logger.info(f"changed python libs: {changed_libs}.")
-        final_flag, opt_str = execute_test_cmd(["python3", "build.py"], log_file)
+
+        model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         if model_name == "wenet":
+            quant_res_dir = model_info["compile_params"][HOUMO_BACKEND]["model_dir"][0]
+            quant_res_dir = quant_res_dir.replace("cached_results", model_res_dir)
+            final_flag, opt_str = execute_test_cmd(
+                ["python3", "build.py", "--model_dir", quant_res_dir],
+                log_file,
+            )
             infer_time = [
                 float(line.rsplit(" ", 3)[-2])
                 for line in opt_str.split("\n")
@@ -782,21 +1245,56 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                 error_msg = f"Performance {infer_val} degradation exceeds 5%, benchmark time is {benchmark} ms."
                 logger.error(error_msg)
         else:
-            final_flag, _ = execute_test_cmd(["python3", "demo.py"], log_file)
+            model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+            perf_idx = 0
+            demo_params = model_info["demo_params"][HOUMO_BACKEND]
+            tokenizer_dir = demo_params["tokenizer_dir"][perf_idx].replace(
+                "cached_models", model_set_dir
+            )
+            embedding_path = demo_params["embedding_path"][perf_idx].replace(
+                "cached_results", model_res_dir
+            )
+            prefill_path = demo_params["prefill_path"][perf_idx].replace(
+                "cached_results", model_res_dir
+            )
+            decode_path = demo_params["decode_path"][perf_idx].replace(
+                "cached_results", model_res_dir
+            )
+            lock_file_res = model_res_dir + "/lock.lock"
+            with ModelResourceLock(
+                lock_file_res, ModelResourceLock.LockMode.WRITE, "execute model demo.py"
+            ):
+                final_flag, _ = execute_test_cmd(
+                    [
+                        "python3",
+                        "demo.py",
+                        "--tokenizer_dir",
+                        tokenizer_dir,
+                        "--embedding_path",
+                        embedding_path,
+                        "--prefill_path",
+                        prefill_path,
+                        "--decode_path",
+                        decode_path,
+                        "--ndevice",
+                        "1",
+                    ],
+                    log_file,
+                )
             perf_dict = {"prefill": 0, "decode": 0, "end2end": 0}
             with open(log_file, "r", encoding="utf-8") as tmp_file:
                 for line in tmp_file:
-                    if "prefill time" in line:
+                    if "Prefill Speed" in line:
                         perf_dict["prefill"] = float(
-                            line.rsplit(",", 1)[-1].split(" ")[1].strip()
+                            line.rsplit(":", 1)[-1].strip().split(" ")[0].strip()
                         )
-                    if "decode average time" in line:
+                    if "TPOT" in line:
                         perf_dict["decode"] = float(
-                            line.rsplit(",", 1)[-1].split(" ")[1].strip()
+                            line.rsplit(":", 1)[-1].strip().split(" ")[0].strip()
                         )
-                    if "end2end average time" in line:
+                    if "TPS" in line:
                         perf_dict["end2end"] = float(
-                            line.rsplit(",", 1)[-1].split(" ")[1].strip()
+                            line.rsplit(":", 1)[-1].strip().split(" ")[0].strip()
                         )
             # check performance
             backend_metrics = model_info["perf_metrics"].get(HOUMO_BACKEND, None)
@@ -828,7 +1326,8 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
         cmd_header = ["hmatc", "perf", "--target", HOUMO_BACKEND]
 
         max_qps = 0
-        cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params)
+        cmd_list = _generate_hmatc_cmds(cmd_header, required_params, optional_params)
+        logger.info(f"cmd list: {cmd_list}")
         for tmp_cmd_list in cmd_list:
             exec_flag, opt_str = execute_test_cmd(tmp_cmd_list, log_file)
             if exec_flag is False:
@@ -841,9 +1340,10 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                 ]
                 if len(qps) > 0 and max_qps < qps[0]:
                     max_qps = qps[0]
+            reset_chips()
         backend_metrics = model_info["perf_metrics"].get(HOUMO_BACKEND, None)
         benchmark = backend_metrics.get(platform, None)
-        if benchmark and (max_qps >= (benchmark * 0.95) or is_ci()):
+        if benchmark and (max_qps >= (benchmark * 0.95) or is_separate()):
             logger.info(
                 f"The best performance is {max_qps} qps, benchmark qps is {benchmark}."
             )
@@ -852,10 +1352,9 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
             error_msg = f"Performance {max_qps} degradation exceeds 5%, benchmark qps is {benchmark}."
             logger.error(error_msg)
 
-    # display_ci_logs(log_file, "perf", model_name, final_flag)
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
-    assert final_flag is True, f"HmATC Perf Test Failed! {error_msg}"
+    assert final_flag is True, f"HmATC Perf Test Failed!"
     logger.info("HmATC Perf Test Success!")
 
 
@@ -870,6 +1369,7 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
+    model_type = model_info.get("model_type", "cv")
     platform = get_platform(model_info["support_platform"])
     if platform is None or platform == "aarch64":
         logger.warning(f"Not support {model_name} testing on {platform}.")
@@ -882,22 +1382,29 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
     current_folder = os.getcwd()
     logger.info("current folder: %s.", current_folder)
 
-    if not _prepare_compiled_model(model_info, platform, log_file):
+    model_type = model_info.get("model_type", "cv")
+    if (
+        model_type == "cv"
+        and not _prepare_compiled_cv_model(model_info, platform, log_file)
+    ) or (
+        model_type == "llm"
+        and not _prepare_compiled_llm_model(model_info, platform, log_file)
+    ):
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
-        logger.warning(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
-        pytest.skip(f"This testcase is not support on {HOUMO_BACKEND}.")
-    if check_ci_simulator() is True:
-        dst_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
-        move_models_res(current_folder, dst_folder)
+        pytest.skip(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
+    if get_test_type() == TCaseType.SEPARATE_NO_INFER:
+        if model_type == "cv":
+            dst_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
+            move_models_res(current_folder, dst_folder)
 
-        # display_ci_logs(log_file, "eval", model_name, False)
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
-        logger.warning(f"Skip perf testcase {model_name} on CI ISIM.")
-        pytest.skip(f"Skip perf testcase {model_name} on CI ISIM.")
-    if is_ci() and check_ci_simulator() is False:
-        src_folder = os.path.join(CI_MODELS_RES_PATH, model_info["model_dir"])
+        skip_msg = f"Skip perf testcase {model_name} in the SEPARATE NO INFER stage."
+        logger.warning(skip_msg)
+        pytest.skip(skip_msg)
+    if model_type == "cv" and get_test_type() == TCaseType.SEPARATE_INFER:
+        src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         restore_models_res(src_folder, current_folder)
 
     final_flag = True
@@ -906,12 +1413,12 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
     optional_params = model_info["hmeval_params"]["params"]["optional"]
     # generate onnx commands (ground truth)
     cmd_header_onnx = ["hmatc", "eval", "--target", HOUMO_BACKEND, "--onnx"]
-    cmd_list_onnx = _generate_hmassist_cmds(
+    cmd_list_onnx = _generate_hmatc_cmds(
         cmd_header_onnx, required_params, optional_params
     )
     # generate hm model commands
     cmd_header = ["hmatc", "eval", "--target", HOUMO_BACKEND]
-    cmd_list = _generate_hmassist_cmds(cmd_header, required_params, optional_params)
+    cmd_list = _generate_hmatc_cmds(cmd_header, required_params, optional_params)
 
     logger.info(f"cmd_list_onnx: {cmd_list_onnx}")
     logger.info(f"cmd_list: {cmd_list}")
@@ -939,15 +1446,14 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
                 hm_perf_vals[perf_name].append(eval_res[perf_name])
 
     if final_flag is False:
-        # display_ci_logs(log_file, "eval", model_name, final_flag)
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
     assert final_flag is True, "HmATC Eval Test Failed!"
 
     for perf_name in perf_names:
         perf_th = model_info["eval_threshold"][perf_name]
-        if is_ci():
-            # lower threshold in ci test
+        if os.getenv("HOUMO_FULL_DATASET", None) is None:
+            # lower threshold
             perf_th = perf_th * 0.5
         check_flag = all(
             perf_th * onnx_val <= hm_val
@@ -961,7 +1467,6 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
             )
             logger.warning(f"remove folder: {os.getcwd()}.")
             shutil.rmtree(os.getcwd())
-            # display_ci_logs(log_file, "eval", model_name, final_flag)
         assert (
             check_flag is True
         ), f"HmATC Eval Test Failed! The difference of {perf_name} exceeds {perf_th*100}%."
