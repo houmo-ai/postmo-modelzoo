@@ -105,7 +105,7 @@ class HmQwenXh2:
         option1.set_dummy_tensors(dummy_tensor_names)
         self.prefill_length = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[1]
         self.embedding_len = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[2]
-        self.context_max_length = self.decode.get_input_info(self.prefill.get_input_name(3)).shape[2]
+        self.context_max_length = self.decode.get_input_info(self.decode.get_input_name(3)).shape[2]
         self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
         self.next_ids = [0] * self.batch
         self.current_echo_lens = [0] * self.batch
