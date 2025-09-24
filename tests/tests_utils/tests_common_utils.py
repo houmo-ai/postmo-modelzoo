@@ -8,8 +8,10 @@ from datetime import datetime
 from glob import glob
 import enum
 import time
+import threading
+import sys
 
-HOUMO_BACKEND = os.getenv("HOUMO_TARGET", "xh1")
+HOUMO_BACKEND = os.getenv("HOUMO_TARGET")
 SKIP_INFER = os.getenv("SKIP_INFER", None)
 HDPL_PLATFORM = os.getenv("HDPL_PLATFORM", "")
 MODELS_PATH = os.getenv("IMODELZOO_MODELS_PATH", "./")
@@ -111,6 +113,65 @@ def load_json(json_path: str) -> dict:
     return json_info
 
 
+class SubprocessLogger:
+    def __init__(self, log_file=""):
+        """
+        初始化输出日志器
+
+        :param log_file: 日志文件路径
+        """
+        self.log_file = log_file
+        if log_file:
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        # 创建文件锁，确保多线程写入安全
+        self.lock = threading.Lock()
+        self.write_flag = True if log_file else False
+
+    def write(self, message, stream=sys.stdout):
+        """
+        同时输出到屏幕和日志文件
+
+        :param message: 要输出的消息
+        :param stream: 输出到屏幕的流（stdout或stderr）
+        """
+        if not message:
+            return
+
+        # 添加时间戳
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_message = f"[{timestamp}] {message}"
+
+        if self.write_flag:
+            # 写入日志文件（加锁确保线程安全）
+            with self.lock:
+                with open(self.log_file, 'a', encoding='utf-8') as f:
+                    f.write(log_message)
+
+        # 输出到屏幕
+        stream.write(message)
+        stream.flush()
+
+
+def _process_stream(stream, logger, results: list, is_stderr=False):
+    """
+    处理子进程的输出流
+
+    :param stream: 子进程的输出流（stdout或stderr）
+    :param logger: SubprocessLogger实例
+    :param is_stderr: 是否为错误流
+    """
+    stream_obj = sys.stderr if is_stderr else sys.stdout
+    outputs = list()
+    try:
+        for line in iter(stream.readline, ''):
+            logger.write(line, stream_obj)
+            outputs.append(line.strip())
+    finally:
+        stream.close()
+
+    results.append("\n".join(outputs))
+
+
 def execute_test_cmd(
     cmd_list: list,
     log_file: str = "",
@@ -121,37 +182,55 @@ def execute_test_cmd(
     logger.info("execute command: %s", cmd_str)
 
     flag = True
+    subprocess_logger = SubprocessLogger(log_file)
     try:
         process = subprocess.Popen(
-            cmd_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            cmd_list,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,  # 行缓冲
+            universal_newlines=True,
         )
-        stdout, stderr = process.communicate(timeout=21600)  # timeout: 6h
-        if process.returncode != 0:
+
+        stdout_res = list()
+        # 创建线程处理stdout和stderr
+        stdout_thread = threading.Thread(
+            target=_process_stream,
+            args=(process.stdout, subprocess_logger, stdout_res, False),
+            daemon=True,
+        )
+        stderr_res = list()
+        stderr_thread = threading.Thread(
+            target=_process_stream,
+            args=(process.stderr, subprocess_logger, stderr_res, True),
+            daemon=True,
+        )
+        # 启动线程
+        stdout_thread.start()
+        stderr_thread.start()
+
+        # 等待子进程完成
+        return_code = process.wait()
+
+        # 等待线程处理剩余输出
+        stdout_thread.join()
+        stderr_thread.join()
+
+        if return_code != 0:
             flag = False
             logger.error(
-                f"Failed to execute command: {cmd_str}, error code: {process.returncode}"
+                f"Failed to execute command: {cmd_str}, error code: {return_code}"
             )
-            print(f"[SUBPROCESS MSG] STDOUT: {stdout}")
-            print(f"[SUBPROCESS MSG] STDERR: {stderr}")
+        else:
+            if check_flag and len(stdout_res) > 0 and "fail" in stdout_res[0]:
+                flag = False
+                logger.error(f"Result verification: FAILED!, command: {cmd_str}.")
 
-    except subprocess.TimeoutExpired as e:
-        flag = False
-        stdout, stderr = e.stdout, e.stderr
-        process.kill()
-        logger.error(f"Executation timeout, command: {cmd_str}, exception info: {e}")
     except Exception as e:
         flag = False
         logger.error(f"Failed to execute command: {cmd_str}, unknown error: {e}")
-    finally:
-        if log_file:
-            with open(log_file, "a", encoding="utf-8") as f:
-                if stdout:
-                    f.write(stdout)
-                if stderr:
-                    f.write(stderr)
-        if check_flag and stdout and "fail" in stdout:
-            flag = False
-            logger.error(f"Result verification: FAILED!, command: {cmd_str}.")
+        subprocess_logger.write(sys.stderr)
 
     if assert_flag:
         if flag is False:
@@ -159,7 +238,10 @@ def execute_test_cmd(
             shutil.rmtree(os.getcwd())
         assert flag is True, f"Failed to execute command: {cmd_str}."
 
-    return flag, stdout
+    if len(stdout_res) == 0:
+        stdout_res.append("")
+
+    return flag, stdout_res[0]
 
 
 def get_platform(support_list: list) -> str:
