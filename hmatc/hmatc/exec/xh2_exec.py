@@ -125,6 +125,7 @@ class Xh2Exec(BaseExec):
             dtype_str = self.onnx_inputs_info[input_name]["dtype"]
             in_datas.append(torch.from_numpy(self.gen_random_data(shape, dtype_str)))
         # 量化以及HMONNX导出
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         t_start = time.time()
         convert_onnx_to_hmonnx(
             self.model_path,
@@ -143,9 +144,12 @@ class Xh2Exec(BaseExec):
         if os.path.exists(self.golden_dir):
             shutil.rmtree(self.golden_dir)
         session.step = 0
-        # to float16
+        # float32 -> float16 and int64 -> int32
         for idx, in_data in enumerate(in_datas):
-            in_datas[idx] = in_data.half().to(self.device)
+            if in_data.dtype == torch.int64:
+                in_datas[idx] = in_datas[idx].type(torch.int32).to(self.device)
+            elif in_data.dtype == torch.float32:
+                in_datas[idx] = in_data.half().to(self.device)
         session(*in_datas)  #
         if os.path.exists(self.quant_onnx_model_path):
             os.remove(self.quant_onnx_model_path)
@@ -163,6 +167,7 @@ class Xh2Exec(BaseExec):
             runtime_version = runtime_version.split(".dev")[0]
             with open(os.path.join(self.quant_output_dir, "VERSION.txt"), "w") as f:
                 f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")
+                f.write(f"quant_time: {now}\n")
             filename = f"hmquant_{self.model_dir_name}_xh2_v{runtime_version}.tar.xz"
             compress_quant_output_path = os.path.join(self.save_dir, "xh2", filename)
             compress_folder_to_tar_xz_with_progress(
@@ -175,7 +180,7 @@ class Xh2Exec(BaseExec):
             )
             upload_file_to_artifactory(
                 compress_quant_output_path,
-                f"models/{self.model_dir_name}/{filename}",
+                f"models/v{runtime_version}/{self.model_dir_name}/{filename}",
                 max_retries=3,
             )
             logger.info(f"Compressing quant output done.")
@@ -195,7 +200,7 @@ class Xh2Exec(BaseExec):
         except ImportError:
             logger.error("Not found tcim module, and please install tcim first!")
             exit(-1)
-
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         t_start = time.time()
         tcim.build_from_hmonnx(
             self.new_quant_onnx_model_path,
@@ -221,6 +226,7 @@ class Xh2Exec(BaseExec):
                 f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")
                 f.write(f"tcim_version: {hmcc_version}\n")
                 f.write(f"tcim_runtime_version: {runtime_version}\n")
+                f.write(f"build_time: {now}\n")
             runtime_version = runtime_version.split(".dev")[0]
             filename = f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{get_hmquant_xh2_version()}.tar.xz"
             compress_hmm_path = os.path.join(
@@ -237,7 +243,7 @@ class Xh2Exec(BaseExec):
             )
             upload_file_to_artifactory(
                 compress_hmm_path,
-                f"models/{self.model_dir_name}/{filename}",
+                f"models/v{runtime_version}/{self.model_dir_name}/{filename}",
                 max_retries=3,
             )
             logger.info(f"Compressing hmmodel done.")
@@ -364,12 +370,13 @@ class Xh2Exec(BaseExec):
             in_datas = load_npz(data_path)
             onnx_in_datas = in_datas
             for input_name in in_datas:
-                in_data = in_datas[input_name]
-                in_data_fp16 = in_data.astype(np.float16).copy()
-                hmquant_in_datas[input_name] = torch.from_numpy(in_data_fp16)
-                xh2_in_datas[input_name] = np.repeat(
-                    in_data_fp16, self.build_batch, axis=0
-                )
+                _in_data = in_datas[input_name]
+                if _in_data.dtype == np.int64:
+                    _in_data = _in_data.astype(np.int32).copy()
+                if _in_data.dtype == np.float32:
+                    _in_data = _in_data.astype(np.float16).copy()
+                hmquant_in_datas[input_name] = torch.from_numpy(_in_data)
+                xh2_in_datas[input_name] = np.repeat(_in_data, self.build_batch, axis=0)
 
         onnx_outputs = onnx_infer.run(onnx_in_datas)
         hmquant_outputs = hmquant_infer.run(hmquant_in_datas)

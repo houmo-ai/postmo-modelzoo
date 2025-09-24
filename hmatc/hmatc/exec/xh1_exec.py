@@ -406,6 +406,7 @@ class Xh1Exec(BaseExec):
             device=self.device,
         )
         logger.info(f"Using {self.device} quantization...")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         t_start = time.time()
         sequencer = quant_single_onnx_network(
             cfg=self.get_quant_cfg(),
@@ -463,6 +464,7 @@ class Xh1Exec(BaseExec):
             runtime_version = runtime_version.split(".dev")[0]
             with open(os.path.join(self.quant_output_dir, "VERSION.txt"), "w") as f:
                 f.write(f"hmquant_version: {get_hmquant_xh1_version()}\n")
+                f.write(f"quant_time: {now}\n")
             filename = f"hmquant_{self.model_dir_name}_xh1_v{runtime_version}.tar.xz"
             compress_quant_output_path = os.path.join(self.save_dir, "xh1", filename)
             compress_folder_to_tar_xz_with_progress(
@@ -475,7 +477,7 @@ class Xh1Exec(BaseExec):
             )
             upload_file_to_artifactory(
                 compress_quant_output_path,
-                f"models/{self.model_dir_name}/{filename}",
+                f"models/v{runtime_version}/{self.model_dir_name}/{filename}",
                 max_retries=3,
             )
             logger.info(f"Compressing quant output done.")
@@ -489,7 +491,7 @@ class Xh1Exec(BaseExec):
         except ImportError:
             logger.error("Not found tcim module, and please install tcim first!")
             exit(-1)
-
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         t_start = time.time()
         tcim.build_from_hmonnx(
             self.quant_onnx_model_path,
@@ -517,6 +519,7 @@ class Xh1Exec(BaseExec):
                 f.write(f"hmquant_version: {get_hmquant_xh1_version()}\n")
                 f.write(f"tcim_version: {hmcc_version}\n")
                 f.write(f"tcim_runtime_version: {runtime_version}\n")
+                f.write(f"build_time: {now}\n")
             runtime_version = runtime_version.split(".dev")[0]
             filename = f"{self.model_dir_name}_xh1_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{runtime_version}.tar.xz"
             compress_hmm_path = os.path.join(
@@ -533,7 +536,7 @@ class Xh1Exec(BaseExec):
             )
             upload_file_to_artifactory(
                 compress_hmm_path,
-                f"models/{self.model_dir_name}/{filename}",
+                f"models/v{runtime_version}/{self.model_dir_name}/{filename}",
                 max_retries=3,
             )
             logger.info(f"Compressing hmmodel done.")
