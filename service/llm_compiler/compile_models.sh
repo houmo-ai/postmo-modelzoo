@@ -1,19 +1,20 @@
 #!/bin/bash
 set -e
 
+VERSION="0.3.1"
 models=(
-    "qwen3;model_size:8b;version:0.3.0;target:xh2;context_length:2048;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_8b_2k_20250812.zip"
-    "qwen3;model_size:8b;version:0.3.0;target:xh2;context_length:4096;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_8b_2k_20250812.zip"
-    "qwen3;model_size:8b;version:0.3.0;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_8b_2k_20250812.zip"
-    "qwen3;model_size:14b;version:0.3.0;target:xh2;context_length:2048;prefill_length:256;batch:1;device_num:2;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_14b_2k_20250902.zip"
-    "qwen3;model_size:14b;version:0.3.0;target:xh2;context_length:4096;prefill_length:256;batch:1;device_num:2;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_14b_2k_20250902.zip"
-    "qwen3;model_size:14b;version:0.3.0;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:2;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_14b_2k_20250902.zip"
-    "qwen2.5;model_size:7b;version:0.3.0;target:xh2;context_length:2048;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5/hmquant_xh2_qwen2.5_7b_2k_20250904.zip"
-    "qwen2.5;model_size:7b;version:0.3.0;target:xh2;context_length:4096;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5/hmquant_xh2_qwen2.5_7b_2k_20250904.zip"
-    "qwen2.5;model_size:7b;version:0.3.0;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5/hmquant_xh2_qwen2.5_7b_2k_20250904.zip"
-    "deepseek-r1-qwen3;model_size:8b;version:0.3.0;target:xh2;context_length:2048;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/deepseek/hmquant_xh2_deepseek_qwen3_8b_2k_20250903.zip"
-    "deepseek-r1-qwen3;model_size:8b;version:0.3.0;target:xh2;context_length:4096;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/deepseek/hmquant_xh2_deepseek_qwen3_8b_2k_20250903.zip"
-    "deepseek-r1-qwen3;model_size:8b;version:0.3.0;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/deepseek/hmquant_xh2_deepseek_qwen3_8b_2k_20250903.zip"
+    "qwen3;model_size:8b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_8b_2k_norm1fast_20250913.zip"
+    "qwen3;model_size:8b;target:xh2;context_length:8192;prefill_length:256;batch:4;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_8b_2k_norm1fast_20250913.zip"
+    "qwen3;model_size:14b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_14b_2k_20250902.zip"
+    "qwen3;model_size:14b;target:xh2;context_length:16384;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_14b_2k_20250902.zip"
+    "qwen3;model_size:14b;target:xh2;context_length:16384;prefill_length:256;batch:1;device_num:2;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_14b_2k_20250902.zip"
+    "qwen3;model_size:14b;target:xh2;context_length:16384;prefill_length:256;batch:2;device_num:2;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_14b_2k_20250902.zip"
+    "qwen3;model_size:14b;target:xh2;context_length:32768;prefill_length:256;batch:1;device_num:2;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_14b_2k_20250902.zip"
+    "qwen2.5-vl;model_size:7b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5-vl/hmquant_xh2_qwen2.5-vl_7b_256_2k_20250908.zip"
+    "qwen2.5;model_size:7b;target:xh2;context_length:2048;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5/hmquant_xh2_qwen2.5_7b_2k_20250904.zip"
+    "qwen2.5;model_size:7b;target:xh2;context_length:4096;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5/hmquant_xh2_qwen2.5_7b_2k_20250904.zip"
+    "qwen2.5;model_size:7b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5/hmquant_xh2_qwen2.5_7b_2k_20250904.zip"
+    "deepseek-r1-qwen3;model_size:8b;target:xh2;context_length:4096;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/deepseek/hmquant_xh2_deepseek_qwen3_8b_2k_20250903.zip"
 )
 
 # 遍历模型列表
@@ -44,12 +45,16 @@ for item in "${models[@]}"; do
         fi
     done
 
+    if [[ $cmd != *"--version"* ]]; then
+        cmd+=" --version $VERSION"
+    fi
     if [[ $cmd != *"--result_dir"* ]]; then
         model_size="${model_params['model_size']}"
         result_dir="/data/services/model_results/${model_name}_${model_size}"
         cmd+=" --result_dir $result_dir"
     fi
     cmd+=" -up -compile"
+    cmd+=" -release"
 
     # 执行命令
     echo -e "\n执行命令: $cmd"

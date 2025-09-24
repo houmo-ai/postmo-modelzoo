@@ -31,5 +31,12 @@
             "path": "models/llm/deepseek-r1-qwen3-8b",
             "raw": "llm/DeepSeek-R1-0528-Qwen3-8B"
         }
+    },
+    "qwen2.5-vl": {
+        "7b": {
+            "support_backends": ["xh1", "xh2"],
+            "path": "models/vllm/qwen2.5-vl",
+            "raw": "llm/Qwen2.5-VL-7B-Instruct"
+        }
     }
 }
