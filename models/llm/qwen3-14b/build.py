@@ -52,7 +52,7 @@ def get_args() -> argparse.Namespace:
         '--batch',
         dest='batch',
         type=int,
-        default=None,
+        default=1,
         help='batch size',
     )
     parser.add_argument(
@@ -66,14 +66,14 @@ def get_args() -> argparse.Namespace:
         '--context_length',
         dest='context_length',
         type=int,
-        default=None,
+        default=2048,
         help='context_length',
     )
     parser.add_argument(
         '--ndevice',
         dest='ndevice',
         type=int,
-        default=None,
+        default=1,
         choices=[1, 2],
         help='device number',
     )
@@ -101,6 +101,7 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore, ndevice
     kwargs = {}
     if HOUMO_TARGET == "xh2":
         kwargs["modify_llm"] = {}
+        kwargs["enable_xh2_stable_output"] = True
         if ndevice:
             kwargs["ndevice"] = ndevice
         if batch:

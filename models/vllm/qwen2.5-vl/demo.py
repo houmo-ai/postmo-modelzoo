@@ -479,8 +479,8 @@ if __name__ == "__main__":
     logger.success(f"Total Images: {image_num}, Total Input: {input_tokens} tokens, Output {output_tokens} tokens, Vision Cost {vit_time * 1000:.3f} ms, Prefill Cost {prefill_time * 1000:.3f} ms, Decode Cost {decode_time * 1000:.3f} ms")
     if image_num:
         logger.success(f"Vision Cost {vit_time / image_num * 1000:.3f} ms/image")
-    logger.success(f"Prefill Speed: {input_tokens / prefill_time:.2f} tokens/s")
+    logger.success(f"Prefill Speed: {input_tokens / prefill_time:.2f} tokens/s; Decode Speed: {(output_tokens - 1) / decode_time:.2f} tokens/s")
     logger.success(f"TTFT (Time to First Token): {visual_prefill_time * 1000:.3f} ms")
-    logger.success(f"TPOT (Time Per Output Token): {(output_tokens - 1) / decode_time:.2f} tokens/s")
+    logger.success(f"TPOT (Time Per Output Token): {decode_time * 1000 / (output_tokens - 1):.3f} ms/token")
     logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
-    logger.success(f"TPS (Tokens Per Second): {output_tokens / total_time:.2f} tokens/s")
+    logger.success(f"E2E TPS (End-to-End Tokens Per Second): {output_tokens / total_time:.2f} tokens/s")
