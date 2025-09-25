@@ -74,14 +74,14 @@ def get_args() -> argparse.Namespace:
         '--context_length',
         dest='context_length',
         type=int,
-        default=None,
+        default=2048,
         help='context_length',
     )
     parser.add_argument(
         '--ndevice',
         dest='ndevice',
         type=int,
-        default=None,
+        default=1,
         choices=[1, 2],
         help='device number',
     )
@@ -127,7 +127,7 @@ def build_llm(
     kwargs = {}
     if HOUMO_TARGET == "xh2":
         kwargs["modify_llm"] = {}
-        # kwargs["enable_xh2_stable_output"] = True
+        kwargs["enable_xh2_stable_output"] = True
         if ndevice:
             kwargs["ndevice"] = ndevice
         if batch:
