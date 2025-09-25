@@ -92,7 +92,6 @@ elif HOUMO_TARGET == 'xh2':
         parser.add_argument("--context-length", type=int, default=2048, help="max sequence length")
         parser.add_argument("--input-sequence-length", type=int, default=256, help="input sequence length")
         parser.add_argument("--quant-type", default="w4a8_ssfp", help="quant type, default is w4a8_ssfp")
-        parser.add_argument("--rmsnorm-mode", default="normal", choices=["normal", "fast"], help="rmsnorm mode, default is normal")
         parser.add_argument("--calibration-dataset", type=str, default=None, help="customized calibrate dataset, should be a json file")
         args = parser.parse_args()
         return args
