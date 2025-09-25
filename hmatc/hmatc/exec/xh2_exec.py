@@ -228,7 +228,7 @@ class Xh2Exec(BaseExec):
                 f.write(f"tcim_runtime_version: {runtime_version}\n")
                 f.write(f"build_time: {now}\n")
             runtime_version = runtime_version.split(".dev")[0]
-            filename = f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{get_hmquant_xh2_version()}.tar.xz"
+            filename = f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{runtime_version}.tar.xz"
             compress_hmm_path = os.path.join(
                 self.save_dir,
                 "xh2",
