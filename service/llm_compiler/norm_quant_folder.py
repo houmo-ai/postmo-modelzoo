@@ -98,9 +98,9 @@ def _process_model_files(
         )
         golden += opt_golden
         name_pattern = (
-            r"(?<=hmquant_).*?(?=_decode)"
+            r"(?<=hmquant_).*?_decode"
             if model_type == "decode"
-            else r"(?<=hmquant_).*?(?=_prefill)"
+            else r"(?<=hmquant_).*?_prefill"
         )
         for data_file in golden:
             file_name = os.path.basename(data_file)

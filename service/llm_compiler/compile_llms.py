@@ -662,23 +662,26 @@ def _upload_model(
         logger.error(f"Upload model zipped file {model_file} failed.")
         return None
 
-    if not version_str:
-        # upload cpp file
-        cpp_zip_file = model_file[:-4] + "_cpps.zip"
-        if os.path.exists(cpp_zip_file):
-            jfrog_cpp_zip_path = jfrog_file_path[:-4] + "_cpps.zip"
-            cmds = [
-                "curl",
-                "-u",
-                jfrog_pwd,
-                "-T",
-                cpp_zip_file,
-                jfrog_cpp_zip_path,
-            ]
-            ret = execute_cmd(cmds, log_file)
-            if not ret:
-                logger.error(f"Upload cpp zipped file {cpp_zip_file} failed.")
-                return None
+    # upload cpp file
+    cpp_zip_file = model_file[:-4] + "_cpps.zip"
+    if os.path.exists(cpp_zip_file):
+        jfrog_cpp_zip_path = jfrog_file_path[:-4] + "_cpps.zip"
+        if not version_str:
+            jfrog_cpp_zip_path = jfrog_cpp_zip_path.replace(
+                "/release/models/", "/release/models_outdated/"
+            )
+        cmds = [
+            "curl",
+            "-u",
+            jfrog_pwd,
+            "-T",
+            cpp_zip_file,
+            jfrog_cpp_zip_path,
+        ]
+        ret = execute_cmd(cmds, log_file)
+        if not ret:
+            logger.error(f"Upload cpp zipped file {cpp_zip_file} failed.")
+            return None
 
     return jfrog_file_path
 
@@ -934,7 +937,7 @@ if __name__ == "__main__":
     )
     md5sum_quant = None
     if docker_flag and args.upload is True:
-        version_str = f"v{version}" if args.release is True else ""
+        version_str = f"{target}-v{version}" if args.release is True else ""
         current_dt = datetime.now()
         current_ts = (
             current_dt.strftime("%Y%m%d_%H%M%S") if not version_str else version_str
