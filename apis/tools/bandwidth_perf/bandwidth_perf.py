@@ -248,15 +248,16 @@ if __name__ == "__main__":
 
     hmm_path = os.path.join(output_dir, f"{MODEL_NAME}.hmm")
 
-    # build model
-    print("=========================================")
-    if os.path.exists(hmm_path):
-        print(f"Skipping model generation since model already exists in {hmm_path}.")
-        args.skip_build = True
-    elif platform_name != "x86_64":
+    if platform_name != "x86_64":
         print(
             f"Skipping model generation since the current platform is {platform_name}."
         )
+        args.skip_build = True
+
+    # build model
+    print("=========================================")
+    if not os.path.exists(hmm_path) and args.skip_build:
+        print(f"Skipping model generation since download hmm from network.")
         args.skip_build = True
         from hmatc.utils.utils import get_file_from_jfrog
 
