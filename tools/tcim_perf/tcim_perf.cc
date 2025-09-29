@@ -52,7 +52,7 @@ struct CliArguments {
   std::string model_path;
   std::string model_name;
   std::string input_path = ".";
-  std::string output_path;
+  std::string output_pat = ".";
   size_t batch = 1;
   size_t warm_up = 1;
   size_t threads = 1;
@@ -279,6 +279,7 @@ int main(int argc, char *argv[]) {
   int warm_up = arguments.warm_up;
   bool infer_only = arguments.infer_only;
   bool is_result_check = true;
+  int device_id = 0;
   auto start = GET_TIME();
   auto end = GET_TIME();
   auto cost = GET_COST(start, end);
@@ -288,7 +289,7 @@ int main(int argc, char *argv[]) {
     if (!strcmp(target, "xh2")) {
       is_result_check = false;
       std::cout << COLOR_YELLOW
-                << "[warn] xh2 not support result check."
+                << "[warn] xh2 not support result check. disabled."
                 << COLOR_RESET << std::endl;
     }
   }
@@ -303,6 +304,10 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  if (auto device = std::getenv("HOUMO_DEVICES")) {
+    if (device) device_id = atoi(device);
+  }
+
   std::cout << "model: " << model_path << std::endl;
   std::cout << "name: " << model_name << std::endl;
   std::cout << "input: " << input_path << std::endl;
@@ -311,7 +316,8 @@ int main(int argc, char *argv[]) {
   std::cout << "warmup: " << warm_up << std::endl;
   std::cout << "batch: " << batch << std::endl;
   std::cout << "threads: " << thread_num << std::endl;
-  std::cout << "devices: " << device_num << std::endl;
+  std::cout << "device_num: " << device_num << std::endl;
+  std::cout << "devices: " << device_id << std::endl;
   std::cout << "infer_only: " << infer_only << std::endl;
 
   if (sample_num < thread_num) {
@@ -338,7 +344,7 @@ int main(int argc, char *argv[]) {
   } else {
     std::cout << COLOR_YELLOW << "create weight manager. device num = " << device_num
               << COLOR_RESET << std::endl;
-    weight_manager = tcim::Module::WeightManager::CreateWeightManager(0);
+    weight_manager = tcim::Module::WeightManager::CreateWeightManager(device_id);
   }
   auto option = tcim::Module::Option(weight_manager);
   auto module = tcim::Module::LoadFromFile(model_path, option);
@@ -430,12 +436,10 @@ int main(int argc, char *argv[]) {
     auto output_name = module.GetOutputName(idx);
     auto output_info = module.GetOutputInfo(output_name);
     std::cout << "Output[" << output_name << "] " << output_info << std::endl;
-    auto data_file = input_path + "/hmquant_" + model_name + "_" + SanitizeName(output_name) + "_output.npy";
-    void* data_ptr = nullptr;
-    int len = 0;
     output_info = output_info.AsContiguous();
     auto tensor = tcim::Tensor::CreateHostTensor(output_info);
     if (is_result_check) {
+      auto data_file = input_path + "/hmquant_" + model_name + "_" + SanitizeName(output_name) + "_output.npy";
       if (fs::exists(data_file)) {
         std::vector<size_t> shape;
         bool fortran_order;
@@ -448,9 +452,8 @@ int main(int argc, char *argv[]) {
                   << std::endl;
         is_result_check = false;
       }
-      output_golden.insert(
-          std::pair<std::string, tcim::Tensor>(output_name, tensor));
     }
+    output_golden.insert(std::pair<std::string, tcim::Tensor>(output_name, tensor));
   }
 
   std::map<std::string, tcim::Tensor> output_datas;
@@ -460,14 +463,12 @@ int main(int argc, char *argv[]) {
     task.data_in = input_datas;
     task.ref_out = output_golden;
     if (!infer_only) {
+      output_datas.clear();
       for (auto &output : output_golden) {
         auto info = output.second.Info().AsContiguous();
-        if (is_result_check) {
-          output_datas.clear();
-          auto tensor = tcim::Tensor::CreateHostTensor(info);
-          output_datas.insert(
-              std::pair<std::string, tcim::Tensor>(output.first, tensor));
-        }
+        auto tensor = tcim::Tensor::CreateHostTensor(info);
+        output_datas.insert(
+            std::pair<std::string, tcim::Tensor>(output.first, tensor));
       }
       task.data_out = output_datas;
     }
@@ -572,11 +573,11 @@ int main(int argc, char *argv[]) {
 
       if (!info.infer_only) {
         for (auto &tensor : task.data_out) {
-          if (info.is_result_check) {
-            module.GetOutput(tensor.first, tensor.second);
-          } else {
-            module.GetOutput(tensor.first);
-          }
+          // auto output_start = GET_TIME();
+          module.GetOutput(tensor.first, tensor.second);
+          // auto output_end = GET_TIME();
+          // cost = GET_COST(output_start, output_end);
+          // std::cout << "GetOutput " << tensor.first << ": " << cost / 1000.0 << " ms" << std::endl;
         }
       }
       end = GET_TIME();

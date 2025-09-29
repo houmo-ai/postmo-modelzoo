@@ -86,13 +86,15 @@ cd tools/tcim_perf/
 ./build.sh
 ```
 
+编译生成tcim_perf可执行文件在tools/bin目录下。
+
 如果是编译android版本请执行：
 
 ```bash
 ./build_ndk.sh
 ```
 
-编译生成tcim_perf可执行文件在tools/bin目录下。
+编译生成tcim_perf可执行文件在tools/android目录下。
 
 ### 2.2 一键运行
 
@@ -103,6 +105,19 @@ cd tools/tcim_perf/
 ```bash
 tcim_perf -m xxx.hmm
 ```
+
+支持的参数为：
+- -m，--model [必选] hmm模型路径
+- -i，--input [可选] 输入和输出golden文件夹，默认为当前文件夹
+- -o，--output [可选] 性能结果文件输出文件夹，默认为当前文件夹
+- -w，--warm_up [可选] warm up次数，默认为1
+- -b，--batch [可选] 模型batch数，仅用于计算正确的qps，默认为1
+- -l，--loops [可选] 模型内循环数，仅用于内部测试，默认为1
+- -t，--threads [可选] 推理线程数，默认为1
+- -d，--devices [可选] 推理模型占用设备数，模型编译时决定，默认为1
+- -s，--samples [可选] 测试样本数，默认为1
+- -n，--name [可选] 模型名，用于寻找golden数据
+- -y，--infer_only [可选] 是否仅进行推理（没有输入输出过程），默认为false
 
 可将参数配置在run脚本中直接运行：
 
