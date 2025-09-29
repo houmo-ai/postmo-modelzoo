@@ -666,7 +666,7 @@ def _upload_model(
     cpp_zip_file = model_file[:-4] + "_cpps.zip"
     if os.path.exists(cpp_zip_file):
         jfrog_cpp_zip_path = jfrog_file_path[:-4] + "_cpps.zip"
-        if not version_str:
+        if version_str:
             jfrog_cpp_zip_path = jfrog_cpp_zip_path.replace(
                 "/release/models/", "/release/models_outdated/"
             )
