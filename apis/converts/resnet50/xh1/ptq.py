@@ -1,15 +1,15 @@
 import os
 import torch
 import torchvision.transforms as transforms
-import argparse
 from torchvision.datasets.folder import pil_loader
+import argparse
 from hmquant.api import quant_single_onnx_network, generate_golden, quantize_profiling
 from hmquant.tools.dataset.preprocess.transform import ToTensorNotNormal
 
-
-HOUMO_TARGET = "xh1"
 HOUMO_MODEL_PATH = os.getenv("HOUMO_MODEL_PATH", "../../../models")
 HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH", ".")
+HOUMO_TARGET = os.getenv("HOUMO_TARGET", "houmo")
+assert HOUMO_TARGET == "xh1", f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
@@ -81,9 +81,6 @@ def calibrate(args=None):
             calib_files.append(filename)
             if len(calib_files) == calib_num:
                 break
-    # calib_files = [
-    #     'ILSVRC2012_val_00000016.JPEG',
-    # ]
     print("calib_files =", calib_files)
     calib_images = [
         pil_loader(os.path.join(calib_dir, file_path)) for file_path in calib_files
@@ -116,7 +113,6 @@ def calibrate(args=None):
     }
 
     onnx_input = calib_dataset[0]
-
     print("start calibrating...")
     sequencer = quant_single_onnx_network(
         quanttool_config,
@@ -124,11 +120,9 @@ def calibrate(args=None):
         model_path,
         device="cpu",
     )
-
     print("start quantize profiling...")
     quantize_profiling(sequencer, [onnx_input])
     print("calibrate completed.")
-
     print("start save model and generate golden...")
     generate_golden(
         sequencer=sequencer,
