@@ -36,7 +36,7 @@ mkdir -p ${build_dir}
 pushd ${build_dir}
 echo "Building in ${build_dir} ..."
 
-output_dir="${project_dir}/output"
+output_dir="${project_dir}/../android"
 echo "Install output to ${output_dir} ..."
 mkdir -p ${output_dir}
 
