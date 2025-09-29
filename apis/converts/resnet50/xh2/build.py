@@ -1,72 +1,238 @@
 import os
-import tcim   # 编译器
-import tcim_lite  # runtime
 import numpy as np
+import time
+import argparse
 import logging
+
 logging.basicConfig(level="INFO")
+HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+assert HOUMO_TARGET == "xh2", f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
-output_dir = "output/xh2"
-quant_type = "w8a8h1_sefp"
-input_name = "input.1"   # onnx输入名字
-output_name = "495"  # onnx输出名字
-ncore = 1
-opt_level = "O2"
-hmonnx_model_path = os.path.join(output_dir, f"resnet50_xh2_{quant_type}.onnx")
-hmmodel_name = f"resnet50_xh2_1batch_{ncore}core_{opt_level}"
-work_dir = os.path.join(output_dir, "tcim")
-golden_dir = os.path.join(output_dir, "hmquant", "golden")
-enable_build = True   # 已经编译后可选择是否编译
 
-if enable_build:
-    # 编译
-    tcim.build_from_hmonnx(
-        hmonnx_model_path,
-        output_name=hmmodel_name,
-        ncore=ncore,
-        opt_level=opt_level,
-        target="xh2",
-        batch=1,
-        legacy=True,
-        output_dir=output_dir,
-        work_dir=work_dir,
+def cosine_distance(data1, data2):
+    if data1.shape != data2.shape:
+        print(f"[error] shape not equal {data1.shape} vs {data2.shape}")
+        return -1
+    v1_d = data1.flatten().astype("float64")
+    v2_d = data2.flatten().astype("float64")
+    v1_d[v1_d == np.inf] = np.finfo(np.float16).max
+    v2_d[v2_d == np.inf] = np.finfo(np.float16).max
+    v1_d[v1_d == -np.inf] = np.finfo(np.float16).min
+    v2_d[v2_d == -np.inf] = np.finfo(np.float16).min
+    v1_norm = v1_d / np.linalg.norm(v1_d)
+    v2_norm = v2_d / np.linalg.norm(v2_d)
+    cosine_dist = np.dot(v1_norm, v2_norm)
+    if np.isnan(cosine_dist):
+        return -1
+    return cosine_dist
+
+
+def get_args() -> argparse.Namespace:
+    """Parse commandline."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--model_dir',
+        dest='model_dir',
+        type=str,
+        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
+        help='path to the model dir',
     )
-# 量化golden和编译输出验证
-hmmodel_path = os.path.join(output_dir, f"{hmmodel_name}.hmm")
-assert os.path.isfile(hmmodel_path)
-module = tcim_lite.runtime.load(hmmodel_path)
-num = module.get_num_inputs()
-for idx in range(num):
-    name = module.get_input_name(idx)
-    info = module.get_input_info(name)
-    shape = list(info.shape)
-    dtype = np.dtype(info.dtype).name
-    fmt = info.format.name
-    print(f"[xh2] input[{idx}], name = {name}, shape = {shape}, dtype = {dtype}, format = {fmt}")
-    
-num = module.get_num_outputs()
-for idx in range(num):
-    name = module.get_output_name(idx)
-    info = module.get_output_info(name)
-    shape = list(info.shape)
-    dtype = np.dtype(info.dtype).name
-    fmt = info.format.name
-    print(f"[xh2] output[{idx}], name = {name}, shape = {shape}, dtype = {dtype}, format = {fmt}")
+    parser.add_argument(
+        '--model_name',
+        dest='model_name',
+        type=str,
+        default='resnet50',
+        help='output houmo model name',
+    )
+    parser.add_argument(
+        '--batch',
+        dest='batch',
+        type=int,
+        default=1,
+        help='batch size',
+    )
+    parser.add_argument(
+        '--ncore',
+        dest='ncore',
+        type=int,
+        default=2,
+        help='core number',
+    )
+    parser.add_argument(
+        '--stage',
+        dest='stage',
+        type=str,
+        default="all",
+        help='build stage choise=["build", "test", "all"]',
+    )
+    parser.add_argument(
+        '--output_dir',
+        dest='output_dir',
+        type=str,
+        default=os.path.join('output', HOUMO_TARGET),
+        help='build output dir',
+    )
+    parser.add_argument(
+        '--verbose',
+        dest='verbose',
+        action='store_true',
+        help='print details',
+    )
+    args = parser.parse_args()
+    return args
 
-# 加载量化产生的golden数据
-golden_input_path = os.path.join(golden_dir, "step_0", f"hmquant_resnet50_xh2_{quant_type}_{input_name}_input.npy") 
-assert os.path.isfile(golden_input_path)
-golden_input_data = np.load(golden_input_path)
-golden_output_path = os.path.join(golden_dir, "step_0", f"hmquant_resnet50_xh2_{quant_type}_{output_name}_output.npy")
-assert os.path.isfile(golden_output_path)
-golden_output_data = np.load(golden_output_path)
-# 设置输入
-module.set_input(input_name, golden_input_data)
-# 推理
-module.run()
-module.sync()
-# 获取输出
-xh2_output_data = module.get_output(output_name)
-# 计算余弦距离
-v0 = golden_output_data.flatten().astype(np.float64)
-v1 = xh2_output_data.numpy().flatten().astype(np.float64)
-print(f"xh2 vs hmquant: {v0.dot(v1) / np.maximum(np.linalg.norm(v0) * np.linalg.norm(v1), np.finfo(np.float32).eps):.6f}")
+
+def build(args=None):
+    """build and test houmo model."""
+    model_dir = args.model_dir
+    model_name = args.model_name
+    batch = args.batch
+    ncore = args.ncore
+    stage = args.stage
+    output_dir = args.output_dir
+    verbose = args.verbose
+    opt_level = "O2"
+    quant_type = "w8a8h1_sefp"
+    hmonnx_model_path = os.path.join(model_dir, f"resnet50_xh2_{quant_type}.onnx")
+    hmmodel_name = f"resnet50_xh2_1batch_{ncore}core_{opt_level}"
+    hmmodel_path = os.path.join(output_dir, f"{hmmodel_name}.hmm")
+    work_dir = os.path.join(output_dir, "tcim")
+    profile = {}
+
+    # 1. build model
+    if stage == 'build' or stage == 'all':
+        import tcim
+
+        print(f"\n===> {model_name} build start...")
+
+        start = time.time()
+        tcim.build_from_hmonnx(
+            hmonnx_model_path,
+            output_name=hmmodel_name,
+            ncore=ncore,
+            opt_level=opt_level,
+            target="xh2",
+            batch=1,
+            legacy=True,
+            output_dir=output_dir,
+            work_dir=work_dir,
+        )
+        profile["build"] = time.time() - start
+        print(f'{model_name} build completed in {profile["build"]:.3f} s.')
+        assert os.path.isfile(hmmodel_path)
+    # 2. test model
+    if stage == 'test' or stage == 'all':
+        import tcim_lite
+
+        print(f"\n===> {model_name} test start...")
+        # 2.1 load model
+        start = time.time()
+        module = tcim_lite.runtime.load(hmmodel_path)
+        profile["load"] = time.time() - start
+        print(f'{model_name} load completed in {profile["load"]*1000:.3f} ms.')
+        # 2.2 set input with golden
+        profile["set_input"] = 0
+        input_num = module.get_num_inputs()
+        print("input_num:", input_num)
+        for idx in range(input_num):
+            input_name = module.get_input_name(idx)
+            input_info = module.get_input_info(input_name)
+            print(
+                f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
+            )
+            input_data_path = os.path.join(
+                model_dir,
+                "golden/step_0",
+                f"hmquant_resnet50_xh2_{quant_type}_{input_name}_input.npy",
+            )
+            print("input data path:", input_data_path)
+            assert os.path.isfile(input_data_path)
+            input_data = np.load(input_data_path).astype(input_info.dtype)
+            input_data = np.concatenate([input_data for i in range(batch)], axis=0)
+            print(
+                f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}"
+            )
+            start = time.time()
+            module.set_input(input_name, input_data)
+            profile["set_input"] += time.time() - start
+        print(
+            f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.'
+        )
+        # 2.3 infer model
+        start = time.time()
+        module.run()
+        module.sync()
+        profile["infer"] = time.time() - start
+        print(f'{model_name} infer completed in {profile["infer"]*1000:.3f} ms.')
+        # 2.4. get output and compare with golden
+        result_check = True
+        profile["get_output"] = 0
+        output_num = module.get_num_outputs()
+        print("output_num:", output_num)
+        for idx in range(output_num):
+            output_name = module.get_output_name(idx)
+            output_info = module.get_output_info(output_name)
+            print(
+                f"output_info[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
+            )
+            start = time.time()
+            output_data = module.get_output(output_name)
+            profile["get_output"] += time.time() - start
+            start = time.time()
+            output_data = output_data.numpy()
+            print(
+                f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
+            )
+            output_data_path = os.path.join(
+                model_dir,
+                "golden/step_0",
+                f"hmquant_resnet50_xh2_{quant_type}_{output_name}_output.npy",
+            )
+            assert os.path.isfile(output_data_path)
+            if os.path.exists(output_data_path):
+                golden_output = np.load(output_data_path)
+                golden_output = np.concatenate(
+                    [golden_output for i in range(batch)], axis=0
+                )
+            elif not os.path.exists(output_data_path):
+                print(
+                    f"[warning] compare canceled while golden data not found -> {output_data_path}"
+                )
+                result_check &= False
+                continue
+            if golden_output.shape == output_data.shape:
+                cosine_dist = cosine_distance(golden_output, output_data)
+                is_match = (golden_output == output_data).all()
+                print(
+                    f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}"
+                )
+                if is_match:
+                    continue
+                if cosine_dist < 0.999:
+                    result_check &= False
+                    if verbose:
+                        print("output_data:\n", output_data)
+                        print("golden_output:\n", golden_output)
+            else:
+                result_check &= False
+                print(
+                    f"[compare] golden output [{output_name}] shape not match {golden_output.shape} vs {output_data.shape},"
+                )
+        print(
+            f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.'
+        )
+        if not result_check:
+            raise RuntimeError("[error] result check failed.")
+        print(f"<=== {model_name} test success.")
+
+
+if __name__ == '__main__':
+    import platform
+
+    arch = platform.machine()
+    if arch != "x86_64":
+        print(f"[error] tcim not support platform: {arch}")
+        exit(0)
+    args = get_args()
+    print(args)
+    build(args)
