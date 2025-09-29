@@ -126,13 +126,13 @@ class ModulePool {
   /**
    * @brief ModulePool destructor.
    */
-  ~ModulePool();
+  inline ~ModulePool();
   /**
    * @brief Init module pool, only effective on the first call.
    * @param max_num The maximum number of loaded models.
    * @return ModulePool pointer
    */
-  static ModulePool* Init(int32_t max_num);
+  static inline ModulePool* Init(int32_t max_num);
   /**
    * @brief Load model from buffer and generate a pooled module.
    * @param module_name model name, used to identify the model.
@@ -141,7 +141,7 @@ class ModulePool {
    * @param option The configuration options for loading model.
    * @return PooledModule pointer
    */
-  PooledModule* Load(
+  inline PooledModule* Load(
       const std::string& module_name, const void* model_data, int len,
       const tcim::Module::Option& option = tcim::Module::Option());
   /**
@@ -150,7 +150,7 @@ class ModulePool {
    * @param option The configuration options for loading model.
    * @return PooledModule pointer
    */
-  PooledModule* Load(
+  inline PooledModule* Load(
       const std::string& model_path,
       const tcim::Module::Option& option = tcim::Module::Option());
   /**
@@ -158,13 +158,13 @@ class ModulePool {
    * @param is_print Print statistical information or not, default: not print.
    * @return A structure containing statistical information.
    */
-  ModulePoolStats GetStats(bool is_print = false);
+  inline ModulePoolStats GetStats(bool is_print = false);
   /**
    * @brief Get the number of loaded models of the specified model.
    * @param module_name model name, used to specify the model.
    * @return The number of loaded models.
    */
-  int32_t GetLoadedModuleNum(const std::string& module_name);
+  inline int32_t GetLoadedModuleNum(const std::string& module_name);
   /**
    * @brief Get the inference statistics information of the specified model.
    * Each time this function is called, the existing statistical data will be
@@ -172,40 +172,40 @@ class ModulePool {
    * @param module_name model name, used to specify the model.
    * @return A structure containing inference statistical information.
    */
-  MdInferStats GetModuleInferStats(const std::string& module_name);
+  inline MdInferStats GetModuleInferStats(const std::string& module_name);
 
   /**
    * Internal use only
    * @brief The PooledModule object updates the statistics to ModulePool.
    */
-  int UpdateInferStats(const std::string& module_name, const float& infer_time);
+  inline int UpdateInferStats(const std::string& module_name, const float& infer_time);
 
  private:
   ModulePool() = default;
   ModulePool(const ModulePool&) = delete;
   ModulePool& operator=(const ModulePool&) = delete;
 
-  int LoadModule(bool is_file,
+  inline int LoadModule(bool is_file,
                  const std::string& module_name,
                  const tcim::Module::Option& option,
                  const void* model_data = nullptr, const int& len = 0);
-  static void InferThread(int stream_id, std::shared_ptr<InferTaskQueue> qin);
+  static inline void InferThread(int stream_id, std::shared_ptr<InferTaskQueue> qin);
 
   std::mutex module_mutex_;
   std::mutex infer_stats_mutex_;
   std::map<std::string, std::vector<tcim::Module*>> module_map_;
   std::map<std::string, MdInferStats*> infer_stats_map_;
 
-  static ModulePool* module_pool_;
-  static std::once_flag flag_;
-  static int32_t module_max_num_;
-  static std::shared_ptr<InferTaskQueue> infer_queue_;
-  static std::vector<std::thread> threads_;  // infer threads
-  static std::vector<tcim::Stream> streams_;
-  static std::mutex module_manager_mutex_;
-  static std::map<std::string, ModuleExec*> module_manager_;
-  static std::mutex stream_stats_mutex_;
-  static std::map<int32_t, StreamStats> stream_stats_map_;
+  static inline ModulePool* module_pool_ = nullptr;
+  static inline std::once_flag flag_;
+  static inline int32_t module_max_num_;
+  static inline std::shared_ptr<InferTaskQueue> infer_queue_ = nullptr;
+  static inline std::vector<std::thread> threads_;  // infer threads
+  static inline std::vector<tcim::Stream> streams_;
+  static inline std::mutex module_manager_mutex_;
+  static inline std::map<std::string, ModuleExec*> module_manager_;
+  static inline std::mutex stream_stats_mutex_;
+  static inline std::map<int32_t, StreamStats> stream_stats_map_;
 };
 
 class PooledModule {
@@ -217,19 +217,19 @@ class PooledModule {
    * @param module_pool The pointer of ModulePool.
    * @param queue Inference task queue.
    */
-  PooledModule(const std::string& model_path, tcim::Module* module,
+  inline PooledModule(const std::string& model_path, tcim::Module* module,
                ModulePool* module_pool, std::shared_ptr<InferTaskQueue> queue);
   /**
    * @brief Gets the total number of input tensors in the model.
    * @return The total number of input tensors.
    */
-  size_t GetInputNum();
+  inline size_t GetInputNum();
   /**
    * @brief Gets the name of the index‑th input tensor.
    * @param index The position of the input tensor in the model to query for.
    * @return The name of the index‑th input tensor.
    */
-  std::string GetInputName(int index);
+  inline std::string GetInputName(int index);
   /**
    * @brief Gets the tensor information, such as tensor shape, data type, and
    *        format with the given input tensor name.
@@ -238,13 +238,13 @@ class PooledModule {
    * not. If true, equal to: module.GetInputInfo(tensor_name).AsContiguous().
    * @return The tensor information of the tensor.
    */
-  tcim::TensorInfo GetInputInfo(const std::string& name, bool as_contiguous);
+  inline tcim::TensorInfo GetInputInfo(const std::string& name, bool as_contiguous);
   /**
    * @brief Gets input tensor on Houmo device with the given tensor name.
    * @param name The name of the input tensor to query for.
    * @return The input tensor.
    */
-  tcim::Tensor GetInput(const std::string& name);
+  inline tcim::Tensor GetInput(const std::string& name);
   /**
    * @brief Gets input data from pre‑allocated memory on host or Houmo device
    * with the given tensor name. The input data includes input tensors defined
@@ -253,18 +253,18 @@ class PooledModule {
    * @param tensor The input tensor.
    * @return The status of the function call.
    */
-  int GetInput(const std::string& name, tcim::Tensor& tensor);
+  inline int GetInput(const std::string& name, tcim::Tensor& tensor);
   /**
    * @brief Gets the total number of output tensors in the model.
    * @return The total number of output tensors.
    */
-  size_t GetOutputNum();
+  inline size_t GetOutputNum();
   /**
    * @brief Gets the name of the index‑th output tensor.
    * @param index The position of the output tensor in the model to query for.
    * @return The name of the index‑th output tensor.
    */
-  std::string GetOutputName(int index);
+  inline std::string GetOutputName(int index);
   /**
    * @brief Gets the information about the output tensor of the model inference,
    * such as tensor shape, data type, and format with the given output tensor
@@ -274,7 +274,7 @@ class PooledModule {
    * not. If true, equal to: module.GetOutputInfo(tensor_name).AsContiguous().
    * @return The information of the output tensor.
    */
-  tcim::TensorInfo GetOutputInfo(const std::string& name, bool as_contiguous);
+  inline tcim::TensorInfo GetOutputInfo(const std::string& name, bool as_contiguous);
   /**
    * @brief Use the provided inputs to infer the model, and then place the
    * inference result into the given outputs.
@@ -283,7 +283,7 @@ class PooledModule {
    * @param option The configuration options for model inference.
    * @return The status of the function call.
    */
-  tcim::Status Infer(
+  inline tcim::Status Infer(
       const std::map<std::string, tcim::Tensor>& inputs,
       std::map<std::string, tcim::Tensor>& outputs,
       const tcim::Module::RunOption& option = tcim::Module::RunOption());
@@ -292,16 +292,16 @@ class PooledModule {
    * @param is_print Print statistical information or not, default: not print.
    * @return A structure containing statistical information.
    */
-  PooledMdStats GetStats(bool is_print = false);
+  inline PooledMdStats GetStats(bool is_print = false);
   /**
    * @brief Get the model name of the current PooledModule object.
    * @return The model name.
    */
-  std::string GetPooledMdName();
+  inline std::string GetPooledMdName();
 
  private:
-  bool CheckModulePool();
-  bool CheckTensorsDevice(const std::map<std::string, tcim::Tensor>& tensors);
+  inline bool CheckModulePool();
+  inline bool CheckTensorsDevice(const std::map<std::string, tcim::Tensor>& tensors);
 
   std::string model_name_ = "";
   tcim::Module* module_ = nullptr;
@@ -442,17 +442,6 @@ bool PooledModule::CheckTensorsDevice(
 
   return true;
 }
-
-ModulePool* ModulePool::module_pool_ = nullptr;
-std::once_flag ModulePool::flag_;
-int32_t ModulePool::module_max_num_;
-std::shared_ptr<InferTaskQueue> ModulePool::infer_queue_ = nullptr;
-std::vector<std::thread> ModulePool::threads_;
-std::vector<tcim::Stream> ModulePool::streams_;
-std::mutex ModulePool::module_manager_mutex_;
-std::map<std::string, ModuleExec*> ModulePool::module_manager_;
-std::mutex ModulePool::stream_stats_mutex_;
-std::map<int32_t, StreamStats> ModulePool::stream_stats_map_;
 
 ModulePool::~ModulePool() {
   LOG_INFO("===> ModulePool Deinit start.");
