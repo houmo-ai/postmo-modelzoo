@@ -68,6 +68,15 @@ pip install -r requirements.txt
 
 此外，示例运行需要依赖houmo-tcim-runtime，参考后摩大道软件平台快速入门配置runtime环境。
 
+## 应用工具
+
+为方便用户评测，示例仓库提供了一些工具源码供用户使用，如下表所示。具体使用方式请参考工具内的readme文件。
+
+| tools            | path         | description                     | language   | target  | arch        | os         |
+| ---------------- | ------------ | ------------------------------- | ---------- | ------- | ----------- | ---------- |
+| bandwidth_perf   | tools        | 带宽测试工具                    | python     | xh1/xh2 | x64/aarch64 | linux      |
+| computing_perf   | tools        | 算力测试工具                    | python     | xh1/xh2 | x64/aarch64 | linux      |
+
 
 ## 模型示例
 
@@ -81,17 +90,18 @@ pip install -r requirements.txt
 | -------------------- | ------------- | ------- | ----- | ----- | ---- | ---- |
 | resnet50             | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
 | mobilenetv2          | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
-| efficientnet         | backbone      | xh1     | yes   | yes   | yes  | yes  |
-| ViT-B-16             | backbone      | xh1     | yes   | yes   | yes  | yes  |
-| yolov3               | detection     | xh1     | yes   | yes   | yes  | yes  |
+| efficientnet         | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
+| ViT-B-16             | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolov3               | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov5s              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov5s_feature      | detection     | xh1     | yes   | yes   | yes  | yes  |
+| yolov5s_feature      | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolo12m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m-pose         | estimation    | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m-seg          | segmentation  | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolop                | autodrive     | xh1/xh2 | yes   | yes   | yes  | x    |
 | lprnet               | ocr           | xh1     | yes   | yes   | yes  | yes  |
+| ppocrv3              | ocr           | xh1     | yes   | yes   | yes  | yes  |
 | wenet                | asr           | xh1     | x     | yes   | yes  | x    |
 | qwen2.5              | llm           | xh1/xh2 | yes   | yes   | yes  | x    |
 | qwen3                | llm           | xh1/xh2 | yes   | yes   | yes  | x    |
@@ -99,7 +109,8 @@ pip install -r requirements.txt
 | deepseek             | llm           | xh1     | x     | yes   | yes  | x    |
 | deepseek-r1-qwen3-8b | llm           | xh2     | yes   | yes   | yes  | x    |
 | sdxl                 | diffusion     | xh1     | x     | yes   | yes  | x    |
-| qwen2.5-vl           | vllm          | xh1     | x     | yes   | yes  | x    |
+| qwen2.5-vl           | vllm          | xh1/xh2 | x     | yes   | yes  | x    |
+| multi_input_custom_random_model |    | xh1/xh2 | yes   | yes   | x    | x    |
 
 
 ## API示例
@@ -118,6 +129,8 @@ API示例在apis目录下，如下表所示，type列为示例类型，其中con
 | resnet50_pipeline            | inferences   | resnet50 流水推理示例           | c++        | xh1     | x64/aarch64 | win/linux  |
 | yolov5s_resnet50_multibatch  | inferences   | yolov5s_resnet50多batch推理示例 | c++        | xh1     | x64/aarch64 | linux      |
 | video_detect                 | scenes       | 视频流目标检测分析业务示例      | c++        | xh1     | x64/aarch64 | linux      |
+| buffer_pool                  | scenes       | 应用内存池示例                  | c++        | xh1     | x64/aarch64 | win/linux  |
+| module_pool                  | scenes       | 应用模型池示例                  | c++        | xh1     | x64/aarch64 | win/linux  |
 
 
 ## 快速上手
