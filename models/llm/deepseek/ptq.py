@@ -3,8 +3,9 @@ import hmquant.llm.llm_utils as utils
 from hmquant.llm.llm_api import QwenQuantPipline
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH", "")
 HOUMO_TARGET = os.getenv("HOUMO_TARGET", "")
+assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
+HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH", "")
 
 
 def str2bool(v):

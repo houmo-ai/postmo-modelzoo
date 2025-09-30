@@ -2,8 +2,10 @@ import os
 import argparse
 from hmatc.utils.utils import get_file_from_jfrog
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -43,7 +45,9 @@ if __name__ == '__main__':
 
     if model_type == "raw" or model_type == "all":
         get_file_from_jfrog(raw_path, model_dir)
-    if not os.path.exists(os.path.join(HOUMO_DATASETS_PATH, "CCPD2020_PPOCRv3_eval.tar.gz")):
+    if not os.path.exists(
+        os.path.join(HOUMO_DATASETS_PATH, "CCPD2020_PPOCRv3_eval.tar.gz")
+    ):
         get_file_from_jfrog(data_path, HOUMO_DATASETS_PATH, HOUMO_DATASETS_PATH)
     # if model_type == "quant" or model_type == "all":
     #     get_file_from_jfrog(quant_path, model_dir, quant_model_dir)

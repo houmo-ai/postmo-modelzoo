@@ -1,10 +1,10 @@
 import os
 import sys
 import argparse
-
 from hmatc.utils.utils import get_file_from_jfrog
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 
 
 def get_args() -> argparse.Namespace:

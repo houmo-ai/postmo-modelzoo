@@ -9,19 +9,24 @@ import time
 import argparse
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 
 
 def quantize_to_int16(tensor, scale, zero_point=0):
     quantized_tensor = np.clip(
-        np.round(tensor / scale + zero_point), -32768, 32767,
+        np.round(tensor / scale + zero_point),
+        -32768,
+        32767,
     ).astype(np.int16)
     return quantized_tensor
 
 
 def quantize_to_int8(tensor, scale, zero_point=0):
     quantized_tensor = np.clip(
-        np.round(tensor / scale + zero_point), -128, 127,
+        np.round(tensor / scale + zero_point),
+        -128,
+        127,
     ).astype(np.int8)
     return quantized_tensor
 
@@ -30,7 +35,8 @@ def dequantize_from_int16(quantized_tensor, scale, zero_point=0):
     dequantized_tensor = (
         quantized_tensor.astype(
             np.float32,
-        ) - zero_point
+        )
+        - zero_point
     ) * scale
     return dequantized_tensor
 
@@ -66,13 +72,27 @@ class HmUnet(torch.nn.Module):
         for index in range(input_num):
             input_name = self.module.get_input_name(index)
             input_info = self.module.get_input_info(input_name)
-            print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype, input_info.format.name))
+            print(
+                "input[{}] shape = {}, dtype = {}, format = {}".format(
+                    input_name,
+                    input_info.shape,
+                    input_info.dtype,
+                    input_info.format.name,
+                )
+            )
         output_num = self.module.get_num_outputs()
         print("output_num:", output_num)
         for index in range(output_num):
             output_name = self.module.get_output_name(index)
             output_info = self.module.get_output_info(output_name)
-            print("output[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape, output_info.dtype, output_info.format.name))
+            print(
+                "output[{}] shape = {}, dtype = {}, format = {}".format(
+                    output_name,
+                    output_info.shape,
+                    output_info.dtype,
+                    output_info.format.name,
+                )
+            )
 
     def get_embeddings(
         self,
@@ -82,12 +102,14 @@ class HmUnet(torch.nn.Module):
         added_cond_kwargs,
     ):
         t_emb = self.get_time_embed(
-            sample=sample, timestep=timestep,
+            sample=sample,
+            timestep=timestep,
         )  # [2, 320]
         emb = self.time_embedding(t_emb, None)  # [2, 1280]
         aug_emb = None
         class_emb = self.get_class_embed(
-            sample=sample, class_labels=None,
+            sample=sample,
+            class_labels=None,
         )  # none
         if class_emb is not None:
             if self.config.class_embeddings_concat:
@@ -95,7 +117,9 @@ class HmUnet(torch.nn.Module):
             else:
                 emb = emb + class_emb
         aug_emb = self.get_aug_embed(
-            emb=emb, encoder_hidden_states=encoder_hidden_states, added_cond_kwargs=added_cond_kwargs,
+            emb=emb,
+            encoder_hidden_states=encoder_hidden_states,
+            added_cond_kwargs=added_cond_kwargs,
         )  # [2, 1280]      pooled_emb + embding( add_time )
         if self.config.addition_embed_type == 'image_hint':
             aug_emb, hint = aug_emb
@@ -104,7 +128,8 @@ class HmUnet(torch.nn.Module):
         if self.time_embed_act is not None:
             emb = self.time_embed_act(emb)
         encoder_hidden_states = self.process_encoder_hidden_states(
-            encoder_hidden_states=encoder_hidden_states, added_cond_kwargs=added_cond_kwargs,
+            encoder_hidden_states=encoder_hidden_states,
+            added_cond_kwargs=added_cond_kwargs,
         )
         return emb, encoder_hidden_states
 
@@ -120,12 +145,17 @@ class HmUnet(torch.nn.Module):
         do_classifier_free_guidance=True,
     ):
         emb, encoder_hidden_states_processed = self.get_embeddings(
-            inp_sample, inp_time_emb, encoder_hidden_states, added_cond_kwargs,
+            inp_sample,
+            inp_time_emb,
+            encoder_hidden_states,
+            added_cond_kwargs,
         )
         start = time.time()
         input = quantize_to_int16(inp_sample.cpu().numpy(), 0.00015613020514138043)
         input_9 = quantize_to_int8(emb.cpu().numpy(), 0.06447089463472366)
-        encoder_hidden_states = quantize_to_int16(encoder_hidden_states_processed[0:1].cpu().numpy(), 0.026054341346025467)
+        encoder_hidden_states = quantize_to_int16(
+            encoder_hidden_states_processed[0:1].cpu().numpy(), 0.026054341346025467
+        )
         self.module.set_input('input', input)
         self.module.set_input('input.9', input_9)
         self.module.set_input('encoder_hidden_states', encoder_hidden_states)
@@ -249,16 +279,18 @@ if __name__ == '__main__':
 
         negative_prompts_list = [
             # 避免生成模糊、低质量、变形、颜色难看、构图不佳以及卡通化的图像。
-            ['Blurry, low - quality, distorted, ugly colors, bad composition, cartoonish.'],
+            [
+                'Blurry, low - quality, distorted, ugly colors, bad composition, cartoonish.'
+            ],
             # 避免生成低质量，虚假质感的水。
             ['Poor details, fake - looking water.'],
             # 防止生成单色、扁平、背景单调以及解剖结构错误的奇幻生物图像。
-            ['Monochrome, flat, boring background, bad anatomy.']
+            ['Monochrome, flat, boring background, bad anatomy.'],
         ]
 
         for i in range(test_num):
-            prompts[i] = prompts_list[i%3]
-            negative_prompts[i] = negative_prompts_list[i%3]
+            prompts[i] = prompts_list[i % 3]
+            negative_prompts[i] = negative_prompts_list[i % 3]
 
     for i in range(test_num):
         start = time.time()
@@ -276,4 +308,6 @@ if __name__ == '__main__':
         avg_unet_time = unet_time / num_inference_steps
         hmunet.profile["unet_infer"] = 0
         logger.success(f"demo results saved in {save_path}, cost {cost*1000:.3f} ms.")
-        logger.success(f"unet infer {num_inference_steps} steps cost {unet_time*1000:.3f} ms, average {avg_unet_time*1000:.3f} ms.")
+        logger.success(
+            f"unet infer {num_inference_steps} steps cost {unet_time*1000:.3f} ms, average {avg_unet_time*1000:.3f} ms."
+        )
