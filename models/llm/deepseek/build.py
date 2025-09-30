@@ -8,6 +8,7 @@ import logging
 logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
 GOLDEN_THRESH = 0.999 if HOUMO_TARGET == "xh1" else 0.98
 

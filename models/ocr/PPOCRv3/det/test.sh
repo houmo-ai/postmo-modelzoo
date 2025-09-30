@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+houmo_target="${HOUMO_TARGET}"
+if [ -z "$houmo_target" ] || [ "$houmo_target" != "xh1" ]; then
+    echo "Only supports HOUMO_TARGET as xh1."
+    exit 1
+fi
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
 arch=$(uname -m)

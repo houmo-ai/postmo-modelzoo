@@ -2,14 +2,17 @@ import os
 import numpy as np
 import time
 import argparse
-
 import logging
+
+
+HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 logging.basicConfig(level="INFO")
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
 
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
+
 
 def cosine_distance(data1, data2):
     if data1.shape != data2.shape:
@@ -93,11 +96,13 @@ if __name__ == '__main__':
     # 1. build model
     if stage == 'build' or stage == 'all':
         import platform
+
         arch = platform.machine()
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
         import tcim
+
         print(f"\n===> {model_name} build start...")
         start = time.time()
         onnx_model = os.path.join(model_dir, f"hmquant_{model_name}_with_act.onnx")
@@ -107,7 +112,7 @@ if __name__ == '__main__':
             ncore=ncore,
             output_dir=output_dir,
             opt_level="O1",
-            work_dir=os.path.join(output_dir, "tcim")
+            work_dir=os.path.join(output_dir, "tcim"),
         )
         profile["build"] = time.time() - start
         print(f'{model_name} build completed in {profile["build"]:.3f} s.')
@@ -115,6 +120,7 @@ if __name__ == '__main__':
     # 2. test model
     if stage == 'test' or stage == 'all':
         import tcim_lite
+
         print(f"\n===> {model_name} test start...")
         # 2.1 load model
         model_path = os.path.join(output_dir, f"{model_name}.hmm")
@@ -130,15 +136,23 @@ if __name__ == '__main__':
         for id in range(input_num):
             input_name = module.get_input_name(id)
             input_info = module.get_input_info(input_name)
-            print(f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}")
-            input_data_path = os.path.join(model_dir, f"hmquant_{model_name}_{sanitize_name(input_name)}_input.npy")
+            print(
+                f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
+            )
+            input_data_path = os.path.join(
+                model_dir, f"hmquant_{model_name}_{sanitize_name(input_name)}_input.npy"
+            )
             input_data = np.load(input_data_path).astype(input_info.dtype)
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
-            print(f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}")
+            print(
+                f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}"
+            )
             start = time.time()
             module.set_input(input_name, input_data)
             profile["set_input"] += time.time() - start
-        print(f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.')
+        print(
+            f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.'
+        )
 
         # 2.3 infer model
         start = time.time()
@@ -155,33 +169,52 @@ if __name__ == '__main__':
         for id in range(output_num):
             output_name = module.get_output_name(id)
             output_info = module.get_output_info(output_name)
-            print(f"output_info[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}")
+            print(
+                f"output_info[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
+            )
             start = time.time()
             output_data = module.get_output(output_name).numpy()
             profile["get_output"] += time.time() - start
-            print(f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}")
-            output_data_path = os.path.join(model_dir, f'hmquant_{model_name}_{sanitize_name(output_name)}_output.npy')
+            print(
+                f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
+            )
+            output_data_path = os.path.join(
+                model_dir,
+                f'hmquant_{model_name}_{sanitize_name(output_name)}_output.npy',
+            )
             if os.path.exists(output_data_path):
                 golden_output = np.load(output_data_path)
-                golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
+                golden_output = np.concatenate(
+                    [golden_output for i in range(batch)], axis=0
+                )
             else:
                 result_check = False
-                print(f"[warning] compare canceled while golden data not found -> {output_data_path}")
+                print(
+                    f"[warning] compare canceled while golden data not found -> {output_data_path}"
+                )
                 continue
             if golden_output.shape == output_data.shape:
                 cosine_dist = cosine_distance(golden_output, output_data)
                 is_match = (golden_output == output_data).all()
-                print("[compare] golden output [{}] match={}, similarity={:.6f}"
-                        .format(output_name, is_match, cosine_dist))
+                print(
+                    "[compare] golden output [{}] match={}, similarity={:.6f}".format(
+                        output_name, is_match, cosine_dist
+                    )
+                )
                 if is_match:
                     continue
                 if cosine_dist < 0.999:
                     result_check = False
             else:
                 result_check = False
-                print("[compare] golden output [{}] shape not match {} vs {}"
-                        .format(output_name, golden_output.shape, output_data.shape))
-        print(f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.')
+                print(
+                    "[compare] golden output [{}] shape not match {} vs {}".format(
+                        output_name, golden_output.shape, output_data.shape
+                    )
+                )
+        print(
+            f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.'
+        )
         if not result_check:
             raise RuntimeError("[error] result check failed.")
         print(f"<=== {model_name} test success.")
