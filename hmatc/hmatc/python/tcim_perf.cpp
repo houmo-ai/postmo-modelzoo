@@ -79,6 +79,7 @@ typedef struct {
     std::map<std::string, tcim::Tensor> data_in;
     std::map<std::string, tcim::Tensor> data_out;
     std::map<std::string, tcim::Tensor> ref_out;
+    std::map<std::string, tcim::TensorInfo> out_info;
 } Task;
 
 typedef struct {
@@ -306,6 +307,7 @@ perfInfo_t ModelRunner(
     // prepare input & output data
     std::map<std::string, input_t> inputs;
     std::map<std::string, tcim::Tensor> input_datas;
+
     int input_num = module.GetInputNum();
     std::cout << "Count of Input: " << input_num << std::endl;
     for (int idx = 0; idx < input_num; idx++) {
@@ -397,10 +399,21 @@ perfInfo_t ModelRunner(
         }
     }
 
+    std::map<std::string, tcim::TensorInfo> out_infos;
+    int output_num = module.GetOutputNum();
+    for (int idx = 0; idx < output_num; ++idx) {
+        auto output_name = module.GetOutputName(idx);
+        auto output_info = module.GetOutputInfo(output_name).AsContiguous();
+        // auto tensor = tcim::Tensor::CreateHostTensor(output_info);
+        std::cout << "Output[" << idx << "] name: " << output_name << ", " << output_info << std::endl;
+        out_infos.insert(std::pair<std::string, tcim::TensorInfo>(output_name, output_info));
+    }
+
     for (int i = 0; i < sample_num; i++) {
         Task task;
         task.req_id = i;
         task.data_in = input_datas;
+        task.out_info = out_infos;  // 绑定输出信息
         qin.queue.push(task);
     }
 
@@ -432,6 +445,12 @@ perfInfo_t ModelRunner(
         std::unique_lock<std::mutex> lock_in(qin.mutex);
         auto task = qin.queue.front();
         lock_in.unlock();
+        // 创建输出tensor
+        std::map<std::string, tcim::Tensor> output_datas;
+        for (auto &output : task.out_info) {
+            output_datas.insert(std::pair<std::string, tcim::Tensor>(
+                output.first, tcim::Tensor::CreateHostTensor(output.second)));
+        }
         for (auto &tensor : task.data_in) {
             module.SetInput(tensor.first, tensor.second);
         }
@@ -493,6 +512,9 @@ perfInfo_t ModelRunner(
             info.infer_total_cost += cost;
             if (info.infer_max_cost < cost)
                 info.infer_max_cost = cost;
+            for (auto &tensor : output_datas) {
+                module.GetOutput(tensor.first, tensor.second);
+            }
             end = GET_TIME();
             cost = GET_COST(infer_end, end);
             info.output_total_cost += cost;

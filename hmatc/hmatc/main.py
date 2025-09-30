@@ -9,6 +9,7 @@ import shutil
 import pandas as pd
 import platform
 import torch
+from multiprocessing import get_context, Queue
 from io import StringIO
 from prettytable import PrettyTable
 from ._version import __build_time__, __commit__, __version__
@@ -41,6 +42,7 @@ def run_model(
     location,
     cfg_path,
     target,
+    queue,
     batch_num=1,
     core_num=1,
     thread_num=1,
@@ -68,8 +70,14 @@ def run_model(
         acc_onnx="N/A",
         acc_chip="N/A",
         acc_err="N/A",
-        ave_latency="N/A",
+        e2e_ave_cost="N/A",
         throughput="N/A",
+        infer_avg_latency="N/A",
+        infer_max_latency="N/A",
+        input_avg_H2D_latency="N/A",
+        input_max_H2D_latency="N/A",
+        output_avg_D2H_latency="N/A",
+        output_max_D2H_latency="N/A",
         enable_static=False,
         msg="ok",
     )
@@ -83,12 +91,16 @@ def run_model(
             msg = f"Not found model: {new_location}"
             logger.error(msg)
             model_infos["msg"] = msg
-            return model_infos
+            queue.put(model_infos)
+            return
+            # return model_infos
     if core_num > int(os.getenv("HOUMO_CORE_NUM", 4 if target == "xh1" else 2)):
         msg = f"{target} core_num must less than {os.getenv('HOUMO_CORE_NUM', 4 if target == 'xh1' else 2)}"
         logger.error(msg)
         model_infos["msg"] = msg
-        return model_infos
+        queue.put(model_infos)
+        return
+        # return model_infos
     root = os.getcwd()
     os.chdir(location)
 
@@ -101,7 +113,9 @@ def run_model(
         logger.error(msg)
         model_infos["msg"] = msg
         os.chdir(root)
-        return model_infos
+        queue.put(model_infos)
+        return
+        # return model_infos
 
     # 解析cfg
     if not os.path.exists(cfg_path):
@@ -109,7 +123,9 @@ def run_model(
         logger.error(msg)
         model_infos["msg"] = msg
         os.chdir(root)
-        return model_infos
+        queue.put(model_infos)
+        return
+        # return model_infos
 
     cfg = read_yaml_to_dict(cfg_path)
     if not check_cfg(cfg):
@@ -117,7 +133,9 @@ def run_model(
         logger.error(msg)
         model_infos["msg"] = msg
         os.chdir(root)
-        return model_infos
+        queue.put(model_infos)
+        return
+        # return model_infos
 
     cfg["target"] = target
     cfg["build"]["ncore"] = core_num
@@ -139,7 +157,9 @@ def run_model(
         else:
             logger.info("static_resizer is disabled")
             os.chdir(root)
-            return model_infos
+            queue.put(model_infos)
+            return
+            # return model_infos
     logger.info(f"\n{json.dumps(cfg, indent=2, sort_keys=False)}")
 
     hm_exec = None
@@ -157,7 +177,9 @@ def run_model(
         logger.error(msg)
         model_infos["msg"] = msg
         os.chdir(root)
-        return model_infos
+        queue.put(model_infos)
+        return
+        # return model_infos
     if enable_cuda and target == "xh1" and torch.cuda.is_available():
         hm_exec.device = "cuda"
     hm_exec.enable_upload = enable_upload
@@ -169,7 +191,7 @@ def run_model(
         input_size += "x".join(map(str, hm_exec.inputs_shape[idx]))
     model_infos["input_size"] = input_size
     macs = model_profile(hm_exec.model_path)
-    model_infos["GOPs"] = f"{macs * 2 * batch_num / 1e9:.2f}"
+    model_infos["GOPs"] = macs * 2 / 1e9
 
     resizer_mode = hm_exec.resizer_mode
     if resizer_mode == 0:
@@ -194,14 +216,18 @@ def run_model(
                 logger.error(msg)
                 model_infos["msg"] = msg
                 os.chdir(root)
-                return model_infos
+                queue.put(model_infos)
+                return
+                # return model_infos
             logger.info(f"Quantize done.")
         except Exception as e:
             msg = f"Quantize failed:\nException: {e}"
             logger.error(msg)
             model_infos["msg"] = msg
             os.chdir(root)
-            return model_infos
+            queue.put(model_infos)
+            return
+            # return model_infos
     # 编译
     if platform_arch == "x86_64" and enable_build:
         try:
@@ -212,7 +238,9 @@ def run_model(
             logger.error(msg)
             model_infos["msg"] = msg
             os.chdir(root)
-            return model_infos
+            queue.put(model_infos)
+            return
+            # return model_infos
 
     if platform_arch != "x86_64" and not os.path.exists(hm_exec.hmm_path):
         msg = (
@@ -221,7 +249,9 @@ def run_model(
         logger.error(msg)
         model_infos["msg"] = msg
         os.chdir(root)
-        return model_infos
+        queue.put(model_infos)
+        return
+        # return model_infos
 
     # 性能测试
     try:
@@ -232,15 +262,35 @@ def run_model(
             hm_exec.hmm_path, warmup, sample, loop_num, device_id, thread_num
         )
         perf_info = list(perf_info["perf"].values())[0]["perf_info"]
-        model_infos["ave_latency"] = f"{perf_info['avg_cost'] / batch_num:.2f}"
+        model_infos["e2e_ave_cost"] = f"{perf_info['avg_cost'] / batch_num:.2f}"
         model_infos["throughput"] = f"{perf_info['qps'] * batch_num:.2f}"
+        model_infos["infer_avg_latency"] = (
+            f"{perf_info['infer_avg_latency'] / batch_num:.2f}"
+        )
+        model_infos["infer_max_latency"] = (
+            f"{perf_info['infer_max_latency'] / batch_num:.2f}"
+        )
+        model_infos["input_avg_H2D_latency"] = (
+            f"{perf_info['input_avg_latency'] / batch_num:.2f}"
+        )
+        model_infos["input_max_H2D_latency"] = (
+            f"{perf_info['input_max_latency'] / batch_num:.2f}"
+        )
+        model_infos["output_avg_D2H_latency"] = (
+            f"{perf_info['output_avg_latency'] / batch_num:.2f}"
+        )
+        model_infos["output_max_D2H_latency"] = (
+            f"{perf_info['output_max_latency'] / batch_num:.2f}"
+        )
         logger.info(f"Performance done.")
     except Exception as e:
         msg = f"Performance failed:\nException: {e}"
         logger.error(msg)
         model_infos["msg"] = msg
         os.chdir(root)
-        return model_infos
+        queue.put(model_infos)
+        return
+        # return model_infos
 
     # onnx 数据集评估
     onnx_info = dict()
@@ -298,7 +348,8 @@ def run_model(
         model_infos["acc_err"] = f"{map50_95_err*100:.2f}%/{map50_err*100:.2f}%"
 
     os.chdir(root)
-    return model_infos
+    queue.put(model_infos)
+    # return model_infos
 
 
 def run_benchmark(
@@ -329,6 +380,13 @@ def run_benchmark(
         )
     )
 
+    report_file_pass = os.path.abspath(
+        os.path.join(
+            "reports",
+            f"benchmark_{target}_v{runtime_version}_{platform.machine().lower()}_{t}_pass.xlsx",
+        )
+    )
+
     headers = [
         "ModelName",
         "Shape",
@@ -346,9 +404,18 @@ def run_benchmark(
         "Accuracy[onnx]",
         f"Accuracy[{target}]",
         "AccRelError",
-        "Latency[ms]",
+        "End2End_Cost[ms]",
         "Throughput",
+        "Infer_Avg[ms]",
+        "Infer_Max[ms]",
+        "Input_AvgH2D[ms]",
+        "Input_MaxH2D[ms]",
+        "Output_AvgD2H[ms]",
+        "Output_MaxD2H[ms]",
     ]
+
+    ctx = get_context("spawn")
+    q = ctx.Queue()
 
     table = PrettyTable(headers)
     table.title = f"HouMo Model Benchmark Report"
@@ -375,22 +442,50 @@ def run_benchmark(
                     if platform.machine().lower() == "x86_64"
                     else False  # TODO 需要在非x86环境跑eval再修改
                 )
-                model_infos = run_model(
-                    location,
-                    cfg_path,
-                    target,
-                    batch_num=batch_num,
-                    core_num=core_num,
-                    thread_num=thread_num,
-                    enable_eval=enable_eval,
-                    enbale_quantize=True,
-                    enable_build=True,
-                    enable_static=enable_static,
-                    device_id=device_id,
-                    enable_cuda=enable_cuda,
-                    enable_upload=enable_upload and not enable_static,
-                    enable_delete=enable_delete and not enable_static,
+                p = ctx.Process(
+                    target=run_model,
+                    args=(location, cfg_path, target, q),
+                    kwargs=dict(
+                        batch_num=batch_num,
+                        core_num=core_num,
+                        thread_num=thread_num,
+                        enable_eval=enable_eval,
+                        enbale_quantize=True,
+                        enable_build=True,
+                        enable_static=enable_static,
+                        device_id=device_id,
+                        enable_cuda=enable_cuda,
+                        enable_upload=enable_upload and not enable_static,
+                        enable_delete=enable_delete and not enable_static,
+                    ),
                 )
+                p.start()
+                p.join(timeout=3600)
+                if p.exitcode != 0:
+                    logger.error(
+                        f"{model_name} run failed, and exitcode is {p.exitcode}"
+                    )
+                if q.empty():
+                    model_infos = dict(
+                        input_size="N/A",
+                        dataset="N/A",
+                        dataset_num="N/A",
+                        GOPs=0,
+                        target=target,
+                        batch_num=batch_num,
+                        core_num=core_num,
+                        thread_num=thread_num,
+                        resizer="N/A",
+                        acc_onnx="N/A",
+                        acc_chip="N/A",
+                        acc_err="N/A",
+                        ave_latency="N/A",
+                        throughput="N/A",
+                        enable_static=False,
+                        msg="unknown error",
+                    )
+                else:
+                    model_infos = q.get()
                 _all_model_infos.append(model_infos)
             return _all_model_infos
 
@@ -407,7 +502,7 @@ def run_benchmark(
                         model_infos["input_size"],
                         model_infos["dataset"],
                         model_infos["dataset_num"],
-                        model_infos["GOPs"],
+                        f"{model_infos['GOPs']:.2f}",
                         platform.machine().lower(),
                         model_infos["core_num"],
                         model_infos["batch_num"],
@@ -419,30 +514,53 @@ def run_benchmark(
                         model_infos["acc_onnx"],
                         model_infos["acc_chip"],
                         model_infos["acc_err"],
-                        model_infos["ave_latency"],
+                        model_infos["e2e_ave_cost"],
                         model_infos["throughput"],
+                        model_infos["infer_avg_latency"],
+                        model_infos["infer_max_latency"],
+                        model_infos["input_avg_H2D_latency"],
+                        model_infos["input_max_H2D_latency"],
+                        model_infos["output_avg_D2H_latency"],
+                        model_infos["output_max_D2H_latency"],
                     ]
                 )
 
         add_rows(all_model_infos)
         add_rows(all_model_infos_static, static_mode=True)
     logger.info(f"\n{table}")
-    df = pd.DataFrame(table.rows, columns=table.field_names)
-    with pd.ExcelWriter(report_file, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Sheet1")
-        workbook = writer.book
-        worksheet = writer.sheets["Sheet1"]
-        text_fmt = workbook.add_format({"num_format": "@"})
 
-        def set_column_text_format(column_name):
-            col_idx = df.columns.get_loc(column_name)
-            excel_idx = chr(ord("A") + col_idx)
-            worksheet.set_column(f"{excel_idx}:{excel_idx}", None, text_fmt)
+    def save_to_excel(rows, field_names, report_file):
+        df = pd.DataFrame(rows, columns=field_names)
+        sheet_name = "Sheet1"
+        with pd.ExcelWriter(report_file, engine="xlsxwriter", mode="w") as writer:
+            df.to_excel(writer, index=False, sheet_name=sheet_name)
+            workbook = writer.book
+            worksheet = writer.sheets[sheet_name]
+            text_fmt = workbook.add_format({"num_format": "@"})
+            number_fmt = workbook.add_format({"num_format": "0.00"})
 
-        set_column_text_format("Accuracy[onnx]")
-        set_column_text_format(f"Accuracy[{target}]")
-        set_column_text_format("AccRelError")
+            def set_column_text_format(column_name):
+                col_idx = df.columns.get_loc(column_name)
+                excel_idx = chr(ord("A") + col_idx)
+                worksheet.set_column(f"{excel_idx}:{excel_idx}", None, text_fmt)
 
+            def set_column_number_format(column_name):
+                col_idx = df.columns.get_loc(column_name)
+                excel_idx = chr(ord("A") + col_idx)
+                worksheet.set_column(f"{excel_idx}:{excel_idx}", None, number_fmt)
+
+            set_column_number_format("GOPs")
+            set_column_text_format("Accuracy[onnx]")
+            set_column_text_format(f"Accuracy[{target}]")
+            set_column_text_format("AccRelError")
+
+    save_to_excel(table.rows, table.field_names, report_file)
+    pass_rows = list()
+    for row in table.rows:
+        if row[16] == "N/A" or row[17] == "N/A":
+            continue
+        pass_rows.append(row)
+    save_to_excel(pass_rows, table.field_names, report_file_pass)
     logger.info("Benchmark done.")
 
 
@@ -526,13 +644,22 @@ def main():
     build_parser = subparsers.add_parser(
         "build",
         parents=[
-            parent_config,
             parent_target,
             parent_result_path,
             model_cfg_parent,
             parent_device_id,
         ],
         help="Build a model",
+    )
+    build_exclusive_group = build_parser.add_mutually_exclusive_group(required=True)
+    build_exclusive_group.add_argument(
+        "--hmonnx",
+        type=str,
+        required=False,
+        help="Specify a hmonnx model path, default is quantized model",
+    )
+    build_exclusive_group.add_argument(
+        "--config", "-c", type=str, help="Specify config file path"
     )
     # compare
     compare_parser = subparsers.add_parser(
