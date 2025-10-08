@@ -23,22 +23,10 @@
 python3 get_model.py --type raw
 ```
 
-如果仅编译芯片模型，可选择下载量化模型，下载后的模型存放在`output/$HOUMO_TARGET/hmquant`目录（注意相同模型会覆盖，请自行保存）：
-
-```bash
-python3 get_model.py --type quant
-```
-
 如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
 python3 get_model.py --type hmm
-```
-
-也可以直接下载以上所有模型和数据集（注意相同模型会覆盖，请自行保存）：
-
-```bash
-python3 get_model.py
 ```
 
 ### 2.2 量化
@@ -49,11 +37,11 @@ python3 get_model.py
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py39-x86.64 /bin/bash
 ```
 
-进入docker后source环境变量，并进入`/hmdd/models/llm/deepseek`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为256和2048，可通过ptq.py中的prefill_shape和cache_len参数修改，cache_len最长为8192。
+进入docker后source环境变量，并进入`models/llm/deepseek`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为256和2048，可通过ptq.py中的prefill_shape和cache_len参数修改，cache_len最长为8192。
 
 ```bash
 source env.sh
-cd /hmdd/models/llm/deepseek
+cd models/llm/deepseek-r1-qwen3-8b
 python3 ptq.py
 ```
 
@@ -64,6 +52,7 @@ python3 ptq.py
 |-- decoder
 |-- prefill
 |-- quant_embedding.pt
+`-- weight.npy
 ```
 
 ### 2.3 编译

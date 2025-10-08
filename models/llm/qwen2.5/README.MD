@@ -10,7 +10,7 @@
 
 ## 2 快速开始
 
-目前Qwen2模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
+目前Qwen2.5模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
 
 ### 2.1 获取模型和数据
 
@@ -22,22 +22,10 @@
 python3 get_model.py --type raw
 ```
 
-如果仅编译芯片模型，可选择下载量化模型，下载后的模型存放在`output/$HOUMO_TARGET/hmquant`目录（注意相同模型会覆盖，请自行保存）：
-
-```bash
-python3 get_model.py --type quant
-```
-
 如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
 python3 get_model.py --type hmm
-```
-
-也可以直接下载以上所有模型和数据集（注意相同模型会覆盖，请自行保存）：
-
-```bash
-python3 get_model.py
 ```
 
 ### 2.2 量化
@@ -48,12 +36,7 @@ python3 get_model.py
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py39-x86.64 /bin/bash
 ```
 
-进入docker后source环境变量，并进入`/hmdd/models/llm/qwen2.5`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为128和4096，可通过ptq.py中的prefill_shape和cache_len参数修改。不同编译模式下支持的上下文长度组合为：
-| cores | batch | prefill | decode |
-| ----- | ----- | ------- | ------ |
-| 4     | 1     | 256     | 8192   |
-| 4     | 1     | 256     | 4096   |
-| 2     | 1     | 256     | 4096   |
+进入docker后source环境变量，并进入`/hmdd/models/llm/qwen2.5`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为256和4096。
 
 ```bash
 source env.sh

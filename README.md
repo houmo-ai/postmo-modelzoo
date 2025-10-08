@@ -26,7 +26,11 @@ houmo-examples目录结构如下，其中README.md为本说明文件：
     ├── backbone
     ├── detection
     ├── diffusion
-    └── llm
+    ├── estimation
+    ├── llm
+    ├── ocr
+    ├── segmentation
+    └── vllm
 ├── data
 ├── hmodel
 ├── env.sh
