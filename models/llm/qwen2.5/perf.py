@@ -14,7 +14,7 @@ from loguru import logger
 
 import tcim_lite as tcim
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 
 def is_valid_char(cp):
     if (

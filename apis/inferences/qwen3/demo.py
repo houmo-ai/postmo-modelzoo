@@ -14,7 +14,7 @@ import tcim_lite as tcim
 
 
 TOKENIZER_PATH = "qwen3-8b"
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 EMBEDDING_PATH = "hmquant/quant_embedding.pt"
 
 

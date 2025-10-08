@@ -2,7 +2,7 @@ import os
 import argparse
 from hmatc.utils.utils import get_file_from_jfrog
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
 

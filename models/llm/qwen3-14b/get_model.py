@@ -4,7 +4,7 @@ import argparse
 from hmatc.utils.utils import get_file_from_jfrog
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh1')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
@@ -15,15 +15,8 @@ def get_args() -> argparse.Namespace:
         '--type',
         dest='model_type',
         type=str,
-        default='quant',
-        help='which resource to get, choise in [raw, quant, hmm, all]',
-    )
-    parser.add_argument(
-        '--quant_model_dir',
-        dest='quant_model_dir',
-        type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
-        help='where to save quant_model',
+        default='hmm',
+        help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
         '--model_dir',
@@ -62,7 +55,6 @@ if __name__ == '__main__':
     if HOUMO_TARGET == "xh1":
         print("[error] not support xh1.")
     elif HOUMO_TARGET == "xh2":
-        quant_path = "models/qwen3/hmquant_xh2_qwen3_14b_256_2k_20250625.zip"
         hmm_map = {
             (1, "2k"): "models/qwen3/hmm_xh2_qwen3_14b_256_2k_2cores_20250701.zip",
             (1, "8k"): "models/qwen3/hmm_xh2_qwen3_14b_256_8k_2cores_20250701.zip",

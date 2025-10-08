@@ -4,7 +4,7 @@ import argparse
 from hmatc.utils.utils import get_file_from_jfrog
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh1')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
@@ -15,15 +15,8 @@ def get_args() -> argparse.Namespace:
         '--type',
         dest='model_type',
         type=str,
-        default='quant',
-        help='which resource to get, choise in [raw, quant, hmm, all]',
-    )
-    parser.add_argument(
-        '--quant_model_dir',
-        dest='quant_model_dir',
-        type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
-        help='where to save quant_model',
+        default='hmm',
+        help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
         '--model_dir',
@@ -47,10 +40,9 @@ if __name__ == '__main__':
         print("Error: not support houmo target", HOUMO_TARGET)
         sys.exit(-1)
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
-    quant_path = "models/deepseek/hmquant_xh2_deepseek_8b_256_2k_20250702.zip"
     hmm_path = "models/deepseek/hmm_xh2_deepseek_8b_256_2k_2cores_20250702.zip"
 
-    if model_type in ["raw", "all"]:
+    if model_type in ["raw"]:
         get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
         ignore_patterns = []
     else:
@@ -60,8 +52,5 @@ if __name__ == '__main__':
                       local_dir='DeepSeek-R1-0528-Qwen3-8B',
                       ignore_patterns=ignore_patterns)
 
-    if model_type == "quant" or model_type == "all":
-        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
-
-    if model_type == "hmm" or model_type == "all":
+    if model_type in ["hmm"]:
         get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))

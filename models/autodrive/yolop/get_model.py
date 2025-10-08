@@ -7,7 +7,7 @@ from pathlib import Path
 from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh1")
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
