@@ -212,3 +212,30 @@ def test_vllm_qwen2dot5_vl_compile(setup_logging):
     model_name = "qwen2.5-vl"
     _compile_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolo12m
+@pytest.mark.compile
+@pytest.mark.dependency(name='test_detection_yolo12m_compile', depends_on=['test_quant_models.py::test_detection_yolo12m_quant'])
+def test_detection_yolo12m_compile(setup_logging):
+    model_name = 'yolo12m'
+    _compile_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_pose
+@pytest.mark.compile
+@pytest.mark.dependency(name='test_estimation_yolov8m_pose_compile', depends_on=['test_quant_models.py::test_estimation_yolov8m_pose_quant'])
+def test_estimation_yolov8m_pose_compile(setup_logging):
+    model_name = 'yolov8m-pose'
+    _compile_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_seg
+@pytest.mark.compile
+@pytest.mark.dependency(name='test_segmentation_yolov8m_seg_compile', depends_on=['test_quant_models.py::test_segmentation_yolov8m_seg_quant'])
+def test_segmentation_yolov8m_seg_compile(setup_logging):
+    model_name = 'yolov8m-seg'
+    _compile_func(model_name, setup_logging)
+    assert True

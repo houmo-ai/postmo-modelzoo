@@ -29,12 +29,12 @@
     },
     "get_model_params": {
         "xh1": {
-            "type": ["raw", "quant", "hmm"],
-            "model_dir": ["cached_models", "cached_models", "cached_models"]
+            "type": ["raw", "hmm"],
+            "model_dir": ["cached_models", "cached_models"]
         },
         "xh2": {
-            "type": ["raw"],
-            "model_dir": ["cached_models"]
+            "type": ["raw", "hmm"],
+            "model_dir": ["cached_models", "cached_models"]
         }
     },
     "hmquant_params": {

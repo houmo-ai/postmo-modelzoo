@@ -7,6 +7,9 @@ import onnx
 import argparse
 import tcim
 
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -43,7 +46,7 @@ def get_args() -> argparse.Namespace:
         '--stage',
         dest='stage',
         type=str,
-        default="all",
+        default="build",
         help='build stage choise=["build", "test", "all"]',
     )
     args = parser.parse_args()
@@ -77,7 +80,7 @@ def build(args=None):
             "tcim.codegen_pic": True,
             "tcim.mem_plan_strategy": "linearscan",
             "tcim.large_split_maxsize": True,
-            "tcim.split_const" : True
+            "tcim.split_const": True,
         }
         if core_num == 4:
             compile_config["tcim.core_num"] = 4
@@ -109,8 +112,15 @@ def build(args=None):
         if os.path.exists(constant_path):
             constant_data_dict = np.load(constant_path, allow_pickle=True).item()
             data_dict.update(constant_data_dict)
-        tcim.build.build_from_hmonnx(onnx_model, weights=data_dict, model_name=part_name, compiler_cfg=compile_config,
-                                     inputs=input_cfg, hdplcc_options=["-O2"], const_weight_prefix=part_name+"_")
+        tcim.build.build_from_hmonnx(
+            onnx_model,
+            weights=data_dict,
+            model_name=part_name,
+            compiler_cfg=compile_config,
+            inputs=input_cfg,
+            hdplcc_options=["-O2"],
+            const_weight_prefix=part_name + "_",
+        )
         print(f"<=== {part_name} build success.")
 
     # 2. test model, prefill model should run first to make the correct result
@@ -130,15 +140,25 @@ def build(args=None):
         for id in range(input_num):
             input_name = module.get_input_name(id)
             input_info = module.get_input_info(input_name)
-            print("input_info[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape,
-                                                                              input_info.dtype, input_info.format.name))
+            print(
+                "input_info[{}] shape = {}, dtype = {}, format = {}".format(
+                    input_name,
+                    input_info.shape,
+                    input_info.dtype,
+                    input_info.format.name,
+                )
+            )
             input_file_name = input_name + '.npy'
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype(input_info.dtype)
             if input_name == 'current_length':
                 current_length = input_data[0]
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
-            print("golden input[{}] shape = {}, dtype = {}".format(input_name, input_data.shape, input_data.dtype))
+            print(
+                "golden input[{}] shape = {}, dtype = {}".format(
+                    input_name, input_data.shape, input_data.dtype
+                )
+            )
             module.set_input(input_name, input_data)
 
         # 2.3 infer model
@@ -151,37 +171,65 @@ def build(args=None):
         for id in range(output_num):
             output_name = module.get_output_name(id)
             output_info = module.get_output_info(output_name, is_quanted=True)
-            print("output_info[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape,
-                                                                               output_info.dtype, output_info.format.name))
+            print(
+                "output_info[{}] shape = {}, dtype = {}, format = {}".format(
+                    output_name,
+                    output_info.shape,
+                    output_info.dtype,
+                    output_info.format.name,
+                )
+            )
             output_data = module.get_output(output_name, is_quanted=True)
-            print("output[{}] shape = {}, dtype = {}".format(output_name, output_data.shape, output_data.dtype))
+            print(
+                "output[{}] shape = {}, dtype = {}".format(
+                    output_name, output_data.shape, output_data.dtype
+                )
+            )
             # only compare [1,current_length,4096]
             output_data = output_data[:1, :current_length, :]
             output_data_path = os.path.join(model_dir, output_name + '.npy')
             if os.path.exists(output_data_path):
-                golden_output = np.load(output_data_path, allow_pickle=True).item().get("output_tensor")
+                golden_output = (
+                    np.load(output_data_path, allow_pickle=True)
+                    .item()
+                    .get("output_tensor")
+                )
                 golden_output = golden_output[:1, :current_length, :]
-                golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
+                golden_output = np.concatenate(
+                    [golden_output for i in range(batch)], axis=0
+                )
             else:
                 result_check = False
-                print("[warning] compare canceled while golden data not found -> {}".format(output_data_path))
+                print(
+                    "[warning] compare canceled while golden data not found -> {}".format(
+                        output_data_path
+                    )
+                )
                 continue
             if golden_output.shape == output_data.shape:
                 from hmassist.utils.dist_metrics import cosine_distance
+
                 cosine_dist = cosine_distance(golden_output, output_data)
                 is_match = (golden_output == output_data).all()
-                print("[compare] golden output [{}] match={}, similarity={:.6f}"
-                      .format(output_name, is_match, cosine_dist))
+                print(
+                    "[compare] golden output [{}] match={}, similarity={:.6f}".format(
+                        output_name, is_match, cosine_dist
+                    )
+                )
                 if cosine_dist < 0.999:
                     result_check = False
             else:
                 result_check = False
-                print("[compare] golden output [{}] shape not match {} vs {}"
-                      .format(output_name, golden_output.shape, output_data.shape))
+                print(
+                    "[compare] golden output [{}] shape not match {} vs {}".format(
+                        output_name, golden_output.shape, output_data.shape
+                    )
+                )
         if not result_check:
             print("[error] result check failed.")
             exit(-1)
         print(f"<=== {part_name} test success.")
+
 
 if __name__ == '__main__':
     args = get_args()

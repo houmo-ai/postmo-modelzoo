@@ -9,12 +9,12 @@
         "xh2": null
     },
     "support_flow": {
-        "xh1": ["get_model", "quant", "compile", "demo", "perf", "eval", "compare"],
-        "xh2": ["get_model", "quant", "compile", "demo", "perf", "eval", "compare"]
+        "xh1": ["get_model", "quant", "compile", "demo", "perf", "compare"],
+        "xh2": ["get_model", "quant", "compile", "demo", "perf", "compare"]
     },
     "support_hmatc": {
-        "xh1": ["hmquant", "hmbuild", "hmdemo", "hmcompare", "hmperf", "hmeval"],
-        "xh2": ["hmquant", "hmbuild", "hmdemo", "hmcompare", "hmperf", "hmeval"]
+        "xh1": ["hmquant", "hmbuild", "hmdemo", "hmcompare", "hmperf"],
+        "xh2": ["hmquant", "hmbuild", "hmdemo", "hmcompare", "hmperf"]
     },
     "perf_metrics": {
         "xh1":{
@@ -30,12 +30,12 @@
     },
     "get_model_params": {
         "xh1": {
-            "type": ["raw", "quant"],
+            "type": ["raw", "hmm"],
             "model_dir": ["cached_models", "cached_models"]
         },
         "xh2": {
-            "type": ["raw"],
-            "model_dir": ["cached_models"]
+            "type": ["raw", "hmm"],
+            "model_dir": ["cached_models", "cached_models"]
         }
     },
     "hmquant_params": {

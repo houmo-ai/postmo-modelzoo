@@ -117,46 +117,42 @@ multi_input_custom_random_model:
         script: ../models/multi_input_custom_random_model/test.sh
   test:
     - multi_input_custom_random_model_test
-yolo12m:
+detection_yolo12m:
   include:
-    - ../models/detection/yolo12m
-  exclude: 
-    - ../models/detection/yolo12m/README.MD
-  example_case:
-    - yolo12m_test:
-        script: ../models/detection/yolo12m/test.sh
-  test:
-    - yolo12m_test
-yolov5s_feature:
-  include:
-    - ../models/detection/yolov5s_feature
+    - models/detection/yolo12m
   exclude:
-    - ../models/detection/yolov5s_feature/README.MD
+    - models/detection/yolo12m/README.MD
   example_case:
-    - yolov8m_seg_test:
-        script: ../models/detection/yolov5s_feature/test.sh
+    - detection_yolo12m_test:
+        test_type: models_tests
+        script: yolo12m
+        args: all
   test:
-    - yolov5s_feature_test
-yolov8m-pose:
+    - detection_yolo12m_test
+estimation_yolov8m_pose:
   include:
-    - ../models/estimation/yolov8m-pose
+    - models/estimation/yolov8m-pose
   exclude:
-    - ../models/estimation/yolov8m-pose/README.MD
+    - models/estimation/yolov8m-pose/README.MD
   example_case:
-    - yolov8m-pose_test:
-        script: ../models/estimation/yolov8m-pose/test.sh
+    - estimation_yolov8m_pose_test:
+        test_type: models_tests
+        script: yolov8m_pose
+        args: all
   test:
-    - yolov8m-pose_test
-yolov8m_seg:
+    - estimation_yolov8m_pose_test
+segmentation_yolov8m_seg:
   include:
-    - ../models/segmentation/yolov8m_seg
+    - models/segmentation/yolov8m-seg
   exclude:
-    - ../models/segmentation/yolov8m_seg/README.MD
+    - models/segmentation/yolov8m-seg/README.MD
   example_case:
-    - yolov8m_seg_test:
-        script: ../models/segmentation/yolov8m_seg/test.sh
+    - segmentation_yolov8m_seg_test:
+        test_type: models_tests
+        script: yolov8m_seg
+        args: all
   test:
-    - yolov8m_seg_test
+    - segmentation_yolov8m_seg_test
 asr_wenet:
   include:
     - models/asr/wenet
@@ -199,7 +195,7 @@ tools_computing_perf:
     - ../apis/tools/computing_perf
   exclude:
     - ../apis/tools/computing_perf/README.MD
-  example_case: 
+  example_case:
     - tools_computing_perf_test:
         script: ../apis/tools/computing_perf/run.sh
   test:
@@ -210,7 +206,7 @@ tools_bandwidth_perf:
     - ../apis/tools/bandwidth_perf
   exclude:
     - ../apis/tools/bandwidth_perf/README.MD
-  example_case: 
+  example_case:
     - tools_bandwidth_perf_test:
         script: ../apis/tools/bandwidth_perf/run.sh
   test:

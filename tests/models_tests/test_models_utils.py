@@ -15,77 +15,6 @@ def _load_model_cfg(model_name: str) -> dict:
     return load_json(model_cfg_path)
 
 
-def _generate_hmassist_cmds(
-    cmd_header: list,
-    required_params: dict,
-    optional_params: dict,
-    skipped_vals: dict = None,
-) -> list:
-    cmd_list = list()
-    # construct required test commands
-    idx = 0
-    max_length = 0
-    while True:
-        tmp_cmd_list = list()
-        for param_name, param_list in required_params.items():
-            if param_name == "target" or param_name == "onnx":
-                continue
-            max_length = len(param_list) if max_length < len(param_list) else max_length
-            param_str = "--" + param_name
-            param_val = param_list[0]
-            if idx < len(param_list):
-                param_val = param_list[idx]
-            if (
-                skipped_vals
-                and param_name in skipped_vals
-                and param_val in skipped_vals[param_name]
-            ):
-                continue
-            tmp_cmd_list += [param_str, param_val]
-
-        if tmp_cmd_list:
-            tmp_cmd_list = cmd_header + tmp_cmd_list
-            cmd_list.append(tmp_cmd_list)
-        idx += 1
-        if idx >= max_length:
-            break
-    max_length = len(cmd_list)
-
-    # construct optional test commands
-    idx = 1  # skip default val
-    flag = True
-    while flag:
-        flag = False
-        tmp_cmd_list = list()
-        for param_name, param_list in optional_params.items():
-            if len(param_list) <= idx:
-                continue
-            if (
-                skipped_vals
-                and param_name in skipped_vals
-                and param_list[idx] in skipped_vals[param_name]
-            ):
-                continue
-            param_str = "--" + param_name
-            tmp_cmd_list += [param_str, param_list[idx]]
-            flag = True
-        if tmp_cmd_list:
-            cmd_list_idx = 0 if idx >= max_length else idx
-            tmp_cmd_list = cmd_list[cmd_list_idx] + tmp_cmd_list
-            cmd_list.append(tmp_cmd_list)
-        idx += 1
-
-    final_cmd_list = list()
-    seen = set()
-    for tmp_cmd in cmd_list:
-        tuple_cmd = tuple(tmp_cmd)
-        if tuple_cmd not in seen:
-            seen.add(tuple_cmd)
-            final_cmd_list.append(tmp_cmd)
-
-    return final_cmd_list
-
-
 def _generate_hmatc_cmds(
     cmd_header: list,
     required_params: dict,
@@ -291,7 +220,10 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
     model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
     lock_file_dst = model_res_dir + "/lock.lock"
     lock_file_src = model_set_dir + "/lock.lock"
-    quant_params = model_info["quant_params"][HOUMO_BACKEND]
+    quant_params_full = model_info.get("quant_params", None)
+    quant_params = (
+        quant_params_full.get(HOUMO_BACKEND, None) if quant_params_full else None
+    )
     flag = False
 
     logger.info("Start to quant llm model for compiling.")
@@ -519,6 +451,7 @@ def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) 
         lock_file = model_res_dir + "/lock.lock"
         if (
             platform != "aarch64"
+            and is_release() is False
             and "compile" in model_info["support_flow"][HOUMO_BACKEND]
             and check_gpu()["has_gpu"] is True
             and _prepare_quantized_llm_model(model_info, log_file)
@@ -734,8 +667,11 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
         or model_info["obsolete"] is True
         or HOUMO_BACKEND not in model_info["support_backend"]
         or "quant" not in model_info["support_flow"][HOUMO_BACKEND]
+        or is_release() is True
     ):
-        logger.warning("Not support %s testing.", model_name)
+        logger.warning(
+            "Not support %s testing, release flag: %d.", model_name, int(is_release())
+        )
         pytest.skip("This testcase is not support.")
     if get_test_type() == TCaseType.SEPARATE_INFER:
         skip_msg = f"This quant testcase of {model_name} has already been run in the SEPARATE INFER stage."
@@ -774,6 +710,7 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
         if model_type == "cv":
             os.system(f"cp -ar {model_set_dir}/* ./")
 
+    logger.info("LD_LIBRARY_PATH: %s", os.getenv("LD_LIBRARY_PATH"))
     final_flag = True
     if "hmquant_params" in model_info:
         # test cmd: hmatc quant
@@ -843,8 +780,11 @@ def execute_compile_flow(
         or model_info["obsolete"] is True
         or HOUMO_BACKEND not in model_info["support_backend"]
         or "compile" not in model_info["support_flow"][HOUMO_BACKEND]
+        or is_release() is True
     ):
-        logger.warning("Not support %s testing.", model_name)
+        logger.warning(
+            "Not support %s testing, release flag: %d.", model_name, int(is_release())
+        )
         pytest.skip("This testcase is not support.")
     if get_test_type() == TCaseType.SEPARATE_INFER:
         skip_msg = f"This compile testcase of {model_name} has already been run in the SEPARATE NO INFER stage."
@@ -1075,6 +1015,9 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
 
 
 def execute_compare_flow(model_name: str, log_file: str = "") -> None:
+    if HOUMO_BACKEND == "xh1" and get_test_type() != TCaseType.DEFAULT:
+        logger.warning("Not support %s (gpu) compare testing.", model_name)
+        pytest.skip("This testcase is not support.")
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -1244,55 +1187,84 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                 final_flag = False
                 error_msg = f"Performance {infer_val} degradation exceeds 5%, benchmark time is {benchmark} ms."
                 logger.error(error_msg)
-        else:
+        elif model_name == "sdxl":
             model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-            perf_idx = 0
             demo_params = model_info["demo_params"][HOUMO_BACKEND]
-            tokenizer_dir = demo_params["tokenizer_dir"][perf_idx].replace(
+            perf_idx = 0
+            model_path = demo_params["model_path"][perf_idx].replace(
+                "cached_results", model_res_dir
+            )
+            sdxl_ckpt = demo_params["sdxl_ckpt"][perf_idx].replace(
                 "cached_models", model_set_dir
             )
-            embedding_path = demo_params["embedding_path"][perf_idx].replace(
-                "cached_results", model_res_dir
-            )
-            prefill_path = demo_params["prefill_path"][perf_idx].replace(
-                "cached_results", model_res_dir
-            )
-            decode_path = demo_params["decode_path"][perf_idx].replace(
-                "cached_results", model_res_dir
+            lora_weights = demo_params["lora_weights"][perf_idx].replace(
+                "cached_models", model_set_dir
             )
             lock_file_res = model_res_dir + "/lock.lock"
             with ModelResourceLock(
                 lock_file_res, ModelResourceLock.LockMode.WRITE, "execute model demo.py"
             ):
-                final_flag, _ = execute_test_cmd(
+                final_flag, opt_str = execute_test_cmd(
                     [
                         "python3",
                         "demo.py",
-                        "--tokenizer_dir",
-                        tokenizer_dir,
-                        "--embedding_path",
-                        embedding_path,
-                        "--prefill_path",
-                        prefill_path,
-                        "--decode_path",
-                        decode_path,
-                        "--ndevice",
-                        "1",
+                        "--model_path",
+                        model_path,
+                        "--sdxl_ckpt",
+                        sdxl_ckpt,
+                        "--lora_weights",
+                        lora_weights,
                     ],
                     log_file,
                 )
+            infer_time = [
+                float(line.strip().rsplit(" ", 3)[-2])
+                for line in opt_str.split("\n")
+                if "ms, average" in line
+            ]
+            infer_val = 0 if len(infer_time) == 0 else infer_time[0]
+            # check performance
+            backend_metrics = model_info["perf_metrics"].get(HOUMO_BACKEND, None)
+            benchmark = backend_metrics.get("avg_cost", 0)
+            if benchmark and infer_val >= (benchmark * 0.95):
+                logger.info(
+                    f"The best performance is {infer_val} qps, benchmark time is {benchmark} ms."
+                )
+            else:
+                final_flag = False
+                error_msg = f"Performance {infer_val} degradation exceeds 5%, benchmark time is {benchmark} ms."
+                logger.error(error_msg)
+        else:
+            model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+            perf_idx = 0
+            demo_cmd = ["python3", "demo.py"]
+            demo_params = model_info["demo_params"][HOUMO_BACKEND]
+            for param, param_list in demo_params.items():
+                if param_list[perf_idx] is None:
+                    continue
+                param_val = param_list[perf_idx]
+                if "cached_models" in param_val:
+                    param_val = param_val.replace("cached_models", model_set_dir)
+                elif "cached_results" in param_val:
+                    param_val = param_val.replace("cached_results", model_res_dir)
+                demo_cmd += [f"--{param}", param_val]
+            lock_file_res = model_res_dir + "/lock.lock"
+            with ModelResourceLock(
+                lock_file_res, ModelResourceLock.LockMode.WRITE, "execute model demo.py"
+            ):
+                final_flag, _ = execute_test_cmd(demo_cmd, log_file)
             perf_dict = {"prefill": 0, "decode": 0, "end2end": 0}
             with open(log_file, "r", encoding="utf-8") as tmp_file:
                 for line in tmp_file:
                     if "Prefill Speed" in line:
                         perf_dict["prefill"] = float(
-                            line.rsplit(":", 1)[-1].strip().split(" ")[0].strip()
+                            line.rsplit(":")[-2].strip().split(" ")[0].strip()
                         )
-                    if "TPOT" in line:
+                    if "Decode Speed" in line:
                         perf_dict["decode"] = float(
                             line.rsplit(":", 1)[-1].strip().split(" ")[0].strip()
                         )
-                    if "TPS" in line:
+                    if "E2E TPS" in line:
                         perf_dict["end2end"] = float(
                             line.rsplit(":", 1)[-1].strip().split(" ")[0].strip()
                         )

@@ -72,3 +72,27 @@ def test_detection_yolov8m_eval(setup_logging):
     model_name = "yolov8m"
     _eval_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolo12m
+@pytest.mark.eval
+def test_detection_yolo12m_eval(setup_logging):
+    model_name = 'yolo12m'
+    _eval_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_pose
+@pytest.mark.eval
+def test_estimation_yolov8m_pose_eval(setup_logging):
+    model_name = 'yolov8m-pose'
+    _eval_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_seg
+@pytest.mark.eval
+def test_segmentation_yolov8m_seg_eval(setup_logging):
+    model_name = 'yolov8m-seg'
+    _eval_func(model_name, setup_logging)
+    assert True

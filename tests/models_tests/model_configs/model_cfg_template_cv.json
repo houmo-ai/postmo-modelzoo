@@ -1,6 +1,6 @@
 {
     "obsolete": false,
-    "model_dir": "models/backbone/ViT-B-16",
+    "model_dir": "models/<model_type>/<model_name>",
     "model_type": "cv",
     "support_platform": ["x86_64"],
     "support_backend": ["xh1", "xh2"],
@@ -18,23 +18,23 @@
     },
     "perf_metrics": {
         "xh1":{
-            "x86_64": 83.995
+            "x86_64": 1733.207
         },
         "xh2":{
-            "x86_64": 20.995
+            "x86_64": 484.383
         }
     },
     "eval_threshold": {
-        "top1_acc": 0.8
+        "top1_acc": 0.95
     },
     "get_model_params": {
         "xh1": {
-            "type": ["raw", "hmm"],
-            "model_dir": ["cached_models", "cached_models"]
+            "type": ["raw", "quant", "hmm"],
+            "model_dir": ["cached_models", "cached_models", "cached_models"]
         },
         "xh2": {
-            "type": ["raw", "hmm"],
-            "model_dir": ["cached_models", "cached_models"]
+            "type": ["raw", "quant", "hmm"],
+            "model_dir": ["cached_models", "cached_models", "cached_models"]
         }
     },
     "hmquant_params": {
@@ -54,6 +54,7 @@
                 "config": ["./config.yml", "./config.yml", "./config.yml", "./config.yml"]
             },
             "optional": {
+                "result_path": [null, null, null, null],
                 "batch": [null, "1", "2", "4"],
                 "ncore": [null, "1", "2", "4"],
                 "opt_level": [null, "0", "1", "2"],
@@ -65,6 +66,7 @@
                 "config": ["./config.yml", "./config.yml", "./config.yml"]
             },
             "optional": {
+                "result_path": [null, null, null],
                 "batch": [null, "1", "1"],
                 "ncore": [null, "1", "2"],
                 "opt_level": ["0", "1", "2"],

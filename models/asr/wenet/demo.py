@@ -15,7 +15,7 @@ from wenet.utils.init_tokenizer import init_tokenizer
 import tcim_lite as tcim
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 HOUMO_MODELZOO_PATH = os.getenv('HOUMO_MODELZOO_PATH', '../../..')
 INPUT_FILE = os.path.join(HOUMO_MODELZOO_PATH, 'data/audio/4s.wav')

@@ -3,6 +3,10 @@ import onnx
 import argparse
 from hmassist.utils.utils import get_file_from_jfrog
 
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -42,7 +46,9 @@ if __name__ == '__main__':
 
     if model_type == "raw" or model_type == "all":
         # get_file_from_jfrog(raw_path, model_dir)
-        os.system('huggingface-cli download --resume-download Qwen/Qwen2-7B-Instruct --local-dir qwen2-7b-instruct-hf')
+        os.system(
+            'huggingface-cli download --resume-download Qwen/Qwen2-7B-Instruct --local-dir qwen2-7b-instruct-hf'
+        )
 
     if model_type == "quant" or model_type == "all":
         file_path_1 = get_file_from_jfrog(quant_path_1, model_dir)

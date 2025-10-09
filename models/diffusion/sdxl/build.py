@@ -5,7 +5,7 @@ import argparse
 import logging
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 logging.basicConfig(level="INFO")
 
@@ -67,7 +67,7 @@ def get_args() -> argparse.Namespace:
         '--stage',
         dest='stage',
         type=str,
-        default="all",
+        default="build",
         help='build stage choise=["build", "test", "all"]',
     )
     parser.add_argument(

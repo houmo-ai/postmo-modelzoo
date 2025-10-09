@@ -1,6 +1,6 @@
 {
     "obsolete": false,
-    "model_dir": "models/llm/qwen2.5",
+    "model_dir": "models/<model_type>/<model_name>",
     "model_type": "llm",
     "support_platform": ["x86_64"],
     "support_backend": ["xh1", "xh2"],
@@ -14,18 +14,18 @@
     },
     "support_hmatc": null,
     "perf_metrics": {
-        "xh1":{
+        "xh1": {
             "x86_64": {
-                "prefill": 2.11,
-                "decode": 13.25,
-                "end2end": 13.04
+                "prefill": 1.05,
+                "decode": 7.92,
+                "end2end": 7.88
             }
         },
-        "xh2":{
+        "xh2": {
             "x86_64": {
-                "prefill": 11.49,
-                "decode": 18.04,
-                "end2end": 16.76
+                "prefill": 40.0,
+                "decode": 15.93,
+                "end2end": 15.69
             }
         }
     },
@@ -43,32 +43,13 @@
         }
     },
     "quant_params": {
-        "xh1": {
-            "model": ["cached_models/qwen2.5-7b-instruct-hf"],
-            "quant_config": [null],
-            "n_calib": [null],
-            "model_name": [null],
-            "save_path": ["cached_results/hmquant_xh2"],
-            "prefill_shape": [null],
-            "cache_len": [null],
-            "multi_batch": [null],
-            "wikitext_local": [null],
-            "eval_ppl": [null],
-            "blocks": [null],
-            "decoder_shape": [null],
-            "gptq": [null],
-            "cache_2_input": [null],
-            "rotate_ov": [null],
-            "rotate_pre_rope": [null],
-            "rotate_post_rope": [null],
-            "use_klt": [null],
-            "compile_mode": [null]
-        },
+        "xh1": null,
         "xh2": {
-            "model": ["cached_models/qwen2.5-7b-instruct-hf"],
-            "out-dir": ["cached_results/hmquant_xh2_2k"],
-            "context-length": ["2048"],
-            "input-sequence-length": [null]
+            "model": ["cached_models/<raw_model_folder>", "cached_models/<raw_model_folder>", "cached_models/<raw_model_folder>"],
+            "out-dir": ["cached_results/hmquant_xh2_2k", "cached_results/hmquant_xh2_4k", "cached_results/hmquant_xh2_8k"],
+            "context-length": ["2048", "4096", "8192"],
+            "input-sequence-length": [null, null, null],
+            "calibration-dataset": [null, null, null]
         }
     },
     "compile_params": {
@@ -91,17 +72,17 @@
     },
     "demo_params": {
         "xh1": {
-            "tokenizer_dir": ["cached_models/qwen2.5-7b-instruct-hf"],
+            "tokenizer_dir": ["cached_models/<raw_model_folder>"],
             "embedding_path": ["cached_results/hmm_xh1/hmquant/quant_embedding.pt"],
-            "prefill_path": ["cached_results/hmm_xh1/qwen2.5_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh1/qwen2.5_decode.hmm"],
+            "prefill_path": ["cached_results/hmm_xh1/<model_name>_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh1/<model_name>_decode.hmm"],
             "ndevice": ["1"]
         },
         "xh2": {
-            "tokenizer_dir": ["cached_models/qwen2.5-7b-instruct-hf", "cached_models/qwen2.5-7b-instruct-hf"],
+            "tokenizer_dir": ["cached_models/<raw_model_folder>", "cached_models/<raw_model_folder>"],
             "embedding_path": ["cached_results/hmm_xh2_2k/hmquant/quant_embedding.pt", "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"],
-            "prefill_path": ["cached_results/hmm_xh2_2k/qwen2.5_prefill.hmm", "cached_results/hmm_xh2_8k/qwen2.5_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_2k/qwen2.5_decode.hmm", "cached_results/hmm_xh2_8k/qwen2.5_decode.hmm"],
+            "prefill_path": ["cached_results/hmm_xh2_2k/<model_name>_prefill.hmm", "cached_results/hmm_xh2_8k/<model_name>_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_2k/<model_name>_decode.hmm", "cached_results/hmm_xh2_8k/<model_name>_decode.hmm"],
             "ndevice": ["1", "1"]
         }
     },

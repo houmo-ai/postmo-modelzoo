@@ -82,6 +82,14 @@ def test_detection_yolov8m_perf(setup_logging):
     assert True
 
 
+@pytest.mark.yolo12m
+@pytest.mark.perf
+def test_detection_yolo12m_perf(setup_logging):
+    model_name = 'yolo12m'
+    _perf_func(model_name, setup_logging)
+    assert True
+
+
 @pytest.mark.deepseek
 @pytest.mark.perf
 def test_llm_deepseek_perf(setup_logging):
@@ -122,9 +130,41 @@ def test_llm_qwen2dot5_perf(setup_logging):
     assert True
 
 
+@pytest.mark.qwen2dot5_vl
+@pytest.mark.perf
+def test_vllm_qwen2dot5_vl_perf(setup_logging):
+    model_name = 'qwen2.5-vl'
+    _perf_func(model_name, setup_logging)
+    assert True
+
+
 @pytest.mark.wenet
 @pytest.mark.perf
 def test_asr_wenet_perf(setup_logging):
     model_name = 'wenet'
+    _perf_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.sdxl
+@pytest.mark.perf
+def test_diffusion_sdxl_perf(setup_logging):
+    model_name = 'sdxl'
+    _perf_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_pose
+@pytest.mark.perf
+def test_estimation_yolov8m_pose_perf(setup_logging):
+    model_name = 'yolov8m-pose'
+    _perf_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_seg
+@pytest.mark.perf
+def test_segmentation_yolov8m_seg_perf(setup_logging):
+    model_name = 'yolov8m-seg'
     _perf_func(model_name, setup_logging)
     assert True

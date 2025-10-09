@@ -14,7 +14,8 @@ from loguru import logger
 
 import tcim_lite as tcim
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+
 
 def is_valid_char(cp):
     if (
@@ -33,7 +34,10 @@ def is_valid_char(cp):
 
     return False
 
+
 import random
+
+
 def generate_random_digit_string(length=1000):
     random_digits = [str(random.randint(0, 9)) for _ in range(length)]
     return ''.join(random_digits)
@@ -103,9 +107,15 @@ class HmQwenXh2:
             f'model_layers_{i}_self_attn_vcache_input' for i in range(self.nblocks)
         ]
         option1.set_dummy_tensors(dummy_tensor_names)
-        self.prefill_length = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[1]
-        self.embedding_len = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[2]
-        self.context_max_length = self.decode.get_input_info(self.decode.get_input_name(3)).shape[2]
+        self.prefill_length = self.prefill.get_input_info(
+            self.prefill.get_input_name(0)
+        ).shape[1]
+        self.embedding_len = self.prefill.get_input_info(
+            self.prefill.get_input_name(0)
+        ).shape[2]
+        self.context_max_length = self.decode.get_input_info(
+            self.decode.get_input_name(3)
+        ).shape[2]
         self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
         self.next_ids = [0] * self.batch
         self.current_echo_lens = [0] * self.batch
@@ -114,10 +124,16 @@ class HmQwenXh2:
         for b in range(self.batch):
             index = 2 if b == 0 else 2 * self.nblocks * b + 3 + 2 * b - 1
             current_length_input = np.array([1]).astype('int32')
-            self.decode.set_input(self.decode.get_input_name(index), current_length_input)
+            self.decode.set_input(
+                self.decode.get_input_name(index), current_length_input
+            )
 
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, trust_remote_code=True)
-        embedding_weight = torch.load(embedding_path, map_location="cpu", weights_only=True)['weight']
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_dir, trust_remote_code=True
+        )
+        embedding_weight = torch.load(
+            embedding_path, map_location="cpu", weights_only=True
+        )['weight']
         self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len)
 
     def get_nblocks(self):
@@ -135,16 +151,20 @@ class HmQwenXh2:
         return all_input_id
 
     def run_prefill(self, b, all_input_id):
-        decode_input_index_start = 2 * self.nblocks * b + 3 + 2 * b  if b > 0 else 3
+        decode_input_index_start = 2 * self.nblocks * b + 3 + 2 * b if b > 0 else 3
         decode_input_index_finish = 2 * self.nblocks * (b + 1) + 3 + b * 2
         prefill_input_index = 3
         for i in range(decode_input_index_start, decode_input_index_finish):
             cache = self.decode.get_dev_input(self.decode.get_input_name(i))
-            self.prefill.set_input(self.prefill.get_input_name(prefill_input_index), cache)
+            self.prefill.set_input(
+                self.prefill.get_input_name(prefill_input_index), cache
+            )
             prefill_input_index += 1
         input_echo_len = all_input_id.numel()
         if input_echo_len >= self.context_max_length:
-            logger.error(f"Question long than {self.context_max_length}, please shorten it!")
+            logger.error(
+                f"Question long than {self.context_max_length}, please shorten it!"
+            )
             sys.exit(1)
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
         prefill_start_time = time.time()
@@ -152,15 +172,26 @@ class HmQwenXh2:
             valid_length = round * self.prefill_length
             if round == prefill_loop_round - 1:
                 current_length = input_echo_len - round * self.prefill_length
-                input_ids = all_input_id[:, round * self.prefill_length: input_echo_len]
+                input_ids = all_input_id[
+                    :, round * self.prefill_length : input_echo_len
+                ]
             else:
                 current_length = self.prefill_length
-                input_ids = all_input_id[:, round * self.prefill_length: (round + 1) * self.prefill_length]
+                input_ids = all_input_id[
+                    :, round * self.prefill_length : (round + 1) * self.prefill_length
+                ]
             inputs_embeds = F.embedding(input_ids, self.embedding_weight)
             effective_length = input_ids.size(-1)
-            _pad_embeds = torch.zeros(1, self.prefill_length - effective_length, inputs_embeds.size(-1),
-                                    dtype=inputs_embeds.dtype, device=inputs_embeds.device)
-            input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(1, self.prefill_length, self.embedding_len)
+            _pad_embeds = torch.zeros(
+                1,
+                self.prefill_length - effective_length,
+                inputs_embeds.size(-1),
+                dtype=inputs_embeds.dtype,
+                device=inputs_embeds.device,
+            )
+            input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
+                1, self.prefill_length, self.embedding_len
+            )
             valid_length_data = np.array([valid_length]).astype("int32")
             current_length_data = np.array([current_length]).astype("int32")
             input_name = self.prefill.get_input_name(0)
@@ -186,10 +217,14 @@ class HmQwenXh2:
         for b in range(self.batch):
             valid_length_index = 1 if b == 0 else 2 * self.nblocks * b + 3 + 2 * b - 2
             valid_length_data = np.array(self.context_lengths[b]).astype('int32')
-            self.decode.set_input(self.decode.get_input_name(valid_length_index), valid_length_data)
+            self.decode.set_input(
+                self.decode.get_input_name(valid_length_index), valid_length_data
+            )
         self.decode.run()
         self.decode.sync()
-        input_datas = self.decode.get_output(self.decode.get_output_name(0)).to_host().numpy()
+        input_datas = (
+            self.decode.get_output(self.decode.get_output_name(0)).to_host().numpy()
+        )
         decode_time = time.time() - decode_start_time
         return decode_time, input_datas
 
@@ -209,7 +244,11 @@ class HmQwenXh2:
             F.embedding(
                 self.next_ids[b].unsqueeze(0),
                 self.embedding_weight,
-            ).reshape(1, -1).float().numpy() for b in range(self.batch)
+            )
+            .reshape(1, -1)
+            .float()
+            .numpy()
+            for b in range(self.batch)
         ]
         self.context_lengths = self.current_echo_lens
         count = 0
@@ -220,7 +259,7 @@ class HmQwenXh2:
             self.next_ids = [input_datas[b].argmax(-1) for b in range(self.batch)]
             self.next_ids = [torch.from_numpy(next_id) for next_id in self.next_ids]
             for b in range(self.batch):
-                    self.context_lengths[b] += 1
+                self.context_lengths[b] += 1
             input_datas = []
             for b in range(self.batch):
                 next_id = torch.from_numpy(np.asarray(self.next_ids[b]))
@@ -228,25 +267,47 @@ class HmQwenXh2:
                     F.embedding(
                         next_id.unsqueeze(
                             0,
-                        ), self.embedding_weight,
-                    ).reshape(1, -1).float().numpy(),
+                        ),
+                        self.embedding_weight,
+                    )
+                    .reshape(1, -1)
+                    .float()
+                    .numpy(),
                 )
             count += 1
-        return self.batch, sum(input_echo_lens), count*self.batch, all_prefill_time, all_decode_time
+        return (
+            self.batch,
+            sum(input_echo_lens),
+            count * self.batch,
+            all_prefill_time,
+            all_decode_time,
+        )
 
 
 if __name__ == "__main__":
     args = get_args()
     if HOUMO_TARGET == 'xh2':
-        hmqwen = HmQwenXh2(args.prefill_path, args.decode_path, args.embedding_path, args.tokenizer_dir)
+        hmqwen = HmQwenXh2(
+            args.prefill_path, args.decode_path, args.embedding_path, args.tokenizer_dir
+        )
 
     start_time = time.time()
-    batch, input_tokens, output_tokens, prefill_time, decode_time = hmqwen.chat(args.isq, args.osq)
+    batch, input_tokens, output_tokens, prefill_time, decode_time = hmqwen.chat(
+        args.isq, args.osq
+    )
     total_time = time.time() - start_time
 
-    logger.success(f"Batch: {batch}, Total Input: {input_tokens} tokens, Output {output_tokens + batch} tokens, Prefill Cost: {prefill_time:.3f} seconds, Decode Cost: {decode_time:.3f} seconds")
-    logger.success(f"Prefill Speed: {input_tokens / prefill_time:.2f} tokens/s; Decode Speed: {(output_tokens) / decode_time:.2f} tokens/s")
+    logger.success(
+        f"Batch: {batch}, Total Input: {input_tokens} tokens, Output {output_tokens + batch} tokens, Prefill Cost: {prefill_time:.3f} seconds, Decode Cost: {decode_time:.3f} seconds"
+    )
+    logger.success(
+        f"Prefill Speed: {input_tokens / prefill_time:.2f} tokens/s; Decode Speed: {(output_tokens) / decode_time:.2f} tokens/s"
+    )
     logger.success(f"TTFT (Time to First Token): {prefill_time * 1000:.3f} ms")
-    logger.success(f"TPOT (Time Per Output Token): {decode_time * 1000 / (output_tokens):.3f} ms/token")
+    logger.success(
+        f"TPOT (Time Per Output Token): {decode_time * 1000 / (output_tokens):.3f} ms/token"
+    )
     logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
-    logger.success(f"E2E TPS (End-to-End Tokens Per Second): {(output_tokens + batch) / total_time:.2f} tokens/s")
+    logger.success(
+        f"E2E TPS (End-to-End Tokens Per Second): {(output_tokens + batch) / total_time:.2f} tokens/s"
+    )

@@ -17,9 +17,9 @@
     "eval_threshold": null,
     "get_model_params": {
         "xh1": {
-            "type": ["raw", "quant"],
-            "quant_model_dir": [null, "cached_models/hmquant_xh1"],
-            "model_dir": ["cached_models", "cached_models"]
+            "type": ["quant"],
+            "quant_model_dir": ["cached_models/hmquant_xh1"],
+            "model_dir": ["cached_models"]
         }
     },
     "compile_params": {

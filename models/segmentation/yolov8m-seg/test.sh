@@ -11,27 +11,27 @@ FOUND_PACKAGE=0
 echo "================================"
 echo "Checking python3 package: $PACKAGE_PATTERN"
 if command -v python3 &>/dev/null && command -v pip3 &>/dev/null; then
-  if pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" >/dev/null 2>&1; then
-      echo "✓ Found python3 package: $PACKAGE_PATTERN"
-      pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" | while read -r line; do
-          echo "  - $line"
-      done
-      FOUND_PACKAGE=1
-  else
-      echo "✗ Not found package: $PACKAGE_PATTERN"
-  fi
+    if pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" >/dev/null 2>&1; then
+        echo "✓ Found python3 package: $PACKAGE_PATTERN"
+        pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" | while read -r line; do
+            echo "  - $line"
+        done
+        FOUND_PACKAGE=1
+    else
+        echo "✗ Not found package: $PACKAGE_PATTERN"
+    fi
 else
-  echo "⚠ Not found python3 or pip3."
-  exit 0
+    echo "⚠ Not found python3 or pip3."
+    exit 0
 fi
 
+python3 get_model.py --type raw
 if [ $FOUND_PACKAGE -eq 0 ]; then
-  python3 get_model.py --type build
+    python3 get_model.py --type build
 else
-  python3 get_model.py
-  hmatc quant   -c config.yml
-  hmatc build   -c config.yml
-  hmatc compare -c config.yml --data_path coco2017/val2017/000000000139.jpg
+    hmatc quant   -c config.yml
+    hmatc build   -c config.yml
+    hmatc compare -c config.yml --data_path coco2017/val2017/000000000139.jpg
 fi
 hmatc perf    -c config.yml -wn 1 -sn 1 -tn 1
 hmatc demo    -c config.yml

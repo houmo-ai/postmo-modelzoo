@@ -10,7 +10,7 @@
     },
     "support_flow": {
         "xh1": ["get_model", "compile", "demo", "perf"],
-        "xh2": ["get_model", "compile", "demo", "perf"]
+        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
     },
     "support_hmatc": null,
     "perf_metrics": {
@@ -23,36 +23,33 @@
         },
         "xh2": {
             "x86_64": {
-                "prefill": 45.61,
-                "decode": 15.78,
-                "end2end": 15.55
+                "prefill": 12.77,
+                "decode": 17.56,
+                "end2end": 16.61
             }
         }
     },
     "eval_threshold": null,
     "get_model_params": {
         "xh1": {
-            "type": ["raw", "quant", "hmm"],
-            "quant_model_dir": [null, "cached_models/hmquant_xh1", null],
-            "build_model_dir": [null, null, "cached_models/hmm_xh1"],
-            "model_dir": ["cached_models", "cached_models", "cached_models"]
+            "type": ["raw", "hmm"],
+            "build_model_dir": [null, "cached_models/hmm_xh1"],
+            "model_dir": ["cached_models", "cached_models"]
         },
         "xh2": {
-            "type": ["raw", "quant", "hmm"],
-            "quant_model_dir": [null, "cached_models/hmquant_xh2", null],
-            "build_model_dir": [null, null, "cached_models/hmm_xh2"],
-            "model_dir": ["cached_models", "cached_models", "cached_models"]
+            "type": ["raw", "hmm"],
+            "build_model_dir": [null, "cached_models/hmm_xh2"],
+            "model_dir": ["cached_models", "cached_models"]
         }
     },
     "quant_params": {
         "xh1": null,
         "xh2": {
-            "model": ["cached_models/qwen3-8b", "cached_models/qwen3-8b", "cached_models/qwen3-8b"],
-            "out-dir": ["cached_results/hmquant_xh2_2k", "cached_results/hmquant_xh2_4k", "cached_results/hmquant_xh2_8k"],
-            "context-length": ["2048", "4096", "8192"],
-            "input-sequence-length": [null, null, null],
-            "rmsnorm-mode": ["normal", "normal", "normal"],
-            "calibration-dataset": [null, null, null]
+            "model": ["cached_models/qwen3-8b"],
+            "out-dir": ["cached_results/hmquant_xh2_2k"],
+            "context-length": ["2048"],
+            "input-sequence-length": [null],
+            "calibration-dataset": [null]
         }
     },
     "compile_params": {
@@ -64,13 +61,13 @@
             "output_dir": ["cached_results/hmm_xh1"]
         },
         "xh2": {
-            "model_dir": ["cached_results/hmquant_xh2"],
-            "batch": [null],
-            "ncore": [null],
-            "ndevice": [null],
-            "stage": ["build"],
-            "context_length": ["2048"],
-            "output_dir": ["cached_results/hmm_xh2"]
+            "model_dir": ["cached_results/hmquant_xh2_2k", "cached_results/hmquant_xh2_8k"],
+            "batch": [null, null],
+            "ncore": [null, null],
+            "ndevice": [null, null],
+            "stage": ["build", "build"],
+            "context_length": ["2048", "8196"],
+            "output_dir": ["cached_results/hmm_xh2_2k", "cached_results/hmm_xh2_8k"]
         }
     },
     "demo_params": {
@@ -82,11 +79,11 @@
             "ndevice": ["1"]
         },
         "xh2": {
-            "tokenizer_dir": ["cached_models/qwen3-8b"],
-            "embedding_path": ["cached_results/hmm_xh2/hmquant/quant_embedding.pt"],
-            "prefill_path": ["cached_results/hmm_xh2/qwen3_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2/qwen3_decode.hmm"],
-            "ndevice": ["1"]
+            "tokenizer_dir": ["cached_models/qwen3-8b", "cached_models/qwen3-8b"],
+            "embedding_path": ["cached_results/hmm_xh2_2k/hmquant/quant_embedding.pt", "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"],
+            "prefill_path": ["cached_results/hmm_xh2_2k/qwen3_prefill.hmm", "cached_results/hmm_xh2_8k/qwen3_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_2k/qwen3_decode.hmm", "cached_results/hmm_xh2_8k/qwen3_decode.hmm"],
+            "ndevice": ["1", "1"]
         }
     },
     "perf_params": "demo"

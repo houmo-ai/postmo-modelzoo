@@ -16,7 +16,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         Args:
             cfg (dict): 来自配置文件
         """
-        self.device = "cpu"
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.target = cfg["target"]
         self.enable_upload = False
         self.model_cfg = cfg.get("model")

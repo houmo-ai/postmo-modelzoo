@@ -1,11 +1,10 @@
 import os
-import onnx
+import sys
 import argparse
-from pathlib import Path
 from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 
 runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
@@ -19,15 +18,8 @@ def get_args() -> argparse.Namespace:
         "--type",
         dest="model_type",
         type=str,
-        default="raw",
-        help="which model type to get, choise in [raw, quant, build, all]",
-    )
-    parser.add_argument(
-        "--quant_model_dir",
-        dest="quant_model_dir",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET),
-        help="where to save quant_model",
+        default="hmm",
+        help="which model type to get, choise in [hmm]",
     )
     parser.add_argument(
         "--build_model_dir",
@@ -49,7 +41,6 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = get_args()
-    quant_model_dir = args.quant_model_dir
     build_model_dir = args.build_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
@@ -60,17 +51,9 @@ if __name__ == "__main__":
     opt_level = "O2"
     version = f"v{runtime_version}"
     target = HOUMO_TARGET
-    quant_path = f"models/v{runtime_version}/{model_name}/hmquant_{model_name}_{target}_{version}.tar.xz"
     build_path = f"models/v{runtime_version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
-    if model_type == "quant" or model_type == "all":
-        try:
-            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
-
-    if model_type == "build" or model_type == "all":
-        try:
-            get_file_from_jfrog(build_path, model_dir, build_model_dir)
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+    if model_type in ["hmm"] and not get_file_from_jfrog(
+        build_path, model_dir, build_model_dir
+    ):
+        sys.exit(1)

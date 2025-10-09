@@ -3,7 +3,7 @@ import sys
 import argparse
 from hmatc.utils.utils import get_file_from_jfrog
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 
 
@@ -14,8 +14,8 @@ def get_args() -> argparse.Namespace:
         '--type',
         dest='model_type',
         type=str,
-        default='quant',
-        help='which model type to get, choise in [raw, quant, hmm, all]',
+        default='hmm',
+        help='which model type to get, choise in [raw, quant, hmm]',
     )
     parser.add_argument(
         '--quant_model_dir',
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     quant_path = "models/sdxl/hmquant_sd_unet_20241231.zip"
     hmm_path = "models/sdxl/hmm_sdxl_4cores_20250314.zip"
 
-    if model_type in ["raw", "all"]:
+    if model_type in ["raw"]:
         ignore_patterns = []
     else:
         ignore_patterns = ["*.safetensors"]
@@ -70,12 +70,12 @@ if __name__ == '__main__':
             ignore_patterns=ignore_patterns,
         )
 
-    if model_type in ["quant", "all"] and not get_file_from_jfrog(
+    if model_type in ["quant"] and not get_file_from_jfrog(
         quant_path, model_dir, quant_model_dir
     ):
         sys.exit(1)
 
-    if model_type in ["hmm", "all"] and not get_file_from_jfrog(
+    if model_type in ["hmm"] and not get_file_from_jfrog(
         hmm_path, model_dir, build_model_dir
     ):
         sys.exit(1)

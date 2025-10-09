@@ -12,16 +12,21 @@ import time
 import threading
 from enum import Enum, unique
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 HOUMO_BACKEND = os.getenv("HOUMO_TARGET", "xh1")
 # ON: quant&compile, OFF:inference
 SEPARATE_TEST = os.getenv("SKIP_INFER", None)
 # 编译量化在一台机器，推理在另一台机器，两个机器共享指定目录
 HDPL_PLATFORM = os.getenv("HDPL_PLATFORM", "")
-MODELS_PATH = os.path.abspath(os.getenv("IMODELZOO_MODELS_PATH", "./"))
+MODELS_PATH = os.path.abspath(
+    os.getenv("IMODELZOO_MODELS_PATH", f"{script_dir}/../../../modelzoo/")
+)
 MODELS_RES_DIR = os.path.abspath(
     os.path.dirname(os.path.abspath(__file__)) + f"/../model_results_{HOUMO_BACKEND}"
 )
+USE_RELEASED_MODELS = os.getenv("USE_RELEASED_MODELS", "OFF")
+
 logger = logging.getLogger(__name__)
 
 
@@ -388,6 +393,12 @@ def install_py_env(env_dir: str, log_file: str) -> dict:
         )
 
     return changed_libs
+
+
+def is_release() -> bool:
+    if USE_RELEASED_MODELS and USE_RELEASED_MODELS in ["on", "ON"]:
+        return True
+    return False
 
 
 def is_separate() -> bool:

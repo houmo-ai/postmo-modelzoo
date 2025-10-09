@@ -1,6 +1,6 @@
 {
     "obsolete": false,
-    "model_dir": "models/backbone/ViT-B-16",
+    "model_dir": "models/estimation/yolov8m-pose",
     "model_type": "cv",
     "support_platform": ["x86_64"],
     "support_backend": ["xh1", "xh2"],
@@ -18,14 +18,15 @@
     },
     "perf_metrics": {
         "xh1":{
-            "x86_64": 83.995
+            "x86_64": 343.633
         },
         "xh2":{
-            "x86_64": 20.995
+            "x86_64": 91.415
         }
     },
     "eval_threshold": {
-        "top1_acc": 0.8
+        "map50": 0.95,
+        "map50_95": 0.90
     },
     "get_model_params": {
         "xh1": {
@@ -116,7 +117,7 @@
         "params": {
             "required": {
                 "config": ["./config.yml"],
-                "data_path": ["./imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG"]
+                "data_path": ["./coco2017/val2017/000000000139.jpg"]
             },
             "optional": {
                 "target": [null],

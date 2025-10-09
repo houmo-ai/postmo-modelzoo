@@ -152,3 +152,27 @@ def test_vllm_qwen2dot5_vl_demo(setup_logging):
     model_name = "qwen2.5-vl"
     _demo_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolo12m
+@pytest.mark.demo
+def test_detection_yolo12m_demo(setup_logging):
+    model_name = 'yolo12m'
+    _demo_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_pose
+@pytest.mark.demo
+def test_estimation_yolov8m_pose_demo(setup_logging):
+    model_name = 'yolov8m-pose'
+    _demo_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_seg
+@pytest.mark.demo
+def test_segmentation_yolov8m_seg_demo(setup_logging):
+    model_name = 'yolov8m-seg'
+    _demo_func(model_name, setup_logging)
+    assert True

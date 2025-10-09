@@ -1,10 +1,10 @@
 import os
+import sys
 import argparse
-
 from hmatc.utils.utils import get_file_from_jfrog
 
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "houmo")
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
@@ -15,15 +15,8 @@ def get_args() -> argparse.Namespace:
         "--type",
         dest="model_type",
         type=str,
-        default="quant",
-        help="which resource to get, choise in [raw, quant, hmm, all]",
-    )
-    parser.add_argument(
-        "--quant_model_dir",
-        dest="quant_model_dir",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
-        help="where to save quant_model",
+        default="hmm",
+        help="which resource to get, choise in [raw, hmm]",
     )
     parser.add_argument(
         "--build_model_dir",
@@ -44,7 +37,6 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = get_args()
-    quant_model_dir = args.quant_model_dir
     build_model_dir = args.build_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
@@ -52,13 +44,11 @@ if __name__ == "__main__":
     HOUMO_MODEL_PATH = os.getenv("HOUMO_MODEL_PATH", ".")
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
     if HOUMO_TARGET == "xh1":
-        quant_path = "models/qwen2.5/hmquant_qwen2.5_256_4096_20250430.zip"
         hmm_path = "models/qwen2.5/hmm_qwen2.5_256_8k_4cores_20250522.zip"
     elif HOUMO_TARGET == "xh2":
-        quant_path = "models/qwen2.5/hmquant_xh2_qwen2.5_256_8k_20250610.zip"
         hmm_path = "models/qwen2.5/hmm_xh2_qwen2.5_256_4k_2cores_20250611.zip"
 
-    if model_type in ["raw", "all"]:
+    if model_type in ["raw"]:
         ignore_patterns = []
         get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
     else:
@@ -72,8 +62,7 @@ if __name__ == "__main__":
         ignore_patterns=ignore_patterns,
     )
 
-    if model_type in ["quant", "all"]:
-        get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
-
-    if model_type in ["hmm", "all"]:
-        get_file_from_jfrog(hmm_path, model_dir, build_model_dir)
+    if model_type in ["hmm"] and not get_file_from_jfrog(
+        hmm_path, model_dir, build_model_dir
+    ):
+        sys.exit(1)

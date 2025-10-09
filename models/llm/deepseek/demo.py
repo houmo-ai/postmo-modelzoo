@@ -14,7 +14,7 @@ from loguru import logger
 
 import tcim_lite as tcim
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 
 

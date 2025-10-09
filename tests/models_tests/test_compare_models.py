@@ -80,3 +80,27 @@ def test_detection_yolov8m_compare(setup_logging):
     model_name = "yolov8m"
     _compare_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolo12m
+@pytest.mark.compare
+def test_detection_yolo12m_compare(setup_logging):
+    model_name = 'yolo12m'
+    _compare_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_pose
+@pytest.mark.compare
+def test_estimation_yolov8m_pose_compare(setup_logging):
+    model_name = 'yolov8m-pose'
+    _compare_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_seg
+@pytest.mark.compare
+def test_segmentation_yolov8m_seg_compare(setup_logging):
+    model_name = 'yolov8m-seg'
+    _compare_func(model_name, setup_logging)
+    assert True

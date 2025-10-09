@@ -188,3 +188,30 @@ def test_vllm_qwen2dot5_vl_quant(setup_logging):
     model_name = "qwen2.5-vl"
     _quant_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolo12m
+@pytest.mark.quant
+@pytest.mark.dependency(name='test_detection_yolo12m_quant', depends_on=['test_get_models.py::test_detection_yolo12m_get_model'])
+def test_detection_yolo12m_quant(setup_logging):
+    model_name = 'yolo12m'
+    _quant_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_pose
+@pytest.mark.quant
+@pytest.mark.dependency(name='test_estimation_yolov8m_pose_quant', depends_on=['test_get_models.py::test_estimation_yolov8m_pose_get_model'])
+def test_estimation_yolov8m_pose_quant(setup_logging):
+    model_name = 'yolov8m-pose'
+    _quant_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_seg
+@pytest.mark.quant
+@pytest.mark.dependency(name='test_segmentation_yolov8m_seg_quant', depends_on=['test_get_models.py::test_segmentation_yolov8m_seg_get_model'])
+def test_segmentation_yolov8m_seg_quant(setup_logging):
+    model_name = 'yolov8m-seg'
+    _quant_func(model_name, setup_logging)
+    assert True
