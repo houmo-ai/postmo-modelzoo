@@ -7,11 +7,6 @@ from typing import Dict
 from ..base.base_infer import BaseInfer
 from ..utils import logger
 from ..utils.utils import torch_to_numpy_dtype
-try:
-    from xhquant.api import HMONNXInference, xhquant_init
-except ImportError:
-    logger.error("Please install xhquant first.")
-    exit(-1)
 
 
 class Xh2HmQuantInfer(BaseInfer, ABC):
@@ -21,15 +16,22 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         self.model_ext = ".onnx"
         self.input_names = list()
         self.output_names = list()
-        from xhquant.api import xhquant_init
-
+        try:
+            from xhquant.api import xhquant_init
+        except ImportError:
+            logger.error("Please install xhquant first.")
+            exit(-1)
         xhquant_init(None, debug=False)
 
     def load(self, model_path, device_id=0):
         if not os.path.exists(model_path):
             logger.error(f"model path: {model_path} not exists.")
             exit(-1)
-        from xhquant.api import HMONNXInference
+        try:
+            from xhquant.api import HMONNXInference
+        except ImportError:
+            logger.error("Please install xhquant first.")
+            exit(-1)
         self.engine = HMONNXInference(model_path)
         # self.engine.to_fast_mode()
         self.engine.to(torch.device(self.device))
