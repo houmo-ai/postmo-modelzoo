@@ -18,7 +18,7 @@ void worker(BufferPool &pool, int32_t thread_id, size_t size) {
     memset(buf_host.Data(), thread_id, buf_host.Size());
     MD5 md5;
     std::string ref = md5.GenerateMD5((unsigned char *)(buf_host.Data()), buf_host.Size());
-    for (int i = 0; i < 100000; ++i) {
+    for (int i = 0; i < 1000; ++i) {
         high_resolution_clock::time_point t1 = high_resolution_clock::now();
         tcim::Buffer buf = pool.Malloc(size);
         high_resolution_clock::time_point t2 = high_resolution_clock::now();
