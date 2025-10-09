@@ -37,7 +37,6 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == '__main__':
     args = get_args()
-    quant_model_dir = args.quant_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
     HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
