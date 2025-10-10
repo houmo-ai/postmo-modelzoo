@@ -209,10 +209,7 @@ def runWithDiff(allArgs):
     for testUnit in allTestUnits:
         unitDict = getUnitDict(testUnit, yamlData)
         allUnitDict.update(unitDict)
-    if HOUMO_TARGET == "xh1":
-        os.system("pip3 install -r requirements-xh1.txt")
-    else:
-        os.system("pip3 install -r requirements-xh2.txt")
+    os.system("pip3 install -r requirements.txt")
     logger.info(f"test modules: {allTestModules}")
     logger.info(f"test units: {allTestUnits}")
     logger.info(f"test cases: {allUnitDict}")
@@ -241,18 +238,8 @@ if __name__ == "__main__":
     )
     os.environ['HOUMO_MODEL_PATH'] = "/data02/modelzoo_ci/models"
     os.system("cd hmatc && chmod +x install.sh && ./install.sh")
-    HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH")
-    imagenet_dir = os.path.join(HOUMO_DATASETS_PATH, "imagenet")
-    os.environ['HOUMO_EXAMPLES_PATH'] = f"{script_dir}/apis"
-    os.system(f"cp data/datasets/imagenet/synset_1000.txt {imagenet_dir}")
-    os.system(f"cp data/datasets/imagenet/val.txt {imagenet_dir}")
-    # os.system("wget http://10.10.1.53:8082/artifactory/toolchain/support/xh2_extra_libs.zip")
-    # os.system("unzip xh2_extra_libs.zip -d xh2_extra_libs")
-    # os.system("cp xh2_extra_libs/* /usr/local/houmo/lib")
 
     os.environ['SKIP_INFER'] = "ON"
-    model_dir = os.path.join(script_dir, "tests/model_results")
-    os.makedirs(model_dir, exist_ok=True)
     # install pytest in release docker
     os.system("pip3 install pytest")
     os.system("pip3 install pytest-xdist")

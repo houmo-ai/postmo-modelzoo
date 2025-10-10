@@ -318,6 +318,18 @@ apis_common:
     - inferences_yolov5s_resnet50_multibatch_test
     - scenes_video_detect_test
 
+###### tools ######
+tools_tcim_perf:
+  include:
+    - tools/tcim_perf
+  exclude:
+    - tools/tcim_perf/README.MD
+  example_case:
+    - tcim_perf_test:
+        script: ../tools/tcim_perf/build.sh
+  test:
+    # - tcim_perf_test
+
 ###### tests ######
 models_tests:
   include:

@@ -52,7 +52,7 @@ struct CliArguments {
   std::string model_path;
   std::string model_name;
   std::string input_path = ".";
-  std::string output_pat = ".";
+  std::string output_path = ".";
   size_t batch = 1;
   size_t warm_up = 1;
   size_t threads = 1;
