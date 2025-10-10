@@ -52,7 +52,6 @@ python3 ptq.py
 |-- decoder
 |-- prefill
 |-- quant_embedding.pt
-`-- weight.npy
 ```
 
 ### 2.3 编译

@@ -7,7 +7,7 @@ import logging
 
 logging.basicConfig(level="INFO")
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
 GOLDEN_THRESH = 0.999 if HOUMO_TARGET == "xh1" else 0.98
 
@@ -97,7 +97,7 @@ def get_args() -> argparse.Namespace:
         '--stage',
         dest='stage',
         type=str,
-        default="all",
+        default="build",
         help='build stage choise=["build", "test", "all"]',
     )
     parser.add_argument(

@@ -50,6 +50,14 @@ def test_backbone_resnet50_demo(setup_logging):
     assert True
 
 
+@pytest.mark.vit
+@pytest.mark.demo
+def test_backbone_vit_demo(setup_logging):
+    model_name = "vit"
+    _demo_func(model_name, setup_logging)
+    assert True
+
+
 @pytest.mark.yolov3
 @pytest.mark.demo
 def test_detection_yolov3_demo(setup_logging):
@@ -62,6 +70,14 @@ def test_detection_yolov3_demo(setup_logging):
 @pytest.mark.demo
 def test_detection_yolov5s_demo(setup_logging):
     model_name = "yolov5s"
+    _demo_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov5s_feature
+@pytest.mark.demo
+def test_detection_yolov5s_feature_demo(setup_logging):
+    model_name = "yolov5s_feature"
     _demo_func(model_name, setup_logging)
     assert True
 
@@ -134,5 +150,29 @@ def test_llm_deepseek_r1_qwen3_8b_demo(setup_logging):
 @pytest.mark.demo
 def test_vllm_qwen2dot5_vl_demo(setup_logging):
     model_name = "qwen2.5-vl"
+    _demo_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolo12m
+@pytest.mark.demo
+def test_detection_yolo12m_demo(setup_logging):
+    model_name = 'yolo12m'
+    _demo_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_pose
+@pytest.mark.demo
+def test_estimation_yolov8m_pose_demo(setup_logging):
+    model_name = 'yolov8m-pose'
+    _demo_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolov8m_seg
+@pytest.mark.demo
+def test_segmentation_yolov8m_seg_demo(setup_logging):
+    model_name = 'yolov8m-seg'
     _demo_func(model_name, setup_logging)
     assert True

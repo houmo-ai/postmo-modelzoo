@@ -1,5 +1,5 @@
 import os
-import onnx
+import sys
 import argparse
 from hmatc.utils.utils import get_file_from_jfrog
 
@@ -16,14 +16,13 @@ def get_args() -> argparse.Namespace:
         dest='model_type',
         type=str,
         default='hmm',
-        help='which model type to get, choise in [raw, hmm, all]',
+        help='which model type to get, choise in [raw, hmm]',
     )
     parser.add_argument(
-        '--quant_model_dir',
-        dest='quant_model_dir',
+        "--build_model_dir",
+        dest="build_model_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
-        help='where to save quant_model',
+        default=os.path.join("output", HOUMO_TARGET),
     )
     parser.add_argument(
         '--model_dir',
@@ -38,24 +37,26 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == '__main__':
     args = get_args()
-    quant_model_dir = args.quant_model_dir
+    build_model_dir = args.build_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
     hmm_path = "models/sd3/hmm_xh2_sd3_2cores_20250704.zip"
 
-    if model_type in ["raw", "all"]:
+    if model_type in ["raw"]:
         ignore_patterns = []
     else:
         ignore_patterns = ["*.safetensors"]
 
     from modelscope import snapshot_download
-    if not os.path.exists('stable-diffusion-3-medium-diffusers'):
-        snapshot_download('stabilityai/stable-diffusion-3-medium-diffusers',
-                          local_dir='stable-diffusion-3-medium-diffusers',
-                          ignore_patterns=ignore_patterns)
 
-    if model_type in ["hmm", "all"]:
-        try:
-            get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+    if not os.path.exists('stable-diffusion-3-medium-diffusers'):
+        snapshot_download(
+            'stabilityai/stable-diffusion-3-medium-diffusers',
+            local_dir='stable-diffusion-3-medium-diffusers',
+            ignore_patterns=ignore_patterns,
+        )
+
+    if model_type in ["hmm"] and not get_file_from_jfrog(
+        hmm_path, model_dir, build_model_dir
+    ):
+        sys.exit(1)

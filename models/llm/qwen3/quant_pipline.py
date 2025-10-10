@@ -10,22 +10,30 @@ from transformers import AutoConfig, AutoModelForCausalLM
 from safetensors.torch import load_file as load_safetensors_file
 from safetensors.torch import save_file as save_safetensors_file
 
-from xhquant.api import DeviceType, xhquant_init, QuantScheme, get_root_logger  # isort:skip
+from xhquant.api import (
+    DeviceType,
+    xhquant_init,
+    QuantScheme,
+    get_root_logger,
+)  # isort:skip
 
 from xh_model_zoo.xh_llm import LLMConverter
 from xh_model_zoo.xh_llm.models.qwen2 import Qwen2ConvertConfig
 from xh_model_zoo.utils.memory_tracker import MemoryTracker  # isort:skip
 from xh_model_zoo.utils.time_profiler import TimeProfiler  # isort:skip
 
+
 def msg_output_format(title):
     padding_str = "*" * 10
     title = f"{padding_str} {title} {padding_str}"
     return title
 
+
 def gptq_quant_llm(args):
     from datasets import load_dataset
     from gptqmodel import GPTQModel, QuantizeConfig
     import json
+
     model_name = os.path.basename(args.model)
     quant_path = os.path.join(args.work_dir, "{}_gptqmodel_4bit".format(model_name))
 
@@ -36,16 +44,20 @@ def gptq_quant_llm(args):
         cnt_start = 0
         with open(args.calibration_dataset, encoding='utf-8') as file:
             for line in file:
-                if cnt>=cnt_start:
+                if cnt >= cnt_start:
                     calibration_dataset.append(json.loads(line)['text'])
-                cnt = cnt +1
-                if cnt==cnt_start+512:
+                cnt = cnt + 1
+                if cnt == cnt_start + 512:
                     break
     else:
-        calibration_dataset = load_dataset('wikitext', 'wikitext-2-raw-v1', split='train').select(range(512))["text"]
+        calibration_dataset = load_dataset(
+            'wikitext', 'wikitext-2-raw-v1', split='train'
+        ).select(range(512))["text"]
 
     # 量化配置
-    quant_config = QuantizeConfig(bits=4, group_size=64,sym=True,mse=2.4,damp_percent=0.01,rotation='hadamard')
+    quant_config = QuantizeConfig(
+        bits=4, group_size=64, sym=True, mse=2.4, damp_percent=0.01, rotation='hadamard'
+    )
     # 载入模型
     model = GPTQModel.load(args.model, quant_config)
 
@@ -53,6 +65,7 @@ def gptq_quant_llm(args):
     model.quantize(calibration_dataset, batch_size=1)
     # 保存量化好的模型
     model.save(quant_path)
+
 
 def houmo_quant_llm(args):
     out_dir = Path(args.work_dir)
@@ -196,11 +209,13 @@ def houmo_quant_llm(args):
         save_safetensors_file(state_dict, filename)
         logger.info(f"Save checkpoint to: {filename}")
 
+
 def quant_llm(args):
     if args.gptqmodel:
         gptq_quant_llm(args)
     else:
         houmo_quant_llm(args)
+
 
 def export_llm(args):
     hf_model_path = osp.normpath(osp.abspath(args.model))
@@ -237,22 +252,29 @@ def export_llm(args):
         elif "qwen2" in args.model.lower():
             architecture = "Qwen2ForCausalLM_legacy"
         else:
-            raise ValueError("Unsupported model architecture") 
+            raise ValueError("Unsupported model architecture")
         LLMConverter.from_pretrained(hf_model_path, architecture, config, str(work_dir))
 
-def move_models(work_dir: Path, source: str = "prefill", model : str = "prefill", target_name: str = "hmquant_qwen3_with_act.onnx"):
+
+def move_models(
+    work_dir: Path,
+    source: str = "prefill",
+    model: str = "prefill",
+    target_name: str = "hmquant_qwen3_with_act.onnx",
+):
     source_dir = work_dir / "hmquant/{}".format(source)
     matched_files = list(source_dir.glob("*{}.onnx".format(model)))
-    
+
     if not matched_files:
         raise FileNotFoundError(f"未找到匹配的onnx文件于 {source_dir}")
-    
+
     target_path = source_dir / target_name
     if target_path.exists():
         target_path.unlink()
-    
+
     shutil.move(matched_files[0], target_path)
     return target_path
+
 
 def format_number(n):
     if n >= 1024 * 1024:
@@ -262,17 +284,31 @@ def format_number(n):
     else:
         return f"0k"
 
+
 def move_llm(args):
     work_dir = Path(args.work_dir)
     dest_dir = Path(args.out_dir)
     model_name = os.path.basename(args.model)
     hm_model_name = "hmquant_{}_with_act.onnx".format(args.model_name)
-    hmm_model_dir = "{}-XH2a-{}-{}".format(model_name, format_number(args.context_length), args.quant_type)
-    logger.info(msg_output_format("Start move from {} to {}").format(work_dir / hmm_model_dir, dest_dir))
-    shutil.move(work_dir / hmm_model_dir / "hmonnx/prefill", dest_dir / "hmquant/prefill")
-    move_models(dest_dir, "prefill", target_name = hm_model_name)
-    shutil.move(work_dir / hmm_model_dir / "hmonnx/decode", dest_dir / "hmquant/decoder")
-    move_models(dest_dir, "decoder", "decoder", target_name = hm_model_name)
-    shutil.move(work_dir / hmm_model_dir / "token_embedding.pt", dest_dir / "hmquant/quant_embedding.pt")
+    hmm_model_dir = "{}-XH2a-{}-{}".format(
+        model_name, format_number(args.context_length), args.quant_type
+    )
+    logger.info(
+        msg_output_format("Start move from {} to {}").format(
+            work_dir / hmm_model_dir, dest_dir
+        )
+    )
+    shutil.move(
+        work_dir / hmm_model_dir / "hmonnx/prefill", dest_dir / "hmquant/prefill"
+    )
+    move_models(dest_dir, "prefill", target_name=hm_model_name)
+    shutil.move(
+        work_dir / hmm_model_dir / "hmonnx/decode", dest_dir / "hmquant/decoder"
+    )
+    move_models(dest_dir, "decoder", "decoder", target_name=hm_model_name)
+    shutil.move(
+        work_dir / hmm_model_dir / "token_embedding.pt",
+        dest_dir / "hmquant/quant_embedding.pt",
+    )
     logger.info(msg_output_format("Start remove work_dir: {}".format(work_dir)))
-    shutil.rmtree(work_dir)
+    shutil.rmtree(work_dir, ignore_errors=True)

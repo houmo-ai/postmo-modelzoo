@@ -1,42 +1,85 @@
 {
     "obsolete": false,
     "model_dir": "models/vllm/qwen2.5-vl",
+    "model_type": "llm",
     "support_platform": ["x86_64", "aarch64"],
-    "support_backend": ["xh1"],
+    "support_backend": ["xh1", "xh2"],
     "support_core_num": {
-        "xh1": [4]
+        "xh1": [4],
+        "xh2": [2]
     },
     "support_flow": {
-        "xh1": ["get_model", "compile", "demo"]
+        "xh1": ["get_model", "compile", "demo", "perf"],
+        "xh2": ["get_model", "compile", "demo", "perf"]
     },
-    "support_hmassist": null,
+    "support_hmatc": null,
     "perf_metrics": {
-        "default": 100,
-        "1core": 100,
-        "2core": 200,
-        "4core": 400
+        "xh1": {
+            "x86_64": {
+                "prefill": 0.42,
+                "decode": 20.47,
+                "end2end": 10.92
+            }
+        },
+        "xh2": {
+            "x86_64": {
+                "prefill": 869.38,
+                "decode": 16.73,
+                "end2end": 10.09
+            }
+        }
     },
-    "eval_threshold": null,
     "get_model_params": {
         "xh1": {
-            "type": ["default", "quant", "hmm", "all"],
-            "quant_model_dir": ["default", "", "./"],
-            "model_dir": ["default", "", "./"]
+            "type": ["raw", "raw", "quant", "quant", "hmm", "hmm"],
+            "model_size": ["3b", "7b", "3b", "7b", "3b", "7b"],
+            "quant_model_dir": [null, null, "cached_models/hmquant_xh1_3b", "cached_models/hmquant_xh1_7b", null, null],
+            "build_model_dir": [null, null, null, null,"cached_models/hmm_xh1_3b", "cached_models/hmm_xh1_7b"],
+            "model_dir": ["cached_models", "cached_models", "cached_models", "cached_models", "cached_models", "cached_models"]
+        },
+        "xh2": {
+            "type": ["raw", "quant", "hmm"],
+            "model_size": ["7b", "7b", "7b"],
+            "quant_model_dir": [null, "cached_models/hmquant_xh2_7b", null],
+            "build_model_dir": [null, null, "cached_models/hmm_xh2_7b_2k"],
+            "model_dir": ["cached_models", "cached_models", "cached_models"]
         }
     },
     "compile_params": {
-        "model_dir": ["default"],
-        "model_name": ["default"],
-        "batch": ["default"],
-        "ncore": ["default"],
-        "model_size": ["default"],
-        "stage": ["default"],
-        "output_dir": ["default"]
+        "xh1": {
+            "model_dir": ["cached_results/hmquant_xh1_3b", "cached_results/hmquant_xh1_7b"],
+            "model_name": [null, null],
+            "ncore": [null, null],
+            "model_size": ["3b", "7b"],
+            "stage": ["build", "build"],
+            "output_dir": ["cached_results/hmm_xh1_3b", "cached_results/hmm_xh1_7b"]
+        },
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_7b", "cached_results/hmquant_xh2_7b"],
+            "model_name": [null, null],
+            "ncore": [null, null],
+            "batch": [null, null],
+            "context_length": ["2048", "8192"],
+            "model_size": ["7b", "7b"],
+            "stage": ["build", "build"],
+            "output_dir": ["cached_results/hmm_xh2_7b_2k", "cached_results/hmm_xh2_7b_8k"]
+        }
     },
     "demo_params": {
-        "model_dir": ["default"],
-        "prefill": ["default"],
-        "decode": ["default"],
-        "nblocks": ["default"]
-    }
+        "xh1": {
+            "tokenizer_dir": ["cached_models/qwen2.5-vl-3b", "cached_models/qwen2.5-vl-7b"],
+            "embedding_path": ["cached_results/hmquant_xh1_3b/hmquant/quant_embedding.pt", "cached_results/hmquant_xh1_7b/hmquant/quant_embedding.pt"],
+            "vit_path": ["cached_results/hmm_xh1_3b/qwen2.5-vl_visual.hmm", "cached_results/hmm_xh1_7b/qwen2.5-vl_visual.hmm"],
+            "prefill_path": ["cached_results/hmm_xh1_3b/qwen2.5-vl_prefill.hmm", "cached_results/hmm_xh1_7b/qwen2.5-vl_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh1_3b/qwen2.5-vl_decode.hmm", "cached_results/hmm_xh1_7b/qwen2.5-vl_decode.hmm"]
+        },
+        "xh2": {
+            "tokenizer_dir": ["cached_models/qwen2.5-vl", "cached_models/qwen2.5-vl"],
+            "embedding_path": ["cached_results/hmm_xh2_7b_2k/hmquant/quant_embedding.pt", "cached_results/hmm_xh2_7b_8k/hmquant/quant_embedding.pt"],
+            "vit_path": ["cached_results/hmm_xh2_7b_2k/qwen2.5-vl_visual.hmm", "cached_results/hmm_xh2_7b_8k/qwen2.5-vl_visual.hmm"],
+            "prefill_path": ["cached_results/hmm_xh2_7b_2k/qwen2.5-vl_prefill.hmm", "cached_results/hmm_xh2_7b_8k/qwen2.5-vl_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_7b_2k/qwen2.5-vl_decode.hmm", "cached_results/hmm_xh2_7b_8k/qwen2.5-vl_decode.hmm"]
+        }
+    },
+    "perf_params": "demo"
 }

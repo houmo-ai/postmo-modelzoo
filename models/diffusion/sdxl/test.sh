@@ -14,10 +14,9 @@ pip3 install -r requirements.txt
 
 arch=$(uname -m)
 if [ "$arch" = "x86_64" ]; then
-  python3 get_model.py
-  python3 build.py
+    python3 get_model.py --type quant
+    python3 build.py
 else
-  python3 get_model.py --type hmm
+    python3 get_model.py --type hmm
 fi
-python3 get_model.py --type raw
 python3 demo.py

@@ -103,9 +103,10 @@ def execute_apis_examples(example_name: str, log_file: str):
     ):
         logger.warning("Not support %s testing.", example_name)
         pytest.skip("This testcase is not support.")
-    if check_ci_simulator() is True:
-        logger.warning(f"Skip apis testcase {example_name} on CI ISIM.")
-        pytest.skip(f"Skip apis testcase {example_name} on CI ISIM.")
+    if get_test_type() == TCaseType.SEPARATE_NO_INFER:
+        skip_msg = f"Skip apis testcase {example_name} in the SEPARATE NO INFER stage."
+        logger.warning(skip_msg)
+        pytest.skip(skip_msg)
     platform = get_platform(example_info["support_platform"])
     if platform is None:
         logger.warning(f"Not support {example_name} testing on {platform}.")

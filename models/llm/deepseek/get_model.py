@@ -1,6 +1,6 @@
 import os
+import sys
 import argparse
-
 from hmatc.utils.utils import get_file_from_jfrog
 
 
@@ -59,5 +59,7 @@ if __name__ == '__main__':
         ignore_patterns=ignore_patterns,
     )
 
-    if model_type in ["hmm"]:
-        get_file_from_jfrog(hmm_path, model_dir, build_model_dir)
+    if model_type in ["hmm"] and not get_file_from_jfrog(
+        hmm_path, model_dir, build_model_dir
+    ):
+        sys.exit(1)

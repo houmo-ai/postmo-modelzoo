@@ -10,7 +10,8 @@ os.environ["HOUMO_MODELZOO_URL"] = (
     "http://10.10.1.53:8082/artifactory/toolchain/release"
 )
 os.environ["HOUMO_DATASETS_PATH"] = f"{script_dir}/../data/datasets/"
-os.environ["IMODELZOO_MODELS_PATH"] = f"{script_dir}/models/"
+# os.environ["IMODELZOO_MODELS_PATH"] = f"{script_dir}/../../modelzoo/"
+# os.environ["IMODELZOO_MODELS_PATH"] = f"/develop02/modelzoo/"
 os.makedirs(f"{script_dir}/models/", exist_ok=True)
 
 
@@ -29,7 +30,8 @@ def setup_logging(request):
 
     # create log folder
     logs_dir = os.path.join(script_dir + "/", f"test_logs/{current_date}/")
-    os.makedirs(logs_dir, exist_ok=True)
+    if not os.path.exists(logs_dir):
+        os.makedirs(logs_dir, exist_ok=True)
     # generate a log file name
     test_name = request.node.name
     module_name = request.module.__name__ if request.module else "unknown"

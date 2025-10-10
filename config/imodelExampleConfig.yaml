@@ -36,6 +36,18 @@ backbone_mobilenetv2:
         args: all
   test:
     - backbone_mobilenetv2_test
+backbone_ViT-B-16:
+  include:
+    - ../models/backbone/ViT-B-16
+  exclude:
+    - ../models/backbone/ViT-B-16/README.MD
+  example_case:
+    - backbone_ViT-B-16_test:
+        test_type: models_tests
+        script: ViT-B-16
+        args: all
+  test:
+    - backbone_ViT-B-16_test
 autodrive_yolop:
   include:
     - models/autodrive/yolop
@@ -72,6 +84,18 @@ detection_yolov5s:
         args: all
   test:
     - detection_yolov5s_test
+detection_yolov5s_feature:
+  include:
+    - models/detection/yolov5s_feature
+  exclude:
+    - models/detection/yolov5s_feature/README.MD
+  example_case:
+    - detection_yolov5s_feature_test:
+        test_type: models_tests
+        script: yolov5s_feature
+        args: all
+  test:
+    - detection_yolov5s_feature_test
 detection_yolov8m:
   include:
     - models/detection/yolov8m
@@ -93,56 +117,42 @@ multi_input_custom_random_model:
         script: ../models/multi_input_custom_random_model/test.sh
   test:
     - multi_input_custom_random_model_test
-ViT-B-16:
+detection_yolo12m:
   include:
-    - ../models/backbone/ViT-B-16
+    - models/detection/yolo12m
   exclude:
-    - ../models/backbone/ViT-B-16/README.MD
+    - models/detection/yolo12m/README.MD
   example_case:
-    - ViT-B-16_test:
-        script: ../models/backbone/ViT-B-16/test.sh
+    - detection_yolo12m_test:
+        test_type: models_tests
+        script: yolo12m
+        args: all
   test:
-    - ViT-B-16_test
-yolo12m:
+    - detection_yolo12m_test
+estimation_yolov8m_pose:
   include:
-    - ../models/detection/yolo12m
-  exclude: 
-    - ../models/detection/yolo12m/README.MD
-  example_case:
-    - yolo12m_test:
-        script: ../models/detection/yolo12m/test.sh
-  test:
-    - yolo12m_test
-yolov5s_feature:
-  include:
-    - ../models/detection/yolov5s_feature
+    - models/estimation/yolov8m-pose
   exclude:
-    - ../models/detection/yolov5s_feature/README.MD
+    - models/estimation/yolov8m-pose/README.MD
   example_case:
-    - yolov8m_seg_test:
-        script: ../models/detection/yolov5s_feature/test.sh
+    - estimation_yolov8m_pose_test:
+        test_type: models_tests
+        script: yolov8m_pose
+        args: all
   test:
-    - yolov5s_feature_test
-yolov8m-pose:
+    - estimation_yolov8m_pose_test
+segmentation_yolov8m_seg:
   include:
-    - ../models/estimation/yolov8m-pose
+    - models/segmentation/yolov8m-seg
   exclude:
-    - ../models/estimation/yolov8m-pose/README.MD
+    - models/segmentation/yolov8m-seg/README.MD
   example_case:
-    - yolov8m-pose_test:
-        script: ../models/estimation/yolov8m-pose/test.sh
+    - segmentation_yolov8m_seg_test:
+        test_type: models_tests
+        script: yolov8m_seg
+        args: all
   test:
-    - yolov8m-pose_test
-yolov8m_seg:
-  include:
-    - ../models/segmentation/yolov8m_seg
-  exclude:
-    - ../models/segmentation/yolov8m_seg/README.MD
-  example_case:
-    - yolov8m_seg_test:
-        script: ../models/segmentation/yolov8m_seg/test.sh
-  test:
-    - yolov8m_seg_test
+    - segmentation_yolov8m_seg_test
 asr_wenet:
   include:
     - models/asr/wenet
@@ -185,7 +195,7 @@ tools_computing_perf:
     - ../apis/tools/computing_perf
   exclude:
     - ../apis/tools/computing_perf/README.MD
-  example_case: 
+  example_case:
     - tools_computing_perf_test:
         script: ../apis/tools/computing_perf/run.sh
   test:
@@ -196,7 +206,7 @@ tools_bandwidth_perf:
     - ../apis/tools/bandwidth_perf
   exclude:
     - ../apis/tools/bandwidth_perf/README.MD
-  example_case: 
+  example_case:
     - tools_bandwidth_perf_test:
         script: ../apis/tools/bandwidth_perf/run.sh
   test:
