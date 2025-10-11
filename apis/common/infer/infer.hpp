@@ -198,8 +198,14 @@ public:
             printf("[ModuleEx] Input HW is too large, except shape: [%d, %d]\n", RESIZER_INPUT_H, RESIZER_INPUT_W);
             return tcim::Status::INVALID_ARGUMENT;
         }
-        assert(MODEL_INPUT_H % 2 == 0);
-        assert(MODEL_INPUT_W % 2 == 0);
+        if (MODEL_INPUT_H % 2 != 0) {
+            printf("[ModuleEx] Input H must be even number\n");
+            return tcim::Status::INVALID_ARGUMENT;
+        }
+        if (MODEL_INPUT_W % 2 != 0) {
+            printf("[ModuleEx] Input W must be even number\n");
+            return tcim::Status::INVALID_ARGUMENT;
+        }
         // 计算dynamic resizer参数
         if (resizerMode == 1 || resizerMode == 2) {
             std::string resizerInputName = "resizer_crop_" + name;
@@ -211,10 +217,12 @@ public:
             dynamicInfo_[1] = 0;
             dynamicInfo_[2] = IMAGE_H;  // 必须是偶数
             dynamicInfo_[3] = IMAGE_W;
+            int32_t resize_H = MODEL_INPUT_H;
+            int32_t resize_W = MODEL_INPUT_W;
             if (resizerMode == 1) {
                 float scale = std::min(MODEL_INPUT_H * 1.0f / IMAGE_H, MODEL_INPUT_W * 1.0f / IMAGE_W);
-                int32_t resize_H = std::round(IMAGE_H * scale);
-                int32_t resize_W = std::round(IMAGE_W * scale);
+                resize_H = std::round(IMAGE_H * scale);
+                resize_W = std::round(IMAGE_W * scale);
                 resize_H &= ~1;
                 resize_W &= ~1;
                 int32_t top = paddingMode == 0 ? 0 : ((MODEL_INPUT_H - resize_H) / 2) & ~1;
@@ -228,6 +236,16 @@ public:
                 dynamicInfo_[7] = left;
                 dynamicInfo_[8] = bottom;
                 dynamicInfo_[9] = right;
+            }
+            float sw = static_cast<float>(resize_W) / IMAGE_W;
+            float sh = static_cast<float>(resize_H) / IMAGE_H;
+            if (sw < 1.0f / 32 || sw > 16) {
+                printf("[ModuleEx] W scale ratio is too large, except range: [1/32, 16]\n");
+                return tcim::Status::INVALID_ARGUMENT;
+            }
+            if (sh < 1.0f / 32 || sh > 16) {
+                printf("[ModuleEx] H scale ratio is too large, except range: [1/32, 16]\n");
+                return tcim::Status::INVALID_ARGUMENT;
             }
             dynamicInfoTensor_ = tcim::Tensor::CreateHostTensor(dyninfo, dyninfo.MemSize(), dynamicInfo_);
             status = SetInput(resizerInputName, dynamicInfoTensor_);
