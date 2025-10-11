@@ -21,6 +21,25 @@ def parse_args():
         default="./execute_no_infer_log.log",
         help="The path of log.",
     )
+    parser.add_argument(
+        "--release",
+        action="store_true",
+        help="use release models for testing (default is False).",
+    )
+    parser.add_argument(
+        "-k",
+        "--key_str",
+        type=str,
+        default="",
+        help="pytest -k value",
+    )
+    parser.add_argument(
+        "-m",
+        "--model_str",
+        type=str,
+        default="",
+        help="pytest -m value",
+    )
 
     args = parser.parse_args()
     return args
@@ -33,13 +52,16 @@ def main(args) -> int:
 
     os.environ["SKIP_INFER"] = "ON"
     os.environ["HDPL_PLATFORM"] = "ISIM"
+    os.environ["IMODELZOO_MODELS_PATH"] = "/develop02/modelzoo/"
+    if args.release is False:
+        os.environ["USE_RELEASED_MODELS"] = "OFF"
 
     root_dir = f"{script_dir}/../../"
     if HOUMO_BACKEND == "xh2":
-        # shutil.rmtree(
-        #     f"{script_dir}/../../tests/model_results_{HOUMO_BACKEND}",
-        #     ignore_errors=True,
-        # )
+        shutil.rmtree(
+            f"{script_dir}/../../tests/model_results_{HOUMO_BACKEND}",
+            ignore_errors=True,
+        )
 
         os.chdir(root_dir)
         logger.info("Current dir: %s", os.getcwd())
@@ -72,7 +94,8 @@ def main(args) -> int:
     logger.info("Current dir: %s", os.getcwd())
 
     key_list = [
-        "asr or autodrive",
+        "asr",
+        "autodrive",
         "backbone",
         "detection",
         "estimation",
@@ -82,6 +105,8 @@ def main(args) -> int:
     # --collect-only
     flag = True
     for key_str in key_list:
+        if args.key_str:
+            key_str = f"{key_str} and ({args.key_str})"
         logger.info(f"==> [CD Test] Start models_tests: {key_str}")
         cmds = [
             "pytest",
@@ -90,7 +115,11 @@ def main(args) -> int:
             "models_tests",
             "-k",
             key_str,
+            f"--junitxml={script_dir}/pytest_results_no_infer_{key_str}.xml",
         ]
+        if args.model_str:
+            cmds += ["-m", f"{args.model_str}"]
+        logger.info(f"execute cmds: {cmds}")
         if not run_tests(cmds, args.log_file):
             logger.error(f"<== [CD Test] End model_tests: {key_str}, Failed.")
             flag = False

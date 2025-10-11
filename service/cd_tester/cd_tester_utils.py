@@ -6,6 +6,8 @@ import threading
 import sys
 
 HOUMO_BACKEND = os.getenv("HOUMO_TARGET", "xh1")
+script_dir = os.path.dirname(os.path.abspath(__file__))
+IMODELZOO_REPO_DIR = os.path.abspath(f"{script_dir}/../../")
 
 
 def setup_logging(log_dir: str = None, log_name: str = "cd_tester"):
@@ -132,7 +134,7 @@ def execute_cmd(cmd_list: list, log_file: str = None) -> bool:
         stdout_thread.join()
         stderr_thread.join()
 
-        if return_code != 0:
+        if return_code != 0 and return_code != 5:
             flag = False
             logger.error(
                 f"Failed to execute command: {cmd_str}, error code: {return_code}"

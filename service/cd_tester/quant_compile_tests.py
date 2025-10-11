@@ -7,7 +7,7 @@ import logging
 import time
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
-from cd_tester_utils import setup_logging
+from cd_tester_utils import *
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -19,7 +19,7 @@ def parse_args():
         "--version",
         required=True,
         type=str,
-        help="Houmo Dadao software version, example: 0.3.0, 2.4.2",
+        help="Houmo Dadao software version, example: 0.3.1, 2.4.2",
     )
     parser.add_argument(
         "-t",
@@ -27,6 +27,26 @@ def parse_args():
         type=str,
         default="xh2",
         help="Houmo backend, support: xh1, xh2.",
+    )
+    parser.add_argument(
+        "--release",
+        type=str,
+        default="off",
+        help="use release models for testing, support: on, off.",
+    )
+    parser.add_argument(
+        "-k",
+        "--key_str",
+        type=str,
+        default="",
+        help="pytest -k value",
+    )
+    parser.add_argument(
+        "-m",
+        "--model_str",
+        type=str,
+        default="",
+        help="pytest -m value",
     )
 
     args = parser.parse_args()
@@ -390,6 +410,7 @@ if __name__ == "__main__":
     # load parameters
     target = args.target
     version = args.version
+    release = True if args.release in ["on", "ON"] else False
 
     # create a result folder for the current container
     container_name = f"tester_cd_{target}_{version}-{int(time.time())}"
@@ -401,7 +422,7 @@ if __name__ == "__main__":
     # set container configs
     container_home = "/hmdd"
     container_log_file = (
-        "/develop02/imodelzoo/service/cd_tester/logs/"
+        f"{IMODELZOO_REPO_DIR}/service/cd_tester/logs/"
         + host_log_file.rsplit("/", 1)[-1]
     )
     # construct the commands to be executed in the container
@@ -416,7 +437,14 @@ if __name__ == "__main__":
         ]
     # quant and compile tests
     compile_cmd = f"python3 execute_no_infer.py -log {container_log_file}"
-    commands.append(f"cd /develop02/imodelzoo/service/cd_tester && {compile_cmd}")
+    if release:
+        compile_cmd += " --release"
+    if args.key_str:
+        compile_cmd += f" -k '{args.key_str}'"
+    if args.model_str:
+        compile_cmd += f" -m '{args.model_str}'"
+    logger.info(f"compilation cmd: {compile_cmd}")
+    commands.append(f"cd {IMODELZOO_REPO_DIR}/service/cd_tester && {compile_cmd}")
 
     # create a docker executor
     docker_exec = DockerExecutor(
@@ -432,8 +460,8 @@ if __name__ == "__main__":
         # map the current directory of the host to the container
         volumes = {
             # map imodelzoo folder
-            "/develop02/wanyu.li/imodelzoo_develop": {
-                "bind": "/develop02/imodelzoo",
+            IMODELZOO_REPO_DIR: {
+                "bind": IMODELZOO_REPO_DIR,
                 "mode": "rw",
             },
             # map modelzoo folder

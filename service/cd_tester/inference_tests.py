@@ -6,7 +6,7 @@ import logging
 import time
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
-from cd_tester_utils import setup_logging
+from cd_tester_utils import *
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -18,7 +18,7 @@ def parse_args():
         "--version",
         required=True,
         type=str,
-        help="Houmo Dadao software version, example: 0.3.0, 2.4.2",
+        help="Houmo Dadao software version, example: 0.3.1, 2.4.2",
     )
     parser.add_argument(
         "-t",
@@ -26,6 +26,44 @@ def parse_args():
         type=str,
         default="xh2",
         help="Houmo backend, support: xh1, xh2.",
+    )
+    parser.add_argument(
+        "--release",
+        type=str,
+        default="off",
+        help="use release models for testing, support: on, off.",
+    )
+    parser.add_argument(
+        "--no_apis",
+        type=str,
+        default="off",
+        help="don't execute apis testing, support: on, off.",
+    )
+    parser.add_argument(
+        "--no_hmatc",
+        type=str,
+        default="off",
+        help="don't execute apis testing, support: on, off.",
+    )
+    parser.add_argument(
+        "--no_models",
+        type=str,
+        default="off",
+        help="don't execute models testing, support: on, off.",
+    )
+    parser.add_argument(
+        "-k",
+        "--key_str",
+        type=str,
+        default="",
+        help="pytest -k value",
+    )
+    parser.add_argument(
+        "-m",
+        "--model_str",
+        type=str,
+        default="",
+        help="pytest -m value",
     )
 
     args = parser.parse_args()
@@ -389,6 +427,10 @@ if __name__ == "__main__":
     # load parameters
     target = args.target
     version = args.version
+    release = True if args.release in ["on", "ON"] else False
+    no_apis = True if args.no_apis in ["on", "ON"] else False
+    no_hmatc = True if args.no_hmatc in ["on", "ON"] else False
+    no_models = True if args.no_models in ["on", "ON"] else False
 
     # create a result folder for the current container
     container_name = f"tester_cd_{target}_{version}-{int(time.time())}"
@@ -401,7 +443,7 @@ if __name__ == "__main__":
     # set container configs
     container_home = "/hmdd"
     container_log_file = (
-        "/develop02/imodelzoo/service/cd_tester/infer_logs/"
+        f"{IMODELZOO_REPO_DIR}/service/cd_tester/infer_logs/"
         + host_log_file.rsplit("/", 1)[-1]
     )
     # construct the commands to be executed in the container
@@ -414,9 +456,23 @@ if __name__ == "__main__":
         commands += [
             "pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple pytest pytest-dependency"
         ]
-    # quant and compile tests
-    compile_cmd = f"python3 execute_infer.py -log {container_log_file}"
-    commands.append(f"cd /develop02/imodelzoo/service/cd_tester && {compile_cmd}")
+    # inference tests
+    infer_cmd = f"python3 execute_infer.py -log {container_log_file}"
+    if release is True:
+        infer_cmd += " --release"
+    if no_apis is True:
+        infer_cmd += " --no_apis"
+    if no_hmatc is True:
+        infer_cmd += " --no_hmatc"
+    if no_models is True:
+        infer_cmd += " --no_models"
+    else:
+        if args.key_str:
+            infer_cmd += f" -k '{args.key_str}'"
+        if args.model_str:
+            infer_cmd += f" -m '{args.model_str}'"
+    logger.info(f"inference cmd: {infer_cmd}")
+    commands.append(f"cd {IMODELZOO_REPO_DIR}/service/cd_tester && {infer_cmd}")
 
     # create a docker executor
     docker_exec = DockerExecutor(
@@ -432,8 +488,8 @@ if __name__ == "__main__":
         # map the current directory of the host to the container
         volumes = {
             # map imodelzoo folder
-            "/develop02/wanyu.li/imodelzoo_develop": {
-                "bind": "/develop02/imodelzoo",
+            IMODELZOO_REPO_DIR: {
+                "bind": IMODELZOO_REPO_DIR,
                 "mode": "rw",
             },
             # map modelzoo folder
