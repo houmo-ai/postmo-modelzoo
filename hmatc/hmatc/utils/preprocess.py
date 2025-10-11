@@ -230,18 +230,37 @@ def xh1_preprocess(
         )
         im = im.detach().cpu().numpy()
 
-    # resizer
-    padding_im = np.zeros((1, C, max_height, max_width), dtype=np.uint8)
-    padding_im[:, :, 0:nh, 0:nw] = im  # 贴至填充图
-    dyn_info = list()
     if resize_type == 1:
         padding_size, size, _ = calc_padding_size((nh, nw), (W, H), padding_mode)
     elif resize_type == 0:
         padding_size = [0, 0, 0, 0]
         size = [H, W]
+
+    # 进一步检查resizer限制[1/32, 16]，虽然量化不需要，但是芯片需要
+    th, tw = size
+    sh = float(th) / nh
+    sw = float(tw) / nw
+    if sh > 16 or sh < 1.0 / 32:
+        nh = int(nh * max(1.0 / 32, min(16, sh))) & ~1
+    if sw > 16 or sw < 1.0 / 32:
+        nw = int(nw * max(1.0 / 32, min(16, sw))) & ~1
+
+    im = torch.nn.functional.interpolate(
+        torch.from_numpy(im), size=(nh, nw), mode="bilinear", align_corners=False
+    )
+    im = im.detach().cpu().numpy()
+
+    if resize_type == 1:
+        padding_size, size, _ = calc_padding_size((nh, nw), (W, H), padding_mode)
+
     resizer_crop = [0, 0, nh, nw]
     resizer_size = size
     resizer_padding = padding_size
+
+    # resizer
+    padding_im = np.zeros((1, C, max_height, max_width), dtype=np.uint8)
+    padding_im[:, :, 0:nh, 0:nw] = im  # 贴至填充图
+    dyn_info = list()
     dyn_info.extend(resizer_crop)
     if resize_type == 1:
         dyn_info.extend(resizer_size)

@@ -342,20 +342,16 @@ perfInfo_t ModelRunner(
             int32_t RESIZER_IMAGE_INPUT_W = shape[3];
             int32_t MODEL_INPUT_H = model_input_shape[2];
             int32_t MODEL_INPUT_W = model_input_shape[3];
-            // 随机数的情况下，默认是crop全图，会出现缩放倍数超过[1/16, 32)
+            // 随机数的情况下，默认是crop全图，会出现缩放倍数超过[1/32, 16]
             int32_t RESIZER_CROP_H = RESIZER_IMAGE_INPUT_H;
             int32_t RESIZER_CROP_W = RESIZER_IMAGE_INPUT_W;
-            if (RESIZER_IMAGE_INPUT_H >= MODEL_INPUT_H) {  // 下采样
-                if ((float)RESIZER_IMAGE_INPUT_H / MODEL_INPUT_H > 16.0f)
-                    RESIZER_CROP_H = MODEL_INPUT_H * 16;
-            } else {  // 上采样
-                assert(float(MODEL_INPUT_H) / RESIZER_IMAGE_INPUT_H < 32.0f);
+            float sw = float(MODEL_INPUT_W) / RESIZER_CROP_W;
+            float sh = float(MODEL_INPUT_H) / RESIZER_CROP_H;
+            if (sh > 16.0f || sh < 1.0f / 32) {
+                RESIZER_CROP_H = int32_t(RESIZER_CROP_H * std::max(1.0f / 32, std::min(16.0f, sw))) & ~1;
             }
-            if (RESIZER_IMAGE_INPUT_W >= MODEL_INPUT_W) {
-                if ((float)RESIZER_IMAGE_INPUT_W / MODEL_INPUT_W > 16.0f)
-                    RESIZER_CROP_W = MODEL_INPUT_W * 16;
-            } else {
-                assert(float(MODEL_INPUT_W) / RESIZER_IMAGE_INPUT_W < 32.0f);
+            if (sw > 16.0f || sw < 1.0f / 32) {
+                RESIZER_CROP_W = int32_t(RESIZER_CROP_W * std::max(1.0f / 32, std::min(16.0f, sh))) & ~1;
             }
             std::string dyn_info_str;
             for (int idx = 0; idx < input_num; ++idx) {
