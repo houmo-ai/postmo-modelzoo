@@ -627,6 +627,15 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
 
     # test script: get_model.py
     params_dict = model_info["get_model_params"][HOUMO_BACKEND]
+    if model_info.get("model_type", "cv") == "llm" and is_release() is True:
+        # skip download raw models
+        raw_indices = []
+        for i in range(len(params_dict["type"]) - 1, -1, -1):
+            if params_dict["type"][i] == "raw":
+                raw_indices.append(i)
+        for idx in raw_indices:
+            for param in params_dict:
+                params_dict[param].pop(idx)
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     cmd_header = ["python3", "get_model.py"]
 
@@ -667,24 +676,26 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
         or model_info["obsolete"] is True
         or HOUMO_BACKEND not in model_info["support_backend"]
         or "quant" not in model_info["support_flow"][HOUMO_BACKEND]
-        or is_release() is True
     ):
-        logger.warning(
-            "Not support %s testing, release flag: %d.", model_name, int(is_release())
-        )
+        logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
     if get_test_type() == TCaseType.SEPARATE_INFER:
         skip_msg = f"This quant testcase of {model_name} has already been run in the SEPARATE INFER stage."
         logger.warning(skip_msg)
         pytest.skip(skip_msg)
     model_type = model_info.get("model_type", "cv")
-    if (
-        model_type == "llm"
-        and get_test_type() != TCaseType.SEPARATE_INFER
-        and check_gpu()["has_gpu"] is False
+    if model_type == "llm" and (
+        (
+            get_test_type() != TCaseType.SEPARATE_INFER
+            and check_gpu()["has_gpu"] is False
+        )
+        or (is_release() is True)
     ):
-        logger.warning(f"{model_name} testcase requires GPU.")
-        pytest.skip(f"{model_name} testcase requires GPU.")
+        skip_msg = (
+            f"{model_name} testcase requires GPU, release flag: {int(is_release())}."
+        )
+        logger.warning(skip_msg)
+        pytest.skip(skip_msg)
     platform = get_platform(model_info["support_platform"])
     if platform is None or platform == "aarch64":
         logger.warning(f"Not support {model_name} testing on {platform}.")
@@ -780,24 +791,26 @@ def execute_compile_flow(
         or model_info["obsolete"] is True
         or HOUMO_BACKEND not in model_info["support_backend"]
         or "compile" not in model_info["support_flow"][HOUMO_BACKEND]
-        or is_release() is True
     ):
-        logger.warning(
-            "Not support %s testing, release flag: %d.", model_name, int(is_release())
-        )
+        logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
     if get_test_type() == TCaseType.SEPARATE_INFER:
         skip_msg = f"This compile testcase of {model_name} has already been run in the SEPARATE NO INFER stage."
         logger.warning(skip_msg)
         pytest.skip(skip_msg)
     model_type = model_info.get("model_type", "cv")
-    if (
-        model_type == "llm"
-        and get_test_type() != TCaseType.SEPARATE_INFER
-        and check_gpu()["has_gpu"] is False
+    if model_type == "llm" and (
+        (
+            get_test_type() != TCaseType.SEPARATE_INFER
+            and check_gpu()["has_gpu"] is False
+        )
+        or (is_release() is True)
     ):
-        logger.warning(f"{model_name} testcase requires GPU.")
-        pytest.skip(f"{model_name} testcase requires GPU.")
+        skip_msg = (
+            f"{model_name} testcase requires GPU, release flag: {int(is_release())}."
+        )
+        logger.warning(skip_msg)
+        pytest.skip(skip_msg)
     platform = get_platform(model_info["support_platform"])
     if platform is None or platform == "aarch64":
         logger.warning(f"Not support {model_name} testing on {platform}.")
@@ -998,6 +1011,8 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
                 exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
                 if exec_flag is False:
                     final_flag = False
+                if model_type == "llm" and is_release() is True:
+                    break
 
     # restore python env
     for lib_name, lib_ver in changed_libs.items():

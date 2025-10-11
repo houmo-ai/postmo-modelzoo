@@ -13,7 +13,7 @@ message(STATUS "ENABLE_ORT: ${ENABLE_ORT}")
 
 if(ENABLE_ORT)
     set(ORT_PATH ${CMAKE_SOURCE_DIR}/../../models/3rdparty/onnxruntime)
-    find_library(ORT_LIBRARY NAMES onnxruntime PATHS ${ORT_PATH}/lib NO_DEFAULT_PATH)
+    link_directories(${ORT_PATH}/lib)
     include_directories(${ORT_PATH}/include)
 endif()
 
@@ -36,7 +36,7 @@ add_executable(${CMAKE_PROJECT_NAME} yolov5s.cc)
 
 if(ENABLE_ORT)
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE ENABLE_ORT)
-    target_link_libraries(${CMAKE_PROJECT_NAME} ${ORT_LIBRARY})
+    target_link_libraries(${CMAKE_PROJECT_NAME} onnxruntime)
 endif()
 target_link_libraries(${CMAKE_PROJECT_NAME} ${OpenCV_LIBS})
 target_link_libraries(${CMAKE_PROJECT_NAME} ${TCIM_LIBRARY})

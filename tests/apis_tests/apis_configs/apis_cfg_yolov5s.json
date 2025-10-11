@@ -24,6 +24,7 @@
     },
     "cpp_example_params": {
         "name": "example_yolov5s",
+        "defines": [[], ["-DENABLE_ORT=ON"], ["-DENABLE_ORT=OFF"]],
         "enable_ort": ["default", true, false]
     }
 }

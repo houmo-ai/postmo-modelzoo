@@ -43,14 +43,12 @@ def execute_cmd(cmd, shell=False):
 def install_ort_env(third_party_dir, ort_pkg_name):
     try:
         print("configure the ORT C++ environment...")
-
         os.rename(f"{third_party_dir}/{ort_pkg_name}", f"{third_party_dir}/onnxruntime")
-        ort_lib_dir = third_party_dir + "/onnxruntime/lib"
-        cmd = f"echo {ort_lib_dir} | tee /etc/ld.so.conf.d/onnxruntime.conf"
-        execute_cmd(cmd, True)
-        cmd = "ldconfig"
-        execute_cmd(cmd, True)
-
+        # ort_lib_dir = third_party_dir + "/onnxruntime/lib"
+        # cmd = f"echo {ort_lib_dir} | tee /etc/ld.so.conf.d/onnxruntime.conf"
+        # execute_cmd(cmd, True)
+        # cmd = "ldconfig"
+        # execute_cmd(cmd, True)
         print("The ORT C++ environment configuration has been completed.")
     except Exception as e:
         print(f"Failed to configure the ORT C++ environment, error: {e}")

@@ -25,7 +25,7 @@ MODELS_PATH = os.path.abspath(
 MODELS_RES_DIR = os.path.abspath(
     os.path.dirname(os.path.abspath(__file__)) + f"/../model_results_{HOUMO_BACKEND}"
 )
-USE_RELEASED_MODELS = os.getenv("USE_RELEASED_MODELS", "OFF")
+USE_RELEASED_MODELS = os.getenv("USE_RELEASED_MODELS", "ON")
 
 logger = logging.getLogger(__name__)
 

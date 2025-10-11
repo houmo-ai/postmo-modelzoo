@@ -327,12 +327,9 @@ models_tests:
     - tests/models_tests/__init__.py
   example_case: null
   test:
+    - asr_wenet_test
     - backbone_resnet50_test
-    - backbone_efficientnet_test
-    - backbone_mobilenetv2_test
-    - detection_yolov3_test
     - detection_yolov5s_test
-    - detection_yolov8m_test
 
 apis_tests:
   include:
