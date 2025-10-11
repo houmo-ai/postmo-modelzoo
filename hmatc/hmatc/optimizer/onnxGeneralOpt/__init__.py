@@ -1,0 +1,2 @@
+from .onnxXh1Optimizer import OnnxXh1Optimizer
+from .onnxXh2Optimizer import OnnxXh2Optimizer

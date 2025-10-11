@@ -17,8 +17,6 @@ import copy
 from .onnxBaseOpt.onnxConfigController import OnnxCfg
 from .onnxBaseOpt.onnxDebugger import OnnxDebugger
 from .onnxBaseOpt.onnxOptimizerManager import OnnxOptimizerManager
-from .onnxBaseOpt.onnxBaseOptimizer import OnnxBaseOptimizer
-from .onnxGeneralOpt.onnxGeneralOptimizer import OnnxGeneralOptimizer
 from .onnxBaseOpt.onnxRuntimeEngine import OnnxRuntimeEngine
 from ..utils import logger
 

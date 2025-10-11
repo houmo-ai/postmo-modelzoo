@@ -1,0 +1,2 @@
+from .onnxBaseOpt.onnxBaseOptimizer import OnnxBaseOptimizer
+from .onnxGeneralOpt.onnxGeneralOptimizer import OnnxGeneralOptimizer

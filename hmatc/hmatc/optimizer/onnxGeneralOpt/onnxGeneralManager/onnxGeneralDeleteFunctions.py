@@ -1,15 +1,15 @@
 import copy
-from ...utils import logger
+from ....utils import logger
 import math
 
 import numpy as np  # type: ignore
 import onnx  # type: ignore
 
 #from ..onnxBaseOpt.onnxRuntimeEngine import OnnxRuntimeEngine
-from ..onnxBaseOpt.onnxDebugger import OnnxDebugger
+from ...onnxBaseOpt.onnxDebugger import OnnxDebugger
 #from ..onnxBaseOpt.onnxBaseFunctions import infer_shapes
-from ..onnxBaseOpt.onnxBaseOptimizer import OnnxBaseOptimizer
-from ..onnxUtils.onnxBasicUtils import *
+from ...onnxBaseOpt.onnxBaseOptimizer import OnnxBaseOptimizer
+from ...onnxUtils.onnxBasicUtils import *
 #from ..onnxBaseOpt.onnxConfigController import OnnxCfg
 
 # delete shape useless func region
