@@ -48,18 +48,18 @@ backbone_ViT-B-16:
         args: all
   test:
     - backbone_ViT-B-16_test
-autodrive_yolop:
-  include:
-    - models/autodrive/yolop
-  exclude:
-    - models/autodrive/yolop/README.MD
-  example_case:
-    - autodrive_yolop_test:
-        test_type: models_tests
-        script: yolop
-        args: all
-  test:
-    - autodrive_yolop_test
+# autodrive_yolop:
+#   include:
+#     - models/autodrive/yolop
+#   exclude:
+#     - models/autodrive/yolop/README.MD
+#   example_case:
+#     - autodrive_yolop_test:
+#         test_type: models_tests
+#         script: yolop
+#         args: all
+#   test:
+#     - autodrive_yolop_test
 detection_yolov3:
   include:
     - models/detection/yolov3

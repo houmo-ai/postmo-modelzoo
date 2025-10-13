@@ -23,9 +23,9 @@ def focus2conv(model_path, new_model_path):
     # 假设我们替换某个已有 Conv/ReOrg 节点
     first_conv_node = None
     for node in graph.nodes:
-        if node.name == "/model.0/Concat":
+        if node.name == "Concat_40":
             node.outputs = []
-        if node.name == "/model.0/conv/conv/Conv":
+        if node.name == "Conv_41":
             first_conv_node = node
 
     weight = np.array(
@@ -49,7 +49,7 @@ def focus2conv(model_path, new_model_path):
     input_tensor = graph.inputs[0]
     weight_const = gs.Constant(name="focus_weight", values=weight)
     output_tensor = gs.Variable(
-        name="focus_out", dtype=np.float32, shape=[1, 12, 192, 320]
+        name="focus_out", dtype=np.float32, shape=[1, 12, 320, 320]
     )
     first_conv_node.inputs[0] = output_tensor
 
@@ -115,18 +115,25 @@ if __name__ == "__main__":
     opt_level = "O2"
     version = f"v{runtime_version}"
     target = HOUMO_TARGET
-    raw_path = f"models/{model_name}/yolop_384x640.onnx"
+    raw_path = f"models/{model_name}/yolop_640x640.onnx"
     build_path = f"models/v{runtime_version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type in ["raw"]:
         file_path = get_file_from_jfrog(raw_path, model_dir)
+        extract_path = os.path.join(
+            os.path.dirname(file_path), "yolop_640x640_clip.onnx"
+        )
+        onnx.utils.extract_model(
+            file_path,
+            extract_path,
+            input_names=["images"],
+            output_names=["1236", "1566", "1896", "drive_area_seg", "lane_line_seg"],
+            check_model=True,
+        )
+        new_model_path = extract_path.replace(".onnx", "_opt.onnx")
+        focus2conv(extract_path, new_model_path)
         if not file_path:
             sys.exit(1)
-        # else:
-        #     new_file_path = os.path.join(
-        #         os.path.dirname(file_path), "yolop_384x640_focus2conv.onnx"
-        #     )
-        #     focus2conv(file_path, new_file_path)
 
     if model_type in ["hmm"] and not get_file_from_jfrog(
         build_path, model_dir, build_model_dir

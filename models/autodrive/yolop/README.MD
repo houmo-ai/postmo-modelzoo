@@ -54,17 +54,17 @@ hmatc demo -c config.yml -t xh1 --onnx
 ### 3.1 性能结果
 
 ```bash
-[latency] Inference     avg:  16.789 ms,        max:  18.061 ms
-[latency] Input         avg:   0.738 ms,        max:   2.871 ms
-[latency] Output        avg:   0.000 ms,        max:   0.008 ms
-[latency] End2End       avg:  17.528 ms,        max:  20.895 ms
-[Throughput] total: 2200.308 ms, avg: 2.200 ms
-[Throughput] qps: 454.482
+[latency] Inference     avg:  25.520 ms,        max:  30.659 ms
+[latency] Input         avg:   1.031 ms,        max:   2.707 ms
+[latency] Output        avg:   1.357 ms,        max:   2.981 ms
+[latency] End2End       avg:  27.910 ms,        max:  33.534 ms
+[Throughput] total: 3499.710 ms, avg: 3.500 ms
+[Throughput] qps: 285.738
 ```
 
 ## 4.免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。
 
-- yolop 模型：[https://github.com/hustvl/YOLOP/blob/main/weights/yolop-320-320.onnx](https://github.com/hustvl/YOLOP/blob/main/weights/yolop-320-320.onnx)
+- yolop 模型：[https://github.com/hustvl/YOLOP/blob/main/weights/yolop-640-640.onnx](https://github.com/hustvl/YOLOP/blob/main/weights/yolop-640-640.onnx)
 - BDD100K 验证集链接: [https://bdd-data.berkeley.edu](https://bdd-data.berkeley.edu)

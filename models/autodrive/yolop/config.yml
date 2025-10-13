@@ -1,10 +1,10 @@
 model:
-  name: yolop_384x640
+  name: yolop_640x640
   save_dir: output
-  model_path: yolop_384x640.onnx
+  model_path: yolop_640x640_clip_opt.onnx
   inputs:
     images:
-      shape: [1, 3, 384, 640]  # NCHW
+      shape: [1, 3, 640, 640]  # NCHW
       data_format: RGB
       mean: [123.675, 116.28, 103.53]
       std: [58.395, 57.12, 57.375]
@@ -14,9 +14,9 @@ model:
       resizer:
         toYUV_format: YUV420SP
         max_input_size: [1080, 1920]  # HW
-  app_onnx_opt: 
-    optimizer: true
-    log_level: 0
+  # app_onnx_opt: 
+  #   optimizer: true
+  #   log_level: 0
   model_impl_module: model_impl
   model_impl_cls: YoloP
 
