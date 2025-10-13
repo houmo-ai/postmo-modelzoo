@@ -21,7 +21,7 @@
             "x86_64": 343.633
         },
         "xh2":{
-            "x86_64": 91.415
+            "x86_64": 110.301
         }
     },
     "eval_threshold": {
@@ -90,7 +90,7 @@
             "required": {
                 "config": ["./config.yml", "./config.yml", "./config.yml"],
                 "warmup": ["1", "10", "10"],
-                "sample": ["1", "1000", "1000"]
+                "sample": ["1", "500", "500"]
             },
             "optional": {
                 "target": [null, null, null],

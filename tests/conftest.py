@@ -9,6 +9,9 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 os.environ["HOUMO_MODELZOO_URL"] = (
     "http://10.10.1.53:8082/artifactory/toolchain/release"
 )
+ori_ld = os.getenv("LD_LIBRARY_PATH", "")
+append_ld = f"/opt/venv/houmo/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/opt/venv/houmo/lib/python3.12/site-packages/torch/lib:{script_dir}/../apis/models/3rdparty/onnxruntime/lib:"
+os.environ["LD_LIBRARY_PATH"] = f"{ori_ld}:{append_ld}" if ori_ld else append_ld
 os.environ["HOUMO_DATASETS_PATH"] = f"{script_dir}/../data/datasets/"
 # os.environ["IMODELZOO_MODELS_PATH"] = f"{script_dir}/../../modelzoo/"
 # os.environ["IMODELZOO_MODELS_PATH"] = f"/develop02/modelzoo/"

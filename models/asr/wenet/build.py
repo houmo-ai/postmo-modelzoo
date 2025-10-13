@@ -68,7 +68,7 @@ def get_args() -> argparse.Namespace:
         '--stage',
         dest='stage',
         type=str,
-        default="build",
+        default="all",
         help='build stage choise=["build", "test", "all"]',
     )
     parser.add_argument(

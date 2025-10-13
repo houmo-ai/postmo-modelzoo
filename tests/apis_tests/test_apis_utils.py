@@ -24,7 +24,7 @@ def _generate_cmds(cmd_header: list, params_dict: dict, max_core_num: int = 0) -
         tmp_cmd_list = list()
         for param_name, param_list in params_dict.items():
             if (
-                param_name in ["name", "defines"]
+                param_name in ["name", "defines", "envs"]
                 or len(param_list) <= idx
                 or param_list[idx] == "default"
             ):
@@ -185,11 +185,12 @@ def execute_apis_examples(example_name: str, log_file: str):
     if "cpp" in demo_types:
         params_dict = example_info["cpp_example_params"]
         compile_defines = params_dict.get("defines", list())
-        _compile_cpp_exec(current_folder, log_file, compile_defines)
         cpp_exe_str = "./" + params_dict["name"]
         cmd_header = [cpp_exe_str]
         cmd_list = _generate_cmds(cmd_header, params_dict)
-        for tmp_cmd_list in cmd_list:
+        for idx, tmp_cmd_list in enumerate(cmd_list):
+            defines = compile_defines[idx] if len(compile_defines) > 0 else list()
+            _compile_cpp_exec(current_folder, log_file, defines)
             exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
             cpp_flag = False if exec_flag is False else cpp_flag
         if cpp_flag is False:
