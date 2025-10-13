@@ -77,10 +77,10 @@ def main(args) -> int:
             ignore_errors=True,
         )
 
-    hmatc_dir = f"{root_dir}/hmatc"
-    os.chdir(hmatc_dir)
-    logger.info(f"==> [CD Test] Install latest hmatc.")
-    os.system("./install.sh")
+    # hmatc_dir = f"{root_dir}/hmatc"
+    # os.chdir(hmatc_dir)
+    # logger.info(f"==> [CD Test] Install latest hmatc.")
+    # os.system("./install.sh")
 
     test_dir = f"{root_dir}/tests"
     os.chdir(test_dir)

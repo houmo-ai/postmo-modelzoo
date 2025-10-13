@@ -83,10 +83,10 @@ def main(args) -> int:
         logger.info("HF_ENDPOINT: %s", os.getenv("HF_ENDPOINT"))
         logger.info("HOUMO_DATASETS_PATH: %s", os.getenv("HOUMO_DATASETS_PATH"))
 
-    hmatc_dir = f"{root_dir}/hmatc"
-    os.chdir(hmatc_dir)
-    logger.info(f"==> [CD Test] Install latest hmatc.")
-    os.system("./install.sh")
+    # hmatc_dir = f"{root_dir}/hmatc"
+    # os.chdir(hmatc_dir)
+    # logger.info(f"==> [CD Test] Install latest hmatc.")
+    # os.system("./install.sh")
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     test_dir = f"{root_dir}/tests"
