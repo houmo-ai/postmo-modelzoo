@@ -479,8 +479,6 @@ def run_benchmark(
                         acc_onnx="N/A",
                         acc_chip="N/A",
                         acc_err="N/A",
-                        ave_latency="N/A",
-                        throughput="N/A",
                         enable_static=False,
                         msg="unknown error",
                     )
@@ -514,14 +512,14 @@ def run_benchmark(
                         model_infos["acc_onnx"],
                         model_infos["acc_chip"],
                         model_infos["acc_err"],
-                        model_infos["e2e_ave_cost"],
-                        model_infos["throughput"],
-                        model_infos["infer_avg_latency"],
-                        model_infos["infer_max_latency"],
-                        model_infos["input_avg_H2D_latency"],
-                        model_infos["input_max_H2D_latency"],
-                        model_infos["output_avg_D2H_latency"],
-                        model_infos["output_max_D2H_latency"],
+                        model_infos.get("e2e_ave_cost", "N/A"),
+                        model_infos.get("throughput", "N/A"),
+                        model_infos.get("infer_avg_latency", "N/A"),
+                        model_infos.get("infer_max_latency", "N/A"),
+                        model_infos.get("input_avg_H2D_latency", "N/A"),
+                        model_infos.get("input_max_H2D_latency", "N/A"),
+                        model_infos.get("output_avg_D2H_latency", "N/A"),
+                        model_infos.get("output_max_D2H_latency", "N/A"),
                     ]
                 )
 
