@@ -62,4 +62,4 @@ if [ "$RK_DECODER_SWITCH" = "ON" ]; then
 fi
 
 cd $WORK_PATH
-# ./example_video_detect
+./example_video_detect
