@@ -1056,24 +1056,25 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
     logger.info("current folder: %s.", current_folder)
 
     model_type = model_info.get("model_type", "cv")
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
 
-    lock_file = model_set_dir + "/lock.lock"
-    with ModelResourceLock(
-        lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
-    ):
-        execute_test_cmd(
-            [
-                "python3",
-                "get_model.py",
-                "--model_dir",
-                model_set_dir,
-                "--type",
-                "raw",
-            ],
-            "",
-            True,
-        )
+    if get_test_type() != TCaseType.SEPARATE_INFER:
+        model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+        lock_file = model_set_dir + "/lock.lock"
+        with ModelResourceLock(
+            lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
+        ):
+            execute_test_cmd(
+                [
+                    "python3",
+                    "get_model.py",
+                    "--model_dir",
+                    model_set_dir,
+                    "--type",
+                    "raw",
+                ],
+                "",
+                True,
+            )
 
     if model_type == "cv" and not _prepare_compiled_cv_model(
         model_info, platform, log_file
