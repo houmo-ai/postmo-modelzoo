@@ -67,7 +67,7 @@ if __name__ == '__main__':
         quant_path = (
             "models_outdated/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_7b_256_2k_20250903.zip"
         )
-        hmm_path = "models/qwen2.5-vl/hmm_xh1_qwen2.5-vl_7b_256_2k_4cores_20250923.zip"
+        hmm_path = "models/qwen2.5-vl/hmm_xh1_qwen2.5-vl_7b_256_2k_4cores_20251014.zip"
     elif HOUMO_TARGET == "xh2" and args.model_size == "7b":
         quant_path = (
             "models_outdated/qwen2.5-vl/hmquant_xh2_qwen2.5-vl_7b_256_2k_20250908.zip"
