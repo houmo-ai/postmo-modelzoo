@@ -94,16 +94,19 @@ question:
 https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg
 请描述图片内容。
 response:
-这张图片展示了一位女士和她的狗在海滩上玩耍的场景。女士坐在沙滩上，狗坐在她对面，似乎在进行某种游戏。女士穿着格子衬衫和黑色裤子，狗戴着项圈。背景是海滩，海水和天空。
+这张图片展示了一位坐在沙滩上的女士和一只狗。女士穿着格子衬衫，坐在沙滩上，与狗互动。狗坐在女士的前面，伸出前爪与女士的手相触。背景是海浪和天空，阳光从右上方照射下来，给整个场景增添了一种温暖的氛围。整个画面给人一种温馨和谐的感觉。
 ```
 
 ### 3.2 性能结果
-
+#### M30 4core
 ```bash
-total: 55 tokens, cost 5.036 s
-visual + prefill time: 2397.724 ms, 0.42 tokens/s
-decode average time: 48.854 ms, 20.47 tokens/s
-end2end average time: 91.561 ms, 10.92 tokens/s
+Total Images: 1, Total Input: 602 tokens, Output 74 tokens, Vision Cost 675.809 ms, Prefill Cost 833.611 ms, Decode Cost 6201.947 ms
+Vision Cost 675.809 ms/image
+Prefill Speed: 722.16 tokens/s; Decode Speed: 11.77 tokens/s
+TTFT (Time to First Token): 1651.820 ms
+TPOT (Time Per Output Token): 84.958 ms/token
+E2E Latency (End-to-End Latency): 7.854 seconds
+E2E TPS (End-to-End Tokens Per Second): 9.42 tokens/s
 ```
 
 ## 4 免责声明

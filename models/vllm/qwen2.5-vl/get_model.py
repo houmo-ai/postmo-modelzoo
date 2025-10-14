@@ -61,7 +61,7 @@ if __name__ == '__main__':
     quant_path = "models/qwen2.5-vl/hmquant_qwen2.5-vl_256_2k_20250626.zip"
     quant_path_7b = "models/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_7b_256_2k_20250711.zip"
     hmm_path = "models/qwen2.5-vl/hmm_qwen2.5-vl_256_2k_4cores_20250626.zip"
-    hmm_path_7b = "models/qwen2.5vl/hmm_xh1_qwen2.5vl_7b_256_2k_4cores_20250711.zip"
+    hmm_path_7b = "models/qwen2.5-vl/hmm_xh1_qwen2.5-vl_7b_256_2k_4cores_20251014.zip"
 
     if model_type in ["raw", "all"]:
         ignore_patterns = []
