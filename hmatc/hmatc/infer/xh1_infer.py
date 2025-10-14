@@ -77,8 +77,10 @@ class Xh1Infer(BaseInfer, ABC):
             output_name = self.engine.get_output_name(idx)
             output_info = self.engine.get_output_info(output_name)
             output_data = self.engine.get_output(output_name)
-            dequanted_data = np.ascontiguousarray(output_data.cast(np.float32).numpy())
             outputs[output_name] = np.ascontiguousarray(output_data.numpy())
+            if output_name in ["auto_profile_data.bin", "primitive_profile_data.bin"]:
+                continue
+            dequanted_data = np.ascontiguousarray(output_data.cast(np.float32).numpy())
             outputs_dequanted[output_name] = dequanted_data
         return outputs, outputs_dequanted
 

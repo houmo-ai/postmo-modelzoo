@@ -37,12 +37,7 @@ class Xh2Exec(BaseExec):
         self.quant_type = "w8a8h1_sefp"
         self.hmm_batch = self.build_batch * self.model_input_batch
         self.hmm_name = f"{self.model_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}"
-        self.hmm_save_dir = os.path.join(self.save_dir, "xh2")
-        if not os.path.exists(self.hmm_save_dir):
-            os.makedirs(self.hmm_save_dir)
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
-        self.quant_output_dir = os.path.join(self.save_dir, "xh2", "hmquant")
-        self.build_output_dir = os.path.join(self.save_dir, "xh2", "tcim")
         self.hmonnx_name = f"{self.model_name}"
         self.quant_onnx_model_path = os.path.join(
             self.quant_output_dir, f"{self.hmonnx_name}.onnx"
@@ -191,7 +186,8 @@ class Xh2Exec(BaseExec):
         logger.info(f"Quantize done. and save hmonnx: {self.new_quant_onnx_model_path}")
         return res_info
 
-    def build(self):
+    def build(self, enable_profile=False):
+        self.enable_profile = enable_profile
         if not os.path.exists(self.build_output_dir):
             os.makedirs(self.build_output_dir)
 
@@ -210,6 +206,7 @@ class Xh2Exec(BaseExec):
             target="xh2",
             batch=self.build_batch,
             legacy=True,
+            enable_profile=enable_profile,
             output_dir=self.hmm_save_dir,
             work_dir=self.build_output_dir,
             enable_dynamic_image_resize=False,
@@ -270,6 +267,7 @@ class Xh2Exec(BaseExec):
 
         res_info = dict()
         outputs, _ = xh2.run(in_datas)
+        self.save_profile_data(outputs)
         header = ["name", "cosine_dist"]
         table = PrettyTable(header)
         table.title = "xh2 vs hmquant"
@@ -299,7 +297,7 @@ class Xh2Exec(BaseExec):
         logger.info(f"Check golden...\n{table}")
         return res_info
 
-    def compare(self, data_path: str):
+    def compare(self, data_path: str, device_id=0):
         t_start = datetime.now().strftime("%Y%m%d%H%M%S")
         # onnx
         onnx_infer = OnnxInfer()
@@ -380,7 +378,8 @@ class Xh2Exec(BaseExec):
 
         onnx_outputs = onnx_infer.run(onnx_in_datas)
         hmquant_outputs = hmquant_infer.run(hmquant_in_datas)
-        _, xh2_outputs_dequanted = xh2_infer.run(xh2_in_datas)
+        xh2_outputs, xh2_outputs_dequanted = xh2_infer.run(xh2_in_datas)
+        self.save_profile_data(xh2_outputs)
 
         res_info = {"compare": {t_start: dict()}}
         res_info["compare"][t_start]["data_path"] = data_path

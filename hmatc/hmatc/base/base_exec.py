@@ -17,6 +17,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             cfg (dict): 来自配置文件
         """
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Using device: {self.device}")
         self.target = cfg["target"]
         self.enable_upload = False
         self.model_cfg = cfg.get("model")
@@ -32,6 +33,11 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.model_name = self.model_cfg.get("name", "model")  # 编译后模型名称
         self.model_dir_name = Path.cwd().name  # 模型所在目录名称
         self.save_dir = self.model_cfg.get("save_dir")
+        self.quant_output_dir = os.path.join(self.save_dir, self.target, "hmquant")
+        self.build_output_dir = os.path.join(self.save_dir, self.target, "tcim")
+        self.hmm_save_dir = os.path.join(self.save_dir, self.target)
+        if not os.path.exists(self.hmm_save_dir):
+            os.makedirs(self.hmm_save_dir)
         self.inputs_cfg = self.model_cfg.get("inputs")
         self.model_inputs_batch = dict()
         self.inputs_name = list()
@@ -350,3 +356,16 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             }
         }
         return res_info
+
+    def save_profile_data(self, outputs: dict):
+        profile_dir = os.path.join(self.build_output_dir, "profile")
+        if "auto_profile_data.bin" in outputs:
+            os.makedirs(profile_dir, exist_ok=True)
+            outputs["auto_profile_data.bin"].tofile(
+                os.path.join(profile_dir, "auto_profile_data.bin")
+            )
+        if "primitive_profile_data.bin" in outputs:
+            os.makedirs(profile_dir, exist_ok=True)
+            outputs["primitive_profile_data.bin"].tofile(
+                os.path.join(profile_dir, "primitive_profile_data.bin")
+            )

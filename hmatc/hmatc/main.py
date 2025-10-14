@@ -659,10 +659,22 @@ def main():
     build_exclusive_group.add_argument(
         "--config", "-c", type=str, help="Specify config file path"
     )
+    build_parser.add_argument(
+        "--profile",
+        action="store_true",
+        required=False,
+        help="Enable profile",
+    )
     # compare
     compare_parser = subparsers.add_parser(
         "compare",
-        parents=[parent_config, parent_target, parent_result_path, model_cfg_parent],
+        parents=[
+            parent_config,
+            parent_target,
+            parent_result_path,
+            model_cfg_parent,
+            parent_device_id,
+        ],
         help="Compare onnx/hmquant/chip",
     )
     compare_parser.add_argument(
@@ -841,7 +853,7 @@ def main():
             hm_exec.device = "cuda"
         new_res_info = hm_exec.quantize()
     elif current_command == "build":
-        new_res_info = hm_exec.build()
+        new_res_info = hm_exec.build(enable_profile=args.profile)
         logger.info(f"Build {hm_exec.model_name} done.")
         new_res_info["build"].update(hm_exec.check_golden(args.device_id))
     elif current_command == "compare":
@@ -855,7 +867,7 @@ def main():
             if not os.path.exists(data_path):
                 logger.error(f"{data_path} or {args.data_path} not exists.")
                 exit(-1)
-        new_res_info = hm_exec.compare(data_path)
+        new_res_info = hm_exec.compare(data_path, args.device_id)
     elif current_command == "perf":
         new_res_info = hm_exec.model_perf(
             hm_exec.hmm_path,

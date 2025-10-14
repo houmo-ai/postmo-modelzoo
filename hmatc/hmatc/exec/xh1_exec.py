@@ -34,8 +34,6 @@ class Xh1Exec(BaseExec):
     def __init__(self, cfg: dict) -> None:
         super().__init__(cfg)
         self.hmm_batch = self.build_batch * self.model_input_batch
-        self.quant_output_dir = os.path.join(self.save_dir, "xh1", "hmquant")
-        self.build_output_dir = os.path.join(self.save_dir, "xh1", "tcim")
         self.quant_sequencer_model_path = os.path.join(
             self.quant_output_dir,
             f"{self.model_name}_xh1_b{self.model_input_batch}.pkl",
@@ -109,9 +107,6 @@ class Xh1Exec(BaseExec):
             roi_tag = "_1roi"
             prefix = "_static"
         self.hmm_name = f"{self.model_name}_xh1_b{self.hmm_batch}{roi_tag}_{self.build_ncore}core_{self.build_opt_level}{prefix}"
-        self.hmm_save_dir = os.path.join(self.save_dir, "xh1")
-        if not os.path.exists(self.hmm_save_dir):
-            os.makedirs(self.hmm_save_dir)
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
         # hmatc onnx optimizer initialization
         if "app_onnx_opt" in cfg["model"]:
@@ -483,7 +478,7 @@ class Xh1Exec(BaseExec):
             logger.info(f"Compressing quant output done.")
         return res_info
 
-    def build(self):
+    def build(self, enable_profile=False):
         if not os.path.exists(self.build_output_dir):
             os.makedirs(self.build_output_dir)
         try:
@@ -505,6 +500,7 @@ class Xh1Exec(BaseExec):
             work_dir=self.build_output_dir,
             enable_dynamic_image_resize=self.resizer_mode in [1],
             one_img_multi_roi=self.roi_num > 1,
+            enable_profile=enable_profile,
             custom_msg=json.dumps(self.custom_msg, ensure_ascii=False),
         )
         span = time.time() - t_start
@@ -576,6 +572,7 @@ class Xh1Exec(BaseExec):
 
         res_info = dict()
         outputs, outputs_dequanted = xh1.run(in_datas)
+        self.save_profile_data(outputs)
         repeats = 1
         if self.build_batch > 1 and self.roi_num == 1:
             # n图n框，且编译batch>1
@@ -592,7 +589,7 @@ class Xh1Exec(BaseExec):
         ]
         table = PrettyTable(header)
         table.title = "xh1 vs hmquant"
-        for output_name in outputs:
+        for output_name in outputs_dequanted:
             new_output_name = output_name.replace("/", "_")
             golden_output_path = os.path.join(
                 self.quant_output_dir,
@@ -643,7 +640,7 @@ class Xh1Exec(BaseExec):
         logger.info(f"Check golden...\n{table}")
         return res_info
 
-    def compare(self, data_path: str):
+    def compare(self, data_path: str, device_id=0):
         t_start = datetime.now().strftime("%Y%m%d%H%M%S")
         # onnx
         onnx_infer = OnnxInfer()
@@ -653,7 +650,7 @@ class Xh1Exec(BaseExec):
         hmquant_infer.load(self.quant_sequencer_model_path)
         # xh1
         xh1_infer = Xh1Infer()
-        xh1_infer.load(self.hmm_path)
+        xh1_infer.load(self.hmm_path, device_id)
 
         onnx_in_datas = dict()
         hmquant_in_datas = dict()
@@ -827,7 +824,8 @@ class Xh1Exec(BaseExec):
 
         onnx_outputs = onnx_infer.run(onnx_in_datas)
         hmquant_outputs = hmquant_infer.run(hmquant_in_datas)
-        _, xh1_outputs_dequanted = xh1_infer.run(xh1_in_datas)
+        xh1_outputs, xh1_outputs_dequanted = xh1_infer.run(xh1_in_datas)
+        self.save_profile_data(xh1_outputs)
 
         repeats = 1
         if self.build_batch > 1 and self.roi_num == 1:
