@@ -109,6 +109,8 @@ class Qwen25VL:
         self.window_size = window_size
         self.spatial_merge_size = spatial_merge_size
         self.patch_size = patch_size
+        self.batch_size = 1
+        self.max_size_t = 2
         self.spatial_merge_unit = self.spatial_merge_size * self.spatial_merge_size
         self.eos_token_id = [151645, 151643]
         # set mode
@@ -128,7 +130,9 @@ class Qwen25VL:
             self.context_max_length = self.decode.get_input_info(
                 self.decode.get_input_name(6)
             ).shape[2]
-            self.image_shape = [364, 644]
+            self.image_shape = self.vit_model.get_input_info(
+                self.vit_model.get_input_name(0)
+            ).shape[3:]
         for i in range(self.nblocks):
             kcache = self.prefill.get_input(f"model_layers_{i}_self_attn_kcache_input")
             vcache = self.prefill.get_input(f"model_layers_{i}_self_attn_vcache_input")
@@ -242,10 +246,23 @@ class Qwen25VL:
 
     def preprocess_visual(self, inputs):
         visual_inputs = dict()
-        visual_inputs["hidden_states"] = inputs["hm_pixel_values"].cpu()
+        hidden_states = []
         window_indexes = []
         window_masks = []
-        for batch in range(inputs["image_grid_thw"].shape[0]):
+        for batch in range(inputs["hm_pixel_values"].shape[0]):
+            if HOUMO_TARGET == "xh1":
+                hidden_state = inputs["hm_pixel_values"][batch]
+            elif HOUMO_TARGET == "xh2":
+                hidden_state = (
+                    inputs["hm_pixel_values"][batch]
+                    .unsqueeze(0)
+                    .repeat(self.batch_size, 1, 1, 1)
+                )
+                hidden_state = (
+                    hidden_state.unsqueeze(2)
+                    .repeat(1, 1, self.max_size_t, 1, 1)
+                    .squeeze(0)
+                )
             window_index, cu_window_seqlens = self.get_window_index(
                 inputs["image_grid_thw"][batch].unsqueeze(0)
             )
@@ -267,10 +284,12 @@ class Qwen25VL:
                     cu_window_seqlens[i - 1] : cu_window_seqlens[i],
                 ] = 0
 
+            hidden_states.append(hidden_state.to(self.device))
             window_indexes.append(window_index.to(self.device))
             window_masks.append(attention_mask.to(self.device))
         visual_inputs["window_index"] = torch.stack(window_indexes)
         visual_inputs["window_mask"] = torch.stack(window_masks)
+        visual_inputs["hidden_states"] = torch.stack(hidden_states)
         if HOUMO_TARGET == "xh1":
             visual_inputs["hidden_states"] = self.rgb2yuv(
                 visual_inputs["hidden_states"].cpu()
@@ -299,7 +318,6 @@ class Qwen25VL:
                     logger.info("skip set window_mask input")
                 self.vit_model.run()
                 self.vit_model.sync()
-                # vit_model_output = self.vit_model.get_output("output").numpy().astype(np.int16)
                 vit_model_output = (
                     self.vit_model.get_output(self.vit_model.get_output_name(0))
                     .numpy()
@@ -331,14 +349,12 @@ class Qwen25VL:
                 )
                 self.vit_model.run()
                 self.vit_model.sync()
-                # vit_model_output = self.vit_model.get_output("output").numpy().astype(np.int16)
                 vit_model_output = (
                     self.vit_model.get_output(self.vit_model.get_output_name(0))
                     .numpy()
                     .astype(np.float16)
                 )
                 vit_model_outputs.append(torch.tensor(vit_model_output))
-                # del self.vit_model
             return torch.cat(vit_model_outputs, dim=0)
 
     def preprocess_prefill(self, inputs, image_features):
