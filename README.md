@@ -105,7 +105,7 @@ pip install -r requirements.txt
 | yolov8m-seg          | segmentation  | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolop                | autodrive     | xh1/xh2 | yes   | yes   | yes  | x    |
 | lprnet               | ocr           | xh1     | yes   | yes   | yes  | yes  |
-| ppocrv3              | ocr           | xh1     | yes   | yes   | yes  | yes  |
+| ppocrv3              | ocr           | xh1/xh2 | yes   | yes   | yes  | yes  |
 | wenet                | asr           | xh1     | x     | yes   | yes  | x    |
 | qwen2.5              | llm           | xh1/xh2 | yes   | yes   | yes  | x    |
 | qwen3                | llm           | xh1/xh2 | yes   | yes   | yes  | x    |
