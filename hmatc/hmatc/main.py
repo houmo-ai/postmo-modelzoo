@@ -70,7 +70,7 @@ def run_model(
         acc_onnx="N/A",
         acc_chip="N/A",
         acc_err="N/A",
-        e2e_ave_cost="N/A",
+        e2e_avg_cost="N/A",
         throughput="N/A",
         infer_avg_latency="N/A",
         infer_max_latency="N/A",
@@ -262,26 +262,14 @@ def run_model(
             hm_exec.hmm_path, warmup, sample, loop_num, device_id, thread_num
         )
         perf_info = list(perf_info["perf"].values())[0]["perf_info"]
-        model_infos["e2e_ave_cost"] = f"{perf_info['avg_cost'] / batch_num:.2f}"
+        model_infos["e2e_avg_cost"] = f"{perf_info['avg_cost']:.2f}"
         model_infos["throughput"] = f"{perf_info['qps'] * batch_num:.2f}"
-        model_infos["infer_avg_latency"] = (
-            f"{perf_info['infer_avg_latency'] / batch_num:.2f}"
-        )
-        model_infos["infer_max_latency"] = (
-            f"{perf_info['infer_max_latency'] / batch_num:.2f}"
-        )
-        model_infos["input_avg_H2D_latency"] = (
-            f"{perf_info['input_avg_latency'] / batch_num:.2f}"
-        )
-        model_infos["input_max_H2D_latency"] = (
-            f"{perf_info['input_max_latency'] / batch_num:.2f}"
-        )
-        model_infos["output_avg_D2H_latency"] = (
-            f"{perf_info['output_avg_latency'] / batch_num:.2f}"
-        )
-        model_infos["output_max_D2H_latency"] = (
-            f"{perf_info['output_max_latency'] / batch_num:.2f}"
-        )
+        model_infos["infer_avg_latency"] = f"{perf_info['infer_avg_latency']:.2f}"
+        model_infos["infer_max_latency"] = f"{perf_info['infer_max_latency']:.2f}"
+        model_infos["input_avg_H2D_latency"] = f"{perf_info['input_avg_latency']:.2f}"
+        model_infos["input_max_H2D_latency"] = f"{perf_info['input_max_latency']:.2f}"
+        model_infos["output_avg_D2H_latency"] = f"{perf_info['output_avg_latency']:.2f}"
+        model_infos["output_max_D2H_latency"] = f"{perf_info['output_max_latency']:.2f}"
         logger.info(f"Performance done.")
     except Exception as e:
         msg = f"Performance failed:\nException: {e}"
@@ -512,7 +500,7 @@ def run_benchmark(
                         model_infos["acc_onnx"],
                         model_infos["acc_chip"],
                         model_infos["acc_err"],
-                        model_infos.get("e2e_ave_cost", "N/A"),
+                        model_infos.get("e2e_avg_cost", "N/A"),
                         model_infos.get("throughput", "N/A"),
                         model_infos.get("infer_avg_latency", "N/A"),
                         model_infos.get("infer_max_latency", "N/A"),

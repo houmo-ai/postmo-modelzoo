@@ -82,8 +82,8 @@ pip install -r requirements.txt
 | resnet50             | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
 | mobilenetv2          | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
 | efficientnet         | backbone      | xh1     | yes   | yes   | yes  | yes  |
-| ViT-B-16             | backbone      | xh1     | yes   | yes   | yes  | yes  |
-| yolov3               | detection     | xh1     | yes   | yes   | yes  | yes  |
+| ViT-B-16             | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolov3               | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov5s              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov5s_feature      | detection     | xh1     | yes   | yes   | yes  | yes  |
 | yolov8m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
@@ -91,7 +91,7 @@ pip install -r requirements.txt
 | yolov8m-pose         | estimation    | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m-seg          | segmentation  | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolop                | autodrive     | xh1/xh2 | yes   | yes   | yes  | x    |
-| ppocrv3	       | ocr           | xh1/xh2 | yes   | yes   | yes  | yes  |
+| ppocrv3	             | ocr           | xh1/xh2 | yes   | yes   | yes  | yes  |
 | lprnet               | ocr           | xh1     | yes   | yes   | yes  | yes  |
 | wenet                | asr           | xh1     | x     | yes   | yes  | x    |
 | qwen2.5              | llm           | xh1/xh2 | yes   | yes   | yes  | x    |
