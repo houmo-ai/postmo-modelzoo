@@ -8,6 +8,25 @@ assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
 HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH", "")
 
 
+def check_gpu():
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            "nvidia-smi --query-gpu=count --format=csv,noheader,nounits | wc -l",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            text=True
+        )
+        if result.returncode == 0 and int(result.stdout.strip()) > 0:
+            return True
+        return False
+    except Exception as e:
+        print(f"Not install GPU driver, error msg: {e}")
+        return False
+
 def str2bool(v):
     if isinstance(v, bool):
         return v
@@ -17,7 +36,6 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError("Boolean value expected.")
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Quant DeepSeek")
@@ -102,6 +120,9 @@ def parse_args():
 
 
 if __name__ == "__main__":
+    if not check_gpu():
+        print("Error: Not found GPU device.")
+        exit(-1)
     args = parse_args()
     model, tokenizer = AutoModelForCausalLM.from_pretrained(
         args.model
