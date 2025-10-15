@@ -10,9 +10,22 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
+FOUND_GPU=0
+echo "Checking GPU..."
+if command -v nvidia-smi &> /dev/null; then
+    gpu_count=$(nvidia-smi --query-gpu=count --format=csv,noheader,nounits | wc -l)
+    if [ $gpu_count -gt 0 ]; then
+        FOUND_GPU=1
+        echo "Found NVIDIA GPU, count: ${gpu_count}"
+    else
+        echo "⚠ Not found NVIDIA GPU device."
+    fi
+else
+    echo "⚠ Not install NVIDIA GPU driver."
+fi
+
 PACKAGE_PATTERN=hmquant
 FOUND_PACKAGE=0
-
 echo "================================"
 echo "Checking python3 package: $PACKAGE_PATTERN"
 if command -v python3 &>/dev/null && command -v pip3 &>/dev/null; then
@@ -30,7 +43,7 @@ else
     exit 0
 fi
 
-if [ $FOUND_PACKAGE -eq 0 ]; then
+if [ $FOUND_PACKAGE -eq 0 ] || [ $FOUND_GPU -eq 0 ]; then
     python3 get_model.py --type hmm
 else
     python3 get_model.py --type raw
