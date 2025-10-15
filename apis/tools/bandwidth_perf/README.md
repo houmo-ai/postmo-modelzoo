@@ -17,7 +17,10 @@
 进入tools/bandwidth_perf目录，执行：
 
 ```bash
-python3 bandwidth_perf.py
+# 写带宽
+python3 bandwidth_perf.py --type w
+# 读带宽
+python3 bandwidth_perf.py --type r
 ```
 
 ## 3. XH1 测试结果
@@ -25,34 +28,97 @@ python3 bandwidth_perf.py
 基于Linux x86_64平台的执行结果
 
 ```bash
-Model run successfully on device 0, elapsed time: 7.24 seconds.
+# 写带宽
+Model run successfully on device 0, elapsed time: 7.81 seconds.
 
 ============================================================
-           Bandwidth Test Summary
+      Write Bandwidth Test Summary
 ============================================================
 Model Parameter           |           Value
 ------------------------------------------------------------
 Data size                 |            8.00 MiB
 Round number              |           80000
-Test time                 |          7.2421 seconds
-BANDWIDTH                 |           86.30 GiB/s
+Test time                 |          7.8059 seconds
+Write Bandwidth           |           80.06 GiB/s
+============================================================
+
+# 读带宽
+Model run successfully on device 0, elapsed time: 7.24 seconds.
+
+============================================================
+      READ Bandwidth Test Summary
+============================================================
+Model Parameter           |           Value
+------------------------------------------------------------
+Data size                 |            8.00 MiB
+Round number              |           80000
+Test time                 |          7.2433 seconds
+READ BANDWIDTH            |           86.28 GiB/s
 ============================================================
 ```
 
 基于Linux aarch64平台的执行结果
 
 ```bash
-Model run successfully on device 0, elapsed time: 8.16 seconds.
+# 写带宽
+Model run successfully on device 0, elapsed time: 8.07 seconds.
 
 ============================================================
-           Bandwidth Test Summary
+      Write Bandwidth Test Summary
 ============================================================
 Model Parameter           |           Value
 ------------------------------------------------------------
 Data size                 |            8.00 MiB
 Round number              |           80000
-Test time                 |          8.1633 seconds
-BANDWIDTH                 |           76.56 GiB/s
+Test time                 |          8.0657 seconds
+Write Bandwidth           |           77.48 GiB/s
 ============================================================
 
+# 读带宽
+Model run successfully on device 0, elapsed time: 8.09 seconds.
+
+============================================================
+      Read Bandwidth Test Summary
+============================================================
+Model Parameter           |           Value
+------------------------------------------------------------
+Data size                 |            8.00 MiB
+Round number              |           80000
+Test time                 |          8.0867 seconds
+Read Bandwidth            |           77.28 GiB/s
+============================================================
+```
+
+## 3. XH2 测试结果
+
+基于Linux x86_64平台的执行结果
+
+```bash
+# 写带宽
+Model run successfully on device 0, elapsed time: 5.06 seconds.
+
+============================================================
+      Write Bandwidth Test Summary
+============================================================
+Model Parameter           |           Value
+------------------------------------------------------------
+Data size                 |            8.00 MiB
+Round number              |           80000
+Test time                 |          5.0634 seconds
+Write Bandwidth           |          123.43 GiB/s
+============================================================
+
+# 读带宽
+Model run successfully on device 0, elapsed time: 4.92 seconds.
+
+============================================================
+      Read Bandwidth Test Summary
+============================================================
+Model Parameter           |           Value
+------------------------------------------------------------
+Data size                 |            8.00 MiB
+Round number              |           80000
+Test time                 |          4.9157 seconds
+Read Bandwidth            |          127.14 GiB/s
+============================================================
 ```

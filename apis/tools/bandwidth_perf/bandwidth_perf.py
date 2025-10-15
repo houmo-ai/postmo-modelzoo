@@ -24,7 +24,7 @@ def gen_copy_model_and_data_size():
     from tcim.hmcc_converter.base_hmonnx import HMOnnxModelVersion
 
     dtype = onnx.TensorProto.INT8
-    input_shape = (4, 2, 1048576)
+    input_shape = (4, 2, 1048512)
     input_name = "input"
 
     input_tensor = make_initializer(
@@ -215,6 +215,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--work-dir", type=str, default="./output", help="work dir.")
     parser.add_argument(
+        "--type", type=str, choices=("r", "w"), default="r", help="bandwidth type."
+    )
+    parser.add_argument(
         "--device-id", type=int, default=0, help="the device id to run the test on."
     )
     parser.add_argument(
@@ -233,6 +236,8 @@ if __name__ == "__main__":
     if target not in ["xh1", "xh2"]:
         raise ValueError("HOUMO_TARGET must be xh1 or xh2")
     MODEL_NAME = f"{target}_transpose"
+
+    bandwidth_type = "Read" if args.type == "r" else "Write"
 
     print("#########################################")
     print("##        AI core bandwidth test       ##")
@@ -265,14 +270,7 @@ if __name__ == "__main__":
             os.environ["HOUMO_MODELZOO_URL"] = (
                 "http://139.224.0.199:8082/artifactory/houmo/release"
             )
-        if target == "xh1":
-            zipped_hmm_path = (
-                "models/bandwidth_perf/hmm_xh1_transpose_1core_20250916.tar.xz"
-            )
-        elif target == "xh2":
-            zipped_hmm_path = (
-                "models/bandwidth_perf/hmm_xh2_transpose_1core_20250916.tar.xz"
-            )
+        zipped_hmm_path = f"models/bandwidth_perf/hmm_{target}_transpose_{bandwidth_type.lower()}_1core_20251015.tar.xz"
         get_file_from_jfrog(zipped_hmm_path, "./", "./")
 
     if not args.skip_build:
@@ -297,12 +295,13 @@ if __name__ == "__main__":
             hmonnx_model,
             output_name=MODEL_NAME,
             output_dir=output_dir,
+            enable_model_connect=False,
             work_dir=build_tmp_dir,
             target=target,
             ncore=1,
             opt_level="O2",
             io_layout="any",
-            emit_cpp_extra_args="only-emit-op-list=hmint.load",
+            emit_cpp_extra_args=f"only-emit-op-list=hmint.{'load' if args.type == 'r' else 'store'}",
         )
         json_path = os.path.join(output_dir, "model.json")
         shutil.copyfile(os.path.join(build_tmp_dir, "model.json"), json_path)
@@ -357,7 +356,7 @@ if __name__ == "__main__":
         bandwidth_GBps = bandwidth / (1024**3)  # GB per second
 
         print("\n" + "=" * 60)
-        print("           Bandwidth Test Summary")
+        print(f"      {bandwidth_type} Bandwidth Test Summary")
         print("=" * 60)
 
         print(f"{'Model Parameter':<25} | {'Value':>15}")
@@ -365,5 +364,5 @@ if __name__ == "__main__":
         print(f"{'Data size':<25} | {data_size_in_MB:>15.2f} MiB")
         print(f"{'Round number':<25} | {total_round_num:>15d}")
         print(f"{'Test time':<25} | {elapsed_time:>15.4f} seconds")
-        print(f"{'BANDWIDTH':<25} | {bandwidth_GBps:>15.2f} GiB/s")
+        print(f"{bandwidth_type + ' Bandwidth':<25} | {bandwidth_GBps:>15.2f} GiB/s")
         print("=" * 60 + "\n")
