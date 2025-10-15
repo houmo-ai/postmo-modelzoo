@@ -16,6 +16,11 @@
             "support_backends": ["xh2"],
             "path": "models/llm/qwen3-14b",
             "raw": "llm/Qwen3-14B"
+        },
+        "32b": {
+            "support_backends": ["xh2"],
+            "path": "models/llm/qwen3-32b",
+            "raw": "llm/qwen3-32b"
         }
     },
     "deepseek-r1-qwen": {

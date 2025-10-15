@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+RELEASE="ON"
 VERSION="0.4.0"
 models=(
     "qwen3;model_size:8b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_8b_2k_norm1fast_20250913.zip"
@@ -10,13 +11,15 @@ models=(
     "qwen3;model_size:14b;target:xh2;context_length:16384;prefill_length:256;batch:1;device_num:2;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_14b_2k_20250902.zip"
     "qwen3;model_size:14b;target:xh2;context_length:16384;prefill_length:256;batch:2;device_num:2;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_14b_2k_20250902.zip"
     "qwen3;model_size:14b;target:xh2;context_length:32768;prefill_length:256;batch:1;device_num:2;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_14b_2k_20250902.zip"
+    "qwen3;model_size:32b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:2;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/v0.4.0/qwen3/hmm_xh2_qwen3_32b_256_8k_b1_2chips_2cores_v0.4.0.zip"
     "qwen2.5;model_size:7b;target:xh2;context_length:2048;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5/hmquant_xh2_qwen2.5_7b_2k_20250904.zip"
     "qwen2.5;model_size:7b;target:xh2;context_length:4096;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5/hmquant_xh2_qwen2.5_7b_2k_20250904.zip"
     "qwen2.5;model_size:7b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5/hmquant_xh2_qwen2.5_7b_2k_20250904.zip"
     "deepseek-r1-qwen3;model_size:8b;target:xh2;context_length:4096;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/deepseek/hmquant_xh2_deepseek_qwen3_8b_2k_20250903.zip"
-    "qwen2.5-vl;model_size:7b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5-vl/hmquant_xh2_qwen2.5-vl_7b_256_2k_20250908.zip"
+    "qwen2.5-vl;model_size:7b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5-vl/hmquant_xh2_qwen2.5-vl_7b_256_2k_20251010.zip"
 )
 
+current_time=$(date +"%Y%m%d_%H%M%S")
 # 遍历模型列表
 for item in "${models[@]}"; do
     # 分割模型名称和参数部分（第一个分号前是模型名）
@@ -50,26 +53,39 @@ for item in "${models[@]}"; do
     fi
     if [[ $cmd != *"--result_dir"* ]]; then
         model_size="${model_params['model_size']}"
-        result_dir="/data/services/model_results/${model_name}_${model_size}"
+        result_dir="/data02/services/model_results/${model_name}_${model_size}"
         cmd+=" --result_dir $result_dir"
     fi
     cmd+=" -up -compile"
-    cmd+=" -release"
+    if [ "$RELEASE" = "ON" ]; then
+        cmd+=" -release -perf ${current_time}"
+    fi
 
     # 执行命令
     echo -e "\n执行命令: $cmd"
     eval "$cmd" || true
 
     # 检查执行结果
-    if [ $? -eq 0 ]; then
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 0 ]; then
         echo "模型${model_name}编译成功"
     else
-        echo "错误: 模型${model_name}编译失败"
-        # exit 1
+        echo "错误: 模型${model_name}编译失败, 错误码:${EXIT_CODE}"
     fi
+    RET=$EXIT_CODE
 
     # 清理参数数组
     unset model_params
 done
+echo "所有模型编译完成 $(date)"
 
-echo "所有模型编译完成"
+if [ "$RELEASE" = "ON" ]; then
+    echo "开始在 10.64.35.71 执行XH2 Perf $(date)"
+    ssh wanyu.li@10.64.35.71 "python3 /data/services/imodelzoo/service/llm_compiler/perf_llms.py -v ${VERSION} -perf ${current_time} -log /data/services/imodelzoo/service/llm_compiler/compiler_perf_${current_time}.log"
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo "XH2远端Perf执行失败(退出码: $EXIT_CODE)" >&2
+        RET=$EXIT_CODE
+    fi
+fi
+exit $RET

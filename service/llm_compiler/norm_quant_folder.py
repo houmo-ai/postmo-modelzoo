@@ -59,12 +59,14 @@ def _process_model_files(
         model_res_dir = os.path.join(result_dir, model_type)
         if model_type == "decode":
             model_res_dir = os.path.join(result_dir, "decoder")
+        elif model_type == "vision":
+            model_res_dir = os.path.join(result_dir, "visual")
         os.makedirs(model_res_dir, exist_ok=True)
         print(f"已创建目标文件夹结构: {model_res_dir}")
 
         # 2. 处理 hmquant_*_with_act.onnx
         onnx_files = find_file_recursive(
-            quant_dir, f"hmquant_*_{model_type}_with_act.onnx"
+            quant_dir, f"hmquant_*{model_type}*with_act.onnx"
         )
         if len(onnx_files) == 0:
             return False
@@ -75,7 +77,7 @@ def _process_model_files(
         print(f"已重命名并移动: {onnx_src} -> {onnx_dst}")
 
         # 3. 处理 *_external_data文件
-        external_files = find_file_recursive(quant_dir, f"*_{model_type}_external_data")
+        external_files = find_file_recursive(quant_dir, f"*{model_type}*external_data")
         if len(external_files) == 0:
             return False
         for external_file in external_files:
@@ -92,24 +94,34 @@ def _process_model_files(
                 print(f"已移动: {external_file} -> {external_dst}")
 
         # 4. 处理golden数据
-        golden = find_file_recursive(quant_dir, f"hmquant_*_{model_type}_*_input.npy")
+        golden = find_file_recursive(quant_dir, f"hmquant_*{model_type}_*_input.npy")
         opt_golden = find_file_recursive(
-            quant_dir, f"hmquant_*_{model_type}_*_output.npy"
+            quant_dir, f"hmquant_*{model_type}_*_output.npy"
         )
         golden += opt_golden
-        name_pattern = (
-            r"(?<=hmquant_).*?_decode"
-            if model_type == "decode"
-            else r"(?<=hmquant_).*?_prefill"
-        )
+        name_pattern = r"(?<=hmquant_).*?_decode"
+        if model_type == "prefill":
+            name_pattern = r"(?<=hmquant_).*?_prefill"
+        elif model_type == "vision":
+            name_pattern = r'(hmquant_)(qwen2\.5-vl-7b-insturct-vision)(_xh2a_360p_batch_image_)(.*?)(\.npy)'
+
         for data_file in golden:
             file_name = os.path.basename(data_file)
+            if "image_embeds" in file_name:
+                data_dst = os.path.join(model_res_dir, "image_embeds.npy")
+                shutil.copy(data_file, data_dst)
+                print(f"已移动: {data_file} -> {data_dst}")
+                continue
             match = re.search(name_pattern, file_name)
             if match:
-                original_name = match.group()
-                file_name_new = file_name.replace(original_name, model_name)
+                if model_type != "vision":
+                    original_name = match.group()
+                    file_name_new = file_name.replace(original_name, model_name)
+                else:
+                    file_name_new = (
+                        f"{match.group(1)}{model_name}_{match.group(4)}{match.group(5)}"
+                    )
                 data_dst = os.path.join(model_res_dir, file_name_new)
-
                 shutil.copy(data_file, data_dst)
                 print(f"已移动: {data_file} -> {data_dst}")
 
@@ -152,6 +164,11 @@ if __name__ == "__main__":
             sys.exit(-1)
         if not _process_model_files(quant_dir, result_dir, model_name, "prefill"):
             print(f"错误: 处理prefill文件夹失败")
+            sys.exit(-1)
+        if os.path.exists(f"{quant_dir}/vision") and not _process_model_files(
+            quant_dir, result_dir, model_name, "vision"
+        ):
+            print(f"错误: 处理visual文件夹失败")
             sys.exit(-1)
         print("文件处理完成！")
 
