@@ -43,7 +43,7 @@ def get_args() -> argparse.Namespace:
         "--context_length",
         dest="context_length",
         type=str,
-        default="2k",
+        default="8k",
         help="context_length",
     )
     args = parser.parse_args()
@@ -59,7 +59,6 @@ if __name__ == "__main__":
     HOUMO_MODEL_PATH = os.getenv("HOUMO_MODEL_PATH", ".")
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
     hmm_map = {
-        (1, "2k"): "models/qwen3/hmm_xh2_qwen3_14b_256_2k_2cores_20250701.zip",
         (1, "8k"): "models/qwen3/hmm_xh2_qwen3_14b_256_8k_2cores_20250701.zip",
         (
             2,
