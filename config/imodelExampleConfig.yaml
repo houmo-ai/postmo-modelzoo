@@ -38,9 +38,9 @@ backbone_mobilenetv2:
     - backbone_mobilenetv2_test
 backbone_ViT-B-16:
   include:
-    - ../models/backbone/ViT-B-16
+    - models/backbone/ViT-B-16
   exclude:
-    - ../models/backbone/ViT-B-16/README.MD
+    - models/backbone/ViT-B-16/README.MD
   example_case:
     - backbone_ViT-B-16_test:
         test_type: models_tests
@@ -110,7 +110,7 @@ detection_yolov8m:
     - detection_yolov8m_test
 multi_input_custom_random_model:
   include:
-    - ../models/multi_input_custom_random_model
+    - models/multi_input_custom_random_model
   exclude: null
   example_case:
     - multi_input_custom_random_model_test:
@@ -192,9 +192,9 @@ hmatc:
 
 tools_computing_perf:
   include:
-    - ../apis/tools/computing_perf
+    - apis/tools/computing_perf
   exclude:
-    - ../apis/tools/computing_perf/README.MD
+    - apis/tools/computing_perf/README.MD
   example_case:
     - tools_computing_perf_test:
         script: ../apis/tools/computing_perf/run.sh
@@ -203,9 +203,9 @@ tools_computing_perf:
 
 tools_bandwidth_perf:
   include:
-    - ../apis/tools/bandwidth_perf
+    - apis/tools/bandwidth_perf
   exclude:
-    - ../apis/tools/bandwidth_perf/README.MD
+    - apis/tools/bandwidth_perf/README.MD
   example_case:
     - tools_bandwidth_perf_test:
         script: ../apis/tools/bandwidth_perf/run.sh
@@ -239,9 +239,9 @@ inferences_yolov5s:
     - inferences_yolov5s_test
 inferences_yolov5s_dynamic:
   include:
-    - ../apis/inferences/yolov5s_dynamic
+    - apis/inferences/yolov5s_dynamic
   exclude:
-    - ../apis/inferences/yolov5s_dynamic/README.MD
+    - apis/inferences/yolov5s_dynamic/README.MD
   example_case:
     - inferences_yolov5s_dynamic_test:
         script: ../apis/inferences/yolov5s_dynamic/run.sh
