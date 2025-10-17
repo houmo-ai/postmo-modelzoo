@@ -16,7 +16,7 @@
         },
         "xh2": {
             "enable_ort": ["default", true, false]
-        }       
+        }
     },
     "py_example_params": {
         "name": "yolov5s.py",

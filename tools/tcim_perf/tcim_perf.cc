@@ -52,7 +52,7 @@ struct CliArguments {
   std::string model_path;
   std::string model_name;
   std::string input_path = ".";
-  std::string output_pat = ".";
+  std::string output_path = ".";
   size_t batch = 1;
   size_t warm_up = 1;
   size_t threads = 1;
@@ -373,9 +373,8 @@ int main(int argc, char *argv[]) {
     if (input_name == "valid_length" || input_name == "current_length") {
       if (fs::exists(data_file)) {
         std::vector<size_t> shape;
-        bool fortran_order;
         std::vector<int32_t> data;
-        npy::LoadArrayFromNumpy(data_file, shape, fortran_order, data);
+        npy::LoadArrayFromNumpy(data_file, shape, data);
         std::cout << input_name << ": " << data[0] << std::endl;
         memcpy(tensor.Data(), &data[0], tensor.Info().MemSize());
       } else {

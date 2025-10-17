@@ -11,6 +11,7 @@ os_type:
       - models
       - data
       - hmodel
+      - tools
       - env.sh
       - requirements.txt
       - README.md

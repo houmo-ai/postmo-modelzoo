@@ -6,4 +6,8 @@ include_directories($ENV{HOUMO_EXAMPLES_PATH}/apis/common/nlohmann/include)
 
 add_executable(${CMAKE_PROJECT_NAME} tcim_perf.cc)
 target_link_libraries(${CMAKE_PROJECT_NAME} ${TCIM_LIBRARY} dl)
+if(ANDROID)
+else()
+    target_link_libraries(${CMAKE_PROJECT_NAME} pthread)
+endif()
 install(TARGETS ${CMAKE_PROJECT_NAME} DESTINATION .)
