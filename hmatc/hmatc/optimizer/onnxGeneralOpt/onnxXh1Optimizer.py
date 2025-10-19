@@ -8,9 +8,10 @@ Date: 2025/08/05
 Company: Houmo
 """
 
-#import platform
+# import platform
 
 import numpy as np  # type: ignore
+
 # from onnx import onnx_ml_pb2  # type: ignore
 # import onnx.helper  # type: ignore
 # import onnx.shape_inference  # type: ignore
@@ -18,17 +19,19 @@ import numpy as np  # type: ignore
 import onnxruntime as rt  # type: ignore
 
 from .onnxNpuPlatformOptimizerManager import NpuOptimizerManager
-#from ..onnxBaseOpt.onnxOptimizerManager import OnnxOptimizerManager
+
+# from ..onnxBaseOpt.onnxOptimizerManager import OnnxOptimizerManager
 from ..onnxBaseOpt.onnxBaseOptimizer import OnnxBaseOptimizer
 from ..onnxBaseOpt.onnxConfigController import OnnxCfg
 from ..onnxBaseOpt.onnxBaseFunctions import *
 from .onnxGeneralManager.onnxGeneralDeleteFunctions import *
 from .onnxGeneralManager.onnxGeneralFusionFunctions import *
 from .onnxGeneralManager.onnxGeneralReplaceFunctions import *
-#from .onnxGeneralSeperateFunctions import *
-#from .onnxGeneralGraphCheckFunctions import *
-#from .onnxGeneralPrecisionFunctions import *
-#from .onnxTransformerFunctions import *
+
+# from .onnxGeneralSeperateFunctions import *
+# from .onnxGeneralGraphCheckFunctions import *
+# from .onnxGeneralPrecisionFunctions import *
+# from .onnxTransformerFunctions import *
 
 from .onnxXh1OptManager.onnxXh1ReplaceFunctions import *
 from .onnxXh1OptManager.onnxXh1FusionFunctions import *
@@ -39,18 +42,18 @@ TensorShapes = Dict[Optional[str], TensorShape]
 
 @NpuOptimizerManager("houmo.xh1")
 class OnnxXh1Optimizer(OnnxBaseOptimizer):
-    '''
+    """
     Explanation: This optimizer takes charge of general onnx optimization functions.
     Author: Nan Xu
     Maintainer: Nan Xu
-    '''
+    """
 
     @classmethod
     def opt(cls, onnx_model, *args):
-        '''
+        """
         :onnx_model input onnx model
         :return: onnx model
-        '''
+        """
         # loop opt, single loop opt is not enough sometimes
         logger.info("\033[1;32m============== General Optimizer ==============\033[0m")
         onnx_model_ori = copy.deepcopy(onnx_model)
@@ -66,6 +69,8 @@ class OnnxXh1Optimizer(OnnxBaseOptimizer):
 
     @classmethod
     def opt_loop(cls, onnx_model):
+        onnx_model = replace_ThreeScatterND_of_ReshapeTransposeGather(onnx_model)
+        onnx_model = delete_reshape_expand(onnx_model)
         onnx_model = replace_focus_layer_of_Conv(onnx_model)
 
         onnx_model = replace_GatherUnsqueeze_of_Slice(onnx_model)

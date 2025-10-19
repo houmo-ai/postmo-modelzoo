@@ -1,16 +1,17 @@
 import copy
-from ....utils import logger
 import math
-
+import onnx_graphsurgeon as gs
 import numpy as np  # type: ignore
 import onnx  # type: ignore
-
-#from ..onnxBaseOpt.onnxRuntimeEngine import OnnxRuntimeEngine
-from ...onnxBaseOpt.onnxDebugger import OnnxDebugger
-#from ..onnxBaseOpt.onnxBaseFunctions import infer_shapes
-from ...onnxBaseOpt.onnxBaseOptimizer import OnnxBaseOptimizer
+from ....utils import logger
 from ...onnxUtils.onnxBasicUtils import *
-#from ..onnxBaseOpt.onnxConfigController import OnnxCfg
+from ...onnxBaseOpt.onnxDebugger import OnnxDebugger
+from ...onnxBaseOpt.onnxBaseOptimizer import OnnxBaseOptimizer
+
+# from ..onnxBaseOpt.onnxBaseFunctions import infer_shapes
+# from ..onnxBaseOpt.onnxRuntimeEngine import OnnxRuntimeEngine
+# from ..onnxBaseOpt.onnxConfigController import OnnxCfg
+
 
 # delete shape useless func region
 def delete_shape_useless_node(onnx_model, node, op_type):
@@ -25,51 +26,77 @@ def delete_shape_useless_node(onnx_model, node, op_type):
         output_value_info = get_value_info_by_name(onnx_model, del_node.output[0])
         if input_value_info is None or output_value_info is None:
             return onnx_model, False
-        input_shape = [d.dim_value if d.dim_value > 0 else 1 for d in input_value_info.type.tensor_type.shape.dim]
-        output_shape = [d.dim_value if d.dim_value > 0 else 1 for d in output_value_info.type.tensor_type.shape.dim]
+        input_shape = [
+            d.dim_value if d.dim_value > 0 else 1
+            for d in input_value_info.type.tensor_type.shape.dim
+        ]
+        output_shape = [
+            d.dim_value if d.dim_value > 0 else 1
+            for d in output_value_info.type.tensor_type.shape.dim
+        ]
         if input_shape != output_shape:
             return onnx_model, False
-        if input_value_info.type.tensor_type.elem_type != output_value_info.type.tensor_type.elem_type:
+        if (
+            input_value_info.type.tensor_type.elem_type
+            != output_value_info.type.tensor_type.elem_type
+        ):
             return onnx_model, False
         model_inputs_names = [input_.name for input_ in onnx_model.graph.input]
         model_outputs_names = [output.name for output in onnx_model.graph.output]
-        if del_node.input[0] in [*model_inputs_names, *model_outputs_names] and \
-                del_node.output[0] in model_outputs_names:
+        if (
+            del_node.input[0] in [*model_inputs_names, *model_outputs_names]
+            and del_node.output[0] in model_outputs_names
+        ):
             return onnx_model, False
         logger.debug(f"Delete:{op_type}")
         logger.debug(f"Nodes:{del_node.name}")
         logger.debug(f"Input:{del_node.input}")
         onnx_model.graph.node.remove(del_node)
         if del_node.output[0] not in model_outputs_names:
-            replace_input_of_all_nodes(onnx_model, del_node.output[0], del_node.input[0])
+            replace_input_of_all_nodes(
+                onnx_model, del_node.output[0], del_node.input[0]
+            )
         else:
             prev_node = get_node_by_output(onnx_model, del_node.input[0])
             replace_node_output(prev_node, del_node.input[0], del_node.output[0])
-            replace_input_of_all_nodes(onnx_model, del_node.input[0], del_node.output[0])
+            replace_input_of_all_nodes(
+                onnx_model, del_node.input[0], del_node.output[0]
+            )
         delete_useless_input_in_initializer(onnx_model)
         return onnx_model, True
     return onnx_model, False
 
+
 @OnnxDebugger.onnx_opt_func_debug_wrapper
 @OnnxBaseOptimizer.onnx_opt_once_wrapper
 def delete_useless_pool(onnx_model, node):
-    '''
+    """
     Explanation: This function deletes some invalid 1D and 2D Pool operators.
     example: dilations, kernel_shape and strides belongs to [1] or [1, 1] and pads belongs to [0, 0] or [0, 0, 0, 0] and storage_order equal 0.
     Author: Nan Xu
-    '''
+    """
     if node.op_type not in ["MaxPool", "AveragePool"]:
         return onnx_model, False
     input_shape = get_shape_by_name(onnx_model, node.input[0])
     if len(input_shape) not in [3, 4]:
         return onnx_model, False
     pool_attribute = attribute_to_dict(node.attribute)
-    dilations = pool_attribute.get("dilations", [1] if len(input_shape) == 3 else [1, 1])
-    kernel_shape = pool_attribute.get("kernel_shape", [1] if len(input_shape) == 3 else [1, 1])
+    dilations = pool_attribute.get(
+        "dilations", [1] if len(input_shape) == 3 else [1, 1]
+    )
+    kernel_shape = pool_attribute.get(
+        "kernel_shape", [1] if len(input_shape) == 3 else [1, 1]
+    )
     pads = pool_attribute.get("pads", [0, 0] if len(input_shape) == 3 else [0, 0, 0, 0])
     strides = pool_attribute.get("strides", [1] if len(input_shape) == 3 else [1, 1])
     storage_order = pool_attribute.get("storage_order", 0)
-    if set(dilations) != {1} or set(kernel_shape) != {1} or set(pads) != {0} or set(strides) != {1} or storage_order != 0:
+    if (
+        set(dilations) != {1}
+        or set(kernel_shape) != {1}
+        or set(pads) != {0}
+        or set(strides) != {1}
+        or storage_order != 0
+    ):
         return onnx_model, False
     logger.debug("Delete:Pool")
     logger.debug(f"Nodes:{node.name}")
@@ -99,3 +126,31 @@ def delete_useless_pool(onnx_model, node):
         onnx_model.graph.value_info.remove(pool_input_value_info)
     onnx_model.graph.node.remove(node)
     return onnx_model, True
+
+
+@OnnxDebugger.onnx_opt_func_debug_wrapper
+@OnnxBaseOptimizer.onnx_opt_traverse_wrapper
+def delete_reshape_expand(
+    onnx_model: onnx.ModelProto, onnx_node: onnx.NodeProto, node_index: int
+):
+    if onnx_node.op_type != "Reshape":
+        return onnx_model, False
+    graph = gs.import_onnx(onnx_model)
+    found = False
+    for _node in graph.nodes:
+        if onnx_node.name != _node.name:
+            continue
+        node = _node
+        found = True
+        break
+    if found and node.op == "Reshape" and node.o(0).op == "Expand":
+        reshape_node = node
+        expand_node = node.o(0)
+        if reshape_node.inputs[0].shape == expand_node.outputs[0].shape:
+            expand_node.o(0).inputs[0] = reshape_node.i(0).outputs[0]
+            expand_node.outputs = []
+            graph.cleanup().toposort()
+            new_model = gs.export_onnx(graph)
+            new_model.ir_version = 8
+            return new_model, True
+    return onnx_model, False
