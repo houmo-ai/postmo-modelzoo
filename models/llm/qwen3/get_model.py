@@ -1,11 +1,14 @@
 import os
 import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog
+from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
+runtime_version = runtime_version.split(".dev")[0]
 
 
 def get_args() -> argparse.Namespace:
@@ -32,10 +35,19 @@ def get_args() -> argparse.Namespace:
         help='where to save downloaded model',
     )
     parser.add_argument(
+        "--context_length",
+        dest="context_length",
+        type=str,
+        default="8k",
+        choices=["2k", "8k"],
+        help="context length",
+    )
+    parser.add_argument(
         '--batch',
         dest='batch',
         type=int,
         default=1,
+        choices=[1, 2, 4],
         help='batch size',
     )
     args = parser.parse_args()
@@ -50,15 +62,17 @@ if __name__ == '__main__':
     HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
-    if HOUMO_TARGET == "xh1":
-        hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250728.zip"
-    elif HOUMO_TARGET == "xh2":
-        if args.batch == 1:
-            hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250808.zip"
-        elif args.batch == 2:
-            hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_2k_2batch_2cores_20250912.zip"
-        elif args.batch == 4:
-            hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_2k_4batch_2cores_20250912.zip"
+
+    model_name = "qwen3"
+    model_size = "8b"
+    ncore = "2cores" if HOUMO_TARGET == "xh2" else "4cores"
+    ndevice = "1chip"
+    context_len = args.context_length
+    prefill_len = 256
+    batch = args.batch
+    version = f"v{runtime_version}"
+    target = HOUMO_TARGET
+    hmm_path = f"models/{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
 
     if model_type in ["raw"]:
         ignore_patterns = []

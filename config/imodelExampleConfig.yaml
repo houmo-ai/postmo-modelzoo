@@ -153,6 +153,54 @@ segmentation_yolov8m_seg:
         args: all
   test:
     - segmentation_yolov8m_seg_test
+llm_qwen3:
+  include:
+    - models/llm/qwen3
+  exclude:
+    - models/llm/qwen3/README.MD
+  example_case:
+    - llm_qwen3_test:
+        test_type: models_tests
+        script: qwen3
+        args: all
+  test:
+    - llm_qwen3_test
+# llm_qwen2.5:
+#   include:
+#     - models/llm/qwen2.5
+#   exclude:
+#     - models/llm/qwen2.5/README.MD
+#   example_case:
+#     - llm_qwen2.5_test:
+#         test_type: models_tests
+#         script: qwen2dot5
+#         args: all
+#   test:
+#     - llm_qwen2.5_test
+# llm_qwen3_14b:
+#   include:
+#     - models/llm/qwen3-14b
+#   exclude:
+#     - models/llm/qwen3-14b/README.MD
+#   example_case:
+#     - llm_qwen3_14b_test:
+#         test_type: models_tests
+#         script: qwen3_14b
+#         args: all
+#   test:
+#     - llm_qwen3_14b_test
+# llm_deepseek_r1_qwen3_8b:
+#   include:
+#     - models/llm/deepseek-r1-qwen3-8b
+#   exclude:
+#     - models/llm/deepseek-r1-qwen3-8b/README.MD
+#   example_case:
+#     - llm_deepseek_r1_qwen3_8b_test:
+#         test_type: models_tests
+#         script: deepseek_r1_qwen3_8b
+#         args: all
+#   test:
+#     - llm_deepseek_r1_qwen3_8b_test
 asr_wenet:
   include:
     - models/asr/wenet

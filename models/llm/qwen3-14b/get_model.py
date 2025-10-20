@@ -1,11 +1,14 @@
 import os
 import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog
+from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2."
+
+runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
+runtime_version = runtime_version.split(".dev")[0]
 
 
 def get_args() -> argparse.Namespace:
@@ -32,19 +35,27 @@ def get_args() -> argparse.Namespace:
         help="where to save downloaded model",
     )
     parser.add_argument(
-        "--ndevice",
-        dest="ndevice",
+        "--batch",
+        dest="batch",
         type=int,
         default=1,
         choices=[1, 2],
-        help="device number",
+        help="batch size",
     )
     parser.add_argument(
         "--context_length",
         dest="context_length",
         type=str,
         default="8k",
-        help="context_length",
+        help="context length",
+    )
+    parser.add_argument(
+        "--ndevice",
+        dest="ndevice",
+        type=int,
+        default=1,
+        choices=[1, 2],
+        help="device number",
     )
     args = parser.parse_args()
     return args
@@ -58,19 +69,17 @@ if __name__ == "__main__":
     HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH", ".")
     HOUMO_MODEL_PATH = os.getenv("HOUMO_MODEL_PATH", ".")
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
-    hmm_map = {
-        (1, "8k"): "models/qwen3/hmm_xh2_qwen3_14b_256_8k_2cores_20250701.zip",
-        (
-            2,
-            "2k",
-        ): "models/qwen3/hmm_xh2_qwen3_14b_256_2k_2cores_2devices_202508013.zip",
-        (
-            2,
-            "16k",
-        ): "models/qwen3/hmm_xh2_qwen3_14b_256_16k_2cores_2devices_20250813.zip",
-    }
-    key = (args.ndevice, args.context_length)
-    hmm_path = hmm_map.get(key)
+
+    model_name = "qwen3"
+    model_size = "14b"
+    ncore = "2cores"
+    ndevice = "1chip" if args.ndevice < 2 else f"{args.ndevice}chips"
+    context_len = args.context_length
+    prefill_len = 256
+    batch = args.batch
+    version = f"v{runtime_version}"
+    target = HOUMO_TARGET
+    hmm_path = f"models/{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
 
     if model_type in ["raw"]:
         ignore_patterns = []
@@ -86,7 +95,7 @@ if __name__ == "__main__":
         ignore_patterns=ignore_patterns,
     )
 
-    if model_type in ["hmm"] and (
-        not hmm_path or not get_file_from_jfrog(hmm_path, model_dir, build_model_dir)
+    if model_type in ["hmm"] and not get_file_from_jfrog(
+        hmm_path, model_dir, build_model_dir
     ):
         sys.exit(1)

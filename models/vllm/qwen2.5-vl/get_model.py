@@ -1,11 +1,14 @@
 import os
 import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog
+from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
+runtime_version = runtime_version.split(".dev")[0]
 
 
 def get_args() -> argparse.Namespace:
@@ -58,21 +61,20 @@ if __name__ == '__main__':
     model_dir = args.model_dir
     HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
-    if HOUMO_TARGET == "xh1" and args.model_size == "3b":
-        quant_path = (
-            "models_outdated/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_3b_256_2k_20250903.zip"
-        )
-        hmm_path = "models/qwen2.5-vl/hmm_xh1_qwen2.5-vl_3b_256_2k_4cores_20250923.zip"
-    elif HOUMO_TARGET == "xh1" and args.model_size == "7b":
-        quant_path = (
-            "models_outdated/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_7b_256_2k_20250903.zip"
-        )
-        hmm_path = "models/qwen2.5-vl/hmm_xh1_qwen2.5-vl_7b_256_2k_4cores_20251014.zip"
-    elif HOUMO_TARGET == "xh2" and args.model_size == "7b":
-        quant_path = (
-            "models_outdated/qwen2.5-vl/hmquant_xh2_qwen2.5-vl_7b_256_2k_20250908.zip"
-        )
-        hmm_path = "models/qwen2.5-vl/hmm_xh2_qwen2.5-vl_7b_256_2k_2cores_20250908.zip"
+
+    model_name = "qwen2.5-vl"
+    model_size = args.model_size
+    ncore = "2cores" if HOUMO_TARGET == "xh2" else "4cores"
+    ndevice = "1chip"
+    context_len = "8k" if HOUMO_TARGET == "xh2" else "2k"
+    prefill_len = 256
+    batch = 1
+    version = f"v{runtime_version}"
+    target = HOUMO_TARGET
+    hmm_path = f"models/{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
+
+    date_str = "20250908" if HOUMO_TARGET == "xh2" else "20250903"
+    quant_path = f"models_outdated/qwen2.5-vl/hmquant_{target}_{model_name}_{model_size}_256_2k_{date_str}.zip"
 
     if model_type in ["raw"]:
         ignore_patterns = []

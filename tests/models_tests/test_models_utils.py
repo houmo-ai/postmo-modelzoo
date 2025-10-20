@@ -970,6 +970,18 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         restore_models_res(src_folder, current_folder)
 
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    if (
+        model_type == "llm"
+        and get_test_type() == TCaseType.SEPARATE_INFER
+        and is_release()
+    ):
+        execute_test_cmd(
+            ["python3", "get_model.py", "--model_dir", model_set_dir, "--type", "hmm"],
+            log_file,
+            True,
+        )
+
     # install python requirements
     changed_libs = install_py_env(current_folder, log_file)
     if changed_libs:
@@ -993,7 +1005,6 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         params_dict = model_info["demo_params"][HOUMO_BACKEND]
         cmd_header = ["python3", "demo.py"]
 
-        model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
         model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         cmd_list = _generate_py_cmds(
             cmd_header,
@@ -1170,6 +1181,17 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
     if model_type == "cv" and get_test_type() == TCaseType.SEPARATE_INFER:
         src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         restore_models_res(src_folder, current_folder)
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    if (
+        model_type == "llm"
+        and get_test_type() == TCaseType.SEPARATE_INFER
+        and is_release()
+    ):
+        execute_test_cmd(
+            ["python3", "get_model.py", "--model_dir", model_set_dir, "--type", "hmm"],
+            log_file,
+            True,
+        )
 
     final_flag = True
     if model_info.get("perf_params", None) == "demo":
@@ -1204,7 +1226,6 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                 error_msg = f"Performance {infer_val} degradation exceeds 5%, benchmark time is {benchmark} ms."
                 logger.error(error_msg)
         elif model_name == "sdxl":
-            model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
             demo_params = model_info["demo_params"][HOUMO_BACKEND]
             perf_idx = 0
             model_path = demo_params["model_path"][perf_idx].replace(
@@ -1251,7 +1272,6 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                 error_msg = f"Performance {infer_val} degradation exceeds 5%, benchmark time is {benchmark} ms."
                 logger.error(error_msg)
         else:
-            model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
             perf_idx = 0
             demo_cmd = ["python3", "demo.py"]
             demo_params = model_info["demo_params"][HOUMO_BACKEND]
