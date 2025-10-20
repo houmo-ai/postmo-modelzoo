@@ -71,6 +71,7 @@ class OnnxXh1Optimizer(OnnxBaseOptimizer):
     def opt_loop(cls, onnx_model):
         onnx_model = replace_ThreeScatterND_of_ReshapeTransposeGather(onnx_model)
         onnx_model = delete_reshape_expand(onnx_model)
+        onnx_model = fusion_SliceSlice(onnx_model)
         onnx_model = replace_focus_layer_of_Conv(onnx_model)
 
         onnx_model = replace_GatherUnsqueeze_of_Slice(onnx_model)

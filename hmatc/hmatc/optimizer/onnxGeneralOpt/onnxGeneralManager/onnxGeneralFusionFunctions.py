@@ -347,3 +347,111 @@ def fusion_TransposeReshapePoolReshapeTranspose(onnx_model):
     if restart:
         onnx_model = fusion_TransposePoolTranspose(onnx_model)
     return onnx_model, restart
+
+@OnnxDebugger.onnx_opt_func_debug_wrapper
+@OnnxBaseOptimizer.onnx_opt_traverse_wrapper
+def fusion_SliceSlice(onnx_model, node, node_index):
+    '''
+    Explanation:This function completes the fusion of two slice.
+    example: Slice + Slice -> Slice
+    Author: Nan.xu
+    '''
+    if check_node_serial_group(onnx_model, node, ["Slice", "Slice"]):
+        slice_node0, slice_node1 = get_node_serial_group(onnx_model, node, ["Slice", "Slice"])
+        next_nodes = get_node_by_input(onnx_model, slice_node0.output)
+        if len(next_nodes) > 1:
+            return onnx_model, False
+        input_shape0 = get_shape_by_name(onnx_model, slice_node0.input[0])
+        input_shape1 = get_shape_by_name(onnx_model, slice_node1.input[0])
+        if len(input_shape0) != len(input_shape1):
+            return onnx_model, False
+        starts0 = list(get_tensor_from_initializer(onnx_model, slice_node0.input[1]))
+        ends0 = list(get_tensor_from_initializer(onnx_model, slice_node0.input[2]))
+        axes0 = list(get_tensor_from_initializer_with_default(onnx_model, slice_node0.input[3], list(range(len(starts0))))) \
+                if len(slice_node0.input) > 3 else list(range(len(starts0)))
+        axes0 = sorted([(a + len(input_shape0)) % len(input_shape0) for a in axes0])
+        steps0 = list(get_tensor_from_initializer_with_default(onnx_model, slice_node0.input[4], [1 for i in range(len(starts0))])) \
+                if len(slice_node0.input) > 4 else [1 for i in range(len(starts0))]
+        starts1 = list(get_tensor_from_initializer(onnx_model, slice_node1.input[1]))
+        ends1 = list(get_tensor_from_initializer(onnx_model, slice_node1.input[2]))
+        axes1 = list(get_tensor_from_initializer_with_default(onnx_model, slice_node1.input[3], list(range(len(starts1))))) \
+                if len(slice_node1.input) > 3 else list(range(len(starts1)))
+        axes1 = sorted([(a + len(input_shape1)) % (len(input_shape1)) for a in axes1])
+        steps1 = list(get_tensor_from_initializer_with_default(onnx_model, slice_node1.input[4], [1 for i in range(len(starts1))])) \
+                if len(slice_node1.input) > 4 else [1 for i in range(len(starts1))]
+        
+        standard_starts0 = [0 for i in range(len(input_shape0))]
+        standard_ends0 = [i for i in input_shape0]
+        standard_steps0 = [1 for i in range(len(input_shape0))]
+        for a, axis in enumerate(axes0):
+            standard_starts0[axis] = max(starts0[a], 0)
+            standard_ends0[axis] = min(ends0[a], input_shape0[axis])
+            standard_steps0[axis] = steps0[a]
+        valid_axes0 = []
+        for i in range(len(input_shape0)):
+            if not (standard_starts0[i] == 0 and standard_ends0[i] == input_shape0[i] and standard_steps0[i] == 1):
+                valid_axes0.append(i)
+
+        standard_starts1 = [0 for i in range(len(input_shape1))]
+        standard_ends1 = [i for i in input_shape1]
+        standard_steps1 = [1 for i in range(len(input_shape1))]
+        for a, axis in enumerate(axes1):
+            standard_starts1[axis] = max(starts1[a], 0)
+            standard_ends1[axis] = min(ends1[a], input_shape1[axis])
+            standard_steps1[axis] = steps1[a]
+        valid_axes1 = []
+        for i in range(len(input_shape1)):
+            if not (standard_starts1[i] == 0 and standard_ends1[i] == input_shape1[i] and standard_steps1[i] == 1):
+                valid_axes1.append(i)
+        if set(valid_axes0).intersection(set(valid_axes1)):
+            return onnx_model, False
+        logger.debug("Fusion:Slice+Slice->Slice")
+        logger.debug(f"Nodes:{slice_node0.name}")
+        logger.debug(f"Input:{slice_node0.input}")
+        new_starts = []
+        new_ends = []
+        new_steps = []
+        new_axes = []
+        for i in range(len(input_shape0)):
+            if i in valid_axes0:
+                new_axes.append(i)
+                new_starts.append(standard_starts0[i])
+                new_ends.append(standard_ends0[i])
+                new_steps.append(standard_steps0[i])
+            elif i in valid_axes1:
+                new_axes.append(i)
+                new_starts.append(standard_starts1[i])
+                new_ends.append(standard_ends1[i])
+                new_steps.append(standard_steps1[i])
+            else:
+                continue
+        
+        new_slice_axes = np.array(new_axes, dtype=np.int64)
+        new_slice_starts = np.array(new_starts, dtype=np.int64) 
+        new_slice_ends = np.array(new_ends, dtype=np.int64)
+        new_slice_steps = np.array(new_steps, dtype=np.int64)
+
+        new_starts_init = onnx.numpy_helper.from_array(new_slice_starts, slice_node0.name+"_starts_fusion")
+        new_ends_init = onnx.numpy_helper.from_array(new_slice_ends, slice_node0.name+"_ends_fusion")
+        new_axes_init = onnx.numpy_helper.from_array(new_slice_axes, slice_node0.name+"_axes_fusion")
+        new_steps_init = onnx.numpy_helper.from_array(new_slice_steps, slice_node0.name+"_steps_fusion")
+        onnx_model.graph.initializer.extend(
+            [new_starts_init, new_ends_init, new_axes_init, new_steps_init]
+        )
+        slice_node0.input[1] = new_starts_init.name
+        slice_node0.input[2] = new_ends_init.name
+        if len(slice_node0.input) > 3:
+            slice_node0.input[3] = new_axes_init.name
+        else:
+            slice_node0.input.append(new_axes_init.name)
+        if len(slice_node0.input) > 4:
+            slice_node0.input[4] = new_steps_init.name
+        else:
+            slice_node0.input.append(new_steps_init.name)
+        slice_node0.output[0] = slice_node1.output[0]
+        del_value_info = get_value_info_by_name(onnx_model, slice_node1.input[0])
+        onnx_model.graph.value_info.remove(del_value_info)
+        onnx_model = delete_nodes(onnx_model, [slice_node1])
+        onnx_model = delete_useless_input_in_initializer(onnx_model)
+        return onnx_model, True
+    return onnx_model, False

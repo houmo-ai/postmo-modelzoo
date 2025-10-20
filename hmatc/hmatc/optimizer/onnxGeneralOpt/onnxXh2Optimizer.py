@@ -67,6 +67,7 @@ class OnnxXh2Optimizer(OnnxBaseOptimizer):
 
     @classmethod
     def opt_loop(cls, onnx_model):
+        onnx_model = fusion_SliceSlice(onnx_model)
         onnx_model = replace_GatherUnsqueeze_of_Slice(onnx_model)
         onnx_model = delete_useless_pool(onnx_model)
         onnx_model = replace_MaxPool1D_of_MaxPool2D(onnx_model)
