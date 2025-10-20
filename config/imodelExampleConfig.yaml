@@ -201,6 +201,18 @@ llm_qwen3:
 #         args: all
 #   test:
 #     - llm_deepseek_r1_qwen3_8b_test
+# llm_deepseek:
+#   include:
+#     - models/llm/deepseek
+#   exclude:
+#     - models/llm/deepseek/README.MD
+#   example_case:
+#     - llm_deepseek_test:
+#         test_type: models_tests
+#         script: deepseek
+#         args: all
+#   test:
+#     - llm_deepseek_test
 asr_wenet:
   include:
     - models/asr/wenet
