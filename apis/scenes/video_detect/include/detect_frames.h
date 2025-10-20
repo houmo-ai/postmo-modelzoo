@@ -23,8 +23,7 @@ typedef struct {
 } InferInfo;
 
 void detect(InferInfo &infer_info, TaskQueue &qin, TaskQueue &qout,
-            Barrier &barrier);
-void classify(InferInfo &infer_info, TaskQueue &qin, TaskQueue &qout,
-              Barrier &barrier);
+            TaskQueue &qout_enc, Barrier &barrier);
+void classify(InferInfo &infer_info, TaskQueue &qin, Barrier &barrier);
 
 #endif  // EXAMPLES_SCENES_VIDEO_DETECT_INCLUDE_DETECT_FRAMES_H_

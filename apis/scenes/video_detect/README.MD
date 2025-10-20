@@ -7,29 +7,31 @@
 ## 概述
 
 本示例展示了两种编解码场景：
-- 视频解码+yolov5s检测模型推理+resnet50分类模型推理，展示视频检测推理Pipeline的基本使用方式。
-- JPEG图像编解码+yolov5s检测模型推理+resnet50分类模型推理，展示JPEG编解码+推理Pipeline的基本使用方式。
+
+- 视频编解码 + yolov5s 检测模型推理 + resnet50 分类模型推理，展示视频检测推理 Pipeline 的基本使用方式。
+- JPEG 图像编解码 + yolov5s 检测模型推理 + resnet50 分类模型推理，展示 JPEG 编解码+推理 Pipeline 的基本使用方式。
 
 对于视频解码，本示例提供两种实现方案：
-- （默认）后摩视频解码。在本方案中，提供Resize视频解码输出功能: 默认开启，将后摩视频解码输出resize为yolov5s输入大小 1080x1920，支持的解码输出最大尺寸为3840x2160。
-- Rockchip视频解码（后文均简称RK视频解码）。
 
-本示例默认执行场景：后摩视频解码并Resize解码输出，Resize后图像用于yolov5s检测模型推理+resnet50分类模型推理。如需运行其他场景，可通过一键执行脚本的参数控制，或修改编译参数控制。
+- （默认）后摩视频编解码。在本方案中，提供 Resize 视频解码输出功能: 默认开启，将后摩视频解码输出 resize 为 yolov5s 输入大小 1080x1920，支持的解码输出最大尺寸为 3840x2160。
+- Rockchip 视频解码（后文均简称 RK 视频解码）。
 
-本示例仅支持c++。由于后摩视频解码暂不支持windows，因此本示例不支持windows。
+本示例默认执行场景：后摩视频解码并 Resize 解码输出，Resize 后图像用于 yolov5s 检测模型推理+resnet50 分类模型推理，并将 yolov5s 检测结果编码为 h264 文件 。如需运行其他场景，可通过一键执行脚本的参数控制，或修改编译参数控制。
+
+本示例仅支持 c++。由于后摩视频解码暂不支持 windows，因此本示例不支持 windows。
 
 ## 软件依赖
 
-本示例依赖opencv库进行图像预处理和可视化，依赖ffmpeg库进行图像取流。
+本示例依赖 opencv 库进行图像预处理和可视化，依赖 ffmpeg 库进行图像取流。
 
-如视频解码实现方案使用RK解码，则需依赖mpp库进行视频解码。mpp库介绍及安装方法见：https://github.com/rockchip-linux/mpp 。
-成功安装mpp库后，将在`/usr/local/lib`下产生mpp相关的so库，mpp库提供的头文件将在`/usr/local/include/rockchip/`中。如果上述路径不存在mpp相关资源，则需从mpp安装路径拷贝相关资源至`/usr/local/lib`和`/usr/local/include/rockchip/`, 用于C++演示程序的编译。
+如视频解码实现方案使用 RK 解码，则需依赖 mpp 库进行视频解码。mpp 库介绍及安装方法见：https://github.com/rockchip-linux/mpp 。
+成功安装 mpp 库后，将在`/usr/local/lib`下产生 mpp 相关的 so 库，mpp 库提供的头文件将在`/usr/local/include/rockchip/`中。如果上述路径不存在 mpp 相关资源，则需从 mpp 安装路径拷贝相关资源至`/usr/local/lib`和`/usr/local/include/rockchip/`, 用于 C++演示程序的编译。
 
 ## 快速上手
 
 ### 1. 获取芯片模型
 
-通过get_model.py脚本下载预编译的模型，含yolov5s和resnet50两个模型。
+通过 get_model.py 脚本下载预编译的模型，含 yolov5s 和 resnet50 两个模型。
 
 ```bash
 python3 get_model.py
@@ -40,28 +42,31 @@ python3 get_model.py
 #### 2.1 演示程序可修改变量说明
 
 可通过修改 `video_detect.cc` 中 `main` 函数的变量指定运行参数:
+
 - `det_model_path`：检测模型路径
 - `cls_model_path`：分类模型路径
-- `stream_path`：视频流路径，目前支持h264/h265文件
-- `det_thread_num`：检测线程数
-- `cls_thread_num`：分类线程数
-- `frame_limit`：取视频流的前n帧，0表示所有（ISIM下推理性能低，默认设置为2）
+- `stream_path`：视频流路径，目前支持 h264/h265 文件
+- `codec_thread_num`：编解码器线程数
+- `frame_limit`：取视频流的前 n 帧，0 表示所有（ISIM 下推理性能低，默认设置为 2）
 
-可通过控制编译提供的-D参数`ENABLE_RESIZER`来开关Resize视频解码输出功能:
-- `-DENABLE_RESIZER=ON`: 开启Resize视频解码输出功能
-- `-DENABLE_RESIZER=OFF`: 关闭Resize视频解码输出功能
+可通过控制编译提供的-D 参数`ENABLE_RESIZER`来开关 Resize 视频解码输出功能:
 
-可通过控制编译提供的-D参数`ENABLE_RK_DECODER`来开关RK视频解码:
-- `-DENABLE_RK_DECODER=ON`: 开启RK视频解码（同时会关闭后摩视频解码）
-- `-DENABLE_RK_DECODER=OFF`: 关闭RK视频解码（同时会开启后摩视频解码）
+- `-DENABLE_RESIZER=ON`: 开启 Resize 视频解码输出功能
+- `-DENABLE_RESIZER=OFF`: 关闭 Resize 视频解码输出功能
 
-可通过控制编译提供的-D参数`ENABLE_JPEG`来开关RK解码:
-- `-DENABLE_JPEG=ON`: 开启JPEG编解码（同时会关闭后摩解码）
-- `-DENABLE_JPEG=OFF`: 开启JPEG编解码（同时会开启后摩解码）
+可通过控制编译提供的-D 参数`ENABLE_RK_DECODER`来开关 RK 视频解码:
 
-*注：无需修改或配置上述变量，程序默认也可运行。*
+- `-DENABLE_RK_DECODER=ON`: 开启 RK 视频解码（同时会关闭后摩视频解码）
+- `-DENABLE_RK_DECODER=OFF`: 关闭 RK 视频解码（同时会开启后摩视频解码）
 
-#### 2.2 编译并执行c++演示程序
+可通过控制编译提供的-D 参数`ENABLE_JPEG`来开关 RK 解码:
+
+- `-DENABLE_JPEG=ON`: 开启 JPEG 编解码（同时会关闭后摩解码）
+- `-DENABLE_JPEG=OFF`: 开启 JPEG 编解码（同时会开启后摩解码）
+
+_注：无需修改或配置上述变量，程序默认也可运行。_
+
+#### 2.2 编译并执行 c++演示程序
 
 ```bash
 mkdir build
@@ -73,7 +78,7 @@ cd ..
 ./example_video_detect
 ```
 
-如果使用RK解码方案，则需在执行C++演示程序前，设置环境变量：
+如果使用 RK 解码方案，则需在执行 C++演示程序前，设置环境变量：
 `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib`
 
 #### 2.3 参考结果
@@ -89,65 +94,65 @@ Count of Output: 3
 Output[340] TensorInfo: shape: [1,3,80,80,85], stride: [2457600,819200,10240,128,1], dtype: INT8, format: ND, size: 2457557, memsize: 2457600, quant_info: size=1 [0, 0.00780907]
 Output[378] TensorInfo: shape: [1,3,40,40,85], stride: [614400,204800,5120,128,1], dtype: INT8, format: ND, size: 614357, memsize: 614400, quant_info: size=1 [0, 0.00783619]
 Output[416] TensorInfo: shape: [1,3,20,20,85], stride: [153600,51200,2560,128,1], dtype: INT8, format: ND, size: 153557, memsize: 153600, quant_info: size=1 [0, 0.00785193]
-[info] thread 0 model loaded: yolov5s.hmm
+I20251020 17:16:11.066434 173269 video_detect.cc:105] thread 0 detection model loaded: yolov5s.hmm.
 Count of Input: 2
 Input[input.1] TensorInfo: shape: [1,3,1080,1920], stride: [2073600,1920,1,1036800,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
 Input[dyn_info] TensorInfo: shape: [10], stride: [4], dtype: INT32, format: ND, size: 40, memsize: 40
 Count of Output: 1
 Output[495] TensorInfo: shape: [1,1000], stride: [1024,1], dtype: INT8, format: ND, size: 1000, memsize: 1024, quant_info: size=1 [0, 0.121476]
-[info] thread 0 model loaded: resnet50.hmm
+I20251020 17:16:11.278972 173269 video_detect.cc:122] thread 0 classify model loaded: resnet50.hmm.
 Count of Input: 2
 Input[input.1] TensorInfo: shape: [1,3,1080,1920], stride: [2073600,1920,1,1036800,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
 Input[dyn_info] TensorInfo: shape: [10], stride: [4], dtype: INT32, format: ND, size: 40, memsize: 40
 Count of Output: 1
 Output[495] TensorInfo: shape: [1,1000], stride: [1024,1], dtype: INT8, format: ND, size: 1000, memsize: 1024, quant_info: size=1 [0, 0.121476]
-[info] thread 1 model loaded: resnet50.hmm
-[info] classify thread, module 1 infer start...[info] classify thread, module 0 infer start...
-[info] detect thread, moudle 0 infer start...
-[info] open stream ../../data/1080P_traffic_4s.h264 completed.
-[info] frame size is 1920 x 1080
-[info] ===> decoder heigth:1080, width:1920
-[debug] get frame 1, stamp 41622, planes 2, len 0
-[info] -->> decoded yuv info:TensorInfo: shape: [3,1080,1920], stride: [1920,1,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[info] -->> resized yuv info:TensorInfo: shape: [3,1080,1920], stride: [1920,1,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[debug] decoder pull data req_id 0, queue size 0
-[debug] get frame 2, stamp 45144, planes 2, len 0
-[info] -->> decoded yuv info:TensorInfo: shape: [3,1080,1920], stride: [1920,1,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[info] -->> resized yuv info:TensorInfo: shape: [3,1080,1920], stride: [1920,1,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[debug] decoder pull data req_id 1, queue size 0
-[debug] get frame 3, stamp 48465, planes 2, len 0
-[info] -->> decoded yuv info:TensorInfo: shape: [3,1080,1920], stride: [1920,1,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[info] -->> resized yuv info:TensorInfo: shape: [3,1080,1920], stride: [1920,1,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[debug] decoder pull data req_id 2, queue size 1
-[debug] get frame 4, stamp 51800, planes 2, len 0
+I20251020 17:16:11.342782 173269 video_detect.cc:122] thread 1 classify model loaded: resnet50.hmm.
+I20251020 17:16:11.353951 173284 detect_frames.cc:241] classify thread, module 0 infer start...
+I20251020 17:16:11.353952 173285 detect_frames.cc:241] classify thread, module 1 infer start...
+I20251020 17:16:11.354134 173277 detect_frames.cc:20] detect thread, moudle 0 infer start...
+I20251020 17:16:11.373563 173288 video_codec.cc:257] open stream ../../data/1080P_traffic_4s.h264 completed.
+I20251020 17:16:11.381962 173294 video_detect.cc:21] ==> Start to monitor encoding/decoding speed, codec num is 1.
+I20251020 17:16:11.382004 173294 video_detect.cc:43] Codec Stats: 0x5562a72910 decoding speed: 0 fps, encoding speed: 0 fps.
+I20251020 17:16:11.385533 173292 video_codec.cc:523] ===> PushEncodeStream thread start, size 1920x1080, ysize=2073600.
+I20251020 17:16:11.479029 173293 video_codec.cc:617] ===> GetEncodeStream thread start, ffmpeg ctx 0x7f50000b60, frame size is 1920x1080, fps is 30.
+I20251020 17:16:11.484971 173288 video_codec.cc:282] frame size is 1920 x 1080.
+I20251020 17:16:11.515329 173289 video_codec.cc:397] ===> decoder heigth: 1080, width: 1920.
+I20251020 17:16:11.515340 173289 video_codec.h:209] HmCodecDecGetAvailBuf, vir_fd_: 366730476992
+I20251020 17:16:11.516169 173293 video_codec.h:70] HmCodecEncGetAvailBuf, vir_fd_: 366730499088
+I20251020 17:16:11.517367 173288 video_codec.h:202] HmCodecDecPushStreamData, vir_fd_: 366730476992, size: 251265, last_flag: 0
+I20251020 17:16:11.569538 173288 video_codec.h:202] HmCodecDecPushStreamData, vir_fd_: 366730476992, size: 14107, last_flag: 0
+I20251020 17:16:11.604949 173288 video_codec.h:202] HmCodecDecPushStreamData, vir_fd_: 366730476992, size: 782, last_flag: 0
+I20251020 17:16:11.612495 173289 video_codec.h:253] get frame 1, stamp 97149, planes 2, total len 3110400.
+-->> decoded yuv info:TensorInfo: shape: [3,1080,1920], stride: [1920,1,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
+-->> resized yuv info:TensorInfo: shape: [3,1080,1920], stride: [1920,1,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
+I20251020 17:16:11.618239 173289 video_codec.cc:495] decoder pull data req_id 0, queue size 0.
 ......
-[debug] detect thread 0 run sample 99 end. cost 15.214 ms.
-[info] detect num:14
-[debug] classify thread 1 run sample 98 obj 7 end. cost 2.502 ms.
-sample 98 box[1182, 153, 1231, 203], det[conf:0.611767, cls:2], cls[id:482, conf:10.932832, lable:[cassette player]]
-[debug] classify thread 1 run sample 98 obj 8 end. cost 2.527 ms.
-sample 98 box[0, 313, 117, 380], det[conf:0.599321, cls:2], cls[id:817, conf:13.119398, lable:[sports car, sport car]]
-[debug] demo results saved to demo_results/99.jpg
-[debug] detect push task req_id 99, obj num 14, queue size 0
-[info] ===> detect thread EOS received.
-[info] <=== detect thread 0 completed. 100 sampels tested.
-[debug] classify thread 1 run sample 98 obj 9 end. cost 2.555 ms.
-[debug] classify thread 1 run sample 98 obj 15 end. cost 2.783 ms.
-sample 98 box[1073, 134, 1109, 165], det[conf:0.253683, cls:2], cls[id:481, conf:11.661688, lable:[cassette]]
-[info] ===> classify thread EOS received.
-[info] <=== classify thread 1 completed. 48 sampels tested.
-[debug] classify thread 0 run sample 99 obj 11 end. cost 2.446 ms.
-sample 99 box[1110, 140, 1157, 176], det[conf:0.448824, cls:2], cls[id:531, conf:10.082500, lable:[digital watch]]
-[debug] classify thread 0 run sample 99 obj 12 end. cost 2.45 ms.
-sample 99 box[887, 138, 943, 183], det[conf:0.422602, cls:2], cls[id:675, conf:10.446928, lable:[moving van]]
-[debug] classify thread 0 run sample 99 obj 13 end. cost 2.468 ms.
-sample 99 box[1424, 128, 1489, 185], det[conf:0.325398, cls:2], cls[id:766, conf:9.110693, lable:[rotisserie]]
-[info] ===> classify thread EOS received.
-[info] <=== classify thread 0 completed. 52 sampels tested.
+I20251020 17:16:23.071904 173277 detect_frames.cc:155] detect num: 15
+I20251020 17:16:23.075141 173293 video_codec.h:107] get encoded data 80, stamp 11557790, planes 1, length 1191505, ptr 0x7f50227230.
+I20251020 17:16:23.108135 173277 detect_frames.cc:191] detect push enc task, req_id 80, queue size 0.
+I20251020 17:16:23.108173 173277 detect_frames.cc:210] detect push task req_id 80 obj num 15, queue size 0.
+I20251020 17:16:23.108195 173292 video_codec.h:56] HmCodecEncPushYuvData, vir_fd_: 366730499088, last_flag: 0
+......
+W20251020 17:16:24.489738 173293 video_codec.h:81] Video encoder received EOS frame.
+I20251020 17:16:24.489780 173293 video_codec.cc:629] ===> get encoded frame thread EOS received.
+I20251020 17:16:24.492479 173285 detect_frames.cc:319] classify thread 1 run sample 99 obj 10 end. cost 3.302 ms.
+I20251020 17:16:24.492614 173285 detect_frames.cc:327] sample 99 box[1100, 362, 1252, 519], det[conf:0.52612543, cls:2], cls[id:817, conf:11.054308, lable:[sports car, sport car]]
+I20251020 17:16:24.495924 173285 detect_frames.cc:319] classify thread 1 run sample 99 obj 11 end. cost 3.227 ms.
+I20251020 17:16:24.496075 173285 detect_frames.cc:327] sample 99 box[1110, 140, 1157, 176], det[conf:0.44882423, cls:2], cls[id:531, conf:10.0825, lable:[digital watch]]
+I20251020 17:16:24.499570 173285 detect_frames.cc:319] classify thread 1 run sample 99 obj 12 end. cost 3.426 ms.
+I20251020 17:16:24.499730 173285 detect_frames.cc:327] sample 99 box[887, 138, 943, 183], det[conf:0.42260215, cls:2], cls[id:675, conf:10.446928, lable:[moving van]]
+I20251020 17:16:24.503567 173285 detect_frames.cc:319] classify thread 1 run sample 99 obj 13 end. cost 3.77 ms.
+I20251020 17:16:24.503708 173285 detect_frames.cc:327] sample 99 box[1424, 128, 1489, 185], det[conf:0.32539758, cls:2], cls[id:766, conf:9.110693, lable:[rotisserie]]
+I20251020 17:16:24.503764 173285 detect_frames.cc:252] ===> classify thread EOS received.
+I20251020 17:16:24.503788 173285 detect_frames.cc:336] <=== classify thread 1 completed. 58 sampels tested.
+I20251020 17:16:24.794116 173293 video_codec.h:45] HmCodecEncClose, vir_fd_: 366730499088
+I20251020 17:16:24.799573 173293 video_codec.cc:669] All task done, stop stats thread.
+I20251020 17:16:24.799629 173293 video_codec.cc:672] <=== GetEncodeStream thread exit. 101 images encoded.
+I20251020 17:16:25.383602 173294 video_detect.cc:49] <== End to monitor encoding/decoding speed.
 ```
 
 ```bash
-# Linux x86 环境，使用后摩解码并关闭Resize解码输出功能
+# Linux aarch64 环境，使用RK解码
 Count of Input: 2
 Input[images] TensorInfo: shape: [1,3,1080,1920], stride: [2073600,1920,1,1036800,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
 Input[dyn_info] TensorInfo: shape: [10], stride: [4], dtype: INT32, format: ND, size: 40, memsize: 40
@@ -155,115 +160,45 @@ Count of Output: 3
 Output[340] TensorInfo: shape: [1,3,80,80,85], stride: [2457600,819200,10240,128,1], dtype: INT8, format: ND, size: 2457557, memsize: 2457600, quant_info: size=1 [0, 0.00780907]
 Output[378] TensorInfo: shape: [1,3,40,40,85], stride: [614400,204800,5120,128,1], dtype: INT8, format: ND, size: 614357, memsize: 614400, quant_info: size=1 [0, 0.00783619]
 Output[416] TensorInfo: shape: [1,3,20,20,85], stride: [153600,51200,2560,128,1], dtype: INT8, format: ND, size: 153557, memsize: 153600, quant_info: size=1 [0, 0.00785193]
-[info] thread 0 model loaded: yolov5s.hmm
+I20251020 17:22:30.728044 177124 video_detect.cc:105] thread 0 detection model loaded: yolov5s.hmm.
 Count of Input: 2
 Input[input.1] TensorInfo: shape: [1,3,1080,1920], stride: [2073600,1920,1,1036800,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
 Input[dyn_info] TensorInfo: shape: [10], stride: [4], dtype: INT32, format: ND, size: 40, memsize: 40
 Count of Output: 1
 Output[495] TensorInfo: shape: [1,1000], stride: [1024,1], dtype: INT8, format: ND, size: 1000, memsize: 1024, quant_info: size=1 [0, 0.121476]
-[info] thread 0 model loaded: resnet50.hmm
+I20251020 17:22:30.896620 177124 video_detect.cc:122] thread 0 classify model loaded: resnet50.hmm.
 Count of Input: 2
 Input[input.1] TensorInfo: shape: [1,3,1080,1920], stride: [2073600,1920,1,1036800,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
 Input[dyn_info] TensorInfo: shape: [10], stride: [4], dtype: INT32, format: ND, size: 40, memsize: 40
 Count of Output: 1
 Output[495] TensorInfo: shape: [1,1000], stride: [1024,1], dtype: INT8, format: ND, size: 1000, memsize: 1024, quant_info: size=1 [0, 0.121476]
-[info] thread 1 model loaded: resnet50.hmm
-[info] classify thread, module 0 infer start...
-[info] detect thread, moudle 0 infer start...
-[info] classify thread, module 1 infer start...
-[info] open stream ../../data/1080P_traffic_4s.h264 completed.
-[info] frame size is 1920 x 1080
-[info] ===> decoder heigth:1080, width:1920
-[debug] get frame 1, stamp 33944, planes 2, len 0
-[info] -->> decoded yuv info:TensorInfo: shape: [3,1080,1920], stride: [1920,1,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[debug] decoder pull data req_id 0, queue size 0
-[debug] get frame 2, stamp 40931, planes 2, len 0
-[info] -->> decoded yuv info:TensorInfo: shape: [3,1080,1920], stride: [1920,1,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[debug] decoder pull data req_id 1, queue size 0
-[debug] get frame 3, stamp 44345, planes 2, len 0
-[info] -->> decoded yuv info:TensorInfo: shape: [3,1080,1920], stride: [1920,1,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[debug] decoder pull data req_id 2, queue size 1
-[debug] get frame 4, stamp 48120, planes 2, len 0
+I20251020 17:22:30.945210 177124 video_detect.cc:122] thread 1 classify model loaded: resnet50.hmm.
+I20251020 17:22:30.950472 177132 detect_frames.cc:20] detect thread, moudle 0 infer start...
+I20251020 17:22:30.950495 177133 detect_frames.cc:241] classify thread, module 0 infer start...
+I20251020 17:22:30.950511 177134 detect_frames.cc:241] classify thread, module 1 infer start...
+I20251020 17:22:30.963369 177138 video_codec.cc:523] ===> PushEncodeStream thread start, size 1920x1080, ysize=2073600.
+I20251020 17:22:30.963812 177140 video_detect.cc:21] ==> Start to monitor encoding/decoding speed, codec num is 1.
+I20251020 17:22:30.963846 177140 video_detect.cc:43] Codec Stats: 0x55b79516e0 decoding speed: 0 fps, encoding speed: 0 fps.
+I20251020 17:22:31.037617 177139 video_codec.cc:617] ===> GetEncodeStream thread start, ffmpeg ctx 0x7f88000b60, frame size is 1920x1080, fps is 30.
 ......
-[debug] detect thread 0 run sample 99 end. cost 15.503 ms.
-[info] detect num:14
-[debug] detect push task req_id 99, obj num 14, queue size 0
-[info] ===> detect thread EOS received.
-[info] <=== detect thread 0 completed. 100 sampels tested.
-[debug] classify thread 0 run sample 99 obj 1 end. cost 2.849 ms.
-sample 99 box[1002, 579, 1236, 903], det[conf:0.822449, cls:7], cls[id:662, conf:8.503314, lable:[modem]]
-[debug] classify thread 1 run sample 98 obj 15 end. cost 2.645 ms.
-sample 98 box[1073, 134, 1109, 165], det[conf:0.253683, cls:2], cls[id:481, conf:11.661688, lable:[cassette]]
-[info] ===> classify thread EOS received.
-[info] <=== classify thread 1 completed. 50 sampels tested.
-[debug] classify thread 0 run sample 99 obj 11 end. cost 2.607 ms.
-sample 99 box[1110, 140, 1157, 176], det[conf:0.448824, cls:2], cls[id:531, conf:10.082500, lable:[digital watch]]
-[debug] classify thread 0 run sample 99 obj 12 end. cost 2.521 ms.
-sample 99 box[887, 138, 943, 183], det[conf:0.422602, cls:2], cls[id:675, conf:10.446928, lable:[moving van]]
-[debug] classify thread 0 run sample 99 obj 13 end. cost 2.507 ms.
-sample 99 box[1424, 128, 1489, 185], det[conf:0.325398, cls:2], cls[id:766, conf:9.110693, lable:[rotisserie]]
-[info] ===> classify thread EOS received.
-[info] <=== classify thread 0 completed. 50 sampels tested.
-```
-
-```bash
-# Linux aarch64 环境，使用RK解码
-[info] Count of Input: 2
-[info] Input[images] TensorInfo: shape: [1,3,1080,1920], stride: [2073600,1920,1,1036800,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[info] Input[dyn_info] TensorInfo: shape: [10], stride: [4], dtype: INT32, format: ND, size: 40, memsize: 40
-[info] Count of Output: 3
-[info] Output[340] TensorInfo: shape: [1,3,80,80,85], stride: [2457600,819200,10240,128,1], dtype: INT8, format: ND, size: 2457557, memsize: 2457600, quant_info: size=1 [0, 0.00780907]
-[info] Output[378] TensorInfo: shape: [1,3,40,40,85], stride: [614400,204800,5120,128,1], dtype: INT8, format: ND, size: 614357, memsize: 614400, quant_info: size=1 [0, 0.00783619]
-[info] Output[416] TensorInfo: shape: [1,3,20,20,85], stride: [153600,51200,2560,128,1], dtype: INT8, format: ND, size: 153557, memsize: 153600, quant_info: size=1 [0, 0.00785193]
-[info] thread 0 model loaded: yolov5s.hmm
-[info] Count of Input: 2
-[info] Input[input.1] TensorInfo: shape: [1,3,1080,1920], stride: [2073600,1920,1,1036800,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[info] Input[dyn_info] TensorInfo: shape: [10], stride: [4], dtype: INT32, format: ND, size: 40, memsize: 40
-[info] Count of Output: 1
-[info] Output[495] TensorInfo: shape: [1,1000], stride: [1024,1], dtype: INT8, format: ND, size: 1000, memsize: 1024, quant_info: size=1 [0, 0.121476]
-[info] thread 0 model loaded: resnet50.hmm
-[info] Count of Input: 2
-[info] Input[input.1] TensorInfo: shape: [1,3,1080,1920], stride: [2073600,1920,1,1036800,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 3110400, memsize: 3110400
-[info] Input[dyn_info] TensorInfo: shape: [10], stride: [4], dtype: INT32, format: ND, size: 40, memsize: 40
-[info] Count of Output: 1
-[info] Output[495] TensorInfo: shape: [1,1000], stride: [1024,1], dtype: INT8, format: ND, size: 1000, memsize: 1024, quant_info: size=1 [0, 0.121476]
-[info] thread 1 model loaded: resnet50.hmm
-[info] classify thread, module 0 infer start...
-[info] detect thread, moudle 0 infer start...
-[info] classify thread, module 1 infer start...
-[info] [RK Decoder] mpp ctx 0x7f94005bc0 start to decode stream...
-[info] [RK Decoder] frame info change: width = 1920, height = 1080, hor_stride = 1920, ver_stride = 1088, buf_size = 4177920
-[debug] detect thread 0 run sample 0 end. cost 19.725 ms.
-[info] detect num:11
-[debug] demo results saved to demo_results/0.jpg
-[debug] detect push task req_id 0, obj num 11, queue size 0
-[debug] classify thread 1 run sample 0 obj 0 end. cost 5.652 ms.
-sample 0 box[314, 596, 638, 842], det[conf:0.917086, cls:2], cls[id:656, conf:12.269067, lable:[minivan]]
-[debug] classify thread 1 run sample 0 obj 1 end. cost 5.851 ms.
-sample 0 box[729, 302, 891, 427], det[conf:0.813372, cls:2], cls[id:713, conf:10.568404, lable:[photocopier]]
-[debug] classify thread 1 run sample 0 obj 2 end. cost 5.208 ms.
-sample 0 box[330, 966, 762, 1067], det[conf:0.801487, cls:2], cls[id:545, conf:10.932832, lable:[electric fan, blower]]
+I20251020 17:22:41.163661 177133 detect_frames.cc:319] classify thread 0 run sample 65 obj 12 end. cost 7.673 ms.
+I20251020 17:22:41.164760 177133 detect_frames.cc:327] sample 65 box[1043, 146, 1089, 186], det[conf:0.4502268, cls:2], cls[id:465, conf:11.540212, lable:[bulletproof vest]]
+I20251020 17:22:41.233027 177132 detect_frames.cc:191] detect push enc task, req_id 66, queue size 0.
+I20251020 17:22:41.233173 177138 video_codec.h:56] HmCodecEncPushYuvData, vir_fd_: 368155355280, last_flag: 0
+I20251020 17:22:41.234962 177132 detect_frames.cc:210] detect push task req_id 66 obj num 13, queue size 0.
+I20251020 17:22:41.235152 177134 detect_frames.cc:259] classify thread receives task 66, obj num 13.
+I20251020 17:22:41.241842 177134 detect_frames.cc:319] classify thread 1 run sample 66 obj 0 end. cost 6.362 ms.
+I20251020 17:22:41.242229 177134 detect_frames.cc:327] sample 66 box[153, 642, 582, 966], det[conf:0.9101195, cls:2], cls[id:466, conf:11.904639, lable:[bullet train, bullet]]
 ......
-[debug] detect thread 0 run sample 97 end. cost 21.547 ms.
-[info] detect num:15
-[debug] demo results saved to demo_results/97.jpg
-[debug] detect push task req_id 97, obj num 15, queue size 0
-[info] ===> detect thread EOS received.
-[info] <=== detect thread 0 completed. 98 sampels tested.
-[debug] classify thread 0 run sample 97 obj 4 end. cost 6.363 ms.
-sample 97 box[1180, 153, 1231, 204], det[conf:0.717143, cls:2], cls[id:482, conf:11.661688, lable:[cassette player]]
-[debug] classify thread 1 run sample 96 obj 14 end. cost 7.514 ms.
-sample 96 box[1069, 137, 1109, 165], det[conf:0.261245, cls:2], cls[id:465, conf:11.904639, lable:[bulletproof vest]]
-[info] ===> classify thread EOS received.
-[info] <=== classify thread 1 completed. 48 sampels tested.
-[debug] classify thread 0 run sample 97 obj 12 end. cost 6.775 ms.
-sample 97 box[1110, 140, 1157, 179], det[conf:0.424432, cls:2], cls[id:482, conf:12.512019, lable:[cassette player]]
-[debug] classify thread 0 run sample 97 obj 13 end. cost 6.529 ms.
-sample 97 box[799, 133, 855, 167], det[conf:0.406686, cls:2], cls[id:507, conf:10.325453, lable:[combination lock]]
-[debug] classify thread 0 run sample 97 obj 14 end. cost 6.575 ms.
-sample 97 box[1424, 129, 1490, 184], det[conf:0.284296, cls:2], cls[id:766, conf:10.325453, lable:[rotisserie]]
-[info] ===> classify thread EOS received.
-[info] <=== classify thread 0 completed. 50 sampels tested.
+I20251020 17:22:43.890947 177134 detect_frames.cc:319] classify thread 1 run sample 97 obj 14 end. cost 7.205 ms.
+I20251020 17:22:43.891099 177134 detect_frames.cc:327] sample 97 box[1424, 129, 1490, 184], det[conf:0.284296, cls:2], cls[id:766, conf:10.325453, lable:[rotisserie]]
+I20251020 17:22:43.903406 177134 detect_frames.cc:252] ===> classify thread EOS received.
+I20251020 17:22:43.903438 177134 detect_frames.cc:336] <=== classify thread 1 completed. 48 sampels tested.
+I20251020 17:22:43.965303 177140 video_detect.cc:43] Codec Stats: 0x55b79516e0 decoding speed: 0 fps, encoding speed: 12.998544 fps.
+I20251020 17:22:44.160198 177139 video_codec.h:45] HmCodecEncClose, vir_fd_: 368155355280
+I20251020 17:22:44.164432 177139 video_codec.cc:669] All task done, stop stats thread.
+I20251020 17:22:44.164478 177139 video_codec.cc:672] <=== GetEncodeStream thread exit. 99 images encoded.
+I20251020 17:22:44.965698 177140 video_detect.cc:49] <== End to monitor encoding/decoding speed.
 ```
 
 ```bash
@@ -320,13 +255,13 @@ I20250922 15:56:07.661484 39610 detect_frames.cc:225] ===> classify thread EOS r
 I20250922 15:56:07.661882 39610 detect_frames.cc:309] <=== classify thread 0 completed. 10 sampels tested.
 ```
 
-检测效果图片保存在demo_results目录下。
+检测效果图片保存在 demo_results 目录下。
 
 ### 3. 一键执行
 
-可以使用run脚本一键执行并查看结果，run脚本中不提供依赖环境安装。
+可以使用 run 脚本一键执行并查看结果，run 脚本中不提供依赖环境安装。
 
-linux下执行：
+linux 下执行：
 
 ```bash
 # (默认) 使用后摩视频解码+开启Resize视频解码输出功能

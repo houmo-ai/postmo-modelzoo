@@ -25,7 +25,6 @@ int main(int argc, char **argv) {
   TaskQueue q_enc;
   TaskQueue q_det;
   TaskQueue q_cls;
-  TaskQueue q_out;
 
   // create infer threads
   int infer_thread_num = det_thread_num + cls_thread_num;
@@ -45,7 +44,7 @@ int main(int argc, char **argv) {
     det_infer_infos[i] = infer_info;
     threads.emplace_back(std::thread(&detect, std::ref(det_infer_infos[i]),
                                      std::ref(q_det), std::ref(q_cls),
-                                     std::ref(barrier)));
+                                     std::ref(q_enc), std::ref(barrier)));
   }
   for (int i = 0; i < cls_thread_num; i++) {
     InferInfo infer_info;
@@ -57,8 +56,7 @@ int main(int argc, char **argv) {
     infer_info.id = i;
     cls_infer_infos[i] = infer_info;
     threads.emplace_back(std::thread(&classify, std::ref(cls_infer_infos[i]),
-                                     std::ref(q_cls), std::ref(q_out),
-                                     std::ref(barrier)));
+                                     std::ref(q_cls), std::ref(barrier)));
   }
   wm.~WeightManager();
   barrier.wait();

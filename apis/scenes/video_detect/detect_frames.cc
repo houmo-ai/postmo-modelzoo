@@ -2,7 +2,7 @@
 
 // define detect thread
 void detect(InferInfo &infer_info, TaskQueue &qin, TaskQueue &qout,
-            Barrier &barrier) {
+            TaskQueue &qout_enc, Barrier &barrier) {
   YoloV5 yolov5;
   // {cropX, cropY, crop height, crop width, resize heigth, resize width, pad
   // top, pad left, pad bottom, pad right}
@@ -33,6 +33,11 @@ void detect(InferInfo &infer_info, TaskQueue &qin, TaskQueue &qout,
       qout.queue.push(task_info);
       qout.cond.notify_all();
       lock_out.unlock();
+      std::unique_lock<std::mutex> lock_enc_out(qout_enc.mutex);
+      qout_enc.queue.push(task_info);
+      qout_enc.cond.notify_all();
+      lock_enc_out.unlock();
+
       lock_in.unlock();
       break;
     }
@@ -157,7 +162,8 @@ void detect(InferInfo &infer_info, TaskQueue &qin, TaskQueue &qout,
                     cv::Point(detection.box.x2, detection.box.y2),
                     cv::Scalar(0, 0, 255), 2);
     }
-    fs::path file_path(std::to_string(task_info.req_id) + ".jpg");
+    fs::path file_path(std::to_string(infer_info.id) + "_" +
+                       std::to_string(task_info.req_id) + ".jpg");
     fs::path result_path("demo_results");
     if (!fs::exists(result_path)) {
       fs::create_directory("demo_results");
@@ -165,6 +171,28 @@ void detect(InferInfo &infer_info, TaskQueue &qin, TaskQueue &qout,
     fs::path result_file = result_path / file_path.filename();
     cv::imwrite(result_file.string().c_str(), bgr);
     LOG_DEBUG("demo results saved to {}", result_file.string());
+
+    int size = 1080 * 1920 * 3;
+    size_t yuv_total_size = size / 2;
+    tcim::Buffer rect_buf = tcim::Buffer::CreateHostBuffer(yuv_total_size);
+    ImageProc::BgrToRgb((int8_t *)(bgr.data), bgr.rows, bgr.cols);
+    cv::Mat img_yuv;
+    cv::cvtColor(bgr, img_yuv, cv::COLOR_RGB2YUV_I420);
+    ImageProc::I420To420sp((uint8_t *)rect_buf.Data(), (uint8_t *)img_yuv.data,
+                           size);
+
+    TaskInfo enc_task;
+    enc_task.req_id = task_info.req_id;
+    enc_task.image = rect_buf;
+    {
+      std::unique_lock<std::mutex> lock_enc(qout_enc.mutex);
+      int size = qout_enc.queue.size();
+      qout_enc.queue.push(enc_task);
+      LOG_INFO("detect push enc task, req_id {}, queue size {}.",
+               task_info.req_id, size);
+      qout_enc.cond.notify_all();
+      lock_enc.unlock();
+    }
 
     // send to classify threads
     for (const auto &detection : detections) {
@@ -200,8 +228,7 @@ void detect(InferInfo &infer_info, TaskQueue &qin, TaskQueue &qout,
 }
 
 // define classify thread
-void classify(InferInfo &infer_info, TaskQueue &qin, TaskQueue &qout,
-              Barrier &barrier) {
+void classify(InferInfo &infer_info, TaskQueue &qin, Barrier &barrier) {
   Resnet50 resnet50;
   int count = 0;
   auto &module = infer_info.module;

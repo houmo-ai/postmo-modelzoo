@@ -29,18 +29,19 @@ extern "C" {
 // #define DUMP_RK_DECODED_DATA  // save rk decoded results
 #endif
 
-#define DECODER_QUEUE_SIZE 20
 // #define DUMP_HM_DECODED_DATA  // save hm decoded results
 
+std::atomic<int32_t> g_codec_cnt = 0;
+
 #ifdef RK_DECODER
-void VideoCodec::PushRKStream(PushStreamInfo& stream_info, TaskQueue& qout,
-                              Barrier& barrier) {
+void VideoCodec::PushRKStream(PushStreamInfo &stream_info, TaskQueue &qout,
+                              Barrier &barrier) {
   // when iteration is greater than 1, reusing the decoded data
   int iteration = 1;
-  H264DataSource* data_source =
+  H264DataSource *data_source =
       H264DataSource::CreateH264Source(stream_info.stream_path, iteration);
   MppCtx ctx = NULL;
-  MppApi* mpi = NULL;
+  MppApi *mpi = NULL;
   MppBuffer frm_buf = NULL;
   MppDecCfg cfg = NULL;
   MPP_RET ret = MPP_OK;
@@ -66,11 +67,12 @@ void VideoCodec::PushRKStream(PushStreamInfo& stream_info, TaskQueue& qout,
   }
 
   barrier.barrier();
-  LOG_INFO("[RK Decoder] mpp ctx {} start to decode stream...", ctx);
+  LOG_INFO("[RK Decoder] {}, mpp ctx {} start to decode stream...",
+           reinterpret_cast<void *>(this), ctx);
 
   uint64_t fid = 0;
   while (true) {
-    uint8_t* data = nullptr;
+    uint8_t *data = nullptr;
     MppPacket packet = NULL;
     int32_t data_length = 0;
     ret = mpp_packet_init(&packet, NULL, 0);
@@ -106,6 +108,7 @@ void VideoCodec::PushRKStream(PushStreamInfo& stream_info, TaskQueue& qout,
         }
       } while (times > 0);
       if (frame) {
+        this->decoded_cnt++;
         if (mpp_frame_get_info_change(frame)) {
           RK_U32 width = mpp_frame_get_width(frame);
           RK_U32 height = mpp_frame_get_height(frame);
@@ -130,7 +133,7 @@ void VideoCodec::PushRKStream(PushStreamInfo& stream_info, TaskQueue& qout,
           //   continue;
           // }
           MppBuffer buffer = NULL;
-          RK_U8* base = NULL;
+          RK_U8 *base = NULL;
           buffer = mpp_frame_get_buffer(frame);
           if (NULL == buffer) {
             break;
@@ -140,13 +143,13 @@ void VideoCodec::PushRKStream(PushStreamInfo& stream_info, TaskQueue& qout,
           RK_U32 height = mpp_frame_get_height(frame);
           RK_U32 hor_stride = mpp_frame_get_hor_stride(frame);
           RK_U32 ver_stride = mpp_frame_get_ver_stride(frame);
-          base = (RK_U8*)mpp_buffer_get_ptr(buffer);
+          base = (RK_U8 *)mpp_buffer_get_ptr(buffer);
           RK_U32 buf_size = mpp_frame_get_buf_size(frame);
 
           // copy the decoded result to a contiguous buffer
           RK_U32 i;
-          RK_U8* base_y = base;
-          RK_U8* base_c = base + hor_stride * ver_stride;
+          RK_U8 *base_y = base;
+          RK_U8 *base_c = base + hor_stride * ver_stride;
           size_t frame_size = (height * 3 / 2) * width;
           auto result = std::shared_ptr<void>(malloc(frame_size), free);
           memcpy(result.get(), base_y, (width * height));
@@ -189,7 +192,7 @@ void VideoCodec::PushRKStream(PushStreamInfo& stream_info, TaskQueue& qout,
       mpp_packet_deinit(&packet);
       packet = NULL;
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(40));
+    std::this_thread::sleep_for(std::chrono::milliseconds(33));
   }
 
   // construct eos TaskInfo
@@ -219,18 +222,13 @@ void VideoCodec::PushRKStream(PushStreamInfo& stream_info, TaskQueue& qout,
 }
 #endif
 
-void VideoCodec::PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info,
-                            Barrier& barrier) {
-  AVFormatContext* format_ctx = NULL;
-  AVPacket* packet = NULL;
-  int index_slice = 0;
+void VideoCodec::PushStream(std::shared_ptr<VideoDecoder> decoder,
+                            PushStreamInfo &stream_info, Barrier &barrier) {
+  AVFormatContext *format_ctx = NULL;
+  AVPacket *packet = NULL;
   int ret = 0;
   uint32_t push_slices_cnt = 0;
   uint32_t rcv_I_slice_flag = 0;
-  /* frame_interval and last_push_stamp unit is microseconds */
-  // unsigned long frame_interval = 1000000 / input_stream_fps;
-  unsigned long last_push_stamp = 0;
-  unsigned long current_time = 0;
   int count = 0;
 
   /*
@@ -279,13 +277,13 @@ void VideoCodec::PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info,
     return;
   }
 
-  AVCodecParameters* codecParameters =
+  AVCodecParameters *codecParameters =
       format_ctx->streams[video_stream_index]->codecpar;
   LOG_INFO("frame size is {} x {}.", codecParameters->width,
            codecParameters->height);
-  auto& width = decoder.GetWidth();
+  auto &width = decoder->GetWidth();
   width = codecParameters->width;
-  auto& height = decoder.GetHeight();
+  auto &height = decoder->GetHeight();
   height = codecParameters->height;
 
 #ifdef RESIZER
@@ -298,12 +296,12 @@ void VideoCodec::PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info,
   // create a resizer to process decoded outputs
   auto option =
       tcim::ImageOps::Resizer::Option(tcim::DataFmt::YUV420SP, DEVICE_ID);
-  auto md_width = decoder.GetResizer().md_width;
-  auto md_height = decoder.GetResizer().md_width;
+  auto md_width = decoder->GetResizer().md_width;
+  auto md_height = decoder->GetResizer().md_width;
   int64_t max_width = width < md_width ? md_width : width;
   int64_t max_height = height < md_height ? md_height : height;
   option.SetMaxSize(max_width, max_height);
-  if (decoder.SetResizer(option) != VIDEO_DECODER_OK) {
+  if (decoder->SetResizer(option) != VIDEO_DECODER_OK) {
     LOG_ERROR("Create resizer failed.");
     avformat_close_input(&format_ctx);
     return;
@@ -324,7 +322,7 @@ void VideoCodec::PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info,
       LOG_WARNING("===> push stream frame limit reached: {}.",
                   stream_info.frame_limit);
       /* push last flag */
-      ret = decoder.PushData(nullptr, 0, 1);
+      ret = decoder->PushData(nullptr, 0, 1);
       if (ret != 0) {
         LOG_ERROR("push last stream failed, ret: {}", ret);
         ret = -1;
@@ -336,7 +334,7 @@ void VideoCodec::PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info,
       if (packet->size == 0) {
         LOG_INFO("===> push stream thread EOS received");
         /* push last flag */
-        ret = decoder.PushData(packet->data, packet->size, 1);
+        ret = decoder->PushData(packet->data, packet->size, 1);
         if (ret != 0) {
           LOG_ERROR("Push last stream failed, ret: {}.", ret);
           ret = -1;
@@ -364,7 +362,7 @@ void VideoCodec::PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info,
       /* find which buf is available. if find, so push stream */
       push_slices_cnt++;
 
-      ret = decoder.PushData(packet->data, packet->size, 0);
+      ret = decoder->PushData(packet->data, packet->size, 0);
       if (ret != 0) {
         LOG_ERROR("push stream failed: {}.", ret);
         ret = -1;
@@ -374,7 +372,7 @@ void VideoCodec::PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info,
       count++;
     }
     av_packet_unref(packet);
-    // std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    std::this_thread::sleep_for(std::chrono::milliseconds(33));
   }
 
   av_packet_free(&packet);
@@ -383,8 +381,8 @@ void VideoCodec::PushStream(VideoDecoder& decoder, PushStreamInfo& stream_info,
   LOG_INFO("<=== PushStream thread exit. {} frames received.", count);
 }
 
-void VideoCodec::GetFrame(VideoDecoder& decoder, TaskQueue& qout,
-                          Barrier& barrier) {
+void VideoCodec::GetFrame(std::shared_ptr<VideoDecoder> decoder,
+                          TaskQueue &qout, Barrier &barrier) {
   int fid = 0;
   int ret = 0;
   int count = 0;
@@ -394,17 +392,19 @@ void VideoCodec::GetFrame(VideoDecoder& decoder, TaskQueue& qout,
 
   barrier.barrier();
 
-  int height = decoder.GetHeight();
-  int width = decoder.GetWidth();
+  int height = decoder->GetHeight();
+  int width = decoder->GetWidth();
   LOG_INFO("===> decoder heigth: {}, width: {}.", height, width);
 
   while (1) {
-    ret = decoder.PullData(frm_data, device);
+    ret = decoder->PullData(frm_data, device);
+    this->decoded_cnt++;
     if (ret == VIDEO_DECODER_EOS) {
       TaskInfo task_info;
       task_info.is_end = true;
       std::unique_lock<std::mutex> lock(qout.mutex);
       qout.queue.push(task_info);
+      qout.cond.notify_all();
       lock.unlock();
       LOG_INFO("===> get frame thread EOS received.");
       break;
@@ -439,7 +439,7 @@ void VideoCodec::GetFrame(VideoDecoder& decoder, TaskQueue& qout,
     uv_buf.CopyTo(uv_tensor.Buffer());
 
 #ifdef RESIZER
-    auto img_resizer = decoder.GetResizer();
+    auto img_resizer = decoder->GetResizer();
     auto md_heigth = img_resizer.md_height;
     auto md_width = img_resizer.md_width;
     tcim::Tensor resized_yuv_tensor;
@@ -474,7 +474,7 @@ void VideoCodec::GetFrame(VideoDecoder& decoder, TaskQueue& qout,
 #endif  // RESIZER
 
     count++;
-    decoder.ReleaseBuf();
+    decoder->ReleaseBuf();
 
     // push input data to det queue
     TaskInfo task_info;
@@ -509,6 +509,166 @@ void VideoCodec::GetFrame(VideoDecoder& decoder, TaskQueue& qout,
     }
   }
 
-  decoder.Close();
+  decoder->Close();
   LOG_INFO("<=== GetFrame thread exit. {} frames received.", count);
+}
+
+void VideoCodec::PushEncodeStream(std::shared_ptr<VideoEncoder> encoder,
+                                  TaskQueue &qin, Barrier &barrier) {
+  int ret = 0;
+  int frames = 0;
+  auto width = encoder->GetWidth();
+  auto height = encoder->GetHeight();
+  const int y_size = width * height;
+  LOG_INFO("===> PushEncodeStream thread start, size {}x{}, ysize={}.", width,
+           height, y_size);
+
+  barrier.barrier();
+
+  while (true) {
+    // get data from the task queue
+    std::unique_lock<std::mutex> lock_in(qin.mutex);
+    while (qin.queue.empty()) {
+      qin.cond.wait(lock_in);
+    }
+    auto task_info = qin.queue.front();
+    qin.queue.pop();
+    lock_in.unlock();
+
+    int last_flag = task_info.is_end == true ? 1 : 0;
+    if (last_flag == 1) {
+      LOG_INFO("===> Push EOS data into video encoder.");
+      ret = encoder->PushData(nullptr, nullptr, last_flag);
+      break;
+    }
+
+    frames++;
+    void *yuv_buffer = task_info.image.Data();
+    char *y_buf = (char *)yuv_buffer;
+    char *uv_buf = (char *)yuv_buffer + y_size;
+    ret = encoder->PushData(y_buf, uv_buf, last_flag);
+    if (ret != 0) {
+      LOG_ERROR("Push data into video encoder failed: {}.", ret);
+      continue;
+    }
+  }
+
+  LOG_INFO("<=== PushEncodeStream thread exit. {} images pushed.", frames);
+}
+
+void VideoCodec::GetEncodeStream(std::shared_ptr<VideoEncoder> encoder,
+                                 const int32_t &width, const int32_t &height,
+                                 const std::string &output_path,
+                                 const int32_t &codec_num, bool &stop_flag,
+                                 Barrier &barrier) {
+  int ret = 0;
+  FrameDevice device = CPU;
+
+#if LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58, 9, 100)
+  av_register_all();
+#endif
+  avformat_network_init();
+
+  AVFormatContext *ofmt_ctx = nullptr;
+  ret = avformat_alloc_output_context2(&ofmt_ctx, nullptr, nullptr,
+                                       output_path.c_str());
+  if (ret < 0) {
+    LOG_ERROR("Failed to create ffmpeg output context, error is {}.", ret);
+    return;
+  }
+
+  AVStream *out_stream = avformat_new_stream(ofmt_ctx, nullptr);
+  if (!out_stream) {
+    LOG_ERROR("Failed to create output stream.");
+    avformat_free_context(ofmt_ctx);
+    return;
+  }
+
+  int fps_num = 30;
+  AVRational fps = {fps_num, 1};
+  AVCodecParameters *codecpar = out_stream->codecpar;
+  codecpar->codec_id = AV_CODEC_ID_H264;
+  codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
+  codecpar->width = width;
+  codecpar->height = height;
+  codecpar->format = AV_PIX_FMT_YUV420P;
+  // 设置时间基（1/fps）和帧率
+  out_stream->time_base = {1, fps_num};
+  out_stream->avg_frame_rate = fps;
+
+  if (!(ofmt_ctx->oformat->flags & AVFMT_NOFILE)) {
+    ret = avio_open(&ofmt_ctx->pb, output_path.c_str(), AVIO_FLAG_WRITE);
+    if (ret < 0) {
+      LOG_ERROR("Failed to open output file, error is {}.", ret);
+      avformat_free_context(ofmt_ctx);
+      return;
+    }
+  }
+
+  ret = avformat_write_header(ofmt_ctx, nullptr);
+  if (ret < 0) {
+    LOG_ERROR("Failed to write video header, error is {}.", ret);
+    avio_closep(&ofmt_ctx->pb);
+    avformat_free_context(ofmt_ctx);
+    return;
+  }
+  int64_t pts = 0;
+
+  LOG_INFO(
+      "===> GetEncodeStream thread start, ffmpeg ctx {}, frame size is {}x{}, "
+      "fps is {}.",
+      reinterpret_cast<void *>(ofmt_ctx), width, height, fps_num);
+
+  barrier.barrier();
+
+  while (true) {
+    EncodedData h264_data = {0};
+    ret = encoder->PullData(h264_data, device);
+    this->encoded_cnt++;
+    if (ret == VIDEO_DECODER_EOS) {
+      LOG_INFO("===> get encoded frame thread EOS received.");
+      encoder->ReleaseBuf();
+      break;
+    }
+    if (ret != VIDEO_DECODER_OK) {
+      LOG_ERROR("Pull data from Video encoder failed: {}.", ret);
+      continue;
+    }
+
+    // 创建AVPacket
+    AVPacket *pkt = av_packet_alloc();
+    av_init_packet(pkt);
+    pkt->data = reinterpret_cast<uint8_t *>(h264_data.data);  // H.264数据指针
+    pkt->size = h264_data.len;                                // 数据大小
+    pkt->stream_index = out_stream->index;                    // 流索引
+    pkt->pts = pts;
+    pkt->dts = pts;
+    pkt->duration = 1;  // 每帧持续1个时间单位（如1/30秒）
+    pts += pkt->duration;
+    LOG_DEBUG("Write packet {}, ptr: {}, length: {}.", pts,
+              reinterpret_cast<void *>(pkt->data), pkt->size);
+    ret = av_interleaved_write_frame(ofmt_ctx, pkt);
+    if (ret < 0) {
+      LOG_ERROR("Write packet {} failed: {}.", pts, ret);
+    }
+    av_packet_free(&pkt);  // 释放数据包
+
+    encoder->ReleaseBuf();
+  }
+
+  av_write_trailer(ofmt_ctx);
+  if (!(ofmt_ctx->oformat->flags & AVFMT_NOFILE)) {
+    avio_closep(&ofmt_ctx->pb);
+  }
+  avformat_free_context(ofmt_ctx);
+
+  encoder->Close();
+
+  g_codec_cnt++;
+  if (g_codec_cnt >= codec_num) {
+    LOG_INFO("All task done, stop stats thread.");
+    stop_flag = true;
+  }
+  LOG_INFO("<=== GetEncodeStream thread exit. {} images encoded.",
+           this->encoded_cnt);
 }
