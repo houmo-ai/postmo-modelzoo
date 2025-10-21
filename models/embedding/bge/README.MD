@@ -1,6 +1,6 @@
 # Bge embedder和reranker
 
-本示例展示如何把Qwen2.5模型量化和编译，部署到后摩鸿途芯片的设备上。
+本示例展示如何把bge系列模型量化和编译，部署到后摩鸿途芯片的设备上。
 
 [TOC]
 
@@ -37,7 +37,7 @@ python3 get_model.py
 
 ### 2.3 演示
 
-Qwen2模型使用python API进行演示
+bge模型使用python API进行演示
 
 1. 将编译好的模型放在当前目录
 
