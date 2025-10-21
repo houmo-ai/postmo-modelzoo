@@ -119,6 +119,8 @@ pip install -r requirements.txt
 | qwen2.5-vl           | vllm          | xh1/xh2 | x     | yes   | yes  | x    |
 | minicpmo             | omni          | xh2     | x     | yes   | yes  | x    |
 | bge-m3               | embedding     | xh2     | yes   | yes   | yes  | x    |
+| gte-qwen2-1.5b-instruct | embedding  | xh2     | x     | x     | yes  | x    |
+| whisper-medium       | asr           | xh2     | x     | yes   | yes  | x    |
 
 
 ## API示例
