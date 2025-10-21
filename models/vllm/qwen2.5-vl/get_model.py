@@ -71,7 +71,7 @@ if __name__ == '__main__':
     batch = 1
     version = f"v{runtime_version}"
     target = HOUMO_TARGET
-    hmm_path = f"models/{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
+    hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
 
     date_str = "20250908" if HOUMO_TARGET == "xh2" else "20250903"
     quant_path = f"models_outdated/qwen2.5-vl/hmquant_{target}_{model_name}_{model_size}_256_2k_{date_str}.zip"
