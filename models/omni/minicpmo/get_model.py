@@ -36,6 +36,7 @@ if __name__ == '__main__':
     config_path = "http://10.10.1.53:8082/artifactory/toolchain/release/models/minicpmo/MiniCPM-o-2_6_file.zip"
     if HOUMO_TARGET == "xh2":
         hmm_path = "http://10.10.1.53:8082/artifactory/toolchain/release/models/minicpmo/hmm_xh2_minicpmo_7b_256_4k_2core_20251016.zip"
+        quant_path = "http://10.10.1.53:8082/artifactory/toolchain/release/models/minicpmo/hmquant_xh2_minicpmo_7b_256_4k_20251016.zip"
     
     try:
         get_file_from_jfrog(config_path, model_dir, "./")
@@ -45,5 +46,10 @@ if __name__ == '__main__':
     if model_type == "hmm":
         try:
             get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
+    elif model_type == "quant":
+        try:
+            get_file_from_jfrog(quant_path, model_dir, os.path.join('output', HOUMO_TARGET))
         except Exception as e:
             print(f"Model doesn't exist, error msg: {e}")

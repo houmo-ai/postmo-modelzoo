@@ -107,7 +107,6 @@ pip install -r requirements.txt
 | yolov8m-seg          | segmentation  | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolop                | autodrive     | xh1/xh2 | yes   | yes   | yes  | x    |
 | multi_input_custom_random_model |    | xh1/xh2 | yes   | yes   | x    | x    |
-| ppocrv3	             | ocr           | xh1/xh2 | yes   | yes   | yes  | yes  |
 | lprnet               | ocr           | xh1     | yes   | yes   | yes  | yes  |
 | ppocrv3              | ocr           | xh1/xh2 | yes   | yes   | yes  | yes  |
 | wenet                | asr           | xh1     | x     | yes   | yes  | x    |
@@ -118,6 +117,8 @@ pip install -r requirements.txt
 | deepseek-r1-qwen3-8b | llm           | xh2     | yes   | yes   | yes  | x    |
 | sdxl                 | diffusion     | xh1     | x     | yes   | yes  | x    |
 | qwen2.5-vl           | vllm          | xh1/xh2 | x     | yes   | yes  | x    |
+| minicpmo             | omni          | xh2     | x     | yes   | yes  | x    |
+| bge-m3               | embedding     | xh2     | yes   | yes   | yes  | x    |
 
 
 ## API示例

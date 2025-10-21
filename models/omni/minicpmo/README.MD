@@ -1,6 +1,6 @@
 # Bge embedder和reranker
 
-本示例展示如何把MiniCPMO中的各个模型量化和编译，部署到后摩鸿途芯片的设备上。
+本示例展示如何把MiniCPMO中的各个模型量化和编译，部署到后摩M50芯片的设备上。
 
 [TOC]
 
@@ -10,23 +10,29 @@
 
 ## 2 快速开始
 
-MiniCPMO暂时只支持vllm或llm模式，其它功能模式待支持。
+MiniCPMO暂时只支持vllm或llm模式，其它功能模式(语音相关)待支持。
 
 ### 2.1 获取模型和数据
 
-通过get_model脚本下载模型，暂时仅支持芯片模型。
+通过get_model脚本下载模型，支持量化后模型编译和直接运行编译后芯片模型
 
 ```bash
+# 直接获取可直接运行的芯片模型
 python3 get_model.py --type hmm
+
+# 量化后模型，需要编译器编译后才能运行
+python3 get_model.py --type quant
 ```
 
 ### 2.2 量化
 
-暂未提供
+由于MiniCPMO模块较多，部分模块需要手动拆分和修改，故暂未提供模型量化示例。
 
 ### 2.3 编译
 
-暂未提供
+```bash
+python3 compile.py
+```
 
 ### 2.3 演示
 
@@ -38,6 +44,10 @@ MiniCPMO模型使用python API进行演示
 
 ```bash
 python3 demo.py
+#默认为vllm模式，如需体验llm
+python3 demo.py --example_idx 1
+#如需体验多张图的vllm
+python3 demo.py --example_idx 3
 ```
 
 ### 2.4 一键评估

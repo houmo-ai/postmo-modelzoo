@@ -1,6 +1,6 @@
 # Bge embedder和reranker
 
-本示例展示如何把bge系列模型量化和编译，部署到后摩鸿途芯片的设备上。
+本示例展示如何把bge系列模型量化和编译，部署到后摩M50芯片的设备上。
 
 [TOC]
 
@@ -11,29 +11,35 @@
 
 ## 2 快速开始
 
-bge暂时提供已经量化好的模型。
+bge系列模型提供在x86平台下提供量化、编译和部署范例，其它平台提供编译后模型直接部署demo。
 
 ### 2.1 获取模型和数据
 
-通过get_model脚本下载模型，暂时仅支持芯片模型。
+通过get_model脚本下载模型，如果不需要量化和编译，则只需下载编译好的hmm模型。
 
 ```bash
 python3 get_model.py --type hmm
 ```
 
-也可以直接下载以上所有模型和数据集（注意相同模型会覆盖，请自行保存）：
+也可以直接下载以上所有模型和数据集（注意相同模型会覆盖，请自行保存）,量化和编译所需的原始onnx浮点模型：
 
 ```bash
-python3 get_model.py
+python3 get_model.py --type raw
 ```
 
 ### 2.2 量化
 
-暂未提供
+```bash
+# 仅量化
+python3 quant_compile.py
+```
 
 ### 2.3 编译
 
-暂未提供
+```bash
+# 量化+编译
+python3 quant_compile.py --compile
+```
 
 ### 2.3 演示
 
