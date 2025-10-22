@@ -343,10 +343,13 @@ class Qwen25VL:
                     self.vit_model.get_input_name(1),
                     inputs["window_index"][batch].numpy().astype(np.int32),
                 )
-                self.vit_model.set_input(
-                    self.vit_model.get_input_name(2),
-                    inputs["window_mask"][batch].numpy().astype(np.float16),
-                )
+                try:
+                    self.vit_model.set_input(
+                        self.vit_model.get_input_name(2),
+                        inputs["window_mask"][batch].numpy().astype(np.float16),
+                    )
+                except:
+                    logger.info("skip set window_mask input")
                 self.vit_model.run()
                 self.vit_model.sync()
                 vit_model_output = (
@@ -547,7 +550,7 @@ class Qwen25VL:
         next_str = self.processor.tokenizer.decode(torch.tensor(self.next_id.item()))
         logger.success("response:")
         print("\033[1;95m{}".format(next_str), end="", flush=True)
-        self.context_length = valid_length + current_length + 1
+        self.context_length = valid_length.item() + current_length.item() + 1
         return vit_time, prefill_time, inputs_embeds.shape[1]
 
     def chat_decoder(self):
