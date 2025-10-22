@@ -297,6 +297,14 @@ if __name__ == '__main__':
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
         model_path = f"hmquant_{model_name}_with_act.onnx"
+        build_vit(
+            "qwen2.5-vl_visual",
+            os.path.join(model_dir, "visual"),
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+        )
         build_llm(
             "qwen2.5-vl_prefill",
             os.path.join(model_dir, "prefill"),
@@ -316,14 +324,6 @@ if __name__ == '__main__':
             ncore,
             ndevice,
             context_length,
-        )
-        build_vit(
-            "qwen2.5-vl_visual",
-            os.path.join(model_dir, "visual"),
-            model_path,
-            output_dir,
-            profile,
-            ncore,
         )
 
     # test model
