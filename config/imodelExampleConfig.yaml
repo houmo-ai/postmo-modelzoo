@@ -365,6 +365,16 @@ scenes_buffer_pool:
         script: ../apis/scenes/buffer_pool/run.sh
   test:
     - scenes_buffer_pool_test
+scenes_module_pool:
+  include:
+    - apis/scenes/module_pool
+  exclude:
+    - apis/scenes/module_pool/README.MD
+  example_case:
+    - scenes_module_pool_test:
+        script: ../apis/scenes/module_pool/run.sh
+  test:
+    - scenes_module_pool_test
 apis_common:
   include:
     - apis/common

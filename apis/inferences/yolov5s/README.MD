@@ -50,7 +50,7 @@ python3 yolov5s.py --enable_ort
 # 后处理实现为方法1
 mkdir build
 cd build
-cmake -DCMAKE_INSTALL_PREFIX=../
+cmake -DCMAKE_INSTALL_PREFIX=../ ..
 make -j
 make install
 cd ..

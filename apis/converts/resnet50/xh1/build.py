@@ -63,6 +63,13 @@ def get_args() -> argparse.Namespace:
         help='core number',
     )
     parser.add_argument(
+        '--roi_num',
+        dest='roi_num',
+        type=int,
+        default=1,
+        help='ROI number',
+    )
+    parser.add_argument(
         '--input_shape',
         dest='input_shape',
         type=lambda s: [int(item) for item in s.split(',')],
@@ -86,7 +93,7 @@ def get_args() -> argparse.Namespace:
         '--output_dir',
         dest='output_dir',
         type=str,
-        default=os.path.join('output', HOUMO_TARGET),
+        default="output",
         help='build output dir',
     )
     parser.add_argument(
@@ -105,21 +112,21 @@ def build(args=None):
     model_name = args.model_name
     batch = args.batch
     ncore = args.ncore
+    roi_num = args.roi_num
     input_shape = args.input_shape
     enable_dynamic_image_resize = args.dynamic_resize
     stage = args.stage
-    output_dir = args.output_dir
+    output_dir = os.path.join(args.output_dir, HOUMO_TARGET)
+    build_output_dir = os.path.join(args.output_dir, HOUMO_TARGET, "tcim")
     verbose = args.verbose
-    quant_name = "hmquant_" + model_name + "_with_act"
-    onnx_name = quant_name + ".onnx"
-    onnx_path = os.path.join(model_dir, onnx_name)
+    opt_level = "O2"
+    onnx_path = os.path.join(model_dir, f"hmquant_{model_name}_with_act.onnx")
     hmm_path = os.path.join(output_dir, f"{model_name}.hmm")
     profile = {}
 
     # arg check
-    if enable_dynamic_image_resize:
-        if input_shape is None:
-            raise RuntimeError("input_shape should be set when dynamic_resize is set.")
+    if enable_dynamic_image_resize and input_shape is None:
+        raise RuntimeError("input_shape should be set when dynamic_resize is set.")
     # 1. build model
     if stage == 'build' or stage == 'all':
         import tcim
@@ -130,9 +137,13 @@ def build(args=None):
             onnx_path,
             output_name=model_name,
             ncore=ncore,
+            opt_level=opt_level,
+            target="xh1",
+            batch=batch if roi_num == 1 else 1,
             output_dir=output_dir,
-            work_dir=os.path.join(output_dir, "tcim"),
+            work_dir=build_output_dir,
             enable_dynamic_image_resize=enable_dynamic_image_resize,
+            one_img_multi_roi=roi_num > 1,
         )
         profile["build"] = time.time() - start
         print(f'{model_name} build completed in {profile["build"]:.3f} s.')

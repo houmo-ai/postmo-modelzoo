@@ -66,7 +66,7 @@ def calibrate(args=None):
     output_name = "495"  # onnx输出名字
     quant_type = "w8a8h1_sefp"
     device = "cpu"
-    hmonnx_model_path = os.path.join(output_path, f"resnet50_xh2_{quant_type}.onnx")
+    hmonnx_model_path = os.path.join(output_path, f"{model_name}.onnx")
 
     if not os.path.exists(output_path):
         os.makedirs(output_path)
@@ -78,8 +78,8 @@ def calibrate(args=None):
     convert_onnx_to_hmonnx(
         model_path,
         [random_data],
-        out_hmonnx_file=hmonnx_model_path,
         device_type=DeviceType.XH2a,
+        out_hmonnx_file=hmonnx_model_path,
         quant_config=quant_config,
         input_names=[input_name],
         output_names=[output_name],
@@ -98,6 +98,14 @@ def calibrate(args=None):
     session.step = 0
     # to float16
     session(random_data.half().to(device))
+    if os.path.exists(hmonnx_model_path):
+        os.remove(hmonnx_model_path)
+    shutil.copytree(
+        os.path.join(golden_dir, "step_0"),
+        output_path,
+        dirs_exist_ok=True,
+    )
+    shutil.rmtree(golden_dir)
     print("save model and generate golden completed.")
 
 

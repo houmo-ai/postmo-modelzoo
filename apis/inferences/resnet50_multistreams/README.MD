@@ -82,7 +82,7 @@ sample 3 top1: predict cls = 65, prob = 0.385072
 ```bash
 mkdir build
 cd build
-cmake -DCMAKE_INSTALL_PREFIX=../
+cmake -DCMAKE_INSTALL_PREFIX=../ ..
 make -j
 make install
 cd ..

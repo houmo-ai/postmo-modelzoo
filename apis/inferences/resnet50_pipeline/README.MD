@@ -43,7 +43,7 @@ python3 get_model.py
 ```bash
 mkdir build
 cd build
-cmake -DCMAKE_INSTALL_PREFIX=../
+cmake -DCMAKE_INSTALL_PREFIX=../ ..
 make -j
 make install
 cd ..

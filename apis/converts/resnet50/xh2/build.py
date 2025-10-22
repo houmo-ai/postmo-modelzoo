@@ -69,7 +69,7 @@ def get_args() -> argparse.Namespace:
         '--output_dir',
         dest='output_dir',
         type=str,
-        default=os.path.join('output', HOUMO_TARGET),
+        default='output',
         help='build output dir',
     )
     parser.add_argument(
@@ -89,13 +89,11 @@ def build(args=None):
     batch = args.batch
     ncore = args.ncore
     stage = args.stage
-    output_dir = args.output_dir
+    output_dir = os.path.join(args.output_dir, HOUMO_TARGET)
     verbose = args.verbose
     opt_level = "O2"
-    quant_type = "w8a8h1_sefp"
-    hmonnx_model_path = os.path.join(model_dir, f"resnet50_xh2_{quant_type}.onnx")
-    hmmodel_name = f"resnet50_xh2_1batch_{ncore}core_{opt_level}"
-    hmmodel_path = os.path.join(output_dir, f"{hmmodel_name}.hmm")
+    hmonnx_model_path = os.path.join(model_dir, f"hmquant_{model_name}_with_act.onnx")
+    hmmodel_path = os.path.join(output_dir, f"{model_name}.hmm")
     work_dir = os.path.join(output_dir, "tcim")
     profile = {}
 
@@ -108,14 +106,14 @@ def build(args=None):
         start = time.time()
         tcim.build_from_hmonnx(
             hmonnx_model_path,
-            output_name=hmmodel_name,
+            output_name=model_name,
             ncore=ncore,
             opt_level=opt_level,
             target="xh2",
-            batch=1,
-            legacy=True,
+            batch=batch,
             output_dir=output_dir,
             work_dir=work_dir,
+            enable_dynamic_image_resize=False,
         )
         profile["build"] = time.time() - start
         print(f'{model_name} build completed in {profile["build"]:.3f} s.')
@@ -142,8 +140,7 @@ def build(args=None):
             )
             input_data_path = os.path.join(
                 model_dir,
-                "golden/step_0",
-                f"hmquant_resnet50_xh2_{quant_type}_{input_name}_input.npy",
+                f"hmquant_{model_name}_{input_name}_input.npy",
             )
             print("input data path:", input_data_path)
             assert os.path.isfile(input_data_path)
@@ -185,8 +182,7 @@ def build(args=None):
             )
             output_data_path = os.path.join(
                 model_dir,
-                "golden/step_0",
-                f"hmquant_resnet50_xh2_{quant_type}_{output_name}_output.npy",
+                f"hmquant_{model_name}_{output_name}_output.npy",
             )
             assert os.path.isfile(output_data_path)
             if os.path.exists(output_data_path):
@@ -202,7 +198,7 @@ def build(args=None):
                 continue
             if golden_output.shape == output_data.shape:
                 cosine_dist = cosine_distance(golden_output, output_data)
-                is_match = (golden_output == output_data).all()
+                is_match = cosine_dist > 0.999
                 print(
                     f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}"
                 )

@@ -87,7 +87,7 @@ def calibrate(args=None):
     ]
     calib_dataset = [calib_transform(data) for data in calib_images]
 
-    quanttool_config = {
+    quant_config = {
         "inputs_cfg": {
             "ALL": {
                 "data_format": "RGB",
@@ -115,13 +115,18 @@ def calibrate(args=None):
     onnx_input = calib_dataset[0]
     print("start calibrating...")
     sequencer = quant_single_onnx_network(
-        quanttool_config,
-        calib_dataset,
-        model_path,
+        cfg=quant_config,
+        calibration_data=calib_dataset,
+        onnx_model_or_path=model_path,
         device="cpu",
     )
     print("start quantize profiling...")
-    quantize_profiling(sequencer, [onnx_input])
+    quantize_profiling(
+        sequencer,
+        [onnx_input],
+        device="cpu",
+        mode=0,
+    )
     print("calibrate completed.")
     print("start save model and generate golden...")
     generate_golden(
@@ -131,6 +136,10 @@ def calibrate(args=None):
         model_name=model_name,
         batch_size=1,
         device="cpu",
+        mode="hardware_forward",
+        input_types=["int8"],
+        output_types=["int8"],
+        separate_weight=False,
     )
     print("save model and generate golden completed.")
 
