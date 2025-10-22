@@ -29,11 +29,32 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--embedding_tokenizer_dir",
+        dest="embedding_tokenizer_dir",
         type=str,
-        default= os.path.join('output', HOUMO_TARGET),
-        help='houmo model dir',
+        default="bge-m3",
+        help="embedder tokenizer dir",
+    )
+    parser.add_argument(
+        "--reranker_tokenizer_dir",
+        dest="reranker_tokenizer_dir",
+        type=str,
+        default="bge-reranker-v2-m3",
+        help="reranker tokenizer dir",
+    )
+    parser.add_argument(
+        "--embedding_path",
+        dest="embedding_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "bge-m3.hmm"),
+        help="houmo embedding model path",
+    )
+    parser.add_argument(
+        "--reranker_path",
+        dest="reranker_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "bge-reranker-v2-m3.hmm"),
+        help="houmo reranker model path",
     )
     parser.add_argument(
         '--mode',
@@ -69,9 +90,9 @@ def get_detailed_instruct(instruction_format: str, instruction: str, sentence: s
     return instruction_format.format(instruction, sentence)
 
 class HmBGEReRanker(nn.Module):
-    def __init__(self, model_dir, device_id=0, model_type="houmo"):
+    def __init__(self, model_path, tokenizer_dir, device_id=0, model_type="houmo"):
         super().__init__()
-        self.model_dir = model_dir
+        self.model_path = model_path
         self.model_type = model_type
         if self.model_type not in SUPPORTED_MODEL_TYPES:
             logger.error(f"Not supported model type: {self.model_type}")
@@ -79,7 +100,7 @@ class HmBGEReRanker(nn.Module):
         if self.model_type == "houmo":
             wt_manager = tcim_lite.runtime.WeightManager(device_id)
             option = tcim_lite.runtime.Option(wt_manager)
-            self.engine = tcim_lite.runtime.load(os.path.join(self.model_dir, "bge-reranker-v2-m3.hmm"), option)
+            self.engine = tcim_lite.runtime.load(self.model_path, option)
             self.input_infos = {}
             for idx in range(self.engine.get_num_inputs()):
                 input_name = self.engine.get_input_name(idx)
@@ -96,7 +117,7 @@ class HmBGEReRanker(nn.Module):
                 }),
                 'CPUExecutionProvider'
             ]
-            self.engine = ort.InferenceSession(os.path.join(self.model_dir, "bge-reranker-v2-m3/bge-reranker-v2-m3.onnx"), providers=providers)
+            self.engine = ort.InferenceSession(self.model_path, providers=providers)
             self.input_infos = {}
             for idx, tensor in enumerate(self.engine.get_inputs()):
                 self.input_infos[tensor.name] = ONNXTensorInfo()
@@ -106,7 +127,7 @@ class HmBGEReRanker(nn.Module):
                 self.input_infos[tensor.name].dtype = onnx.mapping.TENSOR_TYPE_TO_NP_TYPE.get(onnx_dtype).name
             self.output_name = self.engine.get_outputs()[0].name
 
-        self.tokenizer = AutoTokenizer.from_pretrained(f"{SCRIPT_PATH}/bge-reranker-v2-m3", trust_remote_code=False, cache_dir=None)
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, trust_remote_code=False, cache_dir=None)
         self.batch_size = self.input_infos["input_ids"].shape[0]
         self.max_length = self.input_infos["input_ids"].shape[1]
         self.query_max_length = self.max_length * 3 // 4
@@ -116,7 +137,7 @@ class HmBGEReRanker(nn.Module):
         self.passage_instruction_for_rerank = None
         self.query_instruction_format = "{}{}"
         self.query_instruction_for_rerank = None
-        self.get_token_types_ids(os.path.join(self.model_dir, f"{SCRIPT_PATH}/bge-reranker-v2-m3/config.json"))
+        self.get_token_types_ids(f"{tokenizer_dir}/config.json")
     
     def get_token_types_ids(self, config_file):
         if not os.path.exists(config_file):
@@ -244,9 +265,9 @@ class HmBGEReRanker(nn.Module):
 
 
 class HmBGEM3(nn.Module):
-    def __init__(self, model_dir, device_id=0, model_type="houmo"):
+    def __init__(self, model_path, tokenizer_dir, device_id=0, model_type="houmo"):
         super().__init__()
-        self.model_dir = model_dir
+        self.model_path = model_path
         self.model_type = model_type
         if self.model_type not in SUPPORTED_MODEL_TYPES:
             logger.error(f"Not supported model type: {self.model_type}")
@@ -254,7 +275,7 @@ class HmBGEM3(nn.Module):
         if self.model_type == "houmo":
             wt_manager = tcim_lite.runtime.WeightManager(device_id)
             option = tcim_lite.runtime.Option(wt_manager)
-            self.engine = tcim_lite.runtime.load(os.path.join(self.model_dir, "bge-m3.hmm"), option)
+            self.engine = tcim_lite.runtime.load(self.model_path, option)
             self.input_infos = {}
             for idx in range(self.engine.get_num_inputs()):
                 input_name = self.engine.get_input_name(idx)
@@ -271,7 +292,7 @@ class HmBGEM3(nn.Module):
                 }),
                 'CPUExecutionProvider'
             ]
-            self.engine = ort.InferenceSession(os.path.join(self.model_dir, "bge-m3/bge-m3.onnx"), providers=providers)
+            self.engine = ort.InferenceSession(self.model_path, providers=providers)
             self.input_infos = {}
             for idx, tensor in enumerate(self.engine.get_inputs()):
                 self.input_infos[tensor.name] = ONNXTensorInfo()
@@ -281,7 +302,7 @@ class HmBGEM3(nn.Module):
                 self.input_infos[tensor.name].dtype = onnx.mapping.TENSOR_TYPE_TO_NP_TYPE.get(onnx_dtype).name
             self.output_name = self.engine.get_outputs()[0].name
 
-        self.tokenizer = AutoTokenizer.from_pretrained(f"{SCRIPT_PATH}/bge-m3", trust_remote_code=False, cache_dir=None)
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, trust_remote_code=False, cache_dir=None)
         self.batch_size = self.input_infos["input_ids"].shape[0]
         self.max_length = self.input_infos["input_ids"].shape[1]
         self.pooling_method = "cls"
@@ -402,7 +423,7 @@ def xh2_demo(args):
 
     pairs = None
     if args.mode == "embedder" or args.mode == "all":
-        hmbgem3 = HmBGEM3(args.model_dir, args.device_idx, args.model_type)
+        hmbgem3 = HmBGEM3(args.embedding_path, args.embedding_tokenizer_dir, args.device_idx, args.model_type)
         # Encode the corpus into vectors
         start_time = time.time()
         corpus_embeddings = hmbgem3.embedder(corpus).astype(np.float32)
@@ -426,7 +447,7 @@ def xh2_demo(args):
             pairs = [[query, corpus[hit['corpus_id']]] for hit in hits]
 
     if args.mode == "reranker" or args.mode == "all":
-        hmbgereranker = HmBGEReRanker(args.model_dir, args.device_idx, args.model_type)
+        hmbgereranker = HmBGEReRanker(args.reranker_path, args.reranker_tokenizer_dir, args.device_idx, args.model_type)
         if pairs is None:
             pairs = [[query, cor] for cor in corpus]
         

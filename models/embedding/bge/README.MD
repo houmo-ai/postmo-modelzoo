@@ -31,14 +31,14 @@ python3 get_model.py --type raw
 
 ```bash
 # 仅量化
-python3 quant_compile.py
+python3 ptq.py
 ```
 
 ### 2.3 编译
 
 ```bash
 # 量化+编译
-python3 quant_compile.py --compile
+python3 build.py
 ```
 
 ### 2.3 演示

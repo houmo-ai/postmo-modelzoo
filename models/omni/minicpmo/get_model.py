@@ -1,11 +1,13 @@
 import os
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog
+from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
+runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
+runtime_version = runtime_version.split(".dev")[0]
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -32,11 +34,20 @@ if __name__ == '__main__':
     args = get_args()
     model_type = args.model_type
     model_dir = args.model_dir
+    version = f"v{runtime_version}"
+    model_name = "minicpmo"
+    model_size = "7b"
+    ncore = "2cores"
+    ndevice = "1chip"
+    context_len = "2k"
+    prefill_len = 256
+    batch = 1
+    target = HOUMO_TARGET
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
-    config_path = "http://10.10.1.53:8082/artifactory/toolchain/release/models/minicpmo/MiniCPM-o-2_6_file.zip"
+    config_path = "models/minicpmo/MiniCPM-o-2_6_file.zip"
     if HOUMO_TARGET == "xh2":
-        hmm_path = "http://10.10.1.53:8082/artifactory/toolchain/release/models/minicpmo/hmm_xh2_minicpmo_7b_256_4k_2core_20251016.zip"
-        quant_path = "http://10.10.1.53:8082/artifactory/toolchain/release/models/minicpmo/hmquant_xh2_minicpmo_7b_256_4k_20251016.zip"
+        hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
+        quant_path = "models/minicpmo/hmquant_xh2_minicpmo_7b_256_4k_20251016.zip"
     
     try:
         get_file_from_jfrog(config_path, model_dir, "./")
