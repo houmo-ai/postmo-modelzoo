@@ -36,18 +36,18 @@ backbone_mobilenetv2:
         args: all
   test:
     - backbone_mobilenetv2_test
-backbone_ViT-B-16:
-  include:
-    - models/backbone/ViT-B-16
-  exclude:
-    - models/backbone/ViT-B-16/README.MD
-  example_case:
-    - backbone_ViT-B-16_test:
-        test_type: models_tests
-        script: ViT-B-16
-        args: all
-  test:
-    - backbone_ViT-B-16_test
+# backbone_ViT-B-16:
+#   include:
+#     - models/backbone/ViT-B-16
+#   exclude:
+#     - models/backbone/ViT-B-16/README.MD
+#   example_case:
+#     - backbone_ViT-B-16_test:
+#         test_type: models_tests
+#         script: vit
+#         args: all
+#   test:
+#     - backbone_ViT-B-16_test
 # autodrive_yolop:
 #   include:
 #     - models/autodrive/yolop

@@ -50,7 +50,7 @@ if __name__ == "__main__":
     opt_level = "O2"
     version = f"v{runtime_version}"
     target = HOUMO_TARGET
-    build_path = f"models/v{runtime_version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
+    build_path = f"models/{target.lower()}-v{runtime_version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type in ["hmm"] and not get_file_from_jfrog(
         build_path, model_dir, build_model_dir

@@ -1,13 +1,26 @@
 import abc
 import os
 import sys
+import onnx
+import json
 import importlib
 import numpy as np
 import torch
+from onnx import StringStringEntryProto
 from pathlib import Path
 from datetime import datetime
 from ..utils import logger
 from ..utils.utils import get_onnx_inputs_info
+from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
+
+
+QUANTIZATION_RANGES = {
+    "int8": (-128, 127),  # 8位有符号整数
+    "uint8": (0, 255),  # 8位无符号整数
+    "int16": (-32768, 32767),  # 16位有符号整数
+    "uint16": (0, 65535),  # 16位无符号整数
+    "int32": (-2147483648, 2147483647),  # 32位有符号整数
+}
 
 
 class BaseExec(object, metaclass=abc.ABCMeta):
@@ -38,6 +51,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.hmm_save_dir = os.path.join(self.save_dir, self.target)
         if not os.path.exists(self.hmm_save_dir):
             os.makedirs(self.hmm_save_dir)
+        self.quant_onnx_model_path = os.path.join(
+            self.quant_output_dir, f"hmquant_{self.model_name}_with_act.onnx"
+        )
         self.inputs_cfg = self.model_cfg.get("inputs")
         self.model_inputs_batch = dict()
         self.inputs_name = list()
@@ -63,6 +79,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         #             logger.error("all input batch must be same")
         #             exit(-1)
         self.quant_cfg = cfg.get("quant")
+        self.quant_advance_cfg = self.quant_cfg.get("config", dict())
         self.calib_method = self.quant_cfg.get("calib_method", "minmax")
         if self.calib_method not in [
             "minmax",
@@ -103,6 +120,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.onnx_inputs_info, self.onnx_outputs_info = get_onnx_inputs_info(
             self.model_path
         )
+        self.hmm_batch = self.build_batch * self.model_input_batch
         self.onnx_is_static = True
         for input_name in self.inputs_name:
             onnx_shape = self.onnx_inputs_info[input_name]["shape"]
@@ -127,6 +145,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             self.outputs_name.append(name)
         self.demo_cfg = cfg.get("demo", dict())
         self.eval_cfg = cfg.get("eval", dict())
+        # hmatc onnx optimizer initialization
+        if "app_onnx_opt" in cfg["model"]:
+            self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
 
     @staticmethod
     def dtype_transform(dtype):
@@ -369,3 +390,98 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             outputs["primitive_profile_data.bin"].tofile(
                 os.path.join(profile_dir, "primitive_profile_data.bin")
             )
+
+    def add_node_output_as_graph_output(self, model_path):
+        new_model_path = model_path.replace(".onnx", "_debug.onnx")
+        # if os.path.exists(new_model_path):
+        #     return new_model_path
+        model = onnx.load(model_path)
+        graph = model.graph
+        for node in graph.node:
+            if node.op_type == "Split":
+                continue
+            # 获取节点属性
+            node_attributes = {}
+            for attr in node.attribute:
+                value = onnx.helper.get_attribute_value(attr)
+                if isinstance(value, bytes):
+                    value = value.decode("utf-8")
+                node_attributes[attr.name] = value
+            if self.target == "xh1":
+                output_granularity = node_attributes["output_granularity"]
+                output_dtype = node_attributes["output_dtype"]
+                scale = node_attributes["output_scale"]
+                zero_point = node_attributes["output_zero_point"]
+            for output in node.output:
+                if any(
+                    output == existing_output.name for existing_output in graph.output
+                ):
+                    continue
+                value_info = None
+                for vi in graph.value_info:
+                    if vi.name == output:
+                        value_info = vi
+                        break
+
+                if value_info is None:
+                    logger.warning(
+                        f"Warning: Cannot determine type/shape for output {output}, creating basic output"
+                    )
+                    continue
+
+                if self.target == "xh1":
+
+                    def get_shape_from_value_info(value_info):
+                        """从value_info中提取形状信息"""
+                        if not value_info.type.HasField("tensor_type"):
+                            return None
+
+                        tensor_type = value_info.type.tensor_type
+                        shape = []
+                        if tensor_type.HasField("shape"):
+                            for dim in tensor_type.shape.dim:
+                                if dim.HasField("dim_value"):
+                                    shape.append(dim.dim_value)
+                                elif dim.HasField("dim_param"):
+                                    shape.append(dim.dim_param)
+                                else:
+                                    shape.append("?")
+
+                        return shape
+
+                    output_shape = get_shape_from_value_info(value_info)
+                    if output_granularity == "tensor":
+                        block_shape = output_shape
+                    else:
+                        assert output_granularity.startswith("dim")
+                        dim_index = int(output_granularity[-1])
+                        block_shape = [
+                            output_shape[i] if i != dim_index else 1
+                            for i in range(len(output_shape))
+                        ]
+                    # add quantization info
+                    quant_info = dict(
+                        block_shape=block_shape,
+                        scale=scale,
+                        zero_point=zero_point,
+                        src_dtype="float32",
+                        dst_dtype=output_dtype,
+                        dst_min=QUANTIZATION_RANGES[output_dtype][0],
+                        dst_max=QUANTIZATION_RANGES[output_dtype][1],
+                    )
+                    quant_info_json = json.dumps(quant_info)
+                    # 创建 StringStringEntryProto 对象
+                    quant_entry = StringStringEntryProto(
+                        key="houmo.quant.info", value=quant_info_json
+                    )
+                    # 将量化信息添加到 metadata_props
+                    value_info.metadata_props.append(quant_entry)
+                graph.output.append(value_info)
+
+        model.graph.CopyFrom(graph)
+        onnx.checker.check_model(model)
+        model.opset_import[0].version = max(model.opset_import[0].version, 11)
+        model.ir_version = max(model.ir_version, 6)
+        onnx.save(model, new_model_path)
+        logger.info(f"Saved debug model to {new_model_path}")
+        return new_model_path

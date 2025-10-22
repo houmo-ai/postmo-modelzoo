@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
     data_path = f"models/{model_name}/base_yolov5lprnet.tar.gz"
     raw_path = f"models/{model_name}/lprnet_24x94_2dmaxpool.onnx"
-    build_path = f"models/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
+    build_path = f"models/{target.lower()}-{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     get_file_from_jfrog(data_path, ".", ".")
     if model_type in ["raw"] and not get_file_from_jfrog(raw_path, model_dir):

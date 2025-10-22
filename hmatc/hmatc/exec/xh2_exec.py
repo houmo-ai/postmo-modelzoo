@@ -1,19 +1,17 @@
 import os
 import shutil
 import time
-from datetime import datetime
-from importlib.metadata import PackageNotFoundError, version
-
+import onnx
 import cv2
 import numpy as np
 import torch
 from prettytable import PrettyTable
-
+from datetime import datetime
+from importlib.metadata import PackageNotFoundError, version
 from ..base.base_exec import BaseExec
 from ..infer.onnx_infer import OnnxInfer
 from ..infer.xh2_infer import Xh2Infer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
-from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
 from ..utils.preprocess import default_preprocess
@@ -35,22 +33,10 @@ class Xh2Exec(BaseExec):
     def __init__(self, cfg: dict) -> None:
         super().__init__(cfg)
         self.quant_type = "w8a8h1_sefp"
-        self.hmm_batch = self.build_batch * self.model_input_batch
         self.hmm_name = f"{self.model_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}"
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
-        self.hmonnx_name = f"{self.model_name}"
-        self.quant_onnx_model_path = os.path.join(
-            self.quant_output_dir, f"{self.hmonnx_name}.onnx"
-        )
-        self.new_quant_onnx_model_path = os.path.join(
-            self.quant_output_dir, f"hmquant_{self.hmonnx_name}_with_act.onnx"
-        )
         self.golden_dir = os.path.join(self.quant_output_dir, "golden")
-        self.quant_advance_cfg = self.quant_cfg.get("config", dict())
         self.upgrade_opset_version()
-        # hmatc onnx optimizer initialization
-        if "app_onnx_opt" in cfg["model"]:
-            self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
 
     def get_quant_cfg(self) -> dict:
         return dict()
@@ -119,6 +105,9 @@ class Xh2Exec(BaseExec):
             shape = input_cfg["shape"]
             dtype_str = self.onnx_inputs_info[input_name]["dtype"]
             in_datas.append(torch.from_numpy(self.gen_random_data(shape, dtype_str)))
+        quant_onnx_model_path = os.path.join(
+            self.quant_output_dir, f"{self.model_name}.onnx"
+        )
         # 量化以及HMONNX导出
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         t_start = time.time()
@@ -126,13 +115,13 @@ class Xh2Exec(BaseExec):
             self.model_path,
             in_datas,
             device_type=DeviceType.XH2a,
-            out_hmonnx_file=self.quant_onnx_model_path,
+            out_hmonnx_file=quant_onnx_model_path,
             quant_config=quant_config,
             input_names=self.inputs_name,
             output_names=self.outputs_name,
         )
         # 生成芯片所需格式模型
-        session = HMONNXGoldenInference(self.quant_onnx_model_path)
+        session = HMONNXGoldenInference(quant_onnx_model_path)
         session.to(self.device)
         session.save_golden = True
         session.golden_dir = self.golden_dir
@@ -146,8 +135,8 @@ class Xh2Exec(BaseExec):
             elif in_data.dtype == torch.float32:
                 in_datas[idx] = in_data.half().to(self.device)
         session(*in_datas)  #
-        if os.path.exists(self.quant_onnx_model_path):
-            os.remove(self.quant_onnx_model_path)
+        if os.path.exists(quant_onnx_model_path):
+            os.remove(quant_onnx_model_path)
         shutil.copytree(
             os.path.join(self.golden_dir, "step_0"),
             self.quant_output_dir,
@@ -175,7 +164,7 @@ class Xh2Exec(BaseExec):
             )
             upload_file_to_artifactory(
                 compress_quant_output_path,
-                f"models/v{runtime_version}/{self.model_dir_name}/{filename}",
+                f"models/{self.target.lower()}-v{runtime_version}/{self.model_dir_name}/{filename}",
                 max_retries=3,
             )
             logger.info(f"Compressing quant output done.")
@@ -183,7 +172,7 @@ class Xh2Exec(BaseExec):
         res = dict()
         res["time"] = span
         res_info = {"quant": res, "model": self.model_cfg}
-        logger.info(f"Quantize done. and save hmonnx: {self.new_quant_onnx_model_path}")
+        logger.info(f"Quantize done. and save hmonnx: {self.quant_onnx_model_path}")
         return res_info
 
     def build(self, enable_profile=False):
@@ -196,16 +185,16 @@ class Xh2Exec(BaseExec):
         except ImportError:
             logger.error("Not found tcim module, and please install tcim first!")
             exit(-1)
+
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         t_start = time.time()
         tcim.build_from_hmonnx(
-            self.new_quant_onnx_model_path,
+            self.quant_onnx_model_path,
             output_name=self.hmm_name,
             ncore=self.build_ncore,
             opt_level=self.build_opt_level,
             target="xh2",
             batch=self.build_batch,
-            legacy=True,
             enable_profile=enable_profile,
             output_dir=self.hmm_save_dir,
             work_dir=self.build_output_dir,
@@ -240,14 +229,27 @@ class Xh2Exec(BaseExec):
             )
             upload_file_to_artifactory(
                 compress_hmm_path,
-                f"models/v{runtime_version}/{self.model_dir_name}/{filename}",
+                f"models/{self.target.lower()}-v{runtime_version}/{self.model_dir_name}/{filename}",
                 max_retries=3,
             )
             logger.info(f"Compressing hmmodel done.")
         res_info = {"build": {"time": span}}
         return res_info
 
-    def check_golden(self, device_id=0):
+    def check_golden(self, device_id=0, enable_layers=False):
+        logger.info("Checking golden...")
+        if enable_layers:
+            # 将量化后onnx的所有node输出作为graph输出
+            self.quant_onnx_model_path = self.add_node_output_as_graph_output(
+                self.quant_onnx_model_path
+            )
+            self.build_output_dir += "_debug"
+            self.hmm_name += "_debug"
+            self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
+            if not os.path.exists(self.hmm_path):
+                logger.info("Rebuild hmmodel with all layers output...")
+                self.build(enable_profile=False)
+
         xh2 = Xh2Infer()
         xh2.load(self.hmm_path, device_id=device_id)
         in_datas = dict()
@@ -273,10 +275,17 @@ class Xh2Exec(BaseExec):
         table.title = "xh2 vs hmquant"
         for output_name in outputs:
             new_name = output_name.replace("/", "_")
-            golden_output_path = os.path.join(
-                self.quant_output_dir,
-                f"hmquant_{self.model_name}_{new_name}_output.npy",
-            )
+            if enable_layers:
+                golden_output_path = os.path.join(
+                    self.quant_output_dir,
+                    f"hmquant_{self.model_name}_with_act",
+                    f"{new_name}.npy",
+                )
+            else:
+                golden_output_path = os.path.join(
+                    self.quant_output_dir,
+                    f"hmquant_{self.model_name}_{new_name}_output.npy",
+                )
             golden_output = np.load(golden_output_path)
             logger.info(f"Load golden: {golden_output_path}")
             logger.info(
@@ -294,7 +303,7 @@ class Xh2Exec(BaseExec):
                 "golden_md5": golden_output_md5,
                 "cosine_dist": float(dist),
             }
-        logger.info(f"Check golden...\n{table}")
+        logger.info(f"\n{table}")
         return res_info
 
     def compare(self, data_path: str, device_id=0):
@@ -304,7 +313,7 @@ class Xh2Exec(BaseExec):
         onnx_infer.load(self.model_path)
         # hmquant
         hmquant_infer = Xh2HmQuantInfer()
-        hmquant_infer.load(self.new_quant_onnx_model_path)
+        hmquant_infer.load(self.quant_onnx_model_path)
         # xh2
         xh2_infer = Xh2Infer()
         xh2_infer.load(self.hmm_path)

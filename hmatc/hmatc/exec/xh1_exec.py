@@ -27,21 +27,15 @@ from ..utils.utils import (
     get_md5,
     load_npz,
 )
-from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
 
 
 class Xh1Exec(BaseExec):
     def __init__(self, cfg: dict) -> None:
         super().__init__(cfg)
-        self.hmm_batch = self.build_batch * self.model_input_batch
         self.quant_sequencer_model_path = os.path.join(
             self.quant_output_dir,
             f"{self.model_name}_xh1_b{self.model_input_batch}.pkl",
         )
-        self.quant_onnx_model_path = os.path.join(
-            self.quant_output_dir, "hmquant_" + self.model_name + "_with_act.onnx"
-        )
-        self.quant_advance_cfg = self.quant_cfg.get("config", dict())
         mix_search_cfg = self.quant_advance_cfg.get("mix_search", dict())
         if "activation" in mix_search_cfg:
             activation_cfg = mix_search_cfg["activation"]
@@ -108,9 +102,6 @@ class Xh1Exec(BaseExec):
             prefix = "_static"
         self.hmm_name = f"{self.model_name}_xh1_b{self.hmm_batch}{roi_tag}_{self.build_ncore}core_{self.build_opt_level}{prefix}"
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
-        # hmatc onnx optimizer initialization
-        if "app_onnx_opt" in cfg["model"]:
-            self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
 
     def get_quant_cfg(self) -> dict:
         # 设置量化日志输出
@@ -472,7 +463,7 @@ class Xh1Exec(BaseExec):
             )
             upload_file_to_artifactory(
                 compress_quant_output_path,
-                f"models/v{runtime_version}/{self.model_dir_name}/{filename}",
+                f"models/{self.target.lower()}-v{runtime_version}/{self.model_dir_name}/{filename}",
                 max_retries=3,
             )
             logger.info(f"Compressing quant output done.")
@@ -495,7 +486,6 @@ class Xh1Exec(BaseExec):
             opt_level=self.build_opt_level,
             target="xh1",
             batch=self.build_batch if self.roi_num == 1 else self.roi_num,
-            legacy=True,
             output_dir=self.hmm_save_dir,
             work_dir=self.build_output_dir,
             enable_dynamic_image_resize=self.resizer_mode in [1],
@@ -532,13 +522,25 @@ class Xh1Exec(BaseExec):
             )
             upload_file_to_artifactory(
                 compress_hmm_path,
-                f"models/v{runtime_version}/{self.model_dir_name}/{filename}",
+                f"models/{self.target.lower()}-v{runtime_version}/{self.model_dir_name}/{filename}",
                 max_retries=3,
             )
             logger.info(f"Compressing hmmodel done.")
         return res_info
 
-    def check_golden(self, device_id=0):
+    def check_golden(self, device_id=0, enable_layers=False):
+        logger.info("Checking golden...")
+        if enable_layers:
+            self.quant_onnx_model_path = self.add_node_output_as_graph_output(
+                self.quant_onnx_model_path
+            )
+            self.build_output_dir += "_debug"
+            self.hmm_name += "_debug"
+            self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
+            if not os.path.exists(self.hmm_path):
+                logger.info("Rebuild hmmodel with all layers output...")
+                self.build(enable_profile=False)
+
         xh1 = Xh1Infer()
         xh1.load(self.hmm_path, device_id=device_id)
         in_datas = dict()
@@ -591,26 +593,57 @@ class Xh1Exec(BaseExec):
         table.title = "xh1 vs hmquant"
         for output_name in outputs_dequanted:
             new_output_name = output_name.replace("/", "_")
-            golden_output_path = os.path.join(
-                self.quant_output_dir,
-                f"hmquant_{self.model_name}_{new_output_name}_output.npy",
-            )
-            golden_output_dequant_path = os.path.join(
-                self.quant_output_dir,
-                f"hmquant_{self.model_name}_{new_output_name}_dequant_output.npy",
-            )
-            golden_output = np.load(golden_output_path)
-            golden_output_dequanted = np.load(golden_output_dequant_path)
+            if enable_layers:
+                golden_output_path = os.path.join(
+                    self.quant_output_dir,
+                    f"hmquant_{self.model_name}_with_act",
+                    f"{new_output_name}.npy",
+                )
+                golden_outputs = np.load(golden_output_path, allow_pickle=True).item()
+                out_idx = ""
+                if "split_size_or_sections" in golden_outputs:
+                    out_idx = int(new_output_name.split("_")[-1])
+                output_granularity = golden_outputs[f"output{out_idx}_granularity"]
+                golden_output = golden_outputs["output_tensor"]
+                zero_point = np.array(
+                    golden_outputs[f"output{out_idx}_zero_point"], dtype=np.float32
+                )
+                scale = np.array(
+                    golden_outputs[f"output{out_idx}_scale"], dtype=np.float32
+                )
+                if output_granularity != "tensor":
+                    assert output_granularity.startswith("dim")
+                    dim = int(output_granularity[-1])
+                    output_tensor_shape = golden_output.shape
+                    shape = [
+                        1 if i != dim else output_tensor_shape[i]
+                        for i in range(len(output_tensor_shape))
+                    ]
+                    zero_point = np.reshape(zero_point, shape)
+                    scale = np.reshape(scale, shape)
+                golden_output_dequanted = (golden_output - zero_point) * scale
+            else:
+                golden_output_path = os.path.join(
+                    self.quant_output_dir,
+                    f"hmquant_{self.model_name}_{new_output_name}_output.npy",
+                )
+                golden_output_dequant_path = os.path.join(
+                    self.quant_output_dir,
+                    f"hmquant_{self.model_name}_{new_output_name}_dequant_output.npy",
+                )
+                golden_output = np.load(golden_output_path)
+                golden_output_dequanted = np.load(golden_output_dequant_path)
+
             golden_output = np.repeat(golden_output, repeats=repeats, axis=0)
+            golden_output_md5 = get_md5(golden_output)
+            output = outputs[output_name]
+            output_md5 = get_md5(output)
+            output_dequanted = outputs_dequanted[output_name]
+            output_dequanted_md5 = get_md5(output_dequanted)
             golden_output_dequanted = np.repeat(
                 golden_output_dequanted, repeats=repeats, axis=0
             )
-            golden_output_md5 = get_md5(golden_output)
             golden_output_dequanted_md5 = get_md5(golden_output_dequanted)
-            output = outputs[output_name]
-            output_dequanted = outputs_dequanted[output_name]
-            output_md5 = get_md5(output)
-            output_dequanted_md5 = get_md5(output_dequanted)
             # compare
             dist = cosine_distance(golden_output, output)
             dist_dequanted = cosine_distance(golden_output_dequanted, output_dequanted)
@@ -637,7 +670,7 @@ class Xh1Exec(BaseExec):
                 "md5_ok": output_md5 == golden_output_md5,
                 "dequanted_md5_ok": output_dequanted_md5 == golden_output_dequanted_md5,
             }
-        logger.info(f"Check golden...\n{table}")
+        logger.info(f"\n{table}")
         return res_info
 
     def compare(self, data_path: str, device_id=0):

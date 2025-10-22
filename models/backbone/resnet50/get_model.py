@@ -53,7 +53,7 @@ if __name__ == "__main__":
     version = f"v{runtime_version}"
     target = HOUMO_TARGET
     raw_path = f"models/{model_name}/resnet50.onnx"
-    build_path = f"models/v{runtime_version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
+    build_path = f"models/{target.lower()}-v{runtime_version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type in ["raw"] and not get_file_from_jfrog(raw_path, model_dir):
         sys.exit(1)

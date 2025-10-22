@@ -743,6 +743,21 @@ def main():
         ],
         help="Run model benchmark",
     )
+    # check golden
+    check_parser = subparsers.add_parser(
+        "check",
+        parents=[
+            parent_config,
+            parent_target,
+            parent_device_id,
+        ],
+        help="Check model golden",
+    )
+    check_parser.add_argument(
+        "--layers",
+        action="store_true",
+        help="Check model layers output",
+    )
 
     args = parser.parse_args()
 
@@ -759,7 +774,11 @@ def main():
 
     # 存在结果信息，先读回来更新后再存
     res_info = dict()
-    if os.path.exists(args.result_path):
+    if (
+        hasattr(args, "result_path")
+        and args.result_path is not None
+        and os.path.exists(args.result_path)
+    ):
         res_info = read_yaml_to_dict(args.result_path)
 
     # 直接指定模型的perf可跳过配置文件
@@ -844,6 +863,8 @@ def main():
         new_res_info = hm_exec.build(enable_profile=args.profile)
         logger.info(f"Build {hm_exec.model_name} done.")
         new_res_info["build"].update(hm_exec.check_golden(args.device_id))
+    elif current_command == "check":
+        hm_exec.check_golden(args.device_id, args.layers)
     elif current_command == "compare":
         data_path = args.data_path
         if not os.path.exists(data_path):
@@ -878,7 +899,8 @@ def main():
         res_info["perf"].update(new_res_info["perf"])
     else:
         res_info.update(new_res_info)
-    save_dict_to_yaml(res_info, args.result_path)
+    if hasattr(args, "result_path") and args.result_path is not None:
+        save_dict_to_yaml(res_info, args.result_path)
 
 
 if __name__ == "__main__":
