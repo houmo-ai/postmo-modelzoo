@@ -31,7 +31,7 @@ python3 get_model.py --type quant
 ### 2.3 编译
 
 ```bash
-python3 compile.py
+python3 build.py
 ```
 
 ### 2.3 演示

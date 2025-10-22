@@ -1,12 +1,14 @@
 import os
 import onnx
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog
+from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
+runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
+runtime_version = runtime_version.split(".dev")[0]
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -34,9 +36,20 @@ if __name__ == '__main__':
     model_type = args.model_type
     model_dir = args.model_dir
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
-    onnx_path = "http://10.10.1.53:8082/artifactory/toolchain/release/models/bge/onnx_bge_10x512.zip"
+    model_type = args.model_type
+    model_dir = args.model_dir
+    version = f"v{runtime_version}"
+    model_name = "bge"
+    ncore = "2cores"
+    model_size = "0.5b"
+    context_len = "0.5k"
+    ndevice = "1chip"
+    batch = 10
+    target = HOUMO_TARGET
+    onnx_path = "models/bge/onnx_bge_10x512.zip"
     if HOUMO_TARGET == "xh2":
-        hmm_path = "http://10.10.1.53:8082/artifactory/toolchain/release/models/bge/hmm_xh2_bge_10x512_2cores_20251015.zip"
+        quant_path = "models_outdated/bge/hmquant_xh2_bge_0.5b_0.5k_b10_1chip_2core_20251022.zip"
+        hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
 
     from modelscope import snapshot_download
     snapshot_download('BAAI/bge-reranker-v2-m3',
@@ -54,5 +67,10 @@ if __name__ == '__main__':
     if model_type == "hmm":
         try:
             get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
+        except Exception as e:
+            print(f"Model doesn't exist, error msg: {e}")
+    elif model_type == "quant":
+        try:
+            get_file_from_jfrog(quant_path, model_dir, os.path.join('output', HOUMO_TARGET))
         except Exception as e:
             print(f"Model doesn't exist, error msg: {e}")

@@ -43,6 +43,7 @@ from moviepy import VideoFileClip
 import tcim_lite
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 SUPPORTED_MODEL_TYPES = ["onnx", "houmo"]
 EXAMPLES_MODE = {
     0: "all",   ## vision + audio + llm + tts
@@ -56,11 +57,81 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--tokenizer_dir",
+        dest="tokenizer_dir",
         type=str,
-        default= os.path.join('output', HOUMO_TARGET),
-        help='houmo model dir',
+        default="MiniCPM-o-2_6",
+        help="tokenizer dir",
+    )
+    parser.add_argument(
+        "--embedding_path",
+        dest="embedding_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        help="houmo embedding weight path",
+    )
+    parser.add_argument(
+        "--vit_path",
+        dest="vit_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "minicpmo_visual.hmm"),
+        help="houmo visual model path",
+    )
+    parser.add_argument(
+        "--audio_path",
+        dest="audio_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "minicpmo_audio.hmm"),
+        help="houmo audio model path",
+    )
+    parser.add_argument(
+        "--llm_prefill_path",
+        dest="llm_prefill_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "minicpmo_llm_prefill.hmm"),
+        help="houmo llm prefill model path",
+    )
+    parser.add_argument(
+        "--llm_decode_path",
+        dest="llm_decode_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "minicpmo_llm_decode.hmm"),
+        help="houmo llm decode model path",
+    )
+    parser.add_argument(
+        "--llm_projector_path",
+        dest="llm_projector_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "minicpmo_llm_projector.hmm"),
+        help="houmo llm projector model path",
+    )
+    parser.add_argument(
+        "--tts_prefill_path",
+        dest="tts_prefill_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "minicpmo_tts_prefill.hmm"),
+        help="houmo tts Llama prefill model path",
+    )
+    parser.add_argument(
+        "--tts_decode_path",
+        dest="tts_decode_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "minicpmo_tts_decode.hmm"),
+        help="houmo tts Llama decode model path",
+    )
+    parser.add_argument(
+        "--tts_dvae_path",
+        dest="tts_dave_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "minicpmo_dvae.hmm"),
+        help="houmo tts dvae model path",
+    )
+    parser.add_argument(
+        "--tts_vocos_path",
+        dest="tts_vocos_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "minicpmo_vocos.hmm"),
+        help="houmo tts vocos model path",
     )
     parser.add_argument(
         '--device_id',
@@ -218,15 +289,13 @@ def _get_feat_extract_output_lengths(input_lengths: torch.LongTensor, audio_pool
 
 class HMMiniCPMO(object):
     def __init__(self, 
-                 model_dir,
-                 device_id=0, 
+                 args, 
                  init_vision=True,
                  init_audio=True,
                  init_tts=True,
                  use_tts_template=False, 
                  llm_sampling=True,
                  tts_sampling=True):
-        self.model_dir = model_dir
         self.init_vision = init_vision
         self.init_audio = init_audio
         self.init_tts = init_tts
@@ -237,18 +306,18 @@ class HMMiniCPMO(object):
         self.vision_batch_size = 1
         self.default_tts_chat_template = "{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n<|spk_bos|><|spk|><|spk_eos|><|tts_bos|>' }}{% endif %}"
         
-        self.processer = AutoProcessor.from_pretrained(f"{SCRIPT_DIR}/MiniCPM-o-2_6", trust_remote_code=True)
+        self.processer = AutoProcessor.from_pretrained(args.tokenizer_dir, trust_remote_code=True)
 
-        self.embedding_path = os.path.join(self.model_dir, "hmquant", "llm_embedding.pt")
+        self.embedding_path = os.path.join(args.embedding_path, "quant_embedding.pt")
         self.embedding = torch.load(self.embedding_path, map_location=torch.device(self.device), weights_only=False)
         self.hidden_dims = self.embedding.shape[-1]
-        self.tokenizer = AutoTokenizer.from_pretrained(f'{SCRIPT_DIR}/MiniCPM-o-2_6', trust_remote_code=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_dir, trust_remote_code=True)
 
-        wt_manager = tcim_lite.runtime.WeightManager(device_id)
+        wt_manager = tcim_lite.runtime.WeightManager(args.device_id)
         
         if self.init_vision:
             option_vpm = tcim_lite.runtime.Option(wt_manager)
-            self.vpm_engine = tcim_lite.runtime.load(os.path.join(self.model_dir, "minicpmo_vision_7b_xh2a_2k.hmm"), option_vpm)
+            self.vpm_engine = tcim_lite.runtime.load(args.vit_path, option_vpm)
             self.vpm_input_infos = get_input_infos(self.vpm_engine)
             self.vpm_output_infos = get_output_infos(self.vpm_engine)
             self.vpm_patch_size = 14
@@ -257,7 +326,7 @@ class HMMiniCPMO(object):
         
         if self.init_audio:
             option_apm = tcim_lite.runtime.Option(wt_manager)
-            self.apm_engine = tcim_lite.runtime.load(os.path.join(self.model_dir, "minicpmo_audio_7b_xh2a_2k.hmm"), option_apm)
+            self.apm_engine = tcim_lite.runtime.load(args.audio_path, option_apm)
             self.apm_input_infos = get_input_infos(self.apm_engine)
             self.apm_output_infos = get_output_infos(self.apm_engine)
 
@@ -270,7 +339,7 @@ class HMMiniCPMO(object):
         self.eos_token_id = [151645, 151643]
         
         option_llm_prefill = tcim_lite.runtime.Option(wt_manager)
-        self.llm_prefill_engine = tcim_lite.runtime.load(os.path.join(self.model_dir, "minicpmo_llm_7b_xh2a_4k_prefill.hmm"), option_llm_prefill)
+        self.llm_prefill_engine = tcim_lite.runtime.load(args.llm_prefill_path, option_llm_prefill)
         self.llm_prefill_input_infos = get_input_infos(self.llm_prefill_engine)
         self.llm_prefill_output_infos = get_output_infos(self.llm_prefill_engine)
         self.llm_nblocks = self.get_nblocks(self.llm_prefill_engine)
@@ -297,7 +366,7 @@ class HMMiniCPMO(object):
         dummy_llm_tensor_names = [f'model_layers_{i}_self_attn_kcache_input' for i in range(self.llm_nblocks)]
         dummy_llm_tensor_names += [f'model_layers_{i}_self_attn_vcache_input' for i in range(self.llm_nblocks)]
         option_llm_decoder.set_dummy_tensors(dummy_llm_tensor_names)
-        self.llm_decoder_engine = tcim_lite.runtime.load(os.path.join(self.model_dir, "minicpmo_llm_7b_xh2a_4k_decode.hmm"), option_llm_decoder)
+        self.llm_decoder_engine = tcim_lite.runtime.load(args.llm_decode_path, option_llm_decoder)
         self.llm_decoder_input_infos = get_input_infos(self.llm_decoder_engine)
         self.llm_decoder_output_infos = get_output_infos(self.llm_decoder_engine)
         for i in range(self.llm_nblocks):
@@ -308,7 +377,7 @@ class HMMiniCPMO(object):
         self.llm_decoder_engine.set_input("current_length", np.array([1]).astype(self.llm_decoder_input_infos["current_length"].dtype))
 
         if self.init_tts:
-            self.tts_text_tokenizer = BertTokenizerFast.from_pretrained(f"{SCRIPT_DIR}/MiniCPM-o-2_6/assets/chattts_tokenizer")
+            self.tts_text_tokenizer = BertTokenizerFast.from_pretrained(f"{args.tokenizer_dir}/assets/chattts_tokenizer")
             self.tts_streaming_text_reserved_len = 300
             self.tts_streaming_audio_chunk_size = 50
             self.tts_num_spk_embs = 1
@@ -329,17 +398,17 @@ class HMMiniCPMO(object):
                 self.tts_logits_warpers = [TopPLogitsWarper(self.tts_top_p, mini_tokens_to_keep=3),
                                 TopKLogitsWarper(self.tts_top_k, mini_tokens_to_keep=3)]
 
-            self.tts_embedding_path = os.path.join(self.model_dir, HOUMO_TARGET, "hmquant", "tts_embedding.pt")
+            self.tts_embedding_path = os.path.join(args.embedding_path, "quant_embedding_tts.pt")
             self.tts_embedding = torch.load(self.tts_embedding_path, weights_only=False).weight
-            self.tts_code_embeddings = self.load_tts_code_embeds(os.path.join(self.model_dir, HOUMO_TARGET, "hmquant"))
+            self.tts_code_embeddings = self.load_tts_code_embeds(args.embedding_path)
 
             option_tts_projector = tcim_lite.runtime.Option(wt_manager)
-            self.tts_projector_engine = tcim_lite.runtime.load(os.path.join(self.model_dir, "tts_prpjector.hmm", option_tts_projector))
+            self.tts_projector_engine = tcim_lite.runtime.load(args.llm_projector_path, option_tts_projector)
             self.tts_projector_input_infos = get_input_infos(self.tts_projector_engine)
             self.tts_projector_output_infos = get_output_infos(self.tts_projector_engine)
 
             option_tts_prefill = tcim_lite.runtime.Option(wt_manager)
-            self.tts_prefill_engine = tcim_lite.runtime.load(os.path.join(self.model_dir, "tts_prefill.hmm"), option_tts_prefill)
+            self.tts_prefill_engine = tcim_lite.runtime.load(args.tts_prefill_path, option_tts_prefill)
             self.tts_prefill_input_infos = get_input_infos(self.tts_prefill_engine)
             self.tts_prefill_output_infos = get_output_infos(self.tts_prefill_engine)
             self.tts_nblocks = self.get_nblocks(self.tts_prefill_engine)
@@ -352,7 +421,7 @@ class HMMiniCPMO(object):
             self.tts_mask_dtype=self.tts_prefill_output_infos["attention_mask"].dtype
 
             option_tts_decoder = tcim_lite.runtime.Option(wt_manager)
-            self.tts_decoder_engine = tcim_lite.runtime.load(os.path.join(self.model_dir, "tts_decoder.hmm"), option_tts_decoder)
+            self.tts_decoder_engine = tcim_lite.runtime.load(args.tts_decode_path, option_tts_decoder)
             self.tts_decoder_input_infos = get_input_infos(self.tts_decoder_engine)
             self.tts_decoder_output_infos = get_output_infos(self.tts_decoder_engine)
             for i in range(self.tts_nblocks):
@@ -363,12 +432,12 @@ class HMMiniCPMO(object):
             self.tts_decoder_engine.set_input("current_length", np.array([1]).astype(self.tts_decoder_input_infos["current_length"].dtype))
 
             option_dvae = tcim_lite.runtime.Option(wt_manager)
-            self.dvae_engine = tcim_lite.runtime.load(os.path.join(self.model_dir, "dvae.hmm"), option_dvae)
+            self.dvae_engine = tcim_lite.runtime.load(args.tts_dvae_path, option_dvae)
             self.dvae_input_infos = get_input_infos(self.dvae_engine)
             self.dvae_output_infos = get_output_infos(self.dvae_engine)
 
             option_vocos = tcim_lite.runtime.Option(wt_manager)
-            self.vocos_engine = tcim_lite.runtime.load(os.path.join(self.model_dir, "vocos.hmm"), option_vocos)
+            self.vocos_engine = tcim_lite.runtime.load(args.tts_vocos_path, option_vocos)
             self.vocos_input_infos = get_input_infos(self.vocos_engine)
             self.vocos_output_infos = get_output_infos(self.vocos_engine)
             self.vocos_istft = ISTFT(n_fft=1024, hop_length=256, win_length=1024, padding="same")
@@ -385,7 +454,7 @@ class HMMiniCPMO(object):
     def load_tts_code_embeds(self, path_str):
         x = []
         for i in range(self.tts_num_vq):
-            index_emb_path = os.path.join(path_str, f"tts_code_embedding_{i}.pt")
+            index_emb_path = os.path.join(path_str, f"quant_embedding_tts_code_{i}.pt")
             if not os.path.exists(index_emb_path):
                 logger.error(f"{index_emb_path} is not exist! Please check it.")
                 assert(0)
@@ -1270,8 +1339,7 @@ class HMMiniCPMO(object):
         return answer, input_tokens_num, output_token_nums
     
 def xh2_demo(args):
-    hmminicpmo = HMMiniCPMO(model_dir=args.model_dir,
-                device_id=args.device_id,
+    hmminicpmo = HMMiniCPMO(args,
                 init_vision=True,
                 init_audio=False,
                 init_tts=False,
@@ -1281,9 +1349,9 @@ def xh2_demo(args):
 
     example_mode = EXAMPLES_MODE[args.example_idx]
     if example_mode == "all":
-        video_path="/data/xunan/project/public/MiniCPM-V/MiniCPM-o-2_6/assets/Skiing.mp4"
+        video_path="MiniCPM-o-2_6/assets/Skiing.mp4"
         # if use voice clone prompt, please set ref_audio
-        ref_audio_path = '/data/xunan/project/public/MiniCPM-V/MiniCPM-o-2_6/assets/demo.wav'
+        ref_audio_path = 'MiniCPM-o-2_6/assets/demo.wav'
         ref_audio, _ = librosa.load(ref_audio_path, sr=16000, mono=True)
         sys_msg = {"role": "user",
                 "content":["你是一个AI助手。你能接受视频，音频和文本输入并输出语音和文本。模仿输入音频中的声音特征。",
@@ -1332,7 +1400,7 @@ def xh2_demo(args):
         logger.success(f"TPS (Tokens Per Second): {output_tokens_num / total_time:.2f} tokens/s")
 
     elif example_mode == "vllm":
-        image = Image.open("./MiniCPM-o-2_6/airplane.jpeg").convert("RGB")
+        image = Image.open("MiniCPM-o-2_6/airplane.jpeg").convert("RGB")
         msg = {"role":"user", "content": [image, "图中是哪家航空公司的飞机？"]}
         msgs = [msg]
         logger.info(msgs)
