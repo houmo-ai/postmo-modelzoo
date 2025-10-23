@@ -3,7 +3,7 @@
     "model_dir": "models/backbone/ViT-B-16",
     "model_type": "cv",
     "support_platform": ["x86_64"],
-    "support_backend": ["xh1", "xh2"],
+    "support_backend": ["xh2"],
     "support_core_num": {
         "xh1": [1],
         "xh2": [1]
