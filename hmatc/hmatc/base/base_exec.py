@@ -398,16 +398,18 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         model = onnx.load(model_path)
         graph = model.graph
         for node in graph.node:
-            if node.op_type == "Split":
+            if "constant" in str(node.op_type).lower():
                 continue
-            # 获取节点属性
-            node_attributes = {}
-            for attr in node.attribute:
-                value = onnx.helper.get_attribute_value(attr)
-                if isinstance(value, bytes):
-                    value = value.decode("utf-8")
-                node_attributes[attr.name] = value
             if self.target == "xh1":
+                # 获取节点属性
+                node_attributes = {}
+                for attr in node.attribute:
+                    value = onnx.helper.get_attribute_value(attr)
+                    if isinstance(value, bytes):
+                        value = value.decode("utf-8")
+                    node_attributes[attr.name] = value
+                if "output_granularity" not in node_attributes:
+                    continue
                 output_granularity = node_attributes["output_granularity"]
                 output_dtype = node_attributes["output_dtype"]
                 scale = node_attributes["output_scale"]
@@ -450,6 +452,12 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                         return shape
 
                     output_shape = get_shape_from_value_info(value_info)
+                    length = 1
+                    for dim in output_shape:
+                        length *= dim
+                    if length == 1:
+                        print(node.op_type, node.name, node_attributes)
+                        continue
                     if output_granularity == "tensor":
                         block_shape = output_shape
                     else:
