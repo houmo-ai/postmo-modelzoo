@@ -10,7 +10,7 @@ logging.basicConfig(level="INFO")
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
 GOLDEN_THRESH = 0.98
-assert HOUMO_TARGET=="xh2", "Only supported xh2!"
+assert HOUMO_TARGET == "xh2", "Only supported xh2!"
 
 
 def sanitize_name(name: str):
@@ -122,14 +122,21 @@ def build_llm(
 
     kwargs = {}
     if HOUMO_TARGET == "xh2":
+        import json
+
+        custom_msg = dict()
+        custom_msg["prefill_length"] = 256
         kwargs["modify_llm"] = {}
         kwargs["enable_xh2_stable_output"] = True
         if ndevice:
             kwargs["ndevice"] = ndevice
         if batch:
             kwargs["modify_llm"]["batch"] = batch
+            custom_msg["batch"] = batch
         if context_length:
             kwargs["modify_llm"]["context-length"] = context_length
+            custom_msg["context_length"] = context_length
+        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
     print(f"\n===> {model_name} build start...\n kwargs:{kwargs}")
@@ -291,10 +298,10 @@ if __name__ == '__main__':
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"hmquant_{model_name}_llm_{model_size}_{HOUMO_TARGET}a_{ct_length_str}_prefill_with_act.onnx"
+        model_path = f"hmquant_{model_name}_llm_{model_size}_{HOUMO_TARGET}a_4k_prefill_with_act.onnx"
         build_llm(
             "minicpmo_llm_prefill",
-            os.path.join(model_dir, "llm_prefill"),
+            os.path.join(model_dir, "prefill"),
             model_path,
             output_dir,
             profile,
@@ -302,10 +309,10 @@ if __name__ == '__main__':
             ndevice,
             context_length,
         )
-        model_path = f"hmquant_{model_name}_llm_{model_size}_{HOUMO_TARGET}a_{ct_length_str}_decode_with_act.onnx"
+        model_path = f"hmquant_{model_name}_llm_{model_size}_{HOUMO_TARGET}a_4k_decode_with_act.onnx"
         build_llm(
             "minicpmo_llm_decode",
-            os.path.join(model_dir, "llm_decoder"),
+            os.path.join(model_dir, "decoder"),
             model_path,
             output_dir,
             profile,
@@ -313,10 +320,12 @@ if __name__ == '__main__':
             ndevice,
             context_length,
         )
-        model_path = f"hmquant_{model_name}_vision_{model_size}_{HOUMO_TARGET}a_2k_with_act.onnx"
+        model_path = (
+            f"hmquant_{model_name}_vision_{model_size}_{HOUMO_TARGET}a_2k_with_act.onnx"
+        )
         build_vit(
             "minicpmo_visual",
-            os.path.join(model_dir, "vision"),
+            os.path.join(model_dir, "visual"),
             model_path,
             output_dir,
             profile,
@@ -325,9 +334,27 @@ if __name__ == '__main__':
 
     # test model
     if args.stage == 'test' or args.stage == 'all':
-        part_dir = os.path.join(model_dir, "llm_prefill")
-        test("minicpmo_llm_prefill", part_dir, output_dir, profile, prefix=f"{model_name}_llm_{model_size}_{HOUMO_TARGET}a_{ct_length_str}_prefill")
-        part_dir = os.path.join(model_dir, "llm_decoder")
-        test("minicpmo_llm_decode", part_dir, output_dir, profile, prefix=f"{model_name}_llm_{model_size}_{HOUMO_TARGET}a_{ct_length_str}_decode")
-        part_dir = os.path.join(model_dir, "vision")
-        test("minicpmo_llm_visual", part_dir, output_dir, profile, prefix=f"{model_name}_vision_{model_size}_{HOUMO_TARGET}a_2k")
+        part_dir = os.path.join(model_dir, "prefill")
+        test(
+            "minicpmo_llm_prefill",
+            part_dir,
+            output_dir,
+            profile,
+            prefix=f"{model_name}_llm_{model_size}_{HOUMO_TARGET}a_4k_prefill",
+        )
+        part_dir = os.path.join(model_dir, "decoder")
+        test(
+            "minicpmo_llm_decode",
+            part_dir,
+            output_dir,
+            profile,
+            prefix=f"{model_name}_llm_{model_size}_{HOUMO_TARGET}a_4k_decode",
+        )
+        part_dir = os.path.join(model_dir, "visual")
+        test(
+            "minicpmo_llm_visual",
+            part_dir,
+            output_dir,
+            profile,
+            prefix=f"{model_name}_vision_{model_size}_{HOUMO_TARGET}a_2k",
+        )

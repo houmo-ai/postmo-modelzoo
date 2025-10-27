@@ -1,5 +1,5 @@
 import os
-import onnx
+import sys
 import argparse
 from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
@@ -10,6 +10,7 @@ assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
 runtime_version = runtime_version.split(".dev")[0]
 
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -18,7 +19,7 @@ def get_args() -> argparse.Namespace:
         dest='model_type',
         type=str,
         default='hmm',
-        help='which resource to get, choise in [raw, hmm]',
+        help='which resource to get, choise in [raw, quant, hmm]',
     )
     parser.add_argument(
         '--model_dir',
@@ -26,6 +27,18 @@ def get_args() -> argparse.Namespace:
         type=str,
         default='.',
         help='where to save downloaded model',
+    )
+    parser.add_argument(
+        "--build_model_dir",
+        dest="build_model_dir",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET),
+    )
+    parser.add_argument(
+        "--quant_model_dir",
+        dest="quant_model_dir",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
     )
     args = parser.parse_args()
     return args
@@ -35,6 +48,9 @@ if __name__ == '__main__':
     args = get_args()
     model_type = args.model_type
     model_dir = args.model_dir
+    build_model_dir = args.build_model_dir
+    quant_model_dir = args.quant_model_dir
+
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
     model_type = args.model_type
     model_dir = args.model_dir
@@ -47,30 +63,34 @@ if __name__ == '__main__':
     batch = 10
     target = HOUMO_TARGET
     onnx_path = "models/bge/onnx_bge_10x512.zip"
-    if HOUMO_TARGET == "xh2":
-        quant_path = "models_outdated/bge/hmquant_xh2_bge_0.5b_0.5k_b10_1chip_2core_20251022.zip"
-        hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
+    quant_path = f"models_outdated/bge/hmquant_{target}_{model_name}_{model_size}_{context_len}_b{batch}_20251022.zip"
+    hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
+
+    if model_type in ["raw"]:
+        ignore_patterns = []
+        get_file_from_jfrog(onnx_path, model_dir, "./")
+    else:
+        ignore_patterns = ["*.safetensors", "*.bin", "onnx/*"]
 
     from modelscope import snapshot_download
-    snapshot_download('BAAI/bge-reranker-v2-m3',
-                      local_dir=f'{model_dir}/bge-reranker-v2-m3',
-                      ignore_patterns=["*.safetensors"])
-    snapshot_download('BAAI/bge-m3',
-                      local_dir=f'{model_dir}/bge-m3',
-                      ignore_patterns=["*.bin", "onnx/*"])
-    
-    try:
-        get_file_from_jfrog(onnx_path, model_dir, "./")
-    except Exception as e:
-        print(f"Model doesn't exist, error msg: {e}")
-    print("model_type:", model_type)
-    if model_type == "hmm":
-        try:
-            get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
-    elif model_type == "quant":
-        try:
-            get_file_from_jfrog(quant_path, model_dir, os.path.join('output', HOUMO_TARGET))
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+
+    snapshot_download(
+        'BAAI/bge-reranker-v2-m3',
+        local_dir=f'{model_dir}/bge-reranker-v2-m3',
+        ignore_patterns=ignore_patterns,
+    )
+    snapshot_download(
+        'BAAI/bge-m3',
+        local_dir=f'{model_dir}/bge-m3',
+        ignore_patterns=ignore_patterns,
+    )
+
+    if model_type in ["quant"] and not get_file_from_jfrog(
+        quant_path, model_dir, quant_model_dir
+    ):
+        sys.exit(1)
+
+    if model_type in ["hmm"] and not get_file_from_jfrog(
+        hmm_path, model_dir, build_model_dir
+    ):
+        sys.exit(1)
