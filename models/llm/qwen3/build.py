@@ -112,13 +112,13 @@ def build(
     import tcim
 
     kwargs = {}
+    kwargs["modify_llm"] = {}
+    if batch:
+        kwargs["modify_llm"]["batch"] = batch
     if HOUMO_TARGET == "xh2":
-        kwargs["modify_llm"] = {}
         kwargs["enable_xh2_stable_output"] = True
         if ndevice:
             kwargs["ndevice"] = ndevice
-        if batch:
-            kwargs["modify_llm"]["batch"] = batch
         if context_length:
             kwargs["modify_llm"]["context-length"] = context_length
 
