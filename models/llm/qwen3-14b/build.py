@@ -132,7 +132,7 @@ def build(
         ncore=ncore,
         target=HOUMO_TARGET,
         output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim"),
+        work_dir=os.path.join(output_dir, "tcim", model_name),
         llm_opt=True,
         j=24,
         **kwargs,

@@ -145,7 +145,7 @@ def build_llm(
         ncore=ncore,
         target=HOUMO_TARGET,
         output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim"),
+        work_dir=os.path.join(output_dir, "tcim", model_name),
         llm_opt=True,
         **kwargs,
     )
@@ -166,7 +166,7 @@ def build_vit(model_name, model_dir, model_path, output_dir, profile, ncore=1):
         ncore=ncore,
         target=HOUMO_TARGET,
         output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim"),
+        work_dir=os.path.join(output_dir, "tcim", model_name),
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
