@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import time
+import multiprocessing
 import argparse
 
 import logging
@@ -64,6 +65,13 @@ def get_args() -> argparse.Namespace:
         help='batch size',
     )
     parser.add_argument(
+        '--j',
+        dest='j',
+        type=int,
+        default=multiprocessing.cpu_count(),
+        help='build parallel jobs',
+    )
+    parser.add_argument(
         '--ncore',
         dest='ncore',
         type=int,
@@ -120,6 +128,7 @@ def build_llm(
     ncore,
     ndevice,
     context_length,
+    j,
     batch=None,
 ):
     import tcim
@@ -147,13 +156,14 @@ def build_llm(
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim", model_name),
         llm_opt=True,
+        j=j,
         **kwargs,
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 
-def build_vit(model_name, model_dir, model_path, output_dir, profile, ncore=1):
+def build_vit(model_name, model_dir, model_path, output_dir, profile, ncore, j):
     import tcim
 
     start = time.time()
@@ -167,6 +177,7 @@ def build_vit(model_name, model_dir, model_path, output_dir, profile, ncore=1):
         target=HOUMO_TARGET,
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim", model_name),
+        j=j,
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
@@ -286,6 +297,7 @@ if __name__ == '__main__':
     batch = args.batch
     ndevice = args.ndevice
     context_length = args.context_length
+    j = args.j
     profile = {}
 
     # build model
@@ -304,6 +316,7 @@ if __name__ == '__main__':
             output_dir,
             profile,
             ncore,
+            j,
         )
         build_llm(
             "qwen2.5-vl_prefill",
@@ -314,6 +327,7 @@ if __name__ == '__main__':
             ncore,
             ndevice,
             context_length,
+            j,
         )
         build_llm(
             "qwen2.5-vl_decode",
@@ -324,6 +338,7 @@ if __name__ == '__main__':
             ncore,
             ndevice,
             context_length,
+            j,
         )
 
     # test model

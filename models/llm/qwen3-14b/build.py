@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import time
+import multiprocessing
 import argparse
 
 import logging
@@ -59,6 +60,13 @@ def get_args() -> argparse.Namespace:
         help='batch size',
     )
     parser.add_argument(
+        '--j',
+        dest='j',
+        type=int,
+        default=multiprocessing.cpu_count(),
+        help='build parallel jobs',
+    )
+    parser.add_argument(
         '--ncore',
         dest='ncore',
         type=int,
@@ -107,6 +115,7 @@ def build(
     ncore,
     ndevice,
     context_length,
+    j,
     batch=None,
 ):
     import tcim
@@ -134,7 +143,7 @@ def build(
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim", model_name),
         llm_opt=True,
-        j=24,
+        j=j,
         **kwargs,
     )
     profile["build"] = time.time() - start
@@ -249,6 +258,7 @@ if __name__ == '__main__':
     ncore = args.ncore
     batch = args.batch
     ndevice = args.ndevice
+    j = args.j
     context_length = args.context_length
     profile = {}
 
@@ -270,6 +280,7 @@ if __name__ == '__main__':
             ncore,
             ndevice,
             context_length,
+            j,
         )
         model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
         build(
@@ -281,6 +292,7 @@ if __name__ == '__main__':
             ncore,
             ndevice,
             context_length,
+            j,
             batch,
         )
 
