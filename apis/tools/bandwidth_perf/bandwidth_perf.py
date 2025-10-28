@@ -246,16 +246,22 @@ if __name__ == "__main__":
 
     platform_name = platform.machine()
 
-    output_dir = os.path.join(args.work_dir, target)
+    output_dir = os.path.join(args.work_dir, target, bandwidth_type.lower())
     build_tmp_dir = os.path.join(output_dir, "tcim_temp")
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(build_tmp_dir, exist_ok=True)
 
     hmm_path = os.path.join(output_dir, f"{MODEL_NAME}.hmm")
 
-    if platform_name != "x86_64":
+    not_found_tcim = False
+    try:
+        import tcim
+    except ImportError:
+        not_found_tcim = True
+
+    if platform_name != "x86_64" or not_found_tcim:
         print(
-            f"Skipping model generation since the current platform is {platform_name}."
+            f"Skipping model generation since the current platform is {platform_name} or not found tcim."
         )
         args.skip_build = True
 
@@ -270,15 +276,10 @@ if __name__ == "__main__":
             os.environ["HOUMO_MODELZOO_URL"] = (
                 "http://139.224.0.199:8082/artifactory/houmo/release"
             )
-        zipped_hmm_path = f"models/bandwidth_perf/hmm_{target}_transpose_{bandwidth_type.lower()}_1core_20251015.tar.xz"
+        zipped_hmm_path = f"models/bandwidth_perf/hmm_{target}_transpose_{bandwidth_type.lower()}_1core_20251028.tar.xz"
         get_file_from_jfrog(zipped_hmm_path, "./", "./")
 
     if not args.skip_build:
-        try:
-            import tcim
-        except ImportError:
-            print("Please install tcim")
-            exit(-1)
         print("Generating onnx model...")
         hmonnx_model, model_data_size_info = gen_copy_model_and_data_size()
         model_path = os.path.join(output_dir, f"{MODEL_NAME}.onnx")
@@ -291,6 +292,8 @@ if __name__ == "__main__":
         print("=========================================")
         print(f"Building model with tcim in output dir: {output_dir}")
         os.environ["SPLIT_XH2_LOAD"] = "1"
+        import tcim
+
         tcim.build_from_hmonnx(
             hmonnx_model,
             output_name=MODEL_NAME,

@@ -496,9 +496,15 @@ if __name__ == "__main__":
     hmm_path = os.path.join(output_dir, f"{MODEL_NAME}.hmm")
     json_path = os.path.join(output_dir, "model.json")
 
-    if platform_name != "x86_64":
+    not_found_tcim = False
+    try:
+        import tcim
+    except ImportError:
+        not_found_tcim = True
+
+    if platform_name != "x86_64" or not_found_tcim:
         print(
-            f"Skipping model generation since the current platform is {platform_name}."
+            f"Skipping model generation since the current platform is {platform_name} or not found tcim."
         )
         args.skip_build = True
 
@@ -534,11 +540,8 @@ if __name__ == "__main__":
             f.write(json.dumps(model_tops_info, indent=4))
         print("=========================================")
         print(f"Building model with tcim in output dir: {output_dir}")
-        try:
-            import tcim
-        except ImportError:
-            print("Please install tcim_lite")
-            exit(-1)
+        import tcim
+
         tcim.build_from_hmonnx(
             hmonnx_model,
             output_name=MODEL_NAME,
