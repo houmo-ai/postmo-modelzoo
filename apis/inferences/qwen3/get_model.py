@@ -56,14 +56,18 @@ if __name__ == '__main__':
 
     get_file_from_jfrog(hmm_path, model_dir, "./")
     embedding_path = "hmquant/quant_embedding.pt"
-    if os.path.exists(embedding_path) and HOUMO_TARGET == "xh2":
+    if os.path.exists(embedding_path) and HOUMO_TARGET in ["xh1", "xh2"]:
+        print(HOUMO_TARGET)
         import torch
         import numpy as np
 
-        embedding_weight = torch.load(embedding_path, map_location="cpu", weights_only=True)['weight']
+        embedding_weight = torch.load(embedding_path, map_location="cpu", weights_only=True)
+        if HOUMO_TARGET == "xh2":
+            embedding_weight = embedding_weight['weight']
+        if embedding_weight.dtype == torch.bfloat16:
+            embedding_weight = embedding_weight.float().half()
         embedding_data = embedding_weight.cpu().numpy() 
         embedding_data.tofile(embedding_path.replace(".pt", ".bin"))
-    import platform
-    if platform.system() == 'Linux' and platform.machine() == 'x86_64':
-        thirdparty_path = "models/qwen3/3rdparty.zip"
-        get_file_from_jfrog(thirdparty_path, model_dir, "./")
+    # 下载编译好的三方库
+    thirdparty_path = "models/qwen3/3rdparty.zip"
+    get_file_from_jfrog(thirdparty_path, model_dir, "./")

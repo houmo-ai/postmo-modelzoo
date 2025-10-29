@@ -75,6 +75,7 @@ std::unique_ptr<T[]> readEmbeddingWeight(const std::string &path,
   auto ptr = std::make_unique<T[]>(n_elem); // 自动 delete[]
   ifs.read(reinterpret_cast<char *>(ptr.get()), n_bytes);
   ifs.close();
+  memset(reinterpret_cast<char *>(ptr.get()) + n_bytes, 0, n_elems_align * sizeof(T));
   return ptr;
 }
 
@@ -155,21 +156,21 @@ static bool is_valid_char(char32_t cp) noexcept
 
 /**
  * eigen矩阵库计算argmax
- * @param half_ptr          数组首地址
+ * @param ptr          数组首地址
  * @param n                 数组元素个数
  * @return                  返回最大值索引
  */
-static int eigen_argmax_half(const half *half_ptr, std::size_t n)
-{
-  using Eigen::Tensor;
-  using Eigen::TensorMap;
+template <typename T>
+static int eigen_argmax(const T *ptr, std::size_t n) {
+    using Eigen::Tensor;
+    using Eigen::TensorMap;
 
-  TensorMap<Tensor<const half, 1>> tm(static_cast<const half *>(half_ptr), n);
+    TensorMap<Tensor<const T, 1>> tm(static_cast<const T *>(ptr), n);
 
-  Eigen::Tensor<Eigen::Index, 0> t = tm.argmax();
-  Eigen::Index idx = t(0);
+    Eigen::Tensor<Eigen::Index, 0> t = tm.argmax();
+    Eigen::Index idx = t(0);
 
-  return static_cast<int>(idx);
+    return static_cast<int>(idx);
 }
 
 #endif // __UTILS_H__

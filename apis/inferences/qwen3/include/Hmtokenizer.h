@@ -3,8 +3,13 @@
 
 #include "utils.h"
 
-using half_float::half;
 using tokenizers::Tokenizer;
+#ifdef BACKEND_XH1
+using tensor_type = int16_t;
+#else
+using half_float::half;
+using tensor_type = half;
+#endif
 
 class HmTokenizer
 {
@@ -25,19 +30,20 @@ public:
                                 bool enable_thinking = false);
   std::vector<int> Encode(const std::string &text);
   std::string Decode(const std::vector<int32_t> &ids);
-  half *EmbeddingTokens(const std::vector<int> &ids);
+  tensor_type *EmbeddingTokens(const std::vector<int> &ids);
 
   // 一步完成
-  half *EmbeddingTokens(const std::vector<Message> &msgs,
-                        bool add_generation_prompt = true,
-                        bool enable_thinking = false);
+  tensor_type *EmbeddingTokens(const std::vector<Message> &msgs,
+                               bool add_generation_prompt = true,
+                               bool enable_thinking = false);
 
-private:
+  private:
   // 存储读取tokenizer.json后的分词器
   std::unique_ptr<Tokenizer> tok;
   // embedding_weight.pt
-  std::unique_ptr<half[]> embed_w;
-  half *ptr = nullptr;
+  std::unique_ptr<tensor_type[]> embed_w;
+
+  tensor_type *ptr = nullptr;
   size_t ptr_size = 0;
   // 属性
   int prefill_length = 0;

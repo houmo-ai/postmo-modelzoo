@@ -8,8 +8,6 @@
 #include <regex>
 #include <iomanip>
 
-using half_float::half;
-
 struct PerfInfos
 {
   int input_tokens;
@@ -68,7 +66,11 @@ private:
   int batch = 0;
   int eos_token_id = 0;
   int argmax_dim_len = 0;
+#ifdef BACKEND_XH1
+  int16_t decode_current_length = 1;
+#else
   int32_t decode_current_length = 1;
+#endif
   // model related
   std::shared_ptr<HmTokenizer> tokenizer;
 
@@ -76,7 +78,10 @@ private:
   std::shared_ptr<tcim::Module> prefill_module;
   std::shared_ptr<tcim::Module> decode_module;
 
-  std::map<std::string, tcim::Tensor> prefill_input_map;
+  std::vector<std::string> dummy_names;
+
+  std::map<std::string, tcim::Tensor>
+      prefill_input_map;
   std::map<std::string, tcim::Tensor> decode_input_map;
   std::map<std::string, tcim::Tensor> prefill_output_map;
   std::map<std::string, tcim::Tensor> decode_output_map;

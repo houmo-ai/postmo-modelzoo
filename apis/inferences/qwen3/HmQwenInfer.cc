@@ -11,19 +11,44 @@ HmQwenInfer::HmQwenInfer(const std::string &prefillModelPath,
   weight_manager = tcim::Module::WeightManager::CreateWeightManager(0);
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
+
   // 初始化Module
   prefill_module = std::make_shared<tcim::Module>();
   prefill_module->LoadModel(prefillModelPath, option_prefill);
+  int n_blocks = get_nblocks();
+  for (int i = 0; i < n_blocks; i++){
+      std::stringstream ss;
+      ss << "model_layers_" << i << "_self_attn_kcache_input";
+      dummy_names.emplace_back(ss.str());
+  }
+
+  for (int i = 0; i < n_blocks; i++) {
+      std::stringstream ss;
+      ss << "model_layers_" << i << "_self_attn_vcache_input";
+      dummy_names.emplace_back(ss.str());
+  }
+
+  option_decode.SetDummyTensors(dummy_names);
   decode_module = std::make_shared<tcim::Module>();
   decode_module->LoadModel(decodeModelPath, option_decode);
+
   // 获取模型配置
+#ifdef BACKEND_XH1
+  this->prefill_length = prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[0] 
+    * prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
+  this->embedding_length = prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[2];
+  this->context_max_length = prefill_module->GetInputInfo(prefill_module->GetInputName(3)).Shape()[2];
+  this->batch = decode_module->GetInputInfo(decode_module->GetInputName(0)).Shape()[0];
+  this->argmax_dim_len = decode_module->GetOutputInfo(decode_module->GetOutputName(0)).Shape()[1];
+#else
   this->prefill_length = prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
   this->embedding_length = prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[2];
   this->context_max_length = prefill_module->GetInputInfo(prefill_module->GetInputName(3)).Shape()[2];
   this->batch = decode_module->GetInputInfo(decode_module->GetInputName(0)).Shape()[0];
   this->argmax_dim_len = decode_module->GetOutputInfo(decode_module->GetOutputName(0)).Shape()[2];
+#endif
+
   // 配置Decode其他输入
-  int n_blocks = get_nblocks();
   for (int idx = 3; idx < 2 * n_blocks + 3; idx++)
   {
     const std::string input_name = prefill_module->GetInputName(idx);
@@ -114,6 +139,11 @@ HmQwenInfer::~HmQwenInfer()
 
 void HmQwenInfer::PrefillSetInputDatas(void *data, int32_t valid_length, int32_t current_length)
 {
+  prefill_input_map.clear();
+#ifdef BACKEND_XH1
+  int16_t valid_length_int16t = valid_length;
+  int16_t current_length_int16t = current_length;
+#endif
   for (int idx = 0; idx < 3; idx++)
   {
     auto input_name = prefill_module->GetInputName(idx);
@@ -121,24 +151,26 @@ void HmQwenInfer::PrefillSetInputDatas(void *data, int32_t valid_length, int32_t
 
     tcim::Tensor input_tensor;
     size_t mem_size = 0;
-    if (input_name == "input_1")
+    if (idx == 0)
     {
       mem_size = input_info.MemSize();
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
-    }
-    else if (input_name == "valid_length")
-    {
-      mem_size = input_info.MemSize();
-      input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, &valid_length);
-    }
-    else if (input_name == "current_length")
-    {
-      mem_size = input_info.MemSize();
-      input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, &current_length);
-    }
-    else
-    {
-      break;
+    } else if (idx == 1) {
+        mem_size = input_info.MemSize();
+#ifdef BACKEND_XH1
+        input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, &valid_length_int16t);
+#else
+        input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, &valid_length);
+#endif
+    } else if (idx == 2) {
+        mem_size = input_info.MemSize();
+#ifdef BACKEND_XH1
+        input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, &current_length_int16t);
+#else
+        input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, &current_length);
+#endif
+    } else {
+        break;
     }
 
     if (prefill_input_map.find(input_name) != prefill_input_map.end())
@@ -181,11 +213,14 @@ void HmQwenInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids)
   output_tensor.CastTo(output.second);
 
   void *prefill_outData = output_tensor.Data();
-  ids.emplace_back(eigen_argmax_half(reinterpret_cast<half *>(prefill_outData), argmax_dim_len));
+  ids.emplace_back(eigen_argmax<tensor_type>(reinterpret_cast<tensor_type *>(prefill_outData), argmax_dim_len));
 }
 
 void HmQwenInfer::DecodeSetInputDatas(void *data, int32_t context_length)
 {
+#ifdef BACKEND_XH1
+  int16_t context_length_int16t = context_length;
+#endif
   for (int idx = 0; idx < 2; idx++)
   {
     auto input_name = decode_module->GetInputName(idx);
@@ -201,7 +236,11 @@ void HmQwenInfer::DecodeSetInputDatas(void *data, int32_t context_length)
     else if (idx == 1)
     {
       mem_size = input_info.MemSize();
+#ifdef BACKEND_XH1
+      input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, &context_length_int16t);
+#else
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, &context_length);
+#endif
     }
 
     if (decode_input_map.find(input_name) != decode_input_map.end())
@@ -228,7 +267,6 @@ void HmQwenInfer::DecodeInfer()
 
 void HmQwenInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids)
 {
-#if 1
   int output_num = decode_module->GetOutputNum();
   auto output_name = decode_module->GetOutputName(0);
   auto output_info = decode_module->GetOutputInfo(output_name)
@@ -251,29 +289,7 @@ void HmQwenInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids)
   output_tensor.CastTo(output.second);
 
   void *decode_outData = output_tensor.Data();
-  ids.emplace_back(eigen_argmax_half(reinterpret_cast<half *>(decode_outData), argmax_dim_len));
-#else
-  auto output_name = decode_module->GetOutputName(0);
-  if (decode_output_map.find(output_name) != decode_output_map.end())
-  {
-    ;
-  }
-  else
-  {
-    auto output_info = decode_module->GetOutputInfo(output_name)
-                           .AsContiguous();
-
-    auto output_tensor = tcim::Tensor::CreateHostTensor(output_info);
-    decode_output_map.insert(
-        std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
-  }
-
-  decode_output_map.at(output_name) = decode_module->GetOutput(output_name);
-
-  void *decode_outData = decode_output_map.at(output_name).Data();
-
-  ids.emplace_back(eigen_argmax_half(reinterpret_cast<half *>(decode_outData), argmax_dim_len));
-#endif
+  ids.emplace_back(eigen_argmax<tensor_type>(reinterpret_cast<tensor_type *>(decode_outData), argmax_dim_len));
 }
 
 void HmQwenInfer::chat(const std::string &msg)
@@ -304,7 +320,7 @@ void HmQwenInfer::chat(const std::string &msg)
 
   int prefill_loop_round = std::ceil((float)input_echo_len / (float)prefill_length);
   int32_t valid_length = 0, current_length = 0;
-  half *input_datas = nullptr;
+  tensor_type *input_datas = nullptr;
   for (int round = 0; round < prefill_loop_round; round++)
   {
     valid_length = round * prefill_length;
@@ -381,7 +397,7 @@ void HmQwenInfer::chat(const std::string &msg)
     decode_response = u32_to_utf8(udecode_response);
     if (decode_response != "" && is_valid_char(udecode_response.back()))
     {
-      std::cout << decode_response;
+      std::cout << decode_response << std::flush;
       all_response += decode_response;
       std::vector<int> cur_slide_win(chat_history_ids.end() - slide_len, chat_history_ids.end());
       last_response = tokenizer->Decode(cur_slide_win);

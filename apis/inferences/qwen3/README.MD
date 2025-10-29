@@ -40,216 +40,9 @@ python3 get_model.py --ncore 2
 python3 demo.py
 ```
 
-## 3 模型c++推理
-目前c++推理Qwen3-8b模型，仅支持运行在x86_64平台的xh2设备上。 
-### 3.1 依赖三方库环境
-    tokenizer-cpp和eigen，目前在xh2设备上Ubuntu24.04平台x86_64版本的的三方库已经编译好，已经集成到get_model.py和install.sh中，并且在CMakeLists.txt进行了调用，执行cmake ..时会自动进行三方库的安装。如需手动安装，可以参考以下bash脚本示例中的详细步骤进行手动安装。
-```
-#!/bin/bash
-if [ $(uname -m) = "x86_64" ] && [ "$HOUMO_TARGET" = "xh2" ]; then
-  # 安装expect工具（处理交互所需）
-  sudo apt-get update
-  sudo apt-get install -y expect libeigen3-dev
-  if [ -f "$HOME/.cargo/env" ]; then
-        source "$HOME/.cargo/env"
-        echo "环境变量已配置"
-        echo "Rust版本: $(rustc --version)"
-        cd $PWD/..
-        if [ -e 3rdparty ];then
-          cd 3rdparty
-        else
-          mkdir 3rdparty && cd 3rdparty
-        fi
+## 3 参考结果
 
-        git clone https://github.com/mlc-ai/tokenizers-cpp.git
-        cd tokenizers-cpp
-        git submodule update --init --recursive
-        exit 0
-  fi
-# 创建临时的expect脚本
-cat << 'EOF' > rust_install.exp
-#!/usr/bin/expect -f
-set timeout 1800 ;# 设置30分钟超时，适应慢网络
-
-puts "开始自动安装Rust..."
-
-# 启动安装过程
-spawn sh -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-
-# 处理所有可能的交互提示
-expect {
-    # 处理需要回车的提示
-    ">" {
-        send "\r"
-        exp_continue
-    }
-    # 处理安装完成的提示
-    eof
-}
-
-puts "Rust安装完成！"
-EOF
-
-  # 赋予执行权限并运行expect脚本
-  chmod +x rust_install.exp
-  ./rust_install.exp
-
-  # 清理临时文件
-  rm rust_install.exp
-
-  # 配置环境变量
-  if [ -f "$HOME/.cargo/env" ]; then
-      source "$HOME/.cargo/env"
-      echo "环境变量已配置"
-      echo "Rust版本: $(rustc --version)"
-      cd $PWD/..
-      if [ -e 3rdparty ];then
-        cd 3rdparty
-      else
-        mkdir 3rdparty && cd 3rdparty
-      fi
-
-      git clone https://github.com/mlc-ai/tokenizers-cpp.git
-      cd tokenizers-cpp
-      git submodule update --init --recursive
-      exit 0
-  else
-      echo "请手动运行以下命令配置环境变量:"
-      echo "source $HOME/.cargo/env"
-  fi
-else
-  if [ $(uname -m) != "x86_64" ]; then
-    echo "UnSupport Platform" $(uname -m)
-  fi
-
-  if [ "$HOUMO_TARGET" = "xh2" ]; then
-    echo "No xh2Backhend found!"
-  fi
-fi
-```
-
-### 3.2 模型获取与模型准备
-    由于目前c++的demo仅支持xh2的Ubuntu24.04系统的x86_64设备，因此在xh2平台可以直接使用get_model.py获取模型和三方库，为了让c++方便读取embedding权重，需要对embedding权重的pt文件进行转换，转换示例代码如下：
-```python
-embedding_path = "hmquant/quant_embedding.pt"
-#权重转换
-if os.path.exists(embedding_path) and HOUMO_TARGET == "xh2":
-    import torch
-    import numpy as np
-
-    embedding_weight = torch.load(embedding_path, map_location="cpu", weights_only=True)['weight']
-    embedding_data = embedding_weight.cpu().numpy() 
-    embedding_data.tofile(embedding_path.replace(".pt", ".bin"))
-#三方库下载
-import platform
-if platform.system() == 'Linux' and platform.machine() == 'x86_64':
-    thirdparty_path = "models/qwen3/3rdparty.zip"
-    get_file_from_jfrog(thirdparty_path, model_dir, "./")
-```
-    目前这部分转换代码已经集成到get_model.py中，在xh2的Ubuntu24.04系统的x86_64设备下载好模型后，会自动进行转换，并下载三方库。
-
-### 3.3 程序编译和运行
-    提供run_cpp_linux.sh脚本进行一键编译和运行，如需手动编译和运行参考指令如下：
-```bash
-if [ $(uname -m) = "x86_64" ] && [ "$HOUMO_TARGET" = "xh2" ]; then
-  set -e
-
-  WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  cd "${WORK_PATH}" || exit 1
-
-  # get test model
-  python3 get_model.py
-  mkdir -p build
-  cd build || exit 1
-
-  cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH -DCMAKE_BUILD_TYPE=Release ..
-  make
-  make install
-
-  cd $WORK_PATH
-  ./example_cxx_qwen3
-  #如需手动指定对应模型文件路径使用如下方式启动
-  # ./example_cxx_qwen3 ${prefillModelPath} ${decodeModelPath} ${tokenizerJsonPath} ${embeddingWeightPath}
-else
-  echo "UnSupport Environment"
-fi
-```
-
-### 3.4 C++样例相关文件说明
-```
-.
-├── CMakeLists.txt              CMake配置文件
-├── README.MD                   
-├── run_cpp_qwen3.sh            编译和运行qwen3 c++样例脚本         
-├── get_model.py                获取运行所需要的模型文件
-├── include                     相关头文件
-├── HmQwenInfer.cc              qwen3 c++推理类封装
-├── Hmtokenizer.cc              qwen3 tokenizer功能实现封装
-├── qwen3.cc                    qwen3 样例主函数实现
-└── install.sh                  三方依赖库自动编译安装脚本
-```
-
-### 3.5 C++演示结果
-```
-Question : 请介绍一下存算一体技术的优势
-Response : 存算一体（Compute-in-Memory, CIM）技术是一种将存储与计算功能集成在同一芯片或模块中的新型计算架构，它突破了传统冯·诺依曼架构中存储与计算分离的限制，具有显著的优势。以下是存算一体技术的主要优势：
-
----
-
-### 1. **降低能耗**
-- **减少数据移动**：传统计算架构中，数据需要在存储器和处理器之间频繁搬运，这会消耗大量能量。存算一体技术将计算直接在存储单元中完成，大大减少了数据移动，从而显著降低能耗。
-- **提升能效比**：由于减少了数据传输的能耗，存算一体技术在低功耗场景（如物联网、边缘计算）中表现尤为突出。
-
----
-
-### 2. **提高计算效率**
-- **并行计算能力**：存算一体技术可以同时进行存储和计算操作，支持并行处理，提升计算效率。
-- **加速矩阵运算**：在人工智能、深度学习等需要大量矩阵运算的领域，存算一体技术可以显著加快计算速度，提高模型训练和推理效率。
-
----
-
-### 3. **提升计算密度**
-- **高集成度**：将存储器与计算单元集成在同一芯片上，可以实现更高的计算密度，适用于需要高并发计算的场景。
-- **节省空间**：由于不需要额外的计算模块，存算一体技术可以减少硬件体积，适用于嵌入式系统、可穿戴设备等对空间要求较高的设备。
-
----
-
-### 4. **适用于新兴计算场景**
-- **人工智能与机器学习**：存算一体技术特别适合神经网络中的矩阵运算，可以显著提升AI模型的推理速度和能效。
-- **边缘计算**：在边缘端进行本地计算，减少对云端的依赖，提高实时性和隐私性。
-- **物联网（IoT）**：适用于低功耗、高效率的传感器节点和边缘设备。
-
----
-
-### 5. **支持新型存储技术**
-- 存算一体技术可以与新型非易失性存储器（如忆阻器、相变存储器、铁电存储器等）结合，实现高性能、低功耗的存储与计算一体化系统。
-
----
-
-### 6. **降低系统复杂度**
-- 由于存储与计算功能集成，系统架构更加简洁，减少了硬件复杂度，降低了系统设计和维护的难度。
-
----
-
-### 总结
-
-存算一体技术通过将存储与计算功能融合，显著提升了计算效率、降低了能耗，并适用于人工智能、边缘计算、物联网等新兴领域。它被认为是未来高性能计算、低功耗计算的重要发展方向之一。
-
-如果你对某一具体应用场景（如AI、物联网、边缘计算）感兴趣，我可以进一步展开说明。
-```
-
-### 3.6 性能结果
-```bash
-#linux x86_64
-total: 572 tokens, cost 54.163 s
-prefill time: 1655.214 ms, 18.12 tokens/s
-decode average time: 91.957 ms, 10.87 tokens/s
-end2end average time: 94.691 ms, 10.56 tokens/s
-```
-
-## 4 参考结果
-
-### 4.1 演示结果
+### 3.1 演示结果
 
 ```bash
 question:
@@ -329,7 +122,7 @@ response:
 存算一体技术通过整合存储与计算，解决了传统架构中的数据搬运瓶颈，显著提升了能效、速度和灵活性，是未来高性能计算、AI和边缘计算的重要方向。其优势在AI、物联网、自动驾驶等领域尤为突出，正在推动新一代计算架构的变革。
 ```
 
-### 4.2 性能结果
+### 3.2 性能结果
 
 ```bash
 # linux aarch64
@@ -345,6 +138,125 @@ total: 1199 tokens, cost 114.017 s
 prefill time: 741.065 ms, 1.35 tokens/s
 decode average time: 94.553 ms, 10.58 tokens/s
 end2end average time: 95.093 ms, 10.52 tokens/s
+```
+
+## 4 Qwen3 c++推理
+模型库提供基于C++的Qwen3-8b模型的样例，目前验证支持的平台信息如下：
+  - Linux xh2 x86_64        (cmake 3.28.3 gcc/g++ 13.3.0)
+  - Linux xh1 x86_64        (cmake 3.16.3 gcc/g++ 13.1.0)
+  - Linux xh1 aarch64       (cmake 3.16.3 gcc/g++ 9.4.0)
+  - Android xh2 arm64-v8a   (cmake 3.28.3 clang/clang++ 19.0.1)
+  - Windows11 xh2 x64       (cmake 4.1.1  Visual Studio 17 2022)
+### 4.1 依赖三方库环境
+  Qwen3的C++推理样例依赖以下三方库：
+   1. tokenizer-cpp tokenizer实现
+   2. eigen3 科学计算库
+   
+   目前在上述平台的三方库已经编译好，已经集成到get_model.py中，并且在CMakeLists.txt进行了调用，构建时会自动进行三方库的链接。如需手动编译安装，可以参考get_model.py下载的3rdparty.zip压缩包中README.MD的详细步骤进行手动安装。
+
+### 4.2 模型获取与模型准备
+    目前验证支持平台，可以直接使用get_model.py获取模型和三方库，为了让c++方便读取embedding权重，需要对embedding权重的pt文件进行转换，转换示例代码如下：
+```python
+    # 权重转换
+    embedding_path = "hmquant/quant_embedding.pt"
+    if os.path.exists(embedding_path) and HOUMO_TARGET in ["xh1", "xh2"]:
+        import torch
+        import numpy as np
+
+        embedding_weight = torch.load(embedding_path, map_location="cpu", weights_only=True)
+        if HOUMO_TARGET == "xh2":
+            embedding_weight = embedding_weight['weight']
+        embedding_data = embedding_weight.cpu().numpy() 
+        embedding_data.tofile(embedding_path.replace(".pt", ".bin"))
+    # 下载编译好的三方库
+    thirdparty_path = "models/qwen3/3rdparty.zip"
+    get_file_from_jfrog(thirdparty_path, model_dir, "./")
+```
+    目前这部分转换代码已经集成到get_model.py中，会自动进行转换，并下载编译好的三方库。
+
+### 4.3 程序编译和运行
+编译和运行脚本支持的平台及说明如下：
+- run_linux.sh 支持一键编译和运行如下平台的C++样例：
+    1. Linux_x86_64_xh1
+    2. Linux_x86_64_xh2
+    3. Linux_aarch64_xh1
+- run.bat 支持一键编译和运行如下平台的C++样例(TODO)：
+    1. win11_x64_xh2
+- build_ndk.sh 支持一键编译如下平台的C++样例:
+    1. Android_arm64-v8a_xh2
+
+
+### 4.4 C++样例相关文件说明
+```
+.
+├── CMakeLists.txt              CMake配置文件
+├── README.MD                   
+├── run_linux.sh                编译和运行脚本，支持平台参考4.3节         
+├── get_model.py                获取运行所需要的模型文件和三方库
+├── include                     相关头文件
+├── HmQwenInfer.cc              qwen3 c++推理类封装
+├── Hmtokenizer.cc              qwen3 tokenizer功能实现封装
+├── qwen3.cc                    qwen3 样例主函数实现
+├── run.bat                     win11编译和运行脚本(TODO)
+└── build_ndk.sh                安卓编译脚本
+```
+
+### 4.5 C++演示结果
+```
+Question : 请介绍一下存算一体技术的优势
+Response : 存算一体（Compute-in-Memory, CIM）技术是一种将存储与计算功能集成在同一芯片或模块中的新型计算架构，它突破了传统冯·诺依曼架构中存储与计算分离的限制，具有显著的优势。以下是存算一体技术的主要优势：
+
+---
+
+### 1. **降低能耗**
+- **减少数据移动**：传统计算架构中，数据需要在存储器和处理器之间频繁搬运，这会消耗大量能量。存算一体技术将计算直接在存储单元中完成，大大减少了数据移动，从而显著降低能耗。
+- **提升能效比**：由于减少了数据传输的能耗，存算一体技术在低功耗场景（如物联网、边缘计算）中表现尤为突出。
+
+---
+
+### 2. **提高计算效率**
+- **并行计算能力**：存算一体技术可以同时进行存储和计算操作，支持并行处理，提升计算效率。
+- **加速矩阵运算**：在人工智能、深度学习等需要大量矩阵运算的领域，存算一体技术可以显著加快计算速度，提高模型训练和推理效率。
+
+---
+
+### 3. **提升计算密度**
+- **高集成度**：将存储器与计算单元集成在同一芯片上，可以实现更高的计算密度，适用于需要高并发计算的场景。
+- **节省空间**：由于不需要额外的计算模块，存算一体技术可以减少硬件体积，适用于嵌入式系统、可穿戴设备等对空间要求较高的设备。
+
+---
+
+### 4. **适用于新兴计算场景**
+- **人工智能与机器学习**：存算一体技术特别适合神经网络中的矩阵运算，可以显著提升AI模型的推理速度和能效。
+- **边缘计算**：在边缘端进行本地计算，减少对云端的依赖，提高实时性和隐私性。
+- **物联网（IoT）**：适用于低功耗、高效率的传感器节点和边缘设备。
+
+---
+
+### 5. **支持新型存储技术**
+- 存算一体技术可以与新型非易失性存储器（如忆阻器、相变存储器、铁电存储器等）结合，实现高性能、低功耗的存储与计算一体化系统。
+
+---
+
+### 6. **降低系统复杂度**
+- 由于存储与计算功能集成，系统架构更加简洁，减少了硬件复杂度，降低了系统设计和维护的难度。
+
+---
+
+### 总结
+
+存算一体技术通过将存储与计算功能融合，显著提升了计算效率、降低了能耗，并适用于人工智能、边缘计算、物联网等新兴领域。它被认为是未来高性能计算、低功耗计算的重要发展方向之一。
+
+如果你对某一具体应用场景（如AI、物联网、边缘计算）感兴趣，我可以进一步展开说明。
+```
+
+### 4.6 性能结果
+```bash
+#linux x86_64
+total: 572 tokens, cost 54.163 s
+prefill time: 1655.214 ms, 18.12 tokens/s
+decode average time: 91.957 ms, 10.87 tokens/s
+end2end average time: 94.691 ms, 10.56 tokens/s
 ```
 
 ## 5 一键执行
