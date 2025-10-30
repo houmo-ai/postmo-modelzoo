@@ -22,22 +22,10 @@
 python3 get_model.py --type raw
 ```
 
-如果仅编译芯片模型，可选择下载量化模型，下载后的模型存放在`output/$HOUMO_TARGET/hmquant`目录（注意相同模型会覆盖，请自行保存）：
-
-```bash
-python3 get_model.py --type quant
-```
-
 如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
 python3 get_model.py --type hmm
-```
-
-也可以直接下载以上所有模型和数据集（注意相同模型会覆盖，请自行保存）：
-
-```bash
-python3 get_model.py
 ```
 
 ### 2.2 量化
@@ -48,15 +36,11 @@ python3 get_model.py
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py39-x86.64 /bin/bash
 ```
 
-进入docker后source环境变量，并进入`/hmdd/models/llm/qwen3`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为256和8192，可通过ptq.py中的prefill_shape和cache_len参数修改。不同编译模式下支持的上下文长度组合为：
-| cores | batch | prefill | decode |
-| ----- | ----- | ------- | ------ |
-| 4     | 1     | 256     | 8192   |
-| 2     | 1     | 256     | 8192   |
+进入docker后source环境变量，并进入`models/llm/qwen3`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为256和8192。
 
 ```bash
 source env.sh
-cd /hmdd/models/llm/qwen3
+cd models/llm/qwen3
 python3 ptq.py
 ```
 
@@ -84,7 +68,7 @@ qwen3_decode.hmm
 
 ### 2.3 演示
 
-Qwen2模型使用python API进行演示
+Qwen3模型使用python API进行演示
 
 1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下，也可通过demo中的`EMBEDDING_PATH`变量指定位置
 

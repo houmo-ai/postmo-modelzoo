@@ -238,6 +238,7 @@ class HmQwenXh2:
         self.tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH, trust_remote_code=True)
         embedding_weight = torch.load(EMBEDDING_PATH, map_location="cpu", weights_only=True)['weight']
         self.embedding_weight = embedding_weight.reshape(-1, 4096)
+        embedding_weight = embedding_weight.float().half()
 
     def chat(self, question):
         logger.success("question:")

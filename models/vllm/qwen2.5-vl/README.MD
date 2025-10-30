@@ -62,7 +62,7 @@ visual.hmm
 
 ### 2.3 演示
 
-Qwen2模型使用python API进行演示
+Qwen2.5-vl模型使用python API进行演示
 
 1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下，也可通过demo中的`EMBEDDING_PATH`变量指定位置
 

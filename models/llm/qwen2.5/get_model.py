@@ -1,78 +1,86 @@
 import os
-import onnx
+import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog
+from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh1')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
+runtime_version = runtime_version.split(".dev")[0]
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--type',
-        dest='model_type',
+        "--type",
+        dest="model_type",
         type=str,
-        default='quant',
-        help='which resource to get, choise in [raw, quant, hmm, all]',
+        default="hmm",
+        help="which resource to get, choise in [raw, hmm]",
     )
     parser.add_argument(
-        '--quant_model_dir',
-        dest='quant_model_dir',
+        "--build_model_dir",
+        dest="build_model_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
-        help='where to save quant_model',
+        default=os.path.join("output", HOUMO_TARGET),
     )
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--model_dir",
+        dest="model_dir",
         type=str,
-        default='',
-        help='where to save downloaded model',
+        default=".",
+        help="where to save downloaded model",
+    )
+    parser.add_argument(
+        "--context_length",
+        dest="context_length",
+        type=str,
+        default="8k",
+        choices=["2k", "4k", "8k"],
+        help="context length",
     )
     args = parser.parse_args()
     return args
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
-    quant_model_dir = args.quant_model_dir
+    build_model_dir = args.build_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
-    HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
-    HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
+    HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH", ".")
+    HOUMO_MODEL_PATH = os.getenv("HOUMO_MODEL_PATH", ".")
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
-    if HOUMO_TARGET == "xh1":
-        quant_path = "models/qwen2.5/hmquant_qwen2.5_256_4096_20250430.zip"
-        hmm_path = "models/qwen2.5/hmm_qwen2.5_256_4096_4cores_20250430.zip"
-    elif HOUMO_TARGET == "xh2":
-        quant_path = "models/qwen2.5/hmquant_xh2_qwen2.5_256_8k_20250610.zip"
-        hmm_path = "models/qwen2.5/hmm_xh2_qwen2.5_256_4k_2cores_20250611.zip"
 
-    if model_type in ["raw", "all"]:
+    model_name = "qwen2.5"
+    model_size = "7b"
+    ncore = "2cores" if HOUMO_TARGET == "xh2" else "4cores"
+    ndevice = "1chip"
+    context_len = args.context_length
+    prefill_len = 256
+    batch = 1
+    version = f"v{runtime_version}"
+    target = HOUMO_TARGET
+    hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
+
+    if model_type in ["raw"]:
         ignore_patterns = []
-        try:
-            get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+        get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
     else:
         ignore_patterns = ["*.safetensors"]
 
     from modelscope import snapshot_download
-    snapshot_download('qwen/qwen2.5-7b-instruct',
-                      local_dir='qwen2.5-7b-instruct-hf',
-                      ignore_patterns=ignore_patterns)
 
-    if model_type == "quant" or model_type == "all":
-        try:
-            get_file_from_jfrog(quant_path, model_dir, quant_model_dir)
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+    snapshot_download(
+        "qwen/qwen2.5-7b-instruct",
+        local_dir=f"{model_dir}/qwen2.5-7b-instruct-hf",
+        ignore_patterns=ignore_patterns,
+    )
 
-    if model_type == "hmm" or model_type == "all":
-        try:
-            get_file_from_jfrog(hmm_path, model_dir, os.path.join('output', HOUMO_TARGET))
-        except Exception as e:
-            print(f"Model doesn't exist, error msg: {e}")
+    if model_type in ["hmm"] and not get_file_from_jfrog(
+        hmm_path, model_dir, build_model_dir
+    ):
+        sys.exit(1)

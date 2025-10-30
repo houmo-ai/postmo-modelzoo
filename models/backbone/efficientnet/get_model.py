@@ -5,7 +5,7 @@ from pathlib import Path
 from hmatc.utils.utils import get_file_from_jfrog, get_package_version
 
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh1")
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
@@ -20,7 +20,7 @@ def get_args() -> argparse.Namespace:
         dest="model_type",
         type=str,
         default="raw",
-        help="which model type to get, choise in [raw, quant, build, all]",
+        help="which model type to get, choise in [raw, quant, hmm, all]",
     )
     parser.add_argument(
         "--quant_model_dir",
@@ -61,8 +61,8 @@ if __name__ == "__main__":
     version = f"v{runtime_version}"
     target = HOUMO_TARGET
     raw_path = f"models/{model_name}/efficientnet_b0_224x224.onnx"
-    quant_path = f"models/{model_name}/hmquant_{model_name}_{target}_{version}.tar.xz"
-    build_path = f"models/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
+    quant_path = f"models/{target.lower()}-v{runtime_version}/{model_name}/hmquant_{model_name}_{target}_{version}.tar.xz"
+    build_path = f"models/{target.lower()}-v{runtime_version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type == "raw" or model_type == "all":
         try:
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Model doesn't exist, error msg: {e}")
 
-    if model_type == "build" or model_type == "all":
+    if model_type == "hmm" or model_type == "all":
         try:
             get_file_from_jfrog(build_path, model_dir, build_model_dir)
         except Exception as e:

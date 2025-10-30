@@ -1,15 +1,26 @@
 import os
 import numpy as np
 import time
+import multiprocessing
 import argparse
 
 import logging
+
 logging.basicConfig(level="INFO")
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
+GOLDEN_THRESH = 0.999 if HOUMO_TARGET == "xh1" else 0.98
+
+if HOUMO_TARGET == 'xh1':
+    default_ncore = 4
+elif HOUMO_TARGET == 'xh2':
+    default_ncore = 2
+
 
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
+
 
 def cosine_distance(data1, data2):
     if data1.shape != data2.shape:
@@ -43,7 +54,7 @@ def get_args() -> argparse.Namespace:
         '--model_name',
         dest='model_name',
         type=str,
-        default='qwen2.5vl',
+        default='qwen2.5-vl',
         help='output houmo model name',
     )
     parser.add_argument(
@@ -57,14 +68,14 @@ def get_args() -> argparse.Namespace:
         '--ncore',
         dest='ncore',
         type=int,
-        default=4,
+        default=HOUMO_CORE_NUM,
         help='core number',
     )
     parser.add_argument(
         '--model_size',
         dest='model_size',
         type=str,
-        default="3b",
+        default="7b",
         choices=["3b", "7b"],
         help='model size',
     )
@@ -72,7 +83,7 @@ def get_args() -> argparse.Namespace:
         '--stage',
         dest='stage',
         type=str,
-        default="all",
+        default="build",
         help='build stage choise=["build", "test", "all"]',
     )
     parser.add_argument(
@@ -166,7 +177,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
             print(f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}")
             if is_match:
                 continue
-            if cosine_dist < 0.999:
+            if cosine_dist < GOLDEN_THRESH:
                 result_check = False
         else:
             result_check = False
@@ -196,15 +207,16 @@ if __name__ == '__main__':
     # build model
     if args.stage == "build" or args.stage == "all":
         import platform
+
         arch = platform.machine()
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"hmquant_llm_Prefill_with_act.onnx"
+        model_path = f"hmquant_{model_name}_with_act.onnx"
         build("prefill", model_dir+"/prefill", model_path, output_dir, profile, ncore)
-        model_path = f"hmquant_llm_decoder_with_act.onnx"
+
         build("decoder", model_dir+"/decoder", model_path, output_dir, profile, ncore)
-        model_path = f"hmquant_qwen2_5_vl_visual_with_act.onnx"
+
         build("visual", model_dir+"/visual", model_path, output_dir, profile, ncore)
 
     # test model

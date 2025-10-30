@@ -26,6 +26,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+houmo_target="${HOUMO_TARGET}"
+if [ -z "$houmo_target" ] || [ "$houmo_target" != "xh2" ]; then
+    echo "Only supports HOUMO_TARGET as xh2."
+    exit 1
+fi
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 

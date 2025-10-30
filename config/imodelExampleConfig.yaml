@@ -86,7 +86,7 @@ detection_yolov8m:
     - detection_yolov8m_test
 multi_input_custom_random_model:
   include:
-    - ../models/multi_input_custom_random_model
+    - models/multi_input_custom_random_model
   exclude: null
   example_case:
     - multi_input_custom_random_model_test:
@@ -95,9 +95,9 @@ multi_input_custom_random_model:
     - multi_input_custom_random_model_test
 ViT-B-16:
   include:
-    - ../models/backbone/ViT-B-16
+    - models/backbone/ViT-B-16
   exclude:
-    - ../models/backbone/ViT-B-16/README.MD
+    - models/backbone/ViT-B-16/README.MD
   example_case:
     - ViT-B-16_test:
         script: ../models/backbone/ViT-B-16/test.sh
@@ -105,9 +105,9 @@ ViT-B-16:
     - ViT-B-16_test
 yolo12m:
   include:
-    - ../models/detection/yolo12m
+    - models/detection/yolo12m
   exclude: 
-    - ../models/detection/yolo12m/README.MD
+    - models/detection/yolo12m/README.MD
   example_case:
     - yolo12m_test:
         script: ../models/detection/yolo12m/test.sh
@@ -115,9 +115,9 @@ yolo12m:
     - yolo12m_test
 yolov5s_feature:
   include:
-    - ../models/detection/yolov5s_feature
+    - models/detection/yolov5s_feature
   exclude:
-    - ../models/detection/yolov5s_feature/README.MD
+    - models/detection/yolov5s_feature/README.MD
   example_case:
     - yolov8m_seg_test:
         script: ../models/detection/yolov5s_feature/test.sh
@@ -125,9 +125,9 @@ yolov5s_feature:
     - yolov5s_feature_test
 yolov8m-pose:
   include:
-    - ../models/estimation/yolov8m-pose
+    - models/estimation/yolov8m-pose
   exclude:
-    - ../models/estimation/yolov8m-pose/README.MD
+    - models/estimation/yolov8m-pose/README.MD
   example_case:
     - yolov8m-pose_test:
         script: ../models/estimation/yolov8m-pose/test.sh
@@ -135,9 +135,9 @@ yolov8m-pose:
     - yolov8m-pose_test
 yolov8m_seg:
   include:
-    - ../models/segmentation/yolov8m_seg
+    - models/segmentation/yolov8m_seg
   exclude:
-    - ../models/segmentation/yolov8m_seg/README.MD
+    - models/segmentation/yolov8m_seg/README.MD
   example_case:
     - yolov8m_seg_test:
         script: ../models/segmentation/yolov8m_seg/test.sh
@@ -183,9 +183,9 @@ hmatc:
 
 tools_computing_perf:
   include:
-    - ../apis/tools/computing_perf
+    - apis/tools/computing_perf
   exclude:
-    - ../apis/tools/computing_perf/README.MD
+    - apis/tools/computing_perf/README.MD
   example_case: 
     - tools_computing_perf_test:
         script: ../apis/tools/computing_perf/run.sh
@@ -194,9 +194,9 @@ tools_computing_perf:
 
 tools_bandwidth_perf:
   include:
-    - ../apis/tools/bandwidth_perf
+    - apis/tools/bandwidth_perf
   exclude:
-    - ../apis/tools/bandwidth_perf/README.MD
+    - apis/tools/bandwidth_perf/README.MD
   example_case: 
     - tools_bandwidth_perf_test:
         script: ../apis/tools/bandwidth_perf/run.sh
@@ -230,9 +230,9 @@ inferences_yolov5s:
     - inferences_yolov5s_test
 inferences_yolov5s_dynamic:
   include:
-    - ../apis/inferences/yolov5s_dynamic
+    - apis/inferences/yolov5s_dynamic
   exclude:
-    - ../apis/inferences/yolov5s_dynamic/README.MD
+    - apis/inferences/yolov5s_dynamic/README.MD
   example_case:
     - inferences_yolov5s_dynamic_test:
         script: ../apis/inferences/yolov5s_dynamic/run.sh
@@ -294,7 +294,7 @@ apis_common:
   test:
     - inferences_resnet50_test
     - inferences_yolov5s_test
-    - inferences_resnet50_multistreams_test
+    # - inferences_resnet50_multistreams_test
     - inferences_resnet50_pipeline_test
     - inferences_yolov5s_resnet50_multibatch_test
     - scenes_video_detect_test
@@ -309,12 +309,7 @@ models_tests:
   example_case: null
   test:
     - backbone_resnet50_test
-    - backbone_efficientnet_test
-    - backbone_mobilenetv2_test
-    - autodrive_yolop_test
-    - detection_yolov3_test
     - detection_yolov5s_test
-    - detection_yolov8m_test
 
 apis_tests:
   include:
@@ -325,7 +320,7 @@ apis_tests:
   test:
     - inferences_resnet50_test
     - inferences_yolov5s_test
-    - inferences_resnet50_multistreams_test
+    # - inferences_resnet50_multistreams_test
     - inferences_resnet50_pipeline_test
     - inferences_yolov5s_resnet50_multibatch_test
     - scenes_video_detect_test

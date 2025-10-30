@@ -1,10 +1,16 @@
 import os
+import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog
 
-HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '..')
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh1')
+HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../../..')
+sys.path.append(f'{HOUMO_EXAMPLES_PATH}/hmatc/hmatc/utils')
+from utils import get_file_from_jfrog, get_package_version
+
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
+runtime_version = runtime_version.split(".dev")[0]
 
 
 def get_args() -> argparse.Namespace:
@@ -40,13 +46,16 @@ if __name__ == '__main__':
         else args.model_dir
     )
 
-    if HOUMO_TARGET == "xh1":
-        if args.ncore == 2:
-            hmm_path = "models/qwen3/hmm_qwen3_256_8k_2cores_20250603.zip"
-        elif args.ncore == 4:
-            hmm_path = "models/qwen3/hmm_qwen3_256_8k_4cores_20250728.zip"
-    elif HOUMO_TARGET == "xh2":
-        hmm_path = "models/qwen3/hmm_xh2_qwen3_8b_256_8k_2cores_20250808.zip"
+    model_name = "qwen3"
+    model_size = "8b"
+    ncore = "2cores" if HOUMO_TARGET == "xh2" else "4cores"
+    ndevice = "1chip"
+    context_len = "8k"
+    prefill_len = 256
+    batch = 1
+    version = f"v{runtime_version}"
+    target = HOUMO_TARGET
+    hmm_path = f"models/{target.lower()}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
 
     from modelscope import snapshot_download
 

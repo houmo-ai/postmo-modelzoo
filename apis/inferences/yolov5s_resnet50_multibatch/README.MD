@@ -53,8 +53,8 @@ C++演示程序推理完成后会进行后处理，获得分类结果，执行�
 ```bash
 [info] ===> multibatch c++ example start, tcim version: 2.4.2 Jul 20 2025
 [info] ===> multibatch yolov5s example start...
-[info] Load yolov5s hmm model from file yolov5s_xh1_b4_1core_O2.hmm
-[info] Loaded yolov5s model yolov5s_xh1_b4_1core_O2.hmm
+[info] Load yolov5s hmm model from file yolov5s.hmm
+[info] Loaded yolov5s model yolov5s.hmm
 [info] Count of Input: 2
 [info] Input[images] TensorInfo: shape: [4,3,1080,1920], stride: [3110400,1920,1,3110400,1920,2,1,2073600], dtype: UINT8, format: YUV420SP, size: 12441600, memsize: 12441600
 [info] Input[resizer_crop_images] TensorInfo: shape: [4,10], stride: [], dtype: INT32, format: ND, size: 160, memsize: 160, quant_info: size=1 [0, 1]

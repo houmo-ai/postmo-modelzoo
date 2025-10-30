@@ -370,7 +370,7 @@ class OCRRec(object):
             dst_data[self.input_names[0]] = np.ascontiguousarray(yuv)  # np.ndarray
             dst_data[self.input_names[1]] = dyn_info.detach().cpu().numpy()
         elif self.backend == "xh2":
-            input_data, self.valid_ratio = onnx_preprocess(cv_image, self.net_input_size)
+            input_data = onnx_preprocess(cv_image, self.net_input_size)
             input_data_fp16 = input_data.astype(np.float16)
             dst_data[self.input_names[0]] = input_data_fp16
         return dst_data
