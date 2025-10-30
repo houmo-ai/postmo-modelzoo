@@ -20,3 +20,5 @@ rem get test model
 
 rem python example
 %PYTHON_DIR%\python.exe demo.py
+
+run_win.bat

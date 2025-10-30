@@ -6,11 +6,9 @@ include(CheckCXXCompilerFlag)
 if(NOT MSVC)
   check_cxx_compiler_flag("-std=c++17" SUPPORT_CXX17)
   set(CMAKE_CXX_FLAGS "-std=c++17 ${CMAKE_CXX_FLAGS}")
-  set(CMAKE_CUDA_STANDARD 17)
 else()
   check_cxx_compiler_flag("/std:c++17" SUPPORT_CXX17)
-  set(CMAKE_CXX_FLAGS "/std:c++17 ${CMAKE_CXX_FLAGS}")
-  set(CMAKE_CUDA_STANDARD 17)
+  set(CMAKE_CXX_FLAGS "/std:c++17 /w ${CMAKE_CXX_FLAGS}")
 endif()
 
 if(ANDROID_ABI)
@@ -38,6 +36,8 @@ if(NOT MSVC)
   else()
     set(LIB_PATH "Android_xh2")
   endif()
+else()
+  set(LIB_PATH "win11_x64")
 endif()
 
 
@@ -55,7 +55,7 @@ link_directories($ENV{HOUMO_PATH}/lib
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -Wno-deprecated-declarations")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 
 add_executable(${PROJECT_NAME}   ${SOURCE_FILES})
@@ -66,5 +66,16 @@ if(NOT MSVC)
   else()
     target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c tcim_runtime_lite pthread  ${CMAKE_DL_LIBS})
   endif()
+else()
+  target_link_libraries(${PROJECT_NAME} PRIVATE 
+  tokenizers_cpp 
+  tokenizers_c 
+  tcim_runtime_lite 
+  ${CMAKE_DL_LIBS} 
+  ws2_32
+  Userenv
+  ntdll
+  Bcrypt
+  kernel32)
 endif()
 install(TARGETS ${PROJECT_NAME} DESTINATION .)

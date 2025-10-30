@@ -5,8 +5,15 @@
 #include <filesystem>
 #include <locale>
 #include <string>
+#ifdef _MSC_VER
+#include <Windows.h>
+#endif
 
 int main(int argc, char *argv[]) {
+#ifdef _MSC_VER
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+#endif
     // check args
     std::string prefillModelPath, decodeModelPath, tokenizerJsonPath, embeddingWeightPath;
     if (argc == 1) {

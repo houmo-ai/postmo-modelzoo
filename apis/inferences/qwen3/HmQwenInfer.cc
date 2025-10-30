@@ -213,7 +213,7 @@ void HmQwenInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids)
   output_tensor.CastTo(output.second);
 
   void *prefill_outData = output_tensor.Data();
-  ids.emplace_back(eigen_argmax<tensor_type>(reinterpret_cast<tensor_type *>(prefill_outData), argmax_dim_len));
+  ids.emplace_back(eigen_argmax<tensor_type>(static_cast<tensor_type *>(prefill_outData), argmax_dim_len));
 }
 
 void HmQwenInfer::DecodeSetInputDatas(void *data, int32_t context_length)
@@ -289,7 +289,7 @@ void HmQwenInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids)
   output_tensor.CastTo(output.second);
 
   void *decode_outData = output_tensor.Data();
-  ids.emplace_back(eigen_argmax<tensor_type>(reinterpret_cast<tensor_type *>(decode_outData), argmax_dim_len));
+  ids.emplace_back(eigen_argmax<tensor_type>(static_cast<tensor_type *>(decode_outData), argmax_dim_len));
 }
 
 void HmQwenInfer::chat(const std::string &msg)
@@ -376,8 +376,8 @@ void HmQwenInfer::chat(const std::string &msg)
     {
       break;
     }
-    DecodeSetInputDatas(reinterpret_cast<void *>(input_datas),
-                        reinterpret_cast<int32_t>(context_length));
+    DecodeSetInputDatas(static_cast<void *>(input_datas),
+                        static_cast<int32_t>(context_length));
     DecodeInfer();
     ids.clear();
     DecodeGetOutputDatas(ids);
