@@ -143,7 +143,7 @@ def build(
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim", model_name),
         llm_opt=True,
-        j=j
+        j=j,
         **kwargs,
     )
     profile["build"] = time.time() - start
