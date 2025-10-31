@@ -37,6 +37,7 @@ cd "${SCRIPT_DIR}"
 
 pip3 install -r requirements.txt
 
+python3 get_model.py --type raw
 if [[ "$STEP" == "build" ]]; then
     PACKAGE_PATTERN=houmo-tcim-xh1
     FOUND_PACKAGE=0

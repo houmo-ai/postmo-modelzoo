@@ -51,24 +51,18 @@ if __name__ == '__main__':
     hmm_path = "models/sdxl/hmm_sdxl_4cores_20250314.zip"
 
     if model_type in ["raw", "all"]:
-        ignore_patterns = []
-    else:
-        ignore_patterns = ["*.safetensors"]
+        from modelscope import snapshot_download
 
-    from modelscope import snapshot_download
-
-    if not os.path.exists('stable-diffusion-xl-base-1.0'):
-        snapshot_download(
-            'stabilityai/stable-diffusion-xl-base-1.0',
-            local_dir=f"{model_dir}/stable-diffusion-xl-base-1.0",
-            ignore_patterns=ignore_patterns,
-        )
-    if not os.path.exists('TCD-SDXL-LoRA'):
-        snapshot_download(
-            'AI-ModelScope/TCD-SDXL-LoRA',
-            local_dir=f"{model_dir}/TCD-SDXL-LoRA",
-            ignore_patterns=ignore_patterns,
-        )
+        if not os.path.exists('stable-diffusion-xl-base-1.0'):
+            snapshot_download(
+                'stabilityai/stable-diffusion-xl-base-1.0',
+                local_dir=f"{model_dir}/stable-diffusion-xl-base-1.0",
+            )
+        if not os.path.exists('TCD-SDXL-LoRA'):
+            snapshot_download(
+                'AI-ModelScope/TCD-SDXL-LoRA',
+                local_dir=f"{model_dir}/TCD-SDXL-LoRA",
+            )
 
     if model_type in ["quant", "all"]:
         try:
