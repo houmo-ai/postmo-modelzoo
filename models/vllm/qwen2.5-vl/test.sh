@@ -30,17 +30,19 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
 if [[ "$STEP" == "build" ]]; then
-    arch=$(uname -m)
-    if [ "$arch" = "x86_64" ]; then
-        echo "Start to compile model."
-        python3 get_model.py --type quant
+    if [[ "$FOUND_PACKAGE" -eq 1 && "$FOUND_GPU" -eq 1 ]]; then
+        echo "Start to quant and compile model."
+        pip3 install transformers==4.56.0
+        python3 get_model.py --type raw
+        python3 ptq.py
         python3 build.py
     else
-        echo "✗ Not support model compilation."
+        echo "✗ Not support model quantization and compilation."
     fi
 elif [[ "$STEP" == "demo" ]]; then
     echo "Execute demo using precompiled model."
     python3 get_model.py --type hmm
+    pip3 install transformers==4.51.0
     python3 demo.py
 else
     echo "✗ Unknown step ${STEP}."

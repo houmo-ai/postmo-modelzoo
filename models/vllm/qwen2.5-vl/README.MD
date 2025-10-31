@@ -15,15 +15,13 @@
 
 ### 2.1 获取模型和数据
 
-通过get_model脚本下载模型，可通过参数选择下载量化模型或芯片模型。
-
-可以选择下载量化后模型，目前暂时不支持用户自己量化。
+通过get_model脚本下载模型，可通过参数选择下载原始模型或芯片模型。
 
 ```bash
-# 3b模型
-python3 get_model.py --type quant
-# 7b模型
-python3 get_model.py --type quant --model_size 7b
+python3 get_model.py --type raw
+pip3 install transformers==4.56.0
+python3 get_model.py --type raw
+python3 ptq.py
 ```
 
 如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
@@ -56,9 +54,9 @@ python3 build.py --model_size 7b
 ```
 
 编译好的模型存放在当前目录，包括2个文件：
-prefill.hmm
-decoder.hmm
-visual.hmm
+qwen2.5-vl_prefill.hmm
+qwen2.5-vl_decoder.hmm
+qwen2.5-vl_visual.hmm
 
 ### 2.3 演示
 
@@ -71,6 +69,7 @@ Qwen2.5-vl模型使用python API进行演示
 3. 注意：由于ubuntu18.04下qwen_vl_utils无法正常安装，导致无法正常运行。
 
 ```bash
+pip3 install transformers==4.51.0
 # 3b模型
 python3 demo.py
 # 7b模型
