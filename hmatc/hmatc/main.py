@@ -705,6 +705,13 @@ def main():
         default=1,
         help="Specify thread num",
     )
+    perf_parser.add_argument(
+        "--stream",
+        type=int,
+        required=False,
+        default=0,
+        help="Specify stream num",
+    )
     # demo
     demo_parser = subparsers.add_parser(
         "demo",
@@ -788,8 +795,9 @@ def main():
             args.warmup,
             args.sample,
             args.loop_num,
-            args.device_id,
             args.thread,
+            args.stream,
+            devices=[args.device_id],
         )
         if "perf" in res_info:
             res_info["perf"].update(new_res_info["perf"])
@@ -883,8 +891,9 @@ def main():
             args.warmup,
             args.sample,
             args.loop_num,
-            args.device_id,
             args.thread,
+            args.stream,
+            devices=[args.device_id],
         )
     elif current_command == "demo":
         hm_exec.demo(backend=backend, device_id=args.device_id)

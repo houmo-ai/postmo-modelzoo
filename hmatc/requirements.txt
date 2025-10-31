@@ -2,6 +2,7 @@
 # houmo-tcim-xh1
 # houmo-tcim-runtime-xh1
 # opencv-python-headless
+wheel
 numpy
 prettytable
 onnx

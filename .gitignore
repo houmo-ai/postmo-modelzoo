@@ -103,3 +103,4 @@ wiki*
 .msc
 .mv
 tmp
+*_version.py

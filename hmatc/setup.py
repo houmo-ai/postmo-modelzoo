@@ -1,8 +1,23 @@
 import os
+import sys
 import subprocess
 import pybind11
 from datetime import datetime
 from setuptools import setup, find_packages, Extension
+
+
+TCIM_RUNTIME_PATH = os.environ.get("TCIM_RUNTIME_PATH")
+if not TCIM_RUNTIME_PATH:
+    try:
+        import tcim_lite
+
+        TCIM_RUNTIME_PATH = os.path.dirname(tcim_lite.__file__)
+    except ImportError:
+        raise Exception("Please set TCIM_RUNTIME_PATH or install tcim_lite")
+
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+if HOUMO_TARGET not in ["xh1", "xh2"]:
+    raise Exception("Please set HOUMO_TARGET to xh1 or xh2")
 
 
 def get_version():
@@ -15,10 +30,13 @@ def get_build_time():
 
 def get_git_commit():
     try:
-        commit = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], 
-            cwd=os.path.dirname(__file__)
-        ).decode("utf-8").strip()
+        commit = (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=os.path.dirname(__file__)
+            )
+            .decode("utf-8")
+            .strip()
+        )
         return commit[:7]  # 取短 Commit 号
     except Exception:
         return "unknown"
@@ -29,11 +47,15 @@ with open(os.path.join("hmatc", "_version.py"), "w") as f:
     f.write(f"__version__ = '{get_version()}'\n")
     f.write(f"__commit__ = '{commit}'\n")
     f.write(f"__build_time__ = '{get_build_time()}'\n")  # 新增时间字段
-    
 
-TCIM_RUNTIME_PATH = os.environ.get("TCIM_RUNTIME_PATH")
-if not TCIM_RUNTIME_PATH :
-    raise Exception("Please set TCIM_RUNTIME_PATH")
+if sys.platform == "win32":
+    extra_compile_args = ["/std:c++17", "/O2", "/w"]
+    libraries = ["tcim_runtime_lite"]
+    extra_link_args = []
+else:
+    extra_compile_args = ["-std=c++17", "-O2", "-w"]
+    libraries = ["tcim_runtime_lite"]
+    extra_link_args = []
 
 ext_modules = [
     Extension(
@@ -42,14 +64,13 @@ ext_modules = [
         include_dirs=[
             pybind11.get_include(),
             os.path.join(TCIM_RUNTIME_PATH, "include"),
-            "3rdparty/nlohmann/include"
+            "3rdparty/nlohmann/include",
         ],
-        library_dirs=[
-            os.path.join(TCIM_RUNTIME_PATH, "lib")
-        ],
-        libraries=["tcim_runtime_lite"],
+        library_dirs=[os.path.join(TCIM_RUNTIME_PATH, "lib")],
+        libraries=libraries,
         language="c++",
-        extra_compile_args=["-std=c++17", "-O2", "-w"]
+        extra_compile_args=extra_compile_args,
+        extra_link_args=extra_link_args,
     )
 ]
 

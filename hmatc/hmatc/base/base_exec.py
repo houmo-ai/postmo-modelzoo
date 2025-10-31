@@ -343,13 +343,26 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
     @staticmethod
     def model_perf(
-        model_path, warmup_num, sample_num, loop_num=1, device_id=1, thread_num=1
+        model_path,
+        warmup_num,
+        sample_num,
+        loop_num=1,
+        thread_num=1,
+        stream_num=0,
+        devices=[0],
     ):
         from ..python import perf
 
         # TODO 使用golden数据
         perf_info = perf.CModelRunner(
-            model_path, sample_num, thread_num, device_id, loop_num, warmup_num
+            model_path,
+            warmup_num,
+            sample_num,
+            loop_num,
+            thread_num,
+            stream_num=0,
+            check_output=False,
+            devices=devices,
         )
         t_start = datetime.now().strftime("%Y%m%d%H%M%S")
         res_info = {
@@ -357,11 +370,12 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 t_start: {
                     "params": {
                         "hmm_path": model_path,
-                        "thread_num": thread_num,
-                        "device_num": device_id,
-                        "loop_num": loop_num,
                         "warmup_num": warmup_num,
                         "sample_num": sample_num,
+                        "loop_num": loop_num,
+                        "thread_num": thread_num,
+                        "stream_num": stream_num,
+                        "devices": devices,
                     },
                     "perf_info": {
                         "input_avg_latency": perf_info.input_avg_latency,
