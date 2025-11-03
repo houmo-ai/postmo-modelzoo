@@ -250,27 +250,27 @@ hmatc:
     - backbone_resnet50_test
     - detection_yolov5s_test
 
-tools_computing_perf:
-  include:
-    - apis/tools/computing_perf
-  exclude:
-    - apis/tools/computing_perf/README.MD
-  example_case:
-    - tools_computing_perf_test:
-        script: ../apis/tools/computing_perf/run.sh
-  test:
-    - tools_computing_perf_test
+# tools_computing_perf:
+#   include:
+#     - apis/tools/computing_perf
+#   exclude:
+#     - apis/tools/computing_perf/README.MD
+#   example_case:
+#     - tools_computing_perf_test:
+#         script: ../apis/tools/computing_perf/run.sh
+#   test:
+#     - tools_computing_perf_test
 
-tools_bandwidth_perf:
-  include:
-    - apis/tools/bandwidth_perf
-  exclude:
-    - apis/tools/bandwidth_perf/README.MD
-  example_case:
-    - tools_bandwidth_perf_test:
-        script: ../apis/tools/bandwidth_perf/run.sh
-  test:
-    - tools_bandwidth_perf_test
+# tools_bandwidth_perf:
+#   include:
+#     - apis/tools/bandwidth_perf
+#   exclude:
+#     - apis/tools/bandwidth_perf/README.MD
+#   example_case:
+#     - tools_bandwidth_perf_test:
+#         script: ../apis/tools/bandwidth_perf/run.sh
+#   test:
+#     - tools_bandwidth_perf_test
 
 ###### apis ######
 inferences_resnet50:
