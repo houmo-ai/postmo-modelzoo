@@ -1,0 +1,41 @@
+
+cmake_minimum_required(VERSION 3.16.3)
+project(llm_perf)
+
+include(CheckCXXCompilerFlag)
+if(NOT MSVC)
+  check_cxx_compiler_flag("-std=c++17" SUPPORT_CXX17)
+  set(CMAKE_CXX_FLAGS "-std=c++17 ${CMAKE_CXX_FLAGS}")
+else()
+  check_cxx_compiler_flag("/std:c++17" SUPPORT_CXX17)
+  set(CMAKE_CXX_FLAGS "/std:c++17 /w ${CMAKE_CXX_FLAGS}")
+endif()
+
+include(${CMAKE_SOURCE_DIR}/tcim_runtime.cmake)
+include_directories($ENV{HOUMO_EXAMPLES_PATH}/apis/common/nlohmann/include)
+set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
+
+set(SOURCE_FILES HmEmbedding.cc HmllmInfer.cc llm_perf.cc)
+set(INCLUDE_DIRS 
+  ${CMAKE_SOURCE_DIR}/include
+  ${EIGEN_PATH}
+  )
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+#set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -Wall -Wextra")
+
+add_executable(${PROJECT_NAME}   ${SOURCE_FILES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
+if(NOT MSVC)
+  if(ANDROID_ABI)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} dl)
+  else()
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} pthread  ${CMAKE_DL_LIBS})
+  endif()
+else()
+  target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} ${CMAKE_DL_LIBS} ws2_32 Userenv ntdll Bcrypt kernel32)
+endif()
+install(TARGETS ${PROJECT_NAME} DESTINATION .)
