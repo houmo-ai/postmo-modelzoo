@@ -18,7 +18,7 @@ def get_args() -> argparse.Namespace:
         '--type',
         dest='model_type',
         type=str,
-        default='quant',
+        default='hmm',
         help='which resource to get, choise in [raw, quant, hmm]',
     )
     parser.add_argument(
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
 
     date_str = "20251019" if HOUMO_TARGET == "xh2" else "20250903"
-    quant_path = f"models_outdated/qwen2.5-vl/hmquant_{target}_{model_name}_{model_size}_256_2k_{date_str}.zip"
+    quant_path = f"models/qwen2.5-vl/hmquant_{target}_{model_name}_{model_size}_256_2k_{date_str}.zip"
 
     if model_type in ["raw"]:
         ignore_patterns = []

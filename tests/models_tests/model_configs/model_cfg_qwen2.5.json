@@ -1,5 +1,5 @@
 {
-    "obsolete": false,
+    "obsolete": true,
     "model_dir": "models/llm/qwen2.5",
     "model_type": "llm",
     "support_platform": ["x86_64"],

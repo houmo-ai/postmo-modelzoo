@@ -110,7 +110,6 @@ pip install -r requirements.txt
 | lprnet               | ocr           | xh1     | yes   | yes   | yes  | yes  |
 | ppocrv3              | ocr           | xh1/xh2 | yes   | yes   | yes  | yes  |
 | wenet                | asr           | xh1     | x     | yes   | yes  | x    |
-| qwen2.5              | llm           | xh1/xh2 | yes   | yes   | yes  | x    |
 | qwen3                | llm           | xh1/xh2 | yes   | yes   | yes  | x    |
 | qwen3-14b            | llm           | xh2     | yes   | yes   | yes  | x    |
 | deepseek             | llm           | xh1     | x     | yes   | yes  | x    |
