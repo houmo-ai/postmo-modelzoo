@@ -26,7 +26,6 @@
 from typing import List, Union
 
 from transformers.feature_extraction_utils import BatchFeature
-from transformers.image_utils import ImageInput, VideoInput
 from transformers.processing_utils import (
     ProcessingKwargs,
     ProcessorMixin,
@@ -91,11 +90,11 @@ class Qwen2_5_VLProcessor(ProcessorMixin):
 
     def __call__(
         self,
-        images: ImageInput = None,
+        images = None,
         text: Union[
             TextInput, PreTokenizedInput, List[TextInput], List[PreTokenizedInput]
         ] = None,
-        videos: VideoInput = None,
+        videos = None,
         **kwargs: Unpack[Qwen2_5_VLProcessorKwargs],
     ) -> BatchFeature:
         """

@@ -34,9 +34,7 @@ from transformers.image_utils import (
     OPENAI_CLIP_MEAN,
     OPENAI_CLIP_STD,
     ChannelDimension,
-    ImageInput,
     PILImageResampling,
-    VideoInput,
     get_image_size,
     infer_channel_dimension_format,
     is_scaled_image,
@@ -56,7 +54,7 @@ if is_vision_available():
     from PIL import Image
 
 
-def make_batched_images(images) -> List[List[ImageInput]]:
+def make_batched_images(images):
     """
     Accepts images in list or nested list format, and makes a list of images for preprocessing.
 
@@ -84,7 +82,7 @@ def make_batched_images(images) -> List[List[ImageInput]]:
 
 
 # Copied from transformers.models.llava_next_video.image_processing_llava_next_video.make_batched_videos
-def make_batched_videos(videos) -> List[VideoInput]:
+def make_batched_videos(videos):
     if (
         isinstance(videos, (list, tuple))
         and isinstance(videos[0], (list, tuple))
@@ -216,7 +214,7 @@ class Qwen2VLImageProcessor(BaseImageProcessor):
 
     def _hm_preprocess(
         self,
-        images: Union[ImageInput, VideoInput],
+        images,
         do_resize: bool = None,
         resample: PILImageResampling = None,
         do_convert_rgb: bool = None,
@@ -266,7 +264,7 @@ class Qwen2VLImageProcessor(BaseImageProcessor):
 
     def _preprocess(
         self,
-        images: Union[ImageInput, VideoInput],
+        images,
         do_resize: bool = None,
         resample: PILImageResampling = None,
         do_rescale: bool = None,
@@ -399,8 +397,8 @@ class Qwen2VLImageProcessor(BaseImageProcessor):
 
     def preprocess(
         self,
-        images: ImageInput,
-        videos: VideoInput = None,
+        images,
+        videos = None,
         do_resize: bool = None,
         size: Dict[str, int] = None,
         resample: PILImageResampling = None,
