@@ -35,12 +35,12 @@ if __name__ == '__main__':
     model_dir = args.model_dir
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
     if HOUMO_TARGET == "xh2":
-        hmm_path = ""
+        hmm_path = "models/whisper/hmm_xh2_whisper_medium_2cores_202501103.zip"
 
     from modelscope import snapshot_download
     snapshot_download('openai-mirror/whisper-medium',
                       local_dir=f'{model_dir}/whisper-medium',
-                      ignore_patterns=["*.bin", "*.h5", "*.msgpack"])
+                      ignore_patterns=["*.bin", "*.h5", "*.msgpack", "*.safetensors"])
 
     print("model_type:", model_type)
     if model_type == "hmm":
