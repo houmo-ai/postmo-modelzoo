@@ -409,23 +409,9 @@ models_tests:
     - tests/models_tests/__init__.py
   example_case: null
   test:
-    - asr_wenet_test
     - backbone_resnet50_test
-    - backbone_efficientnet_test
-    - backbone_mobilenetv2_test
-    - backbone_ViT-B-16_test
     - detection_yolov5s_test
-    - detection_yolov3_test
-    - detection_yolov8m_test
-    - detection_yolo12m_test
-    - detection_yolov5s_feature
-    - segmentation_yolov8m_seg_test
     - inferences_resnet50_test
-    - inferences_yolov5s_test
-    - inferences_resnet50_pipeline_test
-    - inferences_yolov5s_resnet50_multibatch_test
-    - scenes_video_detect_test
-
 
 apis_tests:
   include:
@@ -448,20 +434,21 @@ all:
   exclude: null
   example_case: null
   test:
-    ### modelzoo ###
+    # - asr_wenet_test
+    # # - autodrive_yolop_test
     # - backbone_resnet50_test
     # - backbone_efficientnet_test
     # - backbone_mobilenetv2_test
-    # - autodrive_yolop_test
-    # - detection_yolov3_test
+    # - backbone_ViT-B-16_test
     # - detection_yolov5s_test
+    # - detection_yolov3_test
     # - detection_yolov8m_test
-    # - asr_wenet_test
-    ### apis ###
+    # - detection_yolo12m_test
+    # - detection_yolov5s_feature
+    # - segmentation_yolov8m_seg_test
     # - inferences_resnet50_test
     # - inferences_yolov5s_test
-    # - inferences_resnet50_multistreams_test
     # - inferences_resnet50_pipeline_test
     # - inferences_yolov5s_resnet50_multibatch_test
+    # # - inferences_resnet50_multistreams_test
     # - scenes_video_detect_test
-    ### hmatc ###

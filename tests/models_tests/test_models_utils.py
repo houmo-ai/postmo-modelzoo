@@ -944,6 +944,32 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
     current_folder = os.getcwd()
     logger.info("current folder: %s.", current_folder)
 
+    # execute test.sh
+    test_sh_flag = True
+    if os.path.exists(f"{current_folder}/test.sh"):
+        logger.info("Ready to execute test.sh in folder: %s.", current_folder)
+
+        test_sh_flag, _ = execute_test_cmd(["bash", "test.sh"], log_file)
+        test_sh_folder = current_folder
+
+        prepare_test_folder(model_dir, "demo")
+        current_folder = os.getcwd()
+        logger.info(
+            "test.sh ret is %d, change test folder,, current folder: %s.",
+            test_sh_flag,
+            current_folder,
+        )
+
+        logger.warning(f"remove folder: {test_sh_folder}.")
+        shutil.rmtree(test_sh_folder)
+
+    if is_release():
+        logger.info(f"RELEASE MODE, only execute test.sh.")
+        logger.warning(f"remove folder: {os.getcwd()}.")
+        shutil.rmtree(os.getcwd())
+        assert test_sh_flag is True, "Execute tesh.sh Failed!"
+        return
+
     model_type = model_info.get("model_type", "cv")
     if (
         model_type == "cv"
@@ -971,17 +997,6 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         restore_models_res(src_folder, current_folder)
 
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-    if (
-        model_type == "llm"
-        and get_test_type() == TCaseType.SEPARATE_INFER
-        and is_release()
-    ):
-        execute_test_cmd(
-            ["python3", "get_model.py", "--model_dir", model_set_dir, "--type", "hmm"],
-            log_file,
-            True,
-        )
-
     # install python requirements
     changed_libs = install_py_env(current_folder, log_file)
     if changed_libs:
@@ -1022,8 +1037,6 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
                 exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
                 if exec_flag is False:
                     final_flag = False
-                if model_type == "llm" and is_release() is True:
-                    break
 
     # restore python env
     for lib_name, lib_ver in changed_libs.items():
@@ -1036,6 +1049,7 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
 
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
+    assert test_sh_flag is True, "Execute tesh.sh Failed!"
     assert final_flag is True, "Demo Test Failed!"
     logger.info("Demo Test Success!")
 
@@ -1182,17 +1196,6 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
         src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         restore_models_res(src_folder, current_folder)
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-    if (
-        model_type == "llm"
-        and get_test_type() == TCaseType.SEPARATE_INFER
-        and is_release()
-    ):
-        execute_test_cmd(
-            ["python3", "get_model.py", "--model_dir", model_set_dir, "--type", "hmm"],
-            log_file,
-            True,
-        )
-
     final_flag = True
     if model_info.get("perf_params", None) == "demo":
         # install python requirements
@@ -1408,7 +1411,7 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
 
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
-        skip_msg = f"Skip perf testcase {model_name} in the SEPARATE NO INFER stage."
+        skip_msg = f"Skip eval testcase {model_name} in the SEPARATE NO INFER stage."
         logger.warning(skip_msg)
         pytest.skip(skip_msg)
     if model_type == "cv" and get_test_type() == TCaseType.SEPARATE_INFER:
