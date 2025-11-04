@@ -286,6 +286,18 @@ scenes_video_detect:
         args: all
   test:
     - scenes_video_detect_test
+  
+scenes_buffer_pool:
+  include:
+    - apis/scenes/buffer_pool
+  exclude:
+    - apis/scenes/buffer_pool/README.MD
+  example_case:
+    - scenes_buffer_pool_test:
+        script: ../apis/scenes/buffer_pool/run.sh
+  test:
+    - scenes_buffer_pool_test
+
 apis_common:
   include:
     - apis/common
