@@ -149,6 +149,7 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
+
 def build_whisper(model_name, model_dir, model_path, output_dir, profile, ncore, j):
     import tcim
 

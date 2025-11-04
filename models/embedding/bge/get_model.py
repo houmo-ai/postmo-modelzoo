@@ -1,14 +1,11 @@
 import os
 import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog, get_package_version
+from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
-
-runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
-runtime_version = runtime_version.split(".dev")[0]
 
 
 def get_args() -> argparse.Namespace:
@@ -50,11 +47,10 @@ if __name__ == '__main__':
     model_dir = args.model_dir
     build_model_dir = args.build_model_dir
     quant_model_dir = args.quant_model_dir
-
-    HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
     model_type = args.model_type
     model_dir = args.model_dir
-    version = f"v{runtime_version}"
+
+    version = get_houmo_version()
     model_name = "bge"
     ncore = "2cores"
     model_size = "0.5b"

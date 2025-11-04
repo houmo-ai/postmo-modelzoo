@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -e
 
-STEP="demo"
+STEP="all"
+MODEL_TYPE="precompiled"
 
 show_help() {
     echo "Usage: $0 [options]"
-    echo "  -s, --step     execution step, default is demo, support: demo, build."
-    echo "  -h, --help     help information"
+    echo "  -s, --step         execution step, default is all, support: all, demo, build."
+    echo "  -t, --model_type   The method for getting the compiled model, default is precompiled, support: precompiled, compile."
+    echo "  -h, --help         help information"
     exit 0
 }
 
@@ -14,6 +16,10 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -s|--step)
             STEP="$2"
+            shift 2
+        ;;
+        -t|--model_type)
+            MODEL_TYPE="$2"
             shift 2
         ;;
         -h|--help)
@@ -35,14 +41,19 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
-if [[ "$STEP" == "demo" ]]; then
-    echo "Execute demo using precompiled model."
-    pip3 install torch==2.8.0
-    pip3 install torchcodec=0.7.0
-    pip3 install torchvision==0.23.0
+if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
+    if [[ "$MODEL_TYPE" == "precompiled" ]]; then
+        echo "Download precompiled model."
+        python3 get_model.py --type hmm
+    else
+        echo "✗ Only support using pre-compiled model."
+        exit 1
+    fi
+fi
+
+if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
+    echo "Execute demo."
+    pip3 install -r requirements.txt
     apt update && apt install ffmpeg
-    python3 get_model.py --type hmm
     python3 demo.py
-else
-    echo "✗ Unknown step ${STEP}."
 fi

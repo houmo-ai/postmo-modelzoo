@@ -1,14 +1,11 @@
 import os
 import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog, get_package_version
+from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
-
-runtime_version = get_package_version(f"houmo_tcim_runtime_{HOUMO_TARGET}")
-runtime_version = runtime_version.split(".dev")[0]
 
 
 def get_args() -> argparse.Namespace:
@@ -70,7 +67,7 @@ if __name__ == '__main__':
     context_len = args.context_length
     prefill_len = 256
     batch = args.batch
-    version = f"v{runtime_version}"
+    version = get_houmo_version()
     target = HOUMO_TARGET
     hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
 

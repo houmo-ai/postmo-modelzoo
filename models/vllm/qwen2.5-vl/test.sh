@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -e
 
-STEP="demo"
+STEP="all"
+MODEL_TYPE="precompiled"
 
 show_help() {
     echo "Usage: $0 [options]"
-    echo "  -s, --step     execution step, default is demo, support: demo, build."
-    echo "  -h, --help     help information"
+    echo "  -s, --step         execution step, default is all, support: all, demo, build."
+    echo "  -t, --model_type   The method for getting the compiled model, default is precompiled, support: precompiled, compile."
+    echo "  -h, --help         help information"
     exit 0
 }
 
@@ -14,6 +16,10 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -s|--step)
             STEP="$2"
+            shift 2
+        ;;
+        -t|--model_type)
+            MODEL_TYPE="$2"
             shift 2
         ;;
         -h|--help)
@@ -29,21 +35,59 @@ done
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
-if [[ "$STEP" == "build" ]]; then
-    if [[ "$FOUND_PACKAGE" -eq 1 && "$FOUND_GPU" -eq 1 ]]; then
-        echo "Start to quant and compile model."
-        pip3 install transformers==4.56.0
-        python3 get_model.py --type raw
-        python3 ptq.py
-        python3 build.py
+if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
+    if [[ "$MODEL_TYPE" == "precompiled" ]]; then
+        echo "Download precompiled model."
+        python3 get_model.py --type hmm
     else
-        echo "✗ Not support model quantization and compilation."
+        FOUND_GPU=0
+        echo "Checking GPU..."
+        if command -v nvidia-smi &> /dev/null; then
+            gpu_count=$(nvidia-smi --query-gpu=count --format=csv,noheader,nounits | wc -l)
+            if [ $gpu_count -gt 0 ]; then
+                FOUND_GPU=1
+                echo "Found NVIDIA GPU, count: ${gpu_count}"
+            else
+                echo "⚠ Not found NVIDIA GPU device."
+            fi
+        else
+            echo "⚠ Not install NVIDIA GPU driver."
+        fi
+
+        PACKAGE_PATTERN=hmquant
+        FOUND_PACKAGE=0
+        echo "================================"
+        echo "Checking python3 package: $PACKAGE_PATTERN"
+        if command -v python3 &>/dev/null && command -v pip3 &>/dev/null; then
+            if pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" >/dev/null 2>&1; then
+                echo "✓ Found python3 package: $PACKAGE_PATTERN"
+                pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" | while read -r line; do
+                    echo "  - $line"
+                done
+                FOUND_PACKAGE=1
+            else
+                echo "✗ Not found package: $PACKAGE_PATTERN"
+            fi
+        else
+            echo "⚠ Not found python3 or pip3."
+            exit 0
+        fi
+
+        if [[ "$FOUND_PACKAGE" -eq 1 && "$FOUND_GPU" -eq 1 ]]; then
+            echo "Start to quant and compile model."
+            pip3 install transformers==4.56.0
+            python3 get_model.py --type raw
+            python3 ptq.py
+            python3 build.py
+        else
+            echo "✗ Not support model quantization and compilation."
+            exit 1
+        fi
     fi
-elif [[ "$STEP" == "demo" ]]; then
-    echo "Execute demo using precompiled model."
-    python3 get_model.py --type hmm
+fi
+
+if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
+    echo "Execute demo."
     pip3 install transformers==4.51.0
     python3 demo.py
-else
-    echo "✗ Unknown step ${STEP}."
 fi

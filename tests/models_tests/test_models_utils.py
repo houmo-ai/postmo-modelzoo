@@ -946,7 +946,7 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
 
     # execute test.sh
     test_sh_flag = True
-    if os.path.exists(f"{current_folder}/test.sh"):
+    if HDPL_PLATFORM == "ASIC" and os.path.exists(f"{current_folder}/test.sh"):
         logger.info("Ready to execute test.sh in folder: %s.", current_folder)
 
         test_sh_flag, _ = execute_test_cmd(["bash", "test.sh"], log_file)

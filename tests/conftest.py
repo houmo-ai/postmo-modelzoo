@@ -13,6 +13,8 @@ ori_ld = os.getenv("LD_LIBRARY_PATH", "")
 append_ld = f"/opt/venv/houmo/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/opt/venv/houmo/lib/python3.12/site-packages/torch/lib:{script_dir}/../apis/models/3rdparty/onnxruntime/lib:"
 os.environ["LD_LIBRARY_PATH"] = f"{ori_ld}:{append_ld}" if ori_ld else append_ld
 os.environ["HOUMO_DATASETS_PATH"] = f"{script_dir}/../data/datasets/"
+if os.getenv("HOUMO_VERSION", None) is None:
+    os.environ["HOUMO_VERSION"] = "2.4.2"
 # os.environ["IMODELZOO_MODELS_PATH"] = f"{script_dir}/../../modelzoo/"
 # os.environ["IMODELZOO_MODELS_PATH"] = f"/develop02/modelzoo/"
 os.makedirs(f"{script_dir}/models/", exist_ok=True)
