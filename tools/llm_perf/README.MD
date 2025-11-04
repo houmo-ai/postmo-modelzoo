@@ -137,7 +137,7 @@ cd tools/llm_perf/
 ./build_linux.sh
 ```
 
-编译生成llm_perf可执行文件在tools/bin目录下。
+编译生成的llm_perf可执行文件在tools/bin目录下。
 
 如果是编译android版本请执行：
 
@@ -146,17 +146,18 @@ cd tools/llm_perf/
 ./build_ndk.sh
 ```
 
-编译生成llm_perf可执行文件在tools/android目录下。
+编译生成的llm_perf可执行文件在tools/android目录下。
 
 如果是windows11版本请执行:
 
 ``` bat
-@REM 需要结合用户目录更改三四行的环境变量实际路径
+rem 需要结合用户目录更改三四行的环境变量实际路径
 ./build_win.bat
 ```
 
-编译生产的llm_perf可执行文件在tools/bin目录下。
-
+编译生成的llm_perf可执行文件在tools/bin目录下，在win11运行llm_perf.exe需要注意以下事项：
+1. 设置环境变量: set HOUMO_TARGET=xh2 和 set TCIM_BACKEND=Xh2HalBackend。
+2. C++样例依赖libhal_xh2a.dll和tcim_runtime_lite.dll可以设置环境变量或和llm_perf.exe放在同一目录。
 
 ### 2.2 一键运行
 ``` shell
