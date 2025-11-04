@@ -55,7 +55,6 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
   mkdir -p ${output_dir}
 
   RUN cmake -G Ninja ${project_dir}  \
-      -DSKIP_GEN_HEADER=ON \
       -DCMAKE_TOOLCHAIN_FILE=${NDK_PATH}/build/cmake/android.toolchain.cmake \
       -DANDROID_ABI=arm64-v8a \
       -DANDROID_PLATFORM=android-35 \

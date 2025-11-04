@@ -12,6 +12,10 @@
 #include "tcim/tcim_runtime.h"
 #include "utils.h"
 
+#ifdef _MSC_VER
+#include <Windows.h>
+#endif
+
 int RunPerf(std::unordered_map<std::string, std::string> args) {
   fs::path prefill_path = validate_path(args, "prefill");      // 工作目录
   fs::path decode_path = validate_path(args, "decode");        // 模型文件路径
@@ -41,7 +45,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   }
 
   std::unique_ptr<HmllmInfer> Qwen3Infer = std::make_unique<HmllmInfer>(
-      prefill_path, decode_path, embedding_path, ndevices);
+      prefill_path.string(), decode_path.string(), embedding_path.string(), ndevices);
 
   PerfInfos avg_perfdata, total_perfdata;
   memset(&avg_perfdata, 0, sizeof(PerfInfos));
@@ -108,6 +112,10 @@ int RunPerfJson(int argc, char* argv[]) {
 }
 
 int main(int argc, char* argv[]) {
+#ifdef _MSC_VER
+  SetConsoleOutputCP(CP_UTF8);
+  SetConsoleCP(CP_UTF8);
+#endif
   try {
     // 1. 解析命令行参数
     PerfConfigType runtype = ParsePerfRunType(argc, argv);

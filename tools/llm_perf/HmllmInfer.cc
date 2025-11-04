@@ -355,8 +355,8 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len, const uint32_t s
     t_embed_end = std::chrono::high_resolution_clock::now();
     llm_perf_datas.embedding_time += std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start).count();
 
-    DecodeSetInputDatas(reinterpret_cast<void *>(input_datas),
-                        reinterpret_cast<int32_t>(context_length));
+    DecodeSetInputDatas(static_cast<void *>(input_datas),
+                        static_cast<int32_t>(context_length));
     DecodeInfer();
     ids.clear();
     DecodeGetOutputDatas(ids);

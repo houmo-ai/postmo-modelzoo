@@ -1,6 +1,6 @@
 # llm_perf 性能测试工具
 
-本代码用于在后摩鸿途系列芯片的设备上测试大语言模型单batch模型推理性能。当前支持linux和android native环境（使用adb运行）。
+本代码用于在后摩鸿途系列芯片的设备上测试大语言模型单batch模型推理性能。当前支持linux、windows11和android native环境（使用adb运行）。
 
 ## 目录
 
@@ -21,6 +21,9 @@
 | HmEmbedding.cc | embedding类实现             |
 | HmllmInfer.cc | 主文件，实现大语言模型具体推理流程             |
 | convert_embed.py | 将embedding的pt模型转换为bin文件方便工具读取权重             |
+| build_linux.sh | Linux平台llm_perf编译脚本             |
+| build_ndk.sh | Android平台llm_perf编译脚本           |
+| build_win.bat | Win11平台llm_perf编译脚本             |
 
 ### 1.2 流程说明
 
@@ -127,6 +130,8 @@ source env.sh
 
 设置完成后进入程序目录编译：
 
+如果是Linux版本请执行：
+
 ```bash
 cd tools/llm_perf/
 ./build_linux.sh
@@ -137,10 +142,21 @@ cd tools/llm_perf/
 如果是编译android版本请执行：
 
 ```bash
+#需要修改脚本第11行的Android版本tcim库在当前系统的路径
 ./build_ndk.sh
 ```
 
 编译生成llm_perf可执行文件在tools/android目录下。
+
+如果是windows11版本请执行:
+
+``` bat
+@REM 需要结合用户目录更改三四行的环境变量实际路径
+./build_win.bat
+```
+
+编译生产的llm_perf可执行文件在tools/bin目录下。
+
 
 ### 2.2 一键运行
 ``` shell
@@ -165,56 +181,56 @@ ndevices : 1
 loop : 2
 =================================================================
 Use Devices 0
-[2025-11-03 10:41:46.683] [tid 1461] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2025-11-03 10:41:46.683] [tid 1461] [warning] Empty backend name, use Xh2HalBackend instead.
+[2025-11-04 06:06:18.174] [tid 4465] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2025-11-04 06:06:18.174] [tid 4465] [warning] Empty backend name, use Xh2HalBackend instead.
 
-==============================LLM-Perf Progress: 1/2==============================
+==============================LLM Perf Progress: 1/2==============================
 Decode: 100% |**************************************************| 100/100
 -------------------  Performance Summary  --------------------
 Metric                        Value
 --------------------------------------------------------------
-Prefill Time                  319.16 ms
-Decode Time                   7248.38 ms
-Prefill Speed                 313.32 tokens/s
-Decode Speed                  13.80 tokens/s
-TTFT                          319.16 ms
-TPOT                          72.48 ms/token
-E2E Latency                   7.57 seconds
-E2E TPS                       13.21 tokens/s
-Embedding Time                0.16 ms
+Prefill Time                  315.87 ms
+Decode Time                   6886.63 ms
+Prefill Speed                 316.58 tokens/s
+Decode Speed                  14.52 tokens/s
+TTFT                          315.87 ms
+TPOT                          68.87 ms/token
+E2E Latency                   7.20 seconds
+E2E TPS                       13.88 tokens/s
+Embedding Time                0.10 ms
 --------------------------------------------------------------
 ==================================================================================
 
-==============================LLM-Perf Progress: 2/2==============================
+==============================LLM Perf Progress: 2/2==============================
 Decode: 100% |**************************************************| 100/100
 -------------------  Performance Summary  --------------------
 Metric                        Value
 --------------------------------------------------------------
-Prefill Time                  319.65 ms
-Decode Time                   7247.73 ms
-Prefill Speed                 312.84 tokens/s
-Decode Speed                  13.80 tokens/s
-TTFT                          319.65 ms
-TPOT                          72.48 ms/token
-E2E Latency                   7.57 seconds
-E2E TPS                       13.21 tokens/s
-Embedding Time                0.26 ms
+Prefill Time                  316.49 ms
+Decode Time                   6895.20 ms
+Prefill Speed                 315.96 tokens/s
+Decode Speed                  14.50 tokens/s
+TTFT                          316.49 ms
+TPOT                          68.95 ms/token
+E2E Latency                   7.21 seconds
+E2E TPS                       13.87 tokens/s
+Embedding Time                0.20 ms
 --------------------------------------------------------------
 ==================================================================================
-============================== LLM-Perf Avarage Information ==============================
+============================== LLM Perf Avarage Information ==============================
 
 -------------------  Performance Summary  --------------------
 Metric                        Value
 --------------------------------------------------------------
-Prefill Time                  319.41 ms
-Decode Time                   7248.05 ms
-Prefill Speed                 313.08 tokens/s
-Decode Speed                  13.80 tokens/s
-TTFT                          319.41 ms
-TPOT                          72.48 ms/token
-E2E Latency                   7.57 seconds
-E2E TPS                       13.21 tokens/s
-Embedding Time                0.21 ms
+Prefill Time                  316.18 ms
+Decode Time                   6890.91 ms
+Prefill Speed                 316.27 tokens/s
+Decode Speed                  14.51 tokens/s
+TTFT                          316.18 ms
+TPOT                          68.91 ms/token
+E2E Latency                   7.21 seconds
+E2E TPS                       13.88 tokens/s
+Embedding Time                0.15 ms
 --------------------------------------------------------------
 ==========================================================================================
 ############################################# End of Task 1, All Task:4,  ModelName:"deepseek_8b_256_4k_b1_1chip_2cores_v0.5.0".#############################################
@@ -231,55 +247,55 @@ ndevices : 1
 loop : 2
 =================================================================
 Use Devices 0
-[2025-11-03 10:42:07.086] [tid 1461] [warning] Empty backend name, use Xh2HalBackend instead.
+[2025-11-04 06:06:37.620] [tid 4465] [warning] Empty backend name, use Xh2HalBackend instead.
 
-==============================LLM-Perf Progress: 1/2==============================
+==============================LLM Perf Progress: 1/2==============================
 Decode: 100% |**************************************************| 200/200
 -------------------  Performance Summary  --------------------
 Metric                        Value
 --------------------------------------------------------------
-Prefill Time                  332.12 ms
-Decode Time                   12840.67 ms
-Prefill Speed                 602.20 tokens/s
-Decode Speed                  15.58 tokens/s
-TTFT                          332.12 ms
-TPOT                          64.20 ms/token
-E2E Latency                   13.17 seconds
-E2E TPS                       15.18 tokens/s
-Embedding Time                0.31 ms
+Prefill Time                  329.83 ms
+Decode Time                   12124.59 ms
+Prefill Speed                 606.38 tokens/s
+Decode Speed                  16.50 tokens/s
+TTFT                          329.83 ms
+TPOT                          60.62 ms/token
+E2E Latency                   12.45 seconds
+E2E TPS                       16.06 tokens/s
+Embedding Time                0.19 ms
 --------------------------------------------------------------
 ==================================================================================
 
-==============================LLM-Perf Progress: 2/2==============================
+==============================LLM Perf Progress: 2/2==============================
 Decode: 100% |**************************************************| 200/200
 -------------------  Performance Summary  --------------------
 Metric                        Value
 --------------------------------------------------------------
-Prefill Time                  332.83 ms
-Decode Time                   12847.48 ms
-Prefill Speed                 600.90 tokens/s
-Decode Speed                  15.57 tokens/s
-TTFT                          332.83 ms
-TPOT                          64.24 ms/token
-E2E Latency                   13.18 seconds
-E2E TPS                       15.17 tokens/s
-Embedding Time                0.39 ms
+Prefill Time                  329.93 ms
+Decode Time                   12130.13 ms
+Prefill Speed                 606.19 tokens/s
+Decode Speed                  16.49 tokens/s
+TTFT                          329.93 ms
+TPOT                          60.65 ms/token
+E2E Latency                   12.46 seconds
+E2E TPS                       16.05 tokens/s
+Embedding Time                0.37 ms
 --------------------------------------------------------------
 ==================================================================================
-============================== LLM-Perf Avarage Information ==============================
+============================== LLM Perf Avarage Information ==============================
 
 -------------------  Performance Summary  --------------------
 Metric                        Value
 --------------------------------------------------------------
-Prefill Time                  332.47 ms
-Decode Time                   12844.07 ms
-Prefill Speed                 601.55 tokens/s
-Decode Speed                  15.57 tokens/s
-TTFT                          332.47 ms
-TPOT                          64.22 ms/token
-E2E Latency                   13.18 seconds
-E2E TPS                       15.18 tokens/s
-Embedding Time                0.35 ms
+Prefill Time                  329.88 ms
+Decode Time                   12127.36 ms
+Prefill Speed                 606.29 tokens/s
+Decode Speed                  16.49 tokens/s
+TTFT                          329.88 ms
+TPOT                          60.64 ms/token
+E2E Latency                   12.46 seconds
+E2E TPS                       16.05 tokens/s
+Embedding Time                0.28 ms
 --------------------------------------------------------------
 ==========================================================================================
 ############################################# End of Task 2, All Task:4,  ModelName:"qwen2.5_7b_256_8k_b1_1chip_2cores_v0.5.0".#############################################
@@ -296,38 +312,38 @@ ndevices : 1
 loop : 1
 =================================================================
 Use Devices 0
-[2025-11-03 10:42:36.278] [tid 1461] [warning] Empty backend name, use Xh2HalBackend instead.
+[2025-11-04 06:07:06.809] [tid 4465] [warning] Empty backend name, use Xh2HalBackend instead.
 
-==============================LLM-Perf Progress: 1/1==============================
+==============================LLM Perf Progress: 1/1==============================
 Decode: 100% |**************************************************| 400/400
 -------------------  Performance Summary  --------------------
 Metric                        Value
 --------------------------------------------------------------
-Prefill Time                  471.97 ms
-Decode Time                   27159.36 ms
-Prefill Speed                 635.64 tokens/s
-Decode Speed                  14.73 tokens/s
-TTFT                          471.97 ms
-TPOT                          67.90 ms/token
-E2E Latency                   27.63 seconds
-E2E TPS                       14.48 tokens/s
-Embedding Time                0.60 ms
+Prefill Time                  468.24 ms
+Decode Time                   26011.80 ms
+Prefill Speed                 640.70 tokens/s
+Decode Speed                  15.38 tokens/s
+TTFT                          468.24 ms
+TPOT                          65.03 ms/token
+E2E Latency                   26.48 seconds
+E2E TPS                       15.11 tokens/s
+Embedding Time                0.39 ms
 --------------------------------------------------------------
 ==================================================================================
-============================== LLM-Perf Avarage Information ==============================
+============================== LLM Perf Avarage Information ==============================
 
 -------------------  Performance Summary  --------------------
 Metric                        Value
 --------------------------------------------------------------
-Prefill Time                  471.97 ms
-Decode Time                   27159.36 ms
-Prefill Speed                 635.64 tokens/s
-Decode Speed                  14.73 tokens/s
-TTFT                          471.97 ms
-TPOT                          67.90 ms/token
-E2E Latency                   27.63 seconds
-E2E TPS                       14.48 tokens/s
-Embedding Time                0.60 ms
+Prefill Time                  468.24 ms
+Decode Time                   26011.80 ms
+Prefill Speed                 640.70 tokens/s
+Decode Speed                  15.38 tokens/s
+TTFT                          468.24 ms
+TPOT                          65.03 ms/token
+E2E Latency                   26.48 seconds
+E2E TPS                       15.11 tokens/s
+Embedding Time                0.39 ms
 --------------------------------------------------------------
 ==========================================================================================
 ############################################# End of Task 3, All Task:4,  ModelName:"qwen3_8b_256_2k_b1_1chip_2cores_v0.5.0".#############################################
@@ -344,38 +360,38 @@ ndevices : 1
 loop : 1
 =================================================================
 Use Devices 0
-[2025-11-03 10:43:06.820] [tid 1461] [warning] Empty backend name, use Xh2HalBackend instead.
+[2025-11-04 06:07:35.605] [tid 4465] [warning] Empty backend name, use Xh2HalBackend instead.
 
-==============================LLM-Perf Progress: 1/1==============================
+==============================LLM Perf Progress: 1/1==============================
 Decode: 100% |**************************************************| 400/400
 -------------------  Performance Summary  --------------------
 Metric                        Value
 --------------------------------------------------------------
-Prefill Time                  1183.00 ms
-Decode Time                   44927.45 ms
-Prefill Speed                 338.12 tokens/s
-Decode Speed                  8.90 tokens/s
-TTFT                          1183.00 ms
-TPOT                          112.32 ms/token
-E2E Latency                   46.11 seconds
-E2E TPS                       8.67 tokens/s
-Embedding Time                0.86 ms
+Prefill Time                  1178.63 ms
+Decode Time                   43578.46 ms
+Prefill Speed                 339.38 tokens/s
+Decode Speed                  9.18 tokens/s
+TTFT                          1178.63 ms
+TPOT                          108.95 ms/token
+E2E Latency                   44.76 seconds
+E2E TPS                       8.94 tokens/s
+Embedding Time                0.66 ms
 --------------------------------------------------------------
 ==================================================================================
-============================== LLM-Perf Avarage Information ==============================
+============================== LLM Perf Avarage Information ==============================
 
 -------------------  Performance Summary  --------------------
 Metric                        Value
 --------------------------------------------------------------
-Prefill Time                  1183.00 ms
-Decode Time                   44927.45 ms
-Prefill Speed                 338.12 tokens/s
-Decode Speed                  8.90 tokens/s
-TTFT                          1183.00 ms
-TPOT                          112.32 ms/token
-E2E Latency                   46.11 seconds
-E2E TPS                       8.67 tokens/s
-Embedding Time                0.86 ms
+Prefill Time                  1178.63 ms
+Decode Time                   43578.46 ms
+Prefill Speed                 339.38 tokens/s
+Decode Speed                  9.18 tokens/s
+TTFT                          1178.63 ms
+TPOT                          108.95 ms/token
+E2E Latency                   44.76 seconds
+E2E TPS                       8.94 tokens/s
+Embedding Time                0.66 ms
 --------------------------------------------------------------
 ==========================================================================================
 ############################################# End of Task 4, All Task:4,  ModelName:"qwen3_14b_256_8k_b1_1chip_2cores_v0.5.0".#############################################
