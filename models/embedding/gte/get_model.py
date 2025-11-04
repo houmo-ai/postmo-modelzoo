@@ -35,7 +35,7 @@ if __name__ == '__main__':
     model_dir = args.model_dir
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
     if HOUMO_TARGET == "xh2":
-        hmm_path = ""
+        hmm_path = "models/gte/hmm_xh2_gte_1.5b_256_2k_2cores_20251104.zip"
 
     from modelscope import snapshot_download
     snapshot_download('iic/gte-Qwen2-1.5B-instruct',
