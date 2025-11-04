@@ -5,6 +5,7 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
   WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   cd "${WORK_PATH}" || exit 1
   ## if user not set NDK_PATH, use default path
+  export TCIM_RUNTIME_PATH=/hmdd/lyz_codes/Android/tcim/houmo-tcim-runtime-xh2
   if [ x${NDK_PATH} == x ]; then
     export NDK_PATH=${WORK_PATH}/toolchains/android-ndk-r28c
     if [ -e ${NDK_PATH} ]; then
@@ -50,12 +51,10 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
   mkdir -p ${output_dir}
 
   RUN cmake -G Ninja ${project_dir}  \
-      -DSKIP_GEN_HEADER=ON \
       -DCMAKE_TOOLCHAIN_FILE=${NDK_PATH}/build/cmake/android.toolchain.cmake \
       -DANDROID_ABI=arm64-v8a \
       -DANDROID_PLATFORM=android-35 \
       -DANDROID_NDK=${NDK_PATH} \
-      -DANDROID_TCIM_RUNTIME_PATH=/hmdd/lyz_codes/Android/tcim \
       -DCMAKE_INSTALL_PREFIX=${output_dir} -DCMAKE_BUILD_TYPE=${capitalized_build_type} ${@:2}             
 
   RUN cmake --build . --target install -j 16
