@@ -13,6 +13,7 @@ import random
 import onnx
 import fnmatch
 import requests
+import re
 from onnx import TensorProto
 from pathlib import Path
 from tqdm import tqdm
@@ -87,6 +88,22 @@ def get_package_version(package_name: str):
         return v
     except PackageNotFoundError:
         return "N/A"
+
+
+def get_houmo_version():
+    """获取houmo版本"""
+    v = os.getenv("HOUMO_VERSION")
+    if v is None and len(v) == 0:
+        raise ValueError("Please set HOUMO_VERSION env")
+
+    def check_version(version_str):
+        pattern = r"^(v)?(\d+)\.(\d+)\.(\d+)(\.dev\d{8})?$"
+        return bool(re.match(pattern, version_str))
+
+    if not check_version(v):
+        raise ValueError(f"Invalid houmo version: {v}")
+
+    return v if v.startswith("v") else f"v{v}"
 
 
 def get_onnx_inputs_info(onnx_path):

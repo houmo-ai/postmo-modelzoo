@@ -23,6 +23,7 @@ from ..utils.utils import (
     get_hmquant_xh2_version,
     get_md5,
     get_package_version,
+    get_houmo_version,
     load_npz,
     str_to_torch_dtype,
     upload_file_to_artifactory,
@@ -147,12 +148,10 @@ class Xh2Exec(BaseExec):
         compress = os.environ.get("HMATC_COMPRESS", "0")
         if compress == "1" and self.enable_upload:
             logger.info("Compressing quant output...")
-            runtime_version = get_package_version(f"houmo_tcim_runtime_xh2")
-            runtime_version = runtime_version.split(".dev")[0]
             with open(os.path.join(self.quant_output_dir, "VERSION.txt"), "w") as f:
                 f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")
                 f.write(f"quant_time: {now}\n")
-            filename = f"hmquant_{self.model_dir_name}_xh2_v{runtime_version}.tar.xz"
+            filename = f"hmquant_{self.model_dir_name}_xh2_{get_houmo_version()}.tar.xz"
             compress_quant_output_path = os.path.join(self.save_dir, "xh2", filename)
             compress_folder_to_tar_xz_with_progress(
                 self.quant_output_dir,
@@ -164,7 +163,7 @@ class Xh2Exec(BaseExec):
             )
             upload_file_to_artifactory(
                 compress_quant_output_path,
-                f"models/{self.target.lower()}-v{runtime_version}/{self.model_dir_name}/{filename}",
+                f"models/{self.target.lower()}-{get_houmo_version()}/{self.model_dir_name}/{filename}",
                 max_retries=3,
             )
             logger.info(f"Compressing quant output done.")
@@ -213,8 +212,7 @@ class Xh2Exec(BaseExec):
                 f.write(f"tcim_version: {hmcc_version}\n")
                 f.write(f"tcim_runtime_version: {runtime_version}\n")
                 f.write(f"build_time: {now}\n")
-            runtime_version = runtime_version.split(".dev")[0]
-            filename = f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_v{runtime_version}.tar.xz"
+            filename = f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_{get_houmo_version()}.tar.xz"
             compress_hmm_path = os.path.join(
                 self.save_dir,
                 "xh2",
@@ -229,7 +227,7 @@ class Xh2Exec(BaseExec):
             )
             upload_file_to_artifactory(
                 compress_hmm_path,
-                f"models/{self.target.lower()}-v{runtime_version}/{self.model_dir_name}/{filename}",
+                f"models/{self.target.lower()}-{get_houmo_version()}/{self.model_dir_name}/{filename}",
                 max_retries=3,
             )
             logger.info(f"Compressing hmmodel done.")
