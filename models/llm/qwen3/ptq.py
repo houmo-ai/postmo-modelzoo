@@ -1,9 +1,71 @@
 import argparse, os
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import time
+import psutil
+import threading
 
 HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '')
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', '')
 
+class ProcessMemoryMonitor:
+    """
+    Monitors the memory usage of the current Python process in real-time using psutil.
+    """
+    def __init__(self, interval=2, log_file=None):
+        """
+        Initializes the monitor.
+        Args:
+            interval (int): Time between measurements in seconds.
+            log_file (str, optional): Path to a file to log results. If None, prints to console.
+        """
+        self.process = psutil.Process(os.getpid())
+        self.interval = interval
+        self.log_file = log_file
+        self.is_monitoring = False
+        self.peak_memory_mb = 0
+
+    def get_memory_info(self):
+        """
+        Gets current memory usage information.
+        Returns:
+            dict: A dictionary containing memory usage data.
+        """
+        memory_info = self.process.memory_info()
+        rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
+        percent = self.process.memory_percent()   # Percentage of system memory
+        return {'rss_mb': rss_mb, 'percent': percent}
+
+    def start(self):
+        """Starts the monitoring loop in a separate daemon thread."""
+        self.is_monitoring = True
+        self.peak_memory_mb = 0
+        self.monitor_thread = threading.Thread(target=self._monitor_loop)
+        self.monitor_thread.daemon = True  # Thread will exit when main program does
+        self.monitor_thread.start()
+        print(f"Memory monitoring started (interval: {self.interval}s)")
+
+    def _monitor_loop(self):
+        """The internal loop that runs in the thread."""
+        while self.is_monitoring:
+            mem_info = self.get_memory_info()
+            self.peak_memory_mb = max(self.peak_memory_mb, mem_info['rss_mb'])
+
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
+
+            # Output to console or file
+            if self.log_file:
+                with open(self.log_file, 'a') as f:
+                    f.write(log_message + '\n')
+
+            time.sleep(self.interval)
+
+    def stop(self):
+        """Stops the monitoring loop and prints peak usage."""
+        self.is_monitoring = False
+        if hasattr(self, 'monitor_thread'):
+            self.monitor_thread.join(timeout=1) # Wait a moment for the thread to finish
+        print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
 
 def check_gpu():
     import subprocess
@@ -131,4 +193,7 @@ if __name__ == "__main__":
     if not check_gpu():
         print("Error: Not found GPU device.")
         exit(-1)
+    memory_monitor = ProcessMemoryMonitor(interval=2)
+    memory_monitor.start()
     main()
+    memory_monitor.stop()
