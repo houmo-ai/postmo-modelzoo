@@ -4,6 +4,7 @@ import sys
 import time
 import logging
 import argparse
+from typing import List, Tuple, Optional
 from loguru import logger
 
 logging.basicConfig(level=logging.ERROR)
@@ -65,8 +66,179 @@ def get_args() -> argparse.Namespace:
         default=os.path.join("output", HOUMO_TARGET, "qwen2.5-vl_decode.hmm"),
         help="houmo decode model path",
     )
+    parser.add_argument(
+        "--repetition_penalty",
+        dest="repetition_penalty",
+        type=float,
+        default=1.0,
+        help="sampling repetition_penalty",
+    )
+    parser.add_argument(
+        "--topk",
+        dest="topk",
+        type=int,
+        default=None,
+        help="sampling top-k",
+    )
+    parser.add_argument(
+        "--topp",
+        dest="topp",
+        type=float,
+        default=1.0,
+        help="sampling top-p",
+    )
+    parser.add_argument(
+        "--temperature",
+        dest="temperature",
+        type=float,
+        default=1.0,
+        help="sampling temperature",
+    )
     args = parser.parse_args()
     return args
+
+class SamplingManager:
+    def __init__(
+        self,
+        temperature: float = 1.0,
+        top_k: Optional[int] = None,
+        top_p: float = 1.0,
+        repetition_penalty: float = 1.0,
+        min_tokens_to_keep: int = 1,
+    ):
+        self.temperature = temperature
+        self.top_k = top_k
+        self.top_p = top_p
+        self.repetition_penalty = repetition_penalty
+        self.min_tokens_to_keep = min_tokens_to_keep
+
+    def softmax(self, x: np.ndarray) -> np.ndarray:
+        exp_x = np.exp(x - np.max(x))
+        return exp_x / np.sum(exp_x)
+
+    def apply_temperature(self, logits: np.ndarray) -> np.ndarray:
+        if self.temperature <= 0:
+            raise ValueError("Temperature must larger than 0")
+
+        return logits / self.temperature
+
+    def apply_repetition_penalty(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        if self.repetition_penalty == 1.0 or not previous_tokens:
+            return logits
+
+        adjusted_logits = logits.copy()
+        for token_id in set(previous_tokens):
+            if 0 <= token_id < len(logits):
+                if logits[token_id] < 0:
+                    adjusted_logits[token_id] = (
+                        logits[token_id] * self.repetition_penalty
+                    )
+                else:
+                    adjusted_logits[token_id] = (
+                        logits[token_id] / self.repetition_penalty
+                    )
+
+        return adjusted_logits
+
+    def apply_top_k(self, probs: np.ndarray) -> np.ndarray:
+        if self.top_k is None or self.top_k <= 0:
+            return probs
+
+        top_k = min(self.top_k, len(probs))
+
+        if top_k <= 0:
+            return probs
+
+        top_k_indices = np.argpartition(probs, -top_k)[-top_k:]
+
+        mask = np.ones_like(probs, dtype=bool)
+        mask[top_k_indices] = False
+        filtered_probs = probs.copy()
+        filtered_probs[mask] = 0
+
+        if np.sum(filtered_probs) > 0:
+            normalized_probs = filtered_probs / np.sum(filtered_probs)
+        else:
+            normalized_probs = np.ones_like(probs) / len(probs)
+
+        return normalized_probs
+
+    def apply_top_p(self, probs: np.ndarray) -> np.ndarray:
+        if self.top_p >= 1.0:
+            return probs
+
+        sorted_indices = np.argsort(probs)[::-1]
+        sorted_probs = probs[sorted_indices]
+
+        cumulative_probs = np.cumsum(sorted_probs)
+
+        cutoff_indices = np.where(cumulative_probs >= self.top_p)[0]
+
+        if len(cutoff_indices) > 0:
+            cutoff_index = cutoff_indices[0]
+            if cutoff_index < self.min_tokens_to_keep - 1:
+                cutoff_index = self.min_tokens_to_keep - 1
+
+            selected_indices = sorted_indices[: cutoff_index + 1]
+        else:
+            selected_indices = sorted_indices
+
+        mask = np.ones_like(probs, dtype=bool)
+        mask[selected_indices] = False
+        filtered_probs = probs.copy()
+        filtered_probs[mask] = 0
+
+        if np.sum(filtered_probs) > 0:
+            normalized_probs = filtered_probs / np.sum(filtered_probs)
+        else:
+            normalized_probs = np.ones_like(probs) / len(probs)
+
+        return normalized_probs
+
+    def process_logits(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        processed_logits = logits.copy()
+        # 1. apply repetition penalty
+        processed_logits = self.apply_repetition_penalty(
+            processed_logits, previous_tokens
+        )
+
+        # 2. apply softmax
+        # not using softmax in case of long time cost
+        probs = processed_logits
+        # probs = self.softmax(processed_logits)
+
+        # 3. apply top-k
+        probs = self.apply_top_k(probs)
+
+        # 4. apply top-p
+        probs = self.apply_top_p(probs)
+
+        # 5. apply temperature
+        probs = self.apply_temperature(probs)
+        return probs
+
+    def sample(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> int:
+        logits = logits[0][0]
+        probs = self.process_logits(logits, previous_tokens)
+        if np.all(probs == 0):
+            probs = np.ones_like(probs) / len(probs)
+
+        # sampled_index = np.random.choice(len(probs), p=probs)
+        sampled_index = probs.argmax(-1)
+
+        return np.array([[sampled_index]])
+
+    def get_processed_probs(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        return self.process_logits(logits, previous_tokens)
+
 
 
 class Qwen25VL:
@@ -99,6 +271,12 @@ class Qwen25VL:
         option2.set_dummy_tensors(dummy_tensor_names)
         self.decode = tcim.runtime.load(os.path.join(decode_path), option=option2)
         logger.info("decode model loaded")
+        self.samplingmanager = SamplingManager(
+            temperature=args.temperature,
+            top_k=args.topk,
+            top_p=args.topp,
+            repetition_penalty=args.repetition_penalty,
+        )
         self.processor = Qwen2_5_VLProcessor.from_pretrained(tokenizer_dir)
         self.device = torch.device("cpu")
         prefill_shape = self.prefill.get_input_info(
@@ -143,6 +321,8 @@ class Qwen25VL:
         if HOUMO_TARGET == "xh2":
             self.embedding = self.embedding.weight
         self.hidden_dims = self.embedding.shape[-1]
+        self.generated_ids = []
+        self.decode_time = 0
 
     def get_nblocks(self):
         input_names = []
@@ -550,6 +730,7 @@ class Qwen25VL:
         next_str = self.processor.tokenizer.decode(torch.tensor(self.next_id.item()))
         logger.success("response:")
         print("\033[1;95m{}".format(next_str), end="", flush=True)
+        self.generated_ids.append(self.next_id.item())
         self.context_length = valid_length.item() + current_length.item() + 1
         return vit_time, prefill_time, inputs_embeds.shape[1]
 
@@ -594,10 +775,13 @@ class Qwen25VL:
             self.decode.get_input_name(5),
             decoder_inputs["current_length"].detach().numpy(),
         )
+        start_time = time.time()
         self.decode.run()
         self.decode.sync()
+        self.decode_time += time.time() - start_time
         decoder_output = self.decode.get_output(self.decode.get_output_name(0))
-        self.next_id = decoder_output.numpy().argmax(-1)
+        self.next_id = self.samplingmanager.sample(decoder_output.numpy(), self.generated_ids)
+        self.generated_ids.append(self.next_id.item())
         if self.next_id.item() in self.eos_token_id:
             return None
         next_str = self.processor.tokenizer.decode(self.next_id.item())
@@ -636,8 +820,8 @@ if __name__ == "__main__":
         print(next_str, end="", flush=True)
     print("\033[0m")
     output_tokens = decode_count + 1
-    decode_time = time.time() - start_time - visual_prefill_time
     total_time = time.time() - start_time
+    decode_time = qwen25vl.decode_time
     logger.success(
         f"Total Images: {image_num}, Total Input: {input_tokens} tokens, Output {output_tokens} tokens, Vision Cost {vit_time * 1000:.3f} ms, Prefill Cost {prefill_time * 1000:.3f} ms, Decode Cost {decode_time * 1000:.3f} ms"
     )
