@@ -3,18 +3,19 @@
  * \file stream_engine.hpp
  */
 #include <unistd.h>
+
 #include <cassert>
+#include <condition_variable>
 #include <iostream>
+#include <mutex>
+#include <queue>
 #include <sstream>
 #include <string>
-#include <vector>
-#include <queue>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
+#include <vector>
 
+#include "logging.h"
 #include "tcim/tcim_runtime.h"
-
 
 typedef struct RunTask {
   tcim::Module module;
@@ -25,7 +26,8 @@ typedef struct RunTask {
 
   RunTask() : is_end(true) {}
 
-  RunTask(tcim::Module& m, const tcim::Module::RunOption& opt) : module(m), option(opt) {
+  RunTask(tcim::Module& m, const tcim::Module::RunOption& opt)
+      : module(m), option(opt) {
     mutex = std::make_shared<std::mutex>();
     cv = std::make_shared<std::condition_variable>();
   }
@@ -42,14 +44,14 @@ typedef struct StreamQueue {
   }
 } StreamQueue;
 
-
 class StreamEngine {
  public:
   StreamEngine(int stream_num) {
     stream_queues_.resize(stream_num);
     wait_counts_.resize(stream_num);
     for (int i = 0; i < stream_num; i++) {
-      threads_.push_back(std::thread(&StreamEngine::StreamThread, i, std::ref(stream_queues_[i])));
+      threads_.push_back(std::thread(&StreamEngine::StreamThread, i,
+                                     std::ref(stream_queues_[i])));
     }
   }
 
@@ -64,7 +66,8 @@ class StreamEngine {
     }
   }
 
-  void RunSync(tcim::Module& module, const tcim::Module::RunOption& option = tcim::Module::RunOption()) {
+  void RunSync(tcim::Module& module, const tcim::Module::RunOption& option =
+                                         tcim::Module::RunOption()) {
     int stream_id = 0;
     for (int i = 1; i < wait_counts_.size(); i++) {
       if (wait_counts_[i] < wait_counts_[stream_id]) {
@@ -87,7 +90,7 @@ class StreamEngine {
 
   static void StreamThread(int id, StreamQueue& qin) {
     tcim::Stream stream;
-    while(1) {
+    while (1) {
       std::unique_lock<std::mutex> queue_lock(*qin.mutex);
       while (qin.queue.empty()) {
         qin.cv->wait(queue_lock);
@@ -101,17 +104,18 @@ class StreamEngine {
       queue_lock.unlock();
 
       task.module.SetStream(stream);
-      task.module.Run();
+      task.module.Run(false, task.option);
+      // task.module.Run();
       task.module.Sync();
 
       std::lock_guard<std::mutex> run_lock(*task.mutex);
       task.cv->notify_one();
     }
-    // std::cout << "StreamThread " << id << " exit." << std::endl;
+    LOG_DEBUG("StreamThread {} exit.", id);
   }
 
  protected:
-  std::vector<StreamQueue> stream_queues_; // stream队列
-  std::vector<int> wait_counts_; // 等待运行的任务数量
-  std::vector<std::thread> threads_; // stream线程
+  std::vector<StreamQueue> stream_queues_;  // stream队列
+  std::vector<int> wait_counts_;            // 等待运行的任务数量
+  std::vector<std::thread> threads_;        // stream线程
 };
