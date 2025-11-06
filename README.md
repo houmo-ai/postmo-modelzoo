@@ -109,14 +109,15 @@ API示例在apis目录下，如下表所示，type列为示例类型，其中con
 
 | examples                     | path         | description                     | language   | target  | arch        | os         |
 | ---------------------------- | ------------ | ------------------------------- | ---------- | ------- | ----------- | ---------- |
-| resnet50                     | converts     | resnet50 量化编译示例           | python     | xh1/xh2 | x64         | linux      |
-| resnet50                     | inferences   | resnet50 单线程推理示例         | python/c++ | xh1/xh2 | x64/aarch64 | win/linux  |
-| yolov5s                      | inferences   | yolov5s 单线程推理示例          | python/c++ | xh1/xh2 | x64/aarch64 | win/linux  |
-| qwen3                        | inferences   | qwen3 大语言模型推理示例        | python     | xh1/xh2 | x64/aarch64 | win/linux  |
+| resnet50                     | converts     | resnet50 量化编译示例            | python     | xh1/xh2 | x64         | linux      |
+| resnet50                     | inferences   | resnet50 单线程推理示例          | python/c++ | xh1/xh2 | x64/aarch64 | win/linux  |
+| yolov5s                      | inferences   | yolov5s 单线程推理示例           | python/c++ | xh1/xh2 | x64/aarch64 | win/linux  |
+| qwen3                        | inferences   | qwen3 大语言模型推理示例         | python     | xh1/xh2 | x64/aarch64 | win/linux  |
 | resnet50_multistreams        | inferences   | resnet50 多线程多stream推理示例 | c++        | xh1     | x64/aarch64 | win/linux  |
 | resnet50_pipeline            | inferences   | resnet50 流水推理示例           | c++        | xh1     | x64/aarch64 | win/linux  |
 | yolov5s_resnet50_multibatch  | inferences   | yolov5s_resnet50多batch推理示例 | c++        | xh1     | x64/aarch64 | linux      |
-| video_detect                 | scenes       | 视频流目标检测分析业务示例      | c++        | xh1     | x64/aarch64 | linux      |
+| yolov5s_dynamic              | inferences   | dynamic_resizer封装应用示例     | c++        | xh1     | x64/aarch64 | linux      |
+| video_detect                 | scenes       | 视频流目标检测分析业务示例       | c++        | xh1     | x64/aarch64 | linux      |
 
 
 ## 快速上手
