@@ -16,7 +16,7 @@ def get_args() -> argparse.Namespace:
         dest='model_type',
         type=str,
         default='hmm',
-        help='which resource to get, choise in [raw, quant, hmm]',
+        help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
         '--model_dir',
@@ -59,7 +59,6 @@ if __name__ == '__main__':
     batch = 10
     target = HOUMO_TARGET
     onnx_path = "models/bge/onnx_bge_10x512.zip"
-    quant_path = f"models_outdated/bge/hmquant_{target}_{model_name}_{model_size}_{context_len}_b{batch}_20251022.zip"
     hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
 
     if model_type in ["raw"]:
@@ -80,11 +79,6 @@ if __name__ == '__main__':
         local_dir=f'{model_dir}/bge-m3',
         ignore_patterns=ignore_patterns,
     )
-
-    if model_type in ["quant"] and not get_file_from_jfrog(
-        quant_path, model_dir, quant_model_dir
-    ):
-        sys.exit(1)
 
     if model_type in ["hmm"] and not get_file_from_jfrog(
         hmm_path, model_dir, build_model_dir

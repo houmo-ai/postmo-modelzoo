@@ -46,10 +46,9 @@ if __name__ == '__main__':
     model_size = "medium"
     ncore = "2cores"
     ndevice = "1chip"
-    batch = args.batch
     version = get_houmo_version()
     target = HOUMO_TARGET
-    hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_b{batch}_{ndevice}_{ncore}_{version}.zip"
+    hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{ndevice}_{ncore}_{version}.zip"
 
     if model_type in ["raw"]:
         ignore_patterns = []

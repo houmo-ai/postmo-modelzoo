@@ -102,6 +102,13 @@ def parse_args():
         help="The number of core, default is 1. The maximum value is 4.",
     )
     parser.add_argument(
+        "-j",
+        "--j",
+        type=int,
+        default=24,
+        help="the number of compilation threads, default is 24.",
+    )
+    parser.add_argument(
         "-up",
         "--upload",
         action="store_true",
@@ -183,11 +190,11 @@ def _check_args(args: dict):
         logger.error(f"Invalid core_num {args.core_num}, only supports [1, 4].")
         return False
 
-    if args.device_num <= 0 or args.device_num > 32:
-        logger.error(f"Invalid device_num {args.device_num}, only supports [1, 32].")
+    if args.device_num < -1 or args.device_num > 32:
+        logger.error(f"Invalid device_num {args.device_num}, only supports [0, 32].")
         return False
 
-    if args.batch <= 0 or args.batch > 32:
+    if args.batch < 0 or args.batch > 32:
         logger.error(f"Invalid batch number {args.batch}, only supports [1, 32].")
         return False
 
@@ -204,7 +211,11 @@ def _check_args(args: dict):
         logger.error(f"Invalid version {args.version}, error msg: {str(e)}")
         return False
 
-    if args.context_length % 1024 != 0:
+    if (
+        args.context_length > 0
+        and args.context_length != 512
+        and args.context_length % 1024 != 0
+    ):
         logger.error(
             f"Invalid context_length {args.context_length}, it needs to be divisible by 1024."
         )
@@ -222,6 +233,7 @@ def _check_args(args: dict):
         "-- Batch: %d \n"
         "-- Device num: %d \n"
         "-- Core num: %d \n"
+        "-- J: %d \n"
         "-- Save results to %s\n"
         "-- Task Id: %s \n",
         args.model_name,
@@ -234,6 +246,7 @@ def _check_args(args: dict):
         args.batch,
         args.device_num,
         args.core_num,
+        args.j,
         args.result_dir,
         args.task_id,
     )
@@ -411,6 +424,7 @@ if __name__ == "__main__":
     device_num = args.device_num
     core_num = args.core_num
     batch = args.batch
+    j = args.j
 
     # get the information of supported models
     with open("./supported_models.json", 'r', encoding='utf-8') as md_file:
@@ -484,7 +498,16 @@ if __name__ == "__main__":
     if args.forced_compile or not quant_flag:
         # compile command
         container_compile_res = f"{container_result_dir}/compile_results"
-        compile_cmd = f"python3 execute_compilation.py -n {model_name} -m {model_dir} -qm {quant_model} -cl {context_len} -dn {device_num} -b {batch} -cn {core_num} -r {container_compile_res} -log {container_log_file}"
+        compile_cmd = f"python3 execute_compilation.py -n {model_name} -m {model_dir} -qm {quant_model} "
+        if context_len >= 1024:
+            compile_cmd += f"-cl {context_len} "
+        if device_num >= 0:
+            compile_cmd += f"-dn {device_num} "
+        if batch > 0:
+            compile_cmd += f"-b {batch} "
+        if core_num > 0:
+            compile_cmd += f"-cn {core_num} "
+        compile_cmd += f"-j {j} -r {container_compile_res} -log {container_log_file}"
         commands.append(
             f"cd {container_home}/imodelzoo/service/llm_compiler && {compile_cmd}"
         )
@@ -554,20 +577,29 @@ if __name__ == "__main__":
     )
     md5sum_quant = None
     compiled_file_name = None
+    context_str = str(int(context_len / 1024)) + "k" if context_len != 512 else "0.5k"
+    chip_str = f"{device_num}chips" if device_num > 1 else "1chip"
+    core_str = f"{core_num}cores" if core_num > 1 else f"{core_num}core"
+
     if docker_flag and args.upload is True:
         version_str = f"{target}-v{version}" if args.release is True else ""
         if version_str:
             model_name = "deepseek" if "deepseek" in model_name else model_name
         current_dt = datetime.now()
         current_ts = (
-            current_dt.strftime("%Y%m%d_%H%M%S") if not version_str else version_str
+            current_dt.strftime("%Y%m%d_%H%M%S") if not version_str else f"v{version}"
         )
         today = current_dt.strftime("%Y%m%d")
-        context_str = str(int(context_len / 1024)) + "k"
         if quant_flag:
             # publish quantized model (will upload to Jfrog)
             host_quant_dir = host_result_dir + "/quant_results/hmquant"
-            quant_file_name = f"hmquant_{target}_{model_name}_{model_size}_{prefill_len}_{context_str}_{current_ts}.zip"
+            quant_file_name = f"hmquant_{target}_{model_name}_{model_size}_"
+            if prefill_len > 0:
+                quant_file_name += f"{prefill_len}_"
+            if context_len > 0:
+                quant_file_name += f"{context_str}_"
+            quant_file_name += f"{current_ts}.zip"
+
             md5sum_quant, jfrog_path_quant = _publish_model(
                 today,
                 quant_file_name,
@@ -595,9 +627,14 @@ if __name__ == "__main__":
         if args.forced_compile or not quant_flag:
             # publish compiled model (will upload to Jfrog)
             host_compile_dir = host_result_dir + "/compile_results"
-            chip_str = f"{device_num}chips" if device_num > 1 else f"{device_num}chip"
-            core_str = f"{core_num}cores" if core_num > 1 else f"{core_num}core"
-            compiled_file_name = f"hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_str}_b{batch}_{chip_str}_{core_str}_{current_ts}.zip"
+            compiled_file_name = f"hmm_{target}_{model_name}_{model_size}_"
+            if prefill_len > 0:
+                compiled_file_name += f"{prefill_len}_"
+            if context_len > 0:
+                compiled_file_name += f"{context_str}_"
+            if batch > 0:
+                compiled_file_name += f"b{batch}_"
+            compiled_file_name += f"{chip_str}_{core_str}_{current_ts}.zip"
             md5sum_compile, jfrog_path_compile = _publish_model(
                 today,
                 compiled_file_name,
@@ -641,12 +678,22 @@ if __name__ == "__main__":
                 logger.info(f"##hm enter here5")
                 exit(5)
 
-    if args.perf_id and target == "xh2":
-        compiled_file_name = (
-            f"{target}_{model_name}_{model_size}_{prefill_len}_{context_str}_b{batch}_{chip_str}_{core_str}"
-            if compiled_file_name is None
-            else compiled_file_name
-        )
+    if (
+        args.perf_id
+        and target == "xh2"
+        and model_name != "qwen2.5-vl"
+        and model_size != "32b"
+    ):
+        if compiled_file_name is None:
+            compiled_file_name = f"{target}_{model_name}_{model_size}_"
+            if prefill_len > 0:
+                compiled_file_name += f"{prefill_len}_"
+            if context_len > 0:
+                compiled_file_name += f"{context_str}_"
+            if batch > 0:
+                compiled_file_name += f"b{batch}_"
+            compiled_file_name += f"{chip_str}_{core_str}"
+
         update_vals = {
             "model": compiled_file_name,
             "case_dir": model_dir,

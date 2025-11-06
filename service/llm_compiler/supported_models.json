@@ -23,6 +23,13 @@
             "raw": "llm/qwen3-32b"
         }
     },
+    "qwen3_a3b": {
+        "30b": {
+            "support_backends": ["xh2"],
+            "path": "models/llm/qwen3-30b",
+            "raw": "llm/Qwen3-30B-A3B"
+        }
+    },
     "deepseek-r1-qwen": {
         "7b": {
             "support_backends": ["xh1"],
@@ -42,6 +49,27 @@
             "support_backends": ["xh1", "xh2"],
             "path": "models/vllm/qwen2.5-vl",
             "raw": "llm/Qwen2.5-VL-7B-Instruct"
+        }
+    },
+    "minicpmo": {
+        "7b": {
+            "support_backends": ["xh2"],
+            "path": "models/omni/minicpmo",
+            "raw": "llm/None"
+        }
+    },
+    "bge": {
+        "0.5b": {
+            "support_backends": ["xh2"],
+            "path": "models/embedding/bge",
+            "raw": "llm/None"
+        }
+    },
+    "whisper": {
+        "medium": {
+            "support_backends": ["xh2"],
+            "path": "models/asr/whisper",
+            "raw": "llm/None"
         }
     }
 }

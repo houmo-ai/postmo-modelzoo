@@ -79,6 +79,9 @@ def check_quant_model(quant_model_path: str, quant_model: str, model_name: str) 
             os.system(f"mv -f {quant_model}/hmquant/* {quant_model}/")
             os.system(f"rm -rf {quant_model}/hmquant")
 
+    if model_name == "bge":
+        return True
+
     # folders
     decoder_dir = os.path.join(quant_model, "decoder")
     prefill_dir = os.path.join(quant_model, "prefill")
@@ -87,16 +90,26 @@ def check_quant_model(quant_model_path: str, quant_model: str, model_name: str) 
     embedding_file = os.path.join(quant_model, "quant_embedding.pt")
     decoder_file = os.path.join(decoder_dir, f"hmquant_{model_name}_with_act.onnx")
     prefill_file = os.path.join(prefill_dir, f"hmquant_{model_name}_with_act.onnx")
-    file_list = [embedding_file, decoder_file, prefill_file]
+    file_list = [decoder_file, prefill_file]
+    if model_name != "whisper":
+        file_list += [embedding_file]
     if target == "xh1":
-        weight_file = os.path.join(quant_model, "weight.npy")
-        file_list.append(weight_file)
+        if model_name == "qwen2.5-vl":
+            decoder_weight_file = os.path.join(decoder_dir, "weight.npy")
+            prefill_weight_file = os.path.join(prefill_dir, "weight.npy")
+            visual_weight_file = os.path.join(quant_model, "visual", "weight.npy")
+            file_list.append(decoder_weight_file)
+            file_list.append(prefill_weight_file)
+            file_list.append(visual_weight_file)
+        else:
+            weight_file = os.path.join(quant_model, "weight.npy")
+            file_list.append(weight_file)
     if all(_check_folder(ele) for ele in folder_list) is False:
         return False
     if all(_check_file(ele) for ele in file_list) is False:
         return False
     if target == "xh2":
-        #遇到量化压缩包中的文件，名字不叫_decode_external_data, 改成下面的适配相关的压缩包
+        # 遇到量化压缩包中的文件，名字不叫_decode_external_data, 改成下面的适配相关的压缩包
         decoder_external = list(glob.glob(decoder_dir + "/*external_data"))
         prefill_external = list(glob.glob(prefill_dir + "/*external_data"))
         if len(decoder_external) == 0 or len(prefill_external) == 0:

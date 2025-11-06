@@ -2,15 +2,17 @@ import os
 import numpy as np
 import time
 import argparse
+import multiprocessing
 
 import logging
 
 logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET == "xh2", "Only supported xh2!"
+
 HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
 GOLDEN_THRESH = 0.98
-assert HOUMO_TARGET=="xh2", "Only supported xh2!"
 
 
 def sanitize_name(name: str):
@@ -63,9 +65,32 @@ def get_args() -> argparse.Namespace:
         '--ndevice',
         dest='ndevice',
         type=int,
-        default=1,
-        choices=[1, 2],
+        default=0,
+        choices=[0, 1, 2],
         help='device number',
+    )
+    parser.add_argument(
+        '--model_size',
+        dest='model_size',
+        type=str,
+        default="0.5b",
+        choices=["0.5b"],
+        help='model size',
+    )
+    parser.add_argument(
+        '--batch',
+        dest='batch',
+        type=int,
+        default=10,
+        choices=[10],
+        help='batch number',
+    )
+    parser.add_argument(
+        '--j',
+        dest='j',
+        type=int,
+        default=multiprocessing.cpu_count(),
+        help='build parallel jobs',
     )
     parser.add_argument(
         '--stage',
@@ -84,7 +109,8 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
-def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
+
+def build(model_name, model_dir, model_path, output_dir, profile, ncore, j):
     import tcim
 
     start = time.time()
@@ -97,8 +123,9 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
         ncore=ncore,
         target=HOUMO_TARGET,
         output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim"),
-        llm_opt=True
+        work_dir=os.path.join(output_dir, "tcim", model_name),
+        llm_opt=True,
+        j=j,
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
@@ -208,6 +235,9 @@ if __name__ == '__main__':
     output_dir = args.output_dir
     ncore = args.ncore
     ndevice = args.ndevice
+    model_size = args.model_size
+    batch = args.batch
+    j = args.j
     profile = {}
 
     # build model
@@ -219,14 +249,7 @@ if __name__ == '__main__':
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
         model_path = f"hmquant_{model_name}-m3_with_act.onnx"
-        build(
-            f"{model_name}-m3",
-            model_dir,
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-        )
+        build(f"{model_name}-m3", model_dir, model_path, output_dir, profile, ncore, j)
         model_path = f"hmquant_{model_name}-reranker-v2-m3_with_act.onnx"
         build(
             f"{model_name}-reranker-v2-m3",
@@ -235,6 +258,7 @@ if __name__ == '__main__':
             output_dir,
             profile,
             ncore,
+            j,
         )
 
     # test model

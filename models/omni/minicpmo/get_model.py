@@ -59,7 +59,7 @@ if __name__ == '__main__':
     target = HOUMO_TARGET
     HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
     config_path = "models/minicpmo/MiniCPM-o-2_6_file.zip"
-    hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
+    hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
     quant_path = "models/minicpmo/hmquant_xh2_minicpmo_7b_256_4k_20251016.zip"
 
     if not get_file_from_jfrog(config_path, model_dir, "./"):
