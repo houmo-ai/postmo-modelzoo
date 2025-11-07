@@ -1,0 +1,81 @@
+{
+    "__comment__": "支持的样例目录",
+    "example_dir": "apis/inferences",
+    "__comment__1": "支持的平台",
+    "support_target": "xh2",
+    "__comment__2": "支持的样例文件夹",
+    "support_demos": {
+        "qwen3": [
+            "python",
+            "c++"
+        ],
+        "resnet50": [
+            "python",
+            "c++"
+        ],
+        "yolov5s": [
+            "python",
+            "c++"
+        ]
+    },
+    "__comment__3": "用来记录系统原始的PATH, --clear时复原回去。",
+    "PATH_ORIGIN": "",
+    "__comment__4": "env.bat将会设置的所有环境变量",
+    "all_environments": {
+        "HOUMO_MODELZOO_URL": "",
+        "HDPL_PLATFORM": "",
+        "HOUMO_TARGET": "",
+        "TCIM_BACKEND": "",
+        "HOUMO_EXAMPLES_PATH": "",
+        "PYTHON_DIR": "",
+        "TCIM_RUNTIME_PATH": "",
+        "CMAKE_PATH": "",
+        "HOUMO_PATH": "",
+        "HOUMO_SDK_PATH": "",
+        "OPENCV_PATH": "",
+        "HOUMO_VERSION": "",
+        "PATH": ""
+    },
+    "__comment__5": "get_model脚本需要的环境变量",
+    "get_model_environments": [
+        "PYTHON_DIR",
+        "HOUMO_MODELZOO_URL",
+        "HOUMO_TARGET",
+        "HOUMO_VERSION",
+        "HDPL_PLATFORM",
+        "HOUMO_EXAMPLES_PATH"
+    ],
+    "__comment__6": "python样例需要的环境变量 = get_model脚本需要的环境变量 + 当前的设置",
+    "py_example_environments": {
+        "qwen3": [
+            "TCIM_BACKEND",
+            "TCIM_RUNTIME_PATH",
+            "HOUMO_SDK_PATH"
+        ],
+        "resnet50": [
+            "TCIM_BACKEND",
+            "TCIM_RUNTIME_PATH",
+            "HOUMO_SDK_PATH"
+        ],
+        "yolov5s": [
+            "TCIM_BACKEND",
+            "TCIM_RUNTIME_PATH",
+            "HOUMO_SDK_PATH"
+        ]
+    },
+    "__comment__7": "cpp样例需要的环境变量 = python样例需要的环境变量 + 当前的设置",
+    "cpp_example_environments": {
+        "qwen3": [
+            "CMAKE_PATH",
+            "HOUMO_PATH"
+        ],
+        "resnet50": [
+            "CMAKE_PATH",
+            "OPENCV_PATH"
+        ],
+        "yolov5s": [
+            "CMAKE_PATH",
+            "OPENCV_PATH"
+        ]
+    }
+}

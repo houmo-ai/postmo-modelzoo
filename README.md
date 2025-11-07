@@ -35,6 +35,7 @@ houmo-examples目录结构如下，其中README.md为本说明文件：
 ├── tools
 ├── hmodel
 ├── env.sh
+├── env.bat
 └── requirements.txt
 ```
 
@@ -127,6 +128,8 @@ pip install -r requirements.txt
 API示例在apis目录下，如下表所示，type列为示例类型，其中convert表示模型转换，inference表示模型推理，scenes表示应用场景。language列为支持的编程语言，target列为支持的芯片平台。
 
 量化和编译示例仅支持在量化工具和编译器支持的平台上运行，部署示例支持情况还受到其他交付件的限制，如固件类型（如芯片解码的示例只能在VPU固件上运行，大模型只能在非VPU固件上运行）、硬件规格（如2核芯片只能运行2核以下编译的模型），具体请查看示例内readme文件。
+
+windows的示例运行前请参照tools/win_envs目录的README.MD进行环境变量的设置。
 
 | examples                     | path         | description                     | language   | target  | arch        | os         |
 | ---------------------------- | ------------ | ------------------------------- | ---------- | ------- | ----------- | ---------- |
