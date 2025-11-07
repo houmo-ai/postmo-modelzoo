@@ -2,8 +2,8 @@
 set -e
 
 houmo_target="${HOUMO_TARGET}"
-if [ -z "$houmo_target" ] || [ "$houmo_target" != "xh1" ]; then
-    echo "Only supports HOUMO_TARGET as xh1."
+if [[ ! "xh1 xh2" =~ (^|[[:space:]])"$houmo_target"($|[[:space:]]) ]]; then
+    echo "Only supports HOUMO_TARGET as xh1 or xh2."
     exit 1
 fi
 

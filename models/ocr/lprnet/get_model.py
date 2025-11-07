@@ -6,8 +6,7 @@ from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh1", "Only support HOUMO_TARGET: xh1."
-
+assert HOUMO_TARGET in ["xh1", "xh2"], "Only support HOUMO_TARGET: xh1 or xh2."
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
