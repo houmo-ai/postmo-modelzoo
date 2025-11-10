@@ -38,12 +38,12 @@ def download_file(url, save_path, file_name, file_size, chunk_size=1024 * 1024):
             # 创建进度条
             with tqdm(
                 total=file_size,
-                unit='B',
+                unit="B",
                 unit_scale=True,
                 unit_divisor=1024,
                 desc=file_name,
             ) as pbar:
-                with open(save_path, 'wb') as f:
+                with open(save_path, "wb") as f:
                     for chunk in response.iter_content(chunk_size=chunk_size):
                         if chunk:  # 过滤掉保持连接的空块
                             f.write(chunk)
@@ -83,7 +83,7 @@ def get_file_from_jfrog(file_path, save_dir, extract_dir=None):
     file_size = 0
     response = requests.get(file_info_path)
     if response.status_code == 200:
-        url_md5 = response.json()['checksums']['md5']
+        url_md5 = response.json()["checksums"]["md5"]
         file_size = int(response.json()["size"])
         if os.path.exists(save_path) and get_file_md5(save_path) == url_md5:
             print(url_md5, save_path, "already exists.")
@@ -113,11 +113,20 @@ def get_file_from_jfrog(file_path, save_dir, extract_dir=None):
                 print("extract to %s" % extract_dir)
                 tar.extractall(path=extract_dir)
         elif save_path.rfind(".tar.xz") > 0:
-            import tarfile
+            try:
+                import tarfile
 
-            with tarfile.open(save_path, "r:xz") as tar:
-                print("extract to %s" % extract_dir)
-                tar.extractall(path=extract_dir)
+                with tarfile.open(save_path, "r:xz") as tar:
+                    print("extract to %s" % extract_dir)
+                    tar.extractall(path=extract_dir)
+            except Exception as e:
+                import subprocess
+
+                subprocess.run(
+                    f"tar -xvf {save_path} -C {extract_dir}",
+                    check=True,
+                    shell=True,
+                )
     return save_path
 
 

@@ -260,11 +260,20 @@ def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) ->
                 print("extract to %s" % extract_dir)
                 tar.extractall(path=extract_dir)
         elif save_path.rfind(".tar.xz") > 0:
-            import tarfile
+            try:
+                import tarfile
 
-            with tarfile.open(save_path, "r:xz") as tar:
-                print("extract to %s" % extract_dir)
-                tar.extractall(path=extract_dir)
+                with tarfile.open(save_path, "r:xz") as tar:
+                    print("extract to %s" % extract_dir)
+                    tar.extractall(path=extract_dir)
+            except Exception as e:
+                import subprocess
+
+                subprocess.run(
+                    f"tar -xvf {save_path} -C {extract_dir}",
+                    check=True,
+                    shell=True,
+                )
     return save_path
 
 
