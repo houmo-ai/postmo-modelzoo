@@ -14,6 +14,109 @@ import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 
+lang_to_id = [
+    50327,
+    50334,
+    50272,
+    50350,
+    50304,
+    50355,
+    50330,
+    50292,
+    50302,
+    50347,
+    50309,
+    50315,
+    50270,
+    50283,
+    50297,
+    50285,
+    50261,
+    50281,
+    50259,
+    50262,
+    50307,
+    50310,
+    50300,
+    50277,
+    50338,
+    50265,
+    50319,
+    50333,
+    50352,
+    50354,
+    50279,
+    50276,
+    50291,
+    50339,
+    50286,
+    50312,
+    50275,
+    50311,
+    50274,
+    50266,
+    50356,
+    50329,
+    50316,
+    50323,
+    50306,
+    50264,
+    50294,
+    50345,
+    50353,
+    50336,
+    50293,
+    50301,
+    50349,
+    50295,
+    50308,
+    50296,
+    50314,
+    50320,
+    50282,
+    50343,
+    50346,
+    50313,
+    50271,
+    50342,
+    50288,
+    50328,
+    50321,
+    50269,
+    50340,
+    50267,
+    50284,
+    50263,
+    50344,
+    50332,
+    50322,
+    50298,
+    50305,
+    50324,
+    50326,
+    50317,
+    50303,
+    50357,
+    50273,
+    50318,
+    50287,
+    50299,
+    50331,
+    50289,
+    50341,
+    50348,
+    50268,
+    50351,
+    50280,
+    50290,
+    50337,
+    50278,
+    50335,
+    50325,
+    50260,
+]
+
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -82,13 +185,9 @@ class HmWhisper:
             self.decoder.set_input(input_name, input_data.numpy())
         self.decoder.run()
         self.decoder.sync()
-        outputs = []
-        for i in range(self.decoder.get_num_outputs()):
-            outputs.append(
-                torch.tensor(
-                    self.decoder.get_output(self.decoder.get_output_name(i)).numpy()
-                )
-            )
+        outputs = torch.tensor(
+            self.decoder.get_output(self.decoder.get_output_name(0)).numpy()
+        )
         return outputs
 
     def run_prefill(
@@ -99,13 +198,9 @@ class HmWhisper:
             self.prefill.set_input(input_name, input_data.numpy())
         self.prefill.run()
         self.prefill.sync()
-        outputs = []
-        for i in range(self.prefill.get_num_outputs()):
-            outputs.append(
-                torch.tensor(
-                    self.prefill.get_output(self.prefill.get_output_name(i)).numpy()
-                )
-            )
+        outputs = torch.tensor(
+            self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
+        )
         return outputs
 
     def get_input_names(self, model_type):
@@ -122,6 +217,7 @@ class HmWhisper:
 
 
 def asr(hmwhisper, processor, input_features):
+    start_time = time.time()
     detect_ids = torch.tensor([[50258]])  # [1,1]
     default_decoder_ids = torch.tensor([[50258, 0, 50359, 50363]])  # [1,1]
     cache_position = torch.tensor([[0]])
@@ -167,110 +263,7 @@ def asr(hmwhisper, processor, input_features):
     for data_detect, v_data in zip(decoder_input_names[77:101], v_list):
         decoder_detext_inputs[data_detect] = v_data
 
-    output = hmwhisper.run_decoder(decoder_detext_inputs)
-    logits, _, _ = output[0], output[1:25], output[25:49]
-
-    lang_to_id = [
-        50327,
-        50334,
-        50272,
-        50350,
-        50304,
-        50355,
-        50330,
-        50292,
-        50302,
-        50347,
-        50309,
-        50315,
-        50270,
-        50283,
-        50297,
-        50285,
-        50261,
-        50281,
-        50259,
-        50262,
-        50307,
-        50310,
-        50300,
-        50277,
-        50338,
-        50265,
-        50319,
-        50333,
-        50352,
-        50354,
-        50279,
-        50276,
-        50291,
-        50339,
-        50286,
-        50312,
-        50275,
-        50311,
-        50274,
-        50266,
-        50356,
-        50329,
-        50316,
-        50323,
-        50306,
-        50264,
-        50294,
-        50345,
-        50353,
-        50336,
-        50293,
-        50301,
-        50349,
-        50295,
-        50308,
-        50296,
-        50314,
-        50320,
-        50282,
-        50343,
-        50346,
-        50313,
-        50271,
-        50342,
-        50288,
-        50328,
-        50321,
-        50269,
-        50340,
-        50267,
-        50284,
-        50263,
-        50344,
-        50332,
-        50322,
-        50298,
-        50305,
-        50324,
-        50326,
-        50317,
-        50303,
-        50357,
-        50273,
-        50318,
-        50287,
-        50299,
-        50331,
-        50289,
-        50341,
-        50348,
-        50268,
-        50351,
-        50280,
-        50290,
-        50337,
-        50278,
-        50335,
-        50325,
-        50260,
-    ]
+    logits = hmwhisper.run_decoder(decoder_detext_inputs)
 
     non_lang_mask = torch.ones_like(logits[0], dtype=torch.bool)
     non_lang_mask[0, list(lang_to_id)] = False
@@ -308,16 +301,31 @@ def asr(hmwhisper, processor, input_features):
     for data_detect, v_data in zip(prefill_input_names[77:101], v_list):
         prefill_inputs[data_detect] = v_data
 
-    output = hmwhisper.run_prefill(prefill_inputs)
-    logits, new_k_cache, new_v_cache = output[0], output[1:25], output[25:49]
+    logits = hmwhisper.run_prefill(prefill_inputs)
+
     next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
     next_tokens = torch.argmax(next_token_logits, dim=-1)
     default_decoder_ids = torch.cat([default_decoder_ids, next_tokens[:, None]], dim=-1)
+    decoded_text = processor.decode(next_tokens)
+    decode_response = decoded_text if decoded_text != "<|endoftext|>" else ""
+    prefill_ids_len = default_decoder_ids.shape[1]
+    ttft_time = time.time() - start_time
+    logger.success("r:transcription:")
+    print("\033[1;95m{}".format(decode_response), end="", flush=True)
 
+    for i in range(48):
+        cache = hmwhisper.prefill.get_dev_output(
+            hmwhisper.prefill.get_output_name(i + 1)
+        )
+        hmwhisper.decoder.set_dev_input(hmwhisper.decoder.get_input_name(i + 5), cache)
+        hmwhisper.decoder.set_dev_output(
+            hmwhisper.decoder.get_output_name(i + 1), cache
+        )
+    for data_detect in prefill_input_names[5:101]:
+        del prefill_inputs[data_detect]
     cnt = 3
     while default_decoder_ids.shape[1] < 448 and next_tokens.item() != 50257:
         cnt += 1
-
         mask_atten = torch.ones(([1, 16, 1, 1024])).half()
         mask_atten[:, :, :, cnt + 1 :] *= -65504
 
@@ -329,23 +337,23 @@ def asr(hmwhisper, processor, input_features):
         prefill_inputs[prefill_input_names[3]] = torch.tensor([1]).to(torch.int32)
         prefill_inputs[prefill_input_names[4]] = mask_atten
 
-        for data_detect, k_data_cache in zip(prefill_input_names[5:29], new_k_cache):
-            prefill_inputs[data_detect] = k_data_cache
-
-        for data_detect, v_data_cache in zip(prefill_input_names[29:53], new_v_cache):
-            prefill_inputs[data_detect] = v_data_cache
-        output = hmwhisper.run_decoder(prefill_inputs)
-        logits, new_k_cache, new_v_cache = output[0], output[1:25], output[25:49]
+        logits = hmwhisper.run_decoder(prefill_inputs)
         next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
         next_tokens = torch.argmax(next_token_logits, dim=-1)
         default_decoder_ids = torch.cat(
             [default_decoder_ids, next_tokens[:, None]], dim=-1
         )
+        decoded_text = processor.decode(next_tokens)
+        decode_response = decoded_text if decoded_text != "<|endoftext|>" else None
+        print(decode_response, end="", flush=True)
 
-    transcription = processor.batch_decode(
-        default_decoder_ids, skip_special_tokens=True
+    print("\033[0m")
+    return (
+        prefill_ids_len,
+        default_decoder_ids.shape[1],
+        ttft_time,
+        (time.time() - start_time),
     )
-    return transcription
 
 
 if __name__ == "__main__":
@@ -371,12 +379,26 @@ if __name__ == "__main__":
     input_features = processor(
         sample["array"], sampling_rate=sample["sampling_rate"], return_tensors="pt"
     ).input_features
-    start_time = time.time()
 
     # run whisper model
-    transcription = asr(hmwhisper, processor, input_features)
-    total_time = time.time() - start_time
+    prefill_ids_len, all_ids_len, ttft_time, total_time = asr(
+        hmwhisper, processor, input_features
+    )
+    decode_time = total_time - ttft_time
 
-    logger.success("transcription:")
-    print("\033[1;95m{}".format(transcription))
-    logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
+    logger.success(
+        f"Output {all_ids_len} tokens, Decode Cost {decode_time*1000:.3f} ms"
+    )
+    logger.success(
+        f"Decode Speed: {(all_ids_len - prefill_ids_len) / decode_time:.2f} tokens/s"
+    )
+    logger.success(f"TTFT (Time to First Token): {ttft_time * 1000:.3f} ms")
+    logger.success(
+        f"TPOT (Time Per Output Token): {decode_time * 1000 / (all_ids_len - prefill_ids_len):.3f} ms/token"
+    )
+    logger.success(
+        f"E2E Latency (End-to-End Latency): {(ttft_time +decode_time):.3f} seconds"
+    )
+    logger.success(
+        f"E2E TPS (End-to-End Tokens Per Second): {all_ids_len / (ttft_time +decode_time):.2f} tokens/s"
+    )
