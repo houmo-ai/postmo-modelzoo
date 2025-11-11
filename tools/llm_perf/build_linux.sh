@@ -15,7 +15,7 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
     mkdir -p build
     cd build || exit 1
 
-    cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH/../bin -DCMAKE_BUILD_TYPE=Debug ..
+    cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH/../bin -DCMAKE_BUILD_TYPE=Release ..
     make
     make install
   elif [ "$HOUMO_TARGET" = "xh1" ]; then

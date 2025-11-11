@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "HmllmInfer.h"
+#include "HmllmInferMultiBatch.h"
 #include "tcim/tcim_runtime.h"
 #include "utils.h"
 
@@ -26,6 +27,9 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
       args.count("ndevices") ? validate_setting(args, "ndevices") : 1;
   int loop_round = args.count("loop") ? validate_setting(args, "loop") : 1;
 
+  int batch =
+      args.count("batch") ? validate_setting(args, "batch") : 1;
+
   std::cout << COLOR_YELLOW << std::string(25, '=')
             << " Perf Settings " << std::string(25, '=') << std::endl;
   std::cout << "prefill path : " << prefill_path << std::endl;
@@ -35,6 +39,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   std::cout << "stop token len : " << stop_token_len << std::endl;
   std::cout << "ndevices : " << ndevices << std::endl;
   std::cout << "loop : " << loop_round << std::endl;
+  std::cout << "batch : " << batch << std::endl;
   std::cout << std::string(65, '=') << COLOR_RESET << std::endl;
 
   const char* houmo_target_env = getenv("HOUMO_TARGET");
@@ -44,8 +49,23 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
     throw std::invalid_argument("Unsupported backend " + houmo_target);
   }
 
-  std::unique_ptr<HmllmInfer> Qwen3Infer = std::make_unique<HmllmInfer>(
-      prefill_path.string(), decode_path.string(), embedding_path.string(), ndevices);
+  if (houmo_target == "xh1"){
+    if(batch != 1){
+      throw std::runtime_error("xh1 only support single-bacth !");
+    }
+  }
+
+  std::unique_ptr<HmllmInferBase> Qwen3Infer;
+  if(batch == 1){
+    Qwen3Infer = std::make_unique<HmllmInfer>(
+      prefill_path.string(), decode_path.string(), embedding_path.string(), ndevices, batch);
+  }else{
+    if(houmo_target != "xh2"){
+      throw std::runtime_error("Only xh2 support multibacth, device not match!");
+    }
+    Qwen3Infer = std::make_unique<HmllmInferMultiBatch>(
+      prefill_path.string(), decode_path.string(), embedding_path.string(), ndevices, batch);
+  }
 
   PerfInfos avg_perfdata, total_perfdata;
   memset(&avg_perfdata, 0, sizeof(PerfInfos));

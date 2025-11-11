@@ -32,6 +32,7 @@ tensor_type *HmEmbedding::EmbeddingTokens(const std::vector<int> &ids) {
     return reinterpret_cast<tensor_type *>(&embed_w[ids[0] * embedding_length]);
   }
 
+  memset(reinterpret_cast<void *>(ptr), 0, prefill_length * embedding_length * sizeof(tensor_type));
   for (int index = 0; index < ids.size(); index++) {
     int embedWeightIndex = ids[index];
     memcpy(reinterpret_cast<void *>(&ptr[index * embedding_length]), reinterpret_cast<void *>(&embed_w[embedWeightIndex * embedding_length]), embedding_length * sizeof(tensor_type));

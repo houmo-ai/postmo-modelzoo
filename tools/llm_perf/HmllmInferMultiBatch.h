@@ -1,5 +1,5 @@
-#ifndef __LLMINFER_H__
-#define __LLMINFER_H__
+#ifndef __HMLLMINFERMULTIBATCH_H__
+#define __HMLLMINFERMULTIBATCH_H__
 
 #include "tcim/tcim_runtime.h"
 #include <map>
@@ -10,19 +10,26 @@
 #include <random>
 #include <chrono>
 
+struct PerfSingleBatchInfo
+{
+  uint32_t input_tokens;
+  float time;
+  float embedding_time;     
+  std::vector<int> next_id;
+};
 
-class HmllmInfer : public HmllmInferBase
+class HmllmInferMultiBatch : public HmllmInferBase
 {
 public:
-  HmllmInfer(const std::string &prefillModelPath,
+  HmllmInferMultiBatch(const std::string &prefillModelPath,
               const std::string &decodeModelPath,
               const std::string &embeddingWeightPath,
               int ndevices, int batches);
-  HmllmInfer(const HmllmInfer &it) = delete;
-  HmllmInfer &operator=(const HmllmInfer &it) = delete;
-  HmllmInfer(HmllmInfer &&it) noexcept = default;
-  HmllmInfer &operator=(HmllmInfer &&it) noexcept = default;
-  ~HmllmInfer();
+  HmllmInferMultiBatch(const HmllmInferMultiBatch &it) = delete;
+  HmllmInferMultiBatch &operator=(const HmllmInferMultiBatch &it) = delete;
+  HmllmInferMultiBatch(HmllmInferMultiBatch &&it) noexcept = default;
+  HmllmInferMultiBatch &operator=(HmllmInferMultiBatch &&it) noexcept = default;
+  ~HmllmInferMultiBatch();
 
   void DebugModelInfo(tcim::Module &module, const std::string &modelName);
   /**
@@ -43,11 +50,9 @@ private:
   int batch = 0;
   int eos_token_id = 0;
   int argmax_dim_len = 0;
-#ifdef BACKEND_XH1
-  int16_t decode_current_length = 1;
-#else
+
   int32_t decode_current_length = 1;
-#endif
+
   std::shared_ptr<HmEmbedding> embedding;
 
   tcim::Module::WeightManager weight_manager;
@@ -61,8 +66,12 @@ private:
   std::map<std::string, tcim::Tensor> prefill_output_map;
   std::map<std::string, tcim::Tensor> decode_output_map;
 
-  int bar_width = 50; 
+  std::vector<std::vector<int>> next_ids;
+  std::vector<int> current_echo_lens;
 
+
+  int bar_width = 50; 
+  int n_blocks = 0;
 private:
   // 获取prefill的nblocks
   int get_nblocks();
@@ -80,6 +89,8 @@ private:
   // 获取prefill输出的token ids
   void PrefillGetOutputDatas(std::vector<int32_t> &ids);
 
+  PerfSingleBatchInfo run_prefill(int batch, const std::vector<int> all_input_ids);
+  PerfSingleBatchInfo run_decode(tensor_type *input_datas, const std::vector<int> context_length);
   /**
    * 设置decode输入
    * @param data              decode输入0
@@ -90,7 +101,7 @@ private:
   // decode模型推理
   void DecodeInfer();
   // 获取deocde输出的token ids
-  void DecodeGetOutputDatas(std::vector<int32_t> &ids);
+  void DecodeGetOutputDatas();
 };
 
-#endif // __LLMINFER_H__
+#endif // __HMLLMINFERMULTIBATCH_H__

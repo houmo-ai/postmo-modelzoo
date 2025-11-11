@@ -1,17 +1,16 @@
-#include "HmllmInfer.h"
+#include "HmllmInferMultiBatch.h"
 
-HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
+HmllmInferMultiBatch::HmllmInferMultiBatch(const std::string &prefillModelPath,
                          const std::string &decodeModelPath,
                          const std::string &embeddingWeightPath,
-                         int ndevices,
-                         int batches)
+                         int ndevices, int batches)
 {
   this->prefillModelPath = prefillModelPath;
   this->decodeModelPath = decodeModelPath;
   // 创建weightManager
   std::vector<int> devs;
   devs.clear();
-  std::cout << "Use Devices ";
+  std::cout << "Multi batch Use Devices ";
   for (int i = 0; i < ndevices; i++)
   {
     devs.emplace_back(i);
@@ -27,7 +26,10 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   // 初始化Module
   prefill_module = std::make_shared<tcim::Module>();
   prefill_module->LoadModel(prefillModelPath, option_prefill);
-  int n_blocks = get_nblocks();
+  decode_module = std::make_shared<tcim::Module>();
+  decode_module->LoadModel(decodeModelPath, option_decode);
+
+  n_blocks = get_nblocks();
   for (int i = 0; i < n_blocks; i++){
       std::stringstream ss;
       ss << "model_layers_" << i << "_self_attn_kcache_input";
@@ -40,57 +42,45 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
       dummy_names.emplace_back(ss.str());
   }
 
-  option_decode.SetDummyTensors(dummy_names);
-  decode_module = std::make_shared<tcim::Module>();
-  decode_module->LoadModel(decodeModelPath, option_decode);
+  option_prefill.SetDummyTensors(dummy_names);
+
 
   // 获取模型配置
-#ifdef BACKEND_XH1
-  this->prefill_length = prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[0] 
-    * prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
-  this->embedding_length = prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[2];
-  this->context_max_length = prefill_module->GetInputInfo(prefill_module->GetInputName(3)).Shape()[2];
-  this->batch = decode_module->GetInputInfo(decode_module->GetInputName(0)).Shape()[0];
-  this->argmax_dim_len = decode_module->GetOutputInfo(decode_module->GetOutputName(0)).Shape()[1];
-#else
   this->prefill_length = prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
   this->embedding_length = prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[2];
   this->context_max_length = prefill_module->GetInputInfo(prefill_module->GetInputName(3)).Shape()[2];
   this->batch = decode_module->GetInputInfo(decode_module->GetInputName(0)).Shape()[0];
-  this->argmax_dim_len = decode_module->GetOutputInfo(decode_module->GetOutputName(0)).Shape()[2];
-#endif
-
 
   if(this->batch != batches){
     throw std::runtime_error("Model Batch Not match args batch!");
   }
-  // 配置Decode其他输入
-  for (int idx = 3; idx < 2 * n_blocks + 3; idx++)
-  {
-    const std::string input_name = prefill_module->GetInputName(idx);
-    auto cache = prefill_module->GetInput(input_name);
-    decode_input_map.insert(
-        std::pair<std::string, tcim::Tensor>(decode_module->GetInputName(idx), cache));
+  this->argmax_dim_len = decode_module->GetOutputInfo(decode_module->GetOutputName(0)).Shape()[2];
+  this->next_ids.clear();
+  this->current_echo_lens.clear();
+
+  for(int idx = 0; idx < this->batch; idx++){
+    this->next_ids.emplace_back(0);
+    this->current_echo_lens.emplace_back(0);
   }
-  // set decode current_length input
-  const std::string decode_current_length_name = decode_module->GetInputName(2);
-  const tcim::TensorInfo decode_current_length_input_info = decode_module->GetInputInfo(decode_current_length_name).AsContiguous();
-  size_t decode_current_length_mem_size = decode_current_length_input_info.MemSize();
-  tcim::Tensor decode_current_length_input_tensor = tcim::Tensor::CreateHostTensor(decode_current_length_input_info,
-                                                                                   decode_current_length_mem_size,
-                                                                                   &decode_current_length);
-  decode_input_map.insert(
-      std::pair<std::string, tcim::Tensor>(decode_current_length_name, decode_current_length_input_tensor));
+
+
+  // 配置Decode其他输入
+  for(int b = 0; b < this->batch; ++b){
+    int index = (b == 0) ? 2 : (2 * n_blocks * b + 3 + 2 * b - 1);
+    auto input_name = decode_module->GetInputName(index);
+    auto input_info = decode_module->GetInputInfo(input_name).AsContiguous();
+    size_t mem_size = input_info.MemSize();
+    tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, &decode_current_length);
+    decode_module->SetInput(input_name, input_tensor);
+  }
 
   //embedding
   embedding = std::make_shared<HmEmbedding>(embeddingWeightPath,
                                             this->embedding_length,
                                             this->prefill_length);
-  // DebugModelInfo(*prefill_module.get(), prefillModelPath);
-  // DebugModelInfo(*decode_module.get(), decodeModelPath);
 }
 
-int HmllmInfer::get_nblocks()
+int HmllmInferMultiBatch::get_nblocks()
 {
   int count = 0;
   static const std::regex pattern(R"(^model_layers_(\d+)_self_attn_kcache_input$)");
@@ -106,7 +96,7 @@ int HmllmInfer::get_nblocks()
   return count;
 }
 
-void HmllmInfer::DebugModelInfo(tcim::Module &module, const std::string &modelName)
+void HmllmInferMultiBatch::DebugModelInfo(tcim::Module &module, const std::string &modelName)
 {
   std::cout << std::string(50, '=') << " ModelInfo of " << modelName << " " << std::string(50, '=') << std::endl;
   int input_num = module.GetInputNum();
@@ -127,14 +117,14 @@ void HmllmInfer::DebugModelInfo(tcim::Module &module, const std::string &modelNa
   }
 }
 
-HmllmInfer::~HmllmInfer()
+HmllmInferMultiBatch::~HmllmInferMultiBatch()
 {
   prefill_module.reset();
   decode_module.reset();
   embedding.reset();
 }
 
-void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length, int32_t current_length)
+void HmllmInferMultiBatch::PrefillSetInputDatas(void *data, int32_t valid_length, int32_t current_length)
 {
   prefill_input_map.clear();
 #ifdef BACKEND_XH1
@@ -187,20 +177,19 @@ void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length, int32_t 
   }
 }
 
-void HmllmInfer::PrefillInfer()
+void HmllmInferMultiBatch::PrefillInfer()
 {
   prefill_module->Run();
   prefill_module->Sync();
 }
 
-void HmllmInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids)
+void HmllmInferMultiBatch::PrefillGetOutputDatas(std::vector<int32_t> &ids)
 {
   int output_num = prefill_module->GetOutputNum();
 
   auto output_name = prefill_module->GetOutputName(0);
   auto output_info = prefill_module->GetOutputInfo(output_name)
                          .AsContiguous();
-
   auto output_tensor = tcim::Tensor::CreateHostTensor(output_info);
   prefill_output_map.insert(
       std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
@@ -213,7 +202,7 @@ void HmllmInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids)
   ids.emplace_back(eigen_argmax<tensor_type>(static_cast<tensor_type *>(prefill_outData), argmax_dim_len));
 }
 
-void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length)
+void HmllmInferMultiBatch::DecodeSetInputDatas(void *data, int32_t context_length)
 {
 #ifdef BACKEND_XH1
   int16_t context_length_int16t = context_length;
@@ -258,13 +247,13 @@ void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length)
 }
 
 
-void HmllmInfer::DecodeInfer()
+void HmllmInferMultiBatch::DecodeInfer()
 {
   decode_module->Run();
   decode_module->Sync();
 }
 
-void HmllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids)
+void HmllmInferMultiBatch::DecodeGetOutputDatas()
 {
   int output_num = decode_module->GetOutputNum();
   auto output_name = decode_module->GetOutputName(0);
@@ -272,7 +261,6 @@ void HmllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids)
                          .AsContiguous();
 
   auto output_tensor = tcim::Tensor::CreateHostTensor(output_info);
-
   if (decode_output_map.find(output_name) != decode_output_map.end())
   {
     decode_output_map.at(output_name) = output_tensor;
@@ -288,36 +276,50 @@ void HmllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids)
   output_tensor.CastTo(output.second);
 
   void *decode_outData = output_tensor.Data();
-  ids.emplace_back(eigen_argmax<tensor_type>(static_cast<tensor_type *>(decode_outData), argmax_dim_len));
+  next_ids.clear();
+  next_ids.resize(this->batch);
+  for(int b = 0; b < this->batch; ++b){
+    std::vector<int> ids;
+    ids.emplace_back(eigen_argmax<tensor_type>(reinterpret_cast<tensor_type *>(reinterpret_cast<char*>(decode_outData) + b * this->embedding_length * sizeof(tensor_type)), argmax_dim_len));
+    next_ids[b] = ids;
+  }
 }
 
-PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len, const uint32_t stop_tokens_len)
-{
-  if (input_tokens_len > context_max_length)
-  {
-    throw std::runtime_error("Question long than " + std::to_string(context_max_length) + ", please shorten it !");
-  }
-  //1. prepare inputs
-  std::vector<int> all_input_ids = generateRandomVector(input_tokens_len);
-  
-  PerfInfos llm_perf_datas;
-  memset(&llm_perf_datas, 0, sizeof(PerfInfos));
-  auto t_start = std::chrono::high_resolution_clock::now();
+
+PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(int batch, const std::vector<int> all_input_ids){
+  PerfSingleBatchInfo ret;
+  ret.input_tokens = all_input_ids.size();
+  ret.time = 0.f;
+  ret.embedding_time = 0.f;
+  ret.next_id.clear();
+
   auto t_embed_start = std::chrono::high_resolution_clock::now();
   auto t_embed_end = std::chrono::high_resolution_clock::now();
   auto t_prefill_end = std::chrono::high_resolution_clock::now();
-  auto t_decode_start = std::chrono::high_resolution_clock::now();
-  auto t_decode_end = std::chrono::high_resolution_clock::now();
   auto t_prefill_start = std::chrono::high_resolution_clock::now();
-  llm_perf_datas.input_tokens = input_tokens_len;
-  llm_perf_datas.stop_tokens = stop_tokens_len;
+
+
+  int decode_input_index_start = (batch > 0) ? (2 * this->n_blocks * batch + 3 + 2 * batch) : 3;
+  int decode_input_index_finish = 2 * this->n_blocks * (batch + 1) + 3 + batch * 2;
+  int prefill_input_index = 3;
+
+  for(int i = decode_input_index_start; i < decode_input_index_finish; ++i){
+    tcim::Tensor cache = decode_module->GetDevInput(decode_module->GetInputName(i));
+    prefill_module->SetInput(prefill_module->GetInputName(prefill_input_index), cache);
+    prefill_input_index++;
+  }
+        
+  int input_tokens_len = ret.input_tokens;
+  if(input_tokens_len > this->context_max_length){
+    throw std::runtime_error("Question long than " + std::to_string(context_max_length) + ", please shorten it !");
+  }
   int prefill_loop_round = std::ceil((float)input_tokens_len / (float)prefill_length);
+
   int32_t valid_length = 0, current_length = 0;
   tensor_type *input_datas = nullptr;
 
-  for (int round = 0; round < prefill_loop_round; round++)
-  {
-    valid_length = round * prefill_length;
+  for(int round = 0; round < prefill_loop_round; ++round){
+    valid_length = round * this->prefill_length;
     std::vector<int> input_ids;
     if (round == prefill_loop_round - 1)
     {
@@ -333,38 +335,107 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len, const uint32_t s
                        all_input_ids.begin() + (round + 1) * prefill_length);
     }
 
+    int32_t effective_length = input_ids.size();
     t_embed_start = std::chrono::high_resolution_clock::now();
     input_datas = embedding->EmbeddingTokens(input_ids);
     t_embed_end = std::chrono::high_resolution_clock::now();
-    llm_perf_datas.embedding_time += std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start).count();
-
+    ret.embedding_time += std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start).count();
     PrefillSetInputDatas(input_datas, valid_length, current_length);
     PrefillInfer();
   }
-  std::vector<int> ids;
-  PrefillGetOutputDatas(ids);
-  t_prefill_end = std::chrono::high_resolution_clock::now();
-  llm_perf_datas.prefill_time += std::chrono::duration<float, std::milli>(t_prefill_end - t_prefill_start).count();
-  int context_length = input_tokens_len;
 
-  t_decode_start = std::chrono::high_resolution_clock::now();
+  PrefillGetOutputDatas(ret.next_id);
+  t_prefill_end = std::chrono::high_resolution_clock::now();
+  ret.time += std::chrono::duration<float, std::milli>(t_prefill_end - t_prefill_start).count();
+
+  return ret;
+}
+
+PerfSingleBatchInfo HmllmInferMultiBatch::run_decode(tensor_type *input_datas, const std::vector<int> context_length){
+  PerfSingleBatchInfo ret;
+  ret.time = 0.f;
+  ret.embedding_time = 0.f;
+
+  auto input_name = decode_module->GetInputName(0);
+  auto input_info = decode_module->GetInputInfo(input_name).AsContiguous();
+  size_t mem_size = input_info.MemSize();
+  tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, static_cast<void *>(input_datas));
+  
+  auto t_decode_end = std::chrono::high_resolution_clock::now();
+  auto t_decode_start = std::chrono::high_resolution_clock::now();
+
+  decode_module->SetInput(input_name, input_tensor);
+
+  for(int b = 0; b < this->batch; ++b){
+    int valid_length_index = (b == 0) ? 1 : (2 * n_blocks * b + 3 + 2 * b - 2);
+    int32_t valid_length_data = context_length[b];
+    input_name = decode_module->GetInputName(valid_length_index);
+    input_info = decode_module->GetInputInfo(input_name).AsContiguous();
+    mem_size = input_info.MemSize();
+    input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, &valid_length_data);
+    decode_module->SetInput(input_name, input_tensor);
+  }
+
+  decode_module->Run();
+  decode_module->Sync();
+  DecodeGetOutputDatas();
+  t_decode_end = std::chrono::high_resolution_clock::now();
+  ret.time += std::chrono::duration<float, std::milli>(t_decode_end - t_decode_start).count();
+  return ret;
+}
+
+PerfInfos HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len, const uint32_t stop_tokens_len)
+{
+  if (input_tokens_len > context_max_length)
+  {
+    throw std::runtime_error("Question long than " + std::to_string(context_max_length) + ", please shorten it !");
+  }
+  tensor_type *input_datas = new tensor_type[this->batch * this->embedding_length];
+  memset(input_datas, 0, this->batch * this->embedding_length);
+  PerfInfos llm_perf_datas;
+  memset(&llm_perf_datas, 0, sizeof(PerfInfos));
+  auto t_embed_start = std::chrono::high_resolution_clock::now();
+  auto t_embed_end = std::chrono::high_resolution_clock::now();
+  auto t_total_start = std::chrono::high_resolution_clock::now();
+  llm_perf_datas.stop_tokens = stop_tokens_len;
+  next_ids.resize(this->batch);
+  std::vector<int> current_echo_lens;
+  current_echo_lens.resize(this->batch);
+  for(int b = 0; b < this->batch; ++b){
+    std::vector<int> all_input_ids = generateRandomVector(input_tokens_len);
+    PerfSingleBatchInfo retInfo = run_prefill(b, all_input_ids);
+    llm_perf_datas.prefill_time += retInfo.time;
+    next_ids[b] = retInfo.next_id;
+    current_echo_lens[b] = retInfo.input_tokens;
+    llm_perf_datas.input_tokens += retInfo.input_tokens;
+    t_embed_start = std::chrono::high_resolution_clock::now();
+    tensor_type *input_data = embedding->EmbeddingTokens(next_ids[b]);
+    memcpy(static_cast<void *>(&input_datas[b * embedding_length]), 
+    static_cast<void *>(input_data), embedding_length * sizeof(tensor_type));
+    t_embed_end = std::chrono::high_resolution_clock::now();
+    llm_perf_datas.embedding_time += std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start).count();
+  }
+
+  std::vector<int> context_length = current_echo_lens;
   do
   {
-    if ((context_length > context_max_length) || (llm_perf_datas.decode_count >= stop_tokens_len))
+    if ((llm_perf_datas.decode_count >= stop_tokens_len))
     {
       break;
     }
 
-    t_embed_start = std::chrono::high_resolution_clock::now();
-    input_datas = embedding->EmbeddingTokens(ids);
-    t_embed_end = std::chrono::high_resolution_clock::now();
-    llm_perf_datas.embedding_time += std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start).count();
-
-    DecodeSetInputDatas(static_cast<void *>(input_datas),
-                        static_cast<int32_t>(context_length));
-    DecodeInfer();
-    ids.clear();
-    DecodeGetOutputDatas(ids);
+    PerfSingleBatchInfo retInfo = run_decode(input_datas, context_length);
+    llm_perf_datas.decode_time += retInfo.time;
+    for(int b = 0; b < this->batch; ++b){
+      context_length[b] += 1;
+      t_embed_start = std::chrono::high_resolution_clock::now();
+      tensor_type *input_data = embedding->EmbeddingTokens(next_ids[b]);
+      memcpy(static_cast<void *>(&input_datas[b * embedding_length]), 
+      static_cast<void *>(input_data), embedding_length * sizeof(tensor_type));
+      t_embed_end = std::chrono::high_resolution_clock::now();
+      llm_perf_datas.embedding_time += std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start).count();
+    }
+    
     llm_perf_datas.decode_count++;
 
     double ratio = static_cast<double>(llm_perf_datas.decode_count) / stop_tokens_len;
@@ -374,14 +445,11 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len, const uint32_t s
               << std::string(bar_width - filled, ' ')
               << "| " << llm_perf_datas.decode_count << '/' << stop_tokens_len
               << std::flush;
-
-    context_length++;
   } while (true);
-  t_decode_end = std::chrono::high_resolution_clock::now();
-  llm_perf_datas.decode_time += std::chrono::duration<float, std::milli>(t_decode_end - t_decode_start).count();
-  auto t_end = std::chrono::high_resolution_clock::now();
-  llm_perf_datas.t_total = std::chrono::duration<float, std::milli>(t_end - t_start).count();
   // perf information
+  auto t_total_end = std::chrono::high_resolution_clock::now();
+  llm_perf_datas.t_total += std::chrono::duration<float, std::milli>(t_total_end - t_total_start).count();
+  llm_perf_datas.decode_count = llm_perf_datas.decode_count * this->batch;
   ShowPerfInformation(llm_perf_datas);
   return llm_perf_datas;
 }
