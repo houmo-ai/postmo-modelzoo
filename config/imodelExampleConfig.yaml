@@ -96,6 +96,16 @@ detection_yolov5s_feature:
         args: all
   test:
     - detection_yolov5s_feature_test
+detection_yolov5m_face:
+  include:
+    - models/detection/yolov5m_face
+  exclude:
+    - models/detection/yolov5m_face/README.MD
+  example_case:
+    - detection_yolov5m_face_test:
+        script: ../models/detection/yolov5m_face/test.sh
+  test:
+    - detection_yolov5m_face_test
 detection_yolov8m:
   include:
     - models/detection/yolov8m

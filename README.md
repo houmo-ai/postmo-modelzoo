@@ -102,6 +102,7 @@ pip install -r requirements.txt
 | yolov3               | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov5s              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov5s_feature      | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolov5m_face         | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolo12m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m-pose         | estimation    | xh1/xh2 | yes   | yes   | yes  | yes  |

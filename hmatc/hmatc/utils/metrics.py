@@ -17,7 +17,7 @@ def smooth(y, f=0.05):
 
 
 def compute_ap(recall, precision):
-    """ Compute the average precision, given the recall and precision curves
+    """Compute the average precision, given the recall and precision curves
     # Arguments
         recall:    The recall curve (list)
         precision: The precision curve (list)
@@ -45,7 +45,7 @@ def compute_ap(recall, precision):
 
 
 def ap_per_class(tp, conf, pred_cls, target_cls, eps=1e-16):
-    """ Compute the average precision, given the recall and precision curves.
+    """Compute the average precision, given the recall and precision curves.
     Source: https://github.com/rafaelpadilla/Object-Detection-Metrics.
     # Arguments
         tp:  True positives (nparray, nx1 or nx10).
@@ -82,7 +82,9 @@ def ap_per_class(tp, conf, pred_cls, target_cls, eps=1e-16):
 
         # Recall
         recall = tpc / (n_l + eps)  # recall curve
-        r[ci] = np.interp(-px, -conf[i], recall[:, 0], left=0)  # negative x, xp because xp decreases
+        r[ci] = np.interp(
+            -px, -conf[i], recall[:, 0], left=0
+        )  # negative x, xp because xp decreases
 
         # Precision
         precision = tpc / (tpc + fpc)  # precision curve
@@ -117,6 +119,20 @@ def detections2txt(detections, filepath):
             f.write(text)
 
 
+def detections_face2txt(detections, filepath):
+    with open(filepath, "w") as f:
+        file_name = os.path.basename(filepath)[:-4] + "\n"
+        bboxs_num = str(len(detections)) + "\n"
+        f.write(file_name)
+        f.write(bboxs_num)
+        for det in detections:
+            f.write(
+                '%d %d %d %d %.03f'
+                % (det[0], det[1], det[2], det[3], det[4] if det[4] <= 1 else 1)
+                + '\n'
+            )
+
+
 def detections_mask2json(detections, contours_lists: list, filepath):
     with open(filepath, "w") as f:
         if not contours_lists:
@@ -149,15 +165,17 @@ def detections_mask2json(detections, contours_lists: list, filepath):
                 new_contours.append(new_contour)
             if len(new_contours) == 0:
                 continue
-            pred_lists.append({
-                "image_id": image_id,
-                "category_id": category_id,
-                "bbox": [x1, y1, w, h],
-                "score": conf,
-                "segmentation": new_contours,
-                "area": area,
-                "iscrowd": 0
-            })
+            pred_lists.append(
+                {
+                    "image_id": image_id,
+                    "category_id": category_id,
+                    "bbox": [x1, y1, w, h],
+                    "score": conf,
+                    "segmentation": new_contours,
+                    "area": area,
+                    "iscrowd": 0,
+                }
+            )
         f.write(json.dumps(pred_lists))
 
 
@@ -178,14 +196,16 @@ def detections_kpt2json(outputs, filepath):
                 if (k + 1) % 3 == 0:
                     kpts[k] = 1
             category_id = coco80_to_coco91_class()[cls]
-            pred_lists.append({
-                "image_id": image_id,
-                "category_id": category_id,
-                "bbox": [x1, y1, w, h],
-                "score": conf,
-                "keypoints": kpts,
-                "iscrowd": 0
-            })
+            pred_lists.append(
+                {
+                    "image_id": image_id,
+                    "category_id": category_id,
+                    "bbox": [x1, y1, w, h],
+                    "score": conf,
+                    "keypoints": kpts,
+                    "iscrowd": 0,
+                }
+            )
         f.write(json.dumps(pred_lists))
 
 
@@ -236,19 +256,21 @@ def detection_txt2json(save_results, pred_json, to_coco91=True):
                 w = x2 - x1 + 1
                 h = y2 - y1 + 1
                 category_id = coco80_to_coco91_class()[cls] if to_coco91 else cls
-                pred_list.append({
-                    "image_id": image_id,
-                    "category_id": category_id,
-                    "bbox": [x1, y1, w, h],
-                    "score": conf
-                })
+                pred_list.append(
+                    {
+                        "image_id": image_id,
+                        "category_id": category_id,
+                        "bbox": [x1, y1, w, h],
+                        "score": conf,
+                    }
+                )
     with open(pred_json, "w") as f:
         json.dump(pred_list, f)
     logger.info("Write pred results to json file -> {}".format(pred_json))
 
 
 def coco_eval(pred_json, anno_json, image_ids, iou_type="bbox"):
-    """ coco 评估方法
+    """coco 评估方法
     :param pred_json:
     :param anno_json:
     :param image_ids:
@@ -270,7 +292,9 @@ def coco_eval(pred_json, anno_json, image_ids, iou_type="bbox"):
         _map, map50 = eval.stats[:2]  # update results (mAP@0.5:0.95, mAP@0.5)
         return _map, map50
     except Exception as e:
-        logger.error("pycocotools unable to run: {}\n{}".format(e, traceback.format_exc()))
+        logger.error(
+            "pycocotools unable to run: {}\n{}".format(e, traceback.format_exc())
+        )
         exit(-1)
 
 
@@ -303,16 +327,16 @@ class StreamSegMetrics(object):
         mask = (label_true >= 0) & (label_true < self.n_classes)
         hist = np.bincount(
             self.n_classes * label_true[mask].astype(int) + label_pred[mask],
-            minlength=self.n_classes ** 2,
+            minlength=self.n_classes**2,
         ).reshape(self.n_classes, self.n_classes)
         return hist
 
     def get_results(self):
         """Returns accuracy score evaluation result.
-            - overall accuracy
-            - mean accuracy
-            - mean IU
-            - fwavacc
+        - overall accuracy
+        - mean accuracy
+        - mean IU
+        - fwavacc
         """
         hist = self.confusion_matrix
         acc = np.diag(hist).sum() / hist.sum()

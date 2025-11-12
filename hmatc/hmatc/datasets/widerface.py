@@ -1,4 +1,4 @@
-#!/usr/bin/env python  
+#!/usr/bin/env python
 # -*- coding:utf-8 _*-
 import os
 from ..base.base_dataset import BaseDataset
@@ -12,13 +12,13 @@ class WiderFace(BaseDataset):
             logger.error(f"root_path not exits -> {self._root_path}")
             exit(-1)
 
-        self._list_file = os.path.join(self._root_path, "val", "wider_val.txt")
+        self._list_file = os.path.join(self._root_path, "WIDER_val", "wider_val.txt")
         if not os.path.exists(self._list_file):
             logger.error(f"wider_val.txt not exits -> {self._list_file}")
             exit(-1)
 
-        self._dataset_val_path = os.path.join(self._root_path, "val", "images")
-        if not os.path.exists(self._list_file):
+        self._dataset_val_path = os.path.join(self._root_path, "WIDER_val", "images")
+        if not os.path.exists(self._dataset_val_path):
             logger.error(f"image val not exits -> {self._dataset_val_path}")
             exit(-1)
 
@@ -29,21 +29,18 @@ class WiderFace(BaseDataset):
             for line in lines:
                 subpath = line.strip()
                 img_path = self._dataset_val_path + subpath
-                if not os.path.exists(img_path):
-                    logger.warning(f"img_path not exist -> {img_path}")
-                    continue
-                self._img_lists.append(img_path)
-                self._img_relative_path.append(subpath)
+                if os.path.exists(img_path):
+                    self._img_lists.append(img_path)
+                    self._img_relative_path.append(subpath)
         self._total_num = len(self._img_lists)
 
-        self._annotation_path = os.path.join(self._root_path, "ground_truth")
+        self._annotation_path = os.path.join(self._root_path, "ground_truth", "val")
         if not os.path.exists(self._annotation_path):
             logger.error(f"annotation_path not exits -> {self._annotation_path}")
             exit(-1)
 
     def get_next_batch(self):
-        """获取下一批数据
-        """
+        """获取下一批数据"""
         pass
 
     def get_datas(self, num: int):
