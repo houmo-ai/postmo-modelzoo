@@ -48,18 +48,18 @@ backbone_ViT-B-16:
         args: all
   test:
     - backbone_ViT-B-16_test
-# autodrive_yolop:
-#   include:
-#     - models/autodrive/yolop
-#   exclude:
-#     - models/autodrive/yolop/README.MD
-#   example_case:
-#     - autodrive_yolop_test:
-#         test_type: models_tests
-#         script: yolop
-#         args: all
-#   test:
-#     - autodrive_yolop_test
+autodrive_yolop:
+  include:
+    - models/autodrive/yolop
+  exclude:
+    - models/autodrive/yolop/README.MD
+  example_case:
+    - autodrive_yolop_test:
+        test_type: models_tests
+        script: yolop
+        args: all
+  test:
+    - autodrive_yolop_test
 detection_yolov3:
   include:
     - models/detection/yolov3
@@ -103,7 +103,9 @@ detection_yolov5m_face:
     - models/detection/yolov5m_face/README.MD
   example_case:
     - detection_yolov5m_face_test:
-        script: ../models/detection/yolov5m_face/test.sh
+        test_type: models_tests
+        script: yolov5m_face
+        args: all
   test:
     - detection_yolov5m_face_test
 detection_yolov8m:
@@ -118,7 +120,6 @@ detection_yolov8m:
         args: all
   test:
     - detection_yolov8m_test
-
 detection_yolov7:
   include:
     - models/detection/yolov7
@@ -129,7 +130,6 @@ detection_yolov7:
         script: ../models/detection/yolov7/test.sh
   test:
     - detection_yolov7_test
-
 detection_yolov9m:
   include:
     - models/detection/yolov9m
@@ -140,7 +140,6 @@ detection_yolov9m:
         script: ../models/detection/yolov9m/test.sh
   test:
     - detection_yolov9m_test
-
 detection_yolo11m:
   include:
     - models/detection/yolo11m
@@ -151,7 +150,6 @@ detection_yolo11m:
         script: ../models/detection/yolo11m/test.sh
   test:
     - detection_yolo11m_test
-
 detection_yolov8m-cls:
   include:
     - models/backbone/yolov8m-cls
@@ -162,7 +160,6 @@ detection_yolov8m-cls:
         script: ../models/backbone/yolov8m-cls/test.sh
   test:
     - detection_yolov8m-cls_test
-
 multi_input_custom_random_model:
   include:
     - models/multi_input_custom_random_model

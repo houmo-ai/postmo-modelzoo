@@ -104,3 +104,11 @@ def test_detection_yolov7_eval(setup_logging):
     model_name = 'yolov7'
     _eval_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolov5m_face
+@pytest.mark.eval
+def test_detection_yolov5m_face_eval(setup_logging):
+    model_name = 'yolov5m_face'
+    _eval_func(model_name, setup_logging)
+    assert True

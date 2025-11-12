@@ -248,3 +248,12 @@ def test_detection_yolov7_compile(setup_logging):
     model_name = 'yolov7'
     _compile_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolov5m_face
+@pytest.mark.compile
+@pytest.mark.dependency(name='test_detection_yolov5m_face_compile', depends_on=['test_quant_models.py::test_detection_yolov5m_face_quant'])
+def test_detection_yolov5m_face_compile(setup_logging):
+    model_name = 'yolov5m_face'
+    _compile_func(model_name, setup_logging)
+    assert True

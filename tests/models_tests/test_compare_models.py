@@ -112,3 +112,11 @@ def test_detection_yolov7_compare(setup_logging):
     model_name = 'yolov7'
     _compare_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolov5m_face
+@pytest.mark.compare
+def test_detection_yolov5m_face_compare(setup_logging):
+    model_name = 'yolov5m_face'
+    _compare_func(model_name, setup_logging)
+    assert True
