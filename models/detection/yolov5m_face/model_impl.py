@@ -131,7 +131,7 @@ class YoloV5MFace(BaseModel):
 
     def evaluate(self, dataset, num=0):
         self.iou_threshold = 0.5
-        self.conf_threshold = 0.2
+        self.conf_threshold = 0.02
         img_paths = dataset.get_datas(num)
         save_results = f"results_{self.backend}"
         if not os.path.exists(save_results):

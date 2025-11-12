@@ -68,10 +68,12 @@ hmatc demo -c config.yml -t xh2 --onnx
 基于data/datasets/widerface数据的结果（非全量数据集）
 
 ```bash
+# xh1
+{'input_size': [1, 3, 640, 640], 'dataset': 'widerface', 'num': 41, 'ap_easy': '0.883376', 'ap_medium': '0.894726', 'ap_hard': '0.808426'}
 # xh2
-{'input_size': [1, 3, 640, 640], 'dataset': 'widerface', 'num': 31, 'ap_easy': '0.900827', 'ap_medium': '0.854056', 'ap_hard': '0.790450'}
+{'input_size': [1, 3, 640, 640], 'dataset': 'widerface', 'num': 41, 'ap_easy': '0.891293', 'ap_medium': '0.891500', 'ap_hard': '0.842538'}
 # onnx
-{'input_size': [1, 3, 640, 640], 'dataset': 'widerface', 'num': 31, 'ap_easy': '0.900354', 'ap_medium': '0.854494', 'ap_hard': '0.796256'}
+{'input_size': [1, 3, 640, 640], 'dataset': 'widerface', 'num': 41, 'ap_easy': '0.907834', 'ap_medium': '0.895021', 'ap_hard': '0.829818'}
 ```
 
 ### 3.2 性能结果
