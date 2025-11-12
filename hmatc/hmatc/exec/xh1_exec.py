@@ -57,10 +57,11 @@ class Xh1Exec(BaseExec):
             data_format = self.inputs_cfg[input_name].get("data_format")
             if data_format is None:
                 continue
+            _, _, H, W = self.inputs_cfg[input_name]["shape"]
             resizer_cfg = self.inputs_cfg[input_name].get("resizer", dict())
             self.resizers_cfg.append(resizer_cfg)
-            max_input_size = resizer_cfg.get("max_input_size", list())
-            enable_static_resizer = resizer_cfg.get("enable_static_resizer", False)
+            max_input_size = resizer_cfg.get("max_input_size", [H, W])
+            enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
             self.enable_static_resizers.append(enable_static_resizer)
             self.max_inputs_size[input_name] = max_input_size
         if self.is_image_single_input and len(self.resizers_cfg[0]) != 0:
@@ -144,7 +145,7 @@ class Xh1Exec(BaseExec):
             new_input_cfg["first_layer_weight_denorm_std"] = std_values
             # toYUV_format
             resizer_cfg = input_cfg["resizer"]
-            max_input_size = resizer_cfg["max_input_size"]
+            max_input_size = resizer_cfg.get("max_input_size", [H, W])
             toYUV_format = resizer_cfg["toYUV_format"]
             new_input_cfg["toYUV_format"] = toYUV_format[0:6]  # 去掉SP
             insert_pad_scatter = resizer_cfg.get("insert_pad_scatter", False)
@@ -444,7 +445,7 @@ class Xh1Exec(BaseExec):
         res_info = {"quant": res, "model": self.model_cfg}
         # 压缩量化产物
         compress = os.environ.get("HMATC_COMPRESS", "0")
-        if compress == "1" and self.enable_upload:
+        if compress == "1" and self.enable_upload and 0:
             logger.info("Compressing quant output...")
             # 写入各版本信息
             with open(os.path.join(self.quant_output_dir, "VERSION.txt"), "w") as f:

@@ -33,7 +33,7 @@ else
     hmatc build   -c config.yml
     hmatc compare -c config.yml --data_path coco2017/val2017/000000000139.jpg
 fi
-hmatc perf    -c config.yml -wn 1 -sn 1 -tn 1
+hmatc perf    -c config.yml -wn 10 -sn 1000 -tn 1
 hmatc demo    -c config.yml
 hmatc demo    -c config.yml --onnx
 hmatc eval    -c config.yml

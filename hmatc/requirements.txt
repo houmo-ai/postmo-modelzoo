@@ -6,6 +6,7 @@ wheel
 numpy
 prettytable
 onnx
+onnxsim
 onnxruntime
 pycocotools
 pillow

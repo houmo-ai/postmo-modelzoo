@@ -33,7 +33,7 @@ else
     hmatc build   -c config.yml
     hmatc compare -c config.yml --data_path imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG
 fi
-hmatc perf    -c config.yml -wn 1 -sn 1 -tn 1
+hmatc perf    -c config.yml -wn 10 -sn 1000 -tn 1
 hmatc demo    -c config.yml
 hmatc demo    -c config.yml --onnx
 hmatc eval    -c config.yml

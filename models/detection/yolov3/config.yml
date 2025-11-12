@@ -13,7 +13,6 @@ model:
       padding_values: [114, 114, 114]
       resizer:
         toYUV_format: YUV420SP
-        max_input_size: [1080, 1920]  # HW
   model_impl_module: model_impl
   model_impl_cls: YoloV3
 
