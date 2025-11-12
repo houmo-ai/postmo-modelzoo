@@ -97,6 +97,7 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
+
 class SamplingManager:
     def __init__(
         self,
@@ -224,7 +225,9 @@ class SamplingManager:
     def sample(
         self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
     ) -> int:
-        logits = logits[0][0]
+        logits = logits[0]
+        if HOUMO_TARGET == "xh2":
+            logits = logits[0]
         probs = self.process_logits(logits, previous_tokens)
         if np.all(probs == 0):
             probs = np.ones_like(probs) / len(probs)
@@ -238,7 +241,6 @@ class SamplingManager:
         self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
     ) -> np.ndarray:
         return self.process_logits(logits, previous_tokens)
-
 
 
 class Qwen25VL:
@@ -780,7 +782,11 @@ class Qwen25VL:
         self.decode.sync()
         self.decode_time += time.time() - start_time
         decoder_output = self.decode.get_output(self.decode.get_output_name(0))
-        self.next_id = self.samplingmanager.sample(decoder_output.numpy(), self.generated_ids)
+        self.next_id = self.samplingmanager.sample(
+            decoder_output.numpy(), self.generated_ids
+        )
+        if HOUMO_TARGET == "xh1":
+            self.next_id = self.next_id[0]
         self.generated_ids.append(self.next_id.item())
         if self.next_id.item() in self.eos_token_id:
             return None
