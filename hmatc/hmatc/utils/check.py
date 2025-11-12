@@ -90,21 +90,24 @@ def check_cfg(cfg):
                 logger.error(f"enable_static_resizer must be equal False or True")
                 return False
             max_input_size = resizer_cfg.get("max_input_size")
-            if not isinstance(max_input_size, list) or len(max_input_size) != 2:
-                logger.error(
-                    f"max_input_size must be list, and [H, W], when use resizer"
-                )
-                return False
-            # 需保证max_input_size为偶数
-            for v in max_input_size:
-                if v % 2 != 0:
-                    logger.error(f"max_input_size[H, W] must be even number")
+            if max_input_size is not None:
+                if not isinstance(max_input_size, list) or len(max_input_size) != 2:
+                    logger.error(
+                        f"max_input_size must be list, and [H, W], when use resizer"
+                    )
                     return False
-            # 如果max_input_size比input WH小给出警告
-            resizer_input_h, resizer_input_w = max_input_size
-            N, C, H, W = shape
-            if resizer_input_h < H or resizer_input_w < W:
-                logger.warning(f"max_input_size[H, W] should be greater than [H, W]")
+                # 需保证max_input_size为偶数
+                for v in max_input_size:
+                    if v % 2 != 0:
+                        logger.error(f"max_input_size[H, W] must be even number")
+                        return False
+                # 如果max_input_size比input WH小给出警告
+                resizer_input_h, resizer_input_w = max_input_size
+                N, C, H, W = shape
+                if resizer_input_h < H or resizer_input_w < W:
+                    logger.warning(
+                        f"max_input_size[H, W] should be greater than [H, W]"
+                    )
             # if enable_static_resizer and resize_type == 1:
             #     logger.error(
             #         f"enable_static_resizer must be = False, when resize_type = 1"

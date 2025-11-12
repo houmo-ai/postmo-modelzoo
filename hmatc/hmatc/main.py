@@ -78,7 +78,7 @@ def run_model(
         input_max_H2D_latency="N/A",
         output_avg_D2H_latency="N/A",
         output_max_D2H_latency="N/A",
-        enable_static=False,
+        enable_static=True,
         msg="ok",
     )
 
@@ -93,14 +93,14 @@ def run_model(
             model_infos["msg"] = msg
             queue.put(model_infos)
             return
-            # return model_infos
+
     if core_num > int(os.getenv("HOUMO_CORE_NUM", 4 if target == "xh1" else 2)):
         msg = f"{target} core_num must less than {os.getenv('HOUMO_CORE_NUM', 4 if target == 'xh1' else 2)}"
         logger.error(msg)
         model_infos["msg"] = msg
         queue.put(model_infos)
         return
-        # return model_infos
+
     root = os.getcwd()
     os.chdir(location)
 
@@ -115,7 +115,6 @@ def run_model(
         os.chdir(root)
         queue.put(model_infos)
         return
-        # return model_infos
 
     # 解析cfg
     if not os.path.exists(cfg_path):
@@ -125,7 +124,6 @@ def run_model(
         os.chdir(root)
         queue.put(model_infos)
         return
-        # return model_infos
 
     cfg = read_yaml_to_dict(cfg_path)
     if not check_cfg(cfg):
@@ -135,31 +133,29 @@ def run_model(
         os.chdir(root)
         queue.put(model_infos)
         return
-        # return model_infos
 
     cfg["target"] = target
     cfg["build"]["ncore"] = core_num
     cfg["build"]["batch"] = batch_num
     inputs_cfg = cfg["model"]["inputs"]
     input_name = list(inputs_cfg.keys())[0]
-    if enable_static:
-        if (
-            len(inputs_cfg) == 1
-            and "resizer" in inputs_cfg[input_name]
-            and not inputs_cfg[input_name]["resizer"].get(
-                "enable_static_resizer", False
-            )
-        ):
-            cfg["model"]["inputs"][input_name]["resizer"][
-                "enable_static_resizer"
-            ] = True
-            model_infos["enable_static"] = True
-        else:
-            logger.info("static_resizer is disabled")
+    if not enable_static:
+        if len(inputs_cfg) != 1 or "resizer" not in inputs_cfg[input_name]:
+            logger.info("resizer is disabled, dynamic mode skipped")
             os.chdir(root)
             queue.put(model_infos)
             return
-            # return model_infos
+        if (
+            "enable_static_resizer" in inputs_cfg[input_name]["resizer"]
+            and inputs_cfg[input_name]["resizer"]["enable_static_resizer"]
+        ):
+            logger.info("dynamic_resizer is disabled, skipped")
+            os.chdir(root)
+            queue.put(model_infos)
+            return
+        inputs_cfg[input_name]["resizer"]["enable_static_resizer"] = False
+        model_infos["enable_static"] = False
+
     logger.info(f"\n{json.dumps(cfg, indent=2, sort_keys=False)}")
 
     hm_exec = None
@@ -429,7 +425,7 @@ def run_benchmark(
 
         def run_all(enable_static):
             _all_model_infos = list()
-            if enable_static and target == "xh2":
+            if not enable_static and target == "xh2":
                 return _all_model_infos
             for exec_cfg in exec_cfgs:
                 batch_num = exec_cfg.get("batch_num", 1)
@@ -455,8 +451,8 @@ def run_benchmark(
                         enable_static=enable_static,
                         device_id=device_id,
                         enable_cuda=enable_cuda,
-                        enable_upload=enable_upload and not enable_static,
-                        enable_delete=enable_delete and not enable_static,
+                        enable_upload=enable_upload and enable_static,
+                        enable_delete=enable_delete and enable_static,
                     ),
                 )
                 p.start()
@@ -684,7 +680,12 @@ def main():
     )
     exclusive_group.add_argument("--model", "-m", type=str, help="Specify model path")
     perf_parser.add_argument(
-        "--warmup", "-wn", type=int, required=True, help="Specify warnup num"
+        "--warmup",
+        "-wn",
+        type=int,
+        default=1,
+        required=False,
+        help="Specify warnup num",
     )
     perf_parser.add_argument(
         "--sample", "-sn", type=int, required=True, help="Specify sample num"

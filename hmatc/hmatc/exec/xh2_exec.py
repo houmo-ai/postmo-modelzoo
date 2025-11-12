@@ -148,7 +148,7 @@ class Xh2Exec(BaseExec):
         session(*in_datas)  #
         # 压缩量化产物
         compress = os.environ.get("HMATC_COMPRESS", "0")
-        if compress == "1" and self.enable_upload:
+        if compress == "1" and self.enable_upload and 0:
             logger.info("Compressing quant output...")
             runtime_version = get_package_version(f"houmo_tcim_runtime_xh2")
             runtime_version = runtime_version.split(".dev")[0]

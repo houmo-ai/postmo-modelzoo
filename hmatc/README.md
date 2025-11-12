@@ -85,13 +85,13 @@ model:
         # [可选] 将模型输入转为YUV输入，目前仅支持YUV400、YUV420SP、YUV422SP、YUV444SP，使能resizer必选
         toYUV_format: YUV420SP
         # [可选] 使能resizer必选，可利用芯片resizer做crop->reisze->padding
-        #       该输入为送入resizer单元的输入，也是量化编译后模型的输入size，输入格式为toYUV_format所配格式
-        #       注意：当实际应用场景模型输入数据(预处理前)可能是不同分辨率时需要设置不能超过的输入size，如果超过需要在外部自行缩放处理
-        #            一般为码流的最大可能分辨率较好 
+        #       表示resizer输入尺寸，也是量化编译后模型的实际输入尺寸，输入格式为toYUV_format配置格式
+        #       缺省默认为原模型输入高宽
+        # 注意：当实际应用场景模型输入数据(预处理前)可能是不同分辨率时需要设置不能超过的输入size，如果超过需要在外部自行缩放处理
+        #       一般为码流的最大可能分辨率较好
         max_input_size: [1080, 1920]  # HW
-        # [可选] 输入为图像时可设置，表示使用静态resizer，默认不使用
-        #     慎用，在实际应用场景中输入的图像分辨率固定
-        enable_static_resizer: false
+        # [可选] 输入为图像时可设置，表示使用静态resizer，默认为true
+        enable_static_resizer: true
         # [可选] 当输入为图像且输入size较小时需要设置为true，反之false，默认为false
         insert_pad_scatter: false
   # [可选] 模型python实现模块，eval和demo功能必须设置，且必须与yml配置文件同级目录
