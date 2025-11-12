@@ -118,6 +118,51 @@ detection_yolov8m:
         args: all
   test:
     - detection_yolov8m_test
+
+detection_yolov7:
+  include:
+    - models/detection/yolov7
+  exclude:
+    - models/detection/yolov7/README.MD
+  example_case:
+    - detection_yolov7_test:
+        script: ../models/detection/yolov7/test.sh
+  test:
+    - detection_yolov7_test
+
+detection_yolov9m:
+  include:
+    - models/detection/yolov9m
+  exclude:
+    - models/detection/yolov9m/README.MD
+  example_case:
+    - detection_yolov9m_test:
+        script: ../models/detection/yolov9m/test.sh
+  test:
+    - detection_yolov9m_test
+
+detection_yolo11m:
+  include:
+    - models/detection/yolo11m
+  exclude:
+    - models/detection/yolo11m/README.MD
+  example_case:
+    - detection_yolo11m_test:
+        script: ../models/detection/yolo11m/test.sh
+  test:
+    - detection_yolo11m_test
+
+detection_yolov8m-cls:
+  include:
+    - models/backbone/yolov8m-cls
+  exclude:
+    - models/backbone/yolov8m-cls/README.MD
+  example_case:
+    - detection_yolo11m_test:
+        script: ../models/backbone/yolov8m-cls/test.sh
+  test:
+    - detection_yolov8m-cls_test
+
 multi_input_custom_random_model:
   include:
     - models/multi_input_custom_random_model

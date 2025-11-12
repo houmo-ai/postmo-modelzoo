@@ -239,3 +239,12 @@ def test_segmentation_yolov8m_seg_compile(setup_logging):
     model_name = 'yolov8m-seg'
     _compile_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolov7
+@pytest.mark.compile
+@pytest.mark.dependency(name='test_detection_yolov7_compile', depends_on=['test_quant_models.py::test_detection_yolov7_quant'])
+def test_detection_yolov7_compile(setup_logging):
+    model_name = 'yolov7'
+    _compile_func(model_name, setup_logging)
+    assert True

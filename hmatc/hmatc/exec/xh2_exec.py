@@ -60,7 +60,7 @@ class Xh2Exec(BaseExec):
         if opset_version is None:
             logger.warning(f"Not found onnx opset version: {self.model_path}")
             return
-        min_opset_version = 11
+        min_opset_version = 13
         if opset_version < min_opset_version:
             new_model_path = self.model_path.replace(".onnx", "_opset11.onnx")
             if not os.path.exists(new_model_path):

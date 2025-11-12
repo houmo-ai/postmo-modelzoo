@@ -215,3 +215,12 @@ def test_segmentation_yolov8m_seg_quant(setup_logging):
     model_name = 'yolov8m-seg'
     _quant_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolov7
+@pytest.mark.quant
+@pytest.mark.dependency(name='test_detection_yolov7_quant', depends_on=['test_get_models.py::test_detection_yolov7_get_model'])
+def test_detection_yolov7_quant(setup_logging):
+    model_name = 'yolov7'
+    _quant_func(model_name, setup_logging)
+    assert True

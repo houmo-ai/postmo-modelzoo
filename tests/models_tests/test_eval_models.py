@@ -96,3 +96,11 @@ def test_segmentation_yolov8m_seg_eval(setup_logging):
     model_name = 'yolov8m-seg'
     _eval_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolov7
+@pytest.mark.eval
+def test_detection_yolov7_eval(setup_logging):
+    model_name = 'yolov7'
+    _eval_func(model_name, setup_logging)
+    assert True

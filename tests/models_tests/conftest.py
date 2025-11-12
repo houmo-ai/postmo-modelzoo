@@ -22,6 +22,7 @@ def pytest_configure(config):
         "yolov5s",
         "yolov5s_feature",
         "yolov8m",
+        "yolov7",
         "yolo12m",
         "yolov8m_pose",
         "yolov8m_seg",

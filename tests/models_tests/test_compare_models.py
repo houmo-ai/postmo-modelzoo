@@ -104,3 +104,11 @@ def test_segmentation_yolov8m_seg_compare(setup_logging):
     model_name = 'yolov8m-seg'
     _compare_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolov7
+@pytest.mark.compare
+def test_detection_yolov7_compare(setup_logging):
+    model_name = 'yolov7'
+    _compare_func(model_name, setup_logging)
+    assert True

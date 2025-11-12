@@ -1,21 +1,18 @@
-# YOLOv8m
 
-本示例展示如何把量化后的YOLOv8m模型编译，部署到后摩芯片的设备上。
+# YOLO11m
 
-[TOC]
+本示例展示如何把量化后的`YOLO11m`模型编译，部署到后摩芯片的设备上。
 
 ## 1.模型说明
 
-本例使用的 YOLOv8m 实现来源 github 开源项目[https://github.com/ultralytics/ultralytics/tree/v8.2.0](https://github.com/ultralytics/ultralytics/tree/v8.2.0)。
+本例使用的模型来自开源项目`Ultralytics`，链接为：[**https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11m.pt**](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11m.pt)
 
-下载模型后可使用ultralytics工具导出为onnx模型，执行命令：
+下载模型后可使用`ultralytics`工具导出为`onnx`模型，执行命令：
+
 ```bash
 pip3 install ultralytics
-yolo export model=yolov8m.pt format=onnx imgsz=640,640 opset=13 simplify=True
+yolo export model=yolo11m.pt format=onnx imgsz=640,640 opset=13 simplify=True
 ```
-
-由于最后yolo检测部分以及检测框和置信度2个不同类型输出融合会显著降低ptq量化的精度，所以建议截取2个分支yolo前的模型进行量化，相关截取操作在get_model.py中。
-如果想继续提升精度，还可以参考yolov5s将不同尺度的检测结果分别量化，或使用混合精度的方法，具体可参考量化相关文档。
 
 ## 2.快速开始
 
@@ -68,27 +65,29 @@ hmatc demo -c config.yml -t xh1 --onnx
 ## 3.参考结果
 
 ### 3.1 精度结果
+
 ```bash
-# xh1
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.605732', 'map50': '0.819257', 'latency': '12.069121'
 # onnx
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.642724', 'map50': '0.831999', 'latency': '96.470609'
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.489875', 'map50': '0.667923'
+# xh1
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.477935', 'map50': '0.657201'
 ```
 
-### 3.2 性能结果
+### 3.1 性能结果
 
 ```bash
-[latency] Inference     avg:  19.496 ms,        max:  21.348 ms
-[latency] Input         avg:   1.395 ms,        max:   2.892 ms
-[latency] Output        avg:   0.000 ms,        max:   0.000 ms
-[latency] End2End       avg:  20.892 ms,        max:  24.227 ms
-[Throughput] total: 2620.077 ms, avg: 2.620 ms
-[Throughput] qps: 381.668
+# xh1
+[Latency] Inference  avg:  17.078 ms, max:  21.296 ms, min:   8.321 ms, tp99:  18.904 ms, tp999:  21.296 ms
+[Latency] Input      avg:   0.990 ms, max:   2.163 ms, min:   0.650 ms, tp99:   1.890 ms, tp999:   2.163 ms
+[Latency] Output     avg:   0.498 ms, max:   1.399 ms, min:   0.309 ms, tp99:   1.161 ms, tp999:   1.399 ms
+[Latency] End2end    avg:  18.566 ms, max:  22.585 ms, min:   9.510 ms, tp99:  20.403 ms, tp999:  22.585 ms
+[Throughput] total: 2374.309 ms, avg: 2.374 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 421.175
 ```
 
 ## 4.免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。
 
-- YOLOv8m 模型：[https://github.com/ultralytics/ultralytics/tree/v8.2.0](https://github.com/ultralytics/ultralytics/tree/v8.2.0)
+- YOLO11m 模型：[https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11m.pt](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11m.pt)
 - COCO 验证集链接: [https://cocodataset.org/#download](https://cocodataset.org/#download)

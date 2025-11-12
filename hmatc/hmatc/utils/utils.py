@@ -93,7 +93,7 @@ def get_package_version(package_name: str):
 def get_houmo_version():
     """获取houmo版本"""
     v = os.getenv("HOUMO_VERSION")
-    if v is None and len(v) == 0:
+    if v is None:
         raise ValueError("Please set HOUMO_VERSION env")
 
     def check_version(version_str):

@@ -197,3 +197,12 @@ def test_segmentation_yolov8m_seg_get_model(setup_logging):
     model_name = 'yolov8m-seg'
     _get_model_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolov7
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_detection_yolov7_get_model')
+def test_detection_yolov7_get_model(setup_logging):
+    model_name = 'yolov7'
+    _get_model_func(model_name, setup_logging)
+    assert True

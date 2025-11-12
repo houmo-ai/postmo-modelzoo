@@ -168,3 +168,11 @@ def test_segmentation_yolov8m_seg_perf(setup_logging):
     model_name = 'yolov8m-seg'
     _perf_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolov7
+@pytest.mark.perf
+def test_detection_yolov7_perf(setup_logging):
+    model_name = 'yolov7'
+    _perf_func(model_name, setup_logging)
+    assert True
