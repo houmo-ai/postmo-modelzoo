@@ -84,6 +84,7 @@ pip install -r requirements.txt
 | bandwidth_perf   | tools        | 带宽测试工具                    | python     | xh1/xh2 | x64/aarch64 | linux         |
 | computing_perf   | tools        | 算力测试工具                    | python     | xh1/xh2 | x64/aarch64 | linux         |
 | tcim_perf        | tools        | 模型测试工具                    | c++        | xh1/xh2 | x64/aarch64 | linux/android |
+| llm_perf         | tools        | 大语言模型性能测试工具           | c++        | xh1/xh2 | x64/aarch64 | linux/android/win11 |
 
 ## 模型示例
 
@@ -109,6 +110,7 @@ pip install -r requirements.txt
 | yolov9m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolo11m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolo12m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolox                | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m-pose         | estimation    | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m-seg          | segmentation  | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolop                | autodrive     | xh1/xh2 | yes   | yes   | yes  | x    |
