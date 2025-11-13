@@ -4,12 +4,15 @@
 
 ## 目录
 
-- [文件说明](#1文件说明)
-- [流程说明](#2流程说明)
-- [快速开始](#3快速开始)
-  - [环境准备](#31-环境准备)
-  - [一键运行](#32-一键运行)
-- [免责声明](#4免责声明)
+- [1. 工具说明](#1工具说明)
+  - [1.1 文件说明](#11-文件说明)
+  - [1.2 流程说明](#12-流程说明)
+  - [1.3 参数说明](#13-参数说明)
+  - [1.4 用法说明](#14-用法说明)
+- [2. 快速开始](#2快速开始)
+  - [2.1 环境准备](#21-环境准备)
+  - [2.2 一键运行](#22-一键运行)
+- [3. 免责声明](#3免责声明)
 
 ## 1.工具说明
 
@@ -33,17 +36,23 @@
 
 ### 1.3 参数说明
 
-- --model, -m: 指定模型路径
-- --input, -i: 指定测试数据路径，若不指定则使用随机数
-- --warm_up, -w: 指定warm up次数
-- --batch, -b: 指定batch数
-- --threads, -t: 指定线程数
-- --loops, -l: 指定内循环次数(仅内部测试使用)
-- --threads, -t: 指定测试线程数
-- --devices, -d: 指定测试设备数
-- --samples, -s: 指定测试样本数
-- --output, -o: 指定输出文件路径
-- --infer_only, -y: 指示是否仅进行推理，不进行输入输出数据传输（同时关闭结果检查）t
+- `--model`, `-m`: (必选) 指定模型路径
+- `--input`, `-i`: 指定测试数据路径，若不指定则使用随机数
+- `--warm_up`, `-w`: 指定warm up次数，默认为1
+- `--batch`, `-b`: 指定batch数，默认为1
+- `--threads`, `-t`: 指定线程数，默认为1
+- `--loops`, `-l`: 指定内循环次数(仅内部测试使用)，默认为1
+- `--devices`, `-d`: 指定测试设备数，默认为1
+- `--samples`, `-s`: 指定测试样本数，默认为1
+- `--output`, `-o`: 指定输出文件路径，默认为当前路径
+- `--infer_only`, `-y`: 指示是否仅进行推理，不进行输入输出数据传输（同时关闭结果检查）
+- `--name`, `-n`: 模型名称，用于检索指定测试数据路径下的模型输入&golden数据
+- `--streams`, `-e`: tcim stream数量，默认为4
+- `--module_pool`, `-p`: 使用模型池进行推理，默认关闭
+- `--modules`, `-c`: 允许实际加载的最大模型数，默认为core数量，本参数仅在使用模型池推理场景下生效
+- `--interval`, `-v`: 按照指定间隔(ms)构造输入数据推送至推理任务队列中，默认不开启（在推理前构造所有输入数据放入推理任务队列中）
+- `--queue_length`, `-q`: 推理任务队列最大长度，如队列中的推理任务超过最大长度，则中止程序，本参数仅在配置`--interval`参数后生效
+- `--help`, `-h`: 参数说明信息
 
 ### 1.4 用法说明
 
@@ -98,17 +107,21 @@ cd tools/tcim_perf/
 
 ### 2.2 一键运行
 
-通过命令行参数修改模型路径、执行次数、线程数和stream数等，目前只支持线程数与stream数相同，即每个推理module使用1个stream。
+通过命令行参数修改模型路径、执行次数、线程数和stream数等。
 
-如果是在android adb环境执行，需要先将tcim_perf可执行文件和模型等拷贝到adb环境中，将runtime和hal库路径加入到LD_LIBRARY_PATH，然后执行：
+如果是在android adb环境执行，需要先将tcim_perf可执行文件和模型等拷贝到adb环境中，将runtime和hal库路径加入到LD_LIBRARY_PATH。
+
+进入tcim_perf可执行文件所在目录，然后执行：
 
 ```bash
-tcim_perf -m xxx.hmm
+./tcim_perf -m xxx.hmm
 ```
 
-支持的参数为：
+提供run脚本运行tcim_perf可执行文件，可将参数配置在run脚本中执行tcim_perf程序
+
+run脚本支持的参数为：
 - -m，--model [必选] hmm模型路径
-- -i，--input [可选] 输入和输出golden文件夹，默认为当前文件夹
+- -i，--input [可选] 输入和输出golden文件夹，默认为空
 - -o，--output [可选] 性能结果文件输出文件夹，默认为当前文件夹
 - -w，--warm_up [可选] warm up次数，默认为1
 - -b，--batch [可选] 模型batch数，仅用于计算正确的qps，默认为1
@@ -117,24 +130,28 @@ tcim_perf -m xxx.hmm
 - -d，--devices [可选] 推理模型占用设备数，模型编译时决定，默认为1
 - -s，--samples [可选] 测试样本数，默认为1
 - -n，--name [可选] 模型名，用于寻找golden数据
-- -y，--infer_only [可选] 是否仅进行推理（没有输入输出过程），默认为false
+- -e，--streams [可选] tcim stream数量，默认为4
 
-可将参数配置在run脚本中直接运行：
+将run.sh脚本拷贝到tcim_perf可执行文件的同级目录中，进入该目录，执行：
 
 ```bash
+# linux环境
 ./run.sh
+# android adb环境
+/system/bin/sh run.sh
 ```
 
-结果：
+参考结果：
+
+执行程序后，生成如下格式测试结果
 
 ```bash
-Result check passed.
-[latency] Inference   average: 6.034 ms,  max: 8.755 ms
-[latency] Input       average: 1.234 ms,  max: 1.787 ms
-[latency] Output      average: 7.155 ms,  max: 9.475 ms
-[latency] End2End     average: 14.425 ms, max: 19.299 ms
-[Throughput] total: 14431.837 ms, average: 14.432 ms
-[Throughput] qps: 69.291
+[latency] Inference avg:    3.365 ms,       max:    6.331 ms,       min:    2.797 ms
+[latency] Input     avg:    0.665 ms,       max:    1.095 ms,       min:    0.480 ms
+[latency] Output    avg:    0.247 ms,       max:    0.984 ms,       min:    0.110 ms
+[latency] End2End   avg:    4.278 ms,       max:    7.316 ms,       min:    3.469 ms
+[Throughput] total:    110.483 ms, avg:    1.105 ms
+[Throughput] qps:  905.117
 ```
 
 ## 3.免责声明
