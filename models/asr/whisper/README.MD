@@ -66,12 +66,12 @@ bash test.sh
 ### 3.2 性能结果
 
 ```bash
-Output 20 tokens, Decode Cost 569.013 ms
-Decode Speed: 26.36 tokens/s
-TTFT (Time to First Token): 598.472 ms
-TPOT (Time Per Output Token): 37.934 ms/token
-E2E Latency (End-to-End Latency): 1.167 seconds
-E2E TPS (End-to-End Tokens Per Second): 17.13 tokens/s
+Output 20 tokens, Decode Cost 574.816 ms
+Decode Speed: 26.10 tokens/s
+TTFT (Time to First Token): 502.699 ms
+TPOT (Time Per Output Token): 38.321 ms/token
+E2E Latency (End-to-End Latency): 1.078 seconds
+E2E TPS (End-to-End Tokens Per Second): 18.56 tokens/s
 ```
 
 ## 4 免责声明

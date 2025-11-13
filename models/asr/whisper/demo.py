@@ -288,19 +288,9 @@ def asr(hmwhisper, processor, input_features):
         prefill_input_names[3]: torch.tensor([4]).to(torch.int32),
         prefill_input_names[4]: mask_atten,
     }
-
-    for data_detect, k_data_cache in zip(prefill_input_names[5:29], k_cache):
-        prefill_inputs[data_detect] = k_data_cache
-
-    for data_detect, v_data_cache in zip(prefill_input_names[29:53], v_cache):
-        prefill_inputs[data_detect] = v_data_cache
-
-    for data_detect, k_data in zip(prefill_input_names[53:77], k_list):
-        prefill_inputs[data_detect] = k_data
-
-    for data_detect, v_data in zip(prefill_input_names[77:101], v_list):
-        prefill_inputs[data_detect] = v_data
-
+    for i in range(96):
+        cache = hmwhisper.decoder.get_dev_input(hmwhisper.decoder.get_input_name(i + 5))
+        hmwhisper.prefill.set_dev_input(hmwhisper.prefill.get_input_name(i + 5), cache)
     logits = hmwhisper.run_prefill(prefill_inputs)
 
     next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
@@ -310,7 +300,7 @@ def asr(hmwhisper, processor, input_features):
     decode_response = decoded_text if decoded_text != "<|endoftext|>" else ""
     prefill_ids_len = default_decoder_ids.shape[1]
     ttft_time = time.time() - start_time
-    logger.success("r:transcription:")
+    logger.success("transcription:")
     print("\033[1;95m{}".format(decode_response), end="", flush=True)
 
     for i in range(48):
@@ -321,8 +311,7 @@ def asr(hmwhisper, processor, input_features):
         hmwhisper.decoder.set_dev_output(
             hmwhisper.decoder.get_output_name(i + 1), cache
         )
-    for data_detect in prefill_input_names[5:101]:
-        del prefill_inputs[data_detect]
+
     cnt = 3
     while default_decoder_ids.shape[1] < 448 and next_tokens.item() != 50257:
         cnt += 1
