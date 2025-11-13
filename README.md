@@ -99,11 +99,15 @@ pip install -r requirements.txt
 | mobilenetv2          | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
 | efficientnet         | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
 | ViT-B-16             | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolov8m-cls          | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov3               | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov5s              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov5s_feature      | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov5m_face         | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolov7               | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolov9m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
+| yolo11m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolo12m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m-pose         | estimation    | xh1/xh2 | yes   | yes   | yes  | yes  |
 | yolov8m-seg          | segmentation  | xh1/xh2 | yes   | yes   | yes  | yes  |
