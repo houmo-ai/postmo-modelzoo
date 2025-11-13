@@ -184,3 +184,11 @@ def test_detection_yolov5m_face_perf(setup_logging):
     model_name = 'yolov5m_face'
     _perf_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolox
+@pytest.mark.perf
+def test_detection_yolox_perf(setup_logging):
+    model_name = 'yolox'
+    _perf_func(model_name, setup_logging)
+    assert True

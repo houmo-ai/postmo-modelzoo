@@ -192,3 +192,11 @@ def test_detection_yolov5m_face_demo(setup_logging):
     model_name = 'yolov5m_face'
     _demo_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolox
+@pytest.mark.demo
+def test_detection_yolox_demo(setup_logging):
+    model_name = 'yolox'
+    _demo_func(model_name, setup_logging)
+    assert True

@@ -1,0 +1,39 @@
+model:
+  name: yolox
+  save_dir: output
+  model_path: yolox_m.onnx
+  inputs:
+    images:
+      shape: [1, 3, 640, 640]
+      data_format: BGR
+      mean: [0.0, 0.0, 0.0]
+      std: [1.0, 1.0, 1.0]
+      resize_type: 1
+      padding_mode: 0
+      padding_values: [114, 114, 114]
+      resizer:
+        toYUV_format: YUV420SP
+  app_onnx_opt: 
+    optimizer: true
+    log_level: 0
+  model_impl_module: model_impl
+  model_impl_cls: YoloX
+  
+quant:
+  calib_data: coco2017/val2017
+  calib_num: 50
+
+build:
+  ncore: 1
+  opt_level: 2
+
+
+demo:
+  data_dir: coco2017/val2017
+  num: 10
+
+eval:
+  data_dir: coco2017
+  num: 0
+  dataset_module: dataset
+  dataset_cls: Dataset

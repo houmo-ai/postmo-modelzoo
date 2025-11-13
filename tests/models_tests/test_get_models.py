@@ -215,3 +215,12 @@ def test_detection_yolov5m_face_get_model(setup_logging):
     model_name = 'yolov5m_face'
     _get_model_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.yolox
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_detection_yolox_get_model')
+def test_detection_yolox_get_model(setup_logging):
+    model_name = 'yolox'
+    _get_model_func(model_name, setup_logging)
+    assert True

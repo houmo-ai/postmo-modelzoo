@@ -106,6 +106,7 @@ def test_segmentation_yolov8m_seg_compare(setup_logging):
     assert True
 
 
+
 @pytest.mark.yolov7
 @pytest.mark.compare
 def test_detection_yolov7_compare(setup_logging):
@@ -113,10 +114,17 @@ def test_detection_yolov7_compare(setup_logging):
     _compare_func(model_name, setup_logging)
     assert True
 
-
 @pytest.mark.yolov5m_face
 @pytest.mark.compare
 def test_detection_yolov5m_face_compare(setup_logging):
     model_name = 'yolov5m_face'
+    _compare_func(model_name, setup_logging)
+    assert True
+
+
+@pytest.mark.yolox
+@pytest.mark.compare
+def test_detection_yolox_compare(setup_logging):
+    model_name = 'yolox'
     _compare_func(model_name, setup_logging)
     assert True
