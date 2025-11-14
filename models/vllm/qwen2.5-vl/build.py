@@ -1,6 +1,8 @@
 import os
 import numpy as np
 import time
+import psutil
+import threading
 import multiprocessing
 import argparse
 
@@ -39,6 +41,65 @@ def cosine_distance(data1, data2):
         return -1
     return cosine_dist
 
+class ProcessMemoryMonitor:
+    """
+    Monitors the memory usage of the current Python process in real-time using psutil.
+    """
+    def __init__(self, interval=2, log_file=None):
+        """
+        Initializes the monitor.
+        Args:
+            interval (int): Time between measurements in seconds.
+            log_file (str, optional): Path to a file to log results. If None, prints to console.
+        """
+        self.process = psutil.Process(os.getpid())
+        self.interval = interval
+        self.log_file = log_file
+        self.is_monitoring = False
+        self.peak_memory_mb = 0
+
+    def get_memory_info(self):
+        """
+        Gets current memory usage information.
+        Returns:
+            dict: A dictionary containing memory usage data.
+        """
+        memory_info = self.process.memory_info()
+        rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
+        percent = self.process.memory_percent()   # Percentage of system memory
+        return {'rss_mb': rss_mb, 'percent': percent}
+
+    def start(self):
+        """Starts the monitoring loop in a separate daemon thread."""
+        self.is_monitoring = True
+        self.peak_memory_mb = 0
+        self.monitor_thread = threading.Thread(target=self._monitor_loop)
+        self.monitor_thread.daemon = True  # Thread will exit when main program does
+        self.monitor_thread.start()
+        print(f"Memory monitoring started (interval: {self.interval}s)")
+
+    def _monitor_loop(self):
+        """The internal loop that runs in the thread."""
+        while self.is_monitoring:
+            mem_info = self.get_memory_info()
+            self.peak_memory_mb = max(self.peak_memory_mb, mem_info['rss_mb'])
+
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
+
+            # Output to console or file
+            if self.log_file:
+                with open(self.log_file, 'a') as f:
+                    f.write(log_message + '\n')
+
+            time.sleep(self.interval)
+
+    def stop(self):
+        """Stops the monitoring loop and prints peak usage."""
+        self.is_monitoring = False
+        if hasattr(self, 'monitor_thread'):
+            self.monitor_thread.join(timeout=1) # Wait a moment for the thread to finish
+        print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -65,11 +126,33 @@ def get_args() -> argparse.Namespace:
         help='batch size',
     )
     parser.add_argument(
+        '--j',
+        dest='j',
+        type=int,
+        default=multiprocessing.cpu_count(),
+        help='build parallel jobs',
+    )
+    parser.add_argument(
         '--ncore',
         dest='ncore',
         type=int,
         default=HOUMO_CORE_NUM,
         help='core number',
+    )
+    parser.add_argument(
+        '--context_length',
+        dest='context_length',
+        type=int,
+        default=2048,
+        help='context_length',
+    )
+    parser.add_argument(
+        '--ndevice',
+        dest='ndevice',
+        type=int,
+        default=1,
+        choices=[1, 2],
+        help='device number',
     )
     parser.add_argument(
         '--model_size',
@@ -97,8 +180,53 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
+def build_llm(
+    model_name,
+    model_dir,
+    model_path,
+    output_dir,
+    profile,
+    ncore,
+    ndevice,
+    context_length,
+    j,
+    batch=None,
+):
     import tcim
+
+    kwargs = {}
+    if HOUMO_TARGET == "xh2":
+        kwargs["modify_llm"] = {}
+        kwargs["enable_xh2_stable_output"] = True
+        if ndevice:
+            kwargs["ndevice"] = ndevice
+        if batch:
+            kwargs["modify_llm"]["batch"] = batch
+        if context_length:
+            kwargs["modify_llm"]["context-length"] = context_length
+
+    start = time.time()
+    print(f"\n===> {model_name} build start...\n kwargs:{kwargs}")
+    decode_model = os.path.join(model_dir, model_path)
+    tcim.build_from_hmonnx(
+        decode_model,
+        weights=os.path.join(model_dir, "weight.npy"),
+        output_name=model_name,
+        ncore=ncore,
+        target=HOUMO_TARGET,
+        output_dir=output_dir,
+        work_dir=os.path.join(output_dir, "tcim", model_name),
+        llm_opt=True,
+        j=j,
+        **kwargs,
+    )
+    profile["build"] = time.time() - start
+    print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
+
+
+def build_vit(model_name, model_dir, model_path, output_dir, profile, ncore, j):
+    import tcim
+
     start = time.time()
     print(f"\n===> {model_name} build start...")
     decode_model = os.path.join(model_dir, model_path)
@@ -107,9 +235,10 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
         weights=os.path.join(model_dir, "weight.npy"),
         output_name=model_name,
         ncore=ncore,
+        target=HOUMO_TARGET,
         output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim"),
-        llm_opt=True,
+        work_dir=os.path.join(output_dir, "tcim", model_name),
+        j=j,
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
@@ -117,6 +246,7 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore=1):
 
 def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     import tcim_lite
+
     print(f"\n===> {model_name} test start...")
     # load model
     model_path = os.path.join(output_dir, f"{model_name}.hmm")
@@ -134,15 +264,23 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     for id in range(input_num):
         input_name = module.get_input_name(id)
         input_info = module.get_input_info(input_name)
-        print(f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}")
-        input_data_path = os.path.join(model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy")
+        print(
+            f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
+        )
+        input_data_path = os.path.join(
+            model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy"
+        )
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
-        print(f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}")
+        print(
+            f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}"
+        )
         start = time.time()
         module.set_input(input_name, input_data)
         profile["set_input"] += time.time() - start
-    print(f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.')
+    print(
+        f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.'
+    )
 
     # infer model
     start = time.time()
@@ -158,31 +296,47 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     for id in range(output_num):
         output_name = module.get_output_name(id)
         output_info = module.get_output_info(output_name)
-        print(f"output_info[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}")
+        print(
+            f"output_info[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
+        )
         start = time.time()
         output_data = module.get_output(output_name).numpy()
         profile["get_output"] += time.time() - start
-        print(f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}")
-        output_data_path = os.path.join(model_dir, f'hmquant_{prefix}_{sanitize_name(output_name)}_output.npy')
+        print(
+            f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
+        )
+        output_data_path = os.path.join(
+            model_dir, f'hmquant_{prefix}_{sanitize_name(output_name)}_output.npy'
+        )
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
-            golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
+            golden_output = np.concatenate(
+                [golden_output for i in range(batch)], axis=0
+            )
         else:
             result_check = False
-            print(f"[warning] compare canceled while golden data not found -> {output_data_path}")
+            print(
+                f"[warning] compare canceled while golden data not found -> {output_data_path}"
+            )
             continue
         if golden_output.shape == output_data.shape:
             cosine_dist = cosine_distance(golden_output, output_data)
             is_match = (golden_output == output_data).all()
-            print(f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}")
+            print(
+                f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}"
+            )
             if is_match:
                 continue
             if cosine_dist < GOLDEN_THRESH:
                 result_check = False
         else:
             result_check = False
-            print(f"[compare] golden output [{output_name}] shape not match {golden_output.shape} vs {output_data.shape}")
-    print(f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.')
+            print(
+                f"[compare] golden output [{output_name}] shape not match {golden_output.shape} vs {output_data.shape}"
+            )
+    print(
+        f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.'
+    )
     if not result_check:
         print("[error] result check failed.")
         exit(-1)
@@ -190,6 +344,11 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
 
 
 if __name__ == '__main__':
+    # Create and start the monitor
+    memory_monitor = ProcessMemoryMonitor(interval=2)
+    memory_monitor.start()
+
+    # parse args
     args = get_args()
     print(args)
     curdir = os.getcwd()
@@ -202,6 +361,9 @@ if __name__ == '__main__':
     output_dir = args.output_dir
     ncore = args.ncore
     batch = args.batch
+    ndevice = args.ndevice
+    context_length = args.context_length
+    j = args.j
     profile = {}
 
     # build model
@@ -213,17 +375,45 @@ if __name__ == '__main__':
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
         model_path = f"hmquant_{model_name}_with_act.onnx"
-        build("prefill", model_dir+"/prefill", model_path, output_dir, profile, ncore)
-
-        build("decoder", model_dir+"/decoder", model_path, output_dir, profile, ncore)
-
-        build("visual", model_dir+"/visual", model_path, output_dir, profile, ncore)
+        build_vit(
+            "qwen2.5-vl_visual",
+            os.path.join(model_dir, "visual"),
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+            j,
+        )
+        build_llm(
+            "qwen2.5-vl_prefill",
+            os.path.join(model_dir, "prefill"),
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+            ndevice,
+            context_length,
+            j,
+        )
+        build_llm(
+            "qwen2.5-vl_decode",
+            os.path.join(model_dir, "decoder"),
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+            ndevice,
+            context_length,
+            j,
+        )
 
     # test model
     if args.stage == 'test' or args.stage == 'all':
         part_dir = os.path.join(model_dir, "prefill")
-        test("prefill", part_dir, output_dir, profile, prefix="llm_Prefill")
+        test("qwen2.5-vl_prefill", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "decoder")
-        test("decoder", part_dir, output_dir, profile, prefix="llm_decoder")
+        test("qwen2.5-vl_decode", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "visual")
-        test("visual", part_dir, output_dir, profile, prefix="qwen2_5_vl_visual")
+        test("qwen2.5-vl_visual", part_dir, output_dir, profile, prefix=model_name)
+
+    memory_monitor.stop()
