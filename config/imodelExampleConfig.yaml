@@ -150,6 +150,16 @@ detection_yolo11m:
         script: ../models/detection/yolo11m/test.sh
   test:
     - detection_yolo11m_test
+detection_yolov10m:
+  include:
+    - models/detection/yolov10m
+  exclude:
+    - models/detection/yolov10m/README.MD
+  example_case:
+    - detection_yolov10m_test:
+        script: ../models/detection/yolov10m/test.sh
+  test:
+    - detection_yolov10m_test
 detection_yolov8m-cls:
   include:
     - models/backbone/yolov8m-cls
