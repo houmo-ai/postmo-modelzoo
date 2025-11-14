@@ -10,7 +10,6 @@ logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh2", "Only supported xh2!"
-
 HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
 GOLDEN_THRESH = 0.98
 
@@ -116,7 +115,7 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def build_llm(
+def build_llm_tts(
     model_name,
     model_dir,
     model_path,
@@ -158,7 +157,7 @@ def build_llm(
         ncore=ncore,
         target=HOUMO_TARGET,
         output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim", model_name),
+        work_dir=os.path.join(output_dir, "tcim"),
         llm_opt=True,
         j=j,
         **kwargs,
@@ -166,8 +165,7 @@ def build_llm(
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
-
-def build_vit(model_name, model_dir, model_path, output_dir, profile, ncore, j):
+def build_other_all(model_name, model_dir, model_path, output_dir, profile, ncore, j):
     import tcim
 
     start = time.time()
@@ -180,7 +178,7 @@ def build_vit(model_name, model_dir, model_path, output_dir, profile, ncore, j):
         ncore=ncore,
         target=HOUMO_TARGET,
         output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim", model_name),
+        work_dir=os.path.join(output_dir, "tcim"),
         j=j,
     )
     profile["build"] = time.time() - start
@@ -311,9 +309,8 @@ if __name__ == '__main__':
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-
         model_path = f"hmquant_{model_name}_with_act.onnx"
-        build_llm(
+        build_llm_tts(
             "minicpmo_llm_prefill",
             os.path.join(model_dir, "prefill"),
             model_path,
@@ -324,7 +321,7 @@ if __name__ == '__main__':
             context_length,
             j,
         )
-        build_llm(
+        build_llm_tts(
             "minicpmo_llm_decode",
             os.path.join(model_dir, "decoder"),
             model_path,
@@ -335,9 +332,76 @@ if __name__ == '__main__':
             context_length,
             j,
         )
-        build_vit(
+        build_llm_tts(
+            "minicpmo_tts_prefill",
+            os.path.join(model_dir, "tts_prefill"),
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+            ndevice,
+            2048,
+            j,
+        )
+        build_llm_tts(
+            "minicpmo_tts_decode",
+            os.path.join(model_dir, "tts_decoder"),
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+            ndevice,
+            2048,
+            j,
+        )
+        build_other_all(
             "minicpmo_visual",
             os.path.join(model_dir, "visual"),
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+            j,
+        )
+        build_other_all(
+            "minicpmo_audio",
+            os.path.join(model_dir, "audio"),
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+            j,
+        )
+        model_path = (
+            f"hmquant_dvae_part1_with_act.onnx"
+        )
+        build_other_all(
+            "minicpmo_dvae_part1",
+            os.path.join(model_dir, "dvae"),
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+            j,
+        )
+        model_path = (
+            f"hmquant_dvae_part2_with_act.onnx"
+        )
+        build_other_all(
+            "minicpmo_dvae_part2",
+            os.path.join(model_dir, "dvae"),
+            model_path,
+            output_dir,
+            profile,
+            ncore,
+            j,
+        )
+        model_path = (
+            f"hmquant_vocos_with_act.onnx"
+        )
+        build_other_all(
+            "minicpmo_vocos",
+            os.path.join(model_dir, "vocos"),
             model_path,
             output_dir,
             profile,
@@ -365,9 +429,56 @@ if __name__ == '__main__':
         )
         part_dir = os.path.join(model_dir, "visual")
         test(
-            "minicpmo_llm_visual",
+            "minicpmo_visual",
             part_dir,
             output_dir,
             profile,
             prefix=model_name,
+        )
+        part_dir = os.path.join(model_dir, "audio")
+        test(
+            "minicpmo_audio",
+            part_dir,
+            output_dir,
+            profile,
+            prefix=model_name,
+        )
+        part_dir = os.path.join(model_dir, "tts_prefill")
+        test(
+            "minicpmo_tts_prefill",
+            part_dir,
+            output_dir,
+            profile,
+            prefix=model_name,
+        )
+        part_dir = os.path.join(model_dir, "tts_decoder")
+        test(
+            "minicpmo_tts_decode",
+            part_dir,
+            output_dir,
+            profile,
+            prefix=model_name,
+        )
+        part_dir = os.path.join(model_dir, "vocos")
+        test(
+            "minicpmo_vocos",
+            part_dir,
+            output_dir,
+            profile,
+            prefix="vocos",
+        )
+        part_dir = os.path.join(model_dir, "dvae")
+        test(
+            "minicpmo_dvae_part1",
+            part_dir,
+            output_dir,
+            profile,
+            prefix="dvae_part1",
+        )
+        test(
+            "minicpmo_dvae_part2",
+            part_dir,
+            output_dir,
+            profile,
+            prefix="dvae_part2",
         )

@@ -10,7 +10,7 @@
 
 ## 2 快速开始
 
-MiniCPMO暂时只支持vllm或llm模式，其它功能模式(语音相关)待支持。
+MiniCPMO支持Omni、vllm、llm、voice clone和only tts等图像、本文、语音功能。
 
 ### 2.1 获取模型和数据
 
@@ -44,10 +44,20 @@ MiniCPMO模型使用python API进行演示
 
 ```bash
 python3 demo.py
-#默认为vllm模式，如需体验llm
+#默认为omni模式，如需体验llm
 python3 demo.py --example_idx 1
+#如需体验vllm
+python3 demo.py --example_idx 2
 #如需体验多张图的vllm
 python3 demo.py --example_idx 3
+#如需语音克隆
+python3 demo.py --example_idx 4
+#如需仅跑tts文本转语音，且声音为女声
+python3 demo.py --example_idx 5
+#如需仅跑tts文本转语音，且声音为男声
+python3 demo.py --example_idx 6
+#如遇到长文本，需要拆分多段来运行tts
+python3 demo.py --example_idx 7
 ```
 
 ### 2.4 一键评估
@@ -63,21 +73,37 @@ bash test.sh
 ### 3.1 演示结果
 
 ```bash
-[{'role': 'user', 'content': [<PIL.Image.Image image mode=RGB size=1920x1440 at 0x7FC2E770B7D0>, '图中是哪家航空公司的飞机？']}]
-图中的飞机属于中国南方航空。
+Audio saved to output_omni.wav
+画面中有一个穿着红色夹克和黑色裤子的人，他站在一个被雪覆盖的斜坡上，似乎在滑雪。背景是壮丽的雪山，天空中有一些云。
 ```
 
 ### 3.2 性能结果
 
 ```bash
-Total cost 9383.719 ms
-Input tokens: 700, Output tokens: 9
-Vision Cost 7646.908 ms
-LLM Prefill Speed: 616.23 tokens/s
-TTFT (Time to First Token): 8787.575 ms
-TPOT (Time Per Output Token): 16.46 tokens/s
-E2E Latency (End-to-End Latency): 9.384 seconds
-TPS (Tokens Per Second): 0.96 tokens/s
+Total Cost 42421.746 ms
+Input Tokens: 1399, Output tokens: 41
+Vision Cost: 7258.220 ms
+Audio Cost: 681.769 ms
+LLM Prefill Speed: 969.80 tokens/s
+TTFT (Time to First Token): 9392.590 ms
+TPOT (Time Per Output Token): 14.67 tokens/s
+ViT+Wishper+LLM TPS (Tokens Per Second): 3.38 tokens/s
+TTS Prefill Mean Time: 17.327 ms x 30 times
+TTS Decoder Mean Time: 421.045 ms x 70 groups
+TTS Dvae Cost: 117.342 ms
+TTS Vocos Cost: 95.591 ms
+Total Audio Duration Generated: 37.23 s
+TTS Total Cost: 30209.722 ms
+TTS Real-Time Factor(RTF): 0.811508
+TTS Generate Speed: 1.23 x real-time
+E2E Latency (End-to-End Latency): 42.422 seconds
+```
+
+### 3.3 备注
+
+```bash
+由于tts对长文本容易产生异常（原算法即存在的现象），我们提供了一种文本拆分的方法。
+只需将chat()或chat_otts()调用时给定text_split=True，即可触发。
 ```
 
 ## 4 免责声明

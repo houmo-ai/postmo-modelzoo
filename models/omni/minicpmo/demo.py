@@ -46,10 +46,14 @@ HOUMO_TARGET = os.getenv('HOUMO_TARGET')
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 SUPPORTED_MODEL_TYPES = ["onnx", "houmo"]
 EXAMPLES_MODE = {
-    0: "all",   ## vision + audio + llm + tts
-    1: "llm",   ## llm only
-    2: "vllm",  ## vision + llm
-    3: "mvllm", ## multi-vision + llm
+    0: "omni",      ## vision + audio + llm + tts
+    1: "llm",       ## llm only
+    2: "vllm",      ## vision + llm
+    3: "mvllm",     ## multi-vision + llm
+    4: "vclone",    ## audio + llm + tts, voice clone
+    5: "wotts",     ## only tts, woman voice
+    6: "motts",     ## only tts, man voice
+    7: "chunkotts", ## only tts, split text
 }
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -99,13 +103,6 @@ def get_args() -> argparse.Namespace:
         help="houmo llm decode model path",
     )
     parser.add_argument(
-        "--llm_projector_path",
-        dest="llm_projector_path",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET, "minicpmo_llm_projector.hmm"),
-        help="houmo llm projector model path",
-    )
-    parser.add_argument(
         "--tts_prefill_path",
         dest="tts_prefill_path",
         type=str,
@@ -121,9 +118,9 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--tts_dvae_path",
-        dest="tts_dave_path",
+        dest="tts_dvae_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "minicpmo_dvae.hmm"),
+        default=os.path.join("output", HOUMO_TARGET),
         help="houmo tts dvae model path",
     )
     parser.add_argument(
@@ -144,8 +141,8 @@ def get_args() -> argparse.Namespace:
         '--example_idx',
         dest='example_idx',
         type=int,
-        default=2,
-        help='example mode index, support 0(all), 1(llm), 2(vllm), 3(mvllm)',
+        default=0,
+        help='example mode index, support 0(omni), 1(llm), 2(vllm), 3(mvllm), 4(vclone), 5(wotts), 6(motts), 7(chunkotts)',
     )
     args = parser.parse_args()
     return args
@@ -287,6 +284,158 @@ def _get_feat_extract_output_lengths(input_lengths: torch.LongTensor, audio_pool
 
     return input_lengths_after_cnn, input_lengths_after_pooling
 
+ABBREVIATIONS = {
+    "e.g.", "i.e.", "etc.", "vs.", "cf.", "et al.", "al.",
+    "Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "Sr.", "Jr.", "Hon.", "Rev.", "St.",
+    "U.S.", "U.S.A.", "U.K.", "E.U.", "P.R.C.", "R.O.K.", "U.A.E.",
+    "CEO.", "CTO.", "CFO.", "COO.", "VP.", "Dir.", "Mgr.", "Capt.", "Lt.", "Col.", "Gen.", "Sgt.",
+    "a.m.", "p.m.", "A.D.", "B.C.",
+    "Jan.", "Feb.", "Mar.", "Apr.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec.",
+    "Ave.", "Blvd.", "Rd.", "St.", "Ln.", "Sq.", "Hwy.", "Apt.", "Ste.", "No.",
+    "Inc.", "Ltd.", "Co.", "Corp.", "LLC.", "Pty.",
+    "ft.", "in.", "lb.", "oz.", "sec.", "min.", "hr.", "km.", "cm.", "mm.", "pt.",
+    "AI.", "ML.", "NLP.", "GPU.", "CPU.", "API.", "SDK.", "UI.", "UX.",
+    "USD.", "EUR.", "GBP.", "JPY.", "CNY.",
+}
+
+def count_mixed_text(s):
+    chinese_chars = re.findall(r'[\u4e00-\u9fff]', s)
+
+    english_words = re.findall(r'[A-Za-z]+(?:[0-9]*[A-Za-z]*)*', s)
+
+    number_tokens = re.findall(r'\b\d+\b', s)
+
+    temp = re.sub(r'[\u4e00-\u9fff]', '', s)
+    temp = re.sub(r'[A-Za-z]+(?:[0-9]*[A-Za-z]*)*', '', temp)
+    temp = re.sub(r'\b\d+\b', '', temp)
+    other_symbols = [c for c in temp if not c.isspace()]
+    
+    return {
+        "EN": len(chinese_chars),
+        "ZH": len(english_words),
+        "Num": len(number_tokens),
+        "Oth": len(other_symbols),
+        "Total": len(chinese_chars) + len(english_words) + len(number_tokens)
+    }
+
+def split_text_for_tts(text: str, max_len: int = 80, min_len: int = 40):
+    """
+    将长文本分成多段，每段适合输入TTS。
+    :param text: 原始文本
+    :param max_len: 每段最大长度
+    :param min_len: 每段最小长度
+    :return: 文本段列表
+    """
+    chinese_punct = {'。', '？', '！', '：', '…'}
+    english_punct = {'.', '?', '!', '...'}
+
+    # 按句号、问号、叹号、分号等自然停顿分句
+    # sentences = re.split(r'([。！？；!?])', text)
+    abbrev_pattern = r'(?:[A-Za-z]\.){2,}|(?:[a-z]\.[a-z]\.)'  # U.S.A. 或 e.g.
+    # 整体正则：先匹配缩写，再匹配句号/感叹号/问号等
+    pattern = rf'({abbrev_pattern}|[。！？；]|[.!?]+|…)'
+
+    sentences = re.split(pattern, text)
+
+    # 将英文中初步分错的缩写拼接回去
+    new_sentences = []
+    pre_sent = sentences[0]
+    for sent in sentences[1:]:
+        if pre_sent.endswith(" ") or sent.startswith(" ") or pre_sent[-1] in chinese_punct:
+            new_sentences.append(pre_sent)
+            pre_sent = sent
+        else:
+            pre_sent += sent
+    new_sentences.append(pre_sent)
+    
+    # 把标点重新拼上去（因为re.split会丢失它们）
+    grouped = []
+    pre_sent = new_sentences[0]
+    for sent in new_sentences[1:]:
+        if sent in chinese_punct or sent in english_punct:
+            pre_sent += sent
+        else:
+            grouped.append(pre_sent)
+            pre_sent = sent
+    grouped.append(pre_sent)
+    # for i in range(0, len(new_sentences)-1, 2):
+    #     grouped.append(new_sentences[i].strip() + new_sentences[i+1])
+    # if len(new_sentences) % 2 == 1:
+    #     grouped.append(new_sentences[-1].strip())
+
+    # 去除空元素
+    grouped = [g for g in grouped if g.strip()]
+
+    # -------------------------------------------------------------
+    # 2) 修复缩写被错误切开的情况
+    # -------------------------------------------------------------
+    fixed_group = []
+    i = 0
+    while i < len(grouped):
+        s = grouped[i]
+        for abbr in ABBREVIATIONS:
+            if s.endswith(abbr) and i + 1 < len(grouped):
+                # 合并缩写后的下一句
+                first_void_str = grouped[i+1][len(grouped[i+1]) - len(grouped[i+1].lstrip())]
+                s += (" " if not grouped[i + 1].startswith(" ") and re.match(r'[A-Za-z]$', first_void_str) else "")
+                s += grouped[i + 1]
+                i += 1
+                break
+        fixed_group.append(s)
+        i += 1 
+
+    # 若某句太长，再切分
+    refined = []
+    for sent in fixed_group:
+        if count_mixed_text(sent)['Total'] > max_len:
+            # 按逗号或顿号进一步切分
+            parts = re.split(r'([，、,])', sent)
+            tmp = ""
+            for p in parts:
+                if count_mixed_text(tmp)['Total'] + count_mixed_text(p)['Total'] < max_len:
+                    tmp += p
+                else:
+                    refined.append(tmp.strip())
+                    tmp = p
+            if tmp:
+                refined.append(tmp.strip())
+        else:
+            refined.append(sent.strip())
+    
+    # 将漏掉的缩写强行给到下一句头部
+    refined.reverse()
+    refixed_group_rever = []
+    pre_str = ""
+    for rg in refined:
+        if len(rg) <= 10 and all(ord(c) < 128 for c in rg) and rg[-1] == ".":
+            pre_str = rg + " " + pre_str
+        else:
+            if len(pre_str) > 0:
+                refixed_group_rever.append(pre_str)
+            pre_str = rg
+    if len(pre_str) > 0:
+        refixed_group_rever.append(pre_str)
+    refixed_group = list(reversed(refixed_group_rever))   
+
+    # 若句子太短，合并前后
+    merged = []
+    cur_str = refixed_group[0]
+    for r in refixed_group[1:]:
+        r_len = count_mixed_text(r)['Total']
+        cs_len = count_mixed_text(cur_str)['Total']
+        if r_len < min_len and cs_len + r_len <= max_len:
+            # if all(ord(c) < 128 for c in cur_str) and all(ord(i) < 128 for i in r):
+            #     cur_str += " "
+            if cur_str[-1] in english_punct + [',']:
+                cur_str += " "
+            cur_str += r
+        else:
+            merged.append(cur_str)
+            cur_str = r
+    merged.append(cur_str)
+
+    return merged
+
 class HMMiniCPMO(object):
     def __init__(self, 
                  args, 
@@ -395,17 +544,18 @@ class HMMiniCPMO(object):
             self.tts_eos_token = torch.tensor([625], dtype=torch.long, device=self.device)
             self.tts_sampling = tts_sampling
             if self.tts_sampling:
-                self.tts_logits_warpers = [TopPLogitsWarper(self.tts_top_p, mini_tokens_to_keep=3),
-                                TopKLogitsWarper(self.tts_top_k, mini_tokens_to_keep=3)]
+                self.tts_logits_warpers = []
+                self.tts_logits_warpers.append(TopPLogitsWarper(self.tts_top_p, min_tokens_to_keep=3))
+                self.tts_logits_warpers.append(TopKLogitsWarper(self.tts_top_k, min_tokens_to_keep=3))
 
             self.tts_embedding_path = os.path.join(args.embedding_path, "quant_embedding_tts.pt")
-            self.tts_embedding = torch.load(self.tts_embedding_path, weights_only=False).weight
+            self.tts_embedding = torch.load(self.tts_embedding_path, map_location=torch.device(self.device), weights_only=False).weight
             self.tts_code_embeddings = self.load_tts_code_embeds(args.embedding_path)
 
-            option_tts_projector = tcim_lite.runtime.Option(wt_manager)
-            self.tts_projector_engine = tcim_lite.runtime.load(args.llm_projector_path, option_tts_projector)
-            self.tts_projector_input_infos = get_input_infos(self.tts_projector_engine)
-            self.tts_projector_output_infos = get_output_infos(self.tts_projector_engine)
+            # option_tts_projector = tcim_lite.runtime.Option(wt_manager)
+            # self.tts_projector_engine = tcim_lite.runtime.load(args.llm_projector_path, option_tts_projector)
+            # self.tts_projector_input_infos = get_input_infos(self.tts_projector_engine)
+            # self.tts_projector_output_infos = get_output_infos(self.tts_projector_engine)
 
             option_tts_prefill = tcim_lite.runtime.Option(wt_manager)
             self.tts_prefill_engine = tcim_lite.runtime.load(args.tts_prefill_path, option_tts_prefill)
@@ -417,8 +567,8 @@ class HMMiniCPMO(object):
             self.tts_context_max_length = self.tts_prefill_input_infos[self.tts_prefill_engine.get_input_name(4)].shape[2]
             self.tts_num_attention_heads = self.tts_prefill_shape[1]
             self.tts_hidden_size = self.tts_prefill_shape[-1]
-            self.tts_mask_shape = self.tts_prefill_output_infos["attention_mask"].shape
-            self.tts_mask_dtype=self.tts_prefill_output_infos["attention_mask"].dtype
+            self.tts_mask_shape = self.tts_prefill_input_infos["attention_mask"].shape
+            self.tts_mask_dtype=self.tts_prefill_input_infos["attention_mask"].dtype
 
             option_tts_decoder = tcim_lite.runtime.Option(wt_manager)
             self.tts_decoder_engine = tcim_lite.runtime.load(args.tts_decode_path, option_tts_decoder)
@@ -431,10 +581,16 @@ class HMMiniCPMO(object):
                 self.tts_decoder_engine.set_input(f"model_layers_{i}_self_attn_vcache_input", vcache)
             self.tts_decoder_engine.set_input("current_length", np.array([1]).astype(self.tts_decoder_input_infos["current_length"].dtype))
 
-            option_dvae = tcim_lite.runtime.Option(wt_manager)
-            self.dvae_engine = tcim_lite.runtime.load(args.tts_dvae_path, option_dvae)
-            self.dvae_input_infos = get_input_infos(self.dvae_engine)
-            self.dvae_output_infos = get_output_infos(self.dvae_engine)
+            option_dvae_part1 = tcim_lite.runtime.Option(wt_manager)
+            tts_dvae_part1_path = os.path.join(args.tts_dvae_path, "minicpmo_dvae_part1.hmm")
+            self.dvae_part1_engine = tcim_lite.runtime.load(tts_dvae_part1_path, option_dvae_part1)
+            self.dvae_part1_input_infos = get_input_infos(self.dvae_part1_engine)
+            self.dvae_part1_output_infos = get_output_infos(self.dvae_part1_engine)
+            option_dvae_part2 = tcim_lite.runtime.Option(wt_manager)
+            tts_dvae_part2_path = os.path.join(args.tts_dvae_path, "minicpmo_dvae_part2.hmm")
+            self.dvae_part2_engine = tcim_lite.runtime.load(tts_dvae_part2_path, option_dvae_part2)
+            self.dvae_part2_input_infos = get_input_infos(self.dvae_part2_engine)
+            self.dvae_part2_output_infos = get_output_infos(self.dvae_part2_engine)
 
             option_vocos = tcim_lite.runtime.Option(wt_manager)
             self.vocos_engine = tcim_lite.runtime.load(args.tts_vocos_path, option_vocos)
@@ -447,9 +603,25 @@ class HMMiniCPMO(object):
         self.audio_time = 0.0
         self.llm_prefill_time = 0.0
         self.llm_decode_time = 0.0
-        self.tts_time = 0.0
         self.llm_ttft_start_time = 0.0
         self.llm_ttft_time = 0.0
+        self.anwser_total_time = 0.0
+
+        self.tts_prefill_times = []
+        self.tts_decode_times = []
+        self.tts_dvae_time = 0.0
+        self.tts_vocos_time = 0.0
+        self.tts_total_time = 0.0
+        self.tts_audio_seconds = 0.0
+        
+        self.tts_chunk_prefill_times = []
+        self.tts_chunk_decoder_times = []
+        self.tts_chunk_dvae_times = []
+        self.tts_chunk_vocos_times = []
+        self.tts_chunk_per_total_times = []
+        self.tts_chunk_total_time = 0.0
+        self.tts_chunk_audio_seconds = []
+        self.tts_total_audio_seconds = 0.0
 
     def load_tts_code_embeds(self, path_str):
         x = []
@@ -458,7 +630,7 @@ class HMMiniCPMO(object):
             if not os.path.exists(index_emb_path):
                 logger.error(f"{index_emb_path} is not exist! Please check it.")
                 assert(0)
-            x.append(torch.load(index_emb_path, weights_only=False).weight)
+            x.append(torch.load(index_emb_path, map_location=torch.device(self.device), weights_only=False).weight)
         return x
 
     def get_nblocks(self, engine):
@@ -636,18 +808,24 @@ class HMMiniCPMO(object):
                 else:
                     truth_pixel_value = all_pixel_values
                     truth_position_ids = torch.full(size=self.vpm_input_infos["position_ids"].shape, fill_value=0,)
-                    truth_attn_mask:torch.Tensor = patch_attn_mask
+                    attn_mask:torch.Tensor = patch_attn_mask.view(1, -1)
+                    if not torch.any(~attn_mask):
+                        truth_attn_mask = torch.zeros(self.vpm_input_infos["attention_mask"].shape, dtype=torch.float16)
+                    else:
+                        from transformers.modeling_attn_mask_utils import _prepare_4d_attention_mask
+                        truth_attn_mask = _prepare_4d_attention_mask(attn_mask, dtype=torch.float16)
                     tgt_h, tgt_w = tgt_sizes[i]
-                    truth_pos_embed:torch.Tensor = self.vpm_pos_embed[:tgt_h, :tgt_w, :].reshape((tgt_h * tgt_w, -1)).permute(1, 0, 2)
+                    truth_pos_embed:torch.Tensor = self.vpm_pos_embed[:tgt_h, :tgt_w, :].reshape((tgt_h * tgt_w, -1)).unsqueeze(0).permute(1, 0, 2)
                     for i in range(B):
-                        key_padding_mask[i, patch_len[i], :] = True
-                    truth_key_padding_mask = torch.zeros_like(key_padding_mask, 
-                                                                dtype=torch.float16).masked_fill_(key_padding_mask, float("-inf"))
+                        key_padding_mask[i, patch_len[i]:] = True
+                    use_key_padding_mask = key_padding_mask[0:1, :self.vpm_input_infos["resampler_key_padding_mask"].shape[1]]
+                    truth_key_padding_mask = torch.zeros_like(use_key_padding_mask, 
+                                                                  dtype=torch.float16).masked_fill_(use_key_padding_mask, float("-inf"))
                     truth_pixel_value = truth_pixel_value.cpu().numpy().astype(self.vpm_input_infos["pixel_values"].dtype)
                     truth_position_ids = truth_position_ids.cpu().numpy().astype(self.vpm_input_infos["position_ids"].dtype)
                     truth_attn_mask = truth_attn_mask.cpu().numpy().astype(self.vpm_input_infos["attention_mask"].dtype)
                     truth_pos_embed = truth_pos_embed.cpu().numpy().astype(self.vpm_input_infos["resampler_pos_embed"].dtype)
-                    truth_key_padding_mask = truth_key_padding_mask.cpu().numpy().astype(self.vpm_input_infos["resampler_key_padding_mask"])
+                    truth_key_padding_mask = truth_key_padding_mask.cpu().numpy().astype(self.vpm_input_infos["resampler_key_padding_mask"].dtype)
 
                     self.vpm_engine.set_input("pixel_values", truth_pixel_value)
                     self.vpm_engine.set_input("position_ids", truth_position_ids)
@@ -658,7 +836,7 @@ class HMMiniCPMO(object):
                     self.vpm_engine.run()
                     self.vpm_engine.sync()
 
-                    vision_embeding = torch.from_numpy(self.vpm_engine.get_output(list(self.vpm_output_infos.keys())[0])).to(self.device)
+                    vision_embeding = torch.from_numpy(self.vpm_engine.get_output(list(self.vpm_output_infos.keys())[0]).numpy()).to(self.device)
                 start = 0
                 for pixel_values in pixel_values_list:
                     img_cnt = len(pixel_values)
@@ -680,7 +858,7 @@ class HMMiniCPMO(object):
         wavforms = data.get("audio_features", [])
         audio_feature_lens_raw = data.get("audio_feature_lens", [])
 
-        if self.init_audio:
+        if not self.init_audio:
             logger.warning("Audio encoder model is not initialized! But there is audio input! Will skip audio input!")
             return []
         # exist audio
@@ -715,6 +893,9 @@ class HMMiniCPMO(object):
 
             truth_input_features = wavforms.detach().cpu().numpy().astype(self.apm_input_infos["input_features"].dtype)
             truth_audio_attention_mask = audio_attention_mask.detach().cpu().numpy().astype(self.apm_input_infos["audio_attention_mask"].dtype)
+            if batch_size == 1:
+                truth_input_features = np.concatenate([truth_input_features, truth_input_features], axis=0)
+                truth_audio_attention_mask = np.concatenate([truth_audio_attention_mask, truth_audio_attention_mask], axis=0)
 
             self.apm_engine.set_input("input_features", truth_input_features)
             self.apm_engine.set_input("audio_attention_mask", truth_audio_attention_mask)
@@ -722,7 +903,11 @@ class HMMiniCPMO(object):
             self.apm_engine.run()
             self.apm_engine.sync()
 
-            audio_embeds = torch.from_numpy(self.apm_engine.get_output(list(self.apm_output_infos.keys())[0])).to(self.device)
+            audio_output = self.apm_engine.get_output(list(self.apm_output_infos.keys())[0]).numpy()
+            if batch_size == 1:
+                audio_output = audio_output[0:1, ...]
+
+            audio_embeds = torch.from_numpy(self.apm_engine.get_output(list(self.apm_output_infos.keys())[0]).numpy()).to(self.device)
 
             _, feature_lens_after_pooling = _get_feat_extract_output_lengths(audio_feature_lens)
 
@@ -862,16 +1047,6 @@ class HMMiniCPMO(object):
         if self.llm_sampling:
             next_token_scores = self.llm_prepared_logits_warper(torch.ones((1, 0), dtype=torch.long, device=self.device),
                                                                 next_token_logits)
-            # scores = torch.from_numpy(next_token_logits / self.llm_temperature).to(device=self.device, dtype=torch.float32)
-            # top_k = min(self.llm_top_k, scores.size(-1))
-            # indices_to_remove = scores < torch.topk(scores, top_k)[0][..., -1, None]
-            # scores_processed = scores.masked_fill(indices_to_remove, self.llm_filter_value)
-            # sorted_logits, sorted_indices = torch.sort(scores_processed, descending=False)
-            # cumulative_probs = sorted_logits.softmax(dim=-1).cumsum(dim=-1)
-            # sorted_indices_to_remove = cumulative_probs <= (1 - self.llm_top_p)
-            # sorted_indices_to_remove[..., -self.llm_min_tokens_to_keep :] = 0
-            # indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
-            # next_token_scores = scores_processed.masked_fill(indices_to_remove, self.llm_filter_value)
             probs = F.softmax(next_token_scores, dim=-1)
             next_tokens = torch.multinomial(probs, num_samples=1).squeeze(1)
         else:
@@ -891,22 +1066,9 @@ class HMMiniCPMO(object):
         decoder_output = self.llm_decoder_engine.get_output(self.llm_output_names[0]).numpy()
         hidden_states = self.llm_decoder_engine.get_output(self.llm_output_names[1]).numpy()
         next_token_logits = torch.from_numpy(decoder_output[:, -1, :]).to(self.device)
-        # score = torch.gather(next_token_logits, 1, input_ids)
-        # score = torch.where(score < 0, score * self.llm_penalty, score / self.llm_penalty)
-        # scores_processed = next_token_logits.scatter(1, input_ids, score)
         if self.llm_sampling:
             next_token_scores = self.llm_prepared_logits_processer(input_ids, next_token_logits)
             next_token_scores = self.llm_prepared_logits_warper(input_ids, next_token_scores)
-            # scores_processed = scores_processed / self.llm_temperature
-            # top_k = min(self.llm_top_k, scores_processed.size(-1))
-            # indices_to_remove = scores_processed < torch.topk(scores_processed, top_k[0][..., -1, None])
-            # scores_processed = scores_processed.masked_fill(indices_to_remove, self.llm_filter_value)
-            # sorted_logits, sorted_indices = torch.sort(scores_processed, descending=False)
-            # cumulative_probs = sorted_logits.softmax(dim=-1).cumsum(dim=-1)
-            # sorted_indices_to_remove = cumulative_probs <= (1 - self.llm_top_p)
-            # sorted_indices_to_remove[..., -self.llm_min_tokens_to_keep :] = 0
-            # indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
-            # next_token_scores = scores_processed.masked_fill(indices_to_remove, self.llm_filter_value)
             probs = F.softmax(next_token_scores, dim=-1)
             next_tokens = torch.multinomial(probs, num_samples=1).squeeze(1)
         else:
@@ -927,7 +1089,7 @@ class HMMiniCPMO(object):
         unfinished_sequences = torch.ones(input_ids.shape[0], dtype=torch.long, device=input_ids.device)
         #last_hidden_states = last_hidden_states[:, -1, ...]
         decode_start_time = time.time()
-        while(~this_peer_finished):
+        while(not this_peer_finished):
             next_tokens, hidden_states = self.chat_llm_decoder(next_tokens, input_ids)
             last_hidden_states = np.concatenate([last_hidden_states, hidden_states], axis=1)
             self.context_length += 1
@@ -958,14 +1120,7 @@ class HMMiniCPMO(object):
         spk_emb_mask = input_ids == self.tts_spk_emb_token_id
         if spk_emb_mask.any():
             assert llm_spk_embeds is not None
-            projector_input_name = list(self.tts_projector_input_infos.keys())[0]
-            projector_input_data = llm_spk_embeds.detach().cpu().numpy().astype(self.tts_prefill_input_infos[projector_input_name].dtype)
-            self.tts_projector_engine.set_input(projector_input_name, projector_input_data)
-            self.tts_projector_engine.run()
-            self.tts_projector_engine.sync()
-            projected_spk_emb = self.tts_projector_engine.get_output(list(self.tts_projector_output_infos.keys())[0])
-            projected_spk_emb = torch.from_numpy(projected_spk_emb).to(device=self.device, dtype=llm_spk_embeds.dtype)
-            projected_spk_emb = F.normalize(projected_spk_emb, p=2, dim=-1)
+            projected_spk_emb = F.normalize(llm_spk_embeds, p=2, dim=-1)
             
             bs = input_ids.shape[0]
             for idx in range(bs):
@@ -985,7 +1140,7 @@ class HMMiniCPMO(object):
         device = inputs_embeds.device
         min_dtype = torch.finfo(dtype).min
 
-        causal_mask = torch.full((1, past_seen_tokens + inputs_embeds.shape[1]), full_value=0, dtype=dtype, device=device)
+        causal_mask = torch.full((1, past_seen_tokens + inputs_embeds.shape[1]), 0, dtype=dtype, device=device)
 
         invisible_text_tokens_start = (min(math.ceil((past_seen_tokens - self.tts_streaming_text_reserved_len) / self.tts_streaming_audio_chunk_size)
                                            * self.tts_streaming_text_chunk_size, self.tts_streaming_text_reserved_len,) + 1 + self.tts_num_spk_embs)
@@ -1000,11 +1155,11 @@ class HMMiniCPMO(object):
         prefill_shape = list(self.tts_prefill_shape)
         x = torch.zeros(prefill_shape, dtype=input_embeds.dtype, device=input_embeds.device)
         x[:, :current_length] = input_embeds[:, -current_length:]
-        current_length = np.array(current_length, dtype=self.tts_prefill_input_infos["current_length"].dtype)
-        valid_length = np.array(valid_length, dtype=self.tts_prefill_input_infos["valid_length"].dtype) 
+        current_length = np.array([current_length], dtype=self.tts_prefill_input_infos["current_length"].dtype)
+        valid_length = np.array([valid_length], dtype=self.tts_prefill_input_infos["valid_length"].dtype) 
         inputs_list = [x.detach().cpu().numpy().astype(self.tts_prefill_input_infos["input_1"].dtype), 
+                       valid_length,
                        current_length, 
-                       valid_length, 
                        attention_mask.detach().cpu().numpy().astype(self.tts_prefill_input_infos["attention_mask"].dtype)]
         for i in range(4):
             input_name = list(self.tts_prefill_input_infos.keys())[i]
@@ -1018,25 +1173,27 @@ class HMMiniCPMO(object):
                                           input_embeds.detach().cpu().numpy().astype(self.tts_decoder_input_infos[input_name].dtype))
         input_name = list(self.tts_decoder_input_infos.keys())[1]
         self.tts_decoder_engine.set_input(input_name,
-                                          np.array(valid_length,dtype=self.tts_decoder_input_infos[input_name].dtype))
+                                          np.array([valid_length],dtype=self.tts_decoder_input_infos[input_name].dtype))
         input_name = list(self.tts_decoder_input_infos.keys())[3]
         self.tts_decoder_engine.set_input(input_name,
                                           attention_mask.detach().cpu().numpy().astype(self.tts_decoder_input_infos[input_name].dtype))
         self.tts_decoder_engine.run()
         self.tts_decoder_engine.sync()
 
-        logits = self.tts_decoder_engine.get_output(list(self.tts_decoder_output_infos.keys())[0])
+        logits = self.tts_decoder_engine.get_output(list(self.tts_decoder_output_infos.keys())[0]).numpy()
         logits = torch.from_numpy(logits).to(device=self.device, dtype=input_embeds.dtype)
 
         #### decoder post process
+        logits = logits.narrow(1, -1, 1).squeeze_(1).float()
         logits = logits.permute(0, 2, 1)
         logits = logits.reshape(-1, logits.size(2))
+        self.tts_decode_run_num += 1
         return logits
 
-    def generate_tts_decoder(self, input_ids, streaming_tts_text_mask, valid_length):
+    def generate_tts_decoder(self, input_ids, streaming_tts_text_mask, valid_length, text_split=False):
         start_idx = 1 + self.tts_num_spk_embs * self.tts_use_speaker_embedding + self.tts_streaming_text_reserved_len + 1
         finish = torch.zeros(input_ids.shape[0], device=input_ids.device).bool()
-        temperature = temperature.unsqueeze(0).expand(input_ids.shape[0], -1).contiguous().view(-1, 1)
+        temperature = self.tts_temperature.unsqueeze(0).expand(input_ids.shape[0], -1).contiguous().view(-1, 1)
         progress = input_ids.shape[1]
         input_ids_buf = torch.zeros(input_ids.shape[0], 
                                     progress + self.tts_max_new_token, 
@@ -1048,7 +1205,14 @@ class HMMiniCPMO(object):
         input_ids = input_ids_buf.narrow(1, 0, progress)
         condition_length = 1 + self.tts_num_spk_embs * self.tts_use_speaker_embedding + self.tts_streaming_text_reserved_len + 1
 
+        if not text_split:
+            last_flag = False
+            last_finish = finish
+            last_idx_next = None
+
         for i in range(self.tts_max_new_token):
+            if valid_length >= self.tts_context_max_length:
+                break
             audio_bos = True if progress == condition_length else False
             if audio_bos:
                 narrowed_input_ids = torch.tensor([[self.tts_audio_bos_token_id]], dtype=torch.long, device=self.device)
@@ -1056,7 +1220,7 @@ class HMMiniCPMO(object):
                 del narrowed_input_ids
             else:
                 narrowed_input_ids = input_ids.narrow(dim=1, start=input_ids.shape[1] - 1, length=1)
-                code_emb = [F.embedding(self.tts_code_embeddings[i], narrowed_input_ids[:, :, i]) for i in range(self.tts_num_vq)]
+                code_emb = [F.embedding(narrowed_input_ids[:, :, i], self.tts_code_embeddings[i]) for i in range(self.tts_num_vq)]
                 inputs_embeds = torch.stack(code_emb, 3).sum(3)
             
             causal_mask, min_dtype = self.make_tts_streaming_chunk_mask(inputs_embeds=inputs_embeds,
@@ -1070,7 +1234,7 @@ class HMMiniCPMO(object):
 
             #### tts decoder postprocess remain
             if self.tts_sampling:
-                logits /= self.tts_temperature
+                logits /= temperature
 
                 if not audio_bos:
                     input_ids_sliced = input_ids.narrow(1, start_idx, input_ids.size(1) - start_idx).permute(0, 2, 1)
@@ -1084,10 +1248,16 @@ class HMMiniCPMO(object):
                 scores = F.softmax(logits, dim=-1)
                 idx_next = torch.multinomial(scores, num_samples=1)
             else:
-                idx_next = torch.argmax(logits, dim=-1)
+                idx_next = torch.argmax(logits, dim=-1).unsqueeze_(1)
             idx_next = idx_next.view(-1, self.tts_num_vq)
             finish_or = idx_next.eq(self.tts_eos_token).any(1)
             finish.logical_or_(finish_or)
+            if not text_split and finish.all() and i < self.tts_max_new_token - 1:
+                last_flag = True
+                last_finish = finish
+                last_idx_next = idx_next
+                finish = torch.zeros(input_ids.shape[0], device=input_ids.device).bool()
+                continue
 
             input_ids_buf.narrow(1, progress, 1).copy_(idx_next.unsqueeze_(1))
             if i == 0 and finish.any():
@@ -1095,22 +1265,35 @@ class HMMiniCPMO(object):
 
             progress += 1
             input_ids = input_ids_buf.narrow(1, 0, progress)
-            if finish.all():
+            if input_ids.shape[1] >= self.tts_context_max_length:
                 break
-        if finish.all():
-            genrated_input_ids = input_ids[:, condition_length:-1, :]
+            if finish.all() and text_split:
+                break
+        if not text_split:
+            if last_flag:
+                input_ids_buf.narrow(1, progress, 1).copy_(last_idx_next.unsqueeze_(1))
+                input_ids = input_ids_buf.narrow(1, 0, progress)
+                genrated_input_ids = input_ids[:, condition_length:-1, :]
+            else:
+                genrated_input_ids = input_ids[:, condition_length:, :]
+            return genrated_input_ids, input_ids, last_finish.all(), valid_length, last_flag
         else:
-            genrated_input_ids = input_ids[:, condition_length:, :]
-            
-        return genrated_input_ids, input_ids, finish.all(), valid_length
+            genrated_input_ids = input_ids[:, condition_length:-1, :] if finish.all() else input_ids[:, condition_length:, :]   
+            return genrated_input_ids, input_ids, finish.all(), valid_length, False
     
-    def generate_tts(self, inputs, last_hidden_states, text):
-        last_hidden_states = torch.from_numpy(last_hidden_states).to(self.device)
-        spk_bound = inputs["spk_bounds"][0][-1]
-        spk_embeds = last_hidden_states[spk_bound[0] : spk_bound[1]]
+    def generate_tts(self, inputs, last_hidden_states, gen_text, **kwargs):
+        only_tts = kwargs.get("only_tts", False)
+        text_split = kwargs.get("text_split", False)
+        if only_tts:
+            spk_embeds = last_hidden_states
+        else:
+            last_hidden_states = torch.from_numpy(last_hidden_states).to(self.device)
+            spk_bound = inputs["spk_bounds"][0][-1]
+            spk_embeds = last_hidden_states[0][spk_bound[0] : spk_bound[1]]
 
-        text = text.split("<|tts_bos|>")[-1]
-        gen_text = text.split("<|tts_eos|>")[0]
+        normal_last_flag = False
+        exceed_tts_max_length = False
+
         tts_tokens = self.tts_text_tokenizer.encode(gen_text, add_special_tokens=False)
         tts_tokens_len = len(tts_tokens)
         if tts_tokens_len < self.tts_streaming_text_reserved_len:
@@ -1122,7 +1305,7 @@ class HMMiniCPMO(object):
             text = self.tts_text_tokenizer.decode(tts_tokens, add_special_tokens=False)
             pad_str = ""
         spk_emb_placeholder_tts = "[spk_emb]" * self.tts_num_spk_embs
-        new_text_tts = f"[Stts]{spk_emb_placeholder_tts}{text}{pad_str}[Ptts]"
+        new_text_tts = f"[Stts]{spk_emb_placeholder_tts}{gen_text}{pad_str}[Ptts]"
         
         tts_inputs = self.tts_text_tokenizer.encode(new_text_tts, add_special_tokens=False)
         tts_input_ids = torch.Tensor(tts_inputs).unsqueeze(0).to(self.device, dtype=torch.long)
@@ -1146,7 +1329,7 @@ class HMMiniCPMO(object):
         eos_lab = False
         tts_prefill_valid_length = 0
         tts_decoder_valid_length = condition_length - 1
-        for chunk_idx in range(math.ceil(emb.shape[1]) / self.tts_streaming_text_chunk_size):
+        for chunk_idx in range(math.ceil(emb.shape[1] / self.tts_streaming_text_chunk_size)):
             if chunk_idx == 0:
                 begin = chunk_idx * self.tts_streaming_text_chunk_size + 0
                 end = (chunk_idx + 1) * self.tts_streaming_text_chunk_size + 1 + self.tts_use_speaker_embedding * self.tts_num_spk_embs
@@ -1158,35 +1341,59 @@ class HMMiniCPMO(object):
                 tts_prefill_input_embeds = self.merge_tts_inputs_embeds(text_input_ids, spk_embeds if begin == 0 else None)
                 min_dtype = torch.finfo(tts_prefill_input_embeds.dtype).min
                 tts_prefill_current_length = tts_prefill_input_embeds.shape[1]
-                tts_prefill_attention_mask = torch.zeros(self.tts_mask_shape, dtype=self.tts_mask_dtype, device=self.device)
-                tts_prefill_attention_mask[..., tts_prefill_current_length:] = min_dtype
+                tts_prefill_attention_mask = torch.zeros(self.tts_mask_shape, dtype=torch.float16, device=self.device)
+                tts_prefill_attention_mask[..., end:] = min_dtype
+                tts_prefill_start_time = time.time()
                 self.chat_tts_prefill(tts_prefill_input_embeds,
                                       tts_prefill_current_length,
                                       tts_prefill_valid_length,
                                       tts_prefill_attention_mask)
+                self.tts_prefill_times.append(time.time() - tts_prefill_start_time)
                 tts_prefill_valid_length += tts_prefill_current_length
-            
-            audio_input_ids, finished, new_ids, tts_decoder_valid_length = self.generate_tts_decoder(audio_input_ids, streaming_tts_text_mask, tts_decoder_valid_length)
-
-            if finished:
+            self.tts_decode_run_num = 0
+            tts_decode_start_time = time.time()
+            new_ids, audio_input_ids, finished, tts_decoder_valid_length, normal_last_flag = self.generate_tts_decoder(audio_input_ids, 
+                                                                                                                       streaming_tts_text_mask, 
+                                                                                                                       tts_decoder_valid_length,
+                                                                                                                       text_split)
+            self.tts_decode_times.append(time.time() - tts_decode_start_time)
+            if finished or chunk_idx > tts_tokens_len:
                 logger.info("tts generation finished!")
                 eos_lab = True
                 break
         if not eos_lab:
             logger.warning("tts eos_lab False, Generation continue!")
             while True:
-                audio_input_ids, finished, new_ids, tts_decoder_valid_length = self.generate_tts_decoder(audio_input_ids, 
+                tts_decode_start_time = time.time()
+                new_ids, audio_input_ids, finished, tts_decoder_valid_length, normal_last_flag = self.generate_tts_decoder(audio_input_ids, 
                                                                                                          streaming_tts_text_mask, 
-                                                                                                         tts_decoder_valid_length)
+                                                                                                         tts_decoder_valid_length,
+                                                                                                         text_split)
+                self.tts_decode_times.append(time.time() - tts_decode_start_time)
                 if finished:
-                    logger.info("Not eos_lab Generation finished.")
+                    if normal_last_flag and not text_split:
+                        logger.info("The normal eos_lab generation is complete. The decoder will run one more round to ensure complete speech generation.")
+                    else:
+                        logger.info("Not eos_lab Generation finished.")
                     break
-                if new_ids.shape[1] > self.tts_context_max_length:
+                if audio_input_ids.shape[1] >= self.tts_context_max_length:
                     logger.warning(f"tts Generation length > {self.tts_context_max_length}, stopped!")
+                    exceed_tts_max_length = True
                     break
+            if text_split:
+                if normal_last_flag and not exceed_tts_max_length:
+                    tts_decode_start_time = time.time()
+                    new_ids, audio_input_ids, _, tts_decoder_valid_length, _ = self.generate_tts_decoder(audio_input_ids, 
+                                                                                                        streaming_tts_text_mask, 
+                                                                                                        tts_decoder_valid_length,
+                                                                                                        text_split)
+                    self.tts_decode_times.append(time.time() - tts_decode_start_time)
+                    logger.info("Not eos_lab Generation finished.")
+        logger.info(f"tts_tokens_len: {tts_tokens_len}")
+        logger.info(f"tts new_ids shape: {new_ids.shape}")
         return new_ids
             
-    def dvae_decode_to_mel_spec(self, result_list: list[torch.Tensor]):
+    def dvae_decode_to_mel_spec(self, result_list: list[torch.Tensor]) -> List:
         max_x_len = -1
         if len(result_list) == 0:
             return np.array([], dtype=np.float32)
@@ -1202,59 +1409,101 @@ class HMMiniCPMO(object):
             src = result_list[i]
             batch_result[i].narrow(1, 0, src.size(0)).copy_(src.permute(1, 0))
         
-        input_name = list(self.dvae_input_infos.keys())[0]
-        input_shape = self.dvae_input_infos[input_name].shape
-        input_dtype = self.dvae_input_infos[input_name].dtype
+        input_name = list(self.dvae_part1_input_infos.keys())[0]
+        input_shape = self.dvae_part1_input_infos[input_name].shape
+        input_dtype = self.dvae_part1_input_infos[input_name].dtype
 
-        truth_input = np.zeros(input_shape, dtype=input_dtype)
-        if input_shape[-1] >= batch_result.shape[-1]:
-            truth_input[..., :batch_result.shape[-1]] = batch_result.detach().cpu().numpy()
-        else:
-            truth_input = batch_result.detach().cpu().numpy()[..., :input_shape[-1]].astype(input_dtype)
-        
-        self.dvae_engine.set_input(input_name, truth_input)
-        self.dvae_engine.run()
-        self.dvae_engine.sync()
+        batch_result_list = []
+        pre_gen_nums = batch_result.shape[-1] // input_shape[-1]
+        start_idx = 0
+        for g in range(pre_gen_nums):
+            end_idx = start_idx + input_shape[-1]
+            cur_batch = batch_result[..., start_idx:end_idx]
+            batch_result_list.append(cur_batch)
+            start_idx = end_idx
+        batch_result_list.append(batch_result[..., (pre_gen_nums * input_shape[-1]):])
 
-        mel_specs = self.dvae_engine.get_output(list(self.dvae_output_infos.keys())[0])
-        mel_specs = np.reshape(mel_specs, (mel_specs.shape[0], mel_specs.shape[1], -1, 2))
-        if input_shape[-1] > batch_result.shape[-1]:
-            mel_specs = mel_specs[:, :, :input_shape[-1]]
-        mel_specs = np.reshape(mel_specs, (mel_specs.shape[0], mel_specs.shape[1], -1))
+        mel_specs = []
+        for cur_batch_result in batch_result_list:
+            truth_input = np.zeros(input_shape, dtype=input_dtype)
+            if input_shape[-1] >= cur_batch_result.shape[-1]:
+                truth_input[..., :cur_batch_result.shape[-1]] = cur_batch_result.detach().cpu().numpy()
+            else:
+                truth_input = cur_batch_result.detach().cpu().numpy()[..., :input_shape[-1]].astype(input_dtype)
+            
+            self.dvae_part1_engine.set_input(input_name, truth_input)
+            self.dvae_part1_engine.run()
+            self.dvae_part1_engine.sync()
+            dvae_part1_outdata = self.dvae_part1_engine.get_output(list(self.dvae_part1_output_infos.keys())[0]).numpy()
 
+            truth_dvae_part1_outdata = dvae_part1_outdata[:, :, :cur_batch_result.size(-1), :]
+            new_shape = (truth_dvae_part1_outdata.shape[0], truth_dvae_part1_outdata.shape[1], -1)
+            dvae_part1_outdata = np.reshape(truth_dvae_part1_outdata, new_shape)
+
+            for part2_input_name in list(self.dvae_part2_input_infos.keys()):
+                part2_input_shape = self.dvae_part2_input_infos[part2_input_name].shape
+                part2_input_dtype = self.dvae_part2_input_infos[part2_input_name].dtype
+                if part2_input_shape[1] != 1:
+                    new_part1_outdata = dvae_part1_outdata.astype(part2_input_dtype) \
+                        if part2_input_dtype != dvae_part1_outdata.dtype else dvae_part1_outdata
+                    if part2_input_shape[-1] > dvae_part1_outdata.shape[-1]:
+                        truth_dvae_part2_data = np.zeros(part2_input_shape, dtype=part2_input_dtype)
+                        truth_dvae_part2_data[..., :dvae_part1_outdata.shape[-1]] = new_part1_outdata
+                    else:
+                        truth_dvae_part2_data = new_part1_outdata[..., :part2_input_shape[-1]]
+                else:
+                    truth_dvae_part2_data = np.ones(part2_input_shape, dtype=part2_input_dtype)
+                    if dvae_part1_outdata.shape[-1] < part2_input_shape[-1]:
+                        truth_dvae_part2_data[..., dvae_part1_outdata.shape[-1]:] = 0
+
+                self.dvae_part2_engine.set_input(part2_input_name, truth_dvae_part2_data)
+            self.dvae_part2_engine.run()
+            self.dvae_part2_engine.sync()
+
+            dvae_part2_outdata = self.dvae_part2_engine.get_output(list(self.dvae_part2_output_infos.keys())[0]).numpy()
+            cur_mel_specs = dvae_part2_outdata[..., :dvae_part1_outdata.shape[-1]]
+            mel_specs.append(cur_mel_specs)
         return mel_specs
 
-    def vocos_decode_mel(self, mel_spec: np.ndarray):
-        input_name = list(self.vocos_input_infos.keys())[0]
-        input_shape = self.vocos_input_infos[input_name].shape
-        input_dtype = self.vocos_input_infos[input_name].dtype
+    def vocos_decode_mel(self, mel_spec_list: List[np.ndarray]):
+        audio_list = []
+        for mel_spec in mel_spec_list:
+            for input_name in list(self.vocos_input_infos.keys()):
+                input_shape = self.vocos_input_infos[input_name].shape
+                input_dtype = self.vocos_input_infos[input_name].dtype
+                if input_shape[1] != 1:
+                    mel_spec = mel_spec.astype(input_dtype)
+                    if input_shape[-1] > mel_spec.shape[-1]:
+                        truth_input = np.zeros(input_shape, dtype=input_dtype)
+                        truth_input[..., :mel_spec.shape[-1]] = mel_spec
+                    else:
+                        truth_input = mel_spec[..., :input_shape[-1]]
+                else:
+                    truth_input = np.ones(input_shape, dtype=input_dtype)
+                    if input_shape[-1] > mel_spec.shape[-1]:
+                        truth_input[..., mel_spec.shape[-1]:] = 0    
+                self.vocos_engine.set_input(input_name, truth_input)
+            self.vocos_engine.run()
+            self.vocos_engine.sync()
 
-        mel_spec = mel_spec.astype(input_dtype)
+            #output_names = sorted(list(self.vocos_output_infos.keys()))
+            mag = self.vocos_engine.get_output("mag").numpy()[..., :mel_spec.shape[-1]]
+            x = self.vocos_engine.get_output("x").numpy()[..., :mel_spec.shape[-1]]
+            y = self.vocos_engine.get_output("y").numpy()[..., :mel_spec.shape[-1]]
 
-        truth_input = np.zeros(input_shape, dtype=input_dtype)
-        if input_shape[-1] >= mel_spec.shape[-1]:
-            truth_input[..., :mel_spec.shape[-1]] = mel_spec
-            truth_length = mel_spec.shape[-1]
-        else:
-            truth_input = mel_spec[..., :input_shape[-1]]
-            truth_length = input_shape[-1]
-        
-        self.vocos_engine.set_input(input_name, truth_input)
-        self.vocos_engine.run()
-        self.vocos_engine.sync()
+            # mag = torch.from_numpy(mag).to(device=self.device, dtype=torch.float16)
+            # mag = torch.exp(mag)
+            # mag = torch.clip(mag, max=1e2)
 
-        #### 这部分onnx,少一个slice mag的输出，但其实exp和clip应该也可以放到模型中
-        #output_names = sorted(list(self.vocos_output_infos.keys()))
-        mag = self.vocos_engine.get_output("slice_output_0")[..., :truth_length]
-        x = self.vocos_engine.get_output("x")[..., :truth_length]
-        y = self.vocos_engine.get_output("y")[..., :truth_length]
+            mag = torch.from_numpy(mag).to(device=self.device).float()
+            x = torch.from_numpy(x).to(device=self.device).float()
+            y = torch.from_numpy(y).to(device=self.device).float()
 
-        mag = torch.from_numpy(mag).to(device=self.device, dtype=torch.float16)
-        mag = torch.exp(mag)
-        mag = torch.clip(mag, max=1e2)
-
-        S = mag * (x + 1j * y)
-        audio = self.vocos_istft(S)
+            S = mag * (x + 1j * y)
+            S = S.detach().cpu()
+            cur_audio = self.vocos_istft(S)
+            audio_list.append(cur_audio)
+        audio = torch.cat(audio_list, dim=-1)
         return audio
 
     def generate(
@@ -1290,24 +1539,102 @@ class HMMiniCPMO(object):
             model_inputs["vision_hidden_states"] = vision_hidden_states
         self.llm_ttft_start_time = time.time()
         model_inputs = self.get_vap_out_embedding(model_inputs)
+        logger.info("Get VAP embedding finish!")
         token_ids, last_hidden_states, input_tokens_num, output_token_nums = self.get_llm_out_tokens(model_inputs)
+        logger.info("LLM Get answer text finish!")
         result = self.llm_decode_text(token_ids)
+        logger.info("Output tokens convert to text finish!")
+        self.anwser_total_time = time.time() - self.llm_ttft_start_time
         answer = result[0]
 
         generate_audio = kwargs.get("generate_audio", False)
+        final_wav = None
         if self.use_tts_template and generate_audio:
             if not self.init_tts:
                 logger.warning("TTS model not init, can not generate audio! Will only return text answer.")
                 pass
-            output_audio_path = kwargs.get("output_audio_path", "./output.wav")
+            text_split = kwargs.get("text_split", False)
+            insert_silence = kwargs.get("insert_silence", False)
+            truth_answer = answer.split("<|tts_bos|>")[-1].split("<|tts_eos|>")[0]
+            answer_list = split_text_for_tts(truth_answer) if text_split else [truth_answer]
+            wav_numpy_list = []
+            tts_chunk_total_start_time = time.time()
+            for idx, cur_answer in enumerate(answer_list):
+                ### get mel spectrum(梅尔频谱)
+                self.tts_prefill_times = []
+                self.tts_decode_times = []
+                logger.info(f"Text {idx} start tts codec...")
+                tts_start_time = time.time()
+                tts_tokens_ids = self.generate_tts(model_inputs, last_hidden_states, cur_answer, **kwargs)
+                tts_dvae_start_time = time.time()
+                mel_spec = self.dvae_decode_to_mel_spec(tts_tokens_ids)
+                self.tts_dvae_time = time.time() - tts_dvae_start_time
+                tts_vocos_start_time = time.time()
+                wav_numpy = self.vocos_decode_mel(mel_spec).squeeze().detach().cpu().numpy()
+                self.tts_vocos_time = time.time() - tts_vocos_start_time
+                self.tts_total_time = time.time() - tts_start_time
+                self.tts_audio_seconds = wav_numpy.shape[0] / float(self.wav_sr)
+                if idx > 0 and insert_silence:
+                    silence = np.zeros((int(self.wav_sr * 0.1),), dtype=wav_numpy.dtype)
+                    wav_numpy_list.append(silence)
+                wav_numpy_list.append(wav_numpy)
+                self.tts_chunk_prefill_times.append(self.tts_prefill_times)
+                self.tts_chunk_decoder_times.append(self.tts_decode_times)
+                self.tts_chunk_dvae_times.append(self.tts_dvae_time)
+                self.tts_chunk_vocos_times.append(self.tts_vocos_time)
+                self.tts_chunk_per_total_times.append(self.tts_total_time)
+                self.tts_chunk_audio_seconds.append(self.tts_audio_seconds)
+            self.tts_chunk_total_time = time.time() - tts_chunk_total_start_time
+            final_wav = np.concatenate(wav_numpy_list)
+        return answer, final_wav, input_tokens_num, output_token_nums
+    
+    def chat_otts(self, msgs, **kwargs):
+        if not isinstance(msgs, dict):
+            logger.error("msgs is not dict, this is not support!")
+            assert(0)
+        only_tts = kwargs.get("only_tts", False)
+        text_split = kwargs.get("text_split", False)
+        insert_silence = kwargs.get("insert_silence", False)
+        final_wav = None
+        if only_tts:
             ### get mel spectrum(梅尔频谱)
-            tts_tokens_ids = self.generate_tts(model_inputs, last_hidden_states, answer)
-            mel_spec = self.dvae_decode_to_mel_spec(tts_tokens_ids)
-            wav_numpy = self.vocos_decode_mel(mel_spec).detach().cpu().numpy()
-            if 1:
-                sf.write(output_audio_path, wav_numpy, samplerate=self.wav_sr)
-                logger.info(f"Audio saved to {output_audio_path}")
-        return answer, input_tokens_num, output_token_nums
+            hidden_states = msgs['content'][1]
+            text = msgs['content'][0]
+            text_list = split_text_for_tts(text) if text_split else [text]
+            logger.info(f"The text will be divided into {len(text_list)} segments for transcoding into speech.")
+            wav_numpy_list = []
+            tts_chunk_total_start_time = time.time()
+            for idx, text in enumerate(text_list):
+                self.tts_prefill_times = []
+                self.tts_decode_times = []
+                tts_start_time = time.time()
+                tts_tokens_ids = self.generate_tts(None, hidden_states, text, **kwargs)
+                tts_dvae_start_time = time.time()
+                mel_spec_list = self.dvae_decode_to_mel_spec(tts_tokens_ids)
+                self.tts_dvae_time = time.time() - tts_dvae_start_time
+                tts_vocos_start_time = time.time()
+                wav_numpy = self.vocos_decode_mel(mel_spec_list).squeeze().detach().cpu().numpy()
+                self.tts_vocos_time = time.time() - tts_vocos_start_time
+                self.tts_total_time = time.time() - tts_start_time
+                self.tts_audio_seconds = wav_numpy.shape[0] / float(self.wav_sr)
+                if idx > 0 and insert_silence:
+                    silence = np.zeros((int(self.wav_sr * 0.1),), dtype=wav_numpy.dtype)
+                    wav_numpy_list.append(silence)
+                wav_numpy_list.append(wav_numpy)
+                self.tts_chunk_prefill_times.append(self.tts_prefill_times)
+                self.tts_chunk_decoder_times.append(self.tts_decode_times)
+                self.tts_chunk_dvae_times.append(self.tts_dvae_time)
+                self.tts_chunk_vocos_times.append(self.tts_vocos_time)
+                self.tts_chunk_per_total_times.append(self.tts_total_time)
+                self.tts_chunk_audio_seconds.append(self.tts_audio_seconds)
+            self.tts_chunk_total_time = time.time() - tts_chunk_total_start_time
+            final_wav = np.concatenate(wav_numpy_list)
+            self.tts_total_audio_seconds = final_wav.shape[0] / float(self.wav_sr)
+            logger.info(f"wav shape: {final_wav.shape}")
+        else:
+            logger.error("Current only_tts is False, it should be set True!")
+            assert(0)
+        return final_wav
 
     def chat(self, msgs, **kwargs):
         if isinstance(msgs[0], list):
@@ -1324,7 +1651,7 @@ class HMMiniCPMO(object):
         
         inputs = self.regularize_msgs(msgs_list, max_slice_nums, omni_input)
 
-        answer, input_tokens_num, output_token_nums = self.generate(input_ids=inputs["input_ids"],
+        answer, wavdata, input_tokens_num, output_token_nums = self.generate(input_ids=inputs["input_ids"],
                                pixel_values=inputs["pixel_values"],
                                tgt_sizes=inputs["tgt_sizes"],
                                audio_features=inputs["audio_features"],
@@ -1336,50 +1663,65 @@ class HMMiniCPMO(object):
                                **kwargs)
         answer = answer.replace(self.tokenizer.tts_end, "")
 
-        return answer, input_tokens_num, output_token_nums
+        return answer, wavdata, input_tokens_num, output_token_nums
     
 def xh2_demo(args):
     hmminicpmo = HMMiniCPMO(args,
                 init_vision=True,
-                init_audio=False,
-                init_tts=False,
-                use_tts_template=False,
+                init_audio=True,
+                init_tts=True,
+                use_tts_template=True,
                 llm_sampling=False,
-                tts_sampling=False)
+                tts_sampling=True)
 
     example_mode = EXAMPLES_MODE[args.example_idx]
-    if example_mode == "all":
-        video_path="MiniCPM-o-2_6/assets/Skiing.mp4"
+    if example_mode == "omni":
+        video_path="./MiniCPM-o-2_6/assets/Skiing.mp4"
         # if use voice clone prompt, please set ref_audio
-        ref_audio_path = 'MiniCPM-o-2_6/assets/demo.wav'
+        ref_audio_path = './MiniCPM-o-2_6/assets/demo.wav'
         ref_audio, _ = librosa.load(ref_audio_path, sr=16000, mono=True)
         sys_msg = {"role": "user",
                 "content":["你是一个AI助手。你能接受视频，音频和文本输入并输出语音和文本。模仿输入音频中的声音特征。",
                             ref_audio,
                             "作为助手，你将使用这种声音风格说话。"]}
-        video_contents = get_video_chunk_content(video_path, flatten=False)
-        msg = {"role":"user", "content": video_contents}
+        video_contents = get_video_chunk_content(video_path)
+        msg = {"role":"user", "content": video_contents + ["请优雅的描述一下画面中的场景。"]}
         #msg = {"role":"user", "content": contents}
         msgs = [sys_msg, msg]
         logger.info(msgs)
         start_time = time.time()
-        answer, input_tokens_num, output_tokens_num = hmminicpmo.chat(
+        answer, wavdata, input_tokens_num, output_tokens_num = hmminicpmo.chat(
             msgs=msgs,
             generate_audio=True,
             max_slice_nums=1,
             omni_input=True,
-            output_audio_path="./output_hmm.wav",
         )
         total_time = time.time() - start_time
+        if wavdata is not None:
+            sf.write("output_omni.wav", wavdata, samplerate=hmminicpmo.wav_sr)
+            logger.info(f"Audio saved to output_omni.wav")
+        tts_prefill_total_time = sum(hmminicpmo.tts_prefill_times)
+        tts_decode_total_time = sum(hmminicpmo.tts_decode_times)
+        tts_rtf = hmminicpmo.tts_total_time / hmminicpmo.tts_audio_seconds
+        tts_gen_speed = hmminicpmo.tts_audio_seconds / hmminicpmo.tts_total_time
         logger.info(f"{answer}")
-        logger.success(f"Total cost {total_time * 1000:.3f} ms")
-        logger.success(f"Input tokens: {input_tokens_num}, Output tokens: {output_tokens_num}")
-        logger.success(f"Vision Cost {hmminicpmo.vision_time * 1000:.3f} ms")
+        logger.success(f"Total Cost {total_time * 1000:.3f} ms")
+        logger.success(f"Input Tokens: {input_tokens_num}, Output tokens: {output_tokens_num}")
+        logger.success(f"Vision Cost: {hmminicpmo.vision_time * 1000:.3f} ms")
+        logger.success(f"Audio Cost: {hmminicpmo.audio_time * 1000:.3f} ms")
         logger.success(f"LLM Prefill Speed: {input_tokens_num / hmminicpmo.llm_prefill_time:.2f} tokens/s")
         logger.success(f"TTFT (Time to First Token): {hmminicpmo.llm_ttft_time * 1000:.3f} ms")
         logger.success(f"TPOT (Time Per Output Token): {(output_tokens_num - 1) / hmminicpmo.llm_decode_time:.2f} tokens/s")
+        logger.success(f"ViT+Wishper+LLM TPS (Tokens Per Second): {output_tokens_num / hmminicpmo.anwser_total_time:.2f} tokens/s")
+        logger.success(f"TTS Prefill Mean Time: {tts_prefill_total_time / len(hmminicpmo.tts_prefill_times) * 1000:.3f} ms x {len(hmminicpmo.tts_prefill_times)} times")
+        logger.success(f"TTS Decoder Mean Time: {tts_decode_total_time / len(hmminicpmo.tts_decode_times) * 1000:.3f} ms x {len(hmminicpmo.tts_decode_times)} groups")
+        logger.success(f"TTS Dvae Cost: {hmminicpmo.tts_dvae_time * 1000:.3f} ms")
+        logger.success(f"TTS Vocos Cost: {hmminicpmo.tts_vocos_time * 1000:.3f} ms")
+        logger.success(f"Total Audio Duration Generated: {hmminicpmo.tts_audio_seconds:.2f} s")
+        logger.success(f"TTS Total Cost: {hmminicpmo.tts_total_time * 1000:.3f} ms")
+        logger.success(f"TTS Real-Time Factor(RTF): {tts_rtf:3f}")
+        logger.success(f"TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
-        logger.success(f"TPS (Tokens Per Second): {output_tokens_num / total_time:.2f} tokens/s")
 
     elif example_mode == "llm":
         msg = {"role":"user", "content": ["介绍一下存算一体技术。"]}
@@ -1391,33 +1733,34 @@ def xh2_demo(args):
         )
         total_time = time.time() - start_time
         logger.info(f"{answer}")
-        logger.success(f"Total cost {total_time * 1000:.3f} ms")
-        logger.success(f"Input tokens: {input_tokens_num}, Output tokens: {output_tokens_num}")
+        logger.success(f"Total Cost {total_time * 1000:.3f} ms")
+        logger.success(f"Input Tokens: {input_tokens_num}, Output tokens: {output_tokens_num}")
         logger.success(f"LLM Prefill Speed: {input_tokens_num / hmminicpmo.llm_prefill_time:.2f} tokens/s")
         logger.success(f"TTFT (Time to First Token): {hmminicpmo.llm_ttft_time * 1000:.3f} ms")
         logger.success(f"TPOT (Time Per Output Token): {(output_tokens_num - 1) / hmminicpmo.llm_decode_time:.2f} tokens/s")
+        logger.success(f"LLM TPS (Tokens Per Second): {output_tokens_num / total_time:.2f} tokens/s")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
-        logger.success(f"TPS (Tokens Per Second): {output_tokens_num / total_time:.2f} tokens/s")
 
     elif example_mode == "vllm":
-        image = Image.open("MiniCPM-o-2_6/airplane.jpeg").convert("RGB")
+        image = Image.open("./MiniCPM-o-2_6/airplane.jpeg").convert("RGB")
         msg = {"role":"user", "content": [image, "图中是哪家航空公司的飞机？"]}
         msgs = [msg]
         logger.info(msgs)
         start_time = time.time()
-        answer, input_tokens_num, output_tokens_num = hmminicpmo.chat(
-            msgs=msgs
+        answer, _, input_tokens_num, output_tokens_num = hmminicpmo.chat(
+            msgs=msgs,
+            max_slice_nums=1,
         )
         total_time = time.time() - start_time
         logger.info(f"{answer}")
-        logger.success(f"Total cost {total_time * 1000:.3f} ms")
-        logger.success(f"Input tokens: {input_tokens_num}, Output tokens: {output_tokens_num}")
+        logger.success(f"Total Cost {total_time * 1000:.3f} ms")
+        logger.success(f"Input Tokens: {input_tokens_num}, Output tokens: {output_tokens_num}")
         logger.success(f"Vision Cost {hmminicpmo.vision_time * 1000:.3f} ms")
         logger.success(f"LLM Prefill Speed: {input_tokens_num / hmminicpmo.llm_prefill_time:.2f} tokens/s")
         logger.success(f"TTFT (Time to First Token): {hmminicpmo.llm_ttft_time * 1000:.3f} ms")
         logger.success(f"TPOT (Time Per Output Token): {(output_tokens_num - 1) / hmminicpmo.llm_decode_time:.2f} tokens/s")
+        logger.success(f"ViT+LLM TPS (Tokens Per Second): {output_tokens_num / total_time:.2f} tokens/s")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
-        logger.success(f"TPS (Tokens Per Second): {output_tokens_num / total_time:.2f} tokens/s")
 
     elif example_mode == "mvllm":
         image0 = Image.open("./MiniCPM-o-2_6/000000002532.jpg").convert("RGB")
@@ -1426,19 +1769,154 @@ def xh2_demo(args):
         msgs = [msg]
         logger.info(msgs)
         start_time = time.time()
-        answer, input_tokens_num, output_tokens_num = hmminicpmo.chat(
-            msgs=msgs
+        answer, _, input_tokens_num, output_tokens_num = hmminicpmo.chat(
+            msgs=msgs,
+            max_slice_nums=1,
         )
         total_time = time.time() - start_time
         logger.info(f"{answer}")
-        logger.success(f"Total cost {total_time * 1000:.3f} ms")
-        logger.success(f"Input tokens: {input_tokens_num}, Output tokens: {output_tokens_num}")
+        logger.success(f"Total Cost {total_time * 1000:.3f} ms")
+        logger.success(f"Input Tokens: {input_tokens_num}, Output tokens: {output_tokens_num}")
         logger.success(f"Vision Cost {hmminicpmo.vision_time * 1000:.3f} ms")
         logger.success(f"LLM Prefill Speed: {input_tokens_num / hmminicpmo.llm_prefill_time:.2f} tokens/s")
         logger.success(f"TTFT (Time to First Token): {hmminicpmo.llm_ttft_time * 1000:.3f} ms")
         logger.success(f"TPOT (Time Per Output Token): {(output_tokens_num - 1) / hmminicpmo.llm_decode_time:.2f} tokens/s")
+        logger.success(f"ViT+LLM TPS (Tokens Per Second): {output_tokens_num / total_time:.2f} tokens/s")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
-        logger.success(f"TPS (Tokens Per Second): {output_tokens_num / total_time:.2f} tokens/s")
+    elif example_mode == "vclone":
+        ref_audio, _ = librosa.load('./MiniCPM-o-2_6/assets/input_examples/assistant_default_female_voice.wav', sr=16000, mono=True)
+        sys_msg = {"role": "user", "content":["Clone the voice in the provided audio prompt.", ref_audio]}
+        user_question = {'role': 'user', 'content': [f"Please read the text below.", "我是部署在后摩智能芯片中的AI智能体。"]}
+        msgs = [sys_msg, user_question]
+        total_start_time = time.time()
+        answer, wavdata, input_tokens_num, output_tokens_num = hmminicpmo.chat(
+            msgs=msgs,
+            generate_audio=True,
+        )
+        total_time = time.time() - total_start_time
+        logger.info(f"{answer}")
+        if wavdata is not None:
+            sf.write("output_vclone.wav", wavdata, samplerate=hmminicpmo.wav_sr)
+            logger.info(f"Audio saved to output_vclone.wav")
+        tts_prefill_total_time = sum(hmminicpmo.tts_prefill_times)
+        tts_decode_total_time = sum(hmminicpmo.tts_decode_times)
+        tts_rtf = hmminicpmo.tts_total_time / hmminicpmo.tts_audio_seconds
+        tts_gen_speed = hmminicpmo.tts_audio_seconds / hmminicpmo.tts_total_time
+        logger.success(f"TTS Prefill Mean Time: {tts_prefill_total_time / len(hmminicpmo.tts_prefill_times) * 1000:.3f} ms x {len(hmminicpmo.tts_prefill_times)} times")
+        logger.success(f"TTS Decoder Mean Time: {tts_decode_total_time / len(hmminicpmo.tts_decode_times) * 1000:.3f} ms x {len(hmminicpmo.tts_decode_times)} groups")
+        logger.success(f"TTS Dvae Cost: {hmminicpmo.tts_dvae_time * 1000:.3f} ms")
+        logger.success(f"TTS Vocos Cost: {hmminicpmo.tts_vocos_time * 1000:.3f} ms")
+        logger.success(f"Total Audio Duration Generated: {hmminicpmo.tts_audio_seconds:.2f} s")
+        logger.success(f"TTS Total Cost: {hmminicpmo.tts_total_time * 1000:.3f} ms")
+        logger.success(f"TTS Real-Time Factor(RTF): {tts_rtf:3f}")
+        logger.success(f"TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
+        logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
+    elif example_mode == "wotts":
+        voice_pt = torch.load("/mnt/data/xunan/project/modelzoo/imodelzoo/models/omni/minicpmo/MiniCPM-o-2_6/woman_voice.pt", map_location=torch.device(hmminicpmo.device))
+        msgs = {'role': 'user', 'content': ["我是部署在后摩智能芯片中的文本到语音专家。很高兴为您服务！我可以按照这种方式将文本生成固定的语音文件。", 
+                                            voice_pt]}
+        total_start_time = time.time()
+        wavdata = hmminicpmo.chat_otts(
+            msgs=msgs,
+            only_tts=True,
+        )
+        total_time = time.time() - total_start_time
+        if wavdata is not None:
+            sf.write("output_wotts.wav", wavdata, samplerate=hmminicpmo.wav_sr)
+            logger.info(f"Audio saved to output_wotts.wav")
+        tts_prefill_total_time = sum(hmminicpmo.tts_prefill_times)
+        tts_decode_total_time = sum(hmminicpmo.tts_decode_times)
+        tts_rtf = hmminicpmo.tts_total_time / hmminicpmo.tts_audio_seconds
+        tts_gen_speed = hmminicpmo.tts_audio_seconds / hmminicpmo.tts_total_time
+        logger.success(f"TTS Prefill Mean Time: {tts_prefill_total_time / len(hmminicpmo.tts_prefill_times) * 1000:.3f} ms x {len(hmminicpmo.tts_prefill_times)} times")
+        logger.success(f"TTS Decoder Mean Time: {tts_decode_total_time / len(hmminicpmo.tts_decode_times) * 1000:.3f} ms x {len(hmminicpmo.tts_decode_times)} groups")
+        logger.success(f"TTS Dvae Cost: {hmminicpmo.tts_dvae_time * 1000:.3f} ms")
+        logger.success(f"TTS Vocos Cost: {hmminicpmo.tts_vocos_time * 1000:.3f} ms")
+        logger.success(f"Total Audio Duration Generated: {hmminicpmo.tts_audio_seconds:.2f} s")
+        logger.success(f"TTS Total Cost: {hmminicpmo.tts_total_time * 1000:.3f} ms")
+        logger.success(f"TTS Real-Time Factor(RTF): {tts_rtf:3f}")
+        logger.success(f"TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
+        logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
+    elif example_mode == "motts":
+        voice_pt = torch.load("./MiniCPM-o-2_6/man_voice.pt", map_location=torch.device(hmminicpmo.device))
+        msgs = {'role': 'user', 'content': ["我是部署在后摩智能芯片中的文本到语音专家。很高兴为您服务！我可以按照这种方式将文本生成固定的语音文件。", 
+                                            voice_pt]}
+        total_start_time = time.time()
+        wavdata = hmminicpmo.chat_otts(
+            msgs=msgs,
+            only_tts=True,
+        )
+        total_time = time.time() - total_start_time
+        if wavdata is not None:
+            sf.write("output_motts.wav", wavdata, samplerate=hmminicpmo.wav_sr)
+            logger.info(f"Audio saved to output_motts.wav")
+        tts_prefill_total_time = sum(hmminicpmo.tts_prefill_times)
+        tts_decode_total_time = sum(hmminicpmo.tts_decode_times)
+        tts_rtf = hmminicpmo.tts_total_time / hmminicpmo.tts_audio_seconds
+        tts_gen_speed = hmminicpmo.tts_audio_seconds / hmminicpmo.tts_total_time
+        logger.success(f"TTS Prefill Mean Time: {tts_prefill_total_time / len(hmminicpmo.tts_prefill_times) * 1000:.3f} ms x {len(hmminicpmo.tts_prefill_times)} times")
+        logger.success(f"TTS Decoder Mean Time: {tts_decode_total_time / len(hmminicpmo.tts_decode_times) * 1000:.3f} ms x {len(hmminicpmo.tts_decode_times)} groups")
+        logger.success(f"TTS Dvae Cost: {hmminicpmo.tts_dvae_time * 1000:.3f} ms")
+        logger.success(f"TTS Vocos Cost: {hmminicpmo.tts_vocos_time * 1000:.3f} ms")
+        logger.success(f"Total Audio Duration Generated: {hmminicpmo.tts_audio_seconds:.2f} s")
+        logger.success(f"TTS Total Cost: {hmminicpmo.tts_total_time * 1000:.3f} ms")
+        logger.success(f"TTS Real-Time Factor(RTF): {tts_rtf:3f}")
+        logger.success(f"TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
+        logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
+    elif example_mode == "chunkotts":
+        voice_pt = torch.load("./MiniCPM-o-2_6/woman_voice.pt", map_location=torch.device(hmminicpmo.device))
+        msgs = {'role': 'user', 'content': ["在当今科技飞速发展的时代，人工智能大模型凭借其强大的语言理解、知识生成和逻辑推理能力，不仅正在深刻改变人们获取信息、沟通交流以及解决问题的方式，而且在教育、医疗、科研、金融等众多领域展现出前所未有的应用潜力，推动着各行各业朝着更加智能化、高效化的方向转型升级，成为推动社会进步和经济发展的关键力量。\
+                                            面对人工智能大模型带来的机遇与挑战，我们必须在技术创新与伦理规范之间找到平衡，既要充分发挥其在提升生产效率、优化决策流程和解决复杂问题方面的巨大优势，又要通过完善法律法规、加强技术监管和推动多方协作，有效应对数据隐私、算法偏见和就业结构变化等潜在风险，确保这项前沿技术能够真正造福人类社会。", 
+                                            voice_pt]}
+        total_start_time = time.time()
+        wavdata = hmminicpmo.chat_otts(
+            msgs=msgs,
+            only_tts=True,
+            text_split=True,
+        )
+        total_time = time.time() - total_start_time
+        if wavdata is not None:
+            sf.write("output_chunkotts.wav", wavdata, samplerate=hmminicpmo.wav_sr)
+            logger.info(f"Audio saved to output_chunkotts.wav")
+        chunk_num = len(hmminicpmo.tts_chunk_audio_seconds)
+        tts_chunk_prefill_total_time = 0
+        tts_chunk_decoder_total_time = 0
+        tts_chunk_prefill_num = 0
+        tts_chunk_decoder_num = 0
+        tts_chunk_total_time = 0
+        logger.info("The following are the time taken to process the TTS for each piece of text.")
+        for i in range(chunk_num):
+            tts_prefill_total_time = sum(hmminicpmo.tts_chunk_prefill_times[i])
+            tts_decode_total_time = sum(hmminicpmo.tts_chunk_decoder_times[i])
+            tts_chunk_prefill_total_time += tts_prefill_total_time
+            tts_chunk_decoder_total_time += tts_decode_total_time
+            tts_rtf = hmminicpmo.tts_chunk_per_total_times[i] / hmminicpmo.tts_chunk_audio_seconds[i]
+            tts_gen_speed = hmminicpmo.tts_chunk_audio_seconds[i] / hmminicpmo.tts_chunk_per_total_times[i]
+            tts_chunk_prefill_num += len(hmminicpmo.tts_chunk_prefill_times[i])
+            tts_chunk_decoder_num += len(hmminicpmo.tts_chunk_decoder_times[i])
+            tts_chunk_total_time += len(hmminicpmo.tts_chunk_per_total_times[i])
+            logger.success(f"Text {i} TTS Prefill Mean Time: \
+                           {tts_prefill_total_time / len(hmminicpmo.tts_chunk_prefill_times[i]) * 1000:.3f} ms x {len(hmminicpmo.tts_chunk_prefill_times[i])} times")
+            logger.success(f"Text {i} TTS Decoder Mean Time: \
+                           {tts_decode_total_time / len(hmminicpmo.tts_chunk_decoder_times[i]) * 1000:.3f} ms x {len(hmminicpmo.tts_chunk_decoder_times[i])} groups")
+            logger.success(f"Text {i} TTS Dvae Cost: {hmminicpmo.tts_chunk_dvae_times[i] * 1000:.3f} ms")
+            logger.success(f"Text {i} TTS Vocos Cost: {hmminicpmo.tts_chunk_vocos_times[i] * 1000:.3f} ms")
+            logger.success(f"Text {i} Total Audio Duration Generated: {hmminicpmo.tts_chunk_audio_seconds[i]:.2f} s")
+            logger.success(f"Text {i} TTS Total Cost: {hmminicpmo.tts_chunk_per_total_times[i] * 1000:.3f} ms")
+            logger.success(f"Text {i} TTS Real-Time Factor(RTF): {tts_rtf:.3f}")
+            logger.success(f"Text {i} TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
+        logger.info("The following is a breakdown of the total time spent.")
+        tts_total_audio_second = wavdata.shape[0] / hmminicpmo.wav_sr
+        tts_chunk_total_rtf = tts_chunk_total_time / tts_total_audio_second
+        tts_chunk_total_gen_speed = tts_total_audio_second / tts_chunk_total_time
+        logger.success(f"Chunk Total TTS Prefill Mean Time: {tts_chunk_prefill_total_time / tts_chunk_prefill_num * 1000:.3f} ms x {tts_chunk_prefill_num} times")
+        logger.success(f"Chunk Total TTS Decoder Mean Time: {tts_chunk_decoder_total_time / tts_chunk_decoder_num * 1000:.3f} ms x {tts_chunk_decoder_num} groups")
+        logger.success(f"Chunk Total TTS Dvae Cost: {sum(hmminicpmo.tts_chunk_dvae_times) * 1000:.3f} ms")
+        logger.success(f"Chunk Total TTS Vocos Cost: {sum(hmminicpmo.tts_chunk_vocos_times) * 1000:.3f} ms")
+        logger.success(f"Chunk Total TTS Audio Duration Generated: {tts_total_audio_second:.2f} s")
+        logger.success(f"Chunk Total TTS Real-Time Factor(RTF): {tts_chunk_total_rtf:.3f}")
+        logger.success(f"Chunk Total TTS Generate Speed: {tts_chunk_total_gen_speed:.2f} x real-time")
+        logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
 
     else:
         logger.error(f"not support example mode {example_mode}!")
@@ -1448,7 +1926,7 @@ if __name__ == "__main__":
 
     args = get_args()
     if HOUMO_TARGET == 'xh1':
-        logger.error(f"bge embedder or reranker is not support xh1 platform!")
+        logger.error(f"MiniCPMO is not support xh1 platform!")
         assert(0)
     elif HOUMO_TARGET == 'xh2':
         xh2_demo(args)
