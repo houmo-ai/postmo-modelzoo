@@ -1,7 +1,7 @@
 model:
-  name: yolov5s_clip
+  name: yolov5s
   save_dir: output
-  model_path: yolov5s_640x640_clip.onnx
+  model_path: yolov5s.onnx
   inputs:
     images:
       shape: [1, 3, 640, 640]  # NCHW
@@ -14,11 +14,16 @@ model:
       resizer:
         toYUV_format: YUV420SP
   model_impl_module: model_impl
-  model_impl_cls: YoloV5Clip
+  model_impl_cls: YoloV5
 
 quant:
   calib_data: coco2017/val2017
-  calib_num: 50
+  calib_num: 32
+  config:
+    mix_attn_outs: 
+      - "/model.24/Sigmoid"
+      - "/model.24/Sigmoid_1"
+      - "/model.24/Sigmoid_2"
 
 build:
   ncore: 1

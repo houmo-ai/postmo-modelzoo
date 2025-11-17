@@ -50,24 +50,11 @@ if __name__ == "__main__":
     opt_level = "O2"
     version = get_houmo_version()
     target = HOUMO_TARGET
-    raw_path = f"models/{model_name}/yolov5s_640x640.onnx"
+    raw_path = f"models/{model_name}/yolov5s.onnx"
     build_path = f"models/{target.lower()}-{version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type in ["raw"]:
         file_path = get_file_from_jfrog(raw_path, model_dir)
-        if file_path:
-            extract_path = os.path.join(
-                os.path.dirname(file_path), "yolov5s_640x640_clip.onnx"
-            )
-            onnx.utils.extract_model(
-                file_path,
-                extract_path,
-                input_names=["images"],
-                output_names=["340", "378", "416"],
-                check_model=True,
-            )
-        else:
-            sys.exit(1)
 
     if model_type in ["hmm"] and not get_file_from_jfrog(
         build_path, model_dir, build_model_dir
