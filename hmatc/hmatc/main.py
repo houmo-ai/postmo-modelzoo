@@ -555,6 +555,7 @@ def main():
     parent_result_path = argparse.ArgumentParser(add_help=False)
     parent_device_id = argparse.ArgumentParser(add_help=False)
     parent_cuda = argparse.ArgumentParser(add_help=False)
+    parent_upload = argparse.ArgumentParser(add_help=False)
     parent_config.add_argument(
         "--config", "-c", type=str, required=True, help="config file path"
     )
@@ -588,6 +589,11 @@ def main():
         "--cuda",
         action="store_true",
         help="Enable cuda quantization",
+    )
+    parent_upload.add_argument(
+        "--upload",
+        action="store_true",
+        help=argparse.SUPPRESS,
     )
     # 主解析器
     parser = argparse.ArgumentParser(description="HouMo Model Assist Tool")
@@ -630,6 +636,7 @@ def main():
             parent_result_path,
             model_cfg_parent,
             parent_device_id,
+            parent_upload,
         ],
         help="Build a model",
     )
@@ -869,6 +876,7 @@ def main():
             hm_exec.device = "cuda"
         new_res_info = hm_exec.quantize()
     elif current_command == "build":
+        hm_exec.enable_upload = args.upload
         new_res_info = hm_exec.build(enable_profile=args.profile)
         logger.info(f"Build {hm_exec.model_name} done.")
         new_res_info["build"].update(hm_exec.check_golden(args.device_id))

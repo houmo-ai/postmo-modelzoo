@@ -145,8 +145,7 @@ class Xh2Exec(BaseExec):
         )
         shutil.rmtree(self.golden_dir)
         # 压缩量化产物
-        compress = os.environ.get("HMATC_COMPRESS", "0")
-        if compress == "1" and self.enable_upload and 0:
+        if self.enable_upload and 0:
             logger.info("Compressing quant output...")
             with open(os.path.join(self.quant_output_dir, "VERSION.txt"), "w") as f:
                 f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")
@@ -202,8 +201,7 @@ class Xh2Exec(BaseExec):
         )
         span = time.time() - t_start
         # 压缩编译后产物
-        compress = os.environ.get("HMATC_COMPRESS", "0")
-        if compress == "1" and self.enable_upload:
+        if self.enable_upload:
             logger.info("Compressing hmmodel...")
             hmcc_version = get_package_version(f"houmo-tcim-xh2")
             runtime_version = get_package_version(f"houmo_tcim_runtime_xh2")
