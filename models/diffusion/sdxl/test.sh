@@ -35,7 +35,17 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
-pip3 install -r requirements.txt
+VENV_FLAG=0
+if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
+    VENV_FLAG=1
+fi
+
+if [[ "$VENV_FLAG" -eq 1 ]]; then
+    echo "⚠ Create python3.9 venv for sdxl demo."
+    virtualenv --python=python3.9 --system-site-packages sdxl_demo
+    source sdxl_demo/bin/activate
+    pip3 install -r requirements.txt
+fi
 
 python3 get_model.py --type raw
 if [[ "$STEP" == "build" ]]; then
@@ -70,4 +80,9 @@ elif [[ "$STEP" == "demo" ]]; then
     python3 demo.py
 else
     echo "✗ Unknown step ${STEP}."
+fi
+
+if [[ "$VENV_FLAG" -eq 1 ]]; then
+    deactivate
+    rm -rf sdxl_demo
 fi
