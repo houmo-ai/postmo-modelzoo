@@ -74,29 +74,29 @@ bash test.sh
 
 ```bash
 Audio saved to output_omni.wav
-画面中有一个穿着红色夹克和黑色裤子的人，他站在一个被雪覆盖的斜坡上，似乎在滑雪。背景是壮丽的雪山，天空中有一些云。
+画面中有一个穿着红色夹克和黑色裤子的人，他正在一个被雪覆盖的山地地形上滑雪。他正沿着一条清晰的滑雪道滑行，周围是高耸的雪山和多云的天空。
 ```
 
 ### 3.2 性能结果
 
 ```bash
-Total Cost 42421.746 ms
-Input Tokens: 1399, Output tokens: 41
-Vision Cost: 7258.220 ms
-Audio Cost: 681.769 ms
-LLM Prefill Speed: 969.80 tokens/s
-TTFT (Time to First Token): 9392.590 ms
-TPOT (Time Per Output Token): 14.67 tokens/s
-ViT+Wishper+LLM TPS (Tokens Per Second): 3.38 tokens/s
-TTS Prefill Mean Time: 17.327 ms x 30 times
-TTS Decoder Mean Time: 421.045 ms x 70 groups
-TTS Dvae Cost: 117.342 ms
-TTS Vocos Cost: 95.591 ms
-Total Audio Duration Generated: 37.23 s
-TTS Total Cost: 30209.722 ms
-TTS Real-Time Factor(RTF): 0.811508
-TTS Generate Speed: 1.23 x real-time
-E2E Latency (End-to-End Latency): 42.422 seconds
+Total Cost 22600.990 ms
+Input Tokens: 1399, Output tokens: 50
+Vision Cost: 6056.815 ms
+Audio Cost: 468.451 ms
+LLM Prefill Speed: 885.53 tokens/s
+TTFT (Time to First Token): 8115.782 ms
+TPOT (Time Per Output Token): 14.48 tokens/s
+ViT+Wishper+LLM TPS (Tokens Per Second): 4.35 tokens/s
+TTS Prefill Mean Time: 13.415 ms x 30 times
+TTS Decoder Mean Time: 338.789 ms x 31 groups
+TTS Dvae Cost: 42.395 ms
+TTS Vocos Cost: 41.258 ms
+Total Audio Duration Generated: 16.45 s
+TTS Total Cost: 10996.603 ms
+TTS Real-Time Factor(RTF): 0.668568
+TTS Generate Speed: 1.50 x real-time
+E2E Latency (End-to-End Latency): 22.601 seconds
 ```
 
 ### 3.3 备注

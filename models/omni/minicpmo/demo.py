@@ -442,12 +442,14 @@ class HMMiniCPMO(object):
                  init_vision=True,
                  init_audio=True,
                  init_tts=True,
+                 init_llm=True,
                  use_tts_template=False, 
                  llm_sampling=True,
                  tts_sampling=True):
         self.init_vision = init_vision
         self.init_audio = init_audio
         self.init_tts = init_tts
+        self.init_llm = init_llm
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.use_tts_template = use_tts_template
         self.llm_sampling = llm_sampling
@@ -479,51 +481,52 @@ class HMMiniCPMO(object):
             self.apm_input_infos = get_input_infos(self.apm_engine)
             self.apm_output_infos = get_output_infos(self.apm_engine)
 
-        self.llm_temperature = 0.5
-        self.llm_top_k = 100
-        self.llm_top_p = 0.8
-        self.llm_min_tokens_to_keep = 1
-        self.llm_filter_value = -float("Inf")
-        self.llm_penalty = 1.05
-        self.eos_token_id = [151645, 151643]
-        
-        option_llm_prefill = tcim_lite.runtime.Option(wt_manager)
-        self.llm_prefill_engine = tcim_lite.runtime.load(args.llm_prefill_path, option_llm_prefill)
-        self.llm_prefill_input_infos = get_input_infos(self.llm_prefill_engine)
-        self.llm_prefill_output_infos = get_output_infos(self.llm_prefill_engine)
-        self.llm_nblocks = self.get_nblocks(self.llm_prefill_engine)
-        self.llm_context_max_length = self.llm_prefill_input_infos[self.llm_prefill_engine.get_input_name(3)].shape[2]
-        llm_prefill_shape = self.llm_prefill_input_infos[self.llm_prefill_engine.get_input_name(0)].shape[:2]
-        self.llm_prefill_shape = torch.Size(llm_prefill_shape)
-        self.llm_prefill_len = self.llm_prefill_shape.numel()
-        self.llm_output_names = sorted(list(self.llm_prefill_output_infos.keys()), reverse=True)
+        if self.init_llm:
+            self.llm_temperature = 0.5
+            self.llm_top_k = 100
+            self.llm_top_p = 0.8
+            self.llm_min_tokens_to_keep = 1
+            self.llm_filter_value = -float("Inf")
+            self.llm_penalty = 1.05
+            self.eos_token_id = [151645, 151643]
+            
+            option_llm_prefill = tcim_lite.runtime.Option(wt_manager)
+            self.llm_prefill_engine = tcim_lite.runtime.load(args.llm_prefill_path, option_llm_prefill)
+            self.llm_prefill_input_infos = get_input_infos(self.llm_prefill_engine)
+            self.llm_prefill_output_infos = get_output_infos(self.llm_prefill_engine)
+            self.llm_nblocks = self.get_nblocks(self.llm_prefill_engine)
+            self.llm_context_max_length = self.llm_prefill_input_infos[self.llm_prefill_engine.get_input_name(3)].shape[2]
+            llm_prefill_shape = self.llm_prefill_input_infos[self.llm_prefill_engine.get_input_name(0)].shape[:2]
+            self.llm_prefill_shape = torch.Size(llm_prefill_shape)
+            self.llm_prefill_len = self.llm_prefill_shape.numel()
+            self.llm_output_names = sorted(list(self.llm_prefill_output_infos.keys()), reverse=True)
 
-        self.llm_prepared_logits_processer = LogitsProcessorList()
-        self.llm_prepared_logits_processer.append(RepetitionPenaltyLogitsProcessor(self.llm_penalty))
-        if self.llm_sampling:
-            self.llm_prepared_logits_warper = LogitsProcessorList()
-            for w in [TemperatureLogitsWarper(self.llm_temperature), 
-                    TopKLogitsWarper(self.llm_top_k, self.llm_min_tokens_to_keep),
-                    TopPLogitsWarper(self.llm_top_p, self.llm_min_tokens_to_keep)]:
-                self.llm_prepared_logits_warper.append(w)
-            self.llm_parpared_stopping_criteria = StoppingCriteriaList()
-            for c in [MaxLengthCriteria(self.llm_context_max_length, self.max_position_embeddings),
-                    EosTokenCriteria(torch.tensor(self.eos_token_id, dtype=torch.long, device=self.device))]:
-                self.llm_parpared_stopping_criteria.append(c)
+            self.llm_prepared_logits_processer = LogitsProcessorList()
+            self.llm_prepared_logits_processer.append(RepetitionPenaltyLogitsProcessor(self.llm_penalty))
+            if self.llm_sampling:
+                self.llm_prepared_logits_warper = LogitsProcessorList()
+                for w in [TemperatureLogitsWarper(self.llm_temperature), 
+                        TopKLogitsWarper(self.llm_top_k, self.llm_min_tokens_to_keep),
+                        TopPLogitsWarper(self.llm_top_p, self.llm_min_tokens_to_keep)]:
+                    self.llm_prepared_logits_warper.append(w)
+                self.llm_parpared_stopping_criteria = StoppingCriteriaList()
+                for c in [MaxLengthCriteria(self.llm_context_max_length, self.max_position_embeddings),
+                        EosTokenCriteria(torch.tensor(self.eos_token_id, dtype=torch.long, device=self.device))]:
+                    self.llm_parpared_stopping_criteria.append(c)
 
-        option_llm_decoder = tcim_lite.runtime.Option(wt_manager)
-        dummy_llm_tensor_names = [f'model_layers_{i}_self_attn_kcache_input' for i in range(self.llm_nblocks)]
-        dummy_llm_tensor_names += [f'model_layers_{i}_self_attn_vcache_input' for i in range(self.llm_nblocks)]
-        option_llm_decoder.set_dummy_tensors(dummy_llm_tensor_names)
-        self.llm_decoder_engine = tcim_lite.runtime.load(args.llm_decode_path, option_llm_decoder)
-        self.llm_decoder_input_infos = get_input_infos(self.llm_decoder_engine)
-        self.llm_decoder_output_infos = get_output_infos(self.llm_decoder_engine)
-        for i in range(self.llm_nblocks):
-            kcache = self.llm_prefill_engine.get_input(f"model_layers_{i}_self_attn_kcache_input")
-            vcache = self.llm_prefill_engine.get_input(f"model_layers_{i}_self_attn_vcache_input")
-            self.llm_decoder_engine.set_input(f"model_layers_{i}_self_attn_kcache_input", kcache)
-            self.llm_decoder_engine.set_input(f"model_layers_{i}_self_attn_vcache_input", vcache)
-        self.llm_decoder_engine.set_input("current_length", np.array([1]).astype(self.llm_decoder_input_infos["current_length"].dtype))
+            option_llm_decoder = tcim_lite.runtime.Option(wt_manager)
+            dummy_llm_tensor_names = [f'model_layers_{i}_self_attn_kcache_input' for i in range(self.llm_nblocks)]
+            dummy_llm_tensor_names += [f'model_layers_{i}_self_attn_vcache_input' for i in range(self.llm_nblocks)]
+            option_llm_decoder.set_dummy_tensors(dummy_llm_tensor_names)
+            self.llm_decoder_engine = tcim_lite.runtime.load(args.llm_decode_path, option_llm_decoder)
+            self.llm_decoder_input_infos = get_input_infos(self.llm_decoder_engine)
+            self.llm_decoder_output_infos = get_output_infos(self.llm_decoder_engine)
+            for i in range(self.llm_nblocks):
+                kcache = self.llm_prefill_engine.get_input(f"model_layers_{i}_self_attn_kcache_input")
+                vcache = self.llm_prefill_engine.get_input(f"model_layers_{i}_self_attn_vcache_input")
+                self.llm_decoder_engine.set_input(f"model_layers_{i}_self_attn_kcache_input", kcache)
+                self.llm_decoder_engine.set_input(f"model_layers_{i}_self_attn_vcache_input", vcache)
+            self.llm_decoder_engine.set_input("current_length", np.array([1]).astype(self.llm_decoder_input_infos["current_length"].dtype))
 
         if self.init_tts:
             self.tts_text_tokenizer = BertTokenizerFast.from_pretrained(f"{args.tokenizer_dir}/assets/chattts_tokenizer")
@@ -1540,6 +1543,9 @@ class HMMiniCPMO(object):
         self.llm_ttft_start_time = time.time()
         model_inputs = self.get_vap_out_embedding(model_inputs)
         logger.info("Get VAP embedding finish!")
+        if not self.init_llm:
+            logger.error("LLM is not initialization!")
+            assert(0)
         token_ids, last_hidden_states, input_tokens_num, output_token_nums = self.get_llm_out_tokens(model_inputs)
         logger.info("LLM Get answer text finish!")
         result = self.llm_decode_text(token_ids)
@@ -1669,10 +1675,11 @@ def xh2_demo(args):
     hmminicpmo = HMMiniCPMO(args,
                 init_vision=True,
                 init_audio=True,
+                init_llm=True,
                 init_tts=True,
                 use_tts_template=True,
                 llm_sampling=False,
-                tts_sampling=True)
+                tts_sampling=False)
 
     example_mode = EXAMPLES_MODE[args.example_idx]
     if example_mode == "omni":
@@ -1894,7 +1901,7 @@ def xh2_demo(args):
             tts_gen_speed = hmminicpmo.tts_chunk_audio_seconds[i] / hmminicpmo.tts_chunk_per_total_times[i]
             tts_chunk_prefill_num += len(hmminicpmo.tts_chunk_prefill_times[i])
             tts_chunk_decoder_num += len(hmminicpmo.tts_chunk_decoder_times[i])
-            tts_chunk_total_time += len(hmminicpmo.tts_chunk_per_total_times[i])
+            tts_chunk_total_time += len(hmminicpmo.tts_chunk_per_total_times)
             logger.success(f"Text {i} TTS Prefill Mean Time: \
                            {tts_prefill_total_time / len(hmminicpmo.tts_chunk_prefill_times[i]) * 1000:.3f} ms x {len(hmminicpmo.tts_chunk_prefill_times[i])} times")
             logger.success(f"Text {i} TTS Decoder Mean Time: \
