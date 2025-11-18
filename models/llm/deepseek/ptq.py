@@ -89,6 +89,25 @@ def check_gpu():
         print(f"Not install GPU driver, error msg: {e}")
         return False
 
+def check_gpu():
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            "nvidia-smi --query-gpu=count --format=csv,noheader,nounits | wc -l",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            text=True
+        )
+        if result.returncode == 0 and int(result.stdout.strip()) > 0:
+            return True
+        return False
+    except Exception as e:
+        print(f"Not install GPU driver, error msg: {e}")
+        return False
+
 def str2bool(v):
     if isinstance(v, bool):
         return v

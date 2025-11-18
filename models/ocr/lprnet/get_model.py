@@ -8,6 +8,7 @@ from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], "Only support HOUMO_TARGET: xh1 or xh2."
 
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -17,6 +18,13 @@ def get_args() -> argparse.Namespace:
         type=str,
         default="hmm",
         help="which model type to get, choise in [raw, hmm]",
+    )
+    parser.add_argument(
+        "--build_model_dir",
+        dest="build_model_dir",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET),
+        help="where to save build_model",
     )
     parser.add_argument(
         "--build_model_dir",

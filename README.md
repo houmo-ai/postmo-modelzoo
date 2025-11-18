@@ -138,18 +138,19 @@ API示例在apis目录下，如下表所示，type列为示例类型，其中con
 
 windows的示例运行前请参照tools/win_envs目录的README.MD进行环境变量的设置。
 
-| examples                     | path         | description                     | language   | target  | arch        | os         |
-| ---------------------------- | ------------ | ------------------------------- | ---------- | ------- | ----------- | ---------- |
-| resnet50                     | converts     | resnet50 量化编译示例           | python     | xh1/xh2 | x64         | linux      |
-| resnet50                     | inferences   | resnet50 单线程推理示例         | python/c++ | xh1/xh2 | x64/aarch64 | win/linux  |
-| yolov5s                      | inferences   | yolov5s 单线程推理示例          | python/c++ | xh1/xh2 | x64/aarch64 | win/linux  |
-| qwen3                        | inferences   | qwen3 大语言模型推理示例        | python     | xh1/xh2 | x64/aarch64 | win/linux  |
-| resnet50_multistreams        | inferences   | resnet50 多线程多stream推理示例 | c++        | xh1     | x64/aarch64 | win/linux  |
-| resnet50_pipeline            | inferences   | resnet50 流水推理示例           | c++        | xh1     | x64/aarch64 | win/linux  |
-| yolov5s_resnet50_multibatch  | inferences   | yolov5s_resnet50多batch推理示例 | c++        | xh1     | x64/aarch64 | linux      |
-| video_detect                 | scenes       | 视频流目标检测分析业务示例      | c++        | xh1     | x64/aarch64 | linux      |
-| buffer_pool                  | scenes       | 应用内存池示例                  | c++        | xh1     | x64/aarch64 | win/linux  |
-| module_pool                  | scenes       | 应用模型池示例                  | c++        | xh1     | x64/aarch64 | win/linux  |
+| examples                     | path         | description                      | language   | target  | arch        | os         |
+| ---------------------------- | ------------ | -------------------------------  | ---------- | ------- | ----------- | ---------- |
+| resnet50                     | converts     | resnet50 量化编译示例            | python     | xh1/xh2 | x64         | linux      |
+| resnet50                     | inferences   | resnet50 单线程推理示例          | python/c++ | xh1/xh2 | x64/aarch64 | win/linux  |
+| yolov5s                      | inferences   | yolov5s 单线程推理示例           | python/c++ | xh1/xh2 | x64/aarch64 | win/linux  |
+| qwen3                        | inferences   | qwen3 大语言模型推理示例         | python     | xh1/xh2 | x64/aarch64 | win/linux  |
+| resnet50_multistreams        | inferences   | resnet50 多线程多stream推理示例  | c++        | xh1     | x64/aarch64 | win/linux  |
+| resnet50_pipeline            | inferences   | resnet50 流水推理示例            | c++        | xh1     | x64/aarch64 | win/linux  |
+| yolov5s_resnet50_multibatch  | inferences   | yolov5s_resnet50多batch推理示例  | c++        | xh1     | x64/aarch64 | linux      |
+| yolov5s_dynamic              | inferences   | dynamic_resizer封装应用示例      | c++        | xh1     | x64/aarch64 | linux      |
+| video_detect                 | scenes       | 视频流目标检测分析业务示例       | c++        | xh1     | x64/aarch64 | linux      |
+| buffer_pool                  | scenes       | 应用内存池示例                   | c++        | xh1     | x64/aarch64 | win/linux  |
+| module_pool                  | scenes       | 应用模型池示例                   | c++        | xh1/xh2 | x64/aarch64 | win/linux  |
 
 
 ## 快速上手
