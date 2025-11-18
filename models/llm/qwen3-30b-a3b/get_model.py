@@ -67,8 +67,8 @@ if __name__ == "__main__":
     HOUMO_MODEL_PATH = os.getenv("HOUMO_MODEL_PATH", ".")
     wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
 
-    model_name = "qwen3_a3b"
-    model_size = "30b"
+    model_name = "qwen3"
+    model_size = "30b_a3b"
     ncore = "2cores"
     ndevice = "1chip" if args.ndevice < 2 else f"{args.ndevice}chips"
     context_len = args.context_length

@@ -35,9 +35,18 @@ done
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
+if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
+    if [[ "$MODEL_TYPE" == "precompiled" ]]; then
+        echo "Download precompiled models."
+        python3 get_model.py --type hmm
+    else
+        echo "Only supports precompiled models."
+        exit 1
+    fi
+fi
+
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
-    python3 get_model.py --type hmm
     pip3 install transformers==4.57.1
     python3 demo.py
 fi
