@@ -139,7 +139,6 @@ def run_model(
     cfg["build"]["batch"] = batch_num
     inputs_cfg = cfg["model"]["inputs"]
     input_name = list(inputs_cfg.keys())[0]
-
     if not enable_static:
         if len(inputs_cfg) != 1 or "resizer" not in inputs_cfg[input_name]:
             logger.info("resizer is disabled, dynamic mode skipped")
