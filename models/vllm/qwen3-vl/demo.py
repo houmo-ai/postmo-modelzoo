@@ -21,7 +21,7 @@ from processing_qwen3_vl import Qwen3VLProcessor
 from utils import get_rope_index, QRawToYuv
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def is_valid_char(cp):
@@ -272,14 +272,12 @@ class Qwen3VL:
         logger.info("vit model loaded")
         self.prefill = tcim.runtime.load(os.path.join(prefill_path), option=option1)
         logger.info("prefill model loaded")
-        self.nblocks = self.get_nblocks()
-        dummy_tensor_names = [
-            f"model_layers_{i}_self_attn_kcache_input" for i in range(self.nblocks)
-        ]
-        dummy_tensor_names += [
-            f"model_layers_{i}_self_attn_vcache_input" for i in range(self.nblocks)
-        ]
-        option2.set_dummy_tensors(dummy_tensor_names)
+        self.input_names = self.get_input_names()
+        dummy_tensor_names = []
+        for input_name in self.input_names:
+            if "model_layers" in input_name:
+                dummy_tensor_names.append(input_name)
+        option1.set_dummy_tensors(dummy_tensor_names)
         self.decode = tcim.runtime.load(os.path.join(decode_path), option=option2)
         logger.info("decode model loaded")
         self.samplingmanager = SamplingManager(
@@ -323,11 +321,10 @@ class Qwen3VL:
         ).shape[-2:]
         self.image_size_w = self.image_shape[0]
         self.image_size_h = self.image_shape[1]
-        for i in range(self.nblocks):
-            kcache = self.prefill.get_input(f"model_layers_{i}_self_attn_kcache_input")
-            vcache = self.prefill.get_input(f"model_layers_{i}_self_attn_vcache_input")
-            self.decode.set_input(f"model_layers_{i}_self_attn_kcache_input", kcache)
-            self.decode.set_input(f"model_layers_{i}_self_attn_vcache_input", vcache)
+        for input_name in self.input_names:
+            if "model_layers" in input_name:
+                cache = self.decode.get_dev_input(input_name)
+                self.prefill.set_input(input_name, cache)
         self.decode.set_input("current_length", np.array([1]).astype("int16"))
         self.embedding = torch.load(embedding_path, weights_only=False)
         if HOUMO_TARGET == "xh2":
@@ -340,13 +337,11 @@ class Qwen3VL:
         self.skip_tokens = 0
         self.slide_len = 10
 
-    def get_nblocks(self):
+    def get_input_names(self):
         input_names = []
         for i in range(self.prefill.get_num_inputs()):
             input_names.append(self.prefill.get_input_name(i))
-        pattern = r"^model_layers_(\d+)_self_attn_kcache_input$"
-        count = sum(1 for item in input_names if re.match(pattern, item))
-        return count
+        return input_names
 
     def get_input_name(self, model):
         input_names = []
@@ -690,7 +685,10 @@ class Qwen3VL:
         n_image_tokens = torch.sum(input_ids == self.image_token_id).item()
         if n_image_tokens > 0:
             image_embeds = data["image_embeds"]
-            n_image_features = image_embeds.shape[1]
+            if HOUMO_TARGET == "xh1":
+                n_image_features = image_embeds.shape[0]
+            elif HOUMO_TARGET == "xh2":
+                n_image_features = image_embeds.shape[1]
             if n_image_tokens != n_image_features:
                 raise ValueError(
                     f"Image features and image tokens do not match: tokens: {n_image_tokens}, features {n_image_features}"
@@ -832,38 +830,38 @@ class Qwen3VL:
             self.prefill.sync()
             self.prefill_time += time.time() - start_time
             past_seq_length += current_input_length
-            prefill_output = self.prefill.get_output(self.prefill.get_output_name(0))
-        next_id = prefill_output.numpy().argmax(-1)
+            prefill_output = self.prefill.get_output(
+                self.prefill.get_output_name(0)
+            ).numpy()
+        if HOUMO_TARGET == "xh1":
+            prefill_output = np.expand_dims(prefill_output, axis=0)
+        next_id = prefill_output.argmax(-1)
         return next_id, past_seq_length
 
     def run_visual(self, inputs):
+        vit_input = inputs[0]
+        if HOUMO_TARGET == "xh1":
+            vit_input = vit_input[:, :, 0, :, :]
+            vit_input = self.rgb2yuv(vit_input)
         self.vit_model.set_input(
             self.vit_model.get_input_name(0),
-            inputs[0].numpy().astype(np.float16),
+            vit_input.numpy(),
         )
         start_time = time.time()
         self.vit_model.run()
         self.vit_model.sync()
         self.vit_time += time.time() - start_time
         image_features = torch.Tensor(
-            self.vit_model.get_output(self.vit_model.get_output_name(0))
-            .numpy()
-            .astype(np.float16)
+            self.vit_model.get_output(self.vit_model.get_output_name(0)).numpy()
         )
         deepstack_image_feature_0 = torch.Tensor(
-            self.vit_model.get_output(self.vit_model.get_output_name(1))
-            .numpy()
-            .astype(np.float16)
+            self.vit_model.get_output(self.vit_model.get_output_name(1)).numpy()
         )
         deepstack_image_feature_1 = torch.Tensor(
-            self.vit_model.get_output(self.vit_model.get_output_name(2))
-            .numpy()
-            .astype(np.float16)
+            self.vit_model.get_output(self.vit_model.get_output_name(2)).numpy()
         )
         deepstack_image_feature_2 = torch.Tensor(
-            self.vit_model.get_output(self.vit_model.get_output_name(3))
-            .numpy()
-            .astype(np.float16)
+            self.vit_model.get_output(self.vit_model.get_output_name(3)).numpy()
         )
         return (
             image_features,
@@ -984,9 +982,11 @@ class Qwen3VL:
         self.decode.run()
         self.decode.sync()
         self.decode_time += time.time() - start_time
-        decoder_output = self.decode.get_output(self.decode.get_output_name(0))
+        decoder_output = self.decode.get_output(self.decode.get_output_name(0)).numpy()
+        if HOUMO_TARGET == "xh1":
+            decoder_output = np.expand_dims(decoder_output, axis=0)
         self.next_id = self.samplingmanager.sample(
-            decoder_output.numpy(), self.generated_ids
+            decoder_output, self.generated_ids
         )
         self.generated_ids.append(self.next_id.item())
         if self.next_id.item() in self.eos_token_id:
@@ -1022,7 +1022,7 @@ if __name__ == "__main__":
     # image_dir = None
     image_dir = "../../../data/pic/beach.jpeg"
     image_num = 1 if image_dir else 0
-    # prompt="你好，你是谁?"
+    # prompt = "你好，你是谁?"
     prompt = "请描述图片内容。"
     logger.success("question:")
     print("\033[1;95m{}\033[0m".format(prompt))
