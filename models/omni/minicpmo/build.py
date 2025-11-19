@@ -17,7 +17,6 @@ GOLDEN_THRESH = 0.98
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
 
-
 def cosine_distance(data1, data2):
     if data1.shape != data2.shape:
         print(f"[error] shape not equal {data1.shape} vs {data2.shape}")

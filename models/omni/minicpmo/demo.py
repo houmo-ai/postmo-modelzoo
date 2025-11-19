@@ -436,6 +436,39 @@ def split_text_for_tts(text: str, max_len: int = 80, min_len: int = 40):
 
     return merged
 
+def trim_tts_tail(wav, sr=2400, frame_ms=20, thresh_ratio=0.05, min_silence_ms=300, redun_frame=50):
+    frame_len = int(sr * frame_ms / 1000)
+    hop_len = frame_len // 2
+
+    frames = librosa.util.frame(wav, frame_length=frame_len, hop_length=hop_len).T
+    energy = np.sum(frames ** 2, axis=1)
+
+    max_energy = np.max(energy)
+    threshold = max_energy * thresh_ratio
+
+    silence = energy < threshold
+
+    min_silence_frames = int(min_silence_ms / frame_ms)
+
+    count = 0
+    tail_start_frame = None
+    for i in range(len(silence)-1, -1, -1):
+        if silence[i]:
+            count += 1
+        else:
+            if count >= min_silence_frames:
+                tail_start_frame = i + 1
+                break
+            count = 0
+
+    if tail_start_frame is None:
+        return wav
+
+    cut_pos = min((tail_start_frame + redun_frame) * hop_len, wav.shape[0])
+
+    wav_cut = wav[:cut_pos]
+    return wav_cut
+
 class HMMiniCPMO(object):
     def __init__(self, 
                  args, 
@@ -574,9 +607,14 @@ class HMMiniCPMO(object):
             self.tts_mask_dtype=self.tts_prefill_input_infos["attention_mask"].dtype
 
             option_tts_decoder = tcim_lite.runtime.Option(wt_manager)
+            dummy_tts_tensor_names = [f'model_layers_{i}_self_attn_kcache_input' for i in range(self.tts_nblocks)]
+            dummy_tts_tensor_names += [f'model_layers_{i}_self_attn_vcache_input' for i in range(self.tts_nblocks)]
+            option_tts_decoder.set_dummy_tensors(dummy_tts_tensor_names)
             self.tts_decoder_engine = tcim_lite.runtime.load(args.tts_decode_path, option_tts_decoder)
             self.tts_decoder_input_infos = get_input_infos(self.tts_decoder_engine)
             self.tts_decoder_output_infos = get_output_infos(self.tts_decoder_engine)
+            self.init_tts_kvcache_value = np.zeros(self.tts_decoder_input_infos["model_layers_0_self_attn_kcache_input"].shape,
+                                              dtype=self.tts_decoder_input_infos["model_layers_0_self_attn_kcache_input"].dtype)
             for i in range(self.tts_nblocks):
                 kcache = self.tts_prefill_engine.get_input(f"model_layers_{i}_self_attn_kcache_input")
                 vcache = self.tts_prefill_engine.get_input(f"model_layers_{i}_self_attn_vcache_input")
@@ -1571,6 +1609,9 @@ class HMMiniCPMO(object):
                 self.tts_decode_times = []
                 logger.info(f"Text {idx} start tts codec...")
                 tts_start_time = time.time()
+                for i in range(self.tts_nblocks):
+                    self.tts_prefill_engine.set_input(f"model_layers_{i}_self_attn_kcache_input", self.init_tts_kvcache_value)
+                    self.tts_prefill_engine.set_input(f"model_layers_{i}_self_attn_vcache_input", self.init_tts_kvcache_value)
                 tts_tokens_ids = self.generate_tts(model_inputs, last_hidden_states, cur_answer, **kwargs)
                 tts_dvae_start_time = time.time()
                 mel_spec = self.dvae_decode_to_mel_spec(tts_tokens_ids)
@@ -1592,6 +1633,13 @@ class HMMiniCPMO(object):
                 self.tts_chunk_audio_seconds.append(self.tts_audio_seconds)
             self.tts_chunk_total_time = time.time() - tts_chunk_total_start_time
             final_wav = np.concatenate(wav_numpy_list)
+            logger.info(f"wav shape: {final_wav.shape}")
+            trim_tail = kwargs.get("trim_tail", False)
+            if trim_tail:
+                logger.info("Redundant trailing sounds have been enabled.")
+                logger.info(f"Length before truncation: {final_wav.shape[0]}")
+                final_wav = trim_tts_tail(final_wav, self.wav_sr)
+                logger.info(f"Length after truncation: {final_wav.shape[0]}")
         return answer, final_wav, input_tokens_num, output_token_nums
     
     def chat_otts(self, msgs, **kwargs):
@@ -1614,6 +1662,9 @@ class HMMiniCPMO(object):
                 self.tts_prefill_times = []
                 self.tts_decode_times = []
                 tts_start_time = time.time()
+                for i in range(self.tts_nblocks):
+                    self.tts_prefill_engine.set_input(f"model_layers_{i}_self_attn_kcache_input", self.init_tts_kvcache_value)
+                    self.tts_prefill_engine.set_input(f"model_layers_{i}_self_attn_vcache_input", self.init_tts_kvcache_value)
                 tts_tokens_ids = self.generate_tts(None, hidden_states, text, **kwargs)
                 tts_dvae_start_time = time.time()
                 mel_spec_list = self.dvae_decode_to_mel_spec(tts_tokens_ids)
@@ -1637,6 +1688,12 @@ class HMMiniCPMO(object):
             final_wav = np.concatenate(wav_numpy_list)
             self.tts_total_audio_seconds = final_wav.shape[0] / float(self.wav_sr)
             logger.info(f"wav shape: {final_wav.shape}")
+            trim_tail = kwargs.get("trim_tail", False)
+            if trim_tail:
+                logger.info("Redundant trailing sounds have been enabled.")
+                logger.info(f"Length before truncation: {final_wav.shape[0]}")
+                final_wav = trim_tts_tail(final_wav, self.wav_sr)
+                logger.info(f"Length after truncation: {final_wav.shape[0]}")
         else:
             logger.error("Current only_tts is False, it should be set True!")
             assert(0)
@@ -1685,7 +1742,7 @@ def xh2_demo(args):
     if example_mode == "omni":
         video_path="./MiniCPM-o-2_6/assets/Skiing.mp4"
         # if use voice clone prompt, please set ref_audio
-        ref_audio_path = './MiniCPM-o-2_6/assets/demo.wav'
+        ref_audio_path = './MiniCPM-o-2_6/assets/input_examples/cxk_original.wav'
         ref_audio, _ = librosa.load(ref_audio_path, sr=16000, mono=True)
         sys_msg = {"role": "user",
                 "content":["你是一个AI助手。你能接受视频，音频和文本输入并输出语音和文本。模仿输入音频中的声音特征。",
@@ -1702,6 +1759,7 @@ def xh2_demo(args):
             generate_audio=True,
             max_slice_nums=1,
             omni_input=True,
+            trim_tail=False,
         )
         total_time = time.time() - start_time
         if wavdata is not None:

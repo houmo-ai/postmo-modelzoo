@@ -74,36 +74,37 @@ bash test.sh
 
 ```bash
 Audio saved to output_omni.wav
-画面中有一个穿着红色夹克和黑色裤子的人，他正在一个被雪覆盖的山地地形上滑雪。他正沿着一条清晰的滑雪道滑行，周围是高耸的雪山和多云的天空。
+画面中有一个穿着红色夹克和黑色裤子的人，他正在滑雪。他正沿着一条被雪覆盖的小径滑行，周围是被白雪覆盖的山脉。天空中可以看到一些云朵，为整个场景增添了一丝戏剧性。
 ```
 
 ### 3.2 性能结果
 
 ```bash
-Total Cost 22600.990 ms
-Input Tokens: 1399, Output tokens: 50
-Vision Cost: 6056.815 ms
-Audio Cost: 468.451 ms
-LLM Prefill Speed: 885.53 tokens/s
-TTFT (Time to First Token): 8115.782 ms
-TPOT (Time Per Output Token): 14.48 tokens/s
-ViT+Wishper+LLM TPS (Tokens Per Second): 4.35 tokens/s
-TTS Prefill Mean Time: 13.415 ms x 30 times
-TTS Decoder Mean Time: 338.789 ms x 31 groups
-TTS Dvae Cost: 42.395 ms
-TTS Vocos Cost: 41.258 ms
-Total Audio Duration Generated: 16.45 s
-TTS Total Cost: 10996.603 ms
-TTS Real-Time Factor(RTF): 0.668568
-TTS Generate Speed: 1.50 x real-time
-E2E Latency (End-to-End Latency): 22.601 seconds
+Total Cost 23679.652 ms
+Input Tokens: 1204, Output tokens: 54
+Vision Cost: 6029.518 ms
+Audio Cost: 465.439 ms
+LLM Prefill Speed: 917.12 tokens/s
+TTFT (Time to First Token): 7817.118 ms
+TPOT (Time Per Output Token): 14.59 tokens/s
+ViT+Wishper+LLM TPS (Tokens Per Second): 4.72 tokens/s
+TTS Prefill Mean Time: 13.260 ms x 30 times
+TTS Decoder Mean Time: 337.586 ms x 33 groups
+TTS Dvae Cost: 331.683 ms
+TTS Vocos Cost: 42.625 ms
+Total Audio Duration Generated: 17.43 s
+TTS Total Cost: 12120.173 ms
+TTS Real-Time Factor(RTF): 0.695389
+TTS Generate Speed: 1.44 x real-time
+E2E Latency (End-to-End Latency): 23.680 seconds
 ```
 
 ### 3.3 备注
 
 ```bash
-由于tts对长文本容易产生异常（原算法即存在的现象），我们提供了一种文本拆分的方法。
-只需将chat()或chat_otts()调用时给定text_split=True，即可触发。
+1. 由于tts对长文本容易产生异常（原算法即存在的现象），我们提供了一种文本拆分的方法。只需将chat()或chat_otts()调用时给定text_split=True，即可触发。同时，为控制多段语音中间自然过渡，可选择打开insert_silence来自动在多段之间插入静音间隔；
+2. 部分生成的语音可能存在结尾有较长无效杂音的情况，目前算法正在持续优化和改善中，当前可通过打开trim_tail来根据音频能量自动截断无效尾音；
+3. tts生成语音，后处理默认是没有打开后采样的，如需更丰富的回答可以选择打开后采样。打开方式：定义HMMiniCPMO时将tts_sample设为True即可。同时，后采样也能避免一些较长无效尾音、杂音、语音异常的问题（原始模型只有后采样方案，也是为了避免此类情况）。
 ```
 
 ## 4 免责声明
