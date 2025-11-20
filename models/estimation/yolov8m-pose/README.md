@@ -13,6 +13,8 @@ pip3 install ultralytics
 yolo export model=yolov8m-pose.pt format=onnx imgsz=640,640 opset=11 simplify=True
 ```
 
+本模型int8精度稍差，需要混合量化。本示例已使用混合量化配置，所以性能方面有所损失。
+
 ## 2.快速开始
 
 可以通过hmatc工具执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
@@ -66,22 +68,28 @@ hmatc demo -c config.yml -t xh1 --onnx
 ### 3.1 精度结果
 
 ```bash
-# xh1
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.511982', 'map50': '0.830081', 'latency': '12.723356'
 # onnx
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.584225', 'map50': '0.819675', 'latency': '91.764905'
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.640348', 'map50': '0.876844'
+# xh1
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.629451', 'map50': '0.876505'
 ```
 
 ### 3.2 性能结果
 
 ```bash
-[latency] Inference     avg:  18.076 ms,        max:  19.792 ms
-[latency] Input         avg:   1.341 ms,        max:   2.898 ms
-[latency] Output        avg:   0.000 ms,        max:   0.000 ms
-[latency] End2End       avg:  19.418 ms,        max:  22.394 ms
-[Throughput] total: 4864.899 ms, avg: 2.432 ms
-[Throughput] qps: 411.108
+# xh1
+[Latency] Inference  avg:  41.138 ms, max:  42.629 ms, min:  20.019 ms, tp99:  42.251 ms, tp999:  42.629 ms
+[Latency] Input      avg:   0.311 ms, max:   0.478 ms, min:   0.145 ms, tp99:   0.402 ms, tp999:   0.478 ms
+[Latency] Output     avg:   1.379 ms, max:   2.196 ms, min:   0.714 ms, tp99:   1.773 ms, tp999:   2.196 ms
+[Latency] End2end    avg:  42.829 ms, max:  44.353 ms, min:  21.476 ms, tp99:  43.959 ms, tp999:  44.353 ms
+[Throughput] total: 5442.440 ms, avg: 5.442 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 183.741
 ```
+
+>**注意：**
+>
+> 结果均是以芯片核数两倍的线程数来测试，这里是8线程，仅供参考，具体结果以实际测试为准。
+
 
 ## 4.免责声明
 

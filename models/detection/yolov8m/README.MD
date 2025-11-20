@@ -14,8 +14,7 @@ pip3 install ultralytics
 yolo export model=yolov8m.pt format=onnx imgsz=640,640 opset=13 simplify=True
 ```
 
-由于最后yolo检测部分以及检测框和置信度2个不同类型输出融合会显著降低ptq量化的精度，所以建议截取2个分支yolo前的模型进行量化，相关截取操作在get_model.py中。
-如果想继续提升精度，还可以参考yolov5s将不同尺度的检测结果分别量化，或使用混合精度的方法，具体可参考量化相关文档。
+本模型int8精度稍差，需要混合量化。本示例已使用混合量化配置，所以性能方面有所损失。
 
 ## 2.快速开始
 
@@ -68,23 +67,30 @@ hmatc demo -c config.yml -t xh1 --onnx
 ## 3.参考结果
 
 ### 3.1 精度结果
+
 ```bash
-# xh1
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.605732', 'map50': '0.819257', 'latency': '12.069121'
 # onnx
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.642724', 'map50': '0.831999', 'latency': '96.470609'
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.478298', 'map50': '0.655562'
+# xh1
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.458586', 'map50': '0.646231'
 ```
 
 ### 3.2 性能结果
 
 ```bash
-[latency] Inference     avg:  19.496 ms,        max:  21.348 ms
-[latency] Input         avg:   1.395 ms,        max:   2.892 ms
-[latency] Output        avg:   0.000 ms,        max:   0.000 ms
-[latency] End2End       avg:  20.892 ms,        max:  24.227 ms
-[Throughput] total: 2620.077 ms, avg: 2.620 ms
-[Throughput] qps: 381.668
+# xh1
+[Latency] Inference  avg:  26.222 ms, max:  29.308 ms, min:  12.530 ms, tp99:  27.006 ms, tp999:  29.308 ms
+[Latency] Input      avg:   0.277 ms, max:   0.482 ms, min:   0.128 ms, tp99:   0.355 ms, tp999:   0.482 ms
+[Latency] Output     avg:   0.338 ms, max:   0.662 ms, min:   0.168 ms, tp99:   0.487 ms, tp999:   0.662 ms
+[Latency] End2end    avg:  26.837 ms, max:  29.950 ms, min:  13.116 ms, tp99:  27.627 ms, tp999:  29.950 ms
+[Throughput] total: 3416.459 ms, avg: 3.416 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 292.701
 ```
+
+>**注意：**
+>
+> 结果均是以芯片核数两倍的线程数来测试，这里是8线程，仅供参考，具体结果以实际测试为准。
+
 
 ## 4.免责声明
 

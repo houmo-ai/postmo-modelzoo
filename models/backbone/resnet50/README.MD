@@ -18,6 +18,9 @@ dummy_input = torch.rand((1, 3, 224, 224))
 torch.onnx.export(model, dummy_input, 'resnet50.onnx', export_params=True, opset_version=13)
 ```
 
+本模型int8精度稍差，需要混合量化。本示例已使用混合量化配置，所以性能方面有所损失。
+
+
 ## 2.快速开始
 
 可以通过hmatc工具执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
@@ -66,21 +69,27 @@ hmatc demo -c config.yml -t xh1
 ### 3.1 精度结果
 ```bash
 # onnx
-'input_size': [1, 3, 224, 224], 'dataset': 'ILSVRC_2012Val', 'num': 20, 'top1_acc': '0.700000', 'latency_ms': '6.009829'
+'input_size': [1, 3, 224, 224], 'dataset': 'ILSVRC_2012Val', 'num': 50000, 'top1_acc': '0.725840'
 # xh1
-'input_size': [1, 3, 224, 224], 'dataset': 'ILSVRC_2012Val', 'num': 20, 'top1_acc': '0.700000', 'latency_ms': '3.432298'
+'input_size': [1, 3, 224, 224], 'dataset': 'ILSVRC_2012Val', 'num': 50000, 'top1_acc': '0.715960'
 ```
 
 ### 3.2 性能结果
 
 ```bash
-[latency] Inference     avg:   3.301 ms,        max:   4.397 ms
-[latency] Input         avg:   1.235 ms,        max:   2.669 ms
-[latency] Output        avg:   0.000 ms,        max:   0.000 ms
-[latency] End2End       avg:   4.537 ms,        max:   7.038 ms
-[Throughput] total: 569.853 ms, avg: 0.570 ms
-[Throughput] qps: 1754.839
+# xh1
+[Latency] Inference  avg:   6.252 ms, max:   7.116 ms, min:   4.969 ms, tp99:   6.959 ms, tp999:   7.116 ms
+[Latency] Input      avg:   0.063 ms, max:   0.156 ms, min:   0.041 ms, tp99:   0.104 ms, tp999:   0.156 ms
+[Latency] Output     avg:   0.049 ms, max:   0.166 ms, min:   0.031 ms, tp99:   0.087 ms, tp999:   0.166 ms
+[Latency] End2end    avg:   6.364 ms, max:   7.227 ms, min:   5.087 ms, tp99:   7.072 ms, tp999:   7.227 ms
+[Throughput] total: 803.029 ms, avg: 0.803 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 1245.285
 ```
+
+>**注意：**
+>
+> 结果均是以芯片核数两倍的线程数来测试，这里分别是8和4线程，仅供参考，具体结果以实际测试为准。
+> 
 
 ## 4.免责声明
 

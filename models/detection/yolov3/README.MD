@@ -8,6 +8,8 @@
 
 本例使用的 YOLOv3 实现来源 github 开源项目[https://github.com/ultralytics/yolov3](https://github.com/ultralytics/yolov3)的v9.0 tag。模型代码导出后，再去除掉yolo相关的节点，细节见量化工具文档。
 
+本模型int8精度稍差，需要混合量化。本示例已使用混合量化配置，所以性能方面有所损失。
+
 ## 2.快速开始
 
 可以通过hmatc工具执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
@@ -61,22 +63,28 @@ hmatc demo -c config.yml -t xh1 --onnx
 ### 3.1 精度结果
 
 ```bash
-# xh1
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.489064', 'map50': '0.671822', 'latency': '12.491688'
 # onnx
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.520569', 'map50': '0.687350', 'latency': '129.895605'
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.449101', 'map50': '0.644056'
+# xh1
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.437196', 'map50': '0.639563'
 ```
 
 ### 3.2 性能结果
 
 ```bash
-[latency] Inference     avg:  16.274 ms,        max:  17.920 ms
-[latency] Input         avg:   1.268 ms,        max:   2.492 ms
-[latency] Output        avg:   0.000 ms,        max:   0.000 ms
-[latency] End2End       avg:  17.543 ms,        max:  20.349 ms
-[Throughput] total: 2200.022 ms, avg: 2.200 ms
-[Throughput] qps: 454.541
+# xh1
+[Latency] Inference  avg:  36.699 ms, max:  37.754 ms, min:  19.292 ms, tp99:  37.608 ms, tp999:  37.754 ms
+[Latency] Input      avg:   0.229 ms, max:   0.461 ms, min:   0.151 ms, tp99:   0.357 ms, tp999:   0.461 ms
+[Latency] Output     avg:   1.880 ms, max:   3.444 ms, min:   1.432 ms, tp99:   3.224 ms, tp999:   3.444 ms
+[Latency] End2end    avg:  38.809 ms, max:  40.731 ms, min:  21.071 ms, tp99:  40.470 ms, tp999:  40.731 ms
+[Throughput] total: 4942.011 ms, avg: 4.942 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 202.347
 ```
+
+>**注意：**
+>
+> 结果均是以芯片核数两倍的线程数来测试，这里分别是8和4线程，仅供参考，具体结果以实际测试为准。
+> 
 
 ## 3.免责声明
 

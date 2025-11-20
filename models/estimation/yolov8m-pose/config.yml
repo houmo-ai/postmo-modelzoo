@@ -18,7 +18,14 @@ model:
 
 quant:
   calib_data: coco2017/val2017
-  calib_num: 50
+  calib_num: 32
+  config:
+    mix_search:
+      activation:
+        method:
+          name: auto
+          target_cos: 0.998
+        calib_samples: 8
 
 build:
   ncore: 1
