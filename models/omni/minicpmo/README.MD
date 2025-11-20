@@ -10,7 +10,7 @@
 
 ## 2 快速开始
 
-MiniCPMO支持Omni、vllm、llm、voice clone和only tts等图像、本文、语音功能。
+MiniCPMO支持Omni、vllm、llm、voice clone、instruction to speech和only tts等图像、本文、语音功能。
 
 ### 2.1 获取模型和数据
 
@@ -58,6 +58,8 @@ python3 demo.py --example_idx 5
 python3 demo.py --example_idx 6
 #如遇到长文本，需要拆分多段来运行tts
 python3 demo.py --example_idx 7
+#如需体验指令到语音功能
+python3 demo.py --example_idx 8
 ```
 
 ### 2.4 一键评估

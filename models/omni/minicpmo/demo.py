@@ -54,6 +54,7 @@ EXAMPLES_MODE = {
     5: "wotts",     ## only tts, woman voice
     6: "motts",     ## only tts, man voice
     7: "chunkotts", ## only tts, split text
+    8: "I2S",       ## Instruction to Speech
 }
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -142,7 +143,7 @@ def get_args() -> argparse.Namespace:
         dest='example_idx',
         type=int,
         default=0,
-        help='example mode index, support 0(omni), 1(llm), 2(vllm), 3(mvllm), 4(vclone), 5(wotts), 6(motts), 7(chunkotts)',
+        help='example mode index, support 0(omni), 1(llm), 2(vllm), 3(mvllm), 4(vclone), 5(wotts), 6(motts), 7(chunkotts), 8(I2S)',
     )
     args = parser.parse_args()
     return args
@@ -1777,7 +1778,7 @@ def xh2_demo(args):
         logger.success(f"LLM Prefill Speed: {input_tokens_num / hmminicpmo.llm_prefill_time:.2f} tokens/s")
         logger.success(f"TTFT (Time to First Token): {hmminicpmo.llm_ttft_time * 1000:.3f} ms")
         logger.success(f"TPOT (Time Per Output Token): {(output_tokens_num - 1) / hmminicpmo.llm_decode_time:.2f} tokens/s")
-        logger.success(f"ViT+Wishper+LLM TPS (Tokens Per Second): {output_tokens_num / hmminicpmo.anwser_total_time:.2f} tokens/s")
+        logger.success(f"ViT+Whisper+LLM TPS (Tokens Per Second): {output_tokens_num / hmminicpmo.anwser_total_time:.2f} tokens/s")
         logger.success(f"TTS Prefill Mean Time: {tts_prefill_total_time / len(hmminicpmo.tts_prefill_times) * 1000:.3f} ms x {len(hmminicpmo.tts_prefill_times)} times")
         logger.success(f"TTS Decoder Mean Time: {tts_decode_total_time / len(hmminicpmo.tts_decode_times) * 1000:.3f} ms x {len(hmminicpmo.tts_decode_times)} groups")
         logger.success(f"TTS Dvae Cost: {hmminicpmo.tts_dvae_time * 1000:.3f} ms")
@@ -1793,7 +1794,7 @@ def xh2_demo(args):
         msgs = [msg]
         logger.info(msgs)
         start_time = time.time()
-        answer, input_tokens_num, output_tokens_num = hmminicpmo.chat(
+        answer, _, input_tokens_num, output_tokens_num = hmminicpmo.chat(
             msgs=msgs
         )
         total_time = time.time() - start_time
@@ -1853,6 +1854,7 @@ def xh2_demo(args):
         sys_msg = {"role": "user", "content":["Clone the voice in the provided audio prompt.", ref_audio]}
         user_question = {'role': 'user', 'content': [f"Please read the text below.", "我是部署在后摩智能芯片中的AI智能体。"]}
         msgs = [sys_msg, user_question]
+        logger.info(msgs)
         total_start_time = time.time()
         answer, wavdata, input_tokens_num, output_tokens_num = hmminicpmo.chat(
             msgs=msgs,
@@ -1867,6 +1869,12 @@ def xh2_demo(args):
         tts_decode_total_time = sum(hmminicpmo.tts_decode_times)
         tts_rtf = hmminicpmo.tts_total_time / hmminicpmo.tts_audio_seconds
         tts_gen_speed = hmminicpmo.tts_audio_seconds / hmminicpmo.tts_total_time
+        logger.success(f"Input Tokens: {input_tokens_num}, Output tokens: {output_tokens_num}")
+        logger.success(f"Audio Cost: {hmminicpmo.audio_time * 1000:.3f} ms")
+        logger.success(f"LLM Prefill Speed: {input_tokens_num / hmminicpmo.llm_prefill_time:.2f} tokens/s")
+        logger.success(f"TTFT (Time to First Token): {hmminicpmo.llm_ttft_time * 1000:.3f} ms")
+        logger.success(f"TPOT (Time Per Output Token): {(output_tokens_num - 1) / hmminicpmo.llm_decode_time:.2f} tokens/s")
+        logger.success(f"Whisper+LLM TPS (Tokens Per Second): {output_tokens_num / hmminicpmo.anwser_total_time:.2f} tokens/s")
         logger.success(f"TTS Prefill Mean Time: {tts_prefill_total_time / len(hmminicpmo.tts_prefill_times) * 1000:.3f} ms x {len(hmminicpmo.tts_prefill_times)} times")
         logger.success(f"TTS Decoder Mean Time: {tts_decode_total_time / len(hmminicpmo.tts_decode_times) * 1000:.3f} ms x {len(hmminicpmo.tts_decode_times)} groups")
         logger.success(f"TTS Dvae Cost: {hmminicpmo.tts_dvae_time * 1000:.3f} ms")
@@ -1880,6 +1888,7 @@ def xh2_demo(args):
         voice_pt = torch.load("/mnt/data/xunan/project/modelzoo/imodelzoo/models/omni/minicpmo/MiniCPM-o-2_6/woman_voice.pt", map_location=torch.device(hmminicpmo.device))
         msgs = {'role': 'user', 'content': ["我是部署在后摩智能芯片中的文本到语音专家。很高兴为您服务！我可以按照这种方式将文本生成固定的语音文件。", 
                                             voice_pt]}
+        logger.info(msgs)
         total_start_time = time.time()
         wavdata = hmminicpmo.chat_otts(
             msgs=msgs,
@@ -1906,6 +1915,7 @@ def xh2_demo(args):
         voice_pt = torch.load("./MiniCPM-o-2_6/man_voice.pt", map_location=torch.device(hmminicpmo.device))
         msgs = {'role': 'user', 'content': ["我是部署在后摩智能芯片中的文本到语音专家。很高兴为您服务！我可以按照这种方式将文本生成固定的语音文件。", 
                                             voice_pt]}
+        logger.info(msgs)
         total_start_time = time.time()
         wavdata = hmminicpmo.chat_otts(
             msgs=msgs,
@@ -1933,6 +1943,7 @@ def xh2_demo(args):
         msgs = {'role': 'user', 'content': ["在当今科技飞速发展的时代，人工智能大模型凭借其强大的语言理解、知识生成和逻辑推理能力，不仅正在深刻改变人们获取信息、沟通交流以及解决问题的方式，而且在教育、医疗、科研、金融等众多领域展现出前所未有的应用潜力，推动着各行各业朝着更加智能化、高效化的方向转型升级，成为推动社会进步和经济发展的关键力量。\
                                             面对人工智能大模型带来的机遇与挑战，我们必须在技术创新与伦理规范之间找到平衡，既要充分发挥其在提升生产效率、优化决策流程和解决复杂问题方面的巨大优势，又要通过完善法律法规、加强技术监管和推动多方协作，有效应对数据隐私、算法偏见和就业结构变化等潜在风险，确保这项前沿技术能够真正造福人类社会。", 
                                             voice_pt]}
+        logger.info(msgs)
         total_start_time = time.time()
         wavdata = hmminicpmo.chat_otts(
             msgs=msgs,
@@ -1982,7 +1993,38 @@ def xh2_demo(args):
         logger.success(f"Chunk Total TTS Real-Time Factor(RTF): {tts_chunk_total_rtf:.3f}")
         logger.success(f"Chunk Total TTS Generate Speed: {tts_chunk_total_gen_speed:.2f} x real-time")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
-
+    elif example_mode == "I2S":
+        msgs = [{'role': 'user', 'content': ["模仿男明星的语气，来解释一下什么是存算一体技术。"]}]
+        logger.info(msgs)
+        total_start_time = time.time()
+        answer, wavdata, input_tokens_num, output_tokens_num = hmminicpmo.chat(
+            msgs=msgs,
+            generate_audio=True,
+            trim_tail=True,
+        )
+        total_time = time.time() - total_start_time
+        logger.info(f"{answer}")
+        if wavdata is not None:
+            sf.write("output_i2s.wav", wavdata, samplerate=hmminicpmo.wav_sr)
+            logger.info(f"Audio saved to output_i2s.wav")
+        tts_prefill_total_time = sum(hmminicpmo.tts_prefill_times)
+        tts_decode_total_time = sum(hmminicpmo.tts_decode_times)
+        tts_rtf = hmminicpmo.tts_total_time / hmminicpmo.tts_audio_seconds
+        tts_gen_speed = hmminicpmo.tts_audio_seconds / hmminicpmo.tts_total_time
+        logger.success(f"Input Tokens: {input_tokens_num}, Output tokens: {output_tokens_num}")
+        logger.success(f"LLM Prefill Speed: {input_tokens_num / hmminicpmo.llm_prefill_time:.2f} tokens/s")
+        logger.success(f"TTFT (Time to First Token): {hmminicpmo.llm_ttft_time * 1000:.3f} ms")
+        logger.success(f"TPOT (Time Per Output Token): {(output_tokens_num - 1) / hmminicpmo.llm_decode_time:.2f} tokens/s")
+        logger.success(f"LLM TPS (Tokens Per Second): {output_tokens_num / hmminicpmo.anwser_total_time:.2f} tokens/s")
+        logger.success(f"TTS Prefill Mean Time: {tts_prefill_total_time / len(hmminicpmo.tts_prefill_times) * 1000:.3f} ms x {len(hmminicpmo.tts_prefill_times)} times")
+        logger.success(f"TTS Decoder Mean Time: {tts_decode_total_time / len(hmminicpmo.tts_decode_times) * 1000:.3f} ms x {len(hmminicpmo.tts_decode_times)} groups")
+        logger.success(f"TTS Dvae Cost: {hmminicpmo.tts_dvae_time * 1000:.3f} ms")
+        logger.success(f"TTS Vocos Cost: {hmminicpmo.tts_vocos_time * 1000:.3f} ms")
+        logger.success(f"Total Audio Duration Generated: {hmminicpmo.tts_audio_seconds:.2f} s")
+        logger.success(f"TTS Total Cost: {hmminicpmo.tts_total_time * 1000:.3f} ms")
+        logger.success(f"TTS Real-Time Factor(RTF): {tts_rtf:3f}")
+        logger.success(f"TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
+        logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
     else:
         logger.error(f"not support example mode {example_mode}!")
         assert(0)
