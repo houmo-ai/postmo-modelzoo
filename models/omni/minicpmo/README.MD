@@ -60,6 +60,8 @@ python3 demo.py --example_idx 6
 python3 demo.py --example_idx 7
 #如需体验指令到语音功能
 python3 demo.py --example_idx 8
+#如需体验语音对话功能
+python3 demo.py --example_idx 9
 ```
 
 ### 2.4 一键评估

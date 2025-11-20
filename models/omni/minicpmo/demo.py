@@ -55,6 +55,7 @@ EXAMPLES_MODE = {
     6: "motts",     ## only tts, man voice
     7: "chunkotts", ## only tts, split text
     8: "I2S",       ## Instruction to Speech
+    9: "CONV",      ## Speech Conversation
 }
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -143,7 +144,7 @@ def get_args() -> argparse.Namespace:
         dest='example_idx',
         type=int,
         default=0,
-        help='example mode index, support 0(omni), 1(llm), 2(vllm), 3(mvllm), 4(vclone), 5(wotts), 6(motts), 7(chunkotts), 8(I2S)',
+        help='example mode index, support 0(omni), 1(llm), 2(vllm), 3(mvllm), 4(vclone), 5(wotts), 6(motts), 7(chunkotts), 8(I2S), 9(CONV)',
     )
     args = parser.parse_args()
     return args
@@ -640,7 +641,8 @@ class HMMiniCPMO(object):
             self.vocos_output_infos = get_output_infos(self.vocos_engine)
             self.vocos_istft = ISTFT(n_fft=1024, hop_length=256, win_length=1024, padding="same")
             self.wav_sr = 24000
-        
+
+    def reset_time_cost(self):
         self.vision_time = 0.0
         self.audio_time = 0.0
         self.llm_prefill_time = 0.0
@@ -935,21 +937,41 @@ class HMMiniCPMO(object):
 
             truth_input_features = wavforms.detach().cpu().numpy().astype(self.apm_input_infos["input_features"].dtype)
             truth_audio_attention_mask = audio_attention_mask.detach().cpu().numpy().astype(self.apm_input_infos["audio_attention_mask"].dtype)
-            if batch_size == 1:
-                truth_input_features = np.concatenate([truth_input_features, truth_input_features], axis=0)
-                truth_audio_attention_mask = np.concatenate([truth_audio_attention_mask, truth_audio_attention_mask], axis=0)
+            
+            audio_model_batch_size = self.apm_input_infos["input_features"].shape[0]
+            audio_gen_num = batch_size // audio_model_batch_size
+            audio_remain_batch = batch_size - audio_model_batch_size * audio_gen_num
+            audio_output = None
+            for idx in range(audio_gen_num):
+                batch_idx_start = idx * audio_model_batch_size
+                batch_idx_end = batch_idx_start + audio_model_batch_size
+                cur_truth_input_features = truth_input_features[batch_idx_start:batch_idx_end, ...]
+                cur_truth_audio_attention_mask = truth_audio_attention_mask[batch_idx_start:batch_idx_end, ...]
+                self.apm_engine.set_input("input_features", cur_truth_input_features)
+                self.apm_engine.set_input("audio_attention_mask", cur_truth_audio_attention_mask)
 
-            self.apm_engine.set_input("input_features", truth_input_features)
-            self.apm_engine.set_input("audio_attention_mask", truth_audio_attention_mask)
+                self.apm_engine.run()
+                self.apm_engine.sync()
 
-            self.apm_engine.run()
-            self.apm_engine.sync()
+                cur_audio_output = self.apm_engine.get_output(list(self.apm_output_infos.keys())[0]).numpy()
+                audio_output = cur_audio_output if audio_output is None else np.concatenate([audio_output, cur_audio_output], axis=0)
+            if audio_remain_batch > 0:
+                remain_truth_input_features = np.zeros(self.apm_input_infos["input_features"].shape, 
+                                                    dtype=self.apm_input_infos["input_features"].dtype)
+                remain_truth_audio_attention_mask = np.zeros(self.apm_input_infos["audio_attention_mask"].shape,
+                                                    dtype=self.apm_input_infos["audio_attention_mask"].dtype)
+                remain_truth_input_features[0:audio_remain_batch, ...] = truth_input_features[-audio_remain_batch:batch_size, ...]
+                remain_truth_audio_attention_mask[0:audio_remain_batch, ...] = truth_audio_attention_mask[-audio_remain_batch:batch_size, ...]
+                self.apm_engine.set_input("input_features", remain_truth_input_features)
+                self.apm_engine.set_input("audio_attention_mask", remain_truth_audio_attention_mask)
 
-            audio_output = self.apm_engine.get_output(list(self.apm_output_infos.keys())[0]).numpy()
-            if batch_size == 1:
-                audio_output = audio_output[0:1, ...]
+                self.apm_engine.run()
+                self.apm_engine.sync()
 
-            audio_embeds = torch.from_numpy(self.apm_engine.get_output(list(self.apm_output_infos.keys())[0]).numpy()).to(self.device)
+                remain_audio_output = self.apm_engine.get_output(list(self.apm_output_infos.keys())[0]).numpy()[0:audio_remain_batch, ...]
+                audio_output = remain_audio_output if audio_output is None else np.concatenate([audio_output, remain_audio_output], axis=0)
+
+            audio_embeds = torch.from_numpy(audio_output).to(self.device)
 
             _, feature_lens_after_pooling = _get_feat_extract_output_lengths(audio_feature_lens)
 
@@ -1644,6 +1666,7 @@ class HMMiniCPMO(object):
         return answer, final_wav, input_tokens_num, output_token_nums
     
     def chat_otts(self, msgs, **kwargs):
+        self.reset_time_cost()
         if not isinstance(msgs, dict):
             logger.error("msgs is not dict, this is not support!")
             assert(0)
@@ -1701,6 +1724,7 @@ class HMMiniCPMO(object):
         return final_wav
 
     def chat(self, msgs, **kwargs):
+        self.reset_time_cost()
         if isinstance(msgs[0], list):
             batched = True
         else:
@@ -1885,7 +1909,7 @@ def xh2_demo(args):
         logger.success(f"TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
     elif example_mode == "wotts":
-        voice_pt = torch.load("/mnt/data/xunan/project/modelzoo/imodelzoo/models/omni/minicpmo/MiniCPM-o-2_6/woman_voice.pt", map_location=torch.device(hmminicpmo.device))
+        voice_pt = torch.load("./MiniCPM-o-2_6/woman_voice.pt", map_location=torch.device(hmminicpmo.device))
         msgs = {'role': 'user', 'content': ["我是部署在后摩智能芯片中的文本到语音专家。很高兴为您服务！我可以按照这种方式将文本生成固定的语音文件。", 
                                             voice_pt]}
         logger.info(msgs)
@@ -2025,6 +2049,92 @@ def xh2_demo(args):
         logger.success(f"TTS Real-Time Factor(RTF): {tts_rtf:3f}")
         logger.success(f"TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
+    elif example_mode == "CONV":
+        conversation_mode = "roleplay"
+        if conversation_mode == "roleplay":
+            vc_prompt_suffix = "假装你是上述音频中的人物，与我进行对话。"
+        elif conversation_mode == "assistant":
+            vc_prompt_suffix = "作为助手，你将使用这种声音风格说话。"
+        else:
+            logger.error("Not supported conversation mode, you can set the prompt yourself according to your needs.")
+            assert(0)
+        ref_audio, _ = librosa.load("./MiniCPM-o-2_6/assets/input_examples/assistant_female_voice.wav", sr=16000, mono=True)
+        if ref_audio is not None:
+            sys_msg = {"role": "user", "content": ["模仿输入音频中的声音特征。", ref_audio, vc_prompt_suffix]}
+        else:
+            sys_msg = {"role": "user", "content": ["Use the <reserved_53> voice.", vc_prompt_suffix]}
+        conver_speech0, _ = librosa.load("./MiniCPM-o-2_6/assets/input_examples/comment0.wav", sr=16000, mono=True)
+        user_question0 = {"role": "user", "content": [conver_speech0]}
+        msgs = [sys_msg, user_question0]
+        logger.info("user comments 0: Input dialogue in the input voice file.")
+        total_start_time = time.time()
+        answer0, wavdata0, input_0_tokens_num, output_0_tokens_num = hmminicpmo.chat(
+            msgs=msgs,
+            generate_audio=True,
+        )
+        total_time = time.time() - total_start_time
+        logger.info(f"assistant answer 0: {answer0}")
+        if wavdata0 is not None:
+            sf.write("output_conv_assistant0.wav", wavdata0, samplerate=hmminicpmo.wav_sr)
+            logger.info(f"Audio saved to output_conv_assistant0.wav")
+        tts_prefill_total_time = sum(hmminicpmo.tts_prefill_times)
+        tts_decode_total_time = sum(hmminicpmo.tts_decode_times)
+        tts_rtf = hmminicpmo.tts_total_time / hmminicpmo.tts_audio_seconds
+        tts_gen_speed = hmminicpmo.tts_audio_seconds / hmminicpmo.tts_total_time
+        logger.success(f"Conversation 0 Input Tokens: {input_0_tokens_num}, Output tokens: {output_0_tokens_num}")
+        logger.success(f"Conversation 0 Audio Cost: {hmminicpmo.audio_time * 1000:.3f} ms")
+        logger.success(f"Conversation 0 LLM Prefill Speed: {input_0_tokens_num / hmminicpmo.llm_prefill_time:.2f} tokens/s")
+        logger.success(f"Conversation 0 TTFT (Time to First Token): {hmminicpmo.llm_ttft_time * 1000:.3f} ms")
+        logger.success(f"Conversation 0 TPOT (Time Per Output Token): {(output_0_tokens_num - 1) / hmminicpmo.llm_decode_time:.2f} tokens/s")
+        logger.success(f"Conversation 0 Whisper+LLM TPS (Tokens Per Second): {output_0_tokens_num / hmminicpmo.anwser_total_time:.2f} tokens/s")
+        logger.success(f"Conversation 0 TTS Prefill Mean Time: {tts_prefill_total_time / len(hmminicpmo.tts_prefill_times) * 1000:.3f} ms x {len(hmminicpmo.tts_prefill_times)} times")
+        logger.success(f"Conversation 0 TTS Decoder Mean Time: {tts_decode_total_time / len(hmminicpmo.tts_decode_times) * 1000:.3f} ms x {len(hmminicpmo.tts_decode_times)} groups")
+        logger.success(f"Conversation 0 TTS Dvae Cost: {hmminicpmo.tts_dvae_time * 1000:.3f} ms")
+        logger.success(f"Conversation 0 TTS Vocos Cost: {hmminicpmo.tts_vocos_time * 1000:.3f} ms")
+        logger.success(f"Conversation 0 Total Audio Duration Generated: {hmminicpmo.tts_audio_seconds:.2f} s")
+        logger.success(f"Conversation 0 TTS Total Cost: {hmminicpmo.tts_total_time * 1000:.3f} ms")
+        logger.success(f"Conversation 0 TTS Real-Time Factor(RTF): {tts_rtf:3f}")
+        logger.success(f"Conversation 0 TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
+        logger.success(f"Conversation 0 E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
+
+        use_history_wav = True
+        history_prompts = [answer0, wavdata0] if use_history_wav else [answer0]
+        msgs.append({"role": "assistant", "content": history_prompts})
+        history = msgs
+        conver_speech1, _ = librosa.load("./MiniCPM-o-2_6/assets/input_examples/comment1.wav", sr=16000, mono=True)
+        user_question1 = {"role": "user", "content": [conver_speech1]}
+        logger.info("user comments 1: Input dialogue in the input voice file.")
+        history.append(user_question1)
+        new_msgs = history
+        total_start_time = time.time()
+        answer1, wavdata1, input_1_tokens_num, output_1_tokens_num = hmminicpmo.chat(
+            msgs=new_msgs,
+            generate_audio=True,
+        )
+        total_time = time.time() - total_start_time
+        logger.info(f"assistant answer 1: {answer1}")
+        if wavdata1 is not None:
+            sf.write("output_conv_assistant1.wav", wavdata1, samplerate=hmminicpmo.wav_sr)
+            logger.info(f"Audio saved to output_conv_assistant1.wav")
+        tts_prefill_total_time = sum(hmminicpmo.tts_prefill_times)
+        tts_decode_total_time = sum(hmminicpmo.tts_decode_times)
+        tts_rtf = hmminicpmo.tts_total_time / hmminicpmo.tts_audio_seconds
+        tts_gen_speed = hmminicpmo.tts_audio_seconds / hmminicpmo.tts_total_time
+        logger.success(f"Conversation 1 Input Tokens: {input_1_tokens_num}, Output tokens: {output_1_tokens_num}")
+        logger.success(f"Conversation 1 Audio Cost: {hmminicpmo.audio_time * 1000:.3f} ms")
+        logger.success(f"Conversation 1 LLM Prefill Speed: {input_1_tokens_num / hmminicpmo.llm_prefill_time:.2f} tokens/s")
+        logger.success(f"Conversation 1 TTFT (Time to First Token): {hmminicpmo.llm_ttft_time * 1000:.3f} ms")
+        logger.success(f"Conversation 1 TPOT (Time Per Output Token): {(output_1_tokens_num - 1) / hmminicpmo.llm_decode_time:.2f} tokens/s")
+        logger.success(f"Conversation 1 Whisper+LLM TPS (Tokens Per Second): {output_1_tokens_num / hmminicpmo.anwser_total_time:.2f} tokens/s")
+        logger.success(f"Conversation 1 TTS Prefill Mean Time: {tts_prefill_total_time / len(hmminicpmo.tts_prefill_times) * 1000:.3f} ms x {len(hmminicpmo.tts_prefill_times)} times")
+        logger.success(f"Conversation 1 TTS Decoder Mean Time: {tts_decode_total_time / len(hmminicpmo.tts_decode_times) * 1000:.3f} ms x {len(hmminicpmo.tts_decode_times)} groups")
+        logger.success(f"Conversation 1 TTS Dvae Cost: {hmminicpmo.tts_dvae_time * 1000:.3f} ms")
+        logger.success(f"Conversation 1 TTS Vocos Cost: {hmminicpmo.tts_vocos_time * 1000:.3f} ms")
+        logger.success(f"Conversation 1 Total Audio Duration Generated: {hmminicpmo.tts_audio_seconds:.2f} s")
+        logger.success(f"Conversation 1 TTS Total Cost: {hmminicpmo.tts_total_time * 1000:.3f} ms")
+        logger.success(f"Conversation 1 TTS Real-Time Factor(RTF): {tts_rtf:3f}")
+        logger.success(f"Conversation 1 TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
+        logger.success(f"Conversation 1 E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
     else:
         logger.error(f"not support example mode {example_mode}!")
         assert(0)
