@@ -177,6 +177,43 @@ decode average time: 95.997 ms, 10.42 tokens/s
 end2end average time: 96.533 ms, 10.36 tokens/s
 ```
 
+### 3.3 性能测试工具
+
+使用perf.py工具可以测试llm的性能。运行指令如下
+
+```bash
+python perf.py
+
+# usage
+usage: perf.py [-h] [--tokenizer_dir TOKENIZER_DIR] [--embedding_path EMBEDDING_PATH] [--prefill_path PREFILL_PATH] [--decode_path DECODE_PATH] [--isq ISQ] [--osq OSQ]
+
+options:
+  -h, --help            show this help message and exit
+  --tokenizer_dir TOKENIZER_DIR
+                        tokenizer dir
+  --embedding_path EMBEDDING_PATH
+                        houmo embedding weight path
+  --prefill_path PREFILL_PATH
+                        houmo prefill model path
+  --decode_path DECODE_PATH
+                        houmo decode model path
+  --isq ISQ             input seq length
+  --osq OSQ             output seq length
+```
+
+结果示例：
+
+```bash
+total prefill count:1024
+total decode count:1024
+Batch: 1, Total Input: 1024 tokens, Output 1024 tokens, Prefill Cost: 1.650 seconds, Decode Cost: 67.361 seconds
+Prefill Speed: 620.57 tokens/s; Decode Speed: 15.19 tokens/s
+TTFT (Time to First Token): 1650.086 ms
+TPOT (Time Per Output Token): 65.847 ms/token
+E2E Latency (End-to-End Latency): 70.379 seconds
+E2E TPS (End-to-End Tokens Per Second): 14.55 tokens/s
+```
+
 ## 4 免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。
