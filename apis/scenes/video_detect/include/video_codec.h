@@ -232,8 +232,8 @@ class VideoDecoder {
           host_data_[i] = malloc(buf_info_.length[i]);
         }
         ret =
-            HmCodecDecGetYuvPayload(vir_fd_, buf_info_.phy_addr[i],
-                                    (char *)host_data_[i], buf_info_.length[i]);
+          HmCodecDecGetYuvPayload(vir_fd_, buf_info_.phy_addr[i],
+                                  (char *)host_data_[i], buf_info_.length[i]);
         if (ret != 0) {
           LOG_ERROR("HmCodecDecGetYuvPayload fail!");
           return VIDEO_DECODER_ERR;
@@ -339,12 +339,13 @@ class VideoCodec {
  public:
 #ifdef RK_DECODER
   void PushRKStream(PushStreamInfo &stream_info, TaskQueue &qout,
-                    Barrier &barrier);
+                    Barrier &barrier, const int32_t &codec_num,
+                    bool &stop_flag);
 #endif
   void PushStream(std::shared_ptr<VideoDecoder> decoder,
                   PushStreamInfo &stream_info, Barrier &barrier);
   void GetFrame(std::shared_ptr<VideoDecoder> decoder, TaskQueue &qout,
-                Barrier &barrier);
+                Barrier &barrier, const int32_t &codec_num, bool &stop_flag);
   void PushEncodeStream(std::shared_ptr<VideoEncoder> encoder, TaskQueue &qin,
                         Barrier &barrier);
   void GetEncodeStream(std::shared_ptr<VideoEncoder> encoder,

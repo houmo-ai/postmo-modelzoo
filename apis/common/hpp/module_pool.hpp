@@ -132,7 +132,7 @@ class ModulePool {
    * @param max_num The maximum number of loaded models.
    * @return ModulePool pointer
    */
-  static inline ModulePool* Init(int32_t max_num);
+  static inline ModulePool* Init(int32_t max_num, int32_t stream_num = 4);
   /**
    * @brief Load model from buffer and generate a pooled module.
    * @param module_name model name, used to identify the model.
@@ -142,8 +142,8 @@ class ModulePool {
    * @return PooledModule pointer
    */
   inline PooledModule* Load(
-      const std::string& module_name, const void* model_data, int len,
-      const tcim::Module::Option& option = tcim::Module::Option());
+    const std::string& module_name, const void* model_data, int len,
+    const tcim::Module::Option& option = tcim::Module::Option());
   /**
    * @brief Load model from the binary model file and generate a pooled module.
    * @param model_path The file name and path of the binary model file.
@@ -151,8 +151,8 @@ class ModulePool {
    * @return PooledModule pointer
    */
   inline PooledModule* Load(
-      const std::string& model_path,
-      const tcim::Module::Option& option = tcim::Module::Option());
+    const std::string& model_path,
+    const tcim::Module::Option& option = tcim::Module::Option());
   /**
    * @brief Get the statistical information of ModulePool.
    * @param is_print Print statistical information or not, default: not print.
@@ -178,18 +178,19 @@ class ModulePool {
    * Internal use only
    * @brief The PooledModule object updates the statistics to ModulePool.
    */
-  inline int UpdateInferStats(const std::string& module_name, const float& infer_time);
+  inline int UpdateInferStats(const std::string& module_name,
+                              const float& infer_time);
 
  private:
   ModulePool() = default;
   ModulePool(const ModulePool&) = delete;
   ModulePool& operator=(const ModulePool&) = delete;
 
-  inline int LoadModule(bool is_file,
-                 const std::string& module_name,
-                 const tcim::Module::Option& option,
-                 const void* model_data = nullptr, const int& len = 0);
-  static inline void InferThread(int stream_id, std::shared_ptr<InferTaskQueue> qin);
+  inline int LoadModule(bool is_file, const std::string& module_name,
+                        const tcim::Module::Option& option,
+                        const void* model_data = nullptr, const int& len = 0);
+  static inline void InferThread(int stream_id,
+                                 std::shared_ptr<InferTaskQueue> qin);
 
   std::mutex module_mutex_;
   std::mutex infer_stats_mutex_;
@@ -218,7 +219,8 @@ class PooledModule {
    * @param queue Inference task queue.
    */
   inline PooledModule(const std::string& model_path, tcim::Module* module,
-               ModulePool* module_pool, std::shared_ptr<InferTaskQueue> queue);
+                      ModulePool* module_pool,
+                      std::shared_ptr<InferTaskQueue> queue);
   /**
    * @brief Gets the total number of input tensors in the model.
    * @return The total number of input tensors.
@@ -238,7 +240,8 @@ class PooledModule {
    * not. If true, equal to: module.GetInputInfo(tensor_name).AsContiguous().
    * @return The tensor information of the tensor.
    */
-  inline tcim::TensorInfo GetInputInfo(const std::string& name, bool as_contiguous);
+  inline tcim::TensorInfo GetInputInfo(const std::string& name,
+                                       bool as_contiguous);
   /**
    * @brief Gets input tensor on Houmo device with the given tensor name.
    * @param name The name of the input tensor to query for.
@@ -274,7 +277,8 @@ class PooledModule {
    * not. If true, equal to: module.GetOutputInfo(tensor_name).AsContiguous().
    * @return The information of the output tensor.
    */
-  inline tcim::TensorInfo GetOutputInfo(const std::string& name, bool as_contiguous);
+  inline tcim::TensorInfo GetOutputInfo(const std::string& name,
+                                        bool as_contiguous);
   /**
    * @brief Use the provided inputs to infer the model, and then place the
    * inference result into the given outputs.
@@ -284,9 +288,9 @@ class PooledModule {
    * @return The status of the function call.
    */
   inline tcim::Status Infer(
-      const std::map<std::string, tcim::Tensor>& inputs,
-      std::map<std::string, tcim::Tensor>& outputs,
-      const tcim::Module::RunOption& option = tcim::Module::RunOption());
+    const std::map<std::string, tcim::Tensor>& inputs,
+    std::map<std::string, tcim::Tensor>& outputs,
+    const tcim::Module::RunOption& option = tcim::Module::RunOption());
   /**
    * @brief Get the statistical information of the current PooledModule object.
    * @param is_print Print statistical information or not, default: not print.
@@ -301,7 +305,8 @@ class PooledModule {
 
  private:
   inline bool CheckModulePool();
-  inline bool CheckTensorsDevice(const std::map<std::string, tcim::Tensor>& tensors);
+  inline bool CheckTensorsDevice(
+    const std::map<std::string, tcim::Tensor>& tensors);
 
   std::string model_name_ = "";
   tcim::Module* module_ = nullptr;
@@ -357,17 +362,17 @@ tcim::TensorInfo PooledModule::GetOutputInfo(const std::string& name,
 }
 
 tcim::Status PooledModule::Infer(
-    const std::map<std::string, tcim::Tensor>& inputs,
-    std::map<std::string, tcim::Tensor>& outputs,
-    const tcim::Module::RunOption& option) {
+  const std::map<std::string, tcim::Tensor>& inputs,
+  std::map<std::string, tcim::Tensor>& outputs,
+  const tcim::Module::RunOption& option) {
   if (CheckModulePool()) {
     LOG_ERROR("Please initialize the ModulePool first.");
     return tcim::Status::UNINITIALIZED;
   }
-  if (!CheckTensorsDevice(inputs)) {
-    LOG_ERROR("The tensor device in the inputs must be the same.");
-    return tcim::Status::INVALID_ARGUMENT;
-  }
+  // if (!CheckTensorsDevice(inputs)) {
+  //   LOG_ERROR("The tensor device in the inputs must be the same.");
+  //   return tcim::Status::INVALID_ARGUMENT;
+  // }
   if (!CheckTensorsDevice(outputs)) {
     LOG_ERROR("The tensor device in the outputs must be the same.");
     return tcim::Status::INVALID_ARGUMENT;
@@ -409,11 +414,11 @@ PooledMdStats PooledModule::GetStats(bool is_print) {
   stats.min_infer_time = infer_stats.min_infer_time;
   if (is_print) {
     LOG_INFO(
-        "PooledModule ({}){} stats info, loaded module num:{}, infer num:{}, "
-        "infer time (avg/max/min): {}/{}/{} ms.",
-        reinterpret_cast<void*>(this), model_name_, stats.module_num,
-        stats.infer_num, stats.avg_infer_time, stats.max_infer_time,
-        stats.min_infer_time);
+      "PooledModule ({}){} stats info, loaded module num:{}, infer num:{}, "
+      "infer time (avg/max/min): {}/{}/{} ms.",
+      reinterpret_cast<void*>(this), model_name_, stats.module_num,
+      stats.infer_num, stats.avg_infer_time, stats.max_infer_time,
+      stats.min_infer_time);
   }
 
   return stats;
@@ -424,7 +429,7 @@ std::string PooledModule::GetPooledMdName() { return model_name_; }
 bool PooledModule::CheckModulePool() { return module_pool_ == nullptr; }
 
 bool PooledModule::CheckTensorsDevice(
-    const std::map<std::string, tcim::Tensor>& tensors) {
+  const std::map<std::string, tcim::Tensor>& tensors) {
   if (tensors.empty()) {
     return false;
   }
@@ -466,20 +471,20 @@ ModulePool::~ModulePool() {
   infer_stats_map_.clear();
   module_map_.clear();
   streams_.clear();
+  infer_queue_.reset();
   module_pool_ = nullptr;
   infer_queue_ = nullptr;
 }
 
-ModulePool* ModulePool::Init(int32_t max_num) {
-  std::call_once(flag_, [max_num]() {
+ModulePool* ModulePool::Init(int32_t max_num, int32_t stream_num) {
+  std::call_once(flag_, [max_num, stream_num]() {
     module_pool_ = new ModulePool();
     infer_queue_ = std::shared_ptr<InferTaskQueue>(new InferTaskQueue());
-    int stream_num = 8;
     streams_.resize(stream_num);
     module_max_num_ = max_num > 0 ? max_num : 1;
     for (int i = 0; i < stream_num; i++) {
       threads_.push_back(
-          std::thread(&ModulePool::InferThread, i, infer_queue_));
+        std::thread(&ModulePool::InferThread, i, infer_queue_));
     }
   });
   LOG_INFO("Init ModulePool {}, the maximum number of modules is {}.",
@@ -504,7 +509,7 @@ PooledModule* ModulePool::Load(const std::string& module_name,
 
   auto tmp_ptr = module_map_[module_name].back();
   PooledModule* pooled_md = new PooledModule(
-      module_name, module_map_[module_name].back(), module_pool_, infer_queue_);
+    module_name, module_map_[module_name].back(), module_pool_, infer_queue_);
 
   return pooled_md;
 }
@@ -524,7 +529,7 @@ PooledModule* ModulePool::Load(const std::string& model_path,
 
   auto tmp_ptr = module_map_[model_path].back();
   PooledModule* pooled_md = new PooledModule(
-      model_path, module_map_[model_path].back(), module_pool_, infer_queue_);
+    model_path, module_map_[model_path].back(), module_pool_, infer_queue_);
 
   return pooled_md;
 }
@@ -574,16 +579,16 @@ ModulePoolStats ModulePool::GetStats(bool is_print) {
     stats.streams_map = std::map<int32_t, size_t>();
     for (const auto& pair : stream_stats_map_) {
       stats.streams_map[pair.first] =
-          stream_stats_map_[pair.first].infer_task_num;
+        stream_stats_map_[pair.first].infer_task_num;
     }
   }
 
   if (is_print) {
     LOG_INFO(
-        "ModulePool {} stats, module_type_num:{}, stream num:{}, "
-        "infer_task_num:{}.",
-        reinterpret_cast<void*>(this), stats.module_type_num, stats.stream_num,
-        stats.infer_task_num);
+      "ModulePool {} stats, module_type_num:{}, stream num:{}, "
+      "infer_task_num:{}.",
+      reinterpret_cast<void*>(this), stats.module_type_num, stats.stream_num,
+      stats.infer_task_num);
     for (const auto& pair : stats.modules_map) {
       LOG_INFO("  module name:{}, loaded module num:{}", pair.first,
                pair.second);
@@ -607,23 +612,22 @@ int ModulePool::UpdateInferStats(const std::string& module_name,
   infer_stats->total_infer_time += infer_time;
   infer_stats->infer_num += 1;
   infer_stats->avg_infer_time =
-      (1.0f * infer_stats->total_infer_time) / infer_stats->infer_num;
+    (1.0f * infer_stats->total_infer_time) / infer_stats->infer_num;
   infer_stats->max_infer_time = infer_time > infer_stats->max_infer_time
-                                    ? infer_time
-                                    : infer_stats->max_infer_time;
+                                  ? infer_time
+                                  : infer_stats->max_infer_time;
   if (infer_stats->min_infer_time <= 0) {
     infer_stats->min_infer_time = infer_time;
   } else {
     infer_stats->min_infer_time = infer_time < infer_stats->min_infer_time
-                                      ? infer_time
-                                      : infer_stats->min_infer_time;
+                                    ? infer_time
+                                    : infer_stats->min_infer_time;
   }
 
   return 0;
 }
 
-int ModulePool::LoadModule(bool is_file,
-                           const std::string& module_name,
+int ModulePool::LoadModule(bool is_file, const std::string& module_name,
                            const tcim::Module::Option& option,
                            const void* model_data, const int& len) {
   std::lock_guard<std::mutex> module_lock(module_mutex_);
@@ -656,7 +660,7 @@ int ModulePool::LoadModule(bool is_file,
       }
       {
         std::lock_guard<std::mutex> module_task_lock(
-            *(module_manager_[module_name]->mutex));
+          *(module_manager_[module_name]->mutex));
         module_manager_[module_name]->queue.push(module);
       }
     }
@@ -694,9 +698,9 @@ void ModulePool::InferThread(int stream_id,
       std::lock_guard<std::mutex> module_task_lock(module_manager_mutex_);
       module_exec = module_manager_[task.model_path];
       LOG_DEBUG(
-          "---> InferThread stream {}, module queue size:{}, module_exec:{}",
-          stream_id, module_exec->queue.size(),
-          reinterpret_cast<void*>(module_exec));
+        "---> InferThread stream {}, module queue size:{}, module_exec:{}",
+        stream_id, module_exec->queue.size(),
+        reinterpret_cast<void*>(module_exec));
     }
 
     auto outputs_device = task.outputs.begin()->second.Device();
@@ -713,10 +717,10 @@ void ModulePool::InferThread(int stream_id,
       module_exec->queue.pop();
       module_queue_lock.unlock();
       LOG_DEBUG(
-          "---> InferThread stream {}, get module:{}, module queue size:{}, "
-          "outputs device: {}, ready to execute.",
-          stream_id, reinterpret_cast<void*>(module), module_exec->queue.size(),
-          static_cast<int>(outputs_device));
+        "---> InferThread stream {}, get module:{}, module queue size:{}, "
+        "outputs device: {}, ready to execute.",
+        stream_id, reinterpret_cast<void*>(module), module_exec->queue.size(),
+        static_cast<int>(outputs_device));
     }
     module->SetStream(stream);
 
@@ -753,9 +757,8 @@ void ModulePool::InferThread(int stream_id,
       module_exec->queue.push(module);
       module_exec->cv->notify_one();
       LOG_DEBUG(
-          "---> InferThread stream {} release module {}, module queue size:{}.",
-          stream_id, reinterpret_cast<void*>(module),
-          module_exec->queue.size());
+        "---> InferThread stream {} release module {}, module queue size:{}.",
+        stream_id, reinterpret_cast<void*>(module), module_exec->queue.size());
     }
 
     {

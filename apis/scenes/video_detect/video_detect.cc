@@ -15,8 +15,8 @@
 #include "detect_frames.h"
 #include "video_codec.h"
 
-void CalculateSpeed(std::vector<std::shared_ptr<VideoCodec>> &codec_vec,
-                    bool &stop_flag) {
+void CalculateSpeed(std::vector<std::shared_ptr<VideoCodec>>& codec_vec,
+                    bool& stop_flag) {
   auto codec_num = codec_vec.size();
   LOG_INFO("==> Start to monitor encoding/decoding speed, codec num is {}.",
            codec_num);
@@ -34,29 +34,57 @@ void CalculateSpeed(std::vector<std::shared_ptr<VideoCodec>> &codec_vec,
       int diff_enc_cnt = encoded_cnt - encoded_hist_vec[idx];
       int diff_dec_cnt = decoded_cnt - decoded_hist_vec[idx];
       float diff_time =
-          (GET_COST(previous_time[idx], current) / 1000.0 / 1000.0);
+        (GET_COST(previous_time[idx], current) / 1000.0 / 1000.0);
       encoded_hist_vec[idx] = encoded_cnt;
       decoded_hist_vec[idx] = decoded_cnt;
       previous_time[idx] = current;
       float enc_speed = 1.0 * diff_enc_cnt / diff_time;
       float dec_speed = 1.0 * diff_dec_cnt / diff_time;
       LOG_INFO(
-          "Codec Stats: {} decoding speed: {} fps, encoding speed: {} fps.",
-          reinterpret_cast<void *>(codec.get()), dec_speed, enc_speed);
+        "Codec Stats: {} decoding speed: {} fps, encoding speed: {} fps.",
+        reinterpret_cast<void*>(codec.get()), dec_speed, enc_speed);
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
   LOG_INFO("<== End to monitor encoding/decoding speed.");
 }
 
-int main(int argc, char **argv) {
-  std::string det_model_path = "yolov5s.hmm";
-  std::string cls_model_path = "resnet50.hmm";
+PooledModule* LoadModelFromFile(ModulePool* module_pool, std::string model_path,
+                                tcim::Module::WeightManager& wm,
+                                std::vector<std::string>& dummy_tensor_names) {
+  if (!fs::exists(model_path)) {
+    LOG_ERROR("Model file {} doesn't exist.", model_path);
+    return nullptr;
+  }
+
+  tcim::Module::Option option(wm);
+  option.SetDummyTensors(dummy_tensor_names);
+  auto pooled_md = module_pool->Load(model_path, option);
+  if (pooled_md == nullptr) {
+    LOG_ERROR("Failed to load model {}.", model_path);
+    return nullptr;
+  }
+  LOG_INFO("Load model {} and pool it into {}.", model_path,
+           reinterpret_cast<void*>(pooled_md));
+
+  return pooled_md;
+}
+
+int main(int argc, char** argv) {
+  LOG_WARNING("[MEM PERF] Main Start, current mem is {} MB",
+              getCurrentMemoryUsage());
+
+  int codec_thread_num = 2;
+  if (argc > 1) {
+    codec_thread_num = std::stoi(argv[1]);
+    LOG_INFO("set codec thread number: {}", codec_thread_num);
+  }
+
+  std::string det_model_path = "./yolov5s.hmm";
+  std::string cls_model_path = "./resnet50.hmm";
   std::string stream_path = "../../data/1080P_traffic_4s.h264";
-  int codec_thread_num = 1;
-  int multiple = 2;
   int det_thread_num = codec_thread_num;
-  int cls_thread_num = multiple * codec_thread_num;
+  int cls_thread_num = det_thread_num;
   size_t frame_limit = 0;
 
   std::vector<std::thread> threads;
@@ -67,7 +95,7 @@ int main(int argc, char **argv) {
   if (auto platform = std::getenv("HDPL_PLATFORM")) {
     if (!strcmp(platform, "ISIM")) {
       det_thread_num = 1;
-      cls_thread_num = 1;
+      cls_thread_num = cls_thread_num == 0 ? 0 : 1;
       frame_limit = 2;
       LOG_WARNING("det_thread_num set to {} while HDPL_PLATFORM=ISIM",
                   det_thread_num);
@@ -89,47 +117,60 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
+#ifndef DECODER_ONLY
+  bool classify_task = cls_thread_num == 0 ? false : true;
+  int module_max_num = 4;
+  int stream_num = 4;
+
+  // create module pool instance
+  auto pool_ptr = ModulePool::Init(module_max_num, stream_num);
   // create infer threads
   int infer_thread_num = det_thread_num + cls_thread_num;
   Barrier barrier(infer_thread_num);
   std::vector<InferInfo> det_infer_infos(det_thread_num);
   std::vector<InferInfo> cls_infer_infos(cls_thread_num);
-
   auto wm = tcim::Module::WeightManager::CreateWeightManager(DEVICE_ID);
-  for (int codec_idx = 0; codec_idx < codec_thread_num; codec_idx++) {
+  // Load yolov5s model and create detection threads
+  std::vector<std::string> yolov5s_names = {"images", "dyn_info"};
+  for (int idx = 0; idx < det_thread_num; idx++) {
     InferInfo detect_info;
-    if (detect_info.module.Load(det_model_path, wm)) {
-      LOG_ERROR("load model fail: {}", det_model_path);
+    PooledModule* yolov5s_md =
+      LoadModelFromFile(pool_ptr, det_model_path, wm, yolov5s_names);
+    if (yolov5s_md == nullptr) {
+      LOG_ERROR("Failed to load yolov5s model: {}", det_model_path);
       exit(-1);
     }
-    LOG_INFO("thread {} detection model loaded: {}.", codec_idx,
-             det_model_path);
-    detect_info.id = codec_idx;
-    det_infer_infos[codec_idx] = detect_info;
-    threads.emplace_back(
-        std::thread(&detect, std::ref(det_infer_infos[codec_idx]),
-                    std::ref(detect_queues[codec_idx]),
-                    std::ref(classify_queues[codec_idx]),
-                    std::ref(encoding_queues[codec_idx]), std::ref(barrier)));
-
-    for (int i = 0; i < multiple; i++) {
-      int inner_idx = i + (codec_idx * multiple);
-      InferInfo classify_info;
-      if (classify_info.module.Load(cls_model_path, wm)) {
-        LOG_ERROR("load model fail: {}", cls_model_path);
-        exit(-1);
-      }
-      LOG_INFO("thread {} classify model loaded: {}.", inner_idx,
-               cls_model_path);
-      classify_info.id = inner_idx;
-      cls_infer_infos[inner_idx] = classify_info;
-      threads.emplace_back(
-          std::thread(&classify, std::ref(cls_infer_infos[inner_idx]),
-                      std::ref(classify_queues[codec_idx]), std::ref(barrier)));
-    }
+    LOG_INFO("thread {} detection model loaded: {}.", idx, det_model_path);
+    detect_info.module = yolov5s_md;
+    detect_info.id = idx;
+    det_infer_infos[idx] = detect_info;
+    threads.emplace_back(std::thread(
+      &detect, std::ref(det_infer_infos[idx]), std::ref(detect_queues[idx]),
+      std::ref(classify_queues[idx]), std::ref(encoding_queues[idx]),
+      classify_task, std::ref(barrier)));
   }
-  wm.~WeightManager();
+
+  // Load resnet50 model and create classify threads
+  std::vector<std::string> resnet50_names = {"input.1"};
+  for (int idx = 0; idx < cls_thread_num; idx++) {
+    InferInfo classify_info;
+    PooledModule* resnet50_md =
+      LoadModelFromFile(pool_ptr, cls_model_path, wm, resnet50_names);
+    if (resnet50_md == nullptr) {
+      LOG_ERROR("Failed to load resnet50 model: {}", cls_model_path);
+      exit(-1);
+    }
+    LOG_INFO("thread {} classify model loaded: {}.", (det_thread_num + idx),
+             cls_model_path);
+    classify_info.module = resnet50_md;
+    classify_info.id = (det_thread_num + idx);
+    cls_infer_infos[idx] = classify_info;
+    threads.emplace_back(std::thread(&classify, std::ref(cls_infer_infos[idx]),
+                                     std::ref(classify_queues[idx]),
+                                     std::ref(barrier)));
+  }
   barrier.wait();
+#endif  // !DECODER_ONLY
 
   // yolov5s input shape (width, height)
   int32_t width = 1920;
@@ -138,21 +179,25 @@ int main(int argc, char **argv) {
   std::vector<std::shared_ptr<VideoCodec>> codec_vec;
   PushStreamInfo stream_info = {stream_path, frame_limit};
 #ifdef RK_DECODER
-  int barrier_multiple = 3;
+  int barrier_multiple = 1;
 #else
-  int barrier_multiple = 4;
+  int barrier_multiple = 2;
   std::vector<std::shared_ptr<VideoDecoder>> decoder_vec;
 #endif
-  Barrier barrier2((codec_thread_num * barrier_multiple));
+#ifdef ENC_TASK
+  barrier_multiple += 2;
   std::vector<std::shared_ptr<VideoEncoder>> encoder_vec;
+#endif
+  Barrier barrier2((codec_thread_num * barrier_multiple));
 
   for (int codec_idx = 0; codec_idx < codec_thread_num; codec_idx++) {
     std::shared_ptr<VideoCodec> codec = std::make_shared<VideoCodec>();
     codec_vec.emplace_back(codec);
 #ifdef RK_DECODER
     threads.emplace_back(
-        std::thread(&VideoCodec::PushRKStream, codec, std::ref(stream_info),
-                    std::ref(detect_queues[codec_idx]), std::ref(barrier2)));
+      std::thread(&VideoCodec::PushRKStream, codec, std::ref(stream_info),
+                  std::ref(detect_queues[codec_idx]), std::ref(barrier2),
+                  codec_thread_num, std::ref(stop_flag)));
 #else
     std::shared_ptr<VideoDecoder> decoder(new VideoDecoder(format, "NV12M"));
 #ifdef RESIZER
@@ -160,34 +205,54 @@ int main(int argc, char **argv) {
 #endif  // RESIZER
     decoder_vec.emplace_back(decoder);
     threads.emplace_back(
-        std::thread(&VideoCodec::PushStream, codec, decoder_vec[codec_idx],
-                    std::ref(stream_info), std::ref(barrier2)));
+      std::thread(&VideoCodec::PushStream, codec, decoder_vec[codec_idx],
+                  std::ref(stream_info), std::ref(barrier2)));
     threads.emplace_back(
-        std::thread(&VideoCodec::GetFrame, codec, decoder_vec[codec_idx],
-                    std::ref(detect_queues[codec_idx]), std::ref(barrier2)));
+      std::thread(&VideoCodec::GetFrame, codec, decoder_vec[codec_idx],
+                  std::ref(detect_queues[codec_idx]), std::ref(barrier2),
+                  codec_thread_num, std::ref(stop_flag)));
 #endif  // RK_DECODER
+
+#ifndef DECODER_ONLY
+#ifdef ENC_TASK
     std::string output_path =
-        "encoded_results_video_" + std::to_string(codec_idx) + ".h264";
+      "encoded_results_video_" + std::to_string(codec_idx) + ".h264";
     std::shared_ptr<VideoEncoder> encoder(
-        new VideoEncoder("NV12M", format, width, height));
+      new VideoEncoder("NV12M", format, width, height));
     encoder_vec.emplace_back(encoder);
-    threads.emplace_back(std::thread(
-        &VideoCodec::PushEncodeStream, codec, encoder_vec[codec_idx],
-        std::ref(encoding_queues[codec_idx]), std::ref(barrier2)));
+    threads.emplace_back(
+      std::thread(&VideoCodec::PushEncodeStream, codec, encoder_vec[codec_idx],
+                  std::ref(encoding_queues[codec_idx]), std::ref(barrier2)));
     threads.emplace_back(std::thread(&VideoCodec::GetEncodeStream, codec,
                                      encoder_vec[codec_idx], width, height,
                                      output_path, codec_thread_num,
                                      std::ref(stop_flag), std::ref(barrier2)));
+#endif  // ENC_TASK
+#endif  // !DECODER_ONLY
   }
 
   // create a thread to calculate encoding/decoding speed
   threads.emplace_back(
-      std::thread(&CalculateSpeed, std::ref(codec_vec), std::ref(stop_flag)));
+    std::thread(&CalculateSpeed, std::ref(codec_vec), std::ref(stop_flag)));
   barrier2.wait();
 
-  for (auto &t : threads) {
+  for (auto& t : threads) {
     t.join();
   }
+
+#ifndef DECODER_ONLY
+  for (auto& infer_info : det_infer_infos) {
+    delete infer_info.module;
+    infer_info.module = nullptr;
+  }
+  det_infer_infos.clear();
+  for (auto& infer_info : cls_infer_infos) {
+    delete infer_info.module;
+    infer_info.module = nullptr;
+  }
+  cls_infer_infos.clear();
+  delete pool_ptr;
+#endif
 
   return 0;
 }

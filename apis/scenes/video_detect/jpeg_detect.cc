@@ -15,7 +15,26 @@
 #include "detect_frames.h"
 #include "jpeg_codec.h"
 
-int main(int argc, char **argv) {
+PooledModule* LoadModelFromFile(ModulePool* module_pool, std::string model_path,
+                                tcim::Module::WeightManager& wm) {
+  if (!fs::exists(model_path)) {
+    LOG_ERROR("Model file {} doesn't exist.", model_path);
+    return nullptr;
+  }
+
+  tcim::Module::Option option(wm);
+  auto pooled_md = module_pool->Load(model_path, option);
+  if (pooled_md == nullptr) {
+    LOG_ERROR("Failed to load model {}.", model_path);
+    return nullptr;
+  }
+  LOG_INFO("Load model {} and pool it into {}.", model_path,
+           reinterpret_cast<void*>(pooled_md));
+
+  return pooled_md;
+}
+
+int main(int argc, char** argv) {
   std::string det_model_path = "yolov5s.hmm";
   std::string cls_model_path = "resnet50.hmm";
   int det_thread_num = 1;
@@ -26,6 +45,10 @@ int main(int argc, char **argv) {
   TaskQueue q_det;
   TaskQueue q_cls;
 
+  int module_max_num = 4;
+  int stream_num = 4;
+  auto pool_ptr = ModulePool::Init(module_max_num, stream_num);
+
   // create infer threads
   int infer_thread_num = det_thread_num + cls_thread_num;
   Barrier barrier(infer_thread_num);
@@ -35,30 +58,34 @@ int main(int argc, char **argv) {
   auto wm = tcim::Module::WeightManager::CreateWeightManager(DEVICE_ID);
   for (int i = 0; i < det_thread_num; i++) {
     InferInfo infer_info;
-    if (infer_info.module.Load(det_model_path, wm)) {
-      LOG_ERROR("load model fail: {}", det_model_path);
+    PooledModule* yolov5s_md = LoadModelFromFile(pool_ptr, det_model_path, wm);
+    if (yolov5s_md == nullptr) {
+      LOG_ERROR("Failed to load yolov5s model: {}", det_model_path);
       exit(-1);
     }
-    LOG_INFO("thread {} model loaded: {}.", i, det_model_path);
+    LOG_INFO("thread {} detection model loaded: {}.", i, det_model_path);
+    infer_info.module = yolov5s_md;
     infer_info.id = i;
     det_infer_infos[i] = infer_info;
     threads.emplace_back(std::thread(&detect, std::ref(det_infer_infos[i]),
                                      std::ref(q_det), std::ref(q_cls),
-                                     std::ref(q_enc), std::ref(barrier)));
+                                     std::ref(q_enc), true, std::ref(barrier)));
   }
   for (int i = 0; i < cls_thread_num; i++) {
     InferInfo infer_info;
-    if (infer_info.module.Load(cls_model_path, wm)) {
-      LOG_ERROR("load model fail: {}", cls_model_path);
+    PooledModule* resnet50_md = LoadModelFromFile(pool_ptr, cls_model_path, wm);
+    if (resnet50_md == nullptr) {
+      LOG_ERROR("Failed to load resnet50 model: {}", cls_model_path);
       exit(-1);
     }
-    LOG_INFO("thread {} model loaded: {}.", i, cls_model_path);
-    infer_info.id = i;
+    LOG_INFO("thread {} classify model loaded: {}.", (det_thread_num + i),
+             cls_model_path);
+    infer_info.module = resnet50_md;
+    infer_info.id = (det_thread_num + i);
     cls_infer_infos[i] = infer_info;
     threads.emplace_back(std::thread(&classify, std::ref(cls_infer_infos[i]),
                                      std::ref(q_cls), std::ref(barrier)));
   }
-  wm.~WeightManager();
   barrier.wait();
 
   // JPEG codec params
@@ -74,11 +101,11 @@ int main(int argc, char **argv) {
   cv::Mat img_rgb;
   cv::Mat img_yuv;
   img_rgb = cv::imread(data_path);
-  ImageProc::BgrToRgb((int8_t *)(img_rgb.data), img_rgb.rows, img_rgb.cols);
+  ImageProc::BgrToRgb((int8_t*)(img_rgb.data), img_rgb.rows, img_rgb.cols);
   cv::cvtColor(img_rgb, img_yuv, cv::COLOR_RGB2YUV_I420);
   int size = width * height * 3;
-  char *yuv_buffer = (char *)(malloc(yuv_total_size));
-  ImageProc::I420To420sp((uint8_t *)yuv_buffer, (uint8_t *)img_yuv.data, size);
+  char* yuv_buffer = (char*)(malloc(yuv_total_size));
+  ImageProc::I420To420sp((uint8_t*)yuv_buffer, (uint8_t*)img_yuv.data, size);
 
   JpegCodec codec;
   Barrier barrier2(2);
@@ -91,14 +118,26 @@ int main(int argc, char **argv) {
                                    std::ref(encoder), yuv_buffer, encode_num,
                                    std::ref(q_enc), std::ref(barrier2)));
   // create jpeg decoder thread
-  threads.emplace_back(std::thread(
-      &JpegCodec::DecodeImage, &codec, std::ref(decoder), width, height,
-      std::ref(q_enc), std::ref(q_det), std::ref(barrier2)));
+  threads.emplace_back(
+    std::thread(&JpegCodec::DecodeImage, &codec, std::ref(decoder), width,
+                height, std::ref(q_enc), std::ref(q_det), std::ref(barrier2)));
   barrier2.wait();
 
-  for (auto &t : threads) {
+  for (auto& t : threads) {
     t.join();
   }
+
+  for (auto& infer_info : det_infer_infos) {
+    delete infer_info.module;
+    infer_info.module = nullptr;
+  }
+  det_infer_infos.clear();
+  for (auto& infer_info : cls_infer_infos) {
+    delete infer_info.module;
+    infer_info.module = nullptr;
+  }
+  cls_infer_infos.clear();
+  delete pool_ptr;
 
   return 0;
 }

@@ -2,8 +2,11 @@
 #define EXAMPLES_SCENES_VIDEO_DETECT_INCLUDE_VIDEO_DETECT_UTILS_H_
 
 #include <condition_variable>
+#include <fstream>
+#include <iostream>
 #include <mutex>
 #include <queue>
+#include <sstream>
 #include <string>
 
 #if (__GNUC__ < 8 && !defined(_MSC_VER))
@@ -19,13 +22,22 @@ namespace fs = std::filesystem;
 #include "logging.h"
 #include "models/resnet50.hpp"
 #include "models/yolov5s.hpp"
+#include "module_pool.hpp"
 #include "tcim/tcim_imageops.h"
 #include "tcim/tcim_runtime.h"
 #include "threads.hpp"
 #include "utils.hpp"
 
-#define DECODER_QUEUE_SIZE 20
-#define INFERENCE_QUEUE_SIZE 10
+#ifdef RK_DECODER
+#include "h264.h"
+#include "mpp_frame.h"
+#include "rk_mpi.h"
+#include "rk_type.h"
+// #define DUMP_RK_DECODED_DATA  // save rk decoded results
+#endif
+
+#define DECODER_QUEUE_SIZE 0
+#define INFERENCE_QUEUE_SIZE 0
 
 // the maximum size supported by resizer
 #define RESIZER_MAX_WIDTH 3840
@@ -70,10 +82,15 @@ typedef struct {
   std::vector<ObjInfo> objs;
   uint64_t req_id;
   bool is_end = false;
+  int frame_width = 0;
+  int frame_height = 0;
 #ifdef RK_DECODER
   // only used in rk decoder
-  std::shared_ptr<void> buffer;
-  size_t buffer_length;
+  MppFrame *frame = nullptr;
+  RK_U8 *y_buf = nullptr;
+  RK_U8 *uv_buf = nullptr;
+  size_t y_buf_size = 0;
+  size_t uv_buf_size = 0;
 #endif
 } TaskInfo;
 
@@ -105,6 +122,38 @@ inline int SaveImgs(int height, int width, void *data_ptr,
   cv::imwrite(result_file.string().c_str(), bgr);
 
   return VIDEO_DECODER_OK;
+}
+
+inline std::string TensorInfo2Str(const tcim::TensorInfo &tensor_info) {
+  std::stringstream ss;
+  ss << tensor_info;
+  return ss.str();
+}
+
+inline int32_t getCurrentMemoryUsage() {
+  int32_t usedMemMB;
+  // 执行 free -m 并过滤 Mem 行（只取物理内存行）
+  FILE *pipe = popen("free -m | awk '/Mem:/ {print $3}'", "r");
+  if (!pipe) {
+    std::cerr << "执行 free 命令失败" << std::endl;
+    return 0;
+  }
+
+  char buffer[32];
+  if (fgets(buffer, sizeof(buffer), pipe) == nullptr) {
+    std::cerr << "读取 free 命令输出失败" << std::endl;
+    pclose(pipe);
+    return 0;
+  }
+  pclose(pipe);
+
+  // 转换为数值
+  std::istringstream iss(buffer);
+  if (!(iss >> usedMemMB)) {
+    std::cerr << "解析 used 内存值失败" << std::endl;
+    return 0;
+  }
+  return usedMemMB;
 }
 
 #endif  // EXAMPLES_SCENES_VIDEO_DETECT_INCLUDE_VIDEO_DETECT_UTILS_H_

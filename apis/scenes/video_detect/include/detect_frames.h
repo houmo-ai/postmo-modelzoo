@@ -18,12 +18,17 @@
 #include "video_detect_utils.h"
 
 typedef struct {
-  InferModule module;
+  PooledModule *module;
   int id = 0;
 } InferInfo;
 
+int GetInputInfoMap(PooledModule *module,
+                    std::map<std::string, tcim::TensorInfo> &input_info_map);
+int GetOutputInfoMap(PooledModule *module,
+                     std::map<std::string, tcim::TensorInfo> &output_info_map);
+
 void detect(InferInfo &infer_info, TaskQueue &qin, TaskQueue &qout,
-            TaskQueue &qout_enc, Barrier &barrier);
+            TaskQueue &qout_enc, bool classify_task, Barrier &barrier);
 void classify(InferInfo &infer_info, TaskQueue &qin, Barrier &barrier);
 
 #endif  // EXAMPLES_SCENES_VIDEO_DETECT_INCLUDE_DETECT_FRAMES_H_

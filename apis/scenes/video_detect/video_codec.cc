@@ -21,25 +21,19 @@ extern "C" {
 
 #include "video_codec.h"
 
-#ifdef RK_DECODER
-#include "h264.h"
-#include "mpp_frame.h"
-#include "rk_mpi.h"
-#include "rk_type.h"
-// #define DUMP_RK_DECODED_DATA  // save rk decoded results
-#endif
-
 // #define DUMP_HM_DECODED_DATA  // save hm decoded results
 
 std::atomic<int32_t> g_codec_cnt = 0;
 
 #ifdef RK_DECODER
 void VideoCodec::PushRKStream(PushStreamInfo &stream_info, TaskQueue &qout,
-                              Barrier &barrier) {
+                              Barrier &barrier, const int32_t &codec_num,
+                              bool &stop_flag) {
   // when iteration is greater than 1, reusing the decoded data
   int iteration = 1;
   H264DataSource *data_source =
-      H264DataSource::CreateH264Source(stream_info.stream_path, iteration);
+    H264DataSource::CreateH264Source(stream_info.stream_path, iteration);
+
   MppCtx ctx = NULL;
   MppApi *mpi = NULL;
   MppBuffer frm_buf = NULL;
@@ -67,8 +61,10 @@ void VideoCodec::PushRKStream(PushStreamInfo &stream_info, TaskQueue &qout,
   }
 
   barrier.barrier();
-  LOG_INFO("[RK Decoder] {}, mpp ctx {} start to decode stream...",
-           reinterpret_cast<void *>(this), ctx);
+  LOG_INFO(
+    "[RK Decoder] {}, mpp ctx {} start to decode stream, current mem is {} "
+    "MB...",
+    reinterpret_cast<void *>(this), ctx, getCurrentMemoryUsage());
 
   uint64_t fid = 0;
   while (true) {
@@ -89,7 +85,16 @@ void VideoCodec::PushRKStream(PushStreamInfo &stream_info, TaskQueue &qout,
     mpp_packet_set_size(packet, data_length);
     mpp_packet_set_pos(packet, data);
     mpp_packet_set_length(packet, data_length);
-    ret = mpi->decode_put_packet(ctx, packet);
+
+    while (true) {
+      ret = mpi->decode_put_packet(ctx, packet);
+      if (ret == -1012) {
+        LOG_WARNING("[RK Decoder] mpp ctx {} decode_put_packet retry", ctx);
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        continue;
+      }
+      break;
+    }
     if (MPP_OK != ret) {
       LOG_ERROR("[RK Decoder] mpp ctx {} decode_put_packet failed, ret {}", ctx,
                 (int)ret);
@@ -97,69 +102,74 @@ void VideoCodec::PushRKStream(PushStreamInfo &stream_info, TaskQueue &qout,
     }
 
     while (true) {
-      MppFrame frame = NULL;
+      MppFrame *frame = new MppFrame();
       RK_S32 times = 30;
       do {
-        ret = mpi->decode_get_frame(ctx, &frame);
+        ret = mpi->decode_get_frame(ctx, frame);
         if (MPP_ERR_TIMEOUT == ret) {
           times--;
         } else {
           break;
         }
       } while (times > 0);
-      if (frame) {
+      if (*frame) {
         this->decoded_cnt++;
-        if (mpp_frame_get_info_change(frame)) {
-          RK_U32 width = mpp_frame_get_width(frame);
-          RK_U32 height = mpp_frame_get_height(frame);
-          RK_U32 hor_stride = mpp_frame_get_hor_stride(frame);
-          RK_U32 ver_stride = mpp_frame_get_ver_stride(frame);
-          RK_U32 buf_size = mpp_frame_get_buf_size(frame);
+        if (mpp_frame_get_info_change(*frame)) {
+          RK_U32 width = mpp_frame_get_width(*frame);
+          RK_U32 height = mpp_frame_get_height(*frame);
+          RK_U32 hor_stride = mpp_frame_get_hor_stride(*frame);
+          RK_U32 ver_stride = mpp_frame_get_ver_stride(*frame);
+          RK_U32 buf_size = mpp_frame_get_buf_size(*frame);
           LOG_INFO(
-              "[RK Decoder] mpp ctx {} frame info change: width={}, height={}, "
-              "hor_stride={}, ver_stride={}, buf_size={}",
-              ctx, width, height, hor_stride, ver_stride, buf_size);
+            "[RK Decoder] mpp ctx {} frame info change: width={}, height={}, "
+            "hor_stride={}, ver_stride={}, buf_size={}",
+            ctx, width, height, hor_stride, ver_stride, buf_size);
           ret = mpi->control(ctx, MPP_DEC_SET_INFO_CHANGE_READY, NULL);
           if (ret) {
             LOG_ERROR(
-                "[RK Decoder] mpp ctx {} info change ready failed, ret {}", ctx,
-                (int)ret);
+              "[RK Decoder] mpp ctx {} info change ready failed, ret {}", ctx,
+              (int)ret);
           }
         } else {
-          // drop Frames
-          // if (fid % 6 != 0) {
-          //   fid++;
-          //   mpp_frame_deinit(&frame);
-          //   continue;
-          // }
+          // drop frames
+          if (fid % 6 != 0) {
+            fid++;
+            mpp_frame_deinit(frame);
+            delete frame;
+            continue;
+          }
           MppBuffer buffer = NULL;
           RK_U8 *base = NULL;
-          buffer = mpp_frame_get_buffer(frame);
+          buffer = mpp_frame_get_buffer(*frame);
           if (NULL == buffer) {
             break;
           }
 
-          RK_U32 width = mpp_frame_get_width(frame);
-          RK_U32 height = mpp_frame_get_height(frame);
-          RK_U32 hor_stride = mpp_frame_get_hor_stride(frame);
-          RK_U32 ver_stride = mpp_frame_get_ver_stride(frame);
+          RK_U32 width = mpp_frame_get_width(*frame);
+          RK_U32 height = mpp_frame_get_height(*frame);
+          RK_U32 hor_stride = mpp_frame_get_hor_stride(*frame);
+          RK_U32 ver_stride = mpp_frame_get_ver_stride(*frame);
+          // RK解码结果buffer指针
           base = (RK_U8 *)mpp_buffer_get_ptr(buffer);
-          RK_U32 buf_size = mpp_frame_get_buf_size(frame);
+          RK_U32 buf_size = mpp_frame_get_buf_size(*frame);
 
+#ifndef DECODER_ONLY
           // copy the decoded result to a contiguous buffer
           RK_U32 i;
-          RK_U8 *base_y = base;
-          RK_U8 *base_c = base + hor_stride * ver_stride;
+          RK_U8 *base_y = base;  // 解码结果Y数据指针
+          RK_U8 *base_c = base + hor_stride * ver_stride;  // 解码结果UV数据指针
           size_t frame_size = (height * 3 / 2) * width;
-          auto result = std::shared_ptr<void>(malloc(frame_size), free);
-          memcpy(result.get(), base_y, (width * height));
-          memcpy(result.get() + (width * height), base_c, (width * height / 2));
 
           // construct TaskInfo for inference
           TaskInfo task_info;
-          task_info.req_id = fid++;
-          task_info.buffer = result;
-          task_info.buffer_length = frame_size;
+          task_info.req_id = fid;
+          task_info.frame = frame;
+          task_info.y_buf = base_y;
+          task_info.uv_buf = base_c;
+          task_info.y_buf_size = (width * height);
+          task_info.uv_buf_size = (width * height / 2);
+          task_info.frame_width = width;
+          task_info.frame_height = height;
 
           bool print_flag = true;
           while (1) {
@@ -174,27 +184,42 @@ void VideoCodec::PushRKStream(PushStreamInfo &stream_info, TaskQueue &qout,
             }
             if (print_flag) {
               LOG_WARNING(
-                  "[RK Decoder] push rk stream queue size {} exceed 20, push "
-                  "stream suspended.",
-                  size);
+                "[RK Decoder] push rk stream queue size {} exceed 20, push "
+                "stream suspended.",
+                size);
               print_flag = false;
             }
             lock.unlock();
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
           }
+#endif  // !DECODER_ONLY
+          fid++;
         }
-        mpp_frame_deinit(&frame);
+#ifdef DECODER_ONLY
+        mpp_frame_deinit(frame);
+        delete frame;
+#endif
       } else {
         break;
       }
     }
     if (packet) {
       mpp_packet_deinit(&packet);
+      delete packet;
       packet = NULL;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(33));
   }
 
+#ifndef ENC_TASK
+  g_codec_cnt++;
+  if (g_codec_cnt >= codec_num) {
+    LOG_INFO("All codec task done, stop stats thread.");
+    stop_flag = true;
+  }
+#endif
+
+#ifndef DECODER_ONLY
   // construct eos TaskInfo
   TaskInfo task_info;
   task_info.req_id = fid++;
@@ -206,6 +231,19 @@ void VideoCodec::PushRKStream(PushStreamInfo &stream_info, TaskQueue &qout,
     qout.cond.notify_all();
     lock.unlock();
   }
+
+  while (true) {
+    std::unique_lock<std::mutex> lock(qout.mutex);
+    auto task = qout.queue.front();
+    if (task.is_end) {
+      LOG_INFO("All mpp frames have been released, mpp ctx {}.", ctx);
+      lock.unlock();
+      break;
+    }
+    lock.unlock();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+#endif
 
   ret = mpi->reset(ctx);
   if (ret) {
@@ -278,7 +316,7 @@ void VideoCodec::PushStream(std::shared_ptr<VideoDecoder> decoder,
   }
 
   AVCodecParameters *codecParameters =
-      format_ctx->streams[video_stream_index]->codecpar;
+    format_ctx->streams[video_stream_index]->codecpar;
   LOG_INFO("frame size is {} x {}.", codecParameters->width,
            codecParameters->height);
   auto &width = decoder->GetWidth();
@@ -289,13 +327,13 @@ void VideoCodec::PushStream(std::shared_ptr<VideoDecoder> decoder,
 #ifdef RESIZER
   if (width > RESIZER_MAX_WIDTH || height > RESIZER_MAX_HEIGHT) {
     LOG_ERROR(
-        "The decoded outputs exceeds the upper limit supported by resizer.");
+      "The decoded outputs exceeds the upper limit supported by resizer.");
     avformat_close_input(&format_ctx);
     return;
   }
   // create a resizer to process decoded outputs
   auto option =
-      tcim::ImageOps::Resizer::Option(tcim::DataFmt::YUV420SP, DEVICE_ID);
+    tcim::ImageOps::Resizer::Option(tcim::DataFmt::YUV420SP, DEVICE_ID);
   auto md_width = decoder->GetResizer().md_width;
   auto md_height = decoder->GetResizer().md_width;
   int64_t max_width = width < md_width ? md_width : width;
@@ -382,7 +420,8 @@ void VideoCodec::PushStream(std::shared_ptr<VideoDecoder> decoder,
 }
 
 void VideoCodec::GetFrame(std::shared_ptr<VideoDecoder> decoder,
-                          TaskQueue &qout, Barrier &barrier) {
+                          TaskQueue &qout, Barrier &barrier,
+                          const int32_t &codec_num, bool &stop_flag) {
   int fid = 0;
   int ret = 0;
   int count = 0;
@@ -414,19 +453,20 @@ void VideoCodec::GetFrame(std::shared_ptr<VideoDecoder> decoder,
       continue;
     }
 
+#ifndef DECODER_ONLY
     tcim::Buffer y_buf;
     tcim::Buffer uv_buf;
     tcim::Tensor yuv_tensor;
     tcim::Tensor y_tensor;
     tcim::Tensor uv_tensor;
     auto yuv_info =
-        tcim::TensorInfo::CreateYUVInfo(width, height, tcim::YUV420SP);
-    std::cout << "-->> decoded yuv info:" << yuv_info << std::endl;
+      tcim::TensorInfo::CreateYUVInfo(width, height, tcim::YUV420SP);
+    LOG_INFO("-->> decoded yuv info: {}", TensorInfo2Str(yuv_info));
     if (device == CPU) {
       yuv_tensor = tcim::Tensor::CreateHostTensor(yuv_info);
       y_buf = tcim::Buffer::CreateHostBuffer(frm_data[0].len, frm_data[0].data);
       uv_buf =
-          tcim::Buffer::CreateHostBuffer(frm_data[1].len, frm_data[1].data);
+        tcim::Buffer::CreateHostBuffer(frm_data[1].len, frm_data[1].data);
     } else {
       yuv_tensor = tcim::Tensor::CreateDeviceTensor(yuv_info);
       y_buf = tcim::Buffer::CreateDeviceBuffer(frm_data[0].data,
@@ -444,9 +484,8 @@ void VideoCodec::GetFrame(std::shared_ptr<VideoDecoder> decoder,
     auto md_width = img_resizer.md_width;
     tcim::Tensor resized_yuv_tensor;
     auto resized_yuv_info =
-        tcim::TensorInfo::CreateYUVInfo(md_width, md_heigth, tcim::YUV420SP);
-    std::cout << "-->> resized yuv info:" << resized_yuv_info << std::endl;
-    ;
+      tcim::TensorInfo::CreateYUVInfo(md_width, md_heigth, tcim::YUV420SP);
+    LOG_INFO("-->> resized yuv info: {}", TensorInfo2Str(resized_yuv_info));
     if (device == CPU) {
       resized_yuv_tensor = tcim::Tensor::CreateHostTensor(resized_yuv_info);
     } else {
@@ -472,13 +511,17 @@ void VideoCodec::GetFrame(std::shared_ptr<VideoDecoder> decoder,
     LOG_INFO("save the resized image, file_path: {}.", resized_file_name);
 #endif  // DUMP_HM_DECODED_DATA
 #endif  // RESIZER
+#endif  // !DECODER_ONLY
 
     count++;
     decoder->ReleaseBuf();
 
+#ifndef DECODER_ONLY
     // push input data to det queue
     TaskInfo task_info;
     task_info.req_id = fid++;
+    task_info.frame_width = width;
+    task_info.frame_height = height;
 #ifdef RESIZER
     task_info.image = resized_yuv_tensor.Buffer();
 #else
@@ -507,9 +550,19 @@ void VideoCodec::GetFrame(std::shared_ptr<VideoDecoder> decoder,
       lock.unlock();
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+#endif  // !DECODER_ONLY
   }
 
   decoder->Close();
+
+#ifndef ENC_TASK
+  g_codec_cnt++;
+  if (g_codec_cnt >= codec_num) {
+    LOG_INFO("All codec task done, stop stats thread.");
+    stop_flag = true;
+  }
+#endif
+
   LOG_INFO("<=== GetFrame thread exit. {} frames received.", count);
 }
 
@@ -615,9 +668,9 @@ void VideoCodec::GetEncodeStream(std::shared_ptr<VideoEncoder> encoder,
   int64_t pts = 0;
 
   LOG_INFO(
-      "===> GetEncodeStream thread start, ffmpeg ctx {}, frame size is {}x{}, "
-      "fps is {}.",
-      reinterpret_cast<void *>(ofmt_ctx), width, height, fps_num);
+    "===> GetEncodeStream thread start, ffmpeg ctx {}, frame size is {}x{}, "
+    "fps is {}.",
+    reinterpret_cast<void *>(ofmt_ctx), width, height, fps_num);
 
   barrier.barrier();
 

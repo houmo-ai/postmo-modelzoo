@@ -22,7 +22,7 @@
 
 ## 软件依赖
 
-本示例依赖 opencv 库进行图像预处理和可视化，依赖 ffmpeg 库进行图像取流。
+本示例依赖 opencv 库进行图像预处理和可视化，依赖 ffmpeg 库进行图像取流，需自行安装 ffmpeg 环境。
 
 如视频解码实现方案使用 RK 解码，则需依赖 mpp 库进行视频解码。mpp 库介绍及安装方法见：https://github.com/rockchip-linux/mpp 。
 成功安装 mpp 库后，将在`/usr/local/lib`下产生 mpp 相关的 so 库，mpp 库提供的头文件将在`/usr/local/include/rockchip/`中。如果上述路径不存在 mpp 相关资源，则需从 mpp 安装路径拷贝相关资源至`/usr/local/lib`和`/usr/local/include/rockchip/`, 用于 C++演示程序的编译。
@@ -59,10 +59,25 @@ python3 get_model.py
 - `-DENABLE_RK_DECODER=ON`: 开启 RK 视频解码（同时会关闭后摩视频解码）
 - `-DENABLE_RK_DECODER=OFF`: 关闭 RK 视频解码（同时会开启后摩视频解码）
 
-可通过控制编译提供的-D 参数`ENABLE_JPEG`来开关 RK 解码:
+可通过控制编译提供的-D 参数`ENABLE_JPEG`来开关 JPEG 编解码:
 
 - `-DENABLE_JPEG=ON`: 开启 JPEG 编解码（同时会关闭后摩解码）
-- `-DENABLE_JPEG=OFF`: 开启 JPEG 编解码（同时会开启后摩解码）
+- `-DENABLE_JPEG=OFF`: 关闭 JPEG 编解码（同时会开启后摩解码）
+
+可通过控制编译提供的-D 参数`ENABLE_GEN_IMGS`来开关 Demo 结果生成:
+
+- `-DENABLE_GEN_IMGS=ON`: 开启 Demo 结果生成
+- `-DENABLE_GEN_IMGS=OFF`: 关闭 Demo 结果生成（同时会关闭后摩编码）
+
+可通过控制编译提供的-D 参数`ENABLE_HM_ENCODER`来开关后摩编码:
+
+- `-DENABLE_HM_ENCODER=ON`: 开启后摩编码 （同时会开启 Demo 结果生成）
+- `-DENABLE_HM_ENCODER=OFF`: 关闭后摩编码
+
+可通过控制编译提供的-D 参数`ENABLE_DECODER_ONLY`来开关仅解码:
+
+- `-DENABLE_DECODER_ONLY=ON`: 开启仅解码
+- `-DENABLE_DECODER_ONLY=OFF`: 关闭仅解码
 
 _注：无需修改或配置上述变量，程序默认也可运行。_
 
@@ -71,7 +86,7 @@ _注：无需修改或配置上述变量，程序默认也可运行。_
 ```bash
 mkdir build
 cd build
-cmake -DCMAKE_INSTALL_PREFIX=../ -DENABLE_RESIZER=ON -DENABLE_RK_DECODER=OFF -DENABLE_JPEG=OFF ..
+cmake -DCMAKE_INSTALL_PREFIX=../ -DENABLE_RESIZER=ON -DENABLE_RK_DECODER=OFF -DENABLE_GEN_IMGS=ON -DENABLE_HM_ENCODER=ON -DENABLE_DECODER_ONLY=OFF -DENABLE_JPEG=OFF -DCMAKE_BUILD_TYPE=Release ..
 make -j
 make install
 cd ..
@@ -270,6 +285,8 @@ bash run.sh
 bash run.sh --disable_resizer
 # 使用RK视频解码（主机上需已安装mpp库）
 bash run.sh --enable_rk_decoder
+# 使用RK视频解码（主机上需已安装mpp库）+ 不生成demo结果(关闭后摩编码)
+bash run.sh --enable_rk_decoder --disable_gen_imgs
 # 运行JPEG图像编解码示例
 bash run.sh --enable_jpeg
 ```
