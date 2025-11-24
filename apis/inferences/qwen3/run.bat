@@ -1,4 +1,7 @@
-set PROJECT_DIR=%cd%
+@echo off
+set PROJECT_DIR=%~dp0
+set PROJECT_DIR=%PROJECT_DIR:~0,-1% 
+cd /d "%PROJECT_DIR%"
 set BUILD_DIR=build_vs2022
 set BUILD_TYPE=Release
 rem get test model
@@ -8,7 +11,7 @@ rem python example
 %PYTHON_DIR%\python.exe demo.py
 
 rem c++ example
-rmdir build
+if exist "build" (rmdir /s /q build)
 md build
 cd build
 
@@ -17,3 +20,4 @@ cmake --build . --target=install --config=%BUILD_TYPE% || echo ERROR && cd .. &&
 
 cd ..
 example_cxx_qwen3.exe
+pause
