@@ -34,9 +34,9 @@ def print_support_lists(list_name: str, support_list: dict):
     print("-" * 50)
     for demo, value in support_list.items():
         if type(value) is bool:
-            print(f"{demo:<15} {'√' if value else '×'}")
+            print(f"{demo:<30} {'√' if value else '×'}")
         else:
-            print(f"√ {demo:<15} : {', '.join(value)}")
+            print(f"√ {demo:<30} : {', '.join(value)}")
     print("-" * 50)
 
 
@@ -151,6 +151,20 @@ class EnvManager:
         except Exception as e:
             print(f"Failed to set {var_name}: {e}")
 
+    def get_initial(self):
+        """Restore ALL environment variables to state before first script run"""
+        if not os.path.exists(self.initial_backup_path):
+            print(f"Initial backup not found: {self.initial_backup_path}")
+            return
+
+        try:
+            with open(self.initial_backup_path, "r", encoding="utf-8") as f:
+                initial_data = json.load(f)
+        except Exception as e:
+            print(f"Restore failed: {e}")
+
+        return initial_data["user_variables"]
+
     def restore_to_initial(self) -> None:
         """Restore ALL environment variables to state before first script run"""
         if not os.path.exists(self.initial_backup_path):
@@ -168,6 +182,7 @@ class EnvManager:
             print(f"Backup source: {os.path.abspath(self.initial_backup_path)}")
         except Exception as e:
             print(f"Restore failed: {e}")
+
 
     def add_to_path(self, new_path: str) -> None:
         """

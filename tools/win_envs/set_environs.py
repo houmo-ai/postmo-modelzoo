@@ -22,6 +22,7 @@ class WinEnvironsGenerater:
         self.env_supported_cpp_examples = None
         self.initial_backup_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "initial_env_backup.json"))
         self.env_manager = EnvManager(self.initial_backup_path)
+        self.initial_env = dict()
 
     def load_origin_settings(self):
         with open(os.path.join(self.setting_dir_path, "env.json"), "r", encoding="utf-8") as f:
@@ -48,11 +49,12 @@ class WinEnvironsGenerater:
             self.all_cpp_example_environments[key] = value + self.py_example_environments[key]
 
     def nullEnvManualSet(self, key: str, need: bool):
+        self.initial_env = self.env_manager.get_initial() if len(self.initial_env.keys()) == 0 else self.initial_env
         var_name = f"{key} [Required] " if need else f"{key} [Optional] "
-        if os.getenv(key) is not None:
+        if key in self.initial_env.keys():
             self.all_environments[key] = os.getenv(key)
             assert os.path.exists(self.all_environments[key]), f'{var_name} invalid, path not exists!'
-        if self.all_environments[key] == "" and os.getenv(key) is None:
+        if self.all_environments[key] == "" and key not in self.initial_env.keys():
             self.all_environments[key] = input(f"Manual Set {var_name} abspath:").strip()
             if need:
                 assert self.all_environments[key] != "", f'{var_name} not find, please set it!'
@@ -92,7 +94,7 @@ class WinEnvironsGenerater:
         tcim_package_path = find_tcim_path()
         assert tcim_package_path is not None, f'Please install houmo_tcim_runtime_xh2 package first, it is Required!'
         self.nullEnvManualSet("HOUMO_SDK_PATH", need=True)
-        self.all_environments["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
+        self.all_environments["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/toolchain/release"
         self.all_environments["HDPL_PLATFORM"] = "ASIC"
         self.all_environments["HOUMO_TARGET"] = self.settings["support_target"]
         self.all_environments["TCIM_BACKEND"] = "Xh2HalBackend" if self.settings["support_target"] == "xh2" else "Xh1HalBackend"
@@ -110,8 +112,56 @@ class WinEnvironsGenerater:
         pattern = r'v\d+\.\d+\.\d+'
         self.all_environments["HOUMO_VERSION"] = re.search(pattern, self.all_environments["HOUMO_SDK_PATH"]).group()
         tcim_dll_path = os.path.join(self.all_environments["TCIM_RUNTIME_PATH"], "bin")
-        xh2a_dll_path = os.path.join(self.all_environments["HOUMO_SDK_PATH"], "hal/lib")
+        xh2a_dll_path = os.path.join(self.all_environments["HOUMO_SDK_PATH"], "hal\\lib")
         env_paths = os.getenv("PATH") + self.all_environments["PATH"]
+        if self.all_environments["CMAKE_PATH"] not in env_paths and self.all_environments["CMAKE_PATH"] != "":
+            self.all_environments["PATH"] = f'{self.all_environments["CMAKE_PATH"]};' + self.all_environments["PATH"]
+
+        if xh2a_dll_path not in env_paths and xh2a_dll_path != "":
+            self.all_environments["PATH"] = f'{xh2a_dll_path};' + self.all_environments["PATH"]
+
+        if tcim_dll_path not in env_paths and tcim_dll_path != "":
+            self.all_environments["PATH"] = f'{tcim_dll_path};' + self.all_environments["PATH"]
+
+        self.nullEnvManualSet("OPENCV_PATH", need=False)
+
+        self.settings["all_environments"] = self.all_environments
+
+        for key, value in self.all_environments.items():
+            if key not in origin_envs:
+                self.nullEnvManualSet(key, need=False)
+            self.env_manager.set_env(key, value) if key != "PATH" else self.env_manager.add_to_path(value)
+        self.env_manager.refresh_envs()
+        with open(os.path.join(self.setting_dir_path, "env.json"), "w", encoding="utf-8") as f:
+            json.dump(self.settings, f, ensure_ascii=False, indent=4)
+
+    def autoReSetEnvirons(self):
+        self.initial_env = self.env_manager.get_initial() if len(self.initial_env.keys()) == 0 else self.initial_env
+        assert self.initial_env['Path'] is not None, None
+        origin_envs = list(self.all_environments.keys())
+        tcim_package_path = find_tcim_path()
+        assert tcim_package_path is not None, f'Please install houmo_tcim_runtime_xh2 package first, it is Required!'
+        self.nullEnvManualSet("HOUMO_SDK_PATH", need=True)
+        self.all_environments["HOUMO_MODELZOO_URL"] = "http://10.10.1.53:8082/artifactory/toolchain/release"
+        self.all_environments["HDPL_PLATFORM"] = "ASIC"
+        self.all_environments["HOUMO_TARGET"] = self.settings["support_target"]
+        self.all_environments["TCIM_BACKEND"] = "Xh2HalBackend" if self.settings["support_target"] == "xh2" else "Xh1HalBackend"
+        self.all_environments["HOUMO_EXAMPLES_PATH"] = os.path.abspath(os.path.join(os.path.abspath(__file__), "../../../"))
+        self.all_environments["PYTHON_DIR"] = os.path.abspath(os.path.join(sys.executable, "../"))
+        self.all_environments["TCIM_RUNTIME_PATH"] = tcim_package_path
+
+        if shutil.which("cmake") is not None:
+            self.all_environments["CMAKE_PATH"] = os.path.abspath(os.path.join(shutil.which("cmake"), "../"))
+        else:
+            self.nullEnvManualSet("CMAKE_PATH", need=False)
+
+        self.all_environments["HOUMO_PATH"] = tcim_package_path
+
+        pattern = r'v\d+\.\d+\.\d+'
+        self.all_environments["HOUMO_VERSION"] = re.search(pattern, self.all_environments["HOUMO_SDK_PATH"]).group()
+        tcim_dll_path = os.path.join(self.all_environments["TCIM_RUNTIME_PATH"], "bin")
+        xh2a_dll_path = os.path.join(self.all_environments["HOUMO_SDK_PATH"], "hal\\lib")
+        env_paths = self.initial_env['Path']
         if self.all_environments["CMAKE_PATH"] not in env_paths and self.all_environments["CMAKE_PATH"] != "":
             self.all_environments["PATH"] = f'{self.all_environments["CMAKE_PATH"]};' + self.all_environments["PATH"]
 
@@ -145,7 +195,7 @@ if __name__ == "__main__":
         generater.clearEnvirons(save=True)
         generater.load_origin_settings()
         generater.show_current_env_supported_demos()
-        generater.autoSetEnvirons()
+        generater.autoReSetEnvirons()
         generater.show_current_env_supported_demos()
         print("========Reset all envs Finished, please reopen cmd window=========")
     if "--clear" in sys.argv and len(sys.argv) == 2:

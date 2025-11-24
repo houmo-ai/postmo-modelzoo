@@ -73,7 +73,7 @@ python依赖可通过requirements.txt安装：
 pip install -r requirements.txt
 ```
 
-此外，示例运行需要依赖houmo-tcim-runtime，参考后摩大道软件平台快速入门配置runtime环境。
+此外，示例运行需要依赖houmo-tcim-runtime，参考后摩大道软件平台快速入门配置runtime环境。windows的示例运行前请参照tools/win_envs目录的README.MD进行环境变量的设置。
 
 ## 应用工具
 

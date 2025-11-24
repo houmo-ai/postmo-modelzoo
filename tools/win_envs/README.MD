@@ -6,19 +6,42 @@
 
 - [win11快速开始](#1win11快速开始)
 - [配置说明](#2配置说明)
-- [免责声明](#3免责声明)
+- [models目录样例支持说明(仅供参考)](#3models目录样例支持说明(仅供参考))
+- [免责声明](#4免责声明)
 
 
 ## 1.win11快速开始
-1. 使用准备：
+此README仅支持python3.8-python3.11版本，其他版本由于部分三方库需要源码编译，编译过程相对复杂，在此不详细给出具体方式（比如onnxsim库，较高的python版本需要用户自行编译，其依赖的部分三方库有些仓库地址已经改变，需要对源码进行部分修改，编译过程中下载三方库需要特定的网络环境），如有需要可以自行编译。
+1. 使用准备与使用前提：
     - win11从后摩智能开发者社区[**https://developer.houmoai.com/**](https://developer.houmoai.com/)下载相关软件，参照社区文档中心完成固件烧录、驱动安装。
-    - 下载example样例，安装必要的python运行环境。推荐使用miniconda3[**https://repo.anaconda.com/miniconda/**](https://repo.anaconda.com/miniconda/)进行安装，如果使用conda，可以通过conda create -n hmenv python == {version>= 3.9}创建运行环境。创建成功后，通过conda activate hmenv进入环境，安装必要的python依赖。
-    - 参照当前目录下environment.yml中的参考版本自行安装。
-    - 从后摩开发者社区下载Runtime SDK，解压后进入houmo_tcim_runtime，执行python setup.py install安装，安装好之后通过pip list查看houmo-tcim-runtime-xh2是否存在，确定安装是否完成。 
+    - 下载example样例，安装必要的python运行环境，建议使用python3.8-python3.11版本。
+    - 从后摩开发者社区下载Runtime SDK，解压后进入houmo_tcim_runtime，执行python setup.py install安装，安装好之后通过pip list查看houmo-tcim-runtime-xh2是否存在，确定安装是否完成。
 
-2. 自动设置环境变量。
-    - 特别注意，设置完成后，需要新的终端方可生效环境变量。可以新开终端cd到对应样例目录，执行run.bat。也可以直接双击对应目录的run.bat运行。
-    - 使用管理员权限运行cmd终端, cd到examples样例目录后，激活安装好houmo-tcim-runtime-xh2的python环境，执行env.bat进入环境变量自动设置流程。
+2. win11 python环境的安装：
+    - 在python官网[**https://www.python.org/downloads/windows/**](https://www.python.org/downloads/windows/) 下载3.11版本的python安装包，以python-3.11.5为例[**https://www.python.org/ftp/python/3.11.5/python-3.11.5-amd64.exe**](https://www.python.org/ftp/python/3.11.5/python-3.11.5-amd64.exe)。
+    - 下载完成后，双击下载的安装文件（如 python-3.11.5-amd64.exe）以启动安装程序。
+    - 在安装界面中，勾选 Add python.exe to PATH（非常重要，避免后续手动配置环境变量）。
+    - 点击 Customize installation（可选），根据需要自定义安装路径或组件，建议默认即可。
+    - 如果需要更改安装路径，点击 Browse 并选择新路径（如 D:\Python）。
+    - 确认所有选项后，点击 Install 开始安装。
+    - 安装完成后，点击 Disable path length limit（建议禁用路径长度限制以避免潜在问题），然后点击 Close 关闭安装程序。
+    - 安装后，win+R打开终端，输入python --version确认版本是python-3.11.5。
+
+3. examples环境安装详细步骤：
+    - 开始菜单搜索cmd，选择命令提示符，右键以管理员身份运行，执行cd /d {path/of/examples}
+    - 执行 pip install -r tools/win_envs/requirements.txt安装相关依赖。如果使用python3.8，请修改onnx==1.16.0并更新requirements.txt文件。
+    - 在[**https://visualstudio.microsoft.com/visual-cpp-build-tools/**](https://visualstudio.microsoft.com/visual-cpp-build-tools/)下载vs生成工具，安装Runtime SDK时需要使用。
+    - 运行vs生成工具，勾选使用c++的桌面开发后，点击安装。
+    - 执行cd /d {path/of/Runtime SDK}/切换到Runtime SDK的目录。
+    - 执行 python setup.py install进行houmo-tcim-runtime-xh2的安装。 
+    - 安装结束后，执行pip list查看houmo-tcim-runtime-xh2是否安装成功以及版本是否正确。
+    - cd /d {path/of/examples}切换回examples的路径。
+
+4. 以下步骤为可选，主要是为了支持C/C++样例。
+    - 在[**https://cmake.org/**](https://cmake.org/)下载cmake并运行安装。
+    - 在opencv官网[**https://opencv.org/**](https://opencv.org/)选择Library->Release下载编译好的opencv并运行解压安装。
+
+5. 自动设置环境变量。
     1. 支持在examples目录的使用方式如下： 
         | 指令        | 说明                                     |
         | -------------- | ---------------------------------------- |
@@ -26,66 +49,87 @@
         | env.bat --set         | 设置环境变量，已经设置的会自动跳过 |
         | env.bat --clear       | 清除脚本设置的环境变量 |
         | env.bat --reset       | 清除环境变量，并重新进入设置环境变量流程 |
-    2. 执行env.bat --set进入自动设置环境变量流程，运行结果示例：
-        ``` bat
-        rem 首先会打印examples支持的示例情况及当前环境支持运行的样例信息
-        --------------------------------------------------
-          imodelzoo win11 support demos
-        --------------------------------------------------
-        √ qwen3           : python, c++
-        √ resnet50        : python, c++
-        √ yolov5s         : python, c++
-        --------------------------------------------------
-        --------------------------------------------------
-                current env support python demos
-        --------------------------------------------------
-        qwen3           ×
-        resnet50        ×
-        yolov5s         ×
-        --------------------------------------------------
-        --------------------------------------------------
-                current env support cpp demos
-        --------------------------------------------------
-        qwen3           ×
-        resnet50        ×
-        yolov5s         ×
-        --------------------------------------------------
-        rem 然后会自动搜索环境变量，部分环境变量可能需要用户手动设置，0.6.0之前的版本HOUMO_SDK_PATH需要用户自行设置，0.6.0及之后的版本如果正确安装之后会自动搜索，搜索失败会提示用户手动设置。[Required]的环境变量是必要的，搜索不到用户必须设置。[Optional]的环境变量如果不设置可以回车跳过，但是会影响部分样例的运行。
-        ✅ Found tcim_package_path at path:
-        D:\miniconda\envs\imodelzoo\Lib\site-packages\tcim_lite
-        Manual Set CMAKE_PATH [Optional]  abspath:
-        Manual Set OPENCV_PATH [Optional]  abspath:
-        rem 设置完成后，会再次打印当前环境变量支持的样例情况，用户可以根据设置后的支持情况运行支持的样例。
-        --------------------------------------------------
-                imodelzoo win11 support demos
-        --------------------------------------------------
-        √ qwen3           : python, c++
-        √ resnet50        : python, c++
-        √ yolov5s         : python, c++
-        --------------------------------------------------
-        --------------------------------------------------
-                current env support python demos
-        --------------------------------------------------
-        qwen3           √
-        resnet50        √
-        yolov5s         √
-        --------------------------------------------------
-        --------------------------------------------------
-                current env support cpp demos
-        --------------------------------------------------
-        qwen3           ×
-        resnet50        ×
-        yolov5s         ×
-        --------------------------------------------------
-        rem 如果用户还需要设置环境变量支持其他样例，可以通过env.bat --reset进行重新设置，此步骤对于设置过的变量也会重设，功能等价于执行env.bat --clear + env.bat。也可以通过env.bat --clear + env.bat清楚后再设置。
-        ```
+    2. 执行env.bat --set进入自动设置环境变量流程，[Required]的环境变量是运行样例必须的，[Optional]用户可以自行选择是否输入，不输入会有部分样例无法运行。目前部分样例需要给到的路径示例如下：
+    ``` bat
+    HOUMO_SDK_PATH [Required]: D:\0.5.0\houmo_drv_xh2_v0.5.0_windows11_x86_64\houmo_drv_xh2
+    OPENCV_PATH [Optional]: D:\Program Files\Opencv\opencv\build
+    CMAKE_PATH: D:\\Program Files\\CMake\\bin
+    ```
+    运行结果示例：
+    ``` bat
+    rem 首先会打印examples支持的示例情况及当前环境支持运行的样例信息
+    ===============Set Win Envs===============
+    --------------------------------------------------
+            imodelzoo win11 support demos
+    --------------------------------------------------
+    √ qwen3           : python, c++
+    √ resnet50        : python, c++
+    √ yolov5s         : python, c++
+    --------------------------------------------------
+    --------------------------------------------------
+            current env support python demos
+    --------------------------------------------------
+    qwen3           ×
+    resnet50        ×
+    yolov5s         ×
+    --------------------------------------------------
+    --------------------------------------------------
+            current env support cpp demos
+    --------------------------------------------------
+    qwen3           ×
+    resnet50        ×
+    yolov5s         ×
+    --------------------------------------------------
+    rem 然后会自动搜索环境变量，部分环境变量可能需要用户手动设置，0.6.0之前的版本HOUMO_SDK_PATH需要用户自行设置，0.6.0及之后的版本如果正确安装之后会自动搜索，搜索失败会提示用户手动设置。[Required]的环境变量是必要的，搜索不到用户必须设置。[Optional]的环境变量如果不设置可以回车跳过，但是会影响部分样例的运行。
+    ✅ Found tcim_package_path at path:
+    C:\Users\liuzhenyao\AppData\Local\Programs\Python\Python311\Lib\site-packages\tcim_lite
+    Manual Set HOUMO_SDK_PATH [Required]  abspath:D:\0.5.0\houmo_drv_xh2_v0.5.0_windows11_x86_64\houmo_drv_xh2
+    Manual Set OPENCV_PATH [Optional]  abspath:D:\Program Files\Opencv\opencv\build
+    Set HOUMO_MODELZOO_URL to http://10.10.1.53:8082/artifactory/toolchain/release ('user-level')
+    Set HDPL_PLATFORM to ASIC ('user-level')
+    Set HOUMO_TARGET to xh2 ('user-level')
+    Set TCIM_BACKEND to Xh2HalBackend ('user-level')
+    Set HOUMO_EXAMPLES_PATH to D:\win11\imodelzoo ('user-level')
+    Set PYTHON_DIR to C:\Users\liuzhenyao\AppData\Local\Programs\Python\Python311 ('user-level')
+    Set TCIM_RUNTIME_PATH to C:\Users\liuzhenyao\AppData\Local\Programs\Python\Python311\Lib\site-packages\tcim_lite ('user-level')
+    Set CMAKE_PATH to D:\Program Files\CMake\bin ('user-level')
+    Set HOUMO_PATH to C:\Users\liuzhenyao\AppData\Local\Programs\Python\Python311\Lib\site-packages\tcim_lite ('user-level')
+    Set HOUMO_SDK_PATH to D:\0.5.0\houmo_drv_xh2_v0.5.0_windows11_x86_64\houmo_drv_xh2 ('user-level')
+    Set OPENCV_PATH to D:\Program Files\Opencv\opencv\build ('user-level')
+    Set HOUMO_VERSION to v0.5.0 ('user-level')
+    Added to 'user-level' PATH: C:\Users\liuzhenyao\AppData\Local\Programs\Python\Python311\Lib\site-packages\tcim_lite\bin;D:\0.5.0\houmo_drv_xh2_v0.5.0_windows11_x86_64\houmo_drv_xh2\hal/lib;
+    Note: New PATH takes effect in new processes. Restart window to apply.
+    --------------------------------------------------
+            imodelzoo win11 support demos
+    --------------------------------------------------
+    √ qwen3           : python, c++
+    √ resnet50        : python, c++
+    √ yolov5s         : python, c++
+    --------------------------------------------------
+    --------------------------------------------------
+            current env support python demos
+    --------------------------------------------------
+    qwen3           √
+    resnet50        √
+    yolov5s         √
+    --------------------------------------------------
+    --------------------------------------------------
+            current env support cpp demos
+    --------------------------------------------------
+    qwen3           √
+    resnet50        √
+    yolov5s         √
+    --------------------------------------------------
+    ========Set all envs Finished, please reopen cmd window=========
+    rem 如果用户还需要设置环境变量支持其他样例，可以通过env.bat --reset进行重新设置，此步骤对于设置过的变量也会重设，功能等价于执行env.bat --clear + env.bat --set。也可以通过env.bat --clear + env.bat --set清楚后再设置。
+    ```
     3. 执行env.bat --clear可以清除设置的环境变量。
-    4. 执行env.bat --reset会清除环境变量后重新进入设置流程，功能等价于env.bat --clear + env.bat。
+    4. 执行env.bat --reset会清除环境变量后重新进入设置流程，功能等价于env.bat --clear + env.bat --set。
     5. 执行env.bat --help/-h打印帮助信息。
 
-3. 初始环境变量会备份为initial_env_backup.json请不要修改和删除此文件，否则应用env.bat前的环境变量可能无法恢复。
+6. 初始环境变量会备份为initial_env_backup.json请不要修改和删除此文件，否则应用env.bat前的环境变量可能无法恢复。
 
-4. 首次运行env.bat需要确保终端中python指令可用，且已经按照使用准备完成了需要的python库文件。设置完环境变量一定要重新启动终端才会生效，env.bat需要管理员权限运行。
+7. 首次运行env.bat需要确保终端中python指令可用，且已经按照使用准备完成了需要的python库文件。设置完环境变量一定要重新启动终端才会生效，env.bat需要管理员权限运行。
 
 ## 2.配置说明
 
@@ -179,10 +223,30 @@
 1. 添加样例：
     - 需要修改env.json中的support_demos、py_example_environments、 cpp_example_environments字段
     - get_model_environments字段的环境变量已经满足了必要的下载条件，请不要在get_model.py中引入额外的环境变量，否则需要自行修改env.json和set_environs.py添加支持。
-- 添加环境依赖：
+2. 添加环境依赖：
     - 目前已经设置了必要的环境变量，可以在json中的all_environments新增新的环境变量，默认是[Optional]，不会进行强制设置要求。
     - 如果需要添加的环境变量是[Required]，则需要在set_environs.py中WinEnvironsGenerater类的autoSetEnvirons中添加支持和校验，可以参考self.nullEnvManualSet("XXX_PATH", need=True)。
 
-## 3.免责声明
+## 3. models目录样例支持说明(仅供参考)
+### 3.1 hmatc的编译和安装
+1. 确保已经安装上述的步骤完成了env.bat的自动环境变量设置。
+2. cd /d {path/of/examples}/hmatc 
+3. python setup.py install
+
+### 3.2 样例的运行
+1. 进入models对应样例目录。
+2. 执行python get_model.py --type raw下载原始模型。
+3. 执行python get_model.py --type hmm下载编译好的支持后摩设备的模型。
+4. 运行时需要执行 set HOUMO_DATASETS_PATH=%HOUMO_EXAMPLES_PATH%/data/datasets 设置临时环境变量（每次新开一个终端都需要）。
+5. 执行以下指令测试：
+    - perf性能测试：hmatc perf -c config.yml -wn 10 -sn 1000 -tn 1
+    - demo运行测试：hmatc demo -c config.yml
+    - onnx运行测试：hmatc demo -c config.yml --onnx
+    - hmm模型评估：hmatc eval -c config.yml
+    - onnx模型评估：hmatc eval -c config.yml --onnx
+
+备注：models下的模型在windows平台仅支持运行，不支持量化和编译，如需量化和编译请使用linux平台进行。env.bat打印支持的apis目录下样例确保可以运行，目前models下的windows样例运行仅供用户参考，样例可能有需要做适当修改才可以运行的情况。
+
+## 4.免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。
