@@ -330,12 +330,6 @@ class Qwen3VL:
         if HOUMO_TARGET == "xh2":
             self.embedding = self.embedding.weight
         self.hidden_dims = self.embedding.shape[-1]
-        self.generated_ids = []
-        self.vit_time = 0
-        self.decode_time = 0
-        self.prefill_time = 0
-        self.skip_tokens = 0
-        self.slide_len = 10
 
     def get_input_names(self):
         input_names = []
@@ -871,6 +865,12 @@ class Qwen3VL:
         )
 
     def chat_vit_prefill(self, image_path, prompt, system_prompt=None):
+        self.generated_ids = []
+        self.vit_time = 0
+        self.decode_time = 0
+        self.prefill_time = 0
+        self.skip_tokens = 0
+        self.slide_len = 10
         start_time = time.time()
         if image_path is not None:
             if self.resize_v1:

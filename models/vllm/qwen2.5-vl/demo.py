@@ -323,8 +323,6 @@ class Qwen25VL:
         if HOUMO_TARGET == "xh2":
             self.embedding = self.embedding.weight
         self.hidden_dims = self.embedding.shape[-1]
-        self.generated_ids = []
-        self.decode_time = 0
 
     def get_nblocks(self):
         input_names = []
@@ -710,6 +708,8 @@ class Qwen25VL:
         return next_id, valid_length, current_length
 
     def chat_vit_prefill(self, image_dir, prompt, system_prompt=None):
+        self.generated_ids = []
+        self.decode_time = 0
         image_features = None
         inputs = self.preprocess(prompt, image_dir)
         start_time = time.time()
