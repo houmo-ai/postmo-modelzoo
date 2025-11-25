@@ -1,4 +1,5 @@
 import os
+import glob
 import argparse
 import logging
 from compiler_utils import setup_logging, execute_cmd
@@ -43,20 +44,22 @@ def parse_args():
         "-cl",
         "--context_length",
         type=int,
-        help="Context length.",
+        default=0,
+        help="Context length, default is 0.",
     )
     parser.add_argument(
         "-dn",
         "--device_num",
         type=int,
-        help="The number of device, default is 1.",
+        default=-1,
+        help="The number of device, default is -1.",
     )
     parser.add_argument(
         "-b",
         "--batch",
         type=int,
-        default=1,
-        help="batch number, default is 1.",
+        default=0,
+        help="batch number, default is 0.",
     )
     parser.add_argument(
         "-cn",
@@ -64,6 +67,13 @@ def parse_args():
         type=int,
         default=1,
         help="The number of core, default is 1.",
+    )
+    parser.add_argument(
+        "-j",
+        "--j",
+        type=int,
+        default=0,
+        help="build parallel jobs.",
     )
     parser.add_argument(
         "-r",
@@ -98,7 +108,7 @@ def _check_golden(dir_path: str):
 def main(args) -> int:
     logger.info(
         "Model name: %s, Model path: %s, Quant model path: %s, Context length: %d, "
-        "Batch: %d, Device num: %d, Core Num: %d, Result Dir: %s",
+        "Batch: %d, Device num: %d, Core Num: %d, J: %d, Result Dir: %s",
         args.model_name,
         args.model_path,
         args.quant_model_path,
@@ -106,6 +116,7 @@ def main(args) -> int:
         args.batch,
         args.device_num,
         args.core_num,
+        args.j,
         args.result_dir,
     )
 
@@ -124,7 +135,8 @@ def main(args) -> int:
 
     os.environ["HDPL_PLATFORM"] = "ISIM"
 
-    stage = "all" if _check_golden(args.quant_model_path) else "build"
+    # stage = "all" if _check_golden(args.quant_model_path) else "build"
+    stage = "build"
     cmds = [
         "python3",
         "build.py",
@@ -134,34 +146,37 @@ def main(args) -> int:
         args.quant_model_path,
         "--model_name",
         model_name,
-        "--context_length",
-        str(args.context_length),
-        "--batch",
-        str(args.batch),
         "--ncore",
         str(args.core_num),
-        "--ndevice",
-        str(args.device_num),
         "--output_dir",
         output_dir,
     ]
+
+    if args.batch > 0:
+        cmds += ["--batch", str(args.batch)]
+    if args.context_length > 0:
+        cmds += ["--context_length", str(args.context_length)]
+    if args.device_num >= 0:
+        cmds += ["--ndevice", str(args.device_num)]
+    if args.j > 0:
+        cmds += ["--j", str(args.j)]
 
     ret = execute_cmd(cmds, args.log_file)
 
     if not ret:
         return 1
 
-    embed_dir = f"{output_dir}/hmquant"
-    os.makedirs(embed_dir, exist_ok=True)
-    execute_cmd(
-        [
-            "cp",
-            "-a",
-            f"{args.quant_model_path}/quant_embedding.pt",
-            f"{embed_dir}/",
-        ],
-        args.log_file,
-    )
+    pt_pattern = f"{args.quant_model_path}/*.pt"
+    embed_files = glob.glob(pt_pattern)
+    if embed_files and len(embed_files) > 0:
+        embed_dir = f"{output_dir}/hmquant"
+        os.makedirs(embed_dir, exist_ok=True)
+        cp_cmds = ["cp", "-a"] + embed_files + [f"{embed_dir}/"]
+        execute_cmd(
+            cp_cmds,
+            args.log_file,
+        )
+
     return 0
 
 

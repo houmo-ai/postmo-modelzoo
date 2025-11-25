@@ -27,10 +27,10 @@ def parse_args():
     )
     parser.add_argument(
         "-perf",
-        "--perf_id",
+        "--perf_cfg",
         type=str,
         default="",
-        help="the id of perf result file.",
+        help="the path of perf result file.",
     )
     parser.add_argument(
         "-log",
@@ -80,9 +80,9 @@ if __name__ == "__main__":
     container_name = f"compiler_perf_{target}_{version}_{ts_str}"
     container_home = "/hmdd"
 
-    cmd_list = _generate_perf_cmds(container_home, args.perf_id, args.log_file)
-    if cmd_list is None:
-        exit(1)
+    cmd_list = list()
+    cmd = f"cd {container_home}/imodelzoo/service/llm_compiler && python3 execute_perf.py --perf_cfg {args.perf_cfg} -log {args.log_file}"
+    cmd_list.append(cmd)
 
     # create a docker executor
     docker_exec = DockerExecutor(

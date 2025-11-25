@@ -143,10 +143,10 @@ def parse_args():
     )
     parser.add_argument(
         "-perf",
-        "--perf_id",
+        "--perf_config",
         type=str,
         default="",
-        help="the id of perf result file.",
+        help="the path of perf config file.",
     )
 
     args = parser.parse_args()
@@ -643,7 +643,7 @@ if __name__ == "__main__":
                 model_name,
                 host_log_file,
                 version_str,
-                [".hmm", ".pt"],
+                [".hmm", ".hmms", ".pt"],
             )
             if jfrog_path_compile is None or md5sum_compile is None:
                 logger.error(f"Failed to publish compiled model {host_compile_dir}.")
@@ -679,10 +679,10 @@ if __name__ == "__main__":
                 exit(5)
 
     if (
-        args.perf_id
+        args.perf_config
         and target == "xh2"
-        and model_name != "qwen2.5-vl"
-        and model_size != "32b"
+        and device_num <= 2
+        and model_info[model_name][model_size]["perf"] is True
     ):
         if compiled_file_name is None:
             compiled_file_name = f"{target}_{model_name}_{model_size}_"
@@ -692,20 +692,44 @@ if __name__ == "__main__":
                 compiled_file_name += f"{context_str}_"
             if batch > 0:
                 compiled_file_name += f"b{batch}_"
-            compiled_file_name += f"{chip_str}_{core_str}"
+            compiled_file_name += f"{chip_str}_{core_str}_v{version}"
 
-        update_vals = {
-            "model": compiled_file_name,
-            "case_dir": model_dir,
-            "tokenizer_dir": f"{host_model_zoo}/{raw_model_path}",
-            "embedding_path": f"{host_result_dir}/compile_results/hmquant/quant_embedding.pt",
-            "prefill_path": f"{host_result_dir}/compile_results/{model_name}_prefill.hmm",
-            "decode_path": f"{host_result_dir}/compile_results/{model_name}_decode.hmm",
-            # "isq": "1024",
-            # "osq": str(int(context_len - 1024)),
+        new_stream = {
+            "ModelName": compiled_file_name,
+            "prefill": f"{host_result_dir}/compile_results/{model_name}_prefill.hmm",
+            "decode": f"{host_result_dir}/compile_results/{model_name}_decode.hmm",
+            "embedding": f"{host_result_dir}/compile_results/hmquant/quant_embedding.bin",
+            "input": 256,
+            "stop": 2048,
+            "ndevices": device_num if device_num > 1 else 1,
+            "loop": 2,
+            "batch": batch,
         }
-        # create and update perf result file
-        update_perf_file(args.perf_id, update_vals)
+        if device_num > 1:
+            new_stream["prefill"] = new_stream["prefill"] + "s"
+            new_stream["decode"] = new_stream["decode"] + "s"
+
+        cfg_path = args.perf_config
+        if os.path.exists(cfg_path):
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg_data = json.load(f)
+            except json.JSONDecodeError:
+                logger.error(f"错误：{cfg_path} 不是合法的 JSON 文件，将创建新文件")
+                cfg_data = {"Streams": []}
+        else:
+            logger.error(f"提示：{cfg_path} 不存在，将创建新文件")
+            cfg_data = {"Streams": []}
+
+        if "Streams" not in cfg_data or not isinstance(cfg_data["Streams"], list):
+            logger.warning("警告：JSON 结构异常，重置 Streams 为列表")
+            cfg_data["Streams"] = []
+
+        cfg_data["Streams"].append(new_stream)
+
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            json.dump(cfg_data, f, indent=2, ensure_ascii=False, sort_keys=False)
+        logger.info(f"成功追加配置！当前待 Perf 模型总数：{len(cfg_data['Streams'])}")
 
     del_suffixes = args.delete_filetypes
     delete_files(host_result_dir, [".zip"])
@@ -717,5 +741,5 @@ if __name__ == "__main__":
             delete_files(quant_work_dir, del_suffixes)
 
     if not docker_flag:
-        logger.info("###something error in docker container")
+        logger.info("### something error in docker container")
         exit(-1)

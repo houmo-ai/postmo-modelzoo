@@ -146,8 +146,12 @@ def _process_model_files(
         if model_type == "prefill":
             name_pattern = r"(?<=hmquant_).*?_prefill"
         elif model_type == "vision":
-            if model_name == "qwen2.5":
+            if model_name == "qwen2.5-vl":
                 name_pattern = r'(hmquant_)(qwen2\.5-vl-7b-insturct-vision_xh2a_)(.*?)(_batch_image_)(.*?)(\.npy)'
+            elif model_name == "qwen3-vl":
+                name_pattern = (
+                    r'(hmquant_)(qwen3_vl_instruct)(_vision)(_config_)(.*?)(\.npy)'
+                )
             elif model_name == "minicpmo":
                 name_pattern = (
                     r'(hmquant_)(minicpmo_vision_)(7b_xh2a_)(.*?k_)(.*?)(\.npy)'
@@ -235,6 +239,7 @@ if __name__ == "__main__":
         if (
             os.path.exists(f"{quant_dir}/vision")
             or os.path.exists(f"{quant_dir}/visual")
+            or "-vl" in model_name
         ) and not _process_model_files(
             backend, quant_dir, result_dir, model_name, "vision"
         ):
