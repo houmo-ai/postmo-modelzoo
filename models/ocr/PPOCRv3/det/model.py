@@ -361,4 +361,11 @@ class OCRDet(BaseModel):
         logger.info("metric eval ********************")
         for k, v in metric.items():
             logger.info('{}:{}'.format(k, v))
+        return {
+            "input_size": self.inputs_cfg[self.input_name]["shape"],
+            "dataset": dataset.dataset_name,
+            "num": total_frame,
+            "hmean": f"{metric['hmean']:.6f}",
+            "latency": f"{self.ave_latency_ms:.6f}",
+        }
 

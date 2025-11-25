@@ -4,10 +4,10 @@ from hmatc.utils import logger
 import hmatc.python.perf as perf
 
 model_path = "./output/xh1/ocr_rec.hmm"
-warmup_num = 1
-sample_num = 1
+warmup_num = 10
+sample_num = 1000
 loop_num = 1
-device_id = 0
+device_id = [0]
 thread_num = 1
 if len(sys.argv) > 1:
     logger.info(f"perf -> hmm path: {sys.argv[1]}")
@@ -23,7 +23,7 @@ elif len(sys.argv) > 4:
     loop_num = int(sys.argv[4])
 elif len(sys.argv) > 5:
     logger.info(f"perf -> device_id = {sys.argv[5]}")
-    device_id = int(sys.argv[5])
+    device_id = [int(sys.argv[5])]
 elif len(sys.argv) > 6:
     logger.info(f"perf -> thread_num = {sys.argv[6]}")
     thread_num = int(sys.argv[6])
@@ -32,4 +32,4 @@ logger.info(f"Using model: {model_path}")
 if not os.path.exists(model_path):
     raise FileNotFoundError(f"Model file not found: {model_path}")
 
-perf_info = perf.CModelRunner(model_path, sample_num, thread_num, device_id, loop_num, warmup_num)
+perf_info = perf.CModelRunner(model_path, warmup_num, sample_num, loop_num, thread_num, stream_num=0, check_output=False, devices=device_id,)

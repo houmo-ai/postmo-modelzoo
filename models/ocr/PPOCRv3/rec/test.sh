@@ -29,14 +29,13 @@ if [ "$arch" = "x86_64" ]; then
     --data_path CCPD2020/PPOCR/val/crop_imgs \
     --infer_mode demo \
     --num 10
+    python3 run_model.py --model_path ./output/${HOUMO_TARGET}/ocr_rec.hmm \
+    --data_path CCPD2020 \
+    --infer_mode eval
     python3 run_model.py --model_path ./paddleocr_rec-sim.onnx \
     --data_path CCPD2020/PPOCR/val/crop_imgs \
     --infer_mode demo \
     --num 10
-    
-    python3 run_model.py --model_path ./output/${HOUMO_TARGET}/ocr_rec.hmm \
-    --data_path CCPD2020 \
-    --infer_mode eval
     python3 run_model.py --model_path ./paddleocr_rec-sim.onnx \
     --data_path CCPD2020 \
     --infer_mode eval
