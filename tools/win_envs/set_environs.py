@@ -20,6 +20,7 @@ class WinEnvironsGenerater:
         self.all_cpp_example_environments = None
         self.env_supported_py_examples = None
         self.env_supported_cpp_examples = None
+        self.develop_mode = False
         self.initial_backup_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "initial_env_backup.json"))
         self.env_manager = EnvManager(self.initial_backup_path)
         self.initial_env = dict()
@@ -47,6 +48,8 @@ class WinEnvironsGenerater:
 
         for key, value in self.cpp_example_environments.items():
             self.all_cpp_example_environments[key] = value + self.py_example_environments[key]
+            
+        self.develop_mode = self.settings["develop_url"]
 
     def nullEnvManualSet(self, key: str, need: bool):
         self.initial_env = self.env_manager.get_initial() if len(self.initial_env.keys()) == 0 else self.initial_env
@@ -94,7 +97,9 @@ class WinEnvironsGenerater:
         tcim_package_path = find_tcim_path()
         assert tcim_package_path is not None, f'Please install houmo_tcim_runtime_xh2 package first, it is Required!'
         self.nullEnvManualSet("HOUMO_SDK_PATH", need=True)
-        self.all_environments["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/toolchain/release"
+        self.all_environments["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
+        if self.develop_mode:
+            self.all_environments["HOUMO_MODELZOO_URL"] = "http://10.10.1.53:8082/artifactory/toolchain/release"
         self.all_environments["HDPL_PLATFORM"] = "ASIC"
         self.all_environments["HOUMO_TARGET"] = self.settings["support_target"]
         self.all_environments["TCIM_BACKEND"] = "Xh2HalBackend" if self.settings["support_target"] == "xh2" else "Xh1HalBackend"
@@ -142,7 +147,9 @@ class WinEnvironsGenerater:
         tcim_package_path = find_tcim_path()
         assert tcim_package_path is not None, f'Please install houmo_tcim_runtime_xh2 package first, it is Required!'
         self.nullEnvManualSet("HOUMO_SDK_PATH", need=True)
-        self.all_environments["HOUMO_MODELZOO_URL"] = "http://10.10.1.53:8082/artifactory/toolchain/release"
+        self.all_environments["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
+        if self.develop_mode:
+            self.all_environments["HOUMO_MODELZOO_URL"] = "http://10.10.1.53:8082/artifactory/toolchain/release"
         self.all_environments["HDPL_PLATFORM"] = "ASIC"
         self.all_environments["HOUMO_TARGET"] = self.settings["support_target"]
         self.all_environments["TCIM_BACKEND"] = "Xh2HalBackend" if self.settings["support_target"] == "xh2" else "Xh1HalBackend"
