@@ -312,6 +312,9 @@ class OCRRec(object):
         self.output_infos = {}
         self.load()
 
+        self.ave_latency_ms = 0.
+        self.total_latency_time = 0.
+
         self.correct_num = 0
         self.all_num = 0
         self.norm_edit_dis = 0
@@ -377,10 +380,12 @@ class OCRRec(object):
     
     def run(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         """模型推理"""
+        import time
         prerpcessed_in_datas = self.preprocess(in_datas)
         # 推理
+        start_time = time.time()
         outs = self.module.run(prerpcessed_in_datas)
-
+        self.total_latency_time += (time.time() - start_time)
         # xh1同时输出量化和反量化结果，只取反量化后的
         if isinstance(outs, tuple):
             outs = outs[1]
@@ -445,7 +450,7 @@ class OCRRec(object):
                     desc="eval:",
                     position=0,
                     leave=True)
-
+        efficent_num = 0
         for data_line in dataset.data_lines:
             data_line = data_line.decode('utf-8')
             substr = data_line.strip("\n").split("\t")
@@ -461,12 +466,14 @@ class OCRRec(object):
             in_datas = {self.input_names[0]: cv_image}
 
             label_data = self.process_label(label)
-
+    
             preds = self.run(in_datas)
             gts = self.ctc_decode.decode(label_data)
 
             self.rec_metric(preds, gts)
             pbar.update(1)
+            efficent_num += 1
+        self.ave_latency_ms = self.total_latency_time / efficent_num
         
         metric = self.get_metric()
         pbar.close()
@@ -474,5 +481,12 @@ class OCRRec(object):
         logger.info("metric eval ***********")
         for k, v in metric.items():
             logger.info(f"{k}:{v}")
+        return {
+            "input_size": [1, 3] + self.net_input_size,
+            "dataset": dataset.dataset_name,
+            "num": efficent_num,
+            "hmean": f"{metric['acc']:.6f}",
+            "latency": f"{self.ave_latency_ms * 1000:.6f}",
+        }
 
 

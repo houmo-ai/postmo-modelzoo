@@ -28,7 +28,8 @@ def main():
             assert(0) 
     if infer_mode == "eval":
         data_module = CCPD2020DataSet(data_path)
-        ppocr_v3.evaluate(data_module, test_num)
+        res = ppocr_v3.evaluate(data_module, test_num)
+        logger.info(res)
     elif infer_mode == "demo":
         import glob
         demo_data_list = glob.glob(os.path.join(data_path, "*.jpg"))

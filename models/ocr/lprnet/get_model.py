@@ -27,13 +27,6 @@ def get_args() -> argparse.Namespace:
         help="where to save build_model",
     )
     parser.add_argument(
-        "--build_model_dir",
-        dest="build_model_dir",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET),
-        help="where to save build_model",
-    )
-    parser.add_argument(
         "--model_dir",
         dest="model_dir",
         type=str,

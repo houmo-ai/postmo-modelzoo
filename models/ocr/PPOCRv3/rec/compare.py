@@ -132,9 +132,9 @@ def compare(args):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_name', type=str, default='ocr_rec')
-    parser.add_argument('--onnx_model_path', type=str, default='/home/project/xh1_quant/hmatc/imodelzoo/models/ocr/PPOCRv3/rec/paddleocr_rec-sim.onnx')
-    parser.add_argument("--output_path", default="/home/project/xh1_quant/hmatc/imodelzoo/models/ocr/PPOCRv3/rec/output", type=str)
-    parser.add_argument("--data_path", default="/home/project/xh1_quant/hmatc/imodelzoo/data/datasets/CCPD2020/quant_data/rec/2_0_0_3_33_30_27_33_27.jpg", type=str)
+    parser.add_argument('--onnx_model_path', type=str, default='./paddleocr_rec-sim.onnx')
+    parser.add_argument("--output_path", default="./output", type=str)
+    parser.add_argument("--data_path", default="CCPD2020/quant_data/rec/2_0_0_3_33_30_27_33_27.jpg", type=str)
     return parser.parse_args()
 
 def main():
