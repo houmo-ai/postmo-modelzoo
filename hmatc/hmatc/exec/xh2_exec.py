@@ -62,7 +62,9 @@ class Xh2Exec(BaseExec):
             return
         min_opset_version = 13
         if opset_version < min_opset_version:
-            new_model_path = self.model_path.replace(".onnx", "_opset11.onnx")
+            new_model_path = self.model_path.replace(
+                ".onnx", f"_opset{min_opset_version}.onnx"
+            )
             if not os.path.exists(new_model_path):
                 new_model = version_converter.convert_version(model, min_opset_version)
                 onnx.save(new_model, new_model_path)
