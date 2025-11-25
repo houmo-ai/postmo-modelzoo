@@ -152,12 +152,22 @@
                 "python",
                 "c++"
             ],
+            "resnet50_multistreams": [
+                "python",
+                "c++"
+            ],
+            "resnet50_pipeline": [
+                "python",
+                "c++"
+            ],
             "yolov5s": [
                 "python",
                 "c++"
             ]
         },
-        "__comment__3": "env.bat将会设置的所有环境变量",
+        "__comment__3": "是否使用内网下载链接",
+        "develop_url": false,
+        "__comment__4": "env.bat将会设置的所有环境变量",
         "all_environments": {
             "HOUMO_MODELZOO_URL": "",
             "HDPL_PLATFORM": "",
@@ -173,7 +183,7 @@
             "HOUMO_VERSION": "",
             "PATH": ""
         },
-        "__comment__4": "get_model脚本需要的环境变量",
+        "__comment__5": "get_model脚本需要的环境变量",
         "get_model_environments": [
             "PYTHON_DIR",
             "HOUMO_MODELZOO_URL",
@@ -182,7 +192,7 @@
             "HDPL_PLATFORM",
             "HOUMO_EXAMPLES_PATH"
         ],
-        "__comment__5": "python样例需要的环境变量 = get_model脚本需要的环境变量 + 当前的设置",
+        "__comment__6": "python样例需要的环境变量 = get_model脚本需要的环境变量 + 当前的设置",
         "py_example_environments": {
             "qwen3": [
                 "TCIM_BACKEND",
@@ -194,19 +204,37 @@
                 "TCIM_RUNTIME_PATH",
                 "HOUMO_SDK_PATH"
             ],
+            "resnet50_multistreams": [
+                "TCIM_BACKEND",
+                "TCIM_RUNTIME_PATH",
+                "HOUMO_SDK_PATH"
+            ],
+            "resnet50_pipeline": [
+                "TCIM_BACKEND",
+                "TCIM_RUNTIME_PATH",
+                "HOUMO_SDK_PATH"
+            ],
             "yolov5s": [
                 "TCIM_BACKEND",
                 "TCIM_RUNTIME_PATH",
                 "HOUMO_SDK_PATH"
             ]
         },
-        "__comment__6": "cpp样例需要的环境变量 = python样例需要的环境变量 + 当前的设置",
+        "__comment__7": "cpp样例需要的环境变量 = python样例需要的环境变量 + 当前的设置",
         "cpp_example_environments": {
             "qwen3": [
                 "CMAKE_PATH",
                 "HOUMO_PATH"
             ],
             "resnet50": [
+                "CMAKE_PATH",
+                "OPENCV_PATH"
+            ],
+            "resnet50_multistreams": [
+                "CMAKE_PATH",
+                "OPENCV_PATH"
+            ],
+            "resnet50_pipeline": [
                 "CMAKE_PATH",
                 "OPENCV_PATH"
             ],
