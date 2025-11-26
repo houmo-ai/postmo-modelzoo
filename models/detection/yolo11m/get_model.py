@@ -44,7 +44,7 @@ if __name__ == "__main__":
     model_type = args.model_type
     model_dir = args.model_dir
 
-    model_name = "yolov11m"
+    model_name = "yolo11m"
     ncore = 1
     batch = 1
     opt_level = "O2"
