@@ -27,9 +27,6 @@ from copy import deepcopy
 import librosa
 import soundfile as sf
 import importlib.util
-if not importlib.util.find_spec("sentence_transformers"):
-    os.system("pip install sentence_transformers -i https://pypi.tuna.tsinghua.edu.cn/simple")
-from sentence_transformers import util
 from typing import Any, Optional, Tuple, Union, List
 if not importlib.util.find_spec("vocos"):
     os.system("pip install vocos -i https://pypi.tuna.tsinghua.edu.cn/simple")
