@@ -192,7 +192,7 @@ class HmQwenXh2:
             position_id = torch.arange(
                 valid_length, valid_length + self.prefill_length, dtype=torch.long
             )
-            position_id_data = np.array([position_id]).astype("int32")
+            position_id_data = np.expand_dims(np.array(position_id), axis=0).astype("int32")
             valid_length_data = np.array([valid_length]).astype("int32")
             current_length_data = np.array([current_length]).astype("int32")
             input_name = self.prefill.get_input_name(0)
