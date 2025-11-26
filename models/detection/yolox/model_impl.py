@@ -46,7 +46,8 @@ def multiclass_nms_class_agnostic(boxes, scores, nms_thr, score_thr):
 
     valid_score_mask = cls_scores > score_thr
     if valid_score_mask.sum() == 0:
-        return None
+        dets = []
+        return dets
     valid_scores = cls_scores[valid_score_mask]
     valid_boxes = boxes[valid_score_mask]
     valid_cls_inds = cls_inds[valid_score_mask]
