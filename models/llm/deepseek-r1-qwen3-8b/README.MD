@@ -45,6 +45,23 @@ cd models/llm/deepseek-r1-qwen3-8b
 python3 ptq.py
 ```
 
+为帮助您的模型在量化后达到最佳性能，您可以使用自定义校准数据集，请按以下步骤操作：
+
+步骤 1：准备校准数据
+请准备一个 JSON Lines 格式的文件，其中包含您目标应用场景的文本数据。每行格式如下：
+
+```json
+{"text": "您的领域相关文本内容..."}
+......
+```
+
+步骤 2：运行量化命令
+将以下命令中的路径替换为您的数据路径后执行：
+```bash
+# 使用预设的校准数据集或者换成自己的jsonl文件
+python3 ptq.py --calib_data ~/houmo-examples-xh2/hmodel/xh2/examples/xh_gen_data/*.jsonl
+```
+
 量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录：
 
 ```bash

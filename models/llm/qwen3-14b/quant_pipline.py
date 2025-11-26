@@ -146,8 +146,8 @@ def houmo_quant_llm(args):
         from xh_model_zoo.xh_llm.quarot.quantizer_utils import gptq
 
         gptq_config = dict(
-            calib_dataset="wikitext2",
-            calib_samples=128,
+            calib_dataset=args.calib_data,
+            calib_samples=512,
             seqlen=2048,
             w_clip=True,
             w_bits=args.w_bits,

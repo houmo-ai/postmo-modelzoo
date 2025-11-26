@@ -174,16 +174,13 @@ elif HOUMO_TARGET == 'xh2':
         parser.add_argument("--context-length", type=int, default=2048, help="max sequence length")
         parser.add_argument("--input-sequence-length", type=int, default=256, help="input sequence length")
         parser.add_argument("--quant-type", default="w4a8_ssfp", help="quant type, default is w4a8_ssfp")
-        parser.add_argument("--calibration-dataset", type=str, default=None, help="customized calibrate dataset, should be a json file")
+        parser.add_argument("--calib_data", type=str,default="wikitext2", help="calibration dataset choose")
+        parser.add_argument("--gptqmodel", action="store_true", help="use gptqmodel to quant")
         args = parser.parse_args()
         return args
 
     def main():
         args = parse_args()
-        if args.calibration_dataset:
-            args.gptqmodel = True
-        else:
-            args.gptqmodel = False
         quant_llm(args)
         export_llm(args)
         move_llm(args)
