@@ -150,7 +150,7 @@ windows的示例运行前请参照tools/win_envs目录的README.MD进行环境�
 | yolov5s_dynamic              | inferences   | dynamic_resizer封装应用示例      | c++        | xh1     | x64/aarch64 | linux      |
 | video_detect                 | scenes       | 视频流目标检测分析业务示例       | c++        | xh1     | x64/aarch64 | linux      |
 | buffer_pool                  | scenes       | 应用内存池示例                   | c++        | xh1     | x64/aarch64 | win/linux  |
-| module_pool                  | scenes       | 应用模型池示例                   | c++        | xh1/xh2 | x64/aarch64 | win/linux  |
+| module_pool                  | scenes       | 应用模型池示例                   | c++        | xh1     | x64/aarch64 | linux  |
 
 
 ## 快速上手
