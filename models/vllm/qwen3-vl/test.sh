@@ -48,5 +48,6 @@ fi
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
     pip3 install transformers==4.57.1
+    pip3 install qwen_vl_utils
     python3 demo.py
 fi
