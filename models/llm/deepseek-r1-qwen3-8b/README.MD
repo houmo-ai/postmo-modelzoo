@@ -180,7 +180,7 @@ end2end average time: 94.731 ms, 10.56 tokens/s
 python perf.py
 
 # usage
-usage: perf.py [-h] [--tokenizer_dir TOKENIZER_DIR] [--embedding_path EMBEDDING_PATH] [--prefill_path PREFILL_PATH] [--decode_path DECODE_PATH] [--isq ISQ] [--osq OSQ]
+usage: perf.py [-h] [--tokenizer_dir TOKENIZER_DIR] [--embedding_path EMBEDDING_PATH] [--prefill_path PREFILL_PATH] [--decode_path DECODE_PATH] [--isl ISL] [--osl OSL]
 
 options:
   -h, --help            show this help message and exit
@@ -192,8 +192,8 @@ options:
                         houmo prefill model path
   --decode_path DECODE_PATH
                         houmo decode model path
-  --isq ISQ             input seq length
-  --osq OSQ             output seq length
+  --isl ISL             input seq length
+  --osl OSL             output seq length
 ```
 
 结果示例：

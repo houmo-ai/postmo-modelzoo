@@ -75,15 +75,15 @@ def get_args() -> argparse.Namespace:
         help='houmo decode model path',
     )
     parser.add_argument(
-        '--isq',
-        dest='isq',
+        '--isl',
+        dest='isl',
         type=int,
         default=1024,
         help='input seq length',
     )
     parser.add_argument(
-        '--osq',
-        dest='osq',
+        '--osl',
+        dest='osl',
         type=int,
         default=1024,
         help='output seq length',
@@ -135,6 +135,11 @@ class HmQwenXh2:
             embedding_path, map_location="cpu", weights_only=True
         )['weight']
         self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len)
+        if args.isl + args.osl >= self.context_max_length:
+            logger.error(
+                f"Context length longer than {self.context_max_length}, please shorten it!"
+            )
+            sys.exit(1)
 
     def get_nblocks(self):
         input_names = []
@@ -144,8 +149,8 @@ class HmQwenXh2:
         count = sum(1 for item in input_names if re.match(pattern, item))
         return count
 
-    def preprocess_prefill(self, isq):
-        text = generate_random_digit_string(isq)
+    def preprocess_prefill(self, isl):
+        text = generate_random_digit_string(isl)
         input = self.tokenizer(text, return_tensors='pt')
         all_input_id = input['input_ids']
         return all_input_id
@@ -161,11 +166,6 @@ class HmQwenXh2:
             )
             prefill_input_index += 1
         input_echo_len = all_input_id.numel()
-        if input_echo_len >= self.context_max_length:
-            logger.error(
-                f"Question long than {self.context_max_length}, please shorten it!"
-            )
-            sys.exit(1)
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
         prefill_start_time = time.time()
         for round in range(prefill_loop_round):
@@ -228,13 +228,13 @@ class HmQwenXh2:
         decode_time = time.time() - decode_start_time
         return decode_time, input_datas
 
-    def chat(self, isq, osq):
+    def chat(self, isl, osl):
         input_echo_lens = []
         all_prefill_time = 0
         all_decode_time = 0
-        logger.info("total prefill count:{}".format(isq))
+        logger.info("total prefill count:{}".format(isl))
         for b in range(self.batch):
-            all_input_id = self.preprocess_prefill(isq)
+            all_input_id = self.preprocess_prefill(isl)
             prefill_time, input_echo_len, next_id = self.run_prefill(b, all_input_id)
             all_prefill_time += prefill_time
             self.next_ids[b] = next_id
@@ -252,8 +252,8 @@ class HmQwenXh2:
         ]
         self.context_lengths = self.current_echo_lens
         count = 0
-        logger.info("total decode count:{}".format(osq))
-        while count < osq - 1:
+        logger.info("total decode count:{}".format(osl))
+        while count < osl - 1:
             decode_time, input_datas = self.run_decode(np.array(input_datas))
             all_decode_time += decode_time
             self.next_ids = [input_datas[b].argmax(-1) for b in range(self.batch)]
@@ -293,7 +293,7 @@ if __name__ == "__main__":
 
     start_time = time.time()
     batch, input_tokens, output_tokens, prefill_time, decode_time = hmqwen.chat(
-        args.isq, args.osq
+        args.isl, args.osl
     )
     total_time = time.time() - start_time
 
