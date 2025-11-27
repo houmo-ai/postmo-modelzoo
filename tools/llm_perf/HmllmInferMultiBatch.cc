@@ -397,7 +397,13 @@ PerfInfos HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len, const 
   auto t_embed_start = std::chrono::high_resolution_clock::now();
   auto t_embed_end = std::chrono::high_resolution_clock::now();
   auto t_total_start = std::chrono::high_resolution_clock::now();
-  llm_perf_datas.stop_tokens = stop_tokens_len;
+  if(input_tokens_len + stop_tokens_len > context_max_length){
+    std::cout << "input_tokens_len + stop_tokens_len > context_max_length, cast stop_tokens_len to " << 
+    context_max_length - input_tokens_len << std::endl;
+    llm_perf_datas.stop_tokens = context_max_length - input_tokens_len;
+  }else{
+    llm_perf_datas.stop_tokens = stop_tokens_len;
+  }
   next_ids.resize(this->batch);
   std::vector<int> current_echo_lens;
   current_echo_lens.resize(this->batch);
@@ -419,7 +425,7 @@ PerfInfos HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len, const 
   std::vector<int> context_length = current_echo_lens;
   do
   {
-    if ((llm_perf_datas.decode_count >= stop_tokens_len))
+    if ((llm_perf_datas.decode_count >= llm_perf_datas.stop_tokens))
     {
       break;
     }
@@ -438,12 +444,12 @@ PerfInfos HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len, const 
     
     llm_perf_datas.decode_count++;
 
-    double ratio = static_cast<double>(llm_perf_datas.decode_count) / stop_tokens_len;
+    double ratio = static_cast<double>(llm_perf_datas.decode_count) / llm_perf_datas.stop_tokens;
     int filled = static_cast<int>(ratio * bar_width);
     std::cout << '\r' << "Decode: " << std::setw(3) << int(ratio * 100) << "% |"
               << std::string(filled, '*')
               << std::string(bar_width - filled, ' ')
-              << "| " << llm_perf_datas.decode_count << '/' << stop_tokens_len
+              << "| " << llm_perf_datas.decode_count << '/' << llm_perf_datas.stop_tokens
               << std::flush;
   } while (true);
   // perf information

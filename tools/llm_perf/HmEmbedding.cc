@@ -18,6 +18,7 @@ HmEmbedding::HmEmbedding(const std::string &embeddingWeightPath,
 
 HmEmbedding::~HmEmbedding()
 {
+  embed_w.reset();
   delete ptr;
 }
 

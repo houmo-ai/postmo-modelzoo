@@ -29,6 +29,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
 
   int batch =
       args.count("batch") ? validate_setting(args, "batch") : 1;
+  bool warm_up_enable = args.count("no_warm_up") ? false : true;
 
   std::cout << COLOR_YELLOW << std::string(25, '=')
             << " Perf Settings " << std::string(25, '=') << std::endl;
@@ -40,6 +41,11 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   std::cout << "ndevices : " << ndevices << std::endl;
   std::cout << "loop : " << loop_round << std::endl;
   std::cout << "batch : " << batch << std::endl;
+  if(warm_up_enable){
+    std::cout << "warm_up : enable" << std::endl;
+  }else{
+    std::cout << "warm_up : disable" << std::endl;
+  } 
   std::cout << std::string(65, '=') << COLOR_RESET << std::endl;
 
   const char* houmo_target_env = getenv("HOUMO_TARGET");
@@ -70,6 +76,14 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   PerfInfos avg_perfdata, total_perfdata;
   memset(&avg_perfdata, 0, sizeof(PerfInfos));
   memset(&total_perfdata, 0, sizeof(PerfInfos));
+  if(warm_up_enable){
+    int32_t warm_up_len = 256;
+    std::cout << "\n"
+                << std::string(30, '=') << "LLM Perf WarmUp: input " 
+                << warm_up_len << ", output " << warm_up_len << std::string(30, '=') << "\n ";
+    Qwen3Infer->perf_llm(warm_up_len, warm_up_len);
+    std::cout << std::string(82, '=') << "\n";
+  }
 
   for (int i = 0; i < loop_round; ++i) {
     std::cout << COLOR_BLUE << "\n"
@@ -99,6 +113,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   ShowPerfInformation(avg_perfdata);
   std::cout << COLOR_GREEN << std::string(90, '=') << "\n";
   std::cout << COLOR_RESET;
+  Qwen3Infer.reset();
   return 0;
 }
 

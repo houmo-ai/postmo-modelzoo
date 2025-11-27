@@ -1,6 +1,6 @@
 # llm_perf 性能测试工具
 
-本代码用于在后摩鸿途系列芯片的设备上测试大语言模型单batch模型推理性能。当前支持linux、windows11和android native环境（使用adb运行）。
+本代码用于在后摩鸿途系列芯片的设备上测试大语言模型单/多batch模型推理性能。当前支持linux、windows11和android native环境（使用adb运行）。
 
 ## 目录
 
@@ -45,6 +45,7 @@
 - --ndevices : 指定模型使用的device数量
 - --loop : 指定循环执行单个模型次数
 - --batch : 指定模型的batch数，不指定则--batch的值为1。多batch模型必须指定，会校验从模型读取到的batch和用户指定的值是否一致。目前多batch仅支持xh2.
+- --no_warm_up : 配置后跳过warm_up流程
 - --help, -h : 打印帮助信息
 - --config, -c : 使用配置文件启动perf程序
 
@@ -55,6 +56,9 @@
 
 手动输入参数启动模型测试，仅支持单个模型的loop测试，参考如下：
 ``` shell
+# 禁用warm_up
+./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --stop 2048 --ndevices 2 --loop 2 --batch 1 --no_warm_up
+# 开启warm_up
 ./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --stop 2048 --ndevices 2 --loop 2 --batch 1
 ```
 
@@ -78,7 +82,8 @@
       "stop" : 100,
       "ndevices" : 1,
       "loop" : 2,
-      "batch" : 1
+      "batch" : 1,
+      "no_warm_up" : ""
     },
     {
       "ModelName": "qwen2.5_7b_256_8k_b1_1chip_2cores_v0.5.0",

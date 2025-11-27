@@ -62,11 +62,11 @@ private:
   std::map<std::string, tcim::Tensor> decode_output_map;
 
   int bar_width = 50; 
-
+  int attn_idx_start = 0;
 private:
   // 获取prefill的nblocks
   int get_nblocks();
-
+  int get_attn_idx_start();
   /**
    * 设置prefill输入
    * @param data              prefill输入0

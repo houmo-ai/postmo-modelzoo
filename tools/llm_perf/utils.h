@@ -55,6 +55,7 @@ static void HelpUsage(char* argv[]) {
                "  --ndevices      NUM       device count\n"
                "  --loop          NUM       loop test rounds\n"
                "  --batch         NUM       if multibatch model only xh2 support!\n"
+               "  --no_warm_up              disable warm up!\n"
                "  -h, --help                show help message\n";
 }
 
