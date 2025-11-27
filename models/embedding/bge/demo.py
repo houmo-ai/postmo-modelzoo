@@ -11,10 +11,10 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from transformers import AutoTokenizer
-import importlib.util
-if not importlib.util.find_spec("sentence_transformers"):
-    os.system("pip install sentence_transformers -i https://pypi.tuna.tsinghua.edu.cn/simple")
-from sentence_transformers import util
+# import importlib.util
+# if not importlib.util.find_spec("sentence_transformers"):
+#     os.system("pip install sentence_transformers==5.1.0 -i https://pypi.tuna.tsinghua.edu.cn/simple")
+# from sentence_transformers import util
 from typing import Any, Optional, Tuple, Union, List
 
 from hmatc.utils import logger
@@ -408,6 +408,19 @@ class HmBGEM3(nn.Module):
         all_embeddings = all_embeddings[np.argsort(length_sorted_idx)]
 
         return all_embeddings
+
+def semantic_search_np(query_emb, corpus_embs, top_k=3):
+    if len(query_emb.shape) > 1:
+        query_emb = query_emb.squeeze()
+    q = query_emb / np.linalg.norm(query_emb)
+    c = corpus_embs / np.linalg.norm(corpus_embs, axis=1, keepdims=True)
+
+    scores = np.dot(c, q)
+
+    top_k_idx = np.argsort(scores)[::-1][:top_k]
+
+    return [(int(i), float(scores[i])) for i in top_k_idx]
+
     
 def xh2_demo(args):
     corpus = [
@@ -436,15 +449,20 @@ def xh2_demo(args):
         embedder_time = time.time() - start_time
         logger.info("User query encoding time: %.6fms"%(embedder_time * 1000))
 
-        # Vector Similarity Retrieval (Top-K Coarse Recall)
-        hits = util.semantic_search(query_embedding, corpus_embeddings, top_k=3)[0]
+        hits_np = semantic_search_np(query_embedding, corpus_embeddings, top_k=3)
+        # print(hits_np)
+        # # Vector Similarity Retrieval (Top-K Coarse Recall)
+        # hits = util.semantic_search(query_embedding, corpus_embeddings, top_k=3)[0]
+        # print(hits)
 
         logger.info("==== 粗召回结果 (bge-m3) ====")
-        for hit in hits:
-            logger.info(f"{corpus[hit['corpus_id']]} score:{hit['score']:.6f}")
+        # for hit in hits:
+        #     logger.info(f"{corpus[hit['corpus_id']]} score:{hit['score']:.6f}")
+        for hit in hits_np:
+             logger.info(f"{corpus[hit[0]]} score:{hit[1]:.6f}")
         
         if args.mode == "all":
-            pairs = [[query, corpus[hit['corpus_id']]] for hit in hits]
+            pairs = [[query, corpus[hit[0]]] for hit in hits_np]
 
     if args.mode == "reranker" or args.mode == "all":
         hmbgereranker = HmBGEReRanker(args.reranker_path, args.reranker_tokenizer_dir, args.device_idx, args.model_type)
