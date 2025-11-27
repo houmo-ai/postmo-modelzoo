@@ -27,7 +27,7 @@ fi
 
 python3 get_model.py --type raw
 if [ $FOUND_PACKAGE -eq 0 ]; then
-    python3 get_model.py --type build
+    python3 get_model.py --type hmm
 else
     hmatc quant   -c config.yml
     hmatc build   -c config.yml
