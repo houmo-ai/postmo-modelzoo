@@ -244,18 +244,32 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
             with ModelResourceLock(
                 lock_file_src, ModelResourceLock.LockMode.WRITE, "model downloading"
             ):
-                execute_test_cmd(
-                    [
-                        "python3",
-                        "get_model.py",
-                        "--model_dir",
-                        model_set_dir,
-                        "--type",
-                        "raw",
-                    ],
-                    "",
-                    True,
-                )
+                if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
+                    execute_test_cmd(
+                        [
+                            "python3",
+                            "get_model.py",
+                            "--download_dir",
+                            model_set_dir,
+                            "--type",
+                            "raw",
+                        ],
+                        "",
+                        True,
+                    )
+                else:
+                    execute_test_cmd(
+                        [
+                            "python3",
+                            "get_model.py",
+                            "--model_dir",
+                            model_set_dir,
+                            "--type",
+                            "raw",
+                        ],
+                        "",
+                        True,
+                    )
 
             with ModelResourceLock(
                 lock_file_dst, ModelResourceLock.LockMode.WRITE, "model quantizing"
@@ -311,18 +325,32 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
                     ModelResourceLock.LockMode.WRITE,
                     "model downloading",
                 ):
-                    flag, _ = execute_test_cmd(
-                        [
-                            "python3",
-                            "get_model.py",
-                            "--model_dir",
-                            model_set_dir,
-                            "--quant_model_dir",
-                            quant_res_dir,
-                            "--type",
-                            "quant",
-                        ]
-                    )
+                    if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
+                        flag, _ = execute_test_cmd(
+                            [
+                                "python3",
+                                "get_model.py",
+                                "--download_dir",
+                                model_set_dir,
+                                "--extract_dir",
+                                quant_res_dir,
+                                "--type",
+                                "quant",
+                            ]
+                        )
+                    else:
+                        flag, _ = execute_test_cmd(
+                            [
+                                "python3",
+                                "get_model.py",
+                                "--model_dir",
+                                model_set_dir,
+                                "--quant_model_dir",
+                                quant_res_dir,
+                                "--type",
+                                "quant",
+                            ]
+                        )
                     if flag is False:
                         return flag
         else:
@@ -353,18 +381,32 @@ def _prepare_quantized_cv_model(model_info: dict, log_file: str) -> bool:
             with ModelResourceLock(
                 lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
             ):
-                flag, _ = execute_test_cmd(
-                    [
-                        "python3",
-                        "get_model.py",
-                        "--model_dir",
-                        model_set_dir,
-                        "--type",
-                        "quant",
-                        "--quant_model_dir",
-                        quant_res_dir,
-                    ]
-                )
+                if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
+                    flag, _ = execute_test_cmd(
+                        [
+                            "python3",
+                            "get_model.py",
+                            "--download_dir",
+                            model_set_dir,
+                            "--extract_dir",
+                            quant_res_dir,
+                            "--type",
+                            "quant",
+                        ]
+                    )
+                else:
+                    flag, _ = execute_test_cmd(
+                        [
+                            "python3",
+                            "get_model.py",
+                            "--model_dir",
+                            model_set_dir,
+                            "--type",
+                            "quant",
+                            "--quant_model_dir",
+                            quant_res_dir,
+                        ]
+                    )
                 if flag is False:
                     break
         return flag
@@ -377,16 +419,28 @@ def _prepare_quantized_cv_model(model_info: dict, log_file: str) -> bool:
         with ModelResourceLock(
             lock_md_file, ModelResourceLock.LockMode.WRITE, "model downloading"
         ):
-            flag, _ = execute_test_cmd(
-                [
-                    "python3",
-                    "get_model.py",
-                    "--model_dir",
-                    model_set_dir,
-                    "--type",
-                    "raw",
-                ]
-            )
+            if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
+                flag, _ = execute_test_cmd(
+                    [
+                        "python3",
+                        "get_model.py",
+                        "--download_dir",
+                        model_set_dir,
+                        "--type",
+                        "raw",
+                    ]
+                )
+            else:
+                flag, _ = execute_test_cmd(
+                    [
+                        "python3",
+                        "get_model.py",
+                        "--model_dir",
+                        model_set_dir,
+                        "--type",
+                        "raw",
+                    ]
+                )
         if flag is False:
             return False
 
@@ -497,18 +551,32 @@ def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) 
                 with ModelResourceLock(
                     lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
                 ):
-                    flag, _ = execute_test_cmd(
-                        [
-                            "python3",
-                            "get_model.py",
-                            "--model_dir",
-                            model_set_dir,
-                            "--build_model_dir",
-                            compile_res_dir,
-                            "--type",
-                            "hmm",
-                        ]
-                    )
+                    if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
+                        flag, _ = execute_test_cmd(
+                            [
+                                "python3",
+                                "get_model.py",
+                                "--download_dir",
+                                model_set_dir,
+                                "--extract_dir",
+                                compile_res_dir,
+                                "--type",
+                                "hmm",
+                            ]
+                        )
+                    else:
+                        flag, _ = execute_test_cmd(
+                            [
+                                "python3",
+                                "get_model.py",
+                                "--model_dir",
+                                model_set_dir,
+                                "--build_model_dir",
+                                compile_res_dir,
+                                "--type",
+                                "hmm",
+                            ]
+                        )
                 if flag is False:
                     break
                 else:
@@ -546,20 +614,36 @@ def _prepare_compiled_cv_model(model_info: dict, platform: str, log_file: str) -
             with ModelResourceLock(
                 lock_file_dst, ModelResourceLock.LockMode.WRITE, "model downloading"
             ):
-                execute_test_cmd(
-                    [
-                        "python3",
-                        "get_model.py",
-                        "--model_dir",
-                        model_set_dir,
-                        "--build_model_dir",
-                        compile_res_dir,
-                        "--type",
-                        "hmm",
-                    ],
-                    "",
-                    True,
-                )
+                if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
+                    execute_test_cmd(
+                        [
+                            "python3",
+                            "get_model.py",
+                            "--download_dir",
+                            model_set_dir,
+                            "--extract_dir",
+                            compile_res_dir,
+                            "--type",
+                            "hmm",
+                        ],
+                        "",
+                        True,
+                    )
+                else:
+                    execute_test_cmd(
+                        [
+                            "python3",
+                            "get_model.py",
+                            "--model_dir",
+                            model_set_dir,
+                            "--build_model_dir",
+                            compile_res_dir,
+                            "--type",
+                            "hmm",
+                        ],
+                        "",
+                        True,
+                    )
         os.system(f"cp -ar {compile_res_dir} ./")
         return True
     # platform != "aarch64"
@@ -713,11 +797,18 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
     with ModelResourceLock(
         lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
     ):
-        execute_test_cmd(
-            ["python3", "get_model.py", "--model_dir", model_set_dir, "--type", "raw"],
-            "",
-            True,
-        )
+        if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
+            execute_test_cmd(
+                ["python3", "get_model.py", "--download_dir", model_set_dir, "--type", "raw"],
+                "",
+                True,
+            )
+        else:
+            execute_test_cmd(
+                ["python3", "get_model.py", "--model_dir", model_set_dir, "--type", "raw"],
+                "",
+                True,
+            )
         if model_type == "cv":
             os.system(f"cp -ar {model_set_dir}/* ./")
 
@@ -1088,18 +1179,32 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
         with ModelResourceLock(
             lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
         ):
-            execute_test_cmd(
-                [
-                    "python3",
-                    "get_model.py",
-                    "--model_dir",
-                    model_set_dir,
-                    "--type",
-                    "raw",
-                ],
-                "",
-                True,
-            )
+            if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
+                execute_test_cmd(
+                    [
+                        "python3",
+                        "get_model.py",
+                        "--download_dir",
+                        model_set_dir,
+                        "--type",
+                        "raw",
+                    ],
+                    "",
+                    True,
+                )
+            else:
+                execute_test_cmd(
+                    [
+                        "python3",
+                        "get_model.py",
+                        "--model_dir",
+                        model_set_dir,
+                        "--type",
+                        "raw",
+                    ],
+                    "",
+                    True,
+                )
 
     if model_type == "cv" and not _prepare_compiled_cv_model(
         model_info, platform, log_file

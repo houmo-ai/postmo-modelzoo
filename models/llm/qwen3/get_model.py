@@ -1,7 +1,7 @@
 import os
 import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
+from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -13,23 +13,32 @@ def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--type',
-        dest='model_type',
+        dest='file_type',
         type=str,
         default='hmm',
         help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
-        "--build_model_dir",
-        dest="build_model_dir",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET),
-    )
-    parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        '--download_dir',
+        dest='download_dir',
         type=str,
         default='.',
         help='where to save downloaded model',
+    )
+    parser.add_argument(
+        "--extract_dir",
+        dest="extract_dir",
+        type=str,
+        default=None,
+        help='where to save extracted files',
+    )
+    parser.add_argument(
+        "--source_type",
+        dest="source_type",
+        type=str,
+        default="jfrog",
+        choices=["jfrog", "modelscope"],
+        help='download the model from which source',
     )
     parser.add_argument(
         "--context_length",
@@ -53,39 +62,28 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == '__main__':
     args = get_args()
-    build_model_dir = args.build_model_dir
-    model_type = args.model_type
-    model_dir = args.model_dir
-    HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
-    HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
-    wiki_path = "models/datasets/wikitext-2-raw-v1.zip"
 
-    model_name = "qwen3"
-    model_size = "8b"
-    ncore = "2cores" if HOUMO_TARGET == "xh2" else "4cores"
-    ndevice = "1chip"
-    context_len = args.context_length
-    prefill_len = 256
-    batch = args.batch
-    version = get_houmo_version()
-    target = HOUMO_TARGET
-    hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
+    model_cfgs = {
+        "target": HOUMO_TARGET,
+        "version": get_houmo_version(),
+        "model_type": "llm",
+        "model_name": "qwen3",
+        "model_info": {
+            "model_size": "8b",
+            "ncore": 2 if HOUMO_TARGET == "xh2" else 4,
+            "ndevice": 1,
+            "context_len": args.context_length,
+            "prefill_len": 256,
+            "batch": args.batch,
+        },
+        "raw_files": {"raw_path": "models/datasets/wikitext-2-raw-v1.zip"},
+        "modelscope_repo": {"repo_ids": ["qwen/qwen3-8b"]},
+    }
 
-    if model_type in ["raw"]:
-        ignore_patterns = []
-        get_file_from_jfrog(wiki_path, model_dir, HOUMO_DATASETS_PATH)
-    else:
-        ignore_patterns = ["*.safetensors"]
-
-    from modelscope import snapshot_download
-
-    snapshot_download(
-        'qwen/qwen3-8b',
-        local_dir=f'{model_dir}/qwen3-8b',
-        ignore_patterns=ignore_patterns,
+    hmatc_get_file(
+        model_cfgs,
+        args.file_type,
+        args.download_dir,
+        args.extract_dir,
+        args.source_type,
     )
-
-    if model_type in ["hmm"] and not get_file_from_jfrog(
-        hmm_path, model_dir, build_model_dir
-    ):
-        sys.exit(1)
