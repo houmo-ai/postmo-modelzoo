@@ -2,13 +2,25 @@
     "obsolete": false,
     "model_dir": "models/llm/qwen3-14b",
     "model_type": "llm",
-    "support_platform": ["x86_64"],
-    "support_backend": ["xh2"],
+    "support_platform": [
+        "x86_64"
+    ],
+    "support_backend": [
+        "xh2"
+    ],
     "support_core_num": {
-        "xh2": [2]
+        "xh2": [
+            2
+        ]
     },
     "support_flow": {
-        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
+        "xh2": [
+            "get_model",
+            "quant",
+            "compile",
+            "demo",
+            "perf"
+        ]
     },
     "support_hmatc": null,
     "perf_metrics": {
@@ -22,45 +34,100 @@
     },
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "hmm"],
-            "build_model_dir": [null, "cached_models/hmm_xh2"],
-            "model_dir": ["cached_models", "cached_models"]
+            "type": [
+                "raw",
+                "hmm"
+            ],
+            "download_dir": [
+                "cached_models",
+                "cached_models"
+            ],
+            "extract_dir": [
+                null,
+                "cached_models/hmm_xh2"
+            ],
+            "source_type": [
+                null,
+                null
+            ]
         }
     },
     "quant_params": {
         "xh2": {
-            "model": ["cached_models/qwen3-14b"],
-            "out-dir": ["cached_results/hmquant_xh2_2k"],
-            "skip-quarot": [null],
-            "skip-gptq": [null],
-            "w-bits": [null],
-            "seed": [null],
-            "resume": [null],
-            "debug": [null],
-            "context-length": ["2048"],
-            "input-sequence-length": [null],
-            "quant-type": [null]
+            "model": [
+                "cached_models/qwen3-14b"
+            ],
+            "out-dir": [
+                "cached_results/hmquant_xh2_2k"
+            ],
+            "skip-quarot": [
+                null
+            ],
+            "skip-gptq": [
+                null
+            ],
+            "w-bits": [
+                null
+            ],
+            "resume": [
+                null
+            ],
+            "context-length": [
+                "2048"
+            ],
+            "input-sequence-length": [
+                null
+            ],
+            "quant-type": [
+                null
+            ]
         }
     },
     "compile_params": {
         "xh2": {
-            "model_dir": ["cached_results/hmquant_xh2_2k"],
-            "model_name": [null],
-            "batch": [null],
-            "ncore": [null],
-            "ndevice": [null],
-            "stage": ["build"],
-            "context_length": ["8192"],
-            "output_dir": ["cached_results/hmm_xh2_8k"]
+            "model_dir": [
+                "cached_results/hmquant_xh2_2k"
+            ],
+            "model_name": [
+                null
+            ],
+            "batch": [
+                null
+            ],
+            "ncore": [
+                null
+            ],
+            "ndevice": [
+                null
+            ],
+            "stage": [
+                "build"
+            ],
+            "context_length": [
+                "8192"
+            ],
+            "output_dir": [
+                "cached_results/hmm_xh2_8k"
+            ]
         }
     },
     "demo_params": {
         "xh2": {
-            "tokenizer_dir": ["cached_models/qwen3-14b"],
-            "embedding_path": ["cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"],
-            "prefill_path": ["cached_results/hmm_xh2_8k/qwen3_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_8k/qwen3_decode.hmm"],
-            "ndevice": ["1"]
+            "tokenizer_dir": [
+                "cached_models/qwen3-14b"
+            ],
+            "embedding_path": [
+                "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
+            ],
+            "prefill_path": [
+                "cached_results/hmm_xh2_8k/qwen3_prefill.hmm"
+            ],
+            "decode_path": [
+                "cached_results/hmm_xh2_8k/qwen3_decode.hmm"
+            ],
+            "ndevice": [
+                "1"
+            ]
         }
     },
     "perf_params": "demo"

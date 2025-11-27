@@ -327,7 +327,7 @@ def hmatc_get_file(
     from modelscope import snapshot_download
 
     if download_dir != "":
-        download_dir = os.path.abspath(download_dir) 
+        download_dir = os.path.abspath(download_dir)
     if extract_dir is not None and extract_dir != "":
         extract_dir = os.path.abspath(extract_dir)
     model_type = model_cfgs["model_type"]
@@ -420,12 +420,12 @@ def hmatc_get_file(
             or hmm_path.rfind(".tar.xz")
             or hmm_path.rfind(".tar.gz")
         ):
-            extract_dir = os.path.join("./output", target)
+            extract_dir = os.path.abspath(os.path.join("./output", target))
 
         if source_type == "modelscope" and model_type in ["llm"] and repo_id:
             import shutil
 
-            download_dir = "./" if not download_dir else download_dir
+            download_dir = os.path.abspath("./") if not download_dir else download_dir
             download_flag = True
             while True:
                 try:
@@ -510,11 +510,30 @@ def hmatc_get_file(
                 repo_name = repo_id.strip().rsplit("/", 1)[-1]
                 local_dir = f'{download_dir}/{repo_name}'
 
-            snapshot_download(
-                repo_id,
-                local_dir=local_dir,
-                ignore_patterns=ignore_patterns,
-            )
+            local_dir = os.path.abspath(local_dir)
+            download_flag = True
+            while True:
+                try:
+                    snapshot_download(
+                        repo_id,
+                        local_dir=local_dir,
+                        ignore_patterns=ignore_patterns,
+                    )
+                    break
+                except Exception as e:
+                    non_retry_msg = [
+                        'permission denied',
+                        'folder not found',
+                        'invalid token',
+                        "does not exist",
+                    ]
+                    if any(msg in str(e).lower() for msg in non_retry_msg):
+                        print(
+                            f"Error:Failed to download models from modelscope, stop download retry, error msg:{e}"
+                        )
+                        break
+            if not download_flag and os.path.exists(local_dir):
+                shutil.rmtree(local_dir)
 
     if (
         "default_files" in model_cfgs

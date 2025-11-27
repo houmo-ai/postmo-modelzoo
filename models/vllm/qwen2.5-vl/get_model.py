@@ -1,7 +1,7 @@
 import os
 import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
+from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -13,30 +13,32 @@ def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--type',
-        dest='model_type',
+        dest='file_type',
         type=str,
         default='hmm',
-        help='which resource to get, choise in [raw, quant, hmm]',
+        help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
-        '--quant_model_dir',
-        dest='quant_model_dir',
-        type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
-        help='where to save quant_model',
-    )
-    parser.add_argument(
-        "--build_model_dir",
-        dest="build_model_dir",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET),
-    )
-    parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        '--download_dir',
+        dest='download_dir',
         type=str,
         default='.',
         help='where to save downloaded model',
+    )
+    parser.add_argument(
+        "--extract_dir",
+        dest="extract_dir",
+        type=str,
+        default=None,
+        help='where to save extracted files',
+    )
+    parser.add_argument(
+        "--source_type",
+        dest="source_type",
+        type=str,
+        default="jfrog",
+        choices=["jfrog", "modelscope"],
+        help='download the model from which source',
     )
     parser.add_argument(
         '--model_size',
@@ -52,46 +54,37 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == '__main__':
     args = get_args()
-    quant_model_dir = args.quant_model_dir
-    build_model_dir = args.build_model_dir
-    model_type = args.model_type
-    model_dir = args.model_dir
-    HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
-    HOUMO_MODEL_PATH = os.getenv('HOUMO_MODEL_PATH', '.')
 
-    model_name = "qwen2.5-vl"
     model_size = args.model_size
-    ncore = "2cores" if HOUMO_TARGET == "xh2" else "4cores"
-    ndevice = "1chip"
-    context_len = "8k" if HOUMO_TARGET == "xh2" else "2k"
-    prefill_len = 256
-    batch = 1
-    version = get_houmo_version()
-    target = HOUMO_TARGET
-    hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
-
     date_str = "20251019" if HOUMO_TARGET == "xh2" else "20250903"
-    quant_path = f"models/qwen2.5-vl/hmquant_{target}_{model_name}_{model_size}_256_2k_{date_str}.zip"
+    quant_path = f"models/qwen2.5-vl/hmquant_{HOUMO_TARGET}_qwen2.5-vl_{model_size}_256_2k_{date_str}.zip"
 
-    if model_type in ["raw"]:
-        ignore_patterns = []
-    else:
-        ignore_patterns = ["*.safetensors"]
+    model_cfgs = {
+        "target": HOUMO_TARGET,
+        "version": get_houmo_version(),
+        "model_type": "llm",
+        "model_name": "qwen2.5-vl",
+        "model_info": {
+            "model_size": model_size,
+            "ncore": 2 if HOUMO_TARGET == "xh2" else 4,
+            "ndevice": 1,
+            "context_len": "8k" if HOUMO_TARGET == "xh2" else "2k",
+            "prefill_len": 256,
+            "batch": 1,
+        },
+        "quant_files": {
+            "quant_path": quant_path,
+        },
+        "modelscope_repo": {
+            "repo_ids": ["Qwen/Qwen2.5-VL-7B-Instruct"],
+            "local_dirs": [f"{args.download_dir}/qwen2.5-vl"],
+        },
+    }
 
-    from modelscope import snapshot_download
-
-    snapshot_download(
-        "Qwen/Qwen2.5-VL-7B-Instruct",
-        local_dir=f"{model_dir}/qwen2.5-vl",
-        ignore_patterns=ignore_patterns,
+    hmatc_get_file(
+        model_cfgs,
+        args.file_type,
+        args.download_dir,
+        args.extract_dir,
+        args.source_type,
     )
-
-    if model_type in ["quant"] and not get_file_from_jfrog(
-        quant_path, model_dir, quant_model_dir
-    ):
-        sys.exit(1)
-
-    if model_type in ["hmm"] and not get_file_from_jfrog(
-        hmm_path, model_dir, build_model_dir
-    ):
-        sys.exit(1)

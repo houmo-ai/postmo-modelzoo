@@ -227,42 +227,30 @@ llm_qwen3:
         args: all
   test:
     - llm_qwen3_test
-# llm_qwen2.5:
-#   include:
-#     - models/llm/qwen2.5
-#   exclude:
-#     - models/llm/qwen2.5/README.MD
-#   example_case:
-#     - llm_qwen2.5_test:
-#         test_type: models_tests
-#         script: qwen2dot5
-#         args: all
-#   test:
-#     - llm_qwen2.5_test
-# llm_qwen3_14b:
-#   include:
-#     - models/llm/qwen3-14b
-#   exclude:
-#     - models/llm/qwen3-14b/README.MD
-#   example_case:
-#     - llm_qwen3_14b_test:
-#         test_type: models_tests
-#         script: qwen3_14b
-#         args: all
-#   test:
-#     - llm_qwen3_14b_test
-# llm_deepseek_r1_qwen3_8b:
-#   include:
-#     - models/llm/deepseek-r1-qwen3-8b
-#   exclude:
-#     - models/llm/deepseek-r1-qwen3-8b/README.MD
-#   example_case:
-#     - llm_deepseek_r1_qwen3_8b_test:
-#         test_type: models_tests
-#         script: deepseek_r1_qwen3_8b
-#         args: all
-#   test:
-#     - llm_deepseek_r1_qwen3_8b_test
+llm_qwen3_14b:
+  include:
+    - models/llm/qwen3-14b
+  exclude:
+    - models/llm/qwen3-14b/README.MD
+  example_case:
+    - llm_qwen3_14b_test:
+        test_type: models_tests
+        script: qwen3_14b
+        args: all
+  test:
+    - llm_qwen3_14b_test
+llm_deepseek_r1_qwen3_8b:
+  include:
+    - models/llm/deepseek-r1-qwen3-8b
+  exclude:
+    - models/llm/deepseek-r1-qwen3-8b/README.MD
+  example_case:
+    - llm_deepseek_r1_qwen3_8b_test:
+        test_type: models_tests
+        script: deepseek_r1_qwen3_8b
+        args: all
+  test:
+    - llm_deepseek_r1_qwen3_8b_test
 # llm_deepseek:
 #   include:
 #     - models/llm/deepseek
@@ -275,6 +263,18 @@ llm_qwen3:
 #         args: all
 #   test:
 #     - llm_deepseek_test
+vllm_qwen2.5-vl:
+  include:
+    - models/vllm/qwen2.5-vl
+  exclude:
+    - models/vllm/qwen2.5-vl/README.MD
+  example_case:
+    - vllm_qwen2.5-vl_test:
+        test_type: models_tests
+        script: qwen2dot5_vl
+        args: all
+  test:
+    - vllm_qwen2.5-vl_test
 asr_wenet:
   include:
     - models/asr/wenet

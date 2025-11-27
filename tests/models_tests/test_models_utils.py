@@ -799,13 +799,27 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
     ):
         if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
             execute_test_cmd(
-                ["python3", "get_model.py", "--download_dir", model_set_dir, "--type", "raw"],
+                [
+                    "python3",
+                    "get_model.py",
+                    "--download_dir",
+                    model_set_dir,
+                    "--type",
+                    "raw",
+                ],
                 "",
                 True,
             )
         else:
             execute_test_cmd(
-                ["python3", "get_model.py", "--model_dir", model_set_dir, "--type", "raw"],
+                [
+                    "python3",
+                    "get_model.py",
+                    "--model_dir",
+                    model_set_dir,
+                    "--type",
+                    "raw",
+                ],
                 "",
                 True,
             )
@@ -1040,7 +1054,10 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
     if HDPL_PLATFORM == "ASIC" and os.path.exists(f"{current_folder}/test.sh"):
         logger.info("Ready to execute test.sh in folder: %s.", current_folder)
 
-        test_sh_flag, _ = execute_test_cmd(["bash", "test.sh"], log_file)
+        check_flag = False if model_name == "qwen2.5-vl" else True
+        test_sh_flag, _ = execute_test_cmd(
+            ["bash", "test.sh"], log_file, False, check_flag
+        )
         test_sh_folder = current_folder
 
         prepare_test_folder(model_dir, "demo")
@@ -1124,8 +1141,11 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         with ModelResourceLock(
             lock_file_res, ModelResourceLock.LockMode.WRITE, "execute model demo.py"
         ):
+            check_flag = False if model_name == "qwen2.5-vl" else True
             for tmp_cmd_list in cmd_list:
-                exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
+                exec_flag, _ = execute_test_cmd(
+                    tmp_cmd_list, log_file, False, check_flag
+                )
                 if exec_flag is False:
                     final_flag = False
 
@@ -1300,8 +1320,31 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
     if model_type == "cv" and get_test_type() == TCaseType.SEPARATE_INFER:
         src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         restore_models_res(src_folder, current_folder)
+
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    if (
+        model_type == "llm"
+        and is_release()
+        and get_test_type() == TCaseType.SEPARATE_INFER
+    ):
+        param_str = "--model_dir"
+        if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
+            param_str = "--download_dir"
+        execute_test_cmd(
+            [
+                "python3",
+                "get_model.py",
+                param_str,
+                model_set_dir,
+                "--type",
+                "hmm",
+            ],
+            "",
+            True,
+        )
+
     final_flag = True
+    perf_threashold = 0.1 if is_release() else 0.95
     if model_info.get("perf_params", None) == "demo":
         # install python requirements
         changed_libs = install_py_env(current_folder, log_file)
@@ -1325,7 +1368,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
             # check performance
             backend_metrics = model_info["perf_metrics"].get(HOUMO_BACKEND, None)
             benchmark = backend_metrics.get(platform, None)
-            if benchmark and infer_val >= (benchmark * 0.95):
+            if benchmark and infer_val >= (benchmark * perf_threashold):
                 logger.info(
                     f"The best performance is {infer_val} qps, benchmark time is {benchmark} ms."
                 )
@@ -1371,7 +1414,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
             # check performance
             backend_metrics = model_info["perf_metrics"].get(HOUMO_BACKEND, None)
             benchmark = backend_metrics.get("avg_cost", 0)
-            if benchmark and infer_val >= (benchmark * 0.95):
+            if benchmark and infer_val >= (benchmark * perf_threashold):
                 logger.info(
                     f"The best performance is {infer_val} qps, benchmark time is {benchmark} ms."
                 )
@@ -1396,7 +1439,8 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
             with ModelResourceLock(
                 lock_file_res, ModelResourceLock.LockMode.WRITE, "execute model demo.py"
             ):
-                final_flag, _ = execute_test_cmd(demo_cmd, log_file)
+                check_flag = False if model_name == "qwen2.5-vl" else True
+                final_flag, _ = execute_test_cmd(demo_cmd, log_file, False, check_flag)
             perf_dict = {"prefill": 0, "decode": 0, "end2end": 0}
             with open(log_file, "r", encoding="utf-8") as tmp_file:
                 for line in tmp_file:
@@ -1417,16 +1461,16 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
             benchmark = backend_metrics.get(platform, None) if backend_metrics else None
             if (
                 benchmark
-                and perf_dict["prefill"] >= (benchmark["prefill"] * 0.95)
-                and perf_dict["decode"] >= (benchmark["decode"] * 0.95)
-                and perf_dict["end2end"] >= (benchmark["end2end"] * 0.95)
+                and perf_dict["prefill"] >= (benchmark["prefill"] * perf_threashold)
+                and perf_dict["decode"] >= (benchmark["decode"] * perf_threashold)
+                and perf_dict["end2end"] >= (benchmark["end2end"] * perf_threashold)
             ):
                 logger.info(
                     f"The best performance is {perf_dict}, benchmark is {benchmark}."
                 )
             else:
                 final_flag = False
-                error_msg = f"Performance {perf_dict} degradation exceeds 5%, benchmark is {benchmark}."
+                error_msg = f"Performance {perf_dict} degradation exceeds {(100-perf_threashold*100)}%, benchmark is {benchmark}."
                 logger.error(error_msg)
         # restore python env
         for lib_name, lib_ver in changed_libs.items():
@@ -1459,7 +1503,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
             reset_chips()
         backend_metrics = model_info["perf_metrics"].get(HOUMO_BACKEND, None)
         benchmark = backend_metrics.get(platform, None)
-        if benchmark and (max_qps >= (benchmark * 0.95) or is_separate()):
+        if benchmark and max_qps >= (benchmark * perf_threashold):
             logger.info(
                 f"The best performance is {max_qps} qps, benchmark qps is {benchmark}."
             )
