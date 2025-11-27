@@ -285,7 +285,7 @@ static int32_t SetInputData(tcim::Module &module, std::map<std::string, tcim::Te
     for (int32_t i = 0; i < module.GetInputNum(); ++i) {
         auto name = module.GetInputName(i);
         auto info = module.GetInputInfo(name);
-        auto tensor = tcim::Tensor::CreateHostTensor(info);
+        auto tensor = tcim::Tensor::CreateHostTensor(info.AsContiguous());
         std::string prefix = "resizer_crop_";
         // fill tensor
         if (tcim::DataType::FLOAT16 == info.DataType()) {

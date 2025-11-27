@@ -9,6 +9,7 @@ onnx
 onnxsim
 onnxruntime
 pycocotools
+pandas
 pillow
 pyyaml
 pybind11
