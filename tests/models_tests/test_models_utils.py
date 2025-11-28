@@ -1474,9 +1474,12 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                 logger.error(error_msg)
         # restore python env
         for lib_name, lib_ver in changed_libs.items():
-            execute_test_cmd(
-                ["pip3", "install", lib_name + "==" + lib_ver], log_file, True
-            )
+            if lib_ver is None:
+                execute_test_cmd(["pip3", "uninstall", lib_name, "-y"], log_file, True)
+            else:
+                execute_test_cmd(
+                    ["pip3", "install", lib_name + "==" + lib_ver], log_file, True
+                )
     else:
         # use hmatc perf command to get perf metrics
         final_flag = True

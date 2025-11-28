@@ -41,6 +41,32 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
+VENV_FLAG=0
+if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
+    VENV_FLAG=1
+fi
+
+dir_path="whisper"
+if [[ "$VENV_FLAG" -eq "1" ]]; then
+    echo "⚠ Create python3 venv for ${dir_path} demo."
+    PY_EXE=$(command -v python3)
+    SITE_PACKAGES=$($PY_EXE -c "import site; print(site.getsitepackages()[0])")
+    if [[ $PY_EXE == */opt/venv* ]]; then
+        virtualenv --python=$PY_EXE --extra-search-dir=$SITE_PACKAGES $dir_path
+        VENV_PYTHON="${dir_path}/bin/python3"
+        VENV_SITE=$(${VENV_PYTHON} -c "import site; print(site.getsitepackages()[0])")
+        echo "export ORIGINAL_PYTHONPATH=\$PYTHONPATH" >> $dir_path/bin/activate  # 保存原始值
+        echo "export PYTHONPATH=${VENV_SITE}:${SITE_PACKAGES}:\$ORIGINAL_PYTHONPATH" >> $dir_path/bin/activate
+        echo "export PYTHONPATH=\$ORIGINAL_PYTHONPATH" >> $dir_path/bin/deactivate  # 恢复外部原始值
+        echo "unset ORIGINAL_PYTHONPATH" >> $dir_path/bin/deactivate  # 清除临时变量
+        sed -i 's/include-system-site-packages = true/include-system-site-packages = false/g' $dir_path/pyvenv.cfg
+    else
+        virtualenv --python=$PY_EXE --system-site-packages $dir_path
+    fi
+    source $dir_path/bin/activate
+    pip3 install -r requirements.txt
+fi
+
 if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
     if [[ "$MODEL_TYPE" == "precompiled" ]]; then
         echo "Download precompiled model."
@@ -53,7 +79,11 @@ fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
-    pip3 install -r requirements.txt
     apt update && apt install ffmpeg
     python3 demo.py
+fi
+
+if [[ "$VENV_FLAG" -eq "1" ]]; then
+    deactivate
+    rm -rf $dir_path
 fi
