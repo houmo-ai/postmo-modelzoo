@@ -40,11 +40,16 @@ if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     VENV_FLAG=1
 fi
 
-if [[ "$VENV_FLAG" -eq 1 ]]; then
-    echo "⚠ Create python3.12 venv for qwenvl demo."
+if [[ "$VENV_FLAG" -eq "1" ]]; then
+    echo "⚠ Create python3 venv for qwenvl demo."
     dir_path="qwenvl"
     if [ ! -d "$dir_path" ]; then
-        virtualenv-clone /opt/venv/houmo/ qwenvl
+        TARGET_PYTHON=$(command -v python3)
+        if [[ $TARGET_PYTHON == */opt/venv* ]]; then
+            virtualenv-clone /opt/venv/houmo/ $dir_path
+        else
+            virtualenv --python=python3.9 --system-site-packages $dir_path
+        fi
     fi
     source qwenvl/bin/activate
     pip3 install -r requirements.txt
@@ -106,7 +111,7 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     python3 demo.py
 fi
 
-if [[ "$VENV_FLAG" -eq 1 ]]; then
+if [[ "$VENV_FLAG" -eq "1" ]]; then
     deactivate
     rm -rf qwenvl
 fi

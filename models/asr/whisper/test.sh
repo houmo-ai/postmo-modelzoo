@@ -38,23 +38,29 @@ if [ -z "$houmo_target" ] || [ "$houmo_target" != "xh2" ]; then
     exit 1
 fi
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "${SCRIPT_DIR}"
+
 VENV_FLAG=0
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     VENV_FLAG=1
 fi
 
-if [[ "$VENV_FLAG" -eq 1 ]]; then
-    echo "⚠ Create python3.12 venv for whisper demo."
+if [[ "$VENV_FLAG" -eq "1" ]]; then
+    echo "⚠ Create python3 venv for whisper demo."
     dir_path="whisper"
     if [ ! -d "$dir_path" ]; then
-        virtualenv-clone /opt/venv/houmo/ whisper
+        TARGET_PYTHON=$(command -v python3)
+        if [[ $TARGET_PYTHON == */opt/venv* ]]; then
+            virtualenv-clone /opt/venv/houmo/ $dir_path
+        else
+            virtualenv --python=python3.9 --system-site-packages $dir_path
+        fi
     fi
     source whisper/bin/activate
     pip3 install -r requirements.txt
 fi
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "${SCRIPT_DIR}"
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
     if [[ "$MODEL_TYPE" == "precompiled" ]]; then
@@ -72,7 +78,7 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     python3 demo.py
 fi
 
-if [[ "$VENV_FLAG" -eq 1 ]]; then
+if [[ "$VENV_FLAG" -eq "1" ]]; then
     deactivate
     rm -rf whisper
 fi
