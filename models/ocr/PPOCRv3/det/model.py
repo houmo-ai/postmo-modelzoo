@@ -5,10 +5,6 @@ import time
 import torch
 import numpy as np
 import importlib.util
-if importlib.util.find_spec("shapely") is None:
-    os.system("pip install shapely -i https://pypi.tuna.tsinghua.edu.cn/simple")
-if importlib.util.find_spec("pyclipper") is None:
-    os.system("pip install pyclipper -i https://pypi.tuna.tsinghua.edu.cn/simple")
 from shapely.geometry import Polygon
 import pyclipper
 

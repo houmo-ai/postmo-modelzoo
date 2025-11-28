@@ -3,7 +3,7 @@ import os
 from hmatc.utils import logger
 import hmatc.python.perf as perf
 
-model_path = "./output/xh1/ocr_rec.hmm"
+model_path = "./output/xh1/ppocrv3_rec.hmm"
 warmup_num = 10
 sample_num = 1000
 loop_num = 1

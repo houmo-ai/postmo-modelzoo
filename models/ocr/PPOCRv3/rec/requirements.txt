@@ -1,0 +1,2 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+rapidfuzz==3.14.3

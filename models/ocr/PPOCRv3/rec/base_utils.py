@@ -5,6 +5,7 @@ import torch
 import cv2
 import numpy as np
 from hmatc.utils import logger
+from hmatc.utils.utils import *
 
 HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '/usr/local/examples/data/datasets')
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', '')
