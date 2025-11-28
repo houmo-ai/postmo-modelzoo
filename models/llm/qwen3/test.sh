@@ -3,10 +3,12 @@ set -e
 
 STEP="all"
 MODEL_TYPE="precompiled"
+MULTI_BATCH="false"
 
 show_help() {
     echo "Usage: $0 [options]"
     echo "  -s, --step         execution step, default is all, support: all, demo, build."
+    echo "  -b, --multi_batch  execution multibatch demo, default is false, support: true/false."
     echo "  -t, --model_type   The method for getting the compiled model, default is precompiled, support: precompiled, compile."
     echo "  -h, --help         help information"
     exit 0
@@ -16,6 +18,10 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -s|--step)
             STEP="$2"
+            shift 2
+        ;;
+        -b|--multi_batch)
+            MULTI_BATCH="$2"
             shift 2
         ;;
         -t|--model_type)
@@ -105,6 +111,11 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
 fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
-    echo "Execute demo."
-    python3 demo.py
+    if [ "$MULTI_BATCH" = "false" ]; then
+        echo "Execute demo."
+        python3 demo.py
+    else
+        echo "Execute multi-batch demo with batch size: $MULTI_BATCH"
+        python3 demo_multibatch.py --forbid_flush
+    fi
 fi
