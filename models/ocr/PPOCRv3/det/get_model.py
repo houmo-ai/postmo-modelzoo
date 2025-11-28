@@ -1,7 +1,7 @@
 import os
 import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog
+from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], "Only support HOUMO_TARGET: xh1 or xh2."
@@ -12,18 +12,25 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--type',
-        dest='model_type',
+        "--type",
+        dest="model_type",
         type=str,
-        default='raw',
-        help='which model type to get, choise in [raw]',
+        default="hmm",
+        help="which model type to get, choise in [raw, hmm]",
     )
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--build_model_dir",
+        dest="build_model_dir",
         type=str,
-        default='.',
-        help='where to save downloaded model',
+        default=os.path.join("output", HOUMO_TARGET),
+        help="where to save build_model",
+    )
+    parser.add_argument(
+        "--model_dir",
+        dest="model_dir",
+        type=str,
+        default=".",
+        help="where to save downloaded model",
     )
     args = parser.parse_args()
     return args
@@ -31,15 +38,29 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == '__main__':
     args = get_args()
+    build_model_dir = args.build_model_dir
     model_type = args.model_type
     model_dir = args.model_dir
-    raw_path = "http://10.10.1.53:8082/artifactory/toolchain/support/custom/saimo/paddleocr_det-sim.onnx"
-    data_path = "http://10.10.1.53:8082/artifactory/toolchain/support/custom/saimo/CCPD2020_PPOCRv3_eval.tar.gz"
 
-    if model_type in ["raw"] and not get_file_from_jfrog(raw_path, model_dir):
-        sys.exit(1)
+    model_name = "ppocrv3_det"
+    ncore = 1
+    batch = 1
+    opt_level = "O2"
+    version = get_houmo_version()
+    target = HOUMO_TARGET
+    raw_path = f"models/PPOCRv3/paddleocr_det-sim.onnx"
+    data_path = f"models/PPOCRv3/CCPD2020_PPOCRv3_eval.tar.gz"
+    build_path = f"models/{target.lower()}-{version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
+
+    if model_type in ["raw"]:
+        file_path = get_file_from_jfrog(raw_path, model_dir)
 
     if not os.path.exists(
         os.path.join(HOUMO_DATASETS_PATH, "CCPD2020_PPOCRv3_eval.tar.gz")
     ):
         get_file_from_jfrog(data_path, HOUMO_DATASETS_PATH, HOUMO_DATASETS_PATH)
+    
+    if model_type in ["hmm"] and not get_file_from_jfrog(
+        build_path, model_dir, build_model_dir
+    ):
+        sys.exit(1)

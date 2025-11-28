@@ -8,7 +8,7 @@ from dataset import *
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, default='./output/xh1/ocr_rec.hmm')
+    parser.add_argument('--model_path', type=str, default='./output/xh1/ppocrv3_rec.hmm')
     parser.add_argument("--data_path", default="CCPD2020", type=str)
     parser.add_argument('--infer_mode', type=str, default='eval')
     parser.add_argument('--num', type=int, default=0)

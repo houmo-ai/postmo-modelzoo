@@ -3,6 +3,7 @@ import sys
 import argparse
 import time
 import glob
+from datetime import datetime
 import json
 from tcim_lite.runtime import Tensor
 
@@ -48,13 +49,14 @@ if HOUMO_TARGET == 'xh1':
     CUSTOM_MSG = dict()
     def parse_args():
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model_name', type=str, default='ocr_rec')
+        parser.add_argument('--model_name', type=str, default='ppocrv3_rec')
         parser.add_argument('--model_path', type=str, default='./paddleocr_rec-sim.onnx')
         parser.add_argument("--output_path", default="./output/", type=str)
         parser.add_argument("--calibset_path", type=str, default="CCPD2020/quant_data/rec/", help="quant calib data path")
         parser.add_argument("--precision", type=str, default="int16", help="quant precision, xh1 support int16, auto or int8")
         parser.add_argument("--calib_num", type=int, default=200, help="calibset use number")
         parser.add_argument("--compile", action="store_true", help="compile quanted model or no")
+        parser.add_argument("--enable_upload", action="store_true", help="Compress hmm model and upload or no")
         return parser.parse_args()
     
     def quantize(args):
@@ -141,10 +143,10 @@ if HOUMO_TARGET == 'xh1':
         import tcim
         base_path = os.path.join(args.output_path, f"{HOUMO_TARGET}")
         quanted_model_dir = os.path.join(base_path, f"{SUB_QUANT_PATH[HOUMO_TARGET]}/hmquant_{args.model_name}_with_act.onnx")
-
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         tcim.build_from_hmonnx(
             onnx_model=quanted_model_dir,
-            output_name=args.model_name,
+            output_name=f"{args.model_name}_xh1_b1_1core_O2",
             ncore=1,
             opt_level='O2',
             target=HOUMO_TARGET,
@@ -154,15 +156,45 @@ if HOUMO_TARGET == 'xh1':
             enable_dynamic_image_resize=DYNAMIC_RESIZE[HOUMO_TARGET],
             custom_msg=json.dumps(CUSTOM_MSG, ensure_ascii=False)
         )
+        hmm_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{args.model_name}_xh1_b1_1core_O2.hmm")
+        if args.enable_upload:
+            logger.info("Compressing hmmodel...")
+            hmcc_version = get_package_version(f"houmo-tcim-xh1")
+            runtime_version = get_package_version(f"houmo_tcim_runtime_xh1")
+            with open(os.path.join(args.output_path, "xh1", "VERSION.txt"), "w") as f:
+                f.write(f"hmquant_version: {get_hmquant_xh1_version()}\n")
+                f.write(f"tcim_version: {hmcc_version}\n")
+                f.write(f"tcim_runtime_version: {runtime_version}\n")
+                f.write(f"build_time: {now}\n")
+            filename = f"{args.model_name}_xh1_b1_1core_O2_{get_houmo_version()}.tar.xz"
+            compress_hmm_path = os.path.join(
+                args.output_path,
+                "xh1",
+                filename,
+            )
+            compress_files_to_tar_xz_with_progress(
+                [hmm_path, os.path.join(args.output_path, "xh1", "VERSION.txt")],
+                compress_hmm_path,
+            )
+            logger.info(
+                f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}"
+            )
+            upload_file_to_artifactory(
+                compress_hmm_path,
+                f"models/{HOUMO_TARGET}-{get_houmo_version()}/{args.model_name}/{filename}",
+                max_retries=3,
+            )
+            logger.info(f"Compressing hmmodel done.")
     
 elif HOUMO_TARGET == 'xh2':
     def parse_args():
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model_name', type=str, default='ocr_rec')
-        parser.add_argument('--model_path', type=str, default='./paddleocr_det-sim.onnx')
+        parser.add_argument('--model_name', type=str, default='ppocrv3_rec')
+        parser.add_argument('--model_path', type=str, default='./paddleocr_rec-sim.onnx')
         parser.add_argument("--output_path", default="./output", type=str)
         parser.add_argument("--precision", type=str, default="w8a8_sefp", help="quant precision, xh2 support w8a8_sefp, w4a8_ssfp or w8a16_sefp")
         parser.add_argument("--compile", action="store_true", help="compile quanted model or no")
+        parser.add_argument("--enable_upload", action="store_true", help="Compress hmm model and upload or no")
         return parser.parse_args()
     
     def quantize(args):
@@ -230,10 +262,10 @@ elif HOUMO_TARGET == 'xh2':
         import tcim
         base_path = os.path.join(args.output_path, f"{HOUMO_TARGET}")
         quanted_model_dir = os.path.join(base_path, f"{SUB_QUANT_PATH[HOUMO_TARGET]}/hmquant_{args.model_name}_with_act.onnx")
-
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         tcim.build_from_hmonnx(
             onnx_model=quanted_model_dir,
-            output_name=args.model_name,
+            output_name=f"{args.model_name}_xh2_b1_1core_O2",
             ncore=1,
             opt_level='O2',
             target=HOUMO_TARGET,
@@ -242,11 +274,40 @@ elif HOUMO_TARGET == 'xh2':
             work_dir=os.path.join(base_path, "tcim"),
             enable_dynamic_image_resize=DYNAMIC_RESIZE[HOUMO_TARGET],
         )
+        hmm_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{args.model_name}_{HOUMO_TARGET}_b1_1core_O2.hmm")
+        if args.enable_upload:
+            logger.info("Compressing hmmodel...")
+            hmcc_version = get_package_version(f"houmo-tcim-xh2")
+            runtime_version = get_package_version(f"houmo_tcim_runtime_xh2")
+            with open(os.path.join(args.output_path, "xh2", "VERSION.txt"), "w") as f:
+                f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")
+                f.write(f"tcim_version: {hmcc_version}\n")
+                f.write(f"tcim_runtime_version: {runtime_version}\n")
+                f.write(f"build_time: {now}\n")
+            filename = f"{args.model_name}_{HOUMO_TARGET}_b1_1core_O2_{get_houmo_version()}.tar.xz"
+            compress_hmm_path = os.path.join(
+                args.output_path,
+                "xh2",
+                filename,
+            )
+            compress_files_to_tar_xz_with_progress(
+                [hmm_path, os.path.join(args.output_path, "xh2", "VERSION.txt")],
+                compress_hmm_path,
+            )
+            logger.info(
+                f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}"
+            )
+            upload_file_to_artifactory(
+                compress_hmm_path,
+                f"models/{HOUMO_TARGET}-{get_houmo_version()}/{args.model_name}/{filename}",
+                max_retries=3,
+            )
+            logger.info(f"Compressing hmmodel done.")
 
 def compare_hmm_golden(args):
     import tcim_lite
     quanted_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{SUB_QUANT_PATH[HOUMO_TARGET]}")
-    hmm_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{args.model_name}.hmm")
+    hmm_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{args.model_name}_{HOUMO_TARGET}_b1_1core_O2.hmm")
 
     # wt_manager = tcim_lite.runtime.WeightManager(1)
     # option = tcim_lite.runtime.Option(wt_manager)

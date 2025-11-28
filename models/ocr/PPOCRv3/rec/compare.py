@@ -41,7 +41,7 @@ def compare(args):
         hmquantInfer = hmquant_infer.HmQuantInfer()
         hmquantInfer.load(sequencer_path)
 
-        hmm_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{model_name}.hmm")
+        hmm_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{model_name}_{HOUMO_TARGET}_b1_1core_O2.hmm")
         xhInfer = xh1_infer.Xh1Infer()
         xhInfer.load(hmm_path)
         data_fmt = xhInfer.inputs_info[inputs_info_list[0]['name']].format.name
@@ -77,7 +77,7 @@ def compare(args):
         hmquantInfer = xhquant_infer.Xh2HmQuantInfer()
         hmquantInfer.load(sequencer_path)
 
-        hmm_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{model_name}.hmm")
+        hmm_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{model_name}_{HOUMO_TARGET}_b1_1core_O2.hmm")
         xhInfer = xh2_infer.Xh2Infer()
         xhInfer.load(hmm_path)
 
@@ -131,7 +131,7 @@ def compare(args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_name', type=str, default='ocr_rec')
+    parser.add_argument('--model_name', type=str, default='ppocrv3_rec')
     parser.add_argument('--onnx_model_path', type=str, default='./paddleocr_rec-sim.onnx')
     parser.add_argument("--output_path", default="./output", type=str)
     parser.add_argument("--data_path", default="CCPD2020/quant_data/rec/2_0_0_3_33_30_27_33_27.jpg", type=str)

@@ -41,6 +41,23 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
+VENV_FLAG=0
+if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
+    VENV_FLAG=1
+fi
+
+if [[ "$VENV_FLAG" -eq 1 ]]; then
+    PY=$(command -v python3)
+    echo "$PY"
+
+    if [[ "$PY" == /usr/bin/* || "$PY" == /bin/* ]]; then
+        echo "⚠ Create python3 venv for minicpmo demo."
+        virtualenv --python=$PY --system-site-packages minicpmo_venv
+        source minicpmo_venv/bin/activate
+    fi
+    pip3 install -r requirements.txt
+fi
+
 if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
     if [[ "$MODEL_TYPE" == "precompiled" ]]; then
         echo "Download precompiled model."

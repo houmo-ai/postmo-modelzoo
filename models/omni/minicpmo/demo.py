@@ -28,11 +28,7 @@ import librosa
 import soundfile as sf
 import importlib.util
 from typing import Any, Optional, Tuple, Union, List
-if not importlib.util.find_spec("vocos"):
-    os.system("pip install vocos -i https://pypi.tuna.tsinghua.edu.cn/simple")
 from vocos.spectral_ops import IMDCT, ISTFT
-if not importlib.util.find_spec("moviepy"):
-    os.system("pip install moviepy -i https://pypi.tuna.tsinghua.edu.cn/simple")
 from moviepy import VideoFileClip
 
 #from hmatc.utils import logger

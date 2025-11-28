@@ -6,9 +6,6 @@ import torch
 from typing import Dict, Any
 import numpy as np
 import importlib.util
-
-if not importlib.util.find_spec("rapidfuzz"):
-    os.system("pip install rapidfuzz -i https://pypi.tuna.tsinghua.edu.cn/simple")
 from rapidfuzz.distance import Levenshtein
 
 import re
