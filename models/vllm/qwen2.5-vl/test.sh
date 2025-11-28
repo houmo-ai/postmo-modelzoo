@@ -35,6 +35,21 @@ done
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
+VENV_FLAG=0
+if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
+    VENV_FLAG=1
+fi
+
+if [[ "$VENV_FLAG" -eq 1 ]]; then
+    echo "⚠ Create python3.12 venv for qwenvl demo."
+    dir_path="qwenvl"
+    if [ ! -d "$dir_path" ]; then
+        virtualenv-clone /opt/venv/houmo/ qwenvl
+    fi
+    source qwenvl/bin/activate
+    pip3 install -r requirements.txt
+fi
+
 if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
     if [[ "$MODEL_TYPE" == "precompiled" ]]; then
         echo "Download precompiled model."
@@ -88,6 +103,10 @@ fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
-    pip3 install transformers==4.51.0
     python3 demo.py
+fi
+
+if [[ "$VENV_FLAG" -eq 1 ]]; then
+    deactivate
+    rm -rf qwenvl
 fi

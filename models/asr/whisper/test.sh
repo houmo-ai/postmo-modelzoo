@@ -38,6 +38,21 @@ if [ -z "$houmo_target" ] || [ "$houmo_target" != "xh2" ]; then
     exit 1
 fi
 
+VENV_FLAG=0
+if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
+    VENV_FLAG=1
+fi
+
+if [[ "$VENV_FLAG" -eq 1 ]]; then
+    echo "⚠ Create python3.12 venv for whisper demo."
+    dir_path="whisper"
+    if [ ! -d "$dir_path" ]; then
+        virtualenv-clone /opt/venv/houmo/ whisper
+    fi
+    source whisper/bin/activate
+    pip3 install -r requirements.txt
+fi
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
@@ -53,7 +68,11 @@ fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
-    pip3 install -r requirements.txt
     apt update && apt install ffmpeg
     python3 demo.py
+fi
+
+if [[ "$VENV_FLAG" -eq 1 ]]; then
+    deactivate
+    rm -rf whisper
 fi
