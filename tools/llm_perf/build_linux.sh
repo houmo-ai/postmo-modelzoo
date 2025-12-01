@@ -29,7 +29,7 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
     mkdir -p build
     cd build || exit 1
 
-    cmake -DCMAKE_CXX_FLAGS="-DBACKEND_XH1" -DCMAKE_INSTALL_PREFIX=$WORK_PATH/../bin -DCMAKE_BUILD_TYPE=Release .. 
+    cmake -DCMAKE_CXX_FLAGS="-DBACKEND_XH1" -DBACKEND_XH1=ON -DCMAKE_INSTALL_PREFIX=$WORK_PATH/../bin -DCMAKE_BUILD_TYPE=Release .. 
     make
     make install
   else
@@ -47,7 +47,7 @@ elif [ $(uname -s) = "Linux" ] && [ $(uname -m) = "aarch64" ]; then
     mkdir -p build
     cd build || exit 1
 
-    cmake -DCMAKE_CXX_FLAGS="-DBACKEND_XH1" -DCMAKE_INSTALL_PREFIX=$WORK_PATH/../bin -DCMAKE_BUILD_TYPE=Release .. 
+    cmake -DCMAKE_CXX_FLAGS="-DBACKEND_XH1" -DBACKEND_XH1=ON -DCMAKE_INSTALL_PREFIX=$WORK_PATH/../bin -DCMAKE_BUILD_TYPE=Release .. 
     make
     make install
   else

@@ -15,9 +15,16 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
     std::cout << i << " ";
   }
   std::cout << std::endl;
+#ifdef BACKEND_XH1
+  if (ndevices > 1) {
+    throw std::runtime_error("xh1 only unsupport ndevice > 1!");
+  }
+  weight_manager = tcim::Module::WeightManager::CreateWeightManager(0);
+#else
   tcim::DevManager dev_manager = tcim::DevManager::Create(devs);
   weight_manager =
       tcim::Module::WeightManager::CreateWeightManager(dev_manager);
+#endif
   // 创建weightManager
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
