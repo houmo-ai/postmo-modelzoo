@@ -105,7 +105,22 @@ def get_args() -> argparse.Namespace:
         default=1.0,
         help="sampling temperature",
     )
+    parser.add_argument(
+        "--it",
+        dest="it",
+        action="store_true",
+        help="interactive mode",
+    )
+    parser.add_argument(
+        "--history",
+        dest="history",
+        action="store_true",
+        help="keep chat history",
+    )
     args = parser.parse_args()
+    if args.ndevice > 1:
+        args.prefill_path = args.prefill_path.replace('.hmm', '.hmms')
+        args.decode_path = args.decode_path.replace('.hmm', '.hmms')
     return args
 
 
@@ -252,7 +267,26 @@ class SamplingManager:
         return self.process_logits(logits, previous_tokens)
 
 
-class HmQwenXh2:
+def show_statistics(
+    input_tokens, output_tokens, ttft_time, prefill_time, decode_time, total_time
+):
+    logger.success(
+        f"Total Input: {input_tokens} tokens, Output {output_tokens} tokens, Prefill Cost {prefill_time*1000:.3f} ms, Decode Cost {decode_time*1000:.3f} ms"
+    )
+    logger.success(
+        f"Prefill Speed: {input_tokens / prefill_time:.2f} tokens/s; Decode Speed: {(output_tokens - 1) / decode_time:.2f} tokens/s"
+    )
+    logger.success(f"TTFT (Time to First Token): {ttft_time * 1000:.3f} ms")
+    logger.success(
+        f"TPOT (Time Per Output Token): {decode_time * 1000 / (output_tokens - 1):.3f} ms/token"
+    )
+    logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
+    logger.success(
+        f"E2E TPS (End-to-End Tokens Per Second): {output_tokens / total_time:.2f} tokens/s"
+    )
+
+
+class HmQwen:
 
     def __init__(
         self, prefill_path, decode_path, embedding_path, tokenizer_dir, ndevice
@@ -310,7 +344,7 @@ class HmQwenXh2:
             embedding_path, map_location="cpu", weights_only=True
         )["weight"]
         self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len)
-        self.generated_ids = []
+        self.context_length = 0
 
     def get_nblocks(self):
         input_names = []
@@ -321,6 +355,12 @@ class HmQwenXh2:
         return count
 
     def chat(self, question):
+        self.generated_ids = []
+        if not args.history:
+            self.context_length = 0
+        self.prefill_time = 0
+        self.decode_time = 0
+        self.ttft_time = 0
         logger.success("question:")
         print("\033[1;95m{}\033[0m".format(question))
         start_time = time.time()
@@ -346,7 +386,7 @@ class HmQwenXh2:
 
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
         for round in range(prefill_loop_round):
-            valid_length = round * self.prefill_length
+            valid_length = round * self.prefill_length + self.context_length
             if round == prefill_loop_round - 1:
                 current_length = input_echo_len - round * self.prefill_length
                 input_ids = all_input_ids[
@@ -366,7 +406,6 @@ class HmQwenXh2:
                 dtype=inputs_embeds.dtype,
                 device=inputs_embeds.device,
             )
-            # [256, 1, 4096] ==> [4, 64, 4096]
             input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
                 1, self.prefill_length, self.embedding_len
             )
@@ -378,13 +417,17 @@ class HmQwenXh2:
             self.prefill.set_input(input_name, input_data.numpy())
             self.prefill.set_input(valid_length_name, valid_length_data)
             self.prefill.set_input(current_length_name, current_length_data)
+            prefill_start = time.time()
             self.prefill.run()
             self.prefill.sync()
+            self.prefill_time += time.time() - prefill_start
 
         input_data = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
         next_id = input_data.argmax(-1)[0]
         prefill_response = self.tokenizer.decode(next_id)
-        prefill_time = time.time() - start_time
+        logger.success("response:")
+        print("\033[1;95m{}".format(prefill_response), end="", flush=True)
+        self.ttft_time = time.time() - start_time
         chat_history_ids = all_input_ids[0]
         next_id = torch.from_numpy(next_id)
         self.generated_ids.append(next_id)
@@ -394,18 +437,15 @@ class HmQwenXh2:
             1, 1, -1
         )
         all_response = prefill_response
-        context_length = input_echo_len
-        logger.success("response:")
-        print("\033[1;95m{}".format(prefill_response), end="", flush=True)
+        self.context_length += input_echo_len
 
         decode_count = 0
         skip_tokens = 0
         slide_len = 10  # sliding window length for decode
         last_response = self.tokenizer.decode(chat_history_ids.tolist()[-slide_len:])
-        decode_time = 0
 
         while True:
-            if context_length >= self.context_max_length:
+            if self.context_length >= self.context_max_length:
                 logger.info(
                     f"context length greater than {self.context_max_length}, break!"
                 )
@@ -414,12 +454,12 @@ class HmQwenXh2:
             input_name = self.decode.get_input_name(0)
             valid_length_name = self.decode.get_input_name(1)
             self.decode.set_input(input_name, input_data.numpy())
-            valid_length_data = np.array(context_length).astype("int32")
+            valid_length_data = np.array(self.context_length).astype("int32")
             self.decode.set_input(valid_length_name, valid_length_data)
-            start_time = time.time()
+            decode_start = time.time()
             self.decode.run()
             self.decode.sync()
-            decode_time += time.time() - start_time
+            self.decode_time += time.time() - decode_start
             input_data = self.decode.get_output(self.decode.get_output_name(0)).numpy()
             decode_count += 1
             next_id = self.samplingmanager.sample(input_data, self.generated_ids)
@@ -447,43 +487,63 @@ class HmQwenXh2:
             input_data = F.embedding(
                 next_id.unsqueeze(0), self.embedding_weight
             ).reshape(1, 1, -1)
-            context_length = context_length + 1
+            self.context_length = self.context_length + 1
 
         print("\033[0m")
 
-        return all_response, input_echo_len, decode_count + 1, prefill_time, decode_time
+        return all_response, input_echo_len, decode_count + 1
 
 
 if __name__ == "__main__":
 
     args = get_args()
     if HOUMO_TARGET == "xh2":
-        hmqwen = HmQwenXh2(
+        hmqwen = HmQwen(
             args.prefill_path,
             args.decode_path,
             args.embedding_path,
             args.tokenizer_dir,
             args.ndevice,
         )
-    question = "请介绍一下存算一体技术的优势"
+    if args.it:
+        from prompt_toolkit import prompt
+    try:
+        while True:
+            if args.it:
+                try:
+                    question = prompt("Input your instruction here: ").strip()
+                    if question.lower() in ("stop", "exit", "quit", ""):
+                        break
+                    if not question:
+                        print("输入不能为空，请重新输入。")
+                        continue
+                except (EOFError, KeyboardInterrupt):
+                    print("\n程序结束")
+                    break
+            else:
+                question = "请介绍一下存算一体技术的优势"
 
-    start_time = time.time()
-    response, input_tokens, output_tokens, prefill_time, decode_time = hmqwen.chat(
-        question
-    )
-    total_time = time.time() - start_time
+            start_time = time.time()
+            try:
+                response, input_tokens, output_tokens = hmqwen.chat(question)
+                total_time = time.time() - start_time
+                show_statistics(
+                    input_tokens,
+                    output_tokens,
+                    hmqwen.ttft_time,
+                    hmqwen.prefill_time,
+                    hmqwen.decode_time,
+                    total_time,
+                )
+            except Exception as e:
+                print(f"聊天过程中出错: {e}")
+                if not args.it:
+                    break
+                continue
+            if not args.it:
+                break
 
-    logger.success(
-        f"Total Input: {input_tokens} tokens, Output {output_tokens} tokens, Prefill Cost {prefill_time*1000:.3f} ms, Decode Cost {decode_time*1000:.3f} ms"
-    )
-    logger.success(
-        f"Prefill Speed: {input_tokens / prefill_time:.2f} tokens/s; Decode Speed: {(output_tokens - 1) / decode_time:.2f} tokens/s"
-    )
-    logger.success(f"TTFT (Time to First Token): {prefill_time * 1000:.3f} ms")
-    logger.success(
-        f"TPOT (Time Per Output Token): {decode_time * 1000 / (output_tokens - 1):.3f} ms/token"
-    )
-    logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
-    logger.success(
-        f"E2E TPS (End-to-End Tokens Per Second): {output_tokens / total_time:.2f} tokens/s"
-    )
+    except KeyboardInterrupt:
+        print("\n程序被用户中断")
+    except Exception as e:
+        print(f"程序运行出错: {e}")
