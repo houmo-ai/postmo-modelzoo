@@ -1,17 +1,18 @@
 #ifndef __EMBEDDING_H__
 #define __EMBEDDING_H__
 
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <memory>
-#include <fstream>
-#include <sstream>
-#include <iostream>
-#include <cctype>
 #include <algorithm>
-#include <locale>
+#include <cctype>
 #include <codecvt>
+#include <fstream>
+#include <iostream>
+#include <locale>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "half.hpp"
 #include "utils.h"
 
@@ -29,11 +30,9 @@ using tensor_type = half_float::half;
  */
 template <typename T>
 std::unique_ptr<T[]> readEmbeddingWeight(const std::string &path,
-                                         size_t n_elems_align = 0)
-{
+                                         size_t n_elems_align = 0) {
   std::ifstream ifs(path, std::ios::binary);
-  if (!ifs)
-  {
+  if (!ifs) {
     throw std::runtime_error("invalid embedding weight file!");
   }
 
@@ -45,15 +44,14 @@ std::unique_ptr<T[]> readEmbeddingWeight(const std::string &path,
   auto ptr = std::make_unique<T[]>(n_elem);
   ifs.read(reinterpret_cast<char *>(ptr.get()), n_bytes);
   ifs.close();
-  memset(reinterpret_cast<char *>(ptr.get()) + n_bytes, 0, n_elems_align * sizeof(T));
+  memset(reinterpret_cast<char *>(ptr.get()) + n_bytes, 0,
+         n_elems_align * sizeof(T));
   return ptr;
 }
 
-class HmEmbedding
-{
-public:
-  HmEmbedding(const std::string &embeddingWeightPath,
-              const int &embedding_len,
+class HmEmbedding {
+ public:
+  HmEmbedding(const std::string &embeddingWeightPath, const int &embedding_len,
               const int &prefill_len);
   HmEmbedding(const HmEmbedding &it) = delete;
   HmEmbedding &operator=(const HmEmbedding &it) = delete;
@@ -63,8 +61,7 @@ public:
 
   tensor_type *EmbeddingTokens(const std::vector<int> &ids);
 
-
-private:
+ private:
   // embedding_weight.pt
   std::unique_ptr<tensor_type[]> embed_w;
   tensor_type *ptr = nullptr;
@@ -74,4 +71,4 @@ private:
   int embedding_length = 0;
 };
 
-#endif // __EMBEDDING_H__
+#endif  // __EMBEDDING_H__

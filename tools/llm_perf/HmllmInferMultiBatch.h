@@ -1,30 +1,29 @@
 #ifndef __HMLLMINFERMULTIBATCH_H__
 #define __HMLLMINFERMULTIBATCH_H__
 
-#include "tcim/tcim_runtime.h"
-#include <map>
-#include "HmEmbedding.h"
-#include <regex>
-#include <iomanip>
-#include <sstream>
-#include <random>
 #include <chrono>
+#include <iomanip>
+#include <map>
+#include <random>
+#include <regex>
+#include <sstream>
 
-struct PerfSingleBatchInfo
-{
+#include "HmEmbedding.h"
+#include "tcim/tcim_runtime.h"
+
+struct PerfSingleBatchInfo {
   uint32_t input_tokens;
   float time;
-  float embedding_time;     
+  float embedding_time;
   std::vector<int> next_id;
 };
 
-class HmllmInferMultiBatch : public HmllmInferBase
-{
-public:
+class HmllmInferMultiBatch : public HmllmInferBase {
+ public:
   HmllmInferMultiBatch(const std::string &prefillModelPath,
-              const std::string &decodeModelPath,
-              const std::string &embeddingWeightPath,
-              int ndevices, int batches);
+                       const std::string &decodeModelPath,
+                       const std::string &embeddingWeightPath, int ndevices,
+                       int batches);
   HmllmInferMultiBatch(const HmllmInferMultiBatch &it) = delete;
   HmllmInferMultiBatch &operator=(const HmllmInferMultiBatch &it) = delete;
   HmllmInferMultiBatch(HmllmInferMultiBatch &&it) noexcept = default;
@@ -32,14 +31,11 @@ public:
   ~HmllmInferMultiBatch();
 
   void DebugModelInfo(tcim::Module &module, const std::string &modelName);
-  /**
-   * Qwen3 问答函数
-   * @param msg               用户输入字符串
-   * @return                  无返回值，打印大模型对话的问答信息及性能信息
-   */
-  PerfInfos perf_llm(const uint32_t input_tokens_len, const uint32_t stop_tokens_len) override;
 
-private:
+  PerfInfos perf_llm(const uint32_t input_tokens_len,
+                     const uint32_t stop_tokens_len) override;
+
+ private:
   // 模型路径
   std::string prefillModelPath = "";
   std::string decodeModelPath = "";
@@ -69,10 +65,10 @@ private:
   std::vector<std::vector<int>> next_ids;
   std::vector<int> current_echo_lens;
 
-
-  int bar_width = 50; 
+  int bar_width = 50;
   int n_blocks = 0;
-private:
+
+ private:
   // 获取prefill的nblocks
   int get_nblocks();
 
@@ -83,14 +79,17 @@ private:
    * @param current_length    prefill输入2
    * @return                  无返回值，设置输入数据
    */
-  void PrefillSetInputDatas(void *data, int32_t valid_length, int32_t current_length);
+  void PrefillSetInputDatas(void *data, int32_t valid_length,
+                            int32_t current_length);
   // perfill模型推理
   void PrefillInfer();
   // 获取prefill输出的token ids
   void PrefillGetOutputDatas(std::vector<int32_t> &ids);
 
-  PerfSingleBatchInfo run_prefill(int batch, const std::vector<int> all_input_ids);
-  PerfSingleBatchInfo run_decode(tensor_type *input_datas, const std::vector<int> context_length);
+  PerfSingleBatchInfo run_prefill(int batch,
+                                  const std::vector<int> all_input_ids);
+  PerfSingleBatchInfo run_decode(tensor_type *input_datas,
+                                 const std::vector<int> context_length);
   /**
    * 设置decode输入
    * @param data              decode输入0
@@ -104,4 +103,4 @@ private:
   void DecodeGetOutputDatas();
 };
 
-#endif // __HMLLMINFERMULTIBATCH_H__
+#endif  // __HMLLMINFERMULTIBATCH_H__

@@ -1,38 +1,33 @@
 #ifndef __LLMINFER_H__
 #define __LLMINFER_H__
 
-#include "tcim/tcim_runtime.h"
-#include <map>
-#include "HmEmbedding.h"
-#include <regex>
-#include <iomanip>
-#include <sstream>
-#include <random>
 #include <chrono>
+#include <iomanip>
+#include <map>
+#include <random>
+#include <regex>
+#include <sstream>
 
+#include "HmEmbedding.h"
+#include "tcim/tcim_runtime.h"
 
-class HmllmInfer : public HmllmInferBase
-{
-public:
-  HmllmInfer(const std::string &prefillModelPath,
-              const std::string &decodeModelPath,
-              const std::string &embeddingWeightPath,
-              int ndevices, int batches);
-  HmllmInfer(const HmllmInfer &it) = delete;
-  HmllmInfer &operator=(const HmllmInfer &it) = delete;
-  HmllmInfer(HmllmInfer &&it) noexcept = default;
-  HmllmInfer &operator=(HmllmInfer &&it) noexcept = default;
+class HmllmInfer : public HmllmInferBase {
+ public:
+  HmllmInfer(const std::string& prefillModelPath,
+             const std::string& decodeModelPath,
+             const std::string& embeddingWeightPath, int ndevices, int batches);
+  HmllmInfer(const HmllmInfer& it) = delete;
+  HmllmInfer& operator=(const HmllmInfer& it) = delete;
+  HmllmInfer(HmllmInfer&& it) noexcept = default;
+  HmllmInfer& operator=(HmllmInfer&& it) noexcept = default;
   ~HmllmInfer();
 
-  void DebugModelInfo(tcim::Module &module, const std::string &modelName);
-  /**
-   * Qwen3 问答函数
-   * @param msg               用户输入字符串
-   * @return                  无返回值，打印大模型对话的问答信息及性能信息
-   */
-  PerfInfos perf_llm(const uint32_t input_tokens_len, const uint32_t stop_tokens_len) override;
+  void DebugModelInfo(tcim::Module& module, const std::string& modelName);
 
-private:
+  PerfInfos perf_llm(const uint32_t input_tokens_len,
+                     const uint32_t stop_tokens_len) override;
+
+ private:
   // 模型路径
   std::string prefillModelPath = "";
   std::string decodeModelPath = "";
@@ -61,9 +56,10 @@ private:
   std::map<std::string, tcim::Tensor> prefill_output_map;
   std::map<std::string, tcim::Tensor> decode_output_map;
 
-  int bar_width = 50; 
+  int bar_width = 50;
   int attn_idx_start = 0;
-private:
+
+ private:
   // 获取prefill的nblocks
   int get_nblocks();
   int get_attn_idx_start();
@@ -74,11 +70,12 @@ private:
    * @param current_length    prefill输入2
    * @return                  无返回值，设置输入数据
    */
-  void PrefillSetInputDatas(void *data, int32_t valid_length, int32_t current_length);
+  void PrefillSetInputDatas(void* data, int32_t valid_length,
+                            int32_t current_length);
   // perfill模型推理
-  void PrefillInfer();
+  float PrefillInfer();
   // 获取prefill输出的token ids
-  void PrefillGetOutputDatas(std::vector<int32_t> &ids);
+  void PrefillGetOutputDatas(std::vector<int32_t>& ids);
 
   /**
    * 设置decode输入
@@ -86,11 +83,11 @@ private:
    * @param context_length    decode输入1
    * @return                  无返回值，设置输入数据
    */
-  void DecodeSetInputDatas(void *data, int32_t context_length);
+  void DecodeSetInputDatas(void* data, int32_t context_length);
   // decode模型推理
-  void DecodeInfer();
+  float DecodeInfer();
   // 获取deocde输出的token ids
-  void DecodeGetOutputDatas(std::vector<int32_t> &ids);
+  void DecodeGetOutputDatas(std::vector<int32_t>& ids);
 };
 
-#endif // __LLMINFER_H__
+#endif  // __LLMINFER_H__

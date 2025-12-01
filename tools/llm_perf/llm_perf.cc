@@ -10,6 +10,7 @@
 
 #include "HmllmInfer.h"
 #include "HmllmInferMultiBatch.h"
+#include "HmvllmInfer.h"
 #include "tcim/tcim_runtime.h"
 #include "utils.h"
 
@@ -18,8 +19,10 @@
 #endif
 
 int RunPerf(std::unordered_map<std::string, std::string> args) {
-  fs::path prefill_path = validate_path(args, "prefill");      // 工作目录
-  fs::path decode_path = validate_path(args, "decode");        // 模型文件路径
+  fs::path prefill_path = validate_path(args, "prefill");  // 工作目录
+  fs::path decode_path = validate_path(args, "decode");    // 模型文件路径
+  fs::path visual_path =
+      args.count("visual") ? validate_path(args, "visual") : fs::path();
   fs::path embedding_path = validate_path(args, "embedding");  // 分词器路径
   int input_token_len = validate_setting(args, "input");
   int stop_token_len = validate_setting(args, "stop");
@@ -27,25 +30,27 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
       args.count("ndevices") ? validate_setting(args, "ndevices") : 1;
   int loop_round = args.count("loop") ? validate_setting(args, "loop") : 1;
 
-  int batch =
-      args.count("batch") ? validate_setting(args, "batch") : 1;
+  int batch = args.count("batch") ? validate_setting(args, "batch") : 1;
   bool warm_up_enable = args.count("no_warm_up") ? false : true;
 
-  std::cout << COLOR_YELLOW << std::string(25, '=')
-            << " Perf Settings " << std::string(25, '=') << std::endl;
-  std::cout << "prefill path : " << prefill_path << std::endl;
-  std::cout << "decode path : " << decode_path << std::endl;
-  std::cout << "embedding path : " << embedding_path << std::endl;
+  std::cout << COLOR_YELLOW << std::string(25, '=') << " Perf Settings "
+            << std::string(25, '=') << std::endl;
+  std::cout << "prefill path : " << prefill_path.string() << std::endl;
+  std::cout << "decode path : " << decode_path.string() << std::endl;
+  if (!visual_path.empty()) {
+    std::cout << "visual path : " << visual_path.string() << std::endl;
+  }
+  std::cout << "embedding path : " << embedding_path.string() << std::endl;
   std::cout << "input token len : " << input_token_len << std::endl;
   std::cout << "stop token len : " << stop_token_len << std::endl;
   std::cout << "ndevices : " << ndevices << std::endl;
   std::cout << "loop : " << loop_round << std::endl;
   std::cout << "batch : " << batch << std::endl;
-  if(warm_up_enable){
+  if (warm_up_enable) {
     std::cout << "warm_up : enable" << std::endl;
-  }else{
+  } else {
     std::cout << "warm_up : disable" << std::endl;
-  } 
+  }
   std::cout << std::string(65, '=') << COLOR_RESET << std::endl;
 
   const char* houmo_target_env = getenv("HOUMO_TARGET");
@@ -55,48 +60,60 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
     throw std::invalid_argument("Unsupported backend " + houmo_target);
   }
 
-  if (houmo_target == "xh1"){
-    if(batch != 1){
+  if (houmo_target == "xh1") {
+    if (batch != 1) {
       throw std::runtime_error("xh1 only support single-bacth !");
     }
   }
 
   std::unique_ptr<HmllmInferBase> Qwen3Infer;
-  if(batch == 1){
-    Qwen3Infer = std::make_unique<HmllmInfer>(
-      prefill_path.string(), decode_path.string(), embedding_path.string(), ndevices, batch);
-  }else{
-    if(houmo_target != "xh2"){
-      throw std::runtime_error("Only xh2 support multibacth, device not match!");
+  if (visual_path.empty()) {
+    if (batch == 1) {
+      Qwen3Infer = std::make_unique<HmllmInfer>(
+          prefill_path.string(), decode_path.string(), embedding_path.string(),
+          ndevices, batch);
+    } else {
+      if (houmo_target != "xh2") {
+        throw std::runtime_error(
+            "Only xh2 support multibacth, device not match!");
+      }
+      Qwen3Infer = std::make_unique<HmllmInferMultiBatch>(
+          prefill_path.string(), decode_path.string(), embedding_path.string(),
+          ndevices, batch);
     }
-    Qwen3Infer = std::make_unique<HmllmInferMultiBatch>(
-      prefill_path.string(), decode_path.string(), embedding_path.string(), ndevices, batch);
+  } else {
+    Qwen3Infer = std::make_unique<HmvllmInfer>(
+        prefill_path.string(), decode_path.string(), embedding_path.string(),
+        visual_path.string(), ndevices, batch);
   }
 
   PerfInfos avg_perfdata, total_perfdata;
   memset(&avg_perfdata, 0, sizeof(PerfInfos));
   memset(&total_perfdata, 0, sizeof(PerfInfos));
-  if(warm_up_enable){
+  if (warm_up_enable) {
     int32_t warm_up_len = 256;
     std::cout << "\n"
-                << std::string(30, '=') << "LLM Perf WarmUp: input " 
-                << warm_up_len << ", output " << warm_up_len << std::string(30, '=') << "\n ";
+              << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
+              << warm_up_len << ", output " << warm_up_len
+              << std::string(30, '=') << "\n ";
     Qwen3Infer->perf_llm(warm_up_len, warm_up_len);
     std::cout << std::string(82, '=') << "\n";
   }
 
   for (int i = 0; i < loop_round; ++i) {
     std::cout << COLOR_BLUE << "\n"
-              << std::string(30, '=') << "LLM Perf Progress: " << (i + 1) << "/"
-              << loop_round << std::string(30, '=') << "\n ";
+              << std::string(30, '=')
+              << "(v)LLM Perf Loop Progress: " << (i + 1) << "/" << loop_round
+              << std::string(30, '=') << "\n ";
     PerfInfos perf_data = Qwen3Infer->perf_llm(input_token_len, stop_token_len);
     std::cout << std::string(82, '=') << "\n";
     total_perfdata.input_tokens = perf_data.input_tokens;
-    total_perfdata.stop_tokens  = perf_data.stop_tokens;
+    total_perfdata.stop_tokens = perf_data.stop_tokens;
     total_perfdata.prefill_time += perf_data.prefill_time;
     total_perfdata.decode_time += perf_data.decode_time;
     total_perfdata.embedding_time += perf_data.embedding_time;
     total_perfdata.t_total += perf_data.t_total;
+    total_perfdata.ttft += perf_data.ttft;
     total_perfdata.decode_count += perf_data.decode_count;
   }
 
@@ -107,9 +124,10 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   avg_perfdata.embedding_time = total_perfdata.embedding_time / loop_round;
   avg_perfdata.t_total = total_perfdata.t_total / loop_round;
   avg_perfdata.decode_count = total_perfdata.decode_count / loop_round;
+  avg_perfdata.ttft = total_perfdata.ttft / loop_round;
   std::cout << COLOR_GREEN << std::string(30, '=')
-            << " LLM Perf Avarage Information "
-            << std::string(30, '=')  << "\n";
+            << " (v)LLM Perf Avarage Information " << std::string(30, '=')
+            << "\n";
   ShowPerfInformation(avg_perfdata);
   std::cout << COLOR_GREEN << std::string(90, '=') << "\n";
   std::cout << COLOR_RESET;
@@ -121,7 +139,8 @@ int RunPerfJson(int argc, char* argv[]) {
   const std::string jsonfile = argv[2];
   fs::path path = fs::u8path(jsonfile);
   if (!fs::exists(path)) {
-    throw std::invalid_argument("config path does not exist: " + path.u8string());
+    throw std::invalid_argument("config path does not exist: " +
+                                path.u8string());
   }
 
   std::ifstream f(jsonfile);
@@ -131,8 +150,9 @@ int RunPerfJson(int argc, char* argv[]) {
   int curTaskId = 0;
   for (json& stream : perf_configs["Streams"]) {
     std::cout << COLOR_GREEN << std::string(45, '#') << "Start of Task "
-              << (curTaskId + 1) << ", All Task:" << n_tasks << ", ModelName:" << stream["ModelName"] << "." << std::string(45, '#')
-    << "\n";
+              << (curTaskId + 1) << ", All Task:" << n_tasks
+              << ", ModelName:" << stream["ModelName"] << "."
+              << std::string(45, '#') << "\n";
 
     std::unordered_map<std::string, std::string> args = parse_json(stream);
     RunPerf(args);
@@ -154,12 +174,12 @@ int main(int argc, char* argv[]) {
   try {
     // 1. 解析命令行参数
     PerfConfigType runtype = ParsePerfRunType(argc, argv);
-    if(runtype == PerfConfigType::PERFCMD){
+    if (runtype == PerfConfigType::PERFCMD) {
       auto args = parse_args(argc, argv);
       return RunPerf(args);
-    }else if (runtype == PerfConfigType::PERFJSON) {
+    } else if (runtype == PerfConfigType::PERFJSON) {
       return RunPerfJson(argc, argv);
-    }else{
+    } else {
       HelpUsage(argv);
       return -1;
     }

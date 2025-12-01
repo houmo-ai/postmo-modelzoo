@@ -1,25 +1,25 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
+#include <algorithm>
+#include <cctype>
+#include <chrono>
 #include <codecvt>
+#include <eigen3/unsupported/Eigen/CXX11/Tensor>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <locale>
+#include <memory>
 #include <nlohmann/json.hpp>
+#include <random>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <memory>
-#include <cctype>
-#include <algorithm>
-#include <regex>
-#include <iomanip>
-#include <random>
-#include <eigen3/unsupported/Eigen/CXX11/Tensor>
-#include <chrono>
 
 #define TOKEN_ID_MAX 150000
 
@@ -34,32 +34,30 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-typedef enum {
-  PERFCMD = 0,
-  PERFJSON,
-  PERFINVAILD
-} PerfConfigType;
+typedef enum { PERFCMD = 0, PERFJSON, PERFINVAILD } PerfConfigType;
 
 static void HelpUsage(char* argv[]) {
-  std::cout << "Usage: " << argv[0]
-            << " --key value [options...]\n\n"
-               "Options:\n"
-               "  -c, --config    FILE      use json file to start llm_perf, "
-               "cat template config.json for more message\n"
-               "Or:\n"
-               "  --prefill       FILE      prefill model file\n"
-               "  --decode        FILE      decode model file\n"
-               "  --embedding     FILE      embedding weight file\n"
-               "  --input         NUM       number of input tokens\n"
-               "  --stop          NUM       number of tokens to generate\n"
-               "  --ndevices      NUM       device count\n"
-               "  --loop          NUM       loop test rounds\n"
-               "  --batch         NUM       if multibatch model only xh2 support!\n"
-               "  --no_warm_up              disable warm up!\n"
-               "  -h, --help                show help message\n";
+  std::cout
+      << "Usage: " << argv[0]
+      << " --key value [options...]\n\n"
+         "Options:\n"
+         "  -c, --config    FILE      use json file to start llm_perf, "
+         "cat template config.json for more message\n"
+         "Or:\n"
+         "  --prefill       FILE      prefill model file\n"
+         "  --decode        FILE      decode model file\n"
+         "  --visual        FILE      visual model file, only vllm perf need\n"
+         "  --embedding     FILE      embedding weight file\n"
+         "  --input         NUM       number of input tokens\n"
+         "  --stop          NUM       number of tokens to generate\n"
+         "  --ndevices      NUM       device count\n"
+         "  --loop          NUM       loop test rounds\n"
+         "  --batch         NUM       if multibatch model only xh2 support!\n"
+         "  --no_warm_up              disable warm up!\n"
+         "  -h, --help                show help message\n";
 }
 
-static std::unordered_map<std::string, std::string> parse_json(const json &j) {
+static std::unordered_map<std::string, std::string> parse_json(const json& j) {
   std::unordered_map<std::string, std::string> args;
   for (auto& [key, val] : j.items()) {
     args[key] = val.is_string() ? val.get<std::string>() : val.dump();
@@ -69,7 +67,7 @@ static std::unordered_map<std::string, std::string> parse_json(const json &j) {
 }
 
 static PerfConfigType ParsePerfRunType(int argc, char* argv[]) {
-  if(argc == 1) {
+  if (argc == 1) {
     return PerfConfigType::PERFINVAILD;
   }
 
@@ -84,7 +82,7 @@ static PerfConfigType ParsePerfRunType(int argc, char* argv[]) {
     const std::string arg = argv[1];
     if (arg == "-c" || arg == "--config") {
       return PerfConfigType::PERFJSON;
-    } 
+    }
   }
 
   return PerfConfigType::PERFCMD;
@@ -97,7 +95,7 @@ static PerfConfigType ParsePerfRunType(int argc, char* argv[]) {
  * @return 解析后的参数映射（key: 参数名, value: 参数值）
  */
 static std::unordered_map<std::string, std::string> parse_args(int argc,
-                                                        char* argv[]) {
+                                                               char* argv[]) {
   std::unordered_map<std::string, std::string> args;
 
   for (int i = 1; i < argc; ++i) {
@@ -133,8 +131,9 @@ static std::unordered_map<std::string, std::string> parse_args(int argc,
  * @param arg_name 参数名（用于错误提示）
  * @return 标准化后的路径
  */
-static fs::path validate_path(std::unordered_map<std::string, std::string>& args,
-                       const std::string& arg_name) {
+static fs::path validate_path(
+    std::unordered_map<std::string, std::string>& args,
+    const std::string& arg_name) {
   fs::path path;
   if (args.find(arg_name) != args.end()) {
     if (args[arg_name].empty()) {
@@ -157,7 +156,7 @@ static fs::path validate_path(std::unordered_map<std::string, std::string>& args
 }
 
 static int validate_setting(std::unordered_map<std::string, std::string>& args,
-                     const std::string& arg_name) {
+                            const std::string& arg_name) {
   int value;
   if (args.find(arg_name) != args.end()) {
     if (args[arg_name].empty()) {
@@ -177,29 +176,28 @@ static int validate_setting(std::unordered_map<std::string, std::string>& args,
   return value;
 }
 
-
-struct PerfInfos
-{
+struct PerfInfos {
   uint32_t input_tokens;
   uint32_t stop_tokens;
   float prefill_time;
   float decode_time;
-  float embedding_time;      
-  float t_total;            //E2E Latency
+  float embedding_time;
+  float vit_time;
+  float ttft;
+  float t_total;  // E2E Latency
   uint32_t decode_count;
 };
 
-
-
-static void ShowPerfInformation(PerfInfos llm_perf_datas){
+static void ShowPerfInformation(PerfInfos llm_perf_datas) {
   std::ostringstream os;
   os << "\n-------------------  Performance Summary  --------------------\n";
   os << std::left << std::setfill(' ');
   os << std::setw(30) << "Metric" << std::setw(30) << "Value" << '\n';
   os << std::string(62, '-') << '\n';
 
-  auto token = [&](const std::string& name, auto val, const std::string& unit = "") {
-      os << std::setw(30) << name << std::setw(30) << val << unit << '\n';
+  auto token = [&](const std::string& name, auto val,
+                   const std::string& unit = "") {
+    os << std::setw(50) << name << std::setw(30) << val << unit << '\n';
   };
 
   auto fmt = [](auto v, int prec, const char* unit) -> std::string {
@@ -208,38 +206,48 @@ static void ShowPerfInformation(PerfInfos llm_perf_datas){
     return o.str();
   };
 
-  token("Prefill Time",  fmt(llm_perf_datas.prefill_time, 2, " ms"));
-  token("Decode Time",  fmt(llm_perf_datas.decode_time,  2, " ms"));
-  token("Prefill Speed",fmt(llm_perf_datas.input_tokens / (llm_perf_datas.prefill_time * 0.001f), 2, " tokens/s"));
-  token("Decode Speed", fmt(llm_perf_datas.decode_count / (llm_perf_datas.decode_time * 0.001f), 2, " tokens/s"));
-  token("TTFT",         fmt(llm_perf_datas.prefill_time, 2, " ms"));
-  token("TPOT",         fmt(llm_perf_datas.decode_time / llm_perf_datas.decode_count, 2, " ms/token"));
-  token("E2E Latency",  fmt(llm_perf_datas.t_total * 0.001f, 2, " seconds"));
-  token("E2E TPS",      fmt(llm_perf_datas.decode_count / (llm_perf_datas.t_total * 0.001f), 2, " tokens/s"));
-  token("Embedding Time",fmt(llm_perf_datas.embedding_time, 2, " ms"));
+  token("Prefill Time", fmt(llm_perf_datas.prefill_time, 2, " ms"));
+  token("Decode Time", fmt(llm_perf_datas.decode_time, 2, " ms"));
+  if (abs(llm_perf_datas.vit_time - 0) > 1e-10) {
+    token("Vision Time", fmt(llm_perf_datas.vit_time, 2, " ms"));
+  }
+  token("Prefill Speed", fmt(llm_perf_datas.input_tokens /
+                                 (llm_perf_datas.prefill_time * 0.001f),
+                             2, " tokens/s"));
+  token("Decode Speed",
+        fmt(llm_perf_datas.decode_count / (llm_perf_datas.decode_time * 0.001f),
+            2, " tokens/s"));
+  token("TTFT (Time to First Token)", fmt(llm_perf_datas.ttft, 2, " ms"));
+  token("TPOT (Time Per Output Token)",
+        fmt(llm_perf_datas.decode_time / llm_perf_datas.decode_count, 2,
+            " ms/token"));
+  token("E2E Latency (End-to-End Latency)",
+        fmt(llm_perf_datas.t_total * 0.001f, 2, " seconds"));
+  token(
+      "E2E TPS (End-to-End Tokens Per Second)",
+      fmt((llm_perf_datas.decode_count + 1) / (llm_perf_datas.t_total * 0.001f),
+          2, " tokens/s"));
+  token("Embedding Time", fmt(llm_perf_datas.embedding_time, 2, " ms"));
   os << "--------------------------------------------------------------\n";
   std::cout << os.str();
 }
 
-static std::vector<int> generateRandomVector(int len)
-{
+static std::vector<int> generateRandomVector(int len) {
   std::vector<int> result;
-  if (len <= 0)
-  {
-    return result; // 处理无效长度（返回空向量）
+  if (len <= 0) {
+    return result;  // 处理无效长度（返回空向量）
   }
 
   // 使用当前时间作为随机种子，确保每次运行生成不同序列
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-  std::mt19937 generator(seed); // 采用 Mersenne Twister 随机数引擎
+  std::mt19937 generator(seed);  // 采用 Mersenne Twister 随机数引擎
 
   // 定义随机数范围：[0, 151642]
   std::uniform_int_distribution<int> distribution(0, TOKEN_ID_MAX);
 
   // 填充向量
-  result.reserve(len); // 预分配内存，提高效率
-  for (int i = 0; i < len; ++i)
-  {
+  result.reserve(len);  // 预分配内存，提高效率
+  for (int i = 0; i < len; ++i) {
     result.push_back(distribution(generator));
   }
 
@@ -253,24 +261,24 @@ static std::vector<int> generateRandomVector(int len)
  * @return                  返回最大值索引
  */
 template <typename T>
-static int eigen_argmax(const T *ptr, std::size_t n) {
-    using Eigen::Tensor;
-    using Eigen::TensorMap;
+static int eigen_argmax(const T* ptr, std::size_t n) {
+  using Eigen::Tensor;
+  using Eigen::TensorMap;
 
-    TensorMap<Tensor<const T, 1>> tm(static_cast<const T *>(ptr), n);
+  TensorMap<Tensor<const T, 1>> tm(static_cast<const T*>(ptr), n);
 
-    Eigen::Tensor<Eigen::Index, 0> t = tm.argmax();
-    Eigen::Index idx = t(0);
+  Eigen::Tensor<Eigen::Index, 0> t = tm.argmax();
+  Eigen::Index idx = t(0);
 
-    return static_cast<int>(idx);
+  return static_cast<int>(idx);
 }
 
-
 class HmllmInferBase {
-public:
+ public:
   HmllmInferBase() = default;
   virtual ~HmllmInferBase() = default;
-  virtual PerfInfos perf_llm(const uint32_t input_tokens_len, const uint32_t stop_tokens_len) = 0; 
+  virtual PerfInfos perf_llm(const uint32_t input_tokens_len,
+                             const uint32_t stop_tokens_len) = 0;
 };
 
 #endif  // __UTILS_H__
