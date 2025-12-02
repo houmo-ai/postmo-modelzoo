@@ -95,7 +95,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   memset(&avg_perfdata, 0, sizeof(PerfInfos));
   memset(&total_perfdata, 0, sizeof(PerfInfos));
   if (warm_up_enable) {
-    int32_t warm_up_len = 256;
+    int32_t warm_up_len = input_token_len;
     std::cout << "\n"
               << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
               << warm_up_len << ", output " << warm_up_len

@@ -17,16 +17,9 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
     std::cout << i << " ";
   }
   std::cout << std::endl;
-#ifdef BACKEND_XH1
-  if (ndevices > 1) {
-    throw std::runtime_error("xh1 only unsupport ndevice > 1!");
-  }
-  weight_manager = tcim::Module::WeightManager::CreateWeightManager(0);
-#else
   tcim::DevManager dev_manager = tcim::DevManager::Create(devs);
   weight_manager =
       tcim::Module::WeightManager::CreateWeightManager(dev_manager);
-#endif
   // 创建weightManager
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
@@ -191,6 +184,7 @@ void HmvllmInfer::PrefillSetInputDatas(void *data) {
       mem_size = input_info.MemSize();
       if (prefill_input_ptrs[idx - 1] == nullptr) {
         prefill_input_ptrs[idx - 1] = new char[mem_size];
+        memset(prefill_input_ptrs[idx - 1], 0, mem_size);
       }
       input_tensor = tcim::Tensor::CreateHostTensor(
           input_info, mem_size, prefill_input_ptrs[idx - 1]);
@@ -252,6 +246,7 @@ void HmvllmInfer::DecodeSetInputDatas(void *data) {
       mem_size = input_info.MemSize();
       if (decode_input_ptrs[idx - 1] == nullptr) {
         decode_input_ptrs[idx - 1] = new char[mem_size];
+        memset(decode_input_ptrs[idx - 1], 0, mem_size);
       }
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
                                                     decode_input_ptrs[idx - 1]);
@@ -314,6 +309,7 @@ void HmvllmInfer::VitSetInput() {
     mem_size = input_info.MemSize();
     if (vit_input_ptrs[idx] == nullptr) {
       vit_input_ptrs[idx] = new char[mem_size];
+      memset(vit_input_ptrs[idx], 0, mem_size);
     }
     input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
                                                   vit_input_ptrs[idx]);
