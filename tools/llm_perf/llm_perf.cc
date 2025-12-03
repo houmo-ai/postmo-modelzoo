@@ -117,8 +117,9 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
     total_perfdata.decode_time += perf_data.decode_time;
     total_perfdata.embedding_time += perf_data.embedding_time;
     total_perfdata.t_total += perf_data.t_total;
-    total_perfdata.ttft += perf_data.ttft;
     total_perfdata.decode_count += perf_data.decode_count;
+    total_perfdata.ttft += perf_data.ttft;
+    total_perfdata.vit_time += perf_data.vit_time;
   }
 
   avg_perfdata.input_tokens = total_perfdata.input_tokens;
@@ -129,6 +130,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   avg_perfdata.t_total = total_perfdata.t_total / loop_round;
   avg_perfdata.decode_count = total_perfdata.decode_count / loop_round;
   avg_perfdata.ttft = total_perfdata.ttft / loop_round;
+  avg_perfdata.vit_time = total_perfdata.vit_time / loop_round;
   std::cout << COLOR_GREEN << std::string(30, '=')
             << " (v)LLM Perf Avarage Information " << std::string(30, '=')
             << "\n";
