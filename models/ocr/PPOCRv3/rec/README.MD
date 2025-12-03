@@ -15,6 +15,10 @@
 
 ### 2.1 精度评估
 
+```bash
+source ~/houmo-examples-xh2/env.sh     # 初始化环境
+```
+
 ### 2.1 量化
 
 ```bash

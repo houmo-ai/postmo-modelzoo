@@ -1,5 +1,5 @@
 model:
-  name: ocr_det
+  name: ppocrv3_det
   save_dir: output
   model_path: paddleocr_det-sim.onnx
   inputs:
