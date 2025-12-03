@@ -79,7 +79,6 @@ fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
-    apt update && apt install ffmpeg
     python3 demo.py
 fi
 
