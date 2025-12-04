@@ -1,7 +1,6 @@
 import os
-import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
+from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
@@ -13,29 +12,33 @@ def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--type',
-        dest='model_type',
+        dest='file_type',
         type=str,
         default='hmm',
+        choices=["raw", "hmm"],
         help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        '--download_dir',
+        dest='download_dir',
         type=str,
         default='.',
         help='where to save downloaded model',
     )
     parser.add_argument(
-        "--build_model_dir",
-        dest="build_model_dir",
+        "--extract_dir",
+        dest="extract_dir",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET),
+        default=None,
+        help='where to save extracted files',
     )
     parser.add_argument(
-        "--quant_model_dir",
-        dest="quant_model_dir",
+        "--source_type",
+        dest="source_type",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        default="jfrog",
+        choices=["jfrog", "modelscope"],
+        help='download the model from which source',
     )
     args = parser.parse_args()
     return args
@@ -43,44 +46,34 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == '__main__':
     args = get_args()
-    model_type = args.model_type
-    model_dir = args.model_dir
-    build_model_dir = args.build_model_dir
-    quant_model_dir = args.quant_model_dir
-    model_type = args.model_type
-    model_dir = args.model_dir
 
-    version = get_houmo_version()
-    model_name = "bge"
-    ncore = "2cores"
-    model_size = "0.5b"
-    context_len = "0.5k"
-    ndevice = "1chip"
-    batch = 10
-    target = HOUMO_TARGET
-    onnx_path = "models/bge/onnx_bge_10x512.zip"
-    hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
+    model_cfgs = {
+        "target": HOUMO_TARGET,
+        "version": get_houmo_version(),
+        "model_type": "llm",
+        "model_name": "bge",
+        "model_info": {
+            "model_size": "0.5b",
+            "ncore": 2,
+            "ndevice": 1,
+            "context_len": "0.5k",
+            "batch": 10,
+        },
+        "raw_files": {
+            "raw_path": "models/bge/onnx_bge_10x512.zip",
+        },
+        "modelscope_repo": {
+            "repo_ids": ["BAAI/bge-reranker-v2-m3", "BAAI/bge-m3"],
+            "ignore_patterns": ["*.safetensors", "*.bin", "onnx/*"],
+        },
+    }
 
-    if model_type in ["raw"]:
-        ignore_patterns = []
-        get_file_from_jfrog(onnx_path, model_dir, "./")
-    else:
-        ignore_patterns = ["*.safetensors", "*.bin", "onnx/*"]
-
-    from modelscope import snapshot_download
-
-    snapshot_download(
-        'BAAI/bge-reranker-v2-m3',
-        local_dir=f'{model_dir}/bge-reranker-v2-m3',
-        ignore_patterns=ignore_patterns,
+    _, ret_dict = hmatc_get_file(
+        model_cfgs,
+        args.file_type,
+        args.download_dir,
+        args.extract_dir,
+        args.source_type,
     )
-    snapshot_download(
-        'BAAI/bge-m3',
-        local_dir=f'{model_dir}/bge-m3',
-        ignore_patterns=ignore_patterns,
-    )
-
-    if model_type in ["hmm"] and not get_file_from_jfrog(
-        hmm_path, model_dir, build_model_dir
-    ):
-        sys.exit(1)
+    if ret_dict.get("ret", False) is False:
+        exit(1)

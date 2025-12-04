@@ -354,6 +354,11 @@ def check_vpu_status() -> bool:
 
 def install_py_env(env_dir: str, log_file: str) -> dict:
     """Install python env according to requirements.txt."""
+    changed_libs = dict()
+    rqmt_path = os.path.join(env_dir, "requirements.txt")
+    if not os.path.exists(rqmt_path) or not os.path.isfile(rqmt_path):
+        return changed_libs
+
     # get current python env
     pip_res = subprocess.run(
         ["pip3", "list"],
@@ -371,26 +376,19 @@ def install_py_env(env_dir: str, log_file: str) -> dict:
         lib_ver = split_res[-1]
         py_env_dict[lib_name] = lib_ver
 
-    changed_libs = dict()
-    rqmt_path = os.path.join(env_dir, "requirements.txt")
-    if os.path.exists(rqmt_path) and os.path.isfile(rqmt_path):
-        with open(rqmt_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "http" in line:
-                    continue
-                lib_name = line
-                if "==" in line:
-                    lib_name = line.split("==", 1)[0]
-                changed_libs[lib_name] = py_env_dict.get(lib_name, None)
+    with open(rqmt_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "http" in line:
+                continue
+            lib_name = line
+            if "==" in line:
+                lib_name = line.split("==", 1)[0]
+            changed_libs[lib_name] = py_env_dict.get(lib_name, None)
 
-        os.chdir(env_dir)
-        ret, _ = execute_test_cmd(
-            ["pip3", "install", "-r", "requirements.txt"], log_file
-        )
-        logger.info(
-            f"Install python dependencies for the current testcase, ret: {ret}."
-        )
+    os.chdir(env_dir)
+    ret, _ = execute_test_cmd(["pip3", "install", "-r", "requirements.txt"], log_file)
+    logger.info(f"Install python dependencies for the current testcase, ret: {ret}.")
 
     return changed_libs
 

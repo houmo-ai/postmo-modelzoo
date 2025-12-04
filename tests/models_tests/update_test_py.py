@@ -38,6 +38,9 @@ def main():
         model_name_new = _convert_model_name(model_name)
 
         for flow_name in support_flow:
+            if flow_name == "demo_multibatch":
+                continue
+
             with open(py_path[flow_name], 'r', encoding='utf-8') as file:
                 py_content = file.read()
 

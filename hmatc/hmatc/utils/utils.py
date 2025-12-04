@@ -14,6 +14,7 @@ import onnx
 import fnmatch
 import requests
 import re
+import shutil
 from onnx import TensorProto
 from pathlib import Path
 from tqdm import tqdm
@@ -244,7 +245,7 @@ def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) ->
     jfrog_base = jfrog_base + "artifactory"
     file_info_path = f"{jfrog_base}/api/storage/{jfrog_tail}/{file_path}"
     file_size = 0
-    print(f"Get file from jfrog: {file_info_path}")
+    print(f"Get file info from jfrog: {file_info_path}")
     response = requests.get(file_info_path)
     if response.status_code == 200:
         url_md5 = response.json()["checksums"]["md5"]
@@ -260,6 +261,7 @@ def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) ->
         if os.path.exists(save_path):
             os.remove(save_path)
         url = f"{modelzoo_url}/{file_path}"
+        print(f"Get file from jfrog: {url}")
         if download_file(url, save_path, file_name, file_size) is False:
             return ""
 
@@ -294,6 +296,157 @@ def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) ->
     return save_path
 
 
+def _generate_extract_dir(file_path, edited_dir):
+    generated_dir = None
+    if (
+        file_path.rfind(".zip")
+        or file_path.rfind(".tar.xz")
+        or file_path.rfind(".tar.gz")
+    ):
+        generated_dir = edited_dir
+
+    return generated_dir
+
+
+def _download_from_modelscope(
+    repo_id: str,
+    local_dir: str,
+    allow_patterns=None,
+    ignore_patterns=None,
+    revision=None,
+) -> bool:
+    from modelscope import snapshot_download
+
+    local_dir = os.path.abspath(local_dir)
+    download_flag = True
+    while True:
+        try:
+            snapshot_download(
+                repo_id,
+                local_dir=local_dir,
+                allow_patterns=allow_patterns,
+                ignore_patterns=ignore_patterns,
+                revision=revision,
+            )
+            break
+        except Exception as e:
+            non_retry_msg = [
+                'permission denied',
+                'folder not found',
+                'invalid token',
+                "does not exist",
+                "exist",
+                "has no revision",
+            ]
+            print(
+                f"Warning:Failed to download models from modelscope, retry, error msg:{e}"
+            )
+            if any(msg in str(e).lower() for msg in non_retry_msg):
+                download_flag = False
+                print(
+                    f"Error:Failed to download models from modelscope, stop download retry, error msg:{e}"
+                )
+                break
+
+    return download_flag
+
+
+def _download_other_files(
+    files_key, model_cfgs, download_files, download_dir, extract_dir
+):
+    if files_key not in download_files:
+        download_files[files_key] = dict()
+    download_files[files_key]["other_files"] = list()
+    for other_file in model_cfgs[files_key]["other_files"]:
+        extract_dir_edit = (
+            extract_dir
+            if extract_dir is not None
+            else _generate_extract_dir(other_file, ".")
+        )
+        tmp_file = get_file_from_jfrog(other_file, download_dir, extract_dir_edit)
+        if not tmp_file or not os.path.exists(tmp_file):
+            download_files["ret"] = False
+        download_files[files_key]["other_files"].append(tmp_file)
+
+
+def _download_raw_quant(
+    file_type: str,
+    model_cfgs,
+    download_files,
+    download_dir,
+    extract_dir,
+    extract_dir_new,
+):
+    if file_type not in ["raw", "quant"]:
+        return False
+
+    files_key = f"{file_type}_files"
+    path_key = f"{file_type}_path"
+    if model_cfgs[files_key].get(path_key, None) is not None:
+        model_path = model_cfgs[files_key][path_key]
+        extract_dir_edit = (
+            extract_dir
+            if extract_dir is not None
+            else _generate_extract_dir(model_path, extract_dir_new)
+        )
+        download_file = get_file_from_jfrog(model_path, download_dir, extract_dir_edit)
+        if not download_file or not os.path.exists(download_file):
+            download_files["ret"] = False
+        if files_key not in download_files:
+            download_files[files_key] = dict()
+        download_files[files_key][path_key] = download_file
+
+    if len(model_cfgs[files_key].get("other_files", list())) > 0:
+        _download_other_files(
+            files_key, model_cfgs, download_files, download_dir, extract_dir
+        )
+
+    return True
+
+
+def _generate_hmm_path(model_cfgs, source_type, model_type, target) -> str:
+    # auto generate hmm path
+    # required
+    version = model_cfgs["version"].lower()
+    model_name = model_cfgs["model_name"]
+    ncore_val = model_cfgs["model_info"]["ncore"]
+    # optional
+    batch = model_cfgs["model_info"].get("batch", 0)
+    ndevice_val = model_cfgs["model_info"].get("ndevice", 0)
+    opt_level = model_cfgs["model_info"].get("opt_level", "NA")
+    model_size = model_cfgs["model_info"].get("model_size", "NA")
+    prefill_len = model_cfgs["model_info"].get("prefill_len", "")
+    context_len = model_cfgs["model_info"].get("context_len", "")
+    # convert val to str
+    ncore = f"{ncore_val}cores" if ncore_val > 1 else "1core"
+    ndevice = f"{ndevice_val}chips" if ndevice_val > 1 else "1chip"
+
+    if source_type == "modelscope" and model_type in ["llm"]:
+        repo_id = f"Houmo/{target}_{model_name}_{model_size}"  # repo id
+        hmm_path = f"{model_name}_{model_size}"
+        if prefill_len:
+            hmm_path += f"_{prefill_len}"
+        if context_len:
+            repo_id += f"_{context_len}"
+            hmm_path += f"_{context_len}"
+        if batch > 0:
+            hmm_path += f"_b{batch}"
+        hmm_path += f"_{ndevice}_{ncore}"
+    elif model_type in ["llm"]:
+        hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}"
+        if prefill_len:
+            hmm_path += f"_{prefill_len}"
+        if context_len:
+            hmm_path += f"_{context_len}"
+        if batch > 0:
+            hmm_path += f"_b{batch}"
+        hmm_path += f"_{ndevice}_{ncore}_{version}.zip"
+    else:
+        hmm_path = f"models/{target}-{version}/{model_name}/{model_name}_{target}_b{batch}_{ncore_val}core_{opt_level}_{version}.tar.xz"
+
+    return hmm_path
+
+
 def hmatc_get_file(
     model_cfgs: dict,
     file_type: str,
@@ -303,6 +456,7 @@ def hmatc_get_file(
 ) -> str:
     download_file = ""
     download_files = dict()
+    download_files["ret"] = True
 
     # check model_cfgs
     if (
@@ -315,6 +469,7 @@ def hmatc_get_file(
         or source_type not in ["jfrog", "modelscope"]
     ):
         print("Error: Missing required fields in model_cfgs.")
+        download_files["ret"] = False
         return download_file, download_files
 
     target = model_cfgs["target"].lower()
@@ -322,9 +477,8 @@ def hmatc_get_file(
         print(
             "Error: Only in the xh2 target, modelscope is supported as the source for downloading hmm models."
         )
+        download_files["ret"] = False
         return download_file, download_files
-
-    from modelscope import snapshot_download
 
     if download_dir != "":
         download_dir = os.path.abspath(download_dir)
@@ -334,50 +488,26 @@ def hmatc_get_file(
     ignore_patterns = ["*.safetensors"]
     if file_type in ["raw"] and model_cfgs.get("raw_files", None) is not None:
         ignore_patterns = []
-
-        if model_cfgs["raw_files"].get("raw_path", None) is not None:
-            raw_path = model_cfgs["raw_files"]["raw_path"]
-            if extract_dir is None and (
-                raw_path.rfind(".zip")
-                or raw_path.rfind(".tar.xz")
-                or raw_path.rfind(".tar.gz")
-            ):
-                extract_dir = os.getenv("HOUMO_DATASETS_PATH", ".")
-            download_file = get_file_from_jfrog(raw_path, download_dir, extract_dir)
-            if "raw_files" not in download_files:
-                download_files["raw_files"] = dict()
-            download_files["raw_files"]["raw_path"] = download_file
-
-        if len(model_cfgs["raw_files"].get("other_files", list())) > 0:
-            if "raw_files" not in download_files:
-                download_files["raw_files"] = dict()
-            download_files["raw_files"]["other_files"] = list()
-            for other_file in model_cfgs["raw_files"]["other_files"]:
-                tmp_file = get_file_from_jfrog(other_file, download_dir, extract_dir)
-                download_files["raw_files"]["other_files"].append(tmp_file)
+        extract_dir_new = os.getenv("HOUMO_DATASETS_PATH", ".")
+        _download_raw_quant(
+            file_type,
+            model_cfgs,
+            download_files,
+            download_dir,
+            extract_dir,
+            extract_dir_new,
+        )
 
     elif file_type in ["quant"] and model_cfgs.get("quant_files", None) is not None:
-
-        if model_cfgs["quant_files"].get("quant_path", None) is not None:
-            quant_path = model_cfgs["quant_files"]["quant_path"]
-            if extract_dir is None and (
-                quant_path.rfind(".zip")
-                or quant_path.rfind(".tar.xz")
-                or quant_path.rfind(".tar.gz")
-            ):
-                extract_dir = os.path.join("output", target, "hmquant")
-            download_file = get_file_from_jfrog(quant_path, download_dir, extract_dir)
-            if "quant_files" not in download_files:
-                download_files["quant_files"] = dict()
-            download_files["quant_files"]["quant_path"] = download_file
-
-        if len(model_cfgs["quant_files"].get("other_files", list())) > 0:
-            if "quant_files" not in download_files:
-                download_files["quant_files"] = dict()
-            download_files["quant_files"]["other_files"] = list()
-            for other_file in model_cfgs["quant_files"]["other_files"]:
-                tmp_file = get_file_from_jfrog(other_file, download_dir, extract_dir)
-                download_files["quant_files"]["other_files"].append(tmp_file)
+        extract_dir_new = os.path.join("output", target, "hmquant")
+        _download_raw_quant(
+            file_type,
+            model_cfgs,
+            download_files,
+            download_dir,
+            extract_dir,
+            extract_dir_new,
+        )
 
     elif file_type in ["hmm"]:
         repo_id = ""
@@ -389,79 +519,47 @@ def hmatc_get_file(
         ):
             hmm_path = model_cfgs["hmm_files"]["hmm_path"]
         else:
-            # auto generate hmm path
-            # required
-            version = model_cfgs["version"].lower()
-            model_name = model_cfgs["model_name"]
-            ncore_val = model_cfgs["model_info"]["ncore"]
-            batch = model_cfgs["model_info"]["batch"]
-            # optional
-            ndevice_val = model_cfgs["model_info"].get("ndevice", 0)
-            opt_level = model_cfgs["model_info"].get("opt_level", "NA")
-            model_size = model_cfgs["model_info"].get("model_size", "NA")
-            prefill_len = model_cfgs["model_info"].get("prefill_len", "NA")
-            context_len = model_cfgs["model_info"].get("context_len", "NA")
-            # convert val to str
-            ncore = f"{ncore_val}cores" if ncore_val > 1 else "1core"
-            ndevice = f"{ndevice_val}chips" if ndevice_val > 1 else "1chip"
+            hmm_path = _generate_hmm_path(model_cfgs, source_type, model_type, target)
 
-            if source_type == "modelscope" and model_type in ["llm"]:
-                repo_id = (
-                    f"Houmo/{target}_{model_name}_{model_size}_{context_len}"  # repo id
-                )
-                hmm_path = f"{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}"
-            elif model_type in ["llm"]:
-                hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
-            else:
-                hmm_path = f"models/{target}-{version}/{model_name}/{model_name}_{target}_b{batch}_{ncore_val}core_{opt_level}_{version}.tar.xz"
-
-        if extract_dir is None and (
-            hmm_path.rfind(".zip")
-            or hmm_path.rfind(".tar.xz")
-            or hmm_path.rfind(".tar.gz")
-        ):
-            extract_dir = os.path.abspath(os.path.join("./output", target))
+        extract_dir_edit = (
+            extract_dir
+            if extract_dir is not None
+            else _generate_extract_dir(
+                hmm_path, os.path.abspath(os.path.join("./output", target))
+            )
+        )
 
         if source_type == "modelscope" and model_type in ["llm"] and repo_id:
-            import shutil
-
+            version = model_cfgs["version"].lower()
             download_dir = os.path.abspath("./") if not download_dir else download_dir
-            download_flag = True
-            while True:
-                try:
-                    snapshot_download(
-                        repo_id,
-                        allow_patterns=[f"{hmm_path}/*"],
-                        local_dir=download_dir,
-                        revision=f"{target}-{version}",
-                    )
-                    break
-                except Exception as e:
-                    non_retry_msg = [
-                        'permission denied',
-                        'folder not found',
-                        'invalid token',
-                        "does not exist",
-                    ]
-                    if any(msg in str(e).lower() for msg in non_retry_msg):
-                        download_flag = False
-                        print(
-                            f"Error:Failed to download models from modelscope, stop download retry, error msg:{e}"
-                        )
-                        break
+            allow_patterns = [f"{hmm_path}/*"]
+            download_flag = _download_from_modelscope(
+                repo_id,
+                local_dir=download_dir,
+                allow_patterns=allow_patterns,
+                revision=f"{target}-{version}",
+            )
+
             if download_flag and os.path.exists(f"{download_dir}/{hmm_path}"):
-                os.makedirs(extract_dir, exist_ok=True)
+                os.makedirs(extract_dir_edit, exist_ok=True)
                 try:
-                    shutil.move(f"{download_dir}/{hmm_path}", extract_dir)
+                    shutil.move(f"{download_dir}/{hmm_path}", extract_dir_edit)
                     print(
-                        f"Rename download model dir: {download_dir}/{hmm_path} -> {extract_dir}"
+                        f"Rename download model dir: {download_dir}/{hmm_path} -> {extract_dir_edit}"
                     )
                 except Exception as e:
+                    download_files["ret"] = False
                     print(f"Error: Failed to rename donwnload dir, error msg:{e}")
             elif os.path.exists(f"{download_dir}/{hmm_path}"):
+                download_files["ret"] = False
                 shutil.rmtree(f"{download_dir}/{hmm_path}")
         else:
-            download_file = get_file_from_jfrog(hmm_path, download_dir, extract_dir)
+            # download from jfrog
+            download_file = get_file_from_jfrog(
+                hmm_path, download_dir, extract_dir_edit
+            )
+            if not download_file or not os.path.exists(download_file):
+                download_files["ret"] = False
             if "hmm_files" not in download_files:
                 download_files["hmm_files"] = dict()
             download_files["hmm_files"]["hmm_path"] = download_file
@@ -472,12 +570,9 @@ def hmatc_get_file(
             and isinstance(model_cfgs["hmm_files"]["other_files"], list)
             and len(model_cfgs["hmm_files"]["other_files"]) > 0
         ):
-            if "hmm_files" not in download_files:
-                download_files["hmm_files"] = dict()
-            download_files["hmm_files"]["other_files"] = list()
-            for other_file in model_cfgs["hmm_files"]["other_files"]:
-                tmp_file = get_file_from_jfrog(other_file, download_dir, extract_dir)
-                download_files["hmm_files"]["other_files"].append(tmp_file)
+            _download_other_files(
+                "hmm", model_cfgs, download_files, download_dir, extract_dir
+            )
 
     # download default files
     if (
@@ -510,30 +605,13 @@ def hmatc_get_file(
                 repo_name = repo_id.strip().rsplit("/", 1)[-1]
                 local_dir = f'{download_dir}/{repo_name}'
 
-            local_dir = os.path.abspath(local_dir)
-            download_flag = True
-            while True:
-                try:
-                    snapshot_download(
-                        repo_id,
-                        local_dir=local_dir,
-                        ignore_patterns=ignore_patterns,
-                    )
-                    break
-                except Exception as e:
-                    non_retry_msg = [
-                        'permission denied',
-                        'folder not found',
-                        'invalid token',
-                        "does not exist",
-                    ]
-                    if any(msg in str(e).lower() for msg in non_retry_msg):
-                        print(
-                            f"Error:Failed to download models from modelscope, stop download retry, error msg:{e}"
-                        )
-                        break
-            if not download_flag and os.path.exists(local_dir):
-                shutil.rmtree(local_dir)
+            download_flag = _download_from_modelscope(
+                repo_id, local_dir, ignore_patterns=ignore_patterns
+            )
+            if not download_flag:
+                download_files["ret"] = False
+                if os.path.exists(local_dir):
+                    shutil.rmtree(local_dir)
 
     if (
         "default_files" in model_cfgs
@@ -542,10 +620,17 @@ def hmatc_get_file(
     ):
         download_files["default_files"] = list()
         for default_file in model_cfgs["default_files"]:
-            tmp_file = get_file_from_jfrog(default_file, download_dir, extract_dir)
+            extract_dir_edit = (
+                extract_dir
+                if extract_dir is not None
+                else _generate_extract_dir(default_file, ".")
+            )
+            tmp_file = get_file_from_jfrog(default_file, download_dir, extract_dir_edit)
+            if not tmp_file or not os.path.exists(tmp_file):
+                download_files["ret"] = False
             download_files["default_files"].append(tmp_file)
 
-    return download_files, download_files
+    return download_file, download_files
 
 
 class ProgressFile:

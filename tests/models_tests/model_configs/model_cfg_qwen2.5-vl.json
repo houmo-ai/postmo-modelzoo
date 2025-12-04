@@ -27,6 +27,7 @@
         ],
         "xh2": [
             "get_model",
+            "quant",
             "compile",
             "demo",
             "perf"
@@ -43,9 +44,9 @@
         },
         "xh2": {
             "x86_64": {
-                "prefill": 256.96,
-                "decode": 17.43,
-                "end2end": 11.86
+                "prefill": 402.92,
+                "decode": 14.82,
+                "end2end": 10.74
             }
         }
     },
@@ -95,28 +96,56 @@
         "xh2": {
             "type": [
                 "raw",
-                "quant",
+                "raw",
+                "hmm",
                 "hmm"
             ],
             "download_dir": [
+                "cached_models",
                 "cached_models",
                 "cached_models",
                 "cached_models"
             ],
             "extract_dir": [
                 null,
-                "cached_models/hmquant_xh2_7b",
-                "cached_models/hmm_xh2_7b_2k"
+                null,
+                "cached_models/hmm_xh2_7b_2k",
+                "cached_models/hmm_xh2_7b_2k_ms"
             ],
             "model_size": [
+                "7b",
                 "7b",
                 "7b",
                 "7b"
             ],
             "source_type": [
                 null,
+                "modelscope",
                 null,
-                null
+                "modelscope"
+            ]
+        }
+    },
+    "quant_params": {
+        "xh1": null,
+        "xh2": {
+            "model": [
+                "cached_models/qwen2.5-vl"
+            ],
+            "out-dir": [
+                "cached_results/hmquant_xh2_7b_2k"
+            ],
+            "context-length": [
+                "2048"
+            ],
+            "patch_size": [
+                "16"
+            ],
+            "image_max_size_h": [
+                "448"
+            ],
+            "image_max_size_w": [
+                "448"
             ]
         }
     },
@@ -142,6 +171,10 @@
                 "build",
                 "build"
             ],
+            "j": [
+                "24",
+                "24"
+            ],
             "output_dir": [
                 "cached_results/hmm_xh1_3b",
                 "cached_results/hmm_xh1_7b"
@@ -149,8 +182,8 @@
         },
         "xh2": {
             "model_dir": [
-                "cached_results/hmquant_xh2_7b",
-                "cached_results/hmquant_xh2_7b"
+                "cached_results/hmquant_xh2_7b_2k",
+                "cached_results/hmquant_xh2_7b_2k"
             ],
             "model_name": [
                 null,
@@ -175,6 +208,10 @@
             "stage": [
                 "build",
                 "build"
+            ],
+            "j": [
+                "24",
+                "24"
             ],
             "output_dir": [
                 "cached_results/hmm_xh2_7b_2k",

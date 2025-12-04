@@ -4,28 +4,36 @@ import argparse
 
 HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../../..')
 sys.path.append(f'{HOUMO_EXAMPLES_PATH}/hmatc')
-from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
+from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--ncore",
-        dest="ncore",
-        type=int,
-        default=4,
-        help="which resource to get, choise in [2, 4]",
+        '--download_dir',
+        dest='download_dir',
+        type=str,
+        default=os.path.join(HOUMO_EXAMPLES_PATH, "apis/models"),
+        help='where to save downloaded model',
     )
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--extract_dir",
+        dest="extract_dir",
         type=str,
-        default='',
-        help='where to save downloaded model',
+        default=".",
+        help='where to save extracted files',
+    )
+    parser.add_argument(
+        "--source_type",
+        dest="source_type",
+        type=str,
+        default="jfrog",
+        choices=["jfrog", "modelscope"],
+        help='download the model from which source',
     )
     args = parser.parse_args()
     return args
@@ -37,30 +45,35 @@ if __name__ == '__main__':
         os.environ["HOUMO_MODELZOO_URL"] = (
             "http://139.224.0.199:8082/artifactory/houmo/release"
         )
-    model_dir = (
-        os.path.join(HOUMO_EXAMPLES_PATH, "apis/models")
-        if not args.model_dir
-        else args.model_dir
+
+    model_cfgs = {
+        "target": HOUMO_TARGET,
+        "version": get_houmo_version(),
+        "model_type": "llm",
+        "model_name": "qwen3",
+        "model_info": {
+            "model_size": "8b",
+            "ncore": 2,
+            "ndevice": 1,
+            "context_len": "8k",
+            "prefill_len": 256,
+            "batch": 1,
+        },
+        "hmm_files": {
+            "other_files": ["models/qwen3/3rdparty.zip"],
+        },
+        "modelscope_repo": {"repo_ids": ["qwen/qwen3-8b"]},
+    }
+
+    _, ret_dict = hmatc_get_file(
+        model_cfgs,
+        "hmm",
+        args.download_dir,
+        args.extract_dir,
+        args.source_type,
     )
-
-    model_name = "qwen3"
-    model_size = "8b"
-    ncore = "2cores" if HOUMO_TARGET == "xh2" else f"{args.ncore}cores"
-    ndevice = "1chip"
-    context_len = "8k"
-    prefill_len = 256
-    batch = 1
-    version = get_houmo_version()
-    target = HOUMO_TARGET
-    hmm_path = f"models/{target.lower()}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{prefill_len}_{context_len}_b{batch}_{ndevice}_{ncore}_{version}.zip"
-
-    from modelscope import snapshot_download
-
-    snapshot_download(
-        "qwen/qwen3-8b", local_dir="qwen3-8b", ignore_patterns=["*.safetensors"]
-    )
-
-    get_file_from_jfrog(hmm_path, model_dir, ".")
+    if ret_dict.get("ret", False) is False:
+        exit(1)
 
     embedding_path = "hmquant/quant_embedding.pt"
     if os.path.exists(embedding_path):
@@ -77,7 +90,3 @@ if __name__ == '__main__':
             embedding_weight = embedding_weight.float().half()
         embedding_data = embedding_weight.cpu().numpy()
         embedding_data.tofile(embedding_path.replace(".pt", ".bin"))
-
-    # 下载编译好的三方库
-    thirdparty_path = "models/qwen3/3rdparty.zip"
-    get_file_from_jfrog(thirdparty_path, model_dir, "./")

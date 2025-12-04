@@ -1,7 +1,6 @@
 import os
-import sys
 import argparse
-from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
+from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
@@ -13,24 +12,33 @@ def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--type',
-        dest='model_type',
+        dest='file_type',
         type=str,
         default='hmm',
+        choices=["raw", "hmm"],
         help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
-        "--build_model_dir",
-        dest="build_model_dir",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET),
-        help="where to save build_model",
-    )
-    parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        '--download_dir',
+        dest='download_dir',
         type=str,
         default='.',
         help='where to save downloaded model',
+    )
+    parser.add_argument(
+        "--extract_dir",
+        dest="extract_dir",
+        type=str,
+        default=None,
+        help='where to save extracted files',
+    )
+    parser.add_argument(
+        "--source_type",
+        dest="source_type",
+        type=str,
+        default="jfrog",
+        choices=["jfrog", "modelscope"],
+        help='download the model from which source',
     )
     args = parser.parse_args()
     return args
@@ -38,32 +46,29 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == '__main__':
     args = get_args()
-    model_type = args.model_type
-    model_dir = args.model_dir
-    build_model_dir = args.build_model_dir
 
-    model_name = "whisper"
-    model_size = "medium"
-    ncore = "2cores"
-    ndevice = "1chip"
-    version = get_houmo_version()
-    target = HOUMO_TARGET
-    hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}_{ndevice}_{ncore}_{version}.zip"
+    model_cfgs = {
+        "target": HOUMO_TARGET,
+        "version": get_houmo_version(),
+        "model_type": "llm",
+        "model_name": "whisper",
+        "model_info": {
+            "model_size": "medium",
+            "ncore": 2,
+            "ndevice": 1,
+        },
+        "modelscope_repo": {
+            "repo_ids": ["openai-mirror/whisper-medium"],
+            "ignore_patterns": ["*.bin", "*.h5", "*.msgpack", "*.safetensors"],
+        },
+    }
 
-    if model_type in ["raw"]:
-        ignore_patterns = []
-    else:
-        ignore_patterns = ["*.bin", "*.h5", "*.msgpack", "*.safetensors"]
-
-    from modelscope import snapshot_download
-
-    snapshot_download(
-        'openai-mirror/whisper-medium',
-        local_dir=f'{model_dir}/whisper-medium',
-        ignore_patterns=ignore_patterns,
+    _, ret_dict = hmatc_get_file(
+        model_cfgs,
+        args.file_type,
+        args.download_dir,
+        args.extract_dir,
+        args.source_type,
     )
-
-    if model_type in ["hmm"] and not get_file_from_jfrog(
-        hmm_path, model_dir, build_model_dir
-    ):
-        sys.exit(1)
+    if ret_dict.get("ret", False) is False:
+        exit(1)

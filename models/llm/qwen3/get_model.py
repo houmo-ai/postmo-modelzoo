@@ -1,11 +1,10 @@
 import os
-import sys
 import argparse
 from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
@@ -16,6 +15,7 @@ def get_args() -> argparse.Namespace:
         dest='file_type',
         type=str,
         default='hmm',
+        choices=["raw", "hmm"],
         help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
@@ -53,7 +53,7 @@ def get_args() -> argparse.Namespace:
         dest='batch',
         type=int,
         default=1,
-        choices=[1, 2, 4],
+        choices=[1, 4],
         help='batch size',
     )
     args = parser.parse_args()
@@ -80,10 +80,12 @@ if __name__ == '__main__':
         "modelscope_repo": {"repo_ids": ["qwen/qwen3-8b"]},
     }
 
-    hmatc_get_file(
+    _, ret_dict = hmatc_get_file(
         model_cfgs,
         args.file_type,
         args.download_dir,
         args.extract_dir,
         args.source_type,
     )
+    if ret_dict.get("ret", False) is False:
+        exit(1)

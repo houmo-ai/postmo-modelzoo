@@ -1,11 +1,10 @@
 import os
-import sys
 import argparse
 from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2."
+HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
@@ -16,6 +15,7 @@ def get_args() -> argparse.Namespace:
         dest='file_type',
         type=str,
         default='hmm',
+        choices=["raw", "hmm"],
         help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
@@ -41,19 +41,11 @@ def get_args() -> argparse.Namespace:
         help='download the model from which source',
     )
     parser.add_argument(
-        "--batch",
-        dest="batch",
-        type=int,
-        default=1,
-        choices=[1, 2],
-        help="batch size",
-    )
-    parser.add_argument(
         "--context_length",
         dest="context_length",
         type=str,
         default="2k",
-        choices=["2k", "8k", "16k", "32k"],
+        choices=["2k", "8k", "16k"],
         help="context length",
     )
     parser.add_argument(
@@ -82,16 +74,21 @@ if __name__ == "__main__":
             "ndevice": args.ndevice,
             "context_len": args.context_length,
             "prefill_len": 256,
-            "batch": args.batch,
+            "batch": 1,
         },
         "raw_files": {"raw_path": "models/datasets/wikitext-2-raw-v1.zip"},
-        "modelscope_repo": {"repo_ids": ["openai-mirror/gpt-oss-20b"]},
+        "modelscope_repo": {
+            "repo_ids": ["openai-mirror/gpt-oss-20b"],
+            "ignore_patterns": ["*.safetensors", "*.bin"],
+        },
     }
 
-    hmatc_get_file(
+    _, ret_dict = hmatc_get_file(
         model_cfgs,
         args.file_type,
         args.download_dir,
         args.extract_dir,
         args.source_type,
     )
+    if ret_dict.get("ret", False) is False:
+        exit(1)

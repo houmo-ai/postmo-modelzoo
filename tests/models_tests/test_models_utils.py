@@ -209,6 +209,70 @@ def _get_param_value(params, target_param):
     return None
 
 
+def _find_first_non_none(lst):
+    for idx, value in enumerate(lst):
+        if value is not None:  # 严格判断：不为 None
+            return idx  # 找到第一个，直接返回下标
+    return -1
+
+
+def _download_models(
+    model_info: dict,
+    file_type: str,
+    download_dir: str = "",
+    extract_dir: str = "",
+    lock_type: str = "download",
+    copy_flag: bool = False,
+    assert_flag=True,
+    other_params: list = list(),
+):
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
+
+    download_str = "--model_dir"
+    extract_str = "--quant_model_dir"
+    if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
+        download_str = "--download_dir"
+        extract_str = "--extract_dir"
+
+    cmd_list = ["python3", "get_model.py", "--type", file_type]
+    if file_type == "raw":
+        download_dir = model_set_dir
+        cmd_list += [download_str, model_set_dir]
+    else:
+        cmd_list += [download_str, download_dir, extract_str, extract_dir]
+    if len(other_params) > 0:
+        cmd_list += other_params
+
+    logger.info(f"Ready to download models using {cmd_list}")
+    lock_file_src = (
+        download_dir + "/lock.lock" if download_dir else model_set_dir + "/lock.lock"
+    )
+    lock_file_dst = (
+        extract_dir + "/lock.lock" if extract_dir else model_res_dir + "/lock.lock"
+    )
+    if lock_type == "all":
+        with ModelResourceLock(
+            lock_file_src, ModelResourceLock.LockMode.WRITE, "model downloading"
+        ):
+            with ModelResourceLock(
+                lock_file_dst, ModelResourceLock.LockMode.WRITE, "model downloading"
+            ):
+                flag, _ = execute_test_cmd(cmd_list, "", assert_flag)
+                if copy_flag:
+                    os.system(f"cp -ar {download_dir}/* ./")
+    else:
+        lock_file = lock_file_src if lock_type == "download" else lock_file_dst
+        with ModelResourceLock(
+            lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
+        ):
+            flag, _ = execute_test_cmd(cmd_list, "", assert_flag)
+            if copy_flag:
+                os.system(f"cp -ar {download_dir}/* ./")
+
+    return flag
+
+
 def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
     if get_test_type() == TCaseType.SEPARATE_INFER:
         logger.warning(
@@ -219,7 +283,6 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
     lock_file_dst = model_res_dir + "/lock.lock"
-    lock_file_src = model_set_dir + "/lock.lock"
     quant_params_full = model_info.get("quant_params", None)
     quant_params = (
         quant_params_full.get(HOUMO_BACKEND, None) if quant_params_full else None
@@ -241,62 +304,23 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
                 flag = True
                 continue
             # download raw model files
-            with ModelResourceLock(
-                lock_file_src, ModelResourceLock.LockMode.WRITE, "model downloading"
-            ):
-                if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
-                    execute_test_cmd(
-                        [
-                            "python3",
-                            "get_model.py",
-                            "--download_dir",
-                            model_set_dir,
-                            "--type",
-                            "raw",
-                        ],
-                        "",
-                        True,
-                    )
-                else:
-                    execute_test_cmd(
-                        [
-                            "python3",
-                            "get_model.py",
-                            "--model_dir",
-                            model_set_dir,
-                            "--type",
-                            "raw",
-                        ],
-                        "",
-                        True,
-                    )
+            _download_models(model_info, "raw")
 
+            cmd_list = ["python3", "ptq.py"]
+            for param_key in quant_params:
+                param_val = quant_params[param_key][idx]
+                if param_val is None:
+                    continue
+                tmp_str = f"--{param_key}"
+                if isinstance(param_val, str) and "cached_results" in param_val:
+                    param_val = param_val.replace("cached_results", model_res_dir)
+                elif isinstance(param_val, str) and "cached_models" in param_val:
+                    param_val = param_val.replace("cached_models", model_set_dir)
+                cmd_list += [tmp_str, param_val]
             with ModelResourceLock(
                 lock_file_dst, ModelResourceLock.LockMode.WRITE, "model quantizing"
             ):
-                # quant model
-                model_dir = quant_params["model"][idx]
-                if "cached_models" in quant_params["model"][idx]:
-                    model_dir = quant_params["model"][idx].replace(
-                        "cached_models", model_set_dir
-                    )
-                elif "cached_results" in quant_params["model"][idx]:
-                    model_dir = quant_params["model"][idx].replace(
-                        "cached_results", model_res_dir
-                    )
-                cmds = [
-                    "python3",
-                    "ptq.py",
-                    "--model",
-                    model_dir,
-                    "--context-length",
-                    quant_params["context-length"][idx],
-                ]
-                if HOUMO_BACKEND == "xh1":
-                    cmds += ["--save_path", quant_res_dir]
-                else:
-                    cmds += ["--out-dir", quant_res_dir]
-                flag, _ = execute_test_cmd(cmds, log_file)
+                flag, _ = execute_test_cmd(cmd_list, log_file)
                 if flag is True:
                     tmp_res_dir = f"{quant_res_dir}/hmquant"
                     os.system(f"mv {tmp_res_dir} {quant_res_dir}")
@@ -305,9 +329,18 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
 
         return flag
 
+    if "quant" not in model_info["get_model_params"][HOUMO_BACKEND]["type"]:
+        logger.warning("Not support downloading quantized model file.")
+        return False
+
     compile_params = model_info["compile_params"][HOUMO_BACKEND]
-    for idx, tmp_model_dir in enumerate(compile_params["model_dir"]):
-        quant_res_dir = tmp_model_dir.replace("cached_results", model_res_dir)
+    compile_model_dir = set(compile_params["model_dir"])
+    for tmp_model_dir in compile_model_dir:
+        quant_res_dir = tmp_model_dir
+        if isinstance(tmp_model_dir, str) and "cached_results" in tmp_model_dir:
+            quant_res_dir = tmp_model_dir.replace("cached_results", model_res_dir)
+        elif isinstance(tmp_model_dir, str) and "cached_models" in tmp_model_dir:
+            quant_res_dir = tmp_model_dir.replace("cached_models", model_set_dir)
         if quant_res_dir and os.path.exists(quant_res_dir):
             logger.warning(
                 f"Skip the step of preparing quantized llm model {quant_res_dir} in the SPEARATE NO INFER stage."
@@ -315,46 +348,12 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
             continue
 
         logger.info("Start to download quantized llm model for compiling.")
-        if "quant" in model_info["get_model_params"][HOUMO_BACKEND]["type"]:
-            # download quantized model file
-            with ModelResourceLock(
-                lock_file_src, ModelResourceLock.LockMode.WRITE, "model downloading"
-            ):
-                with ModelResourceLock(
-                    lock_file_dst,
-                    ModelResourceLock.LockMode.WRITE,
-                    "model downloading",
-                ):
-                    if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
-                        flag, _ = execute_test_cmd(
-                            [
-                                "python3",
-                                "get_model.py",
-                                "--download_dir",
-                                model_set_dir,
-                                "--extract_dir",
-                                quant_res_dir,
-                                "--type",
-                                "quant",
-                            ]
-                        )
-                    else:
-                        flag, _ = execute_test_cmd(
-                            [
-                                "python3",
-                                "get_model.py",
-                                "--model_dir",
-                                model_set_dir,
-                                "--quant_model_dir",
-                                quant_res_dir,
-                                "--type",
-                                "quant",
-                            ]
-                        )
-                    if flag is False:
-                        return flag
-        else:
-            logger.warning("Not support downloading quantized model file.")
+        flag = _download_models(
+            model_info, "quant", model_set_dir, quant_res_dir, "all", False, False
+        )
+        if flag is False:
+            return flag
+
     return flag
 
 
@@ -378,69 +377,24 @@ def _prepare_quantized_cv_model(model_info: dict, log_file: str) -> bool:
             if os.path.exists(quant_res_dir):
                 continue
 
-            with ModelResourceLock(
-                lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
-            ):
-                if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
-                    flag, _ = execute_test_cmd(
-                        [
-                            "python3",
-                            "get_model.py",
-                            "--download_dir",
-                            model_set_dir,
-                            "--extract_dir",
-                            quant_res_dir,
-                            "--type",
-                            "quant",
-                        ]
-                    )
-                else:
-                    flag, _ = execute_test_cmd(
-                        [
-                            "python3",
-                            "get_model.py",
-                            "--model_dir",
-                            model_set_dir,
-                            "--type",
-                            "quant",
-                            "--quant_model_dir",
-                            quant_res_dir,
-                        ]
-                    )
-                if flag is False:
-                    break
+            flag = _download_models(
+                model_info,
+                "quant",
+                model_set_dir,
+                quant_res_dir,
+                "extract",
+                False,
+                False,
+            )
+            if flag is False:
+                break
         return flag
 
     if (
         "raw" in get_model_types
         and "quant" in model_info["support_flow"][HOUMO_BACKEND]
     ):
-        lock_md_file = model_set_dir + "/lock.lock"
-        with ModelResourceLock(
-            lock_md_file, ModelResourceLock.LockMode.WRITE, "model downloading"
-        ):
-            if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
-                flag, _ = execute_test_cmd(
-                    [
-                        "python3",
-                        "get_model.py",
-                        "--download_dir",
-                        model_set_dir,
-                        "--type",
-                        "raw",
-                    ]
-                )
-            else:
-                flag, _ = execute_test_cmd(
-                    [
-                        "python3",
-                        "get_model.py",
-                        "--model_dir",
-                        model_set_dir,
-                        "--type",
-                        "raw",
-                    ]
-                )
+        flag = _download_models(model_info, "raw", assert_flag=False)
         if flag is False:
             return False
 
@@ -486,16 +440,10 @@ def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) 
             f"{quant_res_dir}/quant_embedding.pt"
         ):
             os.makedirs(f"{compile_res_dir}/hmquant/", exist_ok=True)
-            os.system(
-                f"cp {quant_res_dir}/quant_embedding.pt {compile_res_dir}/hmquant/"
-            )
+            os.system(f"cp -a {quant_res_dir}/quant_*.pt {compile_res_dir}/hmquant/")
         if get_test_type() in [TCaseType.SEPARATE_NO_INFER, TCaseType.DEFAULT]:
             hmm_files = glob.glob(os.path.join(compile_res_dir, "*.hmm"))
-            if (
-                os.path.exists(compile_res_dir)
-                and os.path.exists(embedding_path)
-                and len(hmm_files) > 0
-            ):
+            if os.path.exists(compile_res_dir) and len(hmm_files) > 0:
                 logger.warning(
                     f"Skip the step of preparing compiled model {compile_res_dir}."
                 )
@@ -510,77 +458,79 @@ def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) 
             and check_gpu()["has_gpu"] is True
             and _prepare_quantized_llm_model(model_info, log_file)
         ):
+            cmd_list = ["python3", "build.py"]
+            for param_key in compile_params:
+                param_val = compile_params[param_key][idx]
+                if param_val is None:
+                    continue
+                tmp_str = f"--{param_key}"
+                if isinstance(param_val, str) and "cached_results" in param_val:
+                    param_val = param_val.replace("cached_results", model_res_dir)
+                elif isinstance(param_val, str) and "cached_models" in param_val:
+                    param_val = param_val.replace("cached_models", model_set_dir)
+                cmd_list += [tmp_str, param_val]
             with ModelResourceLock(
                 lock_file, ModelResourceLock.LockMode.WRITE, "model compiling"
             ):
-                cmd_list = [
-                    "python3",
-                    "build.py",
-                    "--model_dir",
-                    quant_res_dir,
-                    "--output_dir",
-                    compile_res_dir,
-                    "--stage",
-                    "build",
-                ]
-                if HOUMO_BACKEND == "xh2":
-                    cmd_list += [
-                        "--context_length",
-                        compile_params["context_length"][idx],
-                    ]
-                flag, _ = execute_test_cmd(
-                    cmd_list,
-                    log_file,
-                )
+                flag, _ = execute_test_cmd(cmd_list, log_file)
+                if flag is False:
+                    break
+
             if os.path.exists(f"{quant_res_dir}/quant_embedding.pt"):
                 os.makedirs(f"{compile_res_dir}/hmquant/", exist_ok=True)
                 os.system(
-                    f"cp {quant_res_dir}/quant_embedding.pt {compile_res_dir}/hmquant/"
+                    f"cp -a {quant_res_dir}/quant_*.pt {compile_res_dir}/hmquant/"
                 )
-            if flag is False:
-                break
-            else:
-                continue
 
         flag = False
-        if "hmm" in model_info["get_model_params"][HOUMO_BACKEND]["type"]:
-            lock_file_src = model_set_dir + "/lock.lock"
-            with ModelResourceLock(
-                lock_file_src, ModelResourceLock.LockMode.WRITE, "model downloading"
-            ):
-                with ModelResourceLock(
-                    lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
-                ):
-                    if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
-                        flag, _ = execute_test_cmd(
-                            [
-                                "python3",
-                                "get_model.py",
-                                "--download_dir",
-                                model_set_dir,
-                                "--extract_dir",
-                                compile_res_dir,
-                                "--type",
-                                "hmm",
-                            ]
-                        )
-                    else:
-                        flag, _ = execute_test_cmd(
-                            [
-                                "python3",
-                                "get_model.py",
-                                "--model_dir",
-                                model_set_dir,
-                                "--build_model_dir",
-                                compile_res_dir,
-                                "--type",
-                                "hmm",
-                            ]
-                        )
-                if flag is False:
-                    break
-                else:
-                    continue
+        get_model_params = model_info["get_model_params"][HOUMO_BACKEND]
+        if "hmm" in get_model_params["type"]:
+            compile_case_id = compile_res_dir.rsplit("/", 1)[-1]
+
+            model_exist = -1
+            other_params = list()
+            if "extract_dir" in get_model_params:
+                for idx, tmp_dir in enumerate(get_model_params["extract_dir"]):
+                    if (
+                        tmp_dir is not None
+                        and isinstance(tmp_dir, str)
+                        and compile_case_id == tmp_dir.rsplit("/", 1)[-1]
+                    ):
+                        model_exist = idx
+                        break
+            if model_exist > -1:
+                for param_key in get_model_params:
+                    if param_key in [
+                        "type",
+                        "download_dir",
+                        "extract_dir",
+                        "build_model_dir",
+                        "model_dir",
+                        "quant_model_dir",
+                    ]:
+                        continue
+                    param_val = get_model_params[param_key][model_exist]
+                    if param_val is None:
+                        continue
+                    tmp_str = f"--{param_key}"
+                    if isinstance(param_val, str) and "cached_results" in param_val:
+                        param_val = param_val.replace("cached_results", model_res_dir)
+                    elif isinstance(param_val, str) and "cached_models" in param_val:
+                        param_val = param_val.replace("cached_models", model_set_dir)
+                    other_params += [tmp_str, param_val]
+
+            flag = _download_models(
+                model_info,
+                "hmm",
+                model_set_dir,
+                compile_res_dir,
+                "all",
+                copy_flag=False,
+                assert_flag=False,
+                other_params=other_params,
+            )
+            if flag is False:
+                break
 
     return flag
 
@@ -606,44 +556,7 @@ def _prepare_compiled_cv_model(model_info: dict, platform: str, log_file: str) -
 
     logger.info("Start to prepare compiled cv model for inference.")
     if platform == "aarch64":
-        lock_file_src = model_set_dir + "/lock.lock"
-        lock_file_dst = model_res_dir + "/lock.lock"
-        with ModelResourceLock(
-            lock_file_src, ModelResourceLock.LockMode.WRITE, "model downloading"
-        ):
-            with ModelResourceLock(
-                lock_file_dst, ModelResourceLock.LockMode.WRITE, "model downloading"
-            ):
-                if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
-                    execute_test_cmd(
-                        [
-                            "python3",
-                            "get_model.py",
-                            "--download_dir",
-                            model_set_dir,
-                            "--extract_dir",
-                            compile_res_dir,
-                            "--type",
-                            "hmm",
-                        ],
-                        "",
-                        True,
-                    )
-                else:
-                    execute_test_cmd(
-                        [
-                            "python3",
-                            "get_model.py",
-                            "--model_dir",
-                            model_set_dir,
-                            "--build_model_dir",
-                            compile_res_dir,
-                            "--type",
-                            "hmm",
-                        ],
-                        "",
-                        True,
-                    )
+        _download_models(model_info, "hmm", model_set_dir, compile_res_dir, "all")
         os.system(f"cp -ar {compile_res_dir} ./")
         return True
     # platform != "aarch64"
@@ -682,6 +595,59 @@ def _prepare_compiled_cv_model(model_info: dict, platform: str, log_file: str) -
     return True
 
 
+def _run_demo_script(
+    demo_name: str,
+    model_name: str,
+    model_info: dict,
+    model_set_dir: str,
+    model_res_dir: str,
+    log_file: str,
+) -> bool:
+    run_flag = True
+    param_str = f"{demo_name}_params"
+    if (
+        demo_name in model_info["support_flow"][HOUMO_BACKEND]
+        and param_str in model_info
+    ):
+        params_dict = model_info[param_str][HOUMO_BACKEND]
+        cmd_header = ["python3", f"{demo_name}.py"]
+        cmd_list = _generate_py_cmds(
+            cmd_header,
+            params_dict,
+            skip_default=False,
+            model_dir=model_set_dir,
+            res_dir=model_res_dir,
+        )
+
+        logger.info(f"Ready to execute {demo_name}.py, cmd list: {cmd_list}")
+        lock_file_res = model_res_dir + "/lock.lock"
+        with ModelResourceLock(
+            lock_file_res,
+            ModelResourceLock.LockMode.WRITE,
+            f"execute model {demo_name}.py",
+        ):
+            check_flag = False if model_name == "qwen2.5-vl" else True
+            for tmp_cmd_list in cmd_list:
+                # [TMP]
+                # if demo_name == "demo_multibatch":
+                #     logger.warning(
+                #         f"Skip to execute demo_multibatch.py, cmd is {tmp_cmd_list}"
+                #     )
+                #     continue
+                exec_flag, _ = execute_test_cmd(
+                    tmp_cmd_list, log_file, False, check_flag
+                )
+                if exec_flag is False:
+                    logger.error(
+                        f"Failed to execute {demo_name}.py, cmd is {tmp_cmd_list}"
+                    )
+                    run_flag = False
+    else:
+        logger.warning(f"{demo_name} is not supported.")
+
+    return run_flag
+
+
 def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
     """Test all the parameters of the get_model.py in all the supported models."""
     model_info = _load_model_cfg(model_name)
@@ -713,7 +679,7 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
     params_dict = model_info["get_model_params"][HOUMO_BACKEND]
     if model_info.get("model_type", "cv") == "llm" and is_release() is True:
         # skip download raw models
-        raw_indices = []
+        raw_indices = list()
         for i in range(len(params_dict["type"]) - 1, -1, -1):
             if params_dict["type"][i] == "raw":
                 raw_indices.append(i)
@@ -735,6 +701,8 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
         lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
     ):
         for tmp_cmd_list in cmd_list:
+            if is_release() is True and "modelscope" in tmp_cmd_list:
+                continue
             exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file, False, False)
             final_flag = False if exec_flag is False else final_flag
 
@@ -789,42 +757,12 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
     if not os.path.exists(model_dir):
         assert False, f"The {model_name} model folder doesn't exist."
     prepare_test_folder(model_dir, "quant")
-    logger.info("current folder: %s.", os.getcwd())
+    current_folder = os.getcwd()
+    logger.info("current folder: %s.", current_folder)
 
     # download raw model for quantization
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-    lock_file = model_set_dir + "/lock.lock"
-    with ModelResourceLock(
-        lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
-    ):
-        if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
-            execute_test_cmd(
-                [
-                    "python3",
-                    "get_model.py",
-                    "--download_dir",
-                    model_set_dir,
-                    "--type",
-                    "raw",
-                ],
-                "",
-                True,
-            )
-        else:
-            execute_test_cmd(
-                [
-                    "python3",
-                    "get_model.py",
-                    "--model_dir",
-                    model_set_dir,
-                    "--type",
-                    "raw",
-                ],
-                "",
-                True,
-            )
-        if model_type == "cv":
-            os.system(f"cp -ar {model_set_dir}/* ./")
+    copy_flag = True if model_type == "cv" else False
+    _download_models(model_info, "raw", copy_flag=copy_flag)
 
     logger.info("LD_LIBRARY_PATH: %s", os.getenv("LD_LIBRARY_PATH"))
     final_flag = True
@@ -841,6 +779,7 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
             if exec_flag is False:
                 final_flag = False
     else:
+        model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
         model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         # test script: ptq.py
         params_dict = model_info["quant_params"][HOUMO_BACKEND]
@@ -853,6 +792,11 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
             model_dir=model_set_dir,
             res_dir=model_res_dir,
         )
+
+        # install python requirements
+        changed_libs = install_py_env(current_folder, log_file)
+        if changed_libs:
+            logger.info(f"changed python libs: {changed_libs}.")
 
         lock_file_res = model_res_dir + "/lock.lock"
         with ModelResourceLock(
@@ -871,6 +815,15 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
                     tmp_res_dir = f"{quant_res_dir}/hmquant"
                     os.system(f"mv {tmp_res_dir}/* {quant_res_dir}/")
                     os.system(f"rm -rf {tmp_res_dir}")
+
+        # restore python env
+        for lib_name, lib_ver in changed_libs.items():
+            if lib_ver is None:
+                execute_test_cmd(["pip3", "uninstall", lib_name, "-y"], log_file, True)
+            else:
+                execute_test_cmd(
+                    ["pip3", "install", lib_name + "==" + lib_ver], log_file, True
+                )
 
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
@@ -1124,30 +1077,20 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
             if exec_flag is False:
                 final_flag = False
     else:
-        # test script: demo.py
-        params_dict = model_info["demo_params"][HOUMO_BACKEND]
-        cmd_header = ["python3", "demo.py"]
-
         model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-        cmd_list = _generate_py_cmds(
-            cmd_header,
-            params_dict,
-            skip_default=False,
-            model_dir=model_set_dir,
-            res_dir=model_res_dir,
+
+        demo_flag = _run_demo_script(
+            "demo", model_name, model_info, model_set_dir, model_res_dir, log_file
         )
-        logger.info(f"demo flow cmd_list:{cmd_list}")
-        lock_file_res = model_res_dir + "/lock.lock"
-        with ModelResourceLock(
-            lock_file_res, ModelResourceLock.LockMode.WRITE, "execute model demo.py"
-        ):
-            check_flag = False if model_name == "qwen2.5-vl" else True
-            for tmp_cmd_list in cmd_list:
-                exec_flag, _ = execute_test_cmd(
-                    tmp_cmd_list, log_file, False, check_flag
-                )
-                if exec_flag is False:
-                    final_flag = False
+        multibatch_flag = _run_demo_script(
+            "demo_multibatch",
+            model_name,
+            model_info,
+            model_set_dir,
+            model_res_dir,
+            log_file,
+        )
+        final_flag = demo_flag and multibatch_flag
 
     # restore python env
     for lib_name, lib_ver in changed_libs.items():
@@ -1194,37 +1137,7 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
     model_type = model_info.get("model_type", "cv")
 
     if get_test_type() != TCaseType.SEPARATE_INFER:
-        model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-        lock_file = model_set_dir + "/lock.lock"
-        with ModelResourceLock(
-            lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
-        ):
-            if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
-                execute_test_cmd(
-                    [
-                        "python3",
-                        "get_model.py",
-                        "--download_dir",
-                        model_set_dir,
-                        "--type",
-                        "raw",
-                    ],
-                    "",
-                    True,
-                )
-            else:
-                execute_test_cmd(
-                    [
-                        "python3",
-                        "get_model.py",
-                        "--model_dir",
-                        model_set_dir,
-                        "--type",
-                        "raw",
-                    ],
-                    "",
-                    True,
-                )
+        _download_models(model_info, "raw")
 
     if model_type == "cv" and not _prepare_compiled_cv_model(
         model_info, platform, log_file
@@ -1321,28 +1234,14 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
         src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         restore_models_res(src_folder, current_folder)
 
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     if (
         model_type == "llm"
         and is_release()
         and get_test_type() == TCaseType.SEPARATE_INFER
     ):
-        param_str = "--model_dir"
-        if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
-            param_str = "--download_dir"
-        execute_test_cmd(
-            [
-                "python3",
-                "get_model.py",
-                param_str,
-                model_set_dir,
-                "--type",
-                "hmm",
-            ],
-            "",
-            True,
-        )
+        _download_models(model_info, "raw")
 
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     final_flag = True
     perf_threashold = 0.1 if is_release() else 0.95
     if model_info.get("perf_params", None) == "demo":

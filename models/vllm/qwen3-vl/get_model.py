@@ -16,6 +16,7 @@ def get_args() -> argparse.Namespace:
         dest='file_type',
         type=str,
         default='hmm',
+        choices=["raw", "hmm"],
         help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
@@ -74,10 +75,12 @@ if __name__ == '__main__':
         },
     }
 
-    hmatc_get_file(
+    _, ret_dict = hmatc_get_file(
         model_cfgs,
         args.file_type,
         args.download_dir,
         args.extract_dir,
         args.source_type,
     )
+    if ret_dict.get("ret", False) is False:
+        exit(1)

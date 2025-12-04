@@ -1,5 +1,4 @@
 import os
-import sys
 import argparse
 from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
@@ -16,6 +15,7 @@ def get_args() -> argparse.Namespace:
         dest='file_type',
         type=str,
         default='hmm',
+        choices=["raw", "hmm"],
         help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
@@ -55,25 +55,18 @@ def get_args() -> argparse.Namespace:
 if __name__ == '__main__':
     args = get_args()
 
-    model_size = args.model_size
-    date_str = "20251019" if HOUMO_TARGET == "xh2" else "20250903"
-    quant_path = f"models/qwen2.5-vl/hmquant_{HOUMO_TARGET}_qwen2.5-vl_{model_size}_256_2k_{date_str}.zip"
-
     model_cfgs = {
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
         "model_name": "qwen2.5-vl",
         "model_info": {
-            "model_size": model_size,
+            "model_size": args.model_size,
             "ncore": 2 if HOUMO_TARGET == "xh2" else 4,
             "ndevice": 1,
             "context_len": "8k" if HOUMO_TARGET == "xh2" else "2k",
             "prefill_len": 256,
             "batch": 1,
-        },
-        "quant_files": {
-            "quant_path": quant_path,
         },
         "modelscope_repo": {
             "repo_ids": ["Qwen/Qwen2.5-VL-7B-Instruct"],
@@ -81,10 +74,12 @@ if __name__ == '__main__':
         },
     }
 
-    hmatc_get_file(
+    _, ret_dict = hmatc_get_file(
         model_cfgs,
         args.file_type,
         args.download_dir,
         args.extract_dir,
         args.source_type,
     )
+    if ret_dict.get("ret", False) is False:
+        exit(1)
