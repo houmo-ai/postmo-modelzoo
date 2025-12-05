@@ -7,6 +7,9 @@ HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../..")
 sys.path.append(f"{HOUMO_EXAMPLES_PATH}/apis/common/python")
 from utils import get_file_from_jfrog
 
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -60,17 +63,13 @@ if __name__ == "__main__":
         os.environ["HOUMO_MODELZOO_URL"] = (
             "http://139.224.0.199:8082/artifactory/houmo/release"
         )
-    HOUMO_TARGET = os.environ.get("HOUMO_TARGET", "houmo")
 
     model_dir = (
         os.path.join(HOUMO_EXAMPLES_PATH, "apis/models")
         if not args.model_dir
         else args.model_dir
     )
-    if HOUMO_TARGET == "xh1":
-        hmm_path = "models/yolov5s/hmm_yolov5s_20250113.zip"
-    elif HOUMO_TARGET == "xh2":
-        hmm_path = "models/yolov5s/hmm_yolov5s_xh2_b1_1core_20250804.zip"
+    hmm_path = "models/yolov5s/hmm_yolov5s_xh2_b1_1core_20250804.zip"
     get_file_from_jfrog(hmm_path, model_dir, "./")
 
     if args.enable_ort and platform.system() == "Linux":

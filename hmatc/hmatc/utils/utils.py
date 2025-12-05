@@ -544,10 +544,15 @@ def hmatc_get_file(
                 revision=f"{target}-{version}",
             )
 
-            if download_flag and os.path.exists(f"{download_dir}/{hmm_path}"):
+            model_src_dir = f"{download_dir}/{hmm_path}"
+            if download_flag and os.path.exists(model_src_dir):
                 os.makedirs(extract_dir_edit, exist_ok=True)
                 try:
-                    shutil.move(f"{download_dir}/{hmm_path}", extract_dir_edit)
+                    for item in os.listdir(model_src_dir):
+                        src_item = os.path.join(model_src_dir, item)
+                        dst_item = os.path.join(extract_dir_edit, item)
+                        shutil.move(src_item, dst_item)
+                    shutil.rmtree(model_src_dir, ignore_errors=True)
                     print(
                         f"Rename download model dir: {download_dir}/{hmm_path} -> {extract_dir_edit}"
                     )
@@ -556,7 +561,7 @@ def hmatc_get_file(
                     print(f"Error: Failed to rename donwnload dir, error msg:{e}")
             elif os.path.exists(f"{download_dir}/{hmm_path}"):
                 download_files["ret"] = False
-                shutil.rmtree(f"{download_dir}/{hmm_path}")
+                shutil.rmtree(f"{download_dir}/{hmm_path}", ignore_errors=True)
         else:
             # download from jfrog
             download_file = get_file_from_jfrog(
@@ -575,7 +580,7 @@ def hmatc_get_file(
             and len(model_cfgs["hmm_files"]["other_files"]) > 0
         ):
             _download_other_files(
-                "hmm", model_cfgs, download_files, download_dir, extract_dir
+                "hmm_files", model_cfgs, download_files, download_dir, extract_dir
             )
 
     # download default files

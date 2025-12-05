@@ -98,17 +98,14 @@ int main(int argc, char* argv[]) {
   const char* houmo_target_env = getenv("HOUMO_TARGET");
   std::string houmo_target =
       houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
-  printf("tcim version: %s, houmo target: %s \n", tcim::GetVersion().c_str(),
-         houmo_target.c_str());
-  if (houmo_target != "xh1" && houmo_target != "xh2") {
+  if (houmo_target != "xh2") {
     std::cerr << "Unsupported backend " << houmo_target << std::endl;
     exit(-1);
   }
+  printf("tcim version: %s, houmo target: %s \n", tcim::GetVersion().c_str(),
+         houmo_target.c_str());
 
-  std::string default_model_path = "./resnet50.hmm";
-  if (houmo_target == "xh2") {
-    default_model_path = "./resnet50_xh2_b1_1core.hmm";
-  }
+  std::string default_model_path = "./resnet50_xh2_b1_1core.hmm";
   // set the parameters
   CliArguments arguments;
   arguments.model_path = default_model_path;
@@ -171,31 +168,26 @@ int main(int argc, char* argv[]) {
   cv::Mat img_processed;
   size_t img_size = 0;
   img_bgr = cv::imread(data_path);
-  if (houmo_target == "xh1") {
-    cv::resize(img_bgr, img_bgr, {224, 224});
-    cv::cvtColor(img_bgr, img_processed, cv::COLOR_BGR2YUV_I420);
-    img_size = 224 * 224 * 3;
-  } else {
-    cv::Mat img_rgb;
-    cv::Mat img_norm;
-    const float mean[3] = {123.675f, 116.28f, 103.53f};
-    const float std[3] = {58.395f, 57.12f, 57.375f};
-    cv::cvtColor(img_bgr, img_rgb, cv::COLOR_BGR2RGB);
-    cv::resize(img_rgb, img_rgb, {224, 224});
 
-    img_rgb.convertTo(img_norm, CV_32FC3);
-    std::vector<cv::Mat> channels;
-    cv::split(img_norm, channels);
-    for (int i = 0; i < 3; ++i) {
-      channels[i] = (channels[i] - mean[i]) / std[i];
-    }
-    // HWC --> CHW
-    for (auto& ch : channels) {
-      ch = ch.reshape(1, 1);
-    }
-    cv::vconcat(channels, img_processed);
-    img_size = img_norm.total() * img_norm.elemSize();
+  cv::Mat img_rgb;
+  cv::Mat img_norm;
+  const float mean[3] = {123.675f, 116.28f, 103.53f};
+  const float std[3] = {58.395f, 57.12f, 57.375f};
+  cv::cvtColor(img_bgr, img_rgb, cv::COLOR_BGR2RGB);
+  cv::resize(img_rgb, img_rgb, {224, 224});
+
+  img_rgb.convertTo(img_norm, CV_32FC3);
+  std::vector<cv::Mat> channels;
+  cv::split(img_norm, channels);
+  for (int i = 0; i < 3; ++i) {
+    channels[i] = (channels[i] - mean[i]) / std[i];
   }
+  // HWC --> CHW
+  for (auto& ch : channels) {
+    ch = ch.reshape(1, 1);
+  }
+  cv::vconcat(channels, img_processed);
+  img_size = img_norm.total() * img_norm.elemSize();
 
   // prepare input
   auto& name = qh2d.input_info_map.begin()->first;
@@ -203,25 +195,18 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < arguments.sample_num; i++) {
     auto data = malloc(img_size);
     std::shared_ptr<void> data_ptr(data, free);
-    if (houmo_target == "xh1") {
-      ImageProc::I420To420sp((uint8_t*)data, (uint8_t*)img_processed.data,
-                             img_size);
-    } else {
-      memcpy(data, reinterpret_cast<void*>(img_processed.data), img_size);
-    }
+    memcpy(data, reinterpret_cast<void*>(img_processed.data), img_size);
+
     TaskInfo task_info;
     task_info.req_id = i;
     tcim::Tensor tensor;
-    if (houmo_target == "xh1") {
-      tensor = tcim::Tensor::CreateHostTensor(info, img_size, data);
-    } else {
-      // convert f32 buffer to f16 buffer
-      auto info_f32 = info.AsType(tcim::DataType::FLOAT32);
-      auto tensor_f32 =
-          tcim::Tensor::CreateHostTensor(info_f32, img_size, data);
-      tensor = tcim::Tensor::CreateHostTensor(info);
-      tensor_f32.CastTo(tensor);
-    }
+
+    // convert f32 buffer to f16 buffer
+    auto info_f32 = info.AsType(tcim::DataType::FLOAT32);
+    auto tensor_f32 = tcim::Tensor::CreateHostTensor(info_f32, img_size, data);
+    tensor = tcim::Tensor::CreateHostTensor(info);
+    tensor_f32.CastTo(tensor);
+
     task_info.input_map[name] = tensor;
     qh2d.queue.push(task_info);
   }
@@ -389,25 +374,16 @@ int main(int argc, char* argv[]) {
     int top1 = 0;
     const int topk = 1;
     for (auto& output : output_map) {
-      if (houmo_target == "xh1") {
-        std::vector<std::pair<int, int>> sort_pairs;
-        for (int i = 0; i < 1000; ++i) {
-          int8_t tmp_val = static_cast<int8_t*>(output.second.Data())[i];
-          sort_pairs.emplace_back(static_cast<int>(tmp_val), i);
-        }
-        top1 = get_topk(topk, sort_pairs);
-      } else {
-        auto info_f32 = output.second.Info().AsType(tcim::DataType::FLOAT32);
-        auto output_tensor_f32 = tcim::Tensor::CreateHostTensor(info_f32);
-        output.second.CastTo(output_tensor_f32);
+      auto info_f32 = output.second.Info().AsType(tcim::DataType::FLOAT32);
+      auto output_tensor_f32 = tcim::Tensor::CreateHostTensor(info_f32);
+      output.second.CastTo(output_tensor_f32);
 
-        std::vector<std::pair<float, int>> sort_pairs;
-        for (int i = 0; i < 1000; ++i) {
-          sort_pairs.emplace_back(
-              static_cast<float*>(output_tensor_f32.Data())[i], i);
-        }
-        top1 = get_topk(topk, sort_pairs);
+      std::vector<std::pair<float, int>> sort_pairs;
+      for (int i = 0; i < 1000; ++i) {
+        sort_pairs.emplace_back(
+            static_cast<float*>(output_tensor_f32.Data())[i], i);
       }
+      top1 = get_topk(topk, sort_pairs);
     }
 
     // check result, modify it when you change model or data

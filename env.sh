@@ -51,9 +51,7 @@ export HF_ENDPOINT=https://hf-mirror.com
 
 # use asic if detected
 if [[ -z $HDPL_PLATFORM ]]; then
-  if { [[ "$HOUMO_TARGET" == "xh1" ]] && ls /dev/ | grep -q 'hmcl_client_mgr'; } ||
-    { [[ "$HOUMO_TARGET" == "xh2" ]] && ls /dev/ | grep -q 'xh2a'; }
-  then
+  if { [[ "$HOUMO_TARGET" == "xh2" ]] && ls /dev/ | grep -q 'xh2a'; } then
     export HDPL_PLATFORM=ASIC
   else
     export HDPL_PLATFORM=ISIM

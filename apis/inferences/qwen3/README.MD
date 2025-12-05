@@ -23,13 +23,11 @@
 3. 如系统为linux aarch64，需设置预加载动态库路径
     - export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1
 
-4. 获取模型文件，提供4 core模型和2 core模型，可通过参数--ncore指定模型core数量，执行命令：
+4. 获取模型文件，提供2 core模型，执行命令：
 
 ```bash
-# (默认)下载4core模型
-python3 get_model.py
 # 下载2core模型
-python3 get_model.py --ncore 2
+python3 get_model.py
 ```
 
 如果需要其他规格，请参考houmo-modelzoo自行编译或通过其他途径获取。
@@ -143,15 +141,13 @@ end2end average time: 95.093 ms, 10.52 tokens/s
 ## 4 Qwen3 c++推理
 模型库提供基于C++的Qwen3-8b模型的样例，目前验证支持的平台信息如下：
   - Linux xh2 x86_64        (cmake 3.28.3 gcc/g++ 13.3.0)
-  - Linux xh1 x86_64        (cmake 3.16.3 gcc/g++ 13.1.0)
-  - Linux xh1 aarch64       (cmake 3.16.3 gcc/g++ 9.4.0)
   - Android xh2 arm64-v8a   (cmake 3.28.3 clang/clang++ 19.0.1)
   - Windows11 xh2 x64       (cmake 4.1.1  Visual Studio 17 2022)
 ### 4.1 依赖三方库环境
   Qwen3的C++推理样例依赖以下三方库：
    1. tokenizer-cpp tokenizer实现
    2. eigen3 科学计算库
-   
+
    目前在上述平台的三方库已经编译好，已经集成到get_model.py中，并且在CMakeLists.txt进行了调用，构建时会自动进行三方库的链接。如需手动编译安装，可以参考get_model.py下载的3rdparty.zip压缩包中README.MD的详细步骤进行手动安装。
 
 ### 4.2 模型获取与模型准备
@@ -159,27 +155,21 @@ end2end average time: 95.093 ms, 10.52 tokens/s
 ```python
     # 权重转换
     embedding_path = "hmquant/quant_embedding.pt"
-    if os.path.exists(embedding_path) and HOUMO_TARGET in ["xh1", "xh2"]:
+    if os.path.exists(embedding_path) and HOUMO_TARGET in ["xh2"]:
         import torch
         import numpy as np
 
         embedding_weight = torch.load(embedding_path, map_location="cpu", weights_only=True)
-        if HOUMO_TARGET == "xh2":
-            embedding_weight = embedding_weight['weight']
-        embedding_data = embedding_weight.cpu().numpy() 
+        embedding_weight = embedding_weight['weight']
+        embedding_data = embedding_weight.cpu().numpy()
         embedding_data.tofile(embedding_path.replace(".pt", ".bin"))
-    # 下载编译好的三方库
-    thirdparty_path = "models/qwen3/3rdparty.zip"
-    get_file_from_jfrog(thirdparty_path, model_dir, "./")
 ```
     目前这部分转换代码已经集成到get_model.py中，会自动进行转换，并下载编译好的三方库。
 
 ### 4.3 程序编译和运行
 编译和运行脚本支持的平台及说明如下：
 - run_linux.sh 支持一键编译和运行如下平台的C++样例：
-    1. Linux_x86_64_xh1
-    2. Linux_x86_64_xh2
-    3. Linux_aarch64_xh1
+    1. Linux_x86_64_xh2
 - run_win.bat 支持一键编译如下平台的C++样例：
     1. win11_x64_xh2
     - run.bat会同时运行win11的python和c++样例，运行C++样例依赖libhal_xh2a.dll和tcim_runtime_lite.dll。
@@ -264,8 +254,6 @@ end2end average time: 94.691 ms, 10.56 tokens/s
 ## 5 一键执行
 
 可以使用run脚本一键执行查看结果
-
-脚本在linux x86_64环境中默认下载4core模型，在linux aarch64环境中默认下载2core模型。
 
 linux执行脚本命令：
 

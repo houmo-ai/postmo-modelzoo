@@ -141,13 +141,14 @@ def execute_apis_examples(example_name: str, log_file: str):
         or example_info["get_model_params"].get(HOUMO_BACKEND, None) is None
     ):
         model_set_dir = os.path.join(MODELS_PATH, example_info["example_dir"])
+        cmd_list = ["python3", "get_model.py"]
+        if example_name != "qwen3":
+            cmd_list += ["--model_dir", model_set_dir]
         lock_file = model_set_dir + "/lock.lock"
         with ModelResourceLock(
             lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
         ):
-            execute_test_cmd(
-                ["python3", "get_model.py", "--model_dir", model_set_dir], "", True
-            )
+            execute_test_cmd(cmd_list, "", True)
     else:
         get_model_flag = _test_get_model(example_info, platform, log_file)
         if get_model_flag is False:

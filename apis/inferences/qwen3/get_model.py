@@ -62,7 +62,10 @@ if __name__ == '__main__':
         "hmm_files": {
             "other_files": ["models/qwen3/3rdparty.zip"],
         },
-        "modelscope_repo": {"repo_ids": ["qwen/qwen3-8b"]},
+        "modelscope_repo": {
+            "repo_ids": ["qwen/qwen3-8b"],
+            "local_dirs": ["./qwen3-8b"],
+        },
     }
 
     _, ret_dict = hmatc_get_file(
@@ -79,13 +82,11 @@ if __name__ == '__main__':
     if os.path.exists(embedding_path):
         print(HOUMO_TARGET)
         import torch
-        import numpy as np
 
         embedding_weight = torch.load(
             embedding_path, map_location="cpu", weights_only=True
         )
-        if HOUMO_TARGET == "xh2":
-            embedding_weight = embedding_weight['weight']
+        embedding_weight = embedding_weight['weight']
         if embedding_weight.dtype == torch.bfloat16:
             embedding_weight = embedding_weight.float().half()
         embedding_data = embedding_weight.cpu().numpy()

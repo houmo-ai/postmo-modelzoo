@@ -19,13 +19,11 @@ houmo-examples目录结构如下，其中README.md为本说明文件：
     ├── common
     ├── converts
     ├── inferences
-    └── scenes
 ├── models
     ├── asr
     ├── autodrive
     ├── backbone
     ├── detection
-    ├── diffusion
     ├── estimation
     ├── llm
     ├── ocr
@@ -81,10 +79,10 @@ pip install -r requirements.txt
 
 | tools            | path         | description                     | language   | target  | arch        | os                  |
 | ---------------- | ------------ | ------------------------------- | ---------- | ------- | ----------- | ------------------- |
-| bandwidth_perf   | tools        | 带宽测试工具                    | python     | xh1/xh2 | x64/aarch64 | linux               |
-| computing_perf   | tools        | 算力测试工具                    | python     | xh1/xh2 | x64/aarch64 | linux               |
-| tcim_perf        | tools        | 模型测试工具                    | c++        | xh1/xh2 | x64/aarch64 | linux/android       |
-| llm_perf         | tools        | 大语言模型性能测试工具          | c++        | xh1/xh2 | x64/aarch64 | linux/android/win11 |
+| bandwidth_perf   | tools        | 带宽测试工具                    | python     | xh2     | x64/aarch64 | linux               |
+| computing_perf   | tools        | 算力测试工具                    | python     | xh2     | x64/aarch64 | linux               |
+| tcim_perf        | tools        | 模型测试工具                    | c++        | xh2     | x64/aarch64 | linux/android       |
+| llm_perf         | tools        | 大语言模型性能测试工具          | c++        | xh2     | x64/aarch64 | linux/android/win11 |
 
 ## 模型示例
 
@@ -96,31 +94,31 @@ pip install -r requirements.txt
 
 | models               | path          | target  | quant | build | demo | eval |
 | -------------------- | ------------- | ------- | ----- | ----- | ---- | ---- |
-| resnet50             | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
-| mobilenetv2          | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
-| efficientnet         | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
-| ViT-B-16             | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov8m-cls          | backbone      | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov3               | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov5s              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov5s_feature      | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov5m_face         | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov7               | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov8m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov9m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolo11m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolo12m              | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolox                | detection     | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov8m-pose         | estimation    | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolov8m-seg          | segmentation  | xh1/xh2 | yes   | yes   | yes  | yes  |
-| yolop                | autodrive     | xh1/xh2 | yes   | yes   | yes  | x    |
-| multi_input_custom_random_model |    | xh1/xh2 | yes   | yes   | x    | x    |
-| lprnet               | ocr           | xh1/xh2 | yes   | yes   | yes  | yes  |
-| ppocrv3              | ocr           | xh1/xh2 | yes   | yes   | yes  | yes  |
-| qwen3                | llm           | xh1/xh2 | yes   | yes   | yes  | x    |
+| resnet50             | backbone      | xh2     | yes   | yes   | yes  | yes  |
+| mobilenetv2          | backbone      | xh2     | yes   | yes   | yes  | yes  |
+| efficientnet         | backbone      | xh2     | yes   | yes   | yes  | yes  |
+| ViT-B-16             | backbone      | xh2     | yes   | yes   | yes  | yes  |
+| yolov8m-cls          | backbone      | xh2     | yes   | yes   | yes  | yes  |
+| yolov3               | detection     | xh2     | yes   | yes   | yes  | yes  |
+| yolov5s              | detection     | xh2     | yes   | yes   | yes  | yes  |
+| yolov5s_feature      | detection     | xh2     | yes   | yes   | yes  | yes  |
+| yolov5m_face         | detection     | xh2     | yes   | yes   | yes  | yes  |
+| yolov7               | detection     | xh2     | yes   | yes   | yes  | yes  |
+| yolov8m              | detection     | xh2     | yes   | yes   | yes  | yes  |
+| yolov9m              | detection     | xh2     | yes   | yes   | yes  | yes  |
+| yolo11m              | detection     | xh2     | yes   | yes   | yes  | yes  |
+| yolo12m              | detection     | xh2     | yes   | yes   | yes  | yes  |
+| yolox                | detection     | xh2     | yes   | yes   | yes  | yes  |
+| yolov8m-pose         | estimation    | xh2     | yes   | yes   | yes  | yes  |
+| yolov8m-seg          | segmentation  | xh2     | yes   | yes   | yes  | yes  |
+| yolop                | autodrive     | xh2     | yes   | yes   | yes  | x    |
+| multi_input_custom_random_model |    | xh2     | yes   | yes   | x    | x    |
+| lprnet               | ocr           | xh2     | yes   | yes   | yes  | yes  |
+| ppocrv3              | ocr           | xh2     | yes   | yes   | yes  | yes  |
+| qwen3                | llm           | xh2     | yes   | yes   | yes  | x    |
 | qwen3-14b            | llm           | xh2     | yes   | yes   | yes  | x    |
 | deepseek-r1-qwen3-8b | llm           | xh2     | yes   | yes   | yes  | x    |
-| qwen2.5-vl           | vllm          | xh1/xh2 | x     | yes   | yes  | x    |
+| qwen2.5-vl           | vllm          | xh2     | x     | yes   | yes  | x    |
 | minicpmo             | omni          | xh2     | x     | yes   | yes  | x    |
 | bge-m3               | embedding     | xh2     | yes   | yes   | yes  | x    |
 | gte-qwen2-1.5b-instruct | embedding  | xh2     | x     | x     | yes  | x    |

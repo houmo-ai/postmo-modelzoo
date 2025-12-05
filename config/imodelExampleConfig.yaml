@@ -337,6 +337,18 @@ inferences_resnet50_pipeline:
         args: all
   test:
     - inferences_resnet50_pipeline_test
+inferences_qwen3:
+  include:
+    - apis/inferences/qwen3
+  exclude:
+    - apis/inferences/qwen3/README.MD
+  example_case:
+    - inferences_qwen3_test:
+        test_type: apis_tests
+        script: qwen3 and inference
+        args: all
+  test:
+    - inferences_qwen3_test
 apis_common:
   include:
     - apis/common
@@ -400,9 +412,7 @@ apis_tests:
     - tests/apis_tests/__init__.py
   example_case: null
   test:
-    - inferences_resnet50_test
     - inferences_yolov5s_test
-    - inferences_resnet50_multistreams_test
     - inferences_resnet50_pipeline_test
 
 ###### all ######

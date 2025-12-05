@@ -367,7 +367,7 @@ int main(int argc, char* argv[]) {
   const char* houmo_target_env = getenv("HOUMO_TARGET");
   std::string houmo_target =
       houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
-  if (houmo_target != "xh1" && houmo_target != "xh2") {
+  if (houmo_target != "xh2") {
     std::cerr << "Unsupported backend " << houmo_target << std::endl;
     exit(-1);
   }
@@ -384,10 +384,7 @@ int main(int argc, char* argv[]) {
 
   // 1. load model
   std::cout << "LoadFromFile yolov5s" << std::endl;
-  std::string model_path = "./yolov5s.hmm";
-  if (houmo_target == "xh2") {
-    model_path = "./yolov5s_clip_xh2_b1_1core.hmm";
-  }
+  std::string model_path = "./yolov5s_clip_xh2_b1_1core.hmm";
   if (!fs::exists(model_path)) {
     std::cerr << model_path
               << " not exist. you should run build.py in yolov5s example first."
@@ -413,13 +410,12 @@ int main(int argc, char* argv[]) {
     auto input_tensor = tcim::Tensor::CreateHostTensor(input_info);
     input_map.insert(
         std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
-    if (houmo_target == "xh2") {
-      auto input_info_f32 = input_info.AsType(tcim::DataType::FLOAT32);
-      std::cout << "Input f32[" << input_name << "] " << input_info_f32
-                << std::endl;
-      input_map_f32.insert(
-          std::pair<std::string, tcim::TensorInfo>(input_name, input_info_f32));
-    }
+
+    auto input_info_f32 = input_info.AsType(tcim::DataType::FLOAT32);
+    std::cout << "Input f32[" << input_name << "] " << input_info_f32
+              << std::endl;
+    input_map_f32.insert(
+        std::pair<std::string, tcim::TensorInfo>(input_name, input_info_f32));
   }
 
   // 3. input preprocess
@@ -431,49 +427,31 @@ int main(int argc, char* argv[]) {
   }
 
   cv::Mat img_raw = cv::imread(data_path);
-  if (houmo_target == "xh1") {
-    cv::Mat img_rgb;
-    cv::Mat img_yuv;
-    img_rgb = letterbox(img_raw, 640, 640);
-    // cv::resize(img_raw, img_raw, cv::Size(1920, 1080));
-    // img_rgb = img_raw.clone();
-    ImageProc::BgrToRgb((int8_t*)(img_rgb.data), img_rgb.rows, img_rgb.cols);
-    cv::cvtColor(img_rgb, img_yuv, cv::COLOR_RGB2YUV_I420);
-    int size = 640 * 640 * 3;
-    // int size = 1080 * 1920 * 3;
-    ImageProc::I420To420sp((uint8_t*)input_map.at("images").Data(),
-                           (uint8_t*)img_yuv.data, size);
-    auto it = input_map.find("dyn_info");
-    if (it != input_map.end()) {
-      int32_t dyn_info[10] = {0, 0, 1080, 1920, 360, 640, 140, 0, 140, 0};
-      memcpy(it->second.Data(), dyn_info, 10 * sizeof(int32_t));
-    }
-  } else {
-    cv::Mat img_rgb;
-    cv::Mat img_norm;
-    img_rgb = letterbox(img_raw, 640, 640);
-    ImageProc::BgrToRgb((int8_t*)(img_rgb.data), img_rgb.rows, img_rgb.cols);
-    const float mean[3] = {0.0f, 0.0f, 0.0f};
-    const float std[3] = {255.0f, 255.0f, 255.0f};
-    img_rgb.convertTo(img_norm, CV_32FC3);
-    std::vector<cv::Mat> channels;
-    cv::split(img_norm, channels);
-    for (int i = 0; i < 3; ++i) {
-      channels[i] = (channels[i] - mean[i]) / std[i];
-    }
-    // HWC --> CHW
-    for (auto& ch : channels) {
-      ch = ch.reshape(1, 1);
-    }
-    cv::vconcat(channels, img_norm);
 
-    size_t img_bytes = img_norm.total() * img_norm.elemSize();
-    std::cout << "img_bytes: " << img_bytes << std::endl;
-    auto input_tensor_f32 =
-        tcim::Tensor::CreateHostTensor(input_map_f32.at("images"), img_bytes,
-                                       reinterpret_cast<void*>(img_norm.data));
-    input_tensor_f32.CastTo(input_map.at("images"));
+  cv::Mat img_rgb;
+  cv::Mat img_norm;
+  img_rgb = letterbox(img_raw, 640, 640);
+  ImageProc::BgrToRgb((int8_t*)(img_rgb.data), img_rgb.rows, img_rgb.cols);
+  const float mean[3] = {0.0f, 0.0f, 0.0f};
+  const float std[3] = {255.0f, 255.0f, 255.0f};
+  img_rgb.convertTo(img_norm, CV_32FC3);
+  std::vector<cv::Mat> channels;
+  cv::split(img_norm, channels);
+  for (int i = 0; i < 3; ++i) {
+    channels[i] = (channels[i] - mean[i]) / std[i];
   }
+  // HWC --> CHW
+  for (auto& ch : channels) {
+    ch = ch.reshape(1, 1);
+  }
+  cv::vconcat(channels, img_norm);
+
+  size_t img_bytes = img_norm.total() * img_norm.elemSize();
+  std::cout << "img_bytes: " << img_bytes << std::endl;
+  auto input_tensor_f32 =
+      tcim::Tensor::CreateHostTensor(input_map_f32.at("images"), img_bytes,
+                                     reinterpret_cast<void*>(img_norm.data));
+  input_tensor_f32.CastTo(input_map.at("images"));
 
   // 4. get output info
   std::map<std::string, tcim::Tensor> output_map;
