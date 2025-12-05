@@ -211,11 +211,7 @@ def _check_args(args: dict):
         logger.error(f"Invalid version {args.version}, error msg: {str(e)}")
         return False
 
-    if (
-        args.context_length > 0
-        and args.context_length != 512
-        and args.context_length % 1024 != 0
-    ):
+    if args.context_length > 0 and args.context_length % 128 != 0:
         logger.error(
             f"Invalid context_length {args.context_length}, it needs to be divisible by 1024."
         )
@@ -426,6 +422,8 @@ if __name__ == "__main__":
     batch = args.batch
     j = args.j
 
+    model_name_ori = model_name
+
     # get the information of supported models
     with open("./supported_models.json", 'r', encoding='utf-8') as md_file:
         model_info = json.load(md_file)
@@ -499,7 +497,7 @@ if __name__ == "__main__":
         # compile command
         container_compile_res = f"{container_result_dir}/compile_results"
         compile_cmd = f"python3 execute_compilation.py -n {model_name} -m {model_dir} -qm {quant_model} "
-        if context_len >= 1024:
+        if context_len >= 128:
             compile_cmd += f"-cl {context_len} "
         if device_num >= 0:
             compile_cmd += f"-dn {device_num} "
@@ -577,7 +575,11 @@ if __name__ == "__main__":
     )
     md5sum_quant = None
     compiled_file_name = None
-    context_str = str(int(context_len / 1024)) + "k" if context_len != 512 else "0.5k"
+    context_str = (
+        str(int(context_len / 1024)) + "k"
+        if context_len >= 1025
+        else f"{(context_len/1024)}k"
+    )
     chip_str = f"{device_num}chips" if device_num > 1 else "1chip"
     core_str = f"{core_num}cores" if core_num > 1 else f"{core_num}core"
 
@@ -682,7 +684,7 @@ if __name__ == "__main__":
         args.perf_config
         and target == "xh2"
         and device_num <= 2
-        and model_info[model_name][model_size]["perf"] is True
+        and model_info[model_name_ori][model_size]["perf"] is True
     ):
         if compiled_file_name is None:
             compiled_file_name = f"{target}_{model_name}_{model_size}_"
@@ -705,9 +707,20 @@ if __name__ == "__main__":
             "loop": 2,
             "batch": batch,
         }
+        if context_len < (2048 + 256) and context_len >= (1024 + 256):
+            new_stream["stop"] = 1024
+        elif context_len > 0 and context_len < (1024 + 256):
+            new_stream["input"] = int(context_len * 0.2)
+            new_stream["stop"] = context_len - new_stream["input"]
+        if "-vl" in model_name_ori:
+            new_stream["visual"] = (
+                f"{host_result_dir}/compile_results/{model_name}_visual.hmm",
+            )
         if device_num > 1:
             new_stream["prefill"] = new_stream["prefill"] + "s"
             new_stream["decode"] = new_stream["decode"] + "s"
+            if "visual" in new_stream:
+                new_stream["visual"] = new_stream["visual"] + "s"
 
         cfg_path = args.perf_config
         if os.path.exists(cfg_path):
