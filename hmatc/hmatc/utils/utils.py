@@ -315,6 +315,8 @@ def _download_from_modelscope(
     ignore_patterns=None,
     revision=None,
 ) -> bool:
+    print(f"Ready to download from modelscope, repo_id: {repo_id}")
+
     from modelscope import snapshot_download
 
     local_dir = os.path.abspath(local_dir)
@@ -406,6 +408,7 @@ def _download_raw_quant(
 
 def _generate_hmm_path(model_cfgs, source_type, model_type, target) -> str:
     # auto generate hmm path
+    repo_id = ""
     # required
     version = model_cfgs["version"].lower()
     model_name = model_cfgs["model_name"]
@@ -444,7 +447,7 @@ def _generate_hmm_path(model_cfgs, source_type, model_type, target) -> str:
     else:
         hmm_path = f"models/{target}-{version}/{model_name}/{model_name}_{target}_b{batch}_{ncore_val}core_{opt_level}_{version}.tar.xz"
 
-    return hmm_path
+    return hmm_path, repo_id
 
 
 def hmatc_get_file(
@@ -510,7 +513,6 @@ def hmatc_get_file(
         )
 
     elif file_type in ["hmm"]:
-        repo_id = ""
         if (
             source_type == "jfrog"
             and "hmm_files" in model_cfgs
@@ -519,7 +521,9 @@ def hmatc_get_file(
         ):
             hmm_path = model_cfgs["hmm_files"]["hmm_path"]
         else:
-            hmm_path = _generate_hmm_path(model_cfgs, source_type, model_type, target)
+            hmm_path, repo_id = _generate_hmm_path(
+                model_cfgs, source_type, model_type, target
+            )
 
         extract_dir_edit = (
             extract_dir
