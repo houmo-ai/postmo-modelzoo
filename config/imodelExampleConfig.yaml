@@ -251,18 +251,6 @@ llm_deepseek_r1_qwen3_8b:
         args: all
   test:
     - llm_deepseek_r1_qwen3_8b_test
-# llm_deepseek:
-#   include:
-#     - models/llm/deepseek
-#   exclude:
-#     - models/llm/deepseek/README.MD
-#   example_case:
-#     - llm_deepseek_test:
-#         test_type: models_tests
-#         script: deepseek
-#         args: all
-#   test:
-#     - llm_deepseek_test
 vllm_qwen2.5-vl:
   include:
     - models/vllm/qwen2.5-vl
@@ -275,18 +263,6 @@ vllm_qwen2.5-vl:
         args: all
   test:
     - vllm_qwen2.5-vl_test
-asr_wenet:
-  include:
-    - models/asr/wenet
-  exclude:
-    - models/asr/wenet/README.MD
-  example_case:
-    - asr_wenet_test:
-        test_type: models_tests
-        script: wenet
-        args: all
-  test:
-    - asr_wenet_test
 utils:
   include:
     - utils
@@ -311,28 +287,6 @@ hmatc:
     # test models
     - backbone_resnet50_test
     - detection_yolov5s_test
-
-# tools_computing_perf:
-#   include:
-#     - apis/tools/computing_perf
-#   exclude:
-#     - apis/tools/computing_perf/README.MD
-#   example_case:
-#     - tools_computing_perf_test:
-#         script: ../apis/tools/computing_perf/run.sh
-#   test:
-#     - tools_computing_perf_test
-
-# tools_bandwidth_perf:
-#   include:
-#     - apis/tools/bandwidth_perf
-#   exclude:
-#     - apis/tools/bandwidth_perf/README.MD
-#   example_case:
-#     - tools_bandwidth_perf_test:
-#         script: ../apis/tools/bandwidth_perf/run.sh
-#   test:
-#     - tools_bandwidth_perf_test
 
 ###### apis ######
 inferences_resnet50:
@@ -359,16 +313,6 @@ inferences_yolov5s:
         args: all
   test:
     - inferences_yolov5s_test
-inferences_yolov5s_dynamic:
-  include:
-    - apis/inferences/yolov5s_dynamic
-  exclude:
-    - apis/inferences/yolov5s_dynamic/README.MD
-  example_case:
-    - inferences_yolov5s_dynamic_test:
-        script: ../apis/inferences/yolov5s_dynamic/run.sh
-  test:
-    - inferences_yolov5s_dynamic_test
 inferences_resnet50_multistreams:
   include:
     - apis/inferences/resnet50_multistreams
@@ -393,50 +337,6 @@ inferences_resnet50_pipeline:
         args: all
   test:
     - inferences_resnet50_pipeline_test
-inferences_yolov5s_resnet50_multibatch:
-  include:
-    - apis/inferences/yolov5s_resnet50_multibatch
-  exclude:
-    - apis/inferences/yolov5s_resnet50_multibatch/README.MD
-  example_case:
-    - inferences_yolov5s_resnet50_multibatch_test:
-        test_type: apis_tests
-        script: yolov5s and resnet50 and multibatch
-        args: all
-  test:
-    - inferences_yolov5s_resnet50_multibatch_test
-scenes_video_detect:
-  include:
-    - apis/scenes/video_detect
-  exclude:
-    - apis/scenes/video_detect/README.MD
-  example_case:
-    - scenes_video_detect_test:
-        test_type: apis_tests
-        script: video_detect
-        args: all
-  test:
-    - scenes_video_detect_test
-scenes_buffer_pool:
-  include:
-    - apis/scenes/buffer_pool
-  exclude:
-    - apis/scenes/buffer_pool/README.MD
-  example_case:
-    - scenes_buffer_pool_test:
-        script: ../apis/scenes/buffer_pool/run.sh
-  test:
-    - scenes_buffer_pool_test
-scenes_module_pool:
-  include:
-    - apis/scenes/module_pool
-  exclude:
-    - apis/scenes/module_pool/README.MD
-  example_case:
-    - scenes_module_pool_test:
-        script: ../apis/scenes/module_pool/run.sh
-  test:
-    - scenes_module_pool_test
 apis_common:
   include:
     - apis/common
@@ -447,20 +347,38 @@ apis_common:
     - inferences_yolov5s_test
     # - inferences_resnet50_multistreams_test
     - inferences_resnet50_pipeline_test
-    - inferences_yolov5s_resnet50_multibatch_test
-    - scenes_video_detect_test
 
 ###### tools ######
-tools_tcim_perf:
-  include:
-    - tools/tcim_perf
-  exclude:
-    - tools/tcim_perf/README.MD
-  example_case:
-    - tcim_perf_test:
-        script: ../tools/tcim_perf/build.sh
-  test:
-    # - tcim_perf_test
+# tools_tcim_perf:
+#   include:
+#     - tools/tcim_perf
+#   exclude:
+#     - tools/tcim_perf/README.MD
+#   example_case:
+#     - tools_tcim_perf_test:
+#         script: ../tools/tcim_perf/build.sh
+#   test:
+#     - tools_tcim_perf_test
+# tools_computing_perf:
+#   include:
+#     - tools/computing_perf
+#   exclude:
+#     - tools/computing_perf/README.MD
+#   example_case:
+#     - tools_computing_perf_test:
+#         script: ../tools/computing_perf/run.sh
+#   test:
+#     - tools_computing_perf_test
+# tools_bandwidth_perf:
+#   include:
+#     - tools/bandwidth_perf
+#   exclude:
+#     - tools/bandwidth_perf/README.MD
+#   example_case:
+#     - tools_bandwidth_perf_test:
+#         script: ../tools/bandwidth_perf/run.sh
+#   test:
+#     - tools_bandwidth_perf_test
 
 ###### tests ######
 models_tests:
@@ -484,10 +402,8 @@ apis_tests:
   test:
     - inferences_resnet50_test
     - inferences_yolov5s_test
-    # - inferences_resnet50_multistreams_test
+    - inferences_resnet50_multistreams_test
     - inferences_resnet50_pipeline_test
-    - inferences_yolov5s_resnet50_multibatch_test
-    - scenes_video_detect_test
 
 ###### all ######
 all:
@@ -496,7 +412,6 @@ all:
   exclude: null
   example_case: null
   test:
-    # - asr_wenet_test
     # # - autodrive_yolop_test
     # - backbone_resnet50_test
     # - backbone_efficientnet_test
@@ -511,6 +426,4 @@ all:
     # - inferences_resnet50_test
     # - inferences_yolov5s_test
     # - inferences_resnet50_pipeline_test
-    # - inferences_yolov5s_resnet50_multibatch_test
-    # # - inferences_resnet50_multistreams_test
-    # - scenes_video_detect_test
+    # - inferences_resnet50_multistreams_test

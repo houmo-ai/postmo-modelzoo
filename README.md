@@ -79,12 +79,12 @@ pip install -r requirements.txt
 
 为方便用户评测，示例仓库提供了一些工具源码供用户使用，如下表所示。具体使用方式请参考工具内的readme文件。
 
-| tools            | path         | description                     | language   | target  | arch        | os            |
-| ---------------- | ------------ | ------------------------------- | ---------- | ------- | ----------- | ------------- |
-| bandwidth_perf   | tools        | 带宽测试工具                    | python     | xh1/xh2 | x64/aarch64 | linux         |
-| computing_perf   | tools        | 算力测试工具                    | python     | xh1/xh2 | x64/aarch64 | linux         |
-| tcim_perf        | tools        | 模型测试工具                    | c++        | xh1/xh2 | x64/aarch64 | linux/android |
-| llm_perf         | tools        | 大语言模型性能测试工具           | c++        | xh1/xh2 | x64/aarch64 | linux/android/win11 |
+| tools            | path         | description                     | language   | target  | arch        | os                  |
+| ---------------- | ------------ | ------------------------------- | ---------- | ------- | ----------- | ------------------- |
+| bandwidth_perf   | tools        | 带宽测试工具                    | python     | xh1/xh2 | x64/aarch64 | linux               |
+| computing_perf   | tools        | 算力测试工具                    | python     | xh1/xh2 | x64/aarch64 | linux               |
+| tcim_perf        | tools        | 模型测试工具                    | c++        | xh1/xh2 | x64/aarch64 | linux/android       |
+| llm_perf         | tools        | 大语言模型性能测试工具          | c++        | xh1/xh2 | x64/aarch64 | linux/android/win11 |
 
 ## 模型示例
 
@@ -117,12 +117,9 @@ pip install -r requirements.txt
 | multi_input_custom_random_model |    | xh1/xh2 | yes   | yes   | x    | x    |
 | lprnet               | ocr           | xh1/xh2 | yes   | yes   | yes  | yes  |
 | ppocrv3              | ocr           | xh1/xh2 | yes   | yes   | yes  | yes  |
-| wenet                | asr           | xh1     | x     | yes   | yes  | x    |
 | qwen3                | llm           | xh1/xh2 | yes   | yes   | yes  | x    |
 | qwen3-14b            | llm           | xh2     | yes   | yes   | yes  | x    |
-| deepseek             | llm           | xh1     | x     | yes   | yes  | x    |
 | deepseek-r1-qwen3-8b | llm           | xh2     | yes   | yes   | yes  | x    |
-| sdxl                 | diffusion     | xh1     | x     | yes   | yes  | x    |
 | qwen2.5-vl           | vllm          | xh1/xh2 | x     | yes   | yes  | x    |
 | minicpmo             | omni          | xh2     | x     | yes   | yes  | x    |
 | bge-m3               | embedding     | xh2     | yes   | yes   | yes  | x    |
@@ -132,7 +129,7 @@ pip install -r requirements.txt
 
 ## API示例
 
-API示例在apis目录下，如下表所示，type列为示例类型，其中convert表示模型转换，inference表示模型推理，scenes表示应用场景。language列为支持的编程语言，target列为支持的芯片平台。
+API示例在apis目录下，如下表所示，type列为示例类型，其中convert表示模型转换，inference表示模型推理。language列为支持的编程语言，target列为支持的芯片平台。
 
 量化和编译示例仅支持在量化工具和编译器支持的平台上运行，部署示例支持情况还受到其他交付件的限制，如固件类型（如芯片解码的示例只能在VPU固件上运行，大模型只能在非VPU固件上运行）、硬件规格（如2核芯片只能运行2核以下编译的模型），具体请查看示例内readme文件。
 
@@ -140,17 +137,12 @@ windows的示例运行前请参照tools/win_envs目录的README.MD进行环境�
 
 | examples                     | path         | description                      | language   | target  | arch        | os         |
 | ---------------------------- | ------------ | -------------------------------  | ---------- | ------- | ----------- | ---------- |
-| resnet50                     | converts     | resnet50 量化编译示例            | python     | xh1/xh2 | x64         | linux      |
-| resnet50                     | inferences   | resnet50 单线程推理示例          | python/c++ | xh1/xh2 | x64/aarch64 | win/linux  |
-| yolov5s                      | inferences   | yolov5s 单线程推理示例           | python/c++ | xh1/xh2 | x64/aarch64 | win/linux  |
-| qwen3                        | inferences   | qwen3 大语言模型推理示例         | python     | xh1/xh2 | x64/aarch64 | win/linux  |
-| resnet50_multistreams        | inferences   | resnet50 多线程多stream推理示例  | c++        | xh1     | x64/aarch64 | win/linux  |
-| resnet50_pipeline            | inferences   | resnet50 流水推理示例            | c++        | xh1     | x64/aarch64 | win/linux  |
-| yolov5s_resnet50_multibatch  | inferences   | yolov5s_resnet50多batch推理示例  | c++        | xh1     | x64/aarch64 | linux      |
-| yolov5s_dynamic              | inferences   | dynamic_resizer封装应用示例      | c++        | xh1     | x64/aarch64 | linux      |
-| video_detect                 | scenes       | 视频流目标检测分析业务示例       | c++        | xh1     | x64/aarch64 | linux      |
-| buffer_pool                  | scenes       | 应用内存池示例                   | c++        | xh1     | x64/aarch64 | win/linux  |
-| module_pool                  | scenes       | 应用模型池示例                   | c++        | xh1     | x64/aarch64 | linux      |
+| resnet50                     | converts     | resnet50 量化编译示例            | python     | xh2     | x64         | linux      |
+| resnet50                     | inferences   | resnet50 单线程推理示例          | python/c++ | xh2     | x64/aarch64 | win/linux  |
+| yolov5s                      | inferences   | yolov5s 单线程推理示例           | python/c++ | xh2     | x64/aarch64 | win/linux  |
+| qwen3                        | inferences   | qwen3 大语言模型推理示例         | python     | xh2     | x64/aarch64 | win/linux  |
+| resnet50_multistreams        | inferences   | resnet50 多线程多stream推理示例  | c++        | xh2     | x64/aarch64 | win/linux  |
+| resnet50_pipeline            | inferences   | resnet50 流水推理示例            | c++        | xh2     | x64/aarch64 | win/linux  |
 
 
 ## 快速上手
