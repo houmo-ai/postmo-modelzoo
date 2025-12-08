@@ -138,7 +138,7 @@ def get_args() -> argparse.Namespace:
         '--context_length',
         dest='context_length',
         type=int,
-        default=2048,
+        default=8192,
         help='context_length',
     )
     parser.add_argument(

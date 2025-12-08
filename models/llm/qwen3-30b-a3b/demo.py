@@ -116,7 +116,8 @@ class HmQwenXh2:
             self.decode.get_input_name(4)
         ).shape[2]
         self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
-        for i in range(4, 2 * self.nblocks + 4):
+        self.pre_input_num = 4 if self.prefill.get_num_inputs() > 99 else 3
+        for i in range(self.pre_input_num, 2 * self.nblocks + self.pre_input_num):
             cache = self.prefill.get_input(self.prefill.get_input_name(i))
             self.decode.set_input(self.decode.get_input_name(i), cache)
         # set decode input
@@ -192,17 +193,18 @@ class HmQwenXh2:
             position_id = torch.arange(
                 valid_length, valid_length + self.prefill_length, dtype=torch.long
             )
-            position_id_data = np.expand_dims(np.array(position_id), axis=0).astype("int32")
             valid_length_data = np.array([valid_length]).astype("int32")
             current_length_data = np.array([current_length]).astype("int32")
             input_name = self.prefill.get_input_name(0)
             valid_length_name = self.prefill.get_input_name(1)
             current_length_name = self.prefill.get_input_name(2)
-            position_id_name = self.prefill.get_input_name(3)
             self.prefill.set_input(input_name, input_data.numpy())
             self.prefill.set_input(valid_length_name, valid_length_data)
             self.prefill.set_input(current_length_name, current_length_data)
-            self.prefill.set_input(position_id_name, position_id_data)
+            if self.pre_input_num > 3:
+                position_id_data = np.expand_dims(np.array(position_id), axis=0).astype("int32")
+                position_id_name = self.prefill.get_input_name(3)
+                self.prefill.set_input(position_id_name, position_id_data)
             self.prefill.run()
             self.prefill.sync()
 
@@ -239,9 +241,10 @@ class HmQwenXh2:
             valid_length_name = self.decode.get_input_name(1)
             self.decode.set_input(input_name, input_data.numpy())
             valid_length_data = np.array(context_length).astype("int32")
-            position_id_data = np.array([[context_length + 1]]).astype("int32")
             self.decode.set_input(valid_length_name, valid_length_data)
-            self.decode.set_input(position_id_name, position_id_data)
+            if self.pre_input_num > 3:
+                position_id_data = np.array([[context_length + 1]]).astype("int32")
+                self.decode.set_input(position_id_name, position_id_data)
             self.decode.run()
             self.decode.sync()
             input_data = self.decode.get_output(self.decode.get_output_name(0)).numpy()

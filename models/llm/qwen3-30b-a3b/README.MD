@@ -31,13 +31,13 @@ python3 get_model.py --type hmm
 
 ### 2.2 量化
 
-量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上，空闲内存需要达到100GB以上。参考命令：
+量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到12GB以上，空闲内存需要达到291GB以上。参考命令：
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py39-x86.64 /bin/bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64.** /bin/bash
 ```
 
-进入docker后source环境变量，并进入`models/llm/qwen3`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为256和8192。
+进入docker后source环境变量，并进入`models/llm/qwen3-30b-a3b`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为256和8192。
 
 ```bash
 source env.sh
@@ -72,6 +72,8 @@ Qwen2模型使用python API进行演示
 1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下，也可通过demo中的`EMBEDDING_PATH`变量指定位置
 
 2. 执行脚本，推理完成将输出性能结果。
+
+3. 注意：直接运行预编译好的hmm模型和执行量化+编译后产生的hmm模型执行demo后输出可能略有差异，属于正常现象。
 
 ```bash
 python3 demo.py
