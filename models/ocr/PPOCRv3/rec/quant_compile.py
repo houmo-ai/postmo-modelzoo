@@ -193,6 +193,9 @@ elif HOUMO_TARGET == 'xh2':
         parser.add_argument('--model_path', type=str, default='./paddleocr_rec-sim.onnx')
         parser.add_argument("--output_path", default="./output", type=str)
         parser.add_argument("--precision", type=str, default="w8a8_sefp", help="quant precision, xh2 support w8a8_sefp, w4a8_ssfp or w8a16_sefp")
+        parser.add_argument("--calibset_path", type=str, default="CCPD2020/quant_data/rec/", help="quant calib data path")
+        parser.add_argument("--calib_num", type=int, default=1, help="calibset use number")
+        parser.add_argument("--mix_search_cfg", type=str, default="./xh2_mix_search_cfg.yaml", help="quant mix search config path")
         parser.add_argument("--compile", action="store_true", help="compile quanted model or no")
         parser.add_argument("--enable_upload", action="store_true", help="Compress hmm model and upload or no")
         return parser.parse_args()
@@ -212,18 +215,38 @@ elif HOUMO_TARGET == 'xh2':
 
         input_infos_list, output_infos_list = get_net_input_output_infos(args.model_path)
 
-        in_datas = list()
-        for input_info in input_infos_list:
-            input_shape = input_info['input_shape']
-            dtype = input_info['dtype']
-            rng = np.random.default_rng()
-            data = rng.standard_normal(input_shape, dtype=dtype)
-            in_datas.append(torch.from_numpy(data))
+        try:
+            calibset_path = os.path.join(HOUMO_DATASETS_PATH, args.calibset_path) \
+                if not os.path.isabs(args.calibset_path) and "./" != args.calibset_path[:2] else args.calibset_path
+            if not os.path.exists(calibset_path):
+                logger.error(f"{calibset_path} is not exist!")
+            calibdata_list = glob.glob(os.path.join(calibset_path, "*.jpg"))
+            calibdata_list = calibdata_list[:args.calib_num]
+            in_datas = list()
+            for idx, file_dir in enumerate(calibdata_list):
+                image = cv2.imread(file_dir)
+                sequence_data = onnx_preprocess(image, input_infos_list[0]['input_shape'][2:])
+                dtype = input_infos_list[0]['dtype']
+                data = sequence_data.astype(dtype)
+                in_datas.append(torch.from_numpy(data).to(device=device))
+        except FileNotFoundError:
+            logger.warning("Calibset not found, use random data!")
+            in_datas = list()
+            for input_info in input_infos_list:
+                input_shape = input_info['input_shape']
+                dtype = input_info['dtype']
+                rng = np.random.default_rng()
+                data = rng.standard_normal(input_shape, dtype=dtype)
+                in_datas.append(torch.from_numpy(data))
 
         save_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/xhquant")
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         output_model_path = os.path.join(save_path, f"{args.model_name}.onnx")
+
+        mix_search_cfg = None
+        if os.path.exists(args.mix_search_cfg):
+            mix_search_cfg = args.mix_search_cfg
         
         convert_onnx_to_hmonnx(args.model_path,
                                in_datas,
@@ -231,7 +254,8 @@ elif HOUMO_TARGET == 'xh2':
                                out_hmonnx_file=output_model_path,
                                quant_config=quant_config,
                                input_names=[input_info['name'] for input_info in input_infos_list],
-                               output_names=[output_info['name'] for output_info in output_infos_list])
+                               output_names=[output_info['name'] for output_info in output_infos_list],
+                               mix_search=mix_search_cfg)
         
         debug_path = os.path.join(save_path, f"hmquant_{args.model_name}_with_act")
         if os.path.exists(debug_path):
