@@ -2,7 +2,6 @@ import os
 import shutil
 import math
 import json
-import onnx
 import logging
 import argparse
 import platform
@@ -16,6 +15,9 @@ try:
 except ImportError:
     print("Please install tcim_lite")
     exit(-1)
+
+import onnx
+from hmatc.utils.utils import get_file_from_jfrog
 
 logging.basicConfig(level=logging.INFO)
 
