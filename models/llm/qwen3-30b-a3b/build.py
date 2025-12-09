@@ -178,13 +178,14 @@ def build(
     context_length,
     j,
     batch=None,
+    tso=True
 ):
     import tcim
 
     kwargs = {}
     if HOUMO_TARGET == "xh2":
         kwargs["modify_llm"] = {}
-        kwargs["enable_xh2_stable_output"] = True
+        kwargs["enable_xh2_stable_output"] = tso
         if ndevice:
             kwargs["ndevice"] = ndevice
         if batch:
@@ -347,6 +348,7 @@ if __name__ == '__main__':
             ndevice,
             context_length,
             j,
+            tso=True,
         )
         model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
         build(
@@ -360,6 +362,7 @@ if __name__ == '__main__':
             context_length,
             j,
             batch,
+            tso=False,
         )
 
     # test model

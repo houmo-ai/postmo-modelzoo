@@ -191,13 +191,14 @@ def build_llm(
     context_length,
     j,
     batch=None,
+    tso=True
 ):
     import tcim
 
     kwargs = {}
     if HOUMO_TARGET == "xh2":
         kwargs["modify_llm"] = {}
-        kwargs["enable_xh2_stable_output"] = True
+        kwargs["enable_xh2_stable_output"] = tso
         if ndevice:
             kwargs["ndevice"] = ndevice
         if batch:
@@ -394,6 +395,7 @@ if __name__ == '__main__':
             ndevice,
             context_length,
             j,
+            tso=True,
         )
         build_llm(
             "qwen2.5-vl_decode",
@@ -405,6 +407,7 @@ if __name__ == '__main__':
             ndevice,
             context_length,
             j,
+            tso=False,
         )
 
     # test model

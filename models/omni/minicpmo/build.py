@@ -125,6 +125,7 @@ def build_llm_tts(
     context_length,
     j,
     batch=None,
+    tso=True
 ):
     import tcim
 
@@ -135,7 +136,7 @@ def build_llm_tts(
         custom_msg = dict()
         custom_msg["prefill_length"] = 256
         kwargs["modify_llm"] = {}
-        kwargs["enable_xh2_stable_output"] = True
+        kwargs["enable_xh2_stable_output"] = tso
         if ndevice:
             kwargs["ndevice"] = ndevice
         if batch:
@@ -319,6 +320,7 @@ if __name__ == '__main__':
             ndevice,
             context_length,
             j,
+            tso=True
         )
         build_llm_tts(
             "minicpmo_llm_decode",
@@ -330,6 +332,7 @@ if __name__ == '__main__':
             ndevice,
             context_length,
             j,
+            tso=False
         )
         build_llm_tts(
             "minicpmo_tts_prefill",
@@ -341,6 +344,7 @@ if __name__ == '__main__':
             ndevice,
             2048,
             j,
+            tso=True
         )
         build_llm_tts(
             "minicpmo_tts_decode",
@@ -352,6 +356,7 @@ if __name__ == '__main__':
             ndevice,
             2048,
             j,
+            tso=False
         )
         build_other_all(
             "minicpmo_visual",
