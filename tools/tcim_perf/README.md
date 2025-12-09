@@ -76,40 +76,85 @@
 
 ### 2.1 环境准备
 
-进入houmo-examples根目录，先检查 `env.sh` 里的环境变量，并且执行以下命令：
+### 2.1.1 Linux 环境
+
+1. 在后摩智能资源中心获取:
+
+- 后摩大道 linux x86_64 docker 镜像
+- 示例代码压缩包，解压示例代码压缩包，解压后文件夹名为：houmo-examples-xh2
+
+2. 将 houmo-examples-xh2 文件夹挂载至后摩 docker 镜像并创建&启动容器，进入docker容器
+
+3. 进入 houmo-examples-xh2 文件夹，先检查 `env.sh` 里的环境变量，并且执行以下命令：
 
 ```bash
 source env.sh
 ```
 
-如果需要使用其他平台编译链进行交叉编译需要自行下载交叉编译链并设置TCIM_RUNTIME_PATH到目标平台runtime库目录, 以android平台为例：
+### 2.1.2 Android 环境
 
-下载官方NDK[https://developer.android.google.cn/ndk/downloads/index.html?hl=ro]解压到toolchains目录下（也可通过NDK_PATH自由指定路径）。
+如果需要使用其他平台编译链进行交叉编译需要自行下载交叉编译链并设置环境变量 `TCIM_RUNTIME_PATH` 到目标平台 runtime 库目录, 以 android 平台为例：
 
-本例在android-ndk-r28c版本上验证通过，用户的环境如果不一致请自行修改适配。
+1. 在后摩智能资源中心获取:
+
+- 后摩大道 linux x86_64 docker 镜像
+- 示例代码压缩包，解压示例代码压缩包，解压后文件夹名为：houmo-examples-xh2
+- 后摩大道 android aarch64 的 Runtime SDK 压缩包，解压后文件夹名为：houmo-tcim-runtime-xh2
+
+2. 将 houmo-examples-xh2 文件夹挂载至后摩 docker 镜像并创建&启动容器，进入docker容器
+
+3. 进入 houmo-examples-xh2 文件夹，执行: `source env.sh`，读取环境变量 `HOUMO_EXAMPLES_PATH`，通常为 houmo-examples-xh2 文件夹绝对路径
+
+4. 安装 Ninjia
+
+```bash
+sudo apt update
+sudo apt install ninja-build -y
+# 检查是否成功安装 ninja
+ninja --version
+```
+
+5. 在 `HOUMO_EXAMPLES_PATH` 文件夹下创建 `toolchains` 文件夹，下载官方NDK[https://developer.android.google.cn/ndk/downloads/index.html?hl=ro]，解压到创建的 toolchains 目录下（也可通过设置环境变量 `NDK_PATH` 指定 NDK 路径）。预期结果如下：
+
+```bash
+houmo-examples-xh2/toolchains/android-ndk-r28c$ ls
+build         meta       ndk-gdb   ndk-stack  NOTICE            prebuilt         README.md     simpleperf         sources     wrap.sh
+CHANGELOG.md  ndk-build  ndk-lldb  ndk-which  NOTICE.toolchain  python-packages  shader-tools  source.properties  toolchains
+```
+
+6. 配置 RUNTIME 环境变量 `TCIM_RUNTIME_PATH` 为 houmo-tcim-runtime-xh2 文件夹的绝对路径
+
+注：本例在 android-ndk-r28c 版本上验证通过，用户的环境如果不一致请自行修改适配。
+
+### 2.2 编译程序
 
 设置完成后进入程序目录编译：
 
+### 2.2.1 Linux 环境
+
 ```bash
-cd tools/tcim_perf/
+cd houmo-examples-xh2/tools/tcim_perf/
 ./build.sh
 ```
 
-编译生成tcim_perf可执行文件在tools/bin目录下。
+编译生成tcim_perf可执行文件在 houmo-examples-xh2/tools/bin 目录下。
 
-如果是编译android版本请执行：
+### 2.2.2 Android 环境
+
+build_ndk.sh 脚本中预设了编译所需的 NDK 环境路径为 `${HOUMO_EXAMPLES_PATH}/toolchains/android-ndk-r28c`，如有变化，可使用环境变量 `NDK_PATH` 进行配置。
 
 ```bash
+cd houmo-examples-xh2/tools/tcim_perf/
 ./build_ndk.sh
 ```
 
-编译生成tcim_perf可执行文件在tools/android目录下。
+编译生成tcim_perf可执行文件在 houmo-examples-xh2/tools/android 目录下。
 
-### 2.2 一键运行
+### 2.3 一键运行
 
 通过命令行参数修改模型路径、执行次数、线程数和stream数等。
 
-如果是在android adb环境执行，需要先将tcim_perf可执行文件和模型等拷贝到adb环境中，将runtime和hal库路径加入到LD_LIBRARY_PATH。
+如果是在 android adb 环境执行，需要先将 tcim_perf 可执行文件和模型等拷贝到adb环境中，将runtime和hal库路径加入到环境变量 `LD_LIBRARY_PATH`。
 
 进入tcim_perf可执行文件所在目录，然后执行：
 
