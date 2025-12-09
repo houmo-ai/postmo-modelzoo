@@ -117,8 +117,8 @@ class HmQwenXh2:
         embedding_weight = torch.load(
             EMBEDDING_PATH, map_location="cpu", weights_only=True
         )['weight']
+        embedding_weight = embedding_weight.float()
         self.embedding_weight = embedding_weight.reshape(-1, 4096)
-        embedding_weight = embedding_weight.float().half()
 
     def chat(self, question):
         logger.success("question:")
