@@ -1,4 +1,5 @@
 import pytest
+import os
 
 
 def pytest_configure(config):
@@ -11,32 +12,16 @@ def pytest_configure(config):
         "eval",
         "perf",
     ]
-    md_markers = [
-        "sd3",
-        "sdxl",
-        "resnet50",
-        "mobilenetv2",
-        "efficientnet",
-        "vit",
-        "yolov3",
-        "yolov5s",
-        "yolov5s_feature",
-        "yolov5m_face",
-        "yolov8m",
-        "yolov7",
-        "yolo12m",
-        "yolov8m_pose",
-        "yolov8m_seg",
-        "yolox",
-        "qwen2dot5",
-        "qwen3",
-        "qwen3_14b",
-        "deepseek",
-        "deepseek_r1_qwen3_8b",
-        "qwen2dot5_vl",
-        "yolop",
-        "wenet",
-    ]
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    md_markers = list()
+    with open(f"{script_dir}/model_names.txt", "r", encoding="utf-8") as f:
+        for line in f:
+            model_name = line.strip()
+            if model_name:  # 跳过空行
+                md_markers.append(model_name)
+    print("Supported model names:", md_markers)
+
     for markers in test_flow_markers:
         config.addinivalue_line("markers", markers)
     for markers in md_markers:

@@ -4,19 +4,19 @@ from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--type',
-        dest='file_type',
+        "--type",
+        dest="file_type",
         type=str,
-        default='hmm',
-        choices=["raw", "hmm"],
-        help='which resource to get, choise in [raw, hmm]',
+        default="hmm",
+        choices=["raw", "hmm", "quant"],
+        help="which resource to get, choise in [raw, hmm, quant]",
     )
     parser.add_argument(
         '--download_dir',
@@ -62,11 +62,14 @@ if __name__ == '__main__':
         "model_name": "qwen2.5-vl",
         "model_info": {
             "model_size": args.model_size,
-            "ncore": 2 if HOUMO_TARGET == "xh2" else 4,
+            "ncore": 2,
             "ndevice": 1,
-            "context_len": "8k" if HOUMO_TARGET == "xh2" else "2k",
+            "context_len": "8k",
             "prefill_len": 256,
             "batch": 1,
+        },
+        "quant_files": {
+            "quant_path": "models/qwen2.5-vl/hmquant_xh2_qwen2.5-vl_7b_256_2k_448x448_20251128.zip",
         },
         "modelscope_repo": {
             "repo_ids": ["Qwen/Qwen2.5-VL-7B-Instruct"],

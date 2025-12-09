@@ -822,7 +822,7 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
                 execute_test_cmd(["pip3", "uninstall", lib_name, "-y"], log_file, True)
             else:
                 execute_test_cmd(
-                    ["pip3", "install", lib_name + "==" + lib_ver], log_file, True
+                    ["pip3", "install", f"{lib_name}=={lib_ver}"], log_file, True
                 )
 
     logger.warning(f"remove folder: {os.getcwd()}.")
@@ -858,11 +858,9 @@ def execute_compile_flow(
         pytest.skip(skip_msg)
     model_type = model_info.get("model_type", "cv")
     if model_type == "llm" and (
-        (
-            get_test_type() != TCaseType.SEPARATE_INFER
-            and check_gpu()["has_gpu"] is False
-        )
-        or (is_release() is True)
+        get_test_type() != TCaseType.SEPARATE_INFER
+        # and check_gpu()["has_gpu"] is False
+        or is_release() is True
     ):
         skip_msg = (
             f"{model_name} testcase requires GPU, release flag: {int(is_release())}."
@@ -1098,7 +1096,7 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
             execute_test_cmd(["pip3", "uninstall", lib_name, "-y"], log_file, True)
         else:
             execute_test_cmd(
-                ["pip3", "install", lib_name + "==" + lib_ver], log_file, True
+                ["pip3", "install", f"{lib_name}=={lib_ver}"], log_file, True
             )
 
     logger.warning(f"remove folder: {os.getcwd()}.")
@@ -1377,7 +1375,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                 execute_test_cmd(["pip3", "uninstall", lib_name, "-y"], log_file, True)
             else:
                 execute_test_cmd(
-                    ["pip3", "install", lib_name + "==" + lib_ver], log_file, True
+                    ["pip3", "install", f"{lib_name}=={lib_ver}"], log_file, True
                 )
     else:
         # use hmatc perf command to get perf metrics

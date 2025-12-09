@@ -126,10 +126,10 @@ else
     else
         echo "跳过量化及编译测试 $(date)"
     fi
-    
+
     if [ "$TYPE" = "all" ] || [ "$TYPE" = "infer" ]; then
-        echo "开始在 10.64.35.71 执行XH2推理 $(date)"
-        ssh wanyu.li@10.64.35.71 "python3 /data02/services/imodelzoo/service/cd_tester/inference_tests.py -v ${VERSION} -t ${BACKEND} --release ${RELEASE} --no_apis ${NO_APIS} --no_hmatc ${NO_HMATC} --no_models ${NO_MODELS} -k '${KEY_STR}' -m '${MODEL_STR}' > /data02/services/imodelzoo/service/cd_tester/test_cd.log 2>&1"
+        echo "开始在 10.64.34.58 执行XH2推理 $(date)"
+        ssh wanyu.li@10.64.34.58 "python3 ${SCRIPT_DIR}/inference_tests.py -v ${VERSION} -t ${BACKEND} --release ${RELEASE} --no_apis ${NO_APIS} --no_hmatc ${NO_HMATC} --no_models ${NO_MODELS} -k '${KEY_STR}' -m '${MODEL_STR}' > ${SCRIPT_DIR}/test_cd.log 2>&1"
         EXIT_CODE=$?
         if [ $EXIT_CODE -ne 0 ]; then
             echo "XH2远端推理执行失败(退出码: $EXIT_CODE)" >&2

@@ -406,9 +406,9 @@ pytest -s -v
 # 执行models_tests文件夹下所有测试用例
 pytest -s -v models_tests/
 # 执行当前文件夹下yolov5s模型所有测试用例
-pytest -s -v models_tests/ -k "yolov5s"
-# 执行当前文件夹下qwen2.5模型所有测试用例
-pytest -s -v models_tests/ -k "qwen2dot5"
+pytest -s -v models_tests/ -m "yolov5s"
+# 执行当前文件夹下qwen2.5-vl模型所有测试用例
+pytest -s -v models_tests/ -m "qwen2dot5_vl"
 # 执行当前文件夹下llm模型所有测试用例,llm模型指模型用例在models/llm文件夹下的模型
 pytest -s -v models_tests/ -k "_llm_"
 # 执行当前文件夹下所有性能测试用例(不支持性能测试的模型会自动跳过)
@@ -416,7 +416,7 @@ pytest -s -v models_tests/ -m "perf"
 # 执行当前文件夹下所有精度测试用例(不支持精度测试的模型会自动跳过)
 pytest -s -v models_tests/ -m "eval"
 # 执行当前文件夹下resnet50模型的性能测试和精度测试用例
-pytest -s -v models_tests/ -k resnet50 -m "perf and eval"
+pytest -s -v models_tests/ -m resnet50 -m "perf or eval"
 ```
 
 上述示例的测试方法命令中，`pytest -s -v`可作为固定命令前缀，`-k`和`-m`均为 pytest 框架中提供过滤执行测例的关键词，详细说明可参考：
@@ -451,63 +451,13 @@ Detect new model template-v1.0-->template_v1dot0, support flow ['get_model', 'pe
 Add test_xxx_template_v1dot0_perf into perf python file
 ```
 
-说明：脚本打印的 log 中包含了模型原始名称`template-v1.0`和脚本转换后的模型名称`template_v1dot0`，其中转换后的模型名称在下一步骤中将用到。
+说明：脚本打印的 log 中包含了模型原始名称`template-v1.0`和脚本转换后的模型名称`template_v1dot0`，其中转换后的模型名称同时会添加到 `./model_names.txt` 文件中。
 
-### 3.3 增加模型名称 marker
 
-1. 打开并编辑文件 `tests/models_tests/conftest.py`
-2. 在文件 `pytest_configure` 函数中，将新增模型的转换后名称加入 `md_markers` 列表中。新增模型的转换后名称在步骤 3.2 中，执行完`update_test_py.py`脚本会打印: `model_name-->converted model_name`。
-
-```python
-# 修改前模型marker列表
-md_markers = [
-    "sd3",
-    "sdxl",
-    "resnet50",
-    "mobilenetv2",
-    "efficientnet",
-    "vit",
-    "yolov3",
-    "yolov5s",
-    "yolov5s_feature",
-    "yolov8m",
-    "qwen2dot5",
-    "qwen3",
-    "qwen3_14b",
-    "deepseek",
-    "deepseek_r1_qwen3_8b",
-    "qwen2dot5_vl",
-    "yolop",
-    "wenet",
-]
-# 修改后模型marker列表
-md_markers = [
-    "sd3",
-    "sdxl",
-    "resnet50",
-    "mobilenetv2",
-    "efficientnet",
-    "vit",
-    "yolov3",
-    "yolov5s",
-    "yolov5s_feature",
-    "yolov8m",
-    "qwen2dot5",
-    "qwen3",
-    "qwen3_14b",
-    "deepseek",
-    "deepseek_r1_qwen3_8b",
-    "qwen2dot5_vl",
-    "yolop",
-    "wenet",
-    "template_v1dot0",  # 新增的模型名称
-]
-```
-
-### 3.4 执行模型测试
+### 3.3 执行模型测试
 
 ```bash
-cd imodelzoo/tests/models_tests
+cd imodelzoo/tests
 # 假设新增模型的名称为: template-v1.0，转换后模型名称为: template_v1dot0
-pytest -s -v -m "template_v1dot0"
+pytest -s -v models_tests/ -m "template_v1dot0"
 ```

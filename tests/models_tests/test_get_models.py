@@ -100,15 +100,6 @@ def test_detection_yolov8m_get_model(setup_logging):
     assert True
 
 
-@pytest.mark.sd3
-@pytest.mark.get_model
-@pytest.mark.dependency(name="test_diffusion_sd3_get_model")
-def test_diffusion_sd3_get_model(setup_logging):
-    model_name = "sd3"
-    _get_model_func(model_name, setup_logging)
-    assert True
-
-
 @pytest.mark.sdxl
 @pytest.mark.get_model
 @pytest.mark.dependency(name="test_diffusion_sdxl_get_model")

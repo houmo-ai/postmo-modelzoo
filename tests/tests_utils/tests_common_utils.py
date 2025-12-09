@@ -387,6 +387,11 @@ def install_py_env(env_dir: str, log_file: str) -> dict:
             changed_libs[lib_name] = py_env_dict.get(lib_name, None)
 
     os.chdir(env_dir)
+    if os.path.exists("/opt/venv/houmo/lib/python3.12/site-packages"):
+        os.system("sudo chmod 777 /opt/venv/houmo/lib/python3.12/site-packages")
+        os.system(
+            "sudo chmod -R 777 /opt/venv/houmo/lib/python3.12/site-packages/transformers*"
+        )
     ret, _ = execute_test_cmd(["pip3", "install", "-r", "requirements.txt"], log_file)
     logger.info(f"Install python dependencies for the current testcase, ret: {ret}.")
 

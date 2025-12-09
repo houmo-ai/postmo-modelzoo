@@ -10,6 +10,34 @@ def _convert_model_name(model_name: str) -> str:
     return res_str
 
 
+def _append_model_to_txt(new_model: str) -> bool:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = f"{script_dir}/model_names.txt"
+
+    if not os.path.exists(file_path):
+        print(f"Error: Not found {file_path}")
+        return False
+
+    existing_models = []
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            model = line.strip()
+            if model:
+                existing_models.append(model)
+
+    if new_model in existing_models:
+        print(f"✅ 模型 '{new_model}' 已在 {file_path} 中，无需重复添加")
+        return False
+    else:
+        with open(file_path, "a+", encoding="utf-8") as f:
+            f.seek(0, 2)
+            if f.tell() > 0:
+                f.write("\n")
+            f.write(new_model)
+        print(f"✅ 模型 '{new_model}' 已成功追加到 {file_path}")
+        return True
+
+
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     model_cfg_dir = script_dir + "/model_configs"
@@ -51,6 +79,10 @@ def main():
             print(
                 f"Detect new model {model_name}-->{model_name_new}, support flow {support_flow}."
             )
+            if not _append_model_to_txt(model_name_new):
+                print(f"Failed to add {model_name_new} into model_names.txt")
+                continue
+
             print(f"Add {func_name} into {flow_name} python file")
             with open(py_path[flow_name], 'a', encoding='utf-8') as file:
                 if py_content and not py_content.endswith('\n'):

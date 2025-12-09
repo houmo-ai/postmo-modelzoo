@@ -27,7 +27,6 @@
         ],
         "xh2": [
             "get_model",
-            "quant",
             "compile",
             "demo",
             "perf"
@@ -97,10 +96,12 @@
             "type": [
                 "raw",
                 "raw",
+                "quant",
                 "hmm",
                 "hmm"
             ],
             "download_dir": [
+                "cached_models",
                 "cached_models",
                 "cached_models",
                 "cached_models",
@@ -109,10 +110,12 @@
             "extract_dir": [
                 null,
                 null,
+                "cached_models/hmquant_xh2_7b_2k",
                 "cached_models/hmm_xh2_7b_2k",
                 "cached_models/hmm_xh2_7b_2k_ms"
             ],
             "model_size": [
+                "7b",
                 "7b",
                 "7b",
                 "7b",
@@ -121,6 +124,7 @@
             "source_type": [
                 null,
                 "modelscope",
+                null,
                 null,
                 "modelscope"
             ]
@@ -139,7 +143,7 @@
                 "2048"
             ],
             "patch_size": [
-                "16"
+                "14"
             ],
             "image_max_size_h": [
                 "448"

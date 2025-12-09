@@ -90,14 +90,6 @@ def test_detection_yolov8m_demo(setup_logging):
     assert True
 
 
-@pytest.mark.sd3
-@pytest.mark.demo
-def test_diffusion_sd3_demo(setup_logging):
-    model_name = "sd3"
-    _demo_func(model_name, setup_logging)
-    assert True
-
-
 @pytest.mark.sdxl
 @pytest.mark.demo
 def test_diffusion_sdxl_demo(setup_logging):

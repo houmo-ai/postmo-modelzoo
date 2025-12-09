@@ -152,7 +152,7 @@ def execute_apis_examples(example_name: str, log_file: str):
     else:
         get_model_flag = _test_get_model(example_info, platform, log_file)
         if get_model_flag is False:
-            logger.error("{example_name} Get model Failed!")
+            logger.error(f"{example_name} Get model Failed!")
 
     demo_types = example_info["support_backend"][HOUMO_BACKEND]
     # run python demo
