@@ -5,7 +5,6 @@ import os
 import shutil
 import platform
 import numpy as np
-import onnx
 import time
 import multiprocessing
 from itertools import zip_longest
@@ -15,6 +14,9 @@ try:
 except ImportError:
     print("Please install tcim_lite")
     exit(-1)
+
+import onnx
+from hmatc.utils.utils import get_file_from_jfrog
 
 
 def gen_copy_model_and_data_size():
@@ -270,8 +272,6 @@ if __name__ == "__main__":
     if not os.path.exists(hmm_path) and args.skip_build:
         print(f"Skipping model generation since download hmm from network.")
         args.skip_build = True
-        from hmatc.utils.utils import get_file_from_jfrog
-
         if "HOUMO_MODELZOO_URL" not in os.environ:
             os.environ["HOUMO_MODELZOO_URL"] = (
                 "http://139.224.0.199:8082/artifactory/houmo/release"
