@@ -138,6 +138,8 @@ class EnvManager:
         """
         Set a specific environment variable permanently
         """
+        if value == "" :
+            return None
         reg_path = self.user_reg_path
         try:
             root = winreg.HKEY_CURRENT_USER
@@ -189,6 +191,8 @@ class EnvManager:
         Add a new path to the PATH environment variable (permanent)
         """
         # Validate path format
+        if new_path == "":
+            return None
         new_path = new_path.rstrip('\\')  # Remove trailing backslash if present
 
         # Get current PATH value

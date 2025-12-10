@@ -11,29 +11,36 @@
 
 
 ## 1.win11快速开始
-此README仅支持python3.8-python3.11版本，其他版本由于部分三方库需要源码编译，编译过程相对复杂，在此不详细给出具体方式（比如onnxsim库，较高的python版本需要用户自行编译，其依赖的部分三方库有些仓库地址已经改变，需要对源码进行部分修改，编译过程中下载三方库需要特定的网络环境），如有需要可以自行编译。
+此README仅支持python≥3.9，其他版本未作验证，建议使用python≥3.9。
 1. 使用准备与使用前提：
     - win11从后摩智能开发者社区[**https://developer.houmoai.com/**](https://developer.houmoai.com/)下载相关软件，参照社区文档中心完成固件烧录、驱动安装。
-    - 下载example样例，安装必要的python运行环境，建议使用python3.8-python3.11版本。
-    - 从后摩开发者社区下载Runtime SDK，解压后进入houmo_tcim_runtime，执行python setup.py install安装，安装好之后通过pip list查看houmo-tcim-runtime-xh2是否存在，确定安装是否完成。
+    - **驱动安装后需要确认windows的用户环境变量是否有HOUMO_SDK_PATH，该工具依赖此环境变量否则无法运行。**
+    1. 直接使用exe安装包安装驱动，HOUMO_SDK_PATH会自动添加到用户环境变量，只需要用户确认是否正确即可。
+    2. 使用zip包安装时，**解压时解压到zip包同名目录，否则工具可能无法获取到驱动版本号**。此外，用户需要自行添加HOUMO_SDK_PATH环境变量，路径示例D:\houmo_drv_xh2_v0.6.0_windows11_x86_64\houmo_drv_xh2。
+    - 下载example样例，安装必要的python运行环境，**建议使用python≥3.9版本**。
+    1. 安装后需要确认cmd终端python的版本号是否符合要求，有些用户存在多个版本的python需要确认默认的版本是否符合要求，如需查看windows的python位置，可以终端输入where python查看，建议从环境变量删除不需要的python版本。
+    2. **部分用户终端python指令无效，但是py指令有效，具体处理方式为**：在cmd终端输入where py，将输出的路径从环境变量PATH删除。或者手动到对应目录删除py.exe文件。处理完成后重新开新的终端，确保py指令失效，python指令有效。
 
 2. win11 python环境的安装：
-    - 在python官网[**https://www.python.org/downloads/windows/**](https://www.python.org/downloads/windows/) 下载3.11版本的python安装包，以python-3.11.5为例[**https://www.python.org/ftp/python/3.11.5/python-3.11.5-amd64.exe**](https://www.python.org/ftp/python/3.11.5/python-3.11.5-amd64.exe)。
-    - 下载完成后，双击下载的安装文件（如 python-3.11.5-amd64.exe）以启动安装程序。
-    - 在安装界面中，勾选 Add python.exe to PATH（非常重要，避免后续手动配置环境变量）。
-    - 点击 Customize installation（可选），根据需要自定义安装路径或组件，建议默认即可。
-    - 如果需要更改安装路径，点击 Browse 并选择新路径（如 D:\Python）。
-    - 确认所有选项后，点击 Install 开始安装。
-    - 安装完成后，点击 Disable path length limit（建议禁用路径长度限制以避免潜在问题），然后点击 Close 关闭安装程序。
-    - 安装后，win+R打开终端，输入python --version确认版本是python-3.11.5。
+    1. 方式一：
+        打开windows自带的Microsoft Store，搜索python后，点击获取会自动下载安装。
+    2. 方式二：
+        - 在python官网[**https://www.python.org/downloads/windows/**](https://www.python.org/downloads/windows/) 下载python≥3.9安装包。
+        - 下载完成后，双击下载的安装文件启动安装程序。
+        - 在安装界面中，勾选 Add python.exe to PATH（非常重要，避免后续手动配置环境变量）。
+        - 点击 Customize installation（可选），根据需要自定义安装路径或组件，建议默认即可。
+        - 如果需要更改安装路径，点击 Browse 并选择新路径（如 D:\Python）。
+        - 确认所有选项后，点击 Install 开始安装。
+        - 安装完成后，点击 Disable path length limit（建议禁用路径长度限制以避免潜在问题），然后点击 Close 关闭安装程序。
+        - 安装后，win+R打开终端，输入python --version确认python≥3.9。
 
 3. examples环境安装详细步骤：
     - 开始菜单搜索cmd，选择命令提示符，右键以管理员身份运行，执行cd /d {path/of/examples}
-    - 执行 pip install -r tools/win_envs/requirements.txt安装相关依赖。如果使用python3.8，请修改onnx==1.16.0并更新requirements.txt文件。
-    - 在[**https://visualstudio.microsoft.com/visual-cpp-build-tools/**](https://visualstudio.microsoft.com/visual-cpp-build-tools/)下载vs生成工具，安装Runtime SDK时需要使用。
+    - 执行 pip install -r tools/win_envs/requirements.txt安装相关依赖。
+    - 在[**https://visualstudio.microsoft.com/visual-cpp-build-tools/**](https://visualstudio.microsoft.com/visual-cpp-build-tools/)下载vs生成工具，后续C++样例编译需要使用。
     - 运行vs生成工具，勾选使用c++的桌面开发后，点击安装。
-    - 执行cd /d {path/of/Runtime SDK}/切换到Runtime SDK的目录。
-    - 执行 python setup.py install进行houmo-tcim-runtime-xh2的安装。 
+    - 执行cd /d {path/of/Runtime SDK}/切换到Runtime SDK压缩包下载的目录。
+    - 执行pip install {Runtime SDK.tar.gz}进行houmo-tcim-runtime-xh2的安装。 
     - 安装结束后，执行pip list查看houmo-tcim-runtime-xh2是否安装成功以及版本是否正确。
     - cd /d {path/of/examples}切换回examples的路径。
 
@@ -51,7 +58,6 @@
         | env.bat --reset       | 清除环境变量，并重新进入设置环境变量流程 |
     2. 执行env.bat --set进入自动设置环境变量流程，[Required]的环境变量是运行样例必须的，[Optional]用户可以自行选择是否输入，不输入会有部分样例无法运行。目前部分样例需要给到的路径示例如下：
     ``` bat
-    HOUMO_SDK_PATH [Required]: D:\0.5.0\houmo_drv_xh2_v0.5.0_windows11_x86_64\houmo_drv_xh2
     OPENCV_PATH [Optional]: D:\Program Files\Opencv\opencv\build
     CMAKE_PATH: D:\\Program Files\\CMake\\bin
     ```
@@ -259,7 +265,7 @@
 ### 3.1 hmatc的编译和安装
 1. 确保已经安装上述的步骤完成了env.bat的自动环境变量设置。
 2. cd /d {path/of/examples}/hmatc 
-3. python setup.py install
+3. python setup.py install或者python setup.py bdist_wheel后执行pip install dist/hmatc-xxx.whl
 
 ### 3.2 样例的运行
 1. 进入models对应样例目录。
