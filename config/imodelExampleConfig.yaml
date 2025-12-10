@@ -179,6 +179,16 @@ multi_input_custom_random_model:
         script: ../models/multi_input_custom_random_model/test.sh
   test:
     - multi_input_custom_random_model_test
+ocr_ppocrv3_rec:
+  include:
+    - models/ocr/PPOCRv3/rec
+  exclude:
+    - models/ocr/PPOCRv3/rec/README.MD
+  example_case:
+    - ocr_ppocrv3_rec_test:
+        script: ../models/ocr/PPOCRv3/rec/test.sh
+  test:
+    - ocr_ppocrv3_rec_test
 detection_yolo12m:
   include:
     - models/detection/yolo12m
@@ -215,6 +225,30 @@ segmentation_yolov8m_seg:
         args: all
   test:
     - segmentation_yolov8m_seg_test
+ocr_lprnet:
+  include:
+    - models/ocr/lprnet
+  exclude:
+    - models/ocr/lprnet/README.MD
+  example_case:
+    - ocr_lprnet_test:
+        test_type: models_tests
+        script: lprnet
+        args: all
+  test:
+    - ocr_lprnet_test
+ocr_ppocrv3_det:
+  include:
+    - models/ocr/PPOCRv3/det
+  exclude:
+    - models/ocr/PPOCRv3/det/README.MD
+  example_case:
+    - ocr_ppocrv3_rec_test:
+        test_type: models_tests
+        script: ppocrv3_det
+        args: all
+  test:
+    - ocr_ppocrv3_det_test
 llm_qwen3:
   include:
     - models/llm/qwen3
@@ -263,6 +297,18 @@ vllm_qwen2.5-vl:
         args: all
   test:
     - vllm_qwen2.5-vl_test
+llm_bge:
+  include:
+    - models/embedding/bge
+  exclude:
+    - models/embedding/bge/README.MD
+  example_case:
+    - llm_bge_test:
+        test_type: models_tests
+        script: bge
+        args: all
+  test:
+    - llm_bge_test
 utils:
   include:
     - utils
