@@ -3,7 +3,7 @@ import sys
 import platform
 import argparse
 
-HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../..")
+HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
 sys.path.append(f"{HOUMO_EXAMPLES_PATH}/apis/common/python")
 from utils import get_file_from_jfrog
 
@@ -69,7 +69,7 @@ if __name__ == "__main__":
         if not args.model_dir
         else args.model_dir
     )
-    hmm_path = "models/yolov5s/hmm_yolov5s_xh2_b1_1core_20250804.zip"
+    hmm_path = "models/apis/yolov5s/hmm_xh2_yolov5s_b1_1core.zip"
     get_file_from_jfrog(hmm_path, model_dir, "./")
 
     if args.enable_ort and platform.system() == "Linux":

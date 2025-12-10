@@ -79,17 +79,31 @@ export LD_LIBRARY_PATH=$WORK_PATH/../../models/3rdparty/onnxruntime/lib:$LD_LIBR
 Python演示程序推理完成后会进行后处理，获得分类结果，执行成功输出以下打印：
 
 ```bash
-input[images] shape = [1, 640, 640, 3], dtype = <class 'numpy.int8'>, format = YUV420SP
+===> yolov5s python example start...
+input[images] shape = [1, 3, 640, 640], dtype = <class 'numpy.float16'>, format = ND
 output[340] shape = [1, 3, 80, 80, 85], dtype = <class 'numpy.float32'>, format = ND
 output[378] shape = [1, 3, 40, 40, 85], dtype = <class 'numpy.float32'>, format = ND
 output[416] shape = [1, 3, 20, 20, 85], dtype = <class 'numpy.float32'>, format = ND
-box num = 20
-x1:7, y1:169, x2:153, y2:261, conf:0.898910, cls:62
-x1:293, y1:217, x2:353, y2:318, conf:0.855038, cls:56
-x1:412, y1:155, x2:465, y2:298, conf:0.804303, cls:0
-x1:557, y1:211, x2:640, y2:285, conf:0.754565, cls:62
-...
-x1:241, y1:195, x2:252, y2:213, conf:0.251770, cls:75
+box num = 19
+x1:7, y1:168, x2:153, y2:261, conf:0.903683, cls:62
+x1:293, y1:217, x2:353, y2:317, conf:0.844447, cls:56
+x1:413, y1:156, x2:465, y2:298, conf:0.811396, cls:0
+x1:557, y1:211, x2:641, y2:284, conf:0.747585, cls:62
+x1:449, y1:168, x2:513, y2:287, conf:0.660653, cls:72
+x1:551, y1:299, x2:586, y2:402, conf:0.637132, cls:39
+x1:168, y1:233, x2:184, y2:267, conf:0.625747, cls:75
+x1:549, y1:301, x2:586, y2:401, conf:0.598986, cls:75
+x1:360, y1:221, x2:426, y2:315, conf:0.595127, cls:56
+x1:480, y1:360, x2:637, y2:426, conf:0.575638, cls:60
+x1:404, y1:221, x2:442, y2:307, conf:0.542933, cls:56
+x1:447, y1:121, x2:462, y2:141, conf:0.535311, cls:74
+x1:231, y1:172, x2:267, y2:213, conf:0.490232, cls:58
+x1:332, y1:178, x2:368, y2:224, conf:0.480379, cls:58
+x1:411, y1:157, x2:475, y2:293, conf:0.443573, cls:72
+x1:490, y1:174, x2:513, y2:283, conf:0.384144, cls:72
+x1:349, y1:211, x2:362, y2:231, conf:0.356749, cls:75
+x1:357, y1:215, x2:374, y2:231, conf:0.356060, cls:75
+x1:355, y1:217, x2:422, y2:318, conf:0.310120, cls:60
 demo results saved to demo_results/python/000000000139.jpg
 <=== yolov5s python example completed.
 ```
@@ -100,19 +114,34 @@ demo results saved to demo_results/python/000000000139.jpg
 C++演示程序推理完成后会进行后处理，获得分类结果，执行成功输出以下打印：
 
 ```bash
+===> yolov5s c++ example start...
+LoadFromFile yolov5s
+model ./yolov5s_clip_xh2_b1_1core.hmm loaded.
 Count of Input: 1
-Input[images] TensorInfo: shape: [1,640,640,3], stride: [614400,640,1,614400,640,2,1,409600], dtype: UINT8, format: YUV420SP, size: 614400, memsize: 614400
+Input[images] TensorInfo: shape: [1,3,640,640], stride: [], dtype: FLOAT16, format: ND, size: 2457600, memsize: 2457600
+Input f32[images] TensorInfo: shape: [1,3,640,640], stride: [], dtype: FLOAT32, format: ND, size: 4915200, memsize: 4915200
+img_bytes: 4915200
 Count of Output: 3
 Output[340] TensorInfo: shape: [1,3,80,80,85], stride: [], dtype: FLOAT32, format: ND, size: 6528000, memsize: 6528000
 Output[378] TensorInfo: shape: [1,3,40,40,85], stride: [], dtype: FLOAT32, format: ND, size: 1632000, memsize: 1632000
 Output[416] TensorInfo: shape: [1,3,20,20,85], stride: [], dtype: FLOAT32, format: ND, size: 408000, memsize: 408000
-detect num: 17
-box[6, 169, 152, 260], conf:0.898910, cls:62
-box[292, 217, 352, 317], conf:0.855038, cls:56
-box[412, 155, 465, 298], conf:0.804303, cls:0
-box[556, 211, 639, 284], conf:0.754565, cls:62
-...
-box[241, 195, 252, 212], conf:0.251770, cls:75
+detect num: 16
+box[6, 168, 152, 261], conf:0.903683, cls:62
+box[292, 217, 352, 317], conf:0.844447, cls:56
+box[412, 155, 464, 298], conf:0.811396, cls:0
+box[557, 211, 639, 284], conf:0.747585, cls:62
+box[448, 168, 512, 286], conf:0.660653, cls:72
+box[550, 298, 585, 401], conf:0.637132, cls:39
+box[167, 233, 184, 267], conf:0.625747, cls:75
+box[359, 220, 425, 315], conf:0.595127, cls:56
+box[479, 360, 636, 425], conf:0.575638, cls:60
+box[404, 220, 442, 307], conf:0.542933, cls:56
+box[447, 120, 461, 141], conf:0.535311, cls:74
+box[230, 171, 267, 213], conf:0.490232, cls:58
+box[331, 177, 368, 224], conf:0.480379, cls:58
+box[490, 174, 513, 282], conf:0.384144, cls:72
+box[348, 211, 362, 230], conf:0.356749, cls:75
+box[356, 214, 373, 231], conf:0.356060, cls:75
 demo results saved to demo_results/cpp/000000000139.jpg
 <=== yolov5s c++ example completed.
 ```

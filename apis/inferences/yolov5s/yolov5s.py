@@ -501,6 +501,6 @@ if __name__ == '__main__':
     cv2.imwrite(save_path, cv_image)
     print("demo results saved to", save_path)
     # check result, modify it when you change model or data
-    assert len(boxes) == 21
+    assert len(boxes) == 19
 
     print("<=== yolov5s python example completed.\n")

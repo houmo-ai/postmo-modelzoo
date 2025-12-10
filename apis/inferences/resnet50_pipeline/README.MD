@@ -53,11 +53,40 @@ cd ..
 推理完成后会进行后处理，获得分类结果，执行成功输出以下打印：
 
 ```bash
-sample 0 top1: Index=65 Conf=120, Label=[sea snake]
-sample 1 top1: Index=65 Conf=120, Label=[sea snake]
-sample 2 top1: Index=65 Conf=120, Label=[sea snake]
-sample 3 top1: Index=65 Conf=120, Label=[sea snake]
-...
+===> resnet50_pipeline c++ example start...
+model: ./resnet50_xh2_b1_1core.hmm
+samples: 10
+model ./resnet50_xh2_b1_1core.hmm loaded.
+Count of Input: 1
+Input[input.1] TensorInfo: shape: [1,3,224,224], stride: [301056,100352,448,2], dtype: FLOAT16, format: ND, size: 301056, memsize: 301056
+Count of Output: 1
+Output[495] TensorInfo: shape: [1,1000], stride: [2048,2], dtype: FLOAT16, format: ND, size: 2000, memsize: 2048
+sample queue size is 10
+thread H2D start...
+thread infer start...
+thread D2H start...
+run sample 0 end.
+run sample 1 end.
+run sample 2 end.
+run sample 3 end.
+run sample 4 end.
+run sample 5 end.
+run sample 6 end.
+run sample 7 end.
+run sample 8 end.
+run sample 9 end.
+infer thread completed. 10 sampels tested.
+top1: Index=65 Conf=16, Label=[sea snake]
+top1: Index=65 Conf=16, Label=[sea snake]
+top1: Index=65 Conf=16, Label=[sea snake]
+top1: Index=65 Conf=16, Label=[sea snake]
+top1: Index=65 Conf=16, Label=[sea snake]
+top1: Index=65 Conf=16, Label=[sea snake]
+top1: Index=65 Conf=16, Label=[sea snake]
+top1: Index=65 Conf=16, Label=[sea snake]
+top1: Index=65 Conf=16, Label=[sea snake]
+top1: Index=65 Conf=16, Label=[sea snake]
+<=== resnet50_pipeline c++ example completed.
 ```
 
 ### 一键执行
