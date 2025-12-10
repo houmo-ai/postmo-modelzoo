@@ -36,10 +36,12 @@ def cosine_distance(data1, data2):
         return -1
     return cosine_dist
 
+
 class ProcessMemoryMonitor:
     """
     Monitors the memory usage of the current Python process in real-time using psutil.
     """
+
     def __init__(self, interval=2, log_file=None):
         """
         Initializes the monitor.
@@ -61,7 +63,7 @@ class ProcessMemoryMonitor:
         """
         memory_info = self.process.memory_info()
         rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
-        percent = self.process.memory_percent()   # Percentage of system memory
+        percent = self.process.memory_percent()  # Percentage of system memory
         return {'rss_mb': rss_mb, 'percent': percent}
 
     def start(self):
@@ -93,8 +95,11 @@ class ProcessMemoryMonitor:
         """Stops the monitoring loop and prints peak usage."""
         self.is_monitoring = False
         if hasattr(self, 'monitor_thread'):
-            self.monitor_thread.join(timeout=1) # Wait a moment for the thread to finish
+            self.monitor_thread.join(
+                timeout=1
+            )  # Wait a moment for the thread to finish
         print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -146,7 +151,6 @@ def get_args() -> argparse.Namespace:
         dest='ndevice',
         type=int,
         default=1,
-        choices=[1, 2],
         help='device number',
     )
     parser.add_argument(
@@ -163,6 +167,13 @@ def get_args() -> argparse.Namespace:
         default=os.path.join('output', HOUMO_TARGET),
         help='build output dir',
     )
+    parser.add_argument(
+        '--prefill_length',
+        dest='prefill_length',
+        type=int,
+        default=256,
+        help='prefill_length',
+    )
     args = parser.parse_args()
     return args
 
@@ -178,20 +189,27 @@ def build(
     context_length,
     j,
     batch=None,
-    tso=True
+    tso=True,
+    prefill_length=256,
 ):
     import tcim
+    import json
 
     kwargs = {}
     kwargs["modify_llm"] = {}
+    custom_msg = dict()
+    custom_msg["prefill_length"] = prefill_length
     if batch:
         kwargs["modify_llm"]["batch"] = batch
+        custom_msg["batch"] = batch
     if HOUMO_TARGET == "xh2":
         kwargs["enable_xh2_stable_output"] = tso
         if ndevice:
             kwargs["ndevice"] = ndevice
         if context_length:
             kwargs["modify_llm"]["context-length"] = context_length
+            custom_msg["context_length"] = context_length
+    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
     print(f"\n===> {model_name} build start...")
@@ -349,6 +367,7 @@ if __name__ == '__main__':
             context_length,
             j,
             tso=True,
+            prefill_length=args.prefill_length,
         )
         model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
         build(
@@ -363,6 +382,7 @@ if __name__ == '__main__':
             j,
             batch,
             tso=False,
+            prefill_length=args.prefill_length,
         )
 
     # test model

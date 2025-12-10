@@ -1,17 +1,20 @@
 #!/bin/bash
 set -e
 
-RELEASE="ON"
-PERF="ON"
+RELEASE="OFF"
+PERF="OFF"
 VERSION="0.6.0"
 # models=(
-#     # "qwen3;model_size:8b;target:xh1;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh1_qwen3_8b_8k_20250603.zip"
-#     # "qwen3;model_size:8b;target:xh1;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:4;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/qwen3/hmquant_xh1_qwen3_8b_256_8k_20250815.zip"
-#     # "qwen3;model_size:8b;target:xh1;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/qwen3/hmquant_xh1_qwen3_8b_256_8k_20250815.zip"
-#     # "deepseek-r1-qwen;model_size:7b;target:xh1;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:4;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/deepseek/hmquant_deepseek_256_8192_20250922.zip"
-#     # "deepseek-r1-qwen;model_size:7b;target:xh1;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/deepseek/hmquant_deepseek_256_8192_20250922.zip"
-#     # "qwen2.5-vl;model_size:7b;target:xh1;context_length:2048;prefill_length:256;batch:1;device_num:1;core_num:4;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_7b_256_2k_20250903.zip"
-#     # "qwen2.5-vl;model_size:7b;target:xh1;context_length:2048;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_7b_256_2k_20250903.zip"
+#     "qwen3;model_size:8b;target:xh1;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh1_qwen3_8b_8k_20250603.zip"
+#     "qwen3;model_size:8b;target:xh1;context_length:8192;prefill_length:256;batch:1;device_num:1;core_num:4;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/qwen3/hmquant_xh1_qwen3_8b_256_8k_20250815.zip"
+#     "deepseek-r1-qwen;model_size:7b;target:xh1;context_length:8192;prefill_length:256;batch:1;device_num:0;core_num:4;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/deepseek/hmquant_deepseek_256_8192_20250922.zip"
+#     "deepseek-r1-qwen;model_size:7b;target:xh1;context_length:8192;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/deepseek/hmquant_deepseek_256_8192_20250922.zip"
+#     "qwen2.5-vl;model_size:7b;target:xh1;context_length:2048;prefill_length:256;batch:1;device_num:0;core_num:4;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_7b_256_2k_20250903.zip"
+#     "qwen2.5-vl;model_size:7b;target:xh1;context_length:2048;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_7b_256_2k_20250903.zip"
+#     "qwen2.5-vl;model_size:3b;target:xh1;context_length:2048;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_3b_256_2k_448x448_20251219.zip"
+#     "qwen2.5-vl;model_size:3b;target:xh1;context_length:2048;prefill_length:256;batch:1;device_num:0;core_num:4;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5-vl/hmquant_xh1_qwen2.5-vl_3b_256_2k_448x448_20251219.zip"
+#     "qwen3-vl;model_size:4b;target:xh1;context_length:2048;prefill_length:256;batch:1;device_num:0;core_num:4;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3-vl/hmquant_xh1_qwen3-vl_4b_256_2k_448x448_20251111.zip"
+#     "qwen3-vl;model_size:4b;target:xh1;context_length:2048;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3-vl/hmquant_xh1_qwen3-vl_4b_256_2k_448x448_20251111.zip"
 # )
 models=(
     "qwen3;model_size:8b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_8b_2k_20250812.zip"
@@ -25,7 +28,7 @@ models=(
     "qwen3;model_size:32b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:4;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_32b_256_2k_20250625.zip"
     "qwen3;model_size:30b_a3b;target:xh2;context_length:2048;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_30b_a3b_256_8k_20251027.zip"
     "qwen3;model_size:30b_a3b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_30b_a3b_256_8k_20251027.zip"
-    "qwen3;model_size:30b_a3b_coder;target:xh2;context_length:16384;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3/hmquant_xh2_qwen3_30b_a3b_coder_256_2k_20251127.zip"
+    "qwen3_coder;model_size:30b_a3b;target:xh2;context_length:16384;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3_coder/hmquant_xh2_qwen3_coder_30b_a3b_256_2k_20251127.zip"
     "gpt;model_size:20b;target:xh2;context_length:2048;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/gpt/hmquant_xh2_gpt_oss_20b_256_2k_20251127.zip"
     "qwen2.5-vl;model_size:7b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen2.5-vl/hmquant_xh2_qwen2.5-vl_7b_256_2k_448x448_20251128.zip"
     "qwen3-vl;model_size:8b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:0;core_num:2;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3-vl/hmquant_xh2_qwen3-vl_8b_256_2k_448x448_20251107.zip"

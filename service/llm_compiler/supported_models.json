@@ -11,6 +11,14 @@
         }
     },
     "qwen3": {
+        "4b": {
+            "support_backends": [
+                "xh2"
+            ],
+            "path": "models/llm/qwen3",
+            "raw": "llm/None",
+            "perf": true
+        },
         "8b": {
             "support_backends": [
                 "xh1",
@@ -32,8 +40,8 @@
             "support_backends": [
                 "xh2"
             ],
-            "path": "models/llm/qwen3-32b",
-            "raw": "llm/qwen3-32b",
+            "path": "models/llm/qwen3-14b",
+            "raw": "llm/None",
             "perf": true
         },
         "30b_a3b": {
@@ -43,8 +51,10 @@
             "path": "models/llm/qwen3-30b-a3b",
             "raw": "llm/Qwen3-30B-A3B",
             "perf": true
-        },
-        "30b_a3b_coder": {
+        }
+    },
+    "qwen3_coder": {
+        "30b_a3b": {
             "support_backends": [
                 "xh2"
             ],
@@ -74,6 +84,14 @@
         }
     },
     "qwen2.5-vl": {
+        "3b": {
+            "support_backends": [
+                "xh1"
+            ],
+            "path": "models/vllm/qwen2.5-vl",
+            "raw": "llm/None",
+            "perf": true
+        },
         "7b": {
             "support_backends": [
                 "xh1",
@@ -87,6 +105,7 @@
     "qwen3-vl": {
         "2b": {
             "support_backends": [
+                "xh1",
                 "xh2"
             ],
             "path": "models/vllm/qwen3-vl",
@@ -95,6 +114,7 @@
         },
         "4b": {
             "support_backends": [
+                "xh1",
                 "xh2"
             ],
             "path": "models/vllm/qwen3-vl",
@@ -103,6 +123,7 @@
         },
         "8b": {
             "support_backends": [
+                "xh1",
                 "xh2"
             ],
             "path": "models/vllm/qwen3-vl",

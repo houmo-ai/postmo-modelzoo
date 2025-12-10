@@ -577,7 +577,7 @@ if __name__ == "__main__":
     compiled_file_name = None
     context_str = (
         str(int(context_len / 1024)) + "k"
-        if context_len >= 1025
+        if context_len >= 1024
         else f"{(context_len/1024)}k"
     )
     chip_str = f"{device_num}chips" if device_num > 1 else "1chip"

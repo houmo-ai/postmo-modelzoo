@@ -52,7 +52,8 @@ def find_file_recursive(root_dir, pattern, excludes=list()):
     matches = []
     for dirpath, _, filenames in os.walk(root_dir):
         for filename in filenames:
-            if glob.fnmatch.fnmatch(filename, pattern):
+            filename_new = filename.lower()
+            if glob.fnmatch.fnmatch(filename_new, pattern):
                 flag = True
                 for ex_str in excludes:
                     if ex_str in filename:
@@ -63,7 +64,7 @@ def find_file_recursive(root_dir, pattern, excludes=list()):
     return matches
 
 
-def _process_model_files(
+def _process_model_files_xh2(
     backend: str, quant_dir: str, result_dir: str, model_name: str, model_type: str
 ):
     try:
@@ -75,6 +76,9 @@ def _process_model_files(
             model_res_dir = os.path.join(result_dir, "visual")
         os.makedirs(model_res_dir, exist_ok=True)
         print(f"已创建目标文件夹结构: {model_res_dir}")
+
+        if model_name == "qwen3-vl" and model_type == "vision":
+            model_type = "visual"
 
         # 2. 处理 hmquant_*_with_act.onnx
         if model_type == "encoder":
@@ -95,32 +99,31 @@ def _process_model_files(
         shutil.copy(onnx_src, onnx_dst)
         print(f"已重命名并移动: {onnx_src} -> {onnx_dst}")
 
-        if backend == "xh2":
-            # 3. 处理 *_external_data文件
-            if model_type == "encoder":
-                external_files = find_file_recursive(
-                    quant_dir,
-                    "*external_data",
-                    excludes=["decode", "prefill", "vision"],
-                )
-            else:
-                external_files = find_file_recursive(
-                    quant_dir, f"*{model_type}*external_data"
-                )
-            if len(external_files) == 0:
-                return False
-            for external_file in external_files:
-                # 检查该文件是否与找到的onnx文件在同一目录
-                onnx_dir = os.path.dirname(onnx_files[0]) if onnx_files else None
-                external_dir = os.path.dirname(external_file)
+        # 3. 处理 *_external_data文件
+        if model_type == "encoder":
+            external_files = find_file_recursive(
+                quant_dir,
+                "*external_data",
+                excludes=["decode", "prefill", "vision"],
+            )
+        else:
+            external_files = find_file_recursive(
+                quant_dir, f"*{model_type}*external_data"
+            )
+        if len(external_files) == 0:
+            return False
+        for external_file in external_files:
+            # 检查该文件是否与找到的onnx文件在同一目录
+            onnx_dir = os.path.dirname(onnx_files[0]) if onnx_files else None
+            external_dir = os.path.dirname(external_file)
 
-                # 如果找到了onnx文件，只移动同目录下的external_data文件
-                if onnx_dir and external_dir == onnx_dir:
-                    file_name = os.path.basename(external_file)
-                    external_dst = os.path.join(model_res_dir, file_name)
+            # 如果找到了onnx文件，只移动同目录下的external_data文件
+            if onnx_dir and external_dir == onnx_dir:
+                file_name = os.path.basename(external_file)
+                external_dst = os.path.join(model_res_dir, file_name)
 
-                    shutil.copy(external_file, external_dst)
-                    print(f"已移动: {external_file} -> {external_dst}")
+                shutil.copy(external_file, external_dst)
+                print(f"已移动: {external_file} -> {external_dst}")
 
         # 4. 处理golden数据
         if model_type == "encoder":
@@ -189,6 +192,123 @@ def _process_model_files(
     return True
 
 
+def _process_model_files_xh1(
+    backend: str, quant_dir: str, result_dir: str, model_name: str, model_type: str
+):
+    try:
+        # 1. 创建目标文件夹结构
+        model_res_dir = os.path.join(result_dir, model_type)
+        if model_type == "decode":
+            model_res_dir = os.path.join(result_dir, "decoder")
+        elif model_type == "vision":
+            model_res_dir = os.path.join(result_dir, "visual")
+        os.makedirs(model_res_dir, exist_ok=True)
+        print(f"已创建目标文件夹结构: {model_res_dir}")
+
+        if model_name in ["qwen3-vl", "qwen2.5-vl"] and model_type == "vision":
+            model_type = "visual"
+
+        # 2. 处理 hmquant_*_with_act.onnx
+        onnx_files = find_file_recursive(
+            quant_dir, f"hmquant_*{model_type}*with_act.onnx"
+        )
+        if len(onnx_files) == 0:
+            return False
+        # 取第一个匹配的文件
+        onnx_src = onnx_files[0]
+        onnx_dst = os.path.join(model_res_dir, f"hmquant_{model_name}_with_act.onnx")
+        shutil.copy(onnx_src, onnx_dst)
+        print(f"已重命名并移动: {onnx_src} -> {onnx_dst}")
+
+        # 3. 处理golden数据
+        golden = find_file_recursive(quant_dir, f"hmquant_*{model_type}*_input.npy")
+        opt_golden = find_file_recursive(
+            quant_dir, f"hmquant_*{model_type}*_output.npy"
+        )
+        golden += opt_golden
+
+        name_pattern = r"(?<=hmquant_).*?_decode"
+        if model_type == "prefill":
+            name_pattern = r"(?<=hmquant_).*?_prefill"
+        elif model_type in ["vision", "visual"]:
+            name_pattern = r"(?<=hmquant_).*?_visual"
+
+        if model_name in ["qwen3-vl", "qwen2.5-vl"]:
+            if model_type == "decode":
+                name_pattern = r"(?<=hmquant_).*?_decoder"
+            elif model_type == "prefill":
+                name_pattern = r"(?<=hmquant_).*?_Prefill"
+
+        for data_file in golden:
+            file_name = os.path.basename(data_file)
+            if "image_embeds" in file_name:
+                data_dst = os.path.join(model_res_dir, "image_embeds.npy")
+                shutil.copy(data_file, data_dst)
+                print(f"已移动: {data_file} -> {data_dst}")
+                continue
+            if model_type in ["vision", "visual"] and (
+                "Prefill" in file_name
+                or "decode" in file_name
+                or "prefill" in file_name
+            ):
+                continue
+            match = re.search(name_pattern, file_name)
+            if match:
+                original_name = match.group()
+                file_name_new = file_name.replace(original_name, model_name)
+                data_dst = os.path.join(model_res_dir, file_name_new)
+                shutil.copy(data_file, data_dst)
+                print(f"已移动: {data_file} -> {data_dst}")
+
+    except Exception as e:
+        print(f"处理过程中出错: {str(e)}")
+        return False
+
+    return True
+
+
+def _process_model_files(
+    backend: str, quant_dir: str, result_dir: str, model_name: str, model_type: str
+):
+    if backend == "xh1":
+        return _process_model_files_xh1(
+            backend, quant_dir, result_dir, model_name, model_type
+        )
+    elif backend == "xh2":
+        return _process_model_files_xh2(
+            backend, quant_dir, result_dir, model_name, model_type
+        )
+
+
+def _process_weight_file(quant_dir: str, result_dir: str):
+    weight_src = f"{quant_dir}/weight.npy"
+    if os.path.exists(weight_src):
+        weight_dst = os.path.join(result_dir, "weight.npy")
+        shutil.copy(weight_src, weight_dst)
+        print(f"已移动: {weight_src} -> {weight_dst}")
+
+    weight_src = f"{quant_dir}/decoder/weight.npy"
+    if os.path.exists(weight_src):
+        os.makedirs(f"{result_dir}/decoder", exist_ok=True)
+        weight_dst = os.path.join(result_dir, "decoder", "weight.npy")
+        shutil.copy(weight_src, weight_dst)
+        print(f"已移动: {weight_src} -> {weight_dst}")
+
+    weight_src = f"{quant_dir}/prefill/weight.npy"
+    if os.path.exists(weight_src):
+        os.makedirs(f"{result_dir}/prefill", exist_ok=True)
+        weight_dst = os.path.join(result_dir, "prefill", "weight.npy")
+        shutil.copy(weight_src, weight_dst)
+        print(f"已移动: {weight_src} -> {weight_dst}")
+
+    weight_src = f"{quant_dir}/visual/weight.npy"
+    if os.path.exists(weight_src):
+        os.makedirs(f"{result_dir}/visual", exist_ok=True)
+        weight_dst = os.path.join(result_dir, "visual", "weight.npy")
+        shutil.copy(weight_src, weight_dst)
+        print(f"已移动: {weight_src} -> {weight_dst}")
+
+
 if __name__ == "__main__":
     args = parse_args()
 
@@ -206,22 +326,17 @@ if __name__ == "__main__":
         print(f"已创建目标文件夹结构: {result_dir}")
 
         if backend == "xh1":
-            weight_src = f"{quant_dir}/weight.npy"
-            if os.path.exists(weight_src):
-                weight_dst = os.path.join(result_dir, "weight.npy")
-                shutil.copy(weight_src, weight_dst)
-                print(f"已移动: {weight_src} -> {weight_src}")
-            else:
-                print(f"警告: 未找到weight.npy文件")
-                sys.exit(-1)
+            _process_weight_file(quant_dir, result_dir)
 
         # 处理token_embedding.pt
         for embedding_src in glob.glob(
-            os.path.join(quant_dir, "**", "*_embedding*.pt"), recursive=True
+            os.path.join(quant_dir, "**", "*embedding*.pt"), recursive=True
         ):
             file_name = os.path.basename(embedding_src)
             if "quant_embedding" not in file_name and "token_embedding" in file_name:
                 file_name = file_name.replace("token_embedding", "quant_embedding")
+            if "quant_embedding" not in file_name and "qembedding" in file_name:
+                file_name = file_name.replace("qembedding", "quant_embedding")
             embedding_dst = os.path.join(result_dir, file_name)
             shutil.copy(embedding_src, embedding_dst)
             print(f"已移动: {embedding_src} -> {embedding_dst}")
@@ -245,6 +360,7 @@ if __name__ == "__main__":
         ):
             print(f"错误: 处理visual文件夹失败")
             sys.exit(-1)
+
         if os.path.exists(f"{quant_dir}/encoder") and not _process_model_files(
             backend, quant_dir, result_dir, model_name, "encoder"
         ):
