@@ -157,7 +157,7 @@ def quant_llm(args):
     config = AutoConfig.from_pretrained(hf_model_dir)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.float32
+    dtype = torch.float16
 
     native_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
         hf_model_dir,
@@ -165,7 +165,7 @@ def quant_llm(args):
         device_map="cpu",
         # config=config,
         trust_remote_code=True,
-        attn_implementation="eager",
+        attn_implementation="sdpa",
     )
 
     if native_model.config.tie_word_embeddings:
@@ -224,7 +224,7 @@ def quant_llm(args):
         from xh_model_zoo.xh_llm.quarot.quantizer_utils import gptq
 
         gptq_config = dict(
-            calib_dataset="laion/220k-GPT4Vision-captions-from-LIVIS",
+            calib_dataset=args.calib_dataset,
             calib_samples=args.calib_samples,
             seqlen=2048,
             w_clip=True,
@@ -235,6 +235,7 @@ def quant_llm(args):
             act_order=False,
             int8_down_proj=False,
             heading_gptq=True,
+            w_head_bits=args.w_head_bits
         )
 
         torch.cuda.reset_peak_memory_stats()
@@ -252,6 +253,7 @@ def quant_llm(args):
             layers_cache_dir=str(layers_cache_dir),
             is_qwen2_5_vl=True,
             processor=processor,
+            data_files=args.data_files,
         )
         logger.info(msg_output_format("End gptq quantization"))
 
@@ -300,7 +302,16 @@ def export_llm(args):
     model_name = Path(hf_model_path).name
     target_device = DeviceType.XH2a
     quant_type = args.quant_type
-    quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
+    ops=dict(MatMul=dict(
+            act_scheme=dict(
+                bits=8,
+                fp_mode="sefp",
+            ),
+            act_schema_2=dict(
+                bits=16,
+                fp_mode="sefp",
+            ),))
+    quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type, ops=ops)
     model_name = os.path.basename(args.model)
     model_dir = os.path.join(args.work_dir, "{}_quarot_gptq".format(model_name))
     quant_weight = os.path.join(
@@ -330,16 +341,6 @@ def export_llm(args):
     processor = AutoProcessor.from_pretrained(hf_model_path)
 
     # demo(native_model, processor)
-
-    # ops=dict(MatMul=dict(
-    #             act_scheme=dict(
-    #                 bits=8,
-    #                 fp_mode="sefp",
-    #             ),
-    #             w_scheme=dict(
-    #                 bits=16,
-    #                 fp_mode="sefp",
-    #             ),))
     config = Qwen2_5_VLConvertConfig(
         batch_size=args.batch_size,
         context_length=args.context_length,

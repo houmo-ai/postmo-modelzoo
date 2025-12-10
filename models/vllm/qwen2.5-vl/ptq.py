@@ -109,8 +109,9 @@ if HOUMO_TARGET == "xh2":
             "--model-name", type=str, default="qwen2.5-vl", help="output hmonnx model name"
         )
         parser.add_argument("--skip-quarot", action="store_true", help="skip_quarot")
-        parser.add_argument("--skip-gptq", action="store_true", help="skip_quarot")
+        parser.add_argument("--skip-gptq", action="store_true", help="skip_gptq")
         parser.add_argument("--w-bits", type=int, default=4)
+        parser.add_argument("--w-head-bits", type=int, default=8)
         parser.add_argument("--seed", type=int, default=1024)
         parser.add_argument(
             "--resume", action="store_true", help="resume from the cache"
@@ -122,6 +123,8 @@ if HOUMO_TARGET == "xh2":
         )
         parser.add_argument("--validate", action="store_true", help="validate")
         parser.add_argument("--calib-samples", type=int, default=8)
+        parser.add_argument("--calib_dataset", type=str, default="laion/220k-GPT4Vision-captions-from-LIVIS")
+        parser.add_argument("--data_files", nargs="+", type=str, default=[], help="List of dataset files")
         parser.add_argument("--batch-size", type=int, default=1, help="batch size")
         parser.add_argument(
             "--context-length", type=int, default=2048, help="max sequence length"
