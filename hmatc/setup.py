@@ -2,8 +2,11 @@ import os
 import sys
 import subprocess
 import pybind11
+import shutil  # ← 新增
+import pybind11
 from datetime import datetime
 from setuptools import setup, find_packages, Extension
+from setuptools.command.build_ext import build_ext
 
 
 TCIM_RUNTIME_PATH = os.environ.get("TCIM_RUNTIME_PATH")
@@ -78,10 +81,43 @@ requirements = []
 with open("requirements.txt", "r", encoding="utf-8") as f:
     lists = f.readlines()
     for line in lists:
+        if sys.platform == "win32" and "onnxsim" in line:
+            continue
         requirements.append(line.strip())
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
+
+
+class BuildExtWithDLL(build_ext):
+    """
+    在 Windows 平台构建结束后，将 TCIM_RUNTIME_PATH/bin/*.dll 复制到 pyd 同目录
+    """
+
+    def run(self):
+        super().run()
+
+        if sys.platform != "win32":
+            return
+
+        dll_dir = os.path.join(TCIM_RUNTIME_PATH, "bin")
+
+        for ext in self.extensions:
+            pyd_path = self.get_ext_fullpath(ext.name)
+            pyd_dir = os.path.dirname(pyd_path)
+            print(f"[INFO] Copying DLLs to: {pyd_dir}")
+
+            if not os.path.exists(dll_dir):
+                print(f"[WARN] DLL directory not found: {dll_dir}")
+                continue
+
+            for file in os.listdir(dll_dir):
+                if file.lower().endswith(".dll"):
+                    src = os.path.join(dll_dir, file)
+                    dst = os.path.join(pyd_dir, file)
+                    print(f"[COPY] {src} -> {dst}")
+                    shutil.copy(src, dst)
+
 
 setup(
     name="hmatc",
@@ -102,6 +138,9 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
+    cmdclass={
+        "build_ext": BuildExtWithDLL,  # ← 注册
+    },
     python_requires=">=3.8",
     install_requires=requirements,
     entry_points={

@@ -11,7 +11,6 @@ from pathlib import Path
 from datetime import datetime
 from ..utils import logger
 from ..utils.utils import get_onnx_inputs_info
-from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
 
 
 QUANTIZATION_RANGES = {
@@ -147,6 +146,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.eval_cfg = cfg.get("eval", dict())
         # hmatc onnx optimizer initialization
         if "app_onnx_opt" in cfg["model"]:
+            from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
+
             self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
 
     @staticmethod
