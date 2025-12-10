@@ -127,6 +127,9 @@ class WinEnvironsGenerater:
 
         if tcim_dll_path not in env_paths and tcim_dll_path != "":
             self.all_environments["PATH"] = f'{tcim_dll_path};' + self.all_environments["PATH"]
+            python_exe_path = os.path.abspath(os.path.join(self.all_environments["TCIM_RUNTIME_PATH"], "../../Scripts"))
+            if python_exe_path not in env_paths and python_exe_path != "":
+                self.all_environments["PATH"] = f'{python_exe_path};' + self.all_environments["PATH"]
 
         self.nullEnvManualSet("OPENCV_PATH", need=False)
 
@@ -174,7 +177,7 @@ class WinEnvironsGenerater:
 
         if xh2a_dll_path not in env_paths and xh2a_dll_path != "":
             self.all_environments["PATH"] = f'{xh2a_dll_path};' + self.all_environments["PATH"]
-            
+
         if tcim_dll_path not in env_paths and tcim_dll_path != "":
             self.all_environments["PATH"] = f'{tcim_dll_path};' + self.all_environments["PATH"]
             python_exe_path = os.path.abspath(os.path.join(self.all_environments["TCIM_RUNTIME_PATH"], "../../Scripts"))
