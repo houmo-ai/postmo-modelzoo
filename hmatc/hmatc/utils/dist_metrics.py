@@ -5,7 +5,11 @@ import numpy as np
 
 
 def cosine_distance(v1, v2):
-    """余弦距离
+    """
+    cosine_distance
+
+    :param v1: np.ndarray
+    :param v2: np.ndarray
     """
     v1_d = v1.flatten().astype("float64")
     v2_d = v2.flatten().astype("float64")
@@ -14,7 +18,9 @@ def cosine_distance(v1, v2):
     v2_d[v2_d == np.inf] = np.finfo(np.float16).max
     v1_d[v1_d == -np.inf] = np.finfo(np.float16).min
     v2_d[v2_d == -np.inf] = np.finfo(np.float16).min
-    return v1_d.dot(v2_d) / np.maximum(np.linalg.norm(v1_d) * np.linalg.norm(v2_d), np.finfo(np.float32).eps)
+    return np.maximum(v1_d.dot(v2_d), np.finfo(np.float64).eps) / np.maximum(
+        np.linalg.norm(v1_d) * np.linalg.norm(v2_d), np.finfo(np.float64).eps
+    )
 
 
 def numerical_distance(v1, v2, epsilon=1e-3):
@@ -95,7 +101,9 @@ def get_cos_similarity_per_channel_average(expect, actual, layout="NCHW"):
             for c in range(expect.shape[cidx]):
                 per_channel_expect = expect.take(indices=c, axis=cidx)
                 per_channel_actual = actual.take(indices=c, axis=cidx)
-                cosine_list.append(get_cos_similarity(per_channel_expect, per_channel_actual))
+                cosine_list.append(
+                    get_cos_similarity(per_channel_expect, per_channel_actual)
+                )
             return np.mean(cosine_list)
 
     return get_cos_similarity(expect, actual)
