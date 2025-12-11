@@ -21,3 +21,6 @@ deepseek_r1_qwen3_8b
 qwen2dot5_vl
 yolop
 wenet
+lprnet
+ppocrv3_det
+bge

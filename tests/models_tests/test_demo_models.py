@@ -192,3 +192,27 @@ def test_detection_yolox_demo(setup_logging):
     model_name = 'yolox'
     _demo_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.lprnet
+@pytest.mark.demo
+def test_ocr_lprnet_demo(setup_logging: type(print)) -> None:
+    """test_ocr_lprnet_demo"""
+    model_name = 'lprnet'
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.ppocrv3_det
+@pytest.mark.demo
+def test_ocr_ppocrv3_det_demo(setup_logging: type(print)) -> None:
+    """test_ocr_ppocrv3_det_demo"""
+    model_name = 'ppocrv3_det'
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.bge
+@pytest.mark.demo
+def test_embedding_bge_demo(setup_logging: type(print)) -> None:
+    """test_embedding_bge_demo"""
+    model_name = 'bge'
+    _demo_func(model_name, setup_logging)

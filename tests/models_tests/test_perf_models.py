@@ -192,3 +192,19 @@ def test_detection_yolox_perf(setup_logging):
     model_name = 'yolox'
     _perf_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.lprnet
+@pytest.mark.perf
+def test_ocr_lprnet_perf(setup_logging: type(print)) -> None:
+    """test_ocr_lprnet_perf"""
+    model_name = 'lprnet'
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.ppocrv3_det
+@pytest.mark.perf
+def test_ocr_ppocrv3_det_perf(setup_logging: type(print)) -> None:
+    """test_ocr_ppocrv3_det_perf"""
+    model_name = 'ppocrv3_det'
+    _perf_func(model_name, setup_logging)

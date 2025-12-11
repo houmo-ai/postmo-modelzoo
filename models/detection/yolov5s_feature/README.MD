@@ -1,6 +1,6 @@
 # YOLOv5s
 
-本示例展示如何在`XH1`上不使用`Resizer`将`YOLOv5s`模型编译，部署到后摩`XH1`芯片上。
+本示例展示如何不使用`Resizer`将`YOLOv5s`模型编译，部署到后摩芯片上。
 
 [TOC]
 
@@ -27,20 +27,20 @@ python export.py --weights ./yolov5s.pt --simplify --include onnx --opset 13
 ### 2.1 量化
 
 ```bash
-hmatc quant -c config.yml -t xh1       # 芯片
+hmatc quant -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.2 编译
 
 ```bash
-hmatc build -c config.yml -t xh1       # 芯片
+hmatc build -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.3 精度评估
 
 ```bash
-hmatc eval -c config.yml -t xh1          # 芯片
-hmatc eval -c config.yml -t xh1  --onnx  # onnx
+hmatc eval -c config.yml -t xh2          # 芯片
+hmatc eval -c config.yml -t xh2  --onnx  # onnx
 ```
 
 执行完成后会打印模型的数据集精度信息。
@@ -48,7 +48,7 @@ hmatc eval -c config.yml -t xh1  --onnx  # onnx
 ### 2.4 性能评估
 
 ```bash
-hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
+hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
@@ -63,13 +63,13 @@ hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
 本示例依赖hmatc演示结果，在编译完成的基础上执行：
 
 ```bash
-# xh1
-hmatc demo -c config.yml -t xh1
+# xh2
+hmatc demo -c config.yml -t xh2
 # onnx
-hmatc demo -c config.yml -t xh1 --onnx
+hmatc demo -c config.yml -t xh2 --onnx
 ```
 
-执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh1/vis_onnx目录。
+执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh2/vis_onnx目录。
 
 ## 3.参考结果
 
@@ -78,20 +78,19 @@ hmatc demo -c config.yml -t xh1 --onnx
 ```bash
 # onnx
 'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.361782', 'map50': '0.557085'
-# xh1
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.348281', 'map50': '0.546366'
+# xh2
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.355800', 'map50': '0.555100'
 ```
 
 ### 3.2 性能结果
 
 ```bash
-# xh1
-[Latency] Inference  avg:  13.501 ms, max:  15.080 ms, min:   7.365 ms, tp99:  14.648 ms, tp999:  15.080 ms
-[Latency] Input      avg:   0.568 ms, max:   0.871 ms, min:   0.265 ms, tp99:   0.788 ms, tp999:   0.871 ms
-[Latency] Output     avg:   2.118 ms, max:   2.667 ms, min:   0.970 ms, tp99:   2.530 ms, tp999:   2.667 ms
-[Latency] End2end    avg:  16.186 ms, max:  17.557 ms, min:   9.999 ms, tp99:  17.235 ms, tp999:  17.557 ms
-[Throughput] total: 2151.153 ms, avg: 2.151 ms, repeat: 1000, rounds: 1
-[Throughput] qps: 464.867
+[Latency] Inference  avg:   5.310 ms, max:   7.520 ms, min:   4.541 ms, tp99:   6.633 ms, tp999:   7.520 ms
+[Latency] Input      avg:   2.087 ms, max:   7.427 ms, min:   1.096 ms, tp99:   2.760 ms, tp999:   7.427 ms
+[Latency] Output     avg:   3.719 ms, max:   8.450 ms, min:   2.167 ms, tp99:   4.868 ms, tp999:   8.450 ms
+[Latency] End2end    avg:  11.117 ms, max:  15.629 ms, min:   8.689 ms, tp99:  12.859 ms, tp999:  15.629 ms
+[Throughput] total: 2803.001 ms, avg: 2.803 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 356.760
 ```
 
 性能结果相对使用`static_resizer`性能相差较大，非必要不建议将输出作为`feature`。

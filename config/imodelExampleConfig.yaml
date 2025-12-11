@@ -403,7 +403,7 @@ apis_common:
   test:
     - inferences_resnet50_test
     - inferences_yolov5s_test
-    # - inferences_resnet50_multistreams_test
+    - inferences_resnet50_multistreams_test
     - inferences_resnet50_pipeline_test
 
 ###### tools ######

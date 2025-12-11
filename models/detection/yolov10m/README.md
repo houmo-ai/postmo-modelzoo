@@ -23,20 +23,20 @@ yolo export model=yolov10m.pt format=onnx imgsz=640,640 opset=13 simplify=True
 ### 2.1 量化
 
 ```bash
-hmatc quant -c config.yml -t xh1       # 芯片
+hmatc quant -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.2 编译
 
 ```bash
-hmatc build -c config.yml -t xh1       # 芯片
+hmatc build -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.3 精度评估
 
 ```bash
-hmatc eval -c config.yml -t xh1          # 芯片
-hmatc eval -c config.yml -t xh1  --onnx  # onnx
+hmatc eval -c config.yml -t xh2          # 芯片
+hmatc eval -c config.yml -t xh2  --onnx  # onnx
 ```
 
 执行完成后会打印模型的数据集精度信息。
@@ -44,7 +44,7 @@ hmatc eval -c config.yml -t xh1  --onnx  # onnx
 ### 2.4 性能评估
 
 ```bash
-hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
+hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
@@ -54,19 +54,18 @@ hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
 > 性能测试的线程数建议是芯片核数的两倍，核数可通过环境变量HOUMO_CORE_NUM查看
 >
 
-
 ### 2.5 结果演示
 
 本示例依赖hmatc演示结果，在编译完成的基础上执行：
 
 ```bash
-# xh1
-hmatc demo -c config.yml -t xh1
+# xh2
+hmatc demo -c config.yml -t xh2
 # onnx
-hmatc demo -c config.yml -t xh1 --onnx
+hmatc demo -c config.yml -t xh2 --onnx
 ```
 
-执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh1/vis_onnx目录。
+执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh2/vis_onnx目录。
 
 ## 3.参考结果
 
@@ -75,8 +74,6 @@ hmatc demo -c config.yml -t xh1 --onnx
 ```bash
 # onnx
 'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.489048', 'map50': '0.667118'
-# xh1
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.482865', 'map50': '0.657273'
 # xh2
 'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.487788', 'map50': '0.665831'
 ```
@@ -84,15 +81,6 @@ hmatc demo -c config.yml -t xh1 --onnx
 ### 3.2 性能结果
 
 ```bash
-# xh1
-[Latency] Inference  avg:  30.035 ms, max:  31.338 ms, min:  24.975 ms, tp99:  30.997 ms, tp999:  31.338 ms
-[Latency] Input      avg:   0.324 ms, max:   0.513 ms, min:   0.158 ms, tp99:   0.419 ms, tp999:   0.513 ms
-[Latency] Output     avg:   0.967 ms, max:   1.615 ms, min:   0.505 ms, tp99:   1.292 ms, tp999:   1.615 ms
-[Latency] End2end    avg:  31.326 ms, max:  32.867 ms, min:  26.305 ms, tp99:  32.411 ms, tp999:  32.867 ms
-[Throughput] total: 3975.190 ms, avg: 3.975 ms, repeat: 1000, rounds: 1
-[Throughput] qps: 251.560
-
-# xh2
 [Latency] Inference  avg:  23.414 ms, max:  23.939 ms, min:  14.295 ms, tp99:  23.769 ms, tp999:  23.939 ms
 [Latency] Input      avg:   0.911 ms, max:   1.876 ms, min:   0.839 ms, tp99:   1.627 ms, tp999:   1.876 ms
 [Latency] Output     avg:   1.345 ms, max:   2.509 ms, min:   0.931 ms, tp99:   2.190 ms, tp999:   2.509 ms
@@ -100,10 +88,6 @@ hmatc demo -c config.yml -t xh1 --onnx
 [Throughput] total: 6445.712 ms, avg: 6.446 ms, repeat: 1000, rounds: 1
 [Throughput] qps: 155.142
 ```
-
->**注意：**
->
-> 结果均是以芯片核数两倍的线程数来测试，这里分别是8和4线程，仅供参考，具体结果以实际测试为准。
 
 ## 4.免责声明
 

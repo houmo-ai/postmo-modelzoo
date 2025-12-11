@@ -30,20 +30,20 @@ YOLOX导出的模型，前面会有多个Slice算子，可以将其统一利用h
 ### 2.1 量化
 
 ```bash
-hmatc quant -c config.yml -t xh1/xh2       # 芯片
+hmatc quant -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.2 编译
 
 ```bash
-hmatc build -c config.yml -t xh1/xh2       # 芯片
+hmatc build -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.3 精度评估
 
 ```bash
-hmatc eval -c config.yml -t xh1/xh2          # 芯片
-hmatc eval -c config.yml -t xh1/xh2  --onnx  # onnx
+hmatc eval -c config.yml -t xh2          # 芯片
+hmatc eval -c config.yml -t xh2  --onnx  # onnx
 ```
 
 执行完成后会打印模型的数据集精度信息。
@@ -51,7 +51,7 @@ hmatc eval -c config.yml -t xh1/xh2  --onnx  # onnx
 ### 2.4 性能评估
 
 ```bash
-hmatc perf -c config.yml -t xh1/xh2 -wn 10 -sn 1000 -tn 8
+hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
@@ -61,33 +61,25 @@ hmatc perf -c config.yml -t xh1/xh2 -wn 10 -sn 1000 -tn 8
 本示例依赖hmatc演示结果，在编译完成的基础上执行：
 
 ```bash
-# xh1
-hmatc demo -c config.yml -t xh1/xh2
+# xh2
+hmatc demo -c config.yml -t xh2
 # onnx
-hmatc demo -c config.yml -t xh1/xh2 --onnx
+hmatc demo -c config.yml -t xh2 --onnx
 ```
 
-执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh1/vis_onnx目录。
+执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh2/vis_onnx目录。
 
 ## 3.参考结果
 
-### 3.1 精度结果
-```bash
-# xh1
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.605732', 'map50': '0.819257', 'latency': '12.069121'
-# onnx
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 32, 'map50_95': '0.642724', 'map50': '0.831999', 'latency': '96.470609'
-```
-
-### 3.2 性能结果
+### 3.1 性能结果
 
 ```bash
-[latency] Inference     avg:  19.496 ms,        max:  21.348 ms
-[latency] Input         avg:   1.395 ms,        max:   2.892 ms
-[latency] Output        avg:   0.000 ms,        max:   0.000 ms
-[latency] End2End       avg:  20.892 ms,        max:  24.227 ms
-[Throughput] total: 2620.077 ms, avg: 2.620 ms
-[Throughput] qps: 381.668
+[Latency] Inference  avg:  21.441 ms, max:  23.336 ms, min:  13.189 ms, tp99:  22.870 ms, tp999:  23.336 ms
+[Latency] Input      avg:   2.138 ms, max:  10.335 ms, min:   1.121 ms, tp99:   2.570 ms, tp999:  10.335 ms
+[Latency] Output     avg:   1.153 ms, max:   5.390 ms, min:   0.657 ms, tp99:   1.393 ms, tp999:   5.390 ms
+[Latency] End2end    avg:  24.732 ms, max:  28.898 ms, min:  20.409 ms, tp99:  25.279 ms, tp999:  28.898 ms
+[Throughput] total: 6201.183 ms, avg: 6.201 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 161.260
 ```
 
 ## 4.免责声明

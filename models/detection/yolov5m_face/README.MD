@@ -68,18 +68,15 @@ hmatc demo -c config.yml -t xh2 --onnx
 基于data/datasets/widerface数据的结果（非全量数据集）
 
 ```bash
-# xh1
-{'input_size': [1, 3, 640, 640], 'dataset': 'widerface', 'num': 41, 'ap_easy': '0.883376', 'ap_medium': '0.894726', 'ap_hard': '0.808426'}
-# xh2
-{'input_size': [1, 3, 640, 640], 'dataset': 'widerface', 'num': 41, 'ap_easy': '0.891293', 'ap_medium': '0.891500', 'ap_hard': '0.842538'}
 # onnx
 {'input_size': [1, 3, 640, 640], 'dataset': 'widerface', 'num': 41, 'ap_easy': '0.907834', 'ap_medium': '0.895021', 'ap_hard': '0.829818'}
+# xh2
+{'input_size': [1, 3, 640, 640], 'dataset': 'widerface', 'num': 41, 'ap_easy': '0.891293', 'ap_medium': '0.891500', 'ap_hard': '0.842538'}
 ```
 
 ### 3.2 性能结果
 
 ```bash
-# xh2
 [Latency] Inference  avg:  24.027 ms, max:  24.840 ms, min:  11.392 ms, tp99:  24.466 ms, tp999:  24.840 ms
 [Latency] Input      avg:   0.909 ms, max:   2.157 ms, min:   0.519 ms, tp99:   1.023 ms, tp999:   2.157 ms
 [Latency] Output     avg:   0.455 ms, max:   0.694 ms, min:   0.292 ms, tp99:   0.613 ms, tp999:   0.694 ms

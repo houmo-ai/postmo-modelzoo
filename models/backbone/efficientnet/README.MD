@@ -30,20 +30,20 @@ torch.onnx.export(efficientnet, input, 'efficientnet_b0_224x224.onnx', opset_ver
 ### 2.1 量化
 
 ```bash
-hmatc quant -c config.yml -t xh1       # 芯片
+hmatc quant -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.2 编译
 
 ```bash
-hmatc build -c config.yml -t xh1       # 芯片
+hmatc build -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.3 精度评估
 
 ```bash
-hmatc eval -c config.yml -t xh1          # 芯片
-hmatc eval -c config.yml -t xh1  --onnx  # onnx
+hmatc eval -c config.yml -t xh2          # 芯片
+hmatc eval -c config.yml -t xh2  --onnx  # onnx
 ```
 
 执行完成后会打印模型的数据集精度信息。
@@ -51,7 +51,7 @@ hmatc eval -c config.yml -t xh1  --onnx  # onnx
 ### 2.4 性能评估
 
 ```bash
-hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
+hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
@@ -61,7 +61,7 @@ hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
 本示例依赖hmatc演示结果，在编译完成的基础上执行：
 
 ```bash
-hmatc demo -c config.yml -t xh1
+hmatc demo -c config.yml -t xh2
 ```
 
 执行完成后会打印模型的分类结果信息。
@@ -69,29 +69,24 @@ hmatc demo -c config.yml -t xh1
 ## 3.参考结果
 
 ### 3.1 精度结果
+
 ```bash
 # onnx
 'input_size': [1, 3, 224, 224], 'dataset': 'ILSVRC_2012Val', 'num': 50000, 'top1_acc': '0.750500'
-# xh1
-'input_size': [1, 3, 224, 224], 'dataset': 'ILSVRC_2012Val', 'num': 50000, 'top1_acc': '0.741300'
+# xh2
+'input_size': [1, 3, 224, 224], 'dataset': 'ILSVRC_2012Val', 'num': 50000, 'top1_acc': '0.726800'
 ```
 
 ### 3.2 性能结果
 
 ```bash
-# xh1
-[Latency] Inference  avg:  11.696 ms, max:  12.043 ms, min:   9.781 ms, tp99:  12.014 ms, tp999:  12.043 ms
-[Latency] Input      avg:   0.059 ms, max:   0.191 ms, min:   0.044 ms, tp99:   0.094 ms, tp999:   0.191 ms
-[Latency] Output     avg:   0.047 ms, max:   0.110 ms, min:   0.033 ms, tp99:   0.078 ms, tp999:   0.110 ms
-[Latency] End2end    avg:  11.801 ms, max:  12.166 ms, min:   9.908 ms, tp99:  12.121 ms, tp999:  12.166 ms
-[Throughput] total: 1487.464 ms, avg: 1.487 ms, repeat: 1000, rounds: 1
-[Throughput] qps: 672.285
+[Latency] Inference  avg:  12.867 ms, max:  19.161 ms, min:   6.555 ms, tp99:  13.217 ms, tp999:  19.161 ms
+[Latency] Input      avg:   0.301 ms, max:   0.480 ms, min:   0.139 ms, tp99:   0.445 ms, tp999:   0.480 ms
+[Latency] Output     avg:   0.086 ms, max:   0.250 ms, min:   0.012 ms, tp99:   0.228 ms, tp999:   0.250 ms
+[Latency] End2end    avg:  13.254 ms, max:  19.574 ms, min:   6.875 ms, tp99:  13.513 ms, tp999:  19.574 ms
+[Throughput] total: 3356.330 ms, avg: 3.356 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 297.944
 ```
-
->**注意：**
->
-> 结果均是以芯片核数两倍的线程数来测试，这里分别是8和4线程，仅供参考，具体结果以实际测试为准。
-> 
 
 ## 4.免责声明
 

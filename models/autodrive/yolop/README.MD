@@ -17,13 +17,13 @@
 ### 2.1 量化
 
 ```bash
-hmatc quant -c config.yml -t xh1       # 芯片
+hmatc quant -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.2 编译
 
 ```bash
-hmatc build -c config.yml -t xh1       # 芯片
+hmatc build -c config.yml -t xh2       # 芯片
 ```
 
 执行完成后会打印模型的数据集精度信息。
@@ -31,7 +31,7 @@ hmatc build -c config.yml -t xh1       # 芯片
 ### 2.3 性能评估
 
 ```bash
-hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
+hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
@@ -41,25 +41,25 @@ hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
 本示例依赖hmatc演示结果，在编译完成的基础上执行：
 
 ```bash
-# xh1
-hmatc demo -c config.yml -t xh1
+# xh2
+hmatc demo -c config.yml -t xh2
 # onnx
-hmatc demo -c config.yml -t xh1 --onnx
+hmatc demo -c config.yml -t xh2 --onnx
 ```
 
-执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh1/vis_onnx目录。
+执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh2/vis_onnx目录。
 
 ## 3.参考结果
 
 ### 3.1 性能结果
 
 ```bash
-[latency] Inference     avg:  25.520 ms,        max:  30.659 ms
-[latency] Input         avg:   1.031 ms,        max:   2.707 ms
-[latency] Output        avg:   1.357 ms,        max:   2.981 ms
-[latency] End2End       avg:  27.910 ms,        max:  33.534 ms
-[Throughput] total: 3499.710 ms, avg: 3.500 ms
-[Throughput] qps: 285.738
+[Latency] Inference  avg:  38.491 ms, max:  41.180 ms, min:  26.063 ms, tp99:  40.679 ms, tp999:  41.180 ms
+[Latency] Input      avg:   2.108 ms, max:   2.641 ms, min:   1.104 ms, tp99:   2.511 ms, tp999:   2.641 ms
+[Latency] Output     avg:   2.962 ms, max:   8.351 ms, min:   1.584 ms, tp99:   3.656 ms, tp999:   8.351 ms
+[Latency] End2end    avg:  43.562 ms, max:  49.776 ms, min:  30.699 ms, tp99:  44.774 ms, tp999:  49.776 ms
+[Throughput] total: 10935.865 ms, avg: 10.936 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 91.442
 ```
 
 ## 4.免责声明

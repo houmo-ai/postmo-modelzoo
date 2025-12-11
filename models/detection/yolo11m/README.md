@@ -23,20 +23,20 @@ yolo export model=yolo11m.pt format=onnx imgsz=640,640 opset=13 simplify=True
 ### 2.1 量化
 
 ```bash
-hmatc quant -c config.yml -t xh1       # 芯片
+hmatc quant -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.2 编译
 
 ```bash
-hmatc build -c config.yml -t xh1       # 芯片
+hmatc build -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.3 精度评估
 
 ```bash
-hmatc eval -c config.yml -t xh1          # 芯片
-hmatc eval -c config.yml -t xh1  --onnx  # onnx
+hmatc eval -c config.yml -t xh2          # 芯片
+hmatc eval -c config.yml -t xh2  --onnx  # onnx
 ```
 
 执行完成后会打印模型的数据集精度信息。
@@ -44,7 +44,7 @@ hmatc eval -c config.yml -t xh1  --onnx  # onnx
 ### 2.4 性能评估
 
 ```bash
-hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
+hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
@@ -54,13 +54,13 @@ hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
 本示例依赖hmatc演示结果，在编译完成的基础上执行：
 
 ```bash
-# xh1
-hmatc demo -c config.yml -t xh1
+# xh2
+hmatc demo -c config.yml -t xh2
 # onnx
-hmatc demo -c config.yml -t xh1 --onnx
+hmatc demo -c config.yml -t xh2 --onnx
 ```
 
-执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh1/vis_onnx目录。
+执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh2/vis_onnx目录。
 
 ## 3.参考结果
 
@@ -69,20 +69,19 @@ hmatc demo -c config.yml -t xh1 --onnx
 ```bash
 # onnx
 'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.489875', 'map50': '0.667923'
-# xh1
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.477935', 'map50': '0.657201'
+# xh2
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.489875', 'map50': '0.667500'
 ```
 
-### 3.1 性能结果
+### 3.2 性能结果
 
 ```bash
-# xh1
-[Latency] Inference  avg:  17.078 ms, max:  21.296 ms, min:   8.321 ms, tp99:  18.904 ms, tp999:  21.296 ms
-[Latency] Input      avg:   0.990 ms, max:   2.163 ms, min:   0.650 ms, tp99:   1.890 ms, tp999:   2.163 ms
-[Latency] Output     avg:   0.498 ms, max:   1.399 ms, min:   0.309 ms, tp99:   1.161 ms, tp999:   1.399 ms
-[Latency] End2end    avg:  18.566 ms, max:  22.585 ms, min:   9.510 ms, tp99:  20.403 ms, tp999:  22.585 ms
-[Throughput] total: 2374.309 ms, avg: 2.374 ms, repeat: 1000, rounds: 1
-[Throughput] qps: 421.175
+[Latency] Inference  avg:  17.069 ms, max:  18.530 ms, min:  10.258 ms, tp99:  18.154 ms, tp999:  18.530 ms
+[Latency] Input      avg:   1.910 ms, max:   2.349 ms, min:   1.088 ms, tp99:   2.250 ms, tp999:   2.349 ms
+[Latency] Output     avg:   0.937 ms, max:   1.151 ms, min:   0.622 ms, tp99:   1.114 ms, tp999:   1.151 ms
+[Latency] End2end    avg:  19.917 ms, max:  20.586 ms, min:  12.998 ms, tp99:  20.207 ms, tp999:  20.586 ms
+[Throughput] total: 5000.947 ms, avg: 5.001 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 199.962
 ```
 
 ## 4.免责声明

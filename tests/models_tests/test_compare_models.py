@@ -106,13 +106,13 @@ def test_segmentation_yolov8m_seg_compare(setup_logging):
     assert True
 
 
-
 @pytest.mark.yolov7
 @pytest.mark.compare
 def test_detection_yolov7_compare(setup_logging):
     model_name = 'yolov7'
     _compare_func(model_name, setup_logging)
     assert True
+
 
 @pytest.mark.yolov5m_face
 @pytest.mark.compare
@@ -128,3 +128,19 @@ def test_detection_yolox_compare(setup_logging):
     model_name = 'yolox'
     _compare_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.lprnet
+@pytest.mark.compare
+def test_ocr_lprnet_compare(setup_logging: type(print)) -> None:
+    """test_ocr_lprnet_compare"""
+    model_name = 'lprnet'
+    _compare_func(model_name, setup_logging)
+
+
+@pytest.mark.ppocrv3_det
+@pytest.mark.compare
+def test_ocr_ppocrv3_det_compare(setup_logging: type(print)) -> None:
+    """test_ocr_ppocrv3_det_compare"""
+    model_name = 'ppocrv3_det'
+    _compare_func(model_name, setup_logging)

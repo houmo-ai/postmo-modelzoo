@@ -1,15 +1,18 @@
 #ifndef __HMQWENINFER_H__
 #define __HMQWENINFER_H__
 
-#include "utils.h"
-#include "tcim/tcim_runtime.h"
-#include <map>
-#include "Hmtokenizer.h"
-#include <regex>
 #include <iomanip>
+#include <map>
+#include <regex>
 
-struct PerfInfos
-{
+#include "Hmtokenizer.h"
+#include "tcim/tcim_runtime.h"
+#include "utils.h"
+
+/**
+ * 存储perf结果
+ */
+struct PerfInfos {
   int input_tokens;
   int output_tokens;
   float prefill_time;
@@ -17,9 +20,11 @@ struct PerfInfos
   float embedding_time;
 };
 
-class HmQwenInfer
-{
-public:
+/**
+  class HmQwenInfer
+ */
+class HmQwenInfer {
+ public:
   HmQwenInfer(const std::string &prefillModelPath,
               const std::string &decodeModelPath,
               const std::string &tokenizerJsonPath,
@@ -53,9 +58,9 @@ public:
    * @param msg               用户输入字符串
    * @return                  无返回值，打印大模型对话的问答信息及性能信息
    */
-  void chat(const std::string &msg);
+  void Chat(const std::string &msg);
 
-private:
+ private:
   // 模型路径
   std::string prefillModelPath = "";
   std::string decodeModelPath = "";
@@ -66,11 +71,7 @@ private:
   int batch = 0;
   int eos_token_id = 0;
   int argmax_dim_len = 0;
-#ifdef BACKEND_XH1
-  int16_t decode_current_length = 1;
-#else
   int32_t decode_current_length = 1;
-#endif
   // model related
   std::shared_ptr<HmTokenizer> tokenizer;
 
@@ -80,15 +81,14 @@ private:
 
   std::vector<std::string> dummy_names;
 
-  std::map<std::string, tcim::Tensor>
-      prefill_input_map;
+  std::map<std::string, tcim::Tensor> prefill_input_map;
   std::map<std::string, tcim::Tensor> decode_input_map;
   std::map<std::string, tcim::Tensor> prefill_output_map;
   std::map<std::string, tcim::Tensor> decode_output_map;
 
-private:
+ private:
   // 获取prefill的nblocks
-  int get_nblocks();
+  int GetnBlocks();
 
   /**
    * 设置prefill输入
@@ -97,7 +97,8 @@ private:
    * @param current_length    prefill输入2
    * @return                  无返回值，设置输入数据
    */
-  void PrefillSetInputDatas(void *data, int32_t valid_length, int32_t current_length);
+  void PrefillSetInputDatas(void *data, int32_t valid_length,
+                            int32_t current_length);
   // perfill模型推理
   void PrefillInfer();
   // 获取prefill输出的token ids
@@ -116,4 +117,4 @@ private:
   void DecodeGetOutputDatas(std::vector<int32_t> &ids);
 };
 
-#endif // __HMQWENINFER_H__
+#endif  // __HMQWENINFER_H__

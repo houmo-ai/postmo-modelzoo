@@ -3,7 +3,7 @@ import argparse
 from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 

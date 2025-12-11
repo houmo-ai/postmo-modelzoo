@@ -1,13 +1,11 @@
 import os
 import sys
-import onnx
 import argparse
-from pathlib import Path
 from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
@@ -18,6 +16,7 @@ def get_args() -> argparse.Namespace:
         dest="model_type",
         type=str,
         default="hmm",
+        choices=["raw", "hmm"],
         help="which model type to get, choise in [raw, hmm]",
     )
     parser.add_argument(
@@ -56,9 +55,7 @@ if __name__ == "__main__":
     if model_type in ["raw"]:
         file_path = get_file_from_jfrog(raw_path, model_dir)
         if file_path:
-            extract_path = os.path.join(
-                os.path.dirname(file_path), "yolox_m.onnx"
-            )
+            extract_path = os.path.join(os.path.dirname(file_path), "yolox_m.onnx")
         else:
             sys.exit(1)
 

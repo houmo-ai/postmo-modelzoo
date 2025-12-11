@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
   std::unique_ptr<HmQwenInfer> Qwen3Infer =
       std::make_unique<HmQwenInfer>(prefillModelPath, decodeModelPath,
                                     tokenizerJsonPath, embeddingWeightPath);
-  Qwen3Infer->chat("请介绍一下存算一体技术的优势");
+  Qwen3Infer->Chat("请介绍一下存算一体技术的优势");
   Qwen3Infer.reset();
 
   return 0;

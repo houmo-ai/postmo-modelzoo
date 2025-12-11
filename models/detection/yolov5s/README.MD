@@ -27,20 +27,20 @@ python export.py --weights ./yolov5s.pt --simplify --include onnx --opset 13
 ### 2.1 量化
 
 ```bash
-hmatc quant -c config.yml -t xh1       # 芯片
+hmatc quant -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.2 编译
 
 ```bash
-hmatc build -c config.yml -t xh1       # 芯片
+hmatc build -c config.yml -t xh2       # 芯片
 ```
 
 ### 2.3 精度评估
 
 ```bash
-hmatc eval -c config.yml -t xh1          # 芯片
-hmatc eval -c config.yml -t xh1  --onnx  # onnx
+hmatc eval -c config.yml -t xh2          # 芯片
+hmatc eval -c config.yml -t xh2  --onnx  # onnx
 ```
 
 执行完成后会打印模型的数据集精度信息。
@@ -48,7 +48,7 @@ hmatc eval -c config.yml -t xh1  --onnx  # onnx
 ### 2.4 性能评估
 
 ```bash
-hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
+hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
@@ -63,13 +63,13 @@ hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 8
 本示例依赖hmatc演示结果，在编译完成的基础上执行：
 
 ```bash
-# xh1
-hmatc demo -c config.yml -t xh1
+# xh2
+hmatc demo -c config.yml -t xh2
 # onnx
-hmatc demo -c config.yml -t xh1 --onnx
+hmatc demo -c config.yml -t xh2 --onnx
 ```
 
-执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh1/vis_onnx目录。
+执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh2/vis_onnx目录。
 
 ## 3.参考结果
 
@@ -78,8 +78,6 @@ hmatc demo -c config.yml -t xh1 --onnx
 ```bash
 # onnx
 'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.361782', 'map50': '0.557085'
-# xh1
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.349121', 'map50': '0.546347'
 # xh2
 'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.355790', 'map50': '0.555081'
 ```
@@ -87,14 +85,6 @@ hmatc demo -c config.yml -t xh1 --onnx
 ### 3.2 性能结果
 
 ```bash
-# xh1
-[Latency] Inference  avg:   7.029 ms, max:  10.042 ms, min:   4.460 ms, tp99:   7.773 ms, tp999:  10.042 ms
-[Latency] Input      avg:   0.357 ms, max:   0.712 ms, min:   0.192 ms, tp99:   0.561 ms, tp999:   0.712 ms
-[Latency] Output     avg:   2.332 ms, max:   4.136 ms, min:   1.122 ms, tp99:   3.661 ms, tp999:   4.136 ms
-[Latency] End2end    avg:   9.718 ms, max:  11.790 ms, min:   6.784 ms, tp99:  10.956 ms, tp999:  11.790 ms
-[Throughput] total: 1276.426 ms, avg: 1.276 ms, repeat: 1000, rounds: 1
-[Throughput] qps: 783.438
-# xh2
 [Latency] Inference  avg:   6.668 ms, max:   6.790 ms, min:   6.221 ms, tp99:   6.773 ms, tp999:   6.790 ms
 [Latency] Input      avg:   0.908 ms, max:   1.088 ms, min:   0.888 ms, tp99:   0.937 ms, tp999:   1.088 ms
 [Latency] Output     avg:   2.139 ms, max:   2.234 ms, min:   2.069 ms, tp99:   2.206 ms, tp999:   2.234 ms

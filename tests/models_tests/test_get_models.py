@@ -215,3 +215,30 @@ def test_detection_yolox_get_model(setup_logging):
     model_name = 'yolox'
     _get_model_func(model_name, setup_logging)
     assert True
+
+
+@pytest.mark.lprnet
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_ocr_lprnet_get_model')
+def test_ocr_lprnet_get_model(setup_logging: type(print)) -> None:
+    """test_ocr_lprnet_get_model"""
+    model_name = 'lprnet'
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.ppocrv3_det
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_ocr_ppocrv3_det_get_model')
+def test_ocr_ppocrv3_det_get_model(setup_logging: type(print)) -> None:
+    """test_ocr_ppocrv3_det_get_model"""
+    model_name = 'ppocrv3_det'
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.bge
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_embedding_bge_get_model')
+def test_embedding_bge_get_model(setup_logging: type(print)) -> None:
+    """test_embedding_bge_get_model"""
+    model_name = 'bge'
+    _get_model_func(model_name, setup_logging)

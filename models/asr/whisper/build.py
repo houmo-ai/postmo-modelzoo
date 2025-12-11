@@ -10,14 +10,11 @@ import logging
 
 logging.basicConfig(level="INFO")
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
-GOLDEN_THRESH = 0.999 if HOUMO_TARGET == "xh1" else 0.98
+HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
-if HOUMO_TARGET == 'xh1':
-    default_ncore = 4
-elif HOUMO_TARGET == 'xh2':
-    default_ncore = 2
+HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
+GOLDEN_THRESH = 0.98
 
 
 def sanitize_name(name: str):
@@ -41,10 +38,12 @@ def cosine_distance(data1, data2):
         return -1
     return cosine_dist
 
+
 class ProcessMemoryMonitor:
     """
     Monitors the memory usage of the current Python process in real-time using psutil.
     """
+
     def __init__(self, interval=2, log_file=None):
         """
         Initializes the monitor.
@@ -66,7 +65,7 @@ class ProcessMemoryMonitor:
         """
         memory_info = self.process.memory_info()
         rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
-        percent = self.process.memory_percent()   # Percentage of system memory
+        percent = self.process.memory_percent()  # Percentage of system memory
         return {'rss_mb': rss_mb, 'percent': percent}
 
     def start(self):
@@ -98,8 +97,10 @@ class ProcessMemoryMonitor:
         """Stops the monitoring loop and prints peak usage."""
         self.is_monitoring = False
         if hasattr(self, 'monitor_thread'):
-            self.monitor_thread.join(timeout=1) # Wait a moment for the thread to finish
+            # Wait a moment for the thread to finish
+            self.monitor_thread.join(timeout=1)
         print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""

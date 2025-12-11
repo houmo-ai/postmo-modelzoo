@@ -1,13 +1,11 @@
 import os
 import sys
-import onnx
 import argparse
-
 from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
@@ -18,6 +16,7 @@ def get_args() -> argparse.Namespace:
         dest="model_type",
         type=str,
         default="hmm",
+        choices=["raw", "hmm"],
         help="which model type to get, choise in [raw, hmm]",
     )
     parser.add_argument(
