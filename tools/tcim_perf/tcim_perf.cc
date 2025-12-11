@@ -348,8 +348,22 @@ template <typename T>
 void LoadNpyFile(const std::string &data_file, std::vector<size_t> &shape,
                  tcim::Tensor &tensor) {
   std::vector<T> data;
+#ifdef _MSC_VER
+  std::vector<npy::ndarray_len_t> npy_shape;
+  // 关键修改2：调用 LoadArrayFromNumpy 时，传入 npy_shape（而非原 size_t 类型的
+  // shape）
+  npy::LoadArrayFromNumpy(data_file, npy_shape, data);
+  // 补充：将 npy_shape 转换回 size_t 类型的 shape（满足函数输出要求）
+  shape.clear();
+  for (auto dim : npy_shape) {
+    shape.emplace_back(static_cast<size_t>(
+        dim));  // 安全转换（ndarray_len_t 通常是 int64_t/size_t）
+  }
+  memcpy(tensor.Data(), data.data(), tensor.Info().MemSize());
+#else
   npy::LoadArrayFromNumpy(data_file, shape, data);
   memcpy(tensor.Data(), &data[0], tensor.Info().MemSize());
+#endif
 }
 
 int LoadNpy2Tensor(const std::string &hm_target, const std::string &data_file,
@@ -1131,7 +1145,11 @@ int PerfFunc(CliArguments &arguments) {
   StreamEngine *engine = nullptr;
   std::vector<std::future<int>> threads;
   Barrier barrier(thread_num);
+#ifdef _MSC_VER
+  std::vector<ThreadInfo> thread_info(thread_num);
+#else
   ThreadInfo thread_info[thread_num];
+#endif
   int did = 0;
   if (!use_md_pool) {
     engine = new StreamEngine(stream_num);
@@ -1259,8 +1277,13 @@ int PerfFunc(CliArguments &arguments) {
   }
 
   float total_cost = GET_COST(start, end) / 1000.0;
+#ifdef _MSC_VER
+  ProcessPerfResults(thread_info.data(), thread_num, loop_num, sample_num,
+                     batch, total_cost, output_path, input_datas);
+#else
   ProcessPerfResults(thread_info, thread_num, loop_num, sample_num, batch,
                      total_cost, output_path, input_datas);
+#endif
 
   delete engine;
   delete module_pool;
