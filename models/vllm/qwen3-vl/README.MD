@@ -7,7 +7,7 @@
 ## 1 模型说明
 
 本例使用的模型实现来源于[https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct](https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct)。
-本例只适用于xh2。
+本例适用于xh1和xh2，量化仅支持xh2。
 
 ## 2 快速开始
 
@@ -38,7 +38,7 @@ qwen3-vl_visual.hmm
 
 Qwen3-vl模型使用python API进行演示
 
-1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下，也可通过demo中的`EMBEDDING_PATH`变量指定位置
+1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下
 
 2. 执行脚本，推理完成将输出性能结果。
 
@@ -47,6 +47,8 @@ Qwen3-vl模型使用python API进行演示
 ```bash
 pip3 install transformers==4.57.1
 python3 demo.py
+python3 get_model.py --type raw
+python3 ptq.py
 ```
 
 ### 2.4 一键评估

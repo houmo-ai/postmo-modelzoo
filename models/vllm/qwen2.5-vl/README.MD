@@ -7,7 +7,7 @@
 ## 1 模型说明
 
 本例使用的模型实现来源于[https://modelscope.cn/models/Qwen/Qwen2.5-VL-3B-Instruct](https://modelscope.cn/models/Qwen/Qwen2.5-VL-3B-Instruct)。
-本例只适用于xh1。
+本例适用于xh1和xh2，量化仅支持xh2。
 
 ## 2 快速开始
 
