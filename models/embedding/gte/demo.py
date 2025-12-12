@@ -151,7 +151,6 @@ class HmGte:
         output_data = torch.from_numpy(
             self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
         )
-        output_data = F.normalize(output_data, p=2, dim=1)
         prefill_time = time.time() - start_time
 
         return output_data, input_echo_len, prefill_time
