@@ -18,20 +18,20 @@
 ### 2.1 量化
 
 ```bash
-hmatc quant -c config.yml -t xh1       # 芯片, M30系列为xh1，M50系列为xh2
+hmatc quant -c config.yml -t xh2
 ```
 
 ### 2.2 编译
 
 ```bash
-hmatc build -c config.yml -t xh1       # 芯片, M30系列为xh1，M50系列为xh2
+hmatc build -c config.yml -t xh2
 ```
 
 ### 2.3 精度评估
 
 ```bash
-hmatc eval -c config.yml -t xh1          # 芯片, M30系列为xh1，M50系列为xh2
-hmatc eval -c config.yml -t xh1  --onnx  # onnx
+hmatc eval -c config.yml -t xh2
+hmatc eval -c config.yml -t xh2  --onnx
 ```
 
 执行完成后会打印模型的数据集精度信息。
@@ -39,7 +39,7 @@ hmatc eval -c config.yml -t xh1  --onnx  # onnx
 ### 2.4 性能评估
 
 ```bash
-hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 4   # 芯片, M30系列为xh1，M50系列为xh2
+hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
@@ -49,13 +49,13 @@ hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 4   # 芯片, M30系列为xh
 本示例依赖hmatc演示结果，在编译完成的基础上执行：
 
 ```bash
-# xh2
-hmatc demo -c config.yml -t xh1             # 芯片, M30系列为xh1，M50系列为xh2
 # onnx
-hmatc demo -c config.yml -t xh1 --onnx      # 芯片, M30系列为xh1，M50系列为xh2
+hmatc demo -c config.yml -t xh2 --onnx
+# xh2
+hmatc demo -c config.yml -t xh2
 ```
 
-执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh1/vis_onnx目录。
+执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh2/vis_onnx目录。
 
 ## 3.参考结果
 
@@ -64,25 +64,15 @@ hmatc demo -c config.yml -t xh1 --onnx      # 芯片, M30系列为xh1，M50系�
 基于CCPD2020数据的结果
 
 ```bash
-# xh1
-{'input_size': [1, 3, 1184, 736], 'dataset': 'CCPD2020Val', 'num': 1001, 'hmean': '0.998501', 'latency': '60.359270'}
-# xh2
-{'input_size': [1, 3, 1184, 736], 'dataset': 'CCPD2020Val', 'num': 1001, 'hmean': '0.998501', 'latency': '73.519865'}
 # onnx
 {'input_size': [1, 3, 1184, 736], 'dataset': 'CCPD2020Val', 'num': 1001, 'hmean': '0.998501', 'latency': '50.945235'}
+# xh2
+{'input_size': [1, 3, 1184, 736], 'dataset': 'CCPD2020Val', 'num': 1001, 'hmean': '0.998501', 'latency': '73.519865'}
 ```
 
 ### 3.2 性能结果
 
 ```bash
-# xh1
-[Latency] Inference  avg:  57.204 ms, max:  64.370 ms, min:  57.109 ms, tp99:  57.586 ms, tp999:  64.370 ms
-[Latency] Input      avg:   0.416 ms, max:   4.295 ms, min:   0.229 ms, tp99:   0.629 ms, tp999:   4.295 ms
-[Latency] Output     avg:   0.574 ms, max:   7.673 ms, min:   0.361 ms, tp99:   0.927 ms, tp999:   7.673 ms
-[Latency] End2end    avg:  58.193 ms, max:  66.461 ms, min:  57.737 ms, tp99:  60.068 ms, tp999:  66.461 ms
-[Throughput] total: 58195.113 ms, avg: 58.195 ms, repeat: 1000, rounds: 1
-[Throughput] qps: 17.184
-# xh2
 [Latency] Inference  avg:  62.217 ms, max:  62.605 ms, min:  61.571 ms, tp99:  62.484 ms, tp999:  62.605 ms
 [Latency] Input      avg:   2.518 ms, max:   4.715 ms, min:   1.229 ms, tp99:   2.784 ms, tp999:   4.715 ms
 [Latency] Output     avg:   1.012 ms, max:   2.259 ms, min:   0.456 ms, tp99:   1.222 ms, tp999:   2.259 ms

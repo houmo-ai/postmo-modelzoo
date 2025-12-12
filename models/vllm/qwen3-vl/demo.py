@@ -21,7 +21,7 @@ from processing_qwen3_vl import Qwen3VLProcessor
 from utils import get_rope_index, QRawToYuv
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def is_valid_char(cp):
@@ -679,10 +679,7 @@ class Qwen3VL:
         n_image_tokens = torch.sum(input_ids == self.image_token_id).item()
         if n_image_tokens > 0:
             image_embeds = data["image_embeds"]
-            if HOUMO_TARGET == "xh1":
-                n_image_features = image_embeds.shape[0]
-            elif HOUMO_TARGET == "xh2":
-                n_image_features = image_embeds.shape[1]
+            n_image_features = image_embeds.shape[1]
             if n_image_tokens != n_image_features:
                 raise ValueError(
                     f"Image features and image tokens do not match: tokens: {n_image_tokens}, features {n_image_features}"
@@ -827,16 +824,11 @@ class Qwen3VL:
             prefill_output = self.prefill.get_output(
                 self.prefill.get_output_name(0)
             ).numpy()
-        if HOUMO_TARGET == "xh1":
-            prefill_output = np.expand_dims(prefill_output, axis=0)
         next_id = prefill_output.argmax(-1)
         return next_id, past_seq_length
 
     def run_visual(self, inputs):
         vit_input = inputs[0]
-        if HOUMO_TARGET == "xh1":
-            vit_input = vit_input[:, :, 0, :, :]
-            vit_input = self.rgb2yuv(vit_input)
         self.vit_model.set_input(
             self.vit_model.get_input_name(0),
             vit_input.numpy(),
@@ -983,11 +975,7 @@ class Qwen3VL:
         self.decode.sync()
         self.decode_time += time.time() - start_time
         decoder_output = self.decode.get_output(self.decode.get_output_name(0)).numpy()
-        if HOUMO_TARGET == "xh1":
-            decoder_output = np.expand_dims(decoder_output, axis=0)
-        self.next_id = self.samplingmanager.sample(
-            decoder_output, self.generated_ids
-        )
+        self.next_id = self.samplingmanager.sample(decoder_output, self.generated_ids)
         self.generated_ids.append(self.next_id.item())
         if self.next_id.item() in self.eos_token_id:
             print(self.decode_response, end="", flush=True)

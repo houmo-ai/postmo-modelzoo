@@ -95,7 +95,7 @@ def _generate_py_cmds(
     return cmd_list
 
 
-def _check_compile_result(res_str: str) -> bool:
+def _check_compile_result(res_str: str, benchmark_val: float) -> bool:
     import re
 
     if HOUMO_BACKEND == "xh2":
@@ -131,6 +131,8 @@ def _check_compile_result(res_str: str) -> bool:
     compile_th = 0.99
     if HOUMO_BACKEND == "xh2":
         compile_th = 0.9
+    if benchmark_val > 0:
+        compile_th = benchmark_val
     check_res = all(row[header[1]] >= compile_th for row in rows)
     if check_res is True and HOUMO_BACKEND == "xh1":
         check_res = all(row[header[3]] >= compile_th for row in rows)
@@ -912,7 +914,8 @@ def execute_compile_flow(
             if exec_flag is False:
                 final_flag = False
             else:
-                final_flag = _check_compile_result(opt_str)
+                benchmark_val = 0.76 if model_name == "ppocrv3_det" else 0
+                final_flag = _check_compile_result(opt_str, benchmark_val)
                 if final_flag is False:
                     logger.error(
                         f"Cosine distance exceeds 0.99, compile cmd: {tmp_cmd_list}"

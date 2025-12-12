@@ -11,15 +11,12 @@ HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '/usr/local/examples/data
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', '')
 YUV_FORMAT = 'YUV420'
 SUB_QUANT_PATH = {
-    "xh1": "hmquant",
     "xh2": "xhquant"
 }
 NORAM_DIST = {
-    "xh1": 1.0,
     "xh2": 0.99
 }
 DYNAMIC_RESIZE = {
-    "xh1": True,
     "xh2": False
 }
 

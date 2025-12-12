@@ -437,23 +437,23 @@ def move_models_res(src_path: str, dst_path: str) -> bool:
     ):
         # copy onnx & hmm
         for file_path in glob(src_path + "/*"):
-            if not file_path.endswith(".hmm") and not file_path.endswith(".onnx"):
+            if os.path.isdir(file_path):
+                folder_name = file_path.rsplit("/", 1)[-1].strip()
+                dst_opt_folder = os.path.join(dst_path, folder_name)
+                if os.path.exists(dst_opt_folder):
+                    logger.warning(f"remove folder: {dst_opt_folder}.")
+                    shutil.rmtree(dst_opt_folder, ignore_errors=True)
+                shutil.copytree(file_path, dst_opt_folder)
+                logger.info(f"Move model folder {file_path} -> {dst_opt_folder}")
+                continue
+
+            if not not file_path.endswith(".hmm") and not file_path.endswith(".onnx"):
                 continue
             file_name = file_path.rsplit("/", 1)[-1].strip()
             dst_file_path = os.path.join(dst_path, file_name)
             logger.info(f"Move model file {file_path} -> {dst_file_path}")
             shutil.copy2(file_path, dst_file_path)
 
-        if not os.path.isdir(src_path):
-            return True
-
-        src_opt_folder = os.path.join(src_path, "output")
-        if os.path.exists(src_opt_folder):
-            dst_opt_folder = os.path.join(dst_path, "output")
-            if os.path.exists(dst_opt_folder):
-                logger.warning(f"remove folder: {dst_opt_folder}.")
-                shutil.rmtree(dst_opt_folder)
-            shutil.copytree(src_opt_folder, dst_opt_folder)
     return True
 
 

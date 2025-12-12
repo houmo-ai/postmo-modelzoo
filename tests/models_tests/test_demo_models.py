@@ -5,7 +5,8 @@ from .test_models_utils import *
 logger = logging.getLogger(__name__)
 
 
-def _demo_func(model_name, log_file):
+def _demo_func(model_name: str, log_file: str) -> None:
+    """execute demo test"""
     logger.info("===> TEST START: test_%s_demo", model_name)
     execute_demo_flow(model_name, log_file)
 

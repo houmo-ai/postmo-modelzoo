@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 from prettytable import PrettyTable
 from hmatc.infer import onnx_infer
-from hmatc.utils.preprocess import convert_bgr_to_yuv
+from hmatc.infer import xhquant_infer, xh2_infer
 
 SCRIP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(SCRIP_DIR)
@@ -33,65 +33,23 @@ def compare(args):
         logger.error("Failed to decode image")
         assert(0)
     onnx_in_datas[inputs_info_list[0]['name']] = onnx_preprocess(cv_image, inputs_info_list[0]['input_shape'][2:])
-    
-    if HOUMO_TARGET == "xh1":
-        from hmatc.infer import hmquant_infer, xh1_infer
-        
-        sequencer_path =os.path.join(args.output_path, f"{HOUMO_TARGET}/{SUB_QUANT_PATH[HOUMO_TARGET]}/{model_name}.pkl")
-        hmquantInfer = hmquant_infer.HmQuantInfer()
-        hmquantInfer.load(sequencer_path)
 
-        hmm_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{model_name}_{HOUMO_TARGET}_b1_1core_O2.hmm")
-        xhInfer = xh1_infer.Xh1Infer()
-        xhInfer.load(hmm_path)
-        data_fmt = xhInfer.inputs_info[inputs_info_list[0]['name']].format.name
+    sequencer_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{SUB_QUANT_PATH[HOUMO_TARGET]}/{model_name}.onnx")
+    hmquant_infer = xhquant_infer.Xh2HmQuantInfer()
+    hmquant_infer.load(sequencer_path)
 
-        input_tensor, dyn_info = xh_preprocess(cv_image, inputs_info_list[0]['input_shape'][2:])
-        yuv_pad_hwc = convert_bgr_to_yuv(input_tensor, fmt=data_fmt)
-        h, w, c = yuv_pad_hwc.shape
-        yuv_pad = yuv_pad_hwc.view(1, c, h, w)
+    hmm_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{model_name}_{HOUMO_TARGET}_b1_1core_O2.hmm")
+    xh_infer = xh2_infer.Xh2Infer()
+    xh_infer.load(hmm_path)
 
-        hmquant_in_datas[inputs_info_list[0]['name']] = yuv_pad.contiguous()
-        hmquant_in_datas[f"resizer_crop_{inputs_info_list[0]['name']}"] = dyn_info
+    onnx_data_fp16 = onnx_in_datas[inputs_info_list[0]['name']].copy().astype(np.float16)
+    hmquant_in_datas[inputs_info_list[0]['name']] = torch.from_numpy(onnx_data_fp16).cpu()
 
-        yuv_pad = yuv_pad_hwc.detach().cpu().numpy().flatten()
-        if data_fmt == "YUV420SP":
-            valid_len = yuv_pad.size // 2
-        elif data_fmt == "YUV422SP":
-            valid_len = yuv_pad.size * 2 // 3
-        elif data_fmt in ["YUV444SP", "YUV400"]:
-            valid_len = yuv_pad.size
-        else:
-            logger.error(f"Unsupported format: {data_fmt}!")
-            assert(0)
-        yuv = yuv_pad[:valid_len]
-        yuv = yuv.reshape(1, -1)
-
-        xh_in_datas[inputs_info_list[0]['name']] = np.ascontiguousarray(yuv)  # np.ndarray
-        xh_in_datas[f"resizer_crop_{inputs_info_list[0]['name']}"] = dyn_info.detach().cpu().numpy()
-
-    elif HOUMO_TARGET == "xh2":
-        from hmatc.infer import xhquant_infer, xh2_infer
-
-        sequencer_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{SUB_QUANT_PATH[HOUMO_TARGET]}/{model_name}.onnx")
-        hmquantInfer = xhquant_infer.Xh2HmQuantInfer()
-        hmquantInfer.load(sequencer_path)
-
-        hmm_path = os.path.join(args.output_path, f"{HOUMO_TARGET}/{model_name}_{HOUMO_TARGET}_b1_1core_O2.hmm")
-        xhInfer = xh2_infer.Xh2Infer()
-        xhInfer.load(hmm_path)
-
-        onnx_data_fp16 = onnx_in_datas[inputs_info_list[0]['name']].copy().astype(np.float16)
-        hmquant_in_datas[inputs_info_list[0]['name']] = torch.from_numpy(onnx_data_fp16).cpu()
-
-        xh_in_datas[inputs_info_list[0]['name']] = onnx_data_fp16
-    else:
-        logger.error(f"Unsupported CHIP TARGET: {HOUMO_TARGET}")
-        assert(0)
+    xh_in_datas[inputs_info_list[0]['name']] = onnx_data_fp16
     
     onnx_outputs = onnxInfer.run(onnx_in_datas)
-    hmquant_outputs = hmquantInfer.run(hmquant_in_datas)
-    _, xh_outputs = xhInfer.run(xh_in_datas)
+    hmquant_outputs = hmquant_infer.run(hmquant_in_datas)
+    _, xh_outputs = xh_infer.run(xh_in_datas)
 
     header = [
             "name",
@@ -108,9 +66,7 @@ def compare(args):
         
         # hmquant
         hmquant_output = hmquant_outputs[output_name]
-        if HOUMO_TARGET == "xh1":
-            hmquant_output = xhInfer.dequantize(output_name, hmquant_output)
-        
+
         # xh
         xh_output = xh_outputs[output_name]
 

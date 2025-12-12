@@ -27,7 +27,7 @@ def _append_model_to_txt(new_model: str) -> bool:
 
     if new_model in existing_models:
         print(f"✅ 模型 '{new_model}' 已在 {file_path} 中，无需重复添加")
-        return False
+        return True
     else:
         with open(file_path, "a+", encoding="utf-8") as f:
             f.seek(0, 2)
@@ -105,10 +105,10 @@ def main():
                     file.write(
                         f"@pytest.mark.dependency(name='{func_name}', depends_on=['test_get_models.py::test_{model_type}_{model_name_new}_get_model'])\n"
                     )
-                file.write(f"def {func_name}(setup_logging):\n")
+                file.write(f"def {func_name}(setup_logging: type(print)) -> None:\n")
+                file.write(f'    """{func_name}"""\n')
                 file.write(f"    model_name = '{model_name}'\n")
                 file.write(f"    _{flow_name}_func(model_name, setup_logging)\n")
-                file.write(f"    assert True\n")
 
 
 if __name__ == "__main__":

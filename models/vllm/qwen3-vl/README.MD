@@ -7,7 +7,6 @@
 ## 1 模型说明
 
 本例使用的模型实现来源于[https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct](https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct)。
-本例适用于xh1和xh2，量化仅支持xh2。
 
 ## 2 快速开始
 
@@ -15,13 +14,30 @@
 
 ### 2.1 获取模型和数据
 
+通过get_model脚本下载模型，可通过参数选择下载原始模型或芯片模型。
+
+```bash
+# 下载原始模型用于量化
+python3 get_model.py --type raw
+```
+
 如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
 python3 get_model.py --type hmm
 ```
 
-### 2.2 编译
+### 2.2 量化
+
+量化下载的原始模型。在当前目录下，执行脚本：
+
+```bash
+# 量化依赖transformers==4.57.1
+pip3 install transformers==4.57.1
+python3 ptq.py
+```
+
+### 2.3 编译
 
 将量化模型编译为在芯片上运行的模型。执行脚本：
 
@@ -29,12 +45,12 @@ python3 get_model.py --type hmm
 python3 build.py
 ```
 
-编译好的模型存放在当前目录，包括2个文件：
+编译好的模型存放在当前目录，包括3个文件：
 qwen3-vl_prefill.hmm
 qwen3-vl_decoder.hmm
 qwen3-vl_visual.hmm
 
-### 2.3 演示
+### 2.4 演示
 
 Qwen3-vl模型使用python API进行演示
 
@@ -42,16 +58,13 @@ Qwen3-vl模型使用python API进行演示
 
 2. 执行脚本，推理完成将输出性能结果。
 
-3. 注意：由于ubuntu18.04下qwen_vl_utils无法正常安装，导致无法正常运行。
+注意：由于ubuntu18.04下qwen_vl_utils无法正常安装，导致无法正常运行。
 
 ```bash
-pip3 install transformers==4.57.1
 python3 demo.py
-python3 get_model.py --type raw
-python3 ptq.py
 ```
 
-### 2.4 一键评估
+### 2.5 一键评估
 
 以上步骤可以通过test.sh脚本一键执行：
 

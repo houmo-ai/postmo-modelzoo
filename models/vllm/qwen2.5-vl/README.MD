@@ -6,8 +6,8 @@
 
 ## 1 模型说明
 
-本例使用的模型实现来源于[https://modelscope.cn/models/Qwen/Qwen2.5-VL-3B-Instruct](https://modelscope.cn/models/Qwen/Qwen2.5-VL-3B-Instruct)。
-本例适用于xh1和xh2，量化仅支持xh2。
+本例使用的模型实现来源于[https://modelscope.cn/models/Qwen/Qwen2.5-VL-7B-Instruct](https://modelscope.cn/models/Qwen/Qwen2.5-VL-7B-Instruct)。
+本例适用于xh2。
 
 ## 2 快速开始
 
@@ -18,47 +18,40 @@
 通过get_model脚本下载模型，可通过参数选择下载原始模型或芯片模型。
 
 ```bash
+# 下载原始模型用于量化
 python3 get_model.py --type raw
-pip3 install transformers==4.56.0
-python3 get_model.py --type raw
-python3 ptq.py
 ```
 
 如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
-# 3b模型
 python3 get_model.py --type hmm
-# 7b模型
-python3 get_model.py --type hmm --model_size 7b
 ```
 
-也可以直接下载以上所有模型和数据集（注意相同模型会覆盖，请自行保存）：
+### 2.2 量化
+
+量化下载的原始模型。在当前目录下，执行脚本：
 
 ```bash
-# 3b模型
-python3 get_model.py
-# 7b模型
-python3 get_model.py --model_size 7b
+# 量化依赖transformers==4.56.0
+pip3 install transformers==4.56.0
+python3 ptq.py
 ```
 
-### 2.2 编译
+### 2.3 编译
 
-将量化模型编译为在芯片上运行的模型。执行脚本：
+将量化模型编译为在芯片上运行的模型。在当前目录下，执行脚本：
 
 ```bash
-# 3b模型
 python3 build.py
-# 7b模型
-python3 build.py --model_size 7b
 ```
 
-编译好的模型存放在当前目录，包括2个文件：
+编译好的模型存放在当前目录，包括3个文件：
 qwen2.5-vl_prefill.hmm
 qwen2.5-vl_decoder.hmm
 qwen2.5-vl_visual.hmm
 
-### 2.3 演示
+### 2.4 演示
 
 Qwen2.5-vl模型使用python API进行演示
 
@@ -66,17 +59,13 @@ Qwen2.5-vl模型使用python API进行演示
 
 2. 执行脚本，推理完成将输出性能结果。
 
-3. 注意：由于ubuntu18.04下qwen_vl_utils无法正常安装，导致无法正常运行。
+注意：由于ubuntu18.04下qwen_vl_utils无法正常安装，导致无法正常运行。
 
 ```bash
-pip3 install transformers==4.51.0
-# 3b模型
 python3 demo.py
-# 7b模型
-python3 demo.py --model_size 7b
 ```
 
-### 2.4 一键评估
+### 2.5 一键评估
 
 以上步骤可以通过test.sh脚本一键执行：
 
@@ -93,19 +82,19 @@ question:
 https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg
 请描述图片内容。
 response:
-这张图片展示了一位坐在沙滩上的女士和一只狗。女士穿着格子衬衫，坐在沙滩上，与狗互动。狗坐在女士的前面，伸出前爪与女士的手相触。背景是海浪和天空，阳光从右上方照射下来，给整个场景增添了一种温暖的氛围。整个画面给人一种温馨和谐的感觉。
+这张图片展示了一位坐在沙滩上的女士和一只狗。女士穿着格子衬衫，坐在沙地上，面向大海。狗是一只金毛犬，戴着项圈，正抬起前爪，似乎在与女士互动。背景是广阔的海洋和天空，阳光洒在沙滩上，营造出温暖而宁静的氛围。
 ```
 
 ### 3.2 性能结果
-#### M30 4core
+
 ```bash
-Total Images: 1, Total Input: 602 tokens, Output 74 tokens, Vision Cost 675.809 ms, Prefill Cost 833.611 ms, Decode Cost 6201.947 ms
-Vision Cost 675.809 ms/image
-Prefill Speed: 722.16 tokens/s; Decode Speed: 11.77 tokens/s
-TTFT (Time to First Token): 1651.820 ms
-TPOT (Time Per Output Token): 84.958 ms/token
-E2E Latency (End-to-End Latency): 7.854 seconds
-E2E TPS (End-to-End Tokens Per Second): 9.42 tokens/s
+2025-12-12 08:13:43.151 | SUCCESS  | __main__:<module>:778 - Total Images: 1, Total Input: 282 tokens, Output 70 tokens, Vision Cost 188.617 ms, Prefill Cost 833.638 ms, Decode Cost 4649.839 ms
+2025-12-12 08:13:43.152 | SUCCESS  | __main__:<module>:782 - Vision Cost 188.617 ms/image
+2025-12-12 08:13:43.152 | SUCCESS  | __main__:<module>:783 - Prefill Speed: 338.28 tokens/s; Decode Speed: 14.84 tokens/s
+2025-12-12 08:13:43.152 | SUCCESS  | __main__:<module>:786 - TTFT (Time to First Token): 1306.638 ms
+2025-12-12 08:13:43.152 | SUCCESS  | __main__:<module>:787 - TPOT (Time Per Output Token): 67.389 ms/token
+2025-12-12 08:13:43.152 | SUCCESS  | __main__:<module>:790 - E2E Latency (End-to-End Latency): 6.508 seconds
+2025-12-12 08:13:43.152 | SUCCESS  | __main__:<module>:791 - E2E TPS (End-to-End Tokens Per Second): 10.76 tokens/s
 ```
 
 ## 4 免责声明

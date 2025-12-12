@@ -1,12 +1,11 @@
 import os
 import sys
 import argparse
-from pathlib import Path
 from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh1", "xh2"], "Only support HOUMO_TARGET: xh1 or xh2."
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
@@ -17,6 +16,7 @@ def get_args() -> argparse.Namespace:
         dest="model_type",
         type=str,
         default="hmm",
+        choices=["raw", "hmm"],
         help="which model type to get, choise in [raw, hmm]",
     )
     parser.add_argument(
@@ -30,7 +30,7 @@ def get_args() -> argparse.Namespace:
         "--model_dir",
         dest="model_dir",
         type=str,
-        default="",
+        default=".",
         help="where to save downloaded model",
     )
     args = parser.parse_args()

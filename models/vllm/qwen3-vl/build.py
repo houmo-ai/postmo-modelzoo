@@ -11,13 +11,10 @@ import logging
 logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
-GOLDEN_THRESH = 0.999 if HOUMO_TARGET == "xh1" else 0.98
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
-if HOUMO_TARGET == 'xh1':
-    default_ncore = 4
-elif HOUMO_TARGET == 'xh2':
-    default_ncore = 2
+HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
+GOLDEN_THRESH = 0.98
 
 
 def sanitize_name(name: str):

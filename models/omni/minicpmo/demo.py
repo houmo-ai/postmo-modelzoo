@@ -2135,8 +2135,4 @@ def xh2_demo(args):
 if __name__ == "__main__":
 
     args = get_args()
-    if HOUMO_TARGET == 'xh1':
-        logger.error(f"MiniCPMO is not support xh1 platform!")
-        assert(0)
-    elif HOUMO_TARGET == 'xh2':
-        xh2_demo(args)
+    xh2_demo(args)

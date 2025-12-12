@@ -4,7 +4,8 @@ import argparse
 from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh1", "xh2"], "Only support HOUMO_TARGET: xh1 or xh2."
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
 HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
 
 
@@ -16,6 +17,7 @@ def get_args() -> argparse.Namespace:
         dest="model_type",
         type=str,
         default="hmm",
+        choices=["raw", "hmm"],
         help="which model type to get, choise in [raw, hmm]",
     )
     parser.add_argument(
@@ -59,7 +61,7 @@ if __name__ == '__main__':
         os.path.join(HOUMO_DATASETS_PATH, "CCPD2020_PPOCRv3_eval.tar.gz")
     ):
         get_file_from_jfrog(data_path, HOUMO_DATASETS_PATH, HOUMO_DATASETS_PATH)
-    
+
     if model_type in ["hmm"] and not get_file_from_jfrog(
         build_path, model_dir, build_model_dir
     ):

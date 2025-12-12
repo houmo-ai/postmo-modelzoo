@@ -22,20 +22,20 @@ source ~/houmo-examples-xh2/env.sh     # 初始化环境
 ### 2.1 量化
 
 ```bash
-hmatc quant -c config.yml -t xh1       # 芯片, M30系列为xh1，M50系列为xh2
+hmatc quant -c config.yml -t xh2
 ```
 
 ### 2.2 编译
 
 ```bash
-hmatc build -c config.yml -t xh1       # 芯片, M30系列为xh1，M50系列为xh2
+hmatc build -c config.yml -t xh2
 ```
 
 ### 2.3 精度评估
 
 ```bash
-hmatc eval -c config.yml -t xh1          # 芯片, M30系列为xh1，M50系列为xh2
-hmatc eval -c config.yml -t xh1  --onnx  # onnx
+hmatc eval -c config.yml -t xh2
+hmatc eval -c config.yml -t xh2  --onnx
 ```
 
 执行完成后会打印模型的数据集精度信息。
@@ -43,7 +43,7 @@ hmatc eval -c config.yml -t xh1  --onnx  # onnx
 ### 2.4 性能评估
 
 ```bash
-hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 4   # 芯片, M30系列为xh1，M50系列为xh2
+hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
@@ -54,37 +54,18 @@ hmatc perf -c config.yml -t xh1 -wn 10 -sn 1000 -tn 4   # 芯片, M30系列为xh
 
 ```bash
 # xh2
-hmatc demo -c config.yml -t xh1             # 芯片, M30系列为xh1，M50系列为xh2
+hmatc demo -c config.yml -t xh2
 # onnx
-hmatc demo -c config.yml -t xh1 --onnx      # 芯片, M30系列为xh1，M50系列为xh2
+hmatc demo -c config.yml -t xh2 --onnx
 ```
 
-执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh1/vis_onnx目录。
+执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh2/vis_onnx目录。
 
 ## 3.参考结果
 
-### 3.1 精度结果
-
-基于CCPD2020数据的结果
+### 3.1 性能结果
 
 ```bash
-# xh1
-{'input_size': [1, 3, 48, 320], 'dataset': 'CCPD2020Val', 'num': 1001, 'hmean': '0.970030', 'latency': '12.294316'}
-# onnx
-{'input_size': [1, 3, 48, 320], 'dataset': 'CCPD2020Val', 'num': 1001, 'hmean': '0.971029', 'latency': '6.088491'}
-```
-
-### 3.2 性能结果
-
-```bash
-# xh1
-[Latency] Inference  avg:   5.194 ms, max:   5.333 ms, min:   5.148 ms, tp99:   5.266 ms, tp999:   5.333 ms
-[Latency] Input      avg:   0.317 ms, max:   0.625 ms, min:   0.235 ms, tp99:   0.563 ms, tp999:   0.625 ms
-[Latency] Output     avg:   0.135 ms, max:   0.276 ms, min:   0.101 ms, tp99:   0.215 ms, tp999:   0.276 ms
-[Latency] End2end    avg:   5.646 ms, max:   6.128 ms, min:   5.499 ms, tp99:   6.009 ms, tp999:   6.128 ms
-[Throughput] total: 5648.015 ms, avg: 5.648 ms, repeat: 1000, rounds: 1
-[Throughput] qps: 177.053
-# xh2
 [Latency] Inference  avg:   3.320 ms, max:   3.625 ms, min:   3.086 ms, tp99:   3.557 ms, tp999:   3.625 ms
 [Latency] Input      avg:   0.088 ms, max:   0.280 ms, min:   0.032 ms, tp99:   0.223 ms, tp999:   0.280 ms
 [Latency] Output     avg:   0.248 ms, max:   2.922 ms, min:   0.115 ms, tp99:   0.436 ms, tp999:   2.922 ms

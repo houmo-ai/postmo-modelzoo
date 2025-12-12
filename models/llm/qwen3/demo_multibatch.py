@@ -100,33 +100,18 @@ class HmQwen:
             f"model_layers_{i}_self_attn_vcache_input" for i in range(self.nblocks)
         ]
         option1.set_dummy_tensors(dummy_tensor_names)
-        if HOUMO_TARGET == "xh1":
-            prefill_input_shape = self.prefill.get_input_info(
-                self.prefill.get_input_name(0)
-            ).shape
-            self.prefill_length = prefill_input_shape[1] * prefill_input_shape[0]
-            self.embedding_len = self.prefill.get_input_info(
-                self.prefill.get_input_name(0)
-            ).shape[2]
-            self.context_max_length = self.decode.get_input_info(
-                self.decode.get_input_name(3)
-            ).shape[2]
-            self.batch = self.decode.get_input_info(
-                self.decode.get_input_name(0)
-            ).shape[0]
-        elif HOUMO_TARGET == "xh2":
-            self.prefill_length = self.prefill.get_input_info(
-                self.prefill.get_input_name(0)
-            ).shape[1]
-            self.embedding_len = self.prefill.get_input_info(
-                self.prefill.get_input_name(0)
-            ).shape[2]
-            self.context_max_length = self.decode.get_input_info(
-                self.decode.get_input_name(3)
-            ).shape[2]
-            self.batch = self.decode.get_input_info(
-                self.decode.get_input_name(0)
-            ).shape[0]
+
+        self.prefill_length = self.prefill.get_input_info(
+            self.prefill.get_input_name(0)
+        ).shape[1]
+        self.embedding_len = self.prefill.get_input_info(
+            self.prefill.get_input_name(0)
+        ).shape[2]
+        self.context_max_length = self.decode.get_input_info(
+            self.decode.get_input_name(3)
+        ).shape[2]
+        self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
+
         self.flush = not forbid_flush
         self.next_ids = [0] * self.batch
         self.current_questions = [""] * self.batch
@@ -232,20 +217,13 @@ class HmQwen:
                 dtype=inputs_embeds.dtype,
                 device=inputs_embeds.device,
             )
-            if HOUMO_TARGET == "xh1":
-                input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
-                    4, self.prefill_length // 4, self.embedding_len
-                )
-                valid_length_data = np.array([valid_length]).astype("int16")
-                current_length_data = np.array([current_length]).astype("int16")
-            elif HOUMO_TARGET == "xh2":
-                input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
-                    1, self.prefill_length, self.embedding_len
-                )
-                valid_length_data = np.array([valid_length]).astype("int32")
-                current_length_data = np.array([current_length]).astype("int32")
+
+            input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
+                1, self.prefill_length, self.embedding_len
+            )
             valid_length_data = np.array([valid_length]).astype("int32")
             current_length_data = np.array([current_length]).astype("int32")
+
             input_name = self.prefill.get_input_name(0)
             valid_length_name = self.prefill.get_input_name(1)
             current_length_name = self.prefill.get_input_name(2)
@@ -258,8 +236,6 @@ class HmQwen:
         input_data = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
         prefill_time = time.time() - prefill_start_time
         next_id = input_data.argmax(-1)[0]
-        if HOUMO_TARGET == "xh1":
-            next_id = np.array([next_id])
         prefill_response = self.tokenizer.decode(next_id.tolist())
         next_id = torch.from_numpy(next_id)
         self.chat_history_ids[b] = torch.cat(
@@ -331,8 +307,6 @@ class HmQwen:
             max_decode_count += 1
             all_decode_time += decode_time
             self.next_ids = [input_datas[b].argmax(-1) for b in range(self.batch)]
-            if HOUMO_TARGET == "xh1":
-                self.next_ids = [np.array([next_id]) for next_id in self.next_ids]
             self.next_ids = [torch.from_numpy(next_id) for next_id in self.next_ids]
             for b in range(self.batch):
                 if self.context_lengths[b] + 1 >= self.context_max_length:

@@ -22,8 +22,11 @@ from hmatc.utils import logger
 import tcim_lite
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
 SUPPORTED_MODEL_TYPES = ["onnx", "houmo"]
 SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -485,8 +488,4 @@ def xh2_demo(args):
 if __name__ == "__main__":
 
     args = get_args()
-    if HOUMO_TARGET == 'xh1':
-        logger.error(f"bge embedder or reranker is not support xh1 platform!")
-        assert(0)
-    elif HOUMO_TARGET == 'xh2':
-        xh2_demo(args)
+    xh2_demo(args)

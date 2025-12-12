@@ -3,7 +3,7 @@ import os
 from hmatc.utils import logger
 import hmatc.python.perf as perf
 
-model_path = "./output/xh1/ppocrv3_rec.hmm"
+model_path = "./output/xh2/ppocrv3_rec.hmm"
 warmup_num = 10
 sample_num = 1000
 loop_num = 1
@@ -32,4 +32,13 @@ logger.info(f"Using model: {model_path}")
 if not os.path.exists(model_path):
     raise FileNotFoundError(f"Model file not found: {model_path}")
 
-perf_info = perf.CModelRunner(model_path, warmup_num, sample_num, loop_num, thread_num, stream_num=0, check_output=False, devices=device_id,)
+perf_info = perf.CModelRunner(
+    model_path,
+    warmup_num,
+    sample_num,
+    loop_num,
+    thread_num,
+    stream_num=0,
+    check_output=False,
+    devices=device_id,
+)

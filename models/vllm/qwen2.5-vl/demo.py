@@ -21,11 +21,9 @@ from processing_qwen2_5_vl import Qwen2_5_VLProcessor
 from utils import get_rope_index, QRawToYuv
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
-if HOUMO_TARGET == "xh1":
-    TARGET_TYPE = torch.long
-elif HOUMO_TARGET == "xh2":
-    TARGET_TYPE = torch.float16
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+TARGET_TYPE = torch.float16
 
 
 def get_args() -> argparse.Namespace:
@@ -299,20 +297,14 @@ class Qwen25VL:
         self.embedding_len = self.prefill.get_input_info(
             self.prefill.get_input_name(0)
         ).shape[2]
-        if HOUMO_TARGET == "xh1":
-            self.context_max_length = self.decode.get_input_info(
-                self.decode.get_input_name(6)
-            ).shape[3]
-            self.image_shape = self.vit_model.get_input_info(
-                self.vit_model.get_input_name(0)
-            ).shape[2:]
-        elif HOUMO_TARGET == "xh2":
-            self.context_max_length = self.decode.get_input_info(
-                self.decode.get_input_name(6)
-            ).shape[2]
-            self.image_shape = self.vit_model.get_input_info(
-                self.vit_model.get_input_name(0)
-            ).shape[3:]
+
+        self.context_max_length = self.decode.get_input_info(
+            self.decode.get_input_name(6)
+        ).shape[2]
+        self.image_shape = self.vit_model.get_input_info(
+            self.vit_model.get_input_name(0)
+        ).shape[3:]
+
         for i in range(self.nblocks):
             kcache = self.prefill.get_input(f"model_layers_{i}_self_attn_kcache_input")
             vcache = self.prefill.get_input(f"model_layers_{i}_self_attn_vcache_input")
@@ -430,19 +422,14 @@ class Qwen25VL:
         window_indexes = []
         window_masks = []
         for batch in range(inputs["hm_pixel_values"].shape[0]):
-            if HOUMO_TARGET == "xh1":
-                hidden_state = inputs["hm_pixel_values"][batch]
-            elif HOUMO_TARGET == "xh2":
-                hidden_state = (
-                    inputs["hm_pixel_values"][batch]
-                    .unsqueeze(0)
-                    .repeat(self.batch_size, 1, 1, 1)
-                )
-                hidden_state = (
-                    hidden_state.unsqueeze(2)
-                    .repeat(1, 1, self.max_size_t, 1, 1)
-                    .squeeze(0)
-                )
+            hidden_state = (
+                inputs["hm_pixel_values"][batch]
+                .unsqueeze(0)
+                .repeat(self.batch_size, 1, 1, 1)
+            )
+            hidden_state = (
+                hidden_state.unsqueeze(2).repeat(1, 1, self.max_size_t, 1, 1).squeeze(0)
+            )
             window_index, cu_window_seqlens = self.get_window_index(
                 inputs["image_grid_thw"][batch].unsqueeze(0)
             )
@@ -470,75 +457,37 @@ class Qwen25VL:
         visual_inputs["window_index"] = torch.stack(window_indexes)
         visual_inputs["window_mask"] = torch.stack(window_masks)
         visual_inputs["hidden_states"] = torch.stack(hidden_states)
-        if HOUMO_TARGET == "xh1":
-            visual_inputs["hidden_states"] = self.rgb2yuv(
-                visual_inputs["hidden_states"].cpu()
-            ).long()
+
         return visual_inputs
 
-    if HOUMO_TARGET == "xh1":
+    def run_visual(self, inputs):
+        vit_model_outputs = list()
+        for batch in range(inputs["hidden_states"].shape[0]):
+            self.vit_model.set_input(
+                self.vit_model.get_input_name(0),
+                inputs["hidden_states"][batch].unsqueeze(0).numpy().astype(np.float16),
+            )
+            self.vit_model.set_input(
+                self.vit_model.get_input_name(1),
+                inputs["window_index"][batch].numpy().astype(np.int32),
+            )
+            try:
+                self.vit_model.set_input(
+                    self.vit_model.get_input_name(2),
+                    inputs["window_mask"][batch].numpy().astype(np.float16),
+                )
+            except:
+                logger.info("skip set window_mask input")
+            self.vit_model.run()
+            self.vit_model.sync()
+            vit_model_output = (
+                self.vit_model.get_output(self.vit_model.get_output_name(0))
+                .numpy()
+                .astype(np.float16)
+            )
+            vit_model_outputs.append(torch.tensor(vit_model_output))
 
-        def run_visual(self, inputs):
-            vit_model_outputs = list()
-            for batch in range(inputs["hidden_states"].shape[0]):
-                self.vit_model.set_input(
-                    self.vit_model.get_input_name(0),
-                    inputs["hidden_states"][batch].numpy().astype(np.uint8),
-                )
-                self.vit_model.set_input(
-                    self.vit_model.get_input_name(1),
-                    inputs["window_index"][batch].numpy().astype(np.int32),
-                )
-                try:
-                    self.vit_model.set_input(
-                        self.vit_model.get_input_name(2),
-                        inputs["window_mask"][batch].numpy().astype(np.int16),
-                    )
-                except:
-                    logger.info("skip set window_mask input")
-                self.vit_model.run()
-                self.vit_model.sync()
-                vit_model_output = (
-                    self.vit_model.get_output(self.vit_model.get_output_name(0))
-                    .numpy()
-                    .astype(np.int16)
-                )
-                vit_model_outputs.append(torch.tensor(vit_model_output))
-            # del self.vit_model
-            return torch.cat(vit_model_outputs, dim=0)
-
-    elif HOUMO_TARGET == "xh2":
-
-        def run_visual(self, inputs):
-            vit_model_outputs = list()
-            for batch in range(inputs["hidden_states"].shape[0]):
-                self.vit_model.set_input(
-                    self.vit_model.get_input_name(0),
-                    inputs["hidden_states"][batch]
-                    .unsqueeze(0)
-                    .numpy()
-                    .astype(np.float16),
-                )
-                self.vit_model.set_input(
-                    self.vit_model.get_input_name(1),
-                    inputs["window_index"][batch].numpy().astype(np.int32),
-                )
-                try:
-                    self.vit_model.set_input(
-                        self.vit_model.get_input_name(2),
-                        inputs["window_mask"][batch].numpy().astype(np.float16),
-                    )
-                except:
-                    logger.info("skip set window_mask input")
-                self.vit_model.run()
-                self.vit_model.sync()
-                vit_model_output = (
-                    self.vit_model.get_output(self.vit_model.get_output_name(0))
-                    .numpy()
-                    .astype(np.float16)
-                )
-                vit_model_outputs.append(torch.tensor(vit_model_output))
-            return torch.cat(vit_model_outputs, dim=0)
+        return torch.cat(vit_model_outputs, dim=0)
 
     def preprocess_prefill(self, inputs, image_features):
         image_grid_thw = None
@@ -785,8 +734,6 @@ class Qwen25VL:
         self.next_id = self.samplingmanager.sample(
             decoder_output.numpy(), self.generated_ids
         )
-        if HOUMO_TARGET == "xh1":
-            self.next_id = self.next_id[0]
         self.generated_ids.append(self.next_id.item())
         if self.next_id.item() in self.eos_token_id:
             return None

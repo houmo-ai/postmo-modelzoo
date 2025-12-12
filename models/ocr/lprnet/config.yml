@@ -21,6 +21,7 @@ model:
     log_level: 0
   model_impl_module: model
   model_impl_cls: LPRNet
+
 quant:
   calib_data: ./base_yolov5lprnet/rec_images/lprnet_quant_images
   calib_num: 69

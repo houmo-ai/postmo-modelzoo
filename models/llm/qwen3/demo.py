@@ -319,52 +319,21 @@ class HmQwen:
             top_p=args.topp,
             repetition_penalty=args.repetition_penalty,
         )
-        if HOUMO_TARGET == "xh1":
-            prefill_input_shape = self.prefill.get_input_info(
-                self.prefill.get_input_name(0)
-            ).shape
-            self.prefill_length = prefill_input_shape[1] * prefill_input_shape[0]
-            self.embedding_len = self.prefill.get_input_info(
-                self.prefill.get_input_name(0)
-            ).shape[2]
-            self.context_max_length = self.decode.get_input_info(
-                self.decode.get_input_name(3)
-            ).shape[2]
-            self.batch = self.decode.get_input_info(
-                self.decode.get_input_name(0)
-            ).shape[0]
-        elif HOUMO_TARGET == "xh2":
-            self.prefill_length = self.prefill.get_input_info(
-                self.prefill.get_input_name(0)
-            ).shape[1]
-            self.embedding_len = self.prefill.get_input_info(
-                self.prefill.get_input_name(0)
-            ).shape[2]
-            self.context_max_length = self.decode.get_input_info(
-                self.decode.get_input_name(3)
-            ).shape[2]
-            self.batch = self.decode.get_input_info(
-                self.decode.get_input_name(0)
-            ).shape[0]
 
-        if HOUMO_TARGET == "xh1":
-            for i in range(self.nblocks):
-                kcache = self.prefill.get_dev_input(
-                    f"model_layers_{i}_self_attn_kcache_input"
-                )
-                self.decode.set_input(
-                    f"model_layers_{i}_self_attn_kcache_input", kcache
-                )
-                vcache = self.prefill.get_dev_input(
-                    f"model_layers_{i}_self_attn_vcache_input"
-                )
-                self.decode.set_input(
-                    f"model_layers_{i}_self_attn_vcache_input", vcache
-                )
-        elif HOUMO_TARGET == "xh2":
-            for i in range(3, 2 * self.nblocks + 3):
-                cache = self.prefill.get_input(self.prefill.get_input_name(i))
-                self.decode.set_input(self.decode.get_input_name(i), cache)
+        self.prefill_length = self.prefill.get_input_info(
+            self.prefill.get_input_name(0)
+        ).shape[1]
+        self.embedding_len = self.prefill.get_input_info(
+            self.prefill.get_input_name(0)
+        ).shape[2]
+        self.context_max_length = self.decode.get_input_info(
+            self.decode.get_input_name(3)
+        ).shape[2]
+        self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
+
+        for i in range(3, 2 * self.nblocks + 3):
+            cache = self.prefill.get_input(self.prefill.get_input_name(i))
+            self.decode.set_input(self.decode.get_input_name(i), cache)
         # set decode input
         current_length_input_1 = np.array([1]).astype("int32")
         decode_current_length_name = self.decode.get_input_name(2)
@@ -439,18 +408,13 @@ class HmQwen:
                 dtype=inputs_embeds.dtype,
                 device=inputs_embeds.device,
             )
-            if HOUMO_TARGET == "xh1":
-                input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
-                    4, self.prefill_length // 4, self.embedding_len
-                )
-                valid_length_data = np.array([valid_length]).astype("int16")
-                current_length_data = np.array([current_length]).astype("int16")
-            elif HOUMO_TARGET == "xh2":
-                input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
-                    1, self.prefill_length, self.embedding_len
-                )
-                valid_length_data = np.array([valid_length]).astype("int32")
-                current_length_data = np.array([current_length]).astype("int32")
+
+            input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
+                1, self.prefill_length, self.embedding_len
+            )
+            valid_length_data = np.array([valid_length]).astype("int32")
+            current_length_data = np.array([current_length]).astype("int32")
+
             input_name = self.prefill.get_input_name(0)
             valid_length_name = self.prefill.get_input_name(1)
             current_length_name = self.prefill.get_input_name(2)
@@ -464,8 +428,6 @@ class HmQwen:
 
         input_data = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
         next_id = input_data.argmax(-1)[0]
-        if HOUMO_TARGET == "xh1":
-            next_id = np.array([next_id])
         prefill_response = self.tokenizer.decode(next_id)
         logger.success("response:")
         print("\033[1;95m{}".format(prefill_response), end="", flush=True)
@@ -508,8 +470,6 @@ class HmQwen:
             decode_count += 1
 
             next_id = self.samplingmanager.sample(input_data, self.generated_ids)
-            if HOUMO_TARGET == "xh1":
-                next_id = np.array(next_id)
             next_id = torch.from_numpy(next_id[0])
             if next_id == self.tokenizer.eos_token_id:
                 print(decode_response, end="", flush=True)
@@ -542,23 +502,14 @@ class HmQwen:
 
 
 if __name__ == "__main__":
-
     args = get_args()
-    if HOUMO_TARGET == "xh1":
-        hmqwen = HmQwen(
-            args.prefill_path,
-            args.decode_path,
-            args.embedding_path,
-            args.tokenizer_dir,
-        )
-    elif HOUMO_TARGET == "xh2":
-        hmqwen = HmQwen(
-            args.prefill_path,
-            args.decode_path,
-            args.embedding_path,
-            args.tokenizer_dir,
-            args.ndevice,
-        )
+    hmqwen = HmQwen(
+        args.prefill_path,
+        args.decode_path,
+        args.embedding_path,
+        args.tokenizer_dir,
+        args.ndevice,
+    )
     if args.it:
         from prompt_toolkit import prompt
     try:
