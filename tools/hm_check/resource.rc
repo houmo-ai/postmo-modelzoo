@@ -1,0 +1,3 @@
+xh2_bandwidth_write  RCDATA  "models/xh2_bandwidth_write.hmm"
+xh2_bandwidth_read   RCDATA  "models/xh2_bandwidth_read.hmm"
+xh2_compute          RCDATA  "models/xh2_compute.hmm"

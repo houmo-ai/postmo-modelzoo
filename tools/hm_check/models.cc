@@ -1,8 +1,58 @@
 // Copyright (c) 2022 The Houmo.ai Authors. All rights reserved.
 
 #include "models.h"
+#include <cstring>
+#if defined(_MSC_VER)
+#include <windows.h>
+#endif
 
-// 声明多个模型的符号
+typedef struct ModelProfile {
+    const char *name;
+    float num_ops;
+    size_t read_data_size;
+    size_t write_data_size;
+} modelProfile_t;
+
+static const ModelProfile g_profiles[] = {
+    {"xh2_compute", 0.309237645312, 0, 0},
+    {"xh2_bandwidth_read", 0, 8388096, 0},
+    {"xh2_bandwidth_write", 0, 0, 8388096},
+};
+
+static void fill_model_profile(EmbeddedModel &m) {
+    for (const auto &p : g_profiles) {
+        if (std::strcmp(m.name, p.name) == 0) {
+            m.num_ops = p.num_ops;
+            m.read_data_size = p.read_data_size;
+            m.write_data_size = p.write_data_size;
+            return;
+        }
+    }
+    m.num_ops = 0;
+    m.read_data_size = 0;
+    m.write_data_size = 0;
+}
+
+#if defined(_MSC_VER)
+const EmbeddedModel *get_model(const std::string &name) {
+    HMODULE hModule = GetModuleHandle(nullptr);
+    HRSRC hRes = FindResourceW(hModule, name.c_str(), RT_RCDATA);
+    if (!hRes)
+        return nullptr;
+
+    DWORD size = SizeofResource(hModule, hRes);
+    HGLOBAL hData = LoadResource(hModule, hRes);
+    const void *ptr = LockResource(hData);
+
+    static EmbeddedModel model;
+    model.name = name.c_str();
+    model.data = ptr;
+    model.size = static_cast<size_t>(size);
+
+    fill_model_profile(model);
+    return &model;
+}
+#else
 extern const unsigned char _binary_xh2_compute_hmm_start[];
 extern const unsigned char _binary_xh2_compute_hmm_end[];
 
@@ -12,33 +62,34 @@ extern const unsigned char _binary_xh2_bandwidth_read_hmm_end[];
 extern const unsigned char _binary_xh2_bandwidth_write_hmm_start[];
 extern const unsigned char _binary_xh2_bandwidth_write_hmm_end[];
 
-// 如有更多模型，继续写：
-// extern const unsigned char _binary_xxx_hmm_start[];
-// extern const unsigned char _binary_xxx_hmm_end[];
-
-static EmbeddedModel g_models[] = {
-    {"xh2_compute", _binary_xh2_compute_hmm_start,
-     size_t(_binary_xh2_compute_hmm_end - _binary_xh2_compute_hmm_start),
-     0.309237645312, 0, 0},
-    {"xh2_bandwidth_read", _binary_xh2_bandwidth_read_hmm_start,
-     size_t(_binary_xh2_bandwidth_read_hmm_end -
-            _binary_xh2_bandwidth_read_hmm_start),
-     0, 8388096, 0},
-    {"xh2_bandwidth_write", _binary_xh2_bandwidth_write_hmm_start,
-     size_t(_binary_xh2_bandwidth_write_hmm_end -
-            _binary_xh2_bandwidth_write_hmm_start),
-     0, 0, 8388096},
+struct BinSym {
+    const char *name;
+    const unsigned char *begin;
+    const unsigned char *end;
 };
 
-const EmbeddedModel *get_all_models(size_t &count) {
-    count = sizeof(g_models) / sizeof(g_models[0]);
-    return g_models;
-}
+static const BinSym g_bins[] = {
+    {"xh2_compute", _binary_xh2_compute_hmm_start, _binary_xh2_compute_hmm_end},
+
+    {"xh2_bandwidth_read", _binary_xh2_bandwidth_read_hmm_start,
+     _binary_xh2_bandwidth_read_hmm_end},
+
+    {"xh2_bandwidth_write", _binary_xh2_bandwidth_write_hmm_start,
+     _binary_xh2_bandwidth_write_hmm_end},
+};
 
 const EmbeddedModel *get_model(const std::string &name) {
-    for (auto &m : g_models) {
-        if (m.name == name)
-            return &m;
+    for (const auto &b : g_bins) {
+        if (name == b.name) {
+            static EmbeddedModel model;
+            model.name = b.name;
+            model.data = b.begin;
+            model.size = size_t(b.end - b.begin);
+
+            fill_model_profile(model);
+            return &model;
+        }
     }
     return nullptr;
 }
+#endif
