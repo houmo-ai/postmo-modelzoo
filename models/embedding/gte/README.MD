@@ -31,7 +31,7 @@ python3 get_model.py --type hmm
 python3 build.py
 ```
 
-编译好的模型存放在当前目录，包括2个文件：
+编译好的模型存放在当前目录，包括1个文件：
 gte_prefill.hmm
 
 ### 2.3 演示

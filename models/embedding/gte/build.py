@@ -116,7 +116,7 @@ def get_args() -> argparse.Namespace:
         '--model_name',
         dest='model_name',
         type=str,
-        default='whisper',
+        default='gte',
         help='output houmo model name',
     )
     parser.add_argument(

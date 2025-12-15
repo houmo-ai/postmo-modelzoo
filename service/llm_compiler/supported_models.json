@@ -161,6 +161,16 @@
             "perf": false
         }
     },
+    "gte": {
+        "1.5b": {
+            "support_backends": [
+                "xh2"
+            ],
+            "path": "models/embedding/gte",
+            "raw": "llm/None",
+            "perf": false
+        }
+    },
     "whisper": {
         "medium": {
             "support_backends": [

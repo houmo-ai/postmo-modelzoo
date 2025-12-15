@@ -41,27 +41,11 @@ def get_args() -> argparse.Namespace:
         help="download the model from which source",
     )
     parser.add_argument(
-        "--batch",
-        dest="batch",
-        type=int,
-        default=1,
-        choices=[1, 2],
-        help="batch size",
-    )
-    parser.add_argument(
-        "--context_length",
-        dest="context_length",
-        type=str,
-        default="8k",
-        choices=["8k", "16k", "32k"],
-        help="context length",
-    )
-    parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
         default=1,
-        choices=[1, 2],
+        choices=[1],
         help="device number",
     )
     args = parser.parse_args()
@@ -74,14 +58,13 @@ if __name__ == "__main__":
     model_cfgs = {
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
-        "model_type": "embedding",
+        "model_type": "llm",
         "model_name": "gte",
         "model_info": {
             "model_size": "1.5b",
             "ncore": 2,
             "ndevice": args.ndevice,
             "prefill_len": 256,
-            "batch": args.batch,
         },
         "raw_files": {"raw_path": "models/datasets/wikitext-2-raw-v1.zip"},
         "modelscope_repo": {"repo_ids": ["iic/gte_Qwen2-1.5B-instruct"]},

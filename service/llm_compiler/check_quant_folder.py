@@ -79,7 +79,7 @@ def check_quant_model(quant_model_path: str, quant_model: str, model_name: str) 
             os.system(f"mv -f {quant_model}/hmquant/* {quant_model}/")
             os.system(f"rm -rf {quant_model}/hmquant")
 
-    if model_name == "bge":
+    if model_name in ["bge", "gte"]:
         return True
 
     # folders
@@ -94,7 +94,7 @@ def check_quant_model(quant_model_path: str, quant_model: str, model_name: str) 
     if model_name != "whisper":
         file_list += [embedding_file]
     if target == "xh1":
-        if model_name == "qwen2.5-vl":
+        if model_name in ["qwen2.5-vl", "qwen3-vl"]:
             decoder_weight_file = os.path.join(decoder_dir, "weight.npy")
             prefill_weight_file = os.path.join(prefill_dir, "weight.npy")
             visual_weight_file = os.path.join(quant_model, "visual", "weight.npy")

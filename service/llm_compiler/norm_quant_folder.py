@@ -342,15 +342,20 @@ if __name__ == "__main__":
             print(f"已移动: {embedding_src} -> {embedding_dst}")
 
         if not _process_model_files(
-            backend, quant_dir, result_dir, model_name, "decode"
-        ):
-            print(f"错误: 处理decode文件夹失败")
-            sys.exit(-1)
-        if not _process_model_files(
             backend, quant_dir, result_dir, model_name, "prefill"
         ):
             print(f"错误: 处理prefill文件夹失败")
             sys.exit(-1)
+
+        if (
+            os.path.exists(f"{quant_dir}/decode")
+            or os.path.exists(f"{quant_dir}/decoder")
+        ) and not _process_model_files(
+            backend, quant_dir, result_dir, model_name, "decode"
+        ):
+            print(f"错误: 处理decode文件夹失败")
+            sys.exit(-1)
+
         if (
             os.path.exists(f"{quant_dir}/vision")
             or os.path.exists(f"{quant_dir}/visual")
