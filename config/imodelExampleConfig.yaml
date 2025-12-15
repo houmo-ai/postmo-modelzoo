@@ -127,7 +127,9 @@ detection_yolov7:
     - models/detection/yolov7/README.MD
   example_case:
     - detection_yolov7_test:
-        script: ../models/detection/yolov7/test.sh
+        test_type: models_tests
+        script: yolov7
+        args: all
   test:
     - detection_yolov7_test
 detection_yolov9m:
@@ -137,7 +139,9 @@ detection_yolov9m:
     - models/detection/yolov9m/README.MD
   example_case:
     - detection_yolov9m_test:
-        script: ../models/detection/yolov9m/test.sh
+        test_type: models_tests
+        script: yolov9m
+        args: all
   test:
     - detection_yolov9m_test
 detection_yolo11m:
@@ -147,7 +151,9 @@ detection_yolo11m:
     - models/detection/yolo11m/README.MD
   example_case:
     - detection_yolo11m_test:
-        script: ../models/detection/yolo11m/test.sh
+        test_type: models_tests
+        script: yolo11m
+        args: all
   test:
     - detection_yolo11m_test
 detection_yolov10m:
@@ -157,7 +163,9 @@ detection_yolov10m:
     - models/detection/yolov10m/README.MD
   example_case:
     - detection_yolov10m_test:
-        script: ../models/detection/yolov10m/test.sh
+        test_type: models_tests
+        script: yolov10m
+        args: all
   test:
     - detection_yolov10m_test
 detection_yolov8m-cls:
@@ -166,8 +174,10 @@ detection_yolov8m-cls:
   exclude:
     - models/backbone/yolov8m-cls/README.MD
   example_case:
-    - detection_yolo11m_test:
-        script: ../models/backbone/yolov8m-cls/test.sh
+    - detection_yolov8m-cls_test:
+        test_type: models_tests
+        script: yolov8m-cls
+        args: all
   test:
     - detection_yolov8m-cls_test
 multi_input_custom_random_model:

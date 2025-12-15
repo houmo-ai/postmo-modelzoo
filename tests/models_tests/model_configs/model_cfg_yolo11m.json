@@ -1,12 +1,12 @@
 {
     "obsolete": false,
-    "model_dir": "models/detection/yolo12m",
+    "model_dir": "models/detection/yolo11m",
     "model_type": "cv",
     "support_platform": ["x86_64"],
-    "support_backend": ["xh2"],
+    "support_backend": ["xh1", "xh2"],
     "support_core_num": {
         "xh1": [1],
-        "xh2": [1]
+        "xh2": null
     },
     "support_flow": {
         "xh1": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"],
@@ -18,10 +18,10 @@
     },
     "perf_metrics": {
         "xh1":{
-            "x86_64": 124.67
+            "x86_64": 475.36
         },
         "xh2":{
-            "x86_64": 78.87
+            "x86_64": 199.54
         }
     },
     "eval_threshold": {
@@ -92,7 +92,7 @@
             "required": {
                 "config": ["./config.yml", "./config.yml", "./config.yml"],
                 "warmup": ["1", "10", "10"],
-                "sample": ["1", "500", "500"]
+                "sample": ["1", "1000", "1000"]
             },
             "optional": {
                 "target": [null, null, null],

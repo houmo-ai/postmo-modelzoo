@@ -1,6 +1,6 @@
 {
     "obsolete": false,
-    "model_dir": "models/detection/yolo12m",
+    "model_dir": "models/detection/yolov10m",
     "model_type": "cv",
     "support_platform": ["x86_64"],
     "support_backend": ["xh2"],
@@ -18,10 +18,10 @@
     },
     "perf_metrics": {
         "xh1":{
-            "x86_64": 124.67
+            "x86_64": 266.79
         },
         "xh2":{
-            "x86_64": 78.87
+            "x86_64": 155.82
         }
     },
     "eval_threshold": {
