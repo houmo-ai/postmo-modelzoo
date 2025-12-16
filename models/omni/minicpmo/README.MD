@@ -22,11 +22,17 @@ python3 get_model.py --type hmm
 
 # 量化后模型，需要编译器编译后才能运行
 python3 get_model.py --type quant
+
+# 原始模型，需要量化+编译器编译后才能运行
+python3 get_model.py --type raw
 ```
 
 ### 2.2 量化
 
-由于MiniCPMO模块较多，部分模块需要手动拆分和修改，故暂未提供模型量化示例。
+当前仅支持w8a8基础量化，暂未提供其它高阶量化方案。
+```bash
+python3 ptq.py
+```
 
 ### 2.3 编译
 
@@ -78,29 +84,29 @@ bash test.sh
 
 ```bash
 Audio saved to output_omni.wav
-画面中有一个穿着红色夹克和黑色裤子的人，他正在滑雪。他正沿着一条被雪覆盖的小径滑行，周围是被白雪覆盖的山脉。天空中可以看到一些云朵，为整个场景增添了一丝戏剧性。
+画面中有一个穿着红色夹克和黑色裤子的人，他正在一个被雪覆盖的山地地形上滑雪。他正沿着一条清晰的滑雪道滑行，周围是高耸的雪山和多云的天空。
 ```
 
 ### 3.2 性能结果
 
 ```bash
-Total Cost 23679.652 ms
-Input Tokens: 1204, Output tokens: 54
-Vision Cost: 6029.518 ms
-Audio Cost: 465.439 ms
-LLM Prefill Speed: 917.12 tokens/s
-TTFT (Time to First Token): 7817.118 ms
-TPOT (Time Per Output Token): 14.59 tokens/s
-ViT+Wishper+LLM TPS (Tokens Per Second): 4.72 tokens/s
-TTS Prefill Mean Time: 13.260 ms x 30 times
-TTS Decoder Mean Time: 337.586 ms x 33 groups
-TTS Dvae Cost: 331.683 ms
-TTS Vocos Cost: 42.625 ms
-Total Audio Duration Generated: 17.43 s
-TTS Total Cost: 12120.173 ms
-TTS Real-Time Factor(RTF): 0.695389
-TTS Generate Speed: 1.44 x real-time
-E2E Latency (End-to-End Latency): 23.680 seconds
+Total Cost 18230.092 ms
+Input Tokens: 1399, Output tokens: 50
+Vision Cost: 5157.962 ms
+Audio Cost: 385.364 ms
+LLM Prefill Speed: 935.94 tokens/s
+TTFT (Time to First Token): 7048.539 ms
+TPOT (Time Per Output Token): 16.86 tokens/s
+ViT+Whisper+LLM TPS (Tokens Per Second): 5.02 tokens/s
+TTS Prefill Mean Time: 10.058 ms x 30 times
+TTS Decoder Mean Time: 255.036 ms x 30 groups
+TTS Dvae Cost: 41.207 ms
+TTS Vocos Cost: 29.955 ms
+Total Audio Duration Generated: 15.94 s
+TTS Total Cost: 8137.064 ms
+TTS Real-Time Factor(RTF): 0.510609
+TTS Generate Speed: 1.96 x real-time
+E2E Latency (End-to-End Latency): 18.230 seconds
 ```
 
 ### 3.3 备注

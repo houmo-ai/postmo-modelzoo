@@ -1,0 +1,4 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+vector_quantize_pytorch
+compressed_tensors
+transformers==4.44.2

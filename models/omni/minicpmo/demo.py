@@ -35,6 +35,13 @@ from moviepy import VideoFileClip
 
 import tcim_lite
 
+import sys
+SCRIP_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(SCRIP_DIR)
+from transformers.models.whisper.feature_extraction_whisper import WhisperFeatureExtractor
+from processing_minicpmo import *
+from image_processing_minicpmv import *
+
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 SUPPORTED_MODEL_TYPES = ["onnx", "houmo"]
@@ -485,10 +492,17 @@ class HMMiniCPMO(object):
         self.vision_batch_size = 1
         self.default_tts_chat_template = "{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n<|spk_bos|><|spk|><|spk_eos|><|tts_bos|>' }}{% endif %}"
         
-        self.processer = AutoProcessor.from_pretrained(args.tokenizer_dir, trust_remote_code=True)
+        processer_tokenizer = AutoProcessor.from_pretrained(args.tokenizer_dir, trust_remote_code=True).tokenizer
+        image_processor = MiniCPMVImageProcessor()
+        feature_extractor = WhisperFeatureExtractor()
+        self.processer = MiniCPMOProcessor(image_processor=image_processor,
+                                           feature_extractor=feature_extractor,
+                                           tokenizer=processer_tokenizer)
 
         self.embedding_path = os.path.join(args.embedding_path, "quant_embedding.pt")
         self.embedding = torch.load(self.embedding_path, map_location=torch.device(self.device), weights_only=False)
+        if isinstance(self.embedding, torch.nn.Embedding):
+            self.embedding = self.embedding.weight
         self.hidden_dims = self.embedding.shape[-1]
         self.tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_dir, trust_remote_code=True)
 
@@ -580,7 +594,9 @@ class HMMiniCPMO(object):
                 self.tts_logits_warpers.append(TopKLogitsWarper(self.tts_top_k, min_tokens_to_keep=3))
 
             self.tts_embedding_path = os.path.join(args.embedding_path, "quant_embedding_tts.pt")
-            self.tts_embedding = torch.load(self.tts_embedding_path, map_location=torch.device(self.device), weights_only=False).weight
+            self.tts_embedding = torch.load(self.tts_embedding_path, map_location=torch.device(self.device), weights_only=False)
+            if isinstance(self.tts_embedding, torch.nn.Embedding):
+                self.tts_embedding = self.tts_embedding.weight
             self.tts_code_embeddings = self.load_tts_code_embeds(args.embedding_path)
 
             # option_tts_projector = tcim_lite.runtime.Option(wt_manager)
@@ -667,7 +683,10 @@ class HMMiniCPMO(object):
             if not os.path.exists(index_emb_path):
                 logger.error(f"{index_emb_path} is not exist! Please check it.")
                 assert(0)
-            x.append(torch.load(index_emb_path, map_location=torch.device(self.device), weights_only=False).weight)
+            weight = torch.load(index_emb_path, map_location=torch.device(self.device), weights_only=False)
+            if isinstance(weight, torch.nn.Embedding):
+                weight = weight.weight
+            x.append(weight)
         return x
 
     def get_nblocks(self, engine):
@@ -1825,7 +1844,7 @@ def xh2_demo(args):
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
 
     elif example_mode == "vllm":
-        image = Image.open("./MiniCPM-o-2_6/airplane.jpeg").convert("RGB")
+        image = Image.open("./material/airplane.jpeg").convert("RGB")
         msg = {"role":"user", "content": [image, "图中是哪家航空公司的飞机？"]}
         msgs = [msg]
         logger.info(msgs)
@@ -1846,8 +1865,8 @@ def xh2_demo(args):
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
 
     elif example_mode == "mvllm":
-        image0 = Image.open("./MiniCPM-o-2_6/000000002532.jpg").convert("RGB")
-        image1 = Image.open("./MiniCPM-o-2_6/000000001268.jpg").convert("RGB")
+        image0 = Image.open("./material/000000002532.jpg").convert("RGB")
+        image1 = Image.open("./material/000000001268.jpg").convert("RGB")
         msg = {"role":"user", "content": [image0, image1, "两张图的不同之处？"]}
         msgs = [msg]
         logger.info(msgs)
@@ -1902,7 +1921,7 @@ def xh2_demo(args):
         logger.success(f"TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
     elif example_mode == "wotts":
-        voice_pt = torch.load("./MiniCPM-o-2_6/woman_voice.pt", map_location=torch.device(hmminicpmo.device))
+        voice_pt = torch.load("./material/woman_voice.pt", map_location=torch.device(hmminicpmo.device))
         msgs = {'role': 'user', 'content': ["我是部署在后摩智能芯片中的文本到语音专家。很高兴为您服务！我可以按照这种方式将文本生成固定的语音文件。", 
                                             voice_pt]}
         logger.info(msgs)
@@ -1929,7 +1948,7 @@ def xh2_demo(args):
         logger.success(f"TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
     elif example_mode == "motts":
-        voice_pt = torch.load("./MiniCPM-o-2_6/man_voice.pt", map_location=torch.device(hmminicpmo.device))
+        voice_pt = torch.load("./material/man_voice.pt", map_location=torch.device(hmminicpmo.device))
         msgs = {'role': 'user', 'content': ["我是部署在后摩智能芯片中的文本到语音专家。很高兴为您服务！我可以按照这种方式将文本生成固定的语音文件。", 
                                             voice_pt]}
         logger.info(msgs)
@@ -1956,7 +1975,7 @@ def xh2_demo(args):
         logger.success(f"TTS Generate Speed: {tts_gen_speed:.2f} x real-time")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
     elif example_mode == "chunkotts":
-        voice_pt = torch.load("./MiniCPM-o-2_6/woman_voice.pt", map_location=torch.device(hmminicpmo.device))
+        voice_pt = torch.load("./material/woman_voice.pt", map_location=torch.device(hmminicpmo.device))
         msgs = {'role': 'user', 'content': ["在当今科技飞速发展的时代，人工智能大模型凭借其强大的语言理解、知识生成和逻辑推理能力，不仅正在深刻改变人们获取信息、沟通交流以及解决问题的方式，而且在教育、医疗、科研、金融等众多领域展现出前所未有的应用潜力，推动着各行各业朝着更加智能化、高效化的方向转型升级，成为推动社会进步和经济发展的关键力量。\
                                             面对人工智能大模型带来的机遇与挑战，我们必须在技术创新与伦理规范之间找到平衡，既要充分发挥其在提升生产效率、优化决策流程和解决复杂问题方面的巨大优势，又要通过完善法律法规、加强技术监管和推动多方协作，有效应对数据隐私、算法偏见和就业结构变化等潜在风险，确保这项前沿技术能够真正造福人类社会。", 
                                             voice_pt]}
@@ -2056,7 +2075,7 @@ def xh2_demo(args):
             sys_msg = {"role": "user", "content": ["模仿输入音频中的声音特征。", ref_audio, vc_prompt_suffix]}
         else:
             sys_msg = {"role": "user", "content": ["Use the <reserved_53> voice.", vc_prompt_suffix]}
-        conver_speech0, _ = librosa.load("./MiniCPM-o-2_6/assets/input_examples/comment0.wav", sr=16000, mono=True)
+        conver_speech0, _ = librosa.load("./material/comment0.wav", sr=16000, mono=True)
         user_question0 = {"role": "user", "content": [conver_speech0]}
         msgs = [sys_msg, user_question0]
         logger.info("user comments 0: Input dialogue in the input voice file.")
@@ -2094,7 +2113,7 @@ def xh2_demo(args):
         history_prompts = [answer0, wavdata0] if use_history_wav else [answer0]
         msgs.append({"role": "assistant", "content": history_prompts})
         history = msgs
-        conver_speech1, _ = librosa.load("./MiniCPM-o-2_6/assets/input_examples/comment1.wav", sr=16000, mono=True)
+        conver_speech1, _ = librosa.load("./material/comment1.wav", sr=16000, mono=True)
         user_question1 = {"role": "user", "content": [conver_speech1]}
         logger.info("user comments 1: Input dialogue in the input voice file.")
         history.append(user_question1)
@@ -2135,4 +2154,8 @@ def xh2_demo(args):
 if __name__ == "__main__":
 
     args = get_args()
-    xh2_demo(args)
+    if HOUMO_TARGET == 'xh1':
+        logger.error(f"MiniCPMO is not support xh1 platform!")
+        assert(0)
+    elif HOUMO_TARGET == 'xh2':
+        xh2_demo(args)
