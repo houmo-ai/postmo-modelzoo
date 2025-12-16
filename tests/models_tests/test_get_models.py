@@ -242,3 +242,39 @@ def test_embedding_bge_get_model(setup_logging: type(print)) -> None:
     """test_embedding_bge_get_model"""
     model_name = 'bge'
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_segmentation_yolov8m_cls_get_model')
+def test_segmentation_yolov8m_cls_get_model(setup_logging: type(print)) -> None:
+    """test_segmentation_yolov8m_cls_get_model"""
+    model_name = 'yolov8m-cls'
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov10m
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_detection_yolov10m_get_model')
+def test_detection_yolov10m_get_model(setup_logging: type(print)) -> None:
+    """test_detection_yolov10m_get_model"""
+    model_name = 'yolov10m'
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.yolo11m
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_detection_yolo11m_get_model')
+def test_detection_yolo11m_get_model(setup_logging: type(print)) -> None:
+    """test_detection_yolo11m_get_model"""
+    model_name = 'yolo11m'
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov9m
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_detection_yolov9m_get_model')
+def test_detection_yolov9m_get_model(setup_logging: type(print)) -> None:
+    """test_detection_yolov9m_get_model"""
+    model_name = 'yolov9m'
+    _get_model_func(model_name, setup_logging)

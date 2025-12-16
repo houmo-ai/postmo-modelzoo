@@ -5,7 +5,8 @@ from .test_models_utils import *
 logger = logging.getLogger(__name__)
 
 
-def _eval_func(model_name, log_file):
+def _eval_func(model_name: str, log_file: str) -> None:
+    """execute evaluation test"""
     logger.info("===> TEST START: test_%s_eval", model_name)
     execute_eval_flow(model_name, log_file)
 
@@ -116,7 +117,39 @@ def test_detection_yolov5m_face_eval(setup_logging):
 
 @pytest.mark.yolox
 @pytest.mark.eval
-def test_detection_yolox_eval(setup_logging):
+def test_detection_yolox_eval(setup_logging: type(print)) -> None:
+    """test_detection_yolox_eval"""
     model_name = 'yolox'
     _eval_func(model_name, setup_logging)
-    assert True
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.eval
+def test_segmentation_yolov8m_cls_eval(setup_logging: type(print)) -> None:
+    """test_segmentation_yolov8m_cls_eval"""
+    model_name = 'yolov8m-cls'
+    _eval_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov10m
+@pytest.mark.eval
+def test_detection_yolov10m_eval(setup_logging: type(print)) -> None:
+    """test_detection_yolov10m_eval"""
+    model_name = 'yolov10m'
+    _eval_func(model_name, setup_logging)
+
+
+@pytest.mark.yolo11m
+@pytest.mark.eval
+def test_detection_yolo11m_eval(setup_logging: type(print)) -> None:
+    """test_detection_yolo11m_eval"""
+    model_name = 'yolo11m'
+    _eval_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov9m
+@pytest.mark.eval
+def test_detection_yolov9m_eval(setup_logging: type(print)) -> None:
+    """test_detection_yolov9m_eval"""
+    model_name = 'yolov9m'
+    _eval_func(model_name, setup_logging)

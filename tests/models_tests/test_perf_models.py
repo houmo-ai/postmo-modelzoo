@@ -208,3 +208,35 @@ def test_ocr_ppocrv3_det_perf(setup_logging: type(print)) -> None:
     """test_ocr_ppocrv3_det_perf"""
     model_name = 'ppocrv3_det'
     _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.perf
+def test_segmentation_yolov8m_cls_perf(setup_logging: type(print)) -> None:
+    """test_segmentation_yolov8m_cls_perf"""
+    model_name = 'yolov8m-cls'
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov10m
+@pytest.mark.perf
+def test_detection_yolov10m_perf(setup_logging: type(print)) -> None:
+    """test_detection_yolov10m_perf"""
+    model_name = 'yolov10m'
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.yolo11m
+@pytest.mark.perf
+def test_detection_yolo11m_perf(setup_logging: type(print)) -> None:
+    """test_detection_yolo11m_perf"""
+    model_name = 'yolo11m'
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov9m
+@pytest.mark.perf
+def test_detection_yolov9m_perf(setup_logging: type(print)) -> None:
+    """test_detection_yolov9m_perf"""
+    model_name = 'yolov9m'
+    _perf_func(model_name, setup_logging)

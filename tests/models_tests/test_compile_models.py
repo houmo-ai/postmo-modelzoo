@@ -321,3 +321,51 @@ def test_embedding_bge_compile(setup_logging: type(print)) -> None:
     """test_embedding_bge_compile"""
     model_name = 'bge'
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name='test_segmentation_yolov8m_cls_compile',
+    depends_on=['test_quant_models.py::test_segmentation_yolov8m_cls_quant'],
+)
+def test_segmentation_yolov8m_cls_compile(setup_logging: type(print)) -> None:
+    """test_segmentation_yolov8m_cls_compile"""
+    model_name = 'yolov8m-cls'
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov10m
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name='test_detection_yolov10m_compile',
+    depends_on=['test_quant_models.py::test_detection_yolov10m_quant'],
+)
+def test_detection_yolov10m_compile(setup_logging: type(print)) -> None:
+    """test_detection_yolov10m_compile"""
+    model_name = 'yolov10m'
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.yolo11m
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name='test_detection_yolo11m_compile',
+    depends_on=['test_quant_models.py::test_detection_yolo11m_quant'],
+)
+def test_detection_yolo11m_compile(setup_logging: type(print)) -> None:
+    """test_detection_yolo11m_compile"""
+    model_name = 'yolo11m'
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov9m
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name='test_detection_yolov9m_compile',
+    depends_on=['test_quant_models.py::test_detection_yolov9m_quant'],
+)
+def test_detection_yolov9m_compile(setup_logging: type(print)) -> None:
+    """test_detection_yolov9m_compile"""
+    model_name = 'yolov9m'
+    _compile_func(model_name, setup_logging)

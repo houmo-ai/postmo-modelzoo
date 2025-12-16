@@ -144,3 +144,35 @@ def test_ocr_ppocrv3_det_compare(setup_logging: type(print)) -> None:
     """test_ocr_ppocrv3_det_compare"""
     model_name = 'ppocrv3_det'
     _compare_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.compare
+def test_segmentation_yolov8m_cls_compare(setup_logging: type(print)) -> None:
+    """test_segmentation_yolov8m_cls_compare"""
+    model_name = 'yolov8m-cls'
+    _compare_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov10m
+@pytest.mark.compare
+def test_detection_yolov10m_compare(setup_logging: type(print)) -> None:
+    """test_detection_yolov10m_compare"""
+    model_name = 'yolov10m'
+    _compare_func(model_name, setup_logging)
+
+
+@pytest.mark.yolo11m
+@pytest.mark.compare
+def test_detection_yolo11m_compare(setup_logging: type(print)) -> None:
+    """test_detection_yolo11m_compare"""
+    model_name = 'yolo11m'
+    _compare_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov9m
+@pytest.mark.compare
+def test_detection_yolov9m_compare(setup_logging: type(print)) -> None:
+    """test_detection_yolov9m_compare"""
+    model_name = 'yolov9m'
+    _compare_func(model_name, setup_logging)

@@ -297,3 +297,51 @@ def test_embedding_bge_quant(setup_logging: type(print)) -> None:
     """test_embedding_bge_quant"""
     model_name = 'bge'
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name='test_segmentation_yolov8m_cls_quant',
+    depends_on=['test_get_models.py::test_segmentation_yolov8m_cls_get_model'],
+)
+def test_segmentation_yolov8m_cls_quant(setup_logging: type(print)) -> None:
+    """test_segmentation_yolov8m_cls_quant"""
+    model_name = 'yolov8m-cls'
+    _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov10m
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name='test_detection_yolov10m_quant',
+    depends_on=['test_get_models.py::test_detection_yolov10m_get_model'],
+)
+def test_detection_yolov10m_quant(setup_logging: type(print)) -> None:
+    """test_detection_yolov10m_quant"""
+    model_name = 'yolov10m'
+    _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.yolo11m
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name='test_detection_yolo11m_quant',
+    depends_on=['test_get_models.py::test_detection_yolo11m_get_model'],
+)
+def test_detection_yolo11m_quant(setup_logging: type(print)) -> None:
+    """test_detection_yolo11m_quant"""
+    model_name = 'yolo11m'
+    _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov9m
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name='test_detection_yolov9m_quant',
+    depends_on=['test_get_models.py::test_detection_yolov9m_get_model'],
+)
+def test_detection_yolov9m_quant(setup_logging: type(print)) -> None:
+    """test_detection_yolov9m_quant"""
+    model_name = 'yolov9m'
+    _quant_func(model_name, setup_logging)
