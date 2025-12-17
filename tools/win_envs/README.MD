@@ -11,7 +11,7 @@
 
 
 ## 1.win11快速开始
-此README仅支持python≥3.9，其他版本未作验证，建议使用python≥3.9。
+**此README仅支持python≥3.9，其他版本未作验证，建议使用python≥3.9。**
 1. 使用准备与使用前提：
     - win11从后摩智能开发者社区[**https://developer.houmoai.com/**](https://developer.houmoai.com/)下载相关软件，参照社区文档中心完成固件烧录、驱动安装。
     - **驱动安装后需要确认windows的用户环境变量是否有HOUMO_SDK_PATH，该工具依赖此环境变量否则无法运行。**
@@ -54,8 +54,8 @@
         | -------------- | ---------------------------------------- |
         | env.bat --help/-h     | 帮助信息 |
         | env.bat --set         | 设置环境变量，已经设置的会自动跳过 |
-        | env.bat --clear       | 清除脚本设置的环境变量 |
-        | env.bat --reset       | 清除环境变量，并重新进入设置环境变量流程 |
+        | env.bat --clear       | 清除工具设置的环境变量 |
+        | env.bat --reset       | 对于安装过其他版本的环境，使用reset清除环境变量后重新设置 |
     2. 执行env.bat --set进入自动设置环境变量流程，[Required]的环境变量是运行样例必须的，[Optional]用户可以自行选择是否输入，不输入会有部分样例无法运行。目前部分样例需要给到的路径示例如下：
     ``` bat
     OPENCV_PATH [Optional]: D:\Program Files\Opencv\opencv\build
@@ -130,7 +130,7 @@
     rem 如果用户还需要设置环境变量支持其他样例，可以通过env.bat --reset进行重新设置，此步骤对于设置过的变量也会重设，功能等价于执行env.bat --clear + env.bat --set。也可以通过env.bat --clear + env.bat --set清楚后再设置。
     ```
     3. 执行env.bat --clear可以清除设置的环境变量。
-    4. 执行env.bat --reset会清除环境变量后重新进入设置流程，功能等价于env.bat --clear + env.bat --set。
+    4. 执行env.bat --reset会清除旧版本的环境变量。
     5. 执行env.bat --help/-h打印帮助信息。
 
 6. 初始环境变量会备份为initial_env_backup.json请不要修改和删除此文件，否则应用env.bat前的环境变量可能无法恢复。

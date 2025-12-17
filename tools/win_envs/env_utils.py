@@ -80,6 +80,7 @@ class EnvManager:
                         i += 1
                     except OSError:  # No more values
                         break
+                winreg.CloseKey(key)
             return values
         except Exception as e:
             raise RuntimeError(f"Failed to enumerate registry values: {e}")
@@ -147,7 +148,9 @@ class EnvManager:
             with winreg.OpenKey(root, reg_path, 0, access) as key:
                 reg_type = winreg.REG_EXPAND_SZ if "%" in value else winreg.REG_SZ
                 winreg.SetValueEx(key, var_name, 0, reg_type, value)
-            print(f"Set {var_name} to {value} ('user-level')")
+                winreg.CloseKey(key)
+            if var_name != "PATH":
+                print(f"Set {var_name} to {value} ('user-level')")
         except PermissionError:
             raise PermissionError("Admin rights required for system-level variables. Run as administrator.")
         except Exception as e:
@@ -203,7 +206,6 @@ class EnvManager:
         # Check if path already exists
         path_list = [p.strip() for p in current_path.split(";") if p.strip()]
         if new_path in path_list:
-            print(f"Path already in PATH: {new_path}")
             return
 
         # Add new path to PATH
@@ -215,9 +217,89 @@ class EnvManager:
             access = winreg.KEY_SET_VALUE | winreg.KEY_WOW64_64KEY
             with winreg.OpenKey(root, reg_path, 0, access) as key:
                 winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, updated_path)
+                winreg.CloseKey(key)
             print(f"Added to 'user-level' PATH: {new_path}")
             print("Note: New PATH takes effect in new processes. Restart window to apply.")
         except PermissionError:
             raise PermissionError("Admin rights required for system-level PATH. Run as administrator.")
         except Exception as e:
             print(f"Failed to update PATH: {e}")
+    
+    def get_user_path(self)-> list:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, 
+            self.user_reg_path, 
+            0, 
+            winreg.KEY_READ | winreg.KEY_WOW64_64KEY
+        ) as key:
+            user_path = winreg.QueryValueEx(key, "PATH")[0].split(';')
+            winreg.CloseKey(key)
+            return user_path
+    
+    def remove_env_from_path(self, remove_path) -> None:
+        #get path
+        current_paths = self.get_user_path()
+        if not len(current_paths):
+            return
+
+        path_list = [p.strip() for p in current_paths if p.strip()]
+
+        new_path_list = []
+        for path in path_list:
+            normalized_path = os.path.normpath(path)
+            if normalized_path != remove_path and normalized_path not in new_path_list:
+                new_path_list.append(path)
+            else:
+                continue
+                
+        new_path = ";".join(new_path_list)
+        self.set_env('PATH', new_path)
+        return None
+    
+    def reset_env(self)-> None:
+        delete_envs = ["HOUMO_MODELZOO_URL", "HDPL_PLATFORM", "HOUMO_TARGET", "TCIM_BACKEND", "HOUMO_EXAMPLES_PATH",
+                "PYTHON_DIR", "TCIM_RUNTIME_PATH", "HOUMO_PATH", "HOUMO_VERSION"]
+        check_envs = ["CMAKE_PATH", "HOUMO_SDK_PATH", "OPENCV_PATH"]
+        user_vars = self._enum_reg_values(self.user_reg_path)
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            self.user_reg_path,
+            0,
+            winreg.KEY_SET_VALUE  # Simplified access rights
+        ) as key:
+            existing_names = list(user_vars.keys())
+            for name in existing_names:
+                #delete delete_envs
+                if name in delete_envs:
+                    try:
+                        winreg.DeleteValue(key, name)
+                        print(f"Deleted variable: {name}")
+                    except Exception as e:
+                        print(f"Warning: Could not delete {name}: {e}")
+            
+            for name in existing_names:
+                if name in check_envs:
+                    print(f"[Warning]: your have {name} envs, val is {user_vars[name]}. \n",
+                          "we will not delete it, please confirm path exist and version is you need!")
+            winreg.CloseKey(key)
+            #get val of CMAKE_PATH HOUMO_SDK_PATH TCIM_RUNTIME_PATH 
+            for key, val in user_vars.items():
+                if key == "CMAKE_PATH":
+                    self.remove_env_from_path(val)
+                if key == "HOUMO_SDK_PATH":
+                    xh2a_dll_path = os.path.join(val, "hal\\lib")
+                    self.remove_env_from_path(xh2a_dll_path)
+                if key == "TCIM_RUNTIME_PATH":
+                    tcim_dll_path = os.path.join(val, "bin")
+                    python_exe_path = os.path.abspath(os.path.join(val, "../../Scripts"))
+                    self.remove_env_from_path(tcim_dll_path)
+                    self.remove_env_from_path(python_exe_path)
+        self.refresh_envs()
+        env_backup_file_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "initial_env_backup.json"))
+        if os.path.exists(env_backup_file_path):
+            os.remove(env_backup_file_path)
+        
+            
+
+            
+    
