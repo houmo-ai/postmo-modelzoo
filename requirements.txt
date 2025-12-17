@@ -21,7 +21,7 @@ modelscope
 gitpython
 
 # asr
-torchaudio==2.4.1
+torchaudio
 openai-whisper
 langid
 librosa
