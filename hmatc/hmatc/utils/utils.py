@@ -489,17 +489,18 @@ def hmatc_get_file(
         extract_dir = os.path.abspath(extract_dir)
     model_type = model_cfgs["model_type"]
     ignore_patterns = ["*.safetensors"]
-    if file_type in ["raw"] and model_cfgs.get("raw_files", None) is not None:
+    if file_type in ["raw"]:
         ignore_patterns = []
-        extract_dir_new = os.getenv("HOUMO_DATASETS_PATH", ".")
-        _download_raw_quant(
-            file_type,
-            model_cfgs,
-            download_files,
-            download_dir,
-            extract_dir,
-            extract_dir_new,
-        )
+        if model_cfgs.get("raw_files", None) is not None:
+            extract_dir_new = os.getenv("HOUMO_DATASETS_PATH", ".")
+            _download_raw_quant(
+                file_type,
+                model_cfgs,
+                download_files,
+                download_dir,
+                extract_dir,
+                extract_dir_new,
+            )
 
     elif file_type in ["quant"] and model_cfgs.get("quant_files", None) is not None:
         extract_dir_new = os.path.join("output", target, "hmquant")
@@ -629,11 +630,7 @@ def hmatc_get_file(
     ):
         download_files["default_files"] = list()
         for default_file in model_cfgs["default_files"]:
-            extract_dir_edit = (
-                extract_dir
-                if extract_dir is not None
-                else _generate_extract_dir(default_file, ".")
-            )
+            extract_dir_edit = _generate_extract_dir(default_file, ".")
             tmp_file = get_file_from_jfrog(default_file, download_dir, extract_dir_edit)
             if not tmp_file or not os.path.exists(tmp_file):
                 download_files["ret"] = False
