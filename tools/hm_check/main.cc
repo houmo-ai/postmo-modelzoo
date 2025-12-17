@@ -153,11 +153,49 @@ public:
         printf("===========================\n");
     }
 
+    struct Summary {
+        int pass{0};
+        int warn{0};
+        int fail{0};
+    };
+
+    Summary summary() const {
+        Summary s;
+        for (const auto &i : items) {
+            switch (i.status) {
+            case CheckStatus::PASS:
+                s.pass++;
+                break;
+            case CheckStatus::WARN:
+                s.warn++;
+                break;
+            case CheckStatus::FAIL:
+                s.fail++;
+                break;
+            }
+        }
+        return s;
+    }
+
     bool all_pass() const {
         for (auto &i : items)
             if (i.status == CheckStatus::FAIL)
                 return false;
         return true;
+    }
+
+    bool has_fail() const {
+        for (const auto &i : items)
+            if (i.status == CheckStatus::FAIL)
+                return true;
+        return false;
+    }
+
+    bool has_warn() const {
+        for (const auto &i : items)
+            if (i.status == CheckStatus::WARN)
+                return true;
+        return false;
     }
 
 private:
@@ -963,10 +1001,19 @@ int main(int argc, char **argv) {
                    status, std::string(buf), desc);
     }
     report.print();
-    if (!report.all_pass()) {
-        printf("%s❌%s Some checks failed.\n");
-    } else {
-        printf("%s✔%s All checks passed.\n", COLOR_GREEN, COLOR_RESET);
-    }
+
+    auto s = report.summary();
+
+    printf("\n===== Check Summary =====\n");
+    printf("  %sPASS%s : %d\n", COLOR_GREEN, COLOR_RESET, s.pass);
+    printf("  %sWARN%s : %d\n", COLOR_YELLOW, COLOR_RESET, s.warn);
+    printf("  %sFAIL%s : %d\n", COLOR_RED, COLOR_RESET, s.fail);
+    printf("=========================\n\n");
+
+    // if (!report.all_pass()) {
+    //     printf("%s❌%s Some checks failed.\n");
+    // } else {
+    //     printf("%s✔%s All checks passed.\n", COLOR_GREEN, COLOR_RESET);
+    // }
     return 0;
 }
