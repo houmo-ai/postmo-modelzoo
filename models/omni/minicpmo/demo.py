@@ -31,16 +31,14 @@ from typing import Any, Optional, Tuple, Union, List
 from vocos.spectral_ops import IMDCT, ISTFT
 from moviepy import VideoFileClip
 
-#from hmatc.utils import logger
-
 import tcim_lite
 
 import sys
 SCRIP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(SCRIP_DIR)
 from transformers.models.whisper.feature_extraction_whisper import WhisperFeatureExtractor
-from processing_minicpmo import *
-from image_processing_minicpmv import *
+from processing_minicpmo import MiniCPMOProcessor
+from image_processing_minicpmv import MiniCPMVImageProcessor
 
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -293,7 +291,7 @@ ABBREVIATIONS = {
     "CEO.", "CTO.", "CFO.", "COO.", "VP.", "Dir.", "Mgr.", "Capt.", "Lt.", "Col.", "Gen.", "Sgt.",
     "a.m.", "p.m.", "A.D.", "B.C.",
     "Jan.", "Feb.", "Mar.", "Apr.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec.",
-    "Ave.", "Blvd.", "Rd.", "St.", "Ln.", "Sq.", "Hwy.", "Apt.", "Ste.", "No.",
+    "Ave.", "Blvd.", "Rd.", "Ln.", "Sq.", "Hwy.", "Apt.", "Ste.", "No.",
     "Inc.", "Ltd.", "Co.", "Corp.", "LLC.", "Pty.",
     "ft.", "in.", "lb.", "oz.", "sec.", "min.", "hr.", "km.", "cm.", "mm.", "pt.",
     "AI.", "ML.", "NLP.", "GPU.", "CPU.", "API.", "SDK.", "UI.", "UX.",
@@ -360,10 +358,6 @@ def split_text_for_tts(text: str, max_len: int = 80, min_len: int = 40):
             grouped.append(pre_sent)
             pre_sent = sent
     grouped.append(pre_sent)
-    # for i in range(0, len(new_sentences)-1, 2):
-    #     grouped.append(new_sentences[i].strip() + new_sentences[i+1])
-    # if len(new_sentences) % 2 == 1:
-    #     grouped.append(new_sentences[-1].strip())
 
     # 去除空元素
     grouped = [g for g in grouped if g.strip()]
@@ -426,8 +420,6 @@ def split_text_for_tts(text: str, max_len: int = 80, min_len: int = 40):
         r_len = count_mixed_text(r)['Total']
         cs_len = count_mixed_text(cur_str)['Total']
         if r_len < min_len and cs_len + r_len <= max_len:
-            # if all(ord(c) < 128 for c in cur_str) and all(ord(i) < 128 for i in r):
-            #     cur_str += " "
             if cur_str[-1] in english_punct + [',']:
                 cur_str += " "
             cur_str += r
@@ -1779,7 +1771,7 @@ def xh2_demo(args):
     if example_mode == "omni":
         video_path="./MiniCPM-o-2_6/assets/Skiing.mp4"
         # if use voice clone prompt, please set ref_audio
-        ref_audio_path = './MiniCPM-o-2_6/assets/input_examples/cxk_original.wav'
+        ref_audio_path = './MiniCPM-o-2_6/assets/demo.wav'
         ref_audio, _ = librosa.load(ref_audio_path, sr=16000, mono=True)
         sys_msg = {"role": "user",
                 "content":["你是一个AI助手。你能接受视频，音频和文本输入并输出语音和文本。模仿输入音频中的声音特征。",
@@ -2154,8 +2146,4 @@ def xh2_demo(args):
 if __name__ == "__main__":
 
     args = get_args()
-    if HOUMO_TARGET == 'xh1':
-        logger.error(f"MiniCPMO is not support xh1 platform!")
-        assert(0)
-    elif HOUMO_TARGET == 'xh2':
-        xh2_demo(args)
+    xh2_demo(args)

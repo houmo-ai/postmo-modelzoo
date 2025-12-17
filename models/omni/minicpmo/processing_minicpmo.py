@@ -32,7 +32,7 @@ from transformers.tokenization_utils_base import PreTokenizedInput
 from transformers.tokenization_utils_base import TextInput
 from transformers.utils import TensorType
 
-from .image_processing_minicpmv import MiniCPMOBatchFeature
+from image_processing_minicpmv import MiniCPMOBatchFeature
 
 def normalize_audios(audios: Union[np.ndarray, List[np.ndarray], List[List[np.ndarray]]]) -> List[List[np.ndarray]]:
     """统一输入为 List[List[np.ndarray]]"""
@@ -154,7 +154,7 @@ class MiniCPMOProcessor(ProcessorMixin):
     ) -> MiniCPMOBatchFeature:
         if images is not None:
             image_inputs = self.image_processor(
-                images, do_pad=do_pad, max_slice_nums=max_slice_nums, return_tensors=return_tensors
+                images, max_slice_nums=max_slice_nums, return_tensors=return_tensors
             )
         else:
             image_inputs = None
@@ -220,7 +220,7 @@ class MiniCPMOProcessor(ProcessorMixin):
         )
         features = inputs["input_features"]
         lengths = inputs["attention_mask"].sum(dim=1)
-        return list(features), torch.hstack(lengths)
+        return features, lengths
 
     def audio_feature_extract(
         self,
@@ -256,7 +256,7 @@ class MiniCPMOProcessor(ProcessorMixin):
                     final_audios.append(a)
 
             # 提取特征
-            features, lengths = self.extract_audio_features(self, final_audios, sampling_rate, **kwargs)
+            features, lengths = self.extract_audio_features(final_audios, sampling_rate, **kwargs)
             audio_features_all.extend(features)
             audio_feature_lens_list.append(lengths if len(lengths) > 0 else [])
 
@@ -494,7 +494,6 @@ class MiniCPMOProcessor(ProcessorMixin):
             tensor = torch.zeros((batch_size, max_length, shape[-1]), dtype=dtype) + padding_value
             
         return pad_inputs(items, dim, padding_side, tensor)
-
 
 class MelSpectrogramFeatures(torch.nn.Module):
     def __init__(
