@@ -48,95 +48,24 @@
     - 在[**https://cmake.org/**](https://cmake.org/)下载cmake并运行安装。
     - 在opencv官网[**https://opencv.org/**](https://opencv.org/)选择Library->Release下载编译好的opencv并运行解压安装。
 
-5. 自动设置环境变量。
-    1. 支持在examples目录的使用方式如下： 
+5. 自动设置环境变量：运行env.bat需要**确保终端中python指令可用**，且已经按照使用准备完成了需要的python库文件。设置完环境变量一定要重新启动终端才会生效，env.bat需要管理员权限运行。
+    1. **env.bat支持如下参数，以下指令执行时均需要在cmd终端的管理员模式下，--set、--clear、--reset每次执行后需要关闭当前终端才能真正刷新系统环境变量，若需要继续执行下一条指令，请关闭当前终端后重新打开其他终端继续。**
         | 指令        | 说明                                     |
         | -------------- | ---------------------------------------- |
         | env.bat --help/-h     | 帮助信息 |
         | env.bat --set         | 设置环境变量，已经设置的会自动跳过 |
-        | env.bat --clear       | 清除工具设置的环境变量 |
+        | env.bat --clear       | 恢复到首次使用工具时，生成的initial_env_backup.json中备份的环境变量 |
         | env.bat --reset       | 对于安装过其他版本的环境，使用reset清除环境变量后重新设置 |
-    2. 执行env.bat --set进入自动设置环境变量流程，[Required]的环境变量是运行样例必须的，[Optional]用户可以自行选择是否输入，不输入会有部分样例无法运行。目前部分样例需要给到的路径示例如下：
-    ``` bat
-    OPENCV_PATH [Optional]: D:\Program Files\Opencv\opencv\build
-    CMAKE_PATH: D:\\Program Files\\CMake\\bin
-    ```
-    运行结果示例：
-    ``` bat
-    rem 首先会打印examples支持的示例情况及当前环境支持运行的样例信息
-    ===============Set Win Envs===============
-    --------------------------------------------------
-            imodelzoo win11 support demos
-    --------------------------------------------------
-    √ qwen3           : python, c++
-    √ resnet50        : python, c++
-    √ yolov5s         : python, c++
-    --------------------------------------------------
-    --------------------------------------------------
-            current env support python demos
-    --------------------------------------------------
-    qwen3           ×
-    resnet50        ×
-    yolov5s         ×
-    --------------------------------------------------
-    --------------------------------------------------
-            current env support cpp demos
-    --------------------------------------------------
-    qwen3           ×
-    resnet50        ×
-    yolov5s         ×
-    --------------------------------------------------
-    rem 然后会自动搜索环境变量，部分环境变量可能需要用户手动设置，0.6.0之前的版本HOUMO_SDK_PATH需要用户自行设置，0.6.0及之后的版本如果正确安装之后会自动搜索，搜索失败会提示用户手动设置。[Required]的环境变量是必要的，搜索不到用户必须设置。[Optional]的环境变量如果不设置可以回车跳过，但是会影响部分样例的运行。
-    ✅ Found tcim_package_path at path:
-    C:\Users\liuzhenyao\AppData\Local\Programs\Python\Python311\Lib\site-packages\tcim_lite
-    Manual Set HOUMO_SDK_PATH [Required]  abspath:D:\0.5.0\houmo_drv_xh2_v0.5.0_windows11_x86_64\houmo_drv_xh2
-    Manual Set OPENCV_PATH [Optional]  abspath:D:\Program Files\Opencv\opencv\build
-    Set HOUMO_MODELZOO_URL to http://10.10.1.53:8082/artifactory/toolchain/release ('user-level')
-    Set HDPL_PLATFORM to ASIC ('user-level')
-    Set HOUMO_TARGET to xh2 ('user-level')
-    Set TCIM_BACKEND to Xh2HalBackend ('user-level')
-    Set HOUMO_EXAMPLES_PATH to D:\win11\imodelzoo ('user-level')
-    Set PYTHON_DIR to C:\Users\liuzhenyao\AppData\Local\Programs\Python\Python311 ('user-level')
-    Set TCIM_RUNTIME_PATH to C:\Users\liuzhenyao\AppData\Local\Programs\Python\Python311\Lib\site-packages\tcim_lite ('user-level')
-    Set CMAKE_PATH to D:\Program Files\CMake\bin ('user-level')
-    Set HOUMO_PATH to C:\Users\liuzhenyao\AppData\Local\Programs\Python\Python311\Lib\site-packages\tcim_lite ('user-level')
-    Set HOUMO_SDK_PATH to D:\0.5.0\houmo_drv_xh2_v0.5.0_windows11_x86_64\houmo_drv_xh2 ('user-level')
-    Set OPENCV_PATH to D:\Program Files\Opencv\opencv\build ('user-level')
-    Set HOUMO_VERSION to v0.5.0 ('user-level')
-    Added to 'user-level' PATH: C:\Users\liuzhenyao\AppData\Local\Programs\Python\Python311\Lib\site-packages\tcim_lite\bin;D:\0.5.0\houmo_drv_xh2_v0.5.0_windows11_x86_64\houmo_drv_xh2\hal/lib;
-    Note: New PATH takes effect in new processes. Restart window to apply.
-    --------------------------------------------------
-            imodelzoo win11 support demos
-    --------------------------------------------------
-    √ qwen3           : python, c++
-    √ resnet50        : python, c++
-    √ yolov5s         : python, c++
-    --------------------------------------------------
-    --------------------------------------------------
-            current env support python demos
-    --------------------------------------------------
-    qwen3           √
-    resnet50        √
-    yolov5s         √
-    --------------------------------------------------
-    --------------------------------------------------
-            current env support cpp demos
-    --------------------------------------------------
-    qwen3           √
-    resnet50        √
-    yolov5s         √
-    --------------------------------------------------
-    ========Set all envs Finished, please reopen cmd window=========
-    rem 如果用户还需要设置环境变量支持其他样例，可以通过env.bat --reset进行重新设置，此步骤对于设置过的变量也会重设，功能等价于执行env.bat --clear + env.bat --set。也可以通过env.bat --clear + env.bat --set清楚后再设置。
-    ```
-    3. 执行env.bat --clear可以清除设置的环境变量。
-    4. 执行env.bat --reset会清除旧版本的环境变量。
-    5. 执行env.bat --help/-h打印帮助信息。
-
-6. 初始环境变量会备份为initial_env_backup.json请不要修改和删除此文件，否则应用env.bat前的环境变量可能无法恢复。
-
-7. 首次运行env.bat需要确保终端中python指令可用，且已经按照使用准备完成了需要的python库文件。设置完环境变量一定要重新启动终端才会生效，env.bat需要管理员权限运行。
-
+    2. 对于一个从未使用过后摩相关软件的系统环境，首次设置可以使用env.bat --set。
+    3. 对于安装过历史版本的系统环境，首次使用通过env.bat --reset重置当前环境，并根据提示检查部分环境变量是否正确。**用户需要检查reset指令输出的Warning部分的路径是否正确**。如果不正确需要自行删除。关闭该终端后，环境变量reset才会生效。reset过后，用户可以通过新开终端执行env.bat --set设置环境变量。
+    4. env.bat在**首次使用（执行--reset并关闭终端后，也等同于首次使用）**时，在tools/win_envs目录下生成initial_env_backup.json，--clear会将环境变量恢复到initial_env_backup.json所记录的环境变量，即删除--set所设置的所有环境变量。
+    5. **env.bat会校验tcim_version和houmo_sdk_version如果版本不匹配会设置失败。**
+    6. env.bat设置完成后，**样例目录的bat脚本需要cmd终端（非管理员模式）运行，主要原因是env.bat更改的是用户的环境变量。**
+    7. 如果用户在conda环境下使用env.bat工具，执行env.bat工具之前需要先conda activate对应的python环境，这样的目的是告诉工具在特定的python环境下自动寻找部分环境变量。
+    8. 以下路径如果手动设置给到的目录级别参考如下：
+        - HOUMO_SDK_PATH ： D:\houmo_drv_xh2_v0.6.0_windows11_x86_64\houmo_drv_xh2
+        - CMAKE_PATH : D:\Program Files\CMake\bin
+        - OPENCV_PATH : D:\workspace\3rdparty_learning\opencv\build
 ## 2.配置说明
 
 ### 2.1 env.json字段说明
