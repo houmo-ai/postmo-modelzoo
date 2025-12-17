@@ -105,5 +105,10 @@
   Device1 Measured PCIe H2D      [WARN]   6.23 GB/s             The PCIE transfer bandwidth should not be less than 7.88 GB/s * 0.80
   Device1 Measured PCIe D2H      [PASS]   6.59 GB/s             
 ===========================
-✔ All checks passed.
+
+===== Check Summary =====
+  PASS : 16
+  WARN : 2
+  FAIL : 0
+=========================
 ```
