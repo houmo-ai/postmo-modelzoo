@@ -176,6 +176,14 @@ def get_args() -> argparse.Namespace:
         default=256,
         help='prefill_length',
     )
+    parser.add_argument(
+        '--flash_attention',
+        dest='flash_attention',
+        type=int,
+        default=0,
+        choices=[0, 1, 2],
+        help='flash attention optimization',
+    )
     args = parser.parse_args()
     return args
 
@@ -192,6 +200,7 @@ def build(
     j,
     batch=None,
     tso=True,
+    flash_attention=0,
     prefill_length=256,
 ):
     import tcim
@@ -206,6 +215,8 @@ def build(
         custom_msg["batch"] = batch
     if HOUMO_TARGET == "xh2":
         kwargs["enable_xh2_stable_output"] = tso
+        kwargs["flash_attention"] = flash_attention
+        custom_msg["flash_attention"] = flash_attention
         if ndevice:
             kwargs["ndevice"] = ndevice
         if context_length:
@@ -369,6 +380,7 @@ if __name__ == '__main__':
             context_length,
             j,
             tso=True,
+            flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
         model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
@@ -384,6 +396,7 @@ if __name__ == '__main__':
             j,
             batch,
             tso=False,
+            flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
 

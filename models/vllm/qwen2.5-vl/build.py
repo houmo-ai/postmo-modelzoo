@@ -184,6 +184,14 @@ def get_args() -> argparse.Namespace:
         default=256,
         help='prefill_length',
     )
+    parser.add_argument(
+        '--flash_attention',
+        dest='flash_attention',
+        type=int,
+        default=0,
+        choices=[0, 1, 2],
+        help='flash attention optimization',
+    )
     args = parser.parse_args()
     return args
 
@@ -200,6 +208,7 @@ def build_llm(
     j,
     batch=None,
     tso=True,
+    flash_attention=0,
     prefill_length=256,
 ):
     import tcim
@@ -213,6 +222,8 @@ def build_llm(
 
         kwargs["modify_llm"] = {}
         kwargs["enable_xh2_stable_output"] = tso
+        kwargs["flash_attention"] = flash_attention
+        custom_msg["flash_attention"] = flash_attention
         if ndevice:
             kwargs["ndevice"] = ndevice
         if batch:
@@ -242,8 +253,20 @@ def build_llm(
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 
-def build_vit(model_name, model_dir, model_path, output_dir, profile, ncore, j):
+def build_vit(
+    model_name, model_dir, model_path, output_dir, profile, ncore, j, flash_attention
+):
     import tcim
+
+    kwargs = {}
+    if HOUMO_TARGET == "xh2":
+        import json
+
+        flash_attention = 0 if flash_attention == 0 else 1
+        kwargs["flash_attention"] = flash_attention
+        custom_msg = dict()
+        custom_msg["flash_attention"] = flash_attention
+        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
     print(f"\n===> {model_name} build start...")
@@ -257,6 +280,7 @@ def build_vit(model_name, model_dir, model_path, output_dir, profile, ncore, j):
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim", model_name),
         j=j,
+        **kwargs,
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
@@ -401,6 +425,7 @@ if __name__ == '__main__':
             profile,
             ncore,
             j,
+            flash_attention=args.flash_attention,
         )
         build_llm(
             "qwen2.5-vl_prefill",
@@ -413,6 +438,7 @@ if __name__ == '__main__':
             context_length,
             j,
             tso=True,
+            flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
         build_llm(
@@ -426,6 +452,7 @@ if __name__ == '__main__':
             context_length,
             j,
             tso=False,
+            flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
 

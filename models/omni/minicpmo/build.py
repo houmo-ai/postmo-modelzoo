@@ -17,6 +17,7 @@ GOLDEN_THRESH = 0.98
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
 
+
 def cosine_distance(data1, data2):
     if data1.shape != data2.shape:
         print(f"[error] shape not equal {data1.shape} vs {data2.shape}")
@@ -110,6 +111,21 @@ def get_args() -> argparse.Namespace:
         default=os.path.join('output', HOUMO_TARGET),
         help='build output dir',
     )
+    parser.add_argument(
+        '--prefill_length',
+        dest='prefill_length',
+        type=int,
+        default=256,
+        help='prefill_length',
+    )
+    parser.add_argument(
+        '--flash_attention',
+        dest='flash_attention',
+        type=int,
+        default=0,
+        choices=[0, 1, 2],
+        help='flash attention optimization',
+    )
     args = parser.parse_args()
     return args
 
@@ -125,7 +141,9 @@ def build_llm_tts(
     context_length,
     j,
     batch=None,
-    tso=True
+    tso=True,
+    flash_attention=0,
+    prefill_length=256,
 ):
     import tcim
 
@@ -134,9 +152,12 @@ def build_llm_tts(
         import json
 
         custom_msg = dict()
-        custom_msg["prefill_length"] = 256
+        custom_msg["prefill_length"] = prefill_length
+
         kwargs["modify_llm"] = {}
         kwargs["enable_xh2_stable_output"] = tso
+        kwargs["flash_attention"] = flash_attention
+        custom_msg["flash_attention"] = flash_attention
         if ndevice:
             kwargs["ndevice"] = ndevice
         if batch:
@@ -165,8 +186,21 @@ def build_llm_tts(
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
-def build_other_all(model_name, model_dir, model_path, output_dir, profile, ncore, j):
+
+def build_other_all(
+    model_name, model_dir, model_path, output_dir, profile, ncore, j, flash_attention=0
+):
     import tcim
+
+    kwargs = {}
+    if HOUMO_TARGET == "xh2" and flash_attention > 0:
+        import json
+
+        flash_attention = 1
+        kwargs["flash_attention"] = flash_attention
+        custom_msg = dict()
+        custom_msg["flash_attention"] = flash_attention
+        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
     print(f"\n===> {model_name} build start...")
@@ -180,6 +214,7 @@ def build_other_all(model_name, model_dir, model_path, output_dir, profile, ncor
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim"),
         j=j,
+        **kwargs,
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
@@ -320,7 +355,9 @@ if __name__ == '__main__':
             ndevice,
             context_length,
             j,
-            tso=True
+            tso=True,
+            flash_attention=args.flash_attention,
+            prefill_length=args.prefill_length,
         )
         build_llm_tts(
             "minicpmo_llm_decode",
@@ -332,7 +369,9 @@ if __name__ == '__main__':
             ndevice,
             context_length,
             j,
-            tso=False
+            tso=False,
+            flash_attention=args.flash_attention,
+            prefill_length=args.prefill_length,
         )
         build_llm_tts(
             "minicpmo_tts_prefill",
@@ -344,7 +383,9 @@ if __name__ == '__main__':
             ndevice,
             2048,
             j,
-            tso=True
+            tso=True,
+            flash_attention=args.flash_attention,
+            prefill_length=args.prefill_length,
         )
         build_llm_tts(
             "minicpmo_tts_decode",
@@ -356,7 +397,9 @@ if __name__ == '__main__':
             ndevice,
             2048,
             j,
-            tso=False
+            tso=False,
+            flash_attention=args.flash_attention,
+            prefill_length=args.prefill_length,
         )
         build_other_all(
             "minicpmo_visual",
@@ -366,6 +409,7 @@ if __name__ == '__main__':
             profile,
             ncore,
             j,
+            flash_attention=args.flash_attention,
         )
         build_other_all(
             "minicpmo_audio",
@@ -375,10 +419,9 @@ if __name__ == '__main__':
             profile,
             ncore,
             j,
+            flash_attention=args.flash_attention,
         )
-        model_path = (
-            f"hmquant_dvae_part1_with_act.onnx"
-        )
+        model_path = f"hmquant_dvae_part1_with_act.onnx"
         build_other_all(
             "minicpmo_dvae_part1",
             os.path.join(model_dir, "dvae"),
@@ -388,9 +431,7 @@ if __name__ == '__main__':
             ncore,
             j,
         )
-        model_path = (
-            f"hmquant_dvae_part2_with_act.onnx"
-        )
+        model_path = f"hmquant_dvae_part2_with_act.onnx"
         build_other_all(
             "minicpmo_dvae_part2",
             os.path.join(model_dir, "dvae"),
@@ -400,9 +441,7 @@ if __name__ == '__main__':
             ncore,
             j,
         )
-        model_path = (
-            f"hmquant_vocos_with_act.onnx"
-        )
+        model_path = f"hmquant_vocos_with_act.onnx"
         build_other_all(
             "minicpmo_vocos",
             os.path.join(model_dir, "vocos"),

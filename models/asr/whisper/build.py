@@ -147,12 +147,29 @@ def get_args() -> argparse.Namespace:
         default=os.path.join('output', HOUMO_TARGET),
         help='build output dir',
     )
+    parser.add_argument(
+        '--flash_attention',
+        dest='flash_attention',
+        type=int,
+        default=0,
+        choices=[0, 1],
+        help='flash attention optimization',
+    )
     args = parser.parse_args()
     return args
 
 
-def build_whisper(model_name, model_dir, model_path, output_dir, profile, ncore, j):
+def build_whisper(
+    model_name, model_dir, model_path, output_dir, profile, ncore, j, flash_attention=0
+):
     import tcim
+    import json
+
+    kwargs = {}
+    kwargs["flash_attention"] = flash_attention
+    custom_msg = {}
+    custom_msg["flash_attention"] = flash_attention
+    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
     print(f"\n===> {model_name} build start...")
@@ -166,6 +183,7 @@ def build_whisper(model_name, model_dir, model_path, output_dir, profile, ncore,
         output_dir=output_dir,
         work_dir=os.path.join(output_dir, "tcim", model_name),
         j=j,
+        **kwargs,
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
@@ -303,6 +321,7 @@ if __name__ == '__main__':
             profile,
             ncore,
             j,
+            flash_attention=args.flash_attention,
         )
         build_whisper(
             "whisper_decoder",
@@ -312,6 +331,7 @@ if __name__ == '__main__':
             profile,
             ncore,
             j,
+            flash_attention=args.flash_attention,
         )
         build_whisper(
             "whisper_prefill",
@@ -321,6 +341,7 @@ if __name__ == '__main__':
             profile,
             ncore,
             j,
+            flash_attention=args.flash_attention,
         )
 
     # test model
