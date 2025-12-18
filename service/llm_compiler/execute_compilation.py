@@ -76,6 +76,12 @@ def parse_args():
         help="build parallel jobs.",
     )
     parser.add_argument(
+        "--flash_attention",
+        type=int,
+        choices=[0, 1, 2],
+        help='flash attention optimization',
+    )
+    parser.add_argument(
         "-r",
         "--result_dir",
         type=str,
@@ -108,7 +114,7 @@ def _check_golden(dir_path: str):
 def main(args) -> int:
     logger.info(
         "Model name: %s, Model path: %s, Quant model path: %s, Context length: %d, "
-        "Batch: %d, Device num: %d, Core Num: %d, J: %d, Result Dir: %s",
+        "Batch: %d, Device num: %d, Core Num: %d, J: %d, Flash attention: %d, Result Dir: %s",
         args.model_name,
         args.model_path,
         args.quant_model_path,
@@ -117,6 +123,7 @@ def main(args) -> int:
         args.device_num,
         args.core_num,
         args.j,
+        args.flash_attention,
         args.result_dir,
     )
 
@@ -160,6 +167,8 @@ def main(args) -> int:
         cmds += ["--ndevice", str(args.device_num)]
     if args.j > 0:
         cmds += ["--j", str(args.j)]
+    if args.flash_attention and args.flash_attention in [0, 1, 2]:
+        cmds += ["--flash_attention", str(args.flash_attention)]
 
     ret = execute_cmd(cmds, args.log_file)
 

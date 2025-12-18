@@ -148,6 +148,13 @@ def parse_args():
         default="",
         help="the path of perf config file.",
     )
+    parser.add_argument(
+        "--flash_attention",
+        type=int,
+        default=0,
+        choices=[0, 1, 2],
+        help='flash attention optimization, default is 0',
+    )
 
     args = parser.parse_args()
     return args
@@ -230,6 +237,7 @@ def _check_args(args: dict):
         "-- Device num: %d \n"
         "-- Core num: %d \n"
         "-- J: %d \n"
+        "-- Flash Attention: %d \n"
         "-- Save results to %s\n"
         "-- Task Id: %s \n",
         args.model_name,
@@ -243,6 +251,7 @@ def _check_args(args: dict):
         args.device_num,
         args.core_num,
         args.j,
+        args.flash_attention,
         args.result_dir,
         args.task_id,
     )
@@ -421,6 +430,7 @@ if __name__ == "__main__":
     core_num = args.core_num
     batch = args.batch
     j = args.j
+    flash_attention = args.flash_attention
 
     model_name_ori = model_name
 
@@ -505,7 +515,7 @@ if __name__ == "__main__":
             compile_cmd += f"-b {batch} "
         if core_num > 0:
             compile_cmd += f"-cn {core_num} "
-        compile_cmd += f"-j {j} -r {container_compile_res} -log {container_log_file}"
+        compile_cmd += f"-j {j} --flash_attention {flash_attention} -r {container_compile_res} -log {container_log_file}"
         commands.append(
             f"cd {container_home}/imodelzoo/service/llm_compiler && {compile_cmd}"
         )
