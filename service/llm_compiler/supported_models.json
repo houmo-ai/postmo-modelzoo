@@ -136,7 +136,7 @@
             "support_backends": [
                 "xh2"
             ],
-            "path": "models/llm/gpt_oss",
+            "path": "models/llm/gpt-oss",
             "raw": "llm/None",
             "perf": false
         }

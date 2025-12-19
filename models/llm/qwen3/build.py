@@ -199,7 +199,7 @@ def build(
     context_length,
     j,
     batch=None,
-    tso=True,
+    tso=False,
     flash_attention=0,
     prefill_length=256,
 ):
@@ -379,7 +379,6 @@ if __name__ == '__main__':
             ndevice,
             context_length,
             j,
-            tso=True,
             flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
@@ -395,7 +394,6 @@ if __name__ == '__main__':
             context_length,
             j,
             batch,
-            tso=False,
             flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
