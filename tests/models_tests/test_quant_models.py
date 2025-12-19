@@ -345,3 +345,12 @@ def test_detection_yolov9m_quant(setup_logging: type(print)) -> None:
     """test_detection_yolov9m_quant"""
     model_name = 'yolov9m'
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.minicpmo
+@pytest.mark.quant
+@pytest.mark.dependency(name='test_omni_minicpmo_quant', depends_on=['test_get_models.py::test_omni_minicpmo_get_model'])
+def test_omni_minicpmo_quant(setup_logging: type(print)) -> None:
+    """test_omni_minicpmo_quant"""
+    model_name = 'minicpmo'
+    _quant_func(model_name, setup_logging)

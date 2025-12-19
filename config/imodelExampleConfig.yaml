@@ -319,6 +319,18 @@ llm_bge:
         args: all
   test:
     - llm_bge_test
+llm_minicpmo:
+  include:
+    - models/omni/minicpmo
+  exclude:
+    - models/omni/minicpmo/README.MD
+  example_case:
+    - llm_minicpmo_test:
+        test_type: models_tests
+        script: minicpmo
+        args: all
+  test:
+    - llm_minicpmo_test
 utils:
   include:
     - utils

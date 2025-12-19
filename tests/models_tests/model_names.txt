@@ -28,3 +28,4 @@ yolov8m_cls
 yolov10m
 yolo11m
 yolov9m
+minicpmo

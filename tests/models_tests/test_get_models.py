@@ -278,3 +278,12 @@ def test_detection_yolov9m_get_model(setup_logging: type(print)) -> None:
     """test_detection_yolov9m_get_model"""
     model_name = 'yolov9m'
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.minicpmo
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_omni_minicpmo_get_model')
+def test_omni_minicpmo_get_model(setup_logging: type(print)) -> None:
+    """test_omni_minicpmo_get_model"""
+    model_name = 'minicpmo'
+    _get_model_func(model_name, setup_logging)

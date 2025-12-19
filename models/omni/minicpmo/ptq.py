@@ -8,13 +8,8 @@ import psutil
 import threading
 
 import torch
-import torch.nn as nn
 import gc
 from loguru import logger
-from safetensors.torch import load_file as load_safetensors_file
-from safetensors.torch import save_file as save_safetensors_file
-from tqdm import tqdm
-from transformers import AutoConfig, AutoModelForCausalLM
 
 from xh_model_zoo.xh_llm import LLMConverter
 
@@ -24,9 +19,6 @@ from xh_model_zoo.utils.time_profiler import TimeProfiler  # isort:skip
 
 HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '')
 HOUMO_TARGET = os.getenv('HOUMO_TARGET', '')
-
-import torch
-torch.cuda.set_device(1)
 
 class ProcessMemoryMonitor:
     """
@@ -130,6 +122,12 @@ def msg_output_format(title):
     title = f"{padding_str} {title} {padding_str}"
     return title
 
+def cleanup_cuda():
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
 def houmo_export_llm(args, component="vision"):
     hf_model_path = osp.normpath(osp.abspath(args.model))
     model_name = args.model_name
@@ -218,6 +216,8 @@ def houmo_export_llm(args, component="vision"):
     logger = get_root_logger()
     with TimeProfiler("convert", logger), MemoryTracker("cuda:0", "convert", logger):
         LLMConverter.from_pretrained(hf_model_path, architecture, config, str(work_dir))  
+    
+    cleanup_cuda()
 
 def move_models(
     work_dir: Path,
@@ -369,7 +369,7 @@ if HOUMO_TARGET == 'xh2':
 
     def parse_args():
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        parser.add_argument("--model", type=str, default="/mnt/data/xunan/project/public/MiniCPM-V/MiniCPM-o-2_6", help="input hf model path")
+        parser.add_argument("--model", type=str, default="./MiniCPM-o-2_6", help="input hf model path")
         parser.add_argument("--model-name", type=str, default="minicpmo", help="output hmonnx model name")
         parser.add_argument("--work-dir", type=str, default="work_dirs/")
         parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
