@@ -28,11 +28,14 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         Args:
             cfg (dict): 来自配置文件
         """
+        """"基础参数"""
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Using device: {self.device}")
         self.target = cfg["target"]
         self.enable_upload = False
+        """模型参数"""
         self.model_cfg = cfg.get("model")
+        self.save_dir = self.model_cfg.get("save_dir")
         self.model_path = self.model_cfg.get("model_path", "")
         HOUMO_MODEL_PATH = os.environ.get("HOUMO_MODEL_PATH", "")
         if not os.path.isfile(self.model_path):
@@ -42,18 +45,14 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 exit(-1)
             self.model_path = new_model_path
         logger.info(f"model_path: {self.model_path}")
+        self.onnx_inputs_info, self.onnx_outputs_info = get_onnx_inputs_info(
+            self.model_path
+        )
+        self.onnx_is_static = True  # 初始为True
         self.model_name = self.model_cfg.get("name", "model")  # 编译后模型名称
         self.model_dir_name = Path.cwd().name  # 模型所在目录名称
-        self.save_dir = self.model_cfg.get("save_dir")
-        self.quant_output_dir = os.path.join(self.save_dir, self.target, "hmquant")
-        self.build_output_dir = os.path.join(self.save_dir, self.target, "tcim")
-        self.hmm_save_dir = os.path.join(self.save_dir, self.target)
-        if not os.path.exists(self.hmm_save_dir):
-            os.makedirs(self.hmm_save_dir)
-        self.quant_onnx_model_path = os.path.join(
-            self.quant_output_dir, f"hmquant_{self.model_name}_with_act.onnx"
-        )
         self.inputs_cfg = self.model_cfg.get("inputs")
+        self.check_input_shape()
         self.model_inputs_batch = dict()
         self.inputs_name = list()
         self.data_formats = list()
@@ -66,47 +65,99 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             self.data_formats.append(self.inputs_cfg[input_name].get("data_format"))
             self.inputs_shape.append(self.inputs_cfg[input_name]["shape"])
             self.resize_types.append(self.inputs_cfg[input_name].get("resize_type"))
-        self.is_multi_input_model = len(self.inputs_cfg) > 1
-        # 检查必须保证每个输入的batch相同
-        self.model_input_batch = self.model_inputs_batch[
-            self.inputs_name[0]
-        ]  # 用户配置的输入batch
-        # if self.is_multi_input_model:
-        #     for idx in range(1, len(self.inputs_name)):
-        #         batch = self.model_inputs_batch[self.inputs_name[idx]]
-        #         if self.model_input_batch != batch:
-        #             logger.error("all input batch must be same")
-        #             exit(-1)
-        self.quant_cfg = cfg.get("quant")
+        self.model_input_batch = self.model_inputs_batch[self.inputs_name[0]]
+
+        self.is_multi_input_model = len(self.inputs_cfg) > 1  # 是否多输入
+        self.is_image_single_input = (
+            not self.is_multi_input_model and self.data_formats[0] is not None
+        )  # 是否单输入且为图像
+
+        """量化参数"""
+        self.quant_cfg = cfg.get("quant", dict())
         self.quant_advance_cfg = self.quant_cfg.get("config", dict())
-        self.calib_method = self.quant_cfg.get("calib_method", "minmax")
-        if self.calib_method not in [
-            "minmax",
-            "kl",
-            "percent-0.99",
-            "mse",
-            "ema",
-            "aciq",
-        ]:
-            logger.error(f"calib_method {self.calib_method} is not supported")
-            exit(-1)
-        self.calib_data = self.quant_cfg["calib_data"]
-        self.build_cfg = cfg.get("build")
+        self.calib_data = self.quant_cfg.get("calib_data")
+        self.use_random_data = self.calib_data is None  # 使用随机数据量化
+        self.quant_output_dir = os.path.join(self.save_dir, self.target, "hmquant")
+        self.hmm_save_dir = os.path.join(self.save_dir, self.target)
+        if not os.path.exists(self.hmm_save_dir):
+            os.makedirs(self.hmm_save_dir)
+        self.quant_onnx_model_path = os.path.join(
+            self.quant_output_dir, f"hmquant_{self.model_name}_with_act.onnx"
+        )
+        # resizer相关参数
+        # 0 - 输入为非图像数据or多输入情况，禁用resizer，相当于非图像输入
+        # 1 - 全动态resizer，参数为10个值[y, x, height, width, h, w, top, left, bottom, right]
+        # 2 - crop部分动态resizer, 参数为4个值[y, x, height, width]
+        # 3 - 静态resizer
+        self.resizer_mode = 0
+        self.resizers_cfg = list()
+        self.enable_static_resizers = list()
+        self.max_inputs_size = dict()
+        for input_name in self.inputs_cfg:
+            input_cfg = self.inputs_cfg[input_name]
+            data_format = input_cfg.get("data_format")
+            # 非图像或禁用resizer
+            if data_format is None or "resizer" not in input_cfg:
+                continue
+            _, _, H, W = input_cfg["shape"]
+            resizer_cfg = input_cfg.get("resizer", dict())
+            max_input_size = resizer_cfg.get("max_input_size", [H, W])
+            enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
+            self.resizers_cfg.append(resizer_cfg)
+            self.enable_static_resizers.append(enable_static_resizer)
+            self.max_inputs_size[input_name] = max_input_size
+        if self.is_image_single_input and len(self.resizers_cfg) == 1:
+            if self.resize_types[0] == 0:
+                self.resizer_mode = 2  # no padding
+            elif self.resize_types[0] == 1:
+                self.resizer_mode = 1  # padding
+            # XH2没有dynamic_v1
+            if self.resizer_mode == 2 and self.target == "xh2":
+                self.resizer_mode = 1
+            if self.enable_static_resizers[0]:
+                self.resizer_mode = 3
+        logger.info(f"resizer_mode: {self.resizer_mode}")
+
+        """编译参数"""
+        self.build_cfg = cfg.get("build", dict())
         self.build_batch = self.build_cfg.get("batch", 1)
         self.build_ncore = self.build_cfg.get("ncore", 1)
         self.build_opt_level = self.build_cfg.get("opt_level", 2)
         self.build_opt_level = f"O{self.build_opt_level}"
-        self.use_random_data = self.calib_data is None
-        # 图像单输入，非图像or多输入必须是npz数据
-        self.is_image_single_input = (
-            not self.is_multi_input_model and self.data_formats[0] is not None
-        )
-        # resizer工作模式
-        # 0 - 输入为非图像数据or多输入情况，禁用resizer，相当于非图像输入
-        # 1 - 全动态resizer，参数为10个值[y, x, height, width, h, w, top, left, bottom, right]
-        # 2 - crop部分动态resizer, 参数为4个值[y, x, height, width]
-        # 3 - 静态resizer，使用场景几乎没有，不建议用
-        self.resizer_mode = 0
+        self.build_output_dir = os.path.join(self.save_dir, self.target, "tcim")
+        self.hmm_batch = self.build_batch * self.model_input_batch
+        # roi模式
+        # 0 - 1图n框
+        # 1 - n图n框，每图1框，比如：1图1框、2图2框、...
+        self.roi_num = self.build_cfg.get("roi_num", 1)
+        if self.is_image_single_input and len(self.resizers_cfg) == 0:
+            self.roi_num = 1
+        if not isinstance(self.roi_num, int) or self.roi_num < 1:
+            logger.error("roi_num must be int, and >= 1")
+            exit(-1)
+        if self.roi_num > 1 and self.hmm_batch > 1:
+            logger.error(
+                "Not support roi_num > 1, when model_input_batch > 1 or build_batch > 1"
+            )
+            exit(-1)
+        if self.resizer_mode == 3:
+            self.roi_num = 1
+        if self.resizer_mode == 0:
+            roi_tag = ""
+            prefix = ""
+        elif self.resizer_mode == 1:
+            roi_tag = f"_{self.roi_num}roi"
+            prefix = "_dynamic_v2" if self.target == "xh1" else "_dynamic"
+        elif self.resizer_mode == 2:
+            roi_tag = f"_{self.roi_num}roi"
+            prefix = "_dynamic_v1"
+        elif self.resizer_mode == 3:
+            roi_tag = "_1roi"
+            prefix = "_static"
+        self.hmm_name = f"{self.model_name}_{self.target}_b{self.hmm_batch}{roi_tag}_{self.build_ncore}core_{self.build_opt_level}{prefix}"
+        self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
+
+        """用于透传预处理信息进hmm"""
         self.custom_msg = dict()
         for name in self.inputs_cfg:
             input_cfg = self.inputs_cfg[name]
@@ -115,13 +166,22 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 resizer_mode=self.resizer_mode,
                 input_cfg=input_cfg,
             )
-        self.roi_num = 1
-        self.onnx_inputs_info, self.onnx_outputs_info = get_onnx_inputs_info(
-            self.model_path
-        )
-        self.hmm_batch = self.build_batch * self.model_input_batch
-        self.onnx_is_static = True
-        for input_name in self.inputs_name:
+
+        """模型评估参数"""
+        self.demo_cfg = cfg.get("demo", dict())
+        self.eval_cfg = cfg.get("eval", dict())
+
+        # 图优化模块
+        if "app_onnx_opt" in cfg["model"]:
+            from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
+
+            self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
+
+    def check_input_shape(self):
+        """
+        检查配置shape和onnx是否一致
+        """
+        for input_name in self.inputs_cfg:
             onnx_shape = self.onnx_inputs_info[input_name]["shape"]
             cfg_shape = self.inputs_cfg[input_name]["shape"]
             for idx, val in enumerate(onnx_shape):
@@ -139,16 +199,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                             f"onnx shape {onnx_shape} is not equal to cfg shape {cfg_shape}"
                         )
                         exit(-1)
-        self.outputs_name = list()
-        for name in self.onnx_outputs_info:
-            self.outputs_name.append(name)
-        self.demo_cfg = cfg.get("demo", dict())
-        self.eval_cfg = cfg.get("eval", dict())
-        # hmatc onnx optimizer initialization
-        if "app_onnx_opt" in cfg["model"]:
-            from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
-
-            self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
 
     @staticmethod
     def dtype_transform(dtype):

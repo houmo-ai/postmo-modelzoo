@@ -18,8 +18,11 @@ def check_cfg(cfg):
     if save_dir is None:
         logger.error("save_dir not found")
         return False
-    inputs_cfg = model_cfg.get("inputs")
-    for input_name, input_cfg in inputs_cfg.items():
+    inputs_cfg = model_cfg.get("inputs", dict())
+    if len(inputs_cfg) == 0:
+        logger.error("Please set inputs")
+        return False
+    for input_name in inputs_cfg:
         input_cfg = inputs_cfg[input_name]
         shape = input_cfg.get("shape")
         if shape is None:
@@ -33,7 +36,7 @@ def check_cfg(cfg):
             continue
         # 图像
         if data_format not in ["RGB", "BGR", "GRAY"]:
-            logger.error(f"Not support data_format -> {data_format}")
+            logger.error(f"Not support data_format: {data_format}")
             return False
         if len(shape) != 4:
             logger.error(f"{input_name} shape must be [N, C, H, W]")
@@ -41,6 +44,7 @@ def check_cfg(cfg):
         channels = shape[1]
         mean = input_cfg.get("mean")
         std = input_cfg.get("std")
+        N, C, H, W = shape
         if mean is None:
             logger.error(f"model mean error")
             return False
@@ -85,42 +89,40 @@ def check_cfg(cfg):
             logger.error(f"resizer param error, must be dict or None")
             return False
         if resizer_cfg is not None:
-            enable_static_resizer = resizer_cfg.get("enable_static_resizer", False)
+            enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
             if enable_static_resizer not in [False, True]:
                 logger.error(f"enable_static_resizer must be equal False or True")
                 return False
-            max_input_size = resizer_cfg.get("max_input_size")
-            if max_input_size is not None:
-                if not isinstance(max_input_size, list) or len(max_input_size) != 2:
+            max_input_size = resizer_cfg.get("max_input_size", [H, W])
+            if not isinstance(max_input_size, list) or len(max_input_size) != 2:
+                logger.error(
+                    f"max_input_size must be list, and [H, W], when use resizer"
+                )
+                return False
+            # 需保证max_input_size为偶数
+            for v in max_input_size:
+                if v % 2 != 0:
+                    logger.error(f"max_input_size[H, W] must be even number")
+                    return False
+            # 如果max_input_size比input WH小给出警告
+            resizer_input_h, resizer_input_w = max_input_size
+            if resizer_input_h < H or resizer_input_w < W:
+                logger.warning(f"max_input_size[H, W] should be greater than [H, W]")
+
+            if enable_static_resizer and "crop_size" in resizer_cfg:
+                crop_size = resizer_cfg.get("crop_size", [0, 0, H, W])
+                y1, x1, crop_height, crop_width = crop_size
+                x2, y2 = x1 + crop_width, y1 + crop_height
+                # 检查crop_size是否均为偶数
+                for v in crop_size:
+                    if v % 2 != 0:
+                        logger.error(f"crop_size must be even number: {crop_size}")
+                        return False
+                if x1 < 0 or y1 < 0 or y2 > max_input_size[0] or x2 > max_input_size[1]:
                     logger.error(
-                        f"max_input_size must be list, and [H, W], when use resizer"
+                        f"crop_size must be in [0, 0, {max_input_size[0]}, {max_input_size[1]}]"
                     )
                     return False
-                # 需保证max_input_size为偶数
-                for v in max_input_size:
-                    if v % 2 != 0:
-                        logger.error(f"max_input_size[H, W] must be even number")
-                        return False
-                # 如果max_input_size比input WH小给出警告
-                resizer_input_h, resizer_input_w = max_input_size
-                N, C, H, W = shape
-                if resizer_input_h < H or resizer_input_w < W:
-                    logger.warning(
-                        f"max_input_size[H, W] should be greater than [H, W]"
-                    )
-            # if enable_static_resizer and resize_type == 1:
-            #     logger.error(
-            #         f"enable_static_resizer must be = False, when resize_type = 1"
-            #     )
-            #     return False
-            # if enable_static_resizer:
-            #     max_height, max_width = max_input_size
-            #     N, C, H, W = shape
-            #     if max_height != H or max_width != W:
-            #         logger.error(
-            #             f"max_input_size must be equal to [H, W], when enable_static_resizer = True"
-            #         )
-            #         return False
             toYUV_format = resizer_cfg.get("toYUV_format")
             if toYUV_format not in ["YUV400", "YUV420SP", "YUV422SP", "YUV444SP"]:
                 logger.error(

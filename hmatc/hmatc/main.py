@@ -23,6 +23,7 @@ from .utils.utils import (
     get_hmquant_xh1_version,
     get_hmquant_xh2_version,
     get_package_version,
+    get_houmo_version,
     set_random_seed,
 )
 from .onnx_tool import model_profile
@@ -353,20 +354,21 @@ def run_benchmark(
     if runtime_version == "N/A":
         logger.error(f"Not found houmo_tcim_runtime_{target}")
         exit(-1)
+    houmo_version = get_houmo_version()
     models = read_yaml_to_dict(config_path)
     t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
     os.makedirs("reports", exist_ok=True)
     report_file = os.path.abspath(
         os.path.join(
             "reports",
-            f"benchmark_{target}_v{runtime_version}_{platform.machine().lower()}_{t}.xlsx",
+            f"benchmark_{target}_{houmo_version}_{platform.machine().lower()}_{t}.xlsx",
         )
     )
 
     report_file_pass = os.path.abspath(
         os.path.join(
             "reports",
-            f"benchmark_{target}_v{runtime_version}_{platform.machine().lower()}_{t}_pass.xlsx",
+            f"benchmark_{target}_{houmo_version}_{platform.machine().lower()}_{t}_pass.xlsx",
         )
     )
 

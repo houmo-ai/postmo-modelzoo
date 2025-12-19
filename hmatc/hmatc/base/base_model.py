@@ -116,16 +116,18 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 == "onnx",  # 静态resizer，在非量化阶段需要转YUV，不能设置is_onnx=True
                 to_YUV=self.resizer_mode in [1, 2, 3],
                 fmt=toYUV_format,
+                return_dynamic_v1_format=self.backend == "xh2"
+                and self.resizer_mode in [1, 2],
             )
             if self.backend == "onnx":
                 new_datas[in_name] = im.detach().cpu().numpy()
-            elif self.backend == "xh2":
+            elif self.backend == "xh2" and self.resizer_mode == 0:
                 new_datas[in_name] = im.detach().cpu().numpy().astype(np.float16)
             elif self.backend == "xh1" and self.resizer_mode == 0:
                 new_datas[in_name] = self.engine.quantize(
                     in_name, im.detach().cpu().numpy()
                 )
-            elif self.backend == "xh1" and self.resizer_mode in [1, 2, 3]:
+            elif self.resizer_mode in [1, 2, 3]:
                 yuv_pad = im.detach().cpu().numpy().flatten()
                 if toYUV_format == "YUV420SP":
                     valid_len = yuv_pad.size // 2
@@ -146,11 +148,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         # 多batch直接复制数据，以及后续reszier信息的复制
         for name in prerpcessed_in_datas:
             in_data = prerpcessed_in_datas[name]
-            if (
-                self.backend == "xh1"
-                and name.startswith("resizer_crop_")
-                and self.roi_num > 1
-            ):
+            if name.startswith("resizer_crop_") and self.roi_num > 1:
                 prerpcessed_in_datas[name] = np.repeat(
                     in_data, repeats=self.roi_num, axis=0
                 )

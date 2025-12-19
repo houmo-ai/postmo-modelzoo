@@ -14,7 +14,8 @@ from ..infer.xh2_infer import Xh2Infer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
-from ..utils.preprocess import default_preprocess
+from ..utils.preprocess import default_preprocess, calc_padding_size
+from ..utils.preprocess import xh1_preprocess as resizer_preprocess
 from ..utils.utils import (
     SUPPORT_IMAGE_FORMATS,
     compress_files_to_tar_xz_with_progress,
@@ -34,17 +35,19 @@ class Xh2Exec(BaseExec):
     def __init__(self, cfg: dict) -> None:
         super().__init__(cfg)
         self.quant_type = "w8a8h1_sefp"
-        self.hmm_name = f"{self.model_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}"
-        self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
         self.golden_dir = os.path.join(self.quant_output_dir, "golden")
         self.upgrade_opset_version()
 
-    def get_quant_cfg(self) -> dict:
-        return dict()
+        # 获取onnx输出节点name
+        self.outputs_name = list()
+        for name in self.onnx_outputs_info:
+            self.outputs_name.append(name)
 
-    def get_quant_dataset(self):
-        """提供量化数据"""
-        return dict()
+        # 对inputs_name追加动态参数入name
+        if self.resizer_mode == 1:
+            input_name = self.inputs_name[0]
+            input_name = input_name.replace(".", "_")
+            self.inputs_name.append(f"resizer_crop_{input_name}")
 
     def upgrade_opset_version(self):
         import onnx
@@ -73,11 +76,159 @@ class Xh2Exec(BaseExec):
                 )
             self.model_path = new_model_path
 
+    @staticmethod
+    def get_format(toYUV_format):
+        fmt = "yuv420"
+        if toYUV_format == "YUV420SP":
+            fmt = "yuv420"
+        elif toYUV_format == "YUV422SP":
+            fmt = "yuv422"
+        elif toYUV_format == "YUV444SP":
+            fmt = "yuv444"
+        elif toYUV_format == "YUV400":
+            fmt = "R8"
+        return fmt
+
+    def get_quant_cfg(self):
+        try:
+            from xhquant.api import (
+                DeviceType,
+                QuantScheme,
+                ResizerScheme,
+                create_quant_config,
+            )
+        except ImportError as e:
+            logger.error(f"{e}")
+            logger.error("Not found xhquant module, and please install xhquant.")
+            exit(-1)
+
+        input_ppc_config = []
+        if self.is_multi_input_model:
+            # 多输入暂不支持resizer
+            for input_name in self.inputs_cfg:
+                input_ppc_config.append("float16")
+        else:
+            for input_name in self.inputs_cfg:
+                input_cfg = self.inputs_cfg[input_name]
+                data_format = input_cfg.get("data_format")
+                if data_format is None or "resizer" not in input_cfg:
+                    input_ppc_config.append("float16")
+                    continue
+                _, _, H, W = input_cfg.get("shape")
+                mean = input_cfg.get("mean")
+                std = input_cfg.get("std")
+                resizer_cfg = input_cfg.get("resizer", dict())
+                resizer_format = resizer_cfg.get("toYUV_format", "YUV420SP")
+                resize_input_size = resizer_cfg.get("max_input_size", [H, W])
+                enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
+                dynamic_crop = not enable_static_resizer
+                resize_type = input_cfg["resize_type"]
+                crop_offset = (0, 0)
+                crop_size = (resize_input_size[0], resize_input_size[1])
+                pad_value = 0
+                if resize_type == 1:
+                    padding_values = input_cfg.get("padding_values", [114, 114, 114])
+                    pad_value = padding_values[0]
+                    # 静态暂限制为0，TODO：编译器修复后修改
+                    if enable_static_resizer:
+                        pad_value = 0
+                pad_size = (0, 0, 0, 0)
+                if enable_static_resizer:
+                    resizer_crop_size = resizer_cfg.get(
+                        "crop_size",
+                        # [0, 0, resize_input_size[0], resize_input_size[1]],
+                        [0, 0, H, W],
+                    )
+                    crop_offset = (resizer_crop_size[0], resizer_crop_size[1])
+                    crop_size = (resizer_crop_size[2], resizer_crop_size[3])
+                    if resize_type == 1:
+                        padding_mode = input_cfg["padding_mode"]
+                        pad_size, _, _ = calc_padding_size(
+                            crop_size, (W, H), padding_mode
+                        )
+                resizer_cfg = ResizerScheme(
+                    size=(H, W),  # target size, 也是onnx模型输入size
+                    mode="bilinear",  # nearest, 暂不支持配置
+                    align_corners=False,
+                    fmt=self.get_format(resizer_format),
+                    int_trans=True,  # Default: True  -128 for suit 8bit
+                    crop_size=crop_size,  # 暂默认全图crop
+                    crop_offset=crop_offset,
+                    pad_size=pad_size,
+                    pad_value=pad_value,  # 暂时仅支持标量
+                    mean=[v / 255.0 for v in mean],
+                    std=[v / 255.0 for v in std],
+                    dynamic_crop=dynamic_crop,
+                    model_inp_fmt=data_format.lower(),
+                ).to_dict()
+                input_ppc_config.append(resizer_cfg)
+        quant_scheme = QuantScheme(
+            target_device=DeviceType.XH2a,
+            quant_type=self.quant_type,
+            inupt_ppc_config=input_ppc_config,
+        )
+        quant_config = create_quant_config(quant_scheme)
+
+        return quant_config
+
+    def get_random_input_data(self):
+        """generate golden input data"""
+        in_datas = list()
+        dynamic_inputs = list()
+        for input_name in self.inputs_cfg:
+            input_cfg = self.inputs_cfg[input_name]
+            shape = input_cfg.get("shape")
+            dtype_str = self.onnx_inputs_info[input_name]["dtype"]
+            if not self.is_image_single_input or "resizer" not in input_cfg:
+                in_datas.append(
+                    torch.from_numpy(self.gen_random_data(shape, dtype_str))
+                )
+                continue
+            # 输入为图像，且使用resizer的情况，需要重新生成输入和动态输入参数
+            resizer_cfg = input_cfg.get("resizer", dict())
+            N, C, H, W = shape
+            # resizer算子默认输入size为model输入size
+            resizer_input_size = resizer_cfg.get("max_input_size", [H, W])
+            resizer_input_shape = [
+                N,
+                C,
+                resizer_input_size[0],
+                resizer_input_size[1],
+            ]
+            dtype_str = "uint8"
+            in_datas.append(
+                torch.from_numpy(self.gen_random_data(resizer_input_shape, dtype_str))
+            )
+            enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
+            if not enable_static_resizer:
+                # 动态参数数据默认使用全图尺寸作为有效数据
+                dynamic_inputs.append(
+                    torch.tensor(
+                        [
+                            [
+                                0,
+                                0,
+                                resizer_input_size[0],
+                                resizer_input_size[1],
+                                H,
+                                W,
+                                0,
+                                0,
+                                0,
+                                0,
+                            ]
+                        ],
+                        dtype=torch.int32,
+                    )
+                )
+
+        in_datas.extend(dynamic_inputs)
+        return in_datas
+
     def quantize(self):
         """quantize the model"""
         if not os.path.exists(self.quant_output_dir):
             os.makedirs(self.quant_output_dir)
-        # 检查opset_version
 
         if hasattr(self, "ApplicationOnnxOpt"):
             self.ApplicationOnnxOpt.opt()
@@ -88,26 +239,18 @@ class Xh2Exec(BaseExec):
             from xhquant.api import (
                 DeviceType,
                 HMONNXGoldenInference,
-                HMONNXInference,
-                QuantScheme,
                 convert_onnx_to_hmonnx,
-                create_quant_config,
             )
-        except ImportError:
+        except ImportError as e:
+            logger.error(f"{e}")
             logger.error("Not found xhquant module, and please install xhquant.")
             exit(-1)
 
-        quant_scheme = QuantScheme(
-            target_device=DeviceType.XH2a, quant_type=self.quant_type
-        )
-        quant_config = create_quant_config(quant_scheme)
+        quant_cfg = self.get_quant_cfg()
+        logger.info(f"quant_cfg: {quant_cfg}")
 
-        in_datas = list()
-        for input_name in self.inputs_cfg:
-            input_cfg = self.inputs_cfg[input_name]
-            shape = input_cfg["shape"]
-            dtype_str = self.onnx_inputs_info[input_name]["dtype"]
-            in_datas.append(torch.from_numpy(self.gen_random_data(shape, dtype_str)))
+        in_datas = self.get_random_input_data()
+
         quant_onnx_model_path = os.path.join(
             self.quant_output_dir, f"{self.model_name}.onnx"
         )
@@ -119,7 +262,7 @@ class Xh2Exec(BaseExec):
             in_datas,
             device_type=DeviceType.XH2a,
             out_hmonnx_file=quant_onnx_model_path,
-            quant_config=quant_config,
+            quant_config=quant_cfg,
             input_names=self.inputs_name,
             output_names=self.outputs_name,
         )
@@ -133,6 +276,8 @@ class Xh2Exec(BaseExec):
         session.step = 0
         # float32 -> float16 and int64 -> int32
         for idx, in_data in enumerate(in_datas):
+            if self.inputs_name[idx].startswith("resizer_crop_"):
+                continue
             if in_data.dtype == torch.int64:
                 in_datas[idx] = in_datas[idx].type(torch.int32).to(self.device)
             elif in_data.dtype == torch.float32:
@@ -186,6 +331,7 @@ class Xh2Exec(BaseExec):
             logger.error("Not found tcim module, and please install tcim first!")
             exit(-1)
 
+        logger.info(f"hmmonnx: {self.quant_onnx_model_path}")
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         t_start = time.time()
         tcim.build_from_hmonnx(
@@ -194,11 +340,12 @@ class Xh2Exec(BaseExec):
             ncore=self.build_ncore,
             opt_level=self.build_opt_level,
             target="xh2",
-            batch=self.build_batch,
+            batch=self.build_batch if self.roi_num == 1 else self.roi_num,
             enable_profile=enable_profile,
             output_dir=self.hmm_save_dir,
             work_dir=self.build_output_dir,
-            enable_dynamic_image_resize=False,
+            # enable_dynamic_image_resize=self.resizer_mode in [1],
+            one_img_multi_roi=self.roi_num > 1,
             # custom_msg=self.custom_msg,
         )
         span = time.time() - t_start
@@ -248,11 +395,12 @@ class Xh2Exec(BaseExec):
                 logger.info("Rebuild hmmodel with all layers output...")
                 self.build(enable_profile=False)
 
+        logger.info(f"Build batch: {self.build_batch}")
+
         xh2 = Xh2Infer()
         xh2.load(self.hmm_path, device_id=device_id)
         in_datas = dict()
         for input_name in self.inputs_cfg:
-            new_name = input_name.replace("/", "_")
             golden_input_path = os.path.join(
                 self.quant_output_dir,
                 f"hmquant_{self.model_name}_{input_name}_input.npy",
@@ -260,14 +408,53 @@ class Xh2Exec(BaseExec):
             golden_input = np.load(golden_input_path)
             logger.info(f"Load golden: {golden_input_path}")
             logger.info(
-                f"[input] name: {input_name}, shape: {list(golden_input.shape)}, stype: {golden_input.dtype}"
+                f"[Golden][Input] name: {input_name}, shape: {list(golden_input.shape)}, stype: {golden_input.dtype}"
             )
+            if self.resizer_mode in [1, 2, 3]:
+                fmt = xh2.inputs_format[input_name]
+                golden_input = golden_input.flatten()
+                size = golden_input.size
+                if fmt == "YUV420SP":
+                    size //= 2
+                elif fmt == "YUV422SP":
+                    size = size * 3 // 2
+                golden_input = golden_input[:size].reshape(1, size)
             golden_input = np.repeat(golden_input, self.build_batch, axis=0)
             in_datas[input_name] = golden_input
+            if self.resizer_mode == 1:
+                new_name = input_name.replace(".", "_")
+                resizer_name = f"resizer_crop_{new_name}"
+                golden_dyn_info_input_path = os.path.join(
+                    self.quant_output_dir,
+                    f"hmquant_{self.model_name}_{resizer_name}_input.npy",
+                )
+                golden_dyn_input = np.load(golden_dyn_info_input_path)
+                logger.info(f"Load golden: {golden_dyn_info_input_path}")
+                logger.info(
+                    f"[Golden][DynInfo] name: {resizer_name}, shape: {list(golden_dyn_input.shape)}, stype: {golden_dyn_input.dtype}"
+                )
+                repeats = 1
+                if self.roi_num > 1:
+                    # 1图n框
+                    repeats = self.roi_num
+                elif self.roi_num == 1 and self.build_batch > 1:
+                    # n图n框，且编译batch>1
+                    repeats = self.build_batch
+                golden_dyn_input = np.repeat(golden_dyn_input, repeats=repeats, axis=0)
+                in_datas[f"resizer_crop_{new_name}"] = golden_dyn_input
 
         res_info = dict()
         outputs, _ = xh2.run(in_datas)
         self.save_profile_data(outputs)
+
+        repeats = 1
+        if self.build_batch > 1 and self.roi_num == 1:
+            # n图n框，且编译batch>1
+            repeats = self.build_batch
+        elif self.roi_num > 1:
+            # 1图n框
+            repeats = self.roi_num
+
         header = ["name", "cosine_dist"]
         table = PrettyTable(header)
         table.title = "xh2 vs hmquant"
@@ -287,9 +474,9 @@ class Xh2Exec(BaseExec):
             golden_output = np.load(golden_output_path)
             logger.info(f"Load golden: {golden_output_path}")
             logger.info(
-                f"[output] name: {output_name}, shape: {list(golden_output.shape)}, dtype: {golden_output.dtype}"
+                f"[Golden][Output] name: {output_name}, shape: {list(golden_output.shape)}, dtype: {golden_output.dtype}"
             )
-            golden_output = np.repeat(golden_output, repeats=self.build_batch, axis=0)
+            golden_output = np.repeat(golden_output, repeats=repeats, axis=0)
             golden_output_md5 = get_md5(golden_output)
             output = outputs[output_name]
             output_md5 = get_md5(output)
@@ -323,14 +510,16 @@ class Xh2Exec(BaseExec):
         if self.is_image_single_input:
             # 单输入图像
             input_name = self.inputs_name[0]
+            new_name = input_name.replace(".", "_")
             input_cfg = self.inputs_cfg[input_name]
             data_format = input_cfg["data_format"]
             input_shape = input_cfg["shape"]
+            N, C, H, W = input_shape
             mean = input_cfg["mean"]
             std = input_cfg["std"]
             resize_type = input_cfg["resize_type"]
-            padding_mode = input_cfg.get("padding_mode")
-            padding_values = input_cfg.get("padding_values")
+            padding_mode = input_cfg.get("padding_mode", 1)
+            padding_values = input_cfg.get("padding_values", [114, 114, 114])
             if ext not in SUPPORT_IMAGE_FORMATS:
                 logger.error(f"Not support image: {data_path}")
                 exit(-1)
@@ -344,32 +533,94 @@ class Xh2Exec(BaseExec):
             if cv_image is None:
                 logger.error("Failed to decode image")
                 exit(-1)
+            # resizer preprocess
+            resizer_cfg = input_cfg.get("resizer", dict())
+            toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
+            max_input_size = resizer_cfg.get("max_input_size", [H, W])
+            # crop_size = resizer_cfg.get("crop_size", [0, 0, H, W])
             # 获取编译后模型batch
             hmm_batch = xh2_infer.inputs_info[input_name].shape[0]
-            # preprocess
-            N, C, H, W = input_shape
-            onnx_data = default_preprocess(
+            # onnx preprocess
+            onnx_data, _ = resizer_preprocess(
                 cv_image,
-                (W, H),
+                input_shape,
+                max_input_size,
                 mean=mean,
                 std=std,
-                use_norm=True,
                 use_resize=True,
+                use_norm=True,
                 use_rgb=data_format == "RGB",
                 resize_type=resize_type,
                 padding_mode=padding_mode,
-                padding_value=padding_values,
+                padding_values=padding_values,
+                is_onnx=True,
             )
-            # onnx
-            onnx_data = np.repeat(onnx_data, repeats=self.model_input_batch, axis=0)
+            onnx_data = np.repeat(
+                onnx_data.numpy(), repeats=self.model_input_batch, axis=0
+            )
             onnx_in_datas[input_name] = onnx_data  # np.ndarray
-            onnx_data_fp16 = onnx_data.astype(np.float16).copy()
-            # hmquant
-            hmquant_in_datas[input_name] = torch.from_numpy(onnx_data_fp16).cpu()
-            # xh2
-            xh2_in_datas[input_name] = np.repeat(
-                onnx_data_fp16, repeats=self.build_batch, axis=0
+
+            yuv_pad_hwc, dyn_info = resizer_preprocess(
+                cv_image,
+                input_shape,
+                max_input_size,
+                mean=mean,
+                std=std,
+                use_resize=self.resizer_mode in [0, 3],
+                use_norm=self.resizer_mode == 0,
+                use_rgb=data_format == "RGB" and self.resizer_mode == 0,
+                resize_type=resize_type,
+                padding_mode=padding_mode,
+                padding_values=padding_values,
+                is_onnx=self.resizer_mode == 0,
+                to_YUV=self.resizer_mode in [1, 2, 3],
+                fmt=toYUV_format,
+                return_dynamic_v1_format=self.resizer_mode == 1,
+                # crop_size=crop_size,
             )
+
+            if self.resizer_mode in [1, 2, 3]:
+                # 使用resizer
+                h, w, c = yuv_pad_hwc.shape
+                yuv_pad = yuv_pad_hwc.view(1, c, h, w)
+                yuv_pad = yuv_pad.repeat_interleave(self.model_input_batch, dim=0)
+                hmquant_in_datas[input_name] = yuv_pad.contiguous()  # torch.Tensor
+                # xh2
+                yuv_pad = yuv_pad_hwc.detach().cpu().numpy().flatten()
+                if toYUV_format == "YUV420SP":
+                    valid_len = yuv_pad.size // 2
+                elif toYUV_format == "YUV422SP":
+                    valid_len = yuv_pad.size * 2 // 3
+                elif toYUV_format in ["YUV444SP", "YUV400"]:
+                    valid_len = yuv_pad.size
+                yuv = yuv_pad[:valid_len].copy()
+                yuv = yuv.reshape(1, -1)
+                yuv = np.repeat(yuv, repeats=hmm_batch, axis=0)
+                xh2_in_datas[input_name] = np.ascontiguousarray(yuv)  # np.ndarray
+            elif self.resizer_mode == 0:
+                # 禁用resizer
+                in_data = np.repeat(onnx_data, repeats=self.build_batch, axis=0)
+                in_data = in_data.astype(np.float16)
+                hmquant_in_datas[input_name] = torch.from_numpy(
+                    in_data[0 : self.model_input_batch, ...]
+                ).cpu()
+                xh2_in_datas[input_name] = np.ascontiguousarray(in_data)
+            # dynamic_resizer info
+            if self.resizer_mode in [1, 2]:
+                if self.roi_num > 1:
+                    # 1图n框
+                    hmquant_dyn_info = dyn_info
+                    dyn_info = dyn_info.repeat_interleave(self.roi_num, dim=0)
+                else:
+                    # n图n框
+                    hmquant_dyn_info = dyn_info.repeat_interleave(
+                        self.model_input_batch, dim=0
+                    )
+                    dyn_info = dyn_info.repeat_interleave(hmm_batch, dim=0)
+                hmquant_in_datas[f"resizer_crop_{new_name}"] = hmquant_dyn_info
+                xh2_in_datas[f"resizer_crop_{new_name}"] = (
+                    dyn_info.detach().cpu().numpy()
+                )
         else:
             # 单输入非图像or多输入
             in_datas = load_npz(data_path)
@@ -388,6 +639,14 @@ class Xh2Exec(BaseExec):
         xh2_outputs, xh2_outputs_dequanted = xh2_infer.run(xh2_in_datas)
         self.save_profile_data(xh2_outputs)
 
+        repeats = 1
+        if self.build_batch > 1 and self.roi_num == 1:
+            # n图n框，且编译batch>1
+            repeats = self.build_batch
+        elif self.roi_num > 1:
+            # 1图n框
+            repeats = self.roi_num
+
         res_info = {"compare": {t_start: dict()}}
         res_info["compare"][t_start]["data_path"] = data_path
         # 计算相似度
@@ -396,7 +655,11 @@ class Xh2Exec(BaseExec):
         table.title = "Cosine Distance"
         for output_name in onnx_outputs:
             onnx_output = onnx_outputs[output_name]
+            onnx_output = np.repeat(onnx_output, repeats=repeats, axis=0)
+
             hmquant_output = hmquant_outputs[output_name]
+            hmquant_output = np.repeat(hmquant_output, repeats=repeats, axis=0)
+
             xh2_output_dequanted = xh2_outputs_dequanted[output_name]
             xh2_output_dequanted = np.split(
                 xh2_output_dequanted, self.build_batch, axis=0

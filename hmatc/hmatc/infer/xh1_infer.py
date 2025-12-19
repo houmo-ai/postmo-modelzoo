@@ -19,6 +19,7 @@ class Xh1Infer(BaseInfer, ABC):
         self.model_ext = ".hmm"
         self.inputs_info = dict()
         self.inputs_batch = dict()
+        self.inputs_format = dict()
 
     def load(self, model_path, device_id=0):
         if not os.path.exists(model_path):
@@ -41,6 +42,7 @@ class Xh1Infer(BaseInfer, ABC):
             shape = list(input_info.shape)
             dtype = np.dtype(input_info.dtype).name
             fmt = input_info.format.name
+            self.inputs_format[input_name] = fmt
             self.inputs_info[input_name] = input_info
             self.inputs_batch[input_name] = (
                 1
