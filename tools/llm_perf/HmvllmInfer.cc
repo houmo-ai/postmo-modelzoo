@@ -232,7 +232,7 @@ void HmvllmInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
       static_cast<tensor_type *>(prefill_outData), argmax_dim_len));
 }
 
-void HmvllmInfer::DecodeSetInputDatas(void *data) {
+void HmvllmInfer::DecodeSetInputDatas(void *data, int valid_length) {
   for (int idx = 0; idx < attn_idx_start; idx++) {
     auto input_name = decode_module->GetInputName(idx);
     auto input_info = decode_module->GetInputInfo(input_name).AsContiguous();
@@ -247,6 +247,10 @@ void HmvllmInfer::DecodeSetInputDatas(void *data) {
       if (decode_input_ptrs[idx - 1] == nullptr) {
         decode_input_ptrs[idx - 1] = new char[mem_size];
         memset(decode_input_ptrs[idx - 1], 0, mem_size);
+        if (input_name == "valid_length") {
+          memcpy(decode_input_ptrs[idx - 1], &valid_length,
+                 sizeof(valid_length));
+        }
       }
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
                                                     decode_input_ptrs[idx - 1]);
@@ -440,7 +444,7 @@ PerfInfos HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
         std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start)
             .count();
 
-    DecodeSetInputDatas(static_cast<void *>(input_datas));
+    DecodeSetInputDatas(static_cast<void *>(input_datas), context_length);
     vllm_perf_datas.decode_time += DecodeInfer();
     ids.clear();
     DecodeGetOutputDatas(ids);

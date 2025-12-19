@@ -72,7 +72,7 @@ class HmvllmInfer : public HmllmInferBase {
   float PrefillInfer();
   void PrefillGetOutputDatas(std::vector<int32_t> &ids);
 
-  void DecodeSetInputDatas(void *data);
+  void DecodeSetInputDatas(void *data, int valid_length);
   float DecodeInfer();
   void DecodeGetOutputDatas(std::vector<int32_t> &ids);
 
