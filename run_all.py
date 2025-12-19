@@ -93,6 +93,10 @@ def getTestModules(line, yamlData):
                 if not line.startswith(include):
                     continue
                 allModules.add(key)
+
+    if not allModules:
+        return allModules
+
     for key, value in yamlData.items():
         for keyin, valuein in value.items():
             if keyin != "exclude" or valuein == None:

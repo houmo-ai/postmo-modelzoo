@@ -352,10 +352,17 @@ def check_vpu_status() -> bool:
     return False
 
 
-def install_py_env(env_dir: str, log_file: str) -> dict:
+def install_py_env(env_dir: str, log_file: str, flow_type: str = "default") -> dict:
     """Install python env according to requirements.txt."""
     changed_libs = dict()
-    rqmt_path = os.path.join(env_dir, "requirements.txt")
+
+    rqmt_name = "requirements.txt"
+    if flow_type == "quant":
+        tmp_rqmt_path = os.path.join(env_dir, "requirements_ptq.txt")
+        if os.path.exists(tmp_rqmt_path) and os.path.isfile(tmp_rqmt_path):
+            rqmt_name = "requirements_ptq.txt"
+
+    rqmt_path = os.path.join(env_dir, rqmt_name)
     if not os.path.exists(rqmt_path) or not os.path.isfile(rqmt_path):
         return changed_libs
 
@@ -392,7 +399,7 @@ def install_py_env(env_dir: str, log_file: str) -> dict:
         os.system(
             "sudo chmod -R 777 /opt/venv/houmo/lib/python3.12/site-packages/transformers*"
         )
-    ret, _ = execute_test_cmd(["pip3", "install", "-r", "requirements.txt"], log_file)
+    ret, _ = execute_test_cmd(["pip3", "install", "-r", rqmt_name], log_file)
     logger.info(f"Install python dependencies for the current testcase, ret: {ret}.")
 
     return changed_libs

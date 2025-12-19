@@ -11,7 +11,7 @@ model:
       resize_type: 0
   model_impl_module: model_impl
   model_impl_cls: ResNet50
-  
+
 quant:
   calib_data: ./imagenet/ILSVRC2012_img_val
   calib_num: 50

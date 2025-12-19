@@ -95,7 +95,6 @@
         "xh2": {
             "type": [
                 "raw",
-                "raw",
                 "quant",
                 "hmm",
                 "hmm"
@@ -104,11 +103,9 @@
                 "cached_models",
                 "cached_models",
                 "cached_models",
-                "cached_models",
                 "cached_models"
             ],
             "extract_dir": [
-                null,
                 null,
                 "cached_models/hmquant_xh2_7b_2k",
                 "cached_models/hmm_xh2_7b_2k",
@@ -118,12 +115,10 @@
                 "7b",
                 "7b",
                 "7b",
-                "7b",
                 "7b"
             ],
             "source_type": [
                 null,
-                "modelscope",
                 null,
                 null,
                 "modelscope"

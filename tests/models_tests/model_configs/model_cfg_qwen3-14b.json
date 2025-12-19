@@ -37,7 +37,6 @@
         "xh2": {
             "type": [
                 "raw",
-                "raw",
                 "hmm",
                 "hmm",
                 "hmm"
@@ -46,18 +45,15 @@
                 "cached_models",
                 "cached_models",
                 "cached_models",
-                "cached_models",
                 "cached_models"
             ],
             "extract_dir": [
-                null,
                 null,
                 "cached_models/hmm_xh2",
                 "cached_models/hmm_xh2_ms",
                 "cached_models/hmm_xh2_16k_b2"
             ],
             "source_type": [
-                null,
                 null,
                 null,
                 "modelscope",
@@ -67,18 +63,15 @@
                 null,
                 null,
                 null,
-                null,
                 "2"
             ],
             "context_length": [
                 null,
                 null,
                 null,
-                null,
                 "16k"
             ],
             "ndevice": [
-                null,
                 null,
                 null,
                 null,

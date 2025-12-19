@@ -38,7 +38,6 @@
         "xh2": {
             "type": [
                 "raw",
-                "raw",
                 "hmm",
                 "hmm",
                 "hmm"
@@ -47,11 +46,9 @@
                 "cached_models",
                 "cached_models",
                 "cached_models",
-                "cached_models",
                 "cached_models"
             ],
             "extract_dir": [
-                null,
                 null,
                 "cached_models/hmm_xh2",
                 "cached_models/hmm_xh2_ms",
@@ -59,13 +56,11 @@
             ],
             "source_type": [
                 null,
-                "modelscope",
                 null,
                 "modelscope",
                 null
             ],
             "batch": [
-                null,
                 null,
                 null,
                 null,

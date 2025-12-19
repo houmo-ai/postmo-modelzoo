@@ -796,7 +796,7 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
         )
 
         # install python requirements
-        changed_libs = install_py_env(current_folder, log_file)
+        changed_libs = install_py_env(current_folder, log_file, "quant")
         if changed_libs:
             logger.info(f"changed python libs: {changed_libs}.")
 

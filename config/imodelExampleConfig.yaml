@@ -455,6 +455,8 @@ models_tests:
   exclude:
     - tests/models_tests/README.md
     - tests/models_tests/__init__.py
+    - tests/models_tests/model_configs/
+    - tests/hmatc_tests/hmatc_configs/
   example_case: null
   test:
     - backbone_resnet50_test
