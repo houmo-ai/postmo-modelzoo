@@ -193,13 +193,15 @@ def xh1_preprocess(
     is_onnx=False,
     to_YUV=False,
     fmt="YUV420SP",
+    return_dynamic_v1_format=False,
+    crop_size=None,
 ):
     _, C, H, W = input_shape
     height, width = cv_image.shape[:2]
     # resizer需要全为偶数，一般图片宽高为偶数
     height &= ~1
     width &= ~1
-    cv_image = np.ascontiguousarray(cv_image[0:height, 0:width, ...])
+    cv_image = cv2.resize(cv_image, (width, height), interpolation=cv2.INTER_LINEAR)
     # BGR/GRAY(HWC)->RGB/GRAY(HWC)->NCHW
     im = default_preprocess(
         cv_image,
@@ -254,15 +256,19 @@ def xh1_preprocess(
         padding_size, size, _ = calc_padding_size((nh, nw), (W, H), padding_mode)
 
     resizer_crop = [0, 0, nh, nw]
+    if crop_size is not None:
+        resizer_crop = crop_size
     resizer_size = size
     resizer_padding = padding_size
 
     # resizer
     padding_im = np.zeros((1, C, max_height, max_width), dtype=np.uint8)
-    padding_im[:, :, 0:nh, 0:nw] = im  # 贴至填充图
+    padding_im[
+        :, :, resizer_crop[0] : resizer_crop[2], resizer_crop[1] : resizer_crop[3]
+    ] = im  # 贴至填充图
     dyn_info = list()
     dyn_info.extend(resizer_crop)
-    if resize_type == 1:
+    if resize_type == 1 or return_dynamic_v1_format:
         dyn_info.extend(resizer_size)
         dyn_info.extend(resizer_padding)
     dyn_info = torch.Tensor(dyn_info).type(torch.int32).view(1, -1)

@@ -42,13 +42,13 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         for idx, name in enumerate(self.input_names):
             info = self.engine.get_input(name)
             logger.info(
-                f"[Xh2Hmquant] input{info.name}, shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
+                f"[Xh2Hmquant] input[{info.name}], shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
             )
 
         for idx, name in enumerate(self.output_names):
             info = self.engine.get_output(name)
             logger.info(
-                f"[Xh2Hmquant] output{info.name}, shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
+                f"[Xh2Hmquant] output[{info.name}], shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
             )
 
     def run(self, in_datas: dict) -> Dict[str, np.ndarray]:

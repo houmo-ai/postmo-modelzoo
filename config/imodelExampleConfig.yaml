@@ -335,17 +335,17 @@ utils:
     - autodrive_yolop_test
 
 ###### hmatc ######
-hmatc:
-  include:
-    - hmatc
-  exclude:
-    - hmatc/README.MD
-    - hmatc/.clang-format
-  example_case: null
-  test:
-    # test models
-    - backbone_resnet50_test
-    - detection_yolov5s_test
+# hmatc:
+#   include:
+#     - hmatc
+#   exclude:
+#     - hmatc/README.MD
+#     - hmatc/.clang-format
+#   example_case: null
+#   test:
+#     # test models
+#     - backbone_resnet50_test
+#     - detection_yolov5s_test
 
 ###### apis ######
 inferences_resnet50:

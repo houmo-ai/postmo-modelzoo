@@ -119,7 +119,7 @@ echo "Building..."
 cmake --build "$BUILD_DIR" --config "$CONFIG" -- -j "$JOBS"
 
 if [[ "$INSTALL" -ne 0 ]]; then
-  install_dir="$BUILD_DIR/install"
+  install_dir="$BUILD_DIR/../../bin"
   mkdir -p "$install_dir"
   echo "Installing to: $install_dir"
   cmake --install "$BUILD_DIR" --prefix "$install_dir" --config "$CONFIG"

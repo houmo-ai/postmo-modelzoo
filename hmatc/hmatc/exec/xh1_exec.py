@@ -50,60 +50,6 @@ class Xh1Exec(BaseExec):
                     exit(-1)
             else:
                 self.quant_advance_cfg["activation"]["method"] = {"name": "auto"}
-        self.enable_static_resizers = list()
-        self.max_inputs_size = dict()
-        self.resizers_cfg = list()
-        for input_name in self.inputs_cfg:
-            data_format = self.inputs_cfg[input_name].get("data_format")
-            if data_format is None:
-                continue
-            _, _, H, W = self.inputs_cfg[input_name]["shape"]
-            resizer_cfg = self.inputs_cfg[input_name].get("resizer", dict())
-            self.resizers_cfg.append(resizer_cfg)
-            max_input_size = resizer_cfg.get("max_input_size", [H, W])
-            enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
-            self.enable_static_resizers.append(enable_static_resizer)
-            self.max_inputs_size[input_name] = max_input_size
-        if self.is_image_single_input and len(self.resizers_cfg[0]) != 0:
-            # 单输入图像且设置了resizer参数
-            if self.resize_types[0] == 0:
-                self.resizer_mode = 2  # no padding
-            elif self.resize_types[0] == 1:
-                self.resizer_mode = 1  # padding
-            # 如果使用静态更新为3
-            if self.enable_static_resizers[0]:
-                self.resizer_mode = 3
-            # 更新custom_msg
-            self.custom_msg[self.inputs_name[0]]["resizer_mode"] = self.resizer_mode
-        logger.info(f"resizer_mode: {self.resizer_mode}")
-        # roi模式
-        # 0 - 1图n框
-        # 1 - n图n框，每图1框，比如：1图1框、2图2框、...
-        self.roi_num = self.build_cfg.get("roi_num", 1)
-        if not isinstance(self.roi_num, int) or self.roi_num < 1:
-            logger.error("roi_num must be int, and >= 1")
-            exit(-1)
-        if self.roi_num > 1 and self.hmm_batch > 1:
-            logger.error(
-                "Not support roi_num > 1, when model_input_batch > 1 or build_batch > 1"
-            )
-            exit(-1)
-        if self.resizer_mode == 3:
-            self.roi_num = 1
-        if self.resizer_mode == 0:
-            roi_tag = ""
-            prefix = ""
-        elif self.resizer_mode == 1:
-            roi_tag = f"_{self.roi_num}roi"
-            prefix = "_dynamic_v2"
-        elif self.resizer_mode == 2:
-            roi_tag = f"_{self.roi_num}roi"
-            prefix = "_dynamic_v1"
-        elif self.resizer_mode == 3:
-            roi_tag = "_1roi"
-            prefix = "_static"
-        self.hmm_name = f"{self.model_name}_xh1_b{self.hmm_batch}{roi_tag}_{self.build_ncore}core_{self.build_opt_level}{prefix}"
-        self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
 
     def get_quant_cfg(self) -> dict:
         # 设置量化日志输出
@@ -133,7 +79,7 @@ class Xh1Exec(BaseExec):
             # 非图像or多输入跳过
             if not self.is_image_single_input or self.resizer_mode == 0:
                 continue
-            N, C, H, W = input_shape
+            _, _, H, W = input_shape
             new_input_cfg = dict()
             new_input_cfg["data_format"] = data_format
             # mean/std
@@ -146,7 +92,7 @@ class Xh1Exec(BaseExec):
             # toYUV_format
             resizer_cfg = input_cfg["resizer"]
             max_input_size = resizer_cfg.get("max_input_size", [H, W])
-            toYUV_format = resizer_cfg["toYUV_format"]
+            toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
             new_input_cfg["toYUV_format"] = toYUV_format[0:6]  # 去掉SP
             insert_pad_scatter = resizer_cfg.get("insert_pad_scatter", False)
             if insert_pad_scatter not in [False, True]:
@@ -168,7 +114,7 @@ class Xh1Exec(BaseExec):
             # onnx输入大于max_input_size，影响static_resizer crop
             if H > max_height or W > max_width:
                 # 等比例缩放至最大输入内
-                padding_size, size, _ = calc_padding_size(
+                _, size, _ = calc_padding_size(
                     (H, W), (max_width, max_height), padding_mode=0
                 )
                 nh, nw = size
@@ -699,7 +645,7 @@ class Xh1Exec(BaseExec):
             padding_mode = input_cfg.get("padding_mode")
             padding_values = input_cfg.get("padding_values")
             reszier_cfg = input_cfg.get("resizer", dict())
-            toYUV_format = reszier_cfg.get("toYUV_format")
+            toYUV_format = reszier_cfg.get("toYUV_format", "YUV420SP")
             if self.resizer_mode != 0:
                 max_input_size = self.max_inputs_size[input_name]
                 max_height, max_width = max_input_size

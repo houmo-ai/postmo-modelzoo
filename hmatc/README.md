@@ -79,20 +79,21 @@ model:
       padding_mode: 1
       # [可选] padding填充数值，等比例resize必选，对应通道数
       padding_values: [114, 114, 114]
-      # [可选] xh1 resizer相关参数，仅在输入为图像的可用，默认禁用
-      #      xh2 暂不支持
+      # [可选] resizer相关参数，仅在输入为图像的可用，默认禁用
       resizer:
-        # [可选] 将模型输入转为YUV输入，目前仅支持YUV400、YUV420SP、YUV422SP、YUV444SP，使能resizer必选
+        # [可选] 将模型输入转为YUV输入，目前仅支持YUV400、YUV420SP、YUV422SP、YUV444SP，默认YUV420SP
         toYUV_format: YUV420SP
         # [可选] 使能resizer必选，可利用芯片resizer做crop->reisze->padding
         #       表示resizer输入尺寸，也是量化编译后模型的实际输入尺寸，输入格式为toYUV_format配置格式
         #       缺省默认为原模型输入高宽
         # 注意：当实际应用场景模型输入数据(预处理前)可能是不同分辨率时需要设置不能超过的输入size，如果超过需要在外部自行缩放处理
         #       一般为码流的最大可能分辨率较好
-        max_input_size: [1080, 1920]  # HW
+        max_input_size: [640, 640]  # HW
         # [可选] 输入为图像时可设置，表示使用静态resizer，默认为true
+        #  注意：静态resizer的情况下，crop、padding、resize相关参数被固化到算子内
         enable_static_resizer: true
         # [可选] 当输入为图像且输入size较小时需要设置为true，反之false，默认为false
+        #  仅xh1有效
         insert_pad_scatter: false
   # [可选] 模型python实现模块，eval和demo功能必须设置，且必须与yml配置文件同级目录
   #        用于发现模型实现并导入
@@ -115,69 +116,6 @@ quant:
   calib_data: your_calib_data_dir
   # [必填] 校准数据数量
   calib_num: 50
-  
-  #####################
-  # [可选] 混合量化配置，此处仅作为示例，请根据实际情况配置
-  config:
-    # [可选] 混合量化配置
-    mix_search:
-      # [可选] 激活值混合量化相关配置
-      activation:
-        # [可选] 混合量化的搜索方法，可选all、auto，默认auto
-        # all       表示全int16
-        # auto      表示搜索更具敏感性分析结果进行分配
-        method:
-          name: auto
-          # 默认0.99
-          target_cos: 0.99
-        # [可选] 混合量化过程中用来校准的样本数，默认1，建议8
-        calib_samples: 1
-      # [可选] 权重混合量化相关配置
-      weight:
-        # [可选] weight混合量化的阈值, 越小越多 conv\linear的权重设为int16. 默认0.0004
-        w_thresh_ratio: 0.0004
-    advanced_cfg:
-      # [可选] 是否使用GPTQ进行量化, 默认false
-      gptq: false
-    # 混合量化关心算子列表，设置后该算子往后的全部算子都会被设置为高bit量化，默认为空
-    mix_attn_outs: 
-  
-    # [可选] 按节点量化，优先级最高
-    node_wise_cfg:
-      node_name0:
-        weight_quantize:
-          # [可选] 量化的数据类型，目前支持int8、int16，默认int8
-          dtype: int8
-          # [可选] 校准方法，目前支持minmax、kl、percent-0.99、mse、ema
-          #     其中percent-0.99，还可以为percent-0.999，percent-0.99999等
-        output_quantize:
-          dtype: int8
-          calib_method: percentile9999
-    # [可选] 按算子量化，优先级次于按节点
-    op_wise_cfg:
-      Conv:
-        weight_quantize:
-          dtype: int8
-        output_quantize:
-          dtype: int8
-          calib_method: percentile9999
-      Gemm:
-        weight_quantize:
-          dtype: int8
-        output_quantize:
-          dtype: int8
-          calib_method: minmax
-      Mul:
-        output_quantize:
-          dtype: int8
-          calib_method: minmax
-    # [可选] 按全局量化
-    global_wise_cfg:
-      weight_quantize:
-        dtype: int8
-      output_quantize:
-        dtype: int8
-        calib_method: minmax
 
 # 模型编译相关选项
 build:
