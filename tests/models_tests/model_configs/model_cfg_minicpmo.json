@@ -1,0 +1,146 @@
+{
+    "obsolete": false,
+    "model_dir": "models/omni/minicpmo",
+    "model_type": "llm",
+    "support_platform": [
+        "x86_64"
+    ],
+    "support_backend": [
+        "xh2"
+    ],
+    "support_core_num": {
+        "xh2": [
+            2
+        ]
+    },
+    "support_flow": {
+        "xh2": [
+            "get_model",
+            "quant",
+            "compile",
+            "demo"
+        ]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": [
+                "raw",
+                "raw",
+                "hmm"
+            ],
+            "download_dir": [
+                "cached_models",
+                "cached_models",
+                "cached_models"
+            ],
+            "extract_dir": [
+                null,
+                null,
+                "cached_models/hmm_xh2"
+            ],
+            "source_type": [
+                null,
+                null,
+                null
+            ],
+            "batch": [
+                null,
+                null,
+                null
+            ],
+            "context_length": [
+                null,
+                null,
+                null
+            ],
+            "ndevice": [
+                null,
+                null,
+                null
+            ]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": [
+                "cached_models/MiniCPM-o-2_6"
+            ],
+            "out-dir": [
+                "cached_results/hmquant_xh2"
+            ],
+            "context-length": [
+                "4096"
+            ]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": [
+                "cached_results/hmquant_xh2"
+            ],
+            "model_name": [
+                null
+            ],
+            "batch": [
+                null
+            ],
+            "ncore": [
+                null
+            ],
+            "ndevice": [
+                null
+            ],
+            "stage": [
+                "build"
+            ],
+            "j": [
+                "24"
+            ],
+            "output_dir": [
+                "cached_results/hmm_xh2"
+            ]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "tokenizer_dir": [
+                "cached_models/MiniCPM-o-2_6"
+            ],
+            "embedding_path": [
+                "cached_results/hmm_xh2/hmquant"
+            ],
+            "vit_path": [
+                "cached_results/hmm_xh2/minicpmo_visual.hmm"
+            ],
+            "audio_path": [
+                "cached_results/hmm_xh2/minicpmo_audio.hmm"
+            ],
+            "llm_prefill_path": [
+                "cached_results/hmm_xh2/minicpmo_llm_prefill.hmm"
+            ],
+            "llm_decode_path": [
+                "cached_results/hmm_xh2/minicpmo_llm_decode.hmm"
+            ],
+            "tts_prefill_path": [
+                "cached_results/hmm_xh2/minicpmo_tts_prefill.hmm"
+            ],
+            "tts_decode_path": [
+                "cached_results/hmm_xh2/minicpmo_tts_decode.hmm"
+            ],
+            "tts_dvae_path": [
+                "cached_results/hmm_xh2"
+            ],
+            "tts_vocos_path": [
+                "cached_results/hmm_xh2/minicpmo_vocos.hmm"
+            ],
+            "device_idx": [
+                null
+            ],
+            "example_idx": [
+                null
+            ]
+        }
+    },
+    "perf_params": "demo"
+}

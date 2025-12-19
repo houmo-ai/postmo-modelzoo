@@ -15,8 +15,8 @@ def get_args() -> argparse.Namespace:
         dest='file_type',
         type=str,
         default='hmm',
-        choices=["raw", "quant", "hmm"],
-        help='which resource to get, choise in [raw, quant, hmm]',
+        choices=["raw", "hmm"],
+        help='which resource to get, choise in [raw, hmm]',
     )
     parser.add_argument(
         '--download_dir',
@@ -60,13 +60,9 @@ if __name__ == '__main__':
             "prefill_len": 256,
             "batch": 1,
         },
-        "quant_files": {
-            "quant_path": "models_outdated/minicpmo/hmquant_xh2_minicpmo_7b_256_4k_20251216.zip",
-        },
-        "default_files": ["models_outdated/minicpmo/material.zip"],
+        "default_files": ["models/minicpmo/material.zip"],
         "modelscope_repo": {
             "repo_ids": ["OpenBMB/MiniCPM-o-2_6"],
-            "local_dirs": ["./MiniCPM-o-2_6"],
         },
     }
 

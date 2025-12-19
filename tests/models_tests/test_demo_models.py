@@ -249,3 +249,11 @@ def test_detection_yolov9m_demo(setup_logging: type(print)) -> None:
     """test_detection_yolov9m_demo"""
     model_name = 'yolov9m'
     _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.minicpmo
+@pytest.mark.demo
+def test_omni_minicpmo_demo(setup_logging: type(print)) -> None:
+    """test_omni_minicpmo_demo"""
+    model_name = 'minicpmo'
+    _demo_func(model_name, setup_logging)

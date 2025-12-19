@@ -1,4 +1,4 @@
-# Bge embedder和reranker
+# MiniCPM-o_2.6
 
 本示例展示如何把MiniCPMO中的各个模型量化和编译，部署到后摩M50芯片的设备上。
 
@@ -20,9 +20,6 @@ MiniCPMO支持Omni、vllm、llm、voice clone、instruction to speech和only tts
 # 直接获取可直接运行的芯片模型
 python3 get_model.py --type hmm
 
-# 量化后模型，需要编译器编译后才能运行
-python3 get_model.py --type quant
-
 # 原始模型，需要量化+编译器编译后才能运行
 python3 get_model.py --type raw
 ```
@@ -30,9 +27,23 @@ python3 get_model.py --type raw
 ### 2.2 量化
 
 当前仅支持w8a8基础量化，暂未提供其它高阶量化方案。
+量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到48GB，主机空闲内存需要达到48GB以上。参考命令：
+
+```bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64.** /bin/bash
+```
+
+进入docker后source环境变量，并进入`models/llm/minicpmo`目录，执行ptq.py脚本。默认的大语言模型模块prefill和decode上下文长度分别为256和4096。
+
+```bash
+source env.sh
+cd models/llm/minicpmo
+```
+
 ```bash
 python3 ptq.py
 ```
+量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录
 
 ### 2.3 编译
 

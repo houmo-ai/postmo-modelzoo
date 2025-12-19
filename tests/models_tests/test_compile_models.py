@@ -369,3 +369,12 @@ def test_detection_yolov9m_compile(setup_logging: type(print)) -> None:
     """test_detection_yolov9m_compile"""
     model_name = 'yolov9m'
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.minicpmo
+@pytest.mark.compile
+@pytest.mark.dependency(name='test_omni_minicpmo_compile', depends_on=['test_quant_models.py::test_omni_minicpmo_quant'])
+def test_omni_minicpmo_compile(setup_logging: type(print)) -> None:
+    """test_omni_minicpmo_compile"""
+    model_name = 'minicpmo'
+    _compile_func(model_name, setup_logging)
