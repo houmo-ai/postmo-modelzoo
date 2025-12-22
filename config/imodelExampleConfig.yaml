@@ -180,15 +180,6 @@ detection_yolov8m-cls:
         args: all
   test:
     - detection_yolov8m-cls_test
-multi_input_custom_random_model:
-  include:
-    - models/multi_input_custom_random_model
-  exclude: null
-  example_case:
-    - multi_input_custom_random_model_test:
-        script: ../models/multi_input_custom_random_model/test.sh
-  test:
-    - multi_input_custom_random_model_test
 ocr_ppocrv3_rec:
   include:
     - models/ocr/PPOCRv3/rec
