@@ -4,8 +4,8 @@ import threading
 import queue
 import numpy as np
 import cv2
-import torch
 import argparse
+from loguru import logger
 
 import tcim_lite as tcim
 
@@ -43,8 +43,8 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == '__main__':
     sys.path.insert(0, "../../common/python")
-    print("\n===> resnet50_multistreams python example start...")
-    print(
+    logger.info("===> resnet50_multistreams python example start...")
+    logger.info(
         f"tcim runtime version: {tcim.runtime.get_version()}, houmo target: {HOUMO_TARGET}"
     )
 
@@ -56,16 +56,16 @@ if __name__ == '__main__':
     model_path = "./resnet50_xh2_b1_1core.hmm"
     if not os.environ.get("HDPL_PLATFORM") == "ASIC":
         thread_num = 1
-    print("devices:", device_num)
-    print("threads:", thread_num)
-    print("samples:", sample_num)
-    print("model:", model_path)
+    logger.info(f"devices: {device_num}")
+    logger.info(f"threads: {thread_num}")
+    logger.info(f"samples: {sample_num}")
+    logger.info(f"model: {model_path}")
 
     modules = []
     threads = []
 
     if not os.path.exists(model_path):
-        print("[error] could not find model: {}".format(model_path))
+        logger.error("[error] could not find model: {}".format(model_path))
         exit(-1)
 
     # 1. input preprocess
@@ -93,24 +93,15 @@ if __name__ == '__main__':
     barrier = threading.Barrier(thread_num * device_num)
     thread_cnt = 0
 
-    def thread_func(tid, did, model_path, wm, qin, qout, barrier):
+    def thread_func(tid, did, module, qin, qout, barrier):
         count = 0
-        # 3.1 load model, create a stream and set to the module
-        option = tcim.runtime.Option(wm)
-        module = tcim.runtime.load(model_path, option=option)
-        print(
-            "thread {} on device {} load model {} loaded.".format(tid, did, model_path)
-        )
-        stream = tcim.runtime.Stream()
-        module.set_stream(stream)
-
-        # 3.2 prepare input
+        # 3.1 prepare input
         input_infos = {}
         input_num = module.get_num_inputs()
         for id in range(0, input_num):
             input_name = module.get_input_name(id)
             input_info = module.get_input_info(input_name).ascontiguous()
-            print(
+            logger.info(
                 "input[{}] shape = {}, dtype = {}, format = {}".format(
                     input_name,
                     input_info.shape,
@@ -119,13 +110,13 @@ if __name__ == '__main__':
                 )
             )
             input_infos[input_name] = input_info
-        # 3.3 prepare output
+        # 3.2 prepare output
         output_infos = {}
         output_num = module.get_num_outputs()
         for id in range(0, output_num):
             output_name = module.get_output_name(id)
             output_info = module.get_output_info(output_name).ascontiguous()
-            print(
+            logger.info(
                 "output[{}] shape = {}, dtype = {}, format = {}".format(
                     output_name,
                     output_info.shape,
@@ -134,22 +125,22 @@ if __name__ == '__main__':
                 )
             )
             output_infos[output_name] = output_info
-        # 3.4 wait until all threads ready
+        # 3.3 wait until all threads ready
         barrier.wait()
-        # 3.5 infer loop
+        # 3.4 infer loop
         while not qin.empty():
-            # 3.5.1 get data from the task queue
+            # 3.4.1 get data from the task queue
             req_id, input_datas = qin.get()
 
-            # 3.5.2 set input to the module
+            # 3.4.2 set input to the module
             for input_name in input_infos:
                 module.set_input(input_name, input_datas[0])
 
-            # 3.5.3 run and sync
+            # 3.4.3 run and sync
             module.run()
             module.sync()
 
-            # 3.5.4 get output and push to the output queue
+            # 3.4.4 get output and push to the output queue
             output_datas = {}
             for output_name in output_infos:
                 output_datas[output_name] = (
@@ -159,22 +150,38 @@ if __name__ == '__main__':
                 )
             qout.put((req_id, output_datas))
             count += 1
-            print("thread {} on device {} run sample {} end.".format(tid, did, req_id))
-        print(
+            logger.info(
+                "thread {} on device {} run sample {} end.".format(tid, did, req_id)
+            )
+        logger.info(
             "thread {} on device {} completed. {} sampels tested.".format(
                 tid, did, count
             )
         )
 
-    # 4. create threads
-    tid = 0
+    # 4.1 load models
+    module_dict = {}
     for did in range(device_num):
         wm = tcim.runtime.WeightManager(did)
+        option = tcim.runtime.Option(wm)
+        module_dict[did] = []
+        for i in range(thread_num):
+            module = tcim.runtime.load(model_path, option=option)
+            module_dict[did].append(module)
+            logger.info(
+                "thread {} on device {} load model {} loaded.".format(
+                    i, did, model_path
+                )
+            )
+
+    # 4.2 create threads
+    tid = 0
+    for did in range(device_num):
         for i in range(thread_num):
             threads.append(
                 threading.Thread(
                     target=thread_func,
-                    args=(tid, did, model_path, wm, qin, qout, barrier),
+                    args=(tid, did, module_dict[did][i], qin, qout, barrier),
                 )
             )
             tid += 1
@@ -195,7 +202,7 @@ if __name__ == '__main__':
             output_data = softmax(output_datas[output_name])
             pred = np.argsort(-output_data, axis=1, kind="quicksort").flatten()[0]
             prob_list = output_data.flatten()
-            print(
+            logger.info(
                 "sample {} top1: predict cls = {}, prob = {:.6f}".format(
                     req_id, pred, prob_list[pred]
                 )
@@ -203,4 +210,4 @@ if __name__ == '__main__':
             # check result, modify it when you change model or data
             assert pred == 65
 
-    print("<=== resnet50_multistreams python example completed.\n")
+    logger.info("<=== resnet50_multistreams python example completed.\n")
