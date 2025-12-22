@@ -2,9 +2,11 @@
 
 #include <cstring>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 #if (__GNUC__ < 8 && !defined(_MSC_VER))
 #include <experimental/filesystem>
@@ -24,6 +26,7 @@ namespace fs = std::filesystem;
 
 #include "datasets/imagenet.hpp"
 #include "imageproc.hpp"
+#include "logging.h"
 #include "tcim/tcim_runtime.h"
 #include "threads.hpp"
 #include "utils.hpp"
@@ -47,11 +50,6 @@ typedef struct {
   std::map<std::string, tcim::TensorInfo> info_map;
   std::map<std::string, tcim::TensorInfo> info_map_f32;
 } TaskQueue;
-
-typedef struct {
-  std::string model_path;
-  tcim::Module::WeightManager wm;
-} ThreadInfo;
 
 bool ParseArgs(CliArguments* arguments, int argc, char* argv[]) {
 #if !defined(_MSC_VER)
@@ -91,6 +89,12 @@ bool ParseArgs(CliArguments* arguments, int argc, char* argv[]) {
   return true;
 }
 
+std::string TensorInfo2Str(const tcim::TensorInfo& tensor_info) {
+  std::stringstream ss;
+  ss << tensor_info;
+  return ss.str();
+}
+
 template <typename T>
 int get_topk(int topk, std::vector<std::pair<T, int>> sort_pairs) {
   std::sort(sort_pairs.begin(), sort_pairs.end(),
@@ -99,25 +103,25 @@ int get_topk(int topk, std::vector<std::pair<T, int>> sort_pairs) {
             });
 
   for (int i = 0; i < topk; ++i) {
-    std::cout << "top" << (i + 1) << ": Index=" << sort_pairs[i].second
-              << " Conf=" << sort_pairs[i].first << ", Label=["
-              << Imagenet::GetLabel(sort_pairs[i].second) << "]" << std::endl;
+    LOG_INFO("top{}: Index={}, Conf={}, Label=[{}]", (i + 1),
+             sort_pairs[i].second, sort_pairs[i].first,
+             Imagenet::GetLabel(sort_pairs[i].second));
   }
 
   return sort_pairs[0].second;
 }
 
 int main(int argc, char* argv[]) {
-  printf("\n===> resnet50_multistreams c++ example start...\n");
+  LOG_INFO("===> resnet50_multistreams c++ example start...");
   const char* houmo_target_env = getenv("HOUMO_TARGET");
   std::string houmo_target =
       houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
   if (houmo_target != "xh2") {
-    std::cerr << "Unsupported backend " << houmo_target << std::endl;
+    LOG_ERROR("Unsupported backend {}", houmo_target);
     exit(-1);
   }
-  printf("tcim version: %s, houmo target: %s \n", tcim::GetVersion().c_str(),
-         houmo_target.c_str());
+  LOG_INFO("houmo target: {}, tcim version: {}", houmo_target,
+           tcim::GetVersion());
 
   std::string default_model_path = "./resnet50_xh2_b1_1core.hmm";
   // set the parameters
@@ -134,14 +138,13 @@ int main(int argc, char* argv[]) {
     arguments.thread_num = 1;
   }
   ParseArgs(&arguments, argc, argv);
-  std::cout << "model: " << arguments.model_path << std::endl;
-  std::cout << "devices: " << arguments.device_num << std::endl;
-  std::cout << "threads: " << arguments.thread_num << std::endl;
-  std::cout << "samples: " << arguments.sample_num << std::endl;
+  LOG_INFO("model: {}, devices: {}, threads: {}, samples: {}",
+           arguments.model_path, arguments.device_num, arguments.thread_num,
+           arguments.sample_num);
 
   std::string model_path = arguments.model_path;
   if (!fs::exists(model_path)) {
-    std::cerr << model_path << " not exist." << std::endl;
+    LOG_ERROR("{} not exist.", model_path);
     exit(-1);
   }
 
@@ -149,7 +152,7 @@ int main(int argc, char* argv[]) {
   // 1. input preprocess
   std::string data_path = "../../data/snake.jpg";
   if (!fs::exists(data_path)) {
-    std::cerr << data_path << " not exist." << std::endl;
+    LOG_ERROR("{} not exist.", data_path);
     exit(-1);
   }
   cv::Mat img_rgb;
@@ -190,61 +193,45 @@ int main(int argc, char* argv[]) {
         std::pair<std::string, std::shared_ptr<void>>("", data_ptr));
     qin.queue.push(tinfo);
   }
-  std::cout << "sample queue size is " << qin.queue.size() << std::endl;
+  LOG_INFO("sample queue size is {}", qin.queue.size());
 
   // 3. define threads
-  auto thread_func = [](int tid, int did, std::string houmo_target,
-                        ThreadInfo& info, TaskQueue& qin, TaskQueue& qout,
-                        Barrier& barrier) {
-    // 3.1 load model
-    tcim::Module::Option option(info.wm);
-    auto module = tcim::Module::LoadFromFile(info.model_path, option);
-    if (!module) {
-      std::cerr << "thread " << tid << " on device " << did << " load model "
-                << info.model_path << " fail." << std::endl;
-      exit(-1);
-    }
-    printf("thread %d on device %d model %s loaded.\n", tid, did,
-           info.model_path.c_str());
-
-    // 3.2 create a stream and set to the module
-    tcim::Stream stream(true);
-    module.SetStream(stream);
-
-    // 3.3 prepare input
+  auto thread_func = [](int tid, int did, tcim::Module& module, TaskQueue& qin,
+                        TaskQueue& qout, Barrier& barrier) {
+    // 3.1 prepare input
     int input_num = module.GetInputNum();
-    // std::cout << "Count of Input: " << input_num << std::endl;
+    LOG_INFO("Count of Input: {}", input_num);
     for (int idx = 0; idx < input_num; idx++) {
       auto input_name = module.GetInputName(idx);
       auto input_info = module.GetInputInfo(input_name).AsContiguous();
-      std::cout << "Input[" << input_name << "] " << input_info << std::endl;
+      LOG_INFO("Input[{}] info: {}", input_name, TensorInfo2Str(input_info));
       qin.info_map[input_name] = input_info;
 
       auto input_info_f32 = input_info.AsType(tcim::DataType::FLOAT32);
       qin.info_map_f32[input_name] = input_info_f32;
     }
 
-    // 3.4 prepare output
+    // 3.2 prepare output
     int output_num = module.GetOutputNum();
-    // std::cout << "Count of Output: " << output_num << std::endl;
+    LOG_INFO("Count of Output: {}", output_num);
     for (int idx = 0; idx < output_num; idx++) {
       auto output_name = module.GetOutputName(idx);
       auto output_info = module.GetOutputInfo(output_name).AsContiguous();
-      std::cout << "Output[" << output_name << "] " << output_info << std::endl;
+      LOG_INFO("Output[{}] info: {}", output_name, TensorInfo2Str(output_info));
       qout.info_map[output_name] = output_info;
 
       auto output_info_f32 = output_info.AsType(tcim::DataType::FLOAT32);
       qout.info_map_f32[output_name] = output_info_f32;
     }
 
-    // 3.5 wait until all threads ready
+    // 3.3 wait until all threads ready
     barrier.barrier();
-    printf("thread %d on device %d infer start...\n", tid, did);
+    LOG_INFO("thread {} on device {} infer start...", tid, did);
     int count = 0;
 
-    // 3.6 infer loop
+    // 3.4 infer loop
     while (true) {
-      // 3.6.1 get data from the task queue
+      // 3.4.1 get data from the task queue
       std::unique_lock<std::mutex> lock_in(qin.mutex);
       if (qin.queue.empty()) {
         lock_in.unlock();
@@ -255,7 +242,7 @@ int main(int argc, char* argv[]) {
       qin.queue.pop();
       lock_in.unlock();
 
-      // 3.6.2 set input to the module
+      // 3.4.2 set input to the module
       for (auto& info : qin.info_map) {
         tcim::Tensor input_tensor;
         input_tensor = tcim::Tensor::CreateHostTensor(info.second);
@@ -267,11 +254,11 @@ int main(int argc, char* argv[]) {
         module.SetInput(info.first, input_tensor);
       }
 
-      // 3.6.3 run and sync
+      // 3.4.3 run and sync
       module.Run();
       module.Sync();
 
-      // 3.6.4 get output and push to the output queue
+      // 3.4.4 get output and push to the output queue
       TaskInfo tinfo;
       tinfo.req_id = req_id;
       for (auto& info : qout.info_map) {
@@ -295,26 +282,40 @@ int main(int argc, char* argv[]) {
       qout.queue.push(tinfo);
       lock_out.unlock();
       count++;
-      printf("thread %d on device %d run sample %lld end.\n", tid, did, req_id);
+      LOG_INFO("thread {} on device {} run sample {} end.", tid, did, req_id);
       std::this_thread::yield();
     }
 
-    printf("thread %d on device %d completed. %d sampels tested.\n", tid, did,
-           count);
+    LOG_INFO("thread {} on device {} completed. {} sampels tested.", tid, did,
+             count);
   };
 
-  // 4. create threads
-  Barrier barrier(arguments.thread_num * arguments.device_num);
-  auto tinfo = new ThreadInfo[arguments.device_num];
-  int tid = 0;
+  // 4.1 load models
+  std::map<int, std::vector<tcim::Module>> module_map;
   for (int did = 0; did < arguments.device_num; did++) {
     auto wm = tcim::Module::WeightManager::CreateWeightManager(did);
-    tinfo[did].model_path = arguments.model_path;
-    tinfo[did].wm = wm;
-
+    tcim::Module::Option option(wm);
+    std::vector<tcim::Module> dev_modules;
     for (int i = 0; i < arguments.thread_num; i++) {
-      threads.push_back(std::thread(thread_func, tid, did, houmo_target,
-                                    std::ref(tinfo[did]), std::ref(qin),
+      auto module = tcim::Module::LoadFromFile(model_path, option);
+      if (!module) {
+        LOG_ERROR("thread {} on device {} load model {} failed.", i, did,
+                  model_path);
+        exit(-1);
+      }
+      dev_modules.push_back(module);
+      LOG_INFO("thread {} on device {} model {} loaded.", i, did, model_path);
+    }
+    module_map[did] = dev_modules;
+  }
+
+  // 4.2 create threads
+  Barrier barrier(arguments.thread_num * arguments.device_num);
+  int tid = 0;
+  for (int did = 0; did < arguments.device_num; did++) {
+    for (int i = 0; i < arguments.thread_num; i++) {
+      threads.push_back(std::thread(thread_func, tid, did,
+                                    std::ref(module_map[did][i]), std::ref(qin),
                                     std::ref(qout), std::ref(barrier)));
       tid++;
     }
@@ -326,7 +327,6 @@ int main(int argc, char* argv[]) {
   for (auto& t : threads) {
     t.join();
   }
-  delete[] tinfo;
 
   // 6. postprocess without softmax, and check result
   while (!qout.queue.empty()) {
@@ -345,11 +345,11 @@ int main(int argc, char* argv[]) {
 
     // check result, modify it when you change model or data
     if (top1 != 65) {
-      std::cout << "top1 != 65" << std::endl;
+      LOG_ERROR("top1 != 65");
       exit(-1);
     }
   }
 
-  printf("<=== resnet50_multistreams c++ example completed.\n\n");
+  LOG_INFO("<=== resnet50_multistreams c++ example completed.");
   return 0;
 }
