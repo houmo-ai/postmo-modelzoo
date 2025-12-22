@@ -471,13 +471,11 @@ class Qwen25VL:
                 self.vit_model.get_input_name(1),
                 inputs["window_index"][batch].numpy().astype(np.int32),
             )
-            try:
+            if self.vit_model.get_num_inputs() == 3:
                 self.vit_model.set_input(
                     self.vit_model.get_input_name(2),
                     inputs["window_mask"][batch].numpy().astype(np.float16),
                 )
-            except:
-                logger.info("skip set window_mask input")
             self.vit_model.run()
             self.vit_model.sync()
             vit_model_output = (
