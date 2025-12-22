@@ -1,0 +1,113 @@
+{
+    "obsolete": false,
+    "model_dir": "models/asr/whisper",
+    "model_type": "asr",
+    "support_platform": [
+        "x86_64"
+    ],
+    "support_backend": [
+        "xh2"
+    ],
+    "support_core_num": {
+        "xh2": [
+            2
+        ]
+    },
+    "support_flow": {
+        "xh2": [
+            "get_model",
+            "compile",
+            "demo",
+            "perf"
+        ]
+    },
+    "support_hmatc": null,
+    "perf_metrics": {
+        "xh2": {
+            "x86_64": {
+                "decode": 26.10,
+                "end2end": 18.56
+            }
+        }
+    },
+    "get_model_params": {
+        "xh2": {
+            "type": [
+                "hmm"
+            ],
+            "download_dir": [
+                "cached_models"
+            ],
+            "extract_dir": [
+                "cached_models/hmm_xh2"
+            ],
+            "source_type": [
+                null
+            ],
+            "ndevice": [
+                null
+            ]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": [
+                "cached_models/whisper"
+            ],
+            "out-dir": [
+                "cached_results/hmquant_xh2"
+            ],
+            "input-sequence-length": [
+                null
+            ],
+            "calib_data": [
+                null
+            ]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": [
+                "cached_results/hmquant_xh2"
+            ],
+            "model_name": [
+                null
+            ],
+            "ncore": [
+                null
+            ],
+            "ndevice": [
+                null
+            ],
+            "stage": [
+                "build"
+            ],
+            "j": [
+                "24"
+            ],
+            "output_dir": [
+                "cached_results/hmm_xh2"
+            ]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "tokenizer_dir": [
+                "cached_models/whisper-medium"
+            ],
+            "embedding_path": [
+                "cached_results/hmm_xh2/hmquant/quant_embedding.pt"
+            ],
+            "prefill_path": [
+                "cached_results/hmm_xh2/whisper_prefill.hmm"
+            ],
+            "decoder_path": [
+                "cached_results/hmm_xh2/whisper_decoder.hmm"
+            ],
+            "ndevice": [
+                "1"
+            ]
+        }
+    },
+    "perf_params": "demo"
+}

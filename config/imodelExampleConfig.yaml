@@ -274,6 +274,18 @@ llm_qwen3_14b:
         args: all
   test:
     - llm_qwen3_14b_test
+llm_qwen3_30b_a3b:
+  include:
+    - models/llm/qwen3_30b_a3b
+  exclude:
+    - models/llm/qwen3_30b_a3b/README.MD
+  example_case:
+    - llm_qwen3_30b_a3b_test:
+        test_type: models_tests
+        script: qwen3_30b_a3b
+        args: all
+  test:
+    - llm_qwen3_30b_a3b_test
 llm_deepseek_r1_qwen3_8b:
   include:
     - models/llm/deepseek-r1-qwen3-8b
@@ -286,6 +298,18 @@ llm_deepseek_r1_qwen3_8b:
         args: all
   test:
     - llm_deepseek_r1_qwen3_8b_test
+llm_gpt-oss:
+  include:
+    - models/llm/gpt-oss
+  exclude:
+    - models/llm/gpt-oss/README.MD
+  example_case:
+    - llm_qwen3_30b_a3b_test:
+        test_type: models_tests
+        script: gpt-oss
+        args: all
+  test:
+    - llm_gpt-oss_test
 vllm_qwen2.5-vl:
   include:
     - models/vllm/qwen2.5-vl
@@ -298,6 +322,18 @@ vllm_qwen2.5-vl:
         args: all
   test:
     - vllm_qwen2.5-vl_test
+vllm_qwen3-vl:
+  include:
+    - models/vllm/qwen3-vl
+  exclude:
+    - models/vllm/qwen3-vl/README.MD
+  example_case:
+    - vllm_qwen3-vl_test:
+        test_type: models_tests
+        script: qwen3_vl
+        args: all
+  test:
+    - vllm_qwen3-vl_test
 llm_bge:
   include:
     - models/embedding/bge
@@ -322,6 +358,18 @@ llm_minicpmo:
         args: all
   test:
     - llm_minicpmo_test
+# llm_gte:
+#   include:
+#     - models/embedding/gte
+#   exclude:
+#     - models/embedding/gte/README.MD
+#   example_case:
+#     - llm_gte_test:
+#         test_type: models_tests
+#         script: gte
+#         args: all
+#   test:
+#     - llm_gte_test
 utils:
   include:
     - utils
