@@ -112,7 +112,6 @@ pip install -r requirements.txt
 | yolov8m-pose         | estimation    | xh2     | yes   | yes   | yes  | yes  |
 | yolov8m-seg          | segmentation  | xh2     | yes   | yes   | yes  | yes  |
 | yolop                | autodrive     | xh2     | yes   | yes   | yes  | x    |
-| multi_input_custom_random_model |    | xh2     | yes   | yes   | x    | x    |
 | lprnet               | ocr           | xh2     | yes   | yes   | yes  | yes  |
 | ppocrv3              | ocr           | xh2     | yes   | yes   | yes  | yes  |
 | qwen3                | llm           | xh2     | yes   | yes   | yes  | x    |
