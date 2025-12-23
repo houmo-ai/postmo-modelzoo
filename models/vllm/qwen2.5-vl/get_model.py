@@ -15,8 +15,8 @@ def get_args() -> argparse.Namespace:
         dest="file_type",
         type=str,
         default="hmm",
-        choices=["raw", "hmm", "quant"],
-        help="which resource to get, choise in [raw, hmm, quant]",
+        choices=["raw", "hmm"],
+        help="which resource to get, choise in [raw, hmm]",
     )
     parser.add_argument(
         '--download_dir',
@@ -45,7 +45,7 @@ def get_args() -> argparse.Namespace:
         dest='model_size',
         type=str,
         default="7b",
-        choices=["3b", "7b"],
+        choices=["7b"],
         help='model size',
     )
     args = parser.parse_args()
@@ -67,9 +67,6 @@ if __name__ == '__main__':
             "context_len": "8k",
             "prefill_len": 256,
             "batch": 1,
-        },
-        "quant_files": {
-            "quant_path": "models/qwen2.5-vl/hmquant_xh2_qwen2.5-vl_7b_256_2k_448x448_20251128.zip",
         },
         "modelscope_repo": {
             "repo_ids": ["Qwen/Qwen2.5-VL-7B-Instruct"],

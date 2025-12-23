@@ -27,6 +27,7 @@
         ],
         "xh2": [
             "get_model",
+            "quant",
             "compile",
             "demo",
             "perf"
@@ -95,30 +96,25 @@
         "xh2": {
             "type": [
                 "raw",
-                "quant",
                 "hmm",
                 "hmm"
             ],
             "download_dir": [
                 "cached_models",
                 "cached_models",
-                "cached_models",
                 "cached_models"
             ],
             "extract_dir": [
                 null,
-                "cached_models/hmquant_xh2_7b_2k",
                 "cached_models/hmm_xh2_7b_2k",
                 "cached_models/hmm_xh2_7b_2k_ms"
             ],
             "model_size": [
                 "7b",
                 "7b",
-                "7b",
                 "7b"
             ],
             "source_type": [
-                null,
                 null,
                 null,
                 "modelscope"
