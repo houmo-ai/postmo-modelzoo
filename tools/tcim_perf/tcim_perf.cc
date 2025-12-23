@@ -33,6 +33,16 @@ namespace fs = std::experimental::filesystem;
 namespace fs = std::filesystem;
 #endif
 
+#ifdef XH2A_HM_SYS
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "hm_sys.h"
+#ifdef __cplusplus
+}
+#endif
+#endif
+
 #include "../common/module_pool.hpp"
 #include "../common/npy.hpp"
 #include "../common/stream_engine.hpp"
@@ -164,7 +174,7 @@ bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
                   << std::endl;
         std::cout << "--batch/-b: default 1, the batch of model" << std::endl;
         std::cout << "--loops/-l: default 1, the number of loop"
-                     "iterations for model inference only"
+                     " iterations for model inference only"
                   << std::endl;
         std::cout << "--threads/-t: default 1, the number of threads"
                   << std::endl;
@@ -266,6 +276,35 @@ std::ostream &operator<<(std::ostream &out, const std::vector<T> &vec) {
   out << "]";
   return out;
 }
+
+#ifdef XH2A_HM_SYS
+int GetDevMemInfo(std::map<int, hm_mem_info> &dev_mem_info) {
+  hm_device_info dev_info = {0};
+  int ret = hm_sys_get_device_info(&dev_info);
+  if (ret <= 0 || dev_info.num_devices <= 0) {
+    LOG_ERROR("Not found online devices, ret is {}.", ret);
+    return -1;
+  }
+
+  LOG_INFO("Online device num: {}.", dev_info.num_devices);
+  for (int i = 0; i < dev_info.num_devices; i++) {
+    int device_id = dev_info.device_ids[i];
+    dev_mem_info[device_id] = {0};
+    ret = hm_sys_get_mem_info(device_id, &dev_mem_info[device_id]);
+    if (ret != 0) {
+      LOG_ERROR("Failed to get memory info of device {}, ret is {}.", device_id,
+                ret);
+      return ret;
+    }
+    auto mem_info = dev_mem_info[device_id];
+    LOG_INFO(
+        "Online device id: {}, mem_total: {}, mem_used: {}, mem_avail: {}.",
+        device_id, mem_info.mem_total, mem_info.mem_used, mem_info.mem_avail);
+  }
+
+  return ret;
+}
+#endif
 
 class Barrier {
  public:
@@ -1077,6 +1116,10 @@ int PerfFunc(CliArguments &arguments) {
   auto option = tcim::Module::Option(weight_manager);
   tcim::Module *module = nullptr;
   PooledModule *pooled_md = nullptr;
+#ifdef XH2A_HM_SYS
+  std::map<int, hm_mem_info> dev_mem_info_start;
+  auto mem_ret_start = GetDevMemInfo(dev_mem_info_start);
+#endif
   if (use_md_pool) {
     pooled_md = module_pool->Load(model_path, option);
     if (pooled_md == nullptr) {
@@ -1093,6 +1136,30 @@ int PerfFunc(CliArguments &arguments) {
       return -1;
     }
   }
+#ifdef XH2A_HM_SYS
+  std::map<int, hm_mem_info> dev_mem_info_end;
+  auto mem_ret_end = GetDevMemInfo(dev_mem_info_end);
+  if (mem_ret_start == 0 && mem_ret_end == 0) {
+    LOG_INFO("****** HM Device Memory Usage ******");
+    for (const auto &pair : dev_mem_info_start) {
+      int device_id = pair.first;
+      const hm_mem_info &mem_info_start = pair.second;
+      if (dev_mem_info_end.count(device_id) == 0) {
+        LOG_WARNING("Failed to get device {} memory info.", device_id);
+        break;
+      }
+      const hm_mem_info &mem_info_end = dev_mem_info_end[device_id];
+      int32_t mem_used = mem_info_end.mem_used - mem_info_start.mem_used;
+      mem_used = mem_used < 0 ? 0 : mem_used;
+      LOG_INFO("Device id: {}, memory used: {} MB", device_id, mem_used);
+    }
+    LOG_INFO("************************************");
+  } else {
+    LOG_WARNING(
+        "Failed to get device memory info, start ret is {}, end ret is {}.",
+        mem_ret_start, mem_ret_end);
+  }
+#endif
 
   std::vector<std::string> image_input_names;
   std::map<std::string, tcim::Tensor> input_datas;

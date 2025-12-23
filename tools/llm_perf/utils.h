@@ -21,6 +21,16 @@
 #include <unordered_map>
 #include <vector>
 
+#ifdef XH2A_HM_SYS
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "hm_sys.h"
+#ifdef __cplusplus
+}
+#endif
+#endif
+
 #define TOKEN_ID_MAX 150000
 
 #define COLOR_RED "\x1b[91;20m"
@@ -272,6 +282,36 @@ static int eigen_argmax(const T* ptr, std::size_t n) {
 
   return static_cast<int>(idx);
 }
+
+#ifdef XH2A_HM_SYS
+static inline int GetDevMemInfo(std::map<int, hm_mem_info>& dev_mem_info) {
+  hm_device_info dev_info = {0};
+  int ret = hm_sys_get_device_info(&dev_info);
+  if (ret <= 0 || dev_info.num_devices <= 0) {
+    std::cerr << "Not found online devices, ret is " << ret << std::endl;
+    return -1;
+  }
+
+  std::cout << "Online device num: " << dev_info.num_devices << std::endl;
+  for (int i = 0; i < dev_info.num_devices; i++) {
+    int device_id = dev_info.device_ids[i];
+    dev_mem_info[device_id] = {0};
+    ret = hm_sys_get_mem_info(device_id, &dev_mem_info[device_id]);
+    if (ret != 0) {
+      std::cerr << "Failed to get memory info of device " << device_id
+                << ", ret is " << ret << std::endl;
+      return ret;
+    }
+    auto mem_info = dev_mem_info[device_id];
+    std::cout << "Online device id: " << device_id
+              << ", mem_total: " << mem_info.mem_total
+              << ", mem_used: " << mem_info.mem_used
+              << ", mem_avail: " << mem_info.mem_avail << std::endl;
+  }
+
+  return ret;
+}
+#endif
 
 class HmllmInferBase {
  public:

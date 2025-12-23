@@ -12,7 +12,14 @@ else()
 endif()
 
 include(${CMAKE_SOURCE_DIR}/tcim_runtime.cmake)
-include_directories($ENV{HOUMO_EXAMPLES_PATH}/apis/common/nlohmann/include)
+include_directories(
+  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/nlohmann/include
+  $ENV{HOUMO_SDK_PATH}/hal/export/include
+  $ENV{HOUMO_SDK_PATH}/hal/include
+)
+link_directories(
+  $ENV{HOUMO_SDK_PATH}/hal/lib
+)
 set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
 
 if(BACKEND_XH1)
@@ -44,7 +51,8 @@ else()
   if(ANDROID_ABI)
     target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} dl)
   else()
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} pthread  ${CMAKE_DL_LIBS})
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} pthread hal_xh2a ${CMAKE_DL_LIBS})
+    target_compile_definitions(${PROJECT_NAME} PRIVATE XH2A_HM_SYS)
   endif()
 endif()
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
