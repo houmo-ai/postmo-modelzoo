@@ -95,12 +95,11 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   memset(&avg_perfdata, 0, sizeof(PerfInfos));
   memset(&total_perfdata, 0, sizeof(PerfInfos));
   if (warm_up_enable) {
-    int32_t warm_up_len = input_token_len;
     std::cout << "\n"
               << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
-              << warm_up_len << ", output " << warm_up_len
+              << input_token_len << ", output " << stop_token_len
               << std::string(30, '=') << "\n ";
-    Qwen3Infer->perf_llm(warm_up_len, warm_up_len);
+    Qwen3Infer->perf_llm(input_token_len, stop_token_len);
     std::cout << std::string(82, '=') << "\n";
   }
 
