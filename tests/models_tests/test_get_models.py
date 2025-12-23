@@ -287,3 +287,48 @@ def test_omni_minicpmo_get_model(setup_logging: type(print)) -> None:
     """test_omni_minicpmo_get_model"""
     model_name = 'minicpmo'
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_30b_a3b
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_llm_qwen3_30b_a3b_get_model')
+def test_llm_qwen3_30b_a3b_get_model(setup_logging: type(print)) -> None:
+    """test_llm_qwen3_30b_a3b_get_model"""
+    model_name = 'qwen3-30b-a3b'
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_vl
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_vllm_qwen3_vl_get_model')
+def test_vllm_qwen3_vl_get_model(setup_logging: type(print)) -> None:
+    """test_vllm_qwen3_vl_get_model"""
+    model_name = 'qwen3-vl'
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.whisper
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_asr_whisper_get_model')
+def test_asr_whisper_get_model(setup_logging: type(print)) -> None:
+    """test_asr_whisper_get_model"""
+    model_name = 'whisper'
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.gte
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_embedding_gte_get_model')
+def test_embedding_gte_get_model(setup_logging: type(print)) -> None:
+    """test_embedding_gte_get_model"""
+    model_name = 'gte'
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.gpt_oss
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_llm_gpt_oss_get_model')
+def test_llm_gpt_oss_get_model(setup_logging: type(print)) -> None:
+    """test_llm_gpt_oss_get_model"""
+    model_name = 'gpt-oss'
+    _get_model_func(model_name, setup_logging)

@@ -240,3 +240,43 @@ def test_detection_yolov9m_perf(setup_logging: type(print)) -> None:
     """test_detection_yolov9m_perf"""
     model_name = 'yolov9m'
     _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_30b_a3b
+@pytest.mark.perf
+def test_llm_qwen3_30b_a3b_perf(setup_logging: type(print)) -> None:
+    """test_llm_qwen3_30b_a3b_perf"""
+    model_name = 'qwen3-30b-a3b'
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_vl
+@pytest.mark.perf
+def test_vllm_qwen3_vl_perf(setup_logging: type(print)) -> None:
+    """test_vllm_qwen3_vl_perf"""
+    model_name = 'qwen3-vl'
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.whisper
+@pytest.mark.perf
+def test_asr_whisper_perf(setup_logging: type(print)) -> None:
+    """test_asr_whisper_perf"""
+    model_name = 'whisper'
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.gte
+@pytest.mark.perf
+def test_embedding_gte_perf(setup_logging: type(print)) -> None:
+    """test_embedding_gte_perf"""
+    model_name = 'gte'
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.gpt_oss
+@pytest.mark.perf
+def test_llm_gpt_oss_perf(setup_logging: type(print)) -> None:
+    """test_llm_gpt_oss_perf"""
+    model_name = 'gpt-oss'
+    _perf_func(model_name, setup_logging)

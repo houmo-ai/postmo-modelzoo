@@ -29,3 +29,8 @@ yolov10m
 yolo11m
 yolov9m
 minicpmo
+qwen3_30b_a3b
+qwen3_vl
+whisper
+gte
+gpt_oss

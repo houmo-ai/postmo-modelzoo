@@ -76,6 +76,9 @@ def get_args() -> argparse.Namespace:
         help="device number, only xh2 support",
     )
     args = parser.parse_args()
+    if args.ndevice > 1:
+        args.prefill_path = args.prefill_path.replace('.hmm', '.hmms')
+        args.decode_path = args.decode_path.replace('.hmm', '.hmms')
     return args
 
 
@@ -202,7 +205,9 @@ class HmQwenXh2:
             self.prefill.set_input(valid_length_name, valid_length_data)
             self.prefill.set_input(current_length_name, current_length_data)
             if self.pre_input_num > 3:
-                position_id_data = np.expand_dims(np.array(position_id), axis=0).astype("int32")
+                position_id_data = np.expand_dims(np.array(position_id), axis=0).astype(
+                    "int32"
+                )
                 position_id_name = self.prefill.get_input_name(3)
                 self.prefill.set_input(position_id_name, position_id_data)
             self.prefill.run()

@@ -257,3 +257,43 @@ def test_omni_minicpmo_demo(setup_logging: type(print)) -> None:
     """test_omni_minicpmo_demo"""
     model_name = 'minicpmo'
     _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_30b_a3b
+@pytest.mark.demo
+def test_llm_qwen3_30b_a3b_demo(setup_logging: type(print)) -> None:
+    """test_llm_qwen3_30b_a3b_demo"""
+    model_name = 'qwen3-30b-a3b'
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_vl
+@pytest.mark.demo
+def test_vllm_qwen3_vl_demo(setup_logging: type(print)) -> None:
+    """test_vllm_qwen3_vl_demo"""
+    model_name = 'qwen3-vl'
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.whisper
+@pytest.mark.demo
+def test_asr_whisper_demo(setup_logging: type(print)) -> None:
+    """test_asr_whisper_demo"""
+    model_name = 'whisper'
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.gte
+@pytest.mark.demo
+def test_embedding_gte_demo(setup_logging: type(print)) -> None:
+    """test_embedding_gte_demo"""
+    model_name = 'gte'
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.gpt_oss
+@pytest.mark.demo
+def test_llm_gpt_oss_demo(setup_logging: type(print)) -> None:
+    """test_llm_gpt_oss_demo"""
+    model_name = 'gpt-oss'
+    _demo_func(model_name, setup_logging)

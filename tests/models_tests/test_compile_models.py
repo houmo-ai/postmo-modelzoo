@@ -373,8 +373,71 @@ def test_detection_yolov9m_compile(setup_logging: type(print)) -> None:
 
 @pytest.mark.minicpmo
 @pytest.mark.compile
-@pytest.mark.dependency(name='test_omni_minicpmo_compile', depends_on=['test_quant_models.py::test_omni_minicpmo_quant'])
+@pytest.mark.dependency(
+    name='test_omni_minicpmo_compile',
+    depends_on=['test_quant_models.py::test_omni_minicpmo_quant'],
+)
 def test_omni_minicpmo_compile(setup_logging: type(print)) -> None:
     """test_omni_minicpmo_compile"""
     model_name = 'minicpmo'
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_30b_a3b
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name='test_llm_qwen3_30b_a3b_compile',
+    depends_on=['test_get_models.py::test_llm_qwen3_30b_a3b_get_model'],
+)
+def test_llm_qwen3_30b_a3b_compile(setup_logging: type(print)) -> None:
+    """test_llm_qwen3_30b_a3b_compile"""
+    model_name = 'qwen3-30b-a3b'
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_vl
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name='test_vllm_qwen3_vl_compile',
+    depends_on=['test_get_models.py::test_vllm_qwen3_vl_get_model'],
+)
+def test_vllm_qwen3_vl_compile(setup_logging: type(print)) -> None:
+    """test_vllm_qwen3_vl_compile"""
+    model_name = 'qwen3-vl'
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.whisper
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name='test_asr_whisper_compile',
+    depends_on=['test_get_models.py::test_asr_whisper_get_model'],
+)
+def test_asr_whisper_compile(setup_logging: type(print)) -> None:
+    """test_asr_whisper_compile"""
+    model_name = 'whisper'
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.gte
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name='test_embedding_gte_compile',
+    depends_on=['test_get_models.py::test_embedding_gte_get_model'],
+)
+def test_embedding_gte_compile(setup_logging: type(print)) -> None:
+    """test_embedding_gte_compile"""
+    model_name = 'gte'
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.gpt_oss
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name='test_llm_gpt_oss_compile',
+    depends_on=['test_get_models.py::test_llm_gpt_oss_get_model'],
+)
+def test_llm_gpt_oss_compile(setup_logging: type(print)) -> None:
+    """test_llm_gpt_oss_compile"""
+    model_name = 'gpt-oss'
     _compile_func(model_name, setup_logging)

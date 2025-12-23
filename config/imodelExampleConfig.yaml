@@ -358,18 +358,18 @@ llm_minicpmo:
         args: all
   test:
     - llm_minicpmo_test
-# llm_gte:
-#   include:
-#     - models/embedding/gte
-#   exclude:
-#     - models/embedding/gte/README.MD
-#   example_case:
-#     - llm_gte_test:
-#         test_type: models_tests
-#         script: gte
-#         args: all
-#   test:
-#     - llm_gte_test
+llm_gte:
+  include:
+    - models/embedding/gte
+  exclude:
+    - models/embedding/gte/README.MD
+  example_case:
+    - llm_gte_test:
+        test_type: models_tests
+        script: gte
+        args: all
+  test:
+    - llm_gte_test
 utils:
   include:
     - utils
