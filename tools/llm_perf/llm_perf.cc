@@ -68,6 +68,11 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
     }
   }
 
+#ifdef XH2A_HM_SYS
+  std::map<int, hm_mem_info> dev_mem_info_start;
+  auto mem_ret_start = GetDevMemInfo(dev_mem_info_start);
+#endif
+
   std::unique_ptr<HmllmInferBase> Qwen3Infer;
   if (visual_path.empty()) {
     if (batch == 1) {
@@ -90,6 +95,32 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
         prefill_path.string(), decode_path.string(), embedding_path.string(),
         visual_path.string(), ndevices, batch);
   }
+
+#ifdef XH2A_HM_SYS
+  std::map<int, hm_mem_info> dev_mem_info_end;
+  auto mem_ret_end = GetDevMemInfo(dev_mem_info_end);
+  if (mem_ret_start == 0 && mem_ret_end == 0) {
+    std::cout << "****** HM Device Memory Usage ******" << std::endl;
+    for (const auto& pair : dev_mem_info_start) {
+      int device_id = pair.first;
+      const hm_mem_info& mem_info_start = pair.second;
+      if (dev_mem_info_end.count(device_id) == 0) {
+        std::cerr << "Failed to get device " << device_id << " memory info."
+                  << std::endl;
+        break;
+      }
+      const hm_mem_info& mem_info_end = dev_mem_info_end[device_id];
+      int32_t mem_used = mem_info_end.mem_used - mem_info_start.mem_used;
+      mem_used = mem_used < 0 ? 0 : mem_used;
+      std::cout << "Device id: " << device_id << ", memory used: " << mem_used
+                << " MB" << std::endl;
+    }
+    std::cout << "************************************" << std::endl;
+  } else {
+    std::cerr << "Failed to get device memory info, start ret is "
+              << mem_ret_start << ", end ret is " << mem_ret_end << std::endl;
+  }
+#endif
 
   PerfInfos avg_perfdata, total_perfdata;
   memset(&avg_perfdata, 0, sizeof(PerfInfos));
