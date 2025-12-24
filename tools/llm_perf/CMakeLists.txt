@@ -22,11 +22,7 @@ link_directories(
 )
 set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
 
-if(BACKEND_XH1)
-set(SOURCE_FILES HmEmbedding.cc HmvllmInfer.cc HmllmInfer.cc llm_perf.cc)
-else()
 set(SOURCE_FILES HmEmbedding.cc HmvllmInfer.cc HmllmInfer.cc HmllmInferMultiBatch.cc llm_perf.cc)
-endif()
 
 set(INCLUDE_DIRS 
   ${CMAKE_SOURCE_DIR}/include

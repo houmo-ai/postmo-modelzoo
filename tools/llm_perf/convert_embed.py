@@ -4,7 +4,7 @@ import torch
 import numpy as np
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Convert embedding format")

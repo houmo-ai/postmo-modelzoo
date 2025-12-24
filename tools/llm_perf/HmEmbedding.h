@@ -16,11 +16,7 @@
 #include "half.hpp"
 #include "utils.h"
 
-#ifdef BACKEND_XH1
-using tensor_type = int16_t;
-#else
 using tensor_type = half_float::half;
-#endif
 
 /**
  * 读取文件
