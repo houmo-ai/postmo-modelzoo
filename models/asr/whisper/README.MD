@@ -39,7 +39,7 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 
 ```bash
 source env.sh
-cd models/llm/qwen3
+cd models/asr/whisper
 python3 ptq.py
 ```
 

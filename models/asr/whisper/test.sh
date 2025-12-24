@@ -68,15 +68,25 @@ if [[ "$VENV_FLAG" -eq "1" ]]; then
 fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "quant" ]; then
-    echo "Start Quant Model."
-    python3 get_model.py --type raw
-    python3 ptq.py
+    if [[ "$MODEL_TYPE" == "precompiled" ]]; then
+        echo "Download precompiled model."
+        python3 get_model.py --type hmm
+    else
+        if [[ "$MODEL_TYPE" == "compile" ]]; then
+            echo "Down raw model for Quant and Compile."
+            python3 get_model.py --type raw
+            echo "Start Quant Model."
+            python3 ptq.py
+        else
+            echo "✗ Only support using precompiled and compile."
+            exit 1
+        fi
+    fi
 fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
     if [[ "$MODEL_TYPE" == "precompiled" ]]; then
-        echo "Download precompiled model."
-        python3 get_model.py --type hmm
+        echo "Using download precompiled model, skip build."
     else
         if [[ "$MODEL_TYPE" == "compile" ]]; then
             echo "Compile model."
