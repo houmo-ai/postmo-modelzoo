@@ -22,8 +22,28 @@
 ```bash
 python3 get_model.py --type hmm
 ```
+如果需要自行编译模型，可以下载原始模式，下载方式如下：
+```bash
+python3 get_model.py --type raw
+```
 
-### 2.2 编译
+### 2.2 量化
+
+量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上，空闲内存需要达到100GB以上。参考命令：
+
+```bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py39-x86.64 /bin/bash
+```
+
+进入docker后source环境变量，并进入`models/embedding/gte`目录，执行ptq.py脚本。默认的量化方式为w8a8_sefp。
+
+```bash
+source env.sh
+cd models/embedding/gte
+python3 ptq.py
+```
+
+### 2.3 编译
 
 将量化模型编译为在芯片上运行的模型。执行脚本：
 
@@ -34,7 +54,7 @@ python3 build.py
 编译好的模型存放在当前目录，包括1个文件：
 gte_prefill.hmm
 
-### 2.3 演示
+### 2.4 演示
 
 gte_Qwen2-1.5B-instruct模型使用python API进行演示
 
@@ -44,7 +64,7 @@ gte_Qwen2-1.5B-instruct模型使用python API进行演示
 python3 demo.py
 ```
 
-### 2.4 一键评估
+### 2.5 一键评估
 
 以上步骤可以通过test.sh脚本一键执行：
 
