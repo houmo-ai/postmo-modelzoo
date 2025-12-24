@@ -1,6 +1,6 @@
 # llm_perf 性能测试工具
 
-本代码用于在后摩鸿途系列芯片的设备上测试llm模型和vllm模型（当前vllm仅支持xh2）的单/多batch模型推理性能。当前支持linux、windows11和android native环境（使用adb运行）。
+本代码用于在后摩鸿途系列芯片（XH2）的设备上测试llm模型和vllm模型的单/多batch模型推理性能。当前支持linux、windows11和android native环境（使用adb运行）。
 
 ## 目录
 
@@ -33,8 +33,8 @@
 
 功能支持度说明：
   - 具体支持的模型参考models目录下llm和vllm模型支持的平台。
-  - 支持的大道软件版本要求如下：xh1≥v2.5.0和xh2≥v0.6.0 。
-  - xh1运行时请注意设备的额core数是否与模型匹配。
+  - 支持的芯片型号为：xh2。
+  - 支持的大道软件版本要求如下：xh2≥v0.6.0 。
 
 ### 1.2 流程说明
 

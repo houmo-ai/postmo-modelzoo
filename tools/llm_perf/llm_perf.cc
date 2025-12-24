@@ -9,9 +9,7 @@
 #include <vector>
 
 #include "HmllmInfer.h"
-#ifndef BACKEND_XH1
 #include "HmllmInferMultiBatch.h"
-#endif
 #include "HmvllmInfer.h"
 #include "tcim/tcim_runtime.h"
 #include "utils.h"
@@ -58,14 +56,8 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   const char* houmo_target_env = getenv("HOUMO_TARGET");
   std::string houmo_target =
       houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
-  if (houmo_target != "xh2" && houmo_target != "xh1") {
+  if (houmo_target != "xh2") {
     throw std::invalid_argument("Unsupported backend " + houmo_target);
-  }
-
-  if (houmo_target == "xh1") {
-    if (batch != 1) {
-      throw std::runtime_error("xh1 only support single-bacth !");
-    }
   }
 
 #ifdef XH2A_HM_SYS
@@ -84,11 +76,9 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
         throw std::runtime_error(
             "Only xh2 support multibacth, device not match!");
       }
-#ifndef BACKEND_XH1
       Qwen3Infer = std::make_unique<HmllmInferMultiBatch>(
           prefill_path.string(), decode_path.string(), embedding_path.string(),
           ndevices, batch);
-#endif
     }
   } else {
     Qwen3Infer = std::make_unique<HmvllmInfer>(
@@ -126,12 +116,11 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   memset(&avg_perfdata, 0, sizeof(PerfInfos));
   memset(&total_perfdata, 0, sizeof(PerfInfos));
   if (warm_up_enable) {
-    int32_t warm_up_len = input_token_len;
     std::cout << "\n"
               << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
-              << warm_up_len << ", output " << warm_up_len
+              << input_token_len << ", output " << stop_token_len
               << std::string(30, '=') << "\n ";
-    Qwen3Infer->perf_llm(warm_up_len, warm_up_len);
+    Qwen3Infer->perf_llm(input_token_len, stop_token_len);
     std::cout << std::string(82, '=') << "\n";
   }
 

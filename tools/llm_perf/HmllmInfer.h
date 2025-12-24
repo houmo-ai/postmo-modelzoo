@@ -38,11 +38,7 @@ class HmllmInfer : public HmllmInferBase {
   int batch = 0;
   int eos_token_id = 0;
   int argmax_dim_len = 0;
-#ifdef BACKEND_XH1
-  int16_t decode_current_length = 1;
-#else
   int32_t decode_current_length = 1;
-#endif
   std::shared_ptr<HmEmbedding> embedding;
 
   tcim::Module::WeightManager weight_manager;

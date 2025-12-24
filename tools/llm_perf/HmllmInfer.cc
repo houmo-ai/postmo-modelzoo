@@ -44,20 +44,6 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
 
   // 获取模型配置
   attn_idx_start = get_attn_idx_start();
-#ifdef BACKEND_XH1
-  this->prefill_length =
-      prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[0] *
-      prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
-  this->embedding_length =
-      prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[2];
-  this->context_max_length =
-      prefill_module->GetInputInfo(prefill_module->GetInputName(attn_idx_start))
-          .Shape()[2];
-  this->batch =
-      decode_module->GetInputInfo(decode_module->GetInputName(0)).Shape()[0];
-  this->argmax_dim_len =
-      decode_module->GetOutputInfo(decode_module->GetOutputName(0)).Shape()[1];
-#else
   this->prefill_length =
       prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
   this->embedding_length =
@@ -69,7 +55,6 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
       decode_module->GetInputInfo(decode_module->GetInputName(0)).Shape()[0];
   this->argmax_dim_len =
       decode_module->GetOutputInfo(decode_module->GetOutputName(0)).Shape()[2];
-#endif
 
   if (this->batch != batches) {
     throw std::runtime_error("Model Batch Not match args batch!");
@@ -159,10 +144,7 @@ HmllmInfer::~HmllmInfer() {
 void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length,
                                       int32_t current_length) {
   prefill_input_map.clear();
-#ifdef BACKEND_XH1
-  int16_t valid_length_int16t = valid_length;
-  int16_t current_length_int16t = current_length;
-#endif
+
   for (int idx = 0; idx < attn_idx_start; idx++) {
     auto input_name = prefill_module->GetInputName(idx);
     auto input_info = prefill_module->GetInputInfo(input_name).AsContiguous();
@@ -174,22 +156,12 @@ void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length,
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
     } else if (idx == 1) {
       mem_size = input_info.MemSize();
-#ifdef BACKEND_XH1
-      input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
-                                                    &valid_length_int16t);
-#else
       input_tensor =
           tcim::Tensor::CreateHostTensor(input_info, mem_size, &valid_length);
-#endif
     } else if (idx == 2) {
       mem_size = input_info.MemSize();
-#ifdef BACKEND_XH1
-      input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
-                                                    &current_length_int16t);
-#else
       input_tensor =
           tcim::Tensor::CreateHostTensor(input_info, mem_size, &current_length);
-#endif
     } else if (idx == 3) {
       // only support Qwen3-30b
       mem_size = input_info.MemSize();
@@ -246,9 +218,6 @@ void HmllmInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
 }
 
 void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length) {
-#ifdef BACKEND_XH1
-  int16_t context_length_int16t = context_length;
-#endif
   for (int idx = 0; idx < attn_idx_start; idx++) {
     auto input_name = decode_module->GetInputName(idx);
     auto input_info = decode_module->GetInputInfo(input_name).AsContiguous();
@@ -260,13 +229,8 @@ void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length) {
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
     } else if (idx == 1) {
       mem_size = input_info.MemSize();
-#ifdef BACKEND_XH1
-      input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
-                                                    &context_length_int16t);
-#else
       input_tensor =
           tcim::Tensor::CreateHostTensor(input_info, mem_size, &context_length);
-#endif
     } else if (idx == 2) {
       continue;
     } else if (idx == 3) {

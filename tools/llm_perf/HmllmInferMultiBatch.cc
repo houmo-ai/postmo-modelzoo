@@ -125,10 +125,6 @@ void HmllmInferMultiBatch::PrefillSetInputDatas(void *data,
                                                 int32_t valid_length,
                                                 int32_t current_length) {
   prefill_input_map.clear();
-#ifdef BACKEND_XH1
-  int16_t valid_length_int16t = valid_length;
-  int16_t current_length_int16t = current_length;
-#endif
   for (int idx = 0; idx < 3; idx++) {
     auto input_name = prefill_module->GetInputName(idx);
     auto input_info = prefill_module->GetInputInfo(input_name).AsContiguous();
@@ -140,22 +136,12 @@ void HmllmInferMultiBatch::PrefillSetInputDatas(void *data,
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
     } else if (idx == 1) {
       mem_size = input_info.MemSize();
-#ifdef BACKEND_XH1
-      input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
-                                                    &valid_length_int16t);
-#else
       input_tensor =
           tcim::Tensor::CreateHostTensor(input_info, mem_size, &valid_length);
-#endif
     } else if (idx == 2) {
       mem_size = input_info.MemSize();
-#ifdef BACKEND_XH1
-      input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
-                                                    &current_length_int16t);
-#else
       input_tensor =
           tcim::Tensor::CreateHostTensor(input_info, mem_size, &current_length);
-#endif
     } else {
       break;
     }
@@ -198,9 +184,6 @@ void HmllmInferMultiBatch::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
 
 void HmllmInferMultiBatch::DecodeSetInputDatas(void *data,
                                                int32_t context_length) {
-#ifdef BACKEND_XH1
-  int16_t context_length_int16t = context_length;
-#endif
   for (int idx = 0; idx < 2; idx++) {
     auto input_name = decode_module->GetInputName(idx);
     auto input_info = decode_module->GetInputInfo(input_name).AsContiguous();
@@ -212,13 +195,8 @@ void HmllmInferMultiBatch::DecodeSetInputDatas(void *data,
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
     } else if (idx == 1) {
       mem_size = input_info.MemSize();
-#ifdef BACKEND_XH1
-      input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
-                                                    &context_length_int16t);
-#else
       input_tensor =
           tcim::Tensor::CreateHostTensor(input_info, mem_size, &context_length);
-#endif
     }
 
     if (decode_input_map.find(input_name) != decode_input_map.end()) {

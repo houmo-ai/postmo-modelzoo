@@ -121,6 +121,10 @@ static std::unordered_map<std::string, std::string> parse_args(int argc,
     std::string arg = argv[i];
     if (arg.substr(0, 2) == "--") {
       std::string key = arg.substr(2);
+      if (key == "no_warm_up") {
+        args[key] = "";
+        continue;
+      }
       if (i + 1 >= argc) {
         throw std::invalid_argument("Missing value for argument: " + arg);
       }
