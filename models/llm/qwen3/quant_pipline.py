@@ -18,7 +18,7 @@ from xhquant.api import (
 )  # isort:skip
 
 from xh_model_zoo.xh_llm import LLMConverter
-from xh_model_zoo.xh_llm.models.qwen2 import Qwen2ConvertConfig
+from xh_model_zoo.xh_llm.models.qwen2_legacy import Qwen2LegacyConvertConfig
 from xh_model_zoo.utils.memory_tracker import MemoryTracker  # isort:skip
 from xh_model_zoo.utils.time_profiler import TimeProfiler  # isort:skip
 
@@ -232,7 +232,7 @@ def export_llm(args):
     else:
         quant_weight = os.path.join(model_dir, "quarot_gptq-state-dict.safetensors")
 
-    config = Qwen2ConvertConfig(
+    config = Qwen2LegacyConvertConfig(
         batch_size=1,
         context_length=args.context_length,
         input_sequence_length=args.input_sequence_length,
