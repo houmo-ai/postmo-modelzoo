@@ -91,7 +91,16 @@
 source env.sh
 ```
 
-### 2.1.2 Android 环境
+### 2.1.2 Windows 环境（仅支持Windows11）
+
+1. 在后摩智能资源中心获取:
+
+- 后摩大道 windows系统的固件驱动、RUNTIME SDK并安装说明文档进行安装
+- 示例代码压缩包，解压示例代码压缩包，解压后文件夹名为：houmo-examples-xh2
+
+2. 参考houmo-examples-xh2文件夹下的tools/win_envs/README.MD和社区用户手册，配置windows相关开发环境，并检查必要的环境变量。
+
+### 2.1.3 Android 环境
 
 如果需要使用其他平台编译链进行交叉编译需要自行下载交叉编译链并设置环境变量 `TCIM_RUNTIME_PATH` 到目标平台 runtime 库目录, 以 android 平台为例：
 
@@ -139,7 +148,15 @@ cd houmo-examples-xh2/tools/tcim_perf/
 
 编译生成tcim_perf可执行文件在 houmo-examples-xh2/tools/bin 目录下。
 
-### 2.2.2 Android 环境
+### 2.2.2 Windows 环境（仅支持Windows11）
+
+Windows系统下使用env.bat设置好环境变量后，按照如下步骤可以编译tcim_perf.exe，编译好的可执行程序再houmo-examples-xh2/tools/bin目录下。
+``` bat
+cd houmo-examples-xh2/tools/tcim_perf/
+build_win.bat
+```
+
+### 2.2.3 Android 环境
 
 build_ndk.sh 脚本中预设了编译所需的 NDK 环境路径为 `${HOUMO_EXAMPLES_PATH}/toolchains/android-ndk-r28c`，如有变化，可使用环境变量 `NDK_PATH` 进行配置。
 
