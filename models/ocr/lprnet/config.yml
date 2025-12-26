@@ -11,11 +11,8 @@ model:
       resize_type: 0
       padding_model:
       padding_values:
-      resizer: 
-        toYUV_format: YUV420SP
-        max_input_size: [24, 94]
-        enable_static_resizer: true
-        insert_pad_scatter: false
+      # resizer: 
+      #   toYUV_format: YUV420SP
   app_onnx_opt: 
     optimizer: true
     log_level: 0

@@ -9,13 +9,8 @@ model:
       mean: [123.675, 116.28, 103.53]
       std: [58.395, 57.12, 57.375]
       resize_type: 0
-      padding_mode: 
-      padding_values: 
-      resizer:
-        toYUV_format: YUV420SP
-        max_input_size: [1184, 736]  # HW
-        enable_static_resizer: true
-        insert_pad_scatter: false
+      # resizer:
+      #   toYUV_format: YUV420SP
   model_impl_module: model
   model_impl_cls: OCRDet
 
@@ -27,7 +22,7 @@ quant:
       activation:
         method:
           name: all
-          target_cos: 0.99
+
 build:
   ncore: 1
   opt_level: 2
