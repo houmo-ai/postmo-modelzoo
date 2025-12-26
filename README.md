@@ -14,26 +14,30 @@ houmo-examples目录结构如下，其中README.md为本说明文件：
 
 ```bash
 .
-├── README.md
 ├── apis
     ├── common
     ├── converts
     ├── inferences
+├── data
+├── hmatc
+├── hmodel
 ├── models
     ├── asr
     ├── autodrive
     ├── backbone
     ├── detection
+    ├── embedding
     ├── estimation
     ├── llm
     ├── ocr
+    ├── omni
     ├── segmentation
-    └── vllm
-├── data
+    ├── vllm
+    └── benchmark.yml
 ├── tools
-├── hmodel
 ├── env.sh
 ├── env.bat
+├── README.md
 └── requirements.txt
 ```
 
@@ -41,13 +45,13 @@ houmo-examples目录结构如下，其中README.md为本说明文件：
 
 | 目录             | 说明                                        |
 | ---------------- | ------------------------------------------- |
-| hmatc            | hmatc工具源码，通过配置文件进行一键评估     |
-| models           | 模型示例，展示模型的转换和评估过程          |
 | apis             | API示例，展示hal和runtime接口的调用过程     |
 | data             | 评估使用的数据文件，如数据集等              |
-| tools            | 应用层工具源码，如算力测试工具等            |
+| hmatc            | hmatc工具源码，通过配置文件进行一键评估     |
 | hmodel           | 量化模型配置和工具，主要用于大模型和QAT训练 |
-| env.sh           | 环境配置脚本                                |
+| models           | 模型示例，展示模型的转换和评估过程          |
+| tools            | 应用层工具源码，如算力测试工具等            |
+| env.sh/env.bat   | 环境配置脚本                                |
 | requirements.txt | python三方依赖                              |
 
 
@@ -73,6 +77,7 @@ pip install -r requirements.txt
 
 此外，示例运行需要依赖houmo-tcim-runtime，参考后摩大道软件平台快速入门配置runtime环境。windows的示例运行前请参照tools/win_envs目录的README.MD进行环境变量的设置。
 
+
 ## 应用工具
 
 为方便用户评测，示例仓库提供了一些工具源码供用户使用，如下表所示。具体使用方式请参考工具内的readme文件。
@@ -81,47 +86,54 @@ pip install -r requirements.txt
 | ---------------- | ------------ | ------------------------------- | ---------- | ------- | ----------- | ------------------- |
 | bandwidth_perf   | tools        | 带宽测试工具                    | python     | xh2     | x64/aarch64 | linux               |
 | computing_perf   | tools        | 算力测试工具                    | python     | xh2     | x64/aarch64 | linux               |
-| tcim_perf        | tools        | 模型测试工具                    | c++        | xh2     | x64/aarch64 | linux/android       |
+| hm_check         | tools        | 硬件环境检测工具                | c++        | xh2     | x64/aarch64 | linux/android       |
 | llm_perf         | tools        | 大语言模型性能测试工具          | c++        | xh2     | x64/aarch64 | linux/android/win11 |
+| tcim_perf        | tools        | 模型测试工具                    | c++        | xh2     | x64/aarch64 | linux/android       |
+| win_envs         | tools        | win环境设置工具                 | python     | xh2     | x64         | win11               |
+
 
 ## 模型示例
 
 模型示例主要依赖hmatc工具完成评估功能，可通过每个模型示例下的test.sh脚本一键执行，也可参考脚本中的命令分步执行，相关参数在config.yml配置。
 
-模型示例列表如下，type列为模型类型，target列为支持的芯片平台，quant表示提供量化示例，build表示提供编译示例，demo表示提供python端到端demo，eval表示提供精度评估。
+模型示例列表如下，type列为模型类型，target列为支持的芯片平台，quant表示提供量化示例，build表示提供编译示例，perf表示提供性能评估，demo表示提供python端到端demo，eval表示提供精度评估。
 
 量化和编译功能仅支持在量化工具和编译器支持的平台上运行，其中大模型量化需要使用GPU。涉及到模型推理相关的功能（如perf/demo/eval等）最好使用后摩芯片平台运行，运行时需要关注其他限制，如固件类型（如大模型只能在非VPU固件上运行），硬件规格（如2核芯片只能运行2核以下编译的模型）。如果没有安装后摩芯片可以通过`export HDPL_PLATFORM=ISIM`指定模拟器运行，速度较慢。
 
-| models               | path          | target  | quant | build | demo | eval |
-| -------------------- | ------------- | ------- | ----- | ----- | ---- | ---- |
-| resnet50             | backbone      | xh2     | yes   | yes   | yes  | yes  |
-| mobilenetv2          | backbone      | xh2     | yes   | yes   | yes  | yes  |
-| efficientnet         | backbone      | xh2     | yes   | yes   | yes  | yes  |
-| ViT-B-16             | backbone      | xh2     | yes   | yes   | yes  | yes  |
-| yolov8m-cls          | backbone      | xh2     | yes   | yes   | yes  | yes  |
-| yolov3               | detection     | xh2     | yes   | yes   | yes  | yes  |
-| yolov5s              | detection     | xh2     | yes   | yes   | yes  | yes  |
-| yolov5s_feature      | detection     | xh2     | yes   | yes   | yes  | yes  |
-| yolov5m_face         | detection     | xh2     | yes   | yes   | yes  | yes  |
-| yolov7               | detection     | xh2     | yes   | yes   | yes  | yes  |
-| yolov8m              | detection     | xh2     | yes   | yes   | yes  | yes  |
-| yolov9m              | detection     | xh2     | yes   | yes   | yes  | yes  |
-| yolo11m              | detection     | xh2     | yes   | yes   | yes  | yes  |
-| yolo12m              | detection     | xh2     | yes   | yes   | yes  | yes  |
-| yolox                | detection     | xh2     | yes   | yes   | yes  | yes  |
-| yolov8m-pose         | estimation    | xh2     | yes   | yes   | yes  | yes  |
-| yolov8m-seg          | segmentation  | xh2     | yes   | yes   | yes  | yes  |
-| yolop                | autodrive     | xh2     | yes   | yes   | yes  | x    |
-| lprnet               | ocr           | xh2     | yes   | yes   | yes  | yes  |
-| ppocrv3              | ocr           | xh2     | yes   | yes   | yes  | yes  |
-| qwen3                | llm           | xh2     | yes   | yes   | yes  | x    |
-| qwen3-14b            | llm           | xh2     | yes   | yes   | yes  | x    |
-| deepseek-r1-qwen3-8b | llm           | xh2     | yes   | yes   | yes  | x    |
-| qwen2.5-vl           | vllm          | xh2     | x     | yes   | yes  | x    |
-| minicpmo             | omni          | xh2     | x     | yes   | yes  | x    |
-| bge-m3               | embedding     | xh2     | yes   | yes   | yes  | x    |
-| gte-qwen2-1.5b-instruct | embedding  | xh2     | x     | x     | yes  | x    |
-| whisper-medium       | asr           | xh2     | x     | yes   | yes  | x    |
+| models               | path          | target  | quant | build | perf | demo | eval |
+| -------------------- | ------------- | ------- | ----- | ----- | ---- | ---- | ---- |
+| whisper-medium       | asr           | xh2     | x     | yes   | yes  | yes  | x    |
+| yolop                | autodrive     | xh2     | yes   | yes   | yes  | yes  | x    |
+| efficientnet         | backbone      | xh2     | yes   | yes   | yes  | yes  | yes  |
+| mobilenetv2          | backbone      | xh2     | yes   | yes   | yes  | yes  | yes  |
+| resnet50             | backbone      | xh2     | yes   | yes   | yes  | yes  | yes  |
+| ViT-B-16             | backbone      | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolov8m-cls          | backbone      | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolo11m              | detection     | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolo12m              | detection     | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolov3               | detection     | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolov5m_face         | detection     | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolov5s              | detection     | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolov5s_feature      | detection     | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolov7               | detection     | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolov8m              | detection     | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolov9m              | detection     | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolov10m             | detection     | xh2     | yes   | yes   | yes  | yes  | yes  |
+| yolox                | detection     | xh2     | yes   | yes   | yes  | yes  | yes  |
+| bge-m3               | embedding     | xh2     | yes   | yes   | yes  | yes  | x    |
+| gte-qwen2-1.5b-instruct | embedding  | xh2     | x     | x     | yes  | yes  | x    |
+| yolov8m-pose         | estimation    | xh2     | yes   | yes   | yes  | yes  | yes  |
+| deepseek-r1-qwen3-8b | llm           | xh2     | yes   | yes   | yes  | yes  | x    |
+| gpt-oss              | llm           | xh2     | x     | yes   | yes  | yes  | x    |
+| qwen3                | llm           | xh2     | yes   | yes   | yes  | yes  | x    |
+| qwen3-14b            | llm           | xh2     | yes   | yes   | yes  | yes  | x    |
+| qwen3-30b-a3b        | llm           | xh2     | yes   | yes   | yes  | yes  | x    |
+| lprnet               | ocr           | xh2     | yes   | yes   | yes  | yes  | yes  |
+| ppocrv3              | ocr           | xh2     | yes   | yes   | yes  | yes  | yes  |
+| minicpmo             | omni          | xh2     | x     | yes   | yes  | yes  | x    |
+| yolov8m-seg          | segmentation  | xh2     | yes   | yes   | yes  | yes  | yes  |
+| qwen2.5-vl           | vllm          | xh2     | yes   | yes   | yes  | yes  | x    |
+| qwen3-vl             | vllm          | xh2     | yes   | yes   | yes  | yes  | x    |
 
 
 ## API示例
@@ -136,10 +148,10 @@ windows的示例运行前请参照tools/win_envs目录的README.MD进行环境�
 | ---------------------------- | ------------ | -------------------------------  | ---------- | ------- | ----------- | ---------- |
 | resnet50                     | converts     | resnet50 量化编译示例            | python     | xh2     | x64         | linux      |
 | resnet50                     | inferences   | resnet50 单线程推理示例          | python/c++ | xh2     | x64/aarch64 | win/linux  |
-| yolov5s                      | inferences   | yolov5s 单线程推理示例           | python/c++ | xh2     | x64/aarch64 | win/linux  |
 | qwen3                        | inferences   | qwen3 大语言模型推理示例         | python     | xh2     | x64/aarch64 | win/linux  |
 | resnet50_multistreams        | inferences   | resnet50 多线程多stream推理示例  | c++        | xh2     | x64/aarch64 | win/linux  |
 | resnet50_pipeline            | inferences   | resnet50 流水推理示例            | c++        | xh2     | x64/aarch64 | win/linux  |
+| yolov5s                      | inferences   | yolov5s 单线程推理示例           | python/c++ | xh2     | x64/aarch64 | win/linux  |
 
 
 ## 快速上手
