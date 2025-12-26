@@ -1188,12 +1188,11 @@ class HMMiniCPMO(object):
         spk_emb_mask = input_ids == self.tts_spk_emb_token_id
         if spk_emb_mask.any():
             assert llm_spk_embeds is not None
-            projected_spk_emb = F.normalize(llm_spk_embeds, p=2, dim=-1)
             
             bs = input_ids.shape[0]
             for idx in range(bs):
                 s_input_ids = input_ids[idx]
-                s_spk_emb = projected_spk_emb[idx]
+                s_spk_emb = llm_spk_embeds[idx]
                 s_mask = s_input_ids == self.tts_spk_emb_token_id
                 nonzero_position_idx = s_mask.nonzero(as_tuple=False)
                 assert nonzero_position_idx.shape[0] == self.tts_num_spk_embs
@@ -1769,9 +1768,9 @@ def xh2_demo(args):
 
     example_mode = EXAMPLES_MODE[args.example_idx]
     if example_mode == "omni":
-        video_path="./MiniCPM-o-2_6/assets/Skiing.mp4"
+        video_path=f"{args.tokenizer_dir}/assets/Skiing.mp4"
         # if use voice clone prompt, please set ref_audio
-        ref_audio_path = './MiniCPM-o-2_6/assets/demo.wav'
+        ref_audio_path = f"{args.tokenizer_dir}/assets/demo.wav"
         ref_audio, _ = librosa.load(ref_audio_path, sr=16000, mono=True)
         sys_msg = {"role": "user",
                 "content":["你是一个AI助手。你能接受视频，音频和文本输入并输出语音和文本。模仿输入音频中的声音特征。",
@@ -1878,7 +1877,7 @@ def xh2_demo(args):
         logger.success(f"ViT+LLM TPS (Tokens Per Second): {output_tokens_num / total_time:.2f} tokens/s")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
     elif example_mode == "vclone":
-        ref_audio, _ = librosa.load('./MiniCPM-o-2_6/assets/input_examples/assistant_default_female_voice.wav', sr=16000, mono=True)
+        ref_audio, _ = librosa.load(f"{args.tokenizer_dir}/assets/input_examples/assistant_default_female_voice.wav", sr=16000, mono=True)
         sys_msg = {"role": "user", "content":["Clone the voice in the provided audio prompt.", ref_audio]}
         user_question = {'role': 'user', 'content': [f"Please read the text below.", "我是部署在后摩智能芯片中的AI智能体。"]}
         msgs = [sys_msg, user_question]
@@ -2062,7 +2061,7 @@ def xh2_demo(args):
         else:
             logger.error("Not supported conversation mode, you can set the prompt yourself according to your needs.")
             assert(0)
-        ref_audio, _ = librosa.load("./MiniCPM-o-2_6/assets/input_examples/assistant_female_voice.wav", sr=16000, mono=True)
+        ref_audio, _ = librosa.load(f"{args.tokenizer_dir}/assets/input_examples/assistant_female_voice.wav", sr=16000, mono=True)
         if ref_audio is not None:
             sys_msg = {"role": "user", "content": ["模仿输入音频中的声音特征。", ref_audio, vc_prompt_suffix]}
         else:
