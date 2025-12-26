@@ -1,5 +1,6 @@
 import os
 import glob
+import shutil
 import argparse
 import logging
 from compiler_utils import setup_logging, execute_cmd
@@ -18,7 +19,6 @@ def parse_args():
         default=None,
         help="Task ID (optional positional argument)",
     )
-
     parser.add_argument(
         "-n",
         "--model_name",
@@ -78,7 +78,7 @@ def parse_args():
     parser.add_argument(
         "--flash_attention",
         type=int,
-        choices=[0, 1, 2],
+        choices=[0, 1, 2, 3],
         help='flash attention optimization',
     )
     parser.add_argument(
@@ -94,6 +94,13 @@ def parse_args():
         type=str,
         default="./execute_compilation_log.log",
         help="The path of log.",
+    )
+    parser.add_argument(
+        "--strip",
+        type=str,
+        default="off",
+        choices=["off", "overwrite", "copy"],
+        help="Strip shared weights from the last input model",
     )
 
     args = parser.parse_args()
@@ -111,36 +118,10 @@ def _check_golden(dir_path: str):
     return False
 
 
-def main(args) -> int:
-    logger.info(
-        "Model name: %s, Model path: %s, Quant model path: %s, Context length: %d, "
-        "Batch: %d, Device num: %d, Core Num: %d, J: %d, Flash attention: %d, Result Dir: %s",
-        args.model_name,
-        args.model_path,
-        args.quant_model_path,
-        args.context_length,
-        args.batch,
-        args.device_num,
-        args.core_num,
-        args.j,
-        args.flash_attention,
-        args.result_dir,
-    )
+def _generate_cmds(args) -> list:
+    """generate compilation cmds"""
 
     model_name = "deepseek" if "deepseek" in args.model_name else args.model_name
-
-    model_dir = f"{script_dir}/../../" + args.model_path
-    os.chdir(model_dir)
-    logger.info("Current dir: %s", os.getcwd())
-
-    output_dir = args.result_dir
-    try:
-        os.makedirs(output_dir, exist_ok=True)
-    except FileNotFoundError as e:
-        logger.info(f"error create folder failed: {e}")
-        return -1
-
-    os.environ["HDPL_PLATFORM"] = "ISIM"
 
     # stage = "all" if _check_golden(args.quant_model_path) else "build"
     stage = "build"
@@ -156,7 +137,7 @@ def main(args) -> int:
         "--ncore",
         str(args.core_num),
         "--output_dir",
-        output_dir,
+        args.result_dir,
     ]
 
     if args.batch > 0:
@@ -167,11 +148,83 @@ def main(args) -> int:
         cmds += ["--ndevice", str(args.device_num)]
     if args.j > 0:
         cmds += ["--j", str(args.j)]
-    if args.flash_attention and args.flash_attention in [0, 1, 2]:
+    if args.flash_attention and args.flash_attention in [0, 1, 2, 3]:
         cmds += ["--flash_attention", str(args.flash_attention)]
 
-    ret = execute_cmd(cmds, args.log_file)
+    return cmds
 
+
+def _strip_models(output_dir: str, strip: str) -> None:
+    """use hmmstrip command line to strip hmm models"""
+
+    hmm_files = glob.glob(os.path.join(output_dir, "*.hmm")) + glob.glob(
+        os.path.join(output_dir, "*.hmms")
+    )
+    strip_cmds = []
+    for hmm_path in hmm_files:
+        strip_cmd = [
+            "hmmstrip",
+            "--strip",
+        ]
+        if "_prefill" not in hmm_path:
+            continue
+
+        decode_hmm_path = hmm_path.replace("_prefill", "_decode")
+        if not os.path.exists(decode_hmm_path):
+            decode_hmm_path = hmm_path.replace("_prefill", "_decoder")
+            if not os.path.exists(decode_hmm_path):
+                continue
+
+        if strip == "copy":
+            ori_backup = f"{decode_hmm_path}.ori"
+            shutil.copy2(decode_hmm_path, ori_backup)
+            logger.info(f"Copy {decode_hmm_path} -> {ori_backup}")
+        strip_cmd += [
+            "-o",
+            decode_hmm_path,
+            "-i",
+            hmm_path,
+            decode_hmm_path,
+        ]
+        strip_cmds.append(strip_cmd)
+    for cmd in strip_cmds:
+        logger.info(f"Ready to strip hmm: {cmd}")
+        ret = execute_cmd(cmd, args.log_file)
+
+
+def main(args) -> int:
+    logger.info(
+        "Model name: %s, Model path: %s, Quant model path: %s, Context length: %d, "
+        "Batch: %d, Device num: %d, Core Num: %d, J: %d, Flash attention: %d, HmmStrip: %s, "
+        "Result Dir: %s",
+        args.model_name,
+        args.model_path,
+        args.quant_model_path,
+        args.context_length,
+        args.batch,
+        args.device_num,
+        args.core_num,
+        args.j,
+        args.flash_attention,
+        args.strip,
+        args.result_dir,
+    )
+
+    model_dir = f"{script_dir}/../../" + args.model_path
+    os.chdir(model_dir)
+    logger.info("Current dir: %s", os.getcwd())
+
+    output_dir = args.result_dir
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except FileNotFoundError as e:
+        logger.error(f"error create folder failed: {e}")
+        return -1
+
+    os.environ["HDPL_PLATFORM"] = "ISIM"
+
+    cmds = _generate_cmds(args)
+    ret = execute_cmd(cmds, args.log_file)
     if not ret:
         return 1
 
@@ -185,6 +238,15 @@ def main(args) -> int:
             cp_cmds,
             args.log_file,
         )
+
+    HOUMO_PATH = os.getenv("HOUMO_PATH", None)
+    strip = args.strip
+    if (
+        strip in ["overwrite", "copy"]
+        and HOUMO_PATH is not None
+        and os.path.exists(f"{HOUMO_PATH}/bin/hmmstrip")
+    ):
+        _strip_models(output_dir, strip)
 
     return 0
 

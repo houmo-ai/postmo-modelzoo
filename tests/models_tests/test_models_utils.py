@@ -1240,7 +1240,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
         and is_release()
         and get_test_type() == TCaseType.SEPARATE_INFER
     ):
-        _download_models(model_info, "raw")
+        _download_models(model_info, "hmm")
 
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     final_flag = True

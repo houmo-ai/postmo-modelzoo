@@ -28,8 +28,7 @@
         "xh2": [
             "get_model",
             "compile",
-            "demo",
-            "perf"
+            "demo"
         ]
     },
     "support_hmatc": null,

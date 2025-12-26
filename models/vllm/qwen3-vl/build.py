@@ -189,7 +189,7 @@ def get_args() -> argparse.Namespace:
         dest='flash_attention',
         type=int,
         default=0,
-        choices=[0, 1, 2],
+        choices=[0, 1, 2, 3],
         help='flash attention optimization',
     )
     args = parser.parse_args()
@@ -222,8 +222,9 @@ def build_llm(
 
         kwargs["modify_llm"] = {}
         kwargs["enable_xh2_stable_output"] = tso
-        kwargs["flash_attention"] = flash_attention
-        custom_msg["flash_attention"] = flash_attention
+        if flash_attention > 0 and flash_attention < 3:
+            kwargs["flash_attention"] = flash_attention
+            custom_msg["flash_attention"] = flash_attention
         if ndevice:
             kwargs["ndevice"] = ndevice
         if batch:

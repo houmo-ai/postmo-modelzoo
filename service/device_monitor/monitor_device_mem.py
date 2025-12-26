@@ -7,9 +7,10 @@ import subprocess
 def parse_args():
     parser = argparse.ArgumentParser(description="Device Memory Monitor")
     parser.add_argument(
+        "-d",
         "--device_id",
         type=int,
-        choices=[0, 1, 2, 3],
+        choices=[0, 1],
         help="device id.",
     )
 
@@ -39,25 +40,30 @@ def _run_command(command):
         return f"Failed to execute command: {str(e)}", -1
 
 
-def get_device_mem(device_id: int) -> dict:
+def get_device_mem(device_id: int = None) -> dict:
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    cmd = f"{script_dir}/bin/dev_monitor"
+    chip_list = [0, 1]
     if device_id:
-        cmd += f" -d {device_id}"
-    opt, ret = _run_command(cmd)
-    if ret != 0:
-        return None
+        chip_list = [device_id]
 
-    result = None
-    pattern = r"device_id: (?P<device_id>\d+), time: (?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}), mem_total: (?P<mem_total>\d+), mem_used: (?P<mem_used>\d+), mem_avail: (?P<mem_avail>\d+)"
-    for line in opt.split("\n"):
-        if "device_id:" in line:
-            match = re.match(pattern, line.strip())
-            if match:
-                result = match.groupdict()
+    result = {}
+    for chip_id in chip_list:
+        cmd = f"{script_dir}/bin/dev_monitor -d {chip_id}"
+        opt, ret = _run_command(cmd)
+        if ret != 0:
+            continue
+
+        pattern = r"device_id: (?P<device_id>\d+), time: (?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}), mem_total: (?P<mem_total>\d+), mem_used: (?P<mem_used>\d+), mem_avail: (?P<mem_avail>\d+)"
+        for line in opt.split("\n"):
+            if "device_id:" in line:
+                match = re.match(pattern, line.strip())
+                if match:
+                    tmp_result = match.groupdict()
+                    result[int(tmp_result['device_id'])] = tmp_result
     return result
 
 
 # if __name__ == "__main__":
 #     args = parse_args()
-#     get_device_mem(args.device_id)
+#     result = get_device_mem(args.device_id)
+#     print(result)

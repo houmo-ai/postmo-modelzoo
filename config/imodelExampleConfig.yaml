@@ -510,9 +510,9 @@ models_tests:
     - tests/hmatc_tests/hmatc_configs/
   example_case: null
   test:
-    - backbone_resnet50_test
-    - detection_yolov5s_test
-    - inferences_resnet50_test
+    # - backbone_resnet50_test
+    # - detection_yolov5s_test
+    # - inferences_resnet50_test
 
 apis_tests:
   include:

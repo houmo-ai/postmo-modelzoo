@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
   hm_device_info dev_info = {0};
   int ret = hm_sys_get_device_info(&dev_info);
 
-  if (dev_info.num_devices <= 0) {
+  if (ret <= 0 || dev_info.num_devices <= 0) {
     std::cerr << "Not found online devices." << std::endl;
     return -1;
   }

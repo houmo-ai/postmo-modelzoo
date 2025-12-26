@@ -7,7 +7,7 @@
             ],
             "path": "models/llm/qwen2.5",
             "raw": "llm/Qwen2.5-7B-Instruct",
-            "perf": true
+            "perf": "llm_perf"
         }
     },
     "qwen3": {
@@ -17,7 +17,7 @@
             ],
             "path": "models/llm/qwen3",
             "raw": "llm/None",
-            "perf": true
+            "perf": "llm_perf"
         },
         "8b": {
             "support_backends": [
@@ -26,7 +26,7 @@
             ],
             "path": "models/llm/qwen3",
             "raw": "llm/qwen3_8b",
-            "perf": true
+            "perf": "llm_perf"
         },
         "14b": {
             "support_backends": [
@@ -34,7 +34,7 @@
             ],
             "path": "models/llm/qwen3-14b",
             "raw": "llm/Qwen3-14B",
-            "perf": true
+            "perf": "llm_perf"
         },
         "32b": {
             "support_backends": [
@@ -42,7 +42,7 @@
             ],
             "path": "models/llm/qwen3-14b",
             "raw": "llm/None",
-            "perf": true
+            "perf": "llm_perf"
         },
         "30b_a3b": {
             "support_backends": [
@@ -50,7 +50,7 @@
             ],
             "path": "models/llm/qwen3-30b-a3b",
             "raw": "llm/Qwen3-30B-A3B",
-            "perf": true
+            "perf": "llm_perf"
         }
     },
     "qwen3_coder": {
@@ -60,7 +60,7 @@
             ],
             "path": "models/llm/qwen3-30b-a3b",
             "raw": "llm/None",
-            "perf": true
+            "perf": "llm_perf"
         }
     },
     "deepseek-r1-qwen": {
@@ -70,7 +70,7 @@
             ],
             "path": "models/llm/deepseek",
             "raw": "llm/DeepSeek-R1-Distill-Qwen-7B",
-            "perf": true
+            "perf": "llm_perf"
         }
     },
     "deepseek-r1-qwen3": {
@@ -80,7 +80,7 @@
             ],
             "path": "models/llm/deepseek-r1-qwen3-8b",
             "raw": "llm/DeepSeek-R1-0528-Qwen3-8B",
-            "perf": true
+            "perf": "llm_perf"
         }
     },
     "qwen2.5-vl": {
@@ -90,7 +90,7 @@
             ],
             "path": "models/vllm/qwen2.5-vl",
             "raw": "llm/None",
-            "perf": true
+            "perf": "llm_perf"
         },
         "7b": {
             "support_backends": [
@@ -99,7 +99,7 @@
             ],
             "path": "models/vllm/qwen2.5-vl",
             "raw": "llm/None",
-            "perf": true
+            "perf": "llm_perf"
         }
     },
     "qwen3-vl": {
@@ -110,7 +110,7 @@
             ],
             "path": "models/vllm/qwen3-vl",
             "raw": "llm/None",
-            "perf": true
+            "perf": "llm_perf"
         },
         "4b": {
             "support_backends": [
@@ -119,7 +119,7 @@
             ],
             "path": "models/vllm/qwen3-vl",
             "raw": "llm/None",
-            "perf": true
+            "perf": "llm_perf"
         },
         "8b": {
             "support_backends": [
@@ -128,7 +128,7 @@
             ],
             "path": "models/vllm/qwen3-vl",
             "raw": "llm/None",
-            "perf": true
+            "perf": "llm_perf"
         }
     },
     "gpt": {
@@ -138,7 +138,7 @@
             ],
             "path": "models/llm/gpt-oss",
             "raw": "llm/None",
-            "perf": false
+            "perf": "llm_perf"
         }
     },
     "minicpmo": {
@@ -148,7 +148,7 @@
             ],
             "path": "models/omni/minicpmo",
             "raw": "llm/None",
-            "perf": false
+            "perf": "demo"
         }
     },
     "bge": {
@@ -158,7 +158,7 @@
             ],
             "path": "models/embedding/bge",
             "raw": "llm/None",
-            "perf": false
+            "perf": "tcim_perf"
         }
     },
     "gte": {
@@ -168,7 +168,7 @@
             ],
             "path": "models/embedding/gte",
             "raw": "llm/None",
-            "perf": false
+            "perf": "tcim_perf"
         }
     },
     "whisper": {
@@ -178,7 +178,7 @@
             ],
             "path": "models/asr/whisper",
             "raw": "llm/None",
-            "perf": false
+            "perf": "tcim_perf"
         }
     }
 }

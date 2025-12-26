@@ -3,7 +3,8 @@ project(dev_monitor)
 
 message("HOUMO_SDK_PATH=$ENV{HOUMO_SDK_PATH}")
 include_directories(
-	$ENV{HOUMO_SDK_PATH}/hal/export
+	$ENV{HOUMO_SDK_PATH}/hal/export/include
+	$ENV{HOUMO_SDK_PATH}/hal/include
 	$ENV{HOUMO_SDK_PATH}/include
 )
 link_directories($ENV{HOUMO_SDK_PATH}/hal/lib)

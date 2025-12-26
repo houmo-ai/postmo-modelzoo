@@ -1,4 +1,5 @@
 import os
+import glob
 import argparse
 import json
 import logging
@@ -152,8 +153,15 @@ def parse_args():
         "--flash_attention",
         type=int,
         default=0,
-        choices=[0, 1, 2],
+        choices=[0, 1, 2, 3],
         help='flash attention optimization, default is 0',
+    )
+    parser.add_argument(
+        "--strip",
+        type=str,
+        default="off",
+        choices=["off", "overwrite", "copy"],
+        help="Strip shared weights from the last input model",
     )
 
     args = parser.parse_args()
@@ -431,6 +439,7 @@ if __name__ == "__main__":
     batch = args.batch
     j = args.j
     flash_attention = args.flash_attention
+    strip = args.strip
 
     model_name_ori = model_name
 
@@ -515,7 +524,7 @@ if __name__ == "__main__":
             compile_cmd += f"-b {batch} "
         if core_num > 0:
             compile_cmd += f"-cn {core_num} "
-        compile_cmd += f"-j {j} --flash_attention {flash_attention} -r {container_compile_res} -log {container_log_file}"
+        compile_cmd += f"-j {j} --flash_attention {flash_attention} --strip {strip} -r {container_compile_res} -log {container_log_file}"
         commands.append(
             f"cd {container_home}/imodelzoo/service/llm_compiler && {compile_cmd}"
         )
@@ -690,12 +699,9 @@ if __name__ == "__main__":
                 logger.info(f"##hm enter here5")
                 exit(5)
 
-    if (
-        args.perf_config
-        and target == "xh2"
-        and device_num <= 2
-        and model_info[model_name_ori][model_size]["perf"] is True
-    ):
+    if args.perf_config and target == "xh2" and device_num <= 2:
+        perf_mode = model_info[model_name_ori][model_size]["perf"]
+
         if compiled_file_name is None:
             compiled_file_name = f"{target}_{model_name}_{model_size}_"
             if prefill_len > 0:
@@ -706,33 +712,60 @@ if __name__ == "__main__":
                 compiled_file_name += f"b{batch}_"
             compiled_file_name += f"{chip_str}_{core_str}_v{version}"
 
-        new_stream = {
-            "ModelName": compiled_file_name,
-            "prefill": f"{host_result_dir}/compile_results/{model_name}_prefill.hmm",
-            "decode": f"{host_result_dir}/compile_results/{model_name}_decode.hmm",
-            "embedding": f"{host_result_dir}/compile_results/hmquant/quant_embedding.bin",
-            "input": 256,
-            "stop": 2048,
-            "ndevices": device_num if device_num > 1 else 1,
-            "loop": 2,
-            "batch": batch,
-        }
-        if context_len < (2048 + 256) and context_len >= (1024 + 256):
-            new_stream["stop"] = 1024
-        elif context_len > 0 and context_len < (1024 + 256):
-            new_stream["input"] = int(context_len * 0.2)
-            new_stream["stop"] = context_len - new_stream["input"]
-        if "-vl" in model_name_ori:
-            new_stream["visual"] = (
-                f"{host_result_dir}/compile_results/{model_name}_visual.hmm",
-            )
-        if device_num > 1:
-            new_stream["prefill"] = new_stream["prefill"] + "s"
-            new_stream["decode"] = new_stream["decode"] + "s"
-            if "visual" in new_stream:
-                new_stream["visual"] = new_stream["visual"] + "s"
+        compile_results_dir = f"{host_result_dir}/compile_results"
 
-        cfg_path = args.perf_config
+        if perf_mode in ["llm_perf"]:
+            new_stream = {
+                "ModelName": compiled_file_name,
+                "prefill": f"{compile_results_dir}/{model_name}_prefill.hmm",
+                "decode": f"{compile_results_dir}/{model_name}_decode.hmm",
+                "embedding": f"{compile_results_dir}/hmquant/quant_embedding.bin",
+                "input": 256,
+                "stop": 2048,
+                "ndevices": device_num if device_num > 1 else 1,
+                "loop": 2,
+                "batch": batch,
+            }
+            if context_len < (2048 + 256) and context_len >= (1024 + 256):
+                new_stream["stop"] = 1024
+            elif context_len > 0 and context_len < (1024 + 256):
+                new_stream["input"] = int(context_len * 0.2)
+                new_stream["stop"] = context_len - new_stream["input"]
+            if "-vl" in model_name_ori:
+                new_stream["visual"] = f"{compile_results_dir}/{model_name}_visual.hmm"
+            if device_num > 1:
+                new_stream["prefill"] = new_stream["prefill"] + "s"
+                new_stream["decode"] = new_stream["decode"] + "s"
+                if "visual" in new_stream:
+                    new_stream["visual"] = new_stream["visual"] + "s"
+
+            cfg_path = args.perf_config
+
+        elif perf_mode in ["tcim_perf"]:
+            hmm_list = glob.glob(f"{compile_results_dir}/*.hmm")
+            new_stream = {
+                "ModelName": compiled_file_name,
+                "hmm_list": hmm_list,
+                "samples": 100,
+                "devices": device_num if device_num > 1 else 1,
+                "batch": batch,
+                "name": model_name_ori,
+                "loops": 1,
+                "warm_up": 1,
+            }
+            # _tcim.json
+            cfg_path = args.perf_config.replace(".json", "_tcim.json")
+
+        elif perf_mode in ["demo"]:
+            new_stream = {
+                "ModelName": compiled_file_name,
+                "model_dir": model_dir,
+                "hmm_dir": compile_results_dir,
+                "ndevices": device_num if device_num > 1 else 1,
+            }
+            # _demo.json
+            cfg_path = args.perf_config.replace(".json", "_demo.json")
+
         if os.path.exists(cfg_path):
             try:
                 with open(cfg_path, "r", encoding="utf-8") as f:
