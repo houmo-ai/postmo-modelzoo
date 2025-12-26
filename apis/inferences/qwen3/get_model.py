@@ -3,7 +3,7 @@ import sys
 import argparse
 
 HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../../..')
-sys.path.append(f'{HOUMO_EXAMPLES_PATH}/hmatc')
+sys.path.insert(0, f'{HOUMO_EXAMPLES_PATH}/hmatc')
 from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")

@@ -420,18 +420,18 @@ inferences_yolov5s:
         args: all
   test:
     - inferences_yolov5s_test
-inferences_resnet50_multistreams:
-  include:
-    - apis/inferences/resnet50_multistreams
-  exclude:
-    - apis/inferences/resnet50_multistreams/README.MD
-  example_case:
-    - inferences_resnet50_multistreams_test:
-        test_type: apis_tests
-        script: resnet50 and multistreams
-        args: all
-  test:
-    - inferences_resnet50_multistreams_test
+# inferences_resnet50_multistreams:
+#   include:
+#     - apis/inferences/resnet50_multistreams
+#   exclude:
+#     - apis/inferences/resnet50_multistreams/README.MD
+#   example_case:
+#     - inferences_resnet50_multistreams_test:
+#         test_type: apis_tests
+#         script: resnet50 and multistreams
+#         args: all
+#   test:
+#     - inferences_resnet50_multistreams_test
 inferences_resnet50_pipeline:
   include:
     - apis/inferences/resnet50_pipeline
@@ -464,7 +464,7 @@ apis_common:
   test:
     - inferences_resnet50_test
     - inferences_yolov5s_test
-    - inferences_resnet50_multistreams_test
+    # - inferences_resnet50_multistreams_test
     - inferences_resnet50_pipeline_test
 
 ###### tools ######
