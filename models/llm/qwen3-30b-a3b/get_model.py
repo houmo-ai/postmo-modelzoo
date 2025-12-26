@@ -86,7 +86,7 @@ if __name__ == "__main__":
         },
         "modelscope_repo": {
             "repo_ids": ["Qwen/Qwen3-30B-A3B"],
-            "local_dirs": ["./qwen3-30b-a3b"],   
+            "local_dirs": [f"{args.download_dir}/qwen3-30b-a3b"],
         },
     }
 
