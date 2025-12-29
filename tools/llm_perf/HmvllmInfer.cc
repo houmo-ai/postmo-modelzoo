@@ -24,7 +24,9 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
   auto option_vit = tcim::Module::Option(weight_manager);
-
+  option_prefill.EnableLazyMode(true);
+  option_decode.EnableLazyMode(true);
+  option_vit.EnableLazyMode(true);
   // 初始化Module
   prefill_module = std::make_shared<tcim::Module>();
   prefill_module->LoadModel(prefillModelPath, option_prefill);
