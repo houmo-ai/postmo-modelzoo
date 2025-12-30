@@ -1235,14 +1235,15 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
         src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         restore_models_res(src_folder, current_folder)
 
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
     if (
         model_type == "llm"
         and is_release()
         and get_test_type() == TCaseType.SEPARATE_INFER
     ):
-        _download_models(model_info, "hmm")
+        _download_models(model_info, "hmm", model_set_dir, model_res_dir, "all")
 
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     final_flag = True
     perf_threashold = 0.1 if is_release() else 0.95
     if model_info.get("perf_params", None) == "demo":
@@ -1251,7 +1252,6 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
         if changed_libs:
             logger.info(f"changed python libs: {changed_libs}.")
 
-        model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         if model_name == "wenet":
             quant_res_dir = model_info["compile_params"][HOUMO_BACKEND]["model_dir"][0]
             quant_res_dir = quant_res_dir.replace("cached_results", model_res_dir)

@@ -276,9 +276,9 @@ llm_qwen3_14b:
     - llm_qwen3_14b_test
 llm_qwen3_30b_a3b:
   include:
-    - models/llm/qwen3_30b_a3b
+    - models/llm/qwen3-30b-a3b
   exclude:
-    - models/llm/qwen3_30b_a3b/README.MD
+    - models/llm/qwen3-30b-a3b/README.MD
   example_case:
     - llm_qwen3_30b_a3b_test:
         test_type: models_tests
@@ -304,7 +304,7 @@ llm_gpt-oss:
   exclude:
     - models/llm/gpt-oss/README.MD
   example_case:
-    - llm_qwen3_30b_a3b_test:
+    - llm_gpt-oss_test:
         test_type: models_tests
         script: gpt-oss
         args: all
