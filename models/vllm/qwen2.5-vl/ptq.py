@@ -104,7 +104,7 @@ if HOUMO_TARGET == "xh2":
         parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter
         )
-        parser.add_argument("--model", type=str, default="Qwen2.5-VL-7B-Instruct")
+        parser.add_argument("--model", type=str, default="qwen2.5-vl")
         parser.add_argument(
             "--model-name", type=str, default="qwen2.5-vl", help="output hmonnx model name"
         )
