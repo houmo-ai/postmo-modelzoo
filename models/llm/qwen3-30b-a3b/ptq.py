@@ -323,7 +323,7 @@ if HOUMO_TARGET == 'xh2':
     def parse_args():
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("--model", type=str, default="qwen3-30b-a3b")
-        parser.add_argument("--model-name", type=str, default="qwen3_a3b", help="output hmonnx model name")
+        parser.add_argument("--model-name", type=str, default="qwen3", help="output hmonnx model name")
         parser.add_argument("--work-dir", type=str, default="work_dirs/")
         parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
         parser.add_argument("--skip-quarot", action="store_true", help="skip_quarot")

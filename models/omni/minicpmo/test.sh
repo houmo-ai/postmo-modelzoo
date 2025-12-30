@@ -128,6 +128,9 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
             echo "Start to quant and compile model."
             python3 get_model.py --type raw
             pip3 install -r requirements_ptq.txt
+            if [[ ! -d "$dir_path/lib/python3.12/site-packages/distutils" ]]; then
+                ln -s /opt/venv/houmo/lib/python3.12/site-packages/setuptools/_distutils $dir_path/lib/python3.12/site-packages/distutils
+            fi
             python3 ptq.py
             python3 build.py
         else

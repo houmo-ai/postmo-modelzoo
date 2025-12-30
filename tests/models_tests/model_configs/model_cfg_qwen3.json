@@ -75,51 +75,33 @@
         "xh2": {
             "type": [
                 "raw",
-                "raw",
-                "hmm",
-                "hmm",
                 "hmm",
                 "hmm"
             ],
             "download_dir": [
                 "cached_models",
                 "cached_models",
-                "cached_models",
-                "cached_models",
-                "cached_models",
                 "cached_models"
             ],
             "extract_dir": [
                 null,
-                null,
                 "cached_models/hmm_xh2",
-                "cached_models/hmm_xh2_ms",
-                "cached_models/hmm_xh2_2k",
-                "cached_models/hmm_xh2_8k_b4"
+                "cached_models/hmm_xh2_ms"
             ],
             "source_type": [
                 null,
-                "modelscope",
                 null,
-                "modelscope",
-                null,
-                null
+                "modelscope"
             ],
             "context_length": [
                 null,
                 null,
-                null,
-                null,
-                "2k",
-                "8k"
+                null
             ],
             "batch": [
                 null,
                 null,
-                null,
-                null,
-                null,
-                "4"
+                null
             ]
         }
     },
