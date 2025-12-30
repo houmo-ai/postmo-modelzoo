@@ -1,3 +1,22 @@
+/*
+ * HmQwenInfer.h - Header file for Qwen inference class using tcim runtime
+ *
+ * Copyright (c) 2025 HOUMOAI
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #ifndef __HMQWENINFER_H__
 #define __HMQWENINFER_H__
 
@@ -10,111 +29,139 @@
 #include "utils.h"
 
 /**
- * 存储perf结果
+ * @struct PerfInfos
+ * @brief Stores performance metrics for model inference
  */
 struct PerfInfos {
-  int input_tokens;
-  int output_tokens;
-  float prefill_time;
-  float decode_time;
-  float embedding_time;
+    int input_tokens;      // Number of input tokens processed
+    int output_tokens;     // Number of output tokens generated
+    float prefill_time;    // Time taken for prefill phase (in seconds)
+    float decode_time;     // Time taken for decode phase (in seconds)
+    float embedding_time;  // Time taken for embedding generation (in seconds)
 };
 
 /**
-  class HmQwenInfer
+ * @class HmQwenInfer
+ * @brief Main class for Qwen model inference
  */
 class HmQwenInfer {
- public:
-  HmQwenInfer(const std::string &prefillModelPath,
-              const std::string &decodeModelPath,
-              const std::string &tokenizerJsonPath,
-              const std::string &embeddingWeightPath);
-  HmQwenInfer(const HmQwenInfer &it) = delete;
-  HmQwenInfer &operator=(const HmQwenInfer &it) = delete;
-  HmQwenInfer(HmQwenInfer &&it) noexcept = default;
-  HmQwenInfer &operator=(HmQwenInfer &&it) noexcept = default;
-  ~HmQwenInfer();
-
-  /**
-   * 获取模型Module
-   * @param model_type        可选参数 0-prefill 1-decode others-返回nullptr
-   * @return                  对应模型Module管理的shared_ptr,入参错误返回nullptr
+public:
+    /**
+   * @brief Constructor for HmQwenInfer
+   * @param prefillModelPath Path to prefill model
+   * @param decodeModelPath Path to decode model
+   * @param tokenizerJsonPath Path to tokenizer JSON configuration
+   * @param embeddingWeightPath Path to embedding weights
    */
-  std::shared_ptr<tcim::Module> GetModule(int model_type);
-  /**
-   * 获取模型tokenizer
-   * @return                  HmTokenizer的shared_ptr
+    HmQwenInfer(const std::string &prefillModelPath,
+                const std::string &decodeModelPath,
+                const std::string &tokenizerJsonPath,
+                const std::string &embeddingWeightPath);
+    HmQwenInfer(const HmQwenInfer &it) = delete;                  // Delete copy constructor
+    HmQwenInfer &operator=(const HmQwenInfer &it) = delete;       // Delete copy assignment
+    HmQwenInfer(HmQwenInfer &&it) noexcept = default;             // Default move constructor
+    HmQwenInfer &operator=(HmQwenInfer &&it) noexcept = default;  // Default move assignment
+    ~HmQwenInfer();                                               // Destructor
+
+    /**
+   * @brief Gets the model module based on type
+   * @param model_type Type of model: 0-prefill, 1-decode
+   * @return Shared pointer to the module, or nullptr if input is invalid
    */
-  std::shared_ptr<HmTokenizer> GetTokenizer();
-  /**
-   * 打印模型输入输出信息
-   * @param module            模型Module
-   * @param modelName         模型名称
-   * @return                  无返回值，打印输入输出信息
+    std::shared_ptr<tcim::Module> GetModule(int model_type);
+
+    /**
+   * @brief Gets the tokenizer instance
+   * @return Shared pointer to the tokenizer
    */
-  void DebugModelInfo(tcim::Module &module, const std::string &modelName);
-  /**
-   * Qwen3 问答函数
-   * @param msg               用户输入字符串
-   * @return                  无返回值，打印大模型对话的问答信息及性能信息
+    std::shared_ptr<HmTokenizer> GetTokenizer();
+
+    /**
+   * @brief Prints model input and output information
+   * @param module Model module
+   * @param modelName Name of the model
    */
-  void Chat(const std::string &msg);
+    void DebugModelInfo(tcim::Module &module, const std::string &modelName);
 
- private:
-  // 模型路径
-  std::string prefillModelPath = "";
-  std::string decodeModelPath = "";
-  // 相关配置参数-> 模型读取
-  int prefill_length = 0;
-  int embedding_length = 0;
-  int context_max_length = 0;
-  int batch = 0;
-  int eos_token_id = 0;
-  int argmax_dim_len = 0;
-  int32_t decode_current_length = 1;
-  // model related
-  std::shared_ptr<HmTokenizer> tokenizer;
-
-  tcim::Module::WeightManager weight_manager;
-  std::shared_ptr<tcim::Module> prefill_module;
-  std::shared_ptr<tcim::Module> decode_module;
-
-  std::vector<std::string> dummy_names;
-
-  std::map<std::string, tcim::Tensor> prefill_input_map;
-  std::map<std::string, tcim::Tensor> decode_input_map;
-  std::map<std::string, tcim::Tensor> prefill_output_map;
-  std::map<std::string, tcim::Tensor> decode_output_map;
-
- private:
-  // 获取prefill的nblocks
-  int GetnBlocks();
-
-  /**
-   * 设置prefill输入
-   * @param data              prefill输入0
-   * @param valid_length      prefill输入1
-   * @param current_length    prefill输入2
-   * @return                  无返回值，设置输入数据
+    /**
+   * @brief Processes user input and generates response
+   * @param msg User input message
    */
-  void PrefillSetInputDatas(void *data, int32_t valid_length,
-                            int32_t current_length);
-  // perfill模型推理
-  void PrefillInfer();
-  // 获取prefill输出的token ids
-  void PrefillGetOutputDatas(std::vector<int32_t> &ids);
+    void Chat(const std::string &msg);
 
-  /**
-   * 设置decode输入
-   * @param data              decode输入0
-   * @param context_length    decode输入1
-   * @return                  无返回值，设置输入数据
+private:
+    // Model paths
+    std::string prefillModelPath = "";  // Path to prefill model
+    std::string decodeModelPath = "";   // Path to decode model
+
+    // Configuration parameters
+    int prefill_length = 0;             // Maximum prefill length
+    int embedding_length = 0;           // Embedding dimension
+    int context_max_length = 0;         // Maximum context length
+    int batch = 0;                      // Batch size
+    int eos_token_id = 0;               // End-of-sequence token ID
+    int argmax_dim_len = 0;             // Dimension length for argmax operation
+    int32_t decode_current_length = 1;  // Current decode length
+
+    // Model related members
+    std::shared_ptr<HmTokenizer> tokenizer;  // Tokenizer instance
+
+    tcim::Module::WeightManager weight_manager;    // Weight manager
+    std::shared_ptr<tcim::Module> prefill_module;  // Prefill model module
+    std::shared_ptr<tcim::Module> decode_module;   // Decode model module
+
+    std::vector<std::string> dummy_names;  // Dummy names for tensor handling
+
+    // Tensor maps for input/output
+    std::map<std::string, tcim::Tensor> prefill_input_map;   // Prefill input tensors
+    std::map<std::string, tcim::Tensor> decode_input_map;    // Decode input tensors
+    std::map<std::string, tcim::Tensor> prefill_output_map;  // Prefill output tensors
+    std::map<std::string, tcim::Tensor> decode_output_map;   // Decode output tensors
+
+private:
+    /**
+   * @brief Gets the number of blocks in prefill model
+   * @return Number of blocks
    */
-  void DecodeSetInputDatas(void *data, int32_t context_length);
-  // decode模型推理
-  void DecodeInfer();
-  // 获取deocde输出的token ids
-  void DecodeGetOutputDatas(std::vector<int32_t> &ids);
+    int GetnBlocks();
+
+    /**
+   * @brief Sets input data for prefill phase
+   * @param data Input data pointer
+   * @param valid_length Valid input length
+   * @param current_length Current input length
+   */
+    void PrefillSetInputDatas(void *data, int32_t valid_length,
+                              int32_t current_length);
+
+    /**
+   * @brief Performs prefill model inference
+   */
+    void PrefillInfer();
+
+    /**
+   * @brief Gets output token IDs from prefill phase
+   * @param ids Vector to store output token IDs
+   */
+    void PrefillGetOutputDatas(std::vector<int32_t> &ids);
+
+    /**
+   * @brief Sets input data for decode phase
+   * @param data Input data pointer
+   * @param context_length Context length
+   */
+    void DecodeSetInputDatas(void *data, int32_t context_length);
+
+    /**
+   * @brief Performs decode model inference
+   */
+    void DecodeInfer();
+
+    /**
+   * @brief Gets output token IDs from decode phase
+   * @param ids Vector to store output token IDs
+   */
+    void DecodeGetOutputDatas(std::vector<int32_t> &ids);
 };
 
 #endif  // __HMQWENINFER_H__
