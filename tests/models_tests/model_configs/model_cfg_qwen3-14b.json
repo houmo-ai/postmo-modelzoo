@@ -38,44 +38,37 @@
             "type": [
                 "raw",
                 "hmm",
-                "hmm",
                 "hmm"
             ],
             "download_dir": [
-                "cached_models",
                 "cached_models",
                 "cached_models",
                 "cached_models"
             ],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2",
-                "cached_models/hmm_xh2_ms",
-                "cached_models/hmm_xh2_16k_b2"
+                "cached_models/hmm_xh2_8k",
+                "cached_models/hmm_xh2_8k_ms"
             ],
             "source_type": [
                 null,
                 null,
-                "modelscope",
-                null
+                "modelscope"
             ],
             "batch": [
                 null,
                 null,
-                null,
-                "2"
+                null
             ],
             "context_length": [
                 null,
                 null,
-                null,
-                "16k"
+                null
             ],
             "ndevice": [
                 null,
                 null,
-                null,
-                "2"
+                null
             ]
         }
     },

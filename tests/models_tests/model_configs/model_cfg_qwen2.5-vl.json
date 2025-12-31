@@ -106,8 +106,8 @@
             ],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2_7b_2k",
-                "cached_models/hmm_xh2_7b_2k_ms"
+                "cached_models/hmm_xh2_7b_8k",
+                "cached_models/hmm_xh2_7b_8k_ms"
             ],
             "model_size": [
                 "7b",
