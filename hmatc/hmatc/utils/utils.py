@@ -6,7 +6,6 @@ import time
 import json
 import hashlib
 import lzma
-import tarfile
 import torch
 import numpy as np
 import random
@@ -15,21 +14,16 @@ import fnmatch
 import requests
 import re
 import shutil
+import subprocess
 from onnx import TensorProto
-from pathlib import Path
 from tqdm import tqdm
 from importlib.metadata import PackageNotFoundError, version
 from requests.auth import HTTPBasicAuth
-from urllib.parse import urljoin
+from loguru import logger
 
 
-HOUMO_JFROG_IP = os.getenv("HOUMO_JFROG_IP", "139.224.0.199")
-HOUMO_JFROG_PORT = os.getenv("HOUMO_JFROG_PORT", "8082")
-assert HOUMO_JFROG_IP in ["139.224.0.199", "10.10.1.53"]
-BASENAME = "houmo" if HOUMO_JFROG_IP == "139.224.0.199" else "toolchain"
-HOUMO_MODELZOO_URL = (
-    f"http://{HOUMO_JFROG_IP}:{HOUMO_JFROG_PORT}/artifactory/{BASENAME}/release"
-)
+JFROG_REPO = "http://artifactory.houmo.ai/artifactory/toolchain/release"
+OSS_REPO = "https://houmo-llm.oss-cn-shanghai.aliyuncs.com/Dadao"
 
 SUPPORT_IMAGE_FORMATS = [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]
 SUPPORT_BACKEND = ["xh1", "xh2", "onnx"]
@@ -187,19 +181,18 @@ def str_to_torch_dtype(dtype_str):
 
 def download_file(url, save_path, file_name, file_size, chunk_size=1024 * 1024):
     if os.path.exists(save_path):
-        print("local file %s has already exist" % save_path)
+        logger.error("local file %s has already exist" % save_path)
         return False
     if file_size <= 0 or len(file_name) == 0:
-        print(f"Invalid file info, file name {file_name}, file size: {file_size}")
+        logger.error(
+            f"Invalid file info, file name {file_name}, file size: {file_size}"
+        )
         return False
-
-    import requests
 
     try:
         with requests.get(url, stream=True) as response:
             response.raise_for_status()
 
-            # 创建进度条
             with tqdm(
                 total=file_size,
                 unit="B",
@@ -209,90 +202,225 @@ def download_file(url, save_path, file_name, file_size, chunk_size=1024 * 1024):
             ) as pbar:
                 with open(save_path, "wb") as f:
                     for chunk in response.iter_content(chunk_size=chunk_size):
-                        if chunk:  # 过滤掉保持连接的空块
+                        if chunk:
                             f.write(chunk)
                             pbar.update(len(chunk))
 
-            print(f"download {save_path} finished.")
+            logger.info(f"download {save_path} finished.")
             return True
     except requests.exceptions.RequestException as e:
-        print(f"download {save_path} failed, error msg: {str(e)}")
+        logger.error(f"download {save_path} failed, error msg: {str(e)}")
         if os.path.exists(save_path) and os.path.getsize(save_path) != file_size:
             os.remove(save_path)
         return False
     except Exception as e:
-        print(f"download {save_path} failed, unknown err: {str(e)}")
+        logger.error(f"download {save_path} failed, unknown err: {str(e)}")
         return False
 
 
+def _parse_file_url(file_path: str) -> tuple[str, str, str]:
+    """
+    Parse the file path
+    :param file_path: Complete URL / Relative Path
+    :return: (modelzoo_url, file_relative_path, repo_type)
+             repo_type: "jfrog" / "oss"
+    """
+
+    # 1. Handling the situation where the full URL is provided
+    if file_path.startswith(("http://", "https://")):
+        if "artifactory" in file_path:
+            split_key = "artifactory/"
+            repo_type = "jfrog"
+        elif "oss-cn" in file_path:
+            split_key = ".com/"
+            repo_type = "oss"
+        else:
+            raise ValueError(f"Unsupported URL type: {file_path}")
+        split_idx = file_path.find(split_key) + len(split_key)
+        modelzoo_url = file_path[: split_idx - 1]
+        file_relative_path = file_path[split_idx:]
+    # 2. Handling the situation of relative paths
+    else:
+        env_url = os.getenv("HOUMO_MODELZOO_URL")
+        repo_type = "jfrog" if env_url and "artifactory" in env_url else "unknown"
+        modelzoo_url = JFROG_REPO if repo_type == "unknown" else env_url
+        file_relative_path = file_path
+
+    file_relative_path = file_relative_path.strip("/")
+    return modelzoo_url, file_relative_path, repo_type
+
+
+def _get_jfrog_file_md5(
+    jfrog_base_url: str, file_relative_path: str
+) -> tuple[str, int]:
+    """
+    Get the MD5 and size of the file from JFrog
+    :return: (md5sum, file size)
+    """
+
+    try:
+        jfrog_base, jfrog_tail = jfrog_base_url.rsplit("artifactory/", 1)
+        jfrog_base = jfrog_base + "artifactory"
+        file_info_url = f"{jfrog_base}/api/storage/{jfrog_tail}/{file_relative_path}"
+
+        logger.info(f"Get file info from Jfrog: {file_info_url}")
+        response = requests.get(file_info_url, timeout=10)
+        response.raise_for_status()  # Trigger HTTP error (not a 200 status code)
+
+        data = response.json()
+        return data["checksums"]["md5"], int(data["size"])
+    except Exception as e:
+        logger.error(f"Failed to get file information from JFrog: {str(e)}")
+        return "", 0
+
+
+def _get_oss_file_md5(oss_base_url: str, file_relative_path: str) -> tuple[str, int]:
+    """
+    Get the MD5 and file size from OSS
+    :return: (md5sum, file size)
+    """
+    logger.warning("OSS interface is not yet available.")
+    return "", 0
+
+
+def _check_file_exists(save_path: str, expected_md5: str) -> bool:
+    """Check if the file exists and verify its MD5 checksum matches."""
+    if not os.path.exists(save_path) or not expected_md5:
+        return False
+    try:
+        actual_md5 = get_file_md5(save_path)
+        if actual_md5 == expected_md5:
+            logger.info(
+                f"The file already exists and the MD5 checksum matches: {save_path}"
+            )
+            return True
+        else:
+            logger.warning(
+                f"The file MD5 does not match. It will be re-downloaded: {save_path}"
+            )
+            return False
+    except Exception as e:
+        logger.error(f"Failed to calculate the MD5 of the file: {str(e)}")
+        return False
+
+
+def _extract_files(save_path: str, extract_dir: str) -> bool:
+    """
+    Extract files from compressed file.
+
+    :param save_path: the path of compressed file
+    :param extract_dir: the path of extract folder
+    :return: return True if decompression is successful, and False if it fails.
+    """
+
+    if not save_path.strip() or not os.path.exists(save_path):
+        logger.error(f"Invalid path of the compressed file: {save_path}.")
+        return False
+    if not isinstance(extract_dir, str) or not extract_dir.strip():
+        logger.error("The decompression directory cannot be empty.")
+        return False
+
+    import zipfile
+    import tarfile
+
+    extract_dir = os.path.abspath(extract_dir)
+    os.makedirs(extract_dir, exist_ok=True)
+
+    extract_mapping = {
+        (".zip",): (zipfile.ZipFile, {"mode": "r"}),
+        (".tar.gz", ".tgz"): (tarfile.open, {"mode": "r:gz"}),
+        (".tar.xz",): (tarfile.open, {"mode": "r:xz"}),
+    }
+    save_path_lower = save_path.lower()
+    extract_func = None
+    extract_kwargs = None
+
+    for suffixes, (func, kwargs) in extract_mapping.items():
+        if save_path_lower.endswith(suffixes):
+            extract_func = func
+            extract_kwargs = kwargs
+            break
+
+    if not extract_func:
+        logger.error(
+            f"Unsupported compression format for decompression: {save_path}. Only supported:.zip/.tar.gz/.tgz/.tar.xz"
+        )
+        return False
+
+    logger.info(f"Start to decompress: {save_path} -> {extract_dir}")
+    try:
+        with extract_func(save_path, **extract_kwargs) as f:
+            f.extractall(path=extract_dir)
+        return True
+    except Exception as e:
+        if save_path_lower.endswith(".tar.xz"):
+            logger.warning(
+                f"The tarfile extraction failed with error message ({str(e)}). Trying to extract it using the system's tar command."
+            )
+            try:
+                subprocess.run(
+                    ["tar", "-xvf", save_path, "-C", extract_dir],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    encoding="utf-8",
+                )
+                return True
+            except subprocess.CalledProcessError as se:
+                logger.error(
+                    f"The system tar command failed to decompress successfully: {se.stderr}"
+                )
+                return False
+        else:
+            logger.error(f"Decompression failed: {str(e)}")
+            return False
+
+
 def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) -> str:
-    import requests
-    import os
+    if not file_path.strip():
+        logger.error("The file path cannot be empty.")
+        return ""
+
+    try:
+        modelzoo_url, file_relative_path, repo_type = _parse_file_url(file_path)
+    except ValueError as e:
+        logger.error(f"file_path {file_path} parsing failed:{str(e)}")
+        return ""
+
+    save_dir = (
+        save_dir.strip() if save_dir else os.getenv("HOUMO_MODEL_PATH", default="./")
+    )
+    save_dir = os.path.abspath(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
+    file_name = os.path.basename(file_relative_path)
+    save_path = os.path.join(save_dir, file_name)
 
     need_download = True
-    if "http://" in file_path or "https://" in file_path:
-        url, file_path = file_path.split("artifactory/")
-        modelzoo_url = url + "artifactory"
-    else:
-        modelzoo_url = os.environ.get("HOUMO_MODELZOO_URL", HOUMO_MODELZOO_URL)
-    file_name = os.path.basename(file_path)
-    if save_dir == "":
-        save_dir = os.getenv("HOUMO_MODEL_PATH", default="./")
-    else:
-        os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, file_name)
-    jfrog_base, jfrog_tail = modelzoo_url.split("artifactory")
-    jfrog_base = jfrog_base + "artifactory"
-    file_info_path = f"{jfrog_base}/api/storage/{jfrog_tail}/{file_path}"
     file_size = 0
-    print(f"Get file info from jfrog: {file_info_path}")
-    response = requests.get(file_info_path)
-    if response.status_code == 200:
-        url_md5 = response.json()["checksums"]["md5"]
-        file_size = int(response.json()["size"])
-        if os.path.exists(save_path) and get_file_md5(save_path) == url_md5:
-            print(url_md5, save_path, "already exists.")
-            need_download = False
-    else:
-        print("Failed to retrieve MD5. status code:", response.status_code)
+    expected_md5 = ""
+    if repo_type in ["jfrog", "unknown"]:
+        expected_md5, file_size = _get_jfrog_file_md5(modelzoo_url, file_relative_path)
+        repo_type = "jfrog" if file_size > 0 else repo_type
+    if repo_type in ["oss", "unknown"]:
+        modelzoo_url = OSS_REPO if repo_type == "unknown" else modelzoo_url
+        expected_md5, file_size = _get_oss_file_md5(modelzoo_url, file_relative_path)
+    if not expected_md5 or file_size <= 0:
         return ""
+
+    need_download = not _check_file_exists(save_path, expected_md5)
 
     if need_download:
         if os.path.exists(save_path):
             os.remove(save_path)
-        url = f"{modelzoo_url}/{file_path}"
-        print(f"Get file from jfrog: {url}")
-        if download_file(url, save_path, file_name, file_size) is False:
+        download_url = f"{modelzoo_url}/{file_relative_path}"
+        logger.info(f"Start downloading the file: {download_url}")
+        if download_file(download_url, save_path, file_name, file_size) is False:
+            logger.error(f"File download failed: {download_url}")
             return ""
 
-    if extract_dir is not None:
-        if save_path.rfind(".zip") > 0:
-            import zipfile
+    if extract_dir is not None and not _extract_files(save_path, extract_dir):
+        return ""
 
-            with zipfile.ZipFile(save_path, "r") as zip:
-                print("extract to %s" % extract_dir)
-                zip.extractall(path=extract_dir)
-        elif save_path.rfind(".tar.gz") > 0 or save_path.rfind(".tgz") > 0:
-            import tarfile
-
-            with tarfile.open(save_path, "r:gz") as tar:
-                print("extract to %s" % extract_dir)
-                tar.extractall(path=extract_dir)
-        elif save_path.rfind(".tar.xz") > 0:
-            try:
-                import tarfile
-
-                with tarfile.open(save_path, "r:xz") as tar:
-                    print("extract to %s" % extract_dir)
-                    tar.extractall(path=extract_dir)
-            except Exception as e:
-                import subprocess
-
-                subprocess.run(
-                    f"tar -xvf {save_path} -C {extract_dir}",
-                    check=True,
-                    shell=True,
-                )
     return save_path
 
 
@@ -807,8 +935,6 @@ def upload_file_to_artifactory(
 
     # 计算文件的 MD5 和 SHA1 校验和
     def calculate_checksums(filepath):
-        import hashlib
-
         md5_hash = hashlib.md5()
         sha1_hash = hashlib.sha1()
 

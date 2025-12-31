@@ -71,7 +71,7 @@ if [[ "$STEP" == "build" ]]; then
 
     if [[ "$FOUND_PACKAGE" -eq 1 && "$FOUND_GPU" -eq 1 ]]; then
         echo "Start to quant and compile model."
-        python3 get_model.py --type raw
+        python3 get_model.py --type raw --extract_dir ./
         python3 ptq.py
         python3 build.py
     else
@@ -80,7 +80,7 @@ if [[ "$STEP" == "build" ]]; then
 elif [[ "$STEP" == "demo" ]]; then
     echo "Execute demo using precompiled model."
     python3 get_model.py --type hmm
-    python3 demo.py #--model_dir ./onnx --model_type onnx
+    python3 demo.py # --model_type onnx
 else
     echo "✗ Unknown step ${STEP}."
 fi

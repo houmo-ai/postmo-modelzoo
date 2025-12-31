@@ -24,7 +24,7 @@ if [[ -z $TCIM_RUNTIME_PATH ]]; then
 fi
 
 if [[ -z $HOUMO_MODELZOO_URL ]]; then
-  export HOUMO_MODELZOO_URL=http://139.224.0.199:8082/artifactory/houmo/release
+  export HOUMO_MODELZOO_URL=http://artifactory.houmo.ai/artifactory/toolchain/release
 fi
 
 # paths for build
