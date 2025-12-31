@@ -274,6 +274,18 @@ llm_qwen3_14b:
         args: all
   test:
     - llm_qwen3_14b_test
+# llm_qwen3_30b_a3b:
+#   include:
+#     - models/llm/qwen3-30b-a3b
+#   exclude:
+#     - models/llm/qwen3-30b-a3b/README.MD
+#   example_case:
+#     - llm_qwen3_30b_a3b_test:
+#         test_type: models_tests
+#         script: qwen3_30b_a3b
+#         args: all
+#   test:
+#     - llm_qwen3_30b_a3b_test
 llm_deepseek_r1_qwen3_8b:
   include:
     - models/llm/deepseek-r1-qwen3-8b

@@ -85,8 +85,8 @@
             ],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2",
-                "cached_models/hmm_xh2_ms"
+                "cached_models/hmm_xh2_8k",
+                "cached_models/hmm_xh2_8k_ms"
             ],
             "source_type": [
                 null,
