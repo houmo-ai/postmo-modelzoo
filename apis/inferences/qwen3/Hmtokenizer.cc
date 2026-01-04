@@ -1,7 +1,9 @@
 /*
- * Hmtokenizer.h - HoumoAI Tokenizer Implementation for Text Processing and Embedding
+ * Copyright (c) 2025 HOUMO AI
  *
- * Copyright (c) 2025 HOUMOAI
+ * File: Hmtokenizer.cc
+ * Description:
+ *   HoumoAI Tokenizer Implementation for Text Processing and Embedding.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

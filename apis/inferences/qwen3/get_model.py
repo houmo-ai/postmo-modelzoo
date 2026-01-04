@@ -1,26 +1,23 @@
-"""
-Model Download and Quantization Script for Houmo AI LLM
-
-This script handles downloading pre-trained LLM models from specified sources
-and converting the quantized embedding layer to binary format for Houmo AI 
-accelerator deployment.
-
-Copyright (c) 2025 HOUMOAI
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-SPDX-License-Identifier: Apache-2.0
-"""
+# Copyright (c) 2025 HOUMO AI
+#
+# File: get_model.py
+# Description:
+#   Model Download Script for Houmo AI LLM - Handles downloading pre-trained LLM models from specified sources
+#   and converting the quantized embedding layer to binary format.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import os
 import sys
@@ -99,9 +96,6 @@ if __name__ == '__main__':
             "prefill_len": 256,
             "batch": 1,
         },
-        "hmm_files": {
-            "other_files": ["models/qwen3/3rdparty.zip"],
-        },
         "modelscope_repo": {
             "repo_ids": ["qwen/qwen3-8b"],
             "local_dirs": ["./qwen3-8b"],
@@ -124,9 +118,6 @@ if __name__ == '__main__':
     # Convert quantized embedding to binary format
     embedding_path = "hmquant/quant_embedding.pt"
     if os.path.exists(embedding_path):
-        # Print target accelerator type
-        print(HOUMO_TARGET)
-
         # Load embedding weights
         embedding_weight = torch.load(
             embedding_path, map_location="cpu", weights_only=True

@@ -1,7 +1,9 @@
 /*
- * utils.h - Utility functions and structures for common operations
+ * Copyright (c) 2025 HOUMO AI
  *
- * Copyright (c) 2025 HOUMOAI
+ * File: utils.h
+ * Description:
+ *   Utility functions and structures for common operations.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

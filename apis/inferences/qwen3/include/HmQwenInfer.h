@@ -1,7 +1,9 @@
 /*
- * HmQwenInfer.h - Header file for Qwen inference class using tcim runtime
+ * Copyright (c) 2025 HOUMO AI
  *
- * Copyright (c) 2025 HOUMOAI
+ * File: HmQwenInfer.h
+ * Description:
+ *   Header file for Qwen inference class using tcim runtime.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

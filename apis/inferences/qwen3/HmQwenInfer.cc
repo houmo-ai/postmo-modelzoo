@@ -1,7 +1,9 @@
 /*
- * HmQwenInfer.h - C++ inference interface for HmQwen language model
+ * Copyright (c) 2025 HOUMO AI
  *
- * Copyright (c) 2025 HOUMOAI
+ * File: HmQwenInfer.cc
+ * Description:
+ *   C++ inference interface for Qwen language model.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

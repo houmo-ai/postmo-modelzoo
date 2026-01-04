@@ -155,12 +155,17 @@ end2end average time: 95.093 ms, 10.52 tokens/s
 ```python
     # 权重转换
     embedding_path = "hmquant/quant_embedding.pt"
-    if os.path.exists(embedding_path) and HOUMO_TARGET in ["xh2"]:
-        import torch
-        import numpy as np
+    if os.path.exists(embedding_path):
+        # Load embedding weights
+        embedding_weight = torch.load(
+            embedding_path, map_location="cpu", weights_only=True
+        )['weight']
 
-        embedding_weight = torch.load(embedding_path, map_location="cpu", weights_only=True)
-        embedding_weight = embedding_weight['weight']
+        # Convert bfloat16 to float16 if necessary
+        if embedding_weight.dtype == torch.bfloat16:
+            embedding_weight = embedding_weight.float().half()
+
+        # Save as binary file
         embedding_data = embedding_weight.cpu().numpy()
         embedding_data.tofile(embedding_path.replace(".pt", ".bin"))
 ```

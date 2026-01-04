@@ -19,3 +19,5 @@ fi
 python3 get_model.py
 # python example
 python3 demo.py
+# c++ example
+./run_linux.sh

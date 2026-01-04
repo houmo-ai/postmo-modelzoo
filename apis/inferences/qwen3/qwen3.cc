@@ -1,7 +1,11 @@
 /*
- * Qwen3 Model Inference Demo - Demonstrates how to use the HoumoAI Qwen3 inference library
+ * Copyright (c) 2025 HOUMO AI
+/*
+ * Copyright (c) 2025 HOUMO AI
  *
- * Copyright (c) 2025 HOUMOAI
+ * File: qwen3.cc
+ * Description:
+ *   Main application file for Qwen3 inference - Implements the main function for running Qwen3 model inference.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
