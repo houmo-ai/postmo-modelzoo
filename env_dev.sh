@@ -12,7 +12,7 @@ __dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 export HOUMO_EXAMPLES_PATH=${__dir}
 
 if [[ -z $HOUMO_MODELZOO_URL ]]; then
-  export HOUMO_MODELZOO_URL=http://10.10.1.53:8082/artifactory/toolchain/release
+  export HOUMO_MODELZOO_URL=http://artifactory.houmo.ai/artifactory/Dadao
 fi
 
 # main path

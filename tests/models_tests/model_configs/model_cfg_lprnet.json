@@ -17,10 +17,10 @@
         "xh2": ["hmquant", "hmbuild", "hmdemo", "hmcompare", "hmperf"]
     },
     "perf_metrics": {
-        "xh1":{
+        "xh1": {
             "x86_64": 1.345
         },
-        "xh2":{
+        "xh2": {
             "x86_64": 0.848
         }
     },
@@ -118,7 +118,9 @@
         "params": {
             "required": {
                 "config": ["./config.yml"],
-                "data_path": ["./base_yolov5lprnet/rec_images/lprnet_quant_images/C_A2H3W3.jpg"]
+                "data_path": [
+                    "./base_yolov5lprnet/rec_images/lprnet_quant_images/C_A2H3W3.jpg"
+                ]
             },
             "optional": {
                 "target": [null],

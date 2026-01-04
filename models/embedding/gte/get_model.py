@@ -1,3 +1,23 @@
+# Copyright 2025 HOUMO AI
+#
+# File: get_model.py
+# Description:
+#   Download gte_Qwen2-1.5B-instruct model for embedding tasks.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import argparse
 from hmatc.utils.utils import hmatc_get_file, get_houmo_version
@@ -45,7 +65,6 @@ def get_args() -> argparse.Namespace:
         dest="ndevice",
         type=int,
         default=1,
-        choices=[1],
         help="device number",
     )
     args = parser.parse_args()
@@ -66,7 +85,7 @@ if __name__ == "__main__":
             "ndevice": args.ndevice,
             "prefill_len": 256,
         },
-        "raw_files": {"raw_path": "models/datasets/wikitext-2-raw-v1.zip"},
+        "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
         "modelscope_repo": {"repo_ids": ["iic/gte_Qwen2-1.5B-instruct"]},
     }
 

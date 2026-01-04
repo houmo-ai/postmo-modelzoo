@@ -2,24 +2,13 @@
     "obsolete": true,
     "model_dir": "models/diffusion/sdxl",
     "model_type": "llm",
-    "support_platform": [
-        "x86_64"
-    ],
-    "support_backend": [
-        "xh1"
-    ],
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh1"],
     "support_core_num": {
-        "xh1": [
-            4
-        ]
+        "xh1": [4]
     },
     "support_flow": {
-        "xh1": [
-            "get_model",
-            "compile",
-            "demo",
-            "perf"
-        ]
+        "xh1": ["get_model", "compile", "demo", "perf"]
     },
     "support_hmatc": null,
     "perf_metrics": {
@@ -30,65 +19,30 @@
     "eval_threshold": null,
     "get_model_params": {
         "xh1": {
-            "type": [
-                "raw",
-                "hmm"
-            ],
-            "build_model_dir": [
-                null,
-                "cached_models/hmm_xh1"
-            ],
-            "model_dir": [
-                "cached_models",
-                "cached_models"
-            ]
+            "type": ["raw", "hmm"],
+            "build_model_dir": [null, "cached_models/hmm_xh1"],
+            "model_dir": ["cached_models", "cached_models"]
         }
     },
     "compile_params": {
         "xh1": {
-            "model_dir": [
-                "cached_results/hmquant_xh1"
-            ],
-            "model_name": [
-                null
-            ],
-            "ncore": [
-                null
-            ],
-            "stage": [
-                "build"
-            ],
-            "output_dir": [
-                "cached_results/hmm_xh1"
-            ]
+            "model_dir": ["cached_results/hmquant_xh1"],
+            "model_name": [null],
+            "ncore": [null],
+            "stage": ["build"],
+            "output_dir": ["cached_results/hmm_xh1"]
         }
     },
     "demo_params": {
         "xh1": {
-            "model_path": [
-                "cached_results/hmm_xh1/sd_unet.hmm"
-            ],
-            "sdxl_ckpt": [
-                "cached_models/stable-diffusion-xl-base-1.0m_xh1"
-            ],
-            "lora_weights": [
-                "cached_models/TCD-SDXL-LoRA"
-            ],
-            "test_num": [
-                null
-            ],
-            "nstep": [
-                null
-            ],
-            "eta": [
-                null
-            ],
-            "prompt": [
-                null
-            ],
-            "neg_prompt": [
-                null
-            ]
+            "model_path": ["cached_results/hmm_xh1/sd_unet.hmm"],
+            "sdxl_ckpt": ["cached_models/stable-diffusion-xl-base-1.0m_xh1"],
+            "lora_weights": ["cached_models/TCD-SDXL-LoRA"],
+            "test_num": [null],
+            "nstep": [null],
+            "eta": [null],
+            "prompt": [null],
+            "neg_prompt": [null]
         }
     },
     "perf_params": "demo"

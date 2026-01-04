@@ -1195,7 +1195,6 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
-    model_type = model_info.get("model_type", "cv")
     platform = get_platform(model_info["support_platform"])
     if platform is None or platform == "aarch64":
         logger.warning(f"Not support {model_name} testing on {platform}.")

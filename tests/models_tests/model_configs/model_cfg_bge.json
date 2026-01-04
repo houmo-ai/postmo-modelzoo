@@ -2,129 +2,58 @@
     "obsolete": false,
     "model_dir": "models/embedding/bge",
     "model_type": "llm",
-    "support_platform": [
-        "x86_64"
-    ],
-    "support_backend": [
-        "xh2"
-    ],
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
     "support_core_num": {
-        "xh2": [
-            2
-        ]
+        "xh2": [2]
     },
     "support_flow": {
-        "xh2": [
-            "get_model",
-            "quant",
-            "compile",
-            "demo"
-        ]
+        "xh2": ["get_model", "quant", "compile", "demo"]
     },
     "support_hmatc": null,
     "get_model_params": {
         "xh2": {
-            "type": [
-                "raw",
-                "hmm",
-                "hmm"
-            ],
-            "download_dir": [
-                "cached_models",
-                "cached_models",
-                "cached_models"
-            ],
+            "type": ["raw", "hmm", "hmm"],
+            "download_dir": ["cached_models", "cached_models", "cached_models"],
             "extract_dir": [
                 null,
                 "cached_models/hmm_xh2_ms",
                 "cached_models/hmm_xh2"
             ],
-            "source_type": [
-                null,
-                "modelscope",
-                null
-            ],
-            "batch": [
-                null,
-                null,
-                null
-            ],
-            "context_length": [
-                null,
-                null,
-                null
-            ],
-            "ndevice": [
-                null,
-                null,
-                null
-            ]
+            "source_type": [null, "modelscope", null],
+            "batch": [null, null, null],
+            "context_length": [null, null, null],
+            "ndevice": [null, null, null]
         }
     },
     "quant_params": {
         "xh2": {
-            "model_path": [
-                "cached_models/onnx"
-            ],
-            "output_path": [
-                "cached_results/hmquant_xh2"
-            ],
-            "precision": [
-                null
-            ]
+            "model_path": ["cached_models/onnx"],
+            "output_path": ["cached_results/hmquant_xh2"],
+            "precision": [null]
         }
     },
     "compile_params": {
         "xh2": {
-            "model_dir": [
-                "cached_results/hmquant_xh2"
-            ],
-            "model_name": [
-                null
-            ],
-            "batch": [
-                null
-            ],
-            "ncore": [
-                null
-            ],
-            "ndevice": [
-                null
-            ],
-            "stage": [
-                "build"
-            ],
-            "j": [
-                "24"
-            ],
-            "output_dir": [
-                "cached_results/hmm_xh2"
-            ]
+            "model_dir": ["cached_results/hmquant_xh2"],
+            "model_name": [null],
+            "batch": [null],
+            "ncore": [null],
+            "ndevice": [null],
+            "stage": ["build"],
+            "j": ["24"],
+            "output_dir": ["cached_results/hmm_xh2"]
         }
     },
     "demo_params": {
         "xh2": {
-            "embedding_tokenizer_dir": [
-                "cached_models/bge-m3"
-            ],
-            "reranker_tokenizer_dir": [
-                "cached_models/bge-reranker-v2-m3"
-            ],
-            "embedding_path": [
-                "cached_results/hmm_xh2/bge-m3.hmm"
-            ],
-            "reranker_path": [
-                "cached_results/hmm_xh2/bge-reranker-v2-m3.hmm"
-            ],
-            "mode": [
-                null
-            ],
-            "device_idx": [
-                null
-            ],
-            "model_type": [
-                "houmo"
-            ]
+            "embedding_tokenizer_dir": ["cached_models/bge-m3"],
+            "reranker_tokenizer_dir": ["cached_models/bge-reranker-v2-m3"],
+            "embedding_path": ["cached_results/hmm_xh2/bge-m3.hmm"],
+            "reranker_path": ["cached_results/hmm_xh2/bge-reranker-v2-m3.hmm"],
+            "mode": [null],
+            "device_idx": [null],
+            "model_type": ["houmo"]
         }
     },
     "perf_params": "demo"

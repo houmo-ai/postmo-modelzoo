@@ -9,24 +9,47 @@
         "xh2": [1]
     },
     "support_flow": {
-        "xh1": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"],
-        "xh2": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"]
+        "xh1": [
+            "get_model",
+            "quant",
+            "compile",
+            "demo",
+            "compare",
+            "perf",
+            "eval"
+        ],
+        "xh2": [
+            "get_model",
+            "quant",
+            "compile",
+            "demo",
+            "compare",
+            "perf",
+            "eval"
+        ]
     },
     "support_hmatc": {
-        "xh1": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"],
+        "xh1": [
+            "hmquant",
+            "hmbuild",
+            "hmdemo",
+            "hmeval",
+            "hmperf",
+            "hmcompare"
+        ],
         "xh2": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
     },
     "perf_metrics": {
-        "xh1":{
+        "xh1": {
             "x86_64": 423.12
         },
-        "xh2":{
+        "xh2": {
             "x86_64": 31.6
         }
     },
     "eval_threshold": {
         "map50": 0.95,
-        "map50_95": 0.90
+        "map50_95": 0.9
     },
     "get_model_params": {
         "xh1": {
@@ -52,7 +75,12 @@
     "hmbuild_params": {
         "xh1": {
             "required": {
-                "config": ["./config.yml", "./config.yml", "./config.yml", "./config.yml"]
+                "config": [
+                    "./config.yml",
+                    "./config.yml",
+                    "./config.yml",
+                    "./config.yml"
+                ]
             },
             "optional": {
                 "result_path": [null, null, null, null],

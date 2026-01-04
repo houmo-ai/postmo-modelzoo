@@ -242,9 +242,6 @@ def main(allArgs=None):
 
 
 if __name__ == "__main__":
-    os.environ['HOUMO_MODELZOO_URL'] = (
-        "http://10.10.1.53:8082/artifactory/toolchain/release"
-    )
     os.environ['HOUMO_MODEL_PATH'] = "/data02/modelzoo_ci/models"
     os.system("cd hmatc && chmod +x install.sh && ./install.sh")
 

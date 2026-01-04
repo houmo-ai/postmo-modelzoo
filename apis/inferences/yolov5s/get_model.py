@@ -43,26 +43,22 @@ def execute_cmd(cmd, shell=False):
         raise
 
 
-def install_ort_env(third_party_dir, ort_pkg_name):
+def install_ort_env(third_party_dir: str, ort_pkg_name: str) -> None:
+    """
+    Install onnxruntime environment to support post-processing model inference.
+        third_party_dir: third party directory
+        ort_pkg_name: ort package name
+        return: None
+    """
     try:
         print("configure the ORT C++ environment...")
         os.rename(f"{third_party_dir}/{ort_pkg_name}", f"{third_party_dir}/onnxruntime")
-        # ort_lib_dir = third_party_dir + "/onnxruntime/lib"
-        # cmd = f"echo {ort_lib_dir} | tee /etc/ld.so.conf.d/onnxruntime.conf"
-        # execute_cmd(cmd, True)
-        # cmd = "ldconfig"
-        # execute_cmd(cmd, True)
-        print("The ORT C++ environment configuration has been completed.")
     except Exception as e:
         print(f"Failed to configure the ORT C++ environment, error: {e}")
 
 
 if __name__ == "__main__":
     args = get_args()
-    if "HOUMO_MODELZOO_URL" not in os.environ:
-        os.environ["HOUMO_MODELZOO_URL"] = (
-            "http://139.224.0.199:8082/artifactory/houmo/release"
-        )
 
     model_dir = (
         os.path.join(HOUMO_EXAMPLES_PATH, "apis/models")
@@ -74,7 +70,7 @@ if __name__ == "__main__":
 
     if args.enable_ort and platform.system() == "Linux":
         # download yolov5s post-processing onnx model
-        onnx_path = "models/yolov5s/yolov5s_640x640_postprocess.onnx"
+        onnx_path = "models/raw/onnx/yolov5s_640x640_postprocess.onnx"
         get_file_from_jfrog(onnx_path, "./")
 
         platform_name = platform.machine()
@@ -91,7 +87,7 @@ if __name__ == "__main__":
 
         third_party_dir = os.path.join(HOUMO_EXAMPLES_PATH, "apis/models/3rdparty")
         ort_pkg_name = "onnxruntime-linux-" + ort_env_str + "-1.22.0"
-        ort_pkg_path = "models/3rdparty/" + ort_pkg_name + ".tgz"
+        ort_pkg_path = "3rdparty/" + ort_pkg_name + ".tgz"
         get_file_from_jfrog(ort_pkg_path, third_party_dir, third_party_dir)
 
         if not os.path.exists(third_party_dir + "/onnxruntime"):

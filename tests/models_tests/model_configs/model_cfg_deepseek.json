@@ -2,146 +2,71 @@
     "obsolete": true,
     "model_dir": "models/llm/deepseek",
     "model_type": "llm",
-    "support_platform": [
-        "x86_64",
-        "aarch64"
-    ],
-    "support_backend": [
-        "xh1"
-    ],
+    "support_platform": ["x86_64", "aarch64"],
+    "support_backend": ["xh1"],
     "support_core_num": {
-        "xh1": [
-            4
-        ]
+        "xh1": [4]
     },
     "support_flow": {
-        "xh1": [
-            "get_model",
-            "compile",
-            "demo",
-            "perf"
-        ]
+        "xh1": ["get_model", "compile", "demo", "perf"]
     },
     "support_hmatc": null,
     "perf_metrics": {
         "xh1": {
             "x86_64": {
                 "prefill": 1.51,
-                "decode": 11.50,
+                "decode": 11.5,
                 "end2end": 11.42
             }
         }
     },
     "get_model_params": {
         "xh1": {
-            "type": [
-                "raw",
-                "hmm"
-            ],
-            "build_model_dir": [
-                null,
-                "cached_models/hmm_xh1"
-            ],
-            "model_dir": [
-                "cached_models",
-                "cached_models"
-            ]
+            "type": ["raw", "hmm"],
+            "build_model_dir": [null, "cached_models/hmm_xh1"],
+            "model_dir": ["cached_models", "cached_models"]
         }
     },
     "quant_params": {
         "xh1": {
-            "model": [
-                "cached_models/DeepSeek-R1-Distill-Qwen-7B"
-            ],
-            "quant_config": [
-                null
-            ],
-            "n_calib": [
-                null
-            ],
-            "model_name": [
-                null
-            ],
-            "save_path": [
-                "cached_results/hmquant_xh1"
-            ],
-            "prefill_shape": [
-                null
-            ],
-            "cache_len": [
-                null
-            ],
-            "multi_batch": [
-                null
-            ],
-            "wikitext_local": [
-                null
-            ],
-            "eval_ppl": [
-                null
-            ],
-            "blocks": [
-                null
-            ],
-            "decoder_shape": [
-                null
-            ],
-            "gptq": [
-                null
-            ],
-            "cache_2_input": [
-                null
-            ],
-            "rotate_ov": [
-                null
-            ],
-            "rotate_pre_rope": [
-                null
-            ],
-            "rotate_post_rope": [
-                null
-            ],
-            "use_klt": [
-                null
-            ],
-            "compile_mode": [
-                null
-            ]
+            "model": ["cached_models/DeepSeek-R1-Distill-Qwen-7B"],
+            "quant_config": [null],
+            "n_calib": [null],
+            "model_name": [null],
+            "save_path": ["cached_results/hmquant_xh1"],
+            "prefill_shape": [null],
+            "cache_len": [null],
+            "multi_batch": [null],
+            "wikitext_local": [null],
+            "eval_ppl": [null],
+            "blocks": [null],
+            "decoder_shape": [null],
+            "gptq": [null],
+            "cache_2_input": [null],
+            "rotate_ov": [null],
+            "rotate_pre_rope": [null],
+            "rotate_post_rope": [null],
+            "use_klt": [null],
+            "compile_mode": [null]
         }
     },
     "compile_params": {
         "xh1": {
-            "model_dir": [
-                "cached_results/hmquant_xh1"
-            ],
-            "model_name": [
-                null
-            ],
-            "ncore": [
-                "4"
-            ],
-            "stage": [
-                "build"
-            ],
-            "output_dir": [
-                "cached_results/hmm_xh1"
-            ]
+            "model_dir": ["cached_results/hmquant_xh1"],
+            "model_name": [null],
+            "ncore": ["4"],
+            "stage": ["build"],
+            "output_dir": ["cached_results/hmm_xh1"]
         }
     },
     "demo_params": {
         "xh1": {
-            "tokenizer_dir": [
-                "cached_models/DeepSeek-R1-Distill-Qwen-7B"
-            ],
+            "tokenizer_dir": ["cached_models/DeepSeek-R1-Distill-Qwen-7B"],
             "embedding_path": [
                 "cached_results/hmm_xh1/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": [
-                "cached_results/hmm_xh1/deepseek_prefill.hmm"
-            ],
-            "decode_path": [
-                "cached_results/hmm_xh1/deepseek_decode.hmm"
-            ]
+            "prefill_path": ["cached_results/hmm_xh1/deepseek_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh1/deepseek_decode.hmm"]
         }
     },
     "perf_params": "demo"

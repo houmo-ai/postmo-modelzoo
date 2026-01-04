@@ -2,19 +2,22 @@ import os
 import numpy as np
 import time
 import argparse
-import logging
 
-logging.basicConfig(level="INFO")
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh2", f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
-def cosine_distance(data1, data2):
-    if data1.shape != data2.shape:
-        print(f"[error] shape not equal {data1.shape} vs {data2.shape}")
+def cosine_distance(data1, data2, check_shape=True):
+    """Calculate cosine distance of data1 and data2"""
+    if check_shape and data1.shape != data2.shape:
+        print("[error] shape not equal {} vs {}".format(data1.shape, data2.shape))
         return -1
     v1_d = data1.flatten().astype("float64")
     v2_d = data2.flatten().astype("float64")
+    if len(v1_d) != len(v2_d):
+        print("[error] v1 dim {} != v2 dim {}".format(len(v1_d), len(v2_d)))
+        return -1
     v1_d[v1_d == np.inf] = np.finfo(np.float16).max
     v2_d[v2_d == np.inf] = np.finfo(np.float16).max
     v1_d[v1_d == -np.inf] = np.finfo(np.float16).min
@@ -31,52 +34,52 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--model_dir",
+        dest="model_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
-        help='path to the model dir',
+        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        help="path to the model dir",
     )
     parser.add_argument(
-        '--model_name',
-        dest='model_name',
+        "--model_name",
+        dest="model_name",
         type=str,
-        default='resnet50',
-        help='output houmo model name',
+        default="resnet50",
+        help="output houmo model name",
     )
     parser.add_argument(
-        '--batch',
-        dest='batch',
+        "--batch",
+        dest="batch",
         type=int,
         default=1,
-        help='batch size',
+        help="batch size",
     )
     parser.add_argument(
-        '--ncore',
-        dest='ncore',
+        "--ncore",
+        dest="ncore",
         type=int,
         default=2,
-        help='core number',
+        help="core number",
     )
     parser.add_argument(
-        '--stage',
-        dest='stage',
+        "--stage",
+        dest="stage",
         type=str,
         default="all",
         help='build stage choise=["build", "test", "all"]',
     )
     parser.add_argument(
-        '--output_dir',
-        dest='output_dir',
+        "--output_dir",
+        dest="output_dir",
         type=str,
-        default='output',
-        help='build output dir',
+        default="output",
+        help="build output dir",
     )
     parser.add_argument(
-        '--verbose',
-        dest='verbose',
-        action='store_true',
-        help='print details',
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        help="print details",
     )
     args = parser.parse_args()
     return args
@@ -98,7 +101,7 @@ def build(args=None):
     profile = {}
 
     # 1. build model
-    if stage == 'build' or stage == 'all':
+    if stage == "build" or stage == "all":
         import tcim
 
         print(f"\n===> {model_name} build start...")
@@ -119,7 +122,7 @@ def build(args=None):
         print(f'{model_name} build completed in {profile["build"]:.3f} s.')
         assert os.path.isfile(hmmodel_path)
     # 2. test model
-    if stage == 'test' or stage == 'all':
+    if stage == "test" or stage == "all":
         import tcim_lite
 
         print(f"\n===> {model_name} test start...")
@@ -222,7 +225,7 @@ def build(args=None):
         print(f"<=== {model_name} test success.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import platform
 
     arch = platform.machine()

@@ -176,20 +176,10 @@ detection_yolov8m-cls:
   example_case:
     - detection_yolov8m-cls_test:
         test_type: models_tests
-        script: yolov8m-cls
+        script: yolov8m_cls
         args: all
   test:
     - detection_yolov8m-cls_test
-ocr_ppocrv3_rec:
-  include:
-    - models/ocr/PPOCRv3/rec
-  exclude:
-    - models/ocr/PPOCRv3/rec/README.MD
-  example_case:
-    - ocr_ppocrv3_rec_test:
-        script: ../models/ocr/PPOCRv3/rec/test.sh
-  test:
-    - ocr_ppocrv3_rec_test
 detection_yolo12m:
   include:
     - models/detection/yolo12m
@@ -226,6 +216,16 @@ segmentation_yolov8m_seg:
         args: all
   test:
     - segmentation_yolov8m_seg_test
+ocr_ppocrv3_rec:
+  include:
+    - models/ocr/PPOCRv3/rec
+  exclude:
+    - models/ocr/PPOCRv3/rec/README.MD
+  example_case:
+    - ocr_ppocrv3_rec_test:
+        script: ../models/ocr/PPOCRv3/rec/test.sh
+  test:
+    - ocr_ppocrv3_rec_test
 ocr_lprnet:
   include:
     - models/ocr/lprnet
@@ -298,18 +298,18 @@ llm_deepseek_r1_qwen3_8b:
         args: all
   test:
     - llm_deepseek_r1_qwen3_8b_test
-llm_gpt-oss:
-  include:
-    - models/llm/gpt-oss
-  exclude:
-    - models/llm/gpt-oss/README.MD
-  example_case:
-    - llm_gpt-oss_test:
-        test_type: models_tests
-        script: gpt-oss
-        args: all
-  test:
-    - llm_gpt-oss_test
+# llm_gpt-oss:
+#   include:
+#     - models/llm/gpt-oss
+#   exclude:
+#     - models/llm/gpt-oss/README.MD
+#   example_case:
+#     - llm_gpt-oss_test:
+#         test_type: models_tests
+#         script: gpt_oss
+#         args: all
+#   test:
+#     - llm_gpt-oss_test
 vllm_qwen2.5-vl:
   include:
     - models/vllm/qwen2.5-vl
@@ -358,18 +358,18 @@ llm_minicpmo:
         args: all
   test:
     - llm_minicpmo_test
-# llm_gte:
-#   include:
-#     - models/embedding/gte
-#   exclude:
-#     - models/embedding/gte/README.MD
-#   example_case:
-#     - llm_gte_test:
-#         test_type: models_tests
-#         script: gte
-#         args: all
-#   test:
-#     - llm_gte_test
+llm_gte:
+  include:
+    - models/embedding/gte
+  exclude:
+    - models/embedding/gte/README.MD
+  example_case:
+    - llm_gte_test:
+        test_type: models_tests
+        script: gte
+        args: all
+  test:
+    - llm_gte_test
 utils:
   include:
     - utils

@@ -25,9 +25,9 @@ import argparse
 import torch
 
 # Get Houmo examples path from environment variable or use default
-HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../../..')
+HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
 # Add Houmo AI tools to path
-sys.path.insert(0, f'{HOUMO_EXAMPLES_PATH}/hmatc')
+sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
 
 from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
@@ -43,14 +43,16 @@ def get_args() -> argparse.Namespace:
     Returns:
         argparse.Namespace: Parsed command line arguments
     """
-    parser = argparse.ArgumentParser(description="Model Download and Quantization Script")
+    parser = argparse.ArgumentParser(
+        description="Model Download and Quantization Script"
+    )
 
     parser.add_argument(
-        '--download_dir',
-        dest='download_dir',
+        "--download_dir",
+        dest="download_dir",
         type=str,
         default=os.path.join(HOUMO_EXAMPLES_PATH, "apis/models"),
-        help='Directory to save downloaded model files',
+        help="Directory to save downloaded model files",
     )
 
     parser.add_argument(
@@ -58,7 +60,7 @@ def get_args() -> argparse.Namespace:
         dest="extract_dir",
         type=str,
         default=".",
-        help='Directory to extract downloaded files',
+        help="Directory to extract downloaded files",
     )
 
     parser.add_argument(
@@ -67,20 +69,16 @@ def get_args() -> argparse.Namespace:
         type=str,
         default="jfrog",
         choices=["jfrog", "modelscope"],
-        help='Source to download model from (jfrog or modelscope)',
+        help="Source to download model from (jfrog or modelscope)",
     )
 
     args = parser.parse_args()
     return args
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Parse command line arguments
     args = get_args()
-
-    # Set default Houmo model zoo URL if not provided
-    if "HOUMO_MODELZOO_URL" not in os.environ:
-        os.environ["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
 
     # Define model configuration for download
     model_cfgs = {
@@ -121,7 +119,7 @@ if __name__ == '__main__':
         # Load embedding weights
         embedding_weight = torch.load(
             embedding_path, map_location="cpu", weights_only=True
-        )['weight']
+        )["weight"]
 
         # Convert bfloat16 to float16 if necessary
         if embedding_weight.dtype == torch.bfloat16:

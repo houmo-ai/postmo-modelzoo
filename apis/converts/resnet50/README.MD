@@ -85,20 +85,19 @@ resnet50 build completed in 19.486 s.
 
 ```bash
 ===> resnet50 test start...
-resnet50 load completed in 2069.732 ms.
+resnet50 load completed in 426.869 ms.
 input_num: 1
 input_info[input.1] shape = [1, 3, 224, 224], dtype = <class 'numpy.float16'>, format = ND
 input data path: output/xh2/hmquant/hmquant_resnet50_input.1_input.npy
 golden input[input.1] shape = (1, 3, 224, 224), dtype = float16
-resnet50 set 1 inputs completed in 0.778 ms.
-resnet50 infer completed in 2.242 ms.
+resnet50 set 1 inputs completed in 0.302 ms.
+resnet50 infer completed in 1.860 ms.
 output_num: 1
 output_info[495] shape = [1, 1000], dtype = <class 'numpy.float16'>, format = ND
 output[495] shape = (1, 1000), dtype = float16
-[compare] golden output [495] match=True, similarity=0.999900
-resnet50 get 1 ouputs completed in 0.061 ms.
+[compare] golden output [495] match=True, similarity=0.999887
+resnet50 get 1 ouputs completed in 0.021 ms.
 <=== resnet50 test success.
-
 ```
 
 ## 5.免责声明

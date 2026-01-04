@@ -2,20 +2,11 @@
     "obsolete": false,
     "model_dir": "models/llm/qwen3",
     "model_type": "llm",
-    "support_platform": [
-        "x86_64"
-    ],
-    "support_backend": [
-        "xh1",
-        "xh2"
-    ],
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh1", "xh2"],
     "support_core_num": {
-        "xh1": [
-            4
-        ],
-        "xh2": [
-            2
-        ]
+        "xh1": [4],
+        "xh2": [2]
     },
     "support_flow": {
         "xh1": [
@@ -55,87 +46,37 @@
     "eval_threshold": null,
     "get_model_params": {
         "xh1": {
-            "type": [
-                "raw",
-                "hmm"
-            ],
-            "download_dir": [
-                "cached_models",
-                "cached_models"
-            ],
-            "extract_dir": [
-                null,
-                "cached_models/hmm_xh1"
-            ],
-            "source_type": [
-                null,
-                null
-            ]
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh1"],
+            "source_type": [null, null]
         },
         "xh2": {
-            "type": [
-                "raw",
-                "hmm",
-                "hmm"
-            ],
-            "download_dir": [
-                "cached_models",
-                "cached_models",
-                "cached_models"
-            ],
+            "type": ["raw", "hmm", "hmm"],
+            "download_dir": ["cached_models", "cached_models", "cached_models"],
             "extract_dir": [
                 null,
                 "cached_models/hmm_xh2_8k",
                 "cached_models/hmm_xh2_8k_ms"
             ],
-            "source_type": [
-                null,
-                null,
-                "modelscope"
-            ],
-            "context_length": [
-                null,
-                null,
-                null
-            ],
-            "batch": [
-                null,
-                null,
-                null
-            ]
+            "source_type": [null, null, "modelscope"],
+            "context_length": [null, null, null],
+            "batch": [null, null, null]
         }
     },
     "quant_params": {
         "xh1": {
-            "model": [
-                "cached_models/qwen3-8b"
-            ],
-            "save_path": [
-                "cached_results/hmquant_xh1_2k"
-            ],
-            "cache_len": [
-                "2048"
-            ],
-            "prefill_shape": [
-                null
-            ]
+            "model": ["cached_models/qwen3-8b"],
+            "save_path": ["cached_results/hmquant_xh1_2k"],
+            "cache_len": ["2048"],
+            "prefill_shape": [null]
         },
         "xh2": {
-            "model": [
-                "cached_models/qwen3-8b"
-            ],
-            "out-dir": [
-                "cached_results/hmquant_xh2_2k"
-            ],
-            "context-length": [
-                "2048"
-            ],
-            "input-sequence-length": [
-                null
-            ],
-            "calib_data": [
-                null
-            ]
+            "model": ["cached_models/qwen3-8b"],
+            "out-dir": ["cached_results/hmquant_xh2_2k"],
+            "context-length": ["2048"],
+            "input-sequence-length": [null],
+            "calib_data": [null]
         }
     },
     "compile_params": {
@@ -144,30 +85,15 @@
                 "cached_results/hmquant_xh1_2k",
                 "cached_results/hmquant_xh1_2k"
             ],
-            "model_name": [
-                null,
-                null
-            ],
-            "batch": [
-                null,
-                "4"
-            ],
-            "ncore": [
-                null,
-                null
-            ],
-            "stage": [
-                "build",
-                "build"
-            ],
+            "model_name": [null, null],
+            "batch": [null, "4"],
+            "ncore": [null, null],
+            "stage": ["build", "build"],
             "output_dir": [
                 "cached_results/hmm_xh1",
                 "cached_results/hmm_xh1_b4"
             ],
-            "j": [
-                "24",
-                "24"
-            ]
+            "j": ["24", "24"]
         },
         "xh2": {
             "model_dir": [
@@ -175,60 +101,28 @@
                 "cached_results/hmquant_xh2_2k",
                 "cached_results/hmquant_xh2_2k"
             ],
-            "batch": [
-                null,
-                null,
-                "4"
-            ],
-            "ncore": [
-                null,
-                null,
-                null
-            ],
-            "ndevice": [
-                null,
-                null,
-                null
-            ],
-            "stage": [
-                "build",
-                "build",
-                "build"
-            ],
-            "context_length": [
-                "2048",
-                "8192",
-                "8192"
-            ],
+            "batch": [null, null, "4"],
+            "ncore": [null, null, null],
+            "ndevice": [null, null, null],
+            "stage": ["build", "build", "build"],
+            "context_length": ["2048", "8192", "8192"],
             "output_dir": [
                 "cached_results/hmm_xh2_2k",
                 "cached_results/hmm_xh2_8k",
                 "cached_results/hmm_xh2_8k_b4"
             ],
-            "j": [
-                "24",
-                "24",
-                "24"
-            ]
+            "j": ["24", "24", "24"]
         }
     },
     "demo_params": {
         "xh1": {
-            "tokenizer_dir": [
-                "cached_models/qwen3-8b"
-            ],
+            "tokenizer_dir": ["cached_models/qwen3-8b"],
             "embedding_path": [
                 "cached_results/hmm_xh1/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": [
-                "cached_results/hmm_xh1/qwen3_prefill.hmm"
-            ],
-            "decode_path": [
-                "cached_results/hmm_xh1/qwen3_decode.hmm"
-            ],
-            "ndevice": [
-                "1"
-            ]
+            "prefill_path": ["cached_results/hmm_xh1/qwen3_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh1/qwen3_decode.hmm"],
+            "ndevice": ["1"]
         },
         "xh2": {
             "tokenizer_dir": [
@@ -247,40 +141,25 @@
                 "cached_results/hmm_xh2_2k/qwen3_decode.hmm",
                 "cached_results/hmm_xh2_8k/qwen3_decode.hmm"
             ],
-            "ndevice": [
-                "1",
-                "1"
-            ]
+            "ndevice": ["1", "1"]
         }
     },
     "demo_multibatch_params": {
         "xh1": {
-            "tokenizer_dir": [
-                "cached_models/qwen3-8b"
-            ],
+            "tokenizer_dir": ["cached_models/qwen3-8b"],
             "embedding_path": [
                 "cached_results/hmm_xh1_b4/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": [
-                "cached_results/hmm_xh1_b4/qwen3_prefill.hmm"
-            ],
-            "decode_path": [
-                "cached_results/hmm_xh1_b4/qwen3_decode.hmm"
-            ]
+            "prefill_path": ["cached_results/hmm_xh1_b4/qwen3_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh1_b4/qwen3_decode.hmm"]
         },
         "xh2": {
-            "tokenizer_dir": [
-                "cached_models/qwen3-8b"
-            ],
+            "tokenizer_dir": ["cached_models/qwen3-8b"],
             "embedding_path": [
                 "cached_results/hmm_xh2_8k_b4/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": [
-                "cached_results/hmm_xh2_8k_b4/qwen3_prefill.hmm"
-            ],
-            "decode_path": [
-                "cached_results/hmm_xh2_8k_b4/qwen3_decode.hmm"
-            ]
+            "prefill_path": ["cached_results/hmm_xh2_8k_b4/qwen3_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_8k_b4/qwen3_decode.hmm"]
         }
     },
     "perf_params": "demo"

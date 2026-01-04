@@ -1,3 +1,23 @@
+# Copyright 2025 HOUMO AI
+#
+# File: get_model.py
+# Description:
+#   Download BGE-m3 and BGE-reranker-v2-m3 model for embedding tasks.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import argparse
 from hmatc.utils.utils import hmatc_get_file, get_houmo_version
@@ -59,9 +79,7 @@ if __name__ == '__main__':
             "context_len": "0.5k",
             "batch": 10,
         },
-        "raw_files": {
-            "raw_path": "models/bge/onnx_bge_10x512.zip",
-        },
+        "raw_files": {"raw_path": "models/raw/onnx/onnx_bge_10x512.zip"},
         "modelscope_repo": {
             "repo_ids": ["BAAI/bge-reranker-v2-m3", "BAAI/bge-m3"],
             "ignore_patterns": ["*.safetensors", "*.bin", "onnx/*"],
