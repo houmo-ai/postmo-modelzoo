@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2025 HOUMO AI
+ *
+ * File: HmEmbedding.h
+ * Description:
+ *   HmEmbedding Header File - Defines the HmEmbedding class for embedding
+ * operations.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #ifndef __EMBEDDING_H__
 #define __EMBEDDING_H__
 
@@ -16,13 +38,15 @@
 #include "half.hpp"
 #include "utils.h"
 
+// Define tensor_type as half precision floating point
 using tensor_type = half_float::half;
 
 /**
- * 读取文件
- * @param path              文件路径
- * @param n_elems_align     读取完文件后结尾补充空元素个数，默认0
- * @return                  成功返回unique_ptr，否则 nullptr
+ * Reads embedding weight file
+ * @param path              Path to the file
+ * @param n_elems_align     Number of empty elements to append at the end after
+ * reading the file, default 0
+ * @return                  Returns unique_ptr on success, otherwise nullptr
  */
 template <typename T>
 std::unique_ptr<T[]> readEmbeddingWeight(const std::string &path,
@@ -45,24 +69,50 @@ std::unique_ptr<T[]> readEmbeddingWeight(const std::string &path,
   return ptr;
 }
 
+/**
+ * HmEmbedding class - Handles conversion from token IDs to embedding vectors
+ */
 class HmEmbedding {
  public:
+  /**
+   * Constructor for HmEmbedding
+   * @param embeddingWeightPath Path to the embedding weight file
+   * @param embedding_len Length of the embedding vectors
+   * @param prefill_len Length for prefill operations
+   */
   HmEmbedding(const std::string &embeddingWeightPath, const int &embedding_len,
               const int &prefill_len);
+
+  // Delete copy constructor to prevent copying
   HmEmbedding(const HmEmbedding &it) = delete;
+
+  // Delete assignment operator to prevent copying
   HmEmbedding &operator=(const HmEmbedding &it) = delete;
+
+  // Default move constructor
   HmEmbedding(HmEmbedding &&it) noexcept = default;
+
+  // Default move assignment operator
   HmEmbedding &operator=(HmEmbedding &&it) noexcept = default;
+
+  // Destructor
   ~HmEmbedding();
 
+  /**
+   * Converts token IDs to embedding vectors
+   * @param ids Vector of token IDs to be converted
+   * @return Pointer to the resulting embedding vectors
+   */
   tensor_type *EmbeddingTokens(const std::vector<int> &ids);
 
  private:
-  // embedding_weight.pt
+  // Storage for embedding weights
   std::unique_ptr<tensor_type[]> embed_w;
+  // Temporary pointer for storing embedding results
   tensor_type *ptr = nullptr;
+  // Size of the temporary pointer
   size_t ptr_size = 0;
-  // 属性
+  // Properties
   int prefill_length = 0;
   int embedding_length = 0;
 };

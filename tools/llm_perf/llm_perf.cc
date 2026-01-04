@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2025 HOUMO AI
+ *
+ * File: llm_perf.cc
+ * Description:
+ *   LLM Performance Testing Tool - Main application for running performance
+ * tests on large language models with various configurations.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include <codecvt>
 #include <filesystem>
 #include <iostream>
@@ -192,24 +214,37 @@ int RunPerfJson(int argc, char* argv[]) {
   return 0;
 }
 
+/**
+ * @brief Main entry point for the LLM Performance Testing Tool
+ * This application runs performance tests on large language models with various
+ * configurations
+ *
+ * @param argc Number of command line arguments
+ * @param argv Array of command line argument strings
+ * @return int Exit status code (0 for success, non-zero for errors)
+ */
 int main(int argc, char* argv[]) {
 #ifdef _MSC_VER
   SetConsoleOutputCP(CP_UTF8);
   SetConsoleCP(CP_UTF8);
 #endif
   try {
-    // 1. 解析命令行参数
+    // 1. Parse command line arguments to determine execution mode
     PerfConfigType runtype = ParsePerfRunType(argc, argv);
     if (runtype == PerfConfigType::PERFCMD) {
+      // Command-line mode: Parse arguments and run performance test
       auto args = parse_args(argc, argv);
       return RunPerf(args);
     } else if (runtype == PerfConfigType::PERFJSON) {
+      // JSON configuration mode: Run tests from JSON configuration file
       return RunPerfJson(argc, argv);
     } else {
+      // Invalid or no arguments provided, show help usage
       HelpUsage(argv);
       return -1;
     }
   } catch (const std::exception& e) {
+    // Handle any exceptions by printing error message and showing help
     std::cerr << "Error: " << e.what() << std::endl;
     HelpUsage(argv);
     return 1;

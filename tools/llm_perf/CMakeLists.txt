@@ -13,6 +13,7 @@ endif()
 
 include(${CMAKE_SOURCE_DIR}/tcim_runtime.cmake)
 include_directories(
+  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/nlohmann/include
   $ENV{HOUMO_SDK_PATH}/hal/export/include
   $ENV{HOUMO_SDK_PATH}/hal/include

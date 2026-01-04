@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2025 HOUMO AI
+ *
+ * File: HmvllmInfer.cc
+ * Description:
+ *   HmvllmInfer Implementation - Performance testing implementation for
+ * vision-language large language model inference.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include "HmvllmInfer.h"
 
 HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
@@ -8,7 +30,7 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   this->prefillModelPath = prefillModelPath;
   this->decodeModelPath = decodeModelPath;
   this->vitModelPath = vitModelPath;
-  // 创建weightManager
+  // create weightManager
   std::vector<int> devs;
   devs.clear();
   std::cout << "Use Devices ";
@@ -20,14 +42,14 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   tcim::DevManager dev_manager = tcim::DevManager::Create(devs);
   weight_manager =
       tcim::Module::WeightManager::CreateWeightManager(dev_manager);
-  // 创建weightManager
+  // create option
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
   auto option_vit = tcim::Module::Option(weight_manager);
   option_prefill.EnableLazyMode(true);
   option_decode.EnableLazyMode(true);
   option_vit.EnableLazyMode(true);
-  // 初始化Module
+  // init module
   prefill_module = std::make_shared<tcim::Module>();
   prefill_module->LoadModel(prefillModelPath, option_prefill);
 
@@ -67,7 +89,7 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   if (this->batch != batches) {
     throw std::runtime_error("Model Batch Not match args batch!");
   }
-  // 配置Decode其他输入
+  // Configure additional inputs for decode module (KV cache inputs)
   for (int idx = attn_idx_start; idx < 2 * n_blocks + attn_idx_start; idx++) {
     const std::string input_name = prefill_module->GetInputName(idx);
     auto cache = prefill_module->GetInput(input_name);

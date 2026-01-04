@@ -1,12 +1,43 @@
+/*
+ * Copyright (c) 2025 HOUMO AI
+ *
+ * File: HmllmInfer.cc
+ * Description:
+ *   HmllmInfer Implementation - Performance testing implementation for large
+ * language model inference.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include "HmllmInfer.h"
 
+/**
+ * @brief Constructor for HmllmInfer class
+ *
+ * @param prefillModelPath Path to the prefill model
+ * @param decodeModelPath Path to the decode model
+ * @param embeddingWeightPath Path to the embedding weights file
+ * @param ndevices Number of devices to use
+ * @param batches Batch size for the model
+ */
 HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
                        const std::string &decodeModelPath,
                        const std::string &embeddingWeightPath, int ndevices,
                        int batches) {
   this->prefillModelPath = prefillModelPath;
   this->decodeModelPath = decodeModelPath;
-  // 创建weightManager
+  // Create weightManager
   std::vector<int> devs;
   devs.clear();
   std::cout << "Use Devices ";
@@ -15,17 +46,21 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
     std::cout << i << " ";
   }
   std::cout << std::endl;
+  // Create device manager with the specified devices
   tcim::DevManager dev_manager = tcim::DevManager::Create(devs);
+  // Create weight manager using the device manager
   weight_manager =
       tcim::Module::WeightManager::CreateWeightManager(dev_manager);
-  // 创建weightManager
+  // Create weightManager options for prefill and decode modules
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
+  // Enable lazy mode
   option_prefill.EnableLazyMode(true);
   option_decode.EnableLazyMode(true);
-  // 初始化Module
+  // Initialize prefill module and load the model
   prefill_module = std::make_shared<tcim::Module>();
   prefill_module->LoadModel(prefillModelPath, option_prefill);
+  // Get number of blocks in the model and create dummy names for cache inputs
   int n_blocks = get_nblocks();
   for (int i = 0; i < n_blocks; i++) {
     std::stringstream ss;
@@ -39,11 +74,12 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
     dummy_names.emplace_back(ss.str());
   }
 
+  // Set dummy tensors for the decode module
   option_decode.SetDummyTensors(dummy_names);
   decode_module = std::make_shared<tcim::Module>();
   decode_module->LoadModel(decodeModelPath, option_decode);
 
-  // 获取模型配置
+  // Get model configuration parameters
   attn_idx_start = get_attn_idx_start();
   this->prefill_length =
       prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
@@ -60,7 +96,8 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   if (this->batch != batches) {
     throw std::runtime_error("Model Batch Not match args batch!");
   }
-  // 配置Decode其他输入
+
+  // Configure decode module's other inputs (KV cache)
   for (int idx = attn_idx_start; idx < 2 * n_blocks + attn_idx_start; idx++) {
     const std::string input_name = prefill_module->GetInputName(idx);
     auto cache = prefill_module->GetInput(input_name);
@@ -80,7 +117,8 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   decode_input_map.insert(std::pair<std::string, tcim::Tensor>(
       decode_current_length_name, decode_current_length_input_tensor));
 
-  // embedding
+  // Initialize embedding module with weights path, embedding length and prefill
+  // length
   embedding = std::make_shared<HmEmbedding>(
       embeddingWeightPath, this->embedding_length, this->prefill_length);
   // DebugModelInfo(*prefill_module.get(), prefillModelPath);

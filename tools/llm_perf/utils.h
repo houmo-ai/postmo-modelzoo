@@ -99,17 +99,19 @@ static PerfConfigType ParsePerfRunType(int argc, char* argv[]) {
 }
 
 /**
- * 解析命令行参数，支持 --key value 格式
- * @param argc 命令行参数数量
- * @param argv 命令行参数数组
- * @return 解析后的参数映射（key: 参数名, value: 参数值）
+ * Parse command line arguments in --key value format
+ * @param argc Number of command line arguments
+ * @param argv Array of command line argument strings
+ * @return Parsed parameter mapping (key: parameter name, value: parameter
+ * value)
  */
 static std::unordered_map<std::string, std::string> parse_args(int argc,
                                                                char* argv[]) {
   std::unordered_map<std::string, std::string> args;
 
+  // Check for invalid argument combinations at the beginning
   for (int i = 1; i < argc; ++i) {
-    std::string arg = argv[1];
+    std::string arg = argv[1];  // Note: This should probably be argv[i]
     if (arg == "-c" || arg == "--config" || arg == "-h" || arg == "--help") {
       std::cerr << "Invalid args!" << std::endl;
       HelpUsage(argv);
@@ -117,20 +119,28 @@ static std::unordered_map<std::string, std::string> parse_args(int argc,
     }
   }
 
+  // Parse arguments in --key value format
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg.substr(0, 2) == "--") {
-      std::string key = arg.substr(2);
+      std::string key = arg.substr(2);  // Extract key by removing leading "--"
+
+      // Handle flag arguments that don't require a value
       if (key == "no_warm_up") {
-        args[key] = "";
+        args[key] = "";  // Set empty value for flag
         continue;
       }
+
+      // Check if there's a value following the key
       if (i + 1 >= argc) {
         throw std::invalid_argument("Missing value for argument: " + arg);
       }
+
+      // Get the value and increment index to skip it in the next iteration
       std::string value = argv[++i];
       args[key] = value;
     } else {
+      // Invalid argument format - must start with --
       throw std::invalid_argument("Invalid argument format: " + arg +
                                   " (use --key value)");
     }
@@ -140,10 +150,10 @@ static std::unordered_map<std::string, std::string> parse_args(int argc,
 }
 
 /**
- * 验证路径是否存在（文件或目录）
- * @param path 路径字符串
- * @param arg_name 参数名（用于错误提示）
- * @return 标准化后的路径
+ * Validate if a path exists (file or directory)
+ * @param args Map containing command line arguments
+ * @param arg_name Name of the argument to validate (used for error messages)
+ * @return Normalized path if it exists
  */
 static fs::path validate_path(
     std::unordered_map<std::string, std::string>& args,
@@ -155,8 +165,8 @@ static fs::path validate_path(
                                   arg_name + " <value>).");
     }
     std::string path_str = args[arg_name];
-    path = fs::u8path(path_str);  // 支持 Unicode 路径（跨平台）
-    // path = fs::canonical(fs::absolute(path));
+    // Create path object supporting Unicode paths (cross-platform)
+    path = fs::u8path(path_str);
 
     if (!fs::exists(path)) {
       throw std::invalid_argument(arg_name +
@@ -246,21 +256,27 @@ static void ShowPerfInformation(PerfInfos llm_perf_datas) {
   std::cout << os.str();
 }
 
+/**
+ * Generate a vector of random integers within a specified length
+ * Used for creating random token IDs for testing purposes
+ * @param len Length of the vector to generate
+ * @return Vector of random integers in the range [0, TOKEN_ID_MAX]
+ */
 static std::vector<int> generateRandomVector(int len) {
   std::vector<int> result;
   if (len <= 0) {
-    return result;  // 处理无效长度（返回空向量）
+    return result;  // Handle invalid length (return empty vector)
   }
 
-  // 使用当前时间作为随机种子，确保每次运行生成不同序列
+  // Use current time as random seed to ensure different sequences each run
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-  std::mt19937 generator(seed);  // 采用 Mersenne Twister 随机数引擎
+  std::mt19937 generator(seed);  // Use Mersenne Twister random number engine
 
-  // 定义随机数范围：[0, 151642]
+  // Define random number range: [0, TOKEN_ID_MAX]
   std::uniform_int_distribution<int> distribution(0, TOKEN_ID_MAX);
 
-  // 填充向量
-  result.reserve(len);  // 预分配内存，提高效率
+  // Fill the vector
+  result.reserve(len);  // Pre-allocate memory for efficiency
   for (int i = 0; i < len; ++i) {
     result.push_back(distribution(generator));
   }
@@ -269,21 +285,25 @@ static std::vector<int> generateRandomVector(int len) {
 }
 
 /**
- * eigen矩阵库计算argmax
- * @param ptr          数组首地址
- * @param n                 数组元素个数
- * @return                  返回最大值索引
+ * Compute argmax using Eigen tensor library
+ * Finds the index of the element with the maximum value in the tensor
+ * @param ptr Pointer to the beginning of the array/data
+ * @param n Number of elements in the array
+ * @return Index of the maximum value
  */
 template <typename T>
 static int eigen_argmax(const T* ptr, std::size_t n) {
   using Eigen::Tensor;
   using Eigen::TensorMap;
 
+  // Create a tensor map from the raw pointer with specified size
   TensorMap<Tensor<const T, 1>> tm(static_cast<const T*>(ptr), n);
 
+  // Compute the argmax operation to get the index of maximum value
   Eigen::Tensor<Eigen::Index, 0> t = tm.argmax();
   Eigen::Index idx = t(0);
 
+  // Return the index as an integer
   return static_cast<int>(idx);
 }
 

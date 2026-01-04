@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2025 HOUMO AI
+ *
+ * File: HmllmInferMultiBatch.cc
+ * Description:
+ *   HmllmInferMultiBatch Implementation - Multi-batch performance testing
+ * implementation for large language model inference.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include "HmllmInferMultiBatch.h"
 
 HmllmInferMultiBatch::HmllmInferMultiBatch(
@@ -5,7 +27,8 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
     const std::string &embeddingWeightPath, int ndevices, int batches) {
   this->prefillModelPath = prefillModelPath;
   this->decodeModelPath = decodeModelPath;
-  // 创建weightManager
+
+  // Create weightManager
   std::vector<int> devs;
   devs.clear();
   std::cout << "Multi batch Use Devices ";
@@ -14,20 +37,26 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
     std::cout << i << " ";
   }
   std::cout << std::endl;
+
+  // Create device manager and weight manager
   tcim::DevManager dev_manager = tcim::DevManager::Create(devs);
   weight_manager =
       tcim::Module::WeightManager::CreateWeightManager(dev_manager);
-  // 创建weightManager
+
+  // Create weightManager options for prefill and decode modules
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
+  // Enable lazy mode
   option_prefill.EnableLazyMode(true);
   option_decode.EnableLazyMode(true);
-  // 初始化Module
+
+  // Initialize Module - Load prefill and decode models
   prefill_module = std::make_shared<tcim::Module>();
   prefill_module->LoadModel(prefillModelPath, option_prefill);
   decode_module = std::make_shared<tcim::Module>();
   decode_module->LoadModel(decodeModelPath, option_decode);
 
+  // Get number of blocks in the model and create dummy names for cache inputs
   n_blocks = get_nblocks();
   for (int i = 0; i < n_blocks; i++) {
     std::stringstream ss;
@@ -41,9 +70,10 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
     dummy_names.emplace_back(ss.str());
   }
 
+  // Set dummy tensors for prefill module
   option_prefill.SetDummyTensors(dummy_names);
 
-  // 获取模型配置
+  // Get model configuration parameters
   this->prefill_length =
       prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
   this->embedding_length =
@@ -56,28 +86,35 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
   if (this->batch != batches) {
     throw std::runtime_error("Model Batch Not match args batch!");
   }
+
+  // Get the dimension length for argmax operation from decode module output
   this->argmax_dim_len =
       decode_module->GetOutputInfo(decode_module->GetOutputName(0)).Shape()[2];
+
+  // Clear and initialize the next_ids and current_echo_lens vectors
   this->next_ids.clear();
   this->current_echo_lens.clear();
 
+  // Initialize vectors with zeros based on batch size
   for (int idx = 0; idx < this->batch; idx++) {
     this->next_ids.emplace_back(0);
     this->current_echo_lens.emplace_back(0);
   }
 
-  // 配置Decode其他输入
+  // Configure additional inputs for decode module (KV cache inputs)
   for (int b = 0; b < this->batch; ++b) {
+    // Calculate the index for the decode current length input
     int index = (b == 0) ? 2 : (2 * n_blocks * b + 3 + 2 * b - 1);
     auto input_name = decode_module->GetInputName(index);
     auto input_info = decode_module->GetInputInfo(input_name).AsContiguous();
     size_t mem_size = input_info.MemSize();
+    // Create tensor for current length input and set it to the decode module
     tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(
         input_info, mem_size, &decode_current_length);
     decode_module->SetInput(input_name, input_tensor);
   }
 
-  // embedding
+  // Initialize embedding module with the specified parameters
   embedding = std::make_shared<HmEmbedding>(
       embeddingWeightPath, this->embedding_length, this->prefill_length);
 }

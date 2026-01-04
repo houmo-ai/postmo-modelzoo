@@ -81,7 +81,7 @@ pip install -r requirements.txt
 | ---------------- | ------------ | ------------------------------- | ---------- | ------- | ----------- | ------------------- |
 | bandwidth_perf   | tools        | 带宽测试工具                    | python     | xh2     | x64/aarch64 | linux               |
 | computing_perf   | tools        | 算力测试工具                    | python     | xh2     | x64/aarch64 | linux               |
-| tcim_perf        | tools        | 模型测试工具                    | c++        | xh2     | x64/aarch64 | linux/android       |
+| tcim_perf        | tools        | 模型测试工具                    | c++        | xh2     | x64/aarch64 | linux/android/win11 |
 | llm_perf         | tools        | 大语言模型性能测试工具          | c++        | xh2     | x64/aarch64 | linux/android/win11 |
 
 ## 模型示例
