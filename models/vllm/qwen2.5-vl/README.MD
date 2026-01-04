@@ -30,12 +30,32 @@ python3 get_model.py --type hmm
 
 ### 2.2 量化
 
+#### 2.2.1 自定义数据集量化
+
+下载自定义数据集到当前目录下
+```bash
+mkdir -p data/calib_data/ && pushd /data/calib_data
+wget http://10.10.1.53:8081/artifactory/model_zoo2/houmo/vllm_datasets/LMUData.tar.gz
+tar zxvf LMUData.tar.gz
+popd
+```
+
 量化下载的原始模型。在当前目录下，执行脚本：
 
 ```bash
-# 量化依赖transformers==4.56.0
-pip3 install transformers==4.56.0
-python3 ptq.py
+# 量化依赖transformers==4.57.3
+pip3 install transformers==4.57.3
+python ptq.py --data_files ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_CMMMU_VAL_20250923102519_struct.json  ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_COCO_VAL_20250923104643_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_DocVQA_VAL_20250923102720_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_MMMU_DEV_VAL_20250923102615_struct.json --calib-samples 256 --calib_dataset vllm_custom_data
+```
+
+#### 2.2.1 默认公开数据集数据集量化
+
+量化下载的原始模型。在当前目录下，执行脚本：
+
+```bash
+# 量化依赖transformers==4.57.3
+pip3 install transformers==4.57.3
+python ptq.py
 ```
 
 ### 2.3 编译

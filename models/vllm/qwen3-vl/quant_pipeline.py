@@ -81,7 +81,7 @@ def quant_llm(args):
         torch_dtype=dtype,
         device_map="cpu",
         trust_remote_code=True,
-        attn_implementation="sdpa",
+        attn_implementation="flash_attention_2",
     )
 
     if native_model.config.tie_word_embeddings:

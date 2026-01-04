@@ -101,7 +101,6 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
 
         if [[ "$FOUND_PACKAGE" -eq 1 && "$FOUND_GPU" -eq 1 ]]; then
             echo "Start to quant and compile model."
-            pip3 install transformers==4.57.1
             python3 get_model.py --type raw
             python3 ptq.py
             python3 build.py

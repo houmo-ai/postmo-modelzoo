@@ -165,7 +165,7 @@ def quant_llm(args):
         device_map="cpu",
         # config=config,
         trust_remote_code=True,
-        attn_implementation="sdpa",
+        attn_implementation="flash_attention_2",
     )
 
     if native_model.config.tie_word_embeddings:
