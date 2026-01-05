@@ -6,8 +6,13 @@
 
 ## 1 模型说明
 
-本例使用的模型实现来源于[https://modelscope.cn/models/openai-mirror/whisper-medium](https://modelscope.cn/models/openai-mirror/whisper-medium)。
-本例只适用于xh2。
+本例使用的模型实现来源于：
+
+- 模型名称: whisper-medium
+- 来源: [https://modelscope.cn/models/openai-mirror/whisper-medium](https://modelscope.cn/models/openai-mirror/whisper-medium)
+- 许可: [MIT License](https://github.com/openai/whisper/blob/main/LICENSE)
+
+预训练模型在运行时下载，工程发布**不包含**该模型，本例只适用于xh2。
 
 ## 2 快速开始
 

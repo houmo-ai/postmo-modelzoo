@@ -40,8 +40,8 @@
 3. examples环境安装详细步骤：
     - 开始菜单搜索cmd，选择命令提示符，右键以管理员身份运行，执行cd /d {path/of/examples}
     - 执行 pip install -r tools/win_envs/requirements.txt安装相关依赖。
-    - 在[**https://visualstudio.microsoft.com/visual-cpp-build-tools/**](https://visualstudio.microsoft.com/visual-cpp-build-tools/)下载vs生成工具，后续C++样例编译需要使用。
-    - 运行vs生成工具，勾选使用c++的桌面开发后，点击安装。
+    - 在[**https://aka.ms/vs/17/release/vs_community.exe**](https://aka.ms/vs/17/release/vs_community.exe)下载**社区版vs2022工具**，后续C++样例编译需要使用，或者通过[**https://learn.microsoft.com/en-us/visualstudio/releases/2022/release-history**](https://learn.microsoft.com/en-us/visualstudio/releases/2022/release-history)的Evergreen bootstrappers章节选择最新的**vs2022**下载。
+    - 运行vs2022工具，勾选使用c++的桌面开发后，点击安装。
     - 执行cd /d {path/of/Runtime SDK}/切换到Runtime SDK压缩包下载的目录。
     - 执行pip install {Runtime SDK.tar.gz}进行houmo-tcim-runtime-xh2的安装。
     - 安装结束后，执行pip list查看houmo-tcim-runtime-xh2是否安装成功以及版本是否正确。
