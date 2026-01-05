@@ -1,20 +1,41 @@
-// Copyright (c) 2022 The Houmo.ai Authors. All rights reserved.
-/*!
- * \file threads.hpp
+/*
+ * Copyright (c) 2022 HOUMO AI
+ *
+ * File: threads.hpp
+ * Description:
+ *   Thread Synchronization Utilities Header File - Defines the Barrier class
+ * for thread synchronization operations.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
+#ifndef THREADS_HPP
+#define THREADS_HPP
+
 #include <unistd.h>
+
 #include <cassert>
+#include <condition_variable>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
-
 
 class Barrier {
  public:
-  Barrier(int dest): dest_(dest) {}
+  Barrier(int dest) : dest_(dest) {}
 
   void barrier() {
     std::unique_lock<std::mutex> lock(mtx_);
@@ -53,7 +74,7 @@ class Barrier {
       cond0_.notify_all();
     }
   }
-  
+
   void reset() {
     std::unique_lock<std::mutex> lock(mtx_);
     count_ = 0;
@@ -65,4 +86,4 @@ class Barrier {
   std::condition_variable cond_, cond0_;
   std::mutex mtx_;
 };
-
+#endif  // THREADS_HPP

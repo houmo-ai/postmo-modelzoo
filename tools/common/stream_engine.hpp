@@ -1,7 +1,27 @@
-// Copyright (c) 2022 The Houmo.ai Authors. All rights reserved.
-/*!
- * \file stream_engine.hpp
+/*
+ * Copyright (c) 2022 HOUMO AI
+ *
+ * File: stream_engine.hpp
+ * Description:
+ *   Stream Engine Header File - Defines the StreamEngine class for managing
+ * asynchronous execution of model inference tasks using multiple streams.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
+#ifndef STREAM_ENGINE_HPP
+#define STREAM_ENGINE_HPP
 #include <unistd.h>
 
 #include <cassert>
@@ -115,7 +135,9 @@ class StreamEngine {
   }
 
  protected:
-  std::vector<StreamQueue> stream_queues_;  // stream队列
-  std::vector<int> wait_counts_;            // 等待运行的任务数量
-  std::vector<std::thread> threads_;        // stream线程
+  std::vector<StreamQueue> stream_queues_;  // StreamQueue
+  std::vector<int> wait_counts_;            // the num of wait tasks
+  std::vector<std::thread> threads_;        // stream threads
 };
+
+#endif  // STREAM_ENGINE_HPP

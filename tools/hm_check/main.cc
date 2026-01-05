@@ -1,5 +1,25 @@
-// Copyright (c) 2022 The Houmo.ai Authors. All rights reserved.
-
+/*
+ * Copyright (c) 2025 HOUMO AI
+ *
+ * File: main.cc
+ * Description:
+ *   HM System Check Tool - Main application for checking system status,
+ * hardware information, and performance testing for HOUMO AI devices.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include "argparse.hpp"
 #include "hm_sys.h"
 #include "models.h"
@@ -26,8 +46,8 @@ using namespace std::chrono;
 #define COLOR_CYAN "\x1b[96;20m"
 #define COLOR_RESET "\x1b[0m"
 
-static const int INDENT = 2;       // 缩进空格数
-static const int COL_PADDING = 4;  // 列间距
+static const int INDENT = 2;       // Indentation spaces
+static const int COL_PADDING = 4;  // Column padding
 
 typedef enum CheckStatus { PASS = 0, FAIL, WARN } checkStatus_t;
 
@@ -207,14 +227,14 @@ static void print_devices_aligned(const std::vector<hmDeviceInfo_t> &devices) {
     if (N == 0)
         return;
 
-    // 生成每个设备的字段
+    // Generate fields for each device
     std::vector<std::vector<DeviceField>> all;
     for (auto &d : devices)
         all.push_back(build_device_fields(d));
 
     const size_t ROWS = all[0].size();
 
-    // 每列最大宽度计算（含缩进）
+    // Calculate maximum width for each column (including indentation)
     std::vector<int> col_width(N, 0);
     for (size_t c = 0; c < N; ++c) {
         for (size_t r = 0; r < ROWS; ++r) {
@@ -226,7 +246,7 @@ static void print_devices_aligned(const std::vector<hmDeviceInfo_t> &devices) {
 
     printf("\n========== Devices ==========\n\n");
 
-    // 打印标题行
+    // Print the header row
     for (size_t i = 0; i < N; ++i)
         printf("Device %zu:%-*s", devices[i].device_id,
                col_width[i] - (int)std::string("Device X:").size() +
@@ -234,14 +254,14 @@ static void print_devices_aligned(const std::vector<hmDeviceInfo_t> &devices) {
                "");
     printf("\n");
 
-    // 打印每行字段
+    // Print each field row
     for (size_t r = 0; r < ROWS; ++r) {
         for (size_t c = 0; c < N; ++c) {
             printf("%*s%-*s: %-*s", INDENT, "", (int)all[c][r].key.size(),
                    all[c][r].key.c_str(),
                    (int)(col_width[c] - INDENT - all[c][r].key.size() - 2),
                    all[c][r].value.c_str());
-            printf("%*s", COL_PADDING, "");  // 列间距
+            printf("%*s", COL_PADDING, "");  // Column spacing
         }
         printf("\n");
     }
@@ -249,7 +269,7 @@ static void print_devices_aligned(const std::vector<hmDeviceInfo_t> &devices) {
     printf("\n=============================\n");
 }
 
-// 去除前后空格
+// Remove leading and trailing spaces
 static inline std::string trim(const std::string &s) {
     size_t b = s.find_first_not_of(" \t\r\n");
     size_t e = s.find_last_not_of(" \t\r\n");
@@ -551,7 +571,7 @@ static float run_model(std::string model_name, int32_t device_id,
     int32_t thread_num = core_count * 2;
     Barrier barrier(thread_num);
     int32_t repeat = samples / thread_num;
-    int32_t mod = samples % thread_num;  // 余数
+    int32_t mod = samples % thread_num;  // remainder
     std::vector<std::thread> threads;
     std::vector<statsInfo_t> statsInfos;
     statsInfos.resize(thread_num);
@@ -691,7 +711,7 @@ static double pcie_transfer_bandwidth(int32_t warmup, int32_t loops,
         for (auto &t : threads) {
             t.join();
         }
-        // 找到最长时间
+        // Find the maximum duration
         total_time = *std::max_element(durations.begin(), durations.end());
     }
     return (double(block_size) * loops * thread_num / 1024 / 1024 / 1024) /
@@ -758,7 +778,7 @@ int main(int argc, char **argv) {
         version_ok = false;
     }
 
-    // 算力测试
+    // Performance testing
     printf("===== Computing Power Test =====\n");
     std::string model_name = target + "_compute";
     float elapsed_time = 0;
@@ -767,7 +787,7 @@ int main(int argc, char **argv) {
         auto &d = devices[i];
         elapsed_time = run_model(model_name, d.device_id, d.core_count, repeat,
                                  rounds);  // ms
-        // 计算TOPS
+        // Calculate TOPS (Trillions of Operations Per Second)
         auto *model = get_model(model_name);
         d.computing_power = model->num_ops * repeat * 1000.0f / elapsed_time;
         printf("Device %d Computing Power: %.2f TOPS\n", d.device_id,
@@ -777,7 +797,7 @@ int main(int argc, char **argv) {
     printf("=============================\n\n");
 
     printf("===== DDR Bandwidth Test =====\n");
-    // DDR读写带宽测试
+    // DDR read/write bandwidth test
     rounds = 100;
     for (size_t i = 0; i < devices.size(); ++i) {
         auto &d = devices[i];
@@ -807,7 +827,7 @@ int main(int argc, char **argv) {
     printf("=============================\n\n");
 
     printf("===== PCIE Bandwidth Test =====\n");
-    // PCIE传输带宽测试，块1MB，线程数8
+    // PCIe transfer bandwidth test, block size 1MB, 8 threads
     int32_t block_size = 1 * 1024 * 1024;  // Bytes
     int32_t thread_num = 8;
     int32_t warmup = 1;
@@ -830,7 +850,7 @@ int main(int argc, char **argv) {
     printf("=============================\n\n");
 
     if (verbose) {
-        // 打印版本详细信息
+        // Print version details
         printf("===== Detail version info  =====\n\n");
 
         printf("Driver Info:\n");
@@ -895,7 +915,7 @@ int main(int argc, char **argv) {
         report.add("Device" + std::to_string(d.device_id) + " Cur IPU Freq",
                    status, std::string(buf), desc);
     }
-    // 检查算力是否低于最大算力的75%
+    // Check if performance is below 75% of maximum performance
     for (size_t i = 0; i < devices.size(); ++i) {
         const auto &d = devices[i];
         CheckStatus status = CheckStatus::PASS;
@@ -916,7 +936,8 @@ int main(int argc, char **argv) {
         report.add("Device" + std::to_string(d.device_id) + " Measured Compute",
                    status, std::string(buf), desc);
     }
-    // 检查DDR读写带宽是否分别在125GB 和 120GB的正负5%之内
+    // Check if DDR read and write bandwidths are within ±5% of 125GB and 120GB
+    // respectively
     for (size_t i = 0; i < devices.size(); ++i) {
         const auto &d = devices[i];
         CheckStatus status = CheckStatus::PASS;

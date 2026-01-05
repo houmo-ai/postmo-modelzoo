@@ -6,8 +6,13 @@
 
 ## 1 模型说明
 
-本例使用的模型实现来源于[https://modelscope.cn/models/Qwen/Qwen3-8B](https://modelscope.cn/models/Qwen/Qwen3-8B)。
+本例使用的模型实现来源于：
 
+- 模型名称: Qwen3-8B
+- 来源: [https://modelscope.cn/models/Qwen/Qwen3-8B](https://modelscope.cn/models/Qwen/Qwen3-8B)
+- 许可: [Apache License 2.0](https://modelscope.cn/models/Qwen/Qwen3-8B/file/view/master/LICENSE)
+
+预训练模型在运行时下载，工程发布**不包含**该模型。
 目前芯片模型只能在linux环境下量化和编译，请参考houmo-modelzoo/models/llm/qwen3中的量化和编译。
 
 

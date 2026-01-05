@@ -41,13 +41,17 @@
 #endif
 
 int RunPerf(std::unordered_map<std::string, std::string> args) {
-  fs::path prefill_path = validate_path(args, "prefill");  // 工作目录
-  fs::path decode_path = validate_path(args, "decode");    // 模型文件路径
+  fs::path prefill_path =
+      validate_path(args, "prefill");  // the path of prefill model
+  fs::path decode_path =
+      validate_path(args, "decode");  // the path of decode model
   fs::path visual_path =
       args.count("visual") ? validate_path(args, "visual") : fs::path();
-  fs::path embedding_path = validate_path(args, "embedding");  // 分词器路径
-  int input_token_len = validate_setting(args, "input");
-  int stop_token_len = validate_setting(args, "stop");
+  fs::path embedding_path =
+      validate_path(args, "embedding");  // the path of quant_embedding.bin
+  int input_token_len = validate_setting(args, "input");  // input tokens
+  int stop_token_len =
+      validate_setting(args, "stop");  // the num of tokens to stop generation
   int ndevices =
       args.count("ndevices") ? validate_setting(args, "ndevices") : 1;
   int loop_round = args.count("loop") ? validate_setting(args, "loop") : 1;

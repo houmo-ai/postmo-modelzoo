@@ -1,13 +1,32 @@
-// Copyright (c) 2022 The Houmo.ai Authors. All rights reserved.
-/*!
- * \file main.cc
+/*
+ * Copyright (c) 2025 HOUMO AI
+ *
+ * File: tcim_perf.cc
+ * Description:
+ *   TCIM Performance Testing Tool - Main application for measuring
+ * performance of TCIM (Tensor Compiler In Memory) models
+ * using multi-threaded execution and various performance metrics.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
 #include <getopt.h>
 #include <stdio.h>
 #include <unistd.h>
 
 #include <atomic>
-#include <chrono>  // 包含时间单位定义
+#include <chrono>  // Include time unit definitions
 #include <condition_variable>
 #include <cstdint>
 #include <cstring>
@@ -389,14 +408,16 @@ void LoadNpyFile(const std::string &data_file, std::vector<size_t> &shape,
   std::vector<T> data;
 #ifdef _MSC_VER
   std::vector<npy::ndarray_len_t> npy_shape;
-  // 关键修改2：调用 LoadArrayFromNumpy 时，传入 npy_shape（而非原 size_t 类型的
-  // shape）
+  // When calling LoadArrayFromNumpy, pass npy_shape
+  // (instead of the original size_t type
+  // shape)
   npy::LoadArrayFromNumpy(data_file, npy_shape, data);
-  // 补充：将 npy_shape 转换回 size_t 类型的 shape（满足函数输出要求）
+  // Convert npy_shape back to size_t type shape (to meet function
+  // output requirements)
   shape.clear();
   for (auto dim : npy_shape) {
-    shape.emplace_back(static_cast<size_t>(
-        dim));  // 安全转换（ndarray_len_t 通常是 int64_t/size_t）
+    // Safe conversion (ndarray_len_t is typically int64_t/size_t)
+    shape.emplace_back(static_cast<size_t>(dim));
   }
   memcpy(tensor.Data(), data.data(), tensor.Info().MemSize());
 #else

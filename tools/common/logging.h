@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2022 HOUMO AI
+ *
+ * File: logging.h
+ * Description:
+ *   Logging Utilities Header File - Defines logging macros and SpdLogger class
+ * for cross-platform logging with console and file output support.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #ifndef _APIS_COMMON_HPP_LOGGING_H_
 #define _APIS_COMMON_HPP_LOGGING_H_
 
@@ -30,10 +52,10 @@
 #define LOG_ERROR(...) SPDLOG_ERROR(__VA_ARGS__)
 #define LOG_FLUSH spdlog::default_logger_raw()->flush()
 
-// 打印堆栈信息（跨平台）
+// Print stack trace information (cross-platform)
 static void print_stacktrace() {
 #ifdef _WIN32
-  // Windows 堆栈信息捕获
+  // Windows stack trace capture
   void *stack[100];
   HANDLE process = GetCurrentProcess();
   SymInitialize(process, NULL, TRUE);
@@ -50,7 +72,7 @@ static void print_stacktrace() {
   }
   free(symbol);
 #else
-  // Linux/MacOS 堆栈信息捕获
+  // Linux/MacOS stack trace capture
   const int max_frames = 100;
   void *buffer[max_frames];
   int nptrs = backtrace(buffer, max_frames);
@@ -78,7 +100,7 @@ static void print_stacktrace() {
     std::abort();           \
   } while (0)
 
-// 定义 LOG_ASSERT 宏，检查条件并打印堆栈信息
+// Define LOG_ASSERT macro to check condition and print stack trace
 #define LOG_ASSERT(condition)                        \
   do {                                               \
     if (!(condition)) {                              \
@@ -126,7 +148,7 @@ class SpdLogger {
   }
 
   spdlog::level::level_enum get_spdlog_level() {
-    // 读取环境变量 SPDLOG_LEVEL
+    // Read environment variable HM_SPDLOG_LEVEL
     const char *env_level = std::getenv("HM_SPDLOG_LEVEL");
     if (!env_level) {
       return spdlog::level::info;  // default level

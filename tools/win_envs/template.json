@@ -1,9 +1,9 @@
 {
-    "__comment__": "支持的样例目录",
+    "__comment__": "Supported example directory",
     "example_dir": "apis/inferences",
-    "__comment__1": "支持的平台",
+    "__comment__1": "Supported platform",
     "support_target": "xh2",
-    "__comment__2": "支持的样例文件夹",
+    "__comment__2": "Supported example folders",
     "support_demos": {
         "qwen3": [
             "python",
@@ -26,9 +26,9 @@
             "c++"
         ]
     },
-    "__comment__3": "是否使用内网下载链接",
+    "__comment__3": "Whether to use internal network download links",
     "develop_url": false,
-    "__comment__4": "env.bat将会设置的所有环境变量",
+    "__comment__4": "All environment variables that env.bat will set",
     "all_environments": {
         "HOUMO_MODELZOO_URL": "",
         "HDPL_PLATFORM": "",
@@ -44,7 +44,7 @@
         "HOUMO_VERSION": "",
         "PATH": ""
     },
-    "__comment__5": "get_model脚本需要的环境变量",
+    "__comment__5": "Environment variables required by get_model script",
     "get_model_environments": [
         "PYTHON_DIR",
         "HOUMO_MODELZOO_URL",
@@ -53,7 +53,7 @@
         "HDPL_PLATFORM",
         "HOUMO_EXAMPLES_PATH"
     ],
-    "__comment__6": "python样例需要的环境变量 = get_model脚本需要的环境变量 + 当前的设置",
+    "__comment__6": "Python example environment variables = get_model script required environment variables + current settings",
     "py_example_environments": {
         "qwen3": [
             "TCIM_BACKEND",
@@ -81,7 +81,7 @@
             "HOUMO_SDK_PATH"
         ]
     },
-    "__comment__7": "cpp样例需要的环境变量 = python样例需要的环境变量 + 当前的设置",
+    "__comment__7": "C++ example environment variables = Python example environment variables + current settings",
     "cpp_example_environments": {
         "qwen3": [
             "CMAKE_PATH",

@@ -11,13 +11,13 @@
 
 
 ## 1.win11快速开始
-**此README仅支持python≥3.9，其他版本未作验证，建议使用python≥3.9。**
+**此README仅支持python3.9-3.13，其他版本未作验证，建议使用python3.9-3.13。**
 1. 使用准备与使用前提：
     - win11从后摩智能开发者社区[**https://developer.houmoai.com/**](https://developer.houmoai.com/)下载相关软件，参照社区文档中心完成固件烧录、驱动安装。
     - **驱动安装后需要确认windows的用户环境变量是否有HOUMO_SDK_PATH，该工具依赖此环境变量否则无法运行。**
     1. 直接使用exe安装包安装驱动，HOUMO_SDK_PATH会自动添加到用户环境变量，只需要用户确认是否正确即可。
     2. 使用zip包安装时，**解压时解压到zip包同名目录，否则工具可能无法获取到驱动版本号**。此外，用户需要自行添加HOUMO_SDK_PATH环境变量，路径示例D:\houmo_drv_xh2_v0.6.0_windows11_x86_64\houmo_drv_xh2。
-    - 下载example样例，安装必要的python运行环境，**建议使用python≥3.9版本**。
+    - 下载example样例，安装必要的python运行环境，**建议使用python3.9-3.13版本**。
     1. 安装后需要确认cmd终端python的版本号是否符合要求，有些用户存在多个版本的python需要确认默认的版本是否符合要求，如需查看windows的python位置，可以终端输入where python查看，建议从环境变量删除不需要的python版本。
     2. **部分用户终端python指令无效，但是py指令有效，具体处理方式为**：在cmd终端输入where py，将输出的路径从环境变量PATH删除。或者手动到对应目录删除py.exe文件。处理完成后重新开新的终端，确保py指令失效，python指令有效。
 
@@ -25,14 +25,14 @@
     1. 方式一：
         打开windows自带的Microsoft Store，搜索python后，点击获取会自动下载安装。
     2. 方式二：
-        - 在python官网[**https://www.python.org/downloads/windows/**](https://www.python.org/downloads/windows/) 下载python≥3.9安装包。
+        - 在python官网[**https://www.python.org/downloads/windows/**](https://www.python.org/downloads/windows/) 下载pytho3.9-3.13安装包。
         - 下载完成后，双击下载的安装文件启动安装程序。
         - 在安装界面中，勾选 Add python.exe to PATH（非常重要，避免后续手动配置环境变量）。
         - 点击 Customize installation（可选），根据需要自定义安装路径或组件，建议默认即可。
         - 如果需要更改安装路径，点击 Browse 并选择新路径（如 D:\Python）。
         - 确认所有选项后，点击 Install 开始安装。
         - 安装完成后，点击 Disable path length limit（建议禁用路径长度限制以避免潜在问题），然后点击 Close 关闭安装程序。
-        - 安装后，win+R打开终端，输入python --version确认python≥3.9。
+        - 安装后，win+R打开终端，输入python --version确认python3.9-3.13。
 
 3. examples环境安装详细步骤：
     - 开始菜单搜索cmd，选择命令提示符，右键以管理员身份运行，执行cd /d {path/of/examples}
@@ -40,7 +40,7 @@
     - 在[**https://visualstudio.microsoft.com/visual-cpp-build-tools/**](https://visualstudio.microsoft.com/visual-cpp-build-tools/)下载vs生成工具，后续C++样例编译需要使用。
     - 运行vs生成工具，勾选使用c++的桌面开发后，点击安装。
     - 执行cd /d {path/of/Runtime SDK}/切换到Runtime SDK压缩包下载的目录。
-    - 执行pip install {Runtime SDK.tar.gz}进行houmo-tcim-runtime-xh2的安装。 
+    - 执行pip install {Runtime SDK.tar.gz}进行houmo-tcim-runtime-xh2的安装。
     - 安装结束后，执行pip list查看houmo-tcim-runtime-xh2是否安装成功以及版本是否正确。
     - cd /d {path/of/examples}切换回examples的路径。
 
