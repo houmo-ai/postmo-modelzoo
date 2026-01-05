@@ -1,17 +1,27 @@
-# gte_Qwen2-1.5B-instruct
+# gte-Qwen2-1.5B-instruct
 
-本示例展示如何把gte_Qwen2-1.5B-instruct模型量化和编译，部署到后摩鸿途芯片的设备上。
+本示例展示如何把 gte-Qwen2-1.5B-instruct 模型量化和编译，部署到后摩鸿途芯片的设备上。
+
+## 预训练模型
+
+本项目使用从 ModelScope 下载的预训练模型：
+
+- 模型名称: gte-Qwen2-1.5B-instruct
+- 来源: https://www.modelscope.cn/models/iic/gte-Qwen2-1.5B-instruct
+- 许可：https://www.apache.org/licenses/LICENSE-2.0
+
+预训练模型在运行时下载，工程发布**不包含**该模型。
 
 [TOC]
 
 ## 1 模型说明
 
-本例使用的模型实现来源于[https://www.modelscope.cn/models/iic/gte_Qwen2-1.5B-instruct](https://www.modelscope.cn/models/iic/gte_Qwen2-1.5B-instruct)。
+本例使用的模型实现来源于[https://www.modelscope.cn/models/iic/gte-Qwen2-1.5B-instruct](https://www.modelscope.cn/models/iic/gte-Qwen2-1.5B-instruct)。
 本例只适用于xh2。
 
 ## 2 快速开始
 
-目前gte_Qwen2-1.5B-instruct模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
+目前gte-Qwen2-1.5B-instruct模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
 
 ### 2.1 获取模型和数据
 

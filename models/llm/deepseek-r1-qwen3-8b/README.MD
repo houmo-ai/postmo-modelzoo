@@ -2,6 +2,29 @@
 
 本示例展示如何把DeepSeek模型量化和编译，部署到后摩鸿途芯片的设备上。
 
+## 预训练模型
+
+本项目使用从 ModelScope 下载的预训练模型：
+
+- 模型名称: DeepSeek-R1-0528-Qwen3-8B
+- 来源: https://modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
+- 许可: MIT License （https://modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B/file/view/master/LICENSE?status=0）
+
+预训练模型在运行时下载，工程发布**不包含**该模型。
+
+## 用于校准的数据集
+
+本项目引用 wikitext 数据集仅用于**研究和评估目的**。
+
+- 数据集许可: CC BY-NC 4.0
+- 来源: https://www.modelscope.cn/datasets/modelscope/wikitext
+
+⚠️ 重要提示:
+- 本数据集**不作为本仓库的一部分进行分发**。
+- 本数据集**不受本项目 Apache License 2.0 许可的约束**。
+- 任何对数据集的使用都必须遵守其原始许可 (CC BY-NC 4.0)，包括**非商业用途限制**。
+- 用户有责任确保在使用本数据集时遵守相关规定。
+
 [TOC]
 
 ## 1 模型说明

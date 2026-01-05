@@ -2,6 +2,39 @@
 
 本示例展示如何把Qwen2.5VL模型量化和编译，部署到后摩鸿途芯片的设备上。
 
+## 预训练模型
+
+本项目使用从 ModelScope 下载的预训练模型：
+
+- 模型名称: Qwen2.5-VL-7B-Instruct
+- 来源: https://modelscope.cn/models/Qwen/Qwen2.5-VL-7B-Instruct
+- 许可: Apache License 2.0 （https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md）
+
+预训练模型在运行时下载，工程发布**不包含**该模型。
+同时，原有的预处理代码 image_processing_qwen2_vl.py 和 processing_qwen2_5_vl.py 已进行专门的改编和修改，并包含在项目提交文件中。特此声明。
+
+## 数据集使用声明
+
+本项目使用了由LAION提供的"220k-GPT4Vision-captions-from-LIVIS"数据集。该数据集包含22万条通过GPT-4 Vision生成的图像描述文本，源自LIVIS数据集。
+- 数据集获取方式：
+
+    数据集可通过Hugging Face平台公开获取：
+
+    https://huggingface.co/datasets/laion/220k-GPT4Vision-captions-from-LIVIS
+
+- 许可信息： 本数据集采用Apache License 2.0开源协议授权。根据该许可条款，使用者可以自由地：
+
+    使用、复制和分发数据集
+     
+    修改和创建衍生作品
+
+    将数据集用于商业用途
+
+    同时需遵守协议中规定的署名要求和责任限制条款。
+- 合规性说明：
+
+  本项目的使用方式完全符合Apache License 2.0的规定要求，特此声明。
+
 [TOC]
 
 ## 1 模型说明

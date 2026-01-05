@@ -2,6 +2,16 @@
 
 本示例展示如何把gpt-oss-20b模型量化和编译，部署到后摩鸿途芯片的设备上。
 
+## 预训练模型
+
+本项目使用从 ModelScope 下载的预训练模型：
+
+- 模型名称: gpt-oss-20b
+- 来源: https://modelscope.cn/models/openai-mirror/gpt-oss-20b
+- 许可: Apache License 2.0 （https://modelscope.cn/models/openai-mirror/gpt-oss-20b/file/view/master/LICENSE?status=0）
+
+预训练模型在运行时下载，工程发布**不包含**该模型。
+
 [TOC]
 
 ## 1 模型说明
