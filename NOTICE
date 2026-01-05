@@ -1,0 +1,74 @@
+NOTICE
+
+This product includes software developed by HOUMO.AI.
+
+Project Name: <imodelzoo>
+Copyright © <2025> <HOUMO.AI>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Additional Notice:
+
+This repository contains:
+- Model quantization, compilation, and inference example code
+- Model performance benchmarking code
+- Algorithm deployment and application examples
+- Model optimization examples
+
+This project may reference or integrate third-party models, datasets,
+toolchains, SDKs, or runtime libraries that are licensed separately.
+
+Such third-party components are NOT covered by the Apache License 2.0
+of this project. Their usage is subject to their original license terms.
+
+For third-party components requiring special emphasis, 
+please refer to the relevant information in THIRD_PARTY_NOTICE.
+
+Users are solely responsible for ensuring compliance with all applicable
+third-party licenses, usage restrictions, and legal requirements,
+including but not limited to commercial usage rights.
+
+
+Third-Party Software, Algorithm and Data Notices:
+
+# Software libraries
+half IEEE 754-based half-precision floating-point library (MIT) - https://github.com/suruoxi/half
+tokenizers-cpp (Apache-2.0) - https://github.com/mlc-ai/tokenizers-cpp
+Eigen3 (MPL-2.0) - https://gitlab.com/libeigen/eigen
+JSON for Modern C++ (MIT) - https://github.com/nlohmann/json
+mingw-w64 getopt.h (ISC & BSD-2-Clause) - https://sourceforge.net/projects/mingw-w64
+Numpy File I/O for C++ npy.hpp - https://github.com/llohse/libnpy
+Fast C++ Logging Library spdlog - https://github.com/gabime/spdlog
+Modern C++ Argument Parser argparse - https://github.com/p-ranav/argparse
+# Datasets
+CCPD Dataset (MIT) - https://github.com/detectRecog/CCPD
+VOC2012 Dataset (CC BY 4.0) - https://public.roboflow.com/object-detection/pascal-voc-2012
+COCO Dataset (CC BY 4.0) - https://cocodataset.org/#termsofuse
+ImageNet 2012 Dataset - https://www.image-net.org/download?
+BDD100K Dataset (CC BY-NC-SA 4.0) - https://bair.berkeley.edu/blog/2018/05/30/bdd/
+nuScenes Dataset (CC BY-NC-SA 4.0) - https://www.nuscenes.org/
+WIDER FACE Dataset (CC BY-NC-ND 4.0) - https://shuoyang1213.me/WIDERFACE/
+# Algorithm (Only some)
+Whisper - https://github.com/openai/whisper
+bge-m3&bge-reranker-m3-v2 - https://github.com/FlagOpen/FlagEmbedding
+DeepSeek-R1-0528-Qwen3-8B - https://modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
+gpt-oss-20b - https://modelscope.cn/models/openai-mirror/gpt-oss-20b
+Qwen3-8B - https://modelscope.cn/models/Qwen/Qwen3-8B
+Qwen3-14B - https://modelscope.cn/models/Qwen/Qwen3-14B
+Qwen3-30B-A3B - https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B
+Qwen2.5-VL 7B - https://modelscope.cn/models/Qwen/Qwen2.5-VL-7B-Instruct
+Qwen3-VL 8B - https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct
+MiniCPM-O-2.6 - https://github.com/OpenBMB/MiniCPM-V
+
+For detailed third-party citation notices, licenses, and precautions, please refer to THIRD_PARTY_NOTICES.
+
