@@ -71,6 +71,7 @@ https://www.mozilla.org/en-US/MPL/2.0/
 Usage in this project: 
 The following paths are automatically downloaded, associated, and included in the compilation process:
     apis/inferences/qwen3/
+    tools/llm_perf
 
 Only MPL 2.0-licensed modules are used. The preprocessor symbol
 EIGEN_MPL2_ONLY is defined to exclude LGPL-licensed code.
@@ -106,6 +107,7 @@ Usage in this project:
 The following paths are automatically downloaded static lib, associated, 
 and included in the compilation process:
     apis/inferences/qwen3/
+    tools/llm_perf
 
 The tokenizers-cpp library is licensed under the Apache License, Version 2.0,
 which allows use, modification, and distribution of the software in source
