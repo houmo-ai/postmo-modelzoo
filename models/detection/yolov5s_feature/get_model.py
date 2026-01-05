@@ -4,7 +4,7 @@ import argparse
 from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
@@ -43,13 +43,13 @@ if __name__ == "__main__":
     model_type = args.model_type
     model_dir = args.model_dir
 
-    model_name = "yolov5s"
+    model_name = "yolov5s_feature"
     ncore = 1
     batch = 1
     opt_level = "O2"
     version = get_houmo_version()
     target = HOUMO_TARGET
-    raw_path = f"models/{model_name}/yolov5s.onnx"
+    raw_path = f"models/yolov5s/yolov5s.onnx"
     build_path = f"models/{target.lower()}-{version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type in ["raw"]:
