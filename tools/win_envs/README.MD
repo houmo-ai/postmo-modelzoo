@@ -11,7 +11,10 @@
 
 
 ## 1.win11快速开始
-**此README仅支持python3.9-3.13，其他版本未作验证，建议使用python3.9-3.13。**
+- **此README仅支持python3.9-3.13，其他版本未作验证，建议使用python3.9-3.13。**
+- **requirements.txt中的依赖都是python3.9-3.13版本，其他版本未作验证。**
+- **python≥3.14时onnx和onnxruntime需要用户从官网下载源码，自行编译安装对应版本的onnx和onnxruntime。**
+- **python的pip源会不断更新，后续可能会有部分requirements.txt中的依赖版本可能无法安装成功的情况，必要时请自行修改requirements.txt中的依赖版本。**
 1. 使用准备与使用前提：
     - win11从后摩智能开发者社区[**https://developer.houmoai.com/**](https://developer.houmoai.com/)下载相关软件，参照社区文档中心完成固件烧录、驱动安装。
     - **驱动安装后需要确认windows的用户环境变量是否有HOUMO_SDK_PATH，该工具依赖此环境变量否则无法运行。**
@@ -25,7 +28,7 @@
     1. 方式一：
         打开windows自带的Microsoft Store，搜索python后，点击获取会自动下载安装。
     2. 方式二：
-        - 在python官网[**https://www.python.org/downloads/windows/**](https://www.python.org/downloads/windows/) 下载pytho3.9-3.13安装包。
+        - 在python官网[**https://www.python.org/downloads/windows/**](https://www.python.org/downloads/windows/) 下载python3.9-3.13安装包。
         - 下载完成后，双击下载的安装文件启动安装程序。
         - 在安装界面中，勾选 Add python.exe to PATH（非常重要，避免后续手动配置环境变量）。
         - 点击 Customize installation（可选），根据需要自定义安装路径或组件，建议默认即可。
