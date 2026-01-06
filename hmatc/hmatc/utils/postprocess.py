@@ -1,43 +1,79 @@
-import time
+# Copyright 2025 HOUMO AI
+#
+# File: postprocess.py
+# Description:
+#   Postprocess functions
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torchvision
-from . import logger
 
 
 def sigmoid(x):
-    """Compute Sigmoid for scalar/array input"""
+    """Calculate sigmoid function for input x.
+
+    Args:
+        x: Input value or array
+
+    Returns:
+        Sigmoid-transformed value(s)
+    """
     return 1 / (1 + np.exp(-x))
 
 
 def softmax(x, axis=1, keepdims=True):
+    """Apply softmax function to input array.
+
+    Args:
+        x: Input array
+        axis: Axis along which to apply softmax
+        keepdims: Whether to keep dimensions after operation
+
+    Returns:
+        Softmax-transformed array
+    """
     e_x = np.exp(x - np.max(x, axis=axis, keepdims=keepdims))
     return e_x / np.sum(e_x, axis=axis, keepdims=keepdims)
 
 
 def crop_mask(masks, boxes):
-    """
-    "Crop" predicted masks by zeroing out everything not in the predicted bbox.
+    """Crop predicted masks by zeroing out everything not in the predicted bbox.
     Vectorized by Chong (thanks Chong).
 
     Args:
         - masks should be a size [h, w, n] tensor of masks
         - boxes should be a size [n, 4] tensor of bbox coords in relative point form
-    """
 
+    Returns:
+        Cropped masks tensor
+    """
     n, h, w = masks.shape
     x1, y1, x2, y2 = torch.chunk(boxes[:, :, None], 4, 1)  # x1 shape(1,1,n)
-    r = torch.arange(w, device=masks.device, dtype=x1.dtype)[None, None, :]  # rows shape(1,w,1)
-    c = torch.arange(h, device=masks.device, dtype=x1.dtype)[None, :, None]  # cols shape(h,1,1)
+    # rows shape(1,w,1)
+    r = torch.arange(w, device=masks.device, dtype=x1.dtype)[None, None, :]
+    # cols shape(h,1,1)
+    c = torch.arange(h, device=masks.device, dtype=x1.dtype)[None, :, None]
 
     return masks * ((r >= x1) * (r < x2) * (c >= y1) * (c < y2))
 
 
 def process_mask(protos, masks_in, bboxes, shape, upsample=False):
-    """
-    Crop before upsample.
+    """Crop before upsample.
     proto_out: [mask_dim, mask_h, mask_w]
     out_masks: [n, mask_dim], n is number of masks after nms
     bboxes: [n, 4], n is number of masks after nms
@@ -45,7 +81,6 @@ def process_mask(protos, masks_in, bboxes, shape, upsample=False):
 
     return: h, w, n
     """
-
     c, mh, mw = protos.shape  # CHW
     ih, iw = shape
     masks = (masks_in @ protos.float().view(c, -1)).sigmoid().view(-1, mh, mw)  # CHW
@@ -58,12 +93,19 @@ def process_mask(protos, masks_in, bboxes, shape, upsample=False):
 
     masks = crop_mask(masks, downsampled_bboxes)  # CHW
     if upsample:
-        masks = F.interpolate(masks[None], shape, mode='bilinear', align_corners=False)[0]  # CHW
+        masks = F.interpolate(masks[None], shape, mode="bilinear", align_corners=False)[
+            0
+        ]  # CHW
     return masks.gt_(0.5)
 
 
 def clip_coords(boxes, shape):
-    # Clip bounding xyxy bounding boxes to image shape (height, width)
+    """Clip bounding xyxy bounding boxes to image shape (height, width).
+
+    Args:
+        boxes: Bounding boxes in xyxy format
+        shape: Image shape as (height, width)
+    """
     if isinstance(boxes, torch.Tensor):  # faster individually
         boxes[:, 0].clamp_(0, shape[1])  # x1
         boxes[:, 1].clamp_(0, shape[0])  # y1
@@ -74,28 +116,58 @@ def clip_coords(boxes, shape):
         boxes[:, [1, 3]] = boxes[:, [1, 3]].clip(0, shape[0])  # y1, y2
 
 
-def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None):
-    # Rescale coords (xyxy) from img1_shape to img0_shape
-    if ratio_pad is None:  # calculate from img0_shape
-        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
-        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
-    else:
-        gain = ratio_pad[0][0]
-        pad = ratio_pad[1]
+def scale_coords(img1_shape, coords, img0_shape, need_pad=True):
+    """Scale coordinates from img1_shape to img0_shape.
 
-    coords[:, [0, 2]] -= pad[0]  # x padding
-    coords[:, [1, 3]] -= pad[1]  # y padding
+    Args:
+        img1_shape: Shape of input image after transformation
+        coords: Coordinates to be scaled
+        img0_shape: Original image shape
+        need_pad: Whether padding was applied
+
+    Returns:
+        Scaled coordinates
+    """
+    gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])
+    if need_pad:
+        pad = (img1_shape[1] - img0_shape[1] * gain) * 0.5, (
+            img1_shape[0] - img0_shape[0] * gain
+        ) * 0.5
+    else:
+        pad = (0, 0)
+
+    coords[:, [0, 2]] -= pad[0]
+    coords[:, [1, 3]] -= pad[1]
     coords[:, :4] /= gain
-    # clip_coords(coords, img0_shape)
+    if isinstance(coords, torch.Tensor):
+        coords[:, [0, 2]].clamp_(0, img0_shape[1])
+        coords[:, [1, 3]].clamp_(0, img0_shape[0])
+    else:
+        coords[:, [0, 2]] = coords[:, [0, 2]].clip(0, img0_shape[1])  # x1, x2
+        coords[:, [1, 3]] = coords[:, [1, 3]].clip(0, img0_shape[0])  # y1, y2
     return coords
 
 
 def scale_coords_kpt(img1_shape, coords, img0_shape, ratio_pad=None):
+    """Scale coordinates for keypoints from img1_shape to img0_shape.
+
+    Args:
+        img1_shape: Shape of input image after transformation
+        coords: Keypoint coordinates to be scaled
+        img0_shape: Original image shape
+        ratio_pad: Optional ratio and padding parameters
+
+    Returns:
+        Scaled coordinates as numpy array
+    """
     if len(coords) == 0:
         return coords
-    if ratio_pad is None:  # calculate from img0_shape
-        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
-        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+    if ratio_pad is None:
+        # gain  = old / new
+        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])
+        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (
+            img1_shape[0] - img0_shape[0] * gain
+        ) / 2
     else:
         gain = ratio_pad[0][0]
         pad = ratio_pad[1]
@@ -109,16 +181,31 @@ def scale_coords_kpt(img1_shape, coords, img0_shape, ratio_pad=None):
     coords[:, 0:4] /= gain
     coords[:, 6::3] /= gain
     coords[:, 7::3] /= gain
-    # clip_coords(coords, img0_shape)
+    clip_coords(coords, img0_shape)
     return coords.numpy()
 
 
 def scale_coords_mask(img1_shape, contours, img0_shape, ratio_pad=None):
+    """Scale contour coordinates from img1_shape to img0_shape.
+
+    Args:
+        img1_shape: Shape of input image after transformation
+        contours: Contour points to be scaled
+        img0_shape: Original image shape
+        ratio_pad: Optional ratio and padding parameters
+
+    Returns:
+        Scaled contours
+    """
     if len(contours) == 0:
         return contours
     if ratio_pad is None:  # calculate from img0_shape
-        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
-        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+        gain = min(
+            img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1]
+        )  # gain  = old / new
+        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (
+            img1_shape[0] - img0_shape[0] * gain
+        ) / 2  # wh padding
     else:
         gain = ratio_pad[0][0]
         pad = ratio_pad[1]
@@ -135,10 +222,22 @@ def scale_coords_mask(img1_shape, contours, img0_shape, ratio_pad=None):
 
 
 def scale_coords_landmarks(img1_shape, coords, img0_shape, ratio_pad=None):
-    # Rescale coords (xyxy) from img1_shape to img0_shape
-    if ratio_pad is None:  # calculate from img0_shape
-        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
-        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+    """Scale landmark coordinates from img1_shape to img0_shape.
+
+    Args:
+        img1_shape: Shape of input image after transformation
+        coords: Landmark coordinates to be scaled
+        img0_shape: Original image shape
+        ratio_pad: Optional ratio and padding parameters
+
+    Returns:
+        Scaled coordinates
+    """
+    if ratio_pad is None:
+        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])
+        pad = (img1_shape[1] - img0_shape[1] * gain) * 0.5, (
+            img1_shape[0] - img0_shape[0] * gain
+        ) * 0.5
     else:
         gain = ratio_pad[0][0]
         pad = ratio_pad[1]
@@ -146,7 +245,7 @@ def scale_coords_landmarks(img1_shape, coords, img0_shape, ratio_pad=None):
     coords[:, [0, 2, 4, 6, 8]] -= pad[0]  # x padding
     coords[:, [1, 3, 5, 7, 9]] -= pad[1]  # y padding
     coords[:, :10] /= gain
-    # clip_coords(coords, img0_shape)
+    # clip
     coords[:, 0].clamp_(0, img0_shape[1])  # x1
     coords[:, 1].clamp_(0, img0_shape[0])  # y1
     coords[:, 2].clamp_(0, img0_shape[1])  # x2
@@ -161,533 +260,158 @@ def scale_coords_landmarks(img1_shape, coords, img0_shape, ratio_pad=None):
     return coords
 
 
-def box_area(box):
-    # box = xyxy(4,n)
-    return (box[2] - box[0]) * (box[3] - box[1])
-
-
-def box_iou(box1, box2, eps=1e-7):
-    # https://github.com/pytorch/vision/blob/master/torchvision/ops/boxes.py
-    """
-    Return intersection-over-union (Jaccard index) of boxes.
-    Both sets of boxes are expected to be in (x1, y1, x2, y2) format.
-    Arguments:
-        box1 (Tensor[N, 4])
-        box2 (Tensor[M, 4])
-        eps
-    Returns:
-        iou (Tensor[N, M]): the NxM matrix containing the pairwise
-            IoU values for every element in boxes1 and boxes2
-    """
-
-    # inter(N,M) = (rb(N,M,2) - lt(N,M,2)).clamp(0).prod(2)
-    (a1, a2), (b1, b2) = box1[:, None].chunk(2, 2), box2.chunk(2, 1)
-    inter = (torch.min(a2, b2) - torch.max(a1, b1)).clamp(0).prod(2)
-
-    # IoU = inter / (area1 + area2 - inter)
-    return inter / (box_area(box1.T)[:, None] + box_area(box2.T) - inter + eps)
-
-
-def bbox_overlap(bb_test, bb_gt):
-    """
-    Computes IUO between two bboxes in the form [x1,y1,x2,y2]
-    :param bb_test:
-    :param bb_gt:
-    :return: overlap
-    """
-    xx1 = np.maximum(bb_test[0], bb_gt[0])
-    yy1 = np.maximum(bb_test[1], bb_gt[1])
-    xx2 = np.minimum(bb_test[2], bb_gt[2])
-    yy2 = np.minimum(bb_test[3], bb_gt[3])
-    w = np.maximum(0.0, xx2 - xx1)
-    h = np.maximum(0.0, yy2 - yy1)
-    wh = w * h
-    overlap = wh / (
-        (bb_test[2] - bb_test[0]) * (bb_test[3] - bb_test[1])
-        + (bb_gt[2] - bb_gt[0]) * (bb_gt[3] - bb_gt[1])
-        - wh
-    )
-
-    return overlap
-
-
 def xyxy2xywh(x):
-    # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
+    """Convert bounding box format from xyxy to xywh.
+
+    Args:
+        x: Bounding boxes in xyxy format [x1, y1, x2, y2]
+
+    Returns:
+        Bounding boxes in xywh format [x_center, y_center, width, height]
+    """
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
-    y[:, 0] = (x[:, 0] + x[:, 2]) / 2  # x center
-    y[:, 1] = (x[:, 1] + x[:, 3]) / 2  # y center
-    y[:, 2] = x[:, 2] - x[:, 0]  # width
-    y[:, 3] = x[:, 3] - x[:, 1]  # height
+    y[:, 0] = (x[:, 0] + x[:, 2]) * 0.5
+    y[:, 1] = (x[:, 1] + x[:, 3]) * 0.5
+    y[:, 2] = x[:, 2] - x[:, 0]
+    y[:, 3] = x[:, 3] - x[:, 1]
     return y
 
 
 def xywh2xyxy(x):
-    # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+    """Convert bounding box format from xywh to xyxy.
+
+    Args:
+        x: Bounding boxes in xywh format [x_center, y_center, width, height]
+
+    Returns:
+        Bounding boxes in xyxy format [x1, y1, x2, y2]
+    """
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
-    y[:, 0] = x[:, 0] - x[:, 2] / 2  # top left x
-    y[:, 1] = x[:, 1] - x[:, 3] / 2  # top left y
-    y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
-    y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
+    y[:, 0] = x[:, 0] - x[:, 2] * 0.5
+    y[:, 1] = x[:, 1] - x[:, 3] * 0.5
+    y[:, 2] = x[:, 0] + x[:, 2] * 0.5
+    y[:, 3] = x[:, 1] + x[:, 3] * 0.5
     return y
 
 
-def non_max_suppression2(
-    prediction,
-    conf_thres=0.25,
-    iou_thres=0.45,
-    classes=None,
-    agnostic=False,
-    multi_label=False,
-    labels=(),
-    max_det=300,
-    nc=0,  # number of classes (optional)
-    max_time_img=0.05,
-    max_nms=30000,
-    max_wh=7680,
-):
-    # Checks
-    assert 0 <= conf_thres <= 1, f'Invalid Confidence threshold {conf_thres}, valid values are between 0.0 and 1.0'
-    assert 0 <= iou_thres <= 1, f'Invalid IoU {iou_thres}, valid values are between 0.0 and 1.0'
-    if isinstance(prediction, (list, tuple)):  # YOLOv8 model in validation model, output = (inference_out, loss_out)
-        prediction = prediction[0]  # select only inference output
-
-    device = prediction.device
-    mps = 'mps' in device.type  # Apple MPS
-    if mps:  # MPS not fully supported yet, convert tensors to CPU before NMS
-        prediction = prediction.cpu()
-    bs = prediction.shape[0]  # batch size
-    nc = nc or (prediction.shape[1] - 4)  # number of classes
-    nm = prediction.shape[1] - nc - 4
-    mi = 4 + nc  # mask start index
-    xc = prediction[:, 4:mi].amax(1) > conf_thres  # candidates
-
-    # Settings
-    # min_wh = 2  # (pixels) minimum box width and height
-    time_limit = 0.5 + max_time_img * bs  # seconds to quit after
-    redundant = True  # require redundant detections
-    multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
-    merge = False  # use merge-NMS
-
-    t = time.time()
-    output = [torch.zeros((0, 6 + nm), device=prediction.device)] * bs
-    for xi, x in enumerate(prediction):  # image index, image inference
-        # Apply constraints
-        # x[((x[:, 2:4] < min_wh) | (x[:, 2:4] > max_wh)).any(1), 4] = 0  # width-height
-        x = x.transpose(0, -1)[xc[xi]]  # confidence
-
-        # Cat apriori labels if autolabelling
-        if labels and len(labels[xi]):
-            lb = labels[xi]
-            v = torch.zeros((len(lb), nc + nm + 5), device=x.device)
-            v[:, :4] = lb[:, 1:5]  # box
-            v[range(len(lb)), lb[:, 0].long() + 4] = 1.0  # cls
-            x = torch.cat((x, v), 0)
-
-        # If none remain process next image
-        if not x.shape[0]:
-            continue
-
-        # Detections matrix nx6 (xyxy, conf, cls)
-        box, cls, mask = x.split((4, nc, nm), 1)
-        box = xywh2xyxy(box)  # center_x, center_y, width, height) to (x1, y1, x2, y2)
-        if multi_label:
-            i, j = (cls > conf_thres).nonzero(as_tuple=False).T
-            x = torch.cat((box[i], x[i, 4 + j, None], j[:, None].float(), mask[i]), 1)
-        else:  # best class only
-            conf, j = cls.max(1, keepdim=True)
-            x = torch.cat((box, conf, j.float(), mask), 1)[conf.view(-1) > conf_thres]
-
-        # Filter by class
-        if classes is not None:
-            x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
-
-        # Apply finite constraint
-        # if not torch.isfinite(x).all():
-        #     x = x[torch.isfinite(x).all(1)]
-
-        # Check shape
-        n = x.shape[0]  # number of boxes
-        if not n:  # no boxes
-            continue
-        x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence and remove excess boxes
-
-        # Batched NMS
-        c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
-        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
-        i = i[:max_det]  # limit detections
-        if merge and (1 < n < 3e3):  # Merge NMS (boxes merged using weighted mean)
-            # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-            iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-            weights = iou * scores[None]  # box weights
-            x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
-            if redundant:
-                i = i[iou.sum(1) > 1]  # require redundancy
-
-        output[xi] = x[i]
-        if mps:
-            output[xi] = output[xi].to(device)
-        if (time.time() - t) > time_limit:
-            logger.warning(f'WARNING ⚠️ NMS time limit {time_limit:.3f}s exceeded')
-            break  # time limit exceeded
-
-    return output
-
-
 def non_max_suppression(
-    prediction,
+    preds: torch.Tensor,
     conf_thres=0.25,
     iou_thres=0.45,
-    classes=None,
-    agnostic=False,
-    multi_label=False,
-    labels=(),
+    nm=0,
     max_det=300,
-    nm=0,  # number of masks
+    exist_obj_conf=False,
 ):
-    """Non-Maximum Suppression (NMS) on inference results to reject overlapping bounding boxes
+    """Perform Non-Maximum Suppression (NMS) on inference results.
+
+    Args:
+        preds: Prediction tensor with shape [batch, num_predictions, 4 + nc + nm]
+        conf_thres: Confidence threshold for filtering predictions
+        iou_thres: IoU threshold for NMS
+        nm: Number of mask coefficients
+        max_det: Maximum number of detections to keep
+        exist_obj_conf: Whether object confidence exists in predictions
+
     Returns:
-         list of detections, on (n,6) tensor per image [xyxy, conf, cls]
+        List of detection results for each image in batch
     """
-    bs = prediction.shape[0]  # batch size
-    nc = prediction.shape[2] - nm - 5  # number of classes
-    xc = prediction[..., 4] > conf_thres  # candidates
-
-    # Checks
-    assert 0 <= conf_thres <= 1, f'Invalid Confidence threshold {conf_thres}, valid values are between 0.0 and 1.0'
-    assert 0 <= iou_thres <= 1, f'Invalid IoU {iou_thres}, valid values are between 0.0 and 1.0'
-
-    # Settings
-    # min_wh = 2  # (pixels) minimum box width and height
-    max_wh = 7680  # (pixels) maximum box width and height
-    max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()
-    time_limit = 0.5 + 0.05 * bs  # seconds to quit after
-    redundant = True  # require redundant detections
-    multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
-    merge = False  # use merge-NMS
-
-    t = time.time()
-    mi = 5 + nc  # mask start index
-    output = [torch.zeros((0, 6 + nm), device=prediction.device)] * bs
-    for xi, x in enumerate(prediction):  # image index, image inference
-        # Apply constraints
-        # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
-        x = x[xc[xi]]  # confidence
-        # Cat apriori labels if autolabelling
-        if labels and len(labels[xi]):
-            lb = labels[xi]
-            v = torch.zeros((len(lb), nc + 5), device=x.device)
-            v[:, :4] = lb[:, 1:5]  # box
-            v[:, 4] = 1.0  # conf
-            v[range(len(lb)), lb[:, 0].long() + 5] = 1.0  # cls
-            x = torch.cat((x, v), 0)
-
-        # If none remain process next image
-        if not x.shape[0]:
+    max_nms = 30000
+    max_wh = 7680
+    bs = preds.shape[0]
+    if preds.shape[1] < preds.shape[2]:
+        preds = preds.permute(0, 2, 1)
+    if exist_obj_conf:
+        box_data = preds[:, :, :4]
+        cls_conf = preds[:, :, 4:5] * preds[:, :, 5:]
+        preds = torch.cat([box_data, cls_conf], dim=2)
+    nc = preds.shape[2] - nm - 4
+    mi = 4 + nc
+    xc = preds[:, :, 4:mi].amax(dim=2, keepdim=False) > conf_thres
+    output = [torch.zeros((0, 6 + nm), device=preds.device)] * bs
+    for batch_idx, pred in enumerate(preds):
+        pred = pred[xc[batch_idx]]  # confidence
+        if not pred.shape[0]:
             continue
-
-        # Compute conf
-        x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
-
-        # Box (center x, center y, width, height) to (x1, y1, x2, y2)
-        box = xywh2xyxy(x[:, :4])
-        mask = x[:, mi:]  # zero columns if no masks
-
-        # Detections matrix nx6 (xyxy, conf, cls)
-        if multi_label:
-            i, j = (x[:, 5:mi] > conf_thres).nonzero(as_tuple=False).T
-            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float(), mask[i]), dim=1)
-        else:  # best class only
-            conf, j = x[:, 5:mi].max(1, keepdim=True)
-            x = torch.cat((box, conf, j.float(), mask), dim=1)[conf.view(-1) > conf_thres]
-
-        # Filter by class
-        if classes is not None:
-            x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
-
-        # Check shape
-        n = x.shape[0]  # number of boxes
-        if not n:  # no boxes
-            continue
-
-        x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
-
-        # Batched NMS
-        c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
-        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
-        i = i[:max_det]
-        if merge and (1 < n < 3e3):  # Merge NMS (boxes merged using weighted mean)
-            # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-            iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-            weights = iou * scores[None]  # box weights
-            x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
-            if redundant:
-                i = i[iou.sum(1) > 1]  # require redundancy
-
-        output[xi] = x[i]
-        if (time.time() - t) > time_limit:
-            logger.warning(f'WARNING: NMS time limit {time_limit:.3f}s exceeded')
-            break  # time limit exceeded
-
-    return output
-
-
-def output_to_keypoint2(outputs: list) -> list:
-    # Convert model output to target format [batch_id, class_id, x, y, w, h, kpt]
-    results = list()
-    for idx, output in enumerate(outputs):
-        kpts = output[:, 6:]
-        boxes = output[:, :6]
-
-    return results
-
-
-def output_to_keypoint(output):
-    # Convert model output to target format [batch_id, class_id, x, y, w, h, conf, kpt]
-    targets = []
-    for i, o in enumerate(output):
-        kpts = o[:, 6:]
-        o = o[:, :6]
-        for idx, (*box, conf, cls) in enumerate(o.detach().cpu().numpy()):
-            targets.append(
-                [i, cls, *list(*xyxy2xywh(np.array(box)[None])), conf, *list(kpts.detach().cpu().numpy()[idx])])
-    return np.array(targets)
-
-
-def non_max_suppression_kpt(
-    prediction,
-    conf_thres=0.25,
-    iou_thres=0.45,
-    classes=None,
-    agnostic=False,
-    multi_label=False,
-    labels=(),
-    kpt_label=False,
-    nc=None,
-    nkpt=None,
-):
-    """Runs Non-Maximum Suppression (NMS) on inference results
-    Returns:
-         list of detections, on (n,6) tensor per image [xyxy, conf, cls]
-    """
-    if nc is None:
-        nc = prediction.shape[2] - 5 if not kpt_label else prediction.shape[2] - 56  # number of classes
-    xc = prediction[..., 4] > conf_thres  # candidates
-
-    # Settings
-    min_wh, max_wh = 2, 4096  # (pixels) minimum and maximum box width and height
-    max_det = 300  # maximum number of detections per image
-    max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()
-    time_limit = 10.0  # seconds to quit after
-    redundant = True  # require redundant detections
-    multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
-    merge = False  # use merge-NMS
-
-    t = time.time()
-    output = [torch.zeros((0, 6), device=prediction.device)] * prediction.shape[0]
-    for xi, x in enumerate(prediction):  # image index, image inference
-        # Apply constraints
-        # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
-        x = x[xc[xi]]  # confidence
-
-        # Cat apriori labels if autolabelling
-        if labels and len(labels[xi]):
-            l = labels[xi]
-            v = torch.zeros((len(l), nc + 5), device=x.device)
-            v[:, :4] = l[:, 1:5]  # box
-            v[:, 4] = 1.0  # conf
-            v[range(len(l)), l[:, 0].long() + 5] = 1.0  # cls
-            x = torch.cat((x, v), 0)
-
-        # If none remain process next image
-        if not x.shape[0]:
-            continue
-
-        # Compute conf
-        x[:, 5 : 5 + nc] *= x[:, 4:5]  # conf = obj_conf * cls_conf
-
-        # Box (center x, center y, width, height) to (x1, y1, x2, y2)
-        box = xywh2xyxy(x[:, :4])
-
-        # Detections matrix nx6 (xyxy, conf, cls)
-        if multi_label:
-            i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
-            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
-        else:  # best class only
-            if not kpt_label:
-                conf, j = x[:, 5:].max(1, keepdim=True)
-                x = torch.cat((box, conf, j.float()), 1)[conf.view(-1) > conf_thres]
-            else:
-                kpts = x[:, 6:]
-                conf, j = x[:, 5:6].max(1, keepdim=True)
-                x = torch.cat((box, conf, j.float(), kpts), 1)[conf.view(-1) > conf_thres]
-
-        # Filter by class
-        if classes is not None:
-            x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
-
-        # Apply finite constraint
-        # if not torch.isfinite(x).all():
-        #     x = x[torch.isfinite(x).all(1)]
-
-        # Check shape
-        n = x.shape[0]  # number of boxes
-        if not n:  # no boxes
-            continue
-        elif n > max_nms:  # excess boxes
-            x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
-
-        # Batched NMS
-        c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
-        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
-        if i.shape[0] > max_det:  # limit detections
-            i = i[:max_det]
-        if merge and (1 < n < 3e3):  # Merge NMS (boxes merged using weighted mean)
-            # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-            iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-            weights = iou * scores[None]  # box weights
-            x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
-            if redundant:
-                i = i[iou.sum(1) > 1]  # require redundancy
-
-        output[xi] = x[i]
-        if (time.time() - t) > time_limit:
-            print(f'WARNING: NMS time limit {time_limit}s exceeded')
-            break  # time limit exceeded
-
-    return output
-
-
-def scale_coords_face(ori_shape, boxes, lmdks, target_shape):
-    ratio = min(ori_shape[0] / target_shape[0], ori_shape[1] / target_shape[1])
-    padding = (ori_shape[1] - target_shape[1] * ratio) / 2, (ori_shape[0] - target_shape[0] * ratio) / 2
-
-    boxes[:, [0, 2]] -= padding[0]
-    boxes[:, [1, 3]] -= padding[1]
-    boxes[:, :4] /= ratio
-
-    boxes[:, 0].clamp_(0, target_shape[1])  # x1
-    boxes[:, 1].clamp_(0, target_shape[0])  # y1
-    boxes[:, 2].clamp_(0, target_shape[1])  # x2
-    boxes[:, 3].clamp_(0, target_shape[0])  # y2
-
-    lmdks[:, [0, 2, 4, 6, 8]] -= padding[0]
-    lmdks[:, [1, 3, 5, 7, 9]] -= padding[1]
-    lmdks[:, :10] /= ratio
-
-    lmdks[:, 0].clamp_(0, target_shape[1])
-    lmdks[:, 1].clamp_(0, target_shape[0])
-    lmdks[:, 2].clamp_(0, target_shape[1])
-    lmdks[:, 3].clamp_(0, target_shape[0])
-    lmdks[:, 4].clamp_(0, target_shape[1])
-    lmdks[:, 5].clamp_(0, target_shape[0])
-    lmdks[:, 6].clamp_(0, target_shape[1])
-    lmdks[:, 7].clamp_(0, target_shape[0])
-    lmdks[:, 8].clamp_(0, target_shape[1])
-    lmdks[:, 9].clamp_(0, target_shape[0])
-
-    return boxes.round(), lmdks.round()
-
-
-def non_max_suppression_face(
-    prediction, conf_thres=0.25, iou_thres=0.45, classes=None, agnostic=False, labels=()
-):
-    """Performs Non-Maximum Suppression (NMS) on inference results
-    Returns:
-         detections with shape: nx6 (x1, y1, x2, y2, conf, cls)
-    """
-
-    nc = prediction.shape[2] - 15  # number of classes
-    xc = prediction[..., 4] > conf_thres  # candidates
-
-    # Settings
-    min_wh, max_wh = 2, 4096  # (pixels) minimum and maximum box width and height
-    time_limit = 10.0  # seconds to quit after
-    redundant = True  # require redundant detections
-    multi_label = nc > 1  # multiple labels per box (adds 0.5ms/img)
-    merge = False  # use merge-NMS
-
-    t = time.time()
-    output = [torch.zeros((0, 16), device=prediction.device)] * prediction.shape[0]
-    for xi, x in enumerate(prediction):  # image index, image inference
-        # Apply constraints
-        # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
-        x = x[xc[xi]]  # confidence
-
-        # Cat apriori labels if autolabelling
-        if labels and len(labels[xi]):
-            l = labels[xi]
-            v = torch.zeros((len(l), nc + 15), device=x.device)
-            v[:, :4] = l[:, 1:5]  # box
-            v[:, 4] = 1.0  # conf
-            v[range(len(l)), l[:, 0].long() + 15] = 1.0  # cls
-            x = torch.cat((x, v), 0)
-
-        # If none remain process next image
-        if not x.shape[0]:
-            continue
-
-        # Compute conf
-        x[:, 15:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
-
-        # Box (center x, center y, width, height) to (x1, y1, x2, y2)
-        box = xywh2xyxy(x[:, :4])
-
-        # Detections matrix nx6 (xyxy, conf, landmarks, cls)
-        if multi_label:
-            i, j = (x[:, 15:] > conf_thres).nonzero(as_tuple=False).T
-            x = torch.cat((box[i], x[i, j + 15, None], x[i, 5:15], j[:, None].float()), 1)
-        else:  # best class only
-            conf, j = x[:, 15:].max(1, keepdim=True)
-            x = torch.cat((box, conf, x[:, 5:15], j.float()), 1)[conf.view(-1) > conf_thres]
-
-        # Filter by class
-        if classes is not None:
-            x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
-
-        # If none remain process next image
-        n = x.shape[0]  # number of boxes
+        box = xywh2xyxy(pred[:, :4])
+        mask = pred[:, mi:]  # zero columns if no masks
+        conf, j = pred[:, 4:mi].max(1, keepdim=True)  # (xyxy, conf, cls)
+        pred = torch.cat((box, conf, j.float(), mask), dim=1)[
+            conf.view(-1) > conf_thres
+        ]
+        n = pred.shape[0]
         if not n:
             continue
-
-        # Batched NMS
-        c = x[:, 15:16] * (0 if agnostic else max_wh)  # classes
-        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
-        # if i.shape[0] > max_det:  # limit detections
-        #    i = i[:max_det]
-        if merge and (1 < n < 3e3):  # Merge NMS (boxes merged using weighted mean)
-            # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-            iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-            weights = iou * scores[None]  # box weights
-            x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
-            if redundant:
-                i = i[iou.sum(1) > 1]  # require redundancy
-
-        output[xi] = x[i]
-        if (time.time() - t) > time_limit:
-            break  # time limit exceeded
-
+        pred = pred[pred[:, 4].argsort(descending=True)[:max_nms]]
+        c = pred[:, 5:6] * max_wh
+        boxes, scores = pred[:, :4] + c, pred[:, 4]
+        keep_idx = torchvision.ops.nms(boxes, scores, iou_thres)
+        keep_idx = keep_idx[:max_det]
+        output[batch_idx] = pred[keep_idx]
     return output
 
 
 def plot_skeleton_kpts(im, kpts, steps, orig_shape=None):
-    # Plot the skeleton and keypointsfor coco datatset
-    palette = np.array([[255, 128, 0], [255, 153, 51], [255, 178, 102],
-                        [230, 230, 0], [255, 153, 255], [153, 204, 255],
-                        [255, 102, 255], [255, 51, 255], [102, 178, 255],
-                        [51, 153, 255], [255, 153, 153], [255, 102, 102],
-                        [255, 51, 51], [153, 255, 153], [102, 255, 102],
-                        [51, 255, 51], [0, 255, 0], [0, 0, 255], [255, 0, 0],
-                        [255, 255, 255]])
+    """Plot skeleton and keypoints for COCO dataset.
 
-    skeleton = [[16, 14], [14, 12], [17, 15], [15, 13], [12, 13], [6, 12],
-                [7, 13], [6, 7], [6, 8], [7, 9], [8, 10], [9, 11], [2, 3],
-                [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7]]
+    Args:
+        im: Image array to draw on
+        kpts: Keypoints data
+        steps: Number of values per keypoint (2 for x,y or 3 for x,y,conf)
+        orig_shape: Original image shape for scaling
 
-    pose_limb_color = palette[[9, 9, 9, 9, 7, 7, 7, 0, 0, 0, 0, 0, 16, 16, 16, 16, 16, 16, 16]]
+    Returns:
+        Image with skeleton and keypoints drawn
+    """
+    palette = np.array(
+        [
+            [255, 128, 0],
+            [255, 153, 51],
+            [255, 178, 102],
+            [230, 230, 0],
+            [255, 153, 255],
+            [153, 204, 255],
+            [255, 102, 255],
+            [255, 51, 255],
+            [102, 178, 255],
+            [51, 153, 255],
+            [255, 153, 153],
+            [255, 102, 102],
+            [255, 51, 51],
+            [153, 255, 153],
+            [102, 255, 102],
+            [51, 255, 51],
+            [0, 255, 0],
+            [0, 0, 255],
+            [255, 0, 0],
+            [255, 255, 255],
+        ]
+    )
+
+    skeleton = [
+        [16, 14],
+        [14, 12],
+        [17, 15],
+        [15, 13],
+        [12, 13],
+        [6, 12],
+        [7, 13],
+        [6, 7],
+        [6, 8],
+        [7, 9],
+        [8, 10],
+        [9, 11],
+        [2, 3],
+        [1, 2],
+        [1, 3],
+        [2, 4],
+        [3, 5],
+        [4, 6],
+        [5, 7],
+    ]
+
+    pose_limb_color = palette[
+        [9, 9, 9, 9, 7, 7, 7, 0, 0, 0, 0, 0, 16, 16, 16, 16, 16, 16, 16]
+    ]
     pose_kpt_color = palette[[16, 16, 16, 16, 16, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9, 9]]
     radius = 5
     num_kpts = len(kpts) // steps
@@ -700,7 +424,9 @@ def plot_skeleton_kpts(im, kpts, steps, orig_shape=None):
                 conf = kpts[steps * kid + 2]
                 if conf < 0.5:
                     continue
-            cv2.circle(im, (int(x_coord), int(y_coord)), radius, (int(r), int(g), int(b)), -1)
+            cv2.circle(
+                im, (int(x_coord), int(y_coord)), radius, (int(r), int(g), int(b)), -1
+            )
 
     for sk_id, sk in enumerate(skeleton):
         r, g, b = pose_limb_color[sk_id]
@@ -716,30 +442,3 @@ def plot_skeleton_kpts(im, kpts, steps, orig_shape=None):
         if pos2[0] % 640 == 0 or pos2[1] % 640 == 0 or pos2[0] < 0 or pos2[1] < 0:
             continue
         cv2.line(im, pos1, pos2, (int(r), int(g), int(b)), thickness=2)
-
-
-def cpu_nms(detections, iou_threshold):
-    # sort descend
-    detections = np.array(detections)  # [n, 6]
-    idxes = np.argsort(-(detections[:, 4]))
-    detections = list(detections[idxes])
-
-    # nms
-    tmp_detections = list()
-    keep_detections = list()
-    while len(detections) != 0:
-        if len(detections) == 1:
-            keep_detections.append(detections[0])
-            break
-
-        keep_detections.append(detections[0])
-
-        tmp_detections.clear()
-        for idx in range(1, len(detections)):
-            iou = bbox_overlap(keep_detections[-1][0:4], detections[idx][0:4])
-            if iou < iou_threshold:
-                tmp_detections.append(detections[idx])
-
-        detections = tmp_detections.copy()
-
-    return keep_detections

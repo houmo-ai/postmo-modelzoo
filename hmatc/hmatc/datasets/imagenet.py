@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: imagenet.py
+# Description:
+#     This file contains the code for the ImageNet dataset.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import os
@@ -7,7 +26,20 @@ from ..base.base_dataset import BaseDataset
 
 
 class ILSVRC2012(BaseDataset):
+    """ILSVRC2012 (ImageNet) dataset class for image classification tasks.
+
+    This class provides access to the ILSVRC2012 validation dataset, which contains
+    images with class labels for image classification. It handles loading image paths
+    and associated ground truth labels from validation files.
+    """
+
     def __init__(self, root_path):
+        """Initialize the ILSVRC2012 dataset.
+
+        Args:
+            root_path (str): Root directory of the ILSVRC2012 dataset containing
+                           ILSVRC2012_img_val images and validation files.
+        """
         if not os.path.exists(root_path):
             logger.error("ILSVRC2012 dataset path not exist -> {}".format(root_path))
             exit(-1)
@@ -46,15 +78,39 @@ class ILSVRC2012(BaseDataset):
         self.total_num = len(self.filepaths)
 
     def get_next_batch(self):
+        """Get the next image file path in sequence.
+
+        Returns:
+            str: Path to the next image file.
+        """
         filepath = self.filepaths[self.batch_idx]
         self.batch_idx += 1
         return filepath
 
     def get_class_name(self, idx):
+        """Get the class name for a given class index.
+
+        Args:
+            idx (int): Class index.
+
+        Returns:
+            str: Class name corresponding to the index.
+        """
         return self.mapping[idx]
 
     def get_datas(self, num=0):
-        """截取数据路径和gt信息"""
+        """Get a subset of data with specified number of samples.
+
+        Args:
+            num (int): Number of data samples to retrieve. If 0, returns all data.
+                     If greater than total number of samples, returns all data.
+
+        Returns:
+            tuple: A tuple containing:
+                - img_paths (list): List of image file paths
+                - labels (list): List of corresponding class labels
+        """
+        """Extract data paths and ground truth information."""
         if num == 0:
             num = self.total_num
         elif num > self.total_num:
@@ -65,11 +121,25 @@ class ILSVRC2012(BaseDataset):
 
     @property
     def dataset_name(self):
+        """str: Name of the dataset."""
         return "ILSVRC_2012Val"
 
 
 class ILSVRC2015(ILSVRC2012):
+    """ILSVRC2015 dataset class for image classification tasks.
+
+    This class provides access to the ILSVRC2015 validation dataset, which contains
+    images with class labels for image classification. It handles loading image paths
+    and associated ground truth labels from validation files.
+    """
+
     def __init__(self, root_path):
+        """Initialize the ILSVRC2015 dataset.
+
+        Args:
+            root_path (str): Root directory of the ILSVRC2015 dataset containing
+                           ILSVRC2015_img_val images and validation files.
+        """
         if not os.path.exists(root_path):
             logger.error("ILSVRC2012 dataset path not exist -> {}".format(root_path))
             exit(-1)
@@ -98,14 +168,20 @@ class ILSVRC2015(ILSVRC2012):
 
     @property
     def dataset_name(self):
+        """str: Name of the dataset."""
         return "ILSVRC_2015Val"
 
 
-ILSVRC2012_LABELS = \
-{
+ILSVRC2012_LABELS = {
     "0": ["tench", "Tinca tinca"],
     "1": ["goldfish", "Carassius auratus"],
-    "2": ["great white shark", "white shark", "man-eater", "man-eating shark", "Carcharodon carcharias"],
+    "2": [
+        "great white shark",
+        "white shark",
+        "man-eater",
+        "man-eating shark",
+        "Carcharodon carcharias",
+    ],
     "3": ["tiger shark", "Galeocerdo cuvieri"],
     "4": ["hammerhead", "hammerhead shark"],
     "5": ["electric ray", "crampfish", "numbfish", "torpedo"],
@@ -137,7 +213,12 @@ ILSVRC2012_LABELS = \
     "31": ["tree frog", "tree-frog"],
     "32": ["tailed frog", "bell toad", "ribbed toad", "tailed toad", "Ascaphus trui"],
     "33": ["loggerhead", "loggerhead turtle", "Caretta caretta"],
-    "34": ["leatherback turtle", "leatherback", "leathery turtle", "Dermochelys coriacea"],
+    "34": [
+        "leatherback turtle",
+        "leatherback",
+        "leathery turtle",
+        "Dermochelys coriacea",
+    ],
     "35": ["mud turtle"],
     "36": ["terrapin"],
     "37": ["box turtle", "box tortoise"],
@@ -151,7 +232,13 @@ ILSVRC2012_LABELS = \
     "45": ["Gila monster", "Heloderma suspectum"],
     "46": ["green lizard", "Lacerta viridis"],
     "47": ["African chameleon", "Chamaeleo chamaeleon"],
-    "48": ["Komodo dragon", "Komodo lizard", "dragon lizard", "giant lizard", "Varanus komodoensis"],
+    "48": [
+        "Komodo dragon",
+        "Komodo lizard",
+        "dragon lizard",
+        "giant lizard",
+        "Varanus komodoensis",
+    ],
     "49": ["African crocodile", "Nile crocodile", "Crocodylus niloticus"],
     "50": ["American alligator", "Alligator mississipiensis"],
     "51": ["triceratops"],
@@ -206,9 +293,21 @@ ILSVRC2012_LABELS = \
     "100": ["black swan", "Cygnus atratus"],
     "101": ["tusker"],
     "102": ["echidna", "spiny anteater", "anteater"],
-    "103": ["platypus", "duckbill", "duckbilled platypus", "duck-billed platypus", "Ornithorhynchus anatinus"],
+    "103": [
+        "platypus",
+        "duckbill",
+        "duckbilled platypus",
+        "duck-billed platypus",
+        "Ornithorhynchus anatinus",
+    ],
     "104": ["wallaby", "brush kangaroo"],
-    "105": ["koala", "koala bear", "kangaroo bear", "native bear", "Phascolarctos cinereus"],
+    "105": [
+        "koala",
+        "koala bear",
+        "kangaroo bear",
+        "native bear",
+        "Phascolarctos cinereus",
+    ],
     "106": ["wombat"],
     "107": ["jellyfish"],
     "108": ["sea anemone", "anemone"],
@@ -224,9 +323,27 @@ ILSVRC2012_LABELS = \
     "118": ["Dungeness crab", "Cancer magister"],
     "119": ["rock crab", "Cancer irroratus"],
     "120": ["fiddler crab"],
-    "121": ["king crab", "Alaska crab", "Alaskan king crab", "Alaska king crab", "Paralithodes camtschatica"],
-    "122": ["American lobster", "Northern lobster", "Maine lobster", "Homarus americanus"],
-    "123": ["spiny lobster", "langouste", "rock lobster", "crawfish", "crayfish", "sea crawfish"],
+    "121": [
+        "king crab",
+        "Alaska crab",
+        "Alaskan king crab",
+        "Alaska king crab",
+        "Paralithodes camtschatica",
+    ],
+    "122": [
+        "American lobster",
+        "Northern lobster",
+        "Maine lobster",
+        "Homarus americanus",
+    ],
+    "123": [
+        "spiny lobster",
+        "langouste",
+        "rock lobster",
+        "crawfish",
+        "crayfish",
+        "sea crawfish",
+    ],
     "124": ["crayfish", "crawfish", "crawdad", "crawdaddy"],
     "125": ["hermit crab"],
     "126": ["isopod"],
@@ -250,7 +367,13 @@ ILSVRC2012_LABELS = \
     "144": ["pelican"],
     "145": ["king penguin", "Aptenodytes patagonica"],
     "146": ["albatross", "mollymawk"],
-    "147": ["grey whale", "gray whale", "devilfish", "Eschrichtius gibbosus", "Eschrichtius robustus"],
+    "147": [
+        "grey whale",
+        "gray whale",
+        "devilfish",
+        "Eschrichtius gibbosus",
+        "Eschrichtius robustus",
+    ],
     "148": ["killer whale", "killer", "orca", "grampus", "sea wolf", "Orcinus orca"],
     "149": ["dugong", "Dugong dugon"],
     "150": ["sea lion"],
@@ -283,7 +406,12 @@ ILSVRC2012_LABELS = \
     "177": ["Scottish deerhound", "deerhound"],
     "178": ["Weimaraner"],
     "179": ["Staffordshire bullterrier", "Staffordshire bull terrier"],
-    "180": ["American Staffordshire terrier", "Staffordshire terrier", "American pit bull terrier", "pit bull terrier"],
+    "180": [
+        "American Staffordshire terrier",
+        "Staffordshire terrier",
+        "American pit bull terrier",
+        "pit bull terrier",
+    ],
     "181": ["Bedlington terrier"],
     "182": ["Border terrier"],
     "183": ["Kerry blue terrier"],
@@ -389,7 +517,15 @@ ILSVRC2012_LABELS = \
     "283": ["Persian cat"],
     "284": ["Siamese cat", "Siamese"],
     "285": ["Egyptian cat"],
-    "286": ["cougar", "puma", "catamount", "mountain lion", "painter", "panther", "Felis concolor"],
+    "286": [
+        "cougar",
+        "puma",
+        "catamount",
+        "mountain lion",
+        "painter",
+        "panther",
+        "Felis concolor",
+    ],
     "287": ["lynx", "catamount"],
     "288": ["leopard", "Panthera pardus"],
     "289": ["snow leopard", "ounce", "Panthera uncia"],
@@ -398,7 +534,12 @@ ILSVRC2012_LABELS = \
     "292": ["tiger", "Panthera tigris"],
     "293": ["cheetah", "chetah", "Acinonyx jubatus"],
     "294": ["brown bear", "bruin", "Ursus arctos"],
-    "295": ["American black bear", "black bear", "Ursus americanus", "Euarctos americanus"],
+    "295": [
+        "American black bear",
+        "black bear",
+        "Ursus americanus",
+        "Euarctos americanus",
+    ],
     "296": ["ice bear", "polar bear", "Ursus Maritimus", "Thalarctos maritimus"],
     "297": ["sloth bear", "Melursus ursinus", "Ursus ursinus"],
     "298": ["mongoose"],
@@ -422,7 +563,16 @@ ILSVRC2012_LABELS = \
     "316": ["cicada", "cicala"],
     "317": ["leafhopper"],
     "318": ["lacewing", "lacewing fly"],
-    "319": ["dragonfly", "darning needle", "devil's darning needle", "sewing needle", "snake feeder", "snake doctor", "mosquito hawk", "skeeter hawk"],
+    "319": [
+        "dragonfly",
+        "darning needle",
+        "devil's darning needle",
+        "sewing needle",
+        "snake feeder",
+        "snake doctor",
+        "mosquito hawk",
+        "skeeter hawk",
+    ],
     "320": ["damselfly"],
     "321": ["admiral"],
     "322": ["ringlet", "ringlet butterfly"],
@@ -452,7 +602,14 @@ ILSVRC2012_LABELS = \
     "346": ["water buffalo", "water ox", "Asiatic buffalo", "Bubalus bubalis"],
     "347": ["bison"],
     "348": ["ram", "tup"],
-    "349": ["bighorn", "bighorn sheep", "cimarron", "Rocky Mountain bighorn", "Rocky Mountain sheep", "Ovis canadensis"],
+    "349": [
+        "bighorn",
+        "bighorn sheep",
+        "cimarron",
+        "Rocky Mountain bighorn",
+        "Rocky Mountain sheep",
+        "Ovis canadensis",
+    ],
     "350": ["ibex", "Capra ibex"],
     "351": ["hartebeest"],
     "352": ["impala", "Aepyceros melampus"],
@@ -490,11 +647,31 @@ ILSVRC2012_LABELS = \
     "384": ["indri", "indris", "Indri indri", "Indri brevicaudatus"],
     "385": ["Indian elephant", "Elephas maximus"],
     "386": ["African elephant", "Loxodonta africana"],
-    "387": ["lesser panda", "red panda", "panda", "bear cat", "cat bear", "Ailurus fulgens"],
-    "388": ["giant panda", "panda", "panda bear", "coon bear", "Ailuropoda melanoleuca"],
+    "387": [
+        "lesser panda",
+        "red panda",
+        "panda",
+        "bear cat",
+        "cat bear",
+        "Ailurus fulgens",
+    ],
+    "388": [
+        "giant panda",
+        "panda",
+        "panda bear",
+        "coon bear",
+        "Ailuropoda melanoleuca",
+    ],
     "389": ["barracouta", "snoek"],
     "390": ["eel"],
-    "391": ["coho", "cohoe", "coho salmon", "blue jack", "silver salmon", "Oncorhynchus kisutch"],
+    "391": [
+        "coho",
+        "cohoe",
+        "coho salmon",
+        "blue jack",
+        "silver salmon",
+        "Oncorhynchus kisutch",
+    ],
     "392": ["rock beauty", "Holocanthus tricolor"],
     "393": ["anemone fish"],
     "394": ["sturgeon"],
@@ -515,7 +692,18 @@ ILSVRC2012_LABELS = \
     "409": ["analog clock"],
     "410": ["apiary", "bee house"],
     "411": ["apron"],
-    "412": ["ashcan", "trash can", "garbage can", "wastebin", "ash bin", "ash-bin", "ashbin", "dustbin", "trash barrel", "trash bin"],
+    "412": [
+        "ashcan",
+        "trash can",
+        "garbage can",
+        "wastebin",
+        "ash bin",
+        "ash-bin",
+        "ashbin",
+        "dustbin",
+        "trash barrel",
+        "trash bin",
+    ],
     "413": ["assault rifle", "assault gun"],
     "414": ["backpack", "back pack", "knapsack", "packsack", "rucksack", "haversack"],
     "415": ["bakery", "bakeshop", "bakehouse"],
@@ -539,7 +727,15 @@ ILSVRC2012_LABELS = \
     "433": ["bathing cap", "swimming cap"],
     "434": ["bath towel"],
     "435": ["bathtub", "bathing tub", "bath", "tub"],
-    "436": ["beach wagon", "station wagon", "wagon", "estate car", "beach waggon", "station waggon", "waggon"],
+    "436": [
+        "beach wagon",
+        "station wagon",
+        "wagon",
+        "estate car",
+        "beach waggon",
+        "station waggon",
+        "waggon",
+    ],
     "437": ["beacon", "lighthouse", "beacon light", "pharos"],
     "438": ["beaker"],
     "439": ["bearskin", "busby", "shako"],
@@ -583,17 +779,39 @@ ILSVRC2012_LABELS = \
     "477": ["carpenter's kit", "tool kit"],
     "478": ["carton"],
     "479": ["car wheel"],
-    "480": ["cash machine", "cash dispenser", "automated teller machine", "automatic teller machine", "automated teller", "automatic teller", "ATM"],
+    "480": [
+        "cash machine",
+        "cash dispenser",
+        "automated teller machine",
+        "automatic teller machine",
+        "automated teller",
+        "automatic teller",
+        "ATM",
+    ],
     "481": ["cassette"],
     "482": ["cassette player"],
     "483": ["castle"],
     "484": ["catamaran"],
     "485": ["CD player"],
     "486": ["cello", "violoncello"],
-    "487": ["cellular telephone", "cellular phone", "cellphone", "cell", "mobile phone"],
+    "487": [
+        "cellular telephone",
+        "cellular phone",
+        "cellphone",
+        "cell",
+        "mobile phone",
+    ],
     "488": ["chain"],
     "489": ["chainlink fence"],
-    "490": ["chain mail", "ring mail", "mail", "chain armor", "chain armour", "ring armor", "ring armour"],
+    "490": [
+        "chain mail",
+        "ring mail",
+        "mail",
+        "chain armor",
+        "chain armour",
+        "ring armor",
+        "ring armour",
+    ],
     "491": ["chain saw", "chainsaw"],
     "492": ["chest"],
     "493": ["chiffonier", "commode"],
@@ -601,7 +819,13 @@ ILSVRC2012_LABELS = \
     "495": ["china cabinet", "china closet"],
     "496": ["Christmas stocking"],
     "497": ["church", "church building"],
-    "498": ["cinema", "movie theater", "movie theatre", "movie house", "picture palace"],
+    "498": [
+        "cinema",
+        "movie theater",
+        "movie theatre",
+        "movie house",
+        "picture palace",
+    ],
     "499": ["cleaver", "meat cleaver", "chopper"],
     "500": ["cliff dwelling"],
     "501": ["cloak"],
@@ -735,7 +959,13 @@ ILSVRC2012_LABELS = \
     "629": ["lipstick", "lip rouge"],
     "630": ["Loafer"],
     "631": ["lotion"],
-    "632": ["loudspeaker", "speaker", "speaker unit", "loudspeaker system", "speaker system"],
+    "632": [
+        "loudspeaker",
+        "speaker",
+        "speaker unit",
+        "loudspeaker system",
+        "speaker system",
+    ],
     "633": ["loupe", "jeweler's loupe"],
     "634": ["lumbermill", "sawmill"],
     "635": ["magnetic compass"],
@@ -837,7 +1067,14 @@ ILSVRC2012_LABELS = \
     "731": ["plunger", "plumber's helper"],
     "732": ["Polaroid camera", "Polaroid Land camera"],
     "733": ["pole"],
-    "734": ["police van", "police wagon", "paddy wagon", "patrol wagon", "wagon", "black Maria"],
+    "734": [
+        "police van",
+        "police wagon",
+        "paddy wagon",
+        "patrol wagon",
+        "wagon",
+        "black Maria",
+    ],
     "735": ["poncho"],
     "736": ["pool table", "billiard table", "snooker table"],
     "737": ["pop bottle", "soda bottle"],
@@ -970,7 +1207,14 @@ ILSVRC2012_LABELS = \
     "864": ["tow truck", "tow car", "wrecker"],
     "865": ["toyshop"],
     "866": ["tractor"],
-    "867": ["trailer truck", "tractor trailer", "trucking rig", "rig", "articulated lorry", "semi"],
+    "867": [
+        "trailer truck",
+        "tractor trailer",
+        "trucking rig",
+        "rig",
+        "articulated lorry",
+        "semi",
+    ],
     "868": ["tray"],
     "869": ["trench coat"],
     "870": ["tricycle", "trike", "velocipede"],
@@ -1089,7 +1333,12 @@ ILSVRC2012_LABELS = \
     "983": ["scuba diver"],
     "984": ["rapeseed"],
     "985": ["daisy"],
-    "986": ["yellow lady's slipper", "yellow lady-slipper", "Cypripedium calceolus", "Cypripedium parviflorum"],
+    "986": [
+        "yellow lady's slipper",
+        "yellow lady-slipper",
+        "Cypripedium calceolus",
+        "Cypripedium parviflorum",
+    ],
     "987": ["corn"],
     "988": ["acorn"],
     "989": ["hip", "rose hip", "rosehip"],
@@ -1099,8 +1348,13 @@ ILSVRC2012_LABELS = \
     "993": ["gyromitra"],
     "994": ["stinkhorn", "carrion fungus"],
     "995": ["earthstar"],
-    "996": ["hen-of-the-woods", "hen of the woods", "Polyporus frondosus", "Grifola frondosa"],
+    "996": [
+        "hen-of-the-woods",
+        "hen of the woods",
+        "Polyporus frondosus",
+        "Grifola frondosa",
+    ],
     "997": ["bolete"],
     "998": ["ear", "spike", "capitulum"],
-    "999": ["toilet tissue", "toilet paper", "bathroom tissue"]
+    "999": ["toilet tissue", "toilet paper", "bathroom tissue"],
 }

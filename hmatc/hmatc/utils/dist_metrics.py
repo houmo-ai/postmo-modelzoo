@@ -1,12 +1,29 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: dist_metrics.py
+# Description:
+#     Distance Metrics
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import functools
 import numpy as np
 
 
 def cosine_distance(v1, v2):
     """
-    cosine_distance
+    Calculate cosine distance between two vectors.
 
     :param v1: np.ndarray
     :param v2: np.ndarray
@@ -24,6 +41,16 @@ def cosine_distance(v1, v2):
 
 
 def numerical_distance(v1, v2, epsilon=1e-3):
+    """Calculate the ratio of elements with difference less than epsilon.
+
+    Args:
+        v1 (np.ndarray): First input array
+        v2 (np.ndarray): Second input array
+        epsilon (float): Threshold for numerical comparison
+
+    Returns:
+        float: Ratio of matching elements
+    """
     v1_d = v1.flatten().astype("float64")
     v2_d = v2.flatten().astype("float64")
     assert len(v1_d) == len(v2_d), "v1 dim must be == v2 dim"
@@ -35,7 +62,16 @@ def numerical_distance(v1, v2, epsilon=1e-3):
 
 
 def get_cos_similarity(data1, data2, mask=None):
-    """cal cos_similarity"""
+    """Calculate cosine similarity between two arrays.
+
+    Args:
+        data1 (np.ndarray): First input array
+        data2 (np.ndarray): Second input array
+        mask (np.ndarray, optional): Mask to apply to arrays
+
+    Returns:
+        float: Cosine similarity value
+    """
     v1_d = data1.flatten().astype("float64")
     v2_d = data2.flatten().astype("float64")
     assert len(v1_d) == len(v2_d), "calc cos_similarity must have same length!"
@@ -63,9 +99,14 @@ def get_cos_similarity_per_channel_average(expect, actual, layout="NCHW"):
     - If the expect's ndim is 4 and the actual is 5, assume the actual is NCHWc
     - If the different dimension size is 1, skip them
 
-    Return None if the shape mismatch could not get handled.
-    """
+    Args:
+        expect (np.ndarray): Expected array
+        actual (np.ndarray): Actual array
+        layout (str): Data layout string, default is "NCHW"
 
+    Returns:
+        float or None: Average cosine similarity per channel, or None if shapes cannot be handled
+    """
     if expect.shape != actual.shape:
         expect_volume = functools.reduce(lambda a, b: a * b, expect.shape, 1)
         actual_volume = functools.reduce(lambda a, b: a * b, actual.shape, 1)

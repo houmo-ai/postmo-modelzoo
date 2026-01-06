@@ -19,7 +19,7 @@ from onnx import TensorProto
 from tqdm import tqdm
 from importlib.metadata import PackageNotFoundError, version
 from requests.auth import HTTPBasicAuth
-from loguru import logger
+from . import logger
 
 
 JFROG_REPO = "http://artifactory.houmo.ai/artifactory/toolchain/release"
@@ -47,10 +47,26 @@ def read_json_to_dict(file_path: str) -> dict:
 
 
 def get_md5(array: np.ndarray):
+    """Calculate and return the MD5 hash of a numpy array.
+
+    Args:
+        array (np.ndarray): Input numpy array to calculate MD5 hash
+
+    Returns:
+        str: MD5 hash string of the input array
+    """
     return hashlib.md5(array.tobytes()).hexdigest()
 
 
 def get_file_md5(file_path):
+    """Calculate and return the MD5 hash of a file.
+
+    Args:
+        file_path (str): Path to the file to calculate MD5 hash
+
+    Returns:
+        str: MD5 hash string of the file content
+    """
     hash_md5 = hashlib.md5()
     with open(file_path, "rb") as file:
         for chunk in iter(lambda: file.read(4096), b""):
@@ -59,34 +75,56 @@ def get_file_md5(file_path):
 
 
 def get_hmquant_xh1_version():
-    """获取hmquant版本"""
+    """Get the version of the hmquant-xh1 package.
+
+    Returns:
+        str: Version string of the package, or 'N/A' if not found
+    """
     try:
-        v = version("hmquant-xh1")  # 替换成你想查的包名
+        v = version("hmquant-xh1")
         return v
     except PackageNotFoundError:
         return "N/A"
 
 
 def get_hmquant_xh2_version():
-    """获取hmquant版本"""
+    """Get the version of the hmquant_xh2 package.
+
+    Returns:
+        str: Version string of the package, or 'N/A' if not found
+    """
     try:
-        v = version("hmquant_xh2")  # 替换成你想查的包名
+        v = version("hmquant_xh2")
         return v
     except PackageNotFoundError:
         return "N/A"
 
 
 def get_package_version(package_name: str):
-    """获取hmquant版本"""
+    """Get the version of a specified package.
+
+    Args:
+        package_name (str): Name of the package to get version for
+
+    Returns:
+        str: Version string of the package, or 'N/A' if not found
+    """
     try:
-        v = version(package_name)  # 替换成你想查的包名
+        v = version(package_name)
         return v
     except PackageNotFoundError:
         return "N/A"
 
 
 def get_houmo_version():
-    """获取houmo版本"""
+    """Get the Houmo version from environment variable HOUMO_VERSION.
+
+    Returns:
+        str: The Houmo version string with 'v' prefix
+
+    Raises:
+        ValueError: If HOUMO_VERSION environment variable is not set or version format is invalid
+    """
     v = os.getenv("HOUMO_VERSION")
     if v is None:
         raise ValueError("Please set HOUMO_VERSION env")
@@ -102,6 +140,16 @@ def get_houmo_version():
 
 
 def get_onnx_inputs_info(onnx_path):
+    """Get input and output information from an ONNX model file.
+
+    Args:
+        onnx_path (str): Path to the ONNX model file
+
+    Returns:
+        tuple: A tuple containing:
+            - inputs_info (dict): Dictionary with input names as keys and their dtype/shape as values
+            - outputs_info (dict): Dictionary with output names as keys and their dtype/shape as values
+    """
     model = onnx.load(onnx_path)
     inputs_info = dict()
     outputs_info = dict()
@@ -125,6 +173,14 @@ def get_onnx_inputs_info(onnx_path):
 
 
 def load_npz(npz_path):
+    """Load data from a .npz file into a dictionary.
+
+    Args:
+        npz_path (str): Path to the .npz file to load
+
+    Returns:
+        dict: Dictionary with keys from the .npz file and corresponding numpy arrays as values
+    """
     in_datas = dict()
     with np.load(npz_path) as data:
         keys = data.files
@@ -135,6 +191,11 @@ def load_npz(npz_path):
 
 
 def set_random_seed(seed=1234):
+    """Set random seeds for reproducible results across multiple frameworks.
+
+    Args:
+        seed (int): Random seed value to set (default: 1234)
+    """
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -159,6 +220,17 @@ torch_to_numpy_dtype = {
 
 
 def str_to_torch_dtype(dtype_str):
+    """Convert a string representation of a data type to PyTorch data type.
+
+    Args:
+        dtype_str (str): String representation of the data type
+
+    Returns:
+        torch.dtype: Corresponding PyTorch data type
+
+    Raises:
+        ValueError: If the data type string is not supported
+    """
     if dtype_str == "float32":
         return torch.float32
     elif dtype_str == "float16":
@@ -180,6 +252,18 @@ def str_to_torch_dtype(dtype_str):
 
 
 def download_file(url, save_path, file_name, file_size, chunk_size=1024 * 1024):
+    """Download a file from URL with progress bar and MD5 verification.
+
+    Args:
+        url (str): Download URL
+        save_path (str): Local path to save the file
+        file_name (str): Name of the file being downloaded (for display)
+        file_size (int): Expected file size in bytes
+        chunk_size (int): Size of chunks to download at a time (default: 1MB)
+
+    Returns:
+        bool: True if download is successful, False otherwise
+    """
     if os.path.exists(save_path):
         logger.error("local file %s has already exist" % save_path)
         return False
@@ -377,6 +461,16 @@ def _extract_files(save_path: str, extract_dir: str) -> bool:
 
 
 def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) -> str:
+    """Download a file from JFrog repository with MD5 verification and optional extraction.
+
+    Args:
+        file_path (str): Complete URL or relative path to the file
+        save_dir (str): Directory to save the downloaded file (default: current directory or HOUMO_MODEL_PATH)
+        extract_dir (str, optional): Directory to extract compressed files (default: None)
+
+    Returns:
+        str: Path to the downloaded file if successful, empty string otherwise
+    """
     if not file_path.strip():
         logger.error("The file path cannot be empty.")
         return ""
@@ -461,9 +555,9 @@ def _download_from_modelscope(
             break
         except Exception as e:
             non_retry_msg = [
-                'permission denied',
-                'folder not found',
-                'invalid token',
+                "permission denied",
+                "folder not found",
+                "invalid token",
                 "does not exist",
                 "exist",
                 "has no revision",
@@ -585,6 +679,14 @@ def hmatc_get_file(
     extract_dir=None,
     source_type="jfrog",
 ) -> str:
+    """Compress a folder to .tar.xz format with progress bar and support for excluding files.
+
+    Args:
+        folder_path (str): Path to the folder to compress
+        output_path (str): Output file path for the compressed archive
+        exclude (list, optional): List of patterns to exclude from compression (default: None)
+        preset (int): Compression level (0-9, default: 9)
+    """
     download_file = ""
     download_files = dict()
     download_files["ret"] = True
@@ -741,7 +843,7 @@ def hmatc_get_file(
                 local_dir = local_dirs[idx]
             else:
                 repo_name = repo_id.strip().rsplit("/", 1)[-1]
-                local_dir = f'{download_dir}/{repo_name}'
+                local_dir = f"{download_dir}/{repo_name}"
 
             download_flag = _download_from_modelscope(
                 repo_id, local_dir, ignore_patterns=ignore_patterns
@@ -781,26 +883,21 @@ class ProgressFile:
 def compress_folder_to_tar_xz_with_progress(
     folder_path: str, output_path: str, exclude=None, preset=9
 ):
-    """
-    压缩 folder_path 为 .tar.xz 文件，支持 tar -xvf 解压，
-    并用 tqdm 显示压缩进度。
+    """Compress a single file to .tar.xz format with progress bar.
 
     Args:
-        folder_path: 要压缩的文件夹路径
-        output_path: 输出文件路径
-        exclude: 要排除的文件或目录模式列表，支持通配符
-        preset: 压缩级别 (0-9)
+        file_path (str): Path to the file to compress
+        output_path (str): Output file path for the compressed archive
+        preset (int): Compression level (0-9, default: 9)
     """
     if exclude is None:
         exclude = []
 
-    # 统计所有待压缩文件大小
     file_list = []
     total_size = 0
     folder_abs_path = os.path.abspath(folder_path)
 
     for root, dirs, files in os.walk(folder_path):
-        # 排除目录
         dirs[:] = [
             d
             for d in dirs
@@ -814,8 +911,6 @@ def compress_folder_to_tar_xz_with_progress(
         for file in files:
             full_path = os.path.join(root, file)
             rel_path = os.path.relpath(full_path, folder_abs_path)
-
-            # 检查是否应该排除
             should_exclude = any(
                 fnmatch.fnmatch(full_path, pattern)
                 or fnmatch.fnmatch(rel_path, pattern)
@@ -829,7 +924,6 @@ def compress_folder_to_tar_xz_with_progress(
             file_list.append(full_path)
             total_size += os.path.getsize(full_path)
 
-    # 确保输出目录存在
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
     with lzma.open(output_path, "wb", preset=preset | lzma.PRESET_EXTREME) as lzma_file:
@@ -848,8 +942,12 @@ def compress_folder_to_tar_xz_with_progress(
 
 
 def compress_file_to_tar_xz_with_progress(file_path: str, output_path: str, preset=9):
-    """
-    将单个文件压缩成 .tar.xz，支持 tar -xvf 解压，显示压缩进度。
+    """Compress multiple files/directories to .tar.xz format with progress bar.
+
+    Args:
+        file_paths: List of file/directory paths to compress
+        output_path (str): Output file path for the compressed archive
+        preset (int): xz compression preset (0-9, default: 9)
     """
     total_size = os.path.getsize(file_path)
     with lzma.open(output_path, "wb", preset=preset | lzma.PRESET_EXTREME) as lzma_file:
@@ -863,13 +961,12 @@ def compress_file_to_tar_xz_with_progress(file_path: str, output_path: str, pres
 
 
 def compress_files_to_tar_xz_with_progress(file_paths, output_path, preset=9):
-    """
-    将多个文件/目录压缩成 .tar.xz，支持 tar -xvf 解压，显示压缩进度。
+    """Compress multiple files/directories to .tar.xz format with progress bar.
 
     Args:
-        file_paths: 要压缩的文件/目录路径列表
-        output_path: 输出压缩文件路径
-        preset: xz压缩预设 (0-9)
+        file_paths: List of file/directory paths to compress
+        output_path (str): Output file path for the compressed archive
+        preset (int): xz compression preset (0-9, default: 9)
     """
     # 计算总大小
     total_size = 0
@@ -887,14 +984,12 @@ def compress_files_to_tar_xz_with_progress(file_paths, output_path, preset=9):
                 total=total_size, unit="B", unit_scale=True, desc="Compressing"
             ) as pbar:
                 for file_path in file_paths:
-                    # 添加文件或目录到tar
                     if os.path.isfile(file_path):
                         arcname = os.path.basename(file_path)
                         tarinfo = tar.gettarinfo(file_path, arcname=arcname)
                         with open(file_path, "rb") as f:
                             tar.addfile(tarinfo, ProgressFile(f, pbar))
                     elif os.path.isdir(file_path):
-                        # 添加目录及其内容
                         arcname = os.path.basename(file_path)
                         tar.add(
                             file_path,
@@ -913,33 +1008,36 @@ def compress_files_to_tar_xz_with_progress(file_paths, output_path, preset=9):
 def upload_file_to_artifactory(
     file_path, upload_url, username="public", password="Password@123", max_retries=3
 ):
-    """
-    上传文件到 Artifactory 服务器，包含校验和验证
+    """Upload file to Artifactory server with checksum verification and retry mechanism.
 
     Args:
-        file_path (str): 要上传的本地文件路径
-        upload_url (str): 目标上传地址（完整URL）
-        username (str): 认证用户名（默认：public）
-        password (str): 认证密码（默认：Password@123）
-        max_retries (int): 失败最大重试次数（默认：3次）
+        file_path (str): Local file path to upload
+        upload_url (str): Target upload URL (relative path that will be appended to base URL)
+        username (str): Authentication username (default: None)
+        password (str): Authentication password (default: None)
+        max_retries (int): Maximum number of retry attempts (default: 3)
 
     Returns:
-        bool: 上传成功返回True，失败返回False
+        bool: True if upload is successful, False otherwise
     """
-    BASE_URL = "http://10.10.1.53:8082/artifactory/toolchain/release/"
+    username = username or os.getenv("JFROG_USERNAME")
+    password = password or os.getenv("JFROG_PASSWORD")
+    if not username or not password:
+        print("Username and password must be provided")
+        return False
+
+    BASE_URL = JFROG_REPO
     upload_url = os.path.join(BASE_URL, upload_url)
-    # 检查文件是否存在
+
     if not os.path.isfile(file_path):
         print(f"Not found file: {file_path}")
         return False
 
-    # 计算文件的 MD5 和 SHA1 校验和
     def calculate_checksums(filepath):
         md5_hash = hashlib.md5()
         sha1_hash = hashlib.sha1()
 
         with open(filepath, "rb") as f:
-            # 分块读取文件以计算校验和
             for chunk in iter(lambda: f.read(4096), b""):
                 md5_hash.update(chunk)
                 sha1_hash.update(chunk)
@@ -953,21 +1051,17 @@ def upload_file_to_artifactory(
         print(f"Failed to calaculate checksum file: {str(e)}")
         return False
 
-    # 准备认证参数
     auth = HTTPBasicAuth(username, password)
 
-    # 读取文件内容（二进制模式）
     with open(file_path, "rb") as file:
         file_data = file.read()
 
-    # 请求头设置，包含校验和信息
     headers = {
         "Content-Type": "application/octet-stream",
         "X-Checksum-Md5": md5,
         "X-Checksum-Sha1": sha1,
     }
 
-    # 重试机制
     for attempt in range(max_retries):
         try:
             response = requests.put(
@@ -975,10 +1069,9 @@ def upload_file_to_artifactory(
                 data=file_data,
                 headers=headers,
                 auth=auth,
-                timeout=30,  # 设置超时时间（秒）
+                timeout=30,
             )
 
-            # 检查响应状态
             if response.status_code in [200, 201]:
                 print(f"Upload: {upload_url}, done.")
                 return True
@@ -990,9 +1083,8 @@ def upload_file_to_artifactory(
         except requests.exceptions.RequestException as e:
             print(f"Network error (try {attempt + 1}/{max_retries}) : {str(e)}")
 
-        # 如果不是最后一次尝试，则等待后重试
         if attempt < max_retries - 1:
-            wait_time = 2**attempt  # 指数退避策略
+            wait_time = 2**attempt
             print(f"Waiting {wait_time}s retry...")
             time.sleep(wait_time)
 

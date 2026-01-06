@@ -1,4 +1,23 @@
-#!/usr/bin/env python  
+# Copyright 2025 HOUMO AI
+#
+# File: voc.py
+# Description:
+#   VOC dataset
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+#!/usr/bin/env python
 # -*- coding:utf-8 _*-
 import os
 import json
@@ -8,7 +27,18 @@ from ..base.base_dataset import BaseDataset
 
 
 class VOC2007(BaseDataset):
+    """
+    VOC2007 dataset class for object detection tasks.
+    This class loads the VOC2007 dataset, parses XML annotations, and converts them to COCO format.
+    """
+
     def __init__(self, root_path):
+        """
+        Initialize the VOC2007 dataset.
+
+        Args:
+            root_path (str): Root path of the VOC dataset directory containing VOC2007 folder
+        """
         self._dataset_name = "voc2007"
         self._root_path = root_path
         self._img_files = list()
@@ -19,7 +49,9 @@ class VOC2007(BaseDataset):
             logger.error("VOC dataset not exist -> {}".format(self._root_path))
             exit(-1)
 
-        test_file = os.path.join(self._root_path, "VOC2007", "ImageSets", "Main", "test.txt")
+        test_file = os.path.join(
+            self._root_path, "VOC2007", "ImageSets", "Main", "test.txt"
+        )
         if not os.path.exists(test_file):
             logger.error("test file not exist -> {}".format(test_file))
             exit(-1)
@@ -27,8 +59,12 @@ class VOC2007(BaseDataset):
             lines = f.readlines()
             for line in lines:
                 basename = line.strip()
-                img_path = os.path.join(self._root_path, "VOC2007", "JPEGImages", "{}.jpg".format(basename))
-                xml_path = os.path.join(self._root_path, "VOC2007", "Annotations", "{}.xml".format(basename))
+                img_path = os.path.join(
+                    self._root_path, "VOC2007", "JPEGImages", "{}.jpg".format(basename)
+                )
+                xml_path = os.path.join(
+                    self._root_path, "VOC2007", "Annotations", "{}.xml".format(basename)
+                )
                 if not os.path.exists(img_path):
                     logger.warning("img_path not exist -> {}".format(img_path))
                     continue
@@ -42,9 +78,17 @@ class VOC2007(BaseDataset):
         # voc xml to coco json
         self._annotations_json = os.path.join(self._root_path, "voc2007_gt.json")
 
-        categories = [{"supercategory": "none", "id": self.class_map[key], "name": key} for key in self.class_map]
+        categories = [
+            {"supercategory": "none", "id": self.class_map[key], "name": key}
+            for key in self.class_map
+        ]
 
-        gt = {"annotations": list(), "images": list(), "categories": categories, "type": "instances"}
+        gt = {
+            "annotations": list(),
+            "images": list(),
+            "categories": categories,
+            "type": "instances",
+        }
         cnt = 0
         for label_file in self._label_files:
             objects, image_info = self._parse_xml(label_file)
@@ -60,16 +104,41 @@ class VOC2007(BaseDataset):
 
     @property
     def annotations_file(self):
+        """
+        Get the path to the COCO format annotations JSON file.
+
+        Returns:
+            str: Path to the annotations JSON file
+        """
         return self._annotations_json
 
     @property
     def image_ids(self):
+        """
+        Get the list of image IDs in the dataset.
+
+        Returns:
+            list: List of image IDs
+        """
         return self._image_ids
 
     def get_next_batch(self):
+        """
+        Get the next batch of data.
+        This method is currently not implemented.
+        """
         pass
 
     def get_datas(self, num: int):
+        """
+        Get a specified number of image paths from the dataset.
+
+        Args:
+            num (int): Number of images to retrieve. If 0, returns all images.
+
+        Returns:
+            list: List of image file paths
+        """
         if num == 0:
             num = self._total_num
         elif num > self._total_num:
@@ -81,16 +150,58 @@ class VOC2007(BaseDataset):
 
     @property
     def dataset_name(self):
+        """
+        Get the name of the dataset.
+
+        Returns:
+            str: Name of the dataset ("voc2007")
+        """
         return self._dataset_name
 
     @property
     def class_map(self):
-        return {"background": 0, "aeroplane": 1, "bicycle": 2, "bird": 3, "boat": 4,
-                "bottle": 5, "bus": 6, "car": 7, "cat": 8, "chair": 9, "cow": 10,
-                "diningtable": 11, "dog": 12, "horse": 13, "motorbike": 14, "person": 15,
-                "pottedplant": 16, "sheep": 17, "sofa": 18, "train": 19, "tvmonitor": 20}
+        """
+        Get the class mapping from class names to IDs for VOC2007 dataset.
+
+        Returns:
+            dict: Dictionary mapping class names to class IDs, with background as 0
+        """
+        return {
+            "background": 0,
+            "aeroplane": 1,
+            "bicycle": 2,
+            "bird": 3,
+            "boat": 4,
+            "bottle": 5,
+            "bus": 6,
+            "car": 7,
+            "cat": 8,
+            "chair": 9,
+            "cow": 10,
+            "diningtable": 11,
+            "dog": 12,
+            "horse": 13,
+            "motorbike": 14,
+            "person": 15,
+            "pottedplant": 16,
+            "sheep": 17,
+            "sofa": 18,
+            "train": 19,
+            "tvmonitor": 20,
+        }
 
     def _parse_xml(self, filename):
+        """
+        Parse a PASCAL VOC XML annotation file and convert to COCO format.
+
+        Args:
+            filename (str): Path to the XML annotation file
+
+        Returns:
+            tuple: A tuple containing:
+                - objects (list): List of object annotations in COCO format
+                - image_info (dict): Image information in COCO format
+        """
         """ Parse a PASCAL VOC xml file """
         name = os.path.basename(filename)
         basename, _ = os.path.splitext(name)
@@ -102,7 +213,7 @@ class VOC2007(BaseDataset):
             "file_name": filename.replace(".txt", ".jpg"),
             "height": height,
             "width": width,
-            "id": int(basename)
+            "id": int(basename),
         }
         objects = list()
         for obj in tree.findall("object"):
@@ -120,7 +231,7 @@ class VOC2007(BaseDataset):
                 "category_id": self.class_map[obj.find("name").text],
                 "bbox": [x1, y1, w, h],
                 "ignore": 0,
-                'segmentation': []  # This script is not for segmentation
+                "segmentation": [],  # This script is not for segmentation
             }
             objects.append(obj_struct)
 

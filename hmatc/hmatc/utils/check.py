@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: check.py
+# Description:
+#     Check config YAML
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 from PIL import Image
 from . import logger
@@ -5,13 +24,28 @@ from .utils import SUPPORT_IMAGE_FORMATS
 
 
 def get_image_size(filepath):
+    """Get the width and height of an image.
+
+    Args:
+        filepath (str): Path to the image file
+
+    Returns:
+        tuple: A tuple containing (width, height) of the image
+    """
     with Image.open(filepath) as im:
         width, height = im.size
         return width, height
 
 
 def check_cfg(cfg):
-    """check config"""
+    """Check configuration parameters.
+
+    Args:
+        cfg (dict): Configuration dictionary containing model settings
+
+    Returns:
+        bool: True if configuration is valid, False otherwise
+    """
     # model info
     model_cfg = cfg.get("model")
     save_dir = model_cfg.get("save_dir")
@@ -34,7 +68,7 @@ def check_cfg(cfg):
         data_format = input_cfg.get("data_format")
         if data_format is None:
             continue
-        # 图像
+        # image
         if data_format not in ["RGB", "BGR", "GRAY"]:
             logger.error(f"Not support data_format: {data_format}")
             return False
@@ -99,12 +133,12 @@ def check_cfg(cfg):
                     f"max_input_size must be list, and [H, W], when use resizer"
                 )
                 return False
-            # 需保证max_input_size为偶数
+            # need to ensure max_input_size is even number
             for v in max_input_size:
                 if v % 2 != 0:
                     logger.error(f"max_input_size[H, W] must be even number")
                     return False
-            # 如果max_input_size比input WH小给出警告
+            # if max_input_size is smaller than input WH, give warning
             resizer_input_h, resizer_input_w = max_input_size
             if resizer_input_h < H or resizer_input_w < W:
                 logger.warning(f"max_input_size[H, W] should be greater than [H, W]")
@@ -113,7 +147,7 @@ def check_cfg(cfg):
                 crop_size = resizer_cfg.get("crop_size", [0, 0, H, W])
                 y1, x1, crop_height, crop_width = crop_size
                 x2, y2 = x1 + crop_width, y1 + crop_height
-                # 检查crop_size是否均为偶数
+                # check if all values in crop_size are even numbers
                 for v in crop_size:
                     if v % 2 != 0:
                         logger.error(f"crop_size must be even number: {crop_size}")

@@ -1,5 +1,22 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: preprocess.py
+# Description:
+#   preprocess functions
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import cv2
 import torch
 import numpy as np
@@ -9,6 +26,19 @@ from .transform import BGR2YUV
 
 
 def calc_padding_size(img_shape, target_size, padding_mode):
+    """Calculate padding size for image resizing.
+
+    Args:
+        img_shape (tuple): Input image shape as (height, width)
+        target_size (tuple): Target size as (width, height)
+        padding_mode (int): Padding mode (0: left/top padding, 1: center padding)
+
+    Returns:
+        tuple: (padding_size, size, scale_factor) where:
+            - padding_size: [top, left, bottom, right] padding values
+            - size: new image size [height, width]
+            - scale_factor: scaling factor from original to new height
+    """
     top, bottom, left, right = 0, 0, 0, 0
     tw, th = target_size
     h, w = img_shape
@@ -55,14 +85,18 @@ def resize(
     padding_mode=1,
     interpolation=cv2.INTER_LINEAR,
 ):
-    """opencv resize封装，目前仅支持双线性差值
-    :param im:
-    :param size:
-    :param resize_type:  0-长宽分别resize，1-长边等比例resize，2-短边等比例resize，默认为0
-    :param padding_value:
-    :param padding_mode: 0-LEFT_TOP, 1-CENTER
-    :param interpolation:
-    :return:
+    """Resize image with different resize strategies.
+
+    Args:
+        im: Input image
+        size (tuple): Target size as (width, height)
+        resize_type (int): Resize type (0: direct resize, 1: aspect ratio resize with padding, 2: not supported)
+        padding_value (int or list): Value for padding
+        padding_mode (int): Padding mode (0: left/top padding, 1: center padding)
+        interpolation: OpenCV interpolation method
+
+    Returns:
+        Resized image
     """
     if resize_type not in [0, 1, 2]:
         logger.error("resize_type must be equal 0 or 1 or 2")
@@ -88,6 +122,15 @@ def resize(
 
 
 def convert_bgr_to_yuv(im, fmt="YUV420SP"):
+    """Convert BGR image to YUV format.
+
+    Args:
+        im: Input image tensor in BGR format
+        fmt (str): YUV format string
+
+    Returns:
+        Converted image in YUV format
+    """
     if fmt == "YUV400":
         assert len(im.shape) == 2
         h, w = im.shape
@@ -114,19 +157,25 @@ def default_preprocess(
     to_YUV=False,
     fmt="YUV420SP",
 ):
-    """默认预处理函数
-    :param im: BGR or GRAY图像
-    :param size:
-    :param mean:
-    :param std:
-    :param use_norm:
-    :param use_rgb:
-    :param use_resize:
-    :param interpolation:
-    :param resize_type:  0-长宽分别resize，1-长边等比例resize，默认为0
-    :param padding_value:
-    :param padding_mode:  0-LEFT_TOP, 1-CENTER
-    :return:
+    """Default preprocessing function for images.
+
+    Args:
+        im: Input BGR or grayscale image
+        size (tuple): Target size as (width, height)
+        mean (list or tuple): Mean values for normalization
+        std (list or tuple): Standard deviation values for normalization
+        use_norm (bool): Whether to apply normalization
+        use_rgb (bool): Whether to convert BGR to RGB
+        use_resize (bool): Whether to resize the image
+        resize_type (int): Resize type (0: direct resize, 1: aspect ratio resize with padding)
+        interpolation: OpenCV interpolation method
+        padding_value (int or list): Padding value(s)
+        padding_mode (int): Padding mode (0: left/top, 1: center)
+        to_YUV (bool): Whether to convert to YUV format
+        fmt (str): YUV format string
+
+    Returns:
+        Preprocessed image tensor
     """
     if im is None:
         logger.error("Image is None, please check!")
@@ -179,6 +228,15 @@ def default_preprocess(
 
 
 def clip_resize_scale(src_size, dst_size):
+    """Clip resize scale to valid range [1/32, 16].
+
+    Args:
+        src_size (tuple): Source size as (height, width)
+        dst_size (tuple): Destination size as (height, width)
+
+    Returns:
+        tuple: Clipped size (height, width) as even numbers
+    """
     nh, nw = src_size
     th, tw = dst_size
     sh = float(th) / nh
@@ -208,9 +266,33 @@ def xh1_preprocess(
     return_dynamic_v1_format=False,
     crop_size=None,
 ):
+    """Advanced preprocessing function with dynamic resizing and padding.
+
+    Args:
+        cv_image: Input OpenCV image
+        input_shape (tuple): Input tensor shape (N, C, H, W)
+        max_input_size (tuple): Maximum input size (max_height, max_width)
+        mean (list or tuple): Mean values for normalization
+        std (list or tuple): Standard deviation values for normalization
+        use_resize (bool): Whether to resize the image
+        use_norm (bool): Whether to apply normalization
+        use_rgb (bool): Whether to convert BGR to RGB
+        resize_type (int): Resize type (0: direct resize, 1: aspect ratio resize with padding)
+        padding_mode (int): Padding mode (0: left/top, 1: center)
+        padding_values (list): Padding values for each channel
+        is_onnx (bool): Whether to return ONNX-compatible format
+        to_YUV (bool): Whether to convert to YUV format
+        fmt (str): YUV format string
+        return_dynamic_v1_format (bool): Whether to return dynamic v1 format info
+        crop_size (list or None): Crop size [start_h, start_w, end_h, end_w]
+
+    Returns:
+        tuple: (processed_image, dynamic_info) where:
+            - processed_image: Preprocessed image tensor
+            - dynamic_info: Dynamic information tensor for variable input shapes
+    """
     _, C, H, W = input_shape
     height, width = cv_image.shape[:2]
-    # resizer需要全为偶数，一般图片宽高为偶数
     height &= ~1
     width &= ~1
     cv_image = cv2.resize(cv_image, (width, height), interpolation=cv2.INTER_LINEAR)
@@ -250,7 +332,6 @@ def xh1_preprocess(
         padding_size = [0, 0, 0, 0]
         size = [H, W]
 
-    # 进一步检查resizer限制[1/32, 16]，虽然量化不需要，但是芯片需要
     nh, nw = clip_resize_scale((nh, nw), size)
 
     im = torch.nn.functional.interpolate(
@@ -271,7 +352,7 @@ def xh1_preprocess(
     padding_im = np.zeros((1, C, max_height, max_width), dtype=np.uint8)
     padding_im[
         :, :, resizer_crop[0] : resizer_crop[2], resizer_crop[1] : resizer_crop[3]
-    ] = im  # 贴至填充图
+    ] = im
     dyn_info = list()
     dyn_info.extend(resizer_crop)
     if resize_type == 1 or return_dynamic_v1_format:

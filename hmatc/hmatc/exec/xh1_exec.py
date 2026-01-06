@@ -1,10 +1,28 @@
+# Copyright 2025 HOUMO AI
+#
+# File: xh1_exec.py
+# Description:
+#   XH1 executor
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import json
 import os
 import time
 import cv2
 import numpy as np
 import torch
-import shutil
 from datetime import datetime
 from prettytable import PrettyTable
 from ..base.base_exec import BaseExec
@@ -13,7 +31,7 @@ from ..infer.onnx_infer import OnnxInfer
 from ..infer.xh1_infer import Xh1Infer
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
-from ..utils.preprocess import default_preprocess, xh1_preprocess, calc_padding_size
+from ..utils.preprocess import xh1_preprocess, calc_padding_size
 from ..utils.utils import (
     get_hmquant_xh1_version,
     get_package_version,
@@ -31,7 +49,18 @@ from ..utils.utils import (
 
 
 class Xh1Exec(BaseExec):
+    """
+    Executor class for XH1 target platform.
+    Handles quantization, building, checking golden data, and comparison for XH1 hardware.
+    """
+
     def __init__(self, cfg: dict) -> None:
+        """
+        Initialize the XH1 executor.
+
+        Args:
+            cfg (dict): Configuration dictionary containing model and quantization settings
+        """
         super().__init__(cfg)
         self.quant_sequencer_model_path = os.path.join(
             self.quant_output_dir,
@@ -52,7 +81,13 @@ class Xh1Exec(BaseExec):
                 self.quant_advance_cfg["activation"]["method"] = {"name": "auto"}
 
     def get_quant_cfg(self) -> dict:
-        # 设置量化日志输出
+        """
+        Get the quantization configuration for XH1 platform.
+
+        Returns:
+            dict: Quantization configuration dictionary
+        """
+        # Set quantization log output
         log_dir = os.path.join(self.save_dir, "xh1", "logs")
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
@@ -76,7 +111,7 @@ class Xh1Exec(BaseExec):
                 "first_layer_weight_denorm_std": None,
             }
 
-            # 非图像or多输入跳过
+            # Skip if not single image input or resizer_mode is 0
             if not self.is_image_single_input or self.resizer_mode == 0:
                 continue
             _, _, H, W = input_shape
@@ -93,7 +128,7 @@ class Xh1Exec(BaseExec):
             resizer_cfg = input_cfg["resizer"]
             max_input_size = resizer_cfg.get("max_input_size", [H, W])
             toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
-            new_input_cfg["toYUV_format"] = toYUV_format[0:6]  # 去掉SP
+            new_input_cfg["toYUV_format"] = toYUV_format[0:6]  # Remove SP
             insert_pad_scatter = resizer_cfg.get("insert_pad_scatter", False)
             if insert_pad_scatter not in [False, True]:
                 logger.error(
@@ -111,9 +146,9 @@ class Xh1Exec(BaseExec):
             resize_type = input_cfg["resize_type"]
             max_height, max_width = max_input_size
             nh, nw = H, W
-            # onnx输入大于max_input_size，影响static_resizer crop
+            # ONNX input larger than max_input_size, affecting static_resizer crop
             if H > max_height or W > max_width:
-                # 等比例缩放至最大输入内
+                # Scale proportionally within max input size
                 _, size, _ = calc_padding_size(
                     (H, W), (max_width, max_height), padding_mode=0
                 )
@@ -125,7 +160,10 @@ class Xh1Exec(BaseExec):
                 "width": nw,
             }
             new_input_cfg["dynamic_crop"] = self.resizer_mode in [1, 2]
-            new_input_cfg["fold"] = self.resizer_mode in [2, 3]  # 可量化内部判断
+            new_input_cfg["fold"] = self.resizer_mode in [
+                2,
+                3,
+            ]  # Internal quantization decision
             if resize_type == 1 and self.resizer_mode == 1:
                 # padding
                 padding_values = input_cfg["padding_values"]
@@ -147,7 +185,15 @@ class Xh1Exec(BaseExec):
         return quant_cfg
 
     def get_quant_dataset(self):
-        """提供量化数据"""
+        """
+        Provide quantization data for calibration.
+
+        Returns:
+            tuple: A tuple containing:
+                - calib_datasets (list): List of calibration datasets
+                - onnx_datasets (list): List of ONNX datasets
+        """
+        # Provide quantization data
         onnx_datasets = list()
         calib_datasets = list()
         input_name = self.inputs_name[0]
@@ -163,7 +209,7 @@ class Xh1Exec(BaseExec):
         if self.use_random_data:
             logger.warning("Using random data for calibration")
         if self.is_image_single_input:
-            # 单输入且输入为图像
+            # Single input and input is image
             input_name = self.inputs_name[0]
             input_cfg = self.inputs_cfg[input_name]
             input_shape = input_cfg["shape"]
@@ -176,11 +222,11 @@ class Xh1Exec(BaseExec):
             resizer_cfg = input_cfg.get("resizer", dict())
             max_input_size = resizer_cfg.get("max_input_size", (H, W))
             max_height, max_width = max_input_size
-            # 填充图片
+            # Pad images
             padding_len = len(filenames) % N
             for idx in range(padding_len):
                 filenames.append(filenames[0])
-            # 切分图片
+            # Split images
             actual_calib_num = len(filenames) // N
             if actual_calib_num < calib_num:
                 logger.warning(
@@ -258,7 +304,7 @@ class Xh1Exec(BaseExec):
                     in_datas[f"resizer_crop_{input_name}"] = batch_dyninfos
                 calib_datasets.append(in_datas)
         else:
-            # 单输入且输入为非图像 or 多输入
+            # Single input and input is non-image or multi-input
             if len(filenames) < calib_num:
                 logger.warning(
                     f"The number of calibration data is less than the number of calibration samples"
@@ -294,7 +340,13 @@ class Xh1Exec(BaseExec):
         return calib_datasets, onnx_datasets
 
     def quantize(self):
-        """quantize the model"""
+        """
+        Quantize the ONNX model for XH1 hardware.
+
+        Returns:
+            dict: Dictionary containing quantization results and information
+        """
+        # quantize the model
         # quant info
         if self.quant_cfg is None:
             logger.error("quant info not found")
@@ -330,7 +382,7 @@ class Xh1Exec(BaseExec):
         calib_datasets, onnx_datasets = self.get_quant_dataset()
         in_datas = calib_datasets[0]
         onnx_in_datas = onnx_datasets[0]
-        # 打印前端转换对比结果
+        # Print frontend conversion comparison results
         convert_profiling(
             self.model_path,
             onnx_input=[onnx_in_datas],
@@ -349,12 +401,12 @@ class Xh1Exec(BaseExec):
             device=self.device,
         )
         span = time.time() - t_start
-        # 打印量化前后的对比结果
+        # Print quantization before and after comparison results
         res = quantize_profiling(
             sequencer,
             [in_datas],
             device=self.device,
-            mode=0,  # 0：累积误差  1：单算子对比
+            mode=0,  # 0: cumulative error  1: single operator comparison
             quant_mode="quant_forward",
             return_o_metric=True,
         )
@@ -389,10 +441,10 @@ class Xh1Exec(BaseExec):
         )
         res["time"] = span
         res_info = {"quant": res, "model": self.model_cfg}
-        # 压缩量化产物
+        # Compress quantization outputs
         if self.enable_upload and 0:
             logger.info("Compressing quant output...")
-            # 写入各版本信息
+            # Write version information
             with open(os.path.join(self.quant_output_dir, "VERSION.txt"), "w") as f:
                 f.write(f"hmquant_version: {get_hmquant_xh1_version()}\n")
                 f.write(f"quant_time: {now}\n")
@@ -415,6 +467,15 @@ class Xh1Exec(BaseExec):
         return res_info
 
     def build(self, enable_profile=False):
+        """
+        Build the quantized model to HMM format for XH1 hardware.
+
+        Args:
+            enable_profile (bool): Whether to enable profiling during build, defaults to False
+
+        Returns:
+            dict: Dictionary containing build results and information
+        """
         if not os.path.exists(self.build_output_dir):
             os.makedirs(self.build_output_dir)
         try:
@@ -440,7 +501,7 @@ class Xh1Exec(BaseExec):
         )
         span = time.time() - t_start
         res_info = {"build": {"time": span}}
-        # 压缩编译后产物
+        # Compress compiled outputs
         if self.enable_upload:
             logger.info("Compressing hmmodel...")
             hmcc_version = get_package_version(f"houmo-tcim-xh1")
@@ -472,6 +533,16 @@ class Xh1Exec(BaseExec):
         return res_info
 
     def check_golden(self, device_id=0, enable_layers=False):
+        """
+        Check the golden data against the hardware model outputs.
+
+        Args:
+            device_id (int): Device ID for inference, default is 0
+            enable_layers (bool): Whether to enable layer-by-layer checking
+
+        Returns:
+            dict: Dictionary containing comparison results between golden and hardware outputs
+        """
         logger.info("Checking golden...")
         if enable_layers:
             self.quant_onnx_model_path = self.add_node_output_as_graph_output(
@@ -494,23 +565,23 @@ class Xh1Exec(BaseExec):
                 f"hmquant_{self.model_name}_{new_input_name}_input.npy",
             )
             golden_input = np.load(golden_input_path)
-            # 编译时多batch，需要复制数据
+            # Multiple batch during compilation, need to copy data
             if self.build_batch > 1:
                 golden_input = np.repeat(golden_input, self.build_batch, axis=0)
             in_datas[input_name] = golden_input
             if self.resizer_mode in [1, 2]:
-                # 编译后模型多batch，dynamic_resizer数据需要复制
+                # Multiple batch in compiled model, dynamic_resizer data needs to be copied
                 golden_dyn_info_input_path = os.path.join(
                     self.quant_output_dir,
                     f"hmquant_{self.model_name}_resizer_crop_{new_input_name}_input.npy",
                 )
                 golden_dyn_input = np.load(golden_dyn_info_input_path)
                 repeats = 1
-                if self.roi_num > 1:  # 1图n框
+                if self.roi_num > 1:  # 1 image n boxes
                     repeats = self.roi_num
                 elif (
                     self.roi_num == 1 and self.build_batch > 1
-                ):  # n图n框，且编译batch>1
+                ):  # n images n boxes, and compilation batch > 1
                     repeats = self.build_batch
                 golden_dyn_input = np.repeat(golden_dyn_input, repeats=repeats, axis=0)
                 in_datas[f"resizer_crop_{input_name}"] = golden_dyn_input
@@ -520,10 +591,10 @@ class Xh1Exec(BaseExec):
         self.save_profile_data(outputs)
         repeats = 1
         if self.build_batch > 1 and self.roi_num == 1:
-            # n图n框，且编译batch>1
+            # n images n boxes, and compilation batch > 1
             repeats = self.build_batch
         elif self.roi_num > 1:
-            # 1图n框
+            # 1 image n boxes
             repeats = self.roi_num
         header = [
             "name",
@@ -617,6 +688,16 @@ class Xh1Exec(BaseExec):
         return res_info
 
     def compare(self, data_path: str, device_id=0):
+        """
+        Compare outputs from ONNX, HmQuant and XH1 inference.
+
+        Args:
+            data_path (str): Path to input data for comparison
+            device_id (int): Device ID for XH1 inference, defaults to 0
+
+        Returns:
+            dict: Dictionary containing comparison results between different inference engines
+        """
         t_start = datetime.now().strftime("%Y%m%d%H%M%S")
         # onnx
         onnx_infer = OnnxInfer()
@@ -633,7 +714,7 @@ class Xh1Exec(BaseExec):
         xh1_in_datas = dict()
         _, ext = os.path.splitext(os.path.basename(data_path))
         if self.is_image_single_input:
-            # 单输入图像
+            # Single input image
             input_name = self.inputs_name[0]
             input_cfg = self.inputs_cfg[input_name]
             input_shape = input_cfg["shape"]
@@ -665,7 +746,7 @@ class Xh1Exec(BaseExec):
             if cv_image is None:
                 logger.error("Failed to decode image")
                 exit(-1)
-            # 获取编译后模型batch
+            # Get compiled model batch
             hmm_batch = xh1_infer.inputs_info[input_name].shape[0]
             # onnx
             onnx_data, _ = xh1_preprocess(
@@ -704,7 +785,7 @@ class Xh1Exec(BaseExec):
                 fmt=toYUV_format,
             )
             if self.resizer_mode in [1, 2, 3]:
-                # 使用resizer
+                # Using resizer
                 h, w, c = yuv_pad_hwc.shape
                 yuv_pad = yuv_pad_hwc.view(1, c, h, w)
                 yuv_pad = yuv_pad.repeat_interleave(self.model_input_batch, dim=0)
@@ -722,7 +803,7 @@ class Xh1Exec(BaseExec):
                 yuv = np.repeat(yuv, repeats=hmm_batch, axis=0)
                 xh1_in_datas[input_name] = np.ascontiguousarray(yuv)  # np.ndarray
             elif self.resizer_mode == 0:
-                # 禁用resizer
+                # Disable resizer
                 in_data = np.repeat(onnx_data, repeats=self.build_batch, axis=0)
                 in_data_quanted = xh1_infer.quantize(input_name, in_data)
                 hmquant_in_datas[input_name] = torch.from_numpy(
@@ -733,11 +814,11 @@ class Xh1Exec(BaseExec):
             # dynamic_resizer info
             if self.resizer_mode in [1, 2]:
                 if self.roi_num > 1:
-                    # 1图n框
+                    # 1 image n boxes
                     hmquant_dyn_info = dyn_info
                     xh1_dyn_info = dyn_info.repeat_interleave(self.roi_num, dim=0)
                 else:
-                    # n图n框
+                    # n images n boxes
                     hmquant_dyn_info = dyn_info.repeat_interleave(
                         self.model_input_batch, dim=0
                     )
@@ -747,7 +828,7 @@ class Xh1Exec(BaseExec):
                     xh1_dyn_info.detach().cpu().numpy()
                 )
         else:
-            # 单输入非图像or多输入
+            # Single input non-image or multi-input
             if ext != ".npz":
                 logger.error(f"{data_path} is not npz file")
                 exit(-1)
@@ -765,7 +846,7 @@ class Xh1Exec(BaseExec):
                 ).type(torch.int64)
                 xh1_in_datas[input_name] = in_data_quanted
 
-        # 存输入数据
+        # Save input data
         input_data_dir = os.path.join(self.save_dir, "xh1", "datas", "input")
         if not os.path.exists(input_data_dir):
             os.makedirs(input_data_dir)
@@ -805,14 +886,14 @@ class Xh1Exec(BaseExec):
 
         repeats = 1
         if self.build_batch > 1 and self.roi_num == 1:
-            # n图n框，且编译batch>1
+            # n images n boxes, and compilation batch > 1
             repeats = self.build_batch
         elif self.roi_num > 1:
-            # 1图n框
+            # 1 image n boxes
             repeats = self.roi_num
         res_info = {"compare": {t_start: dict()}}
         res_info["compare"][t_start]["data_path"] = data_path
-        # 计算相似度
+        # Calculate similarity
         header = [
             "name",
             "onnx vs hmquant",

@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: widerface.py
+# Description:
+#   WiderFace dataset
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 #!/usr/bin/env python
 # -*- coding:utf-8 _*-
 import os
@@ -6,7 +25,18 @@ from ..utils import logger
 
 
 class WiderFace(BaseDataset):
+    """
+    WiderFace dataset class for face detection tasks.
+    This class handles the loading and management of the WiderFace validation dataset.
+    """
+
     def __init__(self, root_path):
+        """
+        Initialize the WiderFace dataset.
+
+        Args:
+            root_path (str): Root path of the WiderFace dataset directory
+        """
         self._root_path = root_path
         if not os.path.exists(self._root_path):
             logger.error(f"root_path not exits -> {self._root_path}")
@@ -40,10 +70,22 @@ class WiderFace(BaseDataset):
             exit(-1)
 
     def get_next_batch(self):
-        """获取下一批数据"""
+        """
+        Get the next batch of data.
+        This method is currently not implemented.
+        """
         pass
 
     def get_datas(self, num: int):
+        """
+        Get a specified number of image paths from the dataset.
+
+        Args:
+            num (int): Number of images to retrieve. If 0, returns all images.
+
+        Returns:
+            list: List of image file paths
+        """
         if num == 0:
             num = self._total_num
         elif num > self._total_num:
@@ -53,12 +95,33 @@ class WiderFace(BaseDataset):
         return img_paths
 
     def get_relative_path(self, idx):
+        """
+        Get the relative path of an image at the specified index.
+
+        Args:
+            idx (int): Index of the image
+
+        Returns:
+            str: Relative path of the image
+        """
         return self._img_relative_path[idx]
 
     @property
     def annotation_path(self):
+        """
+        Get the path to the annotation directory.
+
+        Returns:
+            str: Path to the ground truth annotation directory
+        """
         return self._annotation_path
 
     @property
     def dataset_name(self):
+        """
+        Get the name of the dataset.
+
+        Returns:
+            str: Name of the dataset ("widerface")
+        """
         return "widerface"

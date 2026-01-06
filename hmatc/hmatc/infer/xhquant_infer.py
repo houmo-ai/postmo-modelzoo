@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: xhquant_infer.py
+# Description:
+#   XH2 HmQuant inference script using xhquant backend.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import time
 import numpy as np
@@ -10,7 +29,17 @@ from ..utils.utils import torch_to_numpy_dtype
 
 
 class Xh2HmQuantInfer(BaseInfer, ABC):
+    """
+    Inference class for XH2 HmQuant models.
+    Handles loading, running and unloading of quantized models using the xhquant backend for XH2 hardware.
+    """
+
     def __init__(self):
+        """
+        Initialize the Xh2HmQuantInfer instance.
+        Sets up the backend, model extension, and initializes input/output tracking.
+        Initializes the xhquant runtime.
+        """
         super().__init__()
         self.backend = "Xh2Hmquant"
         self.model_ext = ".onnx"
@@ -24,6 +53,13 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         xhquant_init(None, debug=False)
 
     def load(self, model_path, device_id=0):
+        """
+        Load the XH2 HmQuant model from the specified path.
+
+        Args:
+            model_path (str): Path to the HMONNX model file (.onnx)
+            device_id (int): Device ID for inference (not used in this implementation)
+        """
         if not os.path.exists(model_path):
             logger.error(f"model path: {model_path} not exists.")
             exit(-1)
@@ -52,6 +88,17 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
             )
 
     def run(self, in_datas: dict) -> Dict[str, np.ndarray]:
+        """
+        Run inference on the loaded XH2 HmQuant model with the provided input data.
+
+        Args:
+            in_datas (dict): Dictionary of input data where keys are input names
+                and values are torch tensors
+
+        Returns:
+            Dict[str, np.ndarray]: Dictionary of output data where keys are output names
+                and values are numpy arrays containing the inference results as float32
+        """
         self.total += 1
         t_start = time.time()
         outputs = self.engine.run(in_datas)
@@ -67,4 +114,8 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         }
 
     def unload(self):
+        """
+        Unload the model from memory.
+        Currently not implemented (no-op).
+        """
         pass

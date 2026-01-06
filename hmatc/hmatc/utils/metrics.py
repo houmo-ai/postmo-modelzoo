@@ -1,5 +1,23 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: metrics.py
+# Description:
+#   Metrics for model evaluation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import json
 import os
 import cv2
@@ -9,6 +27,16 @@ from . import logger
 
 
 def smooth(y, f=0.05):
+    """
+    Apply box filter smoothing to input array.
+
+    Args:
+        y (np.ndarray): Input array to be smoothed
+        f (float): Fraction of the array length for filter size, default is 0.05
+
+    Returns:
+        np.ndarray: Smoothed array
+    """
     # Box filter of fraction f
     nf = round(len(y) * f * 2) // 2 + 1  # number of filter elements (must be odd)
     p = np.ones(nf // 2)  # ones padding
@@ -17,14 +45,16 @@ def smooth(y, f=0.05):
 
 
 def compute_ap(recall, precision):
-    """Compute the average precision, given the recall and precision curves
-    # Arguments
-        recall:    The recall curve (list)
-        precision: The precision curve (list)
-    # Returns
-        Average precision, precision curve, recall curve
     """
+    Compute the average precision, given the recall and precision curves.
 
+    Args:
+        recall (list or np.ndarray): The recall curve
+        precision (list or np.ndarray): The precision curve
+
+    Returns:
+        tuple: (Average precision, precision curve, recall curve)
+    """
     # Append sentinel values to beginning and end
     mrec = np.concatenate(([0.0], recall, [1.0]))
     mpre = np.concatenate(([1.0], precision, [0.0]))
@@ -45,19 +75,27 @@ def compute_ap(recall, precision):
 
 
 def ap_per_class(tp, conf, pred_cls, target_cls, eps=1e-16):
-    """Compute the average precision, given the recall and precision curves.
-    Source: https://github.com/rafaelpadilla/Object-Detection-Metrics.
-    # Arguments
-        tp:  True positives (nparray, nx1 or nx10).
-        conf:  Objectness value from 0-1 (nparray).
-        pred_cls:  Predicted object classes (nparray).
-        target_cls:  True object classes (nparray).
-        plot:  Plot precision-recall curve at mAP@0.5
-        save_dir:  Plot save directory
-    # Returns
-        The average precision as computed in py-faster-rcnn.
     """
+    Compute the average precision for each class, given true positives, confidence,
+    predicted and target classes.
 
+    Args:
+        tp (np.ndarray): True positives (nx1 or nx10)
+        conf (np.ndarray): Objectness value from 0-1
+        pred_cls (np.ndarray): Predicted object classes
+        target_cls (np.ndarray): True object classes
+        eps (float): Small epsilon value to prevent division by zero, default is 1e-16
+
+    Returns:
+        tuple: (tp, fp, p, r, f1, ap, unique_classes)
+            - tp: True positives per class
+            - fp: False positives per class
+            - p: Precision per class
+            - r: Recall per class
+            - f1: F1 score per class
+            - ap: Average precision per class
+            - unique_classes: Unique class indices
+    """
     # Sort by objectness
     i = np.argsort(-conf)
     tp, conf, pred_cls = tp[i], conf[i], pred_cls[i]
@@ -104,14 +142,107 @@ def ap_per_class(tp, conf, pred_cls, target_cls, eps=1e-16):
 
 
 def coco80_to_coco91_class():  # converts 80-index (val2014) to 91-index (paper)
+    """
+    Convert COCO 80-class index to COCO 91-class index.
+    This mapping is used to convert the COCO dataset class indices from the 80-class format
+    used in validation sets (val2014) to the 91-class format described in the original paper.
+
+    Returns:
+        list: Mapping from 80-class indices to 91-class indices
+    """
     # https://tech.amikelive.com/node-718/what-object-categories-labels-are-in-coco-dataset/
     return [
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34,
-        35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
-        64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90]
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        27,
+        28,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        67,
+        70,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+    ]
 
 
 def detections2txt(detections, filepath):
+    """
+    Write detection results to a text file.
+
+    Args:
+        detections (list): List of detections in format [x1, y1, x2, y2, conf, cls]
+        filepath (str): Path to save the text file
+    """
     with open(filepath, "w") as f:
         for det in detections:
             (x1, y1, x2, y2), conf, cls = det[0:4], det[4], det[5]
@@ -120,6 +251,13 @@ def detections2txt(detections, filepath):
 
 
 def detections_face2txt(detections, filepath):
+    """
+    Write face detection results to a text file in a specific format.
+
+    Args:
+        detections (list): List of face detections in format [x1, y1, x2, y2, conf]
+        filepath (str): Path to save the text file
+    """
     with open(filepath, "w") as f:
         file_name = os.path.basename(filepath)[:-4] + "\n"
         bboxs_num = str(len(detections)) + "\n"
@@ -127,13 +265,21 @@ def detections_face2txt(detections, filepath):
         f.write(bboxs_num)
         for det in detections:
             f.write(
-                '%d %d %d %d %.03f'
+                "%d %d %d %d %.03f"
                 % (det[0], det[1], det[2], det[3], det[4] if det[4] <= 1 else 1)
-                + '\n'
+                + "\n"
             )
 
 
 def detections_mask2json(detections, contours_lists: list, filepath):
+    """
+    Convert detection results with masks to COCO JSON format.
+
+    Args:
+        detections (list): List of detections in format [x1, y1, x2, y2, conf, cls]
+        contours_lists (list): List of contours for segmentation masks
+        filepath (str): Path to save the JSON file
+    """
     with open(filepath, "w") as f:
         if not contours_lists:
             return
@@ -180,6 +326,13 @@ def detections_mask2json(detections, contours_lists: list, filepath):
 
 
 def detections_kpt2json(outputs, filepath):
+    """
+    Convert keypoint detection results to COCO JSON format.
+
+    Args:
+        outputs (list): List of keypoint detections in format [x1, y1, x2, y2, conf, cls, kpt1_x, kpt1_y, kpt1_conf, ...]
+        filepath (str): Path to save the JSON file
+    """
     with open(filepath, "w") as f:
         filename = os.path.basename(filepath)
         name, ext = os.path.splitext(filename)
@@ -210,6 +363,13 @@ def detections_kpt2json(outputs, filepath):
 
 
 def merge_json(save_results, pred_json):
+    """
+    Merge multiple JSON files containing detection results into a single JSON file.
+
+    Args:
+        save_results (str): Directory containing JSON result files
+        pred_json (str): Path to save the merged JSON file
+    """
     label_files = os.listdir(save_results)
     results = list()
     for filename in label_files:
@@ -229,12 +389,13 @@ def merge_json(save_results, pred_json):
 
 
 def detection_txt2json(save_results, pred_json, to_coco91=True):
-    """将检测的txt结果转为coco json
-    JSON format [{"image_id": 42, "category_id": 18, "bbox": [258.15, 41.29, 348.26, 243.78], "score": 0.236}, ...]
-    :param save_results:
-    :param pred_json:
-    :param to_coco91:
-    :return:
+    """
+    Convert detection results from text format to COCO JSON format.
+
+    Args:
+        save_results (str): Directory containing text result files
+        pred_json (str): Path to save the JSON file
+        to_coco91 (bool): Whether to convert to COCO 91-class format, default is True
     """
     label_files = os.listdir(save_results)
     pred_list = list()
@@ -270,12 +431,17 @@ def detection_txt2json(save_results, pred_json, to_coco91=True):
 
 
 def coco_eval(pred_json, anno_json, image_ids, iou_type="bbox"):
-    """coco 评估方法
-    :param pred_json:
-    :param anno_json:
-    :param image_ids:
-    :param iou_type:
-    :return:
+    """
+    Perform COCO evaluation using pycocotools.
+
+    Args:
+        pred_json (str): Path to prediction JSON file
+        anno_json (str): Path to annotation JSON file
+        image_ids (list): List of image IDs to evaluate
+        iou_type (str): Type of IoU evaluation ('bbox', 'segm', 'keypoints'), default is 'bbox'
+
+    Returns:
+        tuple: (mAP@0.5:0.95, mAP@0.5)
     """
     logger.info("Evaluating pycocotools mAP... saving {}...".format(pred_json))
     try:  # https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocoEvalDemo.ipynb
@@ -300,19 +466,43 @@ def coco_eval(pred_json, anno_json, image_ids, iou_type="bbox"):
 
 class StreamSegMetrics(object):
     """
-    Stream Metrics for Semantic Segmentation Task
+    Stream Metrics for Semantic Segmentation Task.
+    Provides evaluation metrics for semantic segmentation including overall accuracy,
+    mean accuracy, mean IoU, and frequency weighted accuracy.
     """
 
     def __init__(self, n_classes):
+        """
+        Initialize the metrics calculator.
+
+        Args:
+            n_classes (int): Number of classes in the segmentation task
+        """
         self.n_classes = n_classes
         self.confusion_matrix = np.zeros((n_classes, n_classes))
 
     def update(self, label_trues, label_preds):
+        """
+        Update confusion matrix with new batch of predictions.
+
+        Args:
+            label_trues (np.ndarray): Ground truth labels
+            label_preds (np.ndarray): Predicted labels
+        """
         for lt, lp in zip(label_trues, label_preds):
             self.confusion_matrix += self._fast_hist(lt.flatten(), lp.flatten())
 
     @staticmethod
     def to_str(results):
+        """
+        Convert results dictionary to string format.
+
+        Args:
+            results (dict): Dictionary containing evaluation metrics
+
+        Returns:
+            str: Formatted string representation of the results
+        """
         string = "\n"
         for k, v in results.items():
             if k != "Class IoU":
@@ -324,6 +514,16 @@ class StreamSegMetrics(object):
         return string
 
     def _fast_hist(self, label_true, label_pred):
+        """
+        Calculate histogram for a single image.
+
+        Args:
+            label_true (np.ndarray): True labels
+            label_pred (np.ndarray): Predicted labels
+
+        Returns:
+            np.ndarray: Confusion matrix histogram
+        """
         mask = (label_true >= 0) & (label_true < self.n_classes)
         hist = np.bincount(
             self.n_classes * label_true[mask].astype(int) + label_pred[mask],
@@ -332,11 +532,11 @@ class StreamSegMetrics(object):
         return hist
 
     def get_results(self):
-        """Returns accuracy score evaluation result.
-        - overall accuracy
-        - mean accuracy
-        - mean IU
-        - fwavacc
+        """
+        Calculate and return evaluation metrics.
+
+        Returns:
+            dict: Dictionary containing Overall Acc, Mean Acc, FreqW Acc, Mean IoU, and Class IoU
         """
         hist = self.confusion_matrix
         acc = np.diag(hist).sum() / hist.sum()
@@ -357,4 +557,7 @@ class StreamSegMetrics(object):
         }
 
     def reset(self):
+        """
+        Reset the confusion matrix to zeros.
+        """
         self.confusion_matrix = np.zeros((self.n_classes, self.n_classes))

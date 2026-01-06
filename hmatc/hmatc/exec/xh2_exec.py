@@ -1,20 +1,37 @@
+# Copyright 2025 HOUMO AI
+#
+# File: xh2_exec.py
+# Description:
+#   XH2 Executor
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import shutil
 import time
-import onnx
 import cv2
 import numpy as np
 import torch
 from prettytable import PrettyTable
 from datetime import datetime
-from importlib.metadata import PackageNotFoundError, version
 from ..base.base_exec import BaseExec
 from ..infer.onnx_infer import OnnxInfer
 from ..infer.xh2_infer import Xh2Infer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
-from ..utils.preprocess import default_preprocess, calc_padding_size
+from ..utils.preprocess import calc_padding_size
 from ..utils.preprocess import xh1_preprocess as resizer_preprocess
 from ..utils.utils import (
     SUPPORT_IMAGE_FORMATS,
@@ -26,38 +43,51 @@ from ..utils.utils import (
     get_package_version,
     get_houmo_version,
     load_npz,
-    str_to_torch_dtype,
     upload_file_to_artifactory,
 )
 
 
 class Xh2Exec(BaseExec):
+    """
+    Executor class for XH2 target platform.
+    Handles quantization, building, checking golden data, and comparison for XH2 hardware.
+    """
+
     def __init__(self, cfg: dict) -> None:
+        """
+        Initialize the XH2 executor.
+
+        Args:
+            cfg (dict): Configuration dictionary containing model and quantization settings
+        """
         super().__init__(cfg)
         self.quant_type = "w8a8h1_sefp"
         self.golden_dir = os.path.join(self.quant_output_dir, "golden")
         self.upgrade_opset_version()
 
-        # 获取onnx输出节点name
+        # Get ONNX output node names
         self.outputs_name = list()
         for name in self.onnx_outputs_info:
             self.outputs_name.append(name)
 
-        # 对inputs_name追加动态参数入name
+        # Append dynamic parameter input names to inputs_name
         if self.resizer_mode == 1:
             input_name = self.inputs_name[0]
             input_name = input_name.replace(".", "_")
             self.inputs_name.append(f"resizer_crop_{input_name}")
 
     def upgrade_opset_version(self):
+        """
+        Upgrade the ONNX model opset version to minimum required version (13).
+        """
         import onnx
         from onnx import version_converter
 
         model = onnx.load(self.model_path)
-        # 遍历模型中的 opset_import 字段（可能有多个域）
+        # Iterate through the opset_import fields in the model (there may be multiple domains)
         opset_version = None
         for opset in model.opset_import:
-            if opset.domain == "":  # 主域（默认的 ONNX operator set）
+            if opset.domain == "":  # Main domain (default ONNX operator set)
                 opset_version = opset.version
                 break
         if opset_version is None:
@@ -78,6 +108,15 @@ class Xh2Exec(BaseExec):
 
     @staticmethod
     def get_format(toYUV_format):
+        """
+        Get the format string based on YUV format.
+
+        Args:
+            toYUV_format (str): YUV format string
+
+        Returns:
+            str: Corresponding format string
+        """
         fmt = "yuv420"
         if toYUV_format == "YUV420SP":
             fmt = "yuv420"
@@ -90,6 +129,12 @@ class Xh2Exec(BaseExec):
         return fmt
 
     def get_quant_cfg(self):
+        """
+        Get the quantization configuration for XH2 platform.
+
+        Returns:
+            dict: Quantization configuration dictionary
+        """
         try:
             from xhquant.api import (
                 DeviceType,
@@ -104,7 +149,7 @@ class Xh2Exec(BaseExec):
 
         input_ppc_config = []
         if self.is_multi_input_model:
-            # 多输入暂不支持resizer
+            # Multi-input does not support resizer for now
             for input_name in self.inputs_cfg:
                 input_ppc_config.append("float16")
         else:
@@ -129,7 +174,7 @@ class Xh2Exec(BaseExec):
                 if resize_type == 1:
                     padding_values = input_cfg.get("padding_values", [114, 114, 114])
                     pad_value = padding_values[0]
-                    # 静态暂限制为0，TODO：编译器修复后修改
+                    # Static is temporarily limited to 0, TODO: modify after compiler fix
                     if enable_static_resizer:
                         pad_value = 0
                 pad_size = (0, 0, 0, 0)
@@ -147,15 +192,15 @@ class Xh2Exec(BaseExec):
                             crop_size, (W, H), padding_mode
                         )
                 resizer_cfg = ResizerScheme(
-                    size=(H, W),  # target size, 也是onnx模型输入size
-                    mode="bilinear",  # nearest, 暂不支持配置
+                    size=(H, W),  # target size, also ONNX model input size
+                    mode="bilinear",  # nearest, not supported for configuration yet
                     align_corners=False,
                     fmt=self.get_format(resizer_format),
                     int_trans=True,  # Default: True  -128 for suit 8bit
-                    crop_size=crop_size,  # 暂默认全图crop
+                    crop_size=crop_size,  # Default full image crop
                     crop_offset=crop_offset,
                     pad_size=pad_size,
-                    pad_value=pad_value,  # 暂时仅支持标量
+                    pad_value=pad_value,  # Only scalar supported temporarily
                     mean=[v / 255.0 for v in mean],
                     std=[v / 255.0 for v in std],
                     dynamic_crop=dynamic_crop,
@@ -172,7 +217,12 @@ class Xh2Exec(BaseExec):
         return quant_config
 
     def get_random_input_data(self):
-        """generate golden input data"""
+        """
+        Generate golden input data.
+
+        Returns:
+            list: List of input data tensors
+        """
         in_datas = list()
         dynamic_inputs = list()
         for input_name in self.inputs_cfg:
@@ -184,10 +234,10 @@ class Xh2Exec(BaseExec):
                     torch.from_numpy(self.gen_random_data(shape, dtype_str))
                 )
                 continue
-            # 输入为图像，且使用resizer的情况，需要重新生成输入和动态输入参数
+            # Input is image and using resizer, need to regenerate input and dynamic input parameters
             resizer_cfg = input_cfg.get("resizer", dict())
             N, C, H, W = shape
-            # resizer算子默认输入size为model输入size
+            # Resizer operator default input size is model input size
             resizer_input_size = resizer_cfg.get("max_input_size", [H, W])
             resizer_input_shape = [
                 N,
@@ -201,7 +251,7 @@ class Xh2Exec(BaseExec):
             )
             enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
             if not enable_static_resizer:
-                # 动态参数数据默认使用全图尺寸作为有效数据
+                # Dynamic parameter data defaults to using full image size as valid data
                 dynamic_inputs.append(
                     torch.tensor(
                         [
@@ -226,7 +276,13 @@ class Xh2Exec(BaseExec):
         return in_datas
 
     def quantize(self):
-        """quantize the model"""
+        """
+        Quantize the ONNX model for XH2 hardware.
+
+        Returns:
+            dict: Dictionary containing quantization results and information
+        """
+        # quantize the model
         if not os.path.exists(self.quant_output_dir):
             os.makedirs(self.quant_output_dir)
 
@@ -254,7 +310,7 @@ class Xh2Exec(BaseExec):
         quant_onnx_model_path = os.path.join(
             self.quant_output_dir, f"{self.model_name}.onnx"
         )
-        # 量化以及HMONNX导出
+        # Quantization and HMONNX export
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         t_start = time.time()
         convert_onnx_to_hmonnx(
@@ -266,7 +322,7 @@ class Xh2Exec(BaseExec):
             input_names=self.inputs_name,
             output_names=self.outputs_name,
         )
-        # 生成芯片所需格式模型
+        # Generate chip required format model
         session = HMONNXGoldenInference(quant_onnx_model_path)
         session.to(self.device)
         session.save_golden = True
@@ -291,7 +347,7 @@ class Xh2Exec(BaseExec):
             dirs_exist_ok=True,
         )
         shutil.rmtree(self.golden_dir)
-        # 压缩量化产物
+        # Compress quantization outputs
         if self.enable_upload and 0:
             logger.info("Compressing quant output...")
             with open(os.path.join(self.quant_output_dir, "VERSION.txt"), "w") as f:
@@ -321,6 +377,15 @@ class Xh2Exec(BaseExec):
         return res_info
 
     def build(self, enable_profile=False):
+        """
+        Build the quantized model to HMM format for XH2 hardware.
+
+        Args:
+            enable_profile (bool): Whether to enable profiling during build, defaults to False
+
+        Returns:
+            dict: Dictionary containing build results and information
+        """
         self.enable_profile = enable_profile
         if not os.path.exists(self.build_output_dir):
             os.makedirs(self.build_output_dir)
@@ -349,7 +414,7 @@ class Xh2Exec(BaseExec):
             # custom_msg=self.custom_msg,
         )
         span = time.time() - t_start
-        # 压缩编译后产物
+        # Compress compiled outputs
         if self.enable_upload:
             logger.info("Compressing hmmodel...")
             hmcc_version = get_package_version(f"houmo-tcim-xh2")
@@ -382,9 +447,19 @@ class Xh2Exec(BaseExec):
         return res_info
 
     def check_golden(self, device_id=0, enable_layers=False):
+        """
+        Check the golden data against the hardware model outputs.
+
+        Args:
+            device_id (int): Device ID for inference, default is 0.
+            enable_layers (bool): Whether to enable layer-by-layer checking
+
+        Returns:
+            dict: Dictionary containing comparison results between golden and hardware outputs
+        """
         logger.info("Checking golden...")
         if enable_layers:
-            # 将量化后onnx的所有node输出作为graph输出
+            # Add all node outputs of quantized ONNX as graph outputs
             self.quant_onnx_model_path = self.add_node_output_as_graph_output(
                 self.quant_onnx_model_path
             )
@@ -435,10 +510,10 @@ class Xh2Exec(BaseExec):
                 )
                 repeats = 1
                 if self.roi_num > 1:
-                    # 1图n框
+                    # 1 image n boxes
                     repeats = self.roi_num
                 elif self.roi_num == 1 and self.build_batch > 1:
-                    # n图n框，且编译batch>1
+                    # n images n boxes, and compilation batch > 1
                     repeats = self.build_batch
                 golden_dyn_input = np.repeat(golden_dyn_input, repeats=repeats, axis=0)
                 in_datas[f"resizer_crop_{new_name}"] = golden_dyn_input
@@ -449,10 +524,10 @@ class Xh2Exec(BaseExec):
 
         repeats = 1
         if self.build_batch > 1 and self.roi_num == 1:
-            # n图n框，且编译batch>1
+            # n images n boxes, and compilation batch > 1
             repeats = self.build_batch
         elif self.roi_num > 1:
-            # 1图n框
+            # 1 image n boxes
             repeats = self.roi_num
 
         header = ["name", "cosine_dist"]
@@ -492,6 +567,16 @@ class Xh2Exec(BaseExec):
         return res_info
 
     def compare(self, data_path: str, device_id=0):
+        """
+        Compare outputs from ONNX, HmQuant and XH2 inference.
+
+        Args:
+            data_path (str): Path to input data for comparison
+            device_id (int): Device ID for XH2 inference, defaults to 0
+
+        Returns:
+            dict: Dictionary containing comparison results between different inference engines
+        """
         t_start = datetime.now().strftime("%Y%m%d%H%M%S")
         # onnx
         onnx_infer = OnnxInfer()
@@ -508,7 +593,7 @@ class Xh2Exec(BaseExec):
         xh2_in_datas = dict()
         _, ext = os.path.splitext(os.path.basename(data_path))
         if self.is_image_single_input:
-            # 单输入图像
+            # Single input image
             input_name = self.inputs_name[0]
             new_name = input_name.replace(".", "_")
             input_cfg = self.inputs_cfg[input_name]
@@ -538,7 +623,7 @@ class Xh2Exec(BaseExec):
             toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
             max_input_size = resizer_cfg.get("max_input_size", [H, W])
             # crop_size = resizer_cfg.get("crop_size", [0, 0, H, W])
-            # 获取编译后模型batch
+            # Get compiled model batch
             hmm_batch = xh2_infer.inputs_info[input_name].shape[0]
             # onnx preprocess
             onnx_data, _ = resizer_preprocess(
@@ -580,7 +665,7 @@ class Xh2Exec(BaseExec):
             )
 
             if self.resizer_mode in [1, 2, 3]:
-                # 使用resizer
+                # Using resizer
                 h, w, c = yuv_pad_hwc.shape
                 yuv_pad = yuv_pad_hwc.view(1, c, h, w)
                 yuv_pad = yuv_pad.repeat_interleave(self.model_input_batch, dim=0)
@@ -598,7 +683,7 @@ class Xh2Exec(BaseExec):
                 yuv = np.repeat(yuv, repeats=hmm_batch, axis=0)
                 xh2_in_datas[input_name] = np.ascontiguousarray(yuv)  # np.ndarray
             elif self.resizer_mode == 0:
-                # 禁用resizer
+                # Disable resizer
                 in_data = np.repeat(onnx_data, repeats=self.build_batch, axis=0)
                 in_data = in_data.astype(np.float16)
                 hmquant_in_datas[input_name] = torch.from_numpy(
@@ -608,11 +693,11 @@ class Xh2Exec(BaseExec):
             # dynamic_resizer info
             if self.resizer_mode in [1, 2]:
                 if self.roi_num > 1:
-                    # 1图n框
+                    # 1 image n boxes
                     hmquant_dyn_info = dyn_info
                     dyn_info = dyn_info.repeat_interleave(self.roi_num, dim=0)
                 else:
-                    # n图n框
+                    # n images n boxes
                     hmquant_dyn_info = dyn_info.repeat_interleave(
                         self.model_input_batch, dim=0
                     )
@@ -622,7 +707,7 @@ class Xh2Exec(BaseExec):
                     dyn_info.detach().cpu().numpy()
                 )
         else:
-            # 单输入非图像or多输入
+            # Single input non-image or multi-input
             in_datas = load_npz(data_path)
             onnx_in_datas = in_datas
             for input_name in in_datas:
@@ -641,15 +726,15 @@ class Xh2Exec(BaseExec):
 
         repeats = 1
         if self.build_batch > 1 and self.roi_num == 1:
-            # n图n框，且编译batch>1
+            # n images n boxes, and compilation batch > 1
             repeats = self.build_batch
         elif self.roi_num > 1:
-            # 1图n框
+            # 1 image n boxes
             repeats = self.roi_num
 
         res_info = {"compare": {t_start: dict()}}
         res_info["compare"][t_start]["data_path"] = data_path
-        # 计算相似度
+        # Calculate similarity
         header = ["name", "onnx vs hmquant", "onnx vs xh2", "hmquant vs xh2"]
         table = PrettyTable(header)
         table.title = "Cosine Distance"

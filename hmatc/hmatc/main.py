@@ -1,5 +1,22 @@
-#!/usr/bin/env python3
-# -*- coding:utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: main.py
+# Description:
+#     Main entry point for the HMATC tool.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import argparse
 import json
 import logging
@@ -30,6 +47,14 @@ from .onnx_tool import model_profile
 
 
 def set_logger(op, log_dir, filename):
+    """
+    Set up a logger that writes to a timestamped log file in the specified directory.
+
+    Args:
+        op (str): Operation name used in the log file name
+        log_dir (str): Directory where the log file will be saved
+        filename (str): Base name of the log file
+    """
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
@@ -58,6 +83,31 @@ def run_model(
     enable_upload=False,
     enable_delete=False,
 ):
+    """
+    Execute a model with specified parameters and configurations.
+
+    Args:
+        location (str): Path to the model location
+        cfg_path (str): Path to the configuration file
+        target (str): Target platform (xh1 or xh2)
+        queue (Queue): Queue to store the results
+        batch_num (int): Number of batches for processing
+        core_num (int): Number of cores to use
+        thread_num (int): Number of threads to use
+        device_id (int): ID of the device to use
+        enbale_quantize (bool): Whether to enable quantization
+        enable_build (bool): Whether to enable model building
+        enable_eval (bool): Whether to enable evaluation
+        enable_onnx_eval (bool): Whether to enable ONNX evaluation
+        enable_chip_eval (bool): Whether to enable chip evaluation
+        enable_static (bool): Whether to enable static mode
+        enable_cuda (bool): Whether to enable CUDA for quantization
+        enable_upload (bool): Whether to enable upload
+        enable_delete (bool): Whether to enable deletion of existing files
+
+    Returns:
+        dict: Dictionary containing model information and results
+    """
     model_infos = dict(
         input_size="N/A",
         dataset="N/A",
@@ -84,7 +134,7 @@ def run_model(
     )
 
     if not os.path.exists(location):
-        # 尝试到环境变量HOUMO_MODEL_PATH下寻找
+        # Try to find the model in the HOUMO_MODEL_PATH environment variable
         new_location = os.path.join(os.environ.get("HOUMO_MODEL_PATH", ""), location)
         if os.path.exists(new_location):
             location = new_location
@@ -105,7 +155,7 @@ def run_model(
     root = os.getcwd()
     os.chdir(location)
 
-    # 下载模型
+    # Download model
     try:
         os.system("python3 get_model.py --type raw")
         logger.info(f"Download done.")
@@ -117,7 +167,7 @@ def run_model(
         queue.put(model_infos)
         return
 
-    # 解析cfg
+    # Parse cfg
     if not os.path.exists(cfg_path):
         msg = f"{cfg_path} not exists"
         logger.error(msg)
@@ -204,7 +254,7 @@ def run_model(
     model_infos["resizer"] = resizer_mode
     platform_arch = platform.machine().lower()
 
-    # 量化
+    # Quantization
     if hm_exec is not None and platform_arch == "x86_64" and enbale_quantize:
         try:
             res = hm_exec.quantize()
@@ -225,7 +275,7 @@ def run_model(
             queue.put(model_infos)
             return
             # return model_infos
-    # 编译
+    # Compilation
     if platform_arch == "x86_64" and enable_build:
         try:
             hm_exec.build()
@@ -249,7 +299,7 @@ def run_model(
         queue.put(model_infos)
         return
 
-    # 性能测试
+    # Performance testing
     try:
         warmup = 10
         sample = 1000
@@ -276,11 +326,11 @@ def run_model(
         return
         # return model_infos
 
-    # onnx 数据集评估
+    # ONNX dataset evaluation
     onnx_info = dict()
     if enable_onnx_eval and enable_eval and "eval" in cfg:
         try:
-            # 删除缓存
+            # Delete cache
             shutil.rmtree("results_onnx", ignore_errors=True)
             onnx_info = hm_exec.evaluate(backend="onnx")
             if not onnx_info:
@@ -293,7 +343,7 @@ def run_model(
             model_infos["msg"] = msg
             onnx_info = dict()
 
-    # xh1/xh2 数据集评估
+    # xh1/xh2 dataset evaluation
     chip_info = dict()
     if enable_chip_eval and enable_eval and "eval" in cfg:
         try:
@@ -311,7 +361,7 @@ def run_model(
 
     model_infos["dataset"] = onnx_info.get("dataset", "N/A")
     model_infos["dataset_num"] = onnx_info.get("num", "N/A")
-    # 计算相对误差"
+    # Calculate relative error
     if onnx_info and ("top1_acc" in onnx_info or "acc" in onnx_info):
         key = "acc" if "acc" in onnx_info else "top1_acc"
         acc_onnx = float(onnx_info[key])
@@ -333,7 +383,6 @@ def run_model(
 
     os.chdir(root)
     queue.put(model_infos)
-    # return model_infos
 
 
 def run_benchmark(
@@ -342,13 +391,22 @@ def run_benchmark(
     device_id: int = 0,
     enable_cuda: bool = False,
 ):
-    # 获取量化工具版本
+    """
+    Run benchmark tests for multiple models with specified configurations.
+
+    Args:
+        config_path (str): Path to the configuration file containing model information
+        target (str): Target platform (xh1 or xh2)
+        device_id (int): ID of the device to use for evaluation
+        enable_cuda (bool): Whether to enable CUDA for quantization
+    """
+    # Get quantization tool version
     hmquant_version = "N/A"
     if target == "xh1":
         hmquant_version = get_hmquant_xh1_version()
     elif target == "xh2":
         hmquant_version = get_hmquant_xh2_version()
-    # 获取编译器版本
+    # Get compiler version
     hmcc_version = get_package_version(f"houmo-tcim-{target}")
     runtime_version = get_package_version(f"houmo_tcim_runtime_{target}")
     if runtime_version == "N/A":
@@ -404,7 +462,7 @@ def run_benchmark(
 
     table = PrettyTable(headers)
     table.title = f"HouMo Model Benchmark Report"
-    # 遍历每个模型
+    # Iterate through each model
     models = models["models"]
     for model_name in models:
         model_cfg = models[model_name]
@@ -425,7 +483,7 @@ def run_benchmark(
                 enable_eval = (
                     exec_cfg.get("enable_eval", False)
                     if platform.machine().lower() == "x86_64"
-                    else False  # TODO 需要在非x86环境跑eval再修改
+                    else False  # TODO need to modify after running eval in non-x86 environment
                 )
                 p = ctx.Process(
                     target=run_model,
@@ -548,7 +606,10 @@ def run_benchmark(
 
 
 def main():
-    # 父解析器
+    """
+    Main entry point for the HMATC tool. Parses command-line arguments and executes the appropriate subcommand.
+    """
+    # Parent parser
     target = os.environ.get("HOUMO_TARGET", "unknown")
     parent_config = argparse.ArgumentParser(add_help=False)
     parent_target = argparse.ArgumentParser(add_help=False)
@@ -596,7 +657,7 @@ def main():
         action="store_true",
         help=argparse.SUPPRESS,
     )
-    # 主解析器
+    # Main parser
     parser = argparse.ArgumentParser(description="HouMo Model Assist Tool")
     subparsers = parser.add_subparsers(
         dest="command", required=True, help="qunat build compare perf demo eval"
@@ -780,15 +841,15 @@ def main():
     logger.info(
         f"Hmatc version: {__version__}, commit: {__commit__}, build time: {__build_time__}"
     )
-    # 设置随机种子
+    # Set random seed
     set_random_seed(1234)
-    # 处理批量模型benchmark
+    # Process batch model benchmark
     current_command = args.command
     if current_command == "benchmark":
         run_benchmark(args.config, args.target, args.device_id, args.cuda)
         exit(0)
 
-    # 存在结果信息，先读回来更新后再存
+    # If result info exists, read back and update before saving
     res_info = dict()
     if (
         hasattr(args, "result_path")
@@ -797,7 +858,7 @@ def main():
     ):
         res_info = read_yaml_to_dict(args.result_path)
 
-    # 直接指定模型的perf可跳过配置文件
+    # Directly specify model for perf can skip config file
     if current_command == "perf" and args.model is not None:
         new_res_info = BaseExec.model_perf(
             args.model,
@@ -825,7 +886,7 @@ def main():
         logger.error("Config file error")
         exit(-1)
 
-    # 命令行参数更新至配置文件
+    # Update command line arguments to config file
     cfg["target"] = target
     if current_command in ["build", "perf", "compare", "demo", "eval"]:
         batch = args.batch
@@ -868,10 +929,10 @@ def main():
 
     new_res_info = dict()
     backend = target
-    # 更新onnx backend
+    # Update onnx backend
     if current_command in ["demo", "eval"] and args.onnx:
         backend = "onnx"
-    # 执行对应的命令
+    # Execute the corresponding command
     if current_command == "quant":
         if args.cuda and target == "xh1" and torch.cuda.is_available():
             hm_exec.device = "cuda"
@@ -886,7 +947,7 @@ def main():
     elif current_command == "compare":
         data_path = args.data_path
         if not os.path.exists(data_path):
-            # 不存在，到环境变量HOUMO_DATASETS_PATH下查找
+            # If not exists, look in HOUMO_DATASETS_PATH environment variable
             HOUMO_DATASETS_PATH = os.environ.get(
                 "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets"
             )

@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: base_exec.py
+# Description:
+#   Base execution class
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import abc
 import os
 import sys
@@ -14,26 +33,36 @@ from ..utils.utils import get_onnx_inputs_info
 
 
 QUANTIZATION_RANGES = {
-    "int8": (-128, 127),  # 8位有符号整数
-    "uint8": (0, 255),  # 8位无符号整数
-    "int16": (-32768, 32767),  # 16位有符号整数
-    "uint16": (0, 65535),  # 16位无符号整数
-    "int32": (-2147483648, 2147483647),  # 32位有符号整数
+    "int8": (-128, 127),  # 8-bit signed integer
+    "uint8": (0, 255),  # 8-bit unsigned integer
+    "int16": (-32768, 32767),  # 16-bit signed integer
+    "uint16": (0, 65535),  # 16-bit unsigned integer
+    "int32": (-2147483648, 2147483647),  # 32-bit signed integer
 }
 
 
 class BaseExec(object, metaclass=abc.ABCMeta):
+    """Base execution class for model processing operations.
+
+    This abstract class handles common operations for model quantization, compilation,
+    and evaluation, including device configuration, model path management, input/output
+    handling, and performance optimization parameters.
+    """
+
     def __init__(self, cfg: dict) -> None:
-        """init parameters
+        """Initialize the execution instance with configuration.
+
         Args:
-            cfg (dict): 来自配置文件
+            cfg (dict): Configuration dictionary containing model, quantization,
+                       build, demo, and evaluation parameters.
         """
-        """"基础参数"""
+        # Basic parameters
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Using device: {self.device}")
         self.target = cfg["target"]
         self.enable_upload = False
-        """模型参数"""
+
+        # Model parameters
         self.model_cfg = cfg.get("model")
         self.save_dir = self.model_cfg.get("save_dir")
         self.model_path = self.model_cfg.get("model_path", "")
@@ -48,9 +77,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.onnx_inputs_info, self.onnx_outputs_info = get_onnx_inputs_info(
             self.model_path
         )
-        self.onnx_is_static = True  # 初始为True
-        self.model_name = self.model_cfg.get("name", "model")  # 编译后模型名称
-        self.model_dir_name = Path.cwd().name  # 模型所在目录名称
+        self.onnx_is_static = True  # Initially True
+        self.model_name = self.model_cfg.get("name", "model")  # Compiled model name
+        self.model_dir_name = Path.cwd().name  # Directory name where model is located
         self.inputs_cfg = self.model_cfg.get("inputs")
         self.check_input_shape()
         self.model_inputs_batch = dict()
@@ -67,16 +96,18 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             self.resize_types.append(self.inputs_cfg[input_name].get("resize_type"))
         self.model_input_batch = self.model_inputs_batch[self.inputs_name[0]]
 
-        self.is_multi_input_model = len(self.inputs_cfg) > 1  # 是否多输入
+        self.is_multi_input_model = len(self.inputs_cfg) > 1  # Whether multiple inputs
         self.is_image_single_input = (
             not self.is_multi_input_model and self.data_formats[0] is not None
-        )  # 是否单输入且为图像
+        )  # Whether single input and is image
 
-        """量化参数"""
+        # Quantization parameters
         self.quant_cfg = cfg.get("quant", dict())
         self.quant_advance_cfg = self.quant_cfg.get("config", dict())
         self.calib_data = self.quant_cfg.get("calib_data")
-        self.use_random_data = self.calib_data is None  # 使用随机数据量化
+        self.use_random_data = (
+            self.calib_data is None
+        )  # Use random data for quantization
         self.quant_output_dir = os.path.join(self.save_dir, self.target, "hmquant")
         self.hmm_save_dir = os.path.join(self.save_dir, self.target)
         if not os.path.exists(self.hmm_save_dir):
@@ -84,11 +115,11 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.quant_onnx_model_path = os.path.join(
             self.quant_output_dir, f"hmquant_{self.model_name}_with_act.onnx"
         )
-        # resizer相关参数
-        # 0 - 输入为非图像数据or多输入情况，禁用resizer，相当于非图像输入
-        # 1 - 全动态resizer，参数为10个值[y, x, height, width, h, w, top, left, bottom, right]
-        # 2 - crop部分动态resizer, 参数为4个值[y, x, height, width]
-        # 3 - 静态resizer
+        # Resizer related parameters
+        # 0 - Non-image input or multi-input case, disable resizer, equivalent to non-image input
+        # 1 - Fully dynamic resizer, parameter is 10 values [y, x, height, width, h, w, top, left, bottom, right]
+        # 2 - Crop partial dynamic resizer, parameter is 4 values [y, x, height, width]
+        # 3 - Static resizer
         self.resizer_mode = 0
         self.resizers_cfg = list()
         self.enable_static_resizers = list()
@@ -96,7 +127,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         for input_name in self.inputs_cfg:
             input_cfg = self.inputs_cfg[input_name]
             data_format = input_cfg.get("data_format")
-            # 非图像或禁用resizer
+            # Non-image or disabled resizer
             if data_format is None or "resizer" not in input_cfg:
                 continue
             _, _, H, W = input_cfg["shape"]
@@ -111,14 +142,14 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 self.resizer_mode = 2  # no padding
             elif self.resize_types[0] == 1:
                 self.resizer_mode = 1  # padding
-            # XH2没有dynamic_v1
+            # XH2 does not have dynamic_v1
             if self.resizer_mode == 2 and self.target == "xh2":
                 self.resizer_mode = 1
             if self.enable_static_resizers[0]:
                 self.resizer_mode = 3
         logger.info(f"resizer_mode: {self.resizer_mode}")
 
-        """编译参数"""
+        # Build parameters
         self.build_cfg = cfg.get("build", dict())
         self.build_batch = self.build_cfg.get("batch", 1)
         self.build_ncore = self.build_cfg.get("ncore", 1)
@@ -126,9 +157,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.build_opt_level = f"O{self.build_opt_level}"
         self.build_output_dir = os.path.join(self.save_dir, self.target, "tcim")
         self.hmm_batch = self.build_batch * self.model_input_batch
-        # roi模式
-        # 0 - 1图n框
-        # 1 - n图n框，每图1框，比如：1图1框、2图2框、...
+        # ROI mode
+        # 0 - 1 image n boxes
+        # 1 - n images n boxes, 1 box per image, e.g.: 1 image 1 box, 2 images 2 boxes, ...
         self.roi_num = self.build_cfg.get("roi_num", 1)
         if self.is_image_single_input and len(self.resizers_cfg) == 0:
             self.roi_num = 1
@@ -157,7 +188,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.hmm_name = f"{self.model_name}_{self.target}_b{self.hmm_batch}{roi_tag}_{self.build_ncore}core_{self.build_opt_level}{prefix}"
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
 
-        """用于透传预处理信息进hmm"""
+        # For passing preprocessing information to hmm
         self.custom_msg = dict()
         for name in self.inputs_cfg:
             input_cfg = self.inputs_cfg[name]
@@ -167,11 +198,11 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 input_cfg=input_cfg,
             )
 
-        """模型评估参数"""
+        # Model evaluation parameters
         self.demo_cfg = cfg.get("demo", dict())
         self.eval_cfg = cfg.get("eval", dict())
 
-        # 图优化模块
+        # Graph optimization module
         if "app_onnx_opt" in cfg["model"]:
             from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
 
@@ -179,7 +210,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
     def check_input_shape(self):
         """
-        检查配置shape和onnx是否一致
+        Check if the configured shape matches the ONNX model.
         """
         for input_name in self.inputs_cfg:
             onnx_shape = self.onnx_inputs_info[input_name]["shape"]
@@ -193,7 +224,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 ):
                     self.onnx_is_static = False
                 else:
-                    # 检查配置的shape和onnx是否一致
+                    # Check if the configured shape matches the ONNX model
                     if val != cfg_shape[idx]:
                         logger.error(
                             f"onnx shape {onnx_shape} is not equal to cfg shape {cfg_shape}"
@@ -202,6 +233,14 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
     @staticmethod
     def dtype_transform(dtype):
+        """Convert data type string to feature string.
+
+        Args:
+            dtype (str): Input data type string.
+
+        Returns:
+            str: Corresponding feature string.
+        """
         if dtype == "float32":
             return "Float32Feature"
         elif dtype == "float16":
@@ -220,14 +259,23 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
     @staticmethod
     def gen_random_data(shape, dtype):
+        """Generate random data with specified shape and data type.
+
+        Args:
+            shape (tuple): Shape of the data to generate.
+            dtype (str): Data type of the generated data.
+
+        Returns:
+            numpy.ndarray: Generated random data array.
+        """
         if dtype == "float32":
             random_data = np.random.uniform(low=0, high=128, size=shape).astype(
                 dtype=dtype
-            )  # 数值范围[0, 128)
+            )  # Value range [0, 128)
         elif dtype == "float16":
             random_data = np.random.uniform(low=0, high=128, size=shape).astype(
                 dtype=dtype
-            )  # 数值范围[0, 128)
+            )  # Value range [0, 128)
         elif dtype == "int16":
             random_data = np.random.randint(low=0, high=128, size=shape, dtype=dtype)
         elif dtype == "int32":
@@ -245,21 +293,30 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def quantize(self):
-        """模型量化"""
+        """Perform model quantization."""
         pass
 
     @abc.abstractmethod
     def build(self):
-        """模型编译"""
+        """Compile the model."""
         pass
 
     @abc.abstractmethod
     def compare(self):
-        """模型相似度比较"""
+        """Compare model similarity."""
         pass
 
     @staticmethod
     def import_py_module_from_file(module_path: str, module_cls: str):
+        """Import a Python module from file.
+
+        Args:
+            module_path (str): Path to the module file.
+            module_cls (str): Class name to import from the module.
+
+        Returns:
+            class: The imported class object.
+        """
         module_name = os.path.splitext(os.path.basename(module_path))[1]
         spec = importlib.util.spec_from_file_location(module_name, module_path)
         if spec is None:
@@ -274,7 +331,14 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         return getattr(module, module_cls)
 
     def get_model(self, backend):
-        """获取模型实例"""
+        """Get model instance.
+
+        Args:
+            backend (str): Backend type for the model.
+
+        Returns:
+            object: Model instance or None if failed.
+        """
         model_impl_module = self.model_cfg.get("model_impl_module")
         model_impl_cls = self.model_cfg.get("model_impl_cls")
         if model_impl_module is None or model_impl_cls is None:
@@ -295,7 +359,14 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         )
 
     def get_dataset(self, data_dir):
-        """获取数据集"""
+        """Get dataset instance.
+
+        Args:
+            data_dir (str): Directory containing the dataset.
+
+        Returns:
+            object: Dataset instance or None if failed.
+        """
         dataset_module = self.eval_cfg.get("dataset_module")
         dataset_cls = self.eval_cfg.get("dataset_cls")
         if dataset_module is None or dataset_cls is None:
@@ -310,7 +381,15 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         return Dataset(root_path=data_dir)
 
     def demo(self, backend, device_id=0):
-        """Demo入口"""
+        """Demo entry point.
+
+        Args:
+            backend (str): Backend type for the demo.
+            device_id (int): Device ID to run the demo on.
+
+        Returns:
+            dict: Result dictionary or empty dict if failed.
+        """
         if not self.demo_cfg:
             logger.error("demo config not found")
             return {}
@@ -353,7 +432,15 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         model.unload()
 
     def evaluate(self, backend, device_id=0):
-        """评估入口"""
+        """Evaluation entry point.
+
+        Args:
+            backend (str): Backend type for the evaluation.
+            device_id (int): Device ID to run the evaluation on.
+
+        Returns:
+            dict: Evaluation results dictionary.
+        """
         if not self.eval_cfg:
             logger.error("eval config not found")
             return {}
@@ -375,12 +462,12 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         if num < 0:
             logger.error(f"eval test_num must >= 0 -> {num}")
             return {}
-        # 获取dataset
+        # Get dataset
         dataset = self.get_dataset(data_dir)
         if dataset is None:
             logger.error("get_dataset failed")
             return {}
-        # 获取模型
+        # Get model
         model = self.get_model(backend)
         if model is None:
             logger.error("Failed to get model")
@@ -402,9 +489,23 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         stream_num=0,
         devices=[0],
     ):
+        """Run model performance test.
+
+        Args:
+            model_path (str): Path to the model file.
+            warmup_num (int): Number of warmup iterations.
+            sample_num (int): Number of sample iterations.
+            loop_num (int): Number of loops to run.
+            thread_num (int): Number of threads to use.
+            stream_num (int): Number of streams to use.
+            devices (list): List of device IDs to use.
+
+        Returns:
+            dict: Performance test results.
+        """
         from ..python import perf
 
-        # TODO 使用golden数据
+        # TODO Use golden data
         perf_info = perf.CModelRunner(
             model_path,
             warmup_num,
@@ -444,6 +545,11 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         return res_info
 
     def save_profile_data(self, outputs: dict):
+        """Save profiling data to file.
+
+        Args:
+            outputs (dict): Dictionary containing profiling data.
+        """
         profile_dir = os.path.join(self.build_output_dir, "profile")
         if "auto_profile_data.bin" in outputs:
             os.makedirs(profile_dir, exist_ok=True)
@@ -457,6 +563,14 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             )
 
     def add_node_output_as_graph_output(self, model_path):
+        """Add node outputs as graph outputs for debugging.
+
+        Args:
+            model_path (str): Path to the ONNX model file.
+
+        Returns:
+            str: Path to the debug model file.
+        """
         new_model_path = model_path.replace(".onnx", "_debug.onnx")
         # if os.path.exists(new_model_path):
         #     return new_model_path
@@ -466,7 +580,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             if "constant" in str(node.op_type).lower():
                 continue
             if self.target == "xh1":
-                # 获取节点属性
+                # Get node attributes
                 node_attributes = {}
                 for attr in node.attribute:
                     value = onnx.helper.get_attribute_value(attr)
@@ -499,7 +613,14 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 if self.target == "xh1":
 
                     def get_shape_from_value_info(value_info):
-                        """从value_info中提取形状信息"""
+                        """Extract shape information from value_info.
+
+                        Args:
+                            value_info: ONNX value info object.
+
+                        Returns:
+                            list: Shape information or None if not available.
+                        """
                         if not value_info.type.HasField("tensor_type"):
                             return None
 
@@ -543,11 +664,11 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                         dst_max=QUANTIZATION_RANGES[output_dtype][1],
                     )
                     quant_info_json = json.dumps(quant_info)
-                    # 创建 StringStringEntryProto 对象
+                    # Create StringStringEntryProto object
                     quant_entry = StringStringEntryProto(
                         key="houmo.quant.info", value=quant_info_json
                     )
-                    # 将量化信息添加到 metadata_props
+                    # Add quantization info to metadata_props
                     value_info.metadata_props.append(quant_entry)
                 graph.output.append(value_info)
 

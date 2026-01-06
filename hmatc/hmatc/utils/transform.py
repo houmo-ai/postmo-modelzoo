@@ -1,7 +1,26 @@
+# Copyright 2025 HOUMO AI
+#
+# File: transform.py
+# Description:
+#     This file contains the transformation functions for the model.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import torch
-from torchvision import transforms
 import numpy as np
 from typing import Any
+from torchvision import transforms
 
 # YUV = RGB * M[0:3] + M[3]
 M_RGB2YUV = {
@@ -53,7 +72,15 @@ M_YUV2BGR = {
     ],
 }
 
+
 class YUVFormat:
+    """A class to format RGB image to YUV format with different sampling methods.
+
+    Args:
+        fmt (str): YUV format string (e.g., '420', '422', 'YUV420SP', etc.)
+        interpolation (bool): Whether to use interpolation when downsampling
+    """
+
     def __init__(self, fmt="422", interpolation=False) -> None:
         self.fmt = fmt
         self._MAP = {
@@ -69,6 +96,14 @@ class YUVFormat:
         self.interpolation = interpolation
 
     def __call__(self, img: torch.Tensor):
+        """Convert an image tensor to YUV format.
+
+        Args:
+            img (torch.Tensor): Input image tensor in CHW format
+
+        Returns:
+            torch.Tensor: YUV formatted image tensor
+        """
         _, img_h, img_w = img.size()
         # breakpoint()
         y, u, v = torch.split(img, 1, dim=0)
@@ -101,6 +136,14 @@ class YUVFormat:
 
 
 class RGB2YUV:
+    """A transform to convert RGB image to YUV format.
+
+    Args:
+        version (str): Color space conversion standard (e.g., 'BT601')
+        fmt (str): YUV format string (e.g., '422', '420')
+        interpolation (bool): Whether to use interpolation when downsampling
+    """
+
     def __init__(self, version="BT601", fmt="422", interpolation=True) -> None:
         """
         layout hwc or chw
@@ -113,6 +156,14 @@ class RGB2YUV:
         self.formatter = YUVFormat(fmt, interpolation)
 
     def __call__(self, img: torch.Tensor) -> Any:
+        """Convert RGB image to YUV format.
+
+        Args:
+            img (torch.Tensor): Input RGB image tensor in CHW format
+
+        Returns:
+            torch.Tensor: YUV formatted image tensor
+        """
         # self.M.to(img.device)
         # self.b.to(img.device)
         result = torch.einsum("ij,jhw->ihw", [self.M, img])
@@ -124,6 +175,14 @@ class RGB2YUV:
 
 
 class BGR2YUV:
+    """A transform to convert BGR image to YUV format.
+
+    Args:
+        version (str): Color space conversion standard (e.g., 'BT601')
+        fmt (str): YUV format string (e.g., '422', '420')
+        interpolation (bool): Whether to use interpolation when downsampling
+    """
+
     def __init__(self, version="BT601", fmt="422", interpolation=True) -> None:
         """
         layout hwc or chw
@@ -135,6 +194,14 @@ class BGR2YUV:
         self.formatter = YUVFormat(fmt, interpolation)
 
     def __call__(self, img: torch.Tensor) -> Any:
+        """Convert BGR image to YUV format.
+
+        Args:
+            img (torch.Tensor): Input BGR image tensor in CHW format
+
+        Returns:
+            torch.Tensor: YUV formatted image tensor
+        """
         # self.M.to(img.device)
         # self.b.to(img.device)
         result = torch.einsum("ij,jhw->ihw", [self.M, img])
@@ -146,15 +213,43 @@ class BGR2YUV:
 
 
 def _is_numpy(img: Any) -> bool:
+    """Check if input is a numpy array.
+
+    Args:
+        img: Input to check
+
+    Returns:
+        bool: True if input is numpy array, False otherwise
+    """
     return isinstance(img, np.ndarray)
 
 
 def _is_numpy_image(img: Any) -> bool:
+    """Check if input is a numpy image (2D or 3D array).
+
+    Args:
+        img: Input to check
+
+    Returns:
+        bool: True if input is 2D or 3D numpy array, False otherwise
+    """
     return img.ndim in {2, 3}
 
 
 class ToTensorNotNormal:
+    """Convert a PIL image or numpy array to tensor without normalization.
+    Similar to torchvision's ToTensor but without normalization to [0,1] range.
+    """
+
     def __call__(self, pic):
+        """Convert PIL image or numpy array to tensor.
+
+        Args:
+            pic: Input PIL image or numpy array
+
+        Returns:
+            torch.Tensor: Converted tensor
+        """
         # TODO: The torchvision.transforms.functional_pil module is removed in 0.17**
         # if not(F_pil._is_pil_image(pic) or _is_numpy(pic)):
         #     raise TypeError('pic should be PIL Image or ndarray. Got {}'.format(type(pic)))

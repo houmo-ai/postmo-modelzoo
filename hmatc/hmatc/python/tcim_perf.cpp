@@ -1,3 +1,23 @@
+/* Copyright 2025 HOUMO AI
+ *
+ * File: tcim_perf.cpp
+ * Description:
+ *   Performance test for TCIM
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include "nlohmann/json.hpp"
 #include "tcim/tcim_runtime.h"
 #include <algorithm>
@@ -25,44 +45,57 @@ namespace py = pybind11;
 #define COLOR_CYAN "\x1b[96;20m"
 #define COLOR_RESET "\x1b[0m"
 
+/**
+ * @brief Structure to store performance information
+ * Contains latency and throughput metrics for performance analysis
+ */
 typedef struct PerfInfo {
-    float input_avg_latency;
-    float input_max_latency;
-    float input_min_latency;
-    float input_tp99_latency;
-    float input_tp999_latency;
-    float infer_avg_latency;
-    float infer_max_latency;
-    float infer_min_latency;
-    float infer_tp99_latency;
-    float infer_tp999_latency;
-    float output_avg_latency;
-    float output_max_latency;
-    float output_min_latency;
-    float output_tp99_latency;
-    float output_tp999_latency;
-    float e2e_avg_latency;
-    float e2e_max_latency;
-    float e2e_min_latency;
-    float e2e_tp99_latency;
-    float e2e_tp999_latency;
-    float avg_cost;
-    float qps;
+    float input_avg_latency;     // Average input latency
+    float input_max_latency;     // Maximum input latency
+    float input_min_latency;     // Minimum input latency
+    float input_tp99_latency;    // 99th percentile input latency
+    float input_tp999_latency;   // 99.9th percentile input latency
+    float infer_avg_latency;     // Average inference latency
+    float infer_max_latency;     // Maximum inference latency
+    float infer_min_latency;     // Minimum inference latency
+    float infer_tp99_latency;    // 99th percentile inference latency
+    float infer_tp999_latency;   // 99.9th percentile inference latency
+    float output_avg_latency;    // Average output latency
+    float output_max_latency;    // Maximum output latency
+    float output_min_latency;    // Minimum output latency
+    float output_tp99_latency;   // 99th percentile output latency
+    float output_tp999_latency;  // 99.9th percentile output latency
+    float e2e_avg_latency;       // Average end-to-end latency
+    float e2e_max_latency;       // Maximum end-to-end latency
+    float e2e_min_latency;       // Minimum end-to-end latency
+    float e2e_tp99_latency;      // 99th percentile end-to-end latency
+    float e2e_tp999_latency;     // 99.9th percentile end-to-end latency
+    float avg_cost;              // Average cost per inference
+    float qps;                   // Queries Per Second
 } perfInfo_t;
 
+/**
+ * @brief Structure to store statistics information for each thread
+ * Contains timing information for input, inference, and output operations
+ */
 typedef struct StatsInfo {
-    int32_t idx{-1};
-    int32_t repeat{0};
-    int64_t start_timestamp{0};
-    int64_t end_timestamp{0};
-    std::vector<float> set_input_times;
-    std::vector<float> infer_times;
-    std::vector<float> get_output_times;
-    float total_set_input_time{0};
-    float total_infer_time{0};
-    float total_get_output_time{0};
+    int32_t idx{-1};                      // Thread index
+    int32_t repeat{0};                    // Number of repeats
+    int64_t start_timestamp{0};           // Start timestamp
+    int64_t end_timestamp{0};             // End timestamp
+    std::vector<float> set_input_times;   // Input setting times
+    std::vector<float> infer_times;       // Inference times
+    std::vector<float> get_output_times;  // Output getting times
+    float total_set_input_time{0};        // Total input setting time
+    float total_infer_time{0};            // Total inference time
+    float total_get_output_time{0};       // Total output getting time
 } statsInfo_t;
 
+/**
+ * @brief Convert shape vector to string representation
+ * @param shape Input shape vector
+ * @return String representation of the shape
+ */
 static std::string ShapeToString(const std::vector<int64_t> &shape) {
     std::string shape_str = std::to_string(shape[0]);
     for (int j = 1; j < shape.size(); ++j) {
@@ -71,6 +104,11 @@ static std::string ShapeToString(const std::vector<int64_t> &shape) {
     return shape_str;
 }
 
+/**
+ * @brief Convert TCIM data type to string representation
+ * @param dtype TCIM data type
+ * @return String representation of the data type
+ */
 static std::string DataTypeToString(tcim::DataType dtype) {
     switch (dtype) {
     case tcim::INT8:
@@ -94,6 +132,11 @@ static std::string DataTypeToString(tcim::DataType dtype) {
     }
 }
 
+/**
+ * @brief Convert TCIM data format to string representation
+ * @param format TCIM data format
+ * @return String representation of the data format
+ */
 static std::string FmtToString(tcim::DataFmt format) {
     switch (format) {
     case tcim::YUV420SP:
@@ -109,6 +152,12 @@ static std::string FmtToString(tcim::DataFmt format) {
     }
 }
 
+/**
+ * @brief Calculate percentile value from a vector of latencies
+ * @param latencies Vector of latency values
+ * @param percentile Target percentile (e.g., 0.99 for 99th percentile)
+ * @return Calculated percentile value
+ */
 static float calculate_percentile(const std::vector<float> &latencies, float percentile) {
     if (latencies.empty())
         return 0.0f;
@@ -122,6 +171,13 @@ static float calculate_percentile(const std::vector<float> &latencies, float per
     return sorted[index];
 }
 
+/**
+ * @brief Print statistics information and calculate performance metrics
+ * @param statsInfos Vector of statistics information from all threads
+ * @param samples Number of samples
+ * @param rounds Number of rounds per sample
+ * @param perfInfo Output performance information structure
+ */
 static void PrintStatsInfo(const std::vector<statsInfo_t> &statsInfos, int32_t samples, int32_t rounds, perfInfo_t &perfInfo) {
     int64_t min_timstamp = std::numeric_limits<int64_t>::max();
     int64_t max_timstamp = std::numeric_limits<int64_t>::min();
@@ -232,6 +288,11 @@ static void PrintStatsInfo(const std::vector<statsInfo_t> &statsInfos, int32_t s
     perfInfo.qps = QPS;
 }
 
+/**
+ * @brief Check if the provided device IDs are valid
+ * @param devices Vector of device IDs to check
+ * @return 0 if all devices are valid, -1 otherwise
+ */
 static int32_t CheckDevices(const std::vector<int32_t> &devices) {
     std::string devices_str = "[";
     for (int32_t i = 0; i < devices.size(); ++i) {
@@ -256,6 +317,10 @@ static int32_t CheckDevices(const std::vector<int32_t> &devices) {
     return 0;
 }
 
+/**
+ * @brief Print input and output information of the module
+ * @param module TCIM module reference
+ */
 static void PrintInputOutputInfo(const tcim::Module &module) {
     int32_t core_num = module.GetCoreNum();
     printf("[INFO] CoreNum: %d\n", core_num);
@@ -279,6 +344,12 @@ static void PrintInputOutputInfo(const tcim::Module &module) {
     }
 }
 
+/**
+ * @brief Set random input data for the module
+ * @param module TCIM module reference
+ * @param inputs Map to store input tensors
+ * @return 0 on success, -1 on failure
+ */
 static int32_t SetInputData(tcim::Module &module, std::map<std::string, tcim::Tensor> &inputs) {
     std::random_device rd;
     std::mt19937 rng(rd());
@@ -360,6 +431,17 @@ static int32_t SetInputData(tcim::Module &module, std::map<std::string, tcim::Te
     return 0;
 }
 
+/**
+ * @brief Perform inference in a separate thread
+ * @param tid Thread ID
+ * @param model_path Path to the model file
+ * @param warmup Number of warmup iterations
+ * @param rounds Number of rounds per sample
+ * @param stats Statistics information reference
+ * @param stream TCIM stream reference
+ * @param option Module option reference
+ * @param check_output Whether to check output consistency
+ */
 static void Infer(int32_t tid, std::string model_path, int32_t warmup, int32_t rounds,
                   statsInfo_t &stats, tcim::Stream &stream, tcim::Module::Option &option, bool check_output) {
     printf("[INFO] Infer %d started, wramup: %d, rounds: %d, repeat: %d\n", tid, warmup, rounds, stats.repeat);
@@ -449,6 +531,20 @@ static void Infer(int32_t tid, std::string model_path, int32_t warmup, int32_t r
     printf("[INFO] Infer %d done.\n", tid);
 }
 
+/**
+ * @brief Run performance test with specified parameters
+ * @param model_path Path to the model file
+ * @param model_name Name of the model
+ * @param thread_num Number of threads to use
+ * @param stream_num Number of streams to use
+ * @param warmup Number of warmup iterations
+ * @param samples Number of samples to process
+ * @param rounds Number of rounds per sample
+ * @param devices Vector of device IDs to use
+ * @param check_output Whether to check output consistency
+ * @param perf_info Output performance information structure
+ * @return 0 on success, -1 on failure
+ */
 int32_t Run(const std::string &model_path, const std::string &model_name, int32_t thread_num,
             int32_t stream_num, int32_t warmup, int32_t samples, int32_t rounds,
             std::vector<int32_t> &devices, bool check_output, perfInfo_t &perf_info) {
@@ -525,7 +621,7 @@ int32_t Run(const std::string &model_path, const std::string &model_name, int32_
     std::vector<statsInfo_t> statsInfos;
     statsInfos.resize(thread_num);
     int32_t repeat = samples / thread_num;
-    int32_t mod = samples % thread_num;  // 余数
+    int32_t mod = samples % thread_num;  // remainder
     for (int32_t i = 0; i < thread_num; ++i) {
         statsInfos[i].idx = i;
         statsInfos[i].repeat = repeat;
@@ -540,6 +636,18 @@ int32_t Run(const std::string &model_path, const std::string &model_name, int32_
     return 0;
 }
 
+/**
+ * @brief Main function to run model performance test
+ * @param model_path Path to the model file
+ * @param warmup_num Number of warmup iterations
+ * @param sample_num Number of samples to process
+ * @param loop_num Number of loops per sample
+ * @param thread_num Number of threads to use
+ * @param stream_num Number of streams to use (default 0)
+ * @param check_output Whether to check output consistency (default false)
+ * @param devices Vector of device IDs to use (default {0})
+ * @return Performance information structure
+ */
 perfInfo_t ModelRunner(
     const std::string &model_path,
     int32_t warmup_num,
@@ -558,6 +666,10 @@ perfInfo_t ModelRunner(
     return perfInfo;
 }
 
+/**
+ * @brief Define Python module for performance testing
+ * Exposes the performance testing functionality to Python
+ */
 PYBIND11_MODULE(perf, m) {
     m.doc() = "Python bindings for huomo chip perf test";
     py::class_<perfInfo_t>(m, "PerfInfo")
