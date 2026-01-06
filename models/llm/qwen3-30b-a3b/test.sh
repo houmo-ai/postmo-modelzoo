@@ -3,12 +3,10 @@ set -e
 
 STEP="all"
 MODEL_TYPE="precompiled"
-MULTI_BATCH="false"
 
 show_help() {
     echo "Usage: $0 [options]"
-    echo "  -s, --step         execution step, default is all, support: all, demo, build."
-    echo "  -b, --multi_batch  execution multibatch demo, default is false, support: true/false."
+    echo "  -s, --step         execution step, default is all, support: all, demo."
     echo "  -t, --model_type   The method for getting the compiled model, default is precompiled, support: precompiled, compile."
     echo "  -h, --help         help information"
     exit 0
@@ -18,10 +16,6 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -s|--step)
             STEP="$2"
-            shift 2
-        ;;
-        -b|--multi_batch)
-            MULTI_BATCH="$2"
             shift 2
         ;;
         -t|--model_type)
@@ -38,6 +32,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+houmo_target="${HOUMO_TARGET}"
+if [ -z "$houmo_target" ] || [ "$houmo_target" != "xh2" ]; then
+    echo "Only supports HOUMO_TARGET as xh2."
+    exit 1
+fi
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
 
@@ -45,8 +45,7 @@ VENV_FLAG=0
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     VENV_FLAG=1
 fi
-
-dir_path="qwen3"
+dir_path="qwen3moe_venv"
 if [[ "$VENV_FLAG" -eq "1" ]]; then
     echo "⚠ Create python3 venv for ${dir_path} demo."
     PY_EXE=$(command -v python3)
@@ -67,26 +66,7 @@ if [[ "$VENV_FLAG" -eq "1" ]]; then
     pip3 install -r requirements.txt
 fi
 
-PACKAGE_PATTERN=hmquant
-FOUND_PACKAGE=0
-echo "================================"
-echo "Checking python3 package: $PACKAGE_PATTERN"
-if command -v python3 &>/dev/null && command -v pip3 &>/dev/null; then
-    if pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" >/dev/null 2>&1; then
-        echo "✓ Found python3 package: $PACKAGE_PATTERN"
-        pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" | while read -r line; do
-            echo "  - $line"
-        done
-        FOUND_PACKAGE=1
-    else
-        echo "✗ Not found package: $PACKAGE_PATTERN"
-    fi
-else
-    echo "⚠ Not found python3 or pip3."
-    exit 0
-fi
-
-if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
+if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     if [[ "$MODEL_TYPE" == "precompiled" ]]; then
         echo "Download precompiled model."
         python3 get_model.py --type hmm
@@ -127,6 +107,10 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
         if [[ "$FOUND_PACKAGE" -eq 1 && "$FOUND_GPU" -eq 1 ]]; then
             echo "Start to quant and compile model."
             python3 get_model.py --type raw
+            if [[ ! -d "$dir_path/lib/python3.12/site-packages/distutils" && "$VENV_FLAG" -eq "1" ]]; then
+                ln -s /opt/venv/houmo/lib/python3.12/site-packages/setuptools/_distutils \
+                    $dir_path/lib/python3.12/site-packages/distutils
+            fi
             python3 ptq.py
             python3 build.py
         else
@@ -137,13 +121,8 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
 fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
-    if [ "$MULTI_BATCH" = "false" ]; then
-        echo "Execute demo."
-        python3 demo.py
-    else
-        echo "Execute multi-batch demo with batch size: $MULTI_BATCH"
-        python3 demo_multibatch.py --forbid_flush
-    fi
+    echo "Execute demo."
+    python3 demo.py
 fi
 
 if [[ "$VENV_FLAG" -eq "1" ]]; then
