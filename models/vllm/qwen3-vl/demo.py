@@ -84,7 +84,7 @@ def get_args() -> argparse.Namespace:
         "--repetition_penalty",
         dest="repetition_penalty",
         type=float,
-        default=1.0,
+        default=0.0,
         help="sampling repetition_penalty",
     )
     parser.add_argument(
@@ -157,6 +157,18 @@ class SamplingManager:
 
         return adjusted_logits
 
+    def apply_presence_repetition_penalty(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        if self.repetition_penalty == 0.0 or not previous_tokens:
+            return logits
+
+        adjusted_logits = logits.copy()
+        for token_id in set(previous_tokens):
+            if 0 <= token_id < len(logits):
+                adjusted_logits[token_id] = logits[token_id] - self.repetition_penalty
+        return adjusted_logits
+
     def apply_top_k(self, probs: np.ndarray) -> np.ndarray:
         if self.top_k is None or self.top_k <= 0:
             return probs
@@ -217,7 +229,7 @@ class SamplingManager:
     ) -> np.ndarray:
         processed_logits = logits.copy()
         # 1. apply repetition penalty
-        processed_logits = self.apply_repetition_penalty(
+        processed_logits = self.apply_presence_repetition_penalty(
             processed_logits, previous_tokens
         )
 
