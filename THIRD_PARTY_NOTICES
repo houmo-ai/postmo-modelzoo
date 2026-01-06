@@ -133,6 +133,7 @@ https://opensource.org/licenses/MIT
 Usage in this project:
 The "json" library is used at the following path:
     apis/common/nlohmann/include/nlohmann/json.hpp
+    hmatc/3rdparty/nlohmann/include/nlohmann/json.hpp
 
 The JSON for Modern C++ library (also known as nlohmann/json) is licensed
 under the MIT License, which permits use, copying, modification, merging,
@@ -351,6 +352,51 @@ and license text.
 
 Users are responsible for complying with the MIT License when using,
 redistributing, or modifying argparse.hpp.
+
+----------------------------------------------------------------------
+onnx-tool (ONNX Model Analysis and Manipulation Tool)
+----------------------------------------------------------------------
+
+Component Name:
+onnx-tool
+
+Usage Location:
+hmatc/hmatc/onnx_tool
+
+Source:
+https://github.com/ThanatosShinji/onnx-tool
+
+Copyright Statement:
+Copyright (c) ThanatosShinji and onnx-tool contributors
+
+License:
+MIT License
+
+License Text:
+https://github.com/ThanatosShinji/onnx-tool/blob/main/LICENSE
+
+The onnx-tool project is licensed under the MIT License. The MIT License
+permits use, copying, modification, merging, publishing, distribution,
+sublicensing, and/or selling copies of the software, subject to the
+following condition:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+This project may reference or use onnx-tool as a third-party component.
+Any redistribution or modification of onnx-tool must retain the original
+copyright notice and license text in accordance with the MIT License.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying onnx-tool.
 
 
 2. Datasets
