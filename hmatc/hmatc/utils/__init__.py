@@ -20,7 +20,6 @@
 import sys
 import logging
 from .logging_format import LoggingFormatterWithColor
-from .utils import read_yaml_to_dict, read_json_to_dict
 
 
 console_handler = logging.StreamHandler(sys.stdout)
