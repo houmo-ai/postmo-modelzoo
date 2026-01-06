@@ -18,6 +18,7 @@ message("HOUMO_EXAMPLES_PATH=${HOUMO_EXAMPLES_PATH}")
 
 if(MSVC)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17")
+add_compile_options(/utf-8)
 else()
 add_definitions(-w)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
