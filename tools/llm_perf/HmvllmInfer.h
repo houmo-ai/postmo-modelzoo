@@ -54,7 +54,8 @@ class HmvllmInfer : public HmllmInferBase {
   HmvllmInfer(const std::string &prefillModelPath,
               const std::string &decodeModelPath,
               const std::string &embeddingWeightPath,
-              const std::string &vitModelPath, int ndevices, int batches);
+              const std::string &vitModelPath, int ndevices, int batches,
+              bool LazyMode);
 
   // Delete copy constructor to prevent copying of the object
   HmvllmInfer(const HmvllmInfer &it) = delete;

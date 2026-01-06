@@ -71,6 +71,7 @@
 - --loop        : 指定循环执行单个模型次数，不指定默认为1
 - --batch       : 指定模型的batch数，不指定则--batch的值为1。多batch模型必须指定，会校验从模型读取到的batch和用户指定的值是否一致。目前多batch仅支持xh2.
 - --no_warm_up  : 默认执行warm_up，配置后会跳过warm_up流程
+- --LazyMode    : 默认关闭LazyMode，配置后会打开LazyMode，开启LazyMode后，模型加载实际会变长，内存占用会变小。
 - --help, -h    : 打印帮助信息
 2. 命令行llm_perf以配置文件启动
 - --config, -c  : 使用配置文件启动perf程序，需要提前准备好配置文件，配置文件模板参考1.4节。
@@ -113,7 +114,8 @@
       "ndevices" : 1,
       "loop" : 2,
       "batch" : 1,
-      "no_warm_up" : ""
+      "no_warm_up" : "",
+      "LazyMode" : ""
     },
     {
       "ModelName": "qwen2.5_7b_256_8k_b1_1chip_2cores_v0.5.0",

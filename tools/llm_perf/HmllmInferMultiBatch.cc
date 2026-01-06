@@ -24,7 +24,8 @@
 
 HmllmInferMultiBatch::HmllmInferMultiBatch(
     const std::string &prefillModelPath, const std::string &decodeModelPath,
-    const std::string &embeddingWeightPath, int ndevices, int batches) {
+    const std::string &embeddingWeightPath, int ndevices, int batches,
+    bool LazyMode) {
   this->prefillModelPath = prefillModelPath;
   this->decodeModelPath = decodeModelPath;
 
@@ -47,9 +48,13 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
   // Enable lazy mode
-  option_prefill.EnableLazyMode(true);
-  option_decode.EnableLazyMode(true);
-
+  if (LazyMode) {
+    option_prefill.EnableLazyMode(true);
+    option_decode.EnableLazyMode(true);
+  } else {
+    option_prefill.EnableLazyMode(false);
+    option_decode.EnableLazyMode(false);
+  }
   // Initialize Module - Load prefill and decode models
   prefill_module = std::make_shared<tcim::Module>();
   prefill_module->LoadModel(prefillModelPath, option_prefill);

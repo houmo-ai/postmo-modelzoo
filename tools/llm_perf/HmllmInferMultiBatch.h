@@ -60,7 +60,7 @@ class HmllmInferMultiBatch : public HmllmInferBase {
   HmllmInferMultiBatch(const std::string &prefillModelPath,
                        const std::string &decodeModelPath,
                        const std::string &embeddingWeightPath, int ndevices,
-                       int batches);
+                       int batches, bool LazyMode);
 
   // Delete copy constructor to prevent copying
   HmllmInferMultiBatch(const HmllmInferMultiBatch &it) = delete;

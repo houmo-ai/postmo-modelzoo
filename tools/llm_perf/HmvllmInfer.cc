@@ -26,7 +26,7 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
                          const std::string &decodeModelPath,
                          const std::string &embeddingWeightPath,
                          const std::string &vitModelPath, int ndevices,
-                         int batches) {
+                         int batches, bool LazyMode) {
   this->prefillModelPath = prefillModelPath;
   this->decodeModelPath = decodeModelPath;
   this->vitModelPath = vitModelPath;
@@ -46,9 +46,15 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
   auto option_vit = tcim::Module::Option(weight_manager);
-  option_prefill.EnableLazyMode(true);
-  option_decode.EnableLazyMode(true);
-  option_vit.EnableLazyMode(true);
+  if (LazyMode) {
+    option_prefill.EnableLazyMode(true);
+    option_decode.EnableLazyMode(true);
+    option_vit.EnableLazyMode(true);
+  } else {
+    option_prefill.EnableLazyMode(false);
+    option_decode.EnableLazyMode(false);
+    option_vit.EnableLazyMode(false);
+  }
   // init module
   prefill_module = std::make_shared<tcim::Module>();
   prefill_module->LoadModel(prefillModelPath, option_prefill);

@@ -58,6 +58,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
 
   int batch = args.count("batch") ? validate_setting(args, "batch") : 1;
   bool warm_up_enable = args.count("no_warm_up") ? false : true;
+  bool lazy_mode_enable = args.count("LazyMode") ? true : false;
 
   std::cout << COLOR_YELLOW << std::string(25, '=') << " Perf Settings "
             << std::string(25, '=') << std::endl;
@@ -77,6 +78,15 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   } else {
     std::cout << "warm_up : disable" << std::endl;
   }
+
+  if (lazy_mode_enable) {
+    std::cout
+        << "LazyMode : enable (this may lead to loading model taking more time)"
+        << std::endl;
+  } else {
+    std::cout << "LazyMode : disable" << std::endl;
+  }
+
   std::cout << std::string(65, '=') << COLOR_RESET << std::endl;
 
   const char* houmo_target_env = getenv("HOUMO_TARGET");
@@ -96,7 +106,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
     if (batch == 1) {
       Qwen3Infer = std::make_unique<HmllmInfer>(
           prefill_path.string(), decode_path.string(), embedding_path.string(),
-          ndevices, batch);
+          ndevices, batch, lazy_mode_enable);
     } else {
       if (houmo_target != "xh2") {
         throw std::runtime_error(
@@ -104,12 +114,12 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
       }
       Qwen3Infer = std::make_unique<HmllmInferMultiBatch>(
           prefill_path.string(), decode_path.string(), embedding_path.string(),
-          ndevices, batch);
+          ndevices, batch, lazy_mode_enable);
     }
   } else {
     Qwen3Infer = std::make_unique<HmvllmInfer>(
         prefill_path.string(), decode_path.string(), embedding_path.string(),
-        visual_path.string(), ndevices, batch);
+        visual_path.string(), ndevices, batch, lazy_mode_enable);
   }
 
 #ifdef XH2A_HM_SYS

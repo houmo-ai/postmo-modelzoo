@@ -38,6 +38,7 @@
 #include <nlohmann/json.hpp>
 #include <random>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -87,6 +88,7 @@ static void HelpUsage(char* argv[]) {
          "  --loop          NUM       loop test rounds\n"
          "  --batch         NUM       if multibatch model only xh2 support!\n"
          "  --no_warm_up              disable warm up!\n"
+         "  --LazyMode                enable lazy mode!\n"
          "  -h, --help                show help message\n";
 }
 
@@ -131,6 +133,7 @@ static PerfConfigType ParsePerfRunType(int argc, char* argv[]) {
 static std::unordered_map<std::string, std::string> parse_args(int argc,
                                                                char* argv[]) {
   std::unordered_map<std::string, std::string> args;
+  std::set<std::string> flags = {"no_warm_up", "LazyMode"};
 
   // Check for invalid argument combinations at the beginning
   for (int i = 1; i < argc; ++i) {
@@ -149,11 +152,10 @@ static std::unordered_map<std::string, std::string> parse_args(int argc,
       std::string key = arg.substr(2);  // Extract key by removing leading "--"
 
       // Handle flag arguments that don't require a value
-      if (key == "no_warm_up") {
+      if (flags.find(key) != flags.end()) {
         args[key] = "";  // Set empty value for flag
         continue;
       }
-
       // Check if there's a value following the key
       if (i + 1 >= argc) {
         throw std::invalid_argument("Missing value for argument: " + arg);
