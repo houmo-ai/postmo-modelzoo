@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: model_impl.py
+# Description:
+#   YOLOV8-pose estimation model implementation.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import cv2
 import torch
@@ -7,7 +26,7 @@ from typing import Dict, Any, List
 from hmatc.utils import logger
 from hmatc.base.base_model import BaseModel
 from hmatc.utils.postprocess import (
-    non_max_suppression2,
+    non_max_suppression,
     scale_coords_kpt,
     plot_skeleton_kpts,
 )
@@ -15,7 +34,27 @@ from hmatc.utils.metrics import detections_kpt2json, merge_json, coco_eval
 
 
 class YoloV8Pose(BaseModel):
+    """
+    YOLOv8 Pose Estimation Model implementation.
+
+    This class implements the YOLOv8 pose estimation model with preprocessing,
+    postprocessing, evaluation and demo capabilities. It inherits from BaseModel
+    and provides specific implementation for human pose estimation with keypoint detection.
+
+    Args:
+        **kwargs: Arguments passed to the parent BaseModel class including model configuration
+    """
+
     def __init__(self, **kwargs):
+        """
+        Initialize the YOLOv8 Pose model.
+
+        Sets up the model with input configuration, default thresholds for postprocessing,
+        and other model-specific parameters for pose estimation.
+
+        Args:
+            **kwargs: Arguments passed to the parent BaseModel class
+        """
         super().__init__(**kwargs)
         self.input_name = self.inputs_name[0]
         _, C, H, W = self.inputs_cfg[self.input_name]["shape"]
@@ -28,7 +67,21 @@ class YoloV8Pose(BaseModel):
 
     @staticmethod
     def make_anchors(H, W, strides, grid_cell_offset=0.5):
-        """Generate anchors from features."""
+        """
+        Generate anchors from features.
+
+        Creates anchor points and stride tensors for the model based on input dimensions
+        and specified strides.
+
+        Args:
+            H: Input height
+            W: Input width
+            strides: List of stride values for different feature levels
+            grid_cell_offset: Offset value for grid cell center positioning
+
+        Returns:
+            Tuple of anchor points and stride tensor
+        """
         anchor_points, stride_tensor = [], []
         for i, stride in enumerate(strides):
             h, w = int(H / stride), int(W / stride)
@@ -44,24 +97,51 @@ class YoloV8Pose(BaseModel):
     def postprocess(
         self, outs: Dict[str, np.ndarray], in_datas: Dict[str, np.ndarray]
     ) -> Any:
+        """
+        Postprocess the model outputs to generate final pose estimation results.
+
+        Applies non-maximum suppression and keypoint coordinate scaling to generate
+        final detection and pose estimation results.
+
+        Args:
+            outs: Model output dictionary containing raw predictions
+            in_datas: Input data dictionary containing the original images
+
+        Returns:
+            numpy.ndarray: Processed detections with format [x1, y1, x2, y2, confidence, class, kpts...]
+        """
         outs = list(outs.values())
         if len(outs) == 1:
             out = torch.from_numpy(outs[0])
         elif len(outs) == 9:
             out = self._decode(outs)
-        # 只取batch0，多batch数据是复制来的，不用处理浪费时间
         pred = out[:1, ...]
         cv_image = list(in_datas.values())[0]
         assert len(pred.shape) == 3, "pred shape error"
-        nc = pred.shape[1] - 17 * 3 - 4
-        outputs = non_max_suppression2(
-            pred, self.conf_threshold, self.iou_threshold, nc=nc
+        nm = 17 * 3
+        outputs = non_max_suppression(
+            pred,
+            self.conf_threshold,
+            self.iou_threshold,
+            nm=nm,
         )
         output = outputs[0]
         output = scale_coords_kpt(self.input_size, output, cv_image.shape)
         return output
 
     def _decode(self, outputs: List[np.ndarray]):
+        """
+        Decode the model outputs to bounding boxes, class probabilities, and keypoints.
+
+        Processes the raw model outputs to generate proper bounding box coordinates,
+        class probabilities, and keypoint coordinates.
+
+        Args:
+            outputs: List of raw model outputs as numpy arrays
+
+        Returns:
+            torch.Tensor: Decoded predictions with shape [batch_size, 56, 8400]
+        """
         bs = outputs[0].shape[0]
         kpt_data = np.concatenate(
             [
@@ -127,6 +207,15 @@ class YoloV8Pose(BaseModel):
         return torch.cat([box_data, cls_data, kpt_data], dim=1)
 
     def demo(self, filepaths: list):
+        """
+        Run inference on input images and save visualized pose estimation results.
+
+        Performs pose estimation on the input images, draws bounding boxes and
+        skeleton keypoints, and saves the results with detections visualized.
+
+        Args:
+            filepaths: List of paths to input images for inference
+        """
         in_datas = dict()
         save_dir = f"vis_{self.backend}"
         if not os.path.exists(save_dir):
@@ -156,6 +245,20 @@ class YoloV8Pose(BaseModel):
             logger.info(f"Save result to {save_path}")
 
     def evaluate(self, dataset, num=0):
+        """
+        Evaluate the model performance on a given dataset.
+
+        Runs inference on the dataset images, performs postprocessing,
+        converts detections to COCO format for pose estimation, and calculates mAP metrics.
+
+        Args:
+            dataset: Dataset object containing evaluation data
+            num: Number of samples to evaluate (0 means all samples)
+
+        Returns:
+            dict: Dictionary containing evaluation metrics including mAP50-95, mAP50,
+                  input size, dataset name, number of samples, and latency
+        """
         self.iou_threshold = 0.65
         self.conf_threshold = 0.01
         img_paths = dataset.get_datas(num)

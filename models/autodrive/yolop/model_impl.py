@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: model_impl.py
+# Description:
+#   YoloP model implementation for autonomous driving tasks.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import cv2
 import torch
@@ -8,11 +27,31 @@ from hmatc.utils import logger
 from hmatc.base.base_model import BaseModel
 from hmatc.utils.preprocess import calc_padding_size
 from hmatc.utils.postprocess import non_max_suppression, scale_coords
-from hmatc.utils.metrics import detections2txt, detection_txt2json, coco_eval
 
 
 class YoloP(BaseModel):
+    """
+    YoloP model implementation for autonomous driving tasks.
+
+    This class implements the YoloP model which performs three tasks simultaneously:
+    object detection, drivable area segmentation, and lane line segmentation.
+    It inherits from BaseModel and provides specific implementation for multi-task
+    autonomous driving applications.
+
+    Args:
+        **kwargs: Arguments passed to the parent BaseModel class including model configuration
+    """
+
     def __init__(self, **kwargs):
+        """
+        Initialize the YoloP model.
+
+        Sets up the model with input configuration, default thresholds for postprocessing,
+        and other model-specific parameters for autonomous driving tasks.
+
+        Args:
+            **kwargs: Arguments passed to the parent BaseModel class
+        """
         super().__init__(**kwargs)
         self.input_name = self.inputs_name[0]
         _, C, H, W = self.inputs_cfg[self.input_name]["shape"]
@@ -32,6 +71,22 @@ class YoloP(BaseModel):
     def postprocess(
         self, outs: Dict[str, np.ndarray], in_datas: Dict[str, np.ndarray]
     ) -> Any:
+        """
+        Postprocess the model outputs to generate final results for all three tasks.
+
+        Performs postprocessing for object detection, drivable area segmentation,
+        and lane line segmentation. Applies non-maximum suppression for detection
+        and processes segmentation masks.
+
+        Args:
+            outs: Model output dictionary containing raw predictions for all tasks
+            in_datas: Input data dictionary containing the original images
+
+        Returns:
+            tuple: A tuple containing:
+                - det_out: numpy array of detection results [x1, y1, x2, y2, confidence, class]
+                - mask: numpy array of combined segmentation mask with drivable area and lane line
+        """
         da_seg_out = outs["drive_area_seg"]  # bs, 2, 640, 640
         ll_seg_out = outs["lane_line_seg"]  # bs, 2, 640, 640
         bbox_outs = list()
@@ -55,7 +110,12 @@ class YoloP(BaseModel):
         det_out = torch.cat(z, dim=1)  # bs, -1, 6
         det_out = det_out[:1, ...]  # bs, -1, 6
         cv_image = list(in_datas.values())[0]
-        outputs = non_max_suppression(det_out, self.conf_threshold, self.iou_threshold)
+        outputs = non_max_suppression(
+            det_out,
+            self.conf_threshold,
+            self.iou_threshold,
+            exist_obj_conf=True,
+        )
         output = outputs[0]
         output[:, :4] = scale_coords(
             self.input_size, output[:, :4], cv_image.shape
@@ -63,7 +123,6 @@ class YoloP(BaseModel):
         det_out = output.detach().cpu().numpy()
 
         # da_seg
-        # 先插值会原图大小，mask效果比较平滑
         H, W, _ = cv_image.shape
         target_size = (self.input_size[1], self.input_size[0])  # (W, H)
         padding_size, size, scale = calc_padding_size(
@@ -71,7 +130,6 @@ class YoloP(BaseModel):
         )
         top, left, bottom, right = padding_size
         nh, nw = size
-        # 只取第1个batch
         da_seg_mask = torch.from_numpy(
             da_seg_out[:, :, top : top + nh, left : left + nw]
         )  # 2, nh, nw
@@ -102,6 +160,16 @@ class YoloP(BaseModel):
         return det_out, mask
 
     def demo(self, filepaths: list):
+        """
+        Run inference on input images and save visualized results.
+
+        Performs multi-task inference on the input images, draws bounding boxes
+        for detected objects and overlays segmentation masks for drivable areas
+        and lane lines, then saves the results.
+
+        Args:
+            filepaths: List of paths to input images for inference
+        """
         in_datas = dict()
         save_dir = f"vis_{self.backend}"
         if not os.path.exists(save_dir):
@@ -134,4 +202,17 @@ class YoloP(BaseModel):
             logger.info(f"Save result to {save_path}")
 
     def evaluate(self, dataset, num=0):
+        """
+        Evaluate the model performance on a given dataset.
+
+        Currently not implemented for YoloP model as it performs multiple tasks
+        that require different evaluation metrics.
+
+        Args:
+            dataset: Dataset object containing evaluation data
+            num: Number of samples to evaluate (0 means all samples)
+
+        Raises:
+            NotImplementedError: Evaluation is not implemented for YoloP model
+        """
         raise NotImplementedError("Evaluation is not implemented for YoloP model.")

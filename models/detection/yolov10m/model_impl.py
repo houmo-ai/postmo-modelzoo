@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: model_impl.py
+# Description:
+#   YOLOv10 model implementation.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import cv2
 import torch
@@ -6,12 +25,32 @@ from tqdm import tqdm
 from typing import Dict, Any, List
 from hmatc.utils import logger
 from hmatc.base.base_model import BaseModel
-from hmatc.utils.postprocess import non_max_suppression2, scale_coords, xywh2xyxy
+from hmatc.utils.postprocess import scale_coords
 from hmatc.utils.metrics import detections2txt, detection_txt2json, coco_eval
 
 
 class YoloV10(BaseModel):
+    """
+    YOLOv10 Detection Model implementation.
+
+    This class implements the YOLOv10 object detection model with preprocessing,
+    postprocessing, evaluation and demo capabilities. It inherits from BaseModel
+    and provides specific implementation for YOLOv10 model.
+
+    Args:
+        **kwargs: Arguments passed to the parent BaseModel class including model configuration
+    """
+
     def __init__(self, **kwargs):
+        """
+        Initialize the YOLOv10 model.
+
+        Sets up the model with input configuration, default thresholds for postprocessing,
+        and other model-specific parameters.
+
+        Args:
+            **kwargs: Arguments passed to the parent BaseModel class
+        """
         super().__init__(**kwargs)
         self.input_name = self.inputs_name[0]
         _, C, H, W = self.inputs_cfg[self.input_name]["shape"]
@@ -25,7 +64,21 @@ class YoloV10(BaseModel):
 
     @staticmethod
     def make_anchors(H, W, strides, grid_cell_offset=0.5):
-        """Generate anchors from features."""
+        """
+        Generate anchors from features.
+
+        Creates anchor points and stride tensors for the model based on input dimensions
+        and specified strides.
+
+        Args:
+            H: Input height
+            W: Input width
+            strides: List of stride values for different feature levels
+            grid_cell_offset: Offset value for grid cell center positioning
+
+        Returns:
+            Tuple of anchor points and stride tensor
+        """
         anchor_points, stride_tensor = [], []
         for i, stride in enumerate(strides):
             h, w = int(H / stride), int(W / stride)
@@ -39,6 +92,18 @@ class YoloV10(BaseModel):
         return torch.cat(anchor_points), torch.cat(stride_tensor)
 
     def _decode(self, outputs: List[np.ndarray]):
+        """
+        Decode the model outputs to bounding boxes and class probabilities.
+
+        Processes the raw model outputs to generate proper bounding box coordinates
+        and class probabilities.
+
+        Args:
+            outputs: List of raw model outputs as numpy arrays
+
+        Returns:
+            torch.Tensor: Decoded predictions with shape [batch_size, 84, 8400]
+        """
         bs = outputs[0].shape[0]
         nc = outputs[0].shape[1]
         cls_data = np.concatenate(
@@ -78,6 +143,21 @@ class YoloV10(BaseModel):
     def postprocess(
         self, outs: Dict[str, np.ndarray], in_datas: Dict[str, np.ndarray]
     ) -> Any:
+        """
+        Postprocess the model outputs to generate final detections.
+
+        Applies decoding, filtering, and scaling to generate final detection results.
+
+        Args:
+            outs: Model output dictionary containing raw predictions
+            in_datas: Input data dictionary containing the original images
+
+        Returns:
+            numpy.ndarray: Processed detections with format [x1, y1, x2, y2, confidence, class]
+
+        Raises:
+            ValueError: If the model output doesn't have 1 or 6 elements
+        """
         outs = list(outs.values())
         if len(outs) == 6:
             out = self._decode(outs)
@@ -85,7 +165,6 @@ class YoloV10(BaseModel):
             out = torch.from_numpy(outs[0])  # [bs, 84, 8400]
         else:
             raise ValueError("YoloV10 model only has 1 or 6 output")
-        # 只取batch0，多batch数据是复制来的，不用处理浪费时间
         pred = out[:1, ...]  # [1, 84, 8400]
         nc = pred.shape[1] - 4
         pred = pred.permute(0, 2, 1)
@@ -111,6 +190,15 @@ class YoloV10(BaseModel):
         return output
 
     def demo(self, filepaths: list):
+        """
+        Run inference on input images and save visualized results.
+
+        Performs object detection on the input images, draws bounding boxes,
+        and saves the results with detections visualized.
+
+        Args:
+            filepaths: List of paths to input images for inference
+        """
         in_datas = dict()
         save_dir = f"vis_{self.backend}"
         if not os.path.exists(save_dir):
@@ -140,6 +228,20 @@ class YoloV10(BaseModel):
             logger.info(f"Save result to {save_path}")
 
     def evaluate(self, dataset, num=0):
+        """
+        Evaluate the model performance on a given dataset.
+
+        Runs inference on the dataset images, performs postprocessing,
+        converts detections to COCO format, and calculates mAP metrics.
+
+        Args:
+            dataset: Dataset object containing evaluation data
+            num: Number of samples to evaluate (0 means all samples)
+
+        Returns:
+            dict: Dictionary containing evaluation metrics including mAP50-95, mAP50,
+                  input size, dataset name, number of samples, and latency
+        """
         self.iou_threshold = 0.65
         self.conf_threshold = 0.01
         img_paths = dataset.get_datas(num)

@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: model_impl.py
+# Description:
+#   This file contains the EfficientNet model implementation,
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import cv2
 import numpy as np
 from tqdm import tqdm
@@ -9,13 +28,45 @@ from hmatc.datasets.imagenet import ILSVRC2012_LABELS
 
 
 class EfficientNet(BaseModel):
+    """
+    EfficientNet model implementation for image classification tasks.
+
+    This class implements the EfficientNet model with preprocessing, postprocessing,
+    evaluation and demo capabilities. It inherits from BaseModel and provides
+    specific implementation for image classification using the EfficientNet architecture.
+
+    Args:
+        **kwargs: Arguments passed to the parent BaseModel class including model configuration
+    """
+
     def __init__(self, **kwargs):
+        """
+        Initialize the EfficientNet model.
+
+        Sets up the model with input configuration and other model-specific parameters.
+
+        Args:
+            **kwargs: Arguments passed to the parent BaseModel class
+        """
         super(EfficientNet, self).__init__(**kwargs)
         self.input_name = self.inputs_name[0]
 
     def postprocess(
         self, outs: Dict[str, np.ndarray], in_datas: Dict[str, np.ndarray]
     ) -> Any:
+        """
+        Postprocess the model outputs to generate final classification results.
+
+        Applies softmax to convert logits to probabilities and finds the class
+        with the highest probability for each input in the batch.
+
+        Args:
+            outs: Model output dictionary containing raw predictions (logits)
+            in_datas: Input data dictionary containing the original images
+
+        Returns:
+            list: List of tuples containing (class_index, probability) for each input in batch
+        """
         output_name = list(outs.keys())[0]
         out = softmax(outs[output_name], axis=1, keepdims=True)
         max_idxes = np.argmax(out, axis=1, keepdims=True)
@@ -28,6 +79,15 @@ class EfficientNet(BaseModel):
         return res
 
     def demo(self, filepaths: list):
+        """
+        Run inference on input images and print classification results.
+
+        Performs image classification on the input images and logs the predicted
+        class index, name and confidence score.
+
+        Args:
+            filepaths: List of paths to input images for inference
+        """
         in_datas = dict()
         for idx, filepath in enumerate(filepaths):
             cv_image = cv2.imread(filepath)
@@ -37,7 +97,6 @@ class EfficientNet(BaseModel):
             in_datas[self.input_name] = cv_image
             logger.info(f"[{idx}] {filepath}")
             outs = self.run(in_datas)
-            # 只需取batch0
             out = outs[0]
             cls_idx = str(out[0])
             score = out[1]
@@ -45,6 +104,20 @@ class EfficientNet(BaseModel):
             logger.info(f"score: {score:.3f}, cls_idx: {cls_idx}, cls_name: {cls_name}")
 
     def evaluate(self, dataset, num=0):
+        """
+        Evaluate the model performance on a given dataset.
+
+        Runs inference on the dataset images and calculates top-1 accuracy
+        by comparing predictions with ground truth labels.
+
+        Args:
+            dataset: Dataset object containing evaluation data with labels
+            num: Number of samples to evaluate (0 means all samples)
+
+        Returns:
+            dict: Dictionary containing evaluation metrics including top-1 accuracy,
+                  input size, dataset name, number of samples, and latency
+        """
         img_paths, labels = dataset.get_datas(num)
         in_datas = dict()
         top1_acc = 0

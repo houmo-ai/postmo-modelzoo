@@ -1,12 +1,16 @@
 # YoloP
 
-本示例展示如何把yolop模型量化，编译，最后部署到后摩芯片的设备上。
+本示例展示如何把`yolop`模型量化，编译，最后部署到后摩芯片的设备上。
 
-[TOC]
+## 1.预训练模型
 
-## 1.模型说明
+本项目使用从`github`下载的预训练模型：
 
-本例使用的 yolop 实现来源 github 开源项目[https://github.com/hustvl/YOLOP](https://github.com/hustvl/YOLOP)的master分支。模型代码做一定调整后导出，细节见量化工具文档。
+- 模型名称: YOLOP
+- 来源: [https://github.com/hustvl/YOLOP](https://github.com/hustvl/YOLOP)
+- 许可: [MIT License](https://github.com/hustvl/YOLOP/blob/main/LICENSE)
+
+预训练模型在运行时下载，工程发布**不包含**该模型。
 
 本例模型的训练数据集为bdd100k
 

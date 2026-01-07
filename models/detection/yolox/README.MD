@@ -14,7 +14,8 @@ cd YOLOX_HOME
 python3 tools/export_onnx.py --output-name yolox_m.onnx -n yolox-m -c yolox_m.pth
 ```
 
-YOLOX导出的模型，前面会有多个Slice算子，可以将其统一利用hmatc的图优化功能替换为Conv算子。可以通过在config.yaml配置的model下添加如下配置开启优化。
+`YOLOX`导出的模型，前面会有多个`Slice`算子，可以将其统一利用hmatc的图优化功能替换为Conv算子。可以通过在config.yaml配置的model下添加如下配置开启优化。
+
 ``` yaml
   app_onnx_opt: 
     optimizer: true

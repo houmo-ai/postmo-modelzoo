@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: model_impl.py
+# Description:
+#   YOLOv8 Segmentation Model implementation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import cv2
 import torch
@@ -7,7 +26,7 @@ from typing import Dict, Any, List
 from hmatc.utils import logger
 from hmatc.base.base_model import BaseModel, COLORS
 from hmatc.utils.postprocess import (
-    non_max_suppression2,
+    non_max_suppression,
     scale_coords,
     process_mask,
     scale_coords_mask,
@@ -16,7 +35,27 @@ from hmatc.utils.metrics import detections_mask2json, merge_json, coco_eval
 
 
 class YoloV8Seg(BaseModel):
+    """
+    YOLOv8 Segmentation Model implementation.
+
+    This class implements the YOLOv8 instance segmentation model with preprocessing,
+    postprocessing, evaluation and demo capabilities. It inherits from BaseModel
+    and provides specific implementation for instance segmentation with mask generation.
+
+    Args:
+        **kwargs: Arguments passed to the parent BaseModel class including model configuration
+    """
+
     def __init__(self, **kwargs):
+        """
+        Initialize the YOLOv8 Segmentation model.
+
+        Sets up the model with input configuration, default thresholds for postprocessing,
+        and other model-specific parameters for segmentation.
+
+        Args:
+            **kwargs: Arguments passed to the parent BaseModel class
+        """
         super().__init__(**kwargs)
         self.input_name = self.inputs_name[0]
         _, C, H, W = self.inputs_cfg[self.input_name]["shape"]
@@ -27,18 +66,33 @@ class YoloV8Seg(BaseModel):
     def postprocess(
         self, outs: Dict[str, np.ndarray], in_datas: Dict[str, np.ndarray]
     ) -> Any:
+        """
+        Postprocess the model outputs to generate final segmentation results.
+
+        Applies non-maximum suppression and mask processing to generate
+        final detection and segmentation results.
+
+        Args:
+            outs: Model output dictionary containing raw predictions
+            in_datas: Input data dictionary containing the original images
+
+        Returns:
+            tuple: A tuple containing:
+                - detections: numpy array of detections with format [x1, y1, x2, y2, confidence, class]
+                - masks: list of segmentation masks
+                - contours: list of contours for each mask
+        """
         outs = list(outs.values())
         cv_image = list(in_datas.values())[0]
         det_out = torch.from_numpy(outs[0])  # bs, 116, 8400
         seg_out = torch.from_numpy(outs[1])  # bs, 32, 160, 160
         det_out = det_out[:1, ...]
         seg_out = seg_out[:1, ...]
-        nc = det_out.shape[1] - 32 - 4  # number of classes
-        detections = non_max_suppression2(
+        detections = non_max_suppression(
             det_out,
             conf_thres=self.conf_threshold,
             iou_thres=self.iou_threshold,
-            nc=nc,
+            nm=32,
         )
         detections = detections[0]
         _contours = list()
@@ -70,6 +124,15 @@ class YoloV8Seg(BaseModel):
         return detections, _masks, _contours
 
     def demo(self, filepaths: list):
+        """
+        Run inference on input images and save visualized segmentation results.
+
+        Performs segmentation on the input images, draws bounding boxes,
+        segmentation masks and contours, and saves the results with detections visualized.
+
+        Args:
+            filepaths: List of paths to input images for inference
+        """
         in_datas = dict()
         save_dir = f"vis_{self.backend}"
         if not os.path.exists(save_dir):
@@ -110,6 +173,20 @@ class YoloV8Seg(BaseModel):
             logger.info(f"Save result to {save_path}")
 
     def evaluate(self, dataset, num=0):
+        """
+        Evaluate the model performance on a given dataset.
+
+        Runs inference on the dataset images, performs postprocessing,
+        converts detections to COCO format for segmentation, and calculates mAP metrics.
+
+        Args:
+            dataset: Dataset object containing evaluation data
+            num: Number of samples to evaluate (0 means all samples)
+
+        Returns:
+            dict: Dictionary containing evaluation metrics including mAP50-95, mAP50,
+                  input size, dataset name, number of samples, and latency
+        """
         self.iou_threshold = 0.65
         self.conf_threshold = 0.01
         img_paths = dataset.get_datas(num)

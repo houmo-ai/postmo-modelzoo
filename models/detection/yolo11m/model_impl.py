@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: model_impl.py
+# Description:
+#   YOLOv11 model implementation.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import cv2
 import torch
@@ -6,12 +25,27 @@ from tqdm import tqdm
 from typing import Dict, Any
 from hmatc.utils import logger
 from hmatc.base.base_model import BaseModel
-from hmatc.utils.postprocess import non_max_suppression2, scale_coords
+from hmatc.utils.postprocess import non_max_suppression, scale_coords
 from hmatc.utils.metrics import detections2txt, detection_txt2json, coco_eval
 
 
 class Yolo11(BaseModel):
+    """
+    YOLOv11 object detection model implementation.
+
+    This class implements the YOLOv11 model for object detection tasks,
+    inheriting from BaseModel. It provides functionality for post-processing
+    model outputs, running inference on images, and evaluating model performance
+    using COCO metrics.
+    """
+
     def __init__(self, **kwargs):
+        """
+        Initialize Yolo11 model instance.
+
+        Args:
+            **kwargs: Keyword arguments passed to the parent BaseModel class
+        """
         super().__init__(**kwargs)
         self.input_name = self.inputs_name[0]
         _, C, H, W = self.inputs_cfg[self.input_name]["shape"]
@@ -23,14 +57,29 @@ class Yolo11(BaseModel):
     def postprocess(
         self, outs: Dict[str, np.ndarray], in_datas: Dict[str, np.ndarray]
     ) -> Any:
+        """
+        Post-process the model outputs to extract detections.
+
+        Applies non-maximum suppression and scales the detection coordinates
+        from the model input size to the original image size.
+
+        Args:
+            outs: Model outputs as dictionary of numpy arrays
+            in_datas: Input data as dictionary of numpy arrays
+
+        Returns:
+            Processed detections as numpy array with format [x1, y1, x2, y2, confidence, class_idx]
+
+        Raises:
+            ValueError: If the model has more than one output
+        """
         if len(outs) != 1:
             raise ValueError("YoloV9 model only has one output")
         pred = list(outs.values())[0]  # [bs, 84, 8400]
         pred = torch.from_numpy(pred)
-        # 只取batch0，多batch数据是复制来的，不用处理浪费时间
         pred = pred[:1, ...]  # [1, 84, 8400]
         cv_image = list(in_datas.values())[0]
-        outputs = non_max_suppression2(pred, self.conf_threshold, self.iou_threshold)
+        outputs = non_max_suppression(pred, self.conf_threshold, self.iou_threshold)
         output = outputs[0]
         output[:, :4] = scale_coords(
             self.input_size, output[:, :4], cv_image.shape
@@ -39,6 +88,15 @@ class Yolo11(BaseModel):
         return output
 
     def demo(self, filepaths: list):
+        """
+        Run inference on input images and visualize results.
+
+        Performs object detection on the input images, draws bounding boxes
+        on detected objects, and saves the annotated images to the output directory.
+
+        Args:
+            filepaths: List of image file paths to process
+        """
         in_datas = dict()
         save_dir = f"vis_{self.backend}"
         if not os.path.exists(save_dir):
@@ -68,6 +126,25 @@ class Yolo11(BaseModel):
             logger.info(f"Save result to {save_path}")
 
     def evaluate(self, dataset, num=0):
+        """
+        Evaluate model performance on a dataset.
+
+        Runs inference on all images in the dataset and calculates COCO metrics
+        including mAP@0.5:0.95 and mAP@0.5.
+
+        Args:
+            dataset: Dataset object containing images and annotations
+            num: Number of samples to evaluate (0 means all samples)
+
+        Returns:
+            Dictionary containing evaluation metrics:
+            - input_size: Input shape of the model
+            - dataset: Name of the dataset
+            - num: Number of evaluated samples
+            - map50_95: Mean Average Precision at IoU 0.5:0.05:0.95
+            - map50: Mean Average Precision at IoU 0.5
+            - latency: Average inference latency
+        """
         self.iou_threshold = 0.65
         self.conf_threshold = 0.01
         img_paths = dataset.get_datas(num)

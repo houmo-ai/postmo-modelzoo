@@ -12,18 +12,18 @@ from scipy.io import loadmat
 def get_gt_boxes(gt_dir):
     """gt dir: (wider_face_val.mat, wider_easy_val.mat, wider_medium_val.mat, wider_hard_val.mat)"""
 
-    gt_mat = loadmat(os.path.join(gt_dir, 'wider_face_val.mat'))
-    hard_mat = loadmat(os.path.join(gt_dir, 'wider_hard_val.mat'))
-    medium_mat = loadmat(os.path.join(gt_dir, 'wider_medium_val.mat'))
-    easy_mat = loadmat(os.path.join(gt_dir, 'wider_easy_val.mat'))
+    gt_mat = loadmat(os.path.join(gt_dir, "wider_face_val.mat"))
+    hard_mat = loadmat(os.path.join(gt_dir, "wider_hard_val.mat"))
+    medium_mat = loadmat(os.path.join(gt_dir, "wider_medium_val.mat"))
+    easy_mat = loadmat(os.path.join(gt_dir, "wider_easy_val.mat"))
 
-    facebox_list = gt_mat['face_bbx_list']
-    event_list = gt_mat['event_list']
-    file_list = gt_mat['file_list']
+    facebox_list = gt_mat["face_bbx_list"]
+    event_list = gt_mat["event_list"]
+    file_list = gt_mat["file_list"]
 
-    hard_gt_list = hard_mat['gt_list']
-    medium_gt_list = medium_mat['gt_list']
-    easy_gt_list = easy_mat['gt_list']
+    hard_gt_list = hard_mat["gt_list"]
+    medium_gt_list = medium_mat["gt_list"]
+    easy_gt_list = easy_mat["gt_list"]
 
     print(
         "event_list num:",
@@ -48,24 +48,24 @@ def get_gt_boxes(gt_dir):
 
 def get_gt_boxes_from_txt(gt_path, cache_dir):
 
-    cache_file = os.path.join(cache_dir, 'gt_cache.pkl')
+    cache_file = os.path.join(cache_dir, "gt_cache.pkl")
     if os.path.exists(cache_file):
-        f = open(cache_file, 'rb')
+        f = open(cache_file, "rb")
         boxes = pickle.load(f)
         f.close()
         return boxes
 
-    f = open(gt_path, 'r')
+    f = open(gt_path, "r")
     state = 0
     lines = f.readlines()
-    lines = list(map(lambda x: x.rstrip('\r\n'), lines))
+    lines = list(map(lambda x: x.rstrip("\r\n"), lines))
     boxes = {}
     print(len(lines))
     f.close()
     current_boxes = []
     current_name = None
     for line in lines:
-        if state == 0 and '--' in line:
+        if state == 0 and "--" in line:
             state = 1
             current_name = line
             continue
@@ -73,19 +73,19 @@ def get_gt_boxes_from_txt(gt_path, cache_dir):
             state = 2
             continue
 
-        if state == 2 and '--' in line:
+        if state == 2 and "--" in line:
             state = 1
-            boxes[current_name] = np.array(current_boxes).astype('float32')
+            boxes[current_name] = np.array(current_boxes).astype("float32")
             current_name = line
             current_boxes = []
             continue
 
         if state == 2:
-            box = [float(x) for x in line.split(' ')[:4]]
+            box = [float(x) for x in line.split(" ")[:4]]
             current_boxes.append(box)
             continue
 
-    f = open(cache_file, 'wb')
+    f = open(cache_file, "wb")
     pickle.dump(boxes, f)
     f.close()
     return boxes
@@ -93,9 +93,9 @@ def get_gt_boxes_from_txt(gt_path, cache_dir):
 
 def read_pred_file(filepath):
 
-    with open(filepath, 'r') as f:
+    with open(filepath, "r") as f:
         lines = f.readlines()
-        img_file = lines[0].rstrip('\n\r')
+        img_file = lines[0].rstrip("\n\r")
         lines = lines[2:]
 
     # b = lines[0].rstrip('\r\n').split(' ')[:-1]
@@ -103,8 +103,8 @@ def read_pred_file(filepath):
     # a = map(lambda x: [[float(a[0]), float(a[1]), float(a[2]), float(a[3]), float(a[4])] for a in x.rstrip('\r\n').split(' ')], lines)
     boxes = []
     for line in lines:
-        line = line.rstrip('\r\n').split(' ')
-        if line[0] == '':
+        line = line.rstrip("\r\n").split(" ")
+        if line[0] == "":
             continue
         # a = float(line[4])
         boxes.append(
@@ -118,7 +118,7 @@ def read_pred_file(filepath):
         )
     boxes = np.array(boxes)
     # boxes = np.array(list(map(lambda x: [float(a) for a in x.rstrip('\r\n').split(' ')], lines))).astype('float')
-    return img_file.split('/')[-1], boxes
+    return img_file.split("/")[-1], boxes
 
 
 def get_preds(pred_dir):
@@ -127,13 +127,13 @@ def get_preds(pred_dir):
     pbar = tqdm.tqdm(events)
 
     for event in pbar:
-        pbar.set_description('Reading Predictions ')
+        pbar.set_description("Reading Predictions ")
         event_dir = os.path.join(pred_dir, event)
         event_images = os.listdir(event_dir)
         current_event = dict()
         for imgtxt in event_images:
             imgname, _boxes = read_pred_file(os.path.join(event_dir, imgtxt))
-            current_event[imgname.rstrip('.jpg')] = _boxes
+            current_event[imgname.rstrip(".jpg")] = _boxes
         boxes[event] = current_event
     return boxes
 
@@ -241,7 +241,7 @@ def image_eval(pred, gt, ignore, iou_thresh):
 
 
 def img_pr_info(thresh_num, pred_info, proposal_list, pred_recall):
-    pr_info = np.zeros((thresh_num, 2)).astype('float')
+    pr_info = np.zeros((thresh_num, 2)).astype("float")
     for t in range(thresh_num):
 
         thresh = 1 - (t + 1) / thresh_num
@@ -293,18 +293,17 @@ def evaluation(pred, gt_path, iou_thresh=0.5):
     )
     event_num = len(event_list)
     thresh_num = 1000
-    settings = ['easy', 'medium', 'hard']
+    settings = ["easy", "medium", "hard"]
     setting_gts = [easy_gt_list, medium_gt_list, hard_gt_list]
     aps = []
     for setting_id in range(3):
-        # different setting
         gt_list = setting_gts[setting_id]
         count_face = 0
-        pr_curve = np.zeros((thresh_num, 2)).astype('float')
+        pr_curve = np.zeros((thresh_num, 2)).astype("float")
         # [hard, medium, easy]
         pbar = tqdm.tqdm(range(event_num))
         for i in pbar:
-            pbar.set_description('Processing {}'.format(settings[setting_id]))
+            pbar.set_description("Processing {}".format(settings[setting_id]))
             event_name = str(event_list[i][0][0])
             img_list = file_list[i][0]
             if event_name not in pred:
@@ -320,7 +319,7 @@ def evaluation(pred, gt_path, iou_thresh=0.5):
                     continue
 
                 pred_info = pred_list[tmp_img_name]
-                gt_boxes = gt_bbx_list[j][0].astype('float')
+                gt_boxes = gt_bbx_list[j][0].astype("float")
                 keep_index = sub_gt_list[j][0]
                 count_face += len(keep_index)
 

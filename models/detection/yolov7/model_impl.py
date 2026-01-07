@@ -1,3 +1,22 @@
+# Copyright 2025 HOUMO AI
+#
+# File: model_impl.py
+# Description:
+#   YOLOv7 model implementation for object detection
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import cv2
 import torch
@@ -11,7 +30,21 @@ from hmatc.utils.metrics import detections2txt, detection_txt2json, coco_eval
 
 
 class YoloV7(BaseModel):
+    """
+    YOLOv7 model implementation for object detection tasks.
+
+    This class implements the YOLOv7 model with preprocessing, postprocessing,
+    inference, evaluation, and visualization capabilities. It inherits from BaseModel
+    and provides specific implementations for object detection using the YOLOv7 architecture.
+    """
+
     def __init__(self, **kwargs):
+        """
+        Initialize the YOLOv7 model.
+
+        Sets up input configurations, default thresholds for postprocessing,
+        and other model-specific parameters.
+        """
         super().__init__(**kwargs)
         self.input_name = self.inputs_name[0]
         _, C, H, W = self.inputs_cfg[self.input_name]["shape"]
@@ -23,12 +56,29 @@ class YoloV7(BaseModel):
     def postprocess(
         self, outs: Dict[str, np.ndarray], in_datas: Dict[str, np.ndarray]
     ) -> Any:
+        """
+        Postprocess the model outputs to generate final detections.
+
+        Applies non-maximum suppression to filter detections based on confidence
+        and IoU thresholds, and scales coordinates back to original image dimensions.
+
+        Args:
+            outs: Model output dictionary containing raw predictions
+            in_datas: Input data dictionary containing the original images
+
+        Returns:
+            numpy.ndarray: Processed detections with format [x1, y1, x2, y2, confidence, class]
+        """
         pred = list(outs.values())[0]  # [bs, 25200, 85]
         pred = torch.from_numpy(pred)
-        # 只取batch0，多batch数据是复制来的，不用处理浪费时间
         pred = pred[:1, ...]  # [1, 25200, 85]
         cv_image = list(in_datas.values())[0]
-        outputs = non_max_suppression(pred, self.conf_threshold, self.iou_threshold)
+        outputs = non_max_suppression(
+            pred,
+            self.conf_threshold,
+            self.iou_threshold,
+            exist_obj_conf=True,
+        )
         output = outputs[0]
         output[:, :4] = scale_coords(
             self.input_size, output[:, :4], cv_image.shape
@@ -37,6 +87,15 @@ class YoloV7(BaseModel):
         return output
 
     def demo(self, filepaths: list):
+        """
+        Run inference on input images and save visualized results.
+
+        Performs object detection on the input images, draws bounding boxes,
+        and saves the results with detections visualized.
+
+        Args:
+            filepaths: List of paths to input images for inference
+        """
         in_datas = dict()
         save_dir = f"vis_{self.backend}"
         if not os.path.exists(save_dir):
@@ -66,6 +125,20 @@ class YoloV7(BaseModel):
             logger.info(f"Save result to {save_path}")
 
     def evaluate(self, dataset, num=0):
+        """
+        Evaluate the model performance on a given dataset.
+
+        Runs inference on the dataset images, performs postprocessing,
+        converts detections to COCO format, and calculates mAP metrics.
+
+        Args:
+            dataset: Dataset object containing evaluation data
+            num: Number of samples to evaluate (0 means all samples)
+
+        Returns:
+            dict: Dictionary containing evaluation metrics including mAP50-95, mAP50,
+                  input size, dataset name, number of samples, and latency
+        """
         self.iou_threshold = 0.65
         self.conf_threshold = 0.01
         img_paths = dataset.get_datas(num)
