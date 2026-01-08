@@ -6,23 +6,23 @@
 
 ## 概述
 
-TCIM Examples 以yolov5s模型为例展示TCIM API推理的基本使用方式。
+TCIM Examples 以 yolov5s 模型为例展示 TCIM API 推理的基本使用方式。
 
-1. yolov5s.py 展示python下单线程推理过程，包括：
-    - python单线程推理，使用默认stream（无需指定）
-2. yolov5s.cc 展示c++下单线程推理过程，包括：
-    - c++下单线程推理，使用默认stream（无需指定）
+1. yolov5s.py 展示 python 下单线程推理过程，包括：
+    - python 单线程推理，使用默认 stream（无需指定）
+2. yolov5s.cc 展示 c++下单线程推理过程，包括：
+    - c++下单线程推理，使用默认 stream（无需指定）
 
-对于yolov5s模型中的后处理部分，本示例提供两种实现方法：
+对于 yolov5s 模型中的后处理部分，本示例提供两种实现方法：
+
 1. （默认）基于代码实现后处理逻辑。
-2. 将yolov5s后处理部分独立为一个onnx模型，使用onnxruntime推理得到结果。
+2. 将 yolov5s 后处理部分独立为一个 onnx 模型，使用 onnxruntime 推理得到结果。
 
-其中方法2在本示例中仅提供Linux系统运行方法，如需在windows系统中运行可自行安装配置onnxruntime环境，则可使用相同步骤运行方法2示例。
-
+其中方法 2 在本示例中仅提供 Linux 系统运行方法，如需在 windows 系统中运行可自行安装配置 onnxruntime 环境，则可使用相同步骤运行方法 2 示例。
 
 ## 软件依赖
 
-本示例依赖opencv库进行图像预处理和可视化，依赖ultralytics进行数据可视化，依赖onnxruntime库推理yolov5s后处理模型。
+本示例依赖 opencv 库进行图像预处理和可视化，依赖 onnxruntime 库推理 yolov5s 后处理模型。
 
 ## 快速开始
 
@@ -35,7 +35,7 @@ python3 get_model.py
 python3 get_model.py --enable_ort
 ```
 
-2. 执行python演示程序，执行命令：
+2. 执行 python 演示程序，执行命令：
 
 ```bash
 # 后处理实现为方法1
@@ -44,7 +44,7 @@ python3 yolov5s.py
 python3 yolov5s.py --enable_ort
 ```
 
-3. 编译并执行c++演示程序，执行命令：
+3. 编译并执行 c++演示程序，执行命令：
 
 ```bash
 # 后处理实现为方法1
@@ -74,9 +74,9 @@ export LD_LIBRARY_PATH=$WORK_PATH/../../models/3rdparty/onnxruntime/lib:$LD_LIBR
 
 ## 参考结果
 
-### Python示例结果
+### Python 示例结果
 
-Python演示程序推理完成后会进行后处理，获得分类结果，执行成功输出以下打印：
+Python 演示程序推理完成后会进行后处理，获得分类结果，执行成功输出以下打印：
 
 ```bash
 ===> yolov5s python example start...
@@ -107,7 +107,8 @@ x1:355, y1:217, x2:422, y2:318, conf:0.310120, cls:60
 demo results saved to demo_results/python/000000000139.jpg
 <=== yolov5s python example completed.
 ```
-检测效果图片保存在demo_results/python目录下。
+
+检测效果图片保存在 demo_results/python 目录下。
 
 ### C++示例结果
 
@@ -115,16 +116,16 @@ C++演示程序推理完成后会进行后处理，获得分类结果，执行�
 
 ```bash
 ===> yolov5s c++ example start...
-LoadFromFile yolov5s
-model ./yolov5s_clip_xh2_b1_1core.hmm loaded.
+Load yolov5s model from file ./yolov5s_clip_xh2_b1_1core.hmm.
+Model ./yolov5s_clip_xh2_b1_1core.hmm loaded.
 Count of Input: 1
-Input[images] TensorInfo: shape: [1,3,640,640], stride: [], dtype: FLOAT16, format: ND, size: 2457600, memsize: 2457600
-Input f32[images] TensorInfo: shape: [1,3,640,640], stride: [], dtype: FLOAT32, format: ND, size: 4915200, memsize: 4915200
-img_bytes: 4915200
+Input[images] info: TensorInfo: shape: [1,3,640,640], stride: [], dtype: FLOAT16, format: ND, size: 2457600, memsize: 2457600
+Input[images] float32 info: TensorInfo: shape: [1,3,640,640], stride: [], dtype: FLOAT32, format: ND, size: 4915200, memsize: 4915200
+image bytes: 4915200.
 Count of Output: 3
-Output[340] TensorInfo: shape: [1,3,80,80,85], stride: [], dtype: FLOAT32, format: ND, size: 6528000, memsize: 6528000
-Output[378] TensorInfo: shape: [1,3,40,40,85], stride: [], dtype: FLOAT32, format: ND, size: 1632000, memsize: 1632000
-Output[416] TensorInfo: shape: [1,3,20,20,85], stride: [], dtype: FLOAT32, format: ND, size: 408000, memsize: 408000
+Output[340] info: TensorInfo: shape: [1,3,80,80,85], stride: [], dtype: FLOAT32, format: ND, size: 6528000, memsize: 6528000
+Output[378] info: TensorInfo: shape: [1,3,40,40,85], stride: [], dtype: FLOAT32, format: ND, size: 1632000, memsize: 1632000
+Output[416] info: TensorInfo: shape: [1,3,20,20,85], stride: [], dtype: FLOAT32, format: ND, size: 408000, memsize: 408000
 detect num: 16
 box[6, 168, 152, 261], conf:0.903683, cls:62
 box[292, 217, 352, 317], conf:0.844447, cls:56
@@ -142,18 +143,19 @@ box[331, 177, 368, 224], conf:0.480379, cls:58
 box[490, 174, 513, 282], conf:0.384144, cls:72
 box[348, 211, 362, 230], conf:0.356749, cls:75
 box[356, 214, 373, 231], conf:0.356060, cls:75
-demo results saved to demo_results/cpp/000000000139.jpg
+demo results saved to demo_results/cpp/000000000139.jpg.
 <=== yolov5s c++ example completed.
 ```
-检测效果图片保存在demo_results/cpp目录下。
 
-*注：由于c++与python版本的前后处理不完全一致，算法结果可能有少量偏差。*
+检测效果图片保存在 demo_results/cpp 目录下。
+
+_注：由于 c++与 python 版本的前后处理不完全一致，算法结果可能有少量偏差。_
 
 ### 一键执行
 
-可以使用run脚本一键执行查看结果
+可以使用 run 脚本一键执行查看结果
 
-linux下执行：
+linux 下执行：
 
 ```bash
 # 后处理实现为方法1
@@ -162,7 +164,7 @@ bash run.sh
 bash run.sh enable_ort
 ```
 
-windows下执行：
+windows 下执行：
 
 ```bash
 bash run.bat

@@ -285,6 +285,7 @@ spdlog
 
 Usage Location:
 tools/common/spdlog (entire spdlog source directory)
+apis/common/hpp/spdlog (entire spdlog source directory)
 
 Source:
 https://github.com/gabime/spdlog

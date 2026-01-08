@@ -1,4 +1,28 @@
-// Copyright (c) 2022 The Houmo.ai Authors. All rights reserved.
+/*
+ * Copyright (c) 2025 HOUMO AI
+ *
+ * File: resnet50_multistreams.cc
+ * Description:
+ *   ResNet50 Multi-Stream Image Classification C++ Example.
+ *   This file demonstrates how to use ResNet50 model for image classification
+ *   tasks with multi-threading support, including model
+ *   loading, image preprocessing, inference execution, and result
+ *   post-processing.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include <cstring>
 #include <iostream>
@@ -25,24 +49,26 @@ namespace fs = std::filesystem;
 #include <opencv2/opencv.hpp>
 
 #include "datasets/imagenet.hpp"
-#include "imageproc.hpp"
 #include "logging.h"
 #include "tcim/tcim_runtime.h"
 #include "threads.hpp"
 #include "utils.hpp"
 
+// Structure to hold command-line arguments
 struct CliArguments {
-  std::string model_path;
-  size_t thread_num = 1;
-  size_t sample_num = 1;
-  size_t device_num = 1;
+  std::string model_path;  // Path to the model
+  size_t thread_num = 1;   // Number of threads
+  size_t sample_num = 1;   // Number of samples to process
+  size_t device_num = 1;   // Number of devices
 };
 
+// Structure to hold task information for processing
 typedef struct {
   std::map<std::string, std::shared_ptr<void>> data_map;
-  uint64_t req_id;
+  uint64_t req_id;  // Request ID
 } TaskInfo;
 
+// Structure to hold task queue with synchronization primitives
 typedef struct {
   std::queue<TaskInfo> queue;
   std::mutex mutex;
@@ -51,9 +77,11 @@ typedef struct {
   std::map<std::string, tcim::TensorInfo> info_map_f32;
 } TaskQueue;
 
+// Function to parse command-line arguments
 bool ParseArgs(CliArguments* arguments, int argc, char* argv[]) {
 #if !defined(_MSC_VER)
   int option_idx = 0;
+  // Define long options for command-line argument parsing
   struct option long_options[] = {
       {"help", 0, 0, 'h'},
       {"devices", 1, 0, 'n'},
@@ -61,6 +89,7 @@ bool ParseArgs(CliArguments* arguments, int argc, char* argv[]) {
       {"samples", 1, 0, 's'},
   };
 
+  // Parse command-line arguments
   while (true) {
     int ch = getopt_long(argc, argv, "hn:t:s:", long_options, &option_idx);
     if (ch == -1) {
@@ -89,19 +118,26 @@ bool ParseArgs(CliArguments* arguments, int argc, char* argv[]) {
   return true;
 }
 
-std::string TensorInfo2Str(const tcim::TensorInfo& tensor_info) {
-  std::stringstream ss;
-  ss << tensor_info;
-  return ss.str();
-}
-
+/**
+ * Get the top K maximum values and their index information
+ * This function sorts the value-index pairs in descending order and prints the
+ * top K results
+ *
+ * @param topk Number of top K elements to retrieve
+ * @param sort_pairs Vector of pairs containing values and indices, where T is
+ * the value type and int is the original index
+ * @return Returns the original index corresponding to the maximum value
+ */
 template <typename T>
 int get_topk(int topk, std::vector<std::pair<T, int>> sort_pairs) {
+  // Sort pairs in descending order by value
   std::sort(sort_pairs.begin(), sort_pairs.end(),
             [](const std::pair<T, int>& a, const std::pair<T, int>& b) {
               return a.first > b.first;
             });
 
+  // Print detailed information for top K elements, including index, confidence
+  // and label
   for (int i = 0; i < topk; ++i) {
     LOG_INFO("top{}: Index={}, Conf={}, Label=[{}]", (i + 1),
              sort_pairs[i].second, sort_pairs[i].first,
@@ -113,6 +149,8 @@ int get_topk(int topk, std::vector<std::pair<T, int>> sort_pairs) {
 
 int main(int argc, char* argv[]) {
   LOG_INFO("===> resnet50_multistreams c++ example start...");
+
+  // Check if running on correct hardware target (xh2)
   const char* houmo_target_env = getenv("HOUMO_TARGET");
   std::string houmo_target =
       houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
@@ -123,8 +161,8 @@ int main(int argc, char* argv[]) {
   LOG_INFO("houmo target: {}, tcim version: {}", houmo_target,
            tcim::GetVersion());
 
+  // Set default parameters and override with environment variables if needed
   std::string default_model_path = "./resnet50_xh2_b1_1core.hmm";
-  // set the parameters
   CliArguments arguments;
   arguments.model_path = default_model_path;
   arguments.device_num = 1;
@@ -142,14 +180,14 @@ int main(int argc, char* argv[]) {
            arguments.model_path, arguments.device_num, arguments.thread_num,
            arguments.sample_num);
 
+  // Verify model file exists
   std::string model_path = arguments.model_path;
   if (!fs::exists(model_path)) {
     LOG_ERROR("{} not exist.", model_path);
     exit(-1);
   }
 
-  std::vector<std::thread> threads;
-  // 1. input preprocess
+  // Prepare input image: load, resize, normalize
   std::string data_path = "../../data/snake.jpg";
   if (!fs::exists(data_path)) {
     LOG_ERROR("{} not exist.", data_path);
@@ -179,7 +217,8 @@ int main(int argc, char* argv[]) {
   cv::vconcat(channels, img_processed);
   img_size = img_norm.total() * img_norm.elemSize();
 
-  // 2. prepare input & output queue
+  std::vector<std::thread> threads;
+  // Prepare input and output queues with sample data
   TaskQueue qin;
   TaskQueue qout;
   for (int i = 0; i < arguments.sample_num; i++) {
@@ -195,10 +234,10 @@ int main(int argc, char* argv[]) {
   }
   LOG_INFO("sample queue size is {}", qin.queue.size());
 
-  // 3. define threads
+  // Define the thread function for processing tasks
   auto thread_func = [](int tid, int did, tcim::Module& module, TaskQueue& qin,
                         TaskQueue& qout, Barrier& barrier) {
-    // 3.1 prepare input
+    // Initialize input tensor information
     int input_num = module.GetInputNum();
     LOG_INFO("Count of Input: {}", input_num);
     for (int idx = 0; idx < input_num; idx++) {
@@ -211,7 +250,7 @@ int main(int argc, char* argv[]) {
       qin.info_map_f32[input_name] = input_info_f32;
     }
 
-    // 3.2 prepare output
+    // Initialize output tensor information
     int output_num = module.GetOutputNum();
     LOG_INFO("Count of Output: {}", output_num);
     for (int idx = 0; idx < output_num; idx++) {
@@ -224,14 +263,14 @@ int main(int argc, char* argv[]) {
       qout.info_map_f32[output_name] = output_info_f32;
     }
 
-    // 3.3 wait until all threads ready
+    // Wait until all threads are ready
     barrier.barrier();
     LOG_INFO("thread {} on device {} infer start...", tid, did);
     int count = 0;
 
-    // 3.4 infer loop
+    // Main inference loop
     while (true) {
-      // 3.4.1 get data from the task queue
+      // Get data from input queue
       std::unique_lock<std::mutex> lock_in(qin.mutex);
       if (qin.queue.empty()) {
         lock_in.unlock();
@@ -242,7 +281,7 @@ int main(int argc, char* argv[]) {
       qin.queue.pop();
       lock_in.unlock();
 
-      // 3.4.2 set input to the module
+      // Set input tensors to the module
       for (auto& info : qin.info_map) {
         tcim::Tensor input_tensor;
         input_tensor = tcim::Tensor::CreateHostTensor(info.second);
@@ -254,11 +293,11 @@ int main(int argc, char* argv[]) {
         module.SetInput(info.first, input_tensor);
       }
 
-      // 3.4.3 run and sync
+      // Execute inference
       module.Run();
       module.Sync();
 
-      // 3.4.4 get output and push to the output queue
+      // Get output tensors and add to output queue
       TaskInfo tinfo;
       tinfo.req_id = req_id;
       for (auto& info : qout.info_map) {
@@ -290,7 +329,7 @@ int main(int argc, char* argv[]) {
              count);
   };
 
-  // 4.1 load models
+  // Load models for each device and thread
   std::map<int, std::vector<tcim::Module>> module_map;
   for (int did = 0; did < arguments.device_num; did++) {
     auto wm = tcim::Module::WeightManager::CreateWeightManager(did);
@@ -304,12 +343,12 @@ int main(int argc, char* argv[]) {
         exit(-1);
       }
       dev_modules.push_back(module);
-      LOG_INFO("thread {} on device {} model {} loaded.", i, did, model_path);
+      LOG_INFO("thread {} on device {} model {}.", i, did, model_path);
     }
     module_map[did] = dev_modules;
   }
 
-  // 4.2 create threads
+  // Create and start threads for parallel processing
   Barrier barrier(arguments.thread_num * arguments.device_num);
   int tid = 0;
   for (int did = 0; did < arguments.device_num; did++) {
@@ -323,12 +362,12 @@ int main(int argc, char* argv[]) {
 
   barrier.wait();
 
-  // 5. wait all threads done
+  // Wait for all threads to complete
   for (auto& t : threads) {
     t.join();
   }
 
-  // 6. postprocess without softmax, and check result
+  // Process results and validate output
   while (!qout.queue.empty()) {
     auto output_map = qout.queue.front().data_map;
     auto req_id = qout.queue.front().req_id;
@@ -343,7 +382,7 @@ int main(int argc, char* argv[]) {
       top1 = get_topk(topk, sort_pairs);
     }
 
-    // check result, modify it when you change model or data
+    // Validate the result - snake image should have class ID 65
     if (top1 != 65) {
       LOG_ERROR("top1 != 65");
       exit(-1);

@@ -1,17 +1,41 @@
+# Copyright 2025 HOUMO AI
+#
+# File: resnet50.py
+# Description:
+#   ResNet50 Image Classification Python Example.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import sys
 import numpy as np
 import cv2
+from loguru import logger
 
+HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../../..')
+sys.path.insert(0, f'{HOUMO_EXAMPLES_PATH}/hmatc')
+from hmatc.utils.postprocess import softmax
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
+
 if __name__ == '__main__':
-    sys.path.insert(0, "../../common/python")
-    print("\n===> resnet50 python example start...")
-    print(
+    logger.info("===> resnet50 python example start...")
+    logger.info(
         f"tcim runtime version: {tcim.runtime.get_version()}, houmo target: {HOUMO_TARGET}"
     )
 
@@ -33,13 +57,11 @@ if __name__ == '__main__':
 
     # 3. set input
     input_num = module.get_num_inputs()
-    for id in range(0, input_num):
-        input_name = module.get_input_name(id)
+    for idx in range(0, input_num):
+        input_name = module.get_input_name(idx)
         input_info = module.get_input_info(input_name).ascontiguous()
-        print(
-            "input[{}] shape = {}, dtype = {}, format = {}".format(
-                input_name, input_info.shape, input_info.dtype, input_info.format.name
-            )
+        logger.info(
+            f"input[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
         )
         module.set_input(input_name, input_data)
 
@@ -50,31 +72,26 @@ if __name__ == '__main__':
     # 5. get output
     result_check = True
     output_num = module.get_num_outputs()
-    for id in range(0, output_num):
-        output_name = module.get_output_name(id)
+    for idx in range(0, output_num):
+        output_name = module.get_output_name(idx)
         output_info = (
             module.get_output_info(output_name).ascontiguous().astype(np.float32)
         )
-        print(
-            "output[{}] shape = {}, dtype = {}, format = {}".format(
-                output_name,
-                output_info.shape,
-                output_info.dtype,
-                output_info.format.name,
-            )
+        logger.info(
+            f"output[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
         )
         output_data = module.get_output(output_name).astype(np.float32).numpy()
 
     # 6. postprocess
-    from postprocess import softmax
-
     output_data = softmax(output_data)
     topk = 5
     pred_list = np.argsort(-output_data, axis=1, kind="quicksort").flatten()[0:topk]
     prob_list = output_data.flatten()
-    for i, id in enumerate(pred_list):
-        print("top{}: predict cls = {}, prob = {:.6f}".format(i + 1, id, prob_list[id]))
+    for i, idx in enumerate(pred_list):
+        logger.info(
+            "top{}: predict cls = {}, prob = {:.6f}".format(i + 1, idx, prob_list[idx])
+        )
     # check result, modify it when you change model or data
     assert pred_list[0] == 65
 
-    print("<=== resnet50 python example completed.\n")
+    logger.info("<=== resnet50 python example completed.")

@@ -1,10 +1,30 @@
+# Copyright 2025 HOUMO AI
+#
+# File: get_model.py
+# Description:
+#   Download Yolov5s model for image detection tasks.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import sys
 import platform
 import argparse
 
-HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../../..')
-sys.path.insert(0, f'{HOUMO_EXAMPLES_PATH}/hmatc')
+HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
+sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
 from hmatc.utils.utils import get_file_from_jfrog
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -12,7 +32,7 @@ assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
-    """Parse commandline."""
+    """Parse commandline arguments for model download configuration."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_dir",
@@ -31,6 +51,18 @@ def get_args() -> argparse.Namespace:
 
 
 def execute_cmd(cmd, shell=False):
+    """Execute a command in the shell and return the result.
+
+    Args:
+        cmd: Command to execute
+        shell (bool): Whether to run the command in shell mode
+
+    Returns:
+        str: Output from the command execution
+
+    Raises:
+        Exception: If command execution fails
+    """
     import subprocess
 
     try:
@@ -44,11 +76,17 @@ def execute_cmd(cmd, shell=False):
 
 
 def install_ort_env(third_party_dir: str, ort_pkg_name: str) -> None:
-    """
-    Install onnxruntime environment to support post-processing model inference.
-        third_party_dir: third party directory
-        ort_pkg_name: ort package name
-        return: None
+    """Install onnxruntime environment to support post-processing model inference.
+
+    This function configures the ORT C++ environment by renaming the downloaded
+    package directory to 'onnxruntime'.
+
+    Args:
+        third_party_dir (str): Path to the third party directory
+        ort_pkg_name (str): Name of the ORT package to be renamed
+
+    Returns:
+        None
     """
     try:
         print("configure the ORT C++ environment...")
@@ -60,21 +98,24 @@ def install_ort_env(third_party_dir: str, ort_pkg_name: str) -> None:
 if __name__ == "__main__":
     args = get_args()
 
+    # Determine the model directory to save the downloaded model
     model_dir = (
         os.path.join(HOUMO_EXAMPLES_PATH, "apis/models")
         if not args.model_dir
         else args.model_dir
     )
+    # Path to the YOLOv5s HMM model in the repository
     hmm_path = "models/apis/yolov5s/hmm_xh2_yolov5s_b1_1core.zip"
     get_file_from_jfrog(hmm_path, model_dir, "./")
 
+    # If ONNX Runtime support is enabled and the system is Linux
     if args.enable_ort and platform.system() == "Linux":
-        # download yolov5s post-processing onnx model
+        # Download yolov5s post-processing onnx model
         onnx_path = "models/raw/onnx/yolov5s_640x640_postprocess.onnx"
         get_file_from_jfrog(onnx_path, "./")
 
         platform_name = platform.machine()
-        # download onnxruntime env packages
+        # Determine the appropriate ORT package based on architecture
         if platform_name == "x86_64":
             ort_env_str = "x64"
         elif platform_name == "aarch64":
@@ -90,5 +131,6 @@ if __name__ == "__main__":
         ort_pkg_path = "3rdparty/" + ort_pkg_name + ".tgz"
         get_file_from_jfrog(ort_pkg_path, third_party_dir, third_party_dir)
 
+        # Install ORT environment if it doesn't already exist
         if not os.path.exists(third_party_dir + "/onnxruntime"):
             install_ort_env(third_party_dir, ort_pkg_name)

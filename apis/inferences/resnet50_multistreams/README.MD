@@ -6,18 +6,17 @@
 
 ## 概述
 
-Resnet50 Multistreams Example 以resnet50模型为例展示TCIM API在多设备、多线程以及多stream下的使用方式。
+Resnet50 Multistreams Example 以 resnet50 模型为例展示 TCIM API 在多设备、多线程以及多 stream 下的使用方式。
 
-1. resnet50_multistreams.py 展示python下多线程多stream推理过程
-2. resnet50_multistreams.cc 展示c++下多设备多线程以及多stream推理过程
-3. 使用create_weight_manager接口共享模型内存
-4. 支持配置多线程，每个线程使用1个stream
+1. resnet50_multistreams.py 展示 python 下多线程多 stream 推理过程
+2. resnet50_multistreams.cc 展示 c++下多设备多线程以及多 stream 推理过程
+3. 使用 create_weight_manager 接口共享模型内存
+4. 支持配置多线程，每个线程使用 1 个 stream
 5. 支持配置多设备，每个设备使用相同数量的线程
-
 
 ## 软件依赖
 
-除TCIM Examples公用依赖外，本示例没有其他依赖。
+除 TCIM Examples 公用依赖外，本示例没有其他依赖。
 
 ## 快速上手
 
@@ -25,28 +24,32 @@ Resnet50 Multistreams Example 以resnet50模型为例展示TCIM API在多设备�
 
 可以通过以下两种方式获取芯片模型：
 
-1. 自行编译：通过原始模型或量化模型，经过tcim工具链编译生成，具体可参考houmo-modelzoo
-2. 直接下载：通过get_model.py脚本下载预编译的模型
+1. 自行编译：通过原始模型或量化模型，经过 tcim 工具链编译生成，具体可参考 houmo-modelzoo
+2. 直接下载：通过 get_model.py 脚本下载预编译的模型
 
 ```bash
 python3 get_model.py
 ```
 
-### 模型python推理
+### 模型 python 推理
 
-使用runtime python API进行模型推理，并输出结果。执行时可通过参数修改配置：
+使用 runtime python API 进行模型推理，并输出结果。执行时可通过参数修改配置：
 
-- -n 1：设备数，默认为1
-- -t 4：线程数，默认为4
-- -s 10：测试样本数，默认为10
+-   -n 1：设备数，默认为 1
+-   -t 4：线程数，默认为 4
+-   -s 10：测试样本数，默认为 10
 
-以2个设备为例（有两张卡device id分别为0和1）：
+以 2 个设备为例（有两张卡 device id 分别为 0 和 1）：
 
 ```bash
 python3 resnet50_multistreams.py -n 2
 ```
 
-测试程序将测试样本存入输入队列，由每个线程的推理模块竞争推理，并将推理后的结果存入输出队列。以下打印表示每个线程推理完成后的数量统计（注：模拟器下仅支持单线程）：
+测试程序将测试样本存入输入队列，由每个线程的推理模块竞争推理，并将推理后的结果存入输出队列，每个线程推理完成后将打印推理的数量。
+
+注：模拟器下仅支持单线程。
+
+执行成功输出以下打印：
 
 ```bash
 2025-12-22 15:01:52.164 | INFO     | __main__:<module>:46 - ===> resnet50_multistreams python example start...
@@ -54,10 +57,10 @@ python3 resnet50_multistreams.py -n 2
 2025-12-22 15:01:52.165 | INFO     | __main__:<module>:60 - threads: 4
 2025-12-22 15:01:52.165 | INFO     | __main__:<module>:61 - samples: 10
 2025-12-22 15:01:52.165 | INFO     | __main__:<module>:62 - model: ./resnet50_xh2_b1_1core.hmm
-2025-12-22 15:01:54.232 | INFO     | __main__:<module>:171 - thread 0 on device 0 load model ./resnet50_xh2_b1_1core.hmm loaded.
-2025-12-22 15:01:54.237 | INFO     | __main__:<module>:171 - thread 1 on device 0 load model ./resnet50_xh2_b1_1core.hmm loaded.
-2025-12-22 15:01:54.241 | INFO     | __main__:<module>:171 - thread 2 on device 0 load model ./resnet50_xh2_b1_1core.hmm loaded.
-2025-12-22 15:01:54.244 | INFO     | __main__:<module>:171 - thread 3 on device 0 load model ./resnet50_xh2_b1_1core.hmm loaded.
+2025-12-22 15:01:54.232 | INFO     | __main__:<module>:171 - thread 0 on device 0 load model ./resnet50_xh2_b1_1core.hmm.
+2025-12-22 15:01:54.237 | INFO     | __main__:<module>:171 - thread 1 on device 0 load model ./resnet50_xh2_b1_1core.hmm.
+2025-12-22 15:01:54.241 | INFO     | __main__:<module>:171 - thread 2 on device 0 load model ./resnet50_xh2_b1_1core.hmm.
+2025-12-22 15:01:54.244 | INFO     | __main__:<module>:171 - thread 3 on device 0 load model ./resnet50_xh2_b1_1core.hmm.
 2025-12-22 15:01:54.245 | INFO     | __main__:thread_func:104 - input[input.1] shape = [1, 3, 224, 224], dtype = <class 'numpy.float16'>, format = ND
 2025-12-22 15:01:54.246 | INFO     | __main__:thread_func:104 - input[input.1] shape = [1, 3, 224, 224], dtype = <class 'numpy.float16'>, format = ND
 2025-12-22 15:01:54.246 | INFO     | __main__:thread_func:119 - output[495] shape = [1, 1000], dtype = <class 'numpy.float16'>, format = ND
@@ -93,15 +96,15 @@ python3 resnet50_multistreams.py -n 2
 2025-12-22 15:01:55.935 | INFO     | __main__:<module>:213 - <=== resnet50_multistreams python example completed.
 ```
 
-### 模型c++推理
+### 模型 c++推理
 
-使用runtime c++ API进行模型推理，并输出结果。执行时可通过参数修改配置：
+使用 runtime c++ API 进行模型推理，并输出结果。执行时可通过参数修改配置：
 
-- -n 1：设备数，默认为1
-- -t 4：线程数，默认为4
-- -s 10：测试样本数，默认为10
+-   -n 1：设备数，默认为 1
+-   -t 4：线程数，默认为 4
+-   -s 10：测试样本数，默认为 10
 
-以2个设备为例（有两张卡device id分别为0和1）：
+以 2 个设备为例（有两张卡 device id 分别为 0 和 1）：
 
 ```bash
 mkdir build
@@ -113,16 +116,20 @@ cd ..
 ./example_resnet50_multistreams -n 2
 ```
 
-测试程序将测试样本存入输入队列，由每个线程的推理模块竞争推理，并将推理后的结果存入输出队列。以下打印表示每个线程推理完成后的数量统计，同时显示每个线程工作在哪个设备上（注：模拟器下仅支持单线程单设备）：
+测试程序将测试样本存入输入队列，由每个线程的推理模块竞争推理，并将推理后的结果存入输出队列。每个线程推理完成后将打印推理的数量，同时显示每个线程工作在哪个设备上。
+
+注：模拟器下仅支持单线程。
+
+执行成功输出以下打印：
 
 ```bash
 I20251222 15:44:29.958922 2701239 resnet50_multistreams.cc:115] ===> resnet50_multistreams c++ example start...
 I20251222 15:44:29.959512 2701239 resnet50_multistreams.cc:141] model: ./resnet50_xh2_b1_1core.hmm, devices: 1, threads: 4, samples: 10
 I20251222 15:44:29.966454 2701239 resnet50_multistreams.cc:196] sample queue size is 10
-[2025-12-22 15:44:32.039] [tid 2701239] [info] thread 0 on device 0 model ./resnet50_xh2_b1_1core.hmm loaded.
-[2025-12-22 15:44:32.044] [tid 2701239] [info] thread 1 on device 0 model ./resnet50_xh2_b1_1core.hmm loaded.
-[2025-12-22 15:44:32.048] [tid 2701239] [info] thread 2 on device 0 model ./resnet50_xh2_b1_1core.hmm loaded.
-[2025-12-22 15:44:32.051] [tid 2701239] [info] thread 3 on device 0 model ./resnet50_xh2_b1_1core.hmm loaded.
+[2025-12-22 15:44:32.039] [tid 2701239] [info] thread 0 on device 0 model ./resnet50_xh2_b1_1core.hmm.
+[2025-12-22 15:44:32.044] [tid 2701239] [info] thread 1 on device 0 model ./resnet50_xh2_b1_1core.hmm.
+[2025-12-22 15:44:32.048] [tid 2701239] [info] thread 2 on device 0 model ./resnet50_xh2_b1_1core.hmm.
+[2025-12-22 15:44:32.051] [tid 2701239] [info] thread 3 on device 0 model ./resnet50_xh2_b1_1core.hmm.
 [2025-12-22 15:44:32.052] [tid 2701309] [info] Count of Input: 1
 [2025-12-22 15:44:32.052] [tid 2701310] [info] Count of Input: 1
 [2025-12-22 15:44:32.052] [tid 2701309] [info] Input[input.1] info: TensorInfo: shape: [1,3,224,224], stride: [], dtype: FLOAT16, format: ND, size: 301056, memsize: 301056
@@ -170,19 +177,19 @@ I20251222 15:44:29.966454 2701239 resnet50_multistreams.cc:196] sample queue siz
 [2025-12-22 15:44:32.070] [tid 2701239] [info] <=== resnet50_multistreams c++ example completed.
 ```
 
-**说明：由于c++和python前处理有差异，且c++后处理没有做softmax，部分结果可能存在少量差异。**
+**说明：由于 c++和 python 前处理有差异，且 c++后处理没有做 softmax，部分结果可能存在少量差异。**
 
 ### 一键执行
 
-可以使用run脚本一键执行查看结果, 以2个设备为例（有两张卡device id分别为0和1）
+可以使用 run 脚本一键执行查看结果, 以 2 个设备为例（有两张卡 device id 分别为 0 和 1）
 
-linux下执行：
+linux 下执行：
 
 ```bash
 bash run.sh -n 2
 ```
 
-windows下执行（windows需要在代码中修改参数）：
+windows 下执行（windows 需要在代码中修改参数）：
 
 ```bash
 bash run.bat

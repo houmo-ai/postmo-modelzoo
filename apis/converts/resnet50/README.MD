@@ -20,7 +20,7 @@ torch.onnx.export(model, dummy_input, 'resnet50.onnx', export_params=True, opset
 
 ## 2.环境依赖
 
-主机 Python 环境中需安装后摩量化及编译工具：hmquant & houmo-tcim。
+主机 Python 环境中需安装后摩量化及编译工具：hmquant & houmo-tcim, 需安装 houmo_tcim_runtime 用于执行推理比较 golden 数据。
 
 ## 3.快速开始
 
@@ -104,5 +104,5 @@ resnet50 get 1 ouputs completed in 0.021 ms.
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。
 
-- reset50 torchvision 模型：[https://github.com/pytorch/vision/blob/v0.11.1/torchvision/models/resnet.py](https://github.com/pytorch/vision/blob/v0.11.1/torchvision/models/resnet.py)
-- LSVRC_2012 验证集链接: [https://image-net.org/challenges/LSVRC](https://image-net.org/challenges/LSVRC)
+-   reset50 torchvision 模型：[https://github.com/pytorch/vision/blob/v0.11.1/torchvision/models/resnet.py](https://github.com/pytorch/vision/blob/v0.11.1/torchvision/models/resnet.py)
+-   LSVRC_2012 验证集链接: [https://image-net.org/challenges/LSVRC](https://image-net.org/challenges/LSVRC)

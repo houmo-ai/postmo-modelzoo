@@ -1,5 +1,28 @@
-#ifndef _APIS_COMMON_HPP_LOGGING_H_
-#define _APIS_COMMON_HPP_LOGGING_H_
+/*
+ * Copyright (c) 2025 HOUMO AI
+ *
+ * File: logging.h
+ * Description:
+ *   Logging utility functions and classes based on spdlog for cross-platform
+ *   logging. Provides console and file logging with stack trace functionality.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#ifndef __APIS_COMMON_HPP_LOGGING_H__
+#define __APIS_COMMON_HPP_LOGGING_H__
 
 #include <string>
 
@@ -30,10 +53,12 @@
 #define LOG_ERROR(...) SPDLOG_ERROR(__VA_ARGS__)
 #define LOG_FLUSH spdlog::default_logger_raw()->flush()
 
-// 打印堆栈信息（跨平台）
+/**
+ * @brief Print stack trace information (cross-platform)
+ */
 static void print_stacktrace() {
 #ifdef _WIN32
-  // Windows 堆栈信息捕获
+  // Windows stack trace capture
   void *stack[100];
   HANDLE process = GetCurrentProcess();
   SymInitialize(process, NULL, TRUE);
@@ -50,7 +75,7 @@ static void print_stacktrace() {
   }
   free(symbol);
 #else
-  // Linux/MacOS 堆栈信息捕获
+  // Linux/MacOS stack trace capture
   const int max_frames = 100;
   void *buffer[max_frames];
   int nptrs = backtrace(buffer, max_frames);
@@ -70,6 +95,11 @@ static void print_stacktrace() {
 #endif
 }
 
+/**
+ * @brief Log a fatal error message and terminate the program
+ *
+ * @param ... Format string and arguments for the error message
+ */
 #define LOG_FATAL(...)      \
   do {                      \
     LOG_ERROR(__VA_ARGS__); \
@@ -78,7 +108,11 @@ static void print_stacktrace() {
     std::abort();           \
   } while (0)
 
-// 定义 LOG_ASSERT 宏，检查条件并打印堆栈信息
+/**
+ * @brief Assert a condition and terminate the program if it fails
+ *
+ * @param condition The condition to check
+ */
 #define LOG_ASSERT(condition)                        \
   do {                                               \
     if (!(condition)) {                              \
@@ -89,8 +123,14 @@ static void print_stacktrace() {
     }                                                \
   } while (0)
 
+/**
+ * @brief Logging class that provides cross-platform logging functionality
+ */
 class SpdLogger {
  public:
+  /**
+   * @brief Default constructor that creates a console-only logger
+   */
   SpdLogger() {
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     std::vector<spdlog::sink_ptr> sinks{console_sink};
@@ -103,6 +143,16 @@ class SpdLogger {
     spdlog::set_pattern("%^%L%Y%m%d %T.%6f %t %s:%#] %v%$");
   }
 
+  /**
+   * @brief Constructor that creates a logger with file output and optional
+   * console output
+   *
+   * @param logpath Path to the log file
+   * @param rotating_file_size Maximum size of each log file before rotation (in
+   * bytes)
+   * @param rotating_file_num Maximum number of rotated log files to keep
+   * @param alsologtostderr Whether to also log to stderr (console)
+   */
   SpdLogger(const std::string &logpath, size_t rotating_file_size,
             size_t rotating_file_num, bool alsologtostderr) {
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -121,12 +171,15 @@ class SpdLogger {
     auto log_level = get_spdlog_level();
     spdlog::set_level(log_level);
     spdlog::set_pattern("%^%L%Y%m%d %T.%6f %t %s:%#] %v%$");
-    // LOG_INFO("SPDLOG Version: {}.{}.{}", SPDLOG_VER_MAJOR, SPDLOG_VER_MINOR,
-    //          SPDLOG_VER_PATCH);
   }
 
+  /**
+   * @brief Get the log level from environment variable
+   *
+   * @return The corresponding spdlog::level::level_enum value
+   */
   spdlog::level::level_enum get_spdlog_level() {
-    // 读取环境变量 SPDLOG_LEVEL
+    // Read environment variable HM_SPDLOG_LEVEL
     const char *env_level = std::getenv("HM_SPDLOG_LEVEL");
     if (!env_level) {
       return spdlog::level::info;  // default level
@@ -147,6 +200,11 @@ class SpdLogger {
   }
 };
 
+/**
+ * @brief Helper template class for automatic logger initialization
+ *
+ * @tparam T Template parameter to allow multiple instantiations if needed
+ */
 template <typename T = int>
 class AutoLoggerInitHelper {
  public:
@@ -158,4 +216,4 @@ SpdLogger AutoLoggerInitHelper<T>::logger;
 
 template class AutoLoggerInitHelper<int>;
 
-#endif  // _APIS_COMMON_HPP_LOGGING_H_
+#endif  // __APIS_COMMON_HPP_LOGGING_H__
