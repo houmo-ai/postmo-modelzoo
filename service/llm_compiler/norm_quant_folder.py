@@ -77,8 +77,8 @@ def _process_model_files_xh2(
         os.makedirs(model_res_dir, exist_ok=True)
         print(f"已创建目标文件夹结构: {model_res_dir}")
 
-        if model_name == "qwen3-vl" and model_type == "vision":
-            model_type = "visual"
+        # if model_name == "qwen3-vl" and model_type == "vision":
+        #     model_type = "visual"
 
         # 2. 处理 hmquant_*_with_act.onnx
         if model_type == "encoder":
@@ -350,6 +350,7 @@ if __name__ == "__main__":
         if (
             os.path.exists(f"{quant_dir}/decode")
             or os.path.exists(f"{quant_dir}/decoder")
+            or os.path.exists(f"{quant_dir}/golden/decode")
         ) and not _process_model_files(
             backend, quant_dir, result_dir, model_name, "decode"
         ):

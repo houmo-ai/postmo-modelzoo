@@ -152,9 +152,9 @@ def parse_args():
     parser.add_argument(
         "--flash_attention",
         type=int,
-        default=0,
-        choices=[0, 1, 2, 3],
-        help='flash attention optimization, default is 0',
+        default=-1,
+        choices=[-1, 0, 1, 2, 3],
+        help='flash attention optimization',
     )
     parser.add_argument(
         "--strip",
@@ -524,7 +524,9 @@ if __name__ == "__main__":
             compile_cmd += f"-b {batch} "
         if core_num > 0:
             compile_cmd += f"-cn {core_num} "
-        compile_cmd += f"-j {j} --flash_attention {flash_attention} --strip {strip} -r {container_compile_res} -log {container_log_file}"
+        if flash_attention >= 0:
+            compile_cmd += f"--flash_attention {flash_attention} "
+        compile_cmd += f"-j {j} --strip {strip} -r {container_compile_res} -log {container_log_file}"
         commands.append(
             f"cd {container_home}/imodelzoo/service/llm_compiler && {compile_cmd}"
         )
