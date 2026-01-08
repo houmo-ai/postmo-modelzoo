@@ -1,8 +1,26 @@
+# Copyright 2025 HOUMO AI
+#
+# File: setup.py
+# Description:
+#   Setup script for the hmatc package.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import sys
 import subprocess
-import pybind11
-import shutil  # ← 新增
+import shutil
 import pybind11
 from datetime import datetime
 from setuptools import setup, find_packages, Extension
@@ -24,14 +42,33 @@ if HOUMO_TARGET not in ["xh1", "xh2"]:
 
 
 def get_version():
+    """
+    Get package version from environment variable.
+
+    Returns:
+        str: Version string from HOUMO_VERSION environment variable,
+             defaults to "0.0.0.dev" if not set.
+    """
     return os.environ.get("HOUMO_VERSION", "0.0.0.dev")
 
 
 def get_build_time():
+    """
+    Get current build time in formatted string.
+
+    Returns:
+        str: Current timestamp in format "YYYY-MM-DD HH:MM:SS".
+    """
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def get_git_commit():
+    """
+    Get the short git commit hash for the current repository.
+
+    Returns:
+        str: Short git commit hash (7 characters) or "unknown" if git command fails.
+    """
     try:
         commit = (
             subprocess.check_output(
@@ -40,7 +77,7 @@ def get_git_commit():
             .decode("utf-8")
             .strip()
         )
-        return commit[:7]  # 取短 Commit 号
+        return commit[:7]
     except Exception:
         return "unknown"
 
@@ -49,7 +86,7 @@ commit = get_git_commit()
 with open(os.path.join("hmatc", "_version.py"), "w") as f:
     f.write(f"__version__ = '{get_version()}'\n")
     f.write(f"__commit__ = '{commit}'\n")
-    f.write(f"__build_time__ = '{get_build_time()}'\n")  # 新增时间字段
+    f.write(f"__build_time__ = '{get_build_time()}'\n")
 
 if sys.platform == "win32":
     extra_compile_args = ["/std:c++17", "/O2", "/w"]
@@ -91,10 +128,21 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 class BuildExtWithDLL(build_ext):
     """
-    在 Windows 平台构建结束后，将 TCIM_RUNTIME_PATH/bin/*.dll 复制到 pyd 同目录
+    Custom build extension class that handles Windows-specific deployment.
+
+    On Windows platforms, this class copies required DLL files from the
+    TCIM runtime directory to the same location as the compiled Python extension
+    after the build process completes.
     """
 
     def run(self):
+        """
+        Execute the build process and handle Windows DLL copying.
+
+        This method first calls the parent run() method to perform standard
+        build operations, then copies DLL files on Windows platforms to ensure
+        proper runtime dependencies are available.
+        """
         super().run()
 
         if sys.platform != "win32":
@@ -139,7 +187,7 @@ setup(
         "Operating System :: OS Independent",
     ],
     cmdclass={
-        "build_ext": BuildExtWithDLL,  # ← 注册
+        "build_ext": BuildExtWithDLL,
     },
     python_requires=">=3.8",
     install_requires=requirements,
