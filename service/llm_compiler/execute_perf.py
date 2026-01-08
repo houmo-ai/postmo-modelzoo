@@ -1,3 +1,26 @@
+# Copyright 2025 HOUMO AI
+#
+# File: execute_perf.py
+# Description:
+#   Execute LLM model performance testing and analysis.
+#
+#   This script processes performance test results from LLM models and generates Excel reports
+#   with detailed performance metrics.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import shutil
 import glob
@@ -25,7 +48,8 @@ MEM_END_LINE_STR = "************************************"
 MEM_USED_COLS = "device_mem_used(MB)"
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments for performance testing."""
     parser = argparse.ArgumentParser(description="Perf LLMs")
     parser.add_argument(
         "--perf_cfg",
@@ -45,15 +69,34 @@ def parse_args():
 
 
 def _find_first_matched_keyword(line: str, keywords: Iterable) -> Optional[str]:
+    """
+    Find the first keyword that matches in the given line.
+
+    Args:
+        line (str): The input line to search for keywords
+        keywords (Iterable): Collection of keywords to search for
+
+    Returns:
+        Optional[str]: The first matched keyword, or None if no match is found
+    """
     if not keywords or not line:
         return None
     for keyword in keywords:
         if keyword in line:
-            return keyword  # 找到第一个匹配项立即返回
+            return keyword  # Return immediately when first match is found
     return None
 
 
 def _prepare_test_folder(model_dir: str) -> str:
+    """
+    Prepare a test folder with a timestamp for performance testing.
+
+    Args:
+        model_dir (str): Source directory containing the model
+
+    Returns:
+        str: Path to the prepared test folder
+    """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     test_folder = f"{model_dir}_compiler_{timestamp}"
     if os.path.exists(test_folder):
@@ -68,10 +111,20 @@ def _prepare_test_folder(model_dir: str) -> str:
 def _write_to_xlsx(
     perf_metric, cfg_path: str, sheet_name: str, new_cols: list = []
 ) -> None:
+    """
+    Write performance metrics to an Excel file.
+    Creates or updates an Excel file with performance data organized in a specified sheet.
+
+    Args:
+        perf_metric: Performance metrics data to write
+        cfg_path (str): Configuration file path (used to derive Excel file name)
+        sheet_name (str): Name of the sheet in the Excel file
+        new_cols (list): Column names for the data
+    """
     perf_df = pd.DataFrame(perf_metric)
     perf_df.columns = new_cols
     perf_xlsx_path = cfg_path.replace(JSON_SUFFIX, ".xlsx")
-    logger.info(f'perf_xlsx_path: {perf_xlsx_path}')
+    logger.info(f"perf_xlsx_path: {perf_xlsx_path}")
     excel_mode = "a"
     if not os.path.exists(perf_xlsx_path):
         excel_mode = "w"
@@ -80,96 +133,110 @@ def _write_to_xlsx(
 
 
 def _get_value_after_colon(line: str, split_space: bool = False) -> str:
-    """提取行中最后一个冒号后的内容并去空格"""
+    """
+    Extract content after the last colon in a line and strip whitespace.
+
+    Args:
+        line (str): Input line to process
+        split_space (bool): Whether to split the value by space and take the first part
+
+    Returns:
+        str: Extracted value after the last colon
+    """
     val = line.strip().rsplit(":", 1)[-1].strip()
     if split_space:
         val = val.split(" ", 1)[0]
     return val
 
 
-######################################################################
-# -------------------------- 条件检查函数 -------------------------- #
-######################################################################
+#######################################################################
+# -------------------- Condition Check Functions -------------------- #
+#######################################################################
 
 
 def _check_start_task(line: str, state: Dict) -> bool:
-    """检查是否是任务开始行"""
+    """Check if the line indicates the start of a task."""
     return START_TASK_STR in line
 
 
 def _check_input_token(line: str, state: Dict) -> bool:
-    """检查是否是输入token长度行"""
+    """Check if the line contains input token length information."""
     return "input token len" in line
 
 
 def _check_stop_token(line: str, state: Dict) -> bool:
-    """检查是否是输出token长度行"""
+    """Check if the line contains output token length information."""
     return "stop token len" in line
 
 
 def _check_loop(line: str, state: Dict) -> bool:
-    """检查是否是循环次数行"""
+    """Check if the line contains loop count information."""
     return "loop :" in line or "  loops:" in line
 
 
 def _check_end_task(line: str, state: Dict) -> bool:
-    """检查是否是任务结束行"""
+    """Check if the line indicates the end of a task."""
     return END_TASK_STR in line
 
 
 def _check_llm_perf_avg(line: str, state: Dict) -> bool:
-    """检查是否是LLM性能平均值开始行"""
+    """Check if the line indicates the start of LLM performance average information."""
     return "LLM Perf Avarage Information" in line
 
 
 def _check_perf_flag(line: str, state: Dict) -> bool:
-    """检查是否是性能指标行(且perf_flag为True)"""
+    """Check if the line contains performance metrics (when perf_flag is True)."""
     return state["perf_flag"] is True
 
 
 def _check_mem_start(line: str, state: Dict) -> bool:
-    """检查是否是内存监控开始行"""
+    """Check if the line indicates the start of memory monitoring."""
     return MEM_START_STR in line
 
 
 def _check_mem_used(line: str, state: Dict) -> bool:
-    """检查是否是内存使用量行(且mem_flag为True)"""
+    """Check if the line contains memory usage information (when mem_flag is True)."""
     return state["mem_flag"] is True and MEM_USED_STR in line
 
 
 def _check_mem_end(line: str, state: Dict) -> bool:
-    """检查是否是内存监控结束行(且mem_flag为True)"""
+    """Check if the line indicates the end of memory monitoring (when mem_flag is True)."""
     return MEM_END_LINE_STR in line and state["mem_flag"] is True
 
 
 def _check_samples(line: str, state: Dict) -> bool:
-    """检查是否为samples数量行"""
+    """Check if the line contains sample count information."""
     return "  samples:" in line
 
 
 def _check_warmup(line: str, state: Dict) -> bool:
+    """Check if the line contains warmup information."""
     return "  warmup:" in line
 
 
 def _check_device_num(line: str, state: Dict) -> bool:
+    """Check if the line contains device number information."""
     return "  device_num:" in line
 
 
 def _check_latency(line: str, state: Dict) -> bool:
+    """Check if the line contains latency information."""
     return "[latency] " in line
 
 
 def _check_throughput_qps(line: str, state: Dict) -> bool:
+    """Check if the line contains throughput QPS information."""
     return "[Throughput] qps" in line
 
 
 def _check_total_cost(line: str, state: Dict) -> bool:
+    """Check if the line contains total cost information (excluding TTS)."""
     return "Total Cost " in line and "TTS" not in line
 
 
-######################################################################
-# -------------------------- 业务处理函数 -------------------------- #
-######################################################################
+#######################################################################
+# ------------------ Business Processing Functions ------------------ #
+#######################################################################
 
 
 def _handle_mem_start(
@@ -179,7 +246,7 @@ def _handle_mem_start(
     keywords_dict: Dict = {},
     perf_key: str = "mem_flag",
 ) -> None:
-    """(common) 处理内存监控开始行:置位mem_flag"""
+    """(common) Handle memory monitoring start line: set mem_flag."""
     state["mem_flag"] = True
 
 
@@ -190,7 +257,7 @@ def _handle_mem_end(
     keywords_dict: Dict = {},
     perf_key: str = "mem_flag",
 ) -> None:
-    """(common) 处理内存监控结束行:重置mem_flag"""
+    """(common) Handle memory monitoring end line: reset mem_flag."""
     state["mem_flag"] = False
 
 
@@ -201,7 +268,7 @@ def _handle_mem_used(
     keywords_dict: Dict = {},
     perf_key: str = "device_mem_used",
 ) -> None:
-    """(common) 处理内存使用量行:更新设备内存使用量"""
+    """(common) Handle memory usage line: update device memory usage."""
     mem_used_str = _get_value_after_colon(line)
     if perf_metric[perf_key][-1] == "NA":
         perf_metric[perf_key][-1] = mem_used_str
@@ -212,7 +279,7 @@ def _handle_mem_used(
 def _handle_start_task(
     line: str, perf_metric: Dict, state: Dict, keywords_dict: Dict, perf_key: str
 ) -> None:
-    """(common) 处理任务开始行:初始化指标、提取模型名"""
+    """(common) Handle task start line: initialize metrics, extract model name."""
     for key in state:
         state[key] = False
     for key in perf_metric.keys():
@@ -228,7 +295,7 @@ def _handle_end_task(
     keywords_dict: Dict = {},
     perf_key: str = "",
 ) -> None:
-    """(common) 处理任务结束行:重置flag"""
+    """(common) Handle task end line: reset flags."""
     state["perf_flag"] = False
     state["mem_flag"] = False
 
@@ -240,21 +307,21 @@ def _handle_perf_start_line(
     keywords_dict: Dict = {},
     perf_key: str = "",
 ) -> None:
-    """(common) 处理性能开始行:置位perf_flag"""
+    """(common) Handle performance start line: set perf_flag."""
     state["perf_flag"] = True
 
 
 def _handle_token_loop(
     line: str, perf_metric: Dict, state: Dict, keywords_dict: Dict, perf_key: str
 ) -> None:
-    """(llm_perf) 处理输入/输出token长度&循环次数"""
+    """(llm_perf) Handle input/output token length and loop count."""
     perf_metric[perf_key][-1] = _get_value_after_colon(line)
 
 
 def _handle_perf_flag(
     line: str, perf_metric: Dict, state: Dict, keywords_dict: Dict, perf_key: str
 ) -> None:
-    """(llm_perf) 处理性能指标行:提取匹配的指标值"""
+    """(llm_perf) Handle performance metric line: extract matching metric values."""
     keyword = _find_first_matched_keyword(line, keywords_dict.keys())
     if keyword is not None:
         perf_metric[keywords_dict[keyword]][-1] = (
@@ -263,7 +330,7 @@ def _handle_perf_flag(
 
 
 def _parse_latency_line(line: str, perf_metric: dict) -> None:
-    """(tcim_perf) 解析latency行, 更新perf_metric"""
+    """(tcim_perf) Parse latency line, update perf_metric."""
 
     latency_type_map = {
         " Inference": "inference",
@@ -272,7 +339,7 @@ def _parse_latency_line(line: str, perf_metric: dict) -> None:
         " End2End": "e2e",
     }
 
-    # 匹配latency类型
+    # Match latency type
     key_str = ""
     for pattern, key in latency_type_map.items():
         if pattern in line:
@@ -281,28 +348,27 @@ def _parse_latency_line(line: str, perf_metric: dict) -> None:
     if not key_str:
         return
 
-    # 解析latency值(avg/max/min)
+    # Parse latency values (avg/max/min)
     perf_vals = line.strip().split(",")
-    # 提取值并去除末尾3个字符(如单位)
     avg_val = perf_vals[0].rsplit(":", 1)[-1].strip()[:-3]
     max_val = perf_vals[1].rsplit(":", 1)[-1].strip()[:-3]
     min_val = perf_vals[2].rsplit(":", 1)[-1].strip()[:-3]
 
-    # 更新指标
+    # Update metrics
     perf_metric[f"{key_str}_avg"][-1] = avg_val
     perf_metric[f"{key_str}_max"][-1] = max_val
     perf_metric[f"{key_str}_min"][-1] = min_val
 
 
 def _handle_simple_metric(line: str, perf_metric: dict, metric_key: str) -> None:
-    """(tcim_perf) 处理samples/loops/warmup/device_num等简单指标"""
+    """(tcim_perf) Handle simple metrics like samples/loops/warmup/device_num."""
     perf_metric[metric_key][-1] = _get_value_after_colon(line)
 
 
 def _handle_perf_flag_logic(
     line: str, perf_metric: dict, keywords_dict: dict, keywords_dict_2: dict
 ) -> None:
-    """(minicpmo_perf) 处理perf_flag=True时的所有逻辑"""
+    """(minicpmo_perf) Handle all logic when perf_flag=True."""
     if "Input Tokens:" in line:
         val = line.strip().rsplit(",", 1)[0].strip().rsplit(":", 1)[-1].strip()
         perf_metric["input_tokens"][-1] = val
@@ -320,6 +386,17 @@ def _handle_perf_flag_logic(
 
 
 def _generate_llm_perf_table(cfg_path, outputs):
+    """
+    Generate LLM performance table from outputs.
+
+    Parses performance test outputs and creates an Excel table with metrics
+    including prefill time, decode time, vision time, speed measurements,
+    latency, and token processing rates.
+
+    Args:
+        cfg_path: Path to the configuration file
+        outputs: List of output lines from the performance test
+    """
     perf_metric = {
         "model_name": [],
         "input_token": [],
@@ -396,6 +473,16 @@ def _generate_llm_perf_table(cfg_path, outputs):
 
 
 def _generate_tcim_perf_table(cfg_path, outputs):
+    """
+    Generate TCIM performance table from outputs.
+
+    Parses TCIM performance test outputs and creates an Excel table with metrics
+    including inference latency, input/output latency, end-to-end latency, and QPS.
+
+    Args:
+        cfg_path: Path to the configuration file
+        outputs: List of output lines from the performance test
+    """
     perf_metric = {
         "model_name": [],
         "samples": [],
@@ -420,7 +507,7 @@ def _generate_tcim_perf_table(cfg_path, outputs):
 
     state = {"mem_flag": False}
     processors = [
-        # (条件检查函数, 处理函数, 处理函数的额外参数)
+        # (condition check function, handler function, extra args for handler)
         (_check_start_task, _handle_start_task, (perf_metric, state, {}, "model_name")),
         (_check_samples, _handle_simple_metric, (perf_metric, "samples")),
         (_check_loop, _handle_simple_metric, (perf_metric, "loops")),
@@ -488,7 +575,16 @@ def _generate_tcim_perf_table(cfg_path, outputs):
 
 
 def _generate_demo_perf_table(cfg_path, outputs):
+    """
+    Generate demo performance table from outputs.
 
+    Parses demo performance test outputs and creates an Excel table with metrics
+    for complex workflows including LLM, TTS, and multimodal components.
+
+    Args:
+        cfg_path: Path to the configuration file
+        outputs: List of output lines from the performance test
+    """
     perf_metric = {
         "model_name": [],
         "device_mem_used": [],
@@ -526,7 +622,7 @@ def _generate_demo_perf_table(cfg_path, outputs):
 
     state = {"perf_flag": False, "mem_flag": False}
     processors = [
-        # (条件检查函数, 处理函数, 处理函数的参数)
+        # (condition check function, handler function, args for handler)
         (_check_start_task, _handle_start_task, (perf_metric, state, {}, "model_name")),
         (
             _check_total_cost,
@@ -603,7 +699,16 @@ def _generate_demo_perf_table(cfg_path, outputs):
 def _generate_cfg_paths(
     base_cfg_path: str, suffix_map: Dict[str, str]
 ) -> Dict[str, str]:
-    """配置路径生成函数"""
+    """
+    Generate configuration file paths with suffixes.
+
+    Args:
+        base_cfg_path (str): Base configuration file path
+        suffix_map (Dict[str, str]): Mapping of names to suffixes
+
+    Returns:
+        Dict[str, str]: Dictionary mapping names to full configuration paths
+    """
     cfg_paths = {}
     for name, suffix in suffix_map.items():
         cfg_paths[name] = base_cfg_path.replace(JSON_SUFFIX, f"{suffix}{JSON_SUFFIX}")
@@ -611,7 +716,16 @@ def _generate_cfg_paths(
 
 
 def _load_config_file(cfg_path: str, default_data: Dict = None) -> Dict:
-    """配置文件加载函数"""
+    """
+    Load configuration file with fallback to default data.
+
+    Args:
+        cfg_path (str): Path to the configuration file
+        default_data (Dict): Default data to return if file doesn't exist or loading fails
+
+    Returns:
+        Dict: Loaded configuration data
+    """
     default_data = default_data or {"Streams": []}
     if not os.path.exists(cfg_path):
         return default_data
@@ -630,12 +744,16 @@ def _copy_file_or_dir(
     clean_dir: Optional[str] = None,
 ) -> bool:
     """
-    通用文件/文件夹复制函数
-    :param src: 源路径
-    :param dst: 目标路径
-    :param is_dir: 是否是文件夹
-    :param clean_dir: 复制失败时需要清理的目录
-    :return: 是否复制成功
+    Generic file/directory copy function.
+
+    Args:
+        src (str): Source path
+        dst (str): Destination path
+        is_dir (bool): Whether the source is a directory
+        clean_dir (Optional[str]): Directory to clean up if copy fails
+
+    Returns:
+        bool: Whether the copy operation was successful
     """
     try:
         if is_dir:
@@ -655,23 +773,25 @@ def _copy_file_or_dir(
 def _execute_perf_task(
     perf_dir: str,
     cfg_data: Dict,
-    cmd_builder: Callable[[Dict], Dict[str, List[str]]],
+    cmd_builder: Callable[[Dict, str], Dict[str, List[str]]],
     generate_table_func: Callable[[str, List[str]], None],
     base_cfg_path: str,
     log_file: str,
     task_name: str = "Perf",
 ) -> None:
     """
-    性能任务执行函数, 适用llm_perf&tcim_perf
-    :param perf_dir: 性能测试目录(如llm_perf_dir)
-    :param cfg_data: 配置数据(如llm_cfg_data)
-    :param cmd_builder: 命令构建函数(输入perf_md, 返回cmds字典)
-    :param generate_table_func: 生成表格的函数
-    :param base_cfg_path: 基础配置路径(llm_cfg_path)
-    :param log_file: 日志文件路径
-    :param task_name: 任务名称(用于日志)
+    Execute performance task, suitable for llm_perf & tcim_perf.
+
+    Args:
+        perf_dir (str): Performance test directory (e.g., llm_perf_dir)
+        cfg_data (Dict): Configuration data (e.g., llm_cfg_data)
+        cmd_builder (Callable): Command building function (takes perf_md, returns cmds dict)
+        generate_table_func (Callable): Function to generate tables
+        base_cfg_path (str): Base configuration path (e.g., llm_cfg_path)
+        log_file (str): Log file path
+        task_name (str): Task name for logging
     """
-    cmds = cmd_builder(cfg_data)
+    cmds = cmd_builder(cfg_data, log_file)
     if len(cmds) == 0:
         logger.info(f"[{task_name}] No commands to execute")
         return
@@ -691,21 +811,30 @@ def _execute_perf_task(
     generate_table_func(base_cfg_path, outputs_total)
 
 
-def _build_llm_cmds(cfg_data: Dict) -> Dict[str, List[str]]:
-    """构建llm_perf命令"""
+def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
+    """
+    Build LLM performance test commands from configuration data.
+
+    Args:
+        cfg_data (Dict): Configuration data containing performance test parameters
+
+    Returns:
+        Dict[str, List[str]]: Dictionary mapping model names to command lists
+    """
     os.chdir(f"{script_dir}/../../tools/llm_perf")
 
     cmds = {}
     for perf_md in cfg_data["Streams"]:
+        # , "--LazyMode"
         tmp_cmd = ["./llm_perf"]
-        # 过滤参数
+        # Filter parameters
         for param, param_val in perf_md.items():
             if param in ["ModelName"]:
                 continue
             tmp_cmd += [f"--{param}", str(param_val)]
         cmds[perf_md["ModelName"]] = tmp_cmd
 
-        # 嵌入文件转换逻辑
+        # Embed file conversion logic
         embed_bin = perf_md["embedding"]
         embed_pt = embed_bin.replace(".bin", ".pt")
         if os.path.exists(embed_bin):
@@ -713,17 +842,25 @@ def _build_llm_cmds(cfg_data: Dict) -> Dict[str, List[str]]:
         model_type = "llm" if "visual" not in perf_md else "vllm"
         execute_cmd(
             ["python3", "convert_embed.py", "--path", embed_pt, "--type", model_type],
-            args.log_file,  # args需在主函数中定义
+            log_file,
         )
     return cmds
 
 
 def _build_tcim_cmds(cfg_data: Dict) -> Dict[str, List[str]]:
-    """构建tcim_perf命令"""
+    """
+    Build TCIM performance test commands from configuration data.
+
+    Args:
+        cfg_data (Dict): Configuration data containing performance test parameters
+
+    Returns:
+        Dict[str, List[str]]: Dictionary mapping model names to command lists
+    """
     cmds = {}
     for perf_md in cfg_data["Streams"]:
         tmp_cmd = ["./tcim_perf"]
-        # 过滤参数
+        # Filter parameters
         for param, param_val in perf_md.items():
             if param in ["hmm_list", "ModelName"] or (
                 isinstance(param_val, int) and param_val <= 0
@@ -731,7 +868,7 @@ def _build_tcim_cmds(cfg_data: Dict) -> Dict[str, List[str]]:
                 continue
             tmp_cmd += [f"--{param}", str(param_val)]
 
-        # 处理hmm_list
+        # Process hmm_list
         for hmm_path in perf_md["hmm_list"]:
             ori_backup = f"{hmm_path}.ori"
             strip_backup = f"{hmm_path}.strip"
@@ -742,9 +879,7 @@ def _build_tcim_cmds(cfg_data: Dict) -> Dict[str, List[str]]:
 
             hmm_name = hmm_path.rsplit("/", 1)[-1]
             tmp_cmd_final = tmp_cmd + ["--model", hmm_path]
-            key_name = (
-                f"{perf_md['ModelName']}_{hmm_name}"  # 修复原代码model_name未定义问题
-            )
+            key_name = f"{perf_md['ModelName']}_{hmm_name}"
             cmds[key_name] = tmp_cmd_final
     return cmds
 
@@ -791,7 +926,7 @@ if __name__ == "__main__":
     os.environ["HDPL_PLATFORM"] = "ASIC"
     HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 
-    # ==========  执行 LLM Perf ==========
+    # ==========  Execute LLM Perf ==========
     _execute_perf_task(
         perf_dir=PERF_TASK_CONFIG["llm"]["dir"],
         cfg_data=llm_cfg_data,
@@ -801,7 +936,7 @@ if __name__ == "__main__":
         log_file=args.log_file,
         task_name=PERF_TASK_CONFIG["llm"]["task_name"],
     )
-    # ==========  执行 Tcim Perf ==========
+    # ==========  Execute Tcim Perf ==========
     _execute_perf_task(
         perf_dir=PERF_TASK_CONFIG["tcim"]["dir"],
         cfg_data=tcim_cfg_data,
@@ -811,27 +946,27 @@ if __name__ == "__main__":
         log_file=args.log_file,
         task_name=PERF_TASK_CONFIG["tcim"]["task_name"],
     )
-    # ==========  执行 Demo Perf ==========
+    # ==========  Execute Demo Perf ==========
     for perf_md in demo_cfg_data["Streams"]:
-        hmm_dir = perf_md['hmm_dir']
+        hmm_dir = perf_md["hmm_dir"]
         hmm_file_paths = glob.glob(os.path.join(hmm_dir, "*.hmm"))
         source_hmquant = os.path.join(hmm_dir, "hmquant")
 
-        # 检查文件是否存在
+        # Check if files exist
         if not hmm_file_paths or not os.path.exists(source_hmquant):
             logger.info(
                 f"Warning: Not found hmm files in {hmm_dir} \n or Not found hmquant folder {source_hmquant}."
             )
             continue
 
-        # 准备测试目录
+        # Prepare test directory
         model_dir = os.path.abspath(f"{script_dir}/../../{perf_md['model_dir']}")
         test_dir = _prepare_test_folder(model_dir)
         target_dir = os.path.join(test_dir, "output", HOUMO_TARGET)
         os.makedirs(target_dir, exist_ok=True)
         logger.info("Current dir: %s", os.getcwd())
 
-        # 复制hmm文件
+        # Copy hmm files
         copy_success = True
         for hmm_file in hmm_file_paths:
             file_name = os.path.basename(hmm_file)
@@ -844,7 +979,7 @@ if __name__ == "__main__":
             os.chdir(script_dir)
             continue
 
-        # 复制hmquant文件夹
+        # Copy hmquant folder
         target_hmquant = os.path.join(target_dir, "hmquant")
         if not _copy_file_or_dir(
             source_hmquant, target_hmquant, is_dir=True, clean_dir=test_dir
@@ -852,19 +987,19 @@ if __name__ == "__main__":
             os.chdir(script_dir)
             continue
 
-        # 执行demo命令
+        # Execute demo command
         model_name = perf_md["ModelName"]
         demo_cmd = ["bash", "test.sh", "--step", "demo"]
         logger.info(f"[Demo Perf] execute cmd: {demo_cmd}, folder: {os.getcwd()}")
         ret, outputs = execute_cmd(demo_cmd, args.log_file, get_outputs=True)
 
-        # 生成demo性能表格
+        # Generate demo performance table
         if ret:
             outputs_total = [f"****** {START_TASK_STR}, {MODEL_NAME_STR} {model_name}"]
             outputs_total += outputs
             outputs_total += [f"****** {END_TASK_STR} ******"]
             _generate_demo_perf_table(cfg_paths["llm"], outputs_total)
 
-        # 清理目录
+        # Cleanup directory
         os.chdir(script_dir)
         shutil.rmtree(test_dir, ignore_errors=True)

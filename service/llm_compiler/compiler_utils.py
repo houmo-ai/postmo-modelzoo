@@ -1,3 +1,25 @@
+# Copyright 2025 HOUMO AI
+#
+# File: compiler_utils.py
+# Description:
+#   Compiler utilities for LLM model compilation and execution.
+#   This module provides utility functions and classes for compiling LLM models,
+#   managing Docker containers for execution, logging, and file operations.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import logging
 import time
@@ -6,12 +28,25 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 import threading
 import sys
+import docker
+from docker.errors import NotFound
 
 
 def setup_logging(
     log_dir: str = None, log_name: str = "compile_llms", log_file: str = ""
 ):
-    logger_handlers = [logging.StreamHandler()]  # 输出到控制台
+    """
+    Set up logging configuration for the application.
+
+    Args:
+        log_dir: Directory to store log files
+        log_name: Base name for the log file
+        log_file: Specific log file path
+
+    Returns:
+        tuple: (log_file_path, timestamp)
+    """
+    logger_handlers = [logging.StreamHandler()]  # Output to console
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     if log_dir is not None:
         os.makedirs(log_dir, exist_ok=True)
@@ -20,13 +55,13 @@ def setup_logging(
     elif log_file:
         logger_handlers.append(logging.FileHandler(log_file))
 
-    # 日志格式：时间 - 级别 - 模块.函数 - 消息
-    log_format = '%(asctime)s - %(levelname)s - %(module)s.%(funcName)s - %(message)s'
+    # Log format: time - level - module.function - message
+    log_format = "%(asctime)s - %(levelname)s - %(module)s.%(funcName)s - %(message)s"
 
-    # 配置日志级别（DEBUG < INFO < WARNING < ERROR < CRITICAL）
+    # Configure log level (DEBUG < INFO < WARNING < ERROR < CRITICAL)
     logging.basicConfig(
-        level=logging.INFO,  # 基础日志级别
-        format=log_format,  # 日志格式
+        level=logging.INFO,  # Basic log level
+        format=log_format,  # Log format
         handlers=logger_handlers,
     )
 
@@ -43,26 +78,28 @@ class DockerExecutor:
         keep_container: bool = False,
     ):
         """
-        Init Docker Executor
+        Initialize a DockerExecutor instance.
 
-        :param image: the name of docker image
-        :param container_name: the name of container
-        :param host_log_path: the path of log file on host
-        :param container_workdir: the work directory in container
-        :param keep_container: do not remove the container
+        Args:
+            image (str): The Docker image to use for the container.
+            container_name (str): The name of the Docker container.
+            host_log_path (str, optional): The path to the host log file. Defaults to "".
+            container_workdir (str, optional): The working directory inside the container. Defaults to "/hmdd".
+            keep_container (bool, optional): Whether to keep the container after execution. Defaults to False
+
+        Returns:
+            DockerExec: The DockerExec object.
         """
-        import docker
-        from docker.errors import NotFound
 
         self.image = image
         self.container_name = container_name
         self.container_workdir = container_workdir
         self.keep_container = keep_container
 
-        # init docker client
+        # Initialize docker client
         try:
             self.client = docker.from_env()
-            # check docker connection
+            #  Check docker connection
             self.client.ping()
         except Exception as e:
             raise Exception(f"Cannot connect to docker engine: {str(e)}")
@@ -76,6 +113,9 @@ class DockerExecutor:
         self.logger.setLevel(logging.INFO)
 
     def pull_image(self) -> None:
+        """
+        Pull the Docker image from the registry.
+        """
         self.logger.info(f"Pulling docker image: {self.image}")
         try:
             self.client.images.pull(self.image)
@@ -83,58 +123,62 @@ class DockerExecutor:
         except Exception as e:
             raise Exception(f"Failed to pull image, please check image name: {str(e)}")
 
-    # 添加一个辅助方法用于比较volumes配置
     def _compare_volumes(self, existing_volumes: list, requested_volumes: dict) -> bool:
-        """比较现有容器的volumes配置与请求的volumes配置是否一致"""
-        # 将请求的volumes转换为与Docker API返回的格式一致
+        """
+        Compare the volumes configuration of the existing container with the requested volumes configuration.
+
+        Args:
+            existing_volumes: List of existing volumes in the container
+            requested_volumes: Dictionary of requested volumes to be mounted
+
+        Returns:
+            bool: True if volumes match, False otherwise
+        """
+        # Convert requested volumes to the same format as Docker API returns
         requested_mounts = []
         for host_path, container_path in requested_volumes.items():
             if isinstance(container_path, dict):
-                # 处理 {container_path: {'bind': target_path, 'mode': 'rw'}} 格式
-                target_path = container_path.get('bind')
-                mode = container_path.get('mode', 'rw')
+                # Handle {container_path: {'bind': target_path, 'mode': 'rw'}} format
+                target_path = container_path.get("bind")
+                mode = container_path.get("mode", "rw")
             else:
-                # 处理 {host_path: container_path} 格式
+                # Handle {host_path: container_path} format
                 target_path = container_path
-                mode = 'rw'
+                mode = "rw"
 
             requested_mounts.append(
                 {
-                    'Source': (
+                    "Source": (
                         os.path.abspath(host_path)
-                        if not host_path.startswith(('/', '.'))
+                        if not host_path.startswith(("/", "."))
                         else host_path
                     ),
-                    'Destination': target_path,
-                    'Mode': mode,
+                    "Destination": target_path,
+                    "Mode": mode,
                 }
             )
 
-        # 比较现有的volumes与请求的volumes
-        # 注意：这里简化了比较逻辑，实际应用中可能需要更复杂的比较
-        # 特别是处理路径规范化和权限模式比较
-
-        # 创建一个现有volumes的字典以便查找
+        # Compare existing volumes with requested volumes
+        # Create a dictionary of existing volumes for lookup
         existing_mounts_dict = {
-            mount['Destination']: {'Source': mount['Source'], 'Mode': mount['Mode']}
+            mount["Destination"]: {"Source": mount["Source"], "Mode": mount["Mode"]}
             for mount in existing_volumes
         }
 
-        # 检查请求的每个volume是否在现有volumes中存在且配置一致
+        # Check if each requested volume exists in existing volumes with the same configuration
         for mount in requested_mounts:
-            dest = mount['Destination']
+            dest = mount["Destination"]
             if dest not in existing_mounts_dict:
                 return False
 
             existing = existing_mounts_dict[dest]
             if (
-                existing['Source'] != mount['Source']
-                or existing['Mode'] != mount['Mode']
+                existing["Source"] != mount["Source"]
+                or existing["Mode"] != mount["Mode"]
             ):
                 return False
 
-        # 检查现有volumes是否包含额外的volumes
-        # 如果严格要求一致，可以启用下面的检查
+        # Check if existing volumes contain additional volumes
         # if len(existing_mounts_dict) != len(requested_mounts):
         #     return False
 
@@ -147,13 +191,23 @@ class DockerExecutor:
         network_mode: str = "host",
         task_id=None,
     ) -> None:
+        """
+        Start the Docker container with the specified configuration.
+
+        Args:
+            volumes: Volume mappings for the container
+            environment: Environment variables for the container
+            network_mode: Network mode for the container
+            task_id: Task ID for container reuse logic
+        """
         import getpass
 
         self.logger.info(f"Start container: {self.container_name}")
 
+        # Read-only mode
         default_volumes = {
-            "/etc/timezone": {"bind": "/etc/timezone", "mode": "ro"},  # 只读模式
-            "/etc/localtime": {"bind": "/etc/localtime", "mode": "ro"},  # 只读模式
+            "/etc/timezone": {"bind": "/etc/timezone", "mode": "ro"},
+            "/etc/localtime": {"bind": "/etc/localtime", "mode": "ro"},
         }
         if volumes:
             default_volumes.update(volumes)
@@ -163,49 +217,47 @@ class DockerExecutor:
         if environment:
             default_env.update(environment)
             device_requests = [
-                # -1表示所有可用GPU
+                # -1 means all available GPUs
                 docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])
             ]
 
         try:
             if task_id:
-                # 尝试获取同名容器（无论是否运行中）
+                # Try to get the container with the same name (whether running or not)
                 self.container = self.client.containers.get(self.container_name)
-
-                # 获取现有容器的volumes配置
-                existing_volumes = self.container.attrs.get('Mounts', [])
-
-                # 比较现有volumes与请求的volumes是否一致
+                # Get the volumes configuration of the existing container
+                existing_volumes = self.container.attrs.get("Mounts", [])
+                # Compare if existing volumes match the requested volumes
                 volumes_match = self._compare_volumes(existing_volumes, default_volumes)
 
                 if not volumes_match:
-                    # volumes不匹配，需要重新创建容器
+                    # Volumes don't match, need to recreate the container
                     self.logger.info(
-                        f"容器 {self.container_name} 的volumes配置已更新，正在重新创建容器"
+                        f"Container {self.container_name} volumes configuration has been updated, recreating container"
                     )
                     self.container.remove(force=True)
-                    self.container = None  # 重置容器引用
+                    self.container = None  # Reset container reference
                 elif self.container.status != "running":
                     # volumes匹配且容器未运行，则启动容器
                     self.container.start()
                     self.logger.info(f"容器 {self.container_name} 已启动")
                 else:
-                    # volumes匹配且容器已在运行中
+                    # Volumes match and container is not running, start the container
                     self.logger.info(
-                        f"容器 {self.container_name} 已在运行中且volumes配置匹配"
+                        f"Container {self.container_name} has been started"
                     )
             else:
                 self.container = None
         except NotFound:
-            # 容器不存在，继续创建流程
+            # Container doesn't exist, continue with creation process
             pass
 
-        # 如果容器为None（不存在或已被删除），则创建新容器
+        # If container is None (doesn't exist or has been deleted), create a new container
         if self.container is None:
             try:
                 host_uid = os.getuid()  # 4017
                 host_gid = os.getgid()  # 4017
-                host_username = getpass.getuser()  # wanyu.li
+                host_username = getpass.getuser()
                 self.logger.info(
                     f"宿主用户信息: username={host_username}, uid={host_uid}, gid={host_gid}"
                 )
@@ -217,13 +269,13 @@ class DockerExecutor:
                     volumes=default_volumes,
                     environment=default_env,
                     working_dir=self.container_workdir,
-                    tty=True,  # 分配伪终端，确保命令正确执行
-                    stdin_open=True,  # 保持标准输入打开
+                    tty=True,  # Allocate pseudo-TTY to ensure commands execute properly
+                    stdin_open=True,  # Keep stdin open
                     network_mode=network_mode,
                     pid_mode="host",
-                    command="/bin/bash",  # 启动bash保持容器运行
-                    shm_size="64g",  # 配置共享内存大小
-                    # 配置GPU映射，对应--gpus all参数
+                    command="/bin/bash",  # Start bash to keep container running
+                    shm_size="64g",  # Configure shared memory size
+                    # Configure GPU mapping, corresponding to --gpus all parameter
                     device_requests=device_requests,
                     user=f"{host_uid}:{host_gid}",
                     detach=True,
@@ -233,32 +285,32 @@ class DockerExecutor:
                     f"Successfully started container {self.container_name}."
                 )
 
-                # 等待容器启动
+                # Wait for container to start
                 time.sleep(2)
 
-                # 执行第一个命令：创建container_workdir目录并修改所有权
+                # Execute first command: create container_workdir directory and modify ownership
                 exec_cmd1 = f"mkdir -p {self.container_workdir} && chown {host_uid}:{host_gid} {self.container_workdir} && mkdir /.cache && chmod 777 -R /.cache"
                 exec_id1 = self.client.api.exec_create(
                     self.container.id,
                     cmd=["bash", "-c", exec_cmd1],
-                    user="0:0",  # 以root用户执行
+                    user="0:0",  # Execute as root user
                 )
                 ret = self.client.api.exec_start(exec_id1["Id"])
                 self.logger.info(
                     f"The {self.container_workdir} directory has been created and its ownership has been modified."
                 )
 
-                # 执行第二个命令：创建用户并赋予sudo权限
+                # Execute second command: create user and grant sudo privileges
                 exec_cmd2 = (
                     f"groupadd -g {host_gid} {host_username} && "
                     f"useradd -m -d {self.container_workdir}/{host_username} -u {host_uid} -g {host_username} {host_username} && "
                     f"usermod -a -G sudo {host_username} && "
-                    f"echo \"{host_username} ALL=(ALL) NOPASSWD: ALL\" >> /etc/sudoers"
+                    f'echo "{host_username} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers'
                 )
                 exec_id2 = self.client.api.exec_create(
                     self.container.id,
                     cmd=["bash", "-c", exec_cmd2],
-                    user="0:0",  # 以root用户执行
+                    user="0:0",  # Execute as root user
                 )
                 ret = self.client.api.exec_start(exec_id2["Id"])
                 self.logger.info(
@@ -266,7 +318,7 @@ class DockerExecutor:
                 )
 
                 if environment:
-                    # verify gpu configs
+                    # Verify GPU configurations
                     self._verify_configuration()
 
             except Exception as e:
@@ -281,7 +333,9 @@ class DockerExecutor:
                 raise
 
     def _verify_configuration(self) -> None:
-        """Verify whether the shared memory and GPU configuration is effective"""
+        """
+        Verify whether the shared memory and GPU configuration is effective
+        """
         try:
             self.logger.info("Verify GPU configuration...")
             gpu_exec = self.client.api.exec_create(
@@ -296,7 +350,6 @@ class DockerExecutor:
             self.logger.info(f"GPU Info:\n{gpu_output}")
 
             self.logger.info("Verify the shared memory configuration...")
-            # 查看共享内存大小
             shm_exec = self.client.api.exec_create(
                 self.container.id, "df -h /dev/shm", tty=True
             )
@@ -314,6 +367,15 @@ class DockerExecutor:
             )
 
     def execute_command(self, cmd: str) -> Tuple[int, str]:
+        """
+        Execute a command in the Docker container and return the result.
+
+        Args:
+            cmd (str): Command to execute in the container
+
+        Returns:
+            Tuple[int, str]: Exit code and output of the command
+        """
         if not self.container:
             raise Exception("The container has not been started.")
 
@@ -322,25 +384,25 @@ class DockerExecutor:
             escaped_cmd = cmd.replace("'", "'\\''")
             wrapped_cmd = f"/bin/bash -c '{escaped_cmd}'"
 
-            # 1. create a docker instance
+            # 1. Create a docker exec instance
             exec_instance = self.client.api.exec_create(
                 self.container.id,
                 wrapped_cmd,
                 workdir=self.container_workdir,
-                tty=True,  # 为执行命令分配TTY
+                tty=True,  # Allocate TTY for command execution
             )
-            # 2. start streaming output
+            # 2. Start streaming output
             result = self.client.api.exec_start(
-                exec_instance["Id"], stream=True, tty=True  # 匹配TTY设置
+                exec_instance["Id"], stream=True, tty=True  # Match TTY settings
             )
 
-            # 3. handle the output stream
+            # 3. Handle the output stream
             for line in result:
                 output_line = line.decode("utf-8", errors="replace").strip()
                 output.append(output_line)
                 print(output_line)  # print to the console
 
-            # 4. after the command is executed, query the exit code
+            # 4. After the command is executed, query the exit code
             exit_code = self.client.api.exec_inspect(exec_instance["Id"])["ExitCode"]
 
             return exit_code, "\n".join(output)
@@ -356,6 +418,16 @@ class DockerExecutor:
     def execute_commands(
         self, commands: List[str], stop_on_error: bool = True
     ) -> List[Dict]:
+        """
+        Execute a list of commands sequentially in the container.
+
+        Args:
+            commands (List[str]): List of commands to execute
+            stop_on_error (bool): Whether to stop execution on error
+
+        Returns:
+            List[Dict]: Results for each executed command
+        """
         self.command_results = []
 
         with open(self.log_file, "a", encoding="utf-8") as f:
@@ -370,7 +442,6 @@ class DockerExecutor:
                 )
 
                 exit_code, output = self.execute_command(cmd)
-                # self.logger.info(output)
 
                 cmd_end_time = datetime.now()
                 duration = (cmd_end_time - cmd_start_time).total_seconds()
@@ -403,6 +474,11 @@ class DockerExecutor:
         return self.command_results
 
     def stop_and_remove_container(self) -> None:
+        """
+        Stop and remove the container unless keep_container is True.
+
+        Properly stops and removes the container to clean up resources.
+        """
         if self.container and not self.keep_container:
             try:
                 self.container.stop()
@@ -421,11 +497,13 @@ class DockerExecutor:
             self.logger.warning("There is no operable container.")
 
     def __enter__(self):
+        """Context manager entry method."""
         self.pull_image()
         self.start_container()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit method."""
         self.stop_and_remove_container()
         if exc_type:
             self.logger.error(f"Error occurred: {exc_val}")
@@ -435,52 +513,55 @@ class DockerExecutor:
 class SubprocessLogger:
     def __init__(self, log_file=None):
         """
-        初始化输出日志器
+        Initialize the subprocess output logger.
 
-        :param log_file: 日志文件路径
+        Args:
+            log_file (str): Path to the log file for output
         """
         self.log_file = log_file if log_file else None
         if log_file:
             os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        # 创建文件锁，确保多线程写入安全
+        # Create a file lock to ensure thread-safe writing
         self.lock = threading.Lock()
 
-    def write(self, message, stream=sys.stdout):
+    def write(self, message, stream=sys.stdout) -> None:
         """
-        同时输出到屏幕和日志文件
+        Output message to both screen and log file simultaneously.
 
-        :param message: 要输出的消息
-        :param stream: 输出到屏幕的流（stdout或stderr）
+        Args:
+            message (str): Message to output
+            stream: Output stream (stdout or stderr) to write to screen
         """
         if not message:
             return
 
         if self.log_file:
-            # 添加时间戳
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             log_message = f"[{timestamp}] {message}"
 
-            # 写入日志文件（加锁确保线程安全）
+            # Write to log file (with locking to ensure thread safety)
             with self.lock:
-                with open(self.log_file, 'a', encoding='utf-8') as f:
+                with open(self.log_file, "a", encoding="utf-8") as f:
                     f.write(log_message)
 
-        # 输出到屏幕
+        # Output to screen
         stream.write(message)
         stream.flush()
 
 
 def _process_stream(stream, logger, is_stderr=False, outputs=None):
     """
-    处理子进程的输出流
+    Process output streams from subprocess.
 
-    :param stream: 子进程的输出流（stdout或stderr）
-    :param logger: SubprocessLogger实例
-    :param is_stderr: 是否为错误流
+    Args:
+        stream: Subprocess output stream (stdout or stderr)
+        logger (SubprocessLogger): Instance of SubprocessLogger for output
+        is_stderr (bool): Whether this stream is stderr (True) or stdout (False)
+        outputs (list): List to store output lines
     """
     stream_obj = sys.stderr if is_stderr else sys.stdout
     try:
-        for line in iter(stream.readline, ''):
+        for line in iter(stream.readline, ""):
             logger.write(line, stream_obj)
             if outputs is not None:
                 outputs.append(line)
@@ -488,15 +569,29 @@ def _process_stream(stream, logger, is_stderr=False, outputs=None):
         stream.close()
 
 
-def execute_cmd(cmd_list: list, log_file: str = None, get_outputs=False) -> bool:
+def execute_cmd(
+    cmd_list: list, log_file: str = None, get_outputs=False
+) -> Tuple[bool, list]:
+    """Execute a command with real-time output logging.
+
+    Args:
+        cmd_list (list): List of command arguments to execute
+        log_file (str, optional): Path to log file for output. If None, only console output.
+        get_outputs (bool, optional): Whether to return the output lines. Defaults to False.
+
+    Returns:
+        Tuple[bool, list]: Tuple of (return code, output)
+    """
     if log_file:
         setup_logging(log_file=log_file)
     logger = logging.getLogger(__name__)
 
+    # Convert command list to string for logging
     cmd_str = " ".join(str(item) for item in cmd_list)
     logger.info("execute command: %s", cmd_str)
 
     flag = True
+    # Initialize subprocess logger
     subprocess_logger = SubprocessLogger(log_file)
 
     outputs = list() if get_outputs else None
@@ -506,11 +601,11 @@ def execute_cmd(cmd_list: list, log_file: str = None, get_outputs=False) -> bool
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            bufsize=1,  # 行缓冲，确保实时输出
+            bufsize=1,  # Line buffering to ensure real-time output
             universal_newlines=True,
         )
 
-        # 创建线程处理stdout和stderr
+        # Create threads to handle stdout and stderr streams
         stdout_thread = threading.Thread(
             target=_process_stream,
             args=(process.stdout, subprocess_logger, False, outputs),
@@ -521,13 +616,13 @@ def execute_cmd(cmd_list: list, log_file: str = None, get_outputs=False) -> bool
             args=(process.stderr, subprocess_logger, True, outputs),
             daemon=True,
         )
-        # 启动线程
+
+        # Start the output processing threads
         stdout_thread.start()
         stderr_thread.start()
-        # 等待子进程完成
+        # Wait for subprocess to complete
         return_code = process.wait()
-
-        # 等待线程处理剩余输出
+        # Wait for threads to finish processing remaining output
         stdout_thread.join()
         stderr_thread.join()
 
@@ -550,26 +645,27 @@ def execute_cmd(cmd_list: list, log_file: str = None, get_outputs=False) -> bool
 
 
 def compress_to_zip(folder_path: str, output_path: str, extensions=None) -> bool:
-    """
-    将指定文件夹压缩为zip格式
+    """Compress a folder to a zip file.
 
-    :param folder_path: 要压缩的文件夹路径
-    :param output_path: 输出zip文件的路径
-    :param extensions: 只压缩指定格式的文件
-    :return: 压缩成功返回True, 失败返回False
+    Args:
+        folder_path (str): The path to the folder to be compressed.
+        output_path (str): The path to the output zip file.
+        extensions (list, optional): A list of file extensions to include in the zip file. Defaults to None.
+
+    Returns:
+        bool: True if the compression was successful, False otherwise.
     """
     import zipfile
 
     logger = logging.getLogger(__name__)
 
     if not os.path.isdir(folder_path):
-        logger.error(f"Error: {folder_path} not exist.")
+        logger.error(f"{folder_path} not exist.")
         return False
     if output_path is None:
-        logger.error(f"Error: please provide output file path.")
+        logger.error("Please provide output file path.")
         return False
 
-    # 规范化文件夹路径（去除末尾的斜杠）
     folder_path = os.path.normpath(folder_path)
     cpp_suffix = ".cpp"
     try:
@@ -578,11 +674,10 @@ def compress_to_zip(folder_path: str, output_path: str, extensions=None) -> bool
         for root, dirs, files in os.walk(folder_path):
             relative_path = os.path.relpath(root, folder_path)
             for file in files:
-                # 获取文件名和扩展名
+                # Get the file name and extension
                 file_name = file
                 file_ext = os.path.splitext(file_name)[1].lower()
 
-                # 检查是否符合条件
                 if extensions and file_ext not in extensions and file_ext != cpp_suffix:
                     continue
                 tcim_flag = True if "tcim" in root.split(os.sep) else False
@@ -600,9 +695,9 @@ def compress_to_zip(folder_path: str, output_path: str, extensions=None) -> bool
                 ):
                     continue
 
-                # 源文件完整路径
+                # Complete Path of the source file
                 file_path = os.path.join(root, file)
-                # 计算在zip中的相对路径（不含根目录）
+                # Calculate the relative path in the zip file (excluding the root directory)
                 arcname = os.path.join(relative_path, file)
                 if tcim_flag and file_name.endswith(cpp_suffix):
                     cpp_files.append((file_path, arcname))
@@ -613,13 +708,13 @@ def compress_to_zip(folder_path: str, output_path: str, extensions=None) -> bool
             logger.warning(f"Warning: Specified type of file not found.({extensions})")
             return False
 
-        with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zipf:
             for file_path, arcname in files_to_zip:
                 zipf.write(file_path, arcname)
 
         if len(cpp_files) > 0:
             cpp_zip_path = output_path[:-4] + "_cpps.zip"
-            with zipfile.ZipFile(cpp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            with zipfile.ZipFile(cpp_zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
                 for file_path, arcname in cpp_files:
                     zipf.write(file_path, arcname)
         logger.info(
@@ -629,42 +724,41 @@ def compress_to_zip(folder_path: str, output_path: str, extensions=None) -> bool
 
     except Exception as e:
         logger.error(f"Compresss Failed: {str(e)}")
-        # 清理不完整的输出文件
+        # Clean up incomplete output files
         if os.path.exists(output_path):
             os.remove(output_path)
         return False
 
 
 def delete_files(folder_path: str, extensions: list = list()):
-    """
-    删除指定文件夹下所有后缀在给定列表中的文件
+    """Delete all files in the specified folder whose extensions are in the given list.
 
-    参数:
-        folder_path (str): 要遍历的文件夹路径
-        extensions (list): 要删除的文件后缀列表，例如 ['.txt', '.log']
+    Args:
+        folder_path (str): The path of the folder to be traversed
+        extensions (list, optional): The list of file suffixes to be deleted, such as ['.txt', '.log']
     """
     logger = logging.getLogger(__name__)
 
-    logger.info(f"清理文件夹: {folder_path}, 指定后缀: {extensions}")
+    logger.info(f"Clear folder: {folder_path}, specify extensions: {extensions}")
     # 检查文件夹是否存在
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
-        logger.error(f"错误: 文件夹不存在 - {folder_path}")
+        logger.error(f"Folder does not exist - {folder_path}")
         return
 
     import shutil
 
     if ".DELETE_ALL" in extensions or not extensions:
-        # 删除整个文件夹
+        # Delete the entire folder
         shutil.rmtree(folder_path, ignore_errors=True)
         return
 
-    # 确保后缀以点开头，统一格式
+    # Make sure the suffix starts with a dot and maintain a consistent format.
     normalized_extensions = [
-        ext if ext.startswith('.') else f'.{ext}' for ext in extensions
+        ext if ext.startswith(".") else f".{ext}" for ext in extensions
     ]
     deleted_files_count = 0
     deleted_folders_count = 0
-    # 第一遍：删除符合条件的文件
+    # First round: Delete files that meet the criteria
     for root, dirs, files in os.walk(folder_path):
         for file in files:
             if any(file.endswith(ext) for ext in normalized_extensions):
@@ -675,24 +769,29 @@ def delete_files(folder_path: str, extensions: list = list()):
                 except Exception as e:
                     logger.error(f"删除文件失败 {file_path}: {e}")
 
-    # 第二遍：删除空文件夹（需要逆序遍历，先删除子文件夹）
+    # Second Pass: Delete Empty Folders (Need to traverse in reverse order, delete subfolders first)
     for root, dirs, files in os.walk(folder_path, topdown=False):
         for dir_name in dirs:
             dir_path = os.path.join(root, dir_name)
             try:
-                # 检查文件夹是否为空
                 if not os.listdir(dir_path):
                     shutil.rmtree(dir_path, ignore_errors=True)
                     deleted_folders_count += 1
             except Exception as e:
-                logger.error(f"删除文件夹失败 {dir_path}: {e}")
+                logger.error(f"Failed to delete the folder {dir_path}: {e}")
 
     logger.info(
-        f"\n操作完成，共删除 {deleted_files_count} 个文件，{deleted_folders_count} 个空文件夹"
+        f"Operation completed. A total of {deleted_files_count} files and {deleted_folders_count} empty folders were deleted."
     )
 
 
-def update_perf_file(perf_id: str, update_vals: dict):
+def update_perf_file(perf_id: str, update_vals: dict) -> None:
+    """Update the perf file with the given values.
+
+    Args:
+        perf_id (str): The ID of the perf file to update.
+        update_vals (dict): The values to update in the perf file.
+    """
     import pandas as pd
 
     logger = logging.getLogger(__name__)
@@ -708,14 +807,26 @@ def update_perf_file(perf_id: str, update_vals: dict):
     df = pd.DataFrame([update_vals])
     df.to_csv(
         perf_file,
-        mode='a',
+        mode="a",
         header=not file_exists,
         index=False,
-        encoding='utf-8',
+        encoding="utf-8",
     )
 
 
 def get_perf_models(perf_id: str):
+    """
+    Retrieve performance model data from a CSV file based on the given performance ID.
+
+    Args:
+        perf_id (str): The performance test identifier used to locate the corresponding
+                      CSV file。
+
+    Returns:
+        list or None: A list of dictionaries where each dictionary represents a row
+                     from the CSV file with column names as keys. Returns None if
+                     the performance result file does not exist.
+    """
     import pandas as pd
 
     logger = logging.getLogger(__name__)
@@ -726,13 +837,26 @@ def get_perf_models(perf_id: str):
         logger.error(f"Failed to read perf result file {perf_file}.")
         return None
 
-    df = pd.read_csv(perf_file, encoding='utf-8')
-    perf_models = df.to_dict(orient='records')
+    df = pd.read_csv(perf_file, encoding="utf-8")
+    perf_models = df.to_dict(orient="records")
 
     return perf_models
 
 
-def update_perf_values(perf_id: str, perf_vals: dict):
+def update_perf_values(perf_id: str, perf_vals: dict) -> bool:
+    """
+    Update performance values in a CSV file by merging with new performance data.
+
+    Args:
+        perf_id (str): The performance test identifier used to locate the corresponding
+                      CSV file.
+        perf_vals (dict): A dictionary containing new performance values to be merged
+                         with existing data.
+
+    Returns:
+        bool: True if the update operation was successful, False if the performance
+              result file does not exist or if any other error occurs during the process.
+    """
     import pandas as pd
 
     logger = logging.getLogger(__name__)
@@ -743,13 +867,13 @@ def update_perf_values(perf_id: str, perf_vals: dict):
         logger.error(f"Failed to read perf result file {perf_file}.")
         return False
 
-    df = pd.read_csv(perf_file, encoding='utf-8')
+    df = pd.read_csv(perf_file, encoding="utf-8")
     perf_df = pd.DataFrame([perf_vals])
-    df = pd.merge(df, perf_df, on=['model'], how='inner')
+    df = pd.merge(df, perf_df, on=["model"], how="inner")
     df.to_csv(
         perf_file,
-        mode='w',
+        mode="w",
         index=False,
-        encoding='utf-8',
+        encoding="utf-8",
     )
     return True

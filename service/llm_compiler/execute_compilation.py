@@ -1,3 +1,27 @@
+# Copyright 2025 HOUMO AI
+#
+# File: execute_compilation.py
+# Description:
+#   Execute LLM model compilation flow.
+#
+#   This script provides command-line interface for compiling LLM models with various configurations.
+#   It handles model compilation, optimization, and post-processing steps including optional model
+#   stripping for shared weight removal.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import glob
 import shutil
@@ -11,11 +35,12 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments for the compilation process."""
     parser = argparse.ArgumentParser(description="Compile LLMs")
     parser.add_argument(
         "task_id",
-        nargs='?',
+        nargs="?",
         default=None,
         help="Task ID (optional positional argument)",
     )
@@ -79,7 +104,7 @@ def parse_args():
         "--flash_attention",
         type=int,
         choices=[0, 1, 2, 3],
-        help='flash attention optimization',
+        help="flash attention optimization",
     )
     parser.add_argument(
         "-r",
@@ -107,7 +132,16 @@ def parse_args():
     return args
 
 
-def _check_golden(dir_path: str):
+def _check_golden(dir_path: str) -> bool:
+    """
+    Check if golden files exist in the specified directory.
+
+    Args:
+        dir_path (str): Directory path to check for golden files
+
+    Returns:
+        bool: True if both decoder and prefill golden files exist, False otherwise
+    """
     import glob
 
     decoder_golden = list(glob.glob(dir_path + "/decoder/hmquant_*.npy"))
@@ -119,7 +153,15 @@ def _check_golden(dir_path: str):
 
 
 def _generate_cmds(args) -> list:
-    """generate compilation cmds"""
+    """
+    Generate compilation command line based on input arguments.
+
+    Args:
+        args: Parsed command line arguments containing model configuration
+
+    Returns:
+        list: List of command line arguments for the build process
+    """
 
     model_name = "deepseek" if "deepseek" in args.model_name else args.model_name
 
@@ -155,7 +197,13 @@ def _generate_cmds(args) -> list:
 
 
 def _strip_models(output_dir: str, strip: str) -> None:
-    """use hmmstrip command line to strip hmm models"""
+    """
+    Use hmmstrip command line to strip hmm models by removing shared weights.
+
+    Args:
+        output_dir (str): Directory containing the compiled HMM model files
+        strip (str): Strip mode - "copy" (backup original), "overwrite" (replace in place), or "off"
+    """
 
     hmm_files = glob.glob(os.path.join(output_dir, "*.hmm")) + glob.glob(
         os.path.join(output_dir, "*.hmms")
@@ -193,6 +241,22 @@ def _strip_models(output_dir: str, strip: str) -> None:
 
 
 def main(args) -> int:
+    """
+    Main function to execute the model compilation process.
+
+    This function orchestrates the complete compilation pipeline including:
+    - Setting up the working environment
+    - Generating compilation commands
+    - Executing the build process
+    - Post-processing steps including copying embedding files
+    - Optional model stripping for shared weights
+
+    Args:
+        args: Parsed command line arguments containing model configuration
+
+    Returns:
+        int: Exit code (0 for success, non-zero for failure)
+    """
     logger.info(
         "Model name: %s, Model path: %s, Quant model path: %s, Context length: %d, "
         "Batch: %d, Device num: %d, Core Num: %d, J: %d, Flash attention: %d, HmmStrip: %s, "

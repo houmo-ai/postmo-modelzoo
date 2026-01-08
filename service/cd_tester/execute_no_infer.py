@@ -1,3 +1,26 @@
+# Copyright 2025 HOUMO AI
+#
+# File: execute_no_infer.py
+# Description:
+#   Execute quantization and compilation tests without running inference.
+#   This script handles test orchestration for model quantization and compilation
+#   processes, setting up the appropriate environment and running model tests
+#   without executing actual inference.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import shutil
 import argparse
@@ -6,13 +29,13 @@ import subprocess
 from cd_tester_utils import *
 
 
-HOUMO_BACKEND = os.getenv("HOUMO_TARGET", "xh1")
 script_dir = os.path.dirname(os.path.abspath(__file__))
 setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments for the quantization and compilation execution script."""
     parser = argparse.ArgumentParser(description="Quant and Compile Models")
     parser.add_argument(
         "-log",
@@ -46,10 +69,20 @@ def parse_args():
 
 
 def main(args) -> int:
+    """Main function to execute quantization and compilation tests based on provided arguments.
+
+    Args:
+        args (argparse.Namespace): Parsed command line arguments
+
+    Returns:
+        int: 0 if all tests pass, 1 if any test fails
+    """
+    # Change to the tests directory to run tests
     test_dir = f"{script_dir}/../../tests"
     os.chdir(test_dir)
     logger.info("Current dir: %s", os.getcwd())
 
+    # Set environment variables for quantization/compilation tests (no inference)
     os.environ["SKIP_INFER"] = "ON"
     os.environ["HDPL_PLATFORM"] = "ISIM"
     os.environ["IMODELZOO_MODELS_PATH"] = "/develop02/modelzoo/"
@@ -69,14 +102,14 @@ def main(args) -> int:
         result = subprocess.run(
             cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
-        # set env for xh2
+        # Set environment variables for xh2 from sourced environment
         for line in result.stdout.splitlines():
-            if '=' in line and (
-                'PYTHONPATH' in line
-                or 'HF_ENDPOINT' in line
-                or 'HOUMO_DATASETS_PATH' in line
+            if "=" in line and (
+                "PYTHONPATH" in line
+                or "HF_ENDPOINT" in line
+                or "HOUMO_DATASETS_PATH" in line
             ):
-                key, value = line.split('=', 1)
+                key, value = line.split("=", 1)
                 os.environ[key] = value
         logger.info("*** Env Info ***")
         logger.info("PYTHONPATH: %s", os.getenv("PYTHONPATH"))
@@ -88,22 +121,29 @@ def main(args) -> int:
     # logger.info(f"==> [CD Test] Install latest hmatc.")
     # os.system("./install.sh")
 
+    # Set CUDA device for tests
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     test_dir = f"{root_dir}/tests"
     os.chdir(test_dir)
     logger.info("Current dir: %s", os.getcwd())
 
+    # Define test categories for different model types
     key_list = [
         "asr",
         "autodrive",
         "backbone",
         "detection",
+        "embedding",
         "estimation",
         "llm",
+        "ocr",
+        "omni",
         "diffusion",
+        "segmentation",
     ]
     # --collect-only
     flag = True
+    # Run tests for each category
     for key_str in key_list:
         if args.key_str:
             key_str = f"{key_str} and ({args.key_str})"
@@ -117,12 +157,15 @@ def main(args) -> int:
             key_str,
             f"--junitxml={script_dir}/pytest_results_no_infer_{key_str}.xml",
         ]
+        # Add model-specific filter if provided
         if args.model_str:
             cmds += ["-m", f"{args.model_str}"]
         logger.info(f"execute cmds: {cmds}")
+        # Execute model tests and check for success
         if not run_tests(cmds, args.log_file):
             logger.error(f"<== [CD Test] End model_tests: {key_str}, Failed.")
             flag = False
+
     if not flag:
         return 1
 

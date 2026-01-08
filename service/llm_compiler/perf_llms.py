@@ -1,3 +1,26 @@
+# Copyright 2025 HOUMO AI
+#
+# File: norm_quant_folder.py
+# Description:
+#   Execute LLM model performance testing in Docker containers.
+#
+#   This script orchestrates performance testing of LLM models by running performance evaluation
+#   commands inside Docker containers.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import argparse
 import logging
@@ -9,14 +32,15 @@ logger = logging.getLogger(__name__)
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments for performance testing."""
     parser = argparse.ArgumentParser(description="Perf LLMs")
     parser.add_argument(
         "-v",
         "--version",
         required=True,
         type=str,
-        help="Houmo Dadao software version, example: 0.3.0, 2.4.2",
+        help="Houmo Dadao software version, example: 0.7.0, 2.6.0",
     )
     parser.add_argument(
         "-t",
@@ -44,28 +68,6 @@ def parse_args():
     return args
 
 
-def _generate_perf_cmds(container_home, perf_id, log_file):
-    cmd_list = list()
-    perf_models = get_perf_models(perf_id)
-    if perf_models is None:
-        return None
-    for model_info in perf_models:
-        cmd = f"cd {container_home}/imodelzoo/service/llm_compiler && python3 execute_perf.py"
-        flag = True
-        for key, val in model_info.items():
-            logger.info(f"{key}: {val}")
-            if key not in ["model", "case_dir"] and not os.path.exists(val):
-                flag = False
-                logger.error(f"Missing input file {key}: {val}")
-                break
-            cmd += f" --{key} {val}"
-        if flag:
-            cmd += f" --perf_id {perf_id} -log {log_file}"
-            cmd_list.append(cmd)
-
-    return cmd_list
-
-
 if __name__ == "__main__":
     args = parse_args()
 
@@ -84,7 +86,7 @@ if __name__ == "__main__":
     cmd = f"cd {container_home}/imodelzoo/service/llm_compiler && python3 execute_perf.py --perf_cfg {args.perf_cfg} -log {args.log_file}"
     cmd_list.append(cmd)
 
-    # create a docker executor
+    # Create a docker executor
     docker_exec = DockerExecutor(
         image=image_name,
         container_name=container_name,
@@ -95,9 +97,9 @@ if __name__ == "__main__":
     docker_flag = True
     try:
         docker_exec.pull_image()
-        # map the current directory of the host to the container
+        # Map the current directory of the host to the container
         volumes = {
-            # map imodelzoo folder
+            # Map imodelzoo folder
             os.path.abspath(f"{script_dir}/../../"): {
                 "bind": f"{container_home}/imodelzoo",
                 "mode": "rw",
@@ -115,7 +117,7 @@ if __name__ == "__main__":
         cmds_res = docker_exec.execute_commands(cmd_list, stop_on_error=False)
         for res in cmds_res:
             if res.get("exit_code", -1) != 0:
-                logger.info(f"##hm docker_exec commands error occured")
+                logger.info("## hm docker_exec commands error occured")
                 docker_flag = False
                 break
     except Exception as e:

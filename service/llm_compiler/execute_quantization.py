@@ -1,3 +1,27 @@
+# Copyright 2025 HOUMO AI
+#
+# File: execute_quantization.py
+# Description:
+#   Execute LLM model quantization process.
+#
+#   This script provides command-line interface for quantizing LLM models with various configurations.
+#   It handles model quantization, environment setup, and dependency installation required for the
+#   quantization process.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import argparse
 import logging
@@ -10,11 +34,12 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments for the quantization process."""
     parser = argparse.ArgumentParser(description="Compile LLMs")
     parser.add_argument(
         "task_id",
-        nargs='?',
+        nargs="?",
         default=None,
         help="Task ID (optional positional argument)",
     )
@@ -88,6 +113,21 @@ def parse_args():
 
 
 def main(args) -> int:
+    """
+    Main function to execute the model quantization process.
+
+    This function orchestrates the complete quantization pipeline including:
+    - Environment setup for the target platform
+    - Dependency installation
+    - Model quantization command execution
+    - Result validation
+
+    Args:
+        args: Parsed command line arguments containing model configuration
+
+    Returns:
+        int: Exit code (0 for success, non-zero for failure)
+    """
     logger.info(
         "Houmo Target: %s, Model path: %s, Model name: %s, Raw model path: %s, Batch: %d, Prefill length: %d, Context length: %d, Result Dir: %s",
         args.target,
@@ -107,14 +147,14 @@ def main(args) -> int:
     result = subprocess.run(
         cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
-    # set env for xh2
+    # Set environment variables for xh2
     for line in result.stdout.splitlines():
-        if '=' in line and (
-            'PYTHONPATH' in line
-            or 'HF_ENDPOINT' in line
-            or 'HOUMO_DATASETS_PATH' in line
+        if "=" in line and (
+            "PYTHONPATH" in line
+            or "HF_ENDPOINT" in line
+            or "HOUMO_DATASETS_PATH" in line
         ):
-            key, value = line.split('=', 1)
+            key, value = line.split("=", 1)
             os.environ[key] = value
     logger.info("*** Env Info ***")
     logger.info("PYTHONPATH: %s", os.getenv("PYTHONPATH"))
