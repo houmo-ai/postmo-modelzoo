@@ -28,9 +28,10 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
     if [ -e ${NDK_PATH} ]; then
       export NDK_PATH=${WORK_PATH}/toolchains/android-ndk-r28c
     else
-      wget ${HOUMO_MODELZOO_URL}/models/qwen3/toolchains.zip
-      unzip toolchains.zip && rm toolchains.zip
-      export NDK_PATH=${WORK_PATH}/toolchains/android-ndk-r28c
+      echo "NDK_PATH not set, please set NDK_PATH to android-ndk-r28c"
+      echo "Please Download NDK from [https://developer.android.google.cn/ndk/downloads/index.html?hl=ro]"
+      echo "unzip ndk package and set NDK_PATH to android-ndk-r28c"
+      exit 1
     fi
   fi
 
