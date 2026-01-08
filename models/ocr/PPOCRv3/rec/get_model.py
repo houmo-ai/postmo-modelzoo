@@ -1,3 +1,24 @@
+# Copyright 2025 HOUMO AI
+#
+# File: get_model.py
+# Description:
+#   Download PPOCRv3 rec model for detection tasks.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# git a
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+
 import os
 import sys
 import argparse
@@ -6,7 +27,7 @@ from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
-HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '.')
+HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH", ".")
 
 
 def get_args() -> argparse.Namespace:
@@ -38,7 +59,7 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     build_model_dir = args.build_model_dir
     model_type = args.model_type
@@ -50,8 +71,8 @@ if __name__ == '__main__':
     opt_level = "O2"
     version = get_houmo_version()
     target = HOUMO_TARGET
-    raw_path = f"models/PPOCRv3/paddleocr_rec-sim.onnx"
-    data_path = f"models/PPOCRv3/CCPD2020_PPOCRv3_eval.tar.gz"
+    raw_path = "models/raw/onnx/paddleocr_rec-sim.onnx"
+    data_path = "models/dataset/CCPD2020_PPOCRv3_eval.tar.gz"
     build_path = f"models/{target.lower()}-{version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type in ["raw"]:
