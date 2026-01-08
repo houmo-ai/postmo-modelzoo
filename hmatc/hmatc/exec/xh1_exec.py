@@ -370,8 +370,8 @@ class Xh1Exec(BaseExec):
 
         try:
             from hmquant.api import (
-                generate_golden,
                 quant_single_onnx_network,
+                generate_golden,
                 convert_profiling,
                 quantize_profiling,
             )
@@ -382,15 +382,7 @@ class Xh1Exec(BaseExec):
         calib_datasets, onnx_datasets = self.get_quant_dataset()
         in_datas = calib_datasets[0]
         onnx_in_datas = onnx_datasets[0]
-        # Print frontend conversion comparison results
-        convert_profiling(
-            self.model_path,
-            onnx_input=[onnx_in_datas],
-            cfg=self.get_quant_cfg(),
-            sequencer_input=[in_datas],
-            save_tmp_path=self.quant_output_dir,
-            device=self.device,
-        )
+
         logger.info(f"Using {self.device} quantization...")
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         t_start = time.time()
@@ -400,8 +392,20 @@ class Xh1Exec(BaseExec):
             onnx_model_or_path=self.model_path,
             device=self.device,
         )
+
+        # Print frontend conversion comparison results
+        logger.info("Frontend conversion profiling results:")
+        convert_profiling(
+            self.model_path,
+            onnx_input=[onnx_in_datas],
+            cfg=self.get_quant_cfg(),
+            sequencer_input=[in_datas],
+            save_tmp_path=self.quant_output_dir,
+            device=self.device,
+        )
         span = time.time() - t_start
         # Print quantization before and after comparison results
+        logger.info("Quantization profiling results:")
         res = quantize_profiling(
             sequencer,
             [in_datas],
@@ -419,6 +423,8 @@ class Xh1Exec(BaseExec):
         }
         if not os.path.exists(self.quant_output_dir):
             os.makedirs(self.quant_output_dir)
+
+        logger.info(f"Generate golden data to {self.quant_output_dir}")
         generate_golden(
             sequencer=sequencer,
             calibset=in_datas,
