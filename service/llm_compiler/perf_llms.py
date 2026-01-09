@@ -25,7 +25,8 @@ import os
 import argparse
 import logging
 from datetime import datetime
-from compiler_utils import setup_logging, get_perf_models, DockerExecutor
+from docker_utils import DockerExecutor
+from compiler_utils import setup_logging
 
 global logger
 logger = logging.getLogger(__name__)

@@ -360,9 +360,15 @@ def _get_jfrog_file_md5(
     """
 
     try:
-        jfrog_base, jfrog_tail = jfrog_base_url.rsplit("artifactory/", 1)
-        jfrog_base = jfrog_base + "artifactory"
-        file_info_url = f"{jfrog_base}/api/storage/{jfrog_tail}/{file_relative_path}"
+        split_parts = jfrog_base_url.rstrip("/").rsplit("artifactory", 1)
+        jfrog_base = split_parts[0] + "artifactory"
+        jfrog_tail = split_parts[-1].rstrip("/") if len(split_parts) > 1 else ""
+        if jfrog_tail:
+            file_info_url = (
+                f"{jfrog_base}/api/storage/{jfrog_tail}/{file_relative_path}"
+            )
+        else:
+            file_info_url = f"{jfrog_base}/api/storage/{file_relative_path}"
 
         logger.info(f"Get file info from Jfrog: {file_info_url}")
         response = requests.get(file_info_url, timeout=10)

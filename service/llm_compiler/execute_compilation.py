@@ -259,7 +259,7 @@ def main(args) -> int:
     """
     logger.info(
         "Model name: %s, Model path: %s, Quant model path: %s, Context length: %d, "
-        "Batch: %d, Device num: %d, Core Num: %d, J: %d, Flash attention: %d, HmmStrip: %s, "
+        "Batch: %d, Device num: %d, Core Num: %d, J: %d, Flash attention: %s, HmmStrip: %s, "
         "Result Dir: %s",
         args.model_name,
         args.model_path,

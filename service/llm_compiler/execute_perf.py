@@ -817,6 +817,7 @@ def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
 
     Args:
         cfg_data (Dict): Configuration data containing performance test parameters
+        log_file (str): Path to the log file
 
     Returns:
         Dict[str, List[str]]: Dictionary mapping model names to command lists
@@ -847,12 +848,13 @@ def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
     return cmds
 
 
-def _build_tcim_cmds(cfg_data: Dict) -> Dict[str, List[str]]:
+def _build_tcim_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
     """
     Build TCIM performance test commands from configuration data.
 
     Args:
         cfg_data (Dict): Configuration data containing performance test parameters
+        log_file (str): Path to the log file
 
     Returns:
         Dict[str, List[str]]: Dictionary mapping model names to command lists
