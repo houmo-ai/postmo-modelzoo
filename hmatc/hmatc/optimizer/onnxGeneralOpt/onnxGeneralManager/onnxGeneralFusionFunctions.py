@@ -1,17 +1,37 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+* Copyright 2025 HOUMO AI
+*
+* File: onnxGeneralFusionFunctions.py
+* Description:
+*   Optimization functions that incorporate specific operators.
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     https://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*
+* SPDX-License-Identifier: Apache-2.0
+*
+"""
 import copy
 from ....utils import logger
-#import math
 
 import numpy as np  # type: ignore
 import onnx  # type: ignore
 
-#from ..onnxBaseOpt.onnxRuntimeEngine import OnnxRuntimeEngine
 from .onnxGeneralDeleteFunctions import delete_shape_useless_node
 from ...onnxBaseOpt.onnxDebugger import OnnxDebugger
-#from ..onnxBaseOpt.onnxBaseFunctions import infer_shapes
 from ...onnxBaseOpt.onnxBaseOptimizer import OnnxBaseOptimizer
 from ...onnxUtils.onnxBasicUtils import *
-#from ..onnxBaseOpt.onnxConfigController import OnnxCfg
 
 
 @OnnxDebugger.onnx_opt_func_debug_wrapper
@@ -207,12 +227,6 @@ def fusion_TransposePoolTranspose(onnx_model, node, node_index):
         new_conv_weights[:, ::parameters['pool_stride'], ...] = conv_weights
         new_weights_init = onnx.numpy_helper.from_array(new_conv_weights, conv_node.input[1]+"_fusion_pool")
         onnx_model.graph.initializer.append(new_weights_init)
-        # new_pads = [conv_pads[i] + v for i, v in enumerate(parameters['pool_pads'])]
-        # if conv_attr.get('auto_pad', 'VALID') == 'VALID':
-        #     conv_attr['pads'] = new_pads
-        #     conv_attr.pop('auto_pad', None)
-        # del conv_node.attribute[:]
-        # conv_node.attribute.extend(onnx.helper.make_attribute(key, value) for key, value in sorted(conv_attr.items()))
         value_info_top = get_value_info_by_name(onnx_model, nodes_list[0].output[0])
         value_info_mid = get_value_info_by_name(onnx_model, nodes_list[1].output[0])
         value_info_bot = get_value_info_by_name(onnx_model, nodes_list[2].output[0])

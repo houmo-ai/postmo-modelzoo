@@ -1,21 +1,32 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-
-Author: Nan Xu
-Maintainer: Nan Xu
-Date: 2025/07/14
-Company: Houmo
-
+* Copyright 2025 HOUMO AI
+*
+* File: onnxBasicUtils.py
+* Description:
+*   general basic utils.
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     https://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*
+* SPDX-License-Identifier: Apache-2.0
+*
 """
 
 from collections import OrderedDict
 import onnx  # type: ignore
 from onnx import TensorProto
 import onnx.helper as helper  # type: ignore
-# import onnx.shape_inference  # type: ignore
-# import onnx.numpy_helper  # type: ignore
-# import onnxruntime as rt  # type: ignore
 import numpy as np  # type: ignore
 from typing import List, Dict, Union, Optional, Tuple, Sequence
 from ...utils import logger

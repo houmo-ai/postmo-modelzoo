@@ -1,10 +1,26 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
-
-Author: Nan Xu
-Maintainer: Nan Xu
-Date: 2025/08/04
-Company: Houmo
-
+* Copyright 2025 HOUMO AI
+*
+* File: onnxVersionControlFunctions.py
+* Description:
+*   Version controller for ONNX models.
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     https://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*
+* SPDX-License-Identifier: Apache-2.0
+*
 """
 import os
 import copy
@@ -28,17 +44,6 @@ def get_node_id(node):
     for n in node.output:
         id_string += n
     return id_string
-
-
-# @OnnxDebugger.onnx_opt_func_debug_wrapper
-# def onnx_add_node_domain(onnx_model, domain_dict):
-#     for node_index, node in enumerate(onnx_model.graph.node):
-#         if node.op_type in domain_dict.keys():
-#             node.domain = domain_dict[node.op_type]
-#             logger.info(
-#                 "Add Type:" + node.op_type + " Name:" + node.name + "---->Onnx Domain" + domain_dict[node.op_type])
-#     return onnx_model
-
 
 def remove_initializer_from_input(model: ModelProto) -> ModelProto:
     if model.ir_version < 4:
@@ -156,7 +161,3 @@ def pre_convert_fix(onnx_model):
     for node_index, node in enumerate(onnx_model.graph.node):
         activate |= resize_fix(node, cur_opset_version)
     return onnx_model
-    # if activate:
-    #     return infer_shapes(onnx_model)
-    # else:
-    #     return onnx_model
