@@ -2,12 +2,22 @@
 
 本示例展示如何把bge系列模型量化和编译，部署到后摩M50芯片的设备上。
 
+## 特别事项
+
+本项目使用从 ModelScope 下载的配置文件：
+
+- 模型名称: [bge-m3, bge-reranker-m3-v2]
+- 来源: [https://modelscope.cn/models/BAAI/bge-m3, https://modelscope.cn/models/BAAI/bge-reranker-v2-m3]
+- 许可: Apache License 2.0 （https://www.apache.org/licenses/LICENSE-2.0）
+
+所需配置文件在运行时下载，工程发布**不包含**该下载包。
+
 [TOC]
 
 ## 1 模型说明
 
-本例使用的 bge-reranker 实现来源于[https://huggingface.co/BAAI/bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3)。
-本例使用的 bge-m3 实现来源于[https://huggingface.co/BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3)。
+本例使用的 bge-reranker 实现来源于[https://modelscope.cn/BAAI/bge-reranker-v2-m3](https://modelscope.cn/BAAI/bge-reranker-v2-m3)。
+本例使用的 bge-m3 实现来源于[https://modelscope.cn/BAAI/bge-m3](https://modelscope.cn/BAAI/bge-m3)。
 
 ## 2 快速开始
 

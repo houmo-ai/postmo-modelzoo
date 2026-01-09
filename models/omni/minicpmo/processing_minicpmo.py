@@ -1,5 +1,10 @@
+#!/usr/bin/python3
 # coding=utf-8
 # Copyright 2025 The OpenBMB Team. All rights reserved.
+# Copyright 2025 HOUMO AI. All rights reserved.
+#
+# Modifications:
+# - Portions of this file have been modified by HOUMO AI.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +17,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# File: processing_minicpmo.py
+# Description:
+#   minicpmo original model architecture.
 """
 Processor class for MiniCPMO.
 """
@@ -35,7 +44,7 @@ from transformers.utils import TensorType
 from image_processing_minicpmv import MiniCPMOBatchFeature
 
 def normalize_audios(audios: Union[np.ndarray, List[np.ndarray], List[List[np.ndarray]]]) -> List[List[np.ndarray]]:
-    """统一输入为 List[List[np.ndarray]]"""
+    """Unified input List[List[np.ndarray]]"""
     if isinstance(audios, np.ndarray):
         return [[audios]]
     elif isinstance(audios[0], np.ndarray):
@@ -43,7 +52,7 @@ def normalize_audios(audios: Union[np.ndarray, List[np.ndarray], List[List[np.nd
     return audios
 
 def validate_audio_parts(audios_list: List[List[np.ndarray]], audio_parts: Optional[List[List[int]]]):
-    """校验 audio_parts 长度是否匹配"""
+    """Check if the length of audio_parts matches."""
     if audio_parts is None:
         return
     if len(audio_parts) != len(audios_list):
@@ -53,7 +62,7 @@ def validate_audio_parts(audios_list: List[List[np.ndarray]], audio_parts: Optio
             raise ValueError("audio_parts inner length mismatch")
 
 def merge_audio_parts(audios: List[np.ndarray], parts: Optional[List[int]]) -> List[np.ndarray]:
-    """将相同 part 的音频合并"""
+    """Merge audio from the same part"""
     if parts is None:
         return audios
     merged = []
@@ -70,7 +79,7 @@ def merge_audio_parts(audios: List[np.ndarray], parts: Optional[List[int]]) -> L
     return merged
 
 def chunk_audio(audio: np.ndarray, max_len: int) -> List[np.ndarray]:
-    """拆分过长音频为多个 chunk"""
+    """Split long audio into multiple chunks"""
     if len(audio) <= max_len:
         return [audio]
     chunks = []
@@ -80,7 +89,7 @@ def chunk_audio(audio: np.ndarray, max_len: int) -> List[np.ndarray]:
     return chunks
 
 def build_audio_placeholders(audios: List[np.ndarray], get_placeholder_fn, chunk_input: bool, chunk_length: int):
-    """创建占位符"""
+    """Create placeholders"""
     placeholders = []
     for a in audios:
         placeholders.append(get_placeholder_fn(len(a), chunk_input, chunk_length))
@@ -207,7 +216,7 @@ class MiniCPMOProcessor(ProcessorMixin):
         return audio_placeholder
 
     def extract_audio_features(self, audios: List[np.ndarray], sampling_rate: int, **kwargs):
-        """调用 feature_extractor 获取特征和长度"""
+        """Call feature_extractor to get features and length."""
         if not audios:
             return [], []
         inputs = self.feature_extractor(
@@ -241,13 +250,13 @@ class MiniCPMOProcessor(ProcessorMixin):
         max_audio_len = 30 * sampling_rate if sampling_rate else None
 
         for idx, audios_ in enumerate(audios_list):
-            # 占位符
+            # placeholders
             audio_ph_list.append(build_audio_placeholders(audios_, self.get_audio_placeholder, chunk_input, chunk_length))
 
-            # 合并 part
+            # merge part
             merged = merge_audio_parts(audios_, audio_parts[idx] if audio_parts else None)
 
-            # 拆分长音频
+            # Split long audio
             final_audios = []
             for a in merged:
                 if max_audio_len:
@@ -255,7 +264,7 @@ class MiniCPMOProcessor(ProcessorMixin):
                 else:
                     final_audios.append(a)
 
-            # 提取特征
+            # Feature extraction
             features, lengths = self.extract_audio_features(final_audios, sampling_rate, **kwargs)
             audio_features_all.extend(features)
             audio_feature_lens_list.append(lengths if len(lengths) > 0 else [])

@@ -1,5 +1,24 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: demo.py
+# Description:
+#   Examples of minicpmo model inference based on various capabilities of the M50 device.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import json
 import time
@@ -320,24 +339,24 @@ def count_mixed_text(s):
 
 def split_text_for_tts(text: str, max_len: int = 80, min_len: int = 40):
     """
-    将长文本分成多段，每段适合输入TTS。
-    :param text: 原始文本
-    :param max_len: 每段最大长度
-    :param min_len: 每段最小长度
-    :return: 文本段列表
+    Divide long texts into multiple segments, each suitable for TTS input.
+    :param text: Original text
+    :param max_len: Maximum length of each segment
+    :param min_len: Minimum length of each segment
+    :return: List of text segments
     """
     chinese_punct = {'。', '？', '！', '：', '…'}
     english_punct = {'.', '?', '!', '...'}
 
-    # 按句号、问号、叹号、分号等自然停顿分句
+    # Sentences are divided according to natural pauses such as periods, question marks, exclamation marks, and semicolons.
     # sentences = re.split(r'([。！？；!?])', text)
     abbrev_pattern = r'(?:[A-Za-z]\.){2,}|(?:[a-z]\.[a-z]\.)'  # U.S.A. 或 e.g.
-    # 整体正则：先匹配缩写，再匹配句号/感叹号/问号等
+    # Overall regular expression: First match abbreviations, then match periods, exclamation marks, question marks, etc.
     pattern = rf'({abbrev_pattern}|[。！？；]|[.!?]+|…)'
 
     sentences = re.split(pattern, text)
 
-    # 将英文中初步分错的缩写拼接回去
+    # Reassemble the initially misplaced abbreviations from the English text.
     new_sentences = []
     pre_sent = sentences[0]
     for sent in sentences[1:]:
@@ -348,7 +367,7 @@ def split_text_for_tts(text: str, max_len: int = 80, min_len: int = 40):
             pre_sent += sent
     new_sentences.append(pre_sent)
     
-    # 把标点重新拼上去（因为re.split会丢失它们）
+    # Re-insert the punctuation marks (because re.split will lose them).
     grouped = []
     pre_sent = new_sentences[0]
     for sent in new_sentences[1:]:
@@ -359,12 +378,10 @@ def split_text_for_tts(text: str, max_len: int = 80, min_len: int = 40):
             pre_sent = sent
     grouped.append(pre_sent)
 
-    # 去除空元素
+    # Remove empty elements
     grouped = [g for g in grouped if g.strip()]
 
-    # -------------------------------------------------------------
-    # 2) 修复缩写被错误切开的情况
-    # -------------------------------------------------------------
+    # Fixes the issue of abbreviations being incorrectly split.
     fixed_group = []
     i = 0
     while i < len(grouped):
@@ -380,11 +397,11 @@ def split_text_for_tts(text: str, max_len: int = 80, min_len: int = 40):
         fixed_group.append(s)
         i += 1 
 
-    # 若某句太长，再切分
+    # If a sentence is too long, then split it.
     refined = []
     for sent in fixed_group:
         if count_mixed_text(sent)['Total'] > max_len:
-            # 按逗号或顿号进一步切分
+            # Further segmentation using commas or pauses.
             parts = re.split(r'([，、,])', sent)
             tmp = ""
             for p in parts:
@@ -398,7 +415,7 @@ def split_text_for_tts(text: str, max_len: int = 80, min_len: int = 40):
         else:
             refined.append(sent.strip())
     
-    # 将漏掉的缩写强行给到下一句头部
+    # Forcibly placing the omitted abbreviation at the beginning of the next sentence.
     refined.reverse()
     refixed_group_rever = []
     pre_str = ""
@@ -413,7 +430,7 @@ def split_text_for_tts(text: str, max_len: int = 80, min_len: int = 40):
         refixed_group_rever.append(pre_str)
     refixed_group = list(reversed(refixed_group_rever))   
 
-    # 若句子太短，合并前后
+    # If the sentence is too short, merge the beginning and end.
     merged = []
     cur_str = refixed_group[0]
     for r in refixed_group[1:]:
@@ -590,11 +607,6 @@ class HMMiniCPMO(object):
             if isinstance(self.tts_embedding, torch.nn.Embedding):
                 self.tts_embedding = self.tts_embedding.weight
             self.tts_code_embeddings = self.load_tts_code_embeds(args.embedding_path)
-
-            # option_tts_projector = tcim_lite.runtime.Option(wt_manager)
-            # self.tts_projector_engine = tcim_lite.runtime.load(args.llm_projector_path, option_tts_projector)
-            # self.tts_projector_input_infos = get_input_infos(self.tts_projector_engine)
-            # self.tts_projector_output_infos = get_output_infos(self.tts_projector_engine)
 
             option_tts_prefill = tcim_lite.runtime.Option(wt_manager)
             self.tts_prefill_engine = tcim_lite.runtime.load(args.tts_prefill_path, option_tts_prefill)
@@ -1023,7 +1035,6 @@ class HMMiniCPMO(object):
                     ) 
         data["inputs_embeds"] = new_vllm_embedding
         return data
-        #return new_vllm_embedding, vision_hidden_states
 
     def get_audio_embeddings(self, data):
         start_time = time.time()
@@ -1110,7 +1121,6 @@ class HMMiniCPMO(object):
         prefill_output = self.llm_prefill_engine.get_output(self.llm_output_names[0]).numpy()
         hidden_states = self.llm_prefill_engine.get_output(self.llm_output_names[1]).numpy()[:, :current_length, ...]
         last_hidden_states = hidden_states if last_hidden_states is None else np.concatenate([last_hidden_states, hidden_states], axis=1)
-        ### llm prefill post process   这一部分要修改
         next_token_logits = torch.from_numpy(prefill_output[:, -1, :]).to(dtype=torch.float32, device=self.device)
         if self.llm_sampling:
             next_token_scores = self.llm_prepared_logits_warper(torch.ones((1, 0), dtype=torch.long, device=self.device),
@@ -1155,7 +1165,6 @@ class HMMiniCPMO(object):
         output_token_num = 1
         this_peer_finished = False
         unfinished_sequences = torch.ones(input_ids.shape[0], dtype=torch.long, device=input_ids.device)
-        #last_hidden_states = last_hidden_states[:, -1, ...]
         decode_start_time = time.time()
         while(not this_peer_finished):
             next_tokens, hidden_states = self.chat_llm_decoder(next_tokens, input_ids)
@@ -1167,7 +1176,6 @@ class HMMiniCPMO(object):
                 this_peer_finished = unfinished_sequences.max() == 0
             else:
                 this_peer_finished = (next_tokens == self.eos_token_id[0]).all()
-            #this_peer_finished, unfinished_sequences = self.llm_criteria(input_ids, unfinished_sequences)
             output_token_num += 1
         self.llm_decode_time = time.time() - decode_start_time
         return input_ids, last_hidden_states, input_tokens_num, output_token_num
@@ -1553,14 +1561,9 @@ class HMMiniCPMO(object):
             self.vocos_engine.run()
             self.vocos_engine.sync()
 
-            #output_names = sorted(list(self.vocos_output_infos.keys()))
             mag = self.vocos_engine.get_output("mag").numpy()[..., :mel_spec.shape[-1]]
             x = self.vocos_engine.get_output("x").numpy()[..., :mel_spec.shape[-1]]
             y = self.vocos_engine.get_output("y").numpy()[..., :mel_spec.shape[-1]]
-
-            # mag = torch.from_numpy(mag).to(device=self.device, dtype=torch.float16)
-            # mag = torch.exp(mag)
-            # mag = torch.clip(mag, max=1e2)
 
             mag = torch.from_numpy(mag).to(device=self.device).float()
             x = torch.from_numpy(x).to(device=self.device).float()
@@ -1630,7 +1633,7 @@ class HMMiniCPMO(object):
             wav_numpy_list = []
             tts_chunk_total_start_time = time.time()
             for idx, cur_answer in enumerate(answer_list):
-                ### get mel spectrum(梅尔频谱)
+                ### get mel spectrum
                 self.tts_prefill_times = []
                 self.tts_decode_times = []
                 logger.info(f"Text {idx} start tts codec...")
@@ -1678,7 +1681,7 @@ class HMMiniCPMO(object):
         insert_silence = kwargs.get("insert_silence", False)
         final_wav = None
         if only_tts:
-            ### get mel spectrum(梅尔频谱)
+            ### get mel spectrum
             hidden_states = msgs['content'][1]
             text = msgs['content'][0]
             text_list = split_text_for_tts(text) if text_split else [text]
@@ -1778,7 +1781,6 @@ def xh2_demo(args):
                             "作为助手，你将使用这种声音风格说话。"]}
         video_contents = get_video_chunk_content(video_path)
         msg = {"role":"user", "content": video_contents + ["请优雅的描述一下画面中的场景。"]}
-        #msg = {"role":"user", "content": contents}
         msgs = [sys_msg, msg]
         logger.info(msgs)
         start_time = time.time()

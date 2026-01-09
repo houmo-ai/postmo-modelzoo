@@ -1,3 +1,24 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: model.py
+# Description:
+#   ppocrv3 recognition model implementation on HOUMO AI device.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import cv2
 import json
@@ -244,8 +265,6 @@ class BaseRecLabelEncode(object):
         text_list = []
         for char in text:
             if char not in self.dict:
-                # logger = get_logger()
-                # logger.warning('{} is not in dict'.format(char))
                 continue
             text_list.append(self.dict[char])
         if len(text_list) == 0:
@@ -379,11 +398,11 @@ class OCRRec(object):
         """模型推理"""
         import time
         prerpcessed_in_datas = self.preprocess(in_datas)
-        # 推理
+        # inference
         start_time = time.time()
         outs = self.module.run(prerpcessed_in_datas)
         self.total_latency_time += (time.time() - start_time)
-        # xh1同时输出量化和反量化结果，只取反量化后的
+        # xh1 outputs both quantization and dequantization results simultaneously, but only the dequantized result is taken.
         if isinstance(outs, tuple):
             outs = outs[1]
         outs = self.postprocess(outs, in_datas)

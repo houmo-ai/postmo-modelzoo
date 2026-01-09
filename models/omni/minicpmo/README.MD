@@ -2,11 +2,22 @@
 
 本示例展示如何把MiniCPMO中的各个模型量化和编译，部署到后摩M50芯片的设备上。
 
+## 特别事项
+
+本项目使用从 ModelScope 下载的预训练模型、配置文件和脚本：
+
+- 模型名称: MiniCPM-o-2_6
+- 来源: https://modelscope.cn/openbmb/MiniCPM-o-2_6
+- 许可: Apache License 2.0 （https://www.apache.org/licenses/LICENSE-2.0）
+
+预训练模型、配置文件和脚本在运行时下载，工程发布**不包含**该下载包。
+同时，原有的预处理代码image_processing_minicpmv.py和preocessing_minicpmo.py已进行适配性修改，并包含在项目提交文件中。特此声明。
+
 [TOC]
 
 ## 1 模型说明
 
-本例使用的 MiniCPMO 各模块模型实现来源于[https://huggingface.co/openbmb/MiniCPM-o-2_6](https://huggingface.co/openbmb/MiniCPM-o-2_6)。
+本例使用的 MiniCPMO 各模块模型实现来源于[https://modelscope.cn/openbmb/MiniCPM-o-2_6](https://modelscope.cn/openbmb/MiniCPM-o-2_6)。
 
 ## 2 快速开始
 

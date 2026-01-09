@@ -1,8 +1,10 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
 # Copyright 2025 HOUMO AI
 #
 # File: get_model.py
 # Description:
-#   Download PPOCRv3 rec model for detection tasks.
+#   Download PPOCRv3 rec model for recognition tasks.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

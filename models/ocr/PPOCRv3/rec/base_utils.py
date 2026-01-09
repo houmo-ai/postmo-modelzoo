@@ -1,3 +1,24 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: base_utils.py
+# Description:
+#   Basic functions for the PPOCRv3 recognition model example project.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import onnx
 import math
@@ -84,7 +105,6 @@ def onnx_preprocess(img, net_input_size):
     env_h = src_h if src_h % 2 == 0 else src_h - 1
     env_w = src_w if src_w % 2 == 0 else src_w - 1
     if env_h < src_h or env_w < src_w:
-        #img = np.pad(img, ((0, env_h - src_h), (0, env_w - src_w), (0, 0)), mode='constant', constant_values=0)
         img = img[0:env_h, 0:env_w, :]
         src_h, src_w = (env_h, env_w)
     dst_ratio = src_w / float(src_h)

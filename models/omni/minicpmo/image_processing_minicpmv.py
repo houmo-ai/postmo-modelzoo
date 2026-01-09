@@ -1,5 +1,10 @@
+#!/usr/bin/python3
 # coding=utf-8
 # Copyright 2025 The OpenBMB Team. All rights reserved.
+# Copyright 2025 HOUMO AI. All rights reserved.
+#
+# Modifications:
+# - Portions of this file have been modified by HOUMO AI.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +17,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# File: image_processing_minicpmv.py
+# Description:
+#   Image input preprocessing for minicpmo multi-modal tasks.
 
 import math
 from typing import Any

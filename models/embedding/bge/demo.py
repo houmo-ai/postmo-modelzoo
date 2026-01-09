@@ -1,5 +1,25 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+# Copyright (c) 2025 HOUMO AI
+#
+# File: demo.py
+# Description:
+#   This document provides sample Python inference scripts for bge-m3 and bge-reranker-m3-v2 
+# based on the M50 device, along with time consumption statistics.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 import json
 import time
@@ -11,10 +31,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from transformers import AutoTokenizer
-# import importlib.util
-# if not importlib.util.find_spec("sentence_transformers"):
-#     os.system("pip install sentence_transformers==5.1.0 -i https://pypi.tuna.tsinghua.edu.cn/simple")
-# from sentence_transformers import util
 from typing import Any, Optional, Tuple, Union, List
 
 from hmatc.utils import logger
@@ -453,14 +469,9 @@ def xh2_demo(args):
         logger.info("User query encoding time: %.6fms"%(embedder_time * 1000))
 
         hits_np = semantic_search_np(query_embedding, corpus_embeddings, top_k=3)
-        # print(hits_np)
-        # # Vector Similarity Retrieval (Top-K Coarse Recall)
-        # hits = util.semantic_search(query_embedding, corpus_embeddings, top_k=3)[0]
-        # print(hits)
 
         logger.info("==== 粗召回结果 (bge-m3) ====")
-        # for hit in hits:
-        #     logger.info(f"{corpus[hit['corpus_id']]} score:{hit['score']:.6f}")
+
         for hit in hits_np:
              logger.info(f"{corpus[hit[0]]} score:{hit[1]:.6f}")
         

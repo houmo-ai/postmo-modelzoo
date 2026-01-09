@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
 # Copyright 2025 HOUMO AI
 #
 # File: get_model.py
