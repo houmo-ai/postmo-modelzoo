@@ -1,5 +1,24 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: build.py
+# Description:
+#   Build and test script for Qwen2 2 Blocks model compilation and validation.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import os
 import numpy as np
@@ -15,36 +34,36 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--model_dir",
+        dest="model_dir",
         type=str,
-        default='qwen2_decode_2block',
-        help='path to the model dir',
+        default="qwen2_decode_2block",
+        help="path to the model dir",
     )
     parser.add_argument(
-        '--model_name',
-        dest='model_name',
+        "--model_name",
+        dest="model_name",
         type=str,
-        default='qwen2_decode_2block',
-        help='output houmo model name',
+        default="qwen2_decode_2block",
+        help="output houmo model name",
     )
     parser.add_argument(
-        '--batch',
-        dest='batch',
+        "--batch",
+        dest="batch",
         type=int,
         default=1,
-        help='batch size',
+        help="batch size",
     )
     parser.add_argument(
-        '--core',
-        dest='core',
+        "--core",
+        dest="core",
         type=int,
         default=4,
-        help='core number',
+        help="core number",
     )
     parser.add_argument(
-        '--stage',
-        dest='stage',
+        "--stage",
+        dest="stage",
         type=str,
         default="build",
         help='build stage choise=["build", "test", "all"]',
@@ -65,14 +84,14 @@ def build(args=None):
     onnx_name = quant_name + ".onnx"
     model_path = os.path.join(model_dir, onnx_name)
 
-    os.environ['AOT_COMPILE_NO_FORMAT'] = '1'
+    os.environ["AOT_COMPILE_NO_FORMAT"] = "1"
 
     # 1. build model
-    if stage == 'build' or stage == 'all':
+    if stage == "build" or stage == "all":
         print(f"\n===> {part_name} build start...")
         onnx_model = onnx.load(model_path)
         compile_config = {
-            'tcim.fuse_strategy': 1,
+            "tcim.fuse_strategy": 1,
             "tcim.gen_intrinsic": 1,
             "tcim.sync_strategy": 0,
             "tcim.special_model_name": "vit_small",
@@ -101,14 +120,14 @@ def build(args=None):
             if i <= 2:
                 input_cfg[input.name] = tcim.HMInput(shape=input_shape)
             else:
-                input_cfg[input.name] = tcim.HMInput(shape=input_shape, layout='NCHW')
+                input_cfg[input.name] = tcim.HMInput(shape=input_shape, layout="NCHW")
         weight_path = "2block_weight.npy"
         data_dict = np.load(weight_path, allow_pickle=True).item()
-        kvcache_path = os.path.join(model_dir, '../kvcache.npy')
+        kvcache_path = os.path.join(model_dir, "../kvcache.npy")
         if os.path.exists(kvcache_path):
             kvcache_data_dict = np.load(kvcache_path, allow_pickle=True).item()
             data_dict.update(kvcache_data_dict)
-        constant_path = os.path.join(model_dir, '../constant.npy')
+        constant_path = os.path.join(model_dir, "../constant.npy")
         if os.path.exists(constant_path):
             constant_data_dict = np.load(constant_path, allow_pickle=True).item()
             data_dict.update(constant_data_dict)
@@ -124,7 +143,7 @@ def build(args=None):
         print(f"<=== {part_name} build success.")
 
     # 2. test model, prefill model should run first to make the correct result
-    if stage == 'test' or stage == 'all':
+    if stage == "test" or stage == "all":
         if core_num != 4 and core_num != 2:
             print("[warnning] not support core =", core_num)
             exit(0)
@@ -148,10 +167,10 @@ def build(args=None):
                     input_info.format.name,
                 )
             )
-            input_file_name = input_name + '.npy'
+            input_file_name = input_name + ".npy"
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype(input_info.dtype)
-            if input_name == 'current_length':
+            if input_name == "current_length":
                 current_length = input_data[0]
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
             print(
@@ -187,7 +206,7 @@ def build(args=None):
             )
             # only compare [1,current_length,4096]
             output_data = output_data[:1, :current_length, :]
-            output_data_path = os.path.join(model_dir, output_name + '.npy')
+            output_data_path = os.path.join(model_dir, output_name + ".npy")
             if os.path.exists(output_data_path):
                 golden_output = (
                     np.load(output_data_path, allow_pickle=True)
@@ -231,6 +250,6 @@ def build(args=None):
         print(f"<=== {part_name} test success.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     build(args)

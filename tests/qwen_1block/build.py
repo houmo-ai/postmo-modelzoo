@@ -1,5 +1,24 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: build.py
+# Description:
+#   Build and test script for Qwen2 1 Block model compilation and validation.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import os
 import numpy as np
@@ -18,46 +37,46 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--model_dir",
+        dest="model_dir",
         type=str,
-        default='qwen',
-        help='path to the model dir',
+        default="qwen",
+        help="path to the model dir",
     )
     parser.add_argument(
-        '--model_name',
-        dest='model_name',
+        "--model_name",
+        dest="model_name",
         type=str,
-        default='qwen_decode_1block',
-        help='output houmo model name',
+        default="qwen_decode_1block",
+        help="output houmo model name",
     )
     parser.add_argument(
-        '--batch',
-        dest='batch',
+        "--batch",
+        dest="batch",
         type=int,
         default=1,
-        help='batch size',
+        help="batch size",
     )
     parser.add_argument(
-        '--ncore',
-        dest='ncore',
+        "--ncore",
+        dest="ncore",
         type=int,
         default=4,
-        help='core number',
+        help="core number",
     )
     parser.add_argument(
-        '--stage',
-        dest='stage',
+        "--stage",
+        dest="stage",
         type=str,
         default="build",
         help='build stage choise=["build", "test", "all"]',
     )
     parser.add_argument(
-        '--output_dir',
-        dest='output_dir',
+        "--output_dir",
+        dest="output_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET),
-        help='build output dir',
+        default=os.path.join("output", HOUMO_TARGET),
+        help="build output dir",
     )
     args = parser.parse_args()
     return args
@@ -80,7 +99,7 @@ def build(args=None):
     profile = {}
 
     # 1. build model
-    if stage == 'build' or stage == 'all':
+    if stage == "build" or stage == "all":
         import tcim
 
         print(f"\n===> {model_name} build start...")
@@ -98,7 +117,7 @@ def build(args=None):
         print(f'{model_name} build completed in {profile["build_time"]:.3f} s.')
 
     # 2. test model
-    if stage == 'test' or stage == 'all':
+    if stage == "test" or stage == "all":
         import tcim_lite
 
         print(f"\n===> {model_name} test start...")
@@ -118,12 +137,12 @@ def build(args=None):
             print(
                 f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
             )
-            input_file_name = 'hmquant_' + model_name + '_' + input_name + '_input.npy'
+            input_file_name = "hmquant_" + model_name + "_" + input_name + "_input.npy"
             input_data_path = os.path.join(model_dir, input_file_name)
             input_data = np.load(input_data_path).astype(input_info.dtype)
             if id != 0:
                 input_data = [input_data]
-            if input_name == 'current_length':
+            if input_name == "current_length":
                 current_length = input_data[0]
             input_data = np.concatenate([input_data for i in range(batch)], axis=0)
             print(
@@ -166,7 +185,7 @@ def build(args=None):
                 f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
             )
             output_data_path = os.path.join(
-                model_dir, f'hmquant_{model_name}_{output_name}_output.npy'
+                model_dir, f"hmquant_{model_name}_{output_name}_output.npy"
             )
             if os.path.exists(output_data_path):
                 golden_output = np.load(output_data_path)
@@ -204,6 +223,6 @@ def build(args=None):
         print(f"<=== {part_name} test success.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     build(args)

@@ -78,13 +78,13 @@
 
 ### 2.2 测试文件说明
 
-- `model_configs`: 文件夹中为所有模型测试配置文件。文件命名规则：`"model_cfg_" + 模型名 + ".json"`。
-- `update_test_py.py`: 根据 model*configs 文件夹下的模型配置文件，自动更新 python 测试用例脚本(仅增加用例)。脚本中将自动转换模型名称中的"-"和"."，"-"转为下划线"*"，"."转为"dot"。
-- `test_<test_type>_models.py`: python 测试用例脚本，用于 pytest 执行测例。根据章节 2.1 的 7 种测试类型，共计有 7 个 python 测试脚本。
-  - <test_type>: get, quant, compile, demo, compare, perf, eval。
-- `test_models_utils.py`: 包含了 7 种测试类型的测试逻辑代码，如现有测试逻辑无法覆盖新增模型或场景，则需修改此文件。
-- `conftest.py`: 在 pytest 框架中，是一个用于存放共享测试配置和 fixture 函数的特殊文件。如需详细了解可参考：https://pytest.cn/en/stable/getting-started.html
-  - 本文件中定义了支持的 pytest markers, 当前已支持的 markers: get_model, quant, compile, demo, compare, eval, perf。
+-   `model_configs`: 文件夹中为所有模型测试配置文件。文件命名规则：`"model_cfg_" + 模型名 + ".json"`。
+-   `update_test_py.py`: 根据 model*configs 文件夹下的模型配置文件，自动更新 python 测试用例脚本(仅增加用例)。脚本中将自动转换模型名称中的"-"和"."，"-"转为下划线"*"，"."转为"dot"。
+-   `test_<test_type>_models.py`: python 测试用例脚本，用于 pytest 执行测例。根据章节 2.1 的 7 种测试类型，共计有 7 个 python 测试脚本。
+    -   <test_type>: get, quant, compile, demo, compare, perf, eval。
+-   `test_models_utils.py`: 包含了 7 种测试类型的测试逻辑代码，如现有测试逻辑无法覆盖新增模型或场景，则需修改此文件。
+-   `conftest.py`: 在 pytest 框架中，是一个用于存放共享测试配置和 fixture 函数的特殊文件。如需详细了解可参考：https://pytest.cn/en/stable/getting-started.html
+    -   本文件中定义了支持的 pytest markers, 当前已支持的 markers: get_model, quant, compile, demo, compare, eval, perf。
 
 ### 2.3 测试配置文件说明
 
@@ -92,17 +92,17 @@
 
 提供了 CV 模型和 LLM 模型模板配置文件，便于新增模型的时候进行修改。其中，测试仓库包含两个默认路径：
 
-- `cached_models`: `/develop02/wanyu.li/modelzoo`，主要用于缓存原始模型，避免重复下载。
-- `cached_results`: `/data02/services/imodelzoo/tests/model_results_{HOUMO_TARGET}`，用于缓存单次测试模型量化和编译结果，避免测试用例之间重复量化编译，同时用于支持分阶段测试（如: 在 10.64.35.39 执行量化编译，在 10.64.35.71 执行 xh2 推理）。
+-   `cached_models`: `/develop02/imodelzoo`，主要用于缓存原始模型，避免重复下载。
+-   `cached_results`: `/data02/services/imodelzoo/tests/model_results_{HOUMO_TARGET}`，用于缓存单次测试模型量化和编译结果，避免测试用例之间重复量化编译，同时用于支持分阶段测试（如: 在 GPU 服务器执行量化编译，在装载了 M50 芯片的服务器执行 XH2 推理）。
 
 注意：
 
-- LLM 模型的原始模型下载需要手工提前下载到`cached_models`路径下，不要在测试用例中再下载，容易断开连接无法下载成功导致相关测例无法执行成功，且严重拉长整体测试时间。
-- 当前 Device 相关的配置，仅支持配置为 1，不支持多 Device 场景。
+-   LLM 模型的原始模型下载需要手工提前下载到`cached_models`路径下，不要在测试用例中再下载，容易断开连接无法下载成功导致相关测例无法执行成功，且严重拉长整体测试时间。
+-   当前 Device 相关的配置，仅支持配置为 1，不支持多 Device 场景。
 
 模型模板配置文件说明：
 
-- CV 模板配置文件：`tests/models_tests/model_configs/model_cfg_template_cv.json`，配置项说明。
+-   CV 模板配置文件：`tests/models_tests/model_configs/model_cfg_template_cv.json`，配置项说明。
 
 ```JSON
 // (必需)标识模型是否废弃, true表示已废弃，false表示未废弃
@@ -276,7 +276,7 @@
 }
 ```
 
-- LLM 模板配置文件：`tests/models_tests/model_configs/model_cfg_template_llm.json`，配置项说明。
+-   LLM 模板配置文件：`tests/models_tests/model_configs/model_cfg_template_llm.json`，配置项说明。
 
 ```JSON
 // (必需)标识模型是否废弃, true表示已废弃，false表示未废弃
@@ -421,8 +421,8 @@ pytest -s -v models_tests/ -m resnet50 -m "perf or eval"
 
 上述示例的测试方法命令中，`pytest -s -v`可作为固定命令前缀，`-k`和`-m`均为 pytest 框架中提供过滤执行测例的关键词，详细说明可参考：
 
-- https://pytest.cn/en/stable/example/markers.html
-- https://zhuanlan.zhihu.com/p/629592323
+-   https://pytest.cn/en/stable/example/markers.html
+-   https://zhuanlan.zhihu.com/p/629592323
 
 ## 3. 新增模型
 
@@ -452,7 +452,6 @@ Add test_xxx_template_v1dot0_perf into perf python file
 ```
 
 说明：脚本打印的 log 中包含了模型原始名称`template-v1.0`和脚本转换后的模型名称`template_v1dot0`，其中转换后的模型名称同时会添加到 `./model_names.txt` 文件中。
-
 
 ### 3.3 执行模型测试
 

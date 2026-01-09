@@ -1,3 +1,23 @@
+# Copyright 2025 HOUMO AI
+#
+# File: test_quant_models.py
+# Description:
+#   Model quantization tests module.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 import logging
 from .test_models_utils import *
@@ -6,7 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 def _quant_func(model_name: str, log_file: str) -> None:
-    """execute quant test"""
+    """
+    Execute model quantization test for a specific model.
+
+    Args:
+        model_name (str): Name of the model to quantize
+        log_file (str): Path to the log file for test output
+    """
     logger.info("===> TEST START: test_%s_quant", model_name)
     execute_quant_flow(model_name, log_file)
 
@@ -17,7 +43,7 @@ def _quant_func(model_name: str, log_file: str) -> None:
     name="test_autodrive_yolop_quant",
     depends_on=["test_get_models.py::test_autodrive_yolop_get_model"],
 )
-def test_autodrive_yolop_quant(setup_logging: type(print)) -> None:
+def test_autodrive_yolop_quant(setup_logging) -> None:
     """test_autodrive_yolop_quant"""
     model_name = "yolop"
     _quant_func(model_name, setup_logging)
@@ -29,7 +55,7 @@ def test_autodrive_yolop_quant(setup_logging: type(print)) -> None:
     name="test_backbone_efficientnet_quant",
     depends_on=["test_get_models.py::test_backbone_efficientnet_get_model"],
 )
-def test_backbone_efficientnet_quant(setup_logging: type(print)) -> None:
+def test_backbone_efficientnet_quant(setup_logging) -> None:
     """test_backbone_efficientnet_quant"""
     model_name = "efficientnet"
     _quant_func(model_name, setup_logging)
@@ -41,7 +67,7 @@ def test_backbone_efficientnet_quant(setup_logging: type(print)) -> None:
     name="test_backbone_mobilenetv2_quant",
     depends_on=["test_get_models.py::test_backbone_mobilenetv2_get_model"],
 )
-def test_backbone_mobilenetv2_quant(setup_logging: type(print)) -> None:
+def test_backbone_mobilenetv2_quant(setup_logging) -> None:
     """test_backbone_efficientnet_quant"""
     model_name = "mobilenetv2"
     _quant_func(model_name, setup_logging)
@@ -53,7 +79,7 @@ def test_backbone_mobilenetv2_quant(setup_logging: type(print)) -> None:
     name="test_backbone_resnet50_quant",
     depends_on=["test_get_models.py::test_backbone_resnet50_get_model"],
 )
-def test_backbone_resnet50_quant(setup_logging: type(print)) -> None:
+def test_backbone_resnet50_quant(setup_logging) -> None:
     """test_backbone_resnet50_quant"""
     model_name = "resnet50"
     _quant_func(model_name, setup_logging)
@@ -65,7 +91,7 @@ def test_backbone_resnet50_quant(setup_logging: type(print)) -> None:
     name="test_backbone_vit_quant",
     depends_on=["test_get_models.py::test_backbone_vit_get_model"],
 )
-def test_backbone_vit_quant(setup_logging: type(print)) -> None:
+def test_backbone_vit_quant(setup_logging) -> None:
     """test_backbone_vit_quant"""
     model_name = "vit"
     _quant_func(model_name, setup_logging)
@@ -77,7 +103,7 @@ def test_backbone_vit_quant(setup_logging: type(print)) -> None:
     name="test_detection_yolov3_quant",
     depends_on=["test_get_models.py::test_detection_yolov3_get_model"],
 )
-def test_detection_yolov3_quant(setup_logging: type(print)) -> None:
+def test_detection_yolov3_quant(setup_logging) -> None:
     """test_detection_yolov3_quant"""
     model_name = "yolov3"
     _quant_func(model_name, setup_logging)
@@ -89,7 +115,7 @@ def test_detection_yolov3_quant(setup_logging: type(print)) -> None:
     name="test_detection_yolov5s_quant",
     depends_on=["test_get_models.py::test_detection_yolov5s_get_model"],
 )
-def test_detection_yolov5s_quant(setup_logging: type(print)) -> None:
+def test_detection_yolov5s_quant(setup_logging) -> None:
     """test_detection_yolov5s_quant"""
     model_name = "yolov5s"
     _quant_func(model_name, setup_logging)
@@ -101,7 +127,7 @@ def test_detection_yolov5s_quant(setup_logging: type(print)) -> None:
     name="test_detection_yolov5s_feature_quant",
     depends_on=["test_get_models.py::test_detection_yolov5s_feature_get_model"],
 )
-def test_detection_yolov5s_feature_quant(setup_logging: type(print)) -> None:
+def test_detection_yolov5s_feature_quant(setup_logging) -> None:
     """test_detection_yolov5s_feature_quant"""
     model_name = "yolov5s_feature"
     _quant_func(model_name, setup_logging)
@@ -113,7 +139,7 @@ def test_detection_yolov5s_feature_quant(setup_logging: type(print)) -> None:
     name="test_detection_yolov8m_quant",
     depends_on=["test_get_models.py::test_detection_yolov8m_get_model"],
 )
-def test_detection_yolov8m_quant(setup_logging: type(print)) -> None:
+def test_detection_yolov8m_quant(setup_logging) -> None:
     """test_detection_yolov8m_quant"""
     model_name = "yolov8m"
     _quant_func(model_name, setup_logging)
@@ -125,7 +151,7 @@ def test_detection_yolov8m_quant(setup_logging: type(print)) -> None:
     name="test_llm_qwen2dot5_quant",
     depends_on=["test_get_models.py::test_llm_qwen2dot5_get_model"],
 )
-def test_llm_qwen2dot5_quant(setup_logging: type(print)) -> None:
+def test_llm_qwen2dot5_quant(setup_logging) -> None:
     """test_llm_qwen2dot5_quant"""
     model_name = "qwen2.5"
     _quant_func(model_name, setup_logging)
@@ -137,7 +163,7 @@ def test_llm_qwen2dot5_quant(setup_logging: type(print)) -> None:
     name="test_llm_qwen3_quant",
     depends_on=["test_get_models.py::test_llm_qwen3_get_model"],
 )
-def test_llm_qwen3_quant(setup_logging: type(print)) -> None:
+def test_llm_qwen3_quant(setup_logging) -> None:
     """test_llm_qwen3_quant"""
     model_name = "qwen3"
     _quant_func(model_name, setup_logging)
@@ -149,7 +175,7 @@ def test_llm_qwen3_quant(setup_logging: type(print)) -> None:
     name="test_llm_qwen3_14b_quant",
     depends_on=["test_get_models.py::test_llm_qwen3_14b_get_model"],
 )
-def test_llm_qwen3_14b_quant(setup_logging: type(print)) -> None:
+def test_llm_qwen3_14b_quant(setup_logging) -> None:
     """test_llm_qwen3_14b_quant"""
     model_name = "qwen3-14b"
     _quant_func(model_name, setup_logging)
@@ -161,7 +187,7 @@ def test_llm_qwen3_14b_quant(setup_logging: type(print)) -> None:
     name="test_llm_deepseek_quant",
     depends_on=["test_get_models.py::test_llm_deepseek_get_model"],
 )
-def test_llm_deepseek_quant(setup_logging: type(print)) -> None:
+def test_llm_deepseek_quant(setup_logging) -> None:
     """test_llm_deepseek_quant"""
     model_name = "deepseek"
     _quant_func(model_name, setup_logging)
@@ -173,7 +199,7 @@ def test_llm_deepseek_quant(setup_logging: type(print)) -> None:
     name="test_llm_deepseek_r1_qwen3_8b_quant",
     depends_on=["test_get_models.py::test_llm_deepseek_r1_qwen3_8b_get_model"],
 )
-def test_llm_deepseek_r1_qwen3_8b_quant(setup_logging: type(print)) -> None:
+def test_llm_deepseek_r1_qwen3_8b_quant(setup_logging) -> None:
     """test_llm_deepseek_r1_qwen3_8b_quant"""
     model_name = "deepseek-r1-qwen3-8b"
     _quant_func(model_name, setup_logging)
@@ -185,7 +211,7 @@ def test_llm_deepseek_r1_qwen3_8b_quant(setup_logging: type(print)) -> None:
     name="test_vllm_qwen2dot5_vl_quant",
     depends_on=["test_get_models.py::test_vllm_qwen2dot5_vl_get_model"],
 )
-def test_vllm_qwen2dot5_vl_quant(setup_logging: type(print)) -> None:
+def test_vllm_qwen2dot5_vl_quant(setup_logging) -> None:
     """test_vllm_qwen2dot5_vl_quant"""
     model_name = "qwen2.5-vl"
     _quant_func(model_name, setup_logging)
@@ -194,163 +220,166 @@ def test_vllm_qwen2dot5_vl_quant(setup_logging: type(print)) -> None:
 @pytest.mark.yolo12m
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_detection_yolo12m_quant',
-    depends_on=['test_get_models.py::test_detection_yolo12m_get_model'],
+    name="test_detection_yolo12m_quant",
+    depends_on=["test_get_models.py::test_detection_yolo12m_get_model"],
 )
-def test_detection_yolo12m_quant(setup_logging: type(print)) -> None:
+def test_detection_yolo12m_quant(setup_logging) -> None:
     """test_detection_yolo12m_quant"""
-    model_name = 'yolo12m'
+    model_name = "yolo12m"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.yolov8m_pose
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_estimation_yolov8m_pose_quant',
-    depends_on=['test_get_models.py::test_estimation_yolov8m_pose_get_model'],
+    name="test_estimation_yolov8m_pose_quant",
+    depends_on=["test_get_models.py::test_estimation_yolov8m_pose_get_model"],
 )
-def test_estimation_yolov8m_pose_quant(setup_logging: type(print)) -> None:
+def test_estimation_yolov8m_pose_quant(setup_logging) -> None:
     """test_estimation_yolov8m_pose_quant"""
-    model_name = 'yolov8m-pose'
+    model_name = "yolov8m-pose"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.yolov8m_seg
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_segmentation_yolov8m_seg_quant',
-    depends_on=['test_get_models.py::test_segmentation_yolov8m_seg_get_model'],
+    name="test_segmentation_yolov8m_seg_quant",
+    depends_on=["test_get_models.py::test_segmentation_yolov8m_seg_get_model"],
 )
-def test_segmentation_yolov8m_seg_quant(setup_logging: type(print)) -> None:
+def test_segmentation_yolov8m_seg_quant(setup_logging) -> None:
     """test_segmentation_yolov8m_seg_quant"""
-    model_name = 'yolov8m-seg'
+    model_name = "yolov8m-seg"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.yolov7
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_detection_yolov7_quant',
-    depends_on=['test_get_models.py::test_detection_yolov7_get_model'],
+    name="test_detection_yolov7_quant",
+    depends_on=["test_get_models.py::test_detection_yolov7_get_model"],
 )
-def test_detection_yolov7_quant(setup_logging: type(print)) -> None:
+def test_detection_yolov7_quant(setup_logging) -> None:
     """test_detection_yolov7_quant"""
-    model_name = 'yolov7'
+    model_name = "yolov7"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.yolov5m_face
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_detection_yolov5m_face_quant',
-    depends_on=['test_get_models.py::test_detection_yolov5m_face_get_model'],
+    name="test_detection_yolov5m_face_quant",
+    depends_on=["test_get_models.py::test_detection_yolov5m_face_get_model"],
 )
-def test_detection_yolov5m_face_quant(setup_logging: type(print)) -> None:
+def test_detection_yolov5m_face_quant(setup_logging) -> None:
     """test_detection_yolov5m_face_quant"""
-    model_name = 'yolov5m_face'
+    model_name = "yolov5m_face"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.yolox
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_detection_yolox_quant',
-    depends_on=['test_get_models.py::test_detection_yolox_get_model'],
+    name="test_detection_yolox_quant",
+    depends_on=["test_get_models.py::test_detection_yolox_get_model"],
 )
-def test_detection_yolox_quant(setup_logging: type(print)) -> None:
+def test_detection_yolox_quant(setup_logging) -> None:
     """test_detection_yolox_quant"""
-    model_name = 'yolox'
+    model_name = "yolox"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.lprnet
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_ocr_lprnet_quant',
-    depends_on=['test_get_models.py::test_ocr_lprnet_get_model'],
+    name="test_ocr_lprnet_quant",
+    depends_on=["test_get_models.py::test_ocr_lprnet_get_model"],
 )
-def test_ocr_lprnet_quant(setup_logging: type(print)) -> None:
+def test_ocr_lprnet_quant(setup_logging) -> None:
     """test_ocr_lprnet_quant"""
-    model_name = 'lprnet'
+    model_name = "lprnet"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.ppocrv3_det
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_ocr_ppocrv3_det_quant',
-    depends_on=['test_get_models.py::test_ocr_ppocrv3_det_get_model'],
+    name="test_ocr_ppocrv3_det_quant",
+    depends_on=["test_get_models.py::test_ocr_ppocrv3_det_get_model"],
 )
-def test_ocr_ppocrv3_det_quant(setup_logging: type(print)) -> None:
+def test_ocr_ppocrv3_det_quant(setup_logging) -> None:
     """test_ocr_ppocrv3_det_quant"""
-    model_name = 'ppocrv3_det'
+    model_name = "ppocrv3_det"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.bge
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_embedding_bge_quant',
-    depends_on=['test_get_models.py::test_embedding_bge_get_model'],
+    name="test_embedding_bge_quant",
+    depends_on=["test_get_models.py::test_embedding_bge_get_model"],
 )
-def test_embedding_bge_quant(setup_logging: type(print)) -> None:
+def test_embedding_bge_quant(setup_logging) -> None:
     """test_embedding_bge_quant"""
-    model_name = 'bge'
+    model_name = "bge"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.yolov8m_cls
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_segmentation_yolov8m_cls_quant',
-    depends_on=['test_get_models.py::test_segmentation_yolov8m_cls_get_model'],
+    name="test_segmentation_yolov8m_cls_quant",
+    depends_on=["test_get_models.py::test_segmentation_yolov8m_cls_get_model"],
 )
-def test_segmentation_yolov8m_cls_quant(setup_logging: type(print)) -> None:
+def test_segmentation_yolov8m_cls_quant(setup_logging) -> None:
     """test_segmentation_yolov8m_cls_quant"""
-    model_name = 'yolov8m-cls'
+    model_name = "yolov8m-cls"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.yolov10m
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_detection_yolov10m_quant',
-    depends_on=['test_get_models.py::test_detection_yolov10m_get_model'],
+    name="test_detection_yolov10m_quant",
+    depends_on=["test_get_models.py::test_detection_yolov10m_get_model"],
 )
-def test_detection_yolov10m_quant(setup_logging: type(print)) -> None:
+def test_detection_yolov10m_quant(setup_logging) -> None:
     """test_detection_yolov10m_quant"""
-    model_name = 'yolov10m'
+    model_name = "yolov10m"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.yolo11m
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_detection_yolo11m_quant',
-    depends_on=['test_get_models.py::test_detection_yolo11m_get_model'],
+    name="test_detection_yolo11m_quant",
+    depends_on=["test_get_models.py::test_detection_yolo11m_get_model"],
 )
-def test_detection_yolo11m_quant(setup_logging: type(print)) -> None:
+def test_detection_yolo11m_quant(setup_logging) -> None:
     """test_detection_yolo11m_quant"""
-    model_name = 'yolo11m'
+    model_name = "yolo11m"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.yolov9m
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name='test_detection_yolov9m_quant',
-    depends_on=['test_get_models.py::test_detection_yolov9m_get_model'],
+    name="test_detection_yolov9m_quant",
+    depends_on=["test_get_models.py::test_detection_yolov9m_get_model"],
 )
-def test_detection_yolov9m_quant(setup_logging: type(print)) -> None:
+def test_detection_yolov9m_quant(setup_logging) -> None:
     """test_detection_yolov9m_quant"""
-    model_name = 'yolov9m'
+    model_name = "yolov9m"
     _quant_func(model_name, setup_logging)
 
 
 @pytest.mark.minicpmo
 @pytest.mark.quant
-@pytest.mark.dependency(name='test_omni_minicpmo_quant', depends_on=['test_get_models.py::test_omni_minicpmo_get_model'])
-def test_omni_minicpmo_quant(setup_logging: type(print)) -> None:
+@pytest.mark.dependency(
+    name="test_omni_minicpmo_quant",
+    depends_on=["test_get_models.py::test_omni_minicpmo_get_model"],
+)
+def test_omni_minicpmo_quant(setup_logging) -> None:
     """test_omni_minicpmo_quant"""
-    model_name = 'minicpmo'
+    model_name = "minicpmo"
     _quant_func(model_name, setup_logging)

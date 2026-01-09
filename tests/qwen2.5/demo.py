@@ -1,5 +1,25 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: demo.py
+# Description:
+#   Demo script for Qwen2.5 model inference using compiled HMM models.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import re
 import sys
@@ -39,40 +59,40 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--tokenizer_dir',
-        dest='tokenizer_dir',
+        "--tokenizer_dir",
+        dest="tokenizer_dir",
         type=str,
         default="qwen2.5-7b-instruct-hf",
-        help='tokenizer dir',
+        help="tokenizer dir",
     )
     parser.add_argument(
-        '--embedding_path',
-        dest='embedding_path',
+        "--embedding_path",
+        dest="embedding_path",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant', 'quant_embedding.pt'),
-        help='houmo embedding weight path',
+        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        help="houmo embedding weight path",
     )
     parser.add_argument(
-        '--prefill_path',
-        dest='prefill_path',
+        "--prefill_path",
+        dest="prefill_path",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, "qwen2.5_prefill.hmm"),
-        help='houmo prefill model path',
+        default=os.path.join("output", HOUMO_TARGET, "qwen2.5_prefill.hmm"),
+        help="houmo prefill model path",
     )
     parser.add_argument(
-        '--decode_path',
-        dest='decode_path',
+        "--decode_path",
+        dest="decode_path",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, "qwen2.5_decode.hmm"),
-        help='houmo decode model path',
+        default=os.path.join("output", HOUMO_TARGET, "qwen2.5_decode.hmm"),
+        help="houmo decode model path",
     )
     parser.add_argument(
-        '--ndevice',
-        dest='ndevice',
+        "--ndevice",
+        dest="ndevice",
         type=int,
         default=1,
         choices=[1, 2],
-        help='device number, only xh2 support',
+        help="device number, only xh2 support",
     )
     args = parser.parse_args()
     return args
@@ -88,10 +108,10 @@ class HmQwen:
         logger.info("prefill model loaded")
         self.nblocks = self.get_nblocks()
         dummy_tensor_names = [
-            f'model_layers_{i}_self_attn_kcache_input' for i in range(self.nblocks)
+            f"model_layers_{i}_self_attn_kcache_input" for i in range(self.nblocks)
         ]
         dummy_tensor_names += [
-            f'model_layers_{i}_self_attn_vcache_input' for i in range(self.nblocks)
+            f"model_layers_{i}_self_attn_vcache_input" for i in range(self.nblocks)
         ]
         option2.set_dummy_tensors(dummy_tensor_names)
         self.decode = tcim.runtime.load(decode_path, option=option2)
@@ -109,10 +129,10 @@ class HmQwen:
         self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
         # set kvcache input
         for i in range(self.nblocks):
-            kcache = self.prefill.get_input(f'model_layers_{i}_self_attn_kcache_input')
-            self.decode.set_input(f'model_layers_{i}_self_attn_kcache_input', kcache)
-            vcache = self.prefill.get_input(f'model_layers_{i}_self_attn_vcache_input')
-            self.decode.set_input(f'model_layers_{i}_self_attn_vcache_input', vcache)
+            kcache = self.prefill.get_input(f"model_layers_{i}_self_attn_kcache_input")
+            self.decode.set_input(f"model_layers_{i}_self_attn_kcache_input", kcache)
+            vcache = self.prefill.get_input(f"model_layers_{i}_self_attn_vcache_input")
+            self.decode.set_input(f"model_layers_{i}_self_attn_vcache_input", vcache)
         # set decode input
         current_length_input_1 = np.array([1]).astype("int16")
         self.decode.set_input("current_length", current_length_input_1)
@@ -127,7 +147,7 @@ class HmQwen:
         input_names = []
         for i in range(self.prefill.get_num_inputs()):
             input_names.append(self.prefill.get_input_name(i))
-        pattern = r'^model_layers_(\d+)_self_attn_kcache_input$'
+        pattern = r"^model_layers_(\d+)_self_attn_kcache_input$"
         count = sum(1 for item in input_names if re.match(pattern, item))
         return count
 
@@ -240,7 +260,7 @@ class HmQwen:
             decode_response = self.tokenizer.decode(
                 chat_history_ids.tolist()[-(slide_len + 1) - skip_tokens :]
             )[len(last_response) :]
-            if decode_response != '' and is_valid_char(ord(decode_response[-1])):
+            if decode_response != "" and is_valid_char(ord(decode_response[-1])):
                 print(decode_response, end="", flush=True)
                 all_response += decode_response
                 last_response = self.tokenizer.decode(
@@ -280,10 +300,10 @@ class HmQwenXh2:
         logger.info("prefill model loaded")
         self.nblocks = self.get_nblocks()
         dummy_tensor_names = [
-            f'model_layers_{i}_self_attn_kcache_input' for i in range(self.nblocks)
+            f"model_layers_{i}_self_attn_kcache_input" for i in range(self.nblocks)
         ]
         dummy_tensor_names += [
-            f'model_layers_{i}_self_attn_vcache_input' for i in range(self.nblocks)
+            f"model_layers_{i}_self_attn_vcache_input" for i in range(self.nblocks)
         ]
         option2.set_dummy_tensors(dummy_tensor_names)
         self.decode = tcim.runtime.load(decode_path, option=option2)
@@ -311,14 +331,14 @@ class HmQwenXh2:
         )
         embedding_weight = torch.load(
             embedding_path, map_location="cpu", weights_only=True
-        )['weight']
+        )["weight"]
         self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len)
 
     def get_nblocks(self):
         input_names = []
         for i in range(self.prefill.get_num_inputs()):
             input_names.append(self.prefill.get_input_name(i))
-        pattern = r'^model_layers_(\d+)_self_attn_kcache_input$'
+        pattern = r"^model_layers_(\d+)_self_attn_kcache_input$"
         count = sum(1 for item in input_names if re.match(pattern, item))
         return count
 
@@ -433,7 +453,7 @@ class HmQwenXh2:
             decode_response = self.tokenizer.decode(
                 chat_history_ids.tolist()[-(slide_len + 1) - skip_tokens :]
             )[len(last_response) :]
-            if decode_response != '' and is_valid_char(ord(decode_response[-1])):
+            if decode_response != "" and is_valid_char(ord(decode_response[-1])):
                 print(decode_response, end="", flush=True)
                 all_response += decode_response
                 last_response = self.tokenizer.decode(
@@ -457,11 +477,11 @@ class HmQwenXh2:
 if __name__ == "__main__":
 
     args = get_args()
-    if HOUMO_TARGET == 'xh1':
+    if HOUMO_TARGET == "xh1":
         hmqwen = HmQwen(
             args.prefill_path, args.decode_path, args.embedding_path, args.tokenizer_dir
         )
-    elif HOUMO_TARGET == 'xh2':
+    elif HOUMO_TARGET == "xh2":
         hmqwen = HmQwenXh2(
             args.prefill_path,
             args.decode_path,

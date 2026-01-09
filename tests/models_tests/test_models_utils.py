@@ -1,9 +1,33 @@
+# Copyright 2025 HOUMO AI
+#
+# File: test_models_utils.py
+# Description:
+#   Model testing utilities module for comprehensive model validation.
+#   This module provides utility functions for executing various test flows for different models.
+#   It handles model configuration loading, command generation, model preparation, and execution
+#   of different test types including get_model, quant, compile, demo, compare, eval, and perf tests.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 import os
 import logging
 import shutil
-from ..tests_utils.tests_common_utils import *
 import glob
+import re
+from ..tests_utils.tests_common_utils import *
 
 
 logger = logging.getLogger(__name__)
@@ -11,6 +35,15 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 def _load_model_cfg(model_name: str) -> dict:
+    """
+    Load model configuration from JSON file.
+
+    Args:
+        model_name (str): Name of the model whose configuration needs to be loaded
+
+    Returns:
+        dict: Configuration dictionary loaded from the JSON file, or None if file doesn't exist
+    """
     model_cfg_path = script_dir + "/model_configs/model_cfg_" + model_name + ".json"
     return load_json(model_cfg_path)
 
@@ -21,6 +54,18 @@ def _generate_hmatc_cmds(
     optional_params: dict,
     skipped_vals: dict = None,
 ) -> list:
+    """
+    Generate HMATC command lists with different parameter combinations.
+
+    Args:
+        cmd_header (list): Base command elements (executable and common parameters)
+        required_params (dict): Dictionary containing required parameter names and their values
+        optional_params (dict): Dictionary containing optional parameter names and their values
+        skipped_vals (dict): Dictionary of parameter values to skip during generation
+
+    Returns:
+        list: List of command lists with different parameter combinations
+    """
     merged_params = required_params.copy()
     merged_params.update(optional_params)
 
@@ -65,6 +110,19 @@ def _generate_py_cmds(
     model_dir: str = None,
     res_dir: str = None,
 ) -> list:
+    """
+    Generate Python command lists with different parameter combinations.
+
+    Args:
+        cmd_header (list): Base command elements (executable and common parameters)
+        params_dict (dict): Dictionary containing parameter names and their possible values
+        skip_default (bool): Whether to skip the first parameter combination (default)
+        model_dir (str): Directory containing model files
+        res_dir (str): Directory containing results
+
+    Returns:
+        list: List of command lists with different parameter combinations
+    """
 
     cmd_list = [cmd_header] if skip_default else list()
     idx = 1 if skip_default else 0
@@ -96,7 +154,16 @@ def _generate_py_cmds(
 
 
 def _check_compile_result(res_str: str, benchmark_val: float) -> bool:
-    import re
+    """
+    Check compilation results against benchmark values.
+
+    Args:
+        res_str (str): Output string from compilation test
+        benchmark_val (float): Benchmark value to compare against
+
+    Returns:
+        bool: True if all results meet the threshold, False otherwise
+    """
 
     if HOUMO_BACKEND == "xh2":
         row_pattern = re.compile(r"\|\s*([\w\-/.]+)\s*\|\s*(\d+\.\d+)\s*\|$")
@@ -118,7 +185,7 @@ def _check_compile_result(res_str: str, benchmark_val: float) -> bool:
             for idx, val in enumerate(parts):
                 try:
                     final_val = float(val)
-                except:
+                except Exception:
                     final_val = str(val)
                 res_dict[header[idx]] = final_val
             rows.append(res_dict)
@@ -140,8 +207,15 @@ def _check_compile_result(res_str: str, benchmark_val: float) -> bool:
 
 
 def _check_compare_result(res_str: str) -> bool:
-    import re
+    """
+    Check comparison results between ONNX and HM models.
 
+    Args:
+        res_str (str): Output string from comparison test
+
+    Returns:
+        bool: True if all results meet the threshold, False otherwise
+    """
     if HOUMO_BACKEND == "xh2":
         row_pattern = re.compile(
             r"\|\s*([^|]+?)\s*\|\s*(\d+\.\d+)\s*\|\s*(\d+\.\d+)\s*\|\s*(\d+\.\d+)\s*\|$"
@@ -174,7 +248,6 @@ def _check_compare_result(res_str: str) -> bool:
 
     logger.info(f"Comparation results: {rows}")
     compare_th = 1.0
-    # [TMP]
     if HOUMO_BACKEND == "xh2":
         compare_th = 0.9
     check_res = all(row[header[3]] >= compare_th for row in rows)
@@ -182,7 +255,16 @@ def _check_compare_result(res_str: str) -> bool:
 
 
 def _process_eval_result(res_str: str, perf_names: list) -> dict:
-    import re
+    """
+    Process evaluation results and extract performance metrics.
+
+    Args:
+        res_str (str): Output string from evaluation test
+        perf_names (list): List of performance metric names to extract
+
+    Returns:
+        dict: Dictionary containing extracted performance metrics
+    """
 
     def extract_field(text, field_name):
         pattern = rf"{field_name}':\s*'?([^'\]]+)'?"
@@ -203,19 +285,22 @@ def _process_eval_result(res_str: str, perf_names: list) -> dict:
 
 
 def _get_param_value(params, target_param):
+    """
+    Extract the value of a parameter from a command list.
+
+    Args:
+        params (list): List of parameters in the format [param, value, param, value, ...]
+        target_param (str): Name of the parameter to find
+
+    Returns:
+        str or None: Value of the target parameter, or None if not found
+    """
     for i in range(len(params)):
         if params[i] == target_param:
             if i + 1 < len(params):
                 return params[i + 1]
             break
     return None
-
-
-def _find_first_non_none(lst):
-    for idx, value in enumerate(lst):
-        if value is not None:  # 严格判断：不为 None
-            return idx  # 找到第一个，直接返回下标
-    return -1
 
 
 def _download_models(
@@ -227,7 +312,23 @@ def _download_models(
     copy_flag: bool = False,
     assert_flag=True,
     other_params: list = list(),
-):
+) -> bool:
+    """
+    Download models of specified type with proper resource locking.
+
+    Args:
+        model_info (dict): Dictionary containing model configuration information
+        file_type (str): Type of model files to download (raw, quant, hmm)
+        download_dir (str): Directory to download model files to
+        extract_dir (str): Directory to extract model files to
+        lock_type (str): Type of locking to use (download, extract, all)
+        copy_flag (bool): Whether to copy downloaded files to current directory
+        assert_flag (bool): Whether to assert on download failure
+        other_params (list): Additional parameters to pass to the download command
+
+    Returns:
+        bool: True if download was successful, False otherwise
+    """
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
 
@@ -276,6 +377,16 @@ def _download_models(
 
 
 def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
+    """
+    Prepare quantized LLM model for compilation.
+
+    Args:
+        model_info (dict): Dictionary containing model configuration information
+        log_file (str): Path to the log file for test output
+
+    Returns:
+        bool: True if preparation was successful, False otherwise
+    """
     if get_test_type() == TCaseType.SEPARATE_INFER:
         logger.warning(
             "Skip the step of preparing quantized llm model in the SPEARATE INFER stage."
@@ -360,6 +471,16 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
 
 
 def _prepare_quantized_cv_model(model_info: dict, log_file: str) -> bool:
+    """
+    Prepare quantized computer vision model for compilation.
+
+    Args:
+        model_info (dict): Dictionary containing model configuration information
+        log_file (str): Path to the log file for test output
+
+    Returns:
+        bool: True if preparation was successful, False otherwise
+    """
     logger.info("Start to prepare quantized cv model for compiling.")
     flag = True
     model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
@@ -422,6 +543,17 @@ def _prepare_quantized_cv_model(model_info: dict, log_file: str) -> bool:
 
 
 def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) -> bool:
+    """
+    Prepare compiled LLM model for inference.
+
+    Args:
+        model_info (dict): Dictionary containing model configuration information
+        platform (str): Current platform
+        log_file (str): Path to the log file for test output
+
+    Returns:
+        bool: True if preparation was successful, False otherwise
+    """
     if get_test_type() == TCaseType.SEPARATE_INFER:
         logger.warning(
             "Skip the step of preparing compiled model in the SPEARATE INFER stage."
@@ -538,6 +670,17 @@ def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) 
 
 
 def _prepare_compiled_cv_model(model_info: dict, platform: str, log_file: str) -> bool:
+    """
+    Prepare compiled computer vision model for inference.
+
+    Args:
+        model_info (dict): Dictionary containing model configuration information
+        platform (str): Current platform
+        log_file (str): Path to the log file for test output
+
+    Returns:
+        bool: True if preparation was successful, False otherwise
+    """
     if get_test_type() == TCaseType.SEPARATE_INFER:
         logger.warning(
             "Skip the step of preparing compiled model in the SPEARATE INFER stage."
@@ -605,6 +748,20 @@ def _run_demo_script(
     model_res_dir: str,
     log_file: str,
 ) -> bool:
+    """
+    Execute demo script with different parameter combinations.
+
+    Args:
+        demo_name (str): Name of the demo script to run
+        model_name (str): Name of the model being tested
+        model_info (dict): Dictionary containing model configuration information
+        model_set_dir (str): Directory containing model files
+        model_res_dir (str): Directory containing model results
+        log_file (str): Path to the log file for test output
+
+    Returns:
+        bool: True if all demo executions were successful, False otherwise
+    """
     run_flag = True
     param_str = f"{demo_name}_params"
     if (
@@ -630,7 +787,7 @@ def _run_demo_script(
         ):
             check_flag = False if model_name == "qwen2.5-vl" else True
             for tmp_cmd_list in cmd_list:
-                # [TMP]
+                # [Debug]
                 # if demo_name == "demo_multibatch":
                 #     logger.warning(
                 #         f"Skip to execute demo_multibatch.py, cmd is {tmp_cmd_list}"
@@ -651,7 +808,13 @@ def _run_demo_script(
 
 
 def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
-    """Test all the parameters of the get_model.py in all the supported models."""
+    """
+    Execute the complete get model test flow for a specified model.
+
+    Args:
+        model_name (str): Name of the model to test
+        log_file (str): Path to the log file for test output
+    """
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -716,13 +879,14 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
 
 def execute_quant_flow(model_name: str, log_file: str = "") -> None:
     """
-    Test all the supported model quantization functions and related parameters.
-    1. Download the raw model for quantization.
-    2. Check whether the model supports hmatc quant.
-    3. If the model supports the hmatc tool,
-       then the quantization test will be conducted using the hmatc tool.
-    4. If the model doesn't support the hmatc tool,
-       then execute the quantization test using the ptq.py.
+    Execute the complete quantization test flow for a specified model.
+
+    This function orchestrates the entire quantization test flow, including
+    model preparation, quantization execution, and result validation.
+
+    Args:
+        model_name (str): Name of the model to test
+        log_file (str): Path to the log file for test output
     """
     model_info = _load_model_cfg(model_name)
     if (
@@ -837,13 +1001,12 @@ def execute_compile_flow(
     model_name: str, log_file: str = "", clear_flag: bool = True
 ) -> None:
     """
-    Test all the supported model compilation functions and related parameters.
-    1. Download the already quantized model for compilation.
-    2. Check whether the model supports 'hmatc build'.
-    3. If the model supports the hmatc tool,
-       then the compilation test will be conducted using the hmatc tool.
-    4. If the model doesn't support the hmatc tool,
-       then execute the compilation test using the build.py.
+    Execute the complete compilation test flow for a specified model.
+
+    Args:
+        model_name (str): Name of the model to test
+        log_file (str): Path to the log file for test output
+        clear_flag (bool): Whether to clear previous results before compilation
     """
     model_info = _load_model_cfg(model_name)
     if (
@@ -967,6 +1130,13 @@ def execute_compile_flow(
 
 
 def execute_demo_flow(model_name: str, log_file: str = "") -> None:
+    """
+    Execute the complete demo test flow for a specified model.
+
+    Args:
+        model_name (str): Name of the model to test
+        log_file (str): Path to the log file for test output
+    """
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -976,7 +1146,7 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
-    model_type = model_info.get("model_type", "cv")
+
     platform = get_platform(model_info["support_platform"])
     if platform is None:
         logger.warning(f"Not support {model_name} testing on {platform}.")
@@ -1110,6 +1280,13 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
 
 
 def execute_compare_flow(model_name: str, log_file: str = "") -> None:
+    """
+    Execute the complete comparison test flow for a specified model.
+
+    Args:
+        model_name (str): Name of the model to test
+        log_file (str): Path to the log file for test output
+    """
     if HOUMO_BACKEND == "xh1" and get_test_type() != TCaseType.DEFAULT:
         logger.warning("Not support %s (gpu) compare testing.", model_name)
         pytest.skip("This testcase is not support.")
@@ -1184,6 +1361,13 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
 
 
 def execute_perf_flow(model_name: str, log_file: str = "") -> None:
+    """
+    Execute the complete performance test flow for a specified model.
+
+    Args:
+        model_name (str): Name of the model to test
+        log_file (str): Path to the log file for test output
+    """
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -1416,11 +1600,18 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
 
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
-    assert final_flag is True, f"HmATC Perf Test Failed!"
+    assert final_flag is True, "HmATC Perf Test Failed!"
     logger.info("HmATC Perf Test Success!")
 
 
 def execute_eval_flow(model_name: str, log_file: str = "") -> None:
+    """
+    Execute the complete evaluation test flow for a specified model.
+
+    Args:
+        model_name (str): Name of the model to test
+        log_file (str): Path to the log file for test output
+    """
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -1431,7 +1622,7 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
     ):
         logger.warning("Not support %s testing.", model_name)
         pytest.skip("This testcase is not support.")
-    model_type = model_info.get("model_type", "cv")
+
     platform = get_platform(model_info["support_platform"])
     if platform is None or platform == "aarch64":
         logger.warning(f"Not support {model_name} testing on {platform}.")

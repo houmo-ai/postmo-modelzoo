@@ -1,5 +1,25 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: perf.py
+# Description:
+#   Performance testing script for Qwen2.5 model inference using compiled HMM models.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import re
 import sys
@@ -40,53 +60,53 @@ import random
 
 def generate_random_digit_string(length=1000):
     random_digits = [str(random.randint(0, 9)) for _ in range(length)]
-    return ''.join(random_digits)
+    return "".join(random_digits)
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--tokenizer_dir',
-        dest='tokenizer_dir',
+        "--tokenizer_dir",
+        dest="tokenizer_dir",
         type=str,
         default="qwen2.5-7b-instruct-hf",
-        help='tokenizer dir',
+        help="tokenizer dir",
     )
     parser.add_argument(
-        '--embedding_path',
-        dest='embedding_path',
+        "--embedding_path",
+        dest="embedding_path",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant', 'quant_embedding.pt'),
-        help='houmo embedding weight path',
+        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        help="houmo embedding weight path",
     )
     parser.add_argument(
-        '--prefill_path',
-        dest='prefill_path',
+        "--prefill_path",
+        dest="prefill_path",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, "qwen2.5_prefill.hmm"),
-        help='houmo prefill model path',
+        default=os.path.join("output", HOUMO_TARGET, "qwen2.5_prefill.hmm"),
+        help="houmo prefill model path",
     )
     parser.add_argument(
-        '--decode_path',
-        dest='decode_path',
+        "--decode_path",
+        dest="decode_path",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, "qwen2.5_decode.hmm"),
-        help='houmo decode model path',
+        default=os.path.join("output", HOUMO_TARGET, "qwen2.5_decode.hmm"),
+        help="houmo decode model path",
     )
     parser.add_argument(
-        '--isq',
-        dest='isq',
+        "--isq",
+        dest="isq",
         type=int,
         default=1024,
-        help='input seq length',
+        help="input seq length",
     )
     parser.add_argument(
-        '--osq',
-        dest='osq',
+        "--osq",
+        dest="osq",
         type=int,
         default=1024,
-        help='output seq length',
+        help="output seq length",
     )
     args = parser.parse_args()
     return args
@@ -101,10 +121,10 @@ class HmQwenXh2:
         self.decode = tcim.runtime.load(decode_path, option=option2)
         self.nblocks = self.get_nblocks()
         dummy_tensor_names = [
-            f'model_layers_{i}_self_attn_kcache_input' for i in range(self.nblocks)
+            f"model_layers_{i}_self_attn_kcache_input" for i in range(self.nblocks)
         ]
         dummy_tensor_names += [
-            f'model_layers_{i}_self_attn_vcache_input' for i in range(self.nblocks)
+            f"model_layers_{i}_self_attn_vcache_input" for i in range(self.nblocks)
         ]
         option1.set_dummy_tensors(dummy_tensor_names)
         self.prefill_length = self.prefill.get_input_info(
@@ -123,7 +143,7 @@ class HmQwenXh2:
         # set decode input
         for b in range(self.batch):
             index = 2 if b == 0 else 2 * self.nblocks * b + 3 + 2 * b - 1
-            current_length_input = np.array([1]).astype('int32')
+            current_length_input = np.array([1]).astype("int32")
             self.decode.set_input(
                 self.decode.get_input_name(index), current_length_input
             )
@@ -133,21 +153,21 @@ class HmQwenXh2:
         )
         embedding_weight = torch.load(
             embedding_path, map_location="cpu", weights_only=True
-        )['weight']
+        )["weight"]
         self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len)
 
     def get_nblocks(self):
         input_names = []
         for i in range(self.decode.get_num_inputs()):
             input_names.append(self.decode.get_input_name(i))
-        pattern = r'^model_layers_(\d+)_self_attn_kcache_input$'
+        pattern = r"^model_layers_(\d+)_self_attn_kcache_input$"
         count = sum(1 for item in input_names if re.match(pattern, item))
         return count
 
     def preprocess_prefill(self, isq):
         text = generate_random_digit_string(isq)
-        input = self.tokenizer(text, return_tensors='pt')
-        all_input_id = input['input_ids']
+        input = self.tokenizer(text, return_tensors="pt")
+        all_input_id = input["input_ids"]
         return all_input_id
 
     def run_prefill(self, b, all_input_id):
@@ -216,7 +236,7 @@ class HmQwenXh2:
         self.decode.set_input(input_name, input_datas)
         for b in range(self.batch):
             valid_length_index = 1 if b == 0 else 2 * self.nblocks * b + 3 + 2 * b - 2
-            valid_length_data = np.array(self.context_lengths[b]).astype('int32')
+            valid_length_data = np.array(self.context_lengths[b]).astype("int32")
             self.decode.set_input(
                 self.decode.get_input_name(valid_length_index), valid_length_data
             )
@@ -286,7 +306,7 @@ class HmQwenXh2:
 
 if __name__ == "__main__":
     args = get_args()
-    if HOUMO_TARGET == 'xh2':
+    if HOUMO_TARGET == "xh2":
         hmqwen = HmQwenXh2(
             args.prefill_path, args.decode_path, args.embedding_path, args.tokenizer_dir
         )

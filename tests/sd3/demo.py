@@ -1,3 +1,23 @@
+# Copyright 2025 HOUMO AI
+#
+# File: demo.py
+# Description:
+#   Demo script for Stable Diffusion 3 inference using compiled HMM models.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import numpy as np
 import tcim_lite
@@ -10,7 +30,8 @@ import time
 import argparse
 
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET", "houmo")
+
 
 class DiT(nn.Module):
     def __init__(self, DiT, model_path):
@@ -28,13 +49,17 @@ class DiT(nn.Module):
         for index in range(input_num):
             input_name = self.module.get_input_name(index)
             input_info = self.module.get_input_info(input_name)
-            print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype, input_info.format.name))
+            print(
+                f"input[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
+            )
         output_num = self.module.get_num_outputs()
         print("output_num:", output_num)
         for index in range(output_num):
             output_name = self.module.get_output_name(index)
             output_info = self.module.get_output_info(output_name)
-            print("output[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape, output_info.dtype, output_info.format.name))
+            print(
+                f"output[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
+            )
         self.step = 0
 
     def forward(
@@ -43,17 +68,25 @@ class DiT(nn.Module):
         encoder_hidden_states,
         pooled_projections,
         timestep,
-        **kwargs
+        **kwargs,
     ):
         start = time.time()
-        hidden_states_input = hidden_states.to('cpu').numpy().astype(np.float16)
-        encoder_hidden_states_input = encoder_hidden_states.to('cpu').numpy().astype(np.float16)
-        pooled_projections_input = pooled_projections.to('cpu').numpy().astype(np.float16)
-        timestep_input = timestep.to('cpu').numpy().astype(np.float16)
-        self.module.set_input('hidden_states.hmcc.format', hidden_states_input)
-        self.module.set_input('encoder_hidden_states.hmcc.format', encoder_hidden_states_input)
-        self.module.set_input('pooled_projections.hmcc.format', pooled_projections_input)
-        self.module.set_input('timestep.hmcc.format', timestep_input)
+        hidden_states_input = hidden_states.to("cpu").numpy().astype(np.float16)
+        encoder_hidden_states_input = (
+            encoder_hidden_states.to("cpu").numpy().astype(np.float16)
+        )
+        pooled_projections_input = (
+            pooled_projections.to("cpu").numpy().astype(np.float16)
+        )
+        timestep_input = timestep.to("cpu").numpy().astype(np.float16)
+        self.module.set_input("hidden_states.hmcc.format", hidden_states_input)
+        self.module.set_input(
+            "encoder_hidden_states.hmcc.format", encoder_hidden_states_input
+        )
+        self.module.set_input(
+            "pooled_projections.hmcc.format", pooled_projections_input
+        )
+        self.module.set_input("timestep.hmcc.format", timestep_input)
         self.module.run()
         self.module.sync()
         output_name = self.module.get_output_name(0)
@@ -64,15 +97,15 @@ class DiT(nn.Module):
         return (torch.from_numpy(output),)
 
     def prepare_inputs(self, data):
-            """
-            获取模型输入
-            """
-            return [
-                data["hidden_states"],
-                data["encoder_hidden_states"],
-                data["pooled_projections"],
-                data["timestep"],
-            ]
+        """
+        获取模型输入
+        """
+        return [
+            data["hidden_states"],
+            data["encoder_hidden_states"],
+            data["pooled_projections"],
+            data["timestep"],
+        ]
 
 
 class Clip(nn.Module):
@@ -80,7 +113,7 @@ class Clip(nn.Module):
         super().__init__()
         self.input_shape = input_shape
         self.dtype = torch.float32
-        self.device = 'cpu'
+        self.device = "cpu"
         self.profile = {}
         self.profile["clip_infer"] = 0
         start = time.time()
@@ -92,23 +125,27 @@ class Clip(nn.Module):
         for index in range(input_num):
             input_name = self.module.get_input_name(index)
             input_info = self.module.get_input_info(input_name)
-            print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype, input_info.format.name))
+            print(
+                f"input[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
+            )
         output_num = self.module.get_num_outputs()
         print("output_num:", output_num)
         for index in range(output_num):
             output_name = self.module.get_output_name(index)
             output_info = self.module.get_output_info(output_name)
-            print("output[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape, output_info.dtype, output_info.format.name))
+            print(
+                f"output[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
+            )
 
     def forward(
         self,
         inputs,
-        data_samples = None,
+        data_samples=None,
         **kwargs,
     ):
         start = time.time()
-        inputs = inputs.to('cpu').numpy().astype(np.int32)
-        self.module.set_input('input_ids.hmcc.format', inputs)
+        inputs = inputs.to("cpu").numpy().astype(np.int32)
+        self.module.set_input("input_ids.hmcc.format", inputs)
         self.module.run()
         self.module.sync()
         text_embeds = self.module.get_output("text_embeds").numpy()
@@ -125,11 +162,12 @@ class Clip(nn.Module):
         )
         return outputs
 
+
 class T5(nn.Module):
     def __init__(self, model_path):
         super().__init__()
         self.dtype = torch.float32
-        self.device = 'cpu'
+        self.device = "cpu"
         self.profile = {}
         self.profile["t5_infer"] = 0
         start = time.time()
@@ -141,23 +179,27 @@ class T5(nn.Module):
         for index in range(input_num):
             input_name = self.module.get_input_name(index)
             input_info = self.module.get_input_info(input_name)
-            print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype, input_info.format.name))
+            print(
+                f"input[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
+            )
         output_num = self.module.get_num_outputs()
         print("output_num:", output_num)
         for index in range(output_num):
             output_name = self.module.get_output_name(index)
             output_info = self.module.get_output_info(output_name)
-            print("output[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape, output_info.dtype, output_info.format.name))
+            print(
+                f"output[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
+            )
 
     def forward(
         self,
         inputs,
-        data_samples = None,
+        data_samples=None,
         **kwargs,
     ):
         start = time.time()
-        inputs = inputs.to('cpu').numpy().astype(np.int32)
-        self.module.set_input('input_ids.hmcc.format', inputs)
+        inputs = inputs.to("cpu").numpy().astype(np.int32)
+        self.module.set_input("input_ids.hmcc.format", inputs)
         self.module.run()
         self.module.sync()
         text_embeds = self.module.get_output("text_embeds").numpy()
@@ -165,6 +207,7 @@ class T5(nn.Module):
         self.profile["t5_infer"] += cost
         text_embeds = torch.from_numpy(text_embeds).to(self.dtype).to(self.device)
         return (text_embeds,)
+
 
 class Vae(nn.Module):
     def __init__(self, Vae, model_path):
@@ -182,22 +225,22 @@ class Vae(nn.Module):
         for index in range(input_num):
             input_name = self.module.get_input_name(index)
             input_info = self.module.get_input_info(input_name)
-            print("input[{}] shape = {}, dtype = {}, format = {}".format(input_name, input_info.shape, input_info.dtype, input_info.format.name))
+            print(
+                f"input[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
+            )
         output_num = self.module.get_num_outputs()
         print("output_num:", output_num)
         for index in range(output_num):
             output_name = self.module.get_output_name(index)
             output_info = self.module.get_output_info(output_name)
-            print("output[{}] shape = {}, dtype = {}, format = {}".format(output_name, output_info.shape, output_info.dtype, output_info.format.name))
+            print(
+                f"output[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
+            )
 
-    def decode(
-        self,
-        inputs,
-        **kwargs
-    ):
+    def decode(self, inputs, **kwargs):
         start = time.time()
-        hidden_states_input = inputs.to('cpu').numpy().astype(np.float16)
-        self.module.set_input('input.hmcc.format', hidden_states_input)
+        hidden_states_input = inputs.to("cpu").numpy().astype(np.float16)
+        self.module.set_input("input.hmcc.format", hidden_states_input)
         self.module.run()
         self.module.sync()
         output_name = self.module.get_output_name(0)
@@ -206,56 +249,57 @@ class Vae(nn.Module):
         self.profile["vae_infer"] += cost
         return (torch.from_numpy(output),)
 
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_path',
-        dest='model_path',
+        "--model_path",
+        dest="model_path",
         type=str,
-        default=f'output/{HOUMO_TARGET}',
-        help='path to hmm model',
+        default=f"output/{HOUMO_TARGET}",
+        help="path to hmm model",
     )
     parser.add_argument(
-        '--sd3_ckpt',
-        dest='sd3_ckpt',
+        "--sd3_ckpt",
+        dest="sd3_ckpt",
         type=str,
-        default='stable-diffusion-3-medium-diffusers',
-        help='path to sd3_ckpt',
+        default="stable-diffusion-3-medium-diffusers",
+        help="path to sd3_ckpt",
     )
     parser.add_argument(
-        '--test_num',
-        dest='test_num',
+        "--test_num",
+        dest="test_num",
         type=int,
         default=1,
-        help='batch size',
+        help="batch size",
     )
     parser.add_argument(
-        '--nstep',
-        dest='nstep',
+        "--nstep",
+        dest="nstep",
         type=int,
         default=10,
-        help='num_inference_steps',
+        help="num_inference_steps",
     )
     parser.add_argument(
-        '--prompt',
-        dest='prompt',
+        "--prompt",
+        dest="prompt",
         type=str,
         default=None,
-        help='user prompt',
+        help="user prompt",
     )
     parser.add_argument(
-        '--neg_prompt',
-        dest='neg_prompt',
+        "--neg_prompt",
+        dest="neg_prompt",
         type=str,
-        default='',
-        help='user negative prompt',
+        default="",
+        help="user negative prompt",
     )
     args = parser.parse_args()
     return args
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     logger.info(args)
     test_num = args.test_num
@@ -270,7 +314,7 @@ if __name__ == '__main__':
         os.makedirs(save_results)
 
     pipe = StableDiffusion3Pipeline.from_pretrained(sd3_ckpt, use_safetensors=True)
-    pipe.to('cpu')
+    pipe.to("cpu")
 
     clip_b_path = os.path.join(model_path, "clip.hmm")
     clip_b_model = Clip(768, clip_b_path)
@@ -302,25 +346,27 @@ if __name__ == '__main__':
 
         prompts_list = [
             # 一位穿着粉色连衣裙的可爱年轻女孩在花园里微笑。照片级真实感，8K。
-            'A cute young girl in a pink dress, smiling in a garden. Photo - realistic, 8k.',
+            "A cute young girl in a pink dress, smiling in a garden. Photo - realistic, 8k.",
             # 山间的瀑布，绿树和清澈的水。照片级真实，8K。
-            'A waterfall in the mountains, green trees and clear water. Photo - real, 8k.',
+            "A waterfall in the mountains, green trees and clear water. Photo - real, 8k.",
             # 一只威严的龙在神奇森林中的场景，包含龙的特征、环境元素等。
-            'A majestic dragon with iridescent scales, spreading its wings in a magical forest, glowing mushrooms on the ground, fire in its mouth, highly detailed.',
+            "A majestic dragon with iridescent scales, spreading its wings in a magical forest, glowing mushrooms on the ground, fire in its mouth, highly detailed.",
         ]
 
         negative_prompts_list = [
             # 避免生成模糊、低质量、变形、颜色难看、构图不佳以及卡通化的图像。
-            ['Blurry, low - quality, distorted, ugly colors, bad composition, cartoonish.'],
+            [
+                "Blurry, low - quality, distorted, ugly colors, bad composition, cartoonish."
+            ],
             # 避免生成低质量，虚假质感的水。
-            ['Poor details, fake - looking water.'],
+            ["Poor details, fake - looking water."],
             # 防止生成单色、扁平、背景单调以及解剖结构错误的奇幻生物图像。
-            ['Monochrome, flat, boring background, bad anatomy.']
+            ["Monochrome, flat, boring background, bad anatomy."],
         ]
 
         for i in range(test_num):
-            prompts[i] = prompts_list[i%3]
-            negative_prompts[i] = negative_prompts_list[i%3]
+            prompts[i] = prompts_list[i % 3]
+            negative_prompts[i] = negative_prompts_list[i % 3]
 
     for i in range(test_num):
         start = time.time()
@@ -331,11 +377,11 @@ if __name__ == '__main__':
             negative_prompt=negative_prompts[i],
             guidance_scale=7.0,
             num_inference_steps=num_inference_steps,
-            width = 512,
-            height = 512
+            width=512,
+            height=512,
         ).images[0]
         cost = time.time() - start
-        save_path = os.path.join(save_results, f'{i}.jpg')
+        save_path = os.path.join(save_results, f"{i}.jpg")
         image.save(save_path)
         clip_b_time = clip_b_model.profile["clip_infer"]
         clip_l_time = clip_l_model.profile["clip_infer"]
@@ -347,5 +393,7 @@ if __name__ == '__main__':
         logger.success(f"clip b infer cost {clip_b_time*1000:.3f} ms.")
         logger.success(f"clip l infer cost {clip_l_time*1000:.3f} ms.")
         logger.success(f"t5 infer cost {t5_time*1000:.3f} ms.")
-        logger.success(f"dit infer {num_inference_steps} steps cost {dit_time*1000:.3f} ms, average {avg_dit_time*1000:.3f} ms.")
+        logger.success(
+            f"dit infer {num_inference_steps} steps cost {dit_time*1000:.3f} ms, average {avg_dit_time*1000:.3f} ms."
+        )
         logger.success(f"vae infer cost {vae_time*1000:.3f} ms.")

@@ -1,3 +1,26 @@
+# Copyright 2025 HOUMO AI
+#
+# File: test_apis_utils.py
+# Description:
+#   APIs test utilities module.
+#   This module provides utility functions for executing API tests for different examples.
+#   It handles example configuration loading, command generation, model downloading,
+#   and execution of both Python and C++ demos with proper error handling and logging.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 import os
 import logging
@@ -10,18 +33,38 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 def _load_example_cfg(example_name: str) -> dict:
+    """
+    Load example configuration from JSON file.
+
+    Args:
+        example_name (str): Name of the example whose configuration needs to be loaded
+
+    Returns:
+        dict: Configuration dictionary loaded from the JSON file, or None if file doesn't exist
+    """
     example_cfg_path = script_dir + "/apis_configs/apis_cfg_" + example_name + ".json"
     return load_json(example_cfg_path)
 
 
 def _generate_cmds(cmd_header: list, params_dict: dict, max_core_num: int = 0) -> list:
+    """
+    Generate command lists with different parameter combinations.
+
+    Args:
+        cmd_header (list): Base command elements (executable and common parameters)
+        params_dict (dict): Dictionary containing parameter names and their possible values
+        max_core_num (int): Maximum allowed core number (0 means no limit)
+
+    Returns:
+        list: List of command lists with different parameter combinations
+    """
     cmd_list = [cmd_header]
 
     idx = 1
     flag = True
     while flag:
         flag = False
-        tmp_cmd_list = list()
+        tmp_cmd_list = []
         for param_name, param_list in params_dict.items():
             if (
                 param_name in ["name", "defines", "envs"]
@@ -57,6 +100,14 @@ def _generate_cmds(cmd_header: list, params_dict: dict, max_core_num: int = 0) -
 
 
 def _compile_cpp_exec(example_dir: str, log_file: str, defines: list) -> None:
+    """
+    Compile C++ executable for the example.
+
+    Args:
+        example_dir (str): Directory containing the example source code
+        log_file (str): Path to the log file for compilation output
+        defines (list): List of CMake definitions to pass during compilation
+    """
     os.makedirs("./build", exist_ok=True)
     os.chdir(example_dir + "/build")
 
@@ -73,6 +124,17 @@ def _compile_cpp_exec(example_dir: str, log_file: str, defines: list) -> None:
 
 
 def _test_get_model(example_info: dict, platform: str, log_file: str) -> bool:
+    """
+    Download model for the example with proper resource locking.
+
+    Args:
+        example_info (dict): Dictionary containing example configuration information
+        platform (str): Target platform for the test
+        log_file (str): Path to the log file for download output
+
+    Returns:
+        bool: True if model download was successful, False otherwise
+    """
     get_model_flag = True
     max_core_num = 2 if platform == "aarch64" else 0
     model_set_dir = os.path.join(MODELS_PATH, example_info["example_dir"])
@@ -94,6 +156,16 @@ def _test_get_model(example_info: dict, platform: str, log_file: str) -> bool:
 
 
 def execute_apis_examples(example_name: str, log_file: str):
+    """
+    Execute API examples for the specified example name.
+
+    Args:
+        example_name (str): Name of the example to execute
+        log_file (str): Path to the log file for execution output
+
+    Raises:
+        AssertionError: If the example folder doesn't exist or if tests fail
+    """
     example_info = _load_example_cfg(example_name)
     if (
         example_info is None
@@ -119,7 +191,7 @@ def execute_apis_examples(example_name: str, log_file: str):
         )
     ):
         logger.warning(f"Not support {example_name} testing on 2cores device.")
-        pytest.skip(f"This testcase is not support on 2cores device.")
+        pytest.skip("This testcase is not support on 2cores device.")
 
     if (
         example_info.get("dependency", None) is not None
@@ -127,7 +199,7 @@ def execute_apis_examples(example_name: str, log_file: str):
         and (HDPL_PLATFORM == "ISIM" or check_vpu_status() is False)
     ):
         logger.warning(f"{example_name} testcase needs vpu driver.")
-        pytest.skip(f"This testcase needs vpu driver.")
+        pytest.skip("This testcase needs vpu driver.")
 
     example_dir = script_dir + "/../../" + example_info["example_dir"]
     if not os.path.exists(example_dir):

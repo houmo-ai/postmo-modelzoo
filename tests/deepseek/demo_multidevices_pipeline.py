@@ -1,5 +1,27 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+# Copyright 2025 HOUMO AI
+#
+# File: demo_multidevices_pipeline.py
+# Description:
+#   Multi-device pipeline demonstration for DeepSeek models.
+#   This script demonstrates a multi-device inference pipeline for DeepSeek models,
+#   implementing a sliding window approach for efficient long-context processing.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import math
 import time
@@ -17,10 +39,19 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 TOKENIZER_PATH = "DeepSeek-R1-Distill-Qwen-14B"
-EMBEDDING_PATH = os.path.join('output', HOUMO_TARGET, 'hmquant', 'quant_embedding.pt')
+EMBEDDING_PATH = os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt")
 
 
 def is_valid_char(cp):
+    """
+    Check if a Unicode code point represents a valid character.
+
+    Args:
+        cp (int): Unicode code point to validate
+
+    Returns:
+        bool: True if the character is valid, False otherwise
+    """
     if (
         (cp >= 0x4E00 and cp <= 0x9FFF)
         or (cp >= 0x3400 and cp <= 0x4DBF)
@@ -39,65 +70,91 @@ def is_valid_char(cp):
 
 
 def get_args() -> argparse.Namespace:
-    """Parse commandline."""
+    """Parse command line arguments for the multi-device pipeline demo."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--model_dir",
+        dest="model_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET),
-        help='houmo model dir',
+        default=os.path.join("output", HOUMO_TARGET),
+        help="houmo model dir",
     )
     parser.add_argument(
-        '--prefill',
-        dest='prefill_length',
+        "--prefill",
+        dest="prefill_length",
         type=int,
         default=256,
-        help='prefill max length',
+        help="prefill max length",
     )
     parser.add_argument(
-        '--decode',
-        dest='decode_length',
+        "--decode",
+        dest="decode_length",
         type=int,
         default=8192,
-        help='decode max length',
+        help="decode max length",
     )
     parser.add_argument(
-        '--nblocks',
-        dest='nblocks',
+        "--nblocks",
+        dest="nblocks",
         type=int,
         default=48,
-        help='block number',
+        help="block number",
     )
+
     args = parser.parse_args()
     return args
 
 
 class HmQwen:
+    """
+    Multi-device pipeline wrapper for DeepSeek model inference.
+
+    This class manages the multi-device inference process, including model loading
+    across different devices, handling prefill and decode phases, and managing
+    KV cache states between model partitions.
+    """
 
     def __init__(self, model_dir, prefill_length, decode_length, batch=1, nblocks=28):
+        """
+        Initialize the multi-device pipeline for DeepSeek model inference.
+
+        Args:
+            model_dir (str): Directory containing the compiled model files
+            prefill_length (int): Maximum length for prefill operations
+            decode_length (int): Maximum length for decode operations
+            batch (int): Batch size for inference (default 1)
+            nblocks (int): Number of transformer blocks in the model
+        """
         self.batch = batch
         self.prefill_length = prefill_length
         self.decode_length = decode_length
         self.nblocks = nblocks
         self.mid_layer_id = 25
+
+        # Initialize weight managers for different devices
         weight_manager_0 = tcim.runtime.WeightManager(0)
         weight_manager_1 = tcim.runtime.WeightManager(3)
+
+        # Create options with weight managers
         option1_0 = tcim.runtime.Option(weight_manager_0)
         option1_1 = tcim.runtime.Option(weight_manager_1)
         option2_0 = tcim.runtime.Option(weight_manager_0)
         option2_1 = tcim.runtime.Option(weight_manager_1)
+
+        # Set dummy tensors for decode models
         dummy_tensor_names = [
-            f'model_layers_{i}_self_attn_kcache_input' for i in range(nblocks)
+            f"model_layers_{i}_self_attn_kcache_input" for i in range(nblocks)
         ]
         dummy_tensor_names += [
-            f'model_layers_{i}_self_attn_vcache_input' for i in range(nblocks)
+            f"model_layers_{i}_self_attn_vcache_input" for i in range(nblocks)
         ]
         dummy_tensor_names += [
-            f'model_layers_{i}_self_attn_kcache_history_sum' for i in range(nblocks)
+            f"model_layers_{i}_self_attn_kcache_history_sum" for i in range(nblocks)
         ]
         option2_0.set_dummy_tensors(dummy_tensor_names)
         option2_1.set_dummy_tensors(dummy_tensor_names)
+
+        # Load model partitions on different devices
         self.prefill_model_part1 = tcim.runtime.load(
             os.path.join(model_dir, "deepseek_prefill_part1.hmm"), option=option1_0
         )
@@ -110,46 +167,48 @@ class HmQwen:
         self.decode_model_part2 = tcim.runtime.load(
             os.path.join(model_dir, "deepseek_decode_part2.hmm"), option=option2_1
         )
-        # set kvcache input
+
+        # Set kvcache input
         for i in range(self.mid_layer_id + 1):
             kcache = self.prefill_model_part1.get_input(
-                f'model_layers_{i}_self_attn_kcache_input'
+                f"model_layers_{i}_self_attn_kcache_input"
             )
             self.decode_model_part1.set_input(
-                f'model_layers_{i}_self_attn_kcache_input', kcache
+                f"model_layers_{i}_self_attn_kcache_input", kcache
             )
             vcache = self.prefill_model_part1.get_input(
-                f'model_layers_{i}_self_attn_vcache_input'
+                f"model_layers_{i}_self_attn_vcache_input"
             )
             self.decode_model_part1.set_input(
-                f'model_layers_{i}_self_attn_vcache_input', vcache
+                f"model_layers_{i}_self_attn_vcache_input", vcache
             )
             kcache_history_sum = self.prefill_model_part1.get_input(
-                f'model_layers_{i}_self_attn_kcache_history_sum'
+                f"model_layers_{i}_self_attn_kcache_history_sum"
             )
             self.decode_model_part1.set_input(
-                f'model_layers_{i}_self_attn_kcache_history_sum', kcache_history_sum
+                f"model_layers_{i}_self_attn_kcache_history_sum", kcache_history_sum
             )
         for i in range(self.mid_layer_id + 1, nblocks):
             kcache = self.prefill_model_part2.get_input(
-                f'model_layers_{i}_self_attn_kcache_input'
+                f"model_layers_{i}_self_attn_kcache_input"
             )
             self.decode_model_part2.set_input(
-                f'model_layers_{i}_self_attn_kcache_input', kcache
+                f"model_layers_{i}_self_attn_kcache_input", kcache
             )
             vcache = self.prefill_model_part2.get_input(
-                f'model_layers_{i}_self_attn_vcache_input'
+                f"model_layers_{i}_self_attn_vcache_input"
             )
             self.decode_model_part2.set_input(
-                f'model_layers_{i}_self_attn_vcache_input', vcache
+                f"model_layers_{i}_self_attn_vcache_input", vcache
             )
             kcache_history_sum = self.prefill_model_part2.get_input(
-                f'model_layers_{i}_self_attn_kcache_history_sum'
+                f"model_layers_{i}_self_attn_kcache_history_sum"
             )
             self.decode_model_part2.set_input(
-                f'model_layers_{i}_self_attn_kcache_history_sum', kcache_history_sum
+                f"model_layers_{i}_self_attn_kcache_history_sum", kcache_history_sum
             )
-        # set decode input
+
+        # Set decode input
         current_length_input_1 = np.array([1]).astype("int16")
         self.decode_model_part1.set_input("current_length", current_length_input_1)
         self.decode_model_part2.set_input("current_length", current_length_input_1)
@@ -161,6 +220,15 @@ class HmQwen:
         self.embedding_weight = embedding_weight.reshape(-1, 5120)
 
     def chat(self, question):
+        """
+        Perform a chat interaction with the model.
+
+        Args:
+            question (str): Question to ask the model
+
+        Returns:
+            tuple: (response text, token count, prefill time, decode time)
+        """
         logger.success("question:")
         print("\033[1;95m{}\033[0m".format(question))
         start_time = time.time()
@@ -188,24 +256,24 @@ class HmQwen:
         # clear kcache_history_sum before prefill
         for i in range(self.mid_layer_id + 1):
             kcache_history_sum = self.prefill_model_part1.get_input(
-                f'model_layers_{i}_self_attn_kcache_history_sum'
+                f"model_layers_{i}_self_attn_kcache_history_sum"
             )
             kcache_history_sum_init = np.zeros(
                 kcache_history_sum.info.shape, dtype=kcache_history_sum.info.dtype
             )
             self.prefill_model_part1.set_input(
-                f'model_layers_{i}_self_attn_kcache_history_sum',
+                f"model_layers_{i}_self_attn_kcache_history_sum",
                 kcache_history_sum_init,
             )
         for i in range(self.mid_layer_id + 1, self.nblocks):
             kcache_history_sum = self.prefill_model_part2.get_input(
-                f'model_layers_{i}_self_attn_kcache_history_sum'
+                f"model_layers_{i}_self_attn_kcache_history_sum"
             )
             kcache_history_sum_init = np.zeros(
                 kcache_history_sum.info.shape, dtype=kcache_history_sum.info.dtype
             )
             self.prefill_model_part2.set_input(
-                f'model_layers_{i}_self_attn_kcache_history_sum',
+                f"model_layers_{i}_self_attn_kcache_history_sum",
                 kcache_history_sum_init,
             )
 
@@ -312,7 +380,7 @@ class HmQwen:
             decode_response = self.tokenizer.decode(
                 chat_history_ids.tolist()[-(slide_len + 1) - skip_tokens :]
             )[len(last_response) :]
-            if decode_response != '' and is_valid_char(ord(decode_response[-1])):
+            if decode_response != "" and is_valid_char(ord(decode_response[-1])):
                 print(decode_response, end="", flush=True)
                 all_response += decode_response
                 last_response = self.tokenizer.decode(
@@ -334,8 +402,8 @@ class HmQwen:
 
 
 if __name__ == "__main__":
-
     args = get_args()
+
     hmqwen = HmQwen(
         args.model_dir, args.prefill_length, args.decode_length, nblocks=args.nblocks
     )

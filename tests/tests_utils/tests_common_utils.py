@@ -1,3 +1,25 @@
+# Copyright 2025 HOUMO AI
+#
+# File: tests_common_utils.py
+# Description:
+#   Common utilities for model testing using pytest framework.
+#   This file provides shared functionality for model tests, including environment variable
+#   configuration, resource locking mechanisms, subprocess execution, and hardware checks.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import sys
 import subprocess
@@ -17,7 +39,6 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 HOUMO_BACKEND = os.getenv("HOUMO_TARGET", "xh1")
 # ON: quant&compile, OFF:inference
 SEPARATE_TEST = os.getenv("SKIP_INFER", None)
-# 编译量化在一台机器，推理在另一台机器，两个机器共享指定目录
 HDPL_PLATFORM = os.getenv("HDPL_PLATFORM", "")
 MODELS_PATH = os.path.abspath(
     os.getenv("IMODELZOO_MODELS_PATH", f"{script_dir}/../models_{HOUMO_BACKEND}/")
@@ -32,6 +53,8 @@ logger = logging.getLogger(__name__)
 
 @unique
 class TCaseType(Enum):
+    """Enum representing different types of test cases"""
+
     DEFAULT = 0
     SEPARATE_NO_INFER = 1
     SEPARATE_INFER = 2
@@ -39,7 +62,7 @@ class TCaseType(Enum):
 
 class ModelResourceLock:
     """
-    Model resource lock.
+    A context manager for handling model resource locks using file-based locking.
     """
 
     class LockMode(enum.Enum):
@@ -49,7 +72,7 @@ class ModelResourceLock:
         READ_ONLY = fcntl.LOCK_SH
         WRITE = fcntl.LOCK_EX
 
-    # all tests start simultaneously, expect their maximum end time to be 2 hours
+    # All tests start simultaneously, expect their maximum end time to be 2 hours
     MAX_RESOURCE_ACCESS_TIME_OUT = 7200
 
     def __init__(self, lock_file: str, lock_mode: LockMode, lock_purpose: str):
@@ -69,6 +92,9 @@ class ModelResourceLock:
             self.release_lock()
 
     def acquire_lock(self):
+        """
+        Acquire the file lock with timeout
+        """
         assert self.lock_mode in (
             ModelResourceLock.LockMode.READ_ONLY,
             ModelResourceLock.LockMode.WRITE,
@@ -115,12 +141,21 @@ class ModelResourceLock:
         self.lock_fd = lock_file_fd
 
     def release_lock(self):
+        """
+        Release the acquired file lock
+        """
         assert self.lock_fd is not None
         fcntl.flock(self.lock_fd, fcntl.LOCK_UN)
         os.close(self.lock_fd)
 
 
-def load_json(json_path: str) -> dict:
+def load_json(json_path: str) -> dict | None:
+    """
+    Load JSON data from a file
+
+    :param json_path: Path to the JSON file
+    :return: Loaded JSON data as dictionary, or None if file doesn't exist
+    """
     if not os.path.exists(json_path):
         return None
 
@@ -132,56 +167,60 @@ def load_json(json_path: str) -> dict:
 
 
 class SubprocessLogger:
+    """
+    Logger for subprocess output that can write to both console and file
+    """
+
     def __init__(self, log_file=""):
         """
-        初始化输出日志器
+        Initialize subprocess logger
 
-        :param log_file: 日志文件路径
+        :param log_file: Path to the log file
         """
         self.log_file = log_file
         if log_file:
             os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        # 创建文件锁，确保多线程写入安全
+        # Create file lock to ensure thread-safe writing
         self.lock = threading.Lock()
         self.write_flag = True if log_file else False
 
     def write(self, message, stream=sys.stdout):
         """
-        同时输出到屏幕和日志文件
+        Write message to both screen and log file
 
-        :param message: 要输出的消息
-        :param stream: 输出到屏幕的流（stdout或stderr）
+        :param message: Message to output
+        :param stream: Output stream (stdout or stderr)
         """
         if not message or "MB/s" in message:  # or "kB/s" in message:
             return
 
-        # 添加时间戳
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_message = f"[{timestamp}] {message}"
 
         if self.write_flag:
-            # 写入日志文件（加锁确保线程安全）
+            # Write to log file (with lock to ensure thread safety)
             with self.lock:
-                with open(self.log_file, 'a', encoding='utf-8') as f:
+                with open(self.log_file, "a", encoding="utf-8") as f:
                     f.write(log_message)
 
-        # 输出到屏幕
+        # Output to screen
         stream.write(message)
         stream.flush()
 
 
 def _process_stream(stream, logger, results: list, is_stderr=False):
     """
-    处理子进程的输出流
+    Process subprocess output streams
 
-    :param stream: 子进程的输出流（stdout或stderr）
-    :param logger: SubprocessLogger实例
-    :param is_stderr: 是否为错误流
+    :param stream: Subprocess output stream (stdout or stderr)
+    :param logger: SubprocessLogger instance
+    :param results: List to store output results
+    :param is_stderr: Whether this is stderr stream
     """
     stream_obj = sys.stderr if is_stderr else sys.stdout
     outputs = list()
     try:
-        for line in iter(stream.readline, ''):
+        for line in iter(stream.readline, ""):
             logger.write(line, stream_obj)
             outputs.append(line.strip())
     finally:
@@ -196,6 +235,15 @@ def execute_test_cmd(
     assert_flag: bool = False,
     check_flag: bool = True,
 ) -> tuple[bool, any]:
+    """
+    Execute a command and handle its output
+
+    :param cmd_list: Command to execute as a list
+    :param log_file: Log file path
+    :param assert_flag: Whether to assert success
+    :param check_flag: Whether to check for failure keywords in output
+    :return: Tuple of (success flag, output string)
+    """
     cmd_str = " ".join(cmd_list)
     logger.info("execute command: %s", cmd_str)
 
@@ -207,31 +255,30 @@ def execute_test_cmd(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            bufsize=1,  # 行缓冲
+            bufsize=1,  # Line buffering
             universal_newlines=True,
         )
 
         stdout_res = list()
-        # 创建线程处理stdout和stderr
+        stderr_res = list()
+        # Create threads to handle stdout and stderr
         stdout_thread = threading.Thread(
             target=_process_stream,
             args=(process.stdout, subprocess_logger, stdout_res, False),
             daemon=True,
         )
-        stderr_res = list()
         stderr_thread = threading.Thread(
             target=_process_stream,
             args=(process.stderr, subprocess_logger, stderr_res, True),
             daemon=True,
         )
-        # 启动线程
+
+        # Start threads
         stdout_thread.start()
         stderr_thread.start()
-
-        # 等待子进程完成
+        # Wait for subprocess to complete
         return_code = process.wait()
-
-        # 等待线程处理剩余输出
+        # Wait for threads to process remaining output
         stdout_thread.join()
         stderr_thread.join()
 
@@ -268,7 +315,13 @@ def execute_test_cmd(
     return flag, stdout_res[0]
 
 
-def get_platform(support_list: list) -> str:
+def get_platform(support_list: list) -> str | None:
+    """
+    Get the current platform architecture
+
+    :param support_list: List of supported architectures
+    :return: Platform name if supported, otherwise None
+    """
     import platform
 
     system = platform.system()
@@ -281,6 +334,11 @@ def get_platform(support_list: list) -> str:
 
 
 def check_gpu() -> dict:
+    """
+    Check if NVIDIA GPU is available and retrieve GPU information
+
+    :return: Dictionary containing GPU availability and information
+    """
     result = {"has_gpu": False, "gpu_info": []}
 
     try:
@@ -289,22 +347,26 @@ def check_gpu() -> dict:
             stderr=subprocess.STDOUT,
             text=True,
         )
-        # 如果命令成功执行，说明有NVIDIA GPU且驱动正常
         for line in nvidia_smi_output.strip().split("\n"):
             if line:
                 result["has_gpu"] = True
                 result["gpu_info"].append(f"NVIDIA (nvidia-smi): {line.strip()}")
     except subprocess.CalledProcessError:
-        # 命令执行失败，可能没有NVIDIA GPU或驱动未安装
         pass
     except FileNotFoundError:
-        # nvidia-smi不存在，可能没有NVIDIA GPU
+        # nvidia-smi doesn't exist
         pass
 
     return result
 
 
 def check_device_info(support_list: list) -> bool:
+    """
+    Check if the device has a supported number of cores
+
+    :param support_list: List of supported core numbers
+    :return: True if device has supported core count, False otherwise
+    """
     if support_list is None or len(support_list) == 0:
         logger.error("No support hmm models.")
         return False
@@ -334,6 +396,11 @@ def check_device_info(support_list: list) -> bool:
 
 
 def check_vpu_status() -> bool:
+    """
+    Check VPU status for xh1 backend
+
+    :return: True if VPU is being used, False otherwise
+    """
     if HOUMO_BACKEND != "xh1":
         return False
 
@@ -353,7 +420,14 @@ def check_vpu_status() -> bool:
 
 
 def install_py_env(env_dir: str, log_file: str, flow_type: str = "default") -> dict:
-    """Install python env according to requirements.txt."""
+    """
+    Install Python environment according to requirements.txt
+
+    :param env_dir: Environment directory path
+    :param log_file: Log file path
+    :param flow_type: Type of flow (default, quant, etc.)
+    :return: Dictionary of changed libraries
+    """
     changed_libs = dict()
 
     rqmt_name = "requirements.txt"
@@ -406,18 +480,33 @@ def install_py_env(env_dir: str, log_file: str, flow_type: str = "default") -> d
 
 
 def is_release() -> bool:
+    """
+    Check if released models should be used
+
+    :return: True if released models should be used, False otherwise
+    """
     if USE_RELEASED_MODELS and USE_RELEASED_MODELS in ["on", "ON"]:
         return True
     return False
 
 
 def is_separate() -> bool:
+    """
+    Check if separate testing is enabled
+
+    :return: True if separate testing is enabled, False otherwise
+    """
     if SEPARATE_TEST and SEPARATE_TEST in ["OFF", "ON"]:
         return True
     return False
 
 
 def get_test_type():
+    """
+    Determine the type of test case based on environment settings
+
+    :return: Test case type as defined in TCaseType enum
+    """
     if is_separate():
         if HDPL_PLATFORM == "ISIM":
             return TCaseType.SEPARATE_NO_INFER
@@ -428,6 +517,13 @@ def get_test_type():
 
 
 def move_models_res(src_path: str, dst_path: str) -> bool:
+    """
+    Move model results from source to destination
+
+    :param src_path: Source path
+    :param dst_path: Destination path
+    :return: True if successful, False otherwise
+    """
     if not os.path.isdir(src_path):
         logger.error(f"Invalid source folder: {src_path}")
         return False
@@ -465,6 +561,13 @@ def move_models_res(src_path: str, dst_path: str) -> bool:
 
 
 def restore_models_res(src_folder: str, dst_folder: str) -> bool:
+    """
+    Restore model results from source to destination
+
+    :param src_folder: Source folder path
+    :param dst_folder: Destination folder path
+    :return: True if successful, False otherwise
+    """
     if not os.path.isdir(src_folder):
         logger.info(f"Failed to restore result: {src_folder} -> {dst_folder}")
         return False
@@ -492,6 +595,12 @@ def restore_models_res(src_folder: str, dst_folder: str) -> bool:
 
 
 def prepare_test_folder(model_dir: str, test_type: str):
+    """
+    Prepare a test folder with timestamp
+
+    :param model_dir: Base model directory
+    :param test_type: Type of test
+    """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     test_folder = f"{model_dir}_{test_type}_{timestamp}"
     logger.info(f"create test_folder: {model_dir} -> {test_folder}")
@@ -503,6 +612,9 @@ def prepare_test_folder(model_dir: str, test_type: str):
 
 
 def reset_chips():
+    """
+    Reset hardware chips
+    """
     logger.warning("Ready to reset chips.")
     cmd = "/usr/local/houmo-sdk/hal/utility/ipu_reset"
     if HOUMO_BACKEND != "xh2" or not os.path.exists(cmd):
@@ -517,6 +629,15 @@ def display_to_console(
     res_flag: bool,
     force_print: bool = False,
 ):
+    """
+    Display test results to console
+
+    :param log_file: Log file path
+    :param test_type: Type of test
+    :param model_name: Name of the model
+    :param res_flag: Result flag (True for success, False for failure)
+    :param force_print: Whether to force printing regardless of result
+    """
     if get_test_type() != TCaseType.DEFAULT and (
         res_flag is False or force_print is True
     ):
