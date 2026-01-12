@@ -23,6 +23,7 @@ quant:
         method:
           name: all
           target_cos: 0.99
+
 build:
   ncore: 1
   opt_level: 2
