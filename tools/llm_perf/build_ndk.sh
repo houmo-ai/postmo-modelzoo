@@ -21,7 +21,7 @@ set -e
 if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
   WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   cd "${WORK_PATH}" || exit 1
-  export TCIM_RUNTIME_PATH=/hmdd/imodelzoo/tools/llm_perf/houmo-tcim-runtime-xh2
+  # export TCIM_RUNTIME_PATH=/hmdd/imodelzoo/tools/llm_perf/houmo-tcim-runtime-xh2
   ## if user not set NDK_PATH, use default path
   if [ x${NDK_PATH} == x ]; then
     export NDK_PATH=${WORK_PATH}/toolchains/android-ndk-r28c

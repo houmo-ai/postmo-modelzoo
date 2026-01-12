@@ -35,6 +35,7 @@
   - 具体支持的模型参考models目录下llm和vllm模型支持的平台。
   - 支持的芯片型号为：xh2。
   - 支持的大道软件版本要求如下：xh2≥v0.6.0 。
+  - 支持了device0的温度、功率、IPU频率监控，记录保存在./device_logs/device_0.log。
 
 ### 1.2 流程说明
 
@@ -216,7 +217,13 @@ cd tools/llm_perf/
 如果是编译android版本请执行：
 
 ```bash
-#需要修改脚本第11行的Android版本tcim库在当前系统的路径
+# 1. 需要下载Android NDK，并设置NDK_PATH。
+# 2. 需要下载Android版本houmo-drv-xh2，设置HOUMO_SDK_PATH为当前Android版本路径。
+# 3. 需要下载Android版本runtime-sdk，设置TCIM_RUNTIME_PATH为当前Android版本路径。
+# 示例如下：
+# export NDK_PATH={the_path_of_android}/android-ndk-r28c
+# export HOUMO_SDK_PATH={the_path_of_android}/houmo-drv-xh2
+# export TCIM_RUNTIME_PATH={the_path_of_android}/houmo-tcim-runtime-xh2
 ./build_ndk.sh
 ```
 

@@ -33,6 +33,7 @@
 #include "HmllmInfer.h"
 #include "HmllmInferMultiBatch.h"
 #include "HmvllmInfer.h"
+#include "devices_monitor.h"
 #include "tcim/tcim_runtime.h"
 #include "utils.h"
 
@@ -41,159 +42,171 @@
 #endif
 
 int RunPerf(std::unordered_map<std::string, std::string> args) {
-  fs::path prefill_path =
-      validate_path(args, "prefill");  // the path of prefill model
-  fs::path decode_path =
-      validate_path(args, "decode");  // the path of decode model
-  fs::path visual_path =
-      args.count("visual") ? validate_path(args, "visual") : fs::path();
-  fs::path embedding_path =
-      validate_path(args, "embedding");  // the path of quant_embedding.bin
-  int input_token_len = validate_setting(args, "input");  // input tokens
-  int stop_token_len =
-      validate_setting(args, "stop");  // the num of tokens to stop generation
-  int ndevices =
-      args.count("ndevices") ? validate_setting(args, "ndevices") : 1;
-  int loop_round = args.count("loop") ? validate_setting(args, "loop") : 1;
+  std::thread device_monitor_thread(device_monitor);
+  try {
+    fs::path prefill_path =
+        validate_path(args, "prefill");  // the path of prefill model
+    fs::path decode_path =
+        validate_path(args, "decode");  // the path of decode model
+    fs::path visual_path =
+        args.count("visual") ? validate_path(args, "visual") : fs::path();
+    fs::path embedding_path =
+        validate_path(args, "embedding");  // the path of quant_embedding.bin
+    int input_token_len = validate_setting(args, "input");  // input tokens
+    int stop_token_len =
+        validate_setting(args, "stop");  // the num of tokens to stop generation
+    int ndevices =
+        args.count("ndevices") ? validate_setting(args, "ndevices") : 1;
+    int loop_round = args.count("loop") ? validate_setting(args, "loop") : 1;
 
-  int batch = args.count("batch") ? validate_setting(args, "batch") : 1;
-  bool warm_up_enable = args.count("no_warm_up") ? false : true;
-  bool lazy_mode_enable = args.count("LazyMode") ? true : false;
+    int batch = args.count("batch") ? validate_setting(args, "batch") : 1;
+    bool warm_up_enable = args.count("no_warm_up") ? false : true;
+    bool lazy_mode_enable = args.count("LazyMode") ? true : false;
 
-  std::cout << COLOR_YELLOW << std::string(25, '=') << " Perf Settings "
-            << std::string(25, '=') << std::endl;
-  std::cout << "prefill path : " << prefill_path.string() << std::endl;
-  std::cout << "decode path : " << decode_path.string() << std::endl;
-  if (!visual_path.empty()) {
-    std::cout << "visual path : " << visual_path.string() << std::endl;
-  }
-  std::cout << "embedding path : " << embedding_path.string() << std::endl;
-  std::cout << "input token len : " << input_token_len << std::endl;
-  std::cout << "stop token len : " << stop_token_len << std::endl;
-  std::cout << "ndevices : " << ndevices << std::endl;
-  std::cout << "loop : " << loop_round << std::endl;
-  std::cout << "batch : " << batch << std::endl;
-  if (warm_up_enable) {
-    std::cout << "warm_up : enable" << std::endl;
-  } else {
-    std::cout << "warm_up : disable" << std::endl;
-  }
-
-  if (lazy_mode_enable) {
-    std::cout
-        << "LazyMode : enable (this may lead to loading model taking more time)"
-        << std::endl;
-  } else {
-    std::cout << "LazyMode : disable" << std::endl;
-  }
-
-  std::cout << std::string(65, '=') << COLOR_RESET << std::endl;
-
-  const char* houmo_target_env = getenv("HOUMO_TARGET");
-  std::string houmo_target =
-      houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
-  if (houmo_target != "xh2") {
-    throw std::invalid_argument("Unsupported backend " + houmo_target);
-  }
-
-#ifdef XH2A_HM_SYS
-  std::map<int, hm_mem_info> dev_mem_info_start;
-  auto mem_ret_start = GetDevMemInfo(dev_mem_info_start);
-#endif
-
-  std::unique_ptr<HmllmInferBase> Qwen3Infer;
-  if (visual_path.empty()) {
-    if (batch == 1) {
-      Qwen3Infer = std::make_unique<HmllmInfer>(
-          prefill_path.string(), decode_path.string(), embedding_path.string(),
-          ndevices, batch, lazy_mode_enable);
+    std::cout << COLOR_YELLOW << std::string(25, '=') << " Perf Settings "
+              << std::string(25, '=') << std::endl;
+    std::cout << "prefill path : " << prefill_path.string() << std::endl;
+    std::cout << "decode path : " << decode_path.string() << std::endl;
+    if (!visual_path.empty()) {
+      std::cout << "visual path : " << visual_path.string() << std::endl;
+    }
+    std::cout << "embedding path : " << embedding_path.string() << std::endl;
+    std::cout << "input token len : " << input_token_len << std::endl;
+    std::cout << "stop token len : " << stop_token_len << std::endl;
+    std::cout << "ndevices : " << ndevices << std::endl;
+    std::cout << "loop : " << loop_round << std::endl;
+    std::cout << "batch : " << batch << std::endl;
+    if (warm_up_enable) {
+      std::cout << "warm_up : enable" << std::endl;
     } else {
-      if (houmo_target != "xh2") {
-        throw std::runtime_error(
-            "Only xh2 support multibacth, device not match!");
-      }
-      Qwen3Infer = std::make_unique<HmllmInferMultiBatch>(
-          prefill_path.string(), decode_path.string(), embedding_path.string(),
-          ndevices, batch, lazy_mode_enable);
+      std::cout << "warm_up : disable" << std::endl;
     }
-  } else {
-    Qwen3Infer = std::make_unique<HmvllmInfer>(
-        prefill_path.string(), decode_path.string(), embedding_path.string(),
-        visual_path.string(), ndevices, batch, lazy_mode_enable);
-  }
+
+    if (lazy_mode_enable) {
+      std::cout << "LazyMode : enable (this may lead to loading model taking "
+                   "more time)"
+                << std::endl;
+    } else {
+      std::cout << "LazyMode : disable" << std::endl;
+    }
+
+    std::cout << std::string(65, '=') << COLOR_RESET << std::endl;
+
+    const char* houmo_target_env = getenv("HOUMO_TARGET");
+    std::string houmo_target =
+        houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
+    if (houmo_target != "xh2") {
+      throw std::invalid_argument("Unsupported backend " + houmo_target);
+    }
 
 #ifdef XH2A_HM_SYS
-  std::map<int, hm_mem_info> dev_mem_info_end;
-  auto mem_ret_end = GetDevMemInfo(dev_mem_info_end);
-  if (mem_ret_start == 0 && mem_ret_end == 0) {
-    std::cout << "****** HM Device Memory Usage ******" << std::endl;
-    for (const auto& pair : dev_mem_info_start) {
-      int device_id = pair.first;
-      const hm_mem_info& mem_info_start = pair.second;
-      if (dev_mem_info_end.count(device_id) == 0) {
-        std::cerr << "Failed to get device " << device_id << " memory info."
-                  << std::endl;
-        break;
-      }
-      const hm_mem_info& mem_info_end = dev_mem_info_end[device_id];
-      int32_t mem_used = mem_info_end.mem_used - mem_info_start.mem_used;
-      mem_used = mem_used < 0 ? 0 : mem_used;
-      std::cout << "Device id: " << device_id << ", memory used: " << mem_used
-                << " MB" << std::endl;
-    }
-    std::cout << "************************************" << std::endl;
-  } else {
-    std::cerr << "Failed to get device memory info, start ret is "
-              << mem_ret_start << ", end ret is " << mem_ret_end << std::endl;
-  }
+    std::map<int, hm_mem_info> dev_mem_info_start;
+    auto mem_ret_start = GetDevMemInfo(dev_mem_info_start);
 #endif
 
-  PerfInfos avg_perfdata, total_perfdata;
-  memset(&avg_perfdata, 0, sizeof(PerfInfos));
-  memset(&total_perfdata, 0, sizeof(PerfInfos));
-  if (warm_up_enable) {
-    std::cout << "\n"
-              << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
-              << input_token_len << ", output " << stop_token_len
-              << std::string(30, '=') << "\n ";
-    Qwen3Infer->perf_llm(input_token_len, stop_token_len);
-    std::cout << std::string(82, '=') << "\n";
-  }
+    std::unique_ptr<HmllmInferBase> Qwen3Infer;
+    if (visual_path.empty()) {
+      if (batch == 1) {
+        Qwen3Infer = std::make_unique<HmllmInfer>(
+            prefill_path.string(), decode_path.string(),
+            embedding_path.string(), ndevices, batch, lazy_mode_enable);
+      } else {
+        if (houmo_target != "xh2") {
+          throw std::runtime_error(
+              "Only xh2 support multibacth, device not match!");
+        }
+        Qwen3Infer = std::make_unique<HmllmInferMultiBatch>(
+            prefill_path.string(), decode_path.string(),
+            embedding_path.string(), ndevices, batch, lazy_mode_enable);
+      }
+    } else {
+      Qwen3Infer = std::make_unique<HmvllmInfer>(
+          prefill_path.string(), decode_path.string(), embedding_path.string(),
+          visual_path.string(), ndevices, batch, lazy_mode_enable);
+    }
 
-  for (int i = 0; i < loop_round; ++i) {
-    std::cout << COLOR_BLUE << "\n"
-              << std::string(30, '=')
-              << "(v)LLM Perf Loop Progress: " << (i + 1) << "/" << loop_round
-              << std::string(30, '=') << "\n ";
-    PerfInfos perf_data = Qwen3Infer->perf_llm(input_token_len, stop_token_len);
-    std::cout << std::string(82, '=') << "\n";
-    total_perfdata.input_tokens = perf_data.input_tokens;
-    total_perfdata.stop_tokens = perf_data.stop_tokens;
-    total_perfdata.prefill_time += perf_data.prefill_time;
-    total_perfdata.decode_time += perf_data.decode_time;
-    total_perfdata.embedding_time += perf_data.embedding_time;
-    total_perfdata.t_total += perf_data.t_total;
-    total_perfdata.decode_count += perf_data.decode_count;
-    total_perfdata.ttft += perf_data.ttft;
-    total_perfdata.vit_time += perf_data.vit_time;
-  }
+#ifdef XH2A_HM_SYS
+    std::map<int, hm_mem_info> dev_mem_info_end;
+    auto mem_ret_end = GetDevMemInfo(dev_mem_info_end);
+    if (mem_ret_start == 0 && mem_ret_end == 0) {
+      std::cout << "****** HM Device Memory Usage ******" << std::endl;
+      for (const auto& pair : dev_mem_info_start) {
+        int device_id = pair.first;
+        const hm_mem_info& mem_info_start = pair.second;
+        if (dev_mem_info_end.count(device_id) == 0) {
+          std::cerr << "Failed to get device " << device_id << " memory info."
+                    << std::endl;
+          break;
+        }
+        const hm_mem_info& mem_info_end = dev_mem_info_end[device_id];
+        int32_t mem_used = mem_info_end.mem_used - mem_info_start.mem_used;
+        mem_used = mem_used < 0 ? 0 : mem_used;
+        std::cout << "Device id: " << device_id << ", memory used: " << mem_used
+                  << " MB" << std::endl;
+      }
+      std::cout << "************************************" << std::endl;
+    } else {
+      std::cerr << "Failed to get device memory info, start ret is "
+                << mem_ret_start << ", end ret is " << mem_ret_end << std::endl;
+    }
+#endif
 
-  avg_perfdata.input_tokens = total_perfdata.input_tokens;
-  avg_perfdata.stop_tokens = total_perfdata.stop_tokens;
-  avg_perfdata.prefill_time = total_perfdata.prefill_time / loop_round;
-  avg_perfdata.decode_time = total_perfdata.decode_time / loop_round;
-  avg_perfdata.embedding_time = total_perfdata.embedding_time / loop_round;
-  avg_perfdata.t_total = total_perfdata.t_total / loop_round;
-  avg_perfdata.decode_count = total_perfdata.decode_count / loop_round;
-  avg_perfdata.ttft = total_perfdata.ttft / loop_round;
-  avg_perfdata.vit_time = total_perfdata.vit_time / loop_round;
-  std::cout << COLOR_GREEN << std::string(30, '=')
-            << " (v)LLM Perf Avarage Information " << std::string(30, '=')
-            << "\n";
-  ShowPerfInformation(avg_perfdata);
-  std::cout << COLOR_GREEN << std::string(90, '=') << "\n";
-  std::cout << COLOR_RESET;
-  Qwen3Infer.reset();
+    PerfInfos avg_perfdata, total_perfdata;
+    memset(&avg_perfdata, 0, sizeof(PerfInfos));
+    memset(&total_perfdata, 0, sizeof(PerfInfos));
+    if (warm_up_enable) {
+      std::cout << "\n"
+                << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
+                << input_token_len << ", output " << stop_token_len
+                << std::string(30, '=') << "\n ";
+      Qwen3Infer->perf_llm(input_token_len, stop_token_len);
+      std::cout << std::string(82, '=') << "\n";
+    }
+
+    for (int i = 0; i < loop_round; ++i) {
+      std::cout << COLOR_BLUE << "\n"
+                << std::string(30, '=')
+                << "(v)LLM Perf Loop Progress: " << (i + 1) << "/" << loop_round
+                << std::string(30, '=') << "\n ";
+      PerfInfos perf_data =
+          Qwen3Infer->perf_llm(input_token_len, stop_token_len);
+      std::cout << std::string(82, '=') << "\n";
+      total_perfdata.input_tokens = perf_data.input_tokens;
+      total_perfdata.stop_tokens = perf_data.stop_tokens;
+      total_perfdata.prefill_time += perf_data.prefill_time;
+      total_perfdata.decode_time += perf_data.decode_time;
+      total_perfdata.embedding_time += perf_data.embedding_time;
+      total_perfdata.t_total += perf_data.t_total;
+      total_perfdata.decode_count += perf_data.decode_count;
+      total_perfdata.ttft += perf_data.ttft;
+      total_perfdata.vit_time += perf_data.vit_time;
+    }
+
+    avg_perfdata.input_tokens = total_perfdata.input_tokens;
+    avg_perfdata.stop_tokens = total_perfdata.stop_tokens;
+    avg_perfdata.prefill_time = total_perfdata.prefill_time / loop_round;
+    avg_perfdata.decode_time = total_perfdata.decode_time / loop_round;
+    avg_perfdata.embedding_time = total_perfdata.embedding_time / loop_round;
+    avg_perfdata.t_total = total_perfdata.t_total / loop_round;
+    avg_perfdata.decode_count = total_perfdata.decode_count / loop_round;
+    avg_perfdata.ttft = total_perfdata.ttft / loop_round;
+    avg_perfdata.vit_time = total_perfdata.vit_time / loop_round;
+    std::cout << COLOR_GREEN << std::string(30, '=')
+              << " (v)LLM Perf Avarage Information " << std::string(30, '=')
+              << "\n";
+    ShowPerfInformation(avg_perfdata);
+    std::cout << COLOR_GREEN << std::string(90, '=') << "\n";
+    std::cout << COLOR_RESET;
+    Qwen3Infer.reset();
+    stop_monitor();
+    device_monitor_thread.join();
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "Error: " << e.what() << std::endl;
+    stop_monitor();
+    device_monitor_thread.join();
+    return 1;
+  }
   return 0;
 }
 

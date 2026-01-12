@@ -136,6 +136,25 @@ struct Hm_monitor_infos {
  * @param dev_index Device index
  */
 void hm_device_monitor_info(int dev_index) {
+#ifdef _MSC_VER
+  HMODULE hDll = LoadLibraryA("libhal_xh2a.dll");
+  typedef int (*HM_SYS_CHECK_DEVICE_INDEX)(int dev_index);
+  typedef int (*HM_SYS_GET_TEMPERATURE)(int dev_id, float* temperature);
+  typedef int (*HM_SYS_GET_BOARD_POWER)(int dev_id, float* power);
+  typedef int (*HM_SYS_GET_IPU_FREQUENCY)(int dev_id, uint64_t* freq);
+  HM_SYS_CHECK_DEVICE_INDEX hm_sys_check_device_index = nullptr;
+  HM_SYS_GET_TEMPERATURE hm_sys_get_temperature = nullptr;
+  HM_SYS_GET_BOARD_POWER hm_sys_get_board_power = nullptr;
+  HM_SYS_GET_IPU_FREQUENCY hm_sys_get_ipu_frequency = nullptr;
+  hm_sys_check_device_index = (HM_SYS_CHECK_DEVICE_INDEX)GetProcAddress(
+      hDll, "hm_sys_check_device_index");
+  hm_sys_get_temperature =
+      (HM_SYS_GET_TEMPERATURE)GetProcAddress(hDll, "hm_sys_get_temperature");
+  hm_sys_get_board_power =
+      (HM_SYS_GET_BOARD_POWER)GetProcAddress(hDll, "hm_sys_get_board_power");
+  hm_sys_get_ipu_frequency = (HM_SYS_GET_IPU_FREQUENCY)GetProcAddress(
+      hDll, "hm_sys_get_ipu_frequency");
+#endif
   while (g_running) {
     int ret = hm_sys_check_device_index(dev_index);
     if (ret != 0) {
