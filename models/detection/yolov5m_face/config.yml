@@ -21,7 +21,9 @@ quant:
   calib_num: 50
   config:
     mix_attn_outs:
-      ["/model.23/Reshape", "/model.23/Reshape_2", "/model.23/Reshape_4"]
+      - "/model.23/Reshape"
+      - "/model.23/Reshape_2"
+      - "/model.23/Reshape_4"
 
 build:
   ncore: 1

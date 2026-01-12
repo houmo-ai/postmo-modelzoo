@@ -63,7 +63,7 @@ if __name__ == "__main__":
     model_type = args.model_type
     model_dir = args.model_dir
 
-    model_name = "yolov5s"
+    model_name = "yolov5s_feature"
     ncore = 1
     batch = 1
     opt_level = "O2"

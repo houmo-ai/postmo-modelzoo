@@ -82,7 +82,6 @@ if __name__ == "__main__":
     # Limit to 1 thread if not running on ASIC platform
     if not os.environ.get("HDPL_PLATFORM") == "ASIC":
         thread_num = 1
-
     logger.info(f"devices: {device_num}")
     logger.info(f"threads: {thread_num}")
     logger.info(f"samples: {sample_num}")

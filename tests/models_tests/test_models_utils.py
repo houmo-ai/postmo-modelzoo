@@ -25,7 +25,7 @@ import pytest
 import os
 import logging
 import shutil
-import glob
+import glob as glob_module
 import re
 from ..tests_utils.tests_common_utils import *
 
@@ -576,7 +576,7 @@ def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) 
             os.makedirs(f"{compile_res_dir}/hmquant/", exist_ok=True)
             os.system(f"cp -a {quant_res_dir}/quant_*.pt {compile_res_dir}/hmquant/")
         if get_test_type() in [TCaseType.SEPARATE_NO_INFER, TCaseType.DEFAULT]:
-            hmm_files = glob.glob(os.path.join(compile_res_dir, "*.hmm"))
+            hmm_files = glob_module.glob(os.path.join(compile_res_dir, "*.hmm"))
             if os.path.exists(compile_res_dir) and len(hmm_files) > 0:
                 logger.warning(
                     f"Skip the step of preparing compiled model {compile_res_dir}."

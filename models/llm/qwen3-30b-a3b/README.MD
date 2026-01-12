@@ -1,14 +1,14 @@
-# Qwen3(通义千问3)
+# Qwen3(通义千问 3)
 
-本示例展示如何把Qwen3模型量化和编译，部署到后摩鸿途芯片的设备上。
+本示例展示如何把 Qwen3 模型量化和编译，部署到后摩鸿途芯片的设备上。
 
 ## 预训练模型
 
 本项目使用从 ModelScope 下载的预训练模型：
 
-- 模型名称: Qwen3-30B-A3B
-- 来源: https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B
-- 许可: Apache License 2.0 （https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B/file/view/master/LICENSE?status=0）
+-   模型名称: Qwen3-30B-A3B
+-   来源: https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B
+-   许可: Apache License 2.0 （https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B/file/view/master/LICENSE?status=0）
 
 预训练模型在运行时下载，工程发布**不包含**该模型。
 
@@ -16,31 +16,32 @@
 
 本项目引用 wikitext 数据集仅用于**研究和评估目的**。
 
-- 数据集许可: CC BY-NC 4.0
-- 来源: https://www.modelscope.cn/datasets/modelscope/wikitext
+-   数据集许可: CC BY-NC 4.0
+-   来源: https://www.modelscope.cn/datasets/modelscope/wikitext
 
 ⚠️ 重要提示:
-- 本数据集**不作为本仓库的一部分进行分发**。
-- 本数据集**不受本项目 Apache License 2.0 许可的约束**。
-- 任何对数据集的使用都必须遵守其原始许可 (CC BY-NC 4.0)，包括**非商业用途限制**。
-- 用户有责任确保在使用本数据集时遵守相关规定。
+
+-   本数据集**不作为本仓库的一部分进行分发**。
+-   本数据集**不受本项目 Apache License 2.0 许可的约束**。
+-   任何对数据集的使用都必须遵守其原始许可 (CC BY-NC 4.0)，包括**非商业用途限制**。
+-   用户有责任确保在使用本数据集时遵守相关规定。
 
 [TOC]
 
 ## 1 模型说明
 
 本例使用的模型实现来源于[https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B](https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B)。
-本例只适用于xh2。
+本例只适用于 xh2。
 
 ## 2 快速开始
 
-目前Qwen3模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
+目前 Qwen3 模型仅提供 python 脚本编译方式。芯片模型只能在 linux 环境下量化和编译。
 
 ### 2.1 获取模型和数据
 
-通过get_model脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
+通过 get_model 脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
 
-如果需要自己量化，可选择下载原始模型和wikitext2数据集，下载后的模型存放在qwen3-30b-a3b目录：
+如果需要自己量化，可选择下载原始模型和 wikitext2 数据集，下载后的模型存放在 qwen3-30b-a3b 目录：
 
 ```bash
 python3 get_model.py --type raw
@@ -56,13 +57,13 @@ python3 get_model.py --type hmm
 
 ### 2.2 量化
 
-量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到12GB以上，空闲内存需要达到291GB以上。参考命令：
+量化需要使用 GPU，并在宿主机安装与 CUDA12.2 兼容的 CUDA 和驱动。启动 docker 时将 GPU 映射到 docker 内，并指定可用的 GPU ID，显存需要达到 12GB 以上，空闲内存需要达到 291GB 以上。参考命令：
 
 ```bash
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64.** /bin/bash
 ```
 
-进入docker后source环境变量，并进入`models/llm/qwen3-30b-a3b`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为256和8192。
+进入 docker 后 source 环境变量，并进入`models/llm/qwen3-30b-a3b`目录，执行 ptq.py 脚本。默认的 prefill 和 decode 上下文长度分别为 256 和 8192。
 
 ```bash
 source env.sh
@@ -86,19 +87,19 @@ cd models/llm/qwen3-30b-a3b
 python3 build.py
 ```
 
-编译好的模型存放在当前目录，包括2个文件：
+编译好的模型存放在当前目录，包括 2 个文件：
 qwen3_prefill.hmm
 qwen3_decode.hmm
 
 ### 2.3 演示
 
-Qwen2模型使用python API进行演示
+Qwen2 模型使用 python API 进行演示
 
-1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下，也可通过demo中的`EMBEDDING_PATH`变量指定位置
+1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下，也可通过 demo 中的`EMBEDDING_PATH`变量指定位置
 
 2. 执行脚本，推理完成将输出性能结果。
 
-3. 注意：直接运行预编译好的hmm模型和执行量化+编译后产生的hmm模型执行demo后输出可能略有差异，属于正常现象。
+3. 注意：直接运行预编译好的 hmm 模型和执行量化+编译后产生的 hmm 模型执行 demo 后输出可能略有差异，属于正常现象。
 
 ```bash
 python3 demo.py
@@ -106,7 +107,7 @@ python3 demo.py
 
 ### 2.4 一键评估
 
-以上步骤可以通过test.sh脚本一键执行：
+以上步骤可以通过 test.sh 脚本一键执行：
 
 ```bash
 bash test.sh
