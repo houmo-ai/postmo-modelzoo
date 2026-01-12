@@ -326,7 +326,9 @@ def _parse_file_url(file_path: str) -> tuple[str, str, str]:
     :return: (modelzoo_url, file_relative_path, repo_type)
              repo_type: "jfrog" / "oss"
     """
+    from urllib.parse import unquote
 
+    file_path = unquote(file_path)
     # 1. Handling the situation where the full URL is provided
     if file_path.startswith(("http://", "https://")):
         if "artifactory" in file_path:
@@ -362,7 +364,7 @@ def _get_jfrog_file_md5(
     try:
         split_parts = jfrog_base_url.rstrip("/").rsplit("artifactory", 1)
         jfrog_base = split_parts[0] + "artifactory"
-        jfrog_tail = split_parts[-1].rstrip("/") if len(split_parts) > 1 else ""
+        jfrog_tail = split_parts[-1].strip("/") if len(split_parts) > 1 else ""
         if jfrog_tail:
             file_info_url = (
                 f"{jfrog_base}/api/storage/{jfrog_tail}/{file_relative_path}"
@@ -381,13 +383,33 @@ def _get_jfrog_file_md5(
         return "", 0
 
 
-def _get_oss_file_md5(oss_base_url: str, file_relative_path: str) -> tuple[str, int]:
+def _get_oss_file_md5(file_relative_path: str) -> tuple[str, int]:
     """
     Get the MD5 and file size from OSS
     :return: (md5sum, file size)
     """
-    logger.warning("OSS interface is not yet available.")
-    return "", 0
+    try:
+        file_relative_path = file_relative_path.strip("/")
+        file_relative_path = (
+            file_relative_path
+            if file_relative_path.startswith("Dadao/")
+            else f"Dadao/{file_relative_path}"
+        )
+        oss_api_url = f"https://developer.houmoai.com/api/product/oss_jfrog_file_record/get_file_info/?oss_path={file_relative_path}"
+        logger.info(f"Get file info from OSS: {oss_api_url}")
+
+        response = requests.get(oss_api_url, timeout=10)
+        response.raise_for_status()  # Trigger HTTP error (not a 200 status code)
+
+        resp_data = response.json()
+        if resp_data["code"] == 1:
+            return resp_data["data"]["md5"], int(resp_data["data"]["content_length"])
+
+        logger.warning(f'OSS returned an error. Error code: {resp_data["code"]}')
+        return "", 0
+    except Exception as e:
+        logger.warning(f"Failed to get file information from OSS:{str(e)}")
+        return "", 0
 
 
 def _check_file_exists(save_path: str, expected_md5: str) -> bool:
@@ -517,10 +539,10 @@ def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) ->
     expected_md5 = ""
     if repo_type in ["jfrog", "unknown"]:
         expected_md5, file_size = _get_jfrog_file_md5(modelzoo_url, file_relative_path)
-        repo_type = "jfrog" if file_size > 0 else repo_type
+        repo_type = "unknown" if file_size <= 0 else "jfrog"
     if repo_type in ["oss", "unknown"]:
         modelzoo_url = OSS_REPO if repo_type == "unknown" else modelzoo_url
-        expected_md5, file_size = _get_oss_file_md5(modelzoo_url, file_relative_path)
+        expected_md5, file_size = _get_oss_file_md5(file_relative_path)
     if not expected_md5 or file_size <= 0:
         return ""
 
