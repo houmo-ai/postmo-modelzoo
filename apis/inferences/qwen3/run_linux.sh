@@ -16,9 +16,9 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
     fi
     if [ ! -e 3rdparty/tokenizers-cpp ];then
       cd 3rdparty
-      wget ${HOUMO_MODELZOO_URL}/models/qwen3/tokenizers-cpp.zip
-      unzip tokenizers-cpp.zip
-      rm -rf tokenizers-cpp.zip
+      wget ${HOUMO_MODELZOO_URL}/3rdparty/qwen3-tokenizers-cpp.zip
+      unzip qwen3-tokenizers-cpp.zip
+      rm -rf qwen3-tokenizers-cpp.zip
       cd ..
     fi
 

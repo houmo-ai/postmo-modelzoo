@@ -54,7 +54,6 @@ def get_args() -> argparse.Namespace:
         default=os.path.join(HOUMO_EXAMPLES_PATH, "apis/models"),
         help="Directory to save downloaded model files",
     )
-
     parser.add_argument(
         "--extract_dir",
         dest="extract_dir",
@@ -62,7 +61,6 @@ def get_args() -> argparse.Namespace:
         default=".",
         help="Directory to extract downloaded files",
     )
-
     parser.add_argument(
         "--source_type",
         dest="source_type",
@@ -70,6 +68,20 @@ def get_args() -> argparse.Namespace:
         default="jfrog",
         choices=["jfrog", "modelscope"],
         help="Source to download model from (jfrog or modelscope)",
+    )
+    parser.add_argument(
+        "--context_length",
+        dest="context_length",
+        type=str,
+        default="8k",
+        help="context length",
+    )
+    parser.add_argument(
+        "--ncore",
+        dest="ncore",
+        type=int,
+        default=2,
+        help="core number",
     )
 
     args = parser.parse_args()
@@ -88,9 +100,9 @@ if __name__ == "__main__":
         "model_name": "qwen3",
         "model_info": {
             "model_size": "8b",
-            "ncore": 2,
+            "ncore": args.ncore,
             "ndevice": 1,
-            "context_len": "8k",
+            "context_len": args.context_length,
             "prefill_len": 256,
             "batch": 1,
         },
