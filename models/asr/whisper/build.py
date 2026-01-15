@@ -158,7 +158,8 @@ def get_args() -> argparse.Namespace:
         dest="stage",
         type=str,
         default="build",
-        help='build stage choise=["build", "test", "all"]',
+        choices=["build", "test", "all"],
+        help="build stage",
     )
     parser.add_argument(
         "--output_dir",
@@ -175,6 +176,7 @@ def get_args() -> argparse.Namespace:
         choices=[0, 1],
         help="flash attention optimization",
     )
+
     args = parser.parse_args()
     return args
 
@@ -183,13 +185,16 @@ def build_whisper(
     model_name, model_dir, model_path, output_dir, profile, ncore, j, flash_attention=0
 ):
     import tcim
-    import json
 
     kwargs = {}
-    kwargs["flash_attention"] = flash_attention
-    custom_msg = {}
-    custom_msg["flash_attention"] = flash_attention
-    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
+
+    if flash_attention > 0:
+        import json
+
+        kwargs["flash_attention"] = flash_attention
+        custom_msg = {}
+        custom_msg["flash_attention"] = flash_attention
+        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
     print(f"\n===> {model_name} build start...")

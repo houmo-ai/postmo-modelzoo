@@ -30,10 +30,10 @@ import logging
 
 logging.basicConfig(level="INFO")
 
-HOUMO_TARGET = os.getenv('HOUMO_TARGET')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
-HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
+HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
 GOLDEN_THRESH = 0.98
 
 
@@ -86,7 +86,7 @@ class ProcessMemoryMonitor:
         memory_info = self.process.memory_info()
         rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
         percent = self.process.memory_percent()  # Percentage of system memory
-        return {'rss_mb': rss_mb, 'percent': percent}
+        return {"rss_mb": rss_mb, "percent": percent}
 
     def start(self):
         """Starts the monitoring loop in a separate daemon thread."""
@@ -101,22 +101,22 @@ class ProcessMemoryMonitor:
         """The internal loop that runs in the thread."""
         while self.is_monitoring:
             mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info['rss_mb'])
+            self.peak_memory_mb = max(self.peak_memory_mb, mem_info["rss_mb"])
 
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
             log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
 
             # Output to console or file
             if self.log_file:
-                with open(self.log_file, 'a') as f:
-                    f.write(log_message + '\n')
+                with open(self.log_file, "a") as f:
+                    f.write(log_message + "\n")
 
             time.sleep(self.interval)
 
     def stop(self):
         """Stops the monitoring loop and prints peak usage."""
         self.is_monitoring = False
-        if hasattr(self, 'monitor_thread'):
+        if hasattr(self, "monitor_thread"):
             # Wait a moment for the thread to finish
             self.monitor_thread.join(timeout=1)
         print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
@@ -126,46 +126,47 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--model_dir",
+        dest="model_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
-        help='path to the model dir',
+        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        help="path to the model dir",
     )
     parser.add_argument(
-        '--model_name',
-        dest='model_name',
+        "--model_name",
+        dest="model_name",
         type=str,
-        default='gte',
-        help='output houmo model name',
+        default="gte",
+        help="output houmo model name",
     )
     parser.add_argument(
-        '--j',
-        dest='j',
+        "--j",
+        dest="j",
         type=int,
         default=multiprocessing.cpu_count(),
-        help='build parallel jobs',
+        help="build parallel jobs",
     )
     parser.add_argument(
-        '--ncore',
-        dest='ncore',
+        "--ncore",
+        dest="ncore",
         type=int,
         default=HOUMO_CORE_NUM,
-        help='core number',
+        help="core number",
     )
     parser.add_argument(
-        '--stage',
-        dest='stage',
+        "--stage",
+        dest="stage",
         type=str,
         default="build",
-        help='build stage choise=["build", "test", "all"]',
+        choices=["build", "test", "all"],
+        help="build stage",
     )
     parser.add_argument(
-        '--output_dir',
-        dest='output_dir',
+        "--output_dir",
+        dest="output_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET),
-        help='build output dir',
+        default=os.path.join("output", HOUMO_TARGET),
+        help="build output dir",
     )
     args = parser.parse_args()
     return args
@@ -253,7 +254,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
             f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
         )
         output_data_path = os.path.join(
-            model_dir, f'hmquant_{prefix}_{sanitize_name(output_name)}_output.npy'
+            model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy"
         )
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
@@ -290,7 +291,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     print(f"<=== {model_name} test success.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Create and start the monitor
     memory_monitor = ProcessMemoryMonitor(interval=2)
     memory_monitor.start()
@@ -326,7 +327,7 @@ if __name__ == '__main__':
         )
 
     # test model
-    if args.stage == 'test' or args.stage == 'all':
+    if args.stage == "test" or args.stage == "all":
         part_dir = os.path.join(model_dir, "prefill")
         test("gte_prefill", part_dir, output_dir, profile, prefix=model_name)
     memory_monitor.stop()

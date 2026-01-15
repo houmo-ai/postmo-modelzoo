@@ -123,7 +123,8 @@ def get_args() -> argparse.Namespace:
         dest="stage",
         type=str,
         default="build",
-        help='build stage choise=["build", "test", "all"]',
+        choices=["build", "test", "all"],
+        help="build stage",
     )
     parser.add_argument(
         "--output_dir",
@@ -144,10 +145,13 @@ def get_args() -> argparse.Namespace:
         dest="flash_attention",
         type=int,
         default=2,
-        choices=[0, 1, 2],
+        choices=[0, 1, 2, 3],
         help="flash attention optimization",
     )
+
     args = parser.parse_args()
+    if args.context_length < 2048:
+        args.flash_attention = 3
     return args
 
 
@@ -172,13 +176,14 @@ def build_llm_tts(
     if HOUMO_TARGET == "xh2":
         import json
 
-        custom_msg = dict()
+        custom_msg = {}
         custom_msg["prefill_length"] = prefill_length
 
         kwargs["modify_llm"] = {}
         kwargs["enable_xh2_stable_output"] = tso
-        kwargs["flash_attention"] = flash_attention
-        custom_msg["flash_attention"] = flash_attention
+        if flash_attention > 0 and flash_attention < 3:
+            kwargs["flash_attention"] = flash_attention
+            custom_msg["flash_attention"] = flash_attention
         if ndevice:
             kwargs["ndevice"] = ndevice
         if batch:
@@ -438,7 +443,7 @@ if __name__ == "__main__":
             j,
             flash_attention=args.flash_attention,
         )
-        model_path = f"hmquant_dvae_part1_with_act.onnx"
+        model_path = "hmquant_dvae_part1_with_act.onnx"
         build_other_all(
             "minicpmo_dvae_part1",
             os.path.join(model_dir, "dvae"),
@@ -448,7 +453,7 @@ if __name__ == "__main__":
             ncore,
             j,
         )
-        model_path = f"hmquant_dvae_part2_with_act.onnx"
+        model_path = "hmquant_dvae_part2_with_act.onnx"
         build_other_all(
             "minicpmo_dvae_part2",
             os.path.join(model_dir, "dvae"),

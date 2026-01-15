@@ -214,10 +214,8 @@ def get_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
-
     if args.context_length < 2048:
         args.flash_attention = 3
-
     return args
 
 

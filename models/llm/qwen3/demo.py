@@ -135,10 +135,11 @@ def get_args() -> argparse.Namespace:
         action="store_true",
         help="keep chat history",
     )
+
     args = parser.parse_args()
     if args.ndevice > 1:
-        args.prefill_path = args.prefill_path.replace('.hmm', '.hmms')
-        args.decode_path = args.decode_path.replace('.hmm', '.hmms')
+        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        args.decode_path = args.decode_path.replace(".hmm", ".hmms")
     return args
 
 

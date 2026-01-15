@@ -32,25 +32,25 @@ def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--type",
-        dest='file_type',
+        dest="file_type",
         type=str,
         default="hmm",
         choices=["raw", "hmm"],
         help="which resource to get, choise in [raw, hmm]",
     )
     parser.add_argument(
-        '--download_dir',
-        dest='download_dir',
+        "--download_dir",
+        dest="download_dir",
         type=str,
-        default='.',
-        help='where to save downloaded model',
+        default=".",
+        help="where to save downloaded model",
     )
     parser.add_argument(
         "--extract_dir",
         dest="extract_dir",
         type=str,
         default=None,
-        help='where to save extracted files',
+        help="where to save extracted files",
     )
     parser.add_argument(
         "--source_type",
@@ -58,7 +58,7 @@ def get_args() -> argparse.Namespace:
         type=str,
         default="jfrog",
         choices=["jfrog", "modelscope"],
-        help='download the model from which source',
+        help="download the model from which source",
     )
     parser.add_argument(
         "--context_length",
@@ -68,17 +68,17 @@ def get_args() -> argparse.Namespace:
         help="context length",
     )
     parser.add_argument(
-        '--batch',
-        dest='batch',
+        "--batch",
+        dest="batch",
         type=int,
         default=1,
-        help='batch size',
+        help="batch size",
     )
     args = parser.parse_args()
     return args
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
 
     model_cfgs = {
