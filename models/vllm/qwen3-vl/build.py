@@ -180,7 +180,6 @@ def get_args() -> argparse.Namespace:
         dest="model_size",
         type=str,
         default="8b",
-        choices=["2b", "4b", "8b"],
         help="model size",
     )
     parser.add_argument(
@@ -188,7 +187,8 @@ def get_args() -> argparse.Namespace:
         dest="stage",
         type=str,
         default="build",
-        help='build stage choise=["build", "test", "all"]',
+        choices=["build", "test", "all"],
+        help="build stage",
     )
     parser.add_argument(
         "--output_dir",
@@ -212,7 +212,12 @@ def get_args() -> argparse.Namespace:
         choices=[0, 1, 2, 3],
         help="flash attention optimization",
     )
+
     args = parser.parse_args()
+
+    if args.context_length < 2048:
+        args.flash_attention = 3
+
     return args
 
 

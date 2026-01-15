@@ -136,14 +136,6 @@ def test_detection_yolox_eval(setup_logging) -> None:
     _eval_func(model_name, setup_logging)
 
 
-@pytest.mark.yolov8m_cls
-@pytest.mark.eval
-def test_segmentation_yolov8m_cls_eval(setup_logging) -> None:
-    """test_segmentation_yolov8m_cls_eval"""
-    model_name = "yolov8m-cls"
-    _eval_func(model_name, setup_logging)
-
-
 @pytest.mark.yolov10m
 @pytest.mark.eval
 def test_detection_yolov10m_eval(setup_logging) -> None:
@@ -165,4 +157,12 @@ def test_detection_yolo11m_eval(setup_logging) -> None:
 def test_detection_yolov9m_eval(setup_logging) -> None:
     """test_detection_yolov9m_eval"""
     model_name = "yolov9m"
+    _eval_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.eval
+def test_backbone_yolov8m_cls_eval(setup_logging) -> None:
+    """test_backbone_yolov8m_cls_eval"""
+    model_name = "yolov8m-cls"
     _eval_func(model_name, setup_logging)

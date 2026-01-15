@@ -214,14 +214,6 @@ def test_ocr_ppocrv3_det_perf(setup_logging) -> None:
     _perf_func(model_name, setup_logging)
 
 
-@pytest.mark.yolov8m_cls
-@pytest.mark.perf
-def test_segmentation_yolov8m_cls_perf(setup_logging) -> None:
-    """test_segmentation_yolov8m_cls_perf"""
-    model_name = "yolov8m-cls"
-    _perf_func(model_name, setup_logging)
-
-
 @pytest.mark.yolov10m
 @pytest.mark.perf
 def test_detection_yolov10m_perf(setup_logging) -> None:
@@ -283,4 +275,12 @@ def test_embedding_gte_perf(setup_logging) -> None:
 def test_llm_gpt_oss_perf(setup_logging) -> None:
     """test_llm_gpt_oss_perf"""
     model_name = "gpt-oss"
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.perf
+def test_backbone_yolov8m_cls_perf(setup_logging) -> None:
+    """test_backbone_yolov8m_cls_perf"""
+    model_name = "yolov8m-cls"
     _perf_func(model_name, setup_logging)

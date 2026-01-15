@@ -325,18 +325,6 @@ def test_embedding_bge_quant(setup_logging) -> None:
     _quant_func(model_name, setup_logging)
 
 
-@pytest.mark.yolov8m_cls
-@pytest.mark.quant
-@pytest.mark.dependency(
-    name="test_segmentation_yolov8m_cls_quant",
-    depends_on=["test_get_models.py::test_segmentation_yolov8m_cls_get_model"],
-)
-def test_segmentation_yolov8m_cls_quant(setup_logging) -> None:
-    """test_segmentation_yolov8m_cls_quant"""
-    model_name = "yolov8m-cls"
-    _quant_func(model_name, setup_logging)
-
-
 @pytest.mark.yolov10m
 @pytest.mark.quant
 @pytest.mark.dependency(
@@ -382,4 +370,28 @@ def test_detection_yolov9m_quant(setup_logging) -> None:
 def test_omni_minicpmo_quant(setup_logging) -> None:
     """test_omni_minicpmo_quant"""
     model_name = "minicpmo"
+    _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_backbone_yolov8m_cls_quant",
+    depends_on=["test_get_models.py::test_backbone_yolov8m_cls_get_model"],
+)
+def test_backbone_yolov8m_cls_quant(setup_logging) -> None:
+    """test_backbone_yolov8m_cls_quant"""
+    model_name = "yolov8m-cls"
+    _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.gte
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_embedding_gte_quant",
+    depends_on=["test_get_models.py::test_embedding_gte_get_model"],
+)
+def test_embedding_gte_quant(setup_logging) -> None:
+    """test_embedding_gte_quant"""
+    model_name = "gte"
     _quant_func(model_name, setup_logging)

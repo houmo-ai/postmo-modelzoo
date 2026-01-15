@@ -34,12 +34,13 @@
             "extract_dir": [
                 null,
                 "cached_models/hmm_xh2_8k",
-                "cached_models/hmm_xh2_8k_ms"
+                "cached_models/hmm_xh2_16k",
+                "cached_models/hmm_xh2_16k_ms"
             ],
-            "source_type": [null, null, "modelscope"],
-            "batch": [null, null, null],
-            "context_length": [null, null, null],
-            "ndevice": [null, null, null]
+            "source_type": [null, null, null, "modelscope"],
+            "batch": [null, null, null, null],
+            "context_length": [null, null, "16k", "16k"],
+            "ndevice": [null, null, null, null]
         }
     },
     "quant_params": {
@@ -72,13 +73,23 @@
     },
     "demo_params": {
         "xh2": {
-            "tokenizer_dir": ["cached_models/qwen3-14b"],
-            "embedding_path": [
-                "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
+            "tokenizer_dir": [
+                "cached_models/qwen3-14b",
+                "cached_models/qwen3-14b"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_8k/qwen3_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_8k/qwen3_decode.hmm"],
-            "ndevice": ["1"]
+            "embedding_path": [
+                "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_16k/hmquant/quant_embedding.pt"
+            ],
+            "prefill_path": [
+                "cached_results/hmm_xh2_8k/qwen3_prefill.hmm",
+                "cached_results/hmm_xh2_16k/qwen3_prefill.hmm"
+            ],
+            "decode_path": [
+                "cached_results/hmm_xh2_8k/qwen3_decode.hmm",
+                "cached_results/hmm_xh2_16k/qwen3_decode.hmm"
+            ],
+            "ndevice": ["1", "1"]
         }
     },
     "demo_multibatch_params": {

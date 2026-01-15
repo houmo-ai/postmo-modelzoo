@@ -26,6 +26,7 @@ import os
 import logging
 import shutil
 from ..tests_utils.tests_common_utils import *
+from ..tests_utils.tests_pyvenv_utils import install_py_venv, VENV_NAME
 
 
 logger = logging.getLogger(__name__)
@@ -231,27 +232,21 @@ def execute_apis_examples(example_name: str, log_file: str):
     py_flag = True
     if "python" in demo_types:
         # install python requirements
-        changed_libs = install_py_env(current_folder, log_file)
-        if changed_libs:
-            logger.info(f"changed python libs: {changed_libs}.")
+        venv_flag = install_py_venv(current_folder, log_file)
+        python_exe = "python3"
+        if venv_flag:
+            python_exe = f"{VENV_NAME}/bin/python3"
 
         params_dict = example_info["py_example_params"]
-        cmd_header = ["python3", params_dict["name"]]
+        cmd_header = [python_exe, params_dict["name"]]
         cmd_list = _generate_cmds(cmd_header, params_dict)
         for tmp_cmd_list in cmd_list:
-            exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
+            exec_flag, _ = execute_test_cmd(
+                tmp_cmd_list, log_file, pyvenv_flag=venv_flag
+            )
             py_flag = False if exec_flag is False else py_flag
         if py_flag is False:
             logger.error("Python example execution failed!")
-
-        # restore python env
-        for lib_name, lib_ver in changed_libs.items():
-            if lib_ver is None:
-                execute_test_cmd(["pip3", "uninstall", lib_name, "-y"], log_file, True)
-            else:
-                execute_test_cmd(
-                    ["pip3", "install", lib_name + "==" + lib_ver], log_file, True
-                )
 
     # run c++ demo
     cpp_flag = True
@@ -262,7 +257,7 @@ def execute_apis_examples(example_name: str, log_file: str):
         cmd_header = [cpp_exe_str]
         cmd_list = _generate_cmds(cmd_header, params_dict)
         for idx, tmp_cmd_list in enumerate(cmd_list):
-            defines = compile_defines[idx] if len(compile_defines) > 0 else list()
+            defines = compile_defines[idx] if len(compile_defines) > 0 else []
             _compile_cpp_exec(current_folder, log_file, defines)
             exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
             cpp_flag = False if exec_flag is False else cpp_flag

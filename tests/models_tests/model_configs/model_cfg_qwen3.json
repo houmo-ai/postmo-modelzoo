@@ -52,16 +52,24 @@
             "source_type": [null, null]
         },
         "xh2": {
-            "type": ["raw", "hmm", "hmm"],
-            "download_dir": ["cached_models", "cached_models", "cached_models"],
+            "type": ["raw", "hmm", "hmm", "hmm", "hmm"],
+            "download_dir": [
+                "cached_models",
+                "cached_models",
+                "cached_models",
+                "cached_models",
+                "cached_models"
+            ],
             "extract_dir": [
                 null,
                 "cached_models/hmm_xh2_8k",
-                "cached_models/hmm_xh2_8k_ms"
+                "cached_models/hmm_xh2_8k_ms",
+                "cached_models/hmm_xh2_16k_b4",
+                "cached_models/hmm_xh2_32k"
             ],
-            "source_type": [null, null, "modelscope"],
-            "context_length": [null, null, null],
-            "batch": [null, null, null]
+            "source_type": [null, null, "modelscope", null, null],
+            "context_length": [null, null, null, "16k", "32k"],
+            "batch": [null, null, null, "4", null]
         }
     },
     "quant_params": {
@@ -105,11 +113,11 @@
             "ncore": [null, null, null],
             "ndevice": [null, null, null],
             "stage": ["build", "build", "build"],
-            "context_length": ["2048", "8192", "8192"],
+            "context_length": ["32768", "8192", "16384"],
             "output_dir": [
-                "cached_results/hmm_xh2_2k",
+                "cached_results/hmm_xh2_32k",
                 "cached_results/hmm_xh2_8k",
-                "cached_results/hmm_xh2_8k_b4"
+                "cached_results/hmm_xh2_16k_b4"
             ],
             "j": ["24", "24", "24"]
         }
@@ -130,15 +138,15 @@
                 "cached_models/qwen3-8b"
             ],
             "embedding_path": [
-                "cached_results/hmm_xh2_2k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_32k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_2k/qwen3_prefill.hmm",
+                "cached_results/hmm_xh2_32k/qwen3_prefill.hmm",
                 "cached_results/hmm_xh2_8k/qwen3_prefill.hmm"
             ],
             "decode_path": [
-                "cached_results/hmm_xh2_2k/qwen3_decode.hmm",
+                "cached_results/hmm_xh2_32k/qwen3_decode.hmm",
                 "cached_results/hmm_xh2_8k/qwen3_decode.hmm"
             ],
             "ndevice": ["1", "1"]
@@ -156,10 +164,10 @@
         "xh2": {
             "tokenizer_dir": ["cached_models/qwen3-8b"],
             "embedding_path": [
-                "cached_results/hmm_xh2_8k_b4/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_16k_b4/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_8k_b4/qwen3_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_8k_b4/qwen3_decode.hmm"]
+            "prefill_path": ["cached_results/hmm_xh2_16k_b4/qwen3_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_16k_b4/qwen3_decode.hmm"]
         }
     },
     "perf_params": "demo"

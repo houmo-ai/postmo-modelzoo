@@ -222,14 +222,6 @@ def test_embedding_bge_demo(setup_logging) -> None:
     _demo_func(model_name, setup_logging)
 
 
-@pytest.mark.yolov8m_cls
-@pytest.mark.demo
-def test_segmentation_yolov8m_cls_demo(setup_logging) -> None:
-    """test_segmentation_yolov8m_cls_demo"""
-    model_name = "yolov8m-cls"
-    _demo_func(model_name, setup_logging)
-
-
 @pytest.mark.yolov10m
 @pytest.mark.demo
 def test_detection_yolov10m_demo(setup_logging) -> None:
@@ -299,4 +291,12 @@ def test_embedding_gte_demo(setup_logging) -> None:
 def test_llm_gpt_oss_demo(setup_logging) -> None:
     """test_llm_gpt_oss_demo"""
     model_name = "gpt-oss"
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.demo
+def test_backbone_yolov8m_cls_demo(setup_logging) -> None:
+    """test_backbone_yolov8m_cls_demo"""
+    model_name = "yolov8m-cls"
     _demo_func(model_name, setup_logging)

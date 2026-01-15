@@ -349,18 +349,6 @@ def test_embedding_bge_compile(setup_logging) -> None:
     _compile_func(model_name, setup_logging)
 
 
-@pytest.mark.yolov8m_cls
-@pytest.mark.compile
-@pytest.mark.dependency(
-    name="test_segmentation_yolov8m_cls_compile",
-    depends_on=["test_quant_models.py::test_segmentation_yolov8m_cls_quant"],
-)
-def test_segmentation_yolov8m_cls_compile(setup_logging) -> None:
-    """test_segmentation_yolov8m_cls_compile"""
-    model_name = "yolov8m-cls"
-    _compile_func(model_name, setup_logging)
-
-
 @pytest.mark.yolov10m
 @pytest.mark.compile
 @pytest.mark.dependency(
@@ -466,4 +454,16 @@ def test_embedding_gte_compile(setup_logging) -> None:
 def test_llm_gpt_oss_compile(setup_logging) -> None:
     """test_llm_gpt_oss_compile"""
     model_name = "gpt-oss"
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_backbone_yolov8m_cls_compile",
+    depends_on=["test_quant_models.py::test_backbone_yolov8m_cls_quant"],
+)
+def test_backbone_yolov8m_cls_compile(setup_logging) -> None:
+    """test_backbone_yolov8m_cls_compile"""
+    model_name = "yolov8m-cls"
     _compile_func(model_name, setup_logging)

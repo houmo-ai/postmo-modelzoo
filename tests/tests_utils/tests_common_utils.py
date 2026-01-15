@@ -34,6 +34,8 @@ import time
 import threading
 from enum import Enum, unique
 
+from .tests_pyvenv_utils import get_site_packages, VENV_NAME
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 HOUMO_BACKEND = os.getenv("HOUMO_TARGET", "xh1")
@@ -234,6 +236,7 @@ def execute_test_cmd(
     log_file: str = "",
     assert_flag: bool = False,
     check_flag: bool = True,
+    pyvenv_flag: bool = False,
 ) -> tuple[bool, any]:
     """
     Execute a command and handle its output
@@ -250,11 +253,20 @@ def execute_test_cmd(
     flag = True
     subprocess_logger = SubprocessLogger(log_file)
     try:
+        env = os.environ.copy()
+        if pyvenv_flag is True:
+            system_site = get_site_packages("python3")
+            venv_py_exe = f"{VENV_NAME}/bin/python3"
+            venv_site = get_site_packages(venv_py_exe)
+            custom_pythonpath = f"{venv_site}:{system_site}"
+            env["PYTHONPATH"] = custom_pythonpath
+
         process = subprocess.Popen(
             cmd_list,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            env=env,
             bufsize=1,  # Line buffering
             universal_newlines=True,
         )

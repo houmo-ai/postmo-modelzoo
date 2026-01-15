@@ -28,6 +28,7 @@ import shutil
 import glob as glob_module
 import re
 from ..tests_utils.tests_common_utils import *
+from ..tests_utils.tests_pyvenv_utils import install_py_venv, VENV_NAME
 
 
 logger = logging.getLogger(__name__)
@@ -746,6 +747,7 @@ def _run_demo_script(
     model_info: dict,
     model_set_dir: str,
     model_res_dir: str,
+    python_exe: str,
     log_file: str,
 ) -> bool:
     """
@@ -768,8 +770,9 @@ def _run_demo_script(
         demo_name in model_info["support_flow"][HOUMO_BACKEND]
         and param_str in model_info
     ):
+        venv_flag = True if VENV_NAME in python_exe else False
         params_dict = model_info[param_str][HOUMO_BACKEND]
-        cmd_header = ["python3", f"{demo_name}.py"]
+        cmd_header = [python_exe, f"{demo_name}.py"]
         cmd_list = _generate_py_cmds(
             cmd_header,
             params_dict,
@@ -794,7 +797,7 @@ def _run_demo_script(
                 #     )
                 #     continue
                 exec_flag, _ = execute_test_cmd(
-                    tmp_cmd_list, log_file, False, check_flag
+                    tmp_cmd_list, log_file, False, check_flag, pyvenv_flag=venv_flag
                 )
                 if exec_flag is False:
                     logger.error(
@@ -945,11 +948,17 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
             if exec_flag is False:
                 final_flag = False
     else:
+        # install python requirements
+        venv_flag = install_py_venv(current_folder, log_file, "quant")
+        python_exe = "python3"
+        if venv_flag:
+            python_exe = f"{VENV_NAME}/bin/python3"
+
         model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
         model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         # test script: ptq.py
         params_dict = model_info["quant_params"][HOUMO_BACKEND]
-        cmd_header = ["python3", "ptq.py"]
+        cmd_header = [python_exe, "ptq.py"]
 
         cmd_list = _generate_py_cmds(
             cmd_header,
@@ -958,11 +967,6 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
             model_dir=model_set_dir,
             res_dir=model_res_dir,
         )
-
-        # install python requirements
-        changed_libs = install_py_env(current_folder, log_file, "quant")
-        if changed_libs:
-            logger.info(f"changed python libs: {changed_libs}.")
 
         lock_file_res = model_res_dir + "/lock.lock"
         with ModelResourceLock(
@@ -974,22 +978,15 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
                     shutil.rmtree(quant_res_dir, ignore_errors=True)
                     # [TMP]
                     # continue
-                exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
+                exec_flag, _ = execute_test_cmd(
+                    tmp_cmd_list, log_file, pyvenv_flag=venv_flag
+                )
                 if exec_flag is False:
                     final_flag = False
                 else:
                     tmp_res_dir = f"{quant_res_dir}/hmquant"
                     os.system(f"mv {tmp_res_dir}/* {quant_res_dir}/")
                     os.system(f"rm -rf {tmp_res_dir}")
-
-        # restore python env
-        for lib_name, lib_ver in changed_libs.items():
-            if lib_ver is None:
-                execute_test_cmd(["pip3", "uninstall", lib_name, "-y"], log_file, True)
-            else:
-                execute_test_cmd(
-                    ["pip3", "install", f"{lib_name}=={lib_ver}"], log_file, True
-                )
 
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
@@ -1230,9 +1227,10 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
 
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     # install python requirements
-    changed_libs = install_py_env(current_folder, log_file)
-    if changed_libs:
-        logger.info(f"changed python libs: {changed_libs}.")
+    venv_flag = install_py_venv(current_folder, log_file)
+    python_exe = "python3"
+    if venv_flag:
+        python_exe = f"{VENV_NAME}/bin/python3"
 
     final_flag = True
     if "hmdemo_params" in model_info and platform != "aarch64":
@@ -1244,33 +1242,34 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         cmd_list = _generate_hmatc_cmds(cmd_header, required_params, optional_params)
         logger.info(f"cmd list: {cmd_list}")
         for tmp_cmd_list in cmd_list:
-            exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
+            exec_flag, _ = execute_test_cmd(
+                tmp_cmd_list, log_file, pyvenv_flag=venv_flag
+            )
             if exec_flag is False:
                 final_flag = False
     else:
         model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
 
         demo_flag = _run_demo_script(
-            "demo", model_name, model_info, model_set_dir, model_res_dir, log_file
+            "demo",
+            model_name,
+            model_info,
+            model_set_dir,
+            model_res_dir,
+            python_exe,
+            log_file,
         )
+        multibatch_flag = True
         multibatch_flag = _run_demo_script(
             "demo_multibatch",
             model_name,
             model_info,
             model_set_dir,
             model_res_dir,
+            python_exe,
             log_file,
         )
         final_flag = demo_flag and multibatch_flag
-
-    # restore python env
-    for lib_name, lib_ver in changed_libs.items():
-        if lib_ver is None:
-            execute_test_cmd(["pip3", "uninstall", lib_name, "-y"], log_file, True)
-        else:
-            execute_test_cmd(
-                ["pip3", "install", f"{lib_name}=={lib_ver}"], log_file, True
-            )
 
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
@@ -1431,16 +1430,18 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
     perf_threashold = 0.1 if is_release() else 0.95
     if model_info.get("perf_params", None) == "demo":
         # install python requirements
-        changed_libs = install_py_env(current_folder, log_file)
-        if changed_libs:
-            logger.info(f"changed python libs: {changed_libs}.")
+        venv_flag = install_py_venv(current_folder, log_file)
+        python_exe = "python3"
+        if venv_flag:
+            python_exe = f"{VENV_NAME}/bin/python3"
 
         if model_name == "wenet":
             quant_res_dir = model_info["compile_params"][HOUMO_BACKEND]["model_dir"][0]
             quant_res_dir = quant_res_dir.replace("cached_results", model_res_dir)
             final_flag, opt_str = execute_test_cmd(
-                ["python3", "build.py", "--model_dir", quant_res_dir],
+                [python_exe, "build.py", "--model_dir", quant_res_dir],
                 log_file,
+                pyvenv_flag=venv_flag,
             )
             infer_time = [
                 float(line.rsplit(" ", 3)[-2])
@@ -1477,7 +1478,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
             ):
                 final_flag, opt_str = execute_test_cmd(
                     [
-                        "python3",
+                        python_exe,
                         "demo.py",
                         "--model_path",
                         model_path,
@@ -1487,6 +1488,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                         lora_weights,
                     ],
                     log_file,
+                    pyvenv_flag=venv_flag,
                 )
             infer_time = [
                 float(line.strip().rsplit(" ", 3)[-2])
@@ -1507,7 +1509,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                 logger.error(error_msg)
         else:
             perf_idx = 0
-            demo_cmd = ["python3", "demo.py"]
+            demo_cmd = [python_exe, "demo.py"]
             demo_params = model_info["demo_params"][HOUMO_BACKEND]
             for param, param_list in demo_params.items():
                 if param_list[perf_idx] is None:
@@ -1523,13 +1525,16 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                 lock_file_res, ModelResourceLock.LockMode.WRITE, "execute model demo.py"
             ):
                 check_flag = False if model_name == "qwen2.5-vl" else True
-                final_flag, _ = execute_test_cmd(demo_cmd, log_file, False, check_flag)
+                final_flag, _ = execute_test_cmd(
+                    demo_cmd, log_file, False, check_flag, pyvenv_flag=venv_flag
+                )
             perf_dict = {"prefill": 0, "decode": 0, "end2end": 0}
             with open(log_file, "r", encoding="utf-8") as tmp_file:
                 for line in tmp_file:
                     if "Prefill Speed" in line:
+                        split_idx = -1 if "Decode Speed" not in line else -2
                         perf_dict["prefill"] = float(
-                            line.rsplit(":")[-2].strip().split(" ")[0].strip()
+                            line.rsplit(":")[split_idx].strip().split(" ")[0].strip()
                         )
                     if "Decode Speed" in line:
                         perf_dict["decode"] = float(
@@ -1544,9 +1549,12 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
             benchmark = backend_metrics.get(platform, None) if backend_metrics else None
             if (
                 benchmark
-                and perf_dict["prefill"] >= (benchmark["prefill"] * perf_threashold)
-                and perf_dict["decode"] >= (benchmark["decode"] * perf_threashold)
-                and perf_dict["end2end"] >= (benchmark["end2end"] * perf_threashold)
+                and perf_dict["prefill"]
+                >= (benchmark.get("prefill", 0) * perf_threashold)
+                and perf_dict["decode"]
+                >= (benchmark.get("decode", 0) * perf_threashold)
+                and perf_dict["end2end"]
+                >= (benchmark.get("end2end", 0) * perf_threashold)
             ):
                 logger.info(
                     f"The best performance is {perf_dict}, benchmark is {benchmark}."
@@ -1555,14 +1563,6 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
                 final_flag = False
                 error_msg = f"Performance {perf_dict} degradation exceeds {(100-perf_threashold*100)}%, benchmark is {benchmark}."
                 logger.error(error_msg)
-        # restore python env
-        for lib_name, lib_ver in changed_libs.items():
-            if lib_ver is None:
-                execute_test_cmd(["pip3", "uninstall", lib_name, "-y"], log_file, True)
-            else:
-                execute_test_cmd(
-                    ["pip3", "install", f"{lib_name}=={lib_ver}"], log_file, True
-                )
     else:
         # use hmatc perf command to get perf metrics
         final_flag = True

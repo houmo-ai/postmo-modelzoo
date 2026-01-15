@@ -248,15 +248,6 @@ def test_embedding_bge_get_model(setup_logging) -> None:
     _get_model_func(model_name, setup_logging)
 
 
-@pytest.mark.yolov8m_cls
-@pytest.mark.get_model
-@pytest.mark.dependency(name="test_segmentation_yolov8m_cls_get_model")
-def test_segmentation_yolov8m_cls_get_model(setup_logging) -> None:
-    """test_segmentation_yolov8m_cls_get_model"""
-    model_name = "yolov8m-cls"
-    _get_model_func(model_name, setup_logging)
-
-
 @pytest.mark.yolov10m
 @pytest.mark.get_model
 @pytest.mark.dependency(name="test_detection_yolov10m_get_model")
@@ -335,4 +326,13 @@ def test_embedding_gte_get_model(setup_logging) -> None:
 def test_llm_gpt_oss_get_model(setup_logging) -> None:
     """test_llm_gpt_oss_get_model"""
     model_name = "gpt-oss"
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.yolov8m_cls
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_backbone_yolov8m_cls_get_model")
+def test_backbone_yolov8m_cls_get_model(setup_logging) -> None:
+    """test_backbone_yolov8m_cls_get_model"""
+    model_name = "yolov8m-cls"
     _get_model_func(model_name, setup_logging)
