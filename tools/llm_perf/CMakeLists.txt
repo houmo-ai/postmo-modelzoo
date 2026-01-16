@@ -24,7 +24,7 @@ link_directories(
 )
 set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
 
-set(SOURCE_FILES HmEmbedding.cc HmvllmInfer.cc HmllmInfer.cc HmllmInferMultiBatch.cc llm_perf.cc)
+set(SOURCE_FILES perf_tracker/inference_perf_tracker.cc HmEmbedding.cc HmvllmInfer.cc HmllmInfer.cc HmllmInferMultiBatch.cc llm_perf.cc)
 
 set(INCLUDE_DIRS 
   ${CMAKE_SOURCE_DIR}/include

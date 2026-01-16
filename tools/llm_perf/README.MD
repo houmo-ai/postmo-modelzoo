@@ -27,6 +27,8 @@
 | HmvllmInfer.cc          | 主文件，实现vllm模型单batch具体推理流程             |
 | HmllmInferMultiBatch.cc | 主文件，实现llm多batch具体推理流程，仅支持xh2       |
 | convert_embed.py        | 将embedding的pt模型转换为bin文件方便工具读取权重    |
+| device_monitor.h        | 监控设备温度、功率、IPU频率的脚本                   |
+| perf_tracker            | 性能采集类功能实现                                  |   
 | build_linux.sh          | Linux平台llm_perf编译脚本                           |
 | build_ndk.sh            | Android平台llm_perf编译脚本                         |
 | build_win.bat           | Win11平台llm_perf编译脚本                           |
@@ -45,20 +47,39 @@
 2. 依据参数判断模型类别，创建模型推理Module
 3. 准备模型输入输出数据和输入输出内存
 4. 根据设定的次数执行输入数据->推理->获取结果循环，统计单次推理的性能和平均性能
-5. 输出性能评估结果指标参考如下表：
+5. 输出性能评估结果指标参考如下多表：
+- 表一：Prefill/Decode模型指标
+  | Prefill/Decode Stage 指标               | 说明                                                                |
+  | --------------------------------------- | ------------------------------------------------------------------- |
+  | Prefill/Decode Total Time               | Prefill/Decode阶段耗时，单位（ms）                                  |
+  | Prefill/Decode Total Speed              | Prefill/Decode阶段速度，单位（tokens/s）                            |
+  | Tokenization Time                       | Tokenization耗时，单位（ms）                                        |
+  | Embedding Time                          | Embedding操作总耗时，单位（ms）                                     |
+  | API SetInput Time                       | tcim runtime setinput API耗时，单位（ms）                           |
+  | API Inference Time                      | tcim runtime run+sync API耗时，单位（ms）                           |
+  | API Inference Speed                     | tcim runtime run+sync API速度，单位（tokens/s）                     |
+  | API GetOutput Time                      | tcim runtime GetOutput API耗时，单位（ms）                          |
 
-| 指标                                    | 说明                                                                |
-| --------------------------------------- | ------------------------------------------------------------------- |
-| Prefill Time                            | Prefill模型纯推理耗时，单位（ms）                                   |
-| Decode Time                             | Decode模型纯推理耗时，单位（ms）                                    |
-| Vision Time                             | Vision模型纯推理耗时，单位（ms）                                    |
-| Prefill Speed                           | Prefill模型推理速度，单位（tokens/s）                               |
-| Decode Speed                            | Decode模型推理速度，单位（tokens/s）                                |
-| TTFT (Time to First Token)              | 输出第一个token的耗时，包含tokenizer+embedding+infer时间，单位（ms）|
-| TPOT (Time Per Output Token)            | Decode模型每秒输出的token数，单位（tokens/s）                       |
-| E2E Latency (End-to-End Latency)        | 端到端总时间，单位（s）                                             |
-| E2E TPS (End-to-End Tokens Per Second)  | 端到端每秒输出的token数，单位（tokens/s）                           |
-| Embedding Time                          | Embedding操作总耗时，单位（ms）                                     |
+- 表二：Vision模型指标
+  | Vision Stage 指标                       | 说明                                                                |
+  | --------------------------------------- | ------------------------------------------------------------------- |
+  | Vision Total Time                       | Vision阶段耗时，单位（ms）                                          |
+  | Vision Total Speed                      | Vision阶段速度，单位（tokens/s）                                    | 
+  | Preprocessing Time                      | Preprocessing耗时，单位（ms）                                       |
+  | API SetInput Time                       | tcim runtime setinput API耗时，单位（ms）                           |
+  | API Inference Time                      | tcim runtime run+sync API耗时，单位（ms）                           |
+  | API Inference Speed                     | tcim runtime run+sync API速度，单位（tokens/s）                     |
+  | API GetOutput Time                      | tcim runtime GetOutput API耗时，单位（ms）                          |
+
+- 表三：总体性能指标
+  | Overall 指标                            | 说明                                                                | 
+  | --------------------------------------- | ------------------------------------------------------------------- |
+  | TTFT (Time to First Token)              | 输出第一个token的耗时，单位（ms）                                   |
+  | TPOT (Time Per Output Token)            | Decode模型每秒输出的token数，单位（tokens/s）                       |
+  | E2E Latency (End-to-End Latency)        | 端到端总时间，单位（s）                                             |
+  | E2E TPS (End-to-End Tokens Per Second)  | 端到端每秒输出的token数，单位（tokens/s）                           |
+
+相关指标可以对照表一、表二、表三的指标含义。
 
 ### 1.3 参数说明
 1. 命令行llm_perf以指定参数启动
@@ -250,211 +271,157 @@ rem 需要结合用户目录更改三四行的环境变量实际路径
 ```
 
 结果示例：
+./llm_perf --prefill qwen3_b4/qwen3_prefill.hmm --decode qwen3_b4/qwen3_decode.hmm --embedding qwen3_b4/hmquant/quant_embedding.bin --input 256 --stop 256 --batch 4 --loop 2
 ```bash
-#############################################Start of Task 1, All Task:3, ModelName:"qwen3_8b_256_8k_b4_1chip_2cores_v0.5.0".#############################################
+Started monitor thread for device 0
 ========================= Perf Settings =========================
-prefill path : qwen3/qwen3_prefill.hmm
-decode path : qwen3/qwen3_decode.hmm
-embedding path : qwen3/hmquant/quant_embedding.bin
+prefill path : qwen3_b4/qwen3_prefill.hmm
+decode path : qwen3_b4/qwen3_decode.hmm
+embedding path : qwen3_b4/hmquant/quant_embedding.bin
 input token len : 256
-stop token len : 100
+stop token len : 256
 ndevices : 1
-loop : 1
+loop : 2
 batch : 4
 warm_up : enable
+LazyMode : disable
 =================================================================
+Online device num: 2
+Online device id: 0, mem_total: 24448, mem_used: 0, mem_avail: 24448
+Online device id: 1, mem_total: 24448, mem_used: 0, mem_avail: 24448
 Multi batch Use Devices 0
-[2025-12-01 15:19:43.720] [tid 4735] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2025-12-01 15:19:43.720] [tid 4735] [warning] Empty backend name, use Xh2HalBackend instead.
+[2026-01-16 10:23:08.180] [tid 6765] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-01-16 10:23:08.180] [tid 6765] [warning] Empty backend name, use Xh2HalBackend instead.
+[2026-01-16 10:23:08.540] [info] DEVICE-0 Logger initialization complete, log file: ./device_logs/device_0.log
+Online device num: 2
+Online device id: 0, mem_total: 24448, mem_used: 15757, mem_avail: 8691
+Online device id: 1, mem_total: 24448, mem_used: 0, mem_avail: 24448
+****** HM Device Memory Usage ******
+Device id: 0, memory used: 15757 MB
+Device id: 1, memory used: 0 MB
+************************************
 
 ==============================(v)LLM Perf WarmUp: input 256, output 256==============================
 Decode: 100% |**************************************************| 256/256
--------------------  Performance Summary  --------------------
-Metric                        Value
---------------------------------------------------------------
-Prefill Time                                      1595.45 ms
-Decode Time                                       35946.62 ms
-Prefill Speed                                     641.82 tokens/s
-Decode Speed                                      28.49 tokens/s
-TTFT (Time to First Token)                        1609.99 ms
-TPOT (Time Per Output Token)                      35.10 ms/token
-E2E Latency (End-to-End Latency)                  39.00 seconds
-E2E TPS (End-to-End Tokens Per Second)            26.28 tokens/s
-Embedding Time                                    2.05 ms
---------------------------------------------------------------
+==================================================================================
+                    Model Inference Performance Summary Report
+==================================================================================
+Configuration Details:
+  Batch Size:      4
+  Input Length per Sample:    256 tokens
+  Output Length per Sample:    256 tokens
+Prefill Stage Performance:
+  Total Time:  581.04ms | Speed: 1762.35 tokens/s
+  Tokenization Time: Skipped (No operation)
+  Embedding Time:    2.50ms
+  API SetInput Time:   6.51ms
+  API Inference Time: 565.95ms | Speed: 1809.33 tokens/s
+  API GetOutput Time:  5.88ms
+Decode Stage Performance:
+  Total Time: 22809.89ms | Speed:   44.89 tokens/s
+  Tokenization Time: Skipped (No operation)
+  Embedding Time:    2.17ms
+  API SetInput Time:   0.21ms/token
+  API Inference Time: 20.77ms/token | Speed:   48.14 tokens/s
+  API GetOutput Time:  1.27ms/token
+Overall Performance Metrics:
+  TTFT (Time To First Token):  581.04 ms
+  TPOT (Time Per Output Token): 22.28 ms/token
+  E2E Latency (End-to-End):     23.41 seconds
+  E2E TPS (Throughput):         43.75 tokens/s
+==================================================================================
 ==================================================================================
 
-==============================(v)LLM Perf Loop Progress: 1/1==============================
-Decode: 100% |**************************************************| 100/100
--------------------  Performance Summary  --------------------
-Metric                        Value
---------------------------------------------------------------
-Prefill Time                                      1595.81 ms
-Decode Time                                       14018.04 ms
-Prefill Speed                                     641.68 tokens/s
-Decode Speed                                      28.53 tokens/s
-TTFT (Time to First Token)                        1610.51 ms
-TPOT (Time Per Output Token)                      35.05 ms/token
-E2E Latency (End-to-End Latency)                  16.18 seconds
-E2E TPS (End-to-End Tokens Per Second)            24.78 tokens/s
-Embedding Time                                    0.75 ms
---------------------------------------------------------------
+==============================(v)LLM Perf Loop Progress: 1/2==============================
+Decode: 100% |**************************************************| 256/256
 ==================================================================================
-============================== (v)LLM Perf Avarage Information ==============================
-
--------------------  Performance Summary  --------------------
-Metric                        Value
---------------------------------------------------------------
-Prefill Time                                      1595.81 ms
-Decode Time                                       14018.04 ms
-Prefill Speed                                     641.68 tokens/s
-Decode Speed                                      28.53 tokens/s
-TTFT (Time to First Token)                        1610.51 ms
-TPOT (Time Per Output Token)                      35.05 ms/token
-E2E Latency (End-to-End Latency)                  16.18 seconds
-E2E TPS (End-to-End Tokens Per Second)            24.78 tokens/s
-Embedding Time                                    0.75 ms
---------------------------------------------------------------
-==========================================================================================
-############################################# End of Task 1, All Task:3,  ModelName:"qwen3_8b_256_8k_b4_1chip_2cores_v0.5.0".#############################################
-
-
-#############################################Start of Task 2, All Task:3, ModelName:"qwen2.5-vl".#############################################
-========================= Perf Settings =========================
-prefill path : qwen2.5-vl/qwen2.5-vl_prefill.hmm
-decode path : qwen2.5-vl/qwen2.5-vl_decode.hmm
-visual path : qwen2.5-vl/qwen2.5-vl_visual.hmm
-embedding path : qwen2.5-vl/hmquant/quant_embedding.bin
-input token len : 256
-stop token len : 100
-ndevices : 1
-loop : 1
-batch : 1
-warm_up : enable
-=================================================================
-Use Devices 0
-[2025-12-01 15:20:44.887] [tid 4735] [warning] Empty backend name, use Xh2HalBackend instead.
-
-==============================(v)LLM Perf WarmUp: input 256, output 256==============================
-Decode: 100% | **************************************************| 256/256
--------------------  Performance Summary  --------------------
-Metric                        Value
---------------------------------------------------------------
-Prefill Time                                      372.78 ms
-Decode Time                                       15165.83 ms
-Vision Time                                       357.58 ms
-Prefill Speed                                     686.73 tokens/s
-Decode Speed                                      16.88 tokens/s
-TTFT (Time to First Token)                        376.93 ms
-TPOT (Time Per Output Token)                      59.24 ms/token
-E2E Latency (End-to-End Latency)                  16.18 seconds
-E2E TPS (End-to-End Tokens Per Second)            15.88 tokens/s
-Embedding Time                                    0.73 ms
---------------------------------------------------------------
+                    Model Inference Performance Summary Report
+==================================================================================
+Configuration Details:
+  Batch Size:      4
+  Input Length per Sample:    256 tokens
+  Output Length per Sample:    256 tokens
+Prefill Stage Performance:
+  Total Time:  580.94ms | Speed: 1762.67 tokens/s
+  Tokenization Time: Skipped (No operation)
+  Embedding Time:    3.17ms
+  API SetInput Time:   6.56ms
+  API Inference Time: 564.80ms | Speed: 1813.03 tokens/s
+  API GetOutput Time:  6.17ms
+Decode Stage Performance:
+  Total Time: 22803.51ms | Speed:   44.91 tokens/s
+  Tokenization Time: Skipped (No operation)
+  Embedding Time:    1.96ms
+  API SetInput Time:   0.21ms/token
+  API Inference Time: 20.77ms/token | Speed:   48.16 tokens/s
+  API GetOutput Time:  1.27ms/token
+Overall Performance Metrics:
+  TTFT (Time To First Token):  580.94 ms
+  TPOT (Time Per Output Token): 22.27 ms/token
+  E2E Latency (End-to-End):     23.40 seconds
+  E2E TPS (Throughput):         43.76 tokens/s
+==================================================================================
 ==================================================================================
 
-==============================(v)LLM Perf Loop Progress: 1/1==============================
-Decode: 100% | **************************************************| 100/100
--------------------  Performance Summary  --------------------
-Metric                        Value
---------------------------------------------------------------
-Prefill Time                                      372.37 ms
-Decode Time                                       5925.43 ms
-Vision Time                                       358.21 ms
-Prefill Speed                                     687.49 tokens/s
-Decode Speed                                      16.88 tokens/s
-TTFT (Time to First Token)                        376.42 ms
-TPOT (Time Per Output Token)                      59.25 ms/token
-E2E Latency (End-to-End Latency)                  6.55 seconds
-E2E TPS (End-to-End Tokens Per Second)            15.41 tokens/s
-Embedding Time                                    0.66 ms
---------------------------------------------------------------
+==============================(v)LLM Perf Loop Progress: 2/2==============================
+Decode: 100% |**************************************************| 256/256
+==================================================================================
+                    Model Inference Performance Summary Report
+==================================================================================
+Configuration Details:
+  Batch Size:      4
+  Input Length per Sample:    256 tokens
+  Output Length per Sample:    256 tokens
+Prefill Stage Performance:
+  Total Time:  578.46ms | Speed: 1770.21 tokens/s
+  Tokenization Time: Skipped (No operation)
+  Embedding Time:    2.50ms
+  API SetInput Time:   5.90ms
+  API Inference Time: 564.94ms | Speed: 1812.58 tokens/s
+  API GetOutput Time:  4.93ms
+Decode Stage Performance:
+  Total Time: 22617.93ms | Speed:   45.27 tokens/s
+  Tokenization Time: Skipped (No operation)
+  Embedding Time:    2.23ms
+  API SetInput Time:   0.15ms/token
+  API Inference Time: 20.68ms/token | Speed:   48.35 tokens/s
+  API GetOutput Time:  1.24ms/token
+Overall Performance Metrics:
+  TTFT (Time To First Token):  578.46 ms
+  TPOT (Time Per Output Token): 22.09 ms/token
+  E2E Latency (End-to-End):     23.21 seconds
+  E2E TPS (Throughput):         44.12 tokens/s
+==================================================================================
 ==================================================================================
 ============================== (v)LLM Perf Avarage Information ==============================
-
--------------------  Performance Summary  --------------------
-Metric                        Value
---------------------------------------------------------------
-Prefill Time                                      372.37 ms
-Decode Time                                       5925.43 ms
-Prefill Speed                                     687.49 tokens/s
-Decode Speed                                      16.88 tokens/s
-TTFT (Time to First Token)                        376.42 ms
-TPOT (Time Per Output Token)                      59.25 ms/token
-E2E Latency (End-to-End Latency)                  6.55 seconds
-E2E TPS (End-to-End Tokens Per Second)            15.41 tokens/s
-Embedding Time                                    0.66 ms
---------------------------------------------------------------
-==========================================================================================
-############################################# End of Task 2, All Task:3,  ModelName:"qwen2.5-vl".#############################################
-
-
-#############################################Start of Task 3, All Task:3, ModelName:"qwen3-vl".#############################################
-========================= Perf Settings =========================
-prefill path : qwen3-vl/qwen3-vl_prefill.hmm
-decode path : qwen3-vl/qwen3-vl_decode.hmm
-visual path : qwen3-vl/qwen3-vl_visual.hmm
-embedding path : qwen3-vl/hmquant/quant_embedding.bin
-input token len : 256
-stop token len : 100
-ndevices : 1
-loop : 1
-batch : 1
-warm_up : enable
-=================================================================
-Use Devices 0
-[2025-12-01 15:21:11.118] [tid 4735] [warning] Empty backend name, use Xh2HalBackend instead.
-
-==============================(v)LLM Perf WarmUp: input 256, output 256==============================
-Decode: 100% | **************************************************| 256/256
--------------------  Performance Summary  --------------------
-Metric                        Value
---------------------------------------------------------------
-Prefill Time                                      357.66 ms
-Decode Time                                       18310.78 ms
-Vision Time                                       156.22 ms
-Prefill Speed                                     715.76 tokens/s
-Decode Speed                                      13.98 tokens/s
-TTFT (Time to First Token)                        365.99 ms
-TPOT (Time Per Output Token)                      71.53 ms/token
-E2E Latency (End-to-End Latency)                  19.46 seconds
-E2E TPS (End-to-End Tokens Per Second)            13.21 tokens/s
-Embedding Time                                    0.79 ms
---------------------------------------------------------------
+23.2146.61
 ==================================================================================
-
-==============================(v)LLM Perf Loop Progress: 1/1==============================
-Decode: 100% | **************************************************| 100/100
--------------------  Performance Summary  --------------------
-Metric                        Value
---------------------------------------------------------------
-Prefill Time                                      358.03 ms
-Decode Time                                       7156.79 ms
-Vision Time                                       156.32 ms
-Prefill Speed                                     715.03 tokens/s
-Decode Speed                                      13.97 tokens/s
-TTFT (Time to First Token)                        366.38 ms
-TPOT (Time Per Output Token)                      71.57 ms/token
-E2E Latency (End-to-End Latency)                  7.84 seconds
-E2E TPS (End-to-End Tokens Per Second)            12.89 tokens/s
-Embedding Time                                    0.71 ms
---------------------------------------------------------------
+                    Model Inference Performance Summary Report
 ==================================================================================
-============================== (v)LLM Perf Avarage Information ==============================
-
--------------------  Performance Summary  --------------------
-Metric                        Value
---------------------------------------------------------------
-Prefill Time                                      358.03 ms
-Decode Time                                       7156.79 ms
-Prefill Speed                                     715.03 tokens/s
-Decode Speed                                      13.97 tokens/s
-TTFT (Time to First Token)                        366.38 ms
-TPOT (Time Per Output Token)                      71.57 ms/token
-E2E Latency (End-to-End Latency)                  7.84 seconds
-E2E TPS (End-to-End Tokens Per Second)            12.89 tokens/s
-Embedding Time                                    0.71 ms
---------------------------------------------------------------
+Configuration Details:
+  Batch Size:      4
+  Input Length per Sample:    256 tokens
+  Output Length per Sample:    256 tokens
+Prefill Stage Performance:
+  Total Time:  579.70ms | Speed: 1766.43 tokens/s
+  Tokenization Time: Skipped (No operation)
+  Embedding Time:    2.83ms
+  API SetInput Time:   6.23ms
+  API Inference Time: 564.87ms | Speed: 1812.81 tokens/s
+  API GetOutput Time:  5.55ms
+Decode Stage Performance:
+  Total Time: 22710.72ms | Speed:   45.09 tokens/s
+  Tokenization Time: Skipped (No operation)
+  Embedding Time:    2.10ms
+  API SetInput Time:   0.18ms/token
+  API Inference Time: 20.72ms/token | Speed:   48.26 tokens/s
+  API GetOutput Time:  1.25ms/token
+Overall Performance Metrics:
+  TTFT (Time To First Token):  579.70 ms
+  TPOT (Time Per Output Token): 22.18 ms/token
+  E2E Latency (End-to-End):     23.31 seconds
+  E2E TPS (Throughput):         43.94 tokens/s
+==================================================================================
 ==========================================================================================
 ############################################# End of Task 3, All Task:3,  ModelName:"qwen3-vl".#############################################
 ```

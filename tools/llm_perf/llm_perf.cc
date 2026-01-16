@@ -150,16 +150,14 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
                 << mem_ret_start << ", end ret is " << mem_ret_end << std::endl;
     }
 #endif
-
-    PerfInfos avg_perfdata, total_perfdata;
-    memset(&avg_perfdata, 0, sizeof(PerfInfos));
-    memset(&total_perfdata, 0, sizeof(PerfInfos));
     if (warm_up_enable) {
       std::cout << "\n"
                 << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
                 << input_token_len << ", output " << stop_token_len
                 << std::string(30, '=') << "\n ";
+      Qwen3Infer->get_perf_tracker()->reset();
       Qwen3Infer->perf_llm(input_token_len, stop_token_len);
+      Qwen3Infer->get_perf_tracker()->pref_delete_warmup();
       std::cout << std::string(82, '=') << "\n";
     }
 
@@ -168,33 +166,15 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
                 << std::string(30, '=')
                 << "(v)LLM Perf Loop Progress: " << (i + 1) << "/" << loop_round
                 << std::string(30, '=') << "\n ";
-      PerfInfos perf_data =
-          Qwen3Infer->perf_llm(input_token_len, stop_token_len);
+      Qwen3Infer->get_perf_tracker()->reset();
+      Qwen3Infer->perf_llm(input_token_len, stop_token_len);
       std::cout << std::string(82, '=') << "\n";
-      total_perfdata.input_tokens = perf_data.input_tokens;
-      total_perfdata.stop_tokens = perf_data.stop_tokens;
-      total_perfdata.prefill_time += perf_data.prefill_time;
-      total_perfdata.decode_time += perf_data.decode_time;
-      total_perfdata.embedding_time += perf_data.embedding_time;
-      total_perfdata.t_total += perf_data.t_total;
-      total_perfdata.decode_count += perf_data.decode_count;
-      total_perfdata.ttft += perf_data.ttft;
-      total_perfdata.vit_time += perf_data.vit_time;
     }
 
-    avg_perfdata.input_tokens = total_perfdata.input_tokens;
-    avg_perfdata.stop_tokens = total_perfdata.stop_tokens;
-    avg_perfdata.prefill_time = total_perfdata.prefill_time / loop_round;
-    avg_perfdata.decode_time = total_perfdata.decode_time / loop_round;
-    avg_perfdata.embedding_time = total_perfdata.embedding_time / loop_round;
-    avg_perfdata.t_total = total_perfdata.t_total / loop_round;
-    avg_perfdata.decode_count = total_perfdata.decode_count / loop_round;
-    avg_perfdata.ttft = total_perfdata.ttft / loop_round;
-    avg_perfdata.vit_time = total_perfdata.vit_time / loop_round;
     std::cout << COLOR_GREEN << std::string(30, '=')
               << " (v)LLM Perf Avarage Information " << std::string(30, '=')
               << "\n";
-    ShowPerfInformation(avg_perfdata);
+    Qwen3Infer->get_perf_tracker()->showSummary(true);
     std::cout << COLOR_GREEN << std::string(90, '=') << "\n";
     std::cout << COLOR_RESET;
     Qwen3Infer.reset();

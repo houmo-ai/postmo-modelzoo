@@ -122,6 +122,8 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
   // Initialize embedding module with the specified parameters
   embedding = std::make_shared<HmEmbedding>(
       embeddingWeightPath, this->embedding_length, this->prefill_length);
+
+  perf_tracker = std::make_shared<InferencePerformanceTracker>();
 }
 
 int HmllmInferMultiBatch::get_nblocks() {
@@ -295,13 +297,6 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
     int batch, const std::vector<int> all_input_ids) {
   PerfSingleBatchInfo ret;
   ret.input_tokens = all_input_ids.size();
-  ret.time = 0.f;
-  ret.embedding_time = 0.f;
-  ret.next_id.clear();
-
-  auto t_embed_start = std::chrono::high_resolution_clock::now();
-  auto t_embed_end = std::chrono::high_resolution_clock::now();
-
   int decode_input_index_start =
       (batch > 0) ? (2 * this->n_blocks * batch + 3 + 2 * batch) : 3;
   int decode_input_index_finish =
@@ -311,8 +306,10 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
   for (int i = decode_input_index_start; i < decode_input_index_finish; ++i) {
     tcim::Tensor cache =
         decode_module->GetDevInput(decode_module->GetInputName(i));
+    perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
     prefill_module->SetInput(prefill_module->GetInputName(prefill_input_index),
                              cache);
+    perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
     prefill_input_index++;
   }
 
@@ -344,40 +341,37 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
     }
 
     int32_t effective_length = input_ids.size();
-    t_embed_start = std::chrono::high_resolution_clock::now();
+    perf_tracker->perfStart(PerfType::PREFILL_EMBED_TIME);
     input_datas = embedding->EmbeddingTokens(input_ids);
-    t_embed_end = std::chrono::high_resolution_clock::now();
-    ret.embedding_time +=
-        std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start)
-            .count();
+    perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
+
+    perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
     PrefillSetInputDatas(input_datas, valid_length, current_length);
-    auto t_prefill_end = std::chrono::high_resolution_clock::now();
-    auto t_prefill_start = std::chrono::high_resolution_clock::now();
+    perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
+
+    perf_tracker->perfStart(PerfType::PREFILL_INFER_TIME);
     PrefillInfer();
-    t_prefill_end = std::chrono::high_resolution_clock::now();
-    ret.time += std::chrono::duration<float, std::milli>(t_prefill_end -
-                                                         t_prefill_start)
-                    .count();
+    perf_tracker->perfEnd(PerfType::PREFILL_INFER_TIME);
   }
 
+  perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
   PrefillGetOutputDatas(ret.next_id);
-
+  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
   return ret;
 }
 
 PerfSingleBatchInfo HmllmInferMultiBatch::run_decode(
     tensor_type *input_datas, const std::vector<int> context_length) {
   PerfSingleBatchInfo ret;
-  ret.time = 0.f;
-  ret.embedding_time = 0.f;
 
   auto input_name = decode_module->GetInputName(0);
   auto input_info = decode_module->GetInputInfo(input_name).AsContiguous();
   size_t mem_size = input_info.MemSize();
   tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(
       input_info, mem_size, static_cast<void *>(input_datas));
-
+  perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
   decode_module->SetInput(input_name, input_tensor);
+  perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
 
   for (int b = 0; b < this->batch; ++b) {
     int valid_length_index = (b == 0) ? 1 : (2 * n_blocks * b + 3 + 2 * b - 2);
@@ -387,17 +381,19 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_decode(
     mem_size = input_info.MemSize();
     input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
                                                   &valid_length_data);
+    perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
     decode_module->SetInput(input_name, input_tensor);
+    perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
   }
-  auto t_decode_end = std::chrono::high_resolution_clock::now();
-  auto t_decode_start = std::chrono::high_resolution_clock::now();
+
+  perf_tracker->perfStart(PerfType::DECODE_INFER_TIME);
   decode_module->Run();
   decode_module->Sync();
-  t_decode_end = std::chrono::high_resolution_clock::now();
-  ret.time +=
-      std::chrono::duration<float, std::milli>(t_decode_end - t_decode_start)
-          .count();
+  perf_tracker->perfEnd(PerfType::DECODE_INFER_TIME);
+
+  perf_tracker->perfStart(PerfType::DECODE_OUTPUT_TIME);
   DecodeGetOutputDatas();
+  perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
   return ret;
 }
 
@@ -413,10 +409,7 @@ PerfInfos HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
   memset(input_datas, 0, this->batch * this->embedding_length);
   PerfInfos llm_perf_datas;
   memset(&llm_perf_datas, 0, sizeof(PerfInfos));
-  auto t_embed_start = std::chrono::high_resolution_clock::now();
-  auto t_embed_end = std::chrono::high_resolution_clock::now();
-  auto t_total_start = std::chrono::high_resolution_clock::now();
-  auto t_ttft_start = std::chrono::high_resolution_clock::now();
+
   if (input_tokens_len + stop_tokens_len > context_max_length) {
     std::cout << "input_tokens_len + stop_tokens_len > context_max_length, "
                  "cast stop_tokens_len to "
@@ -430,44 +423,40 @@ PerfInfos HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
   current_echo_lens.resize(this->batch);
   for (int b = 0; b < this->batch; ++b) {
     std::vector<int> all_input_ids = generateRandomVector(input_tokens_len);
+    perf_tracker->perfStart(PerfType::PREFILL_TOTAL_TIME);
     PerfSingleBatchInfo retInfo = run_prefill(b, all_input_ids);
-    llm_perf_datas.prefill_time += retInfo.time;
+    perf_tracker->perfEnd(PerfType::PREFILL_TOTAL_TIME);
     next_ids[b] = retInfo.next_id;
     current_echo_lens[b] = retInfo.input_tokens;
     llm_perf_datas.input_tokens += retInfo.input_tokens;
-    t_embed_start = std::chrono::high_resolution_clock::now();
+
+    perf_tracker->perfStart(PerfType::DECODE_EMBED_TIME);
     tensor_type *input_data = embedding->EmbeddingTokens(next_ids[b]);
     memcpy(static_cast<void *>(&input_datas[b * embedding_length]),
            static_cast<void *>(input_data),
            embedding_length * sizeof(tensor_type));
-    t_embed_end = std::chrono::high_resolution_clock::now();
-    llm_perf_datas.embedding_time +=
-        std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start)
-            .count();
+
+    perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);
   }
-  auto t_ttft_end = std::chrono::high_resolution_clock::now();
-  llm_perf_datas.ttft +=
-      std::chrono::duration<float, std::milli>(t_ttft_end - t_ttft_start)
-          .count();
+
   std::vector<int> context_length = current_echo_lens;
   do {
     if ((llm_perf_datas.decode_count >= llm_perf_datas.stop_tokens)) {
       break;
     }
 
-    PerfSingleBatchInfo retInfo = run_decode(input_datas, context_length);
-    llm_perf_datas.decode_time += retInfo.time;
+    perf_tracker->perfStart(PerfType::DECODE_TOTAL_TIME);
+    run_decode(input_datas, context_length);
+    perf_tracker->perfEnd(PerfType::DECODE_TOTAL_TIME);
+
     for (int b = 0; b < this->batch; ++b) {
       context_length[b] += 1;
-      t_embed_start = std::chrono::high_resolution_clock::now();
+      perf_tracker->perfStart(PerfType::DECODE_EMBED_TIME);
       tensor_type *input_data = embedding->EmbeddingTokens(next_ids[b]);
       memcpy(static_cast<void *>(&input_datas[b * embedding_length]),
              static_cast<void *>(input_data),
              embedding_length * sizeof(tensor_type));
-      t_embed_end = std::chrono::high_resolution_clock::now();
-      llm_perf_datas.embedding_time +=
-          std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start)
-              .count();
+      perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);
     }
 
     llm_perf_datas.decode_count++;
@@ -481,12 +470,9 @@ PerfInfos HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
               << llm_perf_datas.decode_count << '/'
               << llm_perf_datas.stop_tokens << std::flush;
   } while (true);
-  // perf information
-  auto t_total_end = std::chrono::high_resolution_clock::now();
-  llm_perf_datas.t_total +=
-      std::chrono::duration<float, std::milli>(t_total_end - t_total_start)
-          .count();
-  llm_perf_datas.decode_count = llm_perf_datas.decode_count * this->batch;
-  ShowPerfInformation(llm_perf_datas);
+
+  perf_tracker->setBasicInfo(this->batch, input_tokens_len,
+                             llm_perf_datas.decode_count);
+  perf_tracker->showSummary();
   return llm_perf_datas;
 }

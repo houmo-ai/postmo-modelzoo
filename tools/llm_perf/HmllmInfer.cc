@@ -128,6 +128,8 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
       embeddingWeightPath, this->embedding_length, this->prefill_length);
   // DebugModelInfo(*prefill_module.get(), prefillModelPath);
   // DebugModelInfo(*decode_module.get(), decodeModelPath);
+
+  perf_tracker = std::make_shared<InferencePerformanceTracker>();
 }
 
 int HmllmInfer::get_attn_idx_start() {
@@ -343,20 +345,11 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len,
   tensor_type *input_datas = nullptr;
   std::vector<int> input_ids;
   std::vector<int> ids;
-
-  // 1. prepare inputs
-  std::vector<int> all_input_ids = generateRandomVector(input_tokens_len);
   PerfInfos llm_perf_datas;
   memset(&llm_perf_datas, 0, sizeof(PerfInfos));
-  auto t_start = std::chrono::high_resolution_clock::now();
-  auto t_embed_start = std::chrono::high_resolution_clock::now();
-  auto t_embed_end = std::chrono::high_resolution_clock::now();
-  auto t_ttft_end = std::chrono::high_resolution_clock::now();
-  auto t_decode_start = std::chrono::high_resolution_clock::now();
-  auto t_decode_end = std::chrono::high_resolution_clock::now();
+  // 1. prepare inputs
+  std::vector<int> all_input_ids = generateRandomVector(input_tokens_len);
 
-  auto t_ttft_start = std::chrono::high_resolution_clock::now();
-  llm_perf_datas.input_tokens = input_tokens_len;
   if (input_tokens_len + stop_tokens_len > context_max_length) {
     std::cout << "input_tokens_len + stop_tokens_len > context_max_length, "
                  "cast stop_tokens_len to "
@@ -365,6 +358,8 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len,
   } else {
     llm_perf_datas.stop_tokens = stop_tokens_len;
   }
+
+  perf_tracker->perfStart(PerfType::PREFILL_TOTAL_TIME);
   int prefill_loop_round =
       std::ceil((float)input_tokens_len / (float)prefill_length);
   valid_length = 0, current_length = 0;
@@ -384,44 +379,48 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len,
                        all_input_ids.begin() + (round + 1) * prefill_length);
     }
 
-    t_embed_start = std::chrono::high_resolution_clock::now();
+    perf_tracker->perfStart(PerfType::PREFILL_EMBED_TIME);
     input_datas = embedding->EmbeddingTokens(input_ids);
-    t_embed_end = std::chrono::high_resolution_clock::now();
-    llm_perf_datas.embedding_time +=
-        std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start)
-            .count();
+    perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
 
+    perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
     PrefillSetInputDatas(input_datas, valid_length, current_length);
-    llm_perf_datas.prefill_time += PrefillInfer();
+    perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
+
+    perf_tracker->perfStart(PerfType::PREFILL_INFER_TIME);
+    PrefillInfer();
+    perf_tracker->perfEnd(PerfType::PREFILL_INFER_TIME);
   }
-
+  perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
   PrefillGetOutputDatas(ids);
-  t_ttft_end = std::chrono::high_resolution_clock::now();
-  llm_perf_datas.ttft +=
-      std::chrono::duration<float, std::milli>(t_ttft_end - t_ttft_start)
-          .count();
-  int context_length = input_tokens_len;
+  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
+  perf_tracker->perfEnd(PerfType::PREFILL_TOTAL_TIME);
 
+  int context_length = input_tokens_len;
   do {
     if ((context_length > context_max_length) ||
         (llm_perf_datas.decode_count >= llm_perf_datas.stop_tokens)) {
       break;
     }
-
-    t_embed_start = std::chrono::high_resolution_clock::now();
+    perf_tracker->perfStart(PerfType::DECODE_TOTAL_TIME);
+    perf_tracker->perfStart(PerfType::DECODE_EMBED_TIME);
     input_datas = embedding->EmbeddingTokens(ids);
-    t_embed_end = std::chrono::high_resolution_clock::now();
-    llm_perf_datas.embedding_time +=
-        std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start)
-            .count();
+    perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);
 
+    perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
     DecodeSetInputDatas(static_cast<void *>(input_datas),
                         static_cast<int32_t>(context_length));
-    llm_perf_datas.decode_time += DecodeInfer();
-    ids.clear();
-    DecodeGetOutputDatas(ids);
-    llm_perf_datas.decode_count++;
+    perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
 
+    perf_tracker->perfStart(PerfType::DECODE_INFER_TIME);
+    DecodeInfer();
+    perf_tracker->perfEnd(PerfType::DECODE_INFER_TIME);
+    ids.clear();
+    perf_tracker->perfStart(PerfType::DECODE_OUTPUT_TIME);
+    DecodeGetOutputDatas(ids);
+    perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
+    llm_perf_datas.decode_count++;
+    perf_tracker->perfEnd(PerfType::DECODE_TOTAL_TIME);
     double ratio = static_cast<double>(llm_perf_datas.decode_count) /
                    llm_perf_datas.stop_tokens;
     int filled = static_cast<int>(ratio * bar_width);
@@ -433,10 +432,9 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len,
 
     context_length++;
   } while (true);
-  auto t_end = std::chrono::high_resolution_clock::now();
-  llm_perf_datas.t_total =
-      std::chrono::duration<float, std::milli>(t_end - t_start).count();
+  perf_tracker->setBasicInfo(1, input_tokens_len, llm_perf_datas.decode_count,
+                             0);
   // perf information
-  ShowPerfInformation(llm_perf_datas);
+  perf_tracker->showSummary();
   return llm_perf_datas;
 }

@@ -93,7 +93,12 @@ class HmllmInferMultiBatch : public HmllmInferBase {
   PerfInfos perf_llm(const uint32_t input_tokens_len,
                      const uint32_t stop_tokens_len) override;
 
+  std::shared_ptr<InferencePerformanceTracker> get_perf_tracker() {
+    return perf_tracker;
+  }
+
  private:
+  std::shared_ptr<InferencePerformanceTracker> perf_tracker;
   // Model paths
   std::string prefillModelPath = "";  // Path to prefill model
   std::string decodeModelPath = "";   // Path to decode model

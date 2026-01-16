@@ -45,6 +45,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "perf_tracker/inference_perf_tracker.h"
+
 #ifdef XH2A_HM_SYS
 #ifdef __cplusplus
 extern "C" {
@@ -368,6 +370,7 @@ class HmllmInferBase {
   virtual ~HmllmInferBase() = default;
   virtual PerfInfos perf_llm(const uint32_t input_tokens_len,
                              const uint32_t stop_tokens_len) = 0;
+  virtual std::shared_ptr<InferencePerformanceTracker> get_perf_tracker() = 0;
 };
 
 #endif  // __UTILS_H__

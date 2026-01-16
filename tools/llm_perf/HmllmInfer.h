@@ -31,6 +31,7 @@
 #include <sstream>
 
 #include "HmEmbedding.h"
+#include "perf_tracker/inference_perf_tracker.h"
 #include "tcim/tcim_runtime.h"
 
 class HmllmInfer : public HmllmInferBase {
@@ -79,7 +80,13 @@ class HmllmInfer : public HmllmInferBase {
   PerfInfos perf_llm(const uint32_t input_tokens_len,
                      const uint32_t stop_tokens_len) override;
 
+  std::shared_ptr<InferencePerformanceTracker> get_perf_tracker() {
+    return perf_tracker;
+  }
+
  private:
+  std::shared_ptr<InferencePerformanceTracker> perf_tracker;
+
   // Model paths
   std::string prefillModelPath = "";  // Path to the prefill model
   std::string decodeModelPath = "";   // Path to the decode model
