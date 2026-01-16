@@ -48,6 +48,7 @@ using namespace std::chrono;
 
 static const int INDENT = 2;       // Indentation spaces
 static const int COL_PADDING = 4;  // Column padding
+static std::string HOUMO_TARGET = "xh2";
 
 typedef enum CheckStatus { PASS = 0, FAIL, WARN } checkStatus_t;
 
@@ -77,8 +78,8 @@ typedef struct HmDeviceInfo {
     std::string firmware_version;
     std::string ddr_size;  // in GB
     std::string dvfs_mode;
-    std::string pcie_bandwidth;  // in MB/s
-    std::string pcie_bdf;
+    std::string pcie_bandwidth{"unavailable"};  // in MB/s
+    std::string pcie_bdf{"unavailable"};
     std::string temperature;                 // in C
     std::string avail_mem;                   // in MB
     std::string used_mem;                    // in MB
@@ -324,7 +325,12 @@ static void get_device_info(hmDeviceInfo_t &devInfo) {
                               ? buf
                               : "unavailable";
     // core count
+#ifndef _MSC_VER
     devInfo.core_count = std::max(0, hm_sys_get_core_count(dev_id));
+#else
+    // Windows does not support hm_sys_get_core_count yet.
+    devInfo.core_count = 2;
+#endif
     // Computing power
     devInfo.max_computing_power =
         std::max(0, hm_sys_get_computing_power(dev_id));
@@ -375,6 +381,7 @@ static void get_device_info(hmDeviceInfo_t &devInfo) {
     devInfo.temperature = fmt_temp_or_unavail(
         (hm_sys_get_temperature(dev_id, &temp) == 0) ? temp : -1.f);
 
+#ifndef _MSC_VER
     // PCIe BDF
     memset(buf, 0, sizeof(buf));
     devInfo.pcie_bdf = (hm_sys_get_bdf(dev_id, buf, sizeof(buf)) == 0)
@@ -385,6 +392,7 @@ static void get_device_info(hmDeviceInfo_t &devInfo) {
     devInfo.pcie_bandwidth =
         (hm_sys_get_bandwidth(dev_id, buf, sizeof(buf)) == 0) ? buf
                                                               : "unavailable";
+#endif
 }
 
 static void get_runtime_info(hmVerInfo_t &hmVerInfo) {
@@ -551,10 +559,9 @@ static void Infer(int32_t tid, std::string model_name, int32_t warmup,
 }
 
 static std::string get_backend_name() {
-    std::string target = getenv("HOUMO_TARGET");
-    if (target == "xh1") {
+    if (HOUMO_TARGET == "xh1") {
         return "Xh1HdiBackend";
-    } else if (target == "xh2") {
+    } else if (HOUMO_TARGET == "xh2") {
         return "Xh2HalBackend";
     } else {
         throw std::runtime_error("Invalid target");
@@ -729,6 +736,10 @@ int main(int argc, char **argv) {
         .default_value(false)
         .implicit_value(true)
         .help("Print detailed device information");
+    parser.add_argument("--target", "-t")
+        .default_value(std::string("xh2"))
+        .choices("xh2")
+        .help("Target device");
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception &err) {
@@ -739,12 +750,7 @@ int main(int argc, char **argv) {
 
     auto verbose = parser.get<bool>("verbose");
     auto repeat = parser.get<int32_t>("repeat");
-    const std::string target = getenv("HOUMO_TARGET");
-    if (target != "xh1" && target != "xh2") {
-        printf("%s[ERROR] HOUMO_TARGET is invalid: %s%s\n", COLOR_RED,
-               target.c_str(), COLOR_RESET);
-        return -1;
-    }
+    HOUMO_TARGET = parser.get<std::string>("target");
 
     struct hm_device_info info = {0};
     uint32_t ret = hm_sys_get_device_info(&info);
@@ -780,7 +786,7 @@ int main(int argc, char **argv) {
 
     // Performance testing
     printf("===== Computing Power Test =====\n");
-    std::string model_name = target + "_compute";
+    std::string model_name = HOUMO_TARGET + "_compute";
     float elapsed_time = 0;
     int32_t rounds = 1;
     for (size_t i = 0; i < devices.size(); ++i) {
@@ -802,7 +808,7 @@ int main(int argc, char **argv) {
     for (size_t i = 0; i < devices.size(); ++i) {
         auto &d = devices[i];
         repeat = d.core_count * 4;
-        model_name = target + "_bandwidth_read";
+        model_name = HOUMO_TARGET + "_bandwidth_read";
         elapsed_time = run_model(model_name, d.device_id, d.core_count, repeat,
                                  rounds);  // ms
         auto *r_model = get_model(model_name);
@@ -813,7 +819,7 @@ int main(int argc, char **argv) {
                d.ddr_bandwidth_read);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-        model_name = target + "_bandwidth_write";
+        model_name = HOUMO_TARGET + "_bandwidth_write";
         elapsed_time = run_model(model_name, d.device_id, d.core_count, repeat,
                                  rounds);  // ms
         auto *w_model = get_model(model_name);

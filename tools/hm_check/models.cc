@@ -56,7 +56,7 @@ static void fill_model_profile(EmbeddedModel &m) {
 #if defined(_MSC_VER)
 const EmbeddedModel *get_model(const std::string &name) {
     HMODULE hModule = GetModuleHandle(nullptr);
-    HRSRC hRes = FindResourceW(hModule, name.c_str(), RT_RCDATA);
+    HRSRC hRes = FindResourceA(hModule, name.c_str(), RT_RCDATA);
     if (!hRes)
         return nullptr;
 
