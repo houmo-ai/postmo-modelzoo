@@ -34,6 +34,9 @@ from loguru import logger
 
 import tcim_lite as tcim
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")))
+from perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
+
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2."
 
@@ -155,7 +158,7 @@ class HmQwenXh2:
             embedding_path, map_location="cpu", weights_only=True
         )["weight"]
         self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len)
-
+        self.perf_tracker = InferencePerformanceTracker()
     def get_nblocks(self):
         input_names = []
         for i in range(self.prefill.get_num_inputs()):
@@ -167,7 +170,10 @@ class HmQwenXh2:
     def chat(self, question):
         logger.success("question:")
         print("\033[1;95m{}\033[0m".format(question))
-        start_time = time.time()
+
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
+
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
             {
@@ -182,6 +188,8 @@ class HmQwenXh2:
         text = self.tokenizer.batch_decode(inputs.input_ids)[0]
         all_input_ids = inputs["input_ids"]
         input_echo_len = all_input_ids.numel()
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
+
         if input_echo_len >= self.context_max_length:
             logger.error(
                 f"Question long than {self.context_max_length}, please shorten it!"
@@ -201,6 +209,8 @@ class HmQwenXh2:
                 input_ids = all_input_ids[
                     :, round * self.prefill_length : (round + 1) * self.prefill_length
                 ]
+
+            self.perf_tracker.perf_start(PERFTYPE.PREFILL_EMBED_TIME)
             inputs_embeds = F.embedding(input_ids, self.embedding_weight)
             effective_length = input_ids.size(-1)
             _pad_embeds = torch.zeros(
@@ -216,34 +226,48 @@ class HmQwenXh2:
             position_id = torch.arange(
                 valid_length, valid_length + self.prefill_length, dtype=torch.long
             )
+            self.perf_tracker.perf_end(PERFTYPE.PREFILL_EMBED_TIME)
+
             valid_length_data = np.array([valid_length]).astype("int32")
             current_length_data = np.array([current_length]).astype("int32")
             input_name = self.prefill.get_input_name(0)
             valid_length_name = self.prefill.get_input_name(1)
             current_length_name = self.prefill.get_input_name(2)
+
+            self.perf_tracker.perf_start(PERFTYPE.PREFILL_INPUT_TIME)
             self.prefill.set_input(input_name, input_data.numpy())
             self.prefill.set_input(valid_length_name, valid_length_data)
             self.prefill.set_input(current_length_name, current_length_data)
             if self.pre_input_num > 3:
-                position_id_data = np.expand_dims(np.array(position_id), axis=0).astype(
-                    "int32"
-                )
+                position_id_data = np.expand_dims(np.array(position_id), axis=0).astype("int32")
                 position_id_name = self.prefill.get_input_name(3)
                 self.prefill.set_input(position_id_name, position_id_data)
+            self.perf_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
+
+            self.perf_tracker.perf_start(PERFTYPE.PREFILL_INFER_TIME)
             self.prefill.run()
             self.prefill.sync()
+            self.perf_tracker.perf_end(PERFTYPE.PREFILL_INFER_TIME)
 
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_OUTPUT_TIME)
         input_data = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_OUTPUT_TIME)
+
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOTAL_TIME)
+
         next_id = input_data.argmax(-1)[0]
         prefill_response = self.tokenizer.decode(next_id)
-        prefill_time = time.time() - start_time
         chat_history_ids = all_input_ids[0]
         next_id = torch.from_numpy(next_id)
 
         chat_history_ids = torch.cat([chat_history_ids, next_id], dim=-1)
+
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_EMBED_TIME)
         input_data = F.embedding(next_id.unsqueeze(0), self.embedding_weight).reshape(
             1, 1, -1
         )
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_EMBED_TIME)
+
         all_response = prefill_response
         context_length = input_echo_len
         logger.success("response:")
@@ -254,7 +278,6 @@ class HmQwenXh2:
         slide_len = 10  # sliding window length for decode
         last_response = self.tokenizer.decode(chat_history_ids.tolist()[-slide_len:])
 
-        start_time = time.time()
         while True:
             if context_length >= self.context_max_length:
                 logger.info(
@@ -262,6 +285,9 @@ class HmQwenXh2:
                 )
                 break
 
+            self.perf_tracker.perf_start(PERFTYPE.DECODE_TOTAL_TIME)
+
+            self.perf_tracker.perf_start(PERFTYPE.DECODE_INPUT_TIME)
             input_name = self.decode.get_input_name(0)
             valid_length_name = self.decode.get_input_name(1)
             self.decode.set_input(input_name, input_data.numpy())
@@ -269,23 +295,43 @@ class HmQwenXh2:
             self.decode.set_input(valid_length_name, valid_length_data)
             if self.pre_input_num > 3:
                 position_id_data = np.array([[context_length + 1]]).astype("int32")
+                position_id_name = self.decode.get_input_name(3)
                 self.decode.set_input(position_id_name, position_id_data)
+            self.perf_tracker.perf_end(PERFTYPE.DECODE_INPUT_TIME)
+
+            self.perf_tracker.perf_start(PERFTYPE.DECODE_INFER_TIME)
             self.decode.run()
             self.decode.sync()
+            self.perf_tracker.perf_end(PERFTYPE.DECODE_INFER_TIME)
+
+            self.perf_tracker.perf_start(PERFTYPE.DECODE_OUTPUT_TIME)
             input_data = self.decode.get_output(self.decode.get_output_name(0)).numpy()
+            self.perf_tracker.perf_end(PERFTYPE.DECODE_OUTPUT_TIME)
+
             decode_count += 1
 
             next_id = input_data.astype(np.float32).argmax(-1)[0]
             next_id = torch.from_numpy(next_id)
+
+            self.perf_tracker.perf_start(PERFTYPE.DECODE_TOKEN_TIME)
+
             if next_id == self.tokenizer.eos_token_id:
-                print(decode_response, end="", flush=True)
-                all_response += decode_response
+                if 'decode_response' in locals():
+                    print(decode_response, end="", flush=True)
+                    all_response += decode_response
+                self.perf_tracker.perf_end(PERFTYPE.DECODE_TOKEN_TIME)
+                self.perf_tracker.perf_end(PERFTYPE.DECODE_TOTAL_TIME)
                 break
 
             chat_history_ids = torch.cat([chat_history_ids, next_id], dim=-1)
             decode_response = self.tokenizer.decode(
                 chat_history_ids.tolist()[-(slide_len + 1) - skip_tokens :]
             )[len(last_response) :]
+            self.perf_tracker.perf_end(PERFTYPE.DECODE_TOKEN_TIME)
+
+            self.perf_tracker.perf_end(PERFTYPE.DECODE_TOTAL_TIME)
+
+            # Validate and print decoded text (outside timing scope)
             if decode_response != "" and is_valid_char(ord(decode_response[-1])):
                 print(decode_response, end="", flush=True)
                 all_response += decode_response
@@ -296,15 +342,22 @@ class HmQwenXh2:
             else:
                 skip_tokens += 1
 
+            self.perf_tracker.perf_start(PERFTYPE.DECODE_EMBED_TIME)
             input_data = F.embedding(
                 next_id.unsqueeze(0), self.embedding_weight
             ).reshape(1, 1, -1)
+            self.perf_tracker.perf_end(PERFTYPE.DECODE_EMBED_TIME)
+
             context_length = context_length + 1
 
-        decode_time = time.time() - start_time
         print("\033[0m")
 
-        return all_response, input_echo_len, decode_count + 1, prefill_time, decode_time
+        # Set basic performance metrics for reporting
+        self.perf_tracker.set_basic_info(
+            batch_size=1,
+            input_seq_length=input_echo_len,
+            output_seq_length=decode_count
+        )
 
 
 if __name__ == "__main__":
@@ -320,23 +373,5 @@ if __name__ == "__main__":
         )
     question = "请介绍一下存算一体技术的优势"
 
-    start_time = time.time()
-    response, input_tokens, output_tokens, prefill_time, decode_time = hmqwen.chat(
-        question
-    )
-    total_time = time.time() - start_time
-
-    logger.success(
-        f"Total Input: {input_tokens} tokens, Output {output_tokens} tokens, Prefill Cost {prefill_time*1000:.3f} ms, Decode Cost {decode_time*1000:.3f} ms"
-    )
-    logger.success(
-        f"Prefill Speed: {input_tokens / prefill_time:.2f} tokens/s; Decode Speed: {(output_tokens - 1) / decode_time:.2f} tokens/s"
-    )
-    logger.success(f"TTFT (Time to First Token): {prefill_time * 1000:.3f} ms")
-    logger.success(
-        f"TPOT (Time Per Output Token): {decode_time * 1000 / (output_tokens - 1):.3f} ms/token"
-    )
-    logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
-    logger.success(
-        f"E2E TPS (End-to-End Tokens Per Second): {output_tokens / total_time:.2f} tokens/s"
-    )
+    hmqwen.chat(question)
+    hmqwen.perf_tracker.show_summary()

@@ -42,6 +42,9 @@ from PIL import Image
 from processing_qwen2_5_vl import Qwen2_5_VLProcessor
 from utils import get_rope_index, QRawToYuv
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")))
+from perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
+
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
@@ -338,6 +341,8 @@ class Qwen25VL:
             self.embedding = self.embedding.weight
         self.hidden_dims = self.embedding.shape[-1]
 
+        self.perf_tracker = InferencePerformanceTracker()
+
     def get_nblocks(self):
         input_names = []
         for i in range(self.prefill.get_num_inputs()):
@@ -485,6 +490,7 @@ class Qwen25VL:
     def run_visual(self, inputs):
         vit_model_outputs = list()
         for batch in range(inputs["hidden_states"].shape[0]):
+            self.perf_tracker.perf_start(PERFTYPE.VISION_INPUT_TIME)
             self.vit_model.set_input(
                 self.vit_model.get_input_name(0),
                 inputs["hidden_states"][batch].unsqueeze(0).numpy().astype(np.float16),
@@ -498,13 +504,20 @@ class Qwen25VL:
                     self.vit_model.get_input_name(2),
                     inputs["window_mask"][batch].numpy().astype(np.float16),
                 )
+            self.perf_tracker.perf_end(PERFTYPE.VISION_INPUT_TIME)
+
+            self.perf_tracker.perf_start(PERFTYPE.VISION_INFER_TIME)
             self.vit_model.run()
             self.vit_model.sync()
+            self.perf_tracker.perf_end(PERFTYPE.VISION_INFER_TIME)
+
+            self.perf_tracker.perf_start(PERFTYPE.VISION_OUTPUT_TIME)
             vit_model_output = (
                 self.vit_model.get_output(self.vit_model.get_output_name(0))
                 .numpy()
                 .astype(np.float16)
             )
+            self.perf_tracker.perf_end(PERFTYPE.VISION_OUTPUT_TIME)
             vit_model_outputs.append(torch.tensor(vit_model_output))
 
         return torch.cat(vit_model_outputs, dim=0)
@@ -512,7 +525,9 @@ class Qwen25VL:
     def preprocess_prefill(self, inputs, image_features):
         image_grid_thw = None
         input_ids = inputs["input_ids"].cpu()
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_EMBED_TIME)
         inputs_embeds = F.embedding(input_ids, self.embedding).cpu()
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_EMBED_TIME)
         mask = input_ids == 151655  # <image> token id
         mask_unsqueezed = mask.unsqueeze(-1)
         mask_expanded = mask_unsqueezed.expand_as(inputs_embeds)
@@ -593,6 +608,7 @@ class Qwen25VL:
                     width_position_ids,
                     pre_gen_idx,
                 )
+                self.perf_tracker.perf_start(PERFTYPE.PREFILL_INPUT_TIME)
                 self.prefill.set_input(
                     self.prefill.get_input_name(0),
                     prefill_inputs["input_1"].detach().numpy(),
@@ -617,11 +633,18 @@ class Qwen25VL:
                     self.prefill.get_input_name(5),
                     prefill_inputs["current_length"].detach().numpy(),
                 )
+                self.perf_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
+
+                self.perf_tracker.perf_start(PERFTYPE.PREFILL_INFER_TIME)
                 self.prefill.run()
                 self.prefill.sync()
+                self.perf_tracker.perf_end(PERFTYPE.PREFILL_INFER_TIME)
+
+                self.perf_tracker.perf_start(PERFTYPE.PREFILL_OUTPUT_TIME)
                 prefill_output = self.prefill.get_output(
                     self.prefill.get_output_name(0)
                 )
+                self.perf_tracker.perf_end(PERFTYPE.PREFILL_OUTPUT_TIME)
         else:
             pre_gen_nums = 0
 
@@ -647,6 +670,8 @@ class Qwen25VL:
             hight_position_ids=x_hight,
             width_position_ids=x_width,
         )
+
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_INPUT_TIME)
         self.prefill.set_input(
             self.prefill.get_input_name(0), prefill_inputs["input_1"].detach().numpy()
         )
@@ -670,9 +695,15 @@ class Qwen25VL:
             self.prefill.get_input_name(5),
             prefill_inputs["current_length"].detach().numpy(),
         )
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
+
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_INFER_TIME)
         self.prefill.run()
         self.prefill.sync()
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_INFER_TIME)
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_OUTPUT_TIME)
         prefill_output = self.prefill.get_output(self.prefill.get_output_name(0))
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_OUTPUT_TIME)
         next_id = prefill_output.numpy().argmax(-1)
         return next_id, valid_length, current_length
 
@@ -681,11 +712,15 @@ class Qwen25VL:
         self.decode_time = 0
         image_features = None
         inputs = self.preprocess(prompt, image_dir)
-        start_time = time.time()
+        self.perf_tracker.perf_start(PERFTYPE.VISION_TOTAL_TIME)
         if image_dir != None:
+            self.perf_tracker.perf_start(PERFTYPE.VISION_PREPROCESS_TIME)
             visual_inputs = self.preprocess_visual(inputs)
+            self.perf_tracker.perf_end(PERFTYPE.VISION_PREPROCESS_TIME)
             image_features = self.run_visual(visual_inputs)
-        vit_time = time.time() - start_time
+        self.perf_tracker.perf_end(PERFTYPE.VISION_TOTAL_TIME)
+
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
         (
             inputs_embeds,
             time_position_ids,
@@ -693,17 +728,17 @@ class Qwen25VL:
             width_position_ids,
             self.rope_deltas,
         ) = self.preprocess_prefill(inputs, image_features)
-        start_time = time.time()
+
         self.next_id, valid_length, current_length = self.run_prefill(
             inputs_embeds, time_position_ids, hight_position_ids, width_position_ids
         )
-        prefill_time = time.time() - start_time
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOTAL_TIME)
         next_str = self.processor.tokenizer.decode(torch.tensor(self.next_id.item()))
         logger.success("response:")
         print("\033[1;95m{}".format(next_str), end="", flush=True)
         self.generated_ids.append(self.next_id.item())
         self.context_length = valid_length.item() + current_length.item() + 1
-        return vit_time, prefill_time, inputs_embeds.shape[1]
+        return inputs_embeds.shape[1]
 
     def chat_decoder(self):
         if self.context_length >= self.context_max_length:
@@ -712,7 +747,10 @@ class Qwen25VL:
             )
             return None
         decoder_pids = self.context_length + self.rope_deltas.item() - 1
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_TOTAL_TIME)
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_EMBED_TIME)
         x = F.embedding(torch.from_numpy(self.next_id).unsqueeze(0), self.embedding)
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_EMBED_TIME)
         decoder_inputs = dict(
             input_1=x,
             valid_length=torch.tensor(self.context_length - 1),
@@ -723,6 +761,7 @@ class Qwen25VL:
         )
         if HOUMO_TARGET == "xh2":
             decoder_inputs["input_1"] = decoder_inputs["input_1"].squeeze(0)
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_INPUT_TIME)
         self.decode.set_input(
             self.decode.get_input_name(0), decoder_inputs["input_1"].detach().numpy()
         )
@@ -746,18 +785,26 @@ class Qwen25VL:
             self.decode.get_input_name(5),
             decoder_inputs["current_length"].detach().numpy(),
         )
-        start_time = time.time()
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_INPUT_TIME)
+
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_INFER_TIME)
         self.decode.run()
         self.decode.sync()
-        self.decode_time += time.time() - start_time
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_INFER_TIME)
+
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_OUTPUT_TIME)
         decoder_output = self.decode.get_output(self.decode.get_output_name(0))
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_OUTPUT_TIME)
         self.next_id = self.samplingmanager.sample(
             decoder_output.numpy(), self.generated_ids
         )
         self.generated_ids.append(self.next_id.item())
         if self.next_id.item() in self.eos_token_id:
             return None
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_TOKEN_TIME)
         next_str = self.processor.tokenizer.decode(self.next_id.item())
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_TOKEN_TIME)
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_TOTAL_TIME)
         self.context_length += 1
         return next_str
 
@@ -773,17 +820,16 @@ if __name__ == "__main__":
     )
     # image_dir = None
     image_dir = ["../../../data/pic/beach.jpeg"]
-    # image_dir = ["../../../data/pic/beach.jpeg", "../../../data/pic/lane.jpg"]
+
     image_num = 0 if not image_dir else len(image_dir)
-    start_time = time.time()
-    # prompt="你好，你是谁。"
+
     prompt = "请描述图片内容。"
     logger.success("question:")
     print("\033[1;95m{}\033[0m".format(prompt))
-    vit_time, prefill_time, input_tokens = qwen25vl.chat_vit_prefill(
+    input_tokens = qwen25vl.chat_vit_prefill(
         image_dir, prompt=prompt
     )
-    visual_prefill_time = time.time() - start_time
+
     decode_count = 0
     while True:
         next_str = qwen25vl.chat_decoder()
@@ -792,22 +838,12 @@ if __name__ == "__main__":
             break
         print(next_str, end="", flush=True)
     print("\033[0m")
-    output_tokens = decode_count + 1
-    total_time = time.time() - start_time
-    decode_time = qwen25vl.decode_time
-    logger.success(
-        f"Total Images: {image_num}, Total Input: {input_tokens} tokens, Output {output_tokens} tokens, Vision Cost {vit_time * 1000:.3f} ms, Prefill Cost {prefill_time * 1000:.3f} ms, Decode Cost {decode_time * 1000:.3f} ms"
+
+    qwen25vl.perf_tracker.set_basic_info(
+        batch_size=1,
+        input_seq_length=input_tokens,
+        output_seq_length=decode_count,
+        num_images=image_num
     )
-    if image_num:
-        logger.success(f"Vision Cost {vit_time / image_num * 1000:.3f} ms/image")
-    logger.success(
-        f"Prefill Speed: {input_tokens / prefill_time:.2f} tokens/s; Decode Speed: {(output_tokens - 1) / decode_time:.2f} tokens/s"
-    )
-    logger.success(f"TTFT (Time to First Token): {visual_prefill_time * 1000:.3f} ms")
-    logger.success(
-        f"TPOT (Time Per Output Token): {decode_time * 1000 / (output_tokens - 1):.3f} ms/token"
-    )
-    logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
-    logger.success(
-        f"E2E TPS (End-to-End Tokens Per Second): {output_tokens / total_time:.2f} tokens/s"
-    )
+
+    qwen25vl.perf_tracker.show_summary()

@@ -110,6 +110,7 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
+
 class HmQwenXh2:
     def __init__(self, prefill_path, decode_path, embedding_path, tokenizer_dir, isl, osl):
         weight_manager = tcim.runtime.WeightManager(0)
@@ -156,15 +157,14 @@ class HmQwenXh2:
             embedding_path, map_location="cpu", weights_only=True
         )['weight']
         self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len)
-        
+
         if isl + osl >= self.context_max_length:
             logger.error(
                 f"Context length exceeds maximum limit {self.context_max_length}, please reduce input/output sequence length!"
             )
             sys.exit(1)
-        
-        # Initialize performance tracker
-        self.performance_tracker = InferencePerformanceTracker()
+
+        self.perf_tracker = InferencePerformanceTracker()
 
     def get_nblocks(self):
         input_names = []
@@ -176,36 +176,33 @@ class HmQwenXh2:
 
     def preprocess_prefill(self, isl):
         text = generate_random_digit_string(isl)
-        # PREFILL_TOKEN_TIME: Text input -> token id conversion time (including apply_chat_template)
-        self.performance_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
         message = [{"role": "user", "content": text}]
         text_with_template = self.tokenizer.apply_chat_template(
             message, tokenize=False, add_generation_prompt=True
         )
         input = self.tokenizer(text_with_template, return_tensors='pt')
-        self.performance_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
         all_input_id = input['input_ids']
         return all_input_id
 
     def run_prefill(self, b, all_input_id):
-        # PREFILL_TOTAL_TIME: Total run_prefill stage time (until next_token_id retrieval)
-        self.performance_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
-        
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
+
         decode_input_index_start = 2 * self.nblocks * b + 3 + 2 * b if b > 0 else 3
         decode_input_index_finish = 2 * self.nblocks * (b + 1) + 3 + b * 2
         prefill_input_index = 3
-        
-        # Preload cache (non-core SET_INPUT logic, not counted in PREFILL_INPUT_TIME)
+
         for i in range(decode_input_index_start, decode_input_index_finish):
             cache = self.decode.get_dev_input(self.decode.get_input_name(i))
             self.prefill.set_input(
                 self.prefill.get_input_name(prefill_input_index), cache
             )
             prefill_input_index += 1
-        
+
         input_echo_len = all_input_id.numel()
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
-        
+
         for round in range(prefill_loop_round):
             valid_length = round * self.prefill_length
             if round == prefill_loop_round - 1:
@@ -218,9 +215,8 @@ class HmQwenXh2:
                 input_ids = all_input_id[
                     :, round * self.prefill_length : (round + 1) * self.prefill_length
                 ]
-            
-            # PREFILL_EMBED_TIME: Token id -> embedding conversion time (including prefill_length alignment padding)
-            self.performance_tracker.perf_start(PERFTYPE.PREFILL_EMBED_TIME)
+
+            self.perf_tracker.perf_start(PERFTYPE.PREFILL_EMBED_TIME)
             inputs_embeds = F.embedding(input_ids, self.embedding_weight)
             effective_length = input_ids.size(-1)
             # Padding alignment for prefill (required by model input shape)
@@ -234,92 +230,79 @@ class HmQwenXh2:
             input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
                 1, self.prefill_length, self.embedding_len
             )
-            self.performance_tracker.perf_end(PERFTYPE.PREFILL_EMBED_TIME)
-            
+            self.perf_tracker.perf_end(PERFTYPE.PREFILL_EMBED_TIME)
+
             valid_length_data = np.array([valid_length]).astype("int32")
             current_length_data = np.array([current_length]).astype("int32")
-            
-            # PREFILL_INPUT_TIME: tcim_api SET_INPUT operation time
-            self.performance_tracker.perf_start(PERFTYPE.PREFILL_INPUT_TIME)
+
             input_name = self.prefill.get_input_name(0)
             valid_length_name = self.prefill.get_input_name(1)
             current_length_name = self.prefill.get_input_name(2)
+            self.perf_tracker.perf_start(PERFTYPE.PREFILL_INPUT_TIME)
             self.prefill.set_input(input_name, input_data.float().numpy())
             self.prefill.set_input(valid_length_name, valid_length_data)
             self.prefill.set_input(current_length_name, current_length_data)
-            self.performance_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
-            
-            # PREFILL_INFER_TIME: tcim_api RUN + SYNC operation time
-            self.performance_tracker.perf_start(PERFTYPE.PREFILL_INFER_TIME)
+            self.perf_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
+
+            self.perf_tracker.perf_start(PERFTYPE.PREFILL_INFER_TIME)
             self.prefill.run()
             self.prefill.sync()
-            self.performance_tracker.perf_end(PERFTYPE.PREFILL_INFER_TIME)
+            self.perf_tracker.perf_end(PERFTYPE.PREFILL_INFER_TIME)
 
-        # PREFILL_OUTPUT_TIME: tcim_api GET_OUTPUT operation time
-        self.performance_tracker.perf_start(PERFTYPE.PREFILL_OUTPUT_TIME)
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_OUTPUT_TIME)
         input_data = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
-        self.performance_tracker.perf_end(PERFTYPE.PREFILL_OUTPUT_TIME)
-        
-        # Retrieve next_token_id (PREFILL_TOTAL_TIME ends here)
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_OUTPUT_TIME)
+
         next_id = input_data.argmax(-1)[0]
         next_id = torch.from_numpy(next_id)
-        
-        # End PREFILL_TOTAL_TIME statistics
-        self.performance_tracker.perf_end(PERFTYPE.PREFILL_TOTAL_TIME)
-        
+
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOTAL_TIME)
+
         return input_echo_len, next_id
 
     def run_decode(self, input_datas):
-        # DECODE_TOTAL_TIME: Total run_decode stage time (until next_token_id retrieval)
-        self.performance_tracker.perf_start(PERFTYPE.DECODE_TOTAL_TIME)
-        
-        # DECODE_INPUT_TIME: tcim_api SET_INPUT operation time in decode stage
-        self.performance_tracker.perf_start(PERFTYPE.DECODE_INPUT_TIME)
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_TOTAL_TIME)
+
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_INPUT_TIME)
         input_name = self.decode.get_input_name(0)
 
         input_datas_np = np.concatenate(input_datas, axis=0) if self.batch > 1 else input_datas[0]
         self.decode.set_input(input_name, input_datas_np)
-        
+
         for b in range(self.batch):
             valid_length_index = 1 if b == 0 else 2 * self.nblocks * b + 3 + 2 * b - 2
             valid_length_data = np.array(self.context_lengths[b]).astype('int32')
             self.decode.set_input(
                 self.decode.get_input_name(valid_length_index), valid_length_data
             )
-        self.performance_tracker.perf_end(PERFTYPE.DECODE_INPUT_TIME)
-        
-        # DECODE_INFER_TIME: tcim_api RUN + SYNC operation time in decode stage
-        self.performance_tracker.perf_start(PERFTYPE.DECODE_INFER_TIME)
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_INPUT_TIME)
+
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_INFER_TIME)
         self.decode.run()
         self.decode.sync()
-        self.performance_tracker.perf_end(PERFTYPE.DECODE_INFER_TIME)
-        
-        # DECODE_OUTPUT_TIME: tcim_api GET_OUTPUT operation time in decode stage
-        self.performance_tracker.perf_start(PERFTYPE.DECODE_OUTPUT_TIME)
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_INFER_TIME)
+
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_OUTPUT_TIME)
         output_data = self.decode.get_output(self.decode.get_output_name(0)).to_host().numpy()
-        self.performance_tracker.perf_end(PERFTYPE.DECODE_OUTPUT_TIME)
-        
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_OUTPUT_TIME)
+
         # Retrieve next_token_id (DECODE_TOTAL_TIME ends here)
         next_ids = [output_data[b].argmax(-1) for b in range(self.batch)]
-        
-        # DECODE_TOKEN_TIME: Token id -> text conversion time (including apply_chat_template)
-        self.performance_tracker.perf_start(PERFTYPE.DECODE_TOKEN_TIME)
+
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_TOKEN_TIME)
         for b in range(self.batch):
-            # Decode token id to text (including apply_chat_template)
             token_text = self.tokenizer.decode(next_ids[b])
-            # Simulate apply_chat_template (comply with statistics scope)
             message = [{"role": "assistant", "content": token_text}]
             self.tokenizer.apply_chat_template(message, tokenize=False)
-        self.performance_tracker.perf_end(PERFTYPE.DECODE_TOKEN_TIME)
-        
-        # End DECODE_TOTAL_TIME statistics
-        self.performance_tracker.perf_end(PERFTYPE.DECODE_TOTAL_TIME)
-        
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_TOKEN_TIME)
+
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_TOTAL_TIME)
+
         return output_data
 
     def chat(self, isl, osl):
         input_echo_lens = []
-        
+
         logger.info("Total prefill token count: {}".format(isl))
         for b in range(self.batch):
             all_input_id = self.preprocess_prefill(isl)
@@ -327,9 +310,8 @@ class HmQwenXh2:
             self.next_ids[b] = next_id
             self.current_echo_lens[b] = input_echo_len
             input_echo_lens.append(input_echo_len)
-        
-        # DECODE_EMBED_TIME: Token id -> embedding conversion time (decode stage, no padding needed)
-        self.performance_tracker.perf_start(PERFTYPE.DECODE_EMBED_TIME)
+
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_EMBED_TIME)
         input_datas = []
         for b in range(self.batch):
             next_id = self.next_ids[b].unsqueeze(0)
@@ -338,45 +320,36 @@ class HmQwenXh2:
 
             embed_data = inputs_embeds.reshape(1, 1, -1).float().numpy()
             input_datas.append(embed_data)
-        self.performance_tracker.perf_end(PERFTYPE.DECODE_EMBED_TIME)
-        
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_EMBED_TIME)
+
         self.context_lengths = self.current_echo_lens
         count = 0
         logger.info("Total decode token count: {}".format(osl))
-        
+
         while count < osl - 1:
             output_data = self.run_decode(input_datas)
-            
+
             # Process output and record DECODE_EMBED_TIME
             self.next_ids = [output_data[b].argmax(-1) for b in range(self.batch)]
             self.next_ids = [torch.from_numpy(next_id) for next_id in self.next_ids]
-            
+
             input_datas = []
-            self.performance_tracker.perf_start(PERFTYPE.DECODE_EMBED_TIME)
+            self.perf_tracker.perf_start(PERFTYPE.DECODE_EMBED_TIME)
             for b in range(self.batch):
                 self.context_lengths[b] += 1
                 next_id = torch.from_numpy(np.asarray(self.next_ids[b])).unsqueeze(0)
-                # Convert token id to embedding (decode stage, no padding)
+
                 inputs_embeds = F.embedding(next_id, self.embedding_weight)
                 embed_data = inputs_embeds.reshape(1, 1, -1).float().numpy()
                 input_datas.append(embed_data)
-            self.performance_tracker.perf_end(PERFTYPE.DECODE_EMBED_TIME)
-            
+            self.perf_tracker.perf_end(PERFTYPE.DECODE_EMBED_TIME)
+
             count += 1
-        
-        # Set basic information and display performance summary
-        self.performance_tracker.set_basic_info(
+
+        self.perf_tracker.set_basic_info(
             self.batch,
             sum(input_echo_lens),
             count,
-        )
-        self.performance_tracker.calculate_metrics()
-        self.performance_tracker.show_summary()
-        
-        return (
-            self.batch,
-            sum(input_echo_lens),
-            count * self.batch,
         )
 
 if __name__ == "__main__":
@@ -389,3 +362,4 @@ if __name__ == "__main__":
         )
 
     hmqwen.chat(args.isl, args.osl)
+    hmqwen.perf_tracker.show_summary()
