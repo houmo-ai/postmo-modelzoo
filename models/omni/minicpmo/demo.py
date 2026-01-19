@@ -1091,7 +1091,8 @@ class HMMiniCPMO(object):
             logger.error(f"Prefill input token length long than {self.llm_context_max_length}, please shorten it!")
             assert(0)
         last_hidden_states = None
-        if current_length > self.llm_prefill_len:
+        prefill_output = None
+        if current_length >= self.llm_prefill_len:
             pre_gen_nums = current_length // self.llm_prefill_len
             for pre_gen_idx in range(pre_gen_nums):
                 prefill_inputs = self.create_llm_prefill_inputs(input_embeds, pre_gen_idx)
@@ -1106,21 +1107,23 @@ class HMMiniCPMO(object):
         else:
             pre_gen_nums = 0
         current_length = current_length % self.llm_prefill_len
-        prefill_shape = list(self.llm_prefill_shape)
-        prefill_shape.append(self.hidden_dims)
-        x = torch.zeros(prefill_shape, dtype=input_embeds.dtype, device=input_embeds.device)
-        x[:, :current_length] = input_embeds[:, -current_length:]
-        current_length = np.array(current_length, dtype=self.llm_prefill_input_infos["current_length"].dtype)
         valid_length = np.array(self.llm_prefill_len * pre_gen_nums, dtype=self.llm_decoder_input_infos["valid_length"].dtype) 
-        inputs_list = [x.detach().cpu().numpy(), valid_length, current_length]
-        for i in range(3):
-            input_name = list(self.llm_prefill_input_infos.keys())[i]
-            self.llm_prefill_engine.set_input(input_name, inputs_list[i])
-        self.llm_prefill_engine.run()
-        self.llm_prefill_engine.sync()
-        prefill_output = self.llm_prefill_engine.get_output(self.llm_output_names[0]).numpy()
-        hidden_states = self.llm_prefill_engine.get_output(self.llm_output_names[1]).numpy()[:, :current_length, ...]
-        last_hidden_states = hidden_states if last_hidden_states is None else np.concatenate([last_hidden_states, hidden_states], axis=1)
+        if current_length > 0:
+            prefill_shape = list(self.llm_prefill_shape)
+            prefill_shape.append(self.hidden_dims)
+            x = torch.zeros(prefill_shape, dtype=input_embeds.dtype, device=input_embeds.device)
+            x[:, :current_length] = input_embeds[:, -current_length:]
+            current_length = np.array(current_length, dtype=self.llm_prefill_input_infos["current_length"].dtype)
+            inputs_list = [x.detach().cpu().numpy(), valid_length, current_length]
+            for i in range(3):
+                input_name = list(self.llm_prefill_input_infos.keys())[i]
+                self.llm_prefill_engine.set_input(input_name, inputs_list[i])
+            self.llm_prefill_engine.run()
+            self.llm_prefill_engine.sync()
+            prefill_output = self.llm_prefill_engine.get_output(self.llm_output_names[0]).numpy()
+            hidden_states = self.llm_prefill_engine.get_output(self.llm_output_names[1]).numpy()[:, :current_length, ...]
+            last_hidden_states = hidden_states if last_hidden_states is None else np.concatenate([last_hidden_states, hidden_states], axis=1)
+        assert prefill_output is not None, "LLM prefill prefill output is None!"
         next_token_logits = torch.from_numpy(prefill_output[:, -1, :]).to(dtype=torch.float32, device=self.device)
         if self.llm_sampling:
             next_token_scores = self.llm_prepared_logits_warper(torch.ones((1, 0), dtype=torch.long, device=self.device),
