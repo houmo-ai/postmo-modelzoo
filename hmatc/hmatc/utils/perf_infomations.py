@@ -145,40 +145,23 @@ class InferencePerformanceTracker:
 
         # Mapping for perf_end operations
         self.end_time_mapping = {
-            PERFTYPE.PREFILL_TOTAL_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'total_time', 
-                                                                      getattr(self.current_metrics.prefill_perf_infos, 'total_time') + time_diff_ms),
-            PERFTYPE.PREFILL_TOKEN_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'tokenizer_time', 
-                                                                       getattr(self.current_metrics.prefill_perf_infos, 'tokenizer_time') + time_diff_ms),
-            PERFTYPE.PREFILL_EMBED_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'embedding_time', 
-                                                                       getattr(self.current_metrics.prefill_perf_infos, 'embedding_time') + time_diff_ms),
-            PERFTYPE.PREFILL_INPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'setinput_time', 
-                                                                       getattr(self.current_metrics.prefill_perf_infos, 'setinput_time') + time_diff_ms),
-            PERFTYPE.PREFILL_INFER_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'infer_time', 
-                                                                       getattr(self.current_metrics.prefill_perf_infos, 'infer_time') + time_diff_ms),
-            PERFTYPE.PREFILL_OUTPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'getoutput_time', 
-                                                                        getattr(self.current_metrics.prefill_perf_infos, 'getoutput_time') + time_diff_ms),
-            PERFTYPE.DECODE_TOTAL_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'total_time', 
-                                                                      getattr(self.current_metrics.decode_perf_infos, 'total_time') + time_diff_ms),
-            PERFTYPE.DECODE_TOKEN_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'tokenizer_time', 
-                                                                      getattr(self.current_metrics.decode_perf_infos, 'tokenizer_time') + time_diff_ms),
-            PERFTYPE.DECODE_EMBED_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'embedding_time', 
-                                                                      getattr(self.current_metrics.decode_perf_infos, 'embedding_time') + time_diff_ms),
-            PERFTYPE.DECODE_INPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'setinput_time', 
-                                                                      getattr(self.current_metrics.decode_perf_infos, 'setinput_time') + time_diff_ms),
-            PERFTYPE.DECODE_INFER_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'infer_time', 
-                                                                      getattr(self.current_metrics.decode_perf_infos, 'infer_time') + time_diff_ms),
-            PERFTYPE.DECODE_OUTPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'getoutput_time', 
-                                                                       getattr(self.current_metrics.decode_perf_infos, 'getoutput_time') + time_diff_ms),
-            PERFTYPE.VISION_TOTAL_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'vision_total_time', 
-                                                                      getattr(self.current_metrics.vision_perf_infos, 'vision_total_time') + time_diff_ms),
-            PERFTYPE.VISION_PREPROCESS_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'vision_preprocess_time', 
-                                                                           getattr(self.current_metrics.vision_perf_infos, 'vision_preprocess_time') + time_diff_ms),
-            PERFTYPE.VISION_INPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'setinput_time', 
-                                                                      getattr(self.current_metrics.vision_perf_infos, 'setinput_time') + time_diff_ms),
-            PERFTYPE.VISION_INFER_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'infer_time', 
-                                                                      getattr(self.current_metrics.vision_perf_infos, 'infer_time') + time_diff_ms),
-            PERFTYPE.VISION_OUTPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'getoutput_time', 
-                                                                       getattr(self.current_metrics.vision_perf_infos, 'getoutput_time') + time_diff_ms),
+            PERFTYPE.PREFILL_TOTAL_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'total_time', getattr(self.current_metrics.prefill_perf_infos, 'total_time') + time_diff_ms),
+            PERFTYPE.PREFILL_TOKEN_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'tokenizer_time', getattr(self.current_metrics.prefill_perf_infos, 'tokenizer_time') + time_diff_ms),
+            PERFTYPE.PREFILL_EMBED_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'embedding_time', getattr(self.current_metrics.prefill_perf_infos, 'embedding_time') + time_diff_ms),
+            PERFTYPE.PREFILL_INPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'setinput_time', getattr(self.current_metrics.prefill_perf_infos, 'setinput_time') + time_diff_ms),
+            PERFTYPE.PREFILL_INFER_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'infer_time', getattr(self.current_metrics.prefill_perf_infos, 'infer_time') + time_diff_ms),
+            PERFTYPE.PREFILL_OUTPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.prefill_perf_infos, 'getoutput_time', getattr(self.current_metrics.prefill_perf_infos, 'getoutput_time') + time_diff_ms),
+            PERFTYPE.DECODE_TOTAL_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'total_time', getattr(self.current_metrics.decode_perf_infos, 'total_time') + time_diff_ms),
+            PERFTYPE.DECODE_TOKEN_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'tokenizer_time', getattr(self.current_metrics.decode_perf_infos, 'tokenizer_time') + time_diff_ms),
+            PERFTYPE.DECODE_EMBED_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'embedding_time', getattr(self.current_metrics.decode_perf_infos, 'embedding_time') + time_diff_ms),
+            PERFTYPE.DECODE_INPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'setinput_time', getattr(self.current_metrics.decode_perf_infos, 'setinput_time') + time_diff_ms),
+            PERFTYPE.DECODE_INFER_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'infer_time', getattr(self.current_metrics.decode_perf_infos, 'infer_time') + time_diff_ms),
+            PERFTYPE.DECODE_OUTPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.decode_perf_infos, 'getoutput_time', getattr(self.current_metrics.decode_perf_infos, 'getoutput_time') + time_diff_ms),
+            PERFTYPE.VISION_TOTAL_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'vision_total_time', getattr(self.current_metrics.vision_perf_infos, 'vision_total_time') + time_diff_ms),
+            PERFTYPE.VISION_PREPROCESS_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'vision_preprocess_time', getattr(self.current_metrics.vision_perf_infos, 'vision_preprocess_time') + time_diff_ms),
+            PERFTYPE.VISION_INPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'setinput_time', getattr(self.current_metrics.vision_perf_infos, 'setinput_time') + time_diff_ms),
+            PERFTYPE.VISION_INFER_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'infer_time', getattr(self.current_metrics.vision_perf_infos, 'infer_time') + time_diff_ms),
+            PERFTYPE.VISION_OUTPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'getoutput_time', getattr(self.current_metrics.vision_perf_infos, 'getoutput_time') + time_diff_ms),
         }
 
         # Mapping for getting start times
@@ -233,13 +216,13 @@ class InferencePerformanceTracker:
             metrics.prefill_perf_infos.setinput_speed = metrics.input_seq_length / (metrics.prefill_perf_infos.setinput_time / 1000)
 
         if metrics.prefill_perf_infos.infer_time > 0:
-            metrics.prefill_perf_infos.infer_speed = metrics.batch_size * (((metrics.input_seq_length + 255) // 256) * 256) / (metrics.prefill_perf_infos.infer_time / 1000)
+            metrics.prefill_perf_infos.infer_speed = metrics.batch_size * metrics.input_seq_length / (metrics.prefill_perf_infos.infer_time / 1000)
 
         if metrics.prefill_perf_infos.getoutput_time > 0:
             metrics.prefill_perf_infos.getoutput_speed = metrics.input_seq_length / (metrics.prefill_perf_infos.getoutput_time / 1000)
 
         if metrics.prefill_perf_infos.total_time > 0:
-            metrics.prefill_perf_infos.total_speed = metrics.batch_size * (((metrics.input_seq_length + 255) // 256) * 256) / (metrics.prefill_perf_infos.total_time / 1000)
+            metrics.prefill_perf_infos.total_speed = metrics.batch_size * metrics.input_seq_length / (metrics.prefill_perf_infos.total_time / 1000)
 
     def calculate_decode(self, metrics):
         if metrics.decode_perf_infos.tokenizer_time > 0:
@@ -318,7 +301,7 @@ class InferencePerformanceTracker:
             logger.success(f"  Number of Images: {metrics.num_images:>6} images")
 
         # Vision Stage Performance (if applicable)
-        if metrics.num_images > 0 and (metrics.vision_perf_infos.vision_total_time > 0 or 
+        if metrics.num_images > 0 and (metrics.vision_perf_infos.vision_total_time > 0 or
                                        metrics.vision_perf_infos.vision_preprocess_time > 0):
             logger.success(f"Vision Stage Performance:")
             logger.success(f"  Total Time: {metrics.vision_perf_infos.vision_total_time:>7.2f}ms | Speed: {metrics.vision_perf_infos.vision_total_speed:>7.2f} images/s")

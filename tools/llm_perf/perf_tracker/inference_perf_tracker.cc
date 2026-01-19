@@ -247,7 +247,7 @@ void InferencePerformanceTracker::calculateMetrics(InferenceMetrics& metrics) {
         (metrics.prefill_perf_infos.setinput_time / 1000.0);
   }
   if (metrics.prefill_perf_infos.infer_time > 0) {
-    int padded_length = ((metrics.input_seq_length + 255) / 256) * 256;
+    int padded_length = metrics.input_seq_length;
     metrics.prefill_perf_infos.infer_speed =
         (padded_length * metrics.batch_size) /
         (metrics.prefill_perf_infos.infer_time / 1000.0);
@@ -258,7 +258,7 @@ void InferencePerformanceTracker::calculateMetrics(InferenceMetrics& metrics) {
         (metrics.prefill_perf_infos.getoutput_time / 1000.0);
   }
   if (metrics.prefill_perf_infos.total_time > 0) {
-    int padded_length = ((metrics.input_seq_length + 255) / 256) * 256;
+    int padded_length = metrics.input_seq_length;
     metrics.prefill_perf_infos.total_speed =
         (padded_length * metrics.batch_size) /
         (metrics.prefill_perf_infos.total_time / 1000.0);
