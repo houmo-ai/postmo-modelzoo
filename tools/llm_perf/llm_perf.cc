@@ -41,6 +41,9 @@
 #include <Windows.h>
 #endif
 
+#define ALARM_TEMPERATURE_THRESHOLD 80
+#define SHUTDOWN_TEMPERATURE_THRESHOLD 100
+
 int RunPerf(std::unordered_map<std::string, std::string> args) {
   std::thread device_monitor_thread(device_monitor);
   try {
@@ -155,6 +158,21 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
                 << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
                 << input_token_len << ", output " << stop_token_len
                 << std::string(30, '=') << "\n ";
+      float current_temperature = get_temperature();
+      std::cout << COLOR_YELLOW << "Device temperature: " << current_temperature
+                << " °C" << std::endl;
+      if (current_temperature > ALARM_TEMPERATURE_THRESHOLD &&
+          current_temperature < SHUTDOWN_TEMPERATURE_THRESHOLD) {
+        std::cout
+            << COLOR_YELLOW
+            << "Device temperature is beyond 80.0 °C, Temperature Warning!"
+            << std::endl;
+      }
+      if (current_temperature >= SHUTDOWN_TEMPERATURE_THRESHOLD) {
+        throw std::runtime_error(
+            "Device temperature is beyond 100.0 °C, "
+            "Shutdown the demo!");
+      }
       Qwen3Infer->get_perf_tracker()->reset();
       Qwen3Infer->perf_llm(input_token_len, stop_token_len);
       Qwen3Infer->get_perf_tracker()->pref_delete_warmup();
@@ -166,6 +184,21 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
                 << std::string(30, '=')
                 << "(v)LLM Perf Loop Progress: " << (i + 1) << "/" << loop_round
                 << std::string(30, '=') << "\n ";
+      float current_temperature = get_temperature();
+      std::cout << COLOR_YELLOW << "Device temperature: " << current_temperature
+                << " °C" << std::endl;
+      if (current_temperature > ALARM_TEMPERATURE_THRESHOLD &&
+          current_temperature < SHUTDOWN_TEMPERATURE_THRESHOLD) {
+        std::cout
+            << COLOR_YELLOW
+            << "Device temperature is beyond 80.0 °C, Temperature Warning!"
+            << std::endl;
+      }
+      if (current_temperature >= SHUTDOWN_TEMPERATURE_THRESHOLD) {
+        throw std::runtime_error(
+            "Device temperature is beyond 100.0 °C, "
+            "Shutdown the demo!");
+      }
       Qwen3Infer->get_perf_tracker()->reset();
       Qwen3Infer->perf_llm(input_token_len, stop_token_len);
       std::cout << std::string(82, '=') << "\n";

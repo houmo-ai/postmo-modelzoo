@@ -42,6 +42,8 @@
 #include "hm_sys.h"
 
 std::atomic<bool> g_running(true);
+std::atomic<float> g_temperature(0);
+
 std::mutex g_threads_mutex;
 std::vector<std::thread> g_monitor_threads;
 
@@ -197,6 +199,7 @@ void hm_device_monitor_info(int dev_index) {
                     "{:.2f}MHz",
                     hm_infos.dev_id, hm_infos.temperature, hm_infos.power,
                     hm_infos.ipu_freq);
+    g_temperature.store(hm_infos.temperature);
     // Simulate monitoring interval (adjust according to actual requirements)
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
@@ -244,5 +247,7 @@ void device_monitor() {
 }
 
 void stop_monitor() { g_running = false; }
+
+float get_temperature() { return g_temperature.load(); }
 
 #endif  // DEVICE_MONITOR_HPP

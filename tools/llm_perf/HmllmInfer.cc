@@ -349,7 +349,6 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len,
   memset(&llm_perf_datas, 0, sizeof(PerfInfos));
   // 1. prepare inputs
   std::vector<int> all_input_ids = generateRandomVector(input_tokens_len);
-
   if (input_tokens_len + stop_tokens_len > context_max_length) {
     std::cout << "input_tokens_len + stop_tokens_len > context_max_length, "
                  "cast stop_tokens_len to "
@@ -382,6 +381,10 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len,
     perf_tracker->perfStart(PerfType::PREFILL_EMBED_TIME);
     input_datas = embedding->EmbeddingTokens(input_ids);
     perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
+    for (int k = 0; k < input_ids.size(); k++) {
+      std::cout << input_ids[k] << " ";
+    }
+    std::cout << std::endl;
 
     perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
     PrefillSetInputDatas(input_datas, valid_length, current_length);

@@ -28,7 +28,7 @@
 | HmllmInferMultiBatch.cc | 主文件，实现llm多batch具体推理流程，仅支持xh2       |
 | convert_embed.py        | 将embedding的pt模型转换为bin文件方便工具读取权重    |
 | device_monitor.h        | 监控设备温度、功率、IPU频率的脚本                   |
-| perf_tracker            | 性能采集类功能实现                                  |   
+| perf_tracker            | 性能采集类功能实现                                  |
 | build_linux.sh          | Linux平台llm_perf编译脚本                           |
 | build_ndk.sh            | Android平台llm_perf编译脚本                         |
 | build_win.bat           | Win11平台llm_perf编译脚本                           |
@@ -38,6 +38,7 @@
   - 支持的芯片型号为：xh2。
   - 支持的大道软件版本要求如下：xh2≥v0.6.0 。
   - 支持了device0的温度、功率、IPU频率监控，记录保存在./device_logs/device_0.log。
+  - 温度监控带告警功能，当温度大于80℃时，程序会打印警告信息，温度大于100℃时，程序会强制退出。
 
 ### 1.2 流程说明
 
@@ -64,7 +65,7 @@
   | Vision Stage 指标                       | 说明                                                                |
   | --------------------------------------- | ------------------------------------------------------------------- |
   | Vision Total Time                       | Vision阶段耗时，单位（ms）                                          |
-  | Vision Total Speed                      | Vision阶段速度，单位（tokens/s）                                    | 
+  | Vision Total Speed                      | Vision阶段速度，单位（tokens/s）                                    |
   | Preprocessing Time                      | Preprocessing耗时，单位（ms）                                       |
   | API SetInput Time                       | tcim runtime setinput API耗时，单位（ms）                           |
   | API Inference Time                      | tcim runtime run+sync API耗时，单位（ms）                           |
@@ -72,7 +73,7 @@
   | API GetOutput Time                      | tcim runtime GetOutput API耗时，单位（ms）                          |
 
 - 表三：总体性能指标
-  | Overall 指标                            | 说明                                                                | 
+  | Overall 指标                            | 说明                                                                |
   | --------------------------------------- | ------------------------------------------------------------------- |
   | TTFT (Time to First Token)              | 输出第一个token的耗时，单位（ms）                                   |
   | TPOT (Time Per Output Token)            | Decode模型每秒输出的token数，单位（tokens/s）                       |
@@ -119,7 +120,7 @@
 
 用户可以使用如下任一指令指定配置文件：
 ``` shell
-./llm_perf -c config.json 
+./llm_perf -c config.json
 ./llm_perf --config config.json
 ```
 配置文件启动等效于多次指令启动，配置文件的参考模板perf_config.json，详细内容示例如下：
@@ -266,7 +267,7 @@ rem 需要结合用户目录更改三四行的环境变量实际路径
 #单次启动perf
 ./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --stop 2048 --ndevices 2 --loop 2 --batch 1
 #多次启动perf
-./llm_perf -c config.json 
+./llm_perf -c config.json
 ./llm_perf --config config.json
 ```
 
