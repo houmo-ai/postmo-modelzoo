@@ -22,6 +22,7 @@ import shutil
 import time
 import cv2
 import numpy as np
+import json
 import torch
 from prettytable import PrettyTable
 from datetime import datetime
@@ -210,7 +211,7 @@ class Xh2Exec(BaseExec):
         quant_scheme = QuantScheme(
             target_device=DeviceType.XH2a,
             quant_type=self.quant_type,
-            inupt_ppc_config=input_ppc_config,
+            input_ppc_config=input_ppc_config,
         )
         quant_config = create_quant_config(quant_scheme)
 
@@ -411,7 +412,7 @@ class Xh2Exec(BaseExec):
             work_dir=self.build_output_dir,
             # enable_dynamic_image_resize=self.resizer_mode in [1],
             one_img_multi_roi=self.roi_num > 1,
-            # custom_msg=self.custom_msg,
+            custom_msg=json.dumps(self.custom_msg, ensure_ascii=False),
         )
         span = time.time() - t_start
         # Compress compiled outputs
