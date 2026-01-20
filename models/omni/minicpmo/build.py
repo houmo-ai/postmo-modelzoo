@@ -57,6 +57,30 @@ def cosine_distance(data1, data2):
     return cosine_dist
 
 
+def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
+    """Validates and adjusts FlashAttention parameter values."""
+    llm_val, other_val = flash_vals
+
+    # Validate LLM (Prefill & Decode) FlashAttention parameter
+    # Values: 0=off, 1/2=on
+    if llm_val not in [0, 1, 2]:
+        raise ValueError(
+            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
+        )
+
+    # Validate ViT & Audio Models FlashAttention parameter
+    # Values: 0=off, 1=on
+    if other_val not in [0, 1]:
+        raise ValueError(
+            f"ViT&Audio FlashAttention values only support 0/1, current value:{other_val}"
+        )
+
+    if context_length < 2048:
+        llm_val = 0
+
+    return (llm_val, other_val)
+
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -143,15 +167,19 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--flash_attention",
         dest="flash_attention",
+        nargs=2,
         type=int,
-        default=2,
-        choices=[0, 1, 2, 3],
-        help="flash attention optimization",
+        default=(2, 1),
+        help="FlashAttention optimization switches: "
+        "1st int = Prefill/Decode model switch (0=off, 1/2=on), "
+        "2nd int = ViT/Audio model switch (0=off, 1=on); "
+        "e.g., --flash_attention 2 1 (prefill&decode=2, ViT&Audio=1)",
     )
 
     args = parser.parse_args()
-    if args.context_length < 2048:
-        args.flash_attention = 3
+    args.flash_attention = _validate_adjust_flash_attention(
+        args.flash_attention, args.context_length
+    )
     return args
 
 
@@ -181,7 +209,7 @@ def build_llm_tts(
 
         kwargs["modify_llm"] = {}
         kwargs["enable_xh2_stable_output"] = tso
-        if flash_attention > 0 and flash_attention < 3:
+        if flash_attention:
             kwargs["flash_attention"] = flash_attention
             custom_msg["flash_attention"] = flash_attention
         if ndevice:
@@ -219,17 +247,16 @@ def build_other_all(
     import tcim
 
     kwargs = {}
-    if HOUMO_TARGET == "xh2" and flash_attention > 0:
+    if HOUMO_TARGET == "xh2" and flash_attention:
         import json
 
-        flash_attention = 1
         kwargs["flash_attention"] = flash_attention
-        custom_msg = dict()
+        custom_msg = {}
         custom_msg["flash_attention"] = flash_attention
         kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
-    print(f"\n===> {model_name} build start...")
+    print(f"\n===> {model_name} build start... \n kwargs:{kwargs}")
     decode_model = os.path.join(model_dir, model_path)
     tcim.build_from_hmonnx(
         decode_model,
@@ -358,6 +385,7 @@ if __name__ == "__main__":
     context_length = args.context_length
     model_size = args.model_size
     j = args.j
+    llm_flash_attention, other_flash_attention = args.flash_attention
 
     nblocks = 28
     profile = {}
@@ -381,7 +409,7 @@ if __name__ == "__main__":
             ndevice,
             context_length,
             j,
-            flash_attention=args.flash_attention,
+            flash_attention=llm_flash_attention,
             prefill_length=args.prefill_length,
         )
         build_llm_tts(
@@ -394,7 +422,7 @@ if __name__ == "__main__":
             ndevice,
             context_length,
             j,
-            flash_attention=args.flash_attention,
+            flash_attention=llm_flash_attention,
             prefill_length=args.prefill_length,
         )
         build_llm_tts(
@@ -407,7 +435,7 @@ if __name__ == "__main__":
             ndevice,
             2048,
             j,
-            flash_attention=args.flash_attention,
+            flash_attention=llm_flash_attention,
             prefill_length=args.prefill_length,
         )
         build_llm_tts(
@@ -420,7 +448,7 @@ if __name__ == "__main__":
             ndevice,
             2048,
             j,
-            flash_attention=args.flash_attention,
+            flash_attention=llm_flash_attention,
             prefill_length=args.prefill_length,
         )
         build_other_all(
@@ -431,7 +459,7 @@ if __name__ == "__main__":
             profile,
             ncore,
             j,
-            flash_attention=args.flash_attention,
+            flash_attention=other_flash_attention,
         )
         build_other_all(
             "minicpmo_audio",
@@ -441,7 +469,7 @@ if __name__ == "__main__":
             profile,
             ncore,
             j,
-            flash_attention=args.flash_attention,
+            flash_attention=other_flash_attention,
         )
         model_path = "hmquant_dvae_part1_with_act.onnx"
         build_other_all(
@@ -463,7 +491,7 @@ if __name__ == "__main__":
             ncore,
             j,
         )
-        model_path = f"hmquant_vocos_with_act.onnx"
+        model_path = "hmquant_vocos_with_act.onnx"
         build_other_all(
             "minicpmo_vocos",
             os.path.join(model_dir, "vocos"),
