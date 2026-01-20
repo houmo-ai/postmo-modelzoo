@@ -53,7 +53,11 @@ enum class PerfType {
   VISION_PREPROCESS_TIME = 13,
   VISION_INPUT_TIME = 14,
   VISION_INFER_TIME = 15,
-  VISION_OUTPUT_TIME = 16
+  VISION_OUTPUT_TIME = 16,
+
+  PREFILL_LOAD_TIME = 17,
+  DECODE_LOAD_TIME = 18,
+  VISION_LOAD_TIME = 19
 };
 
 // Performance information structure (corresponds to Python's PerfInformations)
@@ -195,6 +199,12 @@ class InferencePerformanceTracker {
   InferenceMetrics total_metrics;
   InferenceMetrics average_metrics;
   size_t num_collected_runs = 0;
+  double prefill_load_time = 0.0;
+  double decode_load_time = 0.0;
+  double vision_load_time = 0.0;
+  double prefill_load_time_start = 0.0;
+  double decode_load_time_start = 0.0;
+  double vision_load_time_start = 0.0;
 
   // Helper function: Get current timestamp (seconds)
   double getCurrentTime() const;

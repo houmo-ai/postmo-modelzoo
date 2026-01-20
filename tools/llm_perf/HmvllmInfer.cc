@@ -27,6 +27,7 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
                          const std::string &embeddingWeightPath,
                          const std::string &vitModelPath, int ndevices,
                          int batches, bool LazyMode) {
+  perf_tracker = std::make_shared<InferencePerformanceTracker>();
   this->prefillModelPath = prefillModelPath;
   this->decodeModelPath = decodeModelPath;
   this->vitModelPath = vitModelPath;
@@ -57,7 +58,9 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   }
   // init module
   prefill_module = std::make_shared<tcim::Module>();
+  perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);
   prefill_module->LoadModel(prefillModelPath, option_prefill);
+  perf_tracker->perfEnd(PerfType::PREFILL_LOAD_TIME);
 
   int n_blocks = get_nblocks();
   for (int i = 0; i < n_blocks; i++) {
@@ -73,10 +76,14 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   }
 
   decode_module = std::make_shared<tcim::Module>();
+  perf_tracker->perfStart(PerfType::DECODE_LOAD_TIME);
   decode_module->LoadModel(decodeModelPath, option_decode);
+  perf_tracker->perfEnd(PerfType::DECODE_LOAD_TIME);
 
   vit_module = std::make_shared<tcim::Module>();
+  perf_tracker->perfStart(PerfType::VISION_LOAD_TIME);
   vit_module->LoadModel(vitModelPath, option_vit);
+  perf_tracker->perfEnd(PerfType::VISION_LOAD_TIME);
 
   attn_idx_start = get_attn_idx_start();
 
@@ -122,8 +129,6 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   // DebugModelInfo(*prefill_module.get(), prefillModelPath);
   // DebugModelInfo(*decode_module.get(), decodeModelPath);
   // DebugModelInfo(*vit_module.get(), vitModelPath);
-
-  perf_tracker = std::make_shared<InferencePerformanceTracker>();
 }
 
 void HmvllmInfer::DebugModelInfo(tcim::Module &module,

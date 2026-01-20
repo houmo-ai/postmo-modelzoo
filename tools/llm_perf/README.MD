@@ -273,167 +273,111 @@ rem 需要结合用户目录更改三四行的环境变量实际路径
 ```
 
 结果示例：
-./llm_perf --prefill qwen3_b4/qwen3_prefill.hmm --decode qwen3_b4/qwen3_decode.hmm --embedding qwen3_b4/hmquant/quant_embedding.bin --input 256 --stop 256 --batch 4 --loop 2
+./llm_perf --prefill qwen3-8b/output/xh2/qwen3_prefill.hmm --decode qwen3-8b/output/xh2/qwen3_decode.hmm --embedding qwen3-8b/output/xh2/hmquant/quant_embedding.bin --input 256 --stop 200 --no_warm_up
 ```bash
 Started monitor thread for device 0
 ========================= Perf Settings =========================
-prefill path : qwen3_b4/qwen3_prefill.hmm
-decode path : qwen3_b4/qwen3_decode.hmm
-embedding path : qwen3_b4/hmquant/quant_embedding.bin
+prefill path :qwen3-8b/output/xh2/qwen3_prefill.hmm
+decode path : qwen3-8b/output/xh2/qwen3_decode.hmm
+embedding path : qwen3-8b/output/xh2/hmquant/quant_embedding.bin
 input token len : 256
-stop token len : 256
+stop token len : 200
 ndevices : 1
-loop : 2
-batch : 4
-warm_up : enable
+loop : 1
+batch : 1
+warm_up : disable
 LazyMode : disable
 =================================================================
 Online device num: 2
 Online device id: 0, mem_total: 24448, mem_used: 0, mem_avail: 24448
 Online device id: 1, mem_total: 24448, mem_used: 0, mem_avail: 24448
-Multi batch Use Devices 0
-[2026-01-16 10:23:08.180] [tid 6765] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-01-16 10:23:08.180] [tid 6765] [warning] Empty backend name, use Xh2HalBackend instead.
-[2026-01-16 10:23:08.540] [info] DEVICE-0 Logger initialization complete, log file: ./device_logs/device_0.log
+Use Devices 0
+[2026-01-20 09:34:11.143] [tid 1870] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-01-20 09:34:11.143] [tid 1870] [warning] Empty backend name, use Xh2HalBackend instead.
+[2026-01-20 09:34:12.494] [info] DEVICE-0 Logger initialization complete, log file: ./device_logs/device_0.log
 Online device num: 2
-Online device id: 0, mem_total: 24448, mem_used: 15757, mem_avail: 8691
+Online device id: 0, mem_total: 24448, mem_used: 4786, mem_avail: 19662
 Online device id: 1, mem_total: 24448, mem_used: 0, mem_avail: 24448
 ****** HM Device Memory Usage ******
-Device id: 0, memory used: 15757 MB
+Device id: 0, memory used: 4786 MB
 Device id: 1, memory used: 0 MB
 ************************************
 
-==============================(v)LLM Perf WarmUp: input 256, output 256==============================
-Decode: 100% |**************************************************| 256/256
+==============================(v)LLM Perf Loop Progress: 1/1==============================
+ Device temperature: 32.771 °C
+Decode: 100% |**************************************************| 200/200
 ==================================================================================
                     Model Inference Performance Summary Report
 ==================================================================================
 Configuration Details:
-  Batch Size:      4
+  Batch Size:      1
   Input Length per Sample:    256 tokens
-  Output Length per Sample:    256 tokens
+  Output Length per Sample:    200 tokens
+  Prefill Model Load Time: 3906.60ms
+  Decode Model Load Time:  280.89ms
+  Vision Model Load Time:    0.00ms
 Prefill Stage Performance:
-  Total Time:  581.04ms | Speed: 1762.35 tokens/s
+  Total Time:  170.67ms | Speed: 1499.99 tokens/s
   Tokenization Time: Skipped (No operation)
-  Embedding Time:    2.50ms
-  API SetInput Time:   6.51ms
-  API Inference Time: 565.95ms | Speed: 1809.33 tokens/s
-  API GetOutput Time:  5.88ms
+  Embedding Time:    0.29ms
+  API SetInput Time:   0.73ms
+  API Inference Time: 169.24ms | Speed: 1512.65 tokens/s
+  API GetOutput Time:  0.41ms
 Decode Stage Performance:
-  Total Time: 22809.89ms | Speed:   44.89 tokens/s
+  Total Time: 10110.99ms | Speed:   19.78 tokens/s
   Tokenization Time: Skipped (No operation)
-  Embedding Time:    2.17ms
-  API SetInput Time:   0.21ms/token
-  API Inference Time: 20.77ms/token | Speed:   48.14 tokens/s
-  API GetOutput Time:  1.27ms/token
+  Embedding Time:    0.06ms
+  API SetInput Time:   0.22ms/token
+  API Inference Time: 49.84ms/token | Speed:   20.06 tokens/s
+  API GetOutput Time:  0.50ms/token
 Overall Performance Metrics:
-  TTFT (Time To First Token):  581.04 ms
-  TPOT (Time Per Output Token): 22.28 ms/token
-  E2E Latency (End-to-End):     23.41 seconds
-  E2E TPS (Throughput):         43.75 tokens/s
-==================================================================================
-==================================================================================
-
-==============================(v)LLM Perf Loop Progress: 1/2==============================
-Decode: 100% |**************************************************| 256/256
-==================================================================================
-                    Model Inference Performance Summary Report
-==================================================================================
-Configuration Details:
-  Batch Size:      4
-  Input Length per Sample:    256 tokens
-  Output Length per Sample:    256 tokens
-Prefill Stage Performance:
-  Total Time:  580.94ms | Speed: 1762.67 tokens/s
-  Tokenization Time: Skipped (No operation)
-  Embedding Time:    3.17ms
-  API SetInput Time:   6.56ms
-  API Inference Time: 564.80ms | Speed: 1813.03 tokens/s
-  API GetOutput Time:  6.17ms
-Decode Stage Performance:
-  Total Time: 22803.51ms | Speed:   44.91 tokens/s
-  Tokenization Time: Skipped (No operation)
-  Embedding Time:    1.96ms
-  API SetInput Time:   0.21ms/token
-  API Inference Time: 20.77ms/token | Speed:   48.16 tokens/s
-  API GetOutput Time:  1.27ms/token
-Overall Performance Metrics:
-  TTFT (Time To First Token):  580.94 ms
-  TPOT (Time Per Output Token): 22.27 ms/token
-  E2E Latency (End-to-End):     23.40 seconds
-  E2E TPS (Throughput):         43.76 tokens/s
-==================================================================================
-==================================================================================
-
-==============================(v)LLM Perf Loop Progress: 2/2==============================
-Decode: 100% |**************************************************| 256/256
-==================================================================================
-                    Model Inference Performance Summary Report
-==================================================================================
-Configuration Details:
-  Batch Size:      4
-  Input Length per Sample:    256 tokens
-  Output Length per Sample:    256 tokens
-Prefill Stage Performance:
-  Total Time:  578.46ms | Speed: 1770.21 tokens/s
-  Tokenization Time: Skipped (No operation)
-  Embedding Time:    2.50ms
-  API SetInput Time:   5.90ms
-  API Inference Time: 564.94ms | Speed: 1812.58 tokens/s
-  API GetOutput Time:  4.93ms
-Decode Stage Performance:
-  Total Time: 22617.93ms | Speed:   45.27 tokens/s
-  Tokenization Time: Skipped (No operation)
-  Embedding Time:    2.23ms
-  API SetInput Time:   0.15ms/token
-  API Inference Time: 20.68ms/token | Speed:   48.35 tokens/s
-  API GetOutput Time:  1.24ms/token
-Overall Performance Metrics:
-  TTFT (Time To First Token):  578.46 ms
-  TPOT (Time Per Output Token): 22.09 ms/token
-  E2E Latency (End-to-End):     23.21 seconds
-  E2E TPS (Throughput):         44.12 tokens/s
+  TTFT (Time To First Token):  170.67 ms
+  TPOT (Time Per Output Token): 50.55 ms/token
+  E2E Latency (End-to-End):     10.29 seconds
+  E2E TPS (Throughput):         19.44 tokens/s
 ==================================================================================
 ==================================================================================
 ============================== (v)LLM Perf Avarage Information ==============================
-23.2146.61
+
 ==================================================================================
                     Model Inference Performance Summary Report
 ==================================================================================
 Configuration Details:
-  Batch Size:      4
+  Batch Size:      1
   Input Length per Sample:    256 tokens
-  Output Length per Sample:    256 tokens
+  Output Length per Sample:    200 tokens
+  Prefill Model Load Time: 3906.60ms
+  Decode Model Load Time:  280.89ms
+  Vision Model Load Time:    0.00ms
 Prefill Stage Performance:
-  Total Time:  579.70ms | Speed: 1766.43 tokens/s
+  Total Time:  170.67ms | Speed: 1499.99 tokens/s
   Tokenization Time: Skipped (No operation)
-  Embedding Time:    2.83ms
-  API SetInput Time:   6.23ms
-  API Inference Time: 564.87ms | Speed: 1812.81 tokens/s
-  API GetOutput Time:  5.55ms
+  Embedding Time:    0.29ms
+  API SetInput Time:   0.73ms
+  API Inference Time: 169.24ms | Speed: 1512.65 tokens/s
+  API GetOutput Time:  0.41ms
 Decode Stage Performance:
-  Total Time: 22710.72ms | Speed:   45.09 tokens/s
+  Total Time: 10110.99ms | Speed:   19.78 tokens/s
   Tokenization Time: Skipped (No operation)
-  Embedding Time:    2.10ms
-  API SetInput Time:   0.18ms/token
-  API Inference Time: 20.72ms/token | Speed:   48.26 tokens/s
-  API GetOutput Time:  1.25ms/token
+  Embedding Time:    0.06ms
+  API SetInput Time:   0.22ms/token
+  API Inference Time: 49.84ms/token | Speed:   20.06 tokens/s
+  API GetOutput Time:  0.50ms/token
 Overall Performance Metrics:
-  TTFT (Time To First Token):  579.70 ms
-  TPOT (Time Per Output Token): 22.18 ms/token
-  E2E Latency (End-to-End):     23.31 seconds
-  E2E TPS (Throughput):         43.94 tokens/s
+  TTFT (Time To First Token):  170.67 ms
+  TPOT (Time Per Output Token): 50.55 ms/token
+  E2E Latency (End-to-End):     10.29 seconds
+  E2E TPS (Throughput):         19.44 tokens/s
 ==================================================================================
 ==========================================================================================
 
 ==================================================================================
                                     Device 0 Monitor Summary Report
 ==================================================================================
-Temperature         |  32.19°C(Min)      |  46.78°C(Max)      |  42.42°C(Avg)      |
-Power               |  8.21 W(Min)       |  16.57 W(Max)      |  14.62 W(Avg)      |
+Temperature         |  30.74°C(Min)      |  42.92°C(Max)      |  38.29°C(Avg)      |
+Power               |  12.56 W(Min)      |  22.72 W(Max)      |  17.03 W(Avg)      |
 IPU Freq            |  1400.00 Mhz(Min)  |  1400.00 Mhz(Max)  |  1400.00 Mhz(Avg)  |
 Mem Info            |  24448 MB(Total)   |  4786 MB(Used)     |  19662 MB(Avail)   |
-############################################# End of Task 3, All Task:3,  ModelName:"qwen3-vl".#############################################
 ```
 
 ## 3.免责声明

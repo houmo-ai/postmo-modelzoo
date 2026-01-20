@@ -26,6 +26,7 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
     const std::string &prefillModelPath, const std::string &decodeModelPath,
     const std::string &embeddingWeightPath, int ndevices, int batches,
     bool LazyMode) {
+  perf_tracker = std::make_shared<InferencePerformanceTracker>();
   this->prefillModelPath = prefillModelPath;
   this->decodeModelPath = decodeModelPath;
 
@@ -57,9 +58,13 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
   }
   // Initialize Module - Load prefill and decode models
   prefill_module = std::make_shared<tcim::Module>();
+  perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);
   prefill_module->LoadModel(prefillModelPath, option_prefill);
+  perf_tracker->perfEnd(PerfType::PREFILL_LOAD_TIME);
   decode_module = std::make_shared<tcim::Module>();
+  perf_tracker->perfStart(PerfType::DECODE_LOAD_TIME);
   decode_module->LoadModel(decodeModelPath, option_decode);
+  perf_tracker->perfEnd(PerfType::DECODE_LOAD_TIME);
 
   // Get number of blocks in the model and create dummy names for cache inputs
   n_blocks = get_nblocks();
@@ -122,8 +127,7 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
   // Initialize embedding module with the specified parameters
   embedding = std::make_shared<HmEmbedding>(
       embeddingWeightPath, this->embedding_length, this->prefill_length);
-
-  perf_tracker = std::make_shared<InferencePerformanceTracker>();
+  perf_tracker->reset();
 }
 
 int HmllmInferMultiBatch::get_nblocks() {
