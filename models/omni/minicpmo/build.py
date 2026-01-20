@@ -169,11 +169,11 @@ def get_args() -> argparse.Namespace:
         dest="flash_attention",
         nargs=2,
         type=int,
-        default=(2, 1),
+        default=(2, 0),
         help="FlashAttention optimization switches: "
         "1st int = Prefill/Decode model switch (0=off, 1/2=on), "
         "2nd int = ViT/Audio model switch (0=off, 1=on); "
-        "e.g., --flash_attention 2 1 (prefill&decode=2, ViT&Audio=1)",
+        "e.g., --flash_attention 2 0 (prefill&decode=2, ViT&Audio=0)",
     )
 
     args = parser.parse_args()
@@ -435,7 +435,6 @@ if __name__ == "__main__":
             ndevice,
             2048,
             j,
-            flash_attention=llm_flash_attention,
             prefill_length=args.prefill_length,
         )
         build_llm_tts(
@@ -448,7 +447,6 @@ if __name__ == "__main__":
             ndevice,
             2048,
             j,
-            flash_attention=llm_flash_attention,
             prefill_length=args.prefill_length,
         )
         build_other_all(
@@ -459,7 +457,6 @@ if __name__ == "__main__":
             profile,
             ncore,
             j,
-            flash_attention=other_flash_attention,
         )
         build_other_all(
             "minicpmo_audio",
@@ -469,7 +466,6 @@ if __name__ == "__main__":
             profile,
             ncore,
             j,
-            flash_attention=other_flash_attention,
         )
         model_path = "hmquant_dvae_part1_with_act.onnx"
         build_other_all(
