@@ -301,13 +301,18 @@ class Qwen3VL:
         tokenizer_dir,
         embedding_path,
     ):
+        self.perf_tracker = InferencePerformanceTracker()
         weight_manager = tcim.runtime.WeightManager(0)
         option0 = tcim.runtime.Option(weight_manager)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
+        self.perf_tracker.perf_start(PERFTYPE.VISION_LOAD_TIME)
         self.vit_model = tcim.runtime.load(os.path.join(vit_path), option=option0)
+        self.perf_tracker.perf_end(PERFTYPE.VISION_LOAD_TIME)
         logger.info("vit model loaded")
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)
         self.prefill = tcim.runtime.load(os.path.join(prefill_path), option=option1)
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_LOAD_TIME)
         logger.info("prefill model loaded")
         self.input_names = self.get_input_names()
         dummy_tensor_names = []
@@ -315,7 +320,9 @@ class Qwen3VL:
             if "model_layers" in input_name:
                 dummy_tensor_names.append(input_name)
         option1.set_dummy_tensors(dummy_tensor_names)
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_LOAD_TIME)
         self.decode = tcim.runtime.load(os.path.join(decode_path), option=option2)
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_LOAD_TIME)
         logger.info("decode model loaded")
         self.samplingmanager = SamplingManager(
             temperature=args.temperature,
@@ -367,7 +374,8 @@ class Qwen3VL:
         if HOUMO_TARGET == "xh2":
             self.embedding = self.embedding.weight
         self.hidden_dims = self.embedding.shape[-1]
-        self.perf_tracker = InferencePerformanceTracker()
+
+        self.perf_tracker.reset_perf_time()
     def get_input_names(self):
         input_names = []
         for i in range(self.prefill.get_num_inputs()):

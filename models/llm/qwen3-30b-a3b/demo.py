@@ -110,6 +110,7 @@ class HmQwenXh2:
     def __init__(
         self, prefill_path, decode_path, embedding_path, tokenizer_dir, ndevice
     ):
+        self.perf_tracker = InferencePerformanceTracker()
         self.ndevice = ndevice
         if self.ndevice == 1:
             weight_manager = tcim.runtime.WeightManager(0)
@@ -120,7 +121,10 @@ class HmQwenXh2:
             raise ValueError("Unsupport device number!")
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)
         self.prefill = tcim.runtime.load(prefill_path, option=option1)
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_LOAD_TIME)
+
         logger.info("prefill model loaded")
         self.nblocks = self.get_nblocks()
         dummy_tensor_names = [
@@ -130,7 +134,9 @@ class HmQwenXh2:
             f"model_layers_{i}_self_attn_vcache_input" for i in range(self.nblocks)
         ]
         option2.set_dummy_tensors(dummy_tensor_names)
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_LOAD_TIME)
         self.decode = tcim.runtime.load(decode_path, option=option2)
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_LOAD_TIME)
         logger.info("decode model loaded")
         self.prefill_length = self.prefill.get_input_info(
             self.prefill.get_input_name(0)
@@ -158,7 +164,8 @@ class HmQwenXh2:
             embedding_path, map_location="cpu", weights_only=True
         )["weight"]
         self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len)
-        self.perf_tracker = InferencePerformanceTracker()
+        self.perf_tracker.reset_perf_time()
+
     def get_nblocks(self):
         input_names = []
         for i in range(self.prefill.get_num_inputs()):
