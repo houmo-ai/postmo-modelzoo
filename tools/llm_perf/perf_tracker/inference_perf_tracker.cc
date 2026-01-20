@@ -88,6 +88,15 @@ void InferencePerformanceTracker::setStartTime(PerfType perf_type) {
     case PerfType::VISION_OUTPUT_TIME:
       current_metrics.vision_perf_infos.getoutput_time_start = now;
       break;
+    case PerfType::PREFILL_LOAD_TIME:
+      prefill_load_time_start = now;
+      break;
+    case PerfType::DECODE_LOAD_TIME:
+      decode_load_time_start = now;
+      break;
+    case PerfType::VISION_LOAD_TIME:
+      vision_load_time_start = now;
+      break;
 
     default:
       throw std::invalid_argument("Invalid PerfType for setStartTime");
@@ -133,6 +142,12 @@ double InferencePerformanceTracker::getStartTime(PerfType perf_type) const {
       return current_metrics.vision_perf_infos.infer_time_start;
     case PerfType::VISION_OUTPUT_TIME:
       return current_metrics.vision_perf_infos.getoutput_time_start;
+    case PerfType::PREFILL_LOAD_TIME:
+      return prefill_load_time_start;
+    case PerfType::DECODE_LOAD_TIME:
+      return decode_load_time_start;
+    case PerfType::VISION_LOAD_TIME:
+      return vision_load_time_start;
 
     default:
       throw std::invalid_argument("Invalid PerfType for getStartTime");
@@ -195,6 +210,15 @@ void InferencePerformanceTracker::accumulateTime(PerfType perf_type,
       break;
     case PerfType::VISION_OUTPUT_TIME:
       current_metrics.vision_perf_infos.getoutput_time += time_diff_ms;
+      break;
+    case PerfType::PREFILL_LOAD_TIME:
+      prefill_load_time += time_diff_ms;
+      break;
+    case PerfType::DECODE_LOAD_TIME:
+      decode_load_time += time_diff_ms;
+      break;
+    case PerfType::VISION_LOAD_TIME:
+      vision_load_time += time_diff_ms;
       break;
 
     default:
@@ -424,6 +448,18 @@ void InferencePerformanceTracker::showSummary(bool average) {
   if (metrics.num_images > 0) {
     std::cout << "  Number of Images: " << std::setw(6) << metrics.num_images
               << " images" << std::endl;
+  }
+  if (prefill_load_time > 0) {
+    std::cout << "  Prefill Model Load Time: " << std::setw(7)
+              << prefill_load_time << "ms" << std::endl;
+  }
+  if (decode_load_time > 0) {
+    std::cout << "  Decode Model Load Time: " << std::setw(7)
+              << decode_load_time << "ms" << std::endl;
+  }
+  if (prefill_load_time > 0) {
+    std::cout << "  Vision Model Load Time: " << std::setw(7)
+              << vision_load_time << "ms" << std::endl;
   }
 
   // Vision stage performance (if any)

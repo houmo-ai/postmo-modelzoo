@@ -35,6 +35,7 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
                        const std::string &decodeModelPath,
                        const std::string &embeddingWeightPath, int ndevices,
                        int batches, bool LazyMode) {
+  perf_tracker = std::make_shared<InferencePerformanceTracker>();
   this->prefillModelPath = prefillModelPath;
   this->decodeModelPath = decodeModelPath;
   // Create weightManager
@@ -64,7 +65,9 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   }
   // Initialize prefill module and load the model
   prefill_module = std::make_shared<tcim::Module>();
+  perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);
   prefill_module->LoadModel(prefillModelPath, option_prefill);
+  perf_tracker->perfEnd(PerfType::PREFILL_LOAD_TIME);
   // Get number of blocks in the model and create dummy names for cache inputs
   int n_blocks = get_nblocks();
   for (int i = 0; i < n_blocks; i++) {
@@ -82,7 +85,9 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   // Set dummy tensors for the decode module
   option_decode.SetDummyTensors(dummy_names);
   decode_module = std::make_shared<tcim::Module>();
+  perf_tracker->perfStart(PerfType::DECODE_LOAD_TIME);
   decode_module->LoadModel(decodeModelPath, option_decode);
+  perf_tracker->perfEnd(PerfType::DECODE_LOAD_TIME);
 
   // Get model configuration parameters
   attn_idx_start = get_attn_idx_start();
@@ -128,8 +133,7 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
       embeddingWeightPath, this->embedding_length, this->prefill_length);
   // DebugModelInfo(*prefill_module.get(), prefillModelPath);
   // DebugModelInfo(*decode_module.get(), decodeModelPath);
-
-  perf_tracker = std::make_shared<InferencePerformanceTracker>();
+  perf_tracker->reset();
 }
 
 int HmllmInfer::get_attn_idx_start() {
@@ -381,10 +385,6 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len,
     perf_tracker->perfStart(PerfType::PREFILL_EMBED_TIME);
     input_datas = embedding->EmbeddingTokens(input_ids);
     perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
-    for (int k = 0; k < input_ids.size(); k++) {
-      std::cout << input_ids[k] << " ";
-    }
-    std::cout << std::endl;
 
     perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
     PrefillSetInputDatas(input_datas, valid_length, current_length);
