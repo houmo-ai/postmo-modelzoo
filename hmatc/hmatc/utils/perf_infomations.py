@@ -46,6 +46,10 @@ class PERFTYPE(IntEnum):
     VISION_INFER_TIME       = 15
     VISION_OUTPUT_TIME      = 16
 
+    PREFILL_LOAD_TIME = 17
+    DECODE_LOAD_TIME  = 18
+    VISION_LOAD_TIME  = 19
+
 @dataclass
 class PerfInformations:
     # Time statistics (ms)
@@ -107,6 +111,12 @@ class InferenceMetrics:
     tpot: float = 0.0             # Time per output token (ms/token)
     e2e_time: float = 0.0
     e2e_tps: float = 0.0          # End-to-end token throughput (tokens/s)
+    prefill_load_time: float = 0.0
+    prefill_load_time_start: float = 0.0
+    decode_load_time: float = 0.0
+    decode_load_time_start: float = 0.0
+    vision_load_time: float = 0.0
+    vision_load_time_start: float = 0.0
 
 class InferencePerformanceTracker:
     """
@@ -141,6 +151,9 @@ class InferencePerformanceTracker:
             PERFTYPE.VISION_INPUT_TIME: lambda: setattr(self.current_metrics.vision_perf_infos, 'setinput_time_start', time.time()),
             PERFTYPE.VISION_INFER_TIME: lambda: setattr(self.current_metrics.vision_perf_infos, 'infer_time_start', time.time()),
             PERFTYPE.VISION_OUTPUT_TIME: lambda: setattr(self.current_metrics.vision_perf_infos, 'getoutput_time_start', time.time()),
+            PERFTYPE.PREFILL_LOAD_TIME: lambda: setattr(self.current_metrics, 'prefill_load_time_start', time.time()),
+            PERFTYPE.DECODE_LOAD_TIME: lambda: setattr(self.current_metrics, 'decode_load_time_start', time.time()),
+            PERFTYPE.VISION_LOAD_TIME: lambda: setattr(self.current_metrics, 'vision_load_time_start', time.time())
         }
 
         # Mapping for perf_end operations
@@ -162,6 +175,9 @@ class InferencePerformanceTracker:
             PERFTYPE.VISION_INPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'setinput_time', getattr(self.current_metrics.vision_perf_infos, 'setinput_time') + time_diff_ms),
             PERFTYPE.VISION_INFER_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'infer_time', getattr(self.current_metrics.vision_perf_infos, 'infer_time') + time_diff_ms),
             PERFTYPE.VISION_OUTPUT_TIME: lambda time_diff_ms: setattr(self.current_metrics.vision_perf_infos, 'getoutput_time', getattr(self.current_metrics.vision_perf_infos, 'getoutput_time') + time_diff_ms),
+            PERFTYPE.PREFILL_LOAD_TIME: lambda time_diff_ms: setattr(self.current_metrics, 'prefill_load_time', getattr(self.current_metrics, 'prefill_load_time') + time_diff_ms),
+            PERFTYPE.DECODE_LOAD_TIME: lambda time_diff_ms: setattr(self.current_metrics, 'decode_load_time', getattr(self.current_metrics, 'decode_load_time') + time_diff_ms),
+            PERFTYPE.VISION_LOAD_TIME: lambda time_diff_ms: setattr(self.current_metrics, 'vision_load_time', getattr(self.current_metrics, 'vision_load_time') + time_diff_ms)
         }
 
         # Mapping for getting start times
@@ -183,6 +199,9 @@ class InferencePerformanceTracker:
             PERFTYPE.VISION_INPUT_TIME: lambda: self.current_metrics.vision_perf_infos.setinput_time_start,
             PERFTYPE.VISION_INFER_TIME: lambda: self.current_metrics.vision_perf_infos.infer_time_start,
             PERFTYPE.VISION_OUTPUT_TIME: lambda: self.current_metrics.vision_perf_infos.getoutput_time_start,
+            PERFTYPE.PREFILL_LOAD_TIME: lambda: self.current_metrics.prefill_load_time_start,
+            PERFTYPE.DECODE_LOAD_TIME: lambda: self.current_metrics.decode_load_time_start,
+            PERFTYPE.VISION_LOAD_TIME: lambda: self.current_metrics.vision_load_time_start
         }
 
     def perf_start(self, perf_type: PERFTYPE):
@@ -283,6 +302,12 @@ class InferencePerformanceTracker:
         self.current_metrics.num_images = num_images
         self.current_metrics.e2e_time = time.time() - self.current_metrics.e2e_time
 
+    def reset_perf_time(self):
+        self.current_metrics.e2e_time = time.time()
+        for perf_type in self.start_time_mapping:
+            if perf_type < PERFTYPE.PREFILL_LOAD_TIME:
+                self.start_time_mapping[perf_type]()
+
     def show_summary(self) -> None:
         """Print formatted performance summary report"""
         self.calculate_metrics()
@@ -299,6 +324,13 @@ class InferencePerformanceTracker:
         logger.success(f"  Output Length per Sample: {(metrics.output_seq_length + 1):>6} tokens")
         if metrics.num_images > 0:
             logger.success(f"  Number of Images: {metrics.num_images:>6} images")
+
+        if metrics.prefill_load_time > 0:
+            logger.success(f"  Prefill Model Load Time: {metrics.prefill_load_time:>7.2f}ms")
+        if metrics.decode_load_time > 0:
+            logger.success(f"  Decode Model Load Time: {metrics.decode_load_time:>7.2f}ms")
+        if metrics.vision_load_time > 0:
+            logger.success(f"  Vision Model Load Time: {metrics.vision_load_time:>7.2f}ms")
 
         # Vision Stage Performance (if applicable)
         if metrics.num_images > 0 and (metrics.vision_perf_infos.vision_total_time > 0 or

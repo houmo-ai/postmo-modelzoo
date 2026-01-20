@@ -117,11 +117,16 @@ def get_args() -> argparse.Namespace:
 
 class HmQwenXh2:
     def __init__(self, prefill_path, decode_path, embedding_path, tokenizer_dir, isl, osl):
+        self.perf_tracker = InferencePerformanceTracker()
         weight_manager = tcim.runtime.WeightManager(0)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)
         self.prefill = tcim.runtime.load(prefill_path, option=option1)
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_LOAD_TIME)
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_LOAD_TIME)
         self.decode = tcim.runtime.load(decode_path, option=option2)
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_LOAD_TIME)
         self.nblocks = self.get_nblocks()
         dummy_tensor_names = [
             f'model_layers_{i}_self_attn_kcache_input' for i in range(self.nblocks)
@@ -167,8 +172,8 @@ class HmQwenXh2:
                 f"Context length exceeds maximum limit {self.context_max_length}, please reduce input/output sequence length!"
             )
             sys.exit(1)
+        self.perf_tracker.reset_perf_time()
 
-        self.perf_tracker = InferencePerformanceTracker()
 
     def get_nblocks(self):
         input_names = []
