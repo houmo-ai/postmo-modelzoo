@@ -858,6 +858,8 @@ if __name__ == "__main__":
                 "ndevices": device_num if device_num > 1 else 1,
                 "loop": 2,
                 "batch": batch,
+                "model_name": model_name,
+                "quant_models": host_quant_model,
             }
             if context_len < (2048 + 256) and context_len >= (1024 + 256):
                 new_stream["stop"] = 1024

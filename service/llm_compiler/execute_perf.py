@@ -830,7 +830,7 @@ def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
         tmp_cmd = ["./llm_perf"]
         # Filter parameters
         for param, param_val in perf_md.items():
-            if param in ["ModelName"]:
+            if param in ["ModelName", "model_name", "quant_models"]:
                 continue
             tmp_cmd += [f"--{param}", str(param_val)]
         cmds[perf_md["ModelName"]] = tmp_cmd
@@ -864,7 +864,7 @@ def _build_tcim_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
         tmp_cmd = ["./tcim_perf"]
         # Filter parameters
         for param, param_val in perf_md.items():
-            if param in ["hmm_list", "ModelName"] or (
+            if param in ["hmm_list", "ModelName", "model_name", "quant_models"] or (
                 isinstance(param_val, int) and param_val <= 0
             ):
                 continue
