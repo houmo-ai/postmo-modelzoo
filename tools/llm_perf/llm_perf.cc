@@ -45,7 +45,9 @@
 #define SHUTDOWN_TEMPERATURE_THRESHOLD 100
 
 int RunPerf(std::unordered_map<std::string, std::string> args) {
-  std::thread device_monitor_thread(device_monitor);
+  int interval =
+      args.count("interval") ? validate_setting(args, "interval") : 1;
+  std::thread device_monitor_thread(device_monitor, 0, interval);
   try {
     fs::path prefill_path =
         validate_path(args, "prefill");  // the path of prefill model
@@ -178,7 +180,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
       Qwen3Infer->get_perf_tracker()->pref_delete_warmup();
       std::cout << std::string(82, '=') << "\n";
     }
-
+    get_mem_info(0);
     for (int i = 0; i < loop_round; ++i) {
       std::cout << COLOR_BLUE << "\n"
                 << std::string(30, '=')
@@ -211,12 +213,12 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
     std::cout << COLOR_GREEN << std::string(90, '=') << "\n";
     std::cout << COLOR_RESET;
     Qwen3Infer.reset();
-    stop_monitor();
+    stop_monitor(0);
     device_monitor_thread.join();
     return 0;
   } catch (const std::exception& e) {
     std::cerr << "Error: " << e.what() << std::endl;
-    stop_monitor();
+    stop_monitor(0);
     device_monitor_thread.join();
     return 1;
   }

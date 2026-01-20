@@ -43,6 +43,23 @@
 
 std::atomic<bool> g_running(true);
 std::atomic<float> g_temperature(0);
+std::atomic<uint64_t> g_times(0);
+
+std::atomic<float> g_temperature_max(0);
+std::atomic<float> g_temperature_min(0);
+std::atomic<float> g_temperature_avg(0);
+
+std::atomic<float> g_power_max(0);
+std::atomic<float> g_power_min(0);
+std::atomic<float> g_power_avg(0);
+
+std::atomic<float> g_ipu_freq_max(0);
+std::atomic<float> g_ipu_freq_min(0);
+std::atomic<float> g_ipu_freq_avg(0);
+
+std::atomic<uint32_t> g_mem_total(0);
+std::atomic<uint32_t> g_mem_used(0);
+std::atomic<uint32_t> g_mem_avail(0);
 
 std::mutex g_threads_mutex;
 std::vector<std::thread> g_monitor_threads;
@@ -159,7 +176,7 @@ struct Hm_monitor_infos {
  * different dev_index)
  * @param dev_index Device index
  */
-void hm_device_monitor_info(int dev_index) {
+void hm_device_monitor_info(int dev_index, uint32_t interval) {
 #ifdef _MSC_VER
   HMODULE hDll = LoadLibraryA("libhal_xh2a.dll");
   typedef int (*HM_SYS_CHECK_DEVICE_INDEX)(int dev_index);
@@ -193,15 +210,47 @@ void hm_device_monitor_info(int dev_index) {
     hm_infos.ipu_freq = (float)(freq) / 1000000.f;
     // 3. Print device monitoring log (automatically written to corresponding
     // device log file)
+    if (g_temperature_min.load() == 0)
+      g_temperature_min.store(hm_infos.temperature);
+    if (g_power_min.load() == 0) g_power_min.store(hm_infos.power);
+    if (g_ipu_freq_min.load() == 0) g_ipu_freq_min.store(hm_infos.ipu_freq);
+    g_temperature.store(hm_infos.temperature);
+    g_times.store(g_times.load() + 1);
+    g_temperature_max.store((hm_infos.temperature > g_temperature_max.load())
+                                ? hm_infos.temperature
+                                : g_temperature_max.load());
+    g_temperature_min.store((hm_infos.temperature < g_temperature_min.load())
+                                ? hm_infos.temperature
+                                : g_temperature_min.load());
+    g_temperature_avg.store((hm_infos.temperature +
+                             g_temperature_avg.load() * (g_times.load() - 1)) /
+                            g_times.load());
+    g_power_max.store((hm_infos.power > g_power_max.load())
+                          ? hm_infos.power
+                          : g_power_max.load());
+    g_power_min.store((hm_infos.power < g_power_min.load())
+                          ? hm_infos.power
+                          : g_power_min.load());
+    g_power_avg.store(
+        (hm_infos.power + g_power_avg.load() * (g_times.load() - 1)) /
+        g_times.load());
+    g_ipu_freq_max.store((hm_infos.ipu_freq > g_ipu_freq_max.load())
+                             ? hm_infos.ipu_freq
+                             : g_ipu_freq_max.load());
+    g_ipu_freq_min.store((hm_infos.ipu_freq < g_ipu_freq_min.load())
+                             ? hm_infos.ipu_freq
+                             : g_ipu_freq_min.load());
+    g_ipu_freq_avg.store(
+        (hm_infos.ipu_freq + g_ipu_freq_avg.load() * (g_times.load() - 1)) /
+        g_times.load());
     DEVICE_LOG_INFO(dev_index,
                     "Device_id: {:d}, Temperature: {:.2f}°C, BoardPower: "
                     "{:.2f}W, IPU Freq: "
                     "{:.2f}MHz",
                     hm_infos.dev_id, hm_infos.temperature, hm_infos.power,
                     hm_infos.ipu_freq);
-    g_temperature.store(hm_infos.temperature);
     // Simulate monitoring interval (adjust according to actual requirements)
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::seconds(interval));
   }
 }
 
@@ -226,17 +275,12 @@ void cleanup_resources() {
   spdlog::shutdown();
 }
 
-void device_monitor() {
+void device_monitor(int dev_id, uint32_t interval) {
   create_log_dir();
-  uint32_t dev_count = 1;
   {
     std::lock_guard<std::mutex> lock(g_threads_mutex);
-    for (uint32_t i = 0; i < dev_count; ++i) {
-      int dev_index = i;
-      g_monitor_threads.emplace_back(hm_device_monitor_info, dev_index);
-      std::cout << "Started monitor thread for device " << dev_index
-                << std::endl;
-    }
+    g_monitor_threads.emplace_back(hm_device_monitor_info, dev_id, interval);
+    std::cout << "Started monitor thread for device " << dev_id << std::endl;
   }
 
   for (auto& thread : g_monitor_threads) {
@@ -246,8 +290,66 @@ void device_monitor() {
   return;
 }
 
-void stop_monitor() { g_running = false; }
+void stop_monitor(int dev_id) {
+  std::cout << std::fixed << std::setprecision(2);
+  std::cout << "\n" << std::string(82, '=') << std::endl;
+  std::cout << std::string(36, ' ') << "Device " << dev_id
+            << " Monitor Summary Report " << std::endl;
+  std::cout << std::string(82, '=') << std::endl;
 
+  auto fmt = [](auto v, int prec, const char* unit) -> std::string {
+    std::ostringstream o;
+    o << std::fixed << std::setprecision(prec) << v << unit;
+    return o.str();
+  };
+
+  std::cout << std::left << std::setw(20) << "Temperature"
+            << "|  " << std::left << std::setw(18)
+            << fmt(g_temperature_min.load(), 2, "°C(Min)") << " |  "
+            << std::left << std::setw(18)
+            << fmt(g_temperature_max.load(), 2, "°C(Max)") << " |  "
+            << std::left << std::setw(18)
+            << fmt(g_temperature_avg.load(), 2, "°C(Avg)") << " |" << std::endl;
+
+  std::cout << std::left << std::setw(20) << "Power"
+            << "|  " << std::left << std::setw(18)
+            << fmt(g_power_min.load(), 2, " W(Min)") << "|  " << std::left
+            << std::setw(18) << fmt(g_power_max.load(), 2, " W(Max)") << "|  "
+            << std::left << std::setw(18)
+            << fmt(g_power_avg.load(), 2, " W(Avg)") << "|" << std::endl;
+
+  std::cout << std::left << std::setw(20) << "IPU Freq"
+            << "|  " << std::left << std::setw(18)
+            << fmt(g_ipu_freq_min.load(), 2, " Mhz(Min)") << "|  " << std::left
+            << std::setw(18) << fmt(g_ipu_freq_max.load(), 2, " Mhz(Max)")
+            << "|  " << std::left << std::setw(18)
+            << fmt(g_ipu_freq_avg.load(), 2, " Mhz(Avg)") << "|" << std::endl;
+
+  std::cout << std::left << std::setw(20) << "Mem Info"
+            << "|  " << std::left << std::setw(18)
+            << (std::to_string(g_mem_total.load()) + " MB(Total)") << "|  "
+            << std::left << std::setw(18)
+            << (std::to_string(g_mem_used.load()) + " MB(Used)") << "|  "
+            << std::left << std::setw(18)
+            << (std::to_string(g_mem_avail.load()) + " MB(Avail)") << "|"
+            << std::endl;
+
+  g_running = false;
+}
+
+void get_mem_info(int dev_id) {
+  hm_mem_info dev_mem_info;
+  if (hm_sys_get_mem_info(dev_id, &dev_mem_info) != 0) {
+    std::cerr << "Failed to get memory info for device " << dev_id << std::endl;
+    return;
+  }
+
+  g_mem_avail.store(dev_mem_info.mem_avail);
+  g_mem_total.store(dev_mem_info.mem_total);
+  g_mem_used.store(dev_mem_info.mem_used);
+
+  return;
+}
 float get_temperature() { return g_temperature.load(); }
 
 #endif  // DEVICE_MONITOR_HPP
