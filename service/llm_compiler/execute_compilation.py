@@ -102,9 +102,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--flash_attention",
+        nargs="+",
         type=int,
-        choices=[0, 1, 2, 3],
-        help="flash attention optimization",
+        help="FlashAttention control: "
+        "1 int = only prefill/decode (0=off,1/2=on); "
+        "2 ints = prefill/decode (0/1/2) + ViT (0/1); "
+        "e.g., --flash_attention 2 / --flash_attention 2 1",
     )
     parser.add_argument(
         "-r",
@@ -190,8 +193,9 @@ def _generate_cmds(args) -> list:
         cmds += ["--ndevice", str(args.device_num)]
     if args.j > 0:
         cmds += ["--j", str(args.j)]
-    if args.flash_attention and args.flash_attention in [0, 1, 2, 3]:
-        cmds += ["--flash_attention", str(args.flash_attention)]
+    if args.flash_attention and len(args.flash_attention) > 0:
+        cmds += ["--flash_attention"]
+        cmds += [str(val) for val in args.flash_attention]
 
     return cmds
 

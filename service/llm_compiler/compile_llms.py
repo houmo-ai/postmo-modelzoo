@@ -177,10 +177,12 @@ def parse_args():
     )
     parser.add_argument(
         "--flash_attention",
+        nargs="+",
         type=int,
-        default=-1,
-        choices=[-1, 0, 1, 2, 3],
-        help="flash attention optimization",
+        help="FlashAttention control: "
+        "1 int = only prefill/decode (0=off,1/2=on); "
+        "2 ints = prefill/decode (0/1/2) + ViT (0/1); "
+        "e.g., --flash_attention 2 / --flash_attention 2 1",
     )
     parser.add_argument(
         "--strip",
@@ -285,7 +287,7 @@ def _check_args(args: dict) -> bool:
         "-- Device num: %d \n"
         "-- Core num: %d \n"
         "-- J: %d \n"
-        "-- Flash Attention: %d \n"
+        "-- Flash Attention: %s \n"
         "-- Save results to %s\n"
         "-- Task Id: %s \n",
         args.model_name,
@@ -655,8 +657,9 @@ if __name__ == "__main__":
             compile_cmd += f"-b {batch} "
         if core_num > 0:
             compile_cmd += f"-cn {core_num} "
-        if flash_attention >= 0:
-            compile_cmd += f"--flash_attention {flash_attention} "
+        if flash_attention is not None and len(flash_attention) > 0:
+            flash_attention_str = " ".join(map(str, flash_attention))
+            compile_cmd += f"--flash_attention {flash_attention_str} "
         compile_cmd += f"-j {j} --strip {strip} -r {container_compile_res} -log {container_log_file}"
         commands.append(
             f"cd {container_home}/imodelzoo/service/llm_compiler && {compile_cmd}"

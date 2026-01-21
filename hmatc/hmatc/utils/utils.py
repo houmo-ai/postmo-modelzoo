@@ -32,6 +32,8 @@ import requests
 import re
 import shutil
 import subprocess
+import zipfile
+import tarfile
 from onnx import TensorProto
 from tqdm import tqdm
 from importlib.metadata import PackageNotFoundError, version
@@ -448,9 +450,6 @@ def _extract_files(save_path: str, extract_dir: str) -> bool:
     if not isinstance(extract_dir, str) or not extract_dir.strip():
         logger.error("The decompression directory cannot be empty.")
         return False
-
-    import zipfile
-    import tarfile
 
     extract_dir = os.path.abspath(extract_dir)
     os.makedirs(extract_dir, exist_ok=True)
@@ -1051,7 +1050,7 @@ def compress_files_to_tar_xz_with_progress(file_paths, output_path, preset=9):
 
 
 def upload_file_to_artifactory(
-    file_path, upload_url, username="public", password="Password@123", max_retries=3
+    file_path, upload_url, username, password, max_retries=3
 ):
     """Upload file to Artifactory server with checksum verification and retry mechanism.
 

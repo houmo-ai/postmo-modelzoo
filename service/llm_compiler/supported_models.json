@@ -1,10 +1,7 @@
 {
     "qwen2.5": {
         "7b": {
-            "support_backends": [
-                "xh1",
-                "xh2"
-            ],
+            "support_backends": ["xh1", "xh2"],
             "path": "models/llm/qwen2.5",
             "raw": "llm/Qwen2.5-7B-Instruct",
             "perf": "llm_perf"
@@ -12,42 +9,31 @@
     },
     "qwen3": {
         "4b": {
-            "support_backends": [
-                "xh2"
-            ],
+            "support_backends": ["xh2"],
             "path": "models/llm/qwen3",
             "raw": "llm/None",
             "perf": "llm_perf"
         },
         "8b": {
-            "support_backends": [
-                "xh1",
-                "xh2"
-            ],
+            "support_backends": ["xh1", "xh2"],
             "path": "models/llm/qwen3",
             "raw": "llm/qwen3_8b",
             "perf": "llm_perf"
         },
         "14b": {
-            "support_backends": [
-                "xh2"
-            ],
+            "support_backends": ["xh2"],
             "path": "models/llm/qwen3-14b",
             "raw": "llm/Qwen3-14B",
             "perf": "llm_perf"
         },
         "32b": {
-            "support_backends": [
-                "xh2"
-            ],
+            "support_backends": ["xh2"],
             "path": "models/llm/qwen3-14b",
             "raw": "llm/None",
             "perf": "llm_perf"
         },
         "30b_a3b": {
-            "support_backends": [
-                "xh2"
-            ],
+            "support_backends": ["xh2"],
             "path": "models/llm/qwen3-30b-a3b",
             "raw": "llm/Qwen3-30B-A3B",
             "perf": "llm_perf"
@@ -55,9 +41,7 @@
     },
     "qwen3_coder": {
         "30b_a3b": {
-            "support_backends": [
-                "xh2"
-            ],
+            "support_backends": ["xh2"],
             "path": "models/llm/qwen3-30b-a3b",
             "raw": "llm/None",
             "perf": "llm_perf"
@@ -65,9 +49,7 @@
     },
     "deepseek-r1-qwen": {
         "7b": {
-            "support_backends": [
-                "xh1"
-            ],
+            "support_backends": ["xh1"],
             "path": "models/llm/deepseek",
             "raw": "llm/DeepSeek-R1-Distill-Qwen-7B",
             "perf": "llm_perf"
@@ -75,9 +57,7 @@
     },
     "deepseek-r1-qwen3": {
         "8b": {
-            "support_backends": [
-                "xh2"
-            ],
+            "support_backends": ["xh2"],
             "path": "models/llm/deepseek-r1-qwen3-8b",
             "raw": "llm/DeepSeek-R1-0528-Qwen3-8B",
             "perf": "llm_perf"
@@ -85,18 +65,13 @@
     },
     "qwen2.5-vl": {
         "3b": {
-            "support_backends": [
-                "xh1"
-            ],
+            "support_backends": ["xh1"],
             "path": "models/vllm/qwen2.5-vl",
             "raw": "llm/None",
             "perf": "llm_perf"
         },
         "7b": {
-            "support_backends": [
-                "xh1",
-                "xh2"
-            ],
+            "support_backends": ["xh1", "xh2"],
             "path": "models/vllm/qwen2.5-vl",
             "raw": "llm/None",
             "perf": "llm_perf"
@@ -104,28 +79,25 @@
     },
     "qwen3-vl": {
         "2b": {
-            "support_backends": [
-                "xh1",
-                "xh2"
-            ],
+            "support_backends": ["xh1", "xh2"],
             "path": "models/vllm/qwen3-vl",
             "raw": "llm/None",
             "perf": "llm_perf"
         },
         "4b": {
-            "support_backends": [
-                "xh1",
-                "xh2"
-            ],
+            "support_backends": ["xh1", "xh2"],
             "path": "models/vllm/qwen3-vl",
             "raw": "llm/None",
             "perf": "llm_perf"
         },
         "8b": {
-            "support_backends": [
-                "xh1",
-                "xh2"
-            ],
+            "support_backends": ["xh1", "xh2"],
+            "path": "models/vllm/qwen3-vl",
+            "raw": "llm/None",
+            "perf": "llm_perf"
+        },
+        "30b_a3b": {
+            "support_backends": ["xh2"],
             "path": "models/vllm/qwen3-vl",
             "raw": "llm/None",
             "perf": "llm_perf"
@@ -133,9 +105,7 @@
     },
     "gpt": {
         "20b": {
-            "support_backends": [
-                "xh2"
-            ],
+            "support_backends": ["xh2"],
             "path": "models/llm/gpt-oss",
             "raw": "llm/None",
             "perf": "llm_perf"
@@ -143,9 +113,7 @@
     },
     "minicpmo": {
         "7b": {
-            "support_backends": [
-                "xh2"
-            ],
+            "support_backends": ["xh2"],
             "path": "models/omni/minicpmo",
             "raw": "llm/None",
             "perf": "demo"
@@ -153,9 +121,7 @@
     },
     "bge": {
         "0.5b": {
-            "support_backends": [
-                "xh2"
-            ],
+            "support_backends": ["xh2"],
             "path": "models/embedding/bge",
             "raw": "llm/None",
             "perf": "tcim_perf"
@@ -163,9 +129,7 @@
     },
     "gte": {
         "1.5b": {
-            "support_backends": [
-                "xh2"
-            ],
+            "support_backends": ["xh2"],
             "path": "models/embedding/gte",
             "raw": "llm/None",
             "perf": "tcim_perf"
@@ -173,9 +137,7 @@
     },
     "whisper": {
         "medium": {
-            "support_backends": [
-                "xh2"
-            ],
+            "support_backends": ["xh2"],
             "path": "models/asr/whisper",
             "raw": "llm/None",
             "perf": "tcim_perf"
