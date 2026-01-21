@@ -147,7 +147,12 @@ class YoloV5(BaseModel):
         # 只取batch0，多batch数据是复制来的，不用处理浪费时间
         pred = pred[:1, ...]  # [1, 25200, 85]
         cv_image = list(in_datas.values())[0]
-        outputs = non_max_suppression(pred, self.conf_threshold, self.iou_threshold)
+        outputs = non_max_suppression(
+            pred,
+            self.conf_threshold,
+            self.iou_threshold,
+            exist_obj_conf=True,
+        )
         output = outputs[0]
         output[:, :4] = scale_coords(
             self.input_size, output[:, :4], cv_image.shape
