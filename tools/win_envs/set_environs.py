@@ -18,7 +18,7 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
-import os, sys 
+import os, sys
 import shutil, re
 import json
 import importlib.util
@@ -68,7 +68,7 @@ class WinEnvironsGenerater:
 
         for key, value in self.cpp_example_environments.items():
             self.all_cpp_example_environments[key] = value + self.py_example_environments[key]
-            
+
         self.develop_mode = self.settings["develop_url"]
 
     def nullEnvManualSet(self, key: str, need: bool):
@@ -121,9 +121,7 @@ class WinEnvironsGenerater:
         tcim_package_path = find_tcim_path()
         assert tcim_package_path is not None, f'Please install houmo_tcim_runtime_xh2 package first, it is Required!'
         self.nullEnvManualSet("HOUMO_SDK_PATH", need=True)
-        self.all_environments["HOUMO_MODELZOO_URL"] = "http://139.224.0.199:8082/artifactory/houmo/release"
-        if self.develop_mode:
-            self.all_environments["HOUMO_MODELZOO_URL"] = "http://10.10.1.53:8082/artifactory/toolchain/release"
+        self.all_environments["HOUMO_MODELZOO_URL"] = self.env_manager.read_env_var_from_sh_file("env.sh", "HOUMO_MODELZOO_URL")
         self.all_environments["HDPL_PLATFORM"] = "ASIC"
         self.all_environments["HOUMO_TARGET"] = self.settings["support_target"]
         self.all_environments["TCIM_BACKEND"] = "Xh2HalBackend" if self.settings["support_target"] == "xh2" else "Xh1HalBackend"
@@ -157,7 +155,7 @@ class WinEnvironsGenerater:
         except Exception as e:
             print(f"[ERROR] {e}, Failed to import tcim_lite, please install runtime sdk!")
             exit()
-        
+
         tcim_dll_path = os.path.join(self.all_environments["TCIM_RUNTIME_PATH"], "bin")
         xh2a_dll_path = os.path.join(self.all_environments["HOUMO_SDK_PATH"], "hal\\lib")
         env_paths = self.env_manager.get_user_path()
@@ -167,7 +165,7 @@ class WinEnvironsGenerater:
             else:
                 if env not in self.all_environments["PATH"]:
                     self.all_environments["PATH"] = f'{env};' + self.all_environments["PATH"]
-        
+
         if self.all_environments["CMAKE_PATH"] not in self.all_environments["PATH"] and self.all_environments["CMAKE_PATH"] != "":
             self.all_environments["PATH"] = f'{self.all_environments["CMAKE_PATH"]};' + self.all_environments["PATH"]
 
@@ -188,14 +186,14 @@ class WinEnvironsGenerater:
             if key not in origin_envs:
                 self.nullEnvManualSet(key, need=False)
             if key != "PATH":
-                self.env_manager.set_env(key, value) 
+                self.env_manager.set_env(key, value)
         for _, value in enumerate(self.all_environments["PATH"].split(";")):
             self.env_manager.add_to_path(value)
-            
+
         self.env_manager.refresh_envs()
         with open(os.path.join(self.setting_dir_path, "env.json"), "w", encoding="utf-8") as f:
             json.dump(self.settings, f, ensure_ascii=False, indent=4)
-            
+
     def ReSetEnvirons(self):
         self.env_manager.reset_env()
 

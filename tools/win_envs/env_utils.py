@@ -244,18 +244,18 @@ class EnvManager:
             raise PermissionError("Admin rights required for system-level PATH. Run as administrator.")
         except Exception as e:
             print(f"Failed to update PATH: {e}")
-    
+
     def get_user_path(self)-> list:
         with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, 
-            self.user_reg_path, 
-            0, 
+            winreg.HKEY_CURRENT_USER,
+            self.user_reg_path,
+            0,
             winreg.KEY_READ | winreg.KEY_WOW64_64KEY
         ) as key:
             user_path = winreg.QueryValueEx(key, "PATH")[0].split(';')
             winreg.CloseKey(key)
             return user_path
-    
+
     def remove_env_from_path(self, remove_path) -> None:
         #get path
         current_paths = self.get_user_path()
@@ -271,11 +271,11 @@ class EnvManager:
                 new_path_list.append(path)
             else:
                 continue
-                
+
         new_path = ";".join(new_path_list)
         self.set_env('PATH', new_path)
         return None
-    
+
     def reset_env(self)-> None:
         delete_envs = ["HOUMO_MODELZOO_URL", "HDPL_PLATFORM", "HOUMO_TARGET", "TCIM_BACKEND", "HOUMO_EXAMPLES_PATH",
                 "PYTHON_DIR", "TCIM_RUNTIME_PATH", "HOUMO_PATH", "HOUMO_VERSION"]
@@ -296,13 +296,13 @@ class EnvManager:
                         print(f"Deleted variable: {name}")
                     except Exception as e:
                         print(f"Warning: Could not delete {name}: {e}")
-            
+
             for name in existing_names:
                 if name in check_envs:
                     print(f"[Warning]: your have {name} envs, val is {user_vars[name]}. \n",
                           "we will not delete it, please confirm path exist and version is you need!")
             winreg.CloseKey(key)
-            #get val of CMAKE_PATH HOUMO_SDK_PATH TCIM_RUNTIME_PATH 
+            #get val of CMAKE_PATH HOUMO_SDK_PATH TCIM_RUNTIME_PATH
             for key, val in user_vars.items():
                 if key == "CMAKE_PATH":
                     self.remove_env_from_path(val)
@@ -318,8 +318,28 @@ class EnvManager:
         env_backup_file_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "initial_env_backup.json"))
         if os.path.exists(env_backup_file_path):
             os.remove(env_backup_file_path)
-        
-            
 
-            
-    
+    def read_env_var_from_sh_file(self, file_path, var_name):
+        pattern = re.compile(
+            re.escape(var_name) + r'\s*=\s*(http[s]?://[^\s]+)',
+            re.DOTALL | re.MULTILINE
+        )
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            match = pattern.search(content)
+            if match:
+                value = match.group(1).strip('\'"')
+                return value
+            else:
+                return None
+
+        except FileNotFoundError:
+            return None
+        except Exception as e:
+            print(f"Read File : {e}")
+            return None
+
+
+
+
