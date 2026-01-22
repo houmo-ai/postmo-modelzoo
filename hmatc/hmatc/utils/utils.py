@@ -370,7 +370,7 @@ def _parse_file_url(file_path: str) -> tuple[str, str, str]:
             modelzoo_url = env_url if env_url else JFROG_REPO
         else:
             repo_type = "oss"
-            modelzoo_url = env_url if env_url else OSS_REPO
+            modelzoo_url = OSS_REPO
         file_relative_path = file_path
 
     file_relative_path = file_relative_path.strip("/")
