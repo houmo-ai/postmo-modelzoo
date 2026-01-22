@@ -9,7 +9,7 @@
     },
     "qwen3": {
         "4b": {
-            "support_backends": ["xh2"],
+            "support_backends": ["xh1", "xh2"],
             "path": "models/llm/qwen3",
             "raw": "llm/None",
             "perf": "llm_perf"
@@ -33,7 +33,7 @@
             "perf": "llm_perf"
         },
         "30b_a3b": {
-            "support_backends": ["xh2"],
+            "support_backends": ["xh1", "xh2"],
             "path": "models/llm/qwen3-30b-a3b",
             "raw": "llm/Qwen3-30B-A3B",
             "perf": "llm_perf"

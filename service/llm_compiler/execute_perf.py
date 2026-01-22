@@ -161,12 +161,12 @@ def _check_start_task(line: str, state: Dict) -> bool:
 
 def _check_input_token(line: str, state: Dict) -> bool:
     """Check if the line contains input token length information."""
-    return "input token len" in line
+    return "Input Length per Sample" in line
 
 
 def _check_stop_token(line: str, state: Dict) -> bool:
     """Check if the line contains output token length information."""
-    return "stop token len" in line
+    return "Output Length per Sample" in line
 
 
 def _check_loop(line: str, state: Dict) -> bool:
@@ -181,7 +181,22 @@ def _check_end_task(line: str, state: Dict) -> bool:
 
 def _check_llm_perf_avg(line: str, state: Dict) -> bool:
     """Check if the line indicates the start of LLM performance average information."""
-    return "LLM Perf Avarage Information" in line
+    return "Model Inference Performance Summary Report" in line
+
+
+def _check_llm_perf_perfill(line: str, state: Dict) -> bool:
+    """Check if the line indicates the start of LLM prefill performance average information."""
+    return "Prefill Stage Performance" in line
+
+
+def _check_llm_perf_decode(line: str, state: Dict) -> bool:
+    """Check if the line indicates the start of LLM decode performance average information."""
+    return "Decode Stage Performance" in line
+
+
+def _check_llm_perf_vision(line: str, state: Dict) -> bool:
+    """Check if the line indicates the start of LLM vision performance average information."""
+    return "Vision Stage Performance" in line
 
 
 def _check_perf_flag(line: str, state: Dict) -> bool:
@@ -311,22 +326,81 @@ def _handle_perf_start_line(
     state["perf_flag"] = True
 
 
+def _handle_perfill_perf_start_line(
+    line: str,
+    perf_metric: Dict,
+    state: Dict,
+    keywords_dict: Dict = {},
+    perf_key: str = "",
+) -> None:
+    """(common) Handle prefill stage performance start line: set prefill_perf_flag."""
+    if state["perf_flag"] is True:
+        state["prefill_perf_flag"] = True
+        state["decode_perf_flag"] = False
+        state["vision_perf_flag"] = False
+
+
+def _handle_decode_perf_start_line(
+    line: str,
+    perf_metric: Dict,
+    state: Dict,
+    keywords_dict: Dict = {},
+    perf_key: str = "",
+) -> None:
+    """(common) Handle decode stage performance start line: set decode_perf_flag."""
+    if state["perf_flag"] is True:
+        state["prefill_perf_flag"] = False
+        state["decode_perf_flag"] = True
+        state["vision_perf_flag"] = False
+
+
+def _handle_vision_perf_start_line(
+    line: str,
+    perf_metric: Dict,
+    state: Dict,
+    keywords_dict: Dict = {},
+    perf_key: str = "",
+) -> None:
+    """(common) Handle vision stage performance start line: set vision_perf_flag."""
+    if state["perf_flag"] is True:
+        state["prefill_perf_flag"] = False
+        state["decode_perf_flag"] = False
+        state["vision_perf_flag"] = True
+
+
 def _handle_token_loop(
     line: str, perf_metric: Dict, state: Dict, keywords_dict: Dict, perf_key: str
 ) -> None:
     """(llm_perf) Handle input/output token length and loop count."""
-    perf_metric[perf_key][-1] = _get_value_after_colon(line)
+    perf_metric[perf_key][-1] = _get_value_after_colon(line, split_space=True)
 
 
 def _handle_perf_flag(
     line: str, perf_metric: Dict, state: Dict, keywords_dict: Dict, perf_key: str
 ) -> None:
     """(llm_perf) Handle performance metric line: extract matching metric values."""
+    perf_type = ""
+    if state["prefill_perf_flag"] is True:
+        perf_type = "prefill"
+    elif state["decode_perf_flag"] is True:
+        perf_type = "decode"
+    elif state["vision_perf_flag"] is True:
+        perf_type = "vision"
     keyword = _find_first_matched_keyword(line, keywords_dict.keys())
     if keyword is not None:
-        perf_metric[keywords_dict[keyword]][-1] = (
-            line.strip().rsplit(" ", 2)[-2].strip()
-        )
+        if keyword == "Total Time" and "Speed:" in line:
+            time_str = f"{perf_type}_time"
+            key_str = f"{perf_type}_speed"
+            perf_metric[time_str][-1] = (
+                line.strip().rsplit("|", 1)[-2].strip().rsplit(" ", 1)[-1].strip()[:-2]
+            )
+        elif keyword == "Embedding Time":
+            key_str = perf_type + keywords_dict[keyword]
+            perf_metric[key_str][-1] = _get_value_after_colon(line)
+            return
+        else:
+            key_str = keywords_dict[keyword]
+        perf_metric[key_str][-1] = line.strip().rsplit(" ", 2)[-2].strip()
 
 
 def _parse_latency_line(line: str, perf_metric: dict) -> None:
@@ -401,43 +475,48 @@ def _generate_llm_perf_table(cfg_path, outputs):
         "model_name": [],
         "input_token": [],
         "output_token": [],
-        "loop": [],
         "device_mem_used": [],
         "prefill_time": [],
         "decode_time": [],
         "vision_time": [],
         "prefill_speed": [],
         "decode_speed": [],
+        "vision_speed": [],
         "TTFT": [],
         "TPOT": [],
         "e2e_latency": [],
         "e2e_tps": [],
-        "embedding_time": [],
+        "prefill_embedding_time": [],
+        "decode_embedding_time": [],
     }
 
     keywords_dict = {
-        "Prefill Time": "prefill_time",
-        "Decode Time": "decode_time",
-        "Vision Time": "vision_time",
-        "Prefill Speed": "prefill_speed",
-        "Decode Speed": "decode_speed",
+        "Total Time": "_time",
         "TTFT": "TTFT",
         "TPOT": "TPOT",
         "E2E Latency": "e2e_latency",
         "E2E TPS": "e2e_tps",
-        "Embedding Time": "embedding_time",
+        "Embedding Time": "_embedding_time",
     }
 
-    state = {"perf_flag": False, "mem_flag": False}
+    state = {
+        "perf_flag": False,
+        "prefill_perf_flag": False,
+        "decode_perf_flag": False,
+        "vision_perf_flag": False,
+        "mem_flag": False,
+    }
 
     processors = [
         (_check_start_task, _handle_start_task, "model_name"),
         (_check_input_token, _handle_token_loop, "input_token"),
         (_check_stop_token, _handle_token_loop, "output_token"),
-        (_check_loop, _handle_token_loop, "loop"),
         (_check_end_task, _handle_end_task, ""),
         (_check_mem_end, _handle_mem_end, ""),
         (_check_llm_perf_avg, _handle_perf_start_line, ""),
+        (_check_llm_perf_vision, _handle_vision_perf_start_line, ""),
+        (_check_llm_perf_perfill, _handle_perfill_perf_start_line, ""),
+        (_check_llm_perf_decode, _handle_decode_perf_start_line, ""),
         (_check_perf_flag, _handle_perf_flag, ""),
         (_check_mem_start, _handle_mem_start, ""),
         (_check_mem_used, _handle_mem_used, "device_mem_used"),
@@ -456,18 +535,19 @@ def _generate_llm_perf_table(cfg_path, outputs):
         "model_name",
         "input(token)",
         "output(token)",
-        "loop",
         MEM_USED_COLS,
         "prefill_time(ms)",
         "decode_time(ms)",
         "vision_time(ms)",
         "prefill_speed(token/s)",
         "decode_speed(token/s)",
+        "vision_speed(images/s)",
         "TTFT(ms)",
         "TPOT(ms/token)",
         "e2e_latency(s)",
         "e2e_tps(tokens/s)",
-        "embedding_time(ms)",
+        "prefill_embedding_time(ms)",
+        "decode_embedding_time(ms)",
     ]
     _write_to_xlsx(perf_metric, cfg_path, "llm_perf", columns)
 

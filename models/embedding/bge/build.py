@@ -32,7 +32,7 @@ logging.basicConfig(level="INFO")
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh2", "Only supported xh2!"
 
-HOUMO_CORE_NUM = os.getenv('HOUMO_CORE_NUM', 2)
+HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
 GOLDEN_THRESH = 0.98
 
 
@@ -62,70 +62,70 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model_dir',
-        dest='model_dir',
+        "--model_dir",
+        dest="model_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant'),
-        help='path to the model dir',
+        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        help="path to the model dir",
     )
     parser.add_argument(
-        '--model_name',
-        dest='model_name',
+        "--model_name",
+        dest="model_name",
         type=str,
-        default='bge',
-        help='output houmo model name',
+        default="bge",
+        help="output houmo model name",
     )
     parser.add_argument(
-        '--ncore',
-        dest='ncore',
+        "--ncore",
+        dest="ncore",
         type=int,
         default=HOUMO_CORE_NUM,
-        help='core number',
+        help="core number",
     )
     parser.add_argument(
-        '--ndevice',
-        dest='ndevice',
+        "--ndevice",
+        dest="ndevice",
         type=int,
         default=0,
         choices=[0, 1, 2],
-        help='device number',
+        help="device number",
     )
     parser.add_argument(
-        '--model_size',
-        dest='model_size',
+        "--model_size",
+        dest="model_size",
         type=str,
         default="0.5b",
         choices=["0.5b"],
-        help='model size',
+        help="model size",
     )
     parser.add_argument(
-        '--batch',
-        dest='batch',
+        "--batch",
+        dest="batch",
         type=int,
         default=10,
         choices=[10],
-        help='batch number',
+        help="batch number",
     )
     parser.add_argument(
-        '--j',
-        dest='j',
+        "--j",
+        dest="j",
         type=int,
         default=multiprocessing.cpu_count(),
-        help='build parallel jobs',
+        help="build parallel jobs",
     )
     parser.add_argument(
-        '--stage',
-        dest='stage',
+        "--stage",
+        dest="stage",
         type=str,
         default="build",
         help='build stage choise=["build", "test", "all"]',
     )
     parser.add_argument(
-        '--output_dir',
-        dest='output_dir',
+        "--output_dir",
+        dest="output_dir",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET),
-        help='build output dir',
+        default=os.path.join("output", HOUMO_TARGET),
+        help="build output dir",
     )
     args = parser.parse_args()
     return args
@@ -213,7 +213,7 @@ def test(model_name, model_dir, output_dir, profile, prefix=None):
             f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
         )
         output_data_path = os.path.join(
-            model_dir, f'hmquant_{prefix}_{sanitize_name(output_name)}_output.npy'
+            model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy"
         )
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
@@ -247,7 +247,7 @@ def test(model_name, model_dir, output_dir, profile, prefix=None):
     print(f"<=== {model_name} test success.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     print(args)
     curdir = os.getcwd()
@@ -283,6 +283,6 @@ if __name__ == '__main__':
         )
 
     # test model
-    if args.stage == 'test' or args.stage == 'all':
+    if args.stage == "test" or args.stage == "all":
         test(f"{model_name}-m3", model_dir, output_dir, profile)
         test(f"{model_name}-reranker-v2-m3", model_dir, output_dir, profile)
