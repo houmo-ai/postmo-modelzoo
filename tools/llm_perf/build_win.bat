@@ -25,44 +25,6 @@ if not exist "3rdparty\eigen3" (
     echo Eigen3 setup completed
 )
 
-:: Download and setup tokenizers-cpp if not exists
-if not exist "3rdparty\tokenizers-cpp" (
-    pushd "3rdparty" || (echo Error: Failed to enter 3rdparty directory! & exit /b 1)
-
-    set "TARGET_DIR=tokenizers-cpp"
-    set "DOWNLOAD_URL=!HOUMO_MODELZOO_URL!\models\qwen3\tokenizers-cpp.zip"
-    set "ZIP_FILE=tokenizers-cpp.zip"
-
-    if "!DOWNLOAD_URL!"=="" (
-        echo Error: DOWNLOAD_URL is empty! Check HOUMO_MODELZOO_URL variable.
-        popd
-        exit /b 1
-    )
-
-    echo Downloading tokenizers-cpp.zip from: !DOWNLOAD_URL!
-    PowerShell -Command "(New-Object System.Net.WebClient).DownloadFile('!DOWNLOAD_URL!', '!ZIP_FILE!')"
-
-    if not exist "!ZIP_FILE!" (
-        echo Error: Failed to download "!ZIP_FILE!"!
-        popd
-        exit /b 1
-    )
-
-    echo Extracting !ZIP_FILE!...
-    tar -xf "!ZIP_FILE!" || PowerShell -Command "Expand-Archive -Path '!ZIP_FILE!' -DestinationPath '.' -Force"
-
-    popd
-
-    if not exist "3rdparty\tokenizers-cpp" (
-        echo Error: Failed to extract tokenizers-cpp!
-        del /f /q "3rdparty\!ZIP_FILE!"
-        exit /b 1
-    )
-
-    del /f /q "3rdparty\!ZIP_FILE!"
-    echo Tokenizers-cpp setup completed
-)
-
 echo All dependencies are ready
 
 set PROJECT_DIR=%cd%

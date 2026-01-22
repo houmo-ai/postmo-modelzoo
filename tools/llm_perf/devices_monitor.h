@@ -338,6 +338,13 @@ void stop_monitor(int dev_id) {
 }
 
 void get_mem_info(int dev_id) {
+#ifdef _MSC_VER
+  HMODULE hDll = LoadLibraryA("libhal_xh2a.dll");
+  typedef int (*HM_SYS_GET_MEM_INFO)(int dev_id, struct hm_mem_info* mem_info);
+  HM_SYS_GET_MEM_INFO hm_sys_get_mem_info = nullptr;
+  hm_sys_get_mem_info =
+      (HM_SYS_GET_MEM_INFO)GetProcAddress(hDll, "hm_sys_get_mem_info");
+#endif
   hm_mem_info dev_mem_info;
   if (hm_sys_get_mem_info(dev_id, &dev_mem_info) != 0) {
     std::cerr << "Failed to get memory info for device " << dev_id << std::endl;
