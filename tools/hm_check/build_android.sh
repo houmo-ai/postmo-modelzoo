@@ -14,7 +14,8 @@ TCIM=""
 HOUMO=""
 ABI="arm64-v8a"
 PLATFORM="android-35"
-INSTALL=0
+INSTALL=1  # Changed from 0 to 1 to enable default installation
+INSTALL_DIR=""  # Initialize INSTALL_DIR variable
 
 usage() {
   cat <<EOF
@@ -30,15 +31,19 @@ Options:
   --houmo PATH   Set HOUMO_SDK_PATH (default: read from env HOUMO_SDK_PATH)
   --abi ABI      Android ABI (default: arm64-v8a)
   --platform API Android platform level (default: android-35)
-  --install      Run 'cmake --install' after building
+  --install [PATH]  Install after building (default: ${SOURCE_DIR}/../android, always enabled by default)
+  --no-install   Skip installation after building
   -h             Show this help
 
 Example:
-  ./build_android.sh -b build_android -c Release -j 8 --ndk /opt/android-ndk-r25 --tcim /opt/tcim --houmo /opt/houmo --abi arm64-v8a --platform android-35 --install
+  ./build_android.sh -b build_android -c Release -j 8 --ndk /opt/android-ndk-r25 --tcim /opt/tcim --houmo /opt/houmo --abi arm64-v8a --platform android-35
+  ./build_android.sh -b build_android -c Release -j 8 --ndk /opt/android-ndk-r25 --tcim /opt/tcim --houmo /opt/houmo --abi arm64-v8a --platform android-35 --install /opt/custom-android
+  ./build_android.sh -b build_android -c Release -j 8 --ndk /opt/android-ndk-r25 --tcim /opt/tcim --houmo /opt/houmo --abi arm64-v8a --platform android-35 --no-install
 
 Notes:
-  - Script prefers environment variables `TCIM_RUNTIME_PATH` and `HOUMO_SDK_PATH` if set.
+  - Script prefers environment variables [TCIM_RUNTIME_PATH](file:///data/weiguo.xing/repo/imodelzoo/hmatc/setup.py#L29-L29) and `HOUMO_SDK_PATH` if set.
   - If `--ndk` is not provided, script tries $NDK_PATH and common installation paths.
+  - Installation runs by default unless --no-install is specified.
 EOF
 }
 
@@ -54,7 +59,20 @@ while [[ $# -gt 0 ]]; do
     --houmo) HOUMO="$2"; shift 2;;
     --abi) ABI="$2"; shift 2;;
     --platform) PLATFORM="$2"; shift 2;;
-    --install) INSTALL=1; shift 1;;
+    --install) 
+      if [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^- ]]; then
+        INSTALL_DIR="$2"
+        shift 2
+      else
+        INSTALL_DIR="${SOURCE_DIR}/../android"
+        shift 1
+      fi
+      INSTALL=1
+      ;;
+    --no-install) 
+      INSTALL=0
+      shift 1
+      ;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown option: $1"; usage; exit 1;;
   esac
@@ -140,16 +158,33 @@ cd "$BUILD_DIR"
 cmake_args=( -S "$SOURCE_DIR" -B "$BUILD_DIR" -G "$GENERATOR" \
     -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI="$ABI" -DANDROID_PLATFORM="$PLATFORM" -DANDROID_NDK="$NDK" \
-    -DCMAKE_BUILD_TYPE="$CONFIG" -DCMAKE_INSTALL_PREFIX="$SOURCE_DIR/android_output" )
+    -DCMAKE_BUILD_TYPE="$CONFIG" )
+
+# Add install prefix only if installation is enabled
+if [[ "$INSTALL" -ne 0 ]]; then
+  if [[ -z "$INSTALL_DIR" ]]; then
+    INSTALL_DIR="${SOURCE_DIR}/../android"
+  fi
+  cmake_args+=( -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" )
+else
+  cmake_args+=( -DCMAKE_INSTALL_PREFIX="$SOURCE_DIR/android" )
+fi
 
 echo "Running: cmake ${cmake_args[*]}"
 cmake "${cmake_args[@]}"
 
 echo "Building..."
-cmake --build "$BUILD_DIR" --config "$CONFIG" --target install -- -j "$JOBS"
+cmake --build "$BUILD_DIR" --config "$CONFIG" -- -j "$JOBS"
 
 if [[ "$INSTALL" -ne 0 ]]; then
-  echo "Install completed to: $SOURCE_DIR/android_output"
+  if [[ -z "$INSTALL_DIR" ]]; then
+    INSTALL_DIR="${SOURCE_DIR}/../android"
+  fi
+  
+  echo "Installing to: $INSTALL_DIR"
+  cmake --install "$BUILD_DIR" --prefix "$INSTALL_DIR" --config "$CONFIG"
+  
+  echo "Install completed to: $INSTALL_DIR"
 fi
 
-echo "Android build complete. Output (installed) under: $SOURCE_DIR/android_output"
+echo "Android build complete. Output (installed) under: ${INSTALL_DIR:-${SOURCE_DIR}/../android}"
