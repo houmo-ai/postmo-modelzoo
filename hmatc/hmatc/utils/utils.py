@@ -321,6 +321,26 @@ def download_file(url, save_path, file_name, file_size, chunk_size=1024 * 1024):
         return False
 
 
+def _ping_houmo_domain(ping_count: int = 5, timeout: int = 3) -> bool:
+    """
+    Ping the houmo domain to check whether it is accessible.
+    :param ping_count: The number of pings to send (default: 5)
+    :param timeout: Timeout for each ping (default: 3)
+    :return: True if the domain is accessible, False otherwise
+    """
+    houmo_domain = "artifactory.houmo.ai"
+    try:
+        cmd = ["ping", "-c", str(ping_count), "-W", str(timeout), houmo_domain]
+        result = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False
+        )
+        if result.returncode == 0:
+            return True
+        return False
+    except Exception:
+        return False
+
+
 def _parse_file_url(file_path: str) -> tuple[str, str, str]:
     """
     Parse the file path
@@ -347,8 +367,12 @@ def _parse_file_url(file_path: str) -> tuple[str, str, str]:
     # 2. Handling the situation of relative paths
     else:
         env_url = os.getenv("HOUMO_MODELZOO_URL")
-        repo_type = "jfrog" if env_url and "artifactory" in env_url else "unknown"
-        modelzoo_url = JFROG_REPO if repo_type == "unknown" else env_url
+        if _ping_houmo_domain() is True:
+            repo_type = "jfrog"
+            modelzoo_url = env_url if env_url else JFROG_REPO
+        else:
+            repo_type = "oss"
+            modelzoo_url = env_url if env_url else OSS_REPO
         file_relative_path = file_path
 
     file_relative_path = file_relative_path.strip("/")
@@ -536,11 +560,9 @@ def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) ->
     need_download = True
     file_size = 0
     expected_md5 = ""
-    if repo_type in ["jfrog", "unknown"]:
+    if repo_type in ["jfrog"]:
         expected_md5, file_size = _get_jfrog_file_md5(modelzoo_url, file_relative_path)
-        repo_type = "unknown" if file_size <= 0 else "jfrog"
-    if repo_type in ["oss", "unknown"]:
-        modelzoo_url = OSS_REPO if repo_type == "unknown" else modelzoo_url
+    elif repo_type in ["oss"]:
         expected_md5, file_size = _get_oss_file_md5(file_relative_path)
     if not expected_md5 or file_size <= 0:
         return ""
