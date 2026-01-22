@@ -12,7 +12,7 @@ param(
     [string]$Platform = "x64",
     [string]$TCIM = "",
     [string]$HOUMO = "",
-    [switch]$Install
+    [switch]$NoInstall  # Changed from Install to NoInstall
 )
 
 function Check-Command {
@@ -57,6 +57,10 @@ $cmakeArgs = @(
     "-DCMAKE_BUILD_TYPE=$Configuration"
 )
 
+# Add install prefix for default installation
+$installDir = Join-Path -Path $SourceDir -ChildPath "..\bin"
+$cmakeArgs += "-DCMAKE_INSTALL_PREFIX=$installDir"
+
 $configureCmd = "cmake " + ($cmakeArgs -join ' ')
 Write-Host "Running: $configureCmd"
 $rc = & cmake @cmakeArgs
@@ -69,9 +73,9 @@ Write-Host "Running: $buildCmd"
 & cmake @buildArgs
 if ($LASTEXITCODE -ne 0) { Write-Error "cmake build failed"; exit $LASTEXITCODE }
 
-# Optional install step
-if ($Install) {
-    $installDir = Join-Path -Path $BuildDir -ChildPath "install"
+# Optional install step - now enabled by default
+if (-not $NoInstall) {
+    $installDir = Join-Path -Path $SourceDir -ChildPath "..\bin"
     if (-not (Test-Path $installDir)) { New-Item -ItemType Directory -Path $installDir | Out-Null }
     $installArgs = @('--install', $BuildDir, '--config', $Configuration, '--prefix', $installDir)
     Write-Host "Installing to: $installDir"
@@ -80,3 +84,4 @@ if ($Install) {
 }
 
 Write-Host "Build complete. Executable located in: $BuildDir\$Configuration\hm-check.exe (or $BuildDir\hm-check.exe for single-config generators)"
+Write-Host "Installation (if enabled) available in: $(Join-Path -Path $SourceDir -ChildPath "..\bin")"

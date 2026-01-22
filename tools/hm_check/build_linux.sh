@@ -11,7 +11,8 @@ GENERATOR=""
 JOBS=$(nproc 2>/dev/null || echo 4)
 TCIM=""
 HOUMO=""
-INSTALL=0
+INSTALL=1
+INSTALL_DIR=""  # Initialize INSTALL_DIR variable
 
 usage() {
   cat <<EOF
@@ -25,17 +26,20 @@ Options:
   -j JOBS           Parallel jobs for build (default: number of CPUs)
   --tcim PATH       Set TCIM_RUNTIME_PATH (default: read from TCIM_RUNTIME_PATH env var)
   --houmo PATH      Set HOUMO_SDK_PATH (default: read from HOUMO_SDK_PATH env var)
-  --install [PATH]  Install after building (default: ${SOURCE_DIR}/..)
+  --install [PATH]  Install after building (default: ${SOURCE_DIR}/../bin, always enabled by default)
+  --no-install      Skip installation after building
   -h                Show this help
 
 Example:
-  $0 -b build -c Release -j 8 --tcim /opt/venv/houmo/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk --install
-  $0 -b build -c Release -j 8 --tcim /opt/venv/houmo/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk --install ${SOURCE_DIR}/..
+  $0 -b build -c Release -j 8 --tcim /opt/venv/houmo/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk
+  $0 -b build -c Release -j 8 --tcim /opt/venv/houmo/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk --install /opt/hmcheck
+  $0 -b build -c Release -j 8 --tcim /opt/venv/houmo/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk --no-install
 
 Notes:
-  By default the script will read `TCIM_RUNTIME_PATH` and `HOUMO_SDK_PATH` from environment.
+  By default the script will read [TCIM_RUNTIME_PATH](file:///data/weiguo.xing/repo/imodelzoo/hmatc/setup.py#L29-L29) and `HOUMO_SDK_PATH` from environment.
   If they are not set, the script will attempt to auto-detect common installation paths.
   You can also explicitly provide paths via `--tcim` and `--houmo`.
+  Installation runs by default unless --no-install is specified.
 EOF
 }
 
@@ -54,10 +58,14 @@ while [[ $# -gt 0 ]]; do
         INSTALL_DIR="$2"
         shift 2
       else
-        INSTALL_DIR="${SOURCE_DIR}/.."
+        INSTALL_DIR="${SOURCE_DIR}/../bin"
         shift 1
       fi
       INSTALL=1
+      ;;
+    --no-install) 
+      INSTALL=0
+      shift 1
       ;;
     -h|--help) usage; exit 0;;
     --) shift; break;;
@@ -130,7 +138,7 @@ cmake --build "$BUILD_DIR" --config "$CONFIG" -- -j "$JOBS"
 
 if [[ "$INSTALL" -ne 0 ]]; then
   if [[ -z "$INSTALL_DIR" ]]; then
-    INSTALL_DIR="${SOURCE_DIR}/.."
+    INSTALL_DIR="${SOURCE_DIR}/../bin"
   fi
   
   # Determine if we need elevated privileges based on target directory
