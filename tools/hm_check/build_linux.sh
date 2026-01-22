@@ -18,18 +18,19 @@ usage() {
 Usage: $0 [options]
 
 Options:
-  -s DIR       Source directory (default: script directory)
-  -b DIR       Build directory (default: ./build)
-  -c CONFIG    Build configuration: Release or Debug (default: Release)
-  -g GENERATOR CMake generator (optional, e.g. "Ninja")
-  -j JOBS      Parallel jobs for build (default: number of CPUs)
-  --tcim PATH  Set TCIM_RUNTIME_PATH (default: read from TCIM_RUNTIME_PATH env var)
-  --houmo PATH Set HOUMO_SDK_PATH (default: read from HOUMO_SDK_PATH env var)
-  --install    Run 'cmake --install' after building
-  -h           Show this help
+  -s DIR            Source directory (default: script directory)
+  -b DIR            Build directory (default: ./build)
+  -c CONFIG         Build configuration: Release or Debug (default: Release)
+  -g GENERATOR      CMake generator (optional, e.g. "Ninja")
+  -j JOBS           Parallel jobs for build (default: number of CPUs)
+  --tcim PATH       Set TCIM_RUNTIME_PATH (default: read from TCIM_RUNTIME_PATH env var)
+  --houmo PATH      Set HOUMO_SDK_PATH (default: read from HOUMO_SDK_PATH env var)
+  --install [PATH]  Install after building (default: ${SOURCE_DIR}/..)
+  -h                Show this help
 
 Example:
-  $0 -b build -c Release -j 8 --tcim /opt/tcim --houmo /opt/houmo --install
+  $0 -b build -c Release -j 8 --tcim /opt/venv/houmo/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk --install
+  $0 -b build -c Release -j 8 --tcim /opt/venv/houmo/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk --install ${SOURCE_DIR}/..
 
 Notes:
   By default the script will read `TCIM_RUNTIME_PATH` and `HOUMO_SDK_PATH` from environment.
@@ -48,7 +49,16 @@ while [[ $# -gt 0 ]]; do
     -j) JOBS="$2"; shift 2;;
     --tcim) TCIM="$2"; shift 2;;
     --houmo) HOUMO="$2"; shift 2;;
-    --install) INSTALL=1; shift 1;;
+    --install) 
+      if [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^- ]]; then
+        INSTALL_DIR="$2"
+        shift 2
+      else
+        INSTALL_DIR="${SOURCE_DIR}/.."
+        shift 1
+      fi
+      INSTALL=1
+      ;;
     -h|--help) usage; exit 0;;
     --) shift; break;;
     *) echo "Unknown arg: $1"; usage; exit 1;;
@@ -66,7 +76,7 @@ fi
 
 # If environment vars are not set, try to auto-detect common installation paths
 if [[ -z "${TCIM_RUNTIME_PATH:-}" ]]; then
-  candidates=("/opt/tcim" "/usr/local/tcim" "/opt/tcim_runtime" "/usr/local/lib/tcim_runtime")
+  candidates=("/opt/venv/houmo/lib/python3.12/site-packages/tcim_lite")
   for p in "${candidates[@]}"; do
     if [[ -d "$p" && ( -d "$p/include" || -d "$p/inc" ) ]]; then
       export TCIM_RUNTIME_PATH="$p"
@@ -77,12 +87,12 @@ if [[ -z "${TCIM_RUNTIME_PATH:-}" ]]; then
 fi
 if [[ -z "${TCIM_RUNTIME_PATH:-}" ]]; then
   echo "Environment variable TCIM_RUNTIME_PATH is not set and auto-detection failed.
-Please set TCIM_RUNTIME_PATH (e.g. export TCIM_RUNTIME_PATH=/opt/tcim) or pass --tcim /path." >&2
+Please set TCIM_RUNTIME_PATH (e.g. export TCIM_RUNTIME_PATH=/opt/venv/houmo/lib/python3.12/site-packages/tcim_lite) or pass --tcim /path." >&2
   exit 1
 fi
 
 if [[ -z "${HOUMO_SDK_PATH:-}" ]]; then
-  candidates=("/opt/houmo_sdk" "/opt/houmo" "/usr/local/houmo" "/usr/local/houmo_sdk")
+  candidates=("/usr/local/houmo-sdk")
   for p in "${candidates[@]}"; do
     if [[ -d "$p" && ( -d "$p/include" || -d "$p/inc" ) ]]; then
       export HOUMO_SDK_PATH="$p"
@@ -93,7 +103,7 @@ if [[ -z "${HOUMO_SDK_PATH:-}" ]]; then
 fi
 if [[ -z "${HOUMO_SDK_PATH:-}" ]]; then
   echo "Environment variable HOUMO_SDK_PATH is not set and auto-detection failed.
-Please set HOUMO_SDK_PATH (e.g. export HOUMO_SDK_PATH=/opt/houmo_sdk) or pass --houmo /path." >&2
+Please set HOUMO_SDK_PATH (e.g. export HOUMO_SDK_PATH=/usr/local/houmo-sdk) or pass --houmo /path." >&2
   exit 1
 fi
 
@@ -119,10 +129,31 @@ echo "Building..."
 cmake --build "$BUILD_DIR" --config "$CONFIG" -- -j "$JOBS"
 
 if [[ "$INSTALL" -ne 0 ]]; then
-  install_dir="$BUILD_DIR/../../bin"
-  mkdir -p "$install_dir"
-  echo "Installing to: $install_dir"
-  cmake --install "$BUILD_DIR" --prefix "$install_dir" --config "$CONFIG"
+  if [[ -z "$INSTALL_DIR" ]]; then
+    INSTALL_DIR="${SOURCE_DIR}/.."
+  fi
+  
+  # Determine if we need elevated privileges based on target directory
+  NEED_SUDO=0
+  if [[ "$INSTALL_DIR" == /usr/* ]] || [[ "$INSTALL_DIR" == /opt/* ]]; then
+    NEED_SUDO=1
+  fi
+  
+  # Create the install directory
+  if [[ $NEED_SUDO -eq 1 ]]; then
+    sudo mkdir -p "$INSTALL_DIR"
+  else
+    mkdir -p "$INSTALL_DIR"
+  fi
+  
+  echo "Installing to: $INSTALL_DIR"
+  
+  # Use CMAKE_INSTALL_PREFIX to specify exact installation directory
+  if [[ $NEED_SUDO -eq 1 ]]; then
+    sudo cmake --install "$BUILD_DIR" --prefix "$INSTALL_DIR" --config "$CONFIG"
+  else
+    cmake --install "$BUILD_DIR" --prefix "$INSTALL_DIR" --config "$CONFIG"
+  fi
 fi
 
 echo "Build complete. Executable should be in: $BUILD_DIR/"
