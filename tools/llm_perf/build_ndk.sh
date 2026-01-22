@@ -10,13 +10,6 @@ if [ ! -e 3rdparty/eigen3 ];then
   rm -rf eigen-3.4.0.zip
   cd ..
 fi
-if [ ! -e 3rdparty/tokenizers-cpp ];then
-  cd 3rdparty
-  wget ${HOUMO_MODELZOO_URL}/models/qwen3/tokenizers-cpp.zip
-  unzip tokenizers-cpp.zip
-  rm -rf tokenizers-cpp.zip
-  cd ..
-fi
 set -e
 if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
   WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -73,7 +66,7 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
       -DANDROID_ABI=arm64-v8a \
       -DANDROID_PLATFORM=android-35 \
       -DANDROID_NDK=${NDK_PATH} \
-      -DCMAKE_INSTALL_PREFIX=${output_dir} -DCMAKE_BUILD_TYPE=${capitalized_build_type} ${@:2}             
+      -DCMAKE_INSTALL_PREFIX=${output_dir} -DCMAKE_BUILD_TYPE=${capitalized_build_type} ${@:2}
 
   RUN cmake --build . --target install -j 16
 

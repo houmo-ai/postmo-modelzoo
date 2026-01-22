@@ -11,13 +11,6 @@ if [ ! -e 3rdparty/eigen3 ];then
   rm -rf eigen-3.4.0.zip
   cd ..
 fi
-if [ ! -e 3rdparty/tokenizers-cpp ];then
-  cd 3rdparty
-  wget ${HOUMO_MODELZOO_URL}/models/qwen3/tokenizers-cpp.zip
-  unzip tokenizers-cpp.zip
-  rm -rf tokenizers-cpp.zip
-  cd ..
-fi
 if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
   if [ "$HOUMO_TARGET" = "xh2" ]; then
     set -e
