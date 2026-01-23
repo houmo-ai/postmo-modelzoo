@@ -24,9 +24,10 @@ link_directories(
 )
 set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
 
-set(SOURCE_FILES perf_tracker/inference_perf_tracker.cc HmEmbedding.cc HmvllmInfer.cc HmllmInfer.cc HmllmInferMultiBatch.cc llm_perf.cc)
+set(SOURCE_FILES perf_dumper/perf_dumper.cc perf_tracker/inference_perf_tracker.cc HmEmbedding.cc
+HmvllmInfer.cc HmllmInfer.cc HmllmInferMultiBatch.cc llm_perf.cc)
 
-set(INCLUDE_DIRS 
+set(INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR}/include
   ${EIGEN_PATH}
   )
@@ -39,6 +40,7 @@ if(MSVC)
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /DNDEBUG")
 else()
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+  set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -ggdb")
 endif()
 
 add_executable(${PROJECT_NAME}   ${SOURCE_FILES})
@@ -50,7 +52,7 @@ else()
     target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} hal_xh2a dl)
   else()
     target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} pthread hal_xh2a ${CMAKE_DL_LIBS})
-    target_compile_definitions(${PROJECT_NAME} PRIVATE XH2A_HM_SYS)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE XH2A_HM_SYS PERF_DUMP_ENABLE)
   endif()
 endif()
 install(TARGETS ${PROJECT_NAME} DESTINATION .)

@@ -401,8 +401,8 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_decode(
   return ret;
 }
 
-PerfInfos HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
-                                         const uint32_t stop_tokens_len) {
+void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
+                                    const uint32_t stop_tokens_len) {
   if (input_tokens_len > context_max_length) {
     throw std::runtime_error("Question long than " +
                              std::to_string(context_max_length) +
@@ -478,5 +478,5 @@ PerfInfos HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
   perf_tracker->setBasicInfo(this->batch, input_tokens_len,
                              llm_perf_datas.decode_count);
   perf_tracker->showSummary();
-  return llm_perf_datas;
+  return;
 }

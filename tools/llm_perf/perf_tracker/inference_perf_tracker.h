@@ -155,6 +155,15 @@ struct InferenceMetrics {
 
     return *this;
   }
+
+  InferenceMetrics& operator=(const InferenceMetrics& it) = default;
+};
+
+struct InferenceMetricsWithLoadTime {
+  InferenceMetrics metrics;
+  double prefill_load_time = 0.0;
+  double decode_load_time = 0.0;
+  double vision_load_time = 0.0;
 };
 
 // Inference performance tracker class
@@ -193,6 +202,14 @@ class InferencePerformanceTracker {
   // Reset tracker (start timing again)
   void reset();
   void pref_delete_warmup();
+  InferenceMetricsWithLoadTime get_perf_avg_summary() {
+    InferenceMetricsWithLoadTime result_metrics;
+    result_metrics.metrics = average_metrics;
+    result_metrics.prefill_load_time = prefill_load_time;
+    result_metrics.decode_load_time = decode_load_time;
+    result_metrics.vision_load_time = vision_load_time;
+    return result_metrics;
+  }
 
  private:
   InferenceMetrics current_metrics;

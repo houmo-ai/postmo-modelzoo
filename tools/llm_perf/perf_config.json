@@ -76,5 +76,6 @@
       "ndevices": 1,
       "loop": 1
     }
-  ]
+  ],
+  "dump_file": "perf_result.json"
 }

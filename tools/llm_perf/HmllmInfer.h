@@ -75,10 +75,10 @@ class HmllmInfer : public HmllmInferBase {
    * @brief Performance test for LLM inference
    * @param input_tokens_len Number of input tokens
    * @param stop_tokens_len Number of tokens to generate before stopping
-   * @return Performance information structure
+   * @return void
    */
-  PerfInfos perf_llm(const uint32_t input_tokens_len,
-                     const uint32_t stop_tokens_len) override;
+  void perf_llm(const uint32_t input_tokens_len,
+                const uint32_t stop_tokens_len) override;
 
   std::shared_ptr<InferencePerformanceTracker> get_perf_tracker() {
     return perf_tracker;

@@ -397,8 +397,8 @@ void HmvllmInfer::VitGetOutputDatas() {
   }
 }
 
-PerfInfos HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
-                                const uint32_t stop_tokens_len) {
+void HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
+                           const uint32_t stop_tokens_len) {
   if (input_tokens_len > context_max_length) {
     throw std::runtime_error("Question long than " +
                              std::to_string(context_max_length) +
@@ -516,5 +516,5 @@ PerfInfos HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
                              1);
   // perf information
   perf_tracker->showSummary();
-  return vllm_perf_datas;
+  return;
 }

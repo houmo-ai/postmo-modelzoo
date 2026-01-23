@@ -424,6 +424,7 @@ void InferencePerformanceTracker::showSummary(bool average) {
     metrics.vision_perf_infos.vision_infer_time /= num_collected_runs;
     metrics.vision_perf_infos.vision_getoutput_time /= num_collected_runs;
     calculateMetrics(metrics);
+    average_metrics = metrics;
   } else {
     calculateMetrics(current_metrics);
     total_metrics += current_metrics;

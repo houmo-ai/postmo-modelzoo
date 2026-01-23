@@ -138,7 +138,6 @@ static std::unordered_map<std::string, std::string> parse_args(int argc,
   std::unordered_map<std::string, std::string> args;
   std::set<std::string> flags = {"no_warm_up", "LazyMode"};
 
-  // Check for invalid argument combinations at the beginning
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[1];  // Note: This should probably be argv[i]
     if (arg == "-c" || arg == "--config" || arg == "-h" || arg == "--help") {
@@ -231,15 +230,10 @@ static int validate_setting(std::unordered_map<std::string, std::string>& args,
 struct PerfInfos {
   uint32_t input_tokens;
   uint32_t stop_tokens;
-  float prefill_time;
-  float decode_time;
-  float embedding_time;
-  float vit_time;
-  float ttft;
-  float t_total;  // E2E Latency
   uint32_t decode_count;
 };
 
+#if 0
 static void ShowPerfInformation(PerfInfos llm_perf_datas) {
   std::ostringstream os;
   os << "\n-------------------  Performance Summary  --------------------\n";
@@ -284,6 +278,7 @@ static void ShowPerfInformation(PerfInfos llm_perf_datas) {
   std::cout << os.str();
 }
 
+#endif
 /**
  * Generate a vector of random integers within a specified length
  * Used for creating random token IDs for testing purposes
@@ -369,9 +364,27 @@ class HmllmInferBase {
  public:
   HmllmInferBase() = default;
   virtual ~HmllmInferBase() = default;
-  virtual PerfInfos perf_llm(const uint32_t input_tokens_len,
-                             const uint32_t stop_tokens_len) = 0;
+  virtual void perf_llm(const uint32_t input_tokens_len,
+                        const uint32_t stop_tokens_len) = 0;
   virtual std::shared_ptr<InferencePerformanceTracker> get_perf_tracker() = 0;
 };
 
+typedef struct perf_settings {
+  std::string model_name;
+  std::string prefill_path;
+  std::string decode_path;
+  std::string visual_path;
+  std::string embedding_path;
+  int input_tokens_len;
+  int stop_tokens_len;
+  int ndevices;
+  int batch_size;
+  int loop_count;
+  bool warm_up;
+  bool LazyMode;
+} PerfSettings;
+
+inline double round_to_3_decimals(double value) {
+  return std::round(value * 1000.0) / 1000.0;
+}
 #endif  // __UTILS_H__
