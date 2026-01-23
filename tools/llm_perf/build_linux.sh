@@ -11,7 +11,7 @@ if [ ! -e 3rdparty/eigen3 ];then
   rm -rf eigen-3.4.0.zip
   cd ..
 fi
-if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
+if [ $(uname -s) = "Linux" ] &&  ([ $(uname -m) = "x86_64" ] || [ $(uname -m) = "aarch64" ]); then
   if [ "$HOUMO_TARGET" = "xh2" ]; then
     set -e
 
