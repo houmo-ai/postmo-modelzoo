@@ -37,6 +37,8 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 JSON_SUFFIX = ".json"
 
+MODELS_FILE_SIZE = "models_file_size"
+
 START_TASK_STR = "Start of Task"
 MODEL_NAME_STR = "ModelName:"
 END_TASK_STR = "End of Task"
@@ -459,7 +461,27 @@ def _handle_perf_flag_logic(
         perf_metric[keywords_dict_2[keyword_2]][-1] = _get_value_after_colon(line)
 
 
-def _generate_llm_perf_table(cfg_path, outputs):
+def _add_file_size_to_perf(perf_dict, size_dict):
+    """
+    Add file_size key-value pairs to perf_dict, matching values from size_dict in order of model_name.
+    :param perf_dict: Original performance metrics dictionary
+    :param size_dict: File size dictionary, key is model name, value is file size string
+    :return: Updated perf_dict with added file_size
+    """
+    model_names = perf_dict.get("model_name", [])
+    if not model_names:
+        return perf_dict
+
+    file_size_list = []
+    for model in model_names:
+        model_size = size_dict.get(model, 0)
+        file_size_list.append(model_size)
+
+    perf_dict["file_size"] = file_size_list
+    return perf_dict
+
+
+def _generate_llm_perf_table(cfg_path, outputs, file_size_dict):
     """
     Generate LLM performance table from outputs.
 
@@ -528,6 +550,7 @@ def _generate_llm_perf_table(cfg_path, outputs):
                 handle_func(line, perf_metric, state, keywords_dict, perf_key)
                 break
 
+    perf_metric = _add_file_size_to_perf(perf_metric, file_size_dict)
     for key, value in perf_metric.items():
         logger.info(f"{key}, length: {len(value)}")
 
@@ -548,11 +571,12 @@ def _generate_llm_perf_table(cfg_path, outputs):
         "e2e_tps(tokens/s)",
         "prefill_embedding_time(ms)",
         "decode_embedding_time(ms)",
+        "file_size(MB)",
     ]
     _write_to_xlsx(perf_metric, cfg_path, "llm_perf", columns)
 
 
-def _generate_tcim_perf_table(cfg_path, outputs):
+def _generate_tcim_perf_table(cfg_path, outputs, file_size_dict):
     """
     Generate TCIM performance table from outputs.
 
@@ -627,6 +651,7 @@ def _generate_tcim_perf_table(cfg_path, outputs):
                 handle_func(line, *args)
                 break
 
+    perf_metric = _add_file_size_to_perf(perf_metric, file_size_dict)
     for key, value in perf_metric.items():
         print(f"{key}, length: {len(value)}")
 
@@ -650,11 +675,12 @@ def _generate_tcim_perf_table(cfg_path, outputs):
         "e2e_max(ms)",
         "e2e_min(ms)",
         "qps",
+        "file_size(MB)",
     ]
     _write_to_xlsx(perf_metric, cfg_path, "tcim_perf", columns)
 
 
-def _generate_demo_perf_table(cfg_path, outputs):
+def _generate_demo_perf_table(cfg_path: str, outputs, file_size_sum: float):
     """
     Generate demo performance table from outputs.
 
@@ -753,6 +779,7 @@ def _generate_demo_perf_table(cfg_path, outputs):
                 handle_func(line, *args)
                 break
 
+    perf_metric["file_size_sum"] = f"{file_size_sum} MB"
     for key, value in perf_metric.items():
         print(f"{key}, length: {len(value)}")
 
@@ -772,6 +799,7 @@ def _generate_demo_perf_table(cfg_path, outputs):
         "tts_rtf",
         "tts_generate_speed",
         "e2e_latency(s)",
+        "file_size_sum(MB)",
     ]
     _write_to_xlsx(perf_metric, cfg_path, "demo_perf", columns)
 
@@ -850,6 +878,24 @@ def _copy_file_or_dir(
         return False
 
 
+def _get_file_size_mb(file_path: str) -> float:
+    """
+    Get the size of the specified file in MB.
+    :param file_path: str, Absolute or relative path to the file
+    :return: float, File size in MB, rounded to 4 decimal places
+    """
+    # Check if path exists and check if path is a file
+    if not os.path.exists(file_path) or not os.path.isfile(file_path):
+        return 0
+
+    # Get file size in bytes
+    byte_size = os.path.getsize(file_path)
+    # Convert to MB
+    mb_size = byte_size / (1024 * 1024)
+
+    return round(mb_size, 4)
+
+
 def _execute_perf_task(
     perf_dir: str,
     cfg_data: Dict,
@@ -882,13 +928,15 @@ def _execute_perf_task(
 
     outputs_total = []
     for model_name, cmd in cmds.items():
+        if model_name == MODELS_FILE_SIZE:
+            continue
         outputs_total += [f"****** {START_TASK_STR}, {MODEL_NAME_STR} {model_name}"]
         _, outputs = execute_cmd(cmd, log_file, get_outputs=True)
         outputs_total += outputs
         outputs_total += [f"****** {END_TASK_STR} ******"]
         time.sleep(5)
 
-    generate_table_func(base_cfg_path, outputs_total)
+    generate_table_func(base_cfg_path, outputs_total, cmds[MODELS_FILE_SIZE])
 
 
 def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
@@ -905,6 +953,8 @@ def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
     os.chdir(f"{script_dir}/../../tools/llm_perf")
 
     cmds = {}
+    file_size_dict = {}
+    file_keys = ["prefill", "decode", "visual"]
     for perf_md in cfg_data["Streams"]:
         # , "--LazyMode"
         tmp_cmd = ["./llm_perf"]
@@ -913,7 +963,16 @@ def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
             if param in ["ModelName", "model_name", "quant_models"]:
                 continue
             tmp_cmd += [f"--{param}", str(param_val)]
-        cmds[perf_md["ModelName"]] = tmp_cmd
+        model_name = perf_md["ModelName"]
+        cmds[model_name] = tmp_cmd
+
+        # Get file size
+        file_size_str = ""
+        for file_key in file_keys:
+            model_path = perf_md.get(file_key, "")
+            model_size = _get_file_size_mb(model_path) if model_path else 0
+            file_size_str += f"{file_key}:{model_size:.3f} MB;"
+        file_size_dict[model_name] = file_size_str
 
         # Embed file conversion logic
         embed_bin = perf_md["embedding"]
@@ -925,6 +984,8 @@ def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
             ["python3", "convert_embed.py", "--path", embed_pt, "--type", model_type],
             log_file,
         )
+    if cmds:
+        cmds[MODELS_FILE_SIZE] = file_size_dict
     return cmds
 
 
@@ -940,6 +1001,7 @@ def _build_tcim_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
         Dict[str, List[str]]: Dictionary mapping model names to command lists
     """
     cmds = {}
+    file_size_dict = {}
     for perf_md in cfg_data["Streams"]:
         tmp_cmd = ["./tcim_perf"]
         # Filter parameters
@@ -963,6 +1025,12 @@ def _build_tcim_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
             tmp_cmd_final = tmp_cmd + ["--model", hmm_path]
             key_name = f"{perf_md['ModelName']}_{hmm_name}"
             cmds[key_name] = tmp_cmd_final
+
+            model_size = _get_file_size_mb(hmm_path)
+            file_size_dict[key_name] = f"{model_size:.3f}"
+
+    if cmds:
+        cmds[MODELS_FILE_SIZE] = file_size_dict
     return cmds
 
 
@@ -1050,7 +1118,9 @@ if __name__ == "__main__":
 
         # Copy hmm files
         copy_success = True
+        file_size_sum = 0
         for hmm_file in hmm_file_paths:
+            file_size_sum += _get_file_size_mb(hmm_file)
             file_name = os.path.basename(hmm_file)
             target_file = os.path.join(target_dir, file_name)
             if not _copy_file_or_dir(hmm_file, target_file, clean_dir=test_dir):
@@ -1080,7 +1150,7 @@ if __name__ == "__main__":
             outputs_total = [f"****** {START_TASK_STR}, {MODEL_NAME_STR} {model_name}"]
             outputs_total += outputs
             outputs_total += [f"****** {END_TASK_STR} ******"]
-            _generate_demo_perf_table(cfg_paths["llm"], outputs_total)
+            _generate_demo_perf_table(cfg_paths["llm"], outputs_total, file_size_sum)
 
         # Cleanup directory
         os.chdir(script_dir)
