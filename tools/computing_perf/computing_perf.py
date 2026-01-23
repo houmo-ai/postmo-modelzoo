@@ -582,6 +582,12 @@ if __name__ == "__main__":
         print("Model built successfully.")
 
     if not args.skip_run:
+        HDPL_PLATFORM = os.environ.get("HDPL_PLATFORM", "ISIM")
+        if HDPL_PLATFORM == "ISIM":
+            print(
+                "Warning: Running on ISIM platform may not reflect actual performance on real hardware."
+            )
+            exit(0)
         print("=========================================")
         print(f"Running model {hmm_path}")
         if not os.path.exists(hmm_path):

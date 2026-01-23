@@ -3,11 +3,6 @@
 WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${WORK_PATH}" || exit 1
 
-if [ "${HDPL_PLATFORM:-}" = "ISIM" ]; then
-    echo "ISIM platform does not support this tool."
-    exit 0
-fi
-
-python3 bandwidth_perf.py --type r
+python3 bandwidth_perf.py --type r "$@"
 sleep 5
-python3 bandwidth_perf.py --type w
+python3 bandwidth_perf.py --type w "$@"
