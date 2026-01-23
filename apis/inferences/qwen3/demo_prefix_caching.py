@@ -30,7 +30,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from loguru import logger
-from typing import Dict, Tuple, List, override
+from typing import Dict, Tuple, List
+from typing_extensions import override
 
 from qwen_base import HmQwenBase
 from sampling_manager import SamplingManager

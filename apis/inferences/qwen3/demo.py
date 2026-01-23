@@ -29,7 +29,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from loguru import logger
-from typing import override
+from typing_extensions import override
 
 from qwen_demo_utils import show_statistics, is_valid_char
 from qwen_base import HmQwenBase
