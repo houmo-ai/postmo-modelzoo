@@ -268,6 +268,7 @@ def houmo_export_llm(args):
         input_sequence_length=args.input_sequence_length,
         quant_scheme=quant_scheme,
         quant_weight=quant_weight,
+        num_logits_to_keep=1,
     )
 
     prefix = "{}-XH2a-{}-{}".format(
