@@ -1071,23 +1071,19 @@ def compress_files_to_tar_xz_with_progress(file_paths, output_path, preset=9):
                         )
 
 
-def upload_file_to_artifactory(
-    file_path, upload_url, username, password, max_retries=3
-):
+def upload_file_to_artifactory(file_path, upload_url, max_retries=3):
     """Upload file to Artifactory server with checksum verification and retry mechanism.
 
     Args:
         file_path (str): Local file path to upload
         upload_url (str): Target upload URL (relative path that will be appended to base URL)
-        username (str): Authentication username (default: None)
-        password (str): Authentication password (default: None)
         max_retries (int): Maximum number of retry attempts (default: 3)
 
     Returns:
         bool: True if upload is successful, False otherwise
     """
-    username = username or os.getenv("JFROG_USERNAME")
-    password = password or os.getenv("JFROG_PASSWORD")
+    username = os.getenv("JFROG_USERNAME")
+    password = os.getenv("JFROG_PASSWORD")
     if not username or not password:
         print("Username and password must be provided")
         return False
