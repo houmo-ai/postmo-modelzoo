@@ -168,6 +168,18 @@ detection_yolov10m:
         args: all
   test:
     - detection_yolov10m_test
+detection_yolox:
+  include:
+    - models/detection/yolox
+  exclude:
+    - models/detection/yolox/README.MD
+  example_case:
+    - detection_yolox_test:
+        test_type: models_tests
+        script: yolox
+        args: all
+  test:
+    - detection_yolox_test
 detection_yolov8m-cls:
   include:
     - models/backbone/yolov8m-cls

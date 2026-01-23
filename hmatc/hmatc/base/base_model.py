@@ -20,6 +20,7 @@
 import os
 import abc
 import time
+import torch
 import numpy as np
 from typing import Dict, Any
 from ..utils import logger
@@ -28,6 +29,7 @@ from ..utils.preprocess import xh1_preprocess as resizer_preprocess
 from ..infer.xh1_infer import Xh1Infer
 from ..infer.xh2_infer import Xh2Infer
 from ..infer.onnx_infer import OnnxInfer
+from ..infer.xhquant_infer import Xh2HmQuantInfer
 
 
 COLORS = [
@@ -69,7 +71,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 - is_image_single_input (bool): Whether input is single image
                 - resizer_mode (int): Mode for resizing (default: 0)
                 - roi_num (int): Number of regions of interest (default: 1)
-                - backend (str): Backend type (onnx/xh1/xh2)
+                - backend (str): Backend type (onnx/xh1/xh2/hmonnx)
         """
         self.time_span = 0  # Total time span for inference operations
         self.total = 0  # Total number of inference operations performed
@@ -91,6 +93,8 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             self.engine = Xh1Infer()
         elif self.backend == "xh2":
             self.engine = Xh2Infer()
+        elif self.backend == "hmonnx":
+            self.engine = Xh2HmQuantInfer()
         else:
             logger.error(f"Not support backend: {self.backend}")
             exit(-1)
@@ -165,17 +169,21 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 == "onnx",  # Static resizer, need to convert to YUV in non-quantization stage, cannot set is_onnx=True
                 to_YUV=self.resizer_mode in [1, 2, 3],
                 fmt=toYUV_format,
-                return_dynamic_v1_format=self.backend == "xh2"
+                return_dynamic_v1_format=self.backend in ["xh2", "hmonnx"]
                 and self.resizer_mode in [1, 2],
             )
             if self.backend == "onnx":
                 new_datas[in_name] = im.detach().cpu().numpy()
-            elif self.backend == "xh2" and self.resizer_mode == 0:
+            elif self.backend in ["xh2", "hmonnx"] and self.resizer_mode == 0:
                 new_datas[in_name] = im.detach().cpu().numpy().astype(np.float16)
             elif self.backend == "xh1" and self.resizer_mode == 0:
                 new_datas[in_name] = self.engine.quantize(
                     in_name, im.detach().cpu().numpy()
                 )
+            elif self.backend == "hmonnx" and self.resizer_mode in [1, 2, 3]:
+                yuv_pad = im.detach().cpu()
+                h, w, c = yuv_pad.shape
+                new_datas[in_name] = yuv_pad.view(1, c, h, w).contiguous().numpy()
             elif self.resizer_mode in [1, 2, 3]:
                 yuv_pad = im.detach().cpu().numpy().flatten()
                 if toYUV_format == "YUV420SP":
@@ -186,9 +194,9 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                     valid_len = yuv_pad.size
                 yuv = yuv_pad[:valid_len].copy().reshape(1, -1)
                 new_datas[in_name] = np.ascontiguousarray(yuv)
-                if self.resizer_mode in [1, 2]:
-                    dyn_info = dyn_info.detach().cpu().numpy()
-                    new_datas[f"resizer_crop_{in_name}"] = dyn_info
+            if self.resizer_mode in [1, 2]:
+                dyn_info = dyn_info.detach().cpu().numpy()
+                new_datas[f"resizer_crop_{in_name}"] = dyn_info
             return new_datas
 
     def run(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
@@ -204,7 +212,11 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         # For multi-batch, directly duplicate data, and subsequent resizer information duplication
         for name in prerpcessed_in_datas:
             in_data = prerpcessed_in_datas[name]
-            if name.startswith("resizer_crop_") and self.roi_num > 1:
+            if (
+                name.startswith("resizer_crop_")
+                and self.roi_num > 1
+                and self.backend in ["xh1", "xh2"]
+            ):
                 prerpcessed_in_datas[name] = np.repeat(
                     in_data, repeats=self.roi_num, axis=0
                 )

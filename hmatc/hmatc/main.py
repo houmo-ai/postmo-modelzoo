@@ -503,8 +503,12 @@ def run_benchmark(
                     ),
                 )
                 p.start()
-                p.join(timeout=3600)
-                if p.exitcode != 0:
+                p.join(timeout=7200)
+                if p.exitcode is None:
+                    logger.warning(f"{model_name} run timeout, will kill it")
+                    p.kill()
+                    p.join()
+                if p.exitcode is not None and p.exitcode != 0:
                     logger.error(
                         f"{model_name} run failed, and exitcode is {p.exitcode}"
                     )
@@ -614,6 +618,7 @@ def main():
     parent_config = argparse.ArgumentParser(add_help=False)
     parent_target = argparse.ArgumentParser(add_help=False)
     parent_onnx = argparse.ArgumentParser(add_help=False)
+    parent_hmonnx = argparse.ArgumentParser(add_help=False)
     parent_result_path = argparse.ArgumentParser(add_help=False)
     parent_device_id = argparse.ArgumentParser(add_help=False)
     parent_cuda = argparse.ArgumentParser(add_help=False)
@@ -633,6 +638,7 @@ def main():
     parent_onnx.add_argument(
         "--onnx", action="store_true", help="Specify onnx model as the backend"
     )
+    parent_hmonnx.add_argument("--hmonnx", action="store_true", help=argparse.SUPPRESS)
     parent_result_path.add_argument(
         "--result_path",
         type=str,
@@ -645,7 +651,7 @@ def main():
         type=int,
         required=False,
         default=0,
-        help="Specify a device",
+        help="Specify a device, running inference on chip",
     )
     parent_cuda.add_argument(
         "--cuda",
@@ -789,6 +795,7 @@ def main():
             parent_config,
             parent_target,
             parent_onnx,
+            parent_hmonnx,
             parent_result_path,
             model_cfg_parent,
             parent_device_id,
@@ -802,6 +809,7 @@ def main():
             parent_config,
             parent_target,
             parent_onnx,
+            parent_hmonnx,
             parent_result_path,
             model_cfg_parent,
             parent_device_id,
@@ -930,8 +938,11 @@ def main():
     new_res_info = dict()
     backend = target
     # Update onnx backend
-    if current_command in ["demo", "eval"] and args.onnx:
-        backend = "onnx"
+    if current_command in ["demo", "eval"]:
+        if args.onnx:
+            backend = "onnx"
+        elif args.hmonnx:
+            backend = "hmonnx"
     # Execute the corresponding command
     if current_command == "quant":
         if args.cuda and target == "xh1" and torch.cuda.is_available():

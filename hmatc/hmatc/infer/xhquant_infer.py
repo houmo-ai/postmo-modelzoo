@@ -41,10 +41,11 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         Initializes the xhquant runtime.
         """
         super().__init__()
-        self.backend = "Xh2Hmquant"
+        self.backend = "hmonnx"
         self.model_ext = ".onnx"
         self.input_names = list()
         self.output_names = list()
+        self.inputs_batch = dict()
         try:
             from xhquant.api import xhquant_init
         except ImportError:
@@ -80,6 +81,7 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
             logger.info(
                 f"[Xh2Hmquant] input[{info.name}], shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
             )
+            self.inputs_batch[name] = info.shape[0]
 
         for idx, name in enumerate(self.output_names):
             info = self.engine.get_output(name)
@@ -99,6 +101,10 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
             Dict[str, np.ndarray]: Dictionary of output data where keys are output names
                 and values are numpy arrays containing the inference results as float32
         """
+        for key in in_datas:
+            in_data = in_datas[key]
+            if isinstance(in_data, np.ndarray):
+                in_datas[key] = torch.from_numpy(in_data)
         self.total += 1
         t_start = time.time()
         outputs = self.engine.run(in_datas)

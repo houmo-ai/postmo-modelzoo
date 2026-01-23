@@ -9,8 +9,8 @@ model:
       mean: [123.675, 116.28, 103.53]
       std: [58.395, 57.12, 57.375]
       resize_type: 0
-      # resizer:
-      #   toYUV_format: YUV420SP
+      resizer:
+        toYUV_format: YUV420SP
   model_impl_module: model
   model_impl_cls: OCRDet
 
