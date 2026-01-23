@@ -2,7 +2,7 @@
 #
 # File: bandwidth_perf.py
 # Description:
-#   Bandwidth Performance Testing Tool - Python script for measuring 
+#   Bandwidth Performance Testing Tool - Python script for measuring
 # AI core bandwidth performance using multi-process execution.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -294,9 +294,9 @@ if __name__ == "__main__":
         args.skip_build = True
         if "HOUMO_MODELZOO_URL" not in os.environ:
             os.environ["HOUMO_MODELZOO_URL"] = (
-                "http://139.224.0.199:8082/artifactory/houmo/release"
+                "http://artifactory.houmo.ai/artifactory/Dadao"
             )
-        zipped_hmm_path = f"models/bandwidth_perf/hmm_{target}_transpose_{bandwidth_type.lower()}_1core_20251028.tar.xz"
+        zipped_hmm_path = f"models/tools/bandwidth_perf/hmm_{target}_transpose_{bandwidth_type.lower()}_1core_20251028.tar.xz"
         get_file_from_jfrog(zipped_hmm_path, "./", "./")
 
     if not args.skip_build:

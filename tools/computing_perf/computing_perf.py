@@ -2,7 +2,7 @@
 #
 # File: computing_perf.py
 # Description:
-#   Computing Performance Testing Tool - Python script for measuring 
+#   Computing Performance Testing Tool - Python script for measuring
 # AI core computing performance using convolution operations.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -539,12 +539,16 @@ if __name__ == "__main__":
 
         if "HOUMO_MODELZOO_URL" not in os.environ:
             os.environ["HOUMO_MODELZOO_URL"] = (
-                "http://139.224.0.199:8082/artifactory/houmo/release"
+                "http://artifactory.houmo.ai/artifactory/Dadao"
             )
         if target == "xh1":
-            zipped_hmm_path = "models/computing_perf/hmm_xh1_conv_1core_20250916.tar.xz"
+            zipped_hmm_path = (
+                "models/tools/computing_perf/hmm_xh1_conv_1core_20250916.tar.xz"
+            )
         elif target == "xh2":
-            zipped_hmm_path = "models/computing_perf/hmm_xh2_conv_1core_20250916.tar.xz"
+            zipped_hmm_path = (
+                "models/tools/computing_perf/hmm_xh2_conv_1core_20250916.tar.xz"
+            )
         get_file_from_jfrog(zipped_hmm_path, "./", "./")
 
     if not args.skip_build:
