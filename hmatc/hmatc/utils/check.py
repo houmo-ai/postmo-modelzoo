@@ -141,7 +141,9 @@ def check_cfg(cfg):
             # if max_input_size is smaller than input WH, give warning
             resizer_input_h, resizer_input_w = max_input_size
             if resizer_input_h < H or resizer_input_w < W:
-                logger.warning(f"max_input_size[H, W] should be greater than [H, W]")
+                logger.warning(
+                    f"max_input_size[{resizer_input_h}, {resizer_input_w}] should be greater than [{H}, {W}]"
+                )
 
             if enable_static_resizer and "crop_size" in resizer_cfg:
                 crop_size = resizer_cfg.get("crop_size", [0, 0, H, W])

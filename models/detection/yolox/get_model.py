@@ -50,7 +50,7 @@ def get_args() -> argparse.Namespace:
         "--model_dir",
         dest="model_dir",
         type=str,
-        default="",
+        default=".",
         help="where to save downloaded model",
     )
     args = parser.parse_args()

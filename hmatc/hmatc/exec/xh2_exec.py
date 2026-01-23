@@ -32,7 +32,7 @@ from ..infer.xh2_infer import Xh2Infer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
-from ..utils.preprocess import calc_padding_size
+from ..utils.preprocess import calc_padding_size, convert_bgr_to_yuv
 from ..utils.preprocess import xh1_preprocess as resizer_preprocess
 from ..utils.utils import (
     SUPPORT_IMAGE_FORMATS,
@@ -62,7 +62,7 @@ class Xh2Exec(BaseExec):
             cfg (dict): Configuration dictionary containing model and quantization settings
         """
         super().__init__(cfg)
-        self.quant_type = "w8a8h1_sefp"
+        self.quant_type = self.quant_cfg.get("quant_type", "w8a8h1_sefp")
         self.golden_dir = os.path.join(self.quant_output_dir, "golden")
         self.upgrade_opset_version()
 
@@ -165,12 +165,13 @@ class Xh2Exec(BaseExec):
                 std = input_cfg.get("std")
                 resizer_cfg = input_cfg.get("resizer", dict())
                 resizer_format = resizer_cfg.get("toYUV_format", "YUV420SP")
-                resize_input_size = resizer_cfg.get("max_input_size", [H, W])
+                resizer_input_size = resizer_cfg.get("max_input_size", [H, W])
+                MAX_H, MAX_W = resizer_input_size
                 enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
                 dynamic_crop = not enable_static_resizer
                 resize_type = input_cfg["resize_type"]
                 crop_offset = (0, 0)
-                crop_size = (resize_input_size[0], resize_input_size[1])
+                crop_size = (resizer_input_size[0], resizer_input_size[1])
                 pad_value = 0
                 if resize_type == 1:
                     padding_values = input_cfg.get("padding_values", [114, 114, 114])
@@ -180,18 +181,20 @@ class Xh2Exec(BaseExec):
                         pad_value = 0
                 pad_size = (0, 0, 0, 0)
                 if enable_static_resizer:
-                    resizer_crop_size = resizer_cfg.get(
-                        "crop_size",
-                        # [0, 0, resize_input_size[0], resize_input_size[1]],
-                        [0, 0, H, W],
-                    )
-                    crop_offset = (resizer_crop_size[0], resizer_crop_size[1])
-                    crop_size = (resizer_crop_size[2], resizer_crop_size[3])
-                    if resize_type == 1:
-                        padding_mode = input_cfg["padding_mode"]
-                        pad_size, _, _ = calc_padding_size(
-                            crop_size, (W, H), padding_mode
+                    resizer_crop_size = resizer_cfg.get("crop_size", [0, 0, H, W])
+                    CROP_H, CROP_W = (resizer_crop_size[2], resizer_crop_size[3])
+                    if CROP_H > MAX_H or CROP_W > MAX_W:
+                        _, new_size, _ = calc_padding_size(
+                            (CROP_H, CROP_W), (MAX_W, MAX_H), 0
                         )
+                        CROP_H, CROP_W = new_size
+                    crop_offset = (resizer_crop_size[0], resizer_crop_size[1])
+                    crop_size = (CROP_H, CROP_W)
+                    # if resize_type == 1:
+                    #     padding_mode = input_cfg["padding_mode"]
+                    #     pad_size, _, _ = calc_padding_size(
+                    #         crop_size, (W, H), padding_mode
+                    #     )
                 resizer_cfg = ResizerScheme(
                     size=(H, W),  # target size, also ONNX model input size
                     mode="bilinear",  # nearest, not supported for configuration yet
@@ -219,7 +222,7 @@ class Xh2Exec(BaseExec):
 
     def get_random_input_data(self):
         """
-        Generate golden input data.
+        Generate random golden input data.
 
         Returns:
             list: List of input data tensors
@@ -240,16 +243,17 @@ class Xh2Exec(BaseExec):
             N, C, H, W = shape
             # Resizer operator default input size is model input size
             resizer_input_size = resizer_cfg.get("max_input_size", [H, W])
+            toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
             resizer_input_shape = [
                 N,
                 C,
                 resizer_input_size[0],
                 resizer_input_size[1],
             ]
-            dtype_str = "uint8"
-            in_datas.append(
-                torch.from_numpy(self.gen_random_data(resizer_input_shape, dtype_str))
-            )
+            random_bgr_img = self.gen_random_data(resizer_input_shape, "uint8")
+            random_yuv_img = convert_bgr_to_yuv(random_bgr_img, toYUV_format)  # HWC
+            random_yuv_img = random_yuv_img.view(N, C, H, W)
+            in_datas.append(random_yuv_img)
             enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
             if not enable_static_resizer:
                 # Dynamic parameter data defaults to using full image size as valid data
@@ -276,6 +280,89 @@ class Xh2Exec(BaseExec):
         in_datas.extend(dynamic_inputs)
         return in_datas
 
+    def get_input_data(self):
+        """Generate golden input data.
+
+        Returns:
+            list: List of input data tensors"""
+        if self.use_random_data:
+            logger.info("Use random calib data")
+            return self.get_random_input_data()
+
+        calib_data = self.quant_cfg.get("calib_data")
+        if not os.path.isdir(calib_data):
+            HOUMO_DATASETS_PATH = os.environ.get("HOUMO_DATASETS_PATH", "")
+            calib_data = os.path.join(HOUMO_DATASETS_PATH, calib_data)
+            if not os.path.isdir(calib_data):
+                logger.error(f"Not found calib_data path: {calib_data}")
+                exit(-1)
+        logger.info(f"calib_data: {calib_data}")
+        filenames = os.listdir(calib_data)
+        data_list = []
+        for filename in filenames:
+            _, ext = os.path.splitext(filename)
+            if (
+                ext not in SUPPORT_IMAGE_FORMATS
+                if self.is_image_single_input
+                else [".npz"]
+            ):
+                continue
+            data_list.append(os.path.join(calib_data, filename))
+        if len(data_list) == 0:
+            logger.error(f"Not found calib data in {calib_data}")
+            exit(-1)
+        data_list.sort()
+
+        data_path = data_list[0]
+        logger.info(f"Using data path: {data_path}")
+        if self.is_multi_input_model or not self.is_image_single_input:
+            in_datas = load_npz(data_path)
+            in_datas = [torch.from_numpy(in_datas[k]) for k in in_datas]
+        else:
+            input_name = self.inputs_name[0]
+            input_cfg = self.inputs_cfg[input_name]
+            data_format = input_cfg["data_format"]
+            input_shape = input_cfg["shape"]
+            N, C, H, W = input_shape
+            mean = input_cfg["mean"]
+            std = input_cfg["std"]
+            resize_type = input_cfg["resize_type"]
+            padding_mode = input_cfg.get("padding_mode", 1)
+            padding_values = input_cfg.get("padding_values", [0, 0, 0])
+            cv_image = cv2.imread(data_path)
+            if cv_image is None:
+                logger.error(f"Failed to load image: {data_path}")
+                exit(1)
+            resizer_cfg = input_cfg.get("resizer", dict())
+            toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
+            max_input_size = resizer_cfg.get("max_input_size", [H, W])
+            MAX_H, MAX_W = max_input_size
+            yuv_im, dyn_info = resizer_preprocess(
+                cv_image,
+                input_shape,
+                max_input_size=max_input_size,
+                mean=mean,
+                std=std,
+                use_resize=self.resizer_mode in [0, 3],
+                use_norm=self.resizer_mode == 0,
+                use_rgb=data_format == "RGB" and self.resizer_mode == 0,
+                resize_type=resize_type,
+                padding_mode=padding_mode,
+                padding_values=padding_values,
+                is_onnx=self.resizer_mode == 0,
+                to_YUV=self.resizer_mode in [1, 2, 3],
+                fmt=toYUV_format,
+                return_dynamic_v1_format=self.resizer_mode == 1,
+            )
+            in_datas = []
+            if self.resizer_mode in [1, 2, 3]:
+                yuv_im = yuv_im.view(N, C, MAX_H, MAX_W)
+            in_datas.append(yuv_im)
+            if self.resizer_mode in [1, 2]:
+                in_datas.append(dyn_info)
+
+        return in_datas
+
     def quantize(self):
         """
         Quantize the ONNX model for XH2 hardware.
@@ -283,6 +370,7 @@ class Xh2Exec(BaseExec):
         Returns:
             dict: Dictionary containing quantization results and information
         """
+        logger.info(f"Quant type: {self.quant_type}")
         # quantize the model
         if not os.path.exists(self.quant_output_dir):
             os.makedirs(self.quant_output_dir)
@@ -306,7 +394,7 @@ class Xh2Exec(BaseExec):
         quant_cfg = self.get_quant_cfg()
         logger.info(f"quant_cfg: {quant_cfg}")
 
-        in_datas = self.get_random_input_data()
+        in_datas = self.get_input_data()
 
         quant_onnx_model_path = os.path.join(
             self.quant_output_dir, f"{self.model_name}.onnx"

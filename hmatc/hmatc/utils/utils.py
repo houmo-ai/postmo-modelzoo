@@ -43,7 +43,7 @@ JFROG_REPO = "http://artifactory.houmo.ai/artifactory/Dadao"
 OSS_REPO = "https://houmo-llm.oss-cn-shanghai.aliyuncs.com/Dadao"
 
 SUPPORT_IMAGE_FORMATS = [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]
-SUPPORT_BACKEND = ["xh1", "xh2", "onnx"]
+SUPPORT_BACKEND = ["xh1", "xh2", "onnx", "hmonnx"]
 
 
 def read_yaml_to_dict(file_path: str) -> dict:

@@ -285,7 +285,6 @@ def xh1_preprocess(
         fmt (str): YUV format string
         return_dynamic_v1_format (bool): Whether to return dynamic v1 format info
         crop_size (list or None): Crop size [start_h, start_w, end_h, end_w]
-
     Returns:
         tuple: (processed_image, dynamic_info) where:
             - processed_image: Preprocessed image tensor
@@ -312,17 +311,20 @@ def xh1_preprocess(
     if is_onnx:
         return torch.from_numpy(im), list()
 
-    _, nc, nh, nw = im.shape
+    _, _, nh, nw = im.shape
     max_height, max_width = max_input_size
     if nh > max_height or nw > max_width:
-        nh, nw = H, W
-        if resize_type == 1:
-            padding_size, size, _ = calc_padding_size(
-                (nh, nw), (max_width, max_height), padding_mode=0
-            )
-            nh, nw = size
+        padding_size, size, _ = calc_padding_size(
+            (nh, nw),
+            (max_width, max_height),
+            padding_mode=0,
+        )
+        nh, nw = size
         im = torch.nn.functional.interpolate(
-            torch.from_numpy(im), size=(nh, nw), mode="bilinear", align_corners=False
+            torch.from_numpy(im),
+            size=(nh, nw),
+            mode="bilinear",
+            align_corners=False,
         )
         im = im.detach().cpu().numpy()
 
@@ -333,12 +335,13 @@ def xh1_preprocess(
         size = [H, W]
 
     nh, nw = clip_resize_scale((nh, nw), size)
-
     im = torch.nn.functional.interpolate(
-        torch.from_numpy(im), size=(nh, nw), mode="bilinear", align_corners=False
+        torch.from_numpy(im),
+        size=(nh, nw),
+        mode="bilinear",
+        align_corners=False,
     )
     im = im.detach().cpu().numpy()
-
     if resize_type == 1:
         padding_size, size, _ = calc_padding_size((nh, nw), (W, H), padding_mode)
 

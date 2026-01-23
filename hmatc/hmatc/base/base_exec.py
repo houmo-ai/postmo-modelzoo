@@ -269,19 +269,19 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             numpy.ndarray: Generated random data array.
         """
         if dtype == "float32":
-            random_data = np.random.uniform(low=0, high=128, size=shape).astype(
+            random_data = np.random.uniform(low=0, high=1, size=shape).astype(
                 dtype=dtype
-            )  # Value range [0, 128)
+            )  # Value range [0, 1)
         elif dtype == "float16":
-            random_data = np.random.uniform(low=0, high=128, size=shape).astype(
+            random_data = np.random.uniform(low=0, high=1, size=shape).astype(
                 dtype=dtype
-            )  # Value range [0, 128)
+            )  # Value range [0, 1)
         elif dtype == "int16":
-            random_data = np.random.randint(low=0, high=128, size=shape, dtype=dtype)
+            random_data = np.random.randint(low=-5, high=5, size=shape, dtype=dtype)
         elif dtype == "int32":
-            random_data = np.random.randint(low=0, high=128, size=shape, dtype=dtype)
+            random_data = np.random.randint(low=-5, high=5, size=shape, dtype=dtype)
         elif dtype == "int64":
-            random_data = np.random.randint(low=0, high=128, size=shape, dtype=dtype)
+            random_data = np.random.randint(low=-5, high=5, size=shape, dtype=dtype)
         elif dtype == "uint8":
             random_data = np.random.randint(low=0, high=255, size=shape, dtype=dtype)
         elif dtype == "bool":
@@ -426,8 +426,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 logger.warning(f"filepath not exists -> {filepath}")
                 continue
             filepaths.append(filepath)
-        model_path = self.model_path if backend == "onnx" else self.hmm_path
-        model.load(model_path, device_id)
+        model.load(self.get_model_path(backend), device_id)
         model.demo(filepaths)
         model.unload()
 
@@ -472,12 +471,31 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         if model is None:
             logger.error("Failed to get model")
             return {}
-        model_path = self.model_path if backend == "onnx" else self.hmm_path
-        model.load(model_path, device_id)
+        model.load(self.get_model_path(backend), device_id)
         res = model.evaluate(dataset, num)
         model.unload()
         logger.info(f"{res}")
         return res
+
+    def get_model_path(self, backend):
+        """Get model path based on backend.
+
+        Args:
+            backend (str): Backend type.
+
+        Returns:
+            str: Model path.
+        """
+        if backend == "onnx":
+            model_path = self.model_path
+        elif backend == "hmonnx":
+            if self.target == "xh1":
+                logger.error("hmonnx backend not support xh1 target")
+                return {}
+            model_path = self.quant_onnx_model_path
+        else:
+            model_path = self.hmm_path
+        return model_path
 
     @staticmethod
     def model_perf(
