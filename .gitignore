@@ -11,6 +11,7 @@ customized/
 tmp_*/
 data/
 toolchains/
+3rdparty/
 
 # media files
 *.jpg
