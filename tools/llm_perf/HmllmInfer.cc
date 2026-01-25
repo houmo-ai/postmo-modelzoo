@@ -57,11 +57,11 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   auto option_decode = tcim::Module::Option(weight_manager);
   // Enable lazy mode
   if (LazyMode) {
-    option_prefill.EnableLazyMode(true);
-    option_decode.EnableLazyMode(true);
+    option_prefill.EnableIOLazyMode(true);
+    option_decode.EnableIOLazyMode(true);
   } else {
-    option_prefill.EnableLazyMode(false);
-    option_decode.EnableLazyMode(false);
+    option_prefill.EnableIOLazyMode(false);
+    option_decode.EnableIOLazyMode(false);
   }
   // Initialize prefill module and load the model
   prefill_module = std::make_shared<tcim::Module>();

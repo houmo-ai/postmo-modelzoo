@@ -48,13 +48,13 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   auto option_decode = tcim::Module::Option(weight_manager);
   auto option_vit = tcim::Module::Option(weight_manager);
   if (LazyMode) {
-    option_prefill.EnableLazyMode(true);
-    option_decode.EnableLazyMode(true);
-    option_vit.EnableLazyMode(true);
+    option_prefill.EnableIOLazyMode(true);
+    option_decode.EnableIOLazyMode(true);
+    option_vit.EnableIOLazyMode(true);
   } else {
-    option_prefill.EnableLazyMode(false);
-    option_decode.EnableLazyMode(false);
-    option_vit.EnableLazyMode(false);
+    option_prefill.EnableIOLazyMode(false);
+    option_decode.EnableIOLazyMode(false);
+    option_vit.EnableIOLazyMode(false);
   }
   // init module
   prefill_module = std::make_shared<tcim::Module>();
