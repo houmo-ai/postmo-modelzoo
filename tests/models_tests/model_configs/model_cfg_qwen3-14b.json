@@ -21,9 +21,9 @@
     "perf_metrics": {
         "xh2": {
             "x86_64": {
-                "prefill": 54.58,
-                "decode": 9.05,
-                "end2end": 8.66
+                "prefill": 122.52,
+                "decode": 11.62,
+                "end2end": 10.71
             }
         }
     },

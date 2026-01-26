@@ -1,7 +1,7 @@
 {
     "obsolete": false,
     "model_dir": "models/asr/whisper",
-    "model_type": "asr",
+    "model_type": "llm",
     "support_platform": ["x86_64"],
     "support_backend": ["xh2"],
     "support_core_num": {

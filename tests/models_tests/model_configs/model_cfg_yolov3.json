@@ -3,7 +3,7 @@
     "model_dir": "models/detection/yolov3",
     "model_type": "cv",
     "support_platform": ["x86_64"],
-    "support_backend": ["xh1"],
+    "support_backend": ["xh1", "xh2"],
     "support_core_num": {
         "xh1": [1],
         "xh2": null
