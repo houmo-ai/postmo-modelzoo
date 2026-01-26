@@ -114,7 +114,9 @@ Qwen3-vl模型使用python API进行演示
 注意：由于ubuntu18.04下qwen_vl_utils无法正常安装，导致无法正常运行。
 
 ```bash
-python3 demo.py
+# Qwen3-VL-4B 推荐惩罚系数是4
+# Qwen3-VL-8B 推荐惩罚系数是1.5
+python3 demo.py --repetition_penalty 1.5
 ```
 
 ### 2.5 一键评估
