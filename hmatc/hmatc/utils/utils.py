@@ -32,7 +32,6 @@ import requests
 import re
 import shutil
 import subprocess
-import zipfile
 import tarfile
 from onnx import TensorProto
 from tqdm import tqdm
@@ -321,22 +320,18 @@ def download_file(url, save_path, file_name, file_size, chunk_size=1024 * 1024):
         return False
 
 
-def _ping_houmo_domain(ping_count: int = 5, timeout: int = 3) -> bool:
+def _ping_houmo_domain(timeout: int = 10) -> bool:
     """
-    Ping the houmo domain to check whether it is accessible.
-    :param ping_count: The number of pings to send (default: 5)
-    :param timeout: Timeout for each ping (default: 3)
-    :return: True if the domain is accessible, False otherwise
+    Checks connectivity to the Houmo domain service.
+    :param timeout: Sets the timeout for the connection attempt (default: 10)
+    :return: Boolean indicating whether the domain is accessible
     """
-    houmo_domain = "artifactory.houmo.ai"
     try:
-        cmd = ["ping", "-c", str(ping_count), "-W", str(timeout), houmo_domain]
-        result = subprocess.run(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False
-        )
-        if result.returncode == 0:
-            return True
-        return False
+        response = requests.get(JFROG_REPO, timeout=timeout)
+        response.raise_for_status()
+        if response.status_code != 200:
+            return False
+        return True
     except Exception:
         return False
 
@@ -474,6 +469,8 @@ def _extract_files(save_path: str, extract_dir: str) -> bool:
     if not isinstance(extract_dir, str) or not extract_dir.strip():
         logger.error("The decompression directory cannot be empty.")
         return False
+
+    import zipfile
 
     extract_dir = os.path.abspath(extract_dir)
     os.makedirs(extract_dir, exist_ok=True)
