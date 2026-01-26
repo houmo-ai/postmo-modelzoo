@@ -49,13 +49,10 @@
     },
     "demo_params": {
         "xh2": {
-            "tokenizer_dir": ["cached_models/whisper-medium"],
-            "embedding_path": [
-                "cached_results/hmm_xh2/hmquant/quant_embedding.pt"
-            ],
+            "processor_dir": ["cached_models/whisper-medium"],
+            "encoder_path": ["cached_results/hmm_xh2/whisper_encoder.hmm"],
             "prefill_path": ["cached_results/hmm_xh2/whisper_prefill.hmm"],
-            "decoder_path": ["cached_results/hmm_xh2/whisper_decoder.hmm"],
-            "ndevice": ["1"]
+            "decoder_path": ["cached_results/hmm_xh2/whisper_decoder.hmm"]
         }
     },
     "perf_params": "demo"

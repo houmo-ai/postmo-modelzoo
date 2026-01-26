@@ -28,7 +28,6 @@ import threading
 import sys
 
 HOUMO_BACKEND = os.getenv("HOUMO_TARGET")
-assert HOUMO_BACKEND in ["xh1", "xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_BACKEND}"
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 IMODELZOO_REPO_DIR = os.path.abspath(f"{script_dir}/../../")

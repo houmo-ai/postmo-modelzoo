@@ -151,9 +151,13 @@ def main(args) -> int:
             "autodrive",
             "backbone",
             "detection",
+            "embedding",
             "estimation",
             "llm",
+            "ocr",
+            "omni",
             "diffusion",
+            "segmentation",
         ]
         # --collect-only
         for key_str in key_list:

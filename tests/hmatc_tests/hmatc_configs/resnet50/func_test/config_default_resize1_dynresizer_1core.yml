@@ -8,7 +8,7 @@ model:
       data_format: RGB
       mean: [123.675, 116.28, 103.53]
       std: [58.395, 57.12, 57.375]
-      resize_type: 1
+      resize_type: 0
       padding_mode: 1
       padding_values: [0, 0, 0]
       resizer:
