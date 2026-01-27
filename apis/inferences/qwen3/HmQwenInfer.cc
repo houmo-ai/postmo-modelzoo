@@ -342,6 +342,8 @@ void HmQwenInfer::Chat(const std::string &msg) {
     auto t_decode_start = std::chrono::high_resolution_clock::now();
     auto t_decode_end = std::chrono::high_resolution_clock::now();
     auto t_prefill_start = std::chrono::high_resolution_clock::now();
+    auto t_ttft_end = std::chrono::high_resolution_clock::now();
+    auto t_ttft_start = std::chrono::high_resolution_clock::now();
     std::vector<Message> msgs = {{"system", "You are a helpful assistant."},
                                  {"user", msg}};
     // Process the input through tokenizer chat template
@@ -381,16 +383,21 @@ void HmQwenInfer::Chat(const std::string &msg) {
             std::chrono::duration<float, std::milli>(t_embed_end - t_embed_start)
                 .count();
         PrefillSetInputDatas(input_datas, valid_length, current_length);
+        t_prefill_start = std::chrono::high_resolution_clock::now();
         PrefillInfer();
+        t_prefill_end = std::chrono::high_resolution_clock::now();
+        llm_perf_datas.prefill_time +=
+            std::chrono::duration<float, std::milli>(t_prefill_end - t_prefill_start)
+                .count();
     }
     std::vector<int> ids;
     PrefillGetOutputDatas(ids);
 
     std::vector<int> chat_history_ids = all_input_ids;
     std::string prefill_response = tokenizer->Decode(ids);
-    t_prefill_end = std::chrono::high_resolution_clock::now();
-    llm_perf_datas.prefill_time +=
-        std::chrono::duration<float, std::milli>(t_prefill_end - t_prefill_start)
+    t_ttft_end = std::chrono::high_resolution_clock::now();
+    llm_perf_datas.ttft_time +=
+        std::chrono::duration<float, std::milli>(t_ttft_end - t_ttft_start)
             .count();
     chat_history_ids.emplace_back(ids[0]);
     t_embed_start = std::chrono::high_resolution_clock::now();
@@ -410,14 +417,18 @@ void HmQwenInfer::Chat(const std::string &msg) {
     std::string last_response = tokenizer->Decode(slide_window_ids);
     std::string decode_response;
 
-    t_decode_start = std::chrono::high_resolution_clock::now();
     do {
         if (context_length > context_max_length) {
             break;
         }
         DecodeSetInputDatas(static_cast<void *>(input_datas),
                             static_cast<int32_t>(context_length));
+        t_decode_start = std::chrono::high_resolution_clock::now();
         DecodeInfer();
+        t_decode_end = std::chrono::high_resolution_clock::now();
+        llm_perf_datas.decode_time +=
+            std::chrono::duration<float, std::milli>(t_decode_end - t_decode_start)
+                .count();
         ids.clear();
         DecodeGetOutputDatas(ids);
         decode_count++;
@@ -454,10 +465,7 @@ void HmQwenInfer::Chat(const std::string &msg) {
                 .count();
         context_length = context_length + 1;
     } while (true);
-    t_decode_end = std::chrono::high_resolution_clock::now();
-    llm_perf_datas.decode_time +=
-        std::chrono::duration<float, std::milli>(t_decode_end - t_decode_start)
-            .count();
+
     auto t_end = std::chrono::high_resolution_clock::now();
     float t_total =
         std::chrono::duration<float, std::milli>(t_end - t_start).count();
@@ -475,7 +483,7 @@ void HmQwenInfer::Chat(const std::string &msg) {
               << " tokens/s\n";
 
     std::cout << std::setprecision(3) << "[SUCCESS] TTFT (Time to First Token): "
-              << llm_perf_datas.prefill_time << " ms\n";
+              << llm_perf_datas.ttft_time << " ms\n";
 
     std::cout << "[SUCCESS] TPOT (Time Per Output Token): "
               << llm_perf_datas.decode_time / (decode_count) << " ms/token\n";

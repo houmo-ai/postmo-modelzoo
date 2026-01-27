@@ -35,8 +35,9 @@
  * @brief Stores performance metrics for model inference
  */
 struct PerfInfos {
-    int input_tokens;      // Number of input tokens processed
-    int output_tokens;     // Number of output tokens generated
+    int input_tokens;
+    int output_tokens;
+    float ttft_time;
     float prefill_time;    // Time taken for prefill phase (in seconds)
     float decode_time;     // Time taken for decode phase (in seconds)
     float embedding_time;  // Time taken for embedding generation (in seconds)
