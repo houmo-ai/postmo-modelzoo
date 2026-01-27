@@ -98,3 +98,29 @@ def show_statistics(
     logger.success(
         f"E2E TPS (End-to-End Tokens Per Second): {output_tokens / total_time:.2f} tokens/s"
     )
+
+
+def download_file(url, save_path, chunk_size=1024 * 1024):
+    import os, requests
+    if os.path.exists(save_path):
+        logger.error("local file %s has already exist" % save_path)
+        return False
+
+    try:
+        with requests.get(url, stream=True) as response:
+            response.raise_for_status()
+            with open(save_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=chunk_size):
+                    if chunk:
+                        f.write(chunk)
+
+            logger.info(f"download {save_path} finished.")
+            return True
+    except requests.exceptions.RequestException as e:
+        logger.error(f"download {save_path} failed, error msg: {str(e)}")
+        if os.path.exists(save_path):
+            os.remove(save_path)
+        return False
+    except Exception as e:
+        logger.error(f"download {save_path} failed, unknown err: {str(e)}")
+        return False

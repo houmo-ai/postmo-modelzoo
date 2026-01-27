@@ -256,6 +256,14 @@ Qwen3 的 C++推理样例依赖以下三方库：
     -   run.bat 会同时运行 win11 的 python 和 c++样例，运行 C++样例依赖 libhal_xh2a.dll 和 tcim_runtime_lite.dll。
 -   build_ndk.sh 支持一键编译如下平台的 C++样例:
     1. Android_arm64-v8a_xh2
+        ```bash
+        # 1. 需要下载Android NDK，并设置NDK_PATH。
+        # 2. 需要下载Android版本runtime-sdk，设置TCIM_RUNTIME_PATH为当前Android版本路径。
+        # 示例如下：
+        # export NDK_PATH={the_path_of_android}/android-ndk-r28c
+        # export TCIM_RUNTIME_PATH={the_path_of_android}/houmo-tcim-runtime-xh2
+        ./build_ndk.sh
+        ```
 
 ### 4.4 C++样例相关文件说明
 

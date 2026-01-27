@@ -29,8 +29,8 @@ HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
 # Add Houmo AI tools to path
 sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
 
-from hmatc.utils.utils import hmatc_get_file, get_houmo_version
-
+from hmatc.utils.utils import hmatc_get_file, get_houmo_version, get_file_from_jfrog, _extract_files
+from qwen_demo_utils import download_file
 # Get and validate target accelerator type
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -140,3 +140,19 @@ if __name__ == "__main__":
         # Save as binary file
         embedding_data = embedding_weight.cpu().numpy()
         embedding_data.tofile(embedding_path.replace(".pt", ".bin"))
+
+        tokenizer_path = "3rdparty/qwen3-tokenizers-cpp.zip"
+        target_dir = "./3rdparty"
+        get_file_from_jfrog(tokenizer_path, target_dir, target_dir)
+        download_file(
+            "https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip",
+            "3rdparty/eigen-3.4.0.zip"
+        )
+
+        _extract_files("3rdparty/eigen-3.4.0.zip", target_dir)
+        os.rename("3rdparty/eigen-3.4.0", "3rdparty/eigen3")
+        for file in os.listdir(target_dir):
+            if file.endswith(".zip"):
+                os.remove(os.path.join(target_dir, file))
+
+
