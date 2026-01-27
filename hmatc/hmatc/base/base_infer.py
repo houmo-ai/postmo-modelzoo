@@ -39,6 +39,7 @@ class BaseInfer(object, metaclass=abc.ABCMeta):
         self.engine = None  # Inference engine instance
         self.backend = "onnx"  # Backend type: onnx/hmquant/xh1/xh2
         self.device = "cpu"  # Device for inference execution
+        self.inputs_batch = dict()
 
     @abc.abstractmethod
     def load(self, model_path, device_id=0):
@@ -86,3 +87,6 @@ class BaseInfer(object, metaclass=abc.ABCMeta):
         if self.total == 0:
             return 0
         return self.time_span / self.total
+
+    def get_input_batch_size(self, name):
+        return self.inputs_batch.get(name, 0)

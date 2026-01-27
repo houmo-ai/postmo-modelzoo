@@ -60,11 +60,11 @@ typedef struct CheckItem {
 } checkItem_t;
 
 typedef struct HmVerInfo {
-    std::string sdk_build_time;
-    std::string sdk_version;
-    std::string driver_version;
-    std::string runtime_version;
-    std::string runtime_build_time;
+    std::string sdk_build_time{"unavailable"};
+    std::string sdk_version{"unavailable"};
+    std::string driver_version{"unavailable"};
+    std::string runtime_version{"unavailable"};
+    std::string runtime_build_time{"unavailable"};
 } hmVerInfo_t;
 
 typedef struct HmDeviceInfo {
@@ -325,7 +325,7 @@ static void get_device_info(hmDeviceInfo_t &devInfo) {
                               ? buf
                               : "unavailable";
     // core count
-#ifndef _MSC_VER
+#if !defined(_WIN32)
     devInfo.core_count = std::max(0, hm_sys_get_core_count(dev_id));
 #else
     // Windows does not support hm_sys_get_core_count yet.
@@ -381,7 +381,7 @@ static void get_device_info(hmDeviceInfo_t &devInfo) {
     devInfo.temperature = fmt_temp_or_unavail(
         (hm_sys_get_temperature(dev_id, &temp) == 0) ? temp : -1.f);
 
-#ifndef _MSC_VER
+#if !defined(_WIN32)
     // PCIe BDF
     memset(buf, 0, sizeof(buf));
     devInfo.pcie_bdf = (hm_sys_get_bdf(dev_id, buf, sizeof(buf)) == 0)
@@ -422,11 +422,13 @@ static void get_version_info(hmVerInfo_t &hmVerInfo) {
     memset(buf, 0, sizeof(buf));
     hmVerInfo.sdk_version =
         hm_sys_get_version(buf, sizeof(buf)) == 0 ? buf : "unavailable";
-
+// windows not support get_driver_version
+// #if defined(__linux__) && defined(__x86_64__)
+#if !defined(_WIN32)
     memset(buf, 0, sizeof(buf));
     hmVerInfo.driver_version =
         hm_sys_get_driver_version(buf, sizeof(buf)) == 0 ? buf : "unavailable";
-
+#endif
     get_runtime_info(hmVerInfo);
 }
 
@@ -882,9 +884,9 @@ int main(int argc, char **argv) {
                hmVerInfo.driver_version != "unavailable" ? CheckStatus::PASS
                                                          : CheckStatus::FAIL,
                hmVerInfo.driver_version);
-    report.add("SDK Version",
-               hmVerInfo.driver_version != "unavailable" ? CheckStatus::PASS
-                                                         : CheckStatus::FAIL,
+    report.add("HAL SDK Version",
+               hmVerInfo.sdk_version != "unavailable" ? CheckStatus::PASS
+                                                      : CheckStatus::FAIL,
                hmVerInfo.sdk_version);
     report.add("Runtime Version",
                hmVerInfo.runtime_version != "unavailable" ? CheckStatus::PASS

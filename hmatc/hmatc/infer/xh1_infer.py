@@ -46,7 +46,6 @@ class Xh1Infer(BaseInfer, ABC):
         self.backend = "xh1"
         self.model_ext = ".hmm"
         self.inputs_info = dict()
-        self.inputs_batch = dict()
         self.inputs_format = dict()
 
     def load(self, model_path, device_id=0):

@@ -700,6 +700,7 @@ def main():
     build_parser = subparsers.add_parser(
         "build",
         parents=[
+            parent_config,
             parent_target,
             parent_result_path,
             model_cfg_parent,
@@ -707,16 +708,6 @@ def main():
             parent_upload,
         ],
         help="Build a model",
-    )
-    build_exclusive_group = build_parser.add_mutually_exclusive_group(required=True)
-    build_exclusive_group.add_argument(
-        "--hmonnx",
-        type=str,
-        required=False,
-        help="Specify a hmonnx model path, default is quantized model",
-    )
-    build_exclusive_group.add_argument(
-        "--config", "-c", type=str, help="Specify config file path"
     )
     build_parser.add_argument(
         "--profile",
@@ -763,7 +754,12 @@ def main():
         help="Specify warnup num",
     )
     perf_parser.add_argument(
-        "--sample", "-sn", type=int, required=True, help="Specify sample num"
+        "--sample",
+        "-sn",
+        type=int,
+        required=False,
+        default=1,
+        help="Specify sample num",
     )
     perf_parser.add_argument(
         "--loop_num",
