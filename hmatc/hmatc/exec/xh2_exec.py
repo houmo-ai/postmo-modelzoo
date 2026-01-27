@@ -72,9 +72,8 @@ class Xh2Exec(BaseExec):
             self.outputs_name.append(name)
 
         # Append dynamic parameter input names to inputs_name
-        if self.resizer_mode == 1:
+        if self.resizer_mode in [1, 2]:
             input_name = self.inputs_name[0]
-            input_name = input_name.replace(".", "_")
             self.inputs_name.append(f"resizer_crop_{input_name}")
 
     def upgrade_opset_version(self):
@@ -565,9 +564,10 @@ class Xh2Exec(BaseExec):
         xh2.load(self.hmm_path, device_id=device_id)
         in_datas = dict()
         for input_name in self.inputs_cfg:
+            new_name = input_name.replace("/", "_")
             golden_input_path = os.path.join(
                 self.quant_output_dir,
-                f"hmquant_{self.model_name}_{input_name}_input.npy",
+                f"hmquant_{self.model_name}_{new_name}_input.npy",
             )
             golden_input = np.load(golden_input_path)
             logger.info(f"Load golden: {golden_input_path}")
@@ -586,11 +586,10 @@ class Xh2Exec(BaseExec):
             golden_input = np.repeat(golden_input, self.build_batch, axis=0)
             in_datas[input_name] = golden_input
             if self.resizer_mode == 1:
-                new_name = input_name.replace(".", "_")
-                resizer_name = f"resizer_crop_{new_name}"
+                resizer_name = f"resizer_crop_{input_name}"
                 golden_dyn_info_input_path = os.path.join(
                     self.quant_output_dir,
-                    f"hmquant_{self.model_name}_{resizer_name}_input.npy",
+                    f"hmquant_{self.model_name}_resizer_crop_{new_name}_input.npy",
                 )
                 golden_dyn_input = np.load(golden_dyn_info_input_path)
                 logger.info(f"Load golden: {golden_dyn_info_input_path}")
@@ -605,7 +604,7 @@ class Xh2Exec(BaseExec):
                     # n images n boxes, and compilation batch > 1
                     repeats = self.build_batch
                 golden_dyn_input = np.repeat(golden_dyn_input, repeats=repeats, axis=0)
-                in_datas[f"resizer_crop_{new_name}"] = golden_dyn_input
+                in_datas[resizer_name] = golden_dyn_input
 
         res_info = dict()
         outputs, _ = xh2.run(in_datas)
@@ -684,7 +683,6 @@ class Xh2Exec(BaseExec):
         if self.is_image_single_input:
             # Single input image
             input_name = self.inputs_name[0]
-            new_name = input_name.replace(".", "_")
             input_cfg = self.inputs_cfg[input_name]
             data_format = input_cfg["data_format"]
             input_shape = input_cfg["shape"]
@@ -791,8 +789,8 @@ class Xh2Exec(BaseExec):
                         self.model_input_batch, dim=0
                     )
                     dyn_info = dyn_info.repeat_interleave(hmm_batch, dim=0)
-                hmquant_in_datas[f"resizer_crop_{new_name}"] = hmquant_dyn_info
-                xh2_in_datas[f"resizer_crop_{new_name}"] = (
+                hmquant_in_datas[f"resizer_crop_{input_name}"] = hmquant_dyn_info
+                xh2_in_datas[f"resizer_crop_{input_name}"] = (
                     dyn_info.detach().cpu().numpy()
                 )
         else:

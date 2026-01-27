@@ -194,7 +194,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                     valid_len = yuv_pad.size
                 yuv = yuv_pad[:valid_len].copy().reshape(1, -1)
                 new_datas[in_name] = np.ascontiguousarray(yuv)
-            if self.resizer_mode in [1, 2]:
+            if self.resizer_mode in [1, 2] and self.backend in ["xh1", "xh2"]:
                 dyn_info = dyn_info.detach().cpu().numpy()
                 new_datas[f"resizer_crop_{in_name}"] = dyn_info
             return new_datas
@@ -221,7 +221,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                     in_data, repeats=self.roi_num, axis=0
                 )
                 continue
-            batch = self.engine.inputs_batch[name]
+            batch = self.engine.get_input_batch_size(name)
             prerpcessed_in_datas[name] = np.repeat(in_data, repeats=batch, axis=0)
         t = time.time()
         # Inference

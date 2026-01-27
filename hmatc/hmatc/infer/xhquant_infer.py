@@ -45,7 +45,6 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         self.model_ext = ".onnx"
         self.input_names = list()
         self.output_names = list()
-        self.inputs_batch = dict()
         try:
             from xhquant.api import xhquant_init
         except ImportError:

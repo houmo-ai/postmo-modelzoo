@@ -42,7 +42,6 @@ class OnnxInfer(BaseInfer, ABC):
         self.backend = "onnx"
         self.model_ext = ".onnx"
         self.output_names = list()
-        self.inputs_batch = dict()
 
     def load(self, model_path, device_id=0):
         """
