@@ -75,7 +75,7 @@ rem get test model
 %PYTHON_DIR%\python.exe get_model.py
 
 rem python example
-@REM %PYTHON_DIR%\python.exe demo.py
+%PYTHON_DIR%\python.exe demo.py
 
 rem c++ example
 if exist "build" (rmdir /s /q build)
