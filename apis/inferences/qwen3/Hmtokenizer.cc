@@ -86,9 +86,9 @@ std::string HmTokenizer::ApplyChatTemplate(const std::vector<Message> &msgs,
 
     // Add special thinking mode tokens if disabled
     if (!enable_thinking) {
+        out.append("<think>\n");
         out.append("\n");
-        out.append("\n");
-        out.append("\n");
+        out.append("</think>\n");
         out.append("\n");
     }
 
