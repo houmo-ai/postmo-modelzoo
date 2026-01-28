@@ -582,7 +582,7 @@ if __name__ == "__main__":
         print("Model built successfully.")
 
     if not args.skip_run:
-        HDPL_PLATFORM = os.environ.get("HDPL_PLATFORM", "ISIM")
+        HDPL_PLATFORM = os.environ.get("HDPL_PLATFORM")
         if HDPL_PLATFORM == "ISIM":
             print(
                 "Warning: Running on ISIM platform may not reflect actual performance on real hardware."
@@ -649,8 +649,8 @@ if __name__ == "__main__":
         print(f"{'Kernel Shape':<25} | {str(model_tops_info['kernel_shape']):>15}")
         print("-" * 60)
         print(
-            f"{'Computing amount':<25} | {model_tops_info['num_tops']:>15.4f} TOPs/sample"
+            f"{'Computing amount':<25} | {model_tops_info['num_tops']:>15.4f} TFLOPs/sample"
         )
         print(f"{'Test time':<25} | {elapsed_time:>15.4f} seconds")
-        print(f"{'PERFORMANCE':<25} | {TOPS:>15.2f} TOPS")
+        print(f"{'PERFORMANCE':<25} | {TOPS:>15.2f} TFLOPS@bFP16")
         print("=" * 60 + "\n")
