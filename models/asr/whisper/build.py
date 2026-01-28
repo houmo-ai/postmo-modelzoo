@@ -122,6 +122,25 @@ class ProcessMemoryMonitor:
         print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
 
 
+def _validate_flash_attention(flash_vals: tuple) -> None:
+    """Validates FlashAttention parameter values."""
+    llm_val, encoder_val = flash_vals
+
+    # Validate LLM (Prefill & Decode) FlashAttention parameter
+    # Values: 0=off, 1/2=on
+    if llm_val not in [0, 1, 2]:
+        raise ValueError(
+            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
+        )
+
+    # Validate Encoder FlashAttention parameter
+    # Values: 0=off, 1=on
+    if encoder_val not in [0, 1]:
+        raise ValueError(
+            f"Encoder FlashAttention values only support 0/1, current value:{encoder_val}"
+        )
+
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -171,13 +190,17 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--flash_attention",
         dest="flash_attention",
+        nargs=2,
         type=int,
-        default=1,
-        choices=[0, 1],
-        help="flash attention optimization",
+        default=(0, 0),
+        help="FlashAttention optimization switches: "
+        "1st int = prefill/decode model switch (0=off, 1/2=on), "
+        "2nd int = encoder model switch (0=off, 1=on); "
+        "e.g., --flash_attention 0 0 (prefill&decode=0, encoder=0)",
     )
 
     args = parser.parse_args()
+    _validate_flash_attention(args.flash_attention)
     return args
 
 
@@ -187,8 +210,7 @@ def build_whisper(
     import tcim
 
     kwargs = {}
-
-    if flash_attention > 0:
+    if flash_attention:
         import json
 
         kwargs["flash_attention"] = flash_attention
@@ -327,6 +349,7 @@ if __name__ == "__main__":
     output_dir = args.output_dir
     ncore = args.ncore
     j = args.j
+    llm_flash_attention, encoder_flash_attention = args.flash_attention
     profile = {}
 
     # build model
@@ -346,7 +369,7 @@ if __name__ == "__main__":
             profile,
             ncore,
             j,
-            flash_attention=args.flash_attention,
+            flash_attention=encoder_flash_attention,
         )
         build_whisper(
             "whisper_decoder",
@@ -356,7 +379,7 @@ if __name__ == "__main__":
             profile,
             ncore,
             j,
-            flash_attention=args.flash_attention,
+            flash_attention=llm_flash_attention,
         )
         build_whisper(
             "whisper_prefill",
@@ -366,7 +389,7 @@ if __name__ == "__main__":
             profile,
             ncore,
             j,
-            flash_attention=args.flash_attention,
+            flash_attention=llm_flash_attention,
         )
 
     # test model
