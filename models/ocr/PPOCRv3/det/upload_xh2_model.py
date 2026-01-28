@@ -39,7 +39,7 @@ compress_hmm_path = os.path.join(
     "xh2",
     filename,
 )
-hmm_path = os.path.join("output", "xh2/ppocrv3_det_xh2_b1_1core_O2.hmm")
+hmm_path = os.path.join("output", "xh2/ppocrv3_det_xh2_b1_1roi_1core_O2_static.hmm")
 compress_files_to_tar_xz_with_progress(
     [hmm_path, os.path.join("output", "xh2", "VERSION.txt")],
     compress_hmm_path,
