@@ -180,11 +180,11 @@ class HmWhisper:
         self.encoder = tcim.runtime.load(encoder_path, option=option1)
         logger.info("encoder model loaded")
         option2 = tcim.runtime.Option(weight_manager)
-        self.decoder = tcim.runtime.load(decoder_path, option=option2)
-        logger.info("decoder model loaded")
-        option3 = tcim.runtime.Option(weight_manager)
-        self.prefill = tcim.runtime.load(prefill_path, option=option3)
+        self.prefill = tcim.runtime.load(prefill_path, option=option2)
         logger.info("prefill model loaded")
+        option3 = tcim.runtime.Option(weight_manager)
+        self.decoder = tcim.runtime.load(decoder_path, option=option3)
+        logger.info("decoder model loaded")
 
     def run_encoder(self, input_features):
         input_features = input_features.numpy()
