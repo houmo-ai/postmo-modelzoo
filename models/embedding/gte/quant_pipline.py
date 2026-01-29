@@ -49,6 +49,7 @@ def msg_output_format(title):
     title = f"{padding_str} {title} {padding_str}"
     return title
 
+
 def _get_work_dir(args) -> Path:
     out_dir = Path(args.work_dir)
     hf_model_path = osp.normpath(osp.abspath(args.model))
@@ -88,7 +89,7 @@ def _load_and_prepare_model(hf_model_dir: str, device: str) -> nn.Module:
 
     native_model.eval()
     native_model.to(device)
-    
+
     return native_model
 
 
@@ -109,10 +110,7 @@ def _calculate_gpu_memory() -> str:
 
 
 def _apply_quarot_quantization(
-    model: nn.Module, 
-    work_dir: Path, 
-    device: str,
-    quant_methods: List[str]
+    model: nn.Module, work_dir: Path, device: str, quant_methods: List[str]
 ) -> nn.Module:
     torch.cuda.reset_peak_memory_stats()
     quant_methods.append("quarot")
@@ -121,11 +119,11 @@ def _apply_quarot_quantization(
 
     if not os.path.exists(filename):
         from xh_model_zoo.xh_llm.quarot.quantizer_utils import quarot
-    
+
         logger.info(msg_output_format("Start quarot quantization"))
         model = quarot(model, device=device)
         logger.info(msg_output_format("End quarot quantization"))
-    
+
         state_dict = model.state_dict()
         logger.info(msg_output_format(f"Saving checkpoint to: {filename}"))
         save_safetensors_file(state_dict, filename)
@@ -142,14 +140,15 @@ def _apply_quarot_quantization(
 
 
 def _apply_gptq_quantization(
-    model: nn.Module, 
+    model: nn.Module,
     args,
-    work_dir: Path, 
+    work_dir: Path,
     hf_model_dir: str,
     device: str,
-    quant_methods: List[str]
+    quant_methods: List[str],
 ) -> nn.Module:
     from xh_model_zoo.xh_llm.quarot.quantizer_utils import gptq
+
     # GPTQ config
     gptq_config = dict(
         calib_dataset="wikitext2",
@@ -171,7 +170,7 @@ def _apply_gptq_quantization(
 
     layers_cache_dir = work_dir / "layers_cache"
     layers_cache_dir.mkdir(exist_ok=True, parents=True)
-    
+
     # gptq quant
     model = gptq(
         model,
@@ -180,6 +179,7 @@ def _apply_gptq_quantization(
         **gptq_config,
         device=device,
         layers_cache_dir=str(layers_cache_dir),
+        cache_dir=args.datasets_dir,
     )
 
     logger.info(msg_output_format("End gptq quantization"))
@@ -190,7 +190,9 @@ def _apply_gptq_quantization(
     return model
 
 
-def _optimize_state_dict(state_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+def _optimize_state_dict(
+    state_dict: Dict[str, torch.Tensor],
+) -> Dict[str, torch.Tensor]:
     for k in tqdm(state_dict):
         paths = k.split(".")
         v = state_dict[k]
@@ -211,9 +213,7 @@ def _optimize_state_dict(state_dict: Dict[str, torch.Tensor]) -> Dict[str, torch
 
 
 def _save_final_quantized_model(
-    model: nn.Module, 
-    work_dir: Path, 
-    quant_methods: List[str]
+    model: nn.Module, work_dir: Path, quant_methods: List[str]
 ) -> None:
     quant_name = "_".join(quant_methods)
     filename = work_dir / f"{quant_name}-state-dict.safetensors"
@@ -252,6 +252,7 @@ def quant_llm(args):
     if len(quant_methods) != 0:
         _save_final_quantized_model(native_model, work_dir, quant_methods)
 
+
 def export_llm(args):
     from xh_model_zoo.xh_llm.models.qwen2_ste import SteQwen2ConvertConfig
 
@@ -260,7 +261,7 @@ def export_llm(args):
     target_device = DeviceType.XH2a
     quant_type = args.quant_type
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
-    
+
     prefix = f"{model_name}-{target_device}-{args.context_length//1024}k-{quant_type}"
     work_dir = Path(args.work_dir) / prefix
     work_dir.mkdir(exist_ok=True, parents=True)
@@ -282,12 +283,14 @@ def export_llm(args):
 
     token_embedding = native_model.model.get_input_embeddings()
     token_embedding_file = Path(work_dir) / "token_embedding.pt"
-    torch.save(token_embedding.state_dict()["weight"].float().half(), str(token_embedding_file))
+    torch.save(
+        token_embedding.state_dict()["weight"].float().half(), str(token_embedding_file)
+    )
 
     config = SteQwen2ConvertConfig(
         batch_size=args.batch,
         context_length=args.context_length,
-        quant_scheme=quant_scheme
+        quant_scheme=quant_scheme,
     )
 
     log_file = work_dir / "convert.log"
@@ -316,7 +319,7 @@ def move_llm(args):
     hmm_model_dir = work_dir / "hmonnx" / "golden" / "prefill"
     for file in os.listdir(hmm_model_dir):
         if os.path.isdir(os.path.join(hmm_model_dir, file)):
-            continue        
+            continue
         else:
             src_file = os.path.join(hmm_model_dir, file)
             dst_file = os.path.join(hmm_model_dir, "step_0", file)
@@ -325,13 +328,11 @@ def move_llm(args):
     hmm_model_dir = os.path.join(hmm_model_dir, "step_0")
     logger.info(
         msg_output_format("Start move from {} to {}").format(
-            hmm_model_dir,  dest_dir / "hmquant" / "prefill"
+            hmm_model_dir, dest_dir / "hmquant" / "prefill"
         )
     )
 
-    shutil.move(
-        hmm_model_dir, dest_dir / "hmquant" / "prefill"
-    )
+    shutil.move(hmm_model_dir, dest_dir / "hmquant" / "prefill")
 
     shutil.move(
         work_dir / "token_embedding.pt",
@@ -347,6 +348,6 @@ def move_llm(args):
                 dst_file = os.path.join(out_path, file.replace(prefix, args.model_name))
                 src_file = os.path.join(out_path, file)
                 shutil.move(src_file, dst_file)
-        
+
     logger.info(msg_output_format("Start remove work_dir: {}".format(work_dir)))
     shutil.rmtree(work_dir, ignore_errors=True)

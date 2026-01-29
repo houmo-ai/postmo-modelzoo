@@ -155,6 +155,7 @@ def parse_args():
     parser.add_argument(
         "--gptqmodel", action="store_true", help="use gptqmodel to quant"
     )
+    parser.add_argument("--datasets-dir", type=str, default="../../../data/datasets")
     args = parser.parse_args()
     return args
 
