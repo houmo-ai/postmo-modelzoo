@@ -59,6 +59,9 @@ from transformers.models.whisper.feature_extraction_whisper import WhisperFeatur
 from processing_minicpmo import MiniCPMOProcessor
 from image_processing_minicpmv import MiniCPMVImageProcessor
 
+import warnings
+warnings.filterwarnings("ignore", category=SyntaxWarning)
+
 HOUMO_TARGET = os.getenv('HOUMO_TARGET')
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 SUPPORTED_MODEL_TYPES = ["onnx", "houmo"]
