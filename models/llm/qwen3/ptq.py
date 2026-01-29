@@ -56,7 +56,7 @@ class ProcessMemoryMonitor:
         memory_info = self.process.memory_info()
         rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
         percent = self.process.memory_percent()  # Percentage of system memory
-        return {'rss_mb': rss_mb, 'percent': percent}
+        return {"rss_mb": rss_mb, "percent": percent}
 
     def start(self):
         """Starts the monitoring loop in a separate daemon thread."""
@@ -71,22 +71,22 @@ class ProcessMemoryMonitor:
         """The internal loop that runs in the thread."""
         while self.is_monitoring:
             mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info['rss_mb'])
+            self.peak_memory_mb = max(self.peak_memory_mb, mem_info["rss_mb"])
 
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
             log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
 
             # Output to console or file
             if self.log_file:
-                with open(self.log_file, 'a') as f:
-                    f.write(log_message + '\n')
+                with open(self.log_file, "a") as f:
+                    f.write(log_message + "\n")
 
             time.sleep(self.interval)
 
     def stop(self):
         """Stops the monitoring loop and prints peak usage."""
         self.is_monitoring = False
-        if hasattr(self, 'monitor_thread'):
+        if hasattr(self, "monitor_thread"):
             # Wait a moment for the thread to finish
             self.monitor_thread.join(timeout=1)
         print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
@@ -141,10 +141,13 @@ def parse_args() -> argparse.Namespace:
         "--input-sequence-length", type=int, default=256, help="input sequence length"
     )
     parser.add_argument(
-        "--quant-type", default="w4a8_ssfp", help="quant type, default is w4a8_ssfp"
+        "--quant-type", default="w4a8h0_ssfp", help="quant type, default is w4a8h0_ssfp"
     )
     parser.add_argument(
-        "--calib_data", type=str, default="wikitext2", help="calibration dataset choose"
+        "--calib_data",
+        type=str,
+        default="../../../hmodel/xh2/examples/xh_gen_data/gen_qwen3_8b.jsonl",
+        help="calibration dataset choose",
     )
     parser.add_argument(
         "--gptqmodel", action="store_true", help="use gptqmodel to quant"
