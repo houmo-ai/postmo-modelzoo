@@ -102,6 +102,8 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
         if [[ "$FOUND_PACKAGE" -eq 1 && "$FOUND_GPU" -eq 1 ]]; then
             echo "Start to quant and compile model."
             python3 get_model.py --type raw
+            mkdir -p data/calib_data/LMUData
+            ln -s ../../../data/datasets/LMUData/* data/calib_data/LMUData
             python3 ptq.py --data_files ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_CMMMU_VAL_20250923102519_struct.json  ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_COCO_VAL_20250923104643_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_DocVQA_VAL_20250923102720_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_MMMU_DEV_VAL_20250923102615_struct.json --calib-samples 64 --calib_dataset vllm_custom_data
             python3 build.py
         else
