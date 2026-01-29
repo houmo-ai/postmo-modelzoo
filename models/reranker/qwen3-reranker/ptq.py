@@ -149,6 +149,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--num_logits_to_keep", type=int, default=1, help="not for test ppl"
     )
+    parser.add_argument("--datasets-dir", type=str, default="../../../data/datasets")
     args = parser.parse_args()
 
     return args

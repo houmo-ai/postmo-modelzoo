@@ -101,6 +101,7 @@ if __name__ == "__main__":
             "prefill_len": 256,
             "batch": args.batch,
         },
+        "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
         "modelscope_repo": {"repo_ids": ["qwen/qwen3-embedding-8b"]},
     }
 

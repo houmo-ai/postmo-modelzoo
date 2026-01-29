@@ -154,6 +154,7 @@ def quant_llm(args):
             **gptq_config,
             device=device,
             layers_cache_dir=str(layers_cache_dir),
+            cache_dir=args.datasets_dir,
         )
         logger.info(msg_output_format("End gptq quantization"))
 

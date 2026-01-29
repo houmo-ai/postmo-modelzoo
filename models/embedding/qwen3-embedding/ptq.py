@@ -143,8 +143,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--quant-type", default="w4a8_ssfp", help="quant type, default is w4a8_ssfp"
     )
-    parser.add_argument("--mix_search", type=str, default=None, help="mix search settings")
-    parser.add_argument("--num_logits_to_keep", type=int, default=1, help="not for test ppl")
+    parser.add_argument(
+        "--mix_search", type=str, default=None, help="mix search settings"
+    )
+    parser.add_argument(
+        "--num_logits_to_keep", type=int, default=1, help="not for test ppl"
+    )
+    parser.add_argument("--datasets-dir", type=str, default="../../../data/datasets")
     args = parser.parse_args()
 
     return args
