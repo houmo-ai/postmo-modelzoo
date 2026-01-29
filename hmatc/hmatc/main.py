@@ -380,6 +380,27 @@ def run_model(
         model_infos["acc_onnx"] = f"{map50_95_onnx*100:.2f}/{map50_onnx*100:.2f}"
         model_infos["acc_chip"] = f"{map50_95_chip*100:.2f}/{map50_chip*100:.2f}"
         model_infos["acc_err"] = f"{map50_95_err*100:.2f}%/{map50_err*100:.2f}%"
+    elif onnx_info.get("dataset", "N/A") == "widerface":
+        onnx_ap_easy = float(onnx_info.get("ap_easy", 0))
+        chip_ap_easy = float(chip_info.get("ap_easy", 0))
+        onnx_ap_medium = float(onnx_info.get("ap_medium", 0))
+        chip_ap_medium = float(chip_info.get("ap_medium", 0))
+        onnx_ap_hard = float(onnx_info.get("ap_hard", 0))
+        chip_ap_hard = float(chip_info.get("ap_hard", 0))
+        ap_err = (
+            chip_ap_easy / onnx_ap_easy - 1,
+            chip_ap_medium / onnx_ap_medium - 1,
+            chip_ap_hard / onnx_ap_hard - 1,
+        )
+        model_infos["acc_onnx"] = (
+            f"{onnx_ap_easy:.2f}/{onnx_ap_medium:.2f}/{onnx_ap_hard:.2f}"
+        )
+        model_infos["acc_chip"] = (
+            f"{chip_ap_easy:.2f}/{chip_ap_medium:.2f}/{chip_ap_hard:.2f}"
+        )
+        model_infos["acc_err"] = (
+            f"{ap_err[0]*100:.2f}%/{ap_err[1]*100:.2f}%/{ap_err[2]*100:.2f}%"
+        )
 
     os.chdir(root)
     queue.put(model_infos)
