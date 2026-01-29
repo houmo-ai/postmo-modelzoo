@@ -208,5 +208,5 @@ if __name__ == "__main__":
     if "--reset" in sys.argv and len(sys.argv) == 2:
         generater.ReSetEnvirons()
         print("========Reset current envs Finished, please reopen cmd window=========")
-    if "--clear" in sys.argv and len(sys.argv) == 2:
-        generater.clearEnvirons()
+    # if "--clear" in sys.argv and len(sys.argv) == 2:
+    #     generater.clearEnvirons()

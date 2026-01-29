@@ -52,20 +52,18 @@
     - 在opencv官网[**https://opencv.org/**](https://opencv.org/)选择Library->Release下载编译好的opencv并运行解压安装。
 
 5. 自动设置环境变量：运行env.bat需要**确保终端中python指令可用**，且已经按照使用准备完成了需要的python库文件。设置完环境变量一定要重新启动终端才会生效，env.bat需要管理员权限运行。
-    1. **env.bat支持如下参数，以下指令执行时均需要在cmd终端的管理员模式下，--set、--clear、--reset每次执行后需要关闭当前终端才能真正刷新系统环境变量，若需要继续执行下一条指令，请关闭当前终端后重新打开其他终端继续。**
+    1. **env.bat支持如下参数，以下指令执行时均需要在cmd终端的管理员模式下，--set、--reset每次执行后需要关闭当前终端才能真正刷新系统环境变量，若需要继续执行下一条指令，请关闭当前终端后重新打开其他终端继续。推荐先使用--reset重置环境变量，然后使用--set重新设置环境变量。**
         | 指令        | 说明                                     |
         | -------------- | ---------------------------------------- |
         | env.bat --help/-h     | 帮助信息 |
         | env.bat --set         | 设置环境变量，已经设置的会自动跳过 |
-        | env.bat --clear       | 恢复到首次使用工具时，生成的initial_env_backup.json中备份的环境变量 |
-        | env.bat --reset       | 对于安装过其他版本的环境，使用reset清除环境变量后重新设置 |
+        | env.bat --reset       | reset清除相关环境变量 |
     2. 对于一个从未使用过后摩相关软件的系统环境，首次设置可以使用env.bat --set。
     3. 对于安装过历史版本的系统环境，首次使用通过env.bat --reset重置当前环境，并根据提示检查部分环境变量是否正确。**用户需要检查reset指令输出的Warning部分的路径是否正确**。如果不正确需要自行删除。关闭该终端后，环境变量reset才会生效。reset过后，用户可以通过新开终端执行env.bat --set设置环境变量。
-    4. env.bat在**首次使用（执行--reset并关闭终端后，也等同于首次使用）**时，在tools/win_envs目录下生成initial_env_backup.json，--clear会将环境变量恢复到initial_env_backup.json所记录的环境变量，即删除--set所设置的所有环境变量。
-    5. **env.bat会校验tcim_version和houmo_sdk_version如果版本不匹配会设置失败。**
-    6. env.bat设置完成后，**样例目录的bat脚本需要cmd终端（非管理员模式）运行，主要原因是env.bat更改的是用户的环境变量。**
-    7. 如果用户在conda环境下使用env.bat工具，执行env.bat工具之前需要先conda activate对应的python环境，这样的目的是告诉工具在特定的python环境下自动寻找部分环境变量。
-    8. 以下路径如果手动设置给到的目录级别参考如下：
+    4. **env.bat会校验tcim_version和houmo_sdk_version如果版本不匹配会设置失败。**
+    5. env.bat设置完成后，**样例目录的bat脚本需要cmd终端（非管理员模式）运行，主要原因是env.bat更改的是用户的环境变量。**
+    6. 如果用户在conda环境下使用env.bat工具，执行env.bat工具之前需要先conda activate对应的python环境，这样的目的是告诉工具在特定的python环境下自动寻找部分环境变量。
+    7. 以下路径如果手动设置给到的目录级别参考如下：
         - HOUMO_SDK_PATH ： D:\houmo_drv_xh2_v0.6.0_windows11_x86_64\houmo_drv_xh2
         - CMAKE_PATH : D:\Program Files\CMake\bin
         - OPENCV_PATH : D:\workspace\3rdparty_learning\opencv\build
@@ -196,7 +194,7 @@
 ## 3. models目录样例支持说明(仅供参考)
 ### 3.1 hmatc的编译和安装
 1. 确保已经安装上述的步骤完成了env.bat的自动环境变量设置。
-2. cd /d {path/of/examples}/hmatc 
+2. cd /d {path/of/examples}/hmatc
 3. python setup.py install或者python setup.py bdist_wheel后执行pip install dist/hmatc-xxx.whl
 
 ### 3.2 样例的运行
