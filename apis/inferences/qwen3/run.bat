@@ -30,7 +30,7 @@ if not exist "3rdparty\tokenizers-cpp" (
     pushd "3rdparty" || (echo Error: Failed to enter 3rdparty directory! & exit /b 1)
 
     set "TARGET_DIR=tokenizers-cpp"
-    set "DOWNLOAD_URL=!HOUMO_MODELZOO_URL!\models\qwen3\tokenizers-cpp.zip"
+    set "DOWNLOAD_URL=!HOUMO_MODELZOO_URL!/3rdparty/qwen3-tokenizers-cpp.zip"
     set "ZIP_FILE=tokenizers-cpp.zip"
 
     if "!DOWNLOAD_URL!"=="" (
@@ -66,7 +66,6 @@ if not exist "3rdparty\tokenizers-cpp" (
 echo All dependencies are ready
 
 set PROJECT_DIR=%cd%
-set HOUMO_EXAMPLES_PATH=%PROJECT_DIR%\..\..
 set BUILD_TYPE=Release
 if "%1" neq "" (set BUILD_TYPE=%1)
 set BUILD_DIR=build_vs2022
@@ -82,7 +81,7 @@ if exist "build" (rmdir /s /q build)
 md build
 cd build
 
-cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=%PROJECT_DIR%/../bin
+cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=%PROJECT_DIR%
 cmake --build . --target=install --config=%BUILD_TYPE% || echo ERROR && cd .. && exit /b
 
 cd ..
