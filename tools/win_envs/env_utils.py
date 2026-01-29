@@ -301,6 +301,18 @@ class EnvManager:
                 if name in check_envs:
                     print(f"[Warning]: your have {name} envs, val is {user_vars[name]}. \n",
                           "we will not delete it, please confirm path exist and version is you need!")
+
+            #delete libhal_xh2a.dll from PATH to avoid PATH have multiple versions of libhal_xh2a.dll
+            current_paths = self.get_user_path()
+            if not len(current_paths):
+                return
+
+            path_list = [p.strip() for p in current_paths if p.strip()]
+            for value in path_list:
+                if value.endswith("lib") and os.path.exists(os.path.join(value, "libhal_xh2a.dll")):
+                    print(f"Deleted libhal_xh2a.dll path of {value} from PATH")
+                    self.remove_env_from_path(value)
+
             winreg.CloseKey(key)
             #get val of CMAKE_PATH HOUMO_SDK_PATH TCIM_RUNTIME_PATH
             for key, val in user_vars.items():
