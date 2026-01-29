@@ -98,6 +98,7 @@ if __name__ == "__main__":
             "repo_ids": ["Qwen/Qwen2.5-VL-7B-Instruct"],
             "local_dirs": [f"{args.download_dir}/qwen2.5-vl"],
         },
+        "raw_files": {"raw_path": "models/dataset/LMUData.tar.gz"},
     }
 
     _, ret_dict = hmatc_get_file(

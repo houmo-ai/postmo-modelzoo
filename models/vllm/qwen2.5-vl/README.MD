@@ -25,7 +25,7 @@
 - 许可信息： 本数据集采用Apache License 2.0开源协议授权。根据该许可条款，使用者可以自由地：
 
     使用、复制和分发数据集
-     
+
     修改和创建衍生作品
 
     将数据集用于商业用途
@@ -67,10 +67,9 @@ python3 get_model.py --type hmm
 
 下载自定义数据集到当前目录下
 ```bash
-mkdir -p data/calib_data/ && pushd /data/calib_data
-wget http://10.10.1.53:8081/artifactory/model_zoo2/houmo/vllm_datasets/LMUData.tar.gz
-tar zxvf LMUData.tar.gz
-popd
+python3 get_model.py --type raw
+mkdir -p data/calib_data/LMUData
+ln -s ../../../data/datasets/LMUData/* data/calib_data/LMUData
 ```
 
 量化下载的原始模型。在当前目录下，执行脚本：
