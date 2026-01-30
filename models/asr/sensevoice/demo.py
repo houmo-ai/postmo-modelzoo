@@ -1,3 +1,23 @@
+# Copyright (c) 2025 HOUMO AI
+#
+# File: demo.py
+# Description:
+#   SenseVoiceSmall ASR Inference Demo - Python script for running sensevoice_small
+# automatic speech recognition on HOUMO AI device.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 import argparse
 import json
 import re
@@ -65,10 +85,9 @@ def get_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--clean_result",
-        dest="clean_result",
-        type=bool,
-        default=True
+        "--raw_result",
+        action="store_true",
+        help="Show Raw Result"
     )
 
     args = parser.parse_args()
@@ -269,7 +288,6 @@ class SenseVoiceSmall:
         **kwargs,
     ):
         self.model_file = model_path
-
         self.config_file = os.path.join(assets_dir, "../SenseVoiceSmall/config.yaml")
         self.cmvn_file = os.path.join(assets_dir, "../SenseVoiceSmall/am.mvn")
 
@@ -291,7 +309,7 @@ class SenseVoiceSmall:
         self.language = language
         self.textnorm = textnorm
 
-    def run_inference(self, audio_files: List, clean_result: bool) -> Tuple[List[int], int]:
+    def run_inference(self, audio_files: List, raw_result: bool) -> Tuple[List[int], int]:
         for audio_file in audio_files:
             logger.info(f"{'=' * 20} Process {audio_file} {'=' * 20}")
             wav = load_data(str(audio_file), self.target_sr)
@@ -344,7 +362,7 @@ class SenseVoiceSmall:
             text = decode_token_ids(token_ids, self.token_list)
 
             clean_text = strip_rich_tags(text)
-            if not clean_result:
+            if raw_result:
                 logger.info(f"Raw Output: {text}")
             logger.info(f"Clean Text: {clean_text}")
             logger.info(f"{'=' * 20} Process {audio_file} take time {t1 * 1000.0} ms {'=' * 20}")
@@ -363,4 +381,4 @@ if __name__ == "__main__":
     else:
         raise ValueError("Unsupport houmo target!")
 
-    sensevoice_small.run_inference(args.audio_files, args.clean_result)
+    sensevoice_small.run_inference(args.audio_files, args.raw_result)

@@ -67,6 +67,7 @@ SenseVoiceSmall模型使用python API进行演示
 
 ```bash
 python3 demo.py
+python3 demo.py --raw_result #输出原始结果
 ```
 
 ### 2.5 一键评估

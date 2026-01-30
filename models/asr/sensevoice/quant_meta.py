@@ -1,8 +1,8 @@
 # Copyright 2025 HOUMO AI
 #
-# File: sensevoice_export_meta.py
+# File: quant_meta.py
 # Description:
-#   Example script: audio/sensevoice_small/sensevoice_export_meta.py
+#   Script: quant_meta functions.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
