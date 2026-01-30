@@ -32,7 +32,9 @@
 ```bash
 python3 get_model.py --type hmm
 ```
+
 如果需要自行编译模型，可以下载原始模式，下载方式如下：
+
 ```bash
 python3 get_model.py --type raw
 ```
@@ -87,15 +89,15 @@ bash test.sh
 ### 3.1 演示结果
 
 ```bash
-[[64.875, 21.9375], [11.84375, 63.03125]]
+[[71.75, 22.046875], [12.5859375, 62.84375]]
 ```
 
 ### 3.2 性能结果
 
 ```bash
-Total Input: 177 tokens, Prefill Cost 340.912 ms
-Prefill Speed: 2075.51 tokens/s
-E2E Latency (End-to-End Latency): 0.342 seconds
+Total Input: 177 tokens, Prefill Cost 188.270 ms
+Prefill Speed: 4287.29 tokens/s
+E2E Latency (End-to-End Latency): 0.189 seconds
 
 ```
 
