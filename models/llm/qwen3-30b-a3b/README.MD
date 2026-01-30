@@ -41,7 +41,7 @@
 
 通过 get_model 脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
 
-如果需要自己量化，可选择下载原始模型和 wikitext2 数据集，下载后的模型存放在 qwen3-30b-a3b 目录：
+如果需要自己量化，可选择下载原始模型，下载后的模型存放在 qwen3-30b-a3b 目录：
 
 ```bash
 python3 get_model.py --type raw
@@ -57,7 +57,7 @@ python3 get_model.py --type hmm
 
 ### 2.2 量化
 
-量化需要使用 GPU，并在宿主机安装与 CUDA12.2 兼容的 CUDA 和驱动。启动 docker 时将 GPU 映射到 docker 内，并指定可用的 GPU ID，显存需要达到 12GB 以上，空闲内存需要达到 291GB 以上。参考命令：
+量化需要使用 GPU，并在宿主机安装与 CUDA12.2 兼容的 CUDA 和驱动。启动 docker 时将 GPU 映射到 docker 内，并指定可用的 GPU ID，显存需要达到 24GB 以上，空闲内存需要达到 291GB 以上。参考命令：
 
 ```bash
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64.** /bin/bash
@@ -68,6 +68,7 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 ```bash
 source env.sh
 cd models/llm/qwen3-30b-a3b
+python ptq.py
 ```
 
 量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录：
@@ -77,6 +78,12 @@ cd models/llm/qwen3-30b-a3b
 |-- decoder
 |-- prefill
 |-- quant_embedding.pt
+```
+
+如需使用高阶量化提升精度，请打开gptqmodel量化权重（需要较长时间，大约超过5小时）
+
+```bash
+python ptq.py --gptqmodel
 ```
 
 ### 2.3 编译

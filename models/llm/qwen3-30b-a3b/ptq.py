@@ -141,6 +141,41 @@ def msg_output_format(title):
     title = f"{padding_str} {title} {padding_str}"
     return title
 
+def gptq_quant_llm(args):
+    from datasets import load_dataset
+    from gptqmodel import GPTQModel, QuantizeConfig
+    import json
+
+    model_name = os.path.basename(args.model)
+    quant_path = os.path.join(args.work_dir, "{}_gptqmodel_4bit".format(model_name))
+
+    calibration_dataset = []
+    if args.calib_data:
+        cnt = 0
+        cnt_start = 0
+        with open(args.calib_data, encoding='utf-8') as file:
+            for line in file:
+                if cnt >= cnt_start:
+                    calibration_dataset.append(json.loads(line)['text'])
+                cnt = cnt + 1
+                if cnt == cnt_start + 512:
+                    break
+    else:
+        calibration_dataset = load_dataset(
+            'wikitext', 'wikitext-2-raw-v1', split='train'
+        ).select(range(512))["text"]
+
+    quant_config = QuantizeConfig(
+        bits=4, group_size=64, hessian_mse=True, rotation="hadamard", offload_to_disk=False,
+    )
+
+    model = GPTQModel.load(args.model, quant_config)
+
+    # increase `batch_size` to match gpu/vram specs to speed up quantization
+    model.quantize(calibration_dataset, batch_size=1)
+
+    model.save(quant_path)
+
 def houmo_quant_llm(args):
     out_dir = Path(args.work_dir)
     hf_model_dir = args.model
@@ -253,11 +288,19 @@ def houmo_export_llm(args):
     from xh_model_zoo.utils.memory_tracker import MemoryTracker  # isort:skip
     from xh_model_zoo.utils.time_profiler import TimeProfiler
 
+    import copy
+
     hf_model_path = osp.normpath(osp.abspath(args.model))
     cfg_name = Path(hf_model_path).name
-    quant_weight = ""
-    if not args.skip_quarot:
-        quant_weight = os.path.join(args.work_dir, f"{cfg_name}_quarot", "quarot-state-dict.safetensors")
+    src_cfg_name = copy.deepcopy(cfg_name)
+    quant_weight = None
+    if args.gptqmodel:
+        quant_path = os.path.join(args.work_dir, "{}_gptqmodel_4bit".format(src_cfg_name))
+        hf_model_path = osp.normpath(osp.abspath(quant_path))
+    else:
+        if not args.skip_quarot:
+            cfg_name += "_quarot"
+            quant_weight = os.path.join(args.work_dir, f"{cfg_name}", f"{cfg_name[len(src_cfg_name)+1:]}-state-dict.safetensors")
 
 
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=args.quant_type)
@@ -268,11 +311,10 @@ def houmo_export_llm(args):
         input_sequence_length=args.input_sequence_length,
         quant_scheme=quant_scheme,
         quant_weight=quant_weight,
-        num_logits_to_keep=1,
     )
 
     prefix = "{}-XH2a-{}-{}".format(
-        cfg_name, format_number(args.context_length), args.quant_type
+        src_cfg_name, format_number(args.context_length), args.quant_type
     )
     work_dir = Path(args.work_dir) / prefix
     work_dir.mkdir(exist_ok=True, parents=True)
@@ -314,6 +356,7 @@ def format_number(n):
 def move_llm(args):
     work_dir = Path(args.work_dir)
     dest_dir = Path(args.out_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
     model_name = os.path.basename(args.model)
     hm_model_name = "hmquant_{}_with_act.onnx".format(args.model_name)
     hmm_model_dir = "{}-XH2a-{}-{}".format(
@@ -324,6 +367,7 @@ def move_llm(args):
             work_dir / hmm_model_dir, dest_dir
         )
     )
+
     shutil.move(
         work_dir / hmm_model_dir / "hmonnx/prefill", dest_dir / "hmquant/prefill"
     )
@@ -345,6 +389,9 @@ if HOUMO_TARGET == 'xh2':
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("--model", type=str, default="qwen3-30b-a3b")
         parser.add_argument("--model-name", type=str, default="qwen3", help="output hmonnx model name")
+        parser.add_argument("--calib_data", type=str, 
+                            default="../../../hmodel/xh2/examples/xh_gen_data/gen_qwen3_30b_EBSS.jsonl", 
+                            help="calibration dataset choose")
         parser.add_argument("--work-dir", type=str, default="work_dirs/")
         parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
         parser.add_argument("--skip-quarot", action="store_true", help="skip_quarot")
@@ -353,13 +400,16 @@ if HOUMO_TARGET == 'xh2':
         parser.add_argument("--context-length", type=int, default=8192, help="max sequence length")
         parser.add_argument("--input-sequence-length", type=int, default=256, help="input sequence length")
         parser.add_argument("--quant-type", default="w4a8h0_ssfp", help="quant type, default is w4a8_ssfp")
+        parser.add_argument("--gptqmodel", action="store_true", help="use gptqmodel to quant")
         args = parser.parse_args()
         return args
 
     def main():
         args = parse_args()
-
-        houmo_quant_llm(args)
+        if args.gptqmodel:
+            gptq_quant_llm(args)
+        else:
+            houmo_quant_llm(args)
         houmo_export_llm(args)
         move_llm(args)
 

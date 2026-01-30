@@ -101,6 +101,7 @@ if __name__ == "__main__":
             "prefill_len": 256,
             "batch": args.batch,
         },
+        "raw_files": {"raw_path": "3rdparty/gptqmodel-5.4.4-py3-none-any.whl"},
         "modelscope_repo": {
             "repo_ids": ["Qwen/Qwen3-30B-A3B"],
             "local_dirs": [f"{args.download_dir}/qwen3-30b-a3b"],
