@@ -36,6 +36,7 @@ import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -153,10 +154,10 @@ class HmGte:
             past_seq_length = round * 256
             position_id = torch.arange(
                 past_seq_length, past_seq_length + self.prefill_length, dtype=torch.long
-            )
+            ).unsqueeze(0)
             valid_length_data = np.array([valid_length]).astype("int32")
             current_length_data = np.array([current_length]).astype("int32")
-            position_id_data = np.array([position_id]).astype("int32")
+            position_id_data = position_id.numpy().astype("int32")
             input_name = self.prefill.get_input_name(0)
             valid_length_name = self.prefill.get_input_name(1)
             current_length_name = self.prefill.get_input_name(2)
