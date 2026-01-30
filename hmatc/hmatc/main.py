@@ -772,7 +772,7 @@ def main():
         type=int,
         default=1,
         required=False,
-        help="Specify warnup num",
+        help="Specify warmup num",
     )
     perf_parser.add_argument(
         "--sample",
