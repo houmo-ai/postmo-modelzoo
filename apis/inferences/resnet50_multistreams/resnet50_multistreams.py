@@ -22,6 +22,7 @@
 
 import os
 import sys
+import time
 import threading
 import queue
 import numpy as np
@@ -37,6 +38,9 @@ import tcim_lite as tcim
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
+# Thread counter
+g_thread_counter = 0
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -46,21 +50,21 @@ def get_args() -> argparse.Namespace:
         dest="device_num",
         type=int,
         default=1,
-        help="device_num",
+        help="Device number",
     )
     parser.add_argument(
         "-t",
         dest="thread_num",
         type=int,
         default=4,
-        help="thread_num",
+        help="Thread number",
     )
     parser.add_argument(
         "-s",
         dest="sample_num",
         type=int,
         default=10,
-        help="sample_num",
+        help="Sample number",
     )
     args = parser.parse_args()
     return args
@@ -80,7 +84,7 @@ if __name__ == "__main__":
     model_path = "./resnet50_xh2_b1_1core.hmm"  # Path to the ResNet50 model file
 
     # Limit to 1 thread if not running on ASIC platform
-    if not os.environ.get("HDPL_PLATFORM") == "ASIC":
+    if os.environ.get("HDPL_PLATFORM", "") != "ASIC":
         thread_num = 1
     logger.info(f"devices: {device_num}")
     logger.info(f"threads: {thread_num}")
@@ -92,7 +96,7 @@ if __name__ == "__main__":
 
     # Verify that the model file exists
     if not os.path.exists(model_path):
-        logger.error("[error] could not find model: {}".format(model_path))
+        logger.error(f"Could not find model: {model_path}")
         exit(-1)
 
     # 1. Preprocess input image for ResNet50 inference
@@ -122,10 +126,10 @@ if __name__ == "__main__":
         qin.put((i, input_datas))
 
     # 3. Define threading function for inference
-    barrier = threading.Barrier(thread_num * device_num)
-    thread_cnt = 0
+    thread_cnt = thread_num * device_num
+    count_lock = threading.Lock()
 
-    def thread_func(tid, did, module, qin, qout, barrier):
+    def thread_func(tid, did, module, qin, qout, thread_cnt, cnt_lock):
         """
         Function executed by each thread for inference on a specific device.
 
@@ -135,9 +139,12 @@ if __name__ == "__main__":
             module: Model module for inference
             qin: Input queue with tasks
             qout: Output queue for results
-            barrier: Synchronization barrier
+            thread_cnt: Total number of threads
+            cnt_lock: Lock for thread counter
         """
+        global g_thread_counter
         count = 0
+
         # 3.1 Prepare input information by querying the module
         input_infos = {}
         input_num = module.get_num_inputs()
@@ -171,12 +178,21 @@ if __name__ == "__main__":
             output_infos[output_name] = output_info
 
         # 3.3 Wait for all threads to be ready before starting inference
-        barrier.wait()
+        with cnt_lock:
+            g_thread_counter += 1
+        while g_thread_counter < thread_cnt:
+            time.sleep(0.1)
 
         # 3.4 Main inference loop - process tasks from input queue until empty
         while not qin.empty():
-            # 3.4.1 Get task data from the input queue
-            req_id, input_datas = qin.get()
+            try:
+                # 3.4.1 Get task data from the input queue
+                req_id, input_datas = qin.get(timeout=2)
+            except queue.Empty:
+                logger.warning(
+                    f"thread {tid} failed to get task data from empty queue."
+                )
+                continue
 
             # 3.4.2 Set input data to the module for each input name
             for input_name in input_infos:
@@ -227,7 +243,15 @@ if __name__ == "__main__":
             threads.append(
                 threading.Thread(
                     target=thread_func,
-                    args=(tid, did, module_dict[did][i], qin, qout, barrier),
+                    args=(
+                        tid,
+                        did,
+                        module_dict[did][i],
+                        qin,
+                        qout,
+                        thread_cnt,
+                        count_lock,
+                    ),
                 )
             )
             tid += 1
@@ -257,4 +281,4 @@ if __name__ == "__main__":
             # Verify result (65 corresponds to snake class in ImageNet dataset)
             assert pred == 65
 
-    logger.info("<=== resnet50_multistreams python example completed.\n")
+    logger.info("<=== resnet50_multistreams python example completed.")
