@@ -895,7 +895,8 @@ def hmatc_get_file(
 
         cfg_ignore_patterns = model_cfgs["modelscope_repo"].get("ignore_patterns", None)
         if (
-            cfg_ignore_patterns is not None
+            file_type not in ["raw"]
+            and cfg_ignore_patterns is not None
             and isinstance(cfg_ignore_patterns, list)
             and len(cfg_ignore_patterns) > 0
         ):
