@@ -182,13 +182,6 @@ class HmllmInferMultiBatch : public HmllmInferBase {
                                  const std::vector<int> context_length);
 
   /**
-   * @brief Set decode input data
-   * @param data Input data for decode operation
-   * @param context_length Context length for the sequence
-   */
-  void DecodeSetInputDatas(void *data, int32_t context_length);
-
-  /**
    * @brief Execute decode inference
    */
   void DecodeInfer();

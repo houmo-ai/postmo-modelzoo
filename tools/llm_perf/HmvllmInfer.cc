@@ -237,7 +237,9 @@ void HmvllmInfer::PrefillSetInputDatas(void *data) {
   }
 
   for (const auto &input : prefill_input_map) {
+    perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
     prefill_module->SetInput(input.first, input.second);
+    perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
   }
 }
 
@@ -262,7 +264,9 @@ void HmvllmInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
       std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
 
   auto output = *prefill_output_map.begin();
+  perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
   output_tensor = prefill_module->GetOutput(output.first);
+  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
   output_tensor.CastTo(output.second);
 
   void *prefill_outData = output_tensor.Data();
@@ -303,7 +307,9 @@ void HmvllmInfer::DecodeSetInputDatas(void *data, int valid_length) {
   }
 
   for (const auto &input : decode_input_map) {
+    perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
     decode_module->SetInput(input.first, input.second);
+    perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
   }
 }
 
@@ -332,7 +338,9 @@ void HmvllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids) {
   }
 
   auto output = *decode_output_map.begin();
+  perf_tracker->perfStart(PerfType::DECODE_OUTPUT_TIME);
   output_tensor = decode_module->GetOutput(output.first);
+  perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
   output_tensor.CastTo(output.second);
 
   void *decode_outData = output_tensor.Data();
@@ -365,7 +373,9 @@ void HmvllmInfer::VitSetInput() {
   }
 
   for (const auto &input : vit_input_map) {
+    perf_tracker->perfStart(PerfType::VISION_INPUT_TIME);
     vit_module->SetInput(input.first, input.second);
+    perf_tracker->perfEnd(PerfType::VISION_INPUT_TIME);
   }
 }
 
@@ -391,8 +401,9 @@ void HmvllmInfer::VitGetOutputDatas() {
       vit_output_map.insert(
           std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
     }
-
+    perf_tracker->perfStart(PerfType::VISION_OUTPUT_TIME);
     output_tensor = vit_module->GetOutput(output_name);
+    perf_tracker->perfEnd(PerfType::VISION_OUTPUT_TIME);
     output_tensor.CastTo(vit_output_map.at(output_name));
   }
 }
@@ -415,15 +426,13 @@ void HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
   PerfInfos vllm_perf_datas;
   memset(&vllm_perf_datas, 0, sizeof(PerfInfos));
   perf_tracker->perfStart(PerfType::VISION_TOTAL_TIME);
-  perf_tracker->perfStart(PerfType::VISION_INPUT_TIME);
+
   VitSetInput();
-  perf_tracker->perfEnd(PerfType::VISION_INPUT_TIME);
   perf_tracker->perfStart(PerfType::VISION_INFER_TIME);
   VitInfer();
   perf_tracker->perfEnd(PerfType::VISION_INFER_TIME);
-  perf_tracker->perfStart(PerfType::VISION_OUTPUT_TIME);
+
   VitGetOutputDatas();
-  perf_tracker->perfEnd(PerfType::VISION_OUTPUT_TIME);
   perf_tracker->perfEnd(PerfType::VISION_TOTAL_TIME);
 
   vllm_perf_datas.input_tokens = input_tokens_len;
@@ -460,19 +469,14 @@ void HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
     input_datas = embedding->EmbeddingTokens(input_ids);
     perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
 
-    perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
     PrefillSetInputDatas(input_datas);
-    perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
 
     perf_tracker->perfStart(PerfType::PREFILL_INFER_TIME);
     PrefillInfer();
     perf_tracker->perfEnd(PerfType::PREFILL_INFER_TIME);
   }
 
-  perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
   PrefillGetOutputDatas(ids);
-  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
-
   perf_tracker->perfEnd(PerfType::PREFILL_TOTAL_TIME);
   int context_length = input_tokens_len;
 
@@ -486,18 +490,14 @@ void HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
     input_datas = embedding->EmbeddingTokens(ids);
     perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);
 
-    perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
     DecodeSetInputDatas(static_cast<void *>(input_datas), context_length);
-    perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
 
     perf_tracker->perfStart(PerfType::DECODE_INFER_TIME);
     DecodeInfer();
     perf_tracker->perfEnd(PerfType::DECODE_INFER_TIME);
     ids.clear();
 
-    perf_tracker->perfStart(PerfType::DECODE_OUTPUT_TIME);
     DecodeGetOutputDatas(ids);
-    perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
     vllm_perf_datas.decode_count++;
     perf_tracker->perfEnd(PerfType::DECODE_TOTAL_TIME);
     double ratio = static_cast<double>(vllm_perf_datas.decode_count) /

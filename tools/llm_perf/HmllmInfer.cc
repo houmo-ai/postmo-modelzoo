@@ -234,7 +234,9 @@ void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length,
   }
 
   for (const auto &input : prefill_input_map) {
+    perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
     prefill_module->SetInput(input.first, input.second);
+    perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
   }
 }
 
@@ -259,7 +261,9 @@ void HmllmInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
       std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
 
   auto output = *prefill_output_map.begin();
+  perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
   output_tensor = prefill_module->GetOutput(output.first);
+  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
   output_tensor.CastTo(output.second);
 
   void *prefill_outData = output_tensor.Data();
@@ -300,7 +304,9 @@ void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length) {
   }
 
   for (const auto &input : decode_input_map) {
+    perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
     decode_module->SetInput(input.first, input.second);
+    perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
   }
 }
 
@@ -329,7 +335,9 @@ void HmllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids) {
   }
 
   auto output = *decode_output_map.begin();
+  perf_tracker->perfStart(PerfType::DECODE_OUTPUT_TIME);
   output_tensor = decode_module->GetOutput(output.first);
+  perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
   output_tensor.CastTo(output.second);
 
   void *decode_outData = output_tensor.Data();
@@ -386,17 +394,14 @@ void HmllmInfer::perf_llm(const uint32_t input_tokens_len,
     input_datas = embedding->EmbeddingTokens(input_ids);
     perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
 
-    perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
     PrefillSetInputDatas(input_datas, valid_length, current_length);
-    perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
 
     perf_tracker->perfStart(PerfType::PREFILL_INFER_TIME);
     PrefillInfer();
     perf_tracker->perfEnd(PerfType::PREFILL_INFER_TIME);
   }
-  perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
+
   PrefillGetOutputDatas(ids);
-  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
   perf_tracker->perfEnd(PerfType::PREFILL_TOTAL_TIME);
 
   int context_length = input_tokens_len;
@@ -410,18 +415,14 @@ void HmllmInfer::perf_llm(const uint32_t input_tokens_len,
     input_datas = embedding->EmbeddingTokens(ids);
     perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);
 
-    perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
     DecodeSetInputDatas(static_cast<void *>(input_datas),
                         static_cast<int32_t>(context_length));
-    perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
 
     perf_tracker->perfStart(PerfType::DECODE_INFER_TIME);
     DecodeInfer();
     perf_tracker->perfEnd(PerfType::DECODE_INFER_TIME);
     ids.clear();
-    perf_tracker->perfStart(PerfType::DECODE_OUTPUT_TIME);
     DecodeGetOutputDatas(ids);
-    perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
     llm_perf_datas.decode_count++;
     perf_tracker->perfEnd(PerfType::DECODE_TOTAL_TIME);
     double ratio = static_cast<double>(llm_perf_datas.decode_count) /
