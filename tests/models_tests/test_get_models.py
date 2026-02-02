@@ -310,6 +310,14 @@ def test_asr_whisper_get_model(setup_logging) -> None:
     model_name = "whisper"
     _get_model_func(model_name, setup_logging)
 
+@pytest.mark.sensevoice
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_asr_sensevoice_get_model")
+def test_asr_sensevoice_get_model(setup_logging) -> None:
+    """test_asr_sensevoice_get_model"""
+    model_name = "sensevoice"
+    _get_model_func(model_name, setup_logging)
+
 
 @pytest.mark.gte
 @pytest.mark.get_model

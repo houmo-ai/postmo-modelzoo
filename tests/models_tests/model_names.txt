@@ -34,3 +34,4 @@ qwen3_vl
 whisper
 gte
 gpt_oss
+sensevoice

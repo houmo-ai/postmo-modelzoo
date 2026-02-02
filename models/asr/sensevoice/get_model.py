@@ -77,7 +77,8 @@ if __name__ == "__main__":
             "ndevice": 1,
         },
         "modelscope_repo": {
-            "repo_ids": ['iic/SenseVoiceSmall']
+            "repo_ids": ['iic/SenseVoiceSmall'],
+            "ignore_patterns": ["*.pt"],
         },
     }
 

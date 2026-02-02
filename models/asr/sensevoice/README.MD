@@ -107,11 +107,36 @@ Loading model from output/xh2/sensevoice_small.hmm
 ### 3.2 性能结果
 
 ```bash
-2026-01-30 07:01:35.330 | INFO     | __main__:run_inference:350 - ==================== Process SenseVoiceSmall/example/zh.mp3 take time 94.55108642578125 ms ====================
-2026-01-30 07:01:35.437 | INFO     | __main__:run_inference:350 - ==================== Process SenseVoiceSmall/example/en.mp3 take time 94.29383277893066 ms ====================
-2026-01-30 07:01:35.543 | INFO     | __main__:run_inference:350 - ==================== Process SenseVoiceSmall/example/yue.mp3 take time 95.37458419799805 ms ====================
-2026-01-30 07:01:35.646 | INFO     | __main__:run_inference:350 - ==================== Process SenseVoiceSmall/example/ja.mp3 take time 87.16630935668945 ms ====================
-2026-01-30 07:01:35.739 | INFO     | __main__:run_inference:350 - ==================== Process SenseVoiceSmall/example/ko.mp3 take time 81.19869232177734 ms ====================
+2026-02-02 06:05:40.028 | INFO     | __main__:run_inference:368 - Clean Text: 开饭时间早上九点至下午五点
+2026-02-02 06:05:40.028 | SUCCESS  | __main__:run_inference:370 - Performance:
+2026-02-02 06:05:40.028 | SUCCESS  | __main__:run_inference:371 -   audio_duration: 5616.00 ms
+2026-02-02 06:05:40.028 | SUCCESS  | __main__:run_inference:372 -   infer time 95.76 ms
+2026-02-02 06:05:40.028 | SUCCESS  | __main__:run_inference:373 -   rtf(audio_duration / infer_time): 58.65
+2026-02-02 06:05:40.028 | INFO     | __main__:run_inference:314 - ==================== Process SenseVoiceSmall/example/en.mp3 ====================
+2026-02-02 06:05:40.132 | INFO     | __main__:run_inference:368 - Clean Text: the tribal chieftain called for the boy and presented him with fifty pieces of gold
+2026-02-02 06:05:40.133 | SUCCESS  | __main__:run_inference:370 - Performance:
+2026-02-02 06:05:40.133 | SUCCESS  | __main__:run_inference:371 -   audio_duration: 7176.00 ms
+2026-02-02 06:05:40.133 | SUCCESS  | __main__:run_inference:372 -   infer time 95.32 ms
+2026-02-02 06:05:40.133 | SUCCESS  | __main__:run_inference:373 -   rtf(audio_duration / infer_time): 75.28
+2026-02-02 06:05:40.133 | INFO     | __main__:run_inference:314 - ==================== Process SenseVoiceSmall/example/yue.mp3 ====================
+2026-02-02 06:05:40.240 | INFO     | __main__:run_inference:368 - Clean Text: 呢几个字都表达唔到我想讲嘅意思
+2026-02-02 06:05:40.240 | SUCCESS  | __main__:run_inference:370 - Performance:
+2026-02-02 06:05:40.240 | SUCCESS  | __main__:run_inference:371 -   audio_duration: 5184.00 ms
+2026-02-02 06:05:40.240 | SUCCESS  | __main__:run_inference:372 -   infer time 96.38 ms
+2026-02-02 06:05:40.240 | SUCCESS  | __main__:run_inference:373 -   rtf(audio_duration / infer_time): 53.79
+2026-02-02 06:05:40.240 | INFO     | __main__:run_inference:314 - ==================== Process SenseVoiceSmall/example/ja.mp3 ====================
+2026-02-02 06:05:40.349 | INFO     | __main__:run_inference:368 - Clean Text: うちの中学は弁当制で持っていきない場合は50円の学校販売のパンを買う
+2026-02-02 06:05:40.349 | SUCCESS  | __main__:run_inference:370 - Performance:
+2026-02-02 06:05:40.349 | SUCCESS  | __main__:run_inference:371 -   audio_duration: 7224.00 ms
+2026-02-02 06:05:40.349 | SUCCESS  | __main__:run_inference:372 -   infer time 95.18 ms
+2026-02-02 06:05:40.349 | SUCCESS  | __main__:run_inference:373 -   rtf(audio_duration / infer_time): 75.90
+2026-02-02 06:05:40.349 | INFO     | __main__:run_inference:314 - ==================== Process SenseVoiceSmall/example/ko.mp3 ====================
+2026-02-02 06:05:40.442 | INFO     | __main__:run_inference:368 - Clean Text: 조금만 생각을 하면서 살면 훨씬 편할 거야
+2026-02-02 06:05:40.442 | SUCCESS  | __main__:run_inference:370 - Performance:
+2026-02-02 06:05:40.443 | SUCCESS  | __main__:run_inference:371 -   audio_duration: 4644.00 ms
+2026-02-02 06:05:40.443 | SUCCESS  | __main__:run_inference:372 -   infer time 82.40 ms
+2026-02-02 06:05:40.443 | SUCCESS  | __main__:run_inference:373 -   rtf(audio_duration / infer_time): 56.36
+
 ```
 
 ## 4 免责声明

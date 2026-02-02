@@ -358,6 +358,18 @@ llm_bge:
         args: all
   test:
     - llm_bge_test
+llm_sensevoice:
+  include:
+    - models/asr/sensevoice
+  exclude:
+    - models/asr/sensevoice/README.MD
+  example_case:
+    - llm_sensevoice_test:
+        test_type: models_tests
+        script: sensevoice
+        args: all
+  test:
+    - llm_sensevoice_test
 llm_minicpmo:
   include:
     - models/omni/minicpmo

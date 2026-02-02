@@ -313,6 +313,7 @@ class SenseVoiceSmall:
         for audio_file in audio_files:
             logger.info(f"{'=' * 20} Process {audio_file} {'=' * 20}")
             wav = load_data(str(audio_file), self.target_sr)
+            audio_duration = len(wav[0]) / self.target_sr * 1000
             feat, feat_len = self.frontend.extract(wav)
 
             inputs = make_inputs_for_sample(feat, feat_len, self.language, self.textnorm)
@@ -351,10 +352,10 @@ class SenseVoiceSmall:
                             self.sess.get_output(self.sess.get_output_name(1)).numpy()
                         )
                 else:
-                    outs[0] = np.concatenate([outs[0], self.sess.get_output(sess.get_output_name(0)).numpy()], axis=1)
-                    outs[1] = outs[1] + self.sess.get_output(sess.get_output_name(1)).numpy()
+                    outs[0] = np.concatenate([outs[0], self.sess.get_output(self.sess.get_output_name(0)).numpy()], axis=1)
+                    outs[1] = outs[1] + self.sess.get_output(self.sess.get_output_name(1)).numpy()
 
-            t1 = time.time() - t0
+            t1 = (time.time() - t0) * 1000.0
 
             logits, lens = outs
             out_len = int(lens[0]) if hasattr(lens, "__len__") else int(lens)
@@ -365,7 +366,11 @@ class SenseVoiceSmall:
             if raw_result:
                 logger.info(f"Raw Output: {text}")
             logger.info(f"Clean Text: {clean_text}")
-            logger.info(f"{'=' * 20} Process {audio_file} take time {t1 * 1000.0} ms {'=' * 20}")
+            rtf = audio_duration / t1
+            logger.success(f"Performance: ")
+            logger.success(f"  audio_duration: {audio_duration :.2f} ms")
+            logger.success(f"  infer time {t1 :.2f} ms")
+            logger.success(f"  rtf(audio_duration / infer_time): {rtf:.2f}")
 
 if __name__ == "__main__":
     args = get_args()

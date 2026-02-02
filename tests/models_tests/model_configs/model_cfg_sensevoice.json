@@ -1,0 +1,29 @@
+{
+    "obsolete": false,
+    "model_dir": "models/asr/sensevoice",
+    "model_type": "llm",
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["hmm"],
+            "download_dir": ["cached_models"],
+            "extract_dir": ["cached_models/hmm_xh2"],
+            "source_type": [null],
+            "ndevice": [null]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "processor_dir": ["cached_models/sensevoice"],
+            "model_path": ["cached_results/hmm_xh2/sensevoice_small.hmm"]
+        }
+    }
+}

@@ -277,6 +277,13 @@ def test_asr_whisper_demo(setup_logging) -> None:
     model_name = "whisper"
     _demo_func(model_name, setup_logging)
 
+@pytest.mark.sensevoice
+@pytest.mark.demo
+def test_asr_sensevoice_demo(setup_logging) -> None:
+    """test_asr_sensevoice_demo"""
+    model_name = "sensevoice"
+    _demo_func(model_name, setup_logging)
+
 
 @pytest.mark.gte
 @pytest.mark.demo
