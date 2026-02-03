@@ -89,6 +89,11 @@ def get_args() -> argparse.Namespace:
         action="store_true",
         help="Show Raw Result"
     )
+    parser.add_argument(
+        "--device_monitor",
+        action="store_true",
+        help="Device Monitor During Demo"
+    )
 
     args = parser.parse_args()
     return args
@@ -372,10 +377,14 @@ class SenseVoiceSmall:
             logger.success(f"  infer time {t1 :.2f} ms")
             logger.success(f"  rtf(audio_duration / infer_time): {rtf:.2f}")
 
-if __name__ == "__main__":
-    args = get_args()
 
-    # init houmo whisper model
+if __name__ == "__main__":
+    import hmatc.python.smi as smi
+    args = get_args()
+    smi_monitor = None
+    if args.device_monitor:
+        smi_monitor = smi.DeviceMonitor(0, 100)
+        smi_monitor.start()
     if HOUMO_TARGET == "xh2":
         sensevoice_small = SenseVoiceSmall(
             args.model_path,
@@ -387,3 +396,5 @@ if __name__ == "__main__":
         raise ValueError("Unsupport houmo target!")
 
     sensevoice_small.run_inference(args.audio_files, args.raw_result)
+    if args.device_monitor:
+        smi_monitor.stop()

@@ -25,6 +25,7 @@ import pybind11
 from datetime import datetime
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
+import argparse
 
 
 TCIM_RUNTIME_PATH = os.environ.get("TCIM_RUNTIME_PATH")
@@ -166,6 +167,32 @@ class BuildExtWithDLL(build_ext):
                     print(f"[COPY] {src} -> {dst}")
                     shutil.copy(src, dst)
 
+
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument('--enable_smi_support', action="store_true", help='enable Python SMI support')
+args, remaining_argv = parser.parse_known_args()
+sys.argv = [sys.argv[0]] + remaining_argv
+
+if sys.platform == "linux" and args.enable_smi_support:
+    HOUMO_SDK_PATH = os.environ.get("HOUMO_SDK_PATH")
+    smi_libraries = ["hal_xh2a"]
+    smi_compile_args = ["-std=c++17", "-O2", "-w", "-D ENABLE_SMI"]
+    smi_ext = Extension(
+        name="hmatc.python.smi",
+        sources=["hmatc/python/device_smi.cpp"],
+        include_dirs=[
+            pybind11.get_include(),
+            os.path.join(HOUMO_SDK_PATH, "hal/export/include"),
+            "3rdparty/nlohmann/include",
+        ],
+        library_dirs=[os.path.join(HOUMO_SDK_PATH, "hal/lib")],
+        libraries=smi_libraries,
+        language="c++",
+        extra_compile_args=smi_compile_args,
+        extra_link_args=extra_link_args,
+    )
+
+    ext_modules.append(smi_ext)
 
 setup(
     name="hmatc",

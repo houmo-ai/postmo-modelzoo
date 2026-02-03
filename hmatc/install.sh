@@ -1,18 +1,21 @@
 #!/bin/bash
 
-set -e  # 出错就退出
+set -e
 
 PACKAGE_NAME="hmatc"
 
-# 清理旧构建产物
-rm -rf build dist 
+SMI_ARG=""
 
-# 构建 .whl 文件
-python3 setup.py bdist_wheel
+if [ "$1" = "--enable_smi_support" ]; then
+    SMI_ARG="--enable_smi_support"
+fi
+
+rm -rf build dist
+
+python3 setup.py bdist_wheel $SMI_ARG
 
 rm -rf "$PACKAGE_NAME.egg-info"
 
-# 判断包是否已安装，再卸载
 if python3 -c "import pkg_resources; pkg_resources.get_distribution('$PACKAGE_NAME')" 2>/dev/null; then
     echo "Uninstalling existing $PACKAGE_NAME ..."
     pip3 uninstall -y "$PACKAGE_NAME"
@@ -20,5 +23,4 @@ else
     echo "$PACKAGE_NAME is not installed, skipping uninstall."
 fi
 
-# 安装新版本
 pip3 install dist/*.whl

@@ -46,6 +46,10 @@ if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     VENV_FLAG=1
 fi
 
+cd ../../../hmatc
+pip uninstall -y hmatc
+./install.sh --enable_smi_support
+cd "${SCRIPT_DIR}"
 dir_path="sensevoice"
 if [[ "$VENV_FLAG" -eq "1" ]]; then
     echo "⚠ Create python3 venv for ${dir_path} demo."
@@ -100,7 +104,7 @@ fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
-    python3 demo.py
+    python3 demo.py --device_monitor
 fi
 
 if [[ "$VENV_FLAG" -eq "1" ]]; then
