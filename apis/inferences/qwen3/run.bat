@@ -7,10 +7,10 @@ if "%1" neq "" (set BUILD_TYPE=%1)
 set BUILD_DIR=build_vs2022
 set HDPL_PLATFORM=ASIC
 rem get test model
-%PYTHON_DIR%\python.exe get_model.py
+"%PYTHON_DIR%\python.exe" get_model.py
 
 rem python example
-%PYTHON_DIR%\python.exe demo.py
+"%PYTHON_DIR%\python.exe" demo.py
 
 rem c++ example
 if exist "build" (rmdir /s /q build)

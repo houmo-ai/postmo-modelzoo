@@ -1,16 +1,16 @@
 @echo off
 set PROJECT_DIR=%~dp0
-set PROJECT_DIR=%PROJECT_DIR:~0,-1% 
+set PROJECT_DIR=%PROJECT_DIR:~0,-1%
 cd /d "%PROJECT_DIR%"
 set BUILD_TYPE=RelWithDebInfo
 set BUILD_DIR=build_vs2022
 set PATH=%OPENCV_PATH%\x64\vc16\bin;%PATH%
 
 rem get test model
-%PYTHON_DIR%\python.exe get_model.py
+"%PYTHON_DIR%\python.exe" get_model.py
 
 rem python example
-%PYTHON_DIR%\python.exe resnet50.py
+"%PYTHON_DIR%\python.exe" resnet50.py
 
 rem c++ example
 if exist "build" (rmdir /s /q build)

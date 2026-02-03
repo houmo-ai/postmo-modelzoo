@@ -41,7 +41,7 @@ if %argC% equ 0 (
     exit /b 1
 ) else (
     if defined PYTHON_DIR (
-        %PYTHON_DIR%\python.exe tools\win_envs\set_environs.py "%1"
+        "%PYTHON_DIR%\python.exe" tools\win_envs\set_environs.py "%1"
     ) else (
         python tools\win_envs\set_environs.py "%1"
     )
