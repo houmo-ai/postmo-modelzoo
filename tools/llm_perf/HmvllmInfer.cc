@@ -207,7 +207,7 @@ HmvllmInfer::~HmvllmInfer() {
   vit_module.reset();
 }
 
-void HmvllmInfer::PrefillSetInputDatas(void *data) {
+void HmvllmInfer::PrefillSetInputDatas(void *data, int current_length) {
   prefill_input_map.clear();
   for (int idx = 0; idx < attn_idx_start; idx++) {
     auto input_name = prefill_module->GetInputName(idx);
@@ -215,17 +215,26 @@ void HmvllmInfer::PrefillSetInputDatas(void *data) {
 
     tcim::Tensor input_tensor;
     size_t mem_size = 0;
-    if (idx == 0) {
-      mem_size = input_info.MemSize();
-      input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
-    } else {
-      mem_size = input_info.MemSize();
-      if (prefill_input_ptrs[idx - 1] == nullptr) {
-        prefill_input_ptrs[idx - 1] = new char[mem_size];
-        memset(prefill_input_ptrs[idx - 1], 0, mem_size);
-      }
-      input_tensor = tcim::Tensor::CreateHostTensor(
-          input_info, mem_size, prefill_input_ptrs[idx - 1]);
+    switch (idx) {
+      case 0:
+        mem_size = input_info.MemSize();
+        input_tensor =
+            tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
+        break;
+      case 5:
+        mem_size = input_info.MemSize();
+        input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
+                                                      &current_length);
+        break;
+      default:
+        mem_size = input_info.MemSize();
+        if (prefill_input_ptrs[idx - 1] == nullptr) {
+          prefill_input_ptrs[idx - 1] = new char[mem_size];
+          memset(prefill_input_ptrs[idx - 1], 0, mem_size);
+        }
+        input_tensor = tcim::Tensor::CreateHostTensor(
+            input_info, mem_size, prefill_input_ptrs[idx - 1]);
+        break;
     }
 
     if (prefill_input_map.find(input_name) != prefill_input_map.end()) {
@@ -359,7 +368,7 @@ void HmvllmInfer::VitSetInput() {
     mem_size = input_info.MemSize();
     if (vit_input_ptrs[idx] == nullptr) {
       vit_input_ptrs[idx] = new char[mem_size];
-      memset(vit_input_ptrs[idx], 0, mem_size);
+      // memset(vit_input_ptrs[idx], 0, mem_size);
     }
     input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
                                                   vit_input_ptrs[idx]);
@@ -469,7 +478,7 @@ void HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
     input_datas = embedding->EmbeddingTokens(input_ids);
     perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
 
-    PrefillSetInputDatas(input_datas);
+    PrefillSetInputDatas(input_datas, current_length);
 
     perf_tracker->perfStart(PerfType::PREFILL_INFER_TIME);
     PrefillInfer();

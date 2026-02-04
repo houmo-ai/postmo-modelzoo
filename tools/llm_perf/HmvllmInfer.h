@@ -159,7 +159,7 @@ class HmvllmInfer : public HmllmInferBase {
    * @brief Set input data for prefill operation
    * @param data Input data for the prefill stage
    */
-  void PrefillSetInputDatas(void *data);
+  void PrefillSetInputDatas(void *data, int current_length);
 
   /**
    * @brief Execute prefill inference and return execution time
