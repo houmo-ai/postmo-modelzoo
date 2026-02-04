@@ -428,6 +428,8 @@ static void get_version_info(hmVerInfo_t &hmVerInfo) {
     memset(buf, 0, sizeof(buf));
     hmVerInfo.driver_version =
         hm_sys_get_driver_version(buf, sizeof(buf)) == 0 ? buf : "unavailable";
+#else
+    hmVerInfo.driver_version = "skipped";
 #endif
     get_runtime_info(hmVerInfo);
 }
@@ -495,7 +497,7 @@ static void Infer(int32_t tid, std::string model_name, int32_t warmup,
     std::this_thread::sleep_for(std::chrono::milliseconds(100 * tid));
     auto option = tcim::Module::Option(wm);
     auto *model = get_model(model_name);
-    printf("[INFO] Infer %d started, wramup: %d, rounds: %d, repeat: %d\n", tid,
+    printf("[INFO] Infer %d started, warmup: %d, rounds: %d, repeat: %d\n", tid,
            warmup, rounds, stats.repeat);
     auto module = tcim::Module::LoadFromMem(model->data, model->size, option);
     if (module.GetInitStatus() != tcim::Status::OK) {
@@ -880,14 +882,23 @@ int main(int argc, char **argv) {
     }
 
     CheckReport report;
-    report.add("Driver Version",
-               hmVerInfo.driver_version != "unavailable" ? CheckStatus::PASS
-                                                         : CheckStatus::FAIL,
-               hmVerInfo.driver_version);
-    report.add("HAL SDK Version",
+
+    auto DRIVER_VERSION_STATUS = hmVerInfo.driver_version != "unavailable"
+                                     ? CheckStatus::PASS
+                                     : CheckStatus::FAIL;
+    std::string msg;
+    if (hmVerInfo.driver_version == "skipped") {
+        DRIVER_VERSION_STATUS = CheckStatus::WARN;
+        msg = "Windows not supported yet.";
+    }
+    report.add("Driver Version", DRIVER_VERSION_STATUS,
+               hmVerInfo.driver_version, msg);
+
+    report.add("SDK Version",
                hmVerInfo.sdk_version != "unavailable" ? CheckStatus::PASS
                                                       : CheckStatus::FAIL,
                hmVerInfo.sdk_version);
+
     report.add("Runtime Version",
                hmVerInfo.runtime_version != "unavailable" ? CheckStatus::PASS
                                                           : CheckStatus::FAIL,
@@ -1038,11 +1049,5 @@ int main(int argc, char **argv) {
     printf("  %sWARN%s : %d\n", COLOR_YELLOW, COLOR_RESET, s.warn);
     printf("  %sFAIL%s : %d\n", COLOR_RED, COLOR_RESET, s.fail);
     printf("=========================\n\n");
-
-    // if (!report.all_pass()) {
-    //     printf("%s❌%s Some checks failed.\n");
-    // } else {
-    //     printf("%s✔%s All checks passed.\n", COLOR_GREEN, COLOR_RESET);
-    // }
     return 0;
 }
