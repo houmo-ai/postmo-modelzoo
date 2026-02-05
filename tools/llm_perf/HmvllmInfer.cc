@@ -221,6 +221,11 @@ void HmvllmInfer::PrefillSetInputDatas(void *data, int current_length) {
         input_tensor =
             tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
         break;
+      case 4:
+        mem_size = input_info.MemSize();
+        input_tensor =
+            tcim::Tensor::CreateHostTensor(input_info, mem_size, &past_seq_len);
+        break;
       case 5:
         mem_size = input_info.MemSize();
         input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
@@ -368,7 +373,6 @@ void HmvllmInfer::VitSetInput() {
     mem_size = input_info.MemSize();
     if (vit_input_ptrs[idx] == nullptr) {
       vit_input_ptrs[idx] = new char[mem_size];
-      // memset(vit_input_ptrs[idx], 0, mem_size);
     }
     input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
                                                   vit_input_ptrs[idx]);
@@ -458,7 +462,7 @@ void HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
   int prefill_loop_round =
       std::ceil((float)input_tokens_len / (float)prefill_length);
   valid_length = 0, current_length = 0;
-
+  past_seq_len = 0;
   for (int round = 0; round < prefill_loop_round; round++) {
     valid_length = round * prefill_length;
     std::vector<int> input_ids;
@@ -479,7 +483,7 @@ void HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
     perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
 
     PrefillSetInputDatas(input_datas, current_length);
-
+    past_seq_len += current_length;
     perf_tracker->perfStart(PerfType::PREFILL_INFER_TIME);
     PrefillInfer();
     perf_tracker->perfEnd(PerfType::PREFILL_INFER_TIME);

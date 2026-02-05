@@ -136,7 +136,7 @@ class HmvllmInfer : public HmllmInferBase {
   int bar_width = 50;      // Width for progress bar display
   int attn_idx_start = 0;  // Starting index for attention inputs
   int vit_input_nums = 0;  // Number of inputs for ViT module
-
+  int past_seq_len = 0;
   // Pointers to input data for different modules
   std::vector<char *> prefill_input_ptrs;  // Pointers to prefill input data
   std::vector<char *> decode_input_ptrs;   // Pointers to decode input data
