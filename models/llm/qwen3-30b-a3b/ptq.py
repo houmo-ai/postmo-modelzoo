@@ -184,7 +184,7 @@ def houmo_quant_llm(args):
     cfg_name = Path(hf_model_path).name
     if not args.skip_quarot:
         cfg_name += "_quarot"
-    
+
     work_dir = Path(out_dir) / cfg_name
     work_dir.mkdir(exist_ok=True, parents=True)
     config = AutoConfig.from_pretrained(hf_model_dir)
@@ -233,7 +233,7 @@ def houmo_quant_llm(args):
             state_dict = load_safetensors_file(filename)
             native_model.load_state_dict(state_dict)
             logger.info(msg_output_format(f"Load state_dict from {filename}"))
-    
+
         consumption = torch.cuda.max_memory_allocated()
         unit = "B"
         if consumption > 1024:
@@ -244,7 +244,7 @@ def houmo_quant_llm(args):
                 unit = "M"
             consumption = round(consumption, 2)
         logger.info(f"GPU memory cost for export {consumption}{unit}")
-    
+
     if len(quant_methods) != 0:
         quant_name = "_".join(quant_methods)
         filename = work_dir / f"{quant_name}-state-dict.safetensors"
@@ -334,7 +334,7 @@ def move_models(
     matched_files = list(source_dir.glob("*{}.onnx".format(model)))
 
     if not matched_files:
-        raise FileNotFoundError(f"未找到匹配的onnx文件于 {source_dir}")
+        raise FileNotFoundError(f"No matching ONNX files found in {source_dir}")
 
     target_path = source_dir / target_name
     if target_path.exists():
@@ -389,8 +389,8 @@ if HOUMO_TARGET == 'xh2':
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("--model", type=str, default="qwen3-30b-a3b")
         parser.add_argument("--model-name", type=str, default="qwen3", help="output hmonnx model name")
-        parser.add_argument("--calib_data", type=str, 
-                            default="../../../hmodel/xh2/examples/xh_gen_data/gen_qwen3_30b_EBSS.jsonl", 
+        parser.add_argument("--calib_data", type=str,
+                            default="../../../hmodel/xh2/examples/xh_gen_data/gen_qwen3_30b_EBSS.jsonl",
                             help="calibration dataset choose")
         parser.add_argument("--work-dir", type=str, default="work_dirs/")
         parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))

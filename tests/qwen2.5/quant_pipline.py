@@ -235,7 +235,7 @@ def move_models(
     matched_files = list(source_dir.glob("*{}.onnx".format(model)))
 
     if not matched_files:
-        raise FileNotFoundError(f"未找到匹配的onnx文件于 {source_dir}")
+        raise FileNotFoundError(f"No matching ONNX files found in {source_dir}")
 
     target_path = source_dir / target_name
     if target_path.exists():
