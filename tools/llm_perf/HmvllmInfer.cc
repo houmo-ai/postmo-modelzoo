@@ -183,21 +183,21 @@ int HmvllmInfer::get_nblocks() {
 HmvllmInfer::~HmvllmInfer() {
   for (int i = 0; i < prefill_input_ptrs.size(); ++i) {
     if (prefill_input_ptrs[i] != nullptr) {
-      delete prefill_input_ptrs[i];
+      delete[] prefill_input_ptrs[i];
       prefill_input_ptrs[i] = nullptr;
     }
   }
 
   for (int i = 0; i < decode_input_ptrs.size(); ++i) {
     if (decode_input_ptrs[i] != nullptr) {
-      delete decode_input_ptrs[i];
+      delete[] decode_input_ptrs[i];
       decode_input_ptrs[i] = nullptr;
     }
   }
 
   for (int i = 0; i < vit_input_ptrs.size(); ++i) {
     if (vit_input_ptrs[i] != nullptr) {
-      delete vit_input_ptrs[i];
+      delete[] vit_input_ptrs[i];
       vit_input_ptrs[i] = nullptr;
     }
   }

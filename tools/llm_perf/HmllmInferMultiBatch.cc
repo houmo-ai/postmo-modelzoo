@@ -449,5 +449,7 @@ void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
   perf_tracker->setBasicInfo(this->batch, input_tokens_len,
                              llm_perf_datas.decode_count);
   perf_tracker->showSummary();
+
+  delete[] input_datas;
   return;
 }

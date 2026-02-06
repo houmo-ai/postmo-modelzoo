@@ -40,7 +40,7 @@ HmEmbedding::HmEmbedding(const std::string& embeddingWeightPath,
 
 HmEmbedding::~HmEmbedding() {
   embed_w.reset();
-  delete ptr;
+  delete[] ptr;
 }
 
 tensor_type* HmEmbedding::EmbeddingTokens(const std::vector<int>& ids) {
