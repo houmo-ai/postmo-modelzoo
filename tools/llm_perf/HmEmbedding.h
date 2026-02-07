@@ -109,7 +109,7 @@ class HmEmbedding {
   // Storage for embedding weights
   std::unique_ptr<tensor_type[]> embed_w;
   // Temporary pointer for storing embedding results
-  tensor_type *ptr = nullptr;
+  std::unique_ptr<tensor_type[]> ptr;
   // Size of the temporary pointer
   size_t ptr_size = 0;
   // Properties

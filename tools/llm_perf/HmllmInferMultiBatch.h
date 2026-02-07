@@ -31,7 +31,7 @@
 #include <sstream>
 
 #include "HmEmbedding.h"
-#include "tcim/tcim_runtime.h"
+#include "tcim_runtime_utils.h"
 
 /**
  * @brief Structure to hold performance information for a single batch
@@ -122,10 +122,6 @@ class HmllmInferMultiBatch : public HmllmInferBase {
   std::vector<std::string> dummy_names;  // Names for dummy tensors
 
   std::map<std::string, tcim::Tensor>
-      prefill_input_map;  // Prefill input tensor mapping
-  std::map<std::string, tcim::Tensor>
-      decode_input_map;  // Decode input tensor mapping
-  std::map<std::string, tcim::Tensor>
       prefill_output_map;  // Prefill output tensor mapping
   std::map<std::string, tcim::Tensor>
       decode_output_map;  // Decode output tensor mapping
@@ -135,6 +131,8 @@ class HmllmInferMultiBatch : public HmllmInferBase {
 
   int bar_width = 50;  // Width for progress bar display
   int n_blocks = 0;    // Number of transformer blocks
+  int32_t valid_length = 0;
+  int32_t current_length = 0;
 
  private:
   /**
@@ -149,8 +147,7 @@ class HmllmInferMultiBatch : public HmllmInferBase {
    * @param valid_length Valid length of the input sequence
    * @param current_length Current length of the sequence
    */
-  void PrefillSetInputDatas(void *data, int32_t valid_length,
-                            int32_t current_length);
+  void PrefillSetInputDatas(void *data);
 
   /**
    * @brief Execute prefill inference
@@ -180,13 +177,6 @@ class HmllmInferMultiBatch : public HmllmInferBase {
    */
   PerfSingleBatchInfo run_decode(tensor_type *input_datas,
                                  const std::vector<int> context_length);
-
-  /**
-   * @brief Set decode input data
-   * @param data Input data for decode operation
-   * @param context_length Context length for the sequence
-   */
-  void DecodeSetInputDatas(void *data, int32_t context_length);
 
   /**
    * @brief Execute decode inference

@@ -59,7 +59,8 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   // init module
   prefill_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);
-  prefill_module->LoadModel(prefillModelPath, option_prefill);
+  CheckTcimRetStatus(
+      prefill_module->LoadModel(prefillModelPath, option_prefill));
   perf_tracker->perfEnd(PerfType::PREFILL_LOAD_TIME);
 
   int n_blocks = get_nblocks();
@@ -77,12 +78,12 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
 
   decode_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::DECODE_LOAD_TIME);
-  decode_module->LoadModel(decodeModelPath, option_decode);
+  CheckTcimRetStatus(decode_module->LoadModel(decodeModelPath, option_decode));
   perf_tracker->perfEnd(PerfType::DECODE_LOAD_TIME);
 
   vit_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::VISION_LOAD_TIME);
-  vit_module->LoadModel(vitModelPath, option_vit);
+  CheckTcimRetStatus(vit_module->LoadModel(vitModelPath, option_vit));
   perf_tracker->perfEnd(PerfType::VISION_LOAD_TIME);
 
   attn_idx_start = get_attn_idx_start();
@@ -183,21 +184,21 @@ int HmvllmInfer::get_nblocks() {
 HmvllmInfer::~HmvllmInfer() {
   for (int i = 0; i < prefill_input_ptrs.size(); ++i) {
     if (prefill_input_ptrs[i] != nullptr) {
-      delete prefill_input_ptrs[i];
+      delete[] prefill_input_ptrs[i];
       prefill_input_ptrs[i] = nullptr;
     }
   }
 
   for (int i = 0; i < decode_input_ptrs.size(); ++i) {
     if (decode_input_ptrs[i] != nullptr) {
-      delete decode_input_ptrs[i];
+      delete[] decode_input_ptrs[i];
       decode_input_ptrs[i] = nullptr;
     }
   }
 
   for (int i = 0; i < vit_input_ptrs.size(); ++i) {
     if (vit_input_ptrs[i] != nullptr) {
-      delete vit_input_ptrs[i];
+      delete[] vit_input_ptrs[i];
       vit_input_ptrs[i] = nullptr;
     }
   }
@@ -207,8 +208,7 @@ HmvllmInfer::~HmvllmInfer() {
   vit_module.reset();
 }
 
-void HmvllmInfer::PrefillSetInputDatas(void *data, int current_length) {
-  prefill_input_map.clear();
+void HmvllmInfer::PrefillSetInputDatas(void *data) {
   for (int idx = 0; idx < attn_idx_start; idx++) {
     auto input_name = prefill_module->GetInputName(idx);
     auto input_info = prefill_module->GetInputInfo(input_name).AsContiguous();
@@ -220,16 +220,19 @@ void HmvllmInfer::PrefillSetInputDatas(void *data, int current_length) {
         mem_size = input_info.MemSize();
         input_tensor =
             tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
+        CheckTcimRetStatus(prefill_module->SetInput(input_name, input_tensor));
         break;
       case 4:
         mem_size = input_info.MemSize();
         input_tensor =
             tcim::Tensor::CreateHostTensor(input_info, mem_size, &past_seq_len);
+        CheckTcimRetStatus(prefill_module->SetInput(input_name, input_tensor));
         break;
       case 5:
         mem_size = input_info.MemSize();
         input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
                                                       &current_length);
+        CheckTcimRetStatus(prefill_module->SetInput(input_name, input_tensor));
         break;
       default:
         mem_size = input_info.MemSize();
@@ -239,26 +242,16 @@ void HmvllmInfer::PrefillSetInputDatas(void *data, int current_length) {
         }
         input_tensor = tcim::Tensor::CreateHostTensor(
             input_info, mem_size, prefill_input_ptrs[idx - 1]);
+        CheckTcimRetStatus(prefill_module->SetInput(input_name, input_tensor));
         break;
     }
-
-    if (prefill_input_map.find(input_name) != prefill_input_map.end()) {
-      prefill_input_map.at(input_name) = input_tensor;
-    } else {
-      prefill_input_map.insert(
-          std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
-    }
-  }
-
-  for (const auto &input : prefill_input_map) {
-    prefill_module->SetInput(input.first, input.second);
   }
 }
 
 float HmvllmInfer::PrefillInfer() {
   auto t_start = std::chrono::high_resolution_clock::now();
-  prefill_module->Run();
-  prefill_module->Sync();
+  CheckTcimRetStatus(prefill_module->Run());
+  CheckTcimRetStatus(prefill_module->Sync());
   auto t_end = std::chrono::high_resolution_clock::now();
   float t_total =
       std::chrono::duration<float, std::milli>(t_end - t_start).count();
@@ -277,7 +270,7 @@ void HmvllmInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
 
   auto output = *prefill_output_map.begin();
   output_tensor = prefill_module->GetOutput(output.first);
-  output_tensor.CastTo(output.second);
+  CheckTcimRetStatus(output_tensor.CastTo(output.second));
 
   void *prefill_outData = output_tensor.Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
@@ -294,6 +287,7 @@ void HmvllmInfer::DecodeSetInputDatas(void *data, int valid_length) {
     if (idx == 0) {
       mem_size = input_info.MemSize();
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
+      CheckTcimRetStatus(decode_module->SetInput(input_name, input_tensor));
     } else {
       mem_size = input_info.MemSize();
       if (decode_input_ptrs[idx - 1] == nullptr) {
@@ -306,25 +300,19 @@ void HmvllmInfer::DecodeSetInputDatas(void *data, int valid_length) {
       }
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
                                                     decode_input_ptrs[idx - 1]);
-    }
-
-    if (decode_input_map.find(input_name) != decode_input_map.end()) {
-      decode_input_map.at(input_name) = input_tensor;
-    } else {
-      decode_input_map.insert(
-          std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
+      CheckTcimRetStatus(decode_module->SetInput(input_name, input_tensor));
     }
   }
 
   for (const auto &input : decode_input_map) {
-    decode_module->SetInput(input.first, input.second);
+    CheckTcimRetStatus(decode_module->SetInput(input.first, input.second));
   }
 }
 
 float HmvllmInfer::DecodeInfer() {
   auto t_start = std::chrono::high_resolution_clock::now();
-  decode_module->Run();
-  decode_module->Sync();
+  CheckTcimRetStatus(decode_module->Run());
+  CheckTcimRetStatus(decode_module->Sync());
   auto t_end = std::chrono::high_resolution_clock::now();
   float t_total =
       std::chrono::duration<float, std::milli>(t_end - t_start).count();
@@ -347,7 +335,7 @@ void HmvllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids) {
 
   auto output = *decode_output_map.begin();
   output_tensor = decode_module->GetOutput(output.first);
-  output_tensor.CastTo(output.second);
+  CheckTcimRetStatus(output_tensor.CastTo(output.second));
 
   void *decode_outData = output_tensor.Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
@@ -368,24 +356,14 @@ void HmvllmInfer::VitSetInput() {
     }
     input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
                                                   vit_input_ptrs[idx]);
-
-    if (vit_input_map.find(input_name) != vit_input_map.end()) {
-      vit_input_map.at(input_name) = input_tensor;
-    } else {
-      vit_input_map.insert(
-          std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
-    }
-  }
-
-  for (const auto &input : vit_input_map) {
-    vit_module->SetInput(input.first, input.second);
+    CheckTcimRetStatus(vit_module->SetInput(input_name, input_tensor));
   }
 }
 
 float HmvllmInfer::VitInfer() {
   auto t_start = std::chrono::high_resolution_clock::now();
-  vit_module->Run();
-  vit_module->Sync();
+  CheckTcimRetStatus(vit_module->Run());
+  CheckTcimRetStatus(vit_module->Sync());
   auto t_end = std::chrono::high_resolution_clock::now();
   float t_total =
       std::chrono::duration<float, std::milli>(t_end - t_start).count();
@@ -406,7 +384,7 @@ void HmvllmInfer::VitGetOutputDatas() {
     }
 
     output_tensor = vit_module->GetOutput(output_name);
-    output_tensor.CastTo(vit_output_map.at(output_name));
+    CheckTcimRetStatus(output_tensor.CastTo(vit_output_map.at(output_name)));
   }
 }
 
@@ -418,7 +396,8 @@ PerfInfos HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
                              ", please shorten it !");
   }
 
-  int32_t valid_length = 0, current_length = this->prefill_length;
+  valid_length = 0;
+  current_length = this->prefill_length;
   tensor_type *input_datas = nullptr;
   std::vector<int> input_ids;
   std::vector<int> ids;
@@ -474,7 +453,7 @@ PerfInfos HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
     perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
 
     perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
-    PrefillSetInputDatas(input_datas, current_length);
+    PrefillSetInputDatas(input_datas);
     perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
     past_seq_len += current_length;
     perf_tracker->perfStart(PerfType::PREFILL_INFER_TIME);
@@ -529,5 +508,6 @@ PerfInfos HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
                              1);
   // perf information
   perf_tracker->showSummary();
+  input_datas = nullptr;
   return vllm_perf_datas;
 }

@@ -32,7 +32,7 @@
 
 #include "HmEmbedding.h"
 #include "perf_tracker/inference_perf_tracker.h"
-#include "tcim/tcim_runtime.h"
+#include "tcim_runtime_utils.h"
 
 class HmllmInfer : public HmllmInferBase {
  public:
@@ -92,13 +92,13 @@ class HmllmInfer : public HmllmInferBase {
   std::string decodeModelPath = "";   // Path to the decode model
 
   // Configuration parameters - Model properties
-  int prefill_length = 0;             // Length of prefill operation
-  int embedding_length = 0;           // Length of embedding vectors
-  int context_max_length = 0;         // Maximum context length supported
-  int batch = 0;                      // Batch size
-  int eos_token_id = 0;               // End-of-sequence token ID
-  int argmax_dim_len = 0;             // Dimension length for argmax operation
-  int32_t decode_current_length = 1;  // Current length for decode operation
+  int prefill_length = 0;      // Length of prefill operation
+  int embedding_length = 0;    // Length of embedding vectors
+  int context_max_length = 0;  // Maximum context length supported
+  int batch = 0;               // Batch size
+  int eos_token_id = 0;        // End-of-sequence token ID
+  int argmax_dim_len = 0;      // Dimension length for argmax operation
+  int32_t decode_current_length = 1;
   std::shared_ptr<HmEmbedding> embedding;  // Embedding module
 
   tcim::Module::WeightManager weight_manager;    // Weight manager for model
@@ -107,8 +107,6 @@ class HmllmInfer : public HmllmInferBase {
 
   std::vector<std::string> dummy_names;  // Names for dummy tensors
 
-  std::map<std::string, tcim::Tensor>
-      prefill_input_map;  // Prefill input tensor mapping
   std::map<std::string, tcim::Tensor>
       decode_input_map;  // Decode input tensor mapping
   std::map<std::string, tcim::Tensor>
@@ -119,57 +117,23 @@ class HmllmInfer : public HmllmInferBase {
   int bar_width = 50;      // Width for progress bar display
   int attn_idx_start = 0;  // Starting index for attention inputs
 
+  tensor_type* input_datas = nullptr;
+  int32_t valid_length = 0;
+  int32_t current_length = 0;
+  int32_t context_length = 0;
+  int32_t position_id = 0;
+  std::vector<int32_t> position_ids;
+
  private:
-  /**
-   * @brief Get the number of blocks in the model
-   * @return Number of blocks in the model
-   */
   int get_nblocks();
-
-  /**
-   * @brief Get the starting index of attention inputs
-   * @return Starting index of attention-related inputs
-   */
   int get_attn_idx_start();
+  void PrefillSetInputDatas(void* data);
 
-  /**
-   * @brief Set prefill input data
-   * @param data Input data for prefill (token embeddings)
-   * @param valid_length Length of valid tokens in the input
-   * @param current_length Current length of the sequence
-   */
-  void PrefillSetInputDatas(void* data, int32_t valid_length,
-                            int32_t current_length);
-
-  /**
-   * @brief Execute prefill inference
-   * @return Execution time in milliseconds
-   */
   float PrefillInfer();
-
-  /**
-   * @brief Get token IDs from prefill output
-   * @param ids Vector to store the output token IDs
-   */
   void PrefillGetOutputDatas(std::vector<int32_t>& ids);
+  void DecodeSetInputDatas(void* data);
 
-  /**
-   * @brief Set decode input data
-   * @param data Input data for decode (token embeddings)
-   * @param context_length Current context length
-   */
-  void DecodeSetInputDatas(void* data, int32_t context_length);
-
-  /**
-   * @brief Execute decode inference
-   * @return Execution time in milliseconds
-   */
   float DecodeInfer();
-
-  /**
-   * @brief Get token IDs from decode output
-   * @param ids Vector to store the output token IDs
-   */
   void DecodeGetOutputDatas(std::vector<int32_t>& ids);
 };
 

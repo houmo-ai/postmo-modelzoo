@@ -32,37 +32,43 @@ HmEmbedding::HmEmbedding(const std::string& embeddingWeightPath,
   if (embed_w.get() == nullptr) {
     throw std::runtime_error("read embed weight failed! \n");
   }
-  ptr = new tensor_type[prefill_length * embedding_length];
+  ptr = std::make_unique<tensor_type[]>(prefill_length * embedding_length);
   if (ptr == nullptr) {
-    throw std::runtime_error("malloc ptr failed! \n");
+    throw std::runtime_error("allocate ptr failed! \n");
   }
 }
 
 HmEmbedding::~HmEmbedding() {
   embed_w.reset();
-  delete ptr;
+  ptr.reset();
 }
 
 tensor_type* HmEmbedding::EmbeddingTokens(const std::vector<int>& ids) {
-  uint64_t num_tokens = ids.size();
-
-  if (!ids.size()) {
+  if (ids.empty()) {
     return nullptr;
   }
 
+  uint64_t num_tokens = ids.size();
+  const uint64_t ptr_total_size = prefill_length * embedding_length;
   if (num_tokens == 1) {
-    return reinterpret_cast<tensor_type*>(&embed_w[ids[0] * embedding_length]);
+    const int token_id = ids[0];
+    const uint64_t embed_index =
+        static_cast<uint64_t>(token_id) * embedding_length;
+    return embed_w.get() + embed_index;
   }
 
-  memset(reinterpret_cast<void*>(ptr), 0,
-         prefill_length * embedding_length * sizeof(tensor_type));
-  for (int index = 0; index < ids.size(); index++) {
-    int embedWeightIndex = ids[index];
-    memcpy(
-        reinterpret_cast<void*>(&ptr[index * embedding_length]),
-        reinterpret_cast<void*>(&embed_w[embedWeightIndex * embedding_length]),
-        embedding_length * sizeof(tensor_type));
+  std::fill_n(ptr.get(), ptr_total_size, static_cast<tensor_type>(0));
+
+  for (uint64_t index = 0; index < num_tokens; ++index) {
+    const int token_id = ids[index];
+    const uint64_t src_offset =
+        static_cast<uint64_t>(token_id) * embedding_length;
+    const uint64_t dst_offset = index * embedding_length;
+
+    std::copy(embed_w.get() + src_offset,
+              embed_w.get() + src_offset + embedding_length,
+              ptr.get() + dst_offset);
   }
 
-  return ptr;
+  return ptr.get();
 }

@@ -26,7 +26,7 @@ set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
 
 set(SOURCE_FILES perf_tracker/inference_perf_tracker.cc HmEmbedding.cc HmvllmInfer.cc HmllmInfer.cc HmllmInferMultiBatch.cc llm_perf.cc)
 
-set(INCLUDE_DIRS 
+set(INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR}/include
   ${EIGEN_PATH}
   )
@@ -39,6 +39,7 @@ if(MSVC)
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /DNDEBUG")
 else()
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+  set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -ggdb")
 endif()
 
 add_executable(${PROJECT_NAME}   ${SOURCE_FILES})

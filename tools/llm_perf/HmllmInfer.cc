@@ -66,7 +66,8 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   // Initialize prefill module and load the model
   prefill_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);
-  prefill_module->LoadModel(prefillModelPath, option_prefill);
+  CheckTcimRetStatus(
+      prefill_module->LoadModel(prefillModelPath, option_prefill));
   perf_tracker->perfEnd(PerfType::PREFILL_LOAD_TIME);
   // Get number of blocks in the model and create dummy names for cache inputs
   int n_blocks = get_nblocks();
@@ -86,7 +87,7 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   option_decode.SetDummyTensors(dummy_names);
   decode_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::DECODE_LOAD_TIME);
-  decode_module->LoadModel(decodeModelPath, option_decode);
+  CheckTcimRetStatus(decode_module->LoadModel(decodeModelPath, option_decode));
   perf_tracker->perfEnd(PerfType::DECODE_LOAD_TIME);
 
   // Get model configuration parameters
@@ -191,10 +192,7 @@ HmllmInfer::~HmllmInfer() {
   embedding.reset();
 }
 
-void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length,
-                                      int32_t current_length) {
-  prefill_input_map.clear();
-
+void HmllmInfer::PrefillSetInputDatas(void *data) {
   for (int idx = 0; idx < attn_idx_start; idx++) {
     auto input_name = prefill_module->GetInputName(idx);
     auto input_info = prefill_module->GetInputInfo(input_name).AsContiguous();
@@ -204,44 +202,37 @@ void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length,
     if (idx == 0) {
       mem_size = input_info.MemSize();
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
+      CheckTcimRetStatus(prefill_module->SetInput(input_name, input_tensor));
     } else if (idx == 1) {
       mem_size = input_info.MemSize();
       input_tensor =
           tcim::Tensor::CreateHostTensor(input_info, mem_size, &valid_length);
+      prefill_module->SetInput(input_name, input_tensor);
     } else if (idx == 2) {
       mem_size = input_info.MemSize();
       input_tensor =
           tcim::Tensor::CreateHostTensor(input_info, mem_size, &current_length);
+      CheckTcimRetStatus(prefill_module->SetInput(input_name, input_tensor));
     } else if (idx == 3) {
       // only support Qwen3-30b
       mem_size = input_info.MemSize();
-      std::vector<int32_t> position_ids;
+      position_ids.clear();
       for (int i = valid_length; i < valid_length + this->prefill_length; ++i) {
         position_ids.emplace_back(i);
       }
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
                                                     position_ids.data());
+      CheckTcimRetStatus(prefill_module->SetInput(input_name, input_tensor));
     } else {
       break;
     }
-
-    if (prefill_input_map.find(input_name) != prefill_input_map.end()) {
-      prefill_input_map.at(input_name) = input_tensor;
-    } else {
-      prefill_input_map.insert(
-          std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
-    }
-  }
-
-  for (const auto &input : prefill_input_map) {
-    prefill_module->SetInput(input.first, input.second);
   }
 }
 
 float HmllmInfer::PrefillInfer() {
   auto t_start = std::chrono::high_resolution_clock::now();
-  prefill_module->Run();
-  prefill_module->Sync();
+  CheckTcimRetStatus(prefill_module->Run());
+  CheckTcimRetStatus(prefill_module->Sync());
   auto t_end = std::chrono::high_resolution_clock::now();
   float t_total =
       std::chrono::duration<float, std::milli>(t_end - t_start).count();
@@ -260,14 +251,14 @@ void HmllmInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
 
   auto output = *prefill_output_map.begin();
   output_tensor = prefill_module->GetOutput(output.first);
-  output_tensor.CastTo(output.second);
+  CheckTcimRetStatus(output_tensor.CastTo(output.second));
 
   void *prefill_outData = output_tensor.Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
       static_cast<tensor_type *>(prefill_outData), argmax_dim_len));
 }
 
-void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length) {
+void HmllmInfer::DecodeSetInputDatas(void *data) {
   for (int idx = 0; idx < attn_idx_start; idx++) {
     auto input_name = decode_module->GetInputName(idx);
     auto input_info = decode_module->GetInputInfo(input_name).AsContiguous();
@@ -277,37 +268,29 @@ void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length) {
     if (idx == 0) {
       mem_size = input_info.MemSize();
       input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
+      CheckTcimRetStatus(decode_module->SetInput(input_name, input_tensor));
     } else if (idx == 1) {
       mem_size = input_info.MemSize();
       input_tensor =
           tcim::Tensor::CreateHostTensor(input_info, mem_size, &context_length);
-    } else if (idx == 2) {
-      continue;
+      CheckTcimRetStatus(decode_module->SetInput(input_name, input_tensor));
     } else if (idx == 3) {
       mem_size = input_info.MemSize();
-      int32_t position_id = context_length + 1;
+      position_id = context_length + 1;
       input_tensor =
           tcim::Tensor::CreateHostTensor(input_info, mem_size, &position_id);
-    } else {
-      break;
-    }
-    if (decode_input_map.find(input_name) != decode_input_map.end()) {
-      decode_input_map.at(input_name) = input_tensor;
-    } else {
-      decode_input_map.insert(
-          std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
+      CheckTcimRetStatus(decode_module->SetInput(input_name, input_tensor));
     }
   }
-
   for (const auto &input : decode_input_map) {
-    decode_module->SetInput(input.first, input.second);
+    CheckTcimRetStatus(decode_module->SetInput(input.first, input.second));
   }
 }
 
 float HmllmInfer::DecodeInfer() {
   auto t_start = std::chrono::high_resolution_clock::now();
-  decode_module->Run();
-  decode_module->Sync();
+  CheckTcimRetStatus(decode_module->Run());
+  CheckTcimRetStatus(decode_module->Sync());
   auto t_end = std::chrono::high_resolution_clock::now();
   float t_total =
       std::chrono::duration<float, std::milli>(t_end - t_start).count();
@@ -330,7 +313,7 @@ void HmllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids) {
 
   auto output = *decode_output_map.begin();
   output_tensor = decode_module->GetOutput(output.first);
-  output_tensor.CastTo(output.second);
+  CheckTcimRetStatus(output_tensor.CastTo(output.second));
 
   void *decode_outData = output_tensor.Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
@@ -345,8 +328,9 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len,
                              ", please shorten it !");
   }
 
-  int32_t valid_length = 0, current_length = this->prefill_length;
-  tensor_type *input_datas = nullptr;
+  valid_length = 0;
+  current_length = this->prefill_length;
+
   std::vector<int> input_ids;
   std::vector<int> ids;
   PerfInfos llm_perf_datas;
@@ -384,22 +368,27 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len,
 
     perf_tracker->perfStart(PerfType::PREFILL_EMBED_TIME);
     input_datas = embedding->EmbeddingTokens(input_ids);
+    if (input_datas == nullptr) {
+      throw std::runtime_error(
+          "Error: EmbeddingTokens returned null (empty input)!");
+    }
     perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
 
     perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
-    PrefillSetInputDatas(input_datas, valid_length, current_length);
+    PrefillSetInputDatas(input_datas);
     perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
 
     perf_tracker->perfStart(PerfType::PREFILL_INFER_TIME);
     PrefillInfer();
     perf_tracker->perfEnd(PerfType::PREFILL_INFER_TIME);
+    input_datas = nullptr;
   }
   perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
   PrefillGetOutputDatas(ids);
   perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
   perf_tracker->perfEnd(PerfType::PREFILL_TOTAL_TIME);
 
-  int context_length = input_tokens_len;
+  context_length = input_tokens_len;
   do {
     if ((context_length > context_max_length) ||
         (llm_perf_datas.decode_count >= llm_perf_datas.stop_tokens)) {
@@ -408,11 +397,14 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len,
     perf_tracker->perfStart(PerfType::DECODE_TOTAL_TIME);
     perf_tracker->perfStart(PerfType::DECODE_EMBED_TIME);
     input_datas = embedding->EmbeddingTokens(ids);
+    if (input_datas == nullptr) {
+      throw std::runtime_error(
+          "Error: EmbeddingTokens returned null (empty input)!");
+    }
     perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);
 
     perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
-    DecodeSetInputDatas(static_cast<void *>(input_datas),
-                        static_cast<int32_t>(context_length));
+    DecodeSetInputDatas(static_cast<void *>(input_datas));
     perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
 
     perf_tracker->perfStart(PerfType::DECODE_INFER_TIME);
@@ -434,6 +426,7 @@ PerfInfos HmllmInfer::perf_llm(const uint32_t input_tokens_len,
               << llm_perf_datas.stop_tokens << std::flush;
 
     context_length++;
+    input_datas = nullptr;
   } while (true);
   perf_tracker->setBasicInfo(1, input_tokens_len, llm_perf_datas.decode_count,
                              0);

@@ -32,7 +32,7 @@
 #include <sstream>
 
 #include "HmEmbedding.h"
-#include "tcim/tcim_runtime.h"
+#include "tcim_runtime_utils.h"
 #include "utils.h"
 
 /**
@@ -117,13 +117,8 @@ class HmvllmInfer : public HmllmInferBase {
 
   std::vector<std::string> dummy_names;  // Names for dummy tensors in model
 
-  // Input tensor maps for different modules
-  std::map<std::string, tcim::Tensor>
-      prefill_input_map;  // Prefill input tensor mapping
   std::map<std::string, tcim::Tensor>
       decode_input_map;  // Decode input tensor mapping
-  std::map<std::string, tcim::Tensor>
-      vit_input_map;  // ViT input tensor mapping
 
   // Output tensor maps for different modules
   std::map<std::string, tcim::Tensor>
@@ -137,6 +132,8 @@ class HmvllmInfer : public HmllmInferBase {
   int attn_idx_start = 0;  // Starting index for attention inputs
   int vit_input_nums = 0;  // Number of inputs for ViT module
   int past_seq_len = 0;
+  int valid_length = 0;
+  int current_length = 0;
   // Pointers to input data for different modules
   std::vector<char *> prefill_input_ptrs;  // Pointers to prefill input data
   std::vector<char *> decode_input_ptrs;   // Pointers to decode input data
@@ -159,7 +156,7 @@ class HmvllmInfer : public HmllmInferBase {
    * @brief Set input data for prefill operation
    * @param data Input data for the prefill stage
    */
-  void PrefillSetInputDatas(void *data, int current_length);
+  void PrefillSetInputDatas(void *data);
 
   /**
    * @brief Execute prefill inference and return execution time
