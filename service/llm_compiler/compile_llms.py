@@ -44,6 +44,8 @@ RELEASE_MODELZOO_URL = "http://artifactory.houmo.ai/artifactory/Dadao/models"
 
 JFROG_CREDENTIALS_RELEASE = os.getenv("JFROG_CREDENTIALS_RELEASE")
 JFROG_CREDENTIALS_GENMDS = os.getenv("JFROG_CREDENTIALS_GENMDS")
+JFROG_USER = os.getenv("JFROG_USER")
+JFROG_PASSWORD = os.getenv("JFROG_PASSWORD")
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 logger = logging.getLogger(__name__)
@@ -191,6 +193,12 @@ def parse_args():
         choices=["off", "overwrite", "copy"],
         help="Strip shared weights from the last input model",
     )
+    parser.add_argument(
+        "--device_kernel_split",
+        type=int,
+        default=0,
+        help="the number of compilation threads, default is 0.",
+    )
 
     args = parser.parse_args()
     return args
@@ -287,6 +295,7 @@ def _check_args(args: dict) -> bool:
         "-- Device num: %d \n"
         "-- Core num: %d \n"
         "-- J: %d \n"
+        "-- Device kernel split: %d \n"
         "-- Flash Attention: %s \n"
         "-- Save results to %s\n"
         "-- Task Id: %s \n",
@@ -301,6 +310,7 @@ def _check_args(args: dict) -> bool:
         args.device_num,
         args.core_num,
         args.j,
+        args.device_kernel_split,
         args.flash_attention,
         args.result_dir,
         args.task_id,
@@ -410,7 +420,7 @@ def _upload_model(
         cpp_upload_cmds = [
             "curl",
             "-u",
-            jfrog_credentials,
+            f"{JFROG_USER}:{JFROG_PASSWORD}",
             "-T",
             cpp_zip_file,
             jfrog_cpp_zip_path,
@@ -573,6 +583,7 @@ if __name__ == "__main__":
     j = args.j
     flash_attention = args.flash_attention
     strip = args.strip
+    device_kernel_split = args.device_kernel_split
 
     model_name_ori = model_name
 
@@ -620,7 +631,7 @@ if __name__ == "__main__":
 
     ###### Docker Executor ######
     # The folder that stores the original model structure and weights
-    host_model_zoo = "/data/gexinyu_workspace/modelzoo"
+    host_model_zoo = "/data02/modelzoo"
     # Construct docker image name
     system = "ubuntu20.04" if target == "xh1" else "ubuntu24.04"
     image_name = f"harbor.houmo.ai/toolchain/release:Dadao-{target}-v{version}-{system}-x86.64.latest"
@@ -660,6 +671,8 @@ if __name__ == "__main__":
         if flash_attention is not None and len(flash_attention) > 0:
             flash_attention_str = " ".join(map(str, flash_attention))
             compile_cmd += f"--flash_attention {flash_attention_str} "
+        if device_kernel_split > 0:
+            compile_cmd += f"--device_kernel_split {device_kernel_split} "
         compile_cmd += f"-j {j} --strip {strip} -r {container_compile_res} -log {container_log_file}"
         commands.append(
             f"cd {container_home}/imodelzoo/service/llm_compiler && {compile_cmd}"
@@ -791,6 +804,8 @@ if __name__ == "__main__":
                 compiled_file_name += f"{context_str}_"
             if batch > 0:
                 compiled_file_name += f"b{batch}_"
+            if device_kernel_split > 0:
+                compiled_file_name += f"split{device_kernel_split}_"
             compiled_file_name += f"{chip_str}_{core_str}_{current_ts}.zip"
             md5sum_compile, jfrog_path_compile = _publish_model(
                 today,
@@ -861,7 +876,8 @@ if __name__ == "__main__":
                 "ndevices": device_num if device_num > 1 else 1,
                 "loop": 2,
                 "batch": batch,
-                "model_name": model_name,
+                "model_name": model_name_ori,
+                "model_size": model_size,
                 "quant_models": host_quant_model,
             }
             if context_len < (2048 + 256) and context_len >= (1024 + 256):

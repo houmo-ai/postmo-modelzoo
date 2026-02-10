@@ -205,6 +205,13 @@ def get_args() -> argparse.Namespace:
         choices=[0, 1, 2],
         help="flash attention optimization",
     )
+    parser.add_argument(
+        "--device_kernel_split",
+        dest="device_kernel_split",
+        type=int,
+        default=0,
+        help="device kernel split",
+    )
 
     args = parser.parse_args()
     if args.context_length < 2048:
@@ -226,6 +233,7 @@ def build(
     tso=False,
     flash_attention=0,
     prefill_length=256,
+    device_kernel_split=0,
 ):
     import tcim
 
@@ -238,8 +246,12 @@ def build(
 
         kwargs["modify_llm"] = {}
         kwargs["enable_xh2_stable_output"] = tso
-        kwargs["flash_attention"] = flash_attention
-        custom_msg["flash_attention"] = flash_attention
+        if device_kernel_split:
+            kwargs["device_kernel_split"] = device_kernel_split
+            custom_msg["device_kernel_split"] = device_kernel_split
+        if flash_attention:
+            kwargs["flash_attention"] = flash_attention
+            custom_msg["flash_attention"] = flash_attention
         if ndevice:
             kwargs["ndevice"] = ndevice
         if batch:
@@ -251,7 +263,7 @@ def build(
         kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
-    print(f"\n===> {model_name} build start...")
+    print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
     decode_model = os.path.join(model_dir, model_path)
     tcim.build_from_hmonnx(
         decode_model,
@@ -407,6 +419,7 @@ if __name__ == "__main__":
             j,
             flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
+            device_kernel_split=args.device_kernel_split,
         )
         model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
         build(
@@ -422,6 +435,7 @@ if __name__ == "__main__":
             batch,
             flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
+            device_kernel_split=args.device_kernel_split,
         )
 
     # test model

@@ -130,6 +130,12 @@ def parse_args() -> argparse.Namespace:
         choices=["off", "overwrite", "copy"],
         help="Strip shared weights from the last input model",
     )
+    parser.add_argument(
+        "--device_kernel_split",
+        type=int,
+        default=0,
+        help="device_kernel_split",
+    )
 
     args = parser.parse_args()
     return args
@@ -196,6 +202,8 @@ def _generate_cmds(args) -> list:
     if args.flash_attention and len(args.flash_attention) > 0:
         cmds += ["--flash_attention"]
         cmds += [str(val) for val in args.flash_attention]
+    if args.device_kernel_split > 0:
+        cmds += ["--device_kernel_split", str(args.device_kernel_split)]
 
     return cmds
 
@@ -263,7 +271,7 @@ def main(args) -> int:
     """
     logger.info(
         "Model name: %s, Model path: %s, Quant model path: %s, Context length: %d, "
-        "Batch: %d, Device num: %d, Core Num: %d, J: %d, Flash attention: %s, HmmStrip: %s, "
+        "Batch: %d, Device num: %d, Core Num: %d, J: %d, Device kernel split: %d, Flash attention: %s, HmmStrip: %s, "
         "Result Dir: %s",
         args.model_name,
         args.model_path,
@@ -273,6 +281,7 @@ def main(args) -> int:
         args.device_num,
         args.core_num,
         args.j,
+        args.device_kernel_split,
         args.flash_attention,
         args.strip,
         args.result_dir,

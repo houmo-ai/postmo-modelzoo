@@ -36,7 +36,11 @@ from loguru import logger
 
 import tcim_lite as tcim
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")))
+sys.path.append(
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")
+    )
+)
 from perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -101,6 +105,13 @@ def get_args() -> argparse.Namespace:
         help="device number, only xh2 support",
     )
     parser.add_argument(
+        "--question",
+        dest="question",
+        type=str,
+        default="请介绍一下存算一体技术的优势",
+        help="question to ask",
+    )
+    parser.add_argument(
         "--repetition_penalty",
         dest="repetition_penalty",
         type=float,
@@ -142,8 +153,16 @@ def get_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
     if args.ndevice > 1:
-        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
-        args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+        args.prefill_path = (
+            args.prefill_path.replace(".hmm", ".hmms")
+            if args.prefill_path.endswith(".hmm")
+            else args.prefill_path
+        )
+        args.decode_path = (
+            args.decode_path.replace(".hmm", ".hmms")
+            if args.decode_path.endswith(".hmm")
+            else args.decode_path
+        )
     return args
 
 
@@ -488,9 +507,9 @@ class HmQwen:
             self.perf_tracker.perf_start(PERFTYPE.DECODE_TOTAL_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.DECODE_EMBED_TIME)
-            input_data = F.embedding(next_id.unsqueeze(0), self.embedding_weight).reshape(
-                1, 1, -1
-            )
+            input_data = F.embedding(
+                next_id.unsqueeze(0), self.embedding_weight
+            ).reshape(1, 1, -1)
             self.perf_tracker.perf_end(PERFTYPE.DECODE_EMBED_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.DECODE_INPUT_TIME)
@@ -520,7 +539,7 @@ class HmQwen:
 
             # Check for end-of-sequence token
             if next_id == self.tokenizer.eos_token_id:
-                if 'decode_response' in locals():
+                if "decode_response" in locals():
                     print(decode_response, end="", flush=True)
                     all_response += decode_response
                 self.perf_tracker.perf_end(PERFTYPE.DECODE_TOKEN_TIME)
@@ -559,21 +578,21 @@ class HmQwen:
         self.perf_tracker.set_basic_info(
             batch_size=1,
             input_seq_length=input_echo_len,
-            output_seq_length=decode_count
+            output_seq_length=decode_count,
         )
 
 
 if __name__ == "__main__":
 
     args = get_args()
-    if HOUMO_TARGET == "xh2":
-        hmqwen = HmQwen(
-            args.prefill_path,
-            args.decode_path,
-            args.embedding_path,
-            args.tokenizer_dir,
-            args.ndevice,
-        )
+
+    hmqwen = HmQwen(
+        args.prefill_path,
+        args.decode_path,
+        args.embedding_path,
+        args.tokenizer_dir,
+        args.ndevice,
+    )
     if args.it:
         from prompt_toolkit import prompt
     try:
@@ -590,7 +609,7 @@ if __name__ == "__main__":
                     print("\n程序结束")
                     break
             else:
-                question = "请介绍一下存算一体技术的优势"
+                question = args.question
 
             try:
                 hmqwen.chat(question)

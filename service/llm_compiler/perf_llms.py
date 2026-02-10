@@ -64,6 +64,12 @@ def parse_args() -> argparse.Namespace:
         default="",
         help="the path of log.",
     )
+    parser.add_argument(
+        "-no_verify",
+        "--no_verify",
+        action="store_true",
+        help="perf only, skip to verify demo.",
+    )
 
     args = parser.parse_args()
     return args
@@ -83,9 +89,14 @@ if __name__ == "__main__":
     container_name = f"compiler_perf_{target}_{version}_{ts_str}"
     container_home = "/hmdd"
 
-    cmd_list = list()
+    cmd_list = []
     cmd = f"cd {container_home}/imodelzoo/service/llm_compiler && python3 execute_perf.py --perf_cfg {args.perf_cfg} -log {args.log_file}"
     cmd_list.append(cmd)
+
+    if not args.no_verify:
+        logger.info("Will verify the model after running perf")
+        verify_cmd = f"cd {container_home}/imodelzoo/service/llm_compiler && python3 execute_demo.py --perf_cfg {args.perf_cfg} -log {args.log_file}"
+        cmd_list.append(verify_cmd)
 
     # Create a docker executor
     docker_exec = DockerExecutor(

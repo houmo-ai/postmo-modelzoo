@@ -183,7 +183,7 @@ def _check_end_task(line: str, state: Dict) -> bool:
 
 def _check_llm_perf_avg(line: str, state: Dict) -> bool:
     """Check if the line indicates the start of LLM performance average information."""
-    return "Model Inference Performance Summary Report" in line
+    return "LLM Perf Avarage Information" in line
 
 
 def _check_llm_perf_perfill(line: str, state: Dict) -> bool:
