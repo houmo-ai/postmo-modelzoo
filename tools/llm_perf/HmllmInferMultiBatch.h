@@ -31,7 +31,7 @@
 #include <sstream>
 
 #include "HmEmbedding.h"
-#include "tcim/tcim_runtime.h"
+#include "tcim_runtime_utils.h"
 
 /**
  * @brief Structure to hold performance information for a single batch
@@ -56,25 +56,21 @@ class HmllmInferMultiBatch : public HmllmInferBase {
    * @param embeddingWeightPath Path to the embedding weights
    * @param ndevices Number of devices to use
    * @param batches Number of batches for multi-batch processing
+   * @param LazyMode Whether to use lazy mode for inference
    */
   HmllmInferMultiBatch(const std::string &prefillModelPath,
                        const std::string &decodeModelPath,
                        const std::string &embeddingWeightPath, int ndevices,
                        int batches, bool LazyMode);
 
-  // Delete copy constructor to prevent copying
   HmllmInferMultiBatch(const HmllmInferMultiBatch &it) = delete;
 
-  // Delete assignment operator to prevent assignment
   HmllmInferMultiBatch &operator=(const HmllmInferMultiBatch &it) = delete;
 
-  // Default move constructor
   HmllmInferMultiBatch(HmllmInferMultiBatch &&it) noexcept = default;
 
-  // Default move assignment operator
   HmllmInferMultiBatch &operator=(HmllmInferMultiBatch &&it) noexcept = default;
 
-  // Destructor
   ~HmllmInferMultiBatch();
 
   /**
@@ -104,39 +100,39 @@ class HmllmInferMultiBatch : public HmllmInferBase {
   std::string decodeModelPath = "";   // Path to decode model
 
   // Configuration parameters - Model properties
-  int prefill_length = 0;      // Length of prefill operation
-  int embedding_length = 0;    // Length of embedding vectors
-  int context_max_length = 0;  // Maximum context length supported
-  int batch = 0;               // Batch size
-  int eos_token_id = 0;        // End-of-sequence token ID
-  int argmax_dim_len = 0;      // Dimension length for argmax operation
+  int prefill_length = 0;
+  int embedding_length = 0;
+  int context_max_length = 0;
+  // Batch size
+  int batch = 0;
+  int argmax_dim_len = 0;
 
-  int32_t decode_current_length = 1;  // Current length for decode operation
+  int32_t decode_current_length = 1;
 
-  std::shared_ptr<HmEmbedding> embedding;  // Embedding module instance
+  std::shared_ptr<HmEmbedding> embedding;
 
-  tcim::Module::WeightManager weight_manager;    // Weight manager for models
-  std::shared_ptr<tcim::Module> prefill_module;  // Prefill module instance
-  std::shared_ptr<tcim::Module> decode_module;   // Decode module instance
+  tcim::Module::WeightManager weight_manager;
+  std::shared_ptr<tcim::Module> prefill_module;
+  std::shared_ptr<tcim::Module> decode_module;
+  // dumpy_tensor_names
+  std::vector<std::string> dummy_names;
 
-  std::vector<std::string> dummy_names;  // Names for dummy tensors
-
-  std::map<std::string, tcim::Tensor>
-      prefill_input_map;  // Prefill input tensor mapping
-  std::map<std::string, tcim::Tensor>
-      decode_input_map;  // Decode input tensor mapping
-  std::map<std::string, tcim::Tensor>
-      prefill_output_map;  // Prefill output tensor mapping
-  std::map<std::string, tcim::Tensor>
-      decode_output_map;  // Decode output tensor mapping
+  std::map<std::string, tcim::Tensor> prefill_input_map;
+  std::map<std::string, tcim::Tensor> decode_input_map;
 
   std::vector<std::vector<int>> next_ids;  // Next token IDs for each batch
   std::vector<int> current_echo_lens;  // Current echo lengths for each batch
 
   int bar_width = 50;  // Width for progress bar display
   int n_blocks = 0;    // Number of transformer blocks
+  int attn_idx_start = 0;
 
  private:
+  void prefill_input_init();
+
+  void decode_input_init();
+
+  int get_attn_idx_start();
   /**
    * @brief Get the number of blocks in the model
    * @return Number of transformer blocks in the model
@@ -180,6 +176,8 @@ class HmllmInferMultiBatch : public HmllmInferBase {
    */
   PerfSingleBatchInfo run_decode(tensor_type *input_datas,
                                  const std::vector<int> context_length);
+
+  void DebugDecodeInput();
 
   /**
    * @brief Execute decode inference

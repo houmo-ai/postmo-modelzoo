@@ -32,7 +32,7 @@
 
 #include "HmEmbedding.h"
 #include "perf_tracker/inference_perf_tracker.h"
-#include "tcim/tcim_runtime.h"
+#include "tcim_runtime_utils.h"
 
 class HmllmInfer : public HmllmInferBase {
  public:
@@ -43,32 +43,23 @@ class HmllmInfer : public HmllmInferBase {
    * @param embeddingWeightPath Path to the embedding weights file
    * @param ndevices Number of devices to use for inference
    * @param batches Batch size for the model
+   * @param LazyMode Whether to use lazy mode for inference
    */
   HmllmInfer(const std::string& prefillModelPath,
              const std::string& decodeModelPath,
              const std::string& embeddingWeightPath, int ndevices, int batches,
              bool LazyMode);
 
-  // Delete copy constructor to prevent copying of the object
   HmllmInfer(const HmllmInfer& it) = delete;
 
-  // Delete assignment operator to prevent assignment of the object
   HmllmInfer& operator=(const HmllmInfer& it) = delete;
 
-  // Default move constructor for efficient object transfer
   HmllmInfer(HmllmInfer&& it) noexcept = default;
 
-  // Default move assignment operator for efficient object transfer
   HmllmInfer& operator=(HmllmInfer&& it) noexcept = default;
 
-  // Destructor for cleaning up resources
   ~HmllmInfer();
 
-  /**
-   * @brief Debug function to print model information
-   * @param module Reference to the module to debug
-   * @param modelName Name of the model to display in debug output
-   */
   void DebugModelInfo(tcim::Module& module, const std::string& modelName);
 
   /**
@@ -88,17 +79,16 @@ class HmllmInfer : public HmllmInferBase {
   std::shared_ptr<InferencePerformanceTracker> perf_tracker;
 
   // Model paths
-  std::string prefillModelPath = "";  // Path to the prefill model
-  std::string decodeModelPath = "";   // Path to the decode model
+  std::string prefillModelPath = "";
+  std::string decodeModelPath = "";
 
   // Configuration parameters - Model properties
-  int prefill_length = 0;             // Length of prefill operation
-  int embedding_length = 0;           // Length of embedding vectors
-  int context_max_length = 0;         // Maximum context length supported
-  int batch = 0;                      // Batch size
-  int eos_token_id = 0;               // End-of-sequence token ID
-  int argmax_dim_len = 0;             // Dimension length for argmax operation
-  int32_t decode_current_length = 1;  // Current length for decode operation
+  int prefill_length = 0;
+  int embedding_length = 0;
+  int context_max_length = 0;
+  int batch = 0;
+  int argmax_dim_len = 0;
+  int32_t decode_current_length = 1;
   std::shared_ptr<HmEmbedding> embedding;  // Embedding module
 
   tcim::Module::WeightManager weight_manager;    // Weight manager for model
@@ -107,17 +97,11 @@ class HmllmInfer : public HmllmInferBase {
 
   std::vector<std::string> dummy_names;  // Names for dummy tensors
 
-  std::map<std::string, tcim::Tensor>
-      prefill_input_map;  // Prefill input tensor mapping
-  std::map<std::string, tcim::Tensor>
-      decode_input_map;  // Decode input tensor mapping
-  std::map<std::string, tcim::Tensor>
-      prefill_output_map;  // Prefill output tensor mapping
-  std::map<std::string, tcim::Tensor>
-      decode_output_map;  // Decode output tensor mapping
-
-  int bar_width = 50;      // Width for progress bar display
-  int attn_idx_start = 0;  // Starting index for attention inputs
+  std::map<std::string, tcim::Tensor> prefill_input_map;
+  std::map<std::string, tcim::Tensor> decode_input_map;
+  // params for decode progress bar
+  int bar_width = 50;
+  int attn_idx_start = 0;
 
  private:
   /**
@@ -132,20 +116,16 @@ class HmllmInfer : public HmllmInferBase {
    */
   int get_attn_idx_start();
 
-  /**
-   * @brief Set prefill input data
-   * @param data Input data for prefill (token embeddings)
-   * @param valid_length Length of valid tokens in the input
-   * @param current_length Current length of the sequence
-   */
+  void prefill_input_init();
+  void decode_input_init();
+
   void PrefillSetInputDatas(void* data, int32_t valid_length,
                             int32_t current_length);
 
   /**
    * @brief Execute prefill inference
-   * @return Execution time in milliseconds
    */
-  float PrefillInfer();
+  void PrefillInfer();
 
   /**
    * @brief Get token IDs from prefill output
@@ -162,9 +142,8 @@ class HmllmInfer : public HmllmInferBase {
 
   /**
    * @brief Execute decode inference
-   * @return Execution time in milliseconds
    */
-  float DecodeInfer();
+  void DecodeInfer();
 
   /**
    * @brief Get token IDs from decode output

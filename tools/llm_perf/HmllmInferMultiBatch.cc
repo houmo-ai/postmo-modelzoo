@@ -59,11 +59,12 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
   // Initialize Module - Load prefill and decode models
   prefill_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);
-  prefill_module->LoadModel(prefillModelPath, option_prefill);
+  CheckTcimRetStatus(
+      prefill_module->LoadModel(prefillModelPath, option_prefill));
   perf_tracker->perfEnd(PerfType::PREFILL_LOAD_TIME);
   decode_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::DECODE_LOAD_TIME);
-  decode_module->LoadModel(decodeModelPath, option_decode);
+  CheckTcimRetStatus(decode_module->LoadModel(decodeModelPath, option_decode));
   perf_tracker->perfEnd(PerfType::DECODE_LOAD_TIME);
 
   // Get number of blocks in the model and create dummy names for cache inputs
@@ -110,24 +111,78 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
     this->next_ids.emplace_back(0);
     this->current_echo_lens.emplace_back(0);
   }
+  attn_idx_start = get_attn_idx_start();
+
+  prefill_input_init();
+  decode_input_init();
 
   // Configure additional inputs for decode module (KV cache inputs)
   for (int b = 0; b < this->batch; ++b) {
     // Calculate the index for the decode current length input
-    int index = (b == 0) ? 2 : (2 * n_blocks * b + 3 + 2 * b - 1);
-    auto input_name = decode_module->GetInputName(index);
-    auto input_info = decode_module->GetInputInfo(input_name).AsContiguous();
-    size_t mem_size = input_info.MemSize();
-    // Create tensor for current length input and set it to the decode module
-    tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(
-        input_info, mem_size, &decode_current_length);
-    decode_module->SetInput(input_name, input_tensor);
-  }
+    int index = (b == 0) ? 2 : (2 * n_blocks * b + attn_idx_start + 2 * b - 1);
 
+    auto input_name = decode_module->GetInputName(index);
+
+    auto tensor = decode_input_map.at(input_name);
+    size_t memSize = tensor.MemSize();
+    CheckTcimRetStatus(
+        tensor.Buffer().CopyFromHost(&decode_current_length, memSize));
+    CheckTcimRetStatus(decode_module->SetInput(input_name, tensor));
+  }
   // Initialize embedding module with the specified parameters
   embedding = std::make_shared<HmEmbedding>(
       embeddingWeightPath, this->embedding_length, this->prefill_length);
+
   perf_tracker->reset();
+}
+
+void HmllmInferMultiBatch::prefill_input_init() {
+  if (prefill_module == nullptr) {
+    return;
+  }
+  prefill_input_map.clear();
+  for (int idx = 0; idx < attn_idx_start; ++idx) {
+    auto input_name = prefill_module->GetInputName(idx);
+    auto input_info = prefill_module->GetInputInfo(input_name).AsContiguous();
+    tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info);
+    prefill_input_map.insert(
+        std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
+  }
+}
+
+void HmllmInferMultiBatch::decode_input_init() {
+  if (decode_module == nullptr) {
+    return;
+  }
+  decode_input_map.clear();
+  int input_num = decode_module->GetInputNum();
+  for (int idx = 0; idx < input_num; ++idx) {
+    auto input_name = decode_module->GetInputName(idx);
+    if (input_name.find("kcache") != std::string::npos ||
+        input_name.find("vcache") != std::string::npos) {
+      continue;
+    } else {
+      auto input_info = decode_module->GetInputInfo(input_name);
+      auto input_tensor = tcim::Tensor::CreateHostTensor(input_info);
+      decode_input_map.insert(
+          std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
+    }
+  }
+}
+
+int HmllmInferMultiBatch::get_attn_idx_start() {
+  int start = 0;
+  static const std::regex pattern(
+      R"(^model_layers_(\d+)_self_attn_kcache_input$)");
+  int input_num = prefill_module->GetInputNum();
+  for (int idx = 0; idx < input_num; idx++) {
+    std::string input_name = prefill_module->GetInputName(idx);
+    if (std::regex_match(input_name, pattern)) {
+      start = idx;
+      break;
+    }
+  }
+  return start;
 }
 
 int HmllmInferMultiBatch::get_nblocks() {
@@ -141,6 +196,7 @@ int HmllmInferMultiBatch::get_nblocks() {
       ++count;
     }
   }
+
   return count;
 }
 
@@ -173,103 +229,88 @@ HmllmInferMultiBatch::~HmllmInferMultiBatch() {
 void HmllmInferMultiBatch::PrefillSetInputDatas(void *data,
                                                 int32_t valid_length,
                                                 int32_t current_length) {
-  prefill_input_map.clear();
-  for (int idx = 0; idx < 3; idx++) {
+  for (int idx = 0; idx < attn_idx_start; idx++) {
     auto input_name = prefill_module->GetInputName(idx);
-    auto input_info = prefill_module->GetInputInfo(input_name).AsContiguous();
+    auto tensor = prefill_input_map.at(input_name);
 
-    tcim::Tensor input_tensor;
-    size_t mem_size = 0;
+    size_t memSize = tensor.MemSize();
     if (idx == 0) {
-      mem_size = input_info.MemSize();
-      input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size, data);
+      CheckTcimRetStatus(tensor.Buffer().CopyFromHost(data, memSize));
     } else if (idx == 1) {
-      mem_size = input_info.MemSize();
-      input_tensor =
-          tcim::Tensor::CreateHostTensor(input_info, mem_size, &valid_length);
+      CheckTcimRetStatus(tensor.Buffer().CopyFromHost(&valid_length, memSize));
     } else if (idx == 2) {
-      mem_size = input_info.MemSize();
-      input_tensor =
-          tcim::Tensor::CreateHostTensor(input_info, mem_size, &current_length);
+      CheckTcimRetStatus(
+          tensor.Buffer().CopyFromHost(&current_length, memSize));
     } else {
-      break;
+      continue;
     }
 
-    if (prefill_input_map.find(input_name) != prefill_input_map.end()) {
-      prefill_input_map.at(input_name) = input_tensor;
-    } else {
-      prefill_input_map.insert(
-          std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
-    }
-  }
-
-  for (const auto &input : prefill_input_map) {
     perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
-    prefill_module->SetInput(input.first, input.second);
+    CheckTcimRetStatus(prefill_module->SetInput(input_name, tensor));
     perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
   }
+
+  DebugSetInputValue(prefill_module, 1, attn_idx_start);
 }
 
 void HmllmInferMultiBatch::PrefillInfer() {
-  prefill_module->Run();
-  prefill_module->Sync();
+  DebugSetInputValue(prefill_module, 1, attn_idx_start);
+  CheckTcimRetStatus(prefill_module->Run());
+  DebugSetInputValue(prefill_module, 1, attn_idx_start);
+  CheckTcimRetStatus(prefill_module->Sync());
+  DebugSetInputValue(prefill_module, 1, attn_idx_start);
 }
 
 void HmllmInferMultiBatch::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
-  int output_num = prefill_module->GetOutputNum();
-
   auto output_name = prefill_module->GetOutputName(0);
   auto output_info = prefill_module->GetOutputInfo(output_name).AsContiguous();
-  auto output_tensor = tcim::Tensor::CreateHostTensor(output_info);
-  prefill_output_map.insert(
-      std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
 
-  auto output = *prefill_output_map.begin();
   perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
-  output_tensor = prefill_module->GetOutput(output.first);
+  auto dev_output_tensor = prefill_module->GetDevOutput(output_name);
   perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
-  output_tensor.CastTo(output.second);
+  auto host_output_tensor = dev_output_tensor.ToHost();
 
-  void *prefill_outData = output_tensor.Data();
+  void *prefill_outData = host_output_tensor.Buffer().Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
       static_cast<tensor_type *>(prefill_outData), argmax_dim_len));
 }
 
+void HmllmInferMultiBatch::DebugDecodeInput() {
+  for (int b = 0; b < this->batch; ++b) {
+    int b_decode_start =
+        (b == 0) ? 1 : (2 * n_blocks * b + attn_idx_start + 2 * b - 2);
+    int b_decode_end =
+        (b == 0) ? 2 : (2 * n_blocks * b + attn_idx_start + 2 * b - 1);
+    DebugSetInputValue(decode_module, b_decode_start, b_decode_end + 1);
+  }
+}
+
 void HmllmInferMultiBatch::DecodeInfer() {
-  decode_module->Run();
-  decode_module->Sync();
+  DebugDecodeInput();
+  CheckTcimRetStatus(decode_module->Run());
+  DebugDecodeInput();
+  CheckTcimRetStatus(decode_module->Sync());
+  DebugDecodeInput();
 }
 
 void HmllmInferMultiBatch::DecodeGetOutputDatas() {
-  int output_num = decode_module->GetOutputNum();
   auto output_name = decode_module->GetOutputName(0);
   auto output_info = decode_module->GetOutputInfo(output_name).AsContiguous();
 
-  auto output_tensor = tcim::Tensor::CreateHostTensor(output_info);
-  if (decode_output_map.find(output_name) != decode_output_map.end()) {
-    decode_output_map.at(output_name) = output_tensor;
-  } else {
-    decode_output_map.insert(
-        std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
-  }
-
-  auto output = *decode_output_map.begin();
   perf_tracker->perfStart(PerfType::DECODE_OUTPUT_TIME);
-  output_tensor = decode_module->GetOutput(output.first);
+  auto dev_output_tensor = decode_module->GetDevOutput(output_name);
   perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
 
-  output_tensor.CastTo(output.second);
+  auto host_output_tensor = dev_output_tensor.ToHost();
 
-  void *decode_outData = output_tensor.Data();
+  tensor_type *decode_outData =
+      reinterpret_cast<tensor_type *>(host_output_tensor.Buffer().Data());
   next_ids.clear();
   next_ids.resize(this->batch);
   for (int b = 0; b < this->batch; ++b) {
     std::vector<int> ids;
     ids.emplace_back(eigen_argmax<tensor_type>(
-        reinterpret_cast<tensor_type *>(
-            reinterpret_cast<char *>(decode_outData) +
-            b * this->embedding_length * sizeof(tensor_type)),
-        argmax_dim_len));
+        decode_outData + b * argmax_dim_len, argmax_dim_len));
     next_ids[b] = ids;
   }
 }
@@ -279,17 +320,18 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
   PerfSingleBatchInfo ret;
   ret.input_tokens = all_input_ids.size();
   int decode_input_index_start =
-      (batch > 0) ? (2 * this->n_blocks * batch + 3 + 2 * batch) : 3;
+      (batch > 0) ? (2 * this->n_blocks * batch + attn_idx_start + 2 * batch)
+                  : attn_idx_start;
   int decode_input_index_finish =
-      2 * this->n_blocks * (batch + 1) + 3 + batch * 2;
-  int prefill_input_index = 3;
+      2 * this->n_blocks * (batch + 1) + attn_idx_start + batch * 2;
+  int prefill_input_index = attn_idx_start;
 
   for (int i = decode_input_index_start; i < decode_input_index_finish; ++i) {
-    tcim::Tensor cache =
-        decode_module->GetDevInput(decode_module->GetInputName(i));
+    auto decode_input_name = decode_module->GetInputName(i);
+    auto cache = decode_module->GetDevInput(decode_input_name);
+    auto prefill_input_name = prefill_module->GetInputName(prefill_input_index);
     perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
-    prefill_module->SetInput(prefill_module->GetInputName(prefill_input_index),
-                             cache);
+    CheckTcimRetStatus(prefill_module->SetDevInput(prefill_input_name, cache));
     perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
     prefill_input_index++;
   }
@@ -304,7 +346,7 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
       std::ceil((float)input_tokens_len / (float)prefill_length);
 
   int32_t valid_length = 0, current_length = 0;
-  tensor_type *input_datas = nullptr;
+  tensor_type *prefill_input_data = nullptr;
 
   for (int round = 0; round < prefill_loop_round; ++round) {
     valid_length = round * this->prefill_length;
@@ -323,10 +365,10 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
 
     int32_t effective_length = input_ids.size();
     perf_tracker->perfStart(PerfType::PREFILL_EMBED_TIME);
-    input_datas = embedding->EmbeddingTokens(input_ids);
+    prefill_input_data = embedding->EmbeddingTokens(input_ids);
     perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
 
-    PrefillSetInputDatas(input_datas, valid_length, current_length);
+    PrefillSetInputDatas(prefill_input_data, valid_length, current_length);
 
     perf_tracker->perfStart(PerfType::PREFILL_INFER_TIME);
     PrefillInfer();
@@ -334,6 +376,7 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
   }
 
   PrefillGetOutputDatas(ret.next_id);
+  prefill_input_data = nullptr;
   return ret;
 }
 
@@ -342,30 +385,30 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_decode(
   PerfSingleBatchInfo ret;
 
   auto input_name = decode_module->GetInputName(0);
-  auto input_info = decode_module->GetInputInfo(input_name).AsContiguous();
-  size_t mem_size = input_info.MemSize();
-  tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(
-      input_info, mem_size, static_cast<void *>(input_datas));
+  auto tensor = decode_input_map.at(input_name);
+  size_t memSize = tensor.MemSize();
+  CheckTcimRetStatus(tensor.Buffer().CopyFromHost(input_datas, memSize));
   perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
-  decode_module->SetInput(input_name, input_tensor);
+  CheckTcimRetStatus(decode_module->SetInput(input_name, tensor));
   perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
 
   for (int b = 0; b < this->batch; ++b) {
-    int valid_length_index = (b == 0) ? 1 : (2 * n_blocks * b + 3 + 2 * b - 2);
+    int valid_length_index =
+        (b == 0) ? 1 : (2 * n_blocks * b + attn_idx_start + 2 * b - 2);
     int32_t valid_length_data = context_length[b];
     input_name = decode_module->GetInputName(valid_length_index);
-    input_info = decode_module->GetInputInfo(input_name).AsContiguous();
-    mem_size = input_info.MemSize();
-    input_tensor = tcim::Tensor::CreateHostTensor(input_info, mem_size,
-                                                  &valid_length_data);
+    tensor = decode_input_map.at(input_name);
+    memSize = tensor.MemSize();
+    CheckTcimRetStatus(
+        tensor.Buffer().CopyFromHost(&valid_length_data, memSize));
     perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
-    decode_module->SetInput(input_name, input_tensor);
+    CheckTcimRetStatus(decode_module->SetInput(input_name, tensor));
     perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
   }
 
+  DebugDecodeInput();
   perf_tracker->perfStart(PerfType::DECODE_INFER_TIME);
-  decode_module->Run();
-  decode_module->Sync();
+  DecodeInfer();
   perf_tracker->perfEnd(PerfType::DECODE_INFER_TIME);
 
   DecodeGetOutputDatas();
@@ -379,9 +422,12 @@ void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
                              std::to_string(context_max_length) +
                              ", please shorten it !");
   }
-  tensor_type *input_datas =
-      new tensor_type[this->batch * this->embedding_length];
-  memset(input_datas, 0, this->batch * this->embedding_length);
+  std::unique_ptr<tensor_type[]> input_datas =
+      std::make_unique<tensor_type[]>(this->batch * this->embedding_length);
+
+  std::fill(input_datas.get(),
+            input_datas.get() + this->batch * this->embedding_length,
+            tensor_type(0));
   PerfInfos llm_perf_datas;
   memset(&llm_perf_datas, 0, sizeof(PerfInfos));
 
@@ -407,11 +453,10 @@ void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
 
     perf_tracker->perfStart(PerfType::DECODE_EMBED_TIME);
     tensor_type *input_data = embedding->EmbeddingTokens(next_ids[b]);
-    memcpy(static_cast<void *>(&input_datas[b * embedding_length]),
-           static_cast<void *>(input_data),
-           embedding_length * sizeof(tensor_type));
-
+    std::copy(input_data, input_data + embedding_length,
+              input_datas.get() + b * embedding_length);
     perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);
+    input_data = nullptr;
   }
 
   std::vector<int> context_length = current_echo_lens;
@@ -421,17 +466,17 @@ void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
     }
 
     perf_tracker->perfStart(PerfType::DECODE_TOTAL_TIME);
-    run_decode(input_datas, context_length);
+    run_decode(input_datas.get(), context_length);
     perf_tracker->perfEnd(PerfType::DECODE_TOTAL_TIME);
 
     for (int b = 0; b < this->batch; ++b) {
       context_length[b] += 1;
       perf_tracker->perfStart(PerfType::DECODE_EMBED_TIME);
       tensor_type *input_data = embedding->EmbeddingTokens(next_ids[b]);
-      memcpy(static_cast<void *>(&input_datas[b * embedding_length]),
-             static_cast<void *>(input_data),
-             embedding_length * sizeof(tensor_type));
+      std::copy(input_data, input_data + embedding_length,
+                input_datas.get() + b * embedding_length);
       perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);
+      input_data = nullptr;
     }
 
     llm_perf_datas.decode_count++;
@@ -450,6 +495,5 @@ void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
                              llm_perf_datas.decode_count);
   perf_tracker->showSummary();
 
-  delete[] input_datas;
   return;
 }

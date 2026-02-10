@@ -60,7 +60,8 @@ std::unique_ptr<T[]> readEmbeddingWeight(const std::string &path,
   const std::size_t n_bytes = ifs.tellg();
   ifs.seekg(0);
 
-  const std::size_t n_elem = n_bytes / sizeof(T) + n_elems_align;
+  const std::size_t n_elem =
+      (n_bytes + sizeof(T) - 1) / sizeof(T) + n_elems_align;
   auto ptr = std::make_unique<T[]>(n_elem);
   ifs.read(reinterpret_cast<char *>(ptr.get()), n_bytes);
   ifs.close();
@@ -83,19 +84,11 @@ class HmEmbedding {
   HmEmbedding(const std::string &embeddingWeightPath, const int &embedding_len,
               const int &prefill_len);
 
-  // Delete copy constructor to prevent copying
   HmEmbedding(const HmEmbedding &it) = delete;
-
-  // Delete assignment operator to prevent copying
   HmEmbedding &operator=(const HmEmbedding &it) = delete;
-
-  // Default move constructor
   HmEmbedding(HmEmbedding &&it) noexcept = default;
-
-  // Default move assignment operator
   HmEmbedding &operator=(HmEmbedding &&it) noexcept = default;
 
-  // Destructor
   ~HmEmbedding();
 
   /**
@@ -106,13 +99,9 @@ class HmEmbedding {
   tensor_type *EmbeddingTokens(const std::vector<int> &ids);
 
  private:
-  // Storage for embedding weights
   std::unique_ptr<tensor_type[]> embed_w;
-  // Temporary pointer for storing embedding results
-  tensor_type *ptr = nullptr;
-  // Size of the temporary pointer
-  size_t ptr_size = 0;
-  // Properties
+  std::unique_ptr<tensor_type[]> ptr;
+
   int prefill_length = 0;
   int embedding_length = 0;
 };

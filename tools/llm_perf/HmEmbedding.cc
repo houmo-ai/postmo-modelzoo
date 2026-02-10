@@ -27,42 +27,45 @@ HmEmbedding::HmEmbedding(const std::string& embeddingWeightPath,
     : prefill_length(prefill_len), embedding_length(embedding_len) {
   // Read embedding.bin, allocate extra space, return pointer to
   // corresponding address of embed_w when decoding
-  embed_w = readEmbeddingWeight<tensor_type>(embeddingWeightPath,
-                                             prefill_length * embedding_length);
-  if (embed_w.get() == nullptr) {
-    throw std::runtime_error("read embed weight failed! \n");
+  try {
+    embed_w = readEmbeddingWeight<tensor_type>(
+        embeddingWeightPath, prefill_length * embedding_length);
+  } catch (const std::exception& e) {
+    throw std::runtime_error("readEmbeddingWeight Error:" +
+                             std::string(e.what()));
   }
-  ptr = new tensor_type[prefill_length * embedding_length];
-  if (ptr == nullptr) {
-    throw std::runtime_error("malloc ptr failed! \n");
-  }
+  ptr = std::make_unique<tensor_type[]>(prefill_length * embedding_length);
 }
 
 HmEmbedding::~HmEmbedding() {
   embed_w.reset();
-  delete[] ptr;
+  ptr.reset();
 }
 
 tensor_type* HmEmbedding::EmbeddingTokens(const std::vector<int>& ids) {
-  uint64_t num_tokens = ids.size();
-
-  if (!ids.size()) {
+  if (ids.empty()) {
     return nullptr;
   }
 
+  uint64_t num_tokens = ids.size();
+
   if (num_tokens == 1) {
-    return reinterpret_cast<tensor_type*>(&embed_w[ids[0] * embedding_length]);
+    int offset = ids[0] * embedding_length;
+    return embed_w.get() + offset;
   }
 
-  memset(reinterpret_cast<void*>(ptr), 0,
-         prefill_length * embedding_length * sizeof(tensor_type));
-  for (int index = 0; index < ids.size(); index++) {
-    int embedWeightIndex = ids[index];
-    memcpy(
-        reinterpret_cast<void*>(&ptr[index * embedding_length]),
-        reinterpret_cast<void*>(&embed_w[embedWeightIndex * embedding_length]),
-        embedding_length * sizeof(tensor_type));
+  std::fill(ptr.get(), ptr.get() + prefill_length * embedding_length,
+            tensor_type(0));
+  for (uint32_t index = 0; index < ids.size(); index++) {
+    const int token_id = ids[index];
+    const uint64_t src_offset =
+        static_cast<uint64_t>(token_id) * embedding_length;
+    const uint64_t dst_offset = static_cast<uint64_t>(index) * embedding_length;
+
+    std::copy(embed_w.get() + src_offset,
+              embed_w.get() + src_offset + embedding_length,
+              ptr.get() + dst_offset);
   }
 
-  return ptr;
+  return ptr.get();
 }
