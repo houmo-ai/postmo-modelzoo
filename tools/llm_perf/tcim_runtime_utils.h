@@ -24,15 +24,21 @@
 #define __TCIM_RUNTIME_UTILS_H__
 
 #include "tcim/tcim_runtime.h"
-inline void CheckTcimRetStatus(const tcim::Status &status) {
+inline void CheckTcimRetStatus(const tcim::Status &status,
+                               const char *file = __FILE__,
+                               int line = __LINE__) {
   if (status != tcim::Status::OK) {
-    throw std::runtime_error(
-        "tcim_runtime ret Status is not OK, current ret Status is " +
-        std::to_string(status));
-  }
+    std::ostringstream err_msg;
+    err_msg << "tcim_runtime ret Status is not OK! "
+            << "File: " << file << ", Line: " << line
+            << ", Current ret Status: " << static_cast<int>(status);
 
-  return;
+    throw std::runtime_error(err_msg.str());
+  }
 }
+
+#define CHECK_TCIM_RET_STATUS(status) \
+  CheckTcimRetStatus(status, __FILE__, __LINE__)
 
 inline void DebugSetInputValue(std::shared_ptr<tcim::Module> module,
                                int start_idx, int end_idx) {

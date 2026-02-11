@@ -61,6 +61,9 @@ std::atomic<uint32_t> g_mem_total(0);
 std::atomic<uint32_t> g_mem_used(0);
 std::atomic<uint32_t> g_mem_avail(0);
 
+std::mutex mtx_;
+std::condition_variable cv_;
+
 std::mutex g_threads_mutex;
 std::vector<std::thread> g_monitor_threads;
 
@@ -250,7 +253,10 @@ void hm_device_monitor_info(int dev_index, uint32_t interval) {
                     hm_infos.dev_id, hm_infos.temperature, hm_infos.power,
                     hm_infos.ipu_freq);
     // Simulate monitoring interval (adjust according to actual requirements)
-    std::this_thread::sleep_for(std::chrono::seconds(interval));
+    // std::this_thread::sleep_for(std::chrono::seconds(interval));
+    std::unique_lock<std::mutex> lock(mtx_);
+    cv_.wait_for(lock, std::chrono::seconds(interval),
+                 [&]() { return !g_running.load(std::memory_order_relaxed); });
   }
 }
 
@@ -334,7 +340,8 @@ void stop_monitor(int dev_id) {
             << (std::to_string(g_mem_avail.load()) + " MB(Avail)") << "|"
             << std::endl;
 
-  g_running = false;
+  g_running.store(false, std::memory_order_relaxed);
+  cv_.notify_one();
 }
 
 void get_mem_info(int dev_id) {

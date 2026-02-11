@@ -32,7 +32,7 @@
 #include <sstream>
 
 #include "HmEmbedding.h"
-#include "tcim/tcim_runtime.h"
+#include "tcim_runtime_utils.h"
 #include "utils.h"
 
 /**
@@ -47,29 +47,25 @@ class HmvllmInfer : public HmllmInferBase {
    * @param prefillModelPath Path to the prefill model
    * @param decodeModelPath Path to the decode model
    * @param embeddingWeightPath Path to the embedding weights
-   * @param vitModelPath Path to the Vision Transformer (ViT) model
+   * @param visionModelPath Path to the Vision Transformer model
    * @param ndevices Number of devices to use for inference
    * @param batches Number of batches for processing
+   * @param LazyMode Whether to use lazy mode for inference
    */
   HmvllmInfer(const std::string &prefillModelPath,
               const std::string &decodeModelPath,
               const std::string &embeddingWeightPath,
-              const std::string &vitModelPath, int ndevices, int batches,
+              const std::string &visionModelPath, int ndevices, int batches,
               bool LazyMode);
 
-  // Delete copy constructor to prevent copying of the object
   HmvllmInfer(const HmvllmInfer &it) = delete;
 
-  // Delete assignment operator to prevent assignment of the object
   HmvllmInfer &operator=(const HmvllmInfer &it) = delete;
 
-  // Default move constructor for efficient object transfer
   HmvllmInfer(HmvllmInfer &&it) noexcept = default;
 
-  // Default move assignment operator for efficient object transfer
   HmvllmInfer &operator=(HmvllmInfer &&it) noexcept = default;
 
-  // Destructor for resource cleanup
   ~HmvllmInfer();
 
   /**
@@ -95,54 +91,48 @@ class HmvllmInfer : public HmllmInferBase {
  private:
   std::shared_ptr<InferencePerformanceTracker> perf_tracker;
   // Model paths
-  std::string prefillModelPath = "";  // Path to the prefill model
-  std::string decodeModelPath = "";   // Path to the decode model
-  std::string vitModelPath = "";      // Path to the Vision Transformer model
+  std::string prefillModelPath = "";
+  std::string decodeModelPath = "";
+  std::string visionModelPath = "";
 
   // Configuration parameters
-  int prefill_length = 0;      // Length of prefill operation
-  int embedding_length = 0;    // Length of embedding vectors
-  int context_max_length = 0;  // Maximum context length supported
-  int batch = 0;               // Batch size
-  int argmax_dim_len = 0;      // Dimension length for argmax operation
+  int prefill_length = 0;
+  int embedding_length = 0;
+  int context_max_length = 0;
+  int batch = 0;
+  int argmax_dim_len = 0;  // Dimension length for argmax operation
 
-  std::shared_ptr<HmEmbedding>
-      embedding;  // Embedding module for token processing
+  std::shared_ptr<HmEmbedding> embedding;
 
-  tcim::Module::WeightManager weight_manager;    // Weight manager for models
-  std::shared_ptr<tcim::Module> prefill_module;  // Prefill module instance
-  std::shared_ptr<tcim::Module> decode_module;   // Decode module instance
-  std::shared_ptr<tcim::Module>
-      vit_module;  // Vision Transformer module instance
+  tcim::Module::WeightManager weight_manager;  // Weight manager for models
+  // module instance for all vision models.
+  std::shared_ptr<tcim::Module> prefill_module;
+  std::shared_ptr<tcim::Module> decode_module;
+  std::shared_ptr<tcim::Module> vision_module;
 
-  std::vector<std::string> dummy_names;  // Names for dummy tensors in model
+  // Names for dummy tensors in model
+  std::vector<std::string> dummy_names;
 
-  // Input tensor maps for different modules
-  std::map<std::string, tcim::Tensor>
-      prefill_input_map;  // Prefill input tensor mapping
-  std::map<std::string, tcim::Tensor>
-      decode_input_map;  // Decode input tensor mapping
-  std::map<std::string, tcim::Tensor>
-      vit_input_map;  // ViT input tensor mapping
-
-  // Output tensor maps for different modules
-  std::map<std::string, tcim::Tensor>
-      prefill_output_map;  // Prefill output tensor mapping
-  std::map<std::string, tcim::Tensor>
-      decode_output_map;  // Decode output tensor mapping
-  std::map<std::string, tcim::Tensor>
-      vit_output_map;  // ViT output tensor mapping
+  // Input tensor maps for different models.
+  std::map<std::string, tcim::Tensor> prefill_input_map;
+  std::map<std::string, tcim::Tensor> decode_input_map;
+  std::map<std::string, tcim::Tensor> vision_input_map;
 
   int bar_width = 50;      // Width for progress bar display
   int attn_idx_start = 0;  // Starting index for attention inputs
-  int vit_input_nums = 0;  // Number of inputs for ViT module
+  int vision_input_nums = 0;
   int past_seq_len = 0;
-  // Pointers to input data for different modules
-  std::vector<char *> prefill_input_ptrs;  // Pointers to prefill input data
-  std::vector<char *> decode_input_ptrs;   // Pointers to decode input data
-  std::vector<char *> vit_input_ptrs;      // Pointers to ViT input data
+
+  bool prefill_use_vision_outputs = false;
+
+  std::map<std::string, std::unique_ptr<char[]>> prefill_input_datas;
+  std::map<std::string, std::unique_ptr<char[]>> decode_input_datas;
+  std::map<std::string, std::unique_ptr<char[]>> vision_input_datas;
 
  private:
+  void prefill_input_init();
+  void decode_input_init();
+  void vision_input_init();
   /**
    * @brief Get the number of transformer blocks in the model
    * @return Number of blocks in the model
@@ -162,10 +152,10 @@ class HmvllmInfer : public HmllmInferBase {
   void PrefillSetInputDatas(void *data, int current_length);
 
   /**
-   * @brief Execute prefill inference and return execution time
-   * @return Execution time in milliseconds
+   * @brief Execute prefill inference
+   * @return void
    */
-  float PrefillInfer();
+  void PrefillInfer();
 
   /**
    * @brief Get output token IDs from prefill stage
@@ -181,10 +171,10 @@ class HmvllmInfer : public HmllmInferBase {
   void DecodeSetInputDatas(void *data, int valid_length);
 
   /**
-   * @brief Execute decode inference and return execution time
-   * @return Execution time in milliseconds
+   * @brief Execute decode inference
+   * @return void
    */
-  float DecodeInfer();
+  void DecodeInfer();
 
   /**
    * @brief Get output token IDs from decode stage
@@ -193,20 +183,20 @@ class HmvllmInfer : public HmllmInferBase {
   void DecodeGetOutputDatas(std::vector<int32_t> &ids);
 
   /**
-   * @brief Set input data for Vision Transformer (ViT) operation
+   * @brief Set input data for Vision Model
    */
-  void VitSetInput();
+  void VisionSetInput();
 
   /**
-   * @brief Execute Vision Transformer inference and return execution time
-   * @return Execution time in milliseconds
+   * @brief Execute Vision Model inference
+   * @return void
    */
-  float VitInfer();
+  void VisionInfer();
 
   /**
-   * @brief Get output data from Vision Transformer stage
+   * @brief Get output data from Vision Model
    */
-  void VitGetOutputDatas();
+  void VisionGetOutputDatas();
 };
 
 #endif  // __VLLMINFER_H__

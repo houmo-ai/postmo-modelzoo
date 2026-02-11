@@ -58,7 +58,7 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   // Initialize prefill module and load the model
   prefill_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);
-  CheckTcimRetStatus(
+  CHECK_TCIM_RET_STATUS(
       prefill_module->LoadModel(prefillModelPath, option_prefill));
   perf_tracker->perfEnd(PerfType::PREFILL_LOAD_TIME);
   // Get number of blocks in the model and create dummy names for cache inputs
@@ -79,7 +79,8 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   option_decode.SetDummyTensors(dummy_names);
   decode_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::DECODE_LOAD_TIME);
-  CheckTcimRetStatus(decode_module->LoadModel(decodeModelPath, option_decode));
+  CHECK_TCIM_RET_STATUS(
+      decode_module->LoadModel(decodeModelPath, option_decode));
   perf_tracker->perfEnd(PerfType::DECODE_LOAD_TIME);
 
   // Get model configuration parameters
@@ -102,9 +103,9 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
 
   // Configure decode module's other inputs (KV cache)
   for (int idx = attn_idx_start; idx < 2 * n_blocks + attn_idx_start; idx++) {
-    const std::string input_name = prefill_module->GetInputName(idx);
-    auto cache = prefill_module->GetDevInput(input_name);
-    CheckTcimRetStatus(decode_module->SetDevInput(input_name, cache));
+    const std::string kvcache_name = prefill_module->GetInputName(idx);
+    auto kvcache = prefill_module->GetDevInput(kvcache_name);
+    CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(kvcache_name, kvcache));
   }
 
   // Initialize embedding module with weights path, embedding length and prefill
@@ -208,24 +209,25 @@ void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length,
     auto tensor = prefill_input_map.at(input_name);
     size_t memSize = tensor.MemSize();
     if (idx == 0) {
-      CheckTcimRetStatus(tensor.Buffer().CopyFromHost(data, memSize));
+      CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(data, memSize));
     } else if (idx == 1) {
-      CheckTcimRetStatus(tensor.Buffer().CopyFromHost(&valid_length, memSize));
+      CHECK_TCIM_RET_STATUS(
+          tensor.Buffer().CopyFromHost(&valid_length, memSize));
     } else if (idx == 2) {
-      CheckTcimRetStatus(
+      CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&current_length, memSize));
     } else if (idx == 3) {
       std::vector<int32_t> position_ids;
       for (int i = valid_length; i < valid_length + this->prefill_length; ++i) {
         position_ids.emplace_back(i);
       }
-      CheckTcimRetStatus(
+      CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(position_ids.data(), memSize));
     } else {
       continue;
     }
     perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
-    CheckTcimRetStatus(prefill_module->SetInput(input_name, tensor));
+    CHECK_TCIM_RET_STATUS(prefill_module->SetInput(input_name, tensor));
     perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
   }
 
@@ -234,9 +236,9 @@ void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length,
 
 void HmllmInfer::PrefillInfer() {
   DebugSetInputValue(prefill_module, 1, attn_idx_start);
-  CheckTcimRetStatus(prefill_module->Run());
+  CHECK_TCIM_RET_STATUS(prefill_module->Run());
   DebugSetInputValue(prefill_module, 1, attn_idx_start);
-  CheckTcimRetStatus(prefill_module->Sync());
+  CHECK_TCIM_RET_STATUS(prefill_module->Sync());
   DebugSetInputValue(prefill_module, 1, attn_idx_start);
   return;
 }
@@ -249,7 +251,7 @@ void HmllmInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
   perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
   auto dev_output_tensor = prefill_module->GetDevOutput(output_name);
   perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
-  auto host_output_tensor = dev_output_tensor.ToHost();
+  auto host_output_tensor = dev_output_tensor.ToHost(true);
 
   void *prefill_outData = host_output_tensor.Buffer().Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
@@ -262,21 +264,22 @@ void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length) {
     auto tensor = decode_input_map.at(input_name);
     size_t memSize = tensor.MemSize();
     if (idx == 0) {
-      CheckTcimRetStatus(tensor.Buffer().CopyFromHost(data, memSize));
+      CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(data, memSize));
     } else if (idx == 1) {
-      CheckTcimRetStatus(
+      CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&context_length, memSize));
     } else if (idx == 2) {
-      CheckTcimRetStatus(
+      CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&decode_current_length, memSize));
     } else if (idx == 3) {
       int32_t position_id = context_length + 1;
-      CheckTcimRetStatus(tensor.Buffer().CopyFromHost(&position_id, memSize));
+      CHECK_TCIM_RET_STATUS(
+          tensor.Buffer().CopyFromHost(&position_id, memSize));
     } else {
       continue;
     }
     perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
-    CheckTcimRetStatus(decode_module->SetInput(input_name, tensor));
+    CHECK_TCIM_RET_STATUS(decode_module->SetInput(input_name, tensor));
     perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
   }
 
@@ -285,9 +288,9 @@ void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length) {
 
 void HmllmInfer::DecodeInfer() {
   DebugSetInputValue(decode_module, 1, attn_idx_start);
-  CheckTcimRetStatus(decode_module->Run());
+  CHECK_TCIM_RET_STATUS(decode_module->Run());
   DebugSetInputValue(decode_module, 1, attn_idx_start);
-  CheckTcimRetStatus(decode_module->Sync());
+  CHECK_TCIM_RET_STATUS(decode_module->Sync());
   DebugSetInputValue(decode_module, 1, attn_idx_start);
   return;
 }
@@ -300,7 +303,7 @@ void HmllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids) {
   perf_tracker->perfStart(PerfType::DECODE_OUTPUT_TIME);
   auto dev_output_tensor = decode_module->GetDevOutput(output_name);
   perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
-  auto host_output_tensor = dev_output_tensor.ToHost();
+  auto host_output_tensor = dev_output_tensor.ToHost(true);
 
   void *decode_outData = host_output_tensor.Buffer().Data();
   ids.emplace_back(eigen_argmax<tensor_type>(

@@ -59,12 +59,13 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
   // Initialize Module - Load prefill and decode models
   prefill_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);
-  CheckTcimRetStatus(
+  CHECK_TCIM_RET_STATUS(
       prefill_module->LoadModel(prefillModelPath, option_prefill));
   perf_tracker->perfEnd(PerfType::PREFILL_LOAD_TIME);
   decode_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::DECODE_LOAD_TIME);
-  CheckTcimRetStatus(decode_module->LoadModel(decodeModelPath, option_decode));
+  CHECK_TCIM_RET_STATUS(
+      decode_module->LoadModel(decodeModelPath, option_decode));
   perf_tracker->perfEnd(PerfType::DECODE_LOAD_TIME);
 
   // Get number of blocks in the model and create dummy names for cache inputs
@@ -125,9 +126,9 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
 
     auto tensor = decode_input_map.at(input_name);
     size_t memSize = tensor.MemSize();
-    CheckTcimRetStatus(
+    CHECK_TCIM_RET_STATUS(
         tensor.Buffer().CopyFromHost(&decode_current_length, memSize));
-    CheckTcimRetStatus(decode_module->SetInput(input_name, tensor));
+    CHECK_TCIM_RET_STATUS(decode_module->SetInput(input_name, tensor));
   }
   // Initialize embedding module with the specified parameters
   embedding = std::make_shared<HmEmbedding>(
@@ -235,18 +236,19 @@ void HmllmInferMultiBatch::PrefillSetInputDatas(void *data,
 
     size_t memSize = tensor.MemSize();
     if (idx == 0) {
-      CheckTcimRetStatus(tensor.Buffer().CopyFromHost(data, memSize));
+      CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(data, memSize));
     } else if (idx == 1) {
-      CheckTcimRetStatus(tensor.Buffer().CopyFromHost(&valid_length, memSize));
+      CHECK_TCIM_RET_STATUS(
+          tensor.Buffer().CopyFromHost(&valid_length, memSize));
     } else if (idx == 2) {
-      CheckTcimRetStatus(
+      CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&current_length, memSize));
     } else {
       continue;
     }
 
     perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
-    CheckTcimRetStatus(prefill_module->SetInput(input_name, tensor));
+    CHECK_TCIM_RET_STATUS(prefill_module->SetInput(input_name, tensor));
     perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
   }
 
@@ -255,9 +257,9 @@ void HmllmInferMultiBatch::PrefillSetInputDatas(void *data,
 
 void HmllmInferMultiBatch::PrefillInfer() {
   DebugSetInputValue(prefill_module, 1, attn_idx_start);
-  CheckTcimRetStatus(prefill_module->Run());
+  CHECK_TCIM_RET_STATUS(prefill_module->Run());
   DebugSetInputValue(prefill_module, 1, attn_idx_start);
-  CheckTcimRetStatus(prefill_module->Sync());
+  CHECK_TCIM_RET_STATUS(prefill_module->Sync());
   DebugSetInputValue(prefill_module, 1, attn_idx_start);
 }
 
@@ -268,7 +270,7 @@ void HmllmInferMultiBatch::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
   perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
   auto dev_output_tensor = prefill_module->GetDevOutput(output_name);
   perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
-  auto host_output_tensor = dev_output_tensor.ToHost();
+  auto host_output_tensor = dev_output_tensor.ToHost(true);
 
   void *prefill_outData = host_output_tensor.Buffer().Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
@@ -287,9 +289,9 @@ void HmllmInferMultiBatch::DebugDecodeInput() {
 
 void HmllmInferMultiBatch::DecodeInfer() {
   DebugDecodeInput();
-  CheckTcimRetStatus(decode_module->Run());
+  CHECK_TCIM_RET_STATUS(decode_module->Run());
   DebugDecodeInput();
-  CheckTcimRetStatus(decode_module->Sync());
+  CHECK_TCIM_RET_STATUS(decode_module->Sync());
   DebugDecodeInput();
 }
 
@@ -301,7 +303,7 @@ void HmllmInferMultiBatch::DecodeGetOutputDatas() {
   auto dev_output_tensor = decode_module->GetDevOutput(output_name);
   perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
 
-  auto host_output_tensor = dev_output_tensor.ToHost();
+  auto host_output_tensor = dev_output_tensor.ToHost(true);
 
   tensor_type *decode_outData =
       reinterpret_cast<tensor_type *>(host_output_tensor.Buffer().Data());
@@ -327,11 +329,13 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
   int prefill_input_index = attn_idx_start;
 
   for (int i = decode_input_index_start; i < decode_input_index_finish; ++i) {
-    auto decode_input_name = decode_module->GetInputName(i);
-    auto cache = decode_module->GetDevInput(decode_input_name);
-    auto prefill_input_name = prefill_module->GetInputName(prefill_input_index);
+    auto decode_kvcache_name = decode_module->GetInputName(i);
+    auto kvcache = decode_module->GetDevInput(decode_kvcache_name);
+    auto prefill_kvcache_name =
+        prefill_module->GetInputName(prefill_input_index);
     perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
-    CheckTcimRetStatus(prefill_module->SetDevInput(prefill_input_name, cache));
+    CHECK_TCIM_RET_STATUS(
+        prefill_module->SetDevInput(prefill_kvcache_name, kvcache));
     perf_tracker->perfEnd(PerfType::PREFILL_INPUT_TIME);
     prefill_input_index++;
   }
@@ -376,7 +380,7 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
   }
 
   PrefillGetOutputDatas(ret.next_id);
-  prefill_input_data = nullptr;
+
   return ret;
 }
 
@@ -387,9 +391,9 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_decode(
   auto input_name = decode_module->GetInputName(0);
   auto tensor = decode_input_map.at(input_name);
   size_t memSize = tensor.MemSize();
-  CheckTcimRetStatus(tensor.Buffer().CopyFromHost(input_datas, memSize));
+  CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(input_datas, memSize));
   perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
-  CheckTcimRetStatus(decode_module->SetInput(input_name, tensor));
+  CHECK_TCIM_RET_STATUS(decode_module->SetInput(input_name, tensor));
   perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
 
   for (int b = 0; b < this->batch; ++b) {
@@ -399,10 +403,10 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_decode(
     input_name = decode_module->GetInputName(valid_length_index);
     tensor = decode_input_map.at(input_name);
     memSize = tensor.MemSize();
-    CheckTcimRetStatus(
+    CHECK_TCIM_RET_STATUS(
         tensor.Buffer().CopyFromHost(&valid_length_data, memSize));
     perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
-    CheckTcimRetStatus(decode_module->SetInput(input_name, tensor));
+    CHECK_TCIM_RET_STATUS(decode_module->SetInput(input_name, tensor));
     perf_tracker->perfEnd(PerfType::DECODE_INPUT_TIME);
   }
 
@@ -456,7 +460,6 @@ void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
     std::copy(input_data, input_data + embedding_length,
               input_datas.get() + b * embedding_length);
     perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);
-    input_data = nullptr;
   }
 
   std::vector<int> context_length = current_echo_lens;
@@ -476,7 +479,6 @@ void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
       std::copy(input_data, input_data + embedding_length,
                 input_datas.get() + b * embedding_length);
       perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);
-      input_data = nullptr;
     }
 
     llm_perf_datas.decode_count++;
