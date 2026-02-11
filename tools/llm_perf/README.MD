@@ -99,6 +99,7 @@
 - --help, -h    : 打印帮助信息
 2. 命令行llm_perf以配置文件启动
 - --config, -c  : 使用配置文件启动perf程序，需要提前准备好配置文件，配置文件模板参考1.4节。
+3. 目前支持通过DEBUG_DEV_INPUT宏开启SetInput输入的Debug模式，须在CMakeLists.txt添加如下编译选项：target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG_DEV_INPUT)。
 
 
 ### 1.4 用法说明

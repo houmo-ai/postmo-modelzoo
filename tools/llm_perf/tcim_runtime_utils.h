@@ -42,7 +42,7 @@ inline void CheckTcimRetStatus(const tcim::Status &status,
 
 inline void DebugSetInputValue(std::shared_ptr<tcim::Module> module,
                                int start_idx, int end_idx) {
-#if DEBUG_DEV_INPUT
+#ifdef DEBUG_DEV_INPUT
   assert(start_idx < end_idx);
   if (module == nullptr) {
     return;
