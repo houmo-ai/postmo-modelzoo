@@ -23,6 +23,7 @@ import time
 import json
 import hashlib
 import lzma
+import tarfile
 import torch
 import numpy as np
 import random
