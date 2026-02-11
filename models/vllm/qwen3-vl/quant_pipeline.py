@@ -248,7 +248,7 @@ def export_llm(args):
                 fp_mode="sefp",
             ),
             act_schema_2=dict(
-                bits=16,
+                bits=8,
                 fp_mode="sefp",
             ),
         )
