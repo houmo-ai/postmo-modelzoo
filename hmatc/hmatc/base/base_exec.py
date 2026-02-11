@@ -58,7 +58,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         """
         # Basic parameters
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"Using device: {self.device}")
         self.target = cfg["target"]
         self.enable_upload = False
 
@@ -256,40 +255,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         else:
             logger.error(f"Not support dtype: {dtype}")
             exit(-1)
-
-    @staticmethod
-    def gen_random_data(shape, dtype):
-        """Generate random data with specified shape and data type.
-
-        Args:
-            shape (tuple): Shape of the data to generate.
-            dtype (str): Data type of the generated data.
-
-        Returns:
-            numpy.ndarray: Generated random data array.
-        """
-        if dtype == "float32":
-            random_data = np.random.uniform(low=0, high=1, size=shape).astype(
-                dtype=dtype
-            )  # Value range [0, 1)
-        elif dtype == "float16":
-            random_data = np.random.uniform(low=0, high=1, size=shape).astype(
-                dtype=dtype
-            )  # Value range [0, 1)
-        elif dtype == "int16":
-            random_data = np.random.randint(low=-5, high=5, size=shape, dtype=dtype)
-        elif dtype == "int32":
-            random_data = np.random.randint(low=-5, high=5, size=shape, dtype=dtype)
-        elif dtype == "int64":
-            random_data = np.random.randint(low=-5, high=5, size=shape, dtype=dtype)
-        elif dtype == "uint8":
-            random_data = np.random.randint(low=0, high=255, size=shape, dtype=dtype)
-        elif dtype == "bool":
-            random_data = np.random.randint(low=0, high=2, size=shape, dtype=dtype)
-        else:
-            logger.error(f"Not support dtype: {dtype}")
-            exit(-1)
-        return random_data
 
     @abc.abstractmethod
     def quantize(self):
@@ -580,11 +545,13 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 os.path.join(profile_dir, "primitive_profile_data.bin")
             )
 
-    def add_node_output_as_graph_output(self, model_path):
+    @staticmethod
+    def add_node_output_as_graph_output(model_path, target):
         """Add node outputs as graph outputs for debugging.
 
         Args:
             model_path (str): Path to the ONNX model file.
+            target (str): Target device type.
 
         Returns:
             str: Path to the debug model file.
@@ -597,7 +564,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         for node in graph.node:
             if "constant" in str(node.op_type).lower():
                 continue
-            if self.target == "xh1":
+            if target == "xh1":
                 # Get node attributes
                 node_attributes = {}
                 for attr in node.attribute:
@@ -628,7 +595,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                     )
                     continue
 
-                if self.target == "xh1":
+                if target == "xh1":
 
                     def get_shape_from_value_info(value_info):
                         """Extract shape information from value_info.
@@ -695,5 +662,5 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         model.opset_import[0].version = max(model.opset_import[0].version, 11)
         model.ir_version = max(model.ir_version, 6)
         onnx.save(model, new_model_path)
-        logger.info(f"Saved debug model to {new_model_path}")
+        logger.info(f"Saved debug hmonnx to {new_model_path}")
         return new_model_path

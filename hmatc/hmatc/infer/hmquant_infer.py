@@ -41,8 +41,8 @@ class HmQuantInfer(BaseInfer, ABC):
         super().__init__()
         self.backend = "hmquant"
         self.model_ext = ".pkl"
-        # self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = "cpu"
+        if torch.cuda.is_available():
+            self.device = "cuda"
         logger.info(f"Using device: {self.device}")
 
     def load(self, model_path, device_id=0):

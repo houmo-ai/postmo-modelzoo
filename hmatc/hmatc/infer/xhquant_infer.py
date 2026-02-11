@@ -25,7 +25,7 @@ from abc import ABC
 from typing import Dict
 from ..base.base_infer import BaseInfer
 from ..utils import logger
-from ..utils.utils import torch_to_numpy_dtype
+from ..utils.utils import torch_to_numpy_dtype, gen_random_data
 
 
 class Xh2HmQuantInfer(BaseInfer, ABC):
@@ -45,6 +45,10 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         self.model_ext = ".onnx"
         self.input_names = list()
         self.output_names = list()
+        self.inputs_info = dict()
+        self.outputs_info = dict()
+        if torch.cuda.is_available():
+            self.device = "cuda"
         try:
             from xhquant.api import xhquant_init
         except ImportError:
@@ -81,20 +85,24 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
                 f"[Xh2Hmquant] input[{info.name}], shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
             )
             self.inputs_batch[name] = info.shape[0]
+            self.inputs_info[name] = {"shape": info.shape, "dtype": info.dtype}
 
         for idx, name in enumerate(self.output_names):
             info = self.engine.get_output(name)
             logger.info(
                 f"[Xh2Hmquant] output[{info.name}], shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
             )
+            self.outputs_info[name] = {"shape": info.shape, "dtype": info.dtype}
 
-    def run(self, in_datas: dict) -> Dict[str, np.ndarray]:
+    def run(self, in_datas: dict, dequant=True) -> Dict[str, np.ndarray]:
         """
         Run inference on the loaded XH2 HmQuant model with the provided input data.
 
         Args:
             in_datas (dict): Dictionary of input data where keys are input names
                 and values are torch tensors
+
+            dequant (bool): Whether to dequantize the output data (default: True)
 
         Returns:
             Dict[str, np.ndarray]: Dictionary of output data where keys are output names
@@ -109,14 +117,18 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         outputs = self.engine.run(in_datas)
         self.time_span += (time.time() - t_start) * 1000
         if len(self.output_names) == 1:
-            outputs = {
-                self.output_names[0]: outputs.detach().cpu().numpy().astype(np.float32)
-            }
+            np_data = outputs.detach().cpu().numpy()
+            if dequant:
+                np_data = np_data.astype(np.float32)
+            outputs = {self.output_names[0]: np_data}
             return outputs
-        return {
-            output_name: outputs[idx].detach().cpu().numpy().astype(np.float32)
-            for idx, output_name in enumerate(self.output_names)
-        }
+        out_datas = dict()
+        for idx, name in enumerate(self.output_names):
+            np_data = outputs[idx].detach().cpu().numpy()
+            if dequant:
+                np_data = np_data.astype(np.float32)
+            out_datas[name] = np_data
+        return out_datas
 
     def unload(self):
         """
@@ -124,3 +136,30 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         Currently not implemented (no-op).
         """
         pass
+
+    @property
+    def has_dynamic_resizer(self):
+        for name in self.input_names:
+            shape = self.inputs_info[name]["shape"]
+            dtype = self.inputs_info[name]["dtype"]
+            if (
+                name.startswith("resizer_crop_")
+                and len(shape) == 2
+                and shape[1] in [4, 10]
+                and dtype == torch.int32
+            ):
+                return True
+        return False
+
+    def get_random_input_data(self, name: str) -> np.ndarray:
+        shape = self.inputs_info[name]["shape"]
+        dtype = self.inputs_info[name]["dtype"]
+        if (
+            name.startswith("resizer_crop_")
+            and len(shape) == 2
+            and shape[1] in [4, 10]
+            and dtype == torch.int32
+        ):
+            raise NotImplementedError("dynamic resizer input is not supported.")
+        else:
+            return gen_random_data(shape, torch_to_numpy_dtype[dtype])

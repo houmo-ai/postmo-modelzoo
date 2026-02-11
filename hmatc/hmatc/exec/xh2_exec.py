@@ -23,6 +23,7 @@ import time
 import cv2
 import numpy as np
 import json
+import psutil
 import torch
 from prettytable import PrettyTable
 from datetime import datetime
@@ -45,6 +46,9 @@ from ..utils.utils import (
     get_houmo_version,
     load_npz,
     upload_file_to_artifactory,
+    find_input_files,
+    find_output_files,
+    gen_random_data,
 )
 
 
@@ -233,9 +237,7 @@ class Xh2Exec(BaseExec):
             shape = input_cfg.get("shape")
             dtype_str = self.onnx_inputs_info[input_name]["dtype"]
             if not self.is_image_single_input or "resizer" not in input_cfg:
-                in_datas.append(
-                    torch.from_numpy(self.gen_random_data(shape, dtype_str))
-                )
+                in_datas.append(torch.from_numpy(gen_random_data(shape, dtype_str)))
                 continue
             # Input is image and using resizer, need to regenerate input and dynamic input parameters
             resizer_cfg = input_cfg.get("resizer", dict())
@@ -249,7 +251,9 @@ class Xh2Exec(BaseExec):
                 resizer_input_size[0],
                 resizer_input_size[1],
             ]
-            random_bgr_img = self.gen_random_data(resizer_input_shape, "uint8")
+            random_bgr_img = torch.from_numpy(
+                gen_random_data(resizer_input_shape, "uint8")
+            )
             random_yuv_img = convert_bgr_to_yuv(random_bgr_img, toYUV_format)  # HWC
             random_yuv_img = random_yuv_img.view(N, C, H, W)
             in_datas.append(random_yuv_img)
@@ -369,6 +373,7 @@ class Xh2Exec(BaseExec):
         Returns:
             dict: Dictionary containing quantization results and information
         """
+        logger.info(f"Using device: {self.device}")
         logger.info(f"Quant type: {self.quant_type}")
         # quantize the model
         if not os.path.exists(self.quant_output_dir):
@@ -497,8 +502,8 @@ class Xh2Exec(BaseExec):
             enable_profile=enable_profile,
             output_dir=self.hmm_save_dir,
             work_dir=self.build_output_dir,
-            # enable_dynamic_image_resize=self.resizer_mode in [1],
             one_img_multi_roi=self.roi_num > 1,
+            j=psutil.cpu_count(logical=False),
             custom_msg=json.dumps(self.custom_msg, ensure_ascii=False),
         )
         span = time.time() - t_start
@@ -549,7 +554,7 @@ class Xh2Exec(BaseExec):
         if enable_layers:
             # Add all node outputs of quantized ONNX as graph outputs
             self.quant_onnx_model_path = self.add_node_output_as_graph_output(
-                self.quant_onnx_model_path
+                self.quant_onnx_model_path, "xh2"
             )
             self.build_output_dir += "_debug"
             self.hmm_name += "_debug"
@@ -854,3 +859,293 @@ class Xh2Exec(BaseExec):
             }
         logger.info(f"\n{table}")
         return res_info
+
+    @staticmethod
+    def check_golden_from_hmm(hmm, golden_dir, enable_layers=False, device_id=0):
+        """
+        Check model inference results against golden data consistency
+
+        Args:
+            hmm (str): HMM model file path
+            golden_dir (str): Golden data directory path
+            hmonnx (str): HMONNX model file path (optional)
+            enable_layers (bool): Whether to enable layer-by-layer checking
+
+        Returns:
+            dict: Similarity results for each output
+        """
+        # Check if necessary files exist
+        if not os.path.exists(hmm):
+            logger.error(f"Not found hmm model: {hmm}")
+            return {}
+        if not os.path.exists(golden_dir):
+            logger.error(f"Not found golden data directory: {golden_dir}")
+            return {}
+
+        # Load model
+        try:
+            xh2 = Xh2Infer()
+            xh2.load(hmm, device_id=device_id)
+        except Exception as e:
+            logger.error(f"Failed to load hmm model: {e}")
+            return {}
+
+        # Get model input and output names
+        input_names = (
+            list(xh2.inputs_info.keys()) if hasattr(xh2, "inputs_info") else []
+        )
+        output_names = []
+        if hasattr(xh2, "engine") and xh2.engine:
+            output_num = xh2.engine.get_num_outputs()
+            for idx in range(output_num):
+                output_names.append(xh2.engine.get_output_name(idx))
+
+        logger.info(f"Model input names: {input_names}")
+        logger.info(f"Model output names: {output_names}")
+
+        # Find input and output files
+        input_files_map = find_input_files(golden_dir, input_names)
+        output_files_map = find_output_files(golden_dir, output_names)
+
+        # Check if required input files are missing
+        missing_inputs = [name for name, files in input_files_map.items() if not files]
+        if missing_inputs:
+            logger.error(f"Missing input files: {missing_inputs}")
+            return {}
+
+        # Check if required output files are missing
+        missing_outputs = [
+            name for name, files in output_files_map.items() if not files
+        ]
+        if missing_outputs:
+            logger.error(f"Missing output files: {missing_outputs}")
+            return {}
+
+        # Load input data
+        input_data = {}
+        for input_name, file_paths in input_files_map.items():
+            if file_paths:
+                try:
+                    data = np.load(file_paths[0])
+                    input_data[input_name] = data
+                    logger.info(
+                        f"Loaded input data: {input_name}, shape: {data.shape}, from: {file_paths[0]}"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to load input file {file_paths[0]}: {e}")
+                    return {}
+
+        # Load golden output data
+        golden_outputs = {}
+        for output_name, file_paths in output_files_map.items():
+            if file_paths:
+                try:
+                    data = np.load(file_paths[0])
+                    golden_outputs[output_name] = data
+                    logger.info(
+                        f"Loaded golden output: {output_name}, shape: {data.shape}, from: {file_paths[0]}"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to load output file {file_paths[0]}: {e}")
+                    return {}
+
+        # Run inference
+        try:
+            logger.info("Running inference...")
+            outputs, _ = xh2.run(input_data)
+            logger.info("Inference completed successfully")
+        except Exception as e:
+            logger.error(f"Inference failed: {e}")
+            return {}
+
+        # Calculate and display cosine similarity for each output
+        logger.info("Calculating cosine similarity with golden data...")
+        similarity_results = {}
+
+        # Find the maximum output name length for alignment
+        all_output_names = list(outputs.keys())
+        max_name_length = (
+            max(len(name) for name in all_output_names) if all_output_names else 0
+        )
+        name_column_width = max(max_name_length, 15)  # Minimum width of 15 characters
+
+        for output_name in all_output_names:
+            if output_name in golden_outputs:
+                golden_data = golden_outputs[output_name]
+                inferred_data = outputs[output_name]
+
+                # Check if shapes match
+                if golden_data.shape != inferred_data.shape:
+                    logger.error(
+                        f"Shape mismatch for {output_name}: golden {golden_data.shape} vs inferred {inferred_data.shape}"
+                    )
+                    similarity_results[output_name] = {
+                        "cosine_similarity": None,
+                        "reason": f"Shape mismatch: golden {golden_data.shape} vs inferred {inferred_data.shape}",
+                    }
+                    continue
+
+                # Calculate similarity
+                similarity = cosine_distance(golden_data, inferred_data)
+
+                similarity_results[output_name] = {
+                    "cosine_similarity": float(similarity),
+                }
+
+                # Print with aligned formatting
+                logger.info(
+                    f"{output_name:<{name_column_width}}: Cosine similarity = {similarity:.6f}"
+                )
+            else:
+                # For layer outputs that don't have golden data, just show the name
+                if enable_layers and output_name not in output_names:
+                    logger.info(
+                        f"{output_name:<{name_column_width}}: Layer output (no golden data)"
+                    )
+                    similarity_results[output_name] = {
+                        "cosine_similarity": None,
+                        "reason": "Layer output without golden data for comparison",
+                    }
+                else:
+                    logger.error(f"Output {output_name} not found in golden data")
+                    similarity_results[output_name] = {
+                        "cosine_similarity": None,
+                        "reason": "Output not found in golden data",
+                    }
+
+        # Display overall summary with aligned formatting
+        valid_results = {
+            k: v
+            for k, v in similarity_results.items()
+            if v["cosine_similarity"] is not None
+        }
+        if valid_results:
+            avg_similarity = np.mean(
+                [v["cosine_similarity"] for v in valid_results.values()]
+            )
+            separator = "=" * (name_column_width + 35)  # Adjust separator length
+            logger.info(separator)
+            logger.info("SIMILARITY SUMMARY:")
+            logger.info(
+                f"  {'Valid outputs:':<{name_column_width-2}} {len(valid_results)}/{len(similarity_results)}"
+            )
+            logger.info(
+                f"  {'Average cosine similarity:':<{name_column_width-2}} {avg_similarity:.6f}"
+            )
+            logger.info(separator)
+        else:
+            separator = "=" * (name_column_width + 25)
+            logger.info(separator)
+            logger.info("NO VALID SIMILARITY RESULTS")
+            logger.info(separator)
+
+        return similarity_results
+
+    @staticmethod
+    def gen_golden(
+        hmonnx: str,
+        output: str,
+        data_path=None,
+        enable_layers=False,
+        target="xh2",
+        **kwargs,
+    ):
+        if not os.path.exists(hmonnx):
+            logger.error(f"Not found hmonnx model: {hmonnx}")
+            return
+        if not os.path.exists(output):
+            os.makedirs(output)
+        try:
+            if enable_layers:
+                hmonnx_debug = BaseExec.add_node_output_as_graph_output(hmonnx, target)
+                hmonnx = hmonnx_debug
+
+            model = Xh2HmQuantInfer()
+            model.load(hmonnx)
+            # Generate input golden data
+            in_datas = dict()
+            if data_path is not None:
+                _, ext = os.path.splitext(data_path)
+                if ext != ".npz":
+                    logger.error(f"Invalid data file: {data_path}")
+                    return
+                in_datas = load_npz(data_path)
+            else:
+                for name in model.input_names:
+                    in_datas[name] = model.get_random_input_data(name)
+                    npy_path = os.path.join(output, f"{name}.npy")
+                    np.save(npy_path, in_datas[name])
+                    logger.info(
+                        f"Generated golden input: {name}, shape: {in_datas[name].shape}, to: {npy_path}"
+                    )
+            outputs = model.run(in_datas, dequant=False)
+            for name in outputs:
+                data = outputs[name]
+                npy_path = os.path.join(output, f"{name}.npy")
+                np.save(npy_path, data)
+                logger.info(
+                    f"Generated golden output: {name}, shape: {data.shape}, to: {npy_path}"
+                )
+            if enable_layers:
+                logger.info(f"Saved debug hmonnx to {hmonnx_debug}")
+        except Exception as e:
+            logger.error(f"Failed to load hmonnx model: {e}")
+            return
+
+    def build_from_hmonnx(
+        hmonnx,
+        hmm_name=None,
+        output="output",
+        ncore=1,
+        opt_level=2,
+        batch=1,
+        enable_profile=False,
+        roi_num=1,
+        flash_attn=0,
+        llm_opt=False,
+        enable_common_subgraph=False,
+        skip_mlir_compile=False,
+        subgraph_repeat_hint=20,
+        target="xh2",
+        **kwargs,
+    ):
+        try:
+            import tcim
+        except ImportError:
+            logger.error("Not found tcim module, and please install tcim first!")
+            return
+        if hmm_name is None:
+            filename = os.path.basename(hmonnx)
+            hmm_name, _ = os.path.splitext(filename)
+        output_dir = os.path.join(output, "xh2")
+        work_dir = os.path.join(output_dir, "tcim")
+        custom_msg = dict(
+            opt_level=opt_level,
+            ncore=ncore,
+            target="xh2",
+            llm_opt=llm_opt,
+            skip_mlir_compile=skip_mlir_compile,
+            enable_common_subgraph=enable_common_subgraph,
+            subgraph_repeat_hint=subgraph_repeat_hint,
+            flash_attention=flash_attn,
+        )
+        tcim.build_from_hmonnx(
+            hmonnx,
+            output_name=hmm_name,
+            ncore=ncore,
+            opt_level=f"O{opt_level}",
+            target="xh2",
+            batch=batch,
+            enable_profile=enable_profile,
+            output_dir=output_dir,
+            work_dir=work_dir,
+            one_img_multi_roi=False,
+            llm_opt=llm_opt,
+            skip_mlir_compile=skip_mlir_compile,
+            enable_common_subgraph=enable_common_subgraph,
+            subgraph_repeat_hint=subgraph_repeat_hint,
+            flash_attention=flash_attn,
+            j=psutil.cpu_count(logical=False),
+            custom_msg=json.dumps(custom_msg, ensure_ascii=False),
+        )
+        return os.path.join(output_dir, f"{hmm_name}.hmm")

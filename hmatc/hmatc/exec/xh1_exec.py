@@ -45,6 +45,7 @@ from ..utils.utils import (
     get_md5,
     load_npz,
     get_houmo_version,
+    gen_random_data,
 )
 
 
@@ -316,7 +317,7 @@ class Xh1Exec(BaseExec):
                     for input_name in self.inputs_cfg:
                         dtype = self.onnx_inputs_info[input_name]["dtype"]
                         input_shape = self.inputs_cfg[input_name]["shape"]
-                        data = self.gen_random_data(input_shape, dtype)
+                        data = gen_random_data(input_shape, dtype)
                         in_datas[input_name] = torch.from_numpy(data)
                 else:
                     filename = filenames[idx]
@@ -348,6 +349,7 @@ class Xh1Exec(BaseExec):
         """
         # quantize the model
         # quant info
+        logger.info(f"Using device: {self.device}")
         if self.quant_cfg is None:
             logger.error("quant info not found")
             return dict()
@@ -552,7 +554,7 @@ class Xh1Exec(BaseExec):
         logger.info("Checking golden...")
         if enable_layers:
             self.quant_onnx_model_path = self.add_node_output_as_graph_output(
-                self.quant_onnx_model_path
+                self.quant_onnx_model_path, "xh1"
             )
             self.build_output_dir += "_debug"
             self.hmm_name += "_debug"

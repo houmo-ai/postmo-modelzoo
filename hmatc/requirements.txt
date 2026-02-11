@@ -9,6 +9,7 @@ pycocotools
 pandas
 pillow
 pyyaml
+psutil
 pybind11
 tabulate
 xlsxwriter

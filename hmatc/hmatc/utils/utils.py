@@ -238,6 +238,38 @@ torch_to_numpy_dtype = {
 }
 
 
+def gen_random_data(shape, dtype):
+    """Generate random data with specified shape and data type.
+    Args:
+        shape (tuple): Shape of the data to generate.
+        dtype (str): Data type of the generated data.
+    Returns:
+        numpy.ndarray: Generated random data array.
+    """
+    if dtype == "float32":
+        random_data = np.random.uniform(low=0, high=1, size=shape).astype(
+            dtype=dtype
+        )  # Value range [0, 1)
+    elif dtype == "float16":
+        random_data = np.random.uniform(low=0, high=1, size=shape).astype(
+            dtype=dtype
+        )  # Value range [0, 1)
+    elif dtype == "int16":
+        random_data = np.random.randint(low=-5, high=5, size=shape, dtype=dtype)
+    elif dtype == "int32":
+        random_data = np.random.randint(low=-5, high=5, size=shape, dtype=dtype)
+    elif dtype == "int64":
+        random_data = np.random.randint(low=-5, high=5, size=shape, dtype=dtype)
+    elif dtype == "uint8":
+        random_data = np.random.randint(low=0, high=255, size=shape, dtype=dtype)
+    elif dtype == "bool":
+        random_data = np.random.randint(low=0, high=2, size=shape, dtype=dtype)
+    else:
+        logger.error(f"Not support dtype: {dtype}")
+        exit(-1)
+    return random_data
+
+
 def str_to_torch_dtype(dtype_str):
     """Convert a string representation of a data type to PyTorch data type.
 
@@ -1151,3 +1183,131 @@ def upload_file_to_artifactory(file_path, upload_url, max_retries=3):
 
     print(f"Upload file failed, retry times: {max_retries}")
     return False
+
+
+def find_input_files(golden_dir, input_names):
+    """
+    Find npy files containing specified input names in the golden directory
+
+    Args:
+        golden_dir (str): Path to the golden data directory
+        input_names (list): List of input names to search for
+
+    Returns:
+        dict: Dictionary with input names as keys and corresponding file paths as values
+    """
+    if not os.path.exists(golden_dir):
+        logger.error(f"Golden directory not found: {golden_dir}")
+        return {}
+
+    # Storage dictionary for results
+    input_files_map = {name: [] for name in input_names}
+
+    # Recursively search directory
+    for root, dirs, files in os.walk(golden_dir):
+        for file in files:
+            if file.endswith(".npy"):
+                file_path = os.path.join(root, file)
+                file_name_without_ext = os.path.splitext(file)[0]
+
+                # Check if filename contains any of the input names
+                for input_name in input_names:
+                    # First try exact name match
+                    if file_name_without_ext == input_name:
+                        input_files_map[input_name].append(file_path)
+                        logger.debug(
+                            f"Found input file for '{input_name}' (exact match): {file_path}"
+                        )
+                        break
+
+                    # If exact match failed, try pattern matching
+                    patterns = [
+                        f"input_{input_name}",  # input_name_xxx.npy
+                        f"{input_name}_input",  # name_input_xxx.npy
+                        f"input-{input_name}",  # input-name_xxx.npy
+                        f"{input_name}-input",  # name-input_xxx.npy
+                        f"input.{input_name}",  # input.name_xxx.npy
+                        f"{input_name}.input",  # name.input_xxx.npy
+                    ]
+
+                    for pattern in patterns:
+                        if pattern in file:
+                            input_files_map[input_name].append(file_path)
+                            logger.debug(
+                                f"Found input file for '{input_name}' (pattern match): {file_path}"
+                            )
+                            break
+
+    # Log search results
+    for input_name, files in input_files_map.items():
+        if files:
+            logger.info(f"Found {len(files)} file(s) for input '{input_name}': {files}")
+        else:
+            logger.warning(f"No files found for input '{input_name}'")
+
+    return input_files_map
+
+
+def find_output_files(golden_dir, output_names):
+    """
+    Find npy files containing specified output names in the golden directory
+
+    Args:
+        golden_dir (str): Path to the golden data directory
+        output_names (list): List of output names to search for
+
+    Returns:
+        dict: Dictionary with output names as keys and corresponding file paths as values
+    """
+    if not os.path.exists(golden_dir):
+        logger.error(f"Golden directory not found: {golden_dir}")
+        return {}
+
+    # Storage dictionary for results
+    output_files_map = {name: [] for name in output_names}
+
+    # Recursively search directory
+    for root, dirs, files in os.walk(golden_dir):
+        for file in files:
+            if file.endswith(".npy"):
+                file_path = os.path.join(root, file)
+                file_name_without_ext = os.path.splitext(file)[0]
+
+                # Check if filename contains any of the output names
+                for output_name in output_names:
+                    # First try exact name match
+                    if file_name_without_ext == output_name:
+                        output_files_map[output_name].append(file_path)
+                        logger.debug(
+                            f"Found output file for '{output_name}' (exact match): {file_path}"
+                        )
+                        break
+
+                    # If exact match failed, try pattern matching
+                    patterns = [
+                        f"output_{output_name}",  # output_name_xxx.npy
+                        f"{output_name}_output",  # name_output_xxx.npy
+                        f"output-{output_name}",  # output-name_xxx.npy
+                        f"{output_name}-output",  # name-output_xxx.npy
+                        f"output.{output_name}",  # output.name_xxx.npy
+                        f"{output_name}.output",  # name.output_xxx.npy
+                    ]
+
+                    for pattern in patterns:
+                        if pattern in file:
+                            output_files_map[output_name].append(file_path)
+                            logger.debug(
+                                f"Found output file for '{output_name}' (pattern match): {file_path}"
+                            )
+                            break
+
+    # Log search results
+    for output_name, files in output_files_map.items():
+        if files:
+            logger.info(
+                f"Found {len(files)} file(s) for output '{output_name}': {files}"
+            )
+        else:
+            logger.warning(f"No files found for output '{output_name}'")
+
+    return output_files_map

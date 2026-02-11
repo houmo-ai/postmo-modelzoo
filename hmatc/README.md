@@ -4,29 +4,57 @@
 ## 安装
 
 ```bash
+# 安装
 python setup.py install
+# 打包
+python setup.py bdist_wheel
+# 开发
+python setup.py develop
 ```
 
 ## 使用
 
 ### 量化
 ```bash
-hmatc quant -c config.yml -t xh2
+# 从配置文件量化
+hmatc quant -c config.yml
+# 若不想手写配置文件，可通过以下命令生成(注意，这种方式不包含预处理相关配置)
+hmatc gen --onnx your_onnx_path --output your_config_yml_output_path
 ```
 
 ### 编译
 ```bash
-hmatc build -c config.yml -t xh2
+# 从配置文件编译
+hmatc build -c config.yml
+# 仅有hmonnx的情况下
+hmatc build --hmonnx your_hmonnx_path
 ```
 
 ### 比较
 ```bash
-hmatc compare -c config.yml -t xh2 --data_path your_img_or_npz_path
+# onnx、hmonnx(量化后)、hmm(编译后)三端比较
+hmatc compare -c config.yml --data_path your_img_or_npz_path
+# golden 比较
+hmatc check -c config.yml
+# golden 逐算子比较
+hmatc check -c config.yml --layers
+# 在有编译后的hmm和golden的情况下
+hmatc check --hmm your_hmm_path --golden your_golden_path
+# 没有golden的情况下，可通过下面命令生成，不指定data_path则使用随机数据作为输入，data_path需要预处理后数据, 按如下方式保存
+#  import numpy as np
+#  a = np.random.rand(1, 3, 28, 28)  # 预处理后数据
+#  b = np.random.rand(1, 3, 64, 64)  # 预处理后数据
+#  in_datas = {'input_a': a, 'input_b': b, ...}
+hmatc golden --hmonnx your_hmonnx_path --output your_golden_output_path --data_path your_npz_path
+# 逐算子生成
+hmatc golden --hmonnx your_hmonnx_path --output your_golden_output_path --data_path your_npz_path --layers
+# 注意逐算子生成golden后，会生成${hmonnx_name}_debug.onnx的文件，需将该文件重新编译后再check
+hmatc build --hmonnx your_debug_hmonnx_path
 ```
 
 ### 性能
 ```bash
-hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 8
+hmatc perf -c config.yml -wn 10 -sn 1000 -tn 4
 ```
 
 ### 模型演示
@@ -34,8 +62,8 @@ hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 8
 需要用户实现模型实现，可参考`modelzoo`中示例
 
 ```bash
-hmatc demo -c config.yml -t xh2         # 芯片
-hmatc demo -c config.yml -t xh2 --onnx  # onnx
+hmatc demo -c config.yml         # 芯片
+hmatc demo -c config.yml --onnx  # onnx
 ```
 
 ### 模型评估
@@ -43,8 +71,8 @@ hmatc demo -c config.yml -t xh2 --onnx  # onnx
 同**模型演示**需要用户实现模型实现，可参考`modelzoo`中示例
 
 ```bash
-hmatc eval -c config.yml -t xh2         # 芯片
-hmatc eval -c config.yml -t xh2 --onnx  # onnx
+hmatc eval -c config.yml         # 芯片
+hmatc eval -c config.yml --onnx  # onnx
 ```
 
 ## 配置文件
