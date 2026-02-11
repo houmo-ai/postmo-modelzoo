@@ -19,11 +19,11 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include "run_perf.h"
+
 #ifdef _MSC_VER
 #include <Windows.h>
 #endif
-
-#include "run_perf.h"
 
 /**
  * @brief Main entry point for the LLM Performance Testing Tool

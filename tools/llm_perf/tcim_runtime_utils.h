@@ -111,4 +111,4 @@ inline void DebugSetInputValue(std::shared_ptr<tcim::Module> module,
   return;
 }
 
-#endif
+#endif  // __TCIM_RUNTIME_UTILS_H__
