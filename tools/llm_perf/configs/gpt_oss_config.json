@@ -1,9 +1,9 @@
 {
     "Streams":[
         {
-            "ModelName" : "DeepSeek-R1-0528-Qwen3-8B",
-            "prefill" : "output/xh2/deepseek_prefill.hmm",
-            "decode" : "output/xh2/deepseek_decode.hmm",
+            "ModelName" : "Gpt-oss",
+            "prefill" : "output/xh2/gpt_prefill.hmm",
+            "decode" : "output/xh2/gpt_decode.hmm",
             "embedding" : "output/xh2/hmquant/quant_embedding.bin",
             "input" : 256,
             "stop" : 256,
@@ -13,9 +13,9 @@
             "no_warm_up" : ""
         },
         {
-            "ModelName" : "DeepSeek-R1-0528-Qwen3-8B",
-            "prefill" : "output/xh2/deepseek_prefill.hmm",
-            "decode" : "output/xh2/deepseek_decode.hmm",
+            "ModelName" : "Gpt-oss",
+            "prefill" : "output/xh2/gpt_prefill.hmm",
+            "decode" : "output/xh2/gpt_decode.hmm",
             "embedding" : "output/xh2/hmquant/quant_embedding.bin",
             "input" : 1024,
             "stop" : 256,
@@ -25,9 +25,9 @@
             "no_warm_up" : ""
         },
         {
-            "ModelName" : "DeepSeek-R1-0528-Qwen3-8B",
-            "prefill" : "output/xh2/deepseek_prefill.hmm",
-            "decode" : "output/xh2/deepseek_decode.hmm",
+            "ModelName" : "Gpt-oss",
+            "prefill" : "output/xh2/gpt_prefill.hmm",
+            "decode" : "output/xh2/gpt_decode.hmm",
             "embedding" : "output/xh2/hmquant/quant_embedding.bin",
             "input" : 2048,
             "stop" : 256,

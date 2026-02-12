@@ -116,6 +116,8 @@ fi
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
     python3 demo.py
+    python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt --type vllm
+    llm_perf -c ../../../tools/llm_perf/configs/qwen3_vl_config.json
 fi
 
 if [[ "$VENV_FLAG" -eq "1" ]]; then

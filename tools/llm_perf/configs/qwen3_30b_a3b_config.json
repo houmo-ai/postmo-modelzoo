@@ -1,39 +1,42 @@
 {
     "Streams":[
         {
-            "ModelName" : "DeepSeek-R1-0528-Qwen3-8B",
-            "prefill" : "output/xh2/deepseek_prefill.hmm",
-            "decode" : "output/xh2/deepseek_decode.hmm",
+            "ModelName" : "Qwen3-30B-A3B",
+            "prefill" : "output/xh2/qwen3_prefill.hmm",
+            "decode" : "output/xh2/qwen3_decode.hmm",
             "embedding" : "output/xh2/hmquant/quant_embedding.bin",
             "input" : 256,
             "stop" : 256,
             "ndevices" : 1,
             "loop" : 1,
             "batch" : 1,
+            "LazyMode" : "",
             "no_warm_up" : ""
         },
         {
-            "ModelName" : "DeepSeek-R1-0528-Qwen3-8B",
-            "prefill" : "output/xh2/deepseek_prefill.hmm",
-            "decode" : "output/xh2/deepseek_decode.hmm",
+            "ModelName" : "Qwen3-30B-A3B",
+            "prefill" : "output/xh2/qwen3_prefill.hmm",
+            "decode" : "output/xh2/qwen3_decode.hmm",
             "embedding" : "output/xh2/hmquant/quant_embedding.bin",
             "input" : 1024,
             "stop" : 256,
             "ndevices" : 1,
             "loop" : 1,
             "batch" : 1,
+            "LazyMode" : "",
             "no_warm_up" : ""
         },
         {
-            "ModelName" : "DeepSeek-R1-0528-Qwen3-8B",
-            "prefill" : "output/xh2/deepseek_prefill.hmm",
-            "decode" : "output/xh2/deepseek_decode.hmm",
+            "ModelName" : "Qwen3-30B-A3B",
+            "prefill" : "output/xh2/qwen3_prefill.hmm",
+            "decode" : "output/xh2/qwen3_decode.hmm",
             "embedding" : "output/xh2/hmquant/quant_embedding.bin",
             "input" : 2048,
             "stop" : 256,
             "ndevices" : 1,
             "loop" : 1,
             "batch" : 1,
+            "LazyMode" : "",
             "no_warm_up" : ""
         }
     ],
