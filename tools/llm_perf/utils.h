@@ -73,6 +73,9 @@ using json = nlohmann::json;
 typedef enum { PERFCMD = 0, PERFJSON, PERFINVAILD } PerfConfigType;
 
 static void HelpUsage(char* argv[]) {
+  std::cout << "llm_perf - A tool for LLM and VLLM performance tests with "
+               "flexible configuration options.\n\n";
+  std::cout << "Release Time : " << __DATE__ << " " << __TIME__ << "\n\n";
   std::cout
       << "Usage: " << argv[0]
       << " --key value [options...]\n\n"

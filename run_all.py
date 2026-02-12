@@ -243,7 +243,10 @@ def main(allArgs=None):
 
 if __name__ == "__main__":
     os.environ['HOUMO_MODEL_PATH'] = "/data02/modelzoo_ci/models"
+    HOUMO_PATH = os.getenv("HOUMO_PATH", "/usr/local/houmo")
+    HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", ".")
     os.system("cd hmatc && chmod +x install.sh && ./install.sh")
+    os.system(f"cd {HOUMO_EXAMPLES_PATH}/tools/llm_perf && bash build_linux.sh && cp {HOUMO_EXAMPLES_PATH}/tools/bin/llm_perf {HOUMO_PATH}/bin")
 
     os.environ['SKIP_INFER'] = "ON"
     # install pytest in release docker
