@@ -10,7 +10,7 @@ PRINT_YELLOW() { echo -e "\033[1;33m$@\033[0m"; }
 
 if [[ -z $HOUMO_SDK_PATH ]]; then
   PRINT_YELLOW "[warn] HOUMO_SDK_PATH not set. use default /usr/local/houmo-sdk."
-  export HOUMO_PATH=/usr/local/houmo-sdk
+  export HOUMO_SDK_PATH=/usr/local/houmo-sdk
 fi
 
 if [[ -z $HOUMO_PATH ]]; then
