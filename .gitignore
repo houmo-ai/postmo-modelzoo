@@ -99,6 +99,7 @@ pred*
 *.tar.xz
 *.tar.gz
 *.zip
+*.skills
 output*
 wiki*
 .msc
