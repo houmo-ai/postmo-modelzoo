@@ -252,10 +252,8 @@ void hm_device_monitor_info(int dev_index, uint32_t interval) {
                     "{:.2f}MHz",
                     hm_infos.dev_id, hm_infos.temperature, hm_infos.power,
                     hm_infos.ipu_freq);
-    // Simulate monitoring interval (adjust according to actual requirements)
-    // std::this_thread::sleep_for(std::chrono::seconds(interval));
     std::unique_lock<std::mutex> lock(mtx_);
-    cv_.wait_for(lock, std::chrono::seconds(interval),
+    cv_.wait_for(lock, std::chrono::milliseconds(interval),
                  [&]() { return !g_running.load(std::memory_order_relaxed); });
   }
 }

@@ -37,7 +37,7 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
     devs.emplace_back(i);
     std::cout << i << " ";
   }
-  if (devs.size() == 1) devs[0] = 1;
+
   std::cout << std::endl;
   // Create device manager with the specified devices
   tcim::DevManager dev_manager = tcim::DevManager::Create(devs);

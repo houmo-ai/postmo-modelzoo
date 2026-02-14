@@ -94,7 +94,8 @@ static void HelpUsage(char* argv[]) {
          "  --batch         NUM       if multibatch model only xh2 support!\n"
          "  --no_warm_up              disable warm up!\n"
          "  --LazyMode                enable lazy mode!\n"
-         "  --interval                device 0 monitor interval!\n"
+         "  --interval                device 0 monitor and host monitor "
+         "sampling interval in seconds!\n"
          "  -h, --help                show help message\n";
 }
 

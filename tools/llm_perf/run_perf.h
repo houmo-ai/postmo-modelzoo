@@ -37,6 +37,9 @@
 #include "perf_dumper/perf_dumper.h"
 #include "tcim/tcim_runtime.h"
 #include "utils.h"
+#if defined(__linux__)
+#include "host_monitor/host_monitor.h"
+#endif
 
 #ifdef _MSC_VER
 #include <Windows.h>
@@ -117,8 +120,12 @@ PerfSettings ParsePerfRunSetting(
 
 int RunPerf(std::unordered_map<std::string, std::string> args) {
   int interval =
-      args.count("interval") ? validate_setting(args, "interval") : 1;
+      args.count("interval") ? validate_setting(args, "interval") * 1000 : 1000;
   std::thread device_monitor_thread(device_monitor, 0, interval);
+#if defined(__linux__)
+  MemoryMonitor host_mem_monitor(interval);
+  host_mem_monitor.start();
+#endif
 #ifdef PERF_DUMP_ENABLE
   if (args.count("dump_file") == 1) {
     perf_dumper.setJsonFile(args["dump_file"], run_perf_by_json);
@@ -257,11 +264,17 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
       perf_dumper.generateJsonFile();
     }
 #endif
+#if defined(__linux__)
+    host_mem_monitor.stop();
+#endif
     return 0;
   } catch (const std::exception& e) {
     std::cerr << "Error: " << e.what() << std::endl;
     stop_monitor(0);
     device_monitor_thread.join();
+#if defined(__linux__)
+    host_mem_monitor.stop();
+#endif
     return 1;
   }
   return 0;
