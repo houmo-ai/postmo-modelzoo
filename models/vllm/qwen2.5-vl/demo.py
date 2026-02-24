@@ -42,7 +42,11 @@ from PIL import Image
 from processing_qwen2_5_vl import Qwen2_5_VLProcessor
 from utils import get_rope_index, QRawToYuv
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")))
+sys.path.append(
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")
+    )
+)
 from perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -93,7 +97,7 @@ def get_args() -> argparse.Namespace:
         "--repetition_penalty",
         dest="repetition_penalty",
         type=float,
-        default=1.0,
+        default=1.1,
         help="sampling repetition_penalty",
     )
     parser.add_argument(
@@ -833,9 +837,7 @@ if __name__ == "__main__":
     prompt = "请描述图片内容。"
     logger.success("question:")
     print("\033[1;95m{}\033[0m".format(prompt))
-    input_tokens = qwen25vl.chat_vit_prefill(
-        image_dir, prompt=prompt
-    )
+    input_tokens = qwen25vl.chat_vit_prefill(image_dir, prompt=prompt)
 
     decode_count = 0
     while True:
@@ -850,7 +852,7 @@ if __name__ == "__main__":
         batch_size=1,
         input_seq_length=input_tokens,
         output_seq_length=decode_count,
-        num_images=image_num
+        num_images=image_num,
     )
 
     qwen25vl.perf_tracker.show_summary()

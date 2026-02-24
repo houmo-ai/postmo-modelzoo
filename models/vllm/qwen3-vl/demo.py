@@ -42,7 +42,11 @@ from PIL import Image
 from processing_qwen3_vl import Qwen3VLProcessor
 from utils import get_rope_index, QRawToYuv
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")))
+sys.path.append(
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")
+    )
+)
 from perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -374,8 +378,12 @@ class Qwen3VL:
         if HOUMO_TARGET == "xh2":
             self.embedding = self.embedding.weight
         self.hidden_dims = self.embedding.shape[-1]
+        repetition_penalty = args.repetition_penalty or {2560: 4.0, 4096: 1.5}.get(
+            self.hidden_dims, 1.0
+        )
 
         self.perf_tracker.reset_perf_time()
+
     def get_input_names(self):
         input_names = []
         for i in range(self.prefill.get_num_inputs()):
@@ -1074,7 +1082,7 @@ class Qwen3VL:
         self.perf_tracker.perf_start(PERFTYPE.DECODE_TOKEN_TIME)
 
         if self.next_id.item() in self.eos_token_id:
-            if hasattr(self, 'decode_response'):
+            if hasattr(self, "decode_response"):
                 print(self.decode_response, end="", flush=True)
                 self.all_response += self.decode_response
             self.perf_tracker.perf_end(PERFTYPE.DECODE_TOKEN_TIME)
@@ -1135,6 +1143,6 @@ if __name__ == "__main__":
         batch_size=1,
         input_seq_length=input_tokens,
         output_seq_length=output_tokens,
-        num_images=image_num
+        num_images=image_num,
     )
     qwen3vl.perf_tracker.show_summary()
