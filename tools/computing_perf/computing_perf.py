@@ -37,7 +37,6 @@ except ImportError:
     exit(-1)
 
 import onnx
-from hmatc.utils.utils import get_file_from_jfrog
 
 logging.basicConfig(level=logging.INFO)
 
@@ -75,139 +74,7 @@ class ConvUtil:
         return padding_low[0], padding_high[0]
 
 
-class Xh1ConvUtil(ConvUtil):
-    """utils for xh1 conv2d related shapes or constraints"""
-
-    @staticmethod
-    def get_kp_shape(kernel_size, input_channel, output_channel):
-        def get_part(align_kernel_size):
-            if align_kernel_size <= 3:
-                return 1
-            if 6 <= align_kernel_size:
-                return 8
-            return (
-                2
-                if (
-                    align_kernel_size == 4
-                    and input_channel <= 64
-                    and output_channel <= 64
-                )
-                else 4
-            )
-
-        align_kernel_size = max(kernel_size[0], kernel_size[1])
-        co_align_val = 64
-        ci_align_val = 512 if align_kernel_size == 1 else 64
-        ci1 = math.ceil(input_channel / ci_align_val)
-        co1 = math.ceil(output_channel / co_align_val)
-        return (co1, ci1, get_part(align_kernel_size), co_align_val)
-
-
-def gen_conv_model_and_tops_xh1():
-    """model with graph: conv2d"""
-    try:
-        from tcim.test_utils.onnx_builder.onnx_builder import (
-            make_model,
-            make_tensor,
-        )
-    except ImportError:
-        raise ImportError("Please install tcim to use this function")
-
-    dtype = onnx.TensorProto.INT8
-    batch_size = 1
-    channel = 256
-    feature_size = (256, 256)
-    kernel_size = (3, 3)
-    stride = (1, 1)
-    num_layers = 64
-    padding = Xh1ConvUtil.get_padding_for_same_fmap_size(
-        feature_size, kernel_size, stride
-    )
-    input_name = "input"
-
-    input_tensor = make_tensor(input_name, (batch_size, *feature_size, channel), dtype)
-    current_tensor = input_tensor
-    initializers = []
-    nodes = []
-    mid_tensors = []
-
-    weight_shape = [*kernel_size, channel, channel]
-    bias_shape = (weight_shape[-1],)
-    kp_shape = Xh1ConvUtil.get_kp_shape(kernel_size, channel, channel)
-    ko_shape = (weight_shape[-1],)
-    weight_data = np.random.randint(
-        low=-128, high=128, size=weight_shape, dtype=np.int8
-    )
-    bias_data = np.random.randint(low=-128, high=128, size=bias_shape, dtype=np.int16)
-    kp_data = np.random.randint(low=0, high=5, size=kp_shape, dtype=np.int8)
-    ko_data = np.random.randint(low=0, high=5, size=ko_shape, dtype=np.int8)
-    from tcim.test_utils.onnx_builder.xh1_op_builder import (
-        make_base_cimd_conv2d_node,
-    )
-
-    for i in range(num_layers):
-        current_layer_name = f"conv{i}"
-        current_tensor = make_base_cimd_conv2d_node(
-            name=current_layer_name,
-            input_names=[current_tensor.name],
-            output_names=[current_layer_name],
-            weight_shape=weight_shape,
-            weight_data=weight_data,
-            bias_data=bias_data,
-            kp_shape=kp_shape,
-            kp_data=kp_data,
-            ko_data=ko_data,
-            kernel_size=kernel_size,
-            padding=padding,
-            strides=stride,
-            feature_map_layout="NHWC",
-            initializers=initializers,
-            nodes=nodes,
-        )
-        mid_tensors.append(current_tensor)
-
-    from tcim.test_utils.onnx_builder.onnx_builder import (
-        GLOBAL_XH1_ONNX_DOMAIN,
-        GLOBAL_XH1_ONNX_VERSION,
-    )
-
-    model = make_model(
-        nodes,
-        "test",
-        inputs=[input_tensor],
-        outputs=[current_tensor],
-        value_info=mid_tensors,
-        initializer=initializers,
-        opset_imports=[
-            onnx.helper.make_opsetid(GLOBAL_XH1_ONNX_DOMAIN, GLOBAL_XH1_ONNX_VERSION),
-        ],
-    )
-
-    num_tops = (
-        num_layers
-        * batch_size
-        * channel
-        * channel
-        * feature_size[0]
-        * feature_size[1]
-        * kernel_size[0]
-        * kernel_size[1]
-        * 2
-        / (1000**4)
-    )
-    model_tops_info = {
-        "num_layers": num_layers,
-        "batch_size": batch_size,
-        "in_channel": channel,
-        "out_channel": channel,
-        "feature_size": feature_size,
-        "kernel_shape": kernel_size,
-    }
-    model_tops_info["num_tops"] = num_tops
-    return model, model_tops_info
-
-
-def gen_conv_model_and_tops_xh2():
+def gen_conv_model_and_tops_xh2(feature_size=(64, 64)):
     """model with graph: conv2d"""
     try:
         from tcim.test_utils.onnx_builder.hmir_op_builder import make_transpose_node
@@ -223,7 +90,6 @@ def gen_conv_model_and_tops_xh2():
     dtype = onnx.TensorProto.FLOAT16
     batch_size = 1
     channel = 256
-    feature_size = (64, 64)
     kernel_shape = (3, 3)
     strides = (1, 1)
     num_layers = 64
@@ -496,13 +362,29 @@ if __name__ == "__main__":
         default=512,
         help="total number of samples to run, the default value runs about 5 seconds.",
     )
+    parser.add_argument(
+        "--compute-mode",
+        choices=("int8", "bfp16"),
+        default="bfp16",
+        required=False,
+        help="the compute mode to run the test, default is bfp16.",
+    )
     args = parser.parse_args()
 
     target = os.getenv("HOUMO_TARGET")
-    if target not in ["xh1", "xh2"]:
-        raise ValueError("HOUMO_TARGET must be xh1 or xh2")
+    if target not in ["xh2"]:
+        raise ValueError("HOUMO_TARGET must be xh2")
 
     MODEL_NAME = f"{target}_conv"
+
+    enable_xh2_sparse_feature = False
+    PEAK_TOPS = 100.0
+    if args.compute_mode == "int8":
+        PEAK_TOPS = 160.0
+        enable_xh2_sparse_feature = True
+        os.environ["RUN_ON_SUBTARGET"] = "2"
+        MODEL_NAME = f"{MODEL_NAME}_int8"
+
     print("#########################################")
     print("##  AI core compute performance test   ##")
     print("#########################################")
@@ -541,21 +423,24 @@ if __name__ == "__main__":
             os.environ["HOUMO_MODELZOO_URL"] = (
                 "http://artifactory.houmo.ai/artifactory/Dadao"
             )
-        if target == "xh1":
-            zipped_hmm_path = (
-                "models/tools/computing_perf/hmm_xh1_conv_1core_20250916.tar.xz"
-            )
-        elif target == "xh2":
-            zipped_hmm_path = (
-                "models/tools/computing_perf/hmm_xh2_conv_1core_20250916.tar.xz"
-            )
+        if target == "xh2":
+            if args.compute_mode == "int8":
+                zipped_hmm_path = "models/tools/computing_perf/hmm_xh2_conv_int8_1core_20260225.tar.xz"
+            elif args.compute_mode == "bfp16":
+                zipped_hmm_path = (
+                    "models/tools/computing_perf/hmm_xh2_conv_1core_20250916.tar.xz"
+                )
         get_file_from_jfrog(zipped_hmm_path, "./", "./")
 
     if not args.skip_build:
-        if target == "xh1":
-            gen_conv_model_and_tops = gen_conv_model_and_tops_xh1
-        elif target == "xh2":
-            gen_conv_model_and_tops = gen_conv_model_and_tops_xh2
+        if target == "xh2":
+            if args.compute_mode == "int8":
+                feature_size = (128, 128)
+            elif args.compute_mode == "bfp16":
+                feature_size = (64, 64)
+            gen_conv_model_and_tops = lambda: gen_conv_model_and_tops_xh2(
+                feature_size=feature_size
+            )
         print("Generating onnx model...")
         hmonnx_model, model_tops_info = gen_conv_model_and_tops()
         model_path = os.path.join(output_dir, f"{MODEL_NAME}.onnx")
@@ -577,6 +462,8 @@ if __name__ == "__main__":
             ncore=1,
             opt_level="O2",
             io_layout="any",
+            enable_xh2_sparse_feature=enable_xh2_sparse_feature,
+            skip_check=True,
         )
         shutil.copyfile(os.path.join(build_tmp_dir, "model.json"), json_path)
         print("Model built successfully.")
@@ -635,6 +522,8 @@ if __name__ == "__main__":
             * SAMPLE_NUM_PER_PROCESS
             / elapsed_time
         )
+        COMPUTE_UNIT = "TFLOP" if args.compute_mode == "bfp16" else "TOP"
+        COMPUTE_MODE = "bFP16" if args.compute_mode == "bfp16" else "INT8"
         print("\n" + "=" * 60)
         print("           Performance Test Summary")
         print("=" * 60)
@@ -649,8 +538,8 @@ if __name__ == "__main__":
         print(f"{'Kernel Shape':<25} | {str(model_tops_info['kernel_shape']):>15}")
         print("-" * 60)
         print(
-            f"{'Computing amount':<25} | {model_tops_info['num_tops']:>15.4f} TFLOPs/sample"
+            f"{'Computing amount':<25} | {model_tops_info['num_tops']:>15.4f} {COMPUTE_UNIT}s/sample"
         )
         print(f"{'Test time':<25} | {elapsed_time:>15.4f} seconds")
-        print(f"{'PERFORMANCE':<25} | {TOPS:>15.2f} TFLOPS@bFP16")
+        print(f"{'PERFORMANCE':<25} | {TOPS:>15.2f} {COMPUTE_UNIT}S@{COMPUTE_MODE}")
         print("=" * 60 + "\n")
