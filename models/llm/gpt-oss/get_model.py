@@ -85,7 +85,7 @@ if __name__ == "__main__":
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": "gpt",
+        "model_name": "gpt-oss",
         "model_info": {
             "model_size": "20b",
             "ncore": 2,

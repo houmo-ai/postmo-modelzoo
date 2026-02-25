@@ -46,8 +46,8 @@ python3 build.py
 ```
 
 编译好的模型存放在当前目录，包括2个文件：
-gpt_prefill.hmm
-gpt_decode.hmm
+gpt-oss_prefill.hmm
+gpt-oss_decode.hmm
 
 ### 2.3 演示
 

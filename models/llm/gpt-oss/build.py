@@ -117,7 +117,7 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="gpt",
+        default="gpt-oss",
         help="output houmo model name",
     )
     parser.add_argument(
@@ -374,7 +374,7 @@ if __name__ == "__main__":
             exit(0)
         model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
         build(
-            "gpt_prefill",
+            "gpt-oss_prefill",
             model_dir,
             model_path,
             output_dir,
@@ -388,7 +388,7 @@ if __name__ == "__main__":
         )
         model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
         build(
-            "gpt_decode",
+            "gpt-oss_decode",
             model_dir,
             model_path,
             output_dir,
@@ -405,8 +405,8 @@ if __name__ == "__main__":
     # test model
     if args.stage == "test" or args.stage == "all":
         part_dir = os.path.join(model_dir, "prefill")
-        test("gpt_prefill", part_dir, output_dir, profile, prefix=model_name)
+        test("gpt-oss_prefill", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "decoder")
-        test("gpt_decode", part_dir, output_dir, profile, prefix=model_name)
+        test("gpt-oss_decode", part_dir, output_dir, profile, prefix=model_name)
 
     memory_monitor.stop()

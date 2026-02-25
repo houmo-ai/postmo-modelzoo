@@ -66,14 +66,14 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "gpt_prefill.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "gpt-oss_prefill.hmm"),
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "gpt_decode.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "gpt-oss_decode.hmm"),
         help="houmo decode model path",
     )
     parser.add_argument(
