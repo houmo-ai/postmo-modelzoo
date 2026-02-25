@@ -109,7 +109,7 @@
             "perf": "llm_perf"
         }
     },
-    "gpt": {
+    "gpt-oss": {
         "20b": {
             "support_backends": ["xh2"],
             "path": "models/llm/gpt-oss",

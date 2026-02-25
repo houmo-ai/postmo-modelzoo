@@ -98,12 +98,12 @@ if __name__ == "__main__":
         model_name = demo_md["model_name"]
         model_size = demo_md["model_size"]
 
-        verify_dict[model_name] = False
+        verify_dict[model_key_str] = False
 
         model_raw_name = model_info[model_name][model_size].get("raw", "")
         model_folder = model_info[model_name][model_size].get("path", "")
 
-        if not model_raw_name or not model_folder:
+        if not model_raw_name or not model_folder or "-vl" in model_name:
             logger.warning(f"Skip to verify model {model_key_str}.")
             continue
 
@@ -159,6 +159,6 @@ if __name__ == "__main__":
                 )
                 continue
 
-            verify_dict[model_name] = True
+            verify_dict[model_key_str] = True
 
     logger.info(f"[Verfiy Demo] Final Results: {verify_dict}")

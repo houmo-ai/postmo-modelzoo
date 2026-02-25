@@ -161,16 +161,6 @@ def _check_start_task(line: str, state: Dict) -> bool:
     return START_TASK_STR in line
 
 
-def _check_input_token(line: str, state: Dict) -> bool:
-    """Check if the line contains input token length information."""
-    return "Input Length per Sample" in line
-
-
-def _check_stop_token(line: str, state: Dict) -> bool:
-    """Check if the line contains output token length information."""
-    return "Output Length per Sample" in line
-
-
 def _check_loop(line: str, state: Dict) -> bool:
     """Check if the line contains loop count information."""
     return "loop :" in line or "  loops:" in line
@@ -179,26 +169,6 @@ def _check_loop(line: str, state: Dict) -> bool:
 def _check_end_task(line: str, state: Dict) -> bool:
     """Check if the line indicates the end of a task."""
     return END_TASK_STR in line
-
-
-def _check_llm_perf_avg(line: str, state: Dict) -> bool:
-    """Check if the line indicates the start of LLM performance average information."""
-    return "LLM Perf Avarage Information" in line
-
-
-def _check_llm_perf_perfill(line: str, state: Dict) -> bool:
-    """Check if the line indicates the start of LLM prefill performance average information."""
-    return "Prefill Stage Performance" in line
-
-
-def _check_llm_perf_decode(line: str, state: Dict) -> bool:
-    """Check if the line indicates the start of LLM decode performance average information."""
-    return "Decode Stage Performance" in line
-
-
-def _check_llm_perf_vision(line: str, state: Dict) -> bool:
-    """Check if the line indicates the start of LLM vision performance average information."""
-    return "Vision Stage Performance" in line
 
 
 def _check_perf_flag(line: str, state: Dict) -> bool:
@@ -328,83 +298,6 @@ def _handle_perf_start_line(
     state["perf_flag"] = True
 
 
-def _handle_perfill_perf_start_line(
-    line: str,
-    perf_metric: Dict,
-    state: Dict,
-    keywords_dict: Dict = {},
-    perf_key: str = "",
-) -> None:
-    """(common) Handle prefill stage performance start line: set prefill_perf_flag."""
-    if state["perf_flag"] is True:
-        state["prefill_perf_flag"] = True
-        state["decode_perf_flag"] = False
-        state["vision_perf_flag"] = False
-
-
-def _handle_decode_perf_start_line(
-    line: str,
-    perf_metric: Dict,
-    state: Dict,
-    keywords_dict: Dict = {},
-    perf_key: str = "",
-) -> None:
-    """(common) Handle decode stage performance start line: set decode_perf_flag."""
-    if state["perf_flag"] is True:
-        state["prefill_perf_flag"] = False
-        state["decode_perf_flag"] = True
-        state["vision_perf_flag"] = False
-
-
-def _handle_vision_perf_start_line(
-    line: str,
-    perf_metric: Dict,
-    state: Dict,
-    keywords_dict: Dict = {},
-    perf_key: str = "",
-) -> None:
-    """(common) Handle vision stage performance start line: set vision_perf_flag."""
-    if state["perf_flag"] is True:
-        state["prefill_perf_flag"] = False
-        state["decode_perf_flag"] = False
-        state["vision_perf_flag"] = True
-
-
-def _handle_token_loop(
-    line: str, perf_metric: Dict, state: Dict, keywords_dict: Dict, perf_key: str
-) -> None:
-    """(llm_perf) Handle input/output token length and loop count."""
-    perf_metric[perf_key][-1] = _get_value_after_colon(line, split_space=True)
-
-
-def _handle_perf_flag(
-    line: str, perf_metric: Dict, state: Dict, keywords_dict: Dict, perf_key: str
-) -> None:
-    """(llm_perf) Handle performance metric line: extract matching metric values."""
-    perf_type = ""
-    if state["prefill_perf_flag"] is True:
-        perf_type = "prefill"
-    elif state["decode_perf_flag"] is True:
-        perf_type = "decode"
-    elif state["vision_perf_flag"] is True:
-        perf_type = "vision"
-    keyword = _find_first_matched_keyword(line, keywords_dict.keys())
-    if keyword is not None:
-        if keyword == "Total Time" and "Speed:" in line:
-            time_str = f"{perf_type}_time"
-            key_str = f"{perf_type}_speed"
-            perf_metric[time_str][-1] = (
-                line.strip().rsplit("|", 1)[-2].strip().rsplit(" ", 1)[-1].strip()[:-2]
-            )
-        elif keyword == "Embedding Time":
-            key_str = perf_type + keywords_dict[keyword]
-            perf_metric[key_str][-1] = _get_value_after_colon(line)
-            return
-        else:
-            key_str = keywords_dict[keyword]
-        perf_metric[key_str][-1] = line.strip().rsplit(" ", 2)[-2].strip()
-
-
 def _parse_latency_line(line: str, perf_metric: dict) -> None:
     """(tcim_perf) Parse latency line, update perf_metric."""
 
@@ -481,98 +374,273 @@ def _add_file_size_to_perf(perf_dict, size_dict):
     return perf_dict
 
 
+def _extract_device_mem_from_log(log_lines: list, model_name: str) -> str:
+    """
+    Extract device memory usage from log lines for a specific model.
+
+    Args:
+        log_lines (list): Lines from the log file
+        model_name (str): Name of the model to search for
+
+    Returns:
+        str: Device memory usage value in format "dev0_mem MB/dev1_mem MB" or "NA" if not found
+    """
+    device_mems = []
+    model_found = False
+    mem_usage_section = False
+
+    for line in log_lines:
+        if START_TASK_STR in line and model_name in line:
+            model_found = True
+            continue
+
+        if model_found:
+            # Check for HM Device Memory Usage section start
+            if MEM_START_STR in line:
+                mem_usage_section = True
+                continue
+
+            if END_TASK_STR in line or (
+                MODEL_NAME_STR in line and model_name not in line
+            ):
+                break
+
+            # If in HM Device Memory Usage section, look for device memory lines
+            if mem_usage_section and MEM_USED_STR in line:
+                mem_used_str = _get_value_after_colon(line)
+                device_mems.append(mem_used_str)
+
+    # Format the result
+    if device_mems:
+        return "/".join(device_mems)
+    else:
+        return "NA"
+
+
 def _generate_llm_perf_table(cfg_path, outputs, file_size_dict):
     """
-    Generate LLM performance table from outputs.
+    Generate LLM performance table from dump files and configuration.
 
-    Parses performance test outputs and creates an Excel table with metrics
-    including prefill time, decode time, vision time, speed measurements,
-    latency, and token processing rates.
+    Reads performance data from dump_file paths specified in the configuration,
+    combines it with configuration parameters and log information to create
+    a comprehensive performance table.
 
     Args:
         cfg_path: Path to the configuration file
-        outputs: List of output lines from the performance test
+        outputs: List of output lines from the log file (for memory extraction)
+        file_size_dict: Dictionary containing file sizes
     """
+    # Load the configuration file
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg_data = json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load config file {cfg_path}: {e}")
+        return
+
+    # Initialize performance metrics dictionary with required columns
     perf_metric = {
-        "model_name": [],
-        "input_token": [],
-        "output_token": [],
-        "device_mem_used": [],
-        "prefill_time": [],
-        "decode_time": [],
-        "vision_time": [],
-        "prefill_speed": [],
-        "decode_speed": [],
-        "vision_speed": [],
-        "TTFT": [],
-        "TPOT": [],
-        "e2e_latency": [],
-        "e2e_tps": [],
-        "prefill_embedding_time": [],
-        "decode_embedding_time": [],
+        "file_name": [],  # ModelName from config
+        "model": [],  # model_name from config
+        "size": [],  # model_size from config
+        "p_len(k)": [],  # prefill_length from config
+        "ctx_len(k)": [],  # context_length from config
+        "batch": [],  # batch from config
+        "nchip": [],  # ndevices from config
+        "ncore": [],  # ncore from config
+        "flash_attention": [],  # Assuming default 0 if not specified
+        "input(k)": [],  # input_token from dump file (converted to k)
+        "output(k)": [],  # output_token from dump file (converted to k)
+        "device_mem(MB)": [],  # Extracted from logs
+        "prefill_load_time(ms)": [],  # prefill_load_time from dump file
+        "decode_load_time(ms)": [],  # decode_load_time from dump file
+        "visual_load_time(ms)": [],  # visual_load_time from dump file
+        "prefill_time(ms)": [],  # prefill_time from dump file
+        "decode_time(ms)": [],  # decode_time from dump file
+        "vision_time(ms)": [],  # vision_time from dump file
+        "prefill_speed(tps)": [],  # prefill_speed from dump file
+        "decode_speed(tps)": [],  # decode_speed from dump file
+        "vision_speed(fps)": [],  # vision_speed from dump file
+        "TTFT(ms)": [],  # TTFT from dump file
+        "TPOT(ms/token)": [],  # TPOT from dump file
+        "e2e_latency(s)": [],  # e2e_latency from dump file
+        "e2e_tps(tps)": [],  # e2e_tps from dump file
+        "prefill_embedding_time(ms)": [],  # prefill_embedding_time from dump file
+        "decode_embedding_time(ms)": [],  # decode_embedding_time from dump file
+        "hmm_prefill_size(MB)": [],  # From file_size_dict
+        "hmm_decode_size(MB)": [],  # From file_size_dict
+        "hmm_visual_size(MB)": [],  # From file_size_dict
     }
 
-    keywords_dict = {
-        "Total Time": "_time",
-        "TTFT": "TTFT",
-        "TPOT": "TPOT",
-        "E2E Latency": "e2e_latency",
-        "E2E TPS": "e2e_tps",
-        "Embedding Time": "_embedding_time",
-    }
+    # Process each model in the configuration
+    for model_config in cfg_data.get("Streams", []):
+        model_name = model_config.get("ModelName", "")
+        dump_file_path = model_config.get("dump_file", "")
 
-    state = {
-        "perf_flag": False,
-        "prefill_perf_flag": False,
-        "decode_perf_flag": False,
-        "vision_perf_flag": False,
-        "mem_flag": False,
-    }
+        # Skip if no dump file specified
+        if not dump_file_path:
+            logger.warning(f"No dump_file specified for model {model_name}")
+            continue
 
-    processors = [
-        (_check_start_task, _handle_start_task, "model_name"),
-        (_check_input_token, _handle_token_loop, "input_token"),
-        (_check_stop_token, _handle_token_loop, "output_token"),
-        (_check_end_task, _handle_end_task, ""),
-        (_check_mem_end, _handle_mem_end, ""),
-        (_check_llm_perf_avg, _handle_perf_start_line, ""),
-        (_check_llm_perf_vision, _handle_vision_perf_start_line, ""),
-        (_check_llm_perf_perfill, _handle_perfill_perf_start_line, ""),
-        (_check_llm_perf_decode, _handle_decode_perf_start_line, ""),
-        (_check_perf_flag, _handle_perf_flag, ""),
-        (_check_mem_start, _handle_mem_start, ""),
-        (_check_mem_used, _handle_mem_used, "device_mem_used"),
-    ]
+        # Initialize row with NA values
+        for key in perf_metric:
+            perf_metric[key].append("NA")
 
-    for line in outputs:
-        for check_func, handle_func, perf_key in processors:
-            if check_func(line, state):
-                handle_func(line, perf_metric, state, keywords_dict, perf_key)
-                break
+        # Fill configuration-based values
+        current_index = len(perf_metric["file_name"]) - 1
+        perf_metric["file_name"][current_index] = model_name
+        perf_metric["model"][current_index] = model_config.get("model_name", "NA")
+        perf_metric["size"][current_index] = model_config.get("model_size", "NA")
+        prefill_length = model_config.get("prefill_length", "NA")
+        perf_metric["p_len(k)"][current_index] = (
+            round(prefill_length / 1024.0, 3) if prefill_length != "NA" else "NA"
+        )
+        perf_metric["ctx_len(k)"][current_index] = model_config.get(
+            "context_length", "NA"
+        )
+        perf_metric["batch"][current_index] = model_config.get("batch", "NA")
+        perf_metric["nchip"][current_index] = model_config.get("ndevices", "NA")
+        perf_metric["ncore"][current_index] = model_config.get("ncore", "NA")
+        perf_metric["flash_attention"][current_index] = model_config.get(
+            "flash_attention", "2"
+        )
 
-    perf_metric = _add_file_size_to_perf(perf_metric, file_size_dict)
+        # Try to read performance data from dump file
+        perf_data = {}
+        if os.path.exists(dump_file_path):
+            try:
+                with open(dump_file_path, "r", encoding="utf-8") as f:
+                    dump_data = json.load(f)
+
+                # Extract performance metrics from Perf_Metrics array
+                perf_metrics_list = dump_data.get("Perf_Metrics", [])
+                if perf_metrics_list:
+                    perf_data = perf_metrics_list[0]  # Take first entry
+            except Exception as e:
+                logger.error(f"Failed to read dump file {dump_file_path}: {e}")
+        else:
+            logger.warning(f"Dump file not found: {dump_file_path}")
+
+        # Fill performance metrics from dump file (convert to appropriate units)
+        if perf_data:
+            # Convert token counts to k units
+            input_tokens = perf_data.get("input_token", 0)
+            output_tokens = perf_data.get("output_token", 0)
+            perf_metric["input(k)"][current_index] = (
+                round(input_tokens / 1024.0, 3) if input_tokens != "NA" else "NA"
+            )
+            perf_metric["output(k)"][current_index] = (
+                round(output_tokens / 1024.0, 3) if output_tokens != "NA" else "NA"
+            )
+
+            # Direct mappings from dump file
+            perf_metric["prefill_time(ms)"][current_index] = perf_data.get(
+                "prefill_time", "NA"
+            )
+            perf_metric["decode_time(ms)"][current_index] = perf_data.get(
+                "decode_time", "NA"
+            )
+            perf_metric["vision_time(ms)"][current_index] = perf_data.get(
+                "vision_time", "NA"
+            )
+            perf_metric["prefill_speed(tps)"][current_index] = perf_data.get(
+                "prefill_speed", "NA"
+            )
+            perf_metric["decode_speed(tps)"][current_index] = perf_data.get(
+                "decode_speed", "NA"
+            )
+            perf_metric["vision_speed(fps)"][current_index] = perf_data.get(
+                "vision_speed", "NA"
+            )
+            perf_metric["TTFT(ms)"][current_index] = perf_data.get("TTFT", "NA")
+            perf_metric["TPOT(ms/token)"][current_index] = perf_data.get("TPOT", "NA")
+            perf_metric["e2e_latency(s)"][current_index] = perf_data.get(
+                "e2e_latency", "NA"
+            )
+            perf_metric["e2e_tps(tps)"][current_index] = perf_data.get("e2e_tps", "NA")
+            perf_metric["prefill_embedding_time(ms)"][current_index] = perf_data.get(
+                "prefill_embedding_time", "NA"
+            )
+            perf_metric["decode_embedding_time(ms)"][current_index] = perf_data.get(
+                "decode_embedding_time", "NA"
+            )
+
+            # New load time metrics
+            perf_metric["prefill_load_time(ms)"][current_index] = perf_data.get(
+                "prefill_load_time", "NA"
+            )
+            perf_metric["decode_load_time(ms)"][current_index] = perf_data.get(
+                "decode_load_time", "NA"
+            )
+            perf_metric["visual_load_time(ms)"][current_index] = perf_data.get(
+                "vision_load_time", "NA"
+            )
+        # Extract device memory usage from logs
+        device_mem = _extract_device_mem_from_log(outputs, model_name)
+        perf_metric["device_mem(MB)"][current_index] = device_mem
+
+        # Fill file sizes from file_size_dict
+        file_sizes = file_size_dict.get(model_name, "")
+        prefill_size = "0"
+        decode_size = "0"
+        visual_size = "0"
+
+        if file_sizes:
+            parts = file_sizes.split(";")
+            for part in parts:
+                if ":" in part:
+                    key, value = part.split(":", 1)
+                    size_mb = value.replace(" MB", "").strip()
+                    if "prefill" in key:
+                        prefill_size = size_mb
+                    elif "decode" in key:
+                        decode_size = size_mb
+                    elif "visual" in key:
+                        visual_size = size_mb
+
+        perf_metric["hmm_prefill_size(MB)"][current_index] = prefill_size
+        perf_metric["hmm_decode_size(MB)"][current_index] = decode_size
+        perf_metric["hmm_visual_size(MB)"][current_index] = visual_size
+
+    # Log the final metrics structure
     for key, value in perf_metric.items():
         logger.info(f"{key}, length: {len(value)}")
 
+    # Define column names for Excel output
     columns = [
-        "model_name",
-        "input(token)",
-        "output(token)",
-        MEM_USED_COLS,
+        "file_name",
+        "model",
+        "size",
+        "p_len(k)",
+        "ctx_len(k)",
+        "batch",
+        "nchip",
+        "ncore",
+        "flash_attention",
+        "input(k)",
+        "output(k)",
+        "device_mem(MB)",
+        "prefill_load_time(ms)",
+        "decode_load_time(ms)",
+        "visual_load_time(ms)",
         "prefill_time(ms)",
         "decode_time(ms)",
         "vision_time(ms)",
-        "prefill_speed(token/s)",
-        "decode_speed(token/s)",
-        "vision_speed(images/s)",
+        "prefill_speed(tps)",
+        "decode_speed(tps)",
+        "vision_speed(fps)",
         "TTFT(ms)",
         "TPOT(ms/token)",
         "e2e_latency(s)",
-        "e2e_tps(tokens/s)",
+        "e2e_tps(tps)",
         "prefill_embedding_time(ms)",
         "decode_embedding_time(ms)",
-        "file_size(MB)",
+        "hmm_prefill_size(MB)",
+        "hmm_decode_size(MB)",
+        "hmm_visual_size(MB)",
     ]
+
+    # Write to Excel file
     _write_to_xlsx(perf_metric, cfg_path, "llm_perf", columns)
 
 
@@ -960,7 +1028,16 @@ def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
         tmp_cmd = ["./llm_perf"]
         # Filter parameters
         for param, param_val in perf_md.items():
-            if param in ["ModelName", "model_name", "quant_models"]:
+            if param in [
+                "ModelName",
+                "model_name",
+                "quant_models",
+                "model_size",
+                "ncore",
+                "prefill_length",
+                "context_length",
+                "flash_attention",
+            ]:
                 continue
             tmp_cmd += [f"--{param}", str(param_val)]
         model_name = perf_md["ModelName"]

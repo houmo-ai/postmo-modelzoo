@@ -850,7 +850,12 @@ if __name__ == "__main__":
                 logger.info("## hm enter here5")
                 exit(5)
 
-    if args.perf_config and target == "xh2" and device_num <= 2:
+    if (
+        args.perf_config
+        and target == "xh2"
+        and device_num <= 2
+        and context_len <= 65536
+    ):
         perf_mode = model_info[model_name_ori][model_size]["perf"]
 
         if compiled_file_name is None:
@@ -866,8 +871,14 @@ if __name__ == "__main__":
         compile_results_dir = f"{host_result_dir}/compile_results"
 
         if perf_mode in ["llm_perf"]:
+            cfg_path = args.perf_config
+
             new_stream = {
-                "ModelName": compiled_file_name,
+                "ModelName": (
+                    compiled_file_name
+                    if ".zip" not in compiled_file_name
+                    else compiled_file_name[:-4]
+                ),
                 "prefill": f"{compile_results_dir}/{model_name}_prefill.hmm",
                 "decode": f"{compile_results_dir}/{model_name}_decode.hmm",
                 "embedding": f"{compile_results_dir}/hmquant/quant_embedding.bin",
@@ -879,6 +890,11 @@ if __name__ == "__main__":
                 "model_name": model_name_ori,
                 "model_size": model_size,
                 "quant_models": host_quant_model,
+                "ncore": core_num,
+                "prefill_length": prefill_len if prefill_len > 0 else 0,
+                "context_length": context_str[:-1] if context_len > 0 else 0,
+                "flash_attention": "N/A",
+                "dump_file": f"{cfg_path[:-5]}/{compiled_file_name}_result.json",
             }
             if context_len < (2048 + 256) and context_len >= (1024 + 256):
                 new_stream["stop"] = 1024
@@ -892,8 +908,14 @@ if __name__ == "__main__":
                 new_stream["decode"] = new_stream["decode"] + "s"
                 if "visual" in new_stream:
                     new_stream["visual"] = new_stream["visual"] + "s"
-
-            cfg_path = args.perf_config
+            if flash_attention is not None and len(flash_attention) > 0:
+                if len(flash_attention) == 2:
+                    flash_attention_str = (
+                        f"vit={flash_attention[1]};prefill&decode={flash_attention[0]}"
+                    )
+                else:
+                    flash_attention_str = " ".join(map(str, flash_attention))
+                new_stream["flash_attention"] = flash_attention_str
 
         elif perf_mode in ["tcim_perf"]:
             hmm_list = glob.glob(f"{compile_results_dir}/*.hmm")
