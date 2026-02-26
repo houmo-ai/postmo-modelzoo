@@ -232,35 +232,35 @@ def build(
     batch=None,
     tso=False,
     flash_attention=0,
-    prefill_length=256,
+    prefill_length=0,
     device_kernel_split=0,
 ):
     import tcim
+    import json
 
     kwargs = {}
-    if HOUMO_TARGET == "xh2":
-        import json
+    custom_msg = {}
 
-        custom_msg = dict()
+    kwargs["modify_llm"] = {}
+    kwargs["enable_xh2_stable_output"] = tso
+    if device_kernel_split:
+        kwargs["device_kernel_split"] = device_kernel_split
+        custom_msg["device_kernel_split"] = device_kernel_split
+    if prefill_length:
+        kwargs["modify_llm"]["fill-length"] = prefill_length
         custom_msg["prefill_length"] = prefill_length
-
-        kwargs["modify_llm"] = {}
-        kwargs["enable_xh2_stable_output"] = tso
-        if device_kernel_split:
-            kwargs["device_kernel_split"] = device_kernel_split
-            custom_msg["device_kernel_split"] = device_kernel_split
-        if flash_attention:
-            kwargs["flash_attention"] = flash_attention
-            custom_msg["flash_attention"] = flash_attention
-        if ndevice:
-            kwargs["ndevice"] = ndevice
-        if batch:
-            kwargs["modify_llm"]["batch"] = batch
-            custom_msg["batch"] = batch
-        if context_length:
-            kwargs["modify_llm"]["context-length"] = context_length
-            custom_msg["context_length"] = context_length
-        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
+    if flash_attention:
+        kwargs["flash_attention"] = flash_attention
+        custom_msg["flash_attention"] = flash_attention
+    if ndevice:
+        kwargs["ndevice"] = ndevice
+    if batch:
+        kwargs["modify_llm"]["batch"] = batch
+        custom_msg["batch"] = batch
+    if context_length:
+        kwargs["modify_llm"]["context-length"] = context_length
+        custom_msg["context_length"] = context_length
+    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
     print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
@@ -434,7 +434,6 @@ if __name__ == "__main__":
             j,
             batch,
             flash_attention=args.flash_attention,
-            prefill_length=args.prefill_length,
             device_kernel_split=args.device_kernel_split,
         )
 

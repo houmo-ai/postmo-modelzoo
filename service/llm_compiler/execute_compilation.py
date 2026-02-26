@@ -73,6 +73,13 @@ def parse_args() -> argparse.Namespace:
         help="Context length, default is 0.",
     )
     parser.add_argument(
+        "-pl",
+        "--prefill_length",
+        type=int,
+        default=0,
+        help="Prefill length.",
+    )
+    parser.add_argument(
         "-dn",
         "--device_num",
         type=int,
@@ -191,6 +198,8 @@ def _generate_cmds(args) -> list:
         args.result_dir,
     ]
 
+    if args.prefill_length > 0:
+        cmds += ["--prefill_length", str(args.prefill_length)]
     if args.batch > 0:
         cmds += ["--batch", str(args.batch)]
     if args.context_length > 0:
@@ -270,13 +279,14 @@ def main(args) -> int:
         int: Exit code (0 for success, non-zero for failure)
     """
     logger.info(
-        "Model name: %s, Model path: %s, Quant model path: %s, Context length: %d, "
+        "Model name: %s, Model path: %s, Quant model path: %s, Context length: %d, Prefill length: %d,"
         "Batch: %d, Device num: %d, Core Num: %d, J: %d, Device kernel split: %d, Flash attention: %s, HmmStrip: %s, "
         "Result Dir: %s",
         args.model_name,
         args.model_path,
         args.quant_model_path,
         args.context_length,
+        args.prefill_length,
         args.batch,
         args.device_num,
         args.core_num,

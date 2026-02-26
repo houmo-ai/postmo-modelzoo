@@ -668,6 +668,8 @@ if __name__ == "__main__":
             compile_cmd += f"-b {batch} "
         if core_num > 0:
             compile_cmd += f"-cn {core_num} "
+        if prefill_len != 256:
+            compile_cmd += f"-pl {prefill_len} "
         if flash_attention is not None and len(flash_attention) > 0:
             flash_attention_str = " ".join(map(str, flash_attention))
             compile_cmd += f"--flash_attention {flash_attention_str} "
@@ -873,6 +875,7 @@ if __name__ == "__main__":
         if perf_mode in ["llm_perf"]:
             cfg_path = args.perf_config
 
+            decode_tokens = 1024 if context_len >= 2048 else int(context_len * 0.2)
             new_stream = {
                 "ModelName": (
                     compiled_file_name
@@ -882,8 +885,8 @@ if __name__ == "__main__":
                 "prefill": f"{compile_results_dir}/{model_name}_prefill.hmm",
                 "decode": f"{compile_results_dir}/{model_name}_decode.hmm",
                 "embedding": f"{compile_results_dir}/hmquant/quant_embedding.bin",
-                "input": 256,
-                "stop": 2048,
+                "input": (context_len - decode_tokens),
+                "stop": decode_tokens,
                 "ndevices": device_num if device_num > 1 else 1,
                 "loop": 2,
                 "batch": batch,
@@ -896,11 +899,6 @@ if __name__ == "__main__":
                 "flash_attention": "N/A",
                 "dump_file": f"{cfg_path[:-5]}/{compiled_file_name}_result.json",
             }
-            if context_len < (2048 + 256) and context_len >= (1024 + 256):
-                new_stream["stop"] = 1024
-            elif context_len > 0 and context_len < (1024 + 256):
-                new_stream["input"] = int(context_len * 0.2)
-                new_stream["stop"] = context_len - new_stream["input"]
             if "-vl" in model_name_ori:
                 new_stream["visual"] = f"{compile_results_dir}/{model_name}_visual.hmm"
             if device_num > 1:
