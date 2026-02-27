@@ -20,11 +20,12 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <yaml-cpp/yaml.h>
+
 #include <codecvt>
 #include <filesystem>
 #include <iostream>
 #include <locale>
-#include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -33,7 +34,7 @@
 #include "HmllmInfer.h"
 #include "HmllmInferMultiBatch.h"
 #include "HmvllmInfer.h"
-#include "devices_monitor.h"
+#include "device_monitor/device_monitor.h"
 #include "perf_dumper/perf_dumper.h"
 #include "tcim/tcim_runtime.h"
 #include "utils.h"
@@ -48,10 +49,8 @@
 #define ALARM_TEMPERATURE_THRESHOLD 80
 #define SHUTDOWN_TEMPERATURE_THRESHOLD 100
 
-#ifdef PERF_DUMP_ENABLE
 static PerfDumper perf_dumper = PerfDumper();
-static bool run_perf_by_json = false;
-#endif
+static bool run_perf_by_yaml = false;
 PerfSettings ParsePerfRunSetting(
     std::unordered_map<std::string, std::string> args) {
   PerfSettings settings;
@@ -65,11 +64,16 @@ PerfSettings ParsePerfRunSetting(
       args.count("visual") ? validate_path(args, "visual") : fs::path();
   fs::path embedding_path = validate_path(args, "embedding");
   int input_token_len = validate_setting(args, "input");
-  int stop_token_len = validate_setting(args, "stop");
+  int stop_token_len = validate_setting(args, "output");
   int ndevices =
       args.count("ndevices") ? validate_setting(args, "ndevices") : 1;
-  int loop_round = args.count("loop") ? validate_setting(args, "loop") : 1;
+  if (ndevices > tcim::GetDeviceNum() || ndevices < 1) {
+    throw std::invalid_argument("ndevices must <= device number and >= 1");
+  }
 
+  bool skip_perf = args.count("skip_perf") ? true : false;
+  int loop_round = args.count("loop") ? validate_setting(args, "loop") : 1;
+  loop_round = std::min(std::max(loop_round, 1), 1000000);
   int batch = args.count("batch") ? validate_setting(args, "batch") : 1;
   bool warm_up_enable = args.count("no_warm_up") ? false : true;
   bool lazy_mode_enable = args.count("LazyMode") ? true : false;
@@ -87,8 +91,12 @@ PerfSettings ParsePerfRunSetting(
   std::cout << "ndevices : " << ndevices << std::endl;
   std::cout << "loop : " << loop_round << std::endl;
   std::cout << "batch : " << batch << std::endl;
+  uint32_t warm_up_output = 0;
   if (warm_up_enable) {
     std::cout << "warm_up : enable" << std::endl;
+    warm_up_output = args.count("warm_up_output")
+                         ? validate_setting(args, "warm_up_output")
+                         : stop_token_len;
   } else {
     std::cout << "warm_up : disable" << std::endl;
   }
@@ -99,6 +107,12 @@ PerfSettings ParsePerfRunSetting(
               << std::endl;
   } else {
     std::cout << "LazyMode : disable" << std::endl;
+  }
+
+  if (skip_perf) {
+    std::cout << "skip_perf : enable" << std::endl;
+  } else {
+    std::cout << "skip_perf : disable" << std::endl;
   }
 
   std::cout << std::string(65, '=') << COLOR_RESET << std::endl;
@@ -113,26 +127,30 @@ PerfSettings ParsePerfRunSetting(
   settings.batch_size = batch;
   settings.LazyMode = lazy_mode_enable;
   settings.warm_up = warm_up_enable;
+  settings.warm_up_output = warm_up_output;
   settings.loop_count = loop_round;
+  settings.skip_perf = skip_perf;
 
   return settings;
 }
 
 int RunPerf(std::unordered_map<std::string, std::string> args) {
   int interval =
-      args.count("interval") ? validate_setting(args, "interval") * 1000 : 1000;
-  std::thread device_monitor_thread(device_monitor, 0, interval);
+      args.count("interval") ? validate_setting(args, "interval") : 500;
+  interval = std::min(std::max(interval, 100), 60000);
+  auto device_monitor = std::make_unique<DeviceMonitor>(interval);
+  device_monitor->start();
 #if defined(__linux__)
-  MemoryMonitor host_mem_monitor(interval);
-  host_mem_monitor.start();
+  auto host_mem_monitor = std::make_unique<HostMonitor>(interval);
+  host_mem_monitor->start();
 #endif
-#ifdef PERF_DUMP_ENABLE
+  HostMemoryInfo host_mem_info, max_host_mem_info;
   if (args.count("dump_file") == 1) {
-    perf_dumper.setJsonFile(args["dump_file"], run_perf_by_json);
+    perf_dumper.setYamlFile(args["dump_file"], run_perf_by_yaml);
   }
-#endif
   try {
     PerfSettings settings = ParsePerfRunSetting(args);
+    settings.interval_ms = interval;
     const char* houmo_target_env = getenv("HOUMO_TARGET");
     std::string houmo_target =
         houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
@@ -140,11 +158,8 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
       throw std::invalid_argument("Unsupported backend " + houmo_target);
     }
 
-#ifdef XH2A_HM_SYS
-    std::map<int, hm_mem_info> dev_mem_info_start;
-    auto mem_ret_start = GetDevMemInfo(dev_mem_info_start);
-#endif
-
+    std::unordered_map<int, DeviceStats> start_dev_stats =
+        device_monitor->getDeviceStats();
     std::unique_ptr<HmllmInferBase> Qwen3Infer;
     if (settings.visual_path.empty()) {
       if (settings.batch_size == 1) {
@@ -169,158 +184,172 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
           settings.LazyMode);
     }
 
-#ifdef XH2A_HM_SYS
-    std::map<int, hm_mem_info> dev_mem_info_end;
-    auto mem_ret_end = GetDevMemInfo(dev_mem_info_end);
-    if (mem_ret_start == 0 && mem_ret_end == 0) {
-      std::cout << "****** HM Device Memory Usage ******" << std::endl;
-      for (const auto& pair : dev_mem_info_start) {
-        int device_id = pair.first;
-        const hm_mem_info& mem_info_start = pair.second;
-        if (dev_mem_info_end.count(device_id) == 0) {
-          std::cerr << "Failed to get device " << device_id << " memory info."
-                    << std::endl;
-          break;
-        }
-        const hm_mem_info& mem_info_end = dev_mem_info_end[device_id];
-        int32_t mem_used = mem_info_end.mem_used - mem_info_start.mem_used;
-        mem_used = mem_used < 0 ? 0 : mem_used;
-        std::cout << "Device id: " << device_id << ", memory used: " << mem_used
-                  << " MB" << std::endl;
-      }
-      std::cout << "************************************" << std::endl;
-    } else {
-      std::cerr << "Failed to get device memory info, start ret is "
-                << mem_ret_start << ", end ret is " << mem_ret_end << std::endl;
-    }
+#if defined(__linux__)
+    host_mem_info = host_mem_monitor->getCurrentMemoryInfo();
 #endif
-    if (settings.warm_up) {
-      std::cout << "\n"
-                << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
-                << settings.input_tokens_len << ", output "
-                << settings.stop_tokens_len << std::string(30, '=') << "\n ";
-      float current_temperature = get_temperature();
-      std::cout << "Device temperature: " << current_temperature << " °C"
-                << std::endl;
-      if (current_temperature > ALARM_TEMPERATURE_THRESHOLD &&
-          current_temperature < SHUTDOWN_TEMPERATURE_THRESHOLD) {
-        std::cout
-            << COLOR_YELLOW
-            << "Device temperature is beyond 80.0 °C, Temperature Warning!"
-            << std::endl;
-      }
-      if (current_temperature >= SHUTDOWN_TEMPERATURE_THRESHOLD) {
-        throw std::runtime_error(
-            "Device temperature is beyond 100.0 °C, "
-            "Shutdown the demo!");
-      }
-      Qwen3Infer->get_perf_tracker()->reset();
-      Qwen3Infer->perf_llm(settings.input_tokens_len, settings.stop_tokens_len);
-      Qwen3Infer->get_perf_tracker()->pref_delete_warmup();
-      std::cout << std::string(82, '=') << "\n";
-    }
-    get_mem_info(0);
-    for (int i = 0; i < settings.loop_count; ++i) {
-      std::cout << COLOR_BLUE << "\n"
-                << std::string(30, '=')
-                << "(v)LLM Perf Loop Progress: " << (i + 1) << "/"
-                << settings.loop_count << std::string(30, '=') << "\n ";
-      float current_temperature = get_temperature();
-      std::cout << "Device temperature: " << current_temperature << " °C"
-                << std::endl;
-      if (current_temperature > ALARM_TEMPERATURE_THRESHOLD &&
-          current_temperature < SHUTDOWN_TEMPERATURE_THRESHOLD) {
-        std::cout
-            << COLOR_YELLOW
-            << "Device temperature is beyond 80.0 °C, Temperature Warning!"
-            << std::endl;
-      }
-      if (current_temperature >= SHUTDOWN_TEMPERATURE_THRESHOLD) {
-        throw std::runtime_error(
-            "Device temperature is beyond 100.0 °C, "
-            "Shutdown the demo!");
-      }
-      Qwen3Infer->get_perf_tracker()->reset();
-      Qwen3Infer->perf_llm(settings.input_tokens_len, settings.stop_tokens_len);
-      std::cout << std::string(82, '=') << "\n";
-    }
+    std::unordered_map<int, DeviceStats> end_dev_stats =
+        device_monitor->getDeviceStats();
 
-    std::cout << COLOR_GREEN << std::string(30, '=')
-              << " (v)LLM Perf Avarage Information " << std::string(30, '=')
-              << "\n";
-    Qwen3Infer->get_perf_tracker()->showSummary(true);
-    std::cout << COLOR_GREEN << std::string(90, '=') << "\n";
-    std::cout << COLOR_RESET;
+    if (!settings.skip_perf) {
+      if (settings.warm_up) {
+        std::cout << "\n"
+                  << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
+                  << settings.input_tokens_len << ", output "
+                  << settings.warm_up_output << std::string(30, '=') << "\n ";
+        float current_temperature = device_monitor->getMaxTemperature();
+        std::cout << "Device temperature: " << current_temperature << " °C"
+                  << std::endl;
+        if (current_temperature > ALARM_TEMPERATURE_THRESHOLD &&
+            current_temperature < SHUTDOWN_TEMPERATURE_THRESHOLD) {
+          std::cout
+              << COLOR_YELLOW
+              << "Device temperature is beyond 80.0 °C, Temperature Warning!"
+              << COLOR_RESET << std::endl;
+        }
+        if (current_temperature >= SHUTDOWN_TEMPERATURE_THRESHOLD) {
+          throw std::runtime_error(
+              "Device temperature is beyond 100.0 °C, "
+              "Shutdown the demo!");
+        }
+        Qwen3Infer->get_perf_tracker()->reset();
+        Qwen3Infer->perf_llm(settings.input_tokens_len,
+                             settings.warm_up_output);
+        Qwen3Infer->get_perf_tracker()->pref_delete_warmup();
+        std::cout << "\n" << std::string(82, '=') << "\n";
+#if defined(__linux__)
+        max_host_mem_info = host_mem_monitor->getMaxMemoryInfo();
+#endif
+        InferenceMetricsWithLoadTime perf_metrics =
+            Qwen3Infer->get_perf_tracker()->get_perf_current_summary();
+        perf_dumper.writePerfBrief(settings, perf_metrics, host_mem_info,
+                                   max_host_mem_info, start_dev_stats,
+                                   end_dev_stats, "llm-perf warmup");
+      }
+
+      for (int i = 0; i < settings.loop_count; ++i) {
+        std::cout << COLOR_BLUE << "\n"
+                  << std::string(30, '=')
+                  << "(v)LLM Perf Loop Progress: " << (i + 1) << "/"
+                  << settings.loop_count << std::string(30, '=') << "\n ";
+        float current_temperature = device_monitor->getMaxTemperature();
+        std::cout << "Device temperature: " << current_temperature << " °C"
+                  << std::endl;
+        if (current_temperature > ALARM_TEMPERATURE_THRESHOLD &&
+            current_temperature < SHUTDOWN_TEMPERATURE_THRESHOLD) {
+          std::cout
+              << COLOR_YELLOW
+              << "Device temperature is beyond 80.0 °C, Temperature Warning!"
+              << COLOR_RESET << std::endl;
+        }
+        if (current_temperature >= SHUTDOWN_TEMPERATURE_THRESHOLD) {
+          throw std::runtime_error(
+              "Device temperature is beyond 100.0 °C, "
+              "Shutdown the demo!");
+        }
+        Qwen3Infer->get_perf_tracker()->reset();
+        Qwen3Infer->perf_llm(settings.input_tokens_len,
+                             settings.stop_tokens_len);
+        std::cout << "\n" << std::string(82, '=') << "\n";
+#if defined(__linux__)
+        max_host_mem_info = host_mem_monitor->getMaxMemoryInfo();
+#endif
+        InferenceMetricsWithLoadTime perf_metrics =
+            Qwen3Infer->get_perf_tracker()->get_perf_current_summary();
+        perf_dumper.writePerfBrief(
+            settings, perf_metrics, host_mem_info, max_host_mem_info,
+            start_dev_stats, end_dev_stats,
+            "llm-perf Loop Progress: " + std::to_string(i + 1) + "/" +
+                std::to_string(settings.loop_count));
+      }
+
+      Qwen3Infer->get_perf_tracker()->showSummary(true);
+      std::cout << COLOR_RESET;
+    }
     InferenceMetricsWithLoadTime metrics =
         Qwen3Infer->get_perf_tracker()->get_perf_avg_summary();
-#ifdef PERF_DUMP_ENABLE
-    perf_dumper.dumpPerf(settings, metrics);
-#endif
+
     Qwen3Infer.reset();
-    stop_monitor(0);
-    device_monitor_thread.join();
-#ifdef PERF_DUMP_ENABLE
-    if (!run_perf_by_json) {
-      perf_dumper.generateJsonFile();
-    }
-#endif
+    device_monitor->stop();
+
 #if defined(__linux__)
-    host_mem_monitor.stop();
+    host_mem_monitor->stop();
+    max_host_mem_info = host_mem_monitor->getFinalMemoryInfo();
 #endif
+    perf_dumper.dumpPerf(settings, metrics, host_mem_info, max_host_mem_info,
+                         start_dev_stats, end_dev_stats);
+    perf_dumper.showPerfBrief(settings, metrics, host_mem_info,
+                              max_host_mem_info, start_dev_stats,
+                              end_dev_stats);
+    perf_dumper.writePerfBrief(settings, metrics, host_mem_info,
+                               max_host_mem_info, start_dev_stats,
+                               end_dev_stats, "llm-perf Average");
+    perf_dumper.generateYamlFile();
+
     return 0;
   } catch (const std::exception& e) {
     std::cerr << "Error: " << e.what() << std::endl;
-    stop_monitor(0);
-    device_monitor_thread.join();
+    device_monitor->stop();
 #if defined(__linux__)
-    host_mem_monitor.stop();
+    host_mem_monitor->stop();
 #endif
     return 1;
   }
+
+  device_monitor->cleanup();
   return 0;
 }
 
-int RunPerfJson(int argc, char* argv[]) {
-  const std::string jsonfile = argv[2];
-  fs::path path = fs::u8path(jsonfile);
+int RunPerfConfig(int argc, char* argv[]) {
+  const std::string yamlfile = argv[2];
+  fs::path path = fs::u8path(yamlfile);
   if (!fs::exists(path)) {
     throw std::invalid_argument("config path does not exist: " +
                                 path.u8string());
   }
 
-  std::ifstream f(jsonfile);
-  json perf_configs;
-  f >> perf_configs;
-  if (!perf_configs.contains("Streams")) {
+  std::ifstream file(yamlfile);
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  std::string yaml_content = buffer.str();
+
+  YAML::Node config = YAML::Load(yaml_content);
+  if (!config["Streams"]) {
     throw std::invalid_argument("config file does not contain perf Streams!");
   }
-  int n_tasks = perf_configs["Streams"].size();
-  int curTaskId = 0;
-#ifdef PERF_DUMP_ENABLE
-  if (perf_configs.contains("dump_file")) {
-    run_perf_by_json = true;
-    perf_dumper.setJsonFile(perf_configs["dump_file"], run_perf_by_json);
-    std::cout << COLOR_GREEN
-              << "Dump perf to file: " << perf_configs["dump_file"] << "\n";
+
+  size_t n_tasks = config["Streams"].size();
+  size_t curTaskId = 0;
+
+  if (config["dump_file"]) {
+    run_perf_by_yaml = true;
+    std::string dump_file = config["dump_file"].as<std::string>();
+    perf_dumper.setYamlFile(dump_file, run_perf_by_yaml);
+    std::cout << COLOR_GREEN << "Dump perf to file: " << dump_file << "\n";
   }
-#endif
-  for (json& stream : perf_configs["Streams"]) {
+
+  for (const auto& stream : config["Streams"]) {
     std::cout << COLOR_GREEN << std::string(45, '#') << "Start of Task "
               << (curTaskId + 1) << ", All Task:" << n_tasks
-              << ", ModelName:" << stream["ModelName"] << "."
+              << ", ModelName:" << stream["ModelName"].as<std::string>() << "."
               << std::string(45, '#') << "\n";
 
-    std::unordered_map<std::string, std::string> args = parse_json(stream);
+    // Convert YAML node to unordered_map<string, string>
+    std::unordered_map<std::string, std::string> args;
+    for (const auto& kv : stream) {
+      std::string key = kv.first.as<std::string>();
+      std::string value = kv.second.as<std::string>();
+      args[key] = value;
+    }
+
     RunPerf(args);
+
     std::cout << COLOR_GREEN << std::string(45, '#') << " End of Task "
               << (curTaskId + 1) << ", All Task:" << n_tasks
-              << ",  ModelName:" << stream["ModelName"] << "."
+              << ",  ModelName:" << stream["ModelName"].as<std::string>() << "."
               << std::string(45, '#') << "\n\n\n";
     curTaskId++;
   }
-#ifdef PERF_DUMP_ENABLE
-  perf_dumper.generateJsonFile();
-#endif
+
   std::cout << COLOR_RESET;
   return 0;
 }

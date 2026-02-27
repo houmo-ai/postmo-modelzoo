@@ -27,8 +27,10 @@
 | HmvllmInfer.cc          | 主文件，实现vllm模型单batch具体推理流程             |
 | HmllmInferMultiBatch.cc | 主文件，实现llm多batch具体推理流程，仅支持xh2       |
 | convert_embed.py        | 将embedding的pt模型转换为bin文件方便工具读取权重    |
-| device_monitor.h        | 监控设备温度、功率、IPU频率的脚本                   |
+| device_monitor          | 监控设备温度、功率、IPU频率的类实现                 |
 | perf_tracker            | 性能采集类功能实现                                  |
+| perf_dumper             | 性能数据落盘及性能数据可视化类功能实现              |
+| host_monitor            | 主机侧内存监控类实现                                |
 | build_linux.sh          | Linux平台llm_perf编译脚本                           |
 | build_ndk.sh            | Android平台llm_perf编译脚本                         |
 | build_win.bat           | Win11平台llm_perf编译脚本                           |
@@ -37,8 +39,10 @@
   - 具体支持的模型参考models目录下llm和vllm模型支持的平台。
   - 支持的芯片型号为：xh2。
   - 支持的大道软件版本要求如下：xh2≥v0.6.0 。
-  - 支持了device0的温度、功率、IPU频率监控，记录保存在./device_logs/device_0.log。
+  - 支持了device的温度、功率、IPU频率监控，记录保存在./device_logs/device_x.log。
   - 温度监控带告警功能，当温度大于80℃时，程序会打印警告信息，温度大于100℃时，程序会强制退出。
+  - 主机侧的内存监控仅支持linux平台。
+  - **修改配置文件启动方式为yaml文件，对之前版本的json文件启动兼容。**
 
 ### 1.2 流程说明
 
@@ -84,21 +88,24 @@
 
 ### 1.3 参数说明
 1. 命令行llm_perf以指定参数启动
-- --prefill     : 指定prefill模型路径
-- --decode      : 指定decode模型路径
-- --visual      : 指定visual模型路径，仅vllm需要指定，不指定时默认模型为llm模型。
-- --embedding   : 指定embedding模型路径
-- --input       : 指定prefill阶段输入token数量
-- --stop        : 指定docode阶段输出多少token后停止
-- --ndevices    : 指定模型使用的device数量，不指定默认为1
-- --loop        : 指定循环执行单个模型次数，不指定默认为1
-- --batch       : 指定模型的batch数，不指定则--batch的值为1。多batch模型必须指定，会校验从模型读取到的batch和用户指定的值是否一致。目前多batch仅支持xh2.
-- --no_warm_up  : 默认执行warm_up，配置后会跳过warm_up流程
-- --LazyMode    : 默认关闭LazyMode，配置后会打开LazyMode，开启LazyMode后，模型加载实际会变长，内存占用会变小。
-- --interval    : 配置温度、IPU频率、功率采样间隔时间，单位秒(s)，默认为1s。
-- --help, -h    : 打印帮助信息
+- --prefill         : 指定prefill模型路径，支持相对/绝对路径。
+- --decode          : 指定decode模型路径，支持相对/绝对路径。
+- --visual          : 指定visual模型路径，，支持相对/绝对路径，仅vllm需要指定，不指定时默认模型为llm模型。
+- --embedding       : 指定embedding模型路径，需要转换成bin文件，支持相对/绝对路径。
+- --input           : 指定prefill阶段输入token数量。
+- --output          : 指定docode阶段输出多少token后停止。
+- --ndevices        : 指定模型使用的device数量，不指定默认为1。
+- --loop            : 指定循环执行单个模型次数，不指定默认为1。
+- --batch           : 指定模型的batch数，不指定则--batch的值为1。多batch模型必须指定，会校验从模型读取到的batch和用户指定的值是否一致。目前多batch仅支持xh2.
+- --no_warm_up      : 默认执行warm_up，配置后会跳过warm_up流程。
+- --warm_up_output  : 设置warm_up阶段decode模型输出的token数量，不指定则--warm_up_output的默认值为--output。
+- --LazyMode        : 默认关闭LazyMode，配置后会打开LazyMode，开启LazyMode后，模型加载实际会变长，内存占用会变小。
+- --interval        : 配置DeviceMonitor(温度、IPU频率、功率)、HostMonitor(physical、virtual memory)监控线程的采样间隔时间，单位秒(ms)，默认为500ms，范围100-60000。
+- --skip_perf       : 默认执行性能评估，配置后会跳过性能评估。
+- --dump_file       : 默认关闭dump性能数据到yaml文件，配置后会将性能数据保存到yaml文件中。
+- --help, -h        : 打印帮助信息
 2. 命令行llm_perf以配置文件启动
-- --config, -c  : 使用配置文件启动perf程序，需要提前准备好配置文件，配置文件模板参考1.4节。
+- --config, -c      : 使用配置文件启动perf程序，需要提前准备好配置文件，配置文件模板参考1.4节。
 3. 目前支持通过DEBUG_DEV_INPUT宏开启SetInput输入的Debug模式，须在CMakeLists.txt添加如下编译选项：target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG_DEV_INPUT)。
 
 
@@ -113,103 +120,97 @@
 手动输入参数启动模型测试，仅支持单个模型的loop测试，参考如下：
 ``` shell
 # 禁用warm_up
-./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --stop 2048 --ndevices 2 --loop 2 --batch 1 --no_warm_up
+./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1 --no_warm_up
 # 开启warm_up
-./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --stop 2048 --ndevices 2 --loop 2 --batch 1
+./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1 --warn_up_output 10
+# 使能dump_file
+./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1 --dump_file model.yaml
 ```
 
 #### 1.4.3 配置文件启动
 
 用户可以使用如下任一指令指定配置文件：
 ``` shell
-./llm_perf -c config.json
-./llm_perf --config config.json
+./llm_perf -c config.yaml
+./llm_perf --config config.yaml
 ```
-配置文件启动等效于多次指令启动，配置文件的参考模板perf_config.json，详细内容示例如下：
-``` json
-{
-  "Streams":[
-    {
-      "ModelName" : "deepseek_8b_256_4k_b1_1chip_2cores_v0.5.0",
-      "prefill" : "deepseek/deepseek_prefill.hmm",
-      "decode" : "deepseek/deepseek_decode.hmm",
-      "embedding" : "deepseek/hmquant/quant_embedding.bin",
-      "input" : 256,
-      "stop" : 100,
-      "ndevices" : 1,
-      "loop" : 2,
-      "batch" : 1,
-      "no_warm_up" : "",
-      "LazyMode" : ""
-    },
-    {
-      "ModelName": "qwen2.5_7b_256_8k_b1_1chip_2cores_v0.5.0",
-      "prefill": "qwen2.5/qwen2.5_prefill.hmm",
-      "decode": "qwen2.5/qwen2.5_decode.hmm",
-      "embedding": "qwen2.5/hmquant/quant_embedding.bin",
-      "input": 256,
-      "stop": 100,
-      "ndevices": 1,
-      "loop": 2,
-      "batch" : 1
-    },
-    {
-      "ModelName": "qwen3_8b_256_8k_b4_1chip_2cores_v0.5.0",
-      "prefill": "qwen3/qwen3_prefill.hmm",
-      "decode": "qwen3/qwen3_decode.hmm",
-      "embedding": "qwen3/hmquant/quant_embedding.bin",
-      "input": 256,
-      "stop": 100,
-      "ndevices": 1,
-      "loop": 1,
-      "batch" : 4
-    },
-    {
-      "ModelName": "qwen3_14b_256_8k_b1_1chip_2cores_v0.5.0",
-      "prefill": "qwen3-14b/qwen3_prefill.hmm",
-      "decode": "qwen3-14b/qwen3_decode.hmm",
-      "embedding": "qwen3-14b/hmquant/quant_embedding.bin",
-      "input": 256,
-      "stop": 100,
-      "ndevices": 1,
-      "loop": 1
-    },
-    {
-      "ModelName": "qwen3_30b-a3b",
-      "prefill": "qwen3-30b-a3b/qwen3_prefill.hmm",
-      "decode": "qwen3-30b-a3b/qwen3_decode.hmm",
-      "embedding": "qwen3-30b-a3b/hmquant/quant_embedding.bin",
-      "input": 256,
-      "stop": 100,
-      "ndevices": 1,
-      "loop": 1
-    },
-    {
-      "ModelName": "qwen2.5-vl",
-      "prefill": "qwen2.5-vl/qwen2.5-vl_prefill.hmm",
-      "decode": "qwen2.5-vl/qwen2.5-vl_decode.hmm",
-      "visual": "qwen2.5-vl/qwen2.5-vl_visual.hmm",
-      "embedding": "qwen2.5-vl/hmquant/quant_embedding.bin",
-      "input": 256,
-      "stop": 100,
-      "ndevices": 1,
-      "loop": 1
-    },
-    {
-      "ModelName": "qwen3-vl",
-      "prefill": "qwen3-vl/qwen3-vl_prefill.hmm",
-      "decode": "qwen3-vl/qwen3-vl_decode.hmm",
-      "visual": "qwen3-vl/qwen3-vl_visual.hmm",
-      "embedding": "qwen3-vl/hmquant/quant_embedding.bin",
-      "input": 256,
-      "stop": 100,
-      "ndevices": 1,
-      "loop": 1
-    }
-  ]
-}
+配置文件启动等效于多次指令启动，配置文件的参考模板perf_config.yaml，详细内容示例如下：
+``` yaml
+# Configuration for multiple LLM/VLLM performance tests
+Streams:
+  # Configuration for a single model test
+  - ModelName: deepseek_8b_256_4k_b1_1chip_2cores_v0.5.0
+    prefill: deepseek/deepseek_prefill.hmm                 # Path to prefill model file
+    decode: deepseek/deepseek_decode.hmm
+    embedding: deepseek/hmquant/quant_embedding.bin
+    input: 256                                             # Number of input tokens for prefill stage
+    output: 100                                              # Number of output tokens to generate in decode stage
+    ndevices: 1                                            # Number of devices to use for inference
+    loop: 2                                                # Number of times to repeat the test
+    batch: 1                                               # Batch size for the model
+    no_warm_up: ''                                         # If present (any value), skip warm-up phase
+  - ModelName: qwen2.5_7b_256_8k_b1_1chip_2cores_v0.5.0
+    prefill: qwen2.5/qwen2.5_prefill.hmm
+    decode: qwen2.5/qwen2.5_decode.hmm
+    embedding: qwen2.5/hmquant/quant_embedding.bin
+    input: 256
+    output: 100
+    ndevices: 1
+    loop: 2
+    batch: 1
+  - ModelName: qwen3_8b_256_8k_b4_1chip_2cores_v0.5.0
+    prefill: qwen3/qwen3_prefill.hmm
+    decode: qwen3/qwen3_decode.hmm
+    embedding: qwen3/hmquant/quant_embedding.bin
+    input: 256
+    output: 100
+    ndevices: 1
+    loop: 1
+    batch: 4
+  - ModelName: qwen3_14b_256_8k_b1_1chip_2cores_v0.5.0
+    prefill: qwen3-14b/qwen3_prefill.hmm
+    decode: qwen3-14b/qwen3_decode.hmm
+    embedding: qwen3-14b/hmquant/quant_embedding.bin
+    input: 256
+    output: 100
+    ndevices: 1
+    loop: 1
+  - ModelName: qwen3_30b-a3b
+    prefill: qwen3-30b-a3b/qwen3_prefill.hmm
+    decode: qwen3-30b-a3b/qwen3_decode.hmm
+    embedding: qwen3-30b-a3b/hmquant/quant_embedding.bin
+    input: 256
+    output: 100
+    ndevices: 1
+    loop: 1
+  - ModelName: qwen2.5-vl
+    prefill: qwen2.5-vl/qwen2.5-vl_prefill.hmm
+    decode: qwen2.5-vl/qwen2.5-vl_decode.hmm
+    visual: qwen2.5-vl/qwen2.5-vl_visual.hmm              # Path to visual processing model file (VLLM only)
+    embedding: qwen2.5-vl/hmquant/quant_embedding.bin
+    input: 256
+    output: 100
+    ndevices: 1
+    loop: 1
+  - ModelName: qwen3-vl
+    prefill: qwen3-vl/qwen3-vl_prefill.hmm
+    decode: qwen3-vl/qwen3-vl_decode.hmm
+    visual: qwen3-vl/qwen3-vl_visual.hmm
+    embedding: qwen3-vl/hmquant/quant_embedding.bin
+    input: 256
+    output: 100
+    ndevices: 1
+    loop: 1
+
+# Global output file for all performance results
+# Note: This has higher priority than individual dump_file settings in Streams
+dump_file: perf_result.json
 ```
+**dump_file最外层的优先级高于Streams下的dump_file**
+- **如果外层dump_file不存在，则使用Streams下的dump_file。**
+- **外层dump_file存在时，则使用外层dump_file，忽略Streams下的dump_file。**
 上述模板等效于同时执行多次指令启动，用户可以根据实际需求自行配置。
+
 
 ## 2.快速开始
 
@@ -267,118 +268,113 @@ rem 需要结合用户目录更改三四行的环境变量实际路径
 ### 2.2 一键运行
 ``` shell
 #单次启动perf
-./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --stop 2048 --ndevices 2 --loop 2 --batch 1
+./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1
 #多次启动perf
-./llm_perf -c config.json
-./llm_perf --config config.json
+./llm_perf -c config.yaml
+./llm_perf --config config.yaml
 ```
 
 结果示例：
-./llm_perf --prefill qwen3-8b/output/xh2/qwen3_prefill.hmm --decode qwen3-8b/output/xh2/qwen3_decode.hmm --embedding qwen3-8b/output/xh2/hmquant/quant_embedding.bin --input 256 --stop 200 --no_warm_up
+./llm_perf --prefill qwen3-8b/qwen3_prefill.hmm --decode qwen3-8b/qwen3_decode.hmm --embedding qwen3-8b/hmquant/quant_embedding.bin  --input 256 --output 200 --warm_up_output 100 --loop 2
 ```bash
-Started monitor thread for device 0
+[HostMonitorImpl] Monitoring thread has started, interval: 500ms
+[2026-02-27 11:57:16.966] [tid 49674] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-02-27 11:57:17.316] [info] DEVICE-0 Logger initialization complete, log file: ./device_logs/device_0.log
 ========================= Perf Settings =========================
-prefill path :qwen3-8b/output/xh2/qwen3_prefill.hmm
-decode path : qwen3-8b/output/xh2/qwen3_decode.hmm
-embedding path : qwen3-8b/output/xh2/hmquant/quant_embedding.bin
+prefill path : qwen3-8b/qwen3_prefill.hmm
+decode path : qwen3-8b/qwen3_decode.hmm
+embedding path : qwen3-8b/hmquant/quant_embedding.bin
 input token len : 256
 stop token len : 200
 ndevices : 1
-loop : 1
+loop : 2
 batch : 1
-warm_up : disable
+warm_up : enable
 LazyMode : disable
+skip_perf : disable
 =================================================================
-Online device num: 2
-Online device id: 0, mem_total: 24448, mem_used: 0, mem_avail: 24448
-Online device id: 1, mem_total: 24448, mem_used: 0, mem_avail: 24448
 Use Devices 0
-[2026-01-20 09:34:11.143] [tid 1870] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-01-20 09:34:11.143] [tid 1870] [warning] Empty backend name, use Xh2HalBackend instead.
-[2026-01-20 09:34:12.494] [info] DEVICE-0 Logger initialization complete, log file: ./device_logs/device_0.log
-Online device num: 2
-Online device id: 0, mem_total: 24448, mem_used: 4786, mem_avail: 19662
-Online device id: 1, mem_total: 24448, mem_used: 0, mem_avail: 24448
-****** HM Device Memory Usage ******
-Device id: 0, memory used: 4786 MB
-Device id: 1, memory used: 0 MB
-************************************
+[2026-02-27 11:57:17.383] [tid 49674] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-02-27 11:57:17.383] [tid 49674] [warning] Empty backend name, use Xh2HalBackend instead.
+[2026-02-27 11:57:17.436] [info] DEVICE-1 Logger initialization complete, log file: ./device_logs/device_1.log
 
-==============================(v)LLM Perf Loop Progress: 1/1==============================
- Device temperature: 32.771 °C
+==============================(v)LLM Perf WarmUp: input 256, output 100==============================
+ Device temperature: 54.51 °C
+Decode: 100% |**************************************************| 100/100
+==================================================================================
+
+==============================(v)LLM Perf Loop Progress: 1/2==============================
+ Device temperature: 63.498 °C
 Decode: 100% |**************************************************| 200/200
 ==================================================================================
-                    Model Inference Performance Summary Report
+
+==============================(v)LLM Perf Loop Progress: 2/2==============================
+ Device temperature: 67.753 °C
+Decode: 100% |**************************************************| 200/200
 ==================================================================================
-Configuration Details:
-  Batch Size:      1
-  Input Length per Sample:    256 tokens
-  Output Length per Sample:    200 tokens
-  Prefill Model Load Time: 3906.60ms
-  Decode Model Load Time:  280.89ms
-  Vision Model Load Time:    0.00ms
-Prefill Stage Performance:
-  Total Time:  170.67ms | Speed: 1499.99 tokens/s
-  Tokenization Time: Skipped (No operation)
-  Embedding Time:    0.29ms
-  API SetInput Time:   0.73ms
-  API Inference Time: 169.24ms | Speed: 1512.65 tokens/s
-  API GetOutput Time:  0.41ms
-Decode Stage Performance:
-  Total Time: 10110.99ms | Speed:   19.78 tokens/s
-  Tokenization Time: Skipped (No operation)
-  Embedding Time:    0.06ms
-  API SetInput Time:   0.22ms/token
-  API Inference Time: 49.84ms/token | Speed:   20.06 tokens/s
-  API GetOutput Time:  0.50ms/token
-Overall Performance Metrics:
-  TTFT (Time To First Token):  170.67 ms
-  TPOT (Time Per Output Token): 50.55 ms/token
-  E2E Latency (End-to-End):     10.29 seconds
-  E2E TPS (Throughput):         19.44 tokens/s
-==================================================================================
-==================================================================================
-============================== (v)LLM Perf Avarage Information ==============================
 
 ==================================================================================
                     Model Inference Performance Summary Report
-==================================================================================
-Configuration Details:
+----------------------------------------------------------------------------------
+                            Configuration Details
+----------------------------------------------------------------------------------
   Batch Size:      1
   Input Length per Sample:    256 tokens
   Output Length per Sample:    200 tokens
-  Prefill Model Load Time: 3906.60ms
-  Decode Model Load Time:  280.89ms
+----------------------------------------------------------------------------------
+                            Inference Performance
+----------------------------------------------------------------------------------
+  Prefill Time: 128.15 ms/token | Speed: 1997.71 tokens/s
+  Decode  Time: 9964.82 ms/token | Speed: 20.07 tokens/s
+  Vision  Time: 0.00 ms/image | Speed: 0.00 images/s
+----------------------------------------------------------------------------------
+                            Overall Performance
+----------------------------------------------------------------------------------
+  Prefill Model Load Time: 6993.45ms
+  Decode Model Load Time:  274.73ms
   Vision Model Load Time:    0.00ms
-Prefill Stage Performance:
-  Total Time:  170.67ms | Speed: 1499.99 tokens/s
+  TTFT (Time To First Token):  138.52 ms
+  TPOT (Time Per Output Token): 56.55 ms/token
+  E2E Latency (End-to-End):     11.46 seconds
+  E2E TPS (Throughput):         17.46 tokens/s
+----------------------------------------------------------------------------------
+                            Memory Usage (Max Values)
+----------------------------------------------------------------------------------
+  Max Physical Memory: 4.01 GB
+  Max Virtual Memory: 4.29 GB
+----------------------------------------------------------------------------------
+                            Device Stats (Max Values)
+----------------------------------------------------------------------------------
+Device 1:
+Temperature    |  49.20°C(Min)      |  54.51°C(Max)      |  52.83°C(Avg)      |
+Power          |  0.00 W(Min)       |  0.00 W(Max)       |  0.00 W(Avg)       |
+IPU Freq       |  1400.00 Mhz(Min)  |  1400.00 Mhz(Max)  |  1400.00 Mhz(Avg)  |
+Mem Info       |  24448 MB(Total)   |  0 MB(Used)        |  24448 MB(Avail)   |
+Device 0:
+Temperature    |  48.62°C(Min)      |  54.22°C(Max)      |  52.80°C(Avg)      |
+Power          |  12.60 W(Min)      |  15.18 W(Max)      |  14.81 W(Avg)      |
+IPU Freq       |  1400.00 Mhz(Min)  |  1400.00 Mhz(Max)  |  1400.00 Mhz(Avg)  |
+Mem Info       |  24448 MB(Total)   |  6240 MB(Used)     |  18208 MB(Avail)   |
+----------------------------------------------------------------------------------
+                            Prefill Stage Performance
+----------------------------------------------------------------------------------
+  Total Time: 138.52 ms | Speed: 1848.08 tokens/s
   Tokenization Time: Skipped (No operation)
-  Embedding Time:    0.29ms
-  API SetInput Time:   0.73ms
-  API Inference Time: 169.24ms | Speed: 1512.65 tokens/s
-  API GetOutput Time:  0.41ms
-Decode Stage Performance:
-  Total Time: 10110.99ms | Speed:   19.78 tokens/s
+  Embedding Time: 3.74   ms
+  API SetInput Time: 1.01  ms
+  API Inference Time: 128.15ms | Speed: 1997.71 tokens/s
+  API GetOutput Time: 0.00 ms
+----------------------------------------------------------------------------------
+                            Decode Stage Performance
+----------------------------------------------------------------------------------
+  Total Time: 11310.32ms | Speed: 17.68   tokens/s
   Tokenization Time: Skipped (No operation)
-  Embedding Time:    0.06ms
-  API SetInput Time:   0.22ms/token
-  API Inference Time: 49.84ms/token | Speed:   20.06 tokens/s
-  API GetOutput Time:  0.50ms/token
-Overall Performance Metrics:
-  TTFT (Time To First Token):  170.67 ms
-  TPOT (Time Per Output Token): 50.55 ms/token
-  E2E Latency (End-to-End):     10.29 seconds
-  E2E TPS (Throughput):         19.44 tokens/s
+  Embedding Time: 0.33   ms
+  API SetInput Time: 0.39  ms/token
+  API Inference Time: 49.82ms/token | Speed: 20.07   tokens/s
+  API GetOutput Time: 0.00 ms/token
 ==================================================================================
-==========================================================================================
-
-==================================================================================
-                                    Device 0 Monitor Summary Report
-==================================================================================
-Temperature         |  30.74°C(Min)      |  42.92°C(Max)      |  38.29°C(Avg)      |
-Power               |  12.56 W(Min)      |  22.72 W(Max)      |  17.03 W(Avg)      |
-IPU Freq            |  1400.00 Mhz(Min)  |  1400.00 Mhz(Max)  |  1400.00 Mhz(Avg)  |
-Mem Info            |  24448 MB(Total)   |  4786 MB(Used)     |  19662 MB(Avail)   |
+Every Loop Performance Result has been written to perf_dumper.log
 ```
 
 ## 3.免责声明

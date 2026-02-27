@@ -211,6 +211,15 @@ class InferencePerformanceTracker {
     return result_metrics;
   }
 
+  InferenceMetricsWithLoadTime get_perf_current_summary() {
+    InferenceMetricsWithLoadTime perf_metrics;
+    perf_metrics.metrics = current_metrics;
+    perf_metrics.prefill_load_time = prefill_load_time;
+    perf_metrics.decode_load_time = decode_load_time;
+    perf_metrics.vision_load_time = vision_load_time;
+    return perf_metrics;
+  }
+
  private:
   InferenceMetrics current_metrics;
   InferenceMetrics total_metrics;

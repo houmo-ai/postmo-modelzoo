@@ -24,7 +24,7 @@
 #include "host_monitor.h"
 
 // ========== Memory Monitor Thread ==========
-class MemoryMonitor::MemoryMonitorImpl {
+class HostMonitor::HostMonitorImpl {
  private:
   std::thread monitor_thread;    // monitoring thread
   std::atomic<bool> is_running;  // flag to control thread loop
@@ -62,13 +62,13 @@ class MemoryMonitor::MemoryMonitorImpl {
   }
 
  public:
-  MemoryMonitorImpl(uint32_t interval_ms = 1000)
+  HostMonitorImpl(uint32_t interval_ms = 1000)
       : is_running(false), interval(interval_ms) {
     max_physical_memory.store(0, std::memory_order_relaxed);
     max_virtual_memory.store(0, std::memory_order_relaxed);
   }
 
-  ~MemoryMonitorImpl() {
+  ~HostMonitorImpl() {
     if (is_running.load(std::memory_order_relaxed)) {
       stop();
     }
@@ -79,12 +79,11 @@ class MemoryMonitor::MemoryMonitorImpl {
     if (!is_running.load(std::memory_order_relaxed)) {
       is_running.store(true, std::memory_order_relaxed);
 
-      monitor_thread = std::thread(&MemoryMonitorImpl::monitorLoop, this);
-      std::cout
-          << "[MemoryMonitorImpl] Monitoring thread has started, interval: "
-          << interval << "ms" << std::endl;
+      monitor_thread = std::thread(&HostMonitorImpl::monitorLoop, this);
+      std::cout << "[HostMonitorImpl] Monitoring thread has started, interval: "
+                << interval << "ms" << std::endl;
     } else {
-      std::cout << "[MemoryMonitorImpl] Monitoring thread is already running"
+      std::cout << "[HostMonitorImpl] Monitoring thread is already running"
                 << std::endl;
     }
   }
@@ -97,43 +96,87 @@ class MemoryMonitor::MemoryMonitorImpl {
         monitor_thread.join();
       }
     } else {
-      std::cout << "[HostMemoryMonitorImpl] Monitoring thread is not running"
+      std::cout << "[HostHostMonitorImpl] Monitoring thread is not running"
                 << std::endl;
     }
-    // print memory info
-    std::cout << "\n[HostMemoryMonitorImpl] Memory Monitoring (" << interval
-              << "ms interval)" << std::endl;
-    std::cout << "  Virtual Memory: "
-              << formatMemorySize(
-                     max_virtual_memory.load(std::memory_order_relaxed))
-              << std::endl;
-    std::cout << "  Physical Memory: "
-              << formatMemorySize(
-                     max_physical_memory.load(std::memory_order_relaxed))
-              << std::endl;
+  }
+
+  HostMemoryInfo getFinalMemoryInfo() {
+    // Wait for monitoring thread to finish to ensure data consistency
+    if (monitor_thread.joinable()) {
+      monitor_thread.join();
+    }
+
+    // Prepare and return final memory info
+    HostMemoryInfo final_info;
+    final_info.virtual_memory =
+        max_virtual_memory.load(std::memory_order_relaxed);
+    final_info.physical_memory =
+        max_physical_memory.load(std::memory_order_relaxed);
+
+    return final_info;
+  }
+
+  HostMemoryInfo getCurrentMemoryInfo() {
+    // Get current memory info without waiting for the monitoring thread to
+    // finish
+    return getProcessHostMemoryInfo();
+  }
+
+  HostMemoryInfo getMaxMemoryInfo() {
+    // Get the maximum memory values tracked during monitoring
+    HostMemoryInfo max_info;
+    max_info.virtual_memory =
+        max_virtual_memory.load(std::memory_order_relaxed);
+    max_info.physical_memory =
+        max_physical_memory.load(std::memory_order_relaxed);
+
+    return max_info;
   }
 };
 
-MemoryMonitor::MemoryMonitor(uint32_t interval_ms)
-    : impl_(new MemoryMonitorImpl(interval_ms)) {}
+HostMonitor::HostMonitor(uint32_t interval_ms)
+    : impl_(std::make_unique<HostMonitorImpl>(interval_ms)) {}
 
-MemoryMonitor::~MemoryMonitor() {
-  if (impl_ != nullptr) {
-    delete impl_;
-    impl_ = nullptr;
-  }
-}
+HostMonitor::~HostMonitor() = default;
 
-void MemoryMonitor::start() {
-  if (impl_ != nullptr) {
+void HostMonitor::start() {
+  if (impl_) {
     impl_->start();
   }
 }
 
-void MemoryMonitor::stop() {
-  if (impl_ != nullptr) {
+void HostMonitor::stop() {
+  if (impl_) {
     impl_->stop();
   }
+}
+
+HostMemoryInfo HostMonitor::getFinalMemoryInfo() {
+  if (impl_) {
+    return impl_->getFinalMemoryInfo();
+  }
+  // Return empty struct if implementation is null
+  HostMemoryInfo empty_info = {0, 0};
+  return empty_info;
+}
+
+HostMemoryInfo HostMonitor::getCurrentMemoryInfo() {
+  if (impl_) {
+    return impl_->getCurrentMemoryInfo();
+  }
+  // Return empty struct if implementation is null
+  HostMemoryInfo empty_info = {0, 0};
+  return empty_info;
+}
+
+HostMemoryInfo HostMonitor::getMaxMemoryInfo() {
+  if (impl_) {
+    return impl_->getMaxMemoryInfo();
+  }
+  // Return empty struct if implementation is null
+  HostMemoryInfo empty_info = {0, 0};
+  return empty_info;
 }
 
 #endif  // Linux implementation

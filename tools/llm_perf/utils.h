@@ -35,7 +35,6 @@
 #include <iostream>
 #include <locale>
 #include <memory>
-#include <nlohmann/json.hpp>
 #include <random>
 #include <regex>
 #include <set>
@@ -46,16 +45,6 @@
 #include <vector>
 
 #include "perf_tracker/inference_perf_tracker.h"
-
-#ifdef XH2A_HM_SYS
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include "hm_sys.h"
-#ifdef __cplusplus
-}
-#endif
-#endif
 
 #define TOKEN_ID_MAX 150000
 
@@ -68,9 +57,8 @@ extern "C" {
 #define COLOR_RESET "\x1b[0m"
 
 namespace fs = std::filesystem;
-using json = nlohmann::json;
 
-typedef enum { PERFCMD = 0, PERFJSON, PERFINVAILD } PerfConfigType;
+typedef enum { PERFCMD = 0, PERFYAML, PERFINVAILD } PerfConfigType;
 
 static void HelpUsage(char* argv[]) {
   std::cout << "llm_perf - A tool for LLM and VLLM performance tests with "
@@ -80,32 +68,43 @@ static void HelpUsage(char* argv[]) {
       << "Usage: " << argv[0]
       << " --key value [options...]\n\n"
          "Options:\n"
-         "  -c, --config    FILE      use json file to start llm_perf, "
-         "cat template config.json for more message\n"
+         "  -c, --config      FILE      use yaml file to start llm_perf, "
+         "cat template perf_config.yaml for more message\n"
          "Or:\n"
-         "  --prefill       FILE      prefill model file\n"
-         "  --decode        FILE      decode model file\n"
-         "  --visual        FILE      visual model file, only vllm perf need\n"
-         "  --embedding     FILE      embedding weight file\n"
-         "  --input         NUM       number of input tokens\n"
-         "  --stop          NUM       number of tokens to generate\n"
-         "  --ndevices      NUM       device count\n"
-         "  --loop          NUM       loop test rounds\n"
-         "  --batch         NUM       if multibatch model only xh2 support!\n"
-         "  --no_warm_up              disable warm up!\n"
-         "  --LazyMode                enable lazy mode!\n"
-         "  --interval                device 0 monitor and host monitor "
-         "sampling interval in seconds!\n"
-         "  -h, --help                show help message\n";
-}
-
-static std::unordered_map<std::string, std::string> parse_json(const json& j) {
-  std::unordered_map<std::string, std::string> args;
-  for (auto& [key, val] : j.items()) {
-    args[key] = val.is_string() ? val.get<std::string>() : val.dump();
-  }
-
-  return args;
+         "  --prefill         FILE      Prefill model file (required).\n"
+         "  --decode          FILE      Decode model file (required).\n"
+         "  --visual          FILE      Visual model file (optional, only "
+         "for VLLM).\n"
+         "  --embedding       FILE      Embedding weight file (.bin, "
+         "required).\n"
+         "  --input           NUM       Number of input tokens (range: "
+         "1-max_context_length).\n"
+         "  --output          NUM       Number of tokens to generate "
+         "(range: 1-(max_context_length-input)).\n"
+         "  --ndevices        NUM       Device count (range: 1-num_devices).\n"
+         "  --loop            NUM       Loop test rounds (range: 1-1000000).\n"
+         "  --batch           NUM       Batch size (range: 1-batch_num, only "
+         "xh2 "
+         "supported for multi-batch).\n"
+         "  --no_warm_up                Disable warm-up (flag, no value "
+         "required).\n"
+         "  --warm_up_output  NUM       set warm_up decode times when "
+         "warm_up enabled(optional, if not set, default is equal to output).\n"
+         "  --LazyMode                  Enable lazy mode (flag, no value "
+         "required).\n"
+         "  --interval        NUM       Sampling interval in milliseconds for "
+         "device/host monitoring (range: 100-60000).\n"
+         "  --skip_perf                 skip prefill and decode performance "
+         "test\n"
+         "  --dump_file       FILE      Dump perf result to file (optional).\n"
+         "  -h, --help                  Show this help message.\n\n"
+         "Examples:\n"
+         "  "
+      << argv[0]
+      << " --prefill prefill.hmm --decode decode.hmm --embedding embed.bin "
+         "--input 256 --output 100\n"
+         "  "
+      << argv[0] << " -c perf_config.yaml\n";
 }
 
 static PerfConfigType ParsePerfRunType(int argc, char* argv[]) {
@@ -123,7 +122,7 @@ static PerfConfigType ParsePerfRunType(int argc, char* argv[]) {
   if (argc == 3) {
     const std::string arg = argv[1];
     if (arg == "-c" || arg == "--config") {
-      return PerfConfigType::PERFJSON;
+      return PerfConfigType::PERFYAML;
     }
   }
 
@@ -140,7 +139,7 @@ static PerfConfigType ParsePerfRunType(int argc, char* argv[]) {
 static std::unordered_map<std::string, std::string> parse_args(int argc,
                                                                char* argv[]) {
   std::unordered_map<std::string, std::string> args;
-  std::set<std::string> flags = {"no_warm_up", "LazyMode"};
+  std::set<std::string> flags = {"no_warm_up", "LazyMode", "skip_perf"};
 
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[1];  // Note: This should probably be argv[i]
@@ -237,52 +236,6 @@ struct PerfInfos {
   uint32_t decode_count;
 };
 
-#if 0
-static void ShowPerfInformation(PerfInfos llm_perf_datas) {
-  std::ostringstream os;
-  os << "\n-------------------  Performance Summary  --------------------\n";
-  os << std::left << std::setfill(' ');
-  os << std::setw(30) << "Metric" << std::setw(30) << "Value" << '\n';
-  os << std::string(62, '-') << '\n';
-
-  auto token = [&](const std::string& name, auto val,
-                   const std::string& unit = "") {
-    os << std::setw(50) << name << std::setw(30) << val << unit << '\n';
-  };
-
-  auto fmt = [](auto v, int prec, const char* unit) -> std::string {
-    std::ostringstream o;
-    o << std::fixed << std::setprecision(prec) << v << unit;
-    return o.str();
-  };
-
-  token("Prefill Time", fmt(llm_perf_datas.prefill_time, 2, " ms"));
-  token("Decode Time", fmt(llm_perf_datas.decode_time, 2, " ms"));
-  if (abs(llm_perf_datas.vit_time - 0) > 1e-10) {
-    token("Vision Time", fmt(llm_perf_datas.vit_time, 2, " ms"));
-  }
-  token("Prefill Speed", fmt(llm_perf_datas.input_tokens /
-                                 (llm_perf_datas.prefill_time * 0.001f),
-                             2, " tokens/s"));
-  token("Decode Speed",
-        fmt(llm_perf_datas.decode_count / (llm_perf_datas.decode_time * 0.001f),
-            2, " tokens/s"));
-  token("TTFT (Time to First Token)", fmt(llm_perf_datas.ttft, 2, " ms"));
-  token("TPOT (Time Per Output Token)",
-        fmt(llm_perf_datas.decode_time / llm_perf_datas.decode_count, 2,
-            " ms/token"));
-  token("E2E Latency (End-to-End Latency)",
-        fmt(llm_perf_datas.t_total * 0.001f, 2, " seconds"));
-  token(
-      "E2E TPS (End-to-End Tokens Per Second)",
-      fmt((llm_perf_datas.decode_count + 1) / (llm_perf_datas.t_total * 0.001f),
-          2, " tokens/s"));
-  token("Embedding Time", fmt(llm_perf_datas.embedding_time, 2, " ms"));
-  os << "--------------------------------------------------------------\n";
-  std::cout << os.str();
-}
-
-#endif
 /**
  * Generate a vector of random integers within a specified length
  * Used for creating random token IDs for testing purposes
@@ -334,36 +287,6 @@ static int eigen_argmax(const T* ptr, std::size_t n) {
   return static_cast<int>(idx);
 }
 
-#ifdef XH2A_HM_SYS
-static inline int GetDevMemInfo(std::map<int, hm_mem_info>& dev_mem_info) {
-  hm_device_info dev_info = {0};
-  int ret = hm_sys_get_device_info(&dev_info);
-  if (ret <= 0 || dev_info.num_devices <= 0) {
-    std::cerr << "Not found online devices, ret is " << ret << std::endl;
-    return -1;
-  }
-
-  std::cout << "Online device num: " << dev_info.num_devices << std::endl;
-  for (int i = 0; i < dev_info.num_devices; i++) {
-    int device_id = dev_info.device_ids[i];
-    dev_mem_info[device_id] = {0};
-    ret = hm_sys_get_mem_info(device_id, &dev_mem_info[device_id]);
-    if (ret != 0) {
-      std::cerr << "Failed to get memory info of device " << device_id
-                << ", ret is " << ret << std::endl;
-      return ret;
-    }
-    auto mem_info = dev_mem_info[device_id];
-    std::cout << "Online device id: " << device_id
-              << ", mem_total: " << mem_info.mem_total
-              << ", mem_used: " << mem_info.mem_used
-              << ", mem_avail: " << mem_info.mem_avail << std::endl;
-  }
-
-  return ret;
-}
-#endif
-
 class HmllmInferBase {
  public:
   HmllmInferBase() = default;
@@ -385,10 +308,16 @@ typedef struct perf_settings {
   int batch_size;
   int loop_count;
   bool warm_up;
+  uint32_t warm_up_output;
   bool LazyMode;
+  bool skip_perf;
+  uint32_t interval_ms;
 } PerfSettings;
 
-inline double round_to_3_decimals(double value) {
-  return std::round(value * 1000.0) / 1000.0;
+inline std::string format_double(double value, int precision = 2) {
+  std::ostringstream oss;
+  oss << std::fixed << std::setprecision(precision);
+  oss << value;
+  return oss.str();
 }
 #endif  // __UTILS_H__

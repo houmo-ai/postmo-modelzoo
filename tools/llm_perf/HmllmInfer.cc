@@ -184,7 +184,7 @@ void HmllmInfer::DebugModelInfo(tcim::Module &module,
   for (int idx = 0; idx < input_num; idx++) {
     auto input_name = module.GetInputName(idx);
     auto input_info = module.GetInputInfo(input_name).AsContiguous();
-
+    size_t memSize = input_info.MemSize();
     std::cout << "Input[" << input_name << "] " << input_info << std::endl;
   }
 

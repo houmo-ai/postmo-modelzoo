@@ -30,6 +30,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <memory>  // Add memory header for unique_ptr
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -47,7 +48,7 @@ static HostMemoryInfo getProcessHostMemoryInfo() {
 
   std::ifstream status_file("/proc/self/status");
   if (!status_file.is_open()) {
-    std::cerr << "[MemoryMonitor] Unable to open /proc/self/status: "
+    std::cerr << "[HostMonitor] Unable to open /proc/self/status: "
               << strerror(errno) << std::endl;
     return info;
   }
@@ -91,17 +92,26 @@ static std::string formatMemorySize(size_t bytes) {
 }
 
 // ========== Memory Monitor Thread ==========
-class MemoryMonitor {
+class HostMonitor {
  private:
-  class MemoryMonitorImpl;
-  MemoryMonitorImpl* impl_;
+  class HostMonitorImpl;
+  std::unique_ptr<HostMonitorImpl> impl_;
 
  public:
-  MemoryMonitor(uint32_t interval_ms = 1000);
-  ~MemoryMonitor();
+  HostMonitor(uint32_t interval_ms = 1000);
+  ~HostMonitor();
   // start monitoring thread
   void start();
   void stop();
+
+  // Get final memory info after stopping
+  HostMemoryInfo getFinalMemoryInfo();
+  
+  // Get current memory info
+  HostMemoryInfo getCurrentMemoryInfo();
+  
+  // Get max memory info during monitoring
+  HostMemoryInfo getMaxMemoryInfo();
 };
 
 #endif

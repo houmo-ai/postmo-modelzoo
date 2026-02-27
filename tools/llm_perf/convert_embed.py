@@ -33,13 +33,12 @@ def parse_args():
         type=str,
         help="Embedding pt file path",
     )
-    
+
     parser.add_argument(
         "--type",
         required=True,
         type=str,
-        default="llm",
-        help="Embedding pt file path",
+        help="Embedding pt file model type, choice from ['llm', 'vllm']",
     )
     args = parser.parse_args()
     return args
@@ -63,4 +62,6 @@ if __name__ == "__main__":
             embedding_weight = embedding_weight.float().half()
 
         embedding_data = embedding_weight.detach().cpu().numpy()
-        embedding_data.tofile(embedding_path.replace(".pt", ".bin"))
+        output_path = embedding_path.replace(".pt", ".bin")
+        embedding_data.tofile(output_path)
+        print(f"embeding file saved to {output_path}")

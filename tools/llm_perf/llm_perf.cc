@@ -44,8 +44,8 @@ int main(int argc, char* argv[]) {
     if (runtype == PerfConfigType::PERFCMD) {
       auto args = parse_args(argc, argv);
       return RunPerf(args);
-    } else if (runtype == PerfConfigType::PERFJSON) {
-      return RunPerfJson(argc, argv);
+    } else if (runtype == PerfConfigType::PERFYAML) {
+      return RunPerfConfig(argc, argv);
     } else {
       HelpUsage(argv);
       return -1;
