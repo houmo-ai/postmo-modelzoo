@@ -39,7 +39,7 @@
 
 通过get_model脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
 
-如果需要自己量化，可选择下载原始模型和wikitext2数据集，下载后的模型存放在qwen3-8b目录：
+如果需要自己量化，可选择下载原始模型和wikitext2数据集，下载后的模型存放在Qwen3-Reranker-8B目录：
 
 ```bash
 python3 get_model.py --type raw
@@ -84,7 +84,7 @@ python3 build.py
 ```
 
 编译好的模型存放在当前目录，包括2个文件：
-qwen3_prefill.hmm
+qwen3-reranker_prefill.hmm
 
 ### 2.3 演示
 

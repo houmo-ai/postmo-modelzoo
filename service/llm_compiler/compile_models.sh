@@ -68,6 +68,7 @@ models=(
     "qwen3-vl;model_size:8b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:0;core_num:2;flash_attention:2 1;strip:overwrite;quant_model_path:http://artifactory.houmo.ai/artifactory/toolchain/release/models_outdated/qwen3-vl/hmquant_xh2_qwen3-vl_8b_256_2k_448x448_20251107.zip"
     "deepseek-r1-qwen3;model_size:8b;target:xh2;context_length:4096;prefill_length:256;batch:1;device_num:0;core_num:2;flash_attention:2;strip:overwrite;quant_model_path:http://artifactory.houmo.ai/artifactory/toolchain/release/models_outdated/deepseek/hmquant_xh2_deepseek_qwen3_8b_2k_20250903.zip"
     "deepseek-r1-qwen3;model_size:8b;target:xh2;context_length:4096;prefill_length:256;batch:2;device_num:0;core_num:2;flash_attention:2;strip:overwrite;quant_model_path:http://artifactory.houmo.ai/artifactory/toolchain/release/models_outdated/deepseek/hmquant_xh2_deepseek_qwen3_8b_2k_20250903.zip"
+    "qwen3-reranker;model_size:8b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:0;core_num:2;flash_attention:2;strip:overwrite;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3-reranker/hmquant_xh2_qwen3_reranker_8b_256_2k_20260122.zip"
 )
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)

@@ -230,7 +230,7 @@ def move_models(
     work_dir: Path,
     source: str = "prefill",
     model: str = "prefill",
-    target_name: str = "hmquant_qwen3_with_act.onnx",
+    target_name: str = "hmquant_qwen3-reranker_with_act.onnx",
 ):
     source_dir = work_dir / "hmquant/{}".format(source)
     matched_files = list(source_dir.glob("*{}.onnx".format(model)))

@@ -124,7 +124,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--model", type=str, default="qwen3-reranker-8b")
     parser.add_argument(
-        "--model-name", type=str, default="qwen3", help="output hmonnx model name"
+        "--model-name",
+        type=str,
+        default="qwen3-reranker",
+        help="output hmonnx model name",
     )
     parser.add_argument("--skip-quarot", action="store_true", help="skip_quarot")
     parser.add_argument("--skip-gptq", action="store_true", help="skip_quarot")
