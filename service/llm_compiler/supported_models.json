@@ -162,5 +162,13 @@
             "raw": null,
             "perf": "tcim_perf"
         }
+    },
+    "sensevoice": {
+        "small": {
+            "support_backends": ["xh2"],
+            "path": "models/asr/sensevoice",
+            "raw": "SenseVoiceSmall",
+            "perf": "tcim_perf"
+        }
     }
 }

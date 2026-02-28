@@ -139,7 +139,7 @@ def check_quant_model(quant_model_path: str, quant_model: str, model_name: str) 
             os.system(f"rm -rf {quant_model}/hmquant")
 
     # Skip checks for certain model types
-    if model_name in ["bge", "gte", "qwen3-reranker"]:
+    if model_name in ["bge", "gte", "qwen3-reranker", "sensevoice"]:
         return True
 
     # Define required directories

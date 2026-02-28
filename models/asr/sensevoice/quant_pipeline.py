@@ -32,7 +32,7 @@ from xhquant.api import (
     create_quant_config,
     convert_onnx_to_hmonnx,
     get_root_logger,
-    xhquant_init
+    xhquant_init,
 )
 from loguru import logger
 import shutil
@@ -43,14 +43,16 @@ def msg_output_format(title):
     title = f"{padding_str} {title} {padding_str}"
     return title
 
+
 class ScaledLayerNorm(torch.nn.Module):
     def __init__(self, original_ln, scale=32.0):
         super().__init__()
         self.ln = original_ln
-        self.register_buffer('inv_scale', torch.tensor(1.0 / scale))
+        self.register_buffer("inv_scale", torch.tensor(1.0 / scale))
 
     def forward(self, x):
         return self.ln(x * self.inv_scale)
+
 
 def replace_layernorm_with_scaled(model, scale=32.0):
     for name, module in model.named_children():
@@ -59,7 +61,10 @@ def replace_layernorm_with_scaled(model, scale=32.0):
         else:
             replace_layernorm_with_scaled(module, scale)
 
-def generate_golden_data(hmonnx_file: Path, golden_path: Path, hm_inputs: List[torch.Tensor]):
+
+def generate_golden_data(
+    hmonnx_file: Path, golden_path: Path, hm_inputs: List[torch.Tensor]
+):
     if not golden_path.exists():
         session = HMONNXGoldenInference(hmonnx_file)
         session.to("cuda")
@@ -68,8 +73,10 @@ def generate_golden_data(hmonnx_file: Path, golden_path: Path, hm_inputs: List[t
         session.step = 0
         session(*hm_inputs)
 
+
 def _get_static_input_shapes(onnx_path: Path) -> dict[str, tuple[int, ...]]:
     import onnx
+
     # Load only structure for speed
     model = onnx.load(str(onnx_path), load_external_data=False)
     shapes = {}
@@ -86,6 +93,7 @@ def _get_static_input_shapes(onnx_path: Path) -> dict[str, tuple[int, ...]]:
             shapes[i.name] = tuple(shape)
     return shapes
 
+
 def _onnx_io_names(onnx_path: Path) -> tuple[list[str], list[str]]:
     import onnx
 
@@ -96,13 +104,18 @@ def _onnx_io_names(onnx_path: Path) -> tuple[list[str], list[str]]:
     outputs = [vi.name for vi in g.output]
     return inputs, outputs
 
-def _make_calib_data_from_dataset(args, input_names: List[str], target_shapes: dict[str, tuple[int, ...]]) -> List["object"]:
+
+def _make_calib_data_from_dataset(
+    args, input_names: List[str], target_shapes: dict[str, tuple[int, ...]]
+) -> List["object"]:
     import torch
     import torch.nn.functional as F
     import quant_common as sc
     from tqdm import tqdm
 
-    print(f"Loading calibration data from HF dataset: {args.hf_dataset} (split={args.hf_split}, limit={args.calib_samples})")
+    print(
+        f"Loading calibration data from HF dataset: {args.hf_dataset} (split={args.hf_split}, limit={args.calib_samples})"
+    )
 
     # Load samples
     samples = sc.load_hf_dataset(
@@ -111,7 +124,7 @@ def _make_calib_data_from_dataset(args, input_names: List[str], target_shapes: d
         split=args.hf_split,
         limit=args.calib_samples,
         streaming=args.hf_streaming,
-        audio_field=args.hf_audio_field
+        audio_field=args.hf_audio_field,
     )
 
     if not samples:
@@ -171,7 +184,7 @@ def _make_calib_data_from_dataset(args, input_names: List[str], target_shapes: d
     for name in input_names:
         t_list = all_inputs_dict[name]
         if not t_list:
-             raise ValueError(f"No data for input: {name}")
+            raise ValueError(f"No data for input: {name}")
 
         # Handle variable length inputs (like speech) by padding to max length in the batch
         if name == "speech" and len(t_list) > 0 and t_list[0].ndim == 3:
@@ -192,13 +205,16 @@ def _make_calib_data_from_dataset(args, input_names: List[str], target_shapes: d
 
     return final_inputs
 
+
 def quant_llm(args):
     model_dir = str(Path(args.model).expanduser().resolve())
     work_dirs = Path(args.work_dirs).expanduser().resolve()
     onnx_dir = work_dirs / "onnx"
     onnx_dir.mkdir(parents=True, exist_ok=True)
 
-    model, kwargs = AutoModel.build_model(model=model_dir, device=args.device, trust_remote_code=False)
+    model, kwargs = AutoModel.build_model(
+        model=model_dir, device=args.device, trust_remote_code=False
+    )
     model.eval()
 
     print("Applying Input Scaling to LayerNorms for FP16 stability...")
@@ -214,6 +230,7 @@ def quant_llm(args):
     static_inputs = rebuilt_model.export_inputs()
     if not os.path.exists(model_file):
         import torch
+
         torch.onnx.export(
             rebuilt_model,
             static_inputs,
@@ -226,9 +243,11 @@ def quant_llm(args):
         )
 
     import onnx
+
     model_proto = onnx.load(str(model_file))
     try:
         from onnxsim import simplify
+
         print("Simplifying ONNX model for static shape...")
         # Use onnxsim to fold constants and remove dynamic ops
         model_sim, check = simplify(model_proto)
@@ -238,7 +257,9 @@ def quant_llm(args):
         else:
             print("Simplification check failed! Keeping original model.")
     except ImportError:
-        print("onnxsim not installed, skipping simplification. Install with: pip install onnxsim")
+        print(
+            "onnxsim not installed, skipping simplification. Install with: pip install onnxsim"
+        )
     except Exception as e:
         print(f"Simplification failed with error: {e}")
 
@@ -261,7 +282,9 @@ def quant_llm(args):
     log_file = work_dirs / "convert.log"
     xhquant_init(str(log_file), debug=bool(args.debug))
 
-    quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=args.quant_type)
+    quant_scheme = QuantScheme(
+        target_device=DeviceType.XH2a, quant_type=args.quant_type
+    )
     quant_config = create_quant_config(quant_scheme)
 
     if "w_cfg" in quant_config and "quantizer" in quant_config["w_cfg"]:
@@ -270,7 +293,6 @@ def quant_llm(args):
 
     if "i_cfg" in quant_config and "quantizer" in quant_config["i_cfg"]:
         quant_config["i_cfg"]["quantizer"]["calib_metric"] = args.calib_metric
-
 
     prefix = f"{args.model_name}-{DeviceType.XH2a}-{args.quant_type}"
     work_dirs = Path(args.work_dirs).expanduser().resolve() / prefix
@@ -289,7 +311,9 @@ def quant_llm(args):
         batch_size = input_list[0].shape[0]
 
     if batch_size > 1:
-        print(f"Detected multiple calibration samples (batch={batch_size}). Using multi-batch calibration.")
+        print(
+            f"Detected multiple calibration samples (batch={batch_size}). Using multi-batch calibration."
+        )
 
         # Import lower-level APIs
         from xhquant.api.ptq_export_hmonnx import (
@@ -302,7 +326,9 @@ def quant_llm(args):
 
         # 1. Convert to quanted graph (without running PTQ yet)
         # Use the first sample for graph construction and shape inference
-        first_sample_args = [t[0:1] if isinstance(t, torch.Tensor) else t for t in input_list]
+        first_sample_args = [
+            t[0:1] if isinstance(t, torch.Tensor) else t for t in input_list
+        ]
 
         quanted_graph_module = _convert_model_to_quanted_model(
             str(model_file),
@@ -321,25 +347,24 @@ def quant_llm(args):
             for t in input_list:
                 if isinstance(t, torch.Tensor):
                     # Slice the batch dimension, keeping it 1
-                    sample_args.append(t[i:i+1].cpu())
+                    sample_args.append(t[i : i + 1].cpu())
                 else:
                     sample_args.append(t)
             calib_data.append(sample_args)
 
-        execution_device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        execution_device = (
+            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        )
 
         # 3. Run PTQ with multiple samples
         ptq_quantize(
-            quanted_graph_module,
-            calib_data,
-            PrecisionMode.ALIGNED,
-            execution_device
+            quanted_graph_module, calib_data, PrecisionMode.ALIGNED, execution_device
         )
 
         # 4. Export to HMONNX
         convert_quanted_model_to_hmonnx(
             quanted_graph_module,
-            first_sample_args, # Use first sample for tracing
+            first_sample_args,  # Use first sample for tracing
             str(out_hmonnx),
             input_names,
             output_names,
@@ -374,24 +399,24 @@ def move_llm(args):
     work_dir = Path(args.work_dirs)
     dest_dir = Path(args.out_dir)
     model_name = os.path.basename(args.model_name)
-    hm_model_name = "hmquant_{}_with_act.onnx".format(args.model_name)
-    hmm_model_dir = "{}-XH2a-{}".format(
-        model_name, args.quant_type
-    )
+    hmm_model_dir = "{}-XH2a-{}".format(model_name, args.quant_type)
     logger.info(
         msg_output_format("Start move from {} to {}").format(
-            work_dir / hmm_model_dir / "golden" / "*" , dest_dir
+            work_dir / hmm_model_dir / "golden" / "*", dest_dir
         )
     )
     src_golden_dir = work_dir / hmm_model_dir / "golden"
-    target_dir = dest_dir / "hmquant" / f"{args.model_name}"
+    target_dir = dest_dir / "hmquant/prefill"
     target_dir.mkdir(parents=True, exist_ok=True)
-    os.remove(os.path.join(src_golden_dir, f"step_0/hmquant_{model_name}_with_act.onnx"))
+    os.remove(
+        os.path.join(src_golden_dir, f"step_0/hmquant_{model_name}_with_act.onnx")
+    )
     os.remove(os.path.join(src_golden_dir, f"step_0/{model_name}_external_data"))
     for file in os.listdir(src_golden_dir):
         shutil.move(src_golden_dir / file, target_dir / file)
-    shutil.move(
-        dest_dir / "hmquant" / f"{args.model_name}" / "step_0", dest_dir / "hmquant" / f"{args.model_name}" / "golden"
-    )
+    # shutil.move(
+    #     target_dir / "step_0",
+    #     target_dir / "golden",
+    # )
     logger.info(msg_output_format("Start remove work_dir: {}".format(work_dir)))
     shutil.rmtree(work_dir, ignore_errors=True)

@@ -69,6 +69,7 @@ models=(
     "deepseek-r1-qwen3;model_size:8b;target:xh2;context_length:4096;prefill_length:256;batch:1;device_num:0;core_num:2;flash_attention:2;strip:overwrite;quant_model_path:http://artifactory.houmo.ai/artifactory/toolchain/release/models_outdated/deepseek/hmquant_xh2_deepseek_qwen3_8b_2k_20250903.zip"
     "deepseek-r1-qwen3;model_size:8b;target:xh2;context_length:4096;prefill_length:256;batch:2;device_num:0;core_num:2;flash_attention:2;strip:overwrite;quant_model_path:http://artifactory.houmo.ai/artifactory/toolchain/release/models_outdated/deepseek/hmquant_xh2_deepseek_qwen3_8b_2k_20250903.zip"
     "qwen3-reranker;model_size:8b;target:xh2;context_length:8192;prefill_length:256;batch:1;device_num:0;core_num:2;flash_attention:2;strip:overwrite;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/qwen3-reranker/hmquant_xh2_qwen3_reranker_8b_256_2k_20260122.zip"
+    "sensevoice;model_size:small;target:xh2;context_length:0;prefill_length:0;batch:0;device_num:-1;core_num:2;flash_attention:1;quant_model_path:http://10.10.1.53:8082/artifactory/toolchain/release/models_outdated/sensevoice/hmquant_xh2_sensevoicesmall_w8a8_256_512_20260227.zip"
 )
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)

@@ -25,6 +25,7 @@ import psutil
 import threading
 import multiprocessing
 import argparse
+import glob
 
 import logging
 
@@ -136,8 +137,15 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="sensevoice_small",
+        default="sensevoice",
         help="output houmo model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default="small",
+        help="model size",
     )
     parser.add_argument(
         "--j",
@@ -182,7 +190,7 @@ def get_args() -> argparse.Namespace:
 
 
 def build_sensevoice(
-    model_name, model_dir, model_path, output_dir, profile, ncore, j, flash_attention=0
+    model_name, model_dir, output_dir, profile, ncore, j, flash_attention=0
 ):
     import tcim
 
@@ -197,8 +205,9 @@ def build_sensevoice(
         kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
-    print(f"\n===> {model_name} build start...")
-    decode_model = os.path.join(model_dir, model_path)
+    print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*_with_act.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -324,6 +333,7 @@ if __name__ == "__main__":
     curdir = os.getcwd()
     model_dir = args.model_dir
     model_name = args.model_name
+    model_size = args.model_size
     output_dir = args.output_dir
     ncore = args.ncore
     j = args.j
@@ -337,11 +347,9 @@ if __name__ == "__main__":
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"hmquant_{model_name}_with_act.onnx"
         build_sensevoice(
-            "sensevoice_small",
-            os.path.join(model_dir, model_name),
-            model_path,
+            f"{model_name}_{model_size}",
+            os.path.join(model_dir, "prefill"),
             output_dir,
             profile,
             ncore,
