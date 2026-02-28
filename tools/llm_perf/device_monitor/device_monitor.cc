@@ -160,6 +160,13 @@ DeviceMonitor::DeviceMonitor(uint32_t interval_ms) {
 DeviceMonitor::~DeviceMonitor() = default;
 
 void DeviceMonitor::start() {
+#ifdef _MSC_VER
+  HMODULE hDll = LoadLibraryA("libhal_xh2a.dll");
+  typedef int (*HM_SYS_GET_DEVICE_INFO)(hm_device_info* info);
+  HM_SYS_GET_DEVICE_INFO hm_sys_get_device_info = nullptr;
+  hm_sys_get_device_info =
+      (HM_SYS_GET_DEVICE_INFO)GetProcAddress(hDll, "hm_sys_get_device_info");
+#endif
   hm_device_info dev_info = {0};
   int ret = hm_sys_get_device_info(&dev_info);
   if (ret <= 0 || dev_info.num_devices <= 0) {
@@ -180,6 +187,25 @@ void DeviceMonitor::start() {
   }
 
   g_thread_ = std::thread([this]() {
+#ifdef _MSC_VER
+    HMODULE hDll = LoadLibraryA("libhal_xh2a.dll");
+    typedef int (*HM_SYS_CHECK_DEVICE_INDEX)(int dev_index);
+    typedef int (*HM_SYS_GET_TEMPERATURE)(int dev_id, float* temperature);
+    typedef int (*HM_SYS_GET_BOARD_POWER)(int dev_id, float* power);
+    typedef int (*HM_SYS_GET_IPU_FREQUENCY)(int dev_id, uint64_t* freq);
+    HM_SYS_CHECK_DEVICE_INDEX hm_sys_check_device_index = nullptr;
+    HM_SYS_GET_TEMPERATURE hm_sys_get_temperature = nullptr;
+    HM_SYS_GET_BOARD_POWER hm_sys_get_board_power = nullptr;
+    HM_SYS_GET_IPU_FREQUENCY hm_sys_get_ipu_frequency = nullptr;
+    hm_sys_check_device_index = (HM_SYS_CHECK_DEVICE_INDEX)GetProcAddress(
+        hDll, "hm_sys_check_device_index");
+    hm_sys_get_temperature =
+        (HM_SYS_GET_TEMPERATURE)GetProcAddress(hDll, "hm_sys_get_temperature");
+    hm_sys_get_board_power =
+        (HM_SYS_GET_BOARD_POWER)GetProcAddress(hDll, "hm_sys_get_board_power");
+    hm_sys_get_ipu_frequency = (HM_SYS_GET_IPU_FREQUENCY)GetProcAddress(
+        hDll, "hm_sys_get_ipu_frequency");
+#endif
     create_log_dir();
     if (!running_.load()) running_.store(true);
 
@@ -270,6 +296,13 @@ void DeviceMonitor::stop() {
 void DeviceMonitor::cleanup() { cleanup_resources(); }
 
 std::unordered_map<int, DeviceStats> DeviceMonitor::getDeviceStats() {
+#ifdef _MSC_VER
+  HMODULE hDll = LoadLibraryA("libhal_xh2a.dll");
+  typedef int (*HM_SYS_GET_MEM_INFO)(int dev_id, struct hm_mem_info* mem_info);
+  HM_SYS_GET_MEM_INFO hm_sys_get_mem_info = nullptr;
+  hm_sys_get_mem_info =
+      (HM_SYS_GET_MEM_INFO)GetProcAddress(hDll, "hm_sys_get_mem_info");
+#endif
   std::lock_guard<std::mutex> lock(mtx_);
   for (int dev_id : deviceIds) {
     auto& device_stats = device_stats_map_[dev_id];

@@ -314,6 +314,11 @@ typedef struct perf_settings {
   uint32_t interval_ms;
 } PerfSettings;
 
+// host memory struct
+struct HostMemoryInfo {
+  size_t virtual_memory;   // virtual_memory (bytes)
+  size_t physical_memory;  // physical_memory (bytes)
+};
 inline std::string format_double(double value, int precision = 2) {
   std::ostringstream oss;
   oss << std::fixed << std::setprecision(precision);

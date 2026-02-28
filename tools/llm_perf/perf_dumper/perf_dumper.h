@@ -36,9 +36,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "../device_monitor/device_monitor.h"
-#include "../host_monitor/host_monitor.h"
-#include "../utils.h"
+#include "device_monitor/device_monitor.h"
+#include "host_monitor/host_monitor.h"
+#include "utils.h"
 
 class PerfDumper {
  public:

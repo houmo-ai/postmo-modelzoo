@@ -30,17 +30,13 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
-#include <memory>  // Add memory header for unique_ptr
+#include <memory>
 #include <mutex>
 #include <sstream>
 #include <string>
 #include <thread>
 
-// host memory struct
-struct HostMemoryInfo {
-  size_t virtual_memory;   // virtual_memory (bytes)
-  size_t physical_memory;  // physical_memory (bytes)
-};
+#include "utils.h"
 
 // Get Current Process Memory Info
 static HostMemoryInfo getProcessHostMemoryInfo() {
@@ -106,10 +102,10 @@ class HostMonitor {
 
   // Get final memory info after stopping
   HostMemoryInfo getFinalMemoryInfo();
-  
+
   // Get current memory info
   HostMemoryInfo getCurrentMemoryInfo();
-  
+
   // Get max memory info during monitoring
   HostMemoryInfo getMaxMemoryInfo();
 };

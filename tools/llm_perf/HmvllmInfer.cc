@@ -234,27 +234,6 @@ int HmvllmInfer::get_nblocks() {
 }
 
 HmvllmInfer::~HmvllmInfer() {
-  // for (int i = 0; i < prefill_input_ptrs.size(); ++i) {
-  //   if (prefill_input_ptrs[i] != nullptr) {
-  //     delete[] prefill_input_ptrs[i];
-  //     prefill_input_ptrs[i] = nullptr;
-  //   }
-  // }
-
-  // for (int i = 0; i < decode_input_ptrs.size(); ++i) {
-  //   if (decode_input_ptrs[i] != nullptr) {
-  //     delete[] decode_input_ptrs[i];
-  //     decode_input_ptrs[i] = nullptr;
-  //   }
-  // }
-  // // TODO
-  // for (int i = 0; i < vit_input_ptrs.size(); ++i) {
-  //   if (vit_input_ptrs[i] != nullptr) {
-  //     delete[] vit_input_ptrs[i];
-  //     vit_input_ptrs[i] = nullptr;
-  //   }
-  // }
-
   prefill_module.reset();
   decode_module.reset();
   vision_module.reset();
@@ -461,9 +440,16 @@ void HmvllmInfer::perf_llm(const uint32_t input_tokens_len,
     perf_tracker->perfStart(PerfType::PREFILL_INFER_TIME);
     PrefillInfer();
     perf_tracker->perfEnd(PerfType::PREFILL_INFER_TIME);
+    float prefill_ratio = (float)(round + 1) / (float)prefill_loop_round;
+    int filled = static_cast<int>(prefill_ratio * bar_width);
+    std::cout << '\r' << "Prefill: " << std::setw(3) << int(prefill_ratio * 100)
+              << "% |" << std::string(filled, '*')
+              << std::string(bar_width - filled, ' ') << "| " << std::flush;
   }
+  std::cout << std::endl;
   ids.clear();
   PrefillGetOutputDatas(ids);
+
   perf_tracker->perfEnd(PerfType::PREFILL_TOTAL_TIME);
   int context_length = input_tokens_len;
 

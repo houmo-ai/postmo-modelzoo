@@ -377,7 +377,13 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
     perf_tracker->perfStart(PerfType::PREFILL_INFER_TIME);
     PrefillInfer();
     perf_tracker->perfEnd(PerfType::PREFILL_INFER_TIME);
+    float prefill_ratio = (float)(round + 1) / (float)prefill_loop_round;
+    int filled = static_cast<int>(prefill_ratio * bar_width);
+    std::cout << '\r' << "Batch " << batch << ", Prefill: " << std::setw(3)
+              << int(prefill_ratio * 100) << "% |" << std::string(filled, '*')
+              << std::string(bar_width - filled, ' ') << "| " << std::flush;
   }
+  std::cout << std::endl;
 
   PrefillGetOutputDatas(ret.next_id);
 

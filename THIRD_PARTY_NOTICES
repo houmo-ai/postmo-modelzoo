@@ -5,10 +5,10 @@ third-party software, models, datasets, or tools.
 
 Each component is licensed under its own respective license.
 
-This declaration only addresses third-party components that 
-require special attention, are not runtime dependencies, and 
-are not included in the project, and advises users to strictly 
-adhere to the terms of the license agreements specified for 
+This declaration only addresses third-party components that
+require special attention, are not runtime dependencies, and
+are not included in the project, and advises users to strictly
+adhere to the terms of the license agreements specified for
 those third-party dependencies.
 
 DISCLAIMER
@@ -68,7 +68,7 @@ Mozilla Public License Version 2.0 (MPL 2.0)
 License Text:
 https://www.mozilla.org/en-US/MPL/2.0/
 
-Usage in this project: 
+Usage in this project:
 The following paths are automatically downloaded, associated, and included in the compilation process:
     apis/inferences/qwen3/
     tools/llm_perf
@@ -103,8 +103,8 @@ Apache License, Version 2.0
 License Text:
 https://github.com/mlc-ai/tokenizers-cpp/blob/main/LICENSE
 
-Usage in this project: 
-The following paths are automatically downloaded static lib, associated, 
+Usage in this project:
+The following paths are automatically downloaded static lib, associated,
 and included in the compilation process:
     apis/inferences/qwen3/
     tools/llm_perf
@@ -399,6 +399,59 @@ copyright notice and license text in accordance with the MIT License.
 Users are responsible for complying with the MIT License when using,
 redistributing, or modifying onnx-tool.
 
+----------------------------------------------------------------------
+yaml-cpp (YAML Parser/Emitter for C++)
+----------------------------------------------------------------------
+
+Component Name:
+yaml-cpp
+
+Usage Location:
+tools/llm_perf
+
+Source:
+https://github.com/jbeder/yaml-cpp
+
+Copyright Statement:
+Copyright (c) 2008-2015 Jesse Beder
+
+License:
+MIT License
+
+License Text:
+https://github.com/jbeder/yaml-cpp/blob/master/LICENSE
+
+The yaml-cpp library is licensed under the MIT License. The MIT License
+permits use, copying, modification, merging, publishing, distribution,
+sublicensing, and/or selling copies of the software, subject to the
+following condition:
+
+Copyright (c) 2008-2015 Jesse Beder
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+This project may reference or use yaml-cpp as a third-party component.
+Any redistribution or modification of yaml-cpp must retain the original
+copyright notice and license text in accordance with the MIT License.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying yaml-cpp.
 
 2. Datasets
 ----------------------------------------------------------------------
@@ -657,7 +710,7 @@ Any redistribution or modification of Whisper must retain the original
 copyright notice, license text, and any required NOTICE information in
 accordance with the MIT License.
 
-Users are responsible for complying with the MIT License 
+Users are responsible for complying with the MIT License
 when using, redistributing, or modifying Whisper.
 
 ----------------------------------------------------------------------
@@ -677,10 +730,10 @@ MIT License
 License Text:
 https://github.com/FlagOpen/FlagEmbedding/blob/master/LICENSE
 
-The FlagEmbedding project, including the bge-m3 embedding and 
-bge-reranker-m3-v2 reranker model, is licensed under the MIT License. 
-The MIT License permits use, copying, modification, merging, publishing, 
-distribution, sublicensing, and/or selling copies of the software and 
+The FlagEmbedding project, including the bge-m3 embedding and
+bge-reranker-m3-v2 reranker model, is licensed under the MIT License.
+The MIT License permits use, copying, modification, merging, publishing,
+distribution, sublicensing, and/or selling copies of the software and
 associated files, subject to the following condition:
 
 The above copyright notice and this permission notice shall be included
