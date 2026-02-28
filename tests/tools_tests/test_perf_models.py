@@ -152,7 +152,7 @@ if __name__ == "__main__":
             "ndevices": res['ndevice'].replace("chips", "") if "chips" in res['ndevice'] else res['ndevice'].replace("chip", ""),
             "loop" : "1",
             "input": str(DECODE_STOP),
-            "stop" : str(DECODE_STOP) if context_length > DECODE_STOP else context_length
+            "output" : str(DECODE_STOP) if context_length > DECODE_STOP else context_length
         }
         if int(relative_model_paths[sub_model_dir_name]['ndevices']) > total_device_num:
             continue
@@ -189,7 +189,7 @@ if __name__ == "__main__":
             perf_config["visual"] = visual_path
         perf_config["embedding"] =  os.path.join(relative_model_paths[sub_model_dir_name]["model_path"], "hmquant/quant_embedding.bin")
         perf_config["input"] = relative_model_paths[sub_model_dir_name]["input"]
-        perf_config["stop"] = relative_model_paths[sub_model_dir_name]["stop"]
+        perf_config["output"] = relative_model_paths[sub_model_dir_name]["output"]
         perf_config["ndevices"] = relative_model_paths[sub_model_dir_name]["ndevices"]
         perf_config["loop"] = "2"
         perf_config["batch"] = relative_model_paths[sub_model_dir_name]["batch"]
@@ -202,8 +202,8 @@ if __name__ == "__main__":
         args.append(perf_config["embedding"])
         args.append("--input")
         args.append(perf_config["input"])
-        args.append("--stop")
-        args.append(perf_config["stop"])
+        args.append("--output")
+        args.append(perf_config["output"])
         args.append("--ndevices")
         args.append(perf_config["ndevices"])
         args.append("--loop")
