@@ -886,10 +886,11 @@ if __name__ == "__main__":
                 "decode": f"{compile_results_dir}/{model_name}_decode.hmm",
                 "embedding": f"{compile_results_dir}/hmquant/quant_embedding.bin",
                 "input": (context_len - decode_tokens),
-                "stop": decode_tokens,
+                "output": decode_tokens,
                 "ndevices": device_num if device_num > 1 else 1,
                 "loop": 2,
                 "batch": batch,
+                "warm_up_output": 128,
                 "model_name": model_name_ori,
                 "model_size": model_size,
                 "quant_models": host_quant_model,
@@ -897,7 +898,7 @@ if __name__ == "__main__":
                 "prefill_length": prefill_len if prefill_len > 0 else 0,
                 "context_length": context_str[:-1] if context_len > 0 else 0,
                 "flash_attention": "N/A",
-                "dump_file": f"{cfg_path[:-5]}/{compiled_file_name}_result.json",
+                "dump_file": f"{cfg_path[:-5]}/{compiled_file_name}_result.yaml",
             }
             if "-vl" in model_name_ori:
                 new_stream["visual"] = f"{compile_results_dir}/{model_name}_visual.hmm"

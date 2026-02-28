@@ -25,6 +25,7 @@ import psutil
 import threading
 import multiprocessing
 import argparse
+import glob
 
 import logging
 
@@ -205,7 +206,7 @@ def get_args() -> argparse.Namespace:
 
 
 def build_whisper(
-    model_name, model_dir, model_path, output_dir, profile, ncore, j, flash_attention=0
+    model_name, model_dir, output_dir, profile, ncore, j, flash_attention=0
 ):
     import tcim
 
@@ -220,7 +221,8 @@ def build_whisper(
 
     start = time.time()
     print(f"\n===> {model_name} build start...")
-    decode_model = os.path.join(model_dir, model_path)
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -236,7 +238,7 @@ def build_whisper(
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 
-def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
+def test(model_name, model_dir, output_dir, profile, batch=1):
     import tcim_lite
 
     print(f"\n===> {model_name} test start...")
@@ -250,18 +252,18 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
 
     # set input
     profile["set_input"] = 0
-    if prefix is None:
-        prefix = model_name
     input_num = module.get_num_inputs()
-    for id in range(input_num):
-        input_name = module.get_input_name(id)
+    for idx in range(input_num):
+        input_name = module.get_input_name(idx)
         input_info = module.get_input_info(input_name)
         print(
             f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
         )
-        input_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy"
+
+        input_files = glob.glob(
+            f"{model_dir}/**/hmquant_*{sanitize_name(input_name)}*.npy", recursive=True
         )
+        input_data_path = os.path.abspath(input_files[0]) if input_files else ""
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
         print(
@@ -285,8 +287,8 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     profile["get_output"] = 0
     result_check = True
     output_num = module.get_num_outputs()
-    for id in range(output_num):
-        output_name = module.get_output_name(id)
+    for idx in range(output_num):
+        output_name = module.get_output_name(idx)
         output_info = module.get_output_info(output_name)
         print(
             f"output_info[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
@@ -297,9 +299,10 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         print(
             f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
         )
-        output_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy"
+        output_files = glob.glob(
+            f"{model_dir}/**/hmquant_*{sanitize_name(output_name)}*.npy", recursive=True
         )
+        output_data_path = os.path.abspath(output_files[0]) if output_files else ""
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
             golden_output = np.concatenate(
@@ -360,11 +363,9 @@ if __name__ == "__main__":
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"hmquant_{model_name}_with_act.onnx"
         build_whisper(
-            "whisper_encoder",
-            os.path.join(model_dir, "encoder"),
-            model_path,
+            f"{model_name}_encoder",
+            os.path.join(model_dir, "encode"),
             output_dir,
             profile,
             ncore,
@@ -372,9 +373,8 @@ if __name__ == "__main__":
             flash_attention=encoder_flash_attention,
         )
         build_whisper(
-            "whisper_decoder",
-            os.path.join(model_dir, "decoder"),
-            model_path,
+            f"{model_name}_decoder",
+            os.path.join(model_dir, "decode"),
             output_dir,
             profile,
             ncore,
@@ -382,9 +382,8 @@ if __name__ == "__main__":
             flash_attention=llm_flash_attention,
         )
         build_whisper(
-            "whisper_prefill",
+            f"{model_name}_prefill",
             os.path.join(model_dir, "prefill"),
-            model_path,
             output_dir,
             profile,
             ncore,
@@ -394,11 +393,11 @@ if __name__ == "__main__":
 
     # test model
     if args.stage == "test" or args.stage == "all":
-        part_dir = os.path.join(model_dir, "encoder")
-        test("whisper_encoder", part_dir, output_dir, profile, prefix=model_name)
-        part_dir = os.path.join(model_dir, "decoder")
-        test("whisper_decoder", part_dir, output_dir, profile, prefix=model_name)
+        part_dir = os.path.join(model_dir, "encode")
+        test(f"{model_name}_encoder", part_dir, output_dir, profile)
+        part_dir = os.path.join(model_dir, "decode")
+        test(f"{model_name}_decoder", part_dir, output_dir, profile)
         part_dir = os.path.join(model_dir, "prefill")
-        test("whisper_prefill", part_dir, output_dir, profile, prefix=model_name)
+        test(f"{model_name}_prefill", part_dir, output_dir, profile)
 
     memory_monitor.stop()

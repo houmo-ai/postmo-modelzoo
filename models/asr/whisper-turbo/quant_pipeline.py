@@ -824,13 +824,13 @@ def move_llm(args):
     rename_onnx(os.path.join(target_dir, "prefill"))
     shutil.move(
         os.path.join(prefix_path, "decoder", "hmonnx"),
-        os.path.join(target_dir, "decoder"),
+        os.path.join(target_dir, "decode"),
     )
-    rename_onnx(os.path.join(target_dir, "decoder"))
+    rename_onnx(os.path.join(target_dir, "decode"))
     shutil.move(
         os.path.join(prefix_path, "encoder", "hmonnx"),
-        os.path.join(target_dir, "encoder"),
+        os.path.join(target_dir, "encode"),
     )
-    rename_onnx(os.path.join(target_dir, "encoder"))
+    rename_onnx(os.path.join(target_dir, "encode"))
     logger.info(msg_output_format("Start remove work_dir: {}".format(work_dir)))
     shutil.rmtree(work_dir, ignore_errors=True)

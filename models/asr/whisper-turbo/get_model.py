@@ -77,8 +77,9 @@ if __name__ == "__main__":
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": "whisper-large-v3-turbo",
+        "model_name": "whisper",
         "model_info": {
+            "model_size": "large_v3_turbo",
             "ncore": 2,
             "ndevice": 1,
         },

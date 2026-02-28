@@ -24,8 +24,10 @@
 import os
 import shutil
 import glob
+import copy
 import time
 import json
+import yaml
 import argparse
 from datetime import datetime
 import logging
@@ -451,10 +453,17 @@ def _generate_llm_perf_table(cfg_path, outputs, file_size_dict):
         "flash_attention": [],  # Assuming default 0 if not specified
         "input(k)": [],  # input_token from dump file (converted to k)
         "output(k)": [],  # output_token from dump file (converted to k)
-        "device_mem(MB)": [],  # Extracted from logs
+        "host_mem(GB)": [],
+        "host_peak_mem(GB)": [],
         "prefill_load_time(ms)": [],  # prefill_load_time from dump file
         "decode_load_time(ms)": [],  # decode_load_time from dump file
-        "visual_load_time(ms)": [],  # visual_load_time from dump file
+        "vision_load_time(ms)": [],  # vision_load_time from dump file
+        "host_mem@lazy(GB)": [],
+        "host_peak_mem@lazy(GB)": [],
+        "prefill_load_time@lazy(ms)": [],  # prefill_load_time from dump file
+        "decode_load_time@lazy(ms)": [],  # decode_load_time from dump file
+        "vision_load_time@lazy(ms)": [],  # vision_load_time from dump file
+        "device_mem(MB)": [],  # Extracted from logs
         "prefill_time(ms)": [],  # prefill_time from dump file
         "decode_time(ms)": [],  # decode_time from dump file
         "vision_time(ms)": [],  # vision_time from dump file
@@ -469,7 +478,7 @@ def _generate_llm_perf_table(cfg_path, outputs, file_size_dict):
         "decode_embedding_time(ms)": [],  # decode_embedding_time from dump file
         "hmm_prefill_size(MB)": [],  # From file_size_dict
         "hmm_decode_size(MB)": [],  # From file_size_dict
-        "hmm_visual_size(MB)": [],  # From file_size_dict
+        "hmm_vision_size(MB)": [],  # From file_size_dict
     }
 
     # Process each model in the configuration
@@ -510,22 +519,37 @@ def _generate_llm_perf_table(cfg_path, outputs, file_size_dict):
         if os.path.exists(dump_file_path):
             try:
                 with open(dump_file_path, "r", encoding="utf-8") as f:
-                    dump_data = json.load(f)
+                    dump_data = yaml.safe_load(f)
 
                 # Extract performance metrics from Perf_Metrics array
-                perf_metrics_list = dump_data.get("Perf_Metrics", [])
-                if perf_metrics_list:
-                    perf_data = perf_metrics_list[0]  # Take first entry
+                if not dump_data or "PerfMetrics" not in dump_data:
+                    logger.error(
+                        f"Failed to read dump file {dump_file_path}: No PerfMetrics found"
+                    )
+                    return
+                perf_metrics_list = dump_data["PerfMetrics"]
+                perf_data = perf_metrics_list[0] if perf_metrics_list else {}
+
+                lazy_dump_file_path = dump_file_path.replace(".yaml", "_lazy.yaml")
+                if os.path.exists(lazy_dump_file_path):
+                    with open(lazy_dump_file_path, "r", encoding="utf-8") as f:
+                        lazy_dump_data = yaml.safe_load(f)
+                    lazy_perf_metrics_list = lazy_dump_data["PerfMetrics"]
+                    lazy_perf_data = (
+                        lazy_perf_metrics_list[0] if lazy_perf_metrics_list else {}
+                    )
             except Exception as e:
                 logger.error(f"Failed to read dump file {dump_file_path}: {e}")
+                return
         else:
             logger.warning(f"Dump file not found: {dump_file_path}")
 
         # Fill performance metrics from dump file (convert to appropriate units)
         if perf_data:
+            perf_results = perf_data.get("PerfResults", {})
             # Convert token counts to k units
-            input_tokens = perf_data.get("input_token", 0)
-            output_tokens = perf_data.get("output_token", 0)
+            input_tokens = perf_results.get("input_token", 0)
+            output_tokens = perf_results.get("output_token", 0)
             perf_metric["input(k)"][current_index] = (
                 round(input_tokens / 1024.0, 3) if input_tokens != "NA" else "NA"
             )
@@ -534,50 +558,93 @@ def _generate_llm_perf_table(cfg_path, outputs, file_size_dict):
             )
 
             # Direct mappings from dump file
-            perf_metric["prefill_time(ms)"][current_index] = perf_data.get(
+            perf_metric["prefill_time(ms)"][current_index] = perf_results.get(
                 "prefill_time", "NA"
             )
-            perf_metric["decode_time(ms)"][current_index] = perf_data.get(
+            perf_metric["decode_time(ms)"][current_index] = perf_results.get(
                 "decode_time", "NA"
             )
-            perf_metric["vision_time(ms)"][current_index] = perf_data.get(
+            perf_metric["vision_time(ms)"][current_index] = perf_results.get(
                 "vision_time", "NA"
             )
-            perf_metric["prefill_speed(tps)"][current_index] = perf_data.get(
+            perf_metric["prefill_speed(tps)"][current_index] = perf_results.get(
                 "prefill_speed", "NA"
             )
-            perf_metric["decode_speed(tps)"][current_index] = perf_data.get(
+            perf_metric["decode_speed(tps)"][current_index] = perf_results.get(
                 "decode_speed", "NA"
             )
-            perf_metric["vision_speed(fps)"][current_index] = perf_data.get(
+            perf_metric["vision_speed(fps)"][current_index] = perf_results.get(
                 "vision_speed", "NA"
             )
-            perf_metric["TTFT(ms)"][current_index] = perf_data.get("TTFT", "NA")
-            perf_metric["TPOT(ms/token)"][current_index] = perf_data.get("TPOT", "NA")
-            perf_metric["e2e_latency(s)"][current_index] = perf_data.get(
+            perf_metric["TTFT(ms)"][current_index] = perf_results.get("TTFT", "NA")
+            perf_metric["TPOT(ms/token)"][current_index] = perf_results.get(
+                "TPOT", "NA"
+            )
+            perf_metric["e2e_latency(s)"][current_index] = perf_results.get(
                 "e2e_latency", "NA"
             )
-            perf_metric["e2e_tps(tps)"][current_index] = perf_data.get("e2e_tps", "NA")
-            perf_metric["prefill_embedding_time(ms)"][current_index] = perf_data.get(
+            perf_metric["e2e_tps(tps)"][current_index] = perf_results.get(
+                "e2e_tps", "NA"
+            )
+            perf_metric["prefill_embedding_time(ms)"][current_index] = perf_results.get(
                 "prefill_embedding_time", "NA"
             )
-            perf_metric["decode_embedding_time(ms)"][current_index] = perf_data.get(
+            perf_metric["decode_embedding_time(ms)"][current_index] = perf_results.get(
                 "decode_embedding_time", "NA"
             )
 
             # New load time metrics
-            perf_metric["prefill_load_time(ms)"][current_index] = perf_data.get(
+            perf_metric["prefill_load_time(ms)"][current_index] = perf_results.get(
                 "prefill_load_time", "NA"
             )
-            perf_metric["decode_load_time(ms)"][current_index] = perf_data.get(
+            perf_metric["decode_load_time(ms)"][current_index] = perf_results.get(
                 "decode_load_time", "NA"
             )
-            perf_metric["visual_load_time(ms)"][current_index] = perf_data.get(
+            perf_metric["vision_load_time(ms)"][current_index] = perf_results.get(
                 "vision_load_time", "NA"
             )
-        # Extract device memory usage from logs
-        device_mem = _extract_device_mem_from_log(outputs, model_name)
-        perf_metric["device_mem(MB)"][current_index] = device_mem
+
+            device_monitor = perf_data.get("DeviceMonitor", {})
+            mem_used_list = []
+            sorted_device_keys = sorted(device_monitor.keys(), key=lambda x: int(x))
+            for dev_id in sorted_device_keys:
+                dev_data = device_monitor[dev_id]
+                mem_used = dev_data.get("mem_used", "NA")
+                mem_used_list.append(f"dev{dev_id}:{mem_used}")
+            mem_used_str = ", ".join(mem_used_list)
+            perf_metric["device_mem(MB)"][current_index] = mem_used_str
+
+            host_monitor = perf_data.get("HostMonitor", {})
+            perf_metric["host_mem(GB)"][current_index] = host_monitor.get(
+                "physical_memory", "NA"
+            )
+            perf_metric["host_peak_mem(GB)"][current_index] = host_monitor.get(
+                "max_physical_memory", "NA"
+            )
+
+            lazy_perf_results = (
+                lazy_perf_data.get("PerfResults", {}) if lazy_perf_data else {}
+            )
+            # New load time metrics
+            perf_metric["prefill_load_time@lazy(ms)"][current_index] = (
+                lazy_perf_results.get("prefill_load_time", "NA")
+            )
+            perf_metric["decode_load_time@lazy(ms)"][current_index] = (
+                lazy_perf_results.get("decode_load_time", "NA")
+            )
+            perf_metric["vision_load_time@lazy(ms)"][current_index] = (
+                lazy_perf_results.get("vision_load_time", "NA")
+            )
+
+            lazy_host_monitor = (
+                lazy_perf_data.get("HostMonitor", {}) if lazy_perf_data else {}
+            )
+            perf_metric["host_mem@lazy(GB)"][current_index] = lazy_host_monitor.get(
+                "physical_memory", "NA"
+            )
+            perf_metric["host_peak_mem@lazy(GB)"][current_index] = (
+                lazy_host_monitor.get("max_physical_memory", "NA")
+            )
 
         # Fill file sizes from file_size_dict
         file_sizes = file_size_dict.get(model_name, "")
@@ -600,7 +667,7 @@ def _generate_llm_perf_table(cfg_path, outputs, file_size_dict):
 
         perf_metric["hmm_prefill_size(MB)"][current_index] = prefill_size
         perf_metric["hmm_decode_size(MB)"][current_index] = decode_size
-        perf_metric["hmm_visual_size(MB)"][current_index] = visual_size
+        perf_metric["hmm_vision_size(MB)"][current_index] = visual_size
 
     # Log the final metrics structure
     for key, value in perf_metric.items():
@@ -619,10 +686,17 @@ def _generate_llm_perf_table(cfg_path, outputs, file_size_dict):
         "flash_attention",
         "input(k)",
         "output(k)",
-        "device_mem(MB)",
+        "host_mem(GB)",
+        "host_peak_mem(GB)",
         "prefill_load_time(ms)",
         "decode_load_time(ms)",
-        "visual_load_time(ms)",
+        "vision_load_time(ms)",
+        "host_mem@lazy(GB)",
+        "host_peak_mem@lazy(GB)",
+        "prefill_load_time@lazy(ms)",
+        "decode_load_time@lazy(ms)",
+        "vision_load_time@lazy(ms)",
+        "device_mem(MB)",
         "prefill_time(ms)",
         "decode_time(ms)",
         "vision_time(ms)",
@@ -637,7 +711,7 @@ def _generate_llm_perf_table(cfg_path, outputs, file_size_dict):
         "decode_embedding_time(ms)",
         "hmm_prefill_size(MB)",
         "hmm_decode_size(MB)",
-        "hmm_visual_size(MB)",
+        "hmm_vision_size(MB)",
     ]
 
     # Write to Excel file
@@ -1018,15 +1092,18 @@ def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
     Returns:
         Dict[str, List[str]]: Dictionary mapping model names to command lists
     """
-    os.chdir(f"{script_dir}/../../tools/llm_perf")
+    # Build commands without changing global working directory.
+    # Use explicit tool directory paths relative to this script to avoid side effects.
+    tools_dir = os.path.normpath(os.path.join(script_dir, "../../tools/llm_perf"))
 
-    cmds = {}
-    file_size_dict = {}
+    cmds: Dict[str, List[str]] = {}
+    file_size_dict: Dict[str, str] = {}
     file_keys = ["prefill", "decode", "visual"]
-    for perf_md in cfg_data["Streams"]:
-        # , "--LazyMode"
+
+    for perf_md in cfg_data.get("Streams", []):
         tmp_cmd = ["./llm_perf"]
-        # Filter parameters
+
+        # Filter and convert parameters to CLI args
         for param, param_val in perf_md.items():
             if param in [
                 "ModelName",
@@ -1037,13 +1114,26 @@ def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
                 "prefill_length",
                 "context_length",
                 "flash_attention",
+                "dump_file",
             ]:
                 continue
             tmp_cmd += [f"--{param}", str(param_val)]
-        model_name = perf_md["ModelName"]
-        cmds[model_name] = tmp_cmd
 
-        # Get file size
+        model_name = perf_md.get("ModelName", "")
+        basic_cmd = copy.deepcopy(tmp_cmd)
+        dump_file = perf_md.get("dump_file", f"./{model_name}_perf_dump.yaml")
+        basic_cmd += ["--dump_file", dump_file]
+        cmds[model_name] = basic_cmd
+
+        lazy_cmd = tmp_cmd + [
+            "--LazyMode",
+            "--skip_perf",
+            "--dump_file",
+            dump_file.replace(".yaml", "_lazy.yaml"),
+        ]
+        cmds[f"{model_name}_lazy"] = lazy_cmd
+
+        # Compute file sizes for the model artifacts (if provided)
         file_size_str = ""
         for file_key in file_keys:
             model_path = perf_md.get(file_key, "")
@@ -1051,16 +1141,19 @@ def _build_llm_cmds(cfg_data: Dict, log_file: str) -> Dict[str, List[str]]:
             file_size_str += f"{file_key}:{model_size:.3f} MB;"
         file_size_dict[model_name] = file_size_str
 
-        # Embed file conversion logic
-        embed_bin = perf_md["embedding"]
-        embed_pt = embed_bin.replace(".bin", ".pt")
-        if os.path.exists(embed_bin):
-            continue
-        model_type = "llm" if "visual" not in perf_md else "vllm"
-        execute_cmd(
-            ["python3", "convert_embed.py", "--path", embed_pt, "--type", model_type],
-            log_file,
-        )
+        # Ensure embedding file exists or try to convert from .pt
+        embed_bin = perf_md.get("embedding", "")
+        embed_pt = embed_bin.replace(".bin", ".pt") if embed_bin else ""
+        # Only attempt conversion if the binary does not exist but a .pt exists
+        if embed_pt and not os.path.exists(embed_bin) and os.path.exists(embed_pt):
+            model_type = "llm" if "visual" not in perf_md else "vllm"
+            # Call converter using absolute path placed in tools_dir to avoid depending on cwd
+            convert_script = os.path.join(tools_dir, "convert_embed.py")
+            execute_cmd(
+                ["python3", convert_script, "--path", embed_pt, "--type", model_type],
+                log_file,
+            )
+
     if cmds:
         cmds[MODELS_FILE_SIZE] = file_size_dict
     return cmds

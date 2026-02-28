@@ -143,23 +143,43 @@ def check_quant_model(quant_model_path: str, quant_model: str, model_name: str) 
         return True
 
     # Define required directories
+    decode_dir = os.path.join(quant_model, "decode")
     decoder_dir = os.path.join(quant_model, "decoder")
+    if _check_folder(decode_dir) is True:
+        decoder_dir_final = decode_dir
+    elif _check_folder(decoder_dir) is True:
+        decoder_dir_final = decoder_dir
+    else:
+        logger.error(f"Missing folder {decode_dir} or {decoder_dir}")
+        return False
+
     prefill_dir = os.path.join(quant_model, "prefill")
-    folder_list = [decoder_dir, prefill_dir]
+    folder_list = [prefill_dir]
+    if all(_check_folder(ele) for ele in folder_list) is False:
+        return False
 
     # Define required files
+    decoder_onnx = list(
+        glob.glob(f"{decoder_dir_final}/**/hmquant_*_with_act.onnx", recursive=True)
+    )
+    prefill_onnx = list(
+        glob.glob(f"{prefill_dir}/**/hmquant_*_with_act.onnx", recursive=True)
+    )
+    if len(decoder_onnx) == 0 or len(prefill_onnx) == 0:
+        logger.error("Missing ONNX files.")
+        return False
+
+    # check embedding file unless it's whisper model
     embedding_file = os.path.join(quant_model, "quant_embedding.pt")
-    decoder_file = os.path.join(decoder_dir, f"hmquant_{model_name}_with_act.onnx")
-    prefill_file = os.path.join(prefill_dir, f"hmquant_{model_name}_with_act.onnx")
-    file_list = [decoder_file, prefill_file]
-    # Add embedding file to check list unless it's whisper model
-    if model_name != "whisper":
-        file_list += [embedding_file]
+    if model_name != "whisper" and _check_file(embedding_file) is False:
+        logger.error(f"Missing embedding file {embedding_file}")
+        return False
 
     # Add weight file based on target hardware
     if target == "xh1":
+        file_list = []
         if model_name in ["qwen2.5-vl", "qwen3-vl"]:
-            decoder_weight_file = os.path.join(decoder_dir, "weight.npy")
+            decoder_weight_file = os.path.join(decoder_dir_final, "weight.npy")
             prefill_weight_file = os.path.join(prefill_dir, "weight.npy")
             visual_weight_file = os.path.join(quant_model, "visual", "weight.npy")
             file_list.append(decoder_weight_file)
@@ -168,13 +188,11 @@ def check_quant_model(quant_model_path: str, quant_model: str, model_name: str) 
         else:
             weight_file = os.path.join(quant_model, "weight.npy")
             file_list.append(weight_file)
-    if all(_check_folder(ele) for ele in folder_list) is False:
-        return False
-    if all(_check_file(ele) for ele in file_list) is False:
-        return False
+        if all(_check_file(ele) for ele in file_list) is False:
+            return False
     if target == "xh2":
         # For xh2 target, check for external data files
-        decoder_external = list(glob.glob(decoder_dir + "/*external_data"))
+        decoder_external = list(glob.glob(decoder_dir_final + "/*external_data"))
         prefill_external = list(glob.glob(prefill_dir + "/*external_data"))
         if len(decoder_external) == 0 or len(prefill_external) == 0:
             logger.error("Missing external data.")
