@@ -524,10 +524,10 @@ def _extract_files(save_path: str, extract_dir: str) -> bool:
             break
 
     if not extract_func:
-        logger.error(
+        logger.warning(
             f"Unsupported compression format for decompression: {save_path}. Only supported:.zip/.tar.gz/.tgz/.tar.xz"
         )
-        return False
+        return True
 
     logger.info(f"Start to decompress: {save_path} -> {extract_dir}")
     try:
