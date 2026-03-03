@@ -292,7 +292,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--audio",
         type=str,
-        default="audio.mp3",
+        default="../../../data/audio/audio.mp3",
     )
     args = parser.parse_args()
 
