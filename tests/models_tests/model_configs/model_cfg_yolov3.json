@@ -17,17 +17,34 @@
             "compare",
             "perf",
             "eval"
+        ],
+        "xh2": [
+            "get_model",
+            "quant",
+            "compile",
+            "demo",
+            "compare",
+            "perf",
+            "eval"
         ]
     },
     "support_hmatc": {
-        "xh1": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
+        "xh1": [
+            "hmquant",
+            "hmbuild",
+            "hmdemo",
+            "hmeval",
+            "hmperf",
+            "hmcompare"
+        ],
+        "xh2": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
     },
     "perf_metrics": {
         "xh1": {
             "x86_64": 200.344
         },
         "xh2": {
-            "x86_64": 200.838
+            "x86_64": 222.169
         }
     },
     "eval_threshold": {
