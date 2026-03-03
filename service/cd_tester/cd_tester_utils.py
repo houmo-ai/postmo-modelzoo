@@ -85,7 +85,7 @@ def run_tests(cmd_list, log_file) -> bool:
     """
 
     ret = execute_cmd(cmd_list, log_file)
-    reset_chips()
+    # reset_chips()
     if not ret:
         return False
     return True

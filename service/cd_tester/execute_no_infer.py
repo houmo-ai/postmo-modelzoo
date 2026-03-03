@@ -85,7 +85,7 @@ def main(args) -> int:
     # Set environment variables for quantization/compilation tests (no inference)
     os.environ["SKIP_INFER"] = "ON"
     os.environ["HDPL_PLATFORM"] = "ISIM"
-    os.environ["IMODELZOO_MODELS_PATH"] = "/develop02/modelzoo/"
+    os.environ["IMODELZOO_MODELS_PATH"] = "/data02/modelzoo/"
     if args.release is False:
         os.environ["USE_RELEASED_MODELS"] = "OFF"
 
@@ -116,6 +116,7 @@ def main(args) -> int:
         logger.info("HF_ENDPOINT: %s", os.getenv("HF_ENDPOINT"))
         logger.info("HOUMO_DATASETS_PATH: %s", os.getenv("HOUMO_DATASETS_PATH"))
 
+    os.system("pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple onnxslim")
     # hmatc_dir = f"{root_dir}/hmatc"
     # os.chdir(hmatc_dir)
     # logger.info(f"==> [CD Test] Install latest hmatc.")
@@ -140,6 +141,7 @@ def main(args) -> int:
         "omni",
         "diffusion",
         "segmentation",
+        "reranker",
     ]
     # --collect-only
     flag = True

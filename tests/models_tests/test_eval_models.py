@@ -38,6 +38,8 @@ def _eval_func(model_name: str, log_file: str) -> None:
 
 
 @pytest.mark.efficientnet
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_backbone_efficientnet_eval(setup_logging) -> None:
     model_name = "efficientnet"
@@ -45,6 +47,8 @@ def test_backbone_efficientnet_eval(setup_logging) -> None:
 
 
 @pytest.mark.mobilenetv2
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_backbone_mobilenetv2_eval(setup_logging) -> None:
     model_name = "mobilenetv2"
@@ -52,6 +56,8 @@ def test_backbone_mobilenetv2_eval(setup_logging) -> None:
 
 
 @pytest.mark.resnet50
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_backbone_resnet50_eval(setup_logging) -> None:
     model_name = "resnet50"
@@ -59,6 +65,8 @@ def test_backbone_resnet50_eval(setup_logging) -> None:
 
 
 @pytest.mark.vit
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_backbone_vit_eval(setup_logging) -> None:
     model_name = "vit"
@@ -66,6 +74,8 @@ def test_backbone_vit_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolov3
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_detection_yolov3_eval(setup_logging) -> None:
     model_name = "yolov3"
@@ -73,6 +83,8 @@ def test_detection_yolov3_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolov5s
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_detection_yolov5s_eval(setup_logging) -> None:
     model_name = "yolov5s"
@@ -80,6 +92,8 @@ def test_detection_yolov5s_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolov5s_feature
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_detection_yolov5s_feature_eval(setup_logging) -> None:
     model_name = "yolov5s_feature"
@@ -87,6 +101,8 @@ def test_detection_yolov5s_feature_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolov8m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_detection_yolov8m_eval(setup_logging) -> None:
     model_name = "yolov8m"
@@ -94,6 +110,8 @@ def test_detection_yolov8m_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolo12m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_detection_yolo12m_eval(setup_logging) -> None:
     model_name = "yolo12m"
@@ -101,6 +119,8 @@ def test_detection_yolo12m_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolov8m_pose
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_estimation_yolov8m_pose_eval(setup_logging) -> None:
     model_name = "yolov8m-pose"
@@ -108,6 +128,8 @@ def test_estimation_yolov8m_pose_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolov8m_seg
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_segmentation_yolov8m_seg_eval(setup_logging) -> None:
     model_name = "yolov8m-seg"
@@ -115,6 +137,8 @@ def test_segmentation_yolov8m_seg_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolov7
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_detection_yolov7_eval(setup_logging) -> None:
     model_name = "yolov7"
@@ -122,6 +146,8 @@ def test_detection_yolov7_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolov5m_face
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_detection_yolov5m_face_eval(setup_logging) -> None:
     model_name = "yolov5m_face"
@@ -129,6 +155,8 @@ def test_detection_yolov5m_face_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolox
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_detection_yolox_eval(setup_logging) -> None:
     """test_detection_yolox_eval"""
@@ -137,6 +165,8 @@ def test_detection_yolox_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolov10m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_detection_yolov10m_eval(setup_logging) -> None:
     """test_detection_yolov10m_eval"""
@@ -145,6 +175,8 @@ def test_detection_yolov10m_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolo11m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_detection_yolo11m_eval(setup_logging) -> None:
     """test_detection_yolo11m_eval"""
@@ -153,6 +185,8 @@ def test_detection_yolo11m_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolov9m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_detection_yolov9m_eval(setup_logging) -> None:
     """test_detection_yolov9m_eval"""
@@ -161,6 +195,8 @@ def test_detection_yolov9m_eval(setup_logging) -> None:
 
 
 @pytest.mark.yolov8m_cls
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.eval
 def test_backbone_yolov8m_cls_eval(setup_logging) -> None:
     """test_backbone_yolov8m_cls_eval"""

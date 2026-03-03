@@ -55,7 +55,15 @@ def pytest_configure(config):
     Args:
         config: pytest configuration object
     """
-    shared_markers = ["imodelzoo"]
+    shared_markers = [
+        "imodelzoo",
+        "ndevice_1",
+        "ndevice_2",
+        "ndevice_4",
+        "dev_mem_12g",
+        "dev_mem_24g",
+        "dev_mem_48g",
+    ]
     for markers in shared_markers:
         config.addinivalue_line("markers", markers)
 

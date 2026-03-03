@@ -99,7 +99,7 @@ def main(args) -> int:
     logger.info("Current dir: %s", os.getcwd())
 
     # Set environment variables for test execution
-    os.environ["IMODELZOO_MODELS_PATH"] = "/develop02/modelzoo/"
+    os.environ["IMODELZOO_MODELS_PATH"] = "/data02/modelzoo/"
     if HOUMO_BACKEND == "xh2":
         os.environ["SKIP_INFER"] = "ON"
     os.environ["HDPL_PLATFORM"] = "ASIC"
@@ -113,6 +113,7 @@ def main(args) -> int:
             ignore_errors=True,
         )
 
+    os.system("pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple onnxslim")
     # hmatc_dir = f"{root_dir}/hmatc"
     # os.chdir(hmatc_dir)
     # logger.info(f"==> [CD Test] Install latest hmatc.")
@@ -158,6 +159,7 @@ def main(args) -> int:
             "omni",
             "diffusion",
             "segmentation",
+            "reranker",
         ]
         # --collect-only
         for key_str in key_list:

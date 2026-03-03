@@ -38,6 +38,8 @@ def _perf_func(model_name: str, log_file: str) -> None:
 
 
 @pytest.mark.yolop
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_autodrive_yolop_perf(setup_logging) -> None:
     model_name = "yolop"
@@ -45,6 +47,8 @@ def test_autodrive_yolop_perf(setup_logging) -> None:
 
 
 @pytest.mark.efficientnet
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_backbone_efficientnet_perf(setup_logging) -> None:
     model_name = "efficientnet"
@@ -52,6 +56,8 @@ def test_backbone_efficientnet_perf(setup_logging) -> None:
 
 
 @pytest.mark.mobilenetv2
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_backbone_mobilenetv2_perf(setup_logging) -> None:
     model_name = "mobilenetv2"
@@ -59,6 +65,8 @@ def test_backbone_mobilenetv2_perf(setup_logging) -> None:
 
 
 @pytest.mark.resnet50
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_backbone_resnet50_perf(setup_logging) -> None:
     model_name = "resnet50"
@@ -66,6 +74,8 @@ def test_backbone_resnet50_perf(setup_logging) -> None:
 
 
 @pytest.mark.vit
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_backbone_vit_perf(setup_logging) -> None:
     model_name = "vit"
@@ -73,6 +83,8 @@ def test_backbone_vit_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolov3
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_detection_yolov3_perf(setup_logging) -> None:
     model_name = "yolov3"
@@ -80,6 +92,8 @@ def test_detection_yolov3_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolov5s
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_detection_yolov5s_perf(setup_logging) -> None:
     model_name = "yolov5s"
@@ -87,6 +101,8 @@ def test_detection_yolov5s_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolov5s_feature
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_detection_yolov5s_feature_perf(setup_logging) -> None:
     model_name = "yolov5s_feature"
@@ -94,6 +110,8 @@ def test_detection_yolov5s_feature_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolov8m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_detection_yolov8m_perf(setup_logging) -> None:
     model_name = "yolov8m"
@@ -101,6 +119,8 @@ def test_detection_yolov8m_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolo12m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_detection_yolo12m_perf(setup_logging) -> None:
     model_name = "yolo12m"
@@ -108,6 +128,8 @@ def test_detection_yolo12m_perf(setup_logging) -> None:
 
 
 @pytest.mark.deepseek
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_llm_deepseek_perf(setup_logging) -> None:
     model_name = "deepseek"
@@ -115,6 +137,8 @@ def test_llm_deepseek_perf(setup_logging) -> None:
 
 
 @pytest.mark.deepseek_r1_qwen3_8b
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_llm_deepseek_r1_qwen3_8b_perf(setup_logging) -> None:
     model_name = "deepseek-r1-qwen3-8b"
@@ -122,6 +146,8 @@ def test_llm_deepseek_r1_qwen3_8b_perf(setup_logging) -> None:
 
 
 @pytest.mark.qwen3
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_llm_qwen3_perf(setup_logging) -> None:
     model_name = "qwen3"
@@ -129,6 +155,8 @@ def test_llm_qwen3_perf(setup_logging) -> None:
 
 
 @pytest.mark.qwen3_14b
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_24g
 @pytest.mark.perf
 def test_llm_qwen3_14b_perf(setup_logging) -> None:
     model_name = "qwen3-14b"
@@ -136,6 +164,8 @@ def test_llm_qwen3_14b_perf(setup_logging) -> None:
 
 
 @pytest.mark.qwen2dot5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_llm_qwen2dot5_perf(setup_logging) -> None:
     model_name = "qwen2.5"
@@ -143,6 +173,8 @@ def test_llm_qwen2dot5_perf(setup_logging) -> None:
 
 
 @pytest.mark.qwen2dot5_vl
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_vllm_qwen2dot5_vl_perf(setup_logging) -> None:
     model_name = "qwen2.5-vl"
@@ -150,6 +182,8 @@ def test_vllm_qwen2dot5_vl_perf(setup_logging) -> None:
 
 
 @pytest.mark.wenet
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_asr_wenet_perf(setup_logging) -> None:
     model_name = "wenet"
@@ -157,6 +191,8 @@ def test_asr_wenet_perf(setup_logging) -> None:
 
 
 @pytest.mark.sdxl
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_diffusion_sdxl_perf(setup_logging) -> None:
     model_name = "sdxl"
@@ -164,6 +200,8 @@ def test_diffusion_sdxl_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolov8m_pose
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_estimation_yolov8m_pose_perf(setup_logging) -> None:
     model_name = "yolov8m-pose"
@@ -171,6 +209,8 @@ def test_estimation_yolov8m_pose_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolov8m_seg
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_segmentation_yolov8m_seg_perf(setup_logging) -> None:
     model_name = "yolov8m-seg"
@@ -178,6 +218,8 @@ def test_segmentation_yolov8m_seg_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolov7
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_detection_yolov7_perf(setup_logging) -> None:
     model_name = "yolov7"
@@ -185,6 +227,8 @@ def test_detection_yolov7_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolov5m_face
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_detection_yolov5m_face_perf(setup_logging) -> None:
     model_name = "yolov5m_face"
@@ -192,6 +236,8 @@ def test_detection_yolov5m_face_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolox
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_detection_yolox_perf(setup_logging) -> None:
     model_name = "yolox"
@@ -199,6 +245,8 @@ def test_detection_yolox_perf(setup_logging) -> None:
 
 
 @pytest.mark.lprnet
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_ocr_lprnet_perf(setup_logging) -> None:
     """test_ocr_lprnet_perf"""
@@ -207,6 +255,8 @@ def test_ocr_lprnet_perf(setup_logging) -> None:
 
 
 @pytest.mark.ppocrv3_det
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_ocr_ppocrv3_det_perf(setup_logging) -> None:
     """test_ocr_ppocrv3_det_perf"""
@@ -215,6 +265,8 @@ def test_ocr_ppocrv3_det_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolov10m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_detection_yolov10m_perf(setup_logging) -> None:
     """test_detection_yolov10m_perf"""
@@ -223,6 +275,8 @@ def test_detection_yolov10m_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolo11m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_detection_yolo11m_perf(setup_logging) -> None:
     """test_detection_yolo11m_perf"""
@@ -231,6 +285,8 @@ def test_detection_yolo11m_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolov9m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_detection_yolov9m_perf(setup_logging) -> None:
     """test_detection_yolov9m_perf"""
@@ -239,6 +295,8 @@ def test_detection_yolov9m_perf(setup_logging) -> None:
 
 
 @pytest.mark.qwen3_30b_a3b
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
 @pytest.mark.perf
 def test_llm_qwen3_30b_a3b_perf(setup_logging) -> None:
     """test_llm_qwen3_30b_a3b_perf"""
@@ -247,6 +305,8 @@ def test_llm_qwen3_30b_a3b_perf(setup_logging) -> None:
 
 
 @pytest.mark.qwen3_vl
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_vllm_qwen3_vl_perf(setup_logging) -> None:
     """test_vllm_qwen3_vl_perf"""
@@ -255,6 +315,8 @@ def test_vllm_qwen3_vl_perf(setup_logging) -> None:
 
 
 @pytest.mark.whisper
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_asr_whisper_perf(setup_logging) -> None:
     """test_asr_whisper_perf"""
@@ -263,6 +325,8 @@ def test_asr_whisper_perf(setup_logging) -> None:
 
 
 @pytest.mark.gte
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_embedding_gte_perf(setup_logging) -> None:
     """test_embedding_gte_perf"""
@@ -271,6 +335,8 @@ def test_embedding_gte_perf(setup_logging) -> None:
 
 
 @pytest.mark.gpt_oss
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
 @pytest.mark.perf
 def test_llm_gpt_oss_perf(setup_logging) -> None:
     """test_llm_gpt_oss_perf"""
@@ -279,6 +345,8 @@ def test_llm_gpt_oss_perf(setup_logging) -> None:
 
 
 @pytest.mark.yolov8m_cls
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 @pytest.mark.perf
 def test_backbone_yolov8m_cls_perf(setup_logging) -> None:
     """test_backbone_yolov8m_cls_perf"""

@@ -2,6 +2,10 @@
     "obsolete": false,
     "model_dir": "models/vllm/qwen3-vl",
     "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
     "support_platform": ["x86_64", "aarch64"],
     "support_backend": ["xh1", "xh2"],
     "support_core_num": {

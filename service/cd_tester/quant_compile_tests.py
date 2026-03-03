@@ -545,6 +545,10 @@ if __name__ == "__main__":
                 "bind": "/develop02/modelzoo",
                 "mode": "rw",
             },
+            "/data02/modelzoo": {
+                "bind": "/data02/modelzoo",
+                "mode": "rw",
+            },
             # Map logs folder
             os.path.abspath(log_dir): {
                 "bind": f"{container_home}/logs",

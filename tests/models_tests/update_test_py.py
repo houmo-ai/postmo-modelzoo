@@ -78,6 +78,34 @@ def _append_model_to_txt(new_model: str) -> bool:
         return True
 
 
+def _build_dependency_markers(model_info: dict) -> list[str]:
+    """
+    Build pytest markers from model dependencies field.
+
+    Rules:
+    - ndevice: use first element, e.g. [1, 4] -> pytest.mark.ndevice_1
+    - dev_mem: use first element, e.g. ["12g", "48g"] -> pytest.mark.dev_mem_12g
+    """
+    dependency_markers = []
+    dependencies = model_info.get("dependencies")
+    if not isinstance(dependencies, dict):
+        return dependency_markers
+
+    ndevice_values = dependencies.get("ndevice")
+    if isinstance(ndevice_values, list) and len(ndevice_values) > 0:
+        ndevice_value = str(ndevice_values[0]).strip()
+        if ndevice_value:
+            dependency_markers.append(f"ndevice_{ndevice_value}")
+
+    dev_mem_values = dependencies.get("dev_mem")
+    if isinstance(dev_mem_values, list) and len(dev_mem_values) > 0:
+        dev_mem_value = str(dev_mem_values[0]).strip().lower()
+        if dev_mem_value:
+            dependency_markers.append(f"dev_mem_{dev_mem_value}")
+
+    return dependency_markers
+
+
 def main():
     """
     Main function to scan model configurations and update test files.
@@ -111,6 +139,7 @@ def main():
         support_flow = list(set(support_flow_xh1 + support_flow_xh2))
         model_type = model_info["model_dir"].split("/")[1]
         model_name_new = _convert_model_name(model_name)
+        dependency_markers = _build_dependency_markers(model_info)
 
         # Generate test functions for each supported flow
         for flow_name in support_flow:
@@ -138,6 +167,8 @@ def main():
 
                 file.write("\n\n")
                 file.write(f"@pytest.mark.{model_name_new}\n")
+                for dependency_marker in dependency_markers:
+                    file.write(f"@pytest.mark.{dependency_marker}\n")
                 file.write(f"@pytest.mark.{flow_name}\n")
                 if flow_name == "get_model":
                     file.write(f"@pytest.mark.dependency(name='{func_name}')\n")

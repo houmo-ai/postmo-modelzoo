@@ -43,6 +43,8 @@ def _quant_func(model_name: str, log_file: str) -> None:
     name="test_autodrive_yolop_quant",
     depends_on=["test_get_models.py::test_autodrive_yolop_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_autodrive_yolop_quant(setup_logging) -> None:
     """test_autodrive_yolop_quant"""
     model_name = "yolop"
@@ -55,6 +57,8 @@ def test_autodrive_yolop_quant(setup_logging) -> None:
     name="test_backbone_efficientnet_quant",
     depends_on=["test_get_models.py::test_backbone_efficientnet_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_backbone_efficientnet_quant(setup_logging) -> None:
     """test_backbone_efficientnet_quant"""
     model_name = "efficientnet"
@@ -67,6 +71,8 @@ def test_backbone_efficientnet_quant(setup_logging) -> None:
     name="test_backbone_mobilenetv2_quant",
     depends_on=["test_get_models.py::test_backbone_mobilenetv2_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_backbone_mobilenetv2_quant(setup_logging) -> None:
     """test_backbone_efficientnet_quant"""
     model_name = "mobilenetv2"
@@ -79,6 +85,8 @@ def test_backbone_mobilenetv2_quant(setup_logging) -> None:
     name="test_backbone_resnet50_quant",
     depends_on=["test_get_models.py::test_backbone_resnet50_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_backbone_resnet50_quant(setup_logging) -> None:
     """test_backbone_resnet50_quant"""
     model_name = "resnet50"
@@ -91,6 +99,8 @@ def test_backbone_resnet50_quant(setup_logging) -> None:
     name="test_backbone_vit_quant",
     depends_on=["test_get_models.py::test_backbone_vit_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_backbone_vit_quant(setup_logging) -> None:
     """test_backbone_vit_quant"""
     model_name = "vit"
@@ -103,6 +113,8 @@ def test_backbone_vit_quant(setup_logging) -> None:
     name="test_detection_yolov3_quant",
     depends_on=["test_get_models.py::test_detection_yolov3_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_detection_yolov3_quant(setup_logging) -> None:
     """test_detection_yolov3_quant"""
     model_name = "yolov3"
@@ -115,6 +127,8 @@ def test_detection_yolov3_quant(setup_logging) -> None:
     name="test_detection_yolov5s_quant",
     depends_on=["test_get_models.py::test_detection_yolov5s_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_detection_yolov5s_quant(setup_logging) -> None:
     """test_detection_yolov5s_quant"""
     model_name = "yolov5s"
@@ -127,6 +141,8 @@ def test_detection_yolov5s_quant(setup_logging) -> None:
     name="test_detection_yolov5s_feature_quant",
     depends_on=["test_get_models.py::test_detection_yolov5s_feature_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_detection_yolov5s_feature_quant(setup_logging) -> None:
     """test_detection_yolov5s_feature_quant"""
     model_name = "yolov5s_feature"
@@ -139,6 +155,8 @@ def test_detection_yolov5s_feature_quant(setup_logging) -> None:
     name="test_detection_yolov8m_quant",
     depends_on=["test_get_models.py::test_detection_yolov8m_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_detection_yolov8m_quant(setup_logging) -> None:
     """test_detection_yolov8m_quant"""
     model_name = "yolov8m"
@@ -151,6 +169,8 @@ def test_detection_yolov8m_quant(setup_logging) -> None:
     name="test_llm_qwen2dot5_quant",
     depends_on=["test_get_models.py::test_llm_qwen2dot5_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_llm_qwen2dot5_quant(setup_logging) -> None:
     """test_llm_qwen2dot5_quant"""
     model_name = "qwen2.5"
@@ -163,6 +183,8 @@ def test_llm_qwen2dot5_quant(setup_logging) -> None:
     name="test_llm_qwen3_quant",
     depends_on=["test_get_models.py::test_llm_qwen3_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_llm_qwen3_quant(setup_logging) -> None:
     """test_llm_qwen3_quant"""
     model_name = "qwen3"
@@ -175,6 +197,8 @@ def test_llm_qwen3_quant(setup_logging) -> None:
     name="test_llm_qwen3_14b_quant",
     depends_on=["test_get_models.py::test_llm_qwen3_14b_get_model"],
 )
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_24g
 def test_llm_qwen3_14b_quant(setup_logging) -> None:
     """test_llm_qwen3_14b_quant"""
     model_name = "qwen3-14b"
@@ -187,6 +211,8 @@ def test_llm_qwen3_14b_quant(setup_logging) -> None:
     name="test_llm_deepseek_quant",
     depends_on=["test_get_models.py::test_llm_deepseek_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_llm_deepseek_quant(setup_logging) -> None:
     """test_llm_deepseek_quant"""
     model_name = "deepseek"
@@ -199,6 +225,8 @@ def test_llm_deepseek_quant(setup_logging) -> None:
     name="test_llm_deepseek_r1_qwen3_8b_quant",
     depends_on=["test_get_models.py::test_llm_deepseek_r1_qwen3_8b_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_llm_deepseek_r1_qwen3_8b_quant(setup_logging) -> None:
     """test_llm_deepseek_r1_qwen3_8b_quant"""
     model_name = "deepseek-r1-qwen3-8b"
@@ -211,6 +239,8 @@ def test_llm_deepseek_r1_qwen3_8b_quant(setup_logging) -> None:
     name="test_vllm_qwen2dot5_vl_quant",
     depends_on=["test_get_models.py::test_vllm_qwen2dot5_vl_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_vllm_qwen2dot5_vl_quant(setup_logging) -> None:
     """test_vllm_qwen2dot5_vl_quant"""
     model_name = "qwen2.5-vl"
@@ -223,6 +253,8 @@ def test_vllm_qwen2dot5_vl_quant(setup_logging) -> None:
     name="test_detection_yolo12m_quant",
     depends_on=["test_get_models.py::test_detection_yolo12m_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_detection_yolo12m_quant(setup_logging) -> None:
     """test_detection_yolo12m_quant"""
     model_name = "yolo12m"
@@ -235,6 +267,8 @@ def test_detection_yolo12m_quant(setup_logging) -> None:
     name="test_estimation_yolov8m_pose_quant",
     depends_on=["test_get_models.py::test_estimation_yolov8m_pose_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_estimation_yolov8m_pose_quant(setup_logging) -> None:
     """test_estimation_yolov8m_pose_quant"""
     model_name = "yolov8m-pose"
@@ -247,6 +281,8 @@ def test_estimation_yolov8m_pose_quant(setup_logging) -> None:
     name="test_segmentation_yolov8m_seg_quant",
     depends_on=["test_get_models.py::test_segmentation_yolov8m_seg_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_segmentation_yolov8m_seg_quant(setup_logging) -> None:
     """test_segmentation_yolov8m_seg_quant"""
     model_name = "yolov8m-seg"
@@ -259,6 +295,8 @@ def test_segmentation_yolov8m_seg_quant(setup_logging) -> None:
     name="test_detection_yolov7_quant",
     depends_on=["test_get_models.py::test_detection_yolov7_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_detection_yolov7_quant(setup_logging) -> None:
     """test_detection_yolov7_quant"""
     model_name = "yolov7"
@@ -271,6 +309,8 @@ def test_detection_yolov7_quant(setup_logging) -> None:
     name="test_detection_yolov5m_face_quant",
     depends_on=["test_get_models.py::test_detection_yolov5m_face_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_detection_yolov5m_face_quant(setup_logging) -> None:
     """test_detection_yolov5m_face_quant"""
     model_name = "yolov5m_face"
@@ -283,6 +323,8 @@ def test_detection_yolov5m_face_quant(setup_logging) -> None:
     name="test_detection_yolox_quant",
     depends_on=["test_get_models.py::test_detection_yolox_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_detection_yolox_quant(setup_logging) -> None:
     """test_detection_yolox_quant"""
     model_name = "yolox"
@@ -295,6 +337,8 @@ def test_detection_yolox_quant(setup_logging) -> None:
     name="test_ocr_lprnet_quant",
     depends_on=["test_get_models.py::test_ocr_lprnet_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_ocr_lprnet_quant(setup_logging) -> None:
     """test_ocr_lprnet_quant"""
     model_name = "lprnet"
@@ -307,6 +351,8 @@ def test_ocr_lprnet_quant(setup_logging) -> None:
     name="test_ocr_ppocrv3_det_quant",
     depends_on=["test_get_models.py::test_ocr_ppocrv3_det_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_ocr_ppocrv3_det_quant(setup_logging) -> None:
     """test_ocr_ppocrv3_det_quant"""
     model_name = "ppocrv3_det"
@@ -319,6 +365,8 @@ def test_ocr_ppocrv3_det_quant(setup_logging) -> None:
     name="test_embedding_bge_quant",
     depends_on=["test_get_models.py::test_embedding_bge_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_embedding_bge_quant(setup_logging) -> None:
     """test_embedding_bge_quant"""
     model_name = "bge"
@@ -331,6 +379,8 @@ def test_embedding_bge_quant(setup_logging) -> None:
     name="test_detection_yolov10m_quant",
     depends_on=["test_get_models.py::test_detection_yolov10m_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_detection_yolov10m_quant(setup_logging) -> None:
     """test_detection_yolov10m_quant"""
     model_name = "yolov10m"
@@ -343,6 +393,8 @@ def test_detection_yolov10m_quant(setup_logging) -> None:
     name="test_detection_yolo11m_quant",
     depends_on=["test_get_models.py::test_detection_yolo11m_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_detection_yolo11m_quant(setup_logging) -> None:
     """test_detection_yolo11m_quant"""
     model_name = "yolo11m"
@@ -355,6 +407,8 @@ def test_detection_yolo11m_quant(setup_logging) -> None:
     name="test_detection_yolov9m_quant",
     depends_on=["test_get_models.py::test_detection_yolov9m_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_detection_yolov9m_quant(setup_logging) -> None:
     """test_detection_yolov9m_quant"""
     model_name = "yolov9m"
@@ -367,6 +421,8 @@ def test_detection_yolov9m_quant(setup_logging) -> None:
     name="test_omni_minicpmo_quant",
     depends_on=["test_get_models.py::test_omni_minicpmo_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_omni_minicpmo_quant(setup_logging) -> None:
     """test_omni_minicpmo_quant"""
     model_name = "minicpmo"
@@ -379,6 +435,8 @@ def test_omni_minicpmo_quant(setup_logging) -> None:
     name="test_backbone_yolov8m_cls_quant",
     depends_on=["test_get_models.py::test_backbone_yolov8m_cls_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_backbone_yolov8m_cls_quant(setup_logging) -> None:
     """test_backbone_yolov8m_cls_quant"""
     model_name = "yolov8m-cls"
@@ -391,6 +449,8 @@ def test_backbone_yolov8m_cls_quant(setup_logging) -> None:
     name="test_embedding_gte_quant",
     depends_on=["test_get_models.py::test_embedding_gte_get_model"],
 )
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_embedding_gte_quant(setup_logging) -> None:
     """test_embedding_gte_quant"""
     model_name = "gte"

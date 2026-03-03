@@ -2,6 +2,10 @@
     "obsolete": false,
     "model_dir": "models/backbone/efficientnet",
     "model_type": "cv",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
     "support_platform": ["x86_64"],
     "support_backend": ["xh1", "xh2"],
     "support_core_num": {
