@@ -111,7 +111,7 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
                 ln -s /opt/venv/houmo/lib/python3.12/site-packages/setuptools/_distutils \
                     $dir_path/lib/python3.12/site-packages/distutils
             fi
-            pip install gptqmodel-5.4.4-py3-none-any.whl
+            pip3 install gptqmodel-5.4.4-py3-none-any.whl
             python3 ptq.py
             python3 build.py
         else
