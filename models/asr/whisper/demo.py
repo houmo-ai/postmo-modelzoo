@@ -24,6 +24,7 @@ import os
 import time
 import numpy as np
 import argparse
+import soundfile as sf
 from loguru import logger
 
 import torch
@@ -33,6 +34,25 @@ from datasets import load_dataset
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+
+
+def is_valid_char(cp):
+    if (
+        (cp >= 0x4E00 and cp <= 0x9FFF)
+        or (cp >= 0x3400 and cp <= 0x4DBF)
+        or (cp >= 0x20000 and cp <= 0x2A6DF)
+        or (cp >= 0x2A700 and cp <= 0x2B73F)
+        or (cp >= 0x2B740 and cp <= 0x2B81F)
+        or (cp >= 0x2B820 and cp <= 0x2CEAF)
+        or (cp >= 0xF900 and cp <= 0xFAFF)
+        or (cp >= 0x2F800 and cp <= 0x2FA1F)
+        or (0x0041 <= cp and cp <= 0x005A)
+        or (0x0061 <= cp and cp <= 0x007A)
+    ):
+        return True
+
+    return False
+
 
 lang_to_id = [
     50327,
@@ -148,6 +168,11 @@ def get_args() -> argparse.Namespace:
         help="processor dir",
     )
     parser.add_argument(
+        "--audio",
+        type=str,
+        default="../../../data/audio/audio.mp3",
+    )
+    parser.add_argument(
         "--encoder_path",
         dest="encoder_path",
         type=str,
@@ -237,6 +262,8 @@ class HmWhisper:
 
 
 def asr(hmwhisper, processor, input_features):
+    slide_len = 10
+    skip_tokens = 0
     start_time = time.time()
     detect_ids = torch.tensor([[50258]])  # [1,1]
     default_decoder_ids = torch.tensor([[50258, 0, 50359, 50363]])  # [1,1]
@@ -316,10 +343,12 @@ def asr(hmwhisper, processor, input_features):
     next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
     next_tokens = torch.argmax(next_token_logits, dim=-1)
     default_decoder_ids = torch.cat([default_decoder_ids, next_tokens[:, None]], dim=-1)
-    decoded_text = processor.decode(next_tokens)
-    decode_response = decoded_text if decoded_text != "<|endoftext|>" else ""
+    decode_response = (
+        processor.decode(next_tokens) if next_tokens.item() != 50257 else ""
+    )
     prefill_ids_len = default_decoder_ids.shape[1]
     ttft_time = time.time() - start_time
+    last_response = processor.decode(default_decoder_ids[-slide_len:])
     logger.success("transcription:")
     print("\033[1;95m{}".format(decode_response), end="", flush=True)
 
@@ -352,9 +381,16 @@ def asr(hmwhisper, processor, input_features):
         default_decoder_ids = torch.cat(
             [default_decoder_ids, next_tokens[:, None]], dim=-1
         )
-        decoded_text = processor.decode(next_tokens)
-        decode_response = decoded_text if decoded_text != "<|endoftext|>" else None
-        print(decode_response, end="", flush=True)
+        decode_response = processor.decode(
+            default_decoder_ids.tolist()[-(slide_len + 1) - skip_tokens :]
+        )[0][len(last_response[0]) :]
+        if decode_response != "" and is_valid_char(ord(decode_response[-1])):
+            print(decode_response, end="", flush=True)
+            last_response = processor.decode(default_decoder_ids[-slide_len:])
+            skip_tokens = 0
+        else:
+            skip_tokens += 1
+        decode_response = "" if next_tokens.item() == 50257 else decode_response
 
     print("\033[0m")
     return (
@@ -379,15 +415,8 @@ if __name__ == "__main__":
         raise ValueError("Unsupport houmo target!")
 
     processor = WhisperProcessor.from_pretrained(args.processor_dir)
-
-    # load dataset
-    ds = load_dataset(
-        "hf-internal-testing/librispeech_asr_dummy", "clean", split="validation"
-    )
-    sample = ds[1]["audio"]
-    input_features = processor(
-        sample["array"], sampling_rate=sample["sampling_rate"], return_tensors="pt"
-    ).input_features
+    sample, _ = sf.read(args.audio)
+    input_features = processor(sample, 16000, return_tensors="pt").input_features
 
     # run whisper model
     prefill_ids_len, all_ids_len, ttft_time, total_time = asr(
