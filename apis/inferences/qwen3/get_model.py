@@ -23,6 +23,7 @@ import os
 import sys
 import argparse
 import torch
+import shutil
 
 # Get Houmo examples path from environment variable or use default
 HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
@@ -150,7 +151,7 @@ if __name__ == "__main__":
         )
 
         _extract_files("3rdparty/eigen-3.4.0.zip", target_dir)
-        os.rename("3rdparty/eigen-3.4.0", "3rdparty/eigen3")
+        shutil.move("3rdparty/eigen-3.4.0", "3rdparty/eigen3")
         for file in os.listdir(target_dir):
             if file.endswith(".zip"):
                 os.remove(os.path.join(target_dir, file))

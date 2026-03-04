@@ -50,6 +50,33 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "get_model" ]; then
     python3 get_model.py
 fi
 
+build_and_run_cpp_demo() {
+  if [ $(uname -s) = "Linux" ] && ([ $(uname -m) = "x86_64" ] || [ $(uname -m) = "aarch64" ]); then
+    if [ "$HOUMO_TARGET" = "xh2" ]; then
+      set -e
+      WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+      cd "${WORK_PATH}" || exit 1
+
+      if [ -e build ]; then
+        rm -rf build
+      fi
+      mkdir -p build
+      cd build || exit 1
+
+      cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH -DCMAKE_BUILD_TYPE=Release ..
+      make
+      make install
+
+      cd $WORK_PATH
+      ./example_cxx_qwen3
+    else
+      echo "UnSupport Backend!"
+    fi
+  else
+    echo "UnSupport PlatForm!"
+  fi
+}
+
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     if [ "$DEMO_TYPE" = "normal" ]; then
         echo "Execute Qwen3 Normal Demo."
@@ -62,5 +89,5 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
         exit 1
     fi
     # c++ example
-    ./run_linux.sh
+    build_and_run_cpp_demo
 fi
