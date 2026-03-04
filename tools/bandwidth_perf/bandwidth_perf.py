@@ -318,7 +318,6 @@ if __name__ == "__main__":
             hmonnx_model,
             output_name=MODEL_NAME,
             output_dir=output_dir,
-            enable_model_connect=False,
             work_dir=build_tmp_dir,
             target=target,
             ncore=1,
