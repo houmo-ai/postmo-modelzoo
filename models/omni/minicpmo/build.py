@@ -434,7 +434,6 @@ if __name__ == "__main__":
             ndevice,
             2048,
             j,
-            prefill_length=args.prefill_length,
         )
         build_llm_tts(
             "minicpmo_tts_decode",
