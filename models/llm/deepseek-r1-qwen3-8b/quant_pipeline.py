@@ -1,9 +1,9 @@
 # Copyright (c) 2025 HOUMO AI
 #
-# File: quant_pipline.py
+# File: quant_pipeline.py
 # Description:
 #   Quantization Pipeline Module - Python script implementing the
-# quantization pipeline for Qwen3 models.
+# quantization pipeline for DeepSeek models.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -62,21 +62,21 @@ def gptq_quant_llm(args):
     if args.calibration_dataset:
         cnt = 0
         cnt_start = 0
-        with open(args.calibration_dataset, encoding='utf-8') as file:
+        with open(args.calibration_dataset, encoding="utf-8") as file:
             for line in file:
                 if cnt >= cnt_start:
-                    calibration_dataset.append(json.loads(line)['text'])
+                    calibration_dataset.append(json.loads(line)["text"])
                 cnt = cnt + 1
                 if cnt == cnt_start + 512:
                     break
     else:
         calibration_dataset = load_dataset(
-            'wikitext', 'wikitext-2-raw-v1', split='train'
+            "wikitext", "wikitext-2-raw-v1", split="train"
         ).select(range(512))["text"]
 
     # 量化配置
     quant_config = QuantizeConfig(
-        bits=4, group_size=64, sym=True, mse=2.4, damp_percent=0.01, rotation='hadamard'
+        bits=4, group_size=64, sym=True, mse=2.4, damp_percent=0.01, rotation="hadamard"
     )
     # 载入模型
     model = GPTQModel.load(args.model, quant_config)
@@ -192,6 +192,7 @@ def houmo_quant_llm(args):
             **gptq_config,
             device=device,
             layers_cache_dir=str(layers_cache_dir),
+            cache_dir=args.datasets_dir,
         )
         logger.info(msg_output_format("End gptq quantization"))
 

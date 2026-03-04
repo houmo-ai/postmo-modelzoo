@@ -1,9 +1,9 @@
 # Copyright (c) 2025 HOUMO AI
 #
-# File: quant_pipline.py
+# File: quant_pipeline.py
 # Description:
 #   Quantization Pipeline Module - Python script implementing the
-# quantization pipeline for DeepSeek models.
+# quantization pipeline for Qwen3 models.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ from xhquant.api import (
 )  # isort:skip
 
 from xh_model_zoo.xh_llm import LLMConverter
-from xh_model_zoo.xh_llm.models.qwen2_legacy import Qwen2LegacyConvertConfig
+from xh_model_zoo.xh_llm.models.qwen3_legacy import Qwen3LegacyConvertConfig
 from xh_model_zoo.utils.memory_tracker import MemoryTracker  # isort:skip
 from xh_model_zoo.utils.time_profiler import TimeProfiler  # isort:skip
 
@@ -62,21 +62,21 @@ def gptq_quant_llm(args):
     if args.calibration_dataset:
         cnt = 0
         cnt_start = 0
-        with open(args.calibration_dataset, encoding='utf-8') as file:
+        with open(args.calibration_dataset, encoding="utf-8") as file:
             for line in file:
                 if cnt >= cnt_start:
-                    calibration_dataset.append(json.loads(line)['text'])
+                    calibration_dataset.append(json.loads(line)["text"])
                 cnt = cnt + 1
                 if cnt == cnt_start + 512:
                     break
     else:
         calibration_dataset = load_dataset(
-            'wikitext', 'wikitext-2-raw-v1', split='train'
+            "wikitext", "wikitext-2-raw-v1", split="train"
         ).select(range(512))["text"]
 
     # 量化配置
     quant_config = QuantizeConfig(
-        bits=4, group_size=64, sym=True, mse=2.4, damp_percent=0.01, rotation='hadamard'
+        bits=4, group_size=64, sym=True, mse=2.4, damp_percent=0.01, rotation="hadamard"
     )
     # 载入模型
     model = GPTQModel.load(args.model, quant_config)
@@ -192,7 +192,6 @@ def houmo_quant_llm(args):
             **gptq_config,
             device=device,
             layers_cache_dir=str(layers_cache_dir),
-            cache_dir=args.datasets_dir,
         )
         logger.info(msg_output_format("End gptq quantization"))
 
@@ -253,12 +252,14 @@ def export_llm(args):
     else:
         quant_weight = os.path.join(model_dir, "quarot_gptq-state-dict.safetensors")
 
-    config = Qwen2LegacyConvertConfig(
+    config = Qwen3LegacyConvertConfig(
         batch_size=1,
         context_length=args.context_length,
         input_sequence_length=args.input_sequence_length,
         quant_scheme=quant_scheme,
         quant_weight=quant_weight,
+        mix_search=args.mix_search,
+        num_logits_to_keep=args.num_logits_to_keep,
     )
 
     prefix = f"{model_name}-{target_device}-{args.context_length//1024}k-{quant_type}"
@@ -268,12 +269,7 @@ def export_llm(args):
     xhquant_init(log_file, debug=args.debug)
     logger = get_root_logger()
     with TimeProfiler("convert", logger), MemoryTracker("cuda:0", "convert", logger):
-        if "qwen3" in args.model.lower():
-            architecture = "Qwen3ForCausalLM_legacy"
-        elif "qwen2" in args.model.lower():
-            architecture = "Qwen2ForCausalLM_legacy"
-        else:
-            raise ValueError("Unsupported model architecture")
+        architecture = "Qwen3ForCausalLM_legacy"
         LLMConverter.from_pretrained(hf_model_path, architecture, config, str(work_dir))
 
 

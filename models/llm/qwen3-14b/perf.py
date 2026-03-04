@@ -24,7 +24,7 @@ import os
 import re
 import sys
 import math
-import time
+import random
 import argparse
 import numpy as np
 import torch
@@ -34,89 +34,74 @@ from loguru import logger
 
 import tcim_lite as tcim
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")))
+sys.path.append(
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")
+    )
+)
 from perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 
 
-def is_valid_char(cp):
-    if (
-        (cp >= 0x4E00 and cp <= 0x9FFF)
-        or (cp >= 0x3400 and cp <= 0x4DBF)
-        or (cp >= 0x20000 and cp <= 0x2A6DF)
-        or (cp >= 0x2A700 and cp <= 0x2B73F)
-        or (cp >= 0x2B740 and cp <= 0x2B81F)
-        or (cp >= 0x2B820 and cp <= 0x2CEAF)
-        or (cp >= 0xF900 and cp <= 0xFAFF)
-        or (cp >= 0x2F800 and cp <= 0x2FA1F)
-        or (0x0041 <= cp and cp <= 0x005A)
-        or (0x0061 <= cp and cp <= 0x007A)
-    ):
-        return True
-
-    return False
-
-
-import random
-
-
 def generate_random_digit_string(length=1000):
     random_digits = [str(random.randint(0, 9)) for _ in range(length)]
-    return ''.join(random_digits)
+    return "".join(random_digits)
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--tokenizer_dir',
-        dest='tokenizer_dir',
+        "--tokenizer_dir",
+        dest="tokenizer_dir",
         type=str,
         default="qwen3-14b",
-        help='tokenizer dir',
+        help="tokenizer dir",
     )
     parser.add_argument(
-        '--embedding_path',
-        dest='embedding_path',
+        "--embedding_path",
+        dest="embedding_path",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, 'hmquant', 'quant_embedding.pt'),
-        help='houmo embedding weight path',
+        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        help="houmo embedding weight path",
     )
     parser.add_argument(
-        '--prefill_path',
-        dest='prefill_path',
+        "--prefill_path",
+        dest="prefill_path",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, "qwen3_prefill.hmm"),
-        help='houmo prefill model path',
+        default=os.path.join("output", HOUMO_TARGET, "qwen3_prefill.hmm"),
+        help="houmo prefill model path",
     )
     parser.add_argument(
-        '--decode_path',
-        dest='decode_path',
+        "--decode_path",
+        dest="decode_path",
         type=str,
-        default=os.path.join('output', HOUMO_TARGET, "qwen3_decode.hmm"),
-        help='houmo decode model path',
+        default=os.path.join("output", HOUMO_TARGET, "qwen3_decode.hmm"),
+        help="houmo decode model path",
     )
     parser.add_argument(
-        '--isl',
-        dest='isl',
+        "--isl",
+        dest="isl",
         type=int,
         default=1024,
-        help='input seq length',
+        help="input seq length",
     )
     parser.add_argument(
-        '--osl',
-        dest='osl',
+        "--osl",
+        dest="osl",
         type=int,
         default=1024,
-        help='output seq length',
+        help="output seq length",
     )
     args = parser.parse_args()
     return args
 
 
 class HmQwenXh2:
-    def __init__(self, prefill_path, decode_path, embedding_path, tokenizer_dir, isl, osl):
+    def __init__(
+        self, prefill_path, decode_path, embedding_path, tokenizer_dir, isl, osl
+    ):
         self.perf_tracker = InferencePerformanceTracker()
         weight_manager = tcim.runtime.WeightManager(0)
         option1 = tcim.runtime.Option(weight_manager)
@@ -131,10 +116,10 @@ class HmQwenXh2:
 
         self.nblocks = self.get_nblocks()
         dummy_tensor_names = [
-            f'model_layers_{i}_self_attn_kcache_input' for i in range(self.nblocks)
+            f"model_layers_{i}_self_attn_kcache_input" for i in range(self.nblocks)
         ]
         dummy_tensor_names += [
-            f'model_layers_{i}_self_attn_vcache_input' for i in range(self.nblocks)
+            f"model_layers_{i}_self_attn_vcache_input" for i in range(self.nblocks)
         ]
         option1.set_dummy_tensors(dummy_tensor_names)
         self.prefill_length = self.prefill.get_input_info(
@@ -153,7 +138,7 @@ class HmQwenXh2:
         # Set decode input
         for b in range(self.batch):
             index = 2 if b == 0 else 2 * self.nblocks * b + 3 + 2 * b - 1
-            current_length_input = np.array([1]).astype('int32')
+            current_length_input = np.array([1]).astype("int32")
             self.decode.set_input(
                 self.decode.get_input_name(index), current_length_input
             )
@@ -166,7 +151,7 @@ class HmQwenXh2:
         # Load embedding weights
         embedding_weight = torch.load(
             embedding_path, map_location="cpu", weights_only=True
-        )['weight']
+        )["weight"]
         self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len)
 
         if isl + osl >= self.context_max_length:
@@ -176,25 +161,20 @@ class HmQwenXh2:
             sys.exit(1)
         self.perf_tracker.reset_perf_time()
 
-
     def get_nblocks(self):
         input_names = []
         for i in range(self.decode.get_num_inputs()):
             input_names.append(self.decode.get_input_name(i))
-        pattern = r'^model_layers_(\d+)_self_attn_kcache_input$'
+        pattern = r"^model_layers_(\d+)_self_attn_kcache_input$"
         count = sum(1 for item in input_names if re.match(pattern, item))
         return count
 
     def preprocess_prefill(self, isl):
         text = generate_random_digit_string(isl)
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
-        message = [{"role": "user", "content": text}]
-        text_with_template = self.tokenizer.apply_chat_template(
-            message, tokenize=False, add_generation_prompt=True
-        )
-        input = self.tokenizer(text_with_template, return_tensors='pt')
+        input = self.tokenizer(text, return_tensors="pt")
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
-        all_input_id = input['input_ids']
+        all_input_id = input["input_ids"]
         return all_input_id
 
     def run_prefill(self, b, all_input_id):
@@ -277,12 +257,14 @@ class HmQwenXh2:
         self.perf_tracker.perf_start(PERFTYPE.DECODE_INPUT_TIME)
         input_name = self.decode.get_input_name(0)
 
-        input_datas_np = np.concatenate(input_datas, axis=0) if self.batch > 1 else input_datas[0]
+        input_datas_np = (
+            np.concatenate(input_datas, axis=0) if self.batch > 1 else input_datas[0]
+        )
         self.decode.set_input(input_name, input_datas_np)
 
         for b in range(self.batch):
             valid_length_index = 1 if b == 0 else 2 * self.nblocks * b + 3 + 2 * b - 2
-            valid_length_data = np.array(self.context_lengths[b]).astype('int32')
+            valid_length_data = np.array(self.context_lengths[b]).astype("int32")
             self.decode.set_input(
                 self.decode.get_input_name(valid_length_index), valid_length_data
             )
@@ -294,7 +276,9 @@ class HmQwenXh2:
         self.perf_tracker.perf_end(PERFTYPE.DECODE_INFER_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.DECODE_OUTPUT_TIME)
-        output_data = self.decode.get_output(self.decode.get_output_name(0)).to_host().numpy()
+        output_data = (
+            self.decode.get_output(self.decode.get_output_name(0)).to_host().numpy()
+        )
         self.perf_tracker.perf_end(PERFTYPE.DECODE_OUTPUT_TIME)
 
         # Retrieve next_token_id (DECODE_TOTAL_TIME ends here)
@@ -363,13 +347,18 @@ class HmQwenXh2:
             count,
         )
 
+
 if __name__ == "__main__":
     args = get_args()
-    if HOUMO_TARGET == 'xh2':
+    if HOUMO_TARGET == "xh2":
         # Initialize with isl and osl parameters
         hmqwen = HmQwenXh2(
-            args.prefill_path, args.decode_path, args.embedding_path, args.tokenizer_dir,
-            args.isl, args.osl
+            args.prefill_path,
+            args.decode_path,
+            args.embedding_path,
+            args.tokenizer_dir,
+            args.isl,
+            args.osl,
         )
 
     hmqwen.chat(args.isl, args.osl)
