@@ -1,5 +1,0 @@
---extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
-docker==7.1.0
-requests==2.32.3
-packaging==20.3
-pandas==2.3.2
