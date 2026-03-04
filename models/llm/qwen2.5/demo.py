@@ -4,7 +4,7 @@
 #
 # File: demo.py
 # Description:
-#   DeepSeek Inference Demo - Python script for running DeepSeek
+#   Qwen2.5 Inference Demo - Python script for running Qwen2.5
 # automatic speech recognition on HOUMO AI device.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,8 +27,7 @@ import sys
 import math
 import time
 import argparse
-from typing import List, Optional
-
+from typing import List, Tuple, Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -45,7 +44,6 @@ sys.path.append(
 from perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2."
 
 
 def is_valid_char(cp):
@@ -73,7 +71,7 @@ def get_args() -> argparse.Namespace:
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="DeepSeek-R1-0528-Qwen3-8B",
+        default="qwen2.5-7b",
         help="tokenizer dir",
     )
     parser.add_argument(
@@ -87,14 +85,14 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "deepseek_prefill.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen2.5_prefill.hmm"),
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "deepseek_decode.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen2.5_decode.hmm"),
         help="houmo decode model path",
     )
     parser.add_argument(
@@ -154,8 +152,16 @@ def get_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
     if args.ndevice > 1:
-        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
-        args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+        args.prefill_path = (
+            args.prefill_path.replace(".hmm", ".hmms")
+            if args.prefill_path.endswith(".hmm")
+            else args.prefill_path
+        )
+        args.decode_path = (
+            args.decode_path.replace(".hmm", ".hmms")
+            if args.decode_path.endswith(".hmm")
+            else args.decode_path
+        )
     return args
 
 
@@ -286,7 +292,9 @@ class SamplingManager:
     def sample(
         self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
     ) -> int:
-        logits = logits[0][0]
+        logits = logits[0]
+        if HOUMO_TARGET == "xh2":
+            logits = logits[0]
         probs = self.process_logits(logits, previous_tokens)
         if np.all(probs == 0):
             probs = np.ones_like(probs) / len(probs)
@@ -294,7 +302,7 @@ class SamplingManager:
         # sampled_index = np.random.choice(len(probs), p=probs)
         sampled_index = probs.argmax(-1)
 
-        return np.array([sampled_index])
+        return np.array([[sampled_index]])
 
     def get_processed_probs(
         self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
@@ -303,27 +311,34 @@ class SamplingManager:
 
 
 class HmQwen:
+    """Main class for Qwen model inference with Houmo backend and performance tracking."""
 
     def __init__(
-        self, prefill_path, decode_path, embedding_path, tokenizer_dir, ndevice
+        self, prefill_path, decode_path, embedding_path, tokenizer_dir, ndevice=1
     ):
         self.perf_tracker = InferencePerformanceTracker()
         self.ndevice = ndevice
+        # Initialize device and weight manager based on device count
         if self.ndevice == 1:
             weight_manager = tcim.runtime.WeightManager(0)
-        elif self.ndevice == 2:
+        elif self.ndevice == 2 and HOUMO_TARGET == "xh2":
             dev_manager = tcim.runtime.DevManager([0, 1], "Xh2HalBackend")
             weight_manager = tcim.runtime.WeightManager(dev_manager)
         else:
-            raise ValueError("Unsupport device number!")
+            raise ValueError(
+                "Unsupported device number! Only 1 or 2 devices are supported for xh2"
+            )
+
+        # Load prefill and decode models
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)
         self.prefill = tcim.runtime.load(prefill_path, option=option1)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_LOAD_TIME)
-
-        logger.info("prefill model loaded")
+        logger.info("Prefill model loaded successfully")
         self.nblocks = self.get_nblocks()
+
+        # Set dummy tensors for cache inputs
         dummy_tensor_names = [
             f"model_layers_{i}_self_attn_kcache_input" for i in range(self.nblocks)
         ]
@@ -334,13 +349,18 @@ class HmQwen:
         self.perf_tracker.perf_start(PERFTYPE.DECODE_LOAD_TIME)
         self.decode = tcim.runtime.load(decode_path, option=option2)
         self.perf_tracker.perf_end(PERFTYPE.DECODE_LOAD_TIME)
-        logger.info("decode model loaded")
+
+        logger.info("Decode model loaded successfully")
+
+        # Initialize sampling manager with command line arguments
         self.samplingmanager = SamplingManager(
             temperature=args.temperature,
             top_k=args.topk,
             top_p=args.topp,
             repetition_penalty=args.repetition_penalty,
         )
+
+        # Get model dimension information from input metadata
         self.prefill_length = self.prefill.get_input_info(
             self.prefill.get_input_name(0)
         ).shape[1]
@@ -351,25 +371,31 @@ class HmQwen:
             self.decode.get_input_name(3)
         ).shape[2]
         self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
+
+        # Initialize cache inputs for decode model from prefill model
         for i in range(3, 2 * self.nblocks + 3):
             cache = self.prefill.get_input(self.prefill.get_input_name(i))
             self.decode.set_input(self.decode.get_input_name(i), cache)
-        # set decode input
+
+        # Set initial decode current length input
         current_length_input_1 = np.array([1]).astype("int32")
         decode_current_length_name = self.decode.get_input_name(2)
         self.decode.set_input(decode_current_length_name, current_length_input_1)
 
+        # Load tokenizer and embedding weights
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_dir, trust_remote_code=True
         )
-        embedding_weight = torch.load(
-            embedding_path, map_location="cpu", weights_only=True
-        )["weight"]
-        self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len)
+        embedding_weight = torch.load(embedding_path, map_location="cpu")
+        if HOUMO_TARGET == "xh2":
+            embedding_weight = embedding_weight["weight"]
+        self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len).float()
         self.context_length = 0
+
         self.perf_tracker.reset_perf_time()
 
     def get_nblocks(self):
+        """Calculate number of transformer blocks from input tensor names."""
         input_names = []
         for i in range(self.prefill.get_num_inputs()):
             input_names.append(self.prefill.get_input_name(i))
@@ -378,11 +404,12 @@ class HmQwen:
         return count
 
     def chat(self, question):
+        """Process user question through prefill and decode stages with performance tracking."""
         self.generated_ids = []
         if not args.history:
             self.context_length = 0
 
-        logger.success("question:")
+        logger.success("User question:")
         print("\033[1;95m{}\033[0m".format(question))
 
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
@@ -399,17 +426,18 @@ class HmQwen:
             messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
         )
         inputs = self.tokenizer(text, return_tensors="pt", add_special_tokens=False)
-        text = self.tokenizer.batch_decode(inputs.input_ids)[0]
         all_input_ids = inputs["input_ids"]
         input_echo_len = all_input_ids.numel()
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
 
+        # Validate input length against maximum context length
         if input_echo_len >= self.context_max_length:
             logger.error(
-                f"Question long than {self.context_max_length}, please shorten it!"
+                f"Input sequence length ({input_echo_len}) exceeds maximum context length ({self.context_max_length}), please shorten your question!"
             )
             sys.exit(1)
 
+        # Process prefill in chunks if input length exceeds prefill length
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
         for round in range(prefill_loop_round):
             valid_length = round * self.prefill_length + self.context_length
@@ -439,8 +467,10 @@ class HmQwen:
             )
             self.perf_tracker.perf_end(PERFTYPE.PREFILL_EMBED_TIME)
 
+            # Prepare length parameters for prefill input
             valid_length_data = np.array([valid_length]).astype("int32")
             current_length_data = np.array([current_length]).astype("int32")
+
             input_name = self.prefill.get_input_name(0)
             valid_length_name = self.prefill.get_input_name(1)
             current_length_name = self.prefill.get_input_name(2)
@@ -463,24 +493,23 @@ class HmQwen:
         next_id = input_data.argmax(-1)[0]
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOTAL_TIME)
 
+        # Decode first token and initialize response
         prefill_response = self.tokenizer.decode(next_id)
-        logger.success("response:")
+        logger.success("Model response:")
         print("\033[1;95m{}".format(prefill_response), end="", flush=True)
 
         chat_history_ids = all_input_ids[0]
         next_id = torch.from_numpy(next_id)
         self.generated_ids.append(next_id)
-
         chat_history_ids = torch.cat([chat_history_ids, next_id], dim=-1)
-        input_data = F.embedding(next_id.unsqueeze(0), self.embedding_weight).reshape(
-            1, 1, -1
-        )
+
         all_response = prefill_response
         self.context_length += input_echo_len
 
+        # Initialize decode stage variables
         decode_count = 0
         skip_tokens = 0
-        slide_len = 10  # sliding window length for decode
+        slide_len = 10  # Sliding window length for decode stage token decoding
         last_response = self.tokenizer.decode(chat_history_ids.tolist()[-slide_len:])
 
         # Decode loop for generating subsequent tokens
@@ -488,7 +517,7 @@ class HmQwen:
             # Stop generation if context length exceeds maximum limit
             if self.context_length >= self.context_max_length:
                 logger.info(
-                    f"context length greater than {self.context_max_length}, break!"
+                    f"Context length ({self.context_length}) exceeds maximum limit ({self.context_max_length}), stopping generation!"
                 )
                 break
 
@@ -517,16 +546,16 @@ class HmQwen:
             input_data = self.decode.get_output(self.decode.get_output_name(0)).numpy()
             self.perf_tracker.perf_end(PERFTYPE.DECODE_OUTPUT_TIME)
 
-            decode_count += 1
-
             # Get next token id (sampling from logits)
-            next_id = self.samplingmanager.sample(input_data, self.generated_ids)
-            next_id = torch.from_numpy(next_id)
+            decode_next_id = self.samplingmanager.sample(input_data, self.generated_ids)
+            decode_next_id = torch.from_numpy(decode_next_id[0])
+
+            decode_count += 1
 
             self.perf_tracker.perf_start(PERFTYPE.DECODE_TOKEN_TIME)
 
             # Check for end-of-sequence token
-            if next_id == self.tokenizer.eos_token_id:
+            if decode_next_id == self.tokenizer.eos_token_id:
                 if "decode_response" in locals():
                     print(decode_response, end="", flush=True)
                     all_response += decode_response
@@ -535,8 +564,8 @@ class HmQwen:
                 break
 
             # Update chat history with new token
-            chat_history_ids = torch.cat([chat_history_ids, next_id], dim=-1)
-            self.generated_ids.append(next_id)
+            chat_history_ids = torch.cat([chat_history_ids, decode_next_id], dim=-1)
+            self.generated_ids.append(decode_next_id)
 
             decode_response = self.tokenizer.decode(
                 chat_history_ids.tolist()[-(slide_len + 1) - skip_tokens :]
@@ -545,6 +574,7 @@ class HmQwen:
 
             self.perf_tracker.perf_end(PERFTYPE.DECODE_TOTAL_TIME)
 
+            # Validate and print decoded text (outside timing scope)
             if decode_response != "" and is_valid_char(ord(decode_response[-1])):
                 print(decode_response, end="", flush=True)
                 all_response += decode_response
@@ -555,12 +585,12 @@ class HmQwen:
             else:
                 skip_tokens += 1
 
-            next_id = next_id
-            self.context_length = self.context_length + 1
+            # Prepare for next iteration
+            next_id = decode_next_id
+            self.context_length += 1
 
         print("\033[0m")
 
-        # Set basic performance metrics for reporting
         self.perf_tracker.set_basic_info(
             batch_size=1,
             input_seq_length=input_echo_len,
@@ -569,7 +599,7 @@ class HmQwen:
 
 
 if __name__ == "__main__":
-
+    # Parse command line arguments and initialize model
     args = get_args()
     hmqwen = HmQwen(
         args.prefill_path,
@@ -578,6 +608,8 @@ if __name__ == "__main__":
         args.tokenizer_dir,
         args.ndevice,
     )
+
+    # Run in interactive or single-question mode
     if args.it:
         from prompt_toolkit import prompt
     try:
@@ -588,7 +620,7 @@ if __name__ == "__main__":
                     if question.lower() in ("stop", "exit", "quit", ""):
                         break
                     if not question:
-                        print("Instruction cannot be empty, please input again.")
+                        print("Instruction cannot be empty, please try again!")
                         continue
                 except (EOFError, KeyboardInterrupt):
                     print("\nProgram ended")
@@ -599,8 +631,9 @@ if __name__ == "__main__":
             try:
                 hmqwen.chat(question)
                 hmqwen.perf_tracker.show_summary()
+
             except Exception as e:
-                print(f"Error occurred during chat: {e}")
+                print(f"Error during chat: {e}")
                 if not args.it:
                     break
                 continue
@@ -610,4 +643,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\nProgram interrupted by user")
     except Exception as e:
-        print(f"程序运行出错: {e}")
+        print(f"Program error: {e}")

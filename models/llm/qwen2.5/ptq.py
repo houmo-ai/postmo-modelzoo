@@ -3,7 +3,7 @@
 # File: ptq.py
 # Description:
 #   Post-Training Quantization Tool - Python script for quantizing
-# Qwen3 models using post-training quantization techniques.
+# Qwen2.5 models using post-training quantization techniques.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -122,9 +122,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("--model", type=str, default="qwen3-8b")
+    parser.add_argument("--model", type=str, default="qwen2.5-7b")
     parser.add_argument(
-        "--model-name", type=str, default="qwen3", help="output hmonnx model name"
+        "--model-name", type=str, default="qwen2.5", help="output hmonnx model name"
     )
     parser.add_argument("--work-dir", type=str, default="work_dirs/")
     parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
@@ -146,11 +146,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--calib_data",
         type=str,
-        default="../../../hmodel/xh2/examples/xh_gen_data/gen_qwen3_8b.jsonl",
+        default="../../../hmodel/xh2/examples/xh_gen_data/gen_qwen2_7b_instruct.jsonl",
         help="calibration dataset choose",
-    )
-    parser.add_argument(
-        "--mix_search", type=str, default=None, help="mix search settings"
     )
     parser.add_argument(
         "--num_logits_to_keep", type=int, default=1, help="not for test ppl"

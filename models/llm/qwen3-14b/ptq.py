@@ -111,19 +111,8 @@ def check_gpu():
         return False
 
 
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1", ""):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected.")
-
-
 if HOUMO_TARGET == "xh2":
-    from quant_pipline import quant_llm, export_llm, move_llm
+    from quant_pipeline import quant_llm, export_llm, move_llm
 
     def parse_args():
         parser = argparse.ArgumentParser(
@@ -155,7 +144,9 @@ if HOUMO_TARGET == "xh2":
             help="input sequence length",
         )
         parser.add_argument(
-            "--quant-type", default="w4a8h0_ssfp", help="quant type, default is w4a8h0_ssfp"
+            "--quant-type",
+            default="w4a8h0_ssfp",
+            help="quant type, default is w4a8h0_ssfp",
         )
         parser.add_argument(
             "--calib_data",

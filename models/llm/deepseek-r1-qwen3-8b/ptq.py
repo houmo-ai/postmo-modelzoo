@@ -23,7 +23,7 @@ import os
 import time
 import psutil
 import threading
-from quant_pipline import quant_llm, export_llm, move_llm
+from quant_pipeline import quant_llm, export_llm, move_llm
 
 HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH", "")
 HOUMO_TARGET = os.getenv("HOUMO_TARGET", "")

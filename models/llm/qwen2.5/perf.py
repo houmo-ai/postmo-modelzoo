@@ -4,7 +4,7 @@
 #
 # File: perf.py
 # Description:
-#   DeepSeek Perf test Demo - Python script for running DeepSeek
+#   Qwen2.5 Perf test Demo - Python script for running qwen2.5
 # automatic speech recognition on HOUMO AI device.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,13 +24,16 @@ import os
 import re
 import sys
 import math
-import time
+import random
 import argparse
 import numpy as np
 import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer
 from loguru import logger
+from dataclasses import dataclass, asdict, field
+from typing import Dict, List, Optional, Any
+from enum import IntEnum, unique
 
 import tcim_lite as tcim
 
@@ -44,76 +47,55 @@ from perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERF
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 
 
-def is_valid_char(cp):
-    if (
-        (cp >= 0x4E00 and cp <= 0x9FFF)
-        or (cp >= 0x3400 and cp <= 0x4DBF)
-        or (cp >= 0x20000 and cp <= 0x2A6DF)
-        or (cp >= 0x2A700 and cp <= 0x2B73F)
-        or (cp >= 0x2B740 and cp <= 0x2B81F)
-        or (cp >= 0x2B820 and cp <= 0x2CEAF)
-        or (cp >= 0xF900 and cp <= 0xFAFF)
-        or (cp >= 0x2F800 and cp <= 0x2FA1F)
-        or (0x0041 <= cp and cp <= 0x005A)
-        or (0x0061 <= cp and cp <= 0x007A)
-    ):
-        return True
-
-    return False
-
-
-import random
-
-
 def generate_random_digit_string(length=1000):
     random_digits = [str(random.randint(0, 9)) for _ in range(length)]
     return "".join(random_digits)
 
 
 def get_args() -> argparse.Namespace:
-    """Parse commandline."""
+    """Parse commandline arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="DeepSeek-R1-0528-Qwen3-8B",
-        help="tokenizer dir",
+        default="qwen2.5-7b",
+        help="tokenizer directory path",
     )
     parser.add_argument(
         "--embedding_path",
         dest="embedding_path",
         type=str,
         default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
-        help="houmo embedding weight path",
+        help="houmo embedding weight file path",
     )
     parser.add_argument(
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "deepseek_prefill.hmm"),
-        help="houmo prefill model path",
+        default=os.path.join("output", HOUMO_TARGET, "qwen2.5_prefill.hmm"),
+        help="houmo prefill model file path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "deepseek_decode.hmm"),
-        help="houmo decode model path",
+        default=os.path.join("output", HOUMO_TARGET, "qwen2.5_decode.hmm"),
+        help="houmo decode model file path",
     )
     parser.add_argument(
         "--isl",
         dest="isl",
         type=int,
         default=1024,
-        help="input seq length",
+        help="input sequence length",
     )
     parser.add_argument(
         "--osl",
         dest="osl",
         type=int,
         default=1024,
-        help="output seq length",
+        help="output sequence length",
     )
     args = parser.parse_args()
     return args
@@ -130,9 +112,11 @@ class HmQwenXh2:
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)
         self.prefill = tcim.runtime.load(prefill_path, option=option1)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_LOAD_TIME)
+
         self.perf_tracker.perf_start(PERFTYPE.DECODE_LOAD_TIME)
         self.decode = tcim.runtime.load(decode_path, option=option2)
         self.perf_tracker.perf_end(PERFTYPE.DECODE_LOAD_TIME)
+
         self.nblocks = self.get_nblocks()
         dummy_tensor_names = [
             f"model_layers_{i}_self_attn_kcache_input" for i in range(self.nblocks)
@@ -178,6 +162,7 @@ class HmQwenXh2:
                 f"Context length exceeds maximum limit {self.context_max_length}, please reduce input/output sequence length!"
             )
             sys.exit(1)
+
         self.perf_tracker.reset_perf_time()
 
     def get_nblocks(self):

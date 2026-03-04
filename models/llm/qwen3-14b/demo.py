@@ -603,10 +603,10 @@ if __name__ == "__main__":
                     if question.lower() in ("stop", "exit", "quit", ""):
                         break
                     if not question:
-                        print("输入不能为空，请重新输入。")
+                        print("Instruction cannot be empty, please input again.")
                         continue
                 except (EOFError, KeyboardInterrupt):
-                    print("\n程序结束")
+                    print("\nProgram ended by user.")
                     break
             else:
                 question = args.question
@@ -615,7 +615,7 @@ if __name__ == "__main__":
                 hmqwen.chat(question)
                 hmqwen.perf_tracker.show_summary()
             except Exception as e:
-                print(f"聊天过程中出错: {e}")
+                print(f"Error during chat: {e}")
                 if not args.it:
                     break
                 continue
@@ -623,6 +623,6 @@ if __name__ == "__main__":
                 break
 
     except KeyboardInterrupt:
-        print("\n程序被用户中断")
+        print("\nProgram interrupted by user.")
     except Exception as e:
-        print(f"程序运行出错: {e}")
+        print(f"Program encountered an error: {e}")
