@@ -31,7 +31,7 @@ toolchains, SDKs, or runtime libraries that are licensed separately.
 Such third-party components are NOT covered by the Apache License 2.0
 of this project. Their usage is subject to their original license terms.
 
-For third-party components requiring special emphasis, 
+For third-party components requiring special emphasis,
 please refer to the relevant information in THIRD_PARTY_NOTICE.
 
 Users are solely responsible for ensuring compliance with all applicable
@@ -50,6 +50,7 @@ mingw-w64 getopt.h (ISC & BSD-2-Clause) - https://sourceforge.net/projects/mingw
 Numpy File I/O for C++ npy.hpp - https://github.com/llohse/libnpy
 Fast C++ Logging Library spdlog - https://github.com/gabime/spdlog
 Modern C++ Argument Parser argparse - https://github.com/p-ranav/argparse
+A YAML parser and emitter in C++ (MIT) - https://github.com/jbeder/yaml-cpp
 # Datasets
 CCPD Dataset (MIT) - https://github.com/detectRecog/CCPD
 VOC2012 Dataset (CC BY 4.0) - https://public.roboflow.com/object-detection/pascal-voc-2012
