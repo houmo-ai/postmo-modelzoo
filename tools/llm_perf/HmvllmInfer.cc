@@ -134,7 +134,7 @@ void HmvllmInfer::prefill_input_init() {
     prefill_input_map.insert(
         std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
     if (input_name.find("position_ids") != std::string::npos ||
-        input_name.find("visual_embed") != std::string::npos) {
+        input_name.find("_embed") != std::string::npos) {
       prefill_input_datas.insert(
           std::pair<std::string, std::unique_ptr<char[]>>(
               input_name, std::make_unique<char[]>(memSize)));
@@ -157,7 +157,7 @@ void HmvllmInfer::decode_input_init() {
     decode_input_map.insert(
         std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
     if (input_name.find("position_ids") != std::string::npos ||
-        input_name.find("visual_embed") != std::string::npos) {
+        input_name.find("_embed") != std::string::npos) {
       decode_input_datas.insert(std::pair<std::string, std::unique_ptr<char[]>>(
           input_name, std::make_unique<char[]>(memSize)));
       std::fill(decode_input_datas.at(input_name).get(),
@@ -256,7 +256,7 @@ void HmvllmInfer::PrefillSetInputDatas(void *data, int current_length) {
     } else if (name.find("current_length") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&current_length, memSize));
-    } else if (name.find("visual_embed") != std::string::npos) {
+    } else if (name.find("_embed") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
           prefill_input_datas.at(name).get(), memSize));
     }
