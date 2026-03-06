@@ -70,7 +70,7 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_prefill.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3-embedding_prefill.hmm"),
         help="houmo prefill model path",
     )
     parser.add_argument(
