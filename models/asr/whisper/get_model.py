@@ -19,13 +19,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 import os
+import shutil
 import argparse
 from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
-
+HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH")
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -66,6 +67,10 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = get_args()
+
+    shutil.copy2(
+        os.path.join(HOUMO_EXAMPLES_PATH, "data", "audio", "audio.mp3"), "./audio.mp3"
+    )
 
     model_cfgs = {
         "target": HOUMO_TARGET,

@@ -24,7 +24,6 @@ import os
 import time
 import numpy as np
 import argparse
-import soundfile as sf
 from loguru import logger
 
 import torch
@@ -34,25 +33,6 @@ from datasets import load_dataset
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-
-
-def is_valid_char(cp):
-    if (
-        (cp >= 0x4E00 and cp <= 0x9FFF)
-        or (cp >= 0x3400 and cp <= 0x4DBF)
-        or (cp >= 0x20000 and cp <= 0x2A6DF)
-        or (cp >= 0x2A700 and cp <= 0x2B73F)
-        or (cp >= 0x2B740 and cp <= 0x2B81F)
-        or (cp >= 0x2B820 and cp <= 0x2CEAF)
-        or (cp >= 0xF900 and cp <= 0xFAFF)
-        or (cp >= 0x2F800 and cp <= 0x2FA1F)
-        or (0x0041 <= cp and cp <= 0x005A)
-        or (0x0061 <= cp and cp <= 0x007A)
-    ):
-        return True
-
-    return False
-
 
 lang_to_id = [
     50327,
@@ -168,11 +148,6 @@ def get_args() -> argparse.Namespace:
         help="processor dir",
     )
     parser.add_argument(
-        "--audio",
-        type=str,
-        default="../../../data/audio/audio.mp3",
-    )
-    parser.add_argument(
         "--encoder_path",
         dest="encoder_path",
         type=str,
@@ -262,8 +237,6 @@ class HmWhisper:
 
 
 def asr(hmwhisper, processor, input_features):
-    slide_len = 10
-    skip_tokens = 0
     start_time = time.time()
     detect_ids = torch.tensor([[50258]])  # [1,1]
     default_decoder_ids = torch.tensor([[50258, 0, 50359, 50363]])  # [1,1]
@@ -275,6 +248,9 @@ def asr(hmwhisper, processor, input_features):
     mask_atten = torch.ones(([1, 16, 1, 1024])).half()
     mask_atten[:, :, :, 0 + 1 :] *= -65504
 
+    enc_seq_len = detect_encoder_out[0].shape[2]
+    encoder_attention_mask = torch.zeros((1, 1, 1, enc_seq_len), device="cpu", dtype=torch.float16)
+
     decoder_input_names = hmwhisper.get_input_names("decoder")
     decoder_detext_inputs = {
         decoder_input_names[0]: detect_ids.to(torch.int32),
@@ -282,6 +258,7 @@ def asr(hmwhisper, processor, input_features):
         decoder_input_names[2]: torch.tensor([0]).to(torch.int32),
         decoder_input_names[3]: torch.tensor([1]).to(torch.int32),
         decoder_input_names[4]: mask_atten,
+        decoder_input_names[5]: encoder_attention_mask.to(torch.float16),
     }
 
     k_cache = [
@@ -291,9 +268,9 @@ def asr(hmwhisper, processor, input_features):
         torch.ones([1, 16, 1024, 64], dtype=torch.float16) * (-65504) for i in range(24)
     ]
 
-    for data_detect, k_data_cache in zip(decoder_input_names[5:29], k_cache):
+    for data_detect, k_data_cache in zip(decoder_input_names[6:30], k_cache):
         decoder_detext_inputs[data_detect] = k_data_cache
-    for data_detect, v_data_cache in zip(decoder_input_names[29:53], v_cache):
+    for data_detect, v_data_cache in zip(decoder_input_names[30:54], v_cache):
         decoder_detext_inputs[data_detect] = v_data_cache
 
     k_list = []
@@ -304,10 +281,10 @@ def asr(hmwhisper, processor, input_features):
     for i in range(24):
         v_list.append(detect_encoder_out[2 * i + 1])
 
-    for data_detect, k_data in zip(decoder_input_names[53:77], k_list):
+    for data_detect, k_data in zip(decoder_input_names[54:78], k_list):
         decoder_detext_inputs[data_detect] = k_data
 
-    for data_detect, v_data in zip(decoder_input_names[77:101], v_list):
+    for data_detect, v_data in zip(decoder_input_names[78:102], v_list):
         decoder_detext_inputs[data_detect] = v_data
 
     logits = hmwhisper.run_decoder(decoder_detext_inputs)
@@ -324,7 +301,7 @@ def asr(hmwhisper, processor, input_features):
 
     default_decoder_ids[0, 1] = lang_ids  # [[50258, 50259, 50359, 50363]] # 34.5197
 
-    mask_atten = torch.ones(([1, 16, 1, 1024])).half()
+    mask_atten = torch.ones(([1, 16, 4, 1024])).half()
     mask_atten[:, :, :, 0 + 4 :] *= -65504
 
     prefill_input_names = hmwhisper.get_input_names("prefill")
@@ -334,21 +311,21 @@ def asr(hmwhisper, processor, input_features):
         prefill_input_names[2]: torch.tensor([0]).to(torch.int32),
         prefill_input_names[3]: torch.tensor([4]).to(torch.int32),
         prefill_input_names[4]: mask_atten,
+        prefill_input_names[5]: encoder_attention_mask.to(torch.float16),
     }
+
     for i in range(96):
-        cache = hmwhisper.decoder.get_dev_input(hmwhisper.decoder.get_input_name(i + 5))
-        hmwhisper.prefill.set_dev_input(hmwhisper.prefill.get_input_name(i + 5), cache)
+        cache = hmwhisper.decoder.get_dev_input(hmwhisper.decoder.get_input_name(i + 6))
+        hmwhisper.prefill.set_dev_input(hmwhisper.prefill.get_input_name(i + 6), cache)
     logits = hmwhisper.run_prefill(prefill_inputs)
 
     next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
     next_tokens = torch.argmax(next_token_logits, dim=-1)
     default_decoder_ids = torch.cat([default_decoder_ids, next_tokens[:, None]], dim=-1)
-    decode_response = (
-        processor.decode(next_tokens) if next_tokens.item() != 50257 else ""
-    )
+    decoded_text = processor.decode(next_tokens)
+    decode_response = decoded_text if decoded_text != "<|endoftext|>" else ""
     prefill_ids_len = default_decoder_ids.shape[1]
     ttft_time = time.time() - start_time
-    last_response = processor.decode(default_decoder_ids[-slide_len:])
     logger.success("transcription:")
     print("\033[1;95m{}".format(decode_response), end="", flush=True)
 
@@ -356,7 +333,7 @@ def asr(hmwhisper, processor, input_features):
         cache = hmwhisper.prefill.get_dev_output(
             hmwhisper.prefill.get_output_name(i + 1)
         )
-        hmwhisper.decoder.set_dev_input(hmwhisper.decoder.get_input_name(i + 5), cache)
+        hmwhisper.decoder.set_dev_input(hmwhisper.decoder.get_input_name(i + 6), cache)
         hmwhisper.decoder.set_dev_output(
             hmwhisper.decoder.get_output_name(i + 1), cache
         )
@@ -374,6 +351,7 @@ def asr(hmwhisper, processor, input_features):
         prefill_inputs[prefill_input_names[2]] = torch.tensor([cnt]).to(torch.int32)
         prefill_inputs[prefill_input_names[3]] = torch.tensor([1]).to(torch.int32)
         prefill_inputs[prefill_input_names[4]] = mask_atten
+        prefill_inputs[prefill_input_names[5]] = encoder_attention_mask.to(torch.float16)
 
         logits = hmwhisper.run_decoder(prefill_inputs)
         next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
@@ -381,16 +359,9 @@ def asr(hmwhisper, processor, input_features):
         default_decoder_ids = torch.cat(
             [default_decoder_ids, next_tokens[:, None]], dim=-1
         )
-        decode_response = processor.decode(
-            default_decoder_ids.tolist()[-(slide_len + 1) - skip_tokens :]
-        )[0][len(last_response[0]) :]
-        if decode_response != "" and is_valid_char(ord(decode_response[-1])):
-            print(decode_response, end="", flush=True)
-            last_response = processor.decode(default_decoder_ids[-slide_len:])
-            skip_tokens = 0
-        else:
-            skip_tokens += 1
-        decode_response = "" if next_tokens.item() == 50257 else decode_response
+        decoded_text = processor.decode(next_tokens)
+        decode_response = decoded_text if decoded_text != "<|endoftext|>" else ""
+        print(decode_response, end="", flush=True)
 
     print("\033[0m")
     return (
@@ -415,8 +386,15 @@ if __name__ == "__main__":
         raise ValueError("Unsupport houmo target!")
 
     processor = WhisperProcessor.from_pretrained(args.processor_dir)
-    sample, _ = sf.read(args.audio)
-    input_features = processor(sample, 16000, return_tensors="pt").input_features
+
+    # load dataset
+    ds = load_dataset(
+        "hf-internal-testing/librispeech_asr_dummy", "clean", split="validation"
+    )
+    sample = ds[1]["audio"]
+    input_features = processor(
+        sample["array"], sampling_rate=sample["sampling_rate"], return_tensors="pt"
+    ).input_features
 
     # run whisper model
     prefill_ids_len, all_ids_len, ttft_time, total_time = asr(

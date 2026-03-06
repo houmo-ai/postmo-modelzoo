@@ -113,7 +113,9 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 
 | models                  | path         | target | quant | build | perf | demo | eval |
 | ----------------------- | ------------ | ------ | ----- | ----- | ---- | ---- | ---- |
-| whisper-medium          | asr          | xh2    | x     | yes   | yes  | yes  | x    |
+| sensevoice-small        | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
+| whisper-medium          | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
+| whisper-large-v3-turbo  | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
 | yolop                   | autodrive    | xh2    | yes   | yes   | yes  | yes  | x    |
 | efficientnet            | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
 | mobilenetv2             | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
@@ -156,9 +158,11 @@ windows 的示例运行前请参照 tools/win_envs 目录的 README.MD 进行环
 
 | examples              | path       | description                       | language   | target | arch        | os        |
 | --------------------- | ---------- | --------------------------------- | ---------- | ------ | ----------- | --------- |
+| qwen3_speculative     | converts   | qwen3 投机解码模型编译示例        | python     | xh2    | x64         | linux     |
 | resnet50              | converts   | resnet50 量化编译示例             | python     | xh2    | x64         | linux     |
-| resnet50              | inferences | resnet50 单线程推理示例           | python/c++ | xh2    | x64/aarch64 | win/linux |
 | qwen3                 | inferences | qwen3 大语言模型推理示例          | python     | xh2    | x64/aarch64 | win/linux |
+| qwen3_speculative     | inferences | qwen3 投机解码示例                | python     | xh2    | x64/aarch64 | linux     |
+| resnet50              | inferences | resnet50 单线程推理示例           | python/c++ | xh2    | x64/aarch64 | win/linux |
 | resnet50_multistreams | inferences | resnet50 多线程多 stream 推理示例 | c++        | xh2    | x64/aarch64 | win/linux |
 | resnet50_pipeline     | inferences | resnet50 流水推理示例             | c++        | xh2    | x64/aarch64 | win/linux |
 | yolov5s               | inferences | yolov5s 单线程推理示例            | python/c++ | xh2    | x64/aarch64 | win/linux |
