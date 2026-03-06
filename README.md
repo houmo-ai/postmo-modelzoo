@@ -121,6 +121,8 @@ pip install -r requirements.txt
 | yolox                   | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
 | bge-m3                  | embedding    | xh2    | yes   | yes   | yes  | yes  | x    |
 | gte-qwen2-1.5b-instruct | embedding    | xh2    | x     | x     | yes  | yes  | x    |
+| qwen3-embedding         | embedding    | xh2    | yes   | yes   | yes  | yes  | x    |
+| qwen3-reranker          | reranker     | xh2    | yes   | yes   | yes  | yes  | x    |
 | yolov8m-pose            | estimation   | xh2    | yes   | yes   | yes  | yes  | yes  |
 | deepseek-r1-qwen3-8b    | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
 | gpt-oss                 | llm          | xh2    | x     | yes   | yes  | yes  | x    |
@@ -129,6 +131,7 @@ pip install -r requirements.txt
 | qwen3-30b-a3b           | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
 | lprnet                  | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  |
 | ppocrv3                 | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  |
+| glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |
 | minicpmo                | omni         | xh2    | x     | yes   | yes  | yes  | x    |
 | yolov8m-seg             | segmentation | xh2    | yes   | yes   | yes  | yes  | yes  |
 | qwen2.5-vl              | vllm         | xh2    | yes   | yes   | yes  | yes  | x    |

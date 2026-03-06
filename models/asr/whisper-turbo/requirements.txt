@@ -1,3 +1,4 @@
 --extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
 torchcodec==0.7.0
 transformers==4.57.1
+protobuf==6.33.5
