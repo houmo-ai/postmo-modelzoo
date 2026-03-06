@@ -151,14 +151,14 @@ def get_args() -> argparse.Namespace:
         "--encoder_path",
         dest="encoder_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "whisper_encoder.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "whisper_encode.hmm"),
         help="houmo encoder model path",
     )
     parser.add_argument(
         "--decoder_path",
         dest="decoder_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "whisper_decoder.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "whisper_decode.hmm"),
         help="houmo decoder model path",
     )
     parser.add_argument(

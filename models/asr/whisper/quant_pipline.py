@@ -103,7 +103,7 @@ def process_encoder(args):
     model.config._attn_implementation = "eager"
     model.model.encoder.decoder_m = model.model.decoder
 
-    name = "encoder"
+    name = "encode"
     work_dir = out_dir / "hmquant" / name
     work_dir.mkdir(exist_ok=True, parents=True)
     onnx_file = work_dir / f"{model_name}_{name}.onnx"
@@ -135,7 +135,7 @@ def process_encoder(args):
     input_features = torch.randn(1, 80, 3000)
 
 
-    meta_info["encoder"] = str(hmonnx_file.relative_to(work_dir))
+    meta_info["encode"] = str(hmonnx_file.relative_to(work_dir))
     # input_features = torch.randn(1, 80, 3000)
     audo_file = str(Path(__file__).parent / "audio.mp3")
     sampling_rate = 16000
@@ -267,7 +267,7 @@ def process_whisper(args, name: str):
 
     decoder_input_ids = torch.tensor([[50258, 50259, 50359, 50363]])
     cache_position = torch.tensor([[0, 1, 2, 3]])
-    if name == "decoder":
+    if name == "decode":
         decoder_input_ids = torch.tensor([[2221]])
         cache_position = torch.tensor([[4]])
     past_len = torch.tensor([0])
@@ -425,4 +425,4 @@ def process_whisper(args, name: str):
 def quant_and_export_llm(args):
     process_encoder(args)
     process_whisper(args, "prefill")
-    process_whisper(args, "decoder")
+    process_whisper(args, "decode")
