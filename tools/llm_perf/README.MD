@@ -53,30 +53,42 @@
 3. 准备模型输入输出数据和输入输出内存
 4. 根据设定的次数执行输入数据->推理->获取结果循环，统计单次推理的性能和平均性能
 5. 输出性能评估结果指标参考如下多表：
-- 表一：Prefill/Decode模型指标
-  | Prefill/Decode Stage 指标               | 说明                                                                |
+- 表一：Prefill模型指标
+  | Prefill Stage 指标                      | 说明                                                                |
   | --------------------------------------- | ------------------------------------------------------------------- |
-  | Prefill/Decode Total Time               | Prefill/Decode阶段耗时，单位（ms）                                  |
-  | Prefill/Decode Total Speed              | Prefill/Decode阶段速度，单位（tokens/s）                            |
-  | Tokenization Time                       | Tokenization耗时，单位（ms）                                        |
-  | Embedding Time                          | Embedding操作总耗时，单位（ms）                                     |
-  | API SetInput Time                       | tcim runtime setinput API耗时，单位（ms）                           |
-  | API Inference Time                      | tcim runtime run+sync API耗时，单位（ms）                           |
+  | Prefill Total Time                      | Prefill阶段总耗时，单位（ms）                                       |
+  | Prefill Total Speed                     | Prefill阶段总速度，单位（tokens/s）                                 |
+  | Tokenization total Time                 | Tokenization耗时，单位（ms）                                        |
+  | Embedding total Time                    | Embedding操作总耗时，单位（ms）                                     |
+  | API SetInput  total Time                | tcim runtime setinput API总耗时，单位（ms）                           |
+  | API Inference total Time                | tcim runtime run+sync API总耗时，单位（ms）                           |
   | API Inference Speed                     | tcim runtime run+sync API速度，单位（tokens/s）                     |
-  | API GetOutput Time                      | tcim runtime GetOutput API耗时，单位（ms）                          |
+  | API GetOutput total Time                | tcim runtime GetOutput API总耗时，单位（ms）                          |
 
-- 表二：Vision模型指标
+- 表二：Decode模型指标
+  | Decode Stage 指标                       | 说明                                                                |
+  | --------------------------------------- | ------------------------------------------------------------------- |
+  | Decode Total Time                       | Decode阶段耗时，单位（ms）                                          |
+  | Decode Total Speed                      | Decode阶段速度，单位（tokens/s）                                    |
+  | Tokenization total Time                 | Tokenization耗时，单位（ms）                                        |
+  | Embedding total Time                    | Embedding操作总耗时，单位（ms）                                     |
+  | API SetInput  avg Time                  | tcim runtime setinput API平均耗时，单位（ms/token）                 |
+  | API Inference avg Time                  | tcim runtime run+sync API平均耗时，单位（ms/token）                 |
+  | API Inference avg Speed                 | tcim runtime run+sync API速度，单位（tokens/s）                     |
+  | API GetOutput avg Time                  | tcim runtime GetOutput API平均耗时，单位（ms/token）                |
+
+- 表三：Vision模型指标
   | Vision Stage 指标                       | 说明                                                                |
   | --------------------------------------- | ------------------------------------------------------------------- |
   | Vision Total Time                       | Vision阶段耗时，单位（ms）                                          |
   | Vision Total Speed                      | Vision阶段速度，单位（tokens/s）                                    |
   | Preprocessing Time                      | Preprocessing耗时，单位（ms）                                       |
-  | API SetInput Time                       | tcim runtime setinput API耗时，单位（ms）                           |
-  | API Inference Time                      | tcim runtime run+sync API耗时，单位（ms）                           |
-  | API Inference Speed                     | tcim runtime run+sync API速度，单位（tokens/s）                     |
-  | API GetOutput Time                      | tcim runtime GetOutput API耗时，单位（ms）                          |
+  | API SetInput  total Time                | tcim runtime setinput API总耗时，单位（ms）                         |
+  | API Inference total Time                | tcim runtime run+sync API总耗时，单位（ms）                         |
+  | API Inference Speed                     | tcim runtime run+sync API速度，单位（images/s）                     |
+  | API GetOutput total Time                | tcim runtime GetOutput API总耗时，单位（ms）                        |
 
-- 表三：总体性能指标
+- 表四：总体性能指标
   | Overall 指标                            | 说明                                                                |
   | --------------------------------------- | ------------------------------------------------------------------- |
   | TTFT (Time to First Token)              | 输出第一个token的耗时，单位（ms）                                   |
@@ -84,7 +96,7 @@
   | E2E Latency (End-to-End Latency)        | 端到端总时间，单位（s）                                             |
   | E2E TPS (End-to-End Tokens Per Second)  | 端到端每秒输出的token数，单位（tokens/s）                           |
 
-相关指标可以对照表一、表二、表三的指标含义。
+相关指标可以对照表一、表二、表三、表四的指标含义。
 
 ### 1.3 参数说明
 1. 命令行llm_perf以指定参数启动
@@ -98,9 +110,10 @@
 - --loop            : 指定循环执行单个模型次数，不指定默认为1。
 - --batch           : 指定模型的batch数，不指定则--batch的值为1。多batch模型必须指定，会校验从模型读取到的batch和用户指定的值是否一致。目前多batch仅支持xh2.
 - --no_warm_up      : 默认执行warm_up，配置后会跳过warm_up流程。
+- --warm_up_input   : 配置warm_up的输入数据长度，不指定则--warm_up_input的默认值为--input。
 - --warm_up_output  : 设置warm_up阶段decode模型输出的token数量，不指定则--warm_up_output的默认值为--output。
 - --LazyMode        : 默认关闭LazyMode，配置后会打开LazyMode，开启LazyMode后，模型加载实际会变长，内存占用会变小。
-- --interval        : 配置DeviceMonitor(温度、IPU频率、功率)、HostMonitor(physical、virtual memory)监控线程的采样间隔时间，单位秒(ms)，默认为500ms，范围100-60000。
+- --interval        : 配置DeviceMonitor(温度、IPU频率、功率)、HostMonitor(physical、virtual memory)监控线程的采样间隔时间，单位毫秒(ms)，默认为500ms，范围100-60000。
 - --skip_perf       : 默认执行性能评估，配置后会跳过性能评估。
 - --dump_file       : 默认关闭dump性能数据到yaml文件，配置后会将性能数据保存到yaml文件中。
 - --help, -h        : 打印帮助信息
@@ -278,8 +291,8 @@ rem 需要结合用户目录更改三四行的环境变量实际路径
 ./llm_perf --prefill qwen3-8b/qwen3_prefill.hmm --decode qwen3-8b/qwen3_decode.hmm --embedding qwen3-8b/hmquant/quant_embedding.bin  --input 256 --output 200 --warm_up_output 100 --loop 2
 ```bash
 [HostMonitorImpl] Monitoring thread has started, interval: 500ms
-[2026-02-27 11:57:16.966] [tid 49674] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-02-27 11:57:17.316] [info] DEVICE-0 Logger initialization complete, log file: ./device_logs/device_0.log
+[2026-03-09 09:42:52.227] [tid 4651] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-03-09 09:42:52.352] [info] DEVICE-0 Logger initialization complete, log file: ./device_logs/device_0.log
 ========================= Perf Settings =========================
 prefill path : qwen3-8b/qwen3_prefill.hmm
 decode path : qwen3-8b/qwen3_decode.hmm
@@ -294,22 +307,25 @@ LazyMode : disable
 skip_perf : disable
 =================================================================
 Use Devices 0
-[2026-02-27 11:57:17.383] [tid 49674] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-02-27 11:57:17.383] [tid 49674] [warning] Empty backend name, use Xh2HalBackend instead.
-[2026-02-27 11:57:17.436] [info] DEVICE-1 Logger initialization complete, log file: ./device_logs/device_1.log
+[2026-03-09 09:42:52.392] [tid 4651] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-03-09 09:42:52.392] [tid 4651] [warning] Empty backend name, use Xh2HalBackend instead.
+[2026-03-09 09:42:52.539] [info] DEVICE-1 Logger initialization complete, log file: ./device_logs/device_1.log
 
 ==============================(v)LLM Perf WarmUp: input 256, output 100==============================
- Device temperature: 54.51 °C
+ Device temperature: 42.048 °C
+Prefill: 100% |**************************************************|
 Decode: 100% |**************************************************| 100/100
 ==================================================================================
 
 ==============================(v)LLM Perf Loop Progress: 1/2==============================
- Device temperature: 63.498 °C
+ Device temperature: 42.338 °C
+Prefill: 100% |**************************************************|
 Decode: 100% |**************************************************| 200/200
 ==================================================================================
 
 ==============================(v)LLM Perf Loop Progress: 2/2==============================
- Device temperature: 67.753 °C
+ Device temperature: 44.074 °C
+Prefill: 100% |**************************************************|
 Decode: 100% |**************************************************| 200/200
 ==================================================================================
 
@@ -324,55 +340,57 @@ Decode: 100% |**************************************************| 200/200
 ----------------------------------------------------------------------------------
                             Inference Performance
 ----------------------------------------------------------------------------------
-  Prefill Time: 128.15 ms/token | Speed: 1997.71 tokens/s
-  Decode  Time: 9964.82 ms/token | Speed: 20.07 tokens/s
-  Vision  Time: 0.00 ms/image | Speed: 0.00 images/s
+  Prefill API Inference total Time: 113.08 ms | Speed: 2263.93 tokens/s
+  Decode  API Inference total Time: 9870.75 ms | Speed: 20.26 tokens/s
+  Vision  API Inference total Time: 0.00 ms | Speed: 0.00 images/s
 ----------------------------------------------------------------------------------
                             Overall Performance
 ----------------------------------------------------------------------------------
-  Prefill Model Load Time: 6993.45ms
-  Decode Model Load Time:  274.73ms
+  Prefill Model Load Time: 95552.91ms
+  Decode Model Load Time: 3530.92ms
   Vision Model Load Time:    0.00ms
-  TTFT (Time To First Token):  138.52 ms
-  TPOT (Time Per Output Token): 56.55 ms/token
-  E2E Latency (End-to-End):     11.46 seconds
-  E2E TPS (Throughput):         17.46 tokens/s
+  TTFT (Time To First Token):  114.49 ms
+  TPOT (Time Per Output Token): 49.97 ms/token
+  E2E Latency (End-to-End):     10.11 seconds
+  E2E TPS (Throughput):         19.78 tokens/s
 ----------------------------------------------------------------------------------
                             Memory Usage (Max Values)
 ----------------------------------------------------------------------------------
-  Max Physical Memory: 4.01 GB
-  Max Virtual Memory: 4.29 GB
+  Physical Memory: 2.30 GB
+  Virtual Memory: 2.53 GB
+  Max Physical Memory: 3.99 GB
+  Max Virtual Memory: 4.66 GB
 ----------------------------------------------------------------------------------
                             Device Stats (Max Values)
 ----------------------------------------------------------------------------------
 Device 1:
-Temperature    |  49.20°C(Min)      |  54.51°C(Max)      |  52.83°C(Avg)      |
+Temperature    |  30.06°C(Min)      |  39.63°C(Max)      |  37.18°C(Avg)      |
 Power          |  0.00 W(Min)       |  0.00 W(Max)       |  0.00 W(Avg)       |
 IPU Freq       |  1400.00 Mhz(Min)  |  1400.00 Mhz(Max)  |  1400.00 Mhz(Avg)  |
 Mem Info       |  24448 MB(Total)   |  0 MB(Used)        |  24448 MB(Avail)   |
 Device 0:
-Temperature    |  48.62°C(Min)      |  54.22°C(Max)      |  52.80°C(Avg)      |
-Power          |  12.60 W(Min)      |  15.18 W(Max)      |  14.81 W(Avg)      |
+Temperature    |  26.88°C(Min)      |  42.05°C(Max)      |  36.20°C(Avg)      |
+Power          |  8.61 W(Min)       |  23.87 W(Max)      |  15.83 W(Avg)      |
 IPU Freq       |  1400.00 Mhz(Min)  |  1400.00 Mhz(Max)  |  1400.00 Mhz(Avg)  |
-Mem Info       |  24448 MB(Total)   |  6240 MB(Used)     |  18208 MB(Avail)   |
+Mem Info       |  24448 MB(Total)   |  8897 MB(Used)     |  15551 MB(Avail)   |
 ----------------------------------------------------------------------------------
                             Prefill Stage Performance
 ----------------------------------------------------------------------------------
-  Total Time: 138.52 ms | Speed: 1848.08 tokens/s
-  Tokenization Time: Skipped (No operation)
-  Embedding Time: 3.74   ms
-  API SetInput Time: 1.01  ms
-  API Inference Time: 128.15ms | Speed: 1997.71 tokens/s
-  API GetOutput Time: 0.00 ms
+  Total Time: 114.49 ms | Speed: 2236.00 tokens/s
+  Tokenization total Time: Skipped (No operation)
+  Embedding total Time: 0.32   ms
+  API SetInput  total Time: 0.62  ms
+  API Inference total Time: 113.08ms | Speed: 2263.93 tokens/s
+  API GetOutput total Time: 0.12 ms
 ----------------------------------------------------------------------------------
                             Decode Stage Performance
 ----------------------------------------------------------------------------------
-  Total Time: 11310.32ms | Speed: 17.68   tokens/s
-  Tokenization Time: Skipped (No operation)
-  Embedding Time: 0.33   ms
-  API SetInput Time: 0.39  ms/token
-  API Inference Time: 49.82ms/token | Speed: 20.07   tokens/s
-  API GetOutput Time: 0.00 ms/token
+  Total Time: 9995.00ms | Speed: 20.01   tokens/s
+  Tokenization total Time: Skipped (No operation)
+  Embedding total Time: 0.03   ms
+  API SetInput  avg Time: 0.20  ms/token
+  API Inference avg Time: 49.35ms/token | Speed: 20.26   tokens/s
+  API GetOutput avg Time: 0.15 ms/token
 ==================================================================================
 Every Loop Performance Result has been written to perf_dumper.log
 ```

@@ -285,8 +285,8 @@ void HmvllmInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
   auto output_info = prefill_module->GetOutputInfo(output_name).AsContiguous();
   perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
   auto dev_output_tensor = prefill_module->GetDevOutput(output_name);
-  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
   auto host_output_tensor = dev_output_tensor.ToHost(true);
+  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
 
   void *prefill_outData = host_output_tensor.Buffer().Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
@@ -335,8 +335,8 @@ void HmvllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids) {
 
   perf_tracker->perfStart(PerfType::DECODE_OUTPUT_TIME);
   auto dev_output_tensor = decode_module->GetDevOutput(output_name);
-  perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
   auto host_output_tensor = dev_output_tensor.ToHost(true);
+  perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
 
   void *decode_outData = host_output_tensor.Buffer().Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
@@ -368,10 +368,9 @@ void HmvllmInfer::VisionGetOutputDatas() {
     auto output_name = vision_module->GetOutputName(idx);
     perf_tracker->perfStart(PerfType::VISION_OUTPUT_TIME);
     auto dev_output_tensor = vision_module->GetDevOutput(output_name);
-    perf_tracker->perfEnd(PerfType::VISION_OUTPUT_TIME);
-
     // make sure the host tensor is contiguous
     auto host_output_tensor = dev_output_tensor.ToHost(true);
+    perf_tracker->perfEnd(PerfType::VISION_OUTPUT_TIME);
   }
 }
 

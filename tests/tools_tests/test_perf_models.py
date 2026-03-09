@@ -44,11 +44,11 @@ os.environ["HDPL_API_TIMEOUT"] = "10000000"
 
 # llm_perf test model lists.
 all_test_models = [
-    f"{TARGET_PATH}/deepseek/hmm_xh2_deepseek_8b_256_32k_b1_1chip_2cores_v1.0.0.zip",
-    f"{TARGET_PATH}/qwen2.5/hmm_xh2_qwen2.5_7b_256_32k_b1_1chip_2cores_v1.0.0.zip",
-    f"{TARGET_PATH}/qwen2.5-vl/hmm_xh2_qwen2.5-vl_7b_256_8k_b1_1chip_2cores_v1.0.0.zip",
-    f"{TARGET_PATH}/qwen3/hmm_xh2_qwen3_8b_256_16k_b4_1chip_2cores_v1.0.0.zip",
-    f"{TARGET_PATH}/qwen3-vl/hmm_xh2_qwen3-vl_8b_256_32k_b1_1chip_2cores_v1.0.0.zip"
+    f"{TARGET_PATH}/deepseek/hmm_xh2_deepseek_8b_256_32k_b1_1chip_2cores_v{VERSION}.zip",
+    f"{TARGET_PATH}/qwen2.5/hmm_xh2_qwen2.5_7b_256_32k_b1_1chip_2cores_v{VERSION}.zip",
+    f"{TARGET_PATH}/qwen2.5-vl/hmm_xh2_qwen2.5-vl_7b_256_8k_b1_1chip_2cores_v{VERSION}.zip",
+    f"{TARGET_PATH}/qwen3/hmm_xh2_qwen3_8b_256_16k_b4_1chip_2cores_v{VERSION}.zip",
+    f"{TARGET_PATH}/qwen3-vl/hmm_xh2_qwen3-vl_8b_256_32k_b1_1chip_2cores_v{VERSION}.zip"
 ]
 
 def parse_hmm_zip_filename(

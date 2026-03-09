@@ -91,9 +91,13 @@ PerfSettings ParsePerfRunSetting(
   std::cout << "ndevices : " << ndevices << std::endl;
   std::cout << "loop : " << loop_round << std::endl;
   std::cout << "batch : " << batch << std::endl;
+  uint32_t warm_up_input = 0;
   uint32_t warm_up_output = 0;
   if (warm_up_enable) {
     std::cout << "warm_up : enable" << std::endl;
+    warm_up_input = args.count("warm_up_input")
+                        ? validate_setting(args, "warm_up_input")
+                        : input_token_len;
     warm_up_output = args.count("warm_up_output")
                          ? validate_setting(args, "warm_up_output")
                          : stop_token_len;
@@ -127,6 +131,7 @@ PerfSettings ParsePerfRunSetting(
   settings.batch_size = batch;
   settings.LazyMode = lazy_mode_enable;
   settings.warm_up = warm_up_enable;
+  settings.warm_up_input = warm_up_input;
   settings.warm_up_output = warm_up_output;
   settings.loop_count = loop_round;
   settings.skip_perf = skip_perf;
@@ -194,7 +199,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
       if (settings.warm_up) {
         std::cout << "\n"
                   << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
-                  << settings.input_tokens_len << ", output "
+                  << settings.warm_up_input << ", output "
                   << settings.warm_up_output << std::string(30, '=') << "\n ";
         float current_temperature = device_monitor->getMaxTemperature();
         std::cout << "Device temperature: " << current_temperature << " °C"
@@ -212,8 +217,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
               "Shutdown the demo!");
         }
         Qwen3Infer->get_perf_tracker()->reset();
-        Qwen3Infer->perf_llm(settings.input_tokens_len,
-                             settings.warm_up_output);
+        Qwen3Infer->perf_llm(settings.warm_up_input, settings.warm_up_output);
         Qwen3Infer->get_perf_tracker()->pref_delete_warmup();
         std::cout << "\n" << std::string(82, '=') << "\n";
 #if defined(__linux__)

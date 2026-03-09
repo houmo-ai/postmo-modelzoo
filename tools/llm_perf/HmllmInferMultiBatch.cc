@@ -269,8 +269,8 @@ void HmllmInferMultiBatch::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
 
   perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
   auto dev_output_tensor = prefill_module->GetDevOutput(output_name);
-  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
   auto host_output_tensor = dev_output_tensor.ToHost(true);
+  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
 
   void *prefill_outData = host_output_tensor.Buffer().Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
@@ -301,9 +301,8 @@ void HmllmInferMultiBatch::DecodeGetOutputDatas() {
 
   perf_tracker->perfStart(PerfType::DECODE_OUTPUT_TIME);
   auto dev_output_tensor = decode_module->GetDevOutput(output_name);
-  perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
-
   auto host_output_tensor = dev_output_tensor.ToHost(true);
+  perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
 
   tensor_type *decode_outData =
       reinterpret_cast<tensor_type *>(host_output_tensor.Buffer().Data());
