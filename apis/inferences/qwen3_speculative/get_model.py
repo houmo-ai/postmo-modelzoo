@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     _ = snapshot_download(
         model_id="qwen/qwen3-8b",
-        cache_dir="./qwen3-8b",
+        local_dir="./qwen3-8b",
         ignore_file_pattern=["*.safetensors", "*.bin"],
     )
 
