@@ -25,16 +25,16 @@ from .test_models_utils import *
 logger = logging.getLogger(__name__)
 
 
-def _perf_func(model_name: str, log_file: str) -> None:
+def _perf_func(model_name: str, setup_logging) -> None:
     """
     Execute model performance test for a specific model.
 
     Args:
         model_name (str): Name of the model to performance test
-        log_file (str): Path to the log file for test output
+        setup_logging: Fixture of setup_logging
     """
     logger.info("===> TEST START: test_%s_perf", model_name)
-    execute_perf_flow(model_name, log_file)
+    execute_perf_flow(model_name, setup_logging)
 
 
 @pytest.mark.yolop

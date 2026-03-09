@@ -27,22 +27,24 @@ from .test_apis_utils import *
 logger = logging.getLogger(__name__)
 
 
-def _scene_func(example_name: str, log_file: str) -> None:
+def _scene_func(example_name: str, setup_logging) -> None:
     """
     Execute API scene test for a specific example.
 
     Args:
         example_name (str): Name of the example to test
-        log_file (str): Path to the log file for test output
+        setup_logging: pytest fixture for setting up logging configuration
     """
     logger.info("===> TEST START: test_apis_scenes_%s", example_name)
-    execute_apis_examples(example_name, log_file)
+    execute_apis_examples(example_name, setup_logging)
 
 
 @pytest.mark.apis
 @pytest.mark.video_detect
 @pytest.mark.yolov5s
 @pytest.mark.resnet50
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_apis_scenes_video_detect(setup_logging) -> None:
     example_name = "video_detect"
     _scene_func(example_name, setup_logging)

@@ -27,21 +27,23 @@ from .test_apis_utils import *
 logger = logging.getLogger(__name__)
 
 
-def _inference_func(example_name: str, log_file: str) -> None:
+def _inference_func(example_name: str, setup_logging) -> None:
     """
     Execute API inference test for a specific example.
 
     Args:
         example_name (str): Name of the example to test
-        log_file (str): Path to the log file for test output
+        setup_logging: pytest fixture for setting up logging configuration
     """
     logger.info("===> TEST START: test_apis_inferences_%s", example_name)
-    execute_apis_examples(example_name, log_file)
+    execute_apis_examples(example_name, setup_logging)
 
 
 @pytest.mark.apis
 @pytest.mark.resnet50
 @pytest.mark.inference
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_apis_inferences_resnet50(setup_logging) -> None:
     example_name = "resnet50"
     _inference_func(example_name, setup_logging)
@@ -50,6 +52,8 @@ def test_apis_inferences_resnet50(setup_logging) -> None:
 @pytest.mark.apis
 @pytest.mark.yolov5s
 @pytest.mark.inference
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_apis_inferences_yolov5s(setup_logging) -> None:
     example_name = "yolov5s"
     _inference_func(example_name, setup_logging)
@@ -58,6 +62,8 @@ def test_apis_inferences_yolov5s(setup_logging) -> None:
 @pytest.mark.apis
 @pytest.mark.qwen3
 @pytest.mark.inference
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_apis_inferences_qwen3(setup_logging) -> None:
     example_name = "qwen3"
     _inference_func(example_name, setup_logging)
@@ -66,6 +72,8 @@ def test_apis_inferences_qwen3(setup_logging) -> None:
 @pytest.mark.apis
 @pytest.mark.resnet50
 @pytest.mark.multistreams
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_apis_inferences_resnet50_multistreams(setup_logging) -> None:
     example_name = "resnet50_multistreams"
     _inference_func(example_name, setup_logging)
@@ -74,6 +82,8 @@ def test_apis_inferences_resnet50_multistreams(setup_logging) -> None:
 @pytest.mark.apis
 @pytest.mark.resnet50
 @pytest.mark.pipeline
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_apis_inferences_resnet50_pipeline(setup_logging) -> None:
     example_name = "resnet50_pipeline"
     _inference_func(example_name, setup_logging)
@@ -83,6 +93,8 @@ def test_apis_inferences_resnet50_pipeline(setup_logging) -> None:
 @pytest.mark.resnet50
 @pytest.mark.yolov5s
 @pytest.mark.multibatch
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_apis_inferences_yolov5s_resnet50_multibatch(setup_logging) -> None:
     example_name = "yolov5s_resnet50_multibatch"
     _inference_func(example_name, setup_logging)

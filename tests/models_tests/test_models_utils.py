@@ -70,13 +70,13 @@ def _generate_hmatc_cmds(
     merged_params = required_params.copy()
     merged_params.update(optional_params)
 
-    cmd_list = list()
+    cmd_list = []
     # construct required test commands
     idx = 0
     flag = True
     while flag:
         flag = False
-        tmp_cmd_list = list()
+        tmp_cmd_list = []
         for param_name, param_list in merged_params.items():
             if (
                 param_name == "onnx"
@@ -125,12 +125,12 @@ def _generate_py_cmds(
         list: List of command lists with different parameter combinations
     """
 
-    cmd_list = [cmd_header] if skip_default else list()
+    cmd_list = [cmd_header] if skip_default else []
     idx = 1 if skip_default else 0
     flag = True
     while flag:
         flag = False
-        tmp_cmd_list = list()
+        tmp_cmd_list = []
         for param_name, param_list in params_dict.items():
             params_str = "--" + param_name
             if (
@@ -307,12 +307,12 @@ def _get_param_value(params, target_param):
 def _download_models(
     model_info: dict,
     file_type: str,
-    download_dir: str = "",
-    extract_dir: str = "",
+    download_dir: str,
+    extract_dir: str,
     lock_type: str = "download",
     copy_flag: bool = False,
     assert_flag=True,
-    other_params: list = list(),
+    other_params: list = [],
 ) -> bool:
     """
     Download models of specified type with proper resource locking.
@@ -330,9 +330,6 @@ def _download_models(
     Returns:
         bool: True if download was successful, False otherwise
     """
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-
     download_str = "--model_dir"
     extract_str = "--quant_model_dir"
     if "download_dir" in model_info["get_model_params"][HOUMO_BACKEND]:
@@ -341,20 +338,15 @@ def _download_models(
 
     cmd_list = ["python3", "get_model.py", "--type", file_type]
     if file_type == "raw":
-        download_dir = model_set_dir
-        cmd_list += [download_str, model_set_dir]
+        cmd_list += [download_str, download_dir]
     else:
         cmd_list += [download_str, download_dir, extract_str, extract_dir]
     if len(other_params) > 0:
         cmd_list += other_params
 
     logger.info(f"Ready to download models using {cmd_list}")
-    lock_file_src = (
-        download_dir + "/lock.lock" if download_dir else model_set_dir + "/lock.lock"
-    )
-    lock_file_dst = (
-        extract_dir + "/lock.lock" if extract_dir else model_res_dir + "/lock.lock"
-    )
+    lock_file_src = download_dir + "/lock.lock"
+    lock_file_dst = extract_dir + "/lock.lock"
     if lock_type == "all":
         with ModelResourceLock(
             lock_file_src, ModelResourceLock.LockMode.WRITE, "model downloading"
@@ -377,7 +369,9 @@ def _download_models(
     return flag
 
 
-def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
+def _prepare_quantized_llm_model(
+    model_info: dict, log_file: str, model_res_dir: str, model_set_dir: str
+) -> bool:
     """
     Prepare quantized LLM model for compilation.
 
@@ -394,8 +388,6 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
         )
         return True
 
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
     lock_file_dst = model_res_dir + "/lock.lock"
     quant_params_full = model_info.get("quant_params", None)
     quant_params = (
@@ -418,7 +410,12 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
                 flag = True
                 continue
             # download raw model files
-            _download_models(model_info, "raw")
+            _download_models(
+                model_info,
+                file_type="raw",
+                download_dir=model_set_dir,
+                extract_dir=model_res_dir,
+            )
 
             cmd_list = ["python3", "ptq.py"]
             for param_key in quant_params:
@@ -463,7 +460,13 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
 
         logger.info("Start to download quantized llm model for compiling.")
         flag = _download_models(
-            model_info, "quant", model_set_dir, quant_res_dir, "all", False, False
+            model_info,
+            file_type="quant",
+            download_dir=model_set_dir,
+            extract_dir=quant_res_dir,
+            lock_type="all",
+            copy_flag=False,
+            assert_flag=False,
         )
         if flag is False:
             return flag
@@ -471,7 +474,9 @@ def _prepare_quantized_llm_model(model_info: dict, log_file: str) -> bool:
     return flag
 
 
-def _prepare_quantized_cv_model(model_info: dict, log_file: str) -> bool:
+def _prepare_quantized_cv_model(
+    model_info: dict, log_file: str, model_res_dir: str, model_set_dir: str
+) -> bool:
     """
     Prepare quantized computer vision model for compilation.
 
@@ -484,8 +489,6 @@ def _prepare_quantized_cv_model(model_info: dict, log_file: str) -> bool:
     """
     logger.info("Start to prepare quantized cv model for compiling.")
     flag = True
-    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     get_model_types = model_info["get_model_params"][HOUMO_BACKEND]["type"]
 
     # get model
@@ -503,12 +506,12 @@ def _prepare_quantized_cv_model(model_info: dict, log_file: str) -> bool:
 
             flag = _download_models(
                 model_info,
-                "quant",
-                model_set_dir,
-                quant_res_dir,
-                "extract",
-                False,
-                False,
+                file_type="quant",
+                download_dir=model_set_dir,
+                extract_dir=quant_res_dir,
+                lock_type="extract",
+                copy_flag=False,
+                assert_flag=False,
             )
             if flag is False:
                 break
@@ -518,7 +521,13 @@ def _prepare_quantized_cv_model(model_info: dict, log_file: str) -> bool:
         "raw" in get_model_types
         and "quant" in model_info["support_flow"][HOUMO_BACKEND]
     ):
-        flag = _download_models(model_info, "raw", assert_flag=False)
+        flag = _download_models(
+            model_info,
+            file_type="raw",
+            download_dir=model_set_dir,
+            extract_dir=model_res_dir,
+            assert_flag=False,
+        )
         if flag is False:
             return False
 
@@ -543,7 +552,13 @@ def _prepare_quantized_cv_model(model_info: dict, log_file: str) -> bool:
     return flag
 
 
-def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) -> bool:
+def _prepare_compiled_llm_model(
+    model_info: dict,
+    platform: str,
+    log_file: str,
+    model_res_dir: str,
+    model_set_dir: str,
+) -> bool:
     """
     Prepare compiled LLM model for inference.
 
@@ -562,8 +577,6 @@ def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) 
         return True
 
     compile_params = model_info["compile_params"][HOUMO_BACKEND]
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
     flag = True
     for idx, tmp_model_dir in enumerate(compile_params["model_dir"]):
         quant_res_dir = tmp_model_dir.replace("cached_results", model_res_dir)
@@ -591,7 +604,12 @@ def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) 
             and is_release() is False
             and "compile" in model_info["support_flow"][HOUMO_BACKEND]
             and check_gpu()["has_gpu"] is True
-            and _prepare_quantized_llm_model(model_info, log_file)
+            and _prepare_quantized_llm_model(
+                model_info,
+                log_file,
+                model_res_dir=model_res_dir,
+                model_set_dir=model_set_dir,
+            )
         ):
             cmd_list = ["python3", "build.py"]
             for param_key in compile_params:
@@ -656,10 +674,10 @@ def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) 
 
             flag = _download_models(
                 model_info,
-                "hmm",
-                model_set_dir,
-                compile_res_dir,
-                "all",
+                file_type="hmm",
+                download_dir=model_set_dir,
+                extract_dir=compile_res_dir,
+                lock_type="all",
                 copy_flag=False,
                 assert_flag=False,
                 other_params=other_params,
@@ -670,7 +688,13 @@ def _prepare_compiled_llm_model(model_info: dict, platform: str, log_file: str) 
     return flag
 
 
-def _prepare_compiled_cv_model(model_info: dict, platform: str, log_file: str) -> bool:
+def _prepare_compiled_cv_model(
+    model_info: dict,
+    platform: str,
+    log_file: str,
+    model_res_dir: str,
+    model_set_dir: str,
+) -> bool:
     """
     Prepare compiled computer vision model for inference.
 
@@ -688,8 +712,6 @@ def _prepare_compiled_cv_model(model_info: dict, platform: str, log_file: str) -
         )
         return True
 
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
     if "compile_params" in model_info:
         compile_res_dir = model_info["compile_params"][HOUMO_BACKEND]["output_dir"][0]
         compile_res_dir = compile_res_dir.replace("cached_results", model_res_dir)
@@ -702,11 +724,22 @@ def _prepare_compiled_cv_model(model_info: dict, platform: str, log_file: str) -
 
     logger.info("Start to prepare compiled cv model for inference.")
     if platform == "aarch64":
-        _download_models(model_info, "hmm", model_set_dir, compile_res_dir, "all")
+        _download_models(
+            model_info,
+            file_type="hmm",
+            download_dir=model_set_dir,
+            extract_dir=compile_res_dir,
+            lock_type="all",
+        )
         os.system(f"cp -ar {compile_res_dir} ./")
         return True
     # platform != "aarch64"
-    if not _prepare_quantized_cv_model(model_info, log_file):
+    if not _prepare_quantized_cv_model(
+        model_info,
+        log_file,
+        model_res_dir=model_res_dir,
+        model_set_dir=model_set_dir,
+    ):
         return False
     if "hmbuild_params" in model_info:
         execute_test_cmd(
@@ -810,14 +843,40 @@ def _run_demo_script(
     return run_flag
 
 
-def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
+def _check_device_markers(pytest_request):
+    all_markers = [marker.name for marker in pytest_request.node.own_markers]
+    target_prefixes = [f"{NDEVICE_MARKER}_", f"{DEVICE_MEM_MARKER}_"]
+    marker_vals = {}
+    for marker in all_markers:
+        for prefix in target_prefixes:
+            if marker.startswith(prefix):
+                marker_key = prefix.rstrip("_")
+                marker_vals[marker_key] = marker
+
+    if (
+        not marker_vals
+        or marker_vals.get(NDEVICE_MARKER, None) is None
+        or marker_vals.get(DEVICE_MEM_MARKER, None) is None
+    ):
+        logger.warning("Device markers are not properly set for this test case.")
+        pytest.skip("Device markers are not properly set for this test case.")
+
+    return marker_vals
+
+
+def execute_get_model_flow(model_name: str, setup_logging) -> None:
     """
     Execute the complete get model test flow for a specified model.
 
     Args:
         model_name (str): Name of the model to test
-        log_file (str): Path to the log file for test output
+        setup_logging: Fixture of setup_logging
     """
+    log_file, pytest_request = setup_logging
+    marker_vals = _check_device_markers(pytest_request)
+    dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
+    logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
+
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -843,6 +902,9 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
     prepare_test_folder(model_dir, "get_model")
     logger.info("current folder: %s.", os.getcwd())
 
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, dev_res_dir, model_info["model_dir"])
+
     # test script: get_model.py
     params_dict = model_info["get_model_params"][HOUMO_BACKEND]
     if model_info.get("model_type", "cv") == "llm" and is_release() is True:
@@ -854,7 +916,6 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
         for idx in raw_indices:
             for param in params_dict:
                 params_dict[param].pop(idx)
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     cmd_header = ["python3", "get_model.py"]
 
     final_flag = True
@@ -880,7 +941,7 @@ def execute_get_model_flow(model_name: str, log_file: str = "") -> None:
     logger.info("Get Model Test Success!")
 
 
-def execute_quant_flow(model_name: str, log_file: str = "") -> None:
+def execute_quant_flow(model_name: str, setup_logging) -> None:
     """
     Execute the complete quantization test flow for a specified model.
 
@@ -889,8 +950,13 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
 
     Args:
         model_name (str): Name of the model to test
-        log_file (str): Path to the log file for test output
+        setup_logging: Fixture of setup_logging
     """
+    log_file, pytest_request = setup_logging
+    marker_vals = _check_device_markers(pytest_request)
+    dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
+    logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
+
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -929,9 +995,18 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
     current_folder = os.getcwd()
     logger.info("current folder: %s.", current_folder)
 
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, dev_res_dir, model_info["model_dir"])
+
     # download raw model for quantization
     copy_flag = True if model_type == "cv" else False
-    _download_models(model_info, "raw", copy_flag=copy_flag)
+    _download_models(
+        model_info,
+        file_type="raw",
+        download_dir=model_set_dir,
+        extract_dir=model_res_dir,
+        copy_flag=copy_flag,
+    )
 
     logger.info("LD_LIBRARY_PATH: %s", os.getenv("LD_LIBRARY_PATH"))
     final_flag = True
@@ -954,8 +1029,6 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
         if venv_flag:
             python_exe = f"{VENV_NAME}/bin/python3"
 
-        model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-        model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         # test script: ptq.py
         params_dict = model_info["quant_params"][HOUMO_BACKEND]
         cmd_header = [python_exe, "ptq.py"]
@@ -994,17 +1067,19 @@ def execute_quant_flow(model_name: str, log_file: str = "") -> None:
     logger.info("Quantization Test Success!")
 
 
-def execute_compile_flow(
-    model_name: str, log_file: str = "", clear_flag: bool = True
-) -> None:
+def execute_compile_flow(model_name: str, setup_logging) -> None:
     """
     Execute the complete compilation test flow for a specified model.
 
     Args:
         model_name (str): Name of the model to test
-        log_file (str): Path to the log file for test output
-        clear_flag (bool): Whether to clear previous results before compilation
+        setup_logging: Fixture of setup_logging
     """
+    log_file, pytest_request = setup_logging
+    marker_vals = _check_device_markers(pytest_request)
+    dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
+    logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
+
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -1040,14 +1115,26 @@ def execute_compile_flow(
     prepare_test_folder(model_dir, "compile")
     logger.info("current folder: %s.", os.getcwd())
 
-    if clear_flag:
-        execute_test_cmd(["rm", "-rf", "output/H30/result"], log_file, True)
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, dev_res_dir, model_info["model_dir"])
 
     # prepare quantized model
     if (
-        model_type == "cv" and not _prepare_quantized_cv_model(model_info, log_file)
+        model_type == "cv"
+        and not _prepare_quantized_cv_model(
+            model_info,
+            log_file,
+            model_res_dir=model_res_dir,
+            model_set_dir=model_set_dir,
+        )
     ) or (
-        model_type == "llm" and not _prepare_quantized_llm_model(model_info, log_file)
+        model_type == "llm"
+        and not _prepare_quantized_llm_model(
+            model_info,
+            log_file,
+            model_res_dir=model_res_dir,
+            model_set_dir=model_set_dir,
+        )
     ):
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
@@ -1085,8 +1172,6 @@ def execute_compile_flow(
         params_dict = model_info["compile_params"][HOUMO_BACKEND]
         cmd_header = ["python3", "build.py"]
 
-        model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-        model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
         cmd_list = _generate_py_cmds(
             cmd_header,
             params_dict,
@@ -1126,14 +1211,19 @@ def execute_compile_flow(
     logger.info("Compilation Test Success!")
 
 
-def execute_demo_flow(model_name: str, log_file: str = "") -> None:
+def execute_demo_flow(model_name: str, setup_logging) -> None:
     """
     Execute the complete demo test flow for a specified model.
 
     Args:
         model_name (str): Name of the model to test
-        log_file (str): Path to the log file for test output
+        setup_logging: Fixture of setup_logging
     """
+    log_file, pytest_request = setup_logging
+    marker_vals = _check_device_markers(pytest_request)
+    dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
+    logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
+
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -1161,7 +1251,7 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         )
     ):
         logger.warning(f"Not support {model_name} testing on 2cores device.")
-        pytest.skip(f"This testcase is not support on 2cores device.")
+        pytest.skip("This testcase is not support on 2cores device.")
 
     model_dir = script_dir + "/../../" + model_info["model_dir"]
     if not os.path.exists(model_dir):
@@ -1184,7 +1274,7 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         prepare_test_folder(model_dir, "demo")
         current_folder = os.getcwd()
         logger.info(
-            "test.sh ret is %d, change test folder,, current folder: %s.",
+            "test.sh ret is %d, change test folder, current folder: %s.",
             test_sh_flag,
             current_folder,
         )
@@ -1193,27 +1283,40 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         shutil.rmtree(test_sh_folder)
 
     if is_release():
-        logger.info(f"RELEASE MODE, only execute test.sh.")
+        logger.info("RELEASE MODE, only execute test.sh.")
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
         assert test_sh_flag is True, "Execute tesh.sh Failed!"
         return
 
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, dev_res_dir, model_info["model_dir"])
     model_type = model_info.get("model_type", "cv")
     if (
         model_type == "cv"
-        and not _prepare_compiled_cv_model(model_info, platform, log_file)
+        and not _prepare_compiled_cv_model(
+            model_info,
+            platform,
+            log_file,
+            model_res_dir=model_res_dir,
+            model_set_dir=model_set_dir,
+        )
     ) or (
         model_type == "llm"
-        and not _prepare_compiled_llm_model(model_info, platform, log_file)
+        and not _prepare_compiled_llm_model(
+            model_info,
+            platform,
+            log_file,
+            model_res_dir=model_res_dir,
+            model_set_dir=model_set_dir,
+        )
     ):
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
         pytest.skip(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
     if get_test_type() == TCaseType.SEPARATE_NO_INFER:
         if model_type == "cv":
-            dst_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-            move_models_res(current_folder, dst_folder)
+            move_models_res(current_folder, model_res_dir)
 
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
@@ -1222,10 +1325,8 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
         )
         pytest.skip(f"Skip demo testcase {model_name} in the SEPARATE NO INFER stage.")
     if model_type == "cv" and get_test_type() == TCaseType.SEPARATE_INFER:
-        src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-        restore_models_res(src_folder, current_folder)
+        restore_models_res(model_res_dir, current_folder)
 
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     # install python requirements
     venv_flag = install_py_venv(current_folder, log_file)
     python_exe = "python3"
@@ -1248,26 +1349,24 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
             if exec_flag is False:
                 final_flag = False
     else:
-        model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-
         demo_flag = _run_demo_script(
-            "demo",
-            model_name,
-            model_info,
-            model_set_dir,
-            model_res_dir,
-            python_exe,
-            log_file,
+            demo_name="demo",
+            model_name=model_name,
+            model_info=model_info,
+            model_set_dir=model_set_dir,
+            model_res_dir=model_res_dir,
+            python_exe=python_exe,
+            log_file=log_file,
         )
         multibatch_flag = True
         multibatch_flag = _run_demo_script(
-            "demo_multibatch",
-            model_name,
-            model_info,
-            model_set_dir,
-            model_res_dir,
-            python_exe,
-            log_file,
+            demo_name="demo_multibatch",
+            model_name=model_name,
+            model_info=model_info,
+            model_set_dir=model_set_dir,
+            model_res_dir=model_res_dir,
+            python_exe=python_exe,
+            log_file=log_file,
         )
         final_flag = demo_flag and multibatch_flag
 
@@ -1278,17 +1377,23 @@ def execute_demo_flow(model_name: str, log_file: str = "") -> None:
     logger.info("Demo Test Success!")
 
 
-def execute_compare_flow(model_name: str, log_file: str = "") -> None:
+def execute_compare_flow(model_name: str, setup_logging) -> None:
     """
     Execute the complete comparison test flow for a specified model.
 
     Args:
         model_name (str): Name of the model to test
-        log_file (str): Path to the log file for test output
+        setup_logging: Fixture of setup_logging
     """
     if HOUMO_BACKEND == "xh1" and get_test_type() != TCaseType.DEFAULT:
         logger.warning("Not support %s (gpu) compare testing.", model_name)
         pytest.skip("This testcase is not support.")
+
+    log_file, pytest_request = setup_logging
+    marker_vals = _check_device_markers(pytest_request)
+    dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
+    logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
+
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -1311,20 +1416,29 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
     current_folder = os.getcwd()
     logger.info("current folder: %s.", current_folder)
 
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, dev_res_dir, model_info["model_dir"])
     model_type = model_info.get("model_type", "cv")
-
     if get_test_type() != TCaseType.SEPARATE_INFER:
-        _download_models(model_info, "raw")
+        _download_models(
+            model_info,
+            file_type="raw",
+            download_dir=model_set_dir,
+            extract_dir=model_res_dir,
+        )
 
     if model_type == "cv" and not _prepare_compiled_cv_model(
-        model_info, platform, log_file
+        model_info,
+        platform,
+        log_file,
+        model_res_dir=model_res_dir,
+        model_set_dir=model_set_dir,
     ):
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
         pytest.skip(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
     if get_test_type() == TCaseType.SEPARATE_NO_INFER:
-        dst_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-        move_models_res(current_folder, dst_folder)
+        move_models_res(current_folder, model_res_dir)
 
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
@@ -1332,8 +1446,7 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
         logger.warning(skip_msg)
         pytest.skip(skip_msg)
     if get_test_type() == TCaseType.SEPARATE_INFER:
-        src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-        restore_models_res(src_folder, current_folder)
+        restore_models_res(model_res_dir, current_folder)
 
     final_flag = True
     # test hmatc compare
@@ -1359,14 +1472,19 @@ def execute_compare_flow(model_name: str, log_file: str = "") -> None:
     logger.info("HmATC Compare Test Success!")
 
 
-def execute_perf_flow(model_name: str, log_file: str = "") -> None:
+def execute_perf_flow(model_name: str, setup_logging) -> None:
     """
     Execute the complete performance test flow for a specified model.
 
     Args:
         model_name (str): Name of the model to test
-        log_file (str): Path to the log file for test output
+        setup_logging: Fixture of setup_logging
     """
+    log_file, pytest_request = setup_logging
+    marker_vals = _check_device_markers(pytest_request)
+    dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
+    logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
+
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -1390,13 +1508,28 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
     current_folder = os.getcwd()
     logger.info("current folder: %s.", current_folder)
 
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, dev_res_dir, model_info["model_dir"])
+
     model_type = model_info.get("model_type", "cv")
     if (
         model_type == "cv"
-        and not _prepare_compiled_cv_model(model_info, platform, log_file)
+        and not _prepare_compiled_cv_model(
+            model_info,
+            platform,
+            log_file,
+            model_res_dir=model_res_dir,
+            model_set_dir=model_set_dir,
+        )
     ) or (
         model_type == "llm"
-        and not _prepare_compiled_llm_model(model_info, platform, log_file)
+        and not _prepare_compiled_llm_model(
+            model_info,
+            platform,
+            log_file,
+            model_res_dir=model_res_dir,
+            model_set_dir=model_set_dir,
+        )
     ):
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
@@ -1405,8 +1538,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
         pytest.skip(skip_msg)
     if get_test_type() == TCaseType.SEPARATE_NO_INFER:
         if model_type == "cv":
-            dst_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-            move_models_res(current_folder, dst_folder)
+            move_models_res(current_folder, model_res_dir)
 
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
@@ -1414,17 +1546,20 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
         logger.warning(skip_msg)
         pytest.skip(skip_msg)
     if model_type == "cv" and get_test_type() == TCaseType.SEPARATE_INFER:
-        src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-        restore_models_res(src_folder, current_folder)
+        restore_models_res(model_res_dir, current_folder)
 
-    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
-    model_res_dir = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
     if (
         model_type == "llm"
         and is_release()
         and get_test_type() == TCaseType.SEPARATE_INFER
     ):
-        _download_models(model_info, "hmm", model_set_dir, model_res_dir, "all")
+        _download_models(
+            model_info,
+            file_type="hmm",
+            download_dir=model_set_dir,
+            extract_dir=model_res_dir,
+            lock_type="all",
+        )
 
     final_flag = True
     perf_threashold = 0.1 if is_release() else 0.95
@@ -1604,7 +1739,7 @@ def execute_perf_flow(model_name: str, log_file: str = "") -> None:
     logger.info("HmATC Perf Test Success!")
 
 
-def execute_eval_flow(model_name: str, log_file: str = "") -> None:
+def execute_eval_flow(model_name: str, setup_logging) -> None:
     """
     Execute the complete evaluation test flow for a specified model.
 
@@ -1612,6 +1747,11 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
         model_name (str): Name of the model to test
         log_file (str): Path to the log file for test output
     """
+    log_file, pytest_request = setup_logging
+    marker_vals = _check_device_markers(pytest_request)
+    dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
+    logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
+
     model_info = _load_model_cfg(model_name)
     if (
         model_info is None
@@ -1635,21 +1775,34 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
     current_folder = os.getcwd()
     logger.info("current folder: %s.", current_folder)
 
+    model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
+    model_res_dir = os.path.join(MODELS_RES_DIR, dev_res_dir, model_info["model_dir"])
     model_type = model_info.get("model_type", "cv")
     if (
         model_type == "cv"
-        and not _prepare_compiled_cv_model(model_info, platform, log_file)
+        and not _prepare_compiled_cv_model(
+            model_info,
+            platform,
+            log_file,
+            model_res_dir=model_res_dir,
+            model_set_dir=model_set_dir,
+        )
     ) or (
         model_type == "llm"
-        and not _prepare_compiled_llm_model(model_info, platform, log_file)
+        and not _prepare_compiled_llm_model(
+            model_info,
+            platform,
+            log_file,
+            model_res_dir=model_res_dir,
+            model_set_dir=model_set_dir,
+        )
     ):
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
         pytest.skip(f"Not support {model_name} testing on {HOUMO_BACKEND}.")
     if get_test_type() == TCaseType.SEPARATE_NO_INFER:
         if model_type == "cv":
-            dst_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-            move_models_res(current_folder, dst_folder)
+            move_models_res(current_folder, model_res_dir)
 
         logger.warning(f"remove folder: {os.getcwd()}.")
         shutil.rmtree(os.getcwd())
@@ -1657,8 +1810,7 @@ def execute_eval_flow(model_name: str, log_file: str = "") -> None:
         logger.warning(skip_msg)
         pytest.skip(skip_msg)
     if model_type == "cv" and get_test_type() == TCaseType.SEPARATE_INFER:
-        src_folder = os.path.join(MODELS_RES_DIR, model_info["model_dir"])
-        restore_models_res(src_folder, current_folder)
+        restore_models_res(model_res_dir, current_folder)
 
     final_flag = True
     # test cmd: hmatc eval

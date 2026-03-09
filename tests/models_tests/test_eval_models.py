@@ -25,16 +25,16 @@ from .test_models_utils import *
 logger = logging.getLogger(__name__)
 
 
-def _eval_func(model_name: str, log_file: str) -> None:
+def _eval_func(model_name: str, setup_logging) -> None:
     """
     Execute model evaluation test for a specific model.
 
     Args:
         model_name (str): Name of the model to evaluate
-        log_file (str): Path to the log file for test output
+        setup_logging: Fixture of setup_logging
     """
     logger.info("===> TEST START: test_%s_eval", model_name)
-    execute_eval_flow(model_name, log_file)
+    execute_eval_flow(model_name, setup_logging)
 
 
 @pytest.mark.efficientnet

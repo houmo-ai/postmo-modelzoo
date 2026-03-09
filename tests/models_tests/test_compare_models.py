@@ -25,16 +25,16 @@ from .test_models_utils import *
 logger = logging.getLogger(__name__)
 
 
-def _compare_func(model_name: str, log_file: str) -> None:
+def _compare_func(model_name: str, setup_logging) -> None:
     """
     Execute model comparison test for a specific model.
 
     Args:
         model_name (str): Name of the model to compare
-        log_file (str): Path to the log file for test output
+        setup_logging: Fixture of setup_logging
     """
     logger.info("===> TEST START: test_%s_compare", model_name)
-    execute_compare_flow(model_name, log_file)
+    execute_compare_flow(model_name, setup_logging)
 
 
 @pytest.mark.yolop

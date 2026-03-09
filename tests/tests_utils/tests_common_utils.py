@@ -50,6 +50,9 @@ MODELS_RES_DIR = os.path.abspath(
 )
 USE_RELEASED_MODELS = os.getenv("USE_RELEASED_MODELS", "ON")
 
+NDEVICE_MARKER = "ndevice"
+DEVICE_MEM_MARKER = "dev_mem"
+
 logger = logging.getLogger(__name__)
 
 

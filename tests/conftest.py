@@ -45,7 +45,7 @@ if os.getenv("HOUMO_VERSION", None) is None:
 # os.environ["IMODELZOO_MODELS_PATH"] = f"/develop02/modelzoo/"
 
 # Create models directory if it doesn't exist
-os.makedirs(f"{script_dir}/models/", exist_ok=True)
+# os.makedirs(f"{script_dir}/models/", exist_ok=True)
 
 
 def pytest_configure(config):
@@ -106,7 +106,7 @@ def setup_logging(request):
     logger.addHandler(file_handler)
 
     # Pass the log path to the test case
-    yield log_file
+    yield (log_file, request)
 
     # Remove handler after test completion to prevent duplicate logs
     logger.removeHandler(file_handler)

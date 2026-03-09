@@ -25,16 +25,16 @@ from .test_models_utils import *
 logger = logging.getLogger(__name__)
 
 
-def _get_model_func(model_name: str, log_file: str) -> None:
+def _get_model_func(model_name: str, setup_logging) -> None:
     """
     Execute model downloading test for a specific model.
 
     Args:
         model_name (str): Name of the model to download
-        log_file (str): Path to the log file for test output
+        setup_logging: Fixture of setup_logging
     """
     logger.info("===> TEST START: test_%s_get_model", model_name)
-    execute_get_model_flow(model_name, log_file)
+    execute_get_model_flow(model_name, setup_logging)
 
 
 @pytest.mark.wenet

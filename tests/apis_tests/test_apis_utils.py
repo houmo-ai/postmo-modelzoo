@@ -124,7 +124,9 @@ def _compile_cpp_exec(example_dir: str, log_file: str, defines: list) -> None:
     os.chdir(example_dir)
 
 
-def _test_get_model(example_info: dict, platform: str, log_file: str) -> bool:
+def _test_get_model(
+    example_info: dict, platform: str, log_file: str, model_set_dir: str
+) -> bool:
     """
     Download model for the example with proper resource locking.
 
@@ -138,7 +140,6 @@ def _test_get_model(example_info: dict, platform: str, log_file: str) -> bool:
     """
     get_model_flag = True
     max_core_num = 2 if platform == "aarch64" else 0
-    model_set_dir = os.path.join(MODELS_PATH, example_info["example_dir"])
     params_dict = example_info["get_model_params"][HOUMO_BACKEND]
     cmd_header = ["python3", "get_model.py", "--model_dir", model_set_dir]
     cmd_list = _generate_cmds(cmd_header, params_dict, max_core_num)
@@ -156,17 +157,43 @@ def _test_get_model(example_info: dict, platform: str, log_file: str) -> bool:
     return get_model_flag
 
 
-def execute_apis_examples(example_name: str, log_file: str):
+def _check_device_markers(pytest_request):
+    all_markers = [marker.name for marker in pytest_request.node.own_markers]
+    target_prefixes = [f"{NDEVICE_MARKER}_", f"{DEVICE_MEM_MARKER}_"]
+    marker_vals = {}
+    for marker in all_markers:
+        for prefix in target_prefixes:
+            if marker.startswith(prefix):
+                marker_key = prefix.rstrip("_")
+                marker_vals[marker_key] = marker
+
+    if (
+        not marker_vals
+        or marker_vals.get(NDEVICE_MARKER, None) is None
+        or marker_vals.get(DEVICE_MEM_MARKER, None) is None
+    ):
+        logger.warning("Device markers are not properly set for this test case.")
+        pytest.skip("Device markers are not properly set for this test case.")
+
+    return marker_vals
+
+
+def execute_apis_examples(example_name: str, setup_logging):
     """
     Execute API examples for the specified example name.
 
     Args:
         example_name (str): Name of the example to execute
-        log_file (str): Path to the log file for execution output
+        setup_logging: pytest fixture for setting up logging configuration
 
     Raises:
         AssertionError: If the example folder doesn't exist or if tests fail
     """
+    log_file, pytest_request = setup_logging
+    marker_vals = _check_device_markers(pytest_request)
+    dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
+    logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
+
     example_info = _load_example_cfg(example_name)
     if (
         example_info is None
@@ -209,11 +236,11 @@ def execute_apis_examples(example_name: str, log_file: str):
     current_folder = os.getcwd()
     logger.info("current folder: %s.", current_folder)
 
+    model_set_dir = os.path.join(MODELS_PATH, example_info["example_dir"])
     if (
         example_info.get("get_model_params", None) is None
         or example_info["get_model_params"].get(HOUMO_BACKEND, None) is None
     ):
-        model_set_dir = os.path.join(MODELS_PATH, example_info["example_dir"])
         cmd_list = ["python3", "get_model.py"]
         if example_name != "qwen3":
             cmd_list += ["--model_dir", model_set_dir]
@@ -223,7 +250,9 @@ def execute_apis_examples(example_name: str, log_file: str):
         ):
             execute_test_cmd(cmd_list, "", True)
     else:
-        get_model_flag = _test_get_model(example_info, platform, log_file)
+        get_model_flag = _test_get_model(
+            example_info, platform, log_file, model_set_dir=model_set_dir
+        )
         if get_model_flag is False:
             logger.error(f"{example_name} Get model Failed!")
 

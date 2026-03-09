@@ -25,16 +25,16 @@ from .test_models_utils import *
 logger = logging.getLogger(__name__)
 
 
-def _quant_func(model_name: str, log_file: str) -> None:
+def _quant_func(model_name: str, setup_logging) -> None:
     """
     Execute model quantization test for a specific model.
 
     Args:
         model_name (str): Name of the model to quantize
-        log_file (str): Path to the log file for test output
+        setup_logging: Fixture of setup_logging
     """
     logger.info("===> TEST START: test_%s_quant", model_name)
-    execute_quant_flow(model_name, log_file)
+    execute_quant_flow(model_name, setup_logging)
 
 
 @pytest.mark.yolop
