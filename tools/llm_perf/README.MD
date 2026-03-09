@@ -204,7 +204,7 @@ Streams:
 
 # Global output file for all performance results
 # Note: This has higher priority than individual dump_file settings in Streams
-dump_file: perf_result.json
+dump_file: perf_result.yaml
 ```
 **dump_file最外层的优先级高于Streams下的dump_file**
 - **如果外层dump_file不存在，则使用Streams下的dump_file。**
