@@ -87,6 +87,16 @@ static std::string formatMemorySize(size_t bytes) {
   return buffer;
 }
 
+static std::string formatHostMemorySize(size_t bytes) {
+  const double KB = 1024.0;
+  const double MB = KB * 1024;
+  const double GB = MB * 1024;
+
+  char buffer[32];
+  snprintf(buffer, sizeof(buffer), "%.2f GB", bytes / GB);
+  return buffer;
+}
+
 // ========== Memory Monitor Thread ==========
 class HostMonitor {
  private:

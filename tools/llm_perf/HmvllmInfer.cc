@@ -134,7 +134,7 @@ void HmvllmInfer::prefill_input_init() {
     prefill_input_map.insert(
         std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
     if (input_name.find("position_ids") != std::string::npos ||
-        input_name.find("visual_embed") != std::string::npos) {
+        input_name.find("_embed") != std::string::npos) {
       prefill_input_datas.insert(
           std::pair<std::string, std::unique_ptr<char[]>>(
               input_name, std::make_unique<char[]>(memSize)));
@@ -157,7 +157,7 @@ void HmvllmInfer::decode_input_init() {
     decode_input_map.insert(
         std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
     if (input_name.find("position_ids") != std::string::npos ||
-        input_name.find("visual_embed") != std::string::npos) {
+        input_name.find("_embed") != std::string::npos) {
       decode_input_datas.insert(std::pair<std::string, std::unique_ptr<char[]>>(
           input_name, std::make_unique<char[]>(memSize)));
       std::fill(decode_input_datas.at(input_name).get(),
@@ -256,7 +256,7 @@ void HmvllmInfer::PrefillSetInputDatas(void *data, int current_length) {
     } else if (name.find("current_length") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&current_length, memSize));
-    } else if (name.find("visual_embed") != std::string::npos) {
+    } else if (name.find("_embed") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
           prefill_input_datas.at(name).get(), memSize));
     }
@@ -285,8 +285,8 @@ void HmvllmInfer::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
   auto output_info = prefill_module->GetOutputInfo(output_name).AsContiguous();
   perf_tracker->perfStart(PerfType::PREFILL_OUTPUT_TIME);
   auto dev_output_tensor = prefill_module->GetDevOutput(output_name);
-  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
   auto host_output_tensor = dev_output_tensor.ToHost(true);
+  perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
 
   void *prefill_outData = host_output_tensor.Buffer().Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
@@ -335,8 +335,8 @@ void HmvllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids) {
 
   perf_tracker->perfStart(PerfType::DECODE_OUTPUT_TIME);
   auto dev_output_tensor = decode_module->GetDevOutput(output_name);
-  perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
   auto host_output_tensor = dev_output_tensor.ToHost(true);
+  perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
 
   void *decode_outData = host_output_tensor.Buffer().Data();
   ids.emplace_back(eigen_argmax<tensor_type>(
@@ -368,10 +368,9 @@ void HmvllmInfer::VisionGetOutputDatas() {
     auto output_name = vision_module->GetOutputName(idx);
     perf_tracker->perfStart(PerfType::VISION_OUTPUT_TIME);
     auto dev_output_tensor = vision_module->GetDevOutput(output_name);
-    perf_tracker->perfEnd(PerfType::VISION_OUTPUT_TIME);
-
     // make sure the host tensor is contiguous
     auto host_output_tensor = dev_output_tensor.ToHost(true);
+    perf_tracker->perfEnd(PerfType::VISION_OUTPUT_TIME);
   }
 }
 

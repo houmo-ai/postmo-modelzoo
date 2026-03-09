@@ -72,6 +72,7 @@ void PerfDumper::dumpPerf(
   model_perf_settings["loop"] = perf_settings.loop_count;
   model_perf_settings["LazyMode"] = perf_settings.LazyMode;
   model_perf_settings["warm_up"] = perf_settings.warm_up;
+  model_perf_settings["warm_up_input"] = perf_settings.warm_up_input;
   model_perf_settings["warm_up_output"] = perf_settings.warm_up_output;
   model_perf_settings["skip_perf"] = perf_settings.skip_perf;
   model_perf_settings["monitor_interval"] = perf_settings.interval_ms;
@@ -98,7 +99,8 @@ void PerfDumper::dumpPerf(
   model_perf_results["vision_speed"] =
       format_double(results.metrics.vision_perf_infos.vision_total_speed);
   model_perf_results["prefill_infer_time_avg"] =
-      format_double(results.metrics.prefill_perf_infos.infer_time);
+      format_double(results.metrics.prefill_perf_infos.infer_time /
+                    perf_settings.input_tokens_len);
   model_perf_results["decode_infer_time_avg"] =
       format_double(results.metrics.decode_perf_infos.infer_time_per_token);
   model_perf_results["vision_infer_time_avg"] =
@@ -122,13 +124,13 @@ void PerfDumper::dumpPerf(
 #if defined(__linux__)
   YAML::Node host_metrics = model_metrics["HostMonitor"];
   host_metrics["physical_memory"] =
-      formatMemorySize(host_mem_info.physical_memory);
+      formatHostMemorySize(host_mem_info.physical_memory);
   host_metrics["virtual_memory"] =
-      formatMemorySize(host_mem_info.virtual_memory);
+      formatHostMemorySize(host_mem_info.virtual_memory);
   host_metrics["max_physical_memory"] =
-      formatMemorySize(max_host_mem_info.physical_memory);
+      formatHostMemorySize(max_host_mem_info.physical_memory);
   host_metrics["max_virtual_memory"] =
-      formatMemorySize(max_host_mem_info.virtual_memory);
+      formatHostMemorySize(max_host_mem_info.virtual_memory);
 #endif
 
   YAML::Node device_metrics = model_metrics["DeviceMonitor"];
@@ -193,19 +195,17 @@ void PerfDumper::showPerfBrief(
   std::cout << "                            Inference Performance "
             << std::endl;
   std::cout << std::string(82, '-') << std::endl;
-  std::cout << "  Prefill Time: "
+  std::cout << "  Prefill API Inference total Time: "
             << results.metrics.prefill_perf_infos.infer_time << std::setw(5)
-            << " ms/token | Speed: "
-            << results.metrics.prefill_perf_infos.infer_speed << " tokens/s"
-            << std::endl;
-  std::cout << "  Decode  Time: "
+            << " ms | Speed: " << results.metrics.prefill_perf_infos.infer_speed
+            << " tokens/s" << std::endl;
+  std::cout << "  Decode  API Inference total Time: "
             << results.metrics.decode_perf_infos.infer_time << std::setw(5)
-            << " ms/token | Speed: "
-            << results.metrics.decode_perf_infos.infer_speed << " tokens/s"
-            << std::endl;
-  std::cout << "  Vision  Time: "
+            << " ms | Speed: " << results.metrics.decode_perf_infos.infer_speed
+            << " tokens/s" << std::endl;
+  std::cout << "  Vision  API Inference total Time: "
             << results.metrics.vision_perf_infos.infer_time << std::setw(5)
-            << " ms/image | Speed: "
+            << " ms | Speed: "
             << results.metrics.vision_perf_infos.vision_infer_speed
             << " images/s" << std::endl;
 
@@ -240,6 +240,10 @@ void PerfDumper::showPerfBrief(
   std::cout << "                            Memory Usage (Max Values)"
             << std::endl;
   std::cout << std::string(82, '-') << std::endl;
+  std::cout << "  Physical Memory: "
+            << formatMemorySize(host_mem_info.physical_memory) << std::endl;
+  std::cout << "  Virtual Memory: "
+            << formatMemorySize(host_mem_info.virtual_memory) << std::endl;
   std::cout << "  Max Physical Memory: "
             << formatMemorySize(max_host_mem_info.physical_memory) << std::endl;
   std::cout << "  Max Virtual Memory: "
@@ -317,14 +321,14 @@ void PerfDumper::showPerfBrief(
       std::cout << "  Preprocessing Time: Skipped (No operation)" << std::endl;
     }
 
-    std::cout << "  API SetInput Time: " << std::setw(6)
+    std::cout << "  API SetInput  total Time: " << std::setw(6)
               << metrics.vision_perf_infos.setinput_time << "ms" << std::endl;
-    std::cout << "  API Inference Time: " << std::setw(5)
+    std::cout << "  API Inference total Time: " << std::setw(5)
               << metrics.vision_perf_infos.infer_time
               << "ms | Speed: " << std::setw(7)
               << metrics.vision_perf_infos.vision_infer_speed << " images/s"
               << std::endl;
-    std::cout << "  API GetOutput Time: " << std::setw(5)
+    std::cout << "  API GetOutput total Time: " << std::setw(5)
               << metrics.vision_perf_infos.getoutput_time << "ms" << std::endl;
     std::cout << std::string(82, '-') << std::endl;
   }
@@ -340,21 +344,22 @@ void PerfDumper::showPerfBrief(
             << metrics.prefill_perf_infos.total_speed << " tokens/s"
             << std::endl;
   if (metrics.prefill_perf_infos.tokenizer_time > 0) {
-    std::cout << "  Tokenization Time: " << std::setw(7)
+    std::cout << "  Tokenization total Time: " << std::setw(7)
               << metrics.prefill_perf_infos.tokenizer_time << "ms" << std::endl;
   } else {
-    std::cout << "  Tokenization Time: Skipped (No operation)" << std::endl;
+    std::cout << "  Tokenization total Time: Skipped (No operation)"
+              << std::endl;
   }
-  std::cout << "  Embedding Time: " << std::setw(7)
+  std::cout << "  Embedding total Time: " << std::setw(7)
             << metrics.prefill_perf_infos.embedding_time << "ms" << std::endl;
-  std::cout << "  API SetInput Time: " << std::setw(6)
+  std::cout << "  API SetInput  total Time: " << std::setw(6)
             << metrics.prefill_perf_infos.setinput_time << "ms" << std::endl;
-  std::cout << "  API Inference Time: " << std::setw(5)
+  std::cout << "  API Inference total Time: " << std::setw(5)
             << metrics.prefill_perf_infos.infer_time
             << "ms | Speed: " << std::setw(7)
             << metrics.prefill_perf_infos.infer_speed << " tokens/s"
             << std::endl;
-  std::cout << "  API GetOutput Time: " << std::setw(5)
+  std::cout << "  API GetOutput total Time: " << std::setw(5)
             << metrics.prefill_perf_infos.getoutput_time << "ms" << std::endl;
   std::cout << std::string(82, '-') << std::endl;
 
@@ -368,22 +373,23 @@ void PerfDumper::showPerfBrief(
             << metrics.decode_perf_infos.total_speed << " tokens/s"
             << std::endl;
   if (metrics.decode_perf_infos.tokenizer_time > 0) {
-    std::cout << "  Tokenization Time: " << std::setw(7)
+    std::cout << "  Tokenization total Time: " << std::setw(7)
               << metrics.decode_perf_infos.tokenizer_time << "ms" << std::endl;
   } else {
-    std::cout << "  Tokenization Time: Skipped (No operation)" << std::endl;
+    std::cout << "  Tokenization total Time: Skipped (No operation)"
+              << std::endl;
   }
-  std::cout << "  Embedding Time: " << std::setw(7)
+  std::cout << "  Embedding total Time: " << std::setw(7)
             << metrics.decode_perf_infos.embedding_time << "ms" << std::endl;
-  std::cout << "  API SetInput Time: " << std::setw(6)
+  std::cout << "  API SetInput  avg Time: " << std::setw(6)
             << metrics.decode_perf_infos.setinput_time_per_token << "ms/token"
             << std::endl;
-  std::cout << "  API Inference Time: " << std::setw(5)
+  std::cout << "  API Inference avg Time: " << std::setw(5)
             << metrics.decode_perf_infos.infer_time_per_token
             << "ms/token | Speed: " << std::setw(7)
             << metrics.decode_perf_infos.infer_speed << " tokens/s"
             << std::endl;
-  std::cout << "  API GetOutput Time: " << std::setw(5)
+  std::cout << "  API GetOutput avg Time: " << std::setw(5)
             << metrics.decode_perf_infos.getoutput_time_per_token << "ms/token"
             << std::endl;
 
@@ -426,15 +432,19 @@ void PerfDumper::writePerfBrief(
   // Brief Inference Performance
   logger->info(
       "-------------------- Inference Performance ---------------------");
-  logger->info("  Prefill Time: {:.2f} ms/token | Speed: {:.2f} tokens/s",
-               results.metrics.prefill_perf_infos.infer_time,
-               results.metrics.prefill_perf_infos.infer_speed);
-  logger->info("  Decode  Time: {:.2f} ms/token | Speed: {:.2f} tokens/s",
-               results.metrics.decode_perf_infos.infer_time,
-               results.metrics.decode_perf_infos.infer_speed);
-  logger->info("  Vision  Time: {:.2f} ms/image | Speed: {:.2f} images/s",
-               results.metrics.vision_perf_infos.infer_time,
-               results.metrics.vision_perf_infos.vision_infer_speed);
+  logger->info(
+      "  Prefill  API Inference total Time: {:.2f} ms | Speed: {:.2f} "
+      "tokens/s",
+      results.metrics.prefill_perf_infos.infer_time,
+      results.metrics.prefill_perf_infos.infer_speed);
+  logger->info(
+      "  Decode  API Inference total Time: {:.2f} ms | Speed: {:.2f} tokens/s",
+      results.metrics.decode_perf_infos.infer_time,
+      results.metrics.decode_perf_infos.infer_speed);
+  logger->info(
+      "  Vision  API Inference total Time: {:.2f} ms | Speed: {:.2f} images/s",
+      results.metrics.vision_perf_infos.infer_time,
+      results.metrics.vision_perf_infos.vision_infer_speed);
 
   // Summary metrics
   logger->info(
@@ -468,6 +478,10 @@ void PerfDumper::writePerfBrief(
 #if defined(__linux__)
   logger->info(
       "-------------------- Memory Usage (Max Values) -----------------");
+  logger->info("  Physical Memory: {}",
+               formatMemorySize(host_mem_info.physical_memory));
+  logger->info("  Virtual Memory: {}",
+               formatMemorySize(host_mem_info.virtual_memory));
   logger->info("  Max Physical Memory: {}",
                formatMemorySize(max_host_mem_info.physical_memory));
   logger->info("  Max Virtual Memory: {}",
@@ -526,12 +540,13 @@ void PerfDumper::writePerfBrief(
       logger->info("  Preprocessing Time: Skipped (No operation)");
     }
 
-    logger->info("  API SetInput Time: {:>6.2f}ms",
+    logger->info("  API SetInput total Time: {:>6.2f}ms",
                  metrics.vision_perf_infos.setinput_time);
-    logger->info("  API Inference Time: {:>5.2f}ms | Speed: {:>7.2f} images/s",
-                 metrics.vision_perf_infos.infer_time,
-                 metrics.vision_perf_infos.vision_infer_speed);
-    logger->info("  API GetOutput Time: {:>5.2f}ms",
+    logger->info(
+        "  API Inference total Time: {:>5.2f}ms | Speed: {:>7.2f} images/s",
+        metrics.vision_perf_infos.infer_time,
+        metrics.vision_perf_infos.vision_infer_speed);
+    logger->info("  API GetOutput total Time: {:>5.2f}ms",
                  metrics.vision_perf_infos.getoutput_time);
     logger->info(
         "----------------------------------------------------------------------"
@@ -546,19 +561,20 @@ void PerfDumper::writePerfBrief(
                metrics.prefill_perf_infos.total_time,
                metrics.prefill_perf_infos.total_speed);
   if (metrics.prefill_perf_infos.tokenizer_time > 0) {
-    logger->info("  Tokenization Time: {:>7.2f}ms",
+    logger->info("  Tokenization total Time: {:>7.2f}ms",
                  metrics.prefill_perf_infos.tokenizer_time);
   } else {
-    logger->info("  Tokenization Time: Skipped (No operation)");
+    logger->info("  Tokenization total Time: Skipped (No operation)");
   }
-  logger->info("  Embedding Time: {:>7.2f}ms",
+  logger->info("  Embedding total Time: {:>7.2f}ms",
                metrics.prefill_perf_infos.embedding_time);
-  logger->info("  API SetInput Time: {:>6.2f}ms",
+  logger->info("  API SetInput total Time: {:>6.2f}ms",
                metrics.prefill_perf_infos.setinput_time);
-  logger->info("  API Inference Time: {:>5.2f}ms | Speed: {:>7.2f} tokens/s",
-               metrics.prefill_perf_infos.infer_time,
-               metrics.prefill_perf_infos.infer_speed);
-  logger->info("  API GetOutput Time: {:>5.2f}ms",
+  logger->info(
+      "  API Inference total Time: {:>5.2f}ms | Speed: {:>7.2f} tokens/s",
+      metrics.prefill_perf_infos.infer_time,
+      metrics.prefill_perf_infos.infer_speed);
+  logger->info("  API GetOutput total Time: {:>5.2f}ms",
                metrics.prefill_perf_infos.getoutput_time);
   logger->info(
       "-----------------------------------------------------------------------"
@@ -571,20 +587,20 @@ void PerfDumper::writePerfBrief(
                metrics.decode_perf_infos.total_time,
                metrics.decode_perf_infos.total_speed);
   if (metrics.decode_perf_infos.tokenizer_time > 0) {
-    logger->info("  Tokenization Time: {:>7.2f}ms",
+    logger->info("  Tokenization total Time: {:>7.2f}ms",
                  metrics.decode_perf_infos.tokenizer_time);
   } else {
-    logger->info("  Tokenization Time: Skipped (No operation)");
+    logger->info("  Tokenization total Time: Skipped (No operation)");
   }
-  logger->info("  Embedding Time: {:>7.2f}ms",
+  logger->info("  Embedding total Time: {:>7.2f}ms",
                metrics.decode_perf_infos.embedding_time);
-  logger->info("  API SetInput Time: {:>6.2f}ms/token",
+  logger->info("  API SetInput avg Time: {:>6.2f}ms/token",
                metrics.decode_perf_infos.setinput_time_per_token);
   logger->info(
-      "  API Inference Time: {:>5.2f}ms/token | Speed: {:>7.2f} tokens/s",
+      "  API Inference avg Time: {:>5.2f}ms/token | Speed: {:>7.2f} tokens/s",
       metrics.decode_perf_infos.infer_time_per_token,
       metrics.decode_perf_infos.infer_speed);
-  logger->info("  API GetOutput Time: {:>5.2f}ms/token",
+  logger->info("  API GetOutput avg Time: {:>5.2f}ms/token",
                metrics.decode_perf_infos.getoutput_time_per_token);
 
   logger->info(

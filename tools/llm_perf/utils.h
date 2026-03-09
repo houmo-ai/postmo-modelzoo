@@ -88,6 +88,8 @@ static void HelpUsage(char* argv[]) {
          "supported for multi-batch).\n"
          "  --no_warm_up                Disable warm-up (flag, no value "
          "required).\n"
+         "  --warm_up_input   NUM       set warm_up input tokens when "
+         "warm_up enabled(optional, if not set, default is equal to input).\n"
          "  --warm_up_output  NUM       set warm_up decode times when "
          "warm_up enabled(optional, if not set, default is equal to output).\n"
          "  --LazyMode                  Enable lazy mode (flag, no value "
@@ -308,6 +310,7 @@ typedef struct perf_settings {
   int batch_size;
   int loop_count;
   bool warm_up;
+  uint32_t warm_up_input;
   uint32_t warm_up_output;
   bool LazyMode;
   bool skip_perf;

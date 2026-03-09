@@ -370,16 +370,16 @@ llm_sensevoice:
         args: all
   test:
     - llm_sensevoice_test
-# llm_perf:
-#   include:
-#     - tools/llm_perf
-#   exclude:
-#     - tools/llm_perf/README.MD
-#   example_case:
-#     - tools_llm_perf_test:
-#         script: ../tests/tools_tests/test_llm_perf.sh
-#   test:
-#     - tools_llm_perf_test
+llm_perf:
+  include:
+    - tools/llm_perf
+  exclude:
+    - tools/llm_perf/README.MD
+  example_case:
+    - tools_llm_perf_test:
+        script: ../tests/tools_tests/test_llm_perf.sh
+  test:
+    - tools_llm_perf_test
 llm_minicpmo:
   include:
     - models/omni/minicpmo
