@@ -380,7 +380,7 @@ def get_args() -> argparse.Namespace:
         "--image_size",
         dest="image_size",
         type=list,
-        default=[336, 336],
+        default=[672, 672],
         help="size of the input image",
     )
     parser.add_argument(

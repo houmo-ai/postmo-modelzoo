@@ -163,8 +163,8 @@ def parse_arguments():
         default=None,
         help="node profile output dir, default work_dir/node_profile",
     )
-    parser.add_argument("--image_size_w", type=int, default=336, help="image width")
-    parser.add_argument("--image_size_h", type=int, default=336, help="image height")
+    parser.add_argument("--image_size_w", type=int, default=672, help="image width")
+    parser.add_argument("--image_size_h", type=int, default=672, help="image height")
     parser.add_argument(
         "--max_sequence_length", type=int, default=2048, help="max sequence length"
     )
