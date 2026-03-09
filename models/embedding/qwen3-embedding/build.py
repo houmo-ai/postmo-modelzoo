@@ -25,6 +25,7 @@ import psutil
 import threading
 import multiprocessing
 import argparse
+import glob
 
 import logging
 
@@ -137,7 +138,7 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="qwen3",
+        default="qwen3-embedding",
         help="output houmo model name",
     )
     parser.add_argument(
@@ -211,7 +212,6 @@ def get_args() -> argparse.Namespace:
 def build(
     model_name,
     model_dir,
-    model_path,
     output_dir,
     profile,
     ncore,
@@ -221,32 +221,34 @@ def build(
     batch=None,
     tso=False,
     flash_attention=0,
-    prefill_length=256,
+    prefill_length=0,
 ):
     import tcim
     import json
 
-    kwargs = dict()
-    kwargs["modify_llm"] = dict()
-    custom_msg = dict()
-    custom_msg["prefill_length"] = prefill_length
+    kwargs = {}
+    custom_msg = {}
+    kwargs["modify_llm"] = {}
+    kwargs["enable_xh2_stable_output"] = tso
+    if prefill_length:
+        custom_msg["prefill_length"] = prefill_length
     if batch:
         kwargs["modify_llm"]["batch"] = batch
         custom_msg["batch"] = batch
-    if HOUMO_TARGET == "xh2":
-        kwargs["enable_xh2_stable_output"] = tso
+    if flash_attention:
         kwargs["flash_attention"] = flash_attention
         custom_msg["flash_attention"] = flash_attention
-        if ndevice:
-            kwargs["ndevice"] = ndevice
-        if context_length:
-            kwargs["modify_llm"]["context-length"] = context_length
-            custom_msg["context_length"] = context_length
+    if ndevice:
+        kwargs["ndevice"] = ndevice
+    if context_length:
+        kwargs["modify_llm"]["context-length"] = context_length
+        custom_msg["context_length"] = context_length
     kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
-    print(f"\n===> {model_name} build start...")
-    decode_model = os.path.join(model_dir, model_path)
+    print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*_with_act.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -263,7 +265,7 @@ def build(
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 
-def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
+def test(model_name, model_dir, output_dir, profile, batch=1):
     import tcim_lite
 
     print(f"\n===> {model_name} test start...")
@@ -276,8 +278,6 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
 
     # set input
     profile["set_input"] = 0
-    if prefix is None:
-        prefix = model_name
     input_num = module.get_num_inputs()
     for id in range(input_num):
         input_name = module.get_input_name(id)
@@ -285,9 +285,10 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         print(
             f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
         )
-        input_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy"
+        input_files = glob.glob(
+            f"{model_dir}/**/hmquant_*{sanitize_name(input_name)}*.npy", recursive=True
         )
+        input_data_path = os.path.abspath(input_files[0]) if input_files else ""
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
         print(
@@ -323,9 +324,10 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         print(
             f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
         )
-        output_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy"
+        output_files = glob.glob(
+            f"{model_dir}/**/hmquant_*{sanitize_name(output_name)}*.npy", recursive=True
         )
+        output_data_path = os.path.abspath(output_files[0]) if output_files else ""
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
             golden_output = np.concatenate(
@@ -388,11 +390,9 @@ if __name__ == "__main__":
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
         build(
-            "qwen3-embedding_prefill",
-            model_dir,
-            model_path,
+            f"{model_name}_prefill",
+            f"{model_dir}/prefill",
             output_dir,
             profile,
             ncore,
@@ -405,9 +405,6 @@ if __name__ == "__main__":
 
     # test model
     if args.stage == "test" or args.stage == "all":
-        part_dir = os.path.join(model_dir, "prefill")
-        test(
-            "qwen3-embedding_prefill", part_dir, output_dir, profile, prefix=model_name
-        )
+        test(f"{model_name}_prefill", f"{model_dir}/prefill", output_dir, profile)
 
     memory_monitor.stop()

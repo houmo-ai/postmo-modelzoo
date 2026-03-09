@@ -172,7 +172,7 @@ def get_args() -> argparse.Namespace:
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
+        default=0,
         help="device number",
     )
     parser.add_argument(
@@ -201,7 +201,7 @@ def get_args() -> argparse.Namespace:
         "--flash_attention",
         dest="flash_attention",
         type=int,
-        default=2,
+        default=0,
         choices=[0, 1, 2],
         help="flash attention optimization",
     )
@@ -253,7 +253,7 @@ def build(
     kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
-    print(f"\n===> {model_name} build start...")
+    print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
     decode_model = os.path.join(model_dir, model_path)
     tcim.build_from_hmonnx(
         decode_model,
