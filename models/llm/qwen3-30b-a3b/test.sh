@@ -54,10 +54,10 @@ if [[ "$VENV_FLAG" -eq "1" ]]; then
         virtualenv --python=$PY_EXE --extra-search-dir=$SITE_PACKAGES $dir_path
         VENV_PYTHON="${dir_path}/bin/python3"
         VENV_SITE=$(${VENV_PYTHON} -c "import site; print(site.getsitepackages()[0])")
-        echo "export ORIGINAL_PYTHONPATH=\$PYTHONPATH" >> $dir_path/bin/activate  
+        echo "export ORIGINAL_PYTHONPATH=\$PYTHONPATH" >> $dir_path/bin/activate
         echo "export PYTHONPATH=${VENV_SITE}:${SITE_PACKAGES}:\$ORIGINAL_PYTHONPATH" >> $dir_path/bin/activate
-        echo "export PYTHONPATH=\$ORIGINAL_PYTHONPATH" >> $dir_path/bin/deactivate  
-        echo "unset ORIGINAL_PYTHONPATH" >> $dir_path/bin/deactivate  
+        echo "export PYTHONPATH=\$ORIGINAL_PYTHONPATH" >> $dir_path/bin/deactivate
+        echo "unset ORIGINAL_PYTHONPATH" >> $dir_path/bin/deactivate
         sed -i 's/include-system-site-packages = true/include-system-site-packages = false/g' $dir_path/pyvenv.cfg
     else
         virtualenv --python=$PY_EXE --system-site-packages $dir_path
@@ -125,7 +125,7 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
     python3 demo.py
     python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt --type llm
-    llm_perf -c ../../../tools/llm_perf/configs/qwen3_30b_a3b_config.json
+    llm_perf -c config.yaml
 fi
 
 if [[ "$VENV_FLAG" -eq "1" ]]; then

@@ -1,0 +1,33 @@
+Streams:
+  - ModelName: Gpt-oss
+    prefill: output/xh2/gpt-oss_prefill.hmm
+    decode: output/xh2/gpt-oss_decode.hmm
+    embedding: output/xh2/hmquant/quant_embedding.bin
+    input: 256
+    output: 256
+    ndevices: 1
+    loop: 1
+    batch: 1
+    no_warm_up: ''
+  - ModelName: Gpt-oss
+    prefill: output/xh2/gpt-oss_prefill.hmm
+    decode: output/xh2/gpt-oss_decode.hmm
+    embedding: output/xh2/hmquant/quant_embedding.bin
+    input: 1024
+    output: 256
+    ndevices: 1
+    loop: 1
+    batch: 1
+    no_warm_up: ''
+  - ModelName: Gpt-oss
+    prefill: output/xh2/gpt-oss_prefill.hmm
+    decode: output/xh2/gpt-oss_decode.hmm
+    embedding: output/xh2/hmquant/quant_embedding.bin
+    input: 2048
+    output: 256
+    ndevices: 1
+    loop: 1
+    batch: 1
+    no_warm_up: ''
+
+dump_file: perf_result.yaml

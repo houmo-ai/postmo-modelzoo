@@ -115,7 +115,7 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
         echo "Execute demo."
         python3 demo.py
         python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt --type llm
-        llm_perf -c ../../../tools/llm_perf/configs/gpt_oss_config.json
+        llm_perf -c config.yaml
     else
         echo "Execute multi-batch demo with batch size: $MULTI_BATCH"
         python3 demo_multibatch.py --forbid_flush

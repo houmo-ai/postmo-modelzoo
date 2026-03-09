@@ -12,6 +12,35 @@ show_help() {
     exit 0
 }
 
+link_subdirs() {
+    if [ $# -ne 2 ]; then
+        echo "link_subdirs <source_dir> <target_dir>"
+        return 1
+    fi
+
+    local src_dir="$1"
+    local dest_dir="$2"
+
+    if [ ! -d "$src_dir" ]; then
+        echo "error: $src_dir unavailable!"
+        return 1
+    fi
+
+    mkdir -p "$dest_dir"
+
+    for subdir in "$src_dir"/*/; do
+        [ -d "$subdir" ] || continue
+        local subdir_name=$(basename "$subdir")
+        local link_path="$dest_dir/$subdir_name"
+        if [ -e "$link_path" ]; then
+            rm -rf "$link_path"
+        fi
+
+        local abs_subdir=$(realpath "$subdir")
+        ln -s "$abs_subdir" "$link_path"
+    done
+}
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         -s|--step)
@@ -103,7 +132,7 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
             echo "Start to quant and compile model."
             python3 get_model.py --type raw
             mkdir -p data/calib_data/LMUData
-            ln -s ../../../data/datasets/LMUData/* data/calib_data/LMUData
+            link_subdirs "../../../data/datasets/LMUData" "data/calib_data/LMUData"
             python3 ptq.py --data_files ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_CMMMU_VAL_20250923102519_struct.json  ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_COCO_VAL_20250923104643_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_DocVQA_VAL_20250923102720_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_MMMU_DEV_VAL_20250923102615_struct.json --calib-samples 64 --calib_dataset vllm_custom_data
             python3 build.py
         else
@@ -117,7 +146,7 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
     python3 demo.py
     python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt --type vllm
-    llm_perf -c ../../../tools/llm_perf/configs/qwen3_vl_config.json
+    llm_perf -c config.yaml
 fi
 
 if [[ "$VENV_FLAG" -eq "1" ]]; then

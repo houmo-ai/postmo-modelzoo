@@ -1,0 +1,39 @@
+Streams:
+  - ModelName: Your-Model-Name
+    prefill: output/xh2/model_prefill.hmm
+    decode: output/xh2/model_decode.hmm
+    visual: output/xh2/model_visual.hmm  # Optional, for vision-language models
+    embedding: output/xh2/hmquant/quant_embedding.bin
+    input: 256
+    output: 256
+    ndevices: 1
+    loop: 1
+    batch: 1
+    LazyMode: ''  # Optional, for specific models
+    no_warm_up: ''
+  - ModelName: Your-Model-Name
+    prefill: output/xh2/model_prefill.hmm
+    decode: output/xh2/model_decode.hmm
+    visual: output/xh2/model_visual.hmm  # Optional, for vision-language models
+    embedding: output/xh2/hmquant/quant_embedding.bin
+    input: 1024
+    output: 256
+    ndevices: 1
+    loop: 1
+    batch: 1
+    LazyMode: ''  # Optional, for specific models
+    no_warm_up: ''
+  - ModelName: Your-Model-Name
+    prefill: output/xh2/model_prefill.hmm
+    decode: output/xh2/model_decode.hmm
+    visual: output/xh2/model_visual.hmm  # Optional, for vision-language models
+    embedding: output/xh2/hmquant/quant_embedding.bin
+    input: 2048
+    output: 256
+    ndevices: 1
+    loop: 1
+    batch: 1
+    LazyMode: ''  # Optional, for specific models
+    no_warm_up: ''
+
+dump_file: perf_result.yaml
