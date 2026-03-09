@@ -200,12 +200,7 @@ def export_llm(args):
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
     model_name = os.path.basename(args.model)
     model_dir = os.path.join(args.work_dir, "{}_quarot_gptq".format(model_name))
-    if args.gptqmodel:
-        quant_weight = None
-        quant_path = os.path.join(args.work_dir, "{}_gptqmodel_4bit".format(model_name))
-        hf_model_path = osp.normpath(osp.abspath(quant_path))
-    else:
-        quant_weight = os.path.join(model_dir, "quarot_gptq-state-dict.safetensors")
+    quant_weight = os.path.join(model_dir, "quarot_gptq-state-dict.safetensors")
 
     config = Qwen2LegacyConvertConfig(
         batch_size=1,
