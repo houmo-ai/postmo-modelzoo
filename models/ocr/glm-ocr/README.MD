@@ -99,6 +99,7 @@ M50芯片
 ### 3.2 性能结果
 #### M50 2core
 ```bash
+#输入 336*336情况下
 Output 156 tokens, Prefill Cost 36.223 ms
 Prefill Speed: 4306.66 tokens/s
 Output 8 tokens, Decode Cost 83.455 ms
