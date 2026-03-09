@@ -267,7 +267,7 @@ def asr(whisper, processor, model_config, audio_array):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tokenizer_path", type=str, default="Whisper-large-v3-turbo")
+    parser.add_argument("--tokenizer_path", type=str, default="whisper-large-v3-turbo")
     parser.add_argument(
         "--encoder_path",
         dest="encoder_path",
