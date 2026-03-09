@@ -49,45 +49,7 @@ def msg_output_format(title):
     return title
 
 
-def gptq_quant_llm(args):
-    from datasets import load_dataset
-    from gptqmodel import GPTQModel, QuantizeConfig
-    import json
-
-    model_name = os.path.basename(args.model)
-    quant_path = os.path.join(args.work_dir, "{}_gptqmodel_4bit".format(model_name))
-
-    # 自定义数据集，做成json格式给到calibration_dataset即可
-    calibration_dataset = []
-    if args.calibration_dataset:
-        cnt = 0
-        cnt_start = 0
-        with open(args.calibration_dataset, encoding="utf-8") as file:
-            for line in file:
-                if cnt >= cnt_start:
-                    calibration_dataset.append(json.loads(line)["text"])
-                cnt = cnt + 1
-                if cnt == cnt_start + 512:
-                    break
-    else:
-        calibration_dataset = load_dataset(
-            "wikitext", "wikitext-2-raw-v1", split="train"
-        ).select(range(512))["text"]
-
-    # 量化配置
-    quant_config = QuantizeConfig(
-        bits=4, group_size=64, sym=True, mse=2.4, damp_percent=0.01, rotation="hadamard"
-    )
-    # 载入模型
-    model = GPTQModel.load(args.model, quant_config)
-
-    # increase `batch_size` to match gpu/vram specs to speed up quantization
-    model.quantize(calibration_dataset, batch_size=1)
-    # 保存量化好的模型
-    model.save(quant_path)
-
-
-def houmo_quant_llm(args):
+def quant_llm(args):
     out_dir = Path(args.work_dir)
     hf_model_dir = args.model
 
@@ -230,13 +192,6 @@ def houmo_quant_llm(args):
         logger.info(f"Save checkpoint to: {filename}")
 
 
-def quant_llm(args):
-    if args.gptqmodel:
-        gptq_quant_llm(args)
-    else:
-        houmo_quant_llm(args)
-
-
 def export_llm(args):
     hf_model_path = osp.normpath(osp.abspath(args.model))
     model_name = Path(hf_model_path).name
@@ -245,12 +200,7 @@ def export_llm(args):
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
     model_name = os.path.basename(args.model)
     model_dir = os.path.join(args.work_dir, "{}_quarot_gptq".format(model_name))
-    if args.gptqmodel:
-        quant_weight = None
-        quant_path = os.path.join(args.work_dir, "{}_gptqmodel_4bit".format(model_name))
-        hf_model_path = osp.normpath(osp.abspath(quant_path))
-    else:
-        quant_weight = os.path.join(model_dir, "quarot_gptq-state-dict.safetensors")
+    quant_weight = os.path.join(model_dir, "quarot_gptq-state-dict.safetensors")
 
     config = Qwen3LegacyConvertConfig(
         batch_size=1,
