@@ -24,6 +24,7 @@ import numpy as np
 import time
 import argparse
 import multiprocessing
+import glob
 
 import logging
 
@@ -127,16 +128,30 @@ def get_args() -> argparse.Namespace:
         default=os.path.join("output", HOUMO_TARGET),
         help="build output dir",
     )
+    parser.add_argument(
+        "--context_length",
+        dest="context_length",
+        type=int,
+        default=512,
+        help="context_length",
+    )
     args = parser.parse_args()
     return args
 
 
-def build(model_name, model_dir, model_path, output_dir, profile, ncore, j):
+def build(model_name, model_dir, output_dir, profile, ncore, j, context_length):
     import tcim
+    import json
+
+    kwargs = {}
+    custom_msg = {}
+    custom_msg["context_length"] = context_length
+    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
     print(f"\n===> {model_name} build start...")
-    decode_model = os.path.join(model_dir, model_path)
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -147,6 +162,7 @@ def build(model_name, model_dir, model_path, output_dir, profile, ncore, j):
         work_dir=os.path.join(output_dir, "tcim", model_name),
         llm_opt=True,
         j=j,
+        **kwargs,
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
@@ -259,6 +275,7 @@ if __name__ == "__main__":
     model_size = args.model_size
     batch = args.batch
     j = args.j
+    context_length = args.context_length
     profile = {}
 
     # build model
@@ -269,17 +286,23 @@ if __name__ == "__main__":
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"hmquant_{model_name}-m3_with_act.onnx"
-        build(f"{model_name}-m3", model_dir, model_path, output_dir, profile, ncore, j)
-        model_path = f"hmquant_{model_name}-reranker-v2-m3_with_act.onnx"
         build(
-            f"{model_name}-reranker-v2-m3",
+            f"{model_name}-m3",
             model_dir,
-            model_path,
             output_dir,
             profile,
             ncore,
             j,
+            context_length=context_length,
+        )
+        build(
+            f"{model_name}-reranker-v2-m3",
+            model_dir,
+            output_dir,
+            profile,
+            ncore,
+            j,
+            context_length=context_length,
         )
 
     # test model
