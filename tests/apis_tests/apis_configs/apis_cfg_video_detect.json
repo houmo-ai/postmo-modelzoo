@@ -9,10 +9,10 @@
     "support_core_num": {
         "xh1": [4]
     },
-    
+
     "get_model_params": null,
-    "cpp_example_params":  {
-        "name": "example_video_detect",
+    "cpp_example_params": {
+        "name": ["example_video_detect", "example_video_detect"],
         "defines": ["-DENABLE_RESIZER=ON", "-DENABLE_RK_DECODER=OFF"]
     }
 }

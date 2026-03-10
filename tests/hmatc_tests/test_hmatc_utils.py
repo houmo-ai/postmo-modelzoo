@@ -107,17 +107,22 @@ def _perf_models(config_yml: str, log_file: str) -> bool:
     return flag
 
 
-def execute_hmatc_cmd(model_name: str, log_file: str):
+def execute_hmatc_cmd(model_name: str, setup_logging):
     """
     Execute HMATC tests for the specified model.
 
     Args:
         model_name (str): Name of the model to test (e.g., resnet50, yolov5s)
-        log_file (str): Path to the log file for test output
+        setup_logging: pytest fixture for setting up logging configuration
 
     Raises:
         AssertionError: If any of the tests fail
     """
+    log_file, pytest_request = setup_logging
+    marker_vals = check_device_markers(pytest_request)
+    dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
+    logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
+
     if get_test_type() == TCaseType.SEPARATE_NO_INFER:
         skip_msg = f"Skip hmatc testcase {model_name} in the SEPARATE NO INFER stage."
         logger.warning(skip_msg)

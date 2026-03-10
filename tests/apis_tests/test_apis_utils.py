@@ -47,7 +47,13 @@ def _load_example_cfg(example_name: str) -> dict:
     return load_json(example_cfg_path)
 
 
-def _generate_cmds(cmd_header: list, params_dict: dict, max_core_num: int = 0) -> list:
+def _generate_cmds(
+    cmd_header: list,
+    params_dict: dict,
+    max_core_num: int = 0,
+    start_idx: int = 0,
+    name_prefix: str = "",
+) -> list:
     """
     Generate command lists with different parameter combinations.
 
@@ -59,28 +65,35 @@ def _generate_cmds(cmd_header: list, params_dict: dict, max_core_num: int = 0) -
     Returns:
         list: List of command lists with different parameter combinations
     """
-    cmd_list = [cmd_header]
+    cmd_list = [] if start_idx == 0 else [cmd_header]
 
-    idx = 1
+    idx = start_idx
     flag = True
     while flag:
         flag = False
         tmp_cmd_list = []
         for param_name, param_list in params_dict.items():
             if (
-                param_name in ["name", "defines", "envs"]
+                param_name in ["defines", "envs"]
                 or len(param_list) <= idx
                 or param_list[idx] == "default"
+                or param_list[idx] is None
             ):
                 continue
             if (
                 max_core_num > 0
                 and param_name == "ncore"
                 and param_list[idx] != "default"
+                and param_list[idx] is not None
                 and int(param_list[idx]) > max_core_num
             ):
                 continue
-            if param_name.startswith("#"):
+            if param_name == "name":
+                name_val = (
+                    (name_prefix + param_list[idx]) if name_prefix else param_list[idx]
+                )
+                tmp_cmd_list += [name_val]
+            elif param_name.startswith("#"):
                 tmp_cmd_list += [param_list[idx]]
             else:
                 params_str = "--" + param_name
@@ -93,7 +106,7 @@ def _generate_cmds(cmd_header: list, params_dict: dict, max_core_num: int = 0) -
                     tmp_cmd_list += [params_str, param_list[idx]]
             flag = True
         if tmp_cmd_list or flag is True:
-            tmp_cmd_list = cmd_list[0] + tmp_cmd_list
+            tmp_cmd_list = cmd_header + tmp_cmd_list
             cmd_list.append(tmp_cmd_list)
         idx += 1
 
@@ -142,7 +155,8 @@ def _test_get_model(
     max_core_num = 2 if platform == "aarch64" else 0
     params_dict = example_info["get_model_params"][HOUMO_BACKEND]
     cmd_header = ["python3", "get_model.py", "--model_dir", model_set_dir]
-    cmd_list = _generate_cmds(cmd_header, params_dict, max_core_num)
+    cmd_list = _generate_cmds(cmd_header, params_dict, max_core_num, start_idx=1)
+    logger.info(f"Get model cmds: {cmd_list}")
 
     lock_file = model_set_dir + "/lock.lock"
     with ModelResourceLock(
@@ -157,27 +171,6 @@ def _test_get_model(
     return get_model_flag
 
 
-def _check_device_markers(pytest_request):
-    all_markers = [marker.name for marker in pytest_request.node.own_markers]
-    target_prefixes = [f"{NDEVICE_MARKER}_", f"{DEVICE_MEM_MARKER}_"]
-    marker_vals = {}
-    for marker in all_markers:
-        for prefix in target_prefixes:
-            if marker.startswith(prefix):
-                marker_key = prefix.rstrip("_")
-                marker_vals[marker_key] = marker
-
-    if (
-        not marker_vals
-        or marker_vals.get(NDEVICE_MARKER, None) is None
-        or marker_vals.get(DEVICE_MEM_MARKER, None) is None
-    ):
-        logger.warning("Device markers are not properly set for this test case.")
-        pytest.skip("Device markers are not properly set for this test case.")
-
-    return marker_vals
-
-
 def execute_apis_examples(example_name: str, setup_logging):
     """
     Execute API examples for the specified example name.
@@ -190,7 +183,7 @@ def execute_apis_examples(example_name: str, setup_logging):
         AssertionError: If the example folder doesn't exist or if tests fail
     """
     log_file, pytest_request = setup_logging
-    marker_vals = _check_device_markers(pytest_request)
+    marker_vals = check_device_markers(pytest_request)
     dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
     logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
 
@@ -236,6 +229,22 @@ def execute_apis_examples(example_name: str, setup_logging):
     current_folder = os.getcwd()
     logger.info("current folder: %s.", current_folder)
 
+    run_sh_flag = True
+    if HDPL_PLATFORM == "ASIC" and os.path.exists(f"{current_folder}/run.sh"):
+        logger.info("Ready to execute run.sh in folder: %s.", current_folder)
+
+        run_sh_flag, _ = execute_test_cmd(["bash", "run.sh"], log_file, False, True)
+
+        logger.warning(f"remove folder: {current_folder}.")
+        shutil.rmtree(current_folder)
+        assert run_sh_flag is True, "Execute run.sh Failed!"
+
+        prepare_test_folder(example_dir, "apis")
+        current_folder = os.getcwd()
+        logger.info(
+            f"run.sh ret is {run_sh_flag}, change pytest folder, current folder: {current_folder}."
+        )
+
     model_set_dir = os.path.join(MODELS_PATH, example_info["example_dir"])
     if (
         example_info.get("get_model_params", None) is None
@@ -267,8 +276,9 @@ def execute_apis_examples(example_name: str, setup_logging):
             python_exe = f"{VENV_NAME}/bin/python3"
 
         params_dict = example_info["py_example_params"]
-        cmd_header = [python_exe, params_dict["name"]]
+        cmd_header = [python_exe]
         cmd_list = _generate_cmds(cmd_header, params_dict)
+        logger.info(f"python exe cmd_list: {cmd_list}")
         for tmp_cmd_list in cmd_list:
             exec_flag, _ = execute_test_cmd(
                 tmp_cmd_list, log_file, pyvenv_flag=venv_flag
@@ -281,10 +291,10 @@ def execute_apis_examples(example_name: str, setup_logging):
     cpp_flag = True
     if "cpp" in demo_types:
         params_dict = example_info["cpp_example_params"]
-        compile_defines = params_dict.get("defines", list())
-        cpp_exe_str = "./" + params_dict["name"]
-        cmd_header = [cpp_exe_str]
-        cmd_list = _generate_cmds(cmd_header, params_dict)
+        compile_defines = params_dict.get("defines", [])
+        cmd_header = []
+        cmd_list = _generate_cmds(cmd_header, params_dict, name_prefix="./")
+        logger.info(f"cpp exe cmd_list: {cmd_list}")
         for idx, tmp_cmd_list in enumerate(cmd_list):
             defines = compile_defines[idx] if len(compile_defines) > 0 else []
             _compile_cpp_exec(current_folder, log_file, defines)

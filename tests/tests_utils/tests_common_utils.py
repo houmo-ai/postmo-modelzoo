@@ -26,19 +26,21 @@ import subprocess
 import logging
 import json
 import shutil
+import select
 import fcntl
 from datetime import datetime
 from glob import glob
 import enum
 import time
 import threading
+import pytest
 from enum import Enum, unique
 
 from .tests_pyvenv_utils import get_site_packages, VENV_NAME
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
-HOUMO_BACKEND = os.getenv("HOUMO_TARGET", "xh1")
+HOUMO_BACKEND = os.getenv("HOUMO_TARGET", "xh2")
 # ON: quant&compile, OFF:inference
 SEPARATE_TEST = os.getenv("SKIP_INFER", None)
 HDPL_PLATFORM = os.getenv("HDPL_PLATFORM", "")
@@ -199,18 +201,21 @@ class SubprocessLogger:
         if not message or "MB/s" in message:  # or "kB/s" in message:
             return
 
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_message = f"[{timestamp}] {message}"
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            log_message = f"[{timestamp}] {message}"
 
-        if self.write_flag:
-            # Write to log file (with lock to ensure thread safety)
-            with self.lock:
-                with open(self.log_file, "a", encoding="utf-8") as f:
-                    f.write(log_message)
+            if self.write_flag:
+                # Write to log file (with lock to ensure thread safety)
+                with self.lock:
+                    with open(self.log_file, "a", encoding="utf-8") as f:
+                        f.write(log_message)
 
-        # Output to screen
-        stream.write(message)
-        stream.flush()
+            # Output to screen
+            stream.write(message)
+            stream.flush()
+        except Exception as e:
+            logger.error(f"Failed to write log: {e}", exc_info=True)
 
 
 def _process_stream(stream, logger, results: list, is_stderr=False):
@@ -223,13 +228,30 @@ def _process_stream(stream, logger, results: list, is_stderr=False):
     :param is_stderr: Whether this is stderr stream
     """
     stream_obj = sys.stderr if is_stderr else sys.stdout
-    outputs = list()
+    outputs = []
     try:
-        for line in iter(stream.readline, ""):
+        while True:
+            # moniter the stream with timeout to avoid blocking if subprocess hangs or descendant process inherits the stream
+            ready, _, _ = select.select([stream], [], [], 1.0)
+            if not ready:
+                # check if stream is closed, if yes, break the loop to avoid infinite loop
+                if stream.closed:
+                    break
+                continue
+
+            line = stream.readline()
+            if not line:  # exit if stream is closed
+                break
             logger.write(line, stream_obj)
             outputs.append(line.strip())
+    except Exception as e:
+        logger.error(f"Failed to process stream: {e}", exc_info=True)
     finally:
-        stream.close()
+        try:
+            if not stream.closed:
+                stream.close()
+        except Exception:
+            pass
 
     results.append("\n".join(outputs))
 
@@ -254,7 +276,12 @@ def execute_test_cmd(
     logger.info("execute command: %s", cmd_str)
 
     flag = True
+    process = None
+    stdout_thread = None
+    stderr_thread = None
     subprocess_logger = SubprocessLogger(log_file)
+    stdout_res = []
+    stderr_res = []
     try:
         env = os.environ.copy()
         if pyvenv_flag is True:
@@ -271,11 +298,10 @@ def execute_test_cmd(
             text=True,
             env=env,
             bufsize=1,  # Line buffering
-            universal_newlines=True,
+            close_fds=True,
+            preexec_fn=os.setpgrp,  # 新增：创建新进程组，方便批量终止子进程
         )
 
-        stdout_res = list()
-        stderr_res = list()
         # Create threads to handle stdout and stderr
         stdout_thread = threading.Thread(
             target=_process_stream,
@@ -315,13 +341,13 @@ def execute_test_cmd(
         logger.error(f"Failed to execute command: {cmd_str}, unknown error: {e}")
         subprocess_logger.write(sys.stderr)
 
-    if flag is False:
-        reset_chips()
+    # if flag is False:
+    #     reset_chips()
 
     if assert_flag:
         if flag is False:
             logger.warning(f"remove folder: {os.getcwd()}.")
-            shutil.rmtree(os.getcwd())
+            shutil.rmtree(os.getcwd(), ignore_errors=True)
         assert flag is True, f"Failed to execute command: {cmd_str}."
 
     if len(stdout_res) == 0:
@@ -658,3 +684,24 @@ def display_to_console(
     ):
         _, log_str = execute_test_cmd(["cat", log_file])
         print(f"[execute {test_type} flow: {model_name}]\n {log_str}")
+
+
+def check_device_markers(pytest_request):
+    all_markers = [marker.name for marker in pytest_request.node.own_markers]
+    target_prefixes = [f"{NDEVICE_MARKER}_", f"{DEVICE_MEM_MARKER}_"]
+    marker_vals = {}
+    for marker in all_markers:
+        for prefix in target_prefixes:
+            if marker.startswith(prefix):
+                marker_key = prefix.rstrip("_")
+                marker_vals[marker_key] = marker
+
+    if (
+        not marker_vals
+        or marker_vals.get(NDEVICE_MARKER, None) is None
+        or marker_vals.get(DEVICE_MEM_MARKER, None) is None
+    ):
+        logger.warning("Device markers are not properly set for this test case.")
+        pytest.skip("Device markers are not properly set for this test case.")
+
+    return marker_vals

@@ -26,20 +26,22 @@ from .test_hmatc_utils import *
 logger = logging.getLogger(__name__)
 
 
-def _hmatc_func(model_name: str, log_file: str) -> None:
+def _hmatc_func(model_name: str, setup_logging) -> None:
     """
     Execute HMATC test for a specific model.
 
     Args:
         model_name (str): Name of the model to test
-        log_file (str): Path to the log file for test output
+        setup_logging: pytest fixture for setting up logging configuration
     """
     logger.info("===> TEST START: test_hmatc_%s", model_name)
-    execute_hmatc_cmd(model_name, log_file)
+    execute_hmatc_cmd(model_name, setup_logging)
 
 
 @pytest.mark.hmatc
 @pytest.mark.resnet50
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_hmatc_resnet50(setup_logging) -> None:
     model_name = "resnet50"
     _hmatc_func(model_name, setup_logging)
@@ -47,6 +49,8 @@ def test_hmatc_resnet50(setup_logging) -> None:
 
 @pytest.mark.hmatc
 @pytest.mark.yolov5s
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
 def test_hmatc_yolov5s(setup_logging) -> None:
     model_name = "yolov5s"
     _hmatc_func(model_name, setup_logging)

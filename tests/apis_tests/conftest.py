@@ -42,11 +42,7 @@ def pytest_configure(config):
         "video_detect",
     ]
     # Define markers for different model types
-    md_markers = [
-        "qwen3",
-        "resnet50",
-        "yolov5s",
-    ]
+    md_markers = ["qwen3", "resnet50", "yolov5s", "qwen3_speculative"]
     for markers in apis_type_markers:
         config.addinivalue_line("markers", markers)
     for markers in md_markers:

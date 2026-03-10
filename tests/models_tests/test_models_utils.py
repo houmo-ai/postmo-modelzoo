@@ -843,27 +843,6 @@ def _run_demo_script(
     return run_flag
 
 
-def _check_device_markers(pytest_request):
-    all_markers = [marker.name for marker in pytest_request.node.own_markers]
-    target_prefixes = [f"{NDEVICE_MARKER}_", f"{DEVICE_MEM_MARKER}_"]
-    marker_vals = {}
-    for marker in all_markers:
-        for prefix in target_prefixes:
-            if marker.startswith(prefix):
-                marker_key = prefix.rstrip("_")
-                marker_vals[marker_key] = marker
-
-    if (
-        not marker_vals
-        or marker_vals.get(NDEVICE_MARKER, None) is None
-        or marker_vals.get(DEVICE_MEM_MARKER, None) is None
-    ):
-        logger.warning("Device markers are not properly set for this test case.")
-        pytest.skip("Device markers are not properly set for this test case.")
-
-    return marker_vals
-
-
 def execute_get_model_flow(model_name: str, setup_logging) -> None:
     """
     Execute the complete get model test flow for a specified model.
@@ -873,7 +852,7 @@ def execute_get_model_flow(model_name: str, setup_logging) -> None:
         setup_logging: Fixture of setup_logging
     """
     log_file, pytest_request = setup_logging
-    marker_vals = _check_device_markers(pytest_request)
+    marker_vals = check_device_markers(pytest_request)
     dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
     logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
 
@@ -953,7 +932,7 @@ def execute_quant_flow(model_name: str, setup_logging) -> None:
         setup_logging: Fixture of setup_logging
     """
     log_file, pytest_request = setup_logging
-    marker_vals = _check_device_markers(pytest_request)
+    marker_vals = check_device_markers(pytest_request)
     dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
     logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
 
@@ -1076,7 +1055,7 @@ def execute_compile_flow(model_name: str, setup_logging) -> None:
         setup_logging: Fixture of setup_logging
     """
     log_file, pytest_request = setup_logging
-    marker_vals = _check_device_markers(pytest_request)
+    marker_vals = check_device_markers(pytest_request)
     dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
     logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
 
@@ -1220,7 +1199,7 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
         setup_logging: Fixture of setup_logging
     """
     log_file, pytest_request = setup_logging
-    marker_vals = _check_device_markers(pytest_request)
+    marker_vals = check_device_markers(pytest_request)
     dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
     logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
 
@@ -1390,7 +1369,7 @@ def execute_compare_flow(model_name: str, setup_logging) -> None:
         pytest.skip("This testcase is not support.")
 
     log_file, pytest_request = setup_logging
-    marker_vals = _check_device_markers(pytest_request)
+    marker_vals = check_device_markers(pytest_request)
     dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
     logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
 
@@ -1481,7 +1460,7 @@ def execute_perf_flow(model_name: str, setup_logging) -> None:
         setup_logging: Fixture of setup_logging
     """
     log_file, pytest_request = setup_logging
-    marker_vals = _check_device_markers(pytest_request)
+    marker_vals = check_device_markers(pytest_request)
     dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
     logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
 
@@ -1748,7 +1727,7 @@ def execute_eval_flow(model_name: str, setup_logging) -> None:
         log_file (str): Path to the log file for test output
     """
     log_file, pytest_request = setup_logging
-    marker_vals = _check_device_markers(pytest_request)
+    marker_vals = check_device_markers(pytest_request)
     dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
     logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
 

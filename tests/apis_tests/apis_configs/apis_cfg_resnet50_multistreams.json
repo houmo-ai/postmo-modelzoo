@@ -12,13 +12,13 @@
     },
     "get_model_params": null,
     "py_example_params": {
-        "name": "resnet50_multistreams.py",
+        "name": ["resnet50_multistreams.py"],
         "-n": ["default"],
         "-t": ["default"],
         "-s": ["default"]
     },
     "cpp_example_params": {
-        "name": "example_resnet50_multistreams",
+        "name": ["example_resnet50_multistreams"],
         "-n": ["default"],
         "-t": ["default"],
         "-s": ["default"]

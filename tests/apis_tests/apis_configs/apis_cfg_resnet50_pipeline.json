@@ -13,7 +13,7 @@
     "get_model_params": null,
     "py_example_params": null,
     "cpp_example_params": {
-        "name": "example_resnet50_pipeline",
+        "name": ["example_resnet50_pipeline"],
         "-s": ["default"]
     }
 }

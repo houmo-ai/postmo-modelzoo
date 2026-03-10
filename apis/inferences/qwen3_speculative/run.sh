@@ -37,7 +37,7 @@ cd "${SCRIPT_DIR}" || exit 1
 
 arch=$(uname -m)
 if [ "$arch" = "aarch64" ]; then
-  export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1
+    export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1
 fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "get_model" ]; then

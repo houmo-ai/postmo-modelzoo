@@ -1,462 +1,428 @@
-# 模型测试
+# `models_tests` 测试说明
 
-当前目录下的所有 python 脚本，均用于测试对外发布模型。
+`tests/models_tests` 是 `imodelzoo` 中面向模型用例的统一回归测试入口，基于 `pytest` + JSON 配置驱动，覆盖模型资源获取、量化、编译、推理、结果对比、精度评测和性能评测。
 
-## 1. 环境依赖
 
-测试依赖 pytest python 库，可使用 `pip3 install pytest` 安装。
+## 1. 目录与文件职责
 
-当前仅支持 linux 系统。
+| 路径 | 说明 |
+| --- | --- |
+| `model_configs/` | 每个模型的测试配置，决定支持哪些 flow、跑哪些参数、需要哪些资源 |
+| `model_names.txt` | 所有模型 marker 名单；`conftest.py` 会读取它并注册成 pytest marker |
+| `test_get_models.py` | 模型获取测试入口 |
+| `test_quant_models.py` | 量化测试入口 |
+| `test_compile_models.py` | 编译测试入口 |
+| `test_demo_models.py` | 推理demo测试入口 |
+| `test_compare_models.py` | 结果对比测试入口 |
+| `test_eval_models.py` | 精度评测测试入口 |
+| `test_perf_models.py` | 性能评测测试入口 |
+| `test_models_utils.py` | 所有 flow 的核心执行逻辑、资源准备、结果校验、缓存恢复 |
+| `update_test_py.py` | 根据 `model_configs` 自动为主测试文件追加新模型用例 |
+| `conftest.py` | 注册 flow marker / model marker，并固定测试文件执行顺序 |
 
-## 2. 测试说明
+## 2. 测试框架是怎么工作的
 
-### 2.1 测试类型
+### 2.1 配置驱动
 
-提供下述七种测试类型用于测试模型用例的不同功能，测试时可自定义测试模型用例的哪些功能。
+每个模型对应一个配置文件：
 
-#### 2.1.1 get_model
+- 命名规则：`model_cfg_<模型名>.json`
+- 路径：`tests/models_tests/model_configs/`
+- 代码入口：`test_models_utils.py::_load_model_cfg()`
 
-测试模型用例中的下载模型及相关资源功能，即测试`get_model.py`脚本。详细测试步骤：
+测试执行时，公共逻辑会先读取配置，再判断：
 
-1. 根据模型 json 配置文件中的`get_model_params`配置，生成`get_model.py`脚本的所有测试参数。
-2. 依次使用测试参数执行`get_model.py`脚本。
-3. 校验`get_model.py`脚本是否成功结束 (不校验下载结果的正确性和完整性)。
+- 模型是否废弃：`obsolete`
+- 当前 backend 是否支持：`support_backend`
+- 当前平台是否支持：`support_platform`
+- 当前 flow 是否支持：`support_flow`
+- 当前设备资源是否满足：`dependencies` + pytest marker
 
-#### 2.1.2 quant
+### 2.2 固定执行顺序
 
-主要测试模型量化功能，详细测试步骤：
+`tests/models_tests/conftest.py` 会按下列顺序重排测试文件：
 
-1. 获取原始模型
-2. 根据模型 json 配置文件中的`hmquant_params`配置或`quant_params`配置，生成量化测试的所有测试参数。其中，`hmquant_params`配置用于 hmatc，`quant_params`配置用于`ptq.py`脚本。
-3. 对原始模型进行量化得到量化模型 (优先使用`hmatc quant`，如模型不支持 hmatc 则使用`ptq.py`)
-4. 校验量化过程中是否存在`fail`字样，不存在且量化正常结束则认为量化测试通过。
+1. `test_get_models.py`
+2. `test_quant_models.py`
+3. `test_compile_models.py`
+4. `test_demo_models.py`
+5. `test_compare_models.py`
+6. `test_eval_models.py`
+7. `test_perf_models.py`
 
-#### 2.1.3 compile
+同时，很多测试函数还通过 `@pytest.mark.dependency(...)` 显式依赖前置 flow，例如：
 
-主要测试模型编译功能，详细测试步骤：
+- `quant` 依赖 `get_model`
+- `compile` 依赖 `quant` 或 `get_model`
 
-1. 获取量化模型
-2. 根据模型 json 配置文件中的`hmbuild_params`配置或`compile_params`配置，生成编译测试的所有测试参数。其中，`hmbuild_params`配置用于 hmatc，`compile_params`配置用于`build.py`脚本。
-3. 将量化模型编译为可在后摩设备执行的编译模型 (优先使用`hmatc build`，如模型不支持 hmatc 则使用`build.py`)
-4. 对编译模型进行 golden 结果校验，编译正常执行且 golden 结果校验通过，认为编译测试通过。
+因此推荐直接跑目录或按 marker 过滤，而不要手工改变 flow 顺序。
 
-#### 2.1.4 demo
+### 2.3 临时工作目录与缓存
 
-主要测试模型推理功能，详细测试步骤：
+每条用例都会先复制模型目录到临时目录，再在临时目录中执行测试，结束后删除临时目录。目录名格式如下：
 
-1. 获取编译后模型，如不支持则获取量化后模型进行编译
-2. 根据模型 json 配置文件中的`hmdemo_params`配置或`demo_params`配置，生成模型推理测试的所有测试参数。其中，`hmdemo_params`配置用于 hmatc，`demo_params`配置用于`demo.py`脚本。
-3. 执行模型推理 (优先使用`hmatc demo`，如模型不支持 hmatc 则使用`demo.py`)
-4. 校验模型推理过程是否正常结束，正常结束则认为测试通过。
-
-#### 2.1.5 compare
-
-(模型需支持 hmatc) 主要测试模型推理结果正确性，需提供输入数据用于比较模型结果是否正确，详细测试步骤：
-
-1. 获取量化后模型，通过 hmatc 进行编译
-2. 根据模型 json 配置文件中的`hmcompare_params`配置，生成模型结果正确性测试的所有测试参数。其中，`hmcompare_params`配置用于 hmatc。
-3. 通过 hmatc 的`hmatc compare`命令，执行模型推理并验证结果正确性。
-4. 校验步骤 3 是否正常结束，正常结束则认为测试通过。
-
-#### 2.1.6 perf
-
-主要测试模型性能并校验是否有显著下降(较 benchmark 下降超过 5%)，详细测试步骤：
-
-1. 获取编译后模型，如不支持则获取量化后模型进行编译
-2. 根据模型 json 配置文件中的`hmperf_params`配置或`perf_params`配置，生成模型性能测试的所有测试参数。其中，`hmperf_params`配置用于 hmatc，`perf_params`配置用于`demo.py`脚本 (当前 llm 模型用例中均通过`demo.py`脚本执行并统计性能数据)。
-3. 执行模型性能测试 (优先使用`hmatc perf`，如模型不支持 hmatc 则使用`demo.py`)
-4. 获取模型性能测试的性能结果，读取模型配置文件中的`perf_metrics`参数获取 benchmark 性能数据，比较性能测试结果是否存在显著下降，若性能无显著下降且性能测试正式结束则认为性能测试通过。
-
-#### 2.1.7 eval
-
-(模型需支持 hmatc) 主要测试模型精度并校验是否有显著下降(基于相同数据集，比较 hm 模型和 onnx 模型的 map), 需提供数据集用于精度测试，详细测试步骤：
-
-1. 获取编译后模型，如不支持则获取量化后模型进行编译
-2. 根据模型 json 配置文件中的`hmeval_params`配置，生成模型精度测试的所有测试参数。其中，`hmeval_params`配置用于 hmatc。
-3. 通过 hmatc 的`hmatc eval`命令，执行模型精度测试。
-4. 获取模型精度测试的 map 结果，读取模型配置文件中的`eval_threshold`参数获取精度阈值，比较`hm map >= (onnx map * threshold)`，若精度无显著下降且精度测试正式结束则认为精度测试通过。
-
-### 2.2 测试文件说明
-
--   `model_configs`: 文件夹中为所有模型测试配置文件。文件命名规则：`"model_cfg_" + 模型名 + ".json"`。
--   `update_test_py.py`: 根据 model*configs 文件夹下的模型配置文件，自动更新 python 测试用例脚本(仅增加用例)。脚本中将自动转换模型名称中的"-"和"."，"-"转为下划线"*"，"."转为"dot"。
--   `test_<test_type>_models.py`: python 测试用例脚本，用于 pytest 执行测例。根据章节 2.1 的 7 种测试类型，共计有 7 个 python 测试脚本。
-    -   <test_type>: get, quant, compile, demo, compare, perf, eval。
--   `test_models_utils.py`: 包含了 7 种测试类型的测试逻辑代码，如现有测试逻辑无法覆盖新增模型或场景，则需修改此文件。
--   `conftest.py`: 在 pytest 框架中，是一个用于存放共享测试配置和 fixture 函数的特殊文件。如需详细了解可参考：https://pytest.cn/en/stable/getting-started.html
-    -   本文件中定义了支持的 pytest markers, 当前已支持的 markers: get_model, quant, compile, demo, compare, eval, perf。
-
-### 2.3 测试配置文件说明
-
-测试配置文件为 tests/models_tests/model_configs 文件夹中的 json 文件，其中每个文件包含了：模型的测试所需的基础信息，模型支持的测试类型，模型支持的平台，模型支持的后摩设备，以及用于不同测试类型的测试参数。
-
-提供了 CV 模型和 LLM 模型模板配置文件，便于新增模型的时候进行修改。其中，测试仓库包含两个默认路径：
-
--   `cached_models`: `/develop02/imodelzoo`，主要用于缓存原始模型，避免重复下载。
--   `cached_results`: `/data02/services/imodelzoo/tests/model_results_{HOUMO_TARGET}`，用于缓存单次测试模型量化和编译结果，避免测试用例之间重复量化编译，同时用于支持分阶段测试（如: 在 GPU 服务器执行量化编译，在装载了 M50 芯片的服务器执行 XH2 推理）。
-
-注意：
-
--   LLM 模型的原始模型下载需要手工提前下载到`cached_models`路径下，不要在测试用例中再下载，容易断开连接无法下载成功导致相关测例无法执行成功，且严重拉长整体测试时间。
--   当前 Device 相关的配置，仅支持配置为 1，不支持多 Device 场景。
-
-模型模板配置文件说明：
-
--   CV 模板配置文件：`tests/models_tests/model_configs/model_cfg_template_cv.json`，配置项说明。
-
-```JSON
-// (必需)标识模型是否废弃, true表示已废弃，false表示未废弃
-"obsolete": false,
-// (必需)模型用例路径(相对路径, 根目录为: imodelzoo)
-"model_dir": "models/<model_type>/<model_name>",
-// (必需)模型用例支持的系统平台: x86_64, aarch64
-"support_platform": ["x86_64"],
-// (必需)模型用例支持的后摩Backend: xh1, xh2
-"support_backend": ["xh1", "xh2"],
-// (必需)get_model.py脚本中默认值支持的hmm模型core数量: 1, 2, 4 ...
-"support_core_num": {
-    "xh1": [1],
-    "xh2": [1]
-},
-// (必需)模型用例支持的测试类型:
-// "get_model": (必需)模型用例中包含get_model.py脚本
-// "quant": 符合下述任一情况即认为支持：
-//     1) 模型用例中包含ptq.py且可基于后摩设备量化。
-//     2) 模型用例支持hmatc的quant命令行: hmatc quant。
-// "compile": 符合下述任一情况即认为支持：
-//     1) 模型用例中包含build.py可在linux x86_64成功编译量化后模型。
-//     2) 模型用例支持hmatc的build命令行: hmatc build。
-// "demo": 符合下述任一情况即认为支持：
-//     1) 模型用例中包含demo.py可成功执行推理。
-//     2) 模型用例支持hmatc的demo命令行: hmatc demo。
-// "compare": 模型用例支持hmatc的copmare命令行。
-// "perf": 符合下述任一情况即认为支持：
-//     1) 模型用例中包含demo.py且计算并打印了性能数据(prefill, decode, end2end)。
-//     2) 模型用例支持hmatc的perf命令行: hmatc perf。
-// "eval": 模型用例支持hmatc的eval命令行。
-"support_flow": {
-    "xh1": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"],
-    "xh2": ["get_model", "quant", "compile", "demo", "compare", "perf", "eval"]
-},
-// (必需)模型用例支持的hmatc功能:
-// "hmquant": 模型用例支持hmatc量化: hmatc quant
-// "hmbuild": 模型用例支持hmatc编译: hmatc build
-// "hmdemo": 模型用例支持hmatc推理: hmatc demo
-// "hmcompare": 模型用例支持hmatc比较推理结果: hmatc compare
-// "hmeval": 模型用例支持hmatc评估精度: hmatc eval
-// "hmperf": 模型用例支持hmatc评估性能: hmatc perf
-"support_hmatc": {
-    "xh1": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"],
-    "xh2": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
-},
-// (可选)模型性能benchmark，用于性能测试。如果support_flow中支持perf，则此配置为必需。
-"perf_metrics": {
-    "xh1":{
-        "x86_64": 1733.207
-    },
-    "xh2":{
-        "x86_64": 484.383
-    }
-},
-// (可选)模型精度阈值，用于精度测试。如果support_flow中支持eval，则此配置为必需。其中key值为精度指标的名称。
-"eval_threshold": {
-    "top1_acc": 0.95
-},
-// (必需)get_model测试中，get_model.py脚本支持的入参及对应待测的参数，待测参数需要一一对应，使用默认值则配置为null。
-"get_model_params": {
-    "xh1": {
-        "type": ["raw", "quant", "hmm"],
-        "model_dir": ["cached_models", "cached_models", "cached_models"]
-    },
-    "xh2": {
-        "type": ["raw", "quant", "hmm"],
-        "model_dir": ["cached_models", "cached_models", "cached_models"]
-    }
-},
-// (可选)quant测试中，如通过hmatc quant命令行量化模型，则此配置为必需。
-// hmatc quant支持的入参及对应待测的参数，待测参数需要一一对应，使用默认值则配置为null。
-"hmquant_params": {
-    "params": {
-        "required": {
-            "config": ["./config.yml"]
-        },
-        "optional": {
-            "target": [null],
-            "result_path": [null]
-        }
-    }
-},
-// (可选)compile测试中，如通过hmatc build命令行编译模型，则此配置为必需。
-// hmatc build支持的入参及对应待测的参数，待测参数需要一一对应，使用默认值则配置为null。
-"hmbuild_params": {
-    "xh1": {
-        "required": {
-            "config": ["./config.yml", "./config.yml", "./config.yml", "./config.yml"]
-        },
-        "optional": {
-            "result_path": [null, null, null, null],
-            "batch": [null, "1", "2", "4"],
-            "ncore": [null, "1", "2", "4"],
-            "opt_level": [null, "0", "1", "2"],
-            "roi_num": [null, null, null, null]
-        }
-    },
-    "xh2": {
-        "required": {
-            "config": ["./config.yml", "./config.yml", "./config.yml"]
-        },
-        "optional": {
-            "result_path": [null, null, null],
-            "batch": [null, "1", "1"],
-            "ncore": [null, "1", "2"],
-            "opt_level": ["0", "1", "2"],
-            "roi_num": [null, null, null]
-        }
-    }
-},
-// (可选)demo测试中，如通过hmatc demo命令行执行推理，则此配置为必需。
-// hmatc demo支持的入参及对应待测的参数，待测参数需要一一对应，使用默认值则配置为null。
-"hmdemo_params": {
-    "params": {
-        "required": {
-            "config": ["./config.yml"]
-        },
-        "optional": {
-            "target": [null],
-            "result_path": [null],
-            "onnx": [null]
-        }
-    }
-},
-// (可选)perf测试中，如通过hmatc perf命令行评估模型性能，则此配置为必需。
-// hmatc perf支持的入参及对应待测的参数，待测参数需要一一对应，使用默认值则配置为null。
-"hmperf_params": {
-    "params": {
-        "required": {
-            "config": ["./config.yml", "./config.yml", "./config.yml"],
-            "warmup": ["1", "10", "10"],
-            "sample": ["1", "1000", "1000"]
-        },
-        "optional": {
-            "target": [null, null, null],
-            "result_path": [null, null, null],
-            "loop_num": [null, null, null],
-            "thread": ["1", "4", "8"],
-            "device": [null, null, null]
-        }
-    }
-},
-// (可选)如支持eval测试类型，则此配置为必需。
-// 用于eval测试中, hmatc eval支持的入参及对应待测的参数，待测参数需要一一对应，使用默认值则配置为null。
-"hmeval_params": {
-    "params": {
-        "required": {
-            "config": ["./config.yml"]
-        },
-        "optional": {
-            "target": [null],
-            "result_path": [null],
-            "onnx": [null]
-        }
-    }
-},
-// (可选)如支持compare测试类型，则此配置为必需。
-// 用于compare测试中, hmatc compare支持的入参及对应待测的参数，待测参数需要一一对应，使用默认值则配置为null。
-"hmcompare_params": {
-    "params": {
-        "required": {
-            "config": ["./config.yml"],
-            "data_path": ["./imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG"]
-        },
-        "optional": {
-            "target": [null],
-            "result_path": [null]
-        }
-    }
-}
+```text
+<model_dir>_<flow>_<timestamp>
 ```
 
--   LLM 模板配置文件：`tests/models_tests/model_configs/model_cfg_template_llm.json`，配置项说明。
+这样可以避免污染原始模型目录。
 
-```JSON
-// (必需)标识模型是否废弃, true表示已废弃，false表示未废弃
-"obsolete": false,
-// (必需)模型用例路径(相对路径, 根目录为: imodelzoo)
-"model_dir": "models/<model_type>/<model_name>",
-// (必需)模型用例支持的系统平台: x86_64, aarch64
-"support_platform": ["x86_64"],
-// (必需)模型用例支持的后摩Backend: xh1, xh2
-"support_backend": ["xh1", "xh2"],
-// (必需)get_model.py脚本中默认值支持的hmm模型core数量: 1, 2, 4 ...
-"support_core_num": {
-    "xh1": [4],
-    "xh2": [2]
-},
-// (必需)模型用例支持的测试类型:
-// "get_model": (必需)模型用例中包含get_model.py脚本
-// "quant": 符合下述任一情况即认为支持：
-//     1) 模型用例中包含ptq.py且可基于后摩设备量化。
-// "compile": 符合下述任一情况即认为支持：
-//     1) 模型用例中包含build.py可在linux x86_64成功编译量化后模型。
-// "demo": 符合下述任一情况即认为支持：
-//     1) 模型用例中包含demo.py可成功执行推理。
-// "perf": 符合下述任一情况即认为支持：
-//     1) 模型用例中包含demo.py且计算并打印了性能数据(prefill, decode, end2end)。
-"support_flow": {
-    "xh1": ["get_model", "compile", "demo", "perf"],
-    "xh2": ["get_model", "quant", "compile", "demo", "perf"]
-},
-// hmatc工具当前均不支持LLM模型，配置为空。
-"support_hmatc": null,
-// (可选)模型性能benchmark，用于性能测试。如果support_flow中支持perf，则此配置为必需
-"perf_metrics": {
-    "xh1": {
-        "x86_64": {
-            "prefill": 1.05,
-            "decode": 7.92,
-            "end2end": 7.88
-        }
-    },
-    "xh2": {
-        "x86_64": {
-            "prefill": 40.0,
-            "decode": 15.93,
-            "end2end": 15.69
-        }
-    }
-},
-// LLM模型当前暂不支持精度评测，配置为空。
-"eval_threshold": null,
-// (必需)get_model测试中，get_model.py脚本支持的入参及对应待测的参数，待测参数需要一一对应，使用默认值则配置为null。
-"get_model_params": {
-    "xh1": {
-        "type": ["raw", "quant", "hmm"],
-        "quant_model_dir": [null, "cached_models/hmquant_xh1", null],
-        "build_model_dir": [null, null, "cached_models/hmm_xh1"],
-        "model_dir": ["cached_models", "cached_models", "cached_models"]
-    },
-    "xh2": {
-        "type": ["raw", "quant", "hmm"],
-        "quant_model_dir": [null, "cached_models/hmquant_xh2", null],
-        "build_model_dir": [null, null, "cached_models/hmm_xh2"],
-        "model_dir": ["cached_models", "cached_models", "cached_models"]
-    }
-},
-// (可选)quant测试中，如通过ptq.py脚本量化模型，则此配置为必需。
-// ptq.py脚本支持的入参及对应待测的参数，其中需要预先下载原始模型至cached_models下，再将cached_models/<raw_model_folder> 路径配置到测试文件中。
-"quant_params": {
-    "xh1": null,
-    "xh2": {
-        "model": ["cached_models/<raw_model_folder>", "cached_models/<raw_model_folder>", "cached_models/<raw_model_folder>"],
-        "out-dir": ["cached_results/hmquant_xh2_2k", "cached_results/hmquant_xh2_4k", "cached_results/hmquant_xh2_8k"],
-        "context-length": ["2048", "4096", "8192"],
-        "input-sequence-length": [null, null, null],
-        "calibration-dataset": [null, null, null]
-    }
-},
-// (可选)compile测试中，如通过build.py脚本编译模型，则此配置为必需。
-// build.py脚本支持的入参及对应待测的参数。如果参数中配置了与量化结果相同的文件夹，则会直接使用该文件夹的结果，不会重新量化。
-"compile_params": {
-    "xh1": {
-        "model_dir": ["cached_results/hmquant_xh1"],
-        "model_name": [null],
-        "ncore": [null],
-        "stage": ["build"],
-        "output_dir": ["cached_results/hmm_xh1"]
-    },
-    "xh2": {
-        "model_dir": ["cached_results/hmquant_xh2_2k", "cached_results/hmquant_xh2_2k"],
-        "batch": [null, null],
-        "ncore": [null, null],
-        "ndevice": [null, null],
-        "stage": ["build", "build"],
-        "context_length": ["2048", "8192"],
-        "output_dir": ["cached_results/hmm_xh2_2k", "cached_results/hmm_xh2_8k"]
-    }
-},
-// (可选)demo测试中，如通过demo.py脚本执行推理，则此配置为必需。
-// demo.py脚本支持的入参及对应待测的参数。如果参数中配置了与量化/编译结果相同的文件夹，则会直接使用该文件夹的结果，不会重新量化/编译。
-"demo_params": {
-    "xh1": {
-        "tokenizer_dir": ["cached_models/<raw_model_folder>"],
-        "embedding_path": ["cached_results/hmm_xh1/hmquant/quant_embedding.pt"],
-        "prefill_path": ["cached_results/hmm_xh1/<model_name>_prefill.hmm"],
-        "decode_path": ["cached_results/hmm_xh1/<model_name>_decode.hmm"],
-        "ndevice": ["1"]
-    },
-    "xh2": {
-        "tokenizer_dir": ["cached_models/<raw_model_folder>", "cached_models/<raw_model_folder>"],
-        "embedding_path": ["cached_results/hmm_xh2_2k/hmquant/quant_embedding.pt", "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"],
-        "prefill_path": ["cached_results/hmm_xh2_2k/<model_name>_prefill.hmm", "cached_results/hmm_xh2_8k/<model_name>_prefill.hmm"],
-        "decode_path": ["cached_results/hmm_xh2_2k/<model_name>_decode.hmm", "cached_results/hmm_xh2_8k/<model_name>_decode.hmm"],
-        "ndevice": ["1", "1"]
-    }
-},
-// (可选)perf测试中，如通过demo.py脚本评估模型性能，则此配置为必需，无需修改配置值。
-"perf_params": "demo"，
+此外，框架还使用两类缓存：
+
+- 原始模型缓存：`IMODELZOO_MODELS_PATH` 指向的目录
+- 测试结果缓存：`tests/model_results_{HOUMO_TARGET}/<ndevice_x>_<dev_mem_xxg>/...`
+
+缓存目录会结合文件锁 `ModelResourceLock` 进行保护，避免并发测试互相覆盖。
+
+## 3. 当前实现的功能全景
+
+### 3.1 七个主测试 flow
+
+| Flow | 作用 | 常见执行路径 | 结果判定 |
+| --- | --- | --- | --- |
+| `get_model` | 测试模型资源下载/准备 | `get_model.py` | 命令正常结束 |
+| `quant` | 测试量化 | `hmatc quant` 或 `ptq.py` | 命令正常结束，输出不含失败标记 |
+| `compile` | 测试编译 | `hmatc build` 或 `build.py` | 编译成功，且 golden / cosine 等结果通过阈值校验 |
+| `demo` | 测试推理 | `hmatc demo` 或 `demo.py` | 推理正常结束 |
+| `compare` | 测试结果一致性 | `hmatc compare` | 解析输出表格并校验阈值 |
+| `eval` | 测试精度 | `hmatc eval` | 解析评测结果并按阈值比较 |
+| `perf` | 测试性能回归 | `hmatc perf` 或 `demo.py` / `perf.py` | 解析性能结果并与 benchmark 比较 |
+
+### 3.2 支持`demo_multibatch`
+
+支持 llm 中的 multibatch demo：
+
+- `execute_demo_flow()` 在跑完 `demo` 后，会继续尝试执行 `demo_multibatch.py`
+- 前提是模型配置中声明了：
+  - `support_flow` 包含 `demo_multibatch`
+  - 且存在 `demo_multibatch_params`
+- 当前它没有单独的 `test_demo_multibatch_models.py`
+- `update_test_py.py` 也会显式跳过为 `demo_multibatch` 生成独立 pytest 用例
+
+也就是说：`demo_multibatch` 是 `demo` flow 的附加执行步骤，而不是单独的第八类 pytest flow。
+
+### 3.3 CV 与 LLM 的差异
+
+当前代码对 CV 和 LLM 走的是不同分支：
+
+| 维度 | CV | LLM |
+| --- | --- | --- |
+| 量化准备 | `_prepare_quantized_cv_model()` | `_prepare_quantized_llm_model()` |
+| 编译准备 | `_prepare_compiled_cv_model()` | `_prepare_compiled_llm_model()` |
+| 常见量化方式 | `hmatc quant` 或模型内量化脚本 | 主要走 `ptq.py` |
+| 常见编译方式 | `hmatc build` 或 `build.py` | 主要走 `build.py` |
+| compare / eval | 主要是 CV 模型支持 | 当前 LLM 基本不支持 |
+| GPU 依赖 | 视模型而定 | 量化/编译常要求 GPU |
+
+补充说明：
+
+- 当前代码中，LLM 测试通常不走 `hmatc` compare / eval。
+- 对 LLM，`quant` / `compile` 在不少场景下要求 `x86_64 + GPU`，且 release 模式下会被跳过。
+
+### 3.4 `hmatc` 路径与 Python 脚本路径
+
+框架会根据模型配置自动选择执行路径：
+
+- 如果配置中存在 `hmquant_params` / `hmbuild_params` / `hmdemo_params` / `hmcompare_params` / `hmeval_params` / `hmperf_params`，优先走 `hmatc`
+- 否则退化到模型目录内的 Python 脚本，如：
+  - `get_model.py`
+  - `ptq.py`
+  - `build.py`
+  - `demo.py`
+  - `perf.py`
+
+Python 脚本型 flow 在需要时会尝试安装/使用独立虚拟环境。
+
+## 4. 主要功能点说明
+
+### 4.1 设备资源依赖 marker：`dependencies`
+
+`model_configs/*.json` 现在普遍带有 `dependencies` 字段，`update_test_py.py` 会把它转成 pytest marker：
+
+- `dependencies.ndevice: [1]` -> `@pytest.mark.ndevice_1`
+- `dependencies.dev_mem: ["24g"]` -> `@pytest.mark.dev_mem_24g`
+
+测试执行时，`test_models_utils.py::check_device_markers()` 会读取这些 marker，并把它们拼到结果缓存路径中：
+
+```text
+<ndevice_x>_<dev_mem_xxg>
 ```
 
-### 2.4 测试方法
+这意味着当前框架已经不只是“模型功能测试”，还显式携带了“资源规格约束”。
+
+### 4.2 自动注册模型 marker
+
+`tests/models_tests/conftest.py` 会读取 `model_names.txt`，把每个模型名注册成 pytest marker。这样可以直接使用：
+
+```bash
+pytest -m "qwen3"
+pytest -m "deepseek_r1_qwen3_8b"
+```
+
+注意：marker 名不是原始模型名，而是脚本转换后的名字：
+
+- `-` 会转成 `_`
+- `.` 会转成 `dot`
+
+例如：
+
+- `qwen2.5` -> `qwen2dot5`
+- `deepseek-r1-qwen3-8b` -> `deepseek_r1_qwen3_8b`
+
+### 4.3 分阶段测试
+
+框架支持把“量化/编译”和“推理/评测”拆到不同机器执行，这是当前实现里非常重要的一点。
+
+核心环境变量：
+
+- `SKIP_INFER`: 只要设置为 `ON` 或 `OFF` 中任一值，就会启用分阶段模式
+- `HDPL_PLATFORM=ISIM`: 当前进程视为“无推理阶段”，即 `SEPARATE_NO_INFER`
+- `HDPL_PLATFORM=ASIC`: 当前进程视为“推理阶段”，即 `SEPARATE_INFER`
+
+代码行为如下：
+
+- `SEPARATE_NO_INFER` 阶段：
+  - 执行量化/编译准备
+  - 把结果保存到 `model_results_{HOUMO_TARGET}`
+  - 跳过真正的推理/compare/eval/perf 执行
+- `SEPARATE_INFER` 阶段：
+  - 从缓存目录恢复模型结果
+  - 在推理侧执行 `demo` / `compare` / `eval` / `perf`
+
+### 4.4 release 模式
+
+`USE_RELEASED_MODELS=ON` 时，代码会启用 release 模式。当前可见行为包括：
+
+- `get_model` 对 LLM 会跳过 `raw` 下载分支
+- `quant` / `compile` 的部分 LLM 测试会直接跳过
+- `demo` 在 release 模式下，如果模型目录存在 `test.sh`，优先只执行 `test.sh`
+
+因此 release 模式更适合“验证已交付模型是否可运行”，而不是完整开发流程回归。
+
+### 4.5 `test.sh` 优先执行
+
+在 `demo` flow 中，如果满足以下条件：
+
+- `HDPL_PLATFORM == "ASIC"`
+- 当前模型目录存在 `test.sh`
+
+框架会先执行 `test.sh`。如果同时又不是 release 模式，后续还会继续走框架标准的 `demo` / `demo_multibatch` 逻辑。
+
+## 5. 环境与前置要求
+
+### 5.1 基本要求
+
+- 当前仅支持 `Linux`
+- 测试框架依赖 `pytest`
+- 部分用例使用 `@pytest.mark.dependency(...)`，因此运行环境应具备对应 pytest 插件能力
+- 如果模型 flow 依赖 `hmatc` / `hm_smi` / 芯片 runtime，需要先完成整套后摩环境初始化
+
+建议先在仓库根目录完成环境初始化，例如：
+
+```bash
+cd imodelzoo
+source env.sh
+```
+
+### 5.2 测试侧会自动设置的环境变量
+
+`tests/conftest.py` 会自动设置：
+
+- `HOUMO_MODELZOO_URL=http://artifactory.houmo.ai/artifactory/Dadao`
+- `HOUMO_DATASETS_PATH=<repo>/data/datasets/`
+- `HOUMO_VERSION=2.4.2`（若外部未设置）
+- `LD_LIBRARY_PATH` 会附加 runtime / torch / onnxruntime 相关路径
+
+### 5.3 关键运行环境变量
+
+| 变量 | 默认值 | 作用 |
+| --- | --- | --- |
+| `HOUMO_TARGET` | `xh2` | 当前 backend，影响配置选择、缓存目录和命令参数 |
+| `HDPL_PLATFORM` | 空 | 区分 `ASIC` / `ISIM`，影响是否跑真实推理 |
+| `SKIP_INFER` | 空 | 设置为 `ON` 或 `OFF` 会启用分阶段模式 |
+| `IMODELZOO_MODELS_PATH` | `tests/models_<HOUMO_TARGET>/` | 原始模型缓存根目录 |
+| `USE_RELEASED_MODELS` | `ON` | 是否走 release 模式 |
+
+## 6. 日志、输出与结果判定
+
+### 6.1 日志目录
+
+每条测试会生成独立日志，路径格式如下：
+
+```text
+tests/test_logs/YYYYMMDD/<module>_<test_name>_<timestamp>.log
+```
+
+### 6.2 结果检查逻辑
+
+当前框架并不是只看返回码，还会做额外结果解析：
+
+- `compile`: 解析表格中的 cosine / golden 结果
+- `compare`: 解析 `onnx vs hmquant` 表格，并按阈值校验
+- `eval`: 解析评测输出字段，再与 `eval_threshold` 比较
+- `perf`: 读取性能结果，与 `perf_metrics` 基线比较
+
+如果命令失败，框架还会尝试执行芯片 reset。
+
+## 7. 如何执行测试
+
+### 7.1 跑全部模型测试
 
 ```bash
 cd imodelzoo/tests
-
-# 执行当前文件夹tests下所有测试用例
-pytest -s -v
-# 执行models_tests文件夹下所有测试用例
 pytest -s -v models_tests/
-# 执行当前文件夹下yolov5s模型所有测试用例
-pytest -s -v models_tests/ -m "yolov5s"
-# 执行当前文件夹下qwen2.5-vl模型所有测试用例
-pytest -s -v models_tests/ -m "qwen2dot5_vl"
-# 执行当前文件夹下llm模型所有测试用例,llm模型指模型用例在models/llm文件夹下的模型
-pytest -s -v models_tests/ -k "_llm_"
-# 执行当前文件夹下所有性能测试用例(不支持性能测试的模型会自动跳过)
-pytest -s -v models_tests/ -m "perf"
-# 执行当前文件夹下所有精度测试用例(不支持精度测试的模型会自动跳过)
-pytest -s -v models_tests/ -m "eval"
-# 执行当前文件夹下resnet50模型的性能测试和精度测试用例
-pytest -s -v models_tests/ -m resnet50 -m "perf or eval"
 ```
 
-上述示例的测试方法命令中，`pytest -s -v`可作为固定命令前缀，`-k`和`-m`均为 pytest 框架中提供过滤执行测例的关键词，详细说明可参考：
+### 7.2 按模型筛选
 
--   https://pytest.cn/en/stable/example/markers.html
--   https://zhuanlan.zhihu.com/p/629592323
+```bash
+cd imodelzoo/tests
+pytest -s -v models_tests/ -m "resnet50"
+pytest -s -v models_tests/ -m "qwen2dot5"
+pytest -s -v models_tests/ -m "deepseek_r1_qwen3_8b"
+```
 
-## 3. 新增模型
+### 7.3 按 flow 筛选
 
-本章节介绍了新增模型加入测试的方法。
+```bash
+cd imodelzoo/tests
+pytest -s -v models_tests/ -m "get_model"
+pytest -s -v models_tests/ -m "compile"
+pytest -s -v models_tests/ -m "perf"
+pytest -s -v models_tests/ -m "eval"
+```
 
-下文示例均假设新增模型的名称为: template-v1.0。
+### 7.4 组合筛选
 
-### 3.1 创建模型测试配置文件
+```bash
+cd imodelzoo/tests
+pytest -s -v models_tests/ -m "resnet50 and perf"
+pytest -s -v models_tests/ -m "ndevice_2 and dev_mem_24g"
+pytest -s -v models_tests/ -k "_llm_"
+```
 
-1. 在文件夹`tests/models_tests/model_configs/`中新增模型配置文件`model_cfg_template-v1.0.json`。
-2. 从模板配置文件`tests/models_tests/model_configs/model_cfg_template_<cv/llm>.json`复制其内容至新增模型的配置文件中，按模型信息进行修改内容。配置文件各配置项说明可参考章节 2.3。
+### 7.5 指定 backend
 
-### 3.2 应用模型测试配置文件
+```bash
+cd imodelzoo/tests
+HOUMO_TARGET=xh2 pytest -s -v models_tests/ -m "qwen3"
+```
+
+### 7.6 分阶段执行示例
+
+第一阶段：在编译/量化侧执行（例如 `ISIM` 环境）
+
+```bash
+cd imodelzoo/tests
+HOUMO_TARGET=xh2 HDPL_PLATFORM=ISIM SKIP_INFER=ON pytest -s -v models_tests/
+```
+
+第二阶段：在真实推理侧执行（例如 `ASIC` 环境）
+
+```bash
+cd imodelzoo/tests
+HOUMO_TARGET=xh2 HDPL_PLATFORM=ASIC SKIP_INFER=ON pytest -s -v models_tests/
+```
+
+说明：分阶段模式下，实际执行/跳过哪些步骤由 `test_models_utils.py` 内部逻辑决定，不同模型可能因配置不同而自动 `skip`。
+
+## 8. 模型配置文件字段说明
+
+### 8.1 通用字段
+
+| 字段 | 是否常用 | 说明 |
+| --- | --- | --- |
+| `obsolete` | 必需 | 是否废弃；为 `true` 时整模型跳过 |
+| `model_type` | 常用 | 当前代码主要区分 `cv` / `llm` |
+| `model_dir` | 必需 | 模型目录，相对仓库根目录 |
+| `dependencies` | 必需且重要 | 资源依赖，当前主要用到 `ndevice`、`dev_mem` |
+| `support_platform` | 必需 | 支持的平台，如 `x86_64`、`aarch64` |
+| `support_backend` | 必需 | 支持的 backend，如 `xh1`、`xh2` |
+| `support_core_num` | 常用 | demo / hmm 相关的核心数限制 |
+| `support_flow` | 必需 | 每个 backend 支持哪些测试 flow |
+| `support_hmatc` | 可选 | 支持哪些 `hmatc` 子命令 |
+| `perf_metrics` | `perf` 必需 | 性能基线 |
+| `eval_threshold` | `eval` 必需 | 精度阈值 |
+
+### 8.2 获取与准备类字段
+
+| 字段 | 说明 |
+| --- | --- |
+| `get_model_params` | `get_model.py` 的测试参数矩阵 |
+| `quant_params` | Python 量化脚本 `ptq.py` 的参数矩阵 |
+| `compile_params` | Python 编译脚本 `build.py` 的参数矩阵 |
+| `demo_params` | `demo.py` 的参数矩阵 |
+| `demo_multibatch_params` | `demo_multibatch.py` 的参数矩阵；在 `demo` flow 内部顺带执行 |
+| `perf_params` | Python 侧性能测试参数；部分 LLM 会复用 `demo` |
+
+### 8.3 `hmatc` 类字段
+
+| 字段 | 对应命令 |
+| --- | --- |
+| `hmquant_params` | `hmatc quant` |
+| `hmbuild_params` | `hmatc build` |
+| `hmdemo_params` | `hmatc demo` |
+| `hmcompare_params` | `hmatc compare` |
+| `hmeval_params` | `hmatc eval` |
+| `hmperf_params` | `hmatc perf` |
+
+### 8.4 参数矩阵规则
+
+无论是 `hmatc` 还是 Python 脚本，当前实现都遵循“按索引并排组合参数”的规则：
+
+- 第 `0` 组参数组成第 `0` 条命令
+- 第 `1` 组参数组成第 `1` 条命令
+- 值为 `null` 或 `default` 的参数会被跳过，表示使用脚本默认值
+- 路径里写成 `cached_models` / `cached_results` 时，运行时会替换成真实缓存目录
+
+## 9. 新增模型如何接入测试
+
+### 9.1 新增配置文件
+
+在 `tests/models_tests/model_configs/` 下新增：
+
+```text
+model_cfg_<模型名>.json
+```
+
+推荐从模板复制并修改：
+
+- `model_cfg_template_cv.json`
+- `model_cfg_template_llm.json`
+
+### 9.2 生成 pytest 入口
 
 ```bash
 cd imodelzoo/tests/models_tests
 python3 update_test_py.py
 ```
 
-执行结果如下：
+脚本会：
 
-```bash
-Detect new model template-v1.0-->template_v1dot0, support flow ['get_model', 'perf'].
-Add test_xxx_template_v1dot0_get_model into get_model python file
-Detect new model template-v1.0-->template_v1dot0, support flow ['get_model', 'perf'].
-Add test_xxx_template_v1dot0_perf into perf python file
-```
+- 扫描新增的配置文件
+- 自动把模型名写入 `model_names.txt`
+- 按支持的 flow 追加到对应 `test_*_models.py`
+- 自动追加 `ndevice_*` / `dev_mem_*` marker
 
-说明：脚本打印的 log 中包含了模型原始名称`template-v1.0`和脚本转换后的模型名称`template_v1dot0`，其中转换后的模型名称同时会添加到 `./model_names.txt` 文件中。
+注意：
 
-### 3.3 执行模型测试
+- `demo_multibatch` 不会生成独立 pytest 用例
+- 模型名会被转换为 marker 名，规则见上文
+
+### 9.3 运行新增模型测试
 
 ```bash
 cd imodelzoo/tests
-# 假设新增模型的名称为: template-v1.0，转换后模型名称为: template_v1dot0
-pytest -s -v models_tests/ -m "template_v1dot0"
+pytest -s -v models_tests/ -m "<转换后的模型名>"
 ```
+
+## 10. 排查建议
+
+如果用例和预期不一致，优先检查以下几项：
+
+1. `HOUMO_TARGET` 是否与模型配置匹配
+2. `HDPL_PLATFORM` 是否正确，是否意外进入分阶段模式
+3. `dependencies` 对应的 `ndevice_*` / `dev_mem_*` marker 是否正确
+4. `model_results_{HOUMO_TARGET}` 中是否已有旧缓存结果
+5. 当前模型是走 `hmatc` 还是走 Python 脚本路径
+6. 对 LLM，当前机器是否具备 GPU，且是否处于 release 模式

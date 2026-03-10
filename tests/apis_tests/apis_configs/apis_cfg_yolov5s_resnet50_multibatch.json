@@ -11,7 +11,11 @@
     "get_model_params": null,
     "py_example_params": null,
     "cpp_example_params": {
-        "name": "multibatch_example",
+        "name": [
+            "multibatch_example",
+            "multibatch_example",
+            "multibatch_example"
+        ],
         "#resize_type": ["default", "0", "1"]
     }
 }

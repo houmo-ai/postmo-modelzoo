@@ -3,7 +3,7 @@
     "example_dir": "apis/inferences/yolov5s",
     "support_platform": ["x86_64"],
     "support_backend": {
-        "xh1": ["python", "cpp"], 
+        "xh1": ["python", "cpp"],
         "xh2": ["python", "cpp"]
     },
     "support_core_num": {
@@ -19,11 +19,11 @@
         }
     },
     "py_example_params": {
-        "name": "yolov5s.py",
-        "enable_ort": ["default", true, false]
+        "name": ["yolov5s.py", "yolov5s.py"],
+        "enable_ort": [true, false]
     },
     "cpp_example_params": {
-        "name": "example_yolov5s",
+        "name": ["example_yolov5s", "example_yolov5s", "example_yolov5s"],
         "defines": [[], ["-DENABLE_ORT=ON"], ["-DENABLE_ORT=OFF"]],
         "enable_ort": ["default", true, false]
     }

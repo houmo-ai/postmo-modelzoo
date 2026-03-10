@@ -3,7 +3,7 @@
     "example_dir": "apis/inferences/resnet50",
     "support_platform": ["x86_64"],
     "support_backend": {
-        "xh1": ["python", "cpp"], 
+        "xh1": ["python", "cpp"],
         "xh2": ["python"]
     },
     "support_core_num": {
@@ -17,12 +17,12 @@
         "xh2": null
     },
     "py_example_params": {
-        "name": "demo.py",
+        "name": ["demo.py"],
         "model_dir": ["default"]
     },
     "cpp_example_params": {
-        "name": "example_cpp",
-        "-n": ["default"],
+        "name": ["example_cpp", "example_cpp", "example_cpp"],
+        "-n": ["default", "default", "default"],
         "#resize_type": ["default", "0", "1"],
         "enable_ort": ["default", true, false]
     }
