@@ -49,7 +49,7 @@ python3 computing_perf.py --compute-mode int8
     ============================================================
     ```
 
-- 基于`Linux x86_64`平台的`bFP16`算力测试执行结果
+- 基于`Linux x86_64`平台的`INT8`算力测试执行结果
 
     ```shell
     Model run successfully on device 0, elapsed time: 6.67 seconds.

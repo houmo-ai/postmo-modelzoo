@@ -537,7 +537,7 @@ int PrepareInputs(PooledModule *pooled_md, tcim::Module *module,
   // prepare dynamic inputs
   for (auto &name : image_input_names) {
     std::string dyn_name = "resizer_crop_" + name;
-    if (input_datas.count(dyn_name) != 1) continue;
+    if (input_datas.count(dyn_name) == 1) continue;
     if (custom_msg_str.empty()) {
       LOG_ERROR("[error] Custom message is empty.");
       return -2;
