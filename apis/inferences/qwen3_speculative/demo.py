@@ -266,7 +266,7 @@ class HmQwen:
         # init weight manager
         self.ndevice = args.ndevice
         if self.ndevice == 1:
-            weight_manager = tcim.runtime.WeightManager(1)
+            weight_manager = tcim.runtime.WeightManager(0)
         elif self.ndevice == 2 and HOUMO_TARGET == "xh2":
             dev_manager = tcim.runtime.DevManager([0, 1], "Xh2HalBackend")
             weight_manager = tcim.runtime.WeightManager(dev_manager)
