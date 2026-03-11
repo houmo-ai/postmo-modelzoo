@@ -48,6 +48,8 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
   // Create weightManager options for prefill and decode modules
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
+  option_prefill.EnableHostLazyLoading(true);
+  option_decode.EnableHostLazyLoading(true);
   // Enable lazy mode
   if (LazyMode) {
     option_prefill.EnableIOLazyMode(true);

@@ -47,6 +47,9 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
   auto option_vision = tcim::Module::Option(weight_manager);
+  option_prefill.EnableHostLazyLoading(true);
+  option_decode.EnableHostLazyLoading(true);
+  option_vision.EnableHostLazyLoading(true);
   if (LazyMode) {
     option_prefill.EnableIOLazyMode(true);
     option_decode.EnableIOLazyMode(true);
