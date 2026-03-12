@@ -348,13 +348,13 @@ def asr(hmwhisper, processor, input_features):
     next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
     next_tokens = torch.argmax(next_token_logits, dim=-1)
     default_decoder_ids = torch.cat([default_decoder_ids, next_tokens[:, None]], dim=-1)
-    decoded_text = processor.decode(next_tokens)
     decode_response = (
         processor.decode(next_tokens) if next_tokens.item() != 50257 else ""
     )
     prefill_ids_len = default_decoder_ids.shape[1]
     ttft_time = time.time() - start_time
-    last_response = processor.decode(default_decoder_ids[-slide_len:])
+    last_response = processor.decode(default_decoder_ids[0][-slide_len:])
+
     logger.success("transcription:")
     print("\033[1;95m{}".format(decode_response), end="", flush=True)
 
@@ -388,12 +388,14 @@ def asr(hmwhisper, processor, input_features):
         default_decoder_ids = torch.cat(
             [default_decoder_ids, next_tokens[:, None]], dim=-1
         )
+
         decode_response = processor.decode(
-            default_decoder_ids.tolist()[-(slide_len + 1) - skip_tokens :]
-        )[0][len(last_response[0]) :]
+            default_decoder_ids[0][-(slide_len + 1) - skip_tokens :]
+        )[len(last_response) :]
+
         if decode_response != "" and is_valid_char(ord(decode_response[-1])):
             print(decode_response, end="", flush=True)
-            last_response = processor.decode(default_decoder_ids[-slide_len:])
+            last_response = processor.decode(default_decoder_ids[0][-slide_len:])
             skip_tokens = 0
         else:
             skip_tokens += 1
