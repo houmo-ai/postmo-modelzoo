@@ -125,7 +125,7 @@ def stream_print(text):
 # def show_statics():
 
 
-def asr(whisper, processor, model_config, audio_array):
+def asr(whisper, processor, audio_array):
 
     # 1. prepare config
     num_heads = 20
@@ -134,11 +134,11 @@ def asr(whisper, processor, model_config, audio_array):
     start_time = time.time()
 
     # get prompt Tokens ID
-    sot_id = model_config.decoder_start_token_id
+    sot_id = processor.tokenizer.convert_tokens_to_ids("<|startoftranscript|>")
     lang_id = processor.tokenizer.convert_tokens_to_ids("<|zh|>")
     transcribe_id = processor.tokenizer.convert_tokens_to_ids("<|transcribe|>")
     notime_id = processor.tokenizer.convert_tokens_to_ids("<|notimestamps|>")
-    eos_id = model_config.eos_token_id
+    eos_id = processor.tokenizer.convert_tokens_to_ids("<|endoftext|>")
 
     prompt_tokens = [sot_id, lang_id, transcribe_id, notime_id]
 
@@ -299,11 +299,8 @@ if __name__ == "__main__":
 if __name__ == "__main__":
     whisper = HmWhisper(args.encoder_path, args.decoder_path, args.prefill_path)
     processor = WhisperProcessor.from_pretrained(args.tokenizer_path)
-    model_config = WhisperForConditionalGeneration.from_pretrained(
-        args.tokenizer_path
-    ).config
     audio_array, _ = sf.read(args.audio)
-    output_tokens, ttft_time = asr(whisper, processor, model_config, audio_array)
+    output_tokens, ttft_time = asr(whisper, processor, audio_array)
     logger.success(
         f"Output {output_tokens} tokens, Decode Cost {whisper.decoder_time*1000:.3f} ms"
     )
