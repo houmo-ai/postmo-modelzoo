@@ -404,6 +404,16 @@ llm_gte:
         args: all
   test:
     - llm_gte_test
+tts_cosyvoice3:
+  include:
+    - models/tts/cosyvoice3
+  exclude:
+    - models/tts/cosyvoice3/README.MD
+  example_case:
+    - tts_cosyvoice3_test:
+        script: ../models/tts/cosyvoice3/test.sh
+  test:
+    - tts_cosyvoice3_test
 utils:
   include:
     - utils
