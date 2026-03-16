@@ -32,6 +32,7 @@ houmo-examples 目录结构如下，其中 README.md 为本说明文件：
     ├── ocr
     ├── omni
     ├── segmentation
+    ├── tts
     ├── vllm
     └── benchmark.yml
 ├── tools
@@ -134,6 +135,7 @@ pip install -r requirements.txt
 | glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |
 | minicpmo                | omni         | xh2    | x     | yes   | yes  | yes  | x    |
 | yolov8m-seg             | segmentation | xh2    | yes   | yes   | yes  | yes  | yes  |
+| cosyvoice3              | tts          | xh2    | yes   | yes   | yes  | yes  | x    |
 | qwen2.5-vl              | vllm         | xh2    | yes   | yes   | yes  | yes  | x    |
 | qwen3-vl                | vllm         | xh2    | yes   | yes   | yes  | yes  | x    |
 

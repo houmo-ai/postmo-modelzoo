@@ -510,6 +510,7 @@ def _extract_files(save_path: str, extract_dir: str) -> bool:
 
     extract_mapping = {
         (".zip",): (zipfile.ZipFile, {"mode": "r"}),
+        (".tar",): (tarfile.open, {"mode": "r"}),
         (".tar.gz", ".tgz"): (tarfile.open, {"mode": "r:gz"}),
         (".tar.xz",): (tarfile.open, {"mode": "r:xz"}),
     }
@@ -774,14 +775,18 @@ def hmatc_get_file(
     download_dir: str = "",
     extract_dir=None,
     source_type="jfrog",
-) -> str:
-    """Compress a folder to .tar.xz format with progress bar and support for excluding files.
+) -> tuple[str, dict]:
+    """Download or locate model-related files.
 
     Args:
-        folder_path (str): Path to the folder to compress
-        output_path (str): Output file path for the compressed archive
-        exclude (list, optional): List of patterns to exclude from compression (default: None)
-        preset (int): Compression level (0-9, default: 9)
+        model_cfgs (dict): Model configuration dictionary
+        file_type (str): File type to process, such as `raw`, `quant`, or `hmm`
+        download_dir (str): Download directory
+        extract_dir (str, optional): Extract directory for compressed files
+        source_type (str): Download source, `jfrog` or `modelscope`
+
+    Returns:
+        tuple[str, dict]: Main downloaded file path and detailed download results
     """
     download_file = ""
     download_files = dict()
@@ -914,7 +919,7 @@ def hmatc_get_file(
     if (
         model_cfgs["model_type"] in ["llm"]
         and model_cfgs.get("modelscope_repo", None) is not None
-        and len(model_cfgs["modelscope_repo"].get("repo_ids", list())) > 0
+        and len(model_cfgs["modelscope_repo"].get("repo_ids", [])) > 0
     ):
         local_dirs = model_cfgs["modelscope_repo"].get("local_dirs", None)
         if (
@@ -955,7 +960,7 @@ def hmatc_get_file(
         and isinstance(model_cfgs["default_files"], list)
         and len(model_cfgs["default_files"]) > 0
     ):
-        download_files["default_files"] = list()
+        download_files["default_files"] = []
         for default_file in model_cfgs["default_files"]:
             extract_dir_edit = _generate_extract_dir(default_file, ".")
             tmp_file = get_file_from_jfrog(default_file, download_dir, extract_dir_edit)
