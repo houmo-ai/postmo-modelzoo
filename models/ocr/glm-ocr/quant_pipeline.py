@@ -1145,12 +1145,12 @@ def move_llm(args):
     logger.info(
         f"Moved and renamed prefill onnx model to {dest_parent_folder}/prefill/hmquant_glm-ocr_with_act.onnx"
     )
-    move_and_rename_folder(src_decode_folder, dest_parent_folder, "decoder")
+    move_and_rename_folder(src_decode_folder, dest_parent_folder, "decode")
     rename_single_onnx_file(
-        os.path.join(dest_parent_folder, "decoder"), "hmquant_glm-ocr_with_act.onnx"
+        os.path.join(dest_parent_folder, "decode"), "hmquant_glm-ocr_with_act.onnx"
     )
     logger.info(
-        f"Moved and renamed decode onnx model to {dest_parent_folder}/decoder/hmquant_glm-ocr_with_act.onnx"
+        f"Moved and renamed decode onnx model to {dest_parent_folder}/decode/hmquant_glm-ocr_with_act.onnx"
     )
     move_and_rename_folder(src_visual_folder, dest_parent_folder, "visual")
     rename_single_onnx_file(
