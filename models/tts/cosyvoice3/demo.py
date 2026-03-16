@@ -2042,6 +2042,7 @@ class CosyVoice3:
 if __name__ == "__main__":
     args = get_args()
 
+    # find prompt wav in current directory
     prompt_wav_matches = glob.glob(os.path.join(".", "zero_shot_prompt.wav"))
     if not prompt_wav_matches:
         raise FileNotFoundError("zero_shot_prompt.wav not found in current directory")

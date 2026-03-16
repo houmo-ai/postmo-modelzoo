@@ -419,3 +419,14 @@ def test_backbone_yolov8m_cls_get_model(setup_logging) -> None:
     """test_backbone_yolov8m_cls_get_model"""
     model_name = "yolov8m-cls"
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.cosyvoice3
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_tts_cosyvoice3_get_model")
+def test_tts_cosyvoice3_get_model(setup_logging) -> None:
+    """test_tts_cosyvoice3_get_model"""
+    model_name = "cosyvoice3"
+    _get_model_func(model_name, setup_logging)

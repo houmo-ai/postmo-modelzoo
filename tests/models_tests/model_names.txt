@@ -35,3 +35,4 @@ whisper
 gte
 gpt_oss
 sensevoice
+cosyvoice3

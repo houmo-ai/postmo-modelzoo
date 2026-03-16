@@ -382,3 +382,13 @@ def test_backbone_yolov8m_cls_demo(setup_logging) -> None:
     """test_backbone_yolov8m_cls_demo"""
     model_name = "yolov8m-cls"
     _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.cosyvoice3
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_tts_cosyvoice3_demo(setup_logging) -> None:
+    """test_tts_cosyvoice3_demo"""
+    model_name = "cosyvoice3"
+    _demo_func(model_name, setup_logging)

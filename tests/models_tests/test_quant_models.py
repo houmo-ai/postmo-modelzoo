@@ -455,3 +455,17 @@ def test_embedding_gte_quant(setup_logging) -> None:
     """test_embedding_gte_quant"""
     model_name = "gte"
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.cosyvoice3
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_tts_cosyvoice3_quant",
+    depends_on=["test_get_models.py::test_tts_cosyvoice3_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_tts_cosyvoice3_quant(setup_logging) -> None:
+    """test_tts_cosyvoice3_quant"""
+    model_name = "cosyvoice3"
+    _quant_func(model_name, setup_logging)
