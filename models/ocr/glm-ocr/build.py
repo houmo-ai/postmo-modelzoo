@@ -24,6 +24,7 @@ import psutil
 import threading
 import multiprocessing
 import argparse
+import glob
 
 import logging
 
@@ -249,7 +250,6 @@ def get_args() -> argparse.Namespace:
 def build_llm(
     model_name,
     model_dir,
-    model_path,
     output_dir,
     profile,
     ncore,
@@ -287,7 +287,8 @@ def build_llm(
 
     start = time.time()
     print(f"\n===> {model_name} build start...\n kwargs:{kwargs}")
-    decode_model = os.path.join(model_dir, model_path)
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -304,9 +305,7 @@ def build_llm(
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 
-def build_vit(
-    model_name, model_dir, model_path, output_dir, profile, ncore, j, flash_attention
-):
+def build_vit(model_name, model_dir, output_dir, profile, ncore, j, flash_attention):
     import tcim
 
     kwargs = {}
@@ -320,7 +319,8 @@ def build_vit(
 
     start = time.time()
     print(f"\n===> {model_name} build start... \n kwargs:{kwargs}")
-    decode_model = os.path.join(model_dir, model_path)
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -467,11 +467,9 @@ if __name__ == "__main__":
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"hmquant_{model_name}_with_act.onnx"
         build_vit(
             "glm-ocr_visual",
             os.path.join(model_dir, "visual"),
-            model_path,
             output_dir,
             profile,
             ncore,
@@ -481,7 +479,6 @@ if __name__ == "__main__":
         build_llm(
             "glm-ocr_prefill",
             os.path.join(model_dir, "prefill"),
-            model_path,
             output_dir,
             profile,
             ncore,
@@ -493,8 +490,7 @@ if __name__ == "__main__":
         )
         build_llm(
             "glm-ocr_decode",
-            os.path.join(model_dir, "decoder"),
-            model_path,
+            os.path.join(model_dir, "decode"),
             output_dir,
             profile,
             ncore,
