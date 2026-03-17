@@ -176,7 +176,7 @@ def test_llm_qwen2dot5_perf(setup_logging) -> None:
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.perf
-def test_vllm_qwen2dot5_vl_perf(setup_logging) -> None:
+def test_vlm_qwen2dot5_vl_perf(setup_logging) -> None:
     model_name = "qwen2.5-vl"
     _perf_func(model_name, setup_logging)
 
@@ -308,8 +308,8 @@ def test_llm_qwen3_30b_a3b_perf(setup_logging) -> None:
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.perf
-def test_vllm_qwen3_vl_perf(setup_logging) -> None:
-    """test_vllm_qwen3_vl_perf"""
+def test_vlm_qwen3_vl_perf(setup_logging) -> None:
+    """test_vlm_qwen3_vl_perf"""
     model_name = "qwen3-vl"
     _perf_func(model_name, setup_logging)
 

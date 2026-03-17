@@ -25,7 +25,14 @@ import numpy as np
 
 from transformers.feature_extraction_utils import BatchFeature
 from transformers.image_utils import ImageInput
-from transformers.processing_utils import ImagesKwargs, MultiModalData, ProcessingKwargs, ProcessorMixin, Unpack, VideosKwargs
+from transformers.processing_utils import (
+    ImagesKwargs,
+    MultiModalData,
+    ProcessingKwargs,
+    ProcessorMixin,
+    Unpack,
+    VideosKwargs,
+)
 from transformers.tokenization_utils_base import PreTokenizedInput, TextInput
 from transformers.utils import logging
 from transformers.video_utils import VideoInput
@@ -80,10 +87,27 @@ class Qwen3VLProcessor(ProcessorMixin):
     video_processor_class = "AutoVideoProcessor"
     tokenizer_class = ("Qwen2Tokenizer", "Qwen2TokenizerFast")
 
-    def __init__(self, image_processor=None, tokenizer=None, video_processor=None, chat_template=None, **kwargs):
-        super().__init__(image_processor, tokenizer, video_processor, chat_template=chat_template)
-        self.image_token = "<|image_pad|>" if not hasattr(tokenizer, "image_token") else tokenizer.image_token
-        self.video_token = "<|video_pad|>" if not hasattr(tokenizer, "video_token") else tokenizer.video_token
+    def __init__(
+        self,
+        image_processor=None,
+        tokenizer=None,
+        video_processor=None,
+        chat_template=None,
+        **kwargs,
+    ):
+        super().__init__(
+            image_processor, tokenizer, video_processor, chat_template=chat_template
+        )
+        self.image_token = (
+            "<|image_pad|>"
+            if not hasattr(tokenizer, "image_token")
+            else tokenizer.image_token
+        )
+        self.video_token = (
+            "<|video_pad|>"
+            if not hasattr(tokenizer, "video_token")
+            else tokenizer.video_token
+        )
         self.image_token_id = (
             tokenizer.image_token_id
             if getattr(tokenizer, "image_token_id", None)
@@ -95,10 +119,14 @@ class Qwen3VLProcessor(ProcessorMixin):
             else tokenizer.convert_tokens_to_ids(self.video_token)
         )
         self.vision_start_token = (
-            "<|vision_start|>" if not hasattr(tokenizer, "vision_start_token") else tokenizer.vision_start_token
+            "<|vision_start|>"
+            if not hasattr(tokenizer, "vision_start_token")
+            else tokenizer.vision_start_token
         )
         self.vision_end_token = (
-            "<|vision_end|>" if not hasattr(tokenizer, "vision_end_token") else tokenizer.vision_end_token
+            "<|vision_end|>"
+            if not hasattr(tokenizer, "vision_end_token")
+            else tokenizer.vision_end_token
         )
         self.vision_start_token_id = (
             tokenizer.vision_start_token_id
@@ -115,7 +143,9 @@ class Qwen3VLProcessor(ProcessorMixin):
     def __call__(
         self,
         images: ImageInput = None,
-        text: Union[TextInput, PreTokenizedInput, list[TextInput], list[PreTokenizedInput]] = None,
+        text: Union[
+            TextInput, PreTokenizedInput, list[TextInput], list[PreTokenizedInput]
+        ] = None,
         videos: VideoInput = None,
         **kwargs: Unpack[Qwen3VLProcessorKwargs],
     ) -> BatchFeature:
@@ -161,14 +191,18 @@ class Qwen3VLProcessor(ProcessorMixin):
             **kwargs,
         )
         if images is not None:
-            image_inputs = self.image_processor(images=images, **output_kwargs["images_kwargs"])
+            image_inputs = self.image_processor(
+                images=images, **output_kwargs["images_kwargs"]
+            )
             image_grid_thw = image_inputs["image_grid_thw"]
         else:
             image_inputs = {}
             image_grid_thw = None
 
         if videos is not None:
-            videos_inputs = self.video_processor(videos=videos, **output_kwargs["videos_kwargs"])
+            videos_inputs = self.video_processor(
+                videos=videos, **output_kwargs["videos_kwargs"]
+            )
             video_grid_thw = videos_inputs["video_grid_thw"]
             # If user has not requested video metadata, pop it
             if "return_metadata" not in kwargs:
@@ -190,7 +224,9 @@ class Qwen3VLProcessor(ProcessorMixin):
             for i in range(len(text)):
                 while self.image_token in text[i]:
                     num_image_tokens = image_grid_thw[index].prod() // merge_length
-                    text[i] = text[i].replace(self.image_token, "<|placeholder|>" * num_image_tokens, 1)
+                    text[i] = text[i].replace(
+                        self.image_token, "<|placeholder|>" * num_image_tokens, 1
+                    )
                     index += 1
                 text[i] = text[i].replace("<|placeholder|>", self.image_token)
 
@@ -221,22 +257,35 @@ class Qwen3VLProcessor(ProcessorMixin):
                         curr_time = curr_timestamp[frame_idx]
                         video_placeholder += f"<{curr_time:.1f} seconds>"
                         video_placeholder += (
-                            self.vision_start_token + "<|placeholder|>" * frame_seqlen + self.vision_end_token
+                            self.vision_start_token
+                            + "<|placeholder|>" * frame_seqlen
+                            + self.vision_end_token
                         )
-                    if f"{self.vision_start_token}{self.video_token}{self.vision_end_token}" in text[i]:
+                    if (
+                        f"{self.vision_start_token}{self.video_token}{self.vision_end_token}"
+                        in text[i]
+                    ):
                         text[i] = text[i].replace(
-                            f"{self.vision_start_token}{self.video_token}{self.vision_end_token}", video_placeholder, 1
+                            f"{self.vision_start_token}{self.video_token}{self.vision_end_token}",
+                            video_placeholder,
+                            1,
                         )
                     else:
-                        # vllm may input video token directly
-                        text[i] = text[i].replace(self.video_token, video_placeholder, 1)
+                        # vlm may input video token directly
+                        text[i] = text[i].replace(
+                            self.video_token, video_placeholder, 1
+                        )
                     index += 1
 
                 text[i] = text[i].replace("<|placeholder|>", self.video_token)
 
         return_tensors = output_kwargs["text_kwargs"].pop("return_tensors", None)
-        return_mm_token_type_ids = output_kwargs["text_kwargs"].pop("return_mm_token_type_ids", None)
-        text_inputs = self.tokenizer(text, **output_kwargs["text_kwargs"], return_tensors="pt")
+        return_mm_token_type_ids = output_kwargs["text_kwargs"].pop(
+            "return_mm_token_type_ids", None
+        )
+        text_inputs = self.tokenizer(
+            text, **output_kwargs["text_kwargs"], return_tensors="pt"
+        )
         self._check_special_mm_tokens(text, text_inputs, modalities=["image", "video"])
 
         if return_mm_token_type_ids:
@@ -264,29 +313,48 @@ class Qwen3VLProcessor(ProcessorMixin):
         if image_sizes is not None:
             images_kwargs = Qwen3VLProcessorKwargs._defaults.get("images_kwargs", {})
             images_kwargs.update(kwargs)
-            merge_size = images_kwargs.get("merge_size", None) or self.image_processor.merge_size
+            merge_size = (
+                images_kwargs.get("merge_size", None) or self.image_processor.merge_size
+            )
 
             num_image_patches = [
-                self.image_processor.get_number_of_image_patches(*image_size, images_kwargs)
+                self.image_processor.get_number_of_image_patches(
+                    *image_size, images_kwargs
+                )
                 for image_size in image_sizes
             ]
-            num_image_tokens = [(num_patches // merge_size**2) for num_patches in num_image_patches]
-            vision_data.update({"num_image_tokens": num_image_tokens, "num_image_patches": num_image_patches})
+            num_image_tokens = [
+                (num_patches // merge_size**2) for num_patches in num_image_patches
+            ]
+            vision_data.update(
+                {
+                    "num_image_tokens": num_image_tokens,
+                    "num_image_patches": num_image_patches,
+                }
+            )
 
         if video_sizes is not None:
             videos_kwargs = Qwen3VLProcessorKwargs._defaults.get("videos_kwargs", {})
             videos_kwargs.update(kwargs)
             num_video_patches = [
-                self.video_processor.get_number_of_video_patches(*video_size, videos_kwargs)
+                self.video_processor.get_number_of_video_patches(
+                    *video_size, videos_kwargs
+                )
                 for video_size in video_sizes
             ]
-            num_video_tokens = [(num_patches // merge_size**2) for num_patches in num_video_patches]
+            num_video_tokens = [
+                (num_patches // merge_size**2) for num_patches in num_video_patches
+            ]
             vision_data["num_video_tokens"] = num_video_tokens
 
         return MultiModalData(**vision_data)
 
     def post_process_image_text_to_text(
-        self, generated_outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False, **kwargs
+        self,
+        generated_outputs,
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
+        **kwargs,
     ):
         """
         Post-process the output of the model to decode the text.
@@ -312,16 +380,24 @@ class Qwen3VLProcessor(ProcessorMixin):
             **kwargs,
         )
 
-    def _calculate_timestamps(self, indices: Union[list[int], np.ndarray], video_fps: float, merge_size: int = 2):
+    def _calculate_timestamps(
+        self,
+        indices: Union[list[int], np.ndarray],
+        video_fps: float,
+        merge_size: int = 2,
+    ):
         if not isinstance(indices, list):
             indices = indices.tolist()
         if len(indices) % merge_size != 0:
-            indices.extend(indices[-1] for _ in range(merge_size - len(indices) % merge_size))
+            indices.extend(
+                indices[-1] for _ in range(merge_size - len(indices) % merge_size)
+            )
         timestamps = [idx / video_fps for idx in indices]
         # @JJJYmmm frames are merged by self.merge_size, \
         # so we need to average the timestamps between the first/last frame within the temporal patch
         timestamps = [
-            (timestamps[i] + timestamps[i + merge_size - 1]) / 2 for i in range(0, len(timestamps), merge_size)
+            (timestamps[i] + timestamps[i + merge_size - 1]) / 2
+            for i in range(0, len(timestamps), merge_size)
         ]
         return timestamps
 

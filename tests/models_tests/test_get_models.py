@@ -201,8 +201,8 @@ def test_llm_deepseek_r1_qwen3_8b_get_model(setup_logging) -> None:
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.get_model
-@pytest.mark.dependency(name="test_vllm_qwen2dot5_vl_get_model")
-def test_vllm_qwen2dot5_vl_get_model(setup_logging) -> None:
+@pytest.mark.dependency(name="test_vlm_qwen2dot5_vl_get_model")
+def test_vlm_qwen2dot5_vl_get_model(setup_logging) -> None:
     model_name = "qwen2.5-vl"
     _get_model_func(model_name, setup_logging)
 
@@ -359,9 +359,9 @@ def test_llm_qwen3_30b_a3b_get_model(setup_logging) -> None:
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.get_model
-@pytest.mark.dependency(name="test_vllm_qwen3_vl_get_model")
-def test_vllm_qwen3_vl_get_model(setup_logging) -> None:
-    """test_vllm_qwen3_vl_get_model"""
+@pytest.mark.dependency(name="test_vlm_qwen3_vl_get_model")
+def test_vlm_qwen3_vl_get_model(setup_logging) -> None:
+    """test_vlm_qwen3_vl_get_model"""
     model_name = "qwen3-vl"
     _get_model_func(model_name, setup_logging)
 

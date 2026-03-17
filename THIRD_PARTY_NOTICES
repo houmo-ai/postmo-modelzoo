@@ -966,7 +966,7 @@ License Text:
 https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md
 
 This alg is used at the following path:
-    models/vllm/qwen2.5-vl/
+    models/vlm/qwen2.5-vl/
 
 The Qwen2.5-VL model is licensed under the Apache License, Version 2.0.
 The Apache License, Version 2.0 permits use, reproduction, modification,
@@ -1003,7 +1003,7 @@ License Text:
 https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md
 
 This alg is used at the following path:
-    models/vllm/qwen3-vl/
+    models/vlm/qwen3-vl/
 
 The Qwen3-VL model is licensed under the Apache License, Version 2.0.
 The Apache License, Version 2.0 permits use, reproduction, modification,

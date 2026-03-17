@@ -25,6 +25,7 @@ import numpy as np
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Convert embedding format")
     parser.add_argument(
@@ -38,7 +39,7 @@ def parse_args():
         "--type",
         required=True,
         type=str,
-        help="Embedding pt file model type, choice from ['llm', 'vllm']",
+        help="Embedding pt file model type, choice from ['llm', 'vlm']",
     )
     args = parser.parse_args()
     return args
@@ -53,9 +54,11 @@ if __name__ == "__main__":
             embedding_weight = torch.load(
                 embedding_path, map_location="cpu", weights_only=True
             )
-            embedding_weight = embedding_weight['weight']
-        if type == "vllm":
-            embedding_weight = torch.load(embedding_path, map_location="cpu", weights_only=False)
+            embedding_weight = embedding_weight["weight"]
+        if type == "vlm":
+            embedding_weight = torch.load(
+                embedding_path, map_location="cpu", weights_only=False
+            )
             if HOUMO_TARGET == "xh2":
                 embedding_weight = embedding_weight.weight
         if embedding_weight.dtype == torch.bfloat16:

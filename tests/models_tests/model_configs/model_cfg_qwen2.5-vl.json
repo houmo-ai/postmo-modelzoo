@@ -1,6 +1,6 @@
 {
     "obsolete": false,
-    "model_dir": "models/vllm/qwen2.5-vl",
+    "model_dir": "models/vlm/qwen2.5-vl",
     "model_type": "llm",
     "dependencies": {
         "ndevice": [1],

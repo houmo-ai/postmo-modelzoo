@@ -33,7 +33,7 @@ houmo-examples 目录结构如下，其中 README.md 为本说明文件：
     ├── omni
     ├── segmentation
     ├── tts
-    ├── vllm
+    ├── vlm
     └── benchmark.yml
 ├── tools
 ├── env.sh
@@ -150,8 +150,8 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | minicpmo                | omni         | xh2    | x     | yes   | yes  | yes  | x    |
 | yolov8m-seg             | segmentation | xh2    | yes   | yes   | yes  | yes  | yes  |
 | cosyvoice3              | tts          | xh2    | yes   | yes   | yes  | yes  | x    |
-| qwen2.5-vl              | vllm         | xh2    | yes   | yes   | yes  | yes  | x    |
-| qwen3-vl                | vllm         | xh2    | yes   | yes   | yes  | yes  | x    |
+| qwen2.5-vl              | vlm          | xh2    | yes   | yes   | yes  | yes  | x    |
+| qwen3-vl                | vlm          | xh2    | yes   | yes   | yes  | yes  | x    |
 
 ## API 示例
 

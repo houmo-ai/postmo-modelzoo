@@ -145,7 +145,7 @@ fi
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
     python3 demo.py
-    python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt --type vllm
+    python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt --type vlm
     llm_perf -c config.yaml
 fi
 

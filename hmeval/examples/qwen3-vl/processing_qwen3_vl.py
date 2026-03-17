@@ -271,7 +271,7 @@ class Qwen3VLProcessor(ProcessorMixin):
                             1,
                         )
                     else:
-                        # vllm may input video token directly
+                        # vlm may input video token directly
                         text[i] = text[i].replace(
                             self.video_token, video_placeholder, 1
                         )

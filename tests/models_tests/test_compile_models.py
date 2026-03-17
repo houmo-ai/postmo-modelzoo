@@ -264,13 +264,13 @@ def test_llm_deepseek_r1_qwen3_8b_compile(setup_logging) -> None:
 @pytest.mark.qwen2dot5_vl
 @pytest.mark.compile
 @pytest.mark.dependency(
-    name="test_vllm_qwen2dot5_vl_compile",
-    depends_on=["test_quant_models.py::test_vllm_qwen2dot5_vl_quant"],
+    name="test_vlm_qwen2dot5_vl_compile",
+    depends_on=["test_quant_models.py::test_vlm_qwen2dot5_vl_quant"],
 )
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
-def test_vllm_qwen2dot5_vl_compile(setup_logging) -> None:
-    """test_vllm_qwen2dot5_vl_compile"""
+def test_vlm_qwen2dot5_vl_compile(setup_logging) -> None:
+    """test_vlm_qwen2dot5_vl_compile"""
     model_name = "qwen2.5-vl"
     _compile_func(model_name, setup_logging)
 
@@ -474,13 +474,13 @@ def test_llm_qwen3_30b_a3b_compile(setup_logging) -> None:
 @pytest.mark.qwen3_vl
 @pytest.mark.compile
 @pytest.mark.dependency(
-    name="test_vllm_qwen3_vl_compile",
-    depends_on=["test_get_models.py::test_vllm_qwen3_vl_get_model"],
+    name="test_vlm_qwen3_vl_compile",
+    depends_on=["test_get_models.py::test_vlm_qwen3_vl_get_model"],
 )
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
-def test_vllm_qwen3_vl_compile(setup_logging) -> None:
-    """test_vllm_qwen3_vl_compile"""
+def test_vlm_qwen3_vl_compile(setup_logging) -> None:
+    """test_vlm_qwen3_vl_compile"""
     model_name = "qwen3-vl"
     _compile_func(model_name, setup_logging)
 

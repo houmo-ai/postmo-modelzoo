@@ -236,13 +236,13 @@ def test_llm_deepseek_r1_qwen3_8b_quant(setup_logging) -> None:
 @pytest.mark.qwen2dot5_vl
 @pytest.mark.quant
 @pytest.mark.dependency(
-    name="test_vllm_qwen2dot5_vl_quant",
-    depends_on=["test_get_models.py::test_vllm_qwen2dot5_vl_get_model"],
+    name="test_vlm_qwen2dot5_vl_quant",
+    depends_on=["test_get_models.py::test_vlm_qwen2dot5_vl_get_model"],
 )
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
-def test_vllm_qwen2dot5_vl_quant(setup_logging) -> None:
-    """test_vllm_qwen2dot5_vl_quant"""
+def test_vlm_qwen2dot5_vl_quant(setup_logging) -> None:
+    """test_vlm_qwen2dot5_vl_quant"""
     model_name = "qwen2.5-vl"
     _quant_func(model_name, setup_logging)
 

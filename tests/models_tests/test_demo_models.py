@@ -185,7 +185,7 @@ def test_llm_deepseek_r1_qwen3_8b_demo(setup_logging) -> None:
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.demo
-def test_vllm_qwen2dot5_vl_demo(setup_logging) -> None:
+def test_vlm_qwen2dot5_vl_demo(setup_logging) -> None:
     model_name = "qwen2.5-vl"
     _demo_func(model_name, setup_logging)
 
@@ -328,8 +328,8 @@ def test_llm_qwen3_30b_a3b_demo(setup_logging) -> None:
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.demo
-def test_vllm_qwen3_vl_demo(setup_logging) -> None:
-    """test_vllm_qwen3_vl_demo"""
+def test_vlm_qwen3_vl_demo(setup_logging) -> None:
+    """test_vlm_qwen3_vl_demo"""
     model_name = "qwen3-vl"
     _demo_func(model_name, setup_logging)
 

@@ -61,7 +61,7 @@ namespace fs = std::filesystem;
 typedef enum { PERFCMD = 0, PERFYAML, PERFINVAILD } PerfConfigType;
 
 static void HelpUsage(char* argv[]) {
-  std::cout << "llm_perf - A tool for LLM and VLLM performance tests with "
+  std::cout << "llm_perf - A tool for LLM and VLM performance tests with "
                "flexible configuration options.\n\n";
   std::cout << "Release Time : " << __DATE__ << " " << __TIME__ << "\n\n";
   std::cout
@@ -74,7 +74,7 @@ static void HelpUsage(char* argv[]) {
          "  --prefill         FILE      Prefill model file (required).\n"
          "  --decode          FILE      Decode model file (required).\n"
          "  --visual          FILE      Visual model file (optional, only "
-         "for VLLM).\n"
+         "for VLM).\n"
          "  --embedding       FILE      Embedding weight file (.bin, "
          "required).\n"
          "  --input           NUM       Number of input tokens (range: "

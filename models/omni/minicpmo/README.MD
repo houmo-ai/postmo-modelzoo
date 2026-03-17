@@ -21,7 +21,7 @@
 
 ## 2 快速开始
 
-MiniCPMO支持Omni、vllm、llm、voice clone、instruction to speech和only tts等图像、本文、语音功能。
+MiniCPMO支持Omni、vlm、llm、voice clone、instruction to speech和only tts等图像、本文、语音功能。
 
 ### 2.1 获取模型和数据
 
@@ -74,9 +74,9 @@ MiniCPMO模型使用python API进行演示
 python3 demo.py
 #默认为omni模式，如需体验llm
 python3 demo.py --example_idx 1
-#如需体验vllm
+#如需体验vlm
 python3 demo.py --example_idx 2
-#如需体验多张图的vllm
+#如需体验多张图的vlm
 python3 demo.py --example_idx 3
 #如需语音克隆
 python3 demo.py --example_idx 4

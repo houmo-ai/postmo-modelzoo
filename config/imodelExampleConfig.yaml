@@ -322,30 +322,30 @@ llm_deepseek_r1_qwen3_8b:
 #         args: all
 #   test:
 #     - llm_gpt-oss_test
-vllm_qwen2.5-vl:
+vlm_qwen2.5-vl:
   include:
-    - models/vllm/qwen2.5-vl
+    - models/vlm/qwen2.5-vl
   exclude:
-    - models/vllm/qwen2.5-vl/README.MD
+    - models/vlm/qwen2.5-vl/README.MD
   example_case:
-    - vllm_qwen2.5-vl_test:
+    - vlm_qwen2.5-vl_test:
         test_type: models_tests
         script: qwen2dot5_vl
         args: all
   test:
-    - vllm_qwen2.5-vl_test
-vllm_qwen3-vl:
+    - vlm_qwen2.5-vl_test
+vlm_qwen3-vl:
   include:
-    - models/vllm/qwen3-vl
+    - models/vlm/qwen3-vl
   exclude:
-    - models/vllm/qwen3-vl/README.MD
+    - models/vlm/qwen3-vl/README.MD
   example_case:
-    - vllm_qwen3-vl_test:
+    - vlm_qwen3-vl_test:
         test_type: models_tests
         script: qwen3_vl
         args: all
   test:
-    - vllm_qwen3-vl_test
+    - vlm_qwen3-vl_test
 llm_bge:
   include:
     - models/embedding/bge
@@ -582,7 +582,7 @@ models_tests:
     - detection_yolov5s_test
     - inferences_resnet50_test
     - llm_qwen3_test
-    - vllm_qwen3-vl_test
+    - vlm_qwen3-vl_test
 
 apis_tests:
   include:

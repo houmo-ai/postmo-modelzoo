@@ -1,18 +1,23 @@
 # llm_perf 性能测试工具
 
-本代码用于在后摩鸿途系列芯片（XH2）的设备上测试llm模型和vllm模型的单/多batch模型推理性能。当前支持linux、windows11和android native环境（使用adb运行）。
+本代码用于在后摩鸿途系列芯片（XH2）的设备上测试llm模型和vlm模型的单/多batch模型推理性能。当前支持linux、windows11和android native环境（使用adb运行）。
 
 ## 目录
 
-- [工具说明](#1工具说明)
-  - [文件及功能支持度说明](#11-文件及功能支持度说明)
-  - [流程说明](#12-流程说明)
-  - [参数说明](#13-参数说明)
-  - [用法说明](#14-用法说明)
-- [快速开始](#2快速开始)
-  - [环境准备](#21-环境准备)
-  - [一键运行](#22-一键运行)
-- [免责声明](#3免责声明)
+- [llm\_perf 性能测试工具](#llm_perf-性能测试工具)
+  - [目录](#目录)
+  - [1.工具说明](#1工具说明)
+    - [1.1 文件及功能支持度说明](#11-文件及功能支持度说明)
+    - [1.2 流程说明](#12-流程说明)
+    - [1.3 参数说明](#13-参数说明)
+    - [1.4 用法说明](#14-用法说明)
+      - [1.4.1 embedding模型准换](#141-embedding模型准换)
+      - [1.4.2 指令启动](#142-指令启动)
+      - [1.4.3 配置文件启动](#143-配置文件启动)
+  - [2.快速开始](#2快速开始)
+    - [2.1 环境准备](#21-环境准备)
+    - [2.2 一键运行](#22-一键运行)
+  - [3.免责声明](#3免责声明)
 
 ## 1.工具说明
 
@@ -24,7 +29,7 @@
 | llm_perf.cc             | 主入口，拉起大语言模型推理流程                      |
 | HmEmbedding.cc          | embedding类实现                                     |
 | HmllmInfer.cc           | 主文件，实现llm模型单batch具体推理流程              |
-| HmvllmInfer.cc          | 主文件，实现vllm模型单batch具体推理流程             |
+| HmvllmInfer.cc          | 主文件，实现vlm模型单batch具体推理流程             |
 | HmllmInferMultiBatch.cc | 主文件，实现llm多batch具体推理流程，仅支持xh2       |
 | convert_embed.py        | 将embedding的pt模型转换为bin文件方便工具读取权重    |
 | device_monitor          | 监控设备温度、功率、IPU频率的类实现                 |
@@ -36,7 +41,7 @@
 | build_win.bat           | Win11平台llm_perf编译脚本                           |
 
 功能支持度说明：
-  - 具体支持的模型参考models目录下llm和vllm模型支持的平台。
+  - 具体支持的模型参考models目录下llm和vlm模型支持的平台。
   - 支持的芯片型号为：xh2。
   - 支持的大道软件版本要求如下：xh2≥v0.6.0 。
   - 支持了device的温度、功率、IPU频率监控，记录保存在./device_logs/device_x.log。
@@ -102,7 +107,7 @@
 1. 命令行llm_perf以指定参数启动
 - --prefill         : 指定prefill模型路径，支持相对/绝对路径。
 - --decode          : 指定decode模型路径，支持相对/绝对路径。
-- --visual          : 指定visual模型路径，，支持相对/绝对路径，仅vllm需要指定，不指定时默认模型为llm模型。
+- --visual          : 指定visual模型路径，，支持相对/绝对路径，仅vlm需要指定，不指定时默认模型为llm模型。
 - --embedding       : 指定embedding模型路径，需要转换成bin文件，支持相对/绝对路径。
 - --input           : 指定prefill阶段输入token数量。
 - --output          : 指定docode阶段输出多少token后停止。
@@ -126,7 +131,7 @@
 
 #### 1.4.1 embedding模型准换
 提供了convert_embed.py对quant_embedding.pt进行准换，转换结果为quant_embedding.bin，可以方便llm_perf工具embedding时读取权重。
-使用方式如下：python convert_embed.py --path <embedding_weight_path> --type <llm/vllm>  。
+使用方式如下：python convert_embed.py --path <embedding_weight_path> --type <llm/vlm>  。
 
 #### 1.4.2 指令启动
 
@@ -149,7 +154,7 @@
 ```
 配置文件启动等效于多次指令启动，配置文件的参考模板perf_config.yaml，详细内容示例如下：
 ``` yaml
-# Configuration for multiple LLM/VLLM performance tests
+# Configuration for multiple LLM/VLM performance tests
 Streams:
   # Configuration for a single model test
   - ModelName: deepseek_8b_256_4k_b1_1chip_2cores_v0.5.0
@@ -199,7 +204,7 @@ Streams:
   - ModelName: qwen2.5-vl
     prefill: qwen2.5-vl/qwen2.5-vl_prefill.hmm
     decode: qwen2.5-vl/qwen2.5-vl_decode.hmm
-    visual: qwen2.5-vl/qwen2.5-vl_visual.hmm              # Path to visual processing model file (VLLM only)
+    visual: qwen2.5-vl/qwen2.5-vl_visual.hmm              # Path to visual processing model file (VLM only)
     embedding: qwen2.5-vl/hmquant/quant_embedding.bin
     input: 256
     output: 100

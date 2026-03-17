@@ -1,4 +1,4 @@
-# Configuration for multiple LLM/VLLM performance tests
+# Configuration for multiple LLM/VLM performance tests
 Streams:
   # Configuration for a single model test
   - ModelName: deepseek_8b_256_4k_b1_1chip_2cores_v0.5.0
@@ -48,7 +48,7 @@ Streams:
   - ModelName: qwen2.5-vl
     prefill: qwen2.5-vl/qwen2.5-vl_prefill.hmm
     decode: qwen2.5-vl/qwen2.5-vl_decode.hmm
-    visual: qwen2.5-vl/qwen2.5-vl_visual.hmm              # Path to visual processing model file (VLLM only)
+    visual: qwen2.5-vl/qwen2.5-vl_visual.hmm              # Path to visual processing model file (VLM only)
     embedding: qwen2.5-vl/hmquant/quant_embedding.bin
     input: 256
     output: 100
