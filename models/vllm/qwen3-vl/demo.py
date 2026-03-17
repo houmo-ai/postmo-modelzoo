@@ -402,39 +402,30 @@ class Qwen3VL:
             output_names.append(model.get_output_name(i))
         return output_names
 
-    def create_template(self, prompt, image_dir=None):
-        if image_dir is None:
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ]
-        else:
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "image": image_dir,
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ]
+    def create_template(self, prompt, images=None):
+        messages = [
+            {
+                "role": "user",
+                "content": [],
+            }
+        ]
+
+        if images is not None:
+            for image in images:
+                messages[0]["content"].append({"type": "image", "image": image})
+
+        messages[0]["content"].append({"type": "text", "text": prompt})
+
         return messages
 
-    def preprocess(self, prompt, image_dir, processor):
+    def preprocess(self, prompt, images, processor):
         from qwen_vl_utils import process_vision_info
 
-        messages = self.create_template(prompt, image_dir)
+        messages = self.create_template(prompt, images)
         text = processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
-        if image_dir is not None:
+        if images is not None:
             image_inputs, video_inputs = process_vision_info(
                 messages, image_patch_size=self.patch_size
             )
@@ -451,9 +442,11 @@ class Qwen3VL:
 
     def preprocess_visual(self, inputs):
         visual_inputs = dict()
-        visual_inputs["hidden_states"] = inputs["hm_pixel_values"][0]
-        visual_inputs["hidden_states"] = visual_inputs["hidden_states"].to(self.device)
-        return (visual_inputs["hidden_states"].half(),)
+        image_num = len(inputs["hm_pixel_values"])
+        hidden_states = []
+        for i in range(image_num):
+            hidden_states.append(inputs["hm_pixel_values"][i].to(self.device).half())
+        return hidden_states
 
     def load_and_process_image(self, image_path):
         """
@@ -753,7 +746,7 @@ class Qwen3VL:
                     deepstack_image_embed
                 )
                 new_deepstack_image_embed = new_deepstack_image_embed.masked_scatter(
-                    image_mask.to(deepstack_image_embed.device), deepstack_image_embed
+                    image_mask, deepstack_image_embed
                 )
                 new_deepstack_image_embeds.append(new_deepstack_image_embed)
             deepstack_image_embed_0 = new_deepstack_image_embeds[0]
@@ -893,8 +886,7 @@ class Qwen3VL:
         next_id = prefill_output.argmax(-1)
         return next_id, past_seq_length
 
-    def run_visual(self, inputs):
-        vit_input = inputs[0]
+    def run_visual(self, vit_input):
 
         self.perf_tracker.perf_start(PERFTYPE.VISION_INPUT_TIME)
         self.vit_model.set_input(
@@ -930,37 +922,53 @@ class Qwen3VL:
             deepstack_image_feature_2,
         )
 
-    def chat_vit_prefill(self, image_path, prompt, system_prompt=None):
+    def chat_vit_prefill(self, image_paths, prompt, system_prompt=None):
         self.generated_ids = []
+        pil_images = []
         self.skip_tokens = 0
         self.slide_len = 10
 
         self.perf_tracker.perf_start(PERFTYPE.VISION_TOTAL_TIME)
         self.perf_tracker.perf_start(PERFTYPE.VISION_PREPROCESS_TIME)
-        if image_path is not None:
-            if self.resize_v1:
-                pil_image = self.load_and_process_image(image_path)
-            else:
-                pil_image = self.load_and_process_image_v2(image_path)
+        if image_paths is not None:
+            for image_path in image_paths:
+                if self.resize_v1:
+                    pil_image = self.load_and_process_image(image_path)
+                else:
+                    pil_image = self.load_and_process_image_v2(image_path)
+                pil_images.append(pil_image)
         else:
-            pil_image = None
+            pil_images = None
         self.perf_tracker.perf_end(PERFTYPE.VISION_PREPROCESS_TIME)
         self.perf_tracker.perf_end(PERFTYPE.VISION_TOTAL_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
-        inputs = self.preprocess(prompt, pil_image, self.processor)
+        inputs = self.preprocess(prompt, pil_images, self.processor)
         inputs = inputs.to(self.device)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.VISION_TOTAL_TIME)
-        if image_path is not None:
+        if image_paths is not None:
             visual_inputs = self.preprocess_visual(inputs)
-            (
-                image_features,
-                deepstack_image_feature_0,
-                deepstack_image_feature_1,
-                deepstack_image_feature_2,
-            ) = self.run_visual(visual_inputs)
+            image_features = []
+            deepstack_image_feature_0 = []
+            deepstack_image_feature_1 = []
+            deepstack_image_feature_2 = []
+            for i in range(len(visual_inputs)):
+                (
+                    image_feature,
+                    deepstack_image_i_feature_0,
+                    deepstack_image_i_feature_1,
+                    deepstack_image_i_feature_2,
+                ) = self.run_visual(visual_inputs[i])
+                image_features.append(image_feature)
+                deepstack_image_feature_0.append(deepstack_image_i_feature_0)
+                deepstack_image_feature_1.append(deepstack_image_i_feature_1)
+                deepstack_image_feature_2.append(deepstack_image_i_feature_2)
+            image_features = torch.cat(image_features, dim=1)
+            deepstack_image_feature_0 = torch.cat(deepstack_image_feature_0, dim=1)
+            deepstack_image_feature_1 = torch.cat(deepstack_image_feature_1, dim=1)
+            deepstack_image_feature_2 = torch.cat(deepstack_image_feature_2, dim=1)
         else:
             image_features = None
             deepstack_image_feature_0 = None
@@ -1121,8 +1129,13 @@ if __name__ == "__main__":
         args.embedding_path,
     )
 
-    image_dir = "../../../data/pic/beach.jpeg"
-    image_num = 1 if image_dir else 0
+    # image_dir = [
+    #     "../../../data/pic/beach.jpeg",
+    #     "../../../data/pic/ocr.jpeg",
+    #     "../../../data/pic/lane.jpg",
+    # ]
+    image_dir = ["../../../data/pic/beach.jpeg"]
+    image_num = len(image_dir) if image_dir else 0
 
     prompt = "请描述图片内容。"
     logger.success("question:")
