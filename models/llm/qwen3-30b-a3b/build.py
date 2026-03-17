@@ -25,6 +25,7 @@ import psutil
 import threading
 import multiprocessing
 import argparse
+import glob
 
 import logging
 
@@ -215,7 +216,6 @@ def get_args() -> argparse.Namespace:
 def build(
     model_name,
     model_dir,
-    model_path,
     output_dir,
     profile,
     ncore,
@@ -253,7 +253,8 @@ def build(
 
     start = time.time()
     print(f"\n===> {model_name} build start... \n kwargs:{kwargs}")
-    decode_model = os.path.join(model_dir, model_path)
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -292,9 +293,10 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         print(
             f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
         )
-        input_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy"
+        input_files = glob.glob(
+            f"{model_dir}/**/hmquant_*{sanitize_name(input_name)}*.npy", recursive=True
         )
+        input_data_path = os.path.abspath(input_files[0]) if input_files else ""
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
         print(
@@ -330,9 +332,10 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         print(
             f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
         )
-        output_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy"
+        output_files = glob.glob(
+            f"{model_dir}/**/hmquant_*{sanitize_name(output_name)}*.npy", recursive=True
         )
+        output_data_path = os.path.abspath(output_files[0]) if output_files else ""
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
             golden_output = np.concatenate(
@@ -395,11 +398,9 @@ if __name__ == "__main__":
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
         build(
-            "qwen3_prefill",
-            model_dir,
-            model_path,
+            f"{model_name}_prefill",
+            os.path.join(model_dir, "prefill"),
             output_dir,
             profile,
             ncore,
@@ -409,11 +410,9 @@ if __name__ == "__main__":
             flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
-        model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
         build(
-            "qwen3_decode",
-            model_dir,
-            model_path,
+            f"{model_name}_decode",
+            os.path.join(model_dir, "decoder"),
             output_dir,
             profile,
             ncore,
@@ -427,8 +426,8 @@ if __name__ == "__main__":
     # test model
     if args.stage == "test" or args.stage == "all":
         part_dir = os.path.join(model_dir, "prefill")
-        test("qwen3_prefill", part_dir, output_dir, profile, prefix=model_name)
+        test(f"{model_name}_prefill", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "decoder")
-        test("qwen3_decode", part_dir, output_dir, profile, prefix=model_name)
+        test(f"{model_name}_decode", part_dir, output_dir, profile, prefix=model_name)
 
     memory_monitor.stop()
