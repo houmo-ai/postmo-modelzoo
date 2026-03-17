@@ -173,7 +173,8 @@ class Qwen3Asr:
 
         decode_start = time.perf_counter()
         tokens_generated = 0
-
+        total_decode_time = 0
+        
         for _ in range(self.max_new_tokens):
             # Use numpy array for token embedding lookup
             token_tensor = torch.tensor([[generated_ids[-1]]], device=self.device)
@@ -183,9 +184,12 @@ class Qwen3Asr:
             self.decode.set_input(self.decode.get_input_name(1), valid_length_np)
             self.decode.set_input(self.decode.get_input_name(2), current_length_np)
 
+            t0 = time.time()
             self.decode.run()
             self.decode.sync()
-
+            t1 = time.time() - t0
+            total_decode_time += t1
+            logger.info(f"Loop {_} Single Decode time: {t1 * 1000:.3f} ms")
             # Process output directly with numpy
             decode_outputs = self.decode.get_output(self.decode.get_output_name(0)).numpy()
             next_id = int(np.argmax(decode_outputs, axis=-1).item())
@@ -200,7 +204,7 @@ class Qwen3Asr:
                 break
 
         decode_time = time.perf_counter() - decode_start
-
+        logger.info(f"total Decode time: {total_decode_time * 1000:.3f} ms")
         result = self.processor.tokenizer.decode(generated_ids, skip_special_tokens=True)
         match = re.search(r'(?<=<asr_text>)[\s\S]*', result)
         if match:
@@ -262,10 +266,11 @@ class Qwen3Asr:
         self.prefill.set_input(self.prefill.get_input_name(0), prefill_embeds.numpy())
         self.prefill.set_input(self.prefill.get_input_name(1), valid_length_np)
         self.prefill.set_input(self.prefill.get_input_name(2), current_length_np)
-
+        t0 = time.time()
         self.prefill.run()
         self.prefill.sync()
-
+        t1 = time.time() - t0
+        logger.info(f"Prefill time: {t1 * 1000:.3f} ms.")
         last_hidden_state = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
         return last_hidden_state, L
 
@@ -341,7 +346,7 @@ class Qwen3Asr:
         all_ids_len = prefill_ids_len + tokens_generated
 
         # Calculate RTF (Real Time Factor)
-        rtf = audio_duration / infer_time
+        rtf = infer_time / audio_duration
 
         # Performance statistics
         logger.success("=" * 60)

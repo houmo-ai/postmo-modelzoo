@@ -371,18 +371,18 @@ class SenseVoiceSmall:
             if raw_result:
                 logger.info(f"Raw Output: {text}")
             logger.info(f"Clean Text: {clean_text}")
-            rtf = audio_duration / t1
+            rtf =  t1 / audio_duration
             logger.success(f"Performance: ")
             logger.success(f"  audio_duration: {audio_duration :.2f} ms")
             logger.success(f"  infer time {t1 :.2f} ms")
-            logger.success(f"  rtf(audio_duration / infer_time): {rtf:.2f}")
+            logger.success(f"  rtf(infer_time/ audio_duration): {rtf:.2f}")
 
 
 if __name__ == "__main__":
-    import hmatc.python.smi as smi
     args = get_args()
     smi_monitor = None
     if args.device_monitor:
+        import hmatc.python.smi as smi
         smi_monitor = smi.DeviceMonitor(0, 100)
         smi_monitor.start()
     if HOUMO_TARGET == "xh2":
