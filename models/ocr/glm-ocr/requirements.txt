@@ -2,4 +2,4 @@
 transformers==5.1.0
 compressed_tensors
 protobuf==6.33.5
-tokenizers==0.23.0
+tokenizers==0.22.2
