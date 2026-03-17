@@ -410,9 +410,20 @@ if __name__ == "__main__":
             flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
+
+        decode_dirs = sorted(
+            path
+            for path in glob.glob(os.path.join(model_dir, "*decode*"))
+            if os.path.isdir(path)
+        )
+        if not decode_dirs:
+            raise FileNotFoundError(
+                f'No subdirectory containing "decode" found under: {model_dir}'
+            )
+        decode_dir = os.path.abspath(decode_dirs[0])
         build(
             f"{model_name}_decode",
-            os.path.join(model_dir, "decoder"),
+            decode_dir,
             output_dir,
             profile,
             ncore,
@@ -425,9 +436,19 @@ if __name__ == "__main__":
 
     # test model
     if args.stage == "test" or args.stage == "all":
-        part_dir = os.path.join(model_dir, "prefill")
-        test(f"{model_name}_prefill", part_dir, output_dir, profile, prefix=model_name)
-        part_dir = os.path.join(model_dir, "decoder")
-        test(f"{model_name}_decode", part_dir, output_dir, profile, prefix=model_name)
+        test(
+            f"{model_name}_prefill",
+            os.path.join(model_dir, "prefill"),
+            output_dir,
+            profile,
+            prefix=model_name,
+        )
+        test(
+            f"{model_name}_decode",
+            decode_dir,
+            output_dir,
+            profile,
+            prefix=model_name,
+        )
 
     memory_monitor.stop()
