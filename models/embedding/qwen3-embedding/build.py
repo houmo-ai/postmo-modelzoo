@@ -247,7 +247,7 @@ def build(
 
     start = time.time()
     print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
-    onnx_files = glob.glob(f"{model_dir}/hmquant_*_with_act.onnx")
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
     decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,

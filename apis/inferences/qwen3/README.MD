@@ -249,9 +249,9 @@ Qwen3 的 C++推理样例依赖以下三方库：
 
 编译和运行脚本支持的平台及说明如下：
 
--   run_linux.sh 支持一键编译和运行如下平台的 C++样例：
+-   run.sh 支持一键编译和运行如下平台的 C++样例：
     1. Linux_x86_64_xh2
--   run_win.bat 支持一键编译如下平台的 C++样例：
+-   run.bat 支持一键编译如下平台的 C++样例：
     1. win11_x64_xh2
     -   run.bat 会同时运行 win11 的 python 和 c++样例，运行 C++样例依赖 libhal_xh2a.dll 和 tcim_runtime_lite.dll。
 -   build_ndk.sh 支持一键编译如下平台的 C++样例:
@@ -271,8 +271,8 @@ Qwen3 的 C++推理样例依赖以下三方库：
 .
 ├── CMakeLists.txt              CMake配置文件
 ├── README.MD
-├── run_linux.sh                编译和运行脚本，支持平台参考4.3节
-├── run_win.bat                 win11编译和运行C++脚本,需要提前使用run.bat下载好模型
+├── run.sh                      编译和运行脚本，支持平台参考4.3节
+├── run.bat                     win11编译和运行C++脚本,需要提前使用run.bat下载好模型
 ├── get_model.py                获取运行所需要的模型文件和三方库
 ├── include                     相关头文件
 ├── HmQwenInfer.cc              qwen3 c++推理类封装

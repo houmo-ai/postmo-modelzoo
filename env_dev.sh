@@ -65,6 +65,7 @@ fi
 
 PRINT_YELLOW "[Please check the following path. Unset the env and source again if you want to use the default path!]"
 PRINT_GREEN "HOUMO_TARGET is $HOUMO_TARGET"
+PRINT_GREEN "HOUMO_VERSION is $HOUMO_VERSION"
 PRINT_GREEN "HOUMO_PATH is $HOUMO_PATH"
 PRINT_GREEN "HMCC_PATH is $HMCC_PATH"
 PRINT_GREEN "TCIM_RUNTIME_PATH is $TCIM_RUNTIME_PATH"

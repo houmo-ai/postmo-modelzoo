@@ -1,1 +1,0 @@
-model_id,model_name,model_size,prefill_length,context_length,version,target,device_num,core_num,publish_time,model_md5sum,quant_model_md5sum,model_path,quant_model_path
