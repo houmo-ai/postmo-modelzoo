@@ -25,14 +25,161 @@ import os
 import time
 import sys
 import torch
+import numpy as np
 import tcim_lite as tcim
 from loguru import logger
 import soundfile as sf
+from typing import List, Tuple, Optional
 from transformers import WhisperForConditionalGeneration, WhisperProcessor
 
 MAX_GEN_LEN = 448
 CACHE_MAX_LEN = 1280
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+
+
+class SamplingManager:
+    def __init__(
+        self,
+        temperature: float = 1.0,
+        top_k: Optional[int] = None,
+        top_p: float = 1.0,
+        repetition_penalty: float = 1.0,
+        min_tokens_to_keep: int = 1,
+    ):
+        self.temperature = temperature
+        self.top_k = top_k
+        self.top_p = top_p
+        self.repetition_penalty = repetition_penalty
+        self.min_tokens_to_keep = min_tokens_to_keep
+
+    def softmax(self, x: np.ndarray) -> np.ndarray:
+        exp_x = np.exp(x - np.max(x))
+        return exp_x / np.sum(exp_x)
+
+    def apply_temperature(self, logits: np.ndarray) -> np.ndarray:
+        if self.temperature <= 0:
+            raise ValueError("Temperature must larger than 0")
+
+        return logits / self.temperature
+
+    def apply_repetition_penalty(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        if self.repetition_penalty == 1.0 or not previous_tokens:
+            return logits
+
+        adjusted_logits = logits.copy()
+        for token_id in set(previous_tokens):
+            if 0 <= token_id < len(logits):
+                if logits[token_id] < 0:
+                    adjusted_logits[token_id] = (
+                        logits[token_id] * self.repetition_penalty
+                    )
+                else:
+                    adjusted_logits[token_id] = (
+                        logits[token_id] / self.repetition_penalty
+                    )
+
+        return adjusted_logits
+
+    def apply_top_k(self, probs: np.ndarray) -> np.ndarray:
+        if self.top_k is None or self.top_k <= 0:
+            return probs
+
+        top_k = min(self.top_k, len(probs))
+
+        if top_k <= 0:
+            return probs
+
+        top_k_indices = np.argpartition(probs, -top_k)[-top_k:]
+
+        mask = np.ones_like(probs, dtype=bool)
+        mask[top_k_indices] = False
+        filtered_probs = probs.copy()
+        filtered_probs[mask] = 0
+
+        if np.sum(filtered_probs) > 0:
+            normalized_probs = filtered_probs / np.sum(filtered_probs)
+        else:
+            normalized_probs = np.ones_like(probs) / len(probs)
+
+        return normalized_probs
+
+    def apply_top_p(self, probs: np.ndarray) -> np.ndarray:
+        if self.top_p >= 1.0:
+            return probs
+
+        sorted_indices = np.argsort(probs)[::-1]
+        sorted_probs = probs[sorted_indices]
+
+        cumulative_probs = np.cumsum(sorted_probs)
+
+        cutoff_indices = np.where(cumulative_probs >= self.top_p)[0]
+
+        if len(cutoff_indices) > 0:
+            cutoff_index = cutoff_indices[0]
+            if cutoff_index < self.min_tokens_to_keep - 1:
+                cutoff_index = self.min_tokens_to_keep - 1
+
+            selected_indices = sorted_indices[: cutoff_index + 1]
+        else:
+            selected_indices = sorted_indices
+
+        mask = np.ones_like(probs, dtype=bool)
+        mask[selected_indices] = False
+        filtered_probs = probs.copy()
+        filtered_probs[mask] = 0
+
+        if np.sum(filtered_probs) > 0:
+            normalized_probs = filtered_probs / np.sum(filtered_probs)
+        else:
+            normalized_probs = np.ones_like(probs) / len(probs)
+
+        return normalized_probs
+
+    def process_logits(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        processed_logits = logits.copy()
+        # 1. apply repetition penalty
+        processed_logits = self.apply_repetition_penalty(
+            processed_logits, previous_tokens
+        )
+
+        # 2. apply softmax
+        # not using softmax in case of long time cost
+        probs = processed_logits
+        # probs = self.softmax(processed_logits)
+
+        # 3. apply top-k
+        probs = self.apply_top_k(probs)
+
+        # 4. apply top-p
+        probs = self.apply_top_p(probs)
+
+        # 5. apply temperature
+        probs = self.apply_temperature(probs)
+        return probs
+
+    def sample(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> int:
+        logits = logits[0].numpy()
+        if HOUMO_TARGET == "xh2":
+            logits = logits[0]
+        probs = self.process_logits(logits, previous_tokens)
+        if np.all(probs == 0):
+            probs = np.ones_like(probs) / len(probs)
+
+        # sampled_index = np.random.choice(len(probs), p=probs)
+        sampled_index = probs.argmax(-1)
+
+        return np.array([[sampled_index]])
+
+    def get_processed_probs(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        return self.process_logits(logits, previous_tokens)
 
 
 class HmWhisper:
@@ -122,15 +269,14 @@ def stream_print(text):
     sys.stdout.flush()
 
 
-# def show_statics():
-
-
 def asr(whisper, processor, audio_array):
 
     # 1. prepare config
     num_heads = 20
     head_dim = 64
     num_decode_layers = 4
+    generated_ids = []
+    sampling_manager = SamplingManager(top_k=None, top_p=1.0, repetition_penalty=1.1)
     start_time = time.time()
 
     # get prompt Tokens ID
@@ -216,11 +362,14 @@ def asr(whisper, processor, audio_array):
 
     # === step 2: Decode ===
     next_token = torch.argmax(logits[:, -1, :], dim=-1).item()
+    generated_ids.append(next_token)
     logger.success("transcription:\n")
     ttft_time = time.time() - start_time
     sys.stdout.write("\033[2J\033[H")
     sys.stdout.flush()
     while step < MAX_GEN_LEN:
+        if type(next_token) is not torch.Tensor:
+            next_token = torch.tensor(next_token)
         all_tokens_list.append(next_token)
 
         current_tensor = torch.tensor([all_tokens_list])
@@ -259,10 +408,11 @@ def asr(whisper, processor, audio_array):
         k_cache = out[1 : 1 + num_decode_layers]
         v_cache = out[1 + num_decode_layers : 1 + 2 * num_decode_layers]
 
-        next_token = torch.argmax(logits[:, -1, :], dim=-1).item()
+        next_token = sampling_manager.sample(logits, generated_ids)
+        generated_ids.append(next_token.item())
         step += 1
     print("\033[0m")
-    return len(decoded_text), ttft_time
+    return len(decoded_text), ttft_time, decoded_text
 
 
 if __name__ == "__main__":
@@ -299,8 +449,29 @@ if __name__ == "__main__":
 if __name__ == "__main__":
     whisper = HmWhisper(args.encoder_path, args.decoder_path, args.prefill_path)
     processor = WhisperProcessor.from_pretrained(args.tokenizer_path)
-    audio_array, _ = sf.read(args.audio)
-    output_tokens, ttft_time = asr(whisper, processor, audio_array)
+    results = ""
+    output_tokens = 0
+    audio_array, sr = sf.read(args.audio)
+    # 20 chunks per second, chunk_size
+    chunk_size = int(20 * sr)
+    total_samples = len(audio_array)
+    chunks = []
+
+    for start in range(0, total_samples, chunk_size):
+        end = start + chunk_size
+        chunk = audio_array[start:end]
+        if len(chunk) < chunk_size:
+            chunk = np.pad(chunk, (0, chunk_size - len(chunk)), mode="constant")
+        chunks.append(chunk)
+    chunks_array = np.array(chunks)
+
+    for i, chunk in enumerate(chunks):
+        output_token, current_ttft, decoded_text = asr(whisper, processor, chunk)
+        results += decoded_text
+        output_tokens += output_token
+        ttft_time = current_ttft if i == 0 else ttft_time
+
+    logger.success(f"Final Transcription:\n{results}")
     logger.success(
         f"Output {output_tokens} tokens, Decode Cost {whisper.decoder_time*1000:.3f} ms"
     )
