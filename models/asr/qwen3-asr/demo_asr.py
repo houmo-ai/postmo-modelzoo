@@ -31,7 +31,6 @@ from loguru import logger
 import torch
 import torch.nn.functional as F
 from transformers import AutoConfig
-from xhquant.api import HMONNXInference as InferenceEngine
 from qwen_asr.core.transformers_backend import (
     Qwen3ASRProcessor,
 )
@@ -39,6 +38,24 @@ from qwen_asr.core.transformers_backend import (
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+
+
+def is_valid_char(cp):
+    """Check if a code point is a valid Chinese or English character."""
+    if (
+        (cp >= 0x4E00 and cp <= 0x9FFF)
+        or (cp >= 0x3400 and cp <= 0x4DBF)
+        or (cp >= 0x20000 and cp <= 0x2A6DF)
+        or (cp >= 0x2A700 and cp <= 0x2B73F)
+        or (cp >= 0x2B740 and cp <= 0x2B81F)
+        or (cp >= 0x2B820 and cp <= 0x2CEAF)
+        or (cp >= 0xF900 and cp <= 0xFAFF)
+        or (cp >= 0x2F800 and cp <= 0x2FA1F)
+        or (0x0041 <= cp and cp <= 0x005A)
+        or (0x0061 <= cp and cp <= 0x007A)
+    ):
+        return True
+    return False
 
 
 def get_args() -> argparse.Namespace:
@@ -60,7 +77,7 @@ def get_args() -> argparse.Namespace:
         "--encode_path",
         dest="encode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "Qwen3-ASR-1.7B_Encoder_xh2a_w8a8_sefp.onnx"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3_asr_encode.hmm"),
         help="houmo encode model path",
     )
     parser.add_argument(
@@ -90,9 +107,9 @@ def get_args() -> argparse.Namespace:
 class Qwen3Asr:
     def __init__(self, encode_path, decode_path, prefill_path, processor_dir, embedding_path):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.encode = InferenceEngine(str(encode_path))
-        self.encode.to(str(self.device))
         weight_manager = tcim.runtime.WeightManager(0)
+        option1 = tcim.runtime.Option(weight_manager)
+        self.encode = tcim.runtime.load(encode_path, option=option1)
         logger.info("encode model loaded")
         option2 = tcim.runtime.Option(weight_manager)
         self.prefill = tcim.runtime.load(prefill_path, option=option2)
@@ -120,48 +137,60 @@ class Qwen3Asr:
         self.processor = Qwen3ASRProcessor.from_pretrained(processor_dir, fix_mistral_regex=True)
         self.config = AutoConfig.from_pretrained(processor_dir, trust_remote_code=True)
 
-        self.embedding_weight = torch.load(embedding_path, map_location=self.device)
+        embedding_tensor = torch.load(embedding_path, map_location=self.device)
         if HOUMO_TARGET == "xh2":
-            self.embedding_weight = self.embedding_weight["weight"].float()
-        logger.info(f"embedding weight shape: {self.embedding_weight.shape}")
+            embedding_tensor = embedding_tensor["weight"].float()
+        # Store as numpy for direct use in inference
+        self.embedding_weight = embedding_tensor.cpu().numpy()
 
         # Link KV caches between prefill and decode
         for i in range(3, 2 * self.nblocks + 3):
             cache = self.prefill.get_input(self.prefill.get_input_name(i))
             self.decode.set_input(self.decode.get_input_name(i), cache)
 
+        self.all_features_len = 0
+        self.max_feature_one_loop = self.encode.get_input_info(
+            self.encode.get_input_name(0)
+        ).shape[2]
+        self.loop_count = 0
+        
     def run_encode(self, inputs):
-        inputs['input_features'] = inputs['input_features'].float()
-        origin_feature_lens = inputs['feature_attention_mask'].sum(dim=-1).to(torch.int32)
+        encode_prep_start = time.perf_counter()
+        # Convert input features to float32 numpy array
+        input_features = inputs["input_features"].float().numpy()
+        # Calculate feature lengths and convert to int
+        origin_feature_lens = input_features.shape[2]
 
-        pad_width = (0, 3000 - inputs['input_features'].shape[2])
-
-        inputs['input_features'] = F.pad(
-            inputs['input_features'],
-            pad_width,
+        pad_width = (0, self.max_feature_one_loop - origin_feature_lens)
+        input_features = np.pad(
+            input_features,
+            ((0, 0), (0, 0), pad_width),
             mode='constant',
-            value=0.0
+            constant_values=0.0
         )
 
-        inputs['feature_attention_mask'] = F.pad(
-            inputs['feature_attention_mask'],
-            pad_width,
-            mode='constant',
-            value=0
-        )
+        encode_prep_time = time.perf_counter() - encode_prep_start
 
-        logger.info(f"encoder input shape: {inputs['input_features'].shape}, feature_attention_mask shape: {inputs['feature_attention_mask'].shape}")
+        encode_infer_start = time.perf_counter()
+        self.encode.set_input(self.encode.get_input_name(0), input_features)
+        self.encode.set_input(self.encode.get_input_name(1), np.array([origin_feature_lens], dtype=np.int32))
 
-        if not os.path.exists("outputs.pt"):
-            outputs = self.encode.run({
-                "input_features": inputs['input_features'].to(torch.float16),
-                "feature_lens": origin_feature_lens,
-            })
-            torch.save(outputs.to("cpu"), "outputs.pt")
-        else:
-            outputs = torch.load("outputs.pt", map_location=torch.device('cpu')).to(self.device)
+        self.encode.run()
+        self.encode.sync()
+        encode_infer_time = time.perf_counter() - encode_infer_start
 
-        return outputs, origin_feature_lens
+        encode_output_start = time.perf_counter()
+        outputs = self.encode.get_output(self.encode.get_output_name(0))
+        # Ensure outputs is numpy array
+        if hasattr(outputs, 'numpy'):
+            outputs = outputs.numpy()
+        encode_output_time = time.perf_counter() - encode_output_start
+
+        # logger.info(f"Encode prep time: {encode_prep_time * 1000:.3f} ms, "
+        #             f"infer time: {encode_infer_time * 1000:.3f} ms, "
+        #             f"output time: {encode_output_time * 1000:.3f} ms")
+
+        return outputs, origin_feature_lens, encode_prep_time, encode_infer_time, encode_output_time
 
     def run_decode(self, next_token_id, L):
         # Use numpy arrays directly to avoid repeated conversions
@@ -174,24 +203,31 @@ class Qwen3Asr:
         decode_start = time.perf_counter()
         tokens_generated = 0
         total_decode_time = 0
-        
-        for _ in range(self.max_new_tokens):
-            # Use numpy array for token embedding lookup
-            token_tensor = torch.tensor([[generated_ids[-1]]], device=self.device)
-            next_embed = F.embedding(token_tensor, self.embedding_weight)
 
-            self.decode.set_input(self.decode.get_input_name(0), next_embed.numpy())
+        # Sliding window mechanism for streaming output
+        slide_len = 10
+        skip_tokens = 0
+        last_response = ""
+
+        for _ in range(self.max_new_tokens):
+            # Direct numpy embedding lookup - avoid torch conversion
+            token_id = generated_ids[-1]
+            next_embed = self.embedding_weight[token_id:token_id+1, :]
+            next_embed = next_embed.reshape(1, 1, -1)
+
+            self.decode.set_input(self.decode.get_input_name(0), next_embed)
             self.decode.set_input(self.decode.get_input_name(1), valid_length_np)
             self.decode.set_input(self.decode.get_input_name(2), current_length_np)
 
-            t0 = time.time()
+            t0 = time.perf_counter()
             self.decode.run()
             self.decode.sync()
-            t1 = time.time() - t0
+            t1 = time.perf_counter() - t0
             total_decode_time += t1
-            logger.info(f"Loop {_} Single Decode time: {t1 * 1000:.3f} ms")
             # Process output directly with numpy
-            decode_outputs = self.decode.get_output(self.decode.get_output_name(0)).numpy()
+            decode_outputs = self.decode.get_output(self.decode.get_output_name(0))
+            if hasattr(decode_outputs, 'numpy'):
+                decode_outputs = decode_outputs.numpy()
             next_id = int(np.argmax(decode_outputs, axis=-1).item())
             generated_ids.append(next_id)
 
@@ -199,30 +235,64 @@ class Qwen3Asr:
             valid_length_np[0] += 1
             tokens_generated += 1
 
+            # Sliding window output
+            if len(generated_ids) > slide_len:
+                decode_response = self.processor.tokenizer.decode(
+                    generated_ids[-(slide_len + 1 + skip_tokens):],
+                    skip_special_tokens=True
+                )
+                # Extract ASR text if pattern exists
+                match = re.search(r'(?<=<asr_text>)[\s\S]*', decode_response)
+                if match:
+                    decode_response = match.group()
+                    # Get new content after last_response
+                    new_content = decode_response[len(last_response):]
+                    if new_content and is_valid_char(ord(new_content[-1])):
+                        print(new_content, end='', flush=True)
+                        last_response = self.processor.tokenizer.decode(
+                            generated_ids[-slide_len:],
+                            skip_special_tokens=True
+                        )
+                        # Update last_response to extract ASR text if pattern exists
+                        match_last = re.search(r'(?<=<asr_text>)[\s\S]*', last_response)
+                        if match_last:
+                            last_response = match_last.group()
+                        skip_tokens = 0
+                    else:
+                        skip_tokens += 1
+
             # Stop on EOS
             if next_id == eos_token_id:
                 break
 
         decode_time = time.perf_counter() - decode_start
-        logger.info(f"total Decode time: {total_decode_time * 1000:.3f} ms")
+        avg_decode_time = total_decode_time / tokens_generated if tokens_generated > 0 else 0
+
+        # Final output for remaining tokens
         result = self.processor.tokenizer.decode(generated_ids, skip_special_tokens=True)
         match = re.search(r'(?<=<asr_text>)[\s\S]*', result)
         if match:
-            print(match.group())
+            final_text = match.group()
+            new_content = final_text[len(last_response):]
+            if new_content:
+                print(new_content, end='', flush=True)
 
-        return result, tokens_generated, decode_time
+        return result, tokens_generated, decode_time, total_decode_time, avg_decode_time
 
     def run_prefill(self, origin_feature_lens, inputs, audio_embeds):
-        T_out = self._get_feat_extract_output_lengths(origin_feature_lens).item()
+        prefill_prep_start = time.perf_counter()
+        T_out = self._get_feat_extract_output_lengths(origin_feature_lens)
         audio_embeds = audio_embeds[:, :T_out, :]
 
-        logger.info(f"origin_feature_lens: {origin_feature_lens}, T_out: {T_out}, audio_embeds shape after trim: {audio_embeds.shape}")
 
-        if audio_embeds.dim() == 2:
-            audio_embeds = audio_embeds.unsqueeze(0)
+        if audio_embeds.ndim == 2:
+            audio_embeds = audio_embeds[np.newaxis, :, :]
 
-        text_input_ids = inputs['input_ids']
-        text_embeds = F.embedding(text_input_ids, self.embedding_weight)
+        text_input_ids = inputs['input_ids'].cpu().numpy()
+        # Direct numpy embedding lookup
+        text_embeds = self.embedding_weight[text_input_ids.flatten(), :].reshape(
+            text_input_ids.shape[0], text_input_ids.shape[1], -1
+        )
 
         tokenizer = self.processor.tokenizer
         if "<|audio_pad|>" in tokenizer.get_vocab():
@@ -230,49 +300,55 @@ class Qwen3Asr:
         else:
             audio_pad_id = tokenizer.encode("<|audio_pad|>", add_special_tokens=False)[0]
 
-        pad_indices = (text_input_ids == audio_pad_id).nonzero(as_tuple=True)[1]
+        pad_indices = np.where(text_input_ids == audio_pad_id)[1]
 
         if len(pad_indices) > 0:
-            start_idx = pad_indices[0].item()
-            end_idx = pad_indices[-1].item()
-            final_inputs_embeds = torch.cat([
+            start_idx = pad_indices[0]
+            end_idx = pad_indices[-1]
+            final_inputs_embeds = np.concatenate([
                 text_embeds[:, :start_idx, :],
                 audio_embeds,
                 text_embeds[:, end_idx+1:, :]
-            ], dim=1)
+            ], axis=1)
         else:
             final_inputs_embeds = text_embeds
 
         text_config = self.config.thinker_config.text_config
-        num_layers = text_config.num_hidden_layers
-        num_kv_heads = text_config.num_key_value_heads
         hidden_size = text_config.hidden_size
-        head_dim = text_config.head_dim
-        cache_len = 2048
 
         seq_len = final_inputs_embeds.shape[1]
         L = min(seq_len, self.max_prefill)
-
-        prefill_embeds = torch.zeros((1, self.max_prefill, hidden_size), dtype=torch.float16, device=self.device)
-        prefill_embeds[:, :L, :] = final_inputs_embeds[:, :L, :].to(torch.float16).to(self.device)
+        # Create numpy array directly in float16
+        prefill_embeds = np.zeros((1, self.max_prefill, hidden_size), dtype=np.float16)
+        # Convert final_inputs_embeds to float16 if needed
+        if final_inputs_embeds.dtype != np.float16:
+            final_inputs_embeds = final_inputs_embeds.astype(np.float16)
+        prefill_embeds[:, :L, :] = final_inputs_embeds[:, :L, :]
 
         valid_length_np = np.array([0], dtype=np.int32)
         current_length_np = np.array([L], dtype=np.int32)
 
-        # Move to CPU before numpy() - fix for GPU runtime
-        if "cuda" in str(self.device):
-            prefill_embeds = prefill_embeds.cpu()
-
-        self.prefill.set_input(self.prefill.get_input_name(0), prefill_embeds.numpy())
+        self.prefill.set_input(self.prefill.get_input_name(0), prefill_embeds)
         self.prefill.set_input(self.prefill.get_input_name(1), valid_length_np)
         self.prefill.set_input(self.prefill.get_input_name(2), current_length_np)
-        t0 = time.time()
+        prefill_prep_time = time.perf_counter() - prefill_prep_start
+
+        prefill_infer_start = time.perf_counter()
         self.prefill.run()
         self.prefill.sync()
-        t1 = time.time() - t0
-        logger.info(f"Prefill time: {t1 * 1000:.3f} ms.")
-        last_hidden_state = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
-        return last_hidden_state, L
+        prefill_infer_time = time.perf_counter() - prefill_infer_start
+
+        prefill_output_start = time.perf_counter()
+        last_hidden_state = self.prefill.get_output(self.prefill.get_output_name(0))
+        if hasattr(last_hidden_state, 'numpy'):
+            last_hidden_state = last_hidden_state.numpy()
+        prefill_output_time = time.perf_counter() - prefill_output_start
+
+        # logger.info(f"Prefill prep time: {prefill_prep_time * 1000:.3f} ms, "
+        #             f"infer time: {prefill_infer_time * 1000:.3f} ms, "
+        #             f"output time: {prefill_output_time * 1000:.3f} ms")
+
+        return last_hidden_state, L, prefill_prep_time, prefill_infer_time, prefill_output_time
 
     def get_nblocks(self):
         """Calculate number of transformer blocks from input tensor names."""
@@ -290,7 +366,7 @@ class Qwen3Asr:
         input_lengths_leave = input_lengths % 100
         feat_lengths = (input_lengths_leave - 1) // 2 + 1
         output_lengths = ((feat_lengths - 1) // 2 + 1 - 1) // 2 + 1 + (input_lengths // 100) * 13
-        return output_lengths
+        return int(output_lengths)
 
     def run(self, audio_path):
         total_start = time.perf_counter()
@@ -312,41 +388,67 @@ class Qwen3Asr:
             {"role": "user", "content": [{"type": "audio", "audio": "placeholder"}]},
         ]
         prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-        inputs = self.processor(text=prompt, audio=audio, return_tensors="pt", padding=True)
-        inputs = inputs.to(self.device)
+        all_inputs = self.processor(text=prompt, audio=audio, return_tensors="pt", padding=True)
+        all_inputs = all_inputs.to(self.device)
+        for k, v in all_inputs.items():
+            print(k, v.shape)
+        self.all_features_lens = all_inputs["input_features"].shape[2]
+        self.loop_count = (self.all_features_lens // self.max_feature_one_loop) + 1
+        
         prep_time = time.perf_counter() - prep_start
 
+        # Accumulate performance statistics
+        total_encode_prep_time = 0.0
+        total_encode_infer_time = 0.0
+        total_encode_output_time = 0.0
+        total_prefill_prep_time = 0.0
+        total_prefill_infer_time = 0.0
+        total_prefill_output_time = 0.0
+        total_decode_time = 0.0
+        total_decode_infer_time = 0.0
+        total_tokens_generated = 0
+        total_prefill_ids_len = 0
+
         # Run encode
-        encode_start = time.perf_counter()
-        outputs, origin_feature_lens = self.run_encode(inputs)
-        audio_embeds = outputs.to(self.device)
-        encode_time = time.perf_counter() - encode_start
-        logger.info(f"audio_embeds shape: {audio_embeds.shape}")
+        for loop_idx in range(self.loop_count):
+            start_idx = loop_idx * self.max_feature_one_loop
+            end_idx = min(start_idx + self.max_feature_one_loop, self.all_features_lens)
+            inputs_features = all_inputs["input_features"][:, :, start_idx:end_idx]
+            inputs = {
+                "input_features": inputs_features,
+                "input_ids" : all_inputs["input_ids"],
+            }
+            outputs, origin_feature_lens, encode_prep_time, encode_infer_time, encode_output_time = self.run_encode(inputs)
+            audio_embeds = outputs
+            last_hidden_state, L, prefill_prep_time, prefill_infer_time, prefill_output_time = self.run_prefill(origin_feature_lens, inputs, audio_embeds)
 
-        # Run prefill
-        prefill_start = time.perf_counter()
-        last_hidden_state, L = self.run_prefill(origin_feature_lens, inputs, audio_embeds)
-        prefill_time = time.perf_counter() - prefill_start
+            next_token_id = int(np.argmax(last_hidden_state, axis=-1).item())
+            result, tokens_generated, decode_time, decode_infer_time, avg_decode_time = self.run_decode(next_token_id, L)
 
-        # Get first token
-        first_token_start = time.perf_counter()
-        next_token_id = int(np.argmax(last_hidden_state, axis=-1).item())
-        first_token_time = time.perf_counter() - first_token_start
+            # Accumulate timing
+            total_encode_prep_time += encode_prep_time
+            total_encode_infer_time += encode_infer_time
+            total_encode_output_time += encode_output_time
+            total_prefill_prep_time += prefill_prep_time
+            total_prefill_infer_time += prefill_infer_time
+            total_prefill_output_time += prefill_output_time
+            total_decode_time += decode_time
+            total_decode_infer_time += decode_infer_time
+            total_tokens_generated += tokens_generated
+            total_prefill_ids_len += L
 
-        # Calculate TTFT (Time To First Token)
-        ttft_time = encode_time + prefill_time + first_token_time
-
-        # Run decode
-        result, tokens_generated, decode_time = self.run_decode(next_token_id, L)
+        # Print newline after streaming output
+        print()
 
         # Calculate total time
         total_time = time.perf_counter() - total_start
         infer_time = total_time  # Total inference time in seconds
-        prefill_ids_len = L
-        all_ids_len = prefill_ids_len + tokens_generated
 
         # Calculate RTF (Real Time Factor)
         rtf = infer_time / audio_duration
+
+        # Calculate average decode time per token
+        avg_decode_time = total_decode_infer_time / total_tokens_generated if total_tokens_generated > 0 else 0
 
         # Performance statistics
         logger.success("=" * 60)
@@ -355,17 +457,30 @@ class Qwen3Asr:
         logger.success(f"Audio duration: {audio_duration * 1000:.2f} ms ({audio_duration:.2f} s)")
         logger.success(f"Audio loading time: {audio_load_time * 1000:.3f} ms")
         logger.success(f"Input preparation time: {prep_time * 1000:.3f} ms")
-        logger.success(f"Encode time: {encode_time * 1000:.3f} ms")
-        logger.success(f"Prefill time: {prefill_time * 1000:.3f} ms")
-        logger.success(f"First token selection time: {first_token_time * 1000:.3f} ms")
-        logger.success(f"Output {all_ids_len} tokens ({prefill_ids_len} prefill + {tokens_generated} generated)")
-        logger.success(f"TTFT (Time to First Token): {ttft_time * 1000:.3f} ms")
-        logger.success(f"Decode Cost: {decode_time * 1000:.3f} ms")
-        logger.success(f"Decode Speed: {tokens_generated / decode_time:.2f} tokens/s")
-        if tokens_generated > 0:
-            logger.success(f"TPOT (Time Per Output Token): {decode_time * 1000 / tokens_generated:.3f} ms/token")
+        logger.success(f"Loop count: {self.loop_count}")
+        logger.success("-" * 60)
+        logger.success(f"Total Encode time: {(total_encode_prep_time + total_encode_infer_time + total_encode_output_time) * 1000:.3f} ms")
+        logger.success(f"  - Encode prep time: {total_encode_prep_time * 1000:.3f} ms")
+        logger.success(f"  - Encode infer time: {total_encode_infer_time * 1000:.3f} ms")
+        logger.success(f"  - Encode output time: {total_encode_output_time * 1000:.3f} ms")
+        logger.success("-" * 60)
+        logger.success(f"Total Prefill time: {(total_prefill_prep_time + total_prefill_infer_time + total_prefill_output_time) * 1000:.3f} ms")
+        logger.success(f"  - Prefill prep time: {total_prefill_prep_time * 1000:.3f} ms")
+        logger.success(f"  - Prefill infer time: {total_prefill_infer_time * 1000:.3f} ms")
+        logger.success(f"  - Prefill output time: {total_prefill_output_time * 1000:.3f} ms")
+        logger.success("-" * 60)
+        logger.success(f"Output {total_tokens_generated} tokens")
+        logger.success(f"Total Decode time(infer + embedding): {total_decode_time * 1000:.3f} ms")
+        logger.success(f"  - Decode infer total time: {total_decode_infer_time * 1000:.3f} ms")
+        logger.success(f"  - Decode infer avg time: {avg_decode_time * 1000:.3f} ms")
+        if total_decode_time > 0:
+            logger.success(f"Decode Speed: {total_tokens_generated / total_decode_time:.2f} tokens/s")
+        if total_tokens_generated > 0:
+            logger.success(f"TPOT (Time Per Output Token): {total_decode_time * 1000 / total_tokens_generated:.3f} ms/token")
+        logger.success("-" * 60)
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
-        logger.success(f"E2E TPS (End-to-End Tokens Per Second): {all_ids_len / total_time:.2f} tokens/s")
+        if total_time > 0:
+            logger.success(f"E2E TPS (End-to-End Tokens Per Second): {total_tokens_generated / total_time:.2f} tokens/s")
         logger.success(f"RTF (Real Time Factor): {rtf:.2f}")
         logger.success("=" * 60)
 

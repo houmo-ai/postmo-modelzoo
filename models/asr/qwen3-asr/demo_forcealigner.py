@@ -55,13 +55,13 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--audio",
         type=str,
-        default="./61-70968-0000.wav",
+        default="../../../data/audio/61-70968-0000.wav",
     )
     parser.add_argument(
         "--encode_path",
         dest="encode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant/encode/hmquant_qwen3_asr_with_act.onnx"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3_asr_encode.hmm"),
         help="houmo encode model path",
     )
     parser.add_argument(
@@ -97,9 +97,9 @@ def get_args() -> argparse.Namespace:
 class Qwen3ForceAligner:
     def __init__(self, encode_path, prefill_path, processor_dir, embedding_path):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.encode = InferenceEngine(str(encode_path))
-        self.encode.to(str(self.device))
         weight_manager = tcim.runtime.WeightManager(0)
+        option1 = tcim.runtime.Option(weight_manager)
+        self.encode = tcim.runtime.load(encode_path, option=option1)
         logger.info("encode model loaded")
         option2 = tcim.runtime.Option(weight_manager)
         self.prefill = tcim.runtime.load(prefill_path, option=option2)
@@ -118,7 +118,6 @@ class Qwen3ForceAligner:
         self.embedding_weight = torch.load(embedding_path, map_location=self.device)
         if HOUMO_TARGET == "xh2":
             self.embedding_weight = self.embedding_weight["weight"].float()
-        logger.info(f"embedding weight shape: {self.embedding_weight.shape}")
 
         self.aligner_processor = Qwen3ForceAlignProcessor()
         self.sample_rate = 16000
@@ -138,22 +137,21 @@ class Qwen3ForceAligner:
             value=0.0
         )
 
-        if not os.path.exists("outputs.pt"):
-            outputs = self.encode.run({
-                "input_features": input_features.to(torch.float16),
-                "feature_lens": origin_feature_lens,
-            })
-            torch.save(outputs.to("cpu"), "outputs.pt")
-        else:
-            outputs = torch.load("outputs.pt", map_location=torch.device('cpu')).to(self.device)
+        self.encode.set_input(self.encode.get_input_name(0), input_features.to(torch.float16).numpy())
+        self.encode.set_input(self.encode.get_input_name(1), origin_feature_lens.numpy())
+        
+        self.encode.run()
+        self.encode.sync()
+
+        outputs = self.encode.get_output(self.encode.get_output_name(0)).numpy()
+
+        outputs = torch.from_numpy(outputs)
 
         return outputs, origin_feature_lens
 
     def run_prefill(self, origin_feature_lens, inputs, audio_embeds):
         T_out = self._get_feat_extract_output_lengths(origin_feature_lens).item()
         audio_embeds = audio_embeds[:, :T_out, :]
-
-        logger.info(f"audio_embeds trimmed: {audio_embeds.shape}")
 
         text_input_ids = inputs['input_ids']
         text_embeds = F.embedding(text_input_ids, self.embedding_weight)
@@ -178,7 +176,6 @@ class Qwen3ForceAligner:
             ],
             dim=1
         )
-        logger.info(f"final_inputs_embeds: {inputs_embeds.shape}")
 
         text_config = self.config.thinker_config.text_config
 
@@ -227,7 +224,6 @@ class Qwen3ForceAligner:
         self.prefill.sync()
 
         prefill_outputs = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
-        logger.info(f"prefill returned {len(prefill_outputs)} outputs")
         return prefill_outputs, text_input_ids
     def _get_feat_extract_output_lengths(self, input_lengths):
         input_lengths_leave = input_lengths % 100
@@ -296,13 +292,11 @@ class Qwen3ForceAligner:
         encoder_outputs, origin_feature_lens = self.run_encode(inputs)
         audio_embeds = encoder_outputs
         encode_time = time.perf_counter() - encode_start
-        logger.info(f"audio_embeds shape: {audio_embeds.shape}")
 
         if isinstance(audio_embeds, np.ndarray):
             audio_embeds = torch.from_numpy(audio_embeds)
         
         audio_embeds = audio_embeds.to(self.device).to(torch.float16)
-        logger.info(f"audio_embeds shape: {audio_embeds.shape}")
         # Run prefill
         prefill_start = time.perf_counter()
         prefill_outputs, input_ids = self.run_prefill(origin_feature_lens, inputs, audio_embeds)
@@ -310,11 +304,9 @@ class Qwen3ForceAligner:
 
         for i, out in enumerate(prefill_outputs):
             t = self.to_torch(out)
-            print(f"  output[{i}]: {tuple(t.shape)}  dtype={t.dtype}")
 
         logits = None
         for out in prefill_outputs:
-            print(f"  output[{i}]: {tuple(t.shape)}  dtype={t.dtype}")
             t = self.to_torch(out)
             # [B,T,V]
             if t.ndim == 3:
@@ -327,7 +319,6 @@ class Qwen3ForceAligner:
         
         if logits is None:
             raise RuntimeError("No suitable logits found from prefill outputs.")
-        print("picked logits:", logits.shape)  # expected [1, T, V]
 
         output_ids = logits.argmax(dim=-1)     # [1, T]
 
@@ -350,7 +341,7 @@ class Qwen3ForceAligner:
             it["start_time"] = round(it["start_time"] / 1000.0, 3)
             it["end_time"] = round(it["end_time"] / 1000.0, 3)
 
-        logger.success("\n输出:\n")
+        logger.success("\n输出:")
         for w in timestamp_output:
             logger.success(f"{w['text']:10s} {w['start_time']:6.3f}  {w['end_time']:6.3f}")
 
