@@ -38,6 +38,30 @@ HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
 GOLDEN_THRESH = 0.98
 
 
+def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
+    """Validates and adjusts FlashAttention parameter values."""
+    llm_val, other_val = flash_vals
+
+    # Validate LLM (Prefill & Decode) FlashAttention parameter
+    # Values: 0=off, 1/2=on
+    if llm_val not in [0, 1, 2]:
+        raise ValueError(
+            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
+        )
+
+    # Validate non-LLM submodel FlashAttention parameter
+    # Values: 0=off, 1=on
+    if other_val not in [0, 1]:
+        raise ValueError(
+            f"Non-LLM FlashAttention values only support 0/1, current value:{other_val}"
+        )
+
+    if context_length < 2048:
+        llm_val = 0
+
+    return (llm_val, other_val)
+
+
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
 
@@ -207,15 +231,19 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--flash_attention",
         dest="flash_attention",
+        nargs=2,
         type=int,
-        default=2,
-        choices=[0, 1, 2],
-        help="flash attention optimization",
+        default=(0, 0),
+        help="FlashAttention optimization switches (default: 0 0): "
+        "1st int = LLM prefill/decode switch (0=off, 1/2=on), "
+        "2nd int = non-LLM submodel switch (0=off, 1=on); "
+        "e.g., --flash_attention 0 0 (prefill&decode=0, others=0)",
     )
 
     args = parser.parse_args()
-    if args.context_length < 2048:
-        args.flash_attention = 0
+    args.flash_attention = _validate_adjust_flash_attention(
+        args.flash_attention, args.context_length
+    )
     return args
 
 
@@ -437,6 +465,7 @@ if __name__ == "__main__":
     context_length = args.context_length
     tso = args.enable_stable_opt
     j = args.j
+    llm_flash_attention, others_flash_attention = args.flash_attention
 
     profile = {}
 
@@ -457,7 +486,7 @@ if __name__ == "__main__":
             ncore,
             j,
             tso=tso,
-            flash_attention=0,
+            flash_attention=others_flash_attention,
         )
         build_others(
             f"{model_name}_speech_tokenizer",
@@ -467,7 +496,7 @@ if __name__ == "__main__":
             ncore,
             j,
             tso=tso,
-            flash_attention=0,
+            flash_attention=others_flash_attention,
         )
         build_others(
             f"{model_name}_llm_decoder",
@@ -477,7 +506,7 @@ if __name__ == "__main__":
             ncore,
             j,
             tso=tso,
-            flash_attention=0,
+            flash_attention=others_flash_attention,
         )
         build(
             f"{model_name}_llm_qwen2_prefill",
@@ -488,7 +517,7 @@ if __name__ == "__main__":
             ndevice,
             context_length,
             j,
-            flash_attention=0,
+            flash_attention=llm_flash_attention,
             prefill_length=args.prefill_length,
         )
         build(
@@ -501,7 +530,7 @@ if __name__ == "__main__":
             context_length,
             j,
             batch,
-            flash_attention=0,
+            flash_attention=llm_flash_attention,
         )
         build_others(
             f"{model_name}_flow_encoder",
@@ -511,7 +540,7 @@ if __name__ == "__main__":
             ncore,
             j,
             tso=tso,
-            flash_attention=0,
+            flash_attention=others_flash_attention,
         )
         build_others(
             f"{model_name}_flow_spk",
@@ -521,7 +550,7 @@ if __name__ == "__main__":
             ncore,
             j,
             tso=tso,
-            flash_attention=0,
+            flash_attention=others_flash_attention,
         )
         build_others(
             f"{model_name}_flow_decoder",
@@ -531,7 +560,7 @@ if __name__ == "__main__":
             ncore,
             j,
             tso=tso,
-            flash_attention=0,
+            flash_attention=others_flash_attention,
         )
         build_others(
             f"{model_name}_hift_part1",
@@ -541,7 +570,7 @@ if __name__ == "__main__":
             ncore,
             j,
             tso=tso,
-            flash_attention=0,
+            flash_attention=others_flash_attention,
             onnx_suffix="part1",
         )
         build_others(
@@ -552,7 +581,7 @@ if __name__ == "__main__":
             ncore,
             j,
             tso=tso,
-            flash_attention=0,
+            flash_attention=others_flash_attention,
             onnx_suffix="part2",
         )
 
