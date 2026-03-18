@@ -140,7 +140,7 @@ def _run_eval(args: argparse.Namespace) -> int:
         eval_type=eval_type,
         datasets=args.dataset,
         model_args=model_args,
-        limit=args.limit,
+        limit=None if args.limit == 0 else args.limit,
     )
     _ = run_task(task_cfg=task_config)
     return 0
