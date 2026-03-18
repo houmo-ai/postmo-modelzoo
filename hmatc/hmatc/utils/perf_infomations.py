@@ -284,7 +284,7 @@ class InferencePerformanceTracker:
             metrics.vision_perf_infos.vision_total_speed = metrics.num_images / (metrics.vision_perf_infos.vision_total_time / 1000)
 
         # 4. Calculate summary metrics
-        metrics.ttft = metrics.prefill_perf_infos.total_time
+        metrics.ttft = metrics.prefill_perf_infos.total_time + metrics.vision_perf_infos.vision_total_time
         if metrics.output_seq_length > 0:
             metrics.tpot = metrics.decode_perf_infos.total_time / (metrics.output_seq_length * metrics.batch_size)  # TPOT = Decode total time / number of output tokens
 

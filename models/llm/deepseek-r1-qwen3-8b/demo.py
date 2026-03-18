@@ -37,12 +37,8 @@ from loguru import logger
 
 import tcim_lite as tcim
 
-sys.path.append(
-    os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")
-    )
-)
-from perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
+
+from hmatc.utils.perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2."
