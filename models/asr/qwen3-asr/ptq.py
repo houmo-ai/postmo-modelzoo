@@ -120,8 +120,12 @@ from quant_pipeline import quant_asr
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--model", type=str, default="Qwen3-ASR-1.7B")
-    parser.add_argument("--model-name", type=str, default="qwen3_asr", help="output hmonnx model name")
+    parser.add_argument("--model", type=str, default="Qwen3-ASR-0.6B")
+    parser.add_argument("--model_name", 
+                        type=str, 
+                        default="qwen3_asr",
+                        choices=["qwen3_asr", "qwen3_forcealigner"],
+                        help="output hmonnx model name")
     parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument("--quant-type", default="w8a8_sefp", help="quant type, default is w8a8")

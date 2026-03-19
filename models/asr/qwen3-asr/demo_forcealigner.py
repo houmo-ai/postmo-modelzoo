@@ -61,7 +61,7 @@ def get_args() -> argparse.Namespace:
         "--encode_path",
         dest="encode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_asr_encode.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3_forcealigner_encode.hmm"),
         help="houmo encode model path",
     )
     parser.add_argument(
@@ -74,7 +74,7 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_asr_prefill.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3_forcealigner_prefill.hmm"),
         help="houmo prefill model path",
     )
     parser.add_argument(

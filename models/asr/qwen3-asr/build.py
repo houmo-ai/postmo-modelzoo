@@ -25,6 +25,7 @@ import psutil
 import threading
 import multiprocessing
 import argparse
+import glob
 
 import logging
 
@@ -156,6 +157,7 @@ def get_args() -> argparse.Namespace:
         dest="model_name",
         type=str,
         default="qwen3_asr",
+        choices=["qwen3_asr", "qwen3_forcealigner"],
         help="output houmo model name",
     )
     parser.add_argument(
@@ -205,7 +207,7 @@ def get_args() -> argparse.Namespace:
 
 
 def build_asr(
-    model_name, model_dir, model_path, output_dir, profile, ncore, j, flash_attention=0
+    model_name, model_dir, output_dir, profile, ncore, j, flash_attention=0
 ):
     import tcim
 
@@ -220,7 +222,8 @@ def build_asr(
 
     start = time.time()
     print(f"\n===> {model_name} build start...")
-    decode_model = os.path.join(model_dir, model_path)
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -360,21 +363,18 @@ if __name__ == "__main__":
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"hmquant_{model_name}_with_act.onnx"
-        # build_asr(
-        #     f"{model_name}_encode",
-        #     os.path.join(model_dir, "encode"),
-        #     model_path,
-        #     output_dir,
-        #     profile,
-        #     ncore,
-        #     j,
-        #     flash_attention=encoder_flash_attention,
-        # )
+        build_asr(
+            f"{model_name}_encode",
+            os.path.join(model_dir, "encode"),
+            output_dir,
+            profile,
+            ncore,
+            j,
+            flash_attention=encoder_flash_attention,
+        )
         build_asr(
             f"{model_name}_prefill",
             os.path.join(model_dir, "prefill"),
-            model_path,
             output_dir,
             profile,
             ncore,
@@ -385,7 +385,6 @@ if __name__ == "__main__":
             build_asr(
                 f"{model_name}_decode",
                 os.path.join(model_dir, "decode"),
-                model_path,
                 output_dir,
                 profile,
                 ncore,

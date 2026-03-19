@@ -48,6 +48,8 @@ from xhquant.api import (
     to_frontend_graph,
     to_quant_graph,
 )
+
+from onnx import TensorProto, helper, numpy_helper
 from xhquant.api.ptq_export_hmonnx import (
     convert_quanted_model_to_hmonnx,
 )
@@ -71,9 +73,140 @@ from xh_model_zoo.xh_llm.models.qwen3_asr import (
     Qwen3ASRForConditionalGeneration
 )
 
+import numpy as np
 
 GB = int(2**30)
 _LARGE_MODEL_SIZE_THRESHOLD = int(2**30 * 1.8)
+
+
+_ONNX_DTYPE_TO_NUMPY = {
+    TensorProto.FLOAT:   np.float32,
+    TensorProto.FLOAT16: np.float16,
+    TensorProto.DOUBLE:  np.float64,
+    TensorProto.INT8:    np.int8,
+    TensorProto.INT16:   np.int16,
+    TensorProto.INT32:   np.int32,
+    TensorProto.INT64:   np.int64,
+    TensorProto.UINT8:   np.uint8,
+    TensorProto.UINT16:  np.uint16,
+    TensorProto.UINT32:  np.uint32,
+    TensorProto.UINT64:  np.uint64,
+    TensorProto.BOOL:    np.bool_,
+}
+
+def change_onnx_initializer_type(
+    input_model_path: str,
+    output_model_path: str,
+    target_initializer_name: str,
+    new_data_type: int = TensorProto.FLOAT16
+):
+    input_model_path = os.path.abspath(input_model_path)
+    output_model_path = os.path.abspath(output_model_path)
+    print(f"📌 Normalized paths:")
+    print(f"   Input model: {input_model_path}")
+    print(f"   Output model: {output_model_path}")
+    
+    # 1. Check input file existence + force read permission
+    if not os.path.exists(input_model_path):
+        raise FileNotFoundError(f"Input model not found: {input_model_path}")
+    
+    # Force add read permission (for current user)
+    try:
+        os.chmod(input_model_path, os.stat(input_model_path).st_mode | stat.S_IRUSR)
+        print(f"✅ Read permission granted for input file: {input_model_path}")
+    except Exception as e:
+        print(f"⚠️ Failed to grant read permission (may need sudo): {e}")
+    
+    # 2. Check output directory + force write permission
+    output_dir = os.path.dirname(output_model_path)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True, mode=0o755)
+        print(f"✅ Output directory created: {output_dir}")
+    
+    # Force add write permission for output directory
+    try:
+        os.chmod(output_dir, os.stat(output_dir).st_mode | stat.S_IWUSR | stat.S_IRUSR | stat.S_IXUSR)
+        print(f"✅ Read/write/execute permissions granted for output directory: {output_dir}")
+    except Exception as e:
+        print(f"⚠️ Failed to grant output directory permissions (may need sudo): {e}")
+    
+    try:
+        model = onnx.load(input_model_path)
+        print("✅ Original model loaded successfully")
+    except Exception as e:
+        raise RuntimeError(f"Failed to load model: {e}")
+
+    target_np_dtype = _ONNX_DTYPE_TO_NUMPY.get(new_data_type)
+    if target_np_dtype is None:
+        raise ValueError(f"Unsupported target ONNX type: {new_data_type}")
+
+    modified = False
+    for i, init in enumerate(model.graph.initializer):
+        if init.name == target_initializer_name:
+            old_type = init.data_type
+            np_array = numpy_helper.to_array(init)
+            np_array_converted = np_array.astype(target_np_dtype)
+            new_init = numpy_helper.from_array(np_array_converted, name=init.name)
+            model.graph.initializer[i].CopyFrom(new_init)
+            print(f"✅ Modified initializer [{target_initializer_name}]:")
+            print(f"   Original type: {TensorProto.DataType.Name(old_type)} ({np_array.dtype})"
+                  f" -> New type: {TensorProto.DataType.Name(new_data_type)} ({target_np_dtype.__name__})")
+            print(f"   shape: {np_array.shape}")
+            modified = True
+            break
+
+    if not modified:
+        print(f"❌ Initializer not found: {target_initializer_name}")
+        print("📋 First 20 initializer names in the model:")
+        for idx, init in enumerate(model.graph.initializer[:20]):
+            print(f"   {idx+1}. {init.name}  dtype={TensorProto.DataType.Name(init.data_type)}")
+        raise ValueError(f"Specified initializer not found: {target_initializer_name}")
+
+    for inp in model.graph.input:
+        if inp.name == target_initializer_name:
+            inp.type.tensor_type.elem_type = new_data_type
+            print(f"✅ Synced graph.input [{target_initializer_name}] type declaration")
+            break
+
+    for vi in model.graph.value_info:
+        if vi.name == target_initializer_name:
+            vi.type.tensor_type.elem_type = new_data_type
+            print(f"✅ Synced graph.value_info [{target_initializer_name}] type declaration")
+            break
+
+    try:
+        onnx.checker.check_model(model)
+        print("✅ Modified model structure validation passed")
+    except onnx.checker.ValidationError as e:
+        print(f"⚠️ Model validation warning (hmonnx custom operator warnings can be ignored): {e}")
+
+    output_stem = os.path.splitext(os.path.basename(output_model_path))[0]
+    model_byte_size = model.ByteSize()
+    use_external_data = model_byte_size > _LARGE_MODEL_SIZE_THRESHOLD
+    print(f"📌 Model size: {model_byte_size / (1 << 30):.3f} GB, "
+          f"{'using' if use_external_data else 'not using'} external data format for saving")
+    try:
+        if use_external_data:
+            onnx.save(
+                model,
+                output_model_path,
+                save_as_external_data=True,
+                all_tensors_to_one_file=True,
+                location=f"{output_stem}_external_data",
+            )
+        else:
+            onnx.save(model, output_model_path)
+        print(f"✅ Model saved to: {output_model_path}")
+        saved_model = onnx.load(output_model_path)
+        print(f"✅ Read-back validation passed, initializer count: {len(saved_model.graph.initializer)}")
+    except Exception as e:
+        temp_output = os.path.join("/tmp", "modified_model_temp.onnx")
+        try:
+            onnx.save(model, temp_output)
+            os.rename(temp_output, output_model_path)
+            print(f"✅ Saved to temp directory and moved to target path: {output_model_path}")
+        except Exception as e2:
+            raise RuntimeError(f"Failed to save model:\nMain approach: {e}\nTemp directory approach: {e2}")
 
 
 def generate_golden_data(hmonnx_file: Path, golden_path: Path, hm_inputs: List[torch.Tensor]):
@@ -123,7 +256,6 @@ def quant_encode(args):
 
     model = Qwen3ASRForConditionalGeneration.from_pretrained(model_dir)
     cfg = Qwen3ASRConfig.from_pretrained(model_dir)
-    processor = Qwen3ASRProcessor.from_pretrained(model_dir)
 
     model.eval()
     model.thinker.audio_tower.eval()
@@ -132,7 +264,7 @@ def quant_encode(args):
     model.config._attn_implementation = "eager"
 
     model_name = args.model_name
-    cfg_name = f"{model_name}_{target_device}"
+
     work_dir = Path(args.out_dir) / "hmquant"
     work_dir.mkdir(exist_ok=True, parents=True)
 
@@ -169,7 +301,6 @@ def quant_encode(args):
     hmonnx_file = work_dir / name / f"hmquant_{model_name}_with_act.onnx"
     golden_path = work_dir / name
     meta_info["encoder"] = str(hmonnx_file.relative_to(work_dir))
-    num_mel_bins = model.config.thinker_config.audio_config.num_mel_bins
 
     input_features = torch.randn(1, 128, 3000).to(model.device).to(model.dtype)
     feature_lens = torch.tensor([3000], dtype=torch.int32).to(model.device)
@@ -180,7 +311,7 @@ def quant_encode(args):
                 temp_onnx_file = str(Path(tmp_dir) / Path(onnx_file).name)
                 torch.onnx.export(
                     model.thinker.audio_tower,
-                    (input_features, feature_lens),  # 传入 input_features 和 feature_lens
+                    (input_features, feature_lens),  # Pass input_features and feature_lens
                     temp_onnx_file,
                     input_names=["input_features", "feature_lens"],
                     output_names=["hidden_state"],
@@ -224,23 +355,41 @@ def quant_encode(args):
 
 
 
+
     output_names = []
     output_names.append("hidden_state")
 
-    convert_onnx_to_hmonnx(
-        str(onnx_file),
-        [input_features, feature_lens],
-        # [input_features],
-        DeviceType.XH2a,
-        hmonnx_file,
-        quant_config=quant_config,
-        input_names=["input_features", "feature_lens"],
-        # input_names=["input_features"],
-        output_names=output_names,
-    )
+    if not Path(hmonnx_file).exists():
+        convert_onnx_to_hmonnx(
+            str(onnx_file),
+            [input_features, feature_lens],
+            DeviceType.XH2a,
+            hmonnx_file,
+            quant_config=quant_config,
+            input_names=["input_features", "feature_lens"],
+            output_names=output_names,
+        )
+
+        change_onnx_initializer_type(
+            input_model_path=hmonnx_file,
+            output_model_path=hmonnx_file,
+            target_initializer_name="_constant_48_output_0_",
+            new_data_type=TensorProto.FLOAT16,
+        )
 
 
-    generate_golden_data(hmonnx_file, golden_path, [input_features.half().to("cuda"), feature_lens.to("cuda")])
+    # Generate golden
+    if args.gen_golden:
+        session = HMONNXGoldenInference(hmonnx_file)
+        session.to("cuda")
+        session.save_golden = True
+        session.golden_dir = golden_path
+        session.step = 0
+        session(input_features.half().to("cuda"), feature_lens.to("cuda"))
+
+    os.remove(onnx_file)
+    os.remove(str(onnx_file).replace(".onnx", "_external_data"))
+
 def quant_model(args, stage : str):
 
     DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -419,7 +568,7 @@ def quant_model(args, stage : str):
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
 
-    # export_cfg 展开 past_key_cache 和 past_value_cache 的输入，变成多个输入，方便后续对齐
+    # export_cfg: Expand past_key_cache and past_value_cache inputs into multiple inputs for easier alignment
     num_hidden_layers = 28
     base_inputs = ["input_embeds", "past_seq_length", "current_input_length"]
     key_names = [f"past_key_cache_{i}" for i in range(num_hidden_layers)]
@@ -511,8 +660,8 @@ def quant_model(args, stage : str):
             decode_calib_data.extend(arg)
         else:
             decode_calib_data.append(arg)
-
-    generate_golden_data(onnx_file, onnx_dir, decode_calib_data)
+    if args.gen_golden:
+        generate_golden_data(onnx_file, onnx_dir, decode_calib_data)
 
 
 def quant_forcealigner(args):
@@ -527,8 +676,8 @@ def quant_forcealigner(args):
     )
     hf_model.eval()
 
-    model_name = os.path.basename(MODEL_PATH)
-    target_device = "XH2a"  # 量化目标设备
+    model_name = args.model_name
+    target_device = "XH2a"  # Quantization target device
 
     cfg = Config.fromfile(args.config)
     cfg_name = f"{model_name}_{target_device}"
@@ -560,7 +709,7 @@ def quant_forcealigner(args):
     model = xh_model.get_hf_model()
     assert isinstance(xh_model, XHQwen3ASRLLMModel)
 
-    # =============== 关键：在 init_wrap_model 前覆盖 wrap_cfg ===============
+    # =============== Key: Override wrap_cfg before init_wrap_model ===============
     full_seq_len = 411
     xh_model.wrap_cfg.num_logits_to_keep = 0
     xh_model.wrap_cfg.only_first_block = False
@@ -576,7 +725,7 @@ def quant_forcealigner(args):
     processor = xh_model.get_processor()
     tokenizer = processor.tokenizer
 
-    # ===== 模型设置 =====
+    # ===== Model settings =====
     xh_model.to(device)
     xh_model.to(dtype)
     xh_model.change_eval_type(eval_type=EvalModelType.WRAPED)
@@ -622,7 +771,7 @@ def quant_forcealigner(args):
     torch.save(token_embedding.state_dict(), str(token_embedding_file))
     meta_info.token_embedding_file = str(token_embedding_file.relative_to(cfg.work_dir))
 
-    # ===== 构造 prefill 输入 =====
+    # ===== Construct prefill input =====
     final_inputs_embeds = torch.randn((1, full_seq_len, hidden_size), device=device, dtype=torch.float16)
 
     data_batch = {
@@ -631,11 +780,11 @@ def quant_forcealigner(args):
         "current_input_length": [full_seq_len],
     }
 
-    # Debug: 这里必须看到 (1,411,1024)
+    # Debug: Must see (1,411,1024) here
     with torch.no_grad():
         outs = xh_model.test_step(data_batch)
 
-    # ===== 量化 =====
+    # ===== Quantization =====
     xh_model.interactive_mode = True
     logger.info("************* convert to frontend graph *************")
     xh_model.convert_to_fronted_graph(data_batch)
@@ -666,7 +815,7 @@ def quant_forcealigner(args):
     xh_model.to(device)
     xh_model.to(dtype)
 
-    # ===== prefill 导出 =====
+    # ===== Prefill export =====
     xh_model = xh_model.to("cpu")
 
     work_dir = Path(args.out_dir) / "hmquant"
@@ -683,7 +832,7 @@ def quant_forcealigner(args):
 
     xh_model.export_cfg = ConfigDict(dict(
         input_names=input_names,
-        output_names=["hidden_states"],  # 名字不重要，关键是输出 shape
+        output_names=["hidden_states"],  # Name doesn't matter, key is output shape
     ))
 
     xh_model.set_input_sequence_length(full_seq_len)
@@ -695,7 +844,7 @@ def quant_forcealigner(args):
         "cpu", dtype, logger, False
     )
 
-    if args.gen_golden and not Path(prefill_golden_path).exists():
+    if args.gen_golden:
         session = HMONNXGoldenInference(prefill_onnx_file)
         session.to("cuda")
         session.save_golden = True
@@ -707,7 +856,7 @@ def quant_forcealigner(args):
     logger.info(f"save prefill onnx model to {prefill_onnx_file}")
 
 def quant_asr(args):
-    # quant_encode(args)
+    quant_encode(args)
     if args.model != "Qwen3-ForcedAligner-0.6B":
         quant_model(args, "prefill")
         quant_model(args, "decode")

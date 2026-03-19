@@ -390,8 +390,7 @@ class Qwen3Asr:
         prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
         all_inputs = self.processor(text=prompt, audio=audio, return_tensors="pt", padding=True)
         all_inputs = all_inputs.to(self.device)
-        for k, v in all_inputs.items():
-            print(k, v.shape)
+
         self.all_features_lens = all_inputs["input_features"].shape[2]
         self.loop_count = (self.all_features_lens // self.max_feature_one_loop) + 1
         
