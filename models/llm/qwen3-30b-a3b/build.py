@@ -26,7 +26,6 @@ import threading
 import multiprocessing
 import argparse
 import glob
-
 import logging
 
 logging.basicConfig(level="INFO")
@@ -271,7 +270,7 @@ def build(
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 
-def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
+def test(model_name, model_dir, output_dir, profile, batch=1):
     import tcim_lite
 
     print(f"\n===> {model_name} test start...")
@@ -284,11 +283,9 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
 
     # set input
     profile["set_input"] = 0
-    if prefix is None:
-        prefix = model_name
     input_num = module.get_num_inputs()
-    for id in range(input_num):
-        input_name = module.get_input_name(id)
+    for idx in range(input_num):
+        input_name = module.get_input_name(idx)
         input_info = module.get_input_info(input_name)
         print(
             f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
@@ -320,8 +317,8 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     profile["get_output"] = 0
     result_check = True
     output_num = module.get_num_outputs()
-    for id in range(output_num):
-        output_name = module.get_output_name(id)
+    for idx in range(output_num):
+        output_name = module.get_output_name(idx)
         output_info = module.get_output_info(output_name)
         print(
             f"output_info[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
@@ -390,6 +387,18 @@ if __name__ == "__main__":
     context_length = args.context_length
     profile = {}
 
+    decode_dirs = sorted(
+        path
+        for path in glob.glob(os.path.join(model_dir, "*decode*"))
+        if os.path.isdir(path)
+    )
+    if not decode_dirs:
+        raise FileNotFoundError(
+            f'No subdirectory containing "decode" found under: {model_dir}'
+        )
+    decode_dir = os.path.abspath(decode_dirs[0])
+    prefill_dir = os.path.join(model_dir, "prefill")
+
     # build model
     if args.stage == "build" or args.stage == "all":
         import platform
@@ -400,7 +409,7 @@ if __name__ == "__main__":
             exit(0)
         build(
             f"{model_name}_prefill",
-            os.path.join(model_dir, "prefill"),
+            prefill_dir,
             output_dir,
             profile,
             ncore,
@@ -410,17 +419,6 @@ if __name__ == "__main__":
             flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
-
-        decode_dirs = sorted(
-            path
-            for path in glob.glob(os.path.join(model_dir, "*decode*"))
-            if os.path.isdir(path)
-        )
-        if not decode_dirs:
-            raise FileNotFoundError(
-                f'No subdirectory containing "decode" found under: {model_dir}'
-            )
-        decode_dir = os.path.abspath(decode_dirs[0])
         build(
             f"{model_name}_decode",
             decode_dir,
@@ -436,19 +434,7 @@ if __name__ == "__main__":
 
     # test model
     if args.stage == "test" or args.stage == "all":
-        test(
-            f"{model_name}_prefill",
-            os.path.join(model_dir, "prefill"),
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-        test(
-            f"{model_name}_decode",
-            decode_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
+        test(f"{model_name}_prefill", prefill_dir, output_dir, profile)
+        test(f"{model_name}_decode", decode_dir, output_dir, profile)
 
     memory_monitor.stop()

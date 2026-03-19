@@ -5,7 +5,7 @@ import psutil
 import threading
 import multiprocessing
 import argparse
-
+import glob
 import logging
 
 logging.basicConfig(level="INFO")
@@ -195,7 +195,6 @@ def get_args() -> argparse.Namespace:
 def build(
     model_name,
     model_dir,
-    model_path,
     output_dir,
     profile,
     ncore,
@@ -234,7 +233,8 @@ def build(
 
     start = time.time()
     print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
-    decode_model = os.path.join(model_dir, model_path)
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -251,7 +251,7 @@ def build(
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 
-def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
+def test(model_name, model_dir, output_dir, profile, batch=1):
     import tcim_lite
 
     print(f"\n===> {model_name} test start...")
@@ -264,18 +264,17 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
 
     # set input
     profile["set_input"] = 0
-    if prefix is None:
-        prefix = model_name
     input_num = module.get_num_inputs()
-    for id in range(input_num):
-        input_name = module.get_input_name(id)
+    for idx in range(input_num):
+        input_name = module.get_input_name(idx)
         input_info = module.get_input_info(input_name)
         print(
             f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
         )
-        input_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy"
+        input_files = glob.glob(
+            f"{model_dir}/**/hmquant_*{sanitize_name(input_name)}*.npy", recursive=True
         )
+        input_data_path = os.path.abspath(input_files[0]) if input_files else ""
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
         print(
@@ -299,8 +298,8 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     profile["get_output"] = 0
     result_check = True
     output_num = module.get_num_outputs()
-    for id in range(output_num):
-        output_name = module.get_output_name(id)
+    for idx in range(output_num):
+        output_name = module.get_output_name(idx)
         output_info = module.get_output_info(output_name)
         print(
             f"output_info[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
@@ -311,9 +310,10 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         print(
             f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
         )
-        output_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy"
+        output_files = glob.glob(
+            f"{model_dir}/**/hmquant_*{sanitize_name(output_name)}*.npy", recursive=True
         )
+        output_data_path = os.path.abspath(output_files[0]) if output_files else ""
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
             golden_output = np.concatenate(
@@ -368,6 +368,18 @@ if __name__ == "__main__":
     context_length = args.context_length
     profile = {}
 
+    decode_dirs = sorted(
+        path
+        for path in glob.glob(os.path.join(model_dir, "*decode*"))
+        if os.path.isdir(path)
+    )
+    if not decode_dirs:
+        raise FileNotFoundError(
+            f'No subdirectory containing "decode" found under: {model_dir}'
+        )
+    decode_dir = os.path.abspath(decode_dirs[0])
+    prefill_dir = os.path.join(model_dir, "prefill")
+
     # build model
     if args.stage == "build" or args.stage == "all":
         import platform
@@ -376,11 +388,9 @@ if __name__ == "__main__":
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
         build(
-            "gpt-oss_prefill",
-            model_dir,
-            model_path,
+            f"{model_name}_prefill",
+            prefill_dir,
             output_dir,
             profile,
             ncore,
@@ -390,11 +400,9 @@ if __name__ == "__main__":
             flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
-        model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
         build(
-            "gpt-oss_decode",
-            model_dir,
-            model_path,
+            f"{model_name}_decode",
+            decode_dir,
             output_dir,
             profile,
             ncore,
@@ -407,9 +415,7 @@ if __name__ == "__main__":
 
     # test model
     if args.stage == "test" or args.stage == "all":
-        part_dir = os.path.join(model_dir, "prefill")
-        test("gpt-oss_prefill", part_dir, output_dir, profile, prefix=model_name)
-        part_dir = os.path.join(model_dir, "decoder")
-        test("gpt-oss_decode", part_dir, output_dir, profile, prefix=model_name)
+        test(f"{model_name}_prefill", prefill_dir, output_dir, profile)
+        test(f"{model_name}_decode", decode_dir, output_dir, profile)
 
     memory_monitor.stop()
