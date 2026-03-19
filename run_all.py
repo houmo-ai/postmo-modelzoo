@@ -6,12 +6,12 @@ import yaml
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("run_all.py")
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'houmo')
-HDPL_PLATFORM = os.getenv('HDPL_PLATFORM', 'ISIM')
+HOUMO_TARGET = os.getenv("HOUMO_TARGET", "houmo")
+HDPL_PLATFORM = os.getenv("HDPL_PLATFORM", "ISIM")
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -49,7 +49,7 @@ def readWithYaml(config):
 def addCiMarker(test_type: str, filter_str: str):
     module_name = None
     case_dict = dict()
-    for line in filter_str.split('\n'):
+    for line in filter_str.split("\n"):
         line = line.strip()
         if "<Module" in line:
             module_name = line.rsplit(" ", 1)[-1][:-1].strip()
@@ -65,7 +65,7 @@ def addCiMarker(test_type: str, filter_str: str):
         logger.info(f"Add ci marker into file_path:{funcs}")
 
         func_indexes = list()
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
             for idx, line in enumerate(lines):
                 line = line.strip()
@@ -77,7 +77,7 @@ def addCiMarker(test_type: str, filter_str: str):
         for idx in reversed(func_indexes):
             logger.info(f"Add ci marker to testcase func:{lines[idx]}")
             lines.insert(idx, "@pytest.mark.imodelzoo\n")
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.writelines(lines)
 
 
@@ -242,13 +242,15 @@ def main(allArgs=None):
 
 
 if __name__ == "__main__":
-    os.environ['HOUMO_MODEL_PATH'] = "/data02/modelzoo_ci/models"
+    os.environ["HOUMO_MODEL_PATH"] = "/data02/modelzoo_ci/models"
     HOUMO_PATH = os.getenv("HOUMO_PATH", "/usr/local/houmo")
     HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", ".")
     os.system("cd hmatc && chmod +x install.sh && ./install.sh")
-    os.system(f"cd {HOUMO_EXAMPLES_PATH}/tools/llm_perf && bash build_linux.sh && cp {HOUMO_EXAMPLES_PATH}/tools/bin/llm_perf {HOUMO_PATH}/bin")
-
-    os.environ['SKIP_INFER'] = "ON"
+    os.system(
+        f"cd {HOUMO_EXAMPLES_PATH}/tools/llm_perf && bash build_linux.sh && cp {HOUMO_EXAMPLES_PATH}/tools/bin/llm_perf {HOUMO_PATH}/bin"
+    )
+    os.system(f"{HOUMO_EXAMPLES_PATH}/hmeval/scripts/install.sh")
+    os.environ["SKIP_INFER"] = "ON"
     # install pytest in release docker
     os.system("pip3 install pytest")
     os.system("pip3 install pytest-xdist")

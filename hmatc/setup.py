@@ -19,23 +19,21 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
 import sys
+import argparse
 import subprocess
 import shutil
 import pybind11
 from datetime import datetime
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
-import argparse
 
 
-TCIM_RUNTIME_PATH = os.environ.get("TCIM_RUNTIME_PATH")
-if not TCIM_RUNTIME_PATH:
-    try:
-        import tcim_lite
+try:
+    import tcim_lite
 
-        TCIM_RUNTIME_PATH = os.path.dirname(tcim_lite.__file__)
-    except ImportError:
-        raise Exception("Please set TCIM_RUNTIME_PATH or install tcim_lite")
+    TCIM_RUNTIME_PATH = os.path.dirname(tcim_lite.__file__)
+except ImportError:
+    raise Exception("Please install tcim_lite in current Python environment")
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 if HOUMO_TARGET not in ["xh1", "xh2"]:
@@ -169,7 +167,9 @@ class BuildExtWithDLL(build_ext):
 
 
 parser = argparse.ArgumentParser(add_help=False)
-parser.add_argument('--enable_smi_support', action="store_true", help='enable Python SMI support')
+parser.add_argument(
+    "--enable_smi_support", action="store_true", help="enable Python SMI support"
+)
 args, remaining_argv = parser.parse_known_args()
 sys.argv = [sys.argv[0]] + remaining_argv
 

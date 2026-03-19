@@ -775,6 +775,7 @@ def hmatc_get_file(
     download_dir: str = "",
     extract_dir=None,
     source_type="jfrog",
+    extract_to_archive_name: bool = False,
 ) -> tuple[str, dict]:
     """Download or locate model-related files.
 
@@ -784,6 +785,8 @@ def hmatc_get_file(
         download_dir (str): Download directory
         extract_dir (str, optional): Extract directory for compressed files
         source_type (str): Download source, `jfrog` or `modelscope`
+        extract_to_archive_name (bool): If True and extract_dir is None, extract to
+            a directory with the same name as the archive (without extension)
 
     Returns:
         tuple[str, dict]: Main downloaded file path and detailed download results
@@ -857,13 +860,22 @@ def hmatc_get_file(
                 model_cfgs, source_type, model_type, target
             )
 
-        extract_dir_edit = (
-            extract_dir
-            if extract_dir is not None
-            else _generate_extract_dir(
+        if extract_dir is not None:
+            extract_dir_edit = extract_dir
+        elif extract_to_archive_name:
+            # Extract to directory with same name as archive (without extension)
+            archive_name = os.path.basename(hmm_path)
+            for ext in [".zip", ".tar.gz", ".tar.xz", ".tar"]:
+                if archive_name.endswith(ext):
+                    archive_name = archive_name[: -len(ext)]
+                    break
+            # Combine with download_dir if extract_dir is not specified
+            base_dir = download_dir if download_dir else "."
+            extract_dir_edit = os.path.abspath(os.path.join(base_dir, archive_name))
+        else:
+            extract_dir_edit = _generate_extract_dir(
                 hmm_path, os.path.abspath(os.path.join("./output", target))
             )
-        )
 
         if source_type == "modelscope" and model_type in ["llm"] and repo_id:
             version = model_cfgs["version"].lower()

@@ -558,6 +558,34 @@ tools_bandwidth_perf:
   test:
     - tools_bandwidth_perf_test
 
+hmeval_examples_llm:
+  include:
+    - hmeval
+  exclude:
+    - hmeval/README_zh.md
+    - hmeval/README.md
+    - hmeval/requirements.txt
+    - hmeval/.gitignore
+  example_case:
+    - hmeval_examples_llm_test:
+        script: ../hmeval/examples/qwen3/test.sh
+  test:
+    - hmeval_examples_llm_test
+
+hmeval_examples_vlm:
+  include:
+    - hmeval
+  exclude:
+    - hmeval/README_zh.md
+    - hmeval/README.md
+    - hmeval/requirements.txt
+    - hmeval/.gitignore
+  example_case:
+    - hmeval_examples_vlm_test:
+        script: ../hmeval/examples/qwen3-vl/test.sh
+  test:
+    - hmeval_examples_vlm_test
+
 ###### tests ######
 models_tests:
   include:

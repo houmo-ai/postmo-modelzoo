@@ -48,7 +48,7 @@ hmeval --model <model_script.py|python.module> \
 ### 参数说明
 
 - `--model`（必填）
-  - 自定义模型脚本路径（如 `examples/qwen3/hm_xh2_qwen3.py`）或模块名。
+  - 自定义模型脚本路径（如 `examples/qwen3/hmm_xh2_qwen3.py`）或模块名。
 - `--model-dir`（必填）
   - 模型权重/产物目录。
   - 会写入 `TaskConfig.model`，并同时透传到 `TaskConfig.model_args["model_dir"]`。
@@ -150,15 +150,31 @@ class MyCustomModel(ModelAPI):
 
 ## 4）示例命令
 
+### 下载模型（hmm）
+
+评测前先下载 hmm 模型文件：
+
+```bash
+cd examples/qwen3
+python get_model.py --download-dir ./models
+```
+
+qwen3-vl 同理：
+
+```bash
+cd examples/qwen3-vl
+python get_model.py --download-dir ./models
+```
+
 ### Qwen3 文本模型
 
 ```bash
 hmeval \
   --model examples/qwen3/hm_xh2_qwen3.py \
-  --model-dir /data/weiguo.xing/repo/HmLMEvalKit/models/hm_xh2_qwen3_8b_256_8k_b1_1chip_2cores_v1.0.0/ \
+  --model-dir examples/qwen3/models/hmm_xh2_qwen3_8b_256_8k_b1_1chip_2cores_v1.1.0/ \
   --dataset gsm8k \
   --limit 2 \
-  --model-args tokenizer_dir=/data/weiguo.xing/repo/lm_models/qwen3-8b
+  --model-args tokenizer_dir=examples/qwen3/models/tokenizers
 ```
 
 ### Qwen3-VL 多模态模型
@@ -166,10 +182,10 @@ hmeval \
 ```bash
 hmeval \
   --model examples/qwen3-vl/hm_xh2_qwen3_vl.py \
-  --model-dir /data/weiguo.xing/repo/HmLMEvalKit/models/hmm_xh2_qwen3-vl_4b_256_32k_b1_1chip_2cores_v1.0.0/ \
+  --model-dir examples/qwen3-vl/models/hmm_xh2_qwen3-vl_4b_256_32k_b1_1chip_2cores_v1.1.0/ \
   --dataset mm_bench \
   --limit 2 \
-  --model-args tokenizer_dir=/data/weiguo.xing/repo/lm_models/Qwen3-VL-4B-Instruct
+  --model-args tokenizer_dir=examples/qwen3-vl/models/tokenizers
 ```
 
 ### 多数据集
@@ -177,9 +193,9 @@ hmeval \
 ```bash
 hmeval \
   --model examples/qwen3/hm_xh2_qwen3.py \
-  --model-dir /path/to/model \
+  --model-dir examples/qwen3/models/hmm_xh2_qwen3_8b_256_8k_b1_1chip_2cores_v1.1.0/ \
   --dataset mmlu gsm8k ceval \
-  --model-args tokenizer_dir=/path/to/tokenizer
+  --model-args tokenizer_dir=examples/qwen3/models/tokenizers
 ```
 
 ---

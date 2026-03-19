@@ -147,15 +147,31 @@ So local imports in the same folder (e.g. `from xxx_impl import ...`) work by de
 
 ## 4) Examples
 
+### Download model (hmm)
+
+Before running evaluation, download the hmm model files:
+
+```bash
+cd examples/qwen3
+python get_model.py --download-dir ./models
+```
+
+For qwen3-vl:
+
+```bash
+cd examples/qwen3-vl
+python get_model.py --download-dir ./models
+```
+
 ### Qwen3 text example
 
 ```bash
 hmeval \
 	--model examples/qwen3/hm_xh2_qwen3.py \
-	--model-dir /data/weiguo.xing/repo/HmLMEvalKit/models/hm_xh2_qwen3_8b_256_8k_b1_1chip_2cores_v1.0.0/ \
+	--model-dir examples/qwen3/models/hmm_xh2_qwen3_8b_256_8k_b1_1chip_2cores_v1.1.0/ \
 	--dataset gsm8k \
 	--limit 2 \
-	--model-args tokenizer_dir=/data/weiguo.xing/repo/lm_models/qwen3-8b
+	--model-args tokenizer_dir=examples/qwen3/models/tokenizers
 ```
 
 ### Qwen3-VL example
@@ -163,10 +179,10 @@ hmeval \
 ```bash
 hmeval \
 	--model examples/qwen3-vl/hm_xh2_qwen3_vl.py \
-	--model-dir /data/weiguo.xing/repo/HmLMEvalKit/models/hmm_xh2_qwen3-vl_4b_256_32k_b1_1chip_2cores_v1.0.0/ \
+	--model-dir examples/qwen3-vl/models/hmm_xh2_qwen3-vl_4b_256_32k_b1_1chip_2cores_v1.1.0/ \
 	--dataset mm_bench \
 	--limit 2 \
-	--model-args tokenizer_dir=/data/weiguo.xing/repo/lm_models/Qwen3-VL-4B-Instruct
+	--model-args tokenizer_dir=examples/qwen3-vl/models/tokenizers
 ```
 
 ### Multiple datasets
@@ -174,9 +190,9 @@ hmeval \
 ```bash
 hmeval \
 	--model examples/qwen3/hm_xh2_qwen3.py \
-	--model-dir /path/to/model \
+	--model-dir examples/qwen3/models/hmm_xh2_qwen3_8b_256_8k_b1_1chip_2cores_v1.0.0/ \
 	--dataset mmlu gsm8k ceval \
-	--model-args tokenizer_dir=/path/to/tokenizer
+	--model-args tokenizer_dir=examples/qwen3/models/tokenizers
 ```
 
 ---
