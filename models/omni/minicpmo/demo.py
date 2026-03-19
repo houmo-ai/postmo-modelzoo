@@ -72,16 +72,16 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 SUPPORTED_MODEL_TYPES = ["onnx", "houmo"]
 EXAMPLES_MODE = {
-    0: "omni",  ## vision + audio + llm + tts
-    1: "llm",  ## llm only
-    2: "vlm",  ## vision + llm
-    3: "mvlm",  ## multi-vision + llm
-    4: "vclone",  ## audio + llm + tts, voice clone
-    5: "wotts",  ## only tts, woman voice
-    6: "motts",  ## only tts, man voice
-    7: "chunkotts",  ## only tts, split text
-    8: "I2S",  ## Instruction to Speech
-    9: "CONV",  ## Speech Conversation
+    0: "omni",      ## vision + audio + llm + tts
+    1: "llm",       ## llm only
+    2: "vlm",       ## vision + llm
+    3: "mvlm",      ## multi-vision + llm
+    4: "vclone",    ## audio + llm + tts, voice clone
+    5: "wotts",     ## only tts, woman voice
+    6: "motts",     ## only tts, man voice
+    7: "chunkotts", ## only tts, split text
+    8: "I2S",       ## Instruction to Speech
+    9: "CONV",      ## Speech Conversation
 }
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -1130,8 +1130,8 @@ class HMMiniCPMO(object):
                         truth_position_ids = self.get_vpm_position_ids(
                             position_ids, attn_mask, tgt_sizes[start_idx:end_idx]
                         )
-                        patch_attn_mask = attn_mask.view(1, -1)
-                        if not torch.any(~patch_attn_mask):
+                        flat_attn_mask = attn_mask.view(1, -1)
+                        if not torch.any(~flat_attn_mask):
                             truth_attn_mask = torch.zeros(
                                 self.vpm_input_infos["attention_mask"].shape,
                                 dtype=torch.float16,
@@ -1142,7 +1142,7 @@ class HMMiniCPMO(object):
                             )
 
                             truth_attn_mask = _prepare_4d_attention_mask(
-                                patch_attn_mask, dtype=torch.float16
+                                flat_attn_mask, dtype=torch.float16
                             )
                         tgt_h, tgt_w = tgt_sizes[i]
                         truth_pos_embed: torch.Tensor = (
@@ -2619,6 +2619,7 @@ def xh2_demo(args):
         msgs = [msg]
         logger.info(msgs)
         start_time = time.time()
+        hmminicpmo.use_tts_template = False
         answer, _, input_tokens_num, output_tokens_num = hmminicpmo.chat(msgs=msgs)
         total_time = time.time() - start_time
         logger.info(f"{answer}")
@@ -2646,9 +2647,10 @@ def xh2_demo(args):
         msgs = [msg]
         logger.info(msgs)
         start_time = time.time()
+        hmminicpmo.use_tts_template = False
         answer, _, input_tokens_num, output_tokens_num = hmminicpmo.chat(
             msgs=msgs,
-            max_slice_nums=1,
+            max_slice_nums=2,
         )
         total_time = time.time() - start_time
         logger.info(f"{answer}")
@@ -2678,6 +2680,7 @@ def xh2_demo(args):
         msgs = [msg]
         logger.info(msgs)
         start_time = time.time()
+        hmminicpmo.use_tts_template = False
         answer, _, input_tokens_num, output_tokens_num = hmminicpmo.chat(
             msgs=msgs,
             max_slice_nums=1,
