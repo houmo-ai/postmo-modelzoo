@@ -185,63 +185,10 @@ E2E TPS (Throughput):         22.21 tokens/s
 
 ### 3.3 性能测试工具
 
-使用perf.py工具可以测试llm的性能。运行指令如下
-
-```bash
-python perf.py
-
-# usage
-usage: perf.py [-h] [--tokenizer_dir TOKENIZER_DIR] [--embedding_path EMBEDDING_PATH] [--prefill_path PREFILL_PATH] [--decode_path DECODE_PATH] [--isl ISL] [--osl OSL]
-
-options:
-  -h, --help            show this help message and exit
-  --tokenizer_dir TOKENIZER_DIR
-                        tokenizer dir
-  --embedding_path EMBEDDING_PATH
-                        houmo embedding weight path
-  --prefill_path PREFILL_PATH
-                        houmo prefill model path
-  --decode_path DECODE_PATH
-                        houmo decode model path
-  --isl ISL             input seq length
-  --osl OSL             output seq length
-```
-
-结果示例：
-
-```bash
-Total prefill token count: 1024
-Total decode token count: 1024
-====================================================================================================
-Model Inference Performance Summary Report
-====================================================================================================
-Configuration Details:
-Batch Size:      1
-Input Length per Sample:   1024 tokens
-Output Length per Sample:   1024 tokens
-Prefill Model Load Time: 6490.85ms
-Decode Model Load Time:  138.82ms
-Prefill Stage Performance:
-Total Time:  443.39ms | Speed: 2309.50 tokens/s
-Tokenization Time:    7.81ms
-Embedding Time:   20.45ms
-API SetInput Time:  24.39ms
-API Inference Time: 393.71ms | Prefill Speed: 2600.93 tokens/s
-API GetOutput Time:  0.55ms
-Decode Stage Performance:
-Total Time: 48920.46ms | Speed:   20.91 tokens/s
-Tokenization Time:  353.91ms
-Embedding Time:  278.91ms
-API SetInput Time:   0.66ms
-API Inference Time: 44.65ms | Decode Speed:   22.40 tokens/s
-API GetOutput Time:  0.50ms
-Overall Performance Metrics:
-TFT (Time To First Token):  443.39 ms
-TPOT (Time Per Output Token): 47.82 ms/token
-E2E Latency (End-to-End):     51.35 seconds
-E2E TPS (Throughput):         19.94 tokens/s
-====================================================================================================
-```
+- 使用llm_perf性能评测工具测试模型性能。
+- llm_perf工具详细使用说明参考${HOUMO_EXAMPLE_PATH}/tools/llm_perf目录的README.MD。
+- 如果使用发布的容器，llm_perf工具已经预编译安装，可以直接通过llm_perf --help获取帮助。
+- config.yaml为llm_perf执行测试的配置文件，用户可以按照需要自行修改。
 
 ## 4 免责声明
 

@@ -219,40 +219,10 @@ end2end average time: 96.533 ms, 10.36 tokens/s
 
 ### 3.3 性能测试工具
 
-使用perf.py工具可以测试llm的性能。运行指令如下
-
-```bash
-python perf.py
-
-# usage
-usage: perf.py [-h] [--tokenizer_dir TOKENIZER_DIR] [--embedding_path EMBEDDING_PATH] [--prefill_path PREFILL_PATH] [--decode_path DECODE_PATH] [--isl ISL] [--osl OSL]
-
-options:
-  -h, --help            show this help message and exit
-  --tokenizer_dir TOKENIZER_DIR
-                        tokenizer dir
-  --embedding_path EMBEDDING_PATH
-                        houmo embedding weight path
-  --prefill_path PREFILL_PATH
-                        houmo prefill model path
-  --decode_path DECODE_PATH
-                        houmo decode model path
-  --isl ISL             input seq length
-  --osl OSL             output seq length
-```
-
-结果示例：
-
-```bash
-total prefill count:1024
-total decode count:1024
-Batch: 1, Total Input: 1024 tokens, Output 1024 tokens, Prefill Cost: 1.650 seconds, Decode Cost: 67.361 seconds
-Prefill Speed: 620.57 tokens/s; Decode Speed: 15.19 tokens/s
-TTFT (Time to First Token): 1650.086 ms
-TPOT (Time Per Output Token): 65.847 ms/token
-E2E Latency (End-to-End Latency): 70.379 seconds
-E2E TPS (End-to-End Tokens Per Second): 14.55 tokens/s
-```
+- 使用llm_perf性能评测工具测试模型性能。
+- llm_perf工具详细使用说明参考${HOUMO_EXAMPLE_PATH}/tools/llm_perf目录的README.MD。
+- 如果使用发布的容器，llm_perf工具已经预编译安装，可以直接通过llm_perf --help获取帮助。
+- config.yaml为llm_perf执行测试的配置文件，用户可以按照需要自行修改。
 
 ## 4 免责声明
 
