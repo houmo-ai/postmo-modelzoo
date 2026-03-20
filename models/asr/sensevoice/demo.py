@@ -2,8 +2,9 @@
 #
 # File: demo.py
 # Description:
-#   SenseVoiceSmall ASR Inference Demo - Python script for running sensevoice_small
-# automatic speech recognition on HOUMO AI device.
+#   SenseVoiceSmall ASR with Optimized Feature-Level Chunking.
+#   Splits features dynamically based on model capacity while maintaining
+#   better context handling through overlapping windows and smarter padding.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +22,8 @@
 import argparse
 import json
 import re
-import sys, os
+import sys
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -43,6 +45,10 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 LANGUAGE_MAP: Dict[str, int] = {"auto": 0, "zh": 3, "en": 4, "yue": 7, "ja": 11, "ko": 12, "nospeech": 13}
 TEXTNORM_MAP: Dict[str, int] = {"withitn": 14, "woitn": 15}
 
+# Overlap frames to maintain context between chunks
+DEFAULT_OVERLAP_FRAMES = 10  # frames of overlap
+DEFAULT_CONTEXT_FRAMES = 20  # extra context frames to pad on both sides
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -50,9 +56,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--audio_files",
         nargs="+",
-        default=["SenseVoiceSmall/example/zh.mp3", "SenseVoiceSmall/example/en.mp3",
-                 "SenseVoiceSmall/example/yue.mp3", "SenseVoiceSmall/example/ja.mp3",
-                 "SenseVoiceSmall/example/ko.mp3"],
+        default=["../../../data/audio/audio.mp3"],
         help="Audio files to transcribe",
     )
     parser.add_argument(
@@ -83,7 +87,20 @@ def get_args() -> argparse.Namespace:
         default="woitn",
         choices=TEXTNORM_MAP.keys()
     )
-
+    parser.add_argument(
+        "--overlap_frames",
+        dest="overlap_frames",
+        type=int,
+        default=DEFAULT_OVERLAP_FRAMES,
+        help="Number of overlapping frames between chunks for context continuity",
+    )
+    parser.add_argument(
+        "--context_frames",
+        dest="context_frames",
+        type=int,
+        default=DEFAULT_CONTEXT_FRAMES,
+        help="Extra context frames to pad on both sides of each chunk",
+    )
     parser.add_argument(
         "--raw_result",
         action="store_true",
@@ -98,9 +115,11 @@ def get_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
+
 def _read_yaml(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
 
 def _load_cmvn(cmvn_file: Path) -> Any:
     lines = cmvn_file.read_text(encoding="utf-8").splitlines()
@@ -125,11 +144,13 @@ def _load_cmvn(cmvn_file: Path) -> Any:
         raise ValueError(f"failed to parse cmvn file: {cmvn_file}")
     return np.stack([means, vars_], axis=0)
 
+
 def _apply_cmvn(feat: Any, cmvn: Any) -> Any:
     frame, dim = feat.shape
     means = np.tile(cmvn[0:1, :dim], (frame, 1))
     vars_ = np.tile(cmvn[1:2, :dim], (frame, 1))
     return (feat + means) * vars_
+
 
 def _apply_lfr(inputs: Any, lfr_m: int, lfr_n: int) -> Any:
     if lfr_m == 1 and lfr_n == 1:
@@ -151,6 +172,7 @@ def _apply_lfr(inputs: Any, lfr_m: int, lfr_n: int) -> Any:
             lfr_inputs.append(frame)
     return np.vstack(lfr_inputs).astype(np.float32)
 
+
 @dataclass(frozen=True)
 class FrontendConfig:
     fs: int = 16000
@@ -163,6 +185,7 @@ class FrontendConfig:
     dither: float = 1.0
     cmvn_file: str = ""
 
+
 class SenseVoiceFrontend:
     def __init__(self, cfg: FrontendConfig):
         self.cfg = cfg
@@ -173,8 +196,8 @@ class SenseVoiceFrontend:
         model_dir = Path(model_dir).expanduser().resolve()
         cfg_path = model_dir / "config.yaml"
         if not cfg_path.exists():
-             print(f"Warning: {cfg_path} not found. Using default config but CMVN might fail.")
-             cfg_obj = FrontendConfig(cmvn_file=str(model_dir / "am.mvn"))
+            print(f"Warning: {cfg_path} not found. Using default config but CMVN might fail.")
+            cfg_obj = FrontendConfig(cmvn_file=str(model_dir / "am.mvn"))
         else:
             cfg = _read_yaml(cfg_path)
             frontend_conf = dict(cfg.get("frontend_conf") or {})
@@ -192,7 +215,6 @@ class SenseVoiceFrontend:
         return cls(cfg_obj)
 
     def fbank(self, waveform: Any) -> Tuple[Any, int]:
-        # wav = torch.as_tensor(waveform, dtype=torch.float32)
         waveform_np = np.array(waveform)
         wav = torch.as_tensor(waveform_np, dtype=torch.float32)
         if wav.ndim == 1:
@@ -222,6 +244,7 @@ class SenseVoiceFrontend:
             feat = _apply_cmvn(feat, self.cmvn).astype("float32")
         return feat, int(feat.shape[0])
 
+
 def load_tokens(tokens_path: Path) -> Optional[List[str]]:
     if not tokens_path.exists():
         return None
@@ -230,21 +253,17 @@ def load_tokens(tokens_path: Path) -> Optional[List[str]]:
         return None
     return [str(x) for x in obj]
 
-def load_data(wav_content: Union[str, np.ndarray, List[str]], fs: int = None) -> List:
-    def load_wav(path: str) -> np.ndarray:
-        waveform, _ = librosa.load(path, sr=fs)
-        return waveform
 
-    if isinstance(wav_content, np.ndarray):
-        return [wav_content]
+def load_audio(audio_path: str, fs: int = 16000) -> np.ndarray:
+    """Load audio file and return waveform."""
+    sample, orig_sr = librosa.load(audio_path)
+    if orig_sr != fs:
+        waveform = librosa.resample(sample, orig_sr=orig_sr, target_sr=fs)
+        logger.info(f"Resampled audio from {orig_sr}Hz to 16000Hz")
+    else:
+        waveform, _ = librosa.load(audio_path, sr=fs)
+    return waveform
 
-    if isinstance(wav_content, str):
-        return [load_wav(wav_content)]
-
-    if isinstance(wav_content, list):
-        return [load_wav(path) for path in wav_content]
-
-    raise TypeError(f"The type of {wav_content} is not in [str, np.ndarray, list]")
 
 def resolve_tag(v: str, mapping: Dict[str, int]) -> int:
     if v.isdigit():
@@ -254,12 +273,14 @@ def resolve_tag(v: str, mapping: Dict[str, int]) -> int:
         raise ValueError(f"unsupported value: {v}; supported: {sorted(mapping.keys())}")
     return int(mapping[key])
 
+
 def make_inputs_for_sample(feat: Any, feat_len: int, language: str, textnorm: str) -> Dict[str, Any]:
     speech = feat[None, :, :].astype("float32")
     speech_lengths = np.array([feat_len], dtype="int32")
     lang = np.array([resolve_tag(language, LANGUAGE_MAP)], dtype="int32")
     norm = np.array([resolve_tag(textnorm, TEXTNORM_MAP)], dtype="int32")
     return {"speech": speech, "speech_lengths": speech_lengths, "language": lang, "textnorm": norm}
+
 
 def ctc_greedy_decode(logits: Any, out_len: int, blank_id: int = 0) -> List[int]:
     x = torch.as_tensor(logits)
@@ -269,13 +290,14 @@ def ctc_greedy_decode(logits: Any, out_len: int, blank_id: int = 0) -> List[int]
     y = y[y != blank_id]
     return [int(v) for v in y.cpu().tolist()]
 
+
 def decode_token_ids(token_ids: List[int], token_list: Optional[List[str]]) -> str:
     if not token_list:
         return " ".join(str(x) for x in token_ids)
     toks = [token_list[i] if 0 <= i < len(token_list) else "" for i in token_ids]
     s = "".join(toks)
     s = s.replace("▁", " ").strip()
-    s = re.sub(r"\\s+", " ", s)
+    s = re.sub(r"\s+", " ", s)
     return s
 
 
@@ -283,18 +305,31 @@ def strip_rich_tags(s: str) -> str:
     return re.sub(r"<\|.*?\|>", "", s)
 
 
-class SenseVoiceSmall:
+class SenseVoiceSmallFeature:
+    """
+    SenseVoice with Optimized Feature-Level Chunking.
+
+    Improvements over basic approach:
+    1. Dynamic chunk sizing based on model capacity
+    2. Context padding on both sides for better boundary accuracy
+    3. Overlapping frames for context continuity
+    4. Smarter padding (edge-padding vs zero-padding)
+    5. Better handling of boundary frames
+    """
     def __init__(
         self,
         model_path: str,
         assets_dir: str,
         language: str,
         textnorm: str,
+        overlap_frames: int = DEFAULT_OVERLAP_FRAMES,
+        context_frames: int = DEFAULT_CONTEXT_FRAMES,
         **kwargs,
     ):
         self.model_file = model_path
-        self.config_file = os.path.join(assets_dir, "../SenseVoiceSmall/config.yaml")
-        self.cmvn_file = os.path.join(assets_dir, "../SenseVoiceSmall/am.mvn")
+        self.assets_dir = assets_dir
+        self.overlap_frames = overlap_frames
+        self.context_frames = context_frames
 
         self.frontend = SenseVoiceFrontend.from_model_dir(assets_dir)
         self.target_sr = self.frontend.cfg.fs
@@ -305,77 +340,209 @@ class SenseVoiceSmall:
         if self.token_list is None:
             print("Warning: Failed to load tokens. Output will be token IDs.")
 
-
         weight_manager = tcim.runtime.WeightManager(0)
         option = tcim.runtime.Option(weight_manager)
         print("Loading model from", self.model_file)
         self.sess = tcim.runtime.load(self.model_file, option=option)
 
+        # Get model max feature length
+        self.max_feat_len = self.sess.get_input_info(self.sess.get_input_name(0)).shape[1]
+        print(f"Model max feature length: {self.max_feat_len}")
+
+        # Reserve space for context padding (max 10 frames per side)
+        self.max_context_per_side = 10
+
+        # Effective chunk size considering overlap
+        self.effective_chunk_size = self.max_feat_len - overlap_frames
+        if self.effective_chunk_size <= 0:
+            logger.warning(f"Overlap frames {overlap_frames} >= max_feat_len {self.max_feat_len}. Disabling overlap.")
+            self.effective_chunk_size = self.max_feat_len
+            self.overlap_frames = 0
+
+        print(f"Effective chunk size: {self.effective_chunk_size} (max_len={self.max_feat_len}, overlap={self.overlap_frames}, max_context_per_side={self.max_context_per_side})")
+
         self.language = language
         self.textnorm = textnorm
 
-    def run_inference(self, audio_files: List, raw_result: bool) -> Tuple[List[int], int]:
+    def calculate_chunk_boundaries(self, total_feat_len: int) -> List[Tuple[int, int]]:
+        """
+        Calculate chunk boundaries with optional overlap.
+
+        Returns list of (start, end) tuples where end is exclusive.
+        """
+        if total_feat_len <= self.max_feat_len:
+            return [(0, total_feat_len)]
+
+        boundaries = []
+        start = 0
+
+        while start < total_feat_len:
+            # Use effective_chunk_size for content length to leave room for context
+            content_end = start + self.effective_chunk_size
+            end = min(content_end, total_feat_len)
+            boundaries.append((start, end))
+
+            # Move start forward with overlap consideration
+            next_start = start + self.effective_chunk_size
+            if next_start >= total_feat_len:
+                break
+            start = next_start
+
+        return boundaries
+
+    def run_inference(self, audio_files: List[str], raw_result: bool) -> None:
+        """
+        Process audio files with optimized feature-level chunking.
+        """
         for audio_file in audio_files:
             logger.info(f"{'=' * 20} Process {audio_file} {'=' * 20}")
-            wav = load_data(str(audio_file), self.target_sr)
-            audio_duration = len(wav[0]) / self.target_sr * 1000
-            feat, feat_len = self.frontend.extract(wav)
 
-            inputs = make_inputs_for_sample(feat, feat_len, self.language, self.textnorm)
+            t0_total = time.time()
 
-            t0 = time.time()
-            outs = []
-            max_feat_len = self.sess.get_input_info(self.sess.get_input_name(0)).shape[1]
-            feats = inputs['speech']
-            feats_len = np.max(inputs['speech_lengths'])
-            loop_round = math.ceil(feats.shape[1] / max_feat_len)
-            for loop_idx in range(loop_round):
-                cur_feats_len = 0
-                if (loop_idx + 1) * max_feat_len > feats_len:
-                    feats_end_idx = feats_len
-                    cur_feats_len = np.array([feats_len - loop_idx * max_feat_len]).astype(np.int32)
-                    cur_feats = feats[:, loop_idx * max_feat_len : feats_end_idx, :]
-                    pad_width = max_feat_len - np.max(cur_feats_len)
-                    _pad_feats = np.zeros((cur_feats.shape[0], pad_width, cur_feats.shape[2]), dtype=np.float32)
-                    cur_feats = np.concatenate([cur_feats, _pad_feats], axis=1)
-                else:
-                    feats_end_idx = (loop_idx + 1) * max_feat_len
-                    cur_feats_len = np.array([max_feat_len]).astype(np.int32)
-                    cur_feats = feats[:, loop_idx * max_feat_len : feats_end_idx, :]
+            # Load and extract features for full audio
+            waveform = load_audio(audio_file, self.target_sr)
+            audio_duration = len(waveform) / self.target_sr
 
-                inputs["speech"] = cur_feats
-                inputs["speech_lengths"] = cur_feats_len
+            # Extract features
+            feat, feat_len = self.frontend.extract(waveform)
+            logger.info(f"Audio duration: {audio_duration:.2f}s, Feature frames: {feat_len}")
+
+            # Calculate chunk boundaries
+            boundaries = self.calculate_chunk_boundaries(feat_len)
+            logger.info(f"Split into {len(boundaries)} feature chunks "
+                       f"(max_len={self.max_feat_len}, overlap={self.overlap_frames})")
+
+            # Process each chunk with sliding window
+            confirmed_text = ""  # 已确认的文本
+            pending_text = ""    # 未确认的文本（滑动窗口）
+            slide_len = 10       # 滑动窗口长度
+            total_infer_time = 0.0
+
+            for i, (start, end) in enumerate(boundaries):
+                t0 = time.time()
+
+                content_len = end - start
+
+                # Calculate context: up to 10 per side
+                left_context = min(self.max_context_per_side, start)
+                right_context = min(self.max_context_per_side, feat_len - end)
+
+                # Ensure content + context = max_feat_len exactly
+                total_with_context = content_len + left_context + right_context
+                if total_with_context > self.max_feat_len:
+                    excess = total_with_context - self.max_feat_len
+                    content_len = content_len - excess
+                    end = start + content_len
+
+                # Calculate context boundaries
+                context_start = start - left_context
+                context_end = end + right_context
+
+                logger.info(f"Chunk {i+1}/{len(boundaries)}: content={content_len} frames, "
+                           f"context=[{left_context}, {right_context}], "
+                           f"total={content_len + left_context + right_context} frames")
+
+                # Extract chunk with context
+                chunk_feat = feat[context_start:context_end, :]
+                chunk_len = context_end - context_start
+
+                # Apply padding if needed
+                if chunk_len < self.max_feat_len:
+                    pad_width = self.max_feat_len - chunk_len
+                    last_frame = chunk_feat[-1:, :]
+                    pad_feats = np.tile(last_frame, (pad_width, 1))
+                    chunk_feat = np.vstack([chunk_feat, pad_feats])
+
+                inputs = make_inputs_for_sample(chunk_feat, chunk_len, self.language, self.textnorm)
+
+                # Run inference
                 for k, v in inputs.items():
                     self.sess.set_input(k, v)
                 self.sess.run()
                 self.sess.sync()
-                if len(outs) < 2:
-                    outs.append(
-                            self.sess.get_output(self.sess.get_output_name(0)).numpy()
-                        )
-                    outs.append(
-                            self.sess.get_output(self.sess.get_output_name(1)).numpy()
-                        )
+
+                # Get outputs
+                logits = self.sess.get_output(self.sess.get_output_name(0)).numpy()
+                lens = self.sess.get_output(self.sess.get_output_name(1)).numpy()
+
+                # Calculate how many logits correspond to context frames
+                ctc_ratio = lens[0] / chunk_len if chunk_len > 0 else 0.25
+                left_context_logits = int(left_context * ctc_ratio)
+                right_context_logits = int(right_context * ctc_ratio)
+
+                # Crop context from both sides
+                start_idx = left_context_logits
+                end_idx = int(lens[0]) - right_context_logits
+
+                # Handle overlap with previous chunk
+                if i > 0:
+                    overlap_logits = int(content_len * ctc_ratio * self.overlap_frames / self.max_feat_len)
+                    if overlap_logits > 0:
+                        end_idx -= overlap_logits
+
+                chunk_logits = logits[:, start_idx:end_idx, :]
+                chunk_lens = end_idx - start_idx
+
+                # Decode this chunk
+                chunk_token_ids = ctc_greedy_decode(chunk_logits[0], chunk_lens)
+                chunk_text = decode_token_ids(chunk_token_ids, self.token_list)
+                chunk_text = strip_rich_tags(chunk_text)
+
+                # Sliding window: keep last slide_len chars as pending
+                if len(chunk_text) > slide_len:
+                    confirm_part = chunk_text[:-slide_len]
+                    pending_part = chunk_text[-slide_len:]
+
+                    if pending_text:
+                        merged = self._merge_with_overlap(pending_text, confirm_part)
+                        confirmed_text += merged
+                    else:
+                        confirmed_text += confirm_part
+
+                    pending_text = pending_part
                 else:
-                    outs[0] = np.concatenate([outs[0], self.sess.get_output(self.sess.get_output_name(0)).numpy()], axis=1)
-                    outs[1] = outs[1] + self.sess.get_output(self.sess.get_output_name(1)).numpy()
+                    pending_text = chunk_text
 
-            t1 = (time.time() - t0) * 1000.0
+                t1 = (time.time() - t0) * 1000.0
+                total_infer_time += t1
 
-            logits, lens = outs
-            out_len = int(lens[0]) if hasattr(lens, "__len__") else int(lens)
-            token_ids = ctc_greedy_decode(logits[0], out_len)
-            text = decode_token_ids(token_ids, self.token_list)
+            # Append final pending
+            if pending_text:
+                confirmed_text += pending_text
 
-            clean_text = strip_rich_tags(text)
+            clean_text = confirmed_text
             if raw_result:
                 logger.info(f"Raw Output: {text}")
             logger.info(f"Clean Text: {clean_text}")
-            rtf =  t1 / audio_duration
-            logger.success(f"Performance: ")
-            logger.success(f"  audio_duration: {audio_duration :.2f} ms")
-            logger.success(f"  infer time {t1 :.2f} ms")
-            logger.success(f"  rtf(infer_time/ audio_duration): {rtf:.2f}")
+
+            # Performance stats
+            t_total = (time.time() - t0_total) * 1000.0
+            audio_duration_ms = audio_duration * 1000
+            rtf = total_infer_time / audio_duration_ms
+
+            logger.success(f"Performance:")
+            logger.success(f"  audio_duration: {audio_duration_ms:.2f} ms")
+            logger.success(f"  total infer time: {total_infer_time:.2f} ms")
+            logger.success(f"  end-to-end time: {t_total:.2f} ms")
+            logger.success(f"  feature chunks: {len(boundaries)}")
+            logger.success(f"  rtf (infer_time/audio_duration): {rtf:.2f}")
+
+    def _merge_with_overlap(self, s1: str, s2: str) -> str:
+        """
+        Merge two strings with overlap detection.
+        Find the longest suffix of s1 that matches prefix of s2.
+        """
+        if not s1 or not s2:
+            return s1 + s2
+
+        # Try to find longest overlap
+        max_overlap = min(len(s1), len(s2))
+        for i in range(max_overlap, 0, -1):
+            if s1[-i:] == s2[:i]:
+                return s1 + s2[i:]
+
+        # No overlap found
+        return s1 + s2
 
 
 if __name__ == "__main__":
@@ -386,15 +553,18 @@ if __name__ == "__main__":
         smi_monitor = smi.DeviceMonitor(0, 100)
         smi_monitor.start()
     if HOUMO_TARGET == "xh2":
-        sensevoice_small = SenseVoiceSmall(
+        sensevoice = SenseVoiceSmallFeature(
             args.model_path,
             args.assets_dir,
             args.language,
             args.textnorm,
+            overlap_frames=args.overlap_frames,
+            context_frames=args.context_frames,
         )
     else:
-        raise ValueError("Unsupport houmo target!")
+        raise ValueError("Unsupported houmo target!")
 
-    sensevoice_small.run_inference(args.audio_files, args.raw_result)
+    sensevoice.run_inference(args.audio_files, args.raw_result)
+
     if args.device_monitor:
         smi_monitor.stop()

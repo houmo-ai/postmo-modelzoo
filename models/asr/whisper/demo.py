@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-# Copyright (c) 2025 HOUMO AI
+# Copyright (c) 2026 HOUMO AI
 #
 # File: demo.py
 # Description:
@@ -192,6 +192,13 @@ def get_args() -> argparse.Namespace:
         default=os.path.join("output", HOUMO_TARGET, "whisper_prefill.hmm"),
         help="houmo prefill model path",
     )
+    parser.add_argument(
+        "--chunk_size",
+        dest="chunk_size",
+        type=int,
+        default=30,
+        help="chunk size of audio",
+    )
     args = parser.parse_args()
     return args
 
@@ -260,14 +267,30 @@ class HmWhisper:
         return input_names
 
 
-def asr(hmwhisper, processor, input_features):
-    slide_len = 10
-    skip_tokens = 0
+def asr(hmwhisper, processor, input_features, state=None, slide_len=10):
+    """
+    Args:
+        state: Dictionary containing cross-chunk continuous state:
+            - last_response: Last decoded text
+            - skip_tokens: Number of tokens to skip
+    Returns:
+        (prefill_ids_len, all_ids_len, ttft_time, total_time, audio_duration, state)
+    """
+    if state is None:
+        # 第一次调用，初始化状态
+        skip_tokens = 0
+        last_response = ""
+    else:
+        # 使用传入的状态（只保持文本解码的连续性）
+        skip_tokens = state["skip_tokens"]
+        last_response = state["last_response"]
+
     start_time = time.time()
     detect_ids = torch.tensor([[50258]])  # [1,1]
     default_decoder_ids = torch.tensor([[50258, 0, 50359, 50363]])  # [1,1]
     cache_position = torch.tensor([[0]])
     cache_position_prefill = torch.tensor([[0, 1, 2, 3]])
+    cnt = 3
 
     # detect language  input_features  detect_ids => [1,51865]
     detect_encoder_out = hmwhisper.run_encoder(input_features.half())
@@ -355,8 +378,10 @@ def asr(hmwhisper, processor, input_features):
     ttft_time = time.time() - start_time
     last_response = processor.decode(default_decoder_ids[0][-slide_len:])
 
-    logger.success("transcription:")
     print("\033[1;95m{}".format(decode_response), end="", flush=True)
+
+    # 重新开始计时，仅测量解码阶段
+    start_time = time.time()
 
     for i in range(48):
         cache = hmwhisper.prefill.get_dev_output(
@@ -367,7 +392,6 @@ def asr(hmwhisper, processor, input_features):
             hmwhisper.decoder.get_output_name(i + 1), cache
         )
 
-    cnt = 3
     while default_decoder_ids.shape[1] < 448 and next_tokens.item() != 50257:
         cnt += 1
         mask_atten = torch.ones(([1, 16, 1, 1024])).half()
@@ -401,12 +425,18 @@ def asr(hmwhisper, processor, input_features):
             skip_tokens += 1
         decode_response = "" if next_tokens.item() == 50257 else decode_response
 
-    print("\033[0m")
+    # 保存状态供下一个chunk使用（只保持文本解码的连续性）
+    state = {
+        "last_response": last_response,
+        "skip_tokens": skip_tokens,
+    }
     return (
         prefill_ids_len,
         default_decoder_ids.shape[1],
         ttft_time,
         (time.time() - start_time),
+        len(input_features[0][0]) * 0.02,  # audio duration in seconds, 20ms per frame
+        state,
     )
 
 
@@ -425,28 +455,66 @@ if __name__ == "__main__":
 
     processor = WhisperProcessor.from_pretrained(args.processor_dir)
 
-    sample, _ = sf.read(args.audio)
-    input_features = processor(sample, 16000, return_tensors="pt").input_features
+    sample, sr = sf.read(args.audio)
+    if sr != 16000:
+        import librosa
+        sample = librosa.resample(sample, orig_sr=sr, target_sr=16000)
+        logger.info(f"Resampled audio from {sr}Hz to 16000Hz")
+        sr = 16000
+    total_samples = len(sample)
+    chunk_size = int(args.chunk_size * sr)
+    total_samples = len(sample)
+    chunks = []
+
+    for start in range(0, total_samples, chunk_size):
+        end = start + chunk_size
+        chunk = sample[start:end]
+        if len(chunk) < chunk_size:
+            chunk = np.pad(chunk, (0, chunk_size - len(chunk)), mode="constant")
+        chunks.append(chunk)
+    chunks_array = np.array(chunks)
+
+    logger.success("transcription:")
+    total_ttft_time = 0.0
+    total_decode_time = 0.0
+    total_tokens = 0
+    total_prefill_tokens = 0
+    total_audio_duration = 0.0
+    state = None  # initial state is None, first chunk will initialize it
+    for i, chunk in enumerate(chunks):
+        input_features = processor(chunk, sampling_rate=sr, return_tensors="pt").input_features
+        prefill_ids_len, all_ids_len, ttft_time, total_time, audio_duration, state = asr(
+            hmwhisper, processor, input_features, state
+        )
+        total_ttft_time += ttft_time
+        total_decode_time += total_time
+        total_tokens += all_ids_len
+        total_prefill_tokens += prefill_ids_len
+        total_audio_duration += audio_duration
+
+    # reset color and print newline
+    print("\033[0m")
 
     # run whisper model
-    prefill_ids_len, all_ids_len, ttft_time, total_time = asr(
-        hmwhisper, processor, input_features
-    )
-    decode_time = total_time - ttft_time
+
+    e2e_time = total_decode_time + total_ttft_time  # end-to-end total time
 
     logger.success(
-        f"Output {all_ids_len} tokens, Decode Cost {decode_time*1000:.3f} ms"
+        f"Output {total_tokens} tokens, Decode Cost {total_decode_time*1000:.3f} ms"
     )
     logger.success(
-        f"Decode Speed: {(all_ids_len - prefill_ids_len) / decode_time:.2f} tokens/s"
+        f"Decode Speed: {(total_tokens - total_prefill_tokens) / total_decode_time:.2f} tokens/s"
     )
-    logger.success(f"TTFT (Time to First Token): {ttft_time * 1000:.3f} ms")
+    logger.success(f"TTFT (Time to First Token): {total_ttft_time * 1000:.3f} ms")
     logger.success(
-        f"TPOT (Time Per Output Token): {decode_time * 1000 / (all_ids_len - prefill_ids_len):.3f} ms/token"
-    )
-    logger.success(
-        f"E2E Latency (End-to-End Latency): {(ttft_time +decode_time):.3f} seconds"
+        f"TPOT (Time Per Output Token): {total_decode_time * 1000 / (total_tokens - total_prefill_tokens):.3f} ms/token"
     )
     logger.success(
-        f"E2E TPS (End-to-End Tokens Per Second): {all_ids_len / (ttft_time +decode_time):.2f} tokens/s"
+        f"E2E Latency (End-to-End Latency): {e2e_time:.3f} seconds"
+    )
+    logger.success(
+        f"E2E TPS (End-to-End Tokens Per Second): {total_tokens / e2e_time:.2f} tokens/s"
+    )
+    logger.success(
+        f"RTF (Real-Time Factor): {e2e_time / total_audio_duration:.4f} (lower is better, <1 means real-time)"
     )

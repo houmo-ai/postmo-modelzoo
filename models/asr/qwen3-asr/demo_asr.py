@@ -374,7 +374,13 @@ class Qwen3Asr:
         # Load audio
         audio_load_start = time.perf_counter()
         if os.path.exists(audio_path):
-            audio, sr = librosa.load(audio_path, sr=16000, mono=True)
+            sample, orig_sr = librosa.load(audio_path, mono=True)
+            if orig_sr != 16000:
+                audio = librosa.resample(sample, orig_sr=orig_sr, target_sr=16000)
+                logger.info(f"Resampled audio from {orig_sr}Hz to 16000Hz")
+                sr = 16000
+            else:
+                audio, sr = librosa.load(audio_path, sr=16000, mono=True)
         else:
             logger.error(f"Audio file {audio_path} does not exist.")
             return
