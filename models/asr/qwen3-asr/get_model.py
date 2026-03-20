@@ -28,6 +28,7 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH")
 
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -60,20 +61,6 @@ def get_args() -> argparse.Namespace:
         default="jfrog",
         choices=["jfrog", "modelscope"],
         help="download the model from which source",
-    )
-    parser.add_argument(
-        "--context_length",
-        dest="context_length",
-        type=str,
-        default="2k",
-        help="context length",
-    )
-    parser.add_argument(
-        "--batch",
-        dest="batch",
-        type=int,
-        default=1,
-        help="batch size",
     )
     parser.add_argument(
         "--ndevice",
@@ -117,8 +104,6 @@ if __name__ == "__main__":
             "model_size": args.model_size,
             "ncore": 2,
             "ndevice": args.ndevice,
-            "context_len": args.context_length,
-            "batch": args.batch,
         },
         "modelscope_repo": {
             "repo_ids": ["Qwen/Qwen3-ASR-0.6B"],
@@ -129,7 +114,7 @@ if __name__ == "__main__":
     if args.model_name == "qwen3_asr" and args.model_size == "1.7b":
         model_cfgs["modelscope_repo"]["repo_ids"][0] = "Qwen/Qwen3-ASR-1.7B"
 
-    if args.model_name =="qwen3_forcealigner":
+    if args.model_name == "qwen3_forcealigner":
         model_cfgs["modelscope_repo"]["repo_ids"][0] = "Qwen/Qwen3-ForcedAligner-0.6B"
 
     _, ret_dict = hmatc_get_file(
