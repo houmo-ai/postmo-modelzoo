@@ -26,7 +26,7 @@
 启动 Docker 时映射 GPU 并指定可用的 GPU ID：
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py39-x86_64 /bin/bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86_64 /bin/bash
 ```
 
 ### 2.2 依赖库安装
@@ -140,23 +140,15 @@ python build.py
 
 ```bash
 output/xh2/
-├── qwen3_prefill_part0.hmm     # 预填充部分 0 的编译模型
-├── qwen3_prefill_part1.hmm     # 预填充部分 1 的编译模型
-├── qwen3_prefill_part2.hmm     # 预填充部分 2 的编译模型
-├── qwen3_prefill_part3.hmm     # 预填充部分 3 的编译模型
-├── qwen3_decode_part0.hmm      # 解码部分 0 的编译模型
-├── qwen3_decode_part1.hmm      # 解码部分 1 的编译模型
-├── qwen3_decode_part2.hmm      # 解码部分 2 的编译模型
-├── qwen3_decode_part3.hmm      # 解码部分 3 的编译模型
+├── qwen3_pipeline_prefill_part0.hmm     # 预填充部分 0 的编译模型
+├── qwen3_pipeline_prefill_part1.hmm     # 预填充部分 1 的编译模型
+├── qwen3_pipeline_decode_part0.hmm      # 解码部分 0 的编译模型
+├── qwen3_pipeline_decode_part1.hmm      # 解码部分 1 的编译模型
 └── tcim/                       # 编译中间文件
-    ├── qwen3_prefill_part0/
-    ├── qwen3_prefill_part1/
-    ├── qwen3_prefill_part2/
-    ├── qwen3_prefill_part3/
-    ├── qwen3_decode_part0/
-    ├── qwen3_decode_part1/
-    ├── qwen3_decode_part2/
-    └── qwen3_decode_part3/
+    ├── qwen3_pipeline_prefill_part0/
+    ├── qwen3_pipeline_prefill_part1/
+    ├── qwen3_pipeline_decode_part0/
+    ├── qwen3_pipeline_decode_part1/
 ```
 
 ---

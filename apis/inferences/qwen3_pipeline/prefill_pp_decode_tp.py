@@ -262,8 +262,8 @@ class SamplingManager:
 
 def gen_prefill_params(device_id : int, args):
     model_path = args.model_path
-    prefill_path = os.path.join(model_path, f"qwen3_prefill_part{device_id}.hmm")
-    decode_path = os.path.join(model_path, f"qwen3_decode_part{device_id}.hmm")
+    prefill_path = os.path.join(model_path, f"qwen3_pipeline_prefill_part{device_id}.hmm")
+    decode_path = os.path.join(model_path, f"qwen3_pipeline_decode_part{device_id}.hmm")
     return {
         "device_id" : device_id,
         "prefill_path": prefill_path,
@@ -276,7 +276,7 @@ def gen_prefill_params(device_id : int, args):
     }
 
 def gen_decode_params(args):
-    decode_path = os.path.join(args.model_path, f"qwen3_decode.hmms")
+    decode_path = os.path.join(args.model_path, "qwen3_pipeline_decode.hmms")
     return {
         "device_id" : [k for k in range(args.ndevice)],
         "decode_path": decode_path,

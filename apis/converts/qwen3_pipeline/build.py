@@ -26,11 +26,11 @@ import psutil
 import threading
 import multiprocessing
 import argparse
-
+import glob
 import logging
 from pathlib import Path
 
-logging.basicConfig(level="DEBUG")
+logging.basicConfig(level="INFO")
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -38,8 +38,10 @@ assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
 GOLDEN_THRESH = 0.98
 
+
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
+
 
 def cosine_distance(data1, data2) -> float:
     """
@@ -226,10 +228,13 @@ def get_n_blocks(model_path):
         else:
             cache_start_idx += 1
 
-    assert n_kvcaches % 2 == 0, f"n_kvcaches({n_kvcaches}) must be even, please check your model."
+    assert (
+        n_kvcaches % 2 == 0
+    ), f"n_kvcaches({n_kvcaches}) must be even, please check your model."
     n_blocks = n_kvcaches // 2
 
     return n_blocks, cache_start_idx
+
 
 def clip(raw_path, split_paths, ndevice, model_name):
     """
@@ -242,7 +247,9 @@ def clip(raw_path, split_paths, ndevice, model_name):
         nblocks (int): Total number of blocks in the model
     """
     n_blocks, cache_start_idx = get_n_blocks(raw_path)
-    assert n_blocks % 2 == 0, f"n_blocks({n_blocks}) must be even, please check your model."
+    assert (
+        n_blocks % 2 == 0
+    ), f"n_blocks({n_blocks}) must be even, please check your model."
     model = onnx.load(raw_path, load_external_data=False)
 
     mid_layer_names = []
@@ -268,8 +275,12 @@ def clip(raw_path, split_paths, ndevice, model_name):
             for j in range(cache_start_idx):
                 inputs.append(model.graph.input[j].name)
             for j in range(n_kvcache_per_stage):
-                inputs.append(f"model_layers_{j + i * n_kvcache_per_stage}_self_attn_kcache_input")
-                inputs.append(f"model_layers_{j + i * n_kvcache_per_stage}_self_attn_vcache_input")
+                inputs.append(
+                    f"model_layers_{j + i * n_kvcache_per_stage}_self_attn_kcache_input"
+                )
+                inputs.append(
+                    f"model_layers_{j + i * n_kvcache_per_stage}_self_attn_vcache_input"
+                )
         else:
             for j in range(cache_start_idx):
                 if j == 0:
@@ -277,8 +288,12 @@ def clip(raw_path, split_paths, ndevice, model_name):
                 else:
                     inputs.append(model.graph.input[j].name)
             for j in range(n_kvcache_per_stage):
-                inputs.append(f"model_layers_{j + i * n_kvcache_per_stage}_self_attn_kcache_input")
-                inputs.append(f"model_layers_{j + i * n_kvcache_per_stage}_self_attn_vcache_input")
+                inputs.append(
+                    f"model_layers_{j + i * n_kvcache_per_stage}_self_attn_kcache_input"
+                )
+                inputs.append(
+                    f"model_layers_{j + i * n_kvcache_per_stage}_self_attn_vcache_input"
+                )
         stages_inputs.append(inputs)
 
     for i in range(ndevice):
@@ -286,13 +301,13 @@ def clip(raw_path, split_paths, ndevice, model_name):
         extract_dir = os.path.dirname(extract_file_path)
         os.makedirs(extract_dir, exist_ok=True)
         onnx.utils.extract_model(
-                Path(raw_path),
-                Path(extract_file_path),
-                input_names=stages_inputs[i],
-                output_names=stages_outputs[i],
-                check_model=False,
-                infer_shapes=False,
-            )
+            Path(raw_path),
+            Path(extract_file_path),
+            input_names=stages_inputs[i],
+            output_names=stages_outputs[i],
+            check_model=False,
+            infer_shapes=False,
+        )
 
         extract_model = onnx.load(extract_file_path)
         onnx.save(
@@ -305,6 +320,7 @@ def clip(raw_path, split_paths, ndevice, model_name):
         if os.path.exists(extract_file_path.replace(".onnx", ".onnx.data")):
             os.remove(extract_file_path.replace(".onnx", ".onnx.data"))
         print(f"save clip model part{i} to {extract_file_path}.")
+
 
 def build(
     model_name,
@@ -372,20 +388,49 @@ if __name__ == "__main__":
     ndevice = args.ndevice
     profile = {}
 
+    decode_dirs = sorted(
+        path
+        for path in glob.glob(os.path.join(model_dir, "*decode*"))
+        if os.path.isdir(path)
+    )
+    if not decode_dirs:
+        raise FileNotFoundError(
+            f'No subdirectory containing "decode" found under: {model_dir}'
+        )
+    decode_dir = os.path.abspath(decode_dirs[0])
+    prefill_dir = os.path.join(model_dir, "prefill")
+
     # clip model to 2 parts
-    raw_path = os.path.join(model_dir, f"prefill/hmquant_{model_name}_with_act.onnx")
-    prefill_split_paths = [os.path.join(model_dir, f"prefill/hmquant_{model_name}_part{k}_with_act.onnx") for k in range(ndevice)]
-    clip(raw_path, prefill_split_paths, ndevice, model_name)
-    raw_path = os.path.join(model_dir, f"decoder/hmquant_{model_name}_with_act.onnx")
-    decode_split_paths = [os.path.join(model_dir, f"decoder/hmquant_{model_name}_part{k}_with_act.onnx") for k in range(ndevice)]
-    clip(raw_path, decode_split_paths, ndevice, model_name)
+    onnx_files = glob.glob(f"{prefill_dir}/hmquant_*.onnx")
+    prefill_raw_path = os.path.abspath(onnx_files[0]) if onnx_files else ""
+    if not prefill_raw_path or not os.path.exists(prefill_raw_path):
+        raise FileNotFoundError(
+            f"No ONNX file found in {prefill_dir} with pattern hmquant_*.onnx"
+        )
+    prefill_split_paths = [
+        os.path.join(prefill_dir, f"hmquant_{model_name}_part{k}_with_act.onnx")
+        for k in range(ndevice)
+    ]
+    clip(prefill_raw_path, prefill_split_paths, ndevice, model_name)
+
+    onnx_files = glob.glob(f"{decode_dir}/hmquant_*.onnx")
+    decode_raw_path = os.path.abspath(onnx_files[0]) if onnx_files else ""
+    if not decode_raw_path or not os.path.exists(decode_raw_path):
+        raise FileNotFoundError(
+            f"No ONNX file found in {decode_dir} with pattern hmquant_*.onnx"
+        )
+    decode_split_paths = [
+        os.path.join(decode_dir, f"hmquant_{model_name}_part{k}_with_act.onnx")
+        for k in range(ndevice)
+    ]
+    clip(decode_raw_path, decode_split_paths, ndevice, model_name)
 
     # build model
     for i in range(ndevice):
-        model_path = f"prefill/hmquant_{model_name}_part{i}_with_act.onnx"
+        model_path = f"hmquant_{model_name}_part{i}_with_act.onnx"
         build(
             f"{model_name}_prefill_part{i}",
-            model_dir,
+            prefill_dir,
             model_path,
             output_dir,
             profile,
@@ -397,10 +442,10 @@ if __name__ == "__main__":
             flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
-        model_path = f"decoder/hmquant_{model_name}_part{i}_with_act.onnx"
+        model_path = f"hmquant_{model_name}_part{i}_with_act.onnx"
         build(
             f"{model_name}_decode_part{i}",
-            model_dir,
+            decode_dir,
             model_path,
             output_dir,
             profile,
@@ -413,10 +458,10 @@ if __name__ == "__main__":
             prefill_length=args.prefill_length,
         )
 
-    model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
+    model_path = os.path.basename(decode_raw_path)
     build(
         f"{model_name}_decode",
-        model_dir,
+        decode_dir,
         model_path,
         output_dir,
         profile,
