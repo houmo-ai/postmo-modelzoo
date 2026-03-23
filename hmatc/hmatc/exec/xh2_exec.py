@@ -304,10 +304,8 @@ class Xh2Exec(BaseExec):
         data_list = []
         for filename in filenames:
             _, ext = os.path.splitext(filename)
-            if (
-                ext not in SUPPORT_IMAGE_FORMATS
-                if self.is_image_single_input
-                else [".npz"]
+            if ext not in (
+                SUPPORT_IMAGE_FORMATS if self.is_image_single_input else [".npz"]
             ):
                 continue
             data_list.append(os.path.join(calib_data, filename))
