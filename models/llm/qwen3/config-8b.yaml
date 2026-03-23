@@ -1,5 +1,5 @@
 Streams:
-  - ModelName: Qwen3-14B
+  - ModelName: Qwen3-8B
     prefill: output/xh2/qwen3_prefill.hmm
     decode: output/xh2/qwen3_decode.hmm
     embedding: output/xh2/hmquant/quant_embedding.bin
@@ -9,7 +9,7 @@ Streams:
     loop: 1
     batch: 1
     no_warm_up: ''
-  - ModelName: Qwen3-14B
+  - ModelName: Qwen3-8B
     prefill: output/xh2/qwen3_prefill.hmm
     decode: output/xh2/qwen3_decode.hmm
     embedding: output/xh2/hmquant/quant_embedding.bin
@@ -19,7 +19,7 @@ Streams:
     loop: 1
     batch: 1
     no_warm_up: ''
-  - ModelName: Qwen3-14B
+  - ModelName: Qwen3-8B
     prefill: output/xh2/qwen3_prefill.hmm
     decode: output/xh2/qwen3_decode.hmm
     embedding: output/xh2/hmquant/quant_embedding.bin
@@ -29,5 +29,4 @@ Streams:
     loop: 1
     batch: 1
     no_warm_up: ''
-
 dump_file: perf_result.yaml

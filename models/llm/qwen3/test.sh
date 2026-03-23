@@ -3,13 +3,13 @@ set -e
 
 STEP="all"
 MODEL_TYPE="precompiled"
-MULTI_BATCH="false"
+MODEL_SIZE="8b"
 
 show_help() {
     echo "Usage: $0 [options]"
     echo "  -s, --step         execution step, default is all, support: all, demo, build."
-    echo "  -b, --multi_batch  execution multibatch demo, default is false, support: true/false."
     echo "  -t, --model_type   The method for getting the compiled model, default is precompiled, support: precompiled, compile."
+    echo "  -m, --model_size   Model size: 8b or 14b, default is 8b."
     echo "  -h, --help         help information"
     exit 0
 }
@@ -20,12 +20,12 @@ while [[ $# -gt 0 ]]; do
             STEP="$2"
             shift 2
         ;;
-        -b|--multi_batch)
-            MULTI_BATCH="$2"
-            shift 2
-        ;;
         -t|--model_type)
             MODEL_TYPE="$2"
+            shift 2
+        ;;
+        -m|--model_size)
+            MODEL_SIZE="$2"
             shift 2
         ;;
         -h|--help)
@@ -37,6 +37,15 @@ while [[ $# -gt 0 ]]; do
         ;;
     esac
 done
+
+if [[ "$MODEL_SIZE" == "8b" ]]; then
+    PERF_CONFIG="config-8b.yaml"
+elif [[ "$MODEL_SIZE" == "14b" ]]; then
+    PERF_CONFIG="config-14b.yaml"
+else
+    echo "Error: Unsupported model size '$MODEL_SIZE', support: 8b or 14b." >&2
+    exit 1
+fi
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
@@ -88,8 +97,8 @@ fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
     if [[ "$MODEL_TYPE" == "precompiled" ]]; then
-        echo "Download precompiled model."
-        python3 get_model.py --type hmm
+        echo "Download precompiled model (size: ${MODEL_SIZE})."
+        python3 get_model.py --type hmm --model_size ${MODEL_SIZE}
     else
         FOUND_GPU=0
         echo "Checking GPU..."
@@ -125,10 +134,10 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
         fi
 
         if [[ "$FOUND_PACKAGE" -eq 1 && "$FOUND_GPU" -eq 1 ]]; then
-            echo "Start to quant and compile model."
-            python3 get_model.py --type raw
-            python3 ptq.py
-            python3 build.py
+            echo "Start to quant and compile model (size: ${MODEL_SIZE})."
+            python3 get_model.py --type raw --model_size ${MODEL_SIZE}
+            python3 ptq.py --model_size ${MODEL_SIZE}
+            python3 build.py --model_size ${MODEL_SIZE}
         else
             echo "✗ Not support model quantization and compilation."
             exit 1
@@ -137,15 +146,10 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
 fi
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
-    if [ "$MULTI_BATCH" = "false" ]; then
-        echo "Execute demo."
-        python3 demo.py
-        python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt --type llm
-        llm_perf -c config.yaml
-    else
-        echo "Execute multi-batch demo with batch size: $MULTI_BATCH"
-        python3 demo_multibatch.py --forbid_flush
-    fi
+    echo "Execute demo (size: ${MODEL_SIZE})."
+    python3 demo.py --model_size ${MODEL_SIZE}
+    python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt --type llm
+    llm_perf -c "${PERF_CONFIG}"
 fi
 
 if [[ "$VENV_FLAG" -eq "1" ]]; then

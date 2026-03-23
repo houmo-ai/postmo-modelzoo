@@ -502,6 +502,18 @@ inferences_qwen3:
         args: all
   test:
     - inferences_qwen3_test
+inferences_qwen3_multibatch:
+  include:
+    - apis/inferences/qwen3_multibatch
+  exclude:
+    - apis/inferences/qwen3_multibatch/README.MD
+  example_case:
+    - inferences_qwen3_multibatch_test:
+        test_type: apis_tests
+        script: qwen3_multibatch
+        args: all
+  test:
+    - inferences_qwen3_multibatch_test
 inferences_qwen3_speculative:
   include:
     - apis/inferences/qwen3_speculative

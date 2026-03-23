@@ -108,3 +108,12 @@ def test_apis_inferences_yolov5s_resnet50_multibatch(setup_logging) -> None:
 def test_apis_inferences_qwen3_speculative(setup_logging) -> None:
     example_name = "qwen3_speculative"
     _inference_func(example_name, setup_logging)
+
+@pytest.mark.apis
+@pytest.mark.qwen3_multibatch
+@pytest.mark.inference
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_apis_inferences_qwen3_multibatch(setup_logging) -> None:
+    example_name = "qwen3_multibatch"
+    _inference_func(example_name, setup_logging)

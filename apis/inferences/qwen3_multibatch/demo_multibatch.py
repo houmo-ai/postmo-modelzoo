@@ -6,6 +6,7 @@
 # Description:
 #   Qwen3 Inference Demo - Python script for running Qwen3
 # automatic speech recognition on HOUMO AI device.
+#   Example for Qwen3-8B 16K 4-batch model.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,6 +36,7 @@ from loguru import logger
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def is_valid_char(cp):
@@ -62,7 +64,7 @@ def get_args() -> argparse.Namespace:
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="qwen3-14b",
+        default="qwen3-8b",
         help="tokenizer dir",
     )
     parser.add_argument(
@@ -120,6 +122,7 @@ class HmQwen:
             f"model_layers_{i}_self_attn_vcache_input" for i in range(self.nblocks)
         ]
         option1.set_dummy_tensors(dummy_tensor_names)
+
         self.prefill_length = self.prefill.get_input_info(
             self.prefill.get_input_name(0)
         ).shape[1]
@@ -129,9 +132,8 @@ class HmQwen:
         self.context_max_length = self.decode.get_input_info(
             self.decode.get_input_name(3)
         ).shape[2]
-        self.batch = self.decode.get_input_info(
-            self.decode.get_input_name(0)
-        ).shape[0]
+        self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
+
         self.flush = not forbid_flush
         self.next_ids = [0] * self.batch
         self.current_questions = [""] * self.batch
@@ -237,13 +239,13 @@ class HmQwen:
                 dtype=inputs_embeds.dtype,
                 device=inputs_embeds.device,
             )
+
             input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
                 1, self.prefill_length, self.embedding_len
             )
             valid_length_data = np.array([valid_length]).astype("int32")
             current_length_data = np.array([current_length]).astype("int32")
-            valid_length_data = np.array([valid_length]).astype("int32")
-            current_length_data = np.array([current_length]).astype("int32")
+
             input_name = self.prefill.get_input_name(0)
             valid_length_name = self.prefill.get_input_name(1)
             current_length_name = self.prefill.get_input_name(2)

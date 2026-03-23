@@ -2,7 +2,7 @@
 #
 # File: get_model.py
 # Description:
-#   Download Qwen3-8B model for text generation tasks.
+#   Download Qwen3 model (8B/14B) for text generation tasks.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ def get_args() -> argparse.Namespace:
         type=str,
         default="hmm",
         choices=["raw", "hmm"],
-        help="which resource to get, choise in [raw, hmm]",
+        help="which resource to get, choice in [raw, hmm]",
     )
     parser.add_argument(
         "--download_dir",
@@ -81,6 +81,14 @@ def get_args() -> argparse.Namespace:
         default=1,
         help="device number",
     )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default="8b",
+        choices=["8b", "14b"],
+        help="model size: 8b or 14b",
+    )
     args = parser.parse_args()
     return args
 
@@ -88,21 +96,37 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
 
+    # Model configurations based on size
+    model_configs = {
+        "8b": {
+            "model_size": "8b",
+            "ncore": 2,
+            "modelscope_repo": ["qwen/qwen3-8b"],
+        },
+        "14b": {
+            "model_size": "14b",
+            "ncore": 2,
+            "modelscope_repo": ["qwen/qwen3-14b"],
+        },
+    }
+
+    config = model_configs[args.model_size]
+
     model_cfgs = {
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
         "model_name": "qwen3",
         "model_info": {
-            "model_size": "8b",
-            "ncore": 2,
+            "model_size": config["model_size"],
+            "ncore": config["ncore"],
             "ndevice": args.ndevice,
             "context_len": args.context_length,
             "prefill_len": 256,
             "batch": args.batch,
         },
         "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
-        "modelscope_repo": {"repo_ids": ["qwen/qwen3-8b"]},
+        "modelscope_repo": {"repo_ids": config["modelscope_repo"]},
     }
 
     _, ret_dict = hmatc_get_file(

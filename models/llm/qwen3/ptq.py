@@ -3,7 +3,7 @@
 # File: ptq.py
 # Description:
 #   Post-Training Quantization Tool - Python script for quantizing
-# Qwen3 models using post-training quantization techniques.
+# Qwen3 models (8B/14B) using post-training quantization techniques.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -122,7 +122,19 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("--model", type=str, default="qwen3-8b")
+    parser.add_argument(
+        "--model_size",
+        type=str,
+        default="8b",
+        choices=["8b", "14b"],
+        help="model size: 8b or 14b",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="model path (default: qwen3-8b or qwen3-14b based on model_size)",
+    )
     parser.add_argument(
         "--model-name", type=str, default="qwen3", help="output hmonnx model name"
     )
@@ -146,8 +158,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--calib_data",
         type=str,
-        default="../../../hmodel/xh2/examples/xh_gen_data/gen_qwen3_8b.jsonl",
-        help="calibration dataset choose",
+        default=None,
+        help="calibration dataset path (default: auto-select based on model_size)",
     )
     parser.add_argument(
         "--mix_search", type=str, default=None, help="mix search settings"
@@ -155,7 +167,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--num_logits_to_keep", type=int, default=1, help="not for test ppl"
     )
+    parser.add_argument(
+        "--gptqmodel", action="store_true", help="use gptqmodel to quant (14b only)"
+    )
     args = parser.parse_args()
+
+    # Set default values based on model_size
+    if args.model is None:
+        args.model = f"qwen3-{args.model_size}"
+
+    if args.calib_data is None:
+        args.calib_data = (
+            "../../../hmodel/xh2/examples/xh_gen_data/gen_qwen3_8b.jsonl"
+        )
 
     return args
 

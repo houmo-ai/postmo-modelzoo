@@ -251,7 +251,7 @@ def execute_apis_examples(example_name: str, setup_logging):
         or example_info["get_model_params"].get(HOUMO_BACKEND, None) is None
     ):
         cmd_list = ["python3", "get_model.py"]
-        if example_name != "qwen3":
+        if example_name not in ["qwen3", "qwen3_multibatch"]:
             cmd_list += ["--model_dir", model_set_dir]
         lock_file = model_set_dir + "/lock.lock"
         with ModelResourceLock(

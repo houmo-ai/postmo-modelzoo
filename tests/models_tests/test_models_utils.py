@@ -369,6 +369,47 @@ def _download_models(
     return flag
 
 
+def _check_existed_models(
+    compile_case_id, get_model_params, model_res_dir, model_set_dir
+):
+    other_params = []
+    if not compile_case_id:
+        return other_params
+
+    model_exist = -1
+    if "extract_dir" in get_model_params:
+        for idx, tmp_dir in enumerate(get_model_params["extract_dir"]):
+            if (
+                tmp_dir is not None
+                and isinstance(tmp_dir, str)
+                and compile_case_id == tmp_dir.rsplit("/", 1)[-1]
+            ):
+                model_exist = idx
+                break
+    if model_exist > -1:
+        for param_key in get_model_params:
+            if param_key in [
+                "type",
+                "download_dir",
+                "extract_dir",
+                "build_model_dir",
+                "model_dir",
+                "quant_model_dir",
+            ]:
+                continue
+            param_val = get_model_params[param_key][model_exist]
+            if param_val is None:
+                continue
+            tmp_str = f"--{param_key}"
+            if isinstance(param_val, str) and "cached_results" in param_val:
+                param_val = param_val.replace("cached_results", model_res_dir)
+            elif isinstance(param_val, str) and "cached_models" in param_val:
+                param_val = param_val.replace("cached_models", model_set_dir)
+            other_params += [tmp_str, param_val]
+
+    return other_params
+
+
 def _prepare_quantized_llm_model(
     model_info: dict, log_file: str, model_res_dir: str, model_set_dir: str
 ) -> bool:
@@ -646,38 +687,9 @@ def _prepare_compiled_llm_model(
         get_model_params = model_info["get_model_params"][HOUMO_BACKEND]
         if "hmm" in get_model_params["type"]:
             compile_case_id = compile_res_dir.rsplit("/", 1)[-1]
-
-            model_exist = -1
-            other_params = list()
-            if "extract_dir" in get_model_params:
-                for idx, tmp_dir in enumerate(get_model_params["extract_dir"]):
-                    if (
-                        tmp_dir is not None
-                        and isinstance(tmp_dir, str)
-                        and compile_case_id == tmp_dir.rsplit("/", 1)[-1]
-                    ):
-                        model_exist = idx
-                        break
-            if model_exist > -1:
-                for param_key in get_model_params:
-                    if param_key in [
-                        "type",
-                        "download_dir",
-                        "extract_dir",
-                        "build_model_dir",
-                        "model_dir",
-                        "quant_model_dir",
-                    ]:
-                        continue
-                    param_val = get_model_params[param_key][model_exist]
-                    if param_val is None:
-                        continue
-                    tmp_str = f"--{param_key}"
-                    if isinstance(param_val, str) and "cached_results" in param_val:
-                        param_val = param_val.replace("cached_results", model_res_dir)
-                    elif isinstance(param_val, str) and "cached_models" in param_val:
-                        param_val = param_val.replace("cached_models", model_set_dir)
-                    other_params += [tmp_str, param_val]
+            other_params = _check_existed_models(
+                compile_case_id, get_model_params, model_res_dir, model_set_dir
+            )
 
             flag = _download_models(
                 model_info,
@@ -1246,11 +1258,21 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
     test_sh_flag = True
     if HDPL_PLATFORM == "ASIC" and os.path.exists(f"{current_folder}/test.sh"):
         logger.info("Ready to execute test.sh in folder: %s.", current_folder)
-
+        try:
+            cmd_model_size = model_info["get_model_params"][HOUMO_BACKEND][
+                "model_size"
+            ][0]
+        except Exception:
+            cmd_model_size = None
         check_flag = False if model_name == "qwen2.5-vl" else True
-        test_sh_flag, _ = execute_test_cmd(
-            ["bash", "test.sh"], log_file, False, check_flag
-        )
+        if cmd_model_size is not None and cmd_model_size in ["14b"]:
+            test_sh_flag, _ = execute_test_cmd(
+                ["bash", "test.sh", "-m", cmd_model_size], log_file, False, check_flag
+            )
+        else:
+            test_sh_flag, _ = execute_test_cmd(
+                ["bash", "test.sh"], log_file, False, check_flag
+            )
         test_sh_folder = current_folder
 
         prepare_test_folder(model_dir, "demo")
@@ -1535,12 +1557,27 @@ def execute_perf_flow(model_name: str, setup_logging) -> None:
         and is_release()
         and get_test_type() == TCaseType.SEPARATE_INFER
     ):
+        get_model_params = model_info["get_model_params"][HOUMO_BACKEND]
+        demo_params = model_info["demo_params"][HOUMO_BACKEND]
+        compile_case_id = ""
+        for value_list in demo_params.values():
+            first_path = value_list[0]
+            if "cached_results" in first_path:
+                path_parts = os.path.normpath(first_path).split(os.sep)
+                cache_idx = path_parts.index("cached_results")
+                compile_case_id = path_parts[cache_idx + 1]
+                break
+        other_params = _check_existed_models(
+            compile_case_id, get_model_params, model_res_dir, model_set_dir
+        )
         _download_models(
             model_info,
             file_type="hmm",
             download_dir=model_set_dir,
             extract_dir=model_res_dir,
             lock_type="all",
+            copy_flag=False,
+            other_params=other_params,
         )
 
     final_flag = True

@@ -2,8 +2,8 @@
 #
 # File: build.py
 # Description:
-#  Qwen3-8B  Model Build and Test Tool - Python script for building and testing
-# Qwen3-8B models.
+#  Qwen3 Model Build and Test Tool - Python script for building and testing
+# Qwen3 models (8B/14B).
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -134,6 +134,14 @@ def get_args() -> argparse.Namespace:
         help="path to the model dir",
     )
     parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default="8b",
+        choices=["8b", "14b"],
+        help="model size: 8b or 14b",
+    )
+    parser.add_argument(
         "--model_name",
         dest="model_name",
         type=str,
@@ -205,6 +213,13 @@ def get_args() -> argparse.Namespace:
         choices=[0, 1, 2],
         help="flash attention optimization",
     )
+    parser.add_argument(
+        "--device_kernel_split",
+        dest="device_kernel_split",
+        type=int,
+        default=0,
+        help="device kernel split (mainly for 14B model)",
+    )
 
     args = parser.parse_args()
     if args.context_length < 2048:
@@ -225,6 +240,7 @@ def build(
     tso=False,
     flash_attention=0,
     prefill_length=0,
+    device_kernel_split=0,
 ):
     import tcim
     import json
@@ -234,18 +250,20 @@ def build(
 
     kwargs["modify_llm"] = {}
     kwargs["enable_xh2_stable_output"] = tso
-
+    if device_kernel_split:
+        kwargs["device_kernel_split"] = device_kernel_split
+        custom_msg["device_kernel_split"] = device_kernel_split
     if prefill_length:
         kwargs["modify_llm"]["fill-length"] = prefill_length
         custom_msg["prefill_length"] = prefill_length
-    if batch:
-        kwargs["modify_llm"]["batch"] = batch
-        custom_msg["batch"] = batch
     if flash_attention:
         kwargs["flash_attention"] = flash_attention
         custom_msg["flash_attention"] = flash_attention
     if ndevice:
         kwargs["ndevice"] = ndevice
+    if batch:
+        kwargs["modify_llm"]["batch"] = batch
+        custom_msg["batch"] = batch
     if context_length:
         kwargs["modify_llm"]["context-length"] = context_length
         custom_msg["context_length"] = context_length
@@ -419,6 +437,7 @@ if __name__ == "__main__":
             j,
             flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
+            device_kernel_split=args.device_kernel_split,
         )
         build(
             f"{model_name}_decode",
@@ -431,6 +450,7 @@ if __name__ == "__main__":
             j,
             batch,
             flash_attention=args.flash_attention,
+            device_kernel_split=args.device_kernel_split,
         )
 
     # test model

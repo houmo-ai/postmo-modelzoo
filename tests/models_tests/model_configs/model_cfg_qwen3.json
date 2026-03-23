@@ -13,22 +13,8 @@
         "xh2": [2]
     },
     "support_flow": {
-        "xh1": [
-            "get_model",
-            "quant",
-            "compile",
-            "demo",
-            "demo_multibatch",
-            "perf"
-        ],
-        "xh2": [
-            "get_model",
-            "quant",
-            "compile",
-            "demo",
-            "demo_multibatch",
-            "perf"
-        ]
+        "xh1": ["get_model", "quant", "compile", "demo", "perf"],
+        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
     },
     "support_hmatc": null,
     "perf_metrics": {
@@ -73,7 +59,8 @@
             ],
             "source_type": [null, null, "modelscope", null, null],
             "context_length": [null, null, null, "16k", "32k"],
-            "batch": [null, null, null, "4", null]
+            "batch": [null, null, null, "4", null],
+            "model_size": ["8b", "8b", "8b", "8b", "8b"]
         }
     },
     "quant_params": {
@@ -88,7 +75,8 @@
             "out-dir": ["cached_results/hmquant_xh2_2k"],
             "context-length": ["2048"],
             "input-sequence-length": [null],
-            "calib_data": [null]
+            "calib_data": [null],
+            "model_size": ["8b"]
         }
     },
     "compile_params": {
@@ -123,7 +111,8 @@
                 "cached_results/hmm_xh2_8k",
                 "cached_results/hmm_xh2_16k_b4"
             ],
-            "j": ["24", "24", "24"]
+            "j": ["24", "24", "24"],
+            "model_size": ["8b", "8b", "8b"]
         }
     },
     "demo_params": {
@@ -153,25 +142,8 @@
                 "cached_results/hmm_xh2_32k/qwen3_decode.hmm",
                 "cached_results/hmm_xh2_8k/qwen3_decode.hmm"
             ],
-            "ndevice": ["1", "1"]
-        }
-    },
-    "demo_multibatch_params": {
-        "xh1": {
-            "tokenizer_dir": ["cached_models/qwen3-8b"],
-            "embedding_path": [
-                "cached_results/hmm_xh1_b4/hmquant/quant_embedding.pt"
-            ],
-            "prefill_path": ["cached_results/hmm_xh1_b4/qwen3_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh1_b4/qwen3_decode.hmm"]
-        },
-        "xh2": {
-            "tokenizer_dir": ["cached_models/qwen3-8b"],
-            "embedding_path": [
-                "cached_results/hmm_xh2_16k_b4/hmquant/quant_embedding.pt"
-            ],
-            "prefill_path": ["cached_results/hmm_xh2_16k_b4/qwen3_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_16k_b4/qwen3_decode.hmm"]
+            "ndevice": ["1", "1"],
+            "model_size": ["8b", "8b"]
         }
     },
     "perf_params": "demo"

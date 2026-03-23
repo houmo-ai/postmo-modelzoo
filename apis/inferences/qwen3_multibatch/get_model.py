@@ -2,7 +2,7 @@
 #
 # File: get_model.py
 # Description:
-#   Download Qwen3-14B model for text generation tasks.
+#   Download Qwen3-8B 16K 4-batch model for text generation tasks.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,14 +31,6 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--type",
-        dest="file_type",
-        type=str,
-        default="hmm",
-        choices=["raw", "hmm"],
-        help="which resource to get, choise in [raw, hmm]",
-    )
-    parser.add_argument(
         "--download_dir",
         dest="download_dir",
         type=str,
@@ -60,27 +52,6 @@ def get_args() -> argparse.Namespace:
         choices=["jfrog", "modelscope"],
         help="download the model from which source",
     )
-    parser.add_argument(
-        "--context_length",
-        dest="context_length",
-        type=str,
-        default="8k",
-        help="context length",
-    )
-    parser.add_argument(
-        "--batch",
-        dest="batch",
-        type=int,
-        default=1,
-        help="batch size",
-    )
-    parser.add_argument(
-        "--ndevice",
-        dest="ndevice",
-        type=int,
-        default=1,
-        help="device number",
-    )
     args = parser.parse_args()
     return args
 
@@ -94,20 +65,19 @@ if __name__ == "__main__":
         "model_type": "llm",
         "model_name": "qwen3",
         "model_info": {
-            "model_size": "14b",
+            "model_size": "8b",
             "ncore": 2,
-            "ndevice": args.ndevice,
-            "context_len": args.context_length,
+            "ndevice": 1,
+            "context_len": "16k",
             "prefill_len": 256,
-            "batch": args.batch,
+            "batch": 4,
         },
-        "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
-        "modelscope_repo": {"repo_ids": ["qwen/qwen3-14b"]},
+        "modelscope_repo": {"repo_ids": ["qwen/qwen3-8b"]},
     }
 
     _, ret_dict = hmatc_get_file(
         model_cfgs,
-        args.file_type,
+        "hmm",
         args.download_dir,
         args.extract_dir,
         args.source_type,
