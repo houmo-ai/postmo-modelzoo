@@ -69,7 +69,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             **kwargs: Keyword arguments including:
                 - inputs_cfg (dict): Configuration for model inputs
                 - is_image_single_input (bool): Whether input is single image
-                - resizer_mode (int): Mode for resizing (default: 0)
+                - resizer_modes (dict): Per-input resizer modes (default: {})
                 - roi_num (int): Number of regions of interest (default: 1)
                 - backend (str): Backend type (onnx/xh1/xh2/hmonnx)
         """
@@ -81,7 +81,18 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         self.is_image_single_input = kwargs[
             "is_image_single_input"
         ]  # Whether input is single image
-        self.resizer_mode = kwargs.get("resizer_mode", 0)  # Mode for resizing
+        # Support both resizer_modes (new) and resizer_mode (legacy)
+        self.resizer_modes = kwargs.get("resizer_modes", {})
+        # For now, only single-input models are supported for demo/eval
+        if self.resizer_modes and not self.is_image_single_input:
+            logger.error("Multi-input models with resizer are not supported for demo/eval yet")
+            exit(-1)
+        # For backward compatibility, extract single resizer_mode for single-input models
+        if self.resizer_modes and self.is_image_single_input:
+            first_input = self.inputs_name[0]
+            self.resizer_mode = self.resizer_modes.get(first_input, 0)
+        else:
+            self.resizer_mode = kwargs.get("resizer_mode", 0)
         self.roi_num = kwargs.get("roi_num", 1)  # Number of regions of interest
         self.backend = kwargs["backend"]  # Backend type: onnx/xh1/xh2
         if self.backend not in SUPPORT_BACKEND:

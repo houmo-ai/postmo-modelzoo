@@ -115,38 +115,51 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             self.quant_output_dir, f"hmquant_{self.model_name}_with_act.onnx"
         )
         # Resizer related parameters
-        # 0 - Non-image input or multi-input case, disable resizer, equivalent to non-image input
-        # 1 - Fully dynamic resizer, parameter is 10 values [y, x, height, width, h, w, top, left, bottom, right]
-        # 2 - Crop partial dynamic resizer, parameter is 4 values [y, x, height, width]
+        # Per-input resizer mode:
+        # 0 - Non-image input or disabled resizer
+        # 1 - Fully dynamic resizer (10 params: [y, x, height, width, h, w, top, left, bottom, right])
+        # 2 - Crop partial dynamic resizer (4 params: [y, x, height, width])
         # 3 - Static resizer
-        self.resizer_mode = 0
-        self.resizers_cfg = list()
-        self.enable_static_resizers = list()
+        self.resizer_modes = {}  # Per-input resizer mode
+        self.resizers_cfg = {}
         self.max_inputs_size = dict()
+        self.has_resizer = False  # Whether any input has resizer
+        self.has_dynamic_resizer = False  # Whether any input uses dynamic resizer (mode 1 or 2)
+
         for input_name in self.inputs_cfg:
             input_cfg = self.inputs_cfg[input_name]
             data_format = input_cfg.get("data_format")
+            resize_type = input_cfg.get("resize_type", 0)
+
             # Non-image or disabled resizer
             if data_format is None or "resizer" not in input_cfg:
+                self.resizer_modes[input_name] = 0
                 continue
+
             _, _, H, W = input_cfg["shape"]
             resizer_cfg = input_cfg.get("resizer", dict())
             max_input_size = resizer_cfg.get("max_input_size", [H, W])
             enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
-            self.resizers_cfg.append(resizer_cfg)
-            self.enable_static_resizers.append(enable_static_resizer)
+
+            self.resizers_cfg[input_name] = resizer_cfg
             self.max_inputs_size[input_name] = max_input_size
-        if self.is_image_single_input and len(self.resizers_cfg) == 1:
-            if self.resize_types[0] == 0:
-                self.resizer_mode = 2  # no padding
-            elif self.resize_types[0] == 1:
-                self.resizer_mode = 1  # padding
-            # XH2 does not have dynamic_v1
-            if self.resizer_mode == 2 and self.target == "xh2":
-                self.resizer_mode = 1
-            if self.enable_static_resizers[0]:
-                self.resizer_mode = 3
-        logger.info(f"resizer_mode: {self.resizer_mode}")
+            self.has_resizer = True
+
+            # Determine per-input resizer mode
+            if enable_static_resizer:
+                self.resizer_modes[input_name] = 3  # Static
+            elif resize_type == 1:
+                self.resizer_modes[input_name] = 1  # Dynamic with padding
+                self.has_dynamic_resizer = True
+            else:
+                # XH2 does not have dynamic_v1, use dynamic_v2
+                if self.target == "xh2":
+                    self.resizer_modes[input_name] = 1  # Dynamic v2
+                else:
+                    self.resizer_modes[input_name] = 2  # Dynamic v1
+                self.has_dynamic_resizer = True
+
+        logger.info(f"resizer_modes: {self.resizer_modes}")
 
         # Build parameters
         self.build_cfg = cfg.get("build", dict())
@@ -160,7 +173,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         # 0 - 1 image n boxes
         # 1 - n images n boxes, 1 box per image, e.g.: 1 image 1 box, 2 images 2 boxes, ...
         self.roi_num = self.build_cfg.get("roi_num", 1)
-        if self.is_image_single_input and len(self.resizers_cfg) == 0:
+        if self.is_image_single_input and not self.has_resizer:
             self.roi_num = 1
         if not isinstance(self.roi_num, int) or self.roi_num < 1:
             logger.error("roi_num must be int, and >= 1")
@@ -170,18 +183,32 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 "Not support roi_num > 1, when model_input_batch > 1 or build_batch > 1"
             )
             exit(-1)
-        if self.resizer_mode == 3:
+
+        # Determine HMM naming based on resizer configuration
+        # For single-input: use that input's mode
+        # For multi-input: use dynamic if any input is dynamic, static if all are static
+        if self.is_image_single_input:
+            resizer_mode_for_naming = self.resizer_modes.get(self.inputs_name[0], 0)
+        else:
+            if self.has_dynamic_resizer:
+                resizer_mode_for_naming = 1  # Use dynamic naming
+            elif self.has_resizer:
+                resizer_mode_for_naming = 3  # All static
+            else:
+                resizer_mode_for_naming = 0  # No resizer
+
+        if resizer_mode_for_naming == 3:
             self.roi_num = 1
-        if self.resizer_mode == 0:
+        if resizer_mode_for_naming == 0:
             roi_tag = ""
             prefix = ""
-        elif self.resizer_mode == 1:
+        elif resizer_mode_for_naming == 1:
             roi_tag = f"_{self.roi_num}roi"
             prefix = "_dynamic_v2" if self.target == "xh1" else "_dynamic"
-        elif self.resizer_mode == 2:
+        elif resizer_mode_for_naming == 2:
             roi_tag = f"_{self.roi_num}roi"
             prefix = "_dynamic_v1"
-        elif self.resizer_mode == 3:
+        elif resizer_mode_for_naming == 3:
             roi_tag = "_1roi"
             prefix = "_static"
         self.hmm_name = f"{self.model_name}_{self.target}_b{self.hmm_batch}{roi_tag}_{self.build_ncore}core_{self.build_opt_level}{prefix}"
@@ -193,7 +220,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             input_cfg = self.inputs_cfg[name]
             self.custom_msg[name] = dict(
                 shape=input_cfg["shape"],
-                resizer_mode=self.resizer_mode,
+                resizer_mode=self.resizer_modes.get(name, 0),
                 input_cfg=input_cfg,
             )
 
@@ -206,6 +233,17 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             from ..optimizer.onnx_opt_engine import HMAppOnnxOptConvert
 
             self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
+
+    @property
+    def resizer_mode(self):
+        """Backward compatibility property: returns first input's resizer mode for single-input models.
+
+        For multi-input models, this returns 0 (no resizer) as a fallback.
+        Use resizer_modes dict for multi-input models.
+        """
+        if self.is_image_single_input and self.inputs_name:
+            return self.resizer_modes.get(self.inputs_name[0], 0)
+        return 0
 
     def check_input_shape(self):
         """
@@ -318,7 +356,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         return Model(
             inputs_cfg=self.inputs_cfg,
             is_image_single_input=self.is_image_single_input,
-            resizer_mode=self.resizer_mode,
+            resizer_modes=self.resizer_modes,
             roi_num=self.roi_num,
             backend=backend,
         )
