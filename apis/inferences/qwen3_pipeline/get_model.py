@@ -76,6 +76,14 @@ def get_args() -> argparse.Namespace:
         help="context length",
     )
     parser.add_argument(
+        "--ndevice",
+        dest="ndevice",
+        type=int,
+        default=2,
+        choices=[2, 4],
+        help="the devices num of pipeline parallel",
+    )
+    parser.add_argument(
         "--ncore",
         dest="ncore",
         type=int,
@@ -100,7 +108,7 @@ if __name__ == "__main__":
         "model_info": {
             "model_size": "8b",
             "ncore": args.ncore,
-            "ndevice": 4,
+            "ndevice": args.ndevice,
             "context_len": args.context_length,
             "prefill_len": 256,
             "batch": 1,

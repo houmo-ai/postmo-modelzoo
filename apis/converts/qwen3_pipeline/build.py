@@ -161,7 +161,7 @@ def get_args() -> argparse.Namespace:
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=4,
+        default=2,
         help="block number",
     )
     parser.add_argument(
@@ -304,7 +304,7 @@ def clip(raw_path, split_paths, ndevice, model_name):
         )
         if os.path.exists(extract_file_path.replace(".onnx", ".onnx.data")):
             os.remove(extract_file_path.replace(".onnx", ".onnx.data"))
-
+        print(f"save clip model part{i} to {extract_file_path}.")
 
 def build(
     model_name,
@@ -412,3 +412,19 @@ if __name__ == "__main__":
             flash_attention=args.flash_attention,
             prefill_length=args.prefill_length,
         )
+
+    model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
+    build(
+        f"{model_name}_decode",
+        model_dir,
+        model_path,
+        output_dir,
+        profile,
+        ncore,
+        ndevice,
+        args.context_length,
+        args.j,
+        batch,
+        flash_attention=args.flash_attention,
+        prefill_length=args.prefill_length,
+    )

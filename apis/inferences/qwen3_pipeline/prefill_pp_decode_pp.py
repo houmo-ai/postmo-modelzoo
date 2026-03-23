@@ -87,7 +87,7 @@ def get_args() -> argparse.Namespace:
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=4,
+        default=2,
         choices=[2, 4],
         help="device number, only xh2 support",
     )

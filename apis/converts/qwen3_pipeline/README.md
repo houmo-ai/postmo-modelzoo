@@ -6,7 +6,7 @@
 
 ## 1. 功能概述
 
-该构建脚本 (`build_multidevices_pipeline.py`) 实现以下功能：
+该构建脚本 (`build.py`) 实现以下功能：
 - 将 Qwen3 模型拆分为多个部分，支持多设备流水线部署
 - 提供模型构建和测试流程
 - 支持预填充 (prefill) 和解码 (decoder) 阶段的模型处理
@@ -114,18 +114,18 @@ output/xh2/hmquant/
 **模型分割与构建模型**
 将量化完成的模型存放在当前文件夹的 `output/$HOUMO_TARGET/hmquant` 目录：
 ```bash
-python build_multidevices_pipeline.py
+python build.py
 ```
 
 ### 4.2 命令行参数说明
 
 | 参数                    | 描述                         |默认值                            |
 | ----------------------- | ---------------------------- | -------------------------------- |
-| `--model_dir`           | 模型目录路径                 | `output/[HOUMO_TARGET]/hmquant`  |
+| `--model_dir`           | 模型目录路径                  | `output/[HOUMO_TARGET]/hmquant`  |
 | `--model_name`          | 输出模型名称                 | `qwen3`                          |
 | `--batch`               | 批次大小                     | `1`                              |
 | `--ncore`               | 核心数量                     | `$HOUMO_CORE_NUM` (默认 2)       |
-| `--ndevice`             | 设备数量                     | `4`                              |
+| `--ndevice`             | 设备数量                     | `2`                             |
 | `--output_dir`          | 构建输出目录                 | `output/[HOUMO_TARGET]`          |
 | `--j`                   | 构建并行任务数               | CPU 核心数                       |
 | `--context_length`      | 上下文长度                   | `32768`                          |

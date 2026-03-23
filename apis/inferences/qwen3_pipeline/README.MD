@@ -26,7 +26,7 @@ cd houmo-example-xh2
 source env.sh
 ```
 
-2. 获取模型文件，提供4chip 2 core模型，2chip模型需要用户自行量化编译，执行命令：
+2. 获取模型文件，提供2chip 2 core模型，4chip模型需要用户自行量化编译，执行命令：
 
 ```bash
 # 下载 4chip 2 core 模型
@@ -72,17 +72,17 @@ python3 prefill_pp_decode_tp.py
 
 运行脚本支持以下参数：
 
-| 参数                   |  默认值                                    | 说明                    |
-| ---------------------- | ------------------------------------------ | ----------------------- |
-| `--tokenizer_dir`      | qwen3-8b                                   | Tokenizer 目录          |
-| `--embedding_path`     | output/{target}/hmquant/quant_embedding.pt | Embedding 权重路径      |
-| `--model_path`         | output/{target}                            | 模型路径                |
-| `--ndevice`            | 4                                          | 设备数量                |
-| `--input_tokens`       | 30720                                      | Prefill 输入token长度   |
-| `--repetition_penalty` | 1.0                                        | 重复惩罚系数            |
-| `--topk`               | None                                       | Top-K 采样参数          |
-| `--topp`               | 1.0                                        | Top-P 采样参数          |
-| `--temperature`        | 1.0                                        | 温度参数                |
+| Args                  | Default Value                              | Description              |
+| --------------------- | ------------------------------------------ | ------------------------ |
+| --tokenizer_dir       | qwen3-8b                                   | Tokenizer path           |
+| --embedding_path      | output/{target}/hmquant/quant_embedding.pt | Embedding weight path    |
+| --model_path          | output/{target}                            | the path of hmm model    |
+| --ndevice             | 2                                          | device nums of M50       |
+| --input_tokens        | 30720                                      | the num of input tokens  |
+| --repetition_penalty  | 1.0                                        | repetition_penalty       |
+| --topk                | None                                       | Top-K                    |
+| --topp                | 1.0                                        | Top-P                    |
+| --temperature         | 1.0                                        | Temperature              |
 
 ## 5 性能结果
 
@@ -159,10 +159,10 @@ It seems like you've sent a long string of ones and zeros. Are you trying to sen
 
 ### 5.3 性能比较
 
-| 输入长度 | 单芯prefill | 4芯pp prefill  | 4芯tp prefill  |
-| -------- | ----------- | -------------- | -------------- |
-| 16k      | 15.66s      | 5.16s (3.03x)  | 8.09s (1.94x)  |
-| 30k      | 41.56s      | 12.23s (3.39x) | 18.23s (2.28x) |
+| Input    | 1chip prefill | 4chips pp prefill  | 4chips tp prefill  |
+| -------- | ------------- | ------------------ | ------------------ |
+| 16k      | 15.66s        | 5.16s (3.03x)      | 8.09s (1.94x)      |
+| 30k      | 41.56s        | 12.23s (3.39x)     | 18.23s (2.28x)     |
 
 ## 6 使用场景
 
