@@ -401,6 +401,7 @@ def _prepare_quantized_llm_model(
         and "quant" in model_info["support_flow"][HOUMO_BACKEND]
         and check_gpu()["has_gpu"] is True
     ):
+        current_folder = os.getcwd()
         for idx, tmp_model_dir in enumerate(quant_params["out-dir"]):
             quant_res_dir = tmp_model_dir.replace("cached_results", model_res_dir)
             if quant_res_dir and os.path.exists(quant_res_dir):
@@ -417,7 +418,13 @@ def _prepare_quantized_llm_model(
                 extract_dir=model_res_dir,
             )
 
-            cmd_list = ["python3", "ptq.py"]
+            # install python requirements
+            venv_flag = install_py_venv(current_folder, log_file, "quant")
+            python_exe = "python3"
+            if venv_flag:
+                python_exe = f"{VENV_NAME}/bin/python3"
+
+            cmd_list = [python_exe, "ptq.py"]
             for param_key in quant_params:
                 param_val = quant_params[param_key][idx]
                 if param_val is None:
@@ -431,7 +438,7 @@ def _prepare_quantized_llm_model(
             with ModelResourceLock(
                 lock_file_dst, ModelResourceLock.LockMode.WRITE, "model quantizing"
             ):
-                flag, _ = execute_test_cmd(cmd_list, log_file)
+                flag, _ = execute_test_cmd(cmd_list, log_file, pyvenv_flag=venv_flag)
                 if flag is True:
                     tmp_res_dir = f"{quant_res_dir}/hmquant"
                     os.system(f"mv {tmp_res_dir} {quant_res_dir}")
