@@ -35,6 +35,16 @@ ori_ld = os.getenv("LD_LIBRARY_PATH", "")
 append_ld = f"/opt/venv/houmo/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/opt/venv/houmo/lib/python3.12/site-packages/torch/lib:{script_dir}/../apis/models/3rdparty/onnxruntime/lib:"
 os.environ["LD_LIBRARY_PATH"] = f"{ori_ld}:{append_ld}" if ori_ld else append_ld
 
+# Append to PYTHONPATH
+ori_pythonpath = os.getenv("PYTHONPATH", "")
+append_pythonpath = f"{script_dir}/hmodel/xh2"
+os.environ["PYTHONPATH"] = (
+    f"{ori_pythonpath}:{append_pythonpath}" if ori_pythonpath else append_pythonpath
+)
+
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ["HF_TOKEN"] = "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"
+
 # Set up dataset path
 os.environ["HOUMO_DATASETS_PATH"] = f"{script_dir}/../data/datasets/"
 if os.getenv("HOUMO_EXAMPLES_PATH", None) is None or not os.getenv(

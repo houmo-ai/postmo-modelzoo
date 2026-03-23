@@ -249,6 +249,13 @@ def get_args() -> argparse.Namespace:
         help="Path to HiFT part2 model file",
     )
     parser.add_argument(
+        "--prompt_wav_path",
+        dest="prompt_wav_path",
+        type=str,
+        default="zero_shot_prompt.wav",
+        help="Path to prompt wav file",
+    )
+    parser.add_argument(
         "--output_dir",
         type=str,
         default="./results",
@@ -2042,11 +2049,13 @@ class CosyVoice3:
 if __name__ == "__main__":
     args = get_args()
 
-    # find prompt wav in current directory
-    prompt_wav_matches = glob.glob(os.path.join(".", "zero_shot_prompt.wav"))
-    if not prompt_wav_matches:
-        raise FileNotFoundError("zero_shot_prompt.wav not found in current directory")
-    prompt_wav = prompt_wav_matches[0]
+    # get prompt wav
+    prompt_wav = args.prompt_wav_path
+    if not os.path.exists(prompt_wav):
+        prompt_wav_matches = glob.glob(os.path.join(".", "*_prompt.wav"))
+        if not prompt_wav_matches:
+            raise FileNotFoundError("prompt wav not found in current directory")
+        prompt_wav = prompt_wav_matches[0]
 
     cosyvoice = CosyVoice3(args)
 

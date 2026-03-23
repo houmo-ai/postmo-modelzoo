@@ -33,6 +33,39 @@ logger = logging.getLogger(__name__)
 VENV_NAME = "imodelzoo_test"
 
 
+def get_imodelzoo_root() -> Path:
+    """
+    Get the repository root directory for iModelZoo.
+
+    Returns:
+        Path: Absolute path to the repository root directory
+    """
+    return Path(__file__).resolve().parents[2]
+
+
+def get_xh_model_zoo_root() -> Path:
+    """
+    Get the parent directory that contains the `xh_model_zoo` package.
+
+    Returns:
+        Path: Absolute path to `hmodel/xh2`
+    """
+    return get_imodelzoo_root() / "hmodel" / "xh2"
+
+
+def _join_pythonpath(*paths: str) -> str:
+    """
+    Join PYTHONPATH entries while skipping empty values.
+
+    Args:
+        *paths (str): PYTHONPATH entries to join
+
+    Returns:
+        str: Colon-separated PYTHONPATH value
+    """
+    return ":".join(path for path in paths if path)
+
+
 def get_python_executable() -> str:
     """
     Get the absolute path of the python3 executable.
@@ -92,7 +125,7 @@ def modify_activate_script(
     """
     try:
         with open(activate_path, "a", encoding="utf-8") as f:
-            f.write(f"export ORIGINAL_PYTHONPATH=$PYTHONPATH\n")
+            f.write("export ORIGINAL_PYTHONPATH=$PYTHONPATH\n")
             f.write(
                 f"export PYTHONPATH={venv_site}:{original_site}:$ORIGINAL_PYTHONPATH\n"
             )
@@ -112,8 +145,8 @@ def modify_deactivate_script(deactivate_path: str) -> None:
     """
     try:
         with open(deactivate_path, "a", encoding="utf-8") as f:
-            f.write(f"export PYTHONPATH=$ORIGINAL_PYTHONPATH\n")
-            f.write(f"unset ORIGINAL_PYTHONPATH\n")
+            f.write("export PYTHONPATH=$ORIGINAL_PYTHONPATH\n")
+            f.write("unset ORIGINAL_PYTHONPATH\n")
     except IOError as e:
         raise RuntimeError(f"Failed to modify deactivate script: {e}") from e
 
@@ -142,6 +175,41 @@ def modify_pyvenv_cfg(cfg_path: str) -> None:
             f.write(modified_content)
     except IOError as e:
         raise RuntimeError(f"Failed to modify pyvenv.cfg: {e}") from e
+
+
+def write_venv_pth(venv_site: str) -> None:
+    """
+    Write a `.pth` file so the virtualenv can always import project packages.
+
+    This keeps imports working for commands like `imodelzoo_test/bin/python3 ptq.py`
+    even after the current process has restored its original environment.
+
+    Args:
+        venv_site (str): Site-packages path of the virtual environment
+
+    Raises:
+        RuntimeError: If writing the `.pth` file fails
+    """
+    repo_root = get_imodelzoo_root()
+    xh_model_zoo_root = get_xh_model_zoo_root()
+    extra_paths = [
+        str(repo_root),
+        str(xh_model_zoo_root),
+    ]
+
+    missing_paths = [path for path in extra_paths if not Path(path).exists()]
+    if missing_paths:
+        raise RuntimeError(
+            f"Failed to configure virtualenv import paths, missing: {missing_paths}"
+        )
+
+    pth_path = Path(venv_site) / "imodelzoo_paths.pth"
+
+    try:
+        with open(pth_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(extra_paths) + "\n")
+    except IOError as e:
+        raise RuntimeError(f"Failed to write virtualenv .pth file: {e}") from e
 
 
 def create_distutils_symlink(dir_path: str) -> None:
@@ -213,6 +281,9 @@ def create_virtualenv(python_exe: str, site_packages: str, dir_path: str) -> Non
         venv_python = str(dir_path_obj / "bin" / "python3")
         venv_site = get_site_packages(venv_python)
 
+        # Persist extra import roots inside the virtualenv itself
+        write_venv_pth(venv_site)
+
         # Modify activation/deactivation scripts
         activate_path = str(dir_path_obj / "bin" / "activate")
         deactivate_path = str(dir_path_obj / "bin" / "deactivate")
@@ -238,6 +309,10 @@ def create_virtualenv(python_exe: str, site_packages: str, dir_path: str) -> Non
             stdout=sys.stdout,
             stderr=sys.stderr,
         )
+
+        venv_python = str(dir_path_obj / "bin" / "python3")
+        venv_site = get_site_packages(venv_python)
+        write_venv_pth(venv_site)
 
 
 def install_requirements(
@@ -267,7 +342,61 @@ def install_requirements(
         raise RuntimeError(f"Failed to install dependencies: {e.output}") from e
 
 
-def install_py_venv(env_dir: str, log_file: str, flow_type: str = "default"):
+def activate_virtualenv(venv_dir: str, python_exe: str, site_packages: str) -> None:
+    """
+    Apply virtualenv activation effects to the current Python process.
+
+    This mirrors the relevant behavior of `source <venv>/bin/activate` used in
+    the shell script so that later subprocess calls that rely on `python3` or
+    `pip3` see the virtual environment first in `PATH`.
+
+    Args:
+        venv_dir (str): Path to the virtual environment directory
+        python_exe (str): Path to the original Python executable
+        site_packages (str): Path to the original site-packages directory
+    """
+    venv_path = Path(venv_dir).resolve()
+    venv_bin = str(venv_path / "bin")
+    venv_python = str(venv_path / "bin" / "python3")
+
+    os.environ["VIRTUAL_ENV"] = str(venv_path)
+    os.environ.pop("PYTHONHOME", None)
+
+    current_path = os.environ.get("PATH", "")
+    path_entries = [entry for entry in current_path.split(":") if entry]
+    if not path_entries or path_entries[0] != venv_bin:
+        path_entries = [entry for entry in path_entries if entry != venv_bin]
+        os.environ["PATH"] = ":".join([venv_bin, *path_entries])
+
+    if "/opt/venv" in python_exe:
+        venv_site = get_site_packages(venv_python)
+        original_pythonpath = os.environ.get("PYTHONPATH", "")
+        os.environ["ORIGINAL_PYTHONPATH"] = original_pythonpath
+        os.environ["PYTHONPATH"] = _join_pythonpath(
+            venv_site, site_packages, original_pythonpath
+        )
+
+
+def deactivate_virtualenv(
+    original_cwd: str, original_env: dict[str, str | None]
+) -> None:
+    """
+    Restore process state after virtualenv activation.
+
+    Args:
+        original_cwd (str): Working directory before activation
+        original_env (dict[str, str | None]): Environment values to restore
+    """
+    os.chdir(original_cwd)
+
+    for env_name, env_value in original_env.items():
+        if env_value is None:
+            os.environ.pop(env_name, None)
+        else:
+            os.environ[env_name] = env_value
+
+
+def install_py_venv(env_dir: str, log_file: str, flow_type: str = "default") -> bool:
     """
     Main function to orchestrate complete virtual environment setup process.
 
@@ -293,13 +422,27 @@ def install_py_venv(env_dir: str, log_file: str, flow_type: str = "default"):
     # 1. Get Python path and site-packages
     py_exe = get_python_executable()
     site_packages = get_site_packages(py_exe)
+    venv_dir = os.path.join(env_dir, VENV_NAME)
+    original_cwd = os.getcwd()
+    original_env = {
+        "PATH": os.environ.get("PATH"),
+        "PYTHONPATH": os.environ.get("PYTHONPATH"),
+        "ORIGINAL_PYTHONPATH": os.environ.get("ORIGINAL_PYTHONPATH"),
+        "PYTHONHOME": os.environ.get("PYTHONHOME"),
+        "VIRTUAL_ENV": os.environ.get("VIRTUAL_ENV"),
+    }
 
-    # 2. Create virtual environment
-    os.chdir(env_dir)
-    create_virtualenv(py_exe, site_packages, VENV_NAME)
+    try:
+        os.chdir(env_dir)
 
-    # 3. Install dependencies
-    install_requirements(VENV_NAME, rqmt_path)
-    logger.info(f"Virtual environment created successfully:{VENV_NAME}")
+        # 2. Create and activate virtual environment
+        create_virtualenv(py_exe, site_packages, venv_dir)
+        activate_virtualenv(venv_dir, py_exe, site_packages)
 
-    return True
+        # 3. Install dependencies
+        install_requirements(venv_dir, rqmt_path)
+        logger.info(f"Virtual environment created successfully: {venv_dir}")
+
+        return True
+    finally:
+        deactivate_virtualenv(original_cwd, original_env)

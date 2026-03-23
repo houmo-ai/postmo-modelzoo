@@ -289,7 +289,13 @@ def execute_test_cmd(
             venv_py_exe = f"{VENV_NAME}/bin/python3"
             venv_site = get_site_packages(venv_py_exe)
             custom_pythonpath = f"{venv_site}:{system_site}"
-            env["PYTHONPATH"] = custom_pythonpath
+            existing_pythonpath = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = (
+                f"{custom_pythonpath}{os.pathsep}{existing_pythonpath}"
+                if existing_pythonpath
+                else custom_pythonpath
+            )
+            logger.info(f"Set PYTHONPATH for subprocess: {env['PYTHONPATH']}")
 
         process = subprocess.Popen(
             cmd_list,

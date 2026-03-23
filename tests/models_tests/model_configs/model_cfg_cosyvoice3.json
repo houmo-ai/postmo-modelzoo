@@ -51,6 +51,9 @@
     "demo_params": {
         "xh2": {
             "tokenizer_dir": ["cached_models/Fun-CosyVoice3-0.5B-2512"],
+            "prompt_wav_path": [
+                "cached_models/hmm_xh2_2k/zero_shot_prompt.wav"
+            ],
             "ndevice": [null],
             "campplus_path": [
                 "cached_results/hmm_xh2_2k/cosyvoice3_campplus.hmm"
