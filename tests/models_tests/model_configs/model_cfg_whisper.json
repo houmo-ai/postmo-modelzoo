@@ -54,9 +54,9 @@
     "demo_params": {
         "xh2": {
             "processor_dir": ["cached_models/whisper-medium"],
-            "encoder_path": ["cached_results/hmm_xh2/whisper_encoder.hmm"],
+            "encoder_path": ["cached_results/hmm_xh2/whisper_encode.hmm"],
             "prefill_path": ["cached_results/hmm_xh2/whisper_prefill.hmm"],
-            "decoder_path": ["cached_results/hmm_xh2/whisper_decoder.hmm"]
+            "decoder_path": ["cached_results/hmm_xh2/whisper_decode.hmm"]
         }
     },
     "perf_params": "demo"

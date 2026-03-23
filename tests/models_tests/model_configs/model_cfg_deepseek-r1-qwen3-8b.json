@@ -96,8 +96,8 @@
             "embedding_path": [
                 "cached_results/hmm_xh2_4k_b2/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_4k_b2/qwen3_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_4k_b2/qwen3_decode.hmm"]
+            "prefill_path": ["cached_results/hmm_xh2_4k_b2/deepseek_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_4k_b2/deepseek_decode.hmm"]
         }
     },
     "perf_params": "demo"

@@ -63,8 +63,8 @@
             "embedding_path": [
                 "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_8k/gpt_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_8k/gpt_decode.hmm"],
+            "prefill_path": ["cached_results/hmm_xh2_8k/gpt-oss_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_8k/gpt-oss_decode.hmm"],
             "ndevice": ["1"]
         }
     },

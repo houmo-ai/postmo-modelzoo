@@ -1026,6 +1026,8 @@ def execute_quant_flow(model_name: str, setup_logging) -> None:
         ):
             for tmp_cmd_list in cmd_list:
                 quant_res_dir = _get_param_value(tmp_cmd_list, "--out-dir")
+                if quant_res_dir is None:
+                    quant_res_dir = _get_param_value(tmp_cmd_list, "--output_dir")
                 if os.path.exists(quant_res_dir):
                     shutil.rmtree(quant_res_dir, ignore_errors=True)
                     # [TMP]
@@ -1073,14 +1075,8 @@ def execute_compile_flow(model_name: str, setup_logging) -> None:
         logger.warning(skip_msg)
         pytest.skip(skip_msg)
     model_type = model_info.get("model_type", "cv")
-    if model_type == "llm" and (
-        get_test_type() != TCaseType.SEPARATE_INFER
-        # and check_gpu()["has_gpu"] is False
-        or is_release() is True
-    ):
-        skip_msg = (
-            f"{model_name} testcase requires GPU, release flag: {int(is_release())}."
-        )
+    if model_type == "llm" and is_release() is True:
+        skip_msg = f"Skip {model_name} testcase, release flag: {int(is_release())}."
         logger.warning(skip_msg)
         pytest.skip(skip_msg)
     platform = get_platform(model_info["support_platform"])

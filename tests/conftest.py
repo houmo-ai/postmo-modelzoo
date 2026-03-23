@@ -37,6 +37,10 @@ os.environ["LD_LIBRARY_PATH"] = f"{ori_ld}:{append_ld}" if ori_ld else append_ld
 
 # Set up dataset path
 os.environ["HOUMO_DATASETS_PATH"] = f"{script_dir}/../data/datasets/"
+if os.getenv("HOUMO_EXAMPLES_PATH", None) is None or not os.getenv(
+    "HOUMO_EXAMPLES_PATH"
+):
+    os.environ["HOUMO_EXAMPLES_PATH"] = os.path.abspath(f"{script_dir}/../")
 
 # Set default HOUMO version if not already set
 if os.getenv("HOUMO_VERSION", None) is None:
