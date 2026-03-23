@@ -115,6 +115,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | models                  | path         | target | quant | build | perf | demo | eval |
 | ----------------------- | ------------ | ------ | ----- | ----- | ---- | ---- | ---- |
 | qwen3-asr               | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
+| glm-asr-nano-2512       | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
 | sensevoice              | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
 | whisper                 | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
 | whisper-turbo           | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
