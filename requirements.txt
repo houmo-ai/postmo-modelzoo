@@ -21,6 +21,9 @@ loguru
 modelscope
 gitpython
 
+# xh_model_zoo
+compressed_tensors
+
 # asr
 torchaudio
 openai-whisper
