@@ -106,7 +106,7 @@ def get_args() -> argparse.Namespace:
 
 class Qwen3Asr:
     def __init__(self, encode_path, decode_path, prefill_path, processor_dir, embedding_path):
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cpu")
         weight_manager = tcim.runtime.WeightManager(0)
         option1 = tcim.runtime.Option(weight_manager)
         self.encode = tcim.runtime.load(encode_path, option=option1)
@@ -206,8 +206,7 @@ class Qwen3Asr:
 
         # Sliding window mechanism for streaming output
         slide_len = 10
-        skip_tokens = 0
-        last_response = ""
+        emitted_response = ""
 
         for _ in range(self.max_new_tokens):
             # Direct numpy embedding lookup - avoid torch conversion
@@ -235,31 +234,19 @@ class Qwen3Asr:
             valid_length_np[0] += 1
             tokens_generated += 1
 
-            # Sliding window output
+            # Keep the last slide_len tokens in the window and stream the stable prefix.
             if len(generated_ids) > slide_len:
-                decode_response = self.processor.tokenizer.decode(
-                    generated_ids[-(slide_len + 1 + skip_tokens):],
+                stable_response = self.processor.tokenizer.decode(
+                    generated_ids[:-slide_len],
                     skip_special_tokens=True
                 )
-                # Extract ASR text if pattern exists
-                match = re.search(r'(?<=<asr_text>)[\s\S]*', decode_response)
+                match = re.search(r'(?<=<asr_text>)[\s\S]*', stable_response)
                 if match:
-                    decode_response = match.group()
-                    # Get new content after last_response
-                    new_content = decode_response[len(last_response):]
-                    if new_content and is_valid_char(ord(new_content[-1])):
+                    stable_response = match.group()
+                    new_content = stable_response[len(emitted_response):]
+                    if new_content:
                         print(new_content, end='', flush=True)
-                        last_response = self.processor.tokenizer.decode(
-                            generated_ids[-slide_len:],
-                            skip_special_tokens=True
-                        )
-                        # Update last_response to extract ASR text if pattern exists
-                        match_last = re.search(r'(?<=<asr_text>)[\s\S]*', last_response)
-                        if match_last:
-                            last_response = match_last.group()
-                        skip_tokens = 0
-                    else:
-                        skip_tokens += 1
+                        emitted_response = stable_response
 
             # Stop on EOS
             if next_id == eos_token_id:
@@ -273,7 +260,7 @@ class Qwen3Asr:
         match = re.search(r'(?<=<asr_text>)[\s\S]*', result)
         if match:
             final_text = match.group()
-            new_content = final_text[len(last_response):]
+            new_content = final_text[len(emitted_response):]
             if new_content:
                 print(new_content, end='', flush=True)
 

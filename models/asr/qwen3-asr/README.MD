@@ -22,9 +22,19 @@
 
 安装示例运行所需的python依赖，建议使用venv
 
+注：由于本示例依赖的transformer版本高于python3.9最高支持的4.33.0版本，因此无法在python3.10以下版本（如ubuntu20.04）运行，如遇到找不到transformer库问题请自行安装python3.10以上版本。python3.10及以上版本运行示例可以执行如下指令安装依赖。
 ```bash
 pip3 install -r requirements.txt
 ```
+
+python3.9 对于requirements.txt中的qwen_asr需要从[https://github.com/QwenLM/Qwen3-ASR.git](https://github.com/QwenLM/Qwen3-ASR.git)下载源码，将qwen_asr文件夹放到当前目录下，并修改qwen_asr/core/transformers_backend/modeling_qwen3_asr.py的17行和1329行，改动后的代码如下：
+``` python
+# 17 行
+from typing import Callable, Optional, Union, List
+# 1329 行
+eos_token_id: Union[int, List[int]] = [151645, 151643],
+```
+此外需要卸载scikit-learn，安装nagisa。
 
 ### 2.2 获取模型和数据
 
@@ -118,7 +128,7 @@ python3 demo_forcealigner.py
 
 推理完成将输出性能结果。
 
-### 2.5 一键评估
+### 2.6 一键评估
 
 以上步骤可以通过test.sh脚本一键执行：
 
