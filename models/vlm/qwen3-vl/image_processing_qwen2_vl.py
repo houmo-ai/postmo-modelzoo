@@ -1,4 +1,3 @@
-
 import math
 from typing import Optional, Union
 import torch
@@ -23,7 +22,10 @@ from transformers.image_utils import (
 )
 from transformers.utils import TensorType, logging
 
-from transformers.models.qwen2_vl.image_processing_qwen2_vl import Qwen2VLImageProcessor, smart_resize
+from transformers.models.qwen2_vl.image_processing_qwen2_vl import (
+    Qwen2VLImageProcessor,
+    smart_resize,
+)
 
 logger = logging.get_logger(__name__)
 
@@ -35,9 +37,9 @@ class Qwen2_5_VLImageProcessor(Qwen2VLImageProcessor):
     def _hm_preprocess(
         self,
         images,
-        do_resize = None,
-        resample =  None,
-        do_convert_rgb = None,
+        do_resize=None,
+        resample=None,
+        do_convert_rgb=None,
         data_format: Optional[ChannelDimension] = ChannelDimension.FIRST,
         input_data_format: Optional[Union[str, ChannelDimension]] = None,
     ):
@@ -72,7 +74,9 @@ class Qwen2_5_VLImageProcessor(Qwen2VLImageProcessor):
                     resample=resample,
                     input_data_format=input_data_format,
                 )
-            image = to_channel_dimension_format(image, data_format, input_channel_dim=input_data_format)
+            image = to_channel_dimension_format(
+                image, data_format, input_channel_dim=input_data_format
+            )
             processed_images.append(image)
 
         patches = np.array(processed_images)
@@ -83,7 +87,7 @@ class Qwen2_5_VLImageProcessor(Qwen2VLImageProcessor):
     def preprocess(
         self,
         images,
-        videos = None,
+        videos=None,
         do_resize: Optional[bool] = None,
         size: Optional[dict[str, int]] = None,
         min_pixels: Optional[int] = None,
@@ -107,7 +111,9 @@ class Qwen2_5_VLImageProcessor(Qwen2VLImageProcessor):
 
         if size is not None:
             if "shortest_edge" not in size or "longest_edge" not in size:
-                raise ValueError("size must contain 'shortest_edge' and 'longest_edge' keys.")
+                raise ValueError(
+                    "size must contain 'shortest_edge' and 'longest_edge' keys."
+                )
             min_pixels = size["shortest_edge"]
         elif min_pixels is not None and max_pixels is not None:
             # backward compatibility: override size with min_pixels and max_pixels if they are provided
@@ -119,14 +125,22 @@ class Qwen2_5_VLImageProcessor(Qwen2VLImageProcessor):
 
         resample = resample if resample is not None else self.resample
         do_rescale = do_rescale if do_rescale is not None else self.do_rescale
-        rescale_factor = rescale_factor if rescale_factor is not None else self.rescale_factor
+        rescale_factor = (
+            rescale_factor if rescale_factor is not None else self.rescale_factor
+        )
         do_normalize = do_normalize if do_normalize is not None else self.do_normalize
         image_mean = image_mean if image_mean is not None else self.image_mean
         image_std = image_std if image_std is not None else self.image_std
         patch_size = patch_size if patch_size is not None else self.patch_size
-        temporal_patch_size = temporal_patch_size if temporal_patch_size is not None else self.temporal_patch_size
+        temporal_patch_size = (
+            temporal_patch_size
+            if temporal_patch_size is not None
+            else self.temporal_patch_size
+        )
         merge_size = merge_size if merge_size is not None else self.merge_size
-        do_convert_rgb = do_convert_rgb if do_convert_rgb is not None else self.do_convert_rgb
+        do_convert_rgb = (
+            do_convert_rgb if do_convert_rgb is not None else self.do_convert_rgb
+        )
 
         if images is not None:
             images = self.fetch_images(images)
@@ -177,12 +191,22 @@ class Qwen2_5_VLImageProcessor(Qwen2VLImageProcessor):
                     data_format=data_format,
                     input_data_format=input_data_format,
                 )
-                hm_pixel_values.append(torch.from_numpy(hm_patches).unsqueeze(2).repeat(1, 1, self.temporal_patch_size, 1, 1))
+                hm_pixel_values.append(
+                    torch.from_numpy(hm_patches)
+                    .unsqueeze(2)
+                    .repeat(1, 1, self.temporal_patch_size, 1, 1)
+                )
                 pixel_values.extend(patches)
                 vision_grid_thws.append(image_grid_thw)
             pixel_values = torch.from_numpy(np.array(pixel_values))
             vision_grid_thws = torch.from_numpy(np.array(vision_grid_thws))
-            data.update({"pixel_values": pixel_values, "image_grid_thw": vision_grid_thws, "hm_pixel_values": hm_pixel_values})
+            data.update(
+                {
+                    "pixel_values": pixel_values,
+                    "image_grid_thw": vision_grid_thws,
+                    "hm_pixel_values": hm_pixel_values,
+                }
+            )
 
         # kept for BC only and should be removed after v5.0
         if videos is not None:
@@ -192,6 +216,7 @@ class Qwen2_5_VLImageProcessor(Qwen2VLImageProcessor):
                 "Your videos should be forwarded to `Qwen2VLVideoProcessor`. "
             )
             from transformers.video_utils import make_batched_videos
+
             videos = make_batched_videos(videos)
             pixel_values_videos, vision_grid_thws_videos = [], []
             for images in videos:

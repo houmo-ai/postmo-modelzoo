@@ -51,6 +51,7 @@ class Qwen3VLImagesKwargs(ImagesKwargs):
     patch_size: Optional[int]
     temporal_patch_size: Optional[int]
     merge_size: Optional[int]
+    return_hm_pixel_values: Optional[int]
 
 
 class Qwen3VLProcessorKwargs(ProcessingKwargs, total=False):
@@ -138,7 +139,27 @@ class Qwen3VLProcessor(ProcessorMixin):
             if getattr(tokenizer, "vision_end_token_id", None)
             else tokenizer.convert_tokens_to_ids(self.vision_end_token)
         )
-        self.image_processor = Qwen2_5_VLImageProcessor(**vars(self.image_processor))
+        self.hm_image_processor = Qwen2_5_VLImageProcessor(**vars(self.image_processor))
+        if getattr(self.image_processor, "size", None) is not None:
+            self.hm_image_processor.size = dict(self.image_processor.size)
+        if getattr(self.image_processor, "patch_size", None) is not None:
+            self.hm_image_processor.patch_size = self.image_processor.patch_size
+        if getattr(self.image_processor, "temporal_patch_size", None) is not None:
+            self.hm_image_processor.temporal_patch_size = (
+                self.image_processor.temporal_patch_size
+            )
+        if getattr(self.image_processor, "merge_size", None) is not None:
+            self.hm_image_processor.merge_size = self.image_processor.merge_size
+        shortest_edge = getattr(self.image_processor, "size", {}).get(
+            "shortest_edge", None
+        )
+        longest_edge = getattr(self.image_processor, "size", {}).get(
+            "longest_edge", None
+        )
+        if shortest_edge is not None:
+            self.hm_image_processor.min_pixels = shortest_edge
+        if longest_edge is not None:
+            self.hm_image_processor.max_pixels = longest_edge
 
     def __call__(
         self,
@@ -190,11 +211,14 @@ class Qwen3VLProcessor(ProcessorMixin):
             tokenizer_init_kwargs=self.tokenizer.init_kwargs,
             **kwargs,
         )
+        images_kwargs = output_kwargs["images_kwargs"]
         if images is not None:
-            image_inputs = self.image_processor(
-                images=images, **output_kwargs["images_kwargs"]
-            )
+            image_inputs = self.image_processor(images=images, **images_kwargs)
             image_grid_thw = image_inputs["image_grid_thw"]
+            hm_inputs = self.hm_image_processor.preprocess(
+                images=images, **images_kwargs
+            )
+            image_inputs["hm_pixel_values"] = hm_inputs["hm_pixel_values"]
         else:
             image_inputs = {}
             image_grid_thw = None
@@ -271,7 +295,7 @@ class Qwen3VLProcessor(ProcessorMixin):
                             1,
                         )
                     else:
-                        # vlm may input video token directly
+                        # vllm may input video token directly
                         text[i] = text[i].replace(
                             self.video_token, video_placeholder, 1
                         )
@@ -283,9 +307,7 @@ class Qwen3VLProcessor(ProcessorMixin):
         return_mm_token_type_ids = output_kwargs["text_kwargs"].pop(
             "return_mm_token_type_ids", None
         )
-        text_inputs = self.tokenizer(
-            text, **output_kwargs["text_kwargs"], return_tensors="pt"
-        )
+        text_inputs = self.tokenizer(text, **output_kwargs["text_kwargs"])
         self._check_special_mm_tokens(text, text_inputs, modalities=["image", "video"])
 
         if return_mm_token_type_ids:
@@ -294,7 +316,12 @@ class Qwen3VLProcessor(ProcessorMixin):
             mm_token_type_ids[array_ids == self.image_token_id] = 1
             text_inputs["mm_token_type_ids"] = mm_token_type_ids.tolist()
 
-        return BatchFeature(data={**text_inputs, **image_inputs, **videos_inputs})
+        batch_data = {**text_inputs, **image_inputs, **videos_inputs}
+        hm_pixel_values = batch_data.pop("hm_pixel_values", None)
+        batch_feature = BatchFeature(data=batch_data, tensor_type=return_tensors)
+        if hm_pixel_values is not None:
+            batch_feature["hm_pixel_values"] = hm_pixel_values
+        return batch_feature
 
     def _get_num_multimodal_tokens(self, image_sizes=None, video_sizes=None, **kwargs):
         """
