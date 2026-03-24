@@ -469,3 +469,16 @@ def test_tts_cosyvoice3_quant(setup_logging) -> None:
     """test_tts_cosyvoice3_quant"""
     model_name = "cosyvoice3"
     _quant_func(model_name, setup_logging)
+
+@pytest.mark.sensevoice
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_asr_sensevoice_quant",
+    depends_on=["test_get_models.py::test_asr_sensevoice_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_asr_sensevoice_quant(setup_logging) -> None:
+    """test_asr_sensevoice_quant"""
+    model_name = "sensevoice"
+    _quant_func(model_name, setup_logging)

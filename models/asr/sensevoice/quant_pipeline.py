@@ -406,7 +406,7 @@ def move_llm(args):
         )
     )
     src_golden_dir = work_dir / hmm_model_dir / "golden"
-    target_dir = dest_dir / "hmquant/prefill"
+    target_dir = dest_dir / "prefill"
     target_dir.mkdir(parents=True, exist_ok=True)
     os.remove(
         os.path.join(src_golden_dir, f"step_0/hmquant_{model_name}_with_act.onnx")

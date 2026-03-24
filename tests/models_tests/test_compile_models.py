@@ -498,6 +498,18 @@ def test_asr_whisper_compile(setup_logging) -> None:
     model_name = "whisper"
     _compile_func(model_name, setup_logging)
 
+@pytest.mark.sensevoice
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_asr_sensevoice_compile",
+    depends_on=["test_quant_models.py::test_asr_sensevoice_quant"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_asr_sensevoice_compile(setup_logging) -> None:
+    """test_asr_sensevoice_compile"""
+    model_name = "sensevoice"
+    _compile_func(model_name, setup_logging)
 
 @pytest.mark.gte
 @pytest.mark.compile
