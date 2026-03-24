@@ -35,7 +35,15 @@
 
 目前Qwen2.5模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
 
-### 2.1 获取模型和数据
+### 2.1 环境准备
+
+安装示例运行所需的python依赖，建议使用venv
+
+```bash
+pip3 install -r requirements.txt
+```
+
+### 2.2 获取模型和数据
 
 通过get_model脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
 
@@ -51,7 +59,7 @@ python3 get_model.py --type raw
 python3 get_model.py --type hmm
 ```
 
-### 2.2 量化
+### 2.3 量化
 
 量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上，空闲内存需要达到100GB以上。参考命令：
 
@@ -94,7 +102,7 @@ python3 ptq.py --calib_data ~/houmo-examples-xh2/hmodel/xh2/examples/xh_gen_data
 `-- weight.npy
 ```
 
-### 2.3 编译
+### 2.4 编译
 
 将量化模型编译为在芯片上运行的模型。执行脚本：
 

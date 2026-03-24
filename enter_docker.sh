@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # 0. 必要变量
-VERSION=v1.0.0
+VERSION=v1.1.0
 IMAGE_NAME="harbor.houmo.ai/toolchain/release:Dadao-xh2-${VERSION}-ubuntu24.04-x86.64"
 CONTAINER_NAME="$(whoami).HoumoDadao_xh2_${VERSION}"
 CONTAINER_HOME="/container/$(whoami)"
@@ -50,7 +50,17 @@ fi
 # 3. 以后台状态创建容器，并挂载第1步设置的路径
 PRINT_BLUE "docker pull $IMAGE_NAME";
 docker pull $IMAGE_NAME >/dev/null
-docker run --privileged --network=host --pid=host --gpus all \
+
+has_gpu=
+if lspci | grep -qi nvidia; then
+    # 检查nvidia-smi是否能正常返回GPU信息
+    if nvidia-smi --query-gpu=name --format=csv,noheader | grep -q .; then
+        has_gpu="--gpus all"
+        PRINT_GREEN "NVIDIA GPU detected: $(nvidia-smi --query-gpu=name --format=csv,noheader | head -n1)"
+    fi
+fi
+
+docker run --privileged --network=host --pid=host ${has_gpu} \
   -v $(pwd):$VOLUME_HOME -v $HOME:$HOME $USER_CONFIG \
   --name $CONTAINER_NAME -w $VOLUME_HOME -itd -u $(id -u):$(id -g) $IMAGE_NAME >/dev/null
 

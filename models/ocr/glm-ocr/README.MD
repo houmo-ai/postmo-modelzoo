@@ -21,12 +21,21 @@
 
 目前GLM-OCR模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
 
-### 2.1 获取模型和数据
+### 2.1 环境准备
+
+安装示例运行所需的python依赖，建议使用venv
+
+```bash
+pip3 install -r requirements.txt
+```
+
+注：由于本示例依赖的transformer版本高于python3.9最高支持的4.33.0版本，因此无法在python3.10以下版本（如ubuntu20.04）运行，如遇到找不到transformer库问题请自行安装python3.10以上版本。
+
+### 2.2 获取模型和数据
 
 通过get_model脚本下载模型，可通过参数选择下载原始模型或芯片模型。
 
 ```bash
-# 下载原始模型用于量化
 python3 get_model.py --type raw
 ```
 
@@ -36,7 +45,7 @@ python3 get_model.py --type raw
 python3 get_model.py --type hmm
 ```
 
-### 2.2 量化
+### 2.3 量化
 
 下载模型到当前目录下
 ```bash
@@ -46,12 +55,10 @@ python3 get_model.py --type raw
 量化下载的原始模型。在当前目录下，执行脚本：
 
 ```bash
-# 量化依赖transformers==51.0
-pip3 install transformers==5.1.0
 python ptq.py
 ```
 
-### 2.3 编译
+### 2.4 编译
 
 将量化模型编译为在芯片上运行的模型。执行脚本：
 
@@ -62,9 +69,9 @@ python3 build.py
 编译好的模型存放在当前目录，包括3个文件：
 glm-ocr_prefill.hmm
 glm-ocr_decode.hmm
-glm-ocr_visual.hmm1
+glm-ocr_visual.hmm
 
-### 2.4 演示
+### 2.5 演示
 
 GLM-OCR模型使用python API进行演示
 
@@ -76,7 +83,7 @@ GLM-OCR模型使用python API进行演示
 python3 demo.py
 ```
 
-### 2.5 一键评估
+### 2.6 一键评估
 
 以上步骤可以通过test.sh脚本一键执行：
 

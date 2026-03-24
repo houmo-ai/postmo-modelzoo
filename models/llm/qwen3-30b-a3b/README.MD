@@ -37,7 +37,15 @@
 
 目前 Qwen3 模型仅提供 python 脚本编译方式。芯片模型只能在 linux 环境下量化和编译。
 
-### 2.1 获取模型和数据
+### 2.1 环境准备
+
+安装示例运行所需的python依赖，建议使用venv
+
+```bash
+pip3 install -r requirements.txt
+```
+
+### 2.2 获取模型和数据
 
 通过 get_model 脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
 
@@ -55,7 +63,7 @@ python3 get_model.py --type raw
 python3 get_model.py --type hmm
 ```
 
-### 2.2 量化
+### 2.3 量化
 
 量化需要使用 GPU，并在宿主机安装与 CUDA12.2 兼容的 CUDA 和驱动。启动 docker 时将 GPU 映射到 docker 内，并指定可用的 GPU ID，显存需要达到 24GB 以上，空闲内存需要达到 291GB 以上。参考命令：
 
@@ -86,7 +94,7 @@ python ptq.py
 python ptq.py --gptqmodel
 ```
 
-### 2.3 编译
+### 2.4 编译
 
 将量化模型编译为在芯片上运行的模型。执行脚本：
 

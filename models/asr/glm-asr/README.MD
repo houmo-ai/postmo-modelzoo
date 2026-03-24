@@ -18,7 +18,17 @@
 
 目前 GLM-ASR 模型提供 python 脚本编译方式。芯片模型只能在 Linux 环境下量化和编译。
 
-### 2.1 获取模型和数据
+### 2.1 环境准备
+
+安装示例运行所需的python依赖，建议使用venv
+
+```bash
+pip3 install -r requirements.txt
+```
+
+注：由于本示例依赖的transformer版本高于python3.9最高支持的4.33.0版本，因此无法在python3.10以下版本（如ubuntu20.04）运行，如遇到找不到transformer库问题请自行安装python3.10以上版本。
+
+### 2.2 获取模型和数据
 
 通过 get_model.py 下载模型，可通过参数选择下载原始模型或芯片模型。
 
@@ -40,7 +50,7 @@ python3 get_model.py --type raw
 ../../../data/audio/audio.mp3
 ```
 
-### 2.2 量化
+### 2.3 量化
 
 量化需要使用 GPU，并在宿主机安装与 CUDA 12.2 兼容的 CUDA 和驱动。启动 docker 时将 GPU 映射到 docker 内，并指定可用的 GPU ID。参考命令：
 
@@ -58,7 +68,7 @@ python3 ptq.py --model glm-asr-nano-2512
 
 注意：当前 ptq.py 默认引用 config/llm/glm_asr_decode_xh2a.py。如果目录下没有该配置文件，需要在执行前补齐对应配置，或通过 --config 显式传入可用配置文件。
 
-### 2.3 编译
+### 2.4 编译
 
 将量化模型编译为在芯片上运行的模型。执行脚本：
 
@@ -72,7 +82,7 @@ python3 build.py
 - glm-asr_decode.hmm
 - glm-asr_prefill.hmm
 
-### 2.4 演示
+### 2.5 演示
 
 如果使用 get_model.py 下载的预编译模型，可直接执行：
 
@@ -90,7 +100,7 @@ python3 demo.py \
   --audio ../../../data/audio/audio.mp3
 ```
 
-### 2.5 一键评估
+### 2.6 一键评估
 
 以上步骤可以通过 test.sh 一键执行：
 

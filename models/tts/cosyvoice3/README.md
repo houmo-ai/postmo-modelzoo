@@ -30,7 +30,15 @@
 - 仅支持 `HOUMO_TARGET=xh2`
 - **量化需要 GPU 环境**（`test.sh -t compile` 会检查 `nvidia-smi`）
 
-### 2.1 获取模型
+### 2.1 环境准备
+
+安装示例运行所需的python依赖，建议使用venv
+
+```bash
+pip3 install -r requirements.txt
+```
+
+### 2.2 获取模型
 
 下载 **已编译模型**（推荐，仅跑演示）：
 
@@ -52,7 +60,7 @@ python3 get_model.py --type raw
 python3 get_model.py -h
 ```
 
-### 2.2 量化（PTQ）
+### 2.3 量化（PTQ）
 
 在已准备好工具链环境后，执行：
 
@@ -81,7 +89,7 @@ output/xh2/hmquant
 `-- llm_speech_embedding.pt
 ```
 
-### 2.3 编译（HM-ONNX → HMM）
+### 2.4 编译（HM-ONNX → HMM）
 
 将量化产物编译为芯片可运行的 `.hmm`：
 
@@ -105,7 +113,7 @@ python3 build.py
 
 说明：本仓库的 `build.py` 内部包含多个子模块的编译入口；如仅跑演示，优先使用 `get_model.py --type hmm` 获取已编译模型。
 
-### 2.4 演示（cosyvoice3 推理）
+### 2.5 演示（cosyvoice3 推理）
 
 执行推理示例（会下载 tokenizer 等必要资源，结果音频写入 `--output_dir` 目录， 默认为 `./results`）：
 
@@ -120,7 +128,7 @@ python3 demo.py
 python3 demo.py -h
 ```
 
-### 2.5 一键执行
+### 2.6 一键执行
 
 一键下载并运行演示（使用预编译模型）：
 

@@ -23,7 +23,15 @@
 
 bge系列模型提供在x86平台下提供量化、编译和部署范例，其它平台提供编译后模型直接部署demo。
 
-### 2.1 获取模型和数据
+### 2.1 环境准备
+
+安装示例运行所需的python依赖，建议使用venv
+
+```bash
+pip3 install -r requirements.txt
+```
+
+### 2.2 获取模型和数据
 
 通过get_model脚本下载模型，如果不需要量化和编译，则只需下载编译好的hmm模型。
 
@@ -37,21 +45,21 @@ python3 get_model.py --type hmm
 python3 get_model.py --type raw
 ```
 
-### 2.2 量化
+### 2.3 量化
 
 ```bash
 # 仅量化
 python3 ptq.py
 ```
 
-### 2.3 编译
+### 2.4 编译
 
 ```bash
 # 量化+编译
 python3 build.py
 ```
 
-### 2.3 演示
+### 2.5 演示
 
 bge模型使用python API进行演示
 
@@ -63,7 +71,7 @@ bge模型使用python API进行演示
 python3 demo.py
 ```
 
-### 2.4 一键评估
+### 2.6 一键评估
 
 以上步骤可以通过test.sh脚本一键执行：
 

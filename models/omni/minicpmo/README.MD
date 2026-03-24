@@ -23,7 +23,15 @@
 
 MiniCPMO支持Omni、vlm、llm、voice clone、instruction to speech和only tts等图像、本文、语音功能。
 
-### 2.1 获取模型和数据
+### 2.1 环境准备
+
+安装示例运行所需的python依赖，建议使用venv
+
+```bash
+pip3 install -r requirements.txt
+```
+
+### 2.2 获取模型和数据
 
 通过get_model脚本下载模型，支持量化后模型编译和直接运行编译后芯片模型
 
@@ -35,7 +43,7 @@ python3 get_model.py --type hmm
 python3 get_model.py --type raw
 ```
 
-### 2.2 量化
+### 2.3 量化
 
 当前仅支持w8a8基础量化，暂未提供其它高阶量化方案。
 量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到48GB，主机空闲内存需要达到48GB以上。参考命令：
@@ -56,13 +64,13 @@ python3 ptq.py
 ```
 量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录
 
-### 2.3 编译
+### 2.4 编译
 
 ```bash
 python3 build.py
 ```
 
-### 2.3 演示
+### 2.5 演示
 
 MiniCPMO模型使用python API进行演示
 
@@ -92,7 +100,7 @@ python3 demo.py --example_idx 8
 python3 demo.py --example_idx 9
 ```
 
-### 2.4 一键评估
+### 2.6 一键评估
 
 以上步骤可以通过test.sh脚本一键执行：
 
