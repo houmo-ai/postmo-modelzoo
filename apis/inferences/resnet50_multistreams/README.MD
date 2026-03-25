@@ -164,16 +164,16 @@ I20251222 15:44:29.966454 2701239 resnet50_multistreams.cc:196] sample queue siz
 [2025-12-22 15:44:32.069] [tid 2701312] [info] thread 3 on device 0 completed. 3 sampels tested.
 [2025-12-22 15:44:32.069] [tid 2701310] [info] thread 1 on device 0 run sample 9 end.
 [2025-12-22 15:44:32.069] [tid 2701310] [info] thread 1 on device 0 completed. 3 sampels tested.
-[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=16, Label=[sea snake]
-[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=16, Label=[sea snake]
-[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=16, Label=[sea snake]
-[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=16, Label=[sea snake]
-[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=16, Label=[sea snake]
-[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=16, Label=[sea snake]
-[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=16, Label=[sea snake]
-[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=16, Label=[sea snake]
-[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=16, Label=[sea snake]
-[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=16, Label=[sea snake]
+[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=15.9921875, Label=[sea snake]
+[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=15.9921875, Label=[sea snake]
+[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=15.9921875, Label=[sea snake]
+[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=15.9921875, Label=[sea snake]
+[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=15.9921875, Label=[sea snake]
+[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=15.9921875, Label=[sea snake]
+[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=15.9921875, Label=[sea snake]
+[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=15.9921875, Label=[sea snake]
+[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=15.9921875, Label=[sea snake]
+[2025-12-22 15:44:32.070] [tid 2701239] [info] top1: Index=65, Conf=15.9921875, Label=[sea snake]
 [2025-12-22 15:44:32.070] [tid 2701239] [info] <=== resnet50_multistreams c++ example completed.
 ```
 

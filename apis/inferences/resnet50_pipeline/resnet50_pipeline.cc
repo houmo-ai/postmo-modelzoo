@@ -178,7 +178,24 @@ int main(int argc, char* argv[]) {
            tcim::GetVersion());
 
   // Set default parameters
-  std::string default_model_path = "./resnet50_xh2_b1_1core.hmm";
+  std::string default_model_path;
+  for (const auto& entry : fs::directory_iterator(fs::current_path())) {
+    if (!entry.is_regular_file()) {
+      continue;
+    }
+    if (entry.path().extension() == ".hmm") {
+      default_model_path = entry.path().string();
+      LOG_INFO("Found .hmm file: {}", default_model_path);
+      break;
+    }
+  }
+
+  if (default_model_path.empty() || !fs::exists(default_model_path)) {
+    LOG_ERROR("No .hmm file found in {}", fs::current_path().string());
+    exit(-1);
+  }
+  LOG_INFO("Find resnet50 model file {}", default_model_path);
+
   CliArguments arguments;
   arguments.model_path = default_model_path;
   arguments.sample_num = 10;  // Default to 10 samples

@@ -25,7 +25,7 @@ import argparse
 
 HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
 sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
-from hmatc.utils.utils import get_file_from_jfrog
+from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -105,7 +105,13 @@ if __name__ == "__main__":
         else args.model_dir
     )
     # Path to the YOLOv5s HMM model in the repository
-    hmm_path = "models/apis/yolov5s/hmm_xh2_yolov5s_b1_1core.zip"
+    model_name = "yolov5s"
+    ncore = 1
+    batch = 1
+    opt_level = "O2"
+    version = get_houmo_version()
+    target = HOUMO_TARGET
+    hmm_path = f"models/{target.lower()}-{version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_static_{version}.tar.xz"
     get_file_from_jfrog(hmm_path, model_dir, "./")
 
     # If ONNX Runtime support is enabled and the system is Linux

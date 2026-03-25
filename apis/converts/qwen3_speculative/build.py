@@ -25,7 +25,7 @@ import psutil
 import threading
 import multiprocessing
 import argparse
-
+import glob
 import logging
 
 logging.basicConfig(level="INFO")
@@ -127,8 +127,8 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--target_model_dir",
-        dest="target_model_dir",
+        "--model_dir",
+        dest="model_dir",
         type=str,
         default=os.path.join("output", HOUMO_TARGET, "target", "hmquant"),
         help="path to the model dir",
@@ -144,7 +144,7 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="qwen3",
+        default="qwen3_speculative",
         help="output houmo model name",
     )
     parser.add_argument(
@@ -222,7 +222,6 @@ def get_args() -> argparse.Namespace:
 def build(
     model_name,
     model_dir,
-    model_path,
     output_dir,
     profile,
     ncore,
@@ -265,8 +264,9 @@ def build(
         kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
-    print(f"\n===> {model_name} build start...")
-    decode_model = os.path.join(model_dir, model_path)
+    print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -381,6 +381,21 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     print(f"<=== {model_name} test success.")
 
 
+def _get_decode_dir(model_dir):
+    decode_dirs = sorted(
+        path
+        for path in glob.glob(os.path.join(model_dir, "*decode*"))
+        if os.path.isdir(path)
+    )
+    if not decode_dirs:
+        raise FileNotFoundError(
+            f'No subdirectory containing "decode" found under: {model_dir}'
+        )
+    decode_dir = os.path.abspath(decode_dirs[0])
+
+    return decode_dir
+
+
 if __name__ == "__main__":
     # Create and start the monitor
     memory_monitor = ProcessMemoryMonitor(interval=2)
@@ -390,6 +405,9 @@ if __name__ == "__main__":
     args = get_args()
     print(args)
     curdir = os.getcwd()
+
+    target_model_dir = args.model_dir
+    draft_model_dir = args.draft_model_dir
     model_name = args.model_name
     output_dir = args.output_dir
     ncore = args.ncore
@@ -399,19 +417,22 @@ if __name__ == "__main__":
     context_length = args.context_length
     profile = {}
 
+    target_prefill_dir = os.path.join(target_model_dir, "prefill")
+    draft_decode_dir = _get_decode_dir(draft_model_dir)
+    draft_prefill_dir = os.path.join(draft_model_dir, "prefill")
+
     # build model
     if args.stage == "build" or args.stage == "all":
         import platform
+        import shutil
 
         arch = platform.machine()
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
         build(
-            "qwen3_prefill_draft",
-            args.draft_model_dir,
-            model_path,
+            f"{model_name}_prefill_draft",
+            draft_prefill_dir,
             output_dir,
             profile,
             ncore,
@@ -421,11 +442,9 @@ if __name__ == "__main__":
             batch,
             flash_attention=args.flash_attention,
         )
-        model_path = f"decoder/hmquant_{model_name}_with_act.onnx"
         build(
-            "qwen3_decode_draft",
-            args.draft_model_dir,
-            model_path,
+            f"{model_name}_decode_draft",
+            draft_decode_dir,
             output_dir,
             profile,
             ncore,
@@ -435,11 +454,9 @@ if __name__ == "__main__":
             batch,
             flash_attention=args.flash_attention,
         )
-        model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
         build(
-            "qwen3_prefill",
-            args.target_model_dir,
-            model_path,
+            f"{model_name}_prefill",
+            target_prefill_dir,
             output_dir,
             profile,
             ncore,
@@ -448,11 +465,9 @@ if __name__ == "__main__":
             j,
             flash_attention=args.flash_attention,
         )
-        model_path = f"prefill/hmquant_{model_name}_with_act.onnx"
         build(
-            "qwen3_verify",
-            args.target_model_dir,
-            model_path,
+            f"{model_name}_verify",
+            target_prefill_dir,
             output_dir,
             profile,
             ncore,
@@ -465,13 +480,44 @@ if __name__ == "__main__":
             all_logits=True,
         )
 
+        target_embedding_path = os.path.join(target_model_dir, "quant_embedding.pt")
+        target_embedding_renamed_path = os.path.join(
+            target_model_dir, "quant_embedding_target.pt"
+        )
+        if os.path.exists(target_embedding_path):
+            os.replace(target_embedding_path, target_embedding_renamed_path)
+
+        draft_embedding_path = os.path.join(draft_model_dir, "quant_embedding.pt")
+        draft_embedding_copied_path = os.path.join(
+            target_model_dir, "quant_embedding_draft.pt"
+        )
+        if os.path.exists(draft_embedding_path):
+            if os.path.exists(draft_embedding_copied_path):
+                os.remove(draft_embedding_copied_path)
+            shutil.copy2(draft_embedding_path, draft_embedding_copied_path)
+
     # test model
     if args.stage == "test" or args.stage == "all":
-        part_dir = os.path.join(args.draft_model_dir, "prefill")
-        test("qwen3_prefill_draft", part_dir, output_dir, profile, prefix=model_name)
-        part_dir = os.path.join(args.draft_model_dir, "decoder")
-        test("qwen3_decode_draft", part_dir, output_dir, profile, prefix=model_name)
-        part_dir = os.path.join(args.target_model_dir, "prefill")
-        test("qwen3_prefill", part_dir, output_dir, profile, prefix=model_name)
+        test(
+            f"{model_name}_prefill_draft",
+            draft_prefill_dir,
+            output_dir,
+            profile,
+            prefix=model_name,
+        )
+        test(
+            f"{model_name}_decode_draft",
+            draft_decode_dir,
+            output_dir,
+            profile,
+            prefix=model_name,
+        )
+        test(
+            f"{model_name}_prefill",
+            target_prefill_dir,
+            output_dir,
+            profile,
+            prefix=model_name,
+        )
 
     memory_monitor.stop()

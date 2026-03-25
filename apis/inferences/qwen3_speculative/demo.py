@@ -69,7 +69,7 @@ def get_args() -> argparse.Namespace:
         dest="embedding_path",
         type=str,
         default=os.path.join(
-            "output", HOUMO_TARGET, "draft", "hmquant", "quant_embedding.pt"
+            "output", HOUMO_TARGET, "hmquant", "quant_embedding_draft.pt"
         ),
         help="houmo embedding weight path",
     )
@@ -78,7 +78,7 @@ def get_args() -> argparse.Namespace:
         dest="verify_embedding_path",
         type=str,
         default=os.path.join(
-            "output", HOUMO_TARGET, "target", "hmquant", "quant_embedding.pt"
+            "output", HOUMO_TARGET, "hmquant", "quant_embedding_target.pt"
         ),
         help="houmo embedding weight path",
     )
@@ -86,28 +86,32 @@ def get_args() -> argparse.Namespace:
         "--draft_prefill_path",
         dest="draft_prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_prefill_draft.hmm"),
+        default=os.path.join(
+            "output", HOUMO_TARGET, "qwen3_speculative_prefill_draft.hmm"
+        ),
         help="houmo draft prefill model path",
     )
     parser.add_argument(
         "--draft_decode_path",
         dest="draft_decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_decode_draft.hmm"),
+        default=os.path.join(
+            "output", HOUMO_TARGET, "qwen3_speculative_decode_draft.hmm"
+        ),
         help="houmo draft decode model path",
     )
     parser.add_argument(
         "--verify_path",
         dest="verify_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_verify.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3_speculative_verify.hmm"),
         help="houmo verify model path",
     )
     parser.add_argument(
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_prefill.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3_speculative_prefill.hmm"),
         help="houmo prefill model path",
     )
     parser.add_argument(

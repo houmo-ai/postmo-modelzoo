@@ -539,8 +539,23 @@ int main(int argc, char* argv[]) {
            enable_ort, tcim::GetVersion());
 
   // 1. Load model from file
-  std::string model_path = "./yolov5s_clip_xh2_b1_1core.hmm";
-  LOG_INFO("Load yolov5s model from file {}.", model_path);
+  std::string model_path;
+  for (const auto& entry : fs::directory_iterator(fs::current_path())) {
+    if (!entry.is_regular_file()) {
+      continue;
+    }
+    if (entry.path().extension() == ".hmm") {
+      model_path = entry.path().string();
+      LOG_INFO("Found .hmm file: {}", model_path);
+      break;
+    }
+  }
+
+  if (model_path.empty() || !fs::exists(model_path)) {
+    LOG_ERROR("No .hmm file found in {}", fs::current_path().string());
+    exit(-1);
+  }
+  LOG_INFO("Load yolov5s model from file {}", model_path);
   if (!fs::exists(model_path)) {
     LOG_ERROR("Model file {} not exists.", model_path);
     exit(-1);

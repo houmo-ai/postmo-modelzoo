@@ -74,16 +74,16 @@ run sample 7 end.
 run sample 8 end.
 run sample 9 end.
 infer thread completed. 10 sampels tested.
-top1: Index=65 Conf=16, Label=[sea snake]
-top1: Index=65 Conf=16, Label=[sea snake]
-top1: Index=65 Conf=16, Label=[sea snake]
-top1: Index=65 Conf=16, Label=[sea snake]
-top1: Index=65 Conf=16, Label=[sea snake]
-top1: Index=65 Conf=16, Label=[sea snake]
-top1: Index=65 Conf=16, Label=[sea snake]
-top1: Index=65 Conf=16, Label=[sea snake]
-top1: Index=65 Conf=16, Label=[sea snake]
-top1: Index=65 Conf=16, Label=[sea snake]
+top1: Index=65, Conf=15.9921875, Label=[sea snake]
+top1: Index=65, Conf=15.9921875, Label=[sea snake]
+top1: Index=65, Conf=15.9921875, Label=[sea snake]
+top1: Index=65, Conf=15.9921875, Label=[sea snake]
+top1: Index=65, Conf=15.9921875, Label=[sea snake]
+top1: Index=65, Conf=15.9921875, Label=[sea snake]
+top1: Index=65, Conf=15.9921875, Label=[sea snake]
+top1: Index=65, Conf=15.9921875, Label=[sea snake]
+top1: Index=65, Conf=15.9921875, Label=[sea snake]
+top1: Index=65, Conf=15.9921875, Label=[sea snake]
 <=== resnet50_pipeline c++ example completed.
 ```
 

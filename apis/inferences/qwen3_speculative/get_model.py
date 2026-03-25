@@ -25,7 +25,7 @@ from modelscope import snapshot_download
 
 HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
 sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
-from hmatc.utils.utils import get_file_from_jfrog
+from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -35,11 +35,47 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_dir",
-        dest="model_dir",
+        "--download_dir",
+        dest="download_dir",
         type=str,
-        default="",
-        help="where to save downloaded model",
+        default=os.path.join(HOUMO_EXAMPLES_PATH, "apis/models"),
+        help="Directory to save downloaded model files",
+    )
+    parser.add_argument(
+        "--extract_dir",
+        dest="extract_dir",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET),
+        help="Directory to extract downloaded files",
+    )
+    parser.add_argument(
+        "--source_type",
+        dest="source_type",
+        type=str,
+        default="jfrog",
+        choices=["jfrog", "modelscope"],
+        help="Source to download model from (jfrog or modelscope)",
+    )
+    parser.add_argument(
+        "--context_length",
+        dest="context_length",
+        type=str,
+        default="2k",
+        help="context length",
+    )
+    parser.add_argument(
+        "--ndevice",
+        dest="ndevice",
+        type=int,
+        default=1,
+        help="device number",
+    )
+    parser.add_argument(
+        "--ncore",
+        dest="ncore",
+        type=int,
+        default=2,
+        help="core number",
     )
     args = parser.parse_args()
     return args
@@ -48,17 +84,30 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
 
-    _ = snapshot_download(
-        model_id="qwen/qwen3-8b",
-        local_dir="./qwen3-8b",
-        ignore_file_pattern=["*.safetensors", "*.bin"],
-    )
+    model_cfgs = {
+        "target": HOUMO_TARGET,
+        "version": get_houmo_version(),
+        "model_type": "llm",
+        "model_name": "qwen3_speculative",
+        "model_info": {
+            "model_size": "8b",
+            "ncore": args.ncore,
+            "ndevice": args.ndevice,
+            "context_len": args.context_length,
+            "prefill_len": 256,
+            "batch": 1,
+        },
+        "modelscope_repo": {
+            "repo_ids": ["qwen/qwen3-8b"],
+            "local_dirs": ["./qwen3-8b"],
+        },
+    }
 
-    model_dir = (
-        os.path.join(HOUMO_EXAMPLES_PATH, "apis/models")
-        if not args.model_dir
-        else args.model_dir
+    # Download and extract the model
+    _, ret_dict = hmatc_get_file(
+        model_cfgs,
+        "hmm",
+        args.download_dir,
+        args.extract_dir,
+        args.source_type,
     )
-    hmm_path = "models/apis/qwen3/hmm_xh2_qwen3_speculative_b1_2core_1device.zip"
-
-    get_file_from_jfrog(hmm_path, model_dir, os.path.join("output", HOUMO_TARGET))

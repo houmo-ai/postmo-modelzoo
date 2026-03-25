@@ -76,12 +76,23 @@ if __name__ == "__main__":
         f"houmo target: {HOUMO_TARGET}, tcim runtime version: {tcim.runtime.get_version()}"
     )
 
+    # get model file
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    hmm_files = [
+        os.path.join(current_dir, name)
+        for name in os.listdir(current_dir)
+        if name.endswith(".hmm")
+    ]
+    assert hmm_files, f"No .hmm file found in {current_dir}"
+
+    model_path = hmm_files[0]  # Path to the ResNet50 model file
+    logger.info(f"Found model file: {model_path}")
+
     # set the parameters
     args = get_args()
     device_num = args.device_num  # Number of devices to use for inference
     thread_num = args.thread_num  # Number of threads per device
     sample_num = args.sample_num  # Total number of samples to process
-    model_path = "./resnet50_xh2_b1_1core.hmm"  # Path to the ResNet50 model file
 
     # Limit to 1 thread if not running on ASIC platform
     if os.environ.get("HDPL_PLATFORM", "") != "ASIC":

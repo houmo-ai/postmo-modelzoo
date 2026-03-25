@@ -78,11 +78,11 @@ Input[input.1] float32 info: TensorInfo: shape: [1,3,224,224], stride: [], dtype
 img_bytes: 602112
 Count of Output: 1
 Output[495] info: TensorInfo: shape: [1,1000], stride: [], dtype: FLOAT16, format: ND, size: 2000, memsize: 2000
-top1: Index=65 Conf=16, Label=[sea snake]
-top2: Index=58 Conf=14.5781, Label=[water snake]
-top3: Index=67 Conf=13.5234, Label=[diamondback, diamondback rattlesnake, Crotalus adamanteus]
-top4: Index=54 Conf=13.3984, Label=[hognose snake, puff adder, sand viper]
-top5: Index=62 Conf=13.1172, Label=[rock python, rock snake, Python sebae]
+top1: Index=65 Conf=15.9921875, Label=[sea snake]
+top2: Index=58 Conf=14.5546875, Label=[water snake]
+top3: Index=67 Conf=13.4921875, Label=[diamondback, diamondback rattlesnake, Crotalus adamanteus]
+top4: Index=54 Conf=13.3515625, Label=[hognose snake, puff adder, sand viper]
+top5: Index=62 Conf=13.046875, Label=[rock python, rock snake, Python sebae]
 <=== resnet50 c++ example completed.
 ```
 

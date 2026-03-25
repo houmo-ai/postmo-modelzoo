@@ -24,7 +24,7 @@ import argparse
 
 HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
 sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
-from hmatc.utils.utils import get_file_from_jfrog
+from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -52,6 +52,12 @@ if __name__ == "__main__":
         if not args.model_dir
         else args.model_dir
     )
-    hmm_path = "models/apis/resnet50/hmm_xh2_resnet50_b1_1core.zip"
+    model_name = "resnet50"
+    ncore = 1
+    batch = 1
+    opt_level = "O2"
+    version = get_houmo_version()
+    target = HOUMO_TARGET
+    hmm_path = f"models/{target.lower()}-{version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_static_{version}.tar.xz"
 
     get_file_from_jfrog(hmm_path, model_dir, "./")

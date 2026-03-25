@@ -87,14 +87,23 @@ int main() {
            tcim::GetVersion());
 
   // 1. Load model
-  std::string model_path = "./resnet50_xh2_b1_1core.hmm";
-  LOG_INFO("Load resnet50 model from file {}", model_path);
+  std::string model_path;
+  for (const auto& entry : fs::directory_iterator(fs::current_path())) {
+    if (!entry.is_regular_file()) {
+      continue;
+    }
+    if (entry.path().extension() == ".hmm") {
+      model_path = entry.path().string();
+      LOG_INFO("Found .hmm file: {}", model_path);
+      break;
+    }
+  }
 
-  // Check if model file exists
-  if (!fs::exists(model_path)) {
-    LOG_ERROR("{} not exist.", model_path);
+  if (model_path.empty() || !fs::exists(model_path)) {
+    LOG_ERROR("No .hmm file found in {}", fs::current_path().string());
     exit(-1);
   }
+  LOG_INFO("Load resnet50 model from file {}", model_path);
 
   // Load the model file
   auto module = tcim::Module::LoadFromFile(model_path);

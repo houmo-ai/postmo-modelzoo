@@ -24,8 +24,8 @@ import numpy as np
 import cv2
 from loguru import logger
 
-HOUMO_EXAMPLES_PATH = os.environ.get('HOUMO_EXAMPLES_PATH', '../../..')
-sys.path.insert(0, f'{HOUMO_EXAMPLES_PATH}/hmatc')
+HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
+sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
 from hmatc.utils.postprocess import softmax
 import tcim_lite as tcim
 
@@ -33,14 +33,23 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logger.info("===> resnet50 python example start...")
     logger.info(
         f"tcim runtime version: {tcim.runtime.get_version()}, houmo target: {HOUMO_TARGET}"
     )
 
     # 1. load model
-    model_path = "./resnet50_xh2_b1_1core.hmm"
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    hmm_files = [
+        os.path.join(current_dir, name)
+        for name in os.listdir(current_dir)
+        if name.endswith(".hmm")
+    ]
+    assert hmm_files, f"No .hmm file found in {current_dir}"
+
+    model_path = hmm_files[0]
+    logger.info(f"Found model file: {model_path}")
     module = tcim.runtime.load(model_path)
 
     # 2. preprocess

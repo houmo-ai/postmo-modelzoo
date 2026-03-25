@@ -591,7 +591,17 @@ if __name__ == "__main__":
     )
 
     # 1. Load model from file
-    model_path = "./yolov5s_clip_xh2_b1_1core.hmm"
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    hmm_files = [
+        os.path.join(current_dir, name)
+        for name in os.listdir(current_dir)
+        if name.endswith(".hmm")
+    ]
+    assert hmm_files, f"No .hmm file found in {current_dir}"
+
+    model_path = hmm_files[0]
+    logger.info(f"Found model file: {model_path}")
+
     module = tcim.runtime.load(model_path)
 
     # 2. Preprocess input image
