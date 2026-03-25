@@ -391,11 +391,17 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             device_id (int): Device ID to run the demo on.
 
         Returns:
-            dict: Result dictionary or empty dict if failed.
+            dict: Result dictionary with success status and backend info.
         """
         if not self.demo_cfg:
             logger.error("demo config not found")
-            return {}
+            return {
+                "demo": {
+                    "success": False,
+                    "backend": backend,
+                    "error": "demo config not found",
+                }
+            }
         data_dir = self.demo_cfg.get("data_dir", "")
         HOUMO_DATASETS_PATH = os.environ.get(
             "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets"
@@ -403,21 +409,45 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
         if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
             logger.error("data_dir must be a exist directory")
-            return {}
+            return {
+                "demo": {
+                    "success": False,
+                    "backend": backend,
+                    "error": "data_dir not found",
+                }
+            }
         if not os.path.isdir(data_dir):
             data_dir = HM_data_dir
         logger.info(f"[demo] data_dir: {data_dir}")
         test_num = self.demo_cfg.get("num", 0)
         if not isinstance(test_num, int):
             logger.error(f"test_num must be int -> {test_num}")
-            return {}
+            return {
+                "demo": {
+                    "success": False,
+                    "backend": backend,
+                    "error": "test_num must be int",
+                }
+            }
         if test_num < 0:
             logger.error(f"test_num must >= 0 -> {test_num}")
-            return {}
+            return {
+                "demo": {
+                    "success": False,
+                    "backend": backend,
+                    "error": "test_num must >= 0",
+                }
+            }
         model = self.get_model(backend)
         if model is None:
             logger.error("Failed to get model")
-            return {}
+            return {
+                "demo": {
+                    "success": False,
+                    "backend": backend,
+                    "error": "failed to get model",
+                }
+            }
         filenames = os.listdir(data_dir)
         data_num = len(filenames)
         if test_num > 0 and test_num < data_num:
@@ -433,6 +463,15 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         model.demo(filepaths)
         model.unload()
 
+        return {
+            "demo": {
+                "success": True,
+                "backend": backend,
+                "data_dir": data_dir,
+                "num": len(filepaths),
+            }
+        }
+
     def evaluate(self, backend, device_id=0):
         """Evaluation entry point.
 
@@ -441,11 +480,18 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             device_id (int): Device ID to run the evaluation on.
 
         Returns:
-            dict: Evaluation results dictionary.
+            dict: Evaluation results dictionary with success status and backend info.
         """
         if not self.eval_cfg:
             logger.error("eval config not found")
-            return {}
+            return {
+                "eval": {
+                    backend: {
+                        "success": False,
+                        "error": "eval config not found",
+                    }
+                }
+            }
         data_dir = self.eval_cfg.get("data_dir", "")
         HOUMO_DATASETS_PATH = os.environ.get(
             "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets"
@@ -453,32 +499,77 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
         if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
             logger.error("data_dir must be a exist directory")
-            return {}
+            return {
+                "eval": {
+                    backend: {
+                        "success": False,
+                        "error": "data_dir not found",
+                    }
+                }
+            }
         if not os.path.isdir(data_dir):
             data_dir = HM_data_dir
         logger.info(f"[eval] data_dir: {data_dir}")
         num = self.eval_cfg.get("num", 0)
         if not isinstance(num, int):
             logger.error(f"eval test_num must be int -> {num}")
-            return {}
+            return {
+                "eval": {
+                    backend: {
+                        "success": False,
+                        "error": "num must be int",
+                    }
+                }
+            }
         if num < 0:
             logger.error(f"eval test_num must >= 0 -> {num}")
-            return {}
+            return {
+                "eval": {
+                    backend: {
+                        "success": False,
+                        "error": "num must >= 0",
+                    }
+                }
+            }
         # Get dataset
         dataset = self.get_dataset(data_dir)
         if dataset is None:
             logger.error("get_dataset failed")
-            return {}
+            return {
+                "eval": {
+                    backend: {
+                        "success": False,
+                        "error": "failed to get dataset",
+                    }
+                }
+            }
         # Get model
         model = self.get_model(backend)
         if model is None:
             logger.error("Failed to get model")
-            return {}
+            return {
+                "eval": {
+                    backend: {
+                        "success": False,
+                        "error": "failed to get model",
+                    }
+                }
+            }
         model.load(self.get_model_path(backend), device_id)
         res = model.evaluate(dataset, num)
         model.unload()
         logger.info(f"{res}")
-        return res
+
+        return {
+            "eval": {
+                backend: {
+                    "success": True,
+                    "data_dir": data_dir,
+                    "num": num,
+                    "results": res,
+                }
+            }
+        }
 
     def get_model_path(self, backend):
         """Get model path based on backend.
@@ -537,30 +628,28 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             check_output=False,
             devices=devices,
         )
-        t_start = datetime.now().strftime("%Y%m%d%H%M%S")
         res_info = {
             "perf": {
-                t_start: {
-                    "params": {
-                        "hmm_path": model_path,
-                        "warmup_num": warmup_num,
-                        "sample_num": sample_num,
-                        "loop_num": loop_num,
-                        "thread_num": thread_num,
-                        "stream_num": stream_num,
-                        "devices": devices,
-                    },
-                    "perf_info": {
-                        "input_avg_latency": perf_info.input_avg_latency,
-                        "input_max_latency": perf_info.input_max_latency,
-                        "infer_avg_latency": perf_info.infer_avg_latency,
-                        "infer_max_latency": perf_info.infer_max_latency,
-                        "output_avg_latency": perf_info.output_avg_latency,
-                        "output_max_latency": perf_info.output_max_latency,
-                        "avg_cost": perf_info.avg_cost,
-                        "qps": perf_info.qps,
-                    },
-                }
+                "success": True,
+                "params": {
+                    "hmm_path": model_path,
+                    "warmup_num": warmup_num,
+                    "sample_num": sample_num,
+                    "loop_num": loop_num,
+                    "thread_num": thread_num,
+                    "stream_num": stream_num,
+                    "devices": devices,
+                },
+                "perf_info": {
+                    "input_avg_latency": perf_info.input_avg_latency,
+                    "input_max_latency": perf_info.input_max_latency,
+                    "infer_avg_latency": perf_info.infer_avg_latency,
+                    "infer_max_latency": perf_info.infer_max_latency,
+                    "output_avg_latency": perf_info.output_avg_latency,
+                    "output_max_latency": perf_info.output_max_latency,
+                    "avg_cost": perf_info.avg_cost,
+                    "qps": perf_info.qps,
+                },
             }
         }
         return res_info

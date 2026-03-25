@@ -447,8 +447,14 @@ class Xh1Exec(BaseExec):
         sequencer.save_pkl(
             self.quant_output_dir, f"{self.model_name}_xh1_b{self.model_input_batch}"
         )
-        res["time"] = span
-        res_info = {"quant": res, "model": self.model_cfg}
+        res_info = {
+            "quant": {
+                "success": True,
+                "time": round(span, 2),
+                "quant_type": self.quant_type,
+                "outputs": res,
+            }
+        }
         # Compress quantization outputs
         if self.enable_upload and 0:
             logger.info("Compressing quant output...")
@@ -508,7 +514,16 @@ class Xh1Exec(BaseExec):
             custom_msg=json.dumps(self.custom_msg, ensure_ascii=False),
         )
         span = time.time() - t_start
-        res_info = {"build": {"time": span}}
+        res_info = {
+            "build": {
+                "success": True,
+                "time": round(span, 2),
+                "ncore": self.build_ncore,
+                "opt_level": self.build_opt_level,
+                "batch": self.build_batch if self.roi_num == 1 else self.roi_num,
+                "hmm": self.hmm_path,
+            }
+        }
         # Compress compiled outputs
         if self.enable_upload:
             logger.info("Compressing hmmodel...")
@@ -683,17 +698,15 @@ class Xh1Exec(BaseExec):
                 ]
             )
             res_info[output_name] = {
+                "cosine_dist": float(dist),
+                "dequanted_cosine_dist": float(dist_dequanted),
                 "md5": output_md5,
                 "dequanted_md5": output_dequanted_md5,
                 "golden_md5": golden_output_md5,
                 "golden_dequanted_md5": golden_output_dequanted_md5,
-                "cosine_dist": float(dist),
-                "dequanted_cosine_dist": float(dist_dequanted),
-                "md5_ok": output_md5 == golden_output_md5,
-                "dequanted_md5_ok": output_dequanted_md5 == golden_output_dequanted_md5,
             }
         logger.info(f"\n{table}")
-        return res_info
+        return {"outputs": res_info}
 
     def compare(self, data_path: str, device_id=0):
         """
@@ -706,7 +719,6 @@ class Xh1Exec(BaseExec):
         Returns:
             dict: Dictionary containing comparison results between different inference engines
         """
-        t_start = datetime.now().strftime("%Y%m%d%H%M%S")
         # onnx
         onnx_infer = OnnxInfer()
         onnx_infer.load(self.model_path)
@@ -899,8 +911,8 @@ class Xh1Exec(BaseExec):
         elif self.roi_num > 1:
             # 1 image n boxes
             repeats = self.roi_num
-        res_info = {"compare": {t_start: dict()}}
-        res_info["compare"][t_start]["data_path"] = data_path
+
+        outputs_result = {}
         # Calculate similarity
         header = [
             "name",
@@ -949,16 +961,17 @@ class Xh1Exec(BaseExec):
                 ]
             )
 
-            res_info["compare"][t_start][output_name] = {
+            outputs_result[output_name] = {
                 "onnx_vs_hmquant": float(onnx_vs_hmquant),
                 "onnx_vs_xh1": float(onnx_vs_xh1),
                 "hmquant_vs_xh1": float(hmquant_vs_xh1),
-                "MD5": (
-                    "ok"
-                    if get_md5(hmquant_output_dequanted)
-                    == get_md5(xh1_output_dequanted)
-                    else "fail"
-                ),
             }
+
         logger.info(f"Compare...\n{table}")
-        return res_info
+        return {
+            "compare": {
+                "success": True,
+                "data_path": data_path,
+                "outputs": outputs_result,
+            }
+        }

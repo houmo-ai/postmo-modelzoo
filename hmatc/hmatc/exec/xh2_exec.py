@@ -743,7 +743,14 @@ class Xh2Exec(BaseExec):
         self._log_kv("hmonnx", self.quant_onnx_model_path)
         self._log_kv("time", f"{span:.2f}s")
 
-        return {"quant": {"time": span}, "model": self.model_cfg}
+        return {
+            "quant": {
+                "success": True,
+                "time": round(span, 2),
+                "quant_type": self.quant_type,
+                "hmonnx": self.quant_onnx_model_path,
+            }
+        }
 
     def build(self, enable_profile=False):
         """Build the quantized model to HMM format for XH2 hardware."""
@@ -788,7 +795,16 @@ class Xh2Exec(BaseExec):
         self._log_kv("hmm", self.hmm_path)
         self._log_kv("time", f"{span:.2f}s")
 
-        res_info = {"build": {"time": span}}
+        res_info = {
+            "build": {
+                "success": True,
+                "time": round(span, 2),
+                "ncore": self.build_ncore,
+                "opt_level": self.build_opt_level,
+                "batch": self.build_batch if self.roi_num == 1 else self.roi_num,
+                "hmm": self.hmm_path,
+            }
+        }
 
         # Compress and upload compiled outputs
         if self.enable_upload:
@@ -918,7 +934,7 @@ class Xh2Exec(BaseExec):
         logger.info("Loading golden outputs:")
         table = PrettyTable(["name", "cosine_dist"])
         table.title = "xh2 vs hmquant"
-        res_info = {}
+        outputs_result = {}
 
         for output_name in outputs:
             new_name = output_name.replace("/", "_")
@@ -946,10 +962,10 @@ class Xh2Exec(BaseExec):
             dist = cosine_distance(golden_output, output)
 
             table.add_row([output_name, f"{dist:.6f}"])
-            res_info[output_name] = {
+            outputs_result[output_name] = {
+                "cosine_dist": float(dist),
                 "md5": get_md5(output),
                 "golden_md5": get_md5(golden_output),
-                "cosine_dist": float(dist),
             }
 
         span = time.time() - t_start
@@ -957,14 +973,13 @@ class Xh2Exec(BaseExec):
         self._log_section("Check Golden Complete", char="-")
         self._log_kv("time", f"{span:.2f}s")
 
-        return res_info
+        return {"outputs": outputs_result}
 
     def compare(self, data_path: str, device_id=0):
         """Compare outputs from ONNX, HmQuant and XH2 inference."""
         self._log_section(f"Compare: {self.model_name}")
 
         t_start = time.time()
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
 
         self._log_kv("data_path", data_path)
         self._log_kv("device_id", device_id)
@@ -1020,7 +1035,7 @@ class Xh2Exec(BaseExec):
             ["name", "onnx vs hmquant", "onnx vs xh2", "hmquant vs xh2"]
         )
         table.title = "Cosine Distance"
-        res_info = {"compare": {timestamp: {"data_path": data_path}}}
+        outputs_result = {}
 
         for output_name in onnx_outputs:
             onnx_out = np.repeat(onnx_outputs[output_name], repeats=repeats, axis=0)
@@ -1043,7 +1058,7 @@ class Xh2Exec(BaseExec):
                     f"{hmquant_vs_xh2:.6f}",
                 ]
             )
-            res_info["compare"][timestamp][output_name] = {
+            outputs_result[output_name] = {
                 "onnx_vs_hmquant": float(onnx_vs_hmquant),
                 "onnx_vs_xh2": float(onnx_vs_xh2),
                 "hmquant_vs_xh2": float(hmquant_vs_xh2),
@@ -1054,7 +1069,13 @@ class Xh2Exec(BaseExec):
         self._log_section("Compare Complete", char="-")
         self._log_kv("time", f"{span:.2f}s")
 
-        return res_info
+        return {
+            "compare": {
+                "success": True,
+                "data_path": data_path,
+                "outputs": outputs_result,
+            }
+        }
 
     def _prepare_single_image_compare(
         self, data_path, onnx_in_datas, hmquant_in_datas, xh2_in_datas, xh2_infer

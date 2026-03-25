@@ -35,10 +35,10 @@ from .utils.logging_format import LoggingFormatter
 from .utils.gen_default_config import generate_default_config
 from .utils.utils import (
     read_yaml_to_dict,
-    save_dict_to_yaml,
     set_random_seed,
 )
 from .utils.benchmark import run_benchmark
+from .utils.result_manager import save_result
 
 
 def set_logger(op, log_dir, filename):
@@ -70,7 +70,6 @@ def main():
     parent_target = argparse.ArgumentParser(add_help=False)
     parent_onnx = argparse.ArgumentParser(add_help=False)
     parent_hmonnx = argparse.ArgumentParser(add_help=False)
-    parent_result_path = argparse.ArgumentParser(add_help=False)
     parent_device_id = argparse.ArgumentParser(add_help=False)
     parent_cuda = argparse.ArgumentParser(add_help=False)
     parent_upload = argparse.ArgumentParser(add_help=False)
@@ -82,10 +81,9 @@ def main():
     parent_model_cfg.add_argument("--ncore", type=int, required=False, default=1, choices=(1, 2, 4) if target == "xh1" else (1, 2), help="Specify a ncore")
     parent_model_cfg.add_argument("--opt_level", type=int, required=False, default=2, choices=(0, 1, 2), help="Specify a opt_level")
     parent_model_cfg.add_argument("--roi_num", type=int, required=False, default=1, help="Specify a roi_num")
-    
+
     parent_config.add_argument("--config", "-c", type=str, required=True, help="config file path")
     parent_target.add_argument("--target", "-t", type=str, required=target not in ["xh1", "xh2"], choices=("xh1", "xh2"), default=target, help="Specify a chip target")
-    parent_result_path.add_argument("--result_path", type=str, required=False, default="result.yml", help="Specify a result path")
     parent_device_id.add_argument("--device_id", type=int, required=False, default=0, help="Specify a device, running inference on chip")
     parent_hmonnx.add_argument("--hmonnx", action="store_true", help=argparse.SUPPRESS)
     parent_onnx.add_argument("--onnx", action="store_true", help="Specify onnx model as the backend")
@@ -97,13 +95,13 @@ def main():
     parser = argparse.ArgumentParser(description="HouMo Model Assist Tool")
     subparsers = parser.add_subparsers(dest="command", required=True, help="qunat build compare perf demo eval")
     # subparsers
-    quant_parser = subparsers.add_parser("quant", parents=[parent_target, parent_config, parent_result_path, parent_cuda], help="Quantize a model")
-    build_parser = subparsers.add_parser("build", parents=[parent_target, parent_result_path, parent_model_cfg, parent_device_id, parent_upload], help="Build a model")
-    compare_parser = subparsers.add_parser("compare", parents=[parent_target, parent_config, parent_result_path, parent_model_cfg, parent_device_id], help="Compare onnx/hmquant/chip")
-    perf_parser = subparsers.add_parser("perf", parents=[parent_target, parent_result_path, parent_model_cfg, parent_device_id], help="Test model performance")
-    demo_parser = subparsers.add_parser("demo", parents=[parent_target, parent_config, parent_onnx, parent_hmonnx, parent_result_path, parent_model_cfg, parent_device_id], help="Run model demo")
-    evaluate_parser = subparsers.add_parser("eval", parents=[parent_target, parent_config, parent_onnx, parent_hmonnx, parent_result_path, parent_model_cfg, parent_device_id], help="Run model evaluate")
-    benchmark_parser = subparsers.add_parser("benchmark", parents=[parent_target, parent_config, parent_result_path, parent_device_id, parent_cuda], help="Run model benchmark")
+    quant_parser = subparsers.add_parser("quant", parents=[parent_target, parent_config, parent_cuda], help="Quantize a model")
+    build_parser = subparsers.add_parser("build", parents=[parent_target, parent_model_cfg, parent_device_id, parent_upload], help="Build a model")
+    compare_parser = subparsers.add_parser("compare", parents=[parent_target, parent_config, parent_model_cfg, parent_device_id], help="Compare onnx/hmquant/chip")
+    perf_parser = subparsers.add_parser("perf", parents=[parent_target, parent_model_cfg, parent_device_id], help="Test model performance")
+    demo_parser = subparsers.add_parser("demo", parents=[parent_target, parent_config, parent_onnx, parent_hmonnx, parent_model_cfg, parent_device_id], help="Run model demo")
+    evaluate_parser = subparsers.add_parser("eval", parents=[parent_target, parent_config, parent_onnx, parent_hmonnx, parent_model_cfg, parent_device_id], help="Run model evaluate")
+    benchmark_parser = subparsers.add_parser("benchmark", parents=[parent_target, parent_config, parent_device_id, parent_cuda], help="Run model benchmark")
     check_parser = subparsers.add_parser("check", parents=[parent_target, parent_layers, parent_device_id], help="Check model golden")
     gen_parser = subparsers.add_parser("gen", parents=[parent_target], help="Generate default config.yaml")
     golden_parser = subparsers.add_parser("golden", parents=[parent_target, parent_layers, parent_cuda], help="Generate golden data")
@@ -178,15 +176,6 @@ def main():
         run_benchmark(args.config, args.target, args.device_id, args.cuda)
         return
 
-    # If result info exists, read back and update before saving
-    res_info = dict()
-    if (
-        hasattr(args, "result_path")
-        and args.result_path is not None
-        and os.path.exists(args.result_path)
-    ):
-        res_info = read_yaml_to_dict(args.result_path)
-
     # Directly specify model for perf can skip config file
     if current_command == "perf" and args.model is not None:
         new_res_info = BaseExec.model_perf(
@@ -198,10 +187,10 @@ def main():
             args.stream,
             devices=[args.device_id],
         )
-        if "perf" in res_info:
-            res_info["perf"].update(new_res_info["perf"])
-        else:
-            res_info.update(new_res_info)
+        # Save result to model directory
+        model_dir = os.path.dirname(os.path.dirname(args.model))
+        result_path = os.path.join(model_dir, target, "result.yml")
+        save_result(result_path, new_res_info, "", target)
         return
     # Directly build from hmonnx
     if current_command == "build" and args.hmonnx is not None:
@@ -320,7 +309,10 @@ def main():
         hm_exec.enable_upload = args.upload
         new_res_info = hm_exec.build(enable_profile=args.profile)
         logger.info(f"Build {hm_exec.model_name} done.")
-        new_res_info["build"].update(hm_exec.check_golden(args.device_id))
+        # Merge check_golden outputs into build result
+        check_result = hm_exec.check_golden(args.device_id)
+        if "outputs" in check_result and "build" in new_res_info:
+            new_res_info["build"]["outputs"] = check_result["outputs"]
     elif current_command == "check":
         hm_exec.check_golden(args.device_id, args.layers)
     elif current_command == "compare":
@@ -346,20 +338,16 @@ def main():
             devices=[args.device_id],
         )
     elif current_command == "demo":
-        hm_exec.demo(backend=backend, device_id=args.device_id)
+        new_res_info = hm_exec.demo(backend=backend, device_id=args.device_id)
     elif current_command == "eval":
-        hm_exec.evaluate(backend=backend, device_id=args.device_id)
+        new_res_info = hm_exec.evaluate(backend=backend, device_id=args.device_id)
     else:
         raise NotImplementedError
 
-    if current_command == "compare" and "compare" in res_info:
-        res_info["compare"].update(new_res_info["compare"])
-    elif current_command == "perf" and "perf" in res_info:
-        res_info["perf"].update(new_res_info["perf"])
-    else:
-        res_info.update(new_res_info)
-    if hasattr(args, "result_path") and args.result_path is not None:
-        save_dict_to_yaml(res_info, args.result_path)
+    # Save result to {save_dir}/{target}/result.yml
+    if hm_exec and hasattr(hm_exec, "save_dir") and hm_exec.save_dir:
+        result_path = os.path.join(hm_exec.save_dir, target, "result.yml")
+        save_result(result_path, new_res_info, hm_exec.model_name, target)
 
 
 if __name__ == "__main__":
