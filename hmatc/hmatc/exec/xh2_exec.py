@@ -403,20 +403,17 @@ class Xh2Exec(BaseExec):
 
         calib_data = self._resolve_calib_data_path()
 
-        # Check for multi-input image structures
+        # Multi-input models only support NPZ format
         if self.is_multi_input_model:
-            images_dir = os.path.join(calib_data, "images")
-            if os.path.isdir(images_dir):
-                return self._load_multi_input_images(images_dir)
-            named_images = self._find_named_image_files(calib_data)
-            if named_images:
-                return self._load_named_images(named_images)
+            data_path = self._find_data_file(calib_data)
+            logger.info(f"Using NPZ data path: {data_path}")
+            return self._load_npz_data(data_path)
 
-        # Single input or NPZ fallback
+        # Single input
         data_path = self._find_data_file(calib_data)
         logger.info(f"Using data path: {data_path}")
 
-        if self.is_multi_input_model or not self.is_image_single_input:
+        if not self.is_image_single_input:
             return self._load_npz_data(data_path)
         return self._load_single_image(data_path)
 
@@ -791,7 +788,40 @@ class Xh2Exec(BaseExec):
         self._log_kv("hmm", self.hmm_path)
         self._log_kv("time", f"{span:.2f}s")
 
-        return {"build": {"time": span}}
+        res_info = {"build": {"time": span}}
+
+        # Compress and upload compiled outputs
+        if self.enable_upload:
+            logger.info("Compressing hmmodel...")
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            hmcc_version = get_package_version("houmo-tcim-xh2")
+            runtime_version = get_package_version("houmo_tcim_runtime_xh2")
+            with open(os.path.join(self.save_dir, "xh2", "VERSION.txt"), "w") as f:
+                f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")
+                f.write(f"tcim_version: {hmcc_version}\n")
+                f.write(f"tcim_runtime_version: {runtime_version}\n")
+                f.write(f"build_time: {now}\n")
+            filename = f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_{get_houmo_version()}.tar.xz"
+            compress_hmm_path = os.path.join(
+                self.save_dir,
+                "xh2",
+                filename,
+            )
+            compress_files_to_tar_xz_with_progress(
+                [self.hmm_path, os.path.join(self.save_dir, "xh2", "VERSION.txt")],
+                compress_hmm_path,
+            )
+            logger.info(
+                f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}"
+            )
+            upload_file_to_artifactory(
+                compress_hmm_path,
+                f"models/{self.target.lower()}-{get_houmo_version()}/{self.model_dir_name}/{filename}",
+                max_retries=3,
+            )
+            logger.info("Compressing hmmodel done.")
+
+        return res_info
 
     # ==================== Check and Compare ====================
 
