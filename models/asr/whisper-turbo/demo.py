@@ -190,11 +190,11 @@ class HmWhisper:
         self.encoder = tcim.runtime.load(encoder_path, option=option1)
         logger.info("encoder model loaded")
         option2 = tcim.runtime.Option(weight_manager)
-        self.decoder = tcim.runtime.load(decoder_path, option=option2)
-        logger.info("decoder model loaded")
-        option3 = tcim.runtime.Option(weight_manager)
-        self.prefill = tcim.runtime.load(prefill_path, option=option3)
+        self.prefill = tcim.runtime.load(prefill_path, option=option2)
         logger.info("prefill model loaded")
+        option3 = tcim.runtime.Option(weight_manager)
+        self.decoder = tcim.runtime.load(decoder_path, option=option3)
+        logger.info("decoder model loaded")
         self.encoder_time = 0.0
         self.decoder_time = 0.0
         self.prefill_time = 0.0
@@ -452,6 +452,11 @@ if __name__ == "__main__":
     results = ""
     output_tokens = 0
     audio_array, sr = sf.read(args.audio)
+    if sr != 16000:
+        import librosa
+        audio_array = librosa.resample(audio_array, orig_sr=sr, target_sr=16000)
+        logger.info(f"Resampled audio from {sr}Hz to 16000Hz")
+        sr = 16000
     # 20 chunks per second, chunk_size
     chunk_size = int(20 * sr)
     total_samples = len(audio_array)
