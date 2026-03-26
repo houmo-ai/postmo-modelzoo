@@ -145,9 +145,9 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | gpt-oss                 | llm          | xh2    | x     | yes   | yes  | yes  | x    |
 | qwen2.5                 | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
 | qwen3                   | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
-| qwen3-14b               | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
 | qwen3-30b-a3b           | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
-| glm-ocr                 | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
+| qwen3.5                 | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
+| glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |
 | lprnet                  | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  |
 | PPOCRv3                 | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  |
 | glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |

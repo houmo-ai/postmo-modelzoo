@@ -1,23 +1,22 @@
-# YOLOv7
+# YOLOv9m
 
-本示例展示如何把量化后的YOLOv7模型编译，部署到后摩芯片的设备上。
+本示例展示如何把量化后的YOLOv9m模型编译，部署到后摩芯片的设备上。
 
 [TOC]
 
 ## 1.模型说明
 
-本例使用的 YOLOv7 实现来源 github 开源项目[https://github.com/WongKinYiu/yolov7/releases/download/v0.1/yolov7.pt](https://github.com/WongKinYiu/yolov7/releases/download/v0.1/yolov7.pt)。
+本例使用的 YOLOv9m 实现来源 github 开源项目[https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov9m.pt](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov9m.pt)。
 
-下载模型后可使用官方代码导出为onnx模型，执行命令：
+下载模型后可使用ultralytics工具导出为onnx模型，执行命令：
 ```bash
-git clone https://github.com/WongKinYiu/yolov7.git
-cd yolov7
-python export.py --weights yolov7.pt --grid --simplify
+pip3 install ultralytics
+yolo export model=yolov9m.pt format=onnx imgsz=640,640 opset=13 simplify=True
 ```
 
 ## 2.快速开始
 
-可以通过hmatc工具执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
+可以通过hmatc工具执行性能测试和精度测试，详细介绍请参考houmo-examples根目录下README.md文件的快速上手章节。
 
 ### 2.1 精度评估
 
@@ -69,25 +68,25 @@ hmatc demo -c config.yml -t xh2 --onnx
 
 ```bash
 # onnx
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.491601', 'map50': '0.684097'
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.489321', 'map50': '0.665881'
 # xh2
-'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.491300', 'map50': '0.683800'
+'input_size': [1, 3, 640, 640], 'dataset': 'coco_2017Val', 'num': 5000, 'map50_95': '0.488900', 'map50': '0.664200'
 ```
 
 ### 3.2 性能结果
 
 ```bash
-[Latency] Inference  avg:  16.003 ms, max:  18.085 ms, min:  14.759 ms, tp99:  17.988 ms, tp999:  18.085 ms
-[Latency] Input      avg:   1.925 ms, max:   2.261 ms, min:   1.096 ms, tp99:   2.201 ms, tp999:   2.261 ms
-[Latency] Output     avg:   3.151 ms, max:   3.980 ms, min:   1.970 ms, tp99:   3.824 ms, tp999:   3.980 ms
-[Latency] End2end    avg:  21.078 ms, max:  22.202 ms, min:  19.809 ms, tp99:  22.000 ms, tp999:  22.202 ms
-[Throughput] total: 5283.884 ms, avg: 5.284 ms, repeat: 1000, rounds: 1
-[Throughput] qps: 189.255
+[Latency] Inference  avg: 122.766 ms, max: 125.738 ms, min: 121.488 ms, tp99: 124.468 ms, tp999: 125.738 ms
+[Latency] Input      avg:   2.264 ms, max:   2.755 ms, min:   1.192 ms, tp99:   2.594 ms, tp999:   2.755 ms
+[Latency] Output     avg:   1.138 ms, max:   1.446 ms, min:   0.664 ms, tp99:   1.357 ms, tp999:   1.446 ms
+[Latency] End2end    avg: 126.167 ms, max: 128.350 ms, min: 124.814 ms, tp99: 126.969 ms, tp999: 128.350 ms
+[Throughput] total: 31608.664 ms, avg: 31.609 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 31.637
 ```
 
 ## 4.免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。
 
-- YOLOv7 模型：[https://github.com/WongKinYiu/yolov7/releases/download/v0.1/yolov7.pt](https://github.com/WongKinYiu/yolov7/releases/download/v0.1/yolov7.pt)
+- YOLOv9m 模型：[https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov9m.pt](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov9m.pt)
 - COCO 验证集链接: [https://cocodataset.org/#download](https://cocodataset.org/#download)

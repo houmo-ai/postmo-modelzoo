@@ -23,7 +23,7 @@ torch.onnx.export(efficientnet, input, 'efficientnet_b0_224x224.onnx', opset_ver
 
 ## 2.快速开始
 
-可以通过hmatc工具一键执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
+可以通过hmatc工具一键执行性能测试和精度测试，详细介绍请参考houmo-examples根目录下README.md文件的快速上手章节。
 
 ### 2.1 精度评估
 

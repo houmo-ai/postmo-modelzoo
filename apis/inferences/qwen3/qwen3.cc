@@ -26,10 +26,12 @@
 #include <filesystem>
 #include <locale>
 #include <string>
+#include <vector>
 
 #include "HmQwenInfer.h"
 #include "Hmtokenizer.h"
 #include "tcim/tcim_runtime.h"
+#include "tcim/tcim_dev_ctrl.h"
 #ifdef _MSC_VER
 #include <Windows.h>
 #endif
@@ -42,23 +44,39 @@ int main(int argc, char *argv[]) {
 
     // Paths for model files, tokenizer, and embedding weights
     std::string prefillModelPath, decodeModelPath, tokenizerJsonPath, embeddingWeightPath;
+    bool enablePowerDemo = false;
+    std::vector<std::string> positionalArgs;
 
     // Handle command line arguments
-    if (argc == 1) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "power_opt") {
+            enablePowerDemo = true;
+        } else {
+            positionalArgs.push_back(arg);
+        }
+    }
+
+    if (positionalArgs.empty()) {
         // Default paths if no arguments are provided
         prefillModelPath = "qwen3_prefill.hmm";
         decodeModelPath = "qwen3_decode.hmm";
         tokenizerJsonPath = "qwen3-8b/tokenizer.json";
         embeddingWeightPath = "hmquant/quant_embedding.bin";
-    } else if (argc == 5) {
+    } else if (positionalArgs.size() == 4) {
         // Use paths provided via command line arguments
-        prefillModelPath = argv[1];
-        decodeModelPath = argv[2];
-        tokenizerJsonPath = argv[3];
-        embeddingWeightPath = argv[4];
+        prefillModelPath = positionalArgs[0];
+        decodeModelPath = positionalArgs[1];
+        tokenizerJsonPath = positionalArgs[2];
+        embeddingWeightPath = positionalArgs[3];
     } else {
         // Print usage information if invalid number of arguments
-        std::cerr << "Usage:\n  <1> : ./${demo_name}\n  <2> : ./${demo_name} <prefillModelPath> <decodeModelPath> <tokenizerJsonPath> <embeddingWeightPath>" << std::endl;
+        std::cerr << "Usage:\n"
+                  << "  <1> : ./${demo_name}\n"
+                  << "  <2> : ./${demo_name} [power_opt]\n"
+                  << "  <3> : ./${demo_name} <prefillModelPath> <decodeModelPath> <tokenizerJsonPath> <embeddingWeightPath> [power_opt]\n"
+                  << "       power_opt can be placed at any position"
+                  << std::endl;
         return -1;
     }
 
@@ -67,7 +85,12 @@ int main(int argc, char *argv[]) {
         !std::filesystem::exists(decodeModelPath) ||
         !std::filesystem::exists(tokenizerJsonPath) ||
         !std::filesystem::exists(embeddingWeightPath)) {
-        std::cerr << "Usage:\n  <1> : ./${demo_name}\n  <2> : ./${demo_name} <prefillModelPath> <decodeModelPath> <tokenizerJsonPath> <embeddingWeightPath>" << std::endl;
+        std::cerr << "Usage:\n"
+                  << "  <1> : ./${demo_name}\n"
+                  << "  <2> : ./${demo_name} [power_opt]\n"
+                  << "  <3> : ./${demo_name} <prefillModelPath> <decodeModelPath> <tokenizerJsonPath> <embeddingWeightPath> [power_opt]\n"
+                  << "       power_opt can be placed at any position"
+                  << std::endl;
         std::cerr << "Please check that all files exist!" << std::endl;
         return -2;
     }
@@ -88,9 +111,52 @@ int main(int argc, char *argv[]) {
 
     // Initialize the Qwen3 inference engine
     std::unique_ptr<HmQwenInfer> qwen3Infer = std::make_unique<HmQwenInfer>(prefillModelPath, decodeModelPath, tokenizerJsonPath, embeddingWeightPath);
-
-    // Run chat inference with a sample question
     qwen3Infer->Chat("请介绍一下存算一体技术的优势");
+
+    if (enablePowerDemo) {
+        auto dev = tcim::dev_ctrl::HalDeviceFactory::Create("Xh2aHalBackend");
+
+        auto pre = dev->RegisterPreResetCallback(0, [&](int id) {
+            if (qwen3Infer) {
+                qwen3Infer.reset();
+            }
+
+        });
+        auto post = dev->RegisterPostResetCallback(0, [&](int id) {
+            qwen3Infer = std::make_unique<HmQwenInfer>(prefillModelPath, decodeModelPath,tokenizerJsonPath, embeddingWeightPath);
+
+        });
+
+        auto device_num = tcim::GetDeviceNum();
+
+        for (auto i = 0; i < device_num; ++i) {
+
+            uint64_t freq;
+            float  util_rate = 0.0f;
+            struct tcim::dev_ctrl::MemInfo mem_info;
+            memset(&mem_info, 0, sizeof(mem_info));
+
+            if (dev->GetMemInfo(i, &mem_info) == tcim::Status::OK) {
+                printf("Device %d: Current DDR memory usage: total %u MB, used %u MB, available %u MB\n", i, mem_info.mem_total, mem_info.mem_used, mem_info.mem_avail);
+            }
+            if (dev->GetIpuUtilRate(i, &util_rate) == tcim::Status::OK) {
+                printf("Device %d: Current IPU utilization rate: %.2f%%\n", i, util_rate);
+            }
+            if (dev->GetIpuFrequency(i, &freq) == tcim::Status::OK) {
+                printf("Device %d: Current IPU frequency: %lu Hz\n", i, freq);
+            }
+
+        }
+
+        tcim::dev_ctrl::DvfsMode mode;
+        dev->GetDvfsMode(0, &mode);
+        dev->SetDvfsMode(0, tcim::dev_ctrl::DvfsMode::kOnDemand);
+        dev->IpuReset(0);   // （pre-callback → hw reset → post-callback）
+
+        dev->UnregisterResetCallback(pre);
+        dev->UnregisterResetCallback(post);
+    }
+   
 
     // Clean up the inference engine
     qwen3Infer.reset();

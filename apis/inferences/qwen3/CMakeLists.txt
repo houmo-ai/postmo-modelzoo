@@ -44,8 +44,13 @@ set(INCLUDE_DIRS
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include
   ${TOKENZIER_CPP_PATH}/${LIB_PATH}/include
   ${CMAKE_SOURCE_DIR}/include
+  $ENV{TCIM_RUNTIME_PATH}/include
+  $ENV{HOUMO_SDK_PATH}/hal/include
   $ENV{HOUMO_PATH}/include
   ${EIGEN_PATH}
+  
+
+  
   )
 
 link_directories($ENV{HOUMO_PATH}/lib
@@ -62,16 +67,43 @@ else()
 endif()
 
 
-add_executable(${PROJECT_NAME}   ${SOURCE_FILES})
+add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} PUBLIC tcim_runtime_lite)
+find_library(TCIM_DEV_CTRL_LIBRARY
+  NAMES tcim_dev_ctrl
+  PATHS
+    $ENV{TCIM_RUNTIME_PATH}/lib
+    $ENV{HOUMO_PATH}/lib
+)
+
+if(TCIM_DEV_CTRL_LIBRARY)
+  message(STATUS "Found tcim_dev_ctrl: ${TCIM_DEV_CTRL_LIBRARY}")
+  target_compile_definitions(${PROJECT_NAME} PRIVATE HAS_TCIM_DEV_CTRL=1)
+else()
+  message(WARNING "tcim_dev_ctrl library not found, build without HAL reset/dvfs features")
+  target_compile_definitions(${PROJECT_NAME} PRIVATE HAS_TCIM_DEV_CTRL=0)
+endif()
 
 if(MSVC)
-  target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c ${TCIM_LIBRARY} ${CMAKE_DL_LIBS} ws2_32 Userenv ntdll Bcrypt kernel32)
+  if(TCIM_DEV_CTRL_LIBRARY)
+    target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c ${TCIM_LIBRARY} ${TCIM_DEV_CTRL_LIBRARY} ${CMAKE_DL_LIBS} ws2_32 Userenv ntdll Bcrypt kernel32)
+  else()
+    target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c ${TCIM_LIBRARY} ${CMAKE_DL_LIBS} ws2_32 Userenv ntdll Bcrypt kernel32)
+  endif()
 else()
   if(ANDROID_ABI)
-    target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c ${TCIM_LIBRARY} dl)
+    if(TCIM_DEV_CTRL_LIBRARY)
+      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c ${TCIM_LIBRARY} ${TCIM_DEV_CTRL_LIBRARY} dl)
+    else()
+      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c ${TCIM_LIBRARY} dl)
+    endif()
   else()
-    target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c tcim_runtime_lite pthread  ${CMAKE_DL_LIBS})
+    if(TCIM_DEV_CTRL_LIBRARY)
+      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c tcim_runtime_lite ${TCIM_DEV_CTRL_LIBRARY} pthread ${CMAKE_DL_LIBS})
+    else()
+      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c tcim_runtime_lite pthread ${CMAKE_DL_LIBS})
+    endif()
   endif()
 endif()
 

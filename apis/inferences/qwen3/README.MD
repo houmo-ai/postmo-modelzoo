@@ -13,7 +13,7 @@
 -   许可: [Apache License 2.0](https://modelscope.cn/models/Qwen/Qwen3-8B/file/view/master/LICENSE)
 
 预训练模型在运行时下载，工程发布**不包含**该模型。
-目前芯片模型只能在 linux 环境下量化和编译，请参考 houmo-modelzoo/models/llm/qwen3 中的量化和编译。
+目前芯片模型只能在 linux 环境下量化和编译，请参考 houmo-examples/models/llm/qwen3 中的量化和编译。
 
 ## 2 快速开始
 
@@ -36,7 +36,7 @@
 python3 get_model.py
 ```
 
-如果需要其他规格，请参考 houmo-modelzoo 自行编译或通过其他途径获取。
+如果需要其他规格，请参考 houmo-examples 自行编译或通过其他途径获取。
 
 5. Qwen3 模型使用 python API 进行演示，提供两种方式的 demo：
 
@@ -48,6 +48,14 @@ python3 get_model.py
 python3 demo.py
 # Prefix Caching demo 执行方式
 python3 demo_prefix_caching.py
+```
+
+6. demo支持通过增加power_opt参数打开功耗优化模式，降低大模型运行期间功耗：
+
+```bash
+# 低功耗执行方式
+python3 demo.py --power_opt
+./example_cxx_qwen3 power_opt
 ```
 
 ## 3 参考结果

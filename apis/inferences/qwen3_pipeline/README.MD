@@ -13,7 +13,7 @@
 -   许可: [Apache License 2.0](https://modelscope.cn/models/Qwen/Qwen3-8B/file/view/master/LICENSE)
 
 预训练模型在运行时下载，工程发布**不包含**该模型。
-目前芯片模型只能在 linux 环境下量化和编译，请参考 houmo-modelzoo/models/llm/qwen3 中的量化和编译。
+目前芯片模型只能在 linux 环境下量化和编译，请参考 houmo-examples/models/llm/qwen3 中的量化和编译。
 
 ## 2 快速开始
 
@@ -33,7 +33,7 @@ source env.sh
 python3 get_model.py
 ```
 
-如果需要其他规格，请参考 houmo-modelzoo 自行编译或通过其他途径获取。
+如果需要其他规格，请参考 houmo-examples 自行编译或通过其他途径获取。
 
 3. Qwen3 Pipeline 模型使用 python API 进行演示，提供两种方式的 demo：
 
