@@ -218,7 +218,7 @@ def build_glm(model_name, model_dir, output_dir, profile, ncore, j, flash_attent
         kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
-    print(f"\n===> {model_name} build start...")
+    print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
     onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
     decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
@@ -363,7 +363,7 @@ if __name__ == "__main__":
             exit(0)
         build_glm(
             f"{model_name}_encode",
-            os.path.join(model_dir, "encoder"),
+            os.path.join(model_dir, "encode"),
             output_dir,
             profile,
             ncore,
@@ -372,7 +372,7 @@ if __name__ == "__main__":
         )
         build_glm(
             f"{model_name}_decode",
-            os.path.join(model_dir, "decoder"),
+            os.path.join(model_dir, "decode"),
             output_dir,
             profile,
             ncore,
@@ -391,10 +391,10 @@ if __name__ == "__main__":
 
     # test model
     if args.stage == "test" or args.stage == "all":
-        part_dir = os.path.join(model_dir, "encoder")
-        test(f"{model_name}_encoder", part_dir, output_dir, profile)
-        part_dir = os.path.join(model_dir, "decoder")
-        test(f"{model_name}_decoder", part_dir, output_dir, profile)
+        part_dir = os.path.join(model_dir, "encode")
+        test(f"{model_name}_encode", part_dir, output_dir, profile)
+        part_dir = os.path.join(model_dir, "decode")
+        test(f"{model_name}_decode", part_dir, output_dir, profile)
         part_dir = os.path.join(model_dir, "prefill")
         test(f"{model_name}_prefill", part_dir, output_dir, profile)
 

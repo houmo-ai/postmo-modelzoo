@@ -117,13 +117,13 @@ def write_final_export_metadata(
 
     final_meta_info = dict(meta_info)
     final_meta_info["encoder"] = str(
-        Path("encoder") / f"hmquant_{output_model_name}_with_act.onnx"
+        Path("encode") / f"hmquant_{output_model_name}_with_act.onnx"
     )
     final_meta_info["prefill_onnx_file"] = str(
         Path("prefill") / f"hmquant_{output_model_name}_with_act.onnx"
     )
     final_meta_info["decode_onnx_file"] = str(
-        Path("decoder") / f"hmquant_{output_model_name}_with_act.onnx"
+        Path("decode") / f"hmquant_{output_model_name}_with_act.onnx"
     )
     final_meta_info["token_embedding_file"] = "quant_embedding.pt"
     final_meta_info["model"] = build_runtime_model_config(Path("."))
@@ -715,7 +715,7 @@ def quant_and_export_llm(args):
     final_hmquant_dir.mkdir(exist_ok=True, parents=True)
 
     encoder_src_dir = work_dir / "Encoder" / "hmonnx"
-    encoder_dst_dir = final_hmquant_dir / "encoder"
+    encoder_dst_dir = final_hmquant_dir / "encode"
     if move_export_dir(encoder_src_dir, encoder_dst_dir):
         rename_onnx_file(encoder_dst_dir, f"hmquant_{args.model_name}_with_act.onnx")
 
@@ -725,7 +725,7 @@ def quant_and_export_llm(args):
         rename_onnx_file(prefill_dst_dir, f"hmquant_{args.model_name}_with_act.onnx")
 
     decoder_src_dir = work_dir / "Decoder"
-    decoder_dst_dir = final_hmquant_dir / "decoder"
+    decoder_dst_dir = final_hmquant_dir / "decode"
     if move_export_dir(decoder_src_dir, decoder_dst_dir):
         rename_onnx_file(decoder_dst_dir, f"hmquant_{args.model_name}_with_act.onnx")
 
