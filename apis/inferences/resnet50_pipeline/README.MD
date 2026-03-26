@@ -26,7 +26,7 @@ resnet50.cc 展示 c++下 pipeline 推理过程，包括：
 
 可以通过以下两种方式获取芯片模型：
 
-1. 自行编译：通过原始模型或量化模型，经过 tcim 工具链编译生成，具体可参考 houmo-modelzoo
+1. 自行编译：通过原始模型或量化模型，经过 tcim 工具链编译生成，具体可参考 houmo-examples
 2. 直接下载：通过 get_model.py 脚本下载预编译的模型
 
 ```bash

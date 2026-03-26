@@ -3,11 +3,13 @@ set -e
 
 STEP="all"
 DEMO_TYPE="normal"
+POWER_OPT=false
 
 show_help() {
     echo "Usage: $0 [options]"
     echo "  -s, --step         execution step, default is all, support: all, get_model, demo."
     echo "  -t, --demo_type    the type of the demo to be executed, default is normal, support: normal, prefix_caching."
+    echo "  -p, --power_opt    enable power optimization mode for C++ demo (flag)."
     echo "  -h, --help         help information"
     exit 0
 }
@@ -24,6 +26,10 @@ while [[ $# -gt 0 ]]; do
         ;;
         -h|--help)
             show_help
+        ;;
+        -p|--power_opt)
+          POWER_OPT=true
+          shift
         ;;
         *)
             echo "Error: Unknown parameter '$1'" >&2
@@ -68,7 +74,11 @@ build_and_run_cpp_demo() {
       make install
 
       cd $WORK_PATH
-      ./example_cxx_qwen3
+      if [ "$POWER_OPT" = true ]; then
+        ./example_cxx_qwen3 power_opt
+      else
+        ./example_cxx_qwen3
+      fi
     else
       echo "UnSupport Backend!"
     fi
@@ -79,8 +89,13 @@ build_and_run_cpp_demo() {
 
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     if [ "$DEMO_TYPE" = "normal" ]; then
-        echo "Execute Qwen3 Normal Demo."
-        python3 demo.py
+        if [ "$POWER_OPT" = true ]; then
+          echo "Execute Qwen3 Normal Demo with power optimization."
+          python3 demo.py --power_opt
+        else
+          echo "Execute Qwen3 Normal Demo."
+          python3 demo.py
+        fi
     elif [ "$DEMO_TYPE" = "prefix_caching" ]; then
         echo "Execute Qwen3 Prefix Caching Demo."
         python3 demo_prefix_caching.py

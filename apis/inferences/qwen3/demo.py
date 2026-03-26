@@ -106,6 +106,12 @@ def get_args() -> argparse.Namespace:
         default=1.0,
         help="sampling temperature",
     )
+    parser.add_argument(
+        "--power_opt",
+        action="store_true",
+        default=False,
+        help="power consumption optimization",
+    )
 
     args = parser.parse_args()
     if args.ndevice > 1:
@@ -343,6 +349,7 @@ class HmQwenXh2(HmQwenBase):
 
 if __name__ == "__main__":
     args = get_args()
+    enable_power_opt = args.power_opt
 
     hmqwen = HmQwenXh2(
         args.prefill_path,
@@ -356,7 +363,37 @@ if __name__ == "__main__":
         temperature=args.temperature,
     )
 
-    question = "请介绍一下存算一体技术的优势"
+    question = "请介绍一下存算一体技术的优势" 
+
+    dev = None
+    pre_h = None
+    post_h = None
+
+    if enable_power_opt:
+        import gc
+        import tcim_lite
+        hw = tcim_lite.dev_ctrl
+
+        def pre_reset(device_id:int):
+            global hmqwen
+            if hmqwen is not None:
+                hmqwen = None
+                gc.collect()
+                # Running twice is a defensive memory cleanup practice, not redundant logic.
+                gc.collect()
+
+        def post_reset(device_id:int):
+            global hmqwen
+            hmqwen = HmQwenXh2(
+                args.prefill_path, args.decode_path, args.embedding_path,
+                args.tokenizer_dir, args.ndevice,
+                repetition_penalty=args.repetition_penalty,
+                topk=args.topk, topp=args.topp, temperature=args.temperature,
+            )
+
+        dev = hw.HalDeviceFactory.create("Xh2aHalBackend")
+        pre_h = dev.register_pre_reset_callback(0, pre_reset)
+        post_h = dev.register_post_reset_callback(0, post_reset)
 
     start_time = time.time()
     try:
@@ -370,5 +407,31 @@ if __name__ == "__main__":
             hmqwen.decode_time,
             total_time,
         )
+
+
+        if enable_power_opt:
+            # Set DVFS mode to ON_DEMAND for power optimization and log device statistics
+            status, mode = dev.get_dvfs_mode(0)
+            if status == 0:
+                status  = dev.set_dvfs_mode(0, hw.DvfsMode.ON_DEMAND)
+                if status != 0:
+                    logger.error(f"Failed to set DVFS mode, status: {status}")
+            else:
+                logger.error(f"Failed to get DVFS mode, status: {status}")
+
+            # Log IPU frequency, memory info, and utilization for power demonstration
+            status, freq = dev.get_ipu_frequency(0)
+            status, mem_info = dev.get_mem_info(0)
+            status,util = dev.get_ipu_util_rate(0)
+
+
+            print(f"IPU frequency: {freq} MHz,mem_total: {mem_info.mem_total},    mem_avail: {mem_info.mem_avail},mem_used: {mem_info.mem_used},IPU utilization: {util} %")
+            dev.ipu_reset(0)
+
     except Exception as e:
         logger.error(f"Error occurred during the chat: {str(e)}")
+
+    finally:
+        if enable_power_opt:
+            dev.unregister_reset_callback(pre_h)
+            dev.unregister_reset_callback(post_h)

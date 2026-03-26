@@ -18,7 +18,7 @@ yolo export model=yolov8m.pt format=onnx imgsz=640,640 opset=13 simplify=True
 
 ## 2.快速开始
 
-可以通过hmatc工具执行性能测试和精度测试，详细介绍请参考houmo-modelzoo根目录下README.md文件的快速上手章节。
+可以通过hmatc工具执行性能测试和精度测试，详细介绍请参考houmo-examples根目录下README.md文件的快速上手章节。
 
 ### 2.1 精度评估
 

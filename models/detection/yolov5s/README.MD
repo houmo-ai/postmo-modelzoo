@@ -20,7 +20,7 @@ python export.py --weights ./yolov5s.pt --simplify --include onnx --opset 13
 
 ## 2.快速开始
 
-可以通过`hmatc`工具执行性能测试和精度测试，详细介绍请参考`houmo-modelzoo`根目录下`README.md`文件的快速上手章节。
+可以通过`hmatc`工具执行性能测试和精度测试，详细介绍请参考`houmo-examples`根目录下`README.md`文件的快速上手章节。
 
 ### 2.1 精度评估
 
