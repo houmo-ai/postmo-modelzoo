@@ -105,8 +105,16 @@ if [[ "$VENV_FLAG" -eq "1" ]]; then
     fi
     source $dir_path/bin/activate
     pip3 install -r requirements.txt
-fi
 
+    arch=$(uname -m)
+    if [[ "$arch" == "aarch64" ]]; then
+        pip3 install scikit-learn==1.3.0 --no-binary scikit-learn -i https://pypi.tuna.tsinghua.edu.cn/simple
+        export PYTHONPATH="${dir_path}/lib/python3.9/site-packages:$PYTHONPATH"
+        export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1
+        export OMP_NUM_THREADS=1
+        export MKL_NUM_THREADS=1
+    fi
+fi
 
 if [[ "$MODEL_TYPE" == "precompiled" ]]; then
     echo "[CosyVoice3 Bash] Download precompiled models..."

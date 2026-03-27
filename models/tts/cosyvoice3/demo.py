@@ -1119,7 +1119,7 @@ class CausalMaskedDiffWithDiT:
         # `mel_len1` is the prompt length and `mel_len2` is the newly synthesized part.
         mel_len1, mel_len2 = prompt_feat.shape[1], token_len * 2 - prompt_feat.shape[1]
         # Build conditioning tensors for the flow decoder.
-        conds = torch.zeros([1, 2048, 80], device=token.device).to(h.dtype)
+        conds = torch.zeros([1, 2048, 80]).to(h.dtype)
         conds[:, :mel_len1] = prompt_feat
         conds = conds.transpose(1, 2)
 

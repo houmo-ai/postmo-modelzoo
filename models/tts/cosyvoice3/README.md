@@ -38,6 +38,26 @@
 pip3 install -r requirements.txt
 ```
 
+`test.sh` 在检测到当前目录存在 `requirements.txt` 时，会自动创建 `cosyvoice3_venv` 虚拟环境并安装依赖。
+
+其中针对 `aarch64` 平台，脚本额外做了如下适配：
+
+- 执行 `pip3 install scikit-learn==1.3.0 --no-binary scikit-learn -i https://pypi.tuna.tsinghua.edu.cn/simple`
+- 补充虚拟环境下的 `site-packages` 到 `PYTHONPATH`
+- 设置 `LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1`
+- 设置 `OMP_NUM_THREADS=1`
+- 设置 `MKL_NUM_THREADS=1`
+
+如需手动执行与 `test.sh` 一致的 `aarch64` 环境配置，可参考：
+
+```bash
+pip3 install scikit-learn==1.3.0 --no-binary scikit-learn -i https://pypi.tuna.tsinghua.edu.cn/simple
+export PYTHONPATH="./cosyvoice3_venv/lib/python3.9/site-packages:$PYTHONPATH"
+export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+```
+
 ### 2.2 获取模型
 
 下载 **已编译模型**（推荐，仅跑演示）：
