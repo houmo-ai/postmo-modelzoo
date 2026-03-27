@@ -193,10 +193,10 @@ class Xh2Exec(BaseExec):
                 continue
 
             padding_mode = input_cfg.get("padding_mode", 1)
-            if padding_mode != 1:
+            if padding_mode != 1 and mode in [1, 2]:
                 logger.error(
-                    f"XH2 resizer constraint violation: input '{input_name}' has padding_mode={padding_mode}. "
-                    f"XH2 requires symmetric padding (padding_mode=1)."
+                    f"XH2 dynamic resizer constraint violation: input '{input_name}' has padding_mode={padding_mode}. "
+                    f"XH2 dynamic resizer requires symmetric padding (padding_mode=1)."
                 )
                 exit(-1)
 
@@ -837,7 +837,9 @@ class Xh2Exec(BaseExec):
             self.upload_dir_name = upload_dir_name
 
         # Use file_prefix for filename, defaults to upload_dir_name
-        actual_file_prefix = file_prefix if file_prefix is not None else self.upload_dir_name
+        actual_file_prefix = (
+            file_prefix if file_prefix is not None else self.upload_dir_name
+        )
 
         if not os.path.exists(self.hmm_path):
             logger.error(f"HMM file not found: {self.hmm_path}")
