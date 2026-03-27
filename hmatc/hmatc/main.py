@@ -72,7 +72,6 @@ def main():
     parent_hmonnx = argparse.ArgumentParser(add_help=False)
     parent_device_id = argparse.ArgumentParser(add_help=False)
     parent_cuda = argparse.ArgumentParser(add_help=False)
-    parent_upload = argparse.ArgumentParser(add_help=False)
     parent_model_cfg = argparse.ArgumentParser(add_help=False)
     parent_layers = argparse.ArgumentParser(add_help=False)
 
@@ -88,7 +87,6 @@ def main():
     parent_hmonnx.add_argument("--hmonnx", action="store_true", help=argparse.SUPPRESS)
     parent_onnx.add_argument("--onnx", action="store_true", help="Specify onnx model as the backend")
     parent_cuda.add_argument("--cuda", action="store_true", help="Enable cuda quantization")
-    parent_upload.add_argument("--upload", action="store_true", help=argparse.SUPPRESS)
     parent_layers.add_argument("--layers", action="store_true", help="Generate model layers output")
 
     # main parser
@@ -96,7 +94,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True, help="qunat build compare perf demo eval")
     # subparsers
     quant_parser = subparsers.add_parser("quant", parents=[parent_target, parent_config, parent_cuda], help="Quantize a model")
-    build_parser = subparsers.add_parser("build", parents=[parent_target, parent_model_cfg, parent_device_id, parent_upload], help="Build a model")
+    build_parser = subparsers.add_parser("build", parents=[parent_target, parent_model_cfg, parent_device_id], help="Build a model")
     compare_parser = subparsers.add_parser("compare", parents=[parent_target, parent_config, parent_model_cfg, parent_device_id], help="Compare onnx/hmquant/chip")
     perf_parser = subparsers.add_parser("perf", parents=[parent_target, parent_model_cfg, parent_device_id], help="Test model performance")
     demo_parser = subparsers.add_parser("demo", parents=[parent_target, parent_config, parent_onnx, parent_hmonnx, parent_model_cfg, parent_device_id], help="Run model demo")
@@ -122,6 +120,10 @@ def main():
     build_parser.add_argument("--enable_common_subgraph", action="store_true", help="enable common subgraph")
     build_parser.add_argument("--skip_mlir_compile", action="store_true", help="skip mlir compile")
     build_parser.add_argument("--subgraph_repeat_hint", type=int, default=20, help="A hint for number of repeat blocks in the model")
+    build_parser.add_argument("--upload_dir_name", type=str, help=argparse.SUPPRESS)
+    build_parser.add_argument("--file_prefix", type=str, help=argparse.SUPPRESS)
+    build_parser.add_argument("--skip_check", action="store_true", help="Skip check golden after build")
+    build_parser.add_argument("--upload", action="store_true", help=argparse.SUPPRESS)
         
     # compare
     compare_parser.add_argument("--data_path", "-d", type=str, required=True, help="Specify a data path, image or npz")
@@ -277,6 +279,12 @@ def main():
                 logger.error("ncore == 4, target must be xh1")
                 return
             cfg["build"]["ncore"] = ncore
+        # Add upload_dir_name for upload directory
+        if hasattr(args, "upload_dir_name") and args.upload_dir_name is not None:
+            cfg["build"]["upload_dir_name"] = args.upload_dir_name
+        # Add file_prefix for compressed file name
+        if hasattr(args, "file_prefix") and args.file_prefix is not None:
+            cfg["build"]["file_prefix"] = args.file_prefix
     logger.info(f"\n{json.dumps(cfg, indent=2, sort_keys=False)}")
 
     hm_exec = None
@@ -307,14 +315,19 @@ def main():
         new_res_info = hm_exec.quantize()
     elif current_command == "build":
         hm_exec.enable_upload = args.upload
-        new_res_info = hm_exec.build(enable_profile=args.profile)
+        new_res_info = hm_exec.build(
+            enable_profile=args.profile,
+            upload_dir_name=getattr(args, "upload_dir_name", None),
+            file_prefix=getattr(args, "file_prefix", None),
+        )
         logger.info(f"Build {hm_exec.model_name} done.")
-        # Merge check_golden outputs into build result
-        check_result = hm_exec.check_golden(args.device_id)
-        if "outputs" in check_result and "build" in new_res_info:
-            new_res_info["build"]["outputs"] = check_result["outputs"]
+        # Merge check_golden outputs into build result (skip if --skip_check)
+        if not args.skip_check:
+            check_result = hm_exec.check_golden(args.device_id)
+            if "outputs" in check_result and "build" in new_res_info:
+                new_res_info["build"]["outputs"] = check_result["outputs"]
     elif current_command == "check":
-        hm_exec.check_golden(args.device_id, args.layers)
+        new_res_info = hm_exec.check_golden(args.device_id, args.layers)
     elif current_command == "compare":
         data_path = args.data_path
         if not os.path.exists(data_path):

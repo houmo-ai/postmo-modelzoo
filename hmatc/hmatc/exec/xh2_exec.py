@@ -150,7 +150,7 @@ class Xh2Exec(BaseExec):
             resize_type=params["resize_type"],
             padding_mode=params["padding_mode"],
             padding_values=params["padding_values"],
-            is_onnx=False,
+            is_onnx=input_mode == 0,
             to_YUV=input_mode in [1, 2, 3],
             fmt=resizer_params["toYUV_format"],
             return_dynamic_v1_format=input_mode == 1,
@@ -681,10 +681,14 @@ class Xh2Exec(BaseExec):
 
         try:
             from xhquant.api import (
+                xhquant_init,
                 DeviceType,
                 HMONNXGoldenInference,
                 convert_onnx_to_hmonnx,
             )
+
+            # xhquant_init(logger=logger)
+            os.environ.setdefault("PYDEVD_DISABLE_FILE_VALIDATION", "1")
         except ImportError as e:
             logger.error(f"{e}\nNot found xhquant module, please install xhquant.")
             exit(-1)
@@ -752,8 +756,14 @@ class Xh2Exec(BaseExec):
             }
         }
 
-    def build(self, enable_profile=False):
-        """Build the quantized model to HMM format for XH2 hardware."""
+    def build(self, enable_profile=False, upload_dir_name=None, file_prefix=None):
+        """Build the quantized model to HMM format for XH2 hardware.
+
+        Args:
+            enable_profile: Enable profiling during build
+            upload_dir_name: Optional external upload_dir_name for upload directory
+            file_prefix: Optional file prefix for compressed file name
+        """
         self._log_section(f"Build: {self.model_name}")
 
         t_start = time.time()
@@ -807,37 +817,62 @@ class Xh2Exec(BaseExec):
         }
 
         # Compress and upload compiled outputs
-        if self.enable_upload:
-            logger.info("Compressing hmmodel...")
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            hmcc_version = get_package_version("houmo-tcim-xh2")
-            runtime_version = get_package_version("houmo_tcim_runtime_xh2")
-            with open(os.path.join(self.save_dir, "xh2", "VERSION.txt"), "w") as f:
-                f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")
-                f.write(f"tcim_version: {hmcc_version}\n")
-                f.write(f"tcim_runtime_version: {runtime_version}\n")
-                f.write(f"build_time: {now}\n")
-            filename = f"{self.model_dir_name}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_{get_houmo_version()}.tar.xz"
-            compress_hmm_path = os.path.join(
-                self.save_dir,
-                "xh2",
-                filename,
-            )
-            compress_files_to_tar_xz_with_progress(
-                [self.hmm_path, os.path.join(self.save_dir, "xh2", "VERSION.txt")],
-                compress_hmm_path,
-            )
-            logger.info(
-                f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}"
-            )
-            upload_file_to_artifactory(
-                compress_hmm_path,
-                f"models/{self.target.lower()}-{get_houmo_version()}/{self.model_dir_name}/{filename}",
-                max_retries=3,
-            )
-            logger.info("Compressing hmmodel done.")
+        self.upload_hmm(upload_dir_name, file_prefix)
 
         return res_info
+
+    def upload_hmm(self, upload_dir_name=None, file_prefix=None):
+        """Upload compiled HMM model to artifactory.
+
+        Args:
+            upload_dir_name: Optional external upload_dir_name to override self.upload_dir_name (for upload directory)
+            file_prefix: Optional file prefix for compressed file name (defaults to upload_dir_name)
+        """
+        if not self.enable_upload:
+            logger.info("Upload is disabled.")
+            return
+
+        # Use external upload_dir_name if provided (for upload directory)
+        if upload_dir_name is not None:
+            self.upload_dir_name = upload_dir_name
+
+        # Use file_prefix for filename, defaults to upload_dir_name
+        actual_file_prefix = file_prefix if file_prefix is not None else self.upload_dir_name
+
+        if not os.path.exists(self.hmm_path):
+            logger.error(f"HMM file not found: {self.hmm_path}")
+            return
+
+        logger.info("Compressing hmmodel...")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        hmcc_version = get_package_version("houmo-tcim-xh2")
+        runtime_version = get_package_version("houmo_tcim_runtime_xh2")
+        with open(os.path.join(self.save_dir, "xh2", "VERSION.txt"), "w") as f:
+            f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")
+            f.write(f"tcim_version: {hmcc_version}\n")
+            f.write(f"tcim_runtime_version: {runtime_version}\n")
+            f.write(f"build_time: {now}\n")
+        # Use actual_file_prefix for filename
+        filename = f"{actual_file_prefix}_xh2_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_{get_houmo_version()}.tar.xz"
+        compress_hmm_path = os.path.join(
+            self.save_dir,
+            "xh2",
+            filename,
+        )
+        compress_files_to_tar_xz_with_progress(
+            [self.hmm_path, os.path.join(self.save_dir, "xh2", "VERSION.txt")],
+            compress_hmm_path,
+        )
+        logger.info(
+            f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}"
+        )
+        # Upload path uses upload_dir_name, filename uses actual_file_prefix
+        upload_file_to_artifactory(
+            compress_hmm_path,
+            f"models/{self.target.lower()}-{get_houmo_version()}/{self.upload_dir_name}/{filename}",
+            max_retries=3,
+        )
+        logger.info("Upload hmmodel done.")
 
     # ==================== Check and Compare ====================
 

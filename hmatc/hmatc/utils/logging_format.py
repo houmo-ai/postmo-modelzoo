@@ -17,67 +17,57 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
+"""
+Logging Format Utilities - Custom formatters for glog-style and colored output.
+"""
+import sys
 import time
 import logging
+from typing import Dict
+
+# FATAL is alias of CRITICAL in Python logging
+logging.FATAL = logging.CRITICAL
 
 
-def format_message(record):
+def format_message(record: logging.LogRecord) -> str:
     """
-    Format the log record message by handling potential argument substitution.
+    Format the log record message with argument substitution.
 
     Args:
-        record: A logging.LogRecord object containing the log information
+        record: LogRecord containing the log information
 
     Returns:
-        str: Formatted message string with arguments properly substituted
+        Formatted message string with arguments substituted
     """
     try:
-        if len(record.args) == 0:
-            record_message = "%s" % record.msg
-        else:
-            record_message = "%s" % (record.msg % record.args)
-    except TypeError:
-        record_message = record.msg
-    return record_message
+        return record.msg if not record.args else record.msg % record.args
+    except (TypeError, ValueError):
+        return str(record.msg)
 
 
-class LoggingFormatter(logging.Formatter):
-    """
-    Custom logging formatter that formats log records in a specific style similar to glog.
-    The format includes level, date, time with microseconds, process ID, filename, line number, and message.
-    """
+class BaseFormatter(logging.Formatter):
+    """Base formatter with common glog-style formatting utilities."""
 
-    LEVEL_MAP = {
-        logging.FATAL: "F",  # FATAL is alias of CRITICAL
-        logging.ERROR: "E",
-        logging.WARN: "W",
-        logging.INFO: "I",
-        logging.DEBUG: "D",
-    }
+    LEVEL_MAP: Dict[int, str] = {}
 
-    def __init__(self):
-        """
-        Initialize the LoggingFormatter instance.
-        """
-        logging.Formatter.__init__(self)
+    def _get_level(self, record: logging.LogRecord) -> str:
+        """Get level string for the record."""
+        return self.LEVEL_MAP.get(record.levelno, "?")
 
-    def format(self, record):
-        """
-        Format the specified record as text according to the custom format.
-
-        Args:
-            record: A logging.LogRecord object to format
-
-        Returns:
-            str: Formatted log record string
-        """
-        try:
-            level = LoggingFormatter.LEVEL_MAP[record.levelno]
-        except KeyError:
-            level = "?"
+    def _get_timestamp(self, record: logging.LogRecord) -> tuple:
+        """Get formatted date/time components."""
         date = time.localtime(record.created)
-        date_usec = (record.created - int(record.created)) * 1e6
-        record_message = "%c%d%02d%02d %02d:%02d:%02d.%06d %s %s:%d] %s" % (
+        usec = int((record.created - int(record.created)) * 1e6)
+        return date, usec
+
+    def _format_glog(self, record: logging.LogRecord) -> str:
+        """
+        Format record in glog style: I20250326 14:30:45.123456 12345 file.py:42] message
+        """
+        level = self._get_level(record)
+        date, usec = self._get_timestamp(record)
+
+        return "%c%d%02d%02d %02d:%02d:%02d.%06d %s %s:%d] %s" % (
             level,
             date.tm_year,
             date.tm_mon,
@@ -85,81 +75,84 @@ class LoggingFormatter(logging.Formatter):
             date.tm_hour,
             date.tm_min,
             date.tm_sec,
-            date_usec,
-            record.process if record.process is not None else "?????",
+            usec,
+            record.process or "?????",
             record.filename,
             record.lineno,
             format_message(record),
         )
-        record.getMessage = lambda: record_message
-        return logging.Formatter.format(self, record)
 
 
-class LoggingFormatterWithColor(logging.Formatter):
+class LoggingFormatter(BaseFormatter):
     """
-    Custom logging formatter that formats log records with color coding based on log level.
-    Colors help distinguish different log levels visually in terminal output.
+    Glog-style formatter with level, timestamp, process ID, file, and line.
+
+    Output format: I20250326 14:30:45.123456 12345 file.py:42] message
     """
 
     LEVEL_MAP = {
-        logging.FATAL: "FATAL",  # FATAL is alias of CRITICAL
-        logging.ERROR: "ERROR",
-        logging.WARN: "WARN",
-        logging.INFO: "INFO",
-        logging.DEBUG: "DEBUG",
+        logging.FATAL: "F",
+        logging.ERROR: "E",
+        logging.WARN: "W",
+        logging.INFO: "I",
+        logging.DEBUG: "D",
     }
 
-    green = "\x1b[92;20m"
-    grey = "\x1b[98;20m"
-    yellow = "\x1b[93;20m"
-    red = "\x1b[91;20m"
-    bold_red = "\x1b[91;1m"
-    reset = "\x1b[0m"
+    def format(self, record: logging.LogRecord) -> str:
+        message = self._format_glog(record)
+        record.getMessage = lambda: message
+        return super().format(record)
 
-    COLOR_FORMATS = {
-        logging.DEBUG: grey,
-        logging.INFO: green,
-        logging.WARNING: yellow,
-        logging.ERROR: bold_red,  # red,
-        logging.CRITICAL: bold_red,
+
+class LoggingFormatterWithColor(BaseFormatter):
+    """
+    Colored glog-style formatter for terminal output.
+
+    Output format: I20250326 14:30:45.123456 12345 file.py:42] message
+    (with ANSI colors based on log level)
+    """
+
+    LEVEL_MAP = {
+        logging.FATAL: "F",
+        logging.ERROR: "E",
+        logging.WARN: "W",
+        logging.INFO: "I",
+        logging.DEBUG: "D",
     }
 
-    def __init__(self):
-        """
-        Initialize the LoggingFormatterWithColor instance.
-        """
-        logging.Formatter.__init__(self)
+    # ANSI color codes
+    RESET = "\x1b[0m"
+    COLORS = {
+        logging.DEBUG: "\x1b[98;20m",  # grey
+        logging.INFO: "\x1b[92;20m",  # green
+        logging.WARN: "\x1b[93;20m",  # yellow
+        logging.ERROR: "\x1b[91;1m",  # bold red
+        logging.FATAL: "\x1b[97;41m",  # white on red background
+    }
 
-    def format(self, record):
-        """
-        Format the specified record as text with color coding based on log level.
+    def format(self, record: logging.LogRecord) -> str:
+        message = self._format_glog(record)
 
-        Args:
-            record: A logging.LogRecord object to format
+        # Apply color
+        color = self.COLORS.get(record.levelno, "")
+        if color:
+            message = f"{color}{message}{self.RESET}"
 
-        Returns:
-            str: Formatted log record string with color codes
-        """
-        try:
-            level = LoggingFormatterWithColor.LEVEL_MAP[record.levelno]
-        except KeyError:
-            level = "?"
-        date = time.localtime(record.created)
-        date_usec = (record.created - int(record.created)) * 1e6
-        record_message = "%02d:%02d:%02d.%06d %s:%d [%s] %s" % (
-            date.tm_hour,
-            date.tm_min,
-            date.tm_sec,
-            date_usec,
-            record.filename,
-            record.lineno,
-            level,
-            format_message(record),
-        )
-        record_message = (
-            LoggingFormatterWithColor.COLOR_FORMATS[record.levelno]
-            + record_message
-            + "\x1b[0m"
-        )
-        record.getMessage = lambda: record_message
-        return logging.Formatter.format(self, record)
+        record.getMessage = lambda: message
+        return super().format(record)
+
+
+class FatalExitHandler(logging.Handler):
+    """
+    Handler that exits the process with error code on FATAL level logs.
+
+    Usage:
+        logger = logging.getLogger()
+        logger.addHandler(FatalExitHandler())
+        logger.fatal("Critical error occurred")  # Will exit with code 1
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Exit process if record level is FATAL/CRITICAL."""
+        if record.levelno >= logging.FATAL:
+            sys.exit(1)

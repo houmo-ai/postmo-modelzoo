@@ -55,6 +55,18 @@ class Xh1Exec(BaseExec):
     Handles quantization, building, checking golden data, and comparison for XH1 hardware.
     """
 
+    @staticmethod
+    def _log_section(title: str, char: str = "=", width: int = 60):
+        """Log a section banner."""
+        logger.info(f"{char * width}")
+        logger.info(f" {title}")
+        logger.info(f"{char * width}")
+
+    @staticmethod
+    def _log_kv(key: str, value, indent: int = 2):
+        """Log a key-value pair with consistent formatting."""
+        logger.info(f"{' ' * indent}{key}: {value}")
+
     def __init__(self, cfg: dict) -> None:
         """
         Initialize the XH1 executor.
@@ -347,9 +359,14 @@ class Xh1Exec(BaseExec):
         Returns:
             dict: Dictionary containing quantization results and information
         """
-        # quantize the model
-        # quant info
-        logger.info(f"Using device: {self.device}")
+        self._log_section(f"Quantize: {self.model_name}")
+
+        t_start = time.time()
+
+        self._log_kv("model", self.model_path)
+        self._log_kv("device", self.device)
+        self._log_kv("target", "XH1")
+
         if self.quant_cfg is None:
             logger.error("quant info not found")
             return dict()
@@ -363,31 +380,32 @@ class Xh1Exec(BaseExec):
                 return dict()
             if not os.path.isdir(self.calib_data):
                 self.calib_data = HM_calib_data
-            logger.info(f"calib_data: {self.calib_data}")
+            self._log_kv("calib_data", self.calib_data)
 
         if hasattr(self, "ApplicationOnnxOpt"):
             self.ApplicationOnnxOpt.opt()
             if hasattr(self.ApplicationOnnxOpt, "opt_model_path"):
                 self.model_path = self.ApplicationOnnxOpt.opt_model_path
-
         try:
+            # from hmquant import set_external_logger
+
+            # set_external_logger(logger)
             from hmquant.api import (
                 quant_single_onnx_network,
                 generate_golden,
                 convert_profiling,
                 quantize_profiling,
             )
-        except ImportError:
-            logger.error("Not found hmquant module, and please install hmquant first")
+        except ImportError as e:
+            logger.error(f"{e}\nNot found hmquant module, please install hmquant.")
             exit(-1)
 
         calib_datasets, onnx_datasets = self.get_quant_dataset()
         in_datas = calib_datasets[0]
         onnx_in_datas = onnx_datasets[0]
 
-        logger.info(f"Using {self.device} quantization...")
+        logger.info("")
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        t_start = time.time()
         sequencer = quant_single_onnx_network(
             cfg=self.get_quant_cfg(),
             calibration_data=calib_datasets,
@@ -451,7 +469,6 @@ class Xh1Exec(BaseExec):
             "quant": {
                 "success": True,
                 "time": round(span, 2),
-                "quant_type": self.quant_type,
                 "outputs": res,
             }
         }
@@ -462,7 +479,7 @@ class Xh1Exec(BaseExec):
             with open(os.path.join(self.quant_output_dir, "VERSION.txt"), "w") as f:
                 f.write(f"hmquant_version: {get_hmquant_xh1_version()}\n")
                 f.write(f"quant_time: {now}\n")
-            filename = f"hmquant_{self.model_dir_name}_xh1_{get_houmo_version()}.tar.xz"
+            filename = f"hmquant_{self.upload_dir_name}_xh1_{get_houmo_version()}.tar.xz"
             compress_quant_output_path = os.path.join(self.save_dir, "xh1", filename)
             compress_folder_to_tar_xz_with_progress(
                 self.quant_output_dir,
@@ -474,31 +491,44 @@ class Xh1Exec(BaseExec):
             )
             upload_file_to_artifactory(
                 compress_quant_output_path,
-                f"models/{self.target.lower()}-{get_houmo_version()}/{self.model_dir_name}/{filename}",
+                f"models/{self.target.lower()}-{get_houmo_version()}/{self.upload_dir_name}/{filename}",
                 max_retries=3,
             )
             logger.info(f"Compressing quant output done.")
         return res_info
 
-    def build(self, enable_profile=False):
+    def build(self, enable_profile=False, upload_dir_name=None, file_prefix=None):
         """
         Build the quantized model to HMM format for XH1 hardware.
 
         Args:
             enable_profile (bool): Whether to enable profiling during build, defaults to False
+            upload_dir_name: Optional external upload_dir_name for upload directory
+            file_prefix: Optional file prefix for compressed file name
 
         Returns:
             dict: Dictionary containing build results and information
         """
+        self._log_section(f"Build: {self.model_name}")
+
+        t_start = time.time()
+
+        self._log_kv("hmonnx", self.quant_onnx_model_path)
+        self._log_kv("ncore", self.build_ncore)
+        self._log_kv("opt_level", f"{self.build_opt_level}")
+        self._log_kv("batch", self.build_batch if self.roi_num == 1 else self.roi_num)
+        self._log_kv("target", "xh1")
+
         if not os.path.exists(self.build_output_dir):
             os.makedirs(self.build_output_dir)
+
         try:
             import tcim
         except ImportError:
-            logger.error("Not found tcim module, and please install tcim first!")
+            logger.error("Not found tcim module, please install tcim first!")
             exit(-1)
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        t_start = time.time()
+
+        logger.info("Building HMM model...")
         tcim.build_from_hmonnx(
             self.quant_onnx_model_path,
             output_name=self.hmm_name,
@@ -513,7 +543,12 @@ class Xh1Exec(BaseExec):
             enable_profile=enable_profile,
             custom_msg=json.dumps(self.custom_msg, ensure_ascii=False),
         )
+
         span = time.time() - t_start
+        self._log_section("Build Complete", char="-")
+        self._log_kv("hmm", self.hmm_path)
+        self._log_kv("time", f"{span:.2f}s")
+
         res_info = {
             "build": {
                 "success": True,
@@ -524,36 +559,62 @@ class Xh1Exec(BaseExec):
                 "hmm": self.hmm_path,
             }
         }
-        # Compress compiled outputs
-        if self.enable_upload:
-            logger.info("Compressing hmmodel...")
-            hmcc_version = get_package_version(f"houmo-tcim-xh1")
-            runtime_version = get_package_version(f"houmo_tcim_runtime_xh1")
-            with open(os.path.join(self.save_dir, "xh1", "VERSION.txt"), "w") as f:
-                f.write(f"hmquant_version: {get_hmquant_xh1_version()}\n")
-                f.write(f"tcim_version: {hmcc_version}\n")
-                f.write(f"tcim_runtime_version: {runtime_version}\n")
-                f.write(f"build_time: {now}\n")
-            filename = f"{self.model_dir_name}_xh1_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_{get_houmo_version()}.tar.xz"
-            compress_hmm_path = os.path.join(
-                self.save_dir,
-                "xh1",
-                filename,
-            )
-            compress_files_to_tar_xz_with_progress(
-                [self.hmm_path, os.path.join(self.save_dir, "xh1", "VERSION.txt")],
-                compress_hmm_path,
-            )
-            logger.info(
-                f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}"
-            )
-            upload_file_to_artifactory(
-                compress_hmm_path,
-                f"models/{self.target.lower()}-{get_houmo_version()}/{self.model_dir_name}/{filename}",
-                max_retries=3,
-            )
-            logger.info(f"Compressing hmmodel done.")
+        # Compress and upload compiled outputs
+        self.upload_hmm(upload_dir_name, file_prefix)
         return res_info
+
+    def upload_hmm(self, upload_dir_name=None, file_prefix=None):
+        """Upload compiled HMM model to artifactory.
+
+        Args:
+            upload_dir_name: Optional external upload_dir_name to override self.upload_dir_name (for upload directory)
+            file_prefix: Optional file prefix for compressed file name (defaults to upload_dir_name)
+        """
+        if not self.enable_upload:
+            logger.info("Upload is disabled.")
+            return
+
+        # Use external upload_dir_name if provided (for upload directory)
+        if upload_dir_name is not None:
+            self.upload_dir_name = upload_dir_name
+
+        # Use file_prefix for filename, defaults to upload_dir_name
+        actual_file_prefix = file_prefix if file_prefix is not None else self.upload_dir_name
+
+        if not os.path.exists(self.hmm_path):
+            logger.error(f"HMM file not found: {self.hmm_path}")
+            return
+
+        logger.info("Compressing hmmodel...")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        hmcc_version = get_package_version(f"houmo-tcim-xh1")
+        runtime_version = get_package_version(f"houmo_tcim_runtime_xh1")
+        with open(os.path.join(self.save_dir, "xh1", "VERSION.txt"), "w") as f:
+            f.write(f"hmquant_version: {get_hmquant_xh1_version()}\n")
+            f.write(f"tcim_version: {hmcc_version}\n")
+            f.write(f"tcim_runtime_version: {runtime_version}\n")
+            f.write(f"build_time: {now}\n")
+        # Use actual_file_prefix for filename
+        filename = f"{actual_file_prefix}_xh1_b{self.hmm_batch}_{self.build_ncore}core_{self.build_opt_level}_{get_houmo_version()}.tar.xz"
+        compress_hmm_path = os.path.join(
+            self.save_dir,
+            "xh1",
+            filename,
+        )
+        compress_files_to_tar_xz_with_progress(
+            [self.hmm_path, os.path.join(self.save_dir, "xh1", "VERSION.txt")],
+            compress_hmm_path,
+        )
+        logger.info(
+            f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}"
+        )
+        # Upload path uses upload_dir_name, filename uses actual_file_prefix
+        upload_file_to_artifactory(
+            compress_hmm_path,
+            f"models/{self.target.lower()}-{get_houmo_version()}/{self.upload_dir_name}/{filename}",
+            max_retries=3,
+        )
+        logger.info("Upload hmmodel done.")
 
     def check_golden(self, device_id=0, enable_layers=False):
         """
@@ -566,7 +627,10 @@ class Xh1Exec(BaseExec):
         Returns:
             dict: Dictionary containing comparison results between golden and hardware outputs
         """
-        logger.info("Checking golden...")
+        self._log_section(f"Check Golden: {self.model_name}")
+
+        t_start = time.time()
+
         if enable_layers:
             self.quant_onnx_model_path = self.add_node_output_as_graph_output(
                 self.quant_onnx_model_path, "xh1"
@@ -575,12 +639,18 @@ class Xh1Exec(BaseExec):
             self.hmm_name += "_debug"
             self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
             if not os.path.exists(self.hmm_path):
-                logger.info("Rebuild hmmodel with all layers output...")
+                logger.info("Rebuilding hmmodel with all layers output...")
                 self.build(enable_profile=False)
+
+        self._log_kv("hmm", self.hmm_path)
+        self._log_kv("batch", self.build_batch)
+        self._log_kv("device_id", device_id)
 
         xh1 = Xh1Infer()
         xh1.load(self.hmm_path, device_id=device_id)
         in_datas = dict()
+
+        logger.info("Loading golden inputs:")
         for input_name in self.inputs_cfg:
             new_input_name = input_name.replace("/", "_")
             golden_input_path = os.path.join(
@@ -588,6 +658,10 @@ class Xh1Exec(BaseExec):
                 f"hmquant_{self.model_name}_{new_input_name}_input.npy",
             )
             golden_input = np.load(golden_input_path)
+            self._log_kv(
+                f"{input_name}",
+                f"shape={list(golden_input.shape)}, dtype={golden_input.dtype}",
+            )
             # Multiple batch during compilation, need to copy data
             if self.build_batch > 1:
                 golden_input = np.repeat(golden_input, self.build_batch, axis=0)
@@ -609,6 +683,7 @@ class Xh1Exec(BaseExec):
                 golden_dyn_input = np.repeat(golden_dyn_input, repeats=repeats, axis=0)
                 in_datas[f"resizer_crop_{input_name}"] = golden_dyn_input
 
+        logger.info("Running XH1 inference...")
         res_info = dict()
         outputs, outputs_dequanted = xh1.run(in_datas)
         self.save_profile_data(outputs)
@@ -705,7 +780,12 @@ class Xh1Exec(BaseExec):
                 "golden_md5": golden_output_md5,
                 "golden_dequanted_md5": golden_output_dequanted_md5,
             }
+
+        span = time.time() - t_start
         logger.info(f"\n{table}")
+        self._log_section("Check Golden Complete", char="-")
+        self._log_kv("time", f"{span:.2f}s")
+
         return {"outputs": res_info}
 
     def compare(self, data_path: str, device_id=0):
@@ -719,15 +799,26 @@ class Xh1Exec(BaseExec):
         Returns:
             dict: Dictionary containing comparison results between different inference engines
         """
-        # onnx
+        self._log_section(f"Compare: {self.model_name}")
+
+        t_start = time.time()
+
+        self._log_kv("data_path", data_path)
+        self._log_kv("device_id", device_id)
+
+        # Load models
+        logger.info("\nLoading models:")
         onnx_infer = OnnxInfer()
         onnx_infer.load(self.model_path)
-        # hmquant
+        self._log_kv("onnx", self.model_path)
+
         hmquant_infer = HmQuantInfer()
         hmquant_infer.load(self.quant_sequencer_model_path)
-        # xh1
+        self._log_kv("hmquant", self.quant_sequencer_model_path)
+
         xh1_infer = Xh1Infer()
         xh1_infer.load(self.hmm_path, device_id)
+        self._log_kv("xh1", self.hmm_path)
 
         onnx_in_datas = dict()
         hmquant_in_datas = dict()
@@ -899,8 +990,13 @@ class Xh1Exec(BaseExec):
         save_input("xh1", xh1_in_datas)
         save_input("hmquant", hmquant_in_datas)
 
+        # Run inference
+        logger.info("Running inference:")
+        logger.info("  ONNX inference...")
         onnx_outputs = onnx_infer.run(onnx_in_datas)
+        logger.info("  HmQuant inference...")
         hmquant_outputs = hmquant_infer.run(hmquant_in_datas)
+        logger.info("  XH1 inference...")
         xh1_outputs, xh1_outputs_dequanted = xh1_infer.run(xh1_in_datas)
         self.save_profile_data(xh1_outputs)
 
@@ -967,7 +1063,11 @@ class Xh1Exec(BaseExec):
                 "hmquant_vs_xh1": float(hmquant_vs_xh1),
             }
 
-        logger.info(f"Compare...\n{table}")
+        span = time.time() - t_start
+        logger.info(f"\n{table}")
+        self._log_section("Compare Complete", char="-")
+        self._log_kv("time", f"{span:.2f}s")
+
         return {
             "compare": {
                 "success": True,

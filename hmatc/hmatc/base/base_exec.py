@@ -78,7 +78,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         )
         self.onnx_is_static = True  # Initially True
         self.model_name = self.model_cfg.get("name", "model")  # Compiled model name
-        self.model_dir_name = Path.cwd().name  # Directory name where model is located
+        self.upload_dir_name = Path.cwd().name  # Upload directory name (defaults to current dir name)
         self.inputs_cfg = self.model_cfg.get("inputs")
         self.check_input_shape()
         self.model_inputs_batch = dict()
@@ -167,6 +167,11 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.build_ncore = self.build_cfg.get("ncore", 1)
         self.build_opt_level = self.build_cfg.get("opt_level", 2)
         self.build_opt_level = f"O{self.build_opt_level}"
+        # Override upload_dir_name if provided via command line
+        if self.build_cfg.get("upload_dir_name"):
+            self.upload_dir_name = self.build_cfg.get("upload_dir_name")
+        # File prefix for compressed file name (defaults to upload_dir_name)
+        self.file_prefix = self.build_cfg.get("file_prefix", self.upload_dir_name)
         self.build_output_dir = os.path.join(self.save_dir, self.target, "tcim")
         self.hmm_batch = self.build_batch * self.model_input_batch
         # ROI mode
