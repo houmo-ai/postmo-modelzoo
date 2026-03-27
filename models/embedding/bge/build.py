@@ -288,7 +288,7 @@ if __name__ == "__main__":
             exit(0)
         build(
             f"{model_name}-m3",
-            model_dir,
+            f"{model_dir}/bge-m3",
             output_dir,
             profile,
             ncore,
@@ -297,7 +297,7 @@ if __name__ == "__main__":
         )
         build(
             f"{model_name}-reranker-v2-m3",
-            model_dir,
+            f"{model_dir}/bge-reranker-v2-m3",
             output_dir,
             profile,
             ncore,
@@ -307,5 +307,15 @@ if __name__ == "__main__":
 
     # test model
     if args.stage == "test" or args.stage == "all":
-        test(f"{model_name}-m3", model_dir, output_dir, profile)
-        test(f"{model_name}-reranker-v2-m3", model_dir, output_dir, profile)
+        test(
+            f"{model_name}-m3",
+            f"{model_dir}/bge-m3",
+            output_dir,
+            profile,
+        )
+        test(
+            f"{model_name}-reranker-v2-m3",
+            f"{model_dir}/bge-reranker-v2-m3",
+            output_dir,
+            profile,
+        )
