@@ -190,8 +190,8 @@ def main():
             devices=[args.device_id],
         )
         # Save result to model directory
-        model_dir = os.path.dirname(os.path.dirname(args.model))
-        result_path = os.path.join(model_dir, target, "result.yml")
+        model_dir = os.path.dirname(args.model)
+        result_path = os.path.join(model_dir, "result.yml")
         save_result(result_path, new_res_info, "", target)
         return
     # Directly build from hmonnx

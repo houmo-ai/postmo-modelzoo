@@ -78,7 +78,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         )
         self.onnx_is_static = True  # Initially True
         self.model_name = self.model_cfg.get("name", "model")  # Compiled model name
-        self.upload_dir_name = Path.cwd().name  # Upload directory name (defaults to current dir name)
+        self.upload_dir_name = (
+            Path.cwd().name
+        )  # Upload directory name (defaults to current dir name)
         self.inputs_cfg = self.model_cfg.get("inputs")
         self.check_input_shape()
         self.model_inputs_batch = dict()
@@ -124,7 +126,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.resizers_cfg = {}
         self.max_inputs_size = dict()
         self.has_resizer = False  # Whether any input has resizer
-        self.has_dynamic_resizer = False  # Whether any input uses dynamic resizer (mode 1 or 2)
+        self.has_dynamic_resizer = (
+            False  # Whether any input uses dynamic resizer (mode 1 or 2)
+        )
 
         for input_name in self.inputs_cfg:
             input_cfg = self.inputs_cfg[input_name]
@@ -629,7 +633,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             sample_num,
             loop_num,
             thread_num,
-            stream_num=0,
+            stream_num=stream_num,
             check_output=False,
             devices=devices,
         )
