@@ -25,7 +25,7 @@ import psutil
 import threading
 import multiprocessing
 import argparse
-
+import glob
 import logging
 
 logging.basicConfig(level="INFO")
@@ -147,38 +147,6 @@ def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> 
     return (llm_val, vit_val)
 
 
-def _has_required_paths(stage: str, model_name: str, required_paths) -> bool:
-    missing_paths = [path for path in required_paths if not os.path.exists(path)]
-    if not missing_paths:
-        return True
-
-    print(f"[warning] skip {model_name} {stage}, missing files:")
-    for path in missing_paths:
-        print(f"  - {path}")
-    return False
-
-
-def _can_build_model(model_name: str, model_dir: str, model_path: str) -> bool:
-    return _has_required_paths(
-        "build",
-        model_name,
-        [
-            os.path.join(model_dir, model_path),
-        ],
-    )
-
-
-def _can_test_model(model_name: str, model_dir: str, output_dir: str) -> bool:
-    return _has_required_paths(
-        "test",
-        model_name,
-        [
-            model_dir,
-            os.path.join(output_dir, f"{model_name}.hmm"),
-        ],
-    )
-
-
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -282,7 +250,6 @@ def get_args() -> argparse.Namespace:
 def build_llm(
     model_name,
     model_dir,
-    model_path,
     output_dir,
     profile,
     ncore,
@@ -320,7 +287,8 @@ def build_llm(
 
     start = time.time()
     print(f"\n===> {model_name} build start...\n kwargs:{kwargs}")
-    decode_model = os.path.join(model_dir, model_path)
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -339,12 +307,18 @@ def build_llm(
 
 
 def build_vit(
-    model_name, model_dir, model_path, output_dir, profile, ncore, j, flash_attention
+    model_name,
+    model_dir,
+    output_dir,
+    profile,
+    ncore,
+    j,
+    flash_attention=0,
 ):
     import tcim
 
     kwargs = {}
-    if HOUMO_TARGET == "xh2" and flash_attention:
+    if flash_attention:
         import json
 
         kwargs["flash_attention"] = flash_attention
@@ -354,7 +328,8 @@ def build_vit(
 
     start = time.time()
     print(f"\n===> {model_name} build start... \n kwargs:{kwargs}")
-    decode_model = os.path.join(model_dir, model_path)
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -489,6 +464,26 @@ if __name__ == "__main__":
     llm_flash_attention, vit_flash_attention = args.flash_attention
     profile = {}
 
+    decode_dirs = sorted(
+        path
+        for path in glob.glob(os.path.join(model_dir, "*decode*"))
+        if os.path.isdir(path)
+    )
+    if not decode_dirs:
+        raise FileNotFoundError(
+            f'No subdirectory containing "decode" found under: {model_dir}'
+        )
+    decode_dir = os.path.abspath(decode_dirs[0])
+    prefill_dir = os.path.join(model_dir, "prefill")
+
+    visual_dirs = [
+        folder_path
+        for folder_path in glob.glob(os.path.join(model_dir, "vis*"))
+        if os.path.isdir(folder_path)
+        and any(key in os.path.basename(folder_path) for key in ["vision", "visual"])
+    ]
+    visual_dir = visual_dirs[0] if visual_dirs else ""
+
     # build model
     if args.stage == "build" or args.stage == "all":
         import platform
@@ -497,63 +492,64 @@ if __name__ == "__main__":
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"hmquant_{model_name}_with_act.onnx"
-        part_dir = os.path.join(model_dir, "visual")
-        if _can_build_model("qwen3.5_visual", part_dir, model_path):
+
+        if visual_dir:
             build_vit(
-                "qwen3.5_visual",
-                part_dir,
-                model_path,
+                f"{model_name}_visual",
+                visual_dir,
                 output_dir,
                 profile,
                 ncore,
                 j,
                 flash_attention=vit_flash_attention,
             )
-
-        part_dir = os.path.join(model_dir, "prefill")
-        if _can_build_model("qwen3.5_prefill", part_dir, model_path):
-            build_llm(
-                "qwen3.5_prefill",
-                part_dir,
-                model_path,
-                output_dir,
-                profile,
-                ncore,
-                ndevice,
-                context_length,
-                j,
-                flash_attention=llm_flash_attention,
-                prefill_length=args.prefill_length,
-            )
-
-        part_dir = os.path.join(model_dir, "decoder")
-        if _can_build_model("qwen3.5_decode", part_dir, model_path):
-            build_llm(
-                "qwen3.5_decode",
-                part_dir,
-                model_path,
-                output_dir,
-                profile,
-                ncore,
-                ndevice,
-                context_length,
-                j,
-                flash_attention=llm_flash_attention,
-            )
+        build_llm(
+            f"{model_name}_prefill",
+            prefill_dir,
+            output_dir,
+            profile,
+            ncore,
+            ndevice,
+            context_length,
+            j,
+            flash_attention=llm_flash_attention,
+            prefill_length=args.prefill_length,
+        )
+        build_llm(
+            f"{model_name}_decode",
+            decode_dir,
+            output_dir,
+            profile,
+            ncore,
+            ndevice,
+            context_length,
+            j,
+            flash_attention=llm_flash_attention,
+        )
 
     # test model
     if args.stage == "test" or args.stage == "all":
-        part_dir = os.path.join(model_dir, "prefill")
-        if _can_test_model("qwen3.5_prefill", part_dir, output_dir):
-            test("qwen3.5_prefill", part_dir, output_dir, profile, prefix=model_name)
-
-        part_dir = os.path.join(model_dir, "decoder")
-        if _can_test_model("qwen3.5_decode", part_dir, output_dir):
-            test("qwen3.5_decode", part_dir, output_dir, profile, prefix=model_name)
-
-        part_dir = os.path.join(model_dir, "visual")
-        if _can_test_model("qwen3.5_visual", part_dir, output_dir):
-            test("qwen3.5_visual", part_dir, output_dir, profile, prefix=model_name)
+        test(
+            f"{model_name}_prefill",
+            prefill_dir,
+            output_dir,
+            profile,
+            prefix=model_name,
+        )
+        test(
+            f"{model_name}_decode",
+            decode_dir,
+            output_dir,
+            profile,
+            prefix=model_name,
+        )
+        if visual_dir:
+            test(
+                f"{model_name}_visual",
+                visual_dir,
+                output_dir,
+                profile,
+                prefix=model_name,
+            )
 
     memory_monitor.stop()
