@@ -5,7 +5,7 @@
 # File: demo.py
 # Description:
 #   Qwen3.5 Inference Demo - Python script for running Qwen3.5
-# automatic speech recognition on HOUMO AI device.
+#   inference on HOUMO AI device.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1232,10 +1232,10 @@ if __name__ == "__main__":
                     if question.lower() in ("stop", "exit", "quit", ""):
                         break
                     if not question:
-                        print("输入不能为空，请重新输入。")
+                        print("Input cannot be empty. Please try again.")
                         continue
                 except (EOFError, KeyboardInterrupt):
-                    print("\n程序结束")
+                    print("\nProgram terminated")
                     break
             else:
                 if is_vision:
@@ -1260,7 +1260,7 @@ if __name__ == "__main__":
                 hmqwen.perf_tracker.show_summary(debug=args.debug)
                 hmqwen.perf_tracker.reset_perf_time()
             except Exception as e:
-                print(f"聊天过程中出错: {e}")
+                print(f"Error during chat: {e}")
                 import traceback
 
                 traceback.print_exc()
@@ -1271,6 +1271,6 @@ if __name__ == "__main__":
                 break
 
     except KeyboardInterrupt:
-        print("\n程序被用户中断")
+        print("\nProgram interrupted by user")
     except Exception as e:
-        print(f"程序运行出错: {e}")
+        print(f"Program execution failed: {e}")
