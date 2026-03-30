@@ -57,9 +57,9 @@ class HmQuantInfer(BaseInfer, ABC):
             logger.error(f"model path: {model_path} not exists.")
             exit(-1)
         try:
-            # from hmquant import set_external_logger
+            from hmquant import set_external_logger
 
-            # set_external_logger(logger)
+            set_external_logger(logger)
             from hmquant.api import quant_single_onnx_network
         except ImportError:
             logger.error("Not found hmquant module, and please install hmquant first.")

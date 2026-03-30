@@ -412,9 +412,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 }
             }
         data_dir = self.demo_cfg.get("data_dir", "")
-        HOUMO_DATASETS_PATH = os.environ.get(
-            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets"
-        )
+        HOUMO_DATASETS_PATH = os.environ.get("HOUMO_DATASETS_PATH", "")
         HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
         if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
             logger.error("data_dir must be a exist directory")
@@ -502,9 +500,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 }
             }
         data_dir = self.eval_cfg.get("data_dir", "")
-        HOUMO_DATASETS_PATH = os.environ.get(
-            "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets"
-        )
+        HOUMO_DATASETS_PATH = os.environ.get("HOUMO_DATASETS_PATH", "")
         HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
         if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
             logger.error("data_dir must be a exist directory")

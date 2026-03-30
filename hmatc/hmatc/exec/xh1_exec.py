@@ -371,9 +371,7 @@ class Xh1Exec(BaseExec):
             logger.error("quant info not found")
             return dict()
         if self.calib_data is not None:
-            HOUMO_DATASETS_PATH = os.environ.get(
-                "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets"
-            )
+            HOUMO_DATASETS_PATH = os.environ.get("HOUMO_DATASETS_PATH")
             HM_calib_data = os.path.join(HOUMO_DATASETS_PATH, self.calib_data)
             if not os.path.isdir(self.calib_data) and not os.path.isdir(HM_calib_data):
                 logger.error("calib_data must be a exist directory")
@@ -387,9 +385,9 @@ class Xh1Exec(BaseExec):
             if hasattr(self.ApplicationOnnxOpt, "opt_model_path"):
                 self.model_path = self.ApplicationOnnxOpt.opt_model_path
         try:
-            # from hmquant import set_external_logger
+            from hmquant import set_external_logger
 
-            # set_external_logger(logger)
+            set_external_logger(logger)
             from hmquant.api import (
                 quant_single_onnx_network,
                 generate_golden,
@@ -479,7 +477,9 @@ class Xh1Exec(BaseExec):
             with open(os.path.join(self.quant_output_dir, "VERSION.txt"), "w") as f:
                 f.write(f"hmquant_version: {get_hmquant_xh1_version()}\n")
                 f.write(f"quant_time: {now}\n")
-            filename = f"hmquant_{self.upload_dir_name}_xh1_{get_houmo_version()}.tar.xz"
+            filename = (
+                f"hmquant_{self.upload_dir_name}_xh1_{get_houmo_version()}.tar.xz"
+            )
             compress_quant_output_path = os.path.join(self.save_dir, "xh1", filename)
             compress_folder_to_tar_xz_with_progress(
                 self.quant_output_dir,
@@ -579,7 +579,9 @@ class Xh1Exec(BaseExec):
             self.upload_dir_name = upload_dir_name
 
         # Use file_prefix for filename, defaults to upload_dir_name
-        actual_file_prefix = file_prefix if file_prefix is not None else self.upload_dir_name
+        actual_file_prefix = (
+            file_prefix if file_prefix is not None else self.upload_dir_name
+        )
 
         if not os.path.exists(self.hmm_path):
             logger.error(f"HMM file not found: {self.hmm_path}")
