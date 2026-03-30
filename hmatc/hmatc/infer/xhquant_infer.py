@@ -51,10 +51,11 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
             self.device = "cuda"
         try:
             from xhquant.api import xhquant_init
+
+            xhquant_init(logger=logger)
         except ImportError:
             logger.error("Please install xhquant first.")
             exit(-1)
-        xhquant_init(None, debug=False)
 
     def load(self, model_path, device_id=0):
         """

@@ -85,7 +85,9 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         self.resizer_modes = kwargs.get("resizer_modes", {})
         # For now, only single-input models are supported for demo/eval
         if self.resizer_modes and not self.is_image_single_input:
-            logger.error("Multi-input models with resizer are not supported for demo/eval yet")
+            logger.error(
+                "Multi-input models with resizer are not supported for demo/eval yet"
+            )
             exit(-1)
         # For backward compatibility, extract single resizer_mode for single-input models
         if self.resizer_modes and self.is_image_single_input:
@@ -219,24 +221,24 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         Returns:
             dict: Dictionary containing output data arrays after inference.
         """
-        prerpcessed_in_datas = self.preprocess(in_datas)
+        preprocessed_in_datas = self.preprocess(in_datas)
         # For multi-batch, directly duplicate data, and subsequent resizer information duplication
-        for name in prerpcessed_in_datas:
-            in_data = prerpcessed_in_datas[name]
+        for name in preprocessed_in_datas:
+            in_data = preprocessed_in_datas[name]
             if (
                 name.startswith("resizer_crop_")
                 and self.roi_num > 1
                 and self.backend in ["xh1", "xh2"]
             ):
-                prerpcessed_in_datas[name] = np.repeat(
+                preprocessed_in_datas[name] = np.repeat(
                     in_data, repeats=self.roi_num, axis=0
                 )
                 continue
             batch = self.engine.get_input_batch_size(name)
-            prerpcessed_in_datas[name] = np.repeat(in_data, repeats=batch, axis=0)
+            preprocessed_in_datas[name] = np.repeat(in_data, repeats=batch, axis=0)
         t = time.time()
         # Inference
-        outs = self.engine.run(prerpcessed_in_datas)
+        outs = self.engine.run(preprocessed_in_datas)
         self.time_span += time.time() - t
         # XH1 outputs both quantized and dequantized results, only take the dequantized one
         if isinstance(outs, tuple):

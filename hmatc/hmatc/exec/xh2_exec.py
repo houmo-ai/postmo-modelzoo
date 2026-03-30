@@ -687,7 +687,7 @@ class Xh2Exec(BaseExec):
                 convert_onnx_to_hmonnx,
             )
 
-            # xhquant_init(logger=logger)
+            xhquant_init(logger=logger)
             os.environ.setdefault("PYDEVD_DISABLE_FILE_VALIDATION", "1")
         except ImportError as e:
             logger.error(f"{e}\nNot found xhquant module, please install xhquant.")

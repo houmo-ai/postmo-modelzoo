@@ -41,7 +41,7 @@ from .utils.benchmark import run_benchmark
 from .utils.result_manager import save_result
 
 
-def set_logger(op, log_dir, filename):
+def set_logger(op, log_dir, filename, log_level=logging.INFO):
     """
     Set up a logger that writes to a timestamped log file in the specified directory.
 
@@ -49,13 +49,26 @@ def set_logger(op, log_dir, filename):
         op (str): Operation name used in the log file name
         log_dir (str): Directory where the log file will be saved
         filename (str): Base name of the log file
+        log_level (int): Logging level for both console and file (default: logging.INFO)
     """
+    # Set logger level (affects all handlers)
+    logger.setLevel(log_level)
+
+    # Set console handler level
+    for handler in logger.handlers:
+        if isinstance(handler, logging.StreamHandler) and not isinstance(
+            handler, logging.FileHandler
+        ):
+            handler.setLevel(log_level)
+
+    # Add file handler
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     t = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
     filepath = os.path.join(log_dir, "{}-{}-{}.log".format(filename, op, t))
     file_handler = logging.FileHandler(filepath)
     file_handler.setFormatter(LoggingFormatter())
+    file_handler.setLevel(log_level)
     logger.addHandler(file_handler)
 
 
@@ -74,6 +87,10 @@ def main():
     parent_cuda = argparse.ArgumentParser(add_help=False)
     parent_model_cfg = argparse.ArgumentParser(add_help=False)
     parent_layers = argparse.ArgumentParser(add_help=False)
+    parent_log = argparse.ArgumentParser(add_help=False)
+
+    # log config
+    parent_log.add_argument("--log_level", type=str, required=False, default="INFO", choices=("DEBUG", "INFO", "WARN", "ERROR", "FATAL"), help="Specify log level")
 
     # model config
     parent_model_cfg.add_argument("--batch", type=int, required=False, default=1, help="Specify a build batch")
@@ -91,18 +108,18 @@ def main():
 
     # main parser
     parser = argparse.ArgumentParser(description="HouMo Model Assist Tool")
-    subparsers = parser.add_subparsers(dest="command", required=True, help="qunat build compare perf demo eval")
+    subparsers = parser.add_subparsers(dest="command", required=True, help="quant build compare perf demo eval")
     # subparsers
-    quant_parser = subparsers.add_parser("quant", parents=[parent_target, parent_config, parent_cuda], help="Quantize a model")
-    build_parser = subparsers.add_parser("build", parents=[parent_target, parent_model_cfg, parent_device_id], help="Build a model")
-    compare_parser = subparsers.add_parser("compare", parents=[parent_target, parent_config, parent_model_cfg, parent_device_id], help="Compare onnx/hmquant/chip")
-    perf_parser = subparsers.add_parser("perf", parents=[parent_target, parent_model_cfg, parent_device_id], help="Test model performance")
-    demo_parser = subparsers.add_parser("demo", parents=[parent_target, parent_config, parent_onnx, parent_hmonnx, parent_model_cfg, parent_device_id], help="Run model demo")
-    evaluate_parser = subparsers.add_parser("eval", parents=[parent_target, parent_config, parent_onnx, parent_hmonnx, parent_model_cfg, parent_device_id], help="Run model evaluate")
-    benchmark_parser = subparsers.add_parser("benchmark", parents=[parent_target, parent_config, parent_device_id, parent_cuda], help="Run model benchmark")
-    check_parser = subparsers.add_parser("check", parents=[parent_target, parent_layers, parent_device_id], help="Check model golden")
+    quant_parser = subparsers.add_parser("quant", parents=[parent_target, parent_config, parent_cuda, parent_log], help="Quantize a model")
+    build_parser = subparsers.add_parser("build", parents=[parent_target, parent_model_cfg, parent_device_id, parent_log], help="Build a model")
+    compare_parser = subparsers.add_parser("compare", parents=[parent_target, parent_config, parent_model_cfg, parent_device_id, parent_log], help="Compare onnx/hmquant/chip")
+    perf_parser = subparsers.add_parser("perf", parents=[parent_target, parent_model_cfg, parent_device_id, parent_log], help="Test model performance")
+    demo_parser = subparsers.add_parser("demo", parents=[parent_target, parent_config, parent_onnx, parent_hmonnx, parent_model_cfg, parent_device_id, parent_log], help="Run model demo")
+    evaluate_parser = subparsers.add_parser("eval", parents=[parent_target, parent_config, parent_onnx, parent_hmonnx, parent_model_cfg, parent_device_id, parent_log], help="Run model evaluate")
+    benchmark_parser = subparsers.add_parser("benchmark", parents=[parent_target, parent_config, parent_device_id, parent_cuda, parent_log], help="Run model benchmark")
+    check_parser = subparsers.add_parser("check", parents=[parent_target, parent_layers, parent_device_id, parent_log], help="Check model golden")
     gen_parser = subparsers.add_parser("gen", parents=[parent_target], help="Generate default config.yaml")
-    golden_parser = subparsers.add_parser("golden", parents=[parent_target, parent_layers, parent_cuda], help="Generate golden data")
+    golden_parser = subparsers.add_parser("golden", parents=[parent_target, parent_layers, parent_cuda, parent_log], help="Generate golden data")
     
     # quant
     quant_parser.add_argument("--quant_type", type=str, default="w8a8h1_sefp", help=argparse.SUPPRESS)
@@ -242,7 +259,15 @@ def main():
         return
 
     target = args.target
-    # set_logger(current_command, "log", "config")
+    # Parse log level
+    log_level_map = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARN": logging.WARN,
+        "ERROR": logging.ERROR,
+        "FATAL": logging.FATAL,
+    }
+    log_level = log_level_map.get(args.log_level, logging.INFO)
     cfg_path = args.config
     if not os.path.exists(cfg_path):
         logger.error("Config file not found")
@@ -285,6 +310,12 @@ def main():
         # Add file_prefix for compressed file name
         if hasattr(args, "file_prefix") and args.file_prefix is not None:
             cfg["build"]["file_prefix"] = args.file_prefix
+
+    # Set logger with fixed log_dir: ${save_dir}/${target}/logs
+    save_dir = cfg.get("model", {}).get("save_dir", "output")
+    log_dir = os.path.join(save_dir, target, "logs")
+    set_logger(current_command, log_dir, "hmatc", log_level)
+
     logger.info(f"\n{json.dumps(cfg, indent=2, sort_keys=False)}")
 
     hm_exec = None
@@ -332,9 +363,7 @@ def main():
         data_path = args.data_path
         if not os.path.exists(data_path):
             # If not exists, look in HOUMO_DATASETS_PATH environment variable
-            HOUMO_DATASETS_PATH = os.environ.get(
-                "HOUMO_DATASETS_PATH", "/usr/local/src/houmo-modelzoo/data/datasets"
-            )
+            HOUMO_DATASETS_PATH = os.environ.get("HOUMO_DATASETS_PATH", "")
             data_path = os.path.join(HOUMO_DATASETS_PATH, data_path)
             if not os.path.exists(data_path):
                 logger.error(f"{data_path} or {args.data_path} not exists.")

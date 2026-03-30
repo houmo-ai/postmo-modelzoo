@@ -43,7 +43,7 @@ class OnnxBaseOptimizer(object):
     def opt(cls, onnx_model):
         '''
         Explanation:
-        Excute with ort compare result
+        Execute with ort compare result
 
         Args:
         :onnx_model input onnx model
