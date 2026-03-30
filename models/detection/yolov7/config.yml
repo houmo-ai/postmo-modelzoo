@@ -19,11 +19,6 @@ model:
 quant:
   calib_data: coco2017/val2017
   calib_num: 32
-  config:
-    mix_attn_outs: 
-      - /model.105/Split
-      - /model.105/Split_1
-      - /model.105/Split_2
 
 build:
   ncore: 1

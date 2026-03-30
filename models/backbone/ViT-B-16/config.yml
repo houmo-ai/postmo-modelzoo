@@ -17,13 +17,6 @@ model:
 quant:
   calib_data: ./imagenet/ILSVRC2012_img_val
   calib_num: 16
-  config:
-    mix_search:
-      activation:
-        method:
-          name: auto
-          target_cos: 0.98
-        calib_samples: 8
 
 build:
   ncore: 1

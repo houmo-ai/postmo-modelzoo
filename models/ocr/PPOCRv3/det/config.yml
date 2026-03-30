@@ -17,12 +17,6 @@ model:
 quant:
   calib_data: CCPD2020/quant_data/det
   calib_num: 50
-  config:
-    mix_search:
-      activation:
-        method:
-          name: all
-          target_cos: 0.99
 
 build:
   ncore: 1
