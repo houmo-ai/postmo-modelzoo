@@ -46,6 +46,25 @@ def readWithYaml(config):
     return yamlData
 
 
+def path_matches_rule(line: str, rule: str) -> bool:
+    if not line or not rule:
+        return False
+
+    line_path = os.path.normpath(line.strip()).replace("\\", "/")
+    rule_path = os.path.normpath(rule.strip()).replace("\\", "/")
+
+    return line_path == rule_path or line_path.startswith(f"{rule_path}/")
+
+
+def get_module_rules(module_config, rule_type: str):
+    rules = module_config.get(rule_type)
+    return rules or []
+
+
+def has_matching_rule(line: str, rules) -> bool:
+    return any(path_matches_rule(line, rule) for rule in rules)
+
+
 def addCiMarker(test_type: str, filter_str: str):
     module_name = None
     case_dict = dict()
@@ -85,26 +104,19 @@ def getTestModules(line, yamlData):
     allModules = set()
     if yamlData == None:
         return allModules
+
     for key, value in yamlData.items():
-        for keyin, valuein in value.items():
-            if keyin != "include" or valuein == None:
-                continue
-            for include in valuein:
-                if not line.startswith(include):
-                    continue
-                allModules.add(key)
+        include_rules = get_module_rules(value, "include")
+        if has_matching_rule(line, include_rules):
+            allModules.add(key)
 
     if not allModules:
         return allModules
 
     for key, value in yamlData.items():
-        for keyin, valuein in value.items():
-            if keyin != "exclude" or valuein == None:
-                continue
-            for exclude in valuein:
-                if not line.startswith(exclude):
-                    continue
-                allModules.remove(key)
+        exclude_rules = get_module_rules(value, "exclude")
+        if has_matching_rule(line, exclude_rules):
+            allModules.discard(key)
 
     return allModules
 

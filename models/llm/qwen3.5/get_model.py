@@ -64,7 +64,7 @@ def get_args() -> argparse.Namespace:
         "--context_length",
         dest="context_length",
         type=str,
-        default="8k",
+        default="32k",
         help="context length",
     )
     parser.add_argument(
@@ -141,7 +141,10 @@ if __name__ == "__main__":
             "batch": args.batch,
         },
         "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
-        "modelscope_repo": {"repo_ids": config["modelscope_repo"]},
+        "modelscope_repo": {
+            "repo_ids": config["modelscope_repo"],
+            "local_dirs": [f"{args.download_dir}/qwen3.5"],
+        },
     }
 
     _, ret_dict = hmatc_get_file(

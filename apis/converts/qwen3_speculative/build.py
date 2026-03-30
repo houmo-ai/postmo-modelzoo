@@ -231,37 +231,34 @@ def build(
     batch=None,
     tso=False,
     flash_attention=0,
-    prefill_length=None,
+    prefill_length=0,
     all_logits=False,
 ):
     import tcim
+    import json
 
     kwargs = {}
-    if HOUMO_TARGET == "xh2":
-        import json
-
-        custom_msg = dict()
-        custom_msg["prefill_length"] = prefill_length
-
-        kwargs["modify_llm"] = {}
-        kwargs["enable_xh2_stable_output"] = tso
+    custom_msg = {}
+    kwargs["modify_llm"] = {}
+    kwargs["enable_xh2_stable_output"] = tso
+    if flash_attention:
         kwargs["flash_attention"] = flash_attention
         custom_msg["flash_attention"] = flash_attention
-        if ndevice:
-            kwargs["ndevice"] = ndevice
-        if batch:
-            kwargs["modify_llm"]["batch"] = batch
-            custom_msg["batch"] = batch
-        if context_length:
-            kwargs["modify_llm"]["context-length"] = context_length
-            custom_msg["context_length"] = context_length
-        if all_logits:
-            kwargs["modify_llm"]["all-logits"] = all_logits
-            custom_msg["all_logits"] = all_logits
-        if prefill_length:
-            kwargs["modify_llm"]["fill-length"] = prefill_length
-            custom_msg["prefill_length"] = prefill_length
-        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
+    if ndevice:
+        kwargs["ndevice"] = ndevice
+    if batch:
+        kwargs["modify_llm"]["batch"] = batch
+        custom_msg["batch"] = batch
+    if context_length:
+        kwargs["modify_llm"]["context-length"] = context_length
+        custom_msg["context_length"] = context_length
+    if all_logits is True:
+        kwargs["modify_llm"]["all-logits"] = all_logits
+        custom_msg["all_logits"] = all_logits
+    if prefill_length:
+        kwargs["modify_llm"]["fill-length"] = prefill_length
+        custom_msg["prefill_length"] = prefill_length
+    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
     print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
@@ -396,6 +393,17 @@ def _get_decode_dir(model_dir):
     return decode_dir
 
 
+def _copy_embedding_if_exists(source_model_dir, target_model_dir, copied_name):
+    import shutil
+
+    source_embedding_path = os.path.join(source_model_dir, "quant_embedding.pt")
+    copied_embedding_path = os.path.join(target_model_dir, copied_name)
+    if os.path.exists(source_embedding_path):
+        if os.path.exists(copied_embedding_path):
+            os.remove(copied_embedding_path)
+        shutil.copy2(source_embedding_path, copied_embedding_path)
+
+
 if __name__ == "__main__":
     # Create and start the monitor
     memory_monitor = ProcessMemoryMonitor(interval=2)
@@ -424,7 +432,6 @@ if __name__ == "__main__":
     # build model
     if args.stage == "build" or args.stage == "all":
         import platform
-        import shutil
 
         arch = platform.machine()
         if arch != "x86_64":
@@ -479,22 +486,12 @@ if __name__ == "__main__":
             prefill_length=args.verify_length,
             all_logits=True,
         )
-
-        target_embedding_path = os.path.join(target_model_dir, "quant_embedding.pt")
-        target_embedding_renamed_path = os.path.join(
-            target_model_dir, "quant_embedding_target.pt"
+        _copy_embedding_if_exists(
+            target_model_dir, target_model_dir, "quant_embedding_target.pt"
         )
-        if os.path.exists(target_embedding_path):
-            os.replace(target_embedding_path, target_embedding_renamed_path)
-
-        draft_embedding_path = os.path.join(draft_model_dir, "quant_embedding.pt")
-        draft_embedding_copied_path = os.path.join(
-            target_model_dir, "quant_embedding_draft.pt"
+        _copy_embedding_if_exists(
+            draft_model_dir, target_model_dir, "quant_embedding_draft.pt"
         )
-        if os.path.exists(draft_embedding_path):
-            if os.path.exists(draft_embedding_copied_path):
-                os.remove(draft_embedding_copied_path)
-            shutil.copy2(draft_embedding_path, draft_embedding_copied_path)
 
     # test model
     if args.stage == "test" or args.stage == "all":
