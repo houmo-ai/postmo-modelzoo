@@ -205,17 +205,28 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def build_glm(model_name, model_dir, output_dir, profile, ncore, j, flash_attention=0):
+def build_glm(
+    model_name,
+    model_dir,
+    output_dir,
+    profile,
+    ncore,
+    j,
+    flash_attention=0,
+    enable_common_subgraph=False,
+):
     import tcim
+    import json
 
     kwargs = {}
+    custom_msg = {}
+    if enable_common_subgraph is True:
+        kwargs["enable_common_subgraph"] = True
+        custom_msg["enable_common_subgraph"] = True
     if flash_attention:
-        import json
-
         kwargs["flash_attention"] = flash_attention
-        custom_msg = {}
         custom_msg["flash_attention"] = flash_attention
-        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
+    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
     start = time.time()
     print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
@@ -369,6 +380,7 @@ if __name__ == "__main__":
             ncore,
             j,
             flash_attention=encoder_flash_attention,
+            enable_common_subgraph=True,
         )
         build_glm(
             f"{model_name}_decode",
