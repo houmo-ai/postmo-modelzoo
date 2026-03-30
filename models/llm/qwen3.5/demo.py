@@ -587,7 +587,7 @@ class HmQwen:
             logger.info("vision model loaded")
 
         # Start inference statistics from a clean slate for the first request.
-        self.perf_tracker.reset_perf_time(preserve_load_times=True)
+        self.perf_tracker.reset_perf_time()
 
     def create_linear_attn_mask(
         self, fill_length: int, new_cache_length: int
@@ -1257,7 +1257,7 @@ if __name__ == "__main__":
                         nested_timings=hmqwen.ttft_debug_nested_timings,
                         extra_timings=hmqwen.ttft_debug_extra_timings,
                     )
-                hmqwen.perf_tracker.show_summary(debug=args.debug)
+                hmqwen.perf_tracker.show_summary()
                 hmqwen.perf_tracker.reset_perf_time()
             except Exception as e:
                 print(f"Error during chat: {e}")
