@@ -29,7 +29,7 @@ from multiprocessing import get_context, Queue
 from . import logger
 from .utils import read_yaml_to_dict
 from .check import check_cfg
-from ..onnx_tool import model_profile
+from .onnx_profile import model_profile
 from .utils import (
     read_yaml_to_dict,
     save_dict_to_yaml,
