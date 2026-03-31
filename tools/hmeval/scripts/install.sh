@@ -14,7 +14,14 @@ cd "$PROJECT_ROOT"
 echo "Installing dependencies..."
 pip install -r requirements.txt
 
-echo "Installing hmeval in develop mode..."
-python setup.py develop
+echo "Building hmeval wheel package..."
+rm -rf dist build *.egg-info
+python setup.py bdist_wheel
+
+echo "Uninstalling existing hmeval..."
+pip uninstall -y hmeval || true
+
+echo "Installing hmeval from wheel..."
+pip install dist/hmeval-*.whl
 
 echo "=== Installation complete ==="

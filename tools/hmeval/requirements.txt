@@ -6,3 +6,4 @@
 
 # Core evaluation engine used by hmeval CLI (`run_task`, `TaskConfig`)
 evalscope
+pydantic==2.12.5
