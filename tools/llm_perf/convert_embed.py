@@ -20,7 +20,6 @@
 import os
 import argparse
 import torch
-import numpy as np
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -34,33 +33,58 @@ def parse_args():
         type=str,
         help="Embedding pt file path",
     )
-
-    parser.add_argument(
-        "--type",
-        required=True,
-        type=str,
-        help="Embedding pt file model type, choice from ['llm', 'vlm']",
-    )
     args = parser.parse_args()
     return args
+
+
+def _extract_embedding_weight(loaded_obj):
+    if torch.is_tensor(loaded_obj):
+        return loaded_obj
+
+    if isinstance(loaded_obj, dict):
+        if "weight" in loaded_obj and torch.is_tensor(loaded_obj["weight"]):
+            return loaded_obj["weight"]
+
+        # Some checkpoints may contain only one tensor entry.
+        tensor_items = [
+            value for value in loaded_obj.values() if torch.is_tensor(value)
+        ]
+        if len(tensor_items) == 1:
+            return tensor_items[0]
+
+        # Fall back to common key suffix used in state_dict.
+        for key, value in loaded_obj.items():
+            if key.endswith(".weight") and torch.is_tensor(value):
+                return value
+
+    if hasattr(loaded_obj, "weight") and torch.is_tensor(loaded_obj.weight):
+        return loaded_obj.weight
+
+    raise ValueError("Cannot infer embedding weight from checkpoint content")
+
+
+def _load_embedding_weight(embedding_path):
+    load_errors = []
+    for weights_only in (True, False):
+        try:
+            loaded_obj = torch.load(
+                embedding_path, map_location="cpu", weights_only=weights_only
+            )
+            return _extract_embedding_weight(loaded_obj)
+        except Exception as exc:
+            load_errors.append(f"weights_only={weights_only}: {exc}")
+
+    raise RuntimeError(
+        "Failed to load embedding checkpoint with both modes: "
+        + " | ".join(load_errors)
+    )
 
 
 if __name__ == "__main__":
     args = parse_args()
     embedding_path = args.path
-    type = args.type
     if os.path.exists(embedding_path) and embedding_path.endswith(".pt"):
-        if type == "llm":
-            embedding_weight = torch.load(
-                embedding_path, map_location="cpu", weights_only=True
-            )
-            embedding_weight = embedding_weight["weight"]
-        if type == "vlm":
-            embedding_weight = torch.load(
-                embedding_path, map_location="cpu", weights_only=False
-            )
-            if HOUMO_TARGET == "xh2":
-                embedding_weight = embedding_weight.weight
+        embedding_weight = _load_embedding_weight(embedding_path)
         if embedding_weight.dtype == torch.bfloat16:
             embedding_weight = embedding_weight.float().half()
 
@@ -68,3 +92,7 @@ if __name__ == "__main__":
         output_path = embedding_path.replace(".pt", ".bin")
         embedding_data.tofile(output_path)
         print(f"embeding file saved to {output_path}")
+    else:
+        raise ValueError(
+            f"Invalid embedding path (expect existing .pt file): {embedding_path}"
+        )

@@ -131,7 +131,7 @@
 
 #### 1.4.1 embedding模型准换
 提供了convert_embed.py对quant_embedding.pt进行准换，转换结果为quant_embedding.bin，可以方便llm_perf工具embedding时读取权重。
-使用方式如下：python convert_embed.py --path <embedding_weight_path> --type <llm/vlm>  。
+使用方式如下：python convert_embed.py --path <embedding_weight_path>。
 
 #### 1.4.2 指令启动
 
