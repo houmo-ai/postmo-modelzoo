@@ -99,10 +99,11 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | -------------- | ----- | ---------------------- | -------- | ------ | ----------- | ------------------- |
 | bandwidth_perf | tools | 带宽测试工具           | python   | xh2    | x64/aarch64 | linux               |
 | computing_perf | tools | 算力测试工具           | python   | xh2    | x64/aarch64 | linux               |
+| hm_check       | tools | 硬件环境检测工具       | c++      | xh2    | x64/aarch64 | linux/android       |
+| hmeval         | tools | 大模型精度测试工具     | python   | xh2    | x64/aarch64 | linux               |
 | llm_perf       | tools | 大语言模型性能测试工具 | c++      | xh2    | x64/aarch64 | linux/android/win11 |
 | tcim_perf      | tools | 模型测试工具           | c++      | xh2    | x64/aarch64 | linux/android       |
 | win_envs       | tools | win 环境设置工具       | python   | xh2    | x64         | win11               |
-| hm_check       | tools | 硬件环境检测工具       | c++      | xh2    | x64/aarch64 | linux/android       |
 
 ## 模型示例
 
