@@ -104,14 +104,40 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   }
 
   // Configure decode module's other inputs (KV cache)
-  for (int idx = attn_idx_start; idx < 2 * n_blocks + attn_idx_start; idx++) {
-    const std::string kvcache_name = prefill_module->GetInputName(idx);
-    auto kvcache = prefill_module->GetDevInput(kvcache_name);
-    CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(kvcache_name, kvcache));
+  for (int idx = 0; idx < this->prefill_module->GetInputNum(); idx++) {
+    const std::string layer_name = prefill_module->GetInputName(idx);
+    if (layer_name.find("model_layers") != std::string::npos) {
+      auto cache = prefill_module->GetDevInput(layer_name);
+      CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(layer_name, cache));
+    }
+
+    if (layer_name.find("conv_cache") != std::string::npos) {
+      std::string output_name = layer_name;
+      const std::string prefix = "past_conv_cache_";
+      if (output_name.rfind(prefix, 0) == 0) {
+        output_name.replace(0, prefix.size(), "conv_cache_out_");
+      }
+      auto cache = prefill_module->GetDevInput(layer_name);
+      CHECK_TCIM_RET_STATUS(prefill_module->SetDevOutput(output_name, cache));
+      CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(layer_name, cache));
+      CHECK_TCIM_RET_STATUS(decode_module->SetDevOutput(output_name, cache));
+    }
+
+    if (layer_name.find("recurrent_state") != std::string::npos) {
+      std::string output_name = layer_name;
+      const std::string prefix = "past_recurrent_state_";
+      if (output_name.rfind(prefix, 0) == 0) {
+        output_name.replace(0, prefix.size(), "recurrent_state_out_");
+      }
+      auto cache = prefill_module->GetDevInput(layer_name);
+      CHECK_TCIM_RET_STATUS(prefill_module->SetDevOutput(output_name, cache));
+      CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(layer_name, cache));
+      CHECK_TCIM_RET_STATUS(decode_module->SetDevOutput(output_name, cache));
+    }
   }
 
-  // Initialize embedding module with weights path, embedding length and prefill
-  // length
+  // Initialize embedding module with weights path,
+  // embedding length and prefill length
   embedding = std::make_shared<HmEmbedding>(
       embeddingWeightPath, this->embedding_length, this->prefill_length);
 
@@ -132,6 +158,20 @@ void HmllmInfer::prefill_input_init() {
     tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info);
     prefill_input_map.insert(
         std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
+  }
+
+  for (int idx = attn_idx_start; idx < prefill_module->GetInputNum(); idx++) {
+    auto input_name = prefill_module->GetInputName(idx);
+    if (input_name.find("conv_cache") != std::string::npos ||
+        input_name.find("recurrent_state") != std::string::npos) {
+      auto input_info = prefill_module->GetInputInfo(input_name).AsContiguous();
+      tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info);
+      prefill_input_map.insert(
+          std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
+      memset(input_tensor.Buffer().Data(), 0, input_tensor.MemSize());
+      CHECK_TCIM_RET_STATUS(prefill_module->SetInput(input_name, input_tensor));
+      CHECK_TCIM_RET_STATUS(decode_module->SetInput(input_name, input_tensor));
+    }
   }
 }
 
@@ -210,21 +250,32 @@ void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length,
     auto input_name = prefill_module->GetInputName(idx);
     auto tensor = prefill_input_map.at(input_name);
     size_t memSize = tensor.MemSize();
-    if (idx == 0) {
+    if (input_name.find("input_1") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(data, memSize));
-    } else if (idx == 1) {
+    } else if (input_name.find("valid_length") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&valid_length, memSize));
-    } else if (idx == 2) {
+    } else if (input_name.find("current_length") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&current_length, memSize));
-    } else if (idx == 3) {
+    } else if (input_name.find("position_ids") != std::string::npos) {
       std::vector<int32_t> position_ids;
       for (int i = valid_length; i < valid_length + this->prefill_length; ++i) {
         position_ids.emplace_back(i);
       }
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(position_ids.data(), memSize));
+    } else if (input_name.find("attn_mask") != std::string::npos) {
+      std::vector<tensor_type> attn_mask;
+      for (int i = 0; i < this->prefill_length; ++i) {
+        if (i < current_length) {
+          attn_mask.emplace_back(static_cast<tensor_type>(1.0f));
+        } else {
+          attn_mask.emplace_back(static_cast<tensor_type>(0.0f));
+        }
+      }
+      CHECK_TCIM_RET_STATUS(
+          tensor.Buffer().CopyFromHost(attn_mask.data(), memSize));
     } else {
       continue;
     }
@@ -265,18 +316,21 @@ void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length) {
     auto input_name = decode_module->GetInputName(idx);
     auto tensor = decode_input_map.at(input_name);
     size_t memSize = tensor.MemSize();
-    if (idx == 0) {
+    if (input_name.find("input_1") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(data, memSize));
-    } else if (idx == 1) {
+    } else if (input_name.find("valid_length") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&context_length, memSize));
-    } else if (idx == 2) {
+    } else if (input_name.find("current_length") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&decode_current_length, memSize));
-    } else if (idx == 3) {
+    } else if (input_name.find("position_id") != std::string::npos) {
       int32_t position_id = context_length + 1;
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&position_id, memSize));
+    } else if (input_name.find("attn_mask") != std::string::npos) {
+      tensor_type mask_value = static_cast<tensor_type>(1.0f);
+      CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(&mask_value, memSize));
     } else {
       continue;
     }
@@ -328,6 +382,7 @@ void HmllmInfer::perf_llm(const uint32_t input_tokens_len,
   memset(&llm_perf_datas, 0, sizeof(PerfInfos));
   // 1. prepare inputs
   std::vector<int> all_input_ids = generateRandomVector(input_tokens_len);
+
   if (input_tokens_len + stop_tokens_len > context_max_length) {
     std::cout << "input_tokens_len + stop_tokens_len > context_max_length, "
                  "cast stop_tokens_len to "
@@ -359,6 +414,7 @@ void HmllmInfer::perf_llm(const uint32_t input_tokens_len,
 
     perf_tracker->perfStart(PerfType::PREFILL_EMBED_TIME);
     input_datas = embedding->EmbeddingTokens(input_ids);
+
     perf_tracker->perfEnd(PerfType::PREFILL_EMBED_TIME);
 
     PrefillSetInputDatas(input_datas, valid_length, current_length);

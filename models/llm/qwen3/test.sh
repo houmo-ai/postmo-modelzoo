@@ -148,7 +148,7 @@ fi
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo (size: ${MODEL_SIZE})."
     python3 demo.py --model_size ${MODEL_SIZE}
-    python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt --type llm
+    python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt
     llm_perf -c "${PERF_CONFIG}"
 fi
 
