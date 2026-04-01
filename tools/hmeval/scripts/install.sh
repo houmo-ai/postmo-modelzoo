@@ -12,16 +12,16 @@ echo "Project root: $PROJECT_ROOT"
 cd "$PROJECT_ROOT"
 
 echo "Installing dependencies..."
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
 echo "Building hmeval wheel package..."
 rm -rf dist build *.egg-info
-python setup.py bdist_wheel
+python3 setup.py bdist_wheel
 
 echo "Uninstalling existing hmeval..."
-pip uninstall -y hmeval || true
+pip3 uninstall -y hmeval || true
 
 echo "Installing hmeval from wheel..."
-pip install dist/hmeval-*.whl
+pip3 install dist/hmeval-*.whl
 
 echo "=== Installation complete ==="
