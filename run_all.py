@@ -156,6 +156,9 @@ def getUnitDict(testUnit, yamlData):
 
 
 def runCase(allUnitDict):
+    """Execute all test cases, if the script is .sh, execute with bash,
+    else execute with pytest, and add ci marker for pytest cases.
+    """
     pytest_folder = script_dir + "/tests"
     os.chdir(pytest_folder)
     logger.info(f"The path for executing pytest tests: {os.getcwd()}")

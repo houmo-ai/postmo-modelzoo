@@ -286,18 +286,18 @@ llm_qwen3_14b:
         args: all
   test:
     - llm_qwen3_14b_test
-# llm_qwen3_30b_a3b:
-#   include:
-#     - models/llm/qwen3-30b-a3b
-#   exclude:
-#     - models/llm/qwen3-30b-a3b/README.MD
-#   example_case:
-#     - llm_qwen3_30b_a3b_test:
-#         test_type: models_tests
-#         script: qwen3_30b_a3b
-#         args: all
-#   test:
-#     - llm_qwen3_30b_a3b_test
+llm_qwen3_30b_a3b:
+  include:
+    - models/llm/qwen3-30b-a3b
+  exclude:
+    - models/llm/qwen3-30b-a3b/README.MD
+  example_case:
+    - llm_qwen3_30b_a3b_test:
+        test_type: models_tests
+        script: qwen3_30b_a3b
+        args: all
+  test:
+    - llm_qwen3_30b_a3b_test
 llm_deepseek_r1_qwen3_8b:
   include:
     - models/llm/deepseek-r1-qwen3-8b
@@ -310,18 +310,18 @@ llm_deepseek_r1_qwen3_8b:
         args: all
   test:
     - llm_deepseek_r1_qwen3_8b_test
-# llm_gpt-oss:
-#   include:
-#     - models/llm/gpt-oss
-#   exclude:
-#     - models/llm/gpt-oss/README.MD
-#   example_case:
-#     - llm_gpt-oss_test:
-#         test_type: models_tests
-#         script: gpt_oss
-#         args: all
-#   test:
-#     - llm_gpt-oss_test
+llm_gpt-oss:
+  include:
+    - models/llm/gpt-oss
+  exclude:
+    - models/llm/gpt-oss/README.MD
+  example_case:
+    - llm_gpt-oss_test:
+        test_type: models_tests
+        script: gpt_oss
+        args: all
+  test:
+    - llm_gpt-oss_test
 vlm_qwen2.5-vl:
   include:
     - models/vlm/qwen2.5-vl
@@ -641,18 +641,22 @@ all:
   exclude: null
   example_case: null
   test:
-    # # - autodrive_yolop_test
-    # - backbone_resnet50_test
+    # - autodrive_yolop_test
+    - backbone_resnet50_test
     # - backbone_efficientnet_test
     # - backbone_mobilenetv2_test
     # - backbone_ViT-B-16_test
-    # - detection_yolov5s_test
+    - detection_yolov5s_test
     # - detection_yolov3_test
     # - detection_yolov8m_test
     # - detection_yolo12m_test
     # - detection_yolov5s_feature
-    # - segmentation_yolov8m_seg_test
-    # - inferences_resnet50_test
-    # - inferences_yolov5s_test
-    # - inferences_resnet50_pipeline_test
-    # - inferences_resnet50_multistreams_test
+    - segmentation_yolov8m_seg_test
+    - llm_qwen3_test
+    - vlm_qwen3-vl_test
+    - llm_gpt-oss_test
+    - llm_qwen3_30b_a3b_test
+    - inferences_resnet50_test
+    - inferences_yolov5s_test
+    - inferences_resnet50_pipeline_test
+    - inferences_resnet50_multistreams_test
