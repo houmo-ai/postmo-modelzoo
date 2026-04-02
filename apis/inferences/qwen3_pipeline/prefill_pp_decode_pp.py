@@ -155,7 +155,9 @@ class SamplingManager:
 
         return logits / self.temperature
 
-    def apply_repetition_penalty(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> np.ndarray:
+    def apply_repetition_penalty(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
         if self.repetition_penalty == 1.0 or not previous_tokens:
             return logits
 
@@ -163,9 +165,13 @@ class SamplingManager:
         for token_id in set(previous_tokens):
             if 0 <= token_id < len(logits):
                 if logits[token_id] < 0:
-                    adjusted_logits[token_id] = logits[token_id] * self.repetition_penalty
+                    adjusted_logits[token_id] = (
+                        logits[token_id] * self.repetition_penalty
+                    )
                 else:
-                    adjusted_logits[token_id] = logits[token_id] / self.repetition_penalty
+                    adjusted_logits[token_id] = (
+                        logits[token_id] / self.repetition_penalty
+                    )
 
         return adjusted_logits
 
@@ -224,10 +230,14 @@ class SamplingManager:
 
         return normalized_probs
 
-    def process_logits(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> np.ndarray:
+    def process_logits(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
         processed_logits = logits.copy()
         # 1. apply repetition penalty
-        processed_logits = self.apply_repetition_penalty(processed_logits, previous_tokens)
+        processed_logits = self.apply_repetition_penalty(
+            processed_logits, previous_tokens
+        )
 
         # 2. apply softmax
         # not using softmax in case of long time cost
@@ -244,7 +254,9 @@ class SamplingManager:
         probs = self.apply_temperature(probs)
         return probs
 
-    def sample(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> int:
+    def sample(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> int:
         logits = logits[0]
         if HOUMO_TARGET == "xh2":
             logits = logits[0]
@@ -257,23 +269,28 @@ class SamplingManager:
 
         return np.array([[sampled_index]])
 
-    def get_processed_probs(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> np.ndarray:
+    def get_processed_probs(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
         return self.process_logits(logits, previous_tokens)
 
-def gen_params(device_id : int, args):
+
+def gen_params(device_id: int, args):
     model_path = args.model_path
-    prefill_path = os.path.join(model_path, f"qwen3_pipeline_prefill_part{device_id}.hmm")
+    prefill_path = os.path.join(
+        model_path, f"qwen3_pipeline_prefill_part{device_id}.hmm"
+    )
     decode_path = os.path.join(model_path, f"qwen3_pipeline_decode_part{device_id}.hmm")
     return {
-        "device_id" : device_id,
+        "device_id": device_id,
         "prefill_path": prefill_path,
         "decode_path": decode_path,
         "tokenizer_dir": args.tokenizer_dir,
         "embedding_path": args.embedding_path,
-        "temperature" : args.temperature,
-        "top_k" : args.topk,
-        "top_p" : args.topp,
-        "repetition_penalty" : args.repetition_penalty,
+        "temperature": args.temperature,
+        "top_k": args.topk,
+        "top_p": args.topp,
+        "repetition_penalty": args.repetition_penalty,
     }
 
 
@@ -295,18 +312,33 @@ def calculate_append_len(tokenizer, input_tokens):
 
     return input_tokens - input_echo_len
 
-def producer(model_params: dict, out_queue: mp.Queue, in_queue: mp.Queue, question_len: int, barrier: mp.Barrier):
+
+def producer(
+    model_params: dict,
+    out_queue: mp.Queue,
+    in_queue: mp.Queue,
+    question_len: int,
+    barrier: mp.Barrier,
+):
     """producer init"""
     weight_manager = tcim.runtime.WeightManager(model_params["device_id"])
     option_prefill = tcim.runtime.Option(weight_manager)
     option_decode = tcim.runtime.Option(weight_manager)
-    #load model
-    prefill_model = tcim.runtime.load(model_params["prefill_path"], option=option_prefill)
-    logger.info(f"Prefill Stage{model_params["device_id"]} load model successfully")
+    # load model
+    prefill_model = tcim.runtime.load(
+        model_params["prefill_path"], option=option_prefill
+    )
+    logger.info(f"Prefill Stage{model_params['device_id']} load model successfully")
 
-    prefill_length = prefill_model.get_input_info(prefill_model.get_input_name(0)).shape[1]
-    embedding_len = prefill_model.get_input_info(prefill_model.get_input_name(0)).shape[2]
-    context_max_length = prefill_model.get_input_info(prefill_model.get_input_name(3)).shape[2]
+    prefill_length = prefill_model.get_input_info(
+        prefill_model.get_input_name(0)
+    ).shape[1]
+    embedding_len = prefill_model.get_input_info(prefill_model.get_input_name(0)).shape[
+        2
+    ]
+    context_max_length = prefill_model.get_input_info(
+        prefill_model.get_input_name(3)
+    ).shape[2]
     batch = prefill_model.get_input_info(prefill_model.get_input_name(0)).shape[0]
 
     # Load decode
@@ -320,10 +352,12 @@ def producer(model_params: dict, out_queue: mp.Queue, in_queue: mp.Queue, questi
             continue
     option_decode.set_dummy_tensors(dummy_tensor_names)
     decode_model = tcim.runtime.load(model_params["decode_path"], option=option_decode)
-    logger.info(f"Decode Stage{model_params["device_id"]} load model successfully")
+    logger.info(f"Decode Stage{model_params['device_id']} load model successfully")
 
     # Load tokenizer and embedding weights
-    tokenizer = AutoTokenizer.from_pretrained(model_params["tokenizer_dir"], trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_params["tokenizer_dir"], trust_remote_code=True
+    )
     embedding_weight = torch.load(model_params["embedding_path"], map_location="cpu")
     embedding_weight = embedding_weight["weight"]
     embedding_weight = embedding_weight.reshape(-1, embedding_len).float()
@@ -332,7 +366,7 @@ def producer(model_params: dict, out_queue: mp.Queue, in_queue: mp.Queue, questi
     logger.success("User question:")
     append_len = calculate_append_len(tokenizer, question_len)
     print("\033[1;95m{}\033[0m".format(f"Hello, '1' *{append_len}"))
-    question = '1' * append_len
+    question = "1" * append_len
 
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
@@ -368,7 +402,9 @@ def producer(model_params: dict, out_queue: mp.Queue, in_queue: mp.Queue, questi
                 input_ids = all_input_ids[:, round * prefill_length : input_echo_len]
             else:
                 current_length = prefill_length
-                input_ids = all_input_ids[:, round * prefill_length : (round + 1) * prefill_length]
+                input_ids = all_input_ids[
+                    :, round * prefill_length : (round + 1) * prefill_length
+                ]
 
             inputs_embeds = F.embedding(input_ids, embedding_weight)
             effective_length = input_ids.size(-1)
@@ -379,7 +415,9 @@ def producer(model_params: dict, out_queue: mp.Queue, in_queue: mp.Queue, questi
                 dtype=inputs_embeds.dtype,
                 device=inputs_embeds.device,
             )
-            input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(1, prefill_length, embedding_len)
+            input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
+                1, prefill_length, embedding_len
+            )
 
             # Prepare length parameters for prefill input
             valid_length_data = np.array([valid_length]).astype("int32")
@@ -405,21 +443,25 @@ def producer(model_params: dict, out_queue: mp.Queue, in_queue: mp.Queue, questi
             data = (output_data, valid_length_data, current_length_data, t0, t1)
             out_queue.put(data)
         except queue.Full:
-            logger.error(f"[Prefill Stage {model_params["device_id"]}] Queue Full, Drop data")
+            logger.error(
+                f"[Prefill Stage {model_params['device_id']}] Queue Full, Drop data"
+            )
 
     out_queue.put("END")
     prefill_end_data = (all_input_ids.numpy(), context_max_length, embedding_len)
     out_queue.put(prefill_end_data)
-    logger.info(f"[Prefill Stage {model_params["device_id"]}] Process Finished, time: {total_time:.2f} s.")
+    logger.info(
+        f"[Prefill Stage {model_params['device_id']}] Process Finished, time: {total_time:.2f} s."
+    )
 
-    #kvcache share
+    # kvcache share
     for i in range(total_layer_num):
         layer_name = prefill_model.get_input_name(i)
         if "cache" in layer_name:
             cache = prefill_model.get_dev_input(layer_name).to_host(True).numpy()
             decode_model.set_input(layer_name, cache)
     total_time = 0
-    #decode stage
+    # decode stage
     while True:
         try:
             data = in_queue.get()
@@ -441,28 +483,38 @@ def producer(model_params: dict, out_queue: mp.Queue, in_queue: mp.Queue, questi
             decode_model.sync()
             t1 = time.time()
             total_time += t1 - t0
-            output_data = decode_model.get_output(decode_model.get_output_name(0)).numpy()
+            output_data = decode_model.get_output(
+                decode_model.get_output_name(0)
+            ).numpy()
             result = (output_data, valid_length_data, current_length_data, t0, t1)
 
             try:
                 out_queue.put(result)
             except queue.Full:
-                logger.error(f"[Prefill Stage {model_params["device_id"]}] Queue Full, Drop data")
+                logger.error(
+                    f"[Prefill Stage {model_params['device_id']}] Queue Full, Drop data"
+                )
 
         except queue.Empty:
             continue
 
-    logger.info(f"[Decode Stage {model_params["device_id"]}] Process Finished, time: {total_time:.2f} s.")
+    logger.info(
+        f"[Decode Stage {model_params['device_id']}] Process Finished, time: {total_time:.2f} s."
+    )
 
-def consumer(model_params: dict, in_queue: mp.Queue, out_queue: mp.Queue,
-                     barrier: mp.Barrier):
+
+def consumer(
+    model_params: dict, in_queue: mp.Queue, out_queue: mp.Queue, barrier: mp.Barrier
+):
     """consumer init"""
     weight_manager = tcim.runtime.WeightManager(model_params["device_id"])
     option_prefill = tcim.runtime.Option(weight_manager)
     option_decode = tcim.runtime.Option(weight_manager)
-    #load model
-    prefill_model = tcim.runtime.load(model_params["prefill_path"], option=option_prefill)
-    logger.info(f"Prefill Stage{model_params["device_id"]} load model successfully")
+    # load model
+    prefill_model = tcim.runtime.load(
+        model_params["prefill_path"], option=option_prefill
+    )
+    logger.info(f"Prefill Stage{model_params['device_id']} load model successfully")
 
     # Load decode
     dummy_tensor_names = []
@@ -475,7 +527,7 @@ def consumer(model_params: dict, in_queue: mp.Queue, out_queue: mp.Queue,
             continue
     option_decode.set_dummy_tensors(dummy_tensor_names)
     decode_model = tcim.runtime.load(model_params["decode_path"], option=option_decode)
-    logger.info(f"Decode Stage{model_params["device_id"]} load model successfully")
+    logger.info(f"Decode Stage{model_params['device_id']} load model successfully")
 
     total_time = 0
     barrier.wait()
@@ -499,29 +551,35 @@ def consumer(model_params: dict, in_queue: mp.Queue, out_queue: mp.Queue,
             prefill_model.sync()
             t2 = time.time()
             total_time += t2 - t1
-            output_data = prefill_model.get_output(prefill_model.get_output_name(0)).numpy()
+            output_data = prefill_model.get_output(
+                prefill_model.get_output_name(0)
+            ).numpy()
             result = (output_data, valid_length_data, current_length_data, t0, t2)
 
             try:
                 out_queue.put(result)
             except queue.Full:
-                logger.error(f"[Prefill Stage {model_params["device_id"]}] Queue Full, Drop data")
+                logger.error(
+                    f"[Prefill Stage {model_params['device_id']}] Queue Full, Drop data"
+                )
 
         except queue.Empty:
             continue
 
-    logger.info(f"[Prefill Stage {model_params["device_id"]}] Process Finished, time: {total_time:.2f} s.")
+    logger.info(
+        f"[Prefill Stage {model_params['device_id']}] Process Finished, time: {total_time:.2f} s."
+    )
 
     prefill_end_data = in_queue.get()
     out_queue.put(prefill_end_data)
 
-    #kvcache share
+    # kvcache share
     for i in range(total_layer_num):
         layer_name = prefill_model.get_input_name(i)
         if "cache" in layer_name:
             cache = prefill_model.get_dev_input(layer_name).to_host(True).numpy()
             decode_model.set_input(layer_name, cache)
-    #decode stage
+    # decode stage
     total_time = 0
     while True:
         try:
@@ -543,22 +601,32 @@ def consumer(model_params: dict, in_queue: mp.Queue, out_queue: mp.Queue,
             decode_model.sync()
             t2 = time.time()
             total_time += t2 - t1
-            output_data = decode_model.get_output(decode_model.get_output_name(0)).numpy()
+            output_data = decode_model.get_output(
+                decode_model.get_output_name(0)
+            ).numpy()
             result = (output_data, valid_length_data, current_length_data, t0, t2)
 
             try:
                 out_queue.put(result)
             except queue.Full:
-                logger.error(f"[Prefill Stage {model_params["device_id"]}] Queue Full, Drop data")
+                logger.error(
+                    f"[Prefill Stage {model_params['device_id']}] Queue Full, Drop data"
+                )
 
         except queue.Empty:
             continue
 
-    logger.info(f"[Decode Stage {model_params["device_id"]}] Process Finished, time: {total_time:.2f} s.")
+    logger.info(
+        f"[Decode Stage {model_params['device_id']}] Process Finished, time: {total_time:.2f} s."
+    )
 
 
-def result_shower(model_params: dict, in_queue: mp.Queue, out_queue: mp.Queue, barrier: mp.Barrier):
-    tokenizer = AutoTokenizer.from_pretrained(model_params["tokenizer_dir"], trust_remote_code=True)
+def result_shower(
+    model_params: dict, in_queue: mp.Queue, out_queue: mp.Queue, barrier: mp.Barrier
+):
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_params["tokenizer_dir"], trust_remote_code=True
+    )
     embedding_weight = torch.load(model_params["embedding_path"], map_location="cpu")
     embedding_weight = embedding_weight["weight"]
     samplingmanager = SamplingManager(
@@ -622,21 +690,29 @@ def result_shower(model_params: dict, in_queue: mp.Queue, out_queue: mp.Queue, b
     end_time = 0
     # Decode loop for generating subsequent tokens
     while True:
-    # Stop generation if context length exceeds maximum limit
+        # Stop generation if context length exceeds maximum limit
         if context_length >= context_max_length:
             logger.info(
                 f"Context length ({context_length}) exceeds maximum limit ({context_max_length}), stopping generation!"
             )
             break
 
-        input_data = F.embedding(
-            next_id.unsqueeze(0), embedding_weight
-        ).reshape(1, 1, -1)
+        input_data = F.embedding(next_id.unsqueeze(0), embedding_weight).reshape(
+            1, 1, -1
+        )
 
         valid_length_data = np.array(context_length).astype("int32")
         current_length_data = np.array([1]).astype("int32")
 
-        out_queue.put((input_data.numpy(), valid_length_data, current_length_data, start_time, end_time))
+        out_queue.put(
+            (
+                input_data.numpy(),
+                valid_length_data,
+                current_length_data,
+                start_time,
+                end_time,
+            )
+        )
 
         decode_data = in_queue.get()
         (output_data, valid_length_data, current_length_data, t0, t2) = decode_data
@@ -667,9 +743,7 @@ def result_shower(model_params: dict, in_queue: mp.Queue, out_queue: mp.Queue, b
         if decode_response != "" and is_valid_char(ord(decode_response[-1])):
             print(decode_response, end="", flush=True)
             all_response += decode_response
-            last_response = tokenizer.decode(
-                chat_history_ids.tolist()[-slide_len:]
-            )
+            last_response = tokenizer.decode(chat_history_ids.tolist()[-slide_len:])
             skip_tokens = 0
         else:
             skip_tokens += 1
@@ -683,12 +757,17 @@ def result_shower(model_params: dict, in_queue: mp.Queue, out_queue: mp.Queue, b
     logger.info(
         f"[Result] total Run Decode {decode_count} times, total_time : {end_time - start_time:.2f} s"
     )
-    logger.info(f"Decode Model average time {(end_time - start_time) * 1000 / decode_count :.2f} ms/token")
+    logger.info(
+        f"Decode Model average time {(end_time - start_time) * 1000 / decode_count :.2f} ms/token"
+    )
+
 
 def main():
     args = get_args()
     if args.ndevice > tcim.runtime.get_device_num():
-        logger.error(f"Device number {args.ndevice} exceeds available device count {tcim.runtime.get_device_num()}")
+        logger.error(
+            f"Device number {args.ndevice} exceeds available device count {tcim.runtime.get_device_num()}"
+        )
         sys.exit(1)
     logger.info("MultiChip pipeline parallel run demo Start!")
     barrier = mp.Barrier(args.ndevice + 1)
@@ -697,29 +776,44 @@ def main():
     queue_list = [mp.Queue(maxsize=5) for _ in range(args.ndevice + 1)]
     question_len = args.input_tokens
 
-
     threads = []
     for i in range(args.ndevice + 1):
         if i == 0:
             producer_process = mp.Process(
                 target=producer,
-                args=(model_params_list[i], queue_list[i], queue_list[args.ndevice], question_len, barrier),
-                name=f"producer_process_{i}"
+                args=(
+                    model_params_list[i],
+                    queue_list[i],
+                    queue_list[args.ndevice],
+                    question_len,
+                    barrier,
+                ),
+                name=f"producer_process_{i}",
             )
             threads.append(producer_process)
         else:
             if i == args.ndevice:
                 decode_process = mp.Process(
                     target=result_shower,
-                    args=(model_params_list[0], queue_list[i - 1], queue_list[i], barrier),
-                    name=f"decode_process_{i}"
+                    args=(
+                        model_params_list[0],
+                        queue_list[i - 1],
+                        queue_list[i],
+                        barrier,
+                    ),
+                    name=f"decode_process_{i}",
                 )
                 threads.append(decode_process)
             else:
                 consumer_process = mp.Process(
                     target=consumer,
-                    args=(model_params_list[i], queue_list[i - 1], queue_list[i], barrier),
-                    name=f"consumer_process_{i}"
+                    args=(
+                        model_params_list[i],
+                        queue_list[i - 1],
+                        queue_list[i],
+                        barrier,
+                    ),
+                    name=f"consumer_process_{i}",
                 )
                 threads.append(consumer_process)
 
