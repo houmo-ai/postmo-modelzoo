@@ -12,6 +12,7 @@ tmp_*/
 data/
 toolchains/
 3rdparty/
+work_dirs/
 
 # media files
 *.jpg
@@ -82,8 +83,9 @@ toolchains/
 *.swp
 *.swo
 
-# Visual Studio Code
+# Visual Studio Code / Cursor
 .vscode
+.cursor/
 
 # Python type checking
 .mypy_cache/

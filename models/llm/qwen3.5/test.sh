@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 STEP="all"
 MODEL_TYPE="precompiled"
 MODEL_SIZE="9b"
+# Optional: JPEG/PNG for vision HMONNX export if src/images/qwen2_vl_demo.jpeg is missing.
+# export VISION_IMAGE=/path/to/sample.jpg
 
 show_help() {
     echo "Usage: $0 [options]"
@@ -37,6 +40,16 @@ while [[ $# -gt 0 ]]; do
         ;;
     esac
 done
+
+case "${MODEL_SIZE}" in
+    2b|4b|9b|27b|35b-a3b) ;;
+    *)
+        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 2b, 4b, 9b, 27b, 35b-a3b." >&2
+        exit 1
+        ;;
+esac
+
+PERF_CONFIG="config.yaml"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${SCRIPT_DIR}"
@@ -86,16 +99,18 @@ else
     exit 0
 fi
 
+RAW_HF_DIR="${SCRIPT_DIR}/qwen3.5"
+
 if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
     if [[ "$MODEL_TYPE" == "precompiled" ]]; then
         echo "Download precompiled model (size: ${MODEL_SIZE})."
-        python3 get_model.py --type hmm --model_size ${MODEL_SIZE}
+        python3 get_model.py --type hmm --model_size "${MODEL_SIZE}"
     else
         FOUND_GPU=0
         echo "Checking GPU..."
         if command -v nvidia-smi &> /dev/null; then
             gpu_count=$(nvidia-smi --query-gpu=count --format=csv,noheader,nounits | wc -l)
-            if [ $gpu_count -gt 0 ]; then
+            if [ "$gpu_count" -gt 0 ]; then
                 FOUND_GPU=1
                 echo "Found NVIDIA GPU, count: ${gpu_count}"
             else
@@ -125,10 +140,20 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
         fi
 
         if [[ "$FOUND_PACKAGE" -eq 1 && "$FOUND_GPU" -eq 1 ]]; then
-            echo "Start to quant and compile model (size: ${MODEL_SIZE})."
-            python3 get_model.py --type raw --model_size ${MODEL_SIZE}
-            python3 ptq.py --model_size ${MODEL_SIZE}
-            python3 build.py --model_size ${MODEL_SIZE}
+            echo "Download HF weights (size: ${MODEL_SIZE}) → ${RAW_HF_DIR}"
+            python3 get_model.py --type raw --model_size "${MODEL_SIZE}"
+            if [[ ! -f "${RAW_HF_DIR}/config.json" ]]; then
+                echo "Error: expected HF checkpoint at ${RAW_HF_DIR} (config.json missing)." >&2
+                exit 1
+            fi
+            echo "Quantize, export HMONNX, layout hmquant (ptq.py)."
+            PTQ_ARGS=(python3 ptq.py --model "${RAW_HF_DIR}")
+            if [[ -n "${VISION_IMAGE:-}" ]]; then
+                PTQ_ARGS+=(--vision-image-path "${VISION_IMAGE}")
+            fi
+            "${PTQ_ARGS[@]}"
+            echo "Build .hmm (size: ${MODEL_SIZE})."
+            python3 build.py --model_size "${MODEL_SIZE}"
         else
             echo "✗ Not support model quantization and compilation."
             exit 1
@@ -139,6 +164,8 @@ fi
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo (size: ${MODEL_SIZE})."
     python3 demo.py
+    python3 ../../../tools/llm_perf/convert_embed.py --path "output/xh2/hmquant/quant_embedding.pt"
+    llm_perf -c "${PERF_CONFIG}"
 fi
 
 if [[ "$VENV_FLAG" -eq "1" ]]; then

@@ -95,6 +95,11 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 ```
 
 进入docker后 source 环境变量，并进入 `models/llm/qwen3.5` 目录。当前目录中的量化脚本整理中，本节暂记为 TODO。
+量化下载的原始模型。在当前目录下，执行脚本：
+```bash
+pip3 install transformers==5.2.0
+python ptq.py  --model /path/to/downloaded/model
+```
 
 量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录：
 
