@@ -34,6 +34,7 @@ from loguru import logger
 
 VISION_CONFIG = "configs/qwen3_5/qwen3_5_instruct_vision_config.py"
 LLM_CONFIG = "configs/qwen3_5/qwen3_5_xh2a.py"
+MOE_VISION_CONFIG = "configs/qwen3_5_moe/qwen3_5_moe_vision_config.py"
 
 # Packaged ONNX name under ``<HOUMO_TARGET or xh2>/hmquant/{visual,prefill,decoder}/``
 HMQUANT_ONNX_NAME = "hmquant_qwen3.5_with_act.onnx"
@@ -125,7 +126,7 @@ def quant_llm(args) -> None:
         ]
         if trust:
             cmd.append("--trust-remote-code")
-        _run_step(cmd, src)
+        _run_step(cmd, src, extra_env={"CUDA_VISIBLE_DEVICES": "0"})
 
     if resume and _hf_dir_ready(gptq_dir):
         logger.info("Resume: skip GPTQ (found {})", gptq_dir)
@@ -159,7 +160,72 @@ def quant_llm(args) -> None:
             cmd.extend(["--calibration-jsonl", str(Path(args.calib_data).resolve())])
         if trust:
             cmd.append("--trust-remote-code")
+        _run_step(cmd, src, extra_env={"CUDA_VISIBLE_DEVICES": "0"})
+
+
+def quant_llm_moe(args) -> None:
+    """Step1: example_qwen35_moe_vl_rotate_fp.py → Step2: example_qwen35moe.py."""
+    if getattr(args, "export_only", False):
+        logger.info("export_only: skip quantization (use existing rotated + GPTQ dirs)")
+        return
+
+    src = _src_dir()
+    if not src.is_dir():
+        raise FileNotFoundError(f"Missing src directory: {src}")
+
+    work_root, _name, rotated_dir, gptq_dir = _paths(args)
+    work_root.mkdir(parents=True, exist_ok=True)
+    py = sys.executable
+    device = getattr(args, "device", "cuda:0")
+    resume = getattr(args, "resume", False)
+
+    if resume and _hf_dir_ready(rotated_dir):
+        logger.info("Resume: skip rotation (found {})", rotated_dir)
+    else:
+        cmd = [
+            py,
+            str(src / "example_qwen35_moe_vl_rotate_fp.py"),
+            "--model",
+            str(Path(args.model).resolve()),
+            "--out",
+            str(rotated_dir),
+            "--llm-rotation",
+            "hadamard",
+            "--vision-rotation",
+            "last",
+            "--device",
+            device,
+            "--no-validate",
+        ]
         _run_step(cmd, src)
+
+    if resume and _hf_dir_ready(gptq_dir):
+        logger.info("Resume: skip GPTQ (found {})", gptq_dir)
+    else:
+        cmd = [
+            py,
+            str(src / "example_qwen35moe.py"),
+            "--model",
+            str(Path(args.model).resolve()),
+            "--out",
+            str(gptq_dir),
+            "--rotation",
+            "hadamard",
+            "--hessian-mse",
+            "--moe-routing",
+            "bypass",
+            "--nsamples",
+            "256",
+            "--shared-expert-bits",
+            "4",
+            "--self-attn-bits",
+            "4",
+            "--expert-bits",
+            "4",
+            "--device",
+            device,
+        ]
+        _run_step(cmd, src, extra_env={"CUDA_VISIBLE_DEVICES": "0"})
 
 
 def export_llm(args) -> None:
@@ -231,6 +297,64 @@ def export_llm(args) -> None:
             cmd_l.append("--debug")
         if getattr(args, "context_length", None):
             cmd_l.extend(["--max_sequence_length", str(args.context_length)])
+        _run_step(cmd_l, src)
+    else:
+        logger.info("skip_export_llm: skipped LLM HMONNX export")
+
+
+def export_llm_moe(args) -> None:
+    """MoE Step3: vision HMONNX; Step4: LLM HMONNX."""
+    src = _src_dir()
+    _work_root, _name, rotated_dir, gptq_dir = _paths(args)
+    out_root = Path(args.out_dir).resolve()
+    out_root.mkdir(parents=True, exist_ok=True)
+
+    if not _hf_dir_ready(rotated_dir):
+        raise FileNotFoundError(f"Rotated model not found: {rotated_dir}")
+    if not _hf_dir_ready(gptq_dir):
+        raise FileNotFoundError(f"GPTQ model not found: {gptq_dir}")
+
+    py = sys.executable
+    model_name = _effective_model_name(args)
+
+    if not getattr(args, "skip_export_vision", False):
+        cmd_v = [
+            py,
+            str(src / "qwen3_5_moe_vision_xh2a_export_hmonnx.py"),
+            "--config",
+            MOE_VISION_CONFIG,
+            "--hf_model_dir",
+            str(rotated_dir),
+            "--model_name",
+            str(model_name),
+            "--output_dir",
+            str(out_root),
+        ]
+        if getattr(args, "debug", False):
+            cmd_v.append("--debug")
+        _run_step(cmd_v, src)
+    else:
+        logger.info("skip_export_vision: skipped vision HMONNX export")
+
+    if not getattr(args, "skip_export_llm", False):
+        cmd_l = [
+            py,
+            str(src / "qwen3_5_moe_xh2a_export_hmonnx.py"),
+            "--model",
+            str(Path(args.model).resolve()),
+            "--quant-weight",
+            str(gptq_dir),
+            "--quant-type",
+            "w4a8h0_sefp",
+            "--context-length",
+            str(getattr(args, "context_length", 2048)),
+            "--input-sequence-length",
+            str(getattr(args, "input_sequence_length", 256)),
+            "--output-dir",
+            str(out_root),
+        ]
+        if getattr(args, "debug", False):
+            cmd_l.append("--debug")
         _run_step(cmd_l, src)
     else:
         logger.info("skip_export_llm: skipped LLM HMONNX export")
@@ -316,4 +440,69 @@ def move_llm(args) -> None:
         logger.warning("move_llm: {} missing, skip LLM copy layout", llm_export)
 
     logger.info(msg_output_format("move_llm done"))
+    logger.info("hmquant root: {}", hmquant)
+
+
+def _resolve_moe_llm_export_dir(args, out_root: Path) -> Path:
+    candidates = [
+        out_root / f"{Path(args.model).resolve().name}_llm_export",
+        out_root / f"{_effective_model_name(args)}_llm_export",
+    ]
+    for p in candidates:
+        if p.is_dir():
+            return p
+    return candidates[0]
+
+
+def move_llm_moe(args) -> None:
+    """Lay out MoE exports into ``<HOUMO_TARGET or xh2>/hmquant`` under --out-dir."""
+    out_root = Path(args.out_dir).resolve()
+    model_name = _effective_model_name(args)
+    target = _houmo_target_dir()
+    hmquant = out_root / target / "hmquant"
+    prefill_d = hmquant / "prefill"
+    decoder_d = hmquant / "decoder"
+    visual_d = hmquant / "visual"
+    prefill_d.mkdir(parents=True, exist_ok=True)
+    decoder_d.mkdir(parents=True, exist_ok=True)
+    visual_d.mkdir(parents=True, exist_ok=True)
+
+    vision_src = out_root / model_name / "vision"
+    if vision_src.is_dir():
+        logger.info(msg_output_format("move_llm_moe: visual"))
+        _copy_dir_files_rename_onnx(vision_src, visual_d)
+    elif not getattr(args, "skip_export_vision", False):
+        logger.warning("move_llm_moe: vision export dir missing, skip visual: {}", vision_src)
+    else:
+        logger.info("move_llm_moe: skip visual (skip_export_vision)")
+
+    llm_export = _resolve_moe_llm_export_dir(args, out_root)
+    emb_src_candidates = [llm_export / "token_embedding", llm_export / "token_embedding.pt"]
+    prefill_src = llm_export / "hmonnx" / "prefill"
+    decode_src = llm_export / "hmonnx" / "decode"
+
+    if llm_export.is_dir() and not getattr(args, "skip_export_llm", False):
+        logger.info(msg_output_format(f"move_llm_moe: LLM export → {target}/hmquant"))
+        emb_src = next((p for p in emb_src_candidates if p.is_file()), None)
+        if emb_src is not None:
+            shutil.copy2(emb_src, hmquant / "quant_embedding.pt")
+        else:
+            logger.warning(
+                "move_llm_moe: missing token embedding in {}, skip embedding copy",
+                llm_export,
+            )
+        if prefill_src.is_dir():
+            _copy_dir_files_rename_onnx(prefill_src, prefill_d)
+        else:
+            logger.warning("move_llm_moe: missing {}, skip prefill", prefill_src)
+        if decode_src.is_dir():
+            _copy_dir_files_rename_onnx(decode_src, decoder_d)
+        else:
+            logger.warning("move_llm_moe: missing {}, skip decoder copy", decode_src)
+    elif getattr(args, "skip_export_llm", False):
+        logger.info("move_llm_moe: skip LLM artifacts (skip_export_llm)")
+    else:
+        logger.warning("move_llm_moe: {} missing, skip LLM copy layout", llm_export)
+
+    logger.info(msg_output_format("move_llm_moe done"))
     logger.info("hmquant root: {}", hmquant)

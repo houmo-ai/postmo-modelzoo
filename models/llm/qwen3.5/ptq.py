@@ -24,6 +24,7 @@ Run from this directory: ``python ptq.py --model /path/to/Qwen3.5-9B ...``
 See src/README.md for script-level equivalents.
 """
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -38,7 +39,14 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-from quant_pipeline import export_llm, move_llm, quant_llm
+from quant_pipeline import (
+    export_llm,
+    export_llm_moe,
+    move_llm,
+    move_llm_moe,
+    quant_llm,
+    quant_llm_moe,
+)
 
 HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH", "")
 HOUMO_TARGET = os.getenv("HOUMO_TARGET", "")
@@ -189,7 +197,13 @@ def parse_args():
         "--context-length",
         type=int,
         default=2048,
-        help="LLM export --max_sequence_length",
+        help="LLM export context length",
+    )
+    parser.add_argument(
+        "--input-sequence-length",
+        type=int,
+        default=256,
+        help="MoE LLM export --input-sequence-length",
     )
     parser.add_argument(
         "--device",
@@ -237,16 +251,45 @@ def _remove_work_dir(args) -> None:
     print(f"[ptq] removed --work-dir: {root}")
 
 
+def _detect_model_family(model_dir: str) -> str:
+    config_path = Path(model_dir).resolve() / "config.json"
+    if not config_path.is_file():
+        return "dense"
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception:
+        return "dense"
+
+    model_type = str(cfg.get("model_type", "")).lower()
+    text_type = str((cfg.get("text_config") or {}).get("model_type", "")).lower()
+    archs = [str(x).lower() for x in (cfg.get("architectures") or [])]
+    markers = [model_type, text_type, *archs]
+    if any("moe" in x for x in markers):
+        return "moe"
+    return "dense"
+
+
 def main(args=None):
     if args is None:
         args = parse_args()
+    family = _detect_model_family(args.model)
+    print(f"[ptq] detected model family: {family}")
     if args.move_only:
-        move_llm(args)
+        if family == "moe":
+            move_llm_moe(args)
+        else:
+            move_llm(args)
         _remove_work_dir(args)
         return
-    quant_llm(args)
-    export_llm(args)
-    move_llm(args)
+    if family == "moe":
+        quant_llm_moe(args)
+        export_llm_moe(args)
+        move_llm_moe(args)
+    else:
+        quant_llm(args)
+        export_llm(args)
+        move_llm(args)
     _remove_work_dir(args)
 
 
