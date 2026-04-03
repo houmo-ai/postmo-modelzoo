@@ -530,10 +530,60 @@ def _extract_files(save_path: str, extract_dir: str) -> bool:
         )
         return True
 
+    # Check if all files exist and match archive checksums
+    need_extract = False
+    try:
+        with extract_func(save_path, **extract_kwargs) as f:
+            if isinstance(f, zipfile.ZipFile):
+                # For zip, use CRC to verify
+                for info in f.infolist():
+                    if info.is_dir():
+                        continue
+                    extracted_path = os.path.join(extract_dir, info.filename)
+                    if not os.path.exists(extracted_path):
+                        need_extract = True
+                        break
+                    # Verify file content by CRC
+                    with open(extracted_path, "rb") as ef:
+                        content = ef.read()
+                        import zlib
+
+                        if zlib.crc32(content) != info.CRC:
+                            need_extract = True
+                            logger.info(
+                                f"File CRC mismatch: {extracted_path}, will re-extract"
+                            )
+                            break
+            else:
+                # For tar, check file existence and size
+                for member in f.getmembers():
+                    if not member.isfile():
+                        continue
+                    extracted_path = os.path.join(extract_dir, member.name)
+                    if not os.path.exists(extracted_path):
+                        need_extract = True
+                        break
+                    if os.path.getsize(extracted_path) != member.size:
+                        need_extract = True
+                        logger.info(
+                            f"File size mismatch: {extracted_path}, will re-extract"
+                        )
+                        break
+    except Exception as e:
+        logger.warning(f"Failed to check existing files: {str(e)}, will extract")
+        need_extract = True
+
+    if not need_extract:
+        logger.info(
+            f"All files exist and match, skip extraction: {save_path} -> {extract_dir}"
+        )
+        return True
+
     logger.info(f"Start to decompress: {save_path} -> {extract_dir}")
     try:
         with extract_func(save_path, **extract_kwargs) as f:
             f.extractall(path=extract_dir)
+        logger.info(f"Extraction completed: {save_path} -> {extract_dir}")
         return True
     except Exception as e:
         if save_path_lower.endswith(".tar.xz"):
@@ -548,6 +598,7 @@ def _extract_files(save_path: str, extract_dir: str) -> bool:
                     stderr=subprocess.PIPE,
                     encoding="utf-8",
                 )
+                logger.info(f"Extraction completed: {save_path} -> {extract_dir}")
                 return True
             except subprocess.CalledProcessError as se:
                 logger.error(
