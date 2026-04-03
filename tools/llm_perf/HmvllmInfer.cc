@@ -114,10 +114,36 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   vision_input_init();
 
   // Configure additional inputs for decode module (KV cache inputs)
-  for (int idx = attn_idx_start; idx < 2 * n_blocks + attn_idx_start; idx++) {
-    const std::string kvcache_name = prefill_module->GetInputName(idx);
-    auto kvcache = prefill_module->GetDevInput(kvcache_name);
-    CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(kvcache_name, kvcache));
+  for (int idx = 0; idx < this->prefill_module->GetInputNum(); idx++) {
+    const std::string layer_name = prefill_module->GetInputName(idx);
+    if (layer_name.find("model_layers") != std::string::npos) {
+      auto cache = prefill_module->GetDevInput(layer_name);
+      CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(layer_name, cache));
+    }
+
+    if (layer_name.find("conv_cache") != std::string::npos) {
+      std::string output_name = layer_name;
+      const std::string prefix = "past_conv_cache_";
+      if (output_name.rfind(prefix, 0) == 0) {
+        output_name.replace(0, prefix.size(), "conv_cache_out_");
+      }
+      auto cache = prefill_module->GetDevInput(layer_name);
+      CHECK_TCIM_RET_STATUS(prefill_module->SetDevOutput(output_name, cache));
+      CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(layer_name, cache));
+      CHECK_TCIM_RET_STATUS(decode_module->SetDevOutput(output_name, cache));
+    }
+
+    if (layer_name.find("recurrent_state") != std::string::npos) {
+      std::string output_name = layer_name;
+      const std::string prefix = "past_recurrent_state_";
+      if (output_name.rfind(prefix, 0) == 0) {
+        output_name.replace(0, prefix.size(), "recurrent_state_out_");
+      }
+      auto cache = prefill_module->GetDevInput(layer_name);
+      CHECK_TCIM_RET_STATUS(prefill_module->SetDevOutput(output_name, cache));
+      CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(layer_name, cache));
+      CHECK_TCIM_RET_STATUS(decode_module->SetDevOutput(output_name, cache));
+    }
   }
 
   embedding = std::make_shared<HmEmbedding>(
@@ -143,6 +169,20 @@ void HmvllmInfer::prefill_input_init() {
               input_name, std::make_unique<char[]>(memSize)));
       std::fill(prefill_input_datas.at(input_name).get(),
                 prefill_input_datas.at(input_name).get() + memSize, char(0));
+    }
+  }
+
+  for (int idx = attn_idx_start; idx < prefill_module->GetInputNum(); idx++) {
+    auto input_name = prefill_module->GetInputName(idx);
+    if (input_name.find("conv_cache") != std::string::npos ||
+        input_name.find("recurrent_state") != std::string::npos) {
+      auto input_info = prefill_module->GetInputInfo(input_name).AsContiguous();
+      tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info);
+      prefill_input_map.insert(
+          std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
+      memset(input_tensor.Buffer().Data(), 0, input_tensor.MemSize());
+      CHECK_TCIM_RET_STATUS(prefill_module->SetInput(input_name, input_tensor));
+      CHECK_TCIM_RET_STATUS(decode_module->SetInput(input_name, input_tensor));
     }
   }
 }
@@ -262,6 +302,17 @@ void HmvllmInfer::PrefillSetInputDatas(void *data, int current_length) {
     } else if (name.find("_embed") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
           prefill_input_datas.at(name).get(), memSize));
+    } else if (name.find("attn_mask") != std::string::npos) {
+      std::vector<tensor_type> attn_mask;
+      for (int i = 0; i < this->prefill_length; ++i) {
+        if (i < current_length) {
+          attn_mask.emplace_back(static_cast<tensor_type>(1.0f));
+        } else {
+          attn_mask.emplace_back(static_cast<tensor_type>(0.0f));
+        }
+      }
+    } else {
+      continue;
     }
 
     perf_tracker->perfStart(PerfType::PREFILL_INPUT_TIME);
@@ -310,6 +361,9 @@ void HmvllmInfer::DecodeSetInputDatas(void *data, int valid_length) {
       int decode_current_length = 1;
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&decode_current_length, memSize));
+    } else if (name.find("attn_mask") != std::string::npos) {
+      tensor_type mask_value = static_cast<tensor_type>(1.0f);
+      CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(&mask_value, memSize));
     } else {
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
           decode_input_datas.at(name).get(), memSize));
