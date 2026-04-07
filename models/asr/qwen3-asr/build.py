@@ -190,6 +190,13 @@ def get_args() -> argparse.Namespace:
         help="build output dir",
     )
     parser.add_argument(
+        "--context_length",
+        dest="context_length",
+        type=int,
+        default=2048,
+        help="context_length",
+    )
+    parser.add_argument(
         "--flash_attention",
         dest="flash_attention",
         nargs=2,
@@ -207,19 +214,23 @@ def get_args() -> argparse.Namespace:
 
 
 def build_asr(
-    model_name, model_dir, output_dir, profile, ncore, j, flash_attention=0
+    model_name, model_dir, output_dir, profile, ncore, j, flash_attention=0, context_length=2048
 ):
     import tcim
+    import json
 
     kwargs = {}
+    custom_msg = {}
+
+    kwargs["modify_llm"] = {}
     if flash_attention:
-        import json
 
         kwargs["flash_attention"] = flash_attention
-        custom_msg = {}
         custom_msg["flash_attention"] = flash_attention
-        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
 
+    kwargs["modify_llm"]["context-length"] = context_length
+    custom_msg["context_length"] = context_length
+    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
     start = time.time()
     print(f"\n===> {model_name} build start...")
     onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
@@ -371,6 +382,7 @@ if __name__ == "__main__":
             ncore,
             j,
             flash_attention=encoder_flash_attention,
+            context_length=args.context_length,
         )
         build_asr(
             f"{model_name}_prefill",
@@ -380,6 +392,7 @@ if __name__ == "__main__":
             ncore,
             j,
             flash_attention=llm_flash_attention,
+            context_length=args.context_length,
         )
         if os.path.exists(os.path.join(model_dir, "decode")):
             build_asr(
@@ -390,6 +403,7 @@ if __name__ == "__main__":
                 ncore,
                 j,
                 flash_attention=llm_flash_attention,
+                context_length=args.context_length,
             )
     # test model
     if args.stage == "test" or args.stage == "all":
