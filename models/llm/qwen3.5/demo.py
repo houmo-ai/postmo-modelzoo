@@ -18,6 +18,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import glob
 import os
 import re
 import sys
@@ -142,9 +143,10 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--image_path",
         dest="image_path",
-        type=str,
+        nargs="+",
+        action="append",
         default=None,
-        help="image path for vision chat",
+        help="one or more image paths, supports repeated usage and comma-separated values",
     )
     parser.add_argument(
         "--vision_path",
@@ -196,6 +198,7 @@ def get_args() -> argparse.Namespace:
     if args.ndevice > 1:
         args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
         args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+    args.image_path = normalize_image_inputs(args.image_path)
     return args
 
 
@@ -234,7 +237,7 @@ def build_processor(
 
 def build_messages(
     prompt: str,
-    image_path: str,
+    image_paths: Sequence[str],
     max_size_h: int,
     max_size_w: int,
     system_prompt: str = "",
@@ -242,21 +245,66 @@ def build_messages(
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
+    content = [
+        {
+            "type": "image",
+            "image": image_path,
+            "resized_height": max_size_h,
+            "resized_width": max_size_w,
+        }
+        for image_path in image_paths
+    ]
+    content.append({"type": "text", "text": prompt})
     messages.append(
         {
             "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                    "image": image_path,
-                    "resized_height": max_size_h,
-                    "resized_width": max_size_w,
-                },
-                {"type": "text", "text": prompt},
-            ],
+            "content": content,
         }
     )
     return messages
+
+
+def normalize_image_inputs(
+    image_args: Optional[List[List[str]]],
+) -> Optional[List[str]]:
+    if not image_args:
+        return None
+
+    image_paths = []
+    for group in image_args:
+        for value in group:
+            for item in value.split(","):
+                image_path = item.strip()
+                if not image_path:
+                    continue
+                matched_paths = sorted(glob.glob(image_path))
+                if matched_paths:
+                    image_paths.extend(matched_paths)
+                else:
+                    image_paths.append(image_path)
+
+    return image_paths or None
+
+
+def prompt_for_image_paths() -> Optional[List[str]]:
+    image_paths = []
+    image_index = 1
+
+    while True:
+        raw_value = input(
+            f"Input image path #{image_index} for this turn (press Enter to run): "
+        ).strip()
+        if not raw_value:
+            break
+
+        normalized_paths = normalize_image_inputs([[raw_value]])
+        if normalized_paths is None:
+            continue
+
+        image_paths.extend(normalized_paths)
+        image_index += 1
+
+    return image_paths or None
 
 
 def scatter_image_embeds(input_ids, token_embeds, image_embeds, image_token_id):
@@ -854,8 +902,8 @@ class HmQwen:
         )
         return position_ids, deltas
 
-    def chat(self, question, image_path=None):
-        use_vision = image_path is not None
+    def chat(self, question, image_paths=None):
+        use_vision = image_paths is not None
         if use_vision and self.vision is None:
             raise RuntimeError("Vision model not loaded. Provide --vision_path.")
 
@@ -873,7 +921,7 @@ class HmQwen:
         logger.success("question:")
         print("\033[1;95m{}\033[0m".format(question))
         if use_vision:
-            logger.info(f"image: {image_path}")
+            logger.info(f"images: {image_paths}")
 
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
@@ -887,10 +935,10 @@ class HmQwen:
         if use_vision:
             messages = build_messages(
                 prompt=question,
-                image_path=image_path,
+                image_paths=image_paths,
                 max_size_h=args.max_size_h,
                 max_size_w=args.max_size_w,
-                system_prompt="介绍一下这张图片",
+                system_prompt="介绍一下这些图片",
             )
             text = self.processor.apply_chat_template(
                 messages,
@@ -1206,26 +1254,28 @@ class HmQwen:
 
         return all_response, input_echo_len, decode_count + 1
 
-    def chat_vision(self, question, image_path):
-        return self.chat(question, image_path=image_path)
+    def chat_vision(self, question, image_paths):
+        return self.chat(question, image_paths=image_paths)
 
 
 if __name__ == "__main__":
 
     args = get_args()
-    is_vision = args.image_path is not None and args.vision_path is not None
+    supports_vision = args.vision_path is not None
+    is_vision = args.image_path is not None and supports_vision
     hmqwen = HmQwen(
         args.prefill_path,
         args.decode_path,
         args.embedding_path,
         args.tokenizer_dir,
         args.ndevice,
-        vision_path=args.vision_path if is_vision else None,
+        vision_path=args.vision_path if (is_vision or args.it) else None,
     )
     if args.it:
         from prompt_toolkit import prompt
     try:
         while True:
+            current_image_paths = args.image_path if is_vision else None
             if args.it:
                 try:
                     question = prompt("Input your instruction here: ").strip()
@@ -1234,12 +1284,14 @@ if __name__ == "__main__":
                     if not question:
                         print("Input cannot be empty. Please try again.")
                         continue
+                    if supports_vision:
+                        current_image_paths = prompt_for_image_paths()
                 except (EOFError, KeyboardInterrupt):
                     print("\nProgram terminated")
                     break
             else:
                 if is_vision:
-                    question = "描述这张照片"
+                    question = "描述这些图片"
                 else:
                     question = "请介绍一下存算一体技术的优势"
 
@@ -1247,7 +1299,7 @@ if __name__ == "__main__":
             try:
                 response, input_tokens, output_tokens = hmqwen.chat(
                     question,
-                    image_path=args.image_path if is_vision else None,
+                    image_paths=current_image_paths,
                 )
                 total_time = time.time() - start_time
                 if args.debug:

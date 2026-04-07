@@ -189,8 +189,8 @@ TODO
 - `--decode_path`: decode模型路径
 - `--vision_path`: vision模型路径
 - `--ndevice`: 设备数量（默认：1）
-- `--image_path`: 图片输入路径
-- `--it`: 交互模式
+- `--image_path`: 图片输入路径，支持一次传入多张图片、重复传参或逗号分隔
+- `--it`: 交互模式，若提供 `--vision_path`，每轮对话可逐张输入图片路径，留空即开始推理，也可首个输入直接留空走纯文本
 - `--history`: 保留对话历史
 - `--debug`: 输出调试日志
 
