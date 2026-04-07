@@ -27,14 +27,14 @@ import argparse
 import numpy as np
 import librosa
 from loguru import logger
-
+import tcim_lite as tcim
 import torch
 from transformers import AutoConfig
 from qwen_asr.core.transformers_backend import (
     Qwen3ASRProcessor,
 )
 
-import tcim_lite as tcim
+
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 ASR_TEXT_PATTERN = re.compile(r"(?<=<asr_text>)[\s\S]*")
