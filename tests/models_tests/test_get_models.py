@@ -430,3 +430,14 @@ def test_tts_cosyvoice3_get_model(setup_logging) -> None:
     """test_tts_cosyvoice3_get_model"""
     model_name = "cosyvoice3"
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.yolo26m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_detection_yolo26m_get_model')
+def test_detection_yolo26m_get_model(setup_logging) -> None:
+    """test_detection_yolo26m_get_model"""
+    model_name = 'yolo26m'
+    _get_model_func(model_name, setup_logging)

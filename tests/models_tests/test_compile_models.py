@@ -565,3 +565,14 @@ def test_tts_cosyvoice3_compile(setup_logging) -> None:
     """test_tts_cosyvoice3_compile"""
     model_name = "cosyvoice3"
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.yolo26m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.compile
+@pytest.mark.dependency(name='test_detection_yolo26m_compile', depends_on=['test_quant_models.py::test_detection_yolo26m_quant'])
+def test_detection_yolo26m_compile(setup_logging) -> None:
+    """test_detection_yolo26m_compile"""
+    model_name = 'yolo26m'
+    _compile_func(model_name, setup_logging)

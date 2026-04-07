@@ -180,6 +180,18 @@ detection_yolox:
         args: all
   test:
     - detection_yolox_test
+detection_yolo26m:
+  include:
+    - models/detection/yolo26m
+  exclude:
+    - models/detection/yolo26m/README.MD
+  example_case:
+    - detection_yolo26m_test:
+        test_type: models_tests
+        script: yolo26m
+        args: all
+  test:
+    - detection_yolo26m_test
 detection_yolov8m-cls:
   include:
     - models/backbone/yolov8m-cls

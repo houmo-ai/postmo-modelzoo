@@ -392,3 +392,13 @@ def test_tts_cosyvoice3_demo(setup_logging) -> None:
     """test_tts_cosyvoice3_demo"""
     model_name = "cosyvoice3"
     _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.yolo26m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_detection_yolo26m_demo(setup_logging) -> None:
+    """test_detection_yolo26m_demo"""
+    model_name = 'yolo26m'
+    _demo_func(model_name, setup_logging)

@@ -10,6 +10,7 @@ yolov5m_face
 yolov8m
 yolov7
 yolo12m
+yolo26m
 yolov8m_pose
 yolov8m_seg
 yolox

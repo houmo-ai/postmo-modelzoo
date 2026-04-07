@@ -482,3 +482,14 @@ def test_asr_sensevoice_quant(setup_logging) -> None:
     """test_asr_sensevoice_quant"""
     model_name = "sensevoice"
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.yolo26m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(name='test_detection_yolo26m_quant', depends_on=['test_get_models.py::test_detection_yolo26m_get_model'])
+def test_detection_yolo26m_quant(setup_logging) -> None:
+    """test_detection_yolo26m_quant"""
+    model_name = 'yolo26m'
+    _quant_func(model_name, setup_logging)

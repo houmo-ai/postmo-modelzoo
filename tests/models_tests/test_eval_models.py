@@ -202,3 +202,13 @@ def test_backbone_yolov8m_cls_eval(setup_logging) -> None:
     """test_backbone_yolov8m_cls_eval"""
     model_name = "yolov8m-cls"
     _eval_func(model_name, setup_logging)
+
+
+@pytest.mark.yolo26m
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.eval
+def test_detection_yolo26m_eval(setup_logging) -> None:
+    """test_detection_yolo26m_eval"""
+    model_name = 'yolo26m'
+    _eval_func(model_name, setup_logging)
