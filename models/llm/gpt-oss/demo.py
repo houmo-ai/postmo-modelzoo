@@ -16,7 +16,11 @@ from loguru import logger
 
 import tcim_lite as tcim
 
-from hmatc.utils.perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
+from hmatc.utils.perf_infomations import (
+    InferencePerformanceTracker,
+    InferenceMetrics,
+    PERFTYPE,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2."
@@ -344,6 +348,7 @@ class HmGpt:
         self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len)
         self.context_length = 0
         self.window_size = 128
+        self.reduce_value = 0
         self.perf_tracker = InferencePerformanceTracker()
 
     def create_window_mask(
@@ -361,10 +366,25 @@ class HmGpt:
         mask = np.full(
             (1, 1, fill_length, input_act_length), -65504.0, dtype=np.float16
         )
+
         for i in range(new_cache_length):
-            start_idx = i if old_cache_length + i > window_size else 0
-            end_idx = min(start_idx + window_size, old_cache_length + i + 1)
+            global_pos = old_cache_length + i
+            global_start = max(0, global_pos - window_size + 1)
+
+            start_idx = global_start
+            end_idx = global_pos + 1
+
+            if end_idx - start_idx > window_size:
+                start_idx = end_idx - window_size
+
+            if i == 0:
+                self.reduce_value = start_idx
+
+            start_idx -= self.reduce_value
+            end_idx -= self.reduce_value
+
             mask[0, 0, i, start_idx:end_idx] = 0.0
+
         return mask
 
     def create_global_mask(
