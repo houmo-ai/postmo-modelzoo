@@ -301,7 +301,7 @@ def convert_speech_tokenizer(
     def add_mask_input(model, shape):
         input_names = [i.name for i in model.graph.input]
         if "mask" in input_names:
-            logger.warning("mask input already存在")
+            logger.warning("mask input already exists.")
             return
         mask_input = helper.make_tensor_value_info("mask", TensorProto.FLOAT, shape)
         model.graph.input.append(mask_input)

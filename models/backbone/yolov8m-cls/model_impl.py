@@ -92,7 +92,7 @@ class YoloV8Cls(BaseModel):
             in_datas[self.input_name] = cv_image
             logger.info(f"[{idx}] {filepath}")
             outs = self.run(in_datas)
-            # 只需取batch0
+            # Only need to take batch 0
             out = outs[0]
             cls_idx = str(out[0])
             score = out[1]

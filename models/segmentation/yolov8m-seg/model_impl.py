@@ -150,16 +150,16 @@ class YoloV8Seg(BaseModel):
             for idx, detection in enumerate(detections):
                 (x1, y1, x2, y2, score, cls_idx) = detection[0:6]
                 color = np.array(COLORS[int(cls_idx) % len(COLORS)])
-                # 画mask
+                # Draw mask
                 mask = masks[idx]
                 new_masks = np.array([mask, mask, mask]).transpose((1, 2, 0))
                 cv_image = np.where(
                     new_masks == 255, cv_image * 0.5 + color * 0.5, cv_image
                 )
-                # 画轮廓
+                # Draw contours
                 contour = contours[idx]
                 cv2.drawContours(cv_image, contour, -1, color.tolist(), 2)
-                # 画框
+                # Draw bounding box
                 x1 = int(x1) if x1 > 0 else 0
                 y1 = int(y1) if y1 > 0 else 0
                 x2 = int(x2) if x2 < cv_image.shape[1] else cv_image.shape[1]

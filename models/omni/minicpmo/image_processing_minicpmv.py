@@ -370,7 +370,7 @@ class MiniCPMVImageProcessor(BaseImageProcessor):
         )
 
     def _normalize_input_list(self, images):
-        """统一输入格式为 List[List[Image]]"""
+        """Unify input format to List[List[Image]]"""
         if isinstance(images, Image.Image):
             return [[images]]
         elif isinstance(images[0], Image.Image):
@@ -379,7 +379,7 @@ class MiniCPMVImageProcessor(BaseImageProcessor):
 
 
     def _process_image_group(self, images, max_slice_nums):
-        """处理单个 image group"""
+        """Process a single image group"""
         if not images:
             return [], [], []
 

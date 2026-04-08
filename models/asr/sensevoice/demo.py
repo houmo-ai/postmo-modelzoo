@@ -413,9 +413,9 @@ class SenseVoiceSmallFeature:
                        f"(max_len={self.max_feat_len}, overlap={self.overlap_frames})")
 
             # Process each chunk with sliding window
-            confirmed_text = ""  # 已确认的文本
-            pending_text = ""    # 未确认的文本（滑动窗口）
-            slide_len = 10       # 滑动窗口长度
+            confirmed_text = ""  # Confirmed text
+            pending_text = ""    # Unconfirmed text (sliding window)
+            slide_len = 10       # Sliding window length
             total_infer_time = 0.0
 
             for i, (start, end) in enumerate(boundaries):

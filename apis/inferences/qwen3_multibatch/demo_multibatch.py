@@ -191,7 +191,7 @@ class HmQwen:
         if self.flush:
             sys.stdout.write("\033[2J\033[H")
             sys.stdout.flush()
-            print("=== 后摩多batch模型推理展示 ===")
+            print("=== HMQwen Multi-batch Inference Demo ===")
             for i in range(self.batch):
                 color = self.colors[i]
                 status = "✓" if self.decode_break[i] else "●"

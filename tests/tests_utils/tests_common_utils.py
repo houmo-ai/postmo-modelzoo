@@ -305,7 +305,7 @@ def execute_test_cmd(
             env=env,
             bufsize=1,  # Line buffering
             close_fds=True,
-            preexec_fn=os.setpgrp,  # 新增：创建新进程组，方便批量终止子进程
+            preexec_fn=os.setpgrp,  # Added: create a new process group for batch termination of child processes
         )
 
         # Create threads to handle stdout and stderr
@@ -625,7 +625,7 @@ def restore_models_res(src_folder: str, dst_folder: str) -> bool:
         src_path = os.path.join(src_folder, item)
         dst_path = os.path.join(dst_folder, item)
 
-        # 跳过.lock后缀的文件
+        # Skip files with .lock extension
         if os.path.isfile(src_path) and item.endswith(".lock"):
             continue
 

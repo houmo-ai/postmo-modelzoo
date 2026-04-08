@@ -32,11 +32,11 @@ assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def focus2conv(model_path, new_model_path):
-    # 加载原始模型
+    # Load original model
     onnx_model = onnx.load(model_path)
     graph = gs.import_onnx(onnx_model)
 
-    # 假设我们替换某个已有 Conv/ReOrg 节点
+    # Assume we replace an existing Conv/ReOrg node
     first_conv_node = None
     for node in graph.nodes:
         if node.name == "Concat_40":
@@ -84,7 +84,7 @@ def focus2conv(model_path, new_model_path):
     )
 
     graph.nodes.append(focus_node)
-    # 清理 & 保存
+    # Clean & save
     graph.cleanup().toposort()
     new_model = gs.export_onnx(graph)
     new_model.ir_version = 8

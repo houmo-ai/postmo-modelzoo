@@ -1097,7 +1097,7 @@ def compress_folder_to_tar_xz_with_progress(
                 total=total_size, unit="B", unit_scale=True, desc="Compressing"
             ) as pbar:
                 for file_path in file_list:
-                    # 计算相对路径（相对于文件夹的父目录）
+                    # calculate the relative path (relative to the parent directory of the folder)
                     arcname = os.path.relpath(
                         file_path, start=os.path.dirname(folder_abs_path)
                     )
@@ -1133,7 +1133,7 @@ def compress_files_to_tar_xz_with_progress(file_paths, output_path, preset=9):
         output_path (str): Output file path for the compressed archive
         preset (int): xz compression preset (0-9, default: 9)
     """
-    # 计算总大小
+    # calculate total size
     total_size = 0
     for file_path in file_paths:
         if os.path.isfile(file_path):

@@ -277,11 +277,11 @@ def asr(hmwhisper, processor, input_features, state=None, slide_len=10):
         (prefill_ids_len, all_ids_len, ttft_time, total_time, audio_duration, state)
     """
     if state is None:
-        # 第一次调用，初始化状态
+        # First call, initialize state
         skip_tokens = 0
         last_response = ""
     else:
-        # 使用传入的状态（只保持文本解码的连续性）
+        # Use the passed state (only maintain the continuity of text decoding)
         skip_tokens = state["skip_tokens"]
         last_response = state["last_response"]
 
@@ -380,7 +380,7 @@ def asr(hmwhisper, processor, input_features, state=None, slide_len=10):
 
     print("\033[1;95m{}".format(decode_response), end="", flush=True)
 
-    # 重新开始计时，仅测量解码阶段
+    # Restart the timer, only measure the decoding phase
     start_time = time.time()
 
     for i in range(48):
@@ -425,7 +425,7 @@ def asr(hmwhisper, processor, input_features, state=None, slide_len=10):
             skip_tokens += 1
         decode_response = "" if next_tokens.item() == 50257 else decode_response
 
-    # 保存状态供下一个chunk使用（只保持文本解码的连续性）
+    # Save state for the next chunk (only maintain the continuity of text decoding)
     state = {
         "last_response": last_response,
         "skip_tokens": skip_tokens,

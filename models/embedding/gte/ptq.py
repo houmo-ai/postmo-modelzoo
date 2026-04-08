@@ -155,7 +155,7 @@ def parse_args():
         "--input-sequence-length", type=int, default=256, help="input sequence length"
     )
     parser.add_argument(
-        "--quant-type", default="w8a8_sefp", help="quant type, default is w4a8_sefp"
+        "--quant-type", default="w8a8_sefp", help="quant type, default is w8a8_sefp"
     )
     parser.add_argument(
         "--calibration-dataset",

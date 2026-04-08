@@ -144,7 +144,7 @@ class YoloV5(BaseModel):
         else:
             logger.error(f"Output length error: {len(outs)}")
             exit(-1)
-        # 只取batch0，多batch数据是复制来的，不用处理浪费时间
+        # Only take batch 0, multi-batch data is copied, no need to waste time processing it
         pred = pred[:1, ...]  # [1, 25200, 85]
         cv_image = list(in_datas.values())[0]
         outputs = non_max_suppression(

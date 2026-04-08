@@ -144,7 +144,7 @@ class HmXH2Qwen3VL(ModelAPI):
         decode_count = 0
         while True:
             next_str = self.model.chat_decoder()
-            # 规避死循环
+            # avoid potential infinite loop in generation
             if len(self.model.all_response) > 800 and has_tail_loop(
                 self.model.all_response, sub_str_len=32, repeat=5
             ):

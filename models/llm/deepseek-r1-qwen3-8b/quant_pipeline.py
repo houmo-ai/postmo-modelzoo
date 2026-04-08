@@ -57,7 +57,7 @@ def gptq_quant_llm(args):
     model_name = os.path.basename(args.model)
     quant_path = os.path.join(args.work_dir, "{}_gptqmodel_4bit".format(model_name))
 
-    # 自定义数据集，做成json格式给到calibration_dataset即可
+    # Custom dataset, make it into json format and pass it to calibration_dataset
     calibration_dataset = []
     if args.calibration_dataset:
         cnt = 0
@@ -74,16 +74,16 @@ def gptq_quant_llm(args):
             "wikitext", "wikitext-2-raw-v1", split="train"
         ).select(range(512))["text"]
 
-    # 量化配置
+    # Quantization configuration
     quant_config = QuantizeConfig(
         bits=4, group_size=64, sym=True, mse=2.4, damp_percent=0.01, rotation="hadamard"
     )
-    # 载入模型
+    # Load model
     model = GPTQModel.load(args.model, quant_config)
 
     # increase `batch_size` to match gpu/vram specs to speed up quantization
     model.quantize(calibration_dataset, batch_size=1)
-    # 保存量化好的模型
+    # Save quantized model
     model.save(quant_path)
 
 

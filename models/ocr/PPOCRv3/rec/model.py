@@ -393,9 +393,9 @@ class OCRRec(object):
             input_data_fp16 = input_data.astype(np.float16)
             dst_data[self.input_names[0]] = input_data_fp16
         return dst_data
-    
+
     def run(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-        """模型推理"""
+        """Model inference"""
         import time
         prerpcessed_in_datas = self.preprocess(in_datas)
         # inference

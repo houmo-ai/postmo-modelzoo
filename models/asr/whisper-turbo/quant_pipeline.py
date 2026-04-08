@@ -158,8 +158,8 @@ def export_encoder_prefill(args):
     input_features = processor(
         sample["array"], sampling_rate=sample["sampling_rate"], return_tensors="pt"
     ).input_features
-    # 通过 替换onnx 先导出onnx 再转hmonnx 将decoder部分的qk linear转移到了encoder中，避免重复多次操作
-    # 1. 导出onnx
+    # Export ONNX first then convert to hmonnx by replacing ONNX, moving the qk linear of the decoder to the encoder to avoid repeated operations
+    # 1. Export ONNX
     if not Path(onnx_file).exists():
         with tempfile.TemporaryDirectory() as tmp_dir:
             with RewriterContext(None, backend="onnxruntime"):
@@ -210,13 +210,13 @@ def export_encoder_prefill(args):
             all_tensors_to_one_file=True,
             location=f"{Path(onnx_file).stem}_external_data",
         )
-    # 2. 构造输入
+    # 2. Construct inputs
     output_names = []
     for i in range(num_decode_layers):
         output_names.append(f"key_state_{i}")
     for i in range(num_decode_layers):
         output_names.append(f"value_state_{i}")
-    # 3. 转换
+    # 3. Convert
     if not Path(hmonnx_file).exists():
         convert_onnx_to_hmonnx(
             str(onnx_file),
@@ -227,7 +227,7 @@ def export_encoder_prefill(args):
             input_names=["input_features"],
             output_names=output_names,
         )
-    # 生成golden
+    # Generate golden
     if args.gen_golden and not Path(golden_path).exists():
         session = HMONNXGoldenInference(hmonnx_file)
         session.to("cuda")
@@ -271,7 +271,7 @@ def export_encoder_prefill(args):
     encoder_attention_mask = torch.zeros(
         (1, 1, 1, max_source_positions),
         dtype=torch.float16,
-        device="cpu",  # 或者 target_device
+        device="cpu",  # or target_device
     )
 
     inputs_names = [
@@ -349,7 +349,7 @@ def export_encoder_prefill(args):
             quant_config = ConfigDict(quant_config)
         if "inputs" not in quant_config:
             quant_config.inputs = ConfigDict()
-        ## 将输入的List展开
+        ## Expand input List
         input_args = []
         for arg in warp_inp:
             if isinstance(arg, (list, tuple)):
@@ -551,12 +551,12 @@ def export_decoder(args):
         "array": inputs,
         "sampling_rate": sampling_rate,
     }
-    # 这里的校验集已经是用了 audio
+    # The calibration set already uses audio here
     input_features = processor(
         sample["array"], sampling_rate=sample["sampling_rate"], return_tensors="pt"
     ).input_features
-    # 通过 替换onnx 先导出onnx 再转hmonnx 将decoder部分的qk linear转移到了encoder中，避免重复多次操作
-    # 1. 导出onnx
+    # Export ONNX first then convert to hmonnx by replacing ONNX, moving the qk linear of the decoder to the encoder to avoid repeated operations
+    # 1. Export ONNX
     if not Path(onnx_file).exists():
         with tempfile.TemporaryDirectory() as tmp_dir:
             with RewriterContext(None, backend="onnxruntime"):
@@ -607,13 +607,13 @@ def export_decoder(args):
             all_tensors_to_one_file=True,
             location=f"{Path(onnx_file).stem}_external_data",
         )
-    # 2. 构造输入
+    # 2. Construct inputs
     output_names = []
     for i in range(num_decode_layers):
         output_names.append(f"key_state_{i}")
     for i in range(num_decode_layers):
         output_names.append(f"value_state_{i}")
-    # 3. 转换
+    # 3. Convert
     if not Path(hmonnx_file).exists():
         convert_onnx_to_hmonnx(
             str(onnx_file),
@@ -624,7 +624,7 @@ def export_decoder(args):
             input_names=["input_features"],
             output_names=output_names,
         )
-    # 生成golden
+    # Generate golden
     if args.gen_golden and not Path(golden_path).exists():
         session = HMONNXGoldenInference(hmonnx_file)
         session.to("cuda")
@@ -670,7 +670,7 @@ def export_decoder(args):
     encoder_attention_mask = torch.zeros(
         (1, 1, 1, max_source_positions),
         dtype=torch.float16,
-        device="cpu",  # 或者 target_device
+        device="cpu",  # or target_device
     )
 
     inputs_names = [
@@ -748,7 +748,7 @@ def export_decoder(args):
             quant_config = ConfigDict(quant_config)
         if "inputs" not in quant_config:
             quant_config.inputs = ConfigDict()
-        ## 将输入的List展开
+        ## Expand input List
         input_args = []
         for arg in warp_inp:
             if isinstance(arg, (list, tuple)):
