@@ -190,7 +190,8 @@ def tensorproto2ndarray(initial):
     else:
         arr = numpy.frombuffer(initial.raw_data, dtype=ndtype)
 
-    return arr.reshape(shape) if shape else arr
+    # Always reshape to preserve scalar shape ([])
+    return arr.reshape(shape)
 
 
 def shape_of_tensor(tensor):
@@ -416,13 +417,29 @@ class LeakyReluNode(PWNode):
 class SigmoidNode(PWNode):
     def __init__(self, n):
         super().__init__(n)
-        self.op_mac = EXP_MACS + DIV_MACS
+        # Sigmoid: 1/(1+exp(-x)), simplified to EXP_MACS for consistency with onnx-tool
+        self.op_mac = EXP_MACS
 
 @NODE_REGISTRY.register()
 class TanhNode(PWNode):
     def __init__(self, n):
         super().__init__(n)
         self.op_mac = TANH_MACS
+
+@NODE_REGISTRY.register()
+class HardSigmoidNode(PWNode):
+    def __init__(self, n):
+        super().__init__(n)
+        # HardSigmoid: max(0, min(1, alpha * x + beta))
+        self.op_mac = MUL_MACS + ADD_MACS + CMP_MACS * 2
+
+@NODE_REGISTRY.register()
+class HardSwishNode(PWNode):
+    def __init__(self, n):
+        super().__init__(n)
+        # HardSwish: x * ReLU6(x + 3) / 6
+        # Equivalent to: x * max(0, min(1, x/6 + 0.5))
+        self.op_mac = MUL_MACS * 2 + ADD_MACS + CMP_MACS * 2
 
 @NODE_REGISTRY.register()
 class SoftmaxNode(PWNode):
@@ -447,6 +464,13 @@ class SqrtNode(PWNode):
     def __init__(self, n):
         super().__init__(n)
         self.op_mac = SQRT_MACS
+
+@NODE_REGISTRY.register()
+class ErfNode(PWNode):
+    def __init__(self, n):
+        super().__init__(n)
+        # Erf has 0 MACs (element-wise operation, counted as memory access only)
+        self.op_mac = 0
 
 @NODE_REGISTRY.register()
 class PowNode(PWNode):
@@ -648,8 +672,14 @@ class LayerNormalizationNode(Node):
         outtensors[0].update_dtype(intensors[0].dtype)
 
     def profile(self, intensors, outtensors):
-        vol = volume(intensors[0].get_shape())
-        return [vol * (MUL_MACS * 3 + ADD_MACS * 4 + SQRT_MACS + DIV_MACS), 0]
+        tshape = intensors[0].get_shape()
+        axis = self.axis if self.axis >= 0 else len(tshape) + self.axis
+        vol = volume(tshape)
+        # vol2 is volume with axis dimension set to 1
+        tshape_axis1 = list(tshape)
+        tshape_axis1[axis] = 1
+        vol2 = volume(tshape_axis1)
+        return [vol * (MUL_MACS * 3 + ADD_MACS * 4) + vol2 * (ADD_MACS + SQRT_MACS + DIV_MACS), 0]
 
 
 @NODE_REGISTRY.register()
@@ -668,23 +698,39 @@ class PoolBase(Node):
     def shape_infer(self, intensors, outtensors):
         inshape = intensors[0].get_shape()
 
+        # Handle pads with different lengths (1D vs 2D pooling)
+        pads = list(self.pads)
+        if len(pads) == 2:
+            pads = [pads[0], pads[1], pads[0], pads[1]]  # symmetric padding
+        elif len(pads) < 4:
+            pads = pads + [0] * (4 - len(pads))  # pad with zeros
+
         if self.auto_pad and self.auto_pad != b'NOTSET':
             if self.auto_pad in [b'SAME_LOWER', b'SAME_UPPER']:
-                outshape = inshape[:2] + [math.ceil(inshape[2] / self.strides[0])]
-                if len(inshape) == 4:
-                    outshape.append(math.ceil(inshape[3] / self.strides[1]))
+                if len(inshape) >= 3:
+                    outshape = inshape[:2] + [math.ceil(inshape[2] / self.strides[0])]
+                    if len(inshape) == 4:
+                        outshape.append(math.ceil(inshape[3] / self.strides[1]))
+                else:
+                    outshape = list(inshape)
             else:
-                outshape = inshape[:2] + [math.ceil((inshape[2] - self.kernel_shape[0] + 1) / self.strides[0])]
+                if len(inshape) >= 3:
+                    outshape = inshape[:2] + [math.ceil((inshape[2] - self.kernel_shape[0] + 1) / self.strides[0])]
+                else:
+                    outshape = list(inshape)
         else:
-            oh = _pooling_shape_calc(inshape[2], self.pads[0] + self.pads[2],
-                                     self.kernel_shape[0], self.dilations[0],
-                                     self.strides[0], self.ceil_mode)
-            outshape = inshape[:2] + [oh]
-            if len(inshape) == 4:
-                ow = _pooling_shape_calc(inshape[3], self.pads[1] + self.pads[3],
-                                         self.kernel_shape[1], self.dilations[1],
-                                         self.strides[1], self.ceil_mode)
-                outshape.append(ow)
+            if len(inshape) >= 3:
+                oh = _pooling_shape_calc(inshape[2], pads[0] + pads[2],
+                                         self.kernel_shape[0], self.dilations[0],
+                                         self.strides[0], self.ceil_mode)
+                outshape = inshape[:2] + [oh]
+                if len(inshape) == 4:
+                    ow = _pooling_shape_calc(inshape[3], pads[1] + pads[3],
+                                             self.kernel_shape[1], self.dilations[1],
+                                             self.strides[1], self.ceil_mode)
+                    outshape.append(ow)
+            else:
+                outshape = list(inshape)
 
         outtensors[0].update_shape(outshape)
         outtensors[0].update_dtype(intensors[0].dtype)
@@ -724,7 +770,18 @@ class ReshapeNode(Node):
             outtensors[0].update_shape([1])
         else:
             shape = intensors[1].get_numpy()
-            newshape = [int(srcshape[i]) if s == 0 else int(s) for i, s in enumerate(shape)]
+            # When shape has 0, it means to keep the corresponding dimension from srcshape
+            # But if shape has more dimensions than srcshape, we need to handle index out of range
+            newshape = []
+            for i, s in enumerate(shape):
+                if s == 0:
+                    if i < len(srcshape):
+                        newshape.append(int(srcshape[i]))
+                    else:
+                        # shape has more dims than srcshape, 0 means 1 (empty dimension)
+                        newshape.append(1)
+                else:
+                    newshape.append(int(s))
             if -1 in newshape:
                 total = volume(srcshape)
                 known = volume([s for s in newshape if s > 0])
@@ -744,6 +801,10 @@ class TransposeNode(Node):
         if self.perm is None:
             yshape = xshape[::-1]
         else:
+            # Handle case where perm has more dims than input shape
+            # Pad xshape with 1s if needed (broadcasting case)
+            if len(self.perm) > len(xshape):
+                xshape = [1] * (len(self.perm) - len(xshape)) + list(xshape)
             yshape = [xshape[i] for i in self.perm]
         outtensors[0].update_shape(yshape)
         outtensors[0].update_dtype(intensors[0].dtype)
@@ -751,10 +812,24 @@ class TransposeNode(Node):
 
 @NODE_REGISTRY.register()
 class ConcatNode(Node):
+    def __init__(self, n):
+        super().__init__(n)
+        self.add_default_value('axis', 0)
+
     def shape_infer(self, intensors, outtensors):
-        outshape = intensors[0].get_shape()
+        outshape = list(intensors[0].get_shape())
+        axis = self.axis if self.axis >= 0 else len(outshape) + self.axis
+
+        # Handle axis out of range
+        if axis >= len(outshape):
+            outtensors[0].update_shape(outshape)
+            outtensors[0].update_dtype(intensors[0].dtype)
+            return
+
         for t in intensors[1:]:
-            outshape[self.axis] += t.get_shape()[self.axis]
+            tshape = t.get_shape()
+            if axis < len(tshape):
+                outshape[axis] += tshape[axis]
         outtensors[0].update_shape(outshape)
         outtensors[0].update_dtype(intensors[0].dtype)
 
@@ -923,6 +998,7 @@ class ConstantNode(Node):
         if hasattr(self, 'value'):
             outtensors[0].update_shape(self.value.shape)
             outtensors[0].update_dtype(self.value.dtype.type)
+            outtensors[0].update_tensor(self.value)
 
 
 @NODE_REGISTRY.register()
@@ -934,9 +1010,82 @@ class CastNode(Node):
 
 @NODE_REGISTRY.register()
 class SliceNode(Node):
+    def __init__(self, n):
+        super().__init__(n)
+        self.add_default_value('axes', None)
+        self.add_default_value('starts', None)
+        self.add_default_value('ends', None)
+
     def shape_infer(self, intensors, outtensors):
-        # Simplified slice shape inference
-        outtensors[0].update_shape(intensors[0].get_shape())
+        xshape = intensors[0].get_shape()
+        outshape = list(xshape)
+
+        # ONNX Slice inputs: data, starts, ends, axes, steps (last 4 optional)
+        # If axes not provided, default to all axes [0, 1, ..., len(xshape)-1]
+        # If steps not provided, default to 1 for each axis
+
+        starts = None
+        ends = None
+        axes = None
+        steps = None
+
+        # Get starts from input or attribute
+        if len(intensors) >= 2:
+            starts_arr = intensors[1].get_numpy()
+            starts = list(starts_arr.flatten()) if starts_arr.ndim > 0 else [starts_arr.item()]
+        elif self.starts is not None:
+            starts = list(self.starts)
+
+        # Get ends from input or attribute
+        if len(intensors) >= 3:
+            ends_arr = intensors[2].get_numpy()
+            ends = list(ends_arr.flatten()) if ends_arr.ndim > 0 else [ends_arr.item()]
+        elif self.ends is not None:
+            ends = list(self.ends)
+
+        # Get axes from input or attribute
+        if len(intensors) >= 4:
+            axes_arr = intensors[3].get_numpy()
+            axes = list(axes_arr.flatten()) if axes_arr.ndim > 0 else [axes_arr.item()]
+        elif self.axes is not None:
+            axes = list(self.axes)
+        else:
+            # Default: slice all axes
+            axes = list(range(len(xshape)))
+
+        # Get steps from input (optional)
+        if len(intensors) >= 5:
+            steps_arr = intensors[4].get_numpy()
+            steps = list(steps_arr.flatten()) if steps_arr.ndim > 0 else [steps_arr.item()]
+        else:
+            steps = [1] * len(axes)
+
+        # Compute output shape for each axis
+        if starts and ends and axes and steps:
+            for i, axis in enumerate(axes):
+                axis = axis if axis >= 0 else len(xshape) + axis
+                start = starts[i] if starts[i] >= 0 else xshape[axis] + starts[i]
+                end = ends[i] if ends[i] >= 0 else xshape[axis] + ends[i]
+                step = steps[i]
+
+                # Clamp values
+                start = max(0, min(start, xshape[axis]))
+                end = max(0, min(end, xshape[axis]))
+
+                # Compute output dimension
+                if step > 0:
+                    if end > start:
+                        outshape[axis] = (end - start) // step
+                    else:
+                        outshape[axis] = 0
+                else:
+                    # Negative step (reverse slicing)
+                    if start > end:
+                        outshape[axis] = (start - end) // abs(step)
+                    else:
+                        outshape[axis] = 0
+
+        outtensors[0].update_shape(outshape)
         outtensors[0].update_dtype(intensors[0].dtype)
 
 
@@ -1021,8 +1170,16 @@ class SplitNode(Node):
 
     def shape_infer(self, intensors, outtensors):
         inshape = intensors[0].get_shape()
-        split = self.split if self.split else [inshape[self.axis] // len(outtensors)]
         axis = self.axis if self.axis >= 0 else len(inshape) + self.axis
+
+        # Get split values from attribute or second input
+        if self.split is not None:
+            split = self.split
+        elif len(intensors) > 1:
+            split_arr = intensors[1].get_numpy()
+            split = list(split_arr.flatten()) if split_arr.ndim > 0 else [split_arr.item()]
+        else:
+            split = [inshape[axis] // len(outtensors)]
 
         for i, out in enumerate(outtensors):
             shape = list(inshape)
@@ -1074,15 +1231,36 @@ class ExpandNode(Node):
 
 @NODE_REGISTRY.register()
 class ResizeNode(Node):
+    def __init__(self, n):
+        super().__init__(n)
+        self.add_default_value('mode', b'nearest')
+
     def shape_infer(self, intensors, outtensors):
         xshape = intensors[0].get_shape()
-        # Handle scalar (0-d) array case for sizes
-        if len(intensors) >= 4:
-            sizes_arr = intensors[-1].get_numpy()
+        outshape = list(xshape)
+
+        # ONNX Resize inputs: X, roi, scales, sizes (last 3 are optional)
+        # Input order: X (required), roi (optional), scales (optional), sizes (optional)
+
+        if len(intensors) >= 4 and intensors[3].get_numpy().size > 0:
+            # sizes provided (input 3)
+            sizes_arr = intensors[3].get_numpy()
             sizes = list(sizes_arr.flatten()) if sizes_arr.ndim > 0 else [sizes_arr.item()]
-        else:
-            sizes = xshape
-        outtensors[0].update_shape(sizes if len(sizes) == len(xshape) else xshape[:2] + sizes[-2:])
+            if len(sizes) == len(xshape):
+                outshape = sizes
+            else:
+                outshape = xshape[:2] + sizes[-2:]
+        elif len(intensors) >= 3 and intensors[2].get_numpy().size > 0:
+            # scales provided (input 2)
+            scales_arr = intensors[2].get_numpy()
+            scales = list(scales_arr.flatten()) if scales_arr.ndim > 0 else [scales_arr.item()]
+            if len(scales) == len(xshape):
+                outshape = [int(s * scale) for s, scale in zip(xshape, scales)]
+            else:
+                # scales might be partial (only for H, W)
+                outshape = list(xshape[:2]) + [int(s * scale) for s, scale in zip(xshape[2:], scales[-2:])]
+
+        outtensors[0].update_shape(outshape)
         outtensors[0].update_dtype(intensors[0].dtype)
 
 
@@ -1273,7 +1451,7 @@ class Graph:
             itensors = [self.tensormap[t] for t in node.input if t in self.tensormap]
             otensors = [self.tensormap[t] for t in node.output if t in self.tensormap]
 
-            if itensors and otensors:
+            if otensors:
                 node.shape_infer(itensors, otensors)
 
         self.log(f"Shape inference time: {tm.stop():.4f}s")
