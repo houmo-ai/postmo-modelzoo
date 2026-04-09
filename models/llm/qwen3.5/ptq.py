@@ -229,7 +229,7 @@ def parse_args():
     parser.add_argument(
         "--vision-image-path",
         type=str,
-        default=None,
+        default="../../../data/pic/beach.jpeg",
         help="sample image for vision export (--image_path); required if src/images/qwen2_vl_demo.jpeg is absent",
     )
     args = parser.parse_args()
