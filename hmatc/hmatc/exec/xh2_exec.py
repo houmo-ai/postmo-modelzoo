@@ -71,7 +71,7 @@ class Xh2Exec(BaseExec):
     def __init__(self, cfg: dict) -> None:
         super().__init__(cfg)
         self.quant_type = self.quant_cfg.get("quant_type", "w8a8h1_sefp")
-        self.golden_dir = os.path.join(self.quant_output_dir, "golden")
+        self.golden_dir = os.path.abspath(os.path.join(self.quant_output_dir, "golden"))
         self.upgrade_opset_version()
         self._validate_resizer_constraints()
 
@@ -714,29 +714,32 @@ class Xh2Exec(BaseExec):
         )
 
         # Generate chip required format model
-        logger.info("Generating golden data...")
-        session = HMONNXGoldenInference(quant_onnx_model_path)
-        session.to(self.device)
-        session.save_golden = True
-        session.golden_dir = self.golden_dir
-        if os.path.exists(self.golden_dir):
-            shutil.rmtree(self.golden_dir)
-        session.step = 0
+        try:
+            logger.info("Generating golden data...")
+            session = HMONNXGoldenInference(quant_onnx_model_path)
+            session.to(self.device)
+            session.save_golden = True
+            session.golden_dir = self.golden_dir
+            if os.path.exists(self.golden_dir):
+                shutil.rmtree(self.golden_dir)
+            session.step = 0
 
-        # Convert dtypes for inference
-        for idx, in_data in enumerate(in_datas):
-            if not self.inputs_name[idx].startswith("resizer_crop_"):
-                if in_data.dtype == torch.int64:
-                    in_datas[idx] = in_data.type(torch.int32).to(self.device)
-                elif in_data.dtype == torch.float32:
-                    in_datas[idx] = in_data.half().to(self.device)
+            # Convert dtypes for inference
+            for idx, in_data in enumerate(in_datas):
+                if not self.inputs_name[idx].startswith("resizer_crop_"):
+                    if in_data.dtype == torch.int64:
+                        in_datas[idx] = in_data.type(torch.int32).to(self.device)
+                    elif in_data.dtype == torch.float32:
+                        in_datas[idx] = in_data.half().to(self.device)
 
-        session(*in_datas)
+            session(*in_datas)
+        except Exception as e:
+            logger.error(f"Error occurred while generating golden data: \n{e}")
 
         if os.path.exists(quant_onnx_model_path):
             os.remove(quant_onnx_model_path)
         shutil.copytree(
-            os.path.join(self.golden_dir, "step_0"),
+            os.path.join(os.path.abspath(self.golden_dir), "step_0"),
             self.quant_output_dir,
             dirs_exist_ok=True,
         )

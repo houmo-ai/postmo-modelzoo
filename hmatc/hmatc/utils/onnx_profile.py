@@ -970,7 +970,12 @@ class UnsqueezeNode(Node):
 
     def shape_infer(self, intensors, outtensors):
         inshape = intensors[0].get_shape()
-        axes = self.axes if len(intensors) == 1 else list(intensors[1].get_numpy())
+        # Handle scalar (0-d) array case for axes
+        axes_arr = intensors[1].get_numpy() if len(intensors) > 1 else None
+        if axes_arr is not None:
+            axes = list(axes_arr.flatten()) if axes_arr.ndim > 0 else [axes_arr.item()]
+        else:
+            axes = self.axes
         axes = _axes_neg2pos(len(inshape) + len(axes), axes)
 
         newshape = []
@@ -994,7 +999,12 @@ class SqueezeNode(Node):
 
     def shape_infer(self, intensors, outtensors):
         inshape = intensors[0].get_shape()
-        axes = self.axes if len(intensors) == 1 else list(intensors[1].get_numpy())
+        # Handle scalar (0-d) array case for axes
+        axes_arr = intensors[1].get_numpy() if len(intensors) > 1 else None
+        if axes_arr is not None:
+            axes = list(axes_arr.flatten()) if axes_arr.ndim > 0 else [axes_arr.item()]
+        else:
+            axes = self.axes
         axes = _axes_neg2pos(len(inshape), axes)
 
         newshape = [inshape[i] for i in range(len(inshape)) if i not in axes]
@@ -1029,7 +1039,14 @@ class PadNode(Node):
 
     def shape_infer(self, intensors, outtensors):
         inshape = intensors[0].get_shape()
-        pads = self.pads if self.pads else list(intensors[1].get_numpy()) if len(intensors) > 1 else [0] * len(inshape) * 2
+        # Handle scalar (0-d) array case for pads
+        if self.pads:
+            pads = self.pads
+        elif len(intensors) > 1:
+            pads_arr = intensors[1].get_numpy()
+            pads = list(pads_arr.flatten()) if pads_arr.ndim > 0 else [pads_arr.item()]
+        else:
+            pads = [0] * len(inshape) * 2
 
         newshape = []
         for i, v in enumerate(inshape):
@@ -1043,7 +1060,9 @@ class PadNode(Node):
 class ExpandNode(Node):
     def shape_infer(self, intensors, outtensors):
         xshape = intensors[0].get_shape()
-        expandshape = list(intensors[1].get_numpy())
+        # Handle scalar (0-d) array case for expandshape
+        expand_arr = intensors[1].get_numpy()
+        expandshape = list(expand_arr.flatten()) if expand_arr.ndim > 0 else [expand_arr.item()]
 
         if len(xshape) < len(expandshape):
             xshape = [1] * (len(expandshape) - len(xshape)) + xshape
@@ -1057,7 +1076,12 @@ class ExpandNode(Node):
 class ResizeNode(Node):
     def shape_infer(self, intensors, outtensors):
         xshape = intensors[0].get_shape()
-        sizes = list(intensors[-1].get_numpy()) if len(intensors) >= 4 else xshape
+        # Handle scalar (0-d) array case for sizes
+        if len(intensors) >= 4:
+            sizes_arr = intensors[-1].get_numpy()
+            sizes = list(sizes_arr.flatten()) if sizes_arr.ndim > 0 else [sizes_arr.item()]
+        else:
+            sizes = xshape
         outtensors[0].update_shape(sizes if len(sizes) == len(xshape) else xshape[:2] + sizes[-2:])
         outtensors[0].update_dtype(intensors[0].dtype)
 

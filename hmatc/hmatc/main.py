@@ -192,7 +192,7 @@ def main():
 
     # Process batch model benchmark
     if current_command == "benchmark":
-        run_benchmark(args.config, args.target, args.device_id, args.cuda)
+        run_benchmark(args.config, args.device_id)
         return
 
     # Directly specify model for perf can skip config file
