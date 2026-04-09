@@ -42,7 +42,7 @@ from . import logger
 
 
 JFROG_REPO = "http://artifactory.houmo.ai/artifactory/Dadao"
-OSS_REPO = "https://houmo-llm.oss-cn-shanghai.aliyuncs.com/Dadao"
+OSS_REPO = "https://llmoss.houmoai.com/Dadao"
 
 SUPPORT_IMAGE_FORMATS = [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]
 SUPPORT_BACKEND = ["xh1", "xh2", "onnx", "hmonnx"]
@@ -384,7 +384,7 @@ def _parse_file_url(file_path: str) -> tuple[str, str, str]:
         if "artifactory" in file_path:
             split_key = "artifactory/"
             repo_type = "jfrog"
-        elif "oss-cn" in file_path:
+        elif "oss-cn" in file_path or "llmoss" in file_path:
             split_key = ".com/"
             repo_type = "oss"
         else:
