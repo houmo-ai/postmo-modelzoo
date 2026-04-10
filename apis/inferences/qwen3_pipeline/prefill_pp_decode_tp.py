@@ -687,7 +687,7 @@ def decode_runner(
         # Prepare for next iteration
         next_id = decode_next_id
         context_length += 1
-        break
+
     print("\033[0m")
     logger.info(
         f"Decode Model Run on devices {model_params['device_id']}, decode time {decode_infer_time:.2f} s."

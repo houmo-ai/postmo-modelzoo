@@ -89,33 +89,26 @@ python3 prefill_pp_decode_tp.py
 ### 5.1 prefill_pp_decode_tp.py
 
 ```bash
-2026-03-05 12:38:40.944 | INFO     | __main__:main:629 - MultiChip pipeline parallel run demo Start!
-[2026-03-05 12:38:40.950] [tid 1142] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-03-05 12:38:40.950] [tid 1142] [warning] Empty backend name, use Xh2HalBackend instead.
-[2026-03-05 12:38:40.953] [tid 1143] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-03-05 12:38:40.953] [tid 1143] [warning] Empty backend name, use Xh2HalBackend instead.
-[2026-03-05 12:38:40.955] [tid 1146] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-03-05 12:38:40.955] [tid 1146] [warning] Empty backend name, use Xh2HalBackend instead.
-[2026-03-05 12:38:40.958] [tid 1148] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-03-05 12:38:40.958] [tid 1148] [warning] Empty backend name, use Xh2HalBackend instead.
-2026-03-05 12:38:41.940 | INFO     | __main__:prefill_consumer:431 - Prefill Stage1 load model successfully
-2026-03-05 12:38:41.946 | INFO     | __main__:prefill_consumer:431 - Prefill Stage2 load model successfully
-2026-03-05 12:38:41.947 | INFO     | __main__:prefill_producer:316 - Prefill Stage0 load model successfully
-2026-03-05 12:38:42.023 | INFO     | __main__:prefill_consumer:431 - Prefill Stage3 load model successfully
-2026-03-05 12:38:42.679 | SUCCESS  | __main__:prefill_producer:330 - User question:
+2026-04-10 07:59:45.899] [tid 3920] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+2026-04-10 07:59:46.308 | INFO     | __main__:main:707 - MultiChip pipeline parallel run demo Start!
+[2026-04-10 07:59:46.326] [tid 3920] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-04-10 07:59:46.326] [tid 3920] [warning] Empty backend name, use Xh2HalBackend instead.
+[2026-04-10 07:59:46.332] [tid 3920] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-04-10 07:59:46.332] [tid 3920] [warning] Empty backend name, use Xh2HalBackend instead.
+2026-04-10 07:59:47.318 | INFO     | __main__:prefill_producer:343 - Prefill Stage0 load model successfully
+2026-04-10 07:59:47.677 | INFO     | __main__:prefill_consumer:481 - Prefill Stage1 load model successfully
+2026-04-10 07:59:48.009 | SUCCESS  | __main__:prefill_producer:365 - User question:
 Hello, '1' *30694
-2026-03-05 12:38:42.715 | INFO     | __main__:prefill_producer:349 - Prefill input tokens length: 30720
-2026-03-05 12:39:57.256 | INFO     | __main__:decode_runner:486 - Decode Model Run on devices [0, 1, 2, 3] load model successfully
-2026-03-05 12:40:10.448 | INFO     | __main__:prefill_producer:421 - [Prefill Stage 0] Process Finished, time: 10.34 s.
-2026-03-05 12:40:11.099 | INFO     | __main__:prefill_consumer:476 - [Prefill Stage 1] Process Finished, time: 10.34 s.
-2026-03-05 12:40:11.398 | INFO     | __main__:prefill_consumer:476 - [Prefill Stage 2] Process Finished, time: 10.35 s.
-2026-03-05 12:40:11.691 | INFO     | __main__:prefill_consumer:476 - [Prefill Stage 3] Process Finished, time: 10.70 s.
-2026-03-05 12:40:11.702 | INFO     | __main__:decode_runner:524 - [Result] total Run Prefill 120 times, total_time : 12.39 s, output id = [2132]
-2026-03-05 12:40:16.164 | SUCCESS  | __main__:decode_runner:544 - Model response:
-It seems
-2026-03-05 12:40:16.229 | INFO     | __main__:decode_runner:624 - Decode Model Run on devices [0, 1, 2, 3], decode time 0.04 s.
-2026-03-05 12:40:16.229 | INFO     | __main__:decode_runner:625 - Decode Model average time 43.90 ms/token
-2026-03-05 12:40:16.311 | INFO     | __main__:main:668 - MultiChip pipeline parallel run demo finished!
+2026-04-10 07:59:48.047 | INFO     | __main__:prefill_producer:384 - Prefill input tokens length: 30720
+2026-04-10 07:59:48.535 | INFO     | __main__:decode_runner:551 - Decode Model Run on devices [0, 1] load model successfully
+2026-04-10 08:00:10.705 | INFO     | __main__:prefill_producer:462 - [Prefill Stage 0] Process Finished, time: 18.41 s.
+2026-04-10 08:00:12.299 | INFO     | __main__:prefill_consumer:534 - [Prefill Stage 1] Process Finished, time: 18.73 s.
+2026-04-10 08:00:12.301 | INFO     | __main__:decode_runner:594 - [Result] total Run Prefill 120 times, total_time : 19.94 s, output id = [2132]
+2026-04-10 08:00:19.775 | SUCCESS  | __main__:decode_runner:614 - Model response:
+It seems like you've sent a long string of repeated numbers. Are you trying to test something or is there a specific question or task you'd like help with? Let me know how I can assist you!
+2026-04-10 08:00:22.446 | INFO     | __main__:decode_runner:692 - Decode Model Run on devices [0, 1], decode time 2.37 s.
+2026-04-10 08:00:22.446 | INFO     | __main__:decode_runner:695 - Decode Model average time 56.37 ms/token
+2026-04-10 08:00:22.521 | INFO     | __main__:main:763 - MultiChip pipeline parallel run demo finished!
 ```
 
 ### 5.2 prefill_pp_decode_pp.py
