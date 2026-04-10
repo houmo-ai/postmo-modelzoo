@@ -147,6 +147,8 @@ if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     python3 demo.py
     python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt
     llm_perf -c config.yaml
+    cd cpp && ./build.sh && cd ..
+    ./bin/example_cxx_qwen3_vl --image ../../../data/pic/beach.jpeg
 fi
 
 if [[ "$VENV_FLAG" -eq "1" ]]; then
