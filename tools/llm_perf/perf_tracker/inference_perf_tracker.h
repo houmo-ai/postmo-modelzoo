@@ -164,6 +164,7 @@ struct InferenceMetricsWithLoadTime {
   double prefill_load_time = 0.0;
   double decode_load_time = 0.0;
   double vision_load_time = 0.0;
+  double kvcache_mem = 0.0;
 };
 
 // Inference performance tracker class
@@ -202,12 +203,14 @@ class InferencePerformanceTracker {
   // Reset tracker (start timing again)
   void reset();
   void pref_delete_warmup();
+  void set_kvcache_mem(double mem_size);
   InferenceMetricsWithLoadTime get_perf_avg_summary() {
     InferenceMetricsWithLoadTime result_metrics;
     result_metrics.metrics = average_metrics;
     result_metrics.prefill_load_time = prefill_load_time;
     result_metrics.decode_load_time = decode_load_time;
     result_metrics.vision_load_time = vision_load_time;
+    result_metrics.kvcache_mem = kvcache_mem;
     return result_metrics;
   }
 
@@ -217,6 +220,7 @@ class InferencePerformanceTracker {
     perf_metrics.prefill_load_time = prefill_load_time;
     perf_metrics.decode_load_time = decode_load_time;
     perf_metrics.vision_load_time = vision_load_time;
+    perf_metrics.kvcache_mem = kvcache_mem;
     return perf_metrics;
   }
 
@@ -228,6 +232,7 @@ class InferencePerformanceTracker {
   double prefill_load_time = 0.0;
   double decode_load_time = 0.0;
   double vision_load_time = 0.0;
+  double kvcache_mem = 0.0;
   double prefill_load_time_start = 0.0;
   double decode_load_time_start = 0.0;
   double vision_load_time_start = 0.0;

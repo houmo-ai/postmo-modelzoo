@@ -115,6 +115,7 @@ void PerfDumper::dumpPerf(
       format_double(results.metrics.prefill_perf_infos.embedding_time);
   model_perf_results["decode_embedding_time"] =
       format_double(results.metrics.decode_perf_infos.embedding_time);
+  model_perf_results["kvcache_mem"] = format_double(results.kvcache_mem);
   model_perf_results["TTFT"] = format_double(results.metrics.ttft);
   model_perf_results["TPOT"] = format_double(results.metrics.tpot);
   model_perf_results["e2e_latency"] = format_double(results.metrics.e2e_time);

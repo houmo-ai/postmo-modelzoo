@@ -104,11 +104,14 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   }
 
   // Configure decode module's other inputs (KV cache)
+  size_t total_mem_size = 0;
   for (int idx = 0; idx < this->prefill_module->GetInputNum(); idx++) {
     const std::string layer_name = prefill_module->GetInputName(idx);
     if (layer_name.find("model_layers") != std::string::npos) {
       auto cache = prefill_module->GetDevInput(layer_name);
       CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(layer_name, cache));
+      auto input_info = prefill_module->GetInputInfo(layer_name);
+      total_mem_size += input_info.MemSize();
     }
 
     if (layer_name.find("conv_cache") != std::string::npos) {
@@ -121,6 +124,8 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
       CHECK_TCIM_RET_STATUS(prefill_module->SetDevOutput(output_name, cache));
       CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(layer_name, cache));
       CHECK_TCIM_RET_STATUS(decode_module->SetDevOutput(output_name, cache));
+      auto input_info = prefill_module->GetInputInfo(layer_name);
+      total_mem_size += input_info.MemSize();
     }
 
     if (layer_name.find("recurrent_state") != std::string::npos) {
@@ -133,8 +138,13 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
       CHECK_TCIM_RET_STATUS(prefill_module->SetDevOutput(output_name, cache));
       CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(layer_name, cache));
       CHECK_TCIM_RET_STATUS(decode_module->SetDevOutput(output_name, cache));
+      auto input_info = prefill_module->GetInputInfo(layer_name);
+      total_mem_size += input_info.MemSize();
     }
   }
+  double kvcache_mem_size =
+      static_cast<double>(total_mem_size) / (1024.0 * 1024.0);
+  perf_tracker->set_kvcache_mem(kvcache_mem_size);
 
   // Initialize embedding module with weights path,
   // embedding length and prefill length

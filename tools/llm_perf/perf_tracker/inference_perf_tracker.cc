@@ -437,6 +437,11 @@ void InferencePerformanceTracker::showSummary(bool average) {
 const InferenceMetrics& InferencePerformanceTracker::getCurrentMetrics() const {
   return current_metrics;
 }
+
+void InferencePerformanceTracker::set_kvcache_mem(double mem_size) {
+  kvcache_mem = mem_size;
+}
+
 void InferencePerformanceTracker::reset() {
   memset(&current_metrics, 0, sizeof(current_metrics));
   current_metrics.e2e_time = getCurrentTime();

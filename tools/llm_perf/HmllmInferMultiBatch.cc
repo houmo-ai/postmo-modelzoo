@@ -120,6 +120,7 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
   decode_input_init();
 
   // Configure additional inputs for decode module (KV cache inputs)
+  size_t total_mem_size = 0;
   for (int b = 0; b < this->batch; ++b) {
     // Calculate the index for the decode current length input
     int index = (b == 0) ? 2 : (2 * n_blocks * b + attn_idx_start + 2 * b - 1);
@@ -131,7 +132,12 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
     CHECK_TCIM_RET_STATUS(
         tensor.Buffer().CopyFromHost(&decode_current_length, memSize));
     CHECK_TCIM_RET_STATUS(decode_module->SetInput(input_name, tensor));
+    auto input_info = decode_module->GetInputInfo(input_name);
+    total_mem_size += input_info.MemSize();
   }
+  double kvcache_mem_size =
+      static_cast<double>(total_mem_size) / (1024.0 * 1024.0);
+  perf_tracker->set_kvcache_mem(kvcache_mem_size);
   // Initialize embedding module with the specified parameters
   embedding = std::make_shared<HmEmbedding>(
       embeddingWeightPath, this->embedding_length, this->prefill_length);
