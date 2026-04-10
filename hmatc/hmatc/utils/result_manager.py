@@ -27,7 +27,7 @@ Result Structure:
 result:
   meta:
     model_name: str
-    target: str (xh1/xh2)
+    target: str (xh2)
     created_at: str (ISO format)
     updated_at: str (ISO format)
     hmatc_version: str
@@ -87,7 +87,7 @@ result:
 
   demo:
     success: bool
-    backend: str (onnx/hmonnx/xh1/xh2)
+    backend: str (onnx/hmonnx/xh2)
     data_dir: str
     num: int
     error: str (if failed)

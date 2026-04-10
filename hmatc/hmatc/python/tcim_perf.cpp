@@ -650,12 +650,12 @@ int32_t Run(const std::string &model_path, int32_t thread_num, int32_t stream_nu
 
     // Validate target environment
     const std::string target = getenv("HOUMO_TARGET") ? getenv("HOUMO_TARGET") : "";
-    if (target != "xh1" && target != "xh2") {
-        printf("%s[ERROR] HOUMO_TARGET is invalid: %s%s\n", COLOR_RED, target.c_str(), COLOR_RESET);
+    if (target != "xh2") {
+        printf("%s[ERROR] HOUMO_TARGET is invalid: %s (expected: xh2)%s\n", COLOR_RED, target.c_str(), COLOR_RESET);
         return -1;
     }
 
-    const std::string backend_name = (target == "xh1") ? "Xh1HdiBackend" : "Xh2HalBackend";
+    const std::string backend_name = "Xh2HalBackend";
     printf("[INFO] Backend: %s\n", backend_name.c_str());
 
     if (devices.size() > static_cast<size_t>(tcim::GetDeviceNum())) {
@@ -666,8 +666,9 @@ int32_t Run(const std::string &model_path, int32_t thread_num, int32_t stream_nu
         return -1;
     }
 
+    auto dev_manager = tcim::DevManager::Create(devices, backend_name);
     // Create weight manager
-    auto weight_manager = tcim::Module::WeightManager::CreateWeightManager(devices[0]);
+    auto weight_manager = tcim::Module::WeightManager::CreateWeightManager(dev_manager);
     auto option = tcim::Module::Option(weight_manager);
 
     // Load model to print info

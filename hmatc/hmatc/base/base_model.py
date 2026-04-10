@@ -25,8 +25,7 @@ import numpy as np
 from typing import Dict, Any
 from ..utils import logger
 from ..utils.utils import SUPPORT_BACKEND
-from ..utils.preprocess import xh1_preprocess as resizer_preprocess
-from ..infer.xh1_infer import Xh1Infer
+from ..utils.preprocess import resizer_preprocess
 from ..infer.xh2_infer import Xh2Infer
 from ..infer.onnx_infer import OnnxInfer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
@@ -58,7 +57,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
     """Base model class for model inference and processing operations.
 
     This abstract class provides a unified interface for model inference across different
-    backends (ONNX, XH1, XH2), handling preprocessing, inference execution, and postprocessing
+    backends (ONNX, XH2), handling preprocessing, inference execution, and postprocessing
     with support for various input formats and resizer modes.
     """
 
@@ -71,7 +70,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 - is_image_single_input (bool): Whether input is single image
                 - resizer_modes (dict): Per-input resizer modes (default: {})
                 - roi_num (int): Number of regions of interest (default: 1)
-                - backend (str): Backend type (onnx/xh1/xh2/hmonnx)
+                - backend (str): Backend type (onnx/xh2/hmonnx)
         """
         self.time_span = 0  # Total time span for inference operations
         self.total = 0  # Total number of inference operations performed
@@ -96,14 +95,12 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         else:
             self.resizer_mode = kwargs.get("resizer_mode", 0)
         self.roi_num = kwargs.get("roi_num", 1)  # Number of regions of interest
-        self.backend = kwargs["backend"]  # Backend type: onnx/xh1/xh2
+        self.backend = kwargs["backend"]  # Backend type: onnx/xh2
         if self.backend not in SUPPORT_BACKEND:
             logger.error(f"backend not in {SUPPORT_BACKEND}")
             exit(-1)
         if self.backend == "onnx":
             self.engine = OnnxInfer()
-        elif self.backend == "xh1":
-            self.engine = Xh1Infer()
         elif self.backend == "xh2":
             self.engine = Xh2Infer()
         elif self.backend == "hmonnx":
@@ -138,11 +135,6 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         if not self.is_image_single_input:
             # Single input non-image or multi-input, input data is preprocessed externally
             if self.backend == "onnx":
-                return in_datas
-            elif self.backend in ["xh1"]:
-                for input_name in in_datas:
-                    in_data = in_datas[input_name]
-                    in_datas[input_name] = self.engine.quantize(input_name, in_data)
                 return in_datas
             else:
                 logger.error(f"Not support backend: {self.backend}")
@@ -189,15 +181,11 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 new_datas[in_name] = im.detach().cpu().numpy()
             elif self.backend in ["xh2", "hmonnx"] and self.resizer_mode == 0:
                 new_datas[in_name] = im.detach().cpu().numpy().astype(np.float16)
-            elif self.backend == "xh1" and self.resizer_mode == 0:
-                new_datas[in_name] = self.engine.quantize(
-                    in_name, im.detach().cpu().numpy()
-                )
-            elif self.backend == "hmonnx" and self.resizer_mode in [1, 2, 3]:
+            elif self.backend == "hmonnx" and self.resizer_mode in [1, 3]:
                 yuv_pad = im.detach().cpu()
                 h, w, c = yuv_pad.shape
                 new_datas[in_name] = yuv_pad.view(1, c, h, w).contiguous().numpy()
-            elif self.resizer_mode in [1, 2, 3]:
+            elif self.resizer_mode in [1, 3]:
                 yuv_pad = im.detach().cpu().numpy().flatten()
                 if toYUV_format == "YUV420SP":
                     valid_len = yuv_pad.size // 2
@@ -207,7 +195,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                     valid_len = yuv_pad.size
                 yuv = yuv_pad[:valid_len].copy().reshape(1, -1)
                 new_datas[in_name] = np.ascontiguousarray(yuv)
-            if self.resizer_mode in [1, 2] and self.backend in ["xh1", "xh2"]:
+            if self.resizer_mode == 1 and self.backend in ["xh2", "hmonnx"]:
                 dyn_info = dyn_info.detach().cpu().numpy()
                 new_datas[f"resizer_crop_{in_name}"] = dyn_info
             return new_datas
@@ -228,7 +216,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             if (
                 name.startswith("resizer_crop_")
                 and self.roi_num > 1
-                and self.backend in ["xh1", "xh2"]
+                and self.backend in ["xh2"]
             ):
                 preprocessed_in_datas[name] = np.repeat(
                     in_data, repeats=self.roi_num, axis=0
@@ -240,7 +228,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         # Inference
         outs = self.engine.run(preprocessed_in_datas)
         self.time_span += time.time() - t
-        # XH1 outputs both quantized and dequantized results, only take the dequantized one
+        # outputs both quantized and dequantized results, only take the dequantized one
         if isinstance(outs, tuple):
             outs = outs[1]
         # Before postprocessing, only take batch 0

@@ -45,7 +45,7 @@ JFROG_REPO = "http://artifactory.houmo.ai/artifactory/Dadao"
 OSS_REPO = "https://llmoss.houmoai.com/Dadao"
 
 SUPPORT_IMAGE_FORMATS = [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]
-SUPPORT_BACKEND = ["xh1", "xh2", "onnx", "hmonnx"]
+SUPPORT_BACKEND = ["xh2", "onnx", "hmonnx"]
 
 
 def read_yaml_to_dict(file_path: str) -> dict:
@@ -91,19 +91,6 @@ def get_file_md5(file_path):
         for chunk in iter(lambda: file.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
-
-
-def get_hmquant_xh1_version():
-    """Get the version of the hmquant-xh1 package.
-
-    Returns:
-        str: Version string of the package, or 'N/A' if not found
-    """
-    try:
-        v = version("hmquant-xh1")
-        return v
-    except PackageNotFoundError:
-        return "N/A"
 
 
 def get_hmquant_xh2_version():
@@ -849,7 +836,7 @@ def hmatc_get_file(
     # check model_cfgs
     if (
         not model_cfgs
-        or model_cfgs.get("target", None) not in ["xh1", "xh2"]
+        or model_cfgs.get("target", None) != "xh2"
         or model_cfgs.get("version", None) is None
         or not model_cfgs["version"].startswith("v")
         or model_cfgs.get("model_type", None) not in ["cv", "llm"]

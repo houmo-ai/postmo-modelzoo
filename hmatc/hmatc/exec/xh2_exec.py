@@ -33,8 +33,12 @@ from ..infer.xh2_infer import Xh2Infer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
-from ..utils.preprocess import calc_padding_size, convert_bgr_to_yuv, default_preprocess
-from ..utils.preprocess import xh1_preprocess as resizer_preprocess
+from ..utils.preprocess import (
+    calc_padding_size,
+    convert_bgr_to_yuv,
+    default_preprocess,
+    resizer_preprocess,
+)
 from ..utils.utils import (
     SUPPORT_IMAGE_FORMATS,
     compress_files_to_tar_xz_with_progress,
@@ -799,7 +803,7 @@ class Xh2Exec(BaseExec):
             output_dir=self.hmm_save_dir,
             work_dir=self.build_output_dir,
             one_img_multi_roi=self.roi_num > 1,
-            j=psutil.cpu_count(logical=False),
+            j=self.build_parallel_jobs,
             custom_msg=json.dumps(self.custom_msg, ensure_ascii=False),
         )
 
@@ -1507,7 +1511,7 @@ class Xh2Exec(BaseExec):
             enable_common_subgraph=enable_common_subgraph,
             subgraph_repeat_hint=subgraph_repeat_hint,
             flash_attention=flash_attn,
-            j=psutil.cpu_count(logical=False),
+            j=kwargs.get("parallel_jobs", psutil.cpu_count(logical=False)),
             custom_msg=json.dumps(custom_msg, ensure_ascii=False),
         )
 

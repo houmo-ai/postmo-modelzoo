@@ -24,6 +24,7 @@ import onnx
 import json
 import importlib
 import numpy as np
+import psutil
 import torch
 from onnx import StringStringEntryProto
 from pathlib import Path
@@ -156,17 +157,16 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 self.resizer_modes[input_name] = 1  # Dynamic with padding
                 self.has_dynamic_resizer = True
             else:
-                # XH2 does not have dynamic_v1, use dynamic_v2
-                if self.target == "xh2":
-                    self.resizer_modes[input_name] = 1  # Dynamic v2
-                else:
-                    self.resizer_modes[input_name] = 2  # Dynamic v1
+                self.resizer_modes[input_name] = 1  # Dynamic v2
                 self.has_dynamic_resizer = True
 
         logger.info(f"resizer_modes: {self.resizer_modes}")
 
         # Build parameters
         self.build_cfg = cfg.get("build", dict())
+        self.build_parallel_jobs = self.build_cfg.get(
+            "parallel_jobs", psutil.cpu_count(logical=False)
+        )
         self.build_batch = self.build_cfg.get("batch", 1)
         self.build_ncore = self.build_cfg.get("ncore", 1)
         self.build_opt_level = self.build_cfg.get("opt_level", 2)
@@ -213,10 +213,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             prefix = ""
         elif resizer_mode_for_naming == 1:
             roi_tag = f"_{self.roi_num}roi"
-            prefix = "_dynamic_v2" if self.target == "xh1" else "_dynamic"
-        elif resizer_mode_for_naming == 2:
-            roi_tag = f"_{self.roi_num}roi"
-            prefix = "_dynamic_v1"
+            prefix = "_dynamic"
         elif resizer_mode_for_naming == 3:
             roi_tag = "_1roi"
             prefix = "_static"
@@ -588,9 +585,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         if backend == "onnx":
             model_path = self.model_path
         elif backend == "hmonnx":
-            if self.target == "xh1":
-                logger.error("hmonnx backend not support xh1 target")
-                return {}
             model_path = self.quant_onnx_model_path
         else:
             model_path = self.hmm_path
@@ -696,20 +690,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         for node in graph.node:
             if "constant" in str(node.op_type).lower():
                 continue
-            if target == "xh1":
-                # Get node attributes
-                node_attributes = {}
-                for attr in node.attribute:
-                    value = onnx.helper.get_attribute_value(attr)
-                    if isinstance(value, bytes):
-                        value = value.decode("utf-8")
-                    node_attributes[attr.name] = value
-                if "output_granularity" not in node_attributes:
-                    continue
-                output_granularity = node_attributes["output_granularity"]
-                output_dtype = node_attributes["output_dtype"]
-                scale = node_attributes["output_scale"]
-                zero_point = node_attributes["output_zero_point"]
             for output in node.output:
                 if any(
                     output == existing_output.name for existing_output in graph.output
@@ -727,66 +707,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                     )
                     continue
 
-                if target == "xh1":
-
-                    def get_shape_from_value_info(value_info):
-                        """Extract shape information from value_info.
-
-                        Args:
-                            value_info: ONNX value info object.
-
-                        Returns:
-                            list: Shape information or None if not available.
-                        """
-                        if not value_info.type.HasField("tensor_type"):
-                            return None
-
-                        tensor_type = value_info.type.tensor_type
-                        shape = []
-                        if tensor_type.HasField("shape"):
-                            for dim in tensor_type.shape.dim:
-                                if dim.HasField("dim_value"):
-                                    shape.append(dim.dim_value)
-                                elif dim.HasField("dim_param"):
-                                    shape.append(dim.dim_param)
-                                else:
-                                    shape.append("?")
-
-                        return shape
-
-                    output_shape = get_shape_from_value_info(value_info)
-                    length = 1
-                    for dim in output_shape:
-                        length *= dim
-                    if length == 1:
-                        print(node.op_type, node.name, node_attributes)
-                        continue
-                    if output_granularity == "tensor":
-                        block_shape = output_shape
-                    else:
-                        assert output_granularity.startswith("dim")
-                        dim_index = int(output_granularity[-1])
-                        block_shape = [
-                            output_shape[i] if i != dim_index else 1
-                            for i in range(len(output_shape))
-                        ]
-                    # add quantization info
-                    quant_info = dict(
-                        block_shape=block_shape,
-                        scale=scale,
-                        zero_point=zero_point,
-                        src_dtype="float32",
-                        dst_dtype=output_dtype,
-                        dst_min=QUANTIZATION_RANGES[output_dtype][0],
-                        dst_max=QUANTIZATION_RANGES[output_dtype][1],
-                    )
-                    quant_info_json = json.dumps(quant_info)
-                    # Create StringStringEntryProto object
-                    quant_entry = StringStringEntryProto(
-                        key="houmo.quant.info", value=quant_info_json
-                    )
-                    # Add quantization info to metadata_props
-                    value_info.metadata_props.append(quant_entry)
                 graph.output.append(value_info)
 
         model.graph.CopyFrom(graph)

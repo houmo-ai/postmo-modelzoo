@@ -37,7 +37,7 @@ class BaseInfer(object, metaclass=abc.ABCMeta):
         self.time_span = 0  # Total time span for inference operations
         self.total = 0  # Total number of inference operations performed
         self.engine = None  # Inference engine instance
-        self.backend = "onnx"  # Backend type: onnx/hmquant/xh1/xh2
+        self.backend = "onnx"  # Backend type: onnx/hmquant/xh2
         self.device = "cpu"  # Device for inference execution
         self.inputs_batch = dict()
 

@@ -26,7 +26,7 @@ import argparse
 import json
 import logging
 import time
-import torch
+import psutil
 from ._version import __build_time__, __commit__, __version__
 from .base.base_exec import BaseExec
 from .utils import logger
@@ -94,12 +94,12 @@ def main():
 
     # model config
     parent_model_cfg.add_argument("--batch", type=int, required=False, default=1, help="Specify a build batch")
-    parent_model_cfg.add_argument("--ncore", type=int, required=False, default=1, choices=(1, 2, 4) if target == "xh1" else (1, 2), help="Specify a ncore")
+    parent_model_cfg.add_argument("--ncore", type=int, required=False, default=1, choices=(1, 2), help="Specify a ncore")
     parent_model_cfg.add_argument("--opt_level", type=int, required=False, default=2, choices=(0, 1, 2), help="Specify a opt_level")
     parent_model_cfg.add_argument("--roi_num", type=int, required=False, default=1, help="Specify a roi_num")
 
     parent_config.add_argument("--config", "-c", type=str, required=True, help="config file path")
-    parent_target.add_argument("--target", "-t", type=str, required=target not in ["xh1", "xh2"], choices=("xh1", "xh2"), default=target, help="Specify a chip target")
+    parent_target.add_argument("--target", "-t", type=str, required=target != "xh2", choices=("xh2",), default=target, help="Specify a chip target")
     parent_device_id.add_argument("--device_id", type=int, required=False, default=0, help="Specify a device, running inference on chip")
     parent_hmonnx.add_argument("--hmonnx", action="store_true", help=argparse.SUPPRESS)
     parent_onnx.add_argument("--onnx", action="store_true", help="Specify onnx model as the backend")
@@ -141,6 +141,7 @@ def main():
     build_parser.add_argument("--file_prefix", type=str, help=argparse.SUPPRESS)
     build_parser.add_argument("--skip_check", action="store_true", help="Skip check golden after build")
     build_parser.add_argument("--upload", action="store_true", help=argparse.SUPPRESS)
+    build_parser.add_argument("--jobs", "-j", type=int, default=psutil.cpu_count(logical=False), help="Specify number of parallel jobs")
         
     # compare
     compare_parser.add_argument("--data_path", "-d", type=str, required=True, help="Specify a data path, image or npz")
@@ -213,10 +214,8 @@ def main():
         return
     # Directly build from hmonnx
     if current_command == "build" and args.hmonnx is not None:
-        if target == "xh1":
-            raise NotImplementedError("xh1 not support build from hmonnx yet")
-        elif target == "xh2":
-            from .exec.xh2_exec import Xh2Exec as Exec
+        from .exec.xh2_exec import Xh2Exec as Exec
+
         Exec.build_from_hmonnx(
             args.hmonnx,
             args.hmm_name,
@@ -231,14 +230,13 @@ def main():
             args.enable_common_subgraph,
             args.skip_mlir_compile,
             args.subgraph_repeat_hint,
+            parallel_jobs=args.jobs,
         )
         return
     # Check golden
     if current_command == "check" and args.hmm is not None:
-        if target == "xh1":
-            raise NotImplementedError("xh1 not support check golden from hmm")
-        elif target == "xh2":
-            from .exec.xh2_exec import Xh2Exec as Exec
+        from .exec.xh2_exec import Xh2Exec as Exec
+
         Exec.check_golden_from_hmm(
             args.hmm, args.golden, enable_layers=False, device_id=args.device_id
         )
@@ -246,10 +244,8 @@ def main():
 
     # Generate golden
     if current_command == "golden":
-        if target == "xh1":
-            raise NotImplementedError("xh1 not support check golden from hmm")
-        elif target == "xh2":
-            from .exec.xh2_exec import Xh2Exec as Exec
+        from .exec.xh2_exec import Xh2Exec as Exec
+
         Exec.gen_golden(
             args.hmonnx,
             args.output,
@@ -288,22 +284,21 @@ def main():
             logger.error("Batch must be greater than 0")
             return
         if batch > 1:
+            if roi_num != 1:
+                logger.error("batch > 1, roi_num must be == 1")
+                return
             cfg["build"]["batch"] = batch
-        if batch > 1 and roi_num != 1 and target == "xh1":
-            logger.error("batch > 1, roi_num must be == 1")
+        elif roi_num < 1:
+            logger.error("roi_num must be >= 1")
             return
-        if batch == 1 and roi_num < 1 and target == "xh1":
-            logger.error("batch == 1, roi_num must be >= 1")
-            return
-        if roi_num > 1 and target == "xh1":
+        elif roi_num > 1:
             cfg["build"]["roi_num"] = roi_num
         if opt_level is not None:
             cfg["build"]["opt_level"] = opt_level
         if ncore is not None:
-            if ncore == 4 and target == "xh2":
-                logger.error("ncore == 4, target must be xh1")
-                return
             cfg["build"]["ncore"] = ncore
+        if hasattr(args, "jobs"):
+            cfg["build"]["parallel_jobs"] = args.jobs
         # Add upload_dir_name for upload directory
         if hasattr(args, "upload_dir_name") and args.upload_dir_name is not None:
             cfg["build"]["upload_dir_name"] = args.upload_dir_name
@@ -319,17 +314,9 @@ def main():
     logger.info(f"\n{json.dumps(cfg, indent=2, sort_keys=False)}")
 
     hm_exec = None
-    if target == "xh1":
-        from .exec.xh1_exec import Xh1Exec
+    from .exec.xh2_exec import Xh2Exec
 
-        hm_exec = Xh1Exec(cfg)
-    elif target == "xh2":
-        from .exec.xh2_exec import Xh2Exec
-
-        hm_exec = Xh2Exec(cfg)
-    else:
-        logger.error(f"Not support target: {target}")
-        return
+    hm_exec = Xh2Exec(cfg)
 
     new_res_info = dict()
     backend = target
@@ -341,8 +328,6 @@ def main():
             backend = "hmonnx"
     # Execute the corresponding command
     if current_command == "quant":
-        if args.cuda and target == "xh1" and torch.cuda.is_available():
-            hm_exec.device = "cuda"
         new_res_info = hm_exec.quantize()
     elif current_command == "build":
         hm_exec.enable_upload = args.upload

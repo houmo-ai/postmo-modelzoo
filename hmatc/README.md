@@ -1,4 +1,3 @@
-
 # Hmatc
 
 ## 安装
@@ -26,6 +25,8 @@ hmatc gen --onnx your_onnx_path --output your_config_yml_output_path
 ```bash
 # 从配置文件编译
 hmatc build -c config.yml
+# 指定并行任务数加快编译（默认为CPU物理核心数）
+hmatc build -c config.yml -j 8
 # 仅有hmonnx的情况下
 hmatc build --hmonnx your_hmonnx_path
 ```
@@ -120,9 +121,6 @@ model:
         # [可选] 输入为图像时可设置，表示使用静态resizer，默认为true
         #  注意：静态resizer的情况下，crop、padding、resize相关参数被固化到算子内
         enable_static_resizer: true
-        # [可选] 当输入为图像且输入size较小时需要设置为true，反之false，默认为false
-        #  仅xh1有效
-        insert_pad_scatter: false
   # [可选] 模型python实现模块，eval和demo功能必须设置，且必须与yml配置文件同级目录
   #        用于发现模型实现并导入
   model_impl_module:
@@ -140,14 +138,13 @@ quant:
   #  b = np.random.rand(1, 3, 64, 64)  # 预处理后数据
   #  c = {'a': a, 'b': b}
   #  np.savez_compressed('1.npz', **c)
-  # [xh2] 暂不需要校准数据可设置为null
   calib_data: your_calib_data_dir
   # [必填] 校准数据数量
   calib_num: 50
 
 # 模型编译相关选项
 build:
-  # [可选] 表示编译后模型使用几个IPU核进行推理，支持[1, 2, 4]，默认1
+  # [可选] 表示编译后模型使用几个IPU核进行推理，支持[1, 2]，默认1
   ncore: 1
   # [可选] 编译优化等级，目前支持[0, 1, 2]，默认2
   opt_level: 2
@@ -159,6 +156,9 @@ build:
   #  当前编译后模型输入batch为1时，可设置roi_num>1，比如8、16、32
   #  注意仅对dynmiac_reiszer有效
   roi_num: 1
+  # [可选] 编译时并行任务数，默认为CPU物理核心数
+  #  增大可加快编译速度，但会占用更多内存
+  parallel_jobs: 4
 
 # 模型演示相关选项
 demo:

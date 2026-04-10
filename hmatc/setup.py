@@ -36,8 +36,8 @@ except ImportError:
     raise Exception("Please install tcim_lite in current Python environment")
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-if HOUMO_TARGET not in ["xh1", "xh2"]:
-    raise Exception("Please set HOUMO_TARGET to xh1 or xh2")
+if HOUMO_TARGET != "xh2":
+    raise Exception("Please set HOUMO_TARGET to xh2")
 
 
 def get_version():

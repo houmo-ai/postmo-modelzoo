@@ -248,7 +248,7 @@ def clip_resize_scale(src_size, dst_size):
     return nh, nw
 
 
-def xh1_preprocess(
+def resizer_preprocess(
     cv_image,
     input_shape,
     max_input_size,
