@@ -474,6 +474,77 @@ def _check_file_exists(save_path: str, expected_md5: str) -> bool:
         return False
 
 
+def _extract_files_raw(save_path: str, extract_dir: str) -> bool:
+    """
+    Extract files from compressed file.
+
+    :param save_path: the path of compressed file
+    :param extract_dir: the path of extract folder
+    :return: return True if decompression is successful, and False if it fails.
+    """
+
+    if not save_path.strip() or not os.path.exists(save_path):
+        logger.error(f"Invalid path of the compressed file: {save_path}.")
+        return False
+    if not isinstance(extract_dir, str) or not extract_dir.strip():
+        logger.error("The decompression directory cannot be empty.")
+        return False
+
+    import zipfile
+
+    extract_dir = os.path.abspath(extract_dir)
+    os.makedirs(extract_dir, exist_ok=True)
+
+    extract_mapping = {
+        (".zip",): (zipfile.ZipFile, {"mode": "r"}),
+        (".tar",): (tarfile.open, {"mode": "r"}),
+        (".tar.gz", ".tgz"): (tarfile.open, {"mode": "r:gz"}),
+        (".tar.xz",): (tarfile.open, {"mode": "r:xz"}),
+    }
+    save_path_lower = save_path.lower()
+    extract_func = None
+    extract_kwargs = None
+
+    for suffixes, (func, kwargs) in extract_mapping.items():
+        if save_path_lower.endswith(suffixes):
+            extract_func = func
+            extract_kwargs = kwargs
+            break
+
+    if not extract_func:
+        logger.warning(
+            f"Unsupported compression format for decompression: {save_path}. Only supported:.zip/.tar.gz/.tgz/.tar.xz"
+        )
+        return True
+
+    logger.info(f"Start to decompress: {save_path} -> {extract_dir}")
+    try:
+        with extract_func(save_path, **extract_kwargs) as f:
+            f.extractall(path=extract_dir)
+        return True
+    except Exception as e:
+        if save_path_lower.endswith(".tar.xz"):
+            logger.warning(
+                f"The tarfile extraction failed with error message ({str(e)}). Trying to extract it using the system's tar command."
+            )
+            try:
+                subprocess.run(
+                    ["tar", "-xvf", save_path, "-C", extract_dir],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    encoding="utf-8",
+                )
+                return True
+            except subprocess.CalledProcessError as se:
+                logger.error(
+                    f"The system tar command failed to decompress successfully: {se.stderr}"
+                )
+                return False
+        else:
+            logger.error(f"Decompression failed: {str(e)}")
+            return False
+
 def _extract_files(save_path: str, extract_dir: str) -> bool:
     """
     Extract files from compressed file.
@@ -532,10 +603,16 @@ def _extract_files(save_path: str, extract_dir: str) -> bool:
                         break
                     # Verify file content by CRC
                     with open(extracted_path, "rb") as ef:
-                        content = ef.read()
                         import zlib
 
-                        if zlib.crc32(content) != info.CRC:
+                        crc = 0
+                        while True:
+                            chunk = ef.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            crc = zlib.crc32(chunk, crc)
+
+                        if (crc & 0xFFFFFFFF) != info.CRC:
                             need_extract = True
                             logger.info(
                                 f"File CRC mismatch: {extracted_path}, will re-extract"
