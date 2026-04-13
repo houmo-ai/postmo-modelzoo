@@ -69,7 +69,7 @@ if [[ "$VENV_FLAG" -eq "1" ]]; then
         VENV_PYTHON="${dir_path}/bin/python3"
         VENV_SITE=$(${VENV_PYTHON} -c "import site; print(site.getsitepackages()[0])")
         echo "export ORIGINAL_PYTHONPATH=\$PYTHONPATH" >> $dir_path/bin/activate  # 保存原始值
-        echo "export PYTHONPATH=${VENV_SITE}:${SITE_PACKAGES}:\$ORIGINAL_PYTHONPATH" >> $dir_path/bin/activate
+        echo "export PYTHONPATH=\$ORIGINAL_PYTHONPATH:${VENV_SITE}:${SITE_PACKAGES}" >> $dir_path/bin/activate
         echo "export PYTHONPATH=\$ORIGINAL_PYTHONPATH" >> $dir_path/bin/deactivate  # 恢复外部原始值
         echo "unset ORIGINAL_PYTHONPATH" >> $dir_path/bin/deactivate  # 清除临时变量
         sed -i 's/include-system-site-packages = true/include-system-site-packages = false/g' $dir_path/pyvenv.cfg
@@ -78,6 +78,7 @@ if [[ "$VENV_FLAG" -eq "1" ]]; then
     fi
     source $dir_path/bin/activate
     pip3 install -r requirements.txt
+    pip3 install -r ../../../hmodel/gptqmodel/requirements.txt
 fi
 
 PACKAGE_PATTERN=hmquant

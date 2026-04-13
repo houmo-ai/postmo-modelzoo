@@ -48,6 +48,7 @@
 
 ```bash
 pip3 install -r requirements.txt
+pip3 install -r ../../../hmodel/gptqmodel/requirements.txt
 ```
 
 ### 2.2 获取模型和数据
