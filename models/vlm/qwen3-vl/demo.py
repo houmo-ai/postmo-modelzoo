@@ -53,6 +53,10 @@ from perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERF
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
+DEFAULT_MULTI_IMAGE_VIDEO_FPS = 2.0
+DEFAULT_IMAGE_PROMPT = "描述图片内容"
+DEFAULT_VIDEO_PROMPT = "描述视频内容"
+
 
 def is_valid_char(cp):
     if (
@@ -80,7 +84,7 @@ def get_args() -> argparse.Namespace:
         dest="image",
         nargs="*",
         default=None,
-        help="one or more image paths",
+        help="image paths; in video mode, a single image is allowed and will be padded to the visual temporal dimension",
     )
     parser.add_argument(
         "--video",
@@ -90,11 +94,18 @@ def get_args() -> argparse.Namespace:
         help="video path",
     )
     parser.add_argument(
+        "--media_type",
+        dest="media_type",
+        choices=["image", "video"],
+        default=None,
+        help="force image mode or video mode; video mode supports either --video or one or more --image inputs",
+    )
+    parser.add_argument(
         "--prompt",
         dest="prompt",
         type=str,
-        default="请分析输入内容并简洁作答。",
-        help="user prompt",
+        default=None,
+        help="user prompt; defaults to an image or video description prompt based on media_type",
     )
     parser.add_argument(
         "--tokenizer_dir",
@@ -159,6 +170,13 @@ def get_args() -> argparse.Namespace:
         default=1.0,
         help="sampling temperature",
     )
+    parser.add_argument(
+        "--multi_image_video_fps",
+        dest="multi_image_video_fps",
+        type=float,
+        default=DEFAULT_MULTI_IMAGE_VIDEO_FPS,
+        help="fps used when interpreting multiple input images as a pseudo video in video mode",
+    )
     args = parser.parse_args()
     return args
 
@@ -194,7 +212,7 @@ class SamplingManager:
         if self.repetition_penalty == 1.0 or not previous_tokens:
             return logits
 
-        adjusted_logits = logits.copy()
+        adjusted_logits = logits
         for token_id in set(previous_tokens):
             if 0 <= token_id < len(logits):
                 if logits[token_id] < 0:
@@ -379,6 +397,7 @@ class Qwen3VL:
         self.spatial_merge_unit = self.spatial_merge_size * self.spatial_merge_size
         self.batch_size = 1
         self.resize_v1 = True
+        self.multi_image_video_fps = args.multi_image_video_fps
         # set mode
         self.rgb2yuv = QRawToYuv(input_color_type="RGB", toYUV_format="YUV444")
 
@@ -430,40 +449,78 @@ class Qwen3VL:
         content = []
         if media_input is not None:
             if media_type == "video":
-                content.append(
-                    {
-                        "type": "video",
-                        "video": media_input,
-                        "nframes": self.max_size_t,
-                        "resized_height": self.image_size_h,
-                        "resized_width": self.image_size_w,
-                    }
-                )
+                if isinstance(media_input, dict) and "clips" in media_input:
+                    for clip_index, clip in enumerate(media_input["clips"]):
+                        content.append(
+                            {
+                                "type": "video",
+                                "video": f"{media_input.get('source', 'multi_image_sequence')}_{clip_index}",
+                                "nframes": self._get_visual_time_dim(),
+                                "resized_height": self.image_size_h,
+                                "resized_width": self.image_size_w,
+                            }
+                        )
+                else:
+                    video_ref = media_input
+                    nframes = self._get_visual_time_dim()
+                    if isinstance(media_input, dict) and "frames" in media_input:
+                        video_ref = media_input.get("source", "multi_image_sequence")
+                    content.append(
+                        {
+                            "type": "video",
+                            "video": video_ref,
+                            "nframes": nframes,
+                            "resized_height": self.image_size_h,
+                            "resized_width": self.image_size_w,
+                        }
+                    )
             else:
                 for image in media_input:
                     content.append({"type": "image", "image": image})
         content.append({"type": "text", "text": prompt})
         return [{"role": "user", "content": content}]
 
-    def _build_video_raw_clip(self, video_tensor: torch.Tensor) -> torch.Tensor:
+    def _get_visual_time_dim(self) -> int:
+        return max(1, int(self.max_size_t))
+
+    def _fit_video_to_visual_time(
+        self,
+        video_tensor: torch.Tensor,
+        frame_indices: Optional[List[int]] = None,
+    ) -> Tuple[torch.Tensor, List[int]]:
         if video_tensor.dim() != 4:
             raise ValueError(
                 f"Expected sampled video tensor with shape [T, C, H, W], but got {tuple(video_tensor.shape)}"
             )
 
+        num_frames = int(video_tensor.shape[0])
+        if frame_indices is None:
+            frame_indices = list(range(num_frames))
+        if len(frame_indices) != num_frames:
+            raise ValueError(
+                f"Frame indices and video length do not match: {len(frame_indices)} indices vs {num_frames} frames"
+            )
+
+        target_frames = self._get_visual_time_dim()
+        if num_frames > target_frames:
+            selected = (
+                torch.linspace(0, num_frames - 1, target_frames).round().long().tolist()
+            )
+            video_tensor = video_tensor.index_select(
+                0, torch.tensor(selected, dtype=torch.long)
+            )
+            frame_indices = [frame_indices[index] for index in selected]
+        elif num_frames < target_frames:
+            pad_count = target_frames - num_frames
+            pad_frames = video_tensor[-1:].repeat(pad_count, 1, 1, 1)
+            video_tensor = torch.cat([video_tensor, pad_frames], dim=0)
+            frame_indices = frame_indices + [frame_indices[-1]] * pad_count
+
+        return video_tensor.contiguous(), frame_indices
+
+    def _build_video_raw_clip(self, video_tensor: torch.Tensor) -> torch.Tensor:
+        video_tensor, _ = self._fit_video_to_visual_time(video_tensor)
         video_tensor = video_tensor.float()
-        if video_tensor.shape[0] != self.max_size_t:
-            if video_tensor.shape[0] > self.max_size_t:
-                indices = (
-                    torch.linspace(0, video_tensor.shape[0] - 1, self.max_size_t)
-                    .round()
-                    .long()
-                )
-                video_tensor = video_tensor.index_select(0, indices)
-            else:
-                pad_count = self.max_size_t - video_tensor.shape[0]
-                pad_frames = video_tensor[-1:].repeat(pad_count, 1, 1, 1)
-                video_tensor = torch.cat([video_tensor, pad_frames], dim=0)
 
         if video_tensor.shape[-2:] != (self.image_size_h, self.image_size_w):
             video_tensor = F.interpolate(
@@ -476,10 +533,15 @@ class Qwen3VL:
         return video_tensor.permute(1, 0, 2, 3).unsqueeze(0).contiguous()
 
     def _build_sampled_video_metadata(
-        self, video_tensor: torch.Tensor, sample_fps: float
+        self,
+        video_tensor: torch.Tensor,
+        sample_fps: float,
+        frame_indices: Optional[List[int]] = None,
     ) -> List[VideoMetadata]:
         num_frames = int(video_tensor.shape[0])
         duration = None if sample_fps <= 0 else num_frames / sample_fps
+        if frame_indices is None:
+            frame_indices = list(range(num_frames))
         return [
             VideoMetadata(
                 total_num_frames=num_frames,
@@ -488,9 +550,62 @@ class Qwen3VL:
                 height=int(video_tensor.shape[-2]),
                 duration=duration,
                 video_backend="sampled_clip",
-                frames_indices=list(range(num_frames)),
+                frames_indices=frame_indices,
             )
         ]
+
+    def _should_build_pseudo_video_from_images(
+        self, media_input, media_type: str
+    ) -> bool:
+        return (
+            media_type == "video"
+            and isinstance(media_input, list)
+            and len(media_input) > 0
+        )
+
+    def _build_video_frames_from_images(
+        self, pil_images: List[Image.Image]
+    ) -> List[torch.Tensor]:
+        frames = []
+        for image in pil_images:
+            frame = np.asarray(image)
+            if frame.ndim != 3 or frame.shape[2] != 3:
+                raise ValueError(
+                    f"Expected RGB image frame with shape [H, W, 3], but got {frame.shape}"
+                )
+            frames.append(torch.from_numpy(frame).permute(2, 0, 1).contiguous())
+
+        clips = []
+        for start in range(0, len(frames), self.max_size_t):
+            clip_frames = frames[start : start + self.max_size_t]
+            clips.append(torch.stack(clip_frames, dim=0).contiguous())
+
+        return clips
+
+    def _build_chunked_video_from_images(self, pil_images: List[Image.Image]) -> dict:
+        raw_clips = self._build_video_frames_from_images(pil_images)
+        clips = []
+        clip_frame_indices = []
+        for clip_index, start in enumerate(range(0, len(pil_images), self.max_size_t)):
+            raw_clip = raw_clips[clip_index]
+            indices = list(range(start, min(start + self.max_size_t, len(pil_images))))
+            normalized_clip, normalized_indices = self._fit_video_to_visual_time(
+                raw_clip, indices
+            )
+            clips.append(normalized_clip)
+            clip_frame_indices.append(normalized_indices)
+
+        if len(clips) != len(clip_frame_indices):
+            raise ValueError(
+                f"Chunked video clips and frame indices do not align: {len(clips)} clips vs {len(clip_frame_indices)} index groups"
+            )
+
+        return {
+            "clips": clips,
+            "fps": self.multi_image_video_fps,
+            "source": "multi_image_sequence",
+            "clip_frame_indices": clip_frame_indices,
+        }
 
     def preprocess(self, prompt, media_input, processor, media_type="image"):
         from qwen_vl_utils import process_vision_info
@@ -500,13 +615,51 @@ class Qwen3VL:
             messages, tokenize=False, add_generation_prompt=True
         )
         if media_input is not None and media_type == "video":
-            image_inputs, video_inputs, video_kwargs = process_vision_info(
-                messages, return_video_kwargs=True
-            )
-            sampled_video = video_inputs[0]
-            sampled_metadata = self._build_sampled_video_metadata(
-                sampled_video, float(video_kwargs["fps"][0])
-            )
+            if isinstance(media_input, dict) and "clips" in media_input:
+                image_inputs = None
+                video_inputs = []
+                sampled_metadata = []
+                hm_pixel_values = []
+                for clip_index, sampled_video in enumerate(media_input["clips"]):
+                    frame_indices = media_input["clip_frame_indices"][clip_index]
+                    sampled_video, frame_indices = self._fit_video_to_visual_time(
+                        sampled_video, frame_indices
+                    )
+                    video_inputs.append(sampled_video)
+                    sampled_metadata.extend(
+                        self._build_sampled_video_metadata(
+                            sampled_video,
+                            float(media_input.get("fps", self.multi_image_video_fps)),
+                            frame_indices=frame_indices,
+                        )
+                    )
+                    hm_pixel_values.append(self._build_video_raw_clip(sampled_video))
+            elif isinstance(media_input, dict) and "frames" in media_input:
+                image_inputs = None
+                sampled_video, frame_indices = self._fit_video_to_visual_time(
+                    media_input["frames"]
+                )
+                sampled_metadata = self._build_sampled_video_metadata(
+                    sampled_video,
+                    float(media_input.get("fps", self.multi_image_video_fps)),
+                    frame_indices=frame_indices,
+                )
+                video_inputs = [sampled_video]
+                hm_pixel_values = [self._build_video_raw_clip(sampled_video)]
+            else:
+                image_inputs, video_inputs, video_kwargs = process_vision_info(
+                    messages, return_video_kwargs=True
+                )
+                sampled_video, frame_indices = self._fit_video_to_visual_time(
+                    video_inputs[0]
+                )
+                video_inputs = [sampled_video]
+                sampled_metadata = self._build_sampled_video_metadata(
+                    sampled_video,
+                    float(video_kwargs["fps"][0]),
+                    frame_indices=frame_indices,
+                )
+                hm_pixel_values = [self._build_video_raw_clip(sampled_video)]
             inputs = processor(
                 text=[text],
                 images=image_inputs,
@@ -518,7 +671,7 @@ class Qwen3VL:
                     "return_metadata": True,
                 },
             )
-            inputs["hm_pixel_values"] = [self._build_video_raw_clip(sampled_video)]
+            inputs["hm_pixel_values"] = hm_pixel_values
         elif media_input is not None:
             image_inputs, video_inputs = process_vision_info(
                 messages, image_patch_size=self.patch_size
@@ -899,7 +1052,6 @@ class Qwen3VL:
                 raise ValueError(
                     "At least one of deepstack_image_embeds or deepstack_video_embeds must be provided when visual tokens exist."
                 )
-
             if deepstack_image_embeds is not None:
                 num_deepstack_layers = len(deepstack_image_embeds)
             else:
@@ -1094,12 +1246,13 @@ class Qwen3VL:
     ):
         self.generated_ids = []
         model_media_input = media_input
+        effective_media_type = media_type
         self.skip_tokens = 0
         self.slide_len = 10
 
         self.perf_tracker.perf_start(PERFTYPE.VISION_TOTAL_TIME)
         self.perf_tracker.perf_start(PERFTYPE.VISION_PREPROCESS_TIME)
-        if media_input is not None and media_type == "image":
+        if media_input is not None and isinstance(media_input, list):
             pil_images = []
             for image_path in media_input:
                 if self.resize_v1:
@@ -1107,7 +1260,10 @@ class Qwen3VL:
                 else:
                     pil_image = self.load_and_process_image_v2(image_path)
                 pil_images.append(pil_image)
-            model_media_input = pil_images
+            if self._should_build_pseudo_video_from_images(media_input, media_type):
+                model_media_input = self._build_chunked_video_from_images(pil_images)
+            else:
+                model_media_input = pil_images
         else:
             model_media_input = media_input
         self.perf_tracker.perf_end(PERFTYPE.VISION_PREPROCESS_TIME)
@@ -1115,7 +1271,10 @@ class Qwen3VL:
 
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
         inputs = self.preprocess(
-            prompt, model_media_input, self.processor, media_type=media_type
+            prompt,
+            model_media_input,
+            self.processor,
+            media_type=effective_media_type,
         )
         inputs = inputs.to(self.device)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
@@ -1163,7 +1322,7 @@ class Qwen3VL:
             "image_grid_thw": inputs.get("image_grid_thw", None),
             "video_grid_thw": inputs.get("video_grid_thw", None),
         }
-        if media_type == "video":
+        if effective_media_type == "video":
             data_prefill["video_embeds"] = image_features
             data_prefill["deepstack_video_embeds"] = deepstack_image_features
         else:
@@ -1310,20 +1469,40 @@ if __name__ == "__main__":
     if args.video and args.image:
         raise ValueError("--video and --image cannot be used together")
 
-    if args.video:
+    if args.media_type is not None:
+        media_type = args.media_type
+    elif args.video:
         media_type = "video"
+    else:
+        media_type = "image"
+
+    if args.video:
         media_input = args.video
         visual_num = 1
     elif args.image:
-        media_type = "image"
         media_input = args.image
         visual_num = len(args.image)
     else:
-        media_type = "image"
         media_input = ["../../../data/pic/beach.jpeg"]
         visual_num = len(media_input)
 
-    prompt = args.prompt
+    if media_type == "image" and isinstance(media_input, str):
+        raise ValueError(
+            "image mode does not support --video; use --media_type video or remove --video"
+        )
+
+    if (
+        media_type == "video"
+        and isinstance(media_input, list)
+        and len(media_input) == 0
+    ):
+        raise ValueError("video mode with --image requires at least 1 image")
+
+    prompt = (
+        args.prompt
+        if args.prompt is not None
+        else (DEFAULT_VIDEO_PROMPT if media_type == "video" else DEFAULT_IMAGE_PROMPT)
+    )
     logger.success("question:")
     print("\033[1;95m{}\033[0m".format(prompt))
     input_tokens = qwen3vl.chat_vit_prefill(

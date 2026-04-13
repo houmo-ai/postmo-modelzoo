@@ -120,10 +120,30 @@ Qwen3-vl模型使用python API进行演示
 
 注意：由于ubuntu18.04下qwen_vl_utils无法正常安装，导致无法正常运行。
 
+`demo.py` 现在支持显式指定输入模式：
+
+- 图片模式：使用 `--image` 输入一张或多张图片。
+- 视频模式：使用 `--video` 输入真实视频，或者使用 `--media_type video --image ...` 将一张或多张图片按伪视频方式输入。
+- 当未显式指定 `--prompt` 时，图片模式默认提示词为“描述图片内容”，视频模式默认提示词为“描述视频内容”。
+- 视频模式下，无论输入真实视频还是图片伪视频，都会按 visual 模型时间维度自动进行抽帧或 padding。
+- 多图伪视频的时间语义可通过 `--multi_image_video_fps` 指定，默认值为 `2.0`。
+
 ```bash
 # Qwen3-VL-4B 推荐惩罚系数是4
 # Qwen3-VL-8B 推荐惩罚系数是1.5
-python3 demo.py --repetition_penalty 1.5
+
+# 单图或多图图片模式
+python3 demo.py --image ../../../data/pic/beach.jpeg --repetition_penalty 1.5
+python3 demo.py --image img1.jpg img2.jpg img3.jpg --repetition_penalty 1.5
+
+# 真实视频模式
+python3 demo.py --media_type video --video demo.mp4 --repetition_penalty 1.5
+
+# 多图伪视频模式
+python3 demo.py --media_type video --image img1.jpg img2.jpg img3.jpg --repetition_penalty 1.5
+
+# 指定多图伪视频的 fps
+python3 demo.py --media_type video --image img1.jpg img2.jpg img3.jpg --multi_image_video_fps 4 --repetition_penalty 1.5
 ```
 
 ### 2.6 一键评估
