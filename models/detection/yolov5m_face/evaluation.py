@@ -1,349 +1,396 @@
-"""
-WiderFace evaluation code
-"""
+# Copyright 2025 HOUMO AI
+#
+# File: evaluation.py
+# Description:
+#   Evaluation code for YOLOv5m face detection model on WiderFace dataset.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import os
-import tqdm
 import pickle
+
 import numpy as np
+import tqdm
 from scipy.io import loadmat
 
 
+def _load_widerface_mat_files(gt_dir):
+    return {
+        "base": loadmat(os.path.join(gt_dir, "wider_face_val.mat")),
+        "easy": loadmat(os.path.join(gt_dir, "wider_easy_val.mat")),
+        "medium": loadmat(os.path.join(gt_dir, "wider_medium_val.mat")),
+        "hard": loadmat(os.path.join(gt_dir, "wider_hard_val.mat")),
+    }
+
+
 def get_gt_boxes(gt_dir):
-    """gt dir: (wider_face_val.mat, wider_easy_val.mat, wider_medium_val.mat, wider_hard_val.mat)"""
+    """Load WiderFace validation annotations from mat files."""
 
-    gt_mat = loadmat(os.path.join(gt_dir, "wider_face_val.mat"))
-    hard_mat = loadmat(os.path.join(gt_dir, "wider_hard_val.mat"))
-    medium_mat = loadmat(os.path.join(gt_dir, "wider_medium_val.mat"))
-    easy_mat = loadmat(os.path.join(gt_dir, "wider_easy_val.mat"))
+    mat_files = _load_widerface_mat_files(gt_dir)
+    base_annotations = mat_files["base"]
 
-    facebox_list = gt_mat["face_bbx_list"]
-    event_list = gt_mat["event_list"]
-    file_list = gt_mat["file_list"]
+    face_boxes_by_event = base_annotations["face_bbx_list"]
+    event_names = base_annotations["event_list"]
+    image_names = base_annotations["file_list"]
 
-    hard_gt_list = hard_mat["gt_list"]
-    medium_gt_list = medium_mat["gt_list"]
-    easy_gt_list = easy_mat["gt_list"]
+    hard_gt = mat_files["hard"]["gt_list"]
+    medium_gt = mat_files["medium"]["gt_list"]
+    easy_gt = mat_files["easy"]["gt_list"]
 
     print(
         "event_list num:",
-        len(event_list),
+        len(event_names),
         ", easy num:",
-        len(easy_gt_list),
+        len(easy_gt),
         ", medium num:",
-        len(medium_gt_list),
+        len(medium_gt),
         ", hard num:",
-        len(hard_gt_list),
+        len(hard_gt),
     )
 
     return (
-        facebox_list,
-        event_list,
-        file_list,
-        hard_gt_list,
-        medium_gt_list,
-        easy_gt_list,
+        face_boxes_by_event,
+        event_names,
+        image_names,
+        hard_gt,
+        medium_gt,
+        easy_gt,
     )
 
 
 def get_gt_boxes_from_txt(gt_path, cache_dir):
-
     cache_file = os.path.join(cache_dir, "gt_cache.pkl")
     if os.path.exists(cache_file):
-        f = open(cache_file, "rb")
-        boxes = pickle.load(f)
-        f.close()
-        return boxes
+        with open(cache_file, "rb") as file_obj:
+            return pickle.load(file_obj)
 
-    f = open(gt_path, "r")
-    state = 0
-    lines = f.readlines()
-    lines = list(map(lambda x: x.rstrip("\r\n"), lines))
-    boxes = {}
-    print(len(lines))
-    f.close()
-    current_boxes = []
+    with open(gt_path, "r") as file_obj:
+        raw_lines = [line.rstrip("\r\n") for line in file_obj]
+
+    print(len(raw_lines))
+    boxes_by_image = {}
     current_name = None
-    for line in lines:
-        if state == 0 and "--" in line:
-            state = 1
-            current_name = line
-            continue
-        if state == 1:
-            state = 2
-            continue
+    current_boxes = []
+    parse_state = 0
 
-        if state == 2 and "--" in line:
-            state = 1
-            boxes[current_name] = np.array(current_boxes).astype("float32")
+    for line in raw_lines:
+        if "--" in line:
+            if parse_state == 2 and current_name is not None:
+                boxes_by_image[current_name] = np.asarray(
+                    current_boxes, dtype=np.float32
+                )
             current_name = line
             current_boxes = []
+            parse_state = 1
             continue
 
-        if state == 2:
-            box = [float(x) for x in line.split(" ")[:4]]
-            current_boxes.append(box)
+        if parse_state == 1:
+            parse_state = 2
             continue
 
-    f = open(cache_file, "wb")
-    pickle.dump(boxes, f)
-    f.close()
-    return boxes
+        if parse_state == 2:
+            current_boxes.append([float(value) for value in line.split(" ")[:4]])
+
+    if parse_state == 2 and current_name is not None:
+        boxes_by_image[current_name] = np.asarray(current_boxes, dtype=np.float32)
+
+    with open(cache_file, "wb") as file_obj:
+        pickle.dump(boxes_by_image, file_obj)
+
+    return boxes_by_image
+
+
+def _parse_prediction_lines(lines):
+    detections = []
+    for line in lines:
+        fields = line.rstrip("\r\n").split(" ")
+        if not fields or fields[0] == "":
+            continue
+        detections.append([float(fields[index]) for index in range(5)])
+    return np.asarray(detections)
 
 
 def read_pred_file(filepath):
+    with open(filepath, "r") as file_obj:
+        lines = file_obj.readlines()
 
-    with open(filepath, "r") as f:
-        lines = f.readlines()
-        img_file = lines[0].rstrip("\n\r")
-        lines = lines[2:]
-
-    # b = lines[0].rstrip('\r\n').split(' ')[:-1]
-    # c = float(b)
-    # a = map(lambda x: [[float(a[0]), float(a[1]), float(a[2]), float(a[3]), float(a[4])] for a in x.rstrip('\r\n').split(' ')], lines)
-    boxes = []
-    for line in lines:
-        line = line.rstrip("\r\n").split(" ")
-        if line[0] == "":
-            continue
-        # a = float(line[4])
-        boxes.append(
-            [
-                float(line[0]),
-                float(line[1]),
-                float(line[2]),
-                float(line[3]),
-                float(line[4]),
-            ]
-        )
-    boxes = np.array(boxes)
-    # boxes = np.array(list(map(lambda x: [float(a) for a in x.rstrip('\r\n').split(' ')], lines))).astype('float')
-    return img_file.split("/")[-1], boxes
+    image_path = lines[0].rstrip("\n\r")
+    boxes = _parse_prediction_lines(lines[2:])
+    return image_path.split("/")[-1], boxes
 
 
 def get_preds(pred_dir):
-    events = os.listdir(pred_dir)
-    boxes = dict()
-    pbar = tqdm.tqdm(events)
+    event_names = os.listdir(pred_dir)
+    predictions = {}
+    progress = tqdm.tqdm(event_names)
 
-    for event in pbar:
-        pbar.set_description("Reading Predictions ")
-        event_dir = os.path.join(pred_dir, event)
-        event_images = os.listdir(event_dir)
-        current_event = dict()
-        for imgtxt in event_images:
-            imgname, _boxes = read_pred_file(os.path.join(event_dir, imgtxt))
-            current_event[imgname.rstrip(".jpg")] = _boxes
-        boxes[event] = current_event
-    return boxes
+    for event_name in progress:
+        progress.set_description("Reading Predictions ")
+        event_dir = os.path.join(pred_dir, event_name)
+        image_files = os.listdir(event_dir)
+        event_predictions = {}
+        for image_file in image_files:
+            image_name, image_boxes = read_pred_file(
+                os.path.join(event_dir, image_file)
+            )
+            event_predictions[image_name.rstrip(".jpg")] = image_boxes
+        predictions[event_name] = event_predictions
+
+    return predictions
 
 
 def norm_score(pred):
-    """norm score
-    pred {key: [[x1,y1,x2,y2,s]]}
-    """
+    """Normalize confidence scores into [0, 1]."""
 
-    max_score = 0
-    min_score = 1
+    global_max = 0
+    global_min = 1
 
-    for _, k in pred.items():
-        for _, v in k.items():
-            if len(v) == 0:
+    for event_predictions in pred.values():
+        for image_predictions in event_predictions.values():
+            if len(image_predictions) == 0:
                 continue
-            _min = np.min(v[:, -1])
-            _max = np.max(v[:, -1])
-            max_score = max(_max, max_score)
-            min_score = min(_min, min_score)
+            global_min = min(global_min, np.min(image_predictions[:, -1]))
+            global_max = max(global_max, np.max(image_predictions[:, -1]))
 
-    diff = max_score - min_score
-    for _, k in pred.items():
-        for _, v in k.items():
-            if len(v) == 0:
+    score_range = global_max - global_min
+    if score_range == 0:
+        return
+
+    for event_predictions in pred.values():
+        for image_predictions in event_predictions.values():
+            if len(image_predictions) == 0:
                 continue
-            v[:, -1] = (v[:, -1] - min_score) / diff
+            image_predictions[:, -1] = (
+                image_predictions[:, -1] - global_min
+            ) / score_range
 
 
 def bbox_overlaps(boxes, query_boxes):
-    """
-    Parameters
-    ----------
-    boxes: (N, 4) ndarray of float
-    query_boxes: (K, 4) ndarray of float
-    Returns
-    -------
-    overlaps: (N, K) ndarray of overlap between boxes and query_boxes
-    """
-    N = boxes.shape[0]
-    K = query_boxes.shape[0]
-    overlaps = np.zeros((N, K), dtype=np.float64)
+    """Compute IoU matrix between predicted boxes and target boxes."""
 
-    for k in range(K):
-        box_area = (query_boxes[k, 2] - query_boxes[k, 0] + 1) * (
-            query_boxes[k, 3] - query_boxes[k, 1] + 1
+    num_boxes = boxes.shape[0]
+    num_queries = query_boxes.shape[0]
+    iou_matrix = np.zeros((num_boxes, num_queries), dtype=np.float64)
+
+    for query_index in range(num_queries):
+        query_area = (query_boxes[query_index, 2] - query_boxes[query_index, 0] + 1) * (
+            query_boxes[query_index, 3] - query_boxes[query_index, 1] + 1
         )
-        for n in range(N):
-            iw = (
-                min(boxes[n, 2], query_boxes[k, 2])
-                - max(boxes[n, 0], query_boxes[k, 0])
+        for box_index in range(num_boxes):
+            inter_width = (
+                min(boxes[box_index, 2], query_boxes[query_index, 2])
+                - max(boxes[box_index, 0], query_boxes[query_index, 0])
                 + 1
             )
-            if iw > 0:
-                ih = (
-                    min(boxes[n, 3], query_boxes[k, 3])
-                    - max(boxes[n, 1], query_boxes[k, 1])
-                    + 1
-                )
-                if ih > 0:
-                    ua = float(
-                        (boxes[n, 2] - boxes[n, 0] + 1)
-                        * (boxes[n, 3] - boxes[n, 1] + 1)
-                        + box_area
-                        - iw * ih
-                    )
-                    overlaps[n, k] = iw * ih / ua
-    return overlaps
+            if inter_width <= 0:
+                continue
+
+            inter_height = (
+                min(boxes[box_index, 3], query_boxes[query_index, 3])
+                - max(boxes[box_index, 1], query_boxes[query_index, 1])
+                + 1
+            )
+            if inter_height <= 0:
+                continue
+
+            union_area = float(
+                (boxes[box_index, 2] - boxes[box_index, 0] + 1)
+                * (boxes[box_index, 3] - boxes[box_index, 1] + 1)
+                + query_area
+                - inter_width * inter_height
+            )
+            iou_matrix[box_index, query_index] = inter_width * inter_height / union_area
+
+    return iou_matrix
+
+
+def _convert_xywh_to_xyxy(box_array):
+    converted = box_array.copy()
+    converted[:, 2] = converted[:, 2] + converted[:, 0]
+    converted[:, 3] = converted[:, 3] + converted[:, 1]
+    return converted
 
 
 def image_eval(pred, gt, ignore, iou_thresh):
-    """single image evaluation
-    pred: Nx5
-    gt: Nx4
-    ignore:
-    """
+    """Evaluate predictions for a single image."""
 
-    _pred = pred.copy()
-    _gt = gt.copy()
-    pred_recall = np.zeros(_pred.shape[0])
-    recall_list = np.zeros(_gt.shape[0])
-    proposal_list = np.ones(_pred.shape[0])
+    pred_boxes = _convert_xywh_to_xyxy(pred.copy())
+    gt_boxes = _convert_xywh_to_xyxy(gt.copy())
 
-    _pred[:, 2] = _pred[:, 2] + _pred[:, 0]
-    _pred[:, 3] = _pred[:, 3] + _pred[:, 1]
-    _gt[:, 2] = _gt[:, 2] + _gt[:, 0]
-    _gt[:, 3] = _gt[:, 3] + _gt[:, 1]
+    cumulative_recall = np.zeros(pred_boxes.shape[0])
+    gt_match_state = np.zeros(gt_boxes.shape[0])
+    proposal_state = np.ones(pred_boxes.shape[0])
 
-    overlaps = bbox_overlaps(_pred[:, :4], _gt)
+    overlaps = bbox_overlaps(pred_boxes[:, :4], gt_boxes)
 
-    for h in range(_pred.shape[0]):
+    for pred_index in range(pred_boxes.shape[0]):
+        row_overlaps = overlaps[pred_index]
+        best_iou = row_overlaps.max()
+        best_gt_index = row_overlaps.argmax()
 
-        gt_overlap = overlaps[h]
-        max_overlap, max_idx = gt_overlap.max(), gt_overlap.argmax()
-        if max_overlap >= iou_thresh:
-            if ignore[max_idx] == 0:
-                recall_list[max_idx] = -1
-                proposal_list[h] = -1
-            elif recall_list[max_idx] == 0:
-                recall_list[max_idx] = 1
+        if best_iou >= iou_thresh:
+            if ignore[best_gt_index] == 0:
+                gt_match_state[best_gt_index] = -1
+                proposal_state[pred_index] = -1
+            elif gt_match_state[best_gt_index] == 0:
+                gt_match_state[best_gt_index] = 1
 
-        r_keep_index = np.where(recall_list == 1)[0]
-        pred_recall[h] = len(r_keep_index)
-    return pred_recall, proposal_list
+        cumulative_recall[pred_index] = len(np.where(gt_match_state == 1)[0])
+
+    return cumulative_recall, proposal_state
 
 
 def img_pr_info(thresh_num, pred_info, proposal_list, pred_recall):
-    pr_info = np.zeros((thresh_num, 2)).astype("float")
-    for t in range(thresh_num):
+    pr_info = np.zeros((thresh_num, 2), dtype=float)
+    for thresh_index in range(thresh_num):
+        score_thresh = 1 - (thresh_index + 1) / thresh_num
+        passed_indices = np.where(pred_info[:, 4] >= score_thresh)[0]
+        if len(passed_indices) == 0:
+            continue
 
-        thresh = 1 - (t + 1) / thresh_num
-        r_index = np.where(pred_info[:, 4] >= thresh)[0]
-        if len(r_index) == 0:
-            pr_info[t, 0] = 0
-            pr_info[t, 1] = 0
-        else:
-            r_index = r_index[-1]
-            p_index = np.where(proposal_list[: r_index + 1] == 1)[0]
-            pr_info[t, 0] = len(p_index)
-            pr_info[t, 1] = pred_recall[r_index]
+        last_index = passed_indices[-1]
+        valid_proposals = np.where(proposal_list[: last_index + 1] == 1)[0]
+        pr_info[thresh_index, 0] = len(valid_proposals)
+        pr_info[thresh_index, 1] = pred_recall[last_index]
+
     return pr_info
 
 
 def dataset_pr_info(thresh_num, pr_curve, count_face):
-    _pr_curve = np.zeros((thresh_num, 2))
-    for i in range(thresh_num):
-        _pr_curve[i, 0] = pr_curve[i, 1] / pr_curve[i, 0]
-        _pr_curve[i, 1] = pr_curve[i, 1] / count_face
-    return _pr_curve
+    aggregated_curve = np.zeros((thresh_num, 2), dtype=float)
+    for thresh_index in range(thresh_num):
+        if pr_curve[thresh_index, 0] != 0:
+            aggregated_curve[thresh_index, 0] = (
+                pr_curve[thresh_index, 1] / pr_curve[thresh_index, 0]
+            )
+        if count_face != 0:
+            aggregated_curve[thresh_index, 1] = pr_curve[thresh_index, 1] / count_face
+    return aggregated_curve
 
 
 def voc_ap(rec, prec):
+    recall_points = np.concatenate(([0.0], rec, [1.0]))
+    precision_points = np.concatenate(([0.0], prec, [0.0]))
 
-    # correct AP calculation
-    # first append sentinel values at the end
-    mrec = np.concatenate(([0.0], rec, [1.0]))
-    mpre = np.concatenate(([0.0], prec, [0.0]))
+    for index in range(precision_points.size - 1, 0, -1):
+        precision_points[index - 1] = np.maximum(
+            precision_points[index - 1], precision_points[index]
+        )
 
-    # compute the precision envelope
-    for i in range(mpre.size - 1, 0, -1):
-        mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
+    changed_indices = np.where(recall_points[1:] != recall_points[:-1])[0]
+    return np.sum(
+        (recall_points[changed_indices + 1] - recall_points[changed_indices])
+        * precision_points[changed_indices + 1]
+    )
 
-    # to calculate area under PR curve, look for points
-    # where X axis (recall) changes value
-    i = np.where(mrec[1:] != mrec[:-1])[0]
 
-    # and sum (\Delta recall) * prec
-    ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
-    return ap
+def _iter_setting_data(facebox_list, file_list, gt_list, event_list):
+    for event_index, event_entry in enumerate(event_list):
+        yield {
+            "event_name": str(event_entry[0][0]),
+            "image_list": file_list[event_index][0],
+            "keep_list": gt_list[event_index][0],
+            "gt_box_list": facebox_list[event_index][0],
+        }
+
+
+def _evaluate_one_setting(
+    setting_name,
+    pred,
+    facebox_list,
+    file_list,
+    gt_list,
+    event_list,
+    iou_thresh,
+    thresh_num,
+):
+    total_faces = 0
+    pr_curve = np.zeros((thresh_num, 2), dtype=float)
+    progress = tqdm.tqdm(
+        _iter_setting_data(facebox_list, file_list, gt_list, event_list),
+        total=len(event_list),
+    )
+
+    for event_data in progress:
+        progress.set_description(f"Processing {setting_name}")
+        event_name = event_data["event_name"]
+        if event_name not in pred:
+            continue
+
+        event_predictions = pred[event_name]
+        image_list = event_data["image_list"]
+        keep_list = event_data["keep_list"]
+        gt_box_list = event_data["gt_box_list"]
+
+        for image_index, image_entry in enumerate(image_list):
+            image_name = str(image_entry[0][0])
+            if image_name not in event_predictions:
+                continue
+
+            pred_info = event_predictions[image_name]
+            gt_boxes = gt_box_list[image_index][0].astype(float)
+            keep_index = keep_list[image_index][0]
+            total_faces += len(keep_index)
+
+            if len(gt_boxes) == 0 or len(pred_info) == 0:
+                continue
+
+            ignore = np.zeros(gt_boxes.shape[0])
+            if len(keep_index) != 0:
+                ignore[keep_index - 1] = 1
+
+            pred_recall, proposal_list = image_eval(
+                pred_info, gt_boxes, ignore, iou_thresh
+            )
+            pr_curve += img_pr_info(thresh_num, pred_info, proposal_list, pred_recall)
+
+    normalized_curve = dataset_pr_info(thresh_num, pr_curve, total_faces)
+    precision = normalized_curve[:, 0]
+    recall = normalized_curve[:, 1]
+    return voc_ap(recall, precision)
 
 
 def evaluation(pred, gt_path, iou_thresh=0.5):
     pred = get_preds(pred)
     norm_score(pred)
+
     facebox_list, event_list, file_list, hard_gt_list, medium_gt_list, easy_gt_list = (
         get_gt_boxes(gt_path)
     )
-    event_num = len(event_list)
+
     thresh_num = 1000
-    settings = ["easy", "medium", "hard"]
-    setting_gts = [easy_gt_list, medium_gt_list, hard_gt_list]
+    setting_pairs = [
+        ("easy", easy_gt_list),
+        ("medium", medium_gt_list),
+        ("hard", hard_gt_list),
+    ]
+
     aps = []
-    for setting_id in range(3):
-        gt_list = setting_gts[setting_id]
-        count_face = 0
-        pr_curve = np.zeros((thresh_num, 2)).astype("float")
-        # [hard, medium, easy]
-        pbar = tqdm.tqdm(range(event_num))
-        for i in pbar:
-            pbar.set_description("Processing {}".format(settings[setting_id]))
-            event_name = str(event_list[i][0][0])
-            img_list = file_list[i][0]
-            if event_name not in pred:
-                continue
-            pred_list = pred[event_name]
-            sub_gt_list = gt_list[i][0]
-            # img_pr_info_list = np.zeros((len(img_list), thresh_num, 2))
-            gt_bbx_list = facebox_list[i][0]
-
-            for j in range(len(img_list)):
-                tmp_img_name = str(img_list[j][0][0])
-                if tmp_img_name not in pred_list:
-                    continue
-
-                pred_info = pred_list[tmp_img_name]
-                gt_boxes = gt_bbx_list[j][0].astype("float")
-                keep_index = sub_gt_list[j][0]
-                count_face += len(keep_index)
-
-                if len(gt_boxes) == 0 or len(pred_info) == 0:
-                    continue
-                ignore = np.zeros(gt_boxes.shape[0])
-                if len(keep_index) != 0:
-                    ignore[keep_index - 1] = 1
-                pred_recall, proposal_list = image_eval(
-                    pred_info, gt_boxes, ignore, iou_thresh
-                )
-
-                _img_pr_info = img_pr_info(
-                    thresh_num, pred_info, proposal_list, pred_recall
-                )
-
-                pr_curve += _img_pr_info
-        pr_curve = dataset_pr_info(thresh_num, pr_curve, count_face)
-
-        propose = pr_curve[:, 0]
-        recall = pr_curve[:, 1]
-
-        ap = voc_ap(recall, propose)
-        aps.append(ap)
+    for setting_name, gt_list in setting_pairs:
+        aps.append(
+            _evaluate_one_setting(
+                setting_name,
+                pred,
+                facebox_list,
+                file_list,
+                gt_list,
+                event_list,
+                iou_thresh,
+                thresh_num,
+            )
+        )
 
     print("==================== Results ====================")
     print("Easy   Val AP: {}".format(aps[0]))

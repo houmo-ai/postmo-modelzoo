@@ -77,12 +77,12 @@ hmatc demo -c config.yml -t xh2 --onnx
 ### 3.2 性能结果
 
 ```bash
-[Latency] Inference  avg:  24.027 ms, max:  24.840 ms, min:  11.392 ms, tp99:  24.466 ms, tp999:  24.840 ms
-[Latency] Input      avg:   0.909 ms, max:   2.157 ms, min:   0.519 ms, tp99:   1.023 ms, tp999:   2.157 ms
-[Latency] Output     avg:   0.455 ms, max:   0.694 ms, min:   0.292 ms, tp99:   0.613 ms, tp999:   0.694 ms
-[Latency] End2end    avg:  25.391 ms, max:  26.142 ms, min:  12.606 ms, tp99:  25.599 ms, tp999:  26.142 ms
-[Throughput] total: 6384.589 ms, avg: 6.385 ms, repeat: 1000, rounds: 1
-[Throughput] qps: 156.627
+[Latency] Inference  avg:  13.191 ms, max:  14.118 ms, min:   8.711 ms, tp99:  13.956 ms, tp999:  14.118 ms
+[Latency] Input      avg:   0.694 ms, max:   0.865 ms, min:   0.283 ms, tp99:   0.800 ms, tp999:   0.865 ms
+[Latency] Output     avg:   0.627 ms, max:   0.769 ms, min:   0.315 ms, tp99:   0.713 ms, tp999:   0.769 ms
+[Latency] End2end    avg:  14.512 ms, max:  15.099 ms, min:  10.050 ms, tp99:  14.925 ms, tp999:  15.099 ms
+[Throughput] total: 3644.023 ms, avg: 3.644 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 274.422
 ```
 
 ## 4.免责声明
