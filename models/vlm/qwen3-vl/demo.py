@@ -368,12 +368,6 @@ class Qwen3VL:
         self.decode = tcim.runtime.load(os.path.join(decode_path), option=option2)
         self.perf_tracker.perf_end(PERFTYPE.DECODE_LOAD_TIME)
         logger.info("decode model loaded")
-        self.samplingmanager = SamplingManager(
-            temperature=args.temperature,
-            top_k=args.topk,
-            top_p=args.topp,
-            repetition_penalty=args.repetition_penalty,
-        )
         self.processor = Qwen3VLProcessor.from_pretrained(tokenizer_dir)
         self.device = torch.device("cpu")
         prefill_shape = self.prefill.get_input_info(
@@ -421,8 +415,16 @@ class Qwen3VL:
         if HOUMO_TARGET == "xh2":
             self.embedding = self.embedding.weight
         self.hidden_dims = self.embedding.shape[-1]
-        repetition_penalty = args.repetition_penalty or {2560: 4.0, 4096: 1.5}.get(
-            self.hidden_dims, 1.0
+        repetition_penalty = args.repetition_penalty or {
+            2048: 1.5,
+            2560: 5.0,
+            4096: 1.5,
+        }.get(self.hidden_dims, 1.0)
+        self.samplingmanager = SamplingManager(
+            temperature=args.temperature,
+            top_k=args.topk,
+            top_p=args.topp,
+            repetition_penalty=repetition_penalty,
         )
 
         self.perf_tracker.reset_perf_time()
