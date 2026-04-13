@@ -108,3 +108,5 @@ tmp
 *_version.py
 3rdparty
 benchmark
+demo
+tests

@@ -68,23 +68,18 @@ class Xh2Exec(BaseExec):
         - Resizer input height cannot exceed 4096 pixels
     """
 
-    MAX_PADDING_SIZE = 32  # Maximum padding pixels on each side
-    MAX_RESIZER_INPUT_W = 1024  # Maximum resizer input width
-    MAX_RESIZER_INPUT_H = 4096  # Maximum resizer input height
-
     def __init__(self, cfg: dict) -> None:
         super().__init__(cfg)
         self.quant_type = self.quant_cfg.get("quant_type", "w8a8h1_sefp")
         self.golden_dir = os.path.abspath(os.path.join(self.quant_output_dir, "golden"))
         self.upgrade_opset_version()
-        self._validate_resizer_constraints()
 
         # Get ONNX output node names
         self.outputs_name = list(self.onnx_outputs_info.keys())
 
         # Append dynamic parameter input names for inputs with dynamic resizer (mode 1 or 2)
         for input_name in self.inputs_cfg:
-            if self.resizer_modes.get(input_name, 0) in [1, 2]:
+            if self.resizer_modes[input_name] in [1, 2]:
                 self.inputs_name.append(f"resizer_crop_{input_name}")
 
     # ==================== Helper Methods ====================
@@ -98,153 +93,69 @@ class Xh2Exec(BaseExec):
             data = data[0]
         return data
 
-    @staticmethod
-    def _get_input_preprocess_params(input_cfg: dict):
-        """Extract preprocessing parameters from input config."""
-        N, C, H, W = input_cfg["shape"]
-        return {
-            "shape": input_cfg["shape"],
-            "N": N,
-            "C": C,
-            "H": H,
-            "W": W,
-            "mean": input_cfg.get("mean", [0, 0, 0]),
-            "std": input_cfg.get("std", [1, 1, 1]),
-            "resize_type": input_cfg.get("resize_type", 0),
-            "padding_mode": input_cfg.get("padding_mode", 1),
-            "padding_values": input_cfg.get("padding_values", [114, 114, 114]),
-            "data_format": input_cfg.get("data_format", "BGR"),
-        }
-
-    def _has_resizer(self, input_name: str) -> bool:
-        """Check if input has resizer configured."""
-        input_cfg = self.inputs_cfg[input_name]
-        return "resizer" in input_cfg and input_cfg.get("data_format") is not None
-
-    def _get_resizer_params(self, input_cfg: dict):
+    def _get_resizer_cfg(self, input_cfg: dict):
         """Extract resizer parameters from input config."""
-        resizer_cfg = input_cfg.get("resizer", {})
-        _, _, H, W = input_cfg["shape"]
-        return {
-            "toYUV_format": resizer_cfg.get("toYUV_format", "YUV420SP"),
-            "max_input_size": resizer_cfg.get("max_input_size", [H, W]),
-            "enable_static_resizer": resizer_cfg.get("enable_static_resizer", True),
-            "crop_size": resizer_cfg.get("crop_size", [0, 0, H, W]),
-        }
+        resizer_cfg = input_cfg.get("resizer")
+        if resizer_cfg is None:
+            return dict()
+        return resizer_cfg
 
-    def _preprocess_for_resizer(self, cv_image, input_cfg: dict, input_mode: int):
+    def _preprocess_for_resizer(
+        self, cv_image: np.ndarray, input_cfg: dict, resizer_mode: int
+    ):
         """Preprocess image through resizer pipeline.
 
         Returns:
             tuple: (yuv_im, dyn_info) - yuv image and dynamic info (if applicable)
         """
-        params = self._get_input_preprocess_params(input_cfg)
-        resizer_params = self._get_resizer_params(input_cfg)
-        MAX_H, MAX_W = resizer_params["max_input_size"]
-
+        N, C, H, W = input_cfg["shape"]
+        resizer_cfg = self._get_resizer_cfg(input_cfg)
+        toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
+        resizer_input_size = resizer_cfg.get("resizer_input_size", [H, W])
+        resizer_input_h, resizer_input_w = resizer_input_size
+        resizer_crop = resizer_cfg.get(
+            "resizer_crop", [0, 0, resizer_input_h, resizer_input_w]
+        )
+        yuv_im: torch.Tensor
+        dyn_info: torch.Tensor
         yuv_im, dyn_info = resizer_preprocess(
             cv_image,
-            params["shape"],
-            max_input_size=resizer_params["max_input_size"],
-            mean=params["mean"],
-            std=params["std"],
-            use_resize=input_mode in [0, 3],
-            use_norm=input_mode == 0,
-            use_rgb=params["data_format"] == "RGB" and input_mode == 0,
-            resize_type=params["resize_type"],
-            padding_mode=params["padding_mode"],
-            padding_values=params["padding_values"],
-            is_onnx=input_mode == 0,
-            to_YUV=input_mode in [1, 2, 3],
-            fmt=resizer_params["toYUV_format"],
-            return_dynamic_v1_format=input_mode == 1,
+            input_cfg["shape"],
+            resizer_input_size=resizer_input_size,
+            resizer_crop=resizer_crop,
+            resizer_mode=resizer_mode,
+            mean=input_cfg["mean"],
+            std=input_cfg["std"],
+            use_resize=resizer_mode in [0, 3],
+            use_norm=resizer_mode == 0,
+            use_rgb=input_cfg["data_format"] == "RGB" and resizer_mode == 0,
+            resize_type=input_cfg["resize_type"],
+            padding_mode=input_cfg.get("padding_mode"),
+            padding_values=input_cfg.get("padding_values"),
+            is_onnx=resizer_mode == 0,
+            to_YUV=resizer_mode in [1, 2, 3],
+            fmt=toYUV_format,
         )
-
-        if input_mode in [1, 2, 3]:
-            yuv_im = yuv_im.view(params["N"], params["C"], MAX_H, MAX_W)
-
         return yuv_im, dyn_info
 
     def _preprocess_for_onnx(self, cv_image, input_cfg: dict):
         """Preprocess image for ONNX inference (resize + normalize, no YUV)."""
-        params = self._get_input_preprocess_params(input_cfg)
+        data_format = input_cfg["data_format"]
+        resize_type = input_cfg["resize_type"]
+        N, C, H, W = input_cfg["shape"]
         return default_preprocess(
             cv_image,
-            size=(params["W"], params["H"]),
-            mean=params["mean"],
-            std=params["std"],
+            size=(W, H),
+            mean=input_cfg["mean"],
+            std=input_cfg["std"],
             use_norm=True,
-            use_rgb=(params["data_format"] == "RGB"),
+            use_rgb=(data_format == "RGB"),
             use_resize=True,
-            resize_type=params["resize_type"],
-            padding_value=params["padding_values"],
-            padding_mode=params["padding_mode"],
+            resize_type=resize_type,
+            padding_mode=input_cfg.get("padding_mode"),
+            padding_value=input_cfg.get("padding_values"),
             to_YUV=False,
         )
-
-    # ==================== Validation Methods ====================
-
-    def _validate_resizer_constraints(self):
-        """Validate XH2 resizer constraints:
-        - padding_mode must be 1 (center/symmetric padding)
-        - padding values cannot exceed MAX_PADDING_SIZE
-        - resizer input width cannot exceed MAX_RESIZER_INPUT_W
-        - resizer input height cannot exceed MAX_RESIZER_INPUT_H
-        """
-        for input_name, input_cfg in self.inputs_cfg.items():
-            mode = self.resizer_modes.get(input_name, 0)
-            if mode == 0:
-                continue
-
-            padding_mode = input_cfg.get("padding_mode", 1)
-            if padding_mode != 1 and mode in [1, 2]:
-                logger.error(
-                    f"XH2 dynamic resizer constraint violation: input '{input_name}' has padding_mode={padding_mode}. "
-                    f"XH2 dynamic resizer requires symmetric padding (padding_mode=1)."
-                )
-                exit(-1)
-
-            _, _, H, W = input_cfg["shape"]
-            resizer_cfg = input_cfg.get("resizer", {})
-            max_input_size = resizer_cfg.get("max_input_size", [H, W])
-            max_H, max_W = max_input_size
-
-            # Validate resizer input size constraints
-            if max_W > self.MAX_RESIZER_INPUT_W:
-                logger.error(
-                    f"XH2 resizer constraint violation: input '{input_name}' has max_input_width "
-                    f"({max_W}) exceeding maximum allowed ({self.MAX_RESIZER_INPUT_W})."
-                )
-                exit(-1)
-
-            if max_H > self.MAX_RESIZER_INPUT_H:
-                logger.error(
-                    f"XH2 resizer constraint violation: input '{input_name}' has max_input_height "
-                    f"({max_H}) exceeding maximum allowed ({self.MAX_RESIZER_INPUT_H})."
-                )
-                exit(-1)
-
-            # Validate padding size
-            if input_cfg.get("resize_type", 0) == 1:
-                if abs(W / H - max_W / max_H) > 0.001:
-                    padding_size, _, _ = calc_padding_size(
-                        (max_H, max_W), (W, H), padding_mode=1
-                    )
-                    top, left, bottom, right = padding_size
-
-                    for side, val in [
-                        ("top", top),
-                        ("bottom", bottom),
-                        ("left", left),
-                        ("right", right),
-                    ]:
-                        if val > self.MAX_PADDING_SIZE:
-                            logger.error(
-                                f"XH2 resizer constraint violation: input '{input_name}' has {side} padding "
-                                f"({val}) exceeding maximum allowed ({self.MAX_PADDING_SIZE}). "
-                                f"Max input size ({max_W}x{max_H}) with target size ({W}x{H})."
-                            )
-                            exit(-1)
 
     def upgrade_opset_version(self):
         """Upgrade the ONNX model opset version to minimum required version (13)."""
@@ -298,59 +209,54 @@ class Xh2Exec(BaseExec):
                 create_quant_config,
             )
         except ImportError as e:
-            logger.error(f"{e}\nNot found xhquant module, please install xhquant.")
-            exit(-1)
+            logger.fatal(f"{e}\nNot found xhquant module, please install xhquant.")
 
         input_ppc_config = []
-        for input_name, input_cfg in self.inputs_cfg.items():
-            if not self._has_resizer(input_name):
+        for input_name in self.inputs_cfg:
+            input_cfg = self.inputs_cfg[input_name]
+            resizer_mode = self.resizer_modes[input_name]
+            if resizer_mode == 0:
                 input_ppc_config.append("float16")
                 continue
+            # Resizer
+            _, _, H, W = input_cfg["shape"]
+            mean, std = input_cfg["mean"], input_cfg["std"]
+            data_format = input_cfg["data_format"]
+            resize_type = input_cfg["resize_type"]
+            # padding_mode = input_cfg.get("padding_mode")
+            padding_values = input_cfg.get("padding_values")
 
-            params = self._get_input_preprocess_params(input_cfg)
-            resizer_params = self._get_resizer_params(input_cfg)
-            MAX_H, MAX_W = resizer_params["max_input_size"]
-
-            crop_offset = (0, 0)
-            crop_size = (MAX_H, MAX_W)
+            resizer_cfg = self._get_resizer_cfg(input_cfg)
+            toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
+            resizer_input_size = resizer_cfg.get("resizer_input_size", [H, W])
+            resizer_input_h, resizer_input_w = resizer_input_size
+            resizer_crop = resizer_cfg.get(
+                "resizer_crop", [0, 0, resizer_input_h, resizer_input_w]
+            )
+            crop_y, crop_x, crop_h, crop_w = resizer_crop
+            crop_offset = (crop_y, crop_x)
+            crop_size = (crop_h, crop_w)
             pad_value = 0
             pad_size = (0, 0, 0, 0)
 
-            if params["resize_type"] == 1:
-                pad_value = params["padding_values"][0]
-                if resizer_params["enable_static_resizer"]:
-                    pad_value = 0  # Static is temporarily limited to 0
-
-            if resizer_params["enable_static_resizer"]:
-                crop_offset = (
-                    resizer_params["crop_size"][0],
-                    resizer_params["crop_size"][1],
-                )
-                CROP_H, CROP_W = (
-                    resizer_params["crop_size"][2],
-                    resizer_params["crop_size"][3],
-                )
-                if CROP_H > MAX_H or CROP_W > MAX_W:
-                    _, (CROP_H, CROP_W), _ = calc_padding_size(
-                        (CROP_H, CROP_W), (MAX_W, MAX_H), 0
-                    )
-                crop_size = (CROP_H, CROP_W)
+            if resize_type == 1 and resizer_mode == 1:
+                pad_value = padding_values[0]
 
             input_ppc_config.append(
                 ResizerScheme(
-                    size=(params["H"], params["W"]),
+                    size=(H, W),
                     mode="bilinear",
                     align_corners=False,
-                    fmt=self.get_format(resizer_params["toYUV_format"]),
+                    fmt=self.get_format(toYUV_format),
                     int_trans=True,
                     crop_size=crop_size,
                     crop_offset=crop_offset,
                     pad_size=pad_size,
                     pad_value=pad_value,
-                    mean=[v / 255.0 for v in params["mean"]],
-                    std=[v / 255.0 for v in params["std"]],
-                    dynamic_crop=not resizer_params["enable_static_resizer"],
-                    model_inp_fmt=params["data_format"].lower(),
+                    mean=[v / 255.0 for v in mean],
+                    std=[v / 255.0 for v in std],
+                    dynamic_crop=resizer_mode in [1, 2],
+                    model_inp_fmt=data_format.lower(),
                 ).to_dict()
             )
 
@@ -369,33 +275,40 @@ class Xh2Exec(BaseExec):
         in_datas = []
         dynamic_inputs = []
 
-        for input_name, input_cfg in self.inputs_cfg.items():
+        for input_name in self.inputs_cfg:
+            input_cfg = self.inputs_cfg[input_name]
+            resizer_mode = self.resizer_modes[input_name]
             shape = input_cfg["shape"]
             dtype_str = self.onnx_inputs_info[input_name]["dtype"]
-
-            if not self._has_resizer(input_name):
+            if resizer_mode == 0:
                 in_datas.append(torch.from_numpy(gen_random_data(shape, dtype_str)))
                 continue
 
-            resizer_params = self._get_resizer_params(input_cfg)
-            N, C, H, W = shape
-            MAX_H, MAX_W = resizer_params["max_input_size"]
+            N, C, H, W = input_cfg["shape"]
+            resizer_cfg = self._get_resizer_cfg(input_cfg)
+            toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
+            resizer_input_size = resizer_cfg.get("resizer_input_size", [H, W])
+            resizer_input_h, resizer_input_w = resizer_input_size
 
             random_bgr = torch.from_numpy(
-                gen_random_data([N, C, MAX_H, MAX_W], "uint8")
+                gen_random_data([N, C, resizer_input_h, resizer_input_w], "uint8")
             )
-            random_yuv = convert_bgr_to_yuv(
-                random_bgr, resizer_params["toYUV_format"]
-            ).view(N, C, MAX_H, MAX_W)
+            random_yuv = convert_bgr_to_yuv(random_bgr, toYUV_format, to_NCHW=True)
             in_datas.append(random_yuv)
 
-            if not resizer_params["enable_static_resizer"]:
+            if resizer_mode == 1:
                 dynamic_inputs.append(
                     torch.tensor(
-                        [[0, 0, MAX_H, MAX_W, H, W, 0, 0, 0, 0]], dtype=torch.int32
+                        [[0, 0, resizer_input_h, resizer_input_w, H, W, 0, 0, 0, 0]],
+                        dtype=torch.int32,
                     )
                 )
-
+            elif resizer_mode == 2:
+                dynamic_inputs.append(
+                    torch.tensor(
+                        [[0, 0, resizer_input_h, resizer_input_w]], dtype=torch.int32
+                    )
+                )
         in_datas.extend(dynamic_inputs)
         return in_datas
 
@@ -429,8 +342,7 @@ class Xh2Exec(BaseExec):
                 os.environ.get("HOUMO_DATASETS_PATH", ""), calib_data
             )
             if not os.path.isdir(calib_data):
-                logger.error(f"Not found calib_data path: {calib_data}")
-                exit(-1)
+                logger.fatal(f"Not found calib_data path: {calib_data}")
         logger.info(f"calib_data: {calib_data}")
         return calib_data
 
@@ -445,8 +357,7 @@ class Xh2Exec(BaseExec):
             ]
         )
         if not data_list:
-            logger.error(f"Not found calib data in {calib_data}")
-            exit(-1)
+            logger.fatal(f"Not found calib data in {calib_data}")
         return data_list[0]
 
     def _load_npz_data(self, data_path):
@@ -457,28 +368,22 @@ class Xh2Exec(BaseExec):
 
         for input_name in self.inputs_cfg:
             if input_name not in npz_data:
-                logger.error(f"Input '{input_name}' not found in NPZ file: {data_path}")
-                exit(-1)
+                logger.fatal(f"Input '{input_name}' not found in NPZ file: {data_path}")
 
-            input_mode = self.resizer_modes.get(input_name, 0)
+            resizer_mode = self.resizer_modes[input_name]
             input_cfg = self.inputs_cfg[input_name]
             raw_data = npz_data[input_name]
 
-            if input_mode != 0:
+            if resizer_mode != 0:
                 # Input with resizer
                 cv_image = self._ensure_hwc_uint8(raw_data)
                 yuv_im, dyn_info = self._preprocess_for_resizer(
-                    cv_image, input_cfg, input_mode
+                    cv_image, input_cfg, resizer_mode
                 )
                 in_datas.append(yuv_im)
 
-                if input_mode in [1, 2]:
-                    dyn_param_name = f"resizer_crop_{input_name}"
-                    dynamic_params[input_name] = (
-                        torch.from_numpy(npz_data[dyn_param_name])
-                        if dyn_param_name in npz_data
-                        else dyn_info
-                    )
+                if resizer_mode in [1, 2]:
+                    dynamic_params[input_name] = dyn_info
             else:
                 # mode == 0: Resizer disabled
                 data_format = input_cfg.get("data_format")
@@ -502,152 +407,20 @@ class Xh2Exec(BaseExec):
         """Load single image and preprocess for resizer."""
         input_name = self.inputs_name[0]
         input_cfg = self.inputs_cfg[input_name]
-        input_mode = self.resizer_modes.get(input_name, 0)
+        resizer_mode = self.resizer_modes[input_name]
 
         cv_image = cv2.imread(data_path)
         if cv_image is None:
-            logger.error(f"Failed to load image: {data_path}")
-            exit(1)
+            logger.fatal(f"Failed to load image: {data_path}")
 
-        yuv_im, dyn_info = self._preprocess_for_resizer(cv_image, input_cfg, input_mode)
+        yuv_im, dyn_info = self._preprocess_for_resizer(
+            cv_image, input_cfg, resizer_mode
+        )
         in_datas = [yuv_im]
 
-        if input_mode in [1, 2]:
+        if resizer_mode in [1, 2]:
             in_datas.append(dyn_info)
 
-        return in_datas
-
-    def _load_multi_input_images(self, images_dir: str):
-        """Load multi-input images from directory."""
-        image_files = sorted(
-            [
-                os.path.join(images_dir, f)
-                for f in os.listdir(images_dir)
-                if any(f.lower().endswith(ext) for ext in SUPPORT_IMAGE_FORMATS)
-            ]
-        )
-
-        if not image_files:
-            logger.error(f"No images found in {images_dir}")
-            exit(-1)
-
-        logger.info(f"Loading {len(image_files)} images from {images_dir}")
-        cv_image = cv2.imread(image_files[0])
-        if cv_image is None:
-            logger.error(f"Failed to load image: {image_files[0]}")
-            exit(-1)
-
-        in_datas = []
-        dynamic_inputs = []
-
-        for input_name, input_cfg in self.inputs_cfg.items():
-            if not self._has_resizer(input_name):
-                shape = input_cfg["shape"]
-                dtype_str = self.onnx_inputs_info[input_name]["dtype"]
-                in_datas.append(torch.from_numpy(gen_random_data(shape, dtype_str)))
-                continue
-
-            input_mode = self.resizer_modes.get(input_name, 0)
-            yuv_im, dyn_info = self._preprocess_for_resizer(
-                cv_image, input_cfg, input_mode
-            )
-            in_datas.append(yuv_im)
-
-            resizer_params = self._get_resizer_params(input_cfg)
-            if not resizer_params["enable_static_resizer"]:
-                dynamic_inputs.append(dyn_info)
-
-        in_datas.extend(dynamic_inputs)
-        return in_datas
-
-    def _find_named_image_files(self, data_dir: str):
-        """Find image files named by input (e.g., images_0.jpg)."""
-        named_files = {}
-        for input_name in self.inputs_cfg:
-            for f in os.listdir(data_dir):
-                if f.startswith(input_name + "_"):
-                    ext = os.path.splitext(f)[1].lower()
-                    if ext in SUPPORT_IMAGE_FORMATS or ext in [".npy", ".npz"]:
-                        named_files.setdefault(input_name, []).append(
-                            os.path.join(data_dir, f)
-                        )
-
-        for name in named_files:
-            named_files[name].sort()
-
-        return named_files if named_files else None
-
-    def _load_named_images(self, named_files: dict):
-        """Load calibration data from named image files."""
-        min_samples = min(len(files) for files in named_files.values())
-        logger.info(f"Loading {min_samples} samples from named files")
-
-        in_datas = []
-        dynamic_inputs = []
-
-        for input_name, input_cfg in self.inputs_cfg.items():
-            has_resizer = self._has_resizer(input_name)
-
-            if input_name not in named_files:
-                shape = input_cfg["shape"]
-                dtype_str = self.onnx_inputs_info[input_name]["dtype"]
-                in_datas.append(torch.from_numpy(gen_random_data(shape, dtype_str)))
-                continue
-
-            file_path = named_files[input_name][0]
-            ext = os.path.splitext(file_path)[1].lower()
-
-            if ext in SUPPORT_IMAGE_FORMATS:
-                cv_image = cv2.imread(file_path)
-                if cv_image is None:
-                    logger.error(f"Failed to load image: {file_path}")
-                    exit(-1)
-
-                if has_resizer:
-                    input_mode = self.resizer_modes.get(input_name, 0)
-                    yuv_im, dyn_info = self._preprocess_for_resizer(
-                        cv_image, input_cfg, input_mode
-                    )
-                    in_datas.append(yuv_im)
-
-                    resizer_params = self._get_resizer_params(input_cfg)
-                    if not resizer_params["enable_static_resizer"]:
-                        dynamic_inputs.append(dyn_info)
-                else:
-                    # Preprocess for float16 input
-                    data_format = input_cfg.get("data_format", "BGR")
-                    params = self._get_input_preprocess_params(input_cfg)
-                    im = default_preprocess(
-                        cv_image,
-                        (params["W"], params["H"]),
-                        mean=params["mean"],
-                        std=params["std"],
-                        use_norm=True,
-                        use_rgb=data_format == "RGB",
-                        use_resize=True,
-                        resize_type=params["resize_type"],
-                    )
-                    in_datas.append(torch.from_numpy(im.astype(np.float16)))
-
-            elif ext in [".npy", ".npz"]:
-                arr = (
-                    np.load(file_path)[list(np.load(file_path).keys())[0]]
-                    if ext == ".npz"
-                    else np.load(file_path)
-                )
-                if arr.dtype == np.int64:
-                    arr = arr.astype(np.int32)
-                elif arr.dtype == np.float32:
-                    arr = arr.astype(np.float16)
-                in_datas.append(torch.from_numpy(arr))
-
-                if (
-                    has_resizer
-                    and not self._get_resizer_params(input_cfg)["enable_static_resizer"]
-                ):
-                    dynamic_inputs.append(torch.zeros(1, 10, dtype=torch.int32))
-
-        in_datas.extend(dynamic_inputs)
         return in_datas
 
     # ==================== Quantize and Build ====================
@@ -694,8 +467,7 @@ class Xh2Exec(BaseExec):
             xhquant_init(logger=logger)
             os.environ.setdefault("PYDEVD_DISABLE_FILE_VALIDATION", "1")
         except ImportError as e:
-            logger.error(f"{e}\nNot found xhquant module, please install xhquant.")
-            exit(-1)
+            logger.fatal(f"{e}\nNot found xhquant module, please install xhquant.")
 
         # Load calibration data
         logger.info("")
@@ -738,7 +510,7 @@ class Xh2Exec(BaseExec):
 
             session(*in_datas)
         except Exception as e:
-            logger.error(f"Error occurred while generating golden data: \n{e}")
+            logger.fatal(f"Error occurred while generating golden data: \n{e}")
 
         if os.path.exists(quant_onnx_model_path):
             os.remove(quant_onnx_model_path)
@@ -788,8 +560,7 @@ class Xh2Exec(BaseExec):
         try:
             import tcim
         except ImportError:
-            logger.error("Not found tcim module, please install tcim first!")
-            exit(-1)
+            logger.fatal("Not found tcim module, please install tcim first!")
 
         logger.info("Building HMM model...")
         tcim.build_from_hmonnx(
@@ -1029,7 +800,7 @@ class Xh2Exec(BaseExec):
         self._log_kv("device_id", device_id)
 
         # Load models
-        logger.info("\nLoading models:")
+        logger.info("Loading models:")
         onnx_infer = OnnxInfer()
         onnx_infer.load(self.model_path)
         self._log_kv("onnx", self.model_path)
@@ -1047,15 +818,30 @@ class Xh2Exec(BaseExec):
         xh2_in_datas = {}
         _, ext = os.path.splitext(os.path.basename(data_path))
 
+        if not os.path.exists(data_path):
+            logger.fatal(f"Not found data_path: {data_path}")
+
         if self.is_image_single_input and ext in SUPPORT_IMAGE_FORMATS:
             logger.info("Preparing single image input...")
-            self._prepare_single_image_compare(
-                data_path, onnx_in_datas, hmquant_in_datas, xh2_in_datas, xh2_infer
+            input_cfg = self.inputs_cfg[self.inputs_name[0]]
+            cv_image = cv2.imread(
+                data_path,
+                (
+                    cv2.IMREAD_COLOR
+                    if input_cfg["data_format"] != "GRAY"
+                    else cv2.IMREAD_GRAYSCALE
+                ),
+            )
+            if cv_image is None:
+                logger.fatal("Failed to decode image")
+            onnx_in_datas, hmquant_in_datas, xh2_in_datas = self._prepare_single_image(
+                cv_image, xh2_infer
             )
         else:
             logger.info("Preparing multi-input data...")
-            self._prepare_multi_input_compare(
-                data_path, onnx_in_datas, hmquant_in_datas, xh2_in_datas
+            in_datas = load_npz(data_path)
+            onnx_in_datas, hmquant_in_datas, xh2_in_datas = self._prepare_multi_input(
+                in_datas, xh2_infer
             )
 
         # Run inference
@@ -1121,76 +907,45 @@ class Xh2Exec(BaseExec):
             }
         }
 
-    def _prepare_single_image_compare(
-        self, data_path, onnx_in_datas, hmquant_in_datas, xh2_in_datas, xh2_infer
-    ):
+    def _prepare_single_image(self, cv_image, xh2_infer):
         """Prepare data for single image comparison."""
         input_name = self.inputs_name[0]
-        input_mode = self.resizer_modes.get(input_name, 0)
+        resizer_mode = self.resizer_modes[input_name]
         input_cfg = self.inputs_cfg[input_name]
-        params = self._get_input_preprocess_params(input_cfg)
-        resizer_params = self._get_resizer_params(input_cfg)
-
-        if not os.path.exists(data_path):
-            logger.error(f"Not found data_path: {data_path}")
-            exit(-1)
-
-        cv_image = cv2.imread(
-            data_path,
-            (
-                cv2.IMREAD_COLOR
-                if params["data_format"] != "GRAY"
-                else cv2.IMREAD_GRAYSCALE
-            ),
-        )
-        if cv_image is None:
-            logger.error("Failed to decode image")
-            exit(-1)
+        resizer_cfg = self._get_resizer_cfg(input_cfg)
+        toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
 
         hmm_batch = xh2_infer.inputs_info[input_name].shape[0]
 
+        onnx_in_datas, hmquant_in_datas, xh2_in_datas = dict(), dict(), dict()
         # ONNX preprocessing
-        onnx_data, _ = resizer_preprocess(
-            cv_image,
-            params["shape"],
-            resizer_params["max_input_size"],
-            mean=params["mean"],
-            std=params["std"],
-            use_resize=True,
-            use_norm=True,
-            use_rgb=params["data_format"] == "RGB",
-            resize_type=params["resize_type"],
-            padding_mode=params["padding_mode"],
-            padding_values=params["padding_values"],
-            is_onnx=True,
-        )
-        onnx_data = np.repeat(onnx_data.numpy(), self.model_input_batch, axis=0)
+        onnx_data: np.ndarray = self._preprocess_for_onnx(cv_image, input_cfg)
+        onnx_data = np.repeat(onnx_data, self.model_input_batch, axis=0)
         onnx_in_datas[input_name] = onnx_data
 
         # Resizer preprocessing
-        yuv_im, dyn_info = self._preprocess_for_resizer(cv_image, input_cfg, input_mode)
+        yuv_im: torch.Tensor
+        yuv_im, dyn_info = self._preprocess_for_resizer(
+            cv_image, input_cfg, resizer_mode
+        )
 
-        if input_mode in [1, 2, 3]:
-            # yuv_im is NCHW format: (N, C, H, W)
-            n, c, h, w = yuv_im.shape
+        if resizer_mode in [1, 2, 3]:
             yuv_pad = yuv_im.repeat_interleave(self.model_input_batch, dim=0)
             hmquant_in_datas[input_name] = yuv_pad.contiguous()
-
             # XH2 format - flatten to 1D
             yuv_flat = yuv_im.detach().cpu().numpy().flatten()
             valid_len = (
                 yuv_flat.size // 2
-                if resizer_params["toYUV_format"] == "YUV420SP"
+                if toYUV_format == "YUV420SP"
                 else (
                     yuv_flat.size * 2 // 3
-                    if resizer_params["toYUV_format"] == "YUV422SP"
+                    if toYUV_format == "YUV422SP"
                     else yuv_flat.size
                 )
             )
             yuv = np.repeat(yuv_flat[:valid_len].reshape(1, -1), hmm_batch, axis=0)
             xh2_in_datas[input_name] = np.ascontiguousarray(yuv)
         else:
-            # Disable resizer
             in_data = np.repeat(onnx_data, self.build_batch, axis=0).astype(np.float16)
             hmquant_in_datas[input_name] = torch.from_numpy(
                 in_data[: self.model_input_batch]
@@ -1198,7 +953,7 @@ class Xh2Exec(BaseExec):
             xh2_in_datas[input_name] = np.ascontiguousarray(in_data)
 
         # Dynamic resizer info
-        if input_mode in [1, 2]:
+        if resizer_mode in [1, 2]:
             hmquant_dyn = (
                 dyn_info
                 if self.roi_num > 1
@@ -1209,83 +964,38 @@ class Xh2Exec(BaseExec):
             )
             hmquant_in_datas[f"resizer_crop_{input_name}"] = hmquant_dyn
             xh2_in_datas[f"resizer_crop_{input_name}"] = xh2_dyn.detach().cpu().numpy()
+        return onnx_in_datas, hmquant_in_datas, xh2_in_datas
 
-    def _prepare_multi_input_compare(
-        self, data_path, onnx_in_datas, hmquant_in_datas, xh2_in_datas
-    ):
+    def _prepare_multi_input(self, in_datas, xh2_infer):
         """Prepare data for multi-input comparison."""
-        in_datas = load_npz(data_path)
-
+        onnx_in_datas, hmquant_in_datas, xh2_in_datas = dict(), dict(), dict()
         for input_name in self.inputs_cfg:
             if input_name not in in_datas:
-                logger.error(f"Input '{input_name}' not found in NPZ file: {data_path}")
-                exit(-1)
+                logger.fatal(f"Input '{input_name}' not found in NPZ file")
 
             raw_data = in_datas[input_name]
-            input_mode = self.resizer_modes.get(input_name, 0)
             input_cfg = self.inputs_cfg[input_name]
-
-            if input_mode != 0:
-                # Input with resizer
-                cv_image = self._ensure_hwc_uint8(raw_data)
-                params = self._get_input_preprocess_params(input_cfg)
-
-                # ONNX preprocessing
-                onnx_data = self._preprocess_for_onnx(cv_image, input_cfg)
-                onnx_in_datas[input_name] = onnx_data
-
-                # Resizer preprocessing
-                yuv_im, dyn_info = self._preprocess_for_resizer(
-                    cv_image, input_cfg, input_mode
+            data_format = input_cfg.get("data_format")
+            if data_format is not None:
+                # image
+                cv_image = self._ensure_hwc_uint8(raw_data)  # BGR
+                _onnx_in_datas, _hmquant_in_datas, _xh2_in_datas = (
+                    self._prepare_single_image(cv_image, xh2_infer)
                 )
-                yuv_data = (
-                    yuv_im.detach().cpu().numpy()
-                    if hasattr(yuv_im, "detach")
-                    else yuv_im
-                )
-
-                hmquant_in_datas[input_name] = torch.from_numpy(yuv_data[0:1].copy())
-                xh2_in_datas[input_name] = np.repeat(yuv_data, self.build_batch, axis=0)
-
-                if input_mode in [1, 2]:
-                    hmquant_in_datas[f"resizer_crop_{input_name}"] = dyn_info
-                    xh2_in_datas[f"resizer_crop_{input_name}"] = (
-                        dyn_info.detach().cpu().numpy()
-                    )
+                onnx_in_datas.update(_onnx_in_datas)
+                hmquant_in_datas.update(_hmquant_in_datas)
+                xh2_in_datas.update(_xh2_in_datas)
             else:
-                # mode == 0: Resizer disabled
-                data_format = input_cfg.get("data_format")
-
-                if data_format is not None:
-                    # Image input with resizer disabled
-                    cv_image = self._ensure_hwc_uint8(raw_data)
-
-                    # Preprocess for all backends
-                    preprocessed = self._preprocess_for_onnx(cv_image, input_cfg)
-                    onnx_in_datas[input_name] = preprocessed
-
-                    hmquant_data = preprocessed.astype(np.float16)
-                    hmquant_in_datas[input_name] = torch.from_numpy(hmquant_data)
-                    xh2_in_datas[input_name] = np.repeat(
-                        hmquant_data, self.build_batch, axis=0
-                    )
-                else:
-                    # Non-image input
-                    proc_data = raw_data.copy()
-                    if proc_data.dtype == np.int64:
-                        proc_data = proc_data.astype(np.int32)
-                    elif proc_data.dtype == np.float32:
-                        proc_data = proc_data.astype(np.float16)
-
-                    onnx_in_datas[input_name] = (
-                        raw_data.astype(np.float32)
-                        if raw_data.dtype == np.float16
-                        else raw_data
-                    )
-                    hmquant_in_datas[input_name] = torch.from_numpy(proc_data.copy())
-                    xh2_in_datas[input_name] = np.repeat(
-                        proc_data, self.build_batch, axis=0
-                    )
+                # Non-image input
+                proc_data = raw_data.copy()
+                if proc_data.dtype == np.int64:
+                    proc_data = proc_data.astype(np.int32)
+                elif proc_data.dtype == np.float32:
+                    proc_data = proc_data.astype(np.float16)
+                onnx_in_datas[input_name] = raw_data
+                hmquant_in_datas[input_name] = torch.from_numpy(proc_data.copy())
+                xh2_in_datas[input_name] = proc_data
+        return onnx_in_datas, hmquant_in_datas, xh2_in_datas
 
     # ==================== Static Utility Methods ====================
 

@@ -41,19 +41,16 @@ class ILSVRC2012(BaseDataset):
                            ILSVRC2012_img_val images and validation files.
         """
         if not os.path.exists(root_path):
-            logger.error("ILSVRC2012 dataset path not exist -> {}".format(root_path))
-            exit(-1)
+            logger.fatal(f"ILSVRC2012 dataset path not exist -> {root_path}")
         self.batch_idx = 0
         self.data_root_path = root_path
         self.img_dir = os.path.join(root_path, "ILSVRC2012_img_val")
         self.val_file = os.path.join(self.data_root_path, "val.txt")
         self.label_file = os.path.join(self.data_root_path, "synset_1000.txt")
         if not os.path.exists(self.val_file):
-            logger.error(f"Not found val file -> {self.val_file}")
-            exit(-1)
+            logger.fatal(f"Not found val file -> {self.val_file}")
         if not os.path.exists(self.label_file):
-            logger.error(f"Not found val file -> {self.label_file}")
-            exit(-1)
+            logger.fatal(f"Not found val file -> {self.label_file}")
 
         self.mapping = dict()
         with open(self.label_file, "r") as f:
@@ -141,15 +138,13 @@ class ILSVRC2015(ILSVRC2012):
                            ILSVRC2015_img_val images and validation files.
         """
         if not os.path.exists(root_path):
-            logger.error("ILSVRC2012 dataset path not exist -> {}".format(root_path))
-            exit(-1)
+            logger.fatal("ILSVRC2015 dataset path not exist -> {}".format(root_path))
         self.batch_idx = 0
         self.data_root_path = root_path
         self.img_dir = os.path.join(self.data_root_path, "ILSVRC2015_img_val")
         self.val_file = os.path.join(self.data_root_path, "ILSVRC2015_val.txt")
         if not os.path.exists(self.val_file):
-            logger.error("Not found val file -> {}".format(self.val_file))
-            exit(-1)
+            logger.fatal("Not found val file -> {}".format(self.val_file))
         self.filepaths = list()
         self.labels = list()
         with open(self.val_file, "r") as f:

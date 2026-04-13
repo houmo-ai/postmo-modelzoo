@@ -54,8 +54,7 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
 
             xhquant_init(logger=logger)
         except ImportError:
-            logger.error("Please install xhquant first.")
-            exit(-1)
+            logger.fatal("Please install xhquant first.")
 
     def load(self, model_path, device_id=0):
         """
@@ -66,13 +65,11 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
             device_id (int): Device ID for inference (not used in this implementation)
         """
         if not os.path.exists(model_path):
-            logger.error(f"model path: {model_path} not exists.")
-            exit(-1)
+            logger.fatal(f"model path: {model_path} not exists.")
         try:
             from xhquant.api import HMONNXInference
         except ImportError:
-            logger.error("Please install xhquant first.")
-            exit(-1)
+            logger.fatal("Please install xhquant first.")
         self.engine = HMONNXInference(model_path)
         # self.engine.to_fast_mode()
         self.engine.to(torch.device(self.device))

@@ -70,8 +70,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         if not os.path.isfile(self.model_path):
             new_model_path = os.path.join(HOUMO_MODEL_PATH, self.model_path)
             if not os.path.isfile(new_model_path):
-                logger.error(f"Not found model_path: {self.model_path}")
-                exit(-1)
+                logger.fatal(f"Not found model_path: {self.model_path}")
             self.model_path = new_model_path
         logger.info(f"model_path: {self.model_path}")
         self.onnx_inputs_info, self.onnx_outputs_info = get_onnx_inputs_info(
@@ -87,21 +86,55 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.model_inputs_batch = dict()
         self.inputs_name = list()
         self.data_formats = list()
-        self.inputs_shape = list()
-        self.resize_types = list()
+        # Resizer related parameters
+        # Per-input resizer mode:
+        # 0 - Non-image input or disabled resizer
+        # 1 - Fully dynamic resizer (10 params: [y, x, height, width, h, w, top, left, bottom, right])
+        # 2 - Crop partial dynamic resizer (4 params: [y, x, height, width])
+        # 3 - Static resizer
+        self.resizer_modes = {}  # Per-input resizer mode
+        self.resizers_cfg = {}
+        self.max_inputs_size = dict()
+        self.has_resizer = False  # Whether any input has resizer
+        self.has_dynamic_resizer = False
+        self.has_dynamic_v1_resizer = False
+        self.has_dynamic_v2_resizer = False
+        self.has_static_resizer = False
+
         for input_name in self.inputs_cfg:
-            model_batch = self.inputs_cfg[input_name]["shape"][0]
+            input_cfg = self.inputs_cfg[input_name]
+            shape = input_cfg["shape"]
+            model_batch = shape[0]
+            data_format = input_cfg.get("data_format")
             self.model_inputs_batch[input_name] = model_batch
             self.inputs_name.append(input_name)
-            self.data_formats.append(self.inputs_cfg[input_name].get("data_format"))
-            self.inputs_shape.append(self.inputs_cfg[input_name]["shape"])
-            self.resize_types.append(self.inputs_cfg[input_name].get("resize_type"))
-        self.model_input_batch = self.model_inputs_batch[self.inputs_name[0]]
+            self.data_formats.append(data_format)
+            if data_format is None or "resizer" not in input_cfg:
+                self.resizer_modes[input_name] = 0
+                continue
+            self.has_resizer = True
+            resizer_cfg = input_cfg["resizer"]
+            if resizer_cfg is None:
+                resizer_cfg = dict()
+            resizer_mode = resizer_cfg.get("resizer_mode", 3)
+            self.resizer_modes[input_name] = resizer_mode
+            if resizer_mode == 3:
+                self.has_static_resizer = True
+            elif resizer_mode == 2:
+                self.has_dynamic_v1_resizer = True
+                self.has_dynamic_resizer = True
+            elif resizer_mode == 1:
+                self.has_dynamic_v2_resizer = True
+                self.has_dynamic_resizer = True
+        logger.info(f"resizer_modes: {self.resizer_modes}")
 
-        self.is_multi_input_model = len(self.inputs_cfg) > 1  # Whether multiple inputs
+        self.model_input_batch = self.model_inputs_batch[self.inputs_name[0]]
+        # Whether multiple inputs
+        self.is_multi_input_model = len(self.inputs_cfg) > 1
+        # Whether single input and is image
         self.is_image_single_input = (
             not self.is_multi_input_model and self.data_formats[0] is not None
-        )  # Whether single input and is image
+        )
 
         # Quantization parameters
         self.quant_cfg = cfg.get("quant", dict())
@@ -117,50 +150,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.quant_onnx_model_path = os.path.join(
             self.quant_output_dir, f"hmquant_{self.model_name}_with_act.onnx"
         )
-        # Resizer related parameters
-        # Per-input resizer mode:
-        # 0 - Non-image input or disabled resizer
-        # 1 - Fully dynamic resizer (10 params: [y, x, height, width, h, w, top, left, bottom, right])
-        # 2 - Crop partial dynamic resizer (4 params: [y, x, height, width])
-        # 3 - Static resizer
-        self.resizer_modes = {}  # Per-input resizer mode
-        self.resizers_cfg = {}
-        self.max_inputs_size = dict()
-        self.has_resizer = False  # Whether any input has resizer
-        self.has_dynamic_resizer = (
-            False  # Whether any input uses dynamic resizer (mode 1 or 2)
-        )
-
-        for input_name in self.inputs_cfg:
-            input_cfg = self.inputs_cfg[input_name]
-            data_format = input_cfg.get("data_format")
-            resize_type = input_cfg.get("resize_type", 0)
-
-            # Non-image or disabled resizer
-            if data_format is None or "resizer" not in input_cfg:
-                self.resizer_modes[input_name] = 0
-                continue
-
-            _, _, H, W = input_cfg["shape"]
-            resizer_cfg = input_cfg.get("resizer", dict())
-            max_input_size = resizer_cfg.get("max_input_size", [H, W])
-            enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
-
-            self.resizers_cfg[input_name] = resizer_cfg
-            self.max_inputs_size[input_name] = max_input_size
-            self.has_resizer = True
-
-            # Determine per-input resizer mode
-            if enable_static_resizer:
-                self.resizer_modes[input_name] = 3  # Static
-            elif resize_type == 1:
-                self.resizer_modes[input_name] = 1  # Dynamic with padding
-                self.has_dynamic_resizer = True
-            else:
-                self.resizer_modes[input_name] = 1  # Dynamic v2
-                self.has_dynamic_resizer = True
-
-        logger.info(f"resizer_modes: {self.resizer_modes}")
 
         # Build parameters
         self.build_cfg = cfg.get("build", dict())
@@ -178,46 +167,53 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.file_prefix = self.build_cfg.get("file_prefix", self.upload_dir_name)
         self.build_output_dir = os.path.join(self.save_dir, self.target, "tcim")
         self.hmm_batch = self.build_batch * self.model_input_batch
-        # ROI mode
-        # 0 - 1 image n boxes
-        # 1 - n images n boxes, 1 box per image, e.g.: 1 image 1 box, 2 images 2 boxes, ...
+        # ROI number
+        # Used for dynamic resizer mode, allowing multiple ROIs from one image
+        # roi_num > 1: one input image -> multiple cropped ROIs -> multiple outputs
+        # Constraints:
+        #   - Only valid when hmm_batch == 1 (model_input_batch * build_batch == 1)
+        #   - Only valid for image single input with dynamic resizer enabled
         self.roi_num = self.build_cfg.get("roi_num", 1)
-        if self.is_image_single_input and not self.has_resizer:
-            self.roi_num = 1
         if not isinstance(self.roi_num, int) or self.roi_num < 1:
-            logger.error("roi_num must be int, and >= 1")
-            exit(-1)
+            logger.fatal("[build.roi_num] must be int and >= 1")
+        if not self.has_dynamic_resizer:
+            self.roi_num = 1
         if self.roi_num > 1 and self.hmm_batch > 1:
-            logger.error(
-                "Not support roi_num > 1, when model_input_batch > 1 or build_batch > 1"
+            logger.fatal(
+                "[build.roi_num] > 1 requires model_input_batch * build_batch == 1"
             )
-            exit(-1)
 
         # Determine HMM naming based on resizer configuration
         # For single-input: use that input's mode
         # For multi-input: use dynamic if any input is dynamic, static if all are static
-        if self.is_image_single_input:
-            resizer_mode_for_naming = self.resizer_modes.get(self.inputs_name[0], 0)
-        else:
-            if self.has_dynamic_resizer:
-                resizer_mode_for_naming = 1  # Use dynamic naming
-            elif self.has_resizer:
-                resizer_mode_for_naming = 3  # All static
-            else:
-                resizer_mode_for_naming = 0  # No resizer
-
-        if resizer_mode_for_naming == 3:
-            self.roi_num = 1
-        if resizer_mode_for_naming == 0:
-            roi_tag = ""
-            prefix = ""
-        elif resizer_mode_for_naming == 1:
+        stuffix = ""
+        roi_tag = ""
+        if (
+            self.has_dynamic_v1_resizer
+            and self.has_dynamic_v2_resizer
+            and self.has_static_resizer
+        ):
+            stuffix = "_static_dynamic_v1+v2"
             roi_tag = f"_{self.roi_num}roi"
-            prefix = "_dynamic"
-        elif resizer_mode_for_naming == 3:
+        elif self.has_static_resizer and self.has_dynamic_v1_resizer:
+            stuffix = "_static_dynamic_v1"
+            roi_tag = f"_{self.roi_num}roi"
+        elif self.has_static_resizer and self.has_dynamic_v2_resizer:
+            stuffix = "_static_dynamic_v2"
+            roi_tag = f"_{self.roi_num}roi"
+        elif self.has_dynamic_v1_resizer and self.has_dynamic_v2_resizer:
+            stuffix = "_dynamic_v1+v2"
+            roi_tag = f"_{self.roi_num}roi"
+        elif self.has_dynamic_v2_resizer:
+            stuffix = "_dynamic_v2"
+            roi_tag = f"_{self.roi_num}roi"
+        elif self.has_dynamic_v1_resizer:
+            stuffix = "_dynamic_v1"
+            roi_tag = f"_{self.roi_num}roi"
+        elif self.has_static_resizer:
+            stuffix = "_static"
             roi_tag = "_1roi"
-            prefix = "_static"
-        self.hmm_name = f"{self.model_name}_{self.target}_b{self.hmm_batch}{roi_tag}_{self.build_ncore}core_{self.build_opt_level}{prefix}"
+        self.hmm_name = f"{self.model_name}_{self.target}_b{self.hmm_batch}{roi_tag}_{self.build_ncore}core_{self.build_opt_level}{stuffix}"
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
 
         # For passing preprocessing information to hmm
@@ -240,17 +236,6 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
             self.ApplicationOnnxOpt = HMAppOnnxOptConvert(cfg)
 
-    @property
-    def resizer_mode(self):
-        """Backward compatibility property: returns first input's resizer mode for single-input models.
-
-        For multi-input models, this returns 0 (no resizer) as a fallback.
-        Use resizer_modes dict for multi-input models.
-        """
-        if self.is_image_single_input and self.inputs_name:
-            return self.resizer_modes.get(self.inputs_name[0], 0)
-        return 0
-
     def check_input_shape(self):
         """
         Check if the configured shape matches the ONNX model.
@@ -269,10 +254,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 else:
                     # Check if the configured shape matches the ONNX model
                     if val != cfg_shape[idx]:
-                        logger.error(
+                        logger.fatal(
                             f"onnx shape {onnx_shape} is not equal to cfg shape {cfg_shape}"
                         )
-                        exit(-1)
 
     @staticmethod
     def dtype_transform(dtype):
@@ -297,8 +281,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         elif dtype == "int16":
             return "Int16Feature"
         else:
-            logger.error(f"Not support dtype: {dtype}")
-            exit(-1)
+            logger.fatal(f"Not support dtype: {dtype}")
 
     @abc.abstractmethod
     def quantize(self):
@@ -329,14 +312,12 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         module_name = os.path.splitext(os.path.basename(module_path))[1]
         spec = importlib.util.spec_from_file_location(module_name, module_path)
         if spec is None:
-            logger.error(f"module spec is None -> {module_path}")
-            exit(-1)
+            logger.fatal(f"module spec is None -> {module_path}")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
         spec.loader.exec_module(module)
         if not hasattr(module, module_cls):
-            logger.error(f"module_cls not found -> {module_cls}")
-            exit(-1)
+            logger.fatal(f"module_cls not found -> {module_cls}")
         return getattr(module, module_cls)
 
     def get_model(self, backend):

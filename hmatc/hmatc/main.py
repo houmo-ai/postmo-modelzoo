@@ -266,12 +266,10 @@ def main():
     log_level = log_level_map.get(args.log_level, logging.INFO)
     cfg_path = args.config
     if not os.path.exists(cfg_path):
-        logger.error("Config file not found")
-        return
+        logger.fatal("Config file not found")
     cfg = read_yaml_to_dict(cfg_path)
     if not check_cfg(cfg):
-        logger.error("Config file error")
-        return
+        logger.fatal("Config file error")
 
     # Update command line arguments to config file
     cfg["target"] = target
@@ -281,16 +279,13 @@ def main():
         opt_level = args.opt_level
         roi_num = args.roi_num
         if batch < 1:
-            logger.error("Batch must be greater than 0")
-            return
+            logger.fatal("Batch must be greater than 0")
         if batch > 1:
             if roi_num != 1:
-                logger.error("batch > 1, roi_num must be == 1")
-                return
+                logger.fatal("batch > 1, roi_num must be == 1")
             cfg["build"]["batch"] = batch
         elif roi_num < 1:
-            logger.error("roi_num must be >= 1")
-            return
+            logger.fatal("roi_num must be >= 1")
         elif roi_num > 1:
             cfg["build"]["roi_num"] = roi_num
         if opt_level is not None:
@@ -351,8 +346,7 @@ def main():
             HOUMO_DATASETS_PATH = os.environ.get("HOUMO_DATASETS_PATH", "")
             data_path = os.path.join(HOUMO_DATASETS_PATH, data_path)
             if not os.path.exists(data_path):
-                logger.error(f"{data_path} or {args.data_path} not exists.")
-                exit(-1)
+                logger.fatal(f"{data_path} or {args.data_path} not exists.")
         new_res_info = hm_exec.compare(data_path, args.device_id)
     elif current_command == "perf":
         new_res_info = hm_exec.model_perf(

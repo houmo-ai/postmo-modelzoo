@@ -83,22 +83,14 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         # Support both resizer_modes (new) and resizer_mode (legacy)
         self.resizer_modes = kwargs.get("resizer_modes", {})
         # For now, only single-input models are supported for demo/eval
-        if self.resizer_modes and not self.is_image_single_input:
-            logger.error(
-                "Multi-input models with resizer are not supported for demo/eval yet"
-            )
-            exit(-1)
-        # For backward compatibility, extract single resizer_mode for single-input models
-        if self.resizer_modes and self.is_image_single_input:
-            first_input = self.inputs_name[0]
-            self.resizer_mode = self.resizer_modes.get(first_input, 0)
-        else:
-            self.resizer_mode = kwargs.get("resizer_mode", 0)
+        if not self.is_image_single_input:
+            logger.fatal("Multi-input models are not supported for demo/eval yet")
+
         self.roi_num = kwargs.get("roi_num", 1)  # Number of regions of interest
+
         self.backend = kwargs["backend"]  # Backend type: onnx/xh2
         if self.backend not in SUPPORT_BACKEND:
-            logger.error(f"backend not in {SUPPORT_BACKEND}")
-            exit(-1)
+            logger.fatal(f"backend not in {SUPPORT_BACKEND}")
         if self.backend == "onnx":
             self.engine = OnnxInfer()
         elif self.backend == "xh2":
@@ -106,8 +98,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         elif self.backend == "hmonnx":
             self.engine = Xh2HmQuantInfer()
         else:
-            logger.error(f"Not support backend: {self.backend}")
-            exit(-1)
+            logger.fatal(f"Not support backend: {self.backend}")
 
     def load(self, model_path: str, device_id=0):
         """Load the model for inference.
@@ -119,8 +110,8 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         model_name = os.path.basename(model_path)
         _, ext = os.path.splitext(model_name)
         if ext != self.engine.model_ext:
-            logger.error(f"{model_name} is not {self.engine.model_ext}")
-            exit(-1)
+            logger.fatal(f"{model_name} is not {self.engine.model_ext}")
+
         self.engine.load(model_path, device_id=device_id)
 
     def preprocess(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
@@ -137,55 +128,58 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             if self.backend == "onnx":
                 return in_datas
             else:
-                logger.error(f"Not support backend: {self.backend}")
-                exit(-1)
+                logger.fatal(f"Not support backend: {self.backend}")
         else:
             new_datas = dict()
             # Single input image, can be supported by internal preprocessing
-            in_name = list(in_datas.keys())[0]
-            cv_image = in_datas[in_name]
-            input_cfg = self.inputs_cfg[in_name]
+            input_name = self.inputs_name[0]
+            cv_image = in_datas[input_name]
+            input_cfg = self.inputs_cfg[input_name]
+            resizer_mode = self.resizer_modes[input_name]
             input_shape = input_cfg["shape"]
             data_format = input_cfg["data_format"]
-            mean = input_cfg.get("mean")
-            std = input_cfg.get("std")
             resize_type = input_cfg["resize_type"]
             padding_mode = input_cfg.get("padding_mode")
             padding_values = input_cfg.get("padding_values")
             N, C, H, W = input_shape
-            resizer_cfg = input_cfg.get("resizer", dict())
-            toYUV_format = resizer_cfg.get("toYUV_format", None)
-            max_input_size = resizer_cfg.get("max_input_size", (H, W))
+            resizer_cfg = input_cfg.get("resizer")
+            if resizer_cfg is None:
+                resizer_cfg = dict()
+            toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
+            resizer_input_size = resizer_cfg.get("resizer_input_size", (H, W))
+            resizer_input_h, resizer_input_w = resizer_input_size
+            resizer_crop = resizer_cfg.get(
+                "resizer_crop", [0, 0, resizer_input_h, resizer_input_w]
+            )
+            im: torch.Tensor
             im, dyn_info = resizer_preprocess(
                 cv_image,
                 input_shape,
-                max_input_size,
-                mean=mean,
-                std=std,
-                use_resize=self.resizer_mode in [0, 3] or self.backend == "onnx",
-                use_norm=self.resizer_mode == 0 or self.backend == "onnx",
+                resizer_input_size,
+                resizer_crop,
+                resizer_mode=resizer_mode,
+                mean=input_cfg["mean"],
+                std=input_cfg["std"],
+                use_resize=resizer_mode in [0, 3] or self.backend == "onnx",
+                use_norm=resizer_mode == 0 or self.backend == "onnx",
                 use_rgb=data_format == "RGB"
-                and (self.resizer_mode == 0 or self.backend == "onnx"),
+                and (resizer_mode == 0 or self.backend == "onnx"),
                 resize_type=resize_type,
                 padding_mode=padding_mode,
                 padding_values=padding_values,
-                is_onnx=self.resizer_mode == 0
+                is_onnx=resizer_mode == 0
                 or self.backend
                 == "onnx",  # Static resizer, need to convert to YUV in non-quantization stage, cannot set is_onnx=True
-                to_YUV=self.resizer_mode in [1, 2, 3],
+                to_YUV=resizer_mode in [1, 2, 3],
                 fmt=toYUV_format,
-                return_dynamic_v1_format=self.backend in ["xh2", "hmonnx"]
-                and self.resizer_mode in [1, 2],
             )
             if self.backend == "onnx":
-                new_datas[in_name] = im.detach().cpu().numpy()
-            elif self.backend in ["xh2", "hmonnx"] and self.resizer_mode == 0:
-                new_datas[in_name] = im.detach().cpu().numpy().astype(np.float16)
-            elif self.backend == "hmonnx" and self.resizer_mode in [1, 3]:
-                yuv_pad = im.detach().cpu()
-                h, w, c = yuv_pad.shape
-                new_datas[in_name] = yuv_pad.view(1, c, h, w).contiguous().numpy()
-            elif self.resizer_mode in [1, 3]:
+                new_datas[input_name] = im.detach().cpu().numpy()
+            elif self.backend in ["xh2", "hmonnx"] and resizer_mode == 0:
+                new_datas[input_name] = im.detach().cpu().numpy().astype(np.float16)
+            elif self.backend == "hmonnx" and resizer_mode in [1, 2, 3]:
+                new_datas[input_name] = im.detach().cpu().contiguous().numpy()
+            elif resizer_mode in [1, 2, 3]:
                 yuv_pad = im.detach().cpu().numpy().flatten()
                 if toYUV_format == "YUV420SP":
                     valid_len = yuv_pad.size // 2
@@ -194,10 +188,10 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 elif toYUV_format in ["YUV444SP", "YUV400"]:
                     valid_len = yuv_pad.size
                 yuv = yuv_pad[:valid_len].copy().reshape(1, -1)
-                new_datas[in_name] = np.ascontiguousarray(yuv)
-            if self.resizer_mode == 1 and self.backend in ["xh2", "hmonnx"]:
+                new_datas[input_name] = np.ascontiguousarray(yuv)
+            if resizer_mode in [1, 2] and self.backend in ["xh2", "hmonnx"]:
                 dyn_info = dyn_info.detach().cpu().numpy()
-                new_datas[f"resizer_crop_{in_name}"] = dyn_info
+                new_datas[f"resizer_crop_{input_name}"] = dyn_info
             return new_datas
 
     def run(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:

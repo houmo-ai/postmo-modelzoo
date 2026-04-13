@@ -46,15 +46,12 @@ class VOC2007(BaseDataset):
         self._image_ids = list()
 
         if not os.path.exists(self._root_path):
-            logger.error("VOC dataset not exist -> {}".format(self._root_path))
-            exit(-1)
-
+            logger.fatal("VOC dataset not exist -> {}".format(self._root_path))
         test_file = os.path.join(
             self._root_path, "VOC2007", "ImageSets", "Main", "test.txt"
         )
         if not os.path.exists(test_file):
-            logger.error("test file not exist -> {}".format(test_file))
-            exit(-1)
+            logger.fatal("test file not exist -> {}".format(test_file))
         with open(test_file, "r") as f:
             lines = f.readlines()
             for line in lines:

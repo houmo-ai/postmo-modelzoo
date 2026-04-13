@@ -42,8 +42,7 @@ class COCO2017Val(BaseDataset):
         """
         self.root_path = root_path
         if not os.path.exists(self.root_path):
-            logger.error("root_path not exits -> {}".format(self.root_path))
-            exit(-1)
+            logger.fatal(f"root_path not exits -> {self.root_path}")
 
         self.annotations_file = os.path.join(
             self.root_path, "annotations", "instances_val2017.json"
@@ -52,8 +51,7 @@ class COCO2017Val(BaseDataset):
             self.root_path, "annotations", "person_keypoints_val2017.json"
         )
         if not os.path.exists(self.annotations_file):
-            logger.error(f"annotations_file not exist -> {self.annotations_file}")
-            exit(-1)
+            logger.fatal(f"annotations_file not exist -> {self.annotations_file}")
 
         with open(self.annotations_file, "r") as f:
             annotations = json.load(f)

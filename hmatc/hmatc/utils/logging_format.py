@@ -127,7 +127,8 @@ class LoggingFormatterWithColor(BaseFormatter):
         logging.INFO: "\x1b[92;20m",  # green
         logging.WARN: "\x1b[93;20m",  # yellow
         logging.ERROR: "\x1b[91;1m",  # bold red
-        logging.FATAL: "\x1b[97;41m",  # white on red background
+        logging.FATAL: "\x1b[91;1m",  # bold red
+        # logging.FATAL: "\x1b[97;41m",  # white on red background
     }
 
     def format(self, record: logging.LogRecord) -> str:

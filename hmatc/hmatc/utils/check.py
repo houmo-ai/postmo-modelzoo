@@ -17,10 +17,8 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
-import os
 from PIL import Image
 from . import logger
-from .utils import SUPPORT_IMAGE_FORMATS
 
 
 def get_image_size(filepath):
@@ -48,129 +46,218 @@ def check_cfg(cfg):
     """
     # model info
     model_cfg = cfg.get("model")
+    if model_cfg is None:
+        logger.fatal("[model] section not found")
+
     save_dir = model_cfg.get("save_dir")
     if save_dir is None:
-        logger.error("save_dir not found")
-        return False
+        logger.fatal("[model.save_dir] not found")
+
     inputs_cfg = model_cfg.get("inputs", dict())
     if len(inputs_cfg) == 0:
-        logger.error("Please set inputs")
-        return False
-    for input_name in inputs_cfg:
-        input_cfg = inputs_cfg[input_name]
-        shape = input_cfg.get("shape")
-        if shape is None:
-            logger.error(f"{input_name} shape error -> {shape}")
-            return False
-        if not isinstance(shape, list):
-            logger.error(f"{input_name} shape must be list")
-            return False
-        data_format = input_cfg.get("data_format")
-        if data_format is None:
-            continue
-        # image
-        if data_format not in ["RGB", "BGR", "GRAY"]:
-            logger.error(f"Not support data_format: {data_format}")
-            return False
-        if len(shape) != 4:
-            logger.error(f"{input_name} shape must be [N, C, H, W]")
-            return False
-        channels = shape[1]
-        mean = input_cfg.get("mean")
-        std = input_cfg.get("std")
-        N, C, H, W = shape
-        if mean is None:
-            logger.error(f"model mean error")
-            return False
-        if std is None:
-            logger.error(f"model std error")
-            return False
-        if not isinstance(mean, list):
-            logger.error(f"model mean must be list")
-            return False
-        if not isinstance(std, list):
-            logger.error(f"model std must be list")
-            return False
-        resize_type = input_cfg.get("resize_type")
-        if resize_type not in [0, 1]:
-            logger.error(f"resize_type must be equal 0 or 1")
-            return False
-        if resize_type == 1:
-            padding_mode = input_cfg.get("padding_mode")
-            if padding_mode is None:
-                logger.error(f"padding_mode error, when resize_type is 1")
-                return False
-            if padding_mode not in [0, 1]:
-                logger.error(
-                    f"padding_mode must be equal 0 or 1, when resize_type is 1"
-                )
-                return False
-            padding_values = input_cfg.get("padding_values")
-            if padding_values is None:
-                logger.error(f"padding_values error, when resize_type is 1")
-                return False
-            if not isinstance(padding_values, list):
-                logger.error(f"padding_values must be list, when resize_type is 1")
-                return False
-            if len(padding_values) != channels:
-                logger.error(
-                    f"padding_values length must be equal to channels, when resize_type is 1"
-                )
-                return False
-        # resizer
-        resizer_cfg = input_cfg.get("resizer")
-        if not isinstance(resizer_cfg, dict) and resizer_cfg is not None:
-            logger.error(f"resizer param error, must be dict or None")
-            return False
-        if resizer_cfg is not None:
-            enable_static_resizer = resizer_cfg.get("enable_static_resizer", True)
-            if enable_static_resizer not in [False, True]:
-                logger.error(f"enable_static_resizer must be equal False or True")
-                return False
-            max_input_size = resizer_cfg.get("max_input_size", [H, W])
-            if not isinstance(max_input_size, list) or len(max_input_size) != 2:
-                logger.error(
-                    f"max_input_size must be list, and [H, W], when use resizer"
-                )
-                return False
-            # need to ensure max_input_size is even number
-            for v in max_input_size:
-                if v % 2 != 0:
-                    logger.error(f"max_input_size[H, W] must be even number")
-                    return False
-            # if max_input_size is smaller than input WH, give warning
-            resizer_input_h, resizer_input_w = max_input_size
-            if resizer_input_h < H or resizer_input_w < W:
-                logger.warning(
-                    f"max_input_size[{resizer_input_h}, {resizer_input_w}] should be greater than [{H}, {W}]"
-                )
+        logger.fatal("[model.inputs] not found or empty")
 
-            if enable_static_resizer and "crop_size" in resizer_cfg:
-                crop_size = resizer_cfg.get("crop_size", [0, 0, H, W])
-                y1, x1, crop_height, crop_width = crop_size
-                x2, y2 = x1 + crop_width, y1 + crop_height
-                # check if all values in crop_size are even numbers
-                for v in crop_size:
-                    if v % 2 != 0:
-                        logger.error(f"crop_size must be even number: {crop_size}")
-                        return False
-                if x1 < 0 or y1 < 0 or y2 > max_input_size[0] or x2 > max_input_size[1]:
-                    logger.error(
-                        f"crop_size must be in [0, 0, {max_input_size[0]}, {max_input_size[1]}]"
-                    )
-                    return False
-            toYUV_format = resizer_cfg.get("toYUV_format")
-            if toYUV_format not in ["YUV400", "YUV420SP", "YUV422SP", "YUV444SP"]:
-                logger.error(
-                    "toYUV_format should be in [YUV400, YUV420SP, YUV422SP, YUV444SP], when use resizer"
-                )
-                return False
-            if data_format in ["RGB", "BGR"] and toYUV_format == "YUV400":
-                logger.error(
-                    f"data_format in [RGB, BGR], toYUV_format must be in [YUV420SP, YUV422SP, YUV444SP]"
-                )
-                return False
-            if data_format == "GRAY" and toYUV_format != "YUV400":
-                logger.error(f"data_format = GRAY, toYUV_format must be YUV400")
-                return False
+    for input_name, input_cfg in inputs_cfg.items():
+        _check_input_cfg(input_name, input_cfg)
+
+    # build config
+    build_cfg = cfg.get("build", dict())
+
+    ncore = build_cfg.get("ncore", 1)
+    if ncore not in [1, 2]:
+        logger.fatal(f"[build.ncore] must be 1 or 2, got {ncore}")
+
+    opt_level = build_cfg.get("opt_level", 2)
+    if opt_level not in [0, 1, 2]:
+        logger.fatal(f"[build.opt_level] must be 0/1/2, got {opt_level}")
+
+    batch = build_cfg.get("batch", 1)
+    if batch < 1:
+        logger.fatal(f"[build.batch] must be >= 1, got {batch}")
+
+    roi_num = build_cfg.get("roi_num", 1)
+    if roi_num < 1:
+        logger.fatal(f"[build.roi_num] must be >= 1, got {roi_num}")
+
+    if batch > 1 and roi_num > 1:
+        logger.fatal("[build.batch] and [build.roi_num] cannot both be > 1")
+
+    parallel_jobs = build_cfg.get("parallel_jobs")
+    if parallel_jobs is not None and parallel_jobs < 1:
+        logger.fatal(f"[build.parallel_jobs] must be >= 1, got {parallel_jobs}")
+
     return True
+
+
+def _check_input_cfg(input_name, input_cfg):
+    """Check input configuration.
+
+    Args:
+        input_name (str): Input name
+        input_cfg (dict): Input configuration dictionary
+    """
+    prefix = f"[model.inputs.{input_name}]"
+
+    # shape
+    if "shape" not in input_cfg:
+        logger.fatal(f"{prefix}.shape not found")
+    shape = input_cfg["shape"]
+    if not isinstance(shape, list):
+        logger.fatal(f"{prefix}.shape must be list")
+
+    # data_format
+    if "data_format" not in input_cfg:
+        logger.warning(f"{prefix}.data_format not found, using default null")
+        return
+    data_format = input_cfg["data_format"]
+    if data_format is None:
+        return
+    # Image input validation
+    if data_format not in ["RGB", "BGR", "GRAY"]:
+        logger.fatal(f"{prefix}.data_format must be RGB/BGR/GRAY")
+
+    if len(shape) != 4:
+        logger.fatal(f"{prefix}.shape must be [N, C, H, W]")
+
+    _, C, H, W = shape
+
+    # mean/std
+    mean = input_cfg.get("mean")
+    std = input_cfg.get("std")
+    if mean is None:
+        logger.fatal(f"{prefix}.mean not found")
+    if std is None:
+        logger.fatal(f"{prefix}.std not found")
+    if not isinstance(mean, list):
+        logger.fatal(f"{prefix}.mean must be list")
+    if not isinstance(std, list):
+        logger.fatal(f"{prefix}.std must be list")
+
+    # resize_type
+    resize_type = input_cfg.get("resize_type")
+    if resize_type not in [0, 1]:
+        logger.fatal(f"{prefix}.resize_type must be 0 or 1")
+
+    if resize_type == 1:
+        padding_mode = input_cfg.get("padding_mode")
+        if padding_mode is None:
+            logger.fatal(f"{prefix}.padding_mode not found (resize_type=1)")
+        if padding_mode not in [0, 1]:
+            logger.fatal(f"{prefix}.padding_mode must be 0 or 1")
+
+        padding_values = input_cfg.get("padding_values")
+        if padding_values is None:
+            logger.fatal(f"{prefix}.padding_values not found (resize_type=1)")
+        if not isinstance(padding_values, list):
+            logger.fatal(f"{prefix}.padding_values must be list")
+        if len(padding_values) != C:
+            logger.fatal(f"{prefix}.padding_values length must equal channels ({C})")
+
+    # resizer
+    if "resizer" not in input_cfg:
+        return
+    resizer_cfg = input_cfg["resizer"]
+    if resizer_cfg is None:
+        return
+    if not isinstance(resizer_cfg, dict):
+        logger.fatal(f"{prefix}.resizer must be dict")
+
+    _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W)
+
+
+def _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W):
+    """Check resizer configuration.
+
+    Args:
+        input_name (str): Input name
+        resizer_cfg (dict): Resizer configuration dictionary
+        data_format (str): Data format (RGB/BGR/GRAY)
+        H (int): Model input height
+        W (int): Model input width
+    """
+    prefix = f"[model.inputs.{input_name}.resizer]"
+
+    # toYUV_format
+    toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
+    if toYUV_format not in ["YUV400", "YUV420SP", "YUV422SP", "YUV444SP"]:
+        logger.fatal(f"{prefix}.toYUV_format must be YUV400/YUV420SP/YUV422SP/YUV444SP")
+    if data_format in ["RGB", "BGR"] and toYUV_format == "YUV400":
+        logger.fatal(f"{prefix}.toYUV_format: RGB/BGR input cannot use YUV400")
+    if data_format == "GRAY" and toYUV_format != "YUV400":
+        logger.fatal(f"{prefix}.toYUV_format: GRAY input must use YUV400")
+
+    # resizer_input_size
+    resizer_input_size = resizer_cfg.get("resizer_input_size", [H, W])
+    if not isinstance(resizer_input_size, list) or len(resizer_input_size) != 2:
+        logger.fatal(f"{prefix}.resizer_input_size must be [H, W]")
+    for v in resizer_input_size:
+        if v % 2 != 0:
+            logger.fatal(f"{prefix}.resizer_input_size must be even numbers")
+    resizer_input_h, resizer_input_w = resizer_input_size
+    # Size limit: H <= 4096, W <= 1024
+    if resizer_input_h > 4096:
+        logger.fatal(
+            f"{prefix}.resizer_input_size H must be <= 4096, got {resizer_input_h}"
+        )
+    if resizer_input_w > 1024:
+        logger.fatal(
+            f"{prefix}.resizer_input_size W must be <= 1024, got {resizer_input_w}"
+        )
+    if resizer_input_h < H or resizer_input_w < W:
+        logger.warning(
+            f"{prefix}.resizer_input_size [{resizer_input_h}, {resizer_input_w}] < model input [{H}, {W}]"
+        )
+
+    # resizer_mode
+    resizer_mode = resizer_cfg.get("resizer_mode", 3)
+    if resizer_mode not in [1, 2, 3]:
+        logger.fatal(
+            f"{prefix}.resizer_mode must be 1/2/3 (DYNAMIC_V2/DYNAMIC_V1/STATIC)"
+        )
+    if resizer_mode == 2:
+        logger.fatal(f"{prefix}.resizer_mode=2 (DYNAMIC_V1) is not supported")
+    # DYNAMIC_V2 mode: padding constraint warning
+    if resizer_mode == 1:
+        logger.warning(
+            f"{prefix}: DYNAMIC_V2 mode padding only supports one direction (left-right or top-bottom), max 32 pixels"
+        )
+
+    # resizer_crop (only valid for STATIC mode)
+    if resizer_mode != 3:
+        if "resizer_crop" in resizer_cfg:
+            logger.fatal(
+                f"{prefix}.resizer_crop only valid when resizer_mode=3 (STATIC)"
+            )
+        return
+
+    # STATIC mode: check resizer_crop
+    if "resizer_crop" not in resizer_cfg:
+        logger.warning(
+            f"{prefix}.resizer_crop not found, using default [0, 0, {resizer_input_h}, {resizer_input_w}]"
+        )
+        resizer_crop = [0, 0, resizer_input_h, resizer_input_w]
+    else:
+        resizer_crop = resizer_cfg["resizer_crop"]
+        if not isinstance(resizer_crop, list) or len(resizer_crop) != 4:
+            logger.fatal(f"{prefix}.resizer_crop must be [y, x, h, w]")
+
+    y, x, crop_h, crop_w = resizer_crop
+    for v in resizer_crop:
+        if v % 2 != 0:
+            logger.fatal(f"{prefix}.resizer_crop must be even numbers")
+    if y < 0 or x < 0 or y + crop_h > resizer_input_h or x + crop_w > resizer_input_w:
+        logger.fatal(
+            f"{prefix}.resizer_crop out of bounds [0, 0, {resizer_input_h}, {resizer_input_w}]"
+        )
+    # Scale constraint: [1/32, 16]
+    # crop -> model input, scale must be in [1/32, 16]
+    scale_h = H / crop_h
+    scale_w = W / crop_w
+    if scale_h < 1 / 32 or scale_h > 16:
+        logger.fatal(
+            f"{prefix}.resizer_crop scale out of range [1/32, 16]: crop_h={crop_h} -> H={H}, scale={scale_h:.4f}"
+        )
+    if scale_w < 1 / 32 or scale_w > 16:
+        logger.fatal(
+            f"{prefix}.resizer_crop scale out of range [1/32, 16]: crop_w={crop_w} -> W={W}, scale={scale_w:.4f}"
+        )

@@ -55,8 +55,7 @@ def calc_padding_size(img_shape, target_size, padding_mode):
             top &= ~1
             bottom = th - nh - top
         else:
-            logger.error("Not support padding mode -> {}".format(padding_mode))
-            exit(-1)
+            logger.fatal("Not support padding mode -> {}".format(padding_mode))
     else:
         s = sh
         nh = th
@@ -69,8 +68,7 @@ def calc_padding_size(img_shape, target_size, padding_mode):
             left &= ~1
             right = tw - nw - left
         else:
-            logger.error("Not support padding mode -> {}".format(padding_mode))
-            exit(-1)
+            logger.fatal("Not support padding mode -> {}".format(padding_mode))
 
     padding_size = [top, left, bottom, right]
     size = [nh, nw]
@@ -99,8 +97,7 @@ def resize(
         Resized image
     """
     if resize_type not in [0, 1, 2]:
-        logger.error("resize_type must be equal 0 or 1 or 2")
-        exit(-1)
+        logger.fatal("resize_type must be equal 0 or 1 or 2")
 
     if resize_type == 0:
         return cv2.resize(im, size, interpolation=interpolation)
@@ -117,11 +114,10 @@ def resize(
         )
 
     if resize_type == 2:
-        logger.error("Not support yet")
-        exit(-1)
+        logger.fatal("Not support yet")
 
 
-def convert_bgr_to_yuv(im, fmt="YUV420SP"):
+def convert_bgr_to_yuv(im, fmt="YUV420SP", to_NCHW=False):
     """Convert BGR image to YUV format.
 
     Args:
@@ -131,6 +127,7 @@ def convert_bgr_to_yuv(im, fmt="YUV420SP"):
     Returns:
         Converted image in YUV format
     """
+    n, c, h, w = im.shape
     if fmt == "YUV400":
         assert len(im.shape) == 2
         h, w = im.shape
@@ -139,6 +136,8 @@ def convert_bgr_to_yuv(im, fmt="YUV420SP"):
         im_chw = torch.squeeze(im, dim=0).type(torch.float32)  # CHW
         yuv_im = BGR2YUV(fmt=fmt)(im_chw)
         yuv_im = yuv_im.type(torch.uint8)  # HWC
+    if to_NCHW:
+        yuv_im = yuv_im.view(n, c, h, w)
     return yuv_im
 
 
@@ -178,12 +177,10 @@ def default_preprocess(
         Preprocessed image tensor
     """
     if im is None:
-        logger.error("Image is None, please check!")
-        exit(-1)
+        logger.fatal("Image is None, please check!")
 
     if len(im.shape) not in [2, 3]:
-        logger.error("Image must be 2d or 3d")
-        exit(-1)
+        logger.fatal("Image must be 2d or 3d")
 
     if use_rgb and len(im.shape) == 3:
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
@@ -205,11 +202,9 @@ def default_preprocess(
 
     if use_norm:
         if not isinstance(mean, list) and not isinstance(mean, tuple):
-            logger.error("mean must be list or tuple")
-            exit(-1)
+            logger.fatal("mean must be list or tuple")
         if not isinstance(std, list) and not isinstance(std, tuple):
-            logger.error("mean must be list or tuple")
-            exit(-1)
+            logger.fatal("mean must be list or tuple")
         im = im.astype(dtype=np.float32)
         im -= np.array(mean, dtype=np.float32)
         im /= np.array(std, dtype=np.float32)
@@ -248,7 +243,7 @@ def clip_resize_scale(src_size, dst_size):
     return nh, nw
 
 
-def resizer_preprocess(
+def resizer_preprocess_v1(
     cv_image,
     input_shape,
     max_input_size,
@@ -366,3 +361,78 @@ def resizer_preprocess(
     if to_YUV:
         padding_im = convert_bgr_to_yuv(padding_im, fmt=fmt)
     return padding_im, dyn_info
+
+
+def resizer_preprocess(
+    cv_image: np.ndarray,
+    input_shape: list,
+    resizer_input_size: list,
+    resizer_crop: list,  # 配置文件的crop参数仅对静态resizer有效
+    resizer_mode: int = 3,
+    mean: list = None,
+    std: list = None,
+    use_resize: bool = False,
+    use_norm: bool = False,
+    use_rgb: bool = False,
+    resize_type: int = 1,
+    padding_mode: int = 1,
+    padding_values: list = [114, 114, 144],
+    is_onnx: bool = False,
+    to_YUV: bool = False,
+    fmt: str = "YUV420SP",
+):
+    # onnx模型输入
+    _, C, H, W = input_shape
+    # Ensure even dimensions for input image
+    orig_height, orig_width = cv_image.shape[:2]
+    orig_height &= ~1
+    orig_width &= ~1
+    cv_image = cv2.resize(cv_image, (orig_width, orig_height)).copy()
+
+    if is_onnx or resizer_mode == 0:
+        im = default_preprocess(
+            cv_image,
+            (W, H),
+            mean,
+            std,
+            use_norm=use_norm,
+            use_rgb=use_rgb,
+            use_resize=use_resize,
+            resize_type=resize_type,
+            padding_mode=padding_mode,
+            padding_value=padding_values,
+        )
+        return torch.from_numpy(im), torch.tensor([], dtype=torch.int32)
+
+    resizer_input_h, resizer_input_w = resizer_input_size
+    padded_im = np.zeros((1, C, resizer_input_h, resizer_input_w), dtype=np.uint8)
+
+    if resizer_mode == 3:
+        crop_y, crop_x, crop_h, crop_w = resizer_crop
+        dyn_tensor = torch.tensor([], dtype=torch.int32)
+    elif resizer_mode == 2:
+        crop_y, crop_x, crop_h, crop_w = 0, 0, H, W
+        dyn_tensor = torch.tensor([[crop_y, crop_x, crop_h, crop_w]], dtype=torch.int32)
+    elif resizer_mode == 1:
+        crop_y, crop_x, crop_h, crop_w = 0, 0, H, W
+        dyn_tensor = torch.tensor(
+            [[crop_y, crop_x, crop_h, crop_w, H, W, 0, 0, 0, 0]], dtype=torch.int32
+        )
+    else:
+        logger.fatal(f"Invalid resizer_mode={resizer_mode}")
+
+    im = default_preprocess(
+        cv_image,
+        (crop_w, crop_h),
+        use_norm=False,
+        use_resize=True,
+        use_rgb=use_rgb,
+        resize_type=resize_type,
+        padding_mode=padding_mode,
+        padding_value=padding_values,
+    )
+    padded_im[:, :, crop_y : crop_y + crop_h, crop_x : crop_x + crop_w] = im.copy()
+    im_tensor = torch.from_numpy(padded_im)
+    if to_YUV:
+        im_tensor = convert_bgr_to_yuv(im_tensor, fmt=fmt, to_NCHW=True)
+    return im_tensor, dyn_tensor

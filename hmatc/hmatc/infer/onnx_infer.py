@@ -52,8 +52,7 @@ class OnnxInfer(BaseInfer, ABC):
             device_id (int): Device ID for inference (not used in ONNX Runtime)
         """
         if not os.path.exists(model_path):
-            logger.error(f"model path: {model_path} not exists.")
-            exit(-1)
+            logger.fatal(f"model path: {model_path} not exists.")
         self.engine = ort.InferenceSession(model_path)
         logger.info("load onnx model successfully.")
         for idx, tensor in enumerate(self.engine.get_inputs()):

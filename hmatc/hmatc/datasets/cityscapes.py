@@ -96,12 +96,10 @@ class Cityscapes(BaseDataset):
         self.root_path = root_path
         self.images_dir = os.path.join(self.root_path, "leftImg8bit", "val")
         if not os.path.exists(self.images_dir):
-            logger.error("Not exits: {}".format(self.images_dir))
-            exit(-1)
+            logger.fatal(f"Not exits: {self.images_dir}")
         self.targets_dir = os.path.join(self.root_path, "gtFine", "val")
         if not os.path.exists(self.targets_dir):
-            logger.error("Not exits: {}".format(self.targets_dir))
-            exit(-1)
+            logger.fatal(f"Not exits: {self.targets_dir}")
 
         self.images = list()
         self.targets = list()

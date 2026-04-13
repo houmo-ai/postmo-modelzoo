@@ -39,18 +39,15 @@ class WiderFace(BaseDataset):
         """
         self._root_path = root_path
         if not os.path.exists(self._root_path):
-            logger.error(f"root_path not exits -> {self._root_path}")
-            exit(-1)
+            logger.fatal(f"root_path not exits -> {self._root_path}")
 
         self._list_file = os.path.join(self._root_path, "WIDER_val", "wider_val.txt")
         if not os.path.exists(self._list_file):
-            logger.error(f"wider_val.txt not exits -> {self._list_file}")
-            exit(-1)
+            logger.fatal(f"wider_val.txt not exits -> {self._list_file}")
 
         self._dataset_val_path = os.path.join(self._root_path, "WIDER_val", "images")
         if not os.path.exists(self._dataset_val_path):
-            logger.error(f"image val not exits -> {self._dataset_val_path}")
-            exit(-1)
+            logger.fatal(f"image val not exits -> {self._dataset_val_path}")
 
         self._img_lists = list()
         self._img_relative_path = list()
@@ -66,8 +63,7 @@ class WiderFace(BaseDataset):
 
         self._annotation_path = os.path.join(self._root_path, "ground_truth", "val")
         if not os.path.exists(self._annotation_path):
-            logger.error(f"annotation_path not exits -> {self._annotation_path}")
-            exit(-1)
+            logger.fatal(f"annotation_path not exits -> {self._annotation_path}")
 
     def get_next_batch(self):
         """
