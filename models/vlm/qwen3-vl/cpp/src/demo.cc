@@ -33,6 +33,11 @@
 #endif
 
 void printUsage(const char *program_name) {
+#ifdef _MSC_VER
+  SetConsoleOutputCP(
+      CP_UTF8);           // Set console output code page to UTF-8 for Windows
+  SetConsoleCP(CP_UTF8);  // Set console input code page to UTF-8 for Windows
+#endif
   std::cout << "Usage:" << std::endl;
   std::cout << "  " << program_name << " [options]" << std::endl;
   std::cout << std::endl;

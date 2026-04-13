@@ -112,7 +112,7 @@ qwen3-vl_visual.hmm
 
 ### 2.5 演示
 
-Qwen3-vl模型使用python API进行演示
+Qwen3-vl模型使用python API和c++示例进行演示，c++模型示例的详细介绍见cpp/README.MD文件。
 
 1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下
 
@@ -159,29 +159,57 @@ bash test.sh
 ### 3.1 演示结果
 
 ```bash
-question:
-https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg
-请描述图片内容。
-response:
-这是一张充满温馨与宁静氛围的海滩日落照片。
-
-画面中，一位年轻女性和一只金毛犬坐在沙滩上。女性侧身对着镜头，面带微笑，目光温柔地注视着身旁的狗狗。她穿着一件蓝白格子的衬衫，双腿交叉，姿态放松。狗狗则安静地坐在她旁边，戴着一个蓝色的胸背带，正抬起前爪，似乎在与主人互动或准备握手。
-
-背景是广阔的海洋，海浪正轻轻拍打着沙滩，远处的海平线与天空在柔和的夕阳下融为一体，呈现出温暖的橙黄色调。阳光从画面右侧斜射过来，为整个场景镀上了一层金色的光晕，营造出温暖、治愈的氛围。
-
-整个画面构图和谐，人物与宠物之间的互动充满爱意，展现了人与宠物在自然美景中共享宁静时光的美好瞬间。
+2026-04-13 04:31:19.416] [tid 200602] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-04-13 04:31:19.416] [tid 200602] [warning] Empty backend name, use Xh2HalBackend instead.
+2026-04-13 04:31:20.181 | INFO     | __main__:__init__:338 - vit model loaded
+2026-04-13 04:31:23.454 | INFO     | __main__:__init__:342 - prefill model loaded
+2026-04-13 04:31:23.626 | INFO     | __main__:__init__:352 - decode model loaded
+2026-04-13 04:31:25.937 | SUCCESS  | __main__:<module>:1327 - question:
+请分析输入内容并简洁作答。
+2026-04-13 04:31:26.238 | SUCCESS  | __main__:chat_vit_prefill:1181 - response:
+图片中，一位女士坐在沙滩上，与一只戴着蓝色牵引带的金毛犬互动。背景是日落时分的海面，光线温暖柔和，营造出宁静温馨的氛围。
 ```
 
 ### 3.2 性能结果
 #### M50 2core
 ```bash
-Total Images: 1, Total Input: 211 tokens, Output 186 tokens, Vision Cost 157.396 ms, Prefill Cost 228.211 ms, Decode Cost 13778.114 ms
-Vision Cost 157.396 ms/image
-Prefill Speed: 924.58 tokens/s; Decode Speed: 13.43 tokens/s
-TTFT (Time to First Token): 464.260 ms
-TPOT (Time Per Output Token): 74.476 ms/token
-E2E Latency (End-to-End Latency): 15.824 seconds
-E2E TPS (End-to-End Tokens Per Second): 11.75 tokens/s
+2026-04-13 04:31:28.931 | SUCCESS  | perf_infomations:show_summary:316 - ====================================================================================================
+2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:317 -                     Model Inference Performance Summary Report
+2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:318 - ====================================================================================================
+2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:321 - Configuration Details:
+2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:322 -   Batch Size:      1
+2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:323 -   Input Length per Sample:    215 tokens
+2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:324 -   Output Length per Sample:     44 tokens
+2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:326 -   Number of Images:      1 images
+2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:329 -   Prefill Model Load Time: 3272.80ms
+2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:331 -   Decode Model Load Time:  171.68ms
+2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:333 -   Vision Model Load Time:  765.13ms
+2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:338 - Vision Stage Performance:
+2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:339 -   Total Time:  128.28ms | Speed:    7.80 images/s
+2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:340 -   Preprocessing Time: 27.25ms | Speed:   36.70 images/s
+2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:341 -   API SetInput Time:   1.30ms
+2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:342 -   API Inference Time: 90.72ms | Speed:   11.02 images/s
+2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:343 -   API GetOutput Time:  6.99ms
+2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:346 - Prefill Stage Performance:
+2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:347 -   Total Time:  150.32ms | Speed: 1430.27 tokens/s
+2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:349 -   Tokenization Time:   22.49ms
+2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:352 -   Embedding Time:    0.00ms
+2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:353 -   API SetInput Time:   4.56ms
+2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:354 -   API Inference Time: 121.20ms | Prefill Speed: 1773.90 tokens/s
+2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:355 -   API GetOutput Time:  0.49ms
+2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:358 - Decode Stage Performance:
+2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:359 -   Total Time: 2683.29ms | Speed:   16.03 tokens/s
+2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:361 -   Tokenization Time:    9.42ms
+2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:364 -   Embedding Time:    0.15ms
+2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:365 -   API SetInput Time:   2.63ms
+2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:366 -   API Inference Time: 51.37ms | Decode Speed:   19.47 tokens/s
+2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:367 -   API GetOutput Time:  0.44ms
+2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:370 - Overall Performance Metrics:
+2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:371 -   TTFT (Time To First Token):  278.60 ms
+2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:372 -   TPOT (Time Per Output Token): 62.40 ms/token
+2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:373 -   E2E Latency (End-to-End):      2.99 seconds
+2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:374 -   E2E TPS (Throughput):         14.69 tokens/s
+2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:376 - ====================================================================================================
 ```
 
 ## 4 免责声明

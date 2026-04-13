@@ -454,10 +454,8 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
       // Run vision model
       VisionSetInput(visual_tensor);
       VisionInfer();
-
       // Get outputs
       auto [feat, ds0, ds1, ds2] = VisionGetOutputs();
-
       // Append to buffers
       image_features.insert(image_features.end(), feat.begin(), feat.end());
       deepstack_0.insert(deepstack_0.end(), ds0.begin(), ds0.end());
@@ -558,9 +556,9 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
   }
 
   // Calculate 3D RoPE position indices
-  std::vector<int32_t> time_position_ids(prefill_length_, 0);
-  std::vector<int32_t> height_position_ids(prefill_length_, 0);
-  std::vector<int32_t> width_position_ids(prefill_length_, 0);
+  std::vector<int32_t> time_position_ids(input_seq_length, 0);
+  std::vector<int32_t> height_position_ids(input_seq_length, 0);
+  std::vector<int32_t> width_position_ids(input_seq_length, 0);
 
   int pos_idx = 0;
   size_t img_idx = 0;
@@ -593,7 +591,7 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
     }
   }
 
-  for (size_t i = seq_length; i < prefill_length_; i++) {
+  for (size_t i = seq_length; i < static_cast<size_t>(input_seq_length); i++) {
     time_position_ids[i] = time_position_ids[i - 1] + 1;
     height_position_ids[i] = height_position_ids[i - 1] + 1;
     width_position_ids[i] = width_position_ids[i - 1] + 1;
@@ -655,27 +653,40 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
         std::min((round + 1) * prefill_length_, static_cast<int>(seq_length));
     current_length = end - start;
 
-    // Extract chunk
+    // Build fixed-size chunk tensors to match prefill input shape.
+    // The tail chunk may be shorter than prefill_length_, so we zero-pad it.
     std::vector<half_float::half> chunk_embeds(
-        inputs_embeds.begin() + start * embedding_length_,
-        inputs_embeds.begin() + end * embedding_length_);
+        prefill_length_ * embedding_length_, half_float::half(0.0f));
+    std::vector<int32_t> chunk_time(prefill_length_, 0);
+    std::vector<int32_t> chunk_height(prefill_length_, 0);
+    std::vector<int32_t> chunk_width(prefill_length_, 0);
+    std::vector<half_float::half> chunk_ds0(prefill_length_ * embedding_length_,
+                                            half_float::half(0.0f));
+    std::vector<half_float::half> chunk_ds1(prefill_length_ * embedding_length_,
+                                            half_float::half(0.0f));
+    std::vector<half_float::half> chunk_ds2(prefill_length_ * embedding_length_,
+                                            half_float::half(0.0f));
 
-    std::vector<int32_t> chunk_time(time_position_ids.begin() + start,
-                                    time_position_ids.begin() + end);
-    std::vector<int32_t> chunk_height(height_position_ids.begin() + start,
-                                      height_position_ids.begin() + end);
-    std::vector<int32_t> chunk_width(width_position_ids.begin() + start,
-                                     width_position_ids.begin() + end);
+    size_t token_span = static_cast<size_t>(current_length);
+    size_t embed_span = token_span * static_cast<size_t>(embedding_length_);
+    size_t embed_start = static_cast<size_t>(start) * embedding_length_;
 
-    std::vector<half_float::half> chunk_ds0(
-        deepstack_embed_0.begin() + start * embedding_length_,
-        deepstack_embed_0.begin() + end * embedding_length_);
-    std::vector<half_float::half> chunk_ds1(
-        deepstack_embed_1.begin() + start * embedding_length_,
-        deepstack_embed_1.begin() + end * embedding_length_);
-    std::vector<half_float::half> chunk_ds2(
-        deepstack_embed_2.begin() + start * embedding_length_,
-        deepstack_embed_2.begin() + end * embedding_length_);
+    if (embed_span > 0) {
+      std::memcpy(chunk_embeds.data(), inputs_embeds.data() + embed_start,
+                  embed_span * sizeof(half_float::half));
+      std::memcpy(chunk_ds0.data(), deepstack_embed_0.data() + embed_start,
+                  embed_span * sizeof(half_float::half));
+      std::memcpy(chunk_ds1.data(), deepstack_embed_1.data() + embed_start,
+                  embed_span * sizeof(half_float::half));
+      std::memcpy(chunk_ds2.data(), deepstack_embed_2.data() + embed_start,
+                  embed_span * sizeof(half_float::half));
+      std::memcpy(chunk_time.data(), time_position_ids.data() + start,
+                  token_span * sizeof(int32_t));
+      std::memcpy(chunk_height.data(), height_position_ids.data() + start,
+                  token_span * sizeof(int32_t));
+      std::memcpy(chunk_width.data(), width_position_ids.data() + start,
+                  token_span * sizeof(int32_t));
+    }
 
     PrefillSetInputDatas(chunk_embeds, chunk_time, chunk_height, chunk_width,
                          valid_length, current_length, chunk_ds0, chunk_ds1,
@@ -691,7 +702,6 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
 
   // Get first token
   int next_token = PrefillGetOutputDatas();
-  // std::cout << "First token ID: " << next_token << std::endl;
   generated_ids_.clear();
   generated_ids_.push_back(next_token);
 
@@ -724,8 +734,6 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
 
   // Save rope_deltas for decode
   rope_deltas_ = pos_idx - seq_length;
-  // std::cout << "pos_idx: " << pos_idx << ", rope_deltas: " << rope_deltas_
-  //           << std::endl;
 
   while (true) {
     if (context_length >= context_max_length_ || next_token == EOS_TOKEN_ID) {

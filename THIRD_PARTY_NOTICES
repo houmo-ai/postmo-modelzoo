@@ -87,6 +87,45 @@ Users are responsible for complying with the MPL 2.0 license when using,
 redistributing, or modifying the Eigen3 library.
 
 ----------------------------------------------------------------------
+OpenCV (Open Source Computer Vision Library)
+----------------------------------------------------------------------
+
+Component Name: OpenCV
+
+Version:
+4.x
+
+Author / Copyright Holder:
+OpenCV Team and OpenCV contributors
+
+Copyright Statement:
+Copyright (C) 2000-2025, OpenCV Team, all rights reserved.
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://github.com/opencv/opencv/blob/4.x/LICENSE
+
+Usage in this project:
+OpenCV is used for image loading and preprocessing in the Qwen3-VL C++ example.
+Relevant paths include:
+    models/vlm/qwen3-vl/cpp/include/HmImageProcessor.h
+    models/vlm/qwen3-vl/cpp/src/HmImageProcessor.cc
+    models/vlm/qwen3-vl/cpp/CMakeLists.txt
+
+The OpenCV library is licensed under the Apache License, Version 2.0,
+which allows use, modification, and distribution in source and binary
+forms subject to the terms of that license.
+
+Any redistribution or modification of OpenCV must retain the original
+copyright notice, license text, and NOTICE information as required by
+the Apache License, Version 2.0.
+
+Users are responsible for complying with the Apache License, Version 2.0,
+when using, redistributing, or modifying OpenCV.
+
+----------------------------------------------------------------------
 tokenizers-cpp
 ----------------------------------------------------------------------
 

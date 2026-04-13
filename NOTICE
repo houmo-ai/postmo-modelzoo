@@ -45,6 +45,7 @@ Third-Party Software, Algorithm and Data Notices:
 half IEEE 754-based half-precision floating-point library (MIT) - https://github.com/suruoxi/half
 tokenizers-cpp (Apache-2.0) - https://github.com/mlc-ai/tokenizers-cpp
 Eigen3 (MPL-2.0) - https://gitlab.com/libeigen/eigen
+OpenCV (Apache-2.0) - https://opencv.org/
 JSON for Modern C++ (MIT) - https://github.com/nlohmann/json
 mingw-w64 getopt.h (ISC & BSD-2-Clause) - https://sourceforge.net/projects/mingw-w64
 Numpy File I/O for C++ npy.hpp - https://github.com/llohse/libnpy
