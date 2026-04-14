@@ -5,5 +5,5 @@
 # because each custom example may require different versions.
 
 # Core evaluation engine used by hmeval CLI (`run_task`, `TaskConfig`)
-evalscope
+evalscope==1.5.2
 pydantic==2.12.5
