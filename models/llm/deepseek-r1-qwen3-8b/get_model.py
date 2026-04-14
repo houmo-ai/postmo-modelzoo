@@ -64,7 +64,7 @@ def get_args() -> argparse.Namespace:
         "--context_length",
         dest="context_length",
         type=str,
-        default="4k",
+        default="32k",
         help="context length",
     )
     parser.add_argument(

@@ -42,12 +42,12 @@
             ],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2_4k",
-                "cached_models/hmm_xh2_4k_ms",
-                "cached_models/hmm_xh2_4k_b2"
+                "cached_models/hmm_xh2_32k",
+                "cached_models/hmm_xh2_32k_ms",
+                "cached_models/hmm_xh2_32k_b2"
             ],
             "source_type": [null, null, "modelscope", null],
-            "context_length": [null, null, null, "4k"],
+            "context_length": [null, null, null, "32k"],
             "batch": [null, null, null, "2"]
         }
     },
@@ -71,11 +71,11 @@
             "ncore": [null, null],
             "ndevice": [null, null],
             "stage": ["build", "build"],
-            "context_length": ["4096", "4096"],
+            "context_length": ["32768", "32768"],
             "j": ["24", "24"],
             "output_dir": [
-                "cached_results/hmm_xh2_4k",
-                "cached_results/hmm_xh2_4k_b2"
+                "cached_results/hmm_xh2_32k",
+                "cached_results/hmm_xh2_32k_b2"
             ]
         }
     },
@@ -83,10 +83,10 @@
         "xh2": {
             "tokenizer_dir": ["cached_models/DeepSeek-R1-0528-Qwen3-8B"],
             "embedding_path": [
-                "cached_results/hmm_xh2_4k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_32k/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_4k/deepseek_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_4k/deepseek_decode.hmm"],
+            "prefill_path": ["cached_results/hmm_xh2_32k/deepseek_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_32k/deepseek_decode.hmm"],
             "ndevice": ["1"]
         }
     },
@@ -94,10 +94,12 @@
         "xh2": {
             "tokenizer_dir": ["cached_models/DeepSeek-R1-0528-Qwen3-8B"],
             "embedding_path": [
-                "cached_results/hmm_xh2_4k_b2/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_32k_b2/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_4k_b2/deepseek_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_4k_b2/deepseek_decode.hmm"]
+            "prefill_path": [
+                "cached_results/hmm_xh2_32k_b2/deepseek_prefill.hmm"
+            ],
+            "decode_path": ["cached_results/hmm_xh2_32k_b2/deepseek_decode.hmm"]
         }
     },
     "perf_params": "demo"

@@ -42,15 +42,21 @@
             "source_type": [null, null]
         },
         "xh2": {
-            "type": ["raw", "hmm", "hmm"],
-            "download_dir": ["cached_models", "cached_models", "cached_models"],
+            "type": ["raw", "hmm", "hmm", "hmm"],
+            "download_dir": [
+                "cached_models",
+                "cached_models",
+                "cached_models",
+                "cached_models"
+            ],
             "extract_dir": [
                 null,
                 "cached_models/hmm_xh2_8b_32k",
-                "cached_models/hmm_xh2_8b_32k_ms"
+                "cached_models/hmm_xh2_8b_32k_ms",
+                "cached_models/hmm_xh2_4b_32k"
             ],
-            "model_size": ["8b", "8b", "8b"],
-            "source_type": [null, null, "modelscope"]
+            "model_size": ["8b", "8b", "8b", "4b"],
+            "source_type": [null, null, "modelscope", null]
         }
     },
     "quant_params": {

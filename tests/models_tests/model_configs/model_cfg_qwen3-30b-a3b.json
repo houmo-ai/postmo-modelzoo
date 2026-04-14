@@ -29,8 +29,8 @@
             "type": ["hmm", "hmm"],
             "download_dir": ["cached_models", "cached_models"],
             "extract_dir": [
-                "cached_models/hmm_xh2_8k",
-                "cached_models/hmm_xh2_8k_ms"
+                "cached_models/hmm_xh2_32k",
+                "cached_models/hmm_xh2_32k_ms"
             ],
             "source_type": [null, "modelscope"],
             "batch": [null, null],
@@ -55,19 +55,19 @@
             "ncore": [null],
             "ndevice": [null],
             "stage": ["build"],
-            "context_length": ["8192"],
+            "context_length": ["32768"],
             "j": ["24"],
-            "output_dir": ["cached_results/hmm_xh2_8k"]
+            "output_dir": ["cached_results/hmm_xh2_32k"]
         }
     },
     "demo_params": {
         "xh2": {
             "tokenizer_dir": ["cached_models/qwen3-30b-a3b"],
             "embedding_path": [
-                "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_32k/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_8k/qwen3_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_8k/qwen3_decode.hmm"],
+            "prefill_path": ["cached_results/hmm_xh2_32k/qwen3_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_32k/qwen3_decode.hmm"],
             "ndevice": ["1"]
         }
     },

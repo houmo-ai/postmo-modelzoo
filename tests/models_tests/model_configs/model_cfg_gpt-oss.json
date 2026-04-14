@@ -28,7 +28,7 @@
         "xh2": {
             "type": ["hmm"],
             "download_dir": ["cached_models"],
-            "extract_dir": ["cached_models/hmm_xh2"],
+            "extract_dir": ["cached_models/hmm_xh2_32k"],
             "source_type": [null],
             "batch": [null],
             "context_length": [null],
@@ -52,19 +52,19 @@
             "ncore": [null],
             "ndevice": [null],
             "stage": ["build"],
-            "context_length": ["8192"],
+            "context_length": ["32768"],
             "j": ["24"],
-            "output_dir": ["cached_results/hmm_xh2_8k"]
+            "output_dir": ["cached_results/hmm_xh2_32k"]
         }
     },
     "demo_params": {
         "xh2": {
             "tokenizer_dir": ["cached_models/gpt-oss-20b"],
             "embedding_path": [
-                "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_32k/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_8k/gpt-oss_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_8k/gpt-oss_decode.hmm"],
+            "prefill_path": ["cached_results/hmm_xh2_32k/gpt-oss_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_32k/gpt-oss_decode.hmm"],
             "ndevice": ["1"]
         }
     },
