@@ -57,8 +57,17 @@ def check_cfg(cfg):
     if len(inputs_cfg) == 0:
         logger.fatal("[model.inputs] not found or empty")
 
+    # Track resizer modes across all inputs
+    has_dynamic_resizer = False
     for input_name, input_cfg in inputs_cfg.items():
-        _check_input_cfg(input_name, input_cfg)
+        resizer_mode = _check_input_cfg(input_name, input_cfg)
+        if resizer_mode in [1, 2]:  # DYNAMIC_V2 or DYNAMIC_V1
+            has_dynamic_resizer = True
+
+    # quant config
+    quant_cfg = cfg.get("quant", dict())
+    if "calib_num" in quant_cfg:
+        logger.warning("[quant.calib_num] is currently ignored, only 1 calibration image is used")
 
     # build config
     build_cfg = cfg.get("build", dict())
@@ -75,6 +84,11 @@ def check_cfg(cfg):
     if batch < 1:
         logger.fatal(f"[build.batch] must be >= 1, got {batch}")
 
+    # roi_num: only valid when dynamic resizer is enabled
+    if "roi_num" in build_cfg and not has_dynamic_resizer:
+        logger.fatal(
+            "[build.roi_num] only valid with dynamic resizer (resizer_mode=1 or 2)"
+        )
     roi_num = build_cfg.get("roi_num", 1)
     if roi_num < 1:
         logger.fatal(f"[build.roi_num] must be >= 1, got {roi_num}")
@@ -95,6 +109,9 @@ def _check_input_cfg(input_name, input_cfg):
     Args:
         input_name (str): Input name
         input_cfg (dict): Input configuration dictionary
+
+    Returns:
+        int: resizer_mode (0 if no resizer, otherwise 1/2/3)
     """
     prefix = f"[model.inputs.{input_name}]"
 
@@ -108,10 +125,10 @@ def _check_input_cfg(input_name, input_cfg):
     # data_format
     if "data_format" not in input_cfg:
         logger.warning(f"{prefix}.data_format not found, using default null")
-        return
+        return 0
     data_format = input_cfg["data_format"]
     if data_format is None:
-        return
+        return 0
     # Image input validation
     if data_format not in ["RGB", "BGR", "GRAY"]:
         logger.fatal(f"{prefix}.data_format must be RGB/BGR/GRAY")
@@ -155,14 +172,14 @@ def _check_input_cfg(input_name, input_cfg):
 
     # resizer
     if "resizer" not in input_cfg:
-        return
+        return 0
     resizer_cfg = input_cfg["resizer"]
     if resizer_cfg is None:
-        return
+        resizer_cfg = {}
     if not isinstance(resizer_cfg, dict):
         logger.fatal(f"{prefix}.resizer must be dict")
 
-    _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W)
+    return _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W)
 
 
 def _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W):
@@ -174,6 +191,9 @@ def _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W):
         data_format (str): Data format (RGB/BGR/GRAY)
         H (int): Model input height
         W (int): Model input width
+
+    Returns:
+        int: resizer_mode (1/2/3)
     """
     prefix = f"[model.inputs.{input_name}.resizer]"
 
@@ -228,7 +248,7 @@ def _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W):
             logger.fatal(
                 f"{prefix}.resizer_crop only valid when resizer_mode=3 (STATIC)"
             )
-        return
+        return resizer_mode
 
     # STATIC mode: check resizer_crop
     if "resizer_crop" not in resizer_cfg:
@@ -261,3 +281,4 @@ def _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W):
         logger.fatal(
             f"{prefix}.resizer_crop scale out of range [1/32, 16]: crop_w={crop_w} -> W={W}, scale={scale_w:.4f}"
         )
+    return resizer_mode

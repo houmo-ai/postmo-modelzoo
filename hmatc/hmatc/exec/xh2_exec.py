@@ -432,21 +432,16 @@ class Xh2Exec(BaseExec):
         logger.info(f" {title}")
         logger.info(f"{char * width}")
 
-    @staticmethod
-    def _log_kv(key: str, value, indent: int = 2):
-        """Log a key-value pair with consistent formatting."""
-        logger.info(f"{' ' * indent}{key}: {value}")
-
     def quantize(self):
         """Quantize the ONNX model for XH2 hardware."""
         self._log_section(f"Quantize: {self.model_name}")
 
         t_start = time.time()
 
-        self._log_kv("model", self.model_path)
-        self._log_kv("device", self.device)
-        self._log_kv("quant_type", self.quant_type)
-        self._log_kv("target", "XH2a")
+        logger.info(f"  model: {self.model_path}")
+        logger.info(f"  device: {self.device}")
+        logger.info(f"  quant_type: {self.quant_type}")
+        logger.info(f"  target: XH2a")
 
         if not os.path.exists(self.quant_output_dir):
             os.makedirs(self.quant_output_dir)
@@ -523,8 +518,8 @@ class Xh2Exec(BaseExec):
 
         span = time.time() - t_start
         self._log_section("Quantize Complete", char="-")
-        self._log_kv("hmonnx", self.quant_onnx_model_path)
-        self._log_kv("time", f"{span:.2f}s")
+        logger.info(f"  hmonnx: {self.quant_onnx_model_path}")
+        logger.info(f"  time: {span:.2f}s")
 
         return {
             "quant": {
@@ -548,11 +543,13 @@ class Xh2Exec(BaseExec):
         t_start = time.time()
 
         self.enable_profile = enable_profile
-        self._log_kv("hmonnx", self.quant_onnx_model_path)
-        self._log_kv("ncore", self.build_ncore)
-        self._log_kv("opt_level", f"{self.build_opt_level}")
-        self._log_kv("batch", self.build_batch if self.roi_num == 1 else self.roi_num)
-        self._log_kv("target", "xh2")
+        logger.info(f"  hmonnx: {self.quant_onnx_model_path}")
+        logger.info(f"  ncore: {self.build_ncore}")
+        logger.info(f"  opt_level: {self.build_opt_level}")
+        logger.info(
+            f"  batch: {self.build_batch if self.roi_num == 1 else self.roi_num}"
+        )
+        logger.info(f"  target: xh2")
 
         if not os.path.exists(self.build_output_dir):
             os.makedirs(self.build_output_dir)
@@ -580,8 +577,8 @@ class Xh2Exec(BaseExec):
 
         span = time.time() - t_start
         self._log_section("Build Complete", char="-")
-        self._log_kv("hmm", self.hmm_path)
-        self._log_kv("time", f"{span:.2f}s")
+        logger.info(f"  hmm: {self.hmm_path}")
+        logger.info(f"  time: {span:.2f}s")
 
         res_info = {
             "build": {
@@ -655,6 +652,14 @@ class Xh2Exec(BaseExec):
         logger.info("Upload hmmodel done.")
 
     # ==================== Check and Compare ====================
+    @staticmethod
+    def _get_yuv_valid_len(size, toYUV_format):
+        if toYUV_format == "YUV420SP":
+            return size // 2
+        elif toYUV_format == "YUV422SP":
+            return size * 2 // 3
+        else:
+            return size
 
     def check_golden(self, device_id=0, enable_layers=False):
         """Check the golden data against the hardware model outputs."""
@@ -673,9 +678,9 @@ class Xh2Exec(BaseExec):
                 logger.info("Rebuilding hmmodel with all layers output...")
                 self.build(enable_profile=False)
 
-        self._log_kv("hmm", self.hmm_path)
-        self._log_kv("batch", self.build_batch)
-        self._log_kv("device_id", device_id)
+        logger.info(f"  hmm: {self.hmm_path}")
+        logger.info(f"  batch: {self.build_batch}")
+        logger.info(f"  device_id: {device_id}")
 
         xh2 = Xh2Infer()
         xh2.load(self.hmm_path, device_id=device_id)
@@ -689,50 +694,41 @@ class Xh2Exec(BaseExec):
                 self.quant_output_dir, f"hmquant_{self.model_name}_{new_name}_input.npy"
             )
             golden_input = np.load(golden_input_path)
-            self._log_kv(
-                f"{input_name}",
-                f"shape={list(golden_input.shape)}, dtype={golden_input.dtype}",
+            logger.info(
+                f"  {input_name}: shape={list(golden_input.shape)}, dtype={golden_input.dtype}"
             )
 
-            input_mode = self.resizer_modes.get(input_name, 0)
-            if input_mode in [1, 2, 3]:
+            hmm_batch = xh2.inputs_info[input_name].shape[0]
+
+            resizer_mode = self.resizer_modes[input_name]
+
+            if resizer_mode in [1, 2, 3]:
                 fmt = xh2.inputs_format[input_name]
                 golden_input = golden_input.flatten()
-                size = (
-                    golden_input.size // 2
-                    if fmt == "YUV420SP"
-                    else (
-                        golden_input.size * 3 // 2
-                        if fmt == "YUV422SP"
-                        else golden_input.size
-                    )
-                )
+                size = self._get_yuv_valid_len(golden_input.size, fmt)
                 golden_input = golden_input[:size].reshape(1, size)
 
-            golden_input = np.repeat(golden_input, self.build_batch, axis=0)
+            golden_input = np.repeat(golden_input, hmm_batch, axis=0)
             in_datas[input_name] = golden_input
 
-            # Handle dynamic crop parameters
-            if input_mode in [1, 2]:
+            # Handle dynamic resizer parameters
+            if resizer_mode in [1, 2]:
                 resizer_name = f"resizer_crop_{input_name}"
+                hmm_batch = xh2.inputs_batch[resizer_name]
                 golden_dyn_path = os.path.join(
                     self.quant_output_dir,
                     f"hmquant_{self.model_name}_resizer_crop_{new_name}_input.npy",
                 )
-                if os.path.exists(golden_dyn_path):
-                    golden_dyn_input = np.load(golden_dyn_path)
-                    self._log_kv(
-                        f"{resizer_name}",
-                        f"shape={list(golden_dyn_input.shape)}, dtype={golden_dyn_input.dtype}",
-                    )
-                    repeats = (
-                        self.roi_num
-                        if self.roi_num > 1
-                        else self.build_batch if self.build_batch > 1 else 1
-                    )
-                    in_datas[resizer_name] = np.repeat(
-                        golden_dyn_input, repeats=repeats, axis=0
-                    )
+                if not os.path.exists(golden_dyn_path):
+                    logger.fatal(f"Dynamic resizer input not found: {golden_dyn_path}")
+
+                golden_dyn_input = np.load(golden_dyn_path)
+                logger.info(
+                    f"  {resizer_name}: shape={list(golden_dyn_input.shape)}, dtype={golden_dyn_input.dtype}"
+                )
+                in_datas[resizer_name] = np.repeat(
+                    golden_dyn_input, repeats=hmm_batch, axis=0
+                )
 
         # Run inference
         logger.info("Running XH2 inference...")
@@ -759,7 +755,7 @@ class Xh2Exec(BaseExec):
                 else self.quant_output_dir
             )
             golden_output_path = (
-                os.path.join(golden_dir, f"{new_name}.npy")
+                os.path.join(self.quant_output_dir, golden_dir, f"{new_name}.npy")
                 if enable_layers
                 else os.path.join(
                     self.quant_output_dir,
@@ -767,9 +763,8 @@ class Xh2Exec(BaseExec):
                 )
             )
             golden_output = np.load(golden_output_path)
-            self._log_kv(
-                f"{output_name}",
-                f"shape={list(golden_output.shape)}, dtype={golden_output.dtype}",
+            logger.info(
+                f"  {output_name}: shape={list(golden_output.shape)}, dtype={golden_output.dtype}"
             )
 
             golden_output = np.repeat(golden_output, repeats=repeats, axis=0)
@@ -786,7 +781,7 @@ class Xh2Exec(BaseExec):
         span = time.time() - t_start
         logger.info(f"\n{table}")
         self._log_section("Check Golden Complete", char="-")
-        self._log_kv("time", f"{span:.2f}s")
+        logger.info(f"  time: {span:.2f}s")
 
         return {"outputs": outputs_result}
 
@@ -796,22 +791,22 @@ class Xh2Exec(BaseExec):
 
         t_start = time.time()
 
-        self._log_kv("data_path", data_path)
-        self._log_kv("device_id", device_id)
+        logger.info(f"  data_path: {data_path}")
+        logger.info(f"  device_id: {device_id}")
 
         # Load models
         logger.info("Loading models:")
         onnx_infer = OnnxInfer()
         onnx_infer.load(self.model_path)
-        self._log_kv("onnx", self.model_path)
+        logger.info(f"  onnx: {self.model_path}")
 
         hmquant_infer = Xh2HmQuantInfer()
         hmquant_infer.load(self.quant_onnx_model_path)
-        self._log_kv("hmquant", self.quant_onnx_model_path)
+        logger.info(f"  hmquant: {self.quant_onnx_model_path}")
 
         xh2_infer = Xh2Infer()
         xh2_infer.load(self.hmm_path)
-        self._log_kv("xh2", self.hmm_path)
+        logger.info(f"  xh2: {self.hmm_path}")
 
         onnx_in_datas = {}
         hmquant_in_datas = {}
@@ -821,28 +816,86 @@ class Xh2Exec(BaseExec):
         if not os.path.exists(data_path):
             logger.fatal(f"Not found data_path: {data_path}")
 
-        if self.is_image_single_input and ext in SUPPORT_IMAGE_FORMATS:
-            logger.info("Preparing single image input...")
-            input_cfg = self.inputs_cfg[self.inputs_name[0]]
-            cv_image = cv2.imread(
-                data_path,
-                (
-                    cv2.IMREAD_COLOR
-                    if input_cfg["data_format"] != "GRAY"
-                    else cv2.IMREAD_GRAYSCALE
-                ),
-            )
-            if cv_image is None:
-                logger.fatal("Failed to decode image")
-            onnx_in_datas, hmquant_in_datas, xh2_in_datas = self._prepare_single_image(
-                cv_image, xh2_infer
-            )
-        else:
-            logger.info("Preparing multi-input data...")
-            in_datas = load_npz(data_path)
-            onnx_in_datas, hmquant_in_datas, xh2_in_datas = self._prepare_multi_input(
-                in_datas, xh2_infer
-            )
+        logger.info("Preparing data...")
+        for input_name in self.inputs_cfg:
+            input_cfg = self.inputs_cfg[input_name]
+            resizer_mode = self.resizer_modes[input_name]
+            hmm_batch = xh2_infer.inputs_batch[input_name]
+            hmonnx_batch = hmquant_infer.inputs_batch[input_name]
+            onnx_batch = onnx_infer.inputs_batch[input_name]
+            fmt = xh2_infer.inputs_format[input_name]
+            data_format = input_cfg.get("data_format")
+            if data_format is not None:
+                if len(self.inputs_cfg) == 1:
+                    if ext not in SUPPORT_IMAGE_FORMATS:
+                        logger.fatal(f"Unsupported image format: {ext}")
+                    cv_image = cv2.imread(
+                        data_path,
+                        (
+                            cv2.IMREAD_COLOR
+                            if data_format != "GRAY"
+                            else cv2.IMREAD_GRAYSCALE
+                        ),
+                    )
+                    if cv_image is None:
+                        logger.fatal("Failed to decode image")
+                else:
+                    in_datas = load_npz(data_path)
+                    if input_name not in in_datas:
+                        logger.fatal(f"Input data not found: {input_name}")
+
+                    cv_image = in_datas[input_name]  # BGR
+                onnx_data: np.ndarray = self._preprocess_for_onnx(cv_image, input_cfg)
+                yuv_im: torch.Tensor
+                yuv_im, dyn_info = self._preprocess_for_resizer(
+                    cv_image, input_cfg, resizer_mode
+                )
+                onnx_in_datas[input_name] = np.repeat(
+                    onnx_data, repeats=onnx_batch, axis=0
+                )
+                if resizer_mode == 0:
+                    if onnx_batch != hmm_batch or onnx_batch != hmonnx_batch:
+                        logger.fatal(
+                            f"Batch size mismatch, expected onnx: {onnx_batch}, got hmm: {hmm_batch} and hmonnx: {hmonnx_batch}"
+                        )
+                    hmquant_in_datas[input_name] = torch.from_numpy(
+                        onnx_in_datas[input_name].astype(np.float16)
+                    ).cpu()
+                    xh2_in_datas[input_name] = onnx_in_datas[input_name].astype(
+                        np.float16
+                    )
+                elif resizer_mode in [1, 2, 3]:
+                    if onnx_batch != hmonnx_batch:
+                        logger.fatal(
+                            f"Batch size mismatch, expected onnx: {onnx_batch}, got hmonnx: {hmonnx_batch}"
+                        )
+                    yuv_im = yuv_im.to(torch.float16)
+                    hmquant_in_datas[input_name] = yuv_im.repeat_interleave(
+                        hmonnx_batch, dim=0
+                    ).contiguous()
+                    yuv = yuv_im.detach().cpu().numpy().flatten()
+                    valid_len = self._get_yuv_valid_len(yuv.size, fmt)
+                    yuv = np.repeat(yuv[:valid_len].reshape(1, -1), hmm_batch, axis=0)
+                    xh2_in_datas[input_name] = np.ascontiguousarray(yuv)
+                # Dynamic resizer info
+                if resizer_mode in [1, 2]:
+                    resizer_name = f"resizer_crop_{input_name}"
+                    hmonnx_batch = hmquant_infer.inputs_batch[resizer_name]
+                    hmm_batch = xh2_infer.inputs_batch[resizer_name]
+                    hmquant_dyn = dyn_info.repeat_interleave(hmonnx_batch, dim=0)
+                    xh2_dyn = dyn_info.repeat_interleave(hmm_batch, dim=0)
+                    hmquant_in_datas[resizer_name] = hmquant_dyn
+                    xh2_in_datas[resizer_name] = xh2_dyn.detach().cpu().numpy()
+            else:
+                in_datas = load_npz(data_path)
+                in_data: np.ndarray = in_datas[input_name].copy()
+                if in_data.dtype == np.int64:
+                    in_data = in_data.astype(np.int32)
+                elif in_data.dtype == np.float32:
+                    in_data = in_data.astype(np.float16)
+                onnx_in_datas[input_name] = in_datas[input_name].copy()
+                hmquant_in_datas[input_name] = torch.from_numpy(in_data.copy())
+                xh2_in_datas[input_name] = np.repeat(in_data, repeats=hmm_batch, axis=0)
 
         # Run inference
         logger.info("Running inference:")
@@ -855,8 +908,8 @@ class Xh2Exec(BaseExec):
         self.save_profile_data(xh2_outputs)
 
         repeats = (
-            self.build_batch
-            if self.build_batch > 1 and self.roi_num == 1
+            self.hmm_batch
+            if self.hmm_batch > 1 and self.roi_num == 1
             else self.roi_num if self.roi_num > 1 else 1
         )
 
@@ -897,7 +950,7 @@ class Xh2Exec(BaseExec):
         span = time.time() - t_start
         logger.info(f"\n{table}")
         self._log_section("Compare Complete", char="-")
-        self._log_kv("time", f"{span:.2f}s")
+        logger.info(f"  time: {span:.2f}s")
 
         return {
             "compare": {
@@ -906,96 +959,6 @@ class Xh2Exec(BaseExec):
                 "outputs": outputs_result,
             }
         }
-
-    def _prepare_single_image(self, cv_image, xh2_infer):
-        """Prepare data for single image comparison."""
-        input_name = self.inputs_name[0]
-        resizer_mode = self.resizer_modes[input_name]
-        input_cfg = self.inputs_cfg[input_name]
-        resizer_cfg = self._get_resizer_cfg(input_cfg)
-        toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
-
-        hmm_batch = xh2_infer.inputs_info[input_name].shape[0]
-
-        onnx_in_datas, hmquant_in_datas, xh2_in_datas = dict(), dict(), dict()
-        # ONNX preprocessing
-        onnx_data: np.ndarray = self._preprocess_for_onnx(cv_image, input_cfg)
-        onnx_data = np.repeat(onnx_data, self.model_input_batch, axis=0)
-        onnx_in_datas[input_name] = onnx_data
-
-        # Resizer preprocessing
-        yuv_im: torch.Tensor
-        yuv_im, dyn_info = self._preprocess_for_resizer(
-            cv_image, input_cfg, resizer_mode
-        )
-
-        if resizer_mode in [1, 2, 3]:
-            yuv_pad = yuv_im.repeat_interleave(self.model_input_batch, dim=0)
-            hmquant_in_datas[input_name] = yuv_pad.contiguous()
-            # XH2 format - flatten to 1D
-            yuv_flat = yuv_im.detach().cpu().numpy().flatten()
-            valid_len = (
-                yuv_flat.size // 2
-                if toYUV_format == "YUV420SP"
-                else (
-                    yuv_flat.size * 2 // 3
-                    if toYUV_format == "YUV422SP"
-                    else yuv_flat.size
-                )
-            )
-            yuv = np.repeat(yuv_flat[:valid_len].reshape(1, -1), hmm_batch, axis=0)
-            xh2_in_datas[input_name] = np.ascontiguousarray(yuv)
-        else:
-            in_data = np.repeat(onnx_data, self.build_batch, axis=0).astype(np.float16)
-            hmquant_in_datas[input_name] = torch.from_numpy(
-                in_data[: self.model_input_batch]
-            ).cpu()
-            xh2_in_datas[input_name] = np.ascontiguousarray(in_data)
-
-        # Dynamic resizer info
-        if resizer_mode in [1, 2]:
-            hmquant_dyn = (
-                dyn_info
-                if self.roi_num > 1
-                else dyn_info.repeat_interleave(self.model_input_batch, dim=0)
-            )
-            xh2_dyn = dyn_info.repeat_interleave(
-                self.roi_num if self.roi_num > 1 else hmm_batch, dim=0
-            )
-            hmquant_in_datas[f"resizer_crop_{input_name}"] = hmquant_dyn
-            xh2_in_datas[f"resizer_crop_{input_name}"] = xh2_dyn.detach().cpu().numpy()
-        return onnx_in_datas, hmquant_in_datas, xh2_in_datas
-
-    def _prepare_multi_input(self, in_datas, xh2_infer):
-        """Prepare data for multi-input comparison."""
-        onnx_in_datas, hmquant_in_datas, xh2_in_datas = dict(), dict(), dict()
-        for input_name in self.inputs_cfg:
-            if input_name not in in_datas:
-                logger.fatal(f"Input '{input_name}' not found in NPZ file")
-
-            raw_data = in_datas[input_name]
-            input_cfg = self.inputs_cfg[input_name]
-            data_format = input_cfg.get("data_format")
-            if data_format is not None:
-                # image
-                cv_image = self._ensure_hwc_uint8(raw_data)  # BGR
-                _onnx_in_datas, _hmquant_in_datas, _xh2_in_datas = (
-                    self._prepare_single_image(cv_image, xh2_infer)
-                )
-                onnx_in_datas.update(_onnx_in_datas)
-                hmquant_in_datas.update(_hmquant_in_datas)
-                xh2_in_datas.update(_xh2_in_datas)
-            else:
-                # Non-image input
-                proc_data = raw_data.copy()
-                if proc_data.dtype == np.int64:
-                    proc_data = proc_data.astype(np.int32)
-                elif proc_data.dtype == np.float32:
-                    proc_data = proc_data.astype(np.float16)
-                onnx_in_datas[input_name] = raw_data
-                hmquant_in_datas[input_name] = torch.from_numpy(proc_data.copy())
-                xh2_in_datas[input_name] = proc_data
-        return onnx_in_datas, hmquant_in_datas, xh2_in_datas
 
     # ==================== Static Utility Methods ====================
 
@@ -1191,7 +1154,8 @@ class Xh2Exec(BaseExec):
 
         if hmm_name is None:
             hmm_name = os.path.splitext(os.path.basename(hmonnx))[0]
-
+        if (batch > 1 and roi_num > 1) or batch < 0 or roi_num < 0:
+            logger.fatal(f"Invalid combination of batch{batch} and roi_num{roi_num }")
         output_dir = os.path.join(output, "xh2")
         work_dir = os.path.join(output_dir, "tcim")
         custom_msg = {
@@ -1204,7 +1168,6 @@ class Xh2Exec(BaseExec):
             "subgraph_repeat_hint": subgraph_repeat_hint,
             "flash_attention": flash_attn,
         }
-
         tcim.build_from_hmonnx(
             hmonnx,
             output_name=hmm_name,
@@ -1215,7 +1178,7 @@ class Xh2Exec(BaseExec):
             enable_profile=enable_profile,
             output_dir=output_dir,
             work_dir=work_dir,
-            one_img_multi_roi=False,
+            one_img_multi_roi=roi_num > 1,
             llm_opt=llm_opt,
             skip_mlir_compile=skip_mlir_compile,
             enable_common_subgraph=enable_common_subgraph,

@@ -46,7 +46,7 @@ def run_single_model(
     thread_num: int = 1,
     device_id: int = 0,
     enable_eval: bool = False,
-    enable_static_resizer: bool = True,
+    enable_static: bool = True,
     warmup: int = 10,
     sample: int = 1000,
 ):
@@ -128,20 +128,27 @@ def run_single_model(
         os.chdir(root)
         queue.put(result)
         return
-    if not enable_static_resizer:
-        raise ValueError("Dynamic resizer is not supported")
 
     model_name = cfg["model"]["name"]
     inputs_cfg = cfg["model"]["inputs"]
     if len(inputs_cfg) > 1:
         raise ValueError("Only one input is supported")
-    ext = "_static" if enable_static_resizer else "_dynamic"
+    ext = "_static" if enable_static else "_dynamic"
     input_name = list(cfg["model"]["inputs"].keys())[0]
-    if "resizer" not in cfg["model"]["inputs"].get(input_name, {}):
+    input_cfg = cfg["model"]["inputs"][input_name]
+    if "resizer" not in input_cfg:
         ext = ""
     cfg["target"] = "xh2"
     cfg["build"]["ncore"] = core_num
     cfg["build"]["batch"] = batch_num
+    if not enable_static and "resizer" in input_cfg:
+        if cfg["model"]["inputs"][input_name]["resizer"] is None:
+            cfg["model"]["inputs"][input_name]["resizer"] = {"resizer_mode": 1}
+        elif isinstance(cfg["model"]["inputs"][input_name]["resizer"], dict):
+            cfg["model"]["inputs"][input_name]["resizer"]["resizer_mode"] = 1
+        else:
+            raise ValueError("Invalid resizer configuration")
+
     cfg["model"]["save_dir"] = f"benchmark/{get_houmo_version()}/{model_name}{ext}"
 
     logger.info(f"Config: {json.dumps(cfg, indent=2)}")
@@ -158,22 +165,18 @@ def run_single_model(
         return
 
     # Get model info
-    input_shape = hm_exec.inputs_shape[0]
-    result["input_size"] = "x".join(map(str, input_shape))
+    shape_str = ""
+    for idx in range(len(hm_exec.inputs_shape)):
+        shape = hm_exec.inputs_shape[idx]
+        shape_str = "x".join(map(str, shape))
+        if idx == len(hm_exec.inputs_shape) - 1:
+            break
+        shape_str += "\n"
+    result["input_size"] = shape_str
     result["gops"] = model_profile(hm_exec.model_path) * 2 / 1e9
 
     # Get resizer mode
-    resizer_mode = hm_exec.resizer_mode
-    if resizer_mode == 0:
-        result["resizer"] = "N/A"
-    elif resizer_mode == 1:
-        result["resizer"] = "Dynamic"
-    elif resizer_mode == 2:
-        result["resizer"] = "Dynamic"
-    elif resizer_mode == 3:
-        result["resizer"] = "Static"
-    else:
-        result["resizer"] = "unknown"
+    result["resizer"] = hm_exec.resizer_mode
 
     # Quantization (x86_64 only)
     if platform_arch == "x86_64":
@@ -359,8 +362,7 @@ def run_benchmark(
     runtime_version = get_package_version("houmo_tcim_runtime_xh2")
 
     if runtime_version == "N/A":
-        logger.error("Runtime not found: houmo_tcim_runtime_xh2")
-        exit(-1)
+        logger.fatal("Runtime not found: houmo_tcim_runtime_xh2")
 
     houmo_version = get_houmo_version()
 
@@ -448,12 +450,18 @@ def run_benchmark(
             "msg": msg,
         }
 
-    def run_config(model_name: str, location: str, cfg_path: str, exec_cfg: dict):
+    def run_config(
+        model_name: str,
+        location: str,
+        cfg_path: str,
+        exec_cfg: dict,
+        enable_static=True,
+    ):
         """Run single config and return result."""
         batch_num = exec_cfg.get("batch_num", 1)
         core_num = exec_cfg.get("core_num", 1)
         thread_num = exec_cfg.get("thread_num", 1)
-        enable_eval = exec_cfg.get("enable_eval", False)
+        enable_eval = exec_cfg.get("enable_eval", False) if enable_static else False
         warmup = exec_cfg.get("warmup", 10)
         sample = exec_cfg.get("sample", 1000)
 
@@ -468,6 +476,7 @@ def run_benchmark(
                 "enable_eval": enable_eval,
                 "warmup": warmup,
                 "sample": sample,
+                "enable_static": enable_static,
             },
         )
         process.start()
@@ -512,24 +521,43 @@ def run_benchmark(
         logger.info(f"Model: {model_name}")
 
         for exec_cfg in exec_cfgs:
-            result = run_config(model_name, location, cfg_path, exec_cfg)
-
+            # Run with static resizer (default)
+            result_static = run_config(
+                model_name, location, cfg_path, exec_cfg, enable_static=True
+            )
             # Add version info
-            result["hmquant_version"] = hmquant_version
-            result["hmcc_version"] = hmcc_version
-            result["runtime_version"] = runtime_version
+            result_static["hmquant_version"] = hmquant_version
+            result_static["hmcc_version"] = hmcc_version
+            result_static["runtime_version"] = runtime_version
 
-            # Note: dataset, dataset_num, and accuracy are only recorded
-            # when enable_eval=True (handled inside run_single_model)
-
-            all_results.append(result)
+            all_results.append(result_static)
 
             # Log result
-            status = "SUCCESS" if result["success"] else "FAILED"
+            status = "SUCCESS" if result_static["success"] else "FAILED"
             logger.info(
-                f"[{status}] {model_name} (b={result['batch_num']}, "
-                f"c={result['core_num']}, t={result['thread_num']}) - "
-                f"latency={result['infer_avg_latency']}ms, throughput={result['throughput']}"
+                f"[{status}] {model_name} (b={result_static['batch_num']}, "
+                f"c={result_static['core_num']}, t={result_static['thread_num']}, static) - "
+                f"latency={result_static['infer_avg_latency']}ms, throughput={result_static['throughput']}"
+            )
+
+            if result_static["resizer"] == "NO RESIZER":
+                break
+
+            # Run with dynamic resizer if model supports it
+            result_dynamic = run_config(
+                model_name, location, cfg_path, exec_cfg, enable_static=False
+            )
+            # Add version info
+            result_dynamic["hmquant_version"] = hmquant_version
+            result_dynamic["hmcc_version"] = hmcc_version
+            result_dynamic["runtime_version"] = runtime_version
+            all_results.append(result_dynamic)
+            # Log result
+            status = "SUCCESS" if result_dynamic["success"] else "FAILED"
+            logger.info(
+                f"[{status}] {model_name} (b={result_dynamic['batch_num']}, "
+                f"c={result_dynamic['core_num']}, t={result_dynamic['thread_num']}, dynamic) - "
+                f"latency={result_dynamic['infer_avg_latency']}ms, throughput={result_dynamic['throughput']}"
             )
 
             # Save intermediate results to Excel

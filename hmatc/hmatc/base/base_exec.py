@@ -86,6 +86,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.model_inputs_batch = dict()
         self.inputs_name = list()
         self.data_formats = list()
+        self.inputs_shape = list()
         # Resizer related parameters
         # Per-input resizer mode:
         # 0 - Non-image input or disabled resizer
@@ -104,6 +105,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         for input_name in self.inputs_cfg:
             input_cfg = self.inputs_cfg[input_name]
             shape = input_cfg["shape"]
+            self.inputs_shape.append(shape)
             model_batch = shape[0]
             data_format = input_cfg.get("data_format")
             self.model_inputs_batch[input_name] = model_batch
@@ -186,34 +188,36 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         # Determine HMM naming based on resizer configuration
         # For single-input: use that input's mode
         # For multi-input: use dynamic if any input is dynamic, static if all are static
-        stuffix = ""
+        suffix = ""
         roi_tag = ""
         if (
             self.has_dynamic_v1_resizer
             and self.has_dynamic_v2_resizer
             and self.has_static_resizer
         ):
-            stuffix = "_static_dynamic_v1+v2"
+            suffix = "_static_dynamic_v1+v2"
             roi_tag = f"_{self.roi_num}roi"
         elif self.has_static_resizer and self.has_dynamic_v1_resizer:
-            stuffix = "_static_dynamic_v1"
+            suffix = "_static_dynamic_v1"
             roi_tag = f"_{self.roi_num}roi"
         elif self.has_static_resizer and self.has_dynamic_v2_resizer:
-            stuffix = "_static_dynamic_v2"
+            suffix = "_static_dynamic_v2"
             roi_tag = f"_{self.roi_num}roi"
         elif self.has_dynamic_v1_resizer and self.has_dynamic_v2_resizer:
-            stuffix = "_dynamic_v1+v2"
+            suffix = "_dynamic_v1+v2"
             roi_tag = f"_{self.roi_num}roi"
         elif self.has_dynamic_v2_resizer:
-            stuffix = "_dynamic_v2"
+            suffix = "_dynamic_v2"
             roi_tag = f"_{self.roi_num}roi"
         elif self.has_dynamic_v1_resizer:
-            stuffix = "_dynamic_v1"
+            suffix = "_dynamic_v1"
             roi_tag = f"_{self.roi_num}roi"
         elif self.has_static_resizer:
-            stuffix = "_static"
+            suffix = "_static"
             roi_tag = "_1roi"
-        self.hmm_name = f"{self.model_name}_{self.target}_b{self.hmm_batch}{roi_tag}_{self.build_ncore}core_{self.build_opt_level}{stuffix}"
+        self.resizer_mode: str = suffix[1:] if suffix else "No Resizer"
+        self.resizer_mode = self.resizer_mode.upper()
+        self.hmm_name = f"{self.model_name}_{self.target}_b{self.hmm_batch}{roi_tag}_{self.build_ncore}core_{self.build_opt_level}{suffix}"
         self.hmm_path = os.path.join(self.hmm_save_dir, f"{self.hmm_name}.hmm")
 
         # For passing preprocessing information to hmm

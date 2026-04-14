@@ -60,7 +60,8 @@ class Xh2Infer(BaseInfer, ABC):
         if device_id >= tcim_lite.runtime.get_device_num():
             logger.fatal(f"device_id: {device_id} out of range")
         logger.info(f"load model from {model_path}")
-        wm = tcim_lite.runtime.WeightManager(device_id)
+        dm = tcim_lite.runtime.DevManager([device_id], backend_name="Xh2HalBackend")
+        wm = tcim_lite.runtime.WeightManager(dm)
         option = tcim_lite.runtime.Option(wm)
         self.engine = tcim_lite.runtime.load(model_path, option=option)
         logger.info(f"load {self.backend} model successfully.")
