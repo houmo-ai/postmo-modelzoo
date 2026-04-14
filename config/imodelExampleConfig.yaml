@@ -288,9 +288,9 @@ llm_qwen3:
     - llm_qwen3_test
 llm_qwen3_14b:
   include:
-    - models/llm/qwen3-14b
+    - models/llm/qwen3
   exclude:
-    - models/llm/qwen3-14b/README.MD
+    - models/llm/qwen3/README.MD
   example_case:
     - llm_qwen3_14b_test:
         test_type: models_tests

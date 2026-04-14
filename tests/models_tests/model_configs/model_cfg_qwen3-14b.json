@@ -35,14 +35,14 @@
             ],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2_8k",
                 "cached_models/hmm_xh2_16k",
+                "cached_models/hmm_xh2_32k_d2",
                 "cached_models/hmm_xh2_16k_ms"
             ],
             "source_type": [null, null, null, "modelscope"],
             "batch": [null, null, null, null],
-            "context_length": [null, null, "16k", "16k"],
-            "ndevice": [null, null, null, null],
+            "context_length": [null, null, "32k", "16k"],
+            "ndevice": [null, null, "2", null],
             "model_size": ["14b", "14b", "14b", "14b"]
         }
     },
@@ -63,15 +63,15 @@
                 "cached_results/hmquant_xh2_2k"
             ],
             "model_name": [null, null],
-            "batch": [null, "2"],
+            "batch": [null, null],
             "ncore": [null, null],
-            "ndevice": [null, null],
-            "stage": ["build", "build"],
-            "context_length": ["8192", "16384"],
+            "ndevice": [null, "2"],
+            "stage": ["build"],
+            "context_length": ["16384", "32768"],
             "j": ["24", "24"],
             "output_dir": [
-                "cached_results/hmm_xh2_8k",
-                "cached_results/hmm_xh2_16k"
+                "cached_results/hmm_xh2_16k",
+                "cached_results/hmm_xh2_32k_d2"
             ],
             "model_size": ["14b", "14b"]
         }
@@ -83,18 +83,18 @@
                 "cached_models/qwen3-14b"
             ],
             "embedding_path": [
-                "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_16k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_16k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_32k_d2/hmquant/quant_embedding.pt"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_8k/qwen3_prefill.hmm",
-                "cached_results/hmm_xh2_16k/qwen3_prefill.hmm"
+                "cached_results/hmm_xh2_16k/qwen3_prefill.hmm",
+                "cached_results/hmm_xh2_32k_d2/qwen3_prefill.hmm"
             ],
             "decode_path": [
-                "cached_results/hmm_xh2_8k/qwen3_decode.hmm",
-                "cached_results/hmm_xh2_16k/qwen3_decode.hmm"
+                "cached_results/hmm_xh2_16k/qwen3_decode.hmm",
+                "cached_results/hmm_xh2_32k_d2/qwen3_decode.hmm"
             ],
-            "ndevice": ["1", "1"],
+            "ndevice": ["1", "2"],
             "model_size": ["14b", "14b"]
         }
     },

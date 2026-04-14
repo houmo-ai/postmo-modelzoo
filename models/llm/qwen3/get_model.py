@@ -64,7 +64,7 @@ def get_args() -> argparse.Namespace:
         "--context_length",
         dest="context_length",
         type=str,
-        default="8k",
+        default="",
         help="context length",
     )
     parser.add_argument(
@@ -101,11 +101,13 @@ if __name__ == "__main__":
         "8b": {
             "model_size": "8b",
             "ncore": 2,
+            "context_length": "32k",
             "modelscope_repo": ["qwen/qwen3-8b"],
         },
         "14b": {
             "model_size": "14b",
             "ncore": 2,
+            "context_length": "16k",
             "modelscope_repo": ["qwen/qwen3-14b"],
         },
     }
@@ -121,7 +123,9 @@ if __name__ == "__main__":
             "model_size": config["model_size"],
             "ncore": config["ncore"],
             "ndevice": args.ndevice,
-            "context_len": args.context_length,
+            "context_len": (
+                args.context_length if args.context_length else config["context_length"]
+            ),
             "prefill_len": 256,
             "batch": args.batch,
         },
