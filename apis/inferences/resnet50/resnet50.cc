@@ -23,10 +23,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
-#include <sstream>
+#include <map>
 #include <string>
+#include <vector>
 
 #if (__GNUC__ < 8 && !defined(_MSC_VER))
 #include <experimental/filesystem>
@@ -40,39 +43,16 @@ namespace fs = std::filesystem;
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 
-#include "datasets/imagenet.hpp"
+#include "imageproc.hpp"
 #include "logging.h"
 #include "tcim/tcim_runtime.h"
 #include "threads.hpp"
 #include "utils.hpp"
 
-/**
- * Get the top K maximum values and their index information
- * This function sorts the value-index pairs in descending order and prints the
- * top K results
- *
- * @param topk Number of top K elements to retrieve
- * @param sort_pairs Vector of pairs containing values and indices, where T is
- * the value type and int is the original index
- * @return Returns the original index corresponding to the maximum value
- */
-template <typename T>
-int get_topk(int topk, std::vector<std::pair<T, int>> sort_pairs) {
-  // Sort pairs in descending order by value
-  std::sort(sort_pairs.begin(), sort_pairs.end(),
-            [](const std::pair<T, int>& a, const std::pair<T, int>& b) {
-              return a.first > b.first;
-            });
-
-  // Print detailed information for top K elements, including index, confidence
-  // and label
-  for (int i = 0; i < topk; ++i) {
-    LOG_INFO("top{}: Index={} Conf={}, Label=[{}]", i + 1, sort_pairs[i].second,
-             sort_pairs[i].first, Imagenet::GetLabel(sort_pairs[i].second));
-  }
-
-  return sort_pairs[0].second;
-}
+constexpr const char* kResizeCropInputName = "resizer_crop";
+constexpr const char* kInputImagePath = "../../data/snake.jpg";
+constexpr int kTargetHeight = 224;
+constexpr int kTargetWidth = 224;
 
 int main() {
   LOG_INFO("===> resnet50 c++ example start...");
@@ -86,7 +66,7 @@ int main() {
   LOG_INFO("houmo_target:{}, tcim version: {}.", houmo_target,
            tcim::GetVersion());
 
-  // 1. Load model
+  // 1. Discover model file and input image.
   std::string model_path;
   for (const auto& entry : fs::directory_iterator(fs::current_path())) {
     if (!entry.is_regular_file()) {
@@ -103,9 +83,24 @@ int main() {
     LOG_ERROR("No .hmm file found in {}", fs::current_path().string());
     exit(-1);
   }
-  LOG_INFO("Load resnet50 model from file {}", model_path);
 
-  // Load the model file
+  if (!fs::exists(kInputImagePath)) {
+    LOG_ERROR("{} not exist.", kInputImagePath);
+    exit(-1);
+  }
+
+  cv::Mat image_data = cv::imread(kInputImagePath);
+  if (image_data.empty()) {
+    LOG_ERROR("Failed to read image {}", kInputImagePath);
+    exit(-1);
+  }
+  int img_height = image_data.rows;
+  int img_width = image_data.cols;
+  LOG_INFO("input image shape: [{} x {} x {}]", img_height, img_width,
+           image_data.channels());
+
+  // 2. Load model.
+  LOG_INFO("Load resnet50 model from file {}", model_path);
   auto module = tcim::Module::LoadFromFile(model_path);
   if (!module) {
     LOG_ERROR("Failed to load model {}.", model_path);
@@ -113,129 +108,166 @@ int main() {
   }
   LOG_INFO("Model {} loaded.", model_path);
 
-  // 2. Get input information
-  std::map<std::string, tcim::Tensor> input_map;
-  std::map<std::string, tcim::TensorInfo> input_map_f32;
-  int input_num = module.GetInputNum();
-  LOG_INFO("Count of Input: {}", input_num);
-
-  // Iterate through all inputs and create tensors
-  for (int idx = 0; idx < input_num; idx++) {
+  // 3. Query input information.
+  // Find the image input canvas size and keep all input names for later
+  // feeding.
+  int target_height = kTargetHeight;
+  int target_width = kTargetWidth;
+  int max_img_height = 0;
+  int max_img_width = 0;
+  std::vector<std::string> input_names;
+  const int input_num = static_cast<int>(module.GetInputNum());
+  LOG_INFO("Model input info:");
+  for (int idx = 0; idx < input_num; ++idx) {
     auto input_name = module.GetInputName(idx);
     auto input_info = module.GetInputInfo(input_name).AsContiguous();
-    LOG_INFO("Input[{}] info: {}", input_name, TensorInfo2Str(input_info));
-    auto input_tensor = tcim::Tensor::CreateHostTensor(input_info);
-    input_map.insert(
-        std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
-
-    auto input_info_f32 = input_info.AsType(tcim::DataType::FLOAT32);
-    LOG_INFO("Input[{}] float32 info: {}", input_name,
-             TensorInfo2Str(input_info_f32));
-    input_map_f32.insert(
-        std::pair<std::string, tcim::TensorInfo>(input_name, input_info_f32));
+    input_names.emplace_back(input_name);
+    LOG_INFO("  Input[{}] info: {}", input_name, TensorInfo2Str(input_info));
+    if (input_name.find(kResizeCropInputName) == std::string::npos) {
+      max_img_height = static_cast<int>(input_info.Shape().at(2));
+      max_img_width = static_cast<int>(input_info.Shape().at(3));
+    }
   }
-
-  // 3. Input preprocessing
-  std::string data_path = "../../data/snake.jpg";
-  if (!fs::exists(data_path)) {
-    LOG_ERROR("{} not exist.", data_path);
+  if (max_img_height <= 0 || max_img_width <= 0) {
+    LOG_ERROR("Invalid model input shape: height={}, width={}", max_img_height,
+              max_img_width);
     exit(-1);
   }
 
-  // Load and preprocess image
-  cv::Mat img_rgb;
-  img_rgb = cv::imread(data_path);
-
-  cv::Mat img_norm;
-  // Define normalization parameters for ImageNet
-  const float mean[3] = {123.675f, 116.28f, 103.53f};
-  const float std[3] = {58.395f, 57.12f, 57.375f};
-  // Convert BGR to RGB, resize to 224x224 (standard for ResNet)
-  cv::cvtColor(img_rgb, img_rgb, cv::COLOR_BGR2RGB);
-  cv::resize(img_rgb, img_rgb, {224, 224});
-  // Convert to float32 and normalize
-  img_rgb.convertTo(img_norm, CV_32FC3);
-  std::vector<cv::Mat> channels;
-  cv::split(img_norm, channels);
-  for (int i = 0; i < 3; ++i) {
-    channels[i] = (channels[i] - mean[i]) / std[i];
-  }
-  // Convert from HWC (Height-Width-Channel) to CHW (Channel-Height-Width)
-  for (auto& ch : channels) {
-    ch = ch.reshape(1, 1);
-  }
-  cv::vconcat(channels, img_norm);
-
-  // Calculate image size in bytes
-  size_t img_bytes = img_norm.total() * img_norm.elemSize();
-  LOG_INFO("img_bytes: {}", img_bytes);
-
-  // Create tensor from preprocessed image data
-  auto input_tensor_f32 =
-      tcim::Tensor::CreateHostTensor(input_map_f32.at("input.1"), img_bytes,
-                                     reinterpret_cast<void*>(img_norm.data));
-  input_tensor_f32.CastTo(input_map.at("input.1"));
-
-  // 4. Get output information
-  std::map<std::string, tcim::Tensor> output_map;
-  std::map<std::string, tcim::Tensor> output_map_f32;
-  int output_num = module.GetOutputNum();
-  LOG_INFO("Count of Output: {}", output_num);
-
-  // Iterate through all outputs and create tensors
-  for (int idx = 0; idx < output_num; idx++) {
-    // Get the name and information of each output
-    auto output_name = module.GetOutputName(idx);
-    auto output_info = module.GetOutputInfo(output_name).AsContiguous();
-    LOG_INFO("Output[{}] info: {}", output_name, TensorInfo2Str(output_info));
-
-    // Create host tensor for output
-    auto output_tensor = tcim::Tensor::CreateHostTensor(output_info);
-    output_map.insert(
-        std::pair<std::string, tcim::Tensor>(output_name, output_tensor));
-
-    // Create float32 version of output tensor
-    auto output_info_f32 = output_info.AsType(tcim::DataType::FLOAT32);
-    auto output_tensor_f32 = tcim::Tensor::CreateHostTensor(output_info_f32);
-    output_map_f32.insert(
-        std::pair<std::string, tcim::Tensor>(output_name, output_tensor_f32));
+  // 4. Preprocess image.
+  // Preserve the original valid image region in crop_height and crop_width.
+  int crop_height = max_img_height;
+  int crop_width = max_img_width;
+  if (img_height < max_img_height && img_width <= max_img_width) {
+    // Pad smaller images with zeros on the bottom and right sides.
+    const int pad_bottom = max_img_height - img_height;
+    const int pad_right = max_img_width - img_width;
+    cv::copyMakeBorder(image_data, image_data, 0, pad_bottom, 0, pad_right,
+                       cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+    crop_height = img_height;
+    crop_width = img_width;
+    LOG_INFO("pad input image to [{} x {} x {}], height={}, width={}",
+             image_data.rows, image_data.cols, image_data.channels(),
+             max_img_height, max_img_width);
+  } else {
+    // Resize images that exceed the supported canvas size.
+    cv::resize(image_data, image_data, cv::Size(max_img_width, max_img_height));
+    LOG_INFO("resize input image to height={}, width={}", max_img_height,
+             max_img_width);
   }
 
-  // 5. Set inputs to the model
-  for (const auto& input : input_map) {
-    module.SetInput(input.first, input.second);
+  // Align crop size to even dimensions before feeding the dynamic crop input.
+  crop_height -= crop_height % 2;
+  crop_width -= crop_width % 2;
+  if (crop_height <= 0 || crop_width <= 2 || crop_height % 2 != 0 ||
+      crop_width % 2 != 0) {
+    LOG_ERROR("crop_height and crop_width must be even, got {} and {}",
+              crop_height, crop_width);
+    exit(-1);
   }
 
-  // 6. run and sync
+  // Validate that the resize ratios stay within the accepted range.
+  const float height_scale = static_cast<float>(target_height) / crop_height;
+  const float width_scale = static_cast<float>(target_width) / crop_width;
+  if (height_scale < 1.0f / 32.0f || height_scale > 16.0f) {
+    LOG_ERROR("{} / img_height must be in [1/32, 16], got {}", target_height,
+              height_scale);
+    exit(-1);
+  }
+  if (width_scale < 1.0f / 32.0f || width_scale > 16.0f) {
+    LOG_ERROR("{} / img_width must be in [1/32, 16], got {}", target_width,
+              width_scale);
+    exit(-1);
+  }
+
+  std::vector<int32_t> dyn_info = {
+      0, 0, crop_height, crop_width, target_height, target_width, 0, 0, 0, 0};
+
+  // 5. Feed image data and dynamic crop information into the model.
+  // Keep owned backing buffers alive for tensors created directly from
+  // pointers.
+  std::map<std::string, std::vector<uint8_t>> input_buffers;
+  std::map<std::string, tcim::Tensor> input_tensors;
+  for (const auto& input_name : input_names) {
+    auto input_info = module.GetInputInfo(input_name).AsContiguous();
+
+    if (input_name.find(kResizeCropInputName) != std::string::npos) {
+      // Feed the dynamic crop tensor, using dyn_info directly when sizes match.
+      const size_t dyn_bytes = dyn_info.size() * sizeof(int32_t);
+      if (dyn_bytes > input_info.MemSize()) {
+        LOG_ERROR("dyn_info bytes {} exceed input tensor bytes {} for {}",
+                  dyn_bytes, input_info.MemSize(), input_name);
+        exit(-1);
+      }
+
+      if (dyn_bytes == input_info.MemSize()) {
+        auto input_tensor = tcim::Tensor::CreateHostTensor(
+            input_info, dyn_bytes, static_cast<void*>(dyn_info.data()));
+        input_tensors.emplace(input_name, input_tensor);
+      } else {
+        auto& buffer = input_buffers[input_name];
+        buffer.assign(input_info.MemSize(), 0);
+        std::memcpy(buffer.data(), dyn_info.data(), dyn_bytes);
+        auto input_tensor = tcim::Tensor::CreateHostTensor(
+            input_info, buffer.size(), static_cast<void*>(buffer.data()));
+        input_tensors.emplace(input_name, input_tensor);
+      }
+    } else {
+      // Convert the padded or resized image into YUV420sp directly in the input
+      // buffer.
+      auto& buffer = input_buffers[input_name];
+      buffer.assign(input_info.MemSize(), 0);
+      const size_t image_bytes =
+          ConvertBgrToYuv420sp(image_data, buffer.data(), buffer.size());
+      if (image_bytes == 0) {
+        LOG_ERROR("input image bytes exceed input tensor bytes {} for {}",
+                  input_info.MemSize(), input_name);
+        exit(-1);
+      }
+      auto input_tensor = tcim::Tensor::CreateHostTensor(
+          input_info, buffer.size(), static_cast<void*>(buffer.data()));
+      input_tensors.emplace(input_name, input_tensor);
+    }
+
+    if (module.SetInput(input_name, input_tensors.at(input_name)) !=
+        tcim::Status::OK) {
+      LOG_ERROR("Failed to set input {}", input_name);
+      exit(-1);
+    }
+  }
+
+  LOG_INFO("dyn_info: [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}]", dyn_info[0],
+           dyn_info[1], dyn_info[2], dyn_info[3], dyn_info[4], dyn_info[5],
+           dyn_info[6], dyn_info[7], dyn_info[8], dyn_info[9]);
+
+  // 6. Run and sync.
   module.Run();
   module.Sync();
 
-  // 7. Get output
-  for (auto& output : output_map) {
-    module.GetOutput(output.first, output.second);
-  }
-
-  // 8. Postprocess, with no softmax
+  // 7. Read outputs and apply softmax postprocess.
+  // Copy outputs to host, convert to float32, then report top-k predictions.
   int top1 = 0;
   const int topk = 5;
+  const int output_num = static_cast<int>(module.GetOutputNum());
+  for (int idx = 0; idx < output_num; ++idx) {
+    auto output_name = module.GetOutputName(idx);
+    auto output_info = module.GetOutputInfo(output_name).AsContiguous();
+    LOG_INFO("output[{}] info: {}", output_name, TensorInfo2Str(output_info));
 
-  // Process each output tensor
-  for (auto& output : output_map) {
-    // Get the float32 version of the output
-    auto f32_opt = output_map_f32[output.first];
-    output.second.CastTo(f32_opt);
+    auto output_tensor = module.GetDevOutput(output_name)
+                             .ToHost(true)
+                             .AsType(tcim::DataType::FLOAT32, true);
+    auto* output_ptr = static_cast<float*>(output_tensor.Data());
+    const size_t output_count = GetElementCount(output_tensor.Info());
+    std::vector<float> probs = Softmax(output_ptr, output_count);
 
-    // Create vector to store value-index pairs
     std::vector<std::pair<float, int>> sort_pairs;
-    // Populate the vector with 1000 pairs (for ImageNet's 1000 classes)
-    for (int i = 0; i < 1000; ++i) {
-      sort_pairs.emplace_back(static_cast<float*>(f32_opt.Data())[i], i);
+    for (size_t i = 0; i < probs.size(); ++i) {
+      sort_pairs.emplace_back(probs[i], static_cast<int>(i));
     }
-    // Get top K results
-    top1 = get_topk(topk, sort_pairs);
+    top1 = GetTopK(topk, sort_pairs);
   }
 
-  // Verify the top-1 prediction (class 65 corresponds to snake in ImageNet)
   if (top1 != 65) {
     LOG_ERROR("top1 != 65");
     exit(-1);

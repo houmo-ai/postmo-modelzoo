@@ -26,3 +26,5 @@ make install
 
 cd $WORK_PATH
 ./example_resnet50_multistreams $@
+
+echo "✅ Resnet50-Multistreams script finished."

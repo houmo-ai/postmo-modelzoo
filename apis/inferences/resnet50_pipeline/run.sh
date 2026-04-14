@@ -23,3 +23,5 @@ make install
 
 cd $WORK_PATH
 ./example_resnet50_pipeline
+
+echo "✅ Resnet50-Pipeline script finished."

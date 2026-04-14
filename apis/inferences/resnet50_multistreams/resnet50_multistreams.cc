@@ -24,10 +24,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <map>
-#include <sstream>
+#include <memory>
+#include <mutex>
+#include <queue>
 #include <string>
 #include <thread>
 #include <vector>
@@ -48,11 +52,16 @@ namespace fs = std::filesystem;
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 
-#include "datasets/imagenet.hpp"
+#include "imageproc.hpp"
 #include "logging.h"
 #include "tcim/tcim_runtime.h"
 #include "threads.hpp"
 #include "utils.hpp"
+
+constexpr const char* kResizeCropInputName = "resizer_crop";
+constexpr const char* kInputImagePath = "../../data/snake.jpg";
+constexpr int kTargetHeight = 224;
+constexpr int kTargetWidth = 224;
 
 // Structure to hold command-line arguments
 struct CliArguments {
@@ -64,7 +73,10 @@ struct CliArguments {
 
 // Structure to hold task information for processing
 typedef struct {
+  // Shared host buffers for model inputs. Requests can reuse the same payloads.
   std::map<std::string, std::shared_ptr<void>> data_map;
+  // Host output tensors kept directly to avoid an extra host-side memcpy.
+  std::map<std::string, tcim::Tensor> tensor_map;
   uint64_t req_id;  // Request ID
 } TaskInfo;
 
@@ -72,9 +84,6 @@ typedef struct {
 typedef struct {
   std::queue<TaskInfo> queue;
   std::mutex mutex;
-  std::condition_variable cond;
-  std::map<std::string, tcim::TensorInfo> info_map;
-  std::map<std::string, tcim::TensorInfo> info_map_f32;
 } TaskQueue;
 
 // Function to parse command-line arguments
@@ -116,35 +125,6 @@ bool ParseArgs(CliArguments* arguments, int argc, char* argv[]) {
   }
 #endif
   return true;
-}
-
-/**
- * Get the top K maximum values and their index information
- * This function sorts the value-index pairs in descending order and prints the
- * top K results
- *
- * @param topk Number of top K elements to retrieve
- * @param sort_pairs Vector of pairs containing values and indices, where T is
- * the value type and int is the original index
- * @return Returns the original index corresponding to the maximum value
- */
-template <typename T>
-int get_topk(int topk, std::vector<std::pair<T, int>> sort_pairs) {
-  // Sort pairs in descending order by value
-  std::sort(sort_pairs.begin(), sort_pairs.end(),
-            [](const std::pair<T, int>& a, const std::pair<T, int>& b) {
-              return a.first > b.first;
-            });
-
-  // Print detailed information for top K elements, including index, confidence
-  // and label
-  for (int i = 0; i < topk; ++i) {
-    LOG_INFO("top{}: Index={}, Conf={}, Label=[{}]", (i + 1),
-             sort_pairs[i].second, sort_pairs[i].first,
-             Imagenet::GetLabel(sort_pairs[i].second));
-  }
-
-  return sort_pairs[0].second;
 }
 
 int main(int argc, char* argv[]) {
@@ -204,80 +184,33 @@ int main(int argc, char* argv[]) {
     exit(-1);
   }
 
-  // Prepare input image: load, resize, normalize
-  std::string data_path = "../../data/snake.jpg";
-  if (!fs::exists(data_path)) {
-    LOG_ERROR("{} not exist.", data_path);
-    exit(-1);
-  }
-  cv::Mat img_rgb;
-  cv::Mat img_processed;
-  size_t img_size = 0;
-  img_rgb = cv::imread(data_path);
-
-  cv::Mat img_norm;
-  const float mean[3] = {123.675f, 116.28f, 103.53f};
-  const float std[3] = {58.395f, 57.12f, 57.375f};
-  cv::cvtColor(img_rgb, img_rgb, cv::COLOR_BGR2RGB);
-  cv::resize(img_rgb, img_rgb, {224, 224});
-
-  img_rgb.convertTo(img_norm, CV_32FC3);
-  std::vector<cv::Mat> channels;
-  cv::split(img_norm, channels);
-  for (int i = 0; i < 3; ++i) {
-    channels[i] = (channels[i] - mean[i]) / std[i];
-  }
-  // HWC --> CHW
-  for (auto& ch : channels) {
-    ch = ch.reshape(1, 1);
-  }
-  cv::vconcat(channels, img_processed);
-  img_size = img_norm.total() * img_norm.elemSize();
-
   std::vector<std::thread> threads;
-  // Prepare input and output queues with sample data
   TaskQueue qin;
   TaskQueue qout;
-  for (int i = 0; i < arguments.sample_num; i++) {
-    auto data = malloc(img_size);
-    std::shared_ptr<void> data_ptr(data, free);
-    memcpy(data, reinterpret_cast<void*>(img_processed.data), img_size);
-
-    TaskInfo tinfo;
-    tinfo.req_id = i;
-    tinfo.data_map.insert(
-        std::pair<std::string, std::shared_ptr<void>>("", data_ptr));
-    qin.queue.push(tinfo);
-  }
-  LOG_INFO("sample queue size is {}", qin.queue.size());
 
   // Define the thread function for processing tasks
   auto thread_func = [](int tid, int did, tcim::Module& module, TaskQueue& qin,
                         TaskQueue& qout, Barrier& barrier) {
-    // Initialize input tensor information
+    // Query input metadata for the current module instance.
+    std::map<std::string, tcim::TensorInfo> input_infos;
     int input_num = module.GetInputNum();
     LOG_INFO("Count of Input: {}", input_num);
     for (int idx = 0; idx < input_num; idx++) {
       auto input_name = module.GetInputName(idx);
       auto input_info = module.GetInputInfo(input_name).AsContiguous();
       LOG_INFO("Input[{}] info: {}", input_name, TensorInfo2Str(input_info));
-      qin.info_map[input_name] = input_info;
-
-      auto input_info_f32 = input_info.AsType(tcim::DataType::FLOAT32);
-      qin.info_map_f32[input_name] = input_info_f32;
+      input_infos[input_name] = input_info;
     }
 
-    // Initialize output tensor information
+    // Query output metadata for the current module instance.
+    std::vector<std::string> output_names;
     int output_num = module.GetOutputNum();
     LOG_INFO("Count of Output: {}", output_num);
     for (int idx = 0; idx < output_num; idx++) {
       auto output_name = module.GetOutputName(idx);
       auto output_info = module.GetOutputInfo(output_name).AsContiguous();
       LOG_INFO("Output[{}] info: {}", output_name, TensorInfo2Str(output_info));
-      qout.info_map[output_name] = output_info;
-
-      auto output_info_f32 = output_info.AsType(tcim::DataType::FLOAT32);
-      qout.info_map_f32[output_name] = output_info_f32;
+      output_names.push_back(output_name);
     }
 
     // Wait until all threads are ready
@@ -298,41 +231,36 @@ int main(int argc, char* argv[]) {
       qin.queue.pop();
       lock_in.unlock();
 
-      // Set input tensors to the module
-      for (auto& info : qin.info_map) {
-        tcim::Tensor input_tensor;
-        input_tensor = tcim::Tensor::CreateHostTensor(info.second);
-        auto info_f32 = qin.info_map_f32[info.first];
-        auto input_tensor_f32 = tcim::Tensor::CreateHostTensor(
-            info_f32, info_f32.MemSize(), input_map[""].get());
-        input_tensor_f32.CastTo(input_tensor);
+      // Bind each input name to its shared host buffer for this request.
+      for (const auto& info : input_infos) {
+        auto data_it = input_map.find(info.first);
+        if (data_it == input_map.end()) {
+          LOG_ERROR("thread {} on device {} missing input {}", tid, did,
+                    info.first);
+          exit(-1);
+        }
 
-        module.SetInput(info.first, input_tensor);
+        auto input_tensor = tcim::Tensor::CreateHostTensor(
+            info.second, info.second.MemSize(), data_it->second.get());
+        if (module.SetInput(info.first, input_tensor) != tcim::Status::OK) {
+          LOG_ERROR("thread {} on device {} failed to set input {}", tid, did,
+                    info.first);
+          exit(-1);
+        }
       }
 
       // Execute inference
       module.Run();
       module.Sync();
 
-      // Get output tensors and add to output queue
+      // Materialize outputs on host and keep the tensors directly in the queue.
       TaskInfo tinfo;
       tinfo.req_id = req_id;
-      for (auto& info : qout.info_map) {
-        tcim::Tensor output_tensor;
-        void* data = nullptr;
-        output_tensor = tcim::Tensor::CreateHostTensor(info.second);
-        module.GetOutput(info.first, output_tensor);
-
-        auto info_f32 = qout.info_map_f32[info.first];
-        auto size = info_f32.MemSize();
-        data = malloc(size);
-        auto output_tensor_f32 =
-            tcim::Tensor::CreateHostTensor(info_f32, size, data);
-        output_tensor.CastTo(output_tensor_f32);
-
-        std::shared_ptr<void> data_ptr(data, free);
-        tinfo.data_map.insert(std::pair<std::string, std::shared_ptr<void>>(
-            info.first, data_ptr));
+      for (const auto& output_name : output_names) {
+        auto output_tensor = module.GetDevOutput(output_name)
+                                 .ToHost(true)
+                                 .AsType(tcim::DataType::FLOAT32, true);
+        tinfo.tensor_map.emplace(output_name, output_tensor);
       }
       std::unique_lock<std::mutex> lock_out(qout.mutex);
       qout.queue.push(tinfo);
@@ -365,6 +293,157 @@ int main(int argc, char* argv[]) {
     module_map[did] = dev_modules;
   }
 
+  // Reuse the single-stream preprocessing flow to prepare shared inputs.
+  auto& reference_module = module_map[0][0];
+  int target_height = kTargetHeight;
+  int target_width = kTargetWidth;
+  int max_img_height = 0;
+  int max_img_width = 0;
+  std::vector<std::string> input_names;
+  std::map<std::string, size_t> output_element_counts;
+
+  LOG_INFO("Reference model input info:");
+  const int input_num = static_cast<int>(reference_module.GetInputNum());
+  for (int idx = 0; idx < input_num; ++idx) {
+    auto input_name = reference_module.GetInputName(idx);
+    auto input_info = reference_module.GetInputInfo(input_name).AsContiguous();
+    input_names.push_back(input_name);
+    LOG_INFO("  Input[{}] info: {}", input_name, TensorInfo2Str(input_info));
+    if (input_name.find(kResizeCropInputName) == std::string::npos) {
+      max_img_height = static_cast<int>(input_info.Shape().at(2));
+      max_img_width = static_cast<int>(input_info.Shape().at(3));
+    }
+  }
+  if (max_img_height <= 0 || max_img_width <= 0) {
+    LOG_ERROR("Invalid model input shape: height={}, width={}", max_img_height,
+              max_img_width);
+    exit(-1);
+  }
+
+  const int output_num = static_cast<int>(reference_module.GetOutputNum());
+  for (int idx = 0; idx < output_num; ++idx) {
+    auto output_name = reference_module.GetOutputName(idx);
+    auto output_info =
+        reference_module.GetOutputInfo(output_name).AsContiguous();
+    output_element_counts[output_name] = GetElementCount(output_info);
+  }
+
+  if (!fs::exists(kInputImagePath)) {
+    LOG_ERROR("{} not exist.", kInputImagePath);
+    exit(-1);
+  }
+  cv::Mat image_data = cv::imread(kInputImagePath);
+  if (image_data.empty()) {
+    LOG_ERROR("Failed to read image {}", kInputImagePath);
+    exit(-1);
+  }
+  int img_height = image_data.rows;
+  int img_width = image_data.cols;
+  LOG_INFO("input image shape: [{} x {} x {}]", img_height, img_width,
+           image_data.channels());
+
+  int crop_height = max_img_height;
+  int crop_width = max_img_width;
+  // Pad smaller inputs to the model canvas and preserve the original crop area.
+  if (img_height < max_img_height && img_width <= max_img_width) {
+    const int pad_bottom = max_img_height - img_height;
+    const int pad_right = max_img_width - img_width;
+    cv::copyMakeBorder(image_data, image_data, 0, pad_bottom, 0, pad_right,
+                       cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+    crop_height = img_height;
+    crop_width = img_width;
+    LOG_INFO("pad input image to [{} x {} x {}], height={}, width={}",
+             image_data.rows, image_data.cols, image_data.channels(),
+             max_img_height, max_img_width);
+  } else {
+    // Resize larger inputs so the runtime always receives the expected canvas.
+    cv::resize(image_data, image_data, cv::Size(max_img_width, max_img_height));
+    LOG_INFO("resize input image to height={}, width={}", max_img_height,
+             max_img_width);
+  }
+
+  // Align crop sizes to even values because YUV420 requires even dimensions.
+  crop_height -= crop_height % 2;
+  crop_width -= crop_width % 2;
+  if (crop_height <= 0 || crop_width <= 2 || crop_height % 2 != 0 ||
+      crop_width % 2 != 0) {
+    LOG_ERROR("crop_height and crop_width must be even, got {} and {}",
+              crop_height, crop_width);
+    exit(-1);
+  }
+
+  const float height_scale = static_cast<float>(target_height) / crop_height;
+  const float width_scale = static_cast<float>(target_width) / crop_width;
+  if (height_scale < 1.0f / 32.0f || height_scale > 16.0f) {
+    LOG_ERROR("{} / img_height must be in [1/32, 16], got {}", target_height,
+              height_scale);
+    exit(-1);
+  }
+  if (width_scale < 1.0f / 32.0f || width_scale > 16.0f) {
+    LOG_ERROR("{} / img_width must be in [1/32, 16], got {}", target_width,
+              width_scale);
+    exit(-1);
+  }
+
+  // Dynamic resize-crop metadata follows the same layout as the Python example.
+  std::vector<int32_t> dyn_info = {
+      0, 0, crop_height, crop_width, target_height, target_width, 0, 0, 0, 0};
+
+  // Build one shared payload map and reuse it for all queued requests.
+  std::map<std::string, std::shared_ptr<void>> shared_inputs;
+  for (const auto& input_name : input_names) {
+    auto input_info = reference_module.GetInputInfo(input_name).AsContiguous();
+    if (input_name.find(kResizeCropInputName) != std::string::npos) {
+      const size_t dyn_bytes = dyn_info.size() * sizeof(int32_t);
+      if (dyn_bytes > input_info.MemSize()) {
+        LOG_ERROR("dyn_info bytes {} exceed input tensor bytes {} for {}",
+                  dyn_bytes, input_info.MemSize(), input_name);
+        exit(-1);
+      }
+
+      // Reuse dyn_info directly when tensor size matches, otherwise pad the
+      // tail.
+      if (dyn_bytes == input_info.MemSize()) {
+        shared_inputs[input_name] = std::shared_ptr<void>(
+            static_cast<void*>(dyn_info.data()), [](void*) {});
+      } else {
+        auto data = malloc(input_info.MemSize());
+        if (data == nullptr) {
+          LOG_ERROR("Failed to allocate dyn_info buffer for {}", input_name);
+          exit(-1);
+        }
+        std::memset(data, 0, input_info.MemSize());
+        std::memcpy(data, dyn_info.data(), dyn_bytes);
+        shared_inputs[input_name] = std::shared_ptr<void>(data, free);
+      }
+    } else {
+      // Allocate one reusable image buffer per input and pre-convert it once.
+      auto data = malloc(input_info.MemSize());
+      if (data == nullptr) {
+        LOG_ERROR("Failed to allocate image buffer for {}", input_name);
+        exit(-1);
+      }
+      std::memset(data, 0, input_info.MemSize());
+      const size_t image_bytes = ConvertBgrToYuv420sp(
+          image_data, reinterpret_cast<uint8_t*>(data), input_info.MemSize());
+      if (image_bytes == 0) {
+        LOG_ERROR("input image bytes exceed input tensor bytes {} for {}",
+                  input_info.MemSize(), input_name);
+        exit(-1);
+      }
+      shared_inputs[input_name] = std::shared_ptr<void>(data, free);
+    }
+  }
+
+  // Enqueue repeated requests that all share the same preprocessed inputs.
+  for (int i = 0; i < arguments.sample_num; i++) {
+    TaskInfo tinfo;
+    tinfo.req_id = i;
+    tinfo.data_map = shared_inputs;
+    qin.queue.push(tinfo);
+  }
+  LOG_INFO("sample queue size is {}", qin.queue.size());
+
   // Create and start threads for parallel processing
   Barrier barrier(arguments.thread_num * arguments.device_num);
   int tid = 0;
@@ -386,17 +465,22 @@ int main(int argc, char* argv[]) {
 
   // Process results and validate output
   while (!qout.queue.empty()) {
-    auto output_map = qout.queue.front().data_map;
+    auto output_map = qout.queue.front().tensor_map;
     auto req_id = qout.queue.front().req_id;
     qout.queue.pop();
     int top1 = 0;
     const int topk = 1;
     for (auto& output : output_map) {
+      // Use the already-hosted tensor data directly for softmax and top-k.
+      auto output_count = output_element_counts[output.first];
+      std::vector<float> probs =
+          Softmax(static_cast<float*>(output.second.Data()), output_count);
+
       std::vector<std::pair<float, int>> sort_pairs;
-      for (int i = 0; i < 1000; ++i) {
-        sort_pairs.emplace_back(static_cast<float*>(output.second.get())[i], i);
+      for (size_t i = 0; i < probs.size(); ++i) {
+        sort_pairs.emplace_back(probs[i], static_cast<int>(i));
       }
-      top1 = get_topk(topk, sort_pairs);
+      top1 = GetTopK(topk, sort_pairs);
     }
 
     // Validate the result - snake image should have class ID 65

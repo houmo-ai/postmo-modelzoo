@@ -27,4 +27,4 @@ make install
 cd $SCRIPT_DIR
 ./example_resnet50
 
-echo "resnet50 run.sh end."
+echo "✅ Resnet50 script finished."

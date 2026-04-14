@@ -25,6 +25,9 @@
 #define __APIS_COMMON_HPP_IMAGEPROC_HPP__
 
 #include <iostream>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/opencv.hpp>
 #include <sstream>
 #include <string>
 
@@ -70,5 +73,37 @@ class ImageProc {
     }
   }
 };
+
+/**
+ * @brief Convert BGR image to YUV420sp format
+ *
+ * @param bgr_image Input BGR image
+ * @param dst Destination buffer for YUV420sp data
+ * @param dst_size Size of the destination buffer
+ * @return Size of the converted YUV420sp data, or 0 if conversion fails
+ */
+static inline size_t ConvertBgrToYuv420sp(const cv::Mat &bgr_image,
+                                          uint8_t *dst, size_t dst_size) {
+  cv::Mat rgb_image = bgr_image.clone();
+  if (!rgb_image.isContinuous()) {
+    rgb_image = rgb_image.clone();
+  }
+
+  ImageProc::BgrToRgb(reinterpret_cast<int8_t *>(rgb_image.data),
+                      rgb_image.rows, rgb_image.cols);
+
+  cv::Mat yuv_i420;
+  cv::cvtColor(rgb_image, yuv_i420, cv::COLOR_RGB2YUV_I420);
+
+  const size_t yuv_size =
+      static_cast<size_t>(bgr_image.rows) * bgr_image.cols * 3 / 2;
+  if (dst == nullptr || dst_size < yuv_size) {
+    return 0;
+  }
+
+  ImageProc::I420To420sp(dst, reinterpret_cast<uint8_t *>(yuv_i420.data),
+                         bgr_image.rows * bgr_image.cols * 3);
+  return yuv_size;
+}
 
 #endif  // __APIS_COMMON_HPP_IMAGEPROC_HPP__

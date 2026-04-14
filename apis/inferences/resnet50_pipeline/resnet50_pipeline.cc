@@ -26,10 +26,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <iostream>
-#include <sstream>
+#include <condition_variable>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <map>
+#include <mutex>
+#include <queue>
 #include <string>
 #include <thread>
+#include <vector>
 
 #if (__GNUC__ < 8 && !defined(_MSC_VER))
 #include <experimental/filesystem>
@@ -47,11 +53,16 @@ namespace fs = std::filesystem;
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 
-#include "datasets/imagenet.hpp"
+#include "imageproc.hpp"
 #include "logging.h"
 #include "tcim/tcim_runtime.h"
 #include "threads.hpp"
 #include "utils.hpp"
+
+constexpr const char* kResizeCropInputName = "resizer_crop";
+constexpr const char* kInputImagePath = "../../data/snake.jpg";
+constexpr int kTargetHeight = 224;
+constexpr int kTargetWidth = 224;
 
 /**
  * @struct CliArguments
@@ -127,33 +138,6 @@ bool ParseArgs(CliArguments* arguments, int argc, char* argv[]) {
 }
 
 /**
- * @brief Get the top-k predictions from the model output
- *
- * @tparam T Type of the values in the pairs
- * @param topk Number of top predictions to return
- * @param sort_pairs Vector of value-index pairs to sort
- * @return Index of the top-1 prediction
- */
-template <typename T>
-int get_topk(int topk, std::vector<std::pair<T, int>> sort_pairs) {
-  // Sort pairs in descending order based on the first element (confidence)
-  std::sort(sort_pairs.begin(), sort_pairs.end(),
-            [](const std::pair<T, int>& a, const std::pair<T, int>& b) {
-              return a.first > b.first;
-            });
-
-  // Print the top-k predictions with their indices, confidence scores, and
-  // labels
-  for (int i = 0; i < topk; ++i) {
-    LOG_INFO("top{}: Index={}, Conf={}, Label=[{}]", (i + 1),
-             sort_pairs[i].second, sort_pairs[i].first,
-             Imagenet::GetLabel(sort_pairs[i].second));
-  }
-
-  return sort_pairs[0].second;
-}
-
-/**
  * @brief Main function for the ResNet50 pipeline example
  *
  * This function demonstrates a pipeline approach to image classification using
@@ -224,95 +208,149 @@ int main(int argc, char* argv[]) {
   TaskQueue qd2h;    // Input queue for device-to-host transfer thread
   TaskQueue qout;    // Output queue from device-to-host transfer thread
 
-  // Prepare input information by querying the module
+  // Query input metadata and locate the image canvas expected by the model.
+  std::vector<std::string> input_names;
+  int max_img_height = 0;
+  int max_img_width = 0;
   int input_num = module.GetInputNum();
   LOG_INFO("Count of Input: {}", input_num);
   for (int idx = 0; idx < input_num; idx++) {
     auto input_name = module.GetInputName(idx);
     auto input_info = module.GetInputInfo(input_name);
+    input_names.push_back(input_name);
     LOG_INFO("Input[{}] info: {}", input_name, TensorInfo2Str(input_info));
-    // Store input info in all queues for reference
+
+    if (input_name.find(kResizeCropInputName) == std::string::npos) {
+      max_img_height = static_cast<int>(input_info.Shape().at(2));
+      max_img_width = static_cast<int>(input_info.Shape().at(3));
+    }
+
+    // Store input info in all queues for reference.
     qh2d.input_info_map[input_name] = input_info;
     qinfer.input_info_map[input_name] = input_info;
     qd2h.input_info_map[input_name] = input_info;
   }
+  if (max_img_height <= 0 || max_img_width <= 0) {
+    LOG_ERROR("Invalid model input shape: height={}, width={}", max_img_height,
+              max_img_width);
+    exit(-1);
+  }
 
-  // Prepare output information by querying the module
+  // Query output metadata once and share it across all pipeline stages.
   int output_num = module.GetOutputNum();
   LOG_INFO("Count of Output: {}", output_num);
   for (int idx = 0; idx < output_num; idx++) {
     auto output_name = module.GetOutputName(idx);
     auto output_info = module.GetOutputInfo(output_name);
     LOG_INFO("Output[{}] info: {}", output_name, TensorInfo2Str(output_info));
-    // Store output info in all queues for reference
+    // Store output info in all queues for reference.
     qh2d.output_info_map[output_name] = output_info;
     qinfer.output_info_map[output_name] = output_info;
     qd2h.output_info_map[output_name] = output_info;
   }
 
-  // Preprocess input image
-  std::string data_path = "../../data/snake.jpg";
-  if (!fs::exists(data_path)) {
-    LOG_ERROR("{} not exist.", data_path);
+  // Load and preprocess the input image with the same logic as resnet50.cc.
+  const int target_height = kTargetHeight;
+  const int target_width = kTargetWidth;
+  if (!fs::exists(kInputImagePath)) {
+    LOG_ERROR("{} not exist.", kInputImagePath);
     exit(-1);
   }
 
-  cv::Mat img_bgr;        // Input image in BGR format
-  cv::Mat img_processed;  // Processed image ready for inference
-  size_t img_size = 0;    // Size of the processed image in bytes
-
-  // Load the input image
-  img_bgr = cv::imread(data_path);
-
-  cv::Mat img_rgb;   // Image in RGB format
-  cv::Mat img_norm;  // Normalized image
-  // Define normalization parameters (ImageNet mean and std values)
-  const float mean[3] = {123.675f, 116.28f, 103.53f};
-  const float std[3] = {58.395f, 57.12f, 57.375f};
-
-  // Convert BGR to RGB and resize to required input size (224x224)
-  cv::cvtColor(img_bgr, img_rgb, cv::COLOR_BGR2RGB);
-  cv::resize(img_rgb, img_rgb, {224, 224});
-
-  // Convert to float and normalize
-  img_rgb.convertTo(img_norm, CV_32FC3);
-  std::vector<cv::Mat> channels;  // Vector to store individual channels
-  cv::split(img_norm, channels);  // Split into separate RGB channels
-  // Normalize each channel using mean and std values
-  for (int i = 0; i < 3; ++i) {
-    channels[i] = (channels[i] - mean[i]) / std[i];
+  cv::Mat image_data = cv::imread(kInputImagePath);
+  if (image_data.empty()) {
+    LOG_ERROR("Failed to read image {}", kInputImagePath);
+    exit(-1);
   }
-  // Convert from HWC (Height-Width-Channel) to CHW (Channel-Height-Width)
-  // format
-  for (auto& ch : channels) {
-    ch = ch.reshape(1, 1);
-  }
-  cv::vconcat(channels, img_processed);
-  // Calculate image size in bytes
-  img_size = img_norm.total() * img_norm.elemSize();
 
-  // Prepare input tensors for all samples
-  auto& name = qh2d.input_info_map.begin()->first;
-  auto info = qh2d.input_info_map.begin()->second.AsContiguous();
+  int img_height = image_data.rows;
+  int img_width = image_data.cols;
+  LOG_INFO("input image shape: [{} x {} x {}]", img_height, img_width,
+           image_data.channels());
+
+  // Preserve the original valid crop region when padding is needed.
+  int crop_height = max_img_height;
+  int crop_width = max_img_width;
+  if (img_height < max_img_height && img_width <= max_img_width) {
+    const int pad_bottom = max_img_height - img_height;
+    const int pad_right = max_img_width - img_width;
+    cv::copyMakeBorder(image_data, image_data, 0, pad_bottom, 0, pad_right,
+                       cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+    crop_height = img_height;
+    crop_width = img_width;
+    LOG_INFO("pad input image to [{} x {} x {}], height={}, width={}",
+             image_data.rows, image_data.cols, image_data.channels(),
+             max_img_height, max_img_width);
+  } else {
+    cv::resize(image_data, image_data, cv::Size(max_img_width, max_img_height));
+    LOG_INFO("resize input image to height={}, width={}", max_img_height,
+             max_img_width);
+  }
+
+  // Align crop sizes to even values because YUV420 requires even dimensions.
+  crop_height -= crop_height % 2;
+  crop_width -= crop_width % 2;
+  if (crop_height <= 0 || crop_width <= 2 || crop_height % 2 != 0 ||
+      crop_width % 2 != 0) {
+    LOG_ERROR("crop_height and crop_width must be even, got {} and {}",
+              crop_height, crop_width);
+    exit(-1);
+  }
+
+  const float height_scale = static_cast<float>(target_height) / crop_height;
+  const float width_scale = static_cast<float>(target_width) / crop_width;
+  if (height_scale < 1.0f / 32.0f || height_scale > 16.0f) {
+    LOG_ERROR("{} / img_height must be in [1/32, 16], got {}", target_height,
+              height_scale);
+    exit(-1);
+  }
+  if (width_scale < 1.0f / 32.0f || width_scale > 16.0f) {
+    LOG_ERROR("{} / img_width must be in [1/32, 16], got {}", target_width,
+              width_scale);
+    exit(-1);
+  }
+
+  // Dynamic resize-crop metadata matches the single-stream example.
+  std::vector<int32_t> dyn_info = {
+      0, 0, crop_height, crop_width, target_height, target_width, 0, 0, 0, 0};
+  LOG_INFO("dyn_info: [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}]", dyn_info[0],
+           dyn_info[1], dyn_info[2], dyn_info[3], dyn_info[4], dyn_info[5],
+           dyn_info[6], dyn_info[7], dyn_info[8], dyn_info[9]);
+
+  // Prepare one set of host tensors per request for all model inputs.
   for (int i = 0; i < arguments.sample_num; i++) {
-    // Allocate memory for the image data
-    auto data = malloc(img_size);
-    std::shared_ptr<void> data_ptr(data, free);
-    // Copy processed image data to allocated memory
-    memcpy(data, reinterpret_cast<void*>(img_processed.data), img_size);
-
     TaskInfo task_info;
     task_info.req_id = i;
-    tcim::Tensor tensor;
 
-    // Convert float32 buffer to float16 buffer as required by the model
-    auto info_f32 = info.AsType(tcim::DataType::FLOAT32);
-    auto tensor_f32 = tcim::Tensor::CreateHostTensor(info_f32, img_size, data);
-    tensor = tcim::Tensor::CreateHostTensor(info);
-    tensor_f32.CastTo(tensor);
+    for (const auto& input_name : input_names) {
+      auto info = qh2d.input_info_map.at(input_name).AsContiguous();
+      auto tensor = tcim::Tensor::CreateHostTensor(info);
+      std::memset(tensor.Data(), 0, info.MemSize());
 
-    task_info.input_map[name] = tensor;  // Store the tensor in the task info
-    qh2d.queue.push(task_info);          // Add task to the host-to-device queue
+      if (input_name.find(kResizeCropInputName) != std::string::npos) {
+        const size_t dyn_bytes = dyn_info.size() * sizeof(int32_t);
+        if (dyn_bytes > info.MemSize()) {
+          LOG_ERROR("dyn_info bytes {} exceed input tensor bytes {} for {}",
+                    dyn_bytes, info.MemSize(), input_name);
+          exit(-1);
+        }
+        std::memcpy(tensor.Data(), dyn_info.data(), dyn_bytes);
+      } else {
+        const size_t image_bytes = ConvertBgrToYuv420sp(
+            image_data, reinterpret_cast<uint8_t*>(tensor.Data()),
+            info.MemSize());
+        if (image_bytes == 0) {
+          LOG_ERROR("input image bytes exceed input tensor bytes {} for {}",
+                    info.MemSize(), input_name);
+          exit(-1);
+        }
+      }
+
+      task_info.input_map[input_name] = tensor;
+    }
+
+    // Push the request into the host-to-device stage.
+    qh2d.queue.push(task_info);
   }
   LOG_INFO("sample queue size is {}.", qh2d.queue.size());
 
@@ -399,7 +437,8 @@ int main(int argc, char* argv[]) {
       for (auto& output : output_map) {
         auto& name = output.first;
         auto info = qin.output_info_map[name].AsContiguous();
-        // Create host tensor
+        // Keep one host tensor per output and defer float32 conversion to the
+        // final postprocess stage.
         auto tensor = tcim::Tensor::CreateHostTensor(info);
         // Copy device tensor to host tensor
         output.second.CopyTo(tensor);
@@ -482,30 +521,32 @@ int main(int argc, char* argv[]) {
     t.join();
   }
 
-  // Post-process results and verify output
+  // Post-process results with the same float32 + softmax flow as resnet50.cc.
   while (!qout.queue.empty()) {
     auto output_map = qout.queue.front().output_map;
     auto req_id = qout.queue.front().req_id;
     qout.queue.pop();
     int top1 = 0;
-    const int topk = 1;  // Get top-1 prediction
+    const int topk = 1;
 
     for (auto& output : output_map) {
-      // Convert output tensor to float32 for processing
+      // Convert the host output to float32 before applying softmax.
       auto info_f32 = output.second.Info().AsType(tcim::DataType::FLOAT32);
       auto output_tensor_f32 = tcim::Tensor::CreateHostTensor(info_f32);
       output.second.CastTo(output_tensor_f32);
+      const size_t output_count = GetElementCount(output.second.Info());
+      std::vector<float> probs =
+          Softmax(static_cast<float*>(output_tensor_f32.Data()), output_count);
 
       std::vector<std::pair<float, int>> sort_pairs;
-      // Create pairs of (confidence, index) for all 1000 ImageNet classes
-      for (int i = 0; i < 1000; ++i) {
-        sort_pairs.emplace_back(
-            static_cast<float*>(output_tensor_f32.Data())[i], i);
+      // Rank scores using the softmax probabilities of the real output size.
+      for (size_t i = 0; i < probs.size(); ++i) {
+        sort_pairs.emplace_back(probs[i], static_cast<int>(i));
       }
-      top1 = get_topk(topk, sort_pairs);
+      top1 = GetTopK(topk, sort_pairs);
     }
 
-    // Verify result (65 corresponds to snake class in ImageNet)
+    // Verify the result. The bundled snake image should map to class 65.
     if (top1 != 65) {
       LOG_ERROR("top1 != 65");
       exit(-1);
