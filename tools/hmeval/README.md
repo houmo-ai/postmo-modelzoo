@@ -153,14 +153,14 @@ Before running evaluation, download the hmm model files:
 
 ```bash
 cd examples/qwen3
-python get_model.py --download-dir ./models
+python3 get_model.py --download-dir ./models
 ```
 
 For qwen3-vl:
 
 ```bash
 cd examples/qwen3-vl
-python get_model.py --download-dir ./models
+python3 get_model.py --download-dir ./models
 ```
 
 ### Qwen3 text example

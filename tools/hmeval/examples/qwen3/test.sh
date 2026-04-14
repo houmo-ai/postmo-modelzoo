@@ -32,7 +32,7 @@ fi
 
 # Download hmm model
 echo "Downloading hmm model..."
-python get_model.py --download-dir ./models
+python3 get_model.py --download-dir ./models
 
 # Install specific dependencies
 pip3 install transformers==4.51.0 -i https://pypi.tuna.tsinghua.edu.cn/simple

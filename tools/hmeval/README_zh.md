@@ -156,14 +156,14 @@ class MyCustomModel(ModelAPI):
 
 ```bash
 cd examples/qwen3
-python get_model.py --download-dir ./models
+python3 get_model.py --download-dir ./models
 ```
 
 qwen3-vl 同理：
 
 ```bash
 cd examples/qwen3-vl
-python get_model.py --download-dir ./models
+python3 get_model.py --download-dir ./models
 ```
 
 ### Qwen3 文本模型
