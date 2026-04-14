@@ -492,6 +492,40 @@ copyright notice and license text in accordance with the MIT License.
 Users are responsible for complying with the MIT License when using,
 redistributing, or modifying yaml-cpp.
 
+----------------------------------------------------------------------
+miniaudio
+----------------------------------------------------------------------
+
+Component Name:
+miniaudio
+
+Usage Location:
+models/asr/whisper/cpp/include/miniaudio.h
+models/asr/whisper/cpp/src/miniaudio_impl.cc
+
+Source:
+https://github.com/mackron/miniaudio
+
+Copyright Statement:
+Copyright (c) David Reid
+
+License:
+MIT No Attribution (MIT-0) or Public Domain dedication
+
+License Text:
+See the embedded license statements in:
+models/asr/whisper/cpp/include/miniaudio.h
+
+The Whisper C++ demo vendors miniaudio for audio decoding. The bundled
+header states that miniaudio may be used under MIT-0 terms or under a
+public-domain dedication, at the user's option.
+
+Any redistribution or modification of miniaudio should preserve the
+upstream copyright notice and the selected license text where applicable.
+
+Users are responsible for complying with the applicable upstream terms
+when using, redistributing, or modifying miniaudio.
+
 2. Datasets
 ----------------------------------------------------------------------
 COCO Dataset (Common Objects in Context)

@@ -25,6 +25,7 @@ import time
 import numpy as np
 import argparse
 import soundfile as sf
+from typing import List, Optional
 from loguru import logger
 
 import torch
@@ -34,6 +35,100 @@ from datasets import load_dataset
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+
+
+class SamplingManager:
+    def __init__(
+        self,
+        temperature: float = 1.0,
+        top_k: Optional[int] = None,
+        top_p: float = 1.0,
+        repetition_penalty: float = 1.0,
+        min_tokens_to_keep: int = 1,
+    ):
+        self.temperature = temperature
+        self.top_k = top_k
+        self.top_p = top_p
+        self.repetition_penalty = repetition_penalty
+        self.min_tokens_to_keep = min_tokens_to_keep
+
+    def apply_temperature(self, logits: np.ndarray) -> np.ndarray:
+        if self.temperature <= 0:
+            raise ValueError("Temperature must larger than 0")
+        return logits / self.temperature
+
+    def apply_repetition_penalty(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        if self.repetition_penalty == 1.0 or not previous_tokens:
+            return logits
+
+        adjusted_logits = logits.copy()
+        for token_id in set(previous_tokens):
+            if 0 <= token_id < len(logits):
+                if logits[token_id] < 0:
+                    adjusted_logits[token_id] = logits[token_id] * self.repetition_penalty
+                else:
+                    adjusted_logits[token_id] = logits[token_id] / self.repetition_penalty
+        return adjusted_logits
+
+    def apply_top_k(self, probs: np.ndarray) -> np.ndarray:
+        if self.top_k is None or self.top_k <= 0:
+            return probs
+
+        top_k = min(self.top_k, len(probs))
+        if top_k <= 0:
+            return probs
+
+        top_k_indices = np.argpartition(probs, -top_k)[-top_k:]
+        mask = np.ones_like(probs, dtype=bool)
+        mask[top_k_indices] = False
+        filtered_probs = probs.copy()
+        filtered_probs[mask] = -np.inf
+        return filtered_probs
+
+    def apply_top_p(self, probs: np.ndarray) -> np.ndarray:
+        if self.top_p >= 1.0:
+            return probs
+
+        sorted_indices = np.argsort(probs)[::-1]
+        sorted_logits = probs[sorted_indices]
+        max_logit = np.max(sorted_logits)
+        sorted_probs = np.exp(sorted_logits - max_logit)
+        sorted_probs /= np.sum(sorted_probs)
+        cumulative_probs = np.cumsum(sorted_probs)
+
+        cutoff_indices = np.where(cumulative_probs >= self.top_p)[0]
+        if len(cutoff_indices) > 0:
+            cutoff_index = cutoff_indices[0]
+            cutoff_index = max(cutoff_index, self.min_tokens_to_keep - 1)
+            selected_indices = sorted_indices[: cutoff_index + 1]
+        else:
+            selected_indices = sorted_indices
+
+        mask = np.ones_like(probs, dtype=bool)
+        mask[selected_indices] = False
+        filtered_probs = probs.copy()
+        filtered_probs[mask] = -np.inf
+        return filtered_probs
+
+    def process_logits(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        processed_logits = logits.copy()
+        processed_logits = self.apply_repetition_penalty(processed_logits, previous_tokens)
+        processed_logits = self.apply_top_k(processed_logits)
+        processed_logits = self.apply_top_p(processed_logits)
+        processed_logits = self.apply_temperature(processed_logits)
+        return processed_logits
+
+    def sample(
+        self, logits: torch.Tensor, previous_tokens: Optional[List[int]] = None
+    ) -> torch.Tensor:
+        logits_np = logits[0].detach().cpu().numpy()
+        processed_logits = self.process_logits(logits_np, previous_tokens)
+        sampled_index = int(np.argmax(processed_logits, axis=-1))
+        return torch.tensor([sampled_index], device=logits.device)
 
 
 
@@ -267,7 +362,7 @@ class HmWhisper:
         return input_names
 
 
-def asr(hmwhisper, processor, input_features, state=None, slide_len=10):
+def asr(hmwhisper, processor, input_features, sampling_manager, state=None, slide_len=10):
     """
     Args:
         state: Dictionary containing cross-chunk continuous state:
@@ -369,7 +464,7 @@ def asr(hmwhisper, processor, input_features, state=None, slide_len=10):
     logits = hmwhisper.run_prefill(prefill_inputs)
 
     next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
-    next_tokens = torch.argmax(next_token_logits, dim=-1)
+    next_tokens = sampling_manager.sample(next_token_logits, default_decoder_ids[0].tolist())
     default_decoder_ids = torch.cat([default_decoder_ids, next_tokens[:, None]], dim=-1)
     decode_response = (
         processor.decode(next_tokens) if next_tokens.item() != 50257 else ""
@@ -408,7 +503,7 @@ def asr(hmwhisper, processor, input_features, state=None, slide_len=10):
 
         logits = hmwhisper.run_decoder(prefill_inputs)
         next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
-        next_tokens = torch.argmax(next_token_logits, dim=-1)
+        next_tokens = sampling_manager.sample(next_token_logits, default_decoder_ids[0].tolist())
         default_decoder_ids = torch.cat(
             [default_decoder_ids, next_tokens[:, None]], dim=-1
         )
@@ -454,6 +549,7 @@ if __name__ == "__main__":
         raise ValueError("Unsupport houmo target!")
 
     processor = WhisperProcessor.from_pretrained(args.processor_dir)
+    sampling_manager = SamplingManager(top_k=None, top_p=1.0, repetition_penalty=1.1)
 
     sample, sr = sf.read(args.audio)
     if sr != 16000:
@@ -484,7 +580,7 @@ if __name__ == "__main__":
     for i, chunk in enumerate(chunks):
         input_features = processor(chunk, sampling_rate=sr, return_tensors="pt").input_features
         prefill_ids_len, all_ids_len, ttft_time, total_time, audio_duration, state = asr(
-            hmwhisper, processor, input_features, state
+            hmwhisper, processor, input_features, sampling_manager, state
         )
         total_ttft_time += ttft_time
         total_decode_time += total_time

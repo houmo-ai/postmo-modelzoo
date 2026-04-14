@@ -71,7 +71,7 @@ whisper_prefill.hmm
 
 ### 2.5 演示
 
-Whisper-Medium模型使用python API进行演示
+Whisper-Medium模型使用python API和c++示例进行演示，c++模型示例的详细介绍见cpp/README.MD文件。
 
 2. 执行脚本，推理完成将输出性能结果。
 
@@ -92,19 +92,25 @@ bash test.sh
 ### 3.1 演示结果
 
 ```bash
-[" Nor is Mr. Quilter's manner less interesting than his matter."]
-
+[2026-04-14 03:19:42.549] [tid 254235] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-04-14 03:19:42.549] [tid 254235] [warning] Empty backend name, use Xh2HalBackend instead.
+2026-04-14 03:19:43.168 | INFO     | __main__:__init__:307 - encoder model loaded
+2026-04-14 03:19:43.495 | INFO     | __main__:__init__:310 - prefill model loaded
+2026-04-14 03:19:43.517 | INFO     | __main__:__init__:313 - decoder model loaded
+2026-04-14 03:19:43.639 | SUCCESS  | __main__:<module>:573 - transcription:
+后摩芯片算法部的小伙伴,你们好啊!我是多拉A梦。你们好厉害啊!好像你们拥有装满各种神奇道具的口袋。你们真棒!新的一年,祝你们身体健康、 事业顺利、发大财
 ```
 
 ### 3.2 性能结果
 
 ```bash
-Output 20 tokens, Decode Cost 574.816 ms
-Decode Speed: 26.10 tokens/s
-TTFT (Time to First Token): 502.699 ms
-TPOT (Time Per Output Token): 38.321 ms/token
-E2E Latency (End-to-End Latency): 1.078 seconds
-E2E TPS (End-to-End Tokens Per Second): 18.56 tokens/s
+2026-04-14 03:19:45.758 | SUCCESS  | __main__:<module>:598 - Output 89 tokens, Decode Cost 1667.059 ms
+2026-04-14 03:19:45.758 | SUCCESS  | __main__:<module>:601 - Decode Speed: 50.39 tokens/s
+2026-04-14 03:19:45.758 | SUCCESS  | __main__:<module>:604 - TTFT (Time to First Token): 447.829 ms
+2026-04-14 03:19:45.758 | SUCCESS  | __main__:<module>:605 - TPOT (Time Per Output Token): 19.846 ms/token
+2026-04-14 03:19:45.758 | SUCCESS  | __main__:<module>:608 - E2E Latency (End-to-End Latency): 2.115 seconds
+2026-04-14 03:19:45.758 | SUCCESS  | __main__:<module>:611 - E2E TPS (End-to-End Tokens Per Second): 42.08 tokens/s
+2026-04-14 03:19:45.758 | SUCCESS  | __main__:<module>:614 - RTF (Real-Time Factor): 0.0352 (lower is better, <1 means real-time)
 ```
 
 ## 4 免责声明

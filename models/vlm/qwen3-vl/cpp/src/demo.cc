@@ -50,19 +50,19 @@ void printUsage(const char *program_name) {
                "\"请描述图片内容。\")"
             << std::endl;
   std::cout << "  --visual <path>          Path to visual model (default: "
-               "qwen3-vl_visual.hmm)"
+               "output/xh2/qwen3-vl_visual.hmm)"
             << std::endl;
   std::cout << "  --prefill <path>         Path to prefill model (default: "
-               "qwen3-vl_prefill.hmm)"
+               "output/xh2/qwen3-vl_prefill.hmm)"
             << std::endl;
   std::cout << "  --decode <path>          Path to decode model (default: "
-               "qwen3-vl_decode.hmm)"
+               "output/xh2/qwen3-vl_decode.hmm)"
             << std::endl;
   std::cout << "  --tokenizer <path>       Path to tokenizer.json (default: "
                "qwen3-vl/tokenizer.json)"
             << std::endl;
   std::cout << "  --embedding <path>       Path to embedding weights (default: "
-               "qwen3-vl/hmquant/quant_embedding.bin)"
+               "output/xh2/hmquant/quant_embedding.bin)"
             << std::endl;
   std::cout << "  --repetition-penalty <f> Repetition penalty (default: 1.5)"
             << std::endl;
@@ -167,7 +167,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Create sampling manager
-  SamplingManager sampling_manager(temperature, top_k, top_p, repetition_penalty);
+  SamplingManager sampling_manager(temperature, top_k, top_p,
+                                   repetition_penalty);
 
   try {
     // Initialize inference engine

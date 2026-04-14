@@ -101,6 +101,8 @@ fi
 if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
     echo "Execute demo."
     python3 demo.py
+    cd cpp && ./build.sh && cd ..
+    ./bin/whisper-demo
 fi
 
 if [[ "$VENV_FLAG" -eq "1" ]]; then

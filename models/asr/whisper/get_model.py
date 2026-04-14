@@ -21,7 +21,7 @@
 import os
 import shutil
 import argparse
-from hmatc.utils.utils import hmatc_get_file, get_houmo_version
+from hmatc.utils.utils import hmatc_get_file, get_houmo_version, get_file_from_jfrog
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -97,3 +97,8 @@ if __name__ == "__main__":
     )
     if ret_dict.get("ret", False) is False:
         exit(1)
+
+    tokenizer_path = "3rdparty/qwen3-tokenizers-cpp.zip"
+    target_dir = "./cpp/3rdparty"
+    save_path = get_file_from_jfrog(tokenizer_path, target_dir, target_dir)
+    print(f"Tokenizer downloaded to {save_path} and extracted to: {target_dir}")

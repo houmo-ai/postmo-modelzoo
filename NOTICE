@@ -52,6 +52,7 @@ Numpy File I/O for C++ npy.hpp - https://github.com/llohse/libnpy
 Fast C++ Logging Library spdlog - https://github.com/gabime/spdlog
 Modern C++ Argument Parser argparse - https://github.com/p-ranav/argparse
 A YAML parser and emitter in C++ (MIT) - https://github.com/jbeder/yaml-cpp
+miniaudio (MIT-0 / Public Domain) - https://github.com/mackron/miniaudio
 # Datasets
 CCPD Dataset (MIT) - https://github.com/detectRecog/CCPD
 VOC2012 Dataset (CC BY 4.0) - https://public.roboflow.com/object-detection/pascal-voc-2012
