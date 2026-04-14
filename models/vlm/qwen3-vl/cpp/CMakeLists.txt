@@ -43,6 +43,7 @@ set(SOURCE_FILES
   src/HmImageProcessor.cc
   src/HmQwenVLTokenizer.cc
   src/HmQwenVLInfer.cc
+  src/SamplingManager.cc
   src/demo.cc
 )
 

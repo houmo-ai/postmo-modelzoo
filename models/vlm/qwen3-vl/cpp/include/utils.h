@@ -174,12 +174,36 @@ static int eigen_argmax(const T *ptr, std::size_t n) {
  * @brief Structure for performance metrics
  */
 struct PerfInfos {
+  int batch_size = 1;
+  int num_images = 0;
   int input_tokens = 0;
   int output_tokens = 0;
   int visual_tokens = 0;
+
+  float prefill_model_load_time = 0.0f;
+  float decode_model_load_time = 0.0f;
+  float vision_model_load_time = 0.0f;
+
   float vision_time = 0.0f;
+  float vision_preprocess_time = 0.0f;
+  float vision_set_input_time = 0.0f;
+  float vision_infer_time = 0.0f;
+  float vision_get_output_time = 0.0f;
+
   float prefill_time = 0.0f;
+  float prefill_tokenization_time = 0.0f;
+  float prefill_embedding_time = 0.0f;
+  float prefill_set_input_time = 0.0f;
+  float prefill_infer_time = 0.0f;
+  float prefill_get_output_time = 0.0f;
+
   float decode_time = 0.0f;
+  float decode_tokenization_time = 0.0f;
+  float decode_embedding_time = 0.0f;
+  float decode_set_input_time = 0.0f;
+  float decode_infer_time = 0.0f;
+  float decode_get_output_time = 0.0f;
+
   float embedding_time = 0.0f;
   float ttft_time = 0.0f;
   float total_time = 0.0f;

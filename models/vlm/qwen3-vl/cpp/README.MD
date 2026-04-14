@@ -196,25 +196,58 @@ export TCIM_BACKEND=Xh2HalBackend
 
 ```bash
 Backend: xh2
-TCIM version: v1.1.0
+TCIM version: v1.2.0.dev20260403
 - Git Commit: clean
-- Build Time: 2026-03-07 02:09:38 Mar  7 2026
+- Build Time: 2026-04-03 03:34:40 Apr  3 2026
 Initializing Qwen3-VL inference engine...
+[2026-04-14 02:55:13.984] [tid 250573] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-04-14 02:55:13.984] [tid 250573] [warning] Empty backend name, use Xh2HalBackend instead.
 Visual model loaded
 Prefill model loaded
 Decode model loaded
-VIT input shape: 1 3 2 448 448
+VIT input shape: 1 3 2 448 448 
 Image dimensions: 448x448
 Question: 请分析输入内容并简洁作答。
-Images: beach.jpeg
+Images: ../../../data/pic/beach.jpeg 
 Response: 图片中，一位女士坐在沙滩上，与一只戴着蓝色背带的金毛犬互动。两人在夕阳下相视而笑，氛围温馨。背景是海浪和金色的落日，画面充满宁静与幸福。
 
-[SUCCESS] Total Input: 215 tokens, Output 50 tokens, Vision Cost 112.419 ms, Prefill Cost 124.458 ms, Decode Cost 2635.608 ms
-[SUCCESS] Prefill Speed: 1727.50 tokens/s; Decode Speed: 18.97 tokens/s
-[SUCCESS] TTFT: 236.877 ms
-[SUCCESS] TPOT: 52.712 ms/token
-[SUCCESS] E2E Latency: 2.874 seconds
-[SUCCESS] E2E TPS: 17.40 tokens/s
+[SUCCESS] ====================================================================================================
+[SUCCESS]                     Model Inference Performance Summary Report
+[SUCCESS] ====================================================================================================
+[SUCCESS] Configuration Details:
+[SUCCESS]   Batch Size:      1
+[SUCCESS]   Input Length per Sample:    215 tokens
+[SUCCESS]   Output Length per Sample:     50 tokens
+[SUCCESS]   Number of Images:      1 images
+[SUCCESS]   Prefill Model Load Time: 3236.99ms
+[SUCCESS]   Decode Model Load Time:  174.08ms
+[SUCCESS]   Vision Model Load Time:  758.74ms
+[SUCCESS] Vision Stage Performance:
+[SUCCESS]   Total Time:  118.09ms | Speed:   8.47 images/s
+[SUCCESS]   Preprocessing Time: 15.36ms | Speed:  65.10 images/s
+[SUCCESS]   API SetInput Time:   1.41ms
+[SUCCESS]   API Inference Time: 90.86ms | Speed:  11.01 images/s
+[SUCCESS]   API GetOutput Time:  7.11ms
+[SUCCESS] Prefill Stage Performance:
+[SUCCESS]   Total Time:  136.08ms | Speed: 1579.96 tokens/s
+[SUCCESS]   Tokenization Time:   0.20ms
+[SUCCESS]   Embedding Time:    0.55ms
+[SUCCESS]   API SetInput Time:   8.70ms
+[SUCCESS]   API Inference Time: 124.84ms | Prefill Speed: 1722.27 tokens/s
+[SUCCESS]   API GetOutput Time:  1.55ms
+[SUCCESS] Decode Stage Performance:
+[SUCCESS]   Total Time: 2750.47ms | Speed:   18.18 tokens/s
+[SUCCESS]   Tokenization Time:    1.31ms
+[SUCCESS]   Embedding Time:    0.11ms
+[SUCCESS]   API SetInput Time:   1.28ms/token
+[SUCCESS]   API Inference Time: 52.60ms/token | Decode Speed:   19.40 tokens/s
+[SUCCESS]   API GetOutput Time:  2.17ms/token
+[SUCCESS] Overall Performance Metrics:
+[SUCCESS]   TTFT (Time To First Token):  254.166 ms
+[SUCCESS]   TPOT (Time Per Output Token): 55.009 ms/token
+[SUCCESS]   E2E Latency (End-to-End):      3.012 seconds
+[SUCCESS]   E2E TPS (Throughput):         16.60 tokens/s
+[SUCCESS] ====================================================================================================
 ```
 
 ## 4.免责声明

@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "HmQwenVLInfer.h"
+#include "SamplingManager.h"
 #include "tcim/tcim_runtime.h"
 
 #ifdef _MSC_VER
@@ -165,15 +166,15 @@ int main(int argc, char *argv[]) {
     return -2;
   }
 
-  // Create sampling parameters
-  SamplingParams sampling_params(temperature, top_k, top_p, repetition_penalty);
+  // Create sampling manager
+  SamplingManager sampling_manager(temperature, top_k, top_p, repetition_penalty);
 
   try {
     // Initialize inference engine
     std::cout << "Initializing Qwen3-VL inference engine..." << std::endl;
-    std::unique_ptr<HmQwenVLInfer> infer = std::make_unique<HmQwenVLInfer>(
+    std::unique_ptr<HmQwenVLInfer> infer(new HmQwenVLInfer(
         visual_model_path, prefill_model_path, decode_model_path,
-        tokenizer_path, embedding_path, sampling_params);
+        tokenizer_path, embedding_path, sampling_manager));
 
     // Run chat
     std::string response = infer->Chat(image_paths, prompt);

@@ -29,23 +29,9 @@
 
 #include "HmImageProcessor.h"
 #include "HmQwenVLTokenizer.h"
+#include "SamplingManager.h"
 #include "tcim/tcim_runtime.h"
 #include "utils.h"
-
-/**
- * @brief Sampling parameters for text generation
- */
-struct SamplingParams {
-    float temperature = 1.0f;
-    int top_k = -1;  // -1 means disabled
-    float top_p = 1.0f;
-    float repetition_penalty = 1.5f;
-    int min_tokens_to_keep = 1;
-
-    SamplingParams() = default;
-    SamplingParams(float temp, int k, float p, float rep_pen)
-        : temperature(temp), top_k(k), top_p(p), repetition_penalty(rep_pen) {}
-};
 
 /**
  * @brief Timer class for performance measurement
@@ -79,14 +65,14 @@ public:
      * @param decodeModelPath Path to decode model
      * @param tokenizerJsonPath Path to tokenizer JSON
      * @param embeddingWeightPath Path to embedding weights
-     * @param sampling_params Sampling parameters for generation
+     * @param sampling_manager Sampling manager for generation
      */
     HmQwenVLInfer(const std::string &visualModelPath,
                   const std::string &prefillModelPath,
                   const std::string &decodeModelPath,
                   const std::string &tokenizerJsonPath,
                   const std::string &embeddingWeightPath,
-                  const SamplingParams &sampling_params = SamplingParams());
+                  const SamplingManager &sampling_manager = SamplingManager());
 
     HmQwenVLInfer(const HmQwenVLInfer &it) = delete;
     HmQwenVLInfer &operator=(const HmQwenVLInfer &it) = delete;
@@ -139,7 +125,7 @@ private:
     // Components
     std::shared_ptr<HmQwenVLTokenizer> tokenizer_;
     std::shared_ptr<HmImageProcessor> image_processor_;
-    SamplingParams sampling_params_;
+    SamplingManager sampling_manager_;
 
     // Tensor maps
     std::map<std::string, tcim::Tensor> visual_input_map_;

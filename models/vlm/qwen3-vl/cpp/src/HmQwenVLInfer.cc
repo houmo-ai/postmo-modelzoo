@@ -41,11 +41,11 @@ HmQwenVLInfer::HmQwenVLInfer(const std::string &visualModelPath,
                              const std::string &decodeModelPath,
                              const std::string &tokenizerJsonPath,
                              const std::string &embeddingWeightPath,
-                             const SamplingParams &sampling_params)
+                             const SamplingManager &sampling_manager)
     : visual_model_path_(visualModelPath),
       prefill_model_path_(prefillModelPath),
       decode_model_path_(decodeModelPath),
-      sampling_params_(sampling_params) {
+      sampling_manager_(sampling_manager) {
   // Create weight manager
   weight_manager_ = tcim::Module::WeightManager::CreateWeightManager(0);
 
@@ -55,13 +55,21 @@ HmQwenVLInfer::HmQwenVLInfer(const std::string &visualModelPath,
   auto option_decode = tcim::Module::Option(weight_manager_);
 
   // Load visual model
+  Timer vision_load_timer;
+  vision_load_timer.start();
   visual_module_ = std::make_shared<tcim::Module>();
   visual_module_->LoadModel(visualModelPath, option_visual);
+  vision_load_timer.end();
+  perf_info_.vision_model_load_time = vision_load_timer.elapsed_ms();
   std::cout << "Visual model loaded" << std::endl;
 
   // Load prefill model
+  Timer prefill_load_timer;
+  prefill_load_timer.start();
   prefill_module_ = std::make_shared<tcim::Module>();
   prefill_module_->LoadModel(prefillModelPath, option_prefill);
+  prefill_load_timer.end();
+  perf_info_.prefill_model_load_time = prefill_load_timer.elapsed_ms();
   std::cout << "Prefill model loaded" << std::endl;
 
   // Get number of blocks and generate dummy names
@@ -81,8 +89,12 @@ HmQwenVLInfer::HmQwenVLInfer(const std::string &visualModelPath,
   option_decode.SetDummyTensors(dummy_names_);
 
   // Load decode model
+  Timer decode_load_timer;
+  decode_load_timer.start();
   decode_module_ = std::make_shared<tcim::Module>();
   decode_module_->LoadModel(decodeModelPath, option_decode);
+  decode_load_timer.end();
+  perf_info_.decode_model_load_time = decode_load_timer.elapsed_ms();
   std::cout << "Decode model loaded" << std::endl;
 
   // Get attention index start
@@ -391,8 +403,19 @@ int HmQwenVLInfer::DecodeGetOutputDatas() {
   auto host_output = dev_output.ToHost(true);
 
   void *outData = host_output.Buffer().Data();
-  return eigen_argmax<half_float::half>(
-      static_cast<half_float::half *>(outData), argmax_dim_len_);
+  size_t num_elements = host_output.Buffer().Size() / sizeof(half_float::half);
+
+  // Convert half logits to float for sampling
+  std::vector<float> logits(num_elements);
+  half_float::half *half_data = static_cast<half_float::half *>(outData);
+  for (size_t i = 0; i < num_elements; i++) {
+    logits[i] = static_cast<float>(half_data[i]);
+  }
+
+  // Apply sampling manager for post-processing
+  int token_id =
+      sampling_manager_.sample(logits.data(), num_elements, generated_ids_);
+  return token_id;
 }
 
 bool HmQwenVLInfer::IsValidChar(char32_t cp) {
@@ -411,6 +434,15 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
                                 const std::string &prompt) {
   Timer timer;
   timer.start();
+  const float prefill_model_load_time = perf_info_.prefill_model_load_time;
+  const float decode_model_load_time = perf_info_.decode_model_load_time;
+  const float vision_model_load_time = perf_info_.vision_model_load_time;
+  perf_info_ = PerfInfos();
+  perf_info_.prefill_model_load_time = prefill_model_load_time;
+  perf_info_.decode_model_load_time = decode_model_load_time;
+  perf_info_.vision_model_load_time = vision_model_load_time;
+  perf_info_.batch_size = batch_ > 0 ? batch_ : 1;
+  perf_info_.num_images = static_cast<int>(image_paths.size());
 
   std::cout << "Question: " << prompt << std::endl;
   if (!image_paths.empty()) {
@@ -422,11 +454,15 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
   }
 
   // Apply chat template
+  Timer prefill_tokenize_timer;
+  prefill_tokenize_timer.start();
   std::string formatted =
       tokenizer_->ApplyChatTemplate(prompt, image_paths, true);
 
   // Encode to tokens
   std::vector<int> input_ids = tokenizer_->Encode(formatted);
+  prefill_tokenize_timer.end();
+  perf_info_.prefill_tokenization_time = prefill_tokenize_timer.elapsed_ms();
 
   if (input_ids.size() > static_cast<size_t>(context_max_length_)) {
     std::cerr << "Input too long: " << input_ids.size() << " > "
@@ -445,17 +481,34 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
 
   if (!image_paths.empty()) {
     // Load and preprocess images
+    Timer vision_preprocess_timer;
+    vision_preprocess_timer.start();
     auto images = image_processor_->LoadAndProcessBatch(image_paths);
+    vision_preprocess_timer.end();
+    perf_info_.vision_preprocess_time += vision_preprocess_timer.elapsed_ms();
 
     for (const auto &img : images) {
       // Convert to YUV tensor
       auto visual_tensor = image_processor_->ToHalfTensor(img);
 
       // Run vision model
+      Timer vision_set_input_timer;
+      vision_set_input_timer.start();
       VisionSetInput(visual_tensor);
+      vision_set_input_timer.end();
+      perf_info_.vision_set_input_time += vision_set_input_timer.elapsed_ms();
+
+      Timer vision_infer_timer;
+      vision_infer_timer.start();
       VisionInfer();
+      vision_infer_timer.end();
+      perf_info_.vision_infer_time += vision_infer_timer.elapsed_ms();
       // Get outputs
+      Timer vision_get_output_timer;
+      vision_get_output_timer.start();
       auto [feat, ds0, ds1, ds2] = VisionGetOutputs();
+      vision_get_output_timer.end();
+      perf_info_.vision_get_output_time += vision_get_output_timer.elapsed_ms();
       // Append to buffers
       image_features.insert(image_features.end(), feat.begin(), feat.end());
       deepstack_0.insert(deepstack_0.end(), ds0.begin(), ds0.end());
@@ -521,7 +574,11 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
                                               embedding_length_);
 
   // Compute text embeddings
+  Timer prefill_embedding_timer;
+  prefill_embedding_timer.start();
   auto text_embeds = tokenizer_->EmbeddingTokens(input_ids);
+  prefill_embedding_timer.end();
+  perf_info_.prefill_embedding_time = prefill_embedding_timer.elapsed_ms();
   std::memcpy(inputs_embeds.data(), text_embeds,
               input_seq_length * embedding_length_ * sizeof(half_float::half));
 
@@ -688,10 +745,19 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
                   token_span * sizeof(int32_t));
     }
 
+    Timer prefill_set_input_timer;
+    prefill_set_input_timer.start();
     PrefillSetInputDatas(chunk_embeds, chunk_time, chunk_height, chunk_width,
                          valid_length, current_length, chunk_ds0, chunk_ds1,
                          chunk_ds2);
+    prefill_set_input_timer.end();
+    perf_info_.prefill_set_input_time += prefill_set_input_timer.elapsed_ms();
+
+    Timer prefill_infer_timer;
+    prefill_infer_timer.start();
     PrefillInfer();
+    prefill_infer_timer.end();
+    perf_info_.prefill_infer_time += prefill_infer_timer.elapsed_ms();
 
     valid_length += current_length;
     past_seq_len_ = valid_length;
@@ -701,7 +767,11 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
   perf_info_.prefill_time = prefill_timer.elapsed_ms();
 
   // Get first token
+  Timer prefill_get_output_timer;
+  prefill_get_output_timer.start();
   int next_token = PrefillGetOutputDatas();
+  prefill_get_output_timer.end();
+  perf_info_.prefill_get_output_time = prefill_get_output_timer.elapsed_ms();
   generated_ids_.clear();
   generated_ids_.push_back(next_token);
 
@@ -744,7 +814,11 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
 
     // Get embedding for single token
     std::vector<int> single_token = {next_token};
+    Timer decode_embedding_timer;
+    decode_embedding_timer.start();
     auto token_embeds = tokenizer_->EmbeddingTokens(single_token);
+    decode_embedding_timer.end();
+    perf_info_.decode_embedding_time += decode_embedding_timer.elapsed_ms();
     std::vector<half_float::half> decode_embeds(
         token_embeds, token_embeds + embedding_length_);
 
@@ -764,10 +838,24 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
     std::vector<half_float::half> decode_ds2(embedding_length_,
                                              half_float::half(0));
 
+    Timer decode_set_input_timer;
+    decode_set_input_timer.start();
     DecodeSetInputDatas(decode_embeds, decode_time, decode_height, decode_width,
                         context_length, decode_ds0, decode_ds1, decode_ds2);
+    decode_set_input_timer.end();
+    perf_info_.decode_set_input_time += decode_set_input_timer.elapsed_ms();
+
+    Timer decode_infer_timer;
+    decode_infer_timer.start();
     DecodeInfer();
+    decode_infer_timer.end();
+    perf_info_.decode_infer_time += decode_infer_timer.elapsed_ms();
+
+    Timer decode_get_output_timer;
+    decode_get_output_timer.start();
     next_token = DecodeGetOutputDatas();
+    decode_get_output_timer.end();
+    perf_info_.decode_get_output_time += decode_get_output_timer.elapsed_ms();
     generated_ids_.push_back(next_token);
     chat_history_ids.push_back(next_token);
     context_length++;
@@ -782,7 +870,11 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
     std::vector<int> decode_window_ids(
         chat_history_ids.end() - slide_len_ - skip_tokens_ - 1,
         chat_history_ids.end());
+    Timer decode_tokenize_timer;
+    decode_tokenize_timer.start();
     std::string tmp_response = tokenizer_->Decode(decode_window_ids);
+    decode_tokenize_timer.end();
+    perf_info_.decode_tokenization_time += decode_tokenize_timer.elapsed_ms();
     std::u32string udecode_response =
         utf8_to_u32(tmp_response).substr(substart);
     decode_response = u32_to_utf8(udecode_response);
@@ -806,35 +898,137 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
   timer.end();
   perf_info_.total_time = timer.elapsed_ms();
   perf_info_.output_tokens = generated_ids_.size();
+  perf_info_.embedding_time =
+      perf_info_.prefill_embedding_time + perf_info_.decode_embedding_time;
 
   std::cout << std::endl;
 
-  // Print performance metrics
+  // Print performance metrics in Python demo summary style.
+  auto safe_speed = [](float cnt, float ms) {
+    return ms > 0.0f ? cnt / (ms * 0.001f) : 0.0f;
+  };
+  auto safe_ms_per_token = [](float ms, int tokens) {
+    return tokens > 0 ? ms / static_cast<float>(tokens) : 0.0f;
+  };
+  const int decode_api_tokens =
+      perf_info_.output_tokens > 0 ? perf_info_.output_tokens - 1 : 0;
+  float tpot = perf_info_.output_tokens > 0
+                   ? perf_info_.decode_time / perf_info_.output_tokens
+                   : 0.0f;
+
   std::cout << std::fixed << std::setprecision(3);
-  std::cout << "[SUCCESS] Total Input: " << perf_info_.input_tokens
-            << " tokens, Output " << perf_info_.output_tokens
-            << " tokens, Vision Cost " << perf_info_.vision_time
-            << " ms, Prefill Cost " << perf_info_.prefill_time
-            << " ms, Decode Cost " << perf_info_.decode_time << " ms"
+  std::cout << "[SUCCESS] "
+               "==============================================================="
+               "====================================="
+            << std::endl;
+  std::cout << "[SUCCESS]                     Model Inference Performance "
+               "Summary Report"
+            << std::endl;
+  std::cout << "[SUCCESS] "
+               "==============================================================="
+               "====================================="
             << std::endl;
 
-  std::cout << "[SUCCESS] Prefill Speed: " << std::setprecision(2)
-            << perf_info_.input_tokens / (perf_info_.prefill_time * 0.001f)
-            << " tokens/s; Decode Speed: "
-            << perf_info_.output_tokens / (perf_info_.decode_time * 0.001f)
+  std::cout << "[SUCCESS] Configuration Details:" << std::endl;
+  std::cout << "[SUCCESS]   Batch Size:      " << perf_info_.batch_size
+            << std::endl;
+  std::cout << "[SUCCESS]   Input Length per Sample:    "
+            << perf_info_.input_tokens << " tokens" << std::endl;
+  std::cout << "[SUCCESS]   Output Length per Sample:     "
+            << perf_info_.output_tokens << " tokens" << std::endl;
+  std::cout << "[SUCCESS]   Number of Images:      " << perf_info_.num_images
+            << " images" << std::endl;
+  std::cout << std::setprecision(2) << "[SUCCESS]   Prefill Model Load Time: "
+            << perf_info_.prefill_model_load_time << "ms" << std::endl;
+  std::cout << "[SUCCESS]   Decode Model Load Time:  "
+            << perf_info_.decode_model_load_time << "ms" << std::endl;
+  std::cout << "[SUCCESS]   Vision Model Load Time:  "
+            << perf_info_.vision_model_load_time << "ms" << std::endl;
+
+  std::cout << "[SUCCESS] Vision Stage Performance:" << std::endl;
+  std::cout << "[SUCCESS]   Total Time:  " << perf_info_.vision_time
+            << "ms | Speed:   "
+            << safe_speed(static_cast<float>(perf_info_.num_images),
+                          perf_info_.vision_time)
+            << " images/s" << std::endl;
+  std::cout << "[SUCCESS]   Preprocessing Time: "
+            << perf_info_.vision_preprocess_time << "ms | Speed:  "
+            << safe_speed(static_cast<float>(perf_info_.num_images),
+                          perf_info_.vision_preprocess_time)
+            << " images/s" << std::endl;
+  std::cout << "[SUCCESS]   API SetInput Time:   "
+            << perf_info_.vision_set_input_time << "ms" << std::endl;
+  std::cout << "[SUCCESS]   API Inference Time: "
+            << perf_info_.vision_infer_time << "ms | Speed:  "
+            << safe_speed(static_cast<float>(perf_info_.num_images),
+                          perf_info_.vision_infer_time)
+            << " images/s" << std::endl;
+  std::cout << "[SUCCESS]   API GetOutput Time:  "
+            << perf_info_.vision_get_output_time << "ms" << std::endl;
+
+  std::cout << "[SUCCESS] Prefill Stage Performance:" << std::endl;
+  std::cout << "[SUCCESS]   Total Time:  " << perf_info_.prefill_time
+            << "ms | Speed: "
+            << safe_speed(static_cast<float>(perf_info_.input_tokens),
+                          perf_info_.prefill_time)
             << " tokens/s" << std::endl;
+  std::cout << "[SUCCESS]   Tokenization Time:   "
+            << perf_info_.prefill_tokenization_time << "ms" << std::endl;
+  std::cout << "[SUCCESS]   Embedding Time:    "
+            << perf_info_.prefill_embedding_time << "ms" << std::endl;
+  std::cout << "[SUCCESS]   API SetInput Time:   "
+            << perf_info_.prefill_set_input_time << "ms" << std::endl;
+  std::cout << "[SUCCESS]   API Inference Time: "
+            << perf_info_.prefill_infer_time << "ms | Prefill Speed: "
+            << safe_speed(static_cast<float>(perf_info_.input_tokens),
+                          perf_info_.prefill_infer_time)
+            << " tokens/s" << std::endl;
+  std::cout << "[SUCCESS]   API GetOutput Time:  "
+            << perf_info_.prefill_get_output_time << "ms" << std::endl;
+
+  std::cout << "[SUCCESS] Decode Stage Performance:" << std::endl;
+  std::cout << "[SUCCESS]   Total Time: " << perf_info_.decode_time
+            << "ms | Speed:   "
+            << safe_speed(static_cast<float>(perf_info_.output_tokens),
+                          perf_info_.decode_time)
+            << " tokens/s" << std::endl;
+  std::cout << "[SUCCESS]   Tokenization Time:    "
+            << perf_info_.decode_tokenization_time << "ms" << std::endl;
+  std::cout << "[SUCCESS]   Embedding Time:    "
+            << perf_info_.decode_embedding_time << "ms" << std::endl;
+  std::cout << "[SUCCESS]   API SetInput Time:   "
+            << safe_ms_per_token(perf_info_.decode_set_input_time,
+                                 decode_api_tokens)
+            << "ms/token" << std::endl;
+  std::cout << "[SUCCESS]   API Inference Time: "
+            << safe_ms_per_token(perf_info_.decode_infer_time,
+                                 decode_api_tokens)
+            << "ms/token | Decode Speed:   "
+            << safe_speed(static_cast<float>(perf_info_.output_tokens),
+                          perf_info_.decode_infer_time)
+            << " tokens/s" << std::endl;
+  std::cout << "[SUCCESS]   API GetOutput Time:  "
+            << safe_ms_per_token(perf_info_.decode_get_output_time,
+                                 decode_api_tokens)
+            << "ms/token" << std::endl;
 
   std::cout << std::setprecision(3)
-            << "[SUCCESS] TTFT: " << perf_info_.ttft_time << " ms" << std::endl;
-  std::cout << "[SUCCESS] TPOT: "
-            << perf_info_.decode_time / perf_info_.output_tokens << " ms/token"
-            << std::endl;
-  std::cout << std::setprecision(3)
-            << "[SUCCESS] E2E Latency: " << perf_info_.total_time * 0.001f
-            << " seconds" << std::endl;
-  std::cout << std::setprecision(2) << "[SUCCESS] E2E TPS: "
-            << perf_info_.output_tokens / (perf_info_.total_time * 0.001f)
+            << "[SUCCESS] Overall Performance Metrics:" << std::endl;
+  std::cout << "[SUCCESS]   TTFT (Time To First Token):  "
+            << perf_info_.ttft_time << " ms" << std::endl;
+  std::cout << "[SUCCESS]   TPOT (Time Per Output Token): " << tpot
+            << " ms/token" << std::endl;
+  std::cout << "[SUCCESS]   E2E Latency (End-to-End):      "
+            << perf_info_.total_time * 0.001f << " seconds" << std::endl;
+  std::cout << std::setprecision(2)
+            << "[SUCCESS]   E2E TPS (Throughput):         "
+            << safe_speed(static_cast<float>(perf_info_.output_tokens),
+                          perf_info_.total_time)
             << " tokens/s" << std::endl;
+  std::cout << "[SUCCESS] "
+               "==============================================================="
+               "====================================="
+            << std::endl;
 
   return all_response;
 }
