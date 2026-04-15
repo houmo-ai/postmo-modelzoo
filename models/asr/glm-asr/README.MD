@@ -113,7 +113,7 @@ test.sh 默认使用预编译模型，适合快速验证 demo。
 如果要走下载原始模型、量化、编译流程，可执行：
 
 ```bash
-bash test.sh -t compile
+bash test.sh -s all
 ```
 
 注意：compile 模式依赖有效的量化配置文件和可用的 embedding 权重文件。若这两项未准备好，建议先分别执行下载、量化、编译命令排查环境。

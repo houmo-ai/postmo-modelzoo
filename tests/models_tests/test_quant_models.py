@@ -457,6 +457,20 @@ def test_embedding_gte_quant(setup_logging) -> None:
     _quant_func(model_name, setup_logging)
 
 
+@pytest.mark.qwen3_embedding
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_embedding_qwen3_embedding_quant",
+    depends_on=["test_get_models.py::test_embedding_qwen3_embedding_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_embedding_qwen3_embedding_quant(setup_logging) -> None:
+    """test_embedding_qwen3_embedding_quant"""
+    model_name = "qwen3-embedding"
+    _quant_func(model_name, setup_logging)
+
+
 @pytest.mark.cosyvoice3
 @pytest.mark.quant
 @pytest.mark.dependency(
@@ -481,6 +495,34 @@ def test_tts_cosyvoice3_quant(setup_logging) -> None:
 def test_asr_sensevoice_quant(setup_logging) -> None:
     """test_asr_sensevoice_quant"""
     model_name = "sensevoice"
+    _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.glm_asr
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_asr_glm_asr_quant",
+    depends_on=["test_get_models.py::test_asr_glm_asr_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_asr_glm_asr_quant(setup_logging) -> None:
+    """test_asr_glm_asr_quant"""
+    model_name = "glm-asr"
+    _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.whisper_turbo
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_asr_whisper_turbo_quant",
+    depends_on=["test_get_models.py::test_asr_whisper_turbo_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_asr_whisper_turbo_quant(setup_logging) -> None:
+    """test_asr_whisper_turbo_quant"""
+    model_name = "whisper-turbo"
     _quant_func(model_name, setup_logging)
 
 

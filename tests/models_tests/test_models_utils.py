@@ -1267,7 +1267,10 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
         check_flag = False if model_name == "qwen2.5-vl" else True
         if cmd_model_size is not None and cmd_model_size in ["14b"]:
             test_sh_flag, _ = execute_test_cmd(
-                ["bash", "test.sh", "-m", cmd_model_size], log_file, False, check_flag
+                ["bash", "test.sh", "--model_size", cmd_model_size],
+                log_file,
+                False,
+                check_flag,
             )
         else:
             test_sh_flag, _ = execute_test_cmd(

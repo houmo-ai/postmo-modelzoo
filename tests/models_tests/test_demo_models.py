@@ -354,6 +354,26 @@ def test_asr_sensevoice_demo(setup_logging) -> None:
     _demo_func(model_name, setup_logging)
 
 
+@pytest.mark.glm_asr
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_asr_glm_asr_demo(setup_logging) -> None:
+    """test_asr_glm_asr_demo"""
+    model_name = "glm-asr"
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.whisper_turbo
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_asr_whisper_turbo_demo(setup_logging) -> None:
+    """test_asr_whisper_turbo_demo"""
+    model_name = "whisper-turbo"
+    _demo_func(model_name, setup_logging)
+
+
 @pytest.mark.gte
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -361,6 +381,16 @@ def test_asr_sensevoice_demo(setup_logging) -> None:
 def test_embedding_gte_demo(setup_logging) -> None:
     """test_embedding_gte_demo"""
     model_name = "gte"
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_embedding
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_embedding_qwen3_embedding_demo(setup_logging) -> None:
+    """test_embedding_qwen3_embedding_demo"""
+    model_name = "qwen3-embedding"
     _demo_func(model_name, setup_logging)
 
 
@@ -400,5 +430,5 @@ def test_tts_cosyvoice3_demo(setup_logging) -> None:
 @pytest.mark.demo
 def test_detection_yolo26m_demo(setup_logging) -> None:
     """test_detection_yolo26m_demo"""
-    model_name = 'yolo26m'
+    model_name = "yolo26m"
     _demo_func(model_name, setup_logging)

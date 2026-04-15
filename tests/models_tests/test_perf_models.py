@@ -324,6 +324,16 @@ def test_asr_whisper_perf(setup_logging) -> None:
     _perf_func(model_name, setup_logging)
 
 
+@pytest.mark.whisper_turbo
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.perf
+def test_asr_whisper_turbo_perf(setup_logging) -> None:
+    """test_asr_whisper_turbo_perf"""
+    model_name = "whisper-turbo"
+    _perf_func(model_name, setup_logging)
+
+
 @pytest.mark.gte
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

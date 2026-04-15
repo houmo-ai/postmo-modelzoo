@@ -525,6 +525,20 @@ def test_embedding_gte_compile(setup_logging) -> None:
     _compile_func(model_name, setup_logging)
 
 
+@pytest.mark.qwen3_embedding
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_embedding_qwen3_embedding_compile",
+    depends_on=["test_quant_models.py::test_embedding_qwen3_embedding_quant"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_embedding_qwen3_embedding_compile(setup_logging) -> None:
+    """test_embedding_qwen3_embedding_compile"""
+    model_name = "qwen3-embedding"
+    _compile_func(model_name, setup_logging)
+
+
 @pytest.mark.gpt_oss
 @pytest.mark.compile
 @pytest.mark.dependency(
@@ -564,6 +578,34 @@ def test_backbone_yolov8m_cls_compile(setup_logging) -> None:
 def test_tts_cosyvoice3_compile(setup_logging) -> None:
     """test_tts_cosyvoice3_compile"""
     model_name = "cosyvoice3"
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.glm_asr
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_asr_glm_asr_compile",
+    depends_on=["test_quant_models.py::test_asr_glm_asr_quant"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_asr_glm_asr_compile(setup_logging) -> None:
+    """test_asr_glm_asr_compile"""
+    model_name = "glm-asr"
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.whisper_turbo
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_asr_whisper_turbo_compile",
+    depends_on=["test_quant_models.py::test_asr_whisper_turbo_quant"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_asr_whisper_turbo_compile(setup_logging) -> None:
+    """test_asr_whisper_turbo_compile"""
+    model_name = "whisper-turbo"
     _compile_func(model_name, setup_logging)
 
 

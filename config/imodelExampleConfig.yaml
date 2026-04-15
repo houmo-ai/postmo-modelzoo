@@ -382,6 +382,30 @@ llm_sensevoice:
         args: all
   test:
     - llm_sensevoice_test
+llm_glm-asr:
+  include:
+    - models/asr/glm-asr
+  exclude:
+    - models/asr/glm-asr/README.MD
+  example_case:
+    - llm_glm-asr_test:
+        test_type: models_tests
+        script: glm_asr
+        args: all
+  test:
+    - llm_glm-asr_test
+llm_whisper-turbo:
+  include:
+    - models/asr/whisper-turbo
+  exclude:
+    - models/asr/whisper-turbo/README.MD
+  example_case:
+    - llm_whisper-turbo_test:
+        test_type: models_tests
+        script: whisper_turbo
+        args: all
+  test:
+    - llm_whisper-turbo_test
 llm_perf:
   include:
     - tools/llm_perf
@@ -416,6 +440,18 @@ llm_gte:
         args: all
   test:
     - llm_gte_test
+llm_qwen3-embedding:
+  include:
+    - models/embedding/qwen3-embedding
+  exclude:
+    - models/embedding/qwen3-embedding/README.MD
+  example_case:
+    - llm_qwen3-embedding_test:
+        test_type: models_tests
+        script: qwen3_embedding
+        args: all
+  test:
+    - llm_qwen3-embedding_test
 tts_cosyvoice3:
   include:
     - models/tts/cosyvoice3

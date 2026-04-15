@@ -139,6 +139,12 @@ def parse_args():
         "--quant-type", default="w8a8_sefp", help="quant type, default is w8a8"
     )
     parser.add_argument(
+        "--out-dir",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        help="output directory for quantized models",
+    )
+    parser.add_argument(
         "--gen_golden", action="store_true", help="generate golden data"
     )
     args = parser.parse_args()

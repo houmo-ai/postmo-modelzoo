@@ -809,7 +809,7 @@ def rename_onnx(directory):
 
 
 def move_llm(args):
-    target_dir = os.path.join("output", HOUMO_TARGET, "hmquant")
+    target_dir = args.out_dir
     os.makedirs(target_dir, exist_ok=True)
     model_name = os.path.basename(args.model)
     work_dir = os.path.join("new_work_dirs")
