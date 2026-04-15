@@ -71,6 +71,9 @@ class Xh2Exec(BaseExec):
     def __init__(self, cfg: dict) -> None:
         super().__init__(cfg)
         self.quant_type = self.quant_cfg.get("quant_type", "w8a8h1_sefp")
+        self.mix_search_cfg = self.quant_cfg.get(
+            "mix_search"
+        )  # Optional mix_search config
         self.golden_dir = os.path.abspath(os.path.join(self.quant_output_dir, "golden"))
         self.upgrade_opset_version()
 
@@ -474,6 +477,9 @@ class Xh2Exec(BaseExec):
 
         # Quantization step
         logger.info("Converting ONNX to hmonnx...")
+        if self.mix_search_cfg is not None:
+            logger.info(f"  mix_search: enabled")
+            logger.info(f" {self.mix_search_cfg}")
         convert_onnx_to_hmonnx(
             self.model_path,
             in_datas,
@@ -482,6 +488,7 @@ class Xh2Exec(BaseExec):
             quant_config=self.get_quant_cfg(),
             input_names=self.inputs_name,
             output_names=self.outputs_name,
+            mix_search=self.mix_search_cfg,
         )
 
         # Generate chip required format model

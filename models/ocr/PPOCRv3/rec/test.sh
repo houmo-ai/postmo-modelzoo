@@ -34,23 +34,13 @@ python3 get_model.py --type raw
 if [ $FOUND_PACKAGE -eq 0 ]; then
     python3 get_model.py --type hmm
 else
-    python3 quant_compile.py --compile
-    python3 compare.py
+    hmatc quant   -c config.yml
+    hmatc build   -c config.yml
+    hmatc compare -c config.yml --data_path "CCPD2020/PPOCR/val/crop_imgs/0_0_0_3_24_26_28_27_31.jpg"
 fi
-python3 perf.py ./output/${HOUMO_TARGET}/ppocrv3_rec_${HOUMO_TARGET}_b1_1core_O2.hmm
-
+hmatc perf    -c config.yml -wn 10 -sn 1000 -tn 1
 pip3 install -r requirements.txt
-python3 run_model.py --model_path ./output/${HOUMO_TARGET}/ppocrv3_rec_${HOUMO_TARGET}_b1_1core_O2.hmm \
---data_path CCPD2020/PPOCR/val/crop_imgs \
---infer_mode demo \
---num 10
-python3 run_model.py --model_path ./output/${HOUMO_TARGET}/ppocrv3_rec_${HOUMO_TARGET}_b1_1core_O2.hmm \
---data_path CCPD2020 \
---infer_mode eval
-python3 run_model.py --model_path ./paddleocr_rec-sim.onnx \
---data_path CCPD2020/PPOCR/val/crop_imgs \
---infer_mode demo \
---num 10
-python3 run_model.py --model_path ./paddleocr_rec-sim.onnx \
---data_path CCPD2020 \
---infer_mode eval
+hmatc demo    -c config.yml
+hmatc demo    -c config.yml --onnx
+hmatc eval    -c config.yml
+hmatc eval    -c config.yml --onnx

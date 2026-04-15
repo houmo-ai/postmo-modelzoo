@@ -541,7 +541,7 @@ def run_benchmark(
             )
 
             if result_static["resizer"] == "NO RESIZER":
-                break
+                continue
 
             # Run with dynamic resizer if model supports it
             result_dynamic = run_config(

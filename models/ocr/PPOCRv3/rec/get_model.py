@@ -74,14 +74,14 @@ if __name__ == "__main__":
     version = get_houmo_version()
     target = HOUMO_TARGET
     raw_path = "models/raw/onnx/paddleocr_rec-sim.onnx"
-    data_path = "models/dataset/CCPD2020_PPOCRv3_eval.tar.gz"
+    data_path = "models/dataset/CCPD2020_PPOCRv3_eval.tar.xz"
     build_path = f"models/{target.lower()}-{version}/{model_name}/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     if model_type in ["raw"]:
         file_path = get_file_from_jfrog(raw_path, model_dir)
 
     if not os.path.exists(
-        os.path.join(HOUMO_DATASETS_PATH, "CCPD2020_PPOCRv3_eval.tar.gz")
+        os.path.join(HOUMO_DATASETS_PATH, "./CCPD2020_PPOCRv3_eval.tar.xz")
     ):
         get_file_from_jfrog(data_path, HOUMO_DATASETS_PATH, HOUMO_DATASETS_PATH)
 

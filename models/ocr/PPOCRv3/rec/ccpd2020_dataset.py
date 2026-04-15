@@ -24,39 +24,66 @@ import glob
 from hmatc.utils import logger
 from hmatc.base.base_dataset import BaseDataset
 
+
 class CCPD2020DataSet(BaseDataset):
+    """CCPD2020 dataset for OCR recognition evaluation."""
+
     def __init__(self, root_path):
+        """Initialize dataset with root path.
+
+        Args:
+            root_path (str): Root directory containing the dataset.
+        """
         self.root_path = root_path
         if not os.path.exists(self.root_path):
-            logger.error("root_path not exits -> {}".format(self.root_path))
-            exit(-1)
+            logger.fatal(f"root_path not exists -> {self.root_path}")
+
+        # Dataset paths for recognition
         self.labels_file = os.path.join(self.root_path, "PPOCR/val/rec.txt")
         self.img_dir = os.path.join(self.root_path, "PPOCR")
         self.img_files = glob.glob(os.path.join(self.img_dir, "val/crop_imgs/*.jpg"))
         self.total_num = len(self.img_files)
-        self.data_lines = self.get_image_info_list([self.labels_file])
+        self.data_lines = self._get_image_info_list([self.labels_file])
+
+    def _get_image_info_list(self, file_list):
+        """Read image info from label files.
+
+        Args:
+            file_list (list): List of label file paths.
+
+        Returns:
+            list: List of data lines from label files.
+        """
+        if isinstance(file_list, str):
+            file_list = [file_list]
+        data_lines = []
+        for file in file_list:
+            with open(file, "rb") as f:
+                lines = f.readlines()
+                data_lines.extend(lines)
+        return data_lines
 
     def get_datas(self, num: int):
+        """Get subset of image paths.
+
+        Args:
+            num (int): Number of samples to retrieve. 0 means all.
+
+        Returns:
+            list: List of image file paths.
+        """
         if num == 0:
             num = self.total_num
         elif num > self.total_num:
             num = self.total_num
         img_paths = self.img_files[0:num]
         return img_paths
-    
-    def get_image_info_list(self, file_list):
-        if isinstance(file_list, str):
-            file_list = [file_list]
-        data_lines = []
-        for idx, file in enumerate(file_list):
-            with open(file, "rb") as f:
-                lines = f.readlines()
-                data_lines.extend(lines)
-        return data_lines
-    
+
     @property
     def dataset_name(self):
-        return "CCPD2020Val"
-    
+        """Return dataset name."""
+        return "CCPD2020ValRec"
+
     def get_next_batch(self):
+        """Get next batch of data. Not implemented for this dataset."""
         pass

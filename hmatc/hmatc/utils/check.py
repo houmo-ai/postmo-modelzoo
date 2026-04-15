@@ -57,17 +57,37 @@ def check_cfg(cfg):
     if len(inputs_cfg) == 0:
         logger.fatal("[model.inputs] not found or empty")
 
-    # Track resizer modes across all inputs
+    # Track resizer usage across all inputs
+    has_resizer = False
     has_dynamic_resizer = False
     for input_name, input_cfg in inputs_cfg.items():
         resizer_mode = _check_input_cfg(input_name, input_cfg)
+        if resizer_mode != 0:  # Any resizer mode (1/2/3)
+            has_resizer = True
         if resizer_mode in [1, 2]:  # DYNAMIC_V2 or DYNAMIC_V1
             has_dynamic_resizer = True
 
     # quant config
     quant_cfg = cfg.get("quant", dict())
     if "calib_num" in quant_cfg:
-        logger.warning("[quant.calib_num] is currently ignored, only 1 calibration image is used")
+        logger.warning(
+            "[quant.calib_num] is currently ignored, only 1 calibration image is used"
+        )
+
+    # mix_search config (optional)
+    mix_search_cfg = quant_cfg.get("mix_search")
+    if mix_search_cfg is not None:
+        _check_mix_search_cfg(mix_search_cfg)
+        # mix_search and resizer are mutually exclusive
+        # mix_search runs original ONNX for sensitivity analysis, needs float32 input
+        # resizer requires YUV/uint8 input for hardware resize
+        if has_resizer:
+            logger.fatal(
+                "[quant.mix_search] and [model.inputs.*.resizer] are mutually exclusive. "
+                "mix_search runs original ONNX for sensitivity analysis and needs float32 input, "
+                "while resizer requires YUV/uint8 input for hardware resize. "
+                "Please remove resizer config or disable mix_search."
+            )
 
     # build config
     build_cfg = cfg.get("build", dict())
@@ -99,6 +119,82 @@ def check_cfg(cfg):
     parallel_jobs = build_cfg.get("parallel_jobs")
     if parallel_jobs is not None and parallel_jobs < 1:
         logger.fatal(f"[build.parallel_jobs] must be >= 1, got {parallel_jobs}")
+
+    return True
+
+
+def _check_mix_search_cfg(mix_search_cfg):
+    """Check mix_search configuration for mixed precision quantization.
+
+    Args:
+        mix_search_cfg (dict): Mix search configuration dictionary
+
+    Returns:
+        bool: True if configuration is valid
+
+    Mix search allows automatic selection of layers to use higher precision
+    (e.g., w4a16, w8a16) based on sensitivity analysis.
+
+    Config fields:
+        - topk: proportion of layers to use higher precision (0-1)
+        - weight_bits: candidate weight bit widths [4, 8, 16]
+        - act_bits: candidate activation bit widths [4, 8, 16]
+        - policy: selection strategy (threshold/topk)
+        - task: task type (llm/cv)
+        - metric: sensitivity metric (l1/sqnr/kl)
+        - key_name: output attribute name for sensitivity calculation
+    """
+    prefix = "[quant.mix_search]"
+
+    # topk: proportion of layers to use higher precision
+    topk = mix_search_cfg.get("topk")
+    if topk is not None:
+        if not isinstance(topk, (int, float)):
+            logger.fatal(f"{prefix}.topk must be int or float")
+        if topk <= 0 or topk > 1:
+            logger.warning(f"{prefix}.topk should be in range (0, 1], got {topk}")
+
+    # weight_bits: candidate weight bit widths
+    weight_bits = mix_search_cfg.get("weight_bits")
+    if weight_bits is not None:
+        if not isinstance(weight_bits, list):
+            logger.fatal(f"{prefix}.weight_bits must be list")
+        for v in weight_bits:
+            if v not in [4, 8, 16]:
+                logger.fatal(f"{prefix}.weight_bits values must be 4/8/16, got {v}")
+
+    # act_bits: candidate activation bit widths
+    act_bits = mix_search_cfg.get("act_bits")
+    if act_bits is not None:
+        if not isinstance(act_bits, list):
+            logger.fatal(f"{prefix}.act_bits must be list")
+        for v in act_bits:
+            if v not in [4, 8, 16]:
+                logger.fatal(f"{prefix}.act_bits values must be 4/8/16, got {v}")
+
+    # policy: selection strategy (threshold or topk)
+    policy = mix_search_cfg.get("policy")
+    if policy is not None:
+        if policy not in ["threshold", "topk"]:
+            logger.fatal(f"{prefix}.policy must be threshold or topk, got {policy}")
+
+    # task: task type
+    task = mix_search_cfg.get("task")
+    if task is not None:
+        if task not in ["llm", "cv", "cv_cls"]:
+            logger.fatal(f"{prefix}.task must be llm, cv or cv_cls, got {task}")
+
+    # metric: sensitivity metric
+    metric = mix_search_cfg.get("metric")
+    if metric is not None:
+        if metric not in ["l1", "sqnr", "kl"]:
+            logger.warning(f"{prefix}.metric recommended: l1/sqnr/kl, got {metric}")
+
+    # key_name: output attribute name
+    key_name = mix_search_cfg.get("key_name")
+    if key_name is not None:
+        if not isinstance(key_name, str):
+            logger.fatal(f"{prefix}.key_name must be string")
 
     return True
 
@@ -152,10 +248,11 @@ def _check_input_cfg(input_name, input_cfg):
 
     # resize_type
     resize_type = input_cfg.get("resize_type")
-    if resize_type not in [0, 1]:
-        logger.fatal(f"{prefix}.resize_type must be 0 or 1")
+    if resize_type not in [0, 1, 2]:
+        logger.fatal(f"{prefix}.resize_type must be 0, 1 or 2")
 
     if resize_type == 1:
+        # resize_type=1: aspect ratio resize with padding (padding_mode: 0-left/top, 1-center)
         padding_mode = input_cfg.get("padding_mode")
         if padding_mode is None:
             logger.fatal(f"{prefix}.padding_mode not found (resize_type=1)")
@@ -168,6 +265,23 @@ def _check_input_cfg(input_name, input_cfg):
         if not isinstance(padding_values, list):
             logger.fatal(f"{prefix}.padding_values must be list")
         if len(padding_values) != C:
+            logger.fatal(f"{prefix}.padding_values length must equal channels ({C})")
+
+    if resize_type == 2:
+        # resize_type=2: fixed height, aspect-ratio width, right padding (padding_mode fixed to 0)
+        # padding_mode is optional for resize_type=2, if provided must be 0
+        padding_mode = input_cfg.get("padding_mode")
+        if padding_mode is not None and padding_mode != 0:
+            logger.fatal(
+                f"{prefix}.padding_mode must be 0 for resize_type=2 (right padding only)"
+            )
+
+        padding_values = input_cfg.get("padding_values")
+        if padding_values is None:
+            logger.warning(f"{prefix}.padding_values not found, using default 0")
+        elif not isinstance(padding_values, list):
+            logger.fatal(f"{prefix}.padding_values must be list")
+        elif len(padding_values) != C:
             logger.fatal(f"{prefix}.padding_values length must equal channels ({C})")
 
     # resizer

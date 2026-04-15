@@ -104,9 +104,9 @@ model:
       # 图像预处理参数（data_format非null时必填）
       mean: [0.0, 0.0, 0.0]       # 预处理均值
       std: [255.0, 255.0, 255.0]  # 预处理标准差
-      resize_type: 1              # resize类型: 0-独立resize, 1-等比例resize
-      padding_mode: 1             # padding模式: 0-左上角, 1-中心（等比例resize必填）
-      padding_values: [114, 114, 114]  # padding数值（等比例resize必填）
+      resize_type: 1              # resize类型: 0-直接resize, 1-等比例resize+padding, 2-固定高度等比例宽度+右侧padding(OCR识别)
+      padding_mode: 1             # padding模式: 0-左上角, 1-中心（仅resize_type=1必填，resize_type=2固定右侧padding_mode=0）
+      padding_values: [114, 114, 114]  # padding数值（resize_type=1/2必填）
 
       # Resizer配置（可选，启用芯片硬件resize）
       resizer:
@@ -138,7 +138,23 @@ model:
 
 # 量化配置
 quant:
-  calib_data:               # [可选] 校准数据目录，留空使用随机数据
+  quant_type: w8a8h1_sefp       # [可选] 量化类型，支持混合位宽如 w8w16a8a16_sefp
+  calib_data:                   # [可选] 校准数据目录，留空使用随机数据
+
+  # [可选] 混合精度搜索配置（自动选择高精度层）
+  # 注意：mix_search 与 resizer 配置互斥，两者不能同时使用
+  mix_search:
+    topk: 0.10                  # 选择混合高位宽的比例 (0-1)
+    weight_bits:                # 权重混合候选位宽
+      - 8
+      - 16
+    act_bits:                   # 激活混合候选位宽
+      - 8
+      - 16
+    policy: topk                # 挑选策略: topk(前K%层)/threshold(误差阈值)
+    task: cv                    # 任务类型: cv/cv_cls/llm
+    metric: l1                  # 敏感度计算: l1(绝对差异)/sqnr(信噪比)/kl(KL散度)
+    key_name: loss              # 输出属性名称（如logits或loss）
 
 # 编译配置
 build:
@@ -173,6 +189,75 @@ data = {'input_name': np.ndarray}
 data = {'input_a': np.ndarray, 'input_b': np.ndarray}
 np.savez_compressed('data.npz', **data)
 ```
+
+## 量化格式
+
+### quant_type 格式
+
+量化类型字符串格式：`[w{bit}]*[a{bit}]*[h{h_flag}][n{nshare}][_{fp_mode}]`
+
+| 部分 | 说明 | 可选性 | 示例 |
+|------|------|--------|------|
+| `w{bit}` | 权重位宽，可多次出现表示混合位宽 | 可选 | `w8`, `w8w4`, `w8w4w16` |
+| `a{bit}` | 激活位宽，可多次出现表示混合位宽 | 可选 | `a8`, `a8a16` |
+| `h{h_flag}` | hidden bit 标志 (0 或 1) | 可选 | `h0`, `h1` |
+| `n{nshare}` | nshare 参数 (整数) | 可选 | `n64`, `n128` |
+| `_{fp_mode}` | 浮点模式 (sefp/ssfp) | 可选 | `_sefp`, `_ssfp` |
+
+解析示例：
+```
+"w8a8h1_sefp"       -> bit_w=[8], bit_a=[8], h_flag=1, fp_mode='sefp'
+"w8w4a8a16h0_ssfp"  -> bit_w=[8,4], bit_a=[8,16], h_flag=0, fp_mode='ssfp'
+"w8a8n64"           -> bit_w=[8], bit_a=[8], nshare=64
+"w8a8h1n64_sefp"    -> bit_w=[8], bit_a=[8], h_flag=1, nshare=64, fp_mode='sefp'
+```
+
+### Scale 格式
+
+后摩 float16 数据的量化表示方式：尾数(int) + scale
+
+| 格式 | Scale 定义 | 特点 |
+|------|-----------|------|
+| **sefp** | scale = 2^(-n)，n为正整数 | 计算高效，适合CV模型 |
+| **ssfp** | scale = float16 | 精度更高，适合LLM模型 |
+
+### 常用量化规格
+
+| 规格 | 含义 | 适用场景 |
+|------|------|----------|
+| `w8a8h1_sefp` | 权重8bit，激活8bit，hidden=1 | CV模型默认配置 |
+| `w4a8h0_ssfp` | 权重4bit，激活8bit，hidden=0 | LLM模型推荐配置 |
+| `w8a16h1_sefp` | 权重8bit，激活16bit | 高精度CV模型 |
+| `w8w16a8a16_sefp` | 混合位宽 (配合 mix_search) | 需要精度敏感层分析的场景 |
+
+### mix_search 混合精度搜索
+
+当 quant_type 包含多个位宽选项时（如 `w8w16a8a16`），配合 `mix_search` 配置可自动选择高精度层：
+
+```yaml
+quant:
+  quant_type: w8w16a8a16_sefp  # 混合位宽候选
+  mix_search:
+    topk: 0.1                  # 选择前10%敏感层使用高精度
+    weight_bits: [8, 16]       # 权重候选位宽
+    act_bits: [8, 16]          # 激活候选位宽
+    policy: topk               # 选择策略: topk/threshold
+    task: cv_cls               # 任务类型: cv/cv_cls/llm
+    metric: l1                 # 敏感度度量: l1/sqnr/kl
+    key_name: loss             # 输出属性名称
+```
+
+### task 参数说明
+
+`task` 决定了 mix_search 计算敏感度时使用的 loss 函数：
+
+| task | Loss 函数 | 适用场景 | 输出格式 |
+|------|----------|---------|---------|
+| **llm** | `cross_entropy` | 大语言模型 | dict/3D tensor (bs, seq_len, vocab_size) |
+| **cv_cls** | `cross_entropy` | CV 分类任务 (OCR识别、图像分类) | tensor/dict/list |
+| **cv** | `mse_loss` | 通用 CV 任务 (检测、分割等回归任务) | tensor/dict/list |
+
+**注意：** `mix_search` 与 `resizer` 配置互斥，因为 mix_search 运行原始 ONNX 做敏感度分析需要 float32 输入，而 resizer 需要 YUV uint8 输入。
 
 ## Resizer说明
 

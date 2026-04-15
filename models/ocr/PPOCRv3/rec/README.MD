@@ -22,20 +22,20 @@ source ~/houmo-examples-xh2/env.sh     # 初始化环境
 ### 2.1 量化
 
 ```bash
-hmatc quant -c config.yml -t xh2
+hmatc quant -c config.yml
 ```
 
 ### 2.2 编译
 
 ```bash
-hmatc build -c config.yml -t xh2
+hmatc build -c config.yml
 ```
 
 ### 2.3 精度评估
 
 ```bash
-hmatc eval -c config.yml -t xh2
-hmatc eval -c config.yml -t xh2  --onnx
+hmatc eval -c config.yml
+hmatc eval -c config.yml --onnx
 ```
 
 执行完成后会打印模型的数据集精度信息。
@@ -43,7 +43,7 @@ hmatc eval -c config.yml -t xh2  --onnx
 ### 2.4 性能评估
 
 ```bash
-hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
+hmatc perf -c config.yml -wn 10 -sn 1000 -tn 4
 ```
 
 执行完成后会打印模型推理延迟、吞吐量等信息。
@@ -54,9 +54,9 @@ hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
 
 ```bash
 # xh2
-hmatc demo -c config.yml -t xh2
+hmatc demo -c config.yml
 # onnx
-hmatc demo -c config.yml -t xh2 --onnx
+hmatc demo -c config.yml --onnx
 ```
 
 执行完成后会打印模型的检测结果信息，图片结果将保存在vis_xh2/vis_onnx目录。
@@ -66,12 +66,21 @@ hmatc demo -c config.yml -t xh2 --onnx
 ### 3.1 性能结果
 
 ```bash
-[Latency] Inference  avg:   3.320 ms, max:   3.625 ms, min:   3.086 ms, tp99:   3.557 ms, tp999:   3.625 ms
-[Latency] Input      avg:   0.088 ms, max:   0.280 ms, min:   0.032 ms, tp99:   0.223 ms, tp999:   0.280 ms
-[Latency] Output     avg:   0.248 ms, max:   2.922 ms, min:   0.115 ms, tp99:   0.436 ms, tp999:   2.922 ms
-[Latency] End2end    avg:   3.657 ms, max:   6.633 ms, min:   3.249 ms, tp99:   4.147 ms, tp999:   6.633 ms
-[Throughput] total: 3658.629 ms, avg: 3.659 ms, repeat: 1000, rounds: 1
-[Throughput] qps: 273.326
+# 时延
+[Latency] Inference  avg:   2.586 ms, max:   2.925 ms, min:   2.355 ms, tp99:   2.895 ms, tp999:   2.925 ms
+[Latency] Input      avg:   0.072 ms, max:   0.210 ms, min:   0.032 ms, tp99:   0.095 ms, tp999:   0.210 ms
+[Latency] Output     avg:   0.214 ms, max:   0.361 ms, min:   0.111 ms, tp99:   0.252 ms, tp999:   0.361 ms
+[Latency] End2end    avg:   2.872 ms, max:   3.345 ms, min:   2.500 ms, tp99:   3.215 ms, tp999:   3.345 ms
+[Throughput] total: 2873.640 ms, avg: 2.874 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 347.991
+
+# 吞吐
+[Latency] Inference  avg:   4.336 ms, max:   4.537 ms, min:   2.467 ms, tp99:   4.513 ms, tp999:   4.537 ms
+[Latency] Input      avg:   0.073 ms, max:   0.191 ms, min:   0.032 ms, tp99:   0.120 ms, tp999:   0.191 ms
+[Latency] Output     avg:   0.226 ms, max:   0.395 ms, min:   0.112 ms, tp99:   0.356 ms, tp999:   0.395 ms
+[Latency] End2end    avg:   4.635 ms, max:   4.935 ms, min:   2.752 ms, tp99:   4.736 ms, tp999:   4.935 ms
+[Throughput] total: 1175.978 ms, avg: 1.176 ms, repeat: 1000, rounds: 1
+[Throughput] qps: 850.356
 ```
 
 ## 4.免责声明

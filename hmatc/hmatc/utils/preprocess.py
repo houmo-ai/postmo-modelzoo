@@ -88,7 +88,10 @@ def resize(
     Args:
         im: Input image
         size (tuple): Target size as (width, height)
-        resize_type (int): Resize type (0: direct resize, 1: aspect ratio resize with padding, 2: not supported)
+        resize_type (int): Resize type
+            - 0: direct resize to target size
+            - 1: aspect ratio resize with symmetric padding (keep aspect ratio)
+            - 2: fixed height resize with right padding (OCR recognition style)
         padding_value (int or list): Value for padding
         padding_mode (int): Padding mode (0: left/top padding, 1: center padding)
         interpolation: OpenCV interpolation method
@@ -96,8 +99,10 @@ def resize(
     Returns:
         Resized image
     """
+    import math
+
     if resize_type not in [0, 1, 2]:
-        logger.fatal("resize_type must be equal 0 or 1 or 2")
+        logger.fatal("resize_type must be equal 0, 1 or 2")
 
     if resize_type == 0:
         return cv2.resize(im, size, interpolation=interpolation)
@@ -114,7 +119,33 @@ def resize(
         )
 
     if resize_type == 2:
-        logger.fatal("Not support yet")
+        # Fixed height, aspect-ratio width, right padding
+        # Used for OCR recognition models (e.g., PPOCRv3 rec)
+        tw, th = size
+        h, w = im.shape[:2]
+        # Ensure even dimensions
+        h &= ~1
+        w &= ~1
+        im = cv2.resize(im, (w, h), interpolation=interpolation).copy()
+
+        # Calculate aspect-ratio width based on fixed height
+        ratio = w / float(h)
+        resized_w = int(math.ceil(th * ratio))
+        if resized_w > tw:
+            resized_w = tw
+        else:
+            resized_w &= ~1
+
+        resized_h = th
+        im = cv2.resize(im, (resized_w, resized_h), interpolation=interpolation)
+
+        # Right padding
+        right = tw - resized_w
+        if right > 0:
+            im = cv2.copyMakeBorder(
+                im, 0, 0, 0, right, cv2.BORDER_CONSTANT, value=padding_value
+            )
+        return im
 
 
 def convert_bgr_to_yuv(im, fmt="YUV420SP", to_NCHW=False):
