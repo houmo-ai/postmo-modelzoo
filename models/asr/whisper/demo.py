@@ -67,9 +67,13 @@ class SamplingManager:
         for token_id in set(previous_tokens):
             if 0 <= token_id < len(logits):
                 if logits[token_id] < 0:
-                    adjusted_logits[token_id] = logits[token_id] * self.repetition_penalty
+                    adjusted_logits[token_id] = (
+                        logits[token_id] * self.repetition_penalty
+                    )
                 else:
-                    adjusted_logits[token_id] = logits[token_id] / self.repetition_penalty
+                    adjusted_logits[token_id] = (
+                        logits[token_id] / self.repetition_penalty
+                    )
         return adjusted_logits
 
     def apply_top_k(self, probs: np.ndarray) -> np.ndarray:
@@ -116,7 +120,9 @@ class SamplingManager:
         self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
     ) -> np.ndarray:
         processed_logits = logits.copy()
-        processed_logits = self.apply_repetition_penalty(processed_logits, previous_tokens)
+        processed_logits = self.apply_repetition_penalty(
+            processed_logits, previous_tokens
+        )
         processed_logits = self.apply_top_k(processed_logits)
         processed_logits = self.apply_top_p(processed_logits)
         processed_logits = self.apply_temperature(processed_logits)
@@ -131,22 +137,9 @@ class SamplingManager:
         return torch.tensor([sampled_index], device=logits.device)
 
 
-
 def is_valid_char(cp):
-    if (
-        (cp >= 0x4E00 and cp <= 0x9FFF)
-        or (cp >= 0x3400 and cp <= 0x4DBF)
-        or (cp >= 0x20000 and cp <= 0x2A6DF)
-        or (cp >= 0x2A700 and cp <= 0x2B73F)
-        or (cp >= 0x2B740 and cp <= 0x2B81F)
-        or (cp >= 0x2B820 and cp <= 0x2CEAF)
-        or (cp >= 0xF900 and cp <= 0xFAFF)
-        or (cp >= 0x2F800 and cp <= 0x2FA1F)
-        or (0x0041 <= cp and cp <= 0x005A)
-        or (0x0061 <= cp and cp <= 0x007A)
-    ):
-        return True
-    return False
+    return cp != 0xFFFD and cp > 0x001F
+
 
 lang_to_id = [
     50327,
@@ -294,6 +287,12 @@ def get_args() -> argparse.Namespace:
         default=30,
         help="chunk size of audio",
     )
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="auto",
+        help="language code (e.g. 'zh', 'en') or 'auto' for language detection",
+    )
     args = parser.parse_args()
     return args
 
@@ -362,7 +361,15 @@ class HmWhisper:
         return input_names
 
 
-def asr(hmwhisper, processor, input_features, sampling_manager, state=None, slide_len=10):
+def asr(
+    hmwhisper,
+    processor,
+    input_features,
+    sampling_manager,
+    state=None,
+    slide_len=10,
+    language="auto",
+):
     """
     Args:
         state: Dictionary containing cross-chunk continuous state:
@@ -371,6 +378,11 @@ def asr(hmwhisper, processor, input_features, sampling_manager, state=None, slid
     Returns:
         (prefill_ids_len, all_ids_len, ttft_time, total_time, audio_duration, state)
     """
+    sot_id = processor.tokenizer.convert_tokens_to_ids("<|startoftranscript|>")
+    lang_id = processor.tokenizer.convert_tokens_to_ids("<|zh|>")
+    transcribe_id = processor.tokenizer.convert_tokens_to_ids("<|transcribe|>")
+    notime_id = processor.tokenizer.convert_tokens_to_ids("<|notimestamps|>")
+    eos_id = processor.tokenizer.convert_tokens_to_ids("<|endoftext|>")
     if state is None:
         # First call, initialize state
         skip_tokens = 0
@@ -381,19 +393,21 @@ def asr(hmwhisper, processor, input_features, sampling_manager, state=None, slid
         last_response = state["last_response"]
 
     start_time = time.time()
-    detect_ids = torch.tensor([[50258]])  # [1,1]
-    default_decoder_ids = torch.tensor([[50258, 0, 50359, 50363]])  # [1,1]
+    detect_ids = torch.tensor([[sot_id]])  # [1,1]
+    default_decoder_ids = torch.tensor([[sot_id, 0, transcribe_id, notime_id]])  # [1,1]
     cache_position = torch.tensor([[0]])
     cache_position_prefill = torch.tensor([[0, 1, 2, 3]])
     cnt = 3
 
     # detect language  input_features  detect_ids => [1,51865]
     detect_encoder_out = hmwhisper.run_encoder(input_features.half())
-    mask_atten = torch.ones(([1, 16, 1, 1024])).half()
-    mask_atten[:, :, :, 0 + 1 :] *= -65504
+    mask_atten = torch.zeros(([1, 16, 1, 1024]), dtype=torch.float16)
+    mask_atten[:, :, :, 1:] = -65504.0
 
     enc_seq_len = detect_encoder_out[0].shape[2]
-    encoder_attention_mask = torch.zeros((1, 1, 1, enc_seq_len), device="cpu", dtype=torch.float16)
+    encoder_attention_mask = torch.zeros(
+        (1, 1, 1, enc_seq_len), device="cpu", dtype=torch.float16
+    )
 
     decoder_input_names = hmwhisper.get_input_names("decoder")
     decoder_detext_inputs = {
@@ -433,20 +447,36 @@ def asr(hmwhisper, processor, input_features, sampling_manager, state=None, slid
 
     logits = hmwhisper.run_decoder(decoder_detext_inputs)
 
-    non_lang_mask = torch.ones_like(logits[0], dtype=torch.bool)
-    non_lang_mask[0, list(lang_to_id)] = False
-    logits[:, :, non_lang_mask[0]] = -np.inf
-    lang_ids = logits.argmax(-1)
+    if language == "auto" or language is None:
+        non_lang_mask = torch.ones_like(logits[0], dtype=torch.bool)
+        non_lang_mask[0, list(lang_to_id)] = False
+        logits[:, :, non_lang_mask[0]] = -np.inf
+        lang_ids = logits.argmax(-1)
 
-    non_lang_mask = torch.ones_like(logits, dtype=torch.bool)
-    non_lang_mask[0, 0, list(lang_to_id)] = False
-    logits[:, :, non_lang_mask[0][0]] = -np.inf
-    lang_ids = logits.argmax(-1)
+        non_lang_mask = torch.ones_like(logits, dtype=torch.bool)
+        non_lang_mask[0, 0, list(lang_to_id)] = False
+        logits[:, :, non_lang_mask[0][0]] = -np.inf
+        lang_ids = logits.argmax(-1)
+        print(f"Detected language id: {lang_ids.item()}")
+    else:
+        # Convert language string (e.g. 'zh') to token id
+        token_str = f"<|{language}|>"
+        lang_token_id = processor.tokenizer.convert_tokens_to_ids(token_str)
+        if lang_token_id is None or lang_token_id == processor.tokenizer.unk_token_id:
+            logger.warning(
+                f"Unknown language code '{language}', falling back to auto detection."
+            )
+            lang_ids = logits.argmax(-1)
+            print(f"Detected language id: {lang_ids.item()}")
+        else:
+            lang_ids = torch.tensor([[lang_token_id]])
+            print(f"Forced language id: {lang_token_id} for '{language}'")
 
     default_decoder_ids[0, 1] = lang_ids  # [[50258, 50259, 50359, 50363]] # 34.5197
 
-    mask_atten = torch.ones(([1, 16, 4, 1024])).half()
-    mask_atten[:, :, :, 0 + 4 :] *= -65504
+    mask_atten = torch.full((1, 16, 4, 1024), -65504.0, dtype=torch.float16)
+    for i in range(4):
+        mask_atten[:, :, i, : i + 1] = 0.0
 
     prefill_input_names = hmwhisper.get_input_names("prefill")
     prefill_inputs = {
@@ -464,16 +494,38 @@ def asr(hmwhisper, processor, input_features, sampling_manager, state=None, slid
     logits = hmwhisper.run_prefill(prefill_inputs)
 
     next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
-    next_tokens = sampling_manager.sample(next_token_logits, default_decoder_ids[0].tolist())
-    default_decoder_ids = torch.cat([default_decoder_ids, next_tokens[:, None]], dim=-1)
-    decode_response = (
-        processor.decode(next_tokens) if next_tokens.item() != 50257 else ""
-    )
-    prefill_ids_len = default_decoder_ids.shape[1]
-    ttft_time = time.time() - start_time
+
+    # Fix: Initialize last_response (containing only prompt tokens at this point) before appending new tokens
+    # This prepares it for sliding window slicing
     last_response = processor.decode(default_decoder_ids[0][-slide_len:])
 
-    print("\033[1;95m{}".format(decode_response), end="", flush=True)
+    next_tokens = sampling_manager.sample(
+        next_token_logits, default_decoder_ids[0].tolist()
+    )
+    default_decoder_ids = torch.cat([default_decoder_ids, next_tokens[:, None]], dim=-1)
+
+    prefill_ids_len = default_decoder_ids.shape[1]
+    ttft_time = time.time() - start_time
+
+    # Preset output color
+    print("\033[1;95m", end="", flush=True)
+
+    # Ensure the first token correctly applies the UTF-8 truncation/sliding check
+    decode_response = processor.decode(
+        default_decoder_ids[0][-(slide_len + 1) - skip_tokens :]
+    )[len(last_response) :]
+
+    if (
+        decode_response != ""
+        and is_valid_char(ord(decode_response[-1]))
+        and next_tokens.item() != eos_id
+    ):
+        print(decode_response, end="", flush=True)
+        last_response = processor.decode(default_decoder_ids[0][-slide_len:])
+        skip_tokens = 0
+    else:
+        skip_tokens += 1
+    decode_response = "" if next_tokens.item() == eos_id else decode_response
 
     # Restart the timer, only measure the decoding phase
     start_time = time.time()
@@ -487,10 +539,11 @@ def asr(hmwhisper, processor, input_features, sampling_manager, state=None, slid
             hmwhisper.decoder.get_output_name(i + 1), cache
         )
 
-    while default_decoder_ids.shape[1] < 448 and next_tokens.item() != 50257:
+    while default_decoder_ids.shape[1] < 448 and next_tokens.item() != eos_id:
         cnt += 1
-        mask_atten = torch.ones(([1, 16, 1, 1024])).half()
-        mask_atten[:, :, :, cnt + 1 :] *= -65504
+        mask_atten = torch.zeros(([1, 16, 1, 1024]), dtype=torch.float16)
+        if cnt + 1 < 1024:
+            mask_atten[:, :, :, cnt + 1 :] = -65504.0
 
         prefill_inputs[prefill_input_names[0]] = next_tokens.unsqueeze(0).to(
             torch.int32
@@ -499,11 +552,15 @@ def asr(hmwhisper, processor, input_features, sampling_manager, state=None, slid
         prefill_inputs[prefill_input_names[2]] = torch.tensor([cnt]).to(torch.int32)
         prefill_inputs[prefill_input_names[3]] = torch.tensor([1]).to(torch.int32)
         prefill_inputs[prefill_input_names[4]] = mask_atten
-        prefill_inputs[prefill_input_names[5]] = encoder_attention_mask.to(torch.float16)
+        prefill_inputs[prefill_input_names[5]] = encoder_attention_mask.to(
+            torch.float16
+        )
 
         logits = hmwhisper.run_decoder(prefill_inputs)
         next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
-        next_tokens = sampling_manager.sample(next_token_logits, default_decoder_ids[0].tolist())
+        next_tokens = sampling_manager.sample(
+            next_token_logits, default_decoder_ids[0].tolist()
+        )
         default_decoder_ids = torch.cat(
             [default_decoder_ids, next_tokens[:, None]], dim=-1
         )
@@ -512,13 +569,17 @@ def asr(hmwhisper, processor, input_features, sampling_manager, state=None, slid
             default_decoder_ids[0][-(slide_len + 1) - skip_tokens :]
         )[len(last_response) :]
 
-        if decode_response != "" and is_valid_char(ord(decode_response[-1])):
+        if (
+            decode_response != ""
+            and is_valid_char(ord(decode_response[-1]))
+            and next_tokens.item() != eos_id
+        ):
             print(decode_response, end="", flush=True)
             last_response = processor.decode(default_decoder_ids[0][-slide_len:])
             skip_tokens = 0
         else:
             skip_tokens += 1
-        decode_response = "" if next_tokens.item() == 50257 else decode_response
+        decode_response = "" if next_tokens.item() == eos_id else decode_response
 
     # Save state for the next chunk (only maintain the continuity of text decoding)
     state = {
@@ -554,6 +615,7 @@ if __name__ == "__main__":
     sample, sr = sf.read(args.audio)
     if sr != 16000:
         import librosa
+
         sample = librosa.resample(sample, orig_sr=sr, target_sr=16000)
         logger.info(f"Resampled audio from {sr}Hz to 16000Hz")
         sr = 16000
@@ -578,9 +640,18 @@ if __name__ == "__main__":
     total_audio_duration = 0.0
     state = None  # initial state is None, first chunk will initialize it
     for i, chunk in enumerate(chunks):
-        input_features = processor(chunk, sampling_rate=sr, return_tensors="pt").input_features
-        prefill_ids_len, all_ids_len, ttft_time, total_time, audio_duration, state = asr(
-            hmwhisper, processor, input_features, sampling_manager, state
+        input_features = processor(
+            chunk, sampling_rate=sr, return_tensors="pt"
+        ).input_features
+        prefill_ids_len, all_ids_len, ttft_time, total_time, audio_duration, state = (
+            asr(
+                hmwhisper,
+                processor,
+                input_features,
+                sampling_manager,
+                state,
+                language=args.language,
+            )
         )
         total_ttft_time += ttft_time
         total_decode_time += total_time
@@ -605,9 +676,7 @@ if __name__ == "__main__":
     logger.success(
         f"TPOT (Time Per Output Token): {total_decode_time * 1000 / (total_tokens - total_prefill_tokens):.3f} ms/token"
     )
-    logger.success(
-        f"E2E Latency (End-to-End Latency): {e2e_time:.3f} seconds"
-    )
+    logger.success(f"E2E Latency (End-to-End Latency): {e2e_time:.3f} seconds")
     logger.success(
         f"E2E TPS (End-to-End Tokens Per Second): {total_tokens / e2e_time:.2f} tokens/s"
     )

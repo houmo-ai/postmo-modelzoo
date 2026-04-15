@@ -61,6 +61,7 @@ void PrintUsage(const char* program_name) {
       << "  --tokenizer_path <path> Path to tokenizer (default: "
          "whisper-medium/tokenizer.json)\n"
       << "  --chunk_size <seconds>  Audio chunk size in seconds (default: 30)\n"
+      << "  --language <code|auto>  Language code (default: auto)\n"
       << "  --encoder_path <path>   Deprecated alias of --encode_path\n"
       << "  --decoder_path <path>   Deprecated alias of --decode_path\n"
       << "  --help, -h              Show this help message\n\n"
@@ -99,6 +100,7 @@ int main(int argc, char* argv[]) {
   std::string decode_path = "output/xh2/whisper_decode.hmm";
   std::string prefill_path = "output/xh2/whisper_prefill.hmm";
   std::string tokenizer_path = "whisper-medium/tokenizer.json";
+  std::string language = "auto";
   int chunk_size = 30;
 
   // Parse command line
@@ -113,7 +115,8 @@ int main(int argc, char* argv[]) {
     if (arg == "--audio_path" || arg == "--encode_path" ||
         arg == "--decode_path" || arg == "--encoder_path" ||
         arg == "--decoder_path" || arg == "--prefill_path" ||
-        arg == "--tokenizer_path" || arg == "--chunk_size") {
+        arg == "--tokenizer_path" || arg == "--chunk_size" ||
+        arg == "--language") {
       if (i + 1 >= argc) {
         std::cerr << "Error: Missing value for option: " << arg << "\n";
         PrintUsage(argv[0]);
@@ -131,6 +134,8 @@ int main(int argc, char* argv[]) {
         prefill_path = value;
       } else if (arg == "--tokenizer_path") {
         tokenizer_path = value;
+      } else if (arg == "--language") {
+        language = value;
       } else if (arg == "--chunk_size") {
         try {
           chunk_size = std::stoi(value);
@@ -229,7 +234,7 @@ int main(int argc, char* argv[]) {
     // Process all chunks using pre-computed mel features
     for (int i = 0; i < num_chunks; i++) {
       auto [transcription, perf] =
-          whisper_infer.Transcribe(all_mel_features[i], &state);
+          whisper_infer.Transcribe(all_mel_features[i], &state, language);
 
       total_ttft += perf.ttft_time;
       total_decode_cost += perf.decode_time;

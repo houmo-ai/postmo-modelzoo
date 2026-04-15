@@ -177,10 +177,12 @@ class HmWhisperInfer {
    * @brief Run ASR transcription on mel features
    * @param mel_features Mel spectrogram
    * @param state Decoding state (optional, for chunk continuity)
+   * @param language Forced language code (e.g. "zh", "en", "ko") or "auto"
    * @return Transcription and performance metrics
    */
   std::pair<std::string, WhisperPerfInfo> Transcribe(
-      const MelFeatures& mel_features, DecodeState* state = nullptr);
+      const MelFeatures& mel_features, DecodeState* state = nullptr,
+      const std::string& language = "auto");
 
   /**
    * @brief Process full audio file

@@ -33,9 +33,8 @@ static const std::vector<int> LANG_TO_ID = {
     50268, 50351, 50280, 50290, 50337, 50278, 50335, 50325, 50260};
 
 static int DetectLanguageId(TensorType* logits_data,
-                            const std::vector<int>& lang_to_id) {
-  int vocab_size = 51865;
-
+                            const std::vector<int>& lang_to_id,
+                            int vocab_size) {
   std::vector<bool> non_lang_mask(vocab_size, true);
   for (int id : lang_to_id) {
     non_lang_mask[id] = false;
@@ -143,7 +142,7 @@ void HmWhisperInfer::InitMaps() {
   }
 
   // Pre-allocate reusable buffers to avoid repeated allocations per chunk
-  const int vocab_size = 51865;
+  const int vocab_size = tokenizer_->GetVocabSize();
   mask_attn_prefill_.resize(16 * 4 * 1024);
   encoder_attention_mask_.resize(1500);
   float_logits_.resize(vocab_size);
@@ -185,17 +184,10 @@ void HmWhisperInfer::InitMaps() {
 }
 
 bool HmWhisperInfer::IsValidChar(char32_t cp) {
-  return
-      // CJK Unified Ideographs
-      (cp >= 0x4E00u && cp <= 0x9FFFu) || (cp >= 0x3400u && cp <= 0x4DBFu) ||
-      (cp >= 0x20000u && cp <= 0x2A6DFu) ||
-      (cp >= 0x2A700u && cp <= 0x2B73Fu) ||
-      (cp >= 0x2B740u && cp <= 0x2B81Fu) ||
-      (cp >= 0x2B820u && cp <= 0x2CEAFu) ||
-      // CJK Compatibility Ideographs
-      (cp >= 0xF900u && cp <= 0xFAFFu) || (cp >= 0x2F800u && cp <= 0x2FA1Fu) ||
-      // ASCII Letters
-      (cp >= 0x0041u && cp <= 0x005Au) || (cp >= 0x0061u && cp <= 0x007Au);
+  if (cp == 0xFFFDu || cp <= 0x001Fu) {
+    return false;
+  }
+  return true;
 }
 
 std::vector<tcim::Tensor> HmWhisperInfer::RunEncoder(
@@ -240,7 +232,8 @@ std::vector<tcim::Tensor> HmWhisperInfer::EncoderGetOutputs() {
 
 void HmWhisperInfer::RunDecoder(
     const std::vector<tcim::Tensor>& encoder_outputs) {
-  std::vector<int> decode_input_ids = {50258};
+  std::vector<int> decode_input_ids = {
+      tokenizer_->TokenToId("<|startoftranscript|>")};
   std::vector<int> cache_position = {0};
   std::vector<int> past_len = {0};
   std::vector<int> current_len = {1};
@@ -295,7 +288,8 @@ tcim::Tensor HmWhisperInfer::DecoderGetOutput() {
 }
 
 std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
-    const MelFeatures& mel_features, DecodeState* state) {
+    const MelFeatures& mel_features, DecodeState* state,
+    const std::string& language) {
   int slide_len = 10;
   int skip_tokens = 0;
   auto t_start = std::chrono::high_resolution_clock::now();
@@ -318,10 +312,29 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
   TensorType* logits_data =
       static_cast<TensorType*>(decoder_output.Buffer().Data());
 
-  int lang_id = DetectLanguageId(logits_data, lang_to_id_);
+  int vocab_size = tokenizer_->GetVocabSize();
+  int end_of_text_id = tokenizer_->TokenToId("<|endoftext|>");
+
+  int lang_id = tokenizer_->TokenToId("<|en|>");  // Default fallback to <|en|>
+  if (language == "auto") {
+    lang_id = DetectLanguageId(logits_data, lang_to_id_, vocab_size);
+  } else {
+    std::string lang_token = "<|" + language + "|>";
+    int mapped_id = tokenizer_->TokenToId(lang_token);
+    if (mapped_id != -1) {
+      lang_id = mapped_id;
+    } else {
+      std::cerr << "Warning: Could not map language token: " << lang_token
+                << " falling back to auto detect." << std::endl;
+      lang_id = DetectLanguageId(logits_data, lang_to_id_, vocab_size);
+    }
+  }
 
   // Prefill phase
-  std::vector<int> default_decoder_ids = {50258, lang_id, 50359, 50363};
+  std::vector<int> default_decoder_ids = {
+      tokenizer_->TokenToId("<|startoftranscript|>"), lang_id,
+      tokenizer_->TokenToId("<|transcribe|>"),
+      tokenizer_->TokenToId("<|notimestamps|>")};
   std::vector<int> cache_position_prefill = {0, 1, 2, 3};
   std::vector<int> past_len = {0};
   std::vector<int> current_len = {4};
@@ -375,7 +388,6 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
   TensorType* p_logits =
       static_cast<TensorType*>(pref_logits_tensor.Buffer().Data());
 
-  int vocab_size = 51865;
   SamplingManager sampling_manager(
       sampling_params_.temperature, sampling_params_.top_k,
       sampling_params_.top_p, sampling_params_.repetition_penalty,
@@ -386,6 +398,13 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
   for (int i = 0; i < vocab_size; ++i) {
     float_logits[i] = static_cast<float>(p_logits[3 * vocab_size + i]);
   }
+
+  std::vector<int> cur_slide_win(
+      default_decoder_ids.end() -
+          std::min(slide_len, static_cast<int>(default_decoder_ids.size())),
+      default_decoder_ids.end());
+  std::string last_response = tokenizer_->Decode(cur_slide_win);
+
   int next_token = sampling_manager.sample(float_logits.data(), vocab_size,
                                            default_decoder_ids);
 
@@ -393,12 +412,35 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
   default_decoder_ids.push_back(next_token);
   chat_history_ids.push_back(next_token);
 
-  std::string decode_response =
-      (next_token != 50257) ? tokenizer_->Decode({next_token}) : "";
-  std::string all_response = decode_response;
-  std::string last_response = decode_response;
+  int window_size = slide_len + skip_tokens + 1;
+  auto window_start = default_decoder_ids.size() >= window_size
+                          ? default_decoder_ids.end() - window_size
+                          : default_decoder_ids.begin();
+  std::vector<int> decode_window_ids(window_start, default_decoder_ids.end());
 
-  std::cout << decode_response << std::flush;
+  std::string tmp_response = tokenizer_->Decode(decode_window_ids);
+  int substart = Utf8Len(last_response);
+  std::u32string udecode_response = Utf8ToU32(tmp_response).substr(substart);
+  std::string decode_response = U32ToUtf8(udecode_response);
+
+  std::string all_response = "";
+  if (decode_response != "" && IsValidChar(udecode_response.back()) &&
+      next_token != end_of_text_id) {
+    std::cout << decode_response << std::flush;
+    all_response += decode_response;
+    std::vector<int> cur_slide_win_new(
+        default_decoder_ids.end() -
+            std::min(slide_len, static_cast<int>(default_decoder_ids.size())),
+        default_decoder_ids.end());
+    last_response = tokenizer_->Decode(cur_slide_win_new);
+    skip_tokens = 0;
+  } else {
+    skip_tokens += 1;
+  }
+
+  if (next_token == end_of_text_id) {
+    decode_response = "";
+  }
 
   // Transfer caches to decoder
   for (int i = 0; i < 48; ++i) {
@@ -439,7 +481,7 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
   tcim::Tensor dec_logits_tensor =
       tcim::Tensor::CreateHostTensor(dec_logits_info);
 
-  while (default_decoder_ids.size() < 448 && next_token != 50257) {
+  while (default_decoder_ids.size() < 448 && next_token != end_of_text_id) {
     cnt++;
     loop_input_ids[0] = next_token;
     loop_cache_pos[0] = cnt;
@@ -485,22 +527,23 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
     int substart = Utf8Len(last_response);
 
     int window_size = slide_len + skip_tokens + 1;
-    auto window_start = chat_history_ids.size() >= window_size
-                            ? chat_history_ids.end() - window_size
-                            : chat_history_ids.begin();
-    std::vector<int> decode_window_ids(window_start, chat_history_ids.end());
+    auto window_start = default_decoder_ids.size() >= window_size
+                            ? default_decoder_ids.end() - window_size
+                            : default_decoder_ids.begin();
+    std::vector<int> decode_window_ids(window_start, default_decoder_ids.end());
 
     std::string tmp_response = tokenizer_->Decode(decode_window_ids);
     std::u32string udecode_response = Utf8ToU32(tmp_response).substr(substart);
-    decode_response = U32ToUtf8(udecode_response);
+    std::string decode_response_str = U32ToUtf8(udecode_response);
 
-    if (decode_response != "" && IsValidChar(udecode_response.back())) {
-      std::cout << decode_response << std::flush;
-      all_response += decode_response;
+    if (decode_response_str != "" && IsValidChar(udecode_response.back()) &&
+        next_token != end_of_text_id) {
+      std::cout << decode_response_str << std::flush;
+      all_response += decode_response_str;
       std::vector<int> cur_slide_win(
-          chat_history_ids.end() -
-              std::min(slide_len, static_cast<int>(chat_history_ids.size())),
-          chat_history_ids.end());
+          default_decoder_ids.end() -
+              std::min(slide_len, static_cast<int>(default_decoder_ids.size())),
+          default_decoder_ids.end());
       last_response = tokenizer_->Decode(cur_slide_win);
       skip_tokens = 0;
     } else {

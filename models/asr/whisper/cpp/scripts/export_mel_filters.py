@@ -47,7 +47,9 @@ def export_mel_filters(model_path: str, output_path: str):
         f.write("#pragma once\n\n")
         f.write(f"static const int N_MELS = {mel_filters.shape[0]};\n")
         f.write(f"static const int N_FFT_BINS = {mel_filters.shape[1]};\n\n")
-        f.write(f"static const float MEL_FILTERS[{mel_filters.shape[0]}][{mel_filters.shape[1]}] = {{\n")
+        f.write(
+            f"static const float MEL_FILTERS[{mel_filters.shape[0]}][{mel_filters.shape[1]}] = {{\n"
+        )
 
         for i in range(mel_filters.shape[0]):
             f.write("    {")
@@ -66,12 +68,12 @@ def main():
     parser.add_argument(
         "--model_path",
         default="openai/whisper-medium",
-        help="Whisper model path (default: openai/whisper-medium)"
+        help="Whisper model path (default: openai/whisper-medium)",
     )
     parser.add_argument(
         "--output",
         default="mel_filters.h",
-        help="Output header file path (default: mel_filters.h)"
+        help="Output header file path (default: mel_filters.h)",
     )
     args = parser.parse_args()
 
