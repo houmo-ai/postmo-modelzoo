@@ -1,6 +1,6 @@
 # Qwen3-VL C++ 推理示例
 
-本示例展示如何使用C++在后摩鸿途系列芯片（XH2）的设备上运行Qwen3-VL视觉语言模型推理。当前支持Linux和Android Native环境。
+本示例展示如何使用C++在后摩系列芯片（XH2）的设备上运行Qwen3-VL视觉语言模型推理。当前支持Linux和Android Native环境。
 
 ## 目录
 

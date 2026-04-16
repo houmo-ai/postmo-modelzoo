@@ -1,6 +1,6 @@
 # llm_perf 性能测试工具
 
-本代码用于在后摩鸿途系列芯片（XH2）的设备上测试llm模型和vlm模型的单/多batch模型推理性能。当前支持linux、windows11和android native环境（使用adb运行）。
+本代码用于在后摩系列芯片（XH2）的设备上测试llm模型和vlm模型的单/多batch模型推理性能。当前支持linux、windows11和android native环境（使用adb运行）。
 
 ## 目录
 
