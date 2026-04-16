@@ -219,7 +219,7 @@ def quant_llm_moe(args) -> None:
             "--shared-expert-bits",
             "4",
             "--self-attn-bits",
-            "4",
+            str(getattr(args, "self_attn_bits", 8)),
             "--expert-bits",
             "4",
             "--device",
@@ -297,6 +297,8 @@ def export_llm(args) -> None:
             cmd_l.append("--debug")
         if getattr(args, "context_length", None):
             cmd_l.extend(["--max_sequence_length", str(args.context_length)])
+        if getattr(args, "max_pe_length", None):
+            cmd_l.extend(["--max_pe_length", str(args.max_pe_length)])
         _run_step(cmd_l, src)
     else:
         logger.info("skip_export_llm: skipped LLM HMONNX export")

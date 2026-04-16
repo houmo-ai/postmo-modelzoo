@@ -967,6 +967,7 @@ def _prepare_export_context(cfg, args, logger):
 
     cfg.hf_model_dir = args.hf_model_dir
     cfg.model.hf_model = args.hf_model_dir
+    cfg.model.wrap_cfg.max_pe_length = args.max_pe_length
     cfg.model.wrap_cfg.max_sequence_length = args.max_sequence_length
     cfg.model.wrap_cfg.num_logits_to_keep = args.num_logits_to_keep
     cfg.model.wrap_cfg.support_long_context_over_fp16_limit = getattr(
@@ -1148,6 +1149,7 @@ def _prepare_golden_only_context(cfg, args, logger):
 
     cfg.hf_model_dir = tokenizer_source
     cfg.model.hf_model = tokenizer_source
+    cfg.model.wrap_cfg.max_pe_length = args.max_pe_length
     cfg.model.wrap_cfg.max_sequence_length = args.max_sequence_length
     cfg.model.wrap_cfg.num_logits_to_keep = args.num_logits_to_keep
     cfg.model.wrap_cfg.support_long_context_over_fp16_limit = getattr(
@@ -1339,6 +1341,7 @@ def parse_arguments():
         help="comma-separated no_split_module_classes for accelerate dispatch (default: auto)",
     )
     parser.add_argument("--max_sequence_length", type=int, default=2048)
+    parser.add_argument("--max_pe_length", type=int, default=262144)
     parser.add_argument(
         "--support_long_context_over_fp16_limit",
         action="store_true",

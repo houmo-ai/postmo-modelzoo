@@ -200,6 +200,12 @@ def parse_args():
         help="LLM export context length",
     )
     parser.add_argument(
+        "--max-pe-length",
+        type=int,
+        default=262144,
+        help="LLM export rotary cache max_pe_length",
+    )
+    parser.add_argument(
         "--input-sequence-length",
         type=int,
         default=256,
@@ -222,6 +228,13 @@ def parse_args():
         type=str,
         default=None,
         help="optional JSONL calibration for GPTQ (maps to --calibration-jsonl)",
+    )
+    parser.add_argument(
+        "--self-attn-bits",
+        type=int,
+        default=8,
+        choices=[2, 3, 4, 5, 8],
+        help="MoE GPTQ self-attn q/k/v/o projection bit width",
     )
     parser.add_argument("--skip-export-vision", action="store_true")
     parser.add_argument("--skip-export-llm", action="store_true")
