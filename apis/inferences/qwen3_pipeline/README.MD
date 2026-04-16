@@ -1,6 +1,6 @@
 # Qwen3 Pipeline(Tensor & Pipeline Parallel)
 
-本示例展示如何使用流水线并行和张量并行方式部署编译后的 Qwen3 模型到后摩鸿途芯片的设备上。
+本示例展示如何使用流水线并行和张量并行方式部署编译后的 Qwen3 模型到后摩芯片的设备上。
 
 [TOC]
 

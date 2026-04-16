@@ -1,6 +1,6 @@
 # gte-Qwen2-1.5B-instruct
 
-本示例展示如何把 gte-Qwen2-1.5B-instruct 模型量化和编译，部署到后摩鸿途芯片的设备上。
+本示例展示如何把 gte-Qwen2-1.5B-instruct 模型量化和编译，部署到后摩芯片的设备上。
 
 ## 预训练模型
 

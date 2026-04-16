@@ -1,6 +1,6 @@
 # Qwen3 MultiBatch
 
-本示例展示如何在后摩鸿途芯片设备上运行 qwen3-8b-16k 4batch 多 batch 推理。
+本示例展示如何在后摩芯片设备上运行 qwen3-8b-16k 4batch 多 batch 推理。
 
 [TOC]
 

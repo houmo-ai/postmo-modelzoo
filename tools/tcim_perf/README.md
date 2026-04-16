@@ -1,6 +1,6 @@
 # TCIM性能测试工具
 
-本代码用于在后摩鸿途系列芯片的设备上测试TCIM模型推理性能。当前支持linux和android native环境（使用adb运行）。
+本代码用于在后摩系列芯片的设备上测试TCIM模型推理性能。当前支持linux和android native环境（使用adb运行）。
 
 ## 目录
 

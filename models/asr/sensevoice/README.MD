@@ -1,6 +1,6 @@
 # SenseVoiceSmall
 
-本示例展示如何把SenseVoiceSmall模型量化和编译，部署到后摩鸿途芯片的设备上。
+本示例展示如何把SenseVoiceSmall模型量化和编译，部署到后摩芯片的设备上。
 
 [TOC]
 
