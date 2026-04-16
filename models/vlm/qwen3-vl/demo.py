@@ -649,6 +649,9 @@ class Qwen3VL:
                 video_inputs = [sampled_video]
                 hm_pixel_values = [self._build_video_raw_clip(sampled_video)]
             else:
+                self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
+                self.perf_tracker.perf_start(PERFTYPE.VISION_TOTAL_TIME)
+                self.perf_tracker.perf_start(PERFTYPE.VISION_PREPROCESS_TIME)
                 image_inputs, video_inputs, video_kwargs = process_vision_info(
                     messages, return_video_kwargs=True
                 )
@@ -662,6 +665,9 @@ class Qwen3VL:
                     frame_indices=frame_indices,
                 )
                 hm_pixel_values = [self._build_video_raw_clip(sampled_video)]
+                self.perf_tracker.perf_end(PERFTYPE.VISION_PREPROCESS_TIME)
+                self.perf_tracker.perf_end(PERFTYPE.VISION_TOTAL_TIME)
+                self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
             inputs = processor(
                 text=[text],
                 images=image_inputs,
