@@ -1,0 +1,107 @@
+{
+    "obsolete": false,
+    "model_dir": "models/asr/qwen3-asr",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
+    },
+    "support_hmatc": null,
+    "perf_metrics": {
+        "xh2": {
+            "x86_64": {
+                "decode": 68.59,
+                "end2end": 44.07
+            }
+        }
+    },
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm", "raw", "hmm"],
+            "download_dir": [
+                "cached_models",
+                "cached_models",
+                "cached_models",
+                "cached_models"
+            ],
+            "extract_dir": [
+                null,
+                "cached_models/hmm_xh2_asr_0.6b",
+                null,
+                "cached_models/hmm_xh2_asr_1.7b"
+            ],
+            "source_type": [null, null, null, null],
+            "model_size": ["0.6b", "0.6b", "1.7b", "1.7b"],
+            "model_name": ["qwen3_asr", "qwen3_asr", "qwen3_asr", "qwen3_asr"],
+            "ndevice": [null, null, null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": [
+                "cached_models/Qwen3-ASR-0.6B",
+                "cached_models/Qwen3-ASR-1.7B"
+            ],
+            "model_name": ["qwen3_asr", "qwen3_asr"],
+            "out-dir": [
+                "cached_results/hmquant_xh2_asr_0.6b",
+                "cached_results/hmquant_xh2_asr_1.7b"
+            ],
+            "quant-type": [null, null],
+            "config": [null, null],
+            "max_audio_length": [null, null]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": [
+                "cached_results/hmquant_xh2_asr_0.6b",
+                "cached_results/hmquant_xh2_asr_1.7b"
+            ],
+            "model_name": ["qwen3_asr", "qwen3_asr"],
+            "j": ["24", "24"],
+            "ncore": [null, null],
+            "stage": ["build", "build"],
+            "output_dir": [
+                "cached_results/hmm_xh2_asr_0.6b",
+                "cached_results/hmm_xh2_asr_1.7b"
+            ],
+            "context_length": ["2048", "2048"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "script": ["demo_asr.py", "demo_asr.py"],
+            "processor_dir": [
+                "cached_models/Qwen3-ASR-0.6B",
+                "cached_models/Qwen3-ASR-1.7B"
+            ],
+            "encode_path": [
+                "cached_results/hmm_xh2_asr_0.6b/qwen3_asr_encode.hmm",
+                "cached_results/hmm_xh2_asr_1.7b/qwen3_asr_encode.hmm"
+            ],
+            "decode_path": [
+                "cached_results/hmm_xh2_asr_0.6b/qwen3_asr_decode.hmm",
+                "cached_results/hmm_xh2_asr_1.7b/qwen3_asr_decode.hmm"
+            ],
+            "prefill_path": [
+                "cached_results/hmm_xh2_asr_0.6b/qwen3_asr_prefill.hmm",
+                "cached_results/hmm_xh2_asr_1.7b/qwen3_asr_prefill.hmm"
+            ],
+            "embedding_path": [
+                "cached_results/hmm_xh2_asr_0.6b/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_asr_1.7b/hmquant/quant_embedding.pt"
+            ],
+            "audio": [null, null]
+        }
+    },
+    "perf_params": "demo"
+}

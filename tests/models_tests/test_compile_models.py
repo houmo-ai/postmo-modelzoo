@@ -51,6 +51,34 @@ def test_asr_wenet_compile(setup_logging) -> None:
     _compile_func(model_name, setup_logging)
 
 
+@pytest.mark.qwen3_asr
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_asr_qwen3_asr_compile",
+    depends_on=["test_quant_models.py::test_asr_qwen3_asr_quant"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_asr_qwen3_asr_compile(setup_logging) -> None:
+    """test_asr_qwen3_asr_compile"""
+    model_name = "qwen3-asr"
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_forcealigner
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_asr_qwen3_forcealigner_compile",
+    depends_on=["test_quant_models.py::test_asr_qwen3_forcealigner_quant"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_asr_qwen3_forcealigner_compile(setup_logging) -> None:
+    """test_asr_qwen3_forcealigner_compile"""
+    model_name = "qwen3-forcealigner"
+    _compile_func(model_name, setup_logging)
+
+
 @pytest.mark.yolop
 @pytest.mark.compile
 @pytest.mark.dependency(
@@ -387,6 +415,20 @@ def test_ocr_ppocrv3_det_compile(setup_logging) -> None:
     _compile_func(model_name, setup_logging)
 
 
+@pytest.mark.ppocrv3_rec
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_ocr_ppocrv3_rec_compile",
+    depends_on=["test_quant_models.py::test_ocr_ppocrv3_rec_quant"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_ocr_ppocrv3_rec_compile(setup_logging) -> None:
+    """test_ocr_ppocrv3_rec_compile"""
+    model_name = "ppocrv3_rec"
+    _compile_func(model_name, setup_logging)
+
+
 @pytest.mark.bge
 @pytest.mark.compile
 @pytest.mark.dependency(
@@ -498,6 +540,7 @@ def test_asr_whisper_compile(setup_logging) -> None:
     model_name = "whisper"
     _compile_func(model_name, setup_logging)
 
+
 @pytest.mark.sensevoice
 @pytest.mark.compile
 @pytest.mark.dependency(
@@ -510,6 +553,7 @@ def test_asr_sensevoice_compile(setup_logging) -> None:
     """test_asr_sensevoice_compile"""
     model_name = "sensevoice"
     _compile_func(model_name, setup_logging)
+
 
 @pytest.mark.gte
 @pytest.mark.compile
@@ -567,6 +611,20 @@ def test_backbone_yolov8m_cls_compile(setup_logging) -> None:
     _compile_func(model_name, setup_logging)
 
 
+@pytest.mark.glm_ocr
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_ocr_glm_ocr_compile",
+    depends_on=["test_quant_models.py::test_ocr_glm_ocr_quant"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_ocr_glm_ocr_compile(setup_logging) -> None:
+    """test_ocr_glm_ocr_compile"""
+    model_name = "glm-ocr"
+    _compile_func(model_name, setup_logging)
+
+
 @pytest.mark.cosyvoice3
 @pytest.mark.compile
 @pytest.mark.dependency(
@@ -609,12 +667,29 @@ def test_asr_whisper_turbo_compile(setup_logging) -> None:
     _compile_func(model_name, setup_logging)
 
 
+@pytest.mark.qwen3_reranker
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_reranker_qwen3_reranker_compile",
+    depends_on=["test_quant_models.py::test_reranker_qwen3_reranker_quant"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_reranker_qwen3_reranker_compile(setup_logging) -> None:
+    """test_reranker_qwen3_reranker_compile"""
+    model_name = "qwen3-reranker"
+    _compile_func(model_name, setup_logging)
+
+
 @pytest.mark.yolo26m
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.compile
-@pytest.mark.dependency(name='test_detection_yolo26m_compile', depends_on=['test_quant_models.py::test_detection_yolo26m_quant'])
+@pytest.mark.dependency(
+    name="test_detection_yolo26m_compile",
+    depends_on=["test_quant_models.py::test_detection_yolo26m_quant"],
+)
 def test_detection_yolo26m_compile(setup_logging) -> None:
     """test_detection_yolo26m_compile"""
-    model_name = 'yolo26m'
+    model_name = "yolo26m"
     _compile_func(model_name, setup_logging)

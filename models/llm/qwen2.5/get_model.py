@@ -102,7 +102,7 @@ if __name__ == "__main__":
             "batch": args.batch,
         },
         "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
-        "modelscope_repo": {"repo_ids": ["qwen/qwen2.5-7b"]},
+        "modelscope_repo": {"repo_ids": ["Qwen/Qwen2.5-7B-Instruct"]},
     }
 
     _, ret_dict = hmatc_get_file(

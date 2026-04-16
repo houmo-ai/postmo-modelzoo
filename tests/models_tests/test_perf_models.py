@@ -190,6 +190,16 @@ def test_asr_wenet_perf(setup_logging) -> None:
     _perf_func(model_name, setup_logging)
 
 
+@pytest.mark.qwen3_asr
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.perf
+def test_asr_qwen3_asr_perf(setup_logging) -> None:
+    """test_asr_qwen3_asr_perf"""
+    model_name = "qwen3-asr"
+    _perf_func(model_name, setup_logging)
+
+
 @pytest.mark.sdxl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -261,6 +271,16 @@ def test_ocr_lprnet_perf(setup_logging) -> None:
 def test_ocr_ppocrv3_det_perf(setup_logging) -> None:
     """test_ocr_ppocrv3_det_perf"""
     model_name = "ppocrv3_det"
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.ppocrv3_rec
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.perf
+def test_ocr_ppocrv3_rec_perf(setup_logging) -> None:
+    """test_ocr_ppocrv3_rec_perf"""
+    model_name = "ppocrv3_rec"
     _perf_func(model_name, setup_logging)
 
 
@@ -370,5 +390,25 @@ def test_backbone_yolov8m_cls_perf(setup_logging) -> None:
 @pytest.mark.perf
 def test_detection_yolo26m_perf(setup_logging) -> None:
     """test_detection_yolo26m_perf"""
-    model_name = 'yolo26m'
+    model_name = "yolo26m"
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.glm_ocr
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.perf
+def test_ocr_glm_ocr_perf(setup_logging) -> None:
+    """test_ocr_glm_ocr_perf"""
+    model_name = "glm-ocr"
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_reranker
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.perf
+def test_reranker_qwen3_reranker_perf(setup_logging) -> None:
+    """test_reranker_qwen3_reranker_perf"""
+    model_name = "qwen3-reranker"
     _perf_func(model_name, setup_logging)

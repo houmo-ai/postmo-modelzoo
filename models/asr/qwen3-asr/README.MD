@@ -130,37 +130,56 @@ python3 demo_forcealigner.py
 
 ### 2.6 一键评估
 
-以上步骤可以通过test.sh脚本一键执行：
+以上步骤可以通过test.sh脚本执行。默认执行demo步骤，默认模型为 qwen3_asr 0.6b。
 
 ```bash
-# Qwen3-ASR-0.6B (默认)
+# Qwen3-ASR-0.6B，默认执行 demo
 bash test.sh
 
-# Qwen3-ASR-1.7B
-bash test.sh -m qwen3-asr-1.7b
+# Qwen3-ASR-1.7B，执行 demo
+bash test.sh -name qwen3_asr -size 1.7b
 
-# Qwen3-ForcedAligner-0.6B
-bash test.sh -m qwen3-forcealigner-0.6b
+# Qwen3-ForcedAligner-0.6B，执行 demo
+bash test.sh -name qwen3_forcealigner -size 0.6b
+
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+bash test.sh -s all -name qwen3_asr -size 1.7b
 ```
 
 test.sh支持以下参数：
 
 ```bash
 Usage: test.sh [options]
-  -s, --step         execution step, default is all, support: all, demo, build.
-  -t, --model_type   The method for getting the compiled model, default is precompiled, support: precompiled, compile.
-  -m, --model        model name, default is qwen3-asr-0.6b, support: qwen3-asr-0.6b, qwen3-asr-1.7b, qwen3-forcealigner-0.6b.
-  -h, --help         help information
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+  -skip, --skip_download  Skip model download steps.
+  -size, --model_size     Model size.
+  -name, --model_name     Model name.
+  -h, --help              Show this help message.
 ```
+
+其中支持的模型组合为：
+
+- `qwen3_asr` + `0.6b`
+- `qwen3_asr` + `1.7b`
+- `qwen3_forcealigner` + `0.6b`
 
 示例：
 
 ```bash
-# 仅运行demo（使用预编译模型）
-bash test.sh -s demo -m qwen3-asr-1.7b
+# 仅运行 quant，会先下载原始模型再量化
+bash test.sh -s quant -name qwen3_asr -size 1.7b
+
+# 仅运行 build，要求当前目录下已经有量化输出
+bash test.sh -s build -name qwen3_forcealigner -size 0.6b
+
+# 仅运行 demo，会先下载预编译模型
+bash test.sh -s demo -name qwen3_asr -size 1.7b
 
 # 完整流程（下载原始模型、量化、编译、演示）
-bash test.sh -t compile -m qwen3-forcealigner-0.6b
+bash test.sh -s all -name qwen3_forcealigner -size 0.6b
+
+# 跳过模型下载，使用当前目录下已有的预编译模型进行演示
+bash test.sh -s demo -skip -name qwen3_asr -size 0.6b
 ```
 
 ## 3 参考结果

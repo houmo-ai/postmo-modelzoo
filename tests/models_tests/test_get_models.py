@@ -47,6 +47,28 @@ def test_asr_wenet_get_model(setup_logging) -> None:
     _get_model_func(model_name, setup_logging)
 
 
+@pytest.mark.qwen3_asr
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_asr_qwen3_asr_get_model")
+def test_asr_qwen3_asr_get_model(setup_logging) -> None:
+    """test_asr_qwen3_asr_get_model"""
+    model_name = "qwen3-asr"
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_forcealigner
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_asr_qwen3_forcealigner_get_model")
+def test_asr_qwen3_forcealigner_get_model(setup_logging) -> None:
+    """test_asr_qwen3_forcealigner_get_model"""
+    model_name = "qwen3-forcealigner"
+    _get_model_func(model_name, setup_logging)
+
+
 @pytest.mark.yolop
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -289,6 +311,17 @@ def test_ocr_ppocrv3_det_get_model(setup_logging) -> None:
     _get_model_func(model_name, setup_logging)
 
 
+@pytest.mark.ppocrv3_rec
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_ocr_ppocrv3_rec_get_model")
+def test_ocr_ppocrv3_rec_get_model(setup_logging) -> None:
+    """test_ocr_ppocrv3_rec_get_model"""
+    model_name = "ppocrv3_rec"
+    _get_model_func(model_name, setup_logging)
+
+
 @pytest.mark.bge
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -469,8 +502,30 @@ def test_tts_cosyvoice3_get_model(setup_logging) -> None:
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.get_model
-@pytest.mark.dependency(name='test_detection_yolo26m_get_model')
+@pytest.mark.dependency(name="test_detection_yolo26m_get_model")
 def test_detection_yolo26m_get_model(setup_logging) -> None:
     """test_detection_yolo26m_get_model"""
-    model_name = 'yolo26m'
+    model_name = "yolo26m"
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.glm_ocr
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_ocr_glm_ocr_get_model")
+def test_ocr_glm_ocr_get_model(setup_logging) -> None:
+    """test_ocr_glm_ocr_get_model"""
+    model_name = "glm-ocr"
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_reranker
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_reranker_qwen3_reranker_get_model")
+def test_reranker_qwen3_reranker_get_model(setup_logging) -> None:
+    """test_reranker_qwen3_reranker_get_model"""
+    model_name = "qwen3-reranker"
     _get_model_func(model_name, setup_logging)

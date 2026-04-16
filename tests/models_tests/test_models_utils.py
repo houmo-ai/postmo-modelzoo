@@ -824,7 +824,11 @@ def _run_demo_script(
     ):
         venv_flag = True if VENV_NAME in python_exe else False
         params_dict = model_info[param_str][HOUMO_BACKEND]
-        cmd_header = [python_exe, f"{demo_name}.py"]
+
+        cmd_header = [python_exe]
+        script_vals = params_dict.get("script", [])
+        if not script_vals:
+            cmd_header += [f"{demo_name}.py"]
         cmd_list = _generate_py_cmds(
             cmd_header,
             params_dict,
@@ -833,12 +837,12 @@ def _run_demo_script(
             res_dir=model_res_dir,
         )
 
-        logger.info(f"Ready to execute {demo_name}.py, cmd list: {cmd_list}")
+        logger.info(f"Ready to execute demo script, cmd list: {cmd_list}")
         lock_file_res = model_res_dir + "/lock.lock"
         with ModelResourceLock(
             lock_file_res,
             ModelResourceLock.LockMode.WRITE,
-            f"execute model {demo_name}.py",
+            f"execute model demo script",
         ):
             check_flag = False if model_name == "qwen2.5-vl" else True
             for tmp_cmd_list in cmd_list:
@@ -853,7 +857,7 @@ def _run_demo_script(
                 )
                 if exec_flag is False:
                     logger.error(
-                        f"Failed to execute {demo_name}.py, cmd is {tmp_cmd_list}"
+                        f"Failed to execute demo script, cmd is {tmp_cmd_list}"
                     )
                     run_flag = False
     else:
@@ -1155,7 +1159,9 @@ def execute_compile_flow(model_name: str, setup_logging) -> None:
             if exec_flag is False:
                 final_flag = False
             else:
-                benchmark_val = 0.76 if model_name == "ppocrv3_det" else 0
+                benchmark_val = (
+                    0.76 if model_name in ["ppocrv3_det", "ppocrv3_rec"] else 0
+                )
                 final_flag = _check_compile_result(opt_str, benchmark_val)
                 if final_flag is False:
                     logger.error(
@@ -1564,7 +1570,11 @@ def execute_perf_flow(model_name: str, setup_logging) -> None:
         demo_params = model_info["demo_params"][HOUMO_BACKEND]
         compile_case_id = ""
         for value_list in demo_params.values():
-            first_path = value_list[0]
+            first_path = (
+                value_list[0]
+                if isinstance(value_list, list) and len(value_list) > 0
+                else ""
+            )
             if "cached_results" in first_path:
                 path_parts = os.path.normpath(first_path).split(os.sep)
                 cache_idx = path_parts.index("cached_results")
@@ -1592,6 +1602,7 @@ def execute_perf_flow(model_name: str, setup_logging) -> None:
         if venv_flag:
             python_exe = f"{VENV_NAME}/bin/python3"
 
+        demo_params = model_info["demo_params"][HOUMO_BACKEND]
         if model_name == "wenet":
             quant_res_dir = model_info["compile_params"][HOUMO_BACKEND]["model_dir"][0]
             quant_res_dir = quant_res_dir.replace("cached_results", model_res_dir)
@@ -1618,7 +1629,6 @@ def execute_perf_flow(model_name: str, setup_logging) -> None:
                 error_msg = f"Performance {infer_val} degradation exceeds 5%, benchmark time is {benchmark} ms."
                 logger.error(error_msg)
         elif model_name == "sdxl":
-            demo_params = model_info["demo_params"][HOUMO_BACKEND]
             perf_idx = 0
             model_path = demo_params["model_path"][perf_idx].replace(
                 "cached_results", model_res_dir
@@ -1665,11 +1675,18 @@ def execute_perf_flow(model_name: str, setup_logging) -> None:
                 error_msg = f"Performance {infer_val} degradation exceeds 5%, benchmark time is {benchmark} ms."
                 logger.error(error_msg)
         else:
+            demo_script_vals = demo_params.get("script", [])
+            perf_script = "demo.py"
+            if len(demo_script_vals) > 0 and demo_script_vals[0] not in [
+                None,
+                "default",
+            ]:
+                perf_script = demo_script_vals[0]
+
             perf_idx = 0
-            demo_cmd = [python_exe, "demo.py"]
-            demo_params = model_info["demo_params"][HOUMO_BACKEND]
+            demo_cmd = [python_exe, perf_script]
             for param, param_list in demo_params.items():
-                if param_list[perf_idx] is None:
+                if param == "script" or param_list[perf_idx] is None:
                     continue
                 param_val = param_list[perf_idx]
                 if "cached_models" in param_val:
@@ -1679,7 +1696,9 @@ def execute_perf_flow(model_name: str, setup_logging) -> None:
                 demo_cmd += [f"--{param}", param_val]
             lock_file_res = model_res_dir + "/lock.lock"
             with ModelResourceLock(
-                lock_file_res, ModelResourceLock.LockMode.WRITE, "execute model demo.py"
+                lock_file_res,
+                ModelResourceLock.LockMode.WRITE,
+                f"execute model {perf_script}",
             ):
                 check_flag = False if model_name == "qwen2.5-vl" else True
                 final_flag, _ = execute_test_cmd(

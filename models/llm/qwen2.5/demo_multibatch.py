@@ -62,7 +62,7 @@ def get_args() -> argparse.Namespace:
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="qwen2.5-7b",
+        default="Qwen2.5-7B-Instruct",
         help="tokenizer dir",
     )
     parser.add_argument(

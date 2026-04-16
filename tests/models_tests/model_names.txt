@@ -24,6 +24,7 @@ yolop
 wenet
 lprnet
 ppocrv3_det
+ppocrv3_rec
 bge
 yolov8m_cls
 yolov10m
@@ -40,3 +41,7 @@ cosyvoice3
 glm_asr
 whisper_turbo
 qwen3_embedding
+glm_ocr
+qwen3_reranker
+qwen3_asr
+qwen3_forcealigner

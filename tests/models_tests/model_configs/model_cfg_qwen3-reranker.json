@@ -1,6 +1,6 @@
 {
     "obsolete": false,
-    "model_dir": "models/embedding/qwen3-embedding",
+    "model_dir": "models/reranker/qwen3-reranker",
     "model_type": "llm",
     "dependencies": {
         "ndevice": [1],
@@ -12,9 +12,16 @@
         "xh2": [2]
     },
     "support_flow": {
-        "xh2": ["get_model", "quant", "compile", "demo"]
+        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
     },
     "support_hmatc": null,
+    "perf_metrics": {
+        "xh2": {
+            "x86_64": {
+                "prefill": 741.19
+            }
+        }
+    },
     "get_model_params": {
         "xh2": {
             "type": ["raw", "hmm"],
@@ -28,10 +35,12 @@
     },
     "quant_params": {
         "xh2": {
-            "model": ["cached_models/qwen3-embedding-8b"],
+            "model": ["cached_models/qwen3-reranker-8b"],
             "out-dir": ["cached_results/hmquant_xh2_2k"],
             "context-length": ["2048"],
-            "input-sequence-length": ["256"]
+            "input-sequence-length": ["256"],
+            "mix_search": [null],
+            "datasets-dir": [null]
         }
     },
     "compile_params": {
@@ -46,15 +55,15 @@
     },
     "demo_params": {
         "xh2": {
-            "tokenizer_dir": ["cached_models/qwen3-embedding-8b"],
+            "tokenizer_dir": ["cached_models/qwen3-reranker-8b"],
             "embedding_path": [
                 "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_8k/qwen3-embedding_prefill.hmm"
+                "cached_results/hmm_xh2_8k/qwen3-reranker_prefill.hmm"
             ],
-            "context_max_length": ["8192"],
             "ndevice": ["1"]
         }
-    }
+    },
+    "perf_params": "demo"
 }

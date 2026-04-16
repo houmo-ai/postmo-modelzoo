@@ -1,147 +1,64 @@
 #!/usr/bin/env bash
 set -e
 
-STEP="all"
-MODEL_TYPE="precompiled"
-MODEL_SIZE="9b"
-
-show_help() {
-    echo "Usage: $0 [options]"
-    echo "  -s, --step         execution step, default is all, support: all, demo, build."
-    echo "  -t, --model_type   The method for getting the compiled model, default is precompiled, support: precompiled, compile."
-    echo "  -m, --model_size   Model size: 2b, 4b, 9b, 27b or 35b-a3b, default is 9b."
-    echo "  -h, --help         help information"
-    exit 0
-}
-
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -s|--step)
-            STEP="$2"
-            shift 2
-        ;;
-        -t|--model_type)
-            MODEL_TYPE="$2"
-            shift 2
-        ;;
-        -m|--model_size)
-            MODEL_SIZE="$2"
-            shift 2
-        ;;
-        -h|--help)
-            show_help
-        ;;
-        *)
-            echo "Error: Unknown parameter '$1'" >&2
-            show_help
-        ;;
-    esac
-done
-
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+MODELS_DIR="${SCRIPT_DIR}"
+while [[ ! -f "${MODELS_DIR}/test_common.sh" && "${MODELS_DIR}" != "/" ]]; do
+    MODELS_DIR="$(dirname "${MODELS_DIR}")"
+done
+source "${MODELS_DIR}/test_common.sh"
+
+STEP="demo"
+SKIP_DOWNLOAD="false"
+MODEL_SIZE="9b"
+parse_args "$@"
+
+case "${MODEL_SIZE}" in
+    2b|4b|9b|27b|35b-a3b)
+        ;;
+    *)
+        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 2b, 4b, 9b, 27b, 35b-a3b." >&2
+        exit 1
+        ;;
+esac
+
 cd "${SCRIPT_DIR}"
 
-VENV_FLAG=0
+TEST_VENV_ACTIVE=0
+dir_path="qwen3.5_venv"
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
-    VENV_FLAG=1
+    setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
 fi
 
-dir_path="qwen3.5"
-if [[ "$VENV_FLAG" -eq "1" ]]; then
-    echo "⚠ Create python3 venv for ${dir_path} demo."
-    PY_EXE=$(command -v python3)
-    SITE_PACKAGES=$($PY_EXE -c "import site; print(site.getsitepackages()[0])")
-    if [[ $PY_EXE == */opt/venv* ]]; then
-        virtualenv --python=$PY_EXE --extra-search-dir=$SITE_PACKAGES $dir_path
-        VENV_PYTHON="${dir_path}/bin/python3"
-        VENV_SITE=$(${VENV_PYTHON} -c "import site; print(site.getsitepackages()[0])")
-        echo "export ORIGINAL_PYTHONPATH=\$PYTHONPATH" >> $dir_path/bin/activate  # 保存原始值
-        echo "export PYTHONPATH=${VENV_SITE}:${SITE_PACKAGES}:\$ORIGINAL_PYTHONPATH" >> $dir_path/bin/activate
-        echo "export PYTHONPATH=\$ORIGINAL_PYTHONPATH" >> $dir_path/bin/deactivate  # 恢复外部原始值
-        echo "unset ORIGINAL_PYTHONPATH" >> $dir_path/bin/deactivate  # 清除临时变量
-        sed -i 's/include-system-site-packages = true/include-system-site-packages = false/g' $dir_path/pyvenv.cfg
-    else
-        virtualenv --python=$PY_EXE --system-site-packages $dir_path
+check_step_python_packages || exit 1
+
+if should_run_step "quant"; then
+    if ! check_gpu require; then
+        exit 1
     fi
-    source $dir_path/bin/activate
-    pip3 install -r requirements.txt
-fi
 
-PACKAGE_PATTERN=hmquant
-FOUND_PACKAGE=0
-echo "================================"
-echo "Checking python3 package: $PACKAGE_PATTERN"
-if command -v python3 &>/dev/null && command -v pip3 &>/dev/null; then
-    if pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" >/dev/null 2>&1; then
-        echo "✓ Found python3 package: $PACKAGE_PATTERN"
-        pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" | while read -r line; do
-            echo "  - $line"
-        done
-        FOUND_PACKAGE=1
-    else
-        echo "✗ Not found package: $PACKAGE_PATTERN"
+    if ! should_skip_download; then
+        echo "Download raw model (size: ${MODEL_SIZE})."
+        python3 get_model.py --type raw --model_size ${MODEL_SIZE}
     fi
-else
-    echo "⚠ Not found python3 or pip3."
-    exit 0
+    echo "Start model quantization (size: ${MODEL_SIZE})."
+    python3 ptq.py --model_size ${MODEL_SIZE}
 fi
 
-if [ "$STEP" = "all" ] || [ "$STEP" = "build" ]; then
-    if [[ "$MODEL_TYPE" == "precompiled" ]]; then
-        echo "Download precompiled model (size: ${MODEL_SIZE})."
+if should_run_step "build"; then
+    echo "Start model compilation (size: ${MODEL_SIZE})."
+    python3 build.py --model_size ${MODEL_SIZE}
+fi
+
+if should_run_step "demo"; then
+    if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
+        echo "Download pre-compiled model (size: ${MODEL_SIZE})."
         python3 get_model.py --type hmm --model_size ${MODEL_SIZE}
-    else
-        FOUND_GPU=0
-        echo "Checking GPU..."
-        if command -v nvidia-smi &> /dev/null; then
-            gpu_count=$(nvidia-smi --query-gpu=count --format=csv,noheader,nounits | wc -l)
-            if [ $gpu_count -gt 0 ]; then
-                FOUND_GPU=1
-                echo "Found NVIDIA GPU, count: ${gpu_count}"
-            else
-                echo "⚠ Not found NVIDIA GPU device."
-            fi
-        else
-            echo "⚠ Not install NVIDIA GPU driver."
-        fi
-
-        PACKAGE_PATTERN=hmquant
-        FOUND_PACKAGE=0
-        echo "================================"
-        echo "Checking python3 package: $PACKAGE_PATTERN"
-        if command -v python3 &>/dev/null && command -v pip3 &>/dev/null; then
-            if pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" >/dev/null 2>&1; then
-                echo "✓ Found python3 package: $PACKAGE_PATTERN"
-                pip3 list --format=columns 2>/dev/null | grep -E "^$PACKAGE_PATTERN" | while read -r line; do
-                    echo "  - $line"
-                done
-                FOUND_PACKAGE=1
-            else
-                echo "✗ Not found package: $PACKAGE_PATTERN"
-            fi
-        else
-            echo "⚠ Not found python3 or pip3."
-            exit 0
-        fi
-
-        if [[ "$FOUND_PACKAGE" -eq 1 && "$FOUND_GPU" -eq 1 ]]; then
-            echo "Start to quant and compile model (size: ${MODEL_SIZE})."
-            python3 get_model.py --type raw --model_size ${MODEL_SIZE}
-            python3 ptq.py --model_size ${MODEL_SIZE}
-            python3 build.py --model_size ${MODEL_SIZE}
-        else
-            echo "✗ Not support model quantization and compilation."
-            exit 1
-        fi
     fi
-fi
-
-if [ "$STEP" = "all" ] || [ "$STEP" = "demo" ]; then
-    echo "Execute demo (size: ${MODEL_SIZE})."
+    echo "Execute demo."
     python3 demo.py
 fi
 
-if [[ "$VENV_FLAG" -eq "1" ]]; then
-    deactivate
-    rm -rf $dir_path
+if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then
+    cleanup_python_venv "${dir_path}"
 fi

@@ -195,9 +195,8 @@ TODO
 - `--debug`: 输出调试日志
 
 ### test.sh
-- `-m, --model_size`: 模型大小，支持 `2b`、`4b`、`9b`、`27b` 或 `35b-a3b`，默认 `9b`
-- `-s, --step`: 执行步骤，all/demo/build（默认：all）
-- `-t, --model_type`: 模型获取方式，precompiled/compile（默认：precompiled）
+- `-size, --model_size`: 模型大小，支持 `2b`、`4b`、`9b`、`27b` 或 `35b-a3b`，默认 `9b`
+- `-s, --step`: 执行步骤，demo/build/quant/all（默认：demo）
 
 ## 5 免责声明
 

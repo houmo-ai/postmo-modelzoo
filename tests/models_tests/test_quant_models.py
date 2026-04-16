@@ -51,6 +51,34 @@ def test_autodrive_yolop_quant(setup_logging) -> None:
     _quant_func(model_name, setup_logging)
 
 
+@pytest.mark.qwen3_asr
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_asr_qwen3_asr_quant",
+    depends_on=["test_get_models.py::test_asr_qwen3_asr_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_asr_qwen3_asr_quant(setup_logging) -> None:
+    """test_asr_qwen3_asr_quant"""
+    model_name = "qwen3-asr"
+    _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_forcealigner
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_asr_qwen3_forcealigner_quant",
+    depends_on=["test_get_models.py::test_asr_qwen3_forcealigner_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_asr_qwen3_forcealigner_quant(setup_logging) -> None:
+    """test_asr_qwen3_forcealigner_quant"""
+    model_name = "qwen3-forcealigner"
+    _quant_func(model_name, setup_logging)
+
+
 @pytest.mark.efficientnet
 @pytest.mark.quant
 @pytest.mark.dependency(
@@ -359,6 +387,20 @@ def test_ocr_ppocrv3_det_quant(setup_logging) -> None:
     _quant_func(model_name, setup_logging)
 
 
+@pytest.mark.ppocrv3_rec
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_ocr_ppocrv3_rec_quant",
+    depends_on=["test_get_models.py::test_ocr_ppocrv3_rec_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_ocr_ppocrv3_rec_quant(setup_logging) -> None:
+    """test_ocr_ppocrv3_rec_quant"""
+    model_name = "ppocrv3_rec"
+    _quant_func(model_name, setup_logging)
+
+
 @pytest.mark.bge
 @pytest.mark.quant
 @pytest.mark.dependency(
@@ -484,6 +526,7 @@ def test_tts_cosyvoice3_quant(setup_logging) -> None:
     model_name = "cosyvoice3"
     _quant_func(model_name, setup_logging)
 
+
 @pytest.mark.sensevoice
 @pytest.mark.quant
 @pytest.mark.dependency(
@@ -530,8 +573,39 @@ def test_asr_whisper_turbo_quant(setup_logging) -> None:
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.quant
-@pytest.mark.dependency(name='test_detection_yolo26m_quant', depends_on=['test_get_models.py::test_detection_yolo26m_get_model'])
+@pytest.mark.dependency(
+    name="test_detection_yolo26m_quant",
+    depends_on=["test_get_models.py::test_detection_yolo26m_get_model"],
+)
 def test_detection_yolo26m_quant(setup_logging) -> None:
     """test_detection_yolo26m_quant"""
-    model_name = 'yolo26m'
+    model_name = "yolo26m"
+    _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.glm_ocr
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_ocr_glm_ocr_quant",
+    depends_on=["test_get_models.py::test_ocr_glm_ocr_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_ocr_glm_ocr_quant(setup_logging) -> None:
+    """test_ocr_glm_ocr_quant"""
+    model_name = "glm-ocr"
+    _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_reranker
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_reranker_qwen3_reranker_quant",
+    depends_on=["test_get_models.py::test_reranker_qwen3_reranker_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_reranker_qwen3_reranker_quant(setup_logging) -> None:
+    """test_reranker_qwen3_reranker_quant"""
+    model_name = "qwen3-reranker"
     _quant_func(model_name, setup_logging)

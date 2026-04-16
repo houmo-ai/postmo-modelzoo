@@ -122,7 +122,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("--model", type=str, default="qwen2.5-7b")
+    parser.add_argument("--model", type=str, default="Qwen2.5-7B-Instruct")
     parser.add_argument(
         "--model-name", type=str, default="qwen2.5", help="output hmonnx model name"
     )

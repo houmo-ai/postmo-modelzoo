@@ -21,13 +21,12 @@ quant:
   calib_data: ./base_yolov5lprnet/rec_images/lprnet_quant_images
   calib_num: 69
 
-build: 
+build:
   ncore: 1
   opt_level: 2
   batch: 1
-  roi_num: 1
 
-demo: 
+demo:
   data_dir: ./base_yolov5lprnet/rec_images/test
   num: 10
 

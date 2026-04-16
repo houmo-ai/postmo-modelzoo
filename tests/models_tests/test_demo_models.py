@@ -46,6 +46,26 @@ def test_asr_wenet_demo(setup_logging) -> None:
     _demo_func(model_name, setup_logging)
 
 
+@pytest.mark.qwen3_asr
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_asr_qwen3_asr_demo(setup_logging) -> None:
+    """test_asr_qwen3_asr_demo"""
+    model_name = "qwen3-asr"
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_forcealigner
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_asr_qwen3_forcealigner_demo(setup_logging) -> None:
+    """test_asr_qwen3_forcealigner_demo"""
+    model_name = "qwen3-forcealigner"
+    _demo_func(model_name, setup_logging)
+
+
 @pytest.mark.yolop
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -264,6 +284,16 @@ def test_ocr_ppocrv3_det_demo(setup_logging) -> None:
     _demo_func(model_name, setup_logging)
 
 
+@pytest.mark.ppocrv3_rec
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_ocr_ppocrv3_rec_demo(setup_logging) -> None:
+    """test_ocr_ppocrv3_rec_demo"""
+    model_name = "ppocrv3_rec"
+    _demo_func(model_name, setup_logging)
+
+
 @pytest.mark.bge
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -431,4 +461,24 @@ def test_tts_cosyvoice3_demo(setup_logging) -> None:
 def test_detection_yolo26m_demo(setup_logging) -> None:
     """test_detection_yolo26m_demo"""
     model_name = "yolo26m"
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.glm_ocr
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_ocr_glm_ocr_demo(setup_logging) -> None:
+    """test_ocr_glm_ocr_demo"""
+    model_name = "glm-ocr"
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_reranker
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_reranker_qwen3_reranker_demo(setup_logging) -> None:
+    """test_reranker_qwen3_reranker_demo"""
+    model_name = "qwen3-reranker"
     _demo_func(model_name, setup_logging)

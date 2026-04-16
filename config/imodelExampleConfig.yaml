@@ -240,16 +240,6 @@ segmentation_yolov8m_seg:
         args: all
   test:
     - segmentation_yolov8m_seg_test
-ocr_ppocrv3_rec:
-  include:
-    - models/ocr/PPOCRv3/rec
-  exclude:
-    - models/ocr/PPOCRv3/rec/README.MD
-  example_case:
-    - ocr_ppocrv3_rec_test:
-        script: ../models/ocr/PPOCRv3/rec/test.sh
-  test:
-    - ocr_ppocrv3_rec_test
 ocr_lprnet:
   include:
     - models/ocr/lprnet
@@ -268,12 +258,48 @@ ocr_ppocrv3_det:
   exclude:
     - models/ocr/PPOCRv3/det/README.MD
   example_case:
-    - ocr_ppocrv3_rec_test:
+    - ocr_ppocrv3_det_test:
         test_type: models_tests
         script: ppocrv3_det
         args: all
   test:
     - ocr_ppocrv3_det_test
+ocr_ppocrv3_rec:
+  include:
+    - models/ocr/PPOCRv3/rec
+  exclude:
+    - models/ocr/PPOCRv3/rec/README.MD
+  example_case:
+    - ocr_ppocrv3_rec_test:
+        test_type: models_tests
+        script: ppocrv3_rec
+        args: all
+  test:
+    - ocr_ppocrv3_rec_test
+ocr_glm-ocr:
+  include:
+    - models/ocr/glm-ocr
+  exclude:
+    - models/ocr/glm-ocr/README.MD
+  example_case:
+    - ocr_glm-ocr_test:
+        test_type: models_tests
+        script: glm_ocr
+        args: all
+  test:
+    - ocr_glm-ocr_test
+reranker_qwen3-reranker:
+  include:
+    - models/reranker/qwen3-reranker
+  exclude:
+    - models/reranker/qwen3-reranker/README.MD
+  example_case:
+    - reranker_qwen3-reranker_test:
+        test_type: models_tests
+        script: qwen3_reranker
+        args: all
+  test:
+    - reranker_qwen3-reranker_test
 llm_qwen3:
   include:
     - models/llm/qwen3
@@ -286,6 +312,18 @@ llm_qwen3:
         args: all
   test:
     - llm_qwen3_test
+llm_qwen2.5:
+  include:
+    - models/llm/qwen2.5
+  exclude:
+    - models/llm/qwen2.5/README.MD
+  example_case:
+    - llm_qwen2.5_test:
+        test_type: models_tests
+        script: qwen2dot5
+        args: all
+  test:
+    - llm_qwen2.5_test
 llm_qwen3_14b:
   include:
     - models/llm/qwen3
@@ -406,6 +444,18 @@ llm_whisper-turbo:
         args: all
   test:
     - llm_whisper-turbo_test
+asr_qwen3-asr:
+  include:
+    - models/asr/qwen3-asr
+  exclude:
+    - models/asr/qwen3-asr/README.MD
+  example_case:
+    - asr_qwen3-asr_test:
+        test_type: models_tests
+        script: 'qwen3_asr or qwen3_forcealigner'
+        args: all
+  test:
+    - asr_qwen3-asr_test
 llm_perf:
   include:
     - tools/llm_perf

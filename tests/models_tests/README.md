@@ -93,6 +93,7 @@
 支持 llm 中的 multibatch demo：
 
 - `execute_demo_flow()` 在跑完 `demo` 后，会继续尝试执行 `demo_multibatch.py`
+- 若模型目录存在 `demo_multibatch.py`，模型配置应在 `support_flow` 中包含 `demo_multibatch`，并提供 `demo_multibatch_params`
 - 前提是模型配置中声明了：
   - `support_flow` 包含 `demo_multibatch`
   - 且存在 `demo_multibatch_params`
@@ -100,6 +101,25 @@
 - `update_test_py.py` 也会显式跳过为 `demo_multibatch` 生成独立 pytest 用例
 
 也就是说：`demo_multibatch` 是 `demo` flow 的附加执行步骤，而不是单独的第八类 pytest flow。
+
+### 3.3 支持非 `demo.py` 脚本名
+
+部分模型的推理入口并不叫 `demo.py`，例如 `demo_asr.py`、`demo_forcealigner.py`。这类模型可在配置中声明：
+
+- `demo_params.<backend>.script`：覆盖 `demo` flow 的脚本名
+- `demo_multibatch_params.<backend>.script`：覆盖 `demo_multibatch` 的脚本名
+
+示例：
+
+```json
+"demo_params": {
+  "xh2": {
+    "script": ["demo_asr.py"]
+  }
+}
+```
+
+当 `perf_params: "demo"` 时，perf 默认复用 `demo_params.<backend>.script`；未配置脚本名时，框架仍保持现有默认行为：`demo` 对应 `demo.py`，`demo_multibatch` 对应 `demo_multibatch.py`。
 
 ### 3.3 CV 与 LLM 的差异
 

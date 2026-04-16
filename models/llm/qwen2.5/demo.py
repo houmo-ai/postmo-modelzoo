@@ -36,7 +36,11 @@ from loguru import logger
 
 import tcim_lite as tcim
 
-from hmatc.utils.perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
+from hmatc.utils.perf_infomations import (
+    InferencePerformanceTracker,
+    InferenceMetrics,
+    PERFTYPE,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 
@@ -66,7 +70,7 @@ def get_args() -> argparse.Namespace:
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="qwen2.5-7b",
+        default="Qwen2.5-7B-Instruct",
         help="tokenizer dir",
     )
     parser.add_argument(
