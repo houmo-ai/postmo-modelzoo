@@ -50,6 +50,7 @@ using tensor_type = half_float::half;
  */
 template <typename T>
 std::unique_ptr<T[]> readEmbeddingWeight(const std::string &path,
+                                         int &weight_n_bytes,
                                          size_t n_elems_align = 0) {
   std::ifstream ifs(path, std::ios::binary);
   if (!ifs) {
@@ -59,6 +60,7 @@ std::unique_ptr<T[]> readEmbeddingWeight(const std::string &path,
   ifs.seekg(0, std::ios::end);
   const std::size_t n_bytes = ifs.tellg();
   ifs.seekg(0);
+  weight_n_bytes = n_bytes;
 
   const std::size_t n_elem =
       (n_bytes + sizeof(T) - 1) / sizeof(T) + n_elems_align;
@@ -97,11 +99,13 @@ class HmEmbedding {
    * @return Pointer to the resulting embedding vectors
    */
   tensor_type *EmbeddingTokens(const std::vector<int> &ids);
+  int get_vocab_size() const { return vocab_size; }
 
  private:
   std::unique_ptr<tensor_type[]> embed_w;
   std::unique_ptr<tensor_type[]> ptr;
 
+  int vocab_size = 0;
   int prefill_length = 0;
   int embedding_length = 0;
 };

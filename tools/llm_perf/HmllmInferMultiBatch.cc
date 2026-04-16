@@ -142,6 +142,8 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
   embedding = std::make_shared<HmEmbedding>(
       embeddingWeightPath, this->embedding_length, this->prefill_length);
 
+  vocab_size = embedding->get_vocab_size();
+
   perf_tracker->reset();
 }
 
@@ -460,7 +462,8 @@ void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
   std::vector<int> current_echo_lens;
   current_echo_lens.resize(this->batch);
   for (int b = 0; b < this->batch; ++b) {
-    std::vector<int> all_input_ids = generateRandomVector(input_tokens_len);
+    std::vector<int> all_input_ids =
+        generateRandomVector(input_tokens_len, vocab_size);
     perf_tracker->perfStart(PerfType::PREFILL_TOTAL_TIME);
     PerfSingleBatchInfo retInfo = run_prefill(b, all_input_ids);
     perf_tracker->perfEnd(PerfType::PREFILL_TOTAL_TIME);

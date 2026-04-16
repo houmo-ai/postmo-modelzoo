@@ -242,9 +242,11 @@ struct PerfInfos {
  * Generate a vector of random integers within a specified length
  * Used for creating random token IDs for testing purposes
  * @param len Length of the vector to generate
- * @return Vector of random integers in the range [0, TOKEN_ID_MAX]
+ * @param max_value Maximum value for the random integers (exclusive)
+ * @return Vector of random integers in the range [0, max_value)
  */
-static std::vector<int> generateRandomVector(int len) {
+static std::vector<int> generateRandomVector(
+    int len, const int max_value = TOKEN_ID_MAX) {
   std::vector<int> result;
   if (len <= 0) {
     return result;  // Handle invalid length (return empty vector)
@@ -254,8 +256,8 @@ static std::vector<int> generateRandomVector(int len) {
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
   std::mt19937 generator(seed);  // Use Mersenne Twister random number engine
 
-  // Define random number range: [0, TOKEN_ID_MAX]
-  std::uniform_int_distribution<int> distribution(0, TOKEN_ID_MAX);
+  // Define random number range: [0, max_value)
+  std::uniform_int_distribution<int> distribution(0, max_value - 1);
 
   // Fill the vector
   result.reserve(len);  // Pre-allocate memory for efficiency

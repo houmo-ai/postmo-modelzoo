@@ -126,6 +126,7 @@ class HmllmInferMultiBatch : public HmllmInferBase {
   int bar_width = 50;  // Width for progress bar display
   int n_blocks = 0;    // Number of transformer blocks
   int attn_idx_start = 0;
+  int vocab_size = 0;
 
  private:
   void prefill_input_init();

@@ -99,6 +99,8 @@ class HmllmInfer : public HmllmInferBase {
 
   std::map<std::string, tcim::Tensor> prefill_input_map;
   std::map<std::string, tcim::Tensor> decode_input_map;
+
+  int vocab_size = 0;
   // params for decode progress bar
   int bar_width = 50;
   int attn_idx_start = 0;

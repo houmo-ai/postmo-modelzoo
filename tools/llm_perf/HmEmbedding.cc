@@ -28,8 +28,24 @@ HmEmbedding::HmEmbedding(const std::string& embeddingWeightPath,
   // Read embedding.bin, allocate extra space, return pointer to
   // corresponding address of embed_w when decoding
   try {
+    int n_bytes = 0;
     embed_w = readEmbeddingWeight<tensor_type>(
-        embeddingWeightPath, prefill_length * embedding_length);
+        embeddingWeightPath, n_bytes, prefill_length * embedding_length);
+    vocab_size = n_bytes / (sizeof(tensor_type) * embedding_length);
+    std::cout << "[INFO] vocab_size: " << vocab_size
+              << ", embedding_length: " << embedding_length
+              << ", prefill_length: " << prefill_length << "\n";
+    if (vocab_size <= 0 ||
+        (vocab_size * embedding_length * sizeof(tensor_type) > n_bytes)) {
+      throw std::runtime_error(
+          "Invalid embedding weight file: vocab size must be positive and file "
+          "size mismatch.");
+    }
+
+    if (vocab_size * embedding_length * sizeof(tensor_type) < n_bytes) {
+      std::cout << "[Warning] embedding weight file size is not a multiple of "
+                   "embedding vector size. Some data may be ignored.\n";
+    }
   } catch (const std::exception& e) {
     throw std::runtime_error("readEmbeddingWeight Error:" +
                              std::string(e.what()));

@@ -122,6 +122,7 @@ class HmvllmInfer : public HmllmInferBase {
   int attn_idx_start = 0;  // Starting index for attention inputs
   int vision_input_nums = 0;
   int past_seq_len = 0;
+  int vocab_size = 0;
 
   bool prefill_use_vision_outputs = false;
 

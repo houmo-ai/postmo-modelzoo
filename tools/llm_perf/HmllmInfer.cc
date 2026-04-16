@@ -150,7 +150,7 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   // embedding length and prefill length
   embedding = std::make_shared<HmEmbedding>(
       embeddingWeightPath, this->embedding_length, this->prefill_length);
-
+  vocab_size = embedding->get_vocab_size();
   prefill_input_init();
   decode_input_init();
 
@@ -391,7 +391,8 @@ void HmllmInfer::perf_llm(const uint32_t input_tokens_len,
   PerfInfos llm_perf_datas;
   memset(&llm_perf_datas, 0, sizeof(PerfInfos));
   // 1. prepare inputs
-  std::vector<int> all_input_ids = generateRandomVector(input_tokens_len);
+  std::vector<int> all_input_ids =
+      generateRandomVector(input_tokens_len, vocab_size);
 
   if (input_tokens_len + stop_tokens_len > context_max_length) {
     std::cout << "input_tokens_len + stop_tokens_len > context_max_length, "
