@@ -132,8 +132,13 @@ def main():
     build_exclusive_group.add_argument("--hmonnx", type=str, help="Specify hmonnx file path")
     build_parser.add_argument("--hmm_name", type=str, help="Specify hmodel name" if "--hmonnx" in sys.argv else argparse.SUPPRESS)
     build_parser.add_argument("--output", "-o", type=str, default="output", help="Specify output path" if "--hmonnx" in sys.argv else argparse.SUPPRESS)
-    build_parser.add_argument("--flash_attn", type=int, default=0, choices=[0, 1, 2], help="flash attention optimization")
+    build_parser.add_argument("--flash_attn", type=int, default=0, choices=[0, 1, 2], help="flash attention optimization: 0=off, 1=graph level, 2=operator level")
     build_parser.add_argument("--llm_opt", action="store_true", help="enable llm optimization")
+    build_parser.add_argument("--enable_xh2_stable_output", action="store_true", help="enable xh2 stable output (prefill faster, decode slower)")
+    build_parser.add_argument("--context_length", type=int, default=None, help="maximum context length for LLM")
+    build_parser.add_argument("--prefill_length", type=int, default=None, help="prefill input sequence length (LLM prefill mode)")
+    build_parser.add_argument("--ndevice", type=int, default=1, choices=[1, 2, 4], help="number of devices for multi-device inference")
+    build_parser.add_argument("--is_prefill", action="store_true", help="build prefill model for LLM")
     build_parser.add_argument("--enable_common_subgraph", action="store_true", help="enable common subgraph")
     build_parser.add_argument("--skip_mlir_compile", action="store_true", help="skip mlir compile")
     build_parser.add_argument("--subgraph_repeat_hint", type=int, default=20, help="A hint for number of repeat blocks in the model")
@@ -172,6 +177,17 @@ def main():
     golden_parser.add_argument("--data_path", type=str, required=False, help="Specify a npz file")
 
     args = parser.parse_args()
+    # Parse log level
+    log_level_map = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARN": logging.WARN,
+        "ERROR": logging.ERROR,
+        "FATAL": logging.FATAL,
+    }
+    log_level = log_level_map.get(args.log_level, logging.INFO)
+    logger.setLevel(log_level)
+    
     # print version info
     logger.info(f"Hmatc version: {__version__}, commit: {__commit__}, build time: {__build_time__}")
     # fmt: on
@@ -214,22 +230,44 @@ def main():
         return
     # Directly build from hmonnx
     if current_command == "build" and args.hmonnx is not None:
+        # Check subgraph_repeat_hint only works with enable_common_subgraph
+        if args.subgraph_repeat_hint != 20 and not args.enable_common_subgraph:
+            logger.warning(
+                "subgraph_repeat_hint only takes effect when enable_common_subgraph is enabled. "
+                "Use --enable_common_subgraph to enable this feature."
+            )
+        # Check flash_attn requires context_length >= 2048
+        if (
+            args.flash_attn > 0
+            and args.context_length is not None
+            and args.context_length < 2048
+        ):
+            logger.warning(
+                "Flash attention disabled: context_length < 2048. "
+                "Set --context_length >= 2048 to enable flash attention."
+            )
+            args.flash_attn = 0
         from .exec.xh2_exec import Xh2Exec as Exec
 
         Exec.build_from_hmonnx(
-            args.hmonnx,
-            args.hmm_name,
-            args.output,
-            args.ncore,
-            args.opt_level,
-            args.batch,
-            args.profile,
-            args.roi_num,
-            args.flash_attn,
-            args.llm_opt,
-            args.enable_common_subgraph,
-            args.skip_mlir_compile,
-            args.subgraph_repeat_hint,
+            hmonnx=args.hmonnx,
+            hmm_name=args.hmm_name,
+            output=args.output,
+            ncore=args.ncore,
+            opt_level=args.opt_level,
+            batch=args.batch,
+            enable_profile=args.profile,
+            roi_num=args.roi_num,
+            flash_attn=args.flash_attn,
+            llm_opt=args.llm_opt,
+            enable_xh2_stable_output=args.enable_xh2_stable_output,
+            context_length=args.context_length,
+            prefill_length=args.prefill_length,
+            ndevice=args.ndevice,
+            is_prefill=args.is_prefill,
+            enable_common_subgraph=args.enable_common_subgraph,
+            skip_mlir_compile=args.skip_mlir_compile,
+            subgraph_repeat_hint=args.subgraph_repeat_hint,
             parallel_jobs=args.jobs,
         )
         return
@@ -237,9 +275,7 @@ def main():
     if current_command == "check" and args.hmm is not None:
         from .exec.xh2_exec import Xh2Exec as Exec
 
-        Exec.check_golden_from_hmm(
-            args.hmm, args.golden, enable_layers=False, device_id=args.device_id
-        )
+        Exec.check_golden_from_hmm(args.hmm, args.golden, device_id=args.device_id)
         return
 
     # Generate golden
@@ -255,15 +291,6 @@ def main():
         return
 
     target = args.target
-    # Parse log level
-    log_level_map = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARN": logging.WARN,
-        "ERROR": logging.ERROR,
-        "FATAL": logging.FATAL,
-    }
-    log_level = log_level_map.get(args.log_level, logging.INFO)
     cfg_path = args.config
     if not os.path.exists(cfg_path):
         logger.fatal("Config file not found")

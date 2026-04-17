@@ -45,16 +45,16 @@ hmatc check -c config.yml
 # 逐算子Golden验证
 hmatc check -c config.yml --layers
 # 直接指定HMM和Golden文件验证
-hmatc check --hmm your_hmm_path --golden golden.npz
+hmatc check --hmm your_hmm_path --golden golden_dir
 ```
 
 ### Golden生成
 
 ```bash
 # 生成Golden数据（不指定data_path则使用随机数据）
-hmatc golden --hmonnx your_hmonnx_path --output golden.npz --data_path data.npz
+hmatc golden --hmonnx your_hmonnx_path --output golden_dir --data_path data.npz
 # 逐算子生成Golden（会生成debug.onnx，需重新编译后再check）
-hmatc golden --hmonnx your_hmonnx_path --output golden.npz --data_path data.npz --layers
+hmatc golden --hmonnx your_hmonnx_path --output golden_dir --data_path data.npz --layers
 hmatc build --hmonnx your_hmonnx_path
 ```
 

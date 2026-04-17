@@ -48,7 +48,7 @@ def get_version():
         str: Version string from HOUMO_VERSION environment variable,
              defaults to "0.0.0.dev" if not set.
     """
-    return os.environ.get("HOUMO_VERSION", "0.0.0.dev")
+    return os.environ.get("HOUMO_VERSION", "1.3.0.dev")
 
 
 def get_build_time():

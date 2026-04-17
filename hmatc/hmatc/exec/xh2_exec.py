@@ -970,21 +970,18 @@ class Xh2Exec(BaseExec):
     # ==================== Static Utility Methods ====================
 
     @staticmethod
-    def check_golden_from_hmm(hmm, golden_dir, enable_layers=False, device_id=0):
+    def check_golden_from_hmm(hmm, golden_dir, device_id=0):
         """Check model inference results against golden data consistency."""
         if not os.path.exists(hmm):
-            logger.error(f"Not found hmm model: {hmm}")
-            return {}
+            logger.fatal(f"Not found hmm model: {hmm}")
         if not os.path.exists(golden_dir):
-            logger.error(f"Not found golden data directory: {golden_dir}")
-            return {}
+            logger.fatal(f"Not found golden data directory: {golden_dir}")
 
         try:
             xh2 = Xh2Infer()
             xh2.load(hmm, device_id=device_id)
         except Exception as e:
-            logger.error(f"Failed to load hmm model: {e}")
-            return {}
+            logger.fatal(f"Failed to load hmm model: {e}")
 
         input_names = (
             list(xh2.inputs_info.keys()) if hasattr(xh2, "inputs_info") else []
@@ -1019,8 +1016,7 @@ class Xh2Exec(BaseExec):
                         f"Loaded input: {name}, shape={data.shape}, from={paths[0]}"
                     )
                 except Exception as e:
-                    logger.error(f"Failed to load {paths[0]}: {e}")
-                    return {}
+                    logger.fatal(f"Failed to load {paths[0]}: \n{e}")
 
         golden_outputs = {}
         for name, paths in output_files_map.items():
@@ -1031,16 +1027,14 @@ class Xh2Exec(BaseExec):
                         f"Loaded golden output: {name}, shape={golden_outputs[name].shape}"
                     )
                 except Exception as e:
-                    logger.error(f"Failed to load {paths[0]}: {e}")
-                    return {}
+                    logger.fatal(f"Failed to load {paths[0]}: \n{e}")
 
         try:
             logger.info("Running inference...")
             outputs, _ = xh2.run(input_data)
             logger.info("Inference completed")
         except Exception as e:
-            logger.error(f"Inference failed: {e}")
-            return {}
+            logger.fatal(f"Inference failed: \n{e}")
 
         logger.info("Calculating cosine similarity...")
         similarity_results = {}
@@ -1134,8 +1128,8 @@ class Xh2Exec(BaseExec):
         except Exception as e:
             logger.error(f"Failed to process hmonnx: {e}")
 
+    @staticmethod
     def build_from_hmonnx(
-        self,
         hmonnx,
         hmm_name=None,
         output="output",
@@ -1146,6 +1140,11 @@ class Xh2Exec(BaseExec):
         roi_num=1,
         flash_attn=0,
         llm_opt=False,
+        enable_xh2_stable_output=False,
+        context_length=None,
+        prefill_length=None,
+        ndevice=1,
+        is_prefill=False,
         enable_common_subgraph=False,
         skip_mlir_compile=False,
         subgraph_repeat_hint=20,
@@ -1163,17 +1162,58 @@ class Xh2Exec(BaseExec):
             hmm_name = os.path.splitext(os.path.basename(hmonnx))[0]
         if (batch > 1 and roi_num > 1) or batch < 0 or roi_num < 0:
             logger.fatal(f"Invalid combination of batch{batch} and roi_num{roi_num }")
-        output_dir = os.path.join(output, "xh2")
-        work_dir = os.path.join(output_dir, "tcim")
+        output_dir = os.path.join(output, target)
+        work_dir = os.path.join(output_dir, target, "tcim")
+
+        # Build kwargs for tcim
+        build_kwargs = {}
+
+        # LLM modification parameters
+        if llm_opt:
+            build_kwargs["modify_llm"] = {}
+            if is_prefill:
+                if batch > 1:
+                    logger.warning(
+                        "batch is ignored for prefill model. "
+                        "Prefill model uses fill-length instead of batch."
+                    )
+                if prefill_length is not None:
+                    build_kwargs["modify_llm"]["fill-length"] = prefill_length
+                if context_length is not None:
+                    build_kwargs["modify_llm"]["context-length"] = context_length
+            else:
+                if prefill_length is not None:
+                    logger.warning(
+                        "prefill_length is ignored for decode model. "
+                        "Decode model uses batch instead of fill-length."
+                    )
+                build_kwargs["modify_llm"]["batch"] = batch
+                if context_length is not None:
+                    build_kwargs["modify_llm"]["context-length"] = context_length
+
+        # Multi-device
+        if ndevice > 1:
+            build_kwargs["ndevice"] = ndevice
+
+        # Flash attention with context_length check
+        if flash_attn > 0 and context_length is not None and context_length < 2048:
+            logger.warning("Flash attention disabled: context_length < 2048")
+            flash_attn = 0
+
         custom_msg = {
             "opt_level": opt_level,
             "ncore": ncore,
             "target": "xh2",
             "llm_opt": llm_opt,
+            "enable_xh2_stable_output": enable_xh2_stable_output,
             "skip_mlir_compile": skip_mlir_compile,
             "enable_common_subgraph": enable_common_subgraph,
             "subgraph_repeat_hint": subgraph_repeat_hint,
             "flash_attention": flash_attn,
+            "context_length": context_length,
+            "prefill_length": prefill_length,
+            "ndevice": ndevice,
+            "is_prefill": is_prefill,
         }
         tcim.build_from_hmonnx(
             hmonnx,
@@ -1187,12 +1227,14 @@ class Xh2Exec(BaseExec):
             work_dir=work_dir,
             one_img_multi_roi=roi_num > 1,
             llm_opt=llm_opt,
+            enable_xh2_stable_output=enable_xh2_stable_output,
             skip_mlir_compile=skip_mlir_compile,
             enable_common_subgraph=enable_common_subgraph,
             subgraph_repeat_hint=subgraph_repeat_hint,
             flash_attention=flash_attn,
             j=kwargs.get("parallel_jobs", psutil.cpu_count(logical=False)),
             custom_msg=json.dumps(custom_msg, ensure_ascii=False),
+            **build_kwargs,
         )
 
         return os.path.join(output_dir, f"{hmm_name}.hmm")
