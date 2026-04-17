@@ -12,9 +12,18 @@
         "xh2": [2]
     },
     "support_flow": {
-        "xh2": ["get_model", "quant", "compile", "demo"]
+        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
     },
     "support_hmatc": null,
+    "perf_metrics": {
+        "xh2": {
+            "x86_64": {
+                "prefill": 166.87,
+                "decode": 16.0,
+                "end2end": 15.89
+            }
+        }
+    },
     "get_model_params": {
         "xh2": {
             "type": ["raw", "hmm", "hmm", "hmm", "hmm", "hmm"],
@@ -126,5 +135,6 @@
             ],
             "ndevice": ["1", "1", "1", "1", "1"]
         }
-    }
+    },
+    "perf_params": "demo"
 }
