@@ -53,6 +53,8 @@ Fast C++ Logging Library spdlog - https://github.com/gabime/spdlog
 Modern C++ Argument Parser argparse - https://github.com/p-ranav/argparse
 A YAML parser and emitter in C++ (MIT) - https://github.com/jbeder/yaml-cpp
 miniaudio (MIT-0 / Public Domain) - https://github.com/mackron/miniaudio
+transformers Some files were modified and saved separately (Apache-2.0) - https://github.com/huggingface/transformers
+qwen_vl_utils Process info need (Apache-2.0) - https://github.com/QwenLM/Qwen3-VL/tree/main/qwen-vl-utils
 # Datasets
 CCPD Dataset (MIT) - https://github.com/detectRecog/CCPD
 VOC2012 Dataset (CC BY 4.0) - https://public.roboflow.com/object-detection/pascal-voc-2012
@@ -72,6 +74,7 @@ Qwen3-30B-A3B - https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B
 Qwen2.5-VL 7B - https://modelscope.cn/models/Qwen/Qwen2.5-VL-7B-Instruct
 Qwen3-VL 8B - https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct
 MiniCPM-O-2.6 - https://github.com/OpenBMB/MiniCPM-V
+CoPaw-Flash-9B - https://www.modelscope.cn/models/AgentScope/CoPaw-Flash-9B
 
 For detailed third-party citation notices, licenses, and precautions, please refer to THIRD_PARTY_NOTICES.
 

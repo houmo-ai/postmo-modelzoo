@@ -526,6 +526,110 @@ upstream copyright notice and the selected license text where applicable.
 Users are responsible for complying with the applicable upstream terms
 when using, redistributing, or modifying miniaudio.
 
+----------------------------------------------------------------------
+transformers (Preprocessing is for part of the algorithm)
+----------------------------------------------------------------------
+
+Component Name:
+transformers
+
+Usage Location:
+models/llm/CoPaw-Flash
+models/llm/qwen3.5
+
+Source:
+https://github.com/huggingface/transformers
+
+Copyright Statement:
+Copyright (c) 2008-2015 Jesse Beder
+
+License:
+Apache License 2.0
+
+License Text:
+https://github.com/huggingface/transformers/blob/main/LICENSE
+
+The Transformers library is licensed under the Apache License, Version 2.0 (the "License").
+You may not use these files except in compliance with the License. You may obtain a copy
+of the License at: http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the
+License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+either express or implied. See the License for the specific language governing permissions
+and limitations under the License.
+
+Modifications:
+This project contains modified versions of the following scripts extracted from Transformers:
+
+CoPaw-Flash/image_processing_copawflash.py (Original source: src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py)
+qwen3.5/image_processing_qwen3_5.py (Original source: src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py)
+
+The modifications include, but are not limited to:
+
+    [1：example：Adapted for specific hardware backend (xh2).]
+
+    [2：example：Added hm_pixel_values processing.]
+
+This project references and uses portions of Transformers as a third-party component.
+Any redistribution or modification of these scripts must retain the original copyright
+notice and provide a prominent notice stating that the files have been changed, in
+accordance with Section 4(b) of the Apache License 2.0.
+
+Users are responsible for complying with the Apache License 2.0 when using, redistributing,
+or modifying these components.
+
+----------------------------------------------------------------------
+qwen_vl_utils (Process vision info is for part of the algorithm)
+----------------------------------------------------------------------
+
+Component Name:
+qwen_vl_utils
+
+Usage Location:
+models/llm/CoPaw-Flash
+models/llm/qwen3.5
+
+Source:
+https://github.com/QwenLM/Qwen3-VL/tree/main/qwen-vl-utils
+
+Copyright Statement:
+Copyright (c) 2008-2015 Jesse Beder
+
+License:
+Apache License 2.0
+
+License Text:
+https://github.com/QwenLM/Qwen3-VL/blob/main/LICENSE
+
+The qwen_vl_utils library is licensed under the Apache License, Version 2.0 (the "License").
+You may not use these files except in compliance with the License. You may obtain a copy
+of the License at: http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the
+License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+either express or implied. See the License for the specific language governing permissions
+and limitations under the License.
+
+Modifications:
+This project contains modified versions of the following scripts extracted from qwen_vl_utils:
+
+CoPaw-Flash/vision_process_copawflash.py (Original source: src/qwen_vl_utils/vision_process.py)
+qwen3.5/vision_process_qwen3_5.py (Original source: src/qwen_vl_utils/vision_process.py)
+
+The modifications include, but are not limited to:
+
+    [1：example：Adapted for specific hardware backend (xh2).]
+
+    [2：example：Some parameters and processing methods have been reduced.]
+
+This project references and uses portions of Transformers as a third-party component.
+Any redistribution or modification of these scripts must retain the original copyright
+notice and provide a prominent notice stating that the files have been changed, in
+accordance with Section 4(b) of the Apache License 2.0.
+
+Users are responsible for complying with the Apache License 2.0 when using, redistributing,
+or modifying these components.
+
 2. Datasets
 ----------------------------------------------------------------------
 COCO Dataset (Common Objects in Context)
@@ -1131,6 +1235,44 @@ OF ANY KIND, either express or implied. See the License for the specific
 language governing permissions and limitations under the License.
 
 This project may reference or use MiniCPM-O-2.6 as a third-party component.
+Users are responsible for complying with the Apache License, Version 2.0
+when using, redistributing, or modifying the model.
+
+----------------------------------------------------------------------
+CoPaw-Flash-9B (Multimodal Large Language Model)
+----------------------------------------------------------------------
+
+Component Name: CoPaw-Flash-9B
+Also Known As: copaw-flash-9b
+Source:
+https://www.modelscope.cn/models/AgentScope/CoPaw-Flash-9B
+
+Copyright Statement:
+Copyright (c) OpenBMB contributors
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://www.apache.org/licenses/LICENSE-2.0
+
+This alg is used at the following path:
+    models/llm/CoPaw-Flash/
+
+The CoPaw-Flash-9B model is licensed under the Apache License, Version 2.0.
+The Apache License, Version 2.0 permits use, reproduction, modification,
+distribution, and sublicensing of the model and associated files, subject
+to the terms and conditions of the license.
+
+Any redistribution of the model or derivative works must retain the
+original copyright notice, this license text, and any applicable NOTICE
+information in accordance with the Apache License, Version 2.0.
+
+The model is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+OF ANY KIND, either express or implied. See the License for the specific
+language governing permissions and limitations under the License.
+
+This project may reference or use CoPaw-Flash-9B as a third-party component.
 Users are responsible for complying with the Apache License, Version 2.0
 when using, redistributing, or modifying the model.
 

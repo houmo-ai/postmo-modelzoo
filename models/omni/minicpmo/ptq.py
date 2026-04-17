@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2025 HOUMO AI
 #
-# File: quant_compile.py
+# File: ptq.py
 # Description:
 #   Post-training quantization of the minicpmo model.
 #
