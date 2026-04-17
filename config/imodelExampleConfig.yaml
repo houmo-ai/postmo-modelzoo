@@ -312,6 +312,18 @@ llm_qwen3:
         args: all
   test:
     - llm_qwen3_test
+llm_qwen3.5:
+  include:
+    - models/llm/qwen3.5
+  exclude:
+    - models/llm/qwen3.5/README.MD
+  example_case:
+    - llm_qwen3.5_test:
+        test_type: models_tests
+        script: qwen3dot5
+        args: all
+  test:
+    - llm_qwen3.5_test
 llm_qwen2.5:
   include:
     - models/llm/qwen2.5

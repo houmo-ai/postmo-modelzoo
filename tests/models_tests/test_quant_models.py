@@ -219,6 +219,20 @@ def test_llm_qwen3_quant(setup_logging) -> None:
     _quant_func(model_name, setup_logging)
 
 
+@pytest.mark.qwen3dot5
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_llm_qwen3dot5_quant",
+    depends_on=["test_get_models.py::test_llm_qwen3dot5_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_llm_qwen3dot5_quant(setup_logging) -> None:
+    """test_llm_qwen3dot5_quant"""
+    model_name = "qwen3.5"
+    _quant_func(model_name, setup_logging)
+
+
 @pytest.mark.qwen3_14b
 @pytest.mark.quant
 @pytest.mark.dependency(

@@ -192,7 +192,9 @@ def parse_args():
         default=None,
         help="HF dir for GPTQ weights (LLM export); default: <work-dir>/<model-name>_gptq_4bit",
     )
-    parser.add_argument("--debug", action="store_true", help="forward --debug to export scripts")
+    parser.add_argument(
+        "--debug", action="store_true", help="forward --debug to export scripts"
+    )
     parser.add_argument(
         "--context-length",
         type=int,

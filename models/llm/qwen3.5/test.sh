@@ -34,7 +34,10 @@ TEST_VENV_ACTIVE=0
 dir_path="qwen3.5_venv"
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
-    pip3 install -r ../../../hmodel/gptqmodel/requirements.txt
+    gptq_requirements="${SCRIPT_DIR}/../../../hmodel/gptqmodel/requirements.txt"
+    if [ -f "${gptq_requirements}" ]; then
+        pip3 install -r "${gptq_requirements}"
+    fi
 fi
 
 check_step_python_packages || exit 1

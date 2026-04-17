@@ -426,7 +426,9 @@ def move_llm(args) -> None:
         logger.info(msg_output_format("move_llm: visual"))
         _copy_dir_files_rename_onnx(vision_src, visual_d)
     elif not getattr(args, "skip_export_vision", False):
-        logger.warning("move_llm: vision export dir missing, skip visual: {}", vision_src)
+        logger.warning(
+            "move_llm: vision export dir missing, skip visual: {}", vision_src
+        )
     else:
         logger.info("move_llm: skip visual (skip_export_vision)")
 
@@ -487,12 +489,17 @@ def move_llm_moe(args) -> None:
         logger.info(msg_output_format("move_llm_moe: visual"))
         _copy_dir_files_rename_onnx(vision_src, visual_d)
     elif not getattr(args, "skip_export_vision", False):
-        logger.warning("move_llm_moe: vision export dir missing, skip visual: {}", vision_src)
+        logger.warning(
+            "move_llm_moe: vision export dir missing, skip visual: {}", vision_src
+        )
     else:
         logger.info("move_llm_moe: skip visual (skip_export_vision)")
 
     llm_export = _resolve_moe_llm_export_dir(args, out_root)
-    emb_src_candidates = [llm_export / "token_embedding", llm_export / "token_embedding.pt"]
+    emb_src_candidates = [
+        llm_export / "token_embedding",
+        llm_export / "token_embedding.pt",
+    ]
     prefill_src = llm_export / "hmonnx" / "prefill"
     decode_src = llm_export / "hmonnx" / "decode"
 
