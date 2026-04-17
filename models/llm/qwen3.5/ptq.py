@@ -145,7 +145,7 @@ def parse_args():
     parser.add_argument(
         "--cleanup-work-dir",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help=(
             "after move_llm finishes, remove the entire --work-dir directory tree "
             "(default: on; --no-cleanup-work-dir to keep checkpoints)"
@@ -232,7 +232,7 @@ def parse_args():
     parser.add_argument(
         "--self-attn-bits",
         type=int,
-        default=8,
+        default=4,
         choices=[2, 3, 4, 5, 8],
         help="MoE GPTQ self-attn q/k/v/o projection bit width",
     )
