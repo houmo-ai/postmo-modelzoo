@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Optional: JPEG/PNG for vision HMONNX export if src/images/qwen2_vl_demo.jpeg is missing.
+# export VISION_IMAGE=/path/to/sample.jpg
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -22,12 +25,16 @@ case "${MODEL_SIZE}" in
         ;;
 esac
 
+PERF_CONFIG="config.yaml"
+RAW_HF_DIR="${SCRIPT_DIR}/qwen3.5"
+
 cd "${SCRIPT_DIR}"
 
 TEST_VENV_ACTIVE=0
 dir_path="qwen3.5_venv"
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
+    pip3 install -r ../../../hmodel/gptqmodel/requirements.txt
 fi
 
 check_step_python_packages || exit 1
@@ -38,11 +45,15 @@ if should_run_step "quant"; then
     fi
 
     if ! should_skip_download; then
-        echo "Download raw model (size: ${MODEL_SIZE})."
+        echo "Download raw model (size: ${MODEL_SIZE}) → ${RAW_HF_DIR}."
         python3 get_model.py --type raw --model_size ${MODEL_SIZE}
     fi
     echo "Start model quantization (size: ${MODEL_SIZE})."
-    python3 ptq.py --model_size ${MODEL_SIZE}
+    PTQ_ARGS="--model ${RAW_HF_DIR}"
+    if [[ -n "${VISION_IMAGE}" ]]; then
+        PTQ_ARGS+=" --vision-image-path ${VISION_IMAGE}"
+    fi
+    python3 ptq.py ${PTQ_ARGS}
 fi
 
 if should_run_step "build"; then
@@ -57,6 +68,9 @@ if should_run_step "demo"; then
     fi
     echo "Execute demo."
     python3 demo.py
+    echo "Execute performance case."
+    python3 ../../../tools/llm_perf/convert_embed.py --path "output/xh2/hmquant/quant_embedding.pt"
+    llm_perf -c "${PERF_CONFIG}"
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

@@ -5,7 +5,7 @@
 # File: demo.py
 # Description:
 #   Qwen3.5 Inference Demo - Python script for running Qwen3.5
-#   inference on HOUMO AI device.
+# Inference on HOUMO AI device.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -105,6 +105,13 @@ def get_args() -> argparse.Namespace:
         help="houmo decode model path",
     )
     parser.add_argument(
+        "--vision_path",
+        dest="vision_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_visual.hmm"),
+        help="houmo vision model path (.hmm)",
+    )
+    parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
@@ -147,13 +154,6 @@ def get_args() -> argparse.Namespace:
         action="append",
         default=None,
         help="one or more image paths, supports repeated usage and comma-separated values",
-    )
-    parser.add_argument(
-        "--vision_path",
-        dest="vision_path",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_visual.hmm"),
-        help="houmo vision model path (.hmm)",
     )
     parser.add_argument(
         "--max_size_w",
@@ -595,7 +595,9 @@ class HmQwen:
         # set decode input
         current_length_input_1 = np.array([1]).astype("int32")
         decode_current_length_name = self.decode.get_input_name(5)
-        self.decode.set_input(decode_current_length_name, current_length_input_1)
+        self.set_model_input(
+            self.decode, decode_current_length_name, current_length_input_1
+        )
 
         self.processor = build_processor(
             tokenizer_dir=tokenizer_dir,
@@ -617,9 +619,15 @@ class HmQwen:
         embedding_weight = torch.load(
             embedding_path, map_location="cpu", weights_only=False
         )
-        self.embedding_weight = embedding_weight.weight.reshape(
-            -1, self.embedding_len
-        ).float()
+        if isinstance(embedding_weight, dict):
+            if "weight" not in embedding_weight:
+                raise KeyError(
+                    f"Embedding state_dict at {embedding_path} does not contain 'weight'"
+                )
+            embedding_tensor = embedding_weight["weight"]
+        else:
+            embedding_tensor = embedding_weight.weight
+        self.embedding_weight = embedding_tensor.reshape(-1, self.embedding_len).float()
         self.context_length = 0
         self.vision_time = 0
         self.ttft_debug_nested_timings = {}
@@ -649,14 +657,46 @@ class HmQwen:
         mask[0, :new_cache_length] = 1.0
         return mask
 
+    def get_model_input_shape(self, runtime_model, input_name: str) -> tuple[int, ...]:
+        return tuple(int(dim) for dim in runtime_model.get_input_info(input_name).shape)
+
+    def adapt_input_to_model_shape(self, runtime_model, input_name: str, value):
+        if isinstance(value, torch.Tensor):
+            array = value.detach().cpu().numpy()
+        else:
+            array = np.asarray(value)
+
+        expected_shape = self.get_model_input_shape(runtime_model, input_name)
+        if array.shape == expected_shape:
+            return array
+
+        expected_size = int(np.prod(expected_shape))
+        if array.size != expected_size:
+            raise RuntimeError(
+                f"Input shape mismatch for '{input_name}': expected {expected_shape}, "
+                f"got {array.shape} (size={array.size})"
+            )
+
+        if args.debug:
+            logger.info(
+                f"Auto-reshaping input '{input_name}' from {array.shape} to {expected_shape}"
+            )
+        return array.reshape(expected_shape)
+
+    def set_model_input(self, runtime_model, input_name: str, value) -> None:
+        runtime_model.set_input(
+            input_name,
+            self.adapt_input_to_model_shape(runtime_model, input_name, value),
+        )
+
     def clear_cache(self):
         for i in range(self.prefill.get_num_inputs()):
             input_name = self.prefill.get_input_name(i)
             if "conv_cache" in input_name or "recurrent_state" in input_name:
                 info = self.prefill.get_dev_input(input_name).info
                 zeros = np.zeros(info.shape, dtype=np.float16)
-                self.prefill.set_input(input_name, zeros)
-                self.decode.set_input(input_name, zeros)
+                self.set_model_input(self.prefill, input_name, zeros)
+                self.set_model_input(self.decode, input_name, zeros)
 
     def run_vision(
         self, hm_pixel_values: Union[Sequence[torch.Tensor], torch.Tensor]
@@ -672,22 +712,15 @@ class HmQwen:
 
         image_embeds_list = []
         vision_input_name = self.vision.get_input_name(0)
-        vision_input_shape = list(self.vision.get_input_info(vision_input_name).shape)
 
         for pixel_values in hm_pixel_values:
             pixel_values_np = pixel_values.detach().cpu().numpy()
-            if list(pixel_values_np.shape) != vision_input_shape:
-                if pixel_values_np.size != int(np.prod(vision_input_shape)):
-                    raise ValueError(
-                        f"Vision model input shape mismatch: got {tuple(pixel_values_np.shape)}, expected {tuple(vision_input_shape)}"
-                    )
-                logger.info(
-                    f"Reshaping hm_pixel_values {pixel_values_np.shape} -> {vision_input_shape}"
-                )
-                pixel_values_np = pixel_values_np.reshape(vision_input_shape)
+            pixel_values_np = self.adapt_input_to_model_shape(
+                self.vision, vision_input_name, pixel_values_np
+            )
 
             self.perf_tracker.perf_start(PERFTYPE.VISION_INPUT_TIME)
-            self.vision.set_input(vision_input_name, pixel_values_np)
+            self.set_model_input(self.vision, vision_input_name, pixel_values_np)
             self.perf_tracker.perf_end(PERFTYPE.VISION_INPUT_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.VISION_INFER_TIME)
@@ -1103,13 +1136,15 @@ class HmQwen:
             valid_length_name = self.prefill.get_input_name(4)
             current_length_name = self.prefill.get_input_name(5)
             linear_attn_mask_name = self.prefill.get_input_name(6)
-            self.prefill.set_input(input_name, input_data.detach().numpy())
-            self.prefill.set_input(valid_length_name, valid_length_data)
-            self.prefill.set_input(current_length_name, current_length_data)
-            self.prefill.set_input(time_position_ids_name, chunk_pos[0].numpy())
-            self.prefill.set_input(hight_position_ids_name, chunk_pos[1].numpy())
-            self.prefill.set_input(width_position_ids_name, chunk_pos[2].numpy())
-            self.prefill.set_input(linear_attn_mask_name, linear_attn_mask_data)
+            self.set_model_input(self.prefill, input_name, input_data)
+            self.set_model_input(self.prefill, valid_length_name, valid_length_data)
+            self.set_model_input(self.prefill, current_length_name, current_length_data)
+            self.set_model_input(self.prefill, time_position_ids_name, chunk_pos[0:1])
+            self.set_model_input(self.prefill, hight_position_ids_name, chunk_pos[1:2])
+            self.set_model_input(self.prefill, width_position_ids_name, chunk_pos[2:3])
+            self.set_model_input(
+                self.prefill, linear_attn_mask_name, linear_attn_mask_data
+            )
             self.perf_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_INFER_TIME)
@@ -1169,27 +1204,35 @@ class HmQwen:
             valid_length_name = self.decode.get_input_name(4)
             linear_attn_mask_name = self.decode.get_input_name(6)
 
-            valid_length_data = np.array(self.context_length).astype("int32")
+            valid_length_data = np.array([self.context_length]).astype("int32")
             linear_attn_mask_data = self.create_linear_attn_mask(1, 1)
             if use_vision:
                 decode_pos = self.context_length + self.rope_deltas.item()
-                time_position_ids_data = np.array([decode_pos]).astype("int32")
+                time_position_ids_data = np.array([[decode_pos]]).astype("int32")
                 hight_position_ids_data = time_position_ids_data
                 width_position_ids_data = time_position_ids_data
             else:
                 decode_position_ids, _ = self.get_rope_index_text(
                     self.context_length, 1
                 )
-                time_position_ids_data = decode_position_ids[0][0].squeeze().numpy()
-                hight_position_ids_data = decode_position_ids[1][0].squeeze().numpy()
-                width_position_ids_data = decode_position_ids[2][0].squeeze().numpy()
+                time_position_ids_data = decode_position_ids[0].numpy()
+                hight_position_ids_data = decode_position_ids[1].numpy()
+                width_position_ids_data = decode_position_ids[2].numpy()
 
-            self.decode.set_input(input_name, input_data.detach().numpy())
-            self.decode.set_input(time_position_ids_name, time_position_ids_data)
-            self.decode.set_input(hight_position_ids_name, hight_position_ids_data)
-            self.decode.set_input(width_position_ids_name, width_position_ids_data)
-            self.decode.set_input(valid_length_name, valid_length_data)
-            self.decode.set_input(linear_attn_mask_name, linear_attn_mask_data)
+            self.set_model_input(self.decode, input_name, input_data)
+            self.set_model_input(
+                self.decode, time_position_ids_name, time_position_ids_data
+            )
+            self.set_model_input(
+                self.decode, hight_position_ids_name, hight_position_ids_data
+            )
+            self.set_model_input(
+                self.decode, width_position_ids_name, width_position_ids_data
+            )
+            self.set_model_input(self.decode, valid_length_name, valid_length_data)
+            self.set_model_input(
+                self.decode, linear_attn_mask_name, linear_attn_mask_data
+            )
             self.perf_tracker.perf_end(PERFTYPE.DECODE_INPUT_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.DECODE_INFER_TIME)
