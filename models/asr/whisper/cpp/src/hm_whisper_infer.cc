@@ -564,27 +564,4 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
   return {all_response, perf_info};
 }
 
-// std::string HmWhisperInfer::ProcessAudio(const std::string& audio_path,
-//                                          int chunk_size) {
-//   HmWhisperAudio audio_processor(chunk_size);
-//   if (!audio_processor.LoadAudio(audio_path)) {
-//     std::cerr << "Failed to load audio\n";
-//     return "";
-//   }
-
-//   int num_chunks = audio_processor.GetNumChunks();
-
-//   std::string full_transcription;
-//   DecodeState state;
-//   std::cout << "num_chunks: " << num_chunks << "\n";
-//   for (int i = 0; i < num_chunks; i++) {
-//     MelFeatures mel_features = audio_processor.GetChunkMelFeatures(i);
-//     auto [transcription, perf] = Transcribe(mel_features, &state);
-
-//     full_transcription += transcription;
-//   }
-
-//   return full_transcription;
-// }
-
 }  // namespace houmo

@@ -90,11 +90,11 @@ inline void CheckTcimStatus(const tcim::Status& status,
  * @brief Sampling parameters for text generation
  */
 struct SamplingParams {
-  float temperature = 1.0f;        ///< Temperature for scaling (>0)
-  int top_k = -1;                  ///< Top-K threshold (-1 means disabled)
-  float top_p = 1.0f;              ///< Top-P threshold (1.0 means disabled)
-  float repetition_penalty = 1.1f; ///< Repetition penalty (1.0 means disabled)
-  int min_tokens_to_keep = 1;      ///< Minimum tokens to keep in top-p
+  float temperature = 1.0f;         ///< Temperature for scaling (>0)
+  int top_k = -1;                   ///< Top-K threshold (-1 means disabled)
+  float top_p = 1.0f;               ///< Top-P threshold (1.0 means disabled)
+  float repetition_penalty = 1.1f;  ///< Repetition penalty (1.0 means disabled)
+  int min_tokens_to_keep = 1;       ///< Minimum tokens to keep in top-p
 };
 
 /**
@@ -135,7 +135,8 @@ class HmWhisperInfer {
    * @param decoder_path Path to decoder model (.hmm)
    * @param prefill_path Path to prefill model (.hmm)
    * @param tokenizer_path Path to tokenizer JSON
-   * @param sampling_params Sampling parameters (optional, uses defaults if not provided)
+   * @param sampling_params Sampling parameters (optional, uses defaults if not
+   * provided)
    */
   HmWhisperInfer(const std::string& encoder_path,
                  const std::string& decoder_path,
@@ -183,15 +184,6 @@ class HmWhisperInfer {
   std::pair<std::string, WhisperPerfInfo> Transcribe(
       const MelFeatures& mel_features, DecodeState* state = nullptr,
       const std::string& language = "auto");
-
-  /**
-   * @brief Process full audio file
-   * @param audio_path Path to audio file
-   * @param chunk_size Chunk size in seconds (default: 30)
-   * @return Full transcription
-   */
-  //   std::string ProcessAudio(const std::string& audio_path, int chunk_size =
-  //   30);
 
   /**
    * @brief Check if character is valid for display
