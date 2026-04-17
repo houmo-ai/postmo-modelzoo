@@ -159,10 +159,17 @@ DeviceMonitor::DeviceMonitor(uint32_t interval_ms) {
 
 DeviceMonitor::~DeviceMonitor() = default;
 
+namespace {
+template <typename T>
+void update_running_avg(double& avg, uint32_t count, T value) {
+  avg = (static_cast<double>(value) + avg * (count - 1)) / count;
+}
+}  // namespace
+
 void DeviceMonitor::start() {
 #ifdef _MSC_VER
   HMODULE hDll = LoadLibraryA("libhal_xh2a.dll");
-  typedef int (*HM_SYS_GET_DEVICE_INFO)(hm_device_info* info);
+  typedef int (*HM_SYS_GET_DEVICE_INFO)(hm_device_info * info);
   HM_SYS_GET_DEVICE_INFO hm_sys_get_device_info = nullptr;
   hm_sys_get_device_info =
       (HM_SYS_GET_DEVICE_INFO)GetProcAddress(hDll, "hm_sys_get_device_info");
@@ -193,10 +200,13 @@ void DeviceMonitor::start() {
     typedef int (*HM_SYS_GET_TEMPERATURE)(int dev_id, float* temperature);
     typedef int (*HM_SYS_GET_BOARD_POWER)(int dev_id, float* power);
     typedef int (*HM_SYS_GET_IPU_FREQUENCY)(int dev_id, uint64_t* freq);
+    typedef int (*HM_SYS_GET_MEM_INFO)(int dev_id,
+                                       struct hm_mem_info* mem_info);
     HM_SYS_CHECK_DEVICE_INDEX hm_sys_check_device_index = nullptr;
     HM_SYS_GET_TEMPERATURE hm_sys_get_temperature = nullptr;
     HM_SYS_GET_BOARD_POWER hm_sys_get_board_power = nullptr;
     HM_SYS_GET_IPU_FREQUENCY hm_sys_get_ipu_frequency = nullptr;
+    HM_SYS_GET_MEM_INFO hm_sys_get_mem_info = nullptr;
     hm_sys_check_device_index = (HM_SYS_CHECK_DEVICE_INDEX)GetProcAddress(
         hDll, "hm_sys_check_device_index");
     hm_sys_get_temperature =
@@ -205,26 +215,38 @@ void DeviceMonitor::start() {
         (HM_SYS_GET_BOARD_POWER)GetProcAddress(hDll, "hm_sys_get_board_power");
     hm_sys_get_ipu_frequency = (HM_SYS_GET_IPU_FREQUENCY)GetProcAddress(
         hDll, "hm_sys_get_ipu_frequency");
+    hm_sys_get_mem_info =
+        (HM_SYS_GET_MEM_INFO)GetProcAddress(hDll, "hm_sys_get_mem_info");
 #endif
     create_log_dir();
     if (!running_.load()) running_.store(true);
 
     while (running_.load()) {
       for (int dev_id : deviceIds) {
-        auto& device_stats = device_stats_map_[dev_id];
+        float temperature = 0.0f;
+        float power = 0.0f;
+        float ipu_freq = 0.0f;
+        hm_mem_info mem_info = {0};
 
-        int ret = hm_sys_check_device_index(device_stats.dev_id);
+        int ret = hm_sys_check_device_index(dev_id);
         if (ret != 0) {
-          std::cerr << "Device " << device_stats.dev_id << ": invalid index"
-                    << std::endl;
+          std::cerr << "Device " << dev_id << ": invalid index" << std::endl;
           continue;
         }
 
-        hm_sys_get_temperature(device_stats.dev_id, &device_stats.temperature);
-        hm_sys_get_board_power(device_stats.dev_id, &device_stats.power);
+        hm_sys_get_temperature(dev_id, &temperature);
+        hm_sys_get_board_power(dev_id, &power);
         uint64_t freq;
-        hm_sys_get_ipu_frequency(device_stats.dev_id, &freq);
-        device_stats.ipu_freq = (float)(freq) / 1000000.f;
+        hm_sys_get_ipu_frequency(dev_id, &freq);
+        hm_sys_get_mem_info(dev_id, &mem_info);
+        ipu_freq = static_cast<float>(freq) / 1000000.f;
+
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto& device_stats = device_stats_map_[dev_id];
+        device_stats.temperature = temperature;
+        device_stats.power = power;
+        device_stats.ipu_freq = ipu_freq;
+        device_stats.mem_info = mem_info;
 
         // Update statistics
         if (device_stats.temperature_min == 0)
@@ -233,6 +255,8 @@ void DeviceMonitor::start() {
           device_stats.power_min = device_stats.power;
         if (device_stats.ipu_freq_min == 0)
           device_stats.ipu_freq_min = device_stats.ipu_freq;
+        if (device_stats.mem_used_min == 0)
+          device_stats.mem_used_min = device_stats.mem_info.mem_used;
 
         device_stats.times++;
         device_stats.temperature_max =
@@ -269,13 +293,21 @@ void DeviceMonitor::start() {
             (device_stats.ipu_freq +
              device_stats.ipu_freq_avg * (device_stats.times - 1)) /
             device_stats.times;
+        device_stats.mem_used_max =
+            std::max(device_stats.mem_used_max, device_stats.mem_info.mem_used);
+        device_stats.mem_used_min =
+            std::min(device_stats.mem_used_min, device_stats.mem_info.mem_used);
+        update_running_avg(device_stats.mem_used_avg, device_stats.times,
+                           device_stats.mem_info.mem_used);
 
         DEVICE_LOG_INFO(device_stats.dev_id,
                         "Device_id: {:d}, Temperature: {:.2f}°C, BoardPower: "
-                        "{:.2f}W, IPU Freq: "
-                        "{:.2f}MHz",
+                        "{:.2f}W, IPU Freq: {:.2f}MHz, Mem Used: {:d}MB, Mem "
+                        "Avail: {:d}MB",
                         device_stats.dev_id, device_stats.temperature,
-                        device_stats.power, device_stats.ipu_freq);
+                        device_stats.power, device_stats.ipu_freq,
+                        device_stats.mem_info.mem_used,
+                        device_stats.mem_info.mem_avail);
       }
 
       std::unique_lock<std::mutex> lock(mtx_);
@@ -322,6 +354,7 @@ std::unordered_map<int, DeviceStats> DeviceMonitor::getFinalDeviceStats() {
 }
 
 float DeviceMonitor::getMaxTemperature() {
+  std::lock_guard<std::mutex> lock(mtx_);
   if (device_stats_map_.empty()) {
     return -1.0f;  // Return -1 to indicate no device data
   }

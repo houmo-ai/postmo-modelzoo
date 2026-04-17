@@ -163,8 +163,9 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
       throw std::invalid_argument("Unsupported backend " + houmo_target);
     }
 
-    std::unordered_map<int, DeviceStats> start_dev_stats =
+    std::unordered_map<int, DeviceStats> init_start_dev_stats =
         device_monitor->getDeviceStats();
+
     std::unique_ptr<HmllmInferBase> Qwen3Infer;
     if (settings.visual_path.empty()) {
       if (settings.batch_size == 1) {
@@ -188,13 +189,11 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
           settings.visual_path, settings.ndevices, settings.batch_size,
           settings.LazyMode);
     }
-
+    std::unordered_map<int, DeviceStats> post_init_dev_stats =
+        device_monitor->getDeviceStats();
 #if defined(__linux__)
     host_mem_info = host_mem_monitor->getCurrentMemoryInfo();
 #endif
-    std::unordered_map<int, DeviceStats> end_dev_stats =
-        device_monitor->getDeviceStats();
-
     if (!settings.skip_perf) {
       if (settings.warm_up) {
         std::cout << "\n"
@@ -223,11 +222,13 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
 #if defined(__linux__)
         max_host_mem_info = host_mem_monitor->getMaxMemoryInfo();
 #endif
+        std::unordered_map<int, DeviceStats> current_dev_stats =
+            device_monitor->getDeviceStats();
         InferenceMetricsWithLoadTime perf_metrics =
             Qwen3Infer->get_perf_tracker()->get_perf_current_summary();
         perf_dumper.writePerfBrief(settings, perf_metrics, host_mem_info,
-                                   max_host_mem_info, start_dev_stats,
-                                   end_dev_stats, "llm-perf warmup");
+                                   max_host_mem_info, post_init_dev_stats,
+                                   current_dev_stats, "llm-perf warmup");
       }
 
       for (int i = 0; i < settings.loop_count; ++i) {
@@ -257,11 +258,13 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
 #if defined(__linux__)
         max_host_mem_info = host_mem_monitor->getMaxMemoryInfo();
 #endif
+        std::unordered_map<int, DeviceStats> current_dev_stats =
+            device_monitor->getDeviceStats();
         InferenceMetricsWithLoadTime perf_metrics =
             Qwen3Infer->get_perf_tracker()->get_perf_current_summary();
         perf_dumper.writePerfBrief(
             settings, perf_metrics, host_mem_info, max_host_mem_info,
-            start_dev_stats, end_dev_stats,
+            post_init_dev_stats, current_dev_stats,
             "llm-perf Loop Progress: " + std::to_string(i + 1) + "/" +
                 std::to_string(settings.loop_count));
       }
@@ -274,18 +277,20 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
 
     Qwen3Infer.reset();
     device_monitor->stop();
+    std::unordered_map<int, DeviceStats> end_dev_stats =
+        device_monitor->getFinalDeviceStats();
 
 #if defined(__linux__)
     host_mem_monitor->stop();
     max_host_mem_info = host_mem_monitor->getFinalMemoryInfo();
 #endif
     perf_dumper.dumpPerf(settings, metrics, host_mem_info, max_host_mem_info,
-                         start_dev_stats, end_dev_stats);
+                         post_init_dev_stats, end_dev_stats);
     perf_dumper.showPerfBrief(settings, metrics, host_mem_info,
-                              max_host_mem_info, start_dev_stats,
+                              max_host_mem_info, post_init_dev_stats,
                               end_dev_stats);
     perf_dumper.writePerfBrief(settings, metrics, host_mem_info,
-                               max_host_mem_info, start_dev_stats,
+                               max_host_mem_info, post_init_dev_stats,
                                end_dev_stats, "llm-perf Average");
     perf_dumper.generateYamlFile();
 

@@ -2,8 +2,6 @@
  * Copyright (c) 2025 HOUMO AI
  *
  * File: perf_dumper.cc
- * Description:
- *   PerfDumper Implementation - dump perf metrics to yaml file
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,14 +19,33 @@
  */
 #include "perf_dumper.h"
 
+#include <cmath>
 #include <cstdlib>
 
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/spdlog.h"
 
+namespace {
+std::string format_device_memory(uint32_t value_mb) {
+  return std::to_string(value_mb) + " MB";
+}
+
+std::string format_device_memory(int value_mb) {
+  return std::to_string(value_mb) + " MB";
+}
+
+std::string format_device_memory(double value_mb) {
+  return format_double(value_mb) + " MB";
+}
+
+int format_device_memory_avg_as_int(double value_mb) {
+  return static_cast<int>(std::lround(value_mb));
+}
+}  // namespace
+
 PerfDumper::PerfDumper() : dump_file("") {}
 
-PerfDumper::~PerfDumper() {}
+PerfDumper::~PerfDumper() = default;
 
 void PerfDumper::setYamlFile(const std::string &yaml_file, bool run_yaml_perf) {
   if (dump_file.empty()) {
@@ -45,7 +62,7 @@ void PerfDumper::dumpPerf(
     const InferenceMetricsWithLoadTime &results,
     const HostMemoryInfo &host_mem_info,
     const HostMemoryInfo &max_host_mem_info,
-    const std::unordered_map<int, DeviceStats> &start_device_stats,
+    const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
     const std::unordered_map<int, DeviceStats> &end_device_stats) {
   if (dump_file.empty()) return;
   if (fs::exists(dump_file)) {
@@ -156,11 +173,25 @@ void PerfDumper::dumpPerf(
     device_metrics_node["power_avg"] =
         format_double(device_stats.power_avg) + " W";
     device_metrics_node["mem_total"] =
-        std::to_string(device_stats.mem_info.mem_total) + " MB";
+        format_device_memory(device_stats.mem_info.mem_total);
     device_metrics_node["mem_used"] =
-        std::to_string(device_stats.mem_info.mem_used -
-                       start_device_stats.at(dev_id).mem_info.mem_used) +
-        " MB";
+        format_device_memory(device_stats.mem_info.mem_used);
+    device_metrics_node["mem_used_max"] =
+        format_device_memory(device_stats.mem_used_max);
+    device_metrics_node["mem_used_min"] =
+        format_device_memory(device_stats.mem_used_min);
+    device_metrics_node["mem_used_avg"] = format_device_memory(
+        format_device_memory_avg_as_int(device_stats.mem_used_avg));
+  }
+
+  YAML::Node model_load_metrics = model_metrics["ModelLoadMemory"];
+  for (const auto &[dev_id, init_end_stats] : post_init_dev_stats) {
+    YAML::Node model_load_metrics_node =
+        model_load_metrics[std::to_string(dev_id)];
+    model_load_metrics_node["mem_total"] =
+        format_device_memory(init_end_stats.mem_info.mem_total);
+    model_load_metrics_node["mem_used"] =
+        format_device_memory(init_end_stats.mem_info.mem_used);
   }
   perf_metrics_node.push_back(model_metrics);
 }
@@ -170,7 +201,7 @@ void PerfDumper::showPerfBrief(
     const InferenceMetricsWithLoadTime &results,
     const HostMemoryInfo &host_mem_info,
     const HostMemoryInfo &max_host_mem_info,
-    const std::unordered_map<int, DeviceStats> &start_device_stats,
+    const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
     const std::unordered_map<int, DeviceStats> &end_device_stats) {
   auto metrics = results.metrics;
   std::cout << COLOR_MAGENT << std::fixed << std::setprecision(2);
@@ -225,6 +256,15 @@ void PerfDumper::showPerfBrief(
   if (results.prefill_load_time > 0) {
     std::cout << "  Vision Model Load Time: " << std::setw(7)
               << results.vision_load_time << "ms" << std::endl;
+  }
+  if (!post_init_dev_stats.empty()) {
+    std::cout << "  Model Load Device Memory:" << std::endl;
+    for (const auto &[dev_id, device_stats] : post_init_dev_stats) {
+      std::cout << "    Device " << dev_id
+                << " | Total: " << device_stats.mem_info.mem_total << " MB"
+                << " | Used: " << device_stats.mem_info.mem_used << " MB"
+                << std::endl;
+    }
   }
   std::cout << "  TTFT (Time To First Token): " << std::setw(7) << metrics.ttft
             << " ms" << std::endl;
@@ -295,6 +335,15 @@ void PerfDumper::showPerfBrief(
               << "|  " << std::left << std::setw(18)
               << (std::to_string(device_stats.mem_info.mem_avail) +
                   " MB(Avail)")
+              << "|" << std::endl;
+    std::cout << std::left << std::setw(15) << "Mem Used"
+              << "|  " << std::left << std::setw(18)
+              << fmt(device_stats.mem_used_min, 2, " MB(Min)") << "|  "
+              << std::left << std::setw(18)
+              << fmt(device_stats.mem_used_max, 2, " MB(Max)") << "|  "
+              << std::left << std::setw(18)
+              << fmt(format_device_memory_avg_as_int(device_stats.mem_used_avg),
+                     0, " MB(Avg)")
               << "|" << std::endl;
   }
   std::cout << std::string(82, '-') << std::endl;
@@ -402,7 +451,7 @@ void PerfDumper::writePerfBrief(
     const InferenceMetricsWithLoadTime &results,
     const HostMemoryInfo &host_mem_info,
     const HostMemoryInfo &max_host_mem_info,
-    const std::unordered_map<int, DeviceStats> &start_device_stats,
+    const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
     const std::unordered_map<int, DeviceStats> &end_device_stats,
     std::string perf_intruduction) {
   auto metrics = results.metrics;
@@ -465,6 +514,14 @@ void PerfDumper::writePerfBrief(
     logger->info("  Vision Model Load Time: {:>7.2f}ms",
                  results.vision_load_time);
   }
+  if (!post_init_dev_stats.empty()) {
+    logger->info("  Model Load Device Memory:");
+    for (const auto &[dev_id, device_stats] : post_init_dev_stats) {
+      logger->info("    Device {} | Total: {} MB | Used: {} MB", dev_id,
+                   device_stats.mem_info.mem_total,
+                   device_stats.mem_info.mem_used);
+    }
+  }
   logger->info("  TTFT (Time To First Token): {:>7.2f} ms", metrics.ttft);
   logger->info("  TPOT (Time Per Output Token): {:>5.2f} ms/token",
                metrics.tpot);
@@ -518,6 +575,11 @@ void PerfDumper::writePerfBrief(
                  fmt(device_stats.mem_info.mem_total, 2, " MB(Total)"),
                  fmt(device_stats.mem_info.mem_used, 2, " MB(Used)"),
                  fmt(device_stats.mem_info.mem_avail, 2, " MB(Avail)"));
+    logger->info("{:<15}|  {:<18} |  {:<18} |  {:<18} |", "Mem Used",
+                 fmt(device_stats.mem_used_min, 2, " MB(Min)"),
+                 fmt(device_stats.mem_used_max, 2, " MB(Max)"),
+                 fmt(format_device_memory_avg_as_int(device_stats.mem_used_avg),
+                     0, " MB(Avg)"));
   }
   logger->info(
       "-----------------------------------------------------------------------"

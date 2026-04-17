@@ -54,6 +54,10 @@ struct DeviceStats {
   float power_min;
   float ipu_freq_min;
 
+  uint32_t mem_used_max;
+  uint32_t mem_used_min;
+  double mem_used_avg;
+
   double temperature_avg;
   double power_avg;
   double ipu_freq_avg;

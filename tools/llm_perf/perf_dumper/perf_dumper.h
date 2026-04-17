@@ -54,7 +54,7 @@ class PerfDumper {
                 const InferenceMetricsWithLoadTime &results,
                 const HostMemoryInfo &host_mem_info,
                 const HostMemoryInfo &max_host_mem_info,
-                const std::unordered_map<int, DeviceStats> &start_device_stats,
+                const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
                 const std::unordered_map<int, DeviceStats> &end_device_stats);
 
   void showPerfBrief(
@@ -62,7 +62,7 @@ class PerfDumper {
       const InferenceMetricsWithLoadTime &results,
       const HostMemoryInfo &host_mem_info,
       const HostMemoryInfo &max_host_mem_info,
-      const std::unordered_map<int, DeviceStats> &start_device_stats,
+      const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
       const std::unordered_map<int, DeviceStats> &end_device_stats);
 
   void writePerfBrief(
@@ -70,7 +70,7 @@ class PerfDumper {
       const InferenceMetricsWithLoadTime &results,
       const HostMemoryInfo &host_mem_info,
       const HostMemoryInfo &max_host_mem_info,
-      const std::unordered_map<int, DeviceStats> &start_device_stats,
+      const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
       const std::unordered_map<int, DeviceStats> &end_device_stats,
       std::string perf_intruduction);
 
