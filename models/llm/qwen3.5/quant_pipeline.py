@@ -320,6 +320,17 @@ def export_llm_moe(args) -> None:
     model_name = _effective_model_name(args)
 
     if not getattr(args, "skip_export_vision", False):
+        sample_img = getattr(args, "vision_image_path", None)
+        if sample_img:
+            sample_img = str(Path(sample_img).resolve())
+        else:
+            default_img = src / "images" / "qwen2_vl_demo.jpeg"
+            if not default_img.is_file():
+                logger.warning(
+                    "Default vision sample image missing at {} (cwd is src/). "
+                    "Set ptq --vision-image-path to a JPEG/PNG.",
+                    default_img,
+                )
         cmd_v = [
             py,
             str(src / "qwen3_5_moe_vision_xh2a_export_hmonnx.py"),
@@ -332,6 +343,8 @@ def export_llm_moe(args) -> None:
             "--output_dir",
             str(out_root),
         ]
+        if sample_img:
+            cmd_v.extend(["--image_path", sample_img])
         if getattr(args, "debug", False):
             cmd_v.append("--debug")
         _run_step(cmd_v, src)
