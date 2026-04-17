@@ -214,7 +214,7 @@ def export_encoder_prefill(args):
     output_names = []
     for i in range(num_decode_layers):
         output_names.append(f"key_state_{i}")
-    for i in range(num_decode_layers):
+    # for i in range(num_decode_layers):
         output_names.append(f"value_state_{i}")
     # 3. Convert
     if not Path(hmonnx_file).exists():

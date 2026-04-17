@@ -204,7 +204,7 @@ def process_encoder(args):
     output_names = []
     for i in range(num_decode_layers):
         output_names.append(f"key_state_{i}")
-    for i in range(num_decode_layers):
+    # for i in range(num_decode_layers):
         output_names.append(f"value_state_{i}")
     # 3. convert onnx to hmonnx
     if not Path(hmonnx_file).exists():
