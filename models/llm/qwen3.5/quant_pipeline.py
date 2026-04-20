@@ -360,7 +360,7 @@ def export_llm_moe(args) -> None:
             "--quant-weight",
             str(gptq_dir),
             "--quant-type",
-            "w4a8h0_sefp",
+            "w4a8h0_ssfp",
             "--context-length",
             str(getattr(args, "context_length", 2048)),
             "--input-sequence-length",
