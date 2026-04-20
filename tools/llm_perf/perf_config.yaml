@@ -5,8 +5,8 @@ Streams:
     prefill: deepseek/deepseek_prefill.hmm                 # Path to prefill model file
     decode: deepseek/deepseek_decode.hmm
     embedding: deepseek/hmquant/quant_embedding.bin
-    input: 256                                             # Number of input tokens for prefill stage
-    output: 100                                              # Number of output tokens to generate in decode stage
+    input: "256,512"                                       # Number of input tokens for prefill stage
+    output: "100,200"                                      # Number of output tokens to generate in decode stage
     ndevices: 1                                            # Number of devices to use for inference
     loop: 2                                                # Number of times to repeat the test
     batch: 1                                               # Batch size for the model

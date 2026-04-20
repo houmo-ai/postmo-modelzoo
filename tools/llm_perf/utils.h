@@ -77,10 +77,13 @@ static void HelpUsage(char* argv[]) {
          "for VLM).\n"
          "  --embedding       FILE      Embedding weight file (.bin, "
          "required).\n"
-         "  --input           NUM       Number of input tokens (range: "
-         "1-max_context_length).\n"
-         "  --output          NUM       Number of tokens to generate "
+         "  --input           NUM[,NUM...] Number of input tokens, supports "
+         "comma-separated groups (range: 1-max_context_length).\n"
+         "  --output          NUM[,NUM...] Number of tokens to generate, "
+         "supports comma-separated groups and must match input group count "
          "(range: 1-(max_context_length-input)).\n"
+         "  --model_name      TEXT      Model name used in dump/log output "
+         "(optional, command-line only).\n"
          "  --ndevices        NUM       Device count (range: 1-num_devices).\n"
          "  --loop            NUM       Loop test rounds (range: 1-1000000).\n"
          "  --batch           NUM       Batch size (range: 1-batch_num, only "
@@ -105,6 +108,11 @@ static void HelpUsage(char* argv[]) {
       << argv[0]
       << " --prefill prefill.hmm --decode decode.hmm --embedding embed.bin "
          "--input 256 --output 100\n"
+         "  "
+      << argv[0]
+      << " --model_name qwen3_8b --prefill prefill.hmm --decode decode.hmm "
+         "--embedding embed.bin "
+         "--input 256,512 --output 100,200\n"
          "  "
       << argv[0] << " -c perf_config.yaml\n";
 }
@@ -144,7 +152,7 @@ static std::unordered_map<std::string, std::string> parse_args(int argc,
   std::set<std::string> flags = {"no_warm_up", "LazyMode", "skip_perf"};
 
   for (int i = 1; i < argc; ++i) {
-    std::string arg = argv[1];  // Note: This should probably be argv[i]
+    std::string arg = argv[i];
     if (arg == "-c" || arg == "--config" || arg == "-h" || arg == "--help") {
       std::cerr << "Invalid args!" << std::endl;
       HelpUsage(argv);
@@ -232,6 +240,58 @@ static int validate_setting(std::unordered_map<std::string, std::string>& args,
   return value;
 }
 
+static std::vector<int> validate_multi_setting(
+    std::unordered_map<std::string, std::string>& args,
+    const std::string& arg_name) {
+  if (args.find(arg_name) == args.end()) {
+    throw std::invalid_argument("Missing arg : " + arg_name + ", (use --" +
+                                arg_name + " to set arg).");
+  }
+
+  if (args[arg_name].empty()) {
+    throw std::invalid_argument("Missing " + arg_name + " value (use --" +
+                                arg_name + " <value>).");
+  }
+
+  std::vector<int> values;
+  std::stringstream ss(args[arg_name]);
+  std::string item;
+  while (std::getline(ss, item, ',')) {
+    item.erase(std::remove_if(item.begin(), item.end(),
+                              [](unsigned char c) { return std::isspace(c); }),
+               item.end());
+    if (item.empty()) {
+      throw std::invalid_argument(
+          "Invalid " + arg_name +
+          " value, empty item in comma-separated list.");
+    }
+    int value = stoi(item);
+    if (value <= 0) {
+      throw std::invalid_argument("Invalid " + arg_name + " value (use --" +
+                                  arg_name + " <value> to set valid value).");
+    }
+    values.push_back(value);
+  }
+
+  if (values.empty()) {
+    throw std::invalid_argument("Invalid " + arg_name +
+                                " value, no valid item found.");
+  }
+
+  return values;
+}
+
+static std::string format_int_list(const std::vector<int>& values) {
+  std::ostringstream oss;
+  for (size_t i = 0; i < values.size(); ++i) {
+    if (i > 0) {
+      oss << ", ";
+    }
+    oss << values[i];
+  }
+  return oss.str();
+}
+
 struct PerfInfos {
   uint32_t input_tokens;
   uint32_t stop_tokens;
@@ -301,11 +361,17 @@ class HmllmInferBase {
 };
 
 typedef struct perf_settings {
+  struct PerfCase {
+    int input_tokens_len;
+    int stop_tokens_len;
+  };
+
   std::string model_name;
   std::string prefill_path;
   std::string decode_path;
   std::string visual_path;
   std::string embedding_path;
+  std::vector<PerfCase> perf_cases;
   int input_tokens_len;
   int stop_tokens_len;
   int ndevices;
@@ -317,6 +383,8 @@ typedef struct perf_settings {
   bool LazyMode;
   bool skip_perf;
   uint32_t interval_ms;
+  int perf_case_index = 1;
+  int perf_case_total = 1;
 } PerfSettings;
 
 // host memory struct

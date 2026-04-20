@@ -51,10 +51,25 @@
 
 static PerfDumper perf_dumper = PerfDumper();
 static bool run_perf_by_yaml = false;
+
+static PerfSettings BuildPerfCaseSettings(
+    const PerfSettings& settings, const PerfSettings::PerfCase& perf_case,
+    size_t perf_case_index) {
+  PerfSettings current_settings = settings;
+  current_settings.input_tokens_len = perf_case.input_tokens_len;
+  current_settings.stop_tokens_len = perf_case.stop_tokens_len;
+  current_settings.perf_case_index = static_cast<int>(perf_case_index + 1);
+  current_settings.perf_case_total =
+      static_cast<int>(settings.perf_cases.size());
+  return current_settings;
+}
+
 PerfSettings ParsePerfRunSetting(
     std::unordered_map<std::string, std::string> args) {
   PerfSettings settings;
-  if (args.find("ModelName") != args.end()) {
+  if (args.find("model_name") != args.end()) {
+    settings.model_name = args["model_name"];
+  } else if (args.find("ModelName") != args.end()) {
     settings.model_name = args["ModelName"];
   }
 
@@ -63,8 +78,12 @@ PerfSettings ParsePerfRunSetting(
   fs::path visual_path =
       args.count("visual") ? validate_path(args, "visual") : fs::path();
   fs::path embedding_path = validate_path(args, "embedding");
-  int input_token_len = validate_setting(args, "input");
-  int stop_token_len = validate_setting(args, "output");
+  std::vector<int> input_token_lens = validate_multi_setting(args, "input");
+  std::vector<int> stop_token_lens = validate_multi_setting(args, "output");
+  if (input_token_lens.size() != stop_token_lens.size()) {
+    throw std::invalid_argument(
+        "input and output must have the same number of comma-separated values");
+  }
   int ndevices =
       args.count("ndevices") ? validate_setting(args, "ndevices") : 1;
   if (ndevices > tcim::GetDeviceNum() || ndevices < 1) {
@@ -86,8 +105,10 @@ PerfSettings ParsePerfRunSetting(
     std::cout << "visual path : " << visual_path.string() << std::endl;
   }
   std::cout << "embedding path : " << embedding_path.string() << std::endl;
-  std::cout << "input token len : " << input_token_len << std::endl;
-  std::cout << "stop token len : " << stop_token_len << std::endl;
+  std::cout << "input token len : " << format_int_list(input_token_lens)
+            << std::endl;
+  std::cout << "stop token len : " << format_int_list(stop_token_lens)
+            << std::endl;
   std::cout << "ndevices : " << ndevices << std::endl;
   std::cout << "loop : " << loop_round << std::endl;
   std::cout << "batch : " << batch << std::endl;
@@ -97,10 +118,10 @@ PerfSettings ParsePerfRunSetting(
     std::cout << "warm_up : enable" << std::endl;
     warm_up_input = args.count("warm_up_input")
                         ? validate_setting(args, "warm_up_input")
-                        : input_token_len;
+                        : input_token_lens.front();
     warm_up_output = args.count("warm_up_output")
                          ? validate_setting(args, "warm_up_output")
-                         : stop_token_len;
+                         : stop_token_lens.front();
   } else {
     std::cout << "warm_up : disable" << std::endl;
   }
@@ -125,8 +146,11 @@ PerfSettings ParsePerfRunSetting(
   settings.decode_path = decode_path.string();
   settings.embedding_path = embedding_path.string();
   settings.visual_path = visual_path.string();
-  settings.input_tokens_len = input_token_len;
-  settings.stop_tokens_len = stop_token_len;
+  for (size_t i = 0; i < input_token_lens.size(); ++i) {
+    settings.perf_cases.push_back({input_token_lens[i], stop_token_lens[i]});
+  }
+  settings.input_tokens_len = input_token_lens.front();
+  settings.stop_tokens_len = stop_token_lens.front();
   settings.ndevices = ndevices;
   settings.batch_size = batch;
   settings.LazyMode = lazy_mode_enable;
@@ -135,6 +159,7 @@ PerfSettings ParsePerfRunSetting(
   settings.warm_up_output = warm_up_output;
   settings.loop_count = loop_round;
   settings.skip_perf = skip_perf;
+  settings.perf_case_total = static_cast<int>(settings.perf_cases.size());
 
   return settings;
 }
@@ -163,9 +188,8 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
       throw std::invalid_argument("Unsupported backend " + houmo_target);
     }
 
-    std::unordered_map<int, DeviceStats> init_start_dev_stats =
+    std::unordered_map<int, DeviceStats> init_dev_stats =
         device_monitor->getDeviceStats();
-
     std::unique_ptr<HmllmInferBase> Qwen3Infer;
     if (settings.visual_path.empty()) {
       if (settings.batch_size == 1) {
@@ -195,6 +219,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
     host_mem_info = host_mem_monitor->getCurrentMemoryInfo();
 #endif
     if (!settings.skip_perf) {
+      auto perf_tracker = Qwen3Infer->get_perf_tracker();
       if (settings.warm_up) {
         std::cout << "\n"
                   << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
@@ -215,9 +240,9 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
               "Device temperature is beyond 100.0 °C, "
               "Shutdown the demo!");
         }
-        Qwen3Infer->get_perf_tracker()->reset();
+        perf_tracker->reset();
         Qwen3Infer->perf_llm(settings.warm_up_input, settings.warm_up_output);
-        Qwen3Infer->get_perf_tracker()->pref_delete_warmup();
+        perf_tracker->pref_delete_warmup();
         std::cout << "\n" << std::string(82, '=') << "\n";
 #if defined(__linux__)
         max_host_mem_info = host_mem_monitor->getMaxMemoryInfo();
@@ -225,55 +250,96 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
         std::unordered_map<int, DeviceStats> current_dev_stats =
             device_monitor->getDeviceStats();
         InferenceMetricsWithLoadTime perf_metrics =
-            Qwen3Infer->get_perf_tracker()->get_perf_current_summary();
+            perf_tracker->get_perf_current_summary();
         perf_dumper.writePerfBrief(settings, perf_metrics, host_mem_info,
                                    max_host_mem_info, post_init_dev_stats,
                                    current_dev_stats, "llm-perf warmup");
       }
 
-      for (int i = 0; i < settings.loop_count; ++i) {
+      for (size_t perf_case_index = 0;
+           perf_case_index < settings.perf_cases.size(); ++perf_case_index) {
+        PerfSettings current_settings = BuildPerfCaseSettings(
+            settings, settings.perf_cases[perf_case_index], perf_case_index);
+        perf_tracker->pref_delete_warmup();
+
         std::cout << COLOR_BLUE << "\n"
-                  << std::string(30, '=')
-                  << "(v)LLM Perf Loop Progress: " << (i + 1) << "/"
-                  << settings.loop_count << std::string(30, '=') << "\n ";
-        float current_temperature = device_monitor->getMaxTemperature();
-        std::cout << "Device temperature: " << current_temperature << " °C"
-                  << std::endl;
-        if (current_temperature > ALARM_TEMPERATURE_THRESHOLD &&
-            current_temperature < SHUTDOWN_TEMPERATURE_THRESHOLD) {
-          std::cout
-              << COLOR_YELLOW
-              << "Device temperature is beyond 80.0 °C, Temperature Warning!"
-              << COLOR_RESET << std::endl;
+                  << std::string(24, '=')
+                  << "(v)LLM Perf Case: " << current_settings.perf_case_index
+                  << "/" << current_settings.perf_case_total << " | input "
+                  << current_settings.input_tokens_len << " | output "
+                  << current_settings.stop_tokens_len << std::string(24, '=')
+                  << "\n ";
+
+        for (int i = 0; i < settings.loop_count; ++i) {
+          std::cout << COLOR_BLUE << "\n"
+                    << std::string(24, '=')
+                    << "(v)LLM Perf Loop Progress: " << (i + 1) << "/"
+                    << settings.loop_count << " | case "
+                    << current_settings.perf_case_index << "/"
+                    << current_settings.perf_case_total << std::string(24, '=')
+                    << "\n ";
+          float current_temperature = device_monitor->getMaxTemperature();
+          std::cout << "Device temperature: " << current_temperature << " °C"
+                    << std::endl;
+          if (current_temperature > ALARM_TEMPERATURE_THRESHOLD &&
+              current_temperature < SHUTDOWN_TEMPERATURE_THRESHOLD) {
+            std::cout
+                << COLOR_YELLOW
+                << "Device temperature is beyond 80.0 °C, Temperature Warning!"
+                << COLOR_RESET << std::endl;
+          }
+          if (current_temperature >= SHUTDOWN_TEMPERATURE_THRESHOLD) {
+            throw std::runtime_error(
+                "Device temperature is beyond 100.0 °C, "
+                "Shutdown the demo!");
+          }
+          perf_tracker->reset();
+          Qwen3Infer->perf_llm(current_settings.input_tokens_len,
+                               current_settings.stop_tokens_len);
+          std::cout << "\n" << std::string(82, '=') << "\n";
+#if defined(__linux__)
+          max_host_mem_info = host_mem_monitor->getMaxMemoryInfo();
+#endif
+          std::unordered_map<int, DeviceStats> current_dev_stats =
+              device_monitor->getDeviceStats();
+          InferenceMetricsWithLoadTime current_perf_metrics =
+              perf_tracker->get_perf_current_summary();
+          perf_dumper.writePerfBrief(
+              current_settings, current_perf_metrics, host_mem_info,
+              max_host_mem_info, post_init_dev_stats, current_dev_stats,
+              "llm-perf Loop Progress: " + std::to_string(i + 1) + "/" +
+                  std::to_string(settings.loop_count));
         }
-        if (current_temperature >= SHUTDOWN_TEMPERATURE_THRESHOLD) {
-          throw std::runtime_error(
-              "Device temperature is beyond 100.0 °C, "
-              "Shutdown the demo!");
-        }
-        Qwen3Infer->get_perf_tracker()->reset();
-        Qwen3Infer->perf_llm(settings.input_tokens_len,
-                             settings.stop_tokens_len);
-        std::cout << "\n" << std::string(82, '=') << "\n";
+
+        perf_tracker->showSummary(true);
 #if defined(__linux__)
         max_host_mem_info = host_mem_monitor->getMaxMemoryInfo();
 #endif
         std::unordered_map<int, DeviceStats> current_dev_stats =
             device_monitor->getDeviceStats();
         InferenceMetricsWithLoadTime perf_metrics =
-            Qwen3Infer->get_perf_tracker()->get_perf_current_summary();
+            perf_tracker->get_perf_avg_summary();
+        perf_dumper.dumpPerf(current_settings, perf_metrics, host_mem_info,
+                             max_host_mem_info, post_init_dev_stats,
+                             current_dev_stats);
+        perf_dumper.showPerfBrief(current_settings, perf_metrics, host_mem_info,
+                                  max_host_mem_info, post_init_dev_stats,
+                                  current_dev_stats);
         perf_dumper.writePerfBrief(
-            settings, perf_metrics, host_mem_info, max_host_mem_info,
+            current_settings, perf_metrics, host_mem_info, max_host_mem_info,
             post_init_dev_stats, current_dev_stats,
-            "llm-perf Loop Progress: " + std::to_string(i + 1) + "/" +
-                std::to_string(settings.loop_count));
+            "llm-perf Case Average: " +
+                std::to_string(current_settings.perf_case_index) + "/" +
+                std::to_string(current_settings.perf_case_total));
       }
-
-      Qwen3Infer->get_perf_tracker()->showSummary(true);
       std::cout << COLOR_RESET;
     }
-    InferenceMetricsWithLoadTime metrics =
-        Qwen3Infer->get_perf_tracker()->get_perf_avg_summary();
+
+    InferenceMetricsWithLoadTime skip_perf_metrics;
+    if (settings.skip_perf) {
+      skip_perf_metrics =
+          Qwen3Infer->get_perf_tracker()->get_perf_avg_summary();
+    }
 
     Qwen3Infer.reset();
     device_monitor->stop();
@@ -284,14 +350,17 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
     host_mem_monitor->stop();
     max_host_mem_info = host_mem_monitor->getFinalMemoryInfo();
 #endif
-    perf_dumper.dumpPerf(settings, metrics, host_mem_info, max_host_mem_info,
-                         post_init_dev_stats, end_dev_stats);
-    perf_dumper.showPerfBrief(settings, metrics, host_mem_info,
-                              max_host_mem_info, post_init_dev_stats,
-                              end_dev_stats);
-    perf_dumper.writePerfBrief(settings, metrics, host_mem_info,
-                               max_host_mem_info, post_init_dev_stats,
-                               end_dev_stats, "llm-perf Average");
+    if (settings.skip_perf) {
+      perf_dumper.dumpPerf(settings, skip_perf_metrics, host_mem_info,
+                           max_host_mem_info, post_init_dev_stats,
+                           end_dev_stats);
+      perf_dumper.showPerfBrief(settings, skip_perf_metrics, host_mem_info,
+                                max_host_mem_info, post_init_dev_stats,
+                                end_dev_stats);
+      perf_dumper.writePerfBrief(settings, skip_perf_metrics, host_mem_info,
+                                 max_host_mem_info, post_init_dev_stats,
+                                 end_dev_stats, "llm-perf Average");
+    }
     perf_dumper.generateYamlFile();
 
     return 0;

@@ -2,6 +2,8 @@
  * Copyright (c) 2025 HOUMO AI
  *
  * File: perf_dumper.cc
+ * Description:
+ *   perf_dumper Implementation - dump perf metrics to yaml file.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,9 +52,13 @@ PerfDumper::~PerfDumper() = default;
 void PerfDumper::setYamlFile(const std::string &yaml_file, bool run_yaml_perf) {
   if (dump_file.empty()) {
     dump_file = yaml_file;
+    root.reset();
+    init_yaml = true;
   } else {
     if (!run_yaml_perf) {
       dump_file = yaml_file;
+      root.reset();
+      init_yaml = true;
     }
   }
 }
@@ -65,12 +71,12 @@ void PerfDumper::dumpPerf(
     const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
     const std::unordered_map<int, DeviceStats> &end_device_stats) {
   if (dump_file.empty()) return;
-  if (fs::exists(dump_file)) {
-    root = YAML::LoadFile(dump_file);
-    if (init_yaml) {
-      root.reset();
-      init_yaml = false;
-    }
+  if (init_yaml) {
+    root.reset();
+    root["PerfMetrics"] = YAML::Node(YAML::NodeType::Sequence);
+    init_yaml = false;
+  } else if (!root["PerfMetrics"] || !root["PerfMetrics"].IsSequence()) {
+    root["PerfMetrics"] = YAML::Node(YAML::NodeType::Sequence);
   }
 
   YAML::Node perf_metrics_node = root["PerfMetrics"];
@@ -93,6 +99,8 @@ void PerfDumper::dumpPerf(
   model_perf_settings["warm_up_output"] = perf_settings.warm_up_output;
   model_perf_settings["skip_perf"] = perf_settings.skip_perf;
   model_perf_settings["monitor_interval"] = perf_settings.interval_ms;
+  model_perf_settings["perf_case_index"] = perf_settings.perf_case_index;
+  model_perf_settings["perf_case_total"] = perf_settings.perf_case_total;
 
   YAML::Node model_perf_results = model_metrics["PerfResults"];
   model_perf_results["input_token"] = results.metrics.input_seq_length;
@@ -212,6 +220,11 @@ void PerfDumper::showPerfBrief(
   // Basic configuration
   std::cout << "                            Configuration Details" << std::endl;
   std::cout << std::string(82, '-') << std::endl;
+  if (perf_settings.perf_case_total > 1) {
+    std::cout << "  Perf Case: " << std::setw(6)
+              << perf_settings.perf_case_index << "/"
+              << perf_settings.perf_case_total << std::endl;
+  }
   std::cout << "  Batch Size: " << std::setw(6) << metrics.batch_size
             << std::endl;
   std::cout << "  Input Length per Sample: " << std::setw(6)
@@ -468,6 +481,10 @@ void PerfDumper::writePerfBrief(
       "====================");
   logger->info(
       "-------------------- Configuration Details ---------------------");
+  if (perf_settings.perf_case_total > 1) {
+    logger->info("  Perf Case: {:>6}/{}", perf_settings.perf_case_index,
+                 perf_settings.perf_case_total);
+  }
   logger->info("  Batch Size: {:>6}", metrics.batch_size);
   logger->info("  Input Length per Sample: {:>6} tokens",
                metrics.input_seq_length);

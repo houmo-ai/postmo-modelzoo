@@ -109,16 +109,17 @@
 - --decode          : 指定decode模型路径，支持相对/绝对路径。
 - --visual          : 指定visual模型路径，，支持相对/绝对路径，仅vlm需要指定，不指定时默认模型为llm模型。
 - --embedding       : 指定embedding模型路径，需要转换成bin文件，支持相对/绝对路径。
-- --input           : 指定prefill阶段输入token数量。
-- --output          : 指定docode阶段输出多少token后停止。
+- --input           : 指定prefill阶段输入token数量，支持单值或逗号分隔的多组参数，例如`256,512,1024`。
+- --output          : 指定decode阶段输出token数量，支持单值或逗号分隔的多组参数，组数必须与--input一致。
 - --ndevices        : 指定模型使用的device数量，不指定默认为1。
 - --loop            : 指定循环执行单个模型次数，不指定默认为1。
 - --batch           : 指定模型的batch数，不指定则--batch的值为1。多batch模型必须指定，会校验从模型读取到的batch和用户指定的值是否一致。目前多batch仅支持xh2.
 - --no_warm_up      : 默认执行warm_up，配置后会跳过warm_up流程。
-- --warm_up_input   : 配置warm_up的输入数据长度，不指定则--warm_up_input的默认值为--input。
-- --warm_up_output  : 设置warm_up阶段decode模型输出的token数量，不指定则--warm_up_output的默认值为--output。
+- --warm_up_input   : 配置warm_up的输入数据长度，不指定时默认使用第一组input的值。
+- --warm_up_output  : 设置warm_up阶段decode模型输出的token数量，不指定时默认使用第一组output的值。
 - --LazyMode        : 默认关闭LazyMode，配置后会打开LazyMode，开启LazyMode后，模型加载实际会变长，内存占用会变小。
 - --interval        : 配置DeviceMonitor(温度、IPU频率、功率)、HostMonitor(physical、virtual memory)监控线程的采样间隔时间，单位毫秒(ms)，默认为500ms，范围100-60000。
+- --model_name      : 可选，指定模型名称，用于dump yaml和日志展示。
 - --skip_perf       : 默认执行性能评估，配置后会跳过性能评估。
 - --dump_file       : 默认关闭dump性能数据到yaml文件，配置后会将性能数据保存到yaml文件中。
 - --help, -h        : 打印帮助信息
@@ -140,9 +141,11 @@
 # 禁用warm_up
 ./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1 --no_warm_up
 # 开启warm_up
-./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1 --warn_up_output 10
+./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1 --warm_up_output 10
 # 使能dump_file
 ./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1 --dump_file model.yaml
+# 多组input/output，按组依次测试并分别dump到yaml文件中
+./llm_perf --model_name qwen3_8b --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 256,512 --output 100,200 --loop 2 --dump_file model.yaml
 ```
 
 #### 1.4.3 配置文件启动
@@ -161,10 +164,10 @@ Streams:
     prefill: deepseek/deepseek_prefill.hmm                 # Path to prefill model file
     decode: deepseek/deepseek_decode.hmm
     embedding: deepseek/hmquant/quant_embedding.bin
-    input: 256                                             # Number of input tokens for prefill stage
-    output: 100                                              # Number of output tokens to generate in decode stage
+    input: "256,512"                                       # Single value or comma-separated groups
+    output: "100,200"                                     # Must match input group count
     ndevices: 1                                            # Number of devices to use for inference
-    loop: 2                                                # Number of times to repeat the test
+    loop: 2                                                # Number of times to repeat each input/output group
     batch: 1                                               # Batch size for the model
     no_warm_up: ''                                         # If present (any value), skip warm-up phase
   - ModelName: qwen2.5_7b_256_8k_b1_1chip_2cores_v0.5.0
@@ -228,6 +231,7 @@ dump_file: perf_result.yaml
 - **如果外层dump_file不存在，则使用Streams下的dump_file。**
 - **外层dump_file存在时，则使用外层dump_file，忽略Streams下的dump_file。**
 上述模板等效于同时执行多次指令启动，用户可以根据实际需求自行配置。
+如果单个Streams条目内的input/output配置为多组参数，则会在单次模型加载和单次warm_up之后，按组顺序执行性能测试，并在yaml结果中保留每组测试结果。
 
 
 ## 2.快速开始
