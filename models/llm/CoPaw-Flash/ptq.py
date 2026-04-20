@@ -60,19 +60,26 @@ from xhquant.api import (
 from xh_model_zoo.xh_llm.models.builder import MODELS
 from xh_model_zoo.xh_llm.models.eval_model_type import EvalModelType
 from xh_model_zoo.xh_llm.models.qwen3_5 import (
-    XHQwen3_5Model, 
-    XHQwen3_5VisionModel, 
+    XHQwen3_5Model,
+    XHQwen3_5VisionModel,
     Qwen3_5Processor,
 )
 
-HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', str(Path(__file__).resolve().parents[3] / "data" / "datasets"))
-HOUMO_PIC_PATH = os.getenv('HOUMO_PIC_PATH', str(Path(__file__).resolve().parents[3] / "data" / "pic"))
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', '')
+HOUMO_DATASETS_PATH = os.getenv(
+    "HOUMO_DATASETS_PATH",
+    str(Path(__file__).resolve().parents[3] / "data" / "datasets"),
+)
+HOUMO_PIC_PATH = os.getenv(
+    "HOUMO_PIC_PATH", str(Path(__file__).resolve().parents[3] / "data" / "pic")
+)
+HOUMO_TARGET = os.getenv("HOUMO_TARGET", "")
+
 
 class ProcessMemoryMonitor:
     """
     Monitors the memory usage of the current Python process in real-time using psutil.
     """
+
     def __init__(self, interval=2, log_file=None):
         """
         Initializes the monitor.
@@ -101,8 +108,8 @@ class ProcessMemoryMonitor:
                 except psutil.NoSuchProcess:
                     continue
         rss_mb = rss / (1024 * 1024)  # Resident Set Size in MB
-        percent = self.process.memory_percent()   # Percentage of system memory
-        return {'rss_mb': rss_mb, 'percent': percent}
+        percent = self.process.memory_percent()  # Percentage of system memory
+        return {"rss_mb": rss_mb, "percent": percent}
 
     def start(self):
         """Starts the monitoring loop in a separate daemon thread."""
@@ -117,25 +124,30 @@ class ProcessMemoryMonitor:
         """The internal loop that runs in the thread."""
         while self.is_monitoring:
             mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info['rss_mb'])
+            self.peak_memory_mb = max(self.peak_memory_mb, mem_info["rss_mb"])
 
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
             log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
             # Output to console or file
             if self.log_file:
-                with open(self.log_file, 'a') as f:
-                    f.write(log_message + '\n')
+                with open(self.log_file, "a") as f:
+                    f.write(log_message + "\n")
 
             time.sleep(self.interval)
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        logger.info(f"{timestamp} - Max RSS: {self.peak_memory_mb:.2f} MB, System%: {self.process.memory_percent():.2f}%")
+        logger.info(
+            f"{timestamp} - Max RSS: {self.peak_memory_mb:.2f} MB, System%: {self.process.memory_percent():.2f}%"
+        )
 
     def stop(self):
         """Stops the monitoring loop and prints peak usage."""
         self.is_monitoring = False
-        if hasattr(self, 'monitor_thread'):
-            self.monitor_thread.join(timeout=1) # Wait a moment for the thread to finish
+        if hasattr(self, "monitor_thread"):
+            self.monitor_thread.join(
+                timeout=1
+            )  # Wait a moment for the thread to finish
         print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
+
 
 def set_seed(seed: int):
     random.seed(seed)
@@ -143,6 +155,7 @@ def set_seed(seed: int):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
 
 def check_gpu():
     import subprocess
@@ -154,7 +167,7 @@ def check_gpu():
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False,
-            text=True
+            text=True,
         )
         if result.returncode == 0 and int(result.stdout.strip()) > 0:
             return True
@@ -163,20 +176,23 @@ def check_gpu():
         print(f"Not install GPU driver, error msg: {e}")
         return False
 
+
 def str2bool(v):
     if isinstance(v, bool):
-       return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1',""):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1", ""):
         return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif v.lower() in ("no", "false", "f", "n", "0"):
         return False
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+        raise argparse.ArgumentTypeError("Boolean value expected.")
+
 
 def msg_output_format(title):
     padding_str = "*" * 10
     title = f"{padding_str} {title} {padding_str}"
     return title
+
 
 def cleanup_cuda():
     gc.collect()
@@ -193,6 +209,7 @@ def cleanup_cpu():
         ctypes.CDLL("libc.so.6").malloc_trim(0)
     except Exception:
         pass
+
 
 def save_json(file_path: Path, data: Dict[str, Any]):
     with open(file_path, "w", encoding="utf-8") as file_obj:
@@ -216,6 +233,7 @@ def _unwrap_model_output(output):
                 return value
     raise TypeError(f"Unsupported model output type: {type(output)}")
 
+
 def get_jsonl_texts(path, nsamples, text_key="text"):
     samples = []
     with open(path, "r", encoding="utf-8") as f:
@@ -234,11 +252,14 @@ def get_jsonl_texts(path, nsamples, text_key="text"):
         raise ValueError(f"No calibration samples found in {path}")
     return samples
 
+
 def get_wikitext2(nsamples, seqlen, local_dir=None, tokenizer=None):
     if local_dir is None:
         from datasets import load_dataset
+
         traindata = load_dataset("wikitext", "wikitext-2-raw-v1", split="train").filter(
-            lambda x: len(x["text"]) >= seqlen)
+            lambda x: len(x["text"]) >= seqlen
+        )
         return [example["text"] for example in traindata.select(range(nsamples))]
     else:
         from datasets import load_from_disk
@@ -247,7 +268,7 @@ def get_wikitext2(nsamples, seqlen, local_dir=None, tokenizer=None):
         train_data = load_from_disk(local_dir)["train"]
         if tokenizer is None:
             ValueError("tokenizer must be provided when local_dir is specified")
-        trainenc = tokenizer("n\n".join(train_data['text']))
+        trainenc = tokenizer("n\n".join(train_data["text"]))
         random.seed(0)
         train_samples = []
         input_ids = trainenc.input_ids
@@ -266,6 +287,7 @@ def get_wikitext2(nsamples, seqlen, local_dir=None, tokenizer=None):
             )
         return train_samples
 
+
 def build_prompt_inputs(tokenizer, device, max_len: int):
     prompt = "你多大了？用中文回答。"
     if hasattr(tokenizer, "apply_chat_template"):
@@ -273,7 +295,9 @@ def build_prompt_inputs(tokenizer, device, max_len: int):
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": prompt},
         ]
-        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        text = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
         input_ids = tokenizer([text], return_tensors="pt").input_ids
     else:
         input_ids = tokenizer(prompt, return_tensors="pt").input_ids
@@ -282,29 +306,37 @@ def build_prompt_inputs(tokenizer, device, max_len: int):
         input_ids = input_ids[:, :max_len]
     return input_ids.to(device)
 
+
 def gptq_quant_llm(args):
     sys.path.append(os.path.dirname(__file__))
     from gptqmodel import GPTQModel, QuantizeConfig
 
     modelscope_name = os.path.basename(args.model)
-    quant_path = os.path.join(args.work_dir, "{}_gptqmodel_4bit".format(modelscope_name))
+    quant_path = os.path.join(
+        args.work_dir, "{}_gptqmodel_4bit".format(modelscope_name)
+    )
 
     if args.calib_data:
         if args.calib_data.endswith(".jsonl"):
             calibration_dataset = get_jsonl_texts(args.calib_data, nsamples=256)
         elif os.path.isdir(args.calib_data) and "wikitext" in args.calib_data.lower():
             tokenizer = AutoConfig.from_pretrained(args.model)
-            calibration_dataset = get_wikitext2(nsamples=256, seqlen=1024, local_dir=args.calib_data, tokenizer=tokenizer)
+            calibration_dataset = get_wikitext2(
+                nsamples=256,
+                seqlen=1024,
+                local_dir=args.calib_data,
+                tokenizer=tokenizer,
+            )
         else:
             raise ValueError(f"Unsupported calibration data format: {args.calib_data}")
     else:
         calibration_dataset = get_wikitext2(nsamples=256, seqlen=1024)
 
     quant_config = QuantizeConfig(
-        bits=4, 
-        group_size=64, 
-        hessian_mse=True, 
-        rotation="hadamard", 
+        bits=4,
+        group_size=64,
+        hessian_mse=True,
+        rotation="hadamard",
         offload_to_disk=False,
     )
 
@@ -321,7 +353,10 @@ def gptq_quant_llm(args):
     cleanup_cuda()
     cleanup_cpu()
 
-def export_prefill_decode(cfg, work_dir, input_ids, model_name, quant_type, mode="prefill"):
+
+def export_prefill_decode(
+    cfg, work_dir, input_ids, model_name, quant_type, mode="prefill"
+):
     def _flatten_inputs(inputs):
         flat = []
         for arg in inputs:
@@ -334,9 +369,7 @@ def export_prefill_decode(cfg, work_dir, input_ids, model_name, quant_type, mode
     copaw_flash_model: XHQwen3_5Model = MODELS.build(cfg.model)
     tokenizer = copaw_flash_model.get_tokenizer()
     native_model = copaw_flash_model.get_hf_model(
-        device_map="cpu",
-        use_safetensors=True,
-        torch_dtype="float16"
+        device_map="cpu", use_safetensors=True, torch_dtype="float16"
     )
     native_model.eval()
 
@@ -344,7 +377,7 @@ def export_prefill_decode(cfg, work_dir, input_ids, model_name, quant_type, mode
     hmonnx_dir.mkdir(exist_ok=True, parents=True)
 
     copaw_flash_model.init_wrap_model(native_model)
-    
+
     del native_model
 
     current_input_seq_length = cfg.model.wrap_cfg.input_sequence_length
@@ -355,18 +388,22 @@ def export_prefill_decode(cfg, work_dir, input_ids, model_name, quant_type, mode
     copaw_flash_model.to(torch.float16)
 
     logger.info(f"Start export {mode} hmonnx ...")
-    copaw_flash_model.set_linear_attention_mode("chunk" if mode == "prefill" else "recurrent")
-    copaw_flash_model.set_input_sequence_length(current_input_seq_length if mode == "prefill" else 1)
+    copaw_flash_model.set_linear_attention_mode(
+        "chunk" if mode == "prefill" else "recurrent"
+    )
+    copaw_flash_model.set_input_sequence_length(
+        current_input_seq_length if mode == "prefill" else 1
+    )
     onnx_prefix = f"{model_name}_{mode}_{quant_type}"
     if mode == "prefill":
         input_ids_pad = torch.cat(
             [
-                input_ids, 
+                input_ids,
                 torch.full(
                     (input_ids.shape[0], current_input_seq_length - input_ids.shape[1]),
                     tokenizer.pad_token_id,
                     dtype=torch.long,
-                )
+                ),
             ],
             dim=-1,
         )
@@ -381,7 +418,7 @@ def export_prefill_decode(cfg, work_dir, input_ids, model_name, quant_type, mode
             "past_seq_length": [input_ids.shape[1]],
             "current_input_length": [1],
         }
-    
+
     copaw_flash_model.interactive_mode = True
     copaw_flash_model.convert_to_fronted_graph(data_batch, release_wraped_model=True)
     copaw_flash_model.convert_to_quant_graph(DeviceType.XH2a)
@@ -395,12 +432,12 @@ def export_prefill_decode(cfg, work_dir, input_ids, model_name, quant_type, mode
         [torch.device("cpu")],
         auto_release_unused_parameters=True,
     )
-    
+
     copaw_flash_model.change_eval_type(EvalModelType.QUANTED_ALIGNED)
 
     hmonnx_dir = Path(work_dir) / f"{mode}"
     hmonnx_dir.mkdir(exist_ok=True, parents=True)
-    
+
     copaw_flash_model.convert_to_export_graph(data_batch)
     copaw_flash_model.change_eval_type(EvalModelType.EXPORTED)
 
@@ -419,14 +456,15 @@ def export_prefill_decode(cfg, work_dir, input_ids, model_name, quant_type, mode
 
     return onnx_file
 
+
 def get_prepare_context(cfg, work_dir):
     copaw_flash_model: XHQwen3_5Model = MODELS.build(cfg.model)
     tokenizer = copaw_flash_model.get_tokenizer()
-    input_ids = build_prompt_inputs(tokenizer, "cpu", cfg.model.wrap_cfg.input_sequence_length)
+    input_ids = build_prompt_inputs(
+        tokenizer, "cpu", cfg.model.wrap_cfg.input_sequence_length
+    )
     native_model = copaw_flash_model.get_hf_model(
-        device_map="cpu",
-        use_safetensors=True,
-        torch_dtype="float16"
+        device_map="cpu", use_safetensors=True, torch_dtype="float16"
     )
     native_model.eval()
 
@@ -438,7 +476,7 @@ def get_prepare_context(cfg, work_dir):
     torch.save(token_embedding.state_dict(), str(embed_file))
 
     copaw_flash_model.init_wrap_model(native_model)
-    
+
     del native_model
 
     copaw_flash_model.change_eval_type(EvalModelType.WRAPED)
@@ -455,7 +493,14 @@ def get_prepare_context(cfg, work_dir):
     cleanup_cuda()
     cleanup_cpu()
 
-    return input_ids, embed_file, kv_cache_shape, num_hidden_layers, token_embedding.weight.shape[-1]
+    return (
+        input_ids,
+        embed_file,
+        kv_cache_shape,
+        num_hidden_layers,
+        token_embedding.weight.shape[-1],
+    )
+
 
 def rotate_fp_vl(args):
     from gptqmodel.models.definitions.qwen3_5 import Qwen3_5QModel
@@ -492,7 +537,7 @@ def rotate_fp_vl(args):
     model.eval()
 
     logger.info("Start rotating vision model...")
-    lm_head_name = Qwen3_VLQModel.lm_head,
+    lm_head_name = (Qwen3_VLQModel.lm_head,)
     layers_node = Qwen3_VLQModel.extract_layers_node()
     pre_lm_head_norm_module_name = Qwen3_VLQModel.pre_lm_head_norm_module
     maybe_clone_lm_head(model, lm_head_name)
@@ -515,10 +560,10 @@ def rotate_fp_vl(args):
     logger.info("Vision model rotation complete.")
 
     logger.info(f"Save rotating result to {rotate_path}")
-    model.generation_config.do_sample=True
+    model.generation_config.do_sample = True
     rotate_path_dir = Path(rotate_path)
     rotate_path_dir.mkdir(exist_ok=True, parents=True)
-    model.save_pretrained(rotate_path, safe_serialization=True, max_shard_size='5GB')
+    model.save_pretrained(rotate_path, safe_serialization=True, max_shard_size="5GB")
     processor.save_pretrained(rotate_path)
     logger.info("Model saved successfully.")
 
@@ -526,13 +571,16 @@ def rotate_fp_vl(args):
     cleanup_cuda()
     cleanup_cpu()
 
+
 def houmo_export_llm(args):
     hf_model_path = osp.normpath(osp.abspath(args.model))
     modelscope_name = Path(hf_model_path).name
 
     cfg = Config.fromfile(args.llm_config)
 
-    quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=args.quant_type)
+    quant_scheme = QuantScheme(
+        target_device=DeviceType.XH2a, quant_type=args.quant_type
+    )
     QConfig = create_quant_config(quant_scheme)
     cfg.model.quant_config.w_schema.bits = QConfig.w_schema.man_bit
     cfg.model.quant_config.w_schema.fp_mode = QConfig.w_schema.fp_mode
@@ -542,13 +590,13 @@ def houmo_export_llm(args):
     cfg.model.quant_config.act_schema.hidden_bit = QConfig.act_schema.hidden_bit
 
     if args.gptqmodel:
-        quant_path = os.path.join(args.work_dir, "{}_gptqmodel_4bit".format(modelscope_name))
+        quant_path = os.path.join(
+            args.work_dir, "{}_gptqmodel_4bit".format(modelscope_name)
+        )
         hf_model_path = osp.normpath(osp.abspath(quant_path))
         cfg.model.quant_config.w_schema.bits = 4
 
-    prefix = "{}-XH2a-{}".format(
-        args.model_name, format_number(args.context_length)
-    )
+    prefix = "{}-XH2a-{}".format(args.model_name, format_number(args.context_length))
     work_dir = Path(args.work_dir) / prefix
     work_dir.mkdir(exist_ok=True, parents=True)
     log_file = work_dir / "convert.log"
@@ -560,14 +608,21 @@ def houmo_export_llm(args):
     cfg.model.wrap_cfg.max_sequence_length = args.context_length
     cfg.model.wrap_cfg.input_sequence_length = args.input_sequence_length
 
-
-    input_ids, embed_file, kv_cache_shape, num_hidden_layers, hidden_size = get_prepare_context(cfg, work_dir)
+    input_ids, embed_file, kv_cache_shape, num_hidden_layers, hidden_size = (
+        get_prepare_context(cfg, work_dir)
+    )
 
     quant_bits_str = f"w{cfg.model.quant_config.w_schema.bits}a{cfg.model.quant_config.act_schema.bits}"
     quant_hidden_str = "h1" if cfg.model.quant_config.w_schema.hidden_bit else "h0"
-    quant_type = f"{quant_bits_str}{quant_hidden_str}_{cfg.model.quant_config.w_schema.fp_mode}"
-    prefill_hmonnx_file = export_prefill_decode(cfg, work_dir, input_ids, args.model_name, quant_type, mode="prefill")
-    decode_hmonnx_file = export_prefill_decode(cfg, work_dir, input_ids, args.model_name, quant_type, mode="decode")
+    quant_type = (
+        f"{quant_bits_str}{quant_hidden_str}_{cfg.model.quant_config.w_schema.fp_mode}"
+    )
+    prefill_hmonnx_file = export_prefill_decode(
+        cfg, work_dir, input_ids, args.model_name, quant_type, mode="prefill"
+    )
+    decode_hmonnx_file = export_prefill_decode(
+        cfg, work_dir, input_ids, args.model_name, quant_type, mode="decode"
+    )
 
     meta_info = {
         "create_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
@@ -584,11 +639,14 @@ def houmo_export_llm(args):
     save_json(meta_file, meta_info)
     logger.info(f"Text LLM export complete. Meta saved to {meta_file}")
 
+
 def houmo_export_vision(args):
     from qwen_vl_utils import process_vision_info
     import onnx
 
-    from xhquant.utils.onnxsim_large_model.simplify_large_onnx import simplify_large_onnx
+    from xhquant.utils.onnxsim_large_model.simplify_large_onnx import (
+        simplify_large_onnx,
+    )
 
     hf_model_path = osp.normpath(osp.abspath(args.model))
     image_path = osp.normpath(osp.abspath(args.image))
@@ -596,7 +654,9 @@ def houmo_export_vision(args):
 
     cfg = Config.fromfile(args.vision_config)
 
-    quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=args.quant_type)
+    quant_scheme = QuantScheme(
+        target_device=DeviceType.XH2a, quant_type=args.quant_type
+    )
     QConfig = create_quant_config(quant_scheme)
     cfg.model.quant_config.w_schema.bits = QConfig.w_schema.man_bit
     cfg.model.quant_config.w_schema.fp_mode = QConfig.w_schema.fp_mode
@@ -605,9 +665,7 @@ def houmo_export_vision(args):
     cfg.model.quant_config.act_schema.fp_mode = QConfig.act_schema.fp_mode
     cfg.model.quant_config.act_schema.hidden_bit = QConfig.act_schema.hidden_bit
 
-    prefix = "{}-XH2a-{}".format(
-        args.model_name, format_number(args.context_length)
-    )
+    prefix = "{}-XH2a-{}".format(args.model_name, format_number(args.context_length))
     work_dir = Path(args.work_dir) / prefix
     work_dir.mkdir(exist_ok=True, parents=True)
     log_file = work_dir / "convert.log"
@@ -616,11 +674,16 @@ def houmo_export_vision(args):
     cfg.model.type = "XHQwen3_5VisionModel"
 
     if args.gptqmodel:
-        rotate_path = os.path.join(args.work_dir, "{}_rotate_fp_vl".format(modelscope_name))
+        rotate_path = os.path.join(
+            args.work_dir, "{}_rotate_fp_vl".format(modelscope_name)
+        )
         processor_config_path = os.path.join(hf_model_path, "processor_config.json")
         hf_model_path = osp.normpath(osp.abspath(rotate_path))
         if not os.path.exists(os.path.join(hf_model_path, "processor_config.json")):
-            shutil.copy(processor_config_path, os.path.join(hf_model_path, "processor_config.json"))
+            shutil.copy(
+                processor_config_path,
+                os.path.join(hf_model_path, "processor_config.json"),
+            )
 
     cfg.model.hf_model = hf_model_path
     cfg.hf_model_dir = hf_model_path
@@ -631,7 +694,9 @@ def houmo_export_vision(args):
         or getattr(getattr(hf_config, "text_config", None), "hidden_size", 0)
     )
     if expected_hidden_size <= 0:
-        raise ValueError("Failed to determine expected vision output hidden size from HF config")
+        raise ValueError(
+            "Failed to determine expected vision output hidden size from HF config"
+        )
 
     copaw_flash_vision_model: XHQwen3_5VisionModel = MODELS.build(cfg.model)
     native_model = copaw_flash_vision_model.get_hf_model(device_map="cpu")
@@ -652,8 +717,12 @@ def houmo_export_vision(args):
         }
     ]
 
-    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    image_inputs, video_inputs = process_vision_info(messages, image_patch_size=cfg.model.wrap_cfg.patch_size)
+    text = processor.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+    image_inputs, video_inputs = process_vision_info(
+        messages, image_patch_size=cfg.model.wrap_cfg.patch_size
+    )
 
     inputs = processor(
         text=[text],
@@ -665,11 +734,17 @@ def houmo_export_vision(args):
 
     inputs.to("cpu")
 
-    assert inputs["image_grid_thw"][0][-1] == cfg.model.wrap_cfg.max_size_w // cfg.model.wrap_cfg.patch_size, (
+    assert (
+        inputs["image_grid_thw"][0][-1]
+        == cfg.model.wrap_cfg.max_size_w // cfg.model.wrap_cfg.patch_size
+    ), (
         f"inputs['image_grid_thw'][0][-1] = {inputs['image_grid_thw'][0][-1]}, "
         f"max_size_w = {cfg.model.wrap_cfg.max_size_w}, patch_size = {cfg.model.wrap_cfg.patch_size}"
     )
-    assert inputs["image_grid_thw"][0][-2] == cfg.model.wrap_cfg.max_size_h // cfg.model.wrap_cfg.patch_size, (
+    assert (
+        inputs["image_grid_thw"][0][-2]
+        == cfg.model.wrap_cfg.max_size_h // cfg.model.wrap_cfg.patch_size
+    ), (
         f"inputs['image_grid_thw'][0][-2] = {inputs['image_grid_thw'][0][-2]}, "
         f"max_size_h = {cfg.model.wrap_cfg.max_size_h}, apatch_size = {cfg.model.wrap_cfg.patch_size}"
     )
@@ -679,7 +754,9 @@ def houmo_export_vision(args):
 
     merger = getattr(wraped_model, "merger", None)
     linear_fc2 = getattr(merger, "linear_fc2", None) if merger is not None else None
-    visual_cfg_out_hidden = getattr(getattr(wraped_model, "config", None), "out_hidden_size", None)
+    visual_cfg_out_hidden = getattr(
+        getattr(wraped_model, "config", None), "out_hidden_size", None
+    )
     if linear_fc2 is not None:
         logger.info(
             "Vision merger/projector info: "
@@ -694,7 +771,9 @@ def houmo_export_vision(args):
                 "This indicates the loaded HF visual tower itself is already inconsistent with the target text model."
             )
 
-    pixel_values = inputs["hm_pixel_values"][0].type(wraped_model.dtype).to(wraped_model.device)
+    pixel_values = (
+        inputs["hm_pixel_values"][0].type(wraped_model.dtype).to(wraped_model.device)
+    )
 
     with torch.no_grad():
         sample_output = wraped_model.float().eval().cpu()(pixel_values.float().cpu())
@@ -732,19 +811,21 @@ def houmo_export_vision(args):
 
     vision_onnx_file = str(work_dir / f"{args.model_name}_visual.onnx")
     onnx.save(
-        onnx_model, 
-        vision_onnx_file, 
-        save_as_external_data=True, 
-        all_tensors_to_one_file=True, 
-        location=f"{args.model_name}_visual_external_data", 
-        convert_attribute=True
+        onnx_model,
+        vision_onnx_file,
+        save_as_external_data=True,
+        all_tensors_to_one_file=True,
+        location=f"{args.model_name}_visual_external_data",
+        convert_attribute=True,
     )
 
     os.system("rm -rf {}".format(vision_tmp_onnx_dir))
 
     vision_hmonnx_dir = work_dir / "visual"
     vision_hmonnx_dir.mkdir(exist_ok=True, parents=True)
-    vision_hmonnx_file = vision_hmonnx_dir / f"{args.model_name}_visual_{args.quant_type}.onnx"
+    vision_hmonnx_file = (
+        vision_hmonnx_dir / f"{args.model_name}_visual_{args.quant_type}.onnx"
+    )
 
     convert_onnx_to_hmonnx(
         vision_onnx_file,
@@ -753,7 +834,9 @@ def houmo_export_vision(args):
         out_hmonnx_file=vision_hmonnx_file,
         quant_config=cfg.model.quant_config,
     )
-    logger.info("Export vision model successful, saved to {}".format(vision_hmonnx_file))
+    logger.info(
+        "Export vision model successful, saved to {}".format(vision_hmonnx_file)
+    )
 
     meta_info = {
         "create_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
@@ -763,7 +846,10 @@ def houmo_export_vision(args):
         "vision_output_shape": list(sample_shape),
         "vision_expected_hidden_size": expected_hidden_size,
         "vision_patch_size": cfg.model.wrap_cfg.patch_size,
-        "vision_input_size": [cfg.model.wrap_cfg.max_size_h, cfg.model.wrap_cfg.max_size_w],
+        "vision_input_size": [
+            cfg.model.wrap_cfg.max_size_h,
+            cfg.model.wrap_cfg.max_size_w,
+        ],
         "vision_channels": 3,
         "vision_temporal_patch_size": cfg.model.wrap_cfg.temporal_patch_size,
         "vision_max_size_t": cfg.model.wrap_cfg.max_size_t,
@@ -773,11 +859,12 @@ def houmo_export_vision(args):
     save_json(meta_file, meta_info)
     logger.info(f"Vision export complete. Meta saved to {meta_file}")
 
+
 def move_models(
     work_dir: Path,
     source: str = "prefill",
     model: str = "prefill",
-    target_name: str = "hmquant_CoPaw-Flash_with_act.onnx",
+    target_name: str = "hmquant_copaw-flash_with_act.onnx",
 ):
     source_dir = work_dir / "hmquant/{}".format(source)
     matched_files = list(source_dir.glob("*{}*.onnx".format(model)))
@@ -808,29 +895,21 @@ def move_llm(args):
     dest_dir.mkdir(parents=True, exist_ok=True)
     model_name = os.path.basename(args.model_name)
     hm_model_name = "hmquant_{}_with_act.onnx".format(model_name)
-    hmm_model_dir = "{}-XH2a-{}".format(
-        model_name, format_number(args.context_length)
-    )
+    hmm_model_dir = "{}-XH2a-{}".format(model_name, format_number(args.context_length))
     logger.info(
         msg_output_format("Start move from {} to {}").format(
             work_dir / hmm_model_dir, dest_dir
         )
     )
-    shutil.move(
-        work_dir / hmm_model_dir / "prefill", dest_dir / "hmquant/prefill"
-    )
+    shutil.move(work_dir / hmm_model_dir / "prefill", dest_dir / "hmquant/prefill")
     move_models(dest_dir, "prefill", target_name=hm_model_name)
-    shutil.move(
-        work_dir / hmm_model_dir / "decode", dest_dir / "hmquant/decode"
-    )
+    shutil.move(work_dir / hmm_model_dir / "decode", dest_dir / "hmquant/decode")
     move_models(dest_dir, "decode", "decode", target_name=hm_model_name)
     shutil.move(
         work_dir / hmm_model_dir / "token_embedding.pt",
         dest_dir / "hmquant/quant_embedding.pt",
     )
-    shutil.move(
-        work_dir / hmm_model_dir / "visual", dest_dir / "hmquant/visual"
-    )
+    shutil.move(work_dir / hmm_model_dir / "visual", dest_dir / "hmquant/visual")
     move_models(dest_dir, "visual", "visual", target_name=hm_model_name)
     logger.info(msg_output_format("Start remove work_dir: {}".format(work_dir)))
     shutil.rmtree(work_dir, ignore_errors=True)
@@ -895,25 +974,56 @@ def run_step_in_fresh_process(step_name: str, args: argparse.Namespace):
 
     logger.info(f"Isolated step finished successfully: {step_name}")
 
-if HOUMO_TARGET == 'xh2':
+
+if HOUMO_TARGET == "xh2":
 
     def parse_args():
-        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        )
         parser.add_argument("--model", type=str, default="CoPaw-Flash-9B")
-        parser.add_argument("--model-name", type=str, default="CoPaw-Flash", help="output hmonnx model name")
-        parser.add_argument("--calib_data", type=str,
-                            default="qwen3_8b_gen_data.jsonl",
-                            help="calibration dataset choose")
-        parser.add_argument("--image", type=str, default=f"{HOUMO_PIC_PATH}/beach.jpeg", help="vision input image")
+        parser.add_argument(
+            "--model-name",
+            type=str,
+            default="copaw-flash",
+            help="output hmonnx model name",
+        )
+        parser.add_argument(
+            "--calib_data",
+            type=str,
+            default="qwen3_8b_gen_data.jsonl",
+            help="calibration dataset choose",
+        )
+        parser.add_argument(
+            "--image",
+            type=str,
+            default=f"{HOUMO_PIC_PATH}/beach.jpeg",
+            help="vision input image",
+        )
         parser.add_argument("--work-dir", type=str, default="work_dirs/")
-        parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
+        parser.add_argument(
+            "--out-dir", type=str, default="output/{}".format(HOUMO_TARGET)
+        )
         parser.add_argument("--llm_config", type=str, default="llm_config.py")
         parser.add_argument("--vision_config", type=str, default="vision_config.py")
         parser.add_argument("--debug", action="store_true", help="debug mode")
-        parser.add_argument("--context-length", type=int, default=2048, help="max sequence length")
-        parser.add_argument("--input-sequence-length", type=int, default=256, help="input sequence length")
-        parser.add_argument("--quant-type", default="w8a8h0_ssfp", help="quant type, default is w8a8h0_ssfp")
-        parser.add_argument("--gptqmodel", action="store_true", help="use gptqmodel to quant")
+        parser.add_argument(
+            "--context-length", type=int, default=2048, help="max sequence length"
+        )
+        parser.add_argument(
+            "--input-sequence-length",
+            type=int,
+            default=256,
+            help="input sequence length",
+        )
+        parser.add_argument(
+            "--quant-type",
+            default="w8a8h0_ssfp",
+            help="quant type, default is w8a8h0_ssfp",
+        )
+        parser.add_argument(
+            "--gptqmodel", action="store_true", help="use gptqmodel to quant"
+        )
         args = parser.parse_args()
         return args
 
@@ -926,6 +1036,7 @@ if HOUMO_TARGET == 'xh2':
         houmo_export_llm(args)
         houmo_export_vision(args)
         move_llm(args)
+
 
 if __name__ == "__main__":
     if not check_gpu():

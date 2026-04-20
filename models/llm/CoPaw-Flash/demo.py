@@ -45,12 +45,15 @@ sys.path.append(str(Path(__file__).parent))
 from processing_copawflash import CoPawFlashProcessor
 from image_processing_copawflash import CoPawFlashImageProcessor
 from vision_process_copawflash import process_vision_info
+
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 IMAGE_TOKEN_ID = 248056
 VIDEO_TOKEN_ID = 248057
 VISION_START_TOKEN_ID = 248053
 SPATIAL_MERGE_SIZE = 2
 TEMPORAL_PATCH_SIZE = 2
+
+
 def is_valid_char(cp):
     if (
         (cp >= 0x4E00 and cp <= 0x9FFF)
@@ -66,6 +69,8 @@ def is_valid_char(cp):
     ):
         return True
     return False
+
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -87,14 +92,14 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "CoPaw-Flash_prefill.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "copaw-flash_prefill.hmm"),
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "CoPaw-Flash_decode.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "copaw-flash_decode.hmm"),
         help="houmo decode model path",
     )
     parser.add_argument(
@@ -145,7 +150,7 @@ def get_args() -> argparse.Namespace:
         "--vision_path",
         dest="vision_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "CoPaw-Flash_visual.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "copaw-flash_visual.hmm"),
         help="houmo vision model path (.hmm)",
     )
     parser.add_argument(
@@ -193,11 +198,16 @@ def get_args() -> argparse.Namespace:
         args.decode_path = args.decode_path.replace(".hmm", ".hmms")
     args.image_path = normalize_image_inputs(args.image_path)
     return args
+
+
 class _DummyVideoProcessor(BaseVideoProcessor):
     model_input_names = ["pixel_values_videos", "video_grid_thw"]
+
     def __call__(self, videos=None, **kwargs):
         del videos, kwargs
         return BatchFeature(data={})
+
+
 def build_processor(
     tokenizer_dir: str, max_size_h: int, max_size_w: int, patch_size: int
 ) -> CoPawFlashProcessor:
@@ -220,6 +230,8 @@ def build_processor(
         video_processor=_DummyVideoProcessor(),
         chat_template=chat_template,
     )
+
+
 def build_messages(
     prompt: str,
     image_paths: Sequence[str],
@@ -274,6 +286,8 @@ def normalize_image_inputs(
                 else:
                     image_paths.append(image_path)
     return image_paths or None
+
+
 def prompt_for_image_paths() -> Optional[List[str]]:
     image_paths = []
     image_index = 1
@@ -289,6 +303,8 @@ def prompt_for_image_paths() -> Optional[List[str]]:
         image_paths.extend(normalized_paths)
         image_index += 1
     return image_paths or None
+
+
 def scatter_image_embeds(input_ids, token_embeds, image_embeds, image_token_id):
     """Replace image placeholder embeddings with actual vision features."""
     n_image_tokens = int((input_ids == image_token_id).sum().item())
@@ -309,6 +325,8 @@ def scatter_image_embeds(input_ids, token_embeds, image_embeds, image_token_id):
     image_mask = (input_ids == image_token_id).unsqueeze(-1).expand_as(token_embeds)
     image_embeds = image_embeds.to(token_embeds.device, token_embeds.dtype)
     return token_embeds.masked_scatter(image_mask, image_embeds)
+
+
 class SamplingManager:
     def __init__(
         self,
@@ -323,13 +341,16 @@ class SamplingManager:
         self.top_p = top_p
         self.repetition_penalty = repetition_penalty
         self.min_tokens_to_keep = min_tokens_to_keep
+
     def softmax(self, x: np.ndarray) -> np.ndarray:
         exp_x = np.exp(x - np.max(x))
         return exp_x / np.sum(exp_x)
+
     def apply_temperature(self, logits: np.ndarray) -> np.ndarray:
         if self.temperature <= 0:
             raise ValueError("Temperature must larger than 0")
         return logits / self.temperature
+
     def apply_repetition_penalty(
         self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
     ) -> np.ndarray:
@@ -347,6 +368,7 @@ class SamplingManager:
                         logits[token_id] / self.repetition_penalty
                     )
         return adjusted_logits
+
     def apply_top_k(self, probs: np.ndarray) -> np.ndarray:
         if self.top_k is None or self.top_k <= 0:
             return probs
@@ -363,6 +385,7 @@ class SamplingManager:
         else:
             normalized_probs = np.ones_like(probs) / len(probs)
         return normalized_probs
+
     def apply_top_p(self, probs: np.ndarray) -> np.ndarray:
         if self.top_p >= 1.0:
             return probs
@@ -386,6 +409,7 @@ class SamplingManager:
         else:
             normalized_probs = np.ones_like(probs) / len(probs)
         return normalized_probs
+
     def process_logits(
         self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
     ) -> np.ndarray:
@@ -405,6 +429,7 @@ class SamplingManager:
         # 5. apply temperature
         probs = self.apply_temperature(probs)
         return probs
+
     def sample(
         self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
     ) -> int:
@@ -417,10 +442,13 @@ class SamplingManager:
         # sampled_index = np.random.choice(len(probs), p=probs)
         sampled_index = probs.argmax(-1)
         return np.array([[sampled_index]])
+
     def get_processed_probs(
         self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
     ) -> np.ndarray:
         return self.process_logits(logits, previous_tokens)
+
+
 def show_ttft_breakdown(
     ttft_time: float,
     perf_tracker: InferencePerformanceTracker,
@@ -461,6 +489,8 @@ def show_ttft_breakdown(
     if residual_ms > 0:
         logger.success(f"  Other/Untracked: {residual_ms:.3f} ms")
     logger.success(f"  Total TTFT: {ttft_ms:.3f} ms")
+
+
 class HmCoPawFlash:
     def __init__(
         self,
@@ -521,9 +551,15 @@ class HmCoPawFlash:
         self.prefill_valid_length_name = self.prefill.get_input_name(4)
         self.prefill_current_length_name = self.prefill.get_input_name(5)
         self.prefill_linear_attn_mask_name = self.prefill.get_input_name(6)
-        self.prefill_time_position_ids_info = self.prefill.get_input_info(self.prefill_time_position_ids_name)
-        self.prefill_height_position_ids_info = self.prefill.get_input_info(self.prefill_height_position_ids_name)
-        self.prefill_width_position_ids_info = self.prefill.get_input_info(self.prefill_width_position_ids_name)
+        self.prefill_time_position_ids_info = self.prefill.get_input_info(
+            self.prefill_time_position_ids_name
+        )
+        self.prefill_height_position_ids_info = self.prefill.get_input_info(
+            self.prefill_height_position_ids_name
+        )
+        self.prefill_width_position_ids_info = self.prefill.get_input_info(
+            self.prefill_width_position_ids_name
+        )
 
         self.decode_input_name = self.decode.get_input_name(0)
         self.decode_time_position_ids_name = self.decode.get_input_name(1)
@@ -532,9 +568,15 @@ class HmCoPawFlash:
         self.decode_valid_length_name = self.decode.get_input_name(4)
         self.decode_current_length_name = self.decode.get_input_name(5)
         self.decode_linear_attn_mask_name = self.decode.get_input_name(6)
-        self.decode_time_position_ids_info = self.decode.get_input_info(self.decode_time_position_ids_name)
-        self.decode_height_position_ids_info = self.decode.get_input_info(self.decode_height_position_ids_name)
-        self.decode_width_position_ids_info = self.decode.get_input_info(self.decode_width_position_ids_name)
+        self.decode_time_position_ids_info = self.decode.get_input_info(
+            self.decode_time_position_ids_name
+        )
+        self.decode_height_position_ids_info = self.decode.get_input_info(
+            self.decode_height_position_ids_name
+        )
+        self.decode_width_position_ids_info = self.decode.get_input_info(
+            self.decode_width_position_ids_name
+        )
 
         self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
         for i in range(self.prefill.get_num_inputs()):
@@ -589,10 +631,13 @@ class HmCoPawFlash:
             self.embedding_weight = embedding_weight.reshape(
                 -1, self.embedding_len
             ).float()
-        elif isinstance(embedding_weight, (dict, OrderedDict)) and "weight" in embedding_weight:
-            self.embedding_weight = embedding_weight["weight"].reshape(
-                -1, self.embedding_len
-            ).float()
+        elif (
+            isinstance(embedding_weight, (dict, OrderedDict))
+            and "weight" in embedding_weight
+        ):
+            self.embedding_weight = (
+                embedding_weight["weight"].reshape(-1, self.embedding_len).float()
+            )
         else:
             raise ValueError("Unsupported embedding weight format in the checkpoint")
         self.context_length = 0
@@ -621,6 +666,7 @@ class HmCoPawFlash:
         mask = np.zeros((1, fill_length), dtype=np.float16)
         mask[0, :new_cache_length] = 1.0
         return mask
+
     def clear_cache(self):
         for i in range(self.prefill.get_num_inputs()):
             input_name = self.prefill.get_input_name(i)
@@ -650,6 +696,7 @@ class HmCoPawFlash:
                 "For the current CoPaw-Flash text model, the visual `image_embeds` last dim must match the text embedding dim. "
                 "This usually means the exported visual model is from a different checkpoint or exports an intermediate tensor rather than the final projected image embeddings."
             )
+
     def run_vision(
         self, hm_pixel_values: Union[Sequence[torch.Tensor], torch.Tensor]
     ) -> torch.Tensor:
@@ -689,6 +736,7 @@ class HmCoPawFlash:
                 image_embeds = image_embeds.squeeze(0)
             image_embeds_list.append(image_embeds)
         return torch.cat(image_embeds_list, dim=0)
+
     def maybe_fix_image_token_id(
         self, input_ids: torch.Tensor, image_embeds: torch.Tensor
     ):
@@ -706,6 +754,7 @@ class HmCoPawFlash:
         raise ValueError(
             f"Image token count mismatch: configured={token_count}, feature_tokens={image_embeds.shape[0]}"
         )
+
     def get_rope_index_text(
         self,
         valid_length: int,
@@ -720,6 +769,7 @@ class HmCoPawFlash:
         position_ids = position_ids.expand(3, 1, current_length)
         mrope_position_deltas = torch.tensor([[0]], dtype=torch.long)
         return position_ids, mrope_position_deltas
+
     def get_rope_index(
         self,
         input_ids: torch.LongTensor,
@@ -727,8 +777,7 @@ class HmCoPawFlash:
         video_grid_thw: Optional[torch.LongTensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Compute M-RoPE position IDs for vision+text input.
-        """
+        """Compute M-RoPE position IDs for vision+text input."""
         if input_ids is not None and (
             image_grid_thw is not None or video_grid_thw is not None
         ):
@@ -860,6 +909,7 @@ class HmCoPawFlash:
             [input_ids.shape[0], 1], dtype=input_ids.dtype, device=input_ids.device
         )
         return position_ids, deltas
+
     def chat(self, question, image_paths=None):
         use_vision = image_paths is not None
         if use_vision and self.vision is None:
@@ -1040,24 +1090,46 @@ class HmCoPawFlash:
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_INPUT_TIME)
             self.prefill.set_input(self.prefill_input_name, input_data.detach().numpy())
             self.prefill.set_input(self.prefill_valid_length_name, valid_length_data)
-            self.prefill.set_input(self.prefill_current_length_name, current_length_data)
+            self.prefill.set_input(
+                self.prefill_current_length_name, current_length_data
+            )
 
             prefill_time_position_ids_data = chunk_pos[0].numpy()
-            if len(self.prefill_time_position_ids_info.shape) > len(prefill_time_position_ids_data.shape):
-                prefill_time_position_ids_data = prefill_time_position_ids_data[np.newaxis, :]
-            self.prefill.set_input(self.prefill_time_position_ids_name, prefill_time_position_ids_data)
-            
+            if len(self.prefill_time_position_ids_info.shape) > len(
+                prefill_time_position_ids_data.shape
+            ):
+                prefill_time_position_ids_data = prefill_time_position_ids_data[
+                    np.newaxis, :
+                ]
+            self.prefill.set_input(
+                self.prefill_time_position_ids_name, prefill_time_position_ids_data
+            )
+
             prefill_height_position_ids_data = chunk_pos[1].numpy()
-            if len(self.prefill_height_position_ids_info.shape) > len(prefill_height_position_ids_data.shape):
-                prefill_height_position_ids_data = prefill_height_position_ids_data[np.newaxis, :]
-            self.prefill.set_input(self.prefill_height_position_ids_name, prefill_height_position_ids_data)
+            if len(self.prefill_height_position_ids_info.shape) > len(
+                prefill_height_position_ids_data.shape
+            ):
+                prefill_height_position_ids_data = prefill_height_position_ids_data[
+                    np.newaxis, :
+                ]
+            self.prefill.set_input(
+                self.prefill_height_position_ids_name, prefill_height_position_ids_data
+            )
 
             prefill_width_position_ids_data = chunk_pos[2].numpy()
-            if len(self.prefill_width_position_ids_info.shape) > len(prefill_width_position_ids_data.shape):
-                prefill_width_position_ids_data = prefill_width_position_ids_data[np.newaxis, :]
-            self.prefill.set_input(self.prefill_width_position_ids_name, prefill_width_position_ids_data)
+            if len(self.prefill_width_position_ids_info.shape) > len(
+                prefill_width_position_ids_data.shape
+            ):
+                prefill_width_position_ids_data = prefill_width_position_ids_data[
+                    np.newaxis, :
+                ]
+            self.prefill.set_input(
+                self.prefill_width_position_ids_name, prefill_width_position_ids_data
+            )
 
-            self.prefill.set_input(self.prefill_linear_attn_mask_name, linear_attn_mask_data)
+            self.prefill.set_input(
+                self.prefill_linear_attn_mask_name, linear_attn_mask_data
+            )
             self.perf_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_INFER_TIME)
             prefill_start = time.time()
@@ -1122,11 +1194,17 @@ class HmCoPawFlash:
                 time_position_ids_data = decode_position_ids[0][0].numpy()
                 hight_position_ids_data = decode_position_ids[1][0].numpy()
                 width_position_ids_data = decode_position_ids[2][0].numpy()
-            if len(self.decode_time_position_ids_info.shape) > len(time_position_ids_data.shape):
+            if len(self.decode_time_position_ids_info.shape) > len(
+                time_position_ids_data.shape
+            ):
                 time_position_ids_data = time_position_ids_data[np.newaxis, :]
-            if len(self.decode_height_position_ids_info.shape) > len(hight_position_ids_data.shape):
+            if len(self.decode_height_position_ids_info.shape) > len(
+                hight_position_ids_data.shape
+            ):
                 hight_position_ids_data = hight_position_ids_data[np.newaxis, :]
-            if len(self.decode_width_position_ids_info.shape) > len(width_position_ids_data.shape):
+            if len(self.decode_width_position_ids_info.shape) > len(
+                width_position_ids_data.shape
+            ):
                 width_position_ids_data = width_position_ids_data[np.newaxis, :]
 
             self.decode.set_input(input_name, input_data.detach().numpy())
@@ -1187,8 +1265,11 @@ class HmCoPawFlash:
             num_images=num_images,
         )
         return all_response, input_echo_len, decode_count + 1
+
     def chat_vision(self, question, image_paths):
         return self.chat(question, image_paths=image_paths)
+
+
 if __name__ == "__main__":
     args = get_args()
     supports_vision = args.vision_path is not None
@@ -1243,6 +1324,7 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Error during chat: {e}")
                 import traceback
+
                 traceback.print_exc()
                 if not args.it:
                     break

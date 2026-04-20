@@ -85,7 +85,7 @@ if __name__ == "__main__":
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": "CoPaw-Flash",
+        "model_name": "copaw-flash",
         "model_info": {
             "model_size": args.model_size,
             "ncore": 2,
@@ -94,7 +94,7 @@ if __name__ == "__main__":
             "prefill_len": 256,
             "batch": 1,
         },
-        "raw_files": {"raw_path":"models/dataset/qwen3_8b_gen_data.jsonl"},
+        "raw_files": {"raw_path": "models/dataset/qwen3_8b_gen_data.jsonl"},
         "modelscope_repo": {
             "repo_ids": ["AgentScope/CoPaw-Flash-9B"],
             "local_dirs": [f"{args.download_dir}/CoPaw-Flash-9B"],

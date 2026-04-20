@@ -26,6 +26,7 @@ import psutil
 import threading
 import multiprocessing
 import argparse
+import glob
 
 import logging
 
@@ -123,6 +124,7 @@ class ProcessMemoryMonitor:
             )  # Wait a moment for the thread to finish
         print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
 
+
 def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
     """Validates and adjusts FlashAttention parameter values."""
     llm_val, vit_val = flash_vals
@@ -146,6 +148,7 @@ def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> 
 
     return (llm_val, vit_val)
 
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -160,7 +163,7 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="CoPaw-Flash",
+        default="copaw-flash",
         help="output houmo model name",
     )
     parser.add_argument(
@@ -242,7 +245,6 @@ def get_args() -> argparse.Namespace:
 def build_llm(
     model_name,
     model_dir,
-    model_path,
     output_dir,
     profile,
     ncore,
@@ -280,7 +282,8 @@ def build_llm(
 
     start = time.time()
     print(f"\n===> {model_name} build start... \n kwargs:{kwargs}")
-    decode_model = os.path.join(model_dir, model_path)
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -296,9 +299,8 @@ def build_llm(
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
-def build_vit(
-    model_name, model_dir, model_path, output_dir, profile, ncore, j, flash_attention
-):
+
+def build_vit(model_name, model_dir, output_dir, profile, ncore, j, flash_attention):
     import tcim
 
     kwargs = {}
@@ -312,7 +314,8 @@ def build_vit(
 
     start = time.time()
     print(f"\n===> {model_name} build start... \n kwargs:{kwargs}")
-    decode_model = os.path.join(model_dir, model_path)
+    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
+    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
     tcim.build_from_hmonnx(
         decode_model,
         weights=os.path.join(model_dir, "weight.npy"),
@@ -326,6 +329,7 @@ def build_vit(
     )
     profile["build"] = time.time() - start
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
+
 
 def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     import tcim_lite
@@ -453,11 +457,9 @@ if __name__ == "__main__":
         if arch != "x86_64":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
-        model_path = f"hmquant_{model_name}_with_act.onnx"
         build_vit(
-            "CoPaw-Flash_visual",
+            f"{model_name}_visual",
             os.path.join(model_dir, "visual"),
-            model_path,
             output_dir,
             profile,
             ncore,
@@ -465,9 +467,8 @@ if __name__ == "__main__":
             flash_attention=vit_flash_attention,
         )
         build_llm(
-            "CoPaw-Flash_prefill",
+            f"{model_name}_prefill",
             os.path.join(model_dir, "prefill"),
-            model_path,
             output_dir,
             profile,
             ncore,
@@ -478,9 +479,8 @@ if __name__ == "__main__":
             prefill_length=args.prefill_length,
         )
         build_llm(
-            "CoPaw-Flash_decode",
+            f"{model_name}_decode",
             os.path.join(model_dir, "decode"),
-            model_path,
             output_dir,
             profile,
             ncore,
@@ -494,10 +494,10 @@ if __name__ == "__main__":
     # test model
     if args.stage == "test" or args.stage == "all":
         part_dir = os.path.join(model_dir, "prefill")
-        test("CoPaw-Flash_prefill", part_dir, output_dir, profile, prefix=model_name)
+        test(f"{model_name}_prefill", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "decode")
-        test("CoPaw-Flash_decode", part_dir, output_dir, profile, prefix=model_name)
+        test(f"{model_name}_decode", part_dir, output_dir, profile, prefix=model_name)
         part_dir = os.path.join(model_dir, "visual")
-        test("CoPaw-Flash_visual", part_dir, output_dir, profile, prefix=model_name)
+        test(f"{model_name}_visual", part_dir, output_dir, profile, prefix=model_name)
 
     memory_monitor.stop()

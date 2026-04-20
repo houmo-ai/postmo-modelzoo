@@ -130,9 +130,9 @@ python3 build.py --context_length 8192 --prefill_length 256 --flash_attention 2 
 
 编译输出默认位于 `output/$HOUMO_TARGET` 目录，包括：
 
-- `CoPaw-Flash_prefill.hmm`
-- `CoPaw-Flash_decode.hmm`
-- `CoPaw-Flash_visual.hmm`
+- `copaw-flash_prefill.hmm`
+- `copaw-flash_decode.hmm`
+- `copaw-flash_visual.hmm`
 
 当 `--ndevice 2` 时，LLM 模型会生成对应的多设备模型文件。
 
