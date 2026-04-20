@@ -27,6 +27,9 @@ from pathlib import Path
 import time
 import psutil
 import threading
+import queue
+import traceback
+import multiprocessing as mp
 import random
 import numpy as np
 from typing import Any, Dict
@@ -832,6 +835,66 @@ def move_llm(args):
     logger.info(msg_output_format("Start remove work_dir: {}".format(work_dir)))
     shutil.rmtree(work_dir, ignore_errors=True)
 
+
+def _run_isolated_step(step_name: str, args_dict: Dict[str, Any], result_queue):
+    child_args = argparse.Namespace(**args_dict)
+    try:
+        set_seed(42)
+        if step_name == "gptq_quant_llm":
+            gptq_quant_llm(child_args)
+        elif step_name == "rotate_fp_vl":
+            rotate_fp_vl(child_args)
+        else:
+            raise ValueError(f"Unsupported isolated step: {step_name}")
+        cleanup_cuda()
+        cleanup_cpu()
+        result_queue.put({"ok": True})
+    except Exception as exc:
+        cleanup_cuda()
+        cleanup_cpu()
+        result_queue.put(
+            {
+                "ok": False,
+                "error": str(exc),
+                "traceback": traceback.format_exc(),
+            }
+        )
+
+
+def run_step_in_fresh_process(step_name: str, args: argparse.Namespace):
+    logger.info(f"Start isolated step in fresh process: {step_name}")
+    ctx = mp.get_context("spawn")
+    result_queue = ctx.Queue()
+    process = ctx.Process(
+        target=_run_isolated_step,
+        args=(step_name, vars(args).copy(), result_queue),
+        name=step_name,
+    )
+    process.start()
+    process.join()
+
+    result = None
+    try:
+        result = result_queue.get()
+    except queue.Empty:
+        result = None
+
+    result_queue.close()
+    result_queue.join_thread()
+    process.close()
+
+    if result is not None and not result.get("ok", False):
+        raise RuntimeError(
+            f"Isolated step `{step_name}` failed: {result['error']}\n{result['traceback']}"
+        )
+
+    if process.exitcode != 0:
+        raise RuntimeError(
+            f"Isolated step `{step_name}` exited unexpectedly with code {process.exitcode}"
+        )
+
+    logger.info(f"Isolated step finished successfully: {step_name}")
+
 if HOUMO_TARGET == 'xh2':
 
     def parse_args():
@@ -858,8 +921,8 @@ if HOUMO_TARGET == 'xh2':
         args = parse_args()
         set_seed(42)
         if args.gptqmodel:
-            rotate_fp_vl(args)
-            gptq_quant_llm(args)
+            run_step_in_fresh_process("rotate_fp_vl", args)
+            run_step_in_fresh_process("gptq_quant_llm", args)
         houmo_export_llm(args)
         houmo_export_vision(args)
         move_llm(args)
