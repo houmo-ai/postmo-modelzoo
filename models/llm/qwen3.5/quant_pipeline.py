@@ -164,40 +164,20 @@ def quant_llm(args) -> None:
 
 
 def quant_llm_moe(args) -> None:
-    """Step1: example_qwen35_moe_vl_rotate_fp.py → Step2: example_qwen35moe.py."""
+    """MoE GPTQ only: skip rotate_fp and quantize with example_qwen35moe.py."""
     if getattr(args, "export_only", False):
-        logger.info("export_only: skip quantization (use existing rotated + GPTQ dirs)")
+        logger.info("export_only: skip quantization (use existing GPTQ dir)")
         return
 
     src = _src_dir()
     if not src.is_dir():
         raise FileNotFoundError(f"Missing src directory: {src}")
 
-    work_root, _name, rotated_dir, gptq_dir = _paths(args)
+    work_root, _name, _rotated_dir, gptq_dir = _paths(args)
     work_root.mkdir(parents=True, exist_ok=True)
     py = sys.executable
     device = getattr(args, "device", "cuda:0")
     resume = getattr(args, "resume", False)
-
-    if resume and _hf_dir_ready(rotated_dir):
-        logger.info("Resume: skip rotation (found {})", rotated_dir)
-    else:
-        cmd = [
-            py,
-            str(src / "example_qwen35_moe_vl_rotate_fp.py"),
-            "--model",
-            str(Path(args.model).resolve()),
-            "--out",
-            str(rotated_dir),
-            "--llm-rotation",
-            "hadamard",
-            "--vision-rotation",
-            "last",
-            "--device",
-            device,
-            "--no-validate",
-        ]
-        _run_step(cmd, src)
 
     if resume and _hf_dir_ready(gptq_dir):
         logger.info("Resume: skip GPTQ (found {})", gptq_dir)
@@ -209,8 +189,6 @@ def quant_llm_moe(args) -> None:
             str(Path(args.model).resolve()),
             "--out",
             str(gptq_dir),
-            "--rotation",
-            "hadamard",
             "--hessian-mse",
             "--moe-routing",
             "bypass",
@@ -307,12 +285,10 @@ def export_llm(args) -> None:
 def export_llm_moe(args) -> None:
     """MoE Step3: vision HMONNX; Step4: LLM HMONNX."""
     src = _src_dir()
-    _work_root, _name, rotated_dir, gptq_dir = _paths(args)
+    _work_root, _name, _rotated_dir, gptq_dir = _paths(args)
     out_root = Path(args.out_dir).resolve()
     out_root.mkdir(parents=True, exist_ok=True)
 
-    if not _hf_dir_ready(rotated_dir):
-        raise FileNotFoundError(f"Rotated model not found: {rotated_dir}")
     if not _hf_dir_ready(gptq_dir):
         raise FileNotFoundError(f"GPTQ model not found: {gptq_dir}")
 
@@ -337,7 +313,7 @@ def export_llm_moe(args) -> None:
             "--config",
             MOE_VISION_CONFIG,
             "--hf_model_dir",
-            str(rotated_dir),
+            str(Path(args.model).resolve()),
             "--model_name",
             str(model_name),
             "--output_dir",
