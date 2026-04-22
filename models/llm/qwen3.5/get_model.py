@@ -2,7 +2,7 @@
 #
 # File: get_model.py
 # Description:
-#   Download Qwen3.5 model (2B/4B/9B/27B/35B-A3B) for text generation tasks.
+#   Download Qwen3.5 / Qwen3.6 models for text generation tasks.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -86,8 +86,8 @@ def get_args() -> argparse.Namespace:
         dest="model_size",
         type=str,
         default="9b",
-        choices=["2b", "4b", "9b", "27b", "35b-a3b"],
-        help="model size: 2b, 4b, 9b, 27b or 35b-a3b",
+        choices=["2b", "4b", "9b", "27b", "35b-a3b", "3.6-35b-a3b"],
+        help="model size: 2b, 4b, 9b, 27b, 35b-a3b or 3.6-35b-a3b",
     )
     args = parser.parse_args()
     return args
@@ -100,28 +100,45 @@ if __name__ == "__main__":
     model_configs = {
         "2b": {
             "model_size": "2b",
+            "model_name": "qwen3.5",
+            "local_dir": "qwen3.5",
             "ncore": 2,
             "modelscope_repo": ["Qwen/Qwen3.5-2B"],
         },
         "4b": {
             "model_size": "4b",
+            "model_name": "qwen3.5",
+            "local_dir": "qwen3.5",
             "ncore": 2,
             "modelscope_repo": ["Qwen/Qwen3.5-4B"],
         },
         "9b": {
             "model_size": "9b",
+            "model_name": "qwen3.5",
+            "local_dir": "qwen3.5",
             "ncore": 2,
             "modelscope_repo": ["Qwen/Qwen3.5-9B"],
         },
         "27b": {
             "model_size": "27b",
+            "model_name": "qwen3.5",
+            "local_dir": "qwen3.5",
             "ncore": 2,
             "modelscope_repo": ["Qwen/Qwen3.5-27B"],
         },
         "35b-a3b": {
             "model_size": "35b-a3b",
+            "model_name": "qwen3.5",
+            "local_dir": "qwen3.5",
             "ncore": 2,
             "modelscope_repo": ["Qwen/Qwen3.5-35B-A3B"],
+        },
+        "3.6-35b-a3b": {
+            "model_size": "3.6-35b-a3b",
+            "model_name": "qwen3.6",
+            "local_dir": "qwen3.6",
+            "ncore": 2,
+            "modelscope_repo": ["Qwen/Qwen3.6-35B-A3B"],
         },
     }
 
@@ -131,7 +148,7 @@ if __name__ == "__main__":
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": "qwen3.5",
+        "model_name": config["model_name"],
         "model_info": {
             "model_size": config["model_size"],
             "ncore": config["ncore"],
@@ -143,7 +160,7 @@ if __name__ == "__main__":
         "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
         "modelscope_repo": {
             "repo_ids": config["modelscope_repo"],
-            "local_dirs": [f"{args.download_dir}/qwen3.5"],
+            "local_dirs": [f"{args.download_dir}/{config['local_dir']}"],
         },
     }
 

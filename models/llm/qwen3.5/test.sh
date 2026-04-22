@@ -18,16 +18,22 @@ MODEL_SIZE="9b"
 parse_args "$@"
 
 case "${MODEL_SIZE}" in
-    2b|4b|9b|27b|35b-a3b)
+    2b|4b|9b|27b|35b-a3b|3.6-35b-a3b)
         ;;
     *)
-        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 2b, 4b, 9b, 27b, 35b-a3b." >&2
+        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 2b, 4b, 9b, 27b, 35b-a3b, 3.6-35b-a3b." >&2
         exit 1
         ;;
 esac
 
 PERF_CONFIG="config.yaml"
+RUN_MODEL_NAME="qwen3.5"
 RAW_HF_DIR="${SCRIPT_DIR}/qwen3.5"
+if [[ "${MODEL_SIZE}" == "3.6-35b-a3b" ]]; then
+    RUN_MODEL_NAME="qwen3.6"
+    RAW_HF_DIR="${SCRIPT_DIR}/qwen3.6"
+    PERF_CONFIG="config.qwen3.6.yaml"
+fi
 
 cd "${SCRIPT_DIR}"
 
@@ -50,28 +56,37 @@ if should_run_step "quant"; then
 
     if ! should_skip_download; then
         echo "Download raw model (size: ${MODEL_SIZE}) → ${RAW_HF_DIR}."
-        python3 get_model.py --type raw --model_size ${MODEL_SIZE}
+        python3 get_model.py --type raw --model_size "${MODEL_SIZE}"
     fi
     echo "Start model quantization (size: ${MODEL_SIZE})."
-    PTQ_ARGS="--model ${RAW_HF_DIR}"
+    PTQ_ARGS=(--model "${RAW_HF_DIR}")
     if [[ -n "${VISION_IMAGE}" ]]; then
-        PTQ_ARGS+=" --vision-image-path ${VISION_IMAGE}"
+        PTQ_ARGS+=(--vision-image-path "${VISION_IMAGE}")
     fi
-    python3 ptq.py ${PTQ_ARGS}
+    python3 ptq.py "${PTQ_ARGS[@]}"
 fi
 
 if should_run_step "build"; then
     echo "Start model compilation (size: ${MODEL_SIZE})."
-    python3 build.py --model_size ${MODEL_SIZE}
+    python3 build.py --model_size "${MODEL_SIZE}" --model_name "${RUN_MODEL_NAME}"
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
         echo "Download pre-compiled model (size: ${MODEL_SIZE})."
-        python3 get_model.py --type hmm --model_size ${MODEL_SIZE}
+        python3 get_model.py --type hmm --model_size "${MODEL_SIZE}"
     fi
     echo "Execute demo."
-    python3 demo.py
+    if [[ "${MODEL_SIZE}" == "3.6-35b-a3b" ]]; then
+        target_dir="${HOUMO_TARGET:-xh2}"
+        python3 demo.py \
+            --tokenizer_dir "${RAW_HF_DIR}" \
+            --prefill_path "output/${target_dir}/${RUN_MODEL_NAME}_prefill.hmm" \
+            --decode_path "output/${target_dir}/${RUN_MODEL_NAME}_decode.hmm" \
+            --vision_path "output/${target_dir}/${RUN_MODEL_NAME}_visual.hmm"
+    else
+        python3 demo.py
+    fi
     echo "Execute performance case."
     python3 ../../../tools/llm_perf/convert_embed.py --path "output/xh2/hmquant/quant_embedding.pt"
     llm_perf -c "${PERF_CONFIG}"
