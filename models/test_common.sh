@@ -212,7 +212,7 @@ setup_python_venv() {
         venv_site_packages=$("${venv_python}" -c "import site; print(site.getsitepackages()[0])")
         {
             echo 'export ORIGINAL_PYTHONPATH=$PYTHONPATH'
-            echo "export PYTHONPATH=${venv_site_packages}:${system_site_packages}:\$ORIGINAL_PYTHONPATH"
+            echo "export PYTHONPATH=${venv_site_packages}:\$ORIGINAL_PYTHONPATH:${system_site_packages}"
         } >> "${venv_dir}/bin/activate"
         {
             echo 'export PYTHONPATH=$ORIGINAL_PYTHONPATH'
