@@ -130,8 +130,8 @@ def main():
     build_exclusive_group = build_parser.add_mutually_exclusive_group(required=True)
     build_exclusive_group.add_argument("--config", "-c", type=str, help="Specify config file path")
     build_exclusive_group.add_argument("--hmonnx", type=str, help="Specify hmonnx file path")
-    build_parser.add_argument("--hmm_name", type=str, help="Specify hmodel name" if "--hmonnx" in sys.argv else argparse.SUPPRESS)
-    build_parser.add_argument("--output", "-o", type=str, default="output", help="Specify output path" if "--hmonnx" in sys.argv else argparse.SUPPRESS)
+    build_parser.add_argument("--hmm_name", type=str, help="Specify hmodel name (only for --hmonnx mode)")
+    build_parser.add_argument("--output", "-o", type=str, default="output", help="Specify output path (only for --hmonnx mode)")
     build_parser.add_argument("--flash_attn", type=int, default=0, choices=[0, 1, 2], help="flash attention optimization: 0=off, 1=graph level, 2=operator level")
     build_parser.add_argument("--llm_opt", action="store_true", help="enable llm optimization")
     build_parser.add_argument("--enable_xh2_stable_output", action="store_true", help="enable xh2 stable output (prefill faster, decode slower)")
@@ -275,7 +275,12 @@ def main():
     if current_command == "check" and args.hmm is not None:
         from .exec.xh2_exec import Xh2Exec as Exec
 
-        Exec.check_golden_from_hmm(args.hmm, args.golden, device_id=args.device_id)
+        Exec.check_golden_from_hmm(
+            args.hmm,
+            args.golden,
+            device_id=args.device_id,
+            model_json_path=args.model_json,
+        )
         return
 
     # Generate golden

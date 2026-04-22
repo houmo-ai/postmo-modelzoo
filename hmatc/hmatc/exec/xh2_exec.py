@@ -1163,7 +1163,7 @@ class Xh2Exec(BaseExec):
         if (batch > 1 and roi_num > 1) or batch < 0 or roi_num < 0:
             logger.fatal(f"Invalid combination of batch{batch} and roi_num{roi_num }")
         output_dir = os.path.join(output, target)
-        work_dir = os.path.join(output_dir, target, "tcim")
+        work_dir = os.path.join(output_dir, "tcim")
 
         # Build kwargs for tcim
         build_kwargs = {}
