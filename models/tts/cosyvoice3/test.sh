@@ -56,6 +56,12 @@ if should_run_step "demo"; then
     fi
     echo "Execute demo."
     python3 demo.py
+    cd cpp
+    ./build.sh
+    python3 scripts/convert_embeddings.py
+    cd ..
+    export LD_LIBRARY_PATH=$PWD/bin:$LD_LIBRARY_PATH
+    ./bin/cosyvoice3-demo
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

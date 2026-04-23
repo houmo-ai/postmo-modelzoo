@@ -148,6 +148,8 @@ python3 demo.py
 python3 demo.py -h
 ```
 
+**提供c++示例，详细介绍参考cpp/README.MD。**
+
 ### 2.6 一键执行
 
 一键下载并运行演示（使用预编译模型）：

@@ -527,6 +527,154 @@ Users are responsible for complying with the applicable upstream terms
 when using, redistributing, or modifying miniaudio.
 
 ----------------------------------------------------------------------
+LibrosaCpp (Mel Spectrogram Computation)
+----------------------------------------------------------------------
+
+Component Name:
+LibrosaCpp
+
+Usage Location:
+models/tts/cosyvoice3/cpp/
+
+Source:
+https://github.com/GangLi-Blind/LibrosaCpp
+
+Copyright Statement:
+Copyright (c) Gang Li
+
+License:
+Apache License 2.0
+
+License Text:
+https://github.com/GangLi-Blind/LibrosaCpp/blob/main/LICENSE
+
+LibrosaCpp provides C++ implementations of mel spectrogram computation,
+including STFT and mel filterbank operations. It is licensed under the
+Apache License 2.0, which permits use, reproduction, modification,
+distribution, and sublicensing, subject to the terms of the license.
+
+Any redistribution or modification of LibrosaCpp must retain the original
+copyright notice and license text in accordance with the Apache License 2.0.
+
+Users are responsible for complying with the Apache License 2.0 when using,
+redistributing, or modifying LibrosaCpp.
+
+----------------------------------------------------------------------
+kaldi-native-fbank (FBANK Feature Extraction)
+----------------------------------------------------------------------
+
+Component Name:
+kaldi-native-fbank
+
+Usage Location:
+models/tts/cosyvoice3/cpp/
+
+Source:
+https://github.com/csukuangfj/kaldi-native-fbank
+
+Copyright Statement:
+Copyright (c) kaldi-native-fbank authors
+
+License:
+Apache License 2.0
+
+License Text:
+https://github.com/csukuangfj/kaldi-native-fbank/blob/main/LICENSE
+
+kaldi-native-fbank provides FBANK feature extraction for speaker embedding.
+It is licensed under the Apache License 2.0, which permits use, reproduction,
+modification, distribution, and sublicensing, subject to the terms of the license.
+
+Any redistribution or modification of kaldi-native-fbank must retain the
+original copyright notice and license text in accordance with the Apache
+License 2.0.
+
+Users are responsible for complying with the Apache License 2.0 when using,
+redistributing, or modifying kaldi-native-fbank.
+
+----------------------------------------------------------------------
+libsamplerate (Audio Resampling Library)
+----------------------------------------------------------------------
+
+Component Name:
+libsamplerate
+
+Usage Location:
+models/tts/cosyvoice3/cpp/
+
+Source:
+https://github.com/libsndfile/libsamplerate
+
+Copyright Statement:
+Copyright (c) Erik de Castro Lopo <erikd@mega-nerd.com>
+
+License:
+BSD 2-Clause License
+
+License Text:
+https://github.com/libsndfile/libsamplerate/blob/master/COPYING
+
+libsamplerate provides audio resampling capabilities. It is licensed under
+the BSD 2-Clause License, which permits use, copying, modification,
+distribution, and sublicensing, subject to the following conditions:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.
+
+Users are responsible for complying with the BSD 2-Clause License when using,
+redistributing, or modifying libsamplerate.
+
+----------------------------------------------------------------------
+libsndfile (Audio File I/O Library)
+----------------------------------------------------------------------
+
+Component Name:
+libsndfile
+
+Usage Location:
+models/tts/cosyvoice3/cpp/
+
+Source:
+https://github.com/libsndfile/libsndfile
+
+Copyright Statement:
+Copyright (c) Erik de Castro Lopo
+
+License:
+GNU Lesser General Public License version 2.1 or later (LGPL-2.1-or-later)
+
+License Text:
+https://github.com/libsndfile/libsndfile/blob/master/COPYING.LGPL
+
+libsndfile provides audio file I/O capabilities, including WAV file reading.
+It is licensed under the GNU Lesser General Public License version 2.1 or
+later (LGPL-2.1-or-later).
+
+This library is free software; you can redistribute it and/or modify it
+under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at
+your option) any later version.
+
+This library is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+License for more details.
+
+Users are responsible for complying with the LGPL-2.1-or-later license
+when using, redistributing, or modifying libsndfile. For dynamic linking
+to the library, the LGPL terms allow the application to be licensed under
+any license, but modifications to the library itself must remain LGPL.
+
+----------------------------------------------------------------------
 transformers (Preprocessing is for part of the algorithm)
 ----------------------------------------------------------------------
 
@@ -889,6 +1037,40 @@ accordance with the MIT License.
 
 Users are responsible for complying with the MIT License
 when using, redistributing, or modifying Whisper.
+
+----------------------------------------------------------------------
+CosyVoice3 (Text-to-Speech System)
+----------------------------------------------------------------------
+
+Component Name: CosyVoice3
+
+Usage Location:
+models/tts/cosyvoice3/
+
+Source:
+https://github.com/FunAudioLLM/CosyVoice
+
+Copyright Statement:
+Copyright (c) FunAudioLLM contributors
+
+License:
+Model License (check original repository)
+
+License Text:
+https://github.com/FunAudioLLM/CosyVoice
+
+CosyVoice3 is a text-to-speech synthesis system. This project references
+the CosyVoice3 model and implementation for TTS pipeline design. Users
+should check the original repository for the specific model license terms
+and usage restrictions.
+
+This project does NOT redistribute the CosyVoice3 model weights.
+Any references to CosyVoice3 in this project are limited to documentation,
+configuration examples, scripts, or C++ demo implementations.
+
+Users must obtain the model and comply with the original license terms.
+CosyVoice3 may have specific usage restrictions, including potential
+limitations on commercial use or redistribution of synthesized audio.
 
 ----------------------------------------------------------------------
 bge-m3 and bge-reranker-m3-v2 (Embedding and Reranker Model from FlagEmbedding)
