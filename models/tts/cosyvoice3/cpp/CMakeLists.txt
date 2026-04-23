@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.16.3)
 project(cosyvoice3-demo VERSION 1.0.0 LANGUAGES CXX)
 
+# Option to build audio libraries from source or use prebuilt
+option(BUILD_AUDIO_FROM_SOURCE "Build audio libraries from source instead of using prebuilt" OFF)
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -36,7 +39,15 @@ endif()
 set(TOKENIZER_CPP_PATH ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/tokenizers-cpp)
 set(AUDIO_HEADER_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/audio/include)
 set(HALF_INCLUDE_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include)
-set(AUDIO_THIRDPARTY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/audio_3rdparty)
+
+# Audio libraries configuration
+if(BUILD_AUDIO_FROM_SOURCE)
+    message(STATUS "Building audio libraries from source")
+    include(${CMAKE_CURRENT_SOURCE_DIR}/audio_source.cmake)
+else()
+    message(STATUS "Using prebuilt audio libraries")
+    include(${CMAKE_CURRENT_SOURCE_DIR}/audio_prebuilt.cmake)
+endif()
 
 # Source files
 set(DEMO_SOURCES
@@ -61,23 +72,20 @@ set(INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
     $ENV{TCIM_RUNTIME_PATH}/include
     ${TOKENIZER_CPP_PATH}/${LIB_PATH}/include
-    ${AUDIO_THIRDPARTY_PATH}/${LIB_PATH}/include
     ${HALF_INCLUDE_PATH}
     ${AUDIO_HEADER_PATH}
+    ${AUDIO_INCLUDE_DIRS}
 )
 
 # Library directories
 link_directories(
     $ENV{TCIM_RUNTIME_PATH}/lib
     ${TOKENIZER_CPP_PATH}/${LIB_PATH}/lib
-    ${AUDIO_THIRDPARTY_PATH}/${LIB_PATH}/lib
 )
 
 # Compiler flags
-
 add_definitions(-w)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O3")
-
 
 # Main demo executable
 add_executable(cosyvoice3-demo ${DEMO_SOURCES})
@@ -90,9 +98,7 @@ if(ANDROID_ABI)
         ${TCIM_LIBRARY}
         dl
         m
-        samplerate
-        sndfile
-        kaldi-native-fbank-core
+        ${AUDIO_LIBS}
     )
 else()
     target_link_libraries(cosyvoice3-demo PRIVATE
@@ -102,30 +108,29 @@ else()
         pthread
         ${CMAKE_DL_LIBS}
         m
-        samplerate
-        sndfile
-        kaldi-native-fbank-core
+        ${AUDIO_LIBS}
     )
 endif()
 
 # Install targets
-install(TARGETS cosyvoice3-demo DESTINATION .)
-set(AUDIO_LIBS 
-    ${AUDIO_THIRDPARTY_PATH}/${LIB_PATH}/lib/libsamplerate.so 
-    ${AUDIO_THIRDPARTY_PATH}/${LIB_PATH}/lib/libsndfile.so 
-    ${AUDIO_THIRDPARTY_PATH}/${LIB_PATH}/lib/libkaldi-native-fbank-core.so)
-install(FILES ${AUDIO_LIBS} DESTINATION .)
+install(TARGETS cosyvoice3-demo RUNTIME DESTINATION .)
+if(BUILD_AUDIO_FROM_SOURCE)
+    install(TARGETS samplerate sndfile kaldi-native-fbank-core LIBRARY DESTINATION .)
+else()
+    install(FILES ${AUDIO_LIB_FILES} DESTINATION .)
+endif()
 
 if(ANDROID_ABI)
     set(HMM_MODELS ${CMAKE_CURRENT_SOURCE_DIR}/../output)
     set(RAW_MODEL_CONFIGS ${CMAKE_CURRENT_SOURCE_DIR}/../Fun-CosyVoice3-0.5B-2512)
-    set(OTHER_FILES 
+    set(OTHER_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/../special_tokens.json
         ${CMAKE_CURRENT_SOURCE_DIR}/../zero_shot_prompt.wav)
     INSTALL(DIRECTORY ${HMM_MODELS}/ DESTINATION ./output)
     INSTALL(DIRECTORY ${RAW_MODEL_CONFIGS}/ DESTINATION ./Fun-CosyVoice3-0.5B-2512)
     INSTALL(FILES ${OTHER_FILES} DESTINATION .)
 endif()
+
 # Configuration summary
 message(STATUS "")
 message(STATUS "CosyVoice3 TTS Demo Configuration:")
@@ -133,4 +138,5 @@ message(STATUS "  HOUMO_TARGET: $ENV{HOUMO_TARGET}")
 message(STATUS "  TCIM_RUNTIME_PATH: $ENV{TCIM_RUNTIME_PATH}")
 message(STATUS "  Platform lib path: ${LIB_PATH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  BUILD_AUDIO_FROM_SOURCE: ${BUILD_AUDIO_FROM_SOURCE}")
 message(STATUS "")

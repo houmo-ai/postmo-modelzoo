@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
-# Build script for Qwen3-VL C++ example on Linux
+# Build script for CosyVoice3 C++ demo on Linux
+
+# Parse command line arguments
+BUILD_AUDIO_FROM_SOURCE=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --source)
+            BUILD_AUDIO_FROM_SOURCE="-DBUILD_AUDIO_FROM_SOURCE=ON"
+            shift
+            ;;
+        --prebuilt)
+            BUILD_AUDIO_FROM_SOURCE=""
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
 if [ ! -e 3rdparty ];then
   mkdir 3rdparty
 fi
@@ -9,7 +28,7 @@ if [ ! -e 3rdparty/tokenizers-cpp ];then
   cd cpp
 fi
 if [ ! -e 3rdparty/audio_3rdparty ];then
-  echo "Download precompiled model."
+  echo "Download precompiled audio libraries."
   python3 scripts/get_3rdparty.py
 fi
 if [ ! -e 3rdparty/eigen3 ];then
@@ -31,7 +50,7 @@ if [ $(uname -s) = "Linux" ]; then
     mkdir -p build
     cd build || exit 1
 
-    cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH/../bin -DCMAKE_BUILD_TYPE=Release ..
+    cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH/../bin -DCMAKE_BUILD_TYPE=Release ${BUILD_AUDIO_FROM_SOURCE} ..
     make
     make install
   else

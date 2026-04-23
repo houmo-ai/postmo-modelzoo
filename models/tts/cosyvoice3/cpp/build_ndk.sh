@@ -1,4 +1,31 @@
 #!/usr/bin/env bash
+
+# Parse command line arguments
+BUILD_AUDIO_FROM_SOURCE=""
+BUILD_TYPE=""
+REMAINING_ARGS=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --source)
+            BUILD_AUDIO_FROM_SOURCE="-DBUILD_AUDIO_FROM_SOURCE=ON"
+            shift
+            ;;
+        --prebuilt)
+            BUILD_AUDIO_FROM_SOURCE=""
+            shift
+            ;;
+        release|Release|debug|Debug)
+            BUILD_TYPE="$1"
+            shift
+            ;;
+        *)
+            REMAINING_ARGS="$REMAINING_ARGS $1"
+            shift
+            ;;
+    esac
+done
+
 if [ ! -e 3rdparty ];then
   mkdir 3rdparty
 fi
@@ -53,8 +80,8 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
   project_dir=$(dirname "$script_path")
   echo "Project dir: ${project_dir}"
 
-  if [ -n "$1" ]; then
-    cmake_build_type="$1"
+  if [ -n "$BUILD_TYPE" ]; then
+    cmake_build_type="$BUILD_TYPE"
   else
     cmake_build_type="release"
   fi
@@ -78,7 +105,7 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
       -DANDROID_PLATFORM=android-35 \
       -DANDROID_NDK=${NDK_PATH} \
       -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" \
-      -DCMAKE_INSTALL_PREFIX=${output_dir} -DCMAKE_BUILD_TYPE=${capitalized_build_type} ${@:2}
+      -DCMAKE_INSTALL_PREFIX=${output_dir} -DCMAKE_BUILD_TYPE=${capitalized_build_type} ${BUILD_AUDIO_FROM_SOURCE} ${REMAINING_ARGS}
 
   RUN cmake --build . --target install -j 16
 
