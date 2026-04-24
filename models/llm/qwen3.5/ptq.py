@@ -247,6 +247,24 @@ def parse_args():
         default="../../../data/pic/beach.jpeg",
         help="sample image for vision export (--image_path); required if src/images/qwen2_vl_demo.jpeg is absent",
     )
+    parser.add_argument(
+        "--max_size_w",
+        type=int,
+        default=448,
+        help="vision export max input width in pixels",
+    )
+    parser.add_argument(
+        "--max_size_h",
+        type=int,
+        default=448,
+        help="vision export max input height in pixels",
+    )
+    parser.add_argument(
+        "--max_size_t",
+        type=int,
+        default=2,
+        help="vision export max temporal size in frames",
+    )
     args = parser.parse_args()
     mn = (args.model_name or "").strip()
     if not mn:

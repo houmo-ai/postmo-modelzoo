@@ -245,6 +245,12 @@ def export_llm(args) -> None:
             str(model_name),
             "--output_root",
             str(out_root),
+            "--max_size_w",
+            str(getattr(args, "max_size_w", 448)),
+            "--max_size_h",
+            str(getattr(args, "max_size_h", 448)),
+            "--max_size_t",
+            str(getattr(args, "max_size_t", 2)),
         ]
         if sample_img:
             cmd_v.extend(["--image_path", sample_img])
@@ -318,6 +324,12 @@ def export_llm_moe(args) -> None:
             str(model_name),
             "--output_dir",
             str(out_root),
+            "--max_size_w",
+            str(getattr(args, "max_size_w", 448)),
+            "--max_size_h",
+            str(getattr(args, "max_size_h", 448)),
+            "--max_size_t",
+            str(getattr(args, "max_size_t", 2)),
         ]
         if sample_img:
             cmd_v.extend(["--image_path", sample_img])
