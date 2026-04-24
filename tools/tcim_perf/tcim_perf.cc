@@ -543,6 +543,8 @@ int PrepareInputs(PooledModule *pooled_md, tcim::Module *module,
       return -2;
     }
     json custom_msg = json::parse(custom_msg_str);
+    auto &resizer_mode = custom_msg[name]["resizer_mode"];
+    if (resizer_mode != 1 && resizer_mode != 2) continue;
     std::vector<int64_t> img_shape;
     std::vector<int64_t> dyn_shape;
     if (pooled_md != nullptr) {
@@ -717,7 +719,8 @@ int ModulePoolFunc(ModulePool *module_pool, int tid, int did, ThreadInfo &info,
     info.e2e_total_cost += cost;
     if (info.e2e_max_cost < cost) {
       // LOG_INFO(
-      //     "Device {} Thread {} infer task {}, update max e2e cost {}, input "
+      //     "Device {} Thread {} infer task {}, update max e2e cost {}, input
+      //     "
       //     "{}, infer {}, output {}",
       //     did, tid, task.req_id, (cost / 1000.0), (perf_stats[0] / 1000.0),
       //     (perf_stats[1] / 1000.0), (perf_stats[2] / 1000.0));
@@ -864,7 +867,8 @@ int StreamEngineFunc(int tid, int did, ThreadInfo &info, StreamEngine *engine,
     info.e2e_total_cost += cost;
     if (info.e2e_max_cost < cost) {
       // LOG_INFO(
-      //     "Device {} Thread {} infer task {}, update max e2e cost {}, input "
+      //     "Device {} Thread {} infer task {}, update max e2e cost {}, input
+      //     "
       //     "{}, infer {}, output {}",
       //     did, tid, task.req_id, (cost / 1000.0), (ipt_cost / 1000.0),
       //     (infer_cost / 1000.0), (opt_cost / 1000.0));
