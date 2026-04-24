@@ -84,7 +84,8 @@ static void HelpUsage(char* argv[]) {
          "(range: 1-(max_context_length-input)).\n"
          "  --model_name      TEXT      Model name used in dump/log output "
          "(optional, command-line only).\n"
-         "  --ndevices        NUM       Device count (range: 1-num_devices).\n"
+         "  --devices         NUM[,NUM...]      Device ids for init "
+         "dev_manager .\n"
          "  --loop            NUM       Loop test rounds (range: 1-1000000).\n"
          "  --batch           NUM       Batch size (range: 1-batch_num, only "
          "xh2 "
@@ -266,7 +267,8 @@ static std::vector<int> validate_multi_setting(
           " value, empty item in comma-separated list.");
     }
     int value = stoi(item);
-    if (value <= 0) {
+    if ((arg_name == "devices" && value < 0) ||
+        (arg_name != "devices" && value <= 0)) {
       throw std::invalid_argument("Invalid " + arg_name + " value (use --" +
                                   arg_name + " <value> to set valid value).");
     }
@@ -374,7 +376,7 @@ typedef struct perf_settings {
   std::vector<PerfCase> perf_cases;
   int input_tokens_len;
   int stop_tokens_len;
-  int ndevices;
+  std::vector<int> devices;
   int batch_size;
   int loop_count;
   bool warm_up;

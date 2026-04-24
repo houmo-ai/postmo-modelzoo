@@ -111,7 +111,7 @@
 - --embedding       : 指定embedding模型路径，需要转换成bin文件，支持相对/绝对路径。
 - --input           : 指定prefill阶段输入token数量，支持单值或逗号分隔的多组参数，例如`256,512,1024`。
 - --output          : 指定decode阶段输出token数量，支持单值或逗号分隔的多组参数，组数必须与--input一致。
-- --ndevices        : 指定模型使用的device数量，不指定默认为1。
+- --devices         : 指定模型使用的device_id，不指定时优先从HOUMO_VISIBLE_DEVICES环境变量读取，如果环境变量未设置默认为0，支持单值或逗号分隔的多组参数，例如:0 或者0,1。
 - --loop            : 指定循环执行单个模型次数，不指定默认为1。
 - --batch           : 指定模型的batch数，不指定则--batch的值为1。多batch模型必须指定，会校验从模型读取到的batch和用户指定的值是否一致。目前多batch仅支持xh2.
 - --no_warm_up      : 默认执行warm_up，配置后会跳过warm_up流程。
@@ -138,12 +138,16 @@
 
 手动输入参数启动模型测试，仅支持单个模型的loop测试，参考如下：
 ``` shell
+# --devices 指定使用0,1运行2chip模型
+./llm_perf --prefill prefill_model.hmms --decode decode_model.hmms --embedding quant_embedding.bin --input 100 --output 2048 --devices 0,1 --loop 2 --batch 1 --no_warm_up
+# 环境变量HOUMO_VISIBLE_DEVICES指定使用device 1
+HOUMO_VISIBLE_DEVICES=1 ./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --loop 2 --batch 1 --no_warm_up
 # 禁用warm_up
-./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1 --no_warm_up
+./llm_perf --prefill prefill_model.hmms --decode decode_model.hmms --embedding quant_embedding.bin --input 100 --output 2048 --devices 0,1 --loop 2 --batch 1 --no_warm_up
 # 开启warm_up
-./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1 --warm_up_output 10
+./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --devices 0 --loop 2 --batch 1 --warm_up_output 10
 # 使能dump_file
-./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1 --dump_file model.yaml
+./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --devices 0 --loop 2 --batch 1 --dump_file model.yaml
 # 多组input/output，按组依次测试并分别dump到yaml文件中
 ./llm_perf --model_name qwen3_8b --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 256,512 --output 100,200 --loop 2 --dump_file model.yaml
 ```
@@ -166,7 +170,7 @@ Streams:
     embedding: deepseek/hmquant/quant_embedding.bin
     input: "256,512"                                       # Single value or comma-separated groups
     output: "100,200"                                     # Must match input group count
-    ndevices: 1                                            # Number of devices to use for inference
+    devices: 1                                            # device ids to use for inference
     loop: 2                                                # Number of times to repeat each input/output group
     batch: 1                                               # Batch size for the model
     no_warm_up: ''                                         # If present (any value), skip warm-up phase
@@ -176,7 +180,7 @@ Streams:
     embedding: qwen2.5/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 1
     loop: 2
     batch: 1
   - ModelName: qwen3_8b_256_8k_b4_1chip_2cores_v0.5.0
@@ -185,7 +189,7 @@ Streams:
     embedding: qwen3/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 1
     loop: 1
     batch: 4
   - ModelName: qwen3_14b_256_8k_b1_1chip_2cores_v0.5.0
@@ -194,7 +198,7 @@ Streams:
     embedding: qwen3-14b/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 1
     loop: 1
   - ModelName: qwen3_30b-a3b
     prefill: qwen3-30b-a3b/qwen3_prefill.hmm
@@ -202,7 +206,7 @@ Streams:
     embedding: qwen3-30b-a3b/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 1
     loop: 1
   - ModelName: qwen2.5-vl
     prefill: qwen2.5-vl/qwen2.5-vl_prefill.hmm
@@ -211,16 +215,16 @@ Streams:
     embedding: qwen2.5-vl/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 1
     loop: 1
   - ModelName: qwen3-vl
-    prefill: qwen3-vl/qwen3-vl_prefill.hmm
-    decode: qwen3-vl/qwen3-vl_decode.hmm
-    visual: qwen3-vl/qwen3-vl_visual.hmm
+    prefill: qwen3-vl/qwen3-vl_prefill.hmms
+    decode: qwen3-vl/qwen3-vl_decode.hmms
+    visual: qwen3-vl/qwen3-vl_visual.hmms
     embedding: qwen3-vl/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 0,1
     loop: 1
 
 # Global output file for all performance results
@@ -290,7 +294,7 @@ rem 需要结合用户目录更改三四行的环境变量实际路径
 ### 2.2 一键运行
 ``` shell
 #单次启动perf
-./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --ndevices 2 --loop 2 --batch 1
+./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --devices 2 --loop 2 --batch 1
 #多次启动perf
 ./llm_perf -c config.yaml
 ./llm_perf --config config.yaml
@@ -308,7 +312,7 @@ decode path : qwen3-8b/qwen3_decode.hmm
 embedding path : qwen3-8b/hmquant/quant_embedding.bin
 input token len : 256
 stop token len : 200
-ndevices : 1
+devices : 1
 loop : 2
 batch : 1
 warm_up : enable

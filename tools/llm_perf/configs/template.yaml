@@ -6,7 +6,7 @@ Streams:
     embedding: output/xh2/hmquant/quant_embedding.bin
     input: 256
     output: 256
-    ndevices: 1
+    devices: 1
     loop: 1
     batch: 1
     LazyMode: ''  # Optional, for specific models
@@ -18,7 +18,7 @@ Streams:
     embedding: output/xh2/hmquant/quant_embedding.bin
     input: 1024
     output: 256
-    ndevices: 1
+    devices: 1
     loop: 1
     batch: 1
     LazyMode: ''  # Optional, for specific models
@@ -30,7 +30,7 @@ Streams:
     embedding: output/xh2/hmquant/quant_embedding.bin
     input: 2048
     output: 256
-    ndevices: 1
+    devices: 1
     loop: 1
     batch: 1
     LazyMode: ''  # Optional, for specific models

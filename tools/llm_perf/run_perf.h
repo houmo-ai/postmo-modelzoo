@@ -84,10 +84,35 @@ PerfSettings ParsePerfRunSetting(
     throw std::invalid_argument(
         "input and output must have the same number of comma-separated values");
   }
-  int ndevices =
-      args.count("ndevices") ? validate_setting(args, "ndevices") : 1;
-  if (ndevices > tcim::GetDeviceNum() || ndevices < 1) {
-    throw std::invalid_argument("ndevices must <= device number and >= 1");
+  std::vector<int> devices;
+  if (args.count("devices")) {
+    devices = validate_multi_setting(args, "devices");
+  } else if (getenv("HOUMO_VISIBLE_DEVICES") != nullptr) {
+    std::unordered_map<std::string, std::string> temp_args;
+    temp_args["devices"] = getenv("HOUMO_VISIBLE_DEVICES");
+    devices = validate_multi_setting(temp_args, "devices");
+    if (devices.size() > 1 && prefill_path.extension() != ".hmms") {
+      std::cout << "[Warning] : "
+                << "Multiple devices specified in HOUMO_VISIBLE_DEVICES, "
+                   "but model file is not .hmms. Multi-device testing is "
+                   "only supported for .hmms model files. Ignoring "
+                   "additional devices and using HOUMO_VISIBLE_DEVICES[0] only."
+                << std::endl;
+      devices = {devices[0]};
+    }
+  } else {
+    devices = {0};
+  }
+  for (int device : devices) {
+    if (device >= tcim::GetDeviceNum() || device < 0) {
+      throw std::invalid_argument(
+          "devices must be within the valid device range");
+    }
+  }
+
+  if (prefill_path.extension() != ".hmms" && devices.size() > 1) {
+    throw std::invalid_argument(
+        "Multi-device testing is only supported for .hmms model files.");
   }
 
   bool skip_perf = args.count("skip_perf") ? true : false;
@@ -109,7 +134,7 @@ PerfSettings ParsePerfRunSetting(
             << std::endl;
   std::cout << "stop token len : " << format_int_list(stop_token_lens)
             << std::endl;
-  std::cout << "ndevices : " << ndevices << std::endl;
+  std::cout << "devices : " << format_int_list(devices) << std::endl;
   std::cout << "loop : " << loop_round << std::endl;
   std::cout << "batch : " << batch << std::endl;
   uint32_t warm_up_input = 0;
@@ -151,7 +176,7 @@ PerfSettings ParsePerfRunSetting(
   }
   settings.input_tokens_len = input_token_lens.front();
   settings.stop_tokens_len = stop_token_lens.front();
-  settings.ndevices = ndevices;
+  settings.devices = devices;
   settings.batch_size = batch;
   settings.LazyMode = lazy_mode_enable;
   settings.warm_up = warm_up_enable;
@@ -195,7 +220,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
       if (settings.batch_size == 1) {
         Qwen3Infer = std::make_unique<HmllmInfer>(
             settings.prefill_path, settings.decode_path,
-            settings.embedding_path, settings.ndevices, settings.batch_size,
+            settings.embedding_path, settings.devices, settings.batch_size,
             settings.LazyMode);
       } else {
         if (houmo_target != "xh2") {
@@ -204,13 +229,13 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
         }
         Qwen3Infer = std::make_unique<HmllmInferMultiBatch>(
             settings.prefill_path, settings.decode_path,
-            settings.embedding_path, settings.ndevices, settings.batch_size,
+            settings.embedding_path, settings.devices, settings.batch_size,
             settings.LazyMode);
       }
     } else {
       Qwen3Infer = std::make_unique<HmvllmInfer>(
           settings.prefill_path, settings.decode_path, settings.embedding_path,
-          settings.visual_path, settings.ndevices, settings.batch_size,
+          settings.visual_path, settings.devices, settings.batch_size,
           settings.LazyMode);
     }
     std::unordered_map<int, DeviceStats> post_init_dev_stats =

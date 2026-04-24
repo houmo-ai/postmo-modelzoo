@@ -7,7 +7,7 @@ Streams:
     embedding: deepseek/hmquant/quant_embedding.bin
     input: "256,512"                                       # Number of input tokens for prefill stage
     output: "100,200"                                      # Number of output tokens to generate in decode stage
-    ndevices: 1                                            # Number of devices to use for inference
+    devices: 1                                            # Number of devices to use for inference
     loop: 2                                                # Number of times to repeat the test
     batch: 1                                               # Batch size for the model
     no_warm_up: ''                                         # If present (any value), skip warm-up phase
@@ -17,7 +17,7 @@ Streams:
     embedding: qwen2.5/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 1
     loop: 2
     batch: 1
   - ModelName: qwen3_8b_256_8k_b4_1chip_2cores_v0.5.0
@@ -26,7 +26,7 @@ Streams:
     embedding: qwen3/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 0,1
     loop: 1
     batch: 4
   - ModelName: qwen3_14b_256_8k_b1_1chip_2cores_v0.5.0
@@ -35,7 +35,7 @@ Streams:
     embedding: qwen3-14b/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 0,1
     loop: 1
   - ModelName: qwen3_30b-a3b
     prefill: qwen3-30b-a3b/qwen3_prefill.hmm
@@ -43,7 +43,7 @@ Streams:
     embedding: qwen3-30b-a3b/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 1
     loop: 1
   - ModelName: qwen2.5-vl
     prefill: qwen2.5-vl/qwen2.5-vl_prefill.hmm
@@ -52,7 +52,7 @@ Streams:
     embedding: qwen2.5-vl/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 1
     loop: 1
   - ModelName: qwen3-vl
     prefill: qwen3-vl/qwen3-vl_prefill.hmm
@@ -61,7 +61,7 @@ Streams:
     embedding: qwen3-vl/hmquant/quant_embedding.bin
     input: 256
     output: 100
-    ndevices: 1
+    devices: 1
     loop: 1
 
 # Global output file for all performance results

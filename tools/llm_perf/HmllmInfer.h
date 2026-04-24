@@ -41,14 +41,14 @@ class HmllmInfer : public HmllmInferBase {
    * @param prefillModelPath Path to the prefill model
    * @param decodeModelPath Path to the decode model
    * @param embeddingWeightPath Path to the embedding weights file
-   * @param ndevices Number of devices to use for inference
+   * @param devices Vector of device IDs to use for inference
    * @param batches Batch size for the model
    * @param LazyMode Whether to use lazy mode for inference
    */
   HmllmInfer(const std::string& prefillModelPath,
              const std::string& decodeModelPath,
-             const std::string& embeddingWeightPath, int ndevices, int batches,
-             bool LazyMode);
+             const std::string& embeddingWeightPath,
+             const std::vector<int>& devices, int batches, bool LazyMode);
 
   HmllmInfer(const HmllmInfer& it) = delete;
 

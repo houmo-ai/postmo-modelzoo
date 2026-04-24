@@ -90,7 +90,11 @@ void PerfDumper::dumpPerf(
   model_perf_settings["embedding"] = perf_settings.embedding_path;
   model_perf_settings["input"] = perf_settings.input_tokens_len;
   model_perf_settings["output"] = perf_settings.stop_tokens_len;
-  model_perf_settings["ndevices"] = perf_settings.ndevices;
+  YAML::Node devices_node;
+  for (int d : perf_settings.devices) {
+    devices_node.push_back(d);
+  }
+  model_perf_settings["devices"] = devices_node;
   model_perf_settings["batch"] = perf_settings.batch_size;
   model_perf_settings["loop"] = perf_settings.loop_count;
   model_perf_settings["LazyMode"] = perf_settings.LazyMode;

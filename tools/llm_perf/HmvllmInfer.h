@@ -48,15 +48,15 @@ class HmvllmInfer : public HmllmInferBase {
    * @param decodeModelPath Path to the decode model
    * @param embeddingWeightPath Path to the embedding weights
    * @param visionModelPath Path to the Vision Transformer model
-   * @param ndevices Number of devices to use for inference
+   * @param devices Vector of device IDs to use for inference
    * @param batches Number of batches for processing
    * @param LazyMode Whether to use lazy mode for inference
    */
   HmvllmInfer(const std::string &prefillModelPath,
               const std::string &decodeModelPath,
               const std::string &embeddingWeightPath,
-              const std::string &visionModelPath, int ndevices, int batches,
-              bool LazyMode);
+              const std::string &visionModelPath,
+              const std::vector<int> &devices, int batches, bool LazyMode);
 
   HmvllmInfer(const HmvllmInfer &it) = delete;
 

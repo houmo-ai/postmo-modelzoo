@@ -25,22 +25,15 @@
 HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
                          const std::string &decodeModelPath,
                          const std::string &embeddingWeightPath,
-                         const std::string &visionModelPath, int ndevices,
-                         int batches, bool LazyMode) {
+                         const std::string &visionModelPath,
+                         const std::vector<int> &devices, int batches,
+                         bool LazyMode) {
   perf_tracker = std::make_shared<InferencePerformanceTracker>();
   this->prefillModelPath = prefillModelPath;
   this->decodeModelPath = decodeModelPath;
   this->visionModelPath = visionModelPath;
-  // create weightManager
-  std::vector<int> devs;
-  devs.clear();
-  std::cout << "Use Devices ";
-  for (int i = 0; i < ndevices; i++) {
-    devs.emplace_back(i);
-    std::cout << i << " ";
-  }
-  std::cout << std::endl;
-  tcim::DevManager dev_manager = tcim::DevManager::Create(devs);
+  // create device manager and weight manager
+  tcim::DevManager dev_manager = tcim::DevManager::Create(devices);
   weight_manager =
       tcim::Module::WeightManager::CreateWeightManager(dev_manager);
   // create option
