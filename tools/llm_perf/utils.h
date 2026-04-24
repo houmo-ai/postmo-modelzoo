@@ -400,4 +400,10 @@ inline std::string format_double(double value, int precision = 2) {
   oss << value;
   return oss.str();
 }
+
+struct DeviceCtcInfo {
+  int dev_id;    // device ID
+  int group_id;  // group ID
+  int chip_id;   // chip ID
+};
 #endif  // __UTILS_H__

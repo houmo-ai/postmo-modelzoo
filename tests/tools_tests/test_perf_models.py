@@ -239,7 +239,8 @@ if __name__ == "__main__":
         )
         perf_config["input"] = relative_model_paths[sub_model_dir_name]["input"]
         perf_config["output"] = relative_model_paths[sub_model_dir_name]["output"]
-        perf_config["ndevices"] = relative_model_paths[sub_model_dir_name]["ndevices"]
+        ndevices = int(relative_model_paths[sub_model_dir_name]["ndevices"])
+        perf_config["devices"] = ",".join(str(i) for i in range(ndevices))
         perf_config["loop"] = "2"
         perf_config["batch"] = relative_model_paths[sub_model_dir_name]["batch"]
         import subprocess
@@ -260,8 +261,8 @@ if __name__ == "__main__":
         args.append(perf_config["input"])
         args.append("--output")
         args.append(perf_config["output"])
-        args.append("--ndevices")
-        args.append(perf_config["ndevices"])
+        args.append("--devices")
+        args.append(perf_config["devices"])
         args.append("--loop")
         args.append(perf_config["loop"])
         args.append("--batch")

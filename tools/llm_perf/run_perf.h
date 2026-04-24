@@ -64,6 +64,54 @@ static PerfSettings BuildPerfCaseSettings(
   return current_settings;
 }
 
+static void device_ctc_check(std::vector<int> devices,
+                             const fs::path& prefill_path,
+                             const fs::path& decode_path,
+                             const fs::path& visual_path) {
+  assert(prefill_path.extension() == decode_path.extension());
+  if (!visual_path.string().empty()) {
+    assert(prefill_path.extension() == visual_path.extension());
+  }
+  if (prefill_path.extension() == ".hmms" ||
+      decode_path.extension() == ".hmms" ||
+      visual_path.extension() == ".hmms") {
+    if ((prefill_path.extension() != ".hmms") ||
+        (decode_path.extension() != ".hmms") ||
+        (!visual_path.string().empty() && visual_path.extension() != ".hmms") ||
+        devices.size() < 2) {
+      throw std::invalid_argument(
+          "For .hmms model files, all model files (prefill, decode and visual) "
+          "must be .hmms format and devices must be at least 2.");
+    } else {
+      int group_id, chip_id;
+      std::vector<DeviceCtcInfo> device_ctc_info_list;
+      for (int dev_id : devices) {
+        if (hm_sys_get_ctc_phy_id(dev_id, &group_id, &chip_id) != 0) {
+          throw std::runtime_error("Failed to get physical ID for device " +
+                                   std::to_string(dev_id));
+        }
+        if (group_id < 0 || chip_id < 0) {
+          throw std::runtime_error("Invalid physical ID for device " +
+                                   std::to_string(dev_id));
+        }
+        std::cout << "Device " << dev_id << " -> Group " << group_id
+                  << ", Chip " << chip_id << std::endl;
+        device_ctc_info_list.push_back({dev_id, group_id, chip_id});
+      }
+
+      for (auto ctcInfo : device_ctc_info_list) {
+        if (ctcInfo.group_id != device_ctc_info_list[0].group_id) {
+          throw std::runtime_error(
+              "All devices must be on the same group for multi-device "
+              "testing with .hmms model files.");
+        }
+      }
+    }
+  }
+  std::cout << "Device CTC check passed for devices: "
+            << format_int_list(devices) << std::endl;
+}
+
 PerfSettings ParsePerfRunSetting(
     std::unordered_map<std::string, std::string> args) {
   PerfSettings settings;
@@ -82,7 +130,13 @@ PerfSettings ParsePerfRunSetting(
   std::vector<int> stop_token_lens = validate_multi_setting(args, "output");
   if (input_token_lens.size() != stop_token_lens.size()) {
     throw std::invalid_argument(
-        "input and output must have the same number of comma-separated values");
+        "input and output must have the same number of comma-separated "
+        "values");
+  }
+  if (args.count("ndevices")) {
+    throw std::invalid_argument(
+        "The argument 'ndevices' is deprecated. Please use 'devices' with "
+        "comma-separated device IDs instead (e.g., --devices 0,1,2).");
   }
   std::vector<int> devices;
   if (args.count("devices")) {
@@ -109,6 +163,8 @@ PerfSettings ParsePerfRunSetting(
           "devices must be within the valid device range");
     }
   }
+
+  device_ctc_check(devices, prefill_path, decode_path, visual_path);
 
   if (prefill_path.extension() != ".hmms" && devices.size() > 1) {
     throw std::invalid_argument(
@@ -308,10 +364,10 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
                     << std::endl;
           if (current_temperature > ALARM_TEMPERATURE_THRESHOLD &&
               current_temperature < SHUTDOWN_TEMPERATURE_THRESHOLD) {
-            std::cout
-                << COLOR_YELLOW
-                << "Device temperature is beyond 80.0 °C, Temperature Warning!"
-                << COLOR_RESET << std::endl;
+            std::cout << COLOR_YELLOW
+                      << "Device temperature is beyond 80.0 °C, Temperature "
+                         "Warning!"
+                      << COLOR_RESET << std::endl;
           }
           if (current_temperature >= SHUTDOWN_TEMPERATURE_THRESHOLD) {
             throw std::runtime_error(
