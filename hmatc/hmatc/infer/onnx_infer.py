@@ -69,6 +69,10 @@ class OnnxInfer(BaseInfer, ABC):
                 f"[onnx] output{idx}, name: {tensor.name}, shape={tensor.shape}, dtype={self.onnx_type_to_numpy(tensor.type)}"
             )
             self.output_names.append(tensor.name)
+            bs = tensor.shape[0]
+            self.outputs_batch[tensor.name] = (
+                1 if (not isinstance(bs, int) or bs < 0) else bs
+            )
 
     def run(self, in_datas: dict, to_file=False):
         """

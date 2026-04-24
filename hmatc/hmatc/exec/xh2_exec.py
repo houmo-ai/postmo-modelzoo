@@ -709,13 +709,17 @@ class Xh2Exec(BaseExec):
 
             resizer_mode = self.resizer_modes[input_name]
 
+            bs = golden_input.shape[0]
             if resizer_mode in [1, 2, 3]:
+                # TODO 多batch可能有问题
                 fmt = xh2.inputs_format[input_name]
                 golden_input = golden_input.flatten()
                 size = self._get_yuv_valid_len(golden_input.size, fmt)
-                golden_input = golden_input[:size].reshape(1, size)
+                golden_input = golden_input[:size].reshape(bs, size // bs)
 
-            golden_input = np.repeat(golden_input, hmm_batch, axis=0)
+            golden_input = np.repeat(
+                golden_input, hmm_batch // golden_input.shape[0], axis=0
+            )
             in_datas[input_name] = golden_input
 
             # Handle dynamic resizer parameters
@@ -733,20 +737,16 @@ class Xh2Exec(BaseExec):
                 logger.info(
                     f"  {resizer_name}: shape={list(golden_dyn_input.shape)}, dtype={golden_dyn_input.dtype}"
                 )
-                in_datas[resizer_name] = np.repeat(
-                    golden_dyn_input, repeats=hmm_batch, axis=0
+                golden_dyn_input = golden_dyn_input.shape[0]
+                golden_dyn_input = np.repeat(
+                    golden_dyn_input, hmm_batch // golden_dyn_input, axis=0
                 )
+                in_datas[resizer_name] = golden_dyn_input
 
         # Run inference
         logger.info("Running XH2 inference...")
         outputs, _ = xh2.run(in_datas)
         self.save_profile_data(outputs)
-
-        repeats = (
-            self.build_batch
-            if self.build_batch > 1 and self.roi_num == 1
-            else self.roi_num if self.roi_num > 1 else 1
-        )
 
         # Compare outputs
         logger.info("Loading golden outputs:")
@@ -774,7 +774,10 @@ class Xh2Exec(BaseExec):
                 f"  {output_name}: shape={list(golden_output.shape)}, dtype={golden_output.dtype}"
             )
 
-            golden_output = np.repeat(golden_output, repeats=repeats, axis=0)
+            hmm_batch = xh2.outputs_batch[output_name]
+            golden_output = np.repeat(
+                golden_output, repeats=hmm_batch // golden_output.shape[0], axis=0
+            )
             output = outputs[output_name]
             dist = cosine_distance(golden_output, output)
 
@@ -858,7 +861,7 @@ class Xh2Exec(BaseExec):
                     cv_image, input_cfg, resizer_mode
                 )
                 onnx_in_datas[input_name] = np.repeat(
-                    onnx_data, repeats=onnx_batch, axis=0
+                    onnx_data, repeats=onnx_batch // onnx_data.shape[0], axis=0
                 )
                 if resizer_mode == 0:
                     if onnx_batch != hmm_batch or onnx_batch != hmonnx_batch:
@@ -902,7 +905,9 @@ class Xh2Exec(BaseExec):
                     in_data = in_data.astype(np.float16)
                 onnx_in_datas[input_name] = in_datas[input_name].copy()
                 hmquant_in_datas[input_name] = torch.from_numpy(in_data.copy())
-                xh2_in_datas[input_name] = np.repeat(in_data, repeats=hmm_batch, axis=0)
+                xh2_in_datas[input_name] = np.repeat(
+                    in_data, repeats=hmm_batch // in_data.shape[0], axis=0
+                )
 
         # Run inference
         logger.info("Running inference:")
@@ -914,12 +919,6 @@ class Xh2Exec(BaseExec):
         xh2_outputs, xh2_outputs_dequanted = xh2_infer.run(xh2_in_datas)
         self.save_profile_data(xh2_outputs)
 
-        repeats = (
-            self.hmm_batch
-            if self.hmm_batch > 1 and self.roi_num == 1
-            else self.roi_num if self.roi_num > 1 else 1
-        )
-
         # Compare results
         table = PrettyTable(
             ["name", "onnx vs hmquant", "onnx vs xh2", "hmquant vs xh2"]
@@ -928,9 +927,17 @@ class Xh2Exec(BaseExec):
         outputs_result = {}
 
         for output_name in onnx_outputs:
-            onnx_out = np.repeat(onnx_outputs[output_name], repeats=repeats, axis=0)
+            onnx_batch = onnx_infer.outputs_batch[output_name]
+            onnx_out = np.repeat(
+                onnx_outputs[output_name],
+                repeats=onnx_batch // onnx_outputs[output_name].shape[0],
+                axis=0,
+            )
+            hmquant_batch = hmquant_infer.outputs_batch[output_name]
             hmquant_out = np.repeat(
-                hmquant_outputs[output_name], repeats=repeats, axis=0
+                hmquant_outputs[output_name],
+                repeats=hmquant_batch // hmquant_outputs[output_name].shape[0],
+                axis=0,
             )
             xh2_out = np.split(
                 xh2_outputs_dequanted[output_name], self.build_batch, axis=0
@@ -1011,6 +1018,8 @@ class Xh2Exec(BaseExec):
             if paths:
                 try:
                     data = np.load(paths[0])
+                    hmm_batch = xh2.inputs_batch[name]
+                    data = np.repeat(data, repeats=hmm_batch // data.shape[0], axis=0)
                     input_data[name] = data
                     logger.info(
                         f"Loaded input: {name}, shape={data.shape}, from={paths[0]}"
@@ -1023,6 +1032,12 @@ class Xh2Exec(BaseExec):
             if paths:
                 try:
                     golden_outputs[name] = np.load(paths[0])
+                    golden_batch = xh2.outputs_batch[name]
+                    golden_outputs[name] = np.repeat(
+                        golden_outputs[name],
+                        repeats=golden_batch // golden_outputs[name].shape[0],
+                        axis=0,
+                    )
                     logger.info(
                         f"Loaded golden output: {name}, shape={golden_outputs[name].shape}"
                     )

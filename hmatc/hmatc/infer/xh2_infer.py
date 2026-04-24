@@ -46,6 +46,7 @@ class Xh2Infer(BaseInfer, ABC):
         self.model_ext = ".hmm"
         self.inputs_info = dict()
         self.inputs_format = dict()
+        self.outputs_info = dict()
 
     def load(self, model_path, device_id=0):
         """
@@ -90,6 +91,8 @@ class Xh2Infer(BaseInfer, ABC):
             shape = list(output_info.shape)
             dtype = np.dtype(output_info.dtype).name
             fmt = output_info.format.name
+            self.outputs_info[output_name] = output_info
+            self.outputs_batch[output_name] = shape[0]
             logger.info(
                 f"[{self.backend}] output[{output_name}] shape = {shape}, dtype = {dtype}, format = {fmt}"
             )

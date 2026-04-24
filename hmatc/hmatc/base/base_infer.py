@@ -40,6 +40,7 @@ class BaseInfer(object, metaclass=abc.ABCMeta):
         self.backend = "onnx"  # Backend type: onnx/hmquant/xh2
         self.device = "cpu"  # Device for inference execution
         self.inputs_batch = dict()
+        self.outputs_batch = dict()
 
     @abc.abstractmethod
     def load(self, model_path, device_id=0):
@@ -90,3 +91,6 @@ class BaseInfer(object, metaclass=abc.ABCMeta):
 
     def get_input_batch_size(self, name):
         return self.inputs_batch.get(name, 0)
+
+    def get_output_batch_size(self, name):
+        return self.outputs_batch.get(name, 0)

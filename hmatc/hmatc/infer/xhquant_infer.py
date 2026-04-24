@@ -91,6 +91,7 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
                 f"[Xh2Hmquant] output[{info.name}], shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
             )
             self.outputs_info[name] = {"shape": info.shape, "dtype": info.dtype}
+            self.outputs_batch[name] = info.shape[0]
 
     def run(self, in_datas: dict, dequant=True) -> Dict[str, np.ndarray]:
         """

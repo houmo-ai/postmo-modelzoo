@@ -279,7 +279,6 @@ def main():
             args.hmm,
             args.golden,
             device_id=args.device_id,
-            model_json_path=args.model_json,
         )
         return
 
