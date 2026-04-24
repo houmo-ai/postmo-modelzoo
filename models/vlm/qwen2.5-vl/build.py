@@ -234,7 +234,7 @@ def get_args() -> argparse.Namespace:
         dest="flash_attention",
         nargs=2,
         type=int,
-        default=(0, 1),
+        default=(2, 1),
         help="FlashAttention optimization switches: "
         "1st int = prefill/decode model switch (0=off, 1/2=on), "
         "2nd int = ViT model switch (0=off, 1=on); "

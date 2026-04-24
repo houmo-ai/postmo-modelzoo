@@ -201,7 +201,7 @@ def get_args() -> argparse.Namespace:
         "--flash_attention",
         dest="flash_attention",
         type=int,
-        default=0,
+        default=2,
         choices=[0, 1, 2],
         help="flash attention optimization",
     )

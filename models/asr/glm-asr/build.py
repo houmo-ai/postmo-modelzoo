@@ -380,7 +380,6 @@ if __name__ == "__main__":
             ncore,
             j,
             flash_attention=encoder_flash_attention,
-            enable_common_subgraph=True,
         )
         build_glm(
             f"{model_name}_decode",
