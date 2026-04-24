@@ -59,16 +59,42 @@ if [[ -z $HDPL_PLATFORM ]]; then
   fi
 fi
 
+# 清理环境变量中的重复路径
+_remove_duplicate_paths() {
+  local var_value="$1"
+  local delimiter=":"
+  local -A seen
+  local result=""
+  local IFS=":"
+  
+  for path in $var_value; do
+    if [[ -n "$path" ]] && [[ -z "${seen[$path]}" ]]; then
+      if [[ -z "$result" ]]; then
+        result="$path"
+      else
+        result="$result:$path"
+      fi
+      seen[$path]=1
+    fi
+  done
+  
+  echo "$result"
+}
+
+export PATH=$(_remove_duplicate_paths "$PATH")
+export LD_LIBRARY_PATH=$(_remove_duplicate_paths "$LD_LIBRARY_PATH")
+export PYTHONPATH=$(_remove_duplicate_paths "$PYTHONPATH")
+
 PRINT_YELLOW "[Please check the following path. Unset the env and source again if you want to use the default path!]"
-PRINT_GREEN "HOUMO_TARGET is $HOUMO_TARGET"
-PRINT_GREEN "HOUMO_VERSION is $HOUMO_VERSION"
-PRINT_GREEN "HOUMO_PATH is $HOUMO_PATH"
-PRINT_GREEN "HOUMO_SDK_PATH is $HOUMO_SDK_PATH"
-PRINT_GREEN "TCIM_RUNTIME_PATH is $TCIM_RUNTIME_PATH"
-PRINT_GREEN "HOUMO_EXAMPLES_PATH is $HOUMO_EXAMPLES_PATH"
-PRINT_GREEN "HOUMO_DATASETS_PATH is $HOUMO_DATASETS_PATH"
-PRINT_GREEN "HOUMO_MODEL_PATH is $HOUMO_MODEL_PATH"
-PRINT_GREEN "PYTHONPATH is $PYTHONPATH"
-PRINT_GREEN "LD_LIBRARY_PATH is $LD_LIBRARY_PATH"
-PRINT_GREEN "PATH is $PATH"
-PRINT_GREEN "HDPL_PLATFORM is $HDPL_PLATFORM"
+PRINT_GREEN "HOUMO_TARGET=$HOUMO_TARGET"
+PRINT_GREEN "HOUMO_VERSION=$HOUMO_VERSION"
+PRINT_GREEN "HOUMO_PATH=$HOUMO_PATH"
+PRINT_GREEN "HOUMO_SDK_PATH=$HOUMO_SDK_PATH"
+PRINT_GREEN "TCIM_RUNTIME_PATH=$TCIM_RUNTIME_PATH"
+PRINT_GREEN "HOUMO_EXAMPLES_PATH=$HOUMO_EXAMPLES_PATH"
+PRINT_GREEN "HOUMO_DATASETS_PATH=$HOUMO_DATASETS_PATH"
+PRINT_GREEN "HOUMO_MODEL_PATH=$HOUMO_MODEL_PATH"
+PRINT_GREEN "PYTHONPATH=$PYTHONPATH"
+PRINT_GREEN "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+PRINT_GREEN "PATH=$PATH"
+PRINT_GREEN "HDPL_PLATFORM=$HDPL_PLATFORM"

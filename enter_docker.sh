@@ -1,15 +1,21 @@
 #! /bin/bash
 
 # 0. 必要变量
-VERSION=v1.1.0
+PRINT_RED() { echo -e "\033[1;31m$@\033[0m"; }
+PRINT_GREEN() { echo -e "\033[1;32m$@\033[0m"; }
+PRINT_BLUE() { echo -e "\033[1;34m$@\033[0m"; }
+
+if [ $# -gt 0 ]; then
+  VERSION=$1
+else
+  PRINT_RED "please specify a version like v1.0.0"; exit -1
+fi
+
 IMAGE_NAME="harbor.houmo.ai/toolchain/release:Dadao-xh2-${VERSION}-ubuntu24.04-x86.64"
 CONTAINER_NAME="$(whoami).HoumoDadao_xh2_${VERSION}"
 CONTAINER_HOME="/container/$(whoami)"
 USER_CONFIG="-v /develop02:/develop02 -v /data:/data"
 
-PRINT_RED() { echo -e "\033[1;31m$@\033[0m"; }
-PRINT_GREEN() { echo -e "\033[1;32m$@\033[0m"; }
-PRINT_BLUE() { echo -e "\033[1;34m$@\033[0m"; }
 RUN_IN_DOCKER() { docker exec -it $CONTAINER_NAME bash -c "$@"; }
 ENTER_DOCKER() {
   PRINT_BLUE "Re-enter the container using:";
@@ -23,9 +29,9 @@ PRINT_BLUE "start container named \"$CONTAINER_NAME\" with image $IMAGE_NAME"
 # 1. 挂载路径设置，容器内路径相同
 VOLUME_HOME="/HoumoDadao_xh2_${VERSION}"
 
-# 2. [非必要]处理命令行参数，可选参数只有"restart"
-if [ $# -gt 0 ]; then
-  if [ "$1" == "restart" ]; then
+# 2. [非必要]处理命令行参数，第2个参数只有"restart"
+if [ $# -gt 1 ]; then
+  if [ "$2" == "restart" ]; then
     if docker ps -a | grep -q $CONTAINER_NAME; then 
       PRINT_BLUE "docker stop $CONTAINER_NAME"
       docker stop $CONTAINER_NAME >/dev/null
@@ -39,9 +45,16 @@ if [ $# -gt 0 ]; then
   fi
 else
   if docker ps -a | grep -q $CONTAINER_NAME; then
-    PRINT_BLUE "container exists"; 
-    ENTER_DOCKER
-    exit
+    if docker ps | grep -q $CONTAINER_NAME; then
+      PRINT_BLUE "container is running"; 
+      ENTER_DOCKER
+      exit 0
+    else
+      PRINT_BLUE "container exists but not running, starting it"
+      docker start $CONTAINER_NAME >/dev/null
+      ENTER_DOCKER
+      exit 0
+    fi
   else
     PRINT_BLUE "creating a new container"
   fi
