@@ -1264,24 +1264,10 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
     test_sh_flag = True
     if HDPL_PLATFORM == "ASIC" and os.path.exists(f"{current_folder}/test.sh"):
         logger.info("Ready to execute test.sh in folder: %s.", current_folder)
-        try:
-            cmd_model_size = model_info["get_model_params"][HOUMO_BACKEND][
-                "model_size"
-            ][0]
-        except Exception:
-            cmd_model_size = None
         check_flag = False if model_name == "qwen2.5-vl" else True
-        if cmd_model_size is not None and cmd_model_size in ["14b"]:
-            test_sh_flag, _ = execute_test_cmd(
-                ["bash", "test.sh", "--model_size", cmd_model_size],
-                log_file,
-                False,
-                check_flag,
-            )
-        else:
-            test_sh_flag, _ = execute_test_cmd(
-                ["bash", "test.sh"], log_file, False, check_flag
-            )
+        test_sh_flag, _ = execute_test_cmd(
+            ["bash", "test.sh"], log_file, False, check_flag
+        )
         test_sh_folder = current_folder
 
         prepare_test_folder(model_dir, "demo")

@@ -146,20 +146,11 @@ def test_llm_deepseek_r1_qwen3_8b_perf(setup_logging) -> None:
 
 
 @pytest.mark.qwen3
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-@pytest.mark.perf
-def test_llm_qwen3_perf(setup_logging) -> None:
-    model_name = "qwen3"
-    _perf_func(model_name, setup_logging)
-
-
-@pytest.mark.qwen3_14b
 @pytest.mark.ndevice_2
 @pytest.mark.dev_mem_24g
 @pytest.mark.perf
-def test_llm_qwen3_14b_perf(setup_logging) -> None:
-    model_name = "qwen3-14b"
+def test_llm_qwen3_perf(setup_logging) -> None:
+    model_name = "qwen3"
     _perf_func(model_name, setup_logging)
 
 

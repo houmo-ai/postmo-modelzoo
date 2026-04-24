@@ -18,10 +18,10 @@ MODEL_SIZE="9b"
 parse_args "$@"
 
 case "${MODEL_SIZE}" in
-    2b|4b|9b|27b|35b-a3b|3.6-35b-a3b)
+    0.8b|2b|4b|9b|27b|35b-a3b|3.6-35b-a3b)
         ;;
     *)
-        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 2b, 4b, 9b, 27b, 35b-a3b, 3.6-35b-a3b." >&2
+        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 0.8b, 2b, 4b, 9b, 27b, 35b-a3b, 3.6-35b-a3b." >&2
         exit 1
         ;;
 esac
@@ -37,11 +37,15 @@ fi
 
 cd "${SCRIPT_DIR}"
 
+if [[ -z "${HOUMO_EXAMPLES_PATH:-}" ]]; then
+    HOUMO_EXAMPLES_PATH="$(cd "${SCRIPT_DIR}/../../../" && pwd)"
+fi
+
 TEST_VENV_ACTIVE=0
 dir_path="qwen3.5_venv"
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
-    gptq_requirements="${SCRIPT_DIR}/../../../hmodel/gptqmodel/requirements.txt"
+    gptq_requirements="${HOUMO_EXAMPLES_PATH}/hmodel/gptqmodel/requirements.txt"
     if [ -f "${gptq_requirements}" ]; then
         pip3 install -r "${gptq_requirements}"
     fi
@@ -88,7 +92,7 @@ if should_run_step "demo"; then
         python3 demo.py
     fi
     echo "Execute performance case."
-    python3 ../../../tools/llm_perf/convert_embed.py --path "output/xh2/hmquant/quant_embedding.pt"
+    python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/xh2/hmquant/quant_embedding.pt"
     llm_perf -c "${PERF_CONFIG}"
 fi
 

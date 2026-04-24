@@ -17,7 +17,6 @@ yolox
 qwen2dot5
 qwen3
 qwen3dot5
-qwen3_14b
 deepseek
 deepseek_r1_qwen3_8b
 qwen2dot5_vl

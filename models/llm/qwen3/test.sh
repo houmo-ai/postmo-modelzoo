@@ -14,10 +14,10 @@ MODEL_SIZE="8b"
 parse_args "$@"
 
 case "${MODEL_SIZE}" in
-    8b|14b)
+    0.6b|1.7b|8b|14b)
         ;;
     *)
-        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 8b, 14b." >&2
+        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 0.6b, 1.7b, 8b, 14b." >&2
         exit 1
         ;;
 esac
@@ -25,7 +25,7 @@ esac
 cd "${SCRIPT_DIR}"
 
 TEST_VENV_ACTIVE=0
-dir_path="qwen3"
+dir_path="qwen3_venv"
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
 fi
@@ -63,10 +63,19 @@ if should_run_step "demo"; then
         PERF_CONFIG="config-8b.yaml"
     elif [[ "$MODEL_SIZE" == "14b" ]]; then
         PERF_CONFIG="config-14b.yaml"
+    elif [[ "$MODEL_SIZE" == "0.6b" ]]; then
+        PERF_CONFIG="config-0.6b.yaml"
+    elif [[ "$MODEL_SIZE" == "1.7b" ]]; then
+        PERF_CONFIG="config-1.7b.yaml"
     fi
+
+    if [[ -z "${HOUMO_EXAMPLES_PATH:-}" ]]; then
+        HOUMO_EXAMPLES_PATH="$(cd "${SCRIPT_DIR}/../../../" && pwd)"
+    fi
+
     if [[ -n "${PERF_CONFIG}" ]]; then
         echo "Execute performance case (size: ${MODEL_SIZE})."
-        python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt
+        python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path output/xh2/hmquant/quant_embedding.pt
         llm_perf -c "${PERF_CONFIG}"
     fi
 fi

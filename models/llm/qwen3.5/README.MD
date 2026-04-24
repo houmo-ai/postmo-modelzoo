@@ -6,8 +6,8 @@
 
 本项目使用从 ModelScope 下载的预训练模型：
 
-- 模型名称: Qwen3.5-2B / Qwen3.5-4B / Qwen3.5-9B / Qwen3.5-27B / Qwen3.5-35B-A3B / Qwen3.6-35B-A3B
-- 来源: https://modelscope.cn/models/Qwen/Qwen3.5-2B https://modelscope.cn/models/Qwen/Qwen3.5-4B https://modelscope.cn/models/Qwen/Qwen3.5-9B https://modelscope.cn/models/Qwen/Qwen3.5-27B https://modelscope.cn/models/Qwen/Qwen3.5-35B-A3B https://modelscope.cn/models/Qwen/Qwen3.6-35B-A3B
+- 模型名称: Qwen3.5-0.8B / Qwen3.5-2B / Qwen3.5-4B / Qwen3.5-9B / Qwen3.5-27B / Qwen3.5-35B-A3B / Qwen3.6-35B-A3B
+- 来源: https://modelscope.cn/models/Qwen/Qwen3.5-0.8B https://modelscope.cn/models/Qwen/Qwen3.5-2B https://modelscope.cn/models/Qwen/Qwen3.5-4B https://modelscope.cn/models/Qwen/Qwen3.5-9B https://modelscope.cn/models/Qwen/Qwen3.5-27B https://modelscope.cn/models/Qwen/Qwen3.5-35B-A3B https://modelscope.cn/models/Qwen/Qwen3.6-35B-A3B
 - 许可: Apache License 2.0
 
 预训练模型在运行时下载，工程发布**不包含**该模型。
@@ -30,6 +30,7 @@
 ## 1 模型说明
 
 本例使用的模型实现来源于：
+- Qwen3.5-0.8B: https://modelscope.cn/models/Qwen/Qwen3.5-0.8B
 - Qwen3.5-2B: https://modelscope.cn/models/Qwen/Qwen3.5-2B
 - Qwen3.5-4B: https://modelscope.cn/models/Qwen/Qwen3.5-4B
 - Qwen3.5-9B: https://modelscope.cn/models/Qwen/Qwen3.5-9B
@@ -55,6 +56,11 @@ pip3 install -r ../../../hmodel/gptqmodel/requirements.txt
 ### 2.2 获取模型和数据
 
 通过 get_model.py 脚本下载模型，可通过参数选择下载原始模型或芯片模型。
+
+0.8B 模型：
+```bash
+python3 get_model.py --type raw --model_size 0.8b
+```
 
 2B 模型：
 ```bash
@@ -183,7 +189,7 @@ TODO
 ## 4 命令行参数说明
 
 ### get_model.py
-- `--model_size`: 模型大小，支持 `2b`、`4b`、`9b`、`27b`、`35b-a3b` 或 `3.6-35b-a3b`，默认 `9b`；其中 `3.6-35b-a3b` 对应 Qwen3.6-35B-A3B
+- `--model_size`: 模型大小，支持  `0.8b`、`2b`、`4b`、`9b`、`27b`、`35b-a3b` 或 `3.6-35b-a3b`，默认 `9b`；其中 `3.6-35b-a3b` 对应 Qwen3.6-35B-A3B
 - `--type`: 下载类型，支持 `raw` 或 `hmm`，默认 `hmm`
 - `--download_dir`: 下载目录，默认当前目录
 - `--extract_dir`: 解压目录，默认 `None`
@@ -217,7 +223,7 @@ TODO
 - `--debug`: 输出调试日志
 
 ### test.sh
-- `-size, --model_size`: 模型大小，支持 `2b`、`4b`、`9b`、`27b`、`35b-a3b` 或 `3.6-35b-a3b`，默认 `9b`
+- `-size, --model_size`: 模型大小，支持 `0.8b`、`2b`、`4b`、`9b`、`27b`、`35b-a3b` 或 `3.6-35b-a3b`，默认 `9b`
 - `-s, --step`: 执行步骤，demo/build/quant/all（默认：demo）
 
 ## 5 免责声明

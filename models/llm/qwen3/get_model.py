@@ -86,8 +86,7 @@ def get_args() -> argparse.Namespace:
         dest="model_size",
         type=str,
         default="8b",
-        choices=["8b", "14b"],
-        help="model size: 8b or 14b",
+        help="model size: 0.6b, 1.7b, 8b, or 14b",
     )
     args = parser.parse_args()
     return args
@@ -98,6 +97,18 @@ if __name__ == "__main__":
 
     # Model configurations based on size
     model_configs = {
+        "0.6b": {
+            "model_size": "0.6b",
+            "ncore": 2,
+            "context_length": "32k",
+            "modelscope_repo": ["qwen/qwen3-0.6b"],
+        },
+        "1.7b": {
+            "model_size": "1.7b",
+            "ncore": 2,
+            "context_length": "32k",
+            "modelscope_repo": ["qwen/qwen3-1.7b"],
+        },
         "8b": {
             "model_size": "8b",
             "ncore": 2,

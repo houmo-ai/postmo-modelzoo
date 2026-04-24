@@ -25,8 +25,10 @@ import time
 import psutil
 import threading
 
+
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", os.path.abspath("../../../"))
 
 
 class ProcessMemoryMonitor:
@@ -126,14 +128,13 @@ def parse_args() -> argparse.Namespace:
         "--model_size",
         type=str,
         default="8b",
-        choices=["8b", "14b"],
-        help="model size: 8b or 14b",
+        help="model size: 0.6b, 1.7b, 8b or 14b",
     )
     parser.add_argument(
         "--model",
         type=str,
         default=None,
-        help="model path (default: qwen3-8b or qwen3-14b based on model_size)",
+        help="model path (default: qwen3-0.6b / qwen3-1.7b / qwen3-8b / qwen3-14b based on model_size)",
     )
     parser.add_argument(
         "--model-name", type=str, default="qwen3", help="output hmonnx model name"
@@ -177,8 +178,8 @@ def parse_args() -> argparse.Namespace:
         args.model = f"qwen3-{args.model_size}"
 
     if args.calib_data is None:
-        args.calib_data = (
-            "../../../hmodel/xh2/examples/xh_gen_data/gen_qwen3_8b.jsonl"
+        args.calib_data = os.path.join(
+            HOUMO_EXAMPLES_PATH, "hmodel/xh2/examples/xh_gen_data/gen_qwen3_8b.jsonl"
         )
 
     return args
