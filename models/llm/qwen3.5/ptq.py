@@ -250,13 +250,13 @@ def parse_args():
     parser.add_argument(
         "--max_size_w",
         type=int,
-        default=448,
+        default=896,
         help="vision export max input width in pixels",
     )
     parser.add_argument(
         "--max_size_h",
         type=int,
-        default=448,
+        default=896,
         help="vision export max input height in pixels",
     )
     parser.add_argument(
