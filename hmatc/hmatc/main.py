@@ -251,7 +251,7 @@ def main():
 
         Exec.build_from_hmonnx(
             hmonnx=args.hmonnx,
-            hmm_name=args.hmm_name,
+            hmm_name=str(args.hmm_name).lower(),
             output=args.output,
             ncore=args.ncore,
             opt_level=args.opt_level,
