@@ -727,7 +727,7 @@ def quant_model(args, stages: Tuple[str, ...] = ("prefill", "decode")):
     cfg.dtype = "float16"
     logger = get_root_logger()
 
-    cfg.config_dir = str(os.path.basename(Path(args.model)))
+    cfg.config_dir = MODEL_PATH
     cfg.hf_model_dir = cfg.config_dir
     cfg.model.hf_model = cfg.hf_model_dir
 
@@ -989,7 +989,7 @@ def quant_forcealigner(args):
     cfg.dtype = "float16"
     logger = get_root_logger()
 
-    cfg.config_dir = str(os.path.basename(Path(args.model)))
+    cfg.config_dir = MODEL_PATH
     cfg.hf_model_dir = cfg.config_dir
     cfg.model.hf_model = cfg.hf_model_dir
 
@@ -1172,7 +1172,8 @@ def quant_forcealigner(args):
 
 
 def quant_asr(args):
-    if args.model != "Qwen3-ForcedAligner-0.6B":
+    model_basename = os.path.basename(os.path.normpath(args.model))
+    if model_basename != "Qwen3-ForcedAligner-0.6B":
         quant_encode(args)
         quant_model(args)
     else:
