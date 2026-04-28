@@ -345,7 +345,7 @@ def build_vit(
     print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 
-def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
+def test(model_name, model_dir, output_dir, profile, batch=1):
     import tcim_lite
 
     print(f"\n===> {model_name} test start...")
@@ -359,8 +359,6 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
 
     # set input
     profile["set_input"] = 0
-    if prefix is None:
-        prefix = model_name
     input_num = module.get_num_inputs()
     for id in range(input_num):
         input_name = module.get_input_name(id)
@@ -368,9 +366,11 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         print(
             f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
         )
-        input_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy"
+        input_files = glob.glob(
+            f"{model_dir}/**/hmquant_*_{sanitize_name(input_name)}_*.npy",
+            recursive=True,
         )
+        input_data_path = os.path.abspath(input_files[0]) if input_files else ""
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
         print(
@@ -406,9 +406,10 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         print(
             f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
         )
-        output_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy"
+        output_files = glob.glob(
+            f"{model_dir}/**/hmquant_*{sanitize_name(output_name)}*.npy", recursive=True
         )
+        output_data_path = os.path.abspath(output_files[0]) if output_files else ""
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
             golden_output = np.concatenate(
@@ -482,7 +483,6 @@ if __name__ == "__main__":
         if os.path.isdir(folder_path)
         and any(key in os.path.basename(folder_path) for key in ["vision", "visual"])
     ]
-    visual_dir = visual_dirs[0] if visual_dirs else ""
 
     # build model
     if args.stage == "build" or args.stage == "all":
@@ -493,9 +493,17 @@ if __name__ == "__main__":
             print(f"[error] tcim not support platform: {arch}")
             exit(0)
 
-        if visual_dir:
+        # Build all visual models with resolution suffix
+        for visual_dir in visual_dirs:
+            folder_name = os.path.basename(visual_dir)
+            # Extract resolution suffix from folder name like "visual_448x448x2"
+            if "_" in folder_name:
+                suffix = folder_name.split("_", 1)[1]
+                vit_model_name = f"{model_name}_visual_{suffix}"
+            else:
+                vit_model_name = f"{model_name}_visual"
             build_vit(
-                f"{model_name}_visual",
+                vit_model_name,
                 visual_dir,
                 output_dir,
                 profile,
@@ -543,9 +551,16 @@ if __name__ == "__main__":
             profile,
             prefix=model_name,
         )
-        if visual_dir:
+        # Test all visual models
+        for visual_dir in visual_dirs:
+            folder_name = os.path.basename(visual_dir)
+            if "_" in folder_name:
+                suffix = folder_name.split("_", 1)[1]
+                vit_model_name = f"{model_name}_visual_{suffix}"
+            else:
+                vit_model_name = f"{model_name}_visual"
             test(
-                f"{model_name}_visual",
+                vit_model_name,
                 visual_dir,
                 output_dir,
                 profile,

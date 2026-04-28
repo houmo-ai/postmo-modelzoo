@@ -108,7 +108,7 @@ def get_args() -> argparse.Namespace:
         "--vision_path",
         dest="vision_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_visual.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_visual_896x896x2.hmm"),
         help="houmo vision model path (.hmm)",
     )
     parser.add_argument(
@@ -159,14 +159,14 @@ def get_args() -> argparse.Namespace:
         "--max_size_w",
         dest="max_size_w",
         type=int,
-        default=448,
+        default=896,
         help="max image width for vision",
     )
     parser.add_argument(
         "--max_size_h",
         dest="max_size_h",
         type=int,
-        default=448,
+        default=896,
         help="max image height for vision",
     )
     parser.add_argument(

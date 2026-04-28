@@ -864,8 +864,9 @@ def main(args):
     cfg = Config.fromfile(args.config)
     cfg_name = Path(args.config).stem
 
-    # Output layout: only --model_name (plus --output_root) affects directory names; subdirs are fixed strings.
-    cfg.work_dir = str(Path(args.output_root) / f"{args.model_name}" / "vision_export")
+    # Output layout: include size info in directory to support multiple sizes
+    size_suffix = f"{args.max_size_w}x{args.max_size_h}x{args.max_size_t}"
+    cfg.work_dir = str(Path(args.output_root) / f"{args.model_name}" / f"vision_export_{size_suffix}")
 
     work_path = Path(cfg.work_dir)
     if args.clean_output and work_path.exists():

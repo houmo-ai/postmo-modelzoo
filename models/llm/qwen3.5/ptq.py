@@ -250,20 +250,23 @@ def parse_args():
     parser.add_argument(
         "--max_size_w",
         type=int,
-        default=896,
-        help="vision export max input width in pixels",
+        nargs="+",
+        default=[896],
+        help="vision export max input width in pixels (multiple values allowed)",
     )
     parser.add_argument(
         "--max_size_h",
         type=int,
-        default=896,
-        help="vision export max input height in pixels",
+        nargs="+",
+        default=[896],
+        help="vision export max input height in pixels (multiple values allowed)",
     )
     parser.add_argument(
         "--max_size_t",
         type=int,
-        default=2,
-        help="vision export max temporal size in frames",
+        nargs="+",
+        default=[2],
+        help="vision export max temporal size in frames (multiple values allowed)",
     )
     args = parser.parse_args()
     mn = (args.model_name or "").strip()
@@ -328,6 +331,7 @@ def main(args=None):
 
 if __name__ == "__main__":
     _args = parse_args()
+    print(_args)
     _monitor = None
     if not _args.move_only:
         if not check_gpu():
