@@ -87,7 +87,7 @@ if should_run_step "demo"; then
             --tokenizer_dir "${RAW_HF_DIR}" \
             --prefill_path "output/${target_dir}/${RUN_MODEL_NAME}_prefill.hmm" \
             --decode_path "output/${target_dir}/${RUN_MODEL_NAME}_decode.hmm" \
-            --vision_path "output/${target_dir}/${RUN_MODEL_NAME}_visual.hmm"
+            --vision_path "output/${target_dir}/${RUN_MODEL_NAME}_visual_896x896x2.hmm"
     else
         python3 demo.py
     fi

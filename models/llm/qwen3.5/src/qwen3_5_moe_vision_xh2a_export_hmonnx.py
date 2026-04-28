@@ -345,7 +345,8 @@ def parse_arguments():
 def main(args):
     cfg = Config.fromfile(args.config)
     model_name = args.model_name or Path(args.hf_model_dir).name
-    cfg.work_dir = str(Path(args.output_dir) / f"{model_name}")
+    size_suffix = f"{args.max_size_w}x{args.max_size_h}x{args.max_size_t}"
+    cfg.work_dir = str(Path(args.output_dir) / f"{model_name}_{size_suffix}")
     Path(cfg.work_dir).mkdir(exist_ok=True, parents=True)
     log_file = Path(cfg.work_dir) / "vision_export.log"
     cfg.device = "cuda:0"
