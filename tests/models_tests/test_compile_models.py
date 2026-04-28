@@ -503,7 +503,7 @@ def test_omni_minicpmo_compile(setup_logging) -> None:
 @pytest.mark.compile
 @pytest.mark.dependency(
     name="test_llm_qwen3_30b_a3b_compile",
-    depends_on=["test_get_models.py::test_llm_qwen3_30b_a3b_get_model"],
+    depends_on=["test_quant_models.py::test_llm_qwen3_30b_a3b_quant"],
 )
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_24g

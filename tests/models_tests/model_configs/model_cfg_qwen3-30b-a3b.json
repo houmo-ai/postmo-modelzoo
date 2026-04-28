@@ -26,16 +26,17 @@
     },
     "get_model_params": {
         "xh2": {
-            "type": ["hmm", "hmm"],
-            "download_dir": ["cached_models", "cached_models"],
+            "type": ["raw", "hmm", "hmm"],
+            "download_dir": ["cached_models", "cached_models", "cached_models"],
             "extract_dir": [
+                null,
                 "cached_models/hmm_xh2_32k",
                 "cached_models/hmm_xh2_32k_ms"
             ],
-            "source_type": [null, "modelscope"],
-            "batch": [null, null],
-            "context_length": [null, null],
-            "ndevice": [null, null]
+            "source_type": [null, null, "modelscope"],
+            "batch": [null, null, null],
+            "context_length": [null, null, null],
+            "ndevice": [null, null, null]
         }
     },
     "quant_params": {

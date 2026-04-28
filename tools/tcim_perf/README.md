@@ -22,11 +22,6 @@
 | ------------ | --------------------------------------- |
 | tcim_perf.cc | 主文件，实现TCIM模型推理流程              |
 
-说明：
-
-- `#include <getopt.h>`：Windows 平台使用的 getopt 实现，来源于 [mingw-w64](https://mingw-w64.org/) 运行时包，包含 Todd C. Miller 和 NetBSD 基金会的 BSD 许可证声明。
-
-
 ### 1.2 流程说明
 
 程序按以下流程进行：

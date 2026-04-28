@@ -21,9 +21,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <getopt.h>
 #include <stdio.h>
-#include <unistd.h>
 
 #include <atomic>
 #include <chrono>  // Include time unit definitions
@@ -163,121 +161,154 @@ std::string TensorInfo2Str(const tcim::TensorInfo &tensor_info) {
  * @return true parse command line succeed
  * @return false parse command line failed
  */
-bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
-  int option_idx = 0;
-  struct option long_options[] = {
-      {"help", 0, 0, 'h'},         {"model", 1, 0, 'm'},
-      {"input", 1, 0, 'i'},        {"warm_up", 1, 0, 'w'},
-      {"batch", 1, 0, 'b'},        {"loops", 1, 0, 'l'},
-      {"threads", 1, 0, 't'},      {"devices", 1, 0, 'd'},
-      {"samples", 1, 0, 's'},      {"output", 1, 0, 'o'},
-      {"infer_only", 1, 0, 'y'},   {"name", 1, 0, 'n'},
-      {"module_pool", 1, 0, 'p'},  {"streams", 1, 0, 'e'},
-      {"modules", 1, 0, 'c'},      {"interval", 1, 0, 'v'},
-      {"queue_length", 1, 0, 'q'},
-  };
-  while (true) {
-    int ch = getopt_long(argc, argv,
-                         "hm:i:w:b:t:d:l:s:o:y:n:p:e:c:v:q:", long_options,
-                         &option_idx);
-    if (ch == -1) {
-      break;
-    }
-    switch (ch) {
-      case 'h':
-        std::cout << "Usage:" << std::endl;
-        std::cout << "--model/-m: (required) model path" << std::endl;
-        std::cout << "--input/-i: input data & output golden folder path"
-                  << std::endl;
-        std::cout << "--warm_up/-w: default 1, the number of warm up times"
-                  << std::endl;
-        std::cout << "--batch/-b: default 1, the batch of model" << std::endl;
-        std::cout << "--loops/-l: default 1, the number of loop"
-                     " iterations for model inference only"
-                  << std::endl;
-        std::cout << "--threads/-t: default 1, the number of threads"
-                  << std::endl;
-        std::cout << "--devices/-d: default 1, the number of devices"
-                  << std::endl;
-        std::cout << "--samples/-s: default 1, the number of samples"
-                  << std::endl;
-        std::cout << "--output/-o: default to the current path, the folder "
-                     "path where the perf result file (hmperf.txt) is stored."
-                  << std::endl;
-        std::cout << "--infer_only/-y: default false, only execute inference."
-                  << std::endl;
-        std::cout
-            << "--name/-n: model name, used for reading the input data and "
+void PrintUsage() {
+  std::cout << "Usage:" << std::endl;
+  std::cout << "--model/-m: (required) model path" << std::endl;
+  std::cout << "--input/-i: input data & output golden folder path"
+            << std::endl;
+  std::cout << "--warm_up/-w: default 1, the number of warm up times"
+            << std::endl;
+  std::cout << "--batch/-b: default 1, the batch of model" << std::endl;
+  std::cout << "--loops/-l: default 1, the number of loop"
+               " iterations for model inference only"
+            << std::endl;
+  std::cout << "--threads/-t: default 1, the number of threads" << std::endl;
+  std::cout << "--devices/-d: default 1, the number of devices" << std::endl;
+  std::cout << "--samples/-s: default 1, the number of samples" << std::endl;
+  std::cout << "--output/-o: default to the current path, the folder "
+               "path where the perf result file (hmperf.txt) is stored."
+            << std::endl;
+  std::cout << "--infer_only/-y: default false, only execute inference."
+            << std::endl;
+  std::cout << "--name/-n: model name, used for reading the input data and "
                "output golen of the model."
             << std::endl;
-        std::cout
-            << "--module_pool/-p: default false, testing using the module pool."
+  std::cout << "--module_pool/-p: default false, testing using the module pool."
             << std::endl;
-        std::cout << "--streams/-e: default 4, the number of streams."
-                  << std::endl;
-        std::cout << "--modules/-c: default 1, the maximum number of models "
-                     "that can be loaded. (Only effective in the module pool)"
-                  << std::endl;
-        std::cout << "--interval/-v: push an input data every <interval> "
-                     "milliseconds."
-                  << std::endl;
-        std::cout
-            << "--queue_length/-q: the maximum number of tasks in the "
+  std::cout << "--streams/-e: default 4, the number of streams." << std::endl;
+  std::cout << "--modules/-c: default 1, the maximum number of models "
+               "that can be loaded. (Only effective in the module pool)"
+            << std::endl;
+  std::cout << "--interval/-v: push an input data every <interval> "
+               "milliseconds."
+            << std::endl;
+  std::cout << "--queue_length/-q: the maximum number of tasks in the "
                "task queue. (Only effective when setting the interval param.)"
             << std::endl;
+}
+
+bool ParseArgs(CliArguments *arguments, int argc, char *argv[]) {
+  static const std::map<std::string, std::pair<char, bool>> opt_map = {
+      {"help", {'h', false}},        {"model", {'m', true}},
+      {"input", {'i', true}},        {"warm_up", {'w', true}},
+      {"batch", {'b', true}},        {"loops", {'l', true}},
+      {"threads", {'t', true}},      {"devices", {'d', true}},
+      {"samples", {'s', true}},      {"output", {'o', true}},
+      {"infer_only", {'y', true}},   {"name", {'n', true}},
+      {"module_pool", {'p', true}},  {"streams", {'e', true}},
+      {"modules", {'c', true}},      {"interval", {'v', true}},
+      {"queue_length", {'q', true}},
+  };
+
+  for (int i = 1; i < argc; i++) {
+    std::string arg = argv[i];
+    char ch = 0;
+    std::string val;
+
+    if (arg.compare(0, 2, "--") == 0) {
+      std::string name = arg.substr(2);
+      auto it = opt_map.find(name);
+      if (it == opt_map.end()) {
+        std::cerr << "Unsupported option: " << arg << std::endl;
+        return false;
+      }
+      ch = it->second.first;
+      if (it->second.second) {
+        if (i + 1 >= argc) {
+          std::cerr << "Option " << arg << " requires an argument."
+                    << std::endl;
+          return false;
+        }
+        val = argv[++i];
+      }
+    } else if (arg.compare(0, 1, "-") == 0 && arg.size() == 2) {
+      ch = arg[1];
+      bool found = false;
+      for (auto &kv : opt_map) {
+        if (kv.second.first == ch) {
+          if (kv.second.second) {
+            if (i + 1 >= argc) {
+              std::cerr << "Option " << arg << " requires an argument."
+                        << std::endl;
+              return false;
+            }
+            val = argv[++i];
+          }
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        std::cerr << "Unsupported option: " << arg << std::endl;
+        return false;
+      }
+    } else {
+      std::cerr << "Unexpected argument: " << arg << std::endl;
+      return false;
+    }
+
+    switch (ch) {
+      case 'h':
+        PrintUsage();
         return false;
       case 'm':
-        arguments->model_path = std::string(optarg);
+        arguments->model_path = val;
         break;
       case 'n':
-        arguments->model_name = std::string(optarg);
+        arguments->model_name = val;
         break;
       case 'i':
-        arguments->input_path = std::string(optarg);
+        arguments->input_path = val;
         break;
       case 'w':
-        arguments->warm_up = atoi(optarg);
+        arguments->warm_up = atoi(val.c_str());
         break;
       case 'b':
-        arguments->batch = atoi(optarg);
+        arguments->batch = atoi(val.c_str());
         break;
       case 't':
-        arguments->threads = atoi(optarg);
+        arguments->threads = atoi(val.c_str());
         break;
       case 'd':
-        arguments->devices = atoi(optarg);
+        arguments->devices = atoi(val.c_str());
         break;
       case 'l':
-        arguments->loops = atoi(optarg);
+        arguments->loops = atoi(val.c_str());
         break;
       case 's':
-        arguments->samples = atoi(optarg);
+        arguments->samples = atoi(val.c_str());
         break;
       case 'o':
-        arguments->output_path = optarg;
+        arguments->output_path = val;
         break;
       case 'y':
-        arguments->infer_only = optarg;
+        arguments->infer_only = (val == "1" || val == "true");
         break;
       case 'p':
-        arguments->module_pool = optarg;
+        arguments->module_pool = (val == "1" || val == "true");
         break;
       case 'e':
-        arguments->streams = atoi(optarg);
+        arguments->streams = atoi(val.c_str());
         break;
       case 'c':
-        arguments->modules = atoi(optarg);
+        arguments->modules = atoi(val.c_str());
         break;
       case 'v':
-        arguments->interval = atoi(optarg);
+        arguments->interval = atoi(val.c_str());
         break;
       case 'q':
-        arguments->queue_length = atoi(optarg);
+        arguments->queue_length = atoi(val.c_str());
         break;
-      default:
-        std::cerr << "Unsupported option: " << static_cast<char>(ch)
-                  << std::endl;
-        return false;
     }
   }
   return true;
