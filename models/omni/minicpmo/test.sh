@@ -34,8 +34,6 @@ if should_run_step "quant"; then
         python3 get_model.py --type raw
     fi
 
-    pip3 install -r requirements_ptq.txt
-
     echo "Start model quantization."
     python3 ptq.py
 fi
