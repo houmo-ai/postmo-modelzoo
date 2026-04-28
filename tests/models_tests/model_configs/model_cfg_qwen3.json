@@ -202,7 +202,7 @@
                 "cached_results/hmm_xh2_0.6b_32k/qwen3_decode.hmm",
                 "cached_results/hmm_xh2_1.7b_32k/qwen3_decode.hmm"
             ],
-            "ndevice": ["1", "1", "1", "1", "1"],
+            "ndevice": ["1", "1", "2", "1", "1"],
             "model_size": ["8b", "14b", "14b", "0.6b", "1.7b"]
         }
     },

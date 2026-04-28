@@ -329,10 +329,13 @@ def install_requirements(
         RuntimeError: If installing dependencies fails
     """
     venv_pip = str(Path(dir_path) / "bin" / "pip3")
+    cmd_list = [venv_pip, "install", "-r", requirements_path]
+    if requirements_path.endswith(".whl"):
+        cmd_list = [venv_pip, "install", requirements_path]
     try:
         # Directly use pip from within the virtual environment, no need to manually source activate
         subprocess.run(
-            [venv_pip, "install", "-r", requirements_path],
+            cmd_list,
             check=True,
             text=True,
             stdout=sys.stdout,
@@ -396,7 +399,9 @@ def deactivate_virtualenv(
             os.environ[env_name] = env_value
 
 
-def install_py_venv(env_dir: str, log_file: str, flow_type: str = "default") -> bool:
+def install_py_venv(
+    env_dir: str, log_file: str, flow_type: str = "default", other_reqs: dict = {}
+) -> bool:
     """
     Main function to orchestrate complete virtual environment setup process.
 
@@ -441,6 +446,49 @@ def install_py_venv(env_dir: str, log_file: str, flow_type: str = "default") -> 
 
         # 3. Install dependencies
         install_requirements(venv_dir, rqmt_path)
+
+        if other_reqs:
+            if other_reqs.get("hm_gptq", False):
+                houmo_examples_path = os.environ.get("HOUMO_EXAMPLES_PATH")
+                if houmo_examples_path:
+                    gptq_requirements = os.path.join(
+                        houmo_examples_path, "hmodel", "gptqmodel", "requirements.txt"
+                    )
+                    if os.path.exists(gptq_requirements) and os.path.isfile(
+                        gptq_requirements
+                    ):
+                        logger.info(
+                            f"Installing GPTQ dependencies from: {gptq_requirements}"
+                        )
+                        install_requirements(venv_dir, gptq_requirements)
+                    else:
+                        logger.warning(
+                            f"GPTQ requirements file not found: {gptq_requirements}"
+                        )
+                else:
+                    logger.warning(
+                        "HOUMO_EXAMPLES_PATH environment variable not set, skipping GPTQ dependencies installation"
+                    )
+            if other_reqs.get("py_reqs", []):
+                hm_ds_path = os.environ.get("HOUMO_DATASETS_PATH", ".")
+                for req_path in other_reqs.get("py_reqs", []):
+                    if os.path.exists(req_path) and os.path.isfile(req_path):
+                        logger.info(
+                            f"Installing additional Python requirement: {req_path}"
+                        )
+                        install_requirements(venv_dir, req_path)
+                    elif os.path.exists(f"{hm_ds_path}/{req_path}") and os.path.isfile(
+                        f"{hm_ds_path}/{req_path}"
+                    ):
+                        logger.info(
+                            f"Installing additional Python requirement from HOUMO_DATASETS_PATH: {hm_ds_path}/{req_path}"
+                        )
+                        install_requirements(venv_dir, f"{hm_ds_path}/{req_path}")
+                    else:
+                        logger.warning(
+                            f"Additional requirement file not found: {req_path}"
+                        )
+
         logger.info(f"Virtual environment created successfully: {venv_dir}")
 
         return True

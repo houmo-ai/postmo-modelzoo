@@ -52,6 +52,9 @@
     },
     "quant_params": {
         "xh2": {
+            "prerequisites": {
+                "hm_gptq": true
+            },
             "model": [
                 "cached_models/Qwen3.5-0.8B",
                 "cached_models/Qwen3.5-9B",
@@ -70,8 +73,7 @@
             ],
             "context-length": ["2048", "2048", "2048", "2048", "2048", "2048"],
             "input-sequence-length": ["256", "256", "256", "256", "256", "256"],
-            "calib_data": [null, null, null, null, null, null],
-            "model_size": ["0.8b", "9b", "2b", "4b", "27b", "35b-a3b"]
+            "calib_data": [null, null, null, null, null, null]
         }
     },
     "compile_params": {

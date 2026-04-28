@@ -132,6 +132,8 @@ def _generate_py_cmds(
         flag = False
         tmp_cmd_list = []
         for param_name, param_list in params_dict.items():
+            if param_name in ["prerequisites"]:
+                continue
             params_str = "--" + param_name
             if (
                 len(param_list) <= idx
@@ -638,7 +640,9 @@ def _prepare_compiled_llm_model(
             os.makedirs(f"{compile_res_dir}/hmquant/", exist_ok=True)
             os.system(f"cp -a {quant_res_dir}/quant_*.pt {compile_res_dir}/hmquant/")
         if get_test_type() in [TCaseType.SEPARATE_NO_INFER, TCaseType.DEFAULT]:
-            hmm_files = glob_module.glob(os.path.join(compile_res_dir, "*.hmm"))
+            hmm_files = glob_module.glob(
+                os.path.join(compile_res_dir, "*.hmm")
+            ) + glob_module.glob(os.path.join(compile_res_dir, "*.hmms"))
             if os.path.exists(compile_res_dir) and len(hmm_files) > 0:
                 logger.warning(
                     f"Skip the step of preparing compiled model {compile_res_dir}."
@@ -1025,16 +1029,21 @@ def execute_quant_flow(model_name: str, setup_logging) -> None:
             if exec_flag is False:
                 final_flag = False
     else:
+        params_dict = model_info["quant_params"][HOUMO_BACKEND]
+
         # install python requirements
-        venv_flag = install_py_venv(current_folder, log_file, "quant")
+        venv_flag = install_py_venv(
+            current_folder,
+            log_file,
+            "quant",
+            other_reqs=params_dict.get("prerequisites", {}),
+        )
         python_exe = "python3"
         if venv_flag:
             python_exe = f"{VENV_NAME}/bin/python3"
 
         # test script: ptq.py
-        params_dict = model_info["quant_params"][HOUMO_BACKEND]
         cmd_header = [python_exe, "ptq.py"]
-
         cmd_list = _generate_py_cmds(
             cmd_header,
             params_dict,
@@ -1051,7 +1060,9 @@ def execute_quant_flow(model_name: str, setup_logging) -> None:
                 quant_res_dir = _get_param_value(tmp_cmd_list, "--out-dir")
                 if quant_res_dir is None:
                     quant_res_dir = _get_param_value(tmp_cmd_list, "--output_dir")
-                if os.path.exists(quant_res_dir):
+                elif quant_res_dir is None:
+                    quant_res_dir = _get_param_value(tmp_cmd_list, "--output_path")
+                if quant_res_dir and os.path.exists(quant_res_dir):
                     shutil.rmtree(quant_res_dir, ignore_errors=True)
                     # [TMP]
                     # continue

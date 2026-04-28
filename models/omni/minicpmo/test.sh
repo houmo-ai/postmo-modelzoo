@@ -35,9 +35,7 @@ if should_run_step "quant"; then
     fi
 
     pip3 install -r requirements_ptq.txt
-    if [[ ! -d "$dir_path/lib/python3.12/site-packages/distutils" ]]; then
-        ln -s /opt/venv/houmo/lib/python3.12/site-packages/setuptools/_distutils $dir_path/lib/python3.12/site-packages/distutils
-    fi
+
     echo "Start model quantization."
     python3 ptq.py
 fi

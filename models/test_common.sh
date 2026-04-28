@@ -219,6 +219,11 @@ setup_python_venv() {
             echo 'unset ORIGINAL_PYTHONPATH'
         } >> "${venv_dir}/bin/deactivate"
         sed -i 's/include-system-site-packages = true/include-system-site-packages = false/g' "${venv_dir}/pyvenv.cfg"
+
+        if [[ ! -d "$venv_dir/lib/python3.12/site-packages/distutils" ]]; then
+            ln -s ${system_site_packages}/setuptools/_distutils \
+                $venv_dir/lib/python3.12/site-packages/distutils
+        fi
     else
         virtualenv --python="${python_exe}" --system-site-packages "${venv_dir}"
         venv_python="${venv_dir}/bin/python3"

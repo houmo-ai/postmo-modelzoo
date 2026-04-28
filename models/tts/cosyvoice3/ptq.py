@@ -659,8 +659,8 @@ def quantize_llm_qwen2(
     cfg.hf_model_dir = hf_model_dir
     cfg.model.hf_model = hf_model_dir
     cfg.work_dir = llm_qwen2_work_dir
-    cfg.device = "cuda:1" if torch.cuda.is_available() else "cpu"
-    cfg.exec_device = "cuda:1" if torch.cuda.is_available() else "cpu"
+    cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
+    cfg.exec_device = "cuda" if torch.cuda.is_available() else "cpu"
     cfg.dtype = "float16"
     cfg.debug = debug
     if debug:

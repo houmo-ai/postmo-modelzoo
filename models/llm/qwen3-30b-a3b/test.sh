@@ -34,10 +34,6 @@ if should_run_step "quant"; then
         python3 get_model.py --type raw
     fi
 
-    if [[ ! -d "$dir_path/lib/python3.12/site-packages/distutils" && "$VENV_FLAG" -eq "1" ]]; then
-        ln -s /opt/venv/houmo/lib/python3.12/site-packages/setuptools/_distutils \
-            $dir_path/lib/python3.12/site-packages/distutils
-    fi
     pip3 install gptqmodel-5.4.4-py3-none-any.whl
 
     echo "Start model quantization."

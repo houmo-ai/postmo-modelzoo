@@ -12,7 +12,7 @@
         "xh2": [2]
     },
     "support_flow": {
-        "xh2": ["get_model", "compile", "demo", "perf"]
+        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
     },
     "support_hmatc": null,
     "perf_metrics": {
@@ -40,6 +40,9 @@
     },
     "quant_params": {
         "xh2": {
+            "prerequisites": {
+                "py_reqs": ["gptqmodel-5.4.4-py3-none-any.whl"]
+            },
             "model": ["cached_models/qwen3-30b-a3b"],
             "out-dir": ["cached_results/hmquant_xh2_2k"],
             "context-length": ["2048"],
