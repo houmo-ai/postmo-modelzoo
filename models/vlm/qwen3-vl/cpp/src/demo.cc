@@ -1,9 +1,10 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: demo.cc
  * Description:
  *   Main application for Qwen3-VL C++ inference demo.
+ *   Supports single-shot and interactive chat modes.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +21,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -33,6 +36,45 @@
 #include <Windows.h>
 #endif
 
+const std::string DEFAULT_IMAGE_PROMPT = "描述图片内容";
+
+// Helper function to trim whitespace
+std::string trim(const std::string &str) {
+  size_t start = str.find_first_not_of(" \t\n\r");
+  if (start == std::string::npos) return "";
+  size_t end = str.find_last_not_of(" \t\n\r");
+  return str.substr(start, end - start + 1);
+}
+
+// Helper function to parse user input in interactive mode
+// Format: "image_path1 image_path2 -- prompt text" or just "prompt text"
+void ParseInteractiveInput(const std::string &user_input,
+                           std::vector<std::string> &image_paths,
+                           std::string &prompt) {
+  image_paths.clear();
+
+  // Find the separator "--"
+  size_t sep_pos = user_input.find("--");
+
+  if (sep_pos != std::string::npos) {
+    // Has separator: parse image paths and prompt
+    std::string media_part = trim(user_input.substr(0, sep_pos));
+    prompt = trim(user_input.substr(sep_pos + 2));
+
+    if (!media_part.empty()) {
+      // Split by space for multiple images
+      std::istringstream iss(media_part);
+      std::string path;
+      while (iss >> path) {
+        image_paths.push_back(path);
+      }
+    }
+  } else {
+    // No separator: treat entire input as prompt (text-only)
+    prompt = trim(user_input);
+  }
+}
+
 void printUsage(const char *program_name) {
 #ifdef _MSC_VER
   SetConsoleOutputCP(
@@ -43,12 +85,12 @@ void printUsage(const char *program_name) {
   std::cout << "  " << program_name << " [options]" << std::endl;
   std::cout << std::endl;
   std::cout << "Options:" << std::endl;
-  std::cout << "  --image <path>           Path to image file (can be "
-               "specified multiple times)"
+  std::cout << "  --image <paths...>        Paths to image files (can specify "
+               "multiple paths after --image)"
             << std::endl;
   std::cout << "  --prompt <text>          User prompt text (default: "
-               "\"请描述图片内容。\")"
-            << std::endl;
+               "\""
+            << DEFAULT_IMAGE_PROMPT << "\")" << std::endl;
   std::cout << "  --visual <path>          Path to visual model (default: "
                "output/xh2/qwen3-vl_visual.hmm)"
             << std::endl;
@@ -73,7 +115,18 @@ void printUsage(const char *program_name) {
       << std::endl;
   std::cout << "  --top-p <f>              Top-p sampling (default: 1.0)"
             << std::endl;
+  std::cout << "  --it                     Enable interactive chat mode"
+            << std::endl;
+  std::cout << "  --history                Keep chat history across messages"
+            << std::endl;
   std::cout << "  -h, --help               Show this help message" << std::endl;
+  std::cout << std::endl;
+  std::cout << "Interactive Mode Usage:" << std::endl;
+  std::cout << "  - Pure text: just type your question" << std::endl;
+  std::cout << "  - With image(s): image_path1 [image_path2 ...] -- prompt text"
+            << std::endl;
+  std::cout << "  - Exit: type 'stop', 'exit', 'quit', or press Ctrl+C"
+            << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -88,22 +141,29 @@ int main(int argc, char *argv[]) {
   std::string decode_model_path = "output/xh2/qwen3-vl_decode.hmm";
   std::string tokenizer_path = "qwen3-vl/tokenizer.json";
   std::string embedding_path = "output/xh2/hmquant/quant_embedding.bin";
-  std::string prompt = "请分析输入内容并简洁作答。";
+  std::string prompt = DEFAULT_IMAGE_PROMPT;
   std::vector<std::string> image_paths;
   float repetition_penalty = 1.5f;
   float temperature = 1.0f;
   int top_k = -1;
   float top_p = 1.0f;
+  bool interactive_mode = false;
+  bool keep_history = false;  // Default: do NOT keep history (same as Python)
 
   // Parse command line arguments
+  // Support both: --image path1 path2 ... (multiple paths after --image)
+  //            or: --image path1 --image path2 (repeated --image)
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
 
     if (arg == "-h" || arg == "--help") {
       printUsage(argv[0]);
       return 0;
-    } else if (arg == "--image" && i + 1 < argc) {
-      image_paths.push_back(argv[++i]);
+    } else if (arg == "--image") {
+      // Collect all paths after --image until next option or end
+      while (i + 1 < argc && argv[i + 1][0] != '-') {
+        image_paths.push_back(argv[++i]);
+      }
     } else if (arg == "--prompt" && i + 1 < argc) {
       prompt = argv[++i];
     } else if (arg == "--visual" && i + 1 < argc) {
@@ -124,6 +184,10 @@ int main(int argc, char *argv[]) {
       top_k = std::stoi(argv[++i]);
     } else if (arg == "--top-p" && i + 1 < argc) {
       top_p = std::stof(argv[++i]);
+    } else if (arg == "--it") {
+      interactive_mode = true;
+    } else if (arg == "--history") {
+      keep_history = true;
     } else {
       std::cerr << "Unknown option: " << arg << std::endl;
       printUsage(argv[0]);
@@ -176,9 +240,65 @@ int main(int argc, char *argv[]) {
     std::unique_ptr<HmQwenVLInfer> infer(new HmQwenVLInfer(
         visual_model_path, prefill_model_path, decode_model_path,
         tokenizer_path, embedding_path, sampling_manager));
+    infer->SetKeepHistory(keep_history);
+    infer->SetEnablePerfReport(!interactive_mode);
 
-    // Run chat
-    std::string response = infer->Chat(image_paths, prompt);
+    // Main loop: interactive or single-shot mode
+    while (true) {
+      std::vector<std::string> current_image_paths;
+      std::string current_prompt;
+
+      if (interactive_mode) {
+        // Interactive mode: read user input
+        std::cout << "Input your instruction here (or image paths): ";
+        std::string user_input;
+        std::getline(std::cin, user_input);
+        user_input = trim(user_input);
+
+        // Check for exit commands
+        std::string lower_input = user_input;
+        std::transform(lower_input.begin(), lower_input.end(),
+                       lower_input.begin(), ::tolower);
+        if (lower_input == "stop" || lower_input == "exit" ||
+            lower_input == "quit" || user_input.empty()) {
+          std::cout << std::endl;
+          std::cout << "程序结束" << std::endl;
+          break;
+        }
+
+        // Parse input for images and prompt
+        ParseInteractiveInput(user_input, current_image_paths, current_prompt);
+      } else {
+        // Single-shot mode: use command line arguments
+        current_image_paths = image_paths;
+        current_prompt = prompt;
+      }
+
+      // Print question (same format as Python)
+      std::cout << "[SUCCESS] question:" << std::endl;
+      std::cout << current_prompt << std::endl;
+
+      try {
+        // Run chat
+        std::string response = infer->Chat(current_image_paths, current_prompt);
+
+        // Reset color after response
+        std::cout << std::endl;
+
+        // In single-shot mode, exit after one iteration
+        if (!interactive_mode) {
+          break;
+        }
+      } catch (const std::exception &e) {
+        std::cerr << "聊天过程中出错: " << e.what() << std::endl;
+        std::cout << std::endl;
+        if (!interactive_mode) {
+          return -3;
+        }
+        // In interactive mode, continue to next iteration
+        continue;
+      }
+    }
 
     // Cleanup
     infer.reset();
@@ -188,5 +308,6 @@ int main(int argc, char *argv[]) {
     return -3;
   }
 
+  std::cout << "Program finished successfully" << std::endl;
   return 0;
 }

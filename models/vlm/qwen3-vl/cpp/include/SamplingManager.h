@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: SamplingManager.h
  * Description:
@@ -52,9 +52,8 @@ class SamplingManager {
    * uses presence penalty)
    * @param min_tokens_to_keep Minimum number of tokens to keep in top-p
    */
-  SamplingManager(float temperature = 1.0f, int top_k = -1,
-                  float top_p = 1.0f, float repetition_penalty = 1.0f,
-                  int min_tokens_to_keep = 1)
+  SamplingManager(float temperature = 1.0f, int top_k = -1, float top_p = 1.0f,
+                  float repetition_penalty = 1.0f, int min_tokens_to_keep = 1)
       : temperature_(temperature),
         top_k_(top_k),
         top_p_(top_p),
@@ -86,7 +85,7 @@ class SamplingManager {
    * @param previous_tokens List of previously generated token IDs
    */
   void applyRepetitionPenalty(float* logits, size_t size,
-                               const std::vector<int>& previous_tokens) const;
+                              const std::vector<int>& previous_tokens) const;
 
   /**
    * @brief Apply presence repetition penalty (subtractive penalty)
@@ -95,8 +94,9 @@ class SamplingManager {
    * @param size Size of the array
    * @param previous_tokens List of previously generated token IDs
    */
-  void applyPresenceRepetitionPenalty(float* logits, size_t size,
-                                       const std::vector<int>& previous_tokens) const;
+  void applyPresenceRepetitionPenalty(
+      float* logits, size_t size,
+      const std::vector<int>& previous_tokens) const;
 
   /**
    * @brief Apply top-K filtering to probabilities

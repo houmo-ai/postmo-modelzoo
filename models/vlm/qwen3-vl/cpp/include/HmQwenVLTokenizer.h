@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: HmQwenVLTokenizer.h
  * Description:
@@ -30,7 +30,8 @@ using tokenizers::Tokenizer;
 using tensor_type = half;
 
 /**
- * @brief HmQwenVLTokenizer Class - Handles tokenization for vision-language model
+ * @brief HmQwenVLTokenizer Class - Handles tokenization for vision-language
+ * model
  *
  * This class provides functionalities for:
  * 1. Applying chat templates with vision support
@@ -40,82 +41,81 @@ using tensor_type = half;
  * 5. Handling special vision tokens
  */
 class HmQwenVLTokenizer {
-public:
-    /**
-     * @brief Constructor - Initializes the tokenizer
-     * @param tokenizerJsonPath Path to tokenizer.json
-     * @param embeddingWeightPath Path to embedding weights
-     * @param embedding_len Length of each embedding vector
-     * @param prefill_len Maximum prefill length
-     */
-    HmQwenVLTokenizer(const std::string &tokenizerJsonPath,
-                      const std::string &embeddingWeightPath,
-                      const int embedding_len,
-                      const int prefill_len);
+ public:
+  /**
+   * @brief Constructor - Initializes the tokenizer
+   * @param tokenizerJsonPath Path to tokenizer.json
+   * @param embeddingWeightPath Path to embedding weights
+   * @param embedding_len Length of each embedding vector
+   * @param prefill_len Maximum prefill length
+   */
+  HmQwenVLTokenizer(const std::string &tokenizerJsonPath,
+                    const std::string &embeddingWeightPath,
+                    const int embedding_len, const int prefill_len);
 
-    HmQwenVLTokenizer(const HmQwenVLTokenizer &it) = delete;
-    HmQwenVLTokenizer &operator=(const HmQwenVLTokenizer &it) = delete;
-    HmQwenVLTokenizer(HmQwenVLTokenizer &&it) noexcept = default;
-    HmQwenVLTokenizer &operator=(HmQwenVLTokenizer &&it) noexcept = default;
-    ~HmQwenVLTokenizer();
+  HmQwenVLTokenizer(const HmQwenVLTokenizer &it) = delete;
+  HmQwenVLTokenizer &operator=(const HmQwenVLTokenizer &it) = delete;
+  HmQwenVLTokenizer(HmQwenVLTokenizer &&it) noexcept = default;
+  HmQwenVLTokenizer &operator=(HmQwenVLTokenizer &&it) noexcept = default;
+  ~HmQwenVLTokenizer();
 
-    /**
-     * @brief Apply chat template with vision support
-     * @param text User text prompt
-     * @param image_paths Vector of image paths (can be empty for text-only)
-     * @param add_generation_prompt Whether to add generation prompt
-     * @return Formatted text string ready for encoding
-     */
-    std::string ApplyChatTemplate(const std::string &text,
-                                  const std::vector<std::string> &image_paths,
-                                  bool add_generation_prompt = true);
+  /**
+   * @brief Apply chat template with vision support
+   * @param text User text prompt
+   * @param image_paths Vector of image paths (can be empty for text-only)
+   * @param add_generation_prompt Whether to add generation prompt
+   * @return Formatted text string ready for encoding
+   */
+  std::string ApplyChatTemplate(const std::string &text,
+                                const std::vector<std::string> &image_paths,
+                                bool add_generation_prompt = true);
 
-    /**
-     * @brief Encode text to token IDs
-     * @param text Text to encode
-     * @return Vector of token IDs
-     */
-    std::vector<int> Encode(const std::string &text);
+  /**
+   * @brief Encode text to token IDs
+   * @param text Text to encode
+   * @return Vector of token IDs
+   */
+  std::vector<int> Encode(const std::string &text);
 
-    /**
-     * @brief Decode token IDs to text
-     * @param ids Vector of token IDs
-     * @return Decoded text
-     */
-    std::string Decode(const std::vector<int32_t> &ids);
+  /**
+   * @brief Decode token IDs to text
+   * @param ids Vector of token IDs
+   * @return Decoded text
+   */
+  std::string Decode(const std::vector<int32_t> &ids);
 
-    /**
-     * @brief Generate embeddings from token IDs
-     * @param ids Vector of token IDs
-     * @return Pointer to embedding tensor
-     */
-    tensor_type *EmbeddingTokens(const std::vector<int> &ids);
+  /**
+   * @brief Generate embeddings from token IDs
+   * @param ids Vector of token IDs
+   * @return Pointer to embedding tensor
+   */
+  tensor_type *EmbeddingTokens(const std::vector<int> &ids);
 
-    /**
-     * @brief Count vision tokens in text
-     * @param text Text to analyze
-     * @return Number of vision tokens
-     */
-    int CountVisionTokens(const std::string &text);
+  /**
+   * @brief Count vision tokens in text
+   * @param text Text to analyze
+   * @return Number of vision tokens
+   */
+  int CountVisionTokens(const std::string &text);
 
-    /**
-     * @brief Get special token IDs
-     */
-    int GetImageTokenId() const { return config_.image_token_id; }
-    int GetVideoTokenId() const { return config_.video_token_id; }
-    int GetVisionStartTokenId() const { return config_.vision_start_token_id; }
-    int GetVisionEndTokenId() const { return config_.vision_end_token_id; }
-    int GetEosTokenId() const { return config_.eos_token_id; }
-    int GetPadTokenId() const { return config_.pad_token_id; }
+  /**
+   * @brief Get special token IDs
+   */
+  int GetImageTokenId() const { return config_.image_token_id; }
+  int GetVideoTokenId() const { return config_.video_token_id; }
+  int GetVisionStartTokenId() const { return config_.vision_start_token_id; }
+  int GetVisionEndTokenId() const { return config_.vision_end_token_id; }
+  int GetEosTokenId() const { return config_.eos_token_id; }
+  int GetPadTokenId() const { return config_.pad_token_id; }
 
-private:
-    std::unique_ptr<Tokenizer> tok_;
-    std::unique_ptr<tensor_type[]> embed_w_;
-    tensor_type *ptr_ = nullptr;
-    size_t ptr_size_ = 0;
-    int prefill_length_ = 0;
-    int embedding_length_ = 0;
-    ModelConfig config_;
+ private:
+  std::unique_ptr<Tokenizer> tok_;
+  std::unique_ptr<tensor_type[]> embed_w_;
+  tensor_type *ptr_ = nullptr;
+  size_t ptr_size_ = 0;
+  int prefill_length_ = 0;
+  int embedding_length_ = 0;
+  ModelConfig config_;
 };
 
 #endif  // __HMQWEN_VL_TOKENIZER_H__

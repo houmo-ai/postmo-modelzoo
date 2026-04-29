@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: HmQwenVLInfer.cc
  * Description:
@@ -137,6 +137,7 @@ HmQwenVLInfer::HmQwenVLInfer(const std::string &visualModelPath,
   }
   std::cout << "Image dimensions: " << config_.image_size_w << "x"
             << config_.image_size_h << std::endl;
+  std::cout << "Context max length: " << context_max_length_ << std::endl;
 
   // Initialize components
   tokenizer_ = std::make_shared<HmQwenVLTokenizer>(
@@ -432,6 +433,19 @@ bool HmQwenVLInfer::IsValidChar(char32_t cp) {
 
 std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
                                 const std::string &prompt) {
+  if (!keep_history_) {
+    ResetConversationState();
+  }
+
+  // Check if context is near max length, reset if too close
+  // This prevents overflow before starting new conversation
+  if (context_length > context_max_length_ - 1000) {
+    std::cerr << "Context length (" << context_length
+              << ") is near max length (" << context_max_length_
+              << "), resetting conversation state" << std::endl;
+    ResetConversationState();
+  }
+
   Timer timer;
   timer.start();
   const float prefill_model_load_time = perf_info_.prefill_model_load_time;
@@ -444,15 +458,6 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
   perf_info_.batch_size = batch_ > 0 ? batch_ : 1;
   perf_info_.num_images = static_cast<int>(image_paths.size());
 
-  std::cout << "Question: " << prompt << std::endl;
-  if (!image_paths.empty()) {
-    std::cout << "Images: ";
-    for (const auto &path : image_paths) {
-      std::cout << path << " ";
-    }
-    std::cout << std::endl;
-  }
-
   // Apply chat template
   Timer prefill_tokenize_timer;
   prefill_tokenize_timer.start();
@@ -463,6 +468,13 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
   std::vector<int> input_ids = tokenizer_->Encode(formatted);
   prefill_tokenize_timer.end();
   perf_info_.prefill_tokenization_time = prefill_tokenize_timer.elapsed_ms();
+
+  if (context_length + static_cast<int>(input_ids.size()) >
+      context_max_length_) {
+    std::cerr << "Context exceeds max length, resetting conversation state"
+              << std::endl;
+    ResetConversationState();
+  }
 
   if (input_ids.size() > static_cast<size_t>(context_max_length_)) {
     std::cerr << "Input too long: " << input_ids.size() << " > "
@@ -612,12 +624,24 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
     }
   }
 
+  // In history mode, preserve past_seq_len_; otherwise reset to 0
+  // This matches Python: past_seq_length = self.context_length if args.history
+  // else 0
+  if (!keep_history_) {
+    past_seq_len_ = 0;
+  }
+  // past_seq_len_ now equals context_length if keep_history_, else 0
+  // Save initial context_length for position_ids and valid_length calculation
+  int32_t initial_context_length = past_seq_len_;
+
   // Calculate 3D RoPE position indices
+  // In history mode, position_ids should start from past_seq_len_ (previous KV
+  // cache length)
   std::vector<int32_t> time_position_ids(input_seq_length, 0);
   std::vector<int32_t> height_position_ids(input_seq_length, 0);
   std::vector<int32_t> width_position_ids(input_seq_length, 0);
 
-  int pos_idx = 0;
+  int pos_idx = initial_context_length;  // Start from previous context position
   size_t img_idx = 0;
   for (size_t i = 0; i < seq_length;) {
     if (input_ids[i] == IMAGE_TOKEN_ID && img_idx < image_grid_thw.size()) {
@@ -700,11 +724,14 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
 
   int32_t valid_length = 0;
   int32_t current_length = 0;
-  past_seq_len_ = 0;
 
   int prefill_loop_round = (seq_length + prefill_length_ - 1) / prefill_length_;
 
   for (int round = 0; round < prefill_loop_round; round++) {
+    // valid_length = round * prefill_length + initial KV cache length
+    // This matches Python: valid_length = round * prefill_length +
+    // context_length
+    valid_length = round * prefill_length_ + initial_context_length;
     int start = round * prefill_length_;
     int end =
         std::min((round + 1) * prefill_length_, static_cast<int>(seq_length));
@@ -759,8 +786,7 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
     prefill_infer_timer.end();
     perf_info_.prefill_infer_time += prefill_infer_timer.elapsed_ms();
 
-    valid_length += current_length;
-    past_seq_len_ = valid_length;
+    past_seq_len_ = valid_length + current_length;
   }
 
   prefill_timer.end();
@@ -787,7 +813,8 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
   chat_history_ids.push_back(next_token);
 
   std::string all_response = prefill_response;
-  int context_length = seq_length;
+  // context_length should be set to past_seq_len_ (the actual KV cache length)
+  context_length = past_seq_len_;
   slide_len_ = 10;
   skip_tokens_ = 0;
 
@@ -803,7 +830,13 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
   decode_timer.start();
 
   // Save rope_deltas for decode
-  rope_deltas_ = pos_idx - seq_length;
+  // rope_deltas should be updated only when past_seq_len_ == 0 (first
+  // conversation) In history mode, subsequent conversations should keep the
+  // original rope_deltas This matches Python: position_ids, rope_deltas =
+  // self.get_rope_index(...) only when past_seq_length == 0
+  if (past_seq_len_ == 0) {
+    rope_deltas_ = pos_idx - seq_length;
+  }
 
   while (true) {
     if (context_length >= context_max_length_ || next_token == EOS_TOKEN_ID) {
@@ -867,9 +900,11 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
     }
 
     int substart = utf8_len(last_response_);
-    std::vector<int> decode_window_ids(
-        chat_history_ids.end() - slide_len_ - skip_tokens_ - 1,
-        chat_history_ids.end());
+    const int window_tokens = static_cast<int>(slide_len_ + skip_tokens_ + 1);
+    const int available_tokens = static_cast<int>(chat_history_ids.size());
+    const int take_tokens = std::min(window_tokens, available_tokens);
+    std::vector<int> decode_window_ids(chat_history_ids.end() - take_tokens,
+                                       chat_history_ids.end());
     Timer decode_tokenize_timer;
     decode_tokenize_timer.start();
     std::string tmp_response = tokenizer_->Decode(decode_window_ids);
@@ -916,20 +951,21 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
                    ? perf_info_.decode_time / perf_info_.output_tokens
                    : 0.0f;
 
-  std::cout << std::fixed << std::setprecision(3);
-  std::cout << "[SUCCESS] "
-               "==============================================================="
-               "====================================="
-            << std::endl;
-  std::cout << "[SUCCESS]                     Model Inference Performance "
-               "Summary Report"
-            << std::endl;
-  std::cout << "[SUCCESS] "
-               "==============================================================="
-               "====================================="
-            << std::endl;
+  if (enable_perf_report_) {
+    std::cout << std::fixed << std::setprecision(3);
+    std::cout << "[SUCCESS] "
+                 "==============================================================="
+                 "====================================="
+              << std::endl;
+    std::cout << "[SUCCESS]                     Model Inference Performance "
+                 "Summary Report"
+              << std::endl;
+    std::cout << "[SUCCESS] "
+                 "==============================================================="
+                 "====================================="
+              << std::endl;
 
-  std::cout << "[SUCCESS] Configuration Details:" << std::endl;
+    std::cout << "[SUCCESS] Configuration Details:" << std::endl;
   std::cout << "[SUCCESS]   Batch Size:      " << perf_info_.batch_size
             << std::endl;
   std::cout << "[SUCCESS]   Input Length per Sample:    "
@@ -938,7 +974,8 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
             << perf_info_.output_tokens << " tokens" << std::endl;
   std::cout << "[SUCCESS]   Number of Images:      " << perf_info_.num_images
             << " images" << std::endl;
-  std::cout << std::setprecision(2) << "[SUCCESS]   Prefill Model Load Time: "
+  std::cout << std::setprecision(2)
+            << "[SUCCESS]   Prefill Model Load Time:    "
             << perf_info_.prefill_model_load_time << "ms" << std::endl;
   std::cout << "[SUCCESS]   Decode Model Load Time:  "
             << perf_info_.decode_model_load_time << "ms" << std::endl;
@@ -1025,10 +1062,11 @@ std::string HmQwenVLInfer::Chat(const std::vector<std::string> &image_paths,
             << safe_speed(static_cast<float>(perf_info_.output_tokens),
                           perf_info_.total_time)
             << " tokens/s" << std::endl;
-  std::cout << "[SUCCESS] "
-               "==============================================================="
-               "====================================="
-            << std::endl;
+    std::cout << "[SUCCESS] "
+                 "==============================================================="
+                 "====================================="
+              << std::endl;
+  }
 
   return all_response;
 }

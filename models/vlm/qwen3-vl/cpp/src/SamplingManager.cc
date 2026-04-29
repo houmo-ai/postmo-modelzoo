@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: SamplingManager.cc
  * Description:
@@ -31,7 +31,7 @@
 #include <vector>
 
 void SamplingManager::softmax(const float* logits, size_t size,
-                               float* probs) const {
+                              float* probs) const {
   if (size == 0) return;
 
   // Find max for numerical stability
@@ -66,8 +66,8 @@ void SamplingManager::applyTemperature(float* logits, size_t size) const {
   }
 }
 
-void SamplingManager::applyRepetitionPenalty(float* logits, size_t size,
-                                              const std::vector<int>& previous_tokens) const {
+void SamplingManager::applyRepetitionPenalty(
+    float* logits, size_t size, const std::vector<int>& previous_tokens) const {
   if (repetition_penalty_ == 1.0f || previous_tokens.empty()) {
     return;
   }
@@ -75,9 +75,8 @@ void SamplingManager::applyRepetitionPenalty(float* logits, size_t size,
   // Create unique set of previous tokens
   std::vector<int> unique_tokens = previous_tokens;
   std::sort(unique_tokens.begin(), unique_tokens.end());
-  unique_tokens.erase(
-      std::unique(unique_tokens.begin(), unique_tokens.end()),
-      unique_tokens.end());
+  unique_tokens.erase(std::unique(unique_tokens.begin(), unique_tokens.end()),
+                      unique_tokens.end());
 
   for (int token_id : unique_tokens) {
     if (token_id >= 0 && static_cast<size_t>(token_id) < size) {
@@ -92,8 +91,8 @@ void SamplingManager::applyRepetitionPenalty(float* logits, size_t size,
   }
 }
 
-void SamplingManager::applyPresenceRepetitionPenalty(float* logits, size_t size,
-                                                     const std::vector<int>& previous_tokens) const {
+void SamplingManager::applyPresenceRepetitionPenalty(
+    float* logits, size_t size, const std::vector<int>& previous_tokens) const {
   if (repetition_penalty_ == 0.0f || previous_tokens.empty()) {
     return;
   }
@@ -101,9 +100,8 @@ void SamplingManager::applyPresenceRepetitionPenalty(float* logits, size_t size,
   // Create unique set of previous tokens
   std::vector<int> unique_tokens = previous_tokens;
   std::sort(unique_tokens.begin(), unique_tokens.end());
-  unique_tokens.erase(
-      std::unique(unique_tokens.begin(), unique_tokens.end()),
-      unique_tokens.end());
+  unique_tokens.erase(std::unique(unique_tokens.begin(), unique_tokens.end()),
+                      unique_tokens.end());
 
   // Apply presence penalty: subtract penalty from logits of repeated tokens
   for (int token_id : unique_tokens) {
@@ -163,9 +161,11 @@ void SamplingManager::applyTopP(float* probs, size_t size) const {
   }
 
   // Sort by probability descending
-  std::sort(indexed_probs.begin(), indexed_probs.end(),
-            [](const std::pair<float, size_t>& a,
-               const std::pair<float, size_t>& b) { return a.first > b.first; });
+  std::sort(
+      indexed_probs.begin(), indexed_probs.end(),
+      [](const std::pair<float, size_t>& a, const std::pair<float, size_t>& b) {
+        return a.first > b.first;
+      });
 
   // Find cutoff index where cumulative probability >= top_p
   float cumulative = 0.0f;
@@ -216,13 +216,13 @@ void SamplingManager::applyTopP(float* probs, size_t size) const {
 }
 
 void SamplingManager::processLogits(const float* logits, size_t size,
-                                     const std::vector<int>& previous_tokens,
-                                     float* processed_probs) const {
+                                    const std::vector<int>& previous_tokens,
+                                    float* processed_probs) const {
   // Copy logits to working array
   std::vector<float> working_logits(logits, logits + size);
 
   // 1. Apply presence repetition penalty (matching Python implementation)
-  applyPresenceRepetitionPenalty(working_logits.data(), size, previous_tokens);
+  applyRepetitionPenalty(working_logits.data(), size, previous_tokens);
 
   // 2. Use logits directly as probs (matching Python: not using softmax)
   // Python comment: "not using softmax in case of long time cost"
@@ -239,7 +239,7 @@ void SamplingManager::processLogits(const float* logits, size_t size,
 }
 
 int SamplingManager::sample(const float* logits, size_t size,
-                             const std::vector<int>& previous_tokens) const {
+                            const std::vector<int>& previous_tokens) const {
   std::vector<float> probs(size);
   processLogits(logits, size, previous_tokens, probs.data());
 
