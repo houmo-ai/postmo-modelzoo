@@ -127,7 +127,7 @@ def modify_activate_script(
         with open(activate_path, "a", encoding="utf-8") as f:
             f.write("export ORIGINAL_PYTHONPATH=$PYTHONPATH\n")
             f.write(
-                f"export PYTHONPATH={venv_site}:{original_site}:$ORIGINAL_PYTHONPATH\n"
+                f"export PYTHONPATH={venv_site}:$ORIGINAL_PYTHONPATH:{original_site}\n"
             )
     except IOError as e:
         raise RuntimeError(f"Failed to modify activate script: {e}") from e
@@ -212,12 +212,13 @@ def write_venv_pth(venv_site: str) -> None:
         raise RuntimeError(f"Failed to write virtualenv .pth file: {e}") from e
 
 
-def create_distutils_symlink(dir_path: str) -> None:
+def create_distutils_symlink(dir_path: str, system_site_packages: str) -> None:
     """
     Check and create distutils symbolic link.
 
     Args:
         dir_path (str): Path to the virtual environment directory
+        system_site_packages (str): Path to the original system site-packages directory
 
     Raises:
         RuntimeError: If creating the distutils symbolic link fails
@@ -226,15 +227,13 @@ def create_distutils_symlink(dir_path: str) -> None:
     distutils_dir = (
         Path(dir_path) / "lib" / "python3.12" / "site-packages" / "distutils"
     )
-    symlink_source = (
-        "/opt/venv/houmo/lib/python3.12/site-packages/setuptools/_distutils"
-    )
+    symlink_source = Path(system_site_packages) / "setuptools" / "_distutils"
 
     # Check if directory exists, create symlink if it doesn't
     if not distutils_dir.exists():
         try:
             # Create symlink (os.symlink works on Linux)
-            os.symlink(symlink_source, str(distutils_dir))
+            os.symlink(str(symlink_source), str(distutils_dir))
             logger.info(
                 f"Successfully created symlink: {distutils_dir} -> {symlink_source}"
             )
@@ -294,7 +293,7 @@ def create_virtualenv(python_exe: str, site_packages: str, dir_path: str) -> Non
         pyvenv_cfg_path = str(dir_path_obj / "pyvenv.cfg")
         modify_pyvenv_cfg(pyvenv_cfg_path)
 
-        create_distutils_symlink(dir_path)
+        create_distutils_symlink(dir_path, site_packages)
     else:
         # Create virtual environment with --system-site-packages
         subprocess.run(
@@ -329,9 +328,26 @@ def install_requirements(
         RuntimeError: If installing dependencies fails
     """
     venv_pip = str(Path(dir_path) / "bin" / "pip3")
-    cmd_list = [venv_pip, "install", "-r", requirements_path]
+    cmd_list = [
+        venv_pip,
+        "install",
+        "-r",
+        requirements_path,
+        "-i",
+        "https://pypi.tuna.tsinghua.edu.cn/simple",
+        "--trusted-host",
+        "pypi.tuna.tsinghua.edu.cn",
+    ]
     if requirements_path.endswith(".whl"):
-        cmd_list = [venv_pip, "install", requirements_path]
+        cmd_list = [
+            venv_pip,
+            "install",
+            requirements_path,
+            "-i",
+            "https://pypi.tuna.tsinghua.edu.cn/simple",
+            "--trusted-host",
+            "pypi.tuna.tsinghua.edu.cn",
+        ]
     try:
         # Directly use pip from within the virtual environment, no need to manually source activate
         subprocess.run(
@@ -376,7 +392,7 @@ def activate_virtualenv(venv_dir: str, python_exe: str, site_packages: str) -> N
         original_pythonpath = os.environ.get("PYTHONPATH", "")
         os.environ["ORIGINAL_PYTHONPATH"] = original_pythonpath
         os.environ["PYTHONPATH"] = _join_pythonpath(
-            venv_site, site_packages, original_pythonpath
+            venv_site, original_pythonpath, site_packages
         )
 
 

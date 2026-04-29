@@ -445,7 +445,20 @@ def _prepare_quantized_llm_model(
         and check_gpu()["has_gpu"] is True
     ):
         current_folder = os.getcwd()
-        for idx, tmp_model_dir in enumerate(quant_params["out-dir"]):
+
+        quant_out_keys = ["out-dir", "output_dir", "output_path"]
+        quant_opt_key = None
+        for k in quant_out_keys:
+            if k in quant_params:
+                quant_opt_key = k
+                break
+        if quant_opt_key is None:
+            logger.error(
+                "No keys related to out-dir, output_dir or output_path found in quant_params."
+            )
+            return False
+
+        for idx, tmp_model_dir in enumerate(quant_params[quant_opt_key]):
             quant_res_dir = tmp_model_dir.replace("cached_results", model_res_dir)
             if quant_res_dir and os.path.exists(quant_res_dir):
                 logger.warning(
