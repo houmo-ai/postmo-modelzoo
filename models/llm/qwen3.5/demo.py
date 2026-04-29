@@ -26,7 +26,7 @@ import math
 import time
 import argparse
 from pathlib import Path
-from typing import List, Tuple, Optional, Sequence, Union
+from typing import Any, List, Tuple, Optional, Sequence, Union
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -92,7 +92,7 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--prefill_path",
-        dest="prefill_path",
+        dest="prefill_path", 
         type=str,
         default=os.path.join("output", HOUMO_TARGET, "qwen3.5_prefill.hmm"),
         help="houmo prefill model path",
@@ -128,6 +128,7 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--topk",
+        "--top_k",
         dest="topk",
         type=int,
         default=None,
@@ -135,10 +136,25 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--topp",
+        "--top_p",
         dest="topp",
         type=float,
         default=1.0,
         help="sampling top-p",
+    )
+    parser.add_argument(
+        "--min_p",
+        dest="min_p",
+        type=float,
+        default=0.0,
+        help="sampling min-p",
+    )
+    parser.add_argument(
+        "--presence_penalty",
+        dest="presence_penalty",
+        type=float,
+        default=1.5,
+        help="sampling presence_penalty",
     )
     parser.add_argument(
         "--temperature",
@@ -331,12 +347,16 @@ class SamplingManager:
         temperature: float = 1.0,
         top_k: Optional[int] = None,
         top_p: float = 1.0,
+        min_p: float = 0.0,
+        presence_penalty: float = 0.0,
         repetition_penalty: float = 1.0,
         min_tokens_to_keep: int = 1,
     ):
         self.temperature = temperature
         self.top_k = top_k
         self.top_p = top_p
+        self.min_p = min_p
+        self.presence_penalty = presence_penalty
         self.repetition_penalty = repetition_penalty
         self.min_tokens_to_keep = min_tokens_to_keep
 
@@ -350,14 +370,31 @@ class SamplingManager:
 
         return logits / self.temperature
 
+    @staticmethod
+    def iter_token_ids(tokens: Optional[Sequence[Any]] = None) -> List[int]:
+        if tokens is None:
+            return []
+
+        token_ids = []
+        for token in tokens:
+            if isinstance(token, torch.Tensor):
+                token_ids.extend(int(item) for item in token.detach().cpu().reshape(-1))
+            elif isinstance(token, np.ndarray):
+                token_ids.extend(int(item) for item in token.reshape(-1))
+            elif isinstance(token, (list, tuple)):
+                token_ids.extend(SamplingManager.iter_token_ids(token))
+            else:
+                token_ids.append(int(token))
+        return token_ids
+
     def apply_repetition_penalty(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+        self, logits: np.ndarray, previous_tokens: Optional[Sequence[Any]] = None
     ) -> np.ndarray:
         if self.repetition_penalty == 1.0 or not previous_tokens:
             return logits
 
         adjusted_logits = logits.copy()
-        for token_id in set(previous_tokens):
+        for token_id in set(self.iter_token_ids(previous_tokens)):
             if 0 <= token_id < len(logits):
                 if logits[token_id] < 0:
                     adjusted_logits[token_id] = (
@@ -367,6 +404,19 @@ class SamplingManager:
                     adjusted_logits[token_id] = (
                         logits[token_id] / self.repetition_penalty
                     )
+
+        return adjusted_logits
+
+    def apply_presence_penalty(
+        self, logits: np.ndarray, previous_tokens: Optional[Sequence[Any]] = None
+    ) -> np.ndarray:
+        if self.presence_penalty == 0.0 or not previous_tokens:
+            return logits
+
+        adjusted_logits = logits.copy()
+        for token_id in set(self.iter_token_ids(previous_tokens)):
+            if 0 <= token_id < len(logits):
+                adjusted_logits[token_id] = logits[token_id] - self.presence_penalty
 
         return adjusted_logits
 
@@ -425,8 +475,32 @@ class SamplingManager:
 
         return normalized_probs
 
+    def apply_min_p(self, probs: np.ndarray) -> np.ndarray:
+        if self.min_p <= 0.0:
+            return probs
+
+        max_prob = np.max(probs)
+        threshold = max_prob * self.min_p
+        selected_indices = np.where(probs >= threshold)[0]
+
+        if selected_indices.size < self.min_tokens_to_keep:
+            keep_count = min(self.min_tokens_to_keep, len(probs))
+            selected_indices = np.argpartition(probs, -keep_count)[-keep_count:]
+
+        mask = np.ones_like(probs, dtype=bool)
+        mask[selected_indices] = False
+        filtered_probs = probs.copy()
+        filtered_probs[mask] = 0
+
+        if np.sum(filtered_probs) > 0:
+            normalized_probs = filtered_probs / np.sum(filtered_probs)
+        else:
+            normalized_probs = np.ones_like(probs) / len(probs)
+
+        return normalized_probs
+
     def process_logits(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+        self, logits: np.ndarray, previous_tokens: Optional[Sequence[Any]] = None
     ) -> np.ndarray:
         processed_logits = logits.copy()
         # 1. apply repetition penalty
@@ -434,24 +508,32 @@ class SamplingManager:
             processed_logits, previous_tokens
         )
 
-        # 2. apply softmax
+        # 2. apply presence penalty
+        processed_logits = self.apply_presence_penalty(
+            processed_logits, previous_tokens
+        )
+
+        # 3. apply softmax
         # not using softmax in case of long time cost
         probs = processed_logits
         # probs = self.softmax(processed_logits)
 
-        # 3. apply top-k
+        # 4. apply top-k
         probs = self.apply_top_k(probs)
 
-        # 4. apply top-p
+        # 5. apply top-p
         probs = self.apply_top_p(probs)
 
-        # 5. apply temperature
+        # 6. apply min-p
+        probs = self.apply_min_p(probs)
+
+        # 7. apply temperature
         probs = self.apply_temperature(probs)
         return probs
 
     def sample(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
-    ) -> int:
+        self, logits: np.ndarray, previous_tokens: Optional[Sequence[Any]] = None
+    ) -> np.ndarray:
         logits = logits[0]
         if HOUMO_TARGET == "xh2":
             logits = logits[0]
@@ -465,7 +547,7 @@ class SamplingManager:
         return np.array([[sampled_index]])
 
     def get_processed_probs(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+        self, logits: np.ndarray, previous_tokens: Optional[Sequence[Any]] = None
     ) -> np.ndarray:
         return self.process_logits(logits, previous_tokens)
 
