@@ -216,7 +216,7 @@ def parse_args():
     parser.add_argument(
         "--device",
         type=str,
-        default="cuda:0",
+        default="cuda",
         help="CUDA device string for rotate / GPTQ subprocesses",
     )
     parser.add_argument(

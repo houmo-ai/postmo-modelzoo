@@ -117,7 +117,7 @@ def quant_llm(args) -> None:
     work_root, _name, rotated_dir, gptq_dir = _paths(args)
     work_root.mkdir(parents=True, exist_ok=True)
     py = sys.executable
-    device = getattr(args, "device", "cuda:0")
+    device = getattr(args, "device", "cuda")
     trust = getattr(args, "trust_remote_code", True)
     resume = getattr(args, "resume", False)
 
@@ -143,7 +143,7 @@ def quant_llm(args) -> None:
         ]
         if trust:
             cmd.append("--trust-remote-code")
-        _run_step(cmd, src, extra_env={"CUDA_VISIBLE_DEVICES": "0"})
+        _run_step(cmd, src)
 
     if resume and _hf_dir_ready(gptq_dir):
         logger.info("Resume: skip GPTQ (found {})", gptq_dir)
@@ -177,7 +177,7 @@ def quant_llm(args) -> None:
             cmd.extend(["--calibration-jsonl", str(Path(args.calib_data).resolve())])
         if trust:
             cmd.append("--trust-remote-code")
-        _run_step(cmd, src, extra_env={"CUDA_VISIBLE_DEVICES": "0"})
+        _run_step(cmd, src)
 
 
 def quant_llm_moe(args) -> None:
@@ -193,7 +193,7 @@ def quant_llm_moe(args) -> None:
     work_root, _name, _rotated_dir, gptq_dir = _paths(args)
     work_root.mkdir(parents=True, exist_ok=True)
     py = sys.executable
-    device = getattr(args, "device", "cuda:0")
+    device = getattr(args, "device", "cuda")
     resume = getattr(args, "resume", False)
 
     if resume and _hf_dir_ready(gptq_dir):
@@ -220,7 +220,7 @@ def quant_llm_moe(args) -> None:
             "--device",
             device,
         ]
-        _run_step(cmd, src, extra_env={"CUDA_VISIBLE_DEVICES": "0"})
+        _run_step(cmd, src)
 
 
 def export_llm(args) -> None:
