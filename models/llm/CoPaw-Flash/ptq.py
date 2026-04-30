@@ -949,30 +949,33 @@ def run_step_in_fresh_process(step_name: str, args: argparse.Namespace):
         args=(step_name, vars(args).copy(), result_queue),
         name=step_name,
     )
-    process.start()
-    process.join()
-
-    result = None
     try:
-        result = result_queue.get()
-    except queue.Empty:
+        process.start()
+        process.join()
+
+        exitcode = process.exitcode
+
         result = None
+        try:
+            result = result_queue.get(timeout=1)
+        except queue.Empty:
+            result = None
 
-    result_queue.close()
-    result_queue.join_thread()
-    process.close()
+        if result is not None and not result.get("ok", False):
+            raise RuntimeError(
+                f"Isolated step `{step_name}` failed: {result['error']}\n{result['traceback']}"
+            )
 
-    if result is not None and not result.get("ok", False):
-        raise RuntimeError(
-            f"Isolated step `{step_name}` failed: {result['error']}\n{result['traceback']}"
-        )
+        if exitcode != 0:
+            raise RuntimeError(
+                f"Isolated step `{step_name}` exited unexpectedly with code {exitcode}"
+            )
 
-    if process.exitcode != 0:
-        raise RuntimeError(
-            f"Isolated step `{step_name}` exited unexpectedly with code {process.exitcode}"
-        )
-
-    logger.info(f"Isolated step finished successfully: {step_name}")
+        logger.info(f"Isolated step finished successfully: {step_name}")
+    finally:
+        result_queue.close()
+        result_queue.join_thread()
+        process.close()
 
 
 if HOUMO_TARGET == "xh2":
