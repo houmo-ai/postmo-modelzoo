@@ -33,7 +33,7 @@ from transformers import AutoConfig
 from qwen_asr.core.transformers_backend import (
     Qwen3ASRProcessor,
 )
-
+from hmatc.python.get_hm_devices import get_hm_devices
 
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -197,7 +197,8 @@ class Qwen3Asr:
         self, encode_path, decode_path, prefill_path, processor_dir, embedding_path
     ):
         self.device = torch.device("cpu")
-        weight_manager = tcim.runtime.WeightManager(0)
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
+        weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         self.encode = tcim.runtime.load(encode_path, option=option1)
         logger.info("encode model loaded")

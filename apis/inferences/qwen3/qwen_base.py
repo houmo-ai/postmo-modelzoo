@@ -33,6 +33,7 @@ from loguru import logger
 from typing import List
 
 import tcim_lite as tcim
+from hmatc.python.get_hm_devices import get_hm_devices
 
 
 class HmQwenBase(ABC):
@@ -67,7 +68,7 @@ class HmQwenBase(ABC):
             raise ValueError(f"Unsupported device number {ndevice}.")
 
         self.ndevice = ndevice
-        device_list = list(range(ndevice))
+        device_list = get_hm_devices(self.ndevice)
         # Initialize device manager and weight manager for TCIM runtime
         dev_manager = tcim.runtime.DevManager(device_list, "Xh2HalBackend")
         weight_manager = tcim.runtime.WeightManager(dev_manager)

@@ -34,6 +34,7 @@ from transformers import AutoTokenizer
 from loguru import logger
 
 import tcim_lite as tcim
+from hmatc.python.get_hm_devices import get_hm_devices
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -107,7 +108,8 @@ class HmQwen:
         tokenizer_dir,
         forbid_flush=True,
     ):
-        weight_manager = tcim.runtime.WeightManager(0)
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
+        weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
         self.prefill = tcim.runtime.load(prefill_path, option=option1)

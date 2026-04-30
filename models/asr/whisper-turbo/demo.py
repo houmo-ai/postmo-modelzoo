@@ -31,6 +31,7 @@ from loguru import logger
 import soundfile as sf
 from typing import List, Tuple, Optional
 from transformers import WhisperForConditionalGeneration, WhisperProcessor
+from hmatc.python.get_hm_devices import get_hm_devices
 
 MAX_GEN_LEN = 448
 CACHE_MAX_LEN = 1280
@@ -185,7 +186,8 @@ class SamplingManager:
 class HmWhisper:
     def __init__(self, encoder_path, decoder_path, prefill_path):
         super().__init__()
-        weight_manager = tcim.runtime.WeightManager(0)
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
+        weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         self.encoder = tcim.runtime.load(encoder_path, option=option1)
         logger.info("encoder model loaded")

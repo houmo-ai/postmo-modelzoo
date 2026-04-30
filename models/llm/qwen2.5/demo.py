@@ -41,6 +41,7 @@ from hmatc.utils.perf_infomations import (
     InferenceMetrics,
     PERFTYPE,
 )
+from hmatc.python.get_hm_devices import get_hm_devices
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 
@@ -318,15 +319,8 @@ class HmQwen:
         self.perf_tracker = InferencePerformanceTracker()
         self.ndevice = ndevice
         # Initialize device and weight manager based on device count
-        if self.ndevice == 1:
-            weight_manager = tcim.runtime.WeightManager(0)
-        elif self.ndevice == 2 and HOUMO_TARGET == "xh2":
-            dev_manager = tcim.runtime.DevManager([0, 1], "Xh2HalBackend")
-            weight_manager = tcim.runtime.WeightManager(dev_manager)
-        else:
-            raise ValueError(
-                "Unsupported device number! Only 1 or 2 devices are supported for xh2"
-            )
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(self.ndevice), "Xh2HalBackend")
+        weight_manager = tcim.runtime.WeightManager(dev_manager)
 
         # Load prefill and decode models
         option1 = tcim.runtime.Option(weight_manager)

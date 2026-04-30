@@ -18,3 +18,4 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 import hmatc.python.perf as perf
+import hmatc.python.get_hm_devices as get_hm_devices

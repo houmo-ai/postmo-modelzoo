@@ -43,6 +43,7 @@ from processing_qwen2_5_vl import Qwen2_5_VLProcessor
 from utils import get_rope_index, QRawToYuv
 
 from hmatc.utils.perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
+from hmatc.python.get_hm_devices import get_hm_devices
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -278,7 +279,8 @@ class Qwen25VL:
         patch_size=14,
     ):
         self.perf_tracker = InferencePerformanceTracker()
-        weight_manager = tcim.runtime.WeightManager(0)
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
+        weight_manager = tcim.runtime.WeightManager(dev_manager)
         option0 = tcim.runtime.Option(weight_manager)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)

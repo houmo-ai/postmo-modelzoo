@@ -35,6 +35,7 @@ from loguru import logger
 import tcim_lite as tcim
 
 from hmatc.utils.perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
+from hmatc.python.get_hm_devices import get_hm_devices
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2."
@@ -126,13 +127,8 @@ class HmQwenXh2:
     ):
         self.perf_tracker = InferencePerformanceTracker()
         self.ndevice = ndevice
-        if self.ndevice == 1:
-            weight_manager = tcim.runtime.WeightManager(0)
-        elif self.ndevice == 2:
-            dev_manager = tcim.runtime.DevManager([1, 0], "Xh2HalBackend")
-            weight_manager = tcim.runtime.WeightManager(dev_manager)
-        else:
-            raise ValueError("Unsupport device number!")
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(self.ndevice), "Xh2HalBackend")
+        weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)

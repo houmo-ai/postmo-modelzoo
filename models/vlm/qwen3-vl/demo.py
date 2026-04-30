@@ -43,12 +43,8 @@ from transformers.video_utils import VideoMetadata
 from processing_qwen3_vl import Qwen3VLProcessor
 from utils import get_rope_index, QRawToYuv
 
-sys.path.append(
-    os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../../..", "hmatc/hmatc/utils")
-    )
-)
-from perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
+from hmatc.utils.perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
+from hmatc.python.get_hm_devices import get_hm_devices
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -346,7 +342,8 @@ class Qwen3VL:
         embedding_path,
     ):
         self.perf_tracker = InferencePerformanceTracker()
-        weight_manager = tcim.runtime.WeightManager(0)
+        dev_manager = tcim.runtime.DevManager(get_hm_devices())
+        weight_manager = tcim.runtime.WeightManager(dev_manager)
         option0 = tcim.runtime.Option(weight_manager)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)

@@ -38,6 +38,7 @@ import tcim_lite as tcim
 import math
 import time
 from loguru import logger
+from hmatc.python.get_hm_devices import get_hm_devices
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 
@@ -340,7 +341,8 @@ class SenseVoiceSmallFeature:
         if self.token_list is None:
             print("Warning: Failed to load tokens. Output will be token IDs.")
 
-        weight_manager = tcim.runtime.WeightManager(0)
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
+        weight_manager = tcim.runtime.WeightManager(dev_manager)
         option = tcim.runtime.Option(weight_manager)
         print("Loading model from", self.model_file)
         self.sess = tcim.runtime.load(self.model_file, option=option)

@@ -30,6 +30,7 @@ import torch.nn as nn
 from transformers import AutoTokenizer, AutoProcessor, AutoConfig
 from loguru import logger
 import tcim_lite as tcim
+from hmatc.python.get_hm_devices import get_hm_devices
 
 TARGET_TYPE = torch.float16
 HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
@@ -141,13 +142,8 @@ class HmGLM_ASR:
 
     def __init__(self, args):
         self.ndevice = args.ndevice
-        if self.ndevice == 1:
-            weight_manager = tcim.runtime.WeightManager(0)
-        elif self.ndevice == 2 and HOUMO_TARGET == "xh2":
-            dev_manager = tcim.runtime.DevManager([0, 1], "Xh2HalBackend")
-            weight_manager = tcim.runtime.WeightManager(dev_manager)
-        else:
-            raise ValueError("Unsupported device number!")
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(self.ndevice), "Xh2HalBackend")
+        weight_manager = tcim.runtime.WeightManager(dev_manager)
 
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)

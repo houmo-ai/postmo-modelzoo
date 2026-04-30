@@ -36,7 +36,7 @@ from qwen_asr.core.transformers_backend import (
     Qwen3ASRProcessor,
 )
 from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForceAlignProcessor
-
+from hmatc.python.get_hm_devices import get_hm_devices
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -97,7 +97,8 @@ def get_args() -> argparse.Namespace:
 class Qwen3ForceAligner:
     def __init__(self, encode_path, prefill_path, processor_dir, embedding_path):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        weight_manager = tcim.runtime.WeightManager(0)
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
+        weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         self.encode = tcim.runtime.load(encode_path, option=option1)
         logger.info("encode model loaded")

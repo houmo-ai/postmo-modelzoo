@@ -49,6 +49,39 @@ namespace py = pybind11;
 #define COLOR_CYAN "\x1b[96;20m"
 #define COLOR_RESET "\x1b[0m"
 
+struct DeviceCtcInfo {
+    int dev_id;
+    int group_id;
+    int chip_id;
+};
+
+static bool device_ctc_check(std::vector<int> devices) {
+    int group_id, chip_id;
+    std::vector<DeviceCtcInfo> device_ctc_info_list;
+    for (int dev_id : devices) {
+        if (hm_sys_get_ctc_phy_id(dev_id, &group_id, &chip_id) != 0) {
+            throw std::runtime_error("Failed to get physical ID for device " +
+                                     std::to_string(dev_id));
+        }
+        if (group_id < 0 || chip_id < 0) {
+            throw std::runtime_error("Invalid physical ID for device " +
+                                     std::to_string(dev_id));
+        }
+        std::cout << "Device " << dev_id << " -> Group " << group_id
+                  << ", Chip " << chip_id << std::endl;
+        device_ctc_info_list.push_back({dev_id, group_id, chip_id});
+    }
+
+    for (auto ctcInfo : device_ctc_info_list) {
+        if (ctcInfo.group_id != device_ctc_info_list[0].group_id) {
+            throw std::runtime_error(
+                "All devices must be on the same group for multi-device "
+                "testing with .hmms model files.");
+        }
+    }
+    return true;
+}
+
 class DeviceSmi {
 public:
     DeviceSmi(int id = 0) {
@@ -160,5 +193,6 @@ PYBIND11_MODULE(smi, m) {
         .def_readonly("total", &hm_mem_info::mem_total)
         .def_readonly("used", &hm_mem_info::mem_used)
         .def_readonly("free", &hm_mem_info::mem_avail);
+    m.def("device_ctc_check", &device_ctc_check, "Check CTC info for given devices", py::arg("devices"));
 }
 #endif

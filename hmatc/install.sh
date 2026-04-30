@@ -4,7 +4,7 @@ set -e
 
 PACKAGE_NAME="hmatc"
 
-SMI_ARG=""
+SMI_ARG="--enable_smi_support"
 
 if [ "$1" = "--enable_smi_support" ]; then
     SMI_ARG="--enable_smi_support"

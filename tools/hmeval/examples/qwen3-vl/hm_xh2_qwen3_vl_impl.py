@@ -35,7 +35,7 @@ from PIL import Image, ImageOps
 from typing import List, Optional, Tuple, Union, Any
 from processing_qwen3_vl import Qwen3VLProcessor
 from evalscope.api.tool.utils import logger
-
+from hmatc.python.get_hm_devices import get_hm_devices
 
 # YUV = RGB * M[0:3] + M[3]
 M_RGB2YUV = {
@@ -327,7 +327,8 @@ class Qwen3VL:
         topp,
         repetition_penalty,
     ):
-        weight_manager = tcim.runtime.WeightManager(0)
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
+        weight_manager = tcim.runtime.WeightManager(dev_manager)
         option0 = tcim.runtime.Option(weight_manager)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
