@@ -183,7 +183,8 @@ std::vector<std::string> HmTextFrontend::TextNormalize(const std::string& text,
   if (is_chinese) {
     normalized = NormalizeChinese(normalized);
     if (split) {
-      return SplitParagraph(normalized, 80, 60);
+      // Speech rate: 3 chars/sec, max 15s per chunk => 45 chars max
+      return SplitParagraph(normalized, 60, 40);
     }
     return {normalized};
   } else {
@@ -217,19 +218,14 @@ std::string HmTextFrontend::NormalizeChinese(const std::string& text) {
   // Replace corner marks (superscript symbols)
   result = ReplaceCornerMark(result);
 
-  // Replace "." with Chinese period "。".
-  ReplaceAll(&result, ".", "\xe3\x80\x82");
-
   // Replace " - " with Chinese comma "，".
   ReplaceAll(&result, " - ", "\xef\xbc\x8c");
 
   // Remove brackets
   result = RemoveBracket(result);
 
-  // Remove trailing punctuation (replace multiple punctuation at end with
-  std::regex trailing_punct_pattern("[，,、]+$");
-  result = std::regex_replace(result, trailing_punct_pattern,
-                              "\xe3\x80\x82");  // "。"
+  // Note: Removed std::regex for trailing punctuation as it corrupts UTF-8
+  // Chinese text. The trailing punctuation handling is done in split_paragraph.
 
   return result;
 }
@@ -250,7 +246,9 @@ std::string HmTextFrontend::NormalizeEnglish(const std::string& text) {
 std::vector<std::string> HmTextFrontend::SplitParagraph(const std::string& text,
                                                         int max_tokens,
                                                         int min_tokens) {
-  const int merge_len = 20;
+  // merge_len: threshold for merging short tail segment (proportional to
+  // min_tokens)
+  const int merge_len = min_tokens / 2;
 
   bool is_chinese = ContainsChinese(text);
 
@@ -262,7 +260,8 @@ std::vector<std::string> HmTextFrontend::SplitParagraph(const std::string& text,
             "\xef\xbc\x81",  // "。", "？", "！"
             "\xef\xbc\x9b",
             "\xef\xbc\x9a",
-            "\xe3\x80\x81",  // "；", "：", "、"
+            "\xe3\x80\x81",
+            "\xef\xbc\x8c",  // "；", "：", "、", "，"
             ".",
             "?",
             "!",
@@ -304,7 +303,7 @@ std::vector<std::string> HmTextFrontend::SplitParagraph(const std::string& text,
           utts.push_back(work_text.substr(st, i - st) + p);
         }
 
-        // Handle quote after punctuation: Python checks '"' and '”'.
+        // Handle quote after punctuation: Python checks '"' and '"'.
         size_t next_pos = i + p.length();
         if (next_pos < work_text.length()) {
           if (StartsWithAt(work_text, next_pos, "\"") ||
@@ -340,7 +339,6 @@ std::vector<std::string> HmTextFrontend::SplitParagraph(const std::string& text,
   for (const auto& utt : utts) {
     int cur_len = CalcUttLength(cur_utt, is_chinese);
     int combined_len = CalcUttLength(cur_utt + utt, is_chinese);
-    int utt_len = CalcUttLength(utt, is_chinese);
 
     if (combined_len > max_tokens && cur_len > min_tokens) {
       final_utts.push_back(cur_utt);

@@ -1961,10 +1961,26 @@ class CosyVoice3:
         zero_shot_spk_id="",
         speed=1.0,
         text_frontend=True,
+        concat=False,
     ):
-        """Yield synthesized audio chunks for zero-shot voice cloning."""
+        """Synthesize audio for zero-shot voice cloning.
+
+        Args:
+            tts_text: Text to synthesize.
+            prompt_text: Prompt text for voice cloning.
+            prompt_wav: Path to prompt waveform.
+            zero_shot_spk_id: Cached speaker id, or empty string to extract live.
+            speed: Playback speed ratio.
+            text_frontend: Whether to apply text normalization.
+            concat: If True, concatenate all audio chunks and return a single tensor.
+                   If False (default), return an iterator yielding each chunk.
+
+        Returns:
+            If concat=False: Iterator yielding audio chunks.
+            If concat=True: Single concatenated audio tensor.
+        """
         logger.info(
-            f"Start inference zero shot, zero_shot_spk_id: {zero_shot_spk_id}, speed: {speed}, text_frontend: {text_frontend}"
+            f"Start inference zero shot, zero_shot_spk_id: {zero_shot_spk_id}, speed: {speed}, text_frontend: {text_frontend}, concat: {concat}"
         )
         if (
             self.__class__.__name__ == "CosyVoice3"
@@ -1977,6 +1993,8 @@ class CosyVoice3:
         prompt_text = self.frontend.text_normalize(
             prompt_text, split=False, text_frontend=text_frontend
         )
+
+        audio_chunks = []
         for i in tqdm(
             self.frontend.text_normalize(
                 tts_text, split=True, text_frontend=text_frontend
@@ -1994,9 +2012,13 @@ class CosyVoice3:
             logger.info("synthesis text {}".format(i))
             tts_speech = self.model.tts(**model_input, speed=speed)
             logger.success("generate tts speech successfully.")
-            # Collect perf stats (no printing here; printing happens after all inference).
             self.collect_perf()
-            yield tts_speech
+            audio_chunks.append(tts_speech)
+
+        if concat:
+            logger.info(f"Concatenating {len(audio_chunks)} audio chunks.")
+            return torch.cat(audio_chunks, dim=1)
+        return iter(audio_chunks)
 
     def inference_cross_lingual(
         self,
@@ -2005,8 +2027,24 @@ class CosyVoice3:
         zero_shot_spk_id="",
         speed=1.0,
         text_frontend=True,
+        concat=False,
     ):
-        """Yield synthesized audio chunks for cross-lingual generation."""
+        """Synthesize audio for cross-lingual generation.
+
+        Args:
+            tts_text: Text to synthesize.
+            prompt_wav: Path to prompt waveform.
+            zero_shot_spk_id: Cached speaker id, or empty string to extract live.
+            speed: Playback speed ratio.
+            text_frontend: Whether to apply text normalization.
+            concat: If True, concatenate all audio chunks and return a single tensor.
+                   If False (default), return an iterator yielding each chunk.
+
+        Returns:
+            If concat=False: Iterator yielding audio chunks.
+            If concat=True: Single concatenated audio tensor.
+        """
+        audio_chunks = []
         for i in tqdm(
             self.frontend.text_normalize(
                 tts_text, split=True, text_frontend=text_frontend
@@ -2019,7 +2057,12 @@ class CosyVoice3:
             tts_speech = self.model.tts(**model_input, speed=speed)
             logger.success("Generate tts speech successfully.")
             self.collect_perf()
-            yield tts_speech
+            audio_chunks.append(tts_speech)
+
+        if concat:
+            logger.info(f"Concatenating {len(audio_chunks)} audio chunks.")
+            return torch.cat(audio_chunks, dim=1)
+        return iter(audio_chunks)
 
     def inference_instruct2(
         self,
@@ -2029,8 +2072,25 @@ class CosyVoice3:
         zero_shot_spk_id="",
         speed=1.0,
         text_frontend=True,
+        concat=False,
     ):
-        """Yield synthesized audio chunks for instruction-following generation."""
+        """Synthesize audio for instruction-following generation.
+
+        Args:
+            tts_text: Text to synthesize.
+            instruct_text: Instruction text for guided synthesis.
+            prompt_wav: Path to prompt waveform.
+            zero_shot_spk_id: Cached speaker id, or empty string to extract live.
+            speed: Playback speed ratio.
+            text_frontend: Whether to apply text normalization.
+            concat: If True, concatenate all audio chunks and return a single tensor.
+                   If False (default), return an iterator yielding each chunk.
+
+        Returns:
+            If concat=False: Iterator yielding audio chunks.
+            If concat=True: Single concatenated audio tensor.
+        """
+        audio_chunks = []
         for i in tqdm(
             self.frontend.text_normalize(
                 tts_text, split=True, text_frontend=text_frontend
@@ -2043,7 +2103,12 @@ class CosyVoice3:
             tts_speech = self.model.tts(**model_input, speed=speed)
             logger.success("generate tts speech successfully.")
             self.collect_perf()
-            yield tts_speech
+            audio_chunks.append(tts_speech)
+
+        if concat:
+            logger.info(f"Concatenating {len(audio_chunks)} audio chunks.")
+            return torch.cat(audio_chunks, dim=1)
+        return iter(audio_chunks)
 
 
 if __name__ == "__main__":
@@ -2059,6 +2124,7 @@ if __name__ == "__main__":
 
     cosyvoice = CosyVoice3(args)
 
+    # Example 1: chunked output (default behavior, yields each chunk)
     for i, this_tts_speech in enumerate(
         cosyvoice.inference_zero_shot(
             "下面为您朗诵一段绕口令，希望您[j][ǐ]予好评，朗诵开始: 八百标兵奔北坡，北坡炮兵并排跑，炮兵怕把标兵碰，标兵怕碰炮兵炮。",
@@ -2071,6 +2137,19 @@ if __name__ == "__main__":
             this_tts_speech,
             cosyvoice.sample_rate,
         )
+
+    # Example 2: concatenated output (single audio file for long text)
+    tts_speech = cosyvoice.inference_zero_shot(
+        "在水畔，一座古色古香的亭台静静伫立。朱红的柱子支撑起飞檐翘角的屋顶，金色的瓦片在阳光下闪烁着温润的光泽。它不言不语，却像是一位饱经沧桑的老者，守望着这片山水，等待着每一个渴望宁静的旅人。石阶蜿蜒而下，直通水边，似乎在邀请人们放下尘世的纷扰，去亲近这清澈的流水。",
+        "You are a helpful assistant.<|endofprompt|>希望你以后能够做的比我还好呦。",
+        prompt_wav,
+        concat=True,
+    )
+    torchaudio.save(
+        f"{cosyvoice.output_dir}/cosyvoice3_zero_shot_concat.wav",
+        tts_speech,
+        cosyvoice.sample_rate,
+    )
 
     # fine grained control
     for i, this_tts_speech in enumerate(
