@@ -190,6 +190,11 @@ setup_python_venv() {
     local system_site_packages=
     local venv_python=
     local venv_site_packages=
+    local distutils_src=
+    local distutils_dst=
+    local current_python_version=
+    local venv_python_version=
+    local recreate_venv=0
 
     TEST_VENV_ACTIVE=0
     TEST_VENV_DIR="${venv_dir}"
@@ -206,7 +211,37 @@ setup_python_venv() {
 
     echo "⚠ Create python3 venv for ${venv_label}."
     system_site_packages=$("${python_exe}" -c "import site; print(site.getsitepackages()[0])")
-    if [[ "${python_exe}" == */opt/venv* ]]; then
+    current_python_version=$("${python_exe}" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+
+    if [[ -d "${venv_dir}" ]]; then
+        if [[ -x "${venv_dir}/bin/python3" && -f "${venv_dir}/pyvenv.cfg" ]]; then
+            venv_python_version=$("${venv_dir}/bin/python3" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || true)
+            if [[ -n "${venv_python_version}" && "${venv_python_version}" == "${current_python_version}" ]]; then
+                echo "Reuse existing python venv: ${venv_dir}"
+                venv_python="${venv_dir}/bin/python3"
+            else
+                recreate_venv=1
+            fi
+        else
+            recreate_venv=1
+        fi
+
+        if [[ "${recreate_venv}" -eq 1 ]]; then
+            echo "Remove incompatible python venv: ${venv_dir}"
+            rm -rf "${venv_dir}"
+        fi
+    fi
+
+    if [[ -n "${venv_python}" ]]; then
+        venv_site_packages=$("${venv_python}" -c "import site; print(site.getsitepackages()[0])")
+        if [[ "${python_exe}" == */opt/venv* ]]; then
+            distutils_src="${system_site_packages}/setuptools/_distutils"
+            distutils_dst="${venv_site_packages}/distutils"
+            if [[ -d "${distutils_src}" && ! -e "${distutils_dst}" ]]; then
+                ln -s "${distutils_src}" "${distutils_dst}"
+            fi
+        fi
+    elif [[ "${python_exe}" == */opt/venv* ]]; then
         virtualenv --python="${python_exe}" --extra-search-dir="${system_site_packages}" "${venv_dir}"
         venv_python="${venv_dir}/bin/python3"
         venv_site_packages=$("${venv_python}" -c "import site; print(site.getsitepackages()[0])")
@@ -220,13 +255,15 @@ setup_python_venv() {
         } >> "${venv_dir}/bin/deactivate"
         sed -i 's/include-system-site-packages = true/include-system-site-packages = false/g' "${venv_dir}/pyvenv.cfg"
 
-        if [[ ! -d "$venv_dir/lib/python3.12/site-packages/distutils" ]]; then
-            ln -s ${system_site_packages}/setuptools/_distutils \
-                $venv_dir/lib/python3.12/site-packages/distutils
+        distutils_src="${system_site_packages}/setuptools/_distutils"
+        distutils_dst="${venv_site_packages}/distutils"
+        if [[ -d "${distutils_src}" && ! -e "${distutils_dst}" ]]; then
+            ln -s "${distutils_src}" "${distutils_dst}"
         fi
     else
         virtualenv --python="${python_exe}" --system-site-packages "${venv_dir}"
         venv_python="${venv_dir}/bin/python3"
+        venv_site_packages=$("${venv_python}" -c "import site; print(site.getsitepackages()[0])")
     fi
 
     source "${venv_dir}/bin/activate"
