@@ -128,6 +128,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | yolov8m-cls             | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
 | yolo11m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
 | yolo12m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
+| yolo26m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
 | yolov3                  | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
 | yolov5m_face            | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
 | yolov5s                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
