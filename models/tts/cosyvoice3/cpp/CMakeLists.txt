@@ -115,7 +115,20 @@ endif()
 # Install targets
 install(TARGETS cosyvoice3-demo RUNTIME DESTINATION .)
 if(BUILD_AUDIO_FROM_SOURCE)
-    install(TARGETS samplerate sndfile kaldi-native-fbank-core LIBRARY DESTINATION .)
+    install(FILES
+            "${CMAKE_CURRENT_BINARY_DIR}/libsamplerate/src/libsamplerate.so"
+            "${CMAKE_CURRENT_BINARY_DIR}/libsamplerate/src/libsamplerate.so.0"
+            "${CMAKE_CURRENT_BINARY_DIR}/libsamplerate/src/libsamplerate.so.0.2.2"
+            "${CMAKE_CURRENT_BINARY_DIR}/lib/libkaldi-native-fbank-core.so"
+            "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so"
+            "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so.1"
+            "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so.1.0.37"
+            DESTINATION .)
+    install(FILES "$ENV{HOUMO_EXAMPLES_PATH}/apis/3rdparty/libsamplerate/include/samplerate.h"
+            DESTINATION include)
+    install(FILES "$ENV{HOUMO_EXAMPLES_PATH}/apis/3rdparty/libsndfile/include/sndfile.h"
+                  "$ENV{HOUMO_EXAMPLES_PATH}/apis/3rdparty/libsndfile/include/sndfile.hh"
+            DESTINATION include)
 else()
     install(FILES ${AUDIO_LIB_FILES} DESTINATION .)
 endif()
