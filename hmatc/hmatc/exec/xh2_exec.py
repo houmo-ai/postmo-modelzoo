@@ -24,6 +24,7 @@ import cv2
 import numpy as np
 import json
 import psutil
+import traceback
 import torch
 from prettytable import PrettyTable
 from datetime import datetime
@@ -212,7 +213,9 @@ class Xh2Exec(BaseExec):
                 create_quant_config,
             )
         except ImportError as e:
-            logger.fatal(f"{e}\nNot found xhquant module, please install xhquant.")
+            logger.fatal(
+                f"{traceback.format_exc()}\nNot found xhquant module, please install xhquant."
+            )
 
         input_ppc_config = []
         for input_name in self.inputs_cfg:
@@ -465,7 +468,9 @@ class Xh2Exec(BaseExec):
             xhquant_init(logger=logger)
             os.environ.setdefault("PYDEVD_DISABLE_FILE_VALIDATION", "1")
         except ImportError as e:
-            logger.fatal(f"{e}\nNot found xhquant module, please install xhquant.")
+            logger.fatal(
+                f"{traceback.format_exc()}\nNot found xhquant module, please install xhquant."
+            )
 
         # Load calibration data
         logger.info("")
@@ -512,7 +517,9 @@ class Xh2Exec(BaseExec):
 
             session(*in_datas)
         except Exception as e:
-            logger.fatal(f"Error occurred while generating golden data: \n{e}")
+            logger.fatal(
+                f"Error occurred while generating golden data: \n{traceback.format_exc()}"
+            )
 
         if os.path.exists(quant_onnx_model_path):
             os.remove(quant_onnx_model_path)
@@ -988,7 +995,7 @@ class Xh2Exec(BaseExec):
             xh2 = Xh2Infer()
             xh2.load(hmm, device_id=device_id)
         except Exception as e:
-            logger.fatal(f"Failed to load hmm model: {e}")
+            logger.fatal(f"Failed to load hmm model: \n{traceback.format_exc()}")
 
         input_names = (
             list(xh2.inputs_info.keys()) if hasattr(xh2, "inputs_info") else []
@@ -1025,7 +1032,9 @@ class Xh2Exec(BaseExec):
                         f"Loaded input: {name}, shape={data.shape}, from={paths[0]}"
                     )
                 except Exception as e:
-                    logger.fatal(f"Failed to load {paths[0]}: \n{e}")
+                    logger.fatal(
+                        f"Failed to load {paths[0]}: \n{traceback.format_exc()}"
+                    )
 
         golden_outputs = {}
         for name, paths in output_files_map.items():
@@ -1042,14 +1051,16 @@ class Xh2Exec(BaseExec):
                         f"Loaded golden output: {name}, shape={golden_outputs[name].shape}"
                     )
                 except Exception as e:
-                    logger.fatal(f"Failed to load {paths[0]}: \n{e}")
+                    logger.fatal(
+                        f"Failed to load {paths[0]}: \n{traceback.format_exc()}"
+                    )
 
         try:
             logger.info("Running inference...")
             outputs, _ = xh2.run(input_data)
             logger.info("Inference completed")
         except Exception as e:
-            logger.fatal(f"Inference failed: \n{e}")
+            logger.fatal(f"Inference failed: \n{traceback.format_exc()}")
 
         logger.info("Calculating cosine similarity...")
         similarity_results = {}
@@ -1177,7 +1188,8 @@ class Xh2Exec(BaseExec):
             hmm_name = os.path.splitext(os.path.basename(hmonnx))[0]
         if (batch > 1 and roi_num > 1) or batch < 0 or roi_num < 0:
             logger.fatal(f"Invalid combination of batch{batch} and roi_num{roi_num }")
-        output_dir = os.path.join(output, target)
+        # output_dir = os.path.join(output, target)
+        output_dir = output
         work_dir = os.path.join(output_dir, "tcim", hmm_name)
 
         # Build kwargs for tcim

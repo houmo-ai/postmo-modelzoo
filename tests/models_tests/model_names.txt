@@ -45,3 +45,4 @@ glm_ocr
 qwen3_reranker
 qwen3_asr
 qwen3_forcealigner
+gemma4_vl
