@@ -330,11 +330,8 @@ if __name__ == "__main__":
         print("Model built successfully.")
 
     if not args.skip_run:
-        HDPL_PLATFORM = os.environ.get("HDPL_PLATFORM")
-        if HDPL_PLATFORM == "ISIM":
-            print(
-                "Warning: Running on ISIM platform may not reflect actual performance on real hardware."
-            )
+        if tcim_lite.runtime.get_device_num() < 1:
+            print("No available devices found.")
             exit(0)
         INNER_ROUND = 10000
         print("=========================================")

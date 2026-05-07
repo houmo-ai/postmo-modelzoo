@@ -277,7 +277,7 @@ class EnvManager:
         return None
 
     def reset_env(self)-> None:
-        delete_envs = ["HOUMO_MODELZOO_URL", "HDPL_PLATFORM", "HOUMO_TARGET", "TCIM_BACKEND", "HOUMO_EXAMPLES_PATH",
+        delete_envs = ["HOUMO_MODELZOO_URL", "HOUMO_TARGET", "TCIM_BACKEND", "HOUMO_EXAMPLES_PATH",
                 "PYTHON_DIR", "TCIM_RUNTIME_PATH", "HOUMO_PATH", "HOUMO_VERSION"]
         check_envs = ["CMAKE_PATH", "HOUMO_SDK_PATH", "OPENCV_PATH"]
         user_vars = self._enum_reg_values(self.user_reg_path)

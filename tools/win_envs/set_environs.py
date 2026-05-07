@@ -122,7 +122,6 @@ class WinEnvironsGenerater:
         assert tcim_package_path is not None, f'Please install houmo_tcim_runtime_xh2 package first, it is Required!'
         self.nullEnvManualSet("HOUMO_SDK_PATH", need=True)
         self.all_environments["HOUMO_MODELZOO_URL"] = self.env_manager.read_env_var_from_sh_file("env.sh", "HOUMO_MODELZOO_URL")
-        self.all_environments["HDPL_PLATFORM"] = "ASIC"
         self.all_environments["HOUMO_TARGET"] = self.settings["support_target"]
         self.all_environments["TCIM_BACKEND"] = "Xh2HalBackend" if self.settings["support_target"] == "xh2" else "Xh1HalBackend"
         self.all_environments["HOUMO_EXAMPLES_PATH"] = os.path.abspath(os.path.join(os.path.abspath(__file__), "../../../"))

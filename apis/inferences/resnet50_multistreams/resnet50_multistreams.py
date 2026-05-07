@@ -78,7 +78,9 @@ if __name__ == "__main__":
     logger.info(
         f"houmo target: {HOUMO_TARGET}, tcim runtime version: {tcim.runtime.get_version()}"
     )
-
+    if tcim.runtime.get_device_num() < 1:
+        logger.warning("No available devices found.")
+        exit(0)
     # Discover the local model file in the example directory.
     current_dir = os.path.dirname(os.path.abspath(__file__))
     hmm_files = [
@@ -97,9 +99,6 @@ if __name__ == "__main__":
     thread_num = args.thread_num  # Number of threads per device
     sample_num = args.sample_num  # Total number of samples to process
 
-    # Limit to 1 thread if not running on ASIC platform
-    if os.environ.get("HDPL_PLATFORM", "") != "ASIC":
-        thread_num = 1
     logger.info(f"devices: {device_num}")
     logger.info(f"threads: {thread_num}")
     logger.info(f"samples: {sample_num}")

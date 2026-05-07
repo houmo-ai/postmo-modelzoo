@@ -91,7 +91,6 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 - HOUMO_EXAMPLES_PATH：后摩大道示例目录
 - HOUMO_DATASETS_PATH：后摩大道示例所用的数据目录
 - HOUMO_MODEL_PATH：后摩大道示例所用的模型目录
-- HDPL_PLATFORM：runtime运行平台，可通过这个环境变量设置运行在仿真平台或芯片上
 - HF_ENDPOINT：指定 Hugging Face 资源的访问镜像地址，可自行决定设置
 - HF_TOKEN：设置 Hugging Face 的身份验证令牌（Token），可自行决定设置
 
@@ -115,7 +114,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 
 模型示例列表如下，type 列为模型类型，target 列为支持的芯片平台，quant 表示提供量化示例，build 表示提供编译示例，perf 表示提供性能评估，demo 表示提供 python 端到端 demo，eval 表示提供精度评估。
 
-量化和编译功能仅支持在量化工具和编译器支持的平台上运行，其中大模型量化需要使用 GPU。涉及到模型推理相关的功能（如 perf/demo/eval 等）最好使用后摩芯片平台运行，运行时需要关注其他限制，如固件类型（如大模型只能在非 VPU 固件上运行），硬件规格（如 2 核芯片只能运行 2 核以下编译的模型）。如果没有安装后摩芯片可以通过`export HDPL_PLATFORM=ISIM`指定模拟器运行，速度较慢。
+量化和编译功能仅支持在量化工具和编译器支持的平台上运行，其中大模型量化需要使用 GPU。涉及到模型推理相关的功能（如 perf/demo/eval 等）需要使用后摩芯片平台运行，运行时需要关注其他限制，如固件类型（如大模型只能在非 VPU 固件上运行），硬件规格（如 2 核芯片只能运行 2 核以下编译的模型）。
 
 | models                  | path         | target | quant | build | perf | demo | eval |
 | ----------------------- | ------------ | ------ | ----- | ----- | ---- | ---- | ---- |

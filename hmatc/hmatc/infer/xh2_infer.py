@@ -56,6 +56,9 @@ class Xh2Infer(BaseInfer, ABC):
             model_path (str): Path to the HMM model file (.hmm)
             device_id (int): Device ID for inference on XH2 hardware
         """
+        if tcim_lite.runtime.get_device_num() < 1:
+            logger.warning("No available devices found.")
+            exit(0)
         if not os.path.exists(model_path):
             logger.fatal(f"model path: {model_path} not exists.")
         if device_id >= tcim_lite.runtime.get_device_num():

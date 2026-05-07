@@ -689,6 +689,16 @@ class Xh2Exec(BaseExec):
         """Check the golden data against the hardware model outputs."""
         self._log_section(f"Check Golden: {self.model_name}")
 
+        try:
+            import tcim_lite
+        except ModuleNotFoundError:
+            logger.warning("tcim_lite not found, skipping golden check.")
+            exit(0)
+
+        if tcim_lite.runtime.get_device_num() < 1:
+            logger.warning("No available devices found, skipping golden check.")
+            exit(0)
+
         t_start = time.time()
 
         if enable_layers:

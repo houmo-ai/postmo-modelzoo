@@ -605,6 +605,16 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         """
         from ..python import perf
 
+        try:
+            import tcim_lite
+        except ModuleNotFoundError:
+            logger.warning("tcim_lite not found, skipping perf test.")
+            exit(0)
+
+        if tcim_lite.runtime.get_device_num() < 1:
+            logger.warning("No available devices found, skipping perf test.")
+            exit(0)
+
         # TODO Use golden data
         perf_info = perf.CModelRunner(
             model_path,

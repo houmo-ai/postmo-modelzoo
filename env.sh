@@ -48,14 +48,6 @@ fi
 # paths for xh2 modelzoo
 export PYTHONPATH=$HOUMO_EXAMPLES_PATH/apis/common/python:$HOUMO_EXAMPLES_PATH/hmodel/xh2:$HOUMO_EXAMPLES_PATH/hmodel/gptqmodel:$PYTHONPATH
 
-# use asic if detected
-if [[ -z $HDPL_PLATFORM ]]; then
-  if { [[ "$HOUMO_TARGET" == "xh2" ]] && ls /dev/ | grep -q 'xh2a'; } then
-    export HDPL_PLATFORM=ASIC
-  else
-    export HDPL_PLATFORM=ISIM
-  fi
-fi
 
 # 清理环境变量中的重复路径
 _remove_duplicate_paths() {
@@ -95,4 +87,3 @@ PRINT_GREEN "HOUMO_MODEL_PATH=$HOUMO_MODEL_PATH"
 PRINT_GREEN "PYTHONPATH=$PYTHONPATH"
 PRINT_GREEN "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 PRINT_GREEN "PATH=$PATH"
-PRINT_GREEN "HDPL_PLATFORM=$HDPL_PLATFORM"

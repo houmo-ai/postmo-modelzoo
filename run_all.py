@@ -11,7 +11,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("run_all.py")
 HOUMO_TARGET = os.getenv("HOUMO_TARGET", "houmo")
-HDPL_PLATFORM = os.getenv("HDPL_PLATFORM", "ISIM")
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -182,9 +181,6 @@ def runCase(allUnitDict):
         logger.info(f"===> begin test: {test_type}/{caseName}")
 
         if ".sh" in script:
-            if HDPL_PLATFORM == "ISIM":
-                logger.info(f"<--- test {caseName} skipped in ISIM env.")
-                continue
             cmd_list = ["bash", script]
         else:
             if test_type is None or args is None or args not in valid_args:
