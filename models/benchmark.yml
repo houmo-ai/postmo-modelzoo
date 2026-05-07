@@ -197,6 +197,16 @@ models:
       - {batch_num: 2, core_num: 1, thread_num: 1}
       - {batch_num: 4, core_num: 1, thread_num: 1}
       - {batch_num: 4, core_num: 1, thread_num: 4}
+  yolo26m:
+    location: models/detection/yolo26m
+    exec_cfgs: 
+      - {batch_num: 1, core_num: 1, thread_num: 1, enable_eval: true}
+      - {batch_num: 1, core_num: 1, thread_num: 4}
+      - {batch_num: 1, core_num: 2, thread_num: 1}
+      - {batch_num: 1, core_num: 4, thread_num: 1}
+      - {batch_num: 2, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 1}
+      - {batch_num: 4, core_num: 1, thread_num: 4}
   yolov7:
     location: models/detection/yolov7
     exec_cfgs: 
