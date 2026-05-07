@@ -693,3 +693,17 @@ def test_detection_yolo26m_compile(setup_logging) -> None:
     """test_detection_yolo26m_compile"""
     model_name = "yolo26m"
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.gemma4
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_vlm_gemma4_compile",
+    depends_on=["test_quant_models.py::test_vlm_gemma4_quant"],
+)
+def test_vlm_gemma4_compile(setup_logging) -> None:
+    """test_vlm_gemma4_compile"""
+    model_name = "gemma4"
+    _compile_func(model_name, setup_logging)

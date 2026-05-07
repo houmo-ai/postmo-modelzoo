@@ -1,0 +1,73 @@
+{
+    "obsolete": false,
+    "model_dir": "models/vlm/gemma4",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["24g"]
+    },
+    "support_platform": ["x86_64", "aarch64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
+    },
+    "support_hmatc": null,
+    "perf_metrics": {
+        "xh2": {
+            "x86_64": {
+                "prefill": 166.22,
+                "decode": 28.61,
+                "end2end": 25.14
+            }
+        }
+    },
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": [
+                "cached_models",
+                "cached_models"
+            ],
+            "extract_dir": [
+                null,
+                "cached_models/hmm_xh2_26b-a4b_2k"
+            ],
+            "model_size": [null, "26b-a4b"],
+            "source_type": [null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": ["cached_models/models/gemma-4-26B-A4B-it"],
+            "out-dir": ["cached_results/hmquant_xh2_26b-a4b_2k"],
+            "context-length": ["2048"]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_26b-a4b_2k/hmquant"],
+            "model_name": [null],
+            "ncore": [null],
+            "batch": [null],
+            "context_length": ["2048"],
+            "output_dir": ["cached_results/hmm_xh2_26b-a4b_2k"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "tokenizer_dir": ["cached_models/models/gemma-4-26B-A4B-it"],
+            "embedding_path": [
+                "cached_results/hmm_xh2_26b-a4b_2k/hmquant/quant_embedding.pt"
+            ],
+            "vit_path": ["cached_results/hmm_xh2_26b-a4b_2k/gemma-4-26b-a4b_visual.hmm"],
+            "prefill_path": [
+                "cached_results/hmm_xh2_26b-a4b_2k/gemma-4-26b-a4b_prefill.hmm"
+            ],
+            "decode_path": ["cached_results/hmm_xh2_26b-a4b_2k/gemma-4-26b-a4b_decode.hmm"]
+        }
+    },
+    "perf_params": "demo"
+}

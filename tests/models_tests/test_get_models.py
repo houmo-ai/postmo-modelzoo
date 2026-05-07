@@ -530,3 +530,14 @@ def test_reranker_qwen3_reranker_get_model(setup_logging) -> None:
     """test_reranker_qwen3_reranker_get_model"""
     model_name = "qwen3-reranker"
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.gemma4
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_vlm_gemma4_get_model")
+def test_vlm_gemma4_get_model(setup_logging) -> None:
+    """test_vlm_gemma4_get_model"""
+    model_name = "gemma4"
+    _get_model_func(model_name, setup_logging)

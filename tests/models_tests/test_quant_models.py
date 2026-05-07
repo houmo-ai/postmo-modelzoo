@@ -623,3 +623,17 @@ def test_reranker_qwen3_reranker_quant(setup_logging) -> None:
     """test_reranker_qwen3_reranker_quant"""
     model_name = "qwen3-reranker"
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.gemma4
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_vlm_gemma4_quant",
+    depends_on=["test_get_models.py::test_vlm_gemma4_get_model"],
+)
+def test_vlm_gemma4_quant(setup_logging) -> None:
+    """test_vlm_gemma4_quant"""
+    model_name = "gemma4"
+    _quant_func(model_name, setup_logging)

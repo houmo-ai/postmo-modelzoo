@@ -159,6 +159,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | cosyvoice3              | tts          | xh2    | yes   | yes   | yes  | yes  | x    |
 | qwen2.5-vl              | vlm          | xh2    | yes   | yes   | yes  | yes  | x    |
 | qwen3-vl                | vlm          | xh2    | yes   | yes   | yes  | yes  | x    |
+| gemma4                  | vlm          | xh2    | yes   | yes   | yes  | yes  | x    |
 
 ## API 示例
 

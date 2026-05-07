@@ -118,7 +118,7 @@ def main():
     evaluate_parser = subparsers.add_parser("eval", parents=[parent_target, parent_config, parent_onnx, parent_hmonnx, parent_model_cfg, parent_device_id, parent_log], help="Run model evaluate")
     benchmark_parser = subparsers.add_parser("benchmark", parents=[parent_target, parent_config, parent_device_id, parent_cuda, parent_log], help="Run model benchmark")
     check_parser = subparsers.add_parser("check", parents=[parent_target, parent_layers, parent_device_id, parent_log], help="Check model golden")
-    gen_parser = subparsers.add_parser("gen", parents=[parent_target], help="Generate default config.yaml")
+    gen_parser = subparsers.add_parser("gen", parents=[parent_target, parent_log], help="Generate default config.yaml")
     golden_parser = subparsers.add_parser("golden", parents=[parent_target, parent_layers, parent_cuda, parent_log], help="Generate golden data")
     
     # quant
@@ -203,8 +203,8 @@ def main():
 
     # Generate config
     if current_command == "gen":
-        generate_default_config(args.onnx, args.output_path)
-        logger.info(f"Generate default config done, and save to {args.output_path}")
+        generate_default_config(args.onnx, args.output)
+        logger.info(f"Generate default config done, and save to {args.output}")
         return
 
     # Process batch model benchmark

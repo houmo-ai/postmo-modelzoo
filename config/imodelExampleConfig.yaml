@@ -396,6 +396,18 @@ vlm_qwen3-vl:
         args: all
   test:
     - vlm_qwen3-vl_test
+vlm_gemma4:
+  include:
+    - models/vlm/gemma4
+  exclude:
+    - models/vlm/gemma4/README.MD
+  example_case:
+    - vlm_gemma4-vl_test:
+        test_type: models_tests
+        script: gemma4
+        args: all
+  test:
+    - vlm_gemma4_test
 llm_bge:
   include:
     - models/embedding/bge
