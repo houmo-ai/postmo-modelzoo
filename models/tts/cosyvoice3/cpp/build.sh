@@ -2,7 +2,7 @@
 # Build script for CosyVoice3 C++ demo on Linux
 
 # Parse command line arguments
-BUILD_AUDIO_FROM_SOURCE=""
+BUILD_AUDIO_FROM_SOURCE="-DBUILD_AUDIO_FROM_SOURCE=ON"
 while [[ $# -gt 0 ]]; do
     case $1 in
         --source)
