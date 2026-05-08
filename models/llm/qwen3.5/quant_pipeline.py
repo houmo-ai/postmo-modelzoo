@@ -275,6 +275,8 @@ def export_llm(args) -> None:
         ]
         if getattr(args, "debug", False):
             cmd_l.append("--debug")
+        if not getattr(args, "llm_export_full_output_valid", True):
+            cmd_l.append("--no-valid_compare_full_output")
         if getattr(args, "context_length", None):
             cmd_l.extend(["--max_sequence_length", str(args.context_length)])
         if getattr(args, "max_pe_length", None):

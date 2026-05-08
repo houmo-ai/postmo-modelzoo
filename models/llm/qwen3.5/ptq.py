@@ -209,6 +209,12 @@ def parse_args():
         help="LLM export rotary cache max_pe_length",
     )
     parser.add_argument(
+        "--llm-export-full-output-valid",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="run full-output comparison during LLM export validation; disabled by default to reduce VRAM",
+    )
+    parser.add_argument(
         "--input-sequence-length",
         type=int,
         default=256,
