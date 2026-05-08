@@ -54,6 +54,13 @@ def get_args() -> argparse.Namespace:
         help="base output houmo model name",
     )
     parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default="9b",
+        help="model size",
+    )
+    parser.add_argument(
         "--draft_suffix",
         dest="draft_suffix",
         type=str,
@@ -110,6 +117,14 @@ def get_args() -> argparse.Namespace:
         choices=[0, 1, 2],
         help="flash attention optimization for target prefill/decode models",
     )
+    parser.add_argument(
+        "--stage",
+        dest="stage",
+        type=str,
+        default="build",
+        choices=["build", "test", "all"],
+        help="build stage",
+    )
 
     args = parser.parse_args()
     if args.context_length < 2048:
@@ -117,7 +132,7 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def _find_single_onnx(model_dir: str, pattern: str = "*.onnx") -> str:
+def _find_single_onnx(model_dir: str, pattern: str = "hmquant_*.onnx") -> str:
     onnx_files = sorted(
         path
         for path in glob.glob(os.path.join(model_dir, pattern))
@@ -195,55 +210,57 @@ if __name__ == "__main__":
         raise SystemExit(0)
 
     model_dir = os.path.abspath(args.model_dir)
-    prefill_dir = os.path.join(model_dir, "prefill_onnx")
-    decode_dir = os.path.join(model_dir, "decode_onnx")
-    draft_dir = os.path.join(model_dir, "draft_onnx")
+    prefill_dir = os.path.join(model_dir, "prefill")
+    decode_dir = os.path.join(model_dir, "decode")
+    draft_prefill_dir = os.path.join(model_dir, "draft_prefill")
+    draft_decode_dir = os.path.join(model_dir, "draft_decode")
 
-    for required_dir in [prefill_dir, decode_dir, draft_dir]:
+    for required_dir in [prefill_dir, decode_dir, draft_prefill_dir, draft_decode_dir]:
         if not os.path.isdir(required_dir):
             raise FileNotFoundError(f"Directory not found: {required_dir}")
 
     prefill_onnx = _find_single_onnx(prefill_dir)
     decode_onnx = _find_single_onnx(decode_dir)
-    draft_prefill_onnx = _find_single_onnx(draft_dir, "*prefill*.onnx")
-    draft_decode_onnx = _find_single_onnx(draft_dir, "*decode*.onnx")
+    draft_prefill_onnx = _find_single_onnx(draft_prefill_dir)
+    draft_decode_onnx = _find_single_onnx(draft_decode_dir)
 
-    build_hmonnx(
-        f"{args.model_name}_prefill",
-        prefill_onnx,
-        args.output_dir,
-        args.ncore,
-        args.j,
-        args.ndevice,
-        llm_opt=True,
-        flash_attention=args.flash_attention,
-        context_length=args.context_length,
-        prefill_length=args.prefill_length,
-    )
-    build_hmonnx(
-        f"{args.model_name}_decode",
-        decode_onnx,
-        args.output_dir,
-        args.ncore,
-        args.j,
-        args.ndevice,
-        llm_opt=True,
-        flash_attention=args.flash_attention,
-        context_length=args.context_length,
-    )
-    build_hmonnx(
-        f"{args.model_name}_{args.draft_suffix}_prefill",
-        draft_prefill_onnx,
-        args.output_dir,
-        args.ncore,
-        args.j,
-        args.ndevice,
-    )
-    build_hmonnx(
-        f"{args.model_name}_{args.draft_suffix}_decode",
-        draft_decode_onnx,
-        args.output_dir,
-        args.ncore,
-        args.j,
-        args.ndevice,
-    )
+    if args.stage == "build" or args.stage == "all":
+        build_hmonnx(
+            f"{args.model_name}_prefill",
+            prefill_onnx,
+            args.output_dir,
+            args.ncore,
+            args.j,
+            args.ndevice,
+            llm_opt=True,
+            flash_attention=args.flash_attention,
+            context_length=args.context_length,
+            prefill_length=args.prefill_length,
+        )
+        build_hmonnx(
+            f"{args.model_name}_decode",
+            decode_onnx,
+            args.output_dir,
+            args.ncore,
+            args.j,
+            args.ndevice,
+            llm_opt=True,
+            flash_attention=args.flash_attention,
+            context_length=args.context_length,
+        )
+        build_hmonnx(
+            f"{args.model_name}_prefill_{args.draft_suffix}",
+            draft_prefill_onnx,
+            args.output_dir,
+            args.ncore,
+            args.j,
+            args.ndevice,
+        )
+        build_hmonnx(
+            f"{args.model_name}_decode_{args.draft_suffix}",
+            draft_decode_onnx,
+            args.output_dir,
+            args.ncore,
+            args.j,
+            args.ndevice,
+        )

@@ -28,24 +28,22 @@ from hmatc.utils.perf_infomations import (
     PERFTYPE,
 )
 
-
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 SUFFIX = ".hmcc.format"
-DEFAULT_MODEL_DIR = Path(__file__).resolve().parent / "mtp_new_v2"
+DEFAULT_MODEL_DIR = Path(__file__).resolve().parent
 
 
 def _default_tokenizer_dir() -> str:
-    root = Path(__file__).resolve().parent
     candidates = (
         DEFAULT_MODEL_DIR / "tokenizer",
-        root / "Qwen3.5-35B-A3B",
-        root / "Qwen3.6-35B-A3B",
-        root / "qwen3.5",
+        DEFAULT_MODEL_DIR / "Qwen3.5-35B-A3B",
+        DEFAULT_MODEL_DIR / "Qwen3.6-35B-A3B",
+        DEFAULT_MODEL_DIR / "qwen3.5",
     )
     for candidate in candidates:
         if candidate.exists():
             return str(candidate)
-    return str(root / "Qwen3.5-35B-A3B")
+    return str(DEFAULT_MODEL_DIR / "Qwen3.5-35B-A3B")
 
 
 def is_valid_char(cp):
@@ -78,35 +76,35 @@ def get_args() -> argparse.Namespace:
         "--embedding_path",
         dest="embedding_path",
         type=str,
-        default=str(DEFAULT_MODEL_DIR / "quant_embedding.pt"),
+        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="houmo embedding weight path",
     )
     parser.add_argument(
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=str(DEFAULT_MODEL_DIR / "prefill.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_prefill.hmm"),
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--prefill_mtp_path",
         dest="prefill_mtp_path",
         type=str,
-        default=str(DEFAULT_MODEL_DIR / "prefill_mtp.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_prefill_mtp.hmm"),
         help="houmo MTP prefill model path",
     )
     parser.add_argument(
         "--decode_mtp_path",
         dest="decode_mtp_path",
         type=str,
-        default=str(DEFAULT_MODEL_DIR / "decode_mtp.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_decode_mtp.hmm"),
         help="houmo MTP draft decode model path",
     )
     parser.add_argument(
         "--decode_verify_path",
         dest="decode_verify_path",
         type=str,
-        default=str(DEFAULT_MODEL_DIR / "verify.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_decode.hmm"),
         help="houmo verify decode model path",
     )
     parser.add_argument(
@@ -222,9 +220,13 @@ class SamplingManager:
         for token_id in set(previous_tokens):
             if 0 <= token_id < len(logits):
                 if logits[token_id] < 0:
-                    adjusted_logits[token_id] = logits[token_id] * self.repetition_penalty
+                    adjusted_logits[token_id] = (
+                        logits[token_id] * self.repetition_penalty
+                    )
                 else:
-                    adjusted_logits[token_id] = logits[token_id] / self.repetition_penalty
+                    adjusted_logits[token_id] = (
+                        logits[token_id] / self.repetition_penalty
+                    )
         return adjusted_logits
 
     def apply_top_k(self, logits: np.ndarray) -> np.ndarray:
@@ -259,7 +261,9 @@ class SamplingManager:
         self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
     ) -> np.ndarray:
         processed_logits = logits.copy()
-        processed_logits = self.apply_repetition_penalty(processed_logits, previous_tokens)
+        processed_logits = self.apply_repetition_penalty(
+            processed_logits, previous_tokens
+        )
         processed_logits = self.apply_top_k(processed_logits)
         processed_logits = self.apply_top_p(processed_logits)
         processed_logits = self.apply_temperature(processed_logits)
@@ -269,7 +273,9 @@ class SamplingManager:
         self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
     ) -> int:
         last_logits = np.asarray(logits).reshape(-1, np.asarray(logits).shape[-1])[-1]
-        processed_logits = self.process_logits(last_logits.astype(np.float32), previous_tokens)
+        processed_logits = self.process_logits(
+            last_logits.astype(np.float32), previous_tokens
+        )
         if np.all(~np.isfinite(processed_logits)):
             processed_logits = last_logits.astype(np.float32)
         return int(processed_logits.argmax(-1))
@@ -277,8 +283,12 @@ class SamplingManager:
 
 class PrefillNames:
     def __init__(self, model):
-        in_names = [model.get_input_name(index) for index in range(model.get_num_inputs())]
-        out_names = [model.get_output_name(index) for index in range(model.get_num_outputs())]
+        in_names = [
+            model.get_input_name(index) for index in range(model.get_num_inputs())
+        ]
+        out_names = [
+            model.get_output_name(index) for index in range(model.get_num_outputs())
+        ]
 
         self.activation = self._pick(in_names, "input_1")
         self.valid_length = self._pick(in_names, "valid_length")
@@ -300,17 +310,25 @@ class PrefillNames:
         if not conv_cache_in:
             raise RuntimeError("missing recurrent conv cache inputs")
         self.layer_indices = [layer_idx for layer_idx, _ in conv_cache_in]
-        self._require_same_indices("past_recurrent_state", self.layer_indices, rec_state_in)
+        self._require_same_indices(
+            "past_recurrent_state", self.layer_indices, rec_state_in
+        )
         if conv_cache_out:
-            self._require_same_indices("conv_cache_out", self.layer_indices, conv_cache_out)
+            self._require_same_indices(
+                "conv_cache_out", self.layer_indices, conv_cache_out
+            )
         if rec_state_out:
-            self._require_same_indices("recurrent_state_out", self.layer_indices, rec_state_out)
+            self._require_same_indices(
+                "recurrent_state_out", self.layer_indices, rec_state_out
+            )
 
         self.conv_cache_in = [name for _, name in conv_cache_in]
         self.rec_state_in = [name for _, name in rec_state_in]
         self.conv_cache_out = [name for _, name in conv_cache_out]
         self.rec_state_out = [name for _, name in rec_state_out]
-        self.split_conv_cache_out = self._split_outputs(out_names, r"conv_cache_out_(\d+)_(\d+)$")
+        self.split_conv_cache_out = self._split_outputs(
+            out_names, r"conv_cache_out_(\d+)_(\d+)$"
+        )
         self.split_rec_state_out = self._split_outputs(
             out_names, r"recurrent_state_out_(\d+)_(\d+)$"
         )
@@ -347,7 +365,9 @@ class PrefillNames:
         return name[: -len(SUFFIX)] if name.endswith(SUFFIX) else name
 
     @classmethod
-    def _indexed_names(cls, names: Sequence[str], pattern: str) -> List[Tuple[int, str]]:
+    def _indexed_names(
+        cls, names: Sequence[str], pattern: str
+    ) -> List[Tuple[int, str]]:
         compiled = re.compile(pattern)
         matched = []
         for name in names:
@@ -381,15 +401,21 @@ class PrefillNames:
             step_idx = int(match.group(2))
             outputs.setdefault(layer_idx, []).append((step_idx, name))
         return {
-            layer_idx: [name for _, name in sorted(step_items, key=lambda item: item[0])]
+            layer_idx: [
+                name for _, name in sorted(step_items, key=lambda item: item[0])
+            ]
             for layer_idx, step_items in outputs.items()
         }
 
 
 class MtpNames:
     def __init__(self, model):
-        in_names = [model.get_input_name(index) for index in range(model.get_num_inputs())]
-        out_names = [model.get_output_name(index) for index in range(model.get_num_outputs())]
+        in_names = [
+            model.get_input_name(index) for index in range(model.get_num_inputs())
+        ]
+        out_names = [
+            model.get_output_name(index) for index in range(model.get_num_outputs())
+        ]
 
         self.hidden_states_in = self._pick_any(
             in_names, ("hidden_states", "post_norm_hidden", "pre_norm_hidden")
@@ -397,8 +423,12 @@ class MtpNames:
         self.input_embedding_in = self._pick_any(
             in_names, ("input_embedding", "next_token_embedding")
         )
-        self.position_ids = tuple(name for name in in_names if "position_ids" in self._bare(name))
-        self.past_seq_length = self._pick_scalar(model, in_names, ("past_seq", "valid_length"))
+        self.position_ids = tuple(
+            name for name in in_names if "position_ids" in self._bare(name)
+        )
+        self.past_seq_length = self._pick_scalar(
+            model, in_names, ("past_seq", "valid_length")
+        )
         self.current_input_length = self._pick_scalar(model, in_names, ("current_",))
         self.past_key_cache = self._pick_any(in_names, ("past_key_cache",))
         self.past_value_cache = self._pick_any(in_names, ("past_value_cache",))
@@ -539,7 +569,9 @@ class HmQwenMTP:
             raise ValueError("Unsupport device number!")
 
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)
-        self.prefill = tcim.runtime.load(prefill_path, option=tcim.runtime.Option(weight_manager))
+        self.prefill = tcim.runtime.load(
+            prefill_path, option=tcim.runtime.Option(weight_manager)
+        )
         self.pn = PrefillNames(self.prefill)
         self.prefill_mtp = tcim.runtime.load(
             prefill_mtp_path, option=tcim.runtime.Option(weight_manager)
@@ -553,14 +585,18 @@ class HmQwenMTP:
         self.perf_tracker.perf_start(PERFTYPE.DECODE_LOAD_TIME)
         self.verify = tcim.runtime.load(decode_verify_path, option=verify_option)
         self.vn = PrefillNames(self.verify)
-        self.mtp = tcim.runtime.load(decode_mtp_path, option=tcim.runtime.Option(weight_manager))
+        self.mtp = tcim.runtime.load(
+            decode_mtp_path, option=tcim.runtime.Option(weight_manager)
+        )
         self.mn = MtpNames(self.mtp)
         self.perf_tracker.perf_end(PERFTYPE.DECODE_LOAD_TIME)
         logger.info("decode_verify and decode_mtp models loaded")
 
         self._link_verify_kv()
 
-        activation_shape = tuple(self.prefill.get_dev_input(self.pn.activation).info.shape)
+        activation_shape = tuple(
+            self.prefill.get_dev_input(self.pn.activation).info.shape
+        )
         self.batch, self.prefill_length, self.embedding_len = [
             int(dim) for dim in activation_shape
         ]
@@ -582,8 +618,12 @@ class HmQwenMTP:
             top_p=args.topp,
             repetition_penalty=args.repetition_penalty,
         )
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, trust_remote_code=True)
-        embedding_weight = torch.load(embedding_path, map_location="cpu", weights_only=False)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_dir, trust_remote_code=True
+        )
+        embedding_weight = torch.load(
+            embedding_path, map_location="cpu", weights_only=False
+        )
         if isinstance(embedding_weight, dict):
             if "weight" not in embedding_weight:
                 raise KeyError(
@@ -594,7 +634,9 @@ class HmQwenMTP:
             embedding_tensor = embedding_weight.weight.data
         else:
             embedding_tensor = embedding_weight
-        self.embedding_weight = embedding_tensor.reshape(-1, self.embedding_len).to(torch.float16)
+        self.embedding_weight = embedding_tensor.reshape(-1, self.embedding_len).to(
+            torch.float16
+        )
 
         self.stop_ids = _as_list_eos(getattr(self.tokenizer, "eos_token_id", None))
         for token in ("<|im_end|>", "<|endoftext|>"):
@@ -651,10 +693,9 @@ class HmQwenMTP:
         return self.vn.split_conv_cache_out.get(layer_idx, [])
 
     def _cross_propagate_rec_to_verify(self) -> None:
-        if (
-            len(self.pn.conv_cache_out) != len(self.vn.conv_cache_in)
-            or len(self.pn.rec_state_out) != len(self.vn.rec_state_in)
-        ):
+        if len(self.pn.conv_cache_out) != len(self.vn.conv_cache_in) or len(
+            self.pn.rec_state_out
+        ) != len(self.vn.rec_state_in):
             raise RuntimeError(
                 "prefill recurrent outputs and verify recurrent inputs count differ: "
                 f"conv {len(self.pn.conv_cache_out)} vs {len(self.vn.conv_cache_in)}, "
@@ -693,12 +734,15 @@ class HmQwenMTP:
                 f"got {array.shape} (size={array.size})"
             )
         if args.debug:
-            logger.info(f"Auto-reshaping input '{input_name}' from {array.shape} to {expected_shape}")
+            logger.info(
+                f"Auto-reshaping input '{input_name}' from {array.shape} to {expected_shape}"
+            )
         return array.reshape(expected_shape)
 
     def set_model_input(self, runtime_model, input_name: str, value) -> None:
         runtime_model.set_input(
-            input_name, self.adapt_input_to_model_shape(runtime_model, input_name, value)
+            input_name,
+            self.adapt_input_to_model_shape(runtime_model, input_name, value),
         )
 
     def _embed_ids(self, token_ids, perf_type: PERFTYPE) -> np.ndarray:
@@ -712,7 +756,9 @@ class HmQwenMTP:
         shape = tuple(model.get_dev_input(name).info.shape)
         self.set_model_input(model, name, np.full(shape, int(value), dtype=np.int32))
 
-    def _set_position_ids(self, model, names: Sequence[str], start: int, length: int) -> None:
+    def _set_position_ids(
+        self, model, names: Sequence[str], start: int, length: int
+    ) -> None:
         values = np.arange(start, start + length, dtype=np.int32)
         for name in names:
             shape = tuple(model.get_dev_input(name).info.shape)
@@ -720,7 +766,9 @@ class HmQwenMTP:
 
     def clear_cache(self) -> None:
         for name in self.pn.conv_cache_in + self.pn.rec_state_in:
-            self.set_model_input(self.prefill, name, _zeros_like_input(self.prefill, name))
+            self.set_model_input(
+                self.prefill, name, _zeros_like_input(self.prefill, name)
+            )
         self.prefill_mtp.set_input(
             self.pm.past_key_cache,
             _zeros_like_input(self.prefill_mtp, self.pm.past_key_cache),
@@ -752,12 +800,16 @@ class HmQwenMTP:
                 self.prefill.get_dev_output(rec_out),
             )
 
-    def _create_linear_attn_mask(self, fill_length: int, current_length: int) -> np.ndarray:
+    def _create_linear_attn_mask(
+        self, fill_length: int, current_length: int
+    ) -> np.ndarray:
         mask = np.zeros((1, fill_length), dtype=np.float16)
         mask[0, :current_length] = 1.0
         return mask
 
-    def _run_main_prefill_chunk(self, past_seq_len: int, chunk_ids: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _run_main_prefill_chunk(
+        self, past_seq_len: int, chunk_ids: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         token_ids = torch.as_tensor(chunk_ids.reshape(1, -1), dtype=torch.long)
         valid_len = int(token_ids.shape[1])
         inputs_embeds = self._embed_ids(token_ids, PERFTYPE.PREFILL_EMBED_TIME)
@@ -774,7 +826,11 @@ class HmQwenMTP:
         self._set_scalar_i32(self.prefill, self.pn.current_length, valid_len)
         self._set_position_ids(
             self.prefill,
-            (self.pn.time_position_ids, self.pn.height_position_ids, self.pn.width_position_ids),
+            (
+                self.pn.time_position_ids,
+                self.pn.height_position_ids,
+                self.pn.width_position_ids,
+            ),
             past_seq_len,
             self.prefill_length,
         )
@@ -794,32 +850,50 @@ class HmQwenMTP:
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_INFER_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_OUTPUT_TIME)
-        logits = _to_numpy(self.prefill.get_output(self.pn.logits_out))[:, :valid_len, :].copy()
-        hidden = _to_numpy(self.prefill.get_output(self.pn.hidden_out))[:, :valid_len, :].copy()
+        logits = _to_numpy(self.prefill.get_output(self.pn.logits_out))[
+            :, :valid_len, :
+        ].copy()
+        hidden = _to_numpy(self.prefill.get_output(self.pn.hidden_out))[
+            :, :valid_len, :
+        ].copy()
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_OUTPUT_TIME)
         self._propagate_recurrent_in_prefill()
         return logits, hidden
 
-    def _prefill_mtp_chunk(self, hidden: np.ndarray, token_ids: np.ndarray, past_seq_len: int) -> None:
+    def _prefill_mtp_chunk(
+        self, hidden: np.ndarray, token_ids: np.ndarray, past_seq_len: int
+    ) -> None:
         valid_len = int(token_ids.shape[0])
         if valid_len <= 0:
             return
-        target_len = int(self.prefill_mtp.get_dev_input(self.pm.hidden_states_in).info.shape[1])
+        target_len = int(
+            self.prefill_mtp.get_dev_input(self.pm.hidden_states_in).info.shape[1]
+        )
         if valid_len > target_len:
             raise ValueError(f"MTP prefill chunk too long: {valid_len} > {target_len}")
         mtp_token_ids = torch.as_tensor(token_ids.reshape(1, -1), dtype=torch.long)
         input_embedding = self._embed_ids(mtp_token_ids, PERFTYPE.PREFILL_EMBED_TIME)
         if valid_len < target_len:
-            hidden_pad = np.zeros((1, target_len - valid_len, self.embedding_len), dtype=np.float16)
+            hidden_pad = np.zeros(
+                (1, target_len - valid_len, self.embedding_len), dtype=np.float16
+            )
             embed_pad = np.zeros_like(hidden_pad)
             hidden = np.concatenate([hidden.astype(np.float16), hidden_pad], axis=1)
             input_embedding = np.concatenate([input_embedding, embed_pad], axis=1)
 
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_INPUT_TIME)
-        self.set_model_input(self.prefill_mtp, self.pm.hidden_states_in, hidden.astype(np.float16))
-        self.set_model_input(self.prefill_mtp, self.pm.input_embedding_in, input_embedding.astype(np.float16))
+        self.set_model_input(
+            self.prefill_mtp, self.pm.hidden_states_in, hidden.astype(np.float16)
+        )
+        self.set_model_input(
+            self.prefill_mtp,
+            self.pm.input_embedding_in,
+            input_embedding.astype(np.float16),
+        )
         if self.pm.position_ids:
-            self._set_position_ids(self.prefill_mtp, self.pm.position_ids, past_seq_len, target_len)
+            self._set_position_ids(
+                self.prefill_mtp, self.pm.position_ids, past_seq_len, target_len
+            )
         self._set_scalar_i32(self.prefill_mtp, self.pm.past_seq_length, past_seq_len)
         self._set_scalar_i32(self.prefill_mtp, self.pm.current_input_length, valid_len)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
@@ -829,13 +903,19 @@ class HmQwenMTP:
         self.prefill_mtp.sync()
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_INFER_TIME)
 
-    def _run_mtp_step(self, hidden: np.ndarray, token_id: int, past_seq_len: int) -> Tuple[int, np.ndarray]:
+    def _run_mtp_step(
+        self, hidden: np.ndarray, token_id: int, past_seq_len: int
+    ) -> Tuple[int, np.ndarray]:
         token_ids = torch.as_tensor([[int(token_id)]], dtype=torch.long)
         input_embedding = self._embed_ids(token_ids, PERFTYPE.DECODE_EMBED_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.DECODE_INPUT_TIME)
-        self.set_model_input(self.mtp, self.mn.hidden_states_in, hidden.astype(np.float16))
-        self.set_model_input(self.mtp, self.mn.input_embedding_in, input_embedding.astype(np.float16))
+        self.set_model_input(
+            self.mtp, self.mn.hidden_states_in, hidden.astype(np.float16)
+        )
+        self.set_model_input(
+            self.mtp, self.mn.input_embedding_in, input_embedding.astype(np.float16)
+        )
         if self.mn.position_ids:
             self._set_position_ids(self.mtp, self.mn.position_ids, past_seq_len, 1)
         self._set_scalar_i32(self.mtp, self.mn.past_seq_length, past_seq_len)
@@ -875,7 +955,9 @@ class HmQwenMTP:
         verify_tokens: List[int],
     ) -> Tuple[np.ndarray, np.ndarray]:
         if len(verify_tokens) != self.verify_seq:
-            raise ValueError(f"expected {self.verify_seq} verify tokens, got {len(verify_tokens)}")
+            raise ValueError(
+                f"expected {self.verify_seq} verify tokens, got {len(verify_tokens)}"
+            )
         token_ids = torch.as_tensor([verify_tokens], dtype=torch.long)
         input_embedding = self._embed_ids(token_ids, PERFTYPE.DECODE_EMBED_TIME)
 
@@ -885,7 +967,11 @@ class HmQwenMTP:
         self._set_scalar_i32(self.verify, self.vn.current_length, self.verify_seq)
         self._set_position_ids(
             self.verify,
-            (self.vn.time_position_ids, self.vn.height_position_ids, self.vn.width_position_ids),
+            (
+                self.vn.time_position_ids,
+                self.vn.height_position_ids,
+                self.vn.width_position_ids,
+            ),
             past_seq_len,
             self.verify_seq,
         )
@@ -919,16 +1005,26 @@ class HmQwenMTP:
         ):
             split_conv_outputs = self._find_verify_split_conv_outputs(layer_idx)
             if split_conv_outputs:
-                conv_out_name = split_conv_outputs[min(accept_pos, len(split_conv_outputs) - 1)]
-                self.verify.set_input(conv_in, self.verify.get_dev_output(conv_out_name))
+                conv_out_name = split_conv_outputs[
+                    min(accept_pos, len(split_conv_outputs) - 1)
+                ]
+                self.verify.set_input(
+                    conv_in, self.verify.get_dev_output(conv_out_name)
+                )
             else:
                 if layer_idx >= len(self.vn.conv_cache_out):
-                    raise RuntimeError(f"missing verify conv output for layer {layer_idx}")
-                conv_out_array = _to_numpy(self.verify.get_output(self.vn.conv_cache_out[layer_idx]))
+                    raise RuntimeError(
+                        f"missing verify conv output for layer {layer_idx}"
+                    )
+                conv_out_array = _to_numpy(
+                    self.verify.get_output(self.vn.conv_cache_out[layer_idx])
+                )
                 conv_kernel = int(self.verify.get_dev_input(conv_in).info.shape[-1])
                 if conv_out_array.shape[-1] > conv_kernel:
                     start = min(accept_pos, conv_out_array.shape[-1] - conv_kernel)
-                    conv_slice = conv_out_array[:, :, start : start + conv_kernel].copy()
+                    conv_slice = conv_out_array[
+                        :, :, start : start + conv_kernel
+                    ].copy()
                 else:
                     conv_slice = conv_out_array.copy()
                 self.verify.set_input(conv_in, conv_slice)
@@ -938,7 +1034,9 @@ class HmQwenMTP:
                 rec_out_name = rec_outputs[min(accept_pos, len(rec_outputs) - 1)]
             else:
                 if layer_idx >= len(self.vn.rec_state_out):
-                    raise RuntimeError(f"missing verify recurrent output for layer {layer_idx}")
+                    raise RuntimeError(
+                        f"missing verify recurrent output for layer {layer_idx}"
+                    )
                 rec_out_name = self.vn.rec_state_out[layer_idx]
             self.verify.set_input(rec_in, self.verify.get_dev_output(rec_out_name))
 
@@ -984,7 +1082,9 @@ class HmQwenMTP:
 
     def _build_text_input_ids(self, question: str) -> np.ndarray:
         if not self.messages:
-            self.messages.append({"role": "system", "content": "You are a helpful assistant."})
+            self.messages.append(
+                {"role": "system", "content": "You are a helpful assistant."}
+            )
         self.messages.append({"role": "user", "content": question})
         text = self.tokenizer.apply_chat_template(
             self.messages,
@@ -1003,7 +1103,9 @@ class HmQwenMTP:
         if input_ids.size <= 0:
             raise ValueError("empty input_ids")
         if input_ids.size >= self.context_max_length:
-            raise ValueError(f"prompt too long: {input_ids.size} >= {self.context_max_length}")
+            raise ValueError(
+                f"prompt too long: {input_ids.size} >= {self.context_max_length}"
+            )
 
         self.generated_ids = []
         self.prefill_time = 0.0
@@ -1013,12 +1115,16 @@ class HmQwenMTP:
         if not prefill_total_started:
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
         start_time = time.time()
-        past_seq_len, current_token, last_hidden, mtp_past_seq_len = self._do_prefill(input_ids)
+        past_seq_len, current_token, last_hidden, mtp_past_seq_len = self._do_prefill(
+            input_ids
+        )
         initial_mtp_prefill_tokens = mtp_past_seq_len
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOTAL_TIME)
 
         first_token_decode_start = time.time()
-        prefill_response = self.tokenizer.decode([current_token], skip_special_tokens=True)
+        prefill_response = self.tokenizer.decode(
+            [current_token], skip_special_tokens=True
+        )
         self.ttft_debug_extra_timings["First Token Decode"] = (
             time.time() - first_token_decode_start
         ) * 1000
@@ -1088,12 +1194,16 @@ class HmQwenMTP:
 
             initial_seq_len = past_seq_len
             verify_tokens = [current_token] + draft_tokens
-            verify_logits, verify_hidden = self._run_verify(initial_seq_len, verify_tokens)
+            verify_logits, verify_hidden = self._run_verify(
+                initial_seq_len, verify_tokens
+            )
 
             accepted_count = 0
             for token_idx, draft_token in enumerate(draft_tokens):
                 predicted = int(
-                    np.argmax(verify_logits[:, token_idx : token_idx + 1, :], axis=-1).reshape(-1)[0]
+                    np.argmax(
+                        verify_logits[:, token_idx : token_idx + 1, :], axis=-1
+                    ).reshape(-1)[0]
                 )
                 if predicted != int(draft_token):
                     break
@@ -1120,14 +1230,19 @@ class HmQwenMTP:
             if accepted_count < len(draft_tokens):
                 current_token = int(
                     np.argmax(
-                        verify_logits[:, accepted_count : accepted_count + 1, :], axis=-1
+                        verify_logits[:, accepted_count : accepted_count + 1, :],
+                        axis=-1,
                     ).reshape(-1)[0]
                 )
             else:
-                current_token = int(np.argmax(verify_logits[:, -1:, :], axis=-1).reshape(-1)[0])
+                current_token = int(
+                    np.argmax(verify_logits[:, -1:, :], axis=-1).reshape(-1)[0]
+                )
             self.perf_tracker.perf_end(PERFTYPE.DECODE_TOKEN_TIME)
 
-            last_hidden = verify_hidden[:, accepted_count : accepted_count + 1, :].copy()
+            last_hidden = verify_hidden[
+                :, accepted_count : accepted_count + 1, :
+            ].copy()
             mtp_past_seq_len += accepted_steps
 
             if current_token in self.stop_ids:
@@ -1179,11 +1294,15 @@ class HmQwenMTP:
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
         token_start = time.time()
         input_ids = self._build_text_input_ids(question)
-        self.ttft_debug_extra_timings["Prompt Build"] = (time.time() - token_start) * 1000
+        self.ttft_debug_extra_timings["Prompt Build"] = (
+            time.time() - token_start
+        ) * 1000
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
 
         if input_ids.size >= self.context_max_length:
-            logger.error(f"Question long than {self.context_max_length}, please shorten it!")
+            logger.error(
+                f"Question long than {self.context_max_length}, please shorten it!"
+            )
             sys.exit(1)
 
         logger.success("response:")
