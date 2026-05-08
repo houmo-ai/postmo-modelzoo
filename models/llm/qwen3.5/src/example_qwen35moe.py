@@ -26,18 +26,11 @@ import random
 from datetime import datetime
 
 import torch
-from datasets import load_dataset
 from transformers import AutoTokenizer
 
 from gptqmodel import GPTQModel, QuantizeConfig
 from gptqmodel.quantization.config import ExpertsRoutingBypass, ExpertsRoutingOverride, MoEConfig
-
-
-def get_wikitext2(nsamples, seqlen):
-    traindata = load_dataset("wikitext", "wikitext-2-raw-v1", split="train").filter(
-        lambda x: len(x["text"]) >= seqlen)
-
-    return [example["text"] for example in traindata.select(range(nsamples))]
+from qwen35_common import build_calibration_dataset
 
 
 @torch.inference_mode()
@@ -144,6 +137,18 @@ def parse_args():
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--nsamples", type=int, default=256)
     parser.add_argument("--seqlen", type=int, default=1024, help="minimum sequence length for wikitext2 filtering")
+    parser.add_argument(
+        "--calibration-jsonl",
+        type=str,
+        default=None,
+        help="optional JSONL calibration dataset path; overrides wikitext2 when provided",
+    )
+    parser.add_argument(
+        "--calibration-text-key",
+        type=str,
+        default="text",
+        help="JSON field name used to read text from --calibration-jsonl",
+    )
     parser.add_argument("--device", type=str, default="cuda:0", help="quantization device")
     parser.add_argument("--infer-device", type=str, default=None, help="inference device after quantization")
     parser.add_argument("--offload-to-disk", action=argparse.BooleanOptionalAction, default=True)
@@ -215,8 +220,8 @@ def main():
     tokenizer_source = args.model
     if not args.skip_quantize:
         tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True, trust_remote_code=args.trust_remote_code)
-        calibration_dataset = get_wikitext2(nsamples=args.nsamples, seqlen=args.seqlen)
-        print(f"[1/5] Calibration samples (wikitext2): {len(calibration_dataset)}")
+        calibration_dataset, calibration_source = build_calibration_dataset(args)
+        print(f"[1/5] Calibration samples ({calibration_source}): {len(calibration_dataset)}")
 
         moe_config = build_moe_config(args)
         dynamic_config = build_dynamic_quant_config(args)

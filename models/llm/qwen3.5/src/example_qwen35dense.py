@@ -30,6 +30,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer
 
 from gptqmodel import GPTQModel, QuantizeConfig
+from qwen35_common import build_calibration_dataset
 
 
 # ---------------------------------------------------------------------------
@@ -61,17 +62,17 @@ def get_jsonl_texts(path, nsamples, text_key="text"):
     return samples
 
 
-def build_calibration_dataset(args):
-    if args.calibration_jsonl:
-        calibration_dataset = get_jsonl_texts(
-            path=args.calibration_jsonl,
-            nsamples=args.nsamples,
-            text_key=args.calibration_text_key,
-        )
-        source_name = os.path.basename(args.calibration_jsonl)
-        return calibration_dataset, f"jsonl:{source_name}"
+# def build_calibration_dataset(args):
+#     if args.calibration_jsonl:
+#         calibration_dataset = get_jsonl_texts(
+#             path=args.calibration_jsonl,
+#             nsamples=args.nsamples,
+#             text_key=args.calibration_text_key,
+#         )
+#         source_name = os.path.basename(args.calibration_jsonl)
+#         return calibration_dataset, f"jsonl:{source_name}"
 
-    return get_wikitext2(nsamples=args.nsamples, seqlen=args.seqlen), "wikitext2"
+#     return get_wikitext2(nsamples=args.nsamples, seqlen=args.seqlen), "wikitext2"
 
 
 # ---------------------------------------------------------------------------
