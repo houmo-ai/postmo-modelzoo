@@ -65,7 +65,6 @@ from xh_model_zoo.xh_llm.models.builder import MODELS
 from xh_model_zoo.xh_llm.models.qwen3_5 import Qwen3_5Processor
 from xh_model_zoo.xh_llm.models.qwen3_5_moe import XHQwen3_5MoeVisionModel
 
-
 DEFAULT_NO_SPLIT_MODULES = ["Qwen3_5MoeTextDecoderLayer", "Qwen3_5MoeVisionBlock"]
 DEFAULT_CONFIG = "configs/qwen3_5_moe/qwen3_5_moe_vision_config.py"
 
@@ -94,11 +93,16 @@ def _auto_offload(model, no_split_module_classes=None, target_dtype=torch.float1
     if no_split_module_classes is None:
         no_split_module_classes = []
     max_memory = get_balanced_memory(
-        model, dtype=target_dtype, low_zero=False, max_memory=None,
+        model,
+        dtype=target_dtype,
+        low_zero=False,
+        max_memory=None,
         no_split_module_classes=list(no_split_module_classes),
     )
     device_map = infer_auto_device_map(
-        model, dtype=target_dtype, max_memory=max_memory,
+        model,
+        dtype=target_dtype,
+        max_memory=max_memory,
         no_split_module_classes=list(no_split_module_classes),
     )
     device_map = _normalize_device_map_to_modules(model, device_map)
@@ -141,8 +145,12 @@ def _prepare_inputs(hf_model_dir, args):
             ],
         }
     ]
-    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    image_inputs, video_inputs = process_vision_info(messages, image_patch_size=args.patch_size)
+    text = processor.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+    image_inputs, video_inputs = process_vision_info(
+        messages, image_patch_size=args.patch_size
+    )
     inputs = processor(
         text=[text],
         images=image_inputs,
@@ -154,19 +162,31 @@ def _prepare_inputs(hf_model_dir, args):
 
 
 def _filter_generate_kwargs(inputs):
-    exclude = {"hm_pixel_values", "pixel_values_videos", "image_grid_thw", "video_grid_thw"}
+    exclude = {
+        "hm_pixel_values",
+        "pixel_values_videos",
+        "image_grid_thw",
+        "video_grid_thw",
+    }
     return {k: v for k, v in inputs.items() if k not in exclude}
 
 
-def _run_generate(native_model, inputs, processor, max_new_tokens, label, logger, **gen_kwargs):
+def _run_generate(
+    native_model, inputs, processor, max_new_tokens, label, logger, **gen_kwargs
+):
     gen_inputs = _filter_generate_kwargs(inputs)
     with torch.no_grad():
-        generated_ids = native_model.generate(**gen_inputs, max_new_tokens=max_new_tokens, **gen_kwargs)
+        generated_ids = native_model.generate(
+            **gen_inputs, max_new_tokens=max_new_tokens, **gen_kwargs
+        )
     generated_ids_trimmed = [
-        out_ids[len(in_ids):] for in_ids, out_ids in zip(gen_inputs["input_ids"], generated_ids)
+        out_ids[len(in_ids) :]
+        for in_ids, out_ids in zip(gen_inputs["input_ids"], generated_ids)
     ]
     output_text = processor.batch_decode(
-        generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False,
+        generated_ids_trimmed,
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
     )
     logger.info(f"***************** {label} output *****************")
     logger.info(output_text)
@@ -212,15 +232,21 @@ def _export_onnx(wraped_model, hm_pixel_values, out_onnx_file, logger):
     return onnx_model
 
 
-def _convert_to_hmonnx(out_onnx_file, out_hmonnx_file, hm_pixel_values, quant_config, logger):
+def _convert_to_hmonnx(
+    out_onnx_file, out_hmonnx_file, hm_pixel_values, quant_config, logger
+):
     if out_hmonnx_file.exists():
         logger.info(f"HMONNX model already exists: {out_hmonnx_file}")
         return
     from xhquant.api import DeviceType, convert_onnx_to_hmonnx
+
     out_hmonnx_file.parent.mkdir(exist_ok=True, parents=True)
     convert_onnx_to_hmonnx(
-        str(out_onnx_file), [hm_pixel_values.float().cpu()],
-        DeviceType.XH2a, str(out_hmonnx_file), quant_config,
+        str(out_onnx_file),
+        [hm_pixel_values.float().cpu()],
+        DeviceType.XH2a,
+        str(out_hmonnx_file),
+        quant_config,
     )
     logger.info(f"Convert ONNX to HMONNX success: {out_hmonnx_file}")
 
@@ -250,8 +276,13 @@ def _export_impl(cfg, args):
     # Optional native generate before wrapping
     if args.valid:
         _run_generate(
-            native_model, inputs, processor, args.max_new_tokens,
-            "native model", logger, repetition_penalty=1.05,
+            native_model,
+            inputs,
+            processor,
+            args.max_new_tokens,
+            "native model",
+            logger,
+            repetition_penalty=1.05,
         )
 
     # De-dispatch and init wrap model
@@ -261,7 +292,9 @@ def _export_impl(cfg, args):
     wraped_model = vision_model.wrap_model
 
     # Prepare pixel values for export
-    hm_pixel_values = inputs["hm_pixel_values"][0].type(wraped_model.dtype).to(wraped_model.device)
+    hm_pixel_values = (
+        inputs["hm_pixel_values"][0].type(wraped_model.dtype).to(wraped_model.device)
+    )
     if args.batch_size > 1:
         hm_pixel_values = hm_pixel_values.repeat(args.batch_size, 1, 1, 1, 1)
 
@@ -271,7 +304,9 @@ def _export_impl(cfg, args):
 
     # Convert to HMONNX
     out_hmonnx_file = Path(cfg.work_dir) / "vision" / "vision.onnx"
-    _convert_to_hmonnx(out_onnx_file, out_hmonnx_file, hm_pixel_values, cfg.model.quant_config, logger)
+    _convert_to_hmonnx(
+        out_onnx_file, out_hmonnx_file, hm_pixel_values, cfg.model.quant_config, logger
+    )
 
     logger.info(f"Vision export done. Artifacts in: {cfg.work_dir}")
 
@@ -284,7 +319,9 @@ def _export_impl(cfg, args):
 
         # Patch native model visual with HMONNX wrapper
         spatial_merge_size = getattr(native_model.model.visual, "spatial_merge_size", 2)
-        patch_size_val = getattr(native_model.model.visual, "patch_size", args.patch_size)
+        patch_size_val = getattr(
+            native_model.model.visual, "patch_size", args.patch_size
+        )
 
         class _HMONNXVisual(torch.nn.Module):
             def __init__(self):
@@ -299,8 +336,12 @@ def _export_impl(cfg, args):
         native_model.model.visual = _HMONNXVisual()
         inputs["pixel_values"] = inputs["hm_pixel_values"][0].half()
         _run_generate(
-            native_model, inputs, processor, args.max_new_tokens,
-            "hmonnx model", logger,
+            native_model,
+            inputs,
+            processor,
+            args.max_new_tokens,
+            "hmonnx model",
+            logger,
         )
 
 
@@ -309,6 +350,7 @@ def _export_impl(cfg, args):
 
 def parse_arguments():
     import argparse
+
     parser = argparse.ArgumentParser(
         description="Export Qwen3.5-MoE ViT to ONNX/HMONNX",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -320,7 +362,9 @@ def parse_arguments():
         default="./work_dirs",
         help="Root directory to store export artifacts",
     )
-    parser.add_argument("--hf_model_dir", type=str, default="/data01/nfs_shared/Qwen3.5-35B-A3B")
+    parser.add_argument(
+        "--hf_model_dir", type=str, default="/data01/nfs_shared/Qwen3.5-35B-A3B"
+    )
     parser.add_argument(
         "--model_name",
         type=str,
@@ -336,7 +380,9 @@ def parse_arguments():
     parser.add_argument("--image_path", type=str, default="images/qwen2_vl_demo.jpeg")
     parser.add_argument("--prompt", type=str, default="清晰描述图片中的内容。")
     parser.add_argument("--max_new_tokens", type=int, default=256)
-    parser.add_argument("--valid", action="store_true", help="Validate HMONNX by running generate()")
+    parser.add_argument(
+        "--valid", action="store_true", help="Validate HMONNX by running generate()"
+    )
     parser.add_argument("--seed", type=int, default=1024)
     parser.add_argument("--debug", action="store_true")
     return parser
@@ -349,8 +395,8 @@ def main(args):
     cfg.work_dir = str(Path(args.output_dir) / f"{model_name}_{size_suffix}")
     Path(cfg.work_dir).mkdir(exist_ok=True, parents=True)
     log_file = Path(cfg.work_dir) / "vision_export.log"
-    cfg.device = "cuda:0"
-    cfg.execution_device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    cfg.device = "cuda"
+    cfg.execution_device = "cuda" if torch.cuda.is_available() else "cpu"
 
     set_random_seed(args.seed)
     xhquant_llm_init(log_file, args.debug)
@@ -359,7 +405,9 @@ def main(args):
     logger.info(f"output: {cfg.work_dir}")
 
     xhquant.utils.suppress_printing.disable_printing = True
-    with TimeProfiler("vision export", logger), MemoryTracker(0, "vision_export", logger):
+    with TimeProfiler("vision export", logger), MemoryTracker(
+        0, "vision_export", logger
+    ):
         _export_impl(cfg, args)
 
 

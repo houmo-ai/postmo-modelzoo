@@ -25,7 +25,12 @@ from pathlib import Path
 from xh_model_zoo.xh_llm import LLMConverter
 from xh_model_zoo.xh_llm.models.qwen3_5_moe import Qwen3_5MoeConvertConfig
 
-from xhquant.api import DeviceType, QuantScheme, get_root_logger, xhquant_init  # isort:skip
+from xhquant.api import (
+    DeviceType,
+    QuantScheme,
+    get_root_logger,
+    xhquant_init,
+)  # isort:skip
 from xh_model_zoo.utils.memory_tracker import MemoryTracker  # isort:skip
 from xh_model_zoo.utils.time_profiler import TimeProfiler  # isort:skip
 
@@ -61,7 +66,7 @@ def main(args):
     # Detect architecture from config.json automatically
     architecture = args.architecture  # may be None → auto-detect
 
-    with TimeProfiler("convert", logger), MemoryTracker("cuda:0", "convert", logger):
+    with TimeProfiler("convert", logger), MemoryTracker("cuda", "convert", logger):
         LLMConverter.from_pretrained(hf_model_path, architecture, config, str(work_dir))
 
     logger.info(f"Done. Artifacts in: {work_dir}")
@@ -72,32 +77,62 @@ if __name__ == "__main__":
         description="Export Qwen3.5-MoE to prefill/decode HMONNX",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--model", type=str, default="/data01/nfs_shared/Qwen3.5-35B-A3B",
-                        help="HuggingFace model directory")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="/data01/nfs_shared/Qwen3.5-35B-A3B",
+        help="HuggingFace model directory",
+    )
     parser.add_argument(
         "--output-dir",
         type=str,
         default="work_dirs",
         help="Output root directory. Artifacts will be written to <output-dir>/<model_name>_llm_export/",
     )
-    parser.add_argument("--architecture", type=str, default=None,
-                        help="Architecture string (auto-detected if None). "
-                             "Use 'Qwen3_5MoeForConditionalGeneration' or 'Qwen3_5MoeForCausalLM'")
-    parser.add_argument("--context-length", type=int, default=2048,
-                        help="Maximum context length (kv cache size)")
-    parser.add_argument("--input-sequence-length", type=int, default=256,
-                        help="Prefill chunk size")
-    parser.add_argument("--quant-type", type=str, default="w8a8h0_sefp",
-                        help="Quantisation type string")
-    parser.add_argument("--quant-weight", type=str, default=None,
-                        help="Path to GPTQModel quantised weights (optional)")
-    parser.add_argument("--num-logits-to-keep", type=int, default=1,
-                        help="How many final logit positions to keep (1 = last only)")
-    parser.add_argument("--linear-attention-mode", type=str, default="auto",
-                        choices=["auto", "chunk", "recurrent"],
-                        help="Linear attention computation mode")
-    parser.add_argument("--linear-chunk-size", type=int, default=64,
-                        help="Chunk size for linear attention")
+    parser.add_argument(
+        "--architecture",
+        type=str,
+        default=None,
+        help="Architecture string (auto-detected if None). "
+        "Use 'Qwen3_5MoeForConditionalGeneration' or 'Qwen3_5MoeForCausalLM'",
+    )
+    parser.add_argument(
+        "--context-length",
+        type=int,
+        default=2048,
+        help="Maximum context length (kv cache size)",
+    )
+    parser.add_argument(
+        "--input-sequence-length", type=int, default=256, help="Prefill chunk size"
+    )
+    parser.add_argument(
+        "--quant-type", type=str, default="w8a8h0_sefp", help="Quantisation type string"
+    )
+    parser.add_argument(
+        "--quant-weight",
+        type=str,
+        default=None,
+        help="Path to GPTQModel quantised weights (optional)",
+    )
+    parser.add_argument(
+        "--num-logits-to-keep",
+        type=int,
+        default=1,
+        help="How many final logit positions to keep (1 = last only)",
+    )
+    parser.add_argument(
+        "--linear-attention-mode",
+        type=str,
+        default="auto",
+        choices=["auto", "chunk", "recurrent"],
+        help="Linear attention computation mode",
+    )
+    parser.add_argument(
+        "--linear-chunk-size",
+        type=int,
+        default=64,
+        help="Chunk size for linear attention",
+    )
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
     main(args)

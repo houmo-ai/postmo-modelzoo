@@ -13,7 +13,7 @@ python example_qwen35_vl_rotate_fp.py \
   --out ../output/Qwen3.5-9B-rotated-fp \
   --llm-rotation hadamard \
   --vision-rotation last \
-  --device cuda:0 \
+  --device cuda \
   --validate
 
 ## step2：使用GPTQModel量化Qwen3.5 Dense模型
@@ -28,7 +28,7 @@ python example_qwen35dense.py \
   --seqlen 1024 \
   --mse 2.4 \
   --hessian-mse \
-  --device cuda:0
+  --device cuda
 
 ## step3：导出Vision部分的hmonnx，依赖于step1的输出
 export CUDA_VISIBLE_DEVICES=0

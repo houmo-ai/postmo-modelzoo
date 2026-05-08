@@ -94,7 +94,6 @@ from xh_model_zoo.utils import MemoryTracker, TimeProfiler
 from xh_model_zoo.xh_llm.models.builder import MODELS
 from xh_model_zoo.xh_llm.models.qwen3_5 import Qwen3_5Processor, XHQwen3_5VisionModel
 
-
 # ─────────────────────────── Argument Parsing ──────────────────────────
 
 
@@ -126,7 +125,11 @@ def _normalize_device_map_to_modules(model: nn.Module, device_map):
     return normalized_device_map
 
 
-def _auto_offload(model: nn.Module, no_split_module_classes=None, target_dtype: torch.dtype = torch.float16):
+def _auto_offload(
+    model: nn.Module,
+    no_split_module_classes=None,
+    target_dtype: torch.dtype = torch.float16,
+):
     if no_split_module_classes is None:
         no_split_module_classes = []
     if not isinstance(no_split_module_classes, (list, tuple)):
@@ -157,7 +160,9 @@ def _remove_offload(model: nn.Module):
 def parse_arguments():
     import argparse
 
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     parser.add_argument(
         "--config",
         type=str,
@@ -258,6 +263,7 @@ def _collect_block_outputs(visual_model, forward_fn, block_attr="blocks"):
                 outputs[name] = output[0].detach().cpu().float()
             elif isinstance(output, Tensor):
                 outputs[name] = output.detach().cpu().float()
+
         return hook
 
     handles = []
@@ -273,23 +279,31 @@ def _collect_block_outputs(visual_model, forward_fn, block_attr="blocks"):
     return result, outputs
 
 
-def _run_hf_visual_forward(native_model, pixel_values, image_grid_thw, compare_dtype, compare_per_block, logger):
+def _run_hf_visual_forward(
+    native_model, pixel_values, image_grid_thw, compare_dtype, compare_per_block, logger
+):
     """Run HF visual forward to collect reference output for comparison.
 
     Returns:
         (hf_embeds_ref, hf_block_outs_ref) — tensors on CPU in compare_dtype.
     """
-    logger.info("Running HF visual forward (before wrapping) to collect reference output...")
+    logger.info(
+        "Running HF visual forward (before wrapping) to collect reference output..."
+    )
     hf_visual = native_model.model.visual
     hf_device = next(hf_visual.parameters()).device
     hf_vis_dtype = next(hf_visual.parameters()).dtype
     hf_visual.eval()
 
     # Force eager attention for fair comparison with wrap model (which uses explicit matmul attention)
-    if hasattr(hf_visual, "config") and hasattr(hf_visual.config, "_attn_implementation"):
+    if hasattr(hf_visual, "config") and hasattr(
+        hf_visual.config, "_attn_implementation"
+    ):
         old_attn_impl = hf_visual.config._attn_implementation
         hf_visual.config._attn_implementation = "eager"
-        logger.info(f"HF visual attention: {old_attn_impl} -> eager (forced for comparison)")
+        logger.info(
+            f"HF visual attention: {old_attn_impl} -> eager (forced for comparison)"
+        )
 
     pv = pixel_values.to(device=hf_device, dtype=compare_dtype)
     gt = image_grid_thw.to(device=hf_device)
@@ -299,7 +313,9 @@ def _run_hf_visual_forward(native_model, pixel_values, image_grid_thw, compare_d
     if compare_per_block:
         with torch.no_grad():
             hf_out, hf_block_outs_ref = _collect_block_outputs(
-                hf_visual, lambda: hf_visual(pv, grid_thw=gt), block_attr="blocks",
+                hf_visual,
+                lambda: hf_visual(pv, grid_thw=gt),
+                block_attr="blocks",
             )
     else:
         with torch.no_grad():
@@ -317,7 +333,9 @@ def _run_hf_visual_forward(native_model, pixel_values, image_grid_thw, compare_d
     return hf_embeds_ref, hf_block_outs_ref
 
 
-def _run_wrap_visual_forward(wraped_model, hm_pixel_values, compare_dtype, compare_per_block, logger):
+def _run_wrap_visual_forward(
+    wraped_model, hm_pixel_values, compare_dtype, compare_per_block, logger
+):
     """Run Wrap visual forward for comparison.
 
     Returns:
@@ -333,7 +351,9 @@ def _run_wrap_visual_forward(wraped_model, hm_pixel_values, compare_dtype, compa
     if compare_per_block:
         with torch.no_grad():
             wrap_out, wrap_block_outs = _collect_block_outputs(
-                wraped_model, lambda: wraped_model(hm_pv), block_attr="blocks",
+                wraped_model,
+                lambda: wraped_model(hm_pv),
+                block_attr="blocks",
             )
     else:
         with torch.no_grad():
@@ -350,7 +370,14 @@ def _run_wrap_visual_forward(wraped_model, hm_pixel_values, compare_dtype, compa
     return wrap_embeds, wrap_block_outs
 
 
-def _compare_hf_wrap(hf_embeds_ref, hf_block_outs_ref, wrap_embeds, wrap_block_outs, compare_dtype, logger):
+def _compare_hf_wrap(
+    hf_embeds_ref,
+    hf_block_outs_ref,
+    wrap_embeds,
+    wrap_block_outs,
+    compare_dtype,
+    logger,
+):
     """Compare HF vs Wrap visual model outputs and log metrics."""
     # Align shapes for comparison
     if hf_embeds_ref.dim() == 2 and wrap_embeds.dim() == 3:
@@ -368,14 +395,18 @@ def _compare_hf_wrap(hf_embeds_ref, hf_block_outs_ref, wrap_embeds, wrap_block_o
     logger.info(f"HF vs Wrap Vision Model Precision Comparison (dtype={compare_dtype})")
     logger.info("=" * 70)
 
-    metrics = _compute_precision_metrics(hf_cmp, wrap_cmp, label="image_embeds (merged)")
+    metrics = _compute_precision_metrics(
+        hf_cmp, wrap_cmp, label="image_embeds (merged)"
+    )
     _log_precision_metrics(logger, metrics)
 
     # Per-block comparison
     if hf_block_outs_ref and wrap_block_outs:
         logger.info("-" * 70)
         logger.info("Per-block HF vs Wrap hidden_states comparison:")
-        logger.info(f"{'Block':<12} {'MaxAbsDiff':>14} {'MeanAbsDiff':>14} {'CosSim':>14}")
+        logger.info(
+            f"{'Block':<12} {'MaxAbsDiff':>14} {'MeanAbsDiff':>14} {'CosSim':>14}"
+        )
         logger.info("-" * 56)
 
         first_bad_block = None
@@ -400,11 +431,14 @@ def _compare_hf_wrap(hf_embeds_ref, hf_block_outs_ref, wrap_embeds, wrap_block_o
             blk_diff = (hf_h - wrap_h).abs().max().item()
             blk_mean = (hf_h - wrap_h).abs().mean().item()
             blk_cos = F.cosine_similarity(
-                hf_h.flatten().unsqueeze(0), wrap_h.flatten().unsqueeze(0),
+                hf_h.flatten().unsqueeze(0),
+                wrap_h.flatten().unsqueeze(0),
             ).item()
 
             status = "" if blk_diff < 1e-3 else " *** DIVERGED"
-            logger.info(f"  {block_name:<12} {blk_diff:>14.6e} {blk_mean:>14.6e} {blk_cos:>14.10f}{status}")
+            logger.info(
+                f"  {block_name:<12} {blk_diff:>14.6e} {blk_mean:>14.6e} {blk_cos:>14.10f}{status}"
+            )
 
             if blk_diff >= 1e-3 and first_bad_block is None:
                 first_bad_block = block_name
@@ -428,7 +462,7 @@ class ONNXWrapModel(nn.Module):
         self.session = ort.InferenceSession(model_path)
         self.spatial_merge_size = spatial_merge_size
         self.patch_size = patch_size
-        self.spatial_merge_unit = self.spatial_merge_size ** 2
+        self.spatial_merge_unit = self.spatial_merge_size**2
         self.device = device
 
     @property
@@ -443,7 +477,9 @@ class ONNXWrapModel(nn.Module):
         pixel_values = pixel_values.float().cpu().numpy()
         out = self.session.run(None, {"pixel_values": pixel_values})
         image_embeds = torch.from_numpy(out[0]).to(dtype=dtype, device=device)
-        return BaseModelOutputWithPooling(last_hidden_state=None, pooler_output=image_embeds)
+        return BaseModelOutputWithPooling(
+            last_hidden_state=None, pooler_output=image_embeds
+        )
 
 
 class HMONNXWrapModel(nn.Module):
@@ -454,7 +490,7 @@ class HMONNXWrapModel(nn.Module):
         self._model = model
         self.spatial_merge_size = spatial_merge_size
         self.patch_size = patch_size
-        self.spatial_merge_unit = self.spatial_merge_size ** 2
+        self.spatial_merge_unit = self.spatial_merge_size**2
         self.device = device
 
     @property
@@ -478,7 +514,9 @@ def _filter_generate_kwargs(inputs):
     return {k: v for k, v in inputs.items() if k not in GENERATE_BLACKLIST}
 
 
-def _run_generate(native_model, inputs, processor, max_new_tokens, label, logger, **gen_kwargs):
+def _run_generate(
+    native_model, inputs, processor, max_new_tokens, label, logger, **gen_kwargs
+):
     """Run model.generate() and log the decoded output text.
 
     Args:
@@ -492,12 +530,17 @@ def _run_generate(native_model, inputs, processor, max_new_tokens, label, logger
     """
     gen_inputs = _filter_generate_kwargs(inputs)
     with torch.no_grad():
-        generated_ids = native_model.generate(**gen_inputs, max_new_tokens=max_new_tokens, **gen_kwargs)
+        generated_ids = native_model.generate(
+            **gen_inputs, max_new_tokens=max_new_tokens, **gen_kwargs
+        )
     generated_ids_trimmed = [
-        out_ids[len(in_ids):] for in_ids, out_ids in zip(gen_inputs["input_ids"], generated_ids)
+        out_ids[len(in_ids) :]
+        for in_ids, out_ids in zip(gen_inputs["input_ids"], generated_ids)
     ]
     output_text = processor.batch_decode(
-        generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False,
+        generated_ids_trimmed,
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
     )
     logger.info(f"***************** {label} output *****************")
     logger.info(output_text)
@@ -549,7 +592,9 @@ def _export_onnx(wraped_model, hm_pixel_values, out_onnx_file, logger):
     return onnx_model
 
 
-def _convert_to_hmonnx(out_onnx_file, out_hmonnx_file, hm_pixel_values, quant_config, logger):
+def _convert_to_hmonnx(
+    out_onnx_file, out_hmonnx_file, hm_pixel_values, quant_config, logger
+):
     """Convert ONNX model to HMONNX."""
     if out_hmonnx_file.exists():
         logger.info(f"HMONNX model already exists: {out_hmonnx_file}")
@@ -569,7 +614,9 @@ def _convert_to_hmonnx(out_onnx_file, out_hmonnx_file, hm_pixel_values, quant_co
     logger.info(f"Convert ONNX to HMONNX success: {out_hmonnx_file}")
 
 
-def _run_hmonnx_golden(out_hmonnx_file, hm_pixel_values, execution_device, golden_dir, logger):
+def _run_hmonnx_golden(
+    out_hmonnx_file, hm_pixel_values, execution_device, golden_dir, logger
+):
     """Run HMONNX golden inference and save golden data."""
     from xhquant.api import HMONNXGoldenInference
 
@@ -582,7 +629,9 @@ def _run_hmonnx_golden(out_hmonnx_file, hm_pixel_values, execution_device, golde
     logger.info(f"HMONNX golden saved to: {golden_dir}")
 
 
-def _validate_onnx(native_model, inputs, processor, out_onnx_file, execution_device, args, logger):
+def _validate_onnx(
+    native_model, inputs, processor, out_onnx_file, execution_device, args, logger
+):
     """Validate the exported ONNX model by plugging it into the full VL model."""
     visual_ref = native_model.model.visual
     onnx_infer_model = ONNXWrapModel(
@@ -593,10 +642,20 @@ def _validate_onnx(native_model, inputs, processor, out_onnx_file, execution_dev
     )
     native_model.model.visual = onnx_infer_model
     inputs["pixel_values"] = inputs["hm_pixel_values"][0].half()
-    _run_generate(native_model, inputs, processor, args.max_new_tokens, "onnx model", logger, repetition_penalty=1.05)
+    _run_generate(
+        native_model,
+        inputs,
+        processor,
+        args.max_new_tokens,
+        "onnx model",
+        logger,
+        repetition_penalty=1.05,
+    )
 
 
-def _validate_hmonnx(native_model, inputs, processor, out_hmonnx_file, execution_device, args, logger):
+def _validate_hmonnx(
+    native_model, inputs, processor, out_hmonnx_file, execution_device, args, logger
+):
     """Validate the HMONNX model by plugging it into the full VL model."""
     visual_ref = native_model.model.visual
     spatial_merge_size = getattr(visual_ref, "spatial_merge_size", 2)
@@ -613,7 +672,9 @@ def _validate_hmonnx(native_model, inputs, processor, out_hmonnx_file, execution
     )
 
     native_model.model.visual = xh_model
-    _run_generate(native_model, inputs, processor, args.max_new_tokens, "hmonnx model", logger)
+    _run_generate(
+        native_model, inputs, processor, args.max_new_tokens, "hmonnx model", logger
+    )
 
 
 # ──────────────────────── Prepare Inputs ─────────────────────────────
@@ -642,8 +703,12 @@ def _prepare_inputs(hf_model_dir, args):
         }
     ]
 
-    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    image_inputs, video_inputs = process_vision_info(messages, image_patch_size=args.patch_size)
+    text = processor.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+    image_inputs, video_inputs = process_vision_info(
+        messages, image_patch_size=args.patch_size
+    )
 
     inputs = processor(
         text=[text],
@@ -741,6 +806,7 @@ def _export_impl(cfg, args):
             native_model.config.text_config.tie_word_embeddings = False
 
         from xh_model_zoo.xh_llm.quarot import rotation_utils
+
         rotation_utils.fuse_layer_norms(native_model)
         state_dict = load_safetensors_file(args.quarot_weight_path)
         native_model.load_state_dict(state_dict)
@@ -749,8 +815,11 @@ def _export_impl(cfg, args):
     if args.use_gptq_model:
         if args.gptq_model_rotate:
             from xh_model_zoo.xh_llm.quarot import rotation_utils
+
             rotation_utils.fuse_layer_norms(native_model, llm_rotate=False)
-            rotation_utils.rotate_model(native_model, "hadamard", device=device, llm_rotate=False)
+            rotation_utils.rotate_model(
+                native_model, "hadamard", device=device, llm_rotate=False
+            )
         else:
             raise NotImplementedError("Only support gptq model with rotation")
 
@@ -786,15 +855,24 @@ def _export_impl(cfg, args):
     hf_block_outs_ref = None
     if args.compare_hf_wrap:
         hf_embeds_ref, hf_block_outs_ref = _run_hf_visual_forward(
-            native_model, pixel_values, image_grid_thw,
-            compare_dtype, args.compare_per_block, logger,
+            native_model,
+            pixel_values,
+            image_grid_thw,
+            compare_dtype,
+            args.compare_per_block,
+            logger,
         )
 
     # ── Step 2: Native model generate (before wrapping) ──
     if args.valid:
         _run_generate(
-            native_model, inputs, processor, args.max_new_tokens,
-            "native model", logger, repetition_penalty=1.05,
+            native_model,
+            inputs,
+            processor,
+            args.max_new_tokens,
+            "native model",
+            logger,
+            repetition_penalty=1.05,
         )
 
     # ── Step 3: De-dispatch to CPU, then init wrap model (transforms visual in-place) ──
@@ -808,16 +886,32 @@ def _export_impl(cfg, args):
     if args.compare_hf_wrap and hf_embeds_ref is not None:
         hm_pv_for_cmp = inputs["hm_pixel_values"][0].clone()
         wrap_embeds, wrap_block_outs = _run_wrap_visual_forward(
-            wraped_model, hm_pv_for_cmp, compare_dtype, args.compare_per_block, logger,
+            wraped_model,
+            hm_pv_for_cmp,
+            compare_dtype,
+            args.compare_per_block,
+            logger,
         )
         _compare_hf_wrap(
-            hf_embeds_ref, hf_block_outs_ref, wrap_embeds, wrap_block_outs,
-            compare_dtype, logger,
+            hf_embeds_ref,
+            hf_block_outs_ref,
+            wrap_embeds,
+            wrap_block_outs,
+            compare_dtype,
+            logger,
         )
-        del hf_embeds_ref, hf_block_outs_ref, hm_pv_for_cmp, wrap_embeds, wrap_block_outs
+        del (
+            hf_embeds_ref,
+            hf_block_outs_ref,
+            hm_pv_for_cmp,
+            wrap_embeds,
+            wrap_block_outs,
+        )
 
     # ── Step 5: Prepare hm_pixel_values for export ──
-    hm_pixel_values = inputs["hm_pixel_values"][0].type(wraped_model.dtype).to(wraped_model.device)
+    hm_pixel_values = (
+        inputs["hm_pixel_values"][0].type(wraped_model.dtype).to(wraped_model.device)
+    )
     if args.batch_size > 1:
         hm_pixel_values = hm_pixel_values.repeat(args.batch_size, 1, 1, 1, 1)
     if args.max_size_t != 2:
@@ -842,19 +936,39 @@ def _export_impl(cfg, args):
 
     # ── Step 7: Validate ONNX (optional) ──
     if args.valid:
-        _validate_onnx(native_model, inputs, processor, out_onnx_file, execution_device, args, logger)
+        _validate_onnx(
+            native_model,
+            inputs,
+            processor,
+            out_onnx_file,
+            execution_device,
+            args,
+            logger,
+        )
 
     # ── Step 8: Convert to HMONNX ──
     out_hmonnx_file = Path(cfg.work_dir) / "vision" / f"{cfg_name}.onnx"
-    _convert_to_hmonnx(out_onnx_file, out_hmonnx_file, hm_pixel_values, cfg.model.quant_config, logger)
+    _convert_to_hmonnx(
+        out_onnx_file, out_hmonnx_file, hm_pixel_values, cfg.model.quant_config, logger
+    )
 
     # ── Step 9: HMONNX golden inference ──
     golden_dir = Path(cfg.work_dir) / "vision" / "golden"
-    _run_hmonnx_golden(out_hmonnx_file, hm_pixel_values, execution_device, golden_dir, logger)
+    _run_hmonnx_golden(
+        out_hmonnx_file, hm_pixel_values, execution_device, golden_dir, logger
+    )
 
     # ── Step 10: Validate HMONNX (optional) ──
     if args.valid:
-        _validate_hmonnx(native_model, inputs, processor, out_hmonnx_file, execution_device, args, logger)
+        _validate_hmonnx(
+            native_model,
+            inputs,
+            processor,
+            out_hmonnx_file,
+            execution_device,
+            args,
+            logger,
+        )
 
 
 # ──────────────────────────── Entry Point ────────────────────────────
@@ -866,7 +980,9 @@ def main(args):
 
     # Output layout: include size info in directory to support multiple sizes
     size_suffix = f"{args.max_size_w}x{args.max_size_h}x{args.max_size_t}"
-    cfg.work_dir = str(Path(args.output_root) / f"{args.model_name}" / f"vision_export_{size_suffix}")
+    cfg.work_dir = str(
+        Path(args.output_root) / f"{args.model_name}" / f"vision_export_{size_suffix}"
+    )
 
     work_path = Path(cfg.work_dir)
     if args.clean_output and work_path.exists():
@@ -877,10 +993,10 @@ def main(args):
 
     log_file = Path(cfg.work_dir) / f"{cfg_name}_debug.log"
     Path(cfg.work_dir).mkdir(exist_ok=True, parents=True)
-    cfg.device = "cuda:0"
+    cfg.device = "cuda"
     cfg.dtype = "float16"
     cfg.debug = args.debug
-    cfg.execution_device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    cfg.execution_device = "cuda" if torch.cuda.is_available() else "cpu"
 
     debug_output_dir = Path(cfg.work_dir) / "debug"
     debug_output_dir.mkdir(exist_ok=True, parents=True)
