@@ -22,7 +22,6 @@ import os
 import argparse
 from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
-
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
@@ -64,7 +63,7 @@ def get_args() -> argparse.Namespace:
         "--context_length",
         dest="context_length",
         type=str,
-        default="32k",
+        default="256k",
         help="context length",
     )
     parser.add_argument(

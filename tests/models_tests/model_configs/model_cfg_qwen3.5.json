@@ -46,7 +46,7 @@
                 "cached_models/hmm_xh2_35b_a3b_64k"
             ],
             "source_type": [null, null, null, null, null, null, null],
-            "context_length": [null, null, "32k", "32k", "32k", "32k", "64k"],
+            "context_length": [null, "32k", "32k", "32k", "32k", "32k", "64k"],
             "model_size": [null, null, "0.8b", "2b", "4b", "27b", "35b-a3b"]
         }
     },

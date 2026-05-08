@@ -2,7 +2,7 @@ Streams:
   - ModelName: Qwen3.6
     prefill: output/xh2/qwen3.6_prefill.hmm
     decode: output/xh2/qwen3.6_decode.hmm
-    visual: output/xh2/qwen3.6_visual.hmm
+    visual: output/xh2/qwen3.6_visual_896x896x2.hmm
     embedding: output/xh2/hmquant/quant_embedding.bin
     input: 256
     output: 256
@@ -12,7 +12,7 @@ Streams:
   - ModelName: Qwen3.6
     prefill: output/xh2/qwen3.6_prefill.hmm
     decode: output/xh2/qwen3.6_decode.hmm
-    visual: output/xh2/qwen3.6_visual.hmm
+    visual: output/xh2/qwen3.6_visual_896x896x2.hmm
     embedding: output/xh2/hmquant/quant_embedding.bin
     input: 1024
     output: 256
@@ -22,7 +22,7 @@ Streams:
   - ModelName: Qwen3.6
     prefill: output/xh2/qwen3.6_prefill.hmm
     decode: output/xh2/qwen3.6_decode.hmm
-    visual: output/xh2/qwen3.6_visual.hmm
+    visual: output/xh2/qwen3.6_visual_896x896x2.hmm
     embedding: output/xh2/hmquant/quant_embedding.bin
     input: 2048
     output: 256
