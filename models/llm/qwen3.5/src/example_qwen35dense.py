@@ -32,14 +32,15 @@ from transformers import AutoTokenizer
 from gptqmodel import GPTQModel, QuantizeConfig
 from qwen35_common import build_calibration_dataset
 
-
 # ---------------------------------------------------------------------------
 # Calibration data helpers
 # ---------------------------------------------------------------------------
 
+
 def get_wikitext2(nsamples, seqlen):
     traindata = load_dataset("wikitext", "wikitext-2-raw-v1", split="train").filter(
-        lambda x: len(x["text"]) >= seqlen)
+        lambda x: len(x["text"]) >= seqlen
+    )
     return [example["text"] for example in traindata.select(range(nsamples))]
 
 
@@ -79,6 +80,7 @@ def get_jsonl_texts(path, nsamples, text_key="text"):
 # Perplexity evaluation
 # ---------------------------------------------------------------------------
 
+
 @torch.inference_mode()
 def calculate_avg_ppl(model, tokenizer, device=None):
     from gptqmodel.utils.perplexity import Perplexity
@@ -114,7 +116,11 @@ def temporary_ppl_device(model, target_device: str | None):
     if target_device is None:
         target_device = str(original_device)
 
-    if original_device.type == "cpu" and target_device != "cpu" and torch.cuda.is_available():
+    if (
+        original_device.type == "cpu"
+        and target_device != "cpu"
+        and torch.cuda.is_available()
+    ):
         if target_device == "auto":
             if torch.cuda.device_count() > 1:
                 try:
@@ -130,19 +136,29 @@ def temporary_ppl_device(model, target_device: str | None):
                         memory_kwargs["no_split_module_classes"] = no_split
 
                     max_memory = get_balanced_memory(model, **memory_kwargs)
-                    device_map = infer_auto_device_map(model, max_memory=max_memory, **memory_kwargs)
-                    print("[ppl] Dispatching model to GPU(s) with accelerate device_map=auto for evaluation ...")
+                    device_map = infer_auto_device_map(
+                        model, max_memory=max_memory, **memory_kwargs
+                    )
+                    print(
+                        "[ppl] Dispatching model to GPU(s) with accelerate device_map=auto for evaluation ..."
+                    )
                     simple_dispatch_model(model, device_map)
                     active_device = next(
-                        (dev for dev in device_map.values() if dev not in ("cpu", "disk")),
-                        "cuda:0",
+                        (
+                            dev
+                            for dev in device_map.values()
+                            if dev not in ("cpu", "disk")
+                        ),
+                        "cuda",
                     )
                     dispatched = True
                 except Exception as exc:
-                    target_device = "cuda:0"
-                    print(f"[ppl] Accelerate auto dispatch failed ({exc}); falling back to {target_device}.")
+                    target_device = "cuda"
+                    print(
+                        f"[ppl] Accelerate auto dispatch failed ({exc}); falling back to {target_device}."
+                    )
             else:
-                target_device = "cuda:0"
+                target_device = "cuda"
 
         if not dispatched and target_device != "auto":
             print(f"[ppl] Moving model from cpu to {target_device} for evaluation ...")
@@ -156,7 +172,9 @@ def temporary_ppl_device(model, target_device: str | None):
         if dispatched:
             from accelerate.hooks import remove_hook_from_module
 
-            print("[ppl] Moving accelerate-dispatched model back to cpu after evaluation ...")
+            print(
+                "[ppl] Moving accelerate-dispatched model back to cpu after evaluation ..."
+            )
             remove_hook_from_module(model, recurse=True)
             model.to("cpu")
             model.hf_device_map = {"": "cpu"}
@@ -171,6 +189,7 @@ def temporary_ppl_device(model, target_device: str | None):
 # Chat / inference helpers
 # ---------------------------------------------------------------------------
 
+
 def build_chat_inputs(tokenizer, prompt: str, device: str):
     messages = [{"role": "user", "content": prompt}]
     if hasattr(tokenizer, "apply_chat_template"):
@@ -182,7 +201,9 @@ def build_chat_inputs(tokenizer, prompt: str, device: str):
                 enable_thinking=False,
             )
         except TypeError:
-            text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            text = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
     else:
         text = prompt
     return tokenizer(text, return_tensors="pt").to(device)
@@ -192,10 +213,15 @@ def build_chat_inputs(tokenizer, prompt: str, device: str):
 # Argument parsing
 # ---------------------------------------------------------------------------
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(description="Qwen3.5 dense GPTQ quantization + generation validation")
+    parser = argparse.ArgumentParser(
+        description="Qwen3.5 dense GPTQ quantization + generation validation"
+    )
     parser.add_argument("--model", type=str, required=True, help="fp model path")
-    parser.add_argument("--out", type=str, required=True, help="quantized model output directory")
+    parser.add_argument(
+        "--out", type=str, required=True, help="quantized model output directory"
+    )
     parser.add_argument("--bits", type=int, default=4, choices=[2, 3, 4, 5, 8])
     parser.add_argument("--group-size", type=int, default=64)
     parser.add_argument(
@@ -237,7 +263,12 @@ def parse_args():
     )
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--nsamples", type=int, default=256)
-    parser.add_argument("--seqlen", type=int, default=1024, help="minimum sequence length for wikitext2 filtering")
+    parser.add_argument(
+        "--seqlen",
+        type=int,
+        default=1024,
+        help="minimum sequence length for wikitext2 filtering",
+    )
     parser.add_argument(
         "--calibration-jsonl",
         type=str,
@@ -250,8 +281,18 @@ def parse_args():
         default="text",
         help="JSON field name used to read text from --calibration-jsonl",
     )
-    parser.add_argument("--device", type=str, default=None, help="quantization compute device (single GPU)")
-    parser.add_argument("--infer-device", type=str, default=None, help="inference device after quantization")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=None,
+        help="quantization compute device (single GPU)",
+    )
+    parser.add_argument(
+        "--infer-device",
+        type=str,
+        default=None,
+        help="inference device after quantization",
+    )
     parser.add_argument(
         "--device-map",
         type=str,
@@ -259,7 +300,9 @@ def parse_args():
         choices=["auto", "balanced", "balanced_low_0", "sequential"],
         help="multi-GPU device map strategy; overrides --device/--infer-device when set",
     )
-    parser.add_argument("--offload-to-disk", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--offload-to-disk", action=argparse.BooleanOptionalAction, default=True
+    )
     parser.add_argument(
         "--offload-path",
         type=str,
@@ -267,7 +310,9 @@ def parse_args():
         help="offload path when --offload-to-disk is enabled",
     )
     parser.add_argument("--max-new-tokens", type=int, default=128)
-    parser.add_argument("--prompt", type=str, default="请介绍一下 GPTQ 量化的核心思想。")
+    parser.add_argument(
+        "--prompt", type=str, default="请介绍一下 GPTQ 量化的核心思想。"
+    )
     parser.add_argument("--trust-remote-code", action="store_true", default=False)
     parser.add_argument(
         "--skip-quantize",
@@ -289,10 +334,13 @@ def parse_args():
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     args = parse_args()
 
-    if (args.check_rotation_ppl or args.rotated_out or args.stop_after_rotate) and not args.rotation:
+    if (
+        args.check_rotation_ppl or args.rotated_out or args.stop_after_rotate
+    ) and not args.rotation:
         raise ValueError(
             "--check-rotation-ppl/--rotated-out/--stop-after-rotate require --rotation to be set."
         )
@@ -303,9 +351,13 @@ def main():
 
     tokenizer_source = args.model
     if not args.skip_quantize:
-        tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True, trust_remote_code=args.trust_remote_code)
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model, use_fast=True, trust_remote_code=args.trust_remote_code
+        )
         calibration_dataset, calibration_source = build_calibration_dataset(args)
-        print(f"[1/5] Calibration samples ({calibration_source}): {len(calibration_dataset)}")
+        print(
+            f"[1/5] Calibration samples ({calibration_source}): {len(calibration_dataset)}"
+        )
 
         quantize_config = QuantizeConfig(
             bits=args.bits,
@@ -326,22 +378,36 @@ def main():
 
         # -- Rotation artifacts (ppl check / save / early stop) --
         rotation_artifact_requested = any(
-            [args.check_rotation_ppl, args.rotated_out is not None, args.stop_after_rotate]
+            [
+                args.check_rotation_ppl,
+                args.rotated_out is not None,
+                args.stop_after_rotate,
+            ]
         )
         if args.rotation and rotation_artifact_requested:
             if args.check_rotation_ppl:
-                print("[rotation] Evaluating fp model PPL on wikitext2 before rotation ...")
+                print(
+                    "[rotation] Evaluating fp model PPL on wikitext2 before rotation ..."
+                )
                 with temporary_ppl_device(model.model, "auto") as ppl_device:
-                    fp_ppl_before = calculate_avg_ppl(model.model, tokenizer, device=ppl_device)
-                print(f"[rotation] FP model avg PPL before rotation: {fp_ppl_before:.4f}")
+                    fp_ppl_before = calculate_avg_ppl(
+                        model.model, tokenizer, device=ppl_device
+                    )
+                print(
+                    f"[rotation] FP model avg PPL before rotation: {fp_ppl_before:.4f}"
+                )
 
             print(f"[rotation] Applying {args.rotation} rotation to fp model ...")
             model.apply_rotation()
 
             if args.check_rotation_ppl:
-                print("[rotation] Evaluating fp model PPL on wikitext2 after rotation ...")
+                print(
+                    "[rotation] Evaluating fp model PPL on wikitext2 after rotation ..."
+                )
                 with temporary_ppl_device(model.model, "auto") as ppl_device:
-                    fp_ppl_after = calculate_avg_ppl(model.model, tokenizer, device=ppl_device)
+                    fp_ppl_after = calculate_avg_ppl(
+                        model.model, tokenizer, device=ppl_device
+                    )
                 print(f"[rotation] FP model avg PPL after rotation: {fp_ppl_after:.4f}")
                 print(f"[rotation] PPL delta: {fp_ppl_after - fp_ppl_before:+.6f}")
 
@@ -352,7 +418,9 @@ def main():
                 tokenizer.save_pretrained(args.rotated_out)
 
             if args.stop_after_rotate:
-                print("[rotation] Stop requested after rotation; skipping quantization.")
+                print(
+                    "[rotation] Stop requested after rotation; skipping quantization."
+                )
                 return
 
         print("[3/5] Running GPTQ quantization ...")
@@ -363,7 +431,9 @@ def main():
             return
     else:
         print(f"[1/5] Skip quantization, using existing quantized model: {args.out}")
-        tokenizer = AutoTokenizer.from_pretrained(args.out, use_fast=True, trust_remote_code=args.trust_remote_code)
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.out, use_fast=True, trust_remote_code=args.trust_remote_code
+        )
         tokenizer_source = args.out
 
     # -- Inference --
@@ -371,21 +441,29 @@ def main():
     infer_kwargs = dict(trust_remote_code=args.trust_remote_code)
     if args.device_map:
         infer_kwargs["device_map"] = args.device_map
-        print(f"[4/5] Loading quantized model with device_map='{args.device_map}' and generating ...")
+        print(
+            f"[4/5] Loading quantized model with device_map='{args.device_map}' and generating ..."
+        )
     else:
         infer_kwargs["device"] = infer_device
         print(f"[4/5] Loading quantized model on {infer_device} and generating ...")
     model = GPTQModel.load(args.out, **infer_kwargs)
     runtime_device = str(model.device)
     if tokenizer is None:
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_source, use_fast=True, trust_remote_code=args.trust_remote_code)
+        tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_source, use_fast=True, trust_remote_code=args.trust_remote_code
+        )
     inputs = build_chat_inputs(tokenizer, args.prompt, runtime_device)
 
     with torch.inference_mode():
-        output_ids = model.generate(**inputs, max_new_tokens=args.max_new_tokens, do_sample=False)
+        output_ids = model.generate(
+            **inputs, max_new_tokens=args.max_new_tokens, do_sample=False
+        )
 
-    generated_ids = output_ids[:, inputs["input_ids"].shape[1]:]
-    answer = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+    generated_ids = output_ids[:, inputs["input_ids"].shape[1] :]
+    answer = tokenizer.batch_decode(
+        generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False
+    )[0]
     print("=== Prompt ===")
     print(args.prompt)
     print("=== Answer ===")

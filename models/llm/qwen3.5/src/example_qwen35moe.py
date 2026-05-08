@@ -29,7 +29,11 @@ import torch
 from transformers import AutoTokenizer
 
 from gptqmodel import GPTQModel, QuantizeConfig
-from gptqmodel.quantization.config import ExpertsRoutingBypass, ExpertsRoutingOverride, MoEConfig
+from gptqmodel.quantization.config import (
+    ExpertsRoutingBypass,
+    ExpertsRoutingOverride,
+    MoEConfig,
+)
 from qwen35_common import build_calibration_dataset
 
 
@@ -66,7 +70,9 @@ def build_chat_inputs(tokenizer, prompt: str, device: str):
                 enable_thinking=False,
             )
         except TypeError:
-            text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            text = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
     else:
         text = prompt
     return tokenizer(text, return_tensors="pt").to(device)
@@ -77,17 +83,27 @@ def build_moe_config(args):
         return None
 
     if args.moe_routing == "bypass":
-        return MoEConfig(routing=ExpertsRoutingBypass(batch_size=args.moe_routing_batch_size))
+        return MoEConfig(
+            routing=ExpertsRoutingBypass(batch_size=args.moe_routing_batch_size)
+        )
 
-    return MoEConfig(routing=ExpertsRoutingOverride(num_experts_per_tok=args.moe_num_experts_per_tok))
+    return MoEConfig(
+        routing=ExpertsRoutingOverride(num_experts_per_tok=args.moe_num_experts_per_tok)
+    )
 
 
 def build_dynamic_quant_config(args):
     return {
         r".*\.self_attn\.(q_proj|k_proj|v_proj|o_proj)$": {"bits": args.self_attn_bits},
-        r".*\.linear_attn\.(in_proj_qkv|in_proj_z|out_proj)$": {"bits": args.self_attn_bits},
-        r".*\.mlp\.experts\.\d+\.(gate_proj|up_proj|down_proj)$": {"bits": args.expert_bits},
-        r".*\.mlp\.shared_expert\.(gate_proj|up_proj|down_proj)$": {"bits": args.shared_expert_bits},
+        r".*\.linear_attn\.(in_proj_qkv|in_proj_z|out_proj)$": {
+            "bits": args.self_attn_bits
+        },
+        r".*\.mlp\.experts\.\d+\.(gate_proj|up_proj|down_proj)$": {
+            "bits": args.expert_bits
+        },
+        r".*\.mlp\.shared_expert\.(gate_proj|up_proj|down_proj)$": {
+            "bits": args.shared_expert_bits
+        },
     }
 
 
@@ -95,12 +111,21 @@ def build_default_output_dir(args):
     model_name = os.path.basename(os.path.normpath(args.model))
     bit_profile = f"attn{args.self_attn_bits}-expert{args.expert_bits}-shared{args.shared_expert_bits}-base{args.bits}"
     time_suffix = datetime.now().strftime("%m%d%H")
-    return os.path.join("work_dirs", f"{model_name}-gptq-{bit_profile}-{args.group_size}g_{time_suffix}")
+    return os.path.join(
+        "work_dirs", f"{model_name}-gptq-{bit_profile}-{args.group_size}g_{time_suffix}"
+    )
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Qwen3.5-MoE GPTQ quantization + generation validation")
-    parser.add_argument("--model", type=str, default="/data02/datasets/Qwen3.5-35B-A3B", help="fp model path")
+    parser = argparse.ArgumentParser(
+        description="Qwen3.5-MoE GPTQ quantization + generation validation"
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="./Qwen3.5-35B-A3B",
+        help="fp model path",
+    )
     parser.add_argument(
         "--out",
         type=str,
@@ -136,7 +161,12 @@ def parse_args():
     parser.add_argument("--group-size", type=int, default=64)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--nsamples", type=int, default=256)
-    parser.add_argument("--seqlen", type=int, default=1024, help="minimum sequence length for wikitext2 filtering")
+    parser.add_argument(
+        "--seqlen",
+        type=int,
+        default=1024,
+        help="minimum sequence length for wikitext2 filtering",
+    )
     parser.add_argument(
         "--calibration-jsonl",
         type=str,
@@ -149,9 +179,18 @@ def parse_args():
         default="text",
         help="JSON field name used to read text from --calibration-jsonl",
     )
-    parser.add_argument("--device", type=str, default="cuda:0", help="quantization device")
-    parser.add_argument("--infer-device", type=str, default=None, help="inference device after quantization")
-    parser.add_argument("--offload-to-disk", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--device", type=str, default="cuda", help="quantization device"
+    )
+    parser.add_argument(
+        "--infer-device",
+        type=str,
+        default=None,
+        help="inference device after quantization",
+    )
+    parser.add_argument(
+        "--offload-to-disk", action=argparse.BooleanOptionalAction, default=True
+    )
     parser.add_argument(
         "--offload-path",
         type=str,
@@ -159,7 +198,9 @@ def parse_args():
         help="offload path when --offload-to-disk is enabled",
     )
     parser.add_argument("--max-new-tokens", type=int, default=128)
-    parser.add_argument("--prompt", type=str, default="请介绍一下 GPTQ 量化的核心思想。")
+    parser.add_argument(
+        "--prompt", type=str, default="请介绍一下 GPTQ 量化的核心思想。"
+    )
     parser.add_argument("--trust-remote-code", action="store_true", default=False)
     parser.add_argument(
         "--rotation",
@@ -219,9 +260,13 @@ def main():
 
     tokenizer_source = args.model
     if not args.skip_quantize:
-        tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True, trust_remote_code=args.trust_remote_code)
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model, use_fast=True, trust_remote_code=args.trust_remote_code
+        )
         calibration_dataset, calibration_source = build_calibration_dataset(args)
-        print(f"[1/5] Calibration samples ({calibration_source}): {len(calibration_dataset)}")
+        print(
+            f"[1/5] Calibration samples ({calibration_source}): {len(calibration_dataset)}"
+        )
 
         moe_config = build_moe_config(args)
         dynamic_config = build_dynamic_quant_config(args)
@@ -245,7 +290,9 @@ def main():
         )
 
         print("[2/5] Loading fp model ...")
-        model = GPTQModel.load(args.model, quantize_config, trust_remote_code=args.trust_remote_code)
+        model = GPTQModel.load(
+            args.model, quantize_config, trust_remote_code=args.trust_remote_code
+        )
 
         print("[3/5] Running GPTQ quantization ...")
         model.quantize(calibration_dataset, batch_size=args.batch_size)
@@ -255,22 +302,32 @@ def main():
             return
     else:
         print(f"[1/5] Skip quantization, using existing quantized model: {args.out}")
-        tokenizer = AutoTokenizer.from_pretrained(args.out, use_fast=True, trust_remote_code=args.trust_remote_code)
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.out, use_fast=True, trust_remote_code=args.trust_remote_code
+        )
         tokenizer_source = args.out
 
     infer_device = args.infer_device or args.device
     print(f"[4/5] Loading quantized model on {infer_device} and generating ...")
-    model = GPTQModel.load(args.out, device=infer_device, trust_remote_code=args.trust_remote_code)
+    model = GPTQModel.load(
+        args.out, device=infer_device, trust_remote_code=args.trust_remote_code
+    )
     runtime_device = str(model.device)
     if tokenizer is None:
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_source, use_fast=True, trust_remote_code=args.trust_remote_code)
+        tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_source, use_fast=True, trust_remote_code=args.trust_remote_code
+        )
     inputs = build_chat_inputs(tokenizer, args.prompt, runtime_device)
 
     with torch.inference_mode():
-        output_ids = model.generate(**inputs, max_new_tokens=args.max_new_tokens, do_sample=False)
+        output_ids = model.generate(
+            **inputs, max_new_tokens=args.max_new_tokens, do_sample=False
+        )
 
     generated_ids = output_ids[:, inputs["input_ids"].shape[1] :]
-    answer = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+    answer = tokenizer.batch_decode(
+        generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False
+    )[0]
     print("=== Prompt ===")
     print(args.prompt)
     print("=== Answer ===")

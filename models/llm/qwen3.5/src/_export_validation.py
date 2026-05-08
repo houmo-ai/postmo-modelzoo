@@ -32,7 +32,6 @@ from xhquant.api import PrecisionMode, ptq_quantize
 from xh_model_zoo.xh_llm.models.builder import MODELS
 from xh_model_zoo.xh_llm.models.eval_model_type import EvalModelType
 
-
 _GIB = 1024**3
 
 
@@ -46,7 +45,7 @@ def cleanup_memory() -> None:
 def _pick_best_gpu() -> torch.device:
     """Pick the GPU with the most free memory."""
     if not torch.cuda.is_available():
-        return torch.device("cuda:0")
+        return torch.device("cuda")
     best_gpu = 0
     best_free = 0
     for i in range(torch.cuda.device_count()):
@@ -159,7 +158,9 @@ def _auto_offload(
     target_dtype: torch.dtype = torch.float16,
     max_memory=None,
 ):
-    resolved_no_split_module_classes = _resolve_no_split_module_classes(model, no_split_module_classes)
+    resolved_no_split_module_classes = _resolve_no_split_module_classes(
+        model, no_split_module_classes
+    )
     device_map_kwargs = {"no_split_module_classes": resolved_no_split_module_classes}
     max_memory = get_balanced_memory(
         model,
@@ -195,7 +196,9 @@ def _build_gpu_only_validation_graph_max_memory(logger) -> Optional[Dict[int, st
 
     for gpu_idx in range(num_gpus):
         free_bytes, total_bytes = torch.cuda.mem_get_info(gpu_idx)
-        usable_bytes = min(free_bytes, max(total_bytes - reserve_bytes, min_budget_bytes))
+        usable_bytes = min(
+            free_bytes, max(total_bytes - reserve_bytes, min_budget_bytes)
+        )
         usable_bytes = max(usable_bytes, min_budget_bytes)
         planner_bytes = usable_bytes * 2 if gpu_idx == 0 else usable_bytes
         max_memory[gpu_idx] = _format_bytes_as_gib_str(planner_bytes)
@@ -223,7 +226,9 @@ def _build_gpu_only_validation_graph_max_memory_quiet() -> Optional[Dict[int, st
     max_memory: Dict[int, str] = {}
     for gpu_idx in range(num_gpus):
         free_bytes, total_bytes = torch.cuda.mem_get_info(gpu_idx)
-        usable_bytes = min(free_bytes, max(total_bytes - reserve_bytes, min_budget_bytes))
+        usable_bytes = min(
+            free_bytes, max(total_bytes - reserve_bytes, min_budget_bytes)
+        )
         usable_bytes = max(usable_bytes, min_budget_bytes)
         planner_bytes = usable_bytes * 2 if gpu_idx == 0 else usable_bytes
         max_memory[gpu_idx] = _format_bytes_as_gib_str(planner_bytes)
@@ -262,7 +267,9 @@ def _run_with_first_layer_dtype_capture(model, fn):
     return result, captured_dtype[0]
 
 
-def _offload_wrap_model(qwen3_5_model, no_split_modules: List[str], dtype: torch.dtype, logger):
+def _offload_wrap_model(
+    qwen3_5_model, no_split_modules: List[str], dtype: torch.dtype, logger
+):
     if qwen3_5_model.wrap_model is None:
         raise RuntimeError("wrap_model is None before auto_offload")
     logger.info(
@@ -293,7 +300,9 @@ def _set_validation_graph_auto_offload_max_memory(qwen3_5_model, logger):
     return original_max_memory
 
 
-def _restore_validation_graph_auto_offload_max_memory(qwen3_5_model, original_max_memory):
+def _restore_validation_graph_auto_offload_max_memory(
+    qwen3_5_model, original_max_memory
+):
     qwen3_5_model.wrap_cfg.auto_offload_max_memory = original_max_memory
 
 
@@ -317,10 +326,18 @@ def _clone_tensor_list_to_cpu(tensors) -> Optional[List[torch.Tensor]]:
 
 def _capture_generation_state(qwen3_5_model) -> Dict[str, Optional[torch.Tensor]]:
     return {
-        "past_key_caches": _clone_tensor_list_to_cpu(getattr(qwen3_5_model, "past_key_caches", None)),
-        "past_value_caches": _clone_tensor_list_to_cpu(getattr(qwen3_5_model, "past_value_caches", None)),
-        "past_conv_caches": _clone_tensor_list_to_cpu(getattr(qwen3_5_model, "past_conv_caches", None)),
-        "past_recurrent_states": _clone_tensor_list_to_cpu(getattr(qwen3_5_model, "past_recurrent_states", None)),
+        "past_key_caches": _clone_tensor_list_to_cpu(
+            getattr(qwen3_5_model, "past_key_caches", None)
+        ),
+        "past_value_caches": _clone_tensor_list_to_cpu(
+            getattr(qwen3_5_model, "past_value_caches", None)
+        ),
+        "past_conv_caches": _clone_tensor_list_to_cpu(
+            getattr(qwen3_5_model, "past_conv_caches", None)
+        ),
+        "past_recurrent_states": _clone_tensor_list_to_cpu(
+            getattr(qwen3_5_model, "past_recurrent_states", None)
+        ),
     }
 
 
@@ -376,7 +393,9 @@ def _build_isolated_validation_model(cfg, dtype: torch.dtype, logger, stage_name
     model_cfg = deepcopy(cfg.model)
     isolated_model = MODELS.build(model_cfg)
     cleanup_memory()
-    logger.info(f"[{stage_name}] Loading HF model with device_map='cpu' for isolated full-output validation")
+    logger.info(
+        f"[{stage_name}] Loading HF model with device_map='cpu' for isolated full-output validation"
+    )
     native_model = isolated_model.get_hf_model(
         device_map="cpu",
         use_safetensors=True,
@@ -518,7 +537,11 @@ def _generate_full_output(
         input_ids_pad = torch.cat(
             [
                 input_ids,
-                torch.full((input_ids.shape[0], input_sequence_length - valid_len), pad_token_id, dtype=torch.long),
+                torch.full(
+                    (input_ids.shape[0], input_sequence_length - valid_len),
+                    pad_token_id,
+                    dtype=torch.long,
+                ),
             ],
             dim=-1,
         )
@@ -578,13 +601,17 @@ def _generate_full_output_with_isolated_instances(
         return torch.empty((1, 0), dtype=torch.long)
 
     pad_token_id = tokenizer.pad_token_id or tokenizer.eos_token_id
-    prefill_batch = _build_prefill_batch(input_ids, valid_len, input_sequence_length, pad_token_id)
+    prefill_batch = _build_prefill_batch(
+        input_ids, valid_len, input_sequence_length, pad_token_id
+    )
     prefill_model = None
     decode_model = None
     state_snapshot = None
 
     try:
-        prefill_model = _build_isolated_validation_model(cfg, dtype, logger, f"{stage_name}-prefill")
+        prefill_model = _build_isolated_validation_model(
+            cfg, dtype, logger, f"{stage_name}-prefill"
+        )
         prefill_model.reset_kvcache()
         prefill_model.set_linear_attention_mode("chunk")
         prefill_model.set_input_sequence_length(input_sequence_length)
@@ -598,7 +625,11 @@ def _generate_full_output_with_isolated_instances(
         )
 
         prefill_batch_gpu = {
-            k: v.to(prefill_model.execution_device) if isinstance(v, torch.Tensor) else v
+            k: (
+                v.to(prefill_model.execution_device)
+                if isinstance(v, torch.Tensor)
+                else v
+            )
             for k, v in prefill_batch.items()
         }
         prefill_out = prefill_model.test_step(prefill_batch_gpu)
@@ -615,7 +646,9 @@ def _generate_full_output_with_isolated_instances(
         return torch.tensor([generated_ids], dtype=torch.long)
 
     try:
-        decode_model = _build_isolated_validation_model(cfg, dtype, logger, f"{stage_name}-decode")
+        decode_model = _build_isolated_validation_model(
+            cfg, dtype, logger, f"{stage_name}-decode"
+        )
         decode_model.reset_kvcache()
         decode_model.set_linear_attention_mode("recurrent")
         decode_model.set_input_sequence_length(1)
@@ -656,7 +689,9 @@ def _generate_full_output_with_isolated_instances(
     return torch.tensor([generated_ids], dtype=torch.long)
 
 
-def _log_stage_output(marker: str, token_ids: Optional[torch.Tensor], tokenizer, logger):
+def _log_stage_output(
+    marker: str, token_ids: Optional[torch.Tensor], tokenizer, logger
+):
     if token_ids is None:
         return
     token_list = token_ids.view(-1).tolist()
@@ -694,7 +729,9 @@ def _log_full_output_comparison(
     lhs_text = tokenizer.decode(lhs, skip_special_tokens=True)
     rhs_text = tokenizer.decode(rhs, skip_special_tokens=True)
     text_match = lhs_text == rhs_text
-    logger.info(f"{lhs_name} vs {rhs_name} full output text compare: exact_match={text_match}")
+    logger.info(
+        f"{lhs_name} vs {rhs_name} full output text compare: exact_match={text_match}"
+    )
     if not text_match:
         logger.info(f"{lhs_name} text: {lhs_text}")
         logger.info(f"{rhs_name} text: {rhs_text}")
@@ -749,7 +786,11 @@ def run_conversion_validation(
     input_ids_pad = torch.cat(
         [
             input_ids,
-            torch.full((input_ids.shape[0], input_sequence_length - valid_len), pad_token_id, dtype=torch.long),
+            torch.full(
+                (input_ids.shape[0], input_sequence_length - valid_len),
+                pad_token_id,
+                dtype=torch.long,
+            ),
         ],
         dim=-1,
     )
@@ -762,7 +803,9 @@ def run_conversion_validation(
     wrap_pad_logits = wrap_pad_out.logits.detach().cpu()
     del wrap_pad_out
 
-    diff_mask = _max_abs_diff(wrap_pad_logits, wrap_logits, valid_len, args.num_logits_to_keep)
+    diff_mask = _max_abs_diff(
+        wrap_pad_logits, wrap_logits, valid_len, args.num_logits_to_keep
+    )
     logger.info(f"Mask pad vs unpad max abs error: {diff_mask:.6e}")
 
     compare_full_output = bool(getattr(args, "valid_compare_full_output", True))
@@ -780,17 +823,26 @@ def run_conversion_validation(
         )
         _log_stage_output("wraped model output", wrap_generated_ids, tokenizer, logger)
         if hf_generated_ids is not None:
-            _log_full_output_comparison("HF", hf_generated_ids, "Wrap", wrap_generated_ids, tokenizer, logger)
+            _log_full_output_comparison(
+                "HF", hf_generated_ids, "Wrap", wrap_generated_ids, tokenizer, logger
+            )
 
     _de_offload_wrap_model(qwen3_5_model, logger)
     qwen3_5_model.set_exec_device(torch.device("cpu"))
     qwen3_5_model.reset_kvcache()
     qwen3_5_model.set_linear_attention_mode("chunk")
     qwen3_5_model.set_input_sequence_length(input_sequence_length)
-    original_graph_max_memory = _set_validation_graph_auto_offload_max_memory(qwen3_5_model, logger)
-    data_batch_pad_cpu = {k: v.cpu() if isinstance(v, torch.Tensor) else v for k, v in data_batch_pad.items()}
+    original_graph_max_memory = _set_validation_graph_auto_offload_max_memory(
+        qwen3_5_model, logger
+    )
+    data_batch_pad_cpu = {
+        k: v.cpu() if isinstance(v, torch.Tensor) else v
+        for k, v in data_batch_pad.items()
+    }
     try:
-        qwen3_5_model.convert_to_fronted_graph(data_batch_pad_cpu, release_wraped_model=False)
+        qwen3_5_model.convert_to_fronted_graph(
+            data_batch_pad_cpu, release_wraped_model=False
+        )
         qwen3_5_model.change_eval_type(EvalModelType.FRONTEND)
         qwen3_5_model.to(dtype)
         qwen3_5_model.to(gpu_device)
@@ -803,8 +855,12 @@ def run_conversion_validation(
         frontend_logits = frontend_out.logits.detach().cpu()
         del frontend_out
 
-        diff_wrap_frontend = _max_abs_diff(wrap_pad_logits, frontend_logits, valid_len, args.num_logits_to_keep)
-        logger.info(f"Wrap(pad) vs Frontend(pad) max abs error: {diff_wrap_frontend:.6e}")
+        diff_wrap_frontend = _max_abs_diff(
+            wrap_pad_logits, frontend_logits, valid_len, args.num_logits_to_keep
+        )
+        logger.info(
+            f"Wrap(pad) vs Frontend(pad) max abs error: {diff_wrap_frontend:.6e}"
+        )
 
         qwen3_5_model.reset_kvcache()
         from xhquant.xhonnxruntime import AutoOffloadGraphModel
@@ -820,7 +876,9 @@ def run_conversion_validation(
         cleanup_memory()
 
         qwen3_5_model.convert_to_quant_graph(cfg.target_device)
-        calib_data = _flatten_inputs(qwen3_5_model.prepare_inputs_for_graph(data_batch_pad_cpu))
+        calib_data = _flatten_inputs(
+            qwen3_5_model.prepare_inputs_for_graph(data_batch_pad_cpu)
+        )
         ptq_quantize(
             qwen3_5_model.quanted_model,
             [calib_data],
@@ -837,19 +895,32 @@ def run_conversion_validation(
         qwen3_5_model.to(gpu_device)
         qwen3_5_model.set_exec_device(gpu_device)
         data_batch_pad_gpu_fp16 = {
-            k: (v.to(gpu_device).to(quant_dtype) if v.is_floating_point() else v.to(gpu_device))
-            if isinstance(v, torch.Tensor) else v
+            k: (
+                (
+                    v.to(gpu_device).to(quant_dtype)
+                    if v.is_floating_point()
+                    else v.to(gpu_device)
+                )
+                if isinstance(v, torch.Tensor)
+                else v
+            )
             for k, v in data_batch_pad_cpu.items()
         }
         quant_out = qwen3_5_model.test_step(data_batch_pad_gpu_fp16)
         quant_logits = quant_out.logits.detach().cpu()
         del quant_out, data_batch_pad_gpu_fp16
 
-        diff_frontend_quant = _max_abs_diff(frontend_logits, quant_logits, valid_len, args.num_logits_to_keep)
-        logger.info(f"Frontend(pad) vs Quant(pad) max abs error: {diff_frontend_quant:.6e}")
+        diff_frontend_quant = _max_abs_diff(
+            frontend_logits, quant_logits, valid_len, args.num_logits_to_keep
+        )
+        logger.info(
+            f"Frontend(pad) vs Quant(pad) max abs error: {diff_frontend_quant:.6e}"
+        )
 
         if compare_full_output and compare_max_new_tokens > 0:
-            logger.info("Releasing main validation graphs before isolated full-output comparison")
+            logger.info(
+                "Releasing main validation graphs before isolated full-output comparison"
+            )
             qwen3_5_model.change_eval_type(EvalModelType.NONE)
             qwen3_5_model.release_quanted_model()
             qwen3_5_model.release_frontend_model()
@@ -869,9 +940,21 @@ def run_conversion_validation(
                 stage_name="frontend",
                 logger=logger,
             )
-            _log_stage_output("frontend traced model output", frontend_generated_ids, tokenizer, logger)
+            _log_stage_output(
+                "frontend traced model output",
+                frontend_generated_ids,
+                tokenizer,
+                logger,
+            )
             if wrap_generated_ids is not None:
-                _log_full_output_comparison("Wrap", wrap_generated_ids, "Frontend", frontend_generated_ids, tokenizer, logger)
+                _log_full_output_comparison(
+                    "Wrap",
+                    wrap_generated_ids,
+                    "Frontend",
+                    frontend_generated_ids,
+                    tokenizer,
+                    logger,
+                )
 
             quant_generated_ids = _generate_full_output_with_isolated_instances(
                 cfg=cfg,
@@ -886,13 +969,28 @@ def run_conversion_validation(
                 stage_name="quant",
                 logger=logger,
             )
-            _log_stage_output("quanted (aligned) model output", quant_generated_ids, tokenizer, logger)
-            _log_full_output_comparison("Frontend", frontend_generated_ids, "Quant", quant_generated_ids, tokenizer, logger)
+            _log_stage_output(
+                "quanted (aligned) model output", quant_generated_ids, tokenizer, logger
+            )
+            _log_full_output_comparison(
+                "Frontend",
+                frontend_generated_ids,
+                "Quant",
+                quant_generated_ids,
+                tokenizer,
+                logger,
+            )
         else:
             frontend_next = frontend_logits[:, -1, :].argmax(dim=-1).view(1, 1)
             quant_next = quant_logits[:, -1, :].argmax(dim=-1).view(1, 1)
-            _log_stage_output("frontend traced model output", frontend_next, tokenizer, logger)
-            _log_stage_output("quanted (aligned) model output", quant_next, tokenizer, logger)
+            _log_stage_output(
+                "frontend traced model output", frontend_next, tokenizer, logger
+            )
+            _log_stage_output(
+                "quanted (aligned) model output", quant_next, tokenizer, logger
+            )
             qwen3_5_model.release_wraped_model()
     finally:
-        _restore_validation_graph_auto_offload_max_memory(qwen3_5_model, original_graph_max_memory)
+        _restore_validation_graph_auto_offload_max_memory(
+            qwen3_5_model, original_graph_max_memory
+        )

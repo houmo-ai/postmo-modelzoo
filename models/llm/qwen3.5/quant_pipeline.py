@@ -24,6 +24,7 @@ Paths (effective ``model_name`` from args, or HF dir stem if unset):
     (overridable by --gptq-model-dir)
   - Step2–3 under ``out_dir``: ``<model_name>/vision_export/...``, ``<model_name>_llm_export/``
 """
+
 import os
 import shutil
 import subprocess
@@ -100,7 +101,7 @@ def quant_llm(args) -> None:
     work_root, _name, _rotated_dir, gptq_dir = _paths(args)
     work_root.mkdir(parents=True, exist_ok=True)
     py = sys.executable
-    device = getattr(args, "device", "cuda:0")
+    device = getattr(args, "device", "cuda")
     trust = getattr(args, "trust_remote_code", True)
     resume = getattr(args, "resume", False)
 
@@ -136,7 +137,7 @@ def quant_llm(args) -> None:
             cmd.extend(["--calibration-jsonl", str(Path(args.calib_data).resolve())])
         if trust:
             cmd.append("--trust-remote-code")
-        _run_step(cmd, src, extra_env={"CUDA_VISIBLE_DEVICES": "0"})
+        _run_step(cmd, src)
 
 
 def quant_llm_moe(args) -> None:
@@ -152,7 +153,7 @@ def quant_llm_moe(args) -> None:
     work_root, _name, _rotated_dir, gptq_dir = _paths(args)
     work_root.mkdir(parents=True, exist_ok=True)
     py = sys.executable
-    device = getattr(args, "device", "cuda:0")
+    device = getattr(args, "device", "cuda")
     resume = getattr(args, "resume", False)
 
     if resume and _hf_dir_ready(gptq_dir):
@@ -181,11 +182,11 @@ def quant_llm_moe(args) -> None:
         ]
         if getattr(args, "calib_data", None):
             cmd.extend(["--calibration-jsonl", str(Path(args.calib_data).resolve())])
-        _run_step(cmd, src, extra_env={"CUDA_VISIBLE_DEVICES": "0"})
+        _run_step(cmd, src)
 
 
 def export_llm(args) -> None:
-    """Step2: vision HMONNX; Step3: LLM HMONNX (README defaults)."""
+    """Step2: vision HMONNX (multiple sizes); Step3: LLM HMONNX (README defaults)."""
     src = _src_dir()
     _work_root, _name, _rotated_dir, gptq_dir = _paths(args)
     out_root = Path(args.out_dir).resolve()
@@ -209,30 +210,49 @@ def export_llm(args) -> None:
                     "Set ptq --vision-image-path to a JPEG/PNG.",
                     default_img,
                 )
-        # Step2: match src/README.md (no --valid, no --seed in example)
-        cmd_v = [
-            py,
-            str(src / "qwen3_5_vision_xh2a_export_hmonnx.py"),
-            "--config",
-            VISION_CONFIG,
-            "--hf_model_dir",
-            str(Path(args.model).resolve()),
-            "--model_name",
-            str(model_name),
-            "--output_root",
-            str(out_root),
-            "--max_size_w",
-            str(getattr(args, "max_size_w", 448)),
-            "--max_size_h",
-            str(getattr(args, "max_size_h", 448)),
-            "--max_size_t",
-            str(getattr(args, "max_size_t", 2)),
-        ]
-        if sample_img:
-            cmd_v.extend(["--image_path", sample_img])
-        if getattr(args, "debug", False):
-            cmd_v.append("--debug")
-        _run_step(cmd_v, src)
+        # Step2: export for each size combination
+        max_size_w_list = getattr(args, "max_size_w", [448])
+        max_size_h_list = getattr(args, "max_size_h", [448])
+        max_size_t_list = getattr(args, "max_size_t", [2])
+
+        # Ensure all lists have the same length by repeating the last element if needed
+        max_len = max(len(max_size_w_list), len(max_size_h_list), len(max_size_t_list))
+        while len(max_size_w_list) < max_len:
+            max_size_w_list.append(max_size_w_list[-1])
+        while len(max_size_h_list) < max_len:
+            max_size_h_list.append(max_size_h_list[-1])
+        while len(max_size_t_list) < max_len:
+            max_size_t_list.append(max_size_t_list[-1])
+
+        for idx, (w, h, t) in enumerate(
+            zip(max_size_w_list, max_size_h_list, max_size_t_list)
+        ):
+            logger.info(
+                f"Exporting vision model for size {w}x{h}x{t} ({idx+1}/{max_len})"
+            )
+            cmd_v = [
+                py,
+                str(src / "qwen3_5_vision_xh2a_export_hmonnx.py"),
+                "--config",
+                VISION_CONFIG,
+                "--hf_model_dir",
+                str(Path(args.model).resolve()),
+                "--model_name",
+                str(model_name),
+                "--output_root",
+                str(out_root),
+                "--max_size_w",
+                str(w),
+                "--max_size_h",
+                str(h),
+                "--max_size_t",
+                str(t),
+            ]
+            if sample_img:
+                cmd_v.extend(["--image_path", sample_img])
+            if getattr(args, "debug", False):
+                cmd_v.append("--debug")
+            _run_step(cmd_v, src)
     else:
         logger.info("skip_export_vision: skipped vision HMONNX export")
 
@@ -265,7 +285,7 @@ def export_llm(args) -> None:
 
 
 def export_llm_moe(args) -> None:
-    """MoE Step3: vision HMONNX; Step4: LLM HMONNX."""
+    """MoE Step3: vision HMONNX (multiple sizes); Step4: LLM HMONNX."""
     src = _src_dir()
     _work_root, _name, _rotated_dir, gptq_dir = _paths(args)
     out_root = Path(args.out_dir).resolve()
@@ -289,29 +309,49 @@ def export_llm_moe(args) -> None:
                     "Set ptq --vision-image-path to a JPEG/PNG.",
                     default_img,
                 )
-        cmd_v = [
-            py,
-            str(src / "qwen3_5_moe_vision_xh2a_export_hmonnx.py"),
-            "--config",
-            MOE_VISION_CONFIG,
-            "--hf_model_dir",
-            str(Path(args.model).resolve()),
-            "--model_name",
-            str(model_name),
-            "--output_dir",
-            str(out_root),
-            "--max_size_w",
-            str(getattr(args, "max_size_w", 448)),
-            "--max_size_h",
-            str(getattr(args, "max_size_h", 448)),
-            "--max_size_t",
-            str(getattr(args, "max_size_t", 2)),
-        ]
-        if sample_img:
-            cmd_v.extend(["--image_path", sample_img])
-        if getattr(args, "debug", False):
-            cmd_v.append("--debug")
-        _run_step(cmd_v, src)
+        # Export for each size combination
+        max_size_w_list = getattr(args, "max_size_w", [448])
+        max_size_h_list = getattr(args, "max_size_h", [448])
+        max_size_t_list = getattr(args, "max_size_t", [2])
+
+        # Ensure all lists have the same length by repeating the last element if needed
+        max_len = max(len(max_size_w_list), len(max_size_h_list), len(max_size_t_list))
+        while len(max_size_w_list) < max_len:
+            max_size_w_list.append(max_size_w_list[-1])
+        while len(max_size_h_list) < max_len:
+            max_size_h_list.append(max_size_h_list[-1])
+        while len(max_size_t_list) < max_len:
+            max_size_t_list.append(max_size_t_list[-1])
+
+        for idx, (w, h, t) in enumerate(
+            zip(max_size_w_list, max_size_h_list, max_size_t_list)
+        ):
+            logger.info(
+                f"Exporting MoE vision model for size {w}x{h}x{t} ({idx+1}/{max_len})"
+            )
+            cmd_v = [
+                py,
+                str(src / "qwen3_5_moe_vision_xh2a_export_hmonnx.py"),
+                "--config",
+                MOE_VISION_CONFIG,
+                "--hf_model_dir",
+                str(Path(args.model).resolve()),
+                "--model_name",
+                str(model_name),
+                "--output_dir",
+                str(out_root),
+                "--max_size_w",
+                str(w),
+                "--max_size_h",
+                str(h),
+                "--max_size_t",
+                str(t),
+            ]
+            if sample_img:
+                cmd_v.extend(["--image_path", sample_img])
+            if getattr(args, "debug", False):
+                cmd_v.append("--debug")
+            _run_step(cmd_v, src)
     else:
         logger.info("skip_export_vision: skipped vision HMONNX export")
 
@@ -380,19 +420,43 @@ def move_llm(args) -> None:
     hmquant = out_root / target / "hmquant"
     prefill_d = hmquant / "prefill"
     decoder_d = hmquant / "decoder"
-    visual_d = hmquant / "visual"
     prefill_d.mkdir(parents=True, exist_ok=True)
     decoder_d.mkdir(parents=True, exist_ok=True)
-    visual_d.mkdir(parents=True, exist_ok=True)
 
-    vision_src = out_root / model_name / "vision_export" / "vision"
-    if vision_src.is_dir():
-        logger.info(msg_output_format("move_llm: visual"))
-        _copy_dir_files_rename_onnx(vision_src, visual_d)
-    elif not getattr(args, "skip_export_vision", False):
-        logger.warning(
-            "move_llm: vision export dir missing, skip visual: {}", vision_src
-        )
+    if not getattr(args, "skip_export_vision", False):
+        # Find all vision export directories (with size suffix and without)
+        model_dir = out_root / model_name
+        vision_export_dirs = []
+        if model_dir.is_dir():
+            # Check for vision_export_* directories
+            for p in model_dir.iterdir():
+                if p.is_dir() and p.name.startswith("vision_export_"):
+                    vision_src_candidate = p / "vision"
+                    if vision_src_candidate.is_dir():
+                        size_suffix = p.name[len("vision_export_") :]
+                        vision_export_dirs.append((size_suffix, vision_src_candidate))
+            # Check for the default vision_export directory
+            default_vision_src = model_dir / "vision_export" / "vision"
+            if default_vision_src.is_dir():
+                vision_export_dirs.append(("", default_vision_src))
+
+        if vision_export_dirs:
+            logger.info(msg_output_format("move_llm: visual"))
+            for size_suffix, vision_src in vision_export_dirs:
+                # For multiple sizes, create visual_<size> directories
+                if size_suffix:
+                    target_visual_d = hmquant / f"visual_{size_suffix}"
+                else:
+                    target_visual_d = hmquant / "visual"
+                target_visual_d.mkdir(parents=True, exist_ok=True)
+                logger.info(
+                    f"  Copying vision {size_suffix or 'default'} to {target_visual_d}"
+                )
+                _copy_dir_files_rename_onnx(vision_src, target_visual_d)
+        else:
+            logger.warning(
+                "move_llm: no vision export dirs found under {}, skip visual", model_dir
+            )
     else:
         logger.info("move_llm: skip visual (skip_export_vision)")
 
@@ -443,19 +507,42 @@ def move_llm_moe(args) -> None:
     hmquant = out_root / target / "hmquant"
     prefill_d = hmquant / "prefill"
     decoder_d = hmquant / "decoder"
-    visual_d = hmquant / "visual"
     prefill_d.mkdir(parents=True, exist_ok=True)
     decoder_d.mkdir(parents=True, exist_ok=True)
-    visual_d.mkdir(parents=True, exist_ok=True)
 
-    vision_src = out_root / model_name / "vision"
-    if vision_src.is_dir():
-        logger.info(msg_output_format("move_llm_moe: visual"))
-        _copy_dir_files_rename_onnx(vision_src, visual_d)
-    elif not getattr(args, "skip_export_vision", False):
-        logger.warning(
-            "move_llm_moe: vision export dir missing, skip visual: {}", vision_src
-        )
+    if not getattr(args, "skip_export_vision", False):
+        # Find all MoE vision export directories (with size suffix and without)
+        vision_export_dirs = []
+        # Check for <model_name>_<size> directories
+        for p in out_root.iterdir():
+            if p.is_dir() and p.name.startswith(f"{model_name}_"):
+                vision_src_candidate = p / "vision"
+                if vision_src_candidate.is_dir():
+                    size_suffix = p.name[len(model_name) + 1 :]
+                    vision_export_dirs.append((size_suffix, vision_src_candidate))
+        # Check for the default <model_name> directory
+        default_vision_src = out_root / model_name / "vision"
+        if default_vision_src.is_dir():
+            vision_export_dirs.append(("", default_vision_src))
+
+        if vision_export_dirs:
+            logger.info(msg_output_format("move_llm_moe: visual"))
+            for size_suffix, vision_src in vision_export_dirs:
+                # For multiple sizes, create visual_<size> directories
+                if size_suffix:
+                    target_visual_d = hmquant / f"visual_{size_suffix}"
+                else:
+                    target_visual_d = hmquant / "visual"
+                target_visual_d.mkdir(parents=True, exist_ok=True)
+                logger.info(
+                    f"  Copying vision {size_suffix or 'default'} to {target_visual_d}"
+                )
+                _copy_dir_files_rename_onnx(vision_src, target_visual_d)
+        else:
+            logger.warning(
+                "move_llm_moe: no vision export dirs found under {}, skip visual",
+                out_root,
+            )
     else:
         logger.info("move_llm_moe: skip visual (skip_export_vision)")
 

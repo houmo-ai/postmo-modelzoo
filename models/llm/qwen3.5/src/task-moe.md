@@ -5,16 +5,16 @@
 
 ## step1：对Qwen3.5 MoE做旋转
 python src/example_qwen35_moe_vl_rotate_fp.py \
-  --model /data02/datasets/Qwen3.5-35B-A3B \
+  --model ./Qwen3.5-35B-A3B \
   --out xxx/Qwen3.5-35B-A3B_rotated_fp \
   --llm-rotation hadamard \
   --vision-rotation last \
-  --device cuda:0 \
+  --device cuda \
   --validate
 
 ## step2：使用GPTQModel量化Qwen3.5 MoE模型
 python src/example_qwen35moe.py \
-  --model /data02/datasets/Qwen3.5-35B-A3B \
+  --model ./Qwen3.5-35B-A3B \
   --out xxx/Qwen3.5-35B-A3B_gptq_4bit
   --rotation hadamard --hessian-mse --moe-routing bypass --nsamples=256 \
   --shared-expert-bits 4  \
@@ -31,7 +31,7 @@ python src/qwen3_5_moe_vision_xh2a_export_hmonnx.py \
 
 ## step4：导出LLM部分的hmonnx，--quant-weight依赖于step2的输出，--model就是原始模型
 python src/qwen3_5_moe_xh2a_export_hmonnx.py \
-  --model /data02/datasets/Qwen3.5-35B-A3B \
+  --model ./Qwen3.5-35B-A3B \
   --quant-weight xxx/Qwen3.5-35B-A3B_gptq_4bit \
   --quant-type w4a8h0_sefp \
   --context-length 2048 --input-sequence-length 256 \

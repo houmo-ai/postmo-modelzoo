@@ -34,7 +34,6 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
-DEFAULT_MODEL_DIR = "/data02/datasets/qwen3_5_9b_mtp_k4_w4a8_8k"
 
 
 def get_args() -> argparse.Namespace:
@@ -44,7 +43,7 @@ def get_args() -> argparse.Namespace:
         "--model_dir",
         dest="model_dir",
         type=str,
-        default=DEFAULT_MODEL_DIR,
+        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
         help="path to the exported MTP onnx directory",
     )
     parser.add_argument(
