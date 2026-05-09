@@ -98,8 +98,11 @@ def build_dynamic_quant_config(args):
         r".*\.linear_attn\.(in_proj_qkv|in_proj_z|out_proj)$": {
             "bits": args.self_attn_bits
         },
-        r".*\.mlp\.experts\.\d+\.(gate_proj|up_proj|down_proj)$": {
+        r".*\.mlp\.experts\.\d+\.(gate_proj|up_proj)$": {
             "bits": args.expert_bits
+        },
+        r".*\.mlp\.experts\.\d+\.down_proj$": {
+            "bits": args.expert_down_bits
         },
         r".*\.mlp\.shared_expert\.(gate_proj|up_proj|down_proj)$": {
             "bits": args.shared_expert_bits
@@ -144,6 +147,13 @@ def parse_args():
         help="bit width for self-attn q/k/v/o projections",
     )
     parser.add_argument(
+        "--expert-down-bits",
+        type=int,
+        default=5,
+        choices=[2, 3, 4, 5, 8],
+        help="bit width for non-shared MoE experts down proj",
+    )
+    parser.add_argument(
         "--expert-bits",
         "--non-shared-expert-bits",
         type=int,
@@ -154,7 +164,7 @@ def parse_args():
     parser.add_argument(
         "--shared-expert-bits",
         type=int,
-        default=4,
+        default=8,
         choices=[2, 3, 4, 5, 8],
         help="bit width for shared MoE expert",
     )
