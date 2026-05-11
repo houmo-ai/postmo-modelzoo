@@ -27,7 +27,6 @@ from datetime import datetime
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
 
-
 try:
     import tcim_lite
 
@@ -45,8 +44,7 @@ def get_version():
     Get package version from environment variable.
 
     Returns:
-        str: Version string from HOUMO_VERSION environment variable,
-             defaults to "0.0.0.dev" if not set.
+        str: Version string from HOUMO_VERSION environment variable
     """
     return os.environ.get("HOUMO_VERSION", "1.3.0.dev")
 

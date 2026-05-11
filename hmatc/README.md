@@ -115,7 +115,7 @@ model:
         # Resizer输入尺寸 [H, W]
         # - 表示量化编译后模型的实际输入尺寸
         # - 缺省默认为原模型输入高宽
-        # - 尺寸限制: H <= 4096, W <= 1024, 必须为偶数
+        # - 尺寸限制: H <= 4096, W <= 4096, 必须为偶数
         resizer_input_size: [640, 640]
 
         # Resizer模式
@@ -268,12 +268,25 @@ Resizer利用芯片硬件实现 crop -> resize -> padding 流程，适用于输�
 | 模式 | 参数 | 灵活性 | 适用场景 |
 |------|------|--------|----------|
 | STATIC (3) | 无 | 固定分辨率 | 输入分辨率确定 |
-| DYNAMIC_V1 (2) | 4 (crop) | crop可变 | resize/padding固定 |
-| DYNAMIC_V2 (1) | 10 | 全可变 | 所有参数运行时可调 |
+| DYNAMIC_V1 (2) | 4 (crop) | crop可变 | 暂不支持 |
+| DYNAMIC_V2 (1) | 10 | 全可变 | crop/resize/padding均可运行时调整 |
 
-### ROI_NUM说明
+### 尺寸限制
 
-`roi_num > 1` 时，单张图片可输出多个ROI结果：
-- 仅动态resizer模式有效
-- 需要 `model_input_batch * build_batch == 1`
-- 适用场景：检测模型单图多框
+**通用限制：**
+- H/W方向的输入图片/crop_size/crop_start/输出 都要是2的倍数
+- 输出H最大4096，输出W最大1024
+
+**静态模式 (STATIC) 限制：**
+- 输入H ≤ 4096，输入W ≤ 1024
+- 缩放倍数范围：[1/32, 16]
+
+**动态模式 (DYNAMIC_V2) 限制：**
+- 输入H ≤ 4096，输入W ≤ 4096
+- 放大倍数最大16
+- H方向缩小倍数最大32
+- W方向缩小倍数最大8（YUV444最大4）
+- Padding：支持H或W单方向，pad大小需是偶数且不超过16
+
+**其他限制：**
+- 不支持 one image multi roi（roi_num 必须为1）

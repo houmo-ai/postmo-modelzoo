@@ -62,11 +62,20 @@ class Xh2Exec(BaseExec):
     Executor class for XH2 target platform.
     Handles quantization, building, checking golden data, and comparison for XH2 hardware.
 
-    XH2 Resizer Constraints:
-        - Padding must be symmetric (center padding mode, padding_mode=1)
-        - Padding pixels cannot exceed 32 pixels on each side
-        - Resizer input width cannot exceed 1024 pixels
-        - Resizer input height cannot exceed 4096 pixels
+    XH2 Resizer Constraints (1.3.0):
+        Common constraints:
+        - H/W方向的输入图片/crop_size/crop_start/输出 都要是2的倍数
+        - 输出H最大4096，输出W最大1024
+
+        STATIC mode (resizer_mode=3):
+        - 输入W最大1024
+        - 缩放倍数范围 [1/32, 16]
+
+        DYNAMIC_V2 mode (resizer_mode=1):
+        - 输入W最大4096
+        - 放大倍数最大16，H缩小倍数最大32，W缩小倍数最大8(YUV444最大4)
+        - Padding支持H或W单方向，pad大小需是偶数且不超过16
+        - 不支持one image multi roi (roi_num必须为1)
     """
 
     def __init__(self, cfg: dict) -> None:
@@ -744,9 +753,9 @@ class Xh2Exec(BaseExec):
                 logger.info(
                     f"  {resizer_name}: shape={list(golden_dyn_input.shape)}, dtype={golden_dyn_input.dtype}"
                 )
-                golden_dyn_input = golden_dyn_input.shape[0]
+                golden_dyn_input_batch = golden_dyn_input.shape[0]
                 golden_dyn_input = np.repeat(
-                    golden_dyn_input, hmm_batch // golden_dyn_input, axis=0
+                    golden_dyn_input, hmm_batch // golden_dyn_input_batch, axis=0
                 )
                 in_datas[resizer_name] = golden_dyn_input
 

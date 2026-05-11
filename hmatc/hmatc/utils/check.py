@@ -104,12 +104,12 @@ def check_cfg(cfg):
     if batch < 1:
         logger.fatal(f"[build.batch] must be >= 1, got {batch}")
 
-    # roi_num: only valid when dynamic resizer is enabled
-    if "roi_num" in build_cfg and not has_dynamic_resizer:
-        logger.fatal(
-            "[build.roi_num] only valid with dynamic resizer (resizer_mode=1 or 2)"
-        )
+    # roi_num: not supported (one image multi roi is not supported by resizer)
     roi_num = build_cfg.get("roi_num", 1)
+    if roi_num > 1:
+        logger.fatal(
+            "[build.roi_num] > 1 is not supported (one image multi roi is not supported by resizer operator)"
+        )
     if roi_num < 1:
         logger.fatal(f"[build.roi_num] must be >= 1, got {roi_num}")
 
@@ -311,7 +311,7 @@ def _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W):
     """
     prefix = f"[model.inputs.{input_name}.resizer]"
 
-    # toYUV_format
+    # ========== toYUV_format ==========
     toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
     if toYUV_format not in ["YUV400", "YUV420SP", "YUV422SP", "YUV444SP"]:
         logger.fatal(f"{prefix}.toYUV_format must be YUV400/YUV420SP/YUV422SP/YUV444SP")
@@ -320,7 +320,28 @@ def _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W):
     if data_format == "GRAY" and toYUV_format != "YUV400":
         logger.fatal(f"{prefix}.toYUV_format: GRAY input must use YUV400")
 
-    # resizer_input_size
+    # ========== resizer_mode ==========
+    resizer_mode = resizer_cfg.get("resizer_mode", 3)
+    if resizer_mode not in [1, 2, 3]:
+        logger.fatal(
+            f"{prefix}.resizer_mode must be 1/2/3 (DYNAMIC_V2/DYNAMIC_V1/STATIC)"
+        )
+    if resizer_mode == 2:
+        logger.fatal(f"{prefix}.resizer_mode=2 (DYNAMIC_V1) is not supported by compiler")
+
+    # ========== 输出尺寸检查（模型输入即 resizer 输出）==========
+    # 输出H/W都必须是偶数【硬件限制】
+    if H % 2 != 0:
+        logger.fatal(f"{prefix}: Output H ({H}) must be even (hardware constraint)")
+    if W % 2 != 0:
+        logger.fatal(f"{prefix}: Output W ({W}) must be even (hardware constraint)")
+    # 输出H最大4096，输出W最大1024【算子限制】
+    if H > 4096:
+        logger.fatal(f"{prefix}: Output H ({H}) must be <= 4096 (operator constraint)")
+    if W > 1024:
+        logger.fatal(f"{prefix}: Output W ({W}) must be <= 1024 (operator constraint)")
+
+    # ========== resizer_input_size（输入尺寸）==========
     resizer_input_size = resizer_cfg.get("resizer_input_size", [H, W])
     if not isinstance(resizer_input_size, list) or len(resizer_input_size) != 2:
         logger.fatal(f"{prefix}.resizer_input_size must be [H, W]")
@@ -328,35 +349,29 @@ def _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W):
         if v % 2 != 0:
             logger.fatal(f"{prefix}.resizer_input_size must be even numbers")
     resizer_input_h, resizer_input_w = resizer_input_size
-    # Size limit: H <= 4096, W <= 1024
+
+    # 输入尺寸限制：静态模式 W <= 1024，动态模式 W <= 4096
     if resizer_input_h > 4096:
         logger.fatal(
             f"{prefix}.resizer_input_size H must be <= 4096, got {resizer_input_h}"
         )
-    if resizer_input_w > 1024:
+    max_input_w = 4096 if resizer_mode == 1 else 1024
+    if resizer_input_w > max_input_w:
         logger.fatal(
-            f"{prefix}.resizer_input_size W must be <= 1024, got {resizer_input_w}"
+            f"{prefix}.resizer_input_size W must be <= {max_input_w} ({'DYNAMIC' if resizer_mode == 1 else 'STATIC'} mode), got {resizer_input_w}"
         )
     if resizer_input_h < H or resizer_input_w < W:
         logger.warning(
             f"{prefix}.resizer_input_size [{resizer_input_h}, {resizer_input_w}] < model input [{H}, {W}]"
         )
 
-    # resizer_mode
-    resizer_mode = resizer_cfg.get("resizer_mode", 3)
-    if resizer_mode not in [1, 2, 3]:
-        logger.fatal(
-            f"{prefix}.resizer_mode must be 1/2/3 (DYNAMIC_V2/DYNAMIC_V1/STATIC)"
-        )
-    if resizer_mode == 2:
-        logger.fatal(f"{prefix}.resizer_mode=2 (DYNAMIC_V1) is not supported")
     # DYNAMIC_V2 mode: padding constraint warning
     if resizer_mode == 1:
         logger.warning(
-            f"{prefix}: DYNAMIC_V2 mode padding only supports one direction (left-right or top-bottom), max 32 pixels"
+            f"{prefix}: DYNAMIC_V2 mode padding supports H or W single direction only, max 16 pixels per side, must be even"
         )
 
-    # resizer_crop (only valid for STATIC mode)
+    # ========== resizer_crop (only valid for STATIC mode) ==========
     if resizer_mode != 3:
         if "resizer_crop" in resizer_cfg:
             logger.fatal(
@@ -364,7 +379,7 @@ def _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W):
             )
         return resizer_mode
 
-    # STATIC mode: check resizer_crop
+    # ========== STATIC mode: check resizer_crop ==========
     if "resizer_crop" not in resizer_cfg:
         logger.warning(
             f"{prefix}.resizer_crop not found, using default [0, 0, {resizer_input_h}, {resizer_input_w}]"
@@ -383,8 +398,8 @@ def _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W):
         logger.fatal(
             f"{prefix}.resizer_crop out of bounds [0, 0, {resizer_input_h}, {resizer_input_w}]"
         )
-    # Scale constraint: [1/32, 16]
-    # crop -> model input, scale must be in [1/32, 16]
+
+    # STATIC mode: Scale constraint: [1/32, 16]
     scale_h = H / crop_h
     scale_w = W / crop_w
     if scale_h < 1 / 32 or scale_h > 16:
