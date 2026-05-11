@@ -485,11 +485,11 @@ def test_reranker_qwen3_reranker_demo(setup_logging) -> None:
     _demo_func(model_name, setup_logging)
 
 
-@pytest.mark.gemma4_vl
+@pytest.mark.gemma4
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_24g
 @pytest.mark.demo
-def test_vlm_gemma4_vl_demo(setup_logging) -> None:
-    """test_vlm_gemma4_vl_demo"""
-    model_name = "gemma4-vl"
+def test_vlm_gemma4_demo(setup_logging) -> None:
+    """test_vlm_gemma4_demo"""
+    model_name = "gemma4"
     _demo_func(model_name, setup_logging)

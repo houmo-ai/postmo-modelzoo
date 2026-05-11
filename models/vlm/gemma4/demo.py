@@ -2,7 +2,7 @@
 #
 # File: demo.py
 # Description:
-#   Gemma4-26B-A4B VLM Inference Demo
+#   Gemma4 Inference Demo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ def is_valid_char(cp):
     )
 
 
-class HmGemma4VLM:
+class HmGemma4:
     def __init__(
         self,
         prefill_path,
@@ -494,7 +494,7 @@ if __name__ == "__main__":
     args = get_args()
     base = os.path.dirname(os.path.abspath(__file__))
 
-    model = HmGemma4VLM(
+    model = HmGemma4(
         os.path.join(base, args.prefill_path),
         os.path.join(base, args.decode_path),
         os.path.join(base, args.vit_path),

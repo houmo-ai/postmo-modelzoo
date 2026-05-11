@@ -48,7 +48,7 @@ if __name__ == "__main__":
     model_configs = {
         "26b-a4b": {
             "model_size": "26b-a4b",
-            "model_name": "gemma4-vl",
+            "model_name": "gemma4",
             "local_dir": "models/gemma-4-26B-A4B-it",
             "ncore": 2,
             "modelscope_repo": ["google/gemma-4-26B-A4B-it"],

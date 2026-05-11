@@ -1,6 +1,6 @@
-# Gemma4-VL
+# Gemma4
 
-本示例展示如何把Gemma4-VL模型量化和编译，部署到后摩芯片的设备上。
+本示例展示如何把Gemma4模型量化和编译，部署到后摩芯片的设备上。
 
 ## 预训练模型
 
@@ -24,7 +24,7 @@
 
 ## 2 快速开始
 
-目前Gemma4-VL模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
+目前Gemma4模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
 
 ### 2.1 环境准备
 
@@ -82,7 +82,7 @@ python3 build.py
 
 ### 2.5 演示
 
-Gemma4-VL模型使用python API进行演示。
+Gemma4模型使用python API进行演示。
 
 1. 将编译好的模型放在output目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下
 
