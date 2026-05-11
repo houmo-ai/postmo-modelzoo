@@ -234,7 +234,7 @@ def _unwrap_model_output(output):
     raise TypeError(f"Unsupported model output type: {type(output)}")
 
 
-def get_jsonl_texts(path, nsamples, text_key="text"):
+def get_jsonl_texts(path: str, nsamples: int, text_key: str = "text"):
     samples = []
     with open(path, "r", encoding="utf-8") as f:
         for line_no, line in enumerate(f, start=1):
@@ -248,10 +248,16 @@ def get_jsonl_texts(path, nsamples, text_key="text"):
             samples.append(text)
             if len(samples) >= nsamples:
                 break
-    if len(samples) == 0:
+    if not samples:
         raise ValueError(f"No calibration samples found in {path}")
     return samples
 
+
+def text_to_chat_calibration(samples):
+    return [
+        [{"role": "user", "content": [{"type": "text", "text": sample}]}]
+        for sample in samples
+    ]
 
 def get_wikitext2(nsamples, seqlen, local_dir=None, tokenizer=None):
     if local_dir is None:
@@ -318,7 +324,7 @@ def gptq_quant_llm(args):
 
     if args.calib_data:
         if args.calib_data.endswith(".jsonl"):
-            calibration_dataset = get_jsonl_texts(args.calib_data, nsamples=256)
+            calibration_dataset = get_jsonl_texts(args.calib_data, nsamples=256, text_key="text")
         elif os.path.isdir(args.calib_data) and "wikitext" in args.calib_data.lower():
             tokenizer = AutoConfig.from_pretrained(args.model)
             calibration_dataset = get_wikitext2(
@@ -331,12 +337,16 @@ def gptq_quant_llm(args):
             raise ValueError(f"Unsupported calibration data format: {args.calib_data}")
     else:
         calibration_dataset = get_wikitext2(nsamples=256, seqlen=1024)
+    calibration_dataset = text_to_chat_calibration(calibration_dataset)
 
     quant_config = QuantizeConfig(
         bits=4,
         group_size=64,
+        dynamic=None,
         hessian_mse=True,
         rotation="hadamard",
+        rotation_vision="hadamard",
+        mse=2.4,
         offload_to_disk=False,
     )
 
@@ -503,68 +513,38 @@ def get_prepare_context(cfg, work_dir):
 
 
 def rotate_fp_vl(args):
-    from gptqmodel.models.definitions.qwen3_5 import Qwen3_5QModel
-    from gptqmodel.models.definitions.qwen3_vl import Qwen3_VLQModel
-    from gptqmodel.quantization.rotation.rotation import (
-        fuse_layer_norms_qwen3_5,
-        rotate_model_qwen3_5_vl,
-    )
-    from gptqmodel.utils.model import get_module_by_name_prefix
-
-    def maybe_clone_lm_head(model, lm_head_name: str):
-        if not getattr(model.config, "tie_word_embeddings", False):
-            return
-
-        model.config.tie_word_embeddings = False
-        text_config = getattr(model.config, "text_config", None)
-        if text_config is not None:
-            text_config.tie_word_embeddings = False
-
-        lm_head, _ = get_module_by_name_prefix(model, lm_head_name)
-        lm_head.weight = torch.nn.Parameter(lm_head.weight.data.clone())
+    from gptqmodel import GPTQModel, QuantizeConfig
+    from transformers import AutoTokenizer
 
     modelscope_name = os.path.basename(args.model)
     rotate_path = os.path.join(args.work_dir, "{}_rotate_fp_vl".format(modelscope_name))
 
-    Qwen3_5QModel.before_model_load(Qwen3_5QModel, load_quantized_model=False)
-    processor = AutoProcessor.from_pretrained(args.model, trust_remote_code=False)
-    model = AutoModelForImageTextToText.from_pretrained(
-        args.model,
-        trust_remote_code=False,
-        device_map="cpu",
-        torch_dtype="auto",
+    quantize_config = QuantizeConfig(
+        bits=4,
+        group_size=64,
+        rotation="hadamard",
+        rotation_vision="hadamard",
+        offload_to_disk=False,
     )
-    model.eval()
 
+    load_kwargs = dict(trust_remote_code=False, device_map="auto")
+
+    model = GPTQModel.load(args.model, quantize_config, **load_kwargs)
+    tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True, trust_remote_code=False)
     logger.info("Start rotating vision model...")
-    lm_head_name = (Qwen3_VLQModel.lm_head,)
-    layers_node = Qwen3_VLQModel.extract_layers_node()
-    pre_lm_head_norm_module_name = Qwen3_VLQModel.pre_lm_head_norm_module
-    maybe_clone_lm_head(model, lm_head_name)
+    model.apply_rotation()
 
-    model = fuse_layer_norms_qwen3_5(
-        model=model,
-        pre_lm_head_norm_module_name=pre_lm_head_norm_module_name,
-        layers_node=layers_node,
-        lm_head_name=lm_head_name,
-    )
+    processor = AutoProcessor.from_pretrained(args.model, trust_remote_code=False)
 
-    model, _ = rotate_model_qwen3_5_vl(
-        model=model,
-        rotate_mode="hadamard",
-        device="cuda" if torch.cuda.is_available() else "cpu",
-        lm_head_name=lm_head_name,
-        layers_node=layers_node,
-    )
-    model.eval()
     logger.info("Vision model rotation complete.")
 
     logger.info(f"Save rotating result to {rotate_path}")
     model.generation_config.do_sample = True
     rotate_path_dir = Path(rotate_path)
     rotate_path_dir.mkdir(exist_ok=True, parents=True)
-    model.save_pretrained(rotate_path, safe_serialization=True, max_shard_size="5GB")
+    model.model.save_pretrained(rotate_path, safe_serialization=True, max_shard_size="5GB")
     processor.save_pretrained(rotate_path)
+    tokenizer.save_pretrained(rotate_path)
     logger.info("Model saved successfully.")
 
     del model
