@@ -248,7 +248,7 @@ PerfSettings ParsePerfRunSetting(
 int RunPerf(std::unordered_map<std::string, std::string> args) {
   int interval =
       args.count("interval") ? validate_setting(args, "interval") : 500;
-  interval = std::min(std::max(interval, 100), 60000);
+  interval = std::min(std::max(interval, 300), 60000);
   auto device_monitor = std::make_unique<DeviceMonitor>(interval);
   device_monitor->start();
 #if defined(__linux__)

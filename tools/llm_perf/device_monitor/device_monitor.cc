@@ -221,6 +221,7 @@ void DeviceMonitor::start() {
     create_log_dir();
     if (!running_.load()) running_.store(true);
 
+    auto next_time = std::chrono::steady_clock::now();
     while (running_.load()) {
       for (int dev_id : deviceIds) {
         float temperature = 0.0f;
@@ -234,12 +235,25 @@ void DeviceMonitor::start() {
           continue;
         }
 
-        hm_sys_get_temperature(dev_id, &temperature);
-        hm_sys_get_board_power(dev_id, &power);
-        uint64_t freq;
-        hm_sys_get_ipu_frequency(dev_id, &freq);
-        hm_sys_get_mem_info(dev_id, &mem_info);
-        ipu_freq = static_cast<float>(freq) / 1000000.f;
+        if (hm_sys_get_temperature(dev_id, &temperature) != 0) {
+          temperature = device_stats_map_[dev_id].temperature;
+          continue;
+        }
+        if (hm_sys_get_board_power(dev_id, &power) != 0) {
+          power = device_stats_map_[dev_id].power;
+          continue;
+        }
+        uint64_t freq = 0;
+        if (hm_sys_get_ipu_frequency(dev_id, &freq) != 0) {
+          ipu_freq = device_stats_map_[dev_id].ipu_freq;
+          continue;
+        } else {
+          ipu_freq = static_cast<float>(freq) / 1000000.f;
+        }
+        if (hm_sys_get_mem_info(dev_id, &mem_info) != 0) {
+          mem_info = device_stats_map_[dev_id].mem_info;
+          continue;
+        }
 
         std::lock_guard<std::mutex> lock(mtx_);
         auto& device_stats = device_stats_map_[dev_id];
@@ -249,50 +263,41 @@ void DeviceMonitor::start() {
         device_stats.mem_info = mem_info;
 
         // Update statistics
-        if (device_stats.temperature_min == 0)
+        if (device_stats.times == 0) {
           device_stats.temperature_min = device_stats.temperature;
-        if (device_stats.power_min == 0)
           device_stats.power_min = device_stats.power;
-        if (device_stats.ipu_freq_min == 0)
           device_stats.ipu_freq_min = device_stats.ipu_freq;
-        if (device_stats.mem_used_min == 0)
           device_stats.mem_used_min = device_stats.mem_info.mem_used;
+        }
 
         device_stats.times++;
         device_stats.temperature_max =
-            (device_stats.temperature > device_stats.temperature_max)
-                ? device_stats.temperature
-                : device_stats.temperature_max;
+            std::max(device_stats.temperature, device_stats.temperature_max);
         device_stats.temperature_min =
-            (device_stats.temperature <= device_stats.temperature_min)
-                ? device_stats.temperature
-                : device_stats.temperature_min;
+            std::min(device_stats.temperature, device_stats.temperature_min);
         device_stats.temperature_avg =
             (device_stats.temperature +
              device_stats.temperature_avg * (device_stats.times - 1)) /
             device_stats.times;
-        device_stats.power_max = (device_stats.power > device_stats.power_max)
-                                     ? device_stats.power
-                                     : device_stats.power_max;
-        device_stats.power_min = (device_stats.power < device_stats.power_min)
-                                     ? device_stats.power
-                                     : device_stats.power_min;
+
+        device_stats.power_max =
+            std::max(device_stats.power, device_stats.power_max);
+        device_stats.power_min =
+            std::min(device_stats.power, device_stats.power_min);
         device_stats.power_avg =
             (device_stats.power +
              device_stats.power_avg * (device_stats.times - 1)) /
             device_stats.times;
+
         device_stats.ipu_freq_max =
-            (device_stats.ipu_freq > device_stats.ipu_freq_max)
-                ? device_stats.ipu_freq
-                : device_stats.ipu_freq_max;
+            std::max(device_stats.ipu_freq, device_stats.ipu_freq_max);
         device_stats.ipu_freq_min =
-            (device_stats.ipu_freq < device_stats.ipu_freq_min)
-                ? device_stats.ipu_freq
-                : device_stats.ipu_freq_min;
+            std::min(device_stats.ipu_freq, device_stats.ipu_freq_min);
         device_stats.ipu_freq_avg =
             (device_stats.ipu_freq +
              device_stats.ipu_freq_avg * (device_stats.times - 1)) /
             device_stats.times;
+
         device_stats.mem_used_max =
             std::max(device_stats.mem_used_max, device_stats.mem_info.mem_used);
         device_stats.mem_used_min =
@@ -300,19 +305,21 @@ void DeviceMonitor::start() {
         update_running_avg(device_stats.mem_used_avg, device_stats.times,
                            device_stats.mem_info.mem_used);
 
-        DEVICE_LOG_INFO(device_stats.dev_id,
-                        "Device_id: {:d}, Temperature: {:.2f}°C, BoardPower: "
-                        "{:.2f}W, IPU Freq: {:.2f}MHz, Mem Used: {:d}MB, Mem "
-                        "Avail: {:d}MB",
-                        device_stats.dev_id, device_stats.temperature,
-                        device_stats.power, device_stats.ipu_freq,
-                        device_stats.mem_info.mem_used,
-                        device_stats.mem_info.mem_avail);
+        DEVICE_LOG_INFO(
+            device_stats.dev_id,
+            "Device_id: {:d}, Temperature: {:.2f}°C, BoardPower: "
+            "{:.2f}W, IPU Freq: {:.2f}MHz, Mem Used: {:d}MB, Mem "
+            "Avail: {:d}MB, max_power : {:.2f}W",
+            device_stats.dev_id, device_stats.temperature, device_stats.power,
+            device_stats.ipu_freq, device_stats.mem_info.mem_used,
+            device_stats.mem_info.mem_avail, device_stats.power_max);
       }
 
+      next_time += std::chrono::milliseconds(interval_ms_);
       std::unique_lock<std::mutex> lock(mtx_);
-      cv_.wait_for(lock, std::chrono::milliseconds(interval_ms_),
-                   [&]() { return !running_.load(std::memory_order_relaxed); });
+      cv_.wait_until(lock, next_time, [&]() {
+        return !running_.load(std::memory_order_relaxed);
+      });
     }
   });
 }
