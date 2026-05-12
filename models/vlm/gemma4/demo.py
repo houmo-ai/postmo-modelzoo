@@ -480,7 +480,7 @@ def get_args():
     parser.add_argument("--vit_path", default=f"output/{HOUMO_TARGET}/gemma-4-26b-a4b_visual.hmm")
     parser.add_argument("--device", type=parse_devices, default=0)
     parser.add_argument("--question", default="")
-    parser.add_argument("--image", default=None)
+    parser.add_argument("--image", default="data/pic/beach.jpeg")
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     args = parser.parse_args()
 
@@ -503,5 +503,11 @@ if __name__ == "__main__":
         args.device,
         args.max_new_tokens,
     )
-    model.chat(args.question, args.image)
+    image_path = args.image
+    if not os.path.isfile(image_path):
+        HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", ".")
+        image_path = os.path.join(HOUMO_EXAMPLES_PATH, args.image)
+        if not os.path.isfile(image_path):
+            raise FileNotFoundError(f"Image not found: {image_path}")
+    model.chat(args.question, image_path)
     model.perf_tracker.show_summary()
