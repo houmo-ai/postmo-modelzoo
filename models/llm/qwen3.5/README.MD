@@ -1,13 +1,20 @@
 # Qwen3.5 / Qwen3.6
 
-本示例展示如何把Qwen3.5模型量化和编译，部署到后摩芯片的设备上。Qwen3.6-35B-A3B 与当前Qwen3.5 MoE量化导出流程兼容，可通过 `--model_size 3.6-35b-a3b` 选择。
+本示例展示如何把Qwen3.5模型量化和编译，部署到后摩芯片的设备上。Qwen3.6-35B-A3B 与当前Qwen3.5 MoE量化导出流程兼容，可通过 `--model_name` 选择。
 
 ## 预训练模型
 
 本项目使用从 ModelScope 下载的预训练模型：
 
-- 模型名称: Qwen3.5-0.8B / Qwen3.5-2B / Qwen3.5-4B / Qwen3.5-9B / Qwen3.5-27B / Qwen3.5-35B-A3B / Qwen3.6-35B-A3B
-- 来源: https://modelscope.cn/models/Qwen/Qwen3.5-0.8B https://modelscope.cn/models/Qwen/Qwen3.5-2B https://modelscope.cn/models/Qwen/Qwen3.5-4B https://modelscope.cn/models/Qwen/Qwen3.5-9B https://modelscope.cn/models/Qwen/Qwen3.5-27B https://modelscope.cn/models/Qwen/Qwen3.5-35B-A3B https://modelscope.cn/models/Qwen/Qwen3.6-35B-A3B
+- 来源：
+    + Qwen3.5-0.8B: https://modelscope.cn/models/Qwen/Qwen3.5-0.8B
+    + Qwen3.5-2B: https://modelscope.cn/models/Qwen/Qwen3.5-2B
+    + Qwen3.5-4B: https://modelscope.cn/models/Qwen/Qwen3.5-4B
+    + Qwen3.5-9B: https://modelscope.cn/models/Qwen/Qwen3.5-9B
+    + Qwen3.5-27B: https://modelscope.cn/models/Qwen/Qwen3.5-27B
+    + Qwen3.5-35B-A3B: https://modelscope.cn/models/Qwen/Qwen3.5-35B-A3B
+    + Qwen3.6-27B: https://modelscope.cn/models/Qwen/Qwen3.6-27B
+    + Qwen3.6-35B-A3B: https://modelscope.cn/models/Qwen/Qwen3.6-35B-A3B
 - 许可: Apache License 2.0
 
 预训练模型在运行时下载，工程发布**不包含**该模型。
@@ -36,6 +43,7 @@
 - Qwen3.5-9B: https://modelscope.cn/models/Qwen/Qwen3.5-9B
 - Qwen3.5-27B: https://modelscope.cn/models/Qwen/Qwen3.5-27B
 - Qwen3.5-35B-A3B: https://modelscope.cn/models/Qwen/Qwen3.5-35B-A3B
+- Qwen3.6-27B: https://modelscope.cn/models/Qwen/Qwen3.6-27B
 - Qwen3.6-35B-A3B: https://modelscope.cn/models/Qwen/Qwen3.6-35B-A3B
 
 本示例为Qwen3.5适配目录，同时兼容Qwen3.6-35B-A3B。Qwen3.6-35B-A3B 复用当前Qwen3.5 MoE量化、导出、编译和演示流程。
@@ -57,50 +65,44 @@ pip3 install -r ../../../hmodel/gptqmodel/requirements.txt
 
 通过 get_model.py 脚本下载模型，可通过参数选择下载原始模型或芯片模型。
 
-0.8B 模型：
+Qwen3.5-0.8B 模型：
 ```bash
-python3 get_model.py --type raw --model_size 0.8b
+python3 get_model.py --type raw --model_name qwen3.5 --model_size 0.8b
 ```
 
-2B 模型：
+Qwen3.5-2B 模型：
 ```bash
-python3 get_model.py --type raw --model_size 2b
+python3 get_model.py --type raw --model_name qwen3.5 --model_size 2b
 ```
 
-4B 模型：
+Qwen3.5-4B 模型：
 ```bash
-python3 get_model.py --type raw --model_size 4b
+python3 get_model.py --type raw --model_name qwen3.5 --model_size 4b
 ```
 
-9B 模型：
+Qwen3.5-9B 模型：
 ```bash
-python3 get_model.py --type raw --model_size 9b
+python3 get_model.py --type raw --model_name qwen3.5 --model_size 9b
 ```
 
-27B 模型：
+Qwen3.5-27B 模型：
 ```bash
-python3 get_model.py --type raw --model_size 27b
+python3 get_model.py --type raw --model_name qwen3.5 --model_size 27b
 ```
 
-35B-A3B 模型：
+Qwen3.5-35B-A3B 模型：
 ```bash
-python3 get_model.py --type raw --model_size 35b-a3b
+python3 get_model.py --type raw --model_name qwen3.5 --model_size 35b-a3b
 ```
 
 Qwen3.6-35B-A3B 模型：
 ```bash
-python3 get_model.py --type raw --model_size 3.6-35b-a3b
+python3 get_model.py --type raw --model_name qwen3.6 --model_size 35b-a3b
 ```
 
 如果仅查看演示结果，可选择下载芯片模型：
 ```bash
-python3 get_model.py --type hmm --model_size 9b
-```
-
-如需下载 35B-A3B 的芯片模型，可将 `--model_size` 改为 `35b-a3b`。
-如需下载 Qwen3.6-35B-A3B 的芯片模型，可使用：
-```bash
-python3 get_model.py --type hmm --model_size 3.6-35b-a3b
+python3 get_model.py --type hmm --model_name qwen3.6 --model_size 35b-a3b
 ```
 
 ### 2.3 量化
@@ -166,7 +168,7 @@ bash test.sh
 
 如需指定模型版本，可附加 `-size/--model_size` 参数，具体取值请以脚本帮助信息为准。Qwen3.6-35B-A3B 示例：
 ```bash
-bash test.sh --model_size 3.6-35b-a3b
+bash test.sh --model_name qwen3.6 --model_size 35b-a3b
 ```
 
 ## 3 参考结果
@@ -189,7 +191,8 @@ TODO
 ## 4 命令行参数说明
 
 ### get_model.py
-- `--model_size`: 模型大小，支持  `0.8b`、`2b`、`4b`、`9b`、`27b`、`35b-a3b` 或 `3.6-35b-a3b`，默认 `9b`；其中 `3.6-35b-a3b` 对应 Qwen3.6-35B-A3B
+- `--model_name`: 模型名称，支持 `qwen3.5` 或 `qwen3.6`，默认 `qwen3.6`
+- `--model_size`: 模型大小，支持  `0.8b`、`2b`、`4b`、`9b`、`27b`、`35b-a3b`，默认 `35b-a3b`
 - `--type`: 下载类型，支持 `raw` 或 `hmm`，默认 `hmm`
 - `--download_dir`: 下载目录，默认当前目录
 - `--extract_dir`: 解压目录，默认 `None`
@@ -202,16 +205,16 @@ TODO
 - TODO
 
 ### build.py
-- `--model_size`: 模型大小参数，具体取值请以脚本帮助信息为准；Qwen3.6-35B-A3B 使用 `3.6-35b-a3b`
-- `--model_name`: 输出模型名称（默认：qwen3.5）
+- `--model_name`: 模型名称，支持 `qwen3.5` 或 `qwen3.6`，默认 `qwen3.6`
+- `--model_size`: 模型大小参数，具体取值请以脚本帮助信息为准
 - `--batch`: 批次大小（默认：1）
-- `--context_length`: 上下文长度（默认：2048）
-- `--flash_attention`: Flash Attention优化（默认：2）
+- `--context_length`: 上下文长度（默认：262144）
+- `--flash_attention`: Flash Attention优化（默认：2 1）
 - `--device_kernel_split`: 设备内核分割
 - `--stage`: 构建阶段，build/test/all（默认：build）
 
 ### demo.py
-- `--tokenizer_dir`: tokenizer目录（默认：qwen3.5）
+- `--tokenizer_dir`: tokenizer目录（默认：qwen3.6）
 - `--embedding_path`: embedding权重路径
 - `--prefill_path`: prefill模型路径
 - `--decode_path`: decode模型路径
@@ -223,7 +226,9 @@ TODO
 - `--debug`: 输出调试日志
 
 ### test.sh
-- `-size, --model_size`: 模型大小，支持 `0.8b`、`2b`、`4b`、`9b`、`27b`、`35b-a3b` 或 `3.6-35b-a3b`，默认 `9b`
+- `-name, --model_name`: 模型名称，支持 `qwen3.5` 或 `qwen3.6`，默认 `qwen3.6`
+- `-size, --model_size`: 模型大小，支持 `0.8b`、`2b`、`4b`、`9b`、`27b`、`35b-a3b` 或 `35b-a3b`，默认 `35b-a3b`
+- `-size, --model_size`: 模型大小，支持 `0.8b`、`2b`、`4b`、`9b`、`27b`、`35b-a3b` 或 `35b-a3b`，默认 `35b-a3b`
 - `-s, --step`: 执行步骤，demo/build/quant/all（默认：demo）
 
 ## 5 免责声明

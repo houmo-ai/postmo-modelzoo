@@ -161,7 +161,7 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="qwen3.5",
+        default="qwen3.6",
         help="output houmo model name",
     )
     parser.add_argument(
@@ -189,7 +189,7 @@ def get_args() -> argparse.Namespace:
         "--context_length",
         dest="context_length",
         type=int,
-        default=2048,
+        default=262144,
         help="context_length",
     )
     parser.add_argument(
@@ -203,7 +203,7 @@ def get_args() -> argparse.Namespace:
         "--model_size",
         dest="model_size",
         type=str,
-        default="9b",
+        default="35b-a3b",
         help="model size",
     )
     parser.add_argument(

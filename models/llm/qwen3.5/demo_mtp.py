@@ -38,7 +38,8 @@ def _default_tokenizer_dir() -> str:
         DEFAULT_MODEL_DIR / "tokenizer",
         DEFAULT_MODEL_DIR / "Qwen3.5-35B-A3B",
         DEFAULT_MODEL_DIR / "Qwen3.6-35B-A3B",
-        DEFAULT_MODEL_DIR / "qwen3.5",
+        DEFAULT_MODEL_DIR / "Qwen3.5-27B",
+        DEFAULT_MODEL_DIR / "Qwen3.6-27B",
     )
     for candidate in candidates:
         if candidate.exists():

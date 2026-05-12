@@ -81,12 +81,20 @@ def get_args() -> argparse.Namespace:
         help="device number",
     )
     parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default="qwen3.6",
+        choices=["qwen3.5", "qwen3.6"],
+        help="model name: qwen3.5 or qwen3.6",
+    )
+    parser.add_argument(
         "--model_size",
         dest="model_size",
         type=str,
-        default="9b",
-        choices=["0.8b", "2b", "4b", "9b", "27b", "35b-a3b", "3.6-35b-a3b"],
-        help="model size: 0.8b, 2b, 4b, 9b, 27b, 35b-a3b or 3.6-35b-a3b",
+        default="35b-a3b",
+        choices=["0.8b", "2b", "4b", "9b", "27b", "35b-a3b"],
+        help="model size: 0.8b, 2b, 4b, 9b, 27b, 35b-a3b",
     )
     args = parser.parse_args()
     return args
@@ -97,66 +105,53 @@ if __name__ == "__main__":
 
     # Model configurations based on size
     model_configs = {
-        "0.8b": {
-            "model_size": "0.8b",
-            "model_name": "qwen3.5",
-            "local_dir": "qwen3.5",
-            "ncore": 2,
-            "modelscope_repo": ["Qwen/Qwen3.5-0.8B"],
+        "qwen3.5": {
+            "0.8b": {
+                "ncore": 2,
+                "modelscope_repo": ["Qwen/Qwen3.5-0.8B"],
+            },
+            "2b": {
+                "ncore": 2,
+                "modelscope_repo": ["Qwen/Qwen3.5-2B"],
+            },
+            "4b": {
+                "ncore": 2,
+                "modelscope_repo": ["Qwen/Qwen3.5-4B"],
+            },
+            "9b": {
+                "ncore": 2,
+                "modelscope_repo": ["Qwen/Qwen3.5-9B"],
+            },
+            "27b": {
+                "ncore": 2,
+                "modelscope_repo": ["Qwen/Qwen3.5-27B"],
+            },
+            "35b-a3b": {
+                "ncore": 2,
+                "modelscope_repo": ["Qwen/Qwen3.5-35B-A3B"],
+            },
         },
-        "2b": {
-            "model_size": "2b",
-            "model_name": "qwen3.5",
-            "local_dir": "qwen3.5",
-            "ncore": 2,
-            "modelscope_repo": ["Qwen/Qwen3.5-2B"],
-        },
-        "4b": {
-            "model_size": "4b",
-            "model_name": "qwen3.5",
-            "local_dir": "qwen3.5",
-            "ncore": 2,
-            "modelscope_repo": ["Qwen/Qwen3.5-4B"],
-        },
-        "9b": {
-            "model_size": "9b",
-            "model_name": "qwen3.5",
-            "local_dir": "qwen3.5",
-            "ncore": 2,
-            "modelscope_repo": ["Qwen/Qwen3.5-9B"],
-        },
-        "27b": {
-            "model_size": "27b",
-            "model_name": "qwen3.5",
-            "local_dir": "qwen3.5",
-            "ncore": 2,
-            "modelscope_repo": ["Qwen/Qwen3.5-27B"],
-        },
-        "35b-a3b": {
-            "model_size": "35b-a3b",
-            "model_name": "qwen3.5",
-            "local_dir": "qwen3.5",
-            "ncore": 2,
-            "modelscope_repo": ["Qwen/Qwen3.5-35B-A3B"],
-        },
-        "3.6-35b-a3b": {
-            "model_size": "3.6-35b-a3b",
-            "model_name": "qwen3.6",
-            "local_dir": "qwen3.6",
-            "ncore": 2,
-            "modelscope_repo": ["Qwen/Qwen3.6-35B-A3B"],
+        "qwen3.6": {
+            "35b-a3b": {
+                "ncore": 2,
+                "modelscope_repo": ["Qwen/Qwen3.6-35B-A3B"],
+            },
+            "27b": {
+                "ncore": 2,
+                "modelscope_repo": ["Qwen/Qwen3.6-27B"],
+            },
         },
     }
 
-    config = model_configs[args.model_size]
+    config = model_configs[args.model_name][args.model_size]
 
     model_cfgs = {
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": config["model_name"],
+        "model_name": args.model_name,
         "model_info": {
-            "model_size": config["model_size"],
+            "model_size": args.model_size,
             "ncore": config["ncore"],
             "ndevice": args.ndevice,
             "context_len": args.context_length,
@@ -164,10 +159,7 @@ if __name__ == "__main__":
             "batch": args.batch,
         },
         "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
-        "modelscope_repo": {
-            "repo_ids": config["modelscope_repo"],
-            "local_dirs": [f"{args.download_dir}/{config['local_dir']}"],
-        },
+        "modelscope_repo": {"repo_ids": config["modelscope_repo"]},
     }
 
     _, ret_dict = hmatc_get_file(

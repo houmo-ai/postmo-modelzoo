@@ -18,9 +18,9 @@
     "perf_metrics": {
         "xh2": {
             "x86_64": {
-                "prefill": 210.02,
-                "decode": 21.24,
-                "end2end": 16.58
+                "prefill": 674.06,
+                "decode": 30.09,
+                "end2end": 20.87
             }
         }
     },
@@ -136,43 +136,43 @@
     "demo_params": {
         "xh2": {
             "tokenizer_dir": [
+                "cached_models/Qwen3.6-35B-A3B",
                 "cached_models/Qwen3.5-0.8B",
                 "cached_models/Qwen3.5-9B",
                 "cached_models/Qwen3.5-2B",
-                "cached_models/Qwen3.5-4B",
-                "cached_models/Qwen3.6-35B-A3B"
+                "cached_models/Qwen3.5-4B"
             ],
             "embedding_path": [
+                "cached_results/hmm_xh2_3.6_35b_a3b_256k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_0.8b_256k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_9b_256k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_2b_256k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_4b_256k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_3.6_35b_a3b_256k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_4b_256k/hmquant/quant_embedding.pt"
             ],
             "prefill_path": [
+                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6_prefill.hmm",
                 "cached_results/hmm_xh2_0.8b_256k/qwen3.5_prefill.hmm",
                 "cached_results/hmm_xh2_9b_256k/qwen3.5_prefill.hmm",
                 "cached_results/hmm_xh2_2b_256k/qwen3.5_prefill.hmm",
-                "cached_results/hmm_xh2_4b_256k/qwen3.5_prefill.hmm",
-                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6_prefill.hmm"
+                "cached_results/hmm_xh2_4b_256k/qwen3.5_prefill.hmm"
             ],
             "decode_path": [
+                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6_decode.hmm",
                 "cached_results/hmm_xh2_0.8b_256k/qwen3.5_decode.hmm",
                 "cached_results/hmm_xh2_9b_256k/qwen3.5_decode.hmm",
                 "cached_results/hmm_xh2_2b_256k/qwen3.5_decode.hmm",
-                "cached_results/hmm_xh2_4b_256k/qwen3.5_decode.hmm",
-                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6_decode.hmm"
+                "cached_results/hmm_xh2_4b_256k/qwen3.5_decode.hmm"
             ],
             "vision_path": [
+                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6_visual.hmm",
                 "cached_results/hmm_xh2_0.8b_256k/qwen3.5_visual_896x896x2.hmm",
                 "cached_results/hmm_xh2_9b_256k/qwen3.5_visual_896x896x2.hmm",
                 "cached_results/hmm_xh2_2b_256k/qwen3.5_visual_896x896x2.hmm",
-                "cached_results/hmm_xh2_4b_256k/qwen3.5_visual_896x896x2.hmm",
-                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6_visual.hmm"
+                "cached_results/hmm_xh2_4b_256k/qwen3.5_visual_896x896x2.hmm"
             ],
             "ndevice": ["1", "1", "1", "1", "1"],
-            "max_size_w": ["896", "896", "896", "896", "448"],
-            "max_size_h": ["896", "896", "896", "896", "448"],
+            "max_size_w": ["448", "896", "896", "896", "896"],
+            "max_size_h": ["448", "896", "896", "896", "896"],
             "patch_size": [null, null, null, null, null]
         }
     },

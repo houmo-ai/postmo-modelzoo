@@ -14,32 +14,37 @@ source "${MODELS_DIR}/test_common.sh"
 
 STEP="demo"
 SKIP_DOWNLOAD="false"
-MODEL_SIZE="9b"
+MODEL_NAME="qwen3.6"
+MODEL_SIZE="35b-a3b"
+NDEVICE=1
+
 parse_args "$@"
 
-case "${MODEL_SIZE}" in
-    0.8b|2b|4b|9b|27b|35b-a3b|3.6-35b-a3b)
+case "${MODEL_NAME}" in
+    qwen3.5|qwen3.6)
         ;;
     *)
-        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 0.8b, 2b, 4b, 9b, 27b, 35b-a3b, 3.6-35b-a3b." >&2
+        echo "Error: Unsupported model name '${MODEL_NAME}', support: qwen3.5, qwen3.6." >&2
+        exit 1
+        ;;
+esac
+
+case "${MODEL_SIZE}" in
+    0.8b|2b|4b|9b|27b|35b-a3b)
+        ;;
+    *)
+        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 0.8b, 2b, 4b, 9b, 27b, 35b-a3b." >&2
         exit 1
         ;;
 esac
 
 PERF_CONFIG="config.yaml"
-RUN_MODEL_NAME="qwen3.5"
-RAW_HF_DIR="${SCRIPT_DIR}/qwen3.5"
-if [[ "${MODEL_SIZE}" == "3.6-35b-a3b" ]]; then
-    RUN_MODEL_NAME="qwen3.6"
-    RAW_HF_DIR="${SCRIPT_DIR}/qwen3.6"
+if [[ "${MODEL_NAME}" == "qwen3.6" ]]; then
     PERF_CONFIG="config.qwen3.6.yaml"
 fi
+RAW_HF_DIR="${SCRIPT_DIR}/$(echo "${MODEL_NAME}-${MODEL_SIZE}" | tr '[:lower:]' '[:upper:]')"
 
 cd "${SCRIPT_DIR}"
-
-if [[ -z "${HOUMO_EXAMPLES_PATH:-}" ]]; then
-    HOUMO_EXAMPLES_PATH="$(cd "${SCRIPT_DIR}/../../../" && pwd)"
-fi
 
 TEST_VENV_ACTIVE=0
 dir_path="qwen3.5_venv"
@@ -59,10 +64,10 @@ if should_run_step "quant"; then
     fi
 
     if ! should_skip_download; then
-        echo "Download raw model (size: ${MODEL_SIZE}) → ${RAW_HF_DIR}."
-        python3 get_model.py --type raw --model_size "${MODEL_SIZE}"
+        echo "Download raw model (${MODEL_NAME}-${MODEL_SIZE}) → ${RAW_HF_DIR}."
+        python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
-    echo "Start model quantization (size: ${MODEL_SIZE})."
+    echo "Start model quantization (${MODEL_NAME}-${MODEL_SIZE})."
     PTQ_ARGS=(--model "${RAW_HF_DIR}")
     if [[ -n "${VISION_IMAGE}" ]]; then
         PTQ_ARGS+=(--vision-image-path "${VISION_IMAGE}")
@@ -71,28 +76,29 @@ if should_run_step "quant"; then
 fi
 
 if should_run_step "build"; then
-    echo "Start model compilation (size: ${MODEL_SIZE})."
-    python3 build.py --model_size "${MODEL_SIZE}" --model_name "${RUN_MODEL_NAME}"
+    echo "Start model compilation (${MODEL_NAME}-${MODEL_SIZE})."
+    python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
-        echo "Download pre-compiled model (size: ${MODEL_SIZE})."
-        python3 get_model.py --type hmm --model_size "${MODEL_SIZE}"
+        echo "Download pre-compiled model (${MODEL_NAME}-${MODEL_SIZE})."
+        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Execute demo."
-    if [[ "${MODEL_SIZE}" == "3.6-35b-a3b" ]]; then
-        target_dir="${HOUMO_TARGET:-xh2}"
+    if [[ "${MODEL_NAME}" == "qwen3.5" ]]; then
         python3 demo.py \
             --tokenizer_dir "${RAW_HF_DIR}" \
-            --prefill_path "output/${target_dir}/${RUN_MODEL_NAME}_prefill.hmm" \
-            --decode_path "output/${target_dir}/${RUN_MODEL_NAME}_decode.hmm" \
-            --vision_path "output/${target_dir}/${RUN_MODEL_NAME}_visual_896x896x2.hmm"
+            --prefill_path "output/${HOUMO_TARGET}/${MODEL_NAME}_prefill.hmm" \
+            --decode_path "output/${HOUMO_TARGET}/${MODEL_NAME}_decode.hmm" \
+            --vision_path "output/${HOUMO_TARGET}/${MODEL_NAME}_visual_896x896x2.hmm" \
+            --max_size_w 896 \
+            --max_size_h 896
     else
         python3 demo.py
     fi
     echo "Execute performance case."
-    python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/xh2/hmquant/quant_embedding.pt"
+    python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
     llm_perf -c "${PERF_CONFIG}"
 fi
 
