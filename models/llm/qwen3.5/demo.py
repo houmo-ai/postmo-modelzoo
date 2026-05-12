@@ -47,6 +47,7 @@ from image_processing_qwen3_5 import Qwen3_5ImageProcessor
 from vision_process_qwen3_5 import process_vision_info
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH")
 
 IMAGE_TOKEN_ID = 248056
 VIDEO_TOKEN_ID = 248057
@@ -80,7 +81,7 @@ def get_args() -> argparse.Namespace:
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="qwen3.5",
+        default="qwen3.6",
         help="tokenizer dir",
     )
     parser.add_argument(
@@ -94,21 +95,21 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path", 
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_prefill.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3.6_prefill.hmm"),
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_decode.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3.6_decode.hmm"),
         help="houmo decode model path",
     )
     parser.add_argument(
         "--vision_path",
         dest="vision_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_visual_896x896x2.hmm"),
+        default=os.path.join("output", HOUMO_TARGET, "qwen3.6_visual.hmm"),
         help="houmo vision model path (.hmm)",
     )
     parser.add_argument(
@@ -168,21 +169,21 @@ def get_args() -> argparse.Namespace:
         dest="image_path",
         nargs="+",
         action="append",
-        default=None,
+        default=[[os.path.join(HOUMO_EXAMPLES_PATH, "data/pic/beach.jpeg")]],
         help="one or more image paths, supports repeated usage and comma-separated values",
     )
     parser.add_argument(
         "--max_size_w",
         dest="max_size_w",
         type=int,
-        default=896,
+        default=448,
         help="max image width for vision",
     )
     parser.add_argument(
         "--max_size_h",
         dest="max_size_h",
         type=int,
-        default=896,
+        default=448,
         help="max image height for vision",
     )
     parser.add_argument(

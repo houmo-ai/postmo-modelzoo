@@ -199,7 +199,7 @@ def parse_args():
     parser.add_argument(
         "--context-length",
         type=int,
-        default=2048,
+        default=262144,
         help="LLM export context length",
     )
     parser.add_argument(
