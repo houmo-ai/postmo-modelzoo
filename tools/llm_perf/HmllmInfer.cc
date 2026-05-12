@@ -39,16 +39,18 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   // Create weightManager options for prefill and decode modules
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
-  option_prefill.EnableHostLazyLoading(true);
-  option_decode.EnableHostLazyLoading(true);
+
   // Enable lazy mode
   if (LazyMode) {
-    option_prefill.EnableIOLazyMode(true);
-    option_decode.EnableIOLazyMode(true);
+    option_prefill.EnableHostLazyLoading(true);
+    option_decode.EnableHostLazyLoading(true);
   } else {
-    option_prefill.EnableIOLazyMode(false);
-    option_decode.EnableIOLazyMode(false);
+    option_prefill.EnableHostLazyLoading(false);
+    option_decode.EnableHostLazyLoading(false);
   }
+
+  option_prefill.EnableIOLazyMode(true);
+  option_decode.EnableIOLazyMode(true);
   // Initialize prefill module and load the model
   prefill_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);

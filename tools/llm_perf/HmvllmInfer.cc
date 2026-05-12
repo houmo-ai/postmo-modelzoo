@@ -40,18 +40,20 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
   auto option_vision = tcim::Module::Option(weight_manager);
-  option_prefill.EnableHostLazyLoading(true);
-  option_decode.EnableHostLazyLoading(true);
-  option_vision.EnableHostLazyLoading(true);
+
   if (LazyMode) {
-    option_prefill.EnableIOLazyMode(true);
-    option_decode.EnableIOLazyMode(true);
-    option_vision.EnableIOLazyMode(true);
+    option_prefill.EnableHostLazyLoading(true);
+    option_decode.EnableHostLazyLoading(true);
+    option_vision.EnableHostLazyLoading(true);
   } else {
-    option_prefill.EnableIOLazyMode(false);
-    option_decode.EnableIOLazyMode(false);
-    option_vision.EnableIOLazyMode(false);
+    option_prefill.EnableHostLazyLoading(false);
+    option_decode.EnableHostLazyLoading(false);
+    option_vision.EnableHostLazyLoading(false);
   }
+
+  option_prefill.EnableIOLazyMode(true);
+  option_decode.EnableIOLazyMode(true);
+  option_vision.EnableIOLazyMode(true);
   // init module
   prefill_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);
