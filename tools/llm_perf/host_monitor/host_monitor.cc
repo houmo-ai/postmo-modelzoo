@@ -36,6 +36,7 @@ class HostMonitor::HostMonitorImpl {
 
   // main monitoring loop
   void monitorLoop() {
+    auto next_time = std::chrono::steady_clock::now();
     while (is_running.load(std::memory_order_relaxed)) {
       HostMemoryInfo mem_info = getProcessHostMemoryInfo();
 
@@ -53,9 +54,11 @@ class HostMonitor::HostMonitorImpl {
                                   std::memory_order_relaxed);
       }
 
+      next_time += std::chrono::milliseconds(interval);
+
       // wait for the next interval
       std::unique_lock<std::mutex> lock(mtx_);
-      cv_.wait_for(lock, std::chrono::milliseconds(interval), [this]() {
+      cv_.wait_until(lock, next_time, [this]() {
         return !is_running.load(std::memory_order_relaxed);
       });
     }
