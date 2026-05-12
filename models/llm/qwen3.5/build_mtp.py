@@ -162,18 +162,17 @@ def build_hmonnx(
     kwargs = {}
     custom_msg = {}
 
-    if llm_opt:
-        kwargs["modify_llm"] = {}
-        if context_length:
-            kwargs["modify_llm"]["context-length"] = context_length
-            custom_msg["context_length"] = context_length
-        if prefill_length:
-            kwargs["modify_llm"]["fill-length"] = prefill_length
-            custom_msg["prefill_length"] = prefill_length
-        if flash_attention:
-            kwargs["flash_attention"] = flash_attention
-            custom_msg["flash_attention"] = flash_attention
-
+    
+    kwargs["modify_llm"] = {}
+    if context_length:
+        kwargs["modify_llm"]["context-length"] = context_length
+        custom_msg["context_length"] = context_length
+    if prefill_length:
+        kwargs["modify_llm"]["fill-length"] = prefill_length
+        custom_msg["prefill_length"] = prefill_length
+    if flash_attention:
+        kwargs["flash_attention"] = flash_attention
+        custom_msg["flash_attention"] = flash_attention
     if ndevice:
         kwargs["ndevice"] = ndevice
         custom_msg["ndevice"] = ndevice
@@ -255,6 +254,7 @@ if __name__ == "__main__":
             args.ncore,
             args.j,
             args.ndevice,
+            context_length=args.context_length,
         )
         build_hmonnx(
             f"{args.model_name}_decode_{args.draft_suffix}",
@@ -263,4 +263,5 @@ if __name__ == "__main__":
             args.ncore,
             args.j,
             args.ndevice,
+            context_length=args.context_length,
         )
