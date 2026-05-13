@@ -66,16 +66,38 @@ def find_onnx_file(model_dir: str | Path, subdir: str, pattern: str) -> Path:
     return str(matches[0])
 
 
+def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
+    """Validates and adjusts FlashAttention parameter values."""
+    llm_val, vit_val = flash_vals
+
+    # Validate LLM (Prefill & Decode) FlashAttention parameter
+    # Values: 0=off, 1/2=on
+    if llm_val not in [0, 1, 2]:
+        raise ValueError(
+            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
+        )
+
+    # Validate ViT (Vision Transformer) FlashAttention parameter
+    # Values: 0=off, 1=on
+    if vit_val not in [0, 1]:
+        raise ValueError(
+            f"ViT FlashAttention values only support 0/1, current value:{vit_val}"
+        )
+
+    if context_length < 2048:
+        llm_val = 0
+
+    return (llm_val, vit_val)
+
 def get_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", type=str, default="output/xh2/hmquant", help="path to the model directory")
-    parser.add_argument("--model_name", type=str, default="gemma-4-26b-a4b", help="output houmo model name")
+    parser.add_argument("--model_name", type=str, default="gemma4", help="output houmo model name")
+    parser.add_argument("--model_size", type=str, default="26b-a4b", help="output houmo model size")
     parser.add_argument("--output_dir", type=str, default=f"output/{HOUMO_TARGET}", help="output directory for built models")
     parser.add_argument("--ncore", type=int, default=HOUMO_CORE_NUM, help="core number")
-    parser.add_argument("-j", dest="parallel_jobs", type=int, default=psutil.cpu_count(logical=False), help="build parallel jobs")
-    parser.add_argument("--flash_attn", type=int, default=2, help="flash attention level for LLM models")
-    parser.add_argument("--visual_flash_attn", type=int, default=1, help="flash attention level for visual model")
+    parser.add_argument("--j", dest="parallel_jobs", type=int, default=psutil.cpu_count(logical=False), help="build parallel jobs")
     parser.add_argument("--context_length", type=int, default=2048, help="context length for LLM models")
     parser.add_argument("--prefill_length", type=int, default=256, help="prefill length for prefill model")
     parser.add_argument("--batch", type=int, default=1, help="batch size for decode model")
@@ -83,7 +105,22 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--opt_level", type=int, default=2, help="optimization level")
     parser.add_argument("--stage", type=str, default="all", choices=["prefill", "decode", "visual", "all"], help="build stage")
     parser.add_argument("--monitor_interval", type=float, default=2.0, help="memory monitor interval in seconds")
-    return parser.parse_args()
+    parser.add_argument(
+        "--flash_attention",
+        dest="flash_attention",
+        nargs=2,
+        type=int,
+        default=(2, 1),
+        help="FlashAttention optimization switches: "
+        "1st int = prefill/decode model switch (0=off, 1/2=on), "
+        "2nd int = ViT model switch (0=off, 1=on); "
+        "e.g., --flash_attention 2 1 (prefill&decode=2, ViT=1)",
+    )
+    args = parser.parse_args()
+    args.flash_attention = _validate_adjust_flash_attention(
+        args.flash_attention, args.context_length
+    )
+    return args
 
 
 def build_prefill(
@@ -99,7 +136,7 @@ def build_prefill(
     opt_level: int,
 ):
     """Build prefill model."""
-    hmonnx = find_onnx_file(model_dir, "prefill", "*_prefill_with_act.onnx")
+    hmonnx = find_onnx_file(model_dir, "prefill", "hmquant_*.onnx")
 
     print(f"\n===> Building prefill model...")
     print(f"  hmonnx: {hmonnx}")
@@ -139,7 +176,7 @@ def build_decode(
     opt_level: int,
 ):
     """Build decode model."""
-    hmonnx = find_onnx_file(model_dir, "decode", "*_decode_with_act.onnx")
+    hmonnx = find_onnx_file(model_dir, "decode", "hmquant_*.onnx")
 
     print(f"\n===> Building decode model...")
     print(f"  hmonnx: {hmonnx}")
@@ -175,7 +212,7 @@ def build_visual(
     opt_level: int,
 ):
     """Build visual model."""
-    hmonnx = find_onnx_file(model_dir, "visual", "*_visual_with_act.onnx")
+    hmonnx = find_onnx_file(model_dir, "visual", "hmquant_*.onnx")
 
     print(f"\n===> Building visual model...")
     print(f"  hmonnx: {hmonnx}")
@@ -204,19 +241,18 @@ if __name__ == "__main__":
     output_dir = args.output_dir
     ncore = args.ncore
     parallel_jobs = args.parallel_jobs
-    flash_attn = args.flash_attn
-    visual_flash_attn = args.visual_flash_attn
+    flash_attn, visual_flash_attn = args.flash_attention
     context_length = args.context_length
     prefill_length = args.prefill_length
     batch = args.batch
     ndevice = args.ndevice
     opt_level = args.opt_level
-            
+
     with ProcessMemoryMonitor(interval=args.monitor_interval, quiet=True) as monitor:
         if args.stage in ["prefill", "all"]:
             build_prefill(
                 model_dir=model_dir,
-                model_name=args.model_name,
+                model_name=f"{args.model_name}_{args.model_size}",
                 output_dir=output_dir,
                 ncore=ncore,
                 parallel_jobs=parallel_jobs,
@@ -230,7 +266,7 @@ if __name__ == "__main__":
         if args.stage in ["decode", "all"]:
             build_decode(
                 model_dir=model_dir,
-                model_name=args.model_name,
+                model_name=f"{args.model_name}_{args.model_size}",
                 output_dir=output_dir,
                 ncore=ncore,
                 parallel_jobs=parallel_jobs,
@@ -244,7 +280,7 @@ if __name__ == "__main__":
         if args.stage in ["visual", "all"]:
             build_visual(
                 model_dir=model_dir,
-                model_name=args.model_name,
+                model_name=f"{args.model_name}_{args.model_size}",
                 output_dir=output_dir,
                 ncore=ncore,
                 parallel_jobs=parallel_jobs,

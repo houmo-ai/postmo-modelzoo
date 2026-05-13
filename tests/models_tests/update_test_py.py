@@ -133,6 +133,10 @@ def main():
         with open(file_path, "r", encoding="utf-8") as md_file:
             model_info = json.load(md_file)
 
+        # Skip obsolete models
+        if model_info.get("obsolete"):
+            continue
+
         # Get supported flows for both xh1 and xh2 backends
         support_flow_xh1 = model_info["support_flow"].get("xh1", list())
         support_flow_xh2 = model_info["support_flow"].get("xh2", list())

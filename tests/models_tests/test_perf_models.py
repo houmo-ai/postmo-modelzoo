@@ -413,3 +413,13 @@ def test_vlm_gemma4_perf(setup_logging) -> None:
     """test_vlm_gemma4_perf"""
     model_name = "gemma4"
     _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3dot5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.perf
+def test_llm_qwen3dot5_perf(setup_logging) -> None:
+    """test_llm_qwen3dot5_perf"""
+    model_name = 'qwen3.5'
+    _perf_func(model_name, setup_logging)
