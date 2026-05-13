@@ -344,7 +344,6 @@ hmatc.utils.perf_infomations:show_summary:374 -   E2E TPS (Throughput):         
 - 使用llm_perf性能评测工具测试模型性能。
 - llm_perf工具详细使用说明参考${HOUMO_EXAMPLE_PATH}/tools/llm_perf目录的README.MD。
 - 如果使用发布的容器，llm_perf工具已经预编译安装，可以直接通过llm_perf --help获取帮助。
-- config-0.6b.yaml / config-1.7b.yaml / config-8b.yaml / config-14b.yaml 为llm_perf执行测试的配置文件，用户可以按照需要自行修改。
 
 ## 4 命令行参数说明
 

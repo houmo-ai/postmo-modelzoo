@@ -11,10 +11,15 @@ show_help() {
     echo "Options:"
     echo "  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all."
     echo "                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build."
-    echo "  -b, --multi_batch       Enable multi-batch mode."
-    echo "  -skip, --skip_download  Skip model download steps."
     echo "  -size, --model_size     Model size."
     echo "  -name, --model_name     Model name."
+    echo "  -b, --batch             Batch size (requires model supports multi_batch feature)."
+    echo "  --multi_batch           Enable multi-batch mode (Enable this parameter when the batch count supported by the model is unknown)."
+    echo "  --ndevice               Number of devices."
+    echo "  --context_length        Model context length."
+    echo "  --prefill_length        Model prefill length."
+    echo "  --image_sizes           Image sizes (width,height), e.g. 448,448 896,896. Can be specified multiple times."
+    echo "  --skip_download         Skip model download steps."
     echo "  -h, --help              Show this help message."
     exit 0
 }
@@ -26,6 +31,11 @@ parse_args() {
 
     STEP="${STEP:-demo}"
     MULTI_BATCH="${MULTI_BATCH:-false}"
+    BATCH="${BATCH:-}"
+    NDEVICE="${NDEVICE:-}"
+    CONTEXT_LENGTH="${CONTEXT_LENGTH:-}"
+    PREFILL_LENGTH="${PREFILL_LENGTH:-}"
+    IMAGE_SIZES=()
     SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
     MODEL_SIZE="${MODEL_SIZE:-}"
     MODEL_NAME="${MODEL_NAME:-}"
@@ -51,11 +61,50 @@ parse_args() {
                 fi
                 shift 2
                 ;;
-            -b|--multi_batch)
+            --multi_batch)
                 MULTI_BATCH="true"
                 shift
                 ;;
-            -skip|--skip_download)
+            -b|--batch)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: Missing value for parameter '$1'" >&2
+                    show_help
+                fi
+                BATCH="$2"
+                shift 2
+                ;;
+            --ndevice)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: Missing value for parameter '$1'" >&2
+                    show_help
+                fi
+                NDEVICE="$2"
+                shift 2
+                ;;
+            --context_length)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: Missing value for parameter '$1'" >&2
+                    show_help
+                fi
+                CONTEXT_LENGTH="$2"
+                shift 2
+                ;;
+            --prefill_length)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: Missing value for parameter '$1'" >&2
+                    show_help
+                fi
+                PREFILL_LENGTH="$2"
+                shift 2
+                ;;
+            --image_sizes)
+                shift
+                while [[ $# -gt 0 ]] && [[ ! "$1" =~ ^- ]]; do
+                    IMAGE_SIZES+=("$1")
+                    shift
+                done
+                ;;
+            --skip_download)
                 SKIP_DOWNLOAD="true"
                 shift
                 ;;
@@ -109,6 +158,11 @@ parse_args() {
     done
 
     STEP="${normalized_steps:-demo}"
+
+    # If batch > 1, auto-enable multi_batch
+    if [[ -n "${BATCH}" ]] && [[ "${BATCH}" -gt 1 ]]; then
+        MULTI_BATCH="true"
+    fi
 }
 
 should_run_step() {
@@ -277,11 +331,12 @@ setup_python_venv() {
 
 cleanup_python_venv() {
     local venv_dir="${1:-${TEST_VENV_DIR:-}}"
+    local delete_venv="${2:-false}"
 
     if [[ "${TEST_VENV_ACTIVE:-0}" -eq 1 ]] && declare -F deactivate >/dev/null 2>&1; then
         deactivate
     fi
-    if [[ -n "${venv_dir}" && -d "${venv_dir}" ]]; then
+    if [[ "${delete_venv}" == "true" ]] && [[ -n "${venv_dir}" && -d "${venv_dir}" ]]; then
         rm -rf "${venv_dir}"
     fi
 
@@ -383,4 +438,19 @@ check_step_python_packages() {
     fi
 
     return 0
+}
+
+get_devices_param() {
+    local ndevice="${1:-1}"
+    local devices=""
+    local i
+
+    for ((i=0; i<ndevice; i++)); do
+        if [[ -n "${devices}" ]]; then
+            devices+=","
+        fi
+        devices+="${i}"
+    done
+
+    echo "${devices}"
 }

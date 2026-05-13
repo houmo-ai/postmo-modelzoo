@@ -10,7 +10,9 @@ source "${MODELS_DIR}/test_common.sh"
 
 STEP="demo"
 SKIP_DOWNLOAD="false"
+MODEL_NAME="qwen3"
 MODEL_SIZE="8b"
+NDEVICE=1
 parse_args "$@"
 
 case "${MODEL_SIZE}" in
@@ -58,25 +60,19 @@ if should_run_step "demo"; then
     echo "Execute demo (size: ${MODEL_SIZE})."
     python3 demo.py --model_size ${MODEL_SIZE}
 
-    PERF_CONFIG=""
-    if [[ "$MODEL_SIZE" == "8b" ]]; then
-        PERF_CONFIG="config-8b.yaml"
-    elif [[ "$MODEL_SIZE" == "14b" ]]; then
-        PERF_CONFIG="config-14b.yaml"
-    elif [[ "$MODEL_SIZE" == "0.6b" ]]; then
-        PERF_CONFIG="config-0.6b.yaml"
-    elif [[ "$MODEL_SIZE" == "1.7b" ]]; then
-        PERF_CONFIG="config-1.7b.yaml"
-    fi
-
     if [[ -z "${HOUMO_EXAMPLES_PATH:-}" ]]; then
         HOUMO_EXAMPLES_PATH="$(cd "${SCRIPT_DIR}/../../../" && pwd)"
     fi
 
-    if [[ -n "${PERF_CONFIG}" ]]; then
-        echo "Execute performance case (size: ${MODEL_SIZE})."
+    if command -v llm_perf &>/dev/null; then
+        echo "Execute performance case (size: ${MODEL_NAME}-${MODEL_SIZE})."
         python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path output/xh2/hmquant/quant_embedding.pt
-        llm_perf -c "${PERF_CONFIG}"
+        devices_param=$(get_devices_param "${NDEVICE}")
+        llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
+            --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
+            --prefill output/xh2/${MODEL_NAME}_prefill.hmm \
+            --decode output/xh2/${MODEL_NAME}_decode.hmm \
+            --embedding output/xh2/hmquant/quant_embedding.bin
     fi
 fi
 
