@@ -18,9 +18,9 @@
     "perf_metrics": {
         "xh2": {
             "x86_64": {
-                "prefill": 166.87,
-                "decode": 16.0,
-                "end2end": 15.89
+                "prefill": 210.02,
+                "decode": 21.24,
+                "end2end": 16.58
             }
         }
     },
@@ -38,16 +38,33 @@
             ],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2_9b_32k",
-                "cached_models/hmm_xh2_0.8b_32k",
-                "cached_models/hmm_xh2_2b_32k",
-                "cached_models/hmm_xh2_4b_32k",
-                "cached_models/hmm_xh2_27b_32k",
-                "cached_models/hmm_xh2_35b_a3b_64k"
+                "cached_models/hmm_xh2_9b_256k",
+                "cached_models/hmm_xh2_0.8b_256k",
+                "cached_models/hmm_xh2_2b_256k",
+                "cached_models/hmm_xh2_4b_256k",
+                "cached_models/hmm_xh2_3.6_27b_256k",
+                "cached_models/hmm_xh2_3.6_35b_a3b_256k"
             ],
             "source_type": [null, null, null, null, null, null, null],
-            "context_length": [null, null, "32k", "32k", "32k", "32k", "64k"],
-            "model_size": [null, null, "0.8b", "2b", "4b", "27b", "35b-a3b"]
+            "context_length": [
+                null,
+                "256k",
+                "256k",
+                "256k",
+                "256k",
+                "256k",
+                "256k"
+            ],
+            "model_size": [null, null, "0.8b", "2b", "4b", "27b", "35b-a3b"],
+            "model_name": [
+                null,
+                null,
+                "qwen3.5",
+                "qwen3.5",
+                "qwen3.5",
+                "qwen3.6",
+                "qwen3.6"
+            ]
         }
     },
     "quant_params": {
@@ -60,20 +77,21 @@
                 "cached_models/Qwen3.5-9B",
                 "cached_models/Qwen3.5-2B",
                 "cached_models/Qwen3.5-4B",
-                "cached_models/Qwen3.5-27B",
-                "cached_models/Qwen3.5-35B-A3B"
+                "cached_models/Qwen3.6-35B-A3B"
             ],
             "out-dir": [
                 "cached_results/hmquant_xh2_0.8b_2k",
                 "cached_results/hmquant_xh2_9b_2k",
                 "cached_results/hmquant_xh2_2b_2k",
                 "cached_results/hmquant_xh2_4b_2k",
-                "cached_results/hmquant_xh2_27b_2k",
-                "cached_results/hmquant_xh2_35b_a3b_2k"
+                "cached_results/hmquant_xh2_3.6_35b_a3b_2k"
             ],
-            "context-length": ["2048", "2048", "2048", "2048", "2048", "2048"],
-            "input-sequence-length": ["256", "256", "256", "256", "256", "256"],
-            "calib_data": [null, null, null, null, null, null]
+            "context-length": ["2048", "2048", "2048", "2048", "2048"],
+            "input-sequence-length": ["256", "256", "256", "256", "256"],
+            "max_size_w": ["896", "896", "896", "896", "448"],
+            "max_size_h": ["896", "896", "896", "896", "448"],
+            "max_size_t": ["2", "2", "2", "2", "2"],
+            "calib_data": [null, null, null, null, null]
         }
     },
     "compile_params": {
@@ -83,32 +101,36 @@
                 "cached_results/hmquant_xh2_9b_2k",
                 "cached_results/hmquant_xh2_2b_2k",
                 "cached_results/hmquant_xh2_4b_2k",
-                "cached_results/hmquant_xh2_27b_2k",
-                "cached_results/hmquant_xh2_35b_a3b_2k"
+                "cached_results/hmquant_xh2_3.6_35b_a3b_2k"
             ],
-            "model_size": ["0.8b", "9b", "2b", "4b", "27b", "35b-a3b"],
-            "batch": [null, null, null, null, null, null],
-            "ncore": [null, null, null, null, null, null],
-            "ndevice": [null, null, null, null, null, null],
-            "stage": ["build", "build", "build", "build", "build", "build"],
+            "model_size": ["0.8b", "9b", "2b", "4b", "35b-a3b"],
+            "model_name": [
+                "qwen3.5",
+                "qwen3.5",
+                "qwen3.5",
+                "qwen3.5",
+                "qwen3.6"
+            ],
+            "batch": [null, null, null, null, null],
+            "ncore": [null, null, null, null, null],
+            "ndevice": [null, null, null, null, null],
+            "stage": ["build", "build", "build", "build", "build"],
             "context_length": [
-                "32768",
-                "32768",
-                "32768",
-                "32768",
-                "32768",
-                "65536"
+                "262144",
+                "262144",
+                "262144",
+                "262144",
+                "262144"
             ],
-            "prefill_length": ["256", "256", "256", "256", "256", "256"],
+            "prefill_length": ["256", "256", "256", "256", "256"],
             "output_dir": [
-                "cached_results/hmm_xh2_0.8b_32k",
-                "cached_results/hmm_xh2_9b_32k",
-                "cached_results/hmm_xh2_2b_32k",
-                "cached_results/hmm_xh2_4b_32k",
-                "cached_results/hmm_xh2_27b_32k",
-                "cached_results/hmm_xh2_35b_a3b_64k"
+                "cached_results/hmm_xh2_0.8b_256k",
+                "cached_results/hmm_xh2_9b_256k",
+                "cached_results/hmm_xh2_2b_256k",
+                "cached_results/hmm_xh2_4b_256k",
+                "cached_results/hmm_xh2_3.6_35b_a3b_256k"
             ],
-            "j": ["24", "24", "24", "24", "24", "24"]
+            "j": ["24", "24", "24", "24", "24"]
         }
     },
     "demo_params": {
@@ -118,42 +140,40 @@
                 "cached_models/Qwen3.5-9B",
                 "cached_models/Qwen3.5-2B",
                 "cached_models/Qwen3.5-4B",
-                "cached_models/Qwen3.5-27B",
-                "cached_models/Qwen3.5-35B-A3B"
+                "cached_models/Qwen3.6-35B-A3B"
             ],
             "embedding_path": [
-                "cached_results/hmm_xh2_0.8b_32k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_9b_32k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_2b_32k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_4b_32k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_27b_32k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_35b_a3b_64k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_0.8b_256k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_9b_256k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_2b_256k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_4b_256k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_3.6_35b_a3b_256k/hmquant/quant_embedding.pt"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_0.8b_32k/qwen3.5_prefill.hmm",
-                "cached_results/hmm_xh2_9b_32k/qwen3.5_prefill.hmm",
-                "cached_results/hmm_xh2_2b_32k/qwen3.5_prefill.hmm",
-                "cached_results/hmm_xh2_4b_32k/qwen3.5_prefill.hmm",
-                "cached_results/hmm_xh2_27b_32k/qwen3.5_prefill.hmm",
-                "cached_results/hmm_xh2_35b_a3b_64k/qwen3.5_prefill.hmm"
+                "cached_results/hmm_xh2_0.8b_256k/qwen3.5_prefill.hmm",
+                "cached_results/hmm_xh2_9b_256k/qwen3.5_prefill.hmm",
+                "cached_results/hmm_xh2_2b_256k/qwen3.5_prefill.hmm",
+                "cached_results/hmm_xh2_4b_256k/qwen3.5_prefill.hmm",
+                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6_prefill.hmm"
             ],
             "decode_path": [
-                "cached_results/hmm_xh2_0.8b_32k/qwen3.5_decode.hmm",
-                "cached_results/hmm_xh2_9b_32k/qwen3.5_decode.hmm",
-                "cached_results/hmm_xh2_2b_32k/qwen3.5_decode.hmm",
-                "cached_results/hmm_xh2_4b_32k/qwen3.5_decode.hmm",
-                "cached_results/hmm_xh2_27b_32k/qwen3.5_decode.hmm",
-                "cached_results/hmm_xh2_35b_a3b_64k/qwen3.5_decode.hmm"
+                "cached_results/hmm_xh2_0.8b_256k/qwen3.5_decode.hmm",
+                "cached_results/hmm_xh2_9b_256k/qwen3.5_decode.hmm",
+                "cached_results/hmm_xh2_2b_256k/qwen3.5_decode.hmm",
+                "cached_results/hmm_xh2_4b_256k/qwen3.5_decode.hmm",
+                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6_decode.hmm"
             ],
             "vision_path": [
-                "cached_results/hmm_xh2_0.8b_32k/qwen3.5_visual.hmm",
-                "cached_results/hmm_xh2_9b_32k/qwen3.5_visual.hmm",
-                "cached_results/hmm_xh2_2b_32k/qwen3.5_visual.hmm",
-                "cached_results/hmm_xh2_4b_32k/qwen3.5_visual.hmm",
-                "cached_results/hmm_xh2_27b_32k/qwen3.5_visual.hmm",
-                null
+                "cached_results/hmm_xh2_0.8b_256k/qwen3.5_visual_896x896x2.hmm",
+                "cached_results/hmm_xh2_9b_256k/qwen3.5_visual_896x896x2.hmm",
+                "cached_results/hmm_xh2_2b_256k/qwen3.5_visual_896x896x2.hmm",
+                "cached_results/hmm_xh2_4b_256k/qwen3.5_visual_896x896x2.hmm",
+                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6_visual.hmm"
             ],
-            "ndevice": ["1", "1", "1", "1", "1", "1"]
+            "ndevice": ["1", "1", "1", "1", "1"],
+            "max_size_w": ["896", "896", "896", "896", "448"],
+            "max_size_h": ["896", "896", "896", "896", "448"],
+            "patch_size": [null, null, null, null, null]
         }
     },
     "perf_params": "demo"
