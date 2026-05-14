@@ -104,7 +104,8 @@ class HmvllmInfer : public HmllmInferBase {
 
   std::shared_ptr<HmEmbedding> embedding;
 
-  tcim::Module::WeightManager weight_manager;  // Weight manager for models
+  tcim::Module::WeightManager weight_manager;         // LLM weight manager
+  tcim::Module::WeightManager vision_weight_manager;  // Vision weight manager
   // module instance for all vision models.
   std::shared_ptr<tcim::Module> prefill_module;
   std::shared_ptr<tcim::Module> decode_module;
@@ -122,7 +123,7 @@ class HmvllmInfer : public HmllmInferBase {
   int attn_idx_start = 0;  // Starting index for attention inputs
   int vision_input_nums = 0;
   int past_seq_len = 0;
-  int vocab_size = 0;
+  uint32_t vocab_size = 0;
 
   bool prefill_use_vision_outputs = false;
 

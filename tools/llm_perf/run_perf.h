@@ -69,19 +69,19 @@ static void device_ctc_check(std::vector<int> devices,
                              const fs::path& decode_path,
                              const fs::path& visual_path) {
   assert(prefill_path.extension() == decode_path.extension());
-  if (!visual_path.string().empty()) {
-    assert(prefill_path.extension() == visual_path.extension());
-  }
-  if (prefill_path.extension() == ".hmms" ||
-      decode_path.extension() == ".hmms" ||
-      visual_path.extension() == ".hmms") {
+  const bool has_visual = !visual_path.string().empty();
+  const bool llm_uses_hmms = (prefill_path.extension() == ".hmms") ||
+                             (decode_path.extension() == ".hmms");
+  const bool visual_uses_hmms =
+      has_visual && visual_path.extension() == ".hmms";
+  if (llm_uses_hmms) {
     if ((prefill_path.extension() != ".hmms") ||
-        (decode_path.extension() != ".hmms") ||
-        (!visual_path.string().empty() && visual_path.extension() != ".hmms") ||
-        devices.size() < 2) {
+        (decode_path.extension() != ".hmms") || devices.size() < 2) {
       throw std::invalid_argument(
-          "For .hmms model files, all model files (prefill, decode and visual) "
-          "must be .hmms format and devices must be at least 2.");
+          "For multi-device .hmms execution, prefill and decode model files "
+          "must be .hmms format and devices must be at least 2. The visual "
+          "model may be omitted, be .hmms, or be a single-device model "
+          "loaded on the first device.");
     } else {
       int group_id, chip_id;
       std::vector<DeviceCtcInfo> device_ctc_info_list;
@@ -107,6 +107,9 @@ static void device_ctc_check(std::vector<int> devices,
         }
       }
     }
+  } else if (visual_uses_hmms) {
+    throw std::invalid_argument(
+        "A .hmms visual model requires .hmms prefill/decode models.");
   }
   std::cout << "Device CTC check passed for devices: "
             << format_int_list(devices) << std::endl;

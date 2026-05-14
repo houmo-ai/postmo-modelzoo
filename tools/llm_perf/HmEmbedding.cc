@@ -28,7 +28,7 @@ HmEmbedding::HmEmbedding(const std::string& embeddingWeightPath,
   // Read embedding.bin, allocate extra space, return pointer to
   // corresponding address of embed_w when decoding
   try {
-    int n_bytes = 0;
+    uint32_t n_bytes = 0;
     embed_w = readEmbeddingWeight<tensor_type>(
         embeddingWeightPath, n_bytes, prefill_length * embedding_length);
     vocab_size = n_bytes / (sizeof(tensor_type) * embedding_length);

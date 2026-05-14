@@ -32,14 +32,28 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   this->prefillModelPath = prefillModelPath;
   this->decodeModelPath = decodeModelPath;
   this->visionModelPath = visionModelPath;
+  if (devices.empty()) {
+    throw std::invalid_argument(
+        "Vision-language inference requires at least one valid device.");
+  }
+
+  std::vector<int> vision_devices = devices;
+  if (fs::path(visionModelPath).extension() != ".hmms") {
+    vision_devices = {devices.front()};
+  }
+
   // create device manager and weight manager
   tcim::DevManager dev_manager = tcim::DevManager::Create(devices);
+  tcim::DevManager vision_dev_manager =
+      tcim::DevManager::Create(vision_devices);
   weight_manager =
       tcim::Module::WeightManager::CreateWeightManager(dev_manager);
+  vision_weight_manager =
+      tcim::Module::WeightManager::CreateWeightManager(vision_dev_manager);
   // create option
   auto option_prefill = tcim::Module::Option(weight_manager);
   auto option_decode = tcim::Module::Option(weight_manager);
-  auto option_vision = tcim::Module::Option(weight_manager);
+  auto option_vision = tcim::Module::Option(vision_weight_manager);
 
   if (LazyMode) {
     option_prefill.EnableHostLazyLoading(true);
@@ -54,6 +68,8 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   option_prefill.EnableIOLazyMode(true);
   option_decode.EnableIOLazyMode(true);
   option_vision.EnableIOLazyMode(true);
+  std::cout << "Vision model devices : "
+            << format_int_list(vision_devices) << std::endl;
   // init module
   prefill_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);
