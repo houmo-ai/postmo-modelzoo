@@ -247,12 +247,11 @@ if __name__ == "__main__":
     batch = args.batch
     ndevice = args.ndevice
     opt_level = args.opt_level
-
     with ProcessMemoryMonitor(interval=args.monitor_interval, quiet=True) as monitor:
         if args.stage in ["prefill", "all"]:
             build_prefill(
                 model_dir=model_dir,
-                model_name=f"{args.model_name}_{args.model_size}",
+                model_name=f"{args.model_name}-{args.model_size}",
                 output_dir=output_dir,
                 ncore=ncore,
                 parallel_jobs=parallel_jobs,
@@ -266,7 +265,7 @@ if __name__ == "__main__":
         if args.stage in ["decode", "all"]:
             build_decode(
                 model_dir=model_dir,
-                model_name=f"{args.model_name}_{args.model_size}",
+                model_name=f"{args.model_name}-{args.model_size}",
                 output_dir=output_dir,
                 ncore=ncore,
                 parallel_jobs=parallel_jobs,
@@ -280,7 +279,7 @@ if __name__ == "__main__":
         if args.stage in ["visual", "all"]:
             build_visual(
                 model_dir=model_dir,
-                model_name=f"{args.model_name}_{args.model_size}",
+                model_name=f"{args.model_name}-{args.model_size}",
                 output_dir=output_dir,
                 ncore=ncore,
                 parallel_jobs=parallel_jobs,

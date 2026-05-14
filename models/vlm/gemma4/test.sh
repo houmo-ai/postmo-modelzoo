@@ -15,7 +15,7 @@ parse_args "$@"
 cd "${SCRIPT_DIR}"
 
 TEST_VENV_ACTIVE=0
-dir_path="gemma4"
+dir_path="gemma4_venv"
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
     gptq_requirements="${HOUMO_EXAMPLES_PATH}/hmodel/gptqmodel/requirements.txt"

@@ -76,9 +76,9 @@ python3 build.py
 ```
 
 编译好的模型存放在output目录，包括3个文件：
-- gemma4_26b-a4b_prefill.hmm
-- gemma4_26b-a4b_decode.hmm
-- gemma4_26b-a4b_visual.hmm
+- gemma4-26b-a4b_prefill.hmm
+- gemma4-26b-a4b_decode.hmm
+- gemma4-26b-a4b_visual.hmm
 
 ### 2.5 演示
 
