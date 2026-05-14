@@ -130,7 +130,7 @@ def main():
     build_exclusive_group = build_parser.add_mutually_exclusive_group(required=True)
     build_exclusive_group.add_argument("--config", "-c", type=str, help="Specify config file path")
     build_exclusive_group.add_argument("--hmonnx", type=str, help="Specify hmonnx file path")
-    build_parser.add_argument("--hmm_name", type=str, help="Specify hmodel name (only for --hmonnx mode)")
+    build_parser.add_argument("--hmm_name", type=str, default="model", help="Specify hmodel name (only for --hmonnx mode)")
     build_parser.add_argument("--output", "-o", type=str, default="output", help="Specify output path (only for --hmonnx mode)")
     build_parser.add_argument("--flash_attn", type=int, default=0, choices=[0, 1, 2], help="flash attention optimization: 0=off, 1=graph level, 2=operator level")
     build_parser.add_argument("--llm_opt", action="store_true", help="enable llm optimization")

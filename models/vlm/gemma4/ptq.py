@@ -323,16 +323,13 @@ def rename_hmquant_dir(
             new_path = item.parent / "hmquant"
 
             if new_path.exists():
-                print(f"Warning: Target directory already exists: {new_path}")
-                continue
+                print(f"\033[33mWarning: Target directory already exists, will be overwritten: {new_path}\033[0m")
+                import shutil
+                shutil.rmtree(new_path)
 
             renamed.append((item, new_path))
-
-            if dry_run:
-                print(f"[Dry-run] Would rename: {item} -> {new_path}")
-            else:
-                item.rename(new_path)
-                print(f"Renamed: {item} -> {new_path}")
+            item.rename(new_path)
+            print(f"Renamed: {item} -> {new_path}")
 
     return renamed
 
