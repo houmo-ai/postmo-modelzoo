@@ -33,6 +33,7 @@ import tcim_lite as tcim
 from hmatc.utils.perf_infomations import InferencePerformanceTracker, PERFTYPE
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", ".")
 assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2"
 
 PATCH_SIZE = 16
@@ -74,24 +75,32 @@ class HmGemma4:
         self.devices = devices
 
         backend_name = "Xh2HalBackend"
-        # Load vision model and infer config
-        self.perf_tracker.perf_start(PERFTYPE.VISION_LOAD_TIME)
-        dev_mgr0 = tcim.runtime.DevManager(devices, backend_name)
-        wm0 = tcim.runtime.WeightManager(dev_mgr0)
-        self.vit = tcim.runtime.load(vit_path, option=tcim.runtime.Option(wm0))
-        vit_shape = self.vit.get_input_info(self.vit.get_input_name(0)).shape
-        vit_out_shape = self.vit.get_output_info(self.vit.get_output_name(0)).shape
-        self.vit_num_patches = vit_shape[1]
-        self.vit_num_tokens = vit_out_shape[1]
-        self.perf_tracker.perf_end(PERFTYPE.VISION_LOAD_TIME)
+        # Load vision model (optional)
+        if vit_path and os.path.isfile(vit_path):
+            self.perf_tracker.perf_start(PERFTYPE.VISION_LOAD_TIME)
+            dev_mgr0 = tcim.runtime.DevManager(devices, backend_name)
+            wm0 = tcim.runtime.WeightManager(dev_mgr0)
+            self.vit = tcim.runtime.load(vit_path, option=tcim.runtime.Option(wm0))
+            vit_shape = self.vit.get_input_info(self.vit.get_input_name(0)).shape
+            vit_out_shape = self.vit.get_output_info(self.vit.get_output_name(0)).shape
+            self.vit_num_patches = vit_shape[1]
+            self.vit_num_tokens = vit_out_shape[1]
+            self.perf_tracker.perf_end(PERFTYPE.VISION_LOAD_TIME)
 
-        grid = int(math.sqrt(self.vit_num_patches))
-        self.target_image_size = (grid * PATCH_SIZE, grid * PATCH_SIZE)
-        self.upsample_token = self.vit_num_tokens != self.vit_num_patches
-        logger.info(
-            f"Vision: patches={self.vit_num_patches}, tokens={self.vit_num_tokens}, "
-            f"size={self.target_image_size}, upsample={self.upsample_token}"
-        )
+            grid = int(math.sqrt(self.vit_num_patches))
+            self.target_image_size = (grid * PATCH_SIZE, grid * PATCH_SIZE)
+            self.upsample_token = self.vit_num_tokens != self.vit_num_patches
+            logger.info(
+                f"Vision: patches={self.vit_num_patches}, tokens={self.vit_num_tokens}, "
+                f"size={self.target_image_size}, upsample={self.upsample_token}"
+            )
+        else:
+            self.vit = None
+            self.vit_num_patches = 0
+            self.vit_num_tokens = 0
+            self.target_image_size = None
+            self.upsample_token = False
+            logger.warning("Vision model not loaded, text-only mode")
 
         # Load LLM models
         dev_mgr = tcim.runtime.DevManager(devices, backend_name)
@@ -159,26 +168,32 @@ class HmGemma4:
             tokenizer_dir, trust_remote_code=True
         )
 
-        pool_size = 3 if self.upsample_token else 1
-        self.processor.image_processor.max_soft_tokens = MAX_SOFT_TOKENS
-        self.processor.image_processor.pooling_kernel_size = pool_size
-        self.processor.image_seq_length = (
-            MAX_SOFT_TOKENS if self.upsample_token else self.vit_num_patches
-        )
+        if self.vit is not None:
+            pool_size = 3 if self.upsample_token else 1
+            self.processor.image_processor.max_soft_tokens = MAX_SOFT_TOKENS
+            self.processor.image_processor.pooling_kernel_size = pool_size
+            self.processor.image_seq_length = (
+                MAX_SOFT_TOKENS if self.upsample_token else self.vit_num_patches
+            )
 
         emb = torch.load(embedding_path, map_location="cpu", weights_only=True)
         self.embedding = emb["weight"] if isinstance(emb, dict) else emb
         self.embedding = self.embedding.reshape(-1, self.embed_dim).float()
 
         # Valid mask for vision input
-        valid_patches = self.vit_num_patches
-        self.valid_mask = torch.tensor(
-            [True] * valid_patches + [False] * (MAX_SOFT_TOKENS - valid_patches)
-        )
+        if self.vit is not None:
+            valid_patches = self.vit_num_patches
+            self.valid_mask = torch.tensor(
+                [True] * valid_patches + [False] * (MAX_SOFT_TOKENS - valid_patches)
+            )
+        else:
+            self.valid_mask = None
 
         self.perf_tracker.reset_perf_time()
 
     def _run_vision(self, pixel_values):
+        if self.vit is None:
+            raise RuntimeError("Vision model not loaded")
         self.perf_tracker.perf_start(PERFTYPE.VISION_INPUT_TIME)
         pv = pixel_values[:, self.valid_mask].half()
         if pv.shape[1] < self.vit_num_patches:
@@ -262,7 +277,7 @@ class HmGemma4:
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
 
         # Vision preprocess (image resize)
-        if image_path:
+        if image_path and self.vit is not None:
             self.perf_tracker.perf_start(PERFTYPE.VISION_TOTAL_TIME)
             self.perf_tracker.perf_start(PERFTYPE.VISION_PREPROCESS_TIME)
             img = (
@@ -305,7 +320,12 @@ class HmGemma4:
         llm_ids[img_mask] = self.tokenizer.pad_token_id or 0
         embeds = self.embedding[llm_ids[0]].unsqueeze(0).to(torch.float16)
 
-        if image_path and img_mask.any() and inputs.get("pixel_values") is not None:
+        if (
+            image_path
+            and self.vit is not None
+            and img_mask.any()
+            and inputs.get("pixel_values") is not None
+        ):
             self.perf_tracker.perf_start(PERFTYPE.VISION_TOTAL_TIME)
             img_emb = self._run_vision(inputs["pixel_values"])
             self.perf_tracker.perf_end(PERFTYPE.VISION_TOTAL_TIME)
@@ -477,7 +497,7 @@ def get_args():
     parser.add_argument("--embedding_path", default=f"output/{HOUMO_TARGET}/hmquant/quant_embedding.pt")
     parser.add_argument("--prefill_path", default=f"output/{HOUMO_TARGET}/gemma4-26b-a4b_prefill.hmm")
     parser.add_argument("--decode_path", default=f"output/{HOUMO_TARGET}/gemma4-26b-a4b_decode.hmm")
-    parser.add_argument("--vit_path", default=f"output/{HOUMO_TARGET}/gemma4-26b-a4b_visual.hmm")
+    parser.add_argument("--vit_path", default="", help=f"output/{HOUMO_TARGET}/gemma4-26b-a4b_visual.hmm")
     parser.add_argument("--device", type=parse_devices, default=0)
     parser.add_argument("--question", default="")
     parser.add_argument("--image", default="data/pic/beach.jpeg")
@@ -492,22 +512,23 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    base = os.path.dirname(os.path.abspath(__file__))
-
     model = HmGemma4(
-        os.path.join(base, args.prefill_path),
-        os.path.join(base, args.decode_path),
-        os.path.join(base, args.vit_path),
-        os.path.join(base, args.embedding_path),
-        os.path.join(base, args.tokenizer_dir),
+        args.prefill_path,
+        args.decode_path,
+        args.vit_path,
+        args.embedding_path,
+        args.tokenizer_dir,
         args.device,
         args.max_new_tokens,
     )
-    image_path = args.image
-    if not os.path.isfile(image_path):
-        HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", ".")
-        image_path = os.path.join(HOUMO_EXAMPLES_PATH, args.image)
+    image_path = args.image_path
+    if image_path and not os.path.isfile(image_path):
+        image_path = os.path.join(HOUMO_EXAMPLES_PATH, args.image_path)
         if not os.path.isfile(image_path):
-            raise FileNotFoundError(f"Image not found: {image_path}")
+            logger.warning(f"Image not found: {image_path}, running text-only mode")
+            image_path = None
+    if image_path and model.vit is None:
+        logger.warning("Image provided but vit not loaded, running text-only mode")
+        image_path = None
     model.chat(args.question, image_path)
     model.perf_tracker.show_summary()

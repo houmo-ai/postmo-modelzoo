@@ -33,7 +33,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--download_dir", dest="download_dir", type=str, default=".", help="where to save downloaded model")
     parser.add_argument("--extract_dir", dest="extract_dir", type=str, default=None, help="where to save extracted files")
     parser.add_argument("--source_type", dest="source_type", type=str, default="jfrog", choices=["jfrog", "modelscope"], help="download the model from which source")
-    parser.add_argument("--context_length", dest="context_length", type=str, default="2k")
+    parser.add_argument("--context_length", dest="context_length", type=str, default="128k")
     parser.add_argument("--batch", dest="batch", type=int, default=1)
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=1, help="device number")
     parser.add_argument("--model_size", dest="model_size", type=str, default="26b-a4b", choices=["26b-a4b"])
