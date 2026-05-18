@@ -129,7 +129,6 @@ python3 ptq.py --model_size 8b --calib_data ~/your_data.jsonl
 |-- decoder
 |-- prefill
 |-- quant_embedding.pt
-`-- weight.npy
 ```
 
 ### 2.4 编译
@@ -186,26 +185,47 @@ python3 demo.py --model_size 14b
 
 ### 2.5 一键评估
 
-以上步骤可以通过test.sh脚本一键执行：
+以上步骤可以通过 `test.sh` 脚本执行。默认执行 demo 步骤：
 
-**0.6B模型：**
 ```bash
+# 默认执行 demo（8B 模型），会先下载预编译模型
+bash test.sh
+
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+bash test.sh -s all
+```
+
+test.sh 支持以下参数：
+
+```bash
+Usage: test.sh [options]
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  -size, --model_size     Model size. Choices: 0.6b, 1.7b, 8b, 14b.
+  --skip_download         Skip model download steps.
+  -h, --help              Show this help message.
+```
+
+示例：
+
+```bash
+# 指定模型大小为 0.6b
 bash test.sh --model_size 0.6b
-```
 
-**1.7B模型：**
-```bash
-bash test.sh --model_size 1.7b
-```
+# 仅运行 quant，会先下载原始模型再量化
+bash test.sh -s quant --model_size 8b
 
-**8B模型：**
-```bash
-bash test.sh --model_size 8b
-```
+# 仅运行 build，要求当前目录下已经有量化输出
+bash test.sh -s build --model_size 8b
 
-**14B模型：**
-```bash
-bash test.sh --model_size 14b
+# 仅运行 demo，会先下载预编译模型
+bash test.sh -s demo --model_size 8b
+
+# 完整流程（下载原始模型、量化、编译、演示）
+bash test.sh -s all --model_size 8b
+
+# 跳过模型下载，使用当前目录下已有的预编译模型进行演示
+bash test.sh -s demo --skip_download --model_size 8b
 ```
 
 ## 3 参考结果

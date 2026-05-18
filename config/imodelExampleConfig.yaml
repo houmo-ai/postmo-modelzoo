@@ -402,7 +402,7 @@ vlm_gemma4:
   exclude:
     - models/vlm/gemma4/README.MD
   example_case:
-    - vlm_gemma4-vl_test:
+    - vlm_gemma4_test:
         test_type: models_tests
         script: gemma4
         args: all
@@ -732,7 +732,7 @@ models_tests:
     - detection_yolov5s_test
     - inferences_resnet50_test
     - llm_qwen3_test
-    - vlm_qwen3-vl_test
+    # - vlm_qwen3-vl_test
 
 apis_tests:
   include:

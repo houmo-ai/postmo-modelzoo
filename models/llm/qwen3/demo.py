@@ -28,6 +28,7 @@ import sys
 import math
 import time
 import argparse
+from pathlib import Path
 from typing import List, Tuple, Optional
 import numpy as np
 import torch
@@ -43,6 +44,7 @@ from hmatc.utils.perf_infomations import (
     PERFTYPE,
 )
 from hmatc.python.get_hm_devices import get_hm_devices
+from hmatc.utils.utils import get_model_configs
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -66,14 +68,28 @@ def is_valid_char(cp):
     return False
 
 
-def get_args() -> argparse.Namespace:
+def parse_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default="./config.yaml",
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
     parser.add_argument(
         "--model_size",
         dest="model_size",
         type=str,
-        default="8b",
+        default=None,
         help="model size: 0.6b, 1.7b, 8b or 14b",
     )
     parser.add_argument(
@@ -94,23 +110,22 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_prefill.hmm"),
+        default=None,
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_decode.hmm"),
+        default=None,
         help="houmo decode model path",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
-        choices=[1, 2],
-        help="device number, only xh2 support",
+        default=None,
+        help="device number",
     )
     parser.add_argument(
         "--question",
@@ -161,10 +176,29 @@ def get_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
 
-    # Set default tokenizer_dir based on model_size
-    if args.tokenizer_dir is None:
-        args.tokenizer_dir = f"qwen3-{args.model_size}"
+    default_model_size, model_configs = get_model_configs(args.config_path)
+    model_size = args.model_size if args.model_size is not None else default_model_size
+    model_config = model_configs.get(model_size, {})
 
+    args.model_size = model_size
+    args.model_name = (
+        args.model_name
+        if args.model_name is not None
+        else model_config.get("model_name", "qwen3")
+    )
+    args.ndevice = (
+        args.ndevice if args.ndevice is not None else model_config.get("ndevice", 1)
+    )
+    if args.tokenizer_dir is None:
+        args.tokenizer_dir = f"{args.model_name}-{args.model_size}"
+    if args.prefill_path is None:
+        args.prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
+        )
+    if args.decode_path is None:
+        args.decode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
+        )
     if args.ndevice > 1:
         args.prefill_path = (
             args.prefill_path.replace(".hmm", ".hmms")
@@ -176,6 +210,7 @@ def get_args() -> argparse.Namespace:
             if args.decode_path.endswith(".hmm")
             else args.decode_path
         )
+
     return args
 
 
@@ -331,7 +366,9 @@ class HmQwen:
         self.perf_tracker = InferencePerformanceTracker()
         self.ndevice = ndevice
         # Initialize device and weight manager based on device count
-        dev_manager = tcim.runtime.DevManager(get_hm_devices(self.ndevice), "Xh2HalBackend")
+        dev_manager = tcim.runtime.DevManager(
+            get_hm_devices(self.ndevice), "Xh2HalBackend"
+        )
         weight_manager = tcim.runtime.WeightManager(dev_manager)
 
         # Load prefill and decode models
@@ -606,8 +643,8 @@ class HmQwen:
 
 
 if __name__ == "__main__":
-    # Parse command line arguments and initialize model
-    args = get_args()
+    args = parse_args()
+
     hmqwen = HmQwen(
         args.prefill_path,
         args.decode_path,

@@ -15,10 +15,12 @@ show_help() {
     echo "  -name, --model_name     Model name."
     echo "  -b, --batch             Batch size (requires model supports multi_batch feature)."
     echo "  --multi_batch           Enable multi-batch mode (Enable this parameter when the batch count supported by the model is unknown)."
+    echo "  --mtp                   Enable mtp mode."
     echo "  --ndevice               Number of devices."
     echo "  --context_length        Model context length."
     echo "  --prefill_length        Model prefill length."
     echo "  --image_sizes           Image sizes (width,height), e.g. 448,448 896,896. Can be specified multiple times."
+    echo "  --quant_type            Quantization type, e.g. w8a8, w8a8, w4a16."
     echo "  --skip_download         Skip model download steps."
     echo "  -h, --help              Show this help message."
     exit 0
@@ -32,6 +34,7 @@ parse_args() {
     STEP="${STEP:-demo}"
     MULTI_BATCH="${MULTI_BATCH:-false}"
     BATCH="${BATCH:-}"
+    MTP="${MTP:-false}"
     NDEVICE="${NDEVICE:-}"
     CONTEXT_LENGTH="${CONTEXT_LENGTH:-}"
     PREFILL_LENGTH="${PREFILL_LENGTH:-}"
@@ -39,6 +42,7 @@ parse_args() {
     SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
     MODEL_SIZE="${MODEL_SIZE:-}"
     MODEL_NAME="${MODEL_NAME:-}"
+    QUANT_TYPE="${QUANT_TYPE:-}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -63,6 +67,10 @@ parse_args() {
                 ;;
             --multi_batch)
                 MULTI_BATCH="true"
+                shift
+                ;;
+            --mtp)
+                MTP="true"
                 shift
                 ;;
             -b|--batch)
@@ -122,6 +130,14 @@ parse_args() {
                     show_help
                 fi
                 MODEL_NAME="$2"
+                shift 2
+                ;;
+            --quant_type)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: Missing value for parameter '$1'" >&2
+                    show_help
+                fi
+                QUANT_TYPE="$2"
                 shift 2
                 ;;
             *)

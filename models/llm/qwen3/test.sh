@@ -40,21 +40,21 @@ if should_run_step "quant"; then
     fi
 
     if ! should_skip_download; then
-        echo "Download raw model (size: ${MODEL_SIZE})."
+        echo "Download raw model (size: ${MODEL_NAME}-${MODEL_SIZE})."
         python3 get_model.py --type raw --model_size ${MODEL_SIZE}
     fi
-    echo "Start model quantization (size: ${MODEL_SIZE})."
+    echo "Start model quantization (size: ${MODEL_NAME}-${MODEL_SIZE})."
     python3 ptq.py --model_size ${MODEL_SIZE}
 fi
 
 if should_run_step "build"; then
-    echo "Start model compilation (size: ${MODEL_SIZE})."
+    echo "Start model compilation (size: ${MODEL_NAME}-${MODEL_SIZE})."
     python3 build.py --model_size ${MODEL_SIZE}
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
-        echo "Download precompiled model (size: ${MODEL_SIZE})."
+        echo "Download precompiled model (size: ${MODEL_NAME}-${MODEL_SIZE})."
         python3 get_model.py --type hmm --model_size ${MODEL_SIZE}
     fi
     echo "Execute demo (size: ${MODEL_SIZE})."
@@ -66,13 +66,18 @@ if should_run_step "demo"; then
 
     if command -v llm_perf &>/dev/null; then
         echo "Execute performance case (size: ${MODEL_NAME}-${MODEL_SIZE})."
-        python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path output/xh2/hmquant/quant_embedding.pt
+        python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path output/${HOUMO_TARGET}/hmquant/quant_embedding.pt
         devices_param=$(get_devices_param "${NDEVICE}")
+        if [[ "${NDEVICE}" -gt 1 ]]; then
+            model_suffix="hmms"
+        else
+            model_suffix="hmm"
+        fi
         llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
             --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
-            --prefill output/xh2/${MODEL_NAME}_prefill.hmm \
-            --decode output/xh2/${MODEL_NAME}_decode.hmm \
-            --embedding output/xh2/hmquant/quant_embedding.bin
+            --prefill output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix} \
+            --decode output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix} \
+            --embedding output/${HOUMO_TARGET}/hmquant/quant_embedding.bin
     fi
 fi
 

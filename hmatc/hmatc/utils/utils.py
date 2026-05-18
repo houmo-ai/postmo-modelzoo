@@ -33,19 +33,25 @@ import requests
 import re
 import shutil
 import subprocess
-import tarfile
+import glob
 from onnx import TensorProto
 from tqdm import tqdm
+from pathlib import Path
 from importlib.metadata import PackageNotFoundError, version
 from requests.auth import HTTPBasicAuth
 from . import logger
-
 
 JFROG_REPO = "http://artifactory.houmo.ai/artifactory/Dadao"
 OSS_REPO = "https://llmoss.houmoai.com/Dadao"
 
 SUPPORT_IMAGE_FORMATS = [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]
 SUPPORT_BACKEND = ["xh2", "onnx", "hmonnx"]
+
+
+def get_platform():
+    import platform
+
+    return platform.machine()
 
 
 def read_yaml_to_dict(file_path: str) -> dict:
@@ -143,6 +149,29 @@ def get_houmo_version():
         raise ValueError(f"Invalid houmo version: {v}")
 
     return v if v.startswith("v") else f"v{v}"
+
+
+def check_gpu() -> bool:
+    """
+    Check if the host has a GPU.
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            "nvidia-smi --query-gpu=count --format=csv,noheader,nounits | wc -l",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            text=True,
+        )
+        if result.returncode == 0 and int(result.stdout.strip()) > 0:
+            return True
+        return False
+    except Exception as e:
+        print(f"Not install GPU driver, error msg: {e}")
+        return False
 
 
 def get_onnx_inputs_info(onnx_path):
@@ -545,6 +574,7 @@ def _extract_files_raw(save_path: str, extract_dir: str) -> bool:
             logger.error(f"Decompression failed: {str(e)}")
             return False
 
+
 def _extract_files(save_path: str, extract_dir: str) -> bool:
     """
     Extract files from compressed file.
@@ -852,6 +882,7 @@ def _generate_hmm_path(model_cfgs, source_type, model_type, target) -> str:
     ndevice_val = model_cfgs["model_info"].get("ndevice", 0)
     opt_level = model_cfgs["model_info"].get("opt_level", "NA")
     model_size = model_cfgs["model_info"].get("model_size", "NA")
+    quant_type = model_cfgs["model_info"].get("quant_type", "")
     prefill_len = model_cfgs["model_info"].get("prefill_len", "")
     context_len = model_cfgs["model_info"].get("context_len", "")
     # convert val to str
@@ -859,8 +890,10 @@ def _generate_hmm_path(model_cfgs, source_type, model_type, target) -> str:
     ndevice = f"{ndevice_val}chips" if ndevice_val > 1 else "1chip"
 
     if source_type == "modelscope" and model_type in ["llm"]:
-        repo_id = f"Houmo/{target}_{model_name}_{model_size}"  # repo id
-        hmm_path = f"{model_name}_{model_size}"
+        repo_id = f"Houmo/{target}_{model_name}-{model_size}"  # repo id
+        hmm_path = f"{model_name}-{model_size}"
+        if quant_type:
+            hmm_path += f"_{quant_type}"
         if prefill_len:
             hmm_path += f"_{prefill_len}"
         if context_len:
@@ -870,7 +903,9 @@ def _generate_hmm_path(model_cfgs, source_type, model_type, target) -> str:
             hmm_path += f"_b{batch}"
         hmm_path += f"_{ndevice}_{ncore}"
     elif model_type in ["llm"]:
-        hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}_{model_size}"
+        hmm_path = f"models/{target}-{version}/{model_name}/hmm_{target}_{model_name}-{model_size}"
+        if quant_type:
+            hmm_path += f"_{quant_type}"
         if prefill_len:
             hmm_path += f"_{prefill_len}"
         if context_len:
@@ -1096,6 +1131,17 @@ def hmatc_get_file(
             download_files["default_files"].append(tmp_file)
 
     return download_file, download_files
+
+
+def get_model_configs(config_path: str, config_key: str = "model_configs"):
+    """Get default_model_size and model_configs from config.yaml."""
+    config = {}
+    if not config_path or config_path is None or not os.path.exists(config_path):
+        return "", {}
+
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    return config.get("default_model_size", ""), config.get(config_key, {})
 
 
 class ProgressFile:
@@ -1443,3 +1489,22 @@ def find_output_files(golden_dir, output_names):
             logger.warning(f"No files found for output '{output_name}'")
 
     return output_files_map
+
+
+def find_hmonnx_file(
+    model_dir: str, pattern: str = "hmquant_*.onnx", return_type: str = "single"
+):
+    """Find ONNX files matching the specified pattern in the given directory."""
+
+    if not os.path.exists(model_dir):
+        raise FileNotFoundError(f"Directory not found: {model_dir}")
+
+    matches = glob.glob(f"{model_dir}/{pattern}")
+    if not matches:
+        # Fallback: try without 'hmquant_' prefix
+        fallback_pattern = pattern.replace("hmquant_", "")
+        matches = glob.glob(f"{model_dir}/{fallback_pattern}")
+
+    if return_type == "single" and matches:
+        return matches[0]  # Return the first match if single file is expected
+    return matches

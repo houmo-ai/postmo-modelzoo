@@ -30,7 +30,6 @@ import re
 from ..tests_utils.tests_common_utils import *
 from ..tests_utils.tests_pyvenv_utils import install_py_venv, VENV_NAME
 
-
 logger = logging.getLogger(__name__)
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -446,7 +445,7 @@ def _prepare_quantized_llm_model(
     ):
         current_folder = os.getcwd()
 
-        quant_out_keys = ["out-dir", "output_dir", "output_path"]
+        quant_out_keys = ["out-dir", "out_dir", "output_dir", "output_path"]
         quant_opt_key = None
         for k in quant_out_keys:
             if k in quant_params:
@@ -1073,6 +1072,8 @@ def execute_quant_flow(model_name: str, setup_logging) -> None:
                 quant_res_dir = _get_param_value(tmp_cmd_list, "--out-dir")
                 if quant_res_dir is None:
                     quant_res_dir = _get_param_value(tmp_cmd_list, "--output_dir")
+                elif quant_res_dir is None:
+                    quant_res_dir = _get_param_value(tmp_cmd_list, "--out_dir")
                 elif quant_res_dir is None:
                     quant_res_dir = _get_param_value(tmp_cmd_list, "--output_path")
                 if quant_res_dir and os.path.exists(quant_res_dir):

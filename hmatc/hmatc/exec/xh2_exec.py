@@ -1183,6 +1183,7 @@ class Xh2Exec(BaseExec):
         enable_common_subgraph=False,
         skip_mlir_compile=False,
         subgraph_repeat_hint=20,
+        work_dir=None,
         target="xh2",
         **kwargs,
     ):
@@ -1193,13 +1194,21 @@ class Xh2Exec(BaseExec):
             logger.error("Not found tcim module, please install tcim first!")
             return
 
+        if not hmonnx or not os.path.exists(hmonnx):
+            logger.warning(
+                f"HMONNX file not found, please check the file path: {hmonnx}."
+            )
+            return
+
         if hmm_name is None:
             hmm_name = os.path.splitext(os.path.basename(hmonnx))[0]
         if (batch > 1 and roi_num > 1) or batch < 0 or roi_num < 0:
             logger.fatal(f"Invalid combination of batch{batch} and roi_num{roi_num }")
         # output_dir = os.path.join(output, target)
         output_dir = output
-        work_dir = os.path.join(output_dir, "tcim", hmm_name)
+        work_dir = (
+            os.path.join(output_dir, "tcim", hmm_name) if work_dir is None else work_dir
+        )
 
         # Build kwargs for tcim
         build_kwargs = {}
@@ -1256,7 +1265,7 @@ class Xh2Exec(BaseExec):
             output_name=hmm_name,
             ncore=ncore,
             opt_level=f"O{opt_level}",
-            target="xh2",
+            target=target,
             batch=batch,
             enable_profile=enable_profile,
             output_dir=output_dir,
