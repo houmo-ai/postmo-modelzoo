@@ -34,7 +34,6 @@
 | CMakeLists.txt            | CMake编译配置文件                                 |
 | build.sh                  | Linux平台编译脚本                                 |
 | build_ndk.sh              | Android平台编译脚本                               |
-| build_win.bat             | Windows11平台编译脚本                             |
 | tcim_runtime.cmake        | TCIM Runtime库查找配置                            |
 | export_mel_filters.py     | 将asr模型的mel_filters参数转换为.h文件，方便cpp读取   |
 
@@ -146,13 +145,6 @@ export TCIM_RUNTIME_PATH=/path/to/houmo-tcim-runtime-xh2
 
 编译生成的可执行文件在 `build/` 目录下。
 
-**Windows11平台编译：**
-
-```bash
-./build_win.bat
-```
-
-编译生成的可执行文件在 `build/` 目录下。
 
 ### 2.3 运行
 

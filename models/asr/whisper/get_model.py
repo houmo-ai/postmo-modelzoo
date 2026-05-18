@@ -102,3 +102,9 @@ if __name__ == "__main__":
     target_dir = "./cpp/3rdparty"
     save_path = get_file_from_jfrog(tokenizer_path, target_dir, target_dir)
     print(f"Tokenizer downloaded to {save_path} and extracted to: {target_dir}")
+
+    tokenizer_path = "3rdparty/audio_cpp_3rdparty.zip"
+    target_dir = "./cpp/3rdparty"
+    save_path = get_file_from_jfrog(tokenizer_path, target_dir, target_dir)
+    print(f"Audio 3rd party libraries downloaded to {save_path} and extracted to: {target_dir}")
+

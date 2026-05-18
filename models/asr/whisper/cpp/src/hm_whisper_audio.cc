@@ -11,6 +11,10 @@
 
 #include <cstring>
 
+#include "kaldi-native-fbank/csrc/online-feature.h"
+#include "samplerate.h"
+#include "sndfile.h"
+
 namespace houmo {
 
 HmWhisperAudio::HmWhisperAudio()
@@ -28,29 +32,57 @@ HmWhisperAudio::HmWhisperAudio(int chunk_size_seconds)
 HmWhisperAudio::~HmWhisperAudio() {}
 
 bool HmWhisperAudio::LoadAudio(const std::string& audio_path) {
-  ma_decoder decoder;
-  ma_decoder_config config =
-      ma_decoder_config_init(ma_format_f32, 1, kSampleRate);
+  SF_INFO sf_info;
+  std::memset(&sf_info, 0, sizeof(sf_info));
 
-  if (ma_decoder_init_file(audio_path.c_str(), &config, &decoder) !=
-      MA_SUCCESS) {
+  SNDFILE* snd_file = sf_open(audio_path.c_str(), SFM_READ, &sf_info);
+  if (snd_file == nullptr) {
     std::cerr << "Error: Failed to load audio: " << audio_path << "\n";
     return false;
   }
 
-  ma_uint64 frame_count;
-  ma_decoder_get_length_in_pcm_frames(&decoder, &frame_count);
+  if (sf_info.frames <= 0 || sf_info.channels <= 0 || sf_info.samplerate <= 0) {
+    sf_close(snd_file);
+    std::cerr << "Error: Invalid audio metadata: " << audio_path << "\n";
+    return false;
+  }
 
-  pcm_data_.resize(frame_count);
-  ma_decoder_read_pcm_frames(&decoder, pcm_data_.data(), frame_count,
-                             &frame_count);
-  ma_decoder_uninit(&decoder);
+  const sf_count_t total_frames = sf_info.frames;
+  std::vector<float> interleaved_pcm(
+      static_cast<size_t>(total_frames) * sf_info.channels);
+  const sf_count_t frames_read =
+      sf_readf_float(snd_file, interleaved_pcm.data(), total_frames);
+  sf_close(snd_file);
 
-  pcm_data_.resize(frame_count);
-  total_samples_ = static_cast<int>(frame_count);
+  if (frames_read <= 0) {
+    std::cerr << "Error: Failed to read audio samples: " << audio_path
+              << "\n";
+    return false;
+  }
+
+  interleaved_pcm.resize(static_cast<size_t>(frames_read) * sf_info.channels);
+
+  std::vector<float> mono_pcm;
+  DownmixToMono(interleaved_pcm, sf_info.channels, &mono_pcm);
+
+  if (sf_info.samplerate == kSampleRate) {
+    pcm_data_ = std::move(mono_pcm);
+  } else {
+    if (!ResampleAudio(mono_pcm, static_cast<uint32_t>(sf_info.samplerate),
+                       &pcm_data_)) {
+      std::cerr << "Error: Failed to resample audio from "
+                << sf_info.samplerate << " Hz to " << kSampleRate
+                << " Hz: " << audio_path << "\n";
+      return false;
+    }
+  }
+
+  total_samples_ = static_cast<int>(pcm_data_.size());
   audio_loaded_ = true;
 
   std::cout << "Audio loaded: " << audio_path
+            << ", channels: " << sf_info.channels
+            << ", sample rate: " << sf_info.samplerate << "Hz"
             << ", duration: " << GetTotalDuration() << "s"
             << ", samples: " << total_samples_ << "\n";
 
@@ -89,55 +121,40 @@ MelFeatures HmWhisperAudio::ComputeMelSpectrogram(
   MelFeatures mel;
   mel.n_mels = kNMels;
 
-  // Calculate frames
-  int n_frames = pcm_data.size() / kHopLength - kNFFT / kHopLength + 1;
-  if (pcm_data.size() >= static_cast<size_t>(n_samples_per_chunk_)) {
-    n_frames = 3000;  // Fixed for 30s chunks
+  // Whisper encoder input is fixed to 30 seconds (80 x 3000). Keep the
+  // original behavior by padding shorter chunks and truncating longer chunks
+  // to the fixed 30-second window expected by the model.
+  std::vector<float> whisper_pcm = pcm_data;
+  constexpr size_t kWhisperWindowSamples =
+      static_cast<size_t>(kSampleRate * 30);
+  if (whisper_pcm.size() < kWhisperWindowSamples) {
+    whisper_pcm.resize(kWhisperWindowSamples, 0.0f);
+  } else if (whisper_pcm.size() > kWhisperWindowSamples) {
+    whisper_pcm.resize(kWhisperWindowSamples);
   }
-  mel.n_frames = n_frames;
 
-  // Hann window - use cached version if size matches
-  if (hann_window_cache_.empty() || hann_window_size_ != kNFFT) {
-    hann_window_cache_ = ComputeHannWindow(kNFFT);
-    hann_window_size_ = kNFFT;
+  knf::WhisperFeatureOptions whisper_feature_opts;
+  whisper_feature_opts.dim = mel.n_mels;
+
+  knf::OnlineWhisperFbank whisper_fbank(whisper_feature_opts);
+  whisper_fbank.AcceptWaveform(static_cast<float>(kSampleRate),
+                               whisper_pcm.data(), whisper_pcm.size());
+  whisper_fbank.InputFinished();
+
+  mel.n_frames = whisper_fbank.NumFramesReady();
+  if (mel.n_frames <= 0) {
+    return mel;
   }
-  const std::vector<float>& window = hann_window_cache_;
-
-  // Reflection padding
-  int pad_len = kNFFT / 2;
-  std::vector<float> padded_audio = ApplyReflectionPadding(pcm_data, pad_len);
 
   // Mel computation
   std::vector<float> tmp_mel_data(mel.n_mels * mel.n_frames, 0.0f);
   float max_log_spec = -1e20f;
 
-  for (int t = 0; t < n_frames; t++) {
-    int offset = t * kHopLength;
-    std::vector<float> magnitudes(kNFFTBins, 0.0f);
-
-    // Naive DFT for power spectrum
-    for (int k = 0; k < kNFFTBins; k++) {
-      float sum_real = 0.0f;
-      float sum_imag = 0.0f;
-      float angle_step = -2.0f * static_cast<float>(M_PI) * k / kNFFT;
-
-      for (int n = 0; n < kNFFT; n++) {
-        float val = padded_audio[offset + n] * window[n];
-        sum_real += val * std::cos(angle_step * n);
-        sum_imag += val * std::sin(angle_step * n);
-      }
-      magnitudes[k] = (sum_real * sum_real + sum_imag * sum_imag);
-    }
-
-    // Apply mel filter bank
-    for (int m = 0; m < mel.n_mels; m++) {
-      float sum_mel = 0.0f;
-      for (int k = 0; k < kNFFTBins; k++) {
-        sum_mel += MEL_FILTERS[m][k] * magnitudes[k];
-      }
-
-      float log_spec = std::log10(std::max(sum_mel, 1e-10f));
-      tmp_mel_data[m * n_frames + t] = log_spec;
+  for (int t = 0; t < mel.n_frames; ++t) {
+    const float* frame = whisper_fbank.GetFrame(t);
+    for (int m = 0; m < mel.n_mels; ++m) {
+      float log_spec = std::log10(std::max(frame[m], 1e-10f));
+      tmp_mel_data[m * mel.n_frames + t] = log_spec;
 
       if (log_spec > max_log_spec) {
         max_log_spec = log_spec;
@@ -167,36 +184,70 @@ float HmWhisperAudio::GetTotalDuration() const {
 
 int HmWhisperAudio::GetChunkSize() const { return chunk_size_seconds_; }
 
-std::vector<float> HmWhisperAudio::ComputeHannWindow(int n_fft) const {
-  std::vector<float> window(n_fft);
-  for (int i = 0; i < n_fft; i++) {
-    window[i] =
-        0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) * i / n_fft));
+void HmWhisperAudio::DownmixToMono(const std::vector<float>& interleaved_pcm,
+                                   int channels,
+                                   std::vector<float>* mono_pcm) const {
+  if (mono_pcm == nullptr || channels <= 0) {
+    return;
   }
-  return window;
+
+  if (channels == 1) {
+    *mono_pcm = interleaved_pcm;
+    return;
+  }
+
+  const size_t num_frames = interleaved_pcm.size() / channels;
+  mono_pcm->assign(num_frames, 0.0f);
+
+  const float scale = 1.0f / static_cast<float>(channels);
+  for (size_t frame = 0; frame < num_frames; ++frame) {
+    float mixed_sample = 0.0f;
+    const size_t base_index = frame * channels;
+    for (int channel = 0; channel < channels; ++channel) {
+      mixed_sample += interleaved_pcm[base_index + channel];
+    }
+    (*mono_pcm)[frame] = mixed_sample * scale;
+  }
 }
 
-std::vector<float> HmWhisperAudio::ApplyReflectionPadding(
-    const std::vector<float>& audio, int pad_len) const {
-  std::vector<float> padded(audio.size() + 2 * pad_len);
-
-  // Reflection padding for start
-  for (int i = 0; i < pad_len; i++) {
-    padded[pad_len - 1 - i] = audio[i + 1];
+bool HmWhisperAudio::ResampleAudio(const std::vector<float>& input_pcm,
+                                   uint32_t input_sample_rate,
+                                   std::vector<float>* output_pcm) const {
+  if (output_pcm == nullptr || input_pcm.empty() || input_sample_rate == 0) {
+    return false;
   }
 
-  // Original audio
-  for (size_t i = 0; i < audio.size(); i++) {
-    padded[pad_len + i] = audio[i];
+  if (input_sample_rate == static_cast<uint32_t>(kSampleRate)) {
+    *output_pcm = input_pcm;
+    return true;
   }
 
-  // Reflection padding for end
-  int audio_size = static_cast<int>(audio.size());
-  for (int i = 0; i < pad_len; i++) {
-    padded[pad_len + audio_size + i] = audio[audio_size - 2 - i];
+  const double src_ratio =
+      static_cast<double>(kSampleRate) / input_sample_rate;
+  const size_t output_capacity =
+      static_cast<size_t>(std::ceil(input_pcm.size() * src_ratio)) + 1;
+
+  output_pcm->assign(output_capacity, 0.0f);
+
+  SRC_DATA src_data;
+  std::memset(&src_data, 0, sizeof(src_data));
+  src_data.data_in = input_pcm.data();
+  src_data.input_frames = static_cast<long>(input_pcm.size());
+  src_data.data_out = output_pcm->data();
+  src_data.output_frames = static_cast<long>(output_pcm->size());
+  src_data.src_ratio = src_ratio;
+  src_data.end_of_input = 1;
+
+  const int result = src_simple(&src_data, SRC_SINC_FASTEST, 1);
+  if (result != 0) {
+    std::cerr << "Error: libsamplerate resampling failed: "
+              << src_strerror(result) << "\n";
+    output_pcm->clear();
+    return false;
   }
 
-  return padded;
+  output_pcm->resize(static_cast<size_t>(src_data.output_frames_gen));
+  return true;
 }
 
 }  // namespace houmo

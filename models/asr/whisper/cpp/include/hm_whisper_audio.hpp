@@ -20,17 +20,11 @@
 #include <vector>
 
 #include "half.hpp"
-#include "mel_filters.h"
-#include "miniaudio.h"
 
 namespace houmo {
 
 // Tensor type alias for Whisper model inference
 using TensorType = half_float::half;
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 
 /**
  * @brief Audio chunk data structure
@@ -55,7 +49,7 @@ struct MelFeatures {
  * @brief Audio preprocessing class for Whisper ASR
  *
  * Handles:
- * - Audio file loading (any format via miniaudio)
+ * - Audio file loading (via libsndfile)
  * - Automatic resampling to 16kHz mono
  * - Audio chunking for long files
  * - Mel spectrogram computation (STFT + mel filter bank)
@@ -63,11 +57,8 @@ struct MelFeatures {
 class HmWhisperAudio {
  public:
   // Whisper audio processing constants
-  static constexpr int kSampleRate = 16000;     ///< Target sample rate
-  static constexpr int kNFFT = 400;             ///< FFT size
-  static constexpr int kHopLength = 160;        ///< Hop length (10ms stride)
-  static constexpr int kNMels = N_MELS;         ///< Mel bins (80)
-  static constexpr int kNFFTBins = N_FFT_BINS;  ///< FFT output bins (201)
+  static constexpr int kSampleRate = 16000;  ///< Target sample rate
+  static constexpr int kNMels = 80;          ///< Mel bins (80)
 
   /**
    * @brief Default constructor (30 second chunks)
@@ -136,19 +127,17 @@ class HmWhisperAudio {
   int GetChunkSize() const;
 
  private:
+  void DownmixToMono(const std::vector<float>& interleaved_pcm, int channels,
+                     std::vector<float>* mono_pcm) const;
+  bool ResampleAudio(const std::vector<float>& input_pcm,
+                     uint32_t input_sample_rate,
+                     std::vector<float>* output_pcm) const;
+
   int chunk_size_seconds_;
   int n_samples_per_chunk_;
   std::vector<float> pcm_data_;
   int total_samples_;
   bool audio_loaded_;
-
-  // Cached hann window for efficiency (reused across chunks)
-  mutable std::vector<float> hann_window_cache_;
-  mutable int hann_window_size_ = 0;
-
-  std::vector<float> ComputeHannWindow(int n_fft) const;
-  std::vector<float> ApplyReflectionPadding(const std::vector<float>& audio,
-                                            int pad_len) const;
 };
 
 // Keep backward compatible alias

@@ -292,6 +292,7 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
     const std::string& language) {
   int slide_len = 10;
   int skip_tokens = 0;
+  std::string last_response;
   auto t_start = std::chrono::high_resolution_clock::now();
 
   WhisperPerfInfo perf_info;
@@ -300,8 +301,6 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
   DecodeState local_state;
   if (state == nullptr) {
     state = &local_state;
-  } else {
-    skip_tokens = state->skip_tokens;
   }
 
   auto encoder_outputs =
@@ -403,7 +402,9 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
       default_decoder_ids.end() -
           std::min(slide_len, static_cast<int>(default_decoder_ids.size())),
       default_decoder_ids.end());
-  std::string last_response = tokenizer_->Decode(cur_slide_win);
+  if (last_response.empty()) {
+    last_response = tokenizer_->Decode(cur_slide_win);
+  }
 
   int next_token = sampling_manager.sample(float_logits.data(), vocab_size,
                                            default_decoder_ids);

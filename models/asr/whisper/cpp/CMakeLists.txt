@@ -37,12 +37,12 @@ endif()
 # Paths and sources
 # -----------------------------------------------------------------------------
 set(TOKENIZER_CPP_PATH ${CMAKE_SOURCE_DIR}/3rdparty/tokenizers-cpp)
+set(AUDIO_3RDPARTY_PATH ${CMAKE_SOURCE_DIR}/3rdparty/audio)
 set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
 
 set(SOURCE_FILES
   src/hm_whisper_audio.cc
   src/hm_whisper_infer.cc
-  src/miniaudio_impl.cc
   src/SamplingManager.cc
   src/whisper_demo.cc
 )
@@ -56,9 +56,7 @@ else()
   set(HALF_INCLUDE_PATH /usr/include/half)
 endif()
 
-if(MSVC)
-  set(LIB_PATH win11_x64)
-elseif(ANDROID_ABI)
+if(ANDROID_ABI)
   set(LIB_PATH Android_xh2)
 else()
   set(SYS_NAME "")
@@ -79,15 +77,39 @@ else()
   message(STATUS "LIB_PATH: ${LIB_PATH}")
 endif()
 
+set(AUDIO_3RDPARTY_LIB_ROOT ${AUDIO_3RDPARTY_PATH}/3rdparty_build)
+set(AUDIO_3RDPARTY_INCLUDE_DIR ${AUDIO_3RDPARTY_LIB_ROOT}/include)
+set(AUDIO_3RDPARTY_LIBRARY_DIR ${AUDIO_3RDPARTY_LIB_ROOT}/lib)
+
+if(NOT EXISTS ${AUDIO_3RDPARTY_LIBRARY_DIR}/libkaldi-native-fbank-core.so)
+  message(FATAL_ERROR
+          "Missing prebuilt kaldi-native-fbank library: "
+          "${AUDIO_3RDPARTY_LIBRARY_DIR}/libkaldi-native-fbank-core.so")
+endif()
+
+if(NOT EXISTS ${AUDIO_3RDPARTY_LIBRARY_DIR}/libsamplerate.so)
+  message(FATAL_ERROR
+          "Missing prebuilt libsamplerate library: "
+          "${AUDIO_3RDPARTY_LIBRARY_DIR}/libsamplerate.so")
+endif()
+
+if(NOT EXISTS ${AUDIO_3RDPARTY_LIBRARY_DIR}/libsndfile.so)
+  message(FATAL_ERROR
+          "Missing prebuilt libsndfile library: "
+          "${AUDIO_3RDPARTY_LIBRARY_DIR}/libsndfile.so")
+endif()
+
 # -----------------------------------------------------------------------------
 # Target
 # -----------------------------------------------------------------------------
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE EIGEN_MPL2_ONLY)
+
 target_include_directories(${PROJECT_NAME} PRIVATE
   ${HALF_INCLUDE_PATH}
   ${TOKENIZER_CPP_PATH}/${LIB_PATH}/include
+  ${AUDIO_3RDPARTY_INCLUDE_DIR}
   ${CMAKE_SOURCE_DIR}/include
   $ENV{HOUMO_PATH}/include
   ${EIGEN_PATH}
@@ -97,9 +119,11 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_link_directories(${PROJECT_NAME} PRIVATE
   $ENV{HOUMO_PATH}/lib
   ${TOKENIZER_CPP_PATH}/${LIB_PATH}/lib
+  ${AUDIO_3RDPARTY_LIBRARY_DIR}
 )
 
-set(PROJECT_LINK_LIBS tokenizers_cpp tokenizers_c)
+set(PROJECT_LINK_LIBS tokenizers_cpp tokenizers_c kaldi-native-fbank-core
+                      samplerate sndfile)
 
 if(MSVC)
   list(APPEND PROJECT_LINK_LIBS
@@ -126,7 +150,16 @@ endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_LINK_LIBS})
 
+set_target_properties(${PROJECT_NAME} PROPERTIES
+  BUILD_RPATH ${AUDIO_3RDPARTY_LIBRARY_DIR}
+  INSTALL_RPATH $ORIGIN
+)
+
 # -----------------------------------------------------------------------------
 # Install
 # -----------------------------------------------------------------------------
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
+install(FILES ${AUDIO_3RDPARTY_LIBRARY_DIR}/libkaldi-native-fbank-core.so
+        ${AUDIO_3RDPARTY_LIBRARY_DIR}/libsamplerate.so
+  ${AUDIO_3RDPARTY_LIBRARY_DIR}/libsndfile.so
+        DESTINATION .)

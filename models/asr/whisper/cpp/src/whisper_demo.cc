@@ -60,7 +60,7 @@ void PrintUsage(const char* program_name) {
          "output/xh2/whisper_prefill.hmm)\n"
       << "  --tokenizer_path <path> Path to tokenizer (default: "
          "whisper-medium/tokenizer.json)\n"
-      << "  --chunk_size <seconds>  Audio chunk size in seconds (default: 30)\n"
+      << "  --chunk_size <seconds>  Audio chunk size in seconds (default: 25)\n"
       << "  --language <code|auto>  Language code (default: auto)\n"
       << "  --encoder_path <path>   Deprecated alias of --encode_path\n"
       << "  --decoder_path <path>   Deprecated alias of --decode_path\n"

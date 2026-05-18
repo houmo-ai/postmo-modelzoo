@@ -47,6 +47,7 @@ if should_run_step "demo"; then
     python3 demo.py
     echo "Execute cpp demo."
     cd cpp && ./build.sh && cd ..
+    export LD_LIBRARY_PATH=$PWD/bin:$LD_LIBRARY_PATH
     ./bin/whisper-demo
 fi
 

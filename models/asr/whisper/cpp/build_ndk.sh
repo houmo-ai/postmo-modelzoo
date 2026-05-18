@@ -3,15 +3,11 @@ if [ ! -e 3rdparty ];then
   mkdir 3rdparty
 fi
 
-if [ ! -e 3rdparty/tokenizers-cpp ];then
+if [[ ! -e 3rdparty/tokenizers-cpp ]]; then
   cd ..
   echo "Download precompiled model."
   python3 get_model.py --type hmm
   cd cpp
-fi
-
-if [ ! -e include/mel_filters.h ];then
-    python3 scripts/export_mel_filters.py --model_path ../whisper-medium/ --output include/mel_filters.h
 fi
 
 if [ ! -e 3rdparty/eigen3 ];then
@@ -39,6 +35,11 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
       exit 1
     fi
   fi
+
+  cd "${WORK_PATH}/3rdparty/audio" || exit 1
+  chmod +x build_3rdparty_android.sh
+  ./build_3rdparty_android.sh
+  cd "${WORK_PATH}" || exit 1
 
   RUN() {
     echo -e "Executing: \033[34m$*\033[0m"
@@ -79,7 +80,9 @@ if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
       -DANDROID_PLATFORM=android-35 \
       -DANDROID_NDK=${NDK_PATH} \
       -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" \
-      -DCMAKE_INSTALL_PREFIX=${output_dir} -DCMAKE_BUILD_TYPE=${capitalized_build_type} ${@:2}
+      -DCMAKE_INSTALL_PREFIX=${output_dir} \
+      -DCMAKE_BUILD_TYPE=${capitalized_build_type} \
+      ${@:2}
 
   RUN cmake --build . --target install -j 16
 
