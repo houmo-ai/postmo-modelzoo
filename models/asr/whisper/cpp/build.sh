@@ -11,8 +11,7 @@ if [[ ! -e 3rdparty/tokenizers-cpp ]]; then
 fi
 
 if [[ ! -e 3rdparty/audio/3rdparty_build/lib/libkaldi-native-fbank-core.so || \
-      ! -e 3rdparty/audio/3rdparty_build/lib/libsamplerate.so || \
-      ! -e 3rdparty/audio/3rdparty_build/lib/libsndfile.so ]]; then
+  ! -e 3rdparty/audio/3rdparty_build/lib/libsamplerate.so ]]; then
   cd 3rdparty/audio
   chmod +x build_3rdparty.sh
   ./build_3rdparty.sh

@@ -43,6 +43,7 @@ set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
 set(SOURCE_FILES
   src/hm_whisper_audio.cc
   src/hm_whisper_infer.cc
+  src/miniaudio_impl.cc
   src/SamplingManager.cc
   src/whisper_demo.cc
 )
@@ -93,12 +94,6 @@ if(NOT EXISTS ${AUDIO_3RDPARTY_LIBRARY_DIR}/libsamplerate.so)
           "${AUDIO_3RDPARTY_LIBRARY_DIR}/libsamplerate.so")
 endif()
 
-if(NOT EXISTS ${AUDIO_3RDPARTY_LIBRARY_DIR}/libsndfile.so)
-  message(FATAL_ERROR
-          "Missing prebuilt libsndfile library: "
-          "${AUDIO_3RDPARTY_LIBRARY_DIR}/libsndfile.so")
-endif()
-
 # -----------------------------------------------------------------------------
 # Target
 # -----------------------------------------------------------------------------
@@ -123,7 +118,7 @@ target_link_directories(${PROJECT_NAME} PRIVATE
 )
 
 set(PROJECT_LINK_LIBS tokenizers_cpp tokenizers_c kaldi-native-fbank-core
-                      samplerate sndfile)
+                      samplerate)
 
 if(MSVC)
   list(APPEND PROJECT_LINK_LIBS
@@ -160,6 +155,5 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 # -----------------------------------------------------------------------------
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
 install(FILES ${AUDIO_3RDPARTY_LIBRARY_DIR}/libkaldi-native-fbank-core.so
-        ${AUDIO_3RDPARTY_LIBRARY_DIR}/libsamplerate.so
-  ${AUDIO_3RDPARTY_LIBRARY_DIR}/libsndfile.so
+  ${AUDIO_3RDPARTY_LIBRARY_DIR}/libsamplerate.so
         DESTINATION .)

@@ -12,8 +12,8 @@
 #include <cstring>
 
 #include "kaldi-native-fbank/csrc/online-feature.h"
+#include "miniaudio.h"
 #include "samplerate.h"
-#include "sndfile.h"
 
 namespace houmo {
 
@@ -32,47 +32,92 @@ HmWhisperAudio::HmWhisperAudio(int chunk_size_seconds)
 HmWhisperAudio::~HmWhisperAudio() {}
 
 bool HmWhisperAudio::LoadAudio(const std::string& audio_path) {
-  SF_INFO sf_info;
-  std::memset(&sf_info, 0, sizeof(sf_info));
-
-  SNDFILE* snd_file = sf_open(audio_path.c_str(), SFM_READ, &sf_info);
-  if (snd_file == nullptr) {
-    std::cerr << "Error: Failed to load audio: " << audio_path << "\n";
+  ma_decoder_config decoder_config =
+      ma_decoder_config_init(ma_format_f32, 0, 0);
+  ma_decoder decoder;
+  ma_result result =
+      ma_decoder_init_file(audio_path.c_str(), &decoder_config, &decoder);
+  if (result != MA_SUCCESS) {
+    std::cerr << "Error: Failed to load audio: " << audio_path
+              << ", miniaudio error=" << result << "\n";
     return false;
   }
 
-  if (sf_info.frames <= 0 || sf_info.channels <= 0 || sf_info.samplerate <= 0) {
-    sf_close(snd_file);
+  ma_format format = ma_format_unknown;
+  ma_uint32 channels = 0;
+  ma_uint32 sample_rate = 0;
+  result = ma_decoder_get_data_format(&decoder, &format, &channels,
+                                      &sample_rate, nullptr, 0);
+  if (result != MA_SUCCESS || format != ma_format_f32 || channels == 0 ||
+      sample_rate == 0) {
+    ma_decoder_uninit(&decoder);
     std::cerr << "Error: Invalid audio metadata: " << audio_path << "\n";
     return false;
   }
 
-  const sf_count_t total_frames = sf_info.frames;
-  std::vector<float> interleaved_pcm(
-      static_cast<size_t>(total_frames) * sf_info.channels);
-  const sf_count_t frames_read =
-      sf_readf_float(snd_file, interleaved_pcm.data(), total_frames);
-  sf_close(snd_file);
+  std::vector<float> interleaved_pcm;
+  ma_uint64 total_frames = 0;
+  result = ma_decoder_get_length_in_pcm_frames(&decoder, &total_frames);
+  if (result == MA_SUCCESS && total_frames > 0) {
+    interleaved_pcm.resize(static_cast<size_t>(total_frames) * channels);
 
-  if (frames_read <= 0) {
-    std::cerr << "Error: Failed to read audio samples: " << audio_path
-              << "\n";
+    ma_uint64 frames_read = 0;
+    result = ma_decoder_read_pcm_frames(&decoder, interleaved_pcm.data(),
+                                        total_frames, &frames_read);
+    if (result != MA_SUCCESS && result != MA_AT_END) {
+      ma_decoder_uninit(&decoder);
+      std::cerr << "Error: Failed to read audio samples: " << audio_path
+                << ", miniaudio error=" << result << "\n";
+      return false;
+    }
+
+    interleaved_pcm.resize(static_cast<size_t>(frames_read) * channels);
+  } else {
+    constexpr ma_uint64 kFramesPerRead = 4096;
+    std::vector<float> chunk(static_cast<size_t>(kFramesPerRead) * channels);
+
+    while (true) {
+      ma_uint64 frames_read = 0;
+      result = ma_decoder_read_pcm_frames(&decoder, chunk.data(),
+                                          kFramesPerRead, &frames_read);
+      if (result != MA_SUCCESS && result != MA_AT_END) {
+        ma_decoder_uninit(&decoder);
+        std::cerr << "Error: Failed to stream audio samples: " << audio_path
+                  << ", miniaudio error=" << result << "\n";
+        return false;
+      }
+
+      if (frames_read == 0) {
+        break;
+      }
+
+      interleaved_pcm.insert(
+          interleaved_pcm.end(), chunk.begin(),
+          chunk.begin() + static_cast<std::ptrdiff_t>(frames_read * channels));
+
+      if (result == MA_AT_END) {
+        break;
+      }
+    }
+  }
+
+  ma_decoder_uninit(&decoder);
+
+  if (interleaved_pcm.empty()) {
+    std::cerr << "Error: Failed to read audio samples: " << audio_path << "\n";
     return false;
   }
 
-  interleaved_pcm.resize(static_cast<size_t>(frames_read) * sf_info.channels);
-
   std::vector<float> mono_pcm;
-  DownmixToMono(interleaved_pcm, sf_info.channels, &mono_pcm);
+  DownmixToMono(interleaved_pcm, static_cast<int>(channels), &mono_pcm);
 
-  if (sf_info.samplerate == kSampleRate) {
+  if (sample_rate == static_cast<ma_uint32>(kSampleRate)) {
     pcm_data_ = std::move(mono_pcm);
   } else {
-    if (!ResampleAudio(mono_pcm, static_cast<uint32_t>(sf_info.samplerate),
+    if (!ResampleAudio(mono_pcm, static_cast<uint32_t>(sample_rate),
                        &pcm_data_)) {
-      std::cerr << "Error: Failed to resample audio from "
-                << sf_info.samplerate << " Hz to " << kSampleRate
-                << " Hz: " << audio_path << "\n";
+      std::cerr << "Error: Failed to resample audio from " << sample_rate
+                << " Hz to " << kSampleRate << " Hz: " << audio_path << "\n";
       return false;
     }
   }
@@ -80,9 +125,8 @@ bool HmWhisperAudio::LoadAudio(const std::string& audio_path) {
   total_samples_ = static_cast<int>(pcm_data_.size());
   audio_loaded_ = true;
 
-  std::cout << "Audio loaded: " << audio_path
-            << ", channels: " << sf_info.channels
-            << ", sample rate: " << sf_info.samplerate << "Hz"
+  std::cout << "Audio loaded: " << audio_path << ", channels: " << channels
+            << ", sample rate: " << sample_rate << "Hz"
             << ", duration: " << GetTotalDuration() << "s"
             << ", samples: " << total_samples_ << "\n";
 
@@ -222,8 +266,7 @@ bool HmWhisperAudio::ResampleAudio(const std::vector<float>& input_pcm,
     return true;
   }
 
-  const double src_ratio =
-      static_cast<double>(kSampleRate) / input_sample_rate;
+  const double src_ratio = static_cast<double>(kSampleRate) / input_sample_rate;
   const size_t output_capacity =
       static_cast<size_t>(std::ceil(input_pcm.size() * src_ratio)) + 1;
 

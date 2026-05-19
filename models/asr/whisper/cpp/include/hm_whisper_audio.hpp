@@ -49,7 +49,7 @@ struct MelFeatures {
  * @brief Audio preprocessing class for Whisper ASR
  *
  * Handles:
- * - Audio file loading (via libsndfile)
+ * - Audio file loading (via miniaudio)
  * - Automatic resampling to 16kHz mono
  * - Audio chunking for long files
  * - Mel spectrogram computation (STFT + mel filter bank)
