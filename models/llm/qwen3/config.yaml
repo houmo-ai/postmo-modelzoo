@@ -1,47 +1,45 @@
-# Qwen3 Model Default Configurations
-
-# Default model size
+default_model_name: "qwen3"
 default_model_size: "8b"
 
-# Per-model configurations
 model_configs:
-  "0.6b":
-    modelscope_repo: ["qwen/qwen3-0.6b"]
-    model_name: "qwen3"
-    model_size: "0.6b"
-    ncore: 2
-    quant_type: "w4a8h0_ssfp"
-    context_length: "32k"
-    ndevice: 1
-    batch: 1
-    prefill_length: 256
-  "1.7b":
-    modelscope_repo: ["qwen/qwen3-1.7b"]
-    model_name: "qwen3"
-    model_size: "1.7b"
-    ncore: 2
-    quant_type: "w4a8h0_ssfp"
-    context_length: "32k"
-    ndevice: 1
-    batch: 1
-    prefill_length: 256
-  "8b":
-    modelscope_repo: ["qwen/qwen3-8b"]
-    model_name: "qwen3"
-    model_size: "8b"
-    ncore: 2
-    quant_type: "w4a8h0_ssfp"
-    context_length: "32k"
-    ndevice: 1
-    batch: 1
-    prefill_length: 256
-  "14b":
-    modelscope_repo: ["qwen/qwen3-14b"]
-    model_name: "qwen3"
-    model_size: "14b"
-    ncore: 2
-    quant_type: "w4a8h0_ssfp"
-    context_length: "16k"
-    ndevice: 1
-    batch: 1
-    prefill_length: 256
+  qwen3:
+    "0.6b":
+      modelscope_repo: ["qwen/qwen3-0.6b"]
+      model_name: "qwen3"
+      model_size: "0.6b"
+      ncore: 2
+      quant_type: "w4a8h0_ssfp"
+      context_length: "32k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+    "1.7b":
+      modelscope_repo: ["qwen/qwen3-1.7b"]
+      model_name: "qwen3"
+      model_size: "1.7b"
+      ncore: 2
+      quant_type: "w4a8h0_ssfp"
+      context_length: "32k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+    "8b":
+      modelscope_repo: ["qwen/qwen3-8b"]
+      model_name: "qwen3"
+      model_size: "8b"
+      ncore: 2
+      quant_type: "w4a8h0_ssfp"
+      context_length: "32k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+    "14b":
+      modelscope_repo: ["qwen/qwen3-14b"]
+      model_name: "qwen3"
+      model_size: "14b"
+      ncore: 2
+      quant_type: "w4a8h0_ssfp"
+      context_length: "16k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256

@@ -20,15 +20,28 @@
 
 import os
 import argparse
-from hmatc.utils.utils import hmatc_get_file, get_houmo_version
+from hmatc.utils.utils import (
+    first_not_none,
+    hmatc_get_file,
+    get_houmo_version,
+    get_model_configs,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
     parser.add_argument(
         "--type",
         dest="file_type",
@@ -63,38 +76,50 @@ def get_args() -> argparse.Namespace:
         "--context_length",
         dest="context_length",
         type=str,
-        default="256k",
+        default=None,
         help="context length",
     )
     parser.add_argument(
         "--batch",
         dest="batch",
         type=int,
-        default=1,
+        default=None,
         help="batch size",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
+        default=None,
         help="device number",
     )
     parser.add_argument(
         "--model_name",
         dest="model_name",
         type=str,
-        default="qwen3.6",
-        choices=["qwen3.5", "qwen3.6"],
+        default=None,
         help="model name: qwen3.5 or qwen3.6",
     )
     parser.add_argument(
         "--model_size",
         dest="model_size",
         type=str,
-        default="35b-a3b",
-        choices=["0.8b", "2b", "4b", "9b", "27b", "35b-a3b"],
+        default=None,
         help="model size: 0.8b, 2b, 4b, 9b, 27b, 35b-a3b",
+    )
+    parser.add_argument(
+        "--quant_type",
+        dest="quant_type",
+        type=str,
+        default=None,
+        help="quantization type",
+    )
+    parser.add_argument(
+        "--mtp",
+        dest="mtp",
+        action="store_true",
+        default=False,
+        help="whether it is an mtp model",
     )
     args = parser.parse_args()
     return args
@@ -103,63 +128,39 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
 
-    # Model configurations based on size
-    model_configs = {
-        "qwen3.5": {
-            "0.8b": {
-                "ncore": 2,
-                "modelscope_repo": ["Qwen/Qwen3.5-0.8B"],
-            },
-            "2b": {
-                "ncore": 2,
-                "modelscope_repo": ["Qwen/Qwen3.5-2B"],
-            },
-            "4b": {
-                "ncore": 2,
-                "modelscope_repo": ["Qwen/Qwen3.5-4B"],
-            },
-            "9b": {
-                "ncore": 2,
-                "modelscope_repo": ["Qwen/Qwen3.5-9B"],
-            },
-            "27b": {
-                "ncore": 2,
-                "modelscope_repo": ["Qwen/Qwen3.5-27B"],
-            },
-            "35b-a3b": {
-                "ncore": 2,
-                "modelscope_repo": ["Qwen/Qwen3.5-35B-A3B"],
-            },
-        },
-        "qwen3.6": {
-            "35b-a3b": {
-                "ncore": 2,
-                "modelscope_repo": ["Qwen/Qwen3.6-35B-A3B"],
-            },
-            "27b": {
-                "ncore": 2,
-                "modelscope_repo": ["Qwen/Qwen3.6-27B"],
-            },
-        },
-    }
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
 
-    config = model_configs[args.model_name][args.model_size]
+    model_name = first_not_none(args.model_name, default_model_name)
+    model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(model_name, {}).get(model_size, {})
+
+    context_length = first_not_none(
+        args.context_length, model_config.get("context_length", "256k")
+    )
+    batch = first_not_none(args.batch, model_config.get("batch", 1))
+    ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    quant_type = first_not_none(
+        args.quant_type, model_config.get("quant_type", "wmix_amix")
+    )
 
     model_cfgs = {
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": args.model_name,
+        "model_name": model_name,
         "model_info": {
-            "model_size": args.model_size,
-            "ncore": config["ncore"],
-            "ndevice": args.ndevice,
-            "context_len": args.context_length,
+            "model_size": model_size if not args.mtp else f"{model_size}-mtp",
+            "ncore": model_config.get("ncore", 2),
+            "ndevice": ndevice,
+            "context_len": context_length,
             "prefill_len": 256,
-            "batch": args.batch,
+            "batch": batch,
+            "quant_type": quant_type,
         },
         "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
-        "modelscope_repo": {"repo_ids": config["modelscope_repo"]},
+        "modelscope_repo": {"repo_ids": model_config.get("modelscope_repo", [])},
     }
 
     _, ret_dict = hmatc_get_file(

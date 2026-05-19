@@ -174,6 +174,18 @@ def check_gpu() -> bool:
         return False
 
 
+def parse_context_length(context_length):
+    """Parse context length values like 4096 or 256k into an integer."""
+    if isinstance(context_length, int):
+        return context_length
+    if isinstance(context_length, str):
+        lower_value = context_length.lower()
+        if lower_value.endswith("k"):
+            return int(lower_value[:-1]) * 1024
+        return int(lower_value)
+    raise ValueError(f"Unsupported context length value: {context_length}")
+
+
 def get_onnx_inputs_info(onnx_path):
     """Get input and output information from an ONNX model file.
 
@@ -1133,15 +1145,40 @@ def hmatc_get_file(
     return download_file, download_files
 
 
-def get_model_configs(config_path: str, config_key: str = "model_configs"):
-    """Get default_model_size and model_configs from config.yaml."""
+def get_model_configs(
+    config_path: str,
+    config_key: str = "model_configs",
+):
+    """Get model configs from config.yaml.
+
+    Args:
+        config_path (str): Path to config yaml.
+        config_key (str): Config key to read, default is ``model_configs``.
+
+    Returns:
+        tuple:
+            - ``(default_model_size, default_model_name, model_configs)``.
+    """
     config = {}
     if not config_path or config_path is None or not os.path.exists(config_path):
         return "", {}
 
     with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    return config.get("default_model_size", ""), config.get(config_key, {})
+        config = yaml.safe_load(f) or {}
+
+    default_model_name = config.get("default_model_name", "")
+    default_model_size = config.get("default_model_size", "")
+    model_configs = config.get(config_key, {}) or {}
+
+    return default_model_size, default_model_name, model_configs
+
+
+def first_not_none(*values):
+    """Return the first value that is not None."""
+    for value in values:
+        if value is not None:
+            return value
+    return None
 
 
 class ProgressFile:

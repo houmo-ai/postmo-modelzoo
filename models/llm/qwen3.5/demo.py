@@ -43,18 +43,29 @@ from hmatc.utils.perf_infomations import (
     PERFTYPE,
 )
 from hmatc.python.get_hm_devices import get_hm_devices
+from hmatc.utils.utils import first_not_none, get_model_configs
 from processing_qwen3_5 import Qwen3_5Processor
 from image_processing_qwen3_5 import Qwen3_5ImageProcessor
 from vision_process_qwen3_5 import process_vision_info
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH")
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 IMAGE_TOKEN_ID = 248056
 VIDEO_TOKEN_ID = 248057
 VISION_START_TOKEN_ID = 248053
 SPATIAL_MERGE_SIZE = 2
 TEMPORAL_PATCH_SIZE = 2
+
+
+def get_default_tokenizer_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "qwen3.6").upper()
+    model_size = model_config.get("model_size", "35b-a3b").upper()
+    return f"{model_name}-{model_size}"
 
 
 def is_valid_char(cp):
@@ -79,10 +90,31 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="Qwen3.6-35B-A3B",
+        default=None,
         help="tokenizer dir",
     )
     parser.add_argument(
@@ -96,30 +128,29 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.6_prefill.hmm"),
+        default=None,
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.6_decode.hmm"),
+        default=None,
         help="houmo decode model path",
     )
     parser.add_argument(
         "--vision_path",
         dest="vision_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.6_visual.hmm"),
+        default=None,
         help="houmo vision model path (.hmm)",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
-        choices=[1, 2],
-        help="device number, only xh2 support",
+        default=None,
+        help="device number",
     )
     parser.add_argument(
         "--repetition_penalty",
@@ -177,15 +208,22 @@ def get_args() -> argparse.Namespace:
         "--max_size_w",
         dest="max_size_w",
         type=int,
-        default=448,
+        default=None,
         help="max image width for vision",
     )
     parser.add_argument(
         "--max_size_h",
         dest="max_size_h",
         type=int,
-        default=448,
+        default=None,
         help="max image height for vision",
+    )
+    parser.add_argument(
+        "--max_size_t",
+        dest="max_size_t",
+        type=int,
+        default=None,
+        help="max temporal size for vision filename suffix",
     )
     parser.add_argument(
         "--patch_size",
@@ -213,6 +251,36 @@ def get_args() -> argparse.Namespace:
         help="enable debug logs including TTFT breakdown",
     )
     args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    args.max_size_w = first_not_none(
+        args.max_size_w, model_config.get("max_size_w", 896)
+    )
+    args.max_size_h = first_not_none(
+        args.max_size_h, model_config.get("max_size_h", 896)
+    )
+    args.max_size_t = first_not_none(args.max_size_t, model_config.get("max_size_t", 2))
+    if args.tokenizer_dir is None:
+        args.tokenizer_dir = get_default_tokenizer_dir(model_config)
+    if args.prefill_path is None:
+        args.prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
+        )
+    if args.decode_path is None:
+        args.decode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
+        )
+    if args.vision_path is None:
+        args.vision_path = os.path.join(
+            "output",
+            HOUMO_TARGET,
+            f"{args.model_name}-{args.model_size}_visual_{args.max_size_w}x{args.max_size_h}x{args.max_size_t}.hmm",
+        )
     if args.ndevice > 1:
         args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
         args.decode_path = args.decode_path.replace(".hmm", ".hmms")

@@ -17,32 +17,20 @@ SKIP_DOWNLOAD="false"
 MODEL_NAME="qwen3.6"
 MODEL_SIZE="35b-a3b"
 NDEVICE=1
+MTP="false"
 
 parse_args "$@"
 
-case "${MODEL_NAME}" in
-    qwen3.5|qwen3.6)
+case "${MODEL_NAME}:${MODEL_SIZE}" in
+    qwen3.5:0.8b|qwen3.5:2b|qwen3.5:4b|qwen3.5:9b|qwen3.6:27b|qwen3.6:35b-a3b)
         ;;
     *)
-        echo "Error: Unsupported model name '${MODEL_NAME}', support: qwen3.5, qwen3.6." >&2
+        echo "Error: Unsupported model combination '${MODEL_NAME}-${MODEL_SIZE}'." >&2
+        echo "       qwen3.5 supports: 0.8b, 2b, 4b, 9b" >&2
+        echo "       qwen3.6 supports: 27b, 35b-a3b" >&2
         exit 1
         ;;
 esac
-
-case "${MODEL_SIZE}" in
-    0.8b|2b|4b|9b|27b|35b-a3b)
-        ;;
-    *)
-        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 0.8b, 2b, 4b, 9b, 27b, 35b-a3b." >&2
-        exit 1
-        ;;
-esac
-
-PERF_CONFIG="config.yaml"
-if [[ "${MODEL_NAME}" == "qwen3.6" ]]; then
-    PERF_CONFIG="config.qwen3.6.yaml"
-fi
-RAW_HF_DIR="${SCRIPT_DIR}/$(echo "${MODEL_NAME}-${MODEL_SIZE}" | tr '[:lower:]' '[:upper:]')"
 
 cd "${SCRIPT_DIR}"
 
@@ -64,42 +52,54 @@ if should_run_step "quant"; then
     fi
 
     if ! should_skip_download; then
-        echo "Download raw model (${MODEL_NAME}-${MODEL_SIZE}) → ${RAW_HF_DIR}."
+        echo "Download raw model (${MODEL_NAME}-${MODEL_SIZE})."
         python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Start model quantization (${MODEL_NAME}-${MODEL_SIZE})."
-    PTQ_ARGS=(--model "${RAW_HF_DIR}")
-    if [[ -n "${VISION_IMAGE}" ]]; then
-        PTQ_ARGS+=(--vision-image-path "${VISION_IMAGE}")
-    fi
-    python3 ptq.py "${PTQ_ARGS[@]}"
+    python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}"
 fi
 
 if should_run_step "build"; then
     echo "Start model compilation (${MODEL_NAME}-${MODEL_SIZE})."
-    python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    if [ "${MTP}" = "true" ]; then
+        python3 build_mtp.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    else
+        python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    fi
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
         echo "Download pre-compiled model (${MODEL_NAME}-${MODEL_SIZE})."
-        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        GET_MODEL_ARGS=(--type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}")
+        if [ "${MTP}" = "true" ]; then
+            GET_MODEL_ARGS+=(--mtp)
+        fi
+        python3 get_model.py "${GET_MODEL_ARGS[@]}"
     fi
     echo "Execute demo."
-    if [[ "${MODEL_NAME}" == "qwen3.5" ]]; then
-        python3 demo.py \
-            --tokenizer_dir "${RAW_HF_DIR}" \
-            --prefill_path "output/${HOUMO_TARGET}/${MODEL_NAME}_prefill.hmm" \
-            --decode_path "output/${HOUMO_TARGET}/${MODEL_NAME}_decode.hmm" \
-            --vision_path "output/${HOUMO_TARGET}/${MODEL_NAME}_visual_896x896x2.hmm" \
-            --max_size_w 896 \
-            --max_size_h 896
+    if [ "${MTP}" = "true" ]; then
+        python3 demo_mtp.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     else
-        python3 demo.py
+        python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+
+        if command -v llm_perf &>/dev/null; then
+            echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
+            python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
+            devices_param=$(get_devices_param "${NDEVICE}")
+            if [[ "${NDEVICE}" -gt 1 ]]; then
+                model_suffix="hmms"
+            else
+                model_suffix="hmm"
+            fi
+            llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
+                --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
+                --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
+                --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
+                --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_896x896x2.hmm" \
+                --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
+        fi
     fi
-    echo "Execute performance case."
-    python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
-    llm_perf -c "${PERF_CONFIG}"
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

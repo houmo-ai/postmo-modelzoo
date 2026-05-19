@@ -1,236 +1,216 @@
 # Qwen3.5 / Qwen3.6
 
-本示例展示如何把Qwen3.5模型量化和编译，部署到后摩芯片的设备上。Qwen3.6-35B-A3B 与当前Qwen3.5 MoE量化导出流程兼容，可通过 `--model_name` 选择。
+本目录提供 Qwen3.5 和 Qwen3.6 多模态模型在后摩 XH2 平台上的下载、量化、编译和演示脚本。当前脚本默认读取同目录下的 `config.yaml`，默认模型为 `qwen3.6` + `35b-a3b`。
 
-## 预训练模型
+## 支持的模型
 
-本项目使用从 ModelScope 下载的预训练模型：
+- `qwen3.5`: `0.8b`, `2b`, `4b`, `9b`
+- `qwen3.6`: `27b`, `35b-a3b`
 
-- 来源：
-    + Qwen3.5-0.8B: https://modelscope.cn/models/Qwen/Qwen3.5-0.8B
-    + Qwen3.5-2B: https://modelscope.cn/models/Qwen/Qwen3.5-2B
-    + Qwen3.5-4B: https://modelscope.cn/models/Qwen/Qwen3.5-4B
-    + Qwen3.5-9B: https://modelscope.cn/models/Qwen/Qwen3.5-9B
-    + Qwen3.5-27B: https://modelscope.cn/models/Qwen/Qwen3.5-27B
-    + Qwen3.5-35B-A3B: https://modelscope.cn/models/Qwen/Qwen3.5-35B-A3B
-    + Qwen3.6-27B: https://modelscope.cn/models/Qwen/Qwen3.6-27B
-    + Qwen3.6-35B-A3B: https://modelscope.cn/models/Qwen/Qwen3.6-35B-A3B
-- 许可: Apache License 2.0
+对应 ModelScope 模型：
 
-预训练模型在运行时下载，工程发布**不包含**该模型。
-
-## 用于校准的数据集
-
-本项目引用 wikitext 数据集仅用于**研究和评估目的**。
-
-- 数据集许可: CC BY-NC 4.0
-- 来源: https://www.modelscope.cn/datasets/modelscope/wikitext
-
-⚠️ 重要提示:
-- 本数据集**不作为本仓库的一部分进行分发**。
-- 本数据集**不受本项目 Apache License 2.0 许可的约束**。
-- 任何对数据集的使用都必须遵守其原始许可 (CC BY-NC 4.0)，包括**非商业用途限制**。
-- 用户有责任确保在使用本数据集时遵守相关规定。
-
-[TOC]
-
-## 1 模型说明
-
-本例使用的模型实现来源于：
 - Qwen3.5-0.8B: https://modelscope.cn/models/Qwen/Qwen3.5-0.8B
 - Qwen3.5-2B: https://modelscope.cn/models/Qwen/Qwen3.5-2B
 - Qwen3.5-4B: https://modelscope.cn/models/Qwen/Qwen3.5-4B
 - Qwen3.5-9B: https://modelscope.cn/models/Qwen/Qwen3.5-9B
-- Qwen3.5-27B: https://modelscope.cn/models/Qwen/Qwen3.5-27B
-- Qwen3.5-35B-A3B: https://modelscope.cn/models/Qwen/Qwen3.5-35B-A3B
 - Qwen3.6-27B: https://modelscope.cn/models/Qwen/Qwen3.6-27B
 - Qwen3.6-35B-A3B: https://modelscope.cn/models/Qwen/Qwen3.6-35B-A3B
 
-本示例为Qwen3.5适配目录，同时兼容Qwen3.6-35B-A3B。Qwen3.6-35B-A3B 复用当前Qwen3.5 MoE量化、导出、编译和演示流程。
+预训练模型在运行时下载，仓库本身不包含这些权重。
 
-## 2 快速开始
+## 输出约定
 
-目前Qwen3.5 / Qwen3.6模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
+编译与演示脚本统一使用 `${model_name}-${model_size}` 作为文件名前缀。
 
-### 2.1 环境准备
+标准流程输出：
 
-安装示例运行所需的python依赖，建议使用venv
+- `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill.hmm`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_decode.hmm`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_${max_size_w}x${max_size_h}x${max_size_t}.hmm`
+
+MTP 流程额外输出：
+
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill_mtp.hmm`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_decode_mtp.hmm`
+
+`demo.py` 与 `demo_mtp.py` 默认从 `config.yaml` 中读取 `modelscope_repo`，并使用其最后一段作为 `tokenizer_dir` 默认值；若配置缺失，则回退到 `MODEL_NAME-MODEL_SIZE` 大写目录名。
+
+## 快速开始
+
+### 1. 安装依赖
 
 ```bash
 pip3 install -r requirements.txt
 pip3 install -r ../../../hmodel/gptqmodel/requirements.txt
 ```
 
-### 2.2 获取模型和数据
+### 2. 下载模型
 
-通过 get_model.py 脚本下载模型，可通过参数选择下载原始模型或芯片模型。
+下载原始模型：
 
-Qwen3.5-0.8B 模型：
-```bash
-python3 get_model.py --type raw --model_name qwen3.5 --model_size 0.8b
-```
-
-Qwen3.5-2B 模型：
-```bash
-python3 get_model.py --type raw --model_name qwen3.5 --model_size 2b
-```
-
-Qwen3.5-4B 模型：
-```bash
-python3 get_model.py --type raw --model_name qwen3.5 --model_size 4b
-```
-
-Qwen3.5-9B 模型：
 ```bash
 python3 get_model.py --type raw --model_name qwen3.5 --model_size 9b
-```
-
-Qwen3.5-27B 模型：
-```bash
-python3 get_model.py --type raw --model_name qwen3.5 --model_size 27b
-```
-
-Qwen3.5-35B-A3B 模型：
-```bash
-python3 get_model.py --type raw --model_name qwen3.5 --model_size 35b-a3b
-```
-
-Qwen3.6-35B-A3B 模型：
-```bash
 python3 get_model.py --type raw --model_name qwen3.6 --model_size 35b-a3b
 ```
 
-如果仅查看演示结果，可选择下载芯片模型：
+仅下载预编译模型用于演示：
+
 ```bash
 python3 get_model.py --type hmm --model_name qwen3.6 --model_size 35b-a3b
 ```
 
-### 2.3 量化
+### 3. 量化
 
-量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上，空闲内存需要达到100GB以上。参考命令：
+量化需要 GPU 环境。推荐先通过 `get_model.py --type raw` 下载原始模型，再执行：
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64 /bin/bash
+python3 ptq.py --model ./Qwen3.6-35B-A3B
 ```
 
-进入docker后 source 环境变量，并进入 `models/llm/qwen3.5` 目录。当前目录中的量化脚本整理中，本节暂记为 TODO。
-量化下载的原始模型。在当前目录下，执行脚本：
+如果当前目录下已经存在与配置匹配的模型目录，也可以直接运行 `python3 ptq.py`，脚本会按 `config.yaml` 推导默认模型目录名。
+
+量化输出位于 `output/${HOUMO_TARGET}/hmquant`。
+
+### 4. 编译
+
+标准编译：
+
 ```bash
-pip3 install transformers==5.2.0
-python ptq.py  --model /path/to/downloaded/model
+python3 build.py --model_name qwen3.6 --model_size 35b-a3b
 ```
 
-量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录：
+MTP 编译：
 
 ```bash
-.
-|-- decoder
-|-- prefill
-|-- quant_embedding.pt
-`-- weight.npy
+python3 build_mtp.py --model_name qwen3.6 --model_size 35b-a3b
 ```
 
-### 2.4 编译
+### 5. 演示
 
-将量化模型编译为在芯片上运行的模型。
+标准演示：
 
 ```bash
-python3 build.py
+python3 demo.py --model_name qwen3.6 --model_size 35b-a3b
 ```
 
-如需指定模型版本，可附加 `--model_size` 参数，具体取值请以脚本帮助信息为准。
-Qwen3.6-35B-A3B 使用 `--model_size 3.6-35b-a3b`，test.sh 会自动使用 `qwen3.6` 作为导出和编译模型名前缀。
-
-编译好的模型存放在当前目录，包括2个文件：
-- qwen3.5_prefill.hmm
-- qwen3.5_decode.hmm
-
-如包含视觉分支，还会生成：
-- qwen3.5_visual.hmm
-
-Qwen3.6-35B-A3B 对应输出文件名前缀为 `qwen3.6`。
-
-### 2.5 演示
-
-Qwen3.5 / Qwen3.6模型使用python API进行演示。
+MTP 演示：
 
 ```bash
-python3 demo.py
+python3 demo_mtp.py --model_name qwen3.6 --model_size 35b-a3b
 ```
 
-### 2.6 一键评估
+脚本默认会拼接如下路径：
 
-以上步骤可以通过test.sh脚本一键执行：
+- `demo.py`: `prefill.hmm`, `decode.hmm`, `visual_...hmm`
+- `demo_mtp.py`: `prefill.hmm`, `prefill_mtp.hmm`, `decode_mtp.hmm`, `decode.hmm`
+
+多设备场景下，demo 脚本会自动把默认模型后缀从 `.hmm` 切换为 `.hmms`。
+
+## test.sh
+
+`test.sh` 用于串起下载、量化、编译、演示和 MTP 演示。默认行为是执行 `demo`，默认模型是 `qwen3.6-35b-a3b`。
 
 ```bash
+# 默认执行 demo，会先下载预编译模型
 bash test.sh
+
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+bash test.sh -s all
 ```
 
-如需指定模型版本，可附加 `-size/--model_size` 参数，具体取值请以脚本帮助信息为准。Qwen3.6-35B-A3B 示例：
+脚本参数：
+
 ```bash
-bash test.sh --model_name qwen3.6 --model_size 35b-a3b
+Usage: test.sh [options]
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  -name, --model_name     Model name. Choices: qwen3.5, qwen3.6.
+  -size, --model_size     Model size.
+  --mtp                   Enable mtp mode.
+  --skip_download         Skip model download steps.
+  -h, --help              Show this help message.
 ```
 
-## 3 参考结果
+`test.sh` 会校验模型组合，只接受：
 
-### 3.1 演示结果
+- `qwen3.5`: `0.8b`, `2b`, `4b`, `9b`
+- `qwen3.6`: `27b`, `35b-a3b`
 
-TODO
+示例：
 
-### 3.2 性能结果
+```bash
+# 指定模型为 Qwen3.5-9B
+bash test.sh --model_name qwen3.5 --model_size 9b
 
-TODO
+# 仅运行 quant，会先下载原始模型再量化
+bash test.sh -s quant --model_name qwen3.6 --model_size 35b-a3b
 
-### 3.3 性能测试工具
+# 仅运行 build，要求当前目录下已经有量化输出
+bash test.sh -s build --model_name qwen3.6 --model_size 35b-a3b
 
-- 使用llm_perf性能评测工具测试模型性能。
-- llm_perf工具详细使用说明参考${HOUMO_EXAMPLE_PATH}/tools/llm_perf目录的README.MD。
-- 如果使用发布的容器，llm_perf工具已经预编译安装，可以直接通过llm_perf --help获取帮助。
-- 配置文件与测试样例仍在整理中，本节暂记为 TODO。
+# 仅运行 demo，会先下载预编译模型
+bash test.sh -s demo --model_name qwen3.6 --model_size 35b-a3b
 
-## 4 命令行参数说明
+# 完整流程
+bash test.sh -s all --model_name qwen3.6 --model_size 35b-a3b
+
+# MTP 演示或编译
+bash test.sh --mtp --model_name qwen3.6 --model_size 35b-a3b
+
+# 跳过下载，直接使用当前目录已有模型
+bash test.sh -s demo --skip_download --model_name qwen3.6 --model_size 35b-a3b
+```
+
+标准 demo 流程结束后，脚本还会执行：
+
+```bash
+python3 ${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py --path output/${HOUMO_TARGET}/hmquant/quant_embedding.pt
+llm_perf -c config.yaml
+```
+
+## 关键参数说明
 
 ### get_model.py
-- `--model_name`: 模型名称，支持 `qwen3.5` 或 `qwen3.6`，默认 `qwen3.6`
-- `--model_size`: 模型大小，支持  `0.8b`、`2b`、`4b`、`9b`、`27b`、`35b-a3b`，默认 `35b-a3b`
-- `--type`: 下载类型，支持 `raw` 或 `hmm`，默认 `hmm`
-- `--download_dir`: 下载目录，默认当前目录
-- `--extract_dir`: 解压目录，默认 `None`
-- `--source_type`: 下载源，支持 `jfrog` 或 `modelscope`，默认 `jfrog`
-- `--context_length`: 上下文长度，默认 `8k`
-- `--batch`: 批次大小，默认 `1`
-- `--ndevice`: 设备数量，默认 `1`
+
+- `--config`: 配置文件路径，默认当前目录下 `config.yaml`
+- `--model_name`: 模型名称，默认取 `config.yaml`
+- `--model_size`: 模型尺寸，默认取 `config.yaml`
+- `--type`: `raw` 或 `hmm`
+- `--source_type`: 下载源，支持 `jfrog` 和 `modelscope`
+- `--mtp`: 下载 MTP 预编译模型
 
 ### ptq.py
-- TODO
 
-### build.py
-- `--model_name`: 模型名称，支持 `qwen3.5` 或 `qwen3.6`，默认 `qwen3.6`
-- `--model_size`: 模型大小参数，具体取值请以脚本帮助信息为准
-- `--batch`: 批次大小（默认：1）
-- `--context_length`: 上下文长度（默认：262144）
-- `--flash_attention`: Flash Attention优化（默认：2 1）
-- `--device_kernel_split`: 设备内核分割
-- `--stage`: 构建阶段，build/test/all（默认：build）
+- `--model`: 原始 HF 模型目录；默认根据 `modelscope_repo` 推导目录名
+- `--model-name`: 导出使用的模型名前缀，默认取配置
+- `--model-size`: 模型尺寸，默认取配置
+- `--context-length`: 从配置继承的上下文长度
+- `--max-pe-length`: 默认跟随 `context-length`
+- `--input-sequence-length`: 默认取配置中的 `prefill_length`
+- `--skip-export-vision` / `--skip-export-llm`: 选择性跳过导出
 
-### demo.py
-- `--tokenizer_dir`: tokenizer目录（默认：qwen3.6）
-- `--embedding_path`: embedding权重路径
-- `--prefill_path`: prefill模型路径
-- `--decode_path`: decode模型路径
-- `--vision_path`: vision模型路径
-- `--ndevice`: 设备数量（默认：1）
-- `--image_path`: 图片输入路径，支持一次传入多张图片、重复传参或逗号分隔
-- `--it`: 交互模式，若提供 `--vision_path`，每轮对话可逐张输入图片路径，留空即开始推理，也可首个输入直接留空走纯文本
-- `--history`: 保留对话历史
-- `--debug`: 输出调试日志
+### build.py / build_mtp.py
 
-### test.sh
-- `-name, --model_name`: 模型名称，支持 `qwen3.5` 或 `qwen3.6`，默认 `qwen3.6`
-- `-size, --model_size`: 模型大小，支持 `0.8b`、`2b`、`4b`、`9b`、`27b`、`35b-a3b` 或 `35b-a3b`，默认 `35b-a3b`
-- `-size, --model_size`: 模型大小，支持 `0.8b`、`2b`、`4b`、`9b`、`27b`、`35b-a3b` 或 `35b-a3b`，默认 `35b-a3b`
-- `-s, --step`: 执行步骤，demo/build/quant/all（默认：demo）
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--model_dir`: 默认 `output/${HOUMO_TARGET}/hmquant`
+- `--output_dir`: 默认 `output/${HOUMO_TARGET}`
+- `--stage`: `build`, `test`, `all`
+- `--monitor_interval`: 内存监控采样周期，默认 `1.0`
+- `build.py --enable_xh2_stable_output`: 开启 stable output 编译选项
 
-## 5 免责声明
+### demo.py / demo_mtp.py
 
-您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--tokenizer_dir`: 默认根据 `modelscope_repo` 推导
+- `--embedding_path`: 默认 `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `--prefill_path`, `--decode_path`, `--vision_path`: 默认按 `${model_name}-${model_size}` 自动拼接
+- `demo_mtp.py --prefill_mtp_path`, `--decode_mtp_path`, `--decode_verify_path`: 默认按 `${model_name}-${model_size}` 自动拼接
+
+## 数据与免责声明
+
+本项目引用 wikitext 数据集仅用于研究和评估目的，数据集许可为 CC BY-NC 4.0，来源为 https://www.modelscope.cn/datasets/modelscope/wikitext。该数据集不作为仓库内容分发，使用时需遵守其原始许可。
+
+您明确了解并同意，本文档中引用的软件、数据和模型由第三方提供并维护。使用这些第三方资源时，应遵守各自的许可协议、使用条款和隐私政策，相关风险由使用者自行承担。

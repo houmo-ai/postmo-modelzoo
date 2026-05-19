@@ -20,13 +20,19 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import argparse
-import glob
-import json
 import logging
 import multiprocessing
 import os
-import platform
-import time
+
+from hmatc.exec.xh2_exec import Xh2Exec
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import (
+    find_hmonnx_file,
+    first_not_none,
+    get_model_configs,
+    get_platform,
+    parse_context_length,
+)
 
 logging.basicConfig(level="INFO")
 
@@ -34,11 +40,19 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
     parser.add_argument(
         "--model_dir",
         dest="model_dir",
@@ -50,14 +64,14 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="qwen3.5",
+        default=None,
         help="base output houmo model name",
     )
     parser.add_argument(
         "--model_size",
         dest="model_size",
         type=str,
-        default="9b",
+        default=None,
         help="model size",
     )
     parser.add_argument(
@@ -78,21 +92,21 @@ def get_args() -> argparse.Namespace:
         "--ncore",
         dest="ncore",
         type=int,
-        default=HOUMO_CORE_NUM,
+        default=None,
         help="core number",
     )
     parser.add_argument(
         "--context_length",
         dest="context_length",
         type=int,
-        default=8192,
+        default=None,
         help="context length used for target prefill/decode compilation",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
+        default=None,
         help="device number",
     )
     parser.add_argument(
@@ -106,7 +120,7 @@ def get_args() -> argparse.Namespace:
         "--prefill_length",
         dest="prefill_length",
         type=int,
-        default=256,
+        default=None,
         help="prefill_length for target prefill model",
     )
     parser.add_argument(
@@ -125,88 +139,45 @@ def get_args() -> argparse.Namespace:
         choices=["build", "test", "all"],
         help="build stage",
     )
+    parser.add_argument(
+        "--monitor_interval",
+        dest="monitor_interval",
+        type=float,
+        default=1.0,
+        help="memory monitor interval in seconds",
+    )
 
     args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    args.prefill_length = first_not_none(
+        args.prefill_length, model_config.get("prefill_length", 256)
+    )
+    if args.context_length is None:
+        args.context_length = parse_context_length(
+            model_config.get("context_length", "256k")
+        )
     if args.context_length < 2048:
         args.flash_attention = 0
     return args
-
-
-def _find_single_onnx(model_dir: str, pattern: str = "hmquant_*.onnx") -> str:
-    onnx_files = sorted(
-        path
-        for path in glob.glob(os.path.join(model_dir, pattern))
-        if os.path.isfile(path)
-    )
-    if len(onnx_files) != 1:
-        raise FileNotFoundError(
-            f"Expected exactly one ONNX matching {pattern} under {model_dir}, found {len(onnx_files)}: {onnx_files}"
-        )
-    return os.path.abspath(onnx_files[0])
-
-
-def build_hmonnx(
-    model_name: str,
-    onnx_path: str,
-    output_dir: str,
-    ncore: int,
-    j: int,
-    ndevice: int,
-    llm_opt: bool = False,
-    flash_attention: int = 0,
-    context_length: int = 0,
-    prefill_length: int = 0,
-):
-    import tcim
-
-    kwargs = {}
-    custom_msg = {}
-
-    kwargs["modify_llm"] = {}
-    if context_length:
-        kwargs["modify_llm"]["context-length"] = context_length
-        custom_msg["context_length"] = context_length
-    if prefill_length:
-        kwargs["modify_llm"]["fill-length"] = prefill_length
-        custom_msg["prefill_length"] = prefill_length
-    if flash_attention:
-        kwargs["flash_attention"] = flash_attention
-        custom_msg["flash_attention"] = flash_attention
-    if ndevice:
-        kwargs["ndevice"] = ndevice
-        custom_msg["ndevice"] = ndevice
-
-    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
-
-    start = time.time()
-    print(
-        f"\n===> {model_name} build start..."
-        f"\n onnx: {onnx_path}"
-        f"\n kwargs: {kwargs}"
-    )
-    tcim.build_from_hmonnx(
-        onnx_path,
-        output_name=model_name,
-        ncore=ncore,
-        target=HOUMO_TARGET,
-        output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim", model_name),
-        llm_opt=llm_opt,
-        j=j,
-        **kwargs,
-    )
-    elapsed = time.time() - start
-    print(f"{model_name} build completed in {elapsed:.3f} s.", flush=True)
 
 
 if __name__ == "__main__":
     args = get_args()
     print(args)
 
-    if platform.machine() != "x86_64":
-        print(f"[error] tcim not support platform: {platform.machine()}")
+    if get_platform() != "x86_64":
+        print(f"[error] tcim not support platform: {get_platform()}")
         raise SystemExit(0)
 
+    model_name = args.model_name
+    model_size = args.model_size
     model_dir = os.path.abspath(args.model_dir)
     prefill_dir = os.path.join(model_dir, "prefill")
     decode_dir = os.path.join(model_dir, "decode")
@@ -217,50 +188,53 @@ if __name__ == "__main__":
         if not os.path.isdir(required_dir):
             raise FileNotFoundError(f"Directory not found: {required_dir}")
 
-    prefill_onnx = _find_single_onnx(prefill_dir)
-    decode_onnx = _find_single_onnx(decode_dir)
-    draft_prefill_onnx = _find_single_onnx(draft_prefill_dir)
-    draft_decode_onnx = _find_single_onnx(draft_decode_dir)
+    with ProcessMemoryMonitor(interval=args.monitor_interval, quiet=True) as monitor:
+        if args.stage == "build" or args.stage == "all":
+            Xh2Exec.build_from_hmonnx(
+                is_prefill=True,
+                hmonnx=find_hmonnx_file(prefill_dir),
+                hmm_name=f"{model_name}-{model_size}_prefill",
+                output=args.output_dir,
+                ncore=args.ncore,
+                flash_attn=args.flash_attention,
+                context_length=args.context_length,
+                prefill_length=args.prefill_length,
+                ndevice=args.ndevice,
+                llm_opt=True,
+                parallel_jobs=args.j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(decode_dir),
+                hmm_name=f"{model_name}-{model_size}_decode",
+                output=args.output_dir,
+                ncore=args.ncore,
+                flash_attn=args.flash_attention,
+                context_length=args.context_length,
+                prefill_length=None,
+                ndevice=args.ndevice,
+                llm_opt=True,
+                parallel_jobs=args.j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                is_prefill=True,
+                hmonnx=find_hmonnx_file(draft_prefill_dir),
+                hmm_name=f"{model_name}-{model_size}_prefill_{args.draft_suffix}",
+                output=args.output_dir,
+                ncore=args.ncore,
+                context_length=args.context_length,
+                ndevice=args.ndevice,
+                parallel_jobs=args.j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(draft_decode_dir),
+                hmm_name=f"{model_name}-{model_size}_decode_{args.draft_suffix}",
+                output=args.output_dir,
+                ncore=args.ncore,
+                context_length=args.context_length,
+                ndevice=args.ndevice,
+                parallel_jobs=args.j,
+            )
 
-    if args.stage == "build" or args.stage == "all":
-        build_hmonnx(
-            f"{args.model_name}_prefill",
-            prefill_onnx,
-            args.output_dir,
-            args.ncore,
-            args.j,
-            args.ndevice,
-            llm_opt=True,
-            flash_attention=args.flash_attention,
-            context_length=args.context_length,
-            prefill_length=args.prefill_length,
-        )
-        build_hmonnx(
-            f"{args.model_name}_decode",
-            decode_onnx,
-            args.output_dir,
-            args.ncore,
-            args.j,
-            args.ndevice,
-            llm_opt=True,
-            flash_attention=args.flash_attention,
-            context_length=args.context_length,
-        )
-        build_hmonnx(
-            f"{args.model_name}_prefill_{args.draft_suffix}",
-            draft_prefill_onnx,
-            args.output_dir,
-            args.ncore,
-            args.j,
-            args.ndevice,
-            context_length=args.context_length,
-        )
-        build_hmonnx(
-            f"{args.model_name}_decode_{args.draft_suffix}",
-            draft_decode_onnx,
-            args.output_dir,
-            args.ncore,
-            args.j,
-            args.ndevice,
-            context_length=args.context_length,
-        )
+    print(
+        f"\n=== Build flow finished. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

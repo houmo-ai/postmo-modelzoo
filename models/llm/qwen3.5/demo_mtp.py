@@ -27,24 +27,21 @@ from hmatc.utils.perf_infomations import (
     InferencePerformanceTracker,
     PERFTYPE,
 )
+from hmatc.utils.utils import first_not_none, get_model_configs
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 SUFFIX = ".hmcc.format"
 DEFAULT_MODEL_DIR = Path(__file__).resolve().parent
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
-def _default_tokenizer_dir() -> str:
-    candidates = (
-        DEFAULT_MODEL_DIR / "tokenizer",
-        DEFAULT_MODEL_DIR / "Qwen3.5-35B-A3B",
-        DEFAULT_MODEL_DIR / "Qwen3.6-35B-A3B",
-        DEFAULT_MODEL_DIR / "Qwen3.5-27B",
-        DEFAULT_MODEL_DIR / "Qwen3.6-27B",
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return str(candidate)
-    return str(DEFAULT_MODEL_DIR / "Qwen3.5-35B-A3B")
+def get_default_tokenizer_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "qwen3.6").upper()
+    model_size = model_config.get("model_size", "35b-a3b").upper()
+    return f"{model_name}-{model_size}"
 
 
 def is_valid_char(cp):
@@ -67,10 +64,31 @@ def is_valid_char(cp):
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default=_default_tokenizer_dir(),
+        default=None,
         help="tokenizer dir",
     )
     parser.add_argument(
@@ -84,37 +102,36 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_prefill.hmm"),
+        default=None,
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--prefill_mtp_path",
         dest="prefill_mtp_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_prefill_mtp.hmm"),
+        default=None,
         help="houmo MTP prefill model path",
     )
     parser.add_argument(
         "--decode_mtp_path",
         dest="decode_mtp_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_decode_mtp.hmm"),
+        default=None,
         help="houmo MTP draft decode model path",
     )
     parser.add_argument(
         "--decode_verify_path",
         dest="decode_verify_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3.5_decode.hmm"),
+        default=None,
         help="houmo verify decode model path",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
-        choices=[1, 2],
-        help="device number, only xh2 support",
+        default=None,
+        help="device number",
     )
     parser.add_argument(
         "--repetition_penalty",
@@ -162,7 +179,43 @@ def get_args() -> argparse.Namespace:
         action="store_true",
         help="enable debug logs including TTFT breakdown",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.tokenizer_dir = first_not_none(
+        args.tokenizer_dir, get_default_tokenizer_dir(model_config)
+    )
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    if args.prefill_path is None:
+        args.prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
+        )
+    if args.prefill_mtp_path is None:
+        args.prefill_mtp_path = os.path.join(
+            "output",
+            HOUMO_TARGET,
+            f"{args.model_name}-{args.model_size}_prefill_mtp.hmm",
+        )
+    if args.decode_mtp_path is None:
+        args.decode_mtp_path = os.path.join(
+            "output",
+            HOUMO_TARGET,
+            f"{args.model_name}-{args.model_size}_decode_mtp.hmm",
+        )
+    if args.decode_verify_path is None:
+        args.decode_verify_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
+        )
+    if args.ndevice > 1:
+        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        args.prefill_mtp_path = args.prefill_mtp_path.replace(".hmm", ".hmms")
+        args.decode_mtp_path = args.decode_mtp_path.replace(".hmm", ".hmms")
+        args.decode_verify_path = args.decode_verify_path.replace(".hmm", ".hmms")
+    return args
 
 
 def _numpy_dtype(info) -> np.dtype:

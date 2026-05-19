@@ -29,13 +29,8 @@ import json
 import os
 import shutil
 import sys
-import threading
-import time
 from pathlib import Path
 
-import psutil
-
-# Same package directory as this file (works when cwd is models/llm/qwen3.5)
 _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
@@ -48,74 +43,27 @@ from quant_pipeline import (
     quant_llm,
     quant_llm_moe,
 )
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import (
+    check_gpu,
+    first_not_none,
+    get_model_configs,
+    parse_context_length,
+)
 
 HOUMO_DATASETS_PATH = os.getenv("HOUMO_DATASETS_PATH", "")
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "")
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
-class ProcessMemoryMonitor:
-    """Monitors the memory usage of the current Python process via psutil."""
-
-    def __init__(self, interval=2, log_file=None):
-        self.process = psutil.Process(os.getpid())
-        self.interval = interval
-        self.log_file = log_file
-        self.is_monitoring = False
-        self.peak_memory_mb = 0
-
-    def get_memory_info(self):
-        memory_info = self.process.memory_info()
-        rss_mb = memory_info.rss / (1024 * 1024)
-        percent = self.process.memory_percent()
-        return {"rss_mb": rss_mb, "percent": percent}
-
-    def start(self):
-        self.is_monitoring = True
-        self.peak_memory_mb = 0
-        self.monitor_thread = threading.Thread(target=self._monitor_loop)
-        self.monitor_thread.daemon = True
-        self.monitor_thread.start()
-        print(f"Memory monitoring started (interval: {self.interval}s)")
-
-    def _monitor_loop(self):
-        while self.is_monitoring:
-            mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info["rss_mb"])
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            log_message = (
-                f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, "
-                f"System%: {mem_info['percent']:.2f}%"
-            )
-            if self.log_file:
-                with open(self.log_file, "a") as f:
-                    f.write(log_message + "\n")
-            time.sleep(self.interval)
-
-    def stop(self):
-        self.is_monitoring = False
-        if hasattr(self, "monitor_thread"):
-            self.monitor_thread.join(timeout=1)
-        print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
-
-
-def check_gpu():
-    import subprocess
-
-    try:
-        result = subprocess.run(
-            "nvidia-smi --query-gpu=count --format=csv,noheader,nounits | wc -l",
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            text=True,
-        )
-        if result.returncode == 0 and int(result.stdout.strip()) > 0:
-            return True
-        return False
-    except Exception as e:
-        print(f"Not install GPU driver, error msg: {e}")
-        return False
+def get_default_model_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "qwen3.6").upper()
+    model_size = model_config.get("model_size", "35b-a3b").upper()
+    return f"{model_name}-{model_size}"
 
 
 def parse_args():
@@ -123,19 +71,32 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
         "--model",
         type=str,
-        required=True,
+        default=None,
         help="HF checkpoint directory (Qwen3.5 VL instruct)",
     )
     parser.add_argument(
         "--model-name",
         type=str,
-        default="",
+        default=None,
         help=(
             "HMONNX / layout name (vision --model_name, output folders). "
             "Default: last path component of --model (e.g. .../Qwen3.5-9B → Qwen3.5-9B)"
         ),
+    )
+    parser.add_argument(
+        "--model-size",
+        type=str,
+        default=None,
+        help="model size",
     )
     parser.add_argument(
         "--work-dir",
@@ -199,14 +160,14 @@ def parse_args():
     parser.add_argument(
         "--context-length",
         type=int,
-        default=262144,
+        default=None,
         help="LLM export context length",
     )
     parser.add_argument(
         "--max-pe-length",
         type=int,
-        default=262144,
-        help="LLM export rotary cache max_pe_length",
+        default=None,
+        help="LLM export rotary cache max_pe_length, default follows context_length",
     )
     parser.add_argument(
         "--llm-export-full-output-valid",
@@ -217,7 +178,7 @@ def parse_args():
     parser.add_argument(
         "--input-sequence-length",
         type=int,
-        default=256,
+        default=None,
         help="MoE LLM export --input-sequence-length",
     )
     parser.add_argument(
@@ -258,29 +219,48 @@ def parse_args():
         "--max_size_w",
         type=int,
         nargs="+",
-        default=[896],
+        default=None,
         help="vision export max input width in pixels (multiple values allowed)",
     )
     parser.add_argument(
         "--max_size_h",
         type=int,
         nargs="+",
-        default=[896],
+        default=None,
         help="vision export max input height in pixels (multiple values allowed)",
     )
     parser.add_argument(
         "--max_size_t",
         type=int,
         nargs="+",
-        default=[2],
+        default=None,
         help="vision export max temporal size in frames (multiple values allowed)",
     )
     args = parser.parse_args()
-    mn = (args.model_name or "").strip()
-    if not mn:
-        args.model_name = Path(args.model).resolve().name
-    else:
-        args.model_name = mn
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.model = first_not_none(args.model, get_default_model_dir(model_config))
+    args.context_length = first_not_none(
+        args.context_length,
+        parse_context_length(model_config.get("context_length", "256k")),
+    )
+    args.max_pe_length = first_not_none(args.max_pe_length, args.context_length)
+    args.input_sequence_length = first_not_none(
+        args.input_sequence_length, model_config.get("prefill_length", 256)
+    )
+    args.max_size_w = first_not_none(
+        args.max_size_w, [model_config.get("max_size_w", 896)]
+    )
+    args.max_size_h = first_not_none(
+        args.max_size_h, [model_config.get("max_size_h", 896)]
+    )
+    args.max_size_t = first_not_none(
+        args.max_size_t, [model_config.get("max_size_t", 2)]
+    )
     return args
 
 
@@ -313,41 +293,24 @@ def _detect_model_family(model_dir: str) -> str:
     return "dense"
 
 
-def main(args=None):
-    if args is None:
-        args = parse_args()
-    family = _detect_model_family(args.model)
-    print(f"[ptq] detected model family: {family}")
-    if args.move_only:
-        if family == "moe":
+if __name__ == "__main__":
+    args = parse_args()
+    print(args)
+
+    _family = _detect_model_family(args.model)
+    print(f"[ptq] detected model family: {_family}")
+
+    assert check_gpu() is True, "Error: Not found GPU device."
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
+        if _family == "moe":
+            quant_llm_moe(args)
+            export_llm_moe(args)
             move_llm_moe(args)
         else:
+            quant_llm(args)
+            export_llm(args)
             move_llm(args)
         _remove_work_dir(args)
-        return
-    if family == "moe":
-        quant_llm_moe(args)
-        export_llm_moe(args)
-        move_llm_moe(args)
-    else:
-        quant_llm(args)
-        export_llm(args)
-        move_llm(args)
-    _remove_work_dir(args)
-
-
-if __name__ == "__main__":
-    _args = parse_args()
-    print(_args)
-    _monitor = None
-    if not _args.move_only:
-        if not check_gpu():
-            print("Error: Not found GPU device.")
-            sys.exit(-1)
-        _monitor = ProcessMemoryMonitor(interval=2)
-        _monitor.start()
-    try:
-        main(_args)
-    finally:
-        if _monitor is not None:
-            _monitor.stop()
+    print(
+        f"\n=== All quantization steps completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

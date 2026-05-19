@@ -21,20 +21,25 @@
 import os
 import numpy as np
 import time
-import psutil
-import threading
 import multiprocessing
 import argparse
 import glob
-import logging
-
-logging.basicConfig(level="INFO")
+from hmatc.exec.xh2_exec import Xh2Exec
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import (
+    find_hmonnx_file,
+    first_not_none,
+    get_model_configs,
+    get_platform,
+    parse_context_length,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
 GOLDEN_THRESH = 0.98
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def sanitize_name(name: str):
@@ -57,70 +62,6 @@ def cosine_distance(data1, data2):
     if np.isnan(cosine_dist):
         return -1
     return cosine_dist
-
-
-class ProcessMemoryMonitor:
-    """
-    Monitors the memory usage of the current Python process in real-time using psutil.
-    """
-
-    def __init__(self, interval=2, log_file=None):
-        """
-        Initializes the monitor.
-        Args:
-            interval (int): Time between measurements in seconds.
-            log_file (str, optional): Path to a file to log results. If None, prints to console.
-        """
-        self.process = psutil.Process(os.getpid())
-        self.interval = interval
-        self.log_file = log_file
-        self.is_monitoring = False
-        self.peak_memory_mb = 0
-
-    def get_memory_info(self):
-        """
-        Gets current memory usage information.
-        Returns:
-            dict: A dictionary containing memory usage data.
-        """
-        memory_info = self.process.memory_info()
-        rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
-        percent = self.process.memory_percent()  # Percentage of system memory
-        return {"rss_mb": rss_mb, "percent": percent}
-
-    def start(self):
-        """Starts the monitoring loop in a separate daemon thread."""
-        self.is_monitoring = True
-        self.peak_memory_mb = 0
-        self.monitor_thread = threading.Thread(target=self._monitor_loop)
-        self.monitor_thread.daemon = True  # Thread will exit when main program does
-        self.monitor_thread.start()
-        print(f"Memory monitoring started (interval: {self.interval}s)")
-
-    def _monitor_loop(self):
-        """The internal loop that runs in the thread."""
-        while self.is_monitoring:
-            mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info["rss_mb"])
-
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
-
-            # Output to console or file
-            if self.log_file:
-                with open(self.log_file, "a") as f:
-                    f.write(log_message + "\n")
-
-            time.sleep(self.interval)
-
-    def stop(self):
-        """Stops the monitoring loop and prints peak usage."""
-        self.is_monitoring = False
-        if hasattr(self, "monitor_thread"):
-            self.monitor_thread.join(
-                timeout=1
-            )  # Wait a moment for the thread to finish
-        print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
 
 
 def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
@@ -151,6 +92,13 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
         "--model_dir",
         dest="model_dir",
         type=str,
@@ -161,14 +109,14 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="qwen3.6",
+        default=None,
         help="output houmo model name",
     )
     parser.add_argument(
         "--batch",
         dest="batch",
         type=int,
-        default=1,
+        default=None,
         help="batch size",
     )
     parser.add_argument(
@@ -182,28 +130,28 @@ def get_args() -> argparse.Namespace:
         "--ncore",
         dest="ncore",
         type=int,
-        default=HOUMO_CORE_NUM,
+        default=None,
         help="core number",
     )
     parser.add_argument(
         "--context_length",
         dest="context_length",
         type=int,
-        default=262144,
+        default=None,
         help="context_length",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
+        default=None,
         help="device number",
     )
     parser.add_argument(
         "--model_size",
         dest="model_size",
         type=str,
-        default="35b-a3b",
+        default=None,
         help="model size",
     )
     parser.add_argument(
@@ -225,7 +173,7 @@ def get_args() -> argparse.Namespace:
         "--prefill_length",
         dest="prefill_length",
         type=int,
-        default=256,
+        default=None,
         help="prefill_length",
     )
     parser.add_argument(
@@ -239,110 +187,49 @@ def get_args() -> argparse.Namespace:
         "2nd int = ViT model switch (0=off, 1=on); "
         "e.g., --flash_attention 2 1 (prefill&decode=2, ViT=1)",
     )
+    parser.add_argument(
+        "--enable_common_subgraph",
+        dest="enable_common_subgraph",
+        action="store_true",
+        default=False,
+        help="enable common subgraph optimization",
+    )
+    parser.add_argument(
+        "--enable_xh2_stable_output",
+        dest="enable_xh2_stable_output",
+        action="store_true",
+        default=False,
+        help="enable stable output",
+    )
+    parser.add_argument(
+        "--monitor_interval",
+        dest="monitor_interval",
+        type=float,
+        default=1.0,
+        help="memory monitor interval in seconds",
+    )
 
     args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    args.batch = first_not_none(args.batch, model_config.get("batch", 1))
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    args.prefill_length = first_not_none(
+        args.prefill_length, model_config.get("prefill_length", 256)
+    )
+    if args.context_length is None:
+        args.context_length = parse_context_length(
+            model_config.get("context_length", "256k")
+        )
     args.flash_attention = _validate_adjust_flash_attention(
         args.flash_attention, args.context_length
     )
     return args
-
-
-def build_llm(
-    model_name,
-    model_dir,
-    output_dir,
-    profile,
-    ncore,
-    ndevice,
-    context_length,
-    j,
-    batch=None,
-    tso=False,
-    flash_attention=0,
-    prefill_length=0,
-):
-    import tcim
-    import json
-
-    kwargs = {}
-    custom_msg = {}
-
-    kwargs["modify_llm"] = {}
-    kwargs["enable_xh2_stable_output"] = tso
-    if prefill_length:
-        kwargs["modify_llm"]["fill-length"] = prefill_length
-        custom_msg["prefill_length"] = prefill_length
-    if flash_attention:
-        kwargs["flash_attention"] = flash_attention
-        custom_msg["flash_attention"] = flash_attention
-    if ndevice:
-        kwargs["ndevice"] = ndevice
-    if batch:
-        kwargs["modify_llm"]["batch"] = batch
-        custom_msg["batch"] = batch
-    if context_length:
-        kwargs["modify_llm"]["context-length"] = context_length
-        custom_msg["context_length"] = context_length
-    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
-
-    start = time.time()
-    print(f"\n===> {model_name} build start...\n kwargs:{kwargs}")
-    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
-    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
-    tcim.build_from_hmonnx(
-        decode_model,
-        weights=os.path.join(model_dir, "weight.npy"),
-        output_name=model_name,
-        ncore=ncore,
-        target=HOUMO_TARGET,
-        output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim", model_name),
-        llm_opt=True,
-        cpp_backend="v2",
-        j=j,
-        **kwargs,
-    )
-    profile["build"] = time.time() - start
-    print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
-
-
-def build_vit(
-    model_name,
-    model_dir,
-    output_dir,
-    profile,
-    ncore,
-    j,
-    flash_attention=0,
-):
-    import tcim
-
-    kwargs = {}
-    if flash_attention:
-        import json
-
-        kwargs["flash_attention"] = flash_attention
-        custom_msg = {}
-        custom_msg["flash_attention"] = flash_attention
-        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
-
-    start = time.time()
-    print(f"\n===> {model_name} build start... \n kwargs:{kwargs}")
-    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
-    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
-    tcim.build_from_hmonnx(
-        decode_model,
-        weights=os.path.join(model_dir, "weight.npy"),
-        output_name=model_name,
-        ncore=ncore,
-        target=HOUMO_TARGET,
-        output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim", model_name),
-        j=j,
-        **kwargs,
-    )
-    profile["build"] = time.time() - start
-    print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 
 def test(model_name, model_dir, output_dir, profile, batch=1):
@@ -446,21 +333,14 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
 
 
 if __name__ == "__main__":
-    # Create and start the monitor
-    memory_monitor = ProcessMemoryMonitor(interval=2)
-    memory_monitor.start()
-
-    # parse args
     args = get_args()
     print(args)
-    curdir = os.getcwd()
     model_dir = args.model_dir
     model_name = args.model_name
+    model_size = args.model_size
     output_dir = args.output_dir
     ncore = args.ncore
-    batch = args.batch
     ndevice = args.ndevice
-    context_length = args.context_length
     j = args.j
     llm_flash_attention, vit_flash_attention = args.flash_attention
     profile = {}
@@ -484,87 +364,91 @@ if __name__ == "__main__":
         and any(key in os.path.basename(folder_path) for key in ["vision", "visual"])
     ]
 
-    # build model
-    if args.stage == "build" or args.stage == "all":
-        import platform
+    with ProcessMemoryMonitor(interval=args.monitor_interval, quiet=True) as monitor:
+        # build model
+        if args.stage == "build" or args.stage == "all":
+            assert (
+                get_platform() == "x86_64"
+            ), f"Only supported for compilation on the x86_64 platform."
 
-        arch = platform.machine()
-        if arch != "x86_64":
-            print(f"[error] tcim not support platform: {arch}")
-            exit(0)
+            # Build all visual models with resolution suffix
+            for visual_dir in visual_dirs:
+                folder_name = os.path.basename(visual_dir)
+                # Extract resolution suffix from folder name like "visual_448x448x2"
+                if "_" in folder_name:
+                    suffix = folder_name.split("_", 1)[1]
+                    vit_model_name = f"{model_name}-{model_size}_visual_{suffix}"
+                else:
+                    vit_model_name = f"{model_name}-{model_size}_visual"
+                Xh2Exec.build_from_hmonnx(
+                    hmonnx=find_hmonnx_file(visual_dir),
+                    hmm_name=vit_model_name,
+                    output=output_dir,
+                    ncore=ncore,
+                    flash_attn=vit_flash_attention,
+                    parallel_jobs=j,
+                )
 
-        # Build all visual models with resolution suffix
-        for visual_dir in visual_dirs:
-            folder_name = os.path.basename(visual_dir)
-            # Extract resolution suffix from folder name like "visual_448x448x2"
-            if "_" in folder_name:
-                suffix = folder_name.split("_", 1)[1]
-                vit_model_name = f"{model_name}_visual_{suffix}"
-            else:
-                vit_model_name = f"{model_name}_visual"
-            build_vit(
-                vit_model_name,
-                visual_dir,
-                output_dir,
-                profile,
-                ncore,
-                j,
-                flash_attention=vit_flash_attention,
+            Xh2Exec.build_from_hmonnx(
+                is_prefill=True,
+                hmonnx=find_hmonnx_file(prefill_dir),
+                hmm_name=f"{model_name}-{model_size}_prefill",
+                output=output_dir,
+                flash_attn=llm_flash_attention,
+                context_length=args.context_length,
+                prefill_length=args.prefill_length,
+                ndevice=ndevice,
+                ncore=ncore,
+                enable_common_subgraph=args.enable_common_subgraph,
+                enable_xh2_stable_output=args.enable_xh2_stable_output,
+                llm_opt=True,
+                parallel_jobs=j,
             )
-        build_llm(
-            f"{model_name}_prefill",
-            prefill_dir,
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            context_length,
-            j,
-            flash_attention=llm_flash_attention,
-            prefill_length=args.prefill_length,
-        )
-        build_llm(
-            f"{model_name}_decode",
-            decode_dir,
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            context_length,
-            j,
-            flash_attention=llm_flash_attention,
-        )
 
-    # test model
-    if args.stage == "test" or args.stage == "all":
-        test(
-            f"{model_name}_prefill",
-            prefill_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-        test(
-            f"{model_name}_decode",
-            decode_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-        # Test all visual models
-        for visual_dir in visual_dirs:
-            folder_name = os.path.basename(visual_dir)
-            if "_" in folder_name:
-                suffix = folder_name.split("_", 1)[1]
-                vit_model_name = f"{model_name}_visual_{suffix}"
-            else:
-                vit_model_name = f"{model_name}_visual"
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(decode_dir),
+                hmm_name=f"{model_name}-{model_size}_decode",
+                output=output_dir,
+                batch=args.batch,
+                flash_attn=llm_flash_attention,
+                context_length=args.context_length,
+                ndevice=ndevice,
+                ncore=ncore,
+                enable_common_subgraph=args.enable_common_subgraph,
+                enable_xh2_stable_output=args.enable_xh2_stable_output,
+                llm_opt=True,
+                parallel_jobs=j,
+            )
+
+        # test model
+        if args.stage == "test" or args.stage == "all":
             test(
-                vit_model_name,
-                visual_dir,
+                f"{model_name}-{model_size}_prefill",
+                prefill_dir,
                 output_dir,
                 profile,
-                prefix=model_name,
             )
+            test(
+                f"{model_name}-{model_size}_decode",
+                decode_dir,
+                output_dir,
+                profile,
+            )
+            # Test all visual models
+            for visual_dir in visual_dirs:
+                folder_name = os.path.basename(visual_dir)
+                if "_" in folder_name:
+                    suffix = folder_name.split("_", 1)[1]
+                    vit_model_name = f"{model_name}-{model_size}_visual_{suffix}"
+                else:
+                    vit_model_name = f"{model_name}-{model_size}_visual"
+                test(
+                    vit_model_name,
+                    visual_dir,
+                    output_dir,
+                    profile,
+                )
 
-    memory_monitor.stop()
+    print(
+        f"\n=== Build flow finished. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

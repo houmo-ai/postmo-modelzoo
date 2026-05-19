@@ -41,28 +41,24 @@ if should_run_step "quant"; then
 
     if ! should_skip_download; then
         echo "Download raw model (size: ${MODEL_NAME}-${MODEL_SIZE})."
-        python3 get_model.py --type raw --model_size ${MODEL_SIZE}
+        python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Start model quantization (size: ${MODEL_NAME}-${MODEL_SIZE})."
-    python3 ptq.py --model_size ${MODEL_SIZE}
+    python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 fi
 
 if should_run_step "build"; then
     echo "Start model compilation (size: ${MODEL_NAME}-${MODEL_SIZE})."
-    python3 build.py --model_size ${MODEL_SIZE}
+    python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
         echo "Download precompiled model (size: ${MODEL_NAME}-${MODEL_SIZE})."
-        python3 get_model.py --type hmm --model_size ${MODEL_SIZE}
+        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Execute demo (size: ${MODEL_SIZE})."
-    python3 demo.py --model_size ${MODEL_SIZE}
-
-    if [[ -z "${HOUMO_EXAMPLES_PATH:-}" ]]; then
-        HOUMO_EXAMPLES_PATH="$(cd "${SCRIPT_DIR}/../../../" && pwd)"
-    fi
+    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 
     if command -v llm_perf &>/dev/null; then
         echo "Execute performance case (size: ${MODEL_NAME}-${MODEL_SIZE})."

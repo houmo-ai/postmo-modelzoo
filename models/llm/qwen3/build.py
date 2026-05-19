@@ -26,13 +26,20 @@ import argparse
 import glob
 from hmatc.exec.xh2_exec import Xh2Exec
 from hmatc.utils.monitor import ProcessMemoryMonitor
-from hmatc.utils.utils import get_platform, get_model_configs, find_hmonnx_file
+from hmatc.utils.utils import (
+    find_hmonnx_file,
+    first_not_none,
+    get_model_configs,
+    get_platform,
+    parse_context_length,
+)
 
 HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 GOLDEN_THRESH = 0.98
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def sanitize_name(name: str):
@@ -64,7 +71,7 @@ def parse_args() -> argparse.Namespace:
         "--config",
         dest="config_path",
         type=str,
-        default="./config.yaml",
+        default=DEFAULT_CONFIG_PATH,
         help="path to config.yaml",
     )
     parser.add_argument(
@@ -185,37 +192,22 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
 
     # Load config and resolve parameters
-    default_model_size, model_configs = get_model_configs(args.config_path)
-    args.model_size = (
-        args.model_size if args.model_size is not None else default_model_size
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
     )
-    model_config = model_configs.get(args.model_size, {})
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
 
-    args.model_name = (
-        args.model_name
-        if args.model_name is not None
-        else model_config.get("model_name", "qwen3")
-    )
-    args.ncore = (
-        args.ncore
-        if args.ncore is not None
-        else model_config.get("ncore", HOUMO_CORE_NUM)
-    )
-    args.batch = args.batch if args.batch is not None else model_config.get("batch", 1)
-    args.ndevice = (
-        args.ndevice if args.ndevice is not None else model_config.get("ndevice", 1)
-    )
-    args.prefill_length = (
-        args.prefill_length
-        if args.prefill_length is not None
-        else model_config.get("prefill_length", 256)
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    args.batch = first_not_none(args.batch, model_config.get("batch", 1))
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    args.prefill_length = first_not_none(
+        args.prefill_length, model_config.get("prefill_length", 256)
     )
     if args.context_length is None:
-        context_length_str = model_config.get("context_length", "32k")
-        args.context_length = (
-            int(context_length_str[:-1]) * 1024
-            if context_length_str.endswith("k")
-            else int(context_length_str)
+        args.context_length = parse_context_length(
+            model_config.get("context_length", "32k")
         )
     if args.context_length < 2048:
         args.flash_attention = 0
@@ -346,7 +338,7 @@ if __name__ == "__main__":
     with ProcessMemoryMonitor(interval=args.monitor_interval, quiet=True) as monitor:
         if args.stage == "build" or args.stage == "all":
             assert (
-                get_platform() != "x86_64"
+                get_platform() == "x86_64"
             ), f"Only supported for compilation on the x86_64 platform."
 
             kwargs = {}

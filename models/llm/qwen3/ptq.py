@@ -23,11 +23,22 @@ import os
 import argparse
 from quant_pipeline import quant_llm, export_llm, move_llm
 from hmatc.utils.monitor import ProcessMemoryMonitor
-from hmatc.utils.utils import get_model_configs, check_gpu
+from hmatc.utils.utils import first_not_none, get_model_configs, check_gpu
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
 HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", os.path.abspath("../../../"))
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
+
+def get_default_model_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "qwen3")
+    model_size = model_config.get("model_size", "8b")
+    return f"{model_name}-{model_size}"
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,7 +52,7 @@ def parse_args() -> argparse.Namespace:
         "--config",
         dest="config_path",
         type=str,
-        default="./config.yaml",
+        default=DEFAULT_CONFIG_PATH,
         help="path to config.yaml",
     )
     parser.add_argument(
@@ -96,29 +107,20 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
 
     # Load config and resolve parameters
-    default_model_size, model_configs = get_model_configs(args.config_path)
-    args.model_size = (
-        args.model_size if args.model_size is not None else default_model_size
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
     )
-    model_config = model_configs.get(args.model_size, {})
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
 
-    args.model_name = (
-        args.model_name
-        if args.model_name is not None
-        else model_config.get("model_name", "qwen3")
+    args.quant_type = first_not_none(
+        args.quant_type, model_config.get("quant_type", "w4a8h0_ssfp")
     )
-    args.quant_type = (
-        args.quant_type
-        if args.quant_type is not None
-        else model_config.get("quant_type", "w4a8h0_ssfp")
+    args.input_sequence_length = first_not_none(
+        args.input_sequence_length, model_config.get("prefill_length", 256)
     )
-    args.input_sequence_length = (
-        args.input_sequence_length
-        if args.input_sequence_length is not None
-        else model_config.get("prefill_length", 256)
-    )
-    if args.model is None:
-        args.model = f"{args.model_name}-{args.model_size}"
+    args.model = first_not_none(args.model, get_default_model_dir(model_config))
     if args.calib_data is None:
         args.calib_data = os.path.join(
             HOUMO_EXAMPLES_PATH, "hmodel/xh2/examples/xh_gen_data/gen_qwen3_8b.jsonl"
