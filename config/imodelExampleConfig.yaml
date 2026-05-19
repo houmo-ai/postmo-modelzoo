@@ -372,6 +372,18 @@ llm_gpt-oss:
         args: all
   test:
     - llm_gpt-oss_test
+llm_copaw-flash:
+  include:
+    - models/llm/CoPaw-Flash
+  exclude:
+    - models/llm/CoPaw-Flash/README.MD
+  example_case:
+    - llm_copaw-flash_test:
+        test_type: models_tests
+        script: copaw_flash
+        args: all
+  test:
+    - llm_copaw-flash_test
 vlm_qwen2.5-vl:
   include:
     - models/vlm/qwen2.5-vl

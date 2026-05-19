@@ -20,16 +20,37 @@
 
 import os
 import argparse
-from hmatc.utils.utils import hmatc_get_file, get_houmo_version
-
+from hmatc.utils.utils import (
+    first_not_none,
+    get_houmo_version,
+    get_model_configs,
+    hmatc_get_file,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
+
+def get_default_model_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "copaw-flash").upper()
+    model_size = model_config.get("model_size", "9b").upper()
+    return f"{model_name}-{model_size}"
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
     parser.add_argument(
         "--type",
         dest="file_type",
@@ -61,17 +82,24 @@ def get_args() -> argparse.Namespace:
         help="download the model from which source",
     )
     parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
         "--model_size",
         dest="model_size",
         type=str,
-        default="9b",
+        default=None,
         help="model size",
     )
     parser.add_argument(
         "--context_length",
         dest="context_length",
         type=str,
-        default="8k",
+        default=None,
         help="context length",
     )
     args = parser.parse_args()
@@ -80,24 +108,34 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = get_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    model_name = first_not_none(args.model_name, default_model_name)
+    model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(model_name, {}).get(model_size, {})
+    context_length = first_not_none(
+        args.context_length, model_config.get("context_length", "8k")
+    )
+    default_model_dir = get_default_model_dir(model_config)
 
     model_cfgs = {
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": "copaw-flash",
+        "model_name": model_name,
         "model_info": {
-            "model_size": args.model_size,
-            "ncore": 2,
-            "ndevice": 1,
-            "context_len": args.context_length,
-            "prefill_len": 256,
-            "batch": 1,
+            "model_size": model_size,
+            "ncore": model_config.get("ncore", 2),
+            "ndevice": model_config.get("ndevice", 1),
+            "context_len": context_length,
+            "prefill_len": model_config.get("prefill_length", 256),
+            "batch": model_config.get("batch", 1),
         },
         "raw_files": {"raw_path": "models/dataset/qwen3_8b_gen_data.jsonl"},
         "modelscope_repo": {
-            "repo_ids": ["AgentScope/CoPaw-Flash-9B"],
-            "local_dirs": [f"{args.download_dir}/CoPaw-Flash-9B"],
+            "repo_ids": model_config.get("modelscope_repo", []),
+            "local_dirs": [f"{args.download_dir}/{default_model_dir}"],
         },
     }
 

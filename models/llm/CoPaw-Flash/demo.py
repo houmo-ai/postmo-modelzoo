@@ -40,8 +40,8 @@ from hmatc.utils.perf_infomations import (
     InferencePerformanceTracker,
     PERFTYPE,
 )
-
 from hmatc.python.get_hm_devices import get_hm_devices
+from hmatc.utils.utils import first_not_none, get_model_configs
 
 sys.path.append(str(Path(__file__).parent))
 from processing_copawflash import CoPawFlashProcessor
@@ -49,11 +49,30 @@ from image_processing_copawflash import CoPawFlashImageProcessor
 from vision_process_copawflash import process_vision_info
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+HOUMO_PIC_PATH = os.getenv(
+    "HOUMO_PIC_PATH", str(Path(__file__).resolve().parents[3] / "data" / "pic")
+)
 IMAGE_TOKEN_ID = 248056
 VIDEO_TOKEN_ID = 248057
 VISION_START_TOKEN_ID = 248053
 SPATIAL_MERGE_SIZE = 2
 TEMPORAL_PATCH_SIZE = 2
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
+
+def get_default_tokenizer_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "copaw-flash").upper()
+    model_size = model_config.get("model_size", "9b").upper()
+    return f"{model_name}-{model_size}"
+
+
+def get_default_image_inputs() -> list[list[str]]:
+    return [[os.path.join(HOUMO_PIC_PATH, "beach.jpeg")]]
 
 
 def is_valid_char(cp):
@@ -77,10 +96,31 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="CoPaw-Flash-9B",
+        default=None,
         help="tokenizer dir",
     )
     parser.add_argument(
@@ -94,22 +134,21 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "copaw-flash_prefill.hmm"),
+        default=None,
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "copaw-flash_decode.hmm"),
+        default=None,
         help="houmo decode model path",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
-        choices=[1, 2],
+        default=None,
         help="device number, only xh2 support",
     )
     parser.add_argument(
@@ -152,21 +191,21 @@ def get_args() -> argparse.Namespace:
         "--vision_path",
         dest="vision_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "copaw-flash_visual.hmm"),
+        default=None,
         help="houmo vision model path (.hmm)",
     )
     parser.add_argument(
         "--max_size_w",
         dest="max_size_w",
         type=int,
-        default=448,
+        default=None,
         help="max image width for vision",
     )
     parser.add_argument(
         "--max_size_h",
         dest="max_size_h",
         type=int,
-        default=448,
+        default=None,
         help="max image height for vision",
     )
     parser.add_argument(
@@ -195,6 +234,37 @@ def get_args() -> argparse.Namespace:
         help="enable debug logs including TTFT breakdown",
     )
     args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    args.max_size_w = first_not_none(
+        args.max_size_w, model_config.get("max_size_w", 448)
+    )
+    args.max_size_h = first_not_none(
+        args.max_size_h, model_config.get("max_size_h", 448)
+    )
+    args.max_size_t = model_config.get("max_size_t", TEMPORAL_PATCH_SIZE)
+    if args.tokenizer_dir is None:
+        args.tokenizer_dir = get_default_tokenizer_dir(model_config)
+    if args.prefill_path is None:
+        args.prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
+        )
+    if args.decode_path is None:
+        args.decode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
+        )
+    if args.vision_path is None:
+        args.vision_path = os.path.join(
+            "output",
+            HOUMO_TARGET,
+            f"{args.model_name}-{args.model_size}_visual_{args.max_size_w}x{args.max_size_h}x{args.max_size_t}.hmm",
+        )
+    args.image_path = first_not_none(args.image_path, get_default_image_inputs())
     if args.ndevice > 1:
         args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
         args.decode_path = args.decode_path.replace(".hmm", ".hmms")
@@ -507,7 +577,9 @@ class HmCoPawFlash:
         self.ndevice = ndevice
         self.vision = None
         self.rope_deltas = None
-        dev_manager = tcim.runtime.DevManager(get_hm_devices(self.ndevice), "Xh2HalBackend")
+        dev_manager = tcim.runtime.DevManager(
+            get_hm_devices(self.ndevice), "Xh2HalBackend"
+        )
         weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)

@@ -1,219 +1,172 @@
-# Qwen3(通义千问 3)
+# Qwen3-30B-A3B
 
-本示例展示如何把 Qwen3 模型量化和编译，部署到后摩芯片的设备上。
+本目录提供 Qwen3-30B-A3B 在 XH2 平台上的下载、量化、编译、演示与一键测试脚本。当前默认配置来自同目录下的 `config.yaml`。
 
-## 预训练模型
+## 支持模型
 
-本项目使用从 ModelScope 下载的预训练模型：
+- `model_name`: `qwen3`
+- `model_size`: `30b-a3b`
 
--   模型名称: Qwen3-30B-A3B
--   来源: https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B
--   许可: Apache License 2.0 （https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B/file/view/master/LICENSE?status=0）
+对应 ModelScope 模型：
 
-预训练模型在运行时下载，工程发布**不包含**该模型。
+- Qwen3-30B-A3B: https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B
 
-## 用于校准的数据集
+预训练模型在运行时下载，仓库本身不包含这些权重。
 
-本项目引用 wikitext 数据集仅用于**研究和评估目的**。
+## 配置与默认值
 
--   数据集许可: CC BY-NC 4.0
--   来源: https://www.modelscope.cn/datasets/modelscope/wikitext
+`config.yaml` 是默认值的单一来源，当前约定如下：
 
-⚠️ 重要提示:
+- 默认模型：`qwen3` + `30b-a3b`
+- 默认 `context_length=32k`
+- 默认 `prefill_length=256`
+- 默认输出前缀统一使用 `${model_name}-${model_size}`
+- tokenizer / 原始模型目录默认从 `modelscope_repo` 最后一段推导，即 `Qwen3-30B-A3B`
 
--   本数据集**不作为本仓库的一部分进行分发**。
--   本数据集**不受本项目 Apache License 2.0 许可的约束**。
--   任何对数据集的使用都必须遵守其原始许可 (CC BY-NC 4.0)，包括**非商业用途限制**。
--   用户有责任确保在使用本数据集时遵守相关规定。
+## 输出约定
 
-[TOC]
+标准输出：
 
-## 1 模型说明
+- `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill.hmm`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_decode.hmm`
 
-本例使用的模型实现来源于[https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B](https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B)。
-本例只适用于 xh2。
+当 `ndevice > 1` 时，demo 默认会把 `prefill` 和 `decode` 的后缀切换为 `.hmms`。
 
-## 2 快速开始
+## 快速开始
 
-目前 Qwen3 模型仅提供 python 脚本编译方式。芯片模型只能在 linux 环境下量化和编译。
-
-### 2.1 环境准备
-
-安装示例运行所需的python依赖，建议使用venv
+### 1. 安装依赖
 
 ```bash
 pip3 install -r requirements.txt
 ```
 
-### 2.2 获取模型和数据
+### 2. 下载模型
 
-通过 get_model 脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
-
-如果需要自己量化，可选择下载原始模型，下载后的模型存放在 qwen3-30b-a3b 目录：
+下载原始模型：
 
 ```bash
-python3 get_model.py --type raw
+python3 get_model.py --type raw --model_name qwen3 --model_size 30b-a3b
 ```
 
-如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）。
-
-注意：提供的预编译芯片模型需运行在内存不少于 **24GB** 的后摩芯片中。
+仅下载预编译模型用于演示：
 
 ```bash
-python3 get_model.py --type hmm
+python3 get_model.py --type hmm --model_name qwen3 --model_size 30b-a3b
 ```
 
-### 2.3 量化
+### 3. 量化
 
-量化需要使用 GPU，并在宿主机安装与 CUDA12.2 兼容的 CUDA 和驱动。启动 docker 时将 GPU 映射到 docker 内，并指定可用的 GPU ID，显存需要达到 24GB 以上，空闲内存需要达到 291GB 以上。参考命令：
+量化需要 GPU 环境。推荐先下载原始模型，再执行：
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64.** /bin/bash
+python3 ptq.py --model-name qwen3 --model-size 30b-a3b
 ```
 
-进入 docker 后 source 环境变量，并进入`models/llm/qwen3-30b-a3b`目录，执行 ptq.py 脚本。默认的 prefill 和 decode 上下文长度分别为 256 和 8192。
+若需要启用 `gptqmodel`：
 
 ```bash
-source env.sh
-cd models/llm/qwen3-30b-a3b
-python ptq.py
+python3 ptq.py --model-name qwen3 --model-size 30b-a3b --gptqmodel
 ```
 
-量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录：
+量化结果位于 `output/${HOUMO_TARGET}/hmquant`。
+
+### 4. 编译
 
 ```bash
-.
-|-- decoder
-|-- prefill
-|-- quant_embedding.pt
+python3 build.py --model_name qwen3 --model_size 30b-a3b
 ```
 
-如需使用高阶量化提升精度，请打开gptqmodel量化权重（需要较长时间，大约超过5小时）
+编译输出：
+
+- `qwen3-30b-a3b_prefill.hmm`
+- `qwen3-30b-a3b_decode.hmm`
+
+### 5. 演示
 
 ```bash
-python ptq.py --gptqmodel
+python3 demo.py --model_name qwen3 --model_size 30b-a3b
 ```
 
-### 2.4 编译
+若未显式传 `tokenizer_dir`、`prefill_path`、`decode_path`，脚本会按 `config.yaml` 和 `${model_name}-${model_size}` 自动推导。
 
-将量化模型编译为在芯片上运行的模型。执行脚本：
+## test.sh
 
-```bash
-python3 build.py
-```
-
-编译好的模型存放在当前目录，包括 2 个文件：
-qwen3_prefill.hmm
-qwen3_decode.hmm
-
-### 2.3 演示
-
-Qwen2 模型使用 python API 进行演示
-
-1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下，也可通过 demo 中的`EMBEDDING_PATH`变量指定位置
-
-2. 执行脚本，推理完成将输出性能结果。
-
-3. 注意：直接运行预编译好的 hmm 模型和执行量化+编译后产生的 hmm 模型执行 demo 后输出可能略有差异，属于正常现象。
+`test.sh` 用于串起下载、量化、编译、演示与 perf。默认执行 `demo`，默认模型为 `qwen3-30b-a3b`。
 
 ```bash
-python3 demo.py
-```
-
-### 2.4 一键评估
-
-以上步骤可以通过 test.sh 脚本一键执行：
-
-```bash
+# 默认执行 demo，会先下载预编译模型
 bash test.sh
+
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+bash test.sh -s all
 ```
 
-## 3 参考结果
-
-### 3.1 演示结果
+脚本参数：
 
 ```bash
-question:
-请介绍一下存算一体技术的优势
-response:
-存算一体（Compute-in-Memory, CIM）是一种将计算功能直接集成在存储单元中的新型计算架构，旨在突破传统冯·诺依曼架构的“存储墙”和“功耗墙”限制。它在人工智能、边缘计算、物联网等高性能、低功耗应用中展现出显著优势。以下是存算一体技术的主要优势：
-
----
-
-### 1. **提升计算效率，降低延迟**
-- **传统架构**：数据需要在存储器和处理器之间频繁搬运，导致高延迟和低效率。
-- **存算一体**：计算直接在存储单元内部完成，减少了数据搬运，显著降低了延迟，提高了计算效率。
-
----
-
-### 2. **显著降低功耗**
-- **传统架构**：数据搬运消耗大量能量，尤其是在大规模数据处理中。
-- **存算一体**：由于减少了数据移动，功耗大幅降低，特别适合对能耗敏感的边缘设备和物联网终端。
-
----
-
-### 3. **提高能效比（Energy Efficiency）**
-- 存算一体技术在处理密集型计算任务（如神经网络推理）时，能效比远高于传统CPU或GPU，适合部署在功耗受限的场景中。
-
----
-
-### 4. **支持大规模并行计算**
-- 存算一体架构通常基于存储器的并行特性（如SRAM、DRAM、ReRAM等），能够实现大规模并行计算，适合处理矩阵运算、神经网络等任务。
-
----
-
-### 5. **适用于AI和机器学习**
-- 存算一体技术特别适合处理深度学习中的矩阵乘法和卷积操作，能够显著提升AI推理和训练的效率，降低硬件成本。
-
----
-
-### 6. **减少对高速缓存和内存带宽的依赖**
-- 传统架构依赖高速缓存和内存带宽来支撑计算，而存算一体直接在存储器中进行计算，减少了对这些资源的依赖。
-
----
-
-### 7. **适合边缘计算和物联网**
-- 在边缘设备中，存算一体技术可以实现本地数据处理，减少对云端的依赖，提高实时性和隐私保护。
-
----
-
-### 8. **支持新型存储器技术**
-- 存算一体技术可以与新型存储器（如ReRAM、PCM、MRAM等）结合，充分发挥其非易失性、低功耗、高密度等优势。
-
----
-
-### 应用场景举例：
-- **AI芯片**：如谷歌的TPU、华为的昇腾系列等。
-- **边缘计算设备**：如智能摄像头、可穿戴设备。
-- **物联网终端**：如传感器节点、智能家居设备。
-- **自动驾驶**：用于实时图像识别和决策处理。
-
----
-
-### 挑战与未来发展方向：
-尽管存算一体技术优势显著，但目前仍面临一些挑战，如：
-- 存储器的计算精度和可编程性限制；
-- 与传统软件生态的兼容性问题；
-- 制造工艺和成本控制问题。
-
-未来，随着新型存储器的发展和算法优化，存算一体技术有望成为下一代计算架构的重要组成部分。
-
----
-
-如果你对某个具体应用场景或技术细节感兴趣，我可以进一步展开说明。
+Usage: test.sh [options]
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  --skip_download         Skip model download steps.
+  -h, --help              Show this help message.
 ```
 
-### 3.2 性能结果
+示例：
 
 ```bash
-Total Input: 30 tokens, Output 668 tokens, Prefill Cost 1044.749 ms, Decode Cost 32407.680 ms
-Prefill Speed: 28.72 tokens/s; Decode Speed: 20.58 tokens/s
-TTFT (Time to First Token): 1044.749 ms
-TPOT (Time Per Output Token): 48.587 ms/token
-E2E Latency (End-to-End Latency): 33.454 seconds
-E2E TPS (End-to-End Tokens Per Second): 19.97 tokens/s
+bash test.sh -s quant
+bash test.sh -s build
+bash test.sh -s demo
+bash test.sh -s all
+bash test.sh -s demo --skip_download
 ```
 
-## 4 免责声明
+标准 demo 流程结束后，如果环境中存在 `llm_perf`，脚本还会自动执行：
 
-您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。
+```bash
+python3 ${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py --path output/${HOUMO_TARGET}/hmquant/quant_embedding.pt
+llm_perf --model_name qwen3-30b-a3b ...
+```
+
+## 关键参数说明
+
+### get_model.py
+
+- `--config`: 配置文件路径，默认当前目录下 `config.yaml`
+- `--model_name`: 默认 `qwen3`
+- `--model_size`: 默认 `30b-a3b`
+- `--type`: `raw` 或 `hmm`
+- `--context_length`: 默认取配置中的 `32k`
+
+### ptq.py
+
+- `--config`: 配置文件路径
+- `--model`: 原始 HF 模型目录；默认根据 `modelscope_repo` 推导目录名
+- `--model-name`: 默认取配置
+- `--model-size`: 默认取配置
+- `--context-length`: 默认按配置中的 `32k` 解析
+- `--input-sequence-length`: 默认跟随配置中的 `prefill_length`
+- `--quant-type`: 默认跟随配置
+
+### build.py
+
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--model_dir`: 默认 `output/${HOUMO_TARGET}/hmquant`
+- `--output_dir`: 默认 `output/${HOUMO_TARGET}`
+- `--context_length`: 默认按配置中的 `32k` 解析
+
+### demo.py
+
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--tokenizer_dir`: 默认根据 `modelscope_repo` 推导
+- `--embedding_path`: 默认 `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `--prefill_path`, `--decode_path`: 默认按 `${model_name}-${model_size}` 自动拼接
+
+## 数据与免责声明
+
+本项目引用 wikitext 数据集仅用于研究和评估目的，数据集许可为 CC BY-NC 4.0，来源为 https://www.modelscope.cn/datasets/modelscope/wikitext。该数据集不作为仓库内容分发，使用时需遵守其原始许可。
+
+本文档中引用的软件、数据和模型由第三方提供并维护。使用这些第三方资源时，应遵守各自的许可协议、使用条款和隐私政策，相关风险由使用者自行承担。

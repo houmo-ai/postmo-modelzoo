@@ -1,142 +1,155 @@
-# Qwen2.5(通义千问3)
+# Qwen2.5
 
-本示例展示如何把Qwen2.5模型量化和编译，部署到后摩芯片的设备上。
+本目录提供 `qwen2.5-7b` 在 XH2 平台上的下载、量化、编译、演示与一键测试脚本。当前默认配置来自同目录下的 `config.yaml`。
 
-## 预训练模型
+## 支持模型
 
-本项目使用从 ModelScope 下载的预训练模型：
+- `model_name`: `qwen2.5`
+- `model_size`: `7b`
 
-- 模型名称: Qwen2.5-7B
-- 来源: https://modelscope.cn/models/Qwen/Qwen2.5-7B-Instruct
-- 许可: Apache License 2.0 （https://modelscope.cn/models/Qwen/Qwen2.5-8B/file/view/master/LICENSE?status=0）
+对应 ModelScope 模型：
 
-预训练模型在运行时下载，工程发布**不包含**该模型。
+- Qwen2.5-7B-Instruct: https://www.modelscope.cn/models/Qwen/Qwen2.5-7B-Instruct
 
-## 用于校准的数据集
+预训练模型在运行时下载，仓库本身不包含这些权重。
 
-本项目引用 wikitext 数据集仅用于**研究和评估目的**。
+## 配置与默认值
 
-- 数据集许可: CC BY-NC 4.0
-- 来源: https://www.modelscope.cn/datasets/modelscope/wikitext
+`config.yaml` 是默认值的单一来源，当前约定如下：
 
-⚠️ 重要提示:
-- 本数据集**不作为本仓库的一部分进行分发**。
-- 本数据集**不受本项目 Apache License 2.0 许可的约束**。
-- 任何对数据集的使用都必须遵守其原始许可 (CC BY-NC 4.0)，包括**非商业用途限制**。
-- 用户有责任确保在使用本数据集时遵守相关规定。
+- 默认模型：`qwen2.5` + `7b`
+- 默认 `context_length=8k`
+- 默认 `prefill_length=256`
+- 默认输出前缀统一使用 `${model_name}-${model_size}`
+- tokenizer 默认从 `modelscope_repo` 最后一段推导，即 `Qwen2.5-7B-Instruct`
 
-[TOC]
+## 输出约定
 
-## 1 模型说明
+量化输出：
 
-本例使用的模型实现来源于[https://modelscope.cn/models/Qwen/Qwen2.5-7B-Instruct](https://modelscope.cn/models/Qwen/Qwen2.5-7B-Instruct)。
+- `output/${HOUMO_TARGET}/hmquant/prefill`
+- `output/${HOUMO_TARGET}/hmquant/decoder`
+- `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
 
-## 2 快速开始
+编译输出：
 
-目前Qwen2.5模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill.hmm`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_decode.hmm`
 
-### 2.1 环境准备
+当 `ndevice > 1` 时，单 batch demo 默认会把 `prefill` 和 `decode` 的后缀切换为 `.hmms`。
 
-安装示例运行所需的python依赖，建议使用venv
+## 快速开始
+
+### 1. 安装依赖
 
 ```bash
 pip3 install -r requirements.txt
 ```
 
-### 2.2 获取模型和数据
+### 2. 下载模型
 
-通过get_model脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
-
-如果需要自己量化，可选择下载原始模型和wikitext2数据集，下载后的模型存放在qwen2.5-8b目录：
+下载原始模型：
 
 ```bash
-python3 get_model.py --type raw
+python3 get_model.py --type raw --model_name qwen2.5 --model_size 7b
 ```
 
-如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
+仅下载预编译模型用于演示：
 
 ```bash
-python3 get_model.py --type hmm
+python3 get_model.py --type hmm --model_name qwen2.5 --model_size 7b
 ```
 
-### 2.3 量化
+### 3. 量化
 
-量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上，空闲内存需要达到100GB以上。参考命令：
+`ptq.py` 需要 GPU 环境。默认原始模型目录会根据 `config.yaml` 中的 `modelscope_repo` 自动推导。
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64 /bin/bash
+python3 ptq.py --model-name qwen2.5 --model-size 7b
 ```
 
-进入docker后source环境变量，并进入`models/llm/qwen2.5`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为256和8192。
+如果要使用自定义校准数据集，可直接传 `--calib_data`：
 
 ```bash
-source env.sh
-cd models/llm/qwen2.5
-python3 ptq.py
+python3 ptq.py --model-name qwen2.5 --model-size 7b --calib_data /path/to/custom.jsonl
 ```
 
-为帮助您的模型在量化后达到最佳性能，您可以使用自定义校准数据集，请按以下步骤操作：
-
-步骤 1：准备校准数据
-请准备一个 JSON Lines 格式的文件，其中包含您目标应用场景的文本数据。每行格式如下：
-
-```json
-{"text": "您的领域相关文本内容..."}
-......
-```
-
-步骤 2：运行量化命令
-将以下命令中的路径替换为您的数据路径后执行：
-```bash
-# 使用预设的校准数据集或者换成自己的jsonl文件
-python3 ptq.py --calib_data ~/houmo-examples-xh2/hmodel/xh2/examples/xh_gen_data/*.jsonl
-```
-
-量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录：
+### 4. 编译
 
 ```bash
-.
-|-- decoder
-|-- prefill
-|-- quant_embedding.pt
-`-- weight.npy
+python3 build.py --model_name qwen2.5 --model_size 7b
 ```
 
-### 2.4 编译
+### 5. 演示
 
-将量化模型编译为在芯片上运行的模型。执行脚本：
+单 batch：
 
 ```bash
-python3 build.py
+python3 demo.py --model_name qwen2.5 --model_size 7b
 ```
 
-编译好的模型存放在当前目录，包括2个文件：
-qwen2.5_prefill.hmm
-qwen2.5_decode.hmm
-
-### 2.3 演示
-
-Qwen2.5模型使用python API进行演示
-
-1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下，也可通过demo中的`EMBEDDING_PATH`变量指定位置
-
-2. 执行脚本，推理完成将输出性能结果。
+多 batch：
 
 ```bash
-python3 demo.py
+python3 demo_multibatch.py --model_name qwen2.5 --model_size 7b --forbid_flush
 ```
 
-### 2.4 一键评估
+如果未显式传 `tokenizer_dir`、`prefill_path`、`decode_path`，脚本会按 `config.yaml` 和 `${model_name}-${model_size}` 自动推导。
 
-以上步骤可以通过test.sh脚本一键执行：
+### 6. test.sh
+
+`test.sh` 默认执行 `demo`，会先下载预编译模型。
 
 ```bash
 bash test.sh
+bash test.sh -s quant
+bash test.sh -s build
+bash test.sh -s all
+bash test.sh -b 2
+bash test.sh -s demo --skip_download
 ```
 
-## 3 参考结果
+标准单 batch demo 结束后，如果环境中存在 `llm_perf`，脚本会自动执行显式参数形式的性能测试，不再依赖 `llm_perf -c config.yaml`。
 
-### 3.1 演示结果
+## 关键参数说明
+
+### get_model.py
+
+- `--config`: 配置文件路径，默认当前目录下 `config.yaml`
+- `--model_name`: 默认 `qwen2.5`
+- `--model_size`: 默认 `7b`
+- `--type`: `raw` 或 `hmm`
+- `--context_length`: 默认取配置中的 `8k`
+
+### ptq.py
+
+- `--config`: 配置文件路径
+- `--model-name`, `--model-size`: 默认取配置
+- `--model`: 默认根据 `modelscope_repo` 推导
+- `--context-length`: 默认按配置中的 `8k` 解析
+- `--input-sequence-length`: 默认取配置中的 `256`
+- `--quant-type`: 默认取配置中的 `w4a8h0_ssfp`
+
+### build.py
+
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--model_dir`: 默认 `output/${HOUMO_TARGET}/hmquant`
+- `--output_dir`: 默认 `output/${HOUMO_TARGET}`
+- `--context_length`: 默认按配置中的 `8k` 解析
+- `--prefill_length`: 默认取配置中的 `256`
+
+### demo.py / demo_multibatch.py
+
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--tokenizer_dir`: 默认根据 `modelscope_repo` 推导
+- `--embedding_path`: 默认 `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `--prefill_path`, `--decode_path`: 默认按 `${model_name}-${model_size}` 自动拼接
+
+## 参考结果
+
+### 演示结果
 
 ```bash
 User question:
@@ -157,7 +170,7 @@ Model response:
 存算一体技术是未来计算技术发展的重要方向之一，具有广泛的应用前景。
 ```
 
-### 3.2 性能结果
+### 性能结果
 
 ```bash
 ====================================================================================================
@@ -191,13 +204,6 @@ E2E TPS (Throughput):         22.21 tokens/s
 ====================================================================================================
 ```
 
-### 3.3 性能测试工具
-
-- 使用llm_perf性能评测工具测试模型性能。
-- llm_perf工具详细使用说明参考${HOUMO_EXAMPLE_PATH}/tools/llm_perf目录的README.MD。
-- 如果使用发布的容器，llm_perf工具已经预编译安装，可以直接通过llm_perf --help获取帮助。
-- config.yaml为llm_perf执行测试的配置文件，用户可以按照需要自行修改。
-
-## 4 免责声明
+## 免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。

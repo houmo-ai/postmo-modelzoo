@@ -10,6 +10,8 @@ source "${MODELS_DIR}/test_common.sh"
 
 STEP="demo"
 SKIP_DOWNLOAD="false"
+MODEL_NAME="copaw-flash"
+MODEL_SIZE="9b"
 parse_args "$@"
 
 cd "${SCRIPT_DIR}"
@@ -37,12 +39,9 @@ if should_run_step "quant"; then
 
     if ! should_skip_download; then
         echo "Download raw model."
-        python3 get_model.py --type raw
+        python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
 
-    if [[ ! -d "$dir_path/lib/python3.12/site-packages/distutils" ]]; then
-        ln -s /opt/venv/houmo/lib/python3.12/site-packages/setuptools/_distutils $dir_path/lib/python3.12/site-packages/distutils
-    fi
     GPTQ_CALIB_PATH="$BASE_DIR/hmodel/gptqmodel/gptqmodel/quantization/calibration"
     if [ ! -d "$GPTQ_CALIB_PATH" ]; then
         echo "Error: Directory $GPTQ_CALIB_PATH does not exist."
@@ -59,21 +58,21 @@ if should_run_step "quant"; then
     cd $SCRIPT_DIR
 
     echo "Start model quantization."
-    python3 ptq.py --gptqmodel
+    python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}" --gptqmodel
 fi
 
 if should_run_step "build"; then
     echo "Start model compilation."
-    python3 build.py
+    python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
         echo "Download precompiled model."
-        python3 get_model.py --type hmm
+        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Execute demo."
-    python3 demo.py
+    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

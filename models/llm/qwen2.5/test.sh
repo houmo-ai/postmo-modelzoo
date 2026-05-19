@@ -10,13 +10,16 @@ source "${MODELS_DIR}/test_common.sh"
 
 STEP="demo"
 SKIP_DOWNLOAD="false"
-MULTI_BATCH="false"
+MODEL_NAME="qwen2.5"
+MODEL_SIZE="7b"
+NDEVICE=1
+BATCH=1
 parse_args "$@"
 
 cd "${SCRIPT_DIR}"
 
 TEST_VENV_ACTIVE=0
-dir_path="qwen2.5"
+dir_path="qwen2.5_venv"
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
 fi
@@ -30,31 +33,44 @@ if should_run_step "quant"; then
 
     if ! should_skip_download; then
         echo "Download raw model."
-        python3 get_model.py --type raw
+        python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Start model quantization."
-    python3 ptq.py
+    python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}"
 fi
 
 if should_run_step "build"; then
     echo "Start model compilation."
-    python3 build.py
+    python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --batch "${BATCH}"
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
         echo "Download pre-compiled model."
-        python3 get_model.py --type hmm
+        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --batch "${BATCH}"
     fi
-    if [ "$MULTI_BATCH" = "false" ]; then
+    if [[ "${BATCH}" -lt 2 ]]; then
         echo "Execute demo."
-        python3 demo.py
-        echo "Execute performance case."
-        python3 ../../../tools/llm_perf/convert_embed.py --path output/xh2/hmquant/quant_embedding.pt
-        llm_perf -c config.yaml
+        python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+
+        if command -v llm_perf &>/dev/null; then
+            echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
+            python3 ../../../tools/llm_perf/convert_embed.py --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
+            devices_param=$(get_devices_param "${NDEVICE}")
+            if [[ "${NDEVICE}" -gt 1 ]]; then
+                model_suffix="hmms"
+            else
+                model_suffix="hmm"
+            fi
+            llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
+                --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
+                --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
+                --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
+                --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
+        fi
     else
-        echo "Execute multi-batch demo with batch size: ${MULTI_BATCH}"
-        python3 demo_multibatch.py --forbid_flush
+        echo "Execute multi-batch demo with batch size: ${BATCH}"
+        python3 demo_multibatch.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --forbid_flush
     fi
 fi
 

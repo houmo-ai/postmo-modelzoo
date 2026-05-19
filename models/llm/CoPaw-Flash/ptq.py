@@ -25,8 +25,6 @@ import shutil
 import os.path as osp
 from pathlib import Path
 import time
-import psutil
-import threading
 import queue
 import traceback
 import multiprocessing as mp
@@ -64,6 +62,13 @@ from xh_model_zoo.xh_llm.models.qwen3_5 import (
     XHQwen3_5VisionModel,
     Qwen3_5Processor,
 )
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import (
+    check_gpu,
+    first_not_none,
+    get_model_configs,
+    parse_context_length,
+)
 
 HOUMO_DATASETS_PATH = os.getenv(
     "HOUMO_DATASETS_PATH",
@@ -73,80 +78,16 @@ HOUMO_PIC_PATH = os.getenv(
     "HOUMO_PIC_PATH", str(Path(__file__).resolve().parents[3] / "data" / "pic")
 )
 HOUMO_TARGET = os.getenv("HOUMO_TARGET", "")
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
-class ProcessMemoryMonitor:
-    """
-    Monitors the memory usage of the current Python process in real-time using psutil.
-    """
-
-    def __init__(self, interval=2, log_file=None):
-        """
-        Initializes the monitor.
-        Args:
-            interval (int): Time between measurements in seconds.
-            log_file (str, optional): Path to a file to log results. If None, prints to console.
-        """
-        self.process = psutil.Process(os.getpid())
-        self.interval = interval
-        self.log_file = log_file
-        self.is_monitoring = False
-        self.peak_memory_mb = 0
-        self.include_children = True
-
-    def get_memory_info(self):
-        """
-        Gets current memory usage information.
-        Returns:
-            dict: A dictionary containing memory usage data.
-        """
-        rss = self.process.memory_info().rss
-        if self.include_children:
-            for child in self.process.children(recursive=True):
-                try:
-                    rss += child.memory_info().rss
-                except psutil.NoSuchProcess:
-                    continue
-        rss_mb = rss / (1024 * 1024)  # Resident Set Size in MB
-        percent = self.process.memory_percent()  # Percentage of system memory
-        return {"rss_mb": rss_mb, "percent": percent}
-
-    def start(self):
-        """Starts the monitoring loop in a separate daemon thread."""
-        self.is_monitoring = True
-        self.peak_memory_mb = 0
-        self.monitor_thread = threading.Thread(target=self._monitor_loop)
-        self.monitor_thread.daemon = True  # Thread will exit when main program does
-        self.monitor_thread.start()
-        print(f"Memory monitoring started (interval: {self.interval}s)")
-
-    def _monitor_loop(self):
-        """The internal loop that runs in the thread."""
-        while self.is_monitoring:
-            mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info["rss_mb"])
-
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
-            # Output to console or file
-            if self.log_file:
-                with open(self.log_file, "a") as f:
-                    f.write(log_message + "\n")
-
-            time.sleep(self.interval)
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        logger.info(
-            f"{timestamp} - Max RSS: {self.peak_memory_mb:.2f} MB, System%: {self.process.memory_percent():.2f}%"
-        )
-
-    def stop(self):
-        """Stops the monitoring loop and prints peak usage."""
-        self.is_monitoring = False
-        if hasattr(self, "monitor_thread"):
-            self.monitor_thread.join(
-                timeout=1
-            )  # Wait a moment for the thread to finish
-        print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
+def get_default_model_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "copaw-flash").upper()
+    model_size = model_config.get("model_size", "9b").upper()
+    return f"{model_name}-{model_size}"
 
 
 def set_seed(seed: int):
@@ -155,26 +96,6 @@ def set_seed(seed: int):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-
-
-def check_gpu():
-    import subprocess
-
-    try:
-        result = subprocess.run(
-            "nvidia-smi --query-gpu=count --format=csv,noheader,nounits | wc -l",
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            text=True,
-        )
-        if result.returncode == 0 and int(result.stdout.strip()) > 0:
-            return True
-        return False
-    except Exception as e:
-        print(f"Not install GPU driver, error msg: {e}")
-        return False
 
 
 def str2bool(v):
@@ -259,6 +180,7 @@ def text_to_chat_calibration(samples):
         for sample in samples
     ]
 
+
 def get_wikitext2(nsamples, seqlen, local_dir=None, tokenizer=None):
     if local_dir is None:
         from datasets import load_dataset
@@ -324,7 +246,9 @@ def gptq_quant_llm(args):
 
     if args.calib_data:
         if args.calib_data.endswith(".jsonl"):
-            calibration_dataset = get_jsonl_texts(args.calib_data, nsamples=256, text_key="text")
+            calibration_dataset = get_jsonl_texts(
+                args.calib_data, nsamples=256, text_key="text"
+            )
         elif os.path.isdir(args.calib_data) and "wikitext" in args.calib_data.lower():
             tokenizer = AutoConfig.from_pretrained(args.model)
             calibration_dataset = get_wikitext2(
@@ -530,7 +454,9 @@ def rotate_fp_vl(args):
     load_kwargs = dict(trust_remote_code=False, device_map="auto")
 
     model = GPTQModel.load(args.model, quantize_config, **load_kwargs)
-    tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True, trust_remote_code=False)
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model, use_fast=True, trust_remote_code=False
+    )
     logger.info("Start rotating vision model...")
     model.apply_rotation()
 
@@ -542,7 +468,9 @@ def rotate_fp_vl(args):
     model.generation_config.do_sample = True
     rotate_path_dir = Path(rotate_path)
     rotate_path_dir.mkdir(exist_ok=True, parents=True)
-    model.model.save_pretrained(rotate_path, safe_serialization=True, max_shard_size="5GB")
+    model.model.save_pretrained(
+        rotate_path, safe_serialization=True, max_shard_size="5GB"
+    )
     processor.save_pretrained(rotate_path)
     tokenizer.save_pretrained(rotate_path)
     logger.info("Model saved successfully.")
@@ -958,74 +886,95 @@ def run_step_in_fresh_process(step_name: str, args: argparse.Namespace):
         process.close()
 
 
-if HOUMO_TARGET == "xh2":
+def parse_args():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument("--model", type=str, default=None)
+    parser.add_argument(
+        "--model-name",
+        type=str,
+        default=None,
+        help="output hmonnx model name",
+    )
+    parser.add_argument(
+        "--model-size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
+        "--calib_data",
+        type=str,
+        default="qwen3_8b_gen_data.jsonl",
+        help="calibration dataset choose",
+    )
+    parser.add_argument(
+        "--image",
+        type=str,
+        default=f"{HOUMO_PIC_PATH}/beach.jpeg",
+        help="vision input image",
+    )
+    parser.add_argument("--work-dir", type=str, default="work_dirs/")
+    parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
+    parser.add_argument("--llm_config", type=str, default="llm_config.py")
+    parser.add_argument("--vision_config", type=str, default="vision_config.py")
+    parser.add_argument("--debug", action="store_true", help="debug mode")
+    parser.add_argument(
+        "--context-length", type=int, default=2048, help="max sequence length"
+    )
+    parser.add_argument(
+        "--input-sequence-length",
+        type=int,
+        default=None,
+        help="input sequence length",
+    )
+    parser.add_argument(
+        "--quant-type",
+        default=None,
+        help="quant type, default is w8a8h0_ssfp",
+    )
+    parser.add_argument(
+        "--gptqmodel", action="store_true", help="use gptqmodel to quant"
+    )
+    args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.model = first_not_none(args.model, get_default_model_dir(model_config))
+    args.context_length = first_not_none(
+        args.context_length,
+        parse_context_length(model_config.get("context_length", "8k")),
+    )
+    args.input_sequence_length = first_not_none(
+        args.input_sequence_length, model_config.get("prefill_length", 256)
+    )
+    args.quant_type = first_not_none(
+        args.quant_type, model_config.get("quant_type", "w8a8h0_ssfp")
+    )
+    return args
 
-    def parse_args():
-        parser = argparse.ArgumentParser(
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter
-        )
-        parser.add_argument("--model", type=str, default="CoPaw-Flash-9B")
-        parser.add_argument(
-            "--model-name",
-            type=str,
-            default="copaw-flash",
-            help="output hmonnx model name",
-        )
-        parser.add_argument(
-            "--calib_data",
-            type=str,
-            default="qwen3_8b_gen_data.jsonl",
-            help="calibration dataset choose",
-        )
-        parser.add_argument(
-            "--image",
-            type=str,
-            default=f"{HOUMO_PIC_PATH}/beach.jpeg",
-            help="vision input image",
-        )
-        parser.add_argument("--work-dir", type=str, default="work_dirs/")
-        parser.add_argument(
-            "--out-dir", type=str, default="output/{}".format(HOUMO_TARGET)
-        )
-        parser.add_argument("--llm_config", type=str, default="llm_config.py")
-        parser.add_argument("--vision_config", type=str, default="vision_config.py")
-        parser.add_argument("--debug", action="store_true", help="debug mode")
-        parser.add_argument(
-            "--context-length", type=int, default=2048, help="max sequence length"
-        )
-        parser.add_argument(
-            "--input-sequence-length",
-            type=int,
-            default=256,
-            help="input sequence length",
-        )
-        parser.add_argument(
-            "--quant-type",
-            default="w8a8h0_ssfp",
-            help="quant type, default is w8a8h0_ssfp",
-        )
-        parser.add_argument(
-            "--gptqmodel", action="store_true", help="use gptqmodel to quant"
-        )
-        args = parser.parse_args()
-        return args
 
-    def main():
-        args = parse_args()
-        set_seed(42)
+if __name__ == "__main__":
+    assert check_gpu() is True, "Error: Not found GPU device."
+
+    args = parse_args()
+    set_seed(42)
+    with ProcessMemoryMonitor(interval=2) as monitor:
         if args.gptqmodel:
             run_step_in_fresh_process("rotate_fp_vl", args)
             run_step_in_fresh_process("gptq_quant_llm", args)
         houmo_export_llm(args)
         houmo_export_vision(args)
         move_llm(args)
-
-
-if __name__ == "__main__":
-    if not check_gpu():
-        print("Error: Not found GPU device.")
-        exit(-1)
-    memory_monitor = ProcessMemoryMonitor(interval=2, log_file="./cpu_memory.log")
-    memory_monitor.start()
-    main()
-    memory_monitor.stop()
+    print(f"Peak memory usage: {monitor.peak_memory_mb:.2f} MB")

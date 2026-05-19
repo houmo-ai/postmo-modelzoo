@@ -1,0 +1,86 @@
+{
+    "obsolete": false,
+    "model_dir": "models/llm/CoPaw-Flash",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
+    },
+    "support_hmatc": null,
+    "perf_metrics": {
+        "xh2": {
+            "x86_64": {
+                "prefill": 463.92,
+                "decode": 15.83,
+                "end2end": 14.58
+            }
+        }
+    },
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_8k"],
+            "source_type": [null, null],
+            "model_name": ["copaw-flash", "copaw-flash"],
+            "model_size": ["9b", "9b"],
+            "context_length": [null, "8k"]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": ["cached_models/CoPaw-Flash-9B"],
+            "model-name": ["copaw-flash"],
+            "model-size": ["9b"],
+            "out-dir": ["cached_results/hmquant_xh2_2k"],
+            "context-length": ["2048"],
+            "input-sequence-length": ["256"]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_2k"],
+            "model_name": ["copaw-flash"],
+            "model_size": ["9b"],
+            "batch": [null],
+            "ncore": [null],
+            "ndevice": ["1"],
+            "stage": ["build"],
+            "context_length": ["8192"],
+            "prefill_length": ["256"],
+            "output_dir": ["cached_results/hmm_xh2_8k"],
+            "j": ["24"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "model_name": ["copaw-flash"],
+            "model_size": ["9b"],
+            "tokenizer_dir": ["cached_models/CoPaw-Flash-9B"],
+            "embedding_path": [
+                "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
+            ],
+            "prefill_path": [
+                "cached_results/hmm_xh2_8k/copaw-flash-9b_prefill.hmm"
+            ],
+            "decode_path": [
+                "cached_results/hmm_xh2_8k/copaw-flash-9b_decode.hmm"
+            ],
+            "vision_path": [
+                "cached_results/hmm_xh2_8k/copaw-flash-9b_visual_448x448x2.hmm"
+            ],
+            "ndevice": ["1"],
+            "max_size_w": ["448"],
+            "max_size_h": ["448"]
+        }
+    },
+    "perf_params": "demo"
+}

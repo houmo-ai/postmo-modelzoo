@@ -26,28 +26,21 @@
     },
     "get_model_params": {
         "xh2": {
-            "type": ["hmm"],
-            "download_dir": ["cached_models"],
-            "extract_dir": ["cached_models/hmm_xh2_32k"],
-            "source_type": [null],
-            "batch": [null],
-            "context_length": [null],
-            "ndevice": [null]
-        }
-    },
-    "quant_params": {
-        "xh2": {
-            "model": ["cached_models/gpt-oss-20b"],
-            "out-dir": ["cached_results/hmquant_xh2_2k"],
-            "context-length": ["2048"],
-            "input-sequence-length": [null],
-            "calib_data": [null]
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_32k"],
+            "source_type": [null, null],
+            "model_name": [null, null],
+            "model_size": [null, null],
+            "context_length": [null, "32k"],
+            "ndevice": [null, null]
         }
     },
     "compile_params": {
         "xh2": {
             "model_dir": ["cached_results/hmquant_xh2_2k"],
-            "model_name": [null],
+            "model_name": ["gpt-oss"],
+            "model_size": ["20b"],
             "batch": [null],
             "ncore": [null],
             "ndevice": [null],
@@ -59,12 +52,18 @@
     },
     "demo_params": {
         "xh2": {
+            "model_name": ["gpt-oss"],
+            "model_size": ["20b"],
             "tokenizer_dir": ["cached_models/gpt-oss-20b"],
             "embedding_path": [
                 "cached_results/hmm_xh2_32k/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_32k/gpt-oss_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_32k/gpt-oss_decode.hmm"],
+            "prefill_path": [
+                "cached_results/hmm_xh2_32k/gpt-oss-20b_prefill.hmm"
+            ],
+            "decode_path": [
+                "cached_results/hmm_xh2_32k/gpt-oss-20b_decode.hmm"
+            ],
             "ndevice": ["1"]
         }
     },

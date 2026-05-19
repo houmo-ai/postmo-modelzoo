@@ -34,8 +34,10 @@
                 "cached_models/hmm_xh2_32k_ms"
             ],
             "source_type": [null, null, "modelscope"],
+            "model_name": ["qwen3", "qwen3", "qwen3"],
+            "model_size": ["30b-a3b", "30b-a3b", "30b-a3b"],
             "batch": [null, null, null],
-            "context_length": [null, null, null],
+            "context_length": [null, "32k", "32k"],
             "ndevice": [null, null, null]
         }
     },
@@ -45,6 +47,8 @@
                 "py_reqs": ["gptqmodel-5.4.4-py3-none-any.whl"]
             },
             "model": ["cached_models/qwen3-30b-a3b"],
+            "model-name": ["qwen3"],
+            "model-size": ["30b-a3b"],
             "out-dir": ["cached_results/hmquant_xh2_2k"],
             "context-length": ["2048"],
             "input-sequence-length": [null],
@@ -54,7 +58,8 @@
     "compile_params": {
         "xh2": {
             "model_dir": ["cached_results/hmquant_xh2_2k"],
-            "model_name": [null],
+            "model_name": ["qwen3"],
+            "model_size": ["30b-a3b"],
             "batch": [null],
             "ncore": [null],
             "ndevice": [null],
@@ -66,12 +71,18 @@
     },
     "demo_params": {
         "xh2": {
+            "model_name": ["qwen3"],
+            "model_size": ["30b-a3b"],
             "tokenizer_dir": ["cached_models/qwen3-30b-a3b"],
             "embedding_path": [
                 "cached_results/hmm_xh2_32k/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_32k/qwen3_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_32k/qwen3_decode.hmm"],
+            "prefill_path": [
+                "cached_results/hmm_xh2_32k/qwen3-30b-a3b_prefill.hmm"
+            ],
+            "decode_path": [
+                "cached_results/hmm_xh2_32k/qwen3-30b-a3b_decode.hmm"
+            ],
             "ndevice": ["1"]
         }
     },

@@ -85,8 +85,12 @@
             "embedding_path": [
                 "cached_results/hmm_xh2_32k/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_32k/deepseek_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2_32k/deepseek_decode.hmm"],
+            "prefill_path": [
+                "cached_results/hmm_xh2_32k/deepseek-8b_prefill.hmm"
+            ],
+            "decode_path": [
+                "cached_results/hmm_xh2_32k/deepseek-8b_decode.hmm"
+            ],
             "ndevice": ["1"]
         }
     },
@@ -97,9 +101,11 @@
                 "cached_results/hmm_xh2_32k_b2/hmquant/quant_embedding.pt"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_32k_b2/deepseek_prefill.hmm"
+                "cached_results/hmm_xh2_32k_b2/deepseek-8b_prefill.hmm"
             ],
-            "decode_path": ["cached_results/hmm_xh2_32k_b2/deepseek_decode.hmm"]
+            "decode_path": [
+                "cached_results/hmm_xh2_32k_b2/deepseek-8b_decode.hmm"
+            ]
         }
     },
     "perf_params": "demo"

@@ -1,0 +1,18 @@
+default_model_name: "copaw-flash"
+default_model_size: "9b"
+
+model_configs:
+  copaw-flash:
+    "9b":
+      modelscope_repo: ["AgentScope/CoPaw-Flash-9B"]
+      model_name: "copaw-flash"
+      model_size: "9b"
+      ncore: 2
+      quant_type: "w8a8h0_ssfp"
+      context_length: "8k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      max_size_w: 448
+      max_size_h: 448
+      max_size_t: 2

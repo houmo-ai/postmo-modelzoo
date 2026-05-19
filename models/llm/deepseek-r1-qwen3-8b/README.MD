@@ -1,215 +1,152 @@
-# DeepSeek R1 Qwen3 8b
+# DeepSeek R1 Qwen3 8B
 
-本示例展示如何把DeepSeek模型量化和编译，部署到后摩芯片的设备上。
+本目录提供 `deepseek-8b` 在 XH2 平台上的下载、量化、编译、演示与一键测试脚本。当前默认配置来自同目录下的 `config.yaml`。
 
-## 预训练模型
+## 支持模型
 
-本项目使用从 ModelScope 下载的预训练模型：
+- `model_name`: `deepseek`
+- `model_size`: `8b`
 
-- 模型名称: DeepSeek-R1-0528-Qwen3-8B
-- 来源: https://modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
-- 许可: MIT License （https://modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B/file/view/master/LICENSE?status=0）
+对应 ModelScope 模型：
 
-预训练模型在运行时下载，工程发布**不包含**该模型。
+- DeepSeek-R1-0528-Qwen3-8B: https://www.modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
 
-## 用于校准的数据集
+预训练模型在运行时下载，仓库本身不包含这些权重。
 
-本项目引用 wikitext 数据集仅用于**研究和评估目的**。
+## 配置与默认值
 
-- 数据集许可: CC BY-NC 4.0
-- 来源: https://www.modelscope.cn/datasets/modelscope/wikitext
+`config.yaml` 是默认值的单一来源，当前约定如下：
 
-⚠️ 重要提示:
-- 本数据集**不作为本仓库的一部分进行分发**。
-- 本数据集**不受本项目 Apache License 2.0 许可的约束**。
-- 任何对数据集的使用都必须遵守其原始许可 (CC BY-NC 4.0)，包括**非商业用途限制**。
-- 用户有责任确保在使用本数据集时遵守相关规定。
+- 默认模型：`deepseek` + `8b`
+- 默认 `context_length=32k`
+- 默认 `prefill_length=256`
+- 默认输出前缀统一使用 `${model_name}-${model_size}`
+- tokenizer 默认从 `modelscope_repo` 最后一段推导，即 `DeepSeek-R1-0528-Qwen3-8B`
 
-[TOC]
+## 输出约定
 
-## 1 模型说明
+量化输出：
 
-本例使用的 DeepSeek 实现来源于[https://modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B](https://modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B)。
-本例只适用于xh2。
+- `output/${HOUMO_TARGET}/hmquant/prefill`
+- `output/${HOUMO_TARGET}/hmquant/decoder`
+- `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
 
-## 2 快速开始
+编译输出：
 
-目前DeepSeek模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill.hmm`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_decode.hmm`
 
-### 2.1 环境准备
+当 `ndevice > 1` 时，单 batch demo 默认会把 `prefill` 和 `decode` 的后缀切换为 `.hmms`。
 
-安装示例运行所需的python依赖，建议使用venv
+## 快速开始
+
+### 1. 安装依赖
 
 ```bash
 pip3 install -r requirements.txt
 ```
 
-### 2.2 获取模型和数据
+### 2. 下载模型
 
-通过get_model脚本下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
-
-如果需要自己量化，可选择下载原始模型和wikitext2数据集，下载后的模型存放在DeepSeek-R1-Distill-Qwen-7B目录：
+下载原始模型：
 
 ```bash
-python3 get_model.py --type raw
+python3 get_model.py --type raw --model_name deepseek --model_size 8b
 ```
 
-如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
+仅下载预编译模型用于演示：
 
 ```bash
-python3 get_model.py --type hmm
+python3 get_model.py --type hmm --model_name deepseek --model_size 8b
 ```
 
-### 2.3 量化
+### 3. 量化
 
-量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上。参考命令：
+`ptq.py` 需要 GPU 环境。默认原始模型目录会根据 `config.yaml` 中的 `modelscope_repo` 自动推导。
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py39-x86.64 /bin/bash
+python3 ptq.py --model-name deepseek --model-size 8b
 ```
 
-进入docker后source环境变量，并进入`models/llm/deepseek`目录，执行ptq.py脚本。默认的prefill和decode上下文长度分别为256和2048，可通过ptq.py中的prefill_shape和cache_len参数修改，cache_len最长为8192。
+如果要使用自定义校准数据集，可直接传 `--calib_data`：
 
 ```bash
-source env.sh
-cd models/llm/deepseek-r1-qwen3-8b
-python3 ptq.py
+python3 ptq.py --model-name deepseek --model-size 8b --calib_data /path/to/custom.jsonl
 ```
 
-为帮助您的模型在量化后达到最佳性能，您可以使用自定义校准数据集，请按以下步骤操作：
-
-步骤 1：准备校准数据
-请准备一个 JSON Lines 格式的文件，其中包含您目标应用场景的文本数据。每行格式如下：
-
-```json
-{"text": "您的领域相关文本内容..."}
-......
-```
-
-步骤 2：运行量化命令
-将以下命令中的路径替换为您的数据路径后执行：
-```bash
-# 使用预设的校准数据集或者换成自己的jsonl文件
-python3 ptq.py --calib_data ~/houmo-examples-xh2/hmodel/xh2/examples/xh_gen_data/*.jsonl
-```
-
-量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录：
+### 4. 编译
 
 ```bash
-.
-|-- decoder
-|-- prefill
-|-- quant_embedding.pt
+python3 build.py --model_name deepseek --model_size 8b
 ```
 
-### 2.4 编译
+### 5. 演示
 
-将量化模型编译为在芯片上运行的模型。执行脚本：
+单 batch：
 
 ```bash
-python3 build.py
+python3 demo.py --model_name deepseek --model_size 8b
 ```
 
-编译好的模型存放在当前目录，包括2个文件：
-deepseek_prefill.hmm
-deepseek_decode.hmm
-
-### 2.3 演示
-
-DeepSeek模型使用python API进行演示
-
-1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下，也可通过demo中的`EMBEDDING_PATH`变量指定位置
-
-2. 执行脚本，推理完成将输出性能结果。
+多 batch：
 
 ```bash
-python3 demo.py
+python3 demo_multibatch.py --model_name deepseek --model_size 8b --forbid_flush
 ```
 
-### 2.4 一键评估
+如果未显式传 `tokenizer_dir`、`prefill_path`、`decode_path`，脚本会按 `config.yaml` 和 `${model_name}-${model_size}` 自动推导。
 
-以上步骤可以通过test.sh脚本一键执行：
+### 6. test.sh
+
+`test.sh` 默认执行 `demo`，会先下载预编译模型。
 
 ```bash
 bash test.sh
+bash test.sh -s quant
+bash test.sh -s build
+bash test.sh -s all
+bash test.sh -b 2
+bash test.sh -s demo --skip_download
 ```
 
-## 3 参考结果
+标准单 batch demo 结束后，如果环境中存在 `llm_perf`，脚本会自动执行显式参数形式的性能测试，不再依赖 `llm_perf -c config.yaml`。
 
-### 3.1 演示结果
+## 关键参数说明
 
-```bash
-question:
-请介绍一下存算一体技术的优势
-response:
-<think>
-嗯，我现在要介绍一下存算一体技术的优势。首先，我对这个技术不是很熟悉，所以需要先了解一下什么是存算一体。根据之前的了解，存算一体应该是结合存储和计算的高效解决方案，可能用于云计算或者边缘计算等领域。
+### get_model.py
 
-接下来，我需要分析存算一体的优势。首先，高效利用资源。存算一体可能整合了存储和计算资源，减少了冗余，提高了利用率。比如，可能存储和计算共享相同的硬件，这样资源不会浪费，提高了效率。
+- `--config`: 配置文件路径，默认当前目录下 `config.yaml`
+- `--model_name`: 默认 `deepseek`
+- `--model_size`: 默认 `8b`
+- `--type`: `raw` 或 `hmm`
+- `--context_length`: 默认取配置中的 `32k`
 
-然后是降低成本。如果存储和计算共享资源，那么硬件成本可能会降低，因为不需要额外的存储设备，或者计算资源可以同时服务于存储的需求。这样企业可以在预算有限的情况下，提供更好的服务。
+### ptq.py
 
-安全性也是一个关键点。存储和计算通常分开管理，可能导致数据泄露或服务中断。而存算一体可能将两者集成在一个环境中，这样一旦出现问题，可能更容易排查，或者数据存储和计算的安全性都有保障。
+- `--config`: 配置文件路径
+- `--model-name`, `--model-size`: 默认取配置
+- `--model`: 默认根据 `modelscope_repo` 推导
+- `--context-length`: 默认按配置中的 `32k` 解析
+- `--input-sequence-length`: 默认取配置中的 `256`
+- `--quant-type`: 默认取配置中的 `w4a8h0_ssfp`
 
-实时性和响应速度方面，存算一体可能提供更快的数据处理能力。计算资源的强大处理能力可以让实时数据分析更高效，响应速度快，这对于需要实时反馈的企业非常重要。
+### build.py
 
-扩展性和灵活性方面，存算一体可能支持多种应用场景，可以根据需求灵活调整存储和计算资源的比例，适应不同的业务需求，比如从本地存储到云端存储，或者从边缘计算到分布式架构。
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--model_dir`: 默认 `output/${HOUMO_TARGET}/hmquant`
+- `--output_dir`: 默认 `output/${HOUMO_TARGET}`
+- `--context_length`: 默认按配置中的 `32k` 解析
+- `--prefill_length`: 默认取配置中的 `256`
 
-安全性方面，可能有更好的管理和控制，防止数据泄露或服务中断。同时，存储和计算的协同工作可能提供更高的安全性保障。
+### demo.py / demo_multibatch.py
 
-用户体验方面，存算一体可能让用户享受到更稳定、更快的服务，减少中断和延迟，提升整体使用体验。
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--tokenizer_dir`: 默认根据 `modelscope_repo` 推导
+- `--embedding_path`: 默认 `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `--prefill_path`, `--decode_path`: 默认按 `${model_name}-${model_size}` 自动拼接
 
-最后，合规性和隐私保护也是一个优势，特别是在数据隐私法规日益严格的背景下，存算一体可能提供更好的数据管理和保护机制，确保合规性。
-
-总结一下，存算一体的优势可能包括高效资源利用、降低成本、安全性、实时性、扩展性、用户体验、合规性和更高的性能。这些都是企业在数字化转型中可能需要考虑的关键因素。
-
-不过，我还不太确定每个优势的具体细节，可能需要进一步查阅资料来确认。比如，存算一体如何具体实现资源共享，安全性是如何保障的，实时性方面有哪些具体的技术支持等等。可能需要更深入的理解这些技术的细节，以及它们如何在实际应用场景中发挥作用。
-
-总的来说，存算一体技术通过整合存储和计算资源，能够在多个方面为企业带来优势，包括效率、成本、安全性、实时性等方面，帮助企业更好地应对数字化转型的需求。
-</think>
-
-存算一体技术是一种结合存储和计算资源的高效解决方案，广泛应用于云计算和边缘计算等领域。它通过整合存储和计算资源，为企业带来多项优势。以下是其主要优势的详细阐述：
-
-1. **高效资源利用**：
-   - 存算一体通过共享存储和计算资源，减少了冗余，提高了资源利用率。例如，存储设备和计算服务器可以共享相同的硬件资源，避免浪费，从而最大化资源的使用效率。
-
-2. **降低成本**：
-   - 由于存储和计算资源的共享，企业无需额外投资大量的存储硬件，同时计算资源的强大处理能力也能服务于存储需求，降低了整体运营成本。
-
-3. **安全性增强**：
-   - 将存储和计算集成在一个环境中，提升了数据和应用的安全性。一旦出现问题，更容易进行排查和修复，减少了数据泄露的风险。
-
-4. **实时性和快速响应**：
-   - 存算一体的强大计算能力支持实时数据分析和处理，为企业提供了快速的响应机制，适用于需要即时反馈的应用场景。
-
-5. **扩展性和灵活性**：
-   - 该技术可以根据企业需求灵活调整存储和计算的比例，支持从本地存储到云端存储，以及从边缘计算到分布式架构等多种应用场景。
-
-6. **用户体验优化**：
-   - 提供稳定、快速的服务，减少中断和延迟，提升用户体验，确保用户能够享受到及时和可靠的解决方案。
-
-7. **合规性和隐私保护**：
-   - 在数据隐私法规日益严格的背景下，存算一体提供了有效的数据管理和保护机制，确保合规性，保护用户隐私。
-
-总结而言，存算一体技术通过整合存储和计算资源，为企业提供了高效、低成本、安全、快速的服务，适用于数字化转型中的多种需求，帮助企业更好地应对未来的挑战。
-```
-
-### 3.2 性能结果
-
-```bash
-total: 872 tokens, cost 82.606 s
-prefill time: 688.210 ms, 1.45 tokens/s
-decode average time: 94.048 ms, 10.63 tokens/s
-end2end average time: 94.731 ms, 10.56 tokens/s
-```
-
-### 3.3 性能测试工具
-
-- 使用llm_perf性能评测工具测试模型性能。
-- llm_perf工具详细使用说明参考${HOUMO_EXAMPLE_PATH}/tools/llm_perf目录的README.MD。
-- 如果使用发布的容器，llm_perf工具已经预编译安装，可以直接通过llm_perf --help获取帮助。
-- config.yaml为llm_perf执行测试的配置文件，用户可以按照需要自行修改。
-
-## 4 免责声明
+## 免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。

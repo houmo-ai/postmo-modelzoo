@@ -1,81 +1,126 @@
 # gpt-oss
 
-本示例展示如何把gpt-oss-20b模型量化和编译，部署到后摩芯片的设备上。
+本目录提供 gpt-oss-20b 在 XH2 平台上的下载、编译、演示与一键测试脚本。当前默认配置来自同目录下的 `config.yaml`。
 
-## 预训练模型
+## 支持模型
 
-本项目使用从 ModelScope 下载的预训练模型：
+- `model_name`: `gpt-oss`
+- `model_size`: `20b`
 
-- 模型名称: gpt-oss-20b
-- 来源: https://modelscope.cn/models/openai-mirror/gpt-oss-20b
-- 许可: Apache License 2.0 （https://modelscope.cn/models/openai-mirror/gpt-oss-20b/file/view/master/LICENSE?status=0）
+对应 ModelScope 模型：
 
-预训练模型在运行时下载，工程发布**不包含**该模型。
+- gpt-oss-20b: https://www.modelscope.cn/models/openai-mirror/gpt-oss-20b
 
-[TOC]
+预训练模型在运行时下载，仓库本身不包含这些权重。
 
-## 1 模型说明
+## 配置与默认值
 
-本例使用的模型实现来源于[https://www.modelscope.cn/models/openai-mirror/gpt-oss-20b](https://www.modelscope.cn/models/openai-mirror/gpt-oss-20b)。
-本例只适用于xh2。
+`config.yaml` 是默认值的单一来源，当前约定如下：
 
-## 2 快速开始
+- 默认模型：`gpt-oss` + `20b`
+- 默认 `context_length=32k`
+- 默认 `prefill_length=256`
+- 默认输出前缀统一使用 `${model_name}-${model_size}`
+- tokenizer 默认从 `modelscope_repo` 最后一段推导，即 `gpt-oss-20b`
 
-目前Qwen3模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
+## 输出约定
 
-### 2.1 环境准备
+标准输出：
 
-安装示例运行所需的python依赖，建议使用venv
+- `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill.hmm`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_decode.hmm`
+
+当 `ndevice > 1` 时，demo 默认会把 `prefill` 和 `decode` 的后缀切换为 `.hmms`。
+
+## 快速开始
+
+### 1. 安装依赖
 
 ```bash
 pip3 install -r requirements.txt
 ```
 
-### 2.2 获取模型和数据
+### 2. 下载模型
 
-通过get_model脚本下载模型，可通过参数选择下载量化模型或芯片模型。
-
-```bash
-python3 get_model.py --type raw
-```
-
-如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
+下载原始模型：
 
 ```bash
-python3 get_model.py --type hmm
+python3 get_model.py --type raw --model_name gpt-oss --model_size 20b
 ```
 
-### 2.3 编译
-
-将量化模型编译为在芯片上运行的模型。执行脚本：
+仅下载预编译模型用于演示：
 
 ```bash
-python3 build.py
+python3 get_model.py --type hmm --model_name gpt-oss --model_size 20b
 ```
 
-编译好的模型存放在当前目录，包括2个文件：
-gpt-oss_prefill.hmm
-gpt-oss_decode.hmm
+### 3. 编译
 
-### 2.4 演示
-
-Qwen2模型使用python API进行演示
-
-1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下
-
-2. 执行脚本，推理完成将输出性能结果。
+当前目录不提供 `ptq.py`。`build.py` 负责编译现有 `hmquant` 输出；默认输入目录为 `output/${HOUMO_TARGET}/hmquant`。
 
 ```bash
-python3 demo.py
+python3 build.py --model_name gpt-oss --model_size 20b
 ```
 
-### 2.5 一键评估
+编译输出：
 
-以上步骤可以通过test.sh脚本一键执行：
+- `gpt-oss-20b_prefill.hmm`
+- `gpt-oss-20b_decode.hmm`
+
+### 4. 演示
+
+```bash
+python3 demo.py --model_name gpt-oss --model_size 20b
+```
+
+若未显式传 `tokenizer_dir`、`prefill_path`、`decode_path`，脚本会按 `config.yaml` 和 `${model_name}-${model_size}` 自动推导。
+
+### 5. test.sh
+
+`test.sh` 默认执行 `demo`，会先下载预编译模型。
 
 ```bash
 bash test.sh
+bash test.sh -s demo
+bash test.sh -s build
+bash test.sh -s demo --skip_download
 ```
+
+当前目录不提供 `ptq.py`，因此：
+
+- `-s quant` 不支持
+- `-s all` 不支持
+
+标准 demo 流程结束后，如果环境中存在 `llm_perf`，脚本会自动执行显式参数形式的性能测试。
+
+## 关键参数说明
+
+### get_model.py
+
+- `--config`: 配置文件路径，默认当前目录下 `config.yaml`
+- `--model_name`: 默认 `gpt-oss`
+- `--model_size`: 默认 `20b`
+- `--type`: `raw` 或 `hmm`
+- `--context_length`: 默认取配置中的 `32k`
+
+### build.py
+
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--model_dir`: 默认 `output/${HOUMO_TARGET}/hmquant`
+- `--output_dir`: 默认 `output/${HOUMO_TARGET}`
+- `--context_length`: 默认按配置中的 `32k` 解析
+- `--prefill_length`: 默认取配置中的 `256`
+
+### demo.py
+
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--tokenizer_dir`: 默认根据 `modelscope_repo` 推导
+- `--embedding_path`: 默认 `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `--prefill_path`, `--decode_path`: 默认按 `${model_name}-${model_size}` 自动拼接
+
 
 ## 3 参考结果
 

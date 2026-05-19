@@ -435,6 +435,16 @@ def test_llm_gpt_oss_demo(setup_logging) -> None:
     _demo_func(model_name, setup_logging)
 
 
+@pytest.mark.copaw_flash
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_llm_copaw_flash_demo(setup_logging) -> None:
+    """test_llm_copaw_flash_demo"""
+    model_name = "copaw-flash"
+    _demo_func(model_name, setup_logging)
+
+
 @pytest.mark.yolov8m_cls
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

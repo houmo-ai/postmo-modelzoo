@@ -1,202 +1,188 @@
 # CoPaw-Flash
 
-本示例展示如何将 CoPaw-Flash 模型量化、编译并部署到后摩鸿途芯片设备上，支持图片理解与图文问答场景。
+本目录提供 `copaw-flash-9b` 在 XH2 平台上的下载、量化、编译与图文演示脚本。当前默认配置来自同目录下的 `config.yaml`。
 
-## 预训练模型
+## 支持模型
 
-本项目使用从 ModelScope 下载的预训练模型：
+- `model_name`: `copaw-flash`
+- `model_size`: `9b`
 
-- 模型名称：CoPaw-Flash-9B
-- 原始模型来源：https://modelscope.cn/models/AgentScope/CoPaw-Flash-9B
-- 许可：Apache License 2.0
+对应 ModelScope 模型：
 
-预训练模型在运行时下载，工程发布**不包含**该模型。
+- CoPaw-Flash-9B: https://modelscope.cn/models/AgentScope/CoPaw-Flash-9B
 
-## 代码版权说明
+预训练模型在运行时下载，仓库本身不包含这些权重。
 
-本目录中的以下文件包含基于第三方开源实现的适配代码，后续如对外开源、分发或单独复用，需**保留原始版权声明、修改说明及 Apache License 2.0 许可信息**：
+## 配置与默认值
 
-- `image_processing_copawflash.py`
-- `vision_process_copawflash.py`
+`config.yaml` 是默认值的单一来源，当前约定如下：
 
-其中：
-- `image_processing_copawflash.py` 基于 HuggingFace Transformers / Qwen2-VL 相关图像处理实现改写；
-- `vision_process_copawflash.py` 为视觉预处理流程适配代码，开源时需明确标注其来源、修改内容与继承许可。
+- 默认模型：`copaw-flash` + `9b`
+- 默认 `context_length=8k`
+- 默认 `prefill_length=256`
+- 默认视觉尺寸：`448x448x2`
+- 默认输出前缀统一使用 `${model_name}-${model_size}`
+- tokenizer / 原始模型目录默认从 `modelscope_repo` 最后一段推导，即 `CoPaw-Flash-9B`
 
-[TOC]
+## 输出约定
 
-## 1 模型说明
+量化输出：
 
-本例使用的 CoPaw-Flash 模型实现来源于 AgentScope 发布的 CoPaw-Flash 系列模型，适配目标为后摩 xh2 芯片平台。
+- `output/${HOUMO_TARGET}/hmquant/prefill`
+- `output/${HOUMO_TARGET}/hmquant/decode`
+- `output/${HOUMO_TARGET}/hmquant/visual`
+- `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
 
-当前示例聚焦于单图输入的视觉理解与图文问答流程，整体包含以下三个子模型：
+编译输出：
 
-- Vision：视觉编码模型
-- Prefill：首 token 预填充模型
-- Decode：逐 token 解码模型
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill.hmm`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_decode.hmm`
+- `output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_${max_size_w}x${max_size_h}x${max_size_t}.hmm`
 
-编译完成后，可通过 Python API 完成图片理解与多模态问答演示。
+当 `ndevice > 1` 时，单 batch demo 默认会把 `prefill` 和 `decode` 的后缀切换为 `.hmms`；视觉模型仍保持 `.hmm`。
 
-## 2 快速开始
+## 快速开始
 
-目前 CoPaw-Flash 仅提供 Python 脚本量化与编译方式。芯片模型仅能在 Linux 环境下量化和编译。
-
-### 2.1 环境准备
-
-安装示例运行所需的 Python 依赖，建议使用 venv：
+### 1. 安装依赖
 
 ```bash
 pip3 install -r requirements.txt
 ```
 
-### 2.2 获取模型和数据
+### 2. 下载模型
 
-通过 `get_model.py` 脚本下载原始模型或已编译的芯片模型。
-
-下载原始模型（用于量化 + 编译）：
+下载原始模型：
 
 ```bash
-python3 get_model.py --type raw
+python3 get_model.py --type raw --model_name copaw-flash --model_size 9b
 ```
 
-下载已编译芯片模型（仅用于演示）：
+仅下载预编译模型用于演示：
 
 ```bash
-python3 get_model.py --type hmm
+python3 get_model.py --type hmm --model_name copaw-flash --model_size 9b
 ```
 
-如需从 ModelScope 下载，可附加参数：
+如需从 ModelScope 下载，可附加：
 
 ```bash
-python3 get_model.py --type raw --source_type modelscope
+python3 get_model.py --type raw --source_type modelscope --model_name copaw-flash --model_size 9b
 ```
 
-默认示例图片使用 `${HOUMO_PIC_PATH}/beach.jpeg`，默认校准文本使用当前目录下的 `qwen3_8b_gen_data.jsonl`。
+### 3. 量化
 
-### 2.3 量化
-
-量化需要使用 GPU，并在宿主机安装与 CUDA 12.2 兼容的 CUDA 和驱动。启动 docker 时请将 GPU 映射到容器内，并指定可用 GPU。**建议至少准备 24GB GPU 显存，以及 200GB 以上 CPU 空闲内存。** 参考命令：
+`ptq.py` 需要 GPU 环境。默认原始模型目录会根据 `config.yaml` 中的 `modelscope_repo` 自动推导。
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64 /bin/bash
+python3 ptq.py --model-name copaw-flash --model-size 9b --gptqmodel
 ```
 
-进入 docker 后，source 环境变量并进入 `models/llm/CoPaw-Flash` 目录：
+如果要降低导出规模或使用自定义校准文本，可显式传参：
 
 ```bash
-source env.sh
-cd models/llm/CoPaw-Flash
-```
-
-执行量化脚本：
-
-```bash
-python3 ptq.py --gptqmodel
-```
-
-如需指定原始模型目录、上下文长度或输入长度，可参考：
-
-```bash
-python3 ptq.py \
-  --model /path/to/CoPaw-Flash-9B \
+python3 ptq.py --model-name copaw-flash --model-size 9b --gptqmodel \
   --context-length 2048 \
   --input-sequence-length 256 \
-  --gptqmodel
+  --calib_data /path/to/custom.jsonl
 ```
 
-量化完成的模型存放在 `output/$HOUMO_TARGET/hmquant` 目录，典型结构如下：
+### 4. 编译
 
 ```bash
-output/$HOUMO_TARGET/hmquant/
-├── prefill/
-├── decode/
-├── visual/
-└── quant_embedding.pt
+python3 build.py --model_name copaw-flash --model_size 9b
 ```
 
-### 2.4 编译
-
-将量化模型编译为可在芯片上运行的 `.hmm` 模型：
+如果需要显式调整上下文长度或 FlashAttention：
 
 ```bash
-python3 build.py
+python3 build.py --model_name copaw-flash --model_size 9b --context_length 8192 --prefill_length 256 --flash_attention 2 1
 ```
 
-如需指定上下文长度、prefill 长度或 FlashAttention 选项，可参考：
+### 5. 演示
+
+默认单次 demo 会使用 `${HOUMO_PIC_PATH}/beach.jpeg` 作为输入图片；若环境变量未设置，则回退到仓库内 `data/pic/beach.jpeg`。
 
 ```bash
-python3 build.py --context_length 8192 --prefill_length 256 --flash_attention 2 1
+python3 demo.py --model_name copaw-flash --model_size 9b
 ```
 
-编译输出默认位于 `output/$HOUMO_TARGET` 目录，包括：
-
-- `copaw-flash_prefill.hmm`
-- `copaw-flash_decode.hmm`
-- `copaw-flash_visual.hmm`
-
-当 `--ndevice 2` 时，LLM 模型会生成对应的多设备模型文件。
-
-### 2.5 演示
-
-CoPaw-Flash 模型使用 Python API 进行演示。
-
-直接运行默认示例：
+指定图片：
 
 ```bash
-python3 demo.py
+python3 demo.py --model_name copaw-flash --model_size 9b --image_path ../../../data/pic/beach.jpeg
 ```
 
-指定图片进行单次推理：
+交互模式：
 
 ```bash
-python3 demo.py --image_path ../../../data/pic/beach.jpeg
+python3 demo.py --model_name copaw-flash --model_size 9b --it
 ```
 
-开启交互模式：
+如未显式传 `tokenizer_dir`、`prefill_path`、`decode_path`、`vision_path`，脚本会按 `config.yaml` 和 `${model_name}-${model_size}` 自动推导。
 
-```bash
-python3 demo.py --it
-```
+### 6. test.sh
 
-开启多轮历史对话保留：
-
-```bash
-python3 demo.py --it --history
-```
-
-如需手动指定 tokenizer、embedding、vision/prefill/decode 模型路径，可附加对应参数。
-
-### 2.6 一键评估
-
-以上步骤可以通过 `test.sh` 脚本一键执行：
+`test.sh` 默认执行 `demo`，会先下载预编译模型。
 
 ```bash
 bash test.sh
+bash test.sh -s quant
+bash test.sh -s build
+bash test.sh -s all
+bash test.sh -s demo --skip_download
 ```
 
-默认流程会下载预编译模型并执行 demo。
+当前目录没有单独的 `llm_perf` 流程；性能信息由 `demo.py` 内部统计输出。
 
-如需走“原始模型下载 → 量化 → 编译 → 演示”完整流程，可执行：
+## 关键参数说明
 
-```bash
-bash test.sh -t compile
-```
+### get_model.py
 
-仅执行编译相关步骤：
+- `--config`: 配置文件路径，默认当前目录下 `config.yaml`
+- `--model_name`: 默认 `copaw-flash`
+- `--model_size`: 默认 `9b`
+- `--type`: `raw` 或 `hmm`
+- `--context_length`: 默认取配置中的 `8k`
 
-```bash
-bash test.sh -s build -t compile
-```
+### ptq.py
 
-仅执行演示：
+- `--config`: 配置文件路径
+- `--model-name`, `--model-size`: 默认取配置
+- `--model`: 默认根据 `modelscope_repo` 推导
+- `--context-length`: 默认按配置中的 `8k` 解析
+- `--input-sequence-length`: 默认取配置中的 `256`
+- `--quant-type`: 默认取配置中的 `w8a8h0_ssfp`
+- `--gptqmodel`: 启用 GPTQ 量化分支
 
-```bash
-bash test.sh -s demo
-```
+### build.py
 
-## 3 参考结果
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--model_dir`: 默认 `output/${HOUMO_TARGET}/hmquant`
+- `--output_dir`: 默认 `output/${HOUMO_TARGET}`
+- `--context_length`: 默认按配置中的 `8k` 解析
+- `--prefill_length`: 默认取配置中的 `256`
 
-### 3.1 演示结果
+### demo.py
+
+- `--config`: 配置文件路径
+- `--model_name`, `--model_size`: 默认取配置
+- `--tokenizer_dir`: 默认根据 `modelscope_repo` 推导
+- `--embedding_path`: 默认 `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `--prefill_path`, `--decode_path`: 默认按 `${model_name}-${model_size}` 自动拼接
+- `--vision_path`: 默认按 `${model_name}-${model_size}_visual_${max_size_w}x${max_size_h}x${max_size_t}.hmm` 自动拼接
+- `--image_path`: 默认取 beach 示例图
+
+## 代码版权说明
+
+本目录中的以下文件包含基于第三方开源实现的适配代码，后续如对外开源、分发或单独复用，需保留原始版权声明、修改说明及 Apache License 2.0 许可信息：
+
+- `image_processing_copawflash.py`
+- `vision_process_copawflash.py`
+
+## 参考结果
+
+### 演示结果
 
 以下为单张图片问答的参考输出：
 
@@ -217,7 +203,7 @@ response:
 总结：这是一张表现人与宠物在自然环境中共享宁静时刻的照片，强调陪伴、信任与平和的情感联结。
 ```
 
-### 3.2 性能结果
+### 性能结果
 
 以下为同一次运行的性能统计摘要：
 
@@ -267,6 +253,6 @@ response:
 - 若仅验证功能，建议优先下载预编译模型直接运行；
 - 若需重新量化，请优先确认 GPU 显存、主机空闲内存以及 CUDA 版本满足要求。
 
-## 4 免责声明
+## 免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。

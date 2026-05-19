@@ -20,16 +20,28 @@
 
 import os
 import argparse
-from hmatc.utils.utils import hmatc_get_file, get_houmo_version
-
+from hmatc.utils.utils import (
+    first_not_none,
+    get_houmo_version,
+    get_model_configs,
+    hmatc_get_file,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
     parser.add_argument(
         "--type",
         dest="file_type",
@@ -61,17 +73,31 @@ def get_args() -> argparse.Namespace:
         help="download the model from which source",
     )
     parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
         "--context_length",
         dest="context_length",
         type=str,
-        default="32k",
+        default=None,
         help="context length",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
+        default=None,
         help="device number",
     )
     args = parser.parse_args()
@@ -81,22 +107,36 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
 
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    model_name = first_not_none(args.model_name, default_model_name)
+    model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(model_name, {}).get(model_size, {})
+    ncore = first_not_none(model_config.get("ncore", 2), 2)
+    ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    context_length = first_not_none(
+        args.context_length, model_config.get("context_length", "32k")
+    )
+    prefill_length = first_not_none(model_config.get("prefill_length", 256), 256)
+    batch = first_not_none(model_config.get("batch", 1), 1)
+
     model_cfgs = {
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": "gpt-oss",
+        "model_name": model_name,
         "model_info": {
-            "model_size": "20b",
-            "ncore": 2,
-            "ndevice": args.ndevice,
-            "context_len": args.context_length,
-            "prefill_len": 256,
-            "batch": 1,
+            "model_size": model_config.get("model_size", model_size),
+            "ncore": ncore,
+            "ndevice": ndevice,
+            "context_len": context_length,
+            "prefill_len": prefill_length,
+            "batch": batch,
         },
         "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
         "modelscope_repo": {
-            "repo_ids": ["openai-mirror/gpt-oss-20b"],
+            "repo_ids": model_config.get("modelscope_repo", []),
             "ignore_patterns": ["*.safetensors", "*.bin"],
         },
     }

@@ -389,6 +389,17 @@ def test_llm_qwen3_30b_a3b_get_model(setup_logging) -> None:
     _get_model_func(model_name, setup_logging)
 
 
+@pytest.mark.copaw_flash
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_llm_copaw_flash_get_model")
+def test_llm_copaw_flash_get_model(setup_logging) -> None:
+    """test_llm_copaw_flash_get_model"""
+    model_name = "copaw-flash"
+    _get_model_func(model_name, setup_logging)
+
+
 @pytest.mark.qwen3_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
