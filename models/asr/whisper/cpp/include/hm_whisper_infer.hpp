@@ -170,6 +170,12 @@ class HmWhisperInfer {
   std::shared_ptr<tcim::Module> GetPrefillModule() { return prefill_module_; }
 
   /**
+   * @brief Get number of mel bins from encoder model
+   * @return Number of mel bins (80 for whisper-medium, 128 for whisper-large-v3-turbo)
+   */
+  int GetNumMels() const;
+
+  /**
    * @brief Print model I/O info (debug)
    */
   void DebugModelInfo(tcim::Module& module, const std::string& model_name);
@@ -202,9 +208,14 @@ class HmWhisperInfer {
   std::unique_ptr<tokenizers::Tokenizer> tokenizer_;
 
   // Configuration
-  int n_blocks_ = 24;            ///< Transformer block count
   int max_decode_length_ = 448;  ///< Max decode tokens
-  int eos_token_id_ = 50257;     ///< End-of-sequence token
+  int eos_token_id_ = -1;        ///< End-of-sequence token
+  int num_heads_ = 0;            ///< Self-attention head count
+  int cache_max_len_ = 0;        ///< Decoder KV cache max length
+  int num_decode_layers_ = 0;    ///< Decoder layer count
+  int base_idx_ = 0;             ///< First KV-cache input index
+  int encoder_seq_len_ = 0;      ///< Encoder attention mask length
+  int n_mels_ = 80;              ///< Number of mel bins (80 or 128)
 
   // Language IDs
   std::vector<int> lang_to_id_;
@@ -246,6 +257,7 @@ class HmWhisperInfer {
   void RunDecoder(const std::vector<tcim::Tensor>& encoder_outputs);
   tcim::Tensor DecoderGetOutput();
   void InitMaps();
+  void InitModelConfig();
 
   void EncoderSetInputs(const std::vector<TensorType>& input_features,
                         int n_mels, int n_frames);

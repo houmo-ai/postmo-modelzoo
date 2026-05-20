@@ -444,17 +444,6 @@ def test_asr_glm_asr_get_model(setup_logging) -> None:
     _get_model_func(model_name, setup_logging)
 
 
-@pytest.mark.whisper_turbo
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-@pytest.mark.get_model
-@pytest.mark.dependency(name="test_asr_whisper_turbo_get_model")
-def test_asr_whisper_turbo_get_model(setup_logging) -> None:
-    """test_asr_whisper_turbo_get_model"""
-    model_name = "whisper-turbo"
-    _get_model_func(model_name, setup_logging)
-
-
 @pytest.mark.gte
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

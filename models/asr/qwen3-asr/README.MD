@@ -188,85 +188,83 @@ bash test.sh -s demo -skip -name qwen3_asr -size 0.6b
 
 #### Qwen3-ASR-0.6B:
 ```bash
-2026-03-19 11:05:11.167] [tid 622] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-03-19 11:05:11.167] [tid 622] [warning] Empty backend name, use Xh2HalBackend instead.
-2026-03-19 11:05:11.340 | INFO     | __main__:__init__:113 - encode model loaded
-2026-03-19 11:05:11.652 | INFO     | __main__:__init__:116 - prefill model loaded
-2026-03-19 11:05:11.670 | INFO     | __main__:__init__:128 - decode model loaded
-/hmdd/imodelzoo/models/asr/qwen3-asr/demo_asr.py:148: DeprecationWarning: get_input() deprecated: Use get_dev_input instead.
+Device 0 -> Group 0, Chip 0
+2026-05-20 13:05:57.637 | INFO     | __main__:__init__:204 - encode model loaded
+2026-05-20 13:05:58.203 | INFO     | __main__:__init__:207 - prefill model loaded
+2026-05-20 13:05:58.258 | INFO     | __main__:__init__:219 - decode model loaded
+/hmdd/imodelzoo/models/asr/qwen3-asr/demo_asr.py:261: DeprecationWarning: get_input() deprecated: Use get_dev_input instead.
   cache = self.prefill.get_input(self.prefill.get_input_name(i))
-后摩芯片算法部的小伙伴，你们好啊！我是多拉A梦，你们好厉害啊！好像你们拥有装满各种神奇道具的口袋，你们真棒！新的一年，祝你们身体健康，事业顺利，发大财。
-2026-03-19 11:05:13.353 | SUCCESS  | __main__:run:453 - ============================================================
-2026-03-19 11:05:13.353 | SUCCESS  | __main__:run:454 - Performance Statistics:
-2026-03-19 11:05:13.353 | SUCCESS  | __main__:run:455 - ============================================================
-2026-03-19 11:05:13.353 | SUCCESS  | __main__:run:456 - Audio duration: 14450.00 ms (14.45 s)
-2026-03-19 11:05:13.353 | SUCCESS  | __main__:run:457 - Audio loading time: 397.648 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:458 - Input preparation time: 7.443 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:459 - Loop count: 1
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:460 - ------------------------------------------------------------
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:461 - Total Encode time: 47.164 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:462 -   - Encode prep time: 0.132 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:463 -   - Encode infer time: 46.355 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:464 -   - Encode output time: 0.677 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:465 - ------------------------------------------------------------
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:466 - Total Prefill time: 96.535 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:467 -   - Prefill prep time: 42.983 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:468 -   - Prefill infer time: 53.152 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:469 -   - Prefill output time: 0.400 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:470 - ------------------------------------------------------------
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:471 - Output 54 tokens
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:472 - Total Decode time(infer + embedding): 674.818 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:473 -   - Decode infer total time: 573.417 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:474 -   - Decode infer avg time: 10.619 ms
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:476 - Decode Speed: 80.02 tokens/s
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:478 - TPOT (Time Per Output Token): 12.497 ms/token
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:479 - ------------------------------------------------------------
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:480 - E2E Latency (End-to-End Latency): 1.225 seconds
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:482 - E2E TPS (End-to-End Tokens Per Second): 44.07 tokens/s
-2026-03-19 11:05:13.354 | SUCCESS  | __main__:run:483 - RTF (Real Time Factor): 0.08
-2026-03-19 11:05:13.355 | SUCCESS  | __main__:run:484 - ============================================================
+每一天都要快乐哦。
+2026-05-20 13:05:59.421 | SUCCESS  | __main__:run:580 - ============================================================
+2026-05-20 13:05:59.421 | SUCCESS  | __main__:run:581 - Performance Statistics:
+2026-05-20 13:05:59.422 | SUCCESS  | __main__:run:582 - ============================================================
+2026-05-20 13:05:59.422 | SUCCESS  | __main__:run:583 - Audio duration: 2431.94 ms (2.43 s)
+2026-05-20 13:05:59.422 | SUCCESS  | __main__:run:586 - Audio loading time: 444.255 ms
+2026-05-20 13:05:59.422 | SUCCESS  | __main__:run:587 - Input preparation time: 7.453 ms
+2026-05-20 13:05:59.422 | SUCCESS  | __main__:run:588 - Loop count: 1
+2026-05-20 13:05:59.422 | SUCCESS  | __main__:run:589 - ------------------------------------------------------------
+2026-05-20 13:05:59.422 | SUCCESS  | __main__:run:590 - Total Encode time: 11.730 ms
+2026-05-20 13:05:59.423 | SUCCESS  | __main__:run:593 -   - Encode prep time: 0.110 ms
+2026-05-20 13:05:59.423 | SUCCESS  | __main__:run:594 -   - Encode infer time: 11.400 ms
+2026-05-20 13:05:59.423 | SUCCESS  | __main__:run:597 -   - Encode output time: 0.221 ms
+2026-05-20 13:05:59.423 | SUCCESS  | __main__:run:600 - ------------------------------------------------------------
+2026-05-20 13:05:59.423 | SUCCESS  | __main__:run:601 - Total Prefill time: 34.710 ms
+2026-05-20 13:05:59.423 | SUCCESS  | __main__:run:604 -   - Prefill prep time: 0.593 ms
+2026-05-20 13:05:59.423 | SUCCESS  | __main__:run:607 -   - Prefill infer time: 33.735 ms
+2026-05-20 13:05:59.423 | SUCCESS  | __main__:run:610 -   - Prefill output time: 0.382 ms
+2026-05-20 13:05:59.424 | SUCCESS  | __main__:run:613 - ------------------------------------------------------------
+2026-05-20 13:05:59.424 | SUCCESS  | __main__:run:614 - Output 8 tokens
+2026-05-20 13:05:59.424 | SUCCESS  | __main__:run:615 - Total Decode time(infer + embedding): 111.532 ms
+2026-05-20 13:05:59.424 | SUCCESS  | __main__:run:618 -   - Decode infer total time: 84.596 ms
+2026-05-20 13:05:59.424 | SUCCESS  | __main__:run:621 -   - Decode infer avg time: 10.575 ms
+2026-05-20 13:05:59.424 | SUCCESS  | __main__:run:623 - Decode Speed: 71.73 tokens/s
+2026-05-20 13:05:59.424 | SUCCESS  | __main__:run:627 - TPOT (Time Per Output Token): 13.942 ms/token
+2026-05-20 13:05:59.424 | SUCCESS  | __main__:run:630 - ------------------------------------------------------------
+2026-05-20 13:05:59.424 | SUCCESS  | __main__:run:631 - E2E Latency (End-to-End Latency): 0.168 seconds
+2026-05-20 13:05:59.425 | SUCCESS  | __main__:run:633 - E2E TPS (End-to-End Tokens Per Second): 47.66 tokens/s
+2026-05-20 13:05:59.425 | SUCCESS  | __main__:run:636 - RTF (Real Time Factor): 0.07
+2026-05-20 13:05:59.425 | SUCCESS  | __main__:run:637 - ============================================================
 ```
 
 
 #### Qwen3-ASR-1.7B:
 ```bash
-[2026-03-19 11:02:00.782] [tid 248] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-03-19 11:02:00.782] [tid 248] [warning] Empty backend name, use Xh2HalBackend instead.
-2026-03-19 11:02:00.993 | INFO     | __main__:__init__:113 - encode model loaded
-2026-03-19 11:02:01.669 | INFO     | __main__:__init__:116 - prefill model loaded
-2026-03-19 11:02:01.734 | INFO     | __main__:__init__:128 - decode model loaded
-/hmdd/imodelzoo/models/asr/qwen3-asr/demo_asr.py:148: DeprecationWarning: get_input() deprecated: Use get_dev_input instead.
+Device 0 -> Group 0, Chip 0
+2026-05-20 13:10:05.884 | INFO     | __main__:__init__:204 - encode model loaded
+2026-05-20 13:10:13.767 | INFO     | __main__:__init__:207 - prefill model loaded
+2026-05-20 13:10:13.952 | INFO     | __main__:__init__:219 - decode model loaded
+/hmdd/imodelzoo/models/asr/qwen3-asr/demo_asr.py:261: DeprecationWarning: get_input() deprecated: Use get_dev_input instead.
   cache = self.prefill.get_input(self.prefill.get_input_name(i))
-后模芯片算法部的小伙伴，你们好啊！我是哆啦A梦，你们好厉害啊！好像你们拥有装满各种神奇道具的口袋，你们真棒！新的一年，祝你们身体健康，事业顺利，发大财！
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:454 - ============================================================
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:455 - Performance Statistics:
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:456 - ============================================================
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:457 - Audio duration: 14450.00 ms (14.45 s)
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:458 - Audio loading time: 356.167 ms
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:459 - Input preparation time: 8.329 ms
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:460 - Loop count: 1
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:461 - ------------------------------------------------------------
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:462 - Total Encode time: 31.466 ms
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:463 -   - Encode prep time: 0.143 ms
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:464 -   - Encode infer time: 30.612 ms
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:465 -   - Encode output time: 0.711 ms
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:466 - ------------------------------------------------------------
-2026-03-19 11:02:04.025 | SUCCESS  | __main__:run:467 - Total Prefill time: 106.676 ms
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:468 -   - Prefill prep time: 37.037 ms
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:469 -   - Prefill infer time: 69.128 ms
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:470 -   - Prefill output time: 0.510 ms
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:471 - ------------------------------------------------------------
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:472 - Output 54 tokens
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:473 - Total Decode time(infer + embedding): 1220.985 ms
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:474 -   - Decode infer total time: 1069.999 ms
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:475 -   - Decode infer avg time: 19.815 ms
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:477 - Decode Speed: 44.23 tokens/s
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:479 - TPOT (Time Per Output Token): 22.611 ms/token
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:480 - ------------------------------------------------------------
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:481 - E2E Latency (End-to-End Latency): 1.726 seconds
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:483 - E2E TPS (End-to-End Tokens Per Second): 31.29 tokens/s
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:484 - RTF (Real Time Factor): 0.12
-2026-03-19 11:02:04.026 | SUCCESS  | __main__:run:485 - ============================================================
+每一天都要快乐哦！
+2026-05-20 13:10:15.262 | SUCCESS  | __main__:run:580 - ============================================================
+2026-05-20 13:10:15.262 | SUCCESS  | __main__:run:581 - Performance Statistics:
+2026-05-20 13:10:15.262 | SUCCESS  | __main__:run:582 - ============================================================
+2026-05-20 13:10:15.262 | SUCCESS  | __main__:run:583 - Audio duration: 2431.94 ms (2.43 s)
+2026-05-20 13:10:15.263 | SUCCESS  | __main__:run:586 - Audio loading time: 442.815 ms
+2026-05-20 13:10:15.263 | SUCCESS  | __main__:run:587 - Input preparation time: 7.133 ms
+2026-05-20 13:10:15.263 | SUCCESS  | __main__:run:588 - Loop count: 1
+2026-05-20 13:10:15.263 | SUCCESS  | __main__:run:589 - ------------------------------------------------------------
+2026-05-20 13:10:15.263 | SUCCESS  | __main__:run:590 - Total Encode time: 15.533 ms
+2026-05-20 13:10:15.263 | SUCCESS  | __main__:run:593 -   - Encode prep time: 0.113 ms
+2026-05-20 13:10:15.263 | SUCCESS  | __main__:run:594 -   - Encode infer time: 15.007 ms
+2026-05-20 13:10:15.263 | SUCCESS  | __main__:run:597 -   - Encode output time: 0.413 ms
+2026-05-20 13:10:15.263 | SUCCESS  | __main__:run:600 - ------------------------------------------------------------
+2026-05-20 13:10:15.264 | SUCCESS  | __main__:run:601 - Total Prefill time: 46.440 ms
+2026-05-20 13:10:15.264 | SUCCESS  | __main__:run:604 -   - Prefill prep time: 0.893 ms
+2026-05-20 13:10:15.264 | SUCCESS  | __main__:run:607 -   - Prefill infer time: 45.078 ms
+2026-05-20 13:10:15.264 | SUCCESS  | __main__:run:610 -   - Prefill output time: 0.470 ms
+2026-05-20 13:10:15.264 | SUCCESS  | __main__:run:613 - ------------------------------------------------------------
+2026-05-20 13:10:15.264 | SUCCESS  | __main__:run:614 - Output 8 tokens
+2026-05-20 13:10:15.264 | SUCCESS  | __main__:run:615 - Total Decode time(infer + embedding): 180.232 ms
+2026-05-20 13:10:15.264 | SUCCESS  | __main__:run:618 -   - Decode infer total time: 154.039 ms
+2026-05-20 13:10:15.265 | SUCCESS  | __main__:run:621 -   - Decode infer avg time: 19.255 ms
+2026-05-20 13:10:15.265 | SUCCESS  | __main__:run:623 - Decode Speed: 44.39 tokens/s
+2026-05-20 13:10:15.265 | SUCCESS  | __main__:run:627 - TPOT (Time Per Output Token): 22.529 ms/token
+2026-05-20 13:10:15.265 | SUCCESS  | __main__:run:630 - ------------------------------------------------------------
+2026-05-20 13:10:15.265 | SUCCESS  | __main__:run:631 - E2E Latency (End-to-End Latency): 0.253 seconds
+2026-05-20 13:10:15.265 | SUCCESS  | __main__:run:633 - E2E TPS (End-to-End Tokens Per Second): 31.66 tokens/s
+2026-05-20 13:10:15.265 | SUCCESS  | __main__:run:636 - RTF (Real Time Factor): 0.10
+2026-05-20 13:10:15.265 | SUCCESS  | __main__:run:637 - ============================================================
 ```
 
 #### Qwen3-ForcedAligner-0.6B:
@@ -277,7 +275,7 @@ bash test.sh -s demo -skip -name qwen3_asr -size 0.6b
 2026-03-19 10:43:00.029 | INFO     | __main__:__init__:103 - encode model loaded
 2026-03-19 10:43:00.277 | INFO     | __main__:__init__:106 - prefill model loaded
 WARNING: input_ids len=133 != output_ids len=411
-2026-03-19 10:43:01.345 | SUCCESS  | __main__:run:344 - 
+2026-03-19 10:43:01.345 | SUCCESS  | __main__:run:344 -
 输出:
 2026-03-19 10:43:01.346 | SUCCESS  | __main__:run:346 - HE          0.240   0.320
 2026-03-19 10:43:01.346 | SUCCESS  | __main__:run:346 - BEGAN       0.320   0.640

@@ -395,16 +395,6 @@ def test_asr_glm_asr_demo(setup_logging) -> None:
     _demo_func(model_name, setup_logging)
 
 
-@pytest.mark.whisper_turbo
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-@pytest.mark.demo
-def test_asr_whisper_turbo_demo(setup_logging) -> None:
-    """test_asr_whisper_turbo_demo"""
-    model_name = "whisper-turbo"
-    _demo_func(model_name, setup_logging)
-
-
 @pytest.mark.gte
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

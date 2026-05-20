@@ -82,12 +82,17 @@ HmWhisperInfer::HmWhisperInfer(const std::string& encoder_path,
   CHECK_TCIM_STATUS(prefill_module_->LoadModel(prefill_path_, prefill_option));
 
   decoder_module_ = std::make_shared<tcim::Module>();
-  decoder_module_->LoadModel(decoder_path_, decoder_option);
+  CHECK_TCIM_STATUS(decoder_module_->LoadModel(decoder_path_, decoder_option));
 
+  InitModelConfig();
   InitMaps();
 
-  for (int i = 0; i < 96; ++i) {
-    const std::string layer_name = decoder_module_->GetInputName(i + 6);
+  const int cache_input_end =
+      std::min(base_idx_ + 2 * num_decode_layers_,
+               (int)(std::min(prefill_module_->GetInputNum(),
+                              decoder_module_->GetInputNum())));
+  for (int i = base_idx_; i < cache_input_end; ++i) {
+    const std::string layer_name = decoder_module_->GetInputName(i);
     auto cache = decoder_module_->GetDevInput(layer_name);
     prefill_module_->SetDevInput(layer_name, cache);
   }
@@ -99,9 +104,53 @@ HmWhisperInfer::~HmWhisperInfer() {
   prefill_module_.reset();
 }
 
+int HmWhisperInfer::GetNumMels() const { return n_mels_; }
+
 void HmWhisperInfer::DebugModelInfo(tcim::Module& module,
                                     const std::string& model_name) {
   // DebugModelInfo disabled to reduce output
+}
+
+void HmWhisperInfer::InitModelConfig() {
+  eos_token_id_ = tokenizer_->TokenToId("<|endoftext|>");
+  // Get n_mels from encoder input shape [1, n_mels, 3000]
+  const auto encoder_input_shape =
+      encoder_module_->GetInputInfo(encoder_module_->GetInputName(0)).Shape();
+  if (encoder_input_shape.size() >= 2) {
+    n_mels_ = encoder_input_shape[1];
+  }
+
+
+  const auto mask_shape =
+      prefill_module_->GetInputInfo(prefill_module_->GetInputName(4)).Shape();
+  if (mask_shape.size() >= 4) {
+    num_heads_ = mask_shape[1];
+    cache_max_len_ = mask_shape[3];
+  }
+
+  const auto encoder_attn_shape =
+      decoder_module_->GetInputInfo(decoder_module_->GetInputName(5)).Shape();
+  if (!encoder_attn_shape.empty()) {
+    encoder_seq_len_ = encoder_attn_shape[encoder_attn_shape.size() - 1];
+  }
+
+  int cache_count = 0;
+  base_idx_ = -1;
+  for (int idx = 0; idx < prefill_module_->GetInputNum(); ++idx) {
+    const auto input_name = prefill_module_->GetInputName(idx);
+    if (input_name.find("k_cache") != std::string::npos ||
+        input_name.find("v_cache") != std::string::npos) {
+      ++cache_count;
+      if (base_idx_ < 0 &&
+          (input_name == "k_cache_0" || input_name.find("k_cache") == 0)) {
+        base_idx_ = idx;
+      }
+    }
+  }
+  if (base_idx_ < 0) {
+    base_idx_ = 0;
+  }
+  num_decode_layers_ = cache_count / 2;
 }
 
 void HmWhisperInfer::InitMaps() {
@@ -115,7 +164,7 @@ void HmWhisperInfer::InitMaps() {
 
   if (prefill_module_ == nullptr) return;
   prefill_input_map_.clear();
-  for (int idx = 0; idx < 6; ++idx) {
+  for (int idx = 0; idx < base_idx_; ++idx) {
     auto name = prefill_module_->GetInputName(idx);
     auto info = prefill_module_->GetInputInfo(name).AsContiguous();
     prefill_input_map_.insert({name, tcim::Tensor::CreateHostTensor(info)});
@@ -143,8 +192,8 @@ void HmWhisperInfer::InitMaps() {
 
   // Pre-allocate reusable buffers to avoid repeated allocations per chunk
   const int vocab_size = tokenizer_->GetVocabSize();
-  mask_attn_prefill_.resize(16 * 4 * 1024);
-  encoder_attention_mask_.resize(1500);
+  mask_attn_prefill_.resize(num_heads_ * 4 * cache_max_len_);
+  encoder_attention_mask_.resize(encoder_seq_len_);
   float_logits_.resize(vocab_size);
   float_decode_logits_.resize(vocab_size);
   default_decoder_ids_.resize(max_decode_length_);
@@ -152,17 +201,17 @@ void HmWhisperInfer::InitMaps() {
   loop_input_ids_.resize(1);
   loop_cache_pos_.resize(1);
   loop_past_len_.resize(1);
-  loop_mask_attn_.resize(16 * 1024);
+  loop_mask_attn_.resize(num_heads_ * cache_max_len_);
   decode_window_ids_.reserve(max_decode_length_);
 
   // Initialize mask_attn_prefill_ once
   std::fill(mask_attn_prefill_.begin(), mask_attn_prefill_.end(),
-            static_cast<TensorType>(1.0f));
-  for (int b = 0; b < 16; ++b) {
+            static_cast<TensorType>(-65504.0f));
+  for (int b = 0; b < num_heads_; ++b) {
     for (int r = 0; r < 4; ++r) {
-      for (int c = 4; c < 1024; ++c) {
-        mask_attn_prefill_[b * 4 * 1024 + r * 1024 + c] =
-            static_cast<TensorType>(-65504.0f);
+      for (int c = 0; c <= r && c < cache_max_len_; ++c) {
+        mask_attn_prefill_[b * 4 * cache_max_len_ + r * cache_max_len_ + c] =
+            static_cast<TensorType>(0.0f);
       }
     }
   }
@@ -217,9 +266,13 @@ std::vector<tcim::Tensor> HmWhisperInfer::EncoderGetOutputs() {
 
   for (int idx = 0; idx < output_num; idx++) {
     std::string output_name = encoder_module_->GetOutputName(idx);
-    int is_value = idx % 2;
-    int layer_idx = idx / 2;
-    int decoder_input_idx = is_value ? (78 + layer_idx) : (54 + layer_idx);
+    int decoder_input_idx = 0;
+    if (idx < num_decode_layers_) {
+      decoder_input_idx = base_idx_ + 2 * num_decode_layers_ + idx;
+    } else {
+      decoder_input_idx =
+          base_idx_ + 3 * num_decode_layers_ + (idx - num_decode_layers_);
+    }
 
     std::string decoder_name = decoder_module_->GetInputName(decoder_input_idx);
     auto output_tensor = decoder_input_map_.at(decoder_name);
@@ -237,15 +290,16 @@ void HmWhisperInfer::RunDecoder(
   std::vector<int> cache_position = {0};
   std::vector<int> past_len = {0};
   std::vector<int> current_len = {1};
-  std::vector<TensorType> mask_attn(16 * 1024, static_cast<TensorType>(1.0f));
+  std::vector<TensorType> mask_attn(num_heads_ * cache_max_len_,
+                                    static_cast<TensorType>(0.0f));
 
-  for (int i = 1; i < 1024; ++i) {
-    for (int j = 0; j < 16; ++j) {
-      mask_attn[j * 1024 + i] = static_cast<TensorType>(-65504.0f);
+  for (int i = 1; i < cache_max_len_; ++i) {
+    for (int j = 0; j < num_heads_; ++j) {
+      mask_attn[j * cache_max_len_ + i] = static_cast<TensorType>(-65504.0f);
     }
   }
 
-  std::vector<TensorType> encoder_attention_mask(1500,
+  std::vector<TensorType> encoder_attention_mask(encoder_seq_len_,
                                                  static_cast<TensorType>(0.0f));
 
   for (int i = 0; i < decoder_module_->GetInputNum(); i++) {
@@ -275,6 +329,20 @@ void HmWhisperInfer::RunDecoder(
     decoder_module_->SetInput(name, tensor);
   }
 
+  // Set encoder outputs (key_state and value_state) to decoder inputs
+  // encoder_outputs contains k_cache and v_cache from encoder
+  for (size_t i = 0; i < encoder_outputs.size(); ++i) {
+    int decoder_input_idx = 0;
+    if (static_cast<int>(i) < num_decode_layers_) {
+      decoder_input_idx = base_idx_ + 2 * num_decode_layers_ + static_cast<int>(i);
+    } else {
+      decoder_input_idx = base_idx_ + 3 * num_decode_layers_ +
+                          (static_cast<int>(i) - num_decode_layers_);
+    }
+    std::string decoder_name = decoder_module_->GetInputName(decoder_input_idx);
+    decoder_module_->SetInput(decoder_name, encoder_outputs[i]);
+  }
+
   decoder_module_->Run();
   decoder_module_->Sync();
 }
@@ -291,8 +359,6 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
     const MelFeatures& mel_features, DecodeState* state,
     const std::string& language) {
   int slide_len = 10;
-  int skip_tokens = 0;
-  std::string last_response;
   auto t_start = std::chrono::high_resolution_clock::now();
 
   WhisperPerfInfo perf_info;
@@ -303,6 +369,9 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
     state = &local_state;
   }
 
+  int skip_tokens = state->skip_tokens;
+  std::string last_response = state->last_response;
+
   auto encoder_outputs =
       RunEncoder(mel_features.data, mel_features.n_mels, mel_features.n_frames);
 
@@ -312,11 +381,14 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
       static_cast<TensorType*>(decoder_output.Buffer().Data());
 
   int vocab_size = tokenizer_->GetVocabSize();
-  int end_of_text_id = tokenizer_->TokenToId("<|endoftext|>");
+  int end_of_text_id = eos_token_id_;
 
-  int lang_id = tokenizer_->TokenToId("<|en|>");  // Default fallback to <|en|>
+  int lang_id = tokenizer_->TokenToId("<|zh|>");
   if (language == "auto") {
     lang_id = DetectLanguageId(logits_data, lang_to_id_, vocab_size);
+    if (lang_id < 0) {
+      lang_id = tokenizer_->TokenToId("<|zh|>");
+    }
   } else {
     std::string lang_token = "<|" + language + "|>";
     int mapped_id = tokenizer_->TokenToId(lang_token);
@@ -326,6 +398,9 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
       std::cerr << "Warning: Could not map language token: " << lang_token
                 << " falling back to auto detect." << std::endl;
       lang_id = DetectLanguageId(logits_data, lang_to_id_, vocab_size);
+      if (lang_id < 0) {
+        lang_id = tokenizer_->TokenToId("<|zh|>");
+      }
     }
   }
 
@@ -334,23 +409,10 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
       tokenizer_->TokenToId("<|startoftranscript|>"), lang_id,
       tokenizer_->TokenToId("<|transcribe|>"),
       tokenizer_->TokenToId("<|notimestamps|>")};
+  const int prompt_len = static_cast<int>(default_decoder_ids.size());
   std::vector<int> cache_position_prefill = {0, 1, 2, 3};
   std::vector<int> past_len = {0};
-  std::vector<int> current_len = {4};
-  std::vector<TensorType> mask_attn_prefill(16 * 4 * 1024,
-                                            static_cast<TensorType>(1.0f));
-
-  for (int b = 0; b < 16; ++b) {
-    for (int r = 0; r < 4; ++r) {
-      for (int c = 4; c < 1024; ++c) {
-        mask_attn_prefill[b * 4 * 1024 + r * 1024 + c] =
-            static_cast<TensorType>(-65504.0f);
-      }
-    }
-  }
-
-  std::vector<TensorType> encoder_attention_mask(1500,
-                                                 static_cast<TensorType>(0.0f));
+  std::vector<int> current_len = {prompt_len};
 
   auto set_prefill_input = [&](int idx, const void* data, size_t size) {
     auto name = prefill_module_->GetInputName(idx);
@@ -365,10 +427,22 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
                     cache_position_prefill.size() * sizeof(int));
   set_prefill_input(2, past_len.data(), past_len.size() * sizeof(int));
   set_prefill_input(3, current_len.data(), current_len.size() * sizeof(int));
-  set_prefill_input(4, mask_attn_prefill.data(),
-                    mask_attn_prefill.size() * sizeof(TensorType));
-  set_prefill_input(5, encoder_attention_mask.data(),
-                    encoder_attention_mask.size() * sizeof(TensorType));
+  set_prefill_input(4, mask_attn_prefill_.data(),
+                    mask_attn_prefill_.size() * sizeof(TensorType));
+  set_prefill_input(5, encoder_attention_mask_.data(),
+                    encoder_attention_mask_.size() * sizeof(TensorType));
+
+  // Set encoder KV cache (key_state and value_state) to prefill inputs
+  // These are at indices [base_idx + 2*num_decode_layers + l] for keys
+  // and [base_idx + 3*num_decode_layers + l] for values
+  for (int l = 0; l < num_decode_layers_; ++l) {
+    int key_idx = base_idx_ + 2 * num_decode_layers_ + l;
+    int val_idx = base_idx_ + 3 * num_decode_layers_ + l;
+    std::string key_name = prefill_module_->GetInputName(key_idx);
+    std::string val_name = prefill_module_->GetInputName(val_idx);
+    prefill_module_->SetInput(key_name, encoder_outputs[l]);
+    prefill_module_->SetInput(val_name, encoder_outputs[num_decode_layers_ + l]);
+  }
 
   auto t_prefill_start = std::chrono::high_resolution_clock::now();
   prefill_module_->Run();
@@ -379,13 +453,9 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
 
   // Get prefill logits
   auto pref_logits_name = prefill_module_->GetOutputName(0);
-  auto pref_logits_info =
-      prefill_module_->GetOutputInfo(pref_logits_name).AsContiguous();
-  tcim::Tensor pref_logits_tensor =
-      tcim::Tensor::CreateHostTensor(pref_logits_info);
-  prefill_module_->GetOutput(pref_logits_name).CastTo(pref_logits_tensor);
+  prefill_module_->GetOutput(pref_logits_name).CastTo(pref_logits_tensor_);
   TensorType* p_logits =
-      static_cast<TensorType*>(pref_logits_tensor.Buffer().Data());
+      static_cast<TensorType*>(pref_logits_tensor_.Buffer().Data());
 
   SamplingManager sampling_manager(
       sampling_params_.temperature, sampling_params_.top_k,
@@ -393,9 +463,9 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
       sampling_params_.min_tokens_to_keep);
 
   // Convert TensorType logits to float for SamplingManager
-  std::vector<float> float_logits(vocab_size);
   for (int i = 0; i < vocab_size; ++i) {
-    float_logits[i] = static_cast<float>(p_logits[3 * vocab_size + i]);
+    float_logits_[i] =
+        static_cast<float>(p_logits[(prompt_len - 1) * vocab_size + i]);
   }
 
   std::vector<int> cur_slide_win(
@@ -406,12 +476,20 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
     last_response = tokenizer_->Decode(cur_slide_win);
   }
 
-  int next_token = sampling_manager.sample(float_logits.data(), vocab_size,
-                                           default_decoder_ids);
+  std::vector<int> generated_ids;
+  int next_token = 0;
+  float max_logit = float_logits_[0];
+  for (int i = 1; i < vocab_size; ++i) {
+    if (float_logits_[i] > max_logit) {
+      max_logit = float_logits_[i];
+      next_token = i;
+    }
+  }
+  generated_ids.push_back(next_token);
 
-  std::vector<int> chat_history_ids;
+  chat_history_ids_.clear();
   default_decoder_ids.push_back(next_token);
-  chat_history_ids.push_back(next_token);
+  chat_history_ids_.push_back(next_token);
 
   int window_size = slide_len + skip_tokens + 1;
   auto window_start = default_decoder_ids.size() >= window_size
@@ -444,22 +522,26 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
   }
 
   // Transfer caches to decoder
-  for (int i = 0; i < 48; ++i) {
+  for (int i = 0; i < 2 * num_decode_layers_; ++i) {
     auto name = prefill_module_->GetOutputName(i + 1);
     auto cache = prefill_module_->GetDevOutput(name);
-    decoder_module_->SetDevInput(decoder_module_->GetInputName(i + 6), cache);
+    decoder_module_->SetDevInput(decoder_module_->GetInputName(base_idx_ + i),
+                                 cache);
     decoder_module_->SetDevOutput(decoder_module_->GetOutputName(i + 1), cache);
   }
 
-  int cnt = 3;
+  for (int i = 0; i < 2 * num_decode_layers_; ++i) {
+    auto enc_kv = prefill_module_->GetDevInput(
+        prefill_module_->GetInputName(base_idx_ + 2 * num_decode_layers_ + i));
+    decoder_module_->SetDevInput(
+        decoder_module_->GetInputName(base_idx_ + 2 * num_decode_layers_ + i),
+        enc_kv);
+  }
+
+  int cnt = prompt_len - 1;
   auto t_decode_start = std::chrono::high_resolution_clock::now();
 
-  std::vector<int> loop_input_ids(1);
-  std::vector<int> loop_cache_pos(1);
-  std::vector<int> loop_past_len(1);
   std::vector<int> loop_curr_len = {1};
-  std::vector<TensorType> loop_mask_attn(16 * 1024,
-                                         static_cast<TensorType>(1.0f));
 
   auto set_decoder_input_by_name = [&](const std::string& name,
                                        const void* data, size_t size) {
@@ -477,54 +559,52 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
   std::string enc_attn_mask_name = decoder_module_->GetInputName(5);
 
   auto dec_logits_name = decoder_module_->GetOutputName(0);
-  auto dec_logits_info =
-      decoder_module_->GetOutputInfo(dec_logits_name).AsContiguous();
-  tcim::Tensor dec_logits_tensor =
-      tcim::Tensor::CreateHostTensor(dec_logits_info);
 
-  while (default_decoder_ids.size() < 448 && next_token != end_of_text_id) {
+  while (default_decoder_ids.size() < max_decode_length_ &&
+         next_token != end_of_text_id) {
     cnt++;
-    loop_input_ids[0] = next_token;
-    loop_cache_pos[0] = cnt;
-    loop_past_len[0] = cnt;
+    loop_input_ids_[0] = next_token;
+    loop_cache_pos_[0] = cnt;
+    loop_past_len_[0] = cnt;
 
-    for (int b = 0; b < 16; ++b) {
-      for (int c = 0; c < 1024; ++c) {
-        loop_mask_attn[b * 1024 + c] = (c < cnt + 1)
-                                           ? static_cast<TensorType>(1.0f)
-                                           : static_cast<TensorType>(-65504.0f);
+    for (int b = 0; b < num_heads_; ++b) {
+      for (int c = 0; c < cache_max_len_; ++c) {
+        loop_mask_attn_[b * cache_max_len_ + c] =
+            (c < cnt + 1) ? static_cast<TensorType>(0.0f)
+                          : static_cast<TensorType>(-65504.0f);
       }
     }
 
-    set_decoder_input_by_name(input_ids_name, loop_input_ids.data(),
+    set_decoder_input_by_name(input_ids_name, loop_input_ids_.data(),
                               sizeof(int));
-    set_decoder_input_by_name(cache_pos_name, loop_cache_pos.data(),
+    set_decoder_input_by_name(cache_pos_name, loop_cache_pos_.data(),
                               sizeof(int));
-    set_decoder_input_by_name(past_len_name, loop_past_len.data(), sizeof(int));
+    set_decoder_input_by_name(past_len_name, loop_past_len_.data(),
+                              sizeof(int));
     set_decoder_input_by_name(curr_len_name, loop_curr_len.data(), sizeof(int));
-    set_decoder_input_by_name(mask_attn_name, loop_mask_attn.data(),
-                              loop_mask_attn.size() * sizeof(TensorType));
+    set_decoder_input_by_name(mask_attn_name, loop_mask_attn_.data(),
+                              loop_mask_attn_.size() * sizeof(TensorType));
     set_decoder_input_by_name(
-        enc_attn_mask_name, encoder_attention_mask.data(),
-        encoder_attention_mask.size() * sizeof(TensorType));
+        enc_attn_mask_name, encoder_attention_mask_.data(),
+        encoder_attention_mask_.size() * sizeof(TensorType));
 
     decoder_module_->Run();
     decoder_module_->Sync();
 
-    decoder_module_->GetOutput(dec_logits_name).CastTo(dec_logits_tensor);
+    decoder_module_->GetOutput(dec_logits_name).CastTo(dec_logits_tensor_);
     TensorType* d_logits =
-        static_cast<TensorType*>(dec_logits_tensor.Buffer().Data());
+        static_cast<TensorType*>(dec_logits_tensor_.Buffer().Data());
 
     // Convert TensorType logits to float for SamplingManager
-    std::vector<float> float_decode_logits(vocab_size);
     for (int i = 0; i < vocab_size; ++i) {
-      float_decode_logits[i] = static_cast<float>(d_logits[i]);
+      float_decode_logits_[i] = static_cast<float>(d_logits[i]);
     }
-    next_token = sampling_manager.sample(float_decode_logits.data(), vocab_size,
-                                         default_decoder_ids);
+    next_token = sampling_manager.sample(float_decode_logits_.data(),
+                                         vocab_size, generated_ids);
 
     default_decoder_ids.push_back(next_token);
-    chat_history_ids.push_back(next_token);
+    generated_ids.push_back(next_token);
+    chat_history_ids_.push_back(next_token);
     int substart = Utf8Len(last_response);
 
     int window_size = slide_len + skip_tokens + 1;
@@ -556,8 +636,7 @@ std::pair<std::string, WhisperPerfInfo> HmWhisperInfer::Transcribe(
   perf_info.decode_time =
       std::chrono::duration<float, std::milli>(t_decode_end - t_decode_start)
           .count();
-  perf_info.output_tokens = default_decoder_ids.size() -
-                            4;  // prefill gives 4, and next tokens are appended
+  perf_info.output_tokens = default_decoder_ids.size() - prompt_len;
 
   state->last_response = last_response;
   state->skip_tokens = skip_tokens;

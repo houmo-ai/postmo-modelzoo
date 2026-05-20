@@ -40,6 +40,7 @@
 功能支持度说明：
 - 支持的芯片型号为：xh2。
 - 支持的大道软件版本要求：xh2≥v1.0.0。
+- 支持的模型：whisper-medium（80 mel bins）、whisper-large-v3-turbo（128 mel bins）。
 - 支持长音频分块处理。
 - 支持多语言自动识别。
 - 支持mel频谱图预处理。
@@ -78,11 +79,13 @@
 | 参数                    | 说明                                                         |
 | ----------------------- | ------------------------------------------------------------ |
 | --audio_path <path>     | 输入音频文件路径，默认：audio.mp3                            |
-| --encode_path <path>    | Encode模型路径，默认：output/xh2/whisper_encode.hmm          |
-| --decode_path <path>    | Decode模型路径，默认：output/xh2/whisper_decode.hmm          |
-| --prefill_path <path>   | Prefill模型路径，默认：output/xh2/whisper_prefill.hmm        |
-| --tokenizer_path <path> | tokenizer.json路径，默认：tokenizer.json                     |
+| --model <name>          | 模型名称，支持：whisper-medium、whisper-large-v3-turbo，默认：whisper-medium |
+| --encode_path <path>    | Encode模型路径（指定后将覆盖--model的默认路径）              |
+| --decode_path <path>    | Decode模型路径（指定后将覆盖--model的默认路径）              |
+| --prefill_path <path>   | Prefill模型路径（指定后将覆盖--model的默认路径）             |
+| --tokenizer_path <path> | tokenizer.json路径（指定后将覆盖--model的默认路径）          |
 | --chunk_size <n>        | 音频分块大小，单位秒，默认：30                               |
+| --language <code|auto>  | 语言代码（如zh、en）或auto自动检测，默认：auto               |
 | -h, --help              | 打印帮助信息                                                 |
 
 ### 1.4 用法说明
@@ -90,10 +93,16 @@
 基本用法示例：
 
 ```bash
-# 基本用法
+# 使用默认模型（whisper-medium）
 ./whisper-demo --audio_path audio.mp3
 
-# 指定模型路径
+# 指定模型名称
+./whisper-demo --audio_path audio.mp3 --model whisper-large-v3-turbo
+
+# 指定语言
+./whisper-demo --audio_path audio.mp3 --model whisper-large-v3-turbo --language zh
+
+# 手动指定模型路径（覆盖--model的默认路径）
 ./whisper-demo --audio_path audio.mp3 \
     --encode_path models/whisper_encode.hmm \
     --decode_path models/whisper_decode.hmm \
@@ -149,40 +158,69 @@ export TCIM_RUNTIME_PATH=/path/to/houmo-tcim-runtime-xh2
 ### 2.3 运行
 
 确保以下文件已准备好：
-- Encode模型：whisper_encode.hmm
-- Decode模型：whisper_decode.hmm
-- Prefill模型：whisper_prefill.hmm
-- tokenizer.json
+- Encode模型：`output/xh2/{model}_encode.hmm`
+- Decode模型：`output/xh2/{model}_decode.hmm`
+- Prefill模型：`output/xh2/{model}_prefill.hmm`
+- tokenizer.json：`{model}/tokenizer.json`
+
+支持的模型：
+- `whisper-medium`：标准模型，80 mel bins
+- `whisper-large-v3-turbo`：大型turbo模型，128 mel bins
 
 ```bash
 # 设置环境变量
 export HOUMO_TARGET=xh2
 export TCIM_BACKEND=Xh2HalBackend
 
-# 运行推理
+# 使用 whisper-medium 模型（默认）
 ./build/whisper-demo --audio_path audio.mp3
+
+# 使用 whisper-large-v3-turbo 模型
+./build/whisper-demo --audio_path audio.mp3 --model whisper-large-v3-turbo
 ```
 
 ## 3.参考结果
 
 ```bash
-[2026-04-14 03:25:43.228] [tid 255428] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-04-14 03:25:43.229] [tid 255428] [warning] Empty backend name, use Xh2HalBackend instead.
+./bin/whisper-demo --audio_path audio.mp3 --model whisper-medium
+[2026-05-20 11:30:10.413] [tid 342089] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-05-20 11:30:10.413] [tid 342089] [warning] Empty backend name, use Xh2HalBackend instead.
 [INFO] encoder model loaded
 [INFO] prefill model loaded
 [INFO] decoder model loaded
-[SUCCESS] transcription:
-Audio loaded: ../../../data/audio/audio.mp3, duration: 14.45s, samples: 231200
+[INFO] Using 80 mel bins for audio processing
+Audio loaded: audio.mp3, channels: 1, sample rate: 16000Hz, duration: 2.43187s, samples: 38910
 [INFO] Pre-computing mel spectrograms for 1 chunks...
-[INFO] Mel pre-processing completed in 1.492735s
-后摩芯片算法部的小伙伴,你们好啊!我是多拉A梦,你们好厉害啊!好像你们拥有装满各种神奇道具的口袋,你们真棒!新的一年,祝你们身体健康,事业顺利,发大财
-[SUCCESS] Output 85 tokens, Decode Cost 1762.873 ms
-[SUCCESS] Decode Speed: 48.22 tokens/s
-[SUCCESS] TTFT (Time to First Token): 480.007 ms
-[SUCCESS] TPOT (Time Per Output Token): 20.740 ms/token
-[SUCCESS] E2E Latency (End-to-End Latency): 2.245 seconds
-[SUCCESS] E2E TPS (End-to-End Tokens Per Second): 37.86 tokens/s
-[SUCCESS] RTF (Real-Time Factor): 0.0374 (lower is better, <1 means real-time)
+[INFO] Mel pre-processing completed in 0.424247s
+[SUCCESS] transcription:
+每一天都要快乐哦
+[SUCCESS] Output 9 tokens, Decode Cost 164.095 ms
+[SUCCESS] Decode Speed: 54.85 tokens/s
+[SUCCESS] TTFT (Time to First Token): 655.118 ms
+[SUCCESS] TPOT (Time Per Output Token): 18.233 ms/token
+[SUCCESS] E2E Latency (End-to-End Latency): 0.821 seconds
+[SUCCESS] E2E TPS (End-to-End Tokens Per Second): 10.96 tokens/s
+[SUCCESS] RTF (Real-Time Factor): 0.0137 (lower is better, <1 means real-time)
+
+ ./bin/whisper-demo --audio_path audio.mp3 --model whisper-large-v3-turbo
+[2026-05-20 11:30:43.690] [tid 342110] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
+[2026-05-20 11:30:43.690] [tid 342110] [warning] Empty backend name, use Xh2HalBackend instead.
+[INFO] encoder model loaded
+[INFO] prefill model loaded
+[INFO] decoder model loaded
+[INFO] Using 128 mel bins for audio processing
+Audio loaded: audio.mp3, channels: 1, sample rate: 16000Hz, duration: 2.43187s, samples: 38910
+[INFO] Pre-computing mel spectrograms for 1 chunks...
+[INFO] Mel pre-processing completed in 0.424463s
+[SUCCESS] transcription:
+每一天都要快乐哦
+[SUCCESS] Output 9 tokens, Decode Cost 56.494 ms
+[SUCCESS] Decode Speed: 159.31 tokens/s
+[SUCCESS] TTFT (Time to First Token): 455.209 ms
+[SUCCESS] TPOT (Time Per Output Token): 6.277 ms/token
+[SUCCESS] E2E Latency (End-to-End Latency): 0.513 seconds
+[SUCCESS] E2E TPS (End-to-End Tokens Per Second): 17.54 tokens/s
+[SUCCESS] RTF (Real-Time Factor): 0.0086 (lower is better, <1 means real-time)
 ```
 
 ## 4.免责声明

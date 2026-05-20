@@ -58,18 +58,18 @@ class HmWhisperAudio {
  public:
   // Whisper audio processing constants
   static constexpr int kSampleRate = 16000;  ///< Target sample rate
-  static constexpr int kNMels = 80;          ///< Mel bins (80)
 
   /**
-   * @brief Default constructor (30 second chunks)
+   * @brief Default constructor (30 second chunks, 80 mel bins)
    */
   HmWhisperAudio();
 
   /**
-   * @brief Constructor with custom chunk size
+   * @brief Constructor with custom chunk size and mel bins
    * @param chunk_size_seconds Chunk size in seconds
+   * @param n_mels Number of mel bins (default: 80, whisper-large-v3-turbo uses 128)
    */
-  explicit HmWhisperAudio(int chunk_size_seconds);
+  explicit HmWhisperAudio(int chunk_size_seconds, int n_mels = 80);
 
   // Non-copyable
   HmWhisperAudio(const HmWhisperAudio&) = delete;
@@ -134,6 +134,7 @@ class HmWhisperAudio {
                      std::vector<float>* output_pcm) const;
 
   int chunk_size_seconds_;
+  int n_mels_;
   int n_samples_per_chunk_;
   std::vector<float> pcm_data_;
   int total_samples_;

@@ -19,12 +19,14 @@ namespace houmo {
 
 HmWhisperAudio::HmWhisperAudio()
     : chunk_size_seconds_(30),
+      n_mels_(80),
       n_samples_per_chunk_(kSampleRate * 30),
       total_samples_(0),
       audio_loaded_(false) {}
 
-HmWhisperAudio::HmWhisperAudio(int chunk_size_seconds)
+HmWhisperAudio::HmWhisperAudio(int chunk_size_seconds, int n_mels)
     : chunk_size_seconds_(chunk_size_seconds),
+      n_mels_(n_mels),
       n_samples_per_chunk_(kSampleRate * chunk_size_seconds),
       total_samples_(0),
       audio_loaded_(false) {}
@@ -163,9 +165,9 @@ AudioChunk HmWhisperAudio::GetChunk(int chunk_index) const {
 MelFeatures HmWhisperAudio::ComputeMelSpectrogram(
     const std::vector<float>& pcm_data) const {
   MelFeatures mel;
-  mel.n_mels = kNMels;
+  mel.n_mels = n_mels_;
 
-  // Whisper encoder input is fixed to 30 seconds (80 x 3000). Keep the
+  // Whisper encoder input is fixed to 30 seconds (n_mels x 3000). Keep the
   // original behavior by padding shorter chunks and truncating longer chunks
   // to the fixed 30-second window expected by the model.
   std::vector<float> whisper_pcm = pcm_data;

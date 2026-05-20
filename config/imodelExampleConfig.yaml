@@ -456,18 +456,18 @@ llm_glm-asr:
         args: all
   test:
     - llm_glm-asr_test
-llm_whisper-turbo:
+llm_whisper:
   include:
-    - models/asr/whisper-turbo
+    - models/asr/whisper
   exclude:
-    - models/asr/whisper-turbo/README.MD
+    - models/asr/whisper/README.MD
   example_case:
-    - llm_whisper-turbo_test:
+    - llm_whisper_test:
         test_type: models_tests
-        script: whisper_turbo
+        script: whisper
         args: all
   test:
-    - llm_whisper-turbo_test
+    - llm_whisper_test
 asr_qwen3-asr:
   include:
     - models/asr/qwen3-asr

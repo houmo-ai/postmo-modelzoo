@@ -61,6 +61,21 @@ def get_args() -> argparse.Namespace:
         choices=["jfrog", "modelscope"],
         help="download the model from which source",
     )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default="whisper",
+        help="which model to download, default is whisper",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default="medium",
+        choices=["medium", "large-v3-turbo"],
+        help="which size of whisper model to download, default is medium",
+    )
     args = parser.parse_args()
     return args
 
@@ -76,14 +91,14 @@ if __name__ == "__main__":
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": "whisper",
+        "model_name": args.model_name,
         "model_info": {
-            "model_size": "medium",
+            "model_size": args.model_size,
             "ncore": 2,
             "ndevice": 1,
         },
         "modelscope_repo": {
-            "repo_ids": ["openai-mirror/whisper-medium"],
+            "repo_ids": [f"openai-mirror/whisper-{args.model_size}"],
             "ignore_patterns": ["*.bin", "*.h5", "*.msgpack", "*.safetensors"],
         },
     }

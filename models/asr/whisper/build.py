@@ -3,7 +3,7 @@
 # File: build.py
 # Description:
 #   Whisper Model Build and Test Tool - Python script for building and testing
-# Whisper ASR models.
+# Whisper ASR models (supports both whisper-medium and whisper-turbo variants).
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -156,7 +156,7 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="whisper",
+        default="whisper-medium",
         help="output houmo model name",
     )
     parser.add_argument(

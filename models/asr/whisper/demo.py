@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-# Copyright (c) 2026 HOUMO AI
+# Copyright (c) 2025 HOUMO AI
 #
 # File: demo.py
 # Description:
-#   Whisper ASR Inference Demo - Python script for running Whisper
+#   Whisper-Turbo ASR Inference Demo - Python script for running Whisper
 # automatic speech recognition on HOUMO AI device.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,127 +20,20 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
+import argparse
 import os
 import time
-import numpy as np
-import argparse
-import soundfile as sf
-from typing import List, Optional
-from loguru import logger
-
 import torch
-from transformers import WhisperProcessor
-from datasets import load_dataset
-
+import numpy as np
 import tcim_lite as tcim
+from loguru import logger
+import librosa
+from typing import List, Tuple, Optional
+from transformers import WhisperForConditionalGeneration, WhisperProcessor
 from hmatc.python.get_hm_devices import get_hm_devices
 
+MAX_GEN_LEN = 448
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-
-
-class SamplingManager:
-    def __init__(
-        self,
-        temperature: float = 1.0,
-        top_k: Optional[int] = None,
-        top_p: float = 1.0,
-        repetition_penalty: float = 1.0,
-        min_tokens_to_keep: int = 1,
-    ):
-        self.temperature = temperature
-        self.top_k = top_k
-        self.top_p = top_p
-        self.repetition_penalty = repetition_penalty
-        self.min_tokens_to_keep = min_tokens_to_keep
-
-    def apply_temperature(self, logits: np.ndarray) -> np.ndarray:
-        if self.temperature <= 0:
-            raise ValueError("Temperature must larger than 0")
-        return logits / self.temperature
-
-    def apply_repetition_penalty(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
-    ) -> np.ndarray:
-        if self.repetition_penalty == 1.0 or not previous_tokens:
-            return logits
-
-        adjusted_logits = logits.copy()
-        for token_id in set(previous_tokens):
-            if 0 <= token_id < len(logits):
-                if logits[token_id] < 0:
-                    adjusted_logits[token_id] = (
-                        logits[token_id] * self.repetition_penalty
-                    )
-                else:
-                    adjusted_logits[token_id] = (
-                        logits[token_id] / self.repetition_penalty
-                    )
-        return adjusted_logits
-
-    def apply_top_k(self, probs: np.ndarray) -> np.ndarray:
-        if self.top_k is None or self.top_k <= 0:
-            return probs
-
-        top_k = min(self.top_k, len(probs))
-        if top_k <= 0:
-            return probs
-
-        top_k_indices = np.argpartition(probs, -top_k)[-top_k:]
-        mask = np.ones_like(probs, dtype=bool)
-        mask[top_k_indices] = False
-        filtered_probs = probs.copy()
-        filtered_probs[mask] = -np.inf
-        return filtered_probs
-
-    def apply_top_p(self, probs: np.ndarray) -> np.ndarray:
-        if self.top_p >= 1.0:
-            return probs
-
-        sorted_indices = np.argsort(probs)[::-1]
-        sorted_logits = probs[sorted_indices]
-        max_logit = np.max(sorted_logits)
-        sorted_probs = np.exp(sorted_logits - max_logit)
-        sorted_probs /= np.sum(sorted_probs)
-        cumulative_probs = np.cumsum(sorted_probs)
-
-        cutoff_indices = np.where(cumulative_probs >= self.top_p)[0]
-        if len(cutoff_indices) > 0:
-            cutoff_index = cutoff_indices[0]
-            cutoff_index = max(cutoff_index, self.min_tokens_to_keep - 1)
-            selected_indices = sorted_indices[: cutoff_index + 1]
-        else:
-            selected_indices = sorted_indices
-
-        mask = np.ones_like(probs, dtype=bool)
-        mask[selected_indices] = False
-        filtered_probs = probs.copy()
-        filtered_probs[mask] = -np.inf
-        return filtered_probs
-
-    def process_logits(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
-    ) -> np.ndarray:
-        processed_logits = logits.copy()
-        processed_logits = self.apply_repetition_penalty(
-            processed_logits, previous_tokens
-        )
-        processed_logits = self.apply_top_k(processed_logits)
-        processed_logits = self.apply_top_p(processed_logits)
-        processed_logits = self.apply_temperature(processed_logits)
-        return processed_logits
-
-    def sample(
-        self, logits: torch.Tensor, previous_tokens: Optional[List[int]] = None
-    ) -> torch.Tensor:
-        logits_np = logits[0].detach().cpu().numpy()
-        processed_logits = self.process_logits(logits_np, previous_tokens)
-        sampled_index = int(np.argmax(processed_logits, axis=-1))
-        return torch.tensor([sampled_index], device=logits.device)
-
-
-def is_valid_char(cp):
-    return cp != 0xFFFD and cp > 0x001F
-
 
 lang_to_id = [
     50327,
@@ -245,96 +138,210 @@ lang_to_id = [
 ]
 
 
-def get_args() -> argparse.Namespace:
-    """Parse commandline."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--processor_dir",
-        dest="processor_dir",
-        type=str,
-        default="whisper-medium",
-        help="processor dir",
-    )
-    parser.add_argument(
-        "--audio",
-        type=str,
-        default="../../../data/audio/audio.mp3",
-    )
-    parser.add_argument(
-        "--encoder_path",
-        dest="encoder_path",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET, "whisper_encode.hmm"),
-        help="houmo encoder model path",
-    )
-    parser.add_argument(
-        "--decoder_path",
-        dest="decoder_path",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET, "whisper_decode.hmm"),
-        help="houmo decoder model path",
-    )
-    parser.add_argument(
-        "--prefill_path",
-        dest="prefill_path",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET, "whisper_prefill.hmm"),
-        help="houmo prefill model path",
-    )
-    parser.add_argument(
-        "--chunk_size",
-        dest="chunk_size",
-        type=int,
-        default=30,
-        help="chunk size of audio",
-    )
-    parser.add_argument(
-        "--language",
-        type=str,
-        default="auto",
-        help="language code (e.g. 'zh', 'en') or 'auto' for language detection",
-    )
-    args = parser.parse_args()
-    return args
+class SamplingManager:
+    def __init__(
+        self,
+        temperature: float = 1.0,
+        top_k: Optional[int] = None,
+        top_p: float = 1.0,
+        repetition_penalty: float = 1.0,
+        min_tokens_to_keep: int = 1,
+    ):
+        self.temperature = temperature
+        self.top_k = top_k
+        self.top_p = top_p
+        self.repetition_penalty = repetition_penalty
+        self.min_tokens_to_keep = min_tokens_to_keep
+
+    def softmax(self, x: np.ndarray) -> np.ndarray:
+        exp_x = np.exp(x - np.max(x))
+        return exp_x / np.sum(exp_x)
+
+    def apply_temperature(self, logits: np.ndarray) -> np.ndarray:
+        if self.temperature <= 0:
+            raise ValueError("Temperature must larger than 0")
+
+        return logits / self.temperature
+
+    def apply_repetition_penalty(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        if self.repetition_penalty == 1.0 or not previous_tokens:
+            return logits
+
+        adjusted_logits = logits.copy()
+        for token_id in set(previous_tokens):
+            if 0 <= token_id < len(logits):
+                if logits[token_id] < 0:
+                    adjusted_logits[token_id] = (
+                        logits[token_id] * self.repetition_penalty
+                    )
+                else:
+                    adjusted_logits[token_id] = (
+                        logits[token_id] / self.repetition_penalty
+                    )
+
+        return adjusted_logits
+
+    def apply_top_k(self, probs: np.ndarray) -> np.ndarray:
+        if self.top_k is None or self.top_k <= 0:
+            return probs
+
+        top_k = min(self.top_k, len(probs))
+
+        if top_k <= 0:
+            return probs
+
+        top_k_indices = np.argpartition(probs, -top_k)[-top_k:]
+
+        mask = np.ones_like(probs, dtype=bool)
+        mask[top_k_indices] = False
+        filtered_probs = probs.copy()
+        filtered_probs[mask] = 0
+
+        if np.sum(filtered_probs) > 0:
+            normalized_probs = filtered_probs / np.sum(filtered_probs)
+        else:
+            normalized_probs = np.ones_like(probs) / len(probs)
+
+        return normalized_probs
+
+    def apply_top_p(self, probs: np.ndarray) -> np.ndarray:
+        if self.top_p >= 1.0:
+            return probs
+
+        sorted_indices = np.argsort(probs)[::-1]
+        sorted_probs = probs[sorted_indices]
+
+        cumulative_probs = np.cumsum(sorted_probs)
+
+        cutoff_indices = np.where(cumulative_probs >= self.top_p)[0]
+
+        if len(cutoff_indices) > 0:
+            cutoff_index = cutoff_indices[0]
+            if cutoff_index < self.min_tokens_to_keep - 1:
+                cutoff_index = self.min_tokens_to_keep - 1
+
+            selected_indices = sorted_indices[: cutoff_index + 1]
+        else:
+            selected_indices = sorted_indices
+
+        mask = np.ones_like(probs, dtype=bool)
+        mask[selected_indices] = False
+        filtered_probs = probs.copy()
+        filtered_probs[mask] = 0
+
+        if np.sum(filtered_probs) > 0:
+            normalized_probs = filtered_probs / np.sum(filtered_probs)
+        else:
+            normalized_probs = np.ones_like(probs) / len(probs)
+
+        return normalized_probs
+
+    def process_logits(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        processed_logits = logits.copy()
+        # 1. apply repetition penalty
+        processed_logits = self.apply_repetition_penalty(
+            processed_logits, previous_tokens
+        )
+
+        # 2. apply softmax
+        # not using softmax in case of long time cost
+        probs = processed_logits
+        # probs = self.softmax(processed_logits)
+
+        # 3. apply top-k
+        probs = self.apply_top_k(probs)
+
+        # 4. apply top-p
+        probs = self.apply_top_p(probs)
+
+        # 5. apply temperature
+        probs = self.apply_temperature(probs)
+        return probs
+
+    def sample(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> int:
+        logits = logits[0].numpy()
+        if HOUMO_TARGET == "xh2":
+            logits = logits[0]
+        probs = self.process_logits(logits, previous_tokens)
+        if np.all(probs == 0):
+            probs = np.ones_like(probs) / len(probs)
+
+        # sampled_index = np.random.choice(len(probs), p=probs)
+        sampled_index = probs.argmax(-1)
+
+        return np.array([[sampled_index]])
+
+    def get_processed_probs(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        return self.process_logits(logits, previous_tokens)
 
 
 class HmWhisper:
-    def __init__(self, encoder_path, decoder_path, prefill_path):
+    def __init__(self, encode_path, decode_path, prefill_path):
         super().__init__()
         dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
         weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
-        self.encoder = tcim.runtime.load(encoder_path, option=option1)
-        logger.info("encoder model loaded")
+        self.encode = tcim.runtime.load(encode_path, option=option1)
+        logger.info("encode model loaded")
         option2 = tcim.runtime.Option(weight_manager)
         self.prefill = tcim.runtime.load(prefill_path, option=option2)
         logger.info("prefill model loaded")
         option3 = tcim.runtime.Option(weight_manager)
-        self.decoder = tcim.runtime.load(decoder_path, option=option3)
-        logger.info("decoder model loaded")
+        self.decode = tcim.runtime.load(decode_path, option=option3)
+        logger.info("decode model loaded")
+        self.encode_time = 0.0
+        self.decode_time = 0.0
+        self.prefill_time = 0.0
+        self.num_head = self.prefill.get_input_info(self.prefill.get_input_name(4)).shape[1]
+        self.cache_max_len = self.prefill.get_input_info(self.prefill.get_input_name(4)).shape[3]
+        self.num_decode_layers, self.base_idx = self.get_num_decode_layers()
 
-    def run_encoder(self, input_features):
+    def get_num_decode_layers(self):
+        """Calculate number of transformer blocks from input tensor names."""
+        count = 0
+        base_idx = 0
+        for i in range(self.prefill.get_num_inputs()):
+            input_name = self.prefill.get_input_name(i)
+            if "k_cache" in input_name or "v_cache" in input_name:
+                count += 1
+            if input_name == "k_cache_0":
+
+                base_idx = i
+        return count // 2, base_idx
+
+    def run_encode(self, input_features):
         input_features = input_features.numpy()
-        self.encoder.set_input(self.encoder.get_input_name(0), input_features)
-        self.encoder.run()
-        self.encoder.sync()
+        self.encode.set_input(self.encode.get_input_name(0), input_features)
+        start_time = time.time()
+        self.encode.run()
+        self.encode.sync()
+        self.encode_time += time.time() - start_time
         outputs = []
-        for i in range(self.encoder.get_num_outputs()):
-            outputs.append(
-                torch.tensor(
-                    self.encoder.get_output(self.encoder.get_output_name(i)).numpy()
-                )
-            )
+        for i in range(self.encode.get_num_outputs()):
+            output = self.encode.get_output(self.encode.get_output_name(i)).numpy()
+            outputs.append(torch.tensor(output))
         return outputs
 
-    def run_decoder(self, inputs):
+    def run_decode(self, inputs):
         for input_name, input_data in inputs.items():
-            self.decoder.set_input(input_name, input_data.numpy())
-        self.decoder.run()
-        self.decoder.sync()
-        outputs = torch.tensor(
-            self.decoder.get_output(self.decoder.get_output_name(0)).numpy()
-        )
+            self.decode.set_input(input_name, input_data.numpy())
+        start_time = time.time()
+        self.decode.run()
+        self.decode.sync()
+        self.decode_time += time.time() - start_time
+        outputs = [
+            torch.tensor(
+                self.decode.get_output(self.decode.get_output_name(0)).numpy()
+            )
+        ]
         return outputs
 
     def run_prefill(
@@ -343,345 +350,347 @@ class HmWhisper:
     ):
         for input_name, input_data in inputs.items():
             self.prefill.set_input(input_name, input_data.numpy())
+        start_time = time.time()
         self.prefill.run()
         self.prefill.sync()
-        outputs = torch.tensor(
-            self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
-        )
+        self.prefill_time += time.time() - start_time
+        outputs = [
+            torch.tensor(
+                self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
+            )
+        ]
         return outputs
 
     def get_input_names(self, model_type):
-        if model_type == "encoder":
-            self.model = self.encoder
-        elif model_type == "decoder":
-            self.model = self.decoder
+        if model_type == "encode":
+            self.model = self.encode
+        elif model_type == "decode":
+            self.model = self.decode
         elif model_type == "prefill":
             self.model = self.prefill
         input_names = []
-        for i in range(self.prefill.get_num_inputs()):
-            input_names.append(self.prefill.get_input_name(i))
+        for i in range(self.model.get_num_inputs()):
+            input_names.append(self.model.get_input_name(i))
         return input_names
 
+    def clear_time(self):
+        self.encode_time = 0.0
+        self.decode_time = 0.0
+        self.prefill_time = 0.0
 
-def asr(
-    hmwhisper,
-    processor,
-    input_features,
-    sampling_manager,
-    state=None,
-    slide_len=10,
-    language="auto",
-):
-    """
-    Args:
-        state: Dictionary containing cross-chunk continuous state:
-            - last_response: Last decoded text
-            - skip_tokens: Number of tokens to skip
-    Returns:
-        (prefill_ids_len, all_ids_len, ttft_time, total_time, audio_duration, state)
-    """
+
+def is_valid_char(cp):
+    return cp != 0xFFFD and cp > 0x001F
+
+
+def asr(whisper, processor, audio_array, language="auto"):
+
+    # 1. prepare config
+    num_heads = whisper.num_head
+    num_decode_layers = whisper.num_decode_layers
+    generated_ids = []
+    sampling_manager = SamplingManager(top_k=None, top_p=1.0, repetition_penalty=1.1)
+    start_time = time.time()
+
+    # get prompt Tokens ID
     sot_id = processor.tokenizer.convert_tokens_to_ids("<|startoftranscript|>")
-    lang_id = processor.tokenizer.convert_tokens_to_ids("<|zh|>")
+    default_lang_id = processor.tokenizer.convert_tokens_to_ids("<|zh|>")
     transcribe_id = processor.tokenizer.convert_tokens_to_ids("<|transcribe|>")
     notime_id = processor.tokenizer.convert_tokens_to_ids("<|notimestamps|>")
     eos_id = processor.tokenizer.convert_tokens_to_ids("<|endoftext|>")
-    if state is None:
-        # First call, initialize state
-        skip_tokens = 0
-        last_response = ""
-    else:
-        # Use the passed state (only maintain the continuity of text decoding)
-        skip_tokens = state["skip_tokens"]
-        last_response = state["last_response"]
 
-    start_time = time.time()
-    detect_ids = torch.tensor([[sot_id]])  # [1,1]
-    default_decoder_ids = torch.tensor([[sot_id, 0, transcribe_id, notime_id]])  # [1,1]
-    cache_position = torch.tensor([[0]])
-    cache_position_prefill = torch.tensor([[0, 1, 2, 3]])
-    cnt = 3
+    input_features = processor(
+        audio_array, sampling_rate=16000, return_tensors="pt"
+    ).input_features.half()
+    enc_out = whisper.run_encode(input_features)
 
-    # detect language  input_features  detect_ids => [1,51865]
-    detect_encoder_out = hmwhisper.run_encoder(input_features.half())
-    mask_atten = torch.zeros(([1, 16, 1, 1024]), dtype=torch.float16)
-    mask_atten[:, :, :, 1:] = -65504.0
+    # Dynamically obtain sequence length
+    enc_seq_len = enc_out[0].shape[2]  # 1500
 
-    enc_seq_len = detect_encoder_out[0].shape[2]
-    encoder_attention_mask = torch.zeros(
-        (1, 1, 1, enc_seq_len), device="cpu", dtype=torch.float16
-    )
+    # [k0, k1, k2, k3, v0, v1, v2, v3]
+    k_list = enc_out[:num_decode_layers]
+    v_list = enc_out[num_decode_layers:]
 
-    decoder_input_names = hmwhisper.get_input_names("decoder")
-    decoder_detext_inputs = {
-        decoder_input_names[0]: detect_ids.to(torch.int32),
-        decoder_input_names[1]: cache_position.to(torch.int32),
-        decoder_input_names[2]: torch.tensor([0]).to(torch.int32),
-        decoder_input_names[3]: torch.tensor([1]).to(torch.int32),
-        decoder_input_names[4]: mask_atten,
-        decoder_input_names[5]: encoder_attention_mask.to(torch.float16),
-    }
+    dec_names = whisper.get_input_names("decode")
+    encode_attention_mask = torch.zeros((1, 1, 1, enc_seq_len), dtype=torch.float16)
+    base_idx = whisper.base_idx
 
-    k_cache = [
-        torch.ones([1, 16, 1024, 64], dtype=torch.float16) * (-65504) for i in range(24)
-    ]
-    v_cache = [
-        torch.ones([1, 16, 1024, 64], dtype=torch.float16) * (-65504) for i in range(24)
-    ]
+    def detect_language_id():
+        detect_inputs = {
+            dec_names[0]: torch.tensor([[sot_id]], dtype=torch.int32),
+            dec_names[1]: torch.tensor([[0]], dtype=torch.int32),
+            dec_names[2]: torch.tensor([0], dtype=torch.int32),
+            dec_names[3]: torch.tensor([1], dtype=torch.int32),
+            dec_names[4]: torch.zeros(
+                (1, num_heads, 1, whisper.cache_max_len), dtype=torch.float16
+            ),
+            dec_names[5]: encode_attention_mask,
+        }
 
-    for data_detect, k_data_cache in zip(decoder_input_names[6:30], k_cache):
-        decoder_detext_inputs[data_detect] = k_data_cache
-    for data_detect, v_data_cache in zip(decoder_input_names[30:54], v_cache):
-        decoder_detext_inputs[data_detect] = v_data_cache
+        for i in range(2 * num_decode_layers):
+            cache_name = dec_names[base_idx + i]
+            cache_shape = whisper.decode.get_input_info(cache_name).shape
+            detect_inputs[cache_name] = (
+                torch.ones(cache_shape, dtype=torch.float16) * (-65504.0)
+            )
 
-    k_list = []
-    for i in range(24):
-        k_list.append(detect_encoder_out[2 * i])
+        for l in range(num_decode_layers):
+            detect_inputs[dec_names[base_idx + 2 * num_decode_layers + l]] = k_list[l]
+            detect_inputs[dec_names[base_idx + 3 * num_decode_layers + l]] = v_list[l]
 
-    v_list = []
-    for i in range(24):
-        v_list.append(detect_encoder_out[2 * i + 1])
-
-    for data_detect, k_data in zip(decoder_input_names[54:78], k_list):
-        decoder_detext_inputs[data_detect] = k_data
-
-    for data_detect, v_data in zip(decoder_input_names[78:102], v_list):
-        decoder_detext_inputs[data_detect] = v_data
-
-    logits = hmwhisper.run_decoder(decoder_detext_inputs)
+        detect_logits = whisper.run_decode(detect_inputs)[0][:, -1, :].to(torch.float32)
+        lang_logits = detect_logits.clone()
+        non_lang_mask = torch.ones_like(lang_logits, dtype=torch.bool)
+        non_lang_mask[0, lang_to_id] = False
+        lang_logits[non_lang_mask] = -np.inf
+        if torch.isneginf(lang_logits).all():
+            return default_lang_id
+        return int(lang_logits.argmax(-1).item())
 
     if language == "auto" or language is None:
-        non_lang_mask = torch.ones_like(logits[0], dtype=torch.bool)
-        non_lang_mask[0, list(lang_to_id)] = False
-        logits[:, :, non_lang_mask[0]] = -np.inf
-        lang_ids = logits.argmax(-1)
-
-        non_lang_mask = torch.ones_like(logits, dtype=torch.bool)
-        non_lang_mask[0, 0, list(lang_to_id)] = False
-        logits[:, :, non_lang_mask[0][0]] = -np.inf
-        lang_ids = logits.argmax(-1)
-        print(f"Detected language id: {lang_ids.item()}")
+        lang_id = detect_language_id()
+        logger.info(f"Detected language id: {lang_id}")
     else:
-        # Convert language string (e.g. 'zh') to token id
-        token_str = f"<|{language}|>"
-        lang_token_id = processor.tokenizer.convert_tokens_to_ids(token_str)
-        if lang_token_id is None or lang_token_id == processor.tokenizer.unk_token_id:
+        token_str = f"<|{language.lower()}|>"
+        lang_id = processor.tokenizer.convert_tokens_to_ids(token_str)
+        if lang_id is None or lang_id == processor.tokenizer.unk_token_id:
             logger.warning(
                 f"Unknown language code '{language}', falling back to auto detection."
             )
-            lang_ids = logits.argmax(-1)
-            print(f"Detected language id: {lang_ids.item()}")
+            lang_id = detect_language_id()
+            logger.info(f"Detected language id: {lang_id}")
         else:
-            lang_ids = torch.tensor([[lang_token_id]])
-            print(f"Forced language id: {lang_token_id} for '{language}'")
+            logger.info(f"Forced language id: {lang_id} for '{language}'")
 
-    default_decoder_ids[0, 1] = lang_ids  # [[50258, 50259, 50359, 50363]] # 34.5197
+    prompt_tokens = [sot_id, lang_id, transcribe_id, notime_id]
 
-    mask_atten = torch.full((1, 16, 4, 1024), -65504.0, dtype=torch.float16)
-    for i in range(4):
+    logits = None
+    step = 0
+
+    # === step1 : prefill ===
+
+    # [sot_id, lang_id, transcribe_id, notime_id]
+    input_ids = torch.tensor([prompt_tokens], dtype=torch.int32)
+    prompt_len = len(prompt_tokens)  # 4
+    # 2. Position IDs: [1, 4] -> [[0, 1, 2, 3]]
+    position_ids = torch.arange(prompt_len, dtype=torch.int32).unsqueeze(0)
+    # build self-attention Mask
+    mask_atten = torch.full(
+        (1, num_heads, prompt_len, whisper.cache_max_len), -65504.0, dtype=torch.float16
+    )
+
+    # add mask
+    for i in range(prompt_len):
         mask_atten[:, :, i, : i + 1] = 0.0
 
-    prefill_input_names = hmwhisper.get_input_names("prefill")
-    prefill_inputs = {
-        prefill_input_names[0]: default_decoder_ids.to(torch.int32),
-        prefill_input_names[1]: cache_position_prefill.to(torch.int32),
-        prefill_input_names[2]: torch.tensor([0]).to(torch.int32),
-        prefill_input_names[3]: torch.tensor([4]).to(torch.int32),
-        prefill_input_names[4]: mask_atten,
-        prefill_input_names[5]: encoder_attention_mask.to(torch.float16),
+    # This block of code is creating a dictionary named `inputs` that contains various tensors used as
+    # input for the model during the Prefill stage of the decoding process. Here's a breakdown of each
+    # key-value pair in the `inputs` dictionary:
+    inputs = {
+        dec_names[0]: input_ids,
+        dec_names[1]: position_ids,
+        dec_names[2]: torch.tensor(
+            [0], dtype=torch.int32
+        ),  # past_key_values_length = 0
+        dec_names[3]: torch.tensor(
+            [prompt_len], dtype=torch.int32
+        ),  # current_sequence_length = 4
+        dec_names[4]: mask_atten,
+        dec_names[5]: encode_attention_mask,
     }
 
-    for i in range(96):
-        cache = hmwhisper.decoder.get_dev_input(hmwhisper.decoder.get_input_name(i + 6))
-        hmwhisper.prefill.set_dev_input(hmwhisper.prefill.get_input_name(i + 6), cache)
-    logits = hmwhisper.run_prefill(prefill_inputs)
+    for l in range(num_decode_layers):
+        inputs[dec_names[base_idx + 2 * num_decode_layers + l]] = k_list[l]
+        inputs[dec_names[base_idx + 3 * num_decode_layers + l]] = v_list[l]
 
-    next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
+    # run Prefill
+    for i in range(2 * num_decode_layers):
+        cache = whisper.decode.get_dev_input(whisper.decode.get_input_name(i + whisper.base_idx))
+        whisper.prefill.set_dev_input(whisper.prefill.get_input_name(i + whisper.base_idx), cache)
+    out = whisper.run_prefill(inputs)
 
-    # Fix: Initialize last_response (containing only prompt tokens at this point) before appending new tokens
-    # This prepares it for sliding window slicing
-    last_response = processor.decode(default_decoder_ids[0][-slide_len:])
+    logits = out[0]
 
-    next_tokens = sampling_manager.sample(
-        next_token_logits, default_decoder_ids[0].tolist()
-    )
-    default_decoder_ids = torch.cat([default_decoder_ids, next_tokens[:, None]], dim=-1)
+    step += prompt_len
 
-    prefill_ids_len = default_decoder_ids.shape[1]
+    for i in range(2 * num_decode_layers):
+        cache = whisper.prefill.get_dev_output(whisper.prefill.get_output_name(i + 1))
+        whisper.decode.set_dev_input(whisper.decode.get_input_name(i + whisper.base_idx), cache)
+        whisper.decode.set_dev_output(whisper.decode.get_output_name(i + 1), cache)
+
+    for i in range(2 * num_decode_layers):
+        enc_out_kv = whisper.prefill.get_dev_input(whisper.prefill.get_input_name(base_idx + 2 * num_decode_layers + i))
+        whisper.decode.set_dev_input(whisper.decode.get_input_name(base_idx + 2 * num_decode_layers + i), enc_out_kv)
+
+    # === step 2: Decode ===
+    next_token = torch.argmax(logits[:, -1, :], dim=-1).item()
+    generated_ids.append(next_token)
+
     ttft_time = time.time() - start_time
-
-    # Preset output color
     print("\033[1;95m", end="", flush=True)
 
-    # Ensure the first token correctly applies the UTF-8 truncation/sliding check
-    decode_response = processor.decode(
-        default_decoder_ids[0][-(slide_len + 1) - skip_tokens :]
-    )[len(last_response) :]
+    slide_len = 10
+    skip_tokens = 0
+    last_response = ""
+    # 使用 tensor 存储已生成的 token，与 demo_mix.py 保持一致
+    generated_token_ids = torch.tensor([[next_token]])
 
-    if (
-        decode_response != ""
-        and is_valid_char(ord(decode_response[-1]))
-        and next_tokens.item() != eos_id
-    ):
-        print(decode_response, end="", flush=True)
-        last_response = processor.decode(default_decoder_ids[0][-slide_len:])
-        skip_tokens = 0
-    else:
-        skip_tokens += 1
-    decode_response = "" if next_tokens.item() == eos_id else decode_response
-
-    # Restart the timer, only measure the decoding phase
-    start_time = time.time()
-
-    for i in range(48):
-        cache = hmwhisper.prefill.get_dev_output(
-            hmwhisper.prefill.get_output_name(i + 1)
-        )
-        hmwhisper.decoder.set_dev_input(hmwhisper.decoder.get_input_name(i + 6), cache)
-        hmwhisper.decoder.set_dev_output(
-            hmwhisper.decoder.get_output_name(i + 1), cache
-        )
-
-    while default_decoder_ids.shape[1] < 448 and next_tokens.item() != eos_id:
-        cnt += 1
-        mask_atten = torch.zeros(([1, 16, 1, 1024]), dtype=torch.float16)
-        if cnt + 1 < 1024:
-            mask_atten[:, :, :, cnt + 1 :] = -65504.0
-
-        prefill_inputs[prefill_input_names[0]] = next_tokens.unsqueeze(0).to(
-            torch.int32
-        )
-        prefill_inputs[prefill_input_names[1]] = torch.tensor([[cnt]]).to(torch.int32)
-        prefill_inputs[prefill_input_names[2]] = torch.tensor([cnt]).to(torch.int32)
-        prefill_inputs[prefill_input_names[3]] = torch.tensor([1]).to(torch.int32)
-        prefill_inputs[prefill_input_names[4]] = mask_atten
-        prefill_inputs[prefill_input_names[5]] = encoder_attention_mask.to(
-            torch.float16
-        )
-
-        logits = hmwhisper.run_decoder(prefill_inputs)
-        next_token_logits = logits[:, -1, :].to(copy=True, dtype=torch.float32)
-        next_tokens = sampling_manager.sample(
-            next_token_logits, default_decoder_ids[0].tolist()
-        )
-        default_decoder_ids = torch.cat(
-            [default_decoder_ids, next_tokens[:, None]], dim=-1
-        )
-
+    while step < MAX_GEN_LEN:
+        # 增量解码：只解码滑动窗口内的 token
         decode_response = processor.decode(
-            default_decoder_ids[0][-(slide_len + 1) - skip_tokens :]
-        )[len(last_response) :]
+            generated_token_ids[0][-(slide_len + 1) - skip_tokens :]
+        )[len(last_response):]
 
+        # 只有当解码结果不为空且最后一个字符是有效字符时才打印
         if (
             decode_response != ""
             and is_valid_char(ord(decode_response[-1]))
-            and next_tokens.item() != eos_id
+            and next_token != eos_id
         ):
             print(decode_response, end="", flush=True)
-            last_response = processor.decode(default_decoder_ids[0][-slide_len:])
+            last_response = processor.decode(generated_token_ids[0][-slide_len:])
             skip_tokens = 0
         else:
             skip_tokens += 1
-        decode_response = "" if next_tokens.item() == eos_id else decode_response
 
-    # Save state for the next chunk (only maintain the continuity of text decoding)
-    state = {
-        "last_response": last_response,
-        "skip_tokens": skip_tokens,
-    }
-    return (
-        prefill_ids_len,
-        default_decoder_ids.shape[1],
-        ttft_time,
-        (time.time() - start_time),
-        len(input_features[0][0]) * 0.02,  # audio duration in seconds, 20ms per frame
-        state,
-    )
+        if next_token == eos_id:
+            break
+
+        input_ids = torch.tensor([[next_token]], dtype=torch.int32)
+
+        mask_atten = torch.zeros(
+            (1, num_heads, 1, whisper.cache_max_len), dtype=torch.float16
+        )
+        if step + 1 < whisper.cache_max_len:
+            mask_atten[:, :, :, step + 1 :] = -65504
+
+        inputs = {
+            dec_names[0]: input_ids,
+            dec_names[1]: torch.tensor([[step]], dtype=torch.int32),
+            dec_names[2]: torch.tensor([step], dtype=torch.int32),
+            dec_names[3]: torch.tensor([1], dtype=torch.int32),
+            dec_names[4]: mask_atten,
+            dec_names[5]: encode_attention_mask,
+        }
+
+        out = whisper.run_decode(inputs)
+        logits = out[0]
+
+        next_token_arr = sampling_manager.sample(logits, generated_ids)
+        next_token = int(next_token_arr[0, 0])
+        generated_ids.append(next_token)
+        generated_token_ids = torch.cat(
+            [generated_token_ids, torch.tensor([[next_token]])], dim=-1
+        )
+        step += 1
+    decoded_text = processor.decode(generated_token_ids[0], skip_special_tokens=True)
+    return len(decoded_text), ttft_time, decoded_text
 
 
 if __name__ == "__main__":
-    args = get_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tokenizer_path", type=str, default="whisper-medium", help="Whisper tokenizer path")
+    parser.add_argument(
+        "--encode_path",
+        dest="encode_path",
+        type=str,
+        default=None,
+        help="houmo encode model path",
+    )
+    parser.add_argument(
+        "--decode_path",
+        dest="decode_path",
+        type=str,
+        default=None,
+        help="houmo decode model path",
+    )
+    parser.add_argument(
+        "--prefill_path",
+        dest="prefill_path",
+        type=str,
+        default=None,
+        help="houmo prefill model path",
+    )
+    parser.add_argument(
+        "--audio",
+        type=str,
+        default="../../../data/audio/audio.mp3",
+    )
+    parser.add_argument(
+        "--chunk_size",
+        type=float,
+        default=30.0,
+        help="audio chunk size in seconds",
+    )
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="auto",
+        help="language code (e.g. 'zh', 'en') or 'auto' for language detection",
+    )
+    args = parser.parse_args()
 
-    # init houmo whisper model
-    if HOUMO_TARGET == "xh2":
-        hmwhisper = HmWhisper(
-            args.encoder_path,
-            args.decoder_path,
-            args.prefill_path,
-        )
-    else:
-        raise ValueError("Unsupport houmo target!")
+    if args.chunk_size <= 0 or args.chunk_size > 30:
+        parser.error("--chunk_size must be greater than 0 and less than or equal to 30")
 
-    processor = WhisperProcessor.from_pretrained(args.processor_dir)
-    sampling_manager = SamplingManager(top_k=None, top_p=1.0, repetition_penalty=1.1)
+    houmo_target_val = HOUMO_TARGET if HOUMO_TARGET else "xh2"
+    if args.encode_path is None:
+        args.encode_path = os.path.join("output", houmo_target_val, f"{args.tokenizer_path}_encode.hmm")
+    if args.decode_path is None:
+        args.decode_path = os.path.join("output", houmo_target_val, f"{args.tokenizer_path}_decode.hmm")
+    if args.prefill_path is None:
+        args.prefill_path = os.path.join("output", houmo_target_val, f"{args.tokenizer_path}_prefill.hmm")
 
-    sample, sr = sf.read(args.audio)
+    whisper = HmWhisper(args.encode_path, args.decode_path, args.prefill_path)
+    processor = WhisperProcessor.from_pretrained(args.tokenizer_path)
+    results = ""
+    output_tokens = 0
+    audio_array, sr = librosa.load(args.audio, sr=None, mono=True)
     if sr != 16000:
-        import librosa
-
-        sample = librosa.resample(sample, orig_sr=sr, target_sr=16000)
+        audio_array = librosa.resample(audio_array, orig_sr=sr, target_sr=16000)
         logger.info(f"Resampled audio from {sr}Hz to 16000Hz")
         sr = 16000
-    total_samples = len(sample)
     chunk_size = int(args.chunk_size * sr)
-    total_samples = len(sample)
+    total_samples = len(audio_array)
     chunks = []
 
     for start in range(0, total_samples, chunk_size):
         end = start + chunk_size
-        chunk = sample[start:end]
+        chunk = audio_array[start:end]
         if len(chunk) < chunk_size:
             chunk = np.pad(chunk, (0, chunk_size - len(chunk)), mode="constant")
         chunks.append(chunk)
     chunks_array = np.array(chunks)
 
     logger.success("transcription:")
-    total_ttft_time = 0.0
-    total_decode_time = 0.0
-    total_tokens = 0
-    total_prefill_tokens = 0
-    total_audio_duration = 0.0
-    state = None  # initial state is None, first chunk will initialize it
     for i, chunk in enumerate(chunks):
-        input_features = processor(
-            chunk, sampling_rate=sr, return_tensors="pt"
-        ).input_features
-        prefill_ids_len, all_ids_len, ttft_time, total_time, audio_duration, state = (
-            asr(
-                hmwhisper,
-                processor,
-                input_features,
-                sampling_manager,
-                state,
-                language=args.language,
-            )
+        output_token, current_ttft, decoded_text = asr(
+            whisper, processor, chunk, language=args.language
         )
-        total_ttft_time += ttft_time
-        total_decode_time += total_time
-        total_tokens += all_ids_len
-        total_prefill_tokens += prefill_ids_len
-        total_audio_duration += audio_duration
+        results += decoded_text
+        output_tokens += output_token
+        ttft_time = current_ttft if i == 0 else ttft_time
 
     # reset color and print newline
     print("\033[0m")
 
-    # run whisper model
-
-    e2e_time = total_decode_time + total_ttft_time  # end-to-end total time
-
     logger.success(
-        f"Output {total_tokens} tokens, Decode Cost {total_decode_time*1000:.3f} ms"
+        f"Output {output_tokens} tokens, Decode Cost {whisper.decode_time*1000:.3f} ms"
+    )
+    logger.success(f"Decode Speed: { output_tokens/ whisper.decode_time:.2f} tokens/s")
+    logger.success(f"TTFT (Time to First Token): {ttft_time * 1000:.3f} ms")
+    logger.success(
+        f"TPOT (Time Per Output Token): {whisper.decode_time * 1000 / output_tokens:.3f} ms/token"
     )
     logger.success(
-        f"Decode Speed: {(total_tokens - total_prefill_tokens) / total_decode_time:.2f} tokens/s"
+        f"E2E Latency (End-to-End Latency): {(ttft_time + whisper.decode_time):.3f} seconds"
     )
-    logger.success(f"TTFT (Time to First Token): {total_ttft_time * 1000:.3f} ms")
     logger.success(
-        f"TPOT (Time Per Output Token): {total_decode_time * 1000 / (total_tokens - total_prefill_tokens):.3f} ms/token"
+        f"E2E TPS (End-to-End Tokens Per Second): {output_tokens / (ttft_time + whisper.decode_time):.2f} tokens/s"
     )
-    logger.success(f"E2E Latency (End-to-End Latency): {e2e_time:.3f} seconds")
-    logger.success(
-        f"E2E TPS (End-to-End Tokens Per Second): {total_tokens / e2e_time:.2f} tokens/s"
-    )
+    e2e_time = ttft_time + whisper.decode_time
+    total_audio_duration = len(audio_array) / sr
     logger.success(
         f"RTF (Real-Time Factor): {e2e_time / total_audio_duration:.4f} (lower is better, <1 means real-time)"
     )
+    whisper.clear_time()

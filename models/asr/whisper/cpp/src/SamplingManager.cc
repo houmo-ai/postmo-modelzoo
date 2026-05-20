@@ -221,8 +221,8 @@ void SamplingManager::processLogits(const float* logits, size_t size,
   // Copy logits to working array
   std::vector<float> working_logits(logits, logits + size);
 
-  // 1. Apply presence repetition penalty (matching Python implementation)
-  applyPresenceRepetitionPenalty(working_logits.data(), size, previous_tokens);
+  // 1. Apply multiplicative repetition penalty (matching Python demo.py)
+  applyRepetitionPenalty(working_logits.data(), size, previous_tokens);
 
   // 2. Use logits directly as probs (matching Python: not using softmax)
   // Python comment: "not using softmax in case of long time cost"

@@ -52,21 +52,22 @@ void PrintUsage(const char* program_name) {
       << "  " << program_name << " --audio_path <audio_file> [options]\n\n"
       << "Options:\n"
       << "  --audio_path <path>     Path to audio file (default: audio.mp3)\n"
-      << "  --encode_path <path>    Path to encode model (default: "
-         "output/xh2/whisper_encode.hmm)\n"
-      << "  --decode_path <path>    Path to decode model (default: "
-         "output/xh2/whisper_decode.hmm)\n"
-      << "  --prefill_path <path>   Path to prefill model (default: "
-         "output/xh2/whisper_prefill.hmm)\n"
-      << "  --tokenizer_path <path> Path to tokenizer (default: "
-         "whisper-medium/tokenizer.json)\n"
-      << "  --chunk_size <seconds>  Audio chunk size in seconds (default: 25)\n"
+      << "  --model <name>          Model name (default: whisper-medium)\n"
+      << "                          Supported: whisper-medium, "
+         "whisper-large-v3-turbo\n"
+      << "  --encode_path <path>    Path to encode model (overrides --model)\n"
+      << "  --decode_path <path>    Path to decode model (overrides --model)\n"
+      << "  --prefill_path <path>   Path to prefill model (overrides --model)\n"
+      << "  --tokenizer_path <path> Path to tokenizer (overrides --model)\n"
+      << "  --chunk_size <seconds>  Audio chunk size in seconds (default: 30)\n"
       << "  --language <code|auto>  Language code (default: auto)\n"
       << "  --encoder_path <path>   Deprecated alias of --encode_path\n"
       << "  --decoder_path <path>   Deprecated alias of --decode_path\n"
       << "  --help, -h              Show this help message\n\n"
       << "Examples:\n"
       << "  " << program_name << " --audio_path audio.mp3\n"
+      << "  " << program_name
+      << " --audio_path audio.mp3 --model whisper-large-v3-turbo\n"
       << "  " << program_name
       << " --audio_path audio.mp3 --encode_path models/whisper_encode.hmm\n\n"
       << "Environment Variables:\n"
@@ -96,12 +97,19 @@ int main(int argc, char* argv[]) {
 
   // Default paths
   std::string audio_path = "audio.mp3";
-  std::string encode_path = "output/xh2/whisper_encode.hmm";
-  std::string decode_path = "output/xh2/whisper_decode.hmm";
-  std::string prefill_path = "output/xh2/whisper_prefill.hmm";
-  std::string tokenizer_path = "whisper-medium/tokenizer.json";
+  std::string model_name = "whisper-medium";
+  std::string encode_path;
+  std::string decode_path;
+  std::string prefill_path;
+  std::string tokenizer_path;
   std::string language = "auto";
   int chunk_size = 30;
+
+  // Flags to check if paths were explicitly set
+  bool encode_path_set = false;
+  bool decode_path_set = false;
+  bool prefill_path_set = false;
+  bool tokenizer_path_set = false;
 
   // Parse command line
   for (int i = 1; i < argc; i++) {
@@ -116,7 +124,7 @@ int main(int argc, char* argv[]) {
         arg == "--decode_path" || arg == "--encoder_path" ||
         arg == "--decoder_path" || arg == "--prefill_path" ||
         arg == "--tokenizer_path" || arg == "--chunk_size" ||
-        arg == "--language") {
+        arg == "--language" || arg == "--model") {
       if (i + 1 >= argc) {
         std::cerr << "Error: Missing value for option: " << arg << "\n";
         PrintUsage(argv[0]);
@@ -126,14 +134,20 @@ int main(int argc, char* argv[]) {
       std::string value = argv[++i];
       if (arg == "--audio_path") {
         audio_path = value;
+      } else if (arg == "--model") {
+        model_name = value;
       } else if (arg == "--encode_path" || arg == "--encoder_path") {
         encode_path = value;
+        encode_path_set = true;
       } else if (arg == "--decode_path" || arg == "--decoder_path") {
         decode_path = value;
+        decode_path_set = true;
       } else if (arg == "--prefill_path") {
         prefill_path = value;
+        prefill_path_set = true;
       } else if (arg == "--tokenizer_path") {
         tokenizer_path = value;
+        tokenizer_path_set = true;
       } else if (arg == "--language") {
         language = value;
       } else if (arg == "--chunk_size") {
@@ -182,6 +196,20 @@ int main(int argc, char* argv[]) {
   const char* houmo_target_env = std::getenv("HOUMO_TARGET");
   std::string houmo_target = std::string(houmo_target_env);
 
+  // Build default paths based on model name (like Python version)
+  if (!encode_path_set) {
+    encode_path = "output/" + houmo_target + "/" + model_name + "_encode.hmm";
+  }
+  if (!decode_path_set) {
+    decode_path = "output/" + houmo_target + "/" + model_name + "_decode.hmm";
+  }
+  if (!prefill_path_set) {
+    prefill_path = "output/" + houmo_target + "/" + model_name + "_prefill.hmm";
+  }
+  if (!tokenizer_path_set) {
+    tokenizer_path = model_name + "/tokenizer.json";
+  }
+
   bool models_exist = std::filesystem::exists(encode_path) &&
                       std::filesystem::exists(decode_path) &&
                       std::filesystem::exists(prefill_path);
@@ -199,10 +227,11 @@ int main(int argc, char* argv[]) {
     LOG_INFO("prefill model loaded");
     LOG_INFO("decoder model loaded");
 
-    LOG_SUCCESS("transcription:");
+    // Get n_mels from model and create audio processor with correct mel bins
+    int n_mels = whisper_infer.GetNumMels();
+    LOG_INFO("Using " + std::to_string(n_mels) + " mel bins for audio processing");
 
-    // We only process single chunk info internally, but to capture performance:
-    houmo::HmWhisperAudio audio_processor(chunk_size);
+    houmo::HmWhisperAudio audio_processor(chunk_size, n_mels);
     audio_processor.LoadAudio(audio_path);
     int num_chunks = audio_processor.GetNumChunks();
 
@@ -232,6 +261,7 @@ int main(int argc, char* argv[]) {
 
     auto t_start_overall = std::chrono::high_resolution_clock::now();
     // Process all chunks using pre-computed mel features
+    LOG_SUCCESS("transcription:");
     for (int i = 0; i < num_chunks; i++) {
       auto [transcription, perf] =
           whisper_infer.Transcribe(all_mel_features[i], &state, language);

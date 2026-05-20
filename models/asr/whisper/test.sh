@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -10,7 +11,20 @@ source "${MODELS_DIR}/test_common.sh"
 
 STEP="demo"
 SKIP_DOWNLOAD="false"
+MODEL_NAME="whisper"
+MODEL_SIZE="medium" # medium or large-v3-turbo
+
 parse_args "$@"
+
+case "${MODEL_NAME}-${MODEL_SIZE}" in
+    whisper-medium|whisper-large-v3-turbo)
+        ;;
+    *)
+        echo "Error: Unsupported model '${MODEL_NAME}-${MODEL_SIZE}'." >&2
+        echo "       Supported models: whisper-medium, whisper-large-v3-turbo" >&2
+        exit 1
+        ;;
+esac
 
 check_houmo_target "xh2"
 
@@ -25,30 +39,34 @@ fi
 check_step_python_packages || exit 1
 
 if should_run_step "quant"; then
-    if ! should_skip_download; then
-        echo "Download raw model."
-        python3 get_model.py --type raw
+    if ! check_gpu require; then
+        exit 1
     fi
-    echo "Start model quantization."
-    python3 ptq.py
+
+    if ! should_skip_download; then
+        echo "Download raw model (${MODEL_NAME}-${MODEL_SIZE})."
+        python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    fi
+    echo "Start model quantization (${MODEL_NAME}-${MODEL_SIZE})."
+    python3 ptq.py --model_name "${MODEL_NAME}" --model "${MODEL_NAME}-${MODEL_SIZE}"
 fi
 
 if should_run_step "build"; then
-    echo "Start model compilation."
-    python3 build.py
+    echo "Start model compilation (${MODEL_NAME}-${MODEL_SIZE})."
+    python3 build.py --model_name "${MODEL_NAME}-${MODEL_SIZE}"
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
-        echo "Download pre-compiled model."
-        python3 get_model.py --type hmm
+        echo "Download pre-compiled model (${MODEL_NAME}-${MODEL_SIZE})."
+        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
-    echo "Execute python demo."
-    python3 demo.py
-    echo "Execute cpp demo."
+    echo "Execute python demo (${MODEL_NAME}-${MODEL_SIZE})."
+    python3 demo.py --audio audio.mp3 --tokenizer_path "${MODEL_NAME}-${MODEL_SIZE}" --language "auto"
+    echo "Execute cpp demo (${MODEL_NAME}-${MODEL_SIZE})."
     cd cpp && ./build.sh && cd ..
     export LD_LIBRARY_PATH=$PWD/bin:$LD_LIBRARY_PATH
-    ./bin/whisper-demo
+    ./bin/whisper-demo --audio_path audio.mp3 --model "${MODEL_NAME}-${MODEL_SIZE}"
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

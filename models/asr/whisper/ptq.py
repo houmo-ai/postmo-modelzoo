@@ -116,7 +116,7 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
-from quant_pipline import quant_and_export_llm
+from quant_pipeline import quant_and_export_llm
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)

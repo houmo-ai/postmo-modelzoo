@@ -666,21 +666,6 @@ def test_asr_glm_asr_compile(setup_logging) -> None:
     model_name = "glm-asr"
     _compile_func(model_name, setup_logging)
 
-
-@pytest.mark.whisper_turbo
-@pytest.mark.compile
-@pytest.mark.dependency(
-    name="test_asr_whisper_turbo_compile",
-    depends_on=["test_quant_models.py::test_asr_whisper_turbo_quant"],
-)
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-def test_asr_whisper_turbo_compile(setup_logging) -> None:
-    """test_asr_whisper_turbo_compile"""
-    model_name = "whisper-turbo"
-    _compile_func(model_name, setup_logging)
-
-
 @pytest.mark.qwen3_reranker
 @pytest.mark.compile
 @pytest.mark.dependency(

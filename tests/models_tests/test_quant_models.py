@@ -583,19 +583,6 @@ def test_asr_glm_asr_quant(setup_logging) -> None:
     _quant_func(model_name, setup_logging)
 
 
-@pytest.mark.whisper_turbo
-@pytest.mark.quant
-@pytest.mark.dependency(
-    name="test_asr_whisper_turbo_quant",
-    depends_on=["test_get_models.py::test_asr_whisper_turbo_get_model"],
-)
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-def test_asr_whisper_turbo_quant(setup_logging) -> None:
-    """test_asr_whisper_turbo_quant"""
-    model_name = "whisper-turbo"
-    _quant_func(model_name, setup_logging)
-
 
 @pytest.mark.yolo26m
 @pytest.mark.ndevice_1
