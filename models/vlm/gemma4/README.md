@@ -40,13 +40,13 @@ pip3 install -r requirements.txt
 
 ```bash
 # 下载原始模型用于量化
-python3 get_model.py --type raw
+python3 get_model.py --type raw --model_name gemma4 --model_size 26b-a4b
 ```
 
 如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
-python3 get_model.py --type hmm
+python3 get_model.py --type hmm --model_name gemma4 --model_size 26b-a4b
 ```
 
 ### 2.3 量化
@@ -54,12 +54,16 @@ python3 get_model.py --type hmm
 量化下载的原始模型。在当前目录下，执行脚本：
 
 ```bash
-python3 ptq.py
+python3 ptq.py --model-name gemma4 --model-size 26b-a4b
 ```
 
 量化参数说明：
-- `--model`: 模型目录路径，默认 `./models/gemma-4-26B-A4B-it`
-- `--context-length`: 最大序列长度，默认 2048
+- `--model`: 模型目录路径，默认 `./gemma-4-26B-A4B-it`
+- `--model-name`: 输出模型名，默认 `gemma4`
+- `--model-size`: 输出模型规格，默认 `26b-a4b`
+- `--context-length`: 最大序列长度，默认 `2048`
+- `--max_size_w`: visual 模型最大图像宽度，默认从 `config.yaml` 读取，为 `448`
+- `--max_size_h`: visual 模型最大图像高度，默认从 `config.yaml` 读取，为 `448`
 - `--nsamples`: 校准样本数，默认 512
 - `--seqlen`: 校准序列长度，默认 1024
 - `--mse`: MSE阈值，默认 2.4
@@ -72,13 +76,13 @@ python3 ptq.py
 将量化模型编译为在芯片上运行的模型。执行脚本：
 
 ```bash
-python3 build.py
+python3 build.py --model_name gemma4 --model_size 26b-a4b
 ```
 
 编译好的模型存放在output目录，包括3个文件：
 - gemma4-26b-a4b_prefill.hmm
 - gemma4-26b-a4b_decode.hmm
-- gemma4-26b-a4b_visual.hmm
+- gemma4-26b-a4b_visual_448x448.hmm
 
 ### 2.5 演示
 
@@ -90,10 +94,10 @@ Gemma4模型使用python API进行演示。
 
 ```bash
 # 文本模式
-python3 demo.py --question "你好，请介绍一下你自己。"
+python3 demo.py --model_name gemma4 --model_size 26b-a4b --question "你好，请介绍一下你自己。"
 
 # 图片模式
-python3 demo.py --image ../../../data/pic/beach.jpeg --question "描述这张图片的内容"
+python3 demo.py --model_name gemma4 --model_size 26b-a4b --image ../../../data/pic/beach.jpeg --question "描述这张图片的内容"
 ```
 
 演示参数说明：
@@ -102,17 +106,71 @@ python3 demo.py --image ../../../data/pic/beach.jpeg --question "描述这张图
 - `--prefill_path`: prefill模型路径
 - `--decode_path`: decode模型路径
 - `--vit_path`: visual模型路径
-- `--device`: 设备ID
+- `--model_name`: 模型名，默认 `gemma4`
+- `--model_size`: 模型规格，默认 `26b-a4b`
+- `--ndevice`: 设备数量，默认 `1`
+- `--max_size_w`: visual 模型最大图像宽度，默认从 `config.yaml` 读取，为 `448`
+- `--max_size_h`: visual 模型最大图像高度，默认从 `config.yaml` 读取，为 `448`
 - `--question`: 输入问题
 - `--image`: 图片路径
 - `--max-new-tokens`: 最大生成token数
 
 ### 2.6 一键评估
 
-以上步骤可以通过test.sh脚本一键执行：
+以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
 ```bash
+# 默认执行 demo，会先下载预编译模型
 bash test.sh
+
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+bash test.sh -s all
+```
+
+当前脚本内部固定使用以下默认值：
+- `MODEL_NAME=gemma4`
+- `MODEL_SIZE=26b-a4b`
+- `NDEVICE=1`
+
+对应执行行为如下：
+- `quant`：如未传 `--skip_download`，先下载 raw 模型，再执行 `python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}"`
+- `build`：执行 `python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"`
+- `demo`：如未传 `--skip_download`，先下载预编译模型，再执行 `python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"`
+- `demo`：如果环境中存在 `llm_perf`，会继续自动执行一组性能测试，默认使用 `output/${HOUMO_TARGET}/gemma4-26b-a4b_visual_448x448.hmm`
+
+如果需要修改模型规格、设备数或 visual 尺寸，需要同步调整 `test.sh` 中的默认值，以及 `ptq.py`、`build.py`、`demo.py` 的相关参数。
+
+test.sh 支持以下参数：
+
+```bash
+Usage: test.sh [options]
+Options:
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  -size, --model_size     Model size.
+  -name, --model_name     Model name.
+  --ndevice               Number of devices.
+  --skip_download         Skip model download steps.
+  -h, --help              Show this help message.
+```
+
+示例：
+
+```bash
+# 仅运行 quant，会先下载 raw 模型并使用脚本内默认的 gemma4-26b-a4b 参数量化
+bash test.sh -s quant
+
+# 仅运行 build，要求当前目录下已经有量化输出
+bash test.sh -s build
+
+# 仅运行 demo，会先下载预编译模型；若环境中存在 llm_perf，还会追加跑性能用例
+bash test.sh -s demo
+
+# 完整流程（下载原始模型、量化、编译、演示）
+bash test.sh -s all
+
+# 跳过模型下载，使用当前目录下已有的模型文件执行 demo
+bash test.sh -s demo --skip_download
 ```
 
 ## 3 参考结果

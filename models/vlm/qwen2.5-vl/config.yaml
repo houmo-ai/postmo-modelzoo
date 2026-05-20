@@ -1,33 +1,19 @@
 Streams:
-  - ModelName: Qwen2.5-VL
-    prefill: output/xh2/qwen2.5-vl_prefill.hmm
-    decode: output/xh2/qwen2.5-vl_decode.hmm
-    visual: output/xh2/qwen2.5-vl_visual.hmm
-    embedding: output/xh2/hmquant/quant_embedding.bin
-    input: 256
-    output: 256
-    loop: 1
-    batch: 1
-    no_warm_up: ''
-  - ModelName: Qwen2.5-VL
-    prefill: output/xh2/qwen2.5-vl_prefill.hmm
-    decode: output/xh2/qwen2.5-vl_decode.hmm
-    visual: output/xh2/qwen2.5-vl_visual.hmm
-    embedding: output/xh2/hmquant/quant_embedding.bin
-    input: 1024
-    output: 256
-    loop: 1
-    batch: 1
-    no_warm_up: ''
-  - ModelName: Qwen2.5-VL
-    prefill: output/xh2/qwen2.5-vl_prefill.hmm
-    decode: output/xh2/qwen2.5-vl_decode.hmm
-    visual: output/xh2/qwen2.5-vl_visual.hmm
-    embedding: output/xh2/hmquant/quant_embedding.bin
-    input: 2048
-    output: 256
-    loop: 1
-    batch: 1
-    no_warm_up: ''
+default_model_name: "qwen2.5-vl"
+default_model_size: "7b"
 
-dump_file: perf_result.yaml
+model_configs:
+  qwen2.5-vl:
+    "7b":
+      modelscope_repo: ["Qwen/Qwen2.5-VL-7B-Instruct"]
+      model_name: "qwen2.5-vl"
+      model_size: "7b"
+      ncore: 2
+      quant_type: "w4a8h1_ssfp"
+      context_length: "8k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      max_size_w: 448
+      max_size_h: 448
+      max_size_t: 2

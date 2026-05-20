@@ -31,6 +31,7 @@ from loguru import logger
 
 import tcim_lite as tcim
 from hmatc.utils.perf_infomations import InferencePerformanceTracker, PERFTYPE
+from hmatc.utils.utils import first_not_none, get_model_configs
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", ".")
@@ -38,10 +39,21 @@ assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2"
 
 PATCH_SIZE = 16
 MAX_SOFT_TOKENS = 280
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
 try:
     BICUBIC = Image.Resampling.BICUBIC
 except AttributeError:
     BICUBIC = Image.BICUBIC
+
+
+def get_default_tokenizer_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "gemma4")
+    model_size = model_config.get("model_size", "26b-a4b")
+    return f"{model_name}-{model_size}"
 
 
 def is_valid_char(cp):
@@ -71,7 +83,7 @@ class HmGemma4:
         self.perf_tracker = InferencePerformanceTracker()
 
         if isinstance(devices, int):
-            devices = [devices]
+            devices = list(range(devices))
         self.devices = devices
 
         backend_name = "Xh2HalBackend"
@@ -484,31 +496,69 @@ class HmGemma4:
         )
 
 
-def parse_devices(value):
-    if "," in value:
-        return [int(x.strip()) for x in value.split(",")]
-    return int(value)
-
-
-# fmt: off
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tokenizer_dir", default=f"models/gemma-4-26B-A4B-it")
-    parser.add_argument("--embedding_path", default=f"output/{HOUMO_TARGET}/hmquant/quant_embedding.pt")
-    parser.add_argument("--prefill_path", default=f"output/{HOUMO_TARGET}/gemma4-26b-a4b_prefill.hmm")
-    parser.add_argument("--decode_path", default=f"output/{HOUMO_TARGET}/gemma4-26b-a4b_decode.hmm")
-    parser.add_argument("--vit_path", default="", help=f"output/{HOUMO_TARGET}/gemma4-26b-a4b_visual.hmm")
-    parser.add_argument("--device", type=parse_devices, default=0)
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument("--model_name", type=str, default=None, help="model name")
+    parser.add_argument("--model_size", type=str, default=None, help="model size")
+    parser.add_argument("--tokenizer_dir", type=str, default=None)
+    parser.add_argument(
+        "--embedding_path",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+    )
+    parser.add_argument("--prefill_path", type=str, default=None)
+    parser.add_argument("--decode_path", type=str, default=None)
+    parser.add_argument("--vit_path", type=str, default=None)
+    parser.add_argument("--ndevice", type=int, default=None, help="device number")
+    parser.add_argument("--max_size_w", type=int, default=None)
+    parser.add_argument("--max_size_h", type=int, default=None)
     parser.add_argument("--question", default="")
     parser.add_argument("--image", default="data/pic/beach.jpeg")
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     args = parser.parse_args()
 
-    if isinstance(args.device, list) and len(args.device) > 1:
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    args.max_size_w = first_not_none(
+        args.max_size_w, model_config.get("max_size_w", 448)
+    )
+    args.max_size_h = first_not_none(
+        args.max_size_h, model_config.get("max_size_h", 448)
+    )
+    if args.tokenizer_dir is None:
+        args.tokenizer_dir = get_default_tokenizer_dir(model_config)
+    if args.prefill_path is None:
+        args.prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
+        )
+    if args.decode_path is None:
+        args.decode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
+        )
+    if args.vit_path is None:
+        args.vit_path = os.path.join(
+            "output",
+            HOUMO_TARGET,
+            f"{args.model_name}-{args.model_size}_visual_{args.max_size_w}x{args.max_size_h}.hmm",
+        )
+
+    if args.ndevice > 1:
         args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
         args.decode_path = args.decode_path.replace(".hmm", ".hmms")
     return args
-# fmt: on
+
 
 if __name__ == "__main__":
     args = get_args()
@@ -518,12 +568,12 @@ if __name__ == "__main__":
         args.vit_path,
         args.embedding_path,
         args.tokenizer_dir,
-        args.device,
+        list(range(args.ndevice)),
         args.max_new_tokens,
     )
-    image_path = args.image_path
+    image_path = args.image
     if image_path and not os.path.isfile(image_path):
-        image_path = os.path.join(HOUMO_EXAMPLES_PATH, args.image_path)
+        image_path = os.path.join(HOUMO_EXAMPLES_PATH, args.image)
         if not os.path.isfile(image_path):
             logger.warning(f"Image not found: {image_path}, running text-only mode")
             image_path = None

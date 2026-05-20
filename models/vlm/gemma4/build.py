@@ -2,8 +2,8 @@
 #
 # File: build.py
 # Description:
-#   Gemma-4-26B-A4B Model Build Tool - Python script for building
-#   Gemma-4-26B-A4B models using Xh2Exec.
+#   Gemma4 Model Build Tool - Python script for building
+#   Gemma4 models using Xh2Exec.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,67 +18,36 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
-# fmt: off
 import os
 import argparse
-import psutil
-from pathlib import Path
+import multiprocessing
+import glob
 
 from hmatc.exec.xh2_exec import Xh2Exec
 from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import (
+    find_hmonnx_file,
+    first_not_none,
+    get_model_configs,
+    get_platform,
+    parse_context_length,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
 HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
-
-
-def find_onnx_file(model_dir: str | Path, subdir: str, pattern: str) -> Path:
-    """Find ONNX file in model directory.
-
-    Args:
-        model_dir: Base model directory.
-        subdir: Subdirectory name (e.g., 'prefill', 'decode', 'visual').
-        pattern: Glob pattern to match ONNX file (e.g., '*_prefill_with_act.onnx').
-
-    Returns:
-        Path to the found ONNX file.
-
-    Raises:
-        FileNotFoundError: If no matching ONNX file is found.
-    """
-    model_path = Path(model_dir)
-    search_dir = model_path / subdir
-
-    if not search_dir.exists():
-        raise FileNotFoundError(f"Directory not found: {search_dir}")
-
-    matches = list(search_dir.glob(pattern))
-    if not matches:
-        # Fallback: try without '_with_act' suffix
-        fallback_pattern = pattern.replace("_with_act", "")
-        matches = list(search_dir.glob(fallback_pattern))
-
-    if not matches:
-        raise FileNotFoundError(
-            f"No ONNX file found in {search_dir} matching {pattern}"
-        )
-
-    # Return first match
-    return str(matches[0])
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
-    """Validates and adjusts FlashAttention parameter values."""
     llm_val, vit_val = flash_vals
 
-    # Validate LLM (Prefill & Decode) FlashAttention parameter
-    # Values: 0=off, 1/2=on
     if llm_val not in [0, 1, 2]:
         raise ValueError(
             f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
         )
 
-    # Validate ViT (Vision Transformer) FlashAttention parameter
-    # Values: 0=off, 1=on
     if vit_val not in [0, 1]:
         raise ValueError(
             f"ViT FlashAttention values only support 0/1, current value:{vit_val}"
@@ -89,22 +58,108 @@ def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> 
 
     return (llm_val, vit_val)
 
+
 def get_args() -> argparse.Namespace:
-    """Parse command line arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_dir", type=str, default="output/xh2/hmquant", help="path to the model directory")
-    parser.add_argument("--model_name", type=str, default="gemma4", help="output houmo model name")
-    parser.add_argument("--model_size", type=str, default="26b-a4b", help="output houmo model size")
-    parser.add_argument("--output_dir", type=str, default=f"output/{HOUMO_TARGET}", help="output directory for built models")
-    parser.add_argument("--ncore", type=int, default=HOUMO_CORE_NUM, help="core number")
-    parser.add_argument("--j", dest="parallel_jobs", type=int, default=psutil.cpu_count(logical=False), help="build parallel jobs")
-    parser.add_argument("--context_length", type=int, default=2048, help="context length for LLM models")
-    parser.add_argument("--prefill_length", type=int, default=256, help="prefill length for prefill model")
-    parser.add_argument("--batch", type=int, default=1, help="batch size for decode model")
-    parser.add_argument("--ndevice", type=int, default=1, help="device number for multi-device")
-    parser.add_argument("--opt_level", type=int, default=2, help="optimization level")
-    parser.add_argument("--stage", type=str, default="all", choices=["prefill", "decode", "visual", "all"], help="build stage")
-    parser.add_argument("--monitor_interval", type=float, default=2.0, help="memory monitor interval in seconds")
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_dir",
+        dest="model_dir",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        help="path to the model directory",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="output houmo model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="output houmo model size",
+    )
+    parser.add_argument(
+        "--output_dir",
+        dest="output_dir",
+        type=str,
+        default=os.path.join("output", HOUMO_TARGET),
+        help="output directory for built models",
+    )
+    parser.add_argument(
+        "--ncore",
+        dest="ncore",
+        type=int,
+        default=None,
+        help="core number",
+    )
+    parser.add_argument(
+        "--j",
+        dest="parallel_jobs",
+        type=int,
+        default=multiprocessing.cpu_count(),
+        help="build parallel jobs",
+    )
+    parser.add_argument(
+        "--context_length",
+        dest="context_length",
+        type=int,
+        default=None,
+        help="context length for llm models",
+    )
+    parser.add_argument(
+        "--prefill_length",
+        dest="prefill_length",
+        type=int,
+        default=None,
+        help="prefill length for prefill model",
+    )
+    parser.add_argument(
+        "--batch",
+        dest="batch",
+        type=int,
+        default=None,
+        help="batch size for decode model",
+    )
+    parser.add_argument(
+        "--ndevice",
+        dest="ndevice",
+        type=int,
+        default=None,
+        help="device number for multi-device",
+    )
+    parser.add_argument(
+        "--stage",
+        dest="stage",
+        type=str,
+        default="build",
+        choices=["build", "test", "all"],
+        help="build stage",
+    )
+    parser.add_argument(
+        "--max_size_w",
+        dest="max_size_w",
+        type=int,
+        default=None,
+        help="max image width for visual model name suffix",
+    )
+    parser.add_argument(
+        "--max_size_h",
+        dest="max_size_h",
+        type=int,
+        default=None,
+        help="max image height for visual model name suffix",
+    )
     parser.add_argument(
         "--flash_attention",
         dest="flash_attention",
@@ -116,121 +171,55 @@ def get_args() -> argparse.Namespace:
         "2nd int = ViT model switch (0=off, 1=on); "
         "e.g., --flash_attention 2 1 (prefill&decode=2, ViT=1)",
     )
+    parser.add_argument(
+        "--enable_common_subgraph",
+        dest="enable_common_subgraph",
+        action="store_true",
+        default=False,
+        help="enable common subgraph optimization",
+    )
+    parser.add_argument(
+        "--enable_xh2_stable_output",
+        dest="enable_xh2_stable_output",
+        action="store_true",
+        default=False,
+        help="enable stable output",
+    )
+    parser.add_argument(
+        "--monitor_interval",
+        dest="monitor_interval",
+        type=float,
+        default=1.0,
+        help="memory monitor interval in seconds",
+    )
+
     args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    args.batch = first_not_none(args.batch, model_config.get("batch", 1))
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    args.prefill_length = first_not_none(
+        args.prefill_length, model_config.get("prefill_length", 256)
+    )
+    if args.context_length is None:
+        args.context_length = parse_context_length(
+            model_config.get("context_length", "128k")
+        )
+    args.max_size_w = first_not_none(
+        args.max_size_w, model_config.get("max_size_w", 448)
+    )
+    args.max_size_h = first_not_none(
+        args.max_size_h, model_config.get("max_size_h", 448)
+    )
     args.flash_attention = _validate_adjust_flash_attention(
         args.flash_attention, args.context_length
     )
     return args
-
-
-def build_prefill(
-    model_dir: str,
-    model_name: str,
-    output_dir: str,
-    ncore: int,
-    parallel_jobs: int,
-    flash_attn: int,
-    context_length: int,
-    prefill_length: int,
-    ndevice: int,
-    opt_level: int,
-):
-    """Build prefill model."""
-    hmonnx = find_onnx_file(model_dir, "prefill", "hmquant_*.onnx")
-
-    print(f"\n===> Building prefill model...")
-    print(f"  hmonnx: {hmonnx}")
-    print(f"  ncore: {ncore}")
-    print(f"  flash_attn: {flash_attn}")
-    print(f"  context_length: {context_length}")
-    print(f"  prefill_length: {prefill_length}")
-
-    Xh2Exec.build_from_hmonnx(
-        hmonnx=hmonnx,
-        hmm_name=f"{model_name}_prefill",
-        output=output_dir,
-        ncore=ncore,
-        opt_level=opt_level,
-        batch=1,
-        flash_attn=flash_attn,
-        llm_opt=True,
-        context_length=context_length,
-        prefill_length=prefill_length,
-        ndevice=ndevice,
-        is_prefill=True,
-        parallel_jobs=parallel_jobs,
-    )
-    print(f"<=== prefill build completed.\n")
-
-
-def build_decode(
-    model_dir: str,
-    model_name: str,
-    output_dir: str,
-    ncore: int,
-    parallel_jobs: int,
-    flash_attn: int,
-    context_length: int,
-    batch: int,
-    ndevice: int,
-    opt_level: int,
-):
-    """Build decode model."""
-    hmonnx = find_onnx_file(model_dir, "decode", "hmquant_*.onnx")
-
-    print(f"\n===> Building decode model...")
-    print(f"  hmonnx: {hmonnx}")
-    print(f"  ncore: {ncore}")
-    print(f"  flash_attn: {flash_attn}")
-    print(f"  context_length: {context_length}")
-    print(f"  batch: {batch}")
-
-    Xh2Exec.build_from_hmonnx(
-        hmonnx=hmonnx,
-        hmm_name=f"{model_name}_decode",
-        output=output_dir,
-        ncore=ncore,
-        opt_level=opt_level,
-        batch=batch,
-        flash_attn=flash_attn,
-        llm_opt=True,
-        context_length=context_length,
-        ndevice=ndevice,
-        is_prefill=False,
-        parallel_jobs=parallel_jobs,
-    )
-    print(f"<=== decode build completed.\n")
-
-
-def build_visual(
-    model_dir: str,
-    model_name: str,
-    output_dir: str,
-    ncore: int,
-    parallel_jobs: int,
-    flash_attn: int, 
-    opt_level: int,
-):
-    """Build visual model."""
-    hmonnx = find_onnx_file(model_dir, "visual", "hmquant_*.onnx")
-
-    print(f"\n===> Building visual model...")
-    print(f"  hmonnx: {hmonnx}")
-    print(f"  ncore: {ncore}")
-    print(f"  flash_attn: {flash_attn}")
-
-    Xh2Exec.build_from_hmonnx(
-        hmonnx=hmonnx,
-        hmm_name=f"{model_name}_visual",
-        output=output_dir,
-        ncore=ncore,
-        opt_level=opt_level,
-        batch=1,
-        flash_attn=flash_attn,
-        llm_opt=True,
-        parallel_jobs=parallel_jobs,
-    )
-    print(f"<=== visual build completed.\n")
 
 
 if __name__ == "__main__":
@@ -238,53 +227,62 @@ if __name__ == "__main__":
     print(args)
 
     model_dir = args.model_dir
+    model_name = args.model_name
+    model_size = args.model_size
     output_dir = args.output_dir
     ncore = args.ncore
+    ndevice = args.ndevice
     parallel_jobs = args.parallel_jobs
     flash_attn, visual_flash_attn = args.flash_attention
-    context_length = args.context_length
-    prefill_length = args.prefill_length
-    batch = args.batch
-    ndevice = args.ndevice
-    opt_level = args.opt_level
+
     with ProcessMemoryMonitor(interval=args.monitor_interval, quiet=True) as monitor:
-        if args.stage in ["prefill", "all"]:
-            build_prefill(
-                model_dir=model_dir,
-                model_name=f"{args.model_name}-{args.model_size}",
-                output_dir=output_dir,
+        if args.stage in ["build", "all"]:
+            assert (
+                get_platform() == "x86_64"
+            ), "Only supported for compilation on the x86_64 platform."
+
+            Xh2Exec.build_from_hmonnx(
+                is_prefill=True,
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "prefill")),
+                hmm_name=f"{model_name}-{model_size}_prefill",
+                output=output_dir,
                 ncore=ncore,
-                parallel_jobs=parallel_jobs,
+                batch=1,
                 flash_attn=flash_attn,
-                context_length=context_length,
-                prefill_length=prefill_length,
+                llm_opt=True,
+                context_length=args.context_length,
+                prefill_length=args.prefill_length,
                 ndevice=ndevice,
-                opt_level=opt_level,
+                enable_common_subgraph=args.enable_common_subgraph,
+                enable_xh2_stable_output=args.enable_xh2_stable_output,
+                parallel_jobs=parallel_jobs,
             )
 
-        if args.stage in ["decode", "all"]:
-            build_decode(
-                model_dir=model_dir,
-                model_name=f"{args.model_name}-{args.model_size}",
-                output_dir=output_dir,
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "decode")),
+                hmm_name=f"{model_name}-{model_size}_decode",
+                output=output_dir,
                 ncore=ncore,
-                parallel_jobs=parallel_jobs,
+                batch=args.batch,
                 flash_attn=flash_attn,
-                context_length=context_length,
-                batch=batch,
+                llm_opt=True,
+                context_length=args.context_length,
                 ndevice=ndevice,
-                opt_level=opt_level,
+                enable_common_subgraph=args.enable_common_subgraph,
+                enable_xh2_stable_output=args.enable_xh2_stable_output,
+                parallel_jobs=parallel_jobs,
             )
 
-        if args.stage in ["visual", "all"]:
-            build_visual(
-                model_dir=model_dir,
-                model_name=f"{args.model_name}-{args.model_size}",
-                output_dir=output_dir,
+            visual_model_name = (
+                f"{model_name}-{model_size}_visual_{args.max_size_w}x{args.max_size_h}"
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "visual")),
+                hmm_name=visual_model_name,
+                output=output_dir,
                 ncore=ncore,
-                parallel_jobs=parallel_jobs,
                 flash_attn=visual_flash_attn,
-                opt_level=opt_level,
+                parallel_jobs=parallel_jobs,
             )
 
-    print(f"\n=== All builds completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ===")
+    print(f"\n=== Build completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ===")

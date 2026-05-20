@@ -63,19 +63,29 @@
                 "cached_models/hmm_xh2_7b_8k",
                 "cached_models/hmm_xh2_7b_8k_ms"
             ],
+            "model_name": ["qwen2.5-vl", "qwen2.5-vl", "qwen2.5-vl"],
             "model_size": ["7b", "7b", "7b"],
+            "context_length": [null, "8k", "8k"],
+            "ndevice": ["1", "1", "1"],
+            "prefill_length": [null, null, null],
+            "batch": [null, null, null],
             "source_type": [null, null, "modelscope"]
         }
     },
     "quant_params": {
         "xh1": null,
         "xh2": {
-            "model": ["cached_models/qwen2.5-vl"],
+            "model": ["cached_models/Qwen2.5-VL-7B-Instruct"],
+            "model-name": ["qwen2.5-vl"],
+            "model-size": ["7b"],
             "out-dir": ["cached_results/hmquant_xh2_7b_2k"],
             "context-length": ["2048"],
-            "patch_size": ["14"],
+            "max_pe_length": [null],
+            "quant-type": [null],
+            "patch_size": [null],
             "image_max_size_h": ["448"],
-            "image_max_size_w": ["448"]
+            "image_max_size_w": ["448"],
+            "image_max_size_t": ["2"]
         }
     },
     "compile_params": {
@@ -95,21 +105,20 @@
             ]
         },
         "xh2": {
-            "model_dir": [
-                "cached_results/hmquant_xh2_7b_2k",
-                "cached_results/hmquant_xh2_7b_2k"
-            ],
-            "model_name": [null, null],
-            "ncore": [null, null],
-            "batch": [null, null],
-            "context_length": ["2048", "8192"],
-            "model_size": ["7b", "7b"],
-            "stage": ["build", "build"],
-            "j": ["24", "24"],
-            "output_dir": [
-                "cached_results/hmm_xh2_7b_2k",
-                "cached_results/hmm_xh2_7b_8k"
-            ]
+            "model_dir": ["cached_results/hmquant_xh2_7b_2k"],
+            "model_name": ["qwen2.5-vl"],
+            "model_size": ["7b"],
+            "ncore": [null],
+            "batch": [null],
+            "ndevice": [1],
+            "context_length": ["8192"],
+            "prefill_length": [null],
+            "max_size_w": ["448"],
+            "max_size_h": ["448"],
+            "max_size_t": ["2"],
+            "stage": ["build"],
+            "j": ["24"],
+            "output_dir": ["cached_results/hmm_xh2_7b_8k"]
         }
     },
     "demo_params": {
@@ -136,26 +145,25 @@
             ]
         },
         "xh2": {
-            "tokenizer_dir": [
-                "cached_models/qwen2.5-vl",
-                "cached_models/qwen2.5-vl"
-            ],
+            "tokenizer_dir": ["cached_models/Qwen2.5-VL-7B-Instruct"],
             "embedding_path": [
-                "cached_results/hmm_xh2_7b_2k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_7b_8k/hmquant/quant_embedding.pt"
             ],
             "vit_path": [
-                "cached_results/hmm_xh2_7b_2k/qwen2.5-vl_visual.hmm",
-                "cached_results/hmm_xh2_7b_8k/qwen2.5-vl_visual.hmm"
+                "cached_results/hmm_xh2_7b_8k/qwen2.5-vl-7b_visual_448x448x2.hmm"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_7b_2k/qwen2.5-vl_prefill.hmm",
-                "cached_results/hmm_xh2_7b_8k/qwen2.5-vl_prefill.hmm"
+                "cached_results/hmm_xh2_7b_8k/qwen2.5-vl-7b_prefill.hmm"
             ],
             "decode_path": [
-                "cached_results/hmm_xh2_7b_2k/qwen2.5-vl_decode.hmm",
-                "cached_results/hmm_xh2_7b_8k/qwen2.5-vl_decode.hmm"
-            ]
+                "cached_results/hmm_xh2_7b_8k/qwen2.5-vl-7b_decode.hmm"
+            ],
+            "model_name": ["qwen2.5-vl"],
+            "model_size": ["7b"],
+            "ndevice": ["1"],
+            "max_size_w": ["448"],
+            "max_size_h": ["448"],
+            "max_size_t": ["2"]
         }
     },
     "perf_params": "demo"

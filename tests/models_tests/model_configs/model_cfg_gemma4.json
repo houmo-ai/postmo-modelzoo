@@ -27,46 +27,61 @@
     "get_model_params": {
         "xh2": {
             "type": ["raw", "hmm"],
-            "download_dir": [
-                "cached_models",
-                "cached_models"
-            ],
-            "extract_dir": [
-                null,
-                "cached_models/hmm_xh2_26b-a4b_128k"
-            ],
-            "model_size": [null, "26b-a4b"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_26b-a4b_128k"],
+            "model_name": ["gemma4", "gemma4"],
+            "model_size": ["26b-a4b", "26b-a4b"],
+            "context_length": [null, "128k"],
+            "ndevice": ["1", "1"],
+            "prefill_length": [null, null],
+            "batch": [null, null],
             "source_type": [null, null]
         }
     },
     "quant_params": {
         "xh2": {
-            "model": ["cached_models/models/gemma-4-26B-A4B-it"],
-            "out-dir": ["cached_results/hmquant_xh2_26b-a4b_128k"],
-            "context-length": ["131072"]
+            "model": ["cached_models/gemma-4-26B-A4B-it"],
+            "model-name": ["gemma4"],
+            "model-size": ["26b-a4b"],
+            "out-dir": ["cached_results/hmquant_xh2_26b-a4b_2k"],
+            "context-length": ["2048"]
         }
     },
     "compile_params": {
         "xh2": {
-            "model_dir": ["cached_results/hmquant_xh2_26b-a4b_128k/hmquant"],
-            "model_name": [null],
+            "model_dir": ["cached_results/hmquant_xh2_26b-a4b_2k/hmquant"],
+            "model_name": ["gemma4"],
+            "model_size": ["26b-a4b"],
             "ncore": [null],
             "batch": [null],
+            "ndevice": ["1"],
             "context_length": ["131072"],
+            "prefill_length": [null],
+            "max_size_w": ["448"],
+            "max_size_h": ["448"],
             "output_dir": ["cached_results/hmm_xh2_26b-a4b_128k"]
         }
     },
     "demo_params": {
         "xh2": {
-            "tokenizer_dir": ["cached_models/models/gemma-4-26B-A4B-it"],
+            "tokenizer_dir": ["cached_models/gemma-4-26B-A4B-it"],
             "embedding_path": [
                 "cached_results/hmm_xh2_26b-a4b_128k/hmquant/quant_embedding.pt"
             ],
-            "vit_path": ["cached_results/hmm_xh2_26b-a4b_128k/gemma-4-26b-a4b_visual.hmm"],
-            "prefill_path": [
-                "cached_results/hmm_xh2_26b-a4b_128k/gemma-4-26b-a4b_prefill.hmm"
+            "vit_path": [
+                "cached_results/hmm_xh2_26b-a4b_128k/gemma4-26b-a4b_visual_448x448.hmm"
             ],
-            "decode_path": ["cached_results/hmm_xh2_26b-a4b_128k/gemma-4-26b-a4b_decode.hmm"]
+            "prefill_path": [
+                "cached_results/hmm_xh2_26b-a4b_128k/gemma4-26b-a4b_prefill.hmm"
+            ],
+            "decode_path": [
+                "cached_results/hmm_xh2_26b-a4b_128k/gemma4-26b-a4b_decode.hmm"
+            ],
+            "model_name": ["gemma4"],
+            "model_size": ["26b-a4b"],
+            "ndevice": ["1"],
+            "max_size_w": ["448"],
+            "max_size_h": ["448"]
         }
     },
     "perf_params": "demo"

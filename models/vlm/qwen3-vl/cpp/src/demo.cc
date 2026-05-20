@@ -92,16 +92,16 @@ void printUsage(const char *program_name) {
                "\""
             << DEFAULT_IMAGE_PROMPT << "\")" << std::endl;
   std::cout << "  --visual <path>          Path to visual model (default: "
-               "output/xh2/qwen3-vl_visual.hmm)"
+               "output/xh2/qwen3-vl-8b_visual_448x448x2.hmm)"
             << std::endl;
   std::cout << "  --prefill <path>         Path to prefill model (default: "
-               "output/xh2/qwen3-vl_prefill.hmm)"
+               "output/xh2/qwen3-vl-8b_prefill.hmm)"
             << std::endl;
   std::cout << "  --decode <path>          Path to decode model (default: "
-               "output/xh2/qwen3-vl_decode.hmm)"
+               "output/xh2/qwen3-vl-8b_decode.hmm)"
             << std::endl;
   std::cout << "  --tokenizer <path>       Path to tokenizer.json (default: "
-               "qwen3-vl/tokenizer.json)"
+               "Qwen3-VL-8B-Instruct/tokenizer.json)"
             << std::endl;
   std::cout << "  --embedding <path>       Path to embedding weights (default: "
                "output/xh2/hmquant/quant_embedding.bin)"
@@ -136,10 +136,10 @@ int main(int argc, char *argv[]) {
 #endif
 
   // Default paths
-  std::string visual_model_path = "output/xh2/qwen3-vl_visual.hmm";
-  std::string prefill_model_path = "output/xh2/qwen3-vl_prefill.hmm";
-  std::string decode_model_path = "output/xh2/qwen3-vl_decode.hmm";
-  std::string tokenizer_path = "qwen3-vl/tokenizer.json";
+  std::string visual_model_path = "output/xh2/qwen3-vl-8b_visual_448x448x2.hmm";
+  std::string prefill_model_path = "output/xh2/qwen3-vl-8b_prefill.hmm";
+  std::string decode_model_path = "output/xh2/qwen3-vl-8b_decode.hmm";
+  std::string tokenizer_path = "Qwen3-VL-8B-Instruct/tokenizer.json";
   std::string embedding_path = "output/xh2/hmquant/quant_embedding.bin";
   std::string prompt = DEFAULT_IMAGE_PROMPT;
   std::vector<std::string> image_paths;

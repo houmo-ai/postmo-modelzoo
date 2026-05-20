@@ -61,11 +61,14 @@ from xhmodel_merak.xh_llm.models.gemma4_moe.gemma4_moe_visual_model import (
     Gemma4MoeVisionWrapper,
     XHGemma4MoeVisualModel,
 )
+from hmatc.utils.utils import first_not_none, get_model_configs
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
 HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
-DEFAULT_IMAGE_SIZE = (448, 448)  # WH
 OFFICIAL_POOLING_KERNEL_SIZE = 3
 DIRECT_TOKEN_POOLING_KERNEL_SIZE = 1
 MAX_SOFT_TOKENS = 280
@@ -84,7 +87,7 @@ def _build_cfg_from_model(args):
             model_type="Gemma4ForConditionalGeneration_with_mask",
             hf_model=f"{args.model}-gptq-4bit",
             fallback_hf_model=args.model,
-            model_name=args.model_name,
+            model_name=f"{args.model_name}-{args.model_size}",
             context_max_length=args.context_length,
             prefill_chunk_length=256,
             use_cache=True,
@@ -96,9 +99,9 @@ def _build_cfg_from_model(args):
             visual_config=dict(
                 model_type="Gemma4ForConditionalGeneration_visual",
                 hf_model=f"{args.model}-gptq-4bit",
-                model_name=args.model_name,
-                max_size_w=DEFAULT_IMAGE_SIZE[0],
-                max_size_h=DEFAULT_IMAGE_SIZE[1],
+                model_name=f"{args.model_name}-{args.model_size}",
+                max_size_w=args.max_size_w,
+                max_size_h=args.max_size_h,
                 upsample_token=False,
                 fuse_norm=True,
                 quant_scheme=dict(
@@ -118,9 +121,9 @@ def _build_visual_cfg_from_model(args):
         model=dict(
             model_type="Gemma4ForConditionalGeneration_visual",
             hf_model=args.model,
-            model_name=args.model_name,
-            max_size_w=DEFAULT_IMAGE_SIZE[0],
-            max_size_h=DEFAULT_IMAGE_SIZE[1],
+            model_name=f"{args.model_name}-{args.model_size}",
+            max_size_w=args.max_size_w,
+            max_size_h=args.max_size_h,
             upsample_token=False,
             fuse_norm=True,
             quant_scheme=dict(
@@ -142,7 +145,7 @@ def resolve_pooling_kernel_size(upsample_token: bool) -> int:
 
 def build_visual_variant_name(
     upsample_token: bool,
-    target_image_size: tuple[int, int] = DEFAULT_IMAGE_SIZE,
+    target_image_size: tuple[int, int],
 ) -> str:
     token_tag = "upsample_token" if upsample_token else "no_upsample_token"
     return f"{token_tag}_{target_image_size[0]}x{target_image_size[1]}"
@@ -151,7 +154,7 @@ def build_visual_variant_name(
 def prepare_visual_input_image(
     image_path: str | Path,
     upsample_token: bool,
-    target_image_size: tuple[int, int] = DEFAULT_IMAGE_SIZE,
+    target_image_size: tuple[int, int],
 ) -> tuple[Image.Image, dict[str, Any]]:
     resolved_image_path = Path(image_path).resolve()
     image = Image.open(resolved_image_path).convert("RGB")
@@ -175,7 +178,7 @@ def prepare_visual_input_image(
 def prepare_vision_input_image(
     image_path: str | Path,
     upsample_token: bool,
-    target_image_size: tuple[int, int] = DEFAULT_IMAGE_SIZE,
+    target_image_size: tuple[int, int],
 ) -> tuple[Image.Image, dict[str, Any]]:
     return prepare_visual_input_image(image_path, upsample_token, target_image_size)
 
@@ -286,12 +289,10 @@ def export_onnx_with_xh2a_custom_ops(
     onnx_program.save(str(onnx_file))
 
 
-def _create_default_image() -> Path:
+def _create_default_image(target_image_size: tuple[int, int]) -> Path:
     image_path = Path(tempfile.gettempdir()) / "gemma4_moe_visual_default.png"
     if not image_path.exists():
-        Image.new(
-            "RGB", (DEFAULT_IMAGE_SIZE[0], DEFAULT_IMAGE_SIZE[1]), color=(255, 255, 255)
-        ).save(image_path)
+        Image.new("RGB", target_image_size, color=(255, 255, 255)).save(image_path)
     return image_path
 
 
@@ -323,8 +324,11 @@ def rename_hmquant_dir(
             new_path = item.parent / "hmquant"
 
             if new_path.exists():
-                print(f"\033[33mWarning: Target directory already exists, will be overwritten: {new_path}\033[0m")
+                print(
+                    f"\033[33mWarning: Target directory already exists, will be overwritten: {new_path}\033[0m"
+                )
                 import shutil
+
                 shutil.rmtree(new_path)
 
             renamed.append((item, new_path))
@@ -334,14 +338,16 @@ def rename_hmquant_dir(
     return renamed
 
 
-def configure_gemma4_visual_processor(processor: Any, upsample_token: bool) -> int:
+def configure_gemma4_visual_processor(
+    processor: Any, upsample_token: bool, target_image_size: tuple[int, int]
+) -> int:
     pooling_kernel_size = resolve_pooling_kernel_size(upsample_token)
     processor.image_processor.max_soft_tokens = MAX_SOFT_TOKENS
     processor.image_processor.pooling_kernel_size = pooling_kernel_size
     processor.image_seq_length = (
         MAX_SOFT_TOKENS
         if upsample_token
-        else DEFAULT_IMAGE_SIZE[0] // 28 * DEFAULT_IMAGE_SIZE[1] // 28
+        else target_image_size[0] // 28 * target_image_size[1] // 28
     )
     return pooling_kernel_size
 
@@ -477,9 +483,11 @@ def export_vision(cfg, output_dir: str | Path, device, dtype):
     processor: Gemma4Processor = AutoProcessor.from_pretrained(
         xh_visual_model.hf_model_dir, trust_remote_code=True
     )
+    target_image_size = (cfg.model.max_size_w, cfg.model.max_size_h)
     processor_pooling_kernel_size = configure_gemma4_visual_processor(
         processor,
         xh_visual_model.config.upsample_token,
+        target_image_size,
     )
     vision_tower = model.model.vision_tower
     embed_vision = model.model.embed_vision
@@ -494,14 +502,11 @@ def export_vision(cfg, output_dir: str | Path, device, dtype):
         .to(device)
         .to(dtype)
     )
-    image_path = _create_default_image()
+    image_path = _create_default_image(target_image_size)
     processed_image, _ = prepare_visual_input_image(
         image_path,
         upsample_token=xh_visual_model.config.upsample_token,
-        target_image_size=(
-            xh_visual_model.config.max_size_w,
-            xh_visual_model.config.max_size_h,
-        ),
+        target_image_size=target_image_size,
     )
     inputs = processor.apply_chat_template(
         [
@@ -542,7 +547,7 @@ def export_vision(cfg, output_dir: str | Path, device, dtype):
     )
 
     str_datetime = datetime.now().strftime("%Y%m%d")
-    hmonnx_name = f"hmquant_xh2_{args.model_name}_{cfg.model.max_size_w}_{str_datetime}_visual_with_act.onnx"
+    hmonnx_name = f"hmquant_xh2_{args.model_name}-{args.model_size}_{cfg.model.max_size_w}x{cfg.model.max_size_h}_{str_datetime}_visual_with_act.onnx"
     hmonnx_file = output_dir / hmonnx_name
     convert_onnx_to_hmonnx(
         onnx_file,
@@ -553,12 +558,25 @@ def export_vision(cfg, output_dir: str | Path, device, dtype):
     logger.info("Vision export done.")
 
 
+def get_default_model_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "gemma4")
+    model_size = model_config.get("model_size", "26b-a4b")
+    return f"{model_name}-{model_size}"
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # fmt: off
-    parser.add_argument("--model", type=str, default="./models/gemma-4-26B-A4B-it", help="path to the model directory")
-    parser.add_argument("--model-name", type=str, default="gemma-4-26b-a4b", help="model name for output files")
-    parser.add_argument("--out-dir", type=str, default=f"./output/{HOUMO_TARGET}", help="output directory")      
+    parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
+    parser.add_argument("--model", type=str, default=None, help="path to the model directory")
+    parser.add_argument("--model-name", type=str, default=None, help="model name for output files")
+    parser.add_argument("--model-size", type=str, default=None, help="model size identifier for output files")
+    parser.add_argument("--out-dir", type=str, default=f"./output/{HOUMO_TARGET}", help="output directory")
+    parser.add_argument("--max_size_w", type=int, default=None, help="max image width for visual model")
+    parser.add_argument("--max_size_h", type=int, default=None, help="max image height for visual model")
     parser.add_argument("--context-length", type=int, default=2048, help="max sequence length")
     parser.add_argument("--nsamples", type=int, default=512, help="number of calibration samples")
     parser.add_argument("--seqlen", type=int, default=1024, help="sequence length for calibration")
@@ -571,6 +589,20 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42, help="random seed for reproducibility")
     # fmt: on
     args = parser.parse_args()
+
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.model = first_not_none(args.model, get_default_model_dir(model_config))
+    args.max_size_w = first_not_none(
+        args.max_size_w, model_config.get("max_size_w", 448)
+    )
+    args.max_size_h = first_not_none(
+        args.max_size_h, model_config.get("max_size_h", 448)
+    )
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)

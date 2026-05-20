@@ -11,6 +11,8 @@
     - [1.2 流程说明](#12-流程说明)
     - [1.3 参数说明](#13-参数说明)
     - [1.4 用法说明](#14-用法说明)
+      - [基本用法示例](#基本用法示例)
+      - [交互式模式](#交互式模式)
   - [2.快速开始](#2快速开始)
     - [2.1 环境准备](#21-环境准备)
     - [2.2 编译](#22-编译)
@@ -75,22 +77,22 @@
 
 命令行参数说明：
 
-| 参数                    | 说明                                                         |
+| 参数                    | 说明                                                          |
 | ----------------------- | ------------------------------------------------------------ |
-| --image <paths...>      | 输入图像路径，可指定多个路径（用空格分隔）                   |
-| --prompt <text>         | 用户输入文本，默认："描述图片内容"                           |
-| --visual <path>         | Visual模型路径，默认：output/xh2/qwen3-vl_visual.hmm         |
-| --prefill <path>        | Prefill模型路径，默认：output/xh2/qwen3-vl_prefill.hmm       |
-| --decode <path>         | Decode模型路径，默认：output/xh2/qwen3-vl_decode.hmm         |
-| --tokenizer <path>      | tokenizer.json路径，默认：qwen3-vl/tokenizer.json            |
+| --image <paths...>      | 输入图像路径，可指定多个路径（用空格分隔）                       |
+| --prompt <text>         | 用户输入文本，默认："描述图片内容"                              |
+| --visual <path>         | Visual模型路径，默认：output/xh2/qwen3-vl-8b_visual_448x448x2.hmm |
+| --prefill <path>        | Prefill模型路径，默认：output/xh2/qwen3-vl-8b_prefill.hmm       |
+| --decode <path>         | Decode模型路径，默认：output/xh2/qwen3-vl-8b_decode.hmm         |
+| --tokenizer <path>      | tokenizer.json路径，默认：qwen3-vl/tokenizer.json               |
 | --embedding <path>      | Embedding权重路径，默认：output/xh2/hmquant/quant_embedding.bin |
-| --repetition-penalty <f>| 重复惩罚系数，默认：1.5（Qwen3-VL-8B推荐值）                 |
-| --temperature <f>       | 采样温度，默认：1.0                                          |
-| --top-k <n>             | Top-k采样，默认：-1（禁用）                                  |
-| --top-p <f>             | Top-p采样，默认：1.0                                         |
-| --it                    | 启用交互式聊天模式                                           |
-| --history               | 跨消息保留聊天历史                                           |
-| -h, --help              | 打印帮助信息                                                 |
+| --repetition-penalty <f>| 重复惩罚系数，默认：1.5（Qwen3-VL-8B推荐值）                     |
+| --temperature <f>       | 采样温度，默认：1.0                                             |
+| --top-k <n>             | Top-k采样，默认：-1（禁用）                                     |
+| --top-p <f>             | Top-p采样，默认：1.0                                           |
+| --it                    | 启用交互式聊天模式                                              |
+| --history               | 跨消息保留聊天历史                                             |
+| -h, --help              | 打印帮助信息                                                   |
 
 ### 1.4 用法说明
 
@@ -195,10 +197,10 @@ export TCIM_RUNTIME_PATH=/path/to/houmo-tcim-runtime-xh2
 
 ### 2.3 运行
 
-确保以下文件已准备好：
-- Visual模型：qwen3-vl_visual.hmm
-- Prefill模型：qwen3-vl_prefill.hmm
-- Decode模型：qwen3-vl_decode.hmm
+确保以下文件已准备好（以qwen3-vl-8b为例）：
+- Visual模型：qwen3-vl-8b_visual_448x448x2.hmm
+- Prefill模型：qwen3-vl-8b_prefill.hmm
+- Decode模型：qwen3-vl-8b_decode.hmm
 - tokenizer.json
 - quant_embedding.bin : pt转bin的方式，参考tools/llm_perf文件夹README.MD中convert_embed.py脚本的相关使用说明。
 

@@ -166,7 +166,12 @@ bash test.sh -s demo --skip_download --model_name qwen3.6 --model_size 35b-a3b
 
 ```bash
 python3 ${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py --path output/${HOUMO_TARGET}/hmquant/quant_embedding.pt
-llm_perf -c config.yaml
+llm_perf --model_name ${model_name}-${model_size} --devices 0 \
+  --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
+  --prefill output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill.hmm \
+  --decode output/${HOUMO_TARGET}/${model_name}-${model_size}_decode.hmm \
+  --visual output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_896x896x2.hmm \
+  --embedding output/${HOUMO_TARGET}/hmquant/quant_embedding.bin
 ```
 
 ## 关键参数说明

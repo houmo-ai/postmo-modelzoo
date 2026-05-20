@@ -6,8 +6,10 @@
 
 本项目使用从 ModelScope 下载的预训练模型：
 
-- 模型名称: Qwen3-VL-8B-Instruct
-- 来源: https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct
+- 模型名称: Qwen3-VL-4B-Instruct / Qwen3-VL-8B-Instruct
+- 来源:
+  - https://www.modelscope.cn/models/Qwen/Qwen3-VL-4B-Instruct
+  - https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct
 - 许可: Apache License 2.0 （https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md）
 
 预训练模型在运行时下载，工程发布**不包含**该模型。
@@ -39,7 +41,12 @@
 
 ## 1 模型说明
 
-本例使用的模型实现来源于[https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct](https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct)。
+本例支持以下模型实现来源：
+
+- [https://www.modelscope.cn/models/Qwen/Qwen3-VL-4B-Instruct](https://www.modelscope.cn/models/Qwen/Qwen3-VL-4B-Instruct)
+- [https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct](https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct)
+
+当前脚本默认值统一由同目录下的 `config.yaml` 提供，默认模型为 `qwen3-vl` + `8b`，同时支持 `qwen3-vl` + `4b`；视觉产物命名统一为 `${model_name}-${model_size}_visual_448x448x2.hmm`。
 
 ## 2 快速开始
 
@@ -59,13 +66,19 @@ pip3 install -r requirements.txt
 
 ```bash
 # 下载原始模型用于量化
-python3 get_model.py --type raw
+python3 get_model.py --type raw --model_name qwen3-vl --model_size 8b
+
+# 下载 4b 原始模型用于量化
+python3 get_model.py --type raw --model_name qwen3-vl --model_size 4b
 ```
 
 如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
-python3 get_model.py --type hmm
+python3 get_model.py --type hmm --model_name qwen3-vl --model_size 8b
+
+# 下载 4b 预编译模型
+python3 get_model.py --type hmm --model_name qwen3-vl --model_size 4b
 ```
 
 ### 2.3 量化
@@ -84,7 +97,7 @@ ln -s ../../../data/datasets/LMUData/* data/calib_data/LMUData
 ```bash
 # 量化依赖transformers==4.57.3
 pip3 install transformers==4.57.3
-python ptq.py --data_files ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_CMMMU_VAL_20250923102519_struct.json  ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_COCO_VAL_20250923104643_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_DocVQA_VAL_20250923102720_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_MMMU_DEV_VAL_20250923102615_struct.json --calib-samples 64 --calib_dataset vllm_custom_data
+python3 ptq.py --model-name qwen3-vl --model-size 8b --data_files ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_CMMMU_VAL_20250923102519_struct.json  ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_COCO_VAL_20250923104643_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_DocVQA_VAL_20250923102720_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_MMMU_DEV_VAL_20250923102615_struct.json --calib-samples 64 --calib_dataset vllm_custom_data
 ```
 
 #### 2.3.2 默认公开数据集数据集量化
@@ -94,7 +107,10 @@ python ptq.py --data_files ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Ins
 ```bash
 # 量化依赖transformers==4.57.3
 pip3 install transformers==4.57.3
-python ptq.py
+python3 ptq.py --model-name qwen3-vl --model-size 8b
+
+# 或量化 4b
+python3 ptq.py --model-name qwen3-vl --model-size 4b
 ```
 
 ### 2.4 编译
@@ -102,19 +118,23 @@ python ptq.py
 将量化模型编译为在芯片上运行的模型。执行脚本：
 
 ```bash
-python3 build.py
+python3 build.py --model_name qwen3-vl --model_size 8b
+
+# 或编译 4b
+python3 build.py --model_name qwen3-vl --model_size 4b
 ```
 
-编译好的模型存放在当前目录，包括3个文件：
-qwen3-vl_prefill.hmm
-qwen3-vl_decoder.hmm
-qwen3-vl_visual.hmm
+编译输出默认位于：
+
+- `output/${HOUMO_TARGET}/qwen3-vl-8b_prefill.hmm`
+- `output/${HOUMO_TARGET}/qwen3-vl-8b_decode.hmm`
+- `output/${HOUMO_TARGET}/qwen3-vl-8b_visual_448x448x2.hmm`
 
 ### 2.5 演示
 
 Qwen3-vl模型使用python API和c++示例进行演示，c++模型示例的详细介绍见cpp/README.MD文件。
 
-1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下
+1. 将编译好的模型放在当前目录，同时将对应量化模型的 `quant_embedding.pt` 文件放在量化模型目录下
 
 2. 执行脚本，推理完成将输出性能结果。
 
@@ -133,26 +153,89 @@ Qwen3-vl模型使用python API和c++示例进行演示，c++模型示例的详�
 # Qwen3-VL-8B 推荐惩罚系数是1.5
 
 # 单图或多图图片模式
-python3 demo.py --image ../../../data/pic/beach.jpeg --repetition_penalty 1.5
-python3 demo.py --image img1.jpg img2.jpg img3.jpg --repetition_penalty 1.5
+python3 demo.py --model_name qwen3-vl --model_size 8b --image ../../../data/pic/beach.jpeg --repetition_penalty 1.5
+python3 demo.py --model_name qwen3-vl --model_size 4b --image ../../../data/pic/beach.jpeg --repetition_penalty 4
+python3 demo.py --model_name qwen3-vl --model_size 8b --image img1.jpg img2.jpg img3.jpg --repetition_penalty 1.5
 
 # 真实视频模式
-python3 demo.py --media_type video --video demo.mp4 --repetition_penalty 1.5
+python3 demo.py --model_name qwen3-vl --model_size 8b --media_type video --video demo.mp4 --repetition_penalty 1.5
 
 # 多图伪视频模式
-python3 demo.py --media_type video --image img1.jpg img2.jpg img3.jpg --repetition_penalty 1.5
+python3 demo.py --model_name qwen3-vl --model_size 8b --media_type video --image img1.jpg img2.jpg img3.jpg --repetition_penalty 1.5
 
 # 指定多图伪视频的 fps
-python3 demo.py --media_type video --image img1.jpg img2.jpg img3.jpg --multi_image_video_fps 4 --repetition_penalty 1.5
+python3 demo.py --model_name qwen3-vl --model_size 8b --media_type video --image img1.jpg img2.jpg img3.jpg --multi_image_video_fps 4 --repetition_penalty 1.5
 ```
+
+若未显式传 `tokenizer_dir`、`vit_path`、`prefill_path`、`decode_path`，脚本会按 `config.yaml` 和 `${model_name}-${model_size}` 自动推导默认值；当 `ndevice > 1` 时，`prefill` / `decode` 默认后缀会切换为 `.hmms`。
 
 ### 2.6 一键评估
 
-以上步骤可以通过test.sh脚本一键执行：
+以上步骤可以通过 `test.sh` 脚本执行。脚本默认使用：
+
+- `MODEL_NAME=qwen3-vl`
+- `MODEL_SIZE=8b`
+- `NDEVICE=1`
+
+默认执行 `demo` 步骤：
 
 ```bash
+# 默认执行 demo，会先下载预编译模型
 bash test.sh
+
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+bash test.sh -s all
 ```
+
+运行前请确保 `HOUMO_EXAMPLES_PATH` 指向当前仓库根目录；`quant`、`cpp demo` 和 `llm_perf` 流程都会用到该路径。
+
+`test.sh` 支持以下常用参数：
+
+```bash
+Usage: test.sh [options]
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  -size, --model_size     Model size. Default: 8b. Optional: 4b, 8b.
+  -name, --model_name     Model name. Default: qwen3-vl.
+  --ndevice               Number of devices. Default: 1.
+  --skip_download         Skip model download steps.
+  -h, --help              Show this help message.
+```
+
+示例：
+
+```bash
+# 仅运行 quant，会先下载原始模型再量化
+bash test.sh -s quant
+
+# 仅运行 4b quant
+bash test.sh -s quant --model_size 4b
+
+# 仅运行 build，要求当前目录下已经有量化输出
+bash test.sh -s build
+
+# 仅运行 4b build
+bash test.sh -s build --model_size 4b
+
+# 仅运行 demo，会先下载预编译模型
+bash test.sh -s demo
+
+# 运行 4b demo
+bash test.sh -s demo --model_size 4b
+
+# 完整流程（下载原始模型、量化、编译、演示）
+bash test.sh -s all
+
+# 跳过模型下载，使用当前目录下已有的预编译模型进行演示
+bash test.sh -s demo --skip_download
+```
+
+当前脚本行为说明：
+
+- `quant`：下载原始模型，链接 `LMUData` 数据集，并调用 `ptq.py` 执行量化。
+- `build`：调用 `build.py` 编译 `prefill`、`decode` 和 `visual` 模型。
+- `demo`：下载预编译模型后，先执行 Python demo，再执行 C++ demo。
+- 若环境中存在 `llm_perf`，`demo` 流程末尾还会自动执行性能测试。
 
 ## 3 参考结果
 

@@ -42,6 +42,8 @@
 本例使用的模型实现来源于[https://modelscope.cn/models/Qwen/Qwen2.5-VL-7B-Instruct](https://modelscope.cn/models/Qwen/Qwen2.5-VL-7B-Instruct)。
 本例适用于xh2。
 
+当前脚本默认值统一由同目录下的 `config.yaml` 提供，默认模型为 `qwen2.5-vl` + `7b`。
+
 ## 2 快速开始
 
 目前Qwen2.5VL模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
@@ -60,13 +62,13 @@ pip3 install -r requirements.txt
 
 ```bash
 # 下载原始模型用于量化
-python3 get_model.py --type raw
+python3 get_model.py --type raw --model_name qwen2.5-vl --model_size 7b
 ```
 
 如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
-python3 get_model.py --type hmm
+python3 get_model.py --type hmm --model_name qwen2.5-vl --model_size 7b
 ```
 
 ### 2.3 量化
@@ -75,9 +77,9 @@ python3 get_model.py --type hmm
 
 下载自定义数据集到当前目录下
 ```bash
-python3 get_model.py --type raw
+python3 get_model.py --type raw --model_name qwen2.5-vl --model_size 7b
 mkdir -p data/calib_data/LMUData
-ln -s ../../../data/datasets/LMUData/* data/calib_data/LMUData
+ln -s ${HOUMO_EXAMPLES_PATH}/data/datasets/LMUData/* data/calib_data/LMUData
 ```
 
 量化下载的原始模型。在当前目录下，执行脚本：
@@ -85,7 +87,7 @@ ln -s ../../../data/datasets/LMUData/* data/calib_data/LMUData
 ```bash
 # 量化依赖transformers==4.57.3
 pip3 install transformers==4.57.3
-python ptq.py --data_files ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_CMMMU_VAL_20250923102519_struct.json  ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_COCO_VAL_20250923104643_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_DocVQA_VAL_20250923102720_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_MMMU_DEV_VAL_20250923102615_struct.json --calib-samples 256 --calib_dataset vllm_custom_data
+python3 ptq.py --model-name qwen2.5-vl --model-size 7b --data_files ${HOUMO_EXAMPLES_PATH}/hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_CMMMU_VAL_20250923102519_struct.json  ${HOUMO_EXAMPLES_PATH}/hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_COCO_VAL_20250923104643_struct.json ${HOUMO_EXAMPLES_PATH}/hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_DocVQA_VAL_20250923102720_struct.json ${HOUMO_EXAMPLES_PATH}/hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_MMMU_DEV_VAL_20250923102615_struct.json --calib-samples 256 --calib_dataset vllm_custom_data
 ```
 
 #### 2.2.1 默认公开数据集数据集量化
@@ -95,7 +97,7 @@ python ptq.py --data_files ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Ins
 ```bash
 # 量化依赖transformers==4.57.3
 pip3 install transformers==4.57.3
-python ptq.py
+python3 ptq.py --model-name qwen2.5-vl --model-size 7b
 ```
 
 ### 2.4 编译
@@ -103,13 +105,14 @@ python ptq.py
 将量化模型编译为在芯片上运行的模型。在当前目录下，执行脚本：
 
 ```bash
-python3 build.py
+python3 build.py --model_name qwen2.5-vl --model_size 7b
 ```
 
-编译好的模型存放在当前目录，包括3个文件：
-qwen2.5-vl_prefill.hmm
-qwen2.5-vl_decoder.hmm
-qwen2.5-vl_visual.hmm
+编译输出默认位于：
+
+- `output/${HOUMO_TARGET}/qwen2.5-vl-7b_prefill.hmm`
+- `output/${HOUMO_TARGET}/qwen2.5-vl-7b_decode.hmm`
+- `output/${HOUMO_TARGET}/qwen2.5-vl-7b_visual_448x448x2.hmm`
 
 ### 2.5 演示
 
@@ -123,16 +126,69 @@ Qwen2.5-vl模型使用python API进行演示
 
 ```bash
 # Qwen2.5-VL-7B 推荐惩罚系数是1.1
-python3 demo.py --repetition_penalty 1.1
+python3 demo.py --model_name qwen2.5-vl --model_size 7b --image ../../../data/pic/beach.jpeg --repetition_penalty 1.1
 ```
+
+若未显式传 `tokenizer_dir`、`vit_path`、`prefill_path`、`decode_path`，脚本会按 `config.yaml` 和 `${model_name}-${model_size}` 自动推导默认值；当 `ndevice > 1` 时，`prefill` / `decode` 默认后缀会切换为 `.hmms`。
 
 ### 2.6 一键评估
 
-以上步骤可以通过test.sh脚本一键执行：
+以上步骤可以通过 `test.sh` 脚本执行。脚本默认使用：
+
+- `MODEL_NAME=qwen2.5-vl`
+- `MODEL_SIZE=7b`
+- `NDEVICE=1`
+
+默认执行 `demo` 步骤：
 
 ```bash
+# 默认执行 demo，会先下载预编译模型
 bash test.sh
+
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+bash test.sh -s all
 ```
+
+运行前请确保 `HOUMO_EXAMPLES_PATH` 指向当前仓库根目录；`quant` 和 `llm_perf` 流程都会用到该路径。
+
+`test.sh` 支持以下参数：
+
+```bash
+Usage: test.sh [options]
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  -size, --model_size     Model size. Default: 7b.
+  -name, --model_name     Model name. Default: qwen2.5-vl.
+  --ndevice               Number of devices. Default: 1.
+  --skip_download         Skip model download steps.
+  -h, --help              Show this help message.
+```
+
+示例：
+
+```bash
+# 仅运行 quant，会先下载原始模型再量化
+bash test.sh -s quant
+
+# 仅运行 build，要求当前目录下已经有量化输出
+bash test.sh -s build
+
+# 仅运行 demo，会先下载预编译模型
+bash test.sh -s demo
+
+# 完整流程（下载原始模型、量化、编译、演示）
+bash test.sh -s all
+
+# 跳过模型下载，使用当前目录下已有的预编译模型进行演示
+bash test.sh -s demo --skip_download
+```
+
+当前脚本行为说明：
+
+- `quant`：下载原始模型，链接 `LMUData` 数据集，并调用 `ptq.py` 执行量化。
+- `build`：调用 `build.py` 编译 `prefill`、`decode` 和 `visual` 模型。
+- `demo`：下载预编译模型后，执行 Python demo。
+- 若环境中存在 `llm_perf`，`demo` 流程末尾还会自动执行性能测试。
 
 ## 3 参考结果
 

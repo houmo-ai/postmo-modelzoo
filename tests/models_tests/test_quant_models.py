@@ -651,3 +651,14 @@ def test_vlm_gemma4_quant(setup_logging) -> None:
     """test_vlm_gemma4_quant"""
     model_name = "gemma4"
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_vl
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(name='test_vlm_qwen3_vl_quant', depends_on=['test_get_models.py::test_vlm_qwen3_vl_get_model'])
+def test_vlm_qwen3_vl_quant(setup_logging) -> None:
+    """test_vlm_qwen3_vl_quant"""
+    model_name = 'qwen3-vl'
+    _quant_func(model_name, setup_logging)

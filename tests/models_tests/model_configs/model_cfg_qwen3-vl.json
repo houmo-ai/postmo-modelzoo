@@ -14,7 +14,7 @@
     },
     "support_flow": {
         "xh1": ["get_model", "compile", "demo", "perf"],
-        "xh2": ["get_model", "compile", "demo"]
+        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
     },
     "support_hmatc": null,
     "perf_metrics": {
@@ -27,9 +27,9 @@
         },
         "xh2": {
             "x86_64": {
-                "prefill": 1107.16,
-                "decode": 18.32,
-                "end2end": 15.71
+                "prefill": 1765.41,
+                "decode": 21.21,
+                "end2end": 16.49
             }
         }
     },
@@ -42,7 +42,7 @@
             "source_type": [null, null]
         },
         "xh2": {
-            "type": ["raw", "hmm", "hmm", "hmm"],
+            "type": ["raw", "raw", "hmm", "hmm"],
             "download_dir": [
                 "cached_models",
                 "cached_models",
@@ -51,23 +51,38 @@
             ],
             "extract_dir": [
                 null,
+                null,
                 "cached_models/hmm_xh2_8b_32k",
-                "cached_models/hmm_xh2_8b_32k_ms",
                 "cached_models/hmm_xh2_4b_32k"
             ],
-            "model_size": ["8b", "8b", "8b", "4b"],
-            "source_type": [null, null, "modelscope", null]
+            "model_name": ["qwen3-vl", "qwen3-vl", "qwen3-vl", "qwen3-vl"],
+            "model_size": ["8b", "4b", "8b", "4b"],
+            "context_length": [null, null, "32k", "32k"],
+            "ndevice": ["1", "1", "1", "1"],
+            "prefill_length": [null, null, null, null],
+            "source_type": [null, null, null, null]
         }
     },
     "quant_params": {
         "xh1": null,
         "xh2": {
-            "model": ["cached_models/qwen3-vl"],
-            "out-dir": ["cached_results/hmquant_xh2_8b_2k"],
-            "context-length": ["2048"],
-            "patch_size": ["16"],
-            "image_max_size_h": ["448"],
-            "image_max_size_w": ["448"]
+            "model": [
+                "cached_models/Qwen3-VL-8B-Instruct",
+                "cached_models/Qwen3-VL-4B-Instruct"
+            ],
+            "model-name": ["qwen3-vl", "qwen3-vl"],
+            "model-size": ["8b", "4b"],
+            "out-dir": [
+                "cached_results/hmquant_xh2_8b_2k",
+                "cached_results/hmquant_xh2_4b_2k"
+            ],
+            "context-length": ["2048", "2048"],
+            "max_pe_length": [null, null],
+            "quant-type": [null, null],
+            "patch_size": [null, null],
+            "image_max_size_h": ["448", "448"],
+            "image_max_size_w": ["448", "448"],
+            "image_max_size_t": ["2", "2"]
         }
     },
     "compile_params": {
@@ -81,15 +96,26 @@
             "output_dir": ["cached_results/hmm_xh1_4b"]
         },
         "xh2": {
-            "model_dir": ["cached_results/hmquant_xh2_8b_2k"],
-            "model_name": [null],
-            "ncore": [null],
-            "batch": [null],
-            "context_length": ["32768"],
-            "model_size": ["8b"],
-            "stage": ["build"],
-            "j": ["24"],
-            "output_dir": ["cached_results/hmm_xh2_8b_32k"]
+            "model_dir": [
+                "cached_results/hmquant_xh2_8b_2k",
+                "cached_results/hmquant_xh2_4b_2k"
+            ],
+            "model_name": ["qwen3-vl", "qwen3-vl"],
+            "ncore": [null, null],
+            "batch": [null, null],
+            "ndevice": [null, null],
+            "context_length": ["32768", "32768"],
+            "model_size": ["8b", "4b"],
+            "stage": ["build", "build"],
+            "prefill_length": ["256", "256"],
+            "max_size_w": ["448", "448"],
+            "max_size_h": ["448", "448"],
+            "max_size_t": ["2", "2"],
+            "j": ["24", "24"],
+            "output_dir": [
+                "cached_results/hmm_xh2_8b_32k",
+                "cached_results/hmm_xh2_4b_32k"
+            ]
         }
     },
     "demo_params": {
@@ -103,15 +129,32 @@
             "decode_path": ["cached_results/hmm_xh1_4b/qwen3-vl_decode.hmm"]
         },
         "xh2": {
-            "tokenizer_dir": ["cached_models/qwen3-vl"],
+            "model_name": ["qwen3-vl", "qwen3-vl"],
+            "model_size": ["8b", "4b"],
+            "tokenizer_dir": [
+                "cached_models/Qwen3-VL-8B-Instruct",
+                "cached_models/Qwen3-VL-4B-Instruct"
+            ],
             "embedding_path": [
-                "cached_results/hmm_xh2_8b_32k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_8b_32k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_4b_32k/hmquant/quant_embedding.pt"
             ],
-            "vit_path": ["cached_results/hmm_xh2_8b_32k/qwen3-vl_visual.hmm"],
             "prefill_path": [
-                "cached_results/hmm_xh2_8b_32k/qwen3-vl_prefill.hmm"
+                "cached_results/hmm_xh2_8b_32k/qwen3-vl-8b_prefill.hmm",
+                "cached_results/hmm_xh2_4b_32k/qwen3-vl-4b_prefill.hmm"
             ],
-            "decode_path": ["cached_results/hmm_xh2_8b_32k/qwen3-vl_decode.hmm"]
+            "decode_path": [
+                "cached_results/hmm_xh2_8b_32k/qwen3-vl-8b_decode.hmm",
+                "cached_results/hmm_xh2_4b_32k/qwen3-vl-4b_decode.hmm"
+            ],
+            "vit_path": [
+                "cached_results/hmm_xh2_8b_32k/qwen3-vl-8b_visual_448x448x2.hmm",
+                "cached_results/hmm_xh2_4b_32k/qwen3-vl-4b_visual_448x448x2.hmm"
+            ],
+            "ndevice": ["1", "1"],
+            "max_size_w": ["448", "448"],
+            "max_size_h": ["448", "448"],
+            "max_size_t": ["2", "2"]
         }
     },
     "perf_params": "demo"

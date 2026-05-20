@@ -42,23 +42,59 @@ from PIL import Image
 from processing_qwen2_5_vl import Qwen2_5_VLProcessor
 from utils import get_rope_index, QRawToYuv
 
-from hmatc.utils.perf_infomations import InferencePerformanceTracker, InferenceMetrics, PERFTYPE
+from hmatc.utils.perf_infomations import (
+    InferencePerformanceTracker,
+    InferenceMetrics,
+    PERFTYPE,
+)
 from hmatc.python.get_hm_devices import get_hm_devices
+from hmatc.utils.utils import first_not_none, get_model_configs
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 TARGET_TYPE = torch.float16
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
+
+def get_default_tokenizer_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "qwen2.5-vl")
+    model_size = model_config.get("model_size", "7b")
+    return f"{model_name}-{model_size}"
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="qwen2.5-vl",
+        default=None,
         help="tokenizer dir",
     )
     parser.add_argument(
@@ -72,22 +108,57 @@ def get_args() -> argparse.Namespace:
         "--vit_path",
         dest="vit_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen2.5-vl_visual.hmm"),
+        default=None,
         help="houmo visual model path",
     )
     parser.add_argument(
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen2.5-vl_prefill.hmm"),
+        default=None,
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen2.5-vl_decode.hmm"),
+        default=None,
         help="houmo decode model path",
+    )
+    parser.add_argument(
+        "--ndevice",
+        dest="ndevice",
+        type=int,
+        default=None,
+        help="device number",
+    )
+    parser.add_argument(
+        "--max_size_w",
+        dest="max_size_w",
+        type=int,
+        default=None,
+        help="max image width for vision filename suffix",
+    )
+    parser.add_argument(
+        "--max_size_h",
+        dest="max_size_h",
+        type=int,
+        default=None,
+        help="max image height for vision filename suffix",
+    )
+    parser.add_argument(
+        "--max_size_t",
+        dest="max_size_t",
+        type=int,
+        default=None,
+        help="max temporal size for vision filename suffix",
+    )
+    parser.add_argument(
+        "--image",
+        dest="image",
+        nargs="*",
+        default=None,
+        help="image paths",
     )
     parser.add_argument(
         "--repetition_penalty",
@@ -118,6 +189,41 @@ def get_args() -> argparse.Namespace:
         help="sampling temperature",
     )
     args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    args.max_size_w = first_not_none(
+        args.max_size_w, model_config.get("max_size_w", 448)
+    )
+    args.max_size_h = first_not_none(
+        args.max_size_h, model_config.get("max_size_h", 448)
+    )
+    args.max_size_t = first_not_none(args.max_size_t, model_config.get("max_size_t", 2))
+    if args.tokenizer_dir is None:
+        args.tokenizer_dir = get_default_tokenizer_dir(model_config)
+    if args.vit_path is None:
+        args.vit_path = os.path.join(
+            "output",
+            HOUMO_TARGET,
+            f"{args.model_name}-{args.model_size}_visual_{args.max_size_w}x{args.max_size_h}x{args.max_size_t}.hmm",
+        )
+    if args.prefill_path is None:
+        args.prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
+        )
+    if args.decode_path is None:
+        args.decode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
+        )
+    if args.ndevice > 1:
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        if args.decode_path.endswith(".hmm"):
+            args.decode_path = args.decode_path.replace(".hmm", ".hmms")
     return args
 
 
@@ -321,7 +427,7 @@ class Qwen25VL:
         self.spatial_merge_size = spatial_merge_size
         self.patch_size = patch_size
         self.batch_size = 1
-        self.max_size_t = 2
+        self.max_size_t = args.max_size_t
         self.spatial_merge_unit = self.spatial_merge_size * self.spatial_merge_size
         self.eos_token_id = [151645, 151643]
         # set mode
@@ -826,8 +932,7 @@ if __name__ == "__main__":
         args.tokenizer_dir,
         args.embedding_path,
     )
-    # image_dir = None
-    image_dir = ["../../../data/pic/beach.jpeg"]
+    image_dir = args.image or ["../../../data/pic/beach.jpeg"]
 
     image_num = 0 if not image_dir else len(image_dir)
 
