@@ -38,6 +38,18 @@ from sampling_manager import SamplingManager
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
+# only for win11 platform, to avoid the error "UnicodeEncodeError: 'utf-8' codec can't encode characters in position ... in Windows Terminal"
+import sys
+if sys.platform == "win32" and sys.stdout.encoding != 'UTF-8':
+    import codecs
+    if sys.stdout.encoding != 'UTF-8':
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+
+    if sys.stderr.encoding != 'UTF-8':
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
+
+
 
 def get_args() -> argparse.Namespace:
     """Parse command-line arguments for the script."""
@@ -363,7 +375,7 @@ if __name__ == "__main__":
         temperature=args.temperature,
     )
 
-    question = "请介绍一下存算一体技术的优势" 
+    question = "请介绍一下存算一体技术的优势"
 
     dev = None
     pre_h = None
