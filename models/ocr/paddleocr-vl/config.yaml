@@ -1,0 +1,17 @@
+default_model_name: "paddleocr-vl"
+default_model_size: "0.9b"
+
+model_configs:
+  paddleocr-vl:
+    "0.9b":
+      modelscope_repo: ["PaddlePaddle/PaddleOCR-VL"]
+      model_name: "paddleocr-vl"
+      model_size: "0.9b"
+      ncore: 2
+      quant_type: "w8a8h0_ssfp"
+      context_length: "4k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      max_size_w: 448
+      max_size_h: 448

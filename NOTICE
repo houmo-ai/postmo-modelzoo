@@ -80,6 +80,7 @@ Qwen3-VL 8B - https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct
 MiniCPM-O-2.6 - https://github.com/OpenBMB/MiniCPM-V
 CoPaw-Flash-9B - https://www.modelscope.cn/models/AgentScope/CoPaw-Flash-9B
 CosyVoice3 - https://github.com/FunAudioLLM/CosyVoice
+PaddleOCR-VL - https://www.modelscope.cn/models/PaddlePaddle/PaddleOCR-VL
 
 For detailed third-party citation notices, licenses, and precautions, please refer to THIRD_PARTY_NOTICES.
 

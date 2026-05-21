@@ -1,9 +1,9 @@
-# Copyright (c) 2025 HOUMO AI
+# Copyright (c) 2026 HOUMO AI
 #
 # File: build.py
 # Description:
-#  CoPaw-Flash Model Build and Test Tool - Python script for building and testing
-# CoPaw-Flash models.
+#  PaddleOCR-VL Model Build and Test Tool - Python script for building and testing
+# PaddleOCR-VL models.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,9 +22,10 @@
 import os
 import numpy as np
 import time
+import psutil
 import multiprocessing
 import argparse
-import psutil
+
 from typing import Dict
 
 from hmatc.exec.xh2_exec import Xh2Exec
@@ -43,6 +44,28 @@ assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
+def sanitize_name(name: str):
+    return name.replace(":", "_").replace("/", "_")
+
+
+def cosine_distance(data1, data2):
+    if data1.shape != data2.shape:
+        print(f"[error] shape not equal {data1.shape} vs {data2.shape}")
+        return -1
+    v1_d = data1.flatten().astype("float64")
+    v2_d = data2.flatten().astype("float64")
+    v1_d[v1_d == np.inf] = np.finfo(np.float16).max
+    v2_d[v2_d == np.inf] = np.finfo(np.float16).max
+    v1_d[v1_d == -np.inf] = np.finfo(np.float16).min
+    v2_d[v2_d == -np.inf] = np.finfo(np.float16).min
+    v1_norm = v1_d / np.linalg.norm(v1_d)
+    v2_norm = v2_d / np.linalg.norm(v2_d)
+    cosine_dist = np.dot(v1_norm, v2_norm)
+    if np.isnan(cosine_dist):
+        return -1
+    return cosine_dist
+
 
 class ChildProcessMemoryMonitor(ProcessMemoryMonitor):
     """Process memory monitor that optionally includes child processes."""
@@ -75,27 +98,6 @@ class ChildProcessMemoryMonitor(ProcessMemoryMonitor):
             return {"rss_mb": rss_mb, "percent": percent}
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             return {"rss_mb": 0.0, "percent": 0.0}
-
-def sanitize_name(name: str):
-    return name.replace(":", "_").replace("/", "_")
-
-
-def cosine_distance(data1, data2):
-    if data1.shape != data2.shape:
-        print(f"[error] shape not equal {data1.shape} vs {data2.shape}")
-        return -1
-    v1_d = data1.flatten().astype("float64")
-    v2_d = data2.flatten().astype("float64")
-    v1_d[v1_d == np.inf] = np.finfo(np.float16).max
-    v2_d[v2_d == np.inf] = np.finfo(np.float16).max
-    v1_d[v1_d == -np.inf] = np.finfo(np.float16).min
-    v2_d[v2_d == -np.inf] = np.finfo(np.float16).min
-    v1_norm = v1_d / np.linalg.norm(v1_d)
-    v2_norm = v2_d / np.linalg.norm(v2_d)
-    cosine_dist = np.dot(v1_norm, v2_norm)
-    if np.isnan(cosine_dist):
-        return -1
-    return cosine_dist
 
 
 def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
@@ -219,9 +221,8 @@ def get_args() -> argparse.Namespace:
         help="FlashAttention optimization switches: "
         "1st int = prefill/decode model switch (0=off, 1/2=on), "
         "2nd int = ViT model switch (0=off, 1=on); "
-        "e.g., --flash_attention 2 1 (prefill&decode=2, ViT=1)",
+        "e.g., --flash_attention 2 0 (prefill&decode=2, ViT=0)",
     )
-
     args = parser.parse_args()
     default_model_size, default_model_name, model_configs = get_model_configs(
         args.config_path
@@ -243,12 +244,10 @@ def get_args() -> argparse.Namespace:
         )
     args.max_size_w = model_config.get("max_size_w", 448)
     args.max_size_h = model_config.get("max_size_h", 448)
-    args.max_size_t = model_config.get("max_size_t", 2)
     args.flash_attention = _validate_adjust_flash_attention(
         args.flash_attention, args.context_length
     )
     return args
-
 
 def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     import tcim_lite
@@ -366,7 +365,7 @@ if __name__ == "__main__":
     visual_dir = os.path.join(model_dir, "visual")
     visual_model_name = (
         f"{model_name}-{model_size}_visual_"
-        f"{args.max_size_w}x{args.max_size_h}x{args.max_size_t}"
+        f"{args.max_size_w}x{args.max_size_h}"
     )
 
     with ChildProcessMemoryMonitor(interval=2, quiet=True, include_children=True) as monitor:
@@ -409,6 +408,7 @@ if __name__ == "__main__":
                 parallel_jobs=j,
             )
 
+        # test model
         if args.stage == "test" or args.stage == "all":
             test(
                 f"{model_name}-{model_size}_prefill",

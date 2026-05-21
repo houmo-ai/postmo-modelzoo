@@ -35,10 +35,11 @@ from typing import Any, Dict
 import torch
 import json
 import torch.nn as nn
+import psutil
 import gc
 from loguru import logger
 from tqdm import tqdm
-from transformers import AutoConfig, AutoModelForImageTextToText, AutoProcessor
+from transformers import AutoConfig, AutoProcessor
 
 from xhquant.api import (
     CacheTensor,
@@ -130,6 +131,39 @@ def cleanup_cpu():
         ctypes.CDLL("libc.so.6").malloc_trim(0)
     except Exception:
         pass
+
+
+class ChildProcessMemoryMonitor(ProcessMemoryMonitor):
+    """Process memory monitor that optionally includes child processes."""
+
+    def __init__(self, *args, include_children: bool = True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.include_children = include_children
+
+    @property
+    def process(self):
+        return self._process
+
+    def get_memory_info(self) -> Dict[str, float]:
+        """Gets current memory usage information."""
+        try:
+            rss = self.process.memory_info().rss
+            if self.include_children:
+                for child in self.process.children(recursive=True):
+                    try:
+                        rss += child.memory_info().rss
+                    except (
+                        psutil.NoSuchProcess,
+                        psutil.AccessDenied,
+                        psutil.ZombieProcess,
+                    ):
+                        continue
+
+            rss_mb = rss / (1024 * 1024)
+            percent = self.process.memory_percent()
+            return {"rss_mb": rss_mb, "percent": percent}
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            return {"rss_mb": 0.0, "percent": 0.0}
 
 
 def save_json(file_path: Path, data: Dict[str, Any]):
@@ -970,7 +1004,7 @@ if __name__ == "__main__":
 
     args = parse_args()
     set_seed(42)
-    with ProcessMemoryMonitor(interval=2) as monitor:
+    with ChildProcessMemoryMonitor(interval=2, log_file="./cpu_memory.log", include_children=True) as monitor:
         if args.gptqmodel:
             run_step_in_fresh_process("rotate_fp_vl", args)
             run_step_in_fresh_process("gptq_quant_llm", args)

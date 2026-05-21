@@ -153,6 +153,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | lprnet                  | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  |
 | PPOCRv3                 | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  |
 | glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |
+| PaddleOCR-VL            | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |
 | minicpmo                | omni         | xh2    | x     | yes   | yes  | yes  | x    |
 | qwen3-reranker          | reranker     | xh2    | yes   | yes   | yes  | yes  | x    |
 | yolov8m-seg             | segmentation | xh2    | yes   | yes   | yes  | yes  | yes  |
