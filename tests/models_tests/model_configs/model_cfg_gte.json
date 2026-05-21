@@ -32,22 +32,33 @@
                 "cached_models/hmm_xh2_ms"
             ],
             "source_type": [null, null, "modelscope"],
-            "ndevice": [null, null, null]
+            "model_name": ["gte", "gte", "gte"],
+            "model_size": ["1.5b", "1.5b", "1.5b"],
+            "context_length": [null, "2k", "2k"],
+            "batch": [null, null, null],
+            "ndevice": [null, null, null],
+            "ncore": [null, null, null],
+            "prefill_length": [null, null, null]
         }
     },
     "quant_params": {
         "xh2": {
             "model": ["cached_models/gte_Qwen2-1.5B-instruct"],
+            "model-name": ["gte"],
+            "model-size": ["1.5b"],
             "out-dir": ["cached_results/hmquant_xh2_2k"],
             "context-length": ["2048"],
-            "input-sequence-length": [null],
+            "input-sequence-length": ["256"],
             "calibration-dataset": [null]
         }
     },
     "compile_params": {
         "xh2": {
             "model_dir": ["cached_results/hmquant_xh2_2k"],
-            "model_name": [null],
+            "model_name": ["gte"],
+            "model_size": ["1.5b"],
+            "batch": ["1"],
+            "ndevice": ["1"],
             "ncore": ["2"],
             "stage": ["build"],
             "j": ["24"],
@@ -56,11 +67,13 @@
     },
     "demo_params": {
         "xh2": {
+            "model_name": ["gte"],
+            "model_size": ["1.5b"],
             "tokenizer_dir": ["cached_models/gte_Qwen2-1.5B-instruct"],
             "embedding_path": [
                 "cached_results/hmm_xh2_2k/hmquant/quant_embedding.pt"
             ],
-            "prefill_path": ["cached_results/hmm_xh2_2k/gte_prefill.hmm"],
+            "prefill_path": ["cached_results/hmm_xh2_2k/gte-1.5b_prefill.hmm"],
             "ndevice": ["1"]
         }
     },

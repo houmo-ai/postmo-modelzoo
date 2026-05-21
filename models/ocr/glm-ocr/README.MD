@@ -17,6 +17,16 @@
 
 本例使用的模型实现来源于[https://www.modelscope.cn/models/zhipuAI/GLM-OCR](https://www.modelscope.cn/models/zhipuAI/GLM-OCR)。
 
+当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
+
+- `model_name=glm-ocr`
+- `model_size=0.9b`
+- `context_length=8k`
+- `prefill_length=256`
+- `image_size=672x672`
+- `max_size_t=2`
+- `ndevice=1`
+
 ## 2 快速开始
 
 目前GLM-OCR模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
@@ -33,7 +43,7 @@ pip3 install -r requirements.txt
 
 ### 2.2 获取模型和数据
 
-通过get_model脚本下载模型，可通过参数选择下载原始模型或芯片模型。
+通过 `get_model.py` 脚本下载模型，可通过参数选择下载原始模型或芯片模型。原始模型默认按 `modelscope_repo` 推导目录。
 
 ```bash
 python3 get_model.py --type raw
@@ -52,7 +62,7 @@ python3 get_model.py --type hmm
 python3 get_model.py --type raw
 ```
 
-量化下载的原始模型。在当前目录下，执行脚本：
+量化下载的原始模型。在当前目录下执行脚本。默认的 `context_length`、`prefill_length`、视觉尺寸等参数来自 `config.yaml`：
 
 ```bash
 python ptq.py
@@ -60,22 +70,28 @@ python ptq.py
 
 ### 2.4 编译
 
-将量化模型编译为在芯片上运行的模型。执行脚本：
+将量化模型编译为在芯片上运行的模型。默认输出文件名为：
+
+- `glm-ocr-0.9b_prefill.hmm`
+- `glm-ocr-0.9b_decode.hmm`
+- `glm-ocr-0.9b_visual_672x672x2.hmm`
+
+执行脚本：
 
 ```bash
 python3 build.py
 ```
 
-编译好的模型存放在当前目录，包括3个文件：
-glm-ocr_prefill.hmm
-glm-ocr_decode.hmm
-glm-ocr_visual.hmm
-
 ### 2.5 演示
 
-GLM-OCR模型使用python API进行演示
+GLM-OCR 模型使用 python API 进行演示。
 
-1. 将编译好的模型放在当前目录，同时将对应量化模型的`quant_embedding.pt`文件放在量化模型目录下
+1. `demo.py` 默认从 `config.yaml` 推导 `tokenizer_dir`，并默认读取：
+
+  - `output/${HOUMO_TARGET}/glm-ocr-0.9b_prefill.hmm`
+  - `output/${HOUMO_TARGET}/glm-ocr-0.9b_decode.hmm`
+  - `output/${HOUMO_TARGET}/glm-ocr-0.9b_visual_672x672x2.hmm`
+  - `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
 
 2. 执行脚本，推理完成将输出性能结果。
 
@@ -85,10 +101,53 @@ python3 demo.py
 
 ### 2.6 一键评估
 
-以上步骤可以通过test.sh脚本一键执行：
+以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
 ```bash
+# 默认执行 demo，会先下载预编译模型
 bash test.sh
+
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+bash test.sh -s all
+```
+
+test.sh 支持以下参数：
+
+```bash
+Usage: test.sh [options]
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  -name, --model_name     Model name. Default: glm-ocr.
+  -size, --model_size     Model size. Default: 0.9b.
+  --skip_download         Skip model download steps.
+  -h, --help              Show this help message.
+```
+
+当前脚本会把 `model_name` 和 `model_size` 透传给 `get_model.py`、`ptq.py`、`build.py`、`demo.py`。默认值分别是 `glm-ocr` 和 `0.9b`。
+
+示例：
+
+```bash
+# 仅运行 quant，会先下载原始模型再量化
+bash test.sh -s quant
+
+# 仅运行 build，要求当前目录下已经有量化输出
+bash test.sh -s build
+
+# 仅运行 demo，会先下载预编译模型
+bash test.sh -s demo
+
+# 完整流程（下载原始模型、量化、编译、演示）
+bash test.sh -s all
+
+# 显式指定模型名和模型规格（当前默认就是 glm-ocr 0.9b）
+bash test.sh -s demo -name glm-ocr -size 0.9b
+
+# 组合执行多个步骤
+bash test.sh -s quant,build
+
+# 跳过模型下载，使用当前目录下已有的预编译模型进行演示
+bash test.sh -s demo --skip_download
 ```
 
 ## 3 参考结果

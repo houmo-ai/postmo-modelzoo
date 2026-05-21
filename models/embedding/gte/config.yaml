@@ -1,0 +1,15 @@
+default_model_name: "gte"
+default_model_size: "1.5b"
+
+model_configs:
+  gte:
+    "1.5b":
+      modelscope_repo: ["iic/gte_Qwen2-1.5B-instruct"]
+      model_name: "gte"
+      model_size: "1.5b"
+      ncore: 2
+      quant_type: "w8a8_sefp"
+      context_length: "2k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256

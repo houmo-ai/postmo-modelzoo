@@ -21,98 +21,27 @@
 import os
 import argparse
 from quant_pipeline import quant_llm, export_llm, move_llm
-import time
-import psutil
-import threading
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import (
+    check_gpu,
+    first_not_none,
+    get_model_configs,
+    parse_context_length,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
-
-class ProcessMemoryMonitor:
-    """
-    Monitors the memory usage of the current Python process in real-time using psutil.
-    """
-
-    def __init__(self, interval=2, log_file=None):
-        """
-        Initializes the monitor.
-        Args:
-            interval (int): Time between measurements in seconds.
-            log_file (str, optional): Path to a file to log results. If None, prints to console.
-        """
-        self.process = psutil.Process(os.getpid())
-        self.interval = interval
-        self.log_file = log_file
-        self.is_monitoring = False
-        self.peak_memory_mb = 0
-
-    def get_memory_info(self):
-        """
-        Gets current memory usage information.
-        Returns:
-            dict: A dictionary containing memory usage data.
-        """
-        memory_info = self.process.memory_info()
-        rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
-        percent = self.process.memory_percent()  # Percentage of system memory
-        return {"rss_mb": rss_mb, "percent": percent}
-
-    def start(self):
-        """Starts the monitoring loop in a separate daemon thread."""
-        self.is_monitoring = True
-        self.peak_memory_mb = 0
-        self.monitor_thread = threading.Thread(target=self._monitor_loop)
-        self.monitor_thread.daemon = True  # Thread will exit when main program does
-        self.monitor_thread.start()
-        print(f"Memory monitoring started (interval: {self.interval}s)")
-
-    def _monitor_loop(self):
-        """The internal loop that runs in the thread."""
-        while self.is_monitoring:
-            mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info["rss_mb"])
-
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
-
-            # Output to console or file
-            if self.log_file:
-                with open(self.log_file, "a") as f:
-                    f.write(log_message + "\n")
-
-            time.sleep(self.interval)
-
-    def stop(self):
-        """Stops the monitoring loop and prints peak usage."""
-        self.is_monitoring = False
-        if hasattr(self, "monitor_thread"):
-            # Wait a moment for the thread to finish
-            self.monitor_thread.join(timeout=1)
-        print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
-def check_gpu() -> bool:
-    """
-    Check if the host has a GPU.
-    """
-    import subprocess
-
-    try:
-        result = subprocess.run(
-            "nvidia-smi --query-gpu=count --format=csv,noheader,nounits | wc -l",
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            text=True,
-        )
-        if result.returncode == 0 and int(result.stdout.strip()) > 0:
-            return True
-        return False
-    except Exception as e:
-        print(f"Not install GPU driver, error msg: {e}")
-        return False
+def get_default_model_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "qwen3-reranker")
+    model_size = model_config.get("model_size", "8b")
+    return f"{model_name}-{model_size}"
 
 
 def parse_args() -> argparse.Namespace:
@@ -122,13 +51,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("--model", type=str, default="qwen3-reranker-8b")
+    parser.add_argument(
+        "--config", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml"
+    )
+    parser.add_argument("--model", type=str, default=None)
     parser.add_argument(
         "--model-name",
         type=str,
-        default="qwen3-reranker",
+        default=None,
         help="output hmonnx model name",
     )
+    parser.add_argument("--model-size", type=str, default=None, help="model size")
     parser.add_argument("--skip-quarot", action="store_true", help="skip_quarot")
     parser.add_argument("--skip-gptq", action="store_true", help="skip_quarot")
     parser.add_argument("--w-bits", type=int, default=4)
@@ -138,14 +71,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument(
-        "--context-length", type=int, default=2048, help="max sequence length"
+        "--context-length", type=int, default=None, help="max sequence length"
     )
     parser.add_argument(
-        "--input-sequence-length", type=int, default=256, help="input sequence length"
+        "--input-sequence-length", type=int, default=None, help="input sequence length"
     )
-    parser.add_argument(
-        "--quant-type", default="w4a8h0_ssfp", help="quant type, default is w4a8h0_ssfp"
-    )
+    parser.add_argument("--quant-type", default=None, help="quant type")
     parser.add_argument(
         "--mix_search", type=str, default=None, help="mix search settings"
     )
@@ -155,21 +86,37 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--datasets-dir", type=str, default="../../../data/datasets")
     args = parser.parse_args()
 
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.model = first_not_none(args.model, get_default_model_dir(model_config))
+    args.context_length = first_not_none(
+        args.context_length,
+        parse_context_length(model_config.get("context_length", "8k")),
+    )
+    args.input_sequence_length = first_not_none(
+        args.input_sequence_length, model_config.get("prefill_length", 256)
+    )
+    args.quant_type = first_not_none(
+        args.quant_type, model_config.get("quant_type", "w4a8h0_ssfp")
+    )
+
     return args
 
 
-def main():
-    args = parse_args()
-    quant_llm(args)
-    export_llm(args)
-    move_llm(args)
-
-
 if __name__ == "__main__":
-    if not check_gpu():
-        print("Error: Not found GPU device.")
-        exit(-1)
-    memory_monitor = ProcessMemoryMonitor(interval=2)
-    memory_monitor.start()
-    main()
-    memory_monitor.stop()
+    assert check_gpu() is True, "Error: Not found GPU device."
+
+    args = parse_args()
+    print(args)
+
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
+        quant_llm(args)
+        export_llm(args)
+        move_llm(args)
+    print(
+        f"\n=== Quantization completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

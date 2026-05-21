@@ -10,6 +10,8 @@ source "${MODELS_DIR}/test_common.sh"
 
 STEP="demo"
 SKIP_DOWNLOAD="false"
+MODEL_NAME="cosyvoice3"
+MODEL_SIZE="0.5b-2512"
 parse_args "$@"
 
 cd "${SCRIPT_DIR}"
@@ -38,24 +40,25 @@ if should_run_step "quant"; then
 
     if ! should_skip_download; then
         echo "Download raw model."
-        python3 get_model.py --type raw
+        python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Start model quantization."
-    python3 ptq.py
+    python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 fi
 
 if should_run_step "build"; then
     echo "Start model compilation."
-    python3 build.py
+    python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
         echo "Download pre-compiled model."
-        python3 get_model.py --type hmm
+        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Execute demo."
-    python3 demo.py
+    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+
     cd cpp
     ./build.sh
     python3 scripts/convert_embeddings.py

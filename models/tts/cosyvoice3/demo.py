@@ -46,6 +46,7 @@ from tqdm import tqdm
 from functools import partial
 from typing import List, Generator, Optional, Dict, Any
 from loguru import logger
+from hmatc.utils.utils import first_not_none, get_model_configs
 
 import tcim_lite as tcim
 
@@ -59,15 +60,25 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torch.functional
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 TOKENS_FILE_PATH = "./special_tokens.json"
-SUPPORT_DEVICE_NUM = 4
+SUPPORT_DEVICE_NUM = 1
 mel_basis = {}
 hann_window = {}
 
 # Debug switch: dump model input and output
 ENABLE_DUMP = False
+
+
+def get_default_tokenizer_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "cosyvoice3")
+    model_size = model_config.get("model_size", "0.5b-2512")
+    return f"{model_name}-{model_size}"
 
 
 def _ms(seconds: float) -> float:
@@ -135,31 +146,52 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="./Fun-CosyVoice3-0.5B-2512",
+        default=None,
         help="Path to CosyVoice3 tokenizer directory",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
+        default=None,
         help="Number of devices to use",
     )
     parser.add_argument(
         "--campplus_path",
         dest="campplus_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "cosyvoice3_campplus.hmm"),
+        default=None,
         help="Path to campplus model file",
     )
     parser.add_argument(
         "--speech_tokenizer_path",
         dest="speech_tokenizer_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "cosyvoice3_speech_tokenizer.hmm"),
+        default=None,
         help="Path to speech tokenizer model file",
     )
     parser.add_argument(
@@ -193,21 +225,19 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--prefill_model_path",
         type=str,
-        default=os.path.join(
-            "output", HOUMO_TARGET, "cosyvoice3_llm_qwen2_prefill.hmm"
-        ),
+        default=None,
         help="Path to LLM prefill model file",
     )
     parser.add_argument(
         "--decode_model_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "cosyvoice3_llm_qwen2_decode.hmm"),
+        default=None,
         help="Path to LLM decode model file",
     )
     parser.add_argument(
         "--llm_decoder_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "cosyvoice3_llm_decoder.hmm"),
+        default=None,
         help="Path to LLM decoder model file",
     )
     parser.add_argument(
@@ -221,31 +251,31 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--spk_embed_affine_layer",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "cosyvoice3_flow_spk.hmm"),
+        default=None,
         help="Path to speaker embedding affine layer model file",
     )
     parser.add_argument(
         "--pre_lookahead_layer",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "cosyvoice3_flow_encoder.hmm"),
+        default=None,
         help="Path to flow pre-lookahead encoder model file",
     )
     parser.add_argument(
         "--flow_decoder_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "cosyvoice3_flow_decoder.hmm"),
+        default=None,
         help="Path to flow decoder model file",
     )
     parser.add_argument(
         "--hift_part1_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "cosyvoice3_hift_part1.hmm"),
+        default=None,
         help="Path to HiFT part1 model file",
     )
     parser.add_argument(
         "--hift_part2_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "cosyvoice3_hift_part2.hmm"),
+        default=None,
         help="Path to HiFT part2 model file",
     )
     parser.add_argument(
@@ -263,6 +293,60 @@ def get_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    if args.ndevice != 1:
+        raise ValueError(
+            f"CosyVoice3 demo only supports args.ndevice=1, got: {args.ndevice}"
+        )
+    if args.tokenizer_dir is None:
+        args.tokenizer_dir = get_default_tokenizer_dir(model_config)
+    model_prefix = f"{args.model_name}-{args.model_size}"
+    if args.campplus_path is None:
+        args.campplus_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_campplus.hmm"
+        )
+    if args.speech_tokenizer_path is None:
+        args.speech_tokenizer_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_speech_tokenizer.hmm"
+        )
+    if args.prefill_model_path is None:
+        args.prefill_model_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_llm_qwen2_prefill.hmm"
+        )
+    if args.decode_model_path is None:
+        args.decode_model_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_llm_qwen2_decode.hmm"
+        )
+    if args.llm_decoder_path is None:
+        args.llm_decoder_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_llm_decoder.hmm"
+        )
+    if args.spk_embed_affine_layer is None:
+        args.spk_embed_affine_layer = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_flow_spk.hmm"
+        )
+    if args.pre_lookahead_layer is None:
+        args.pre_lookahead_layer = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_flow_encoder.hmm"
+        )
+    if args.flow_decoder_path is None:
+        args.flow_decoder_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_flow_decoder.hmm"
+        )
+    if args.hift_part1_path is None:
+        args.hift_part1_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_hift_part1.hmm"
+        )
+    if args.hift_part2_path is None:
+        args.hift_part2_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_hift_part2.hmm"
+        )
     return args
 
 

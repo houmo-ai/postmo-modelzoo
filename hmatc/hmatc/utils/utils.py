@@ -175,13 +175,13 @@ def check_gpu() -> bool:
 
 
 def parse_context_length(context_length):
-    """Parse context length values like 4096 or 256k into an integer."""
+    """Parse context length values like 4096, 256k or 0.5k into an integer."""
     if isinstance(context_length, int):
         return context_length
     if isinstance(context_length, str):
-        lower_value = context_length.lower()
+        lower_value = context_length.strip().lower()
         if lower_value.endswith("k"):
-            return int(lower_value[:-1]) * 1024
+            return int(float(lower_value[:-1]) * 1024)
         return int(lower_value)
     raise ValueError(f"Unsupported context length value: {context_length}")
 

@@ -24,6 +24,8 @@ import logging
 import onnx
 import numpy as np
 import torch
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import check_gpu, first_not_none, get_model_configs
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,6 +35,7 @@ logging.basicConfig(
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2."
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def get_net_input_output_infos(model_path):
@@ -70,16 +73,37 @@ def get_net_input_output_infos(model_path):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_path", type=str, default="./onnx", help="path of onnx model"
+        "--config", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml"
     )
-    parser.add_argument("--output_path", default="./output", type=str)
+    parser.add_argument(
+        "--model_path", type=str, default=None, help="path of onnx model"
+    )
+    parser.add_argument(
+        "--model_name", type=str, default=None, help="output hmonnx model name"
+    )
+    parser.add_argument(
+        "--model_size", dest="model_size", type=str, default=None, help="model size"
+    )
+    parser.add_argument("--output_path", default=f"output/{HOUMO_TARGET}", type=str)
     parser.add_argument(
         "--precision",
         type=str,
-        default="w8a8_sefp",
+        default=None,
         help="quant precision, xh2 support w8a8_sefp, w4a8_ssfp or w8a16_sefp",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.model_path = first_not_none(args.model_path, "./onnx")
+    args.precision = first_not_none(
+        args.precision, model_config.get("quant_type", "w8a8_sefp")
+    )
+    return args
 
 
 def quantize(args, model_path, model_name):
@@ -180,4 +204,34 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    assert check_gpu() is True, "Error: Not found GPU device."
+
+    args = parse_args()
+    print(args)
+
+    main_args = args
+    bge_m3_model_name = "bge-m3"
+    bge_reranker_model_name = "bge-reranker-v2-m3"
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
+        # Quantize bge-m3 model
+        onnx_path = os.path.join(
+            main_args.model_path, f"{bge_m3_model_name}/{bge_m3_model_name}.onnx"
+        )
+        if not os.path.exists(onnx_path):
+            logging.error(f"{onnx_path} is not found!")
+            raise SystemExit(1)
+        quantize(main_args, onnx_path, bge_m3_model_name)
+
+        # Quantize bge-reranker-v2-m3 model
+        onnx_path = os.path.join(
+            main_args.model_path,
+            f"{bge_reranker_model_name}/{bge_reranker_model_name}.onnx",
+        )
+        if not os.path.exists(onnx_path):
+            logging.error(f"{onnx_path} is not found!")
+            raise SystemExit(1)
+        quantize(main_args, onnx_path, bge_reranker_model_name)
+
+    print(
+        f"\n=== Quantization completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

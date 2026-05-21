@@ -23,6 +23,8 @@
 - `demo.py`: 在 XH2 上执行端到端 cosyvoice3 推理示例
 - `test.sh`: 一键下载/量化/编译/演示
 
+默认参数统一由 `config.yaml` 提供，当前默认模型为 `cosyvoice3-0.5b-2512`。
+
 ## 2 快速开始
 
 说明：
@@ -64,14 +66,14 @@ export MKL_NUM_THREADS=1
 
 ```bash
 cd models/tts/cosyvoice3
-python3 get_model.py --type hmm
+python3 get_model.py --type hmm --model_name cosyvoice3 --model_size 0.5b-2512
 ```
 
 下载 **原始模型文件**（用于自行量化/编译）：
 
 ```bash
 cd models/tts/cosyvoice3
-python3 get_model.py --type raw
+python3 get_model.py --type raw --model_name cosyvoice3 --model_size 0.5b-2512
 ```
 
 常用参数：
@@ -86,8 +88,17 @@ python3 get_model.py -h
 
 ```bash
 cd models/tts/cosyvoice3
-python3 ptq.py
+python3 ptq.py --model_name cosyvoice3 --model_size 0.5b-2512
 ```
+
+常用参数：
+
+- `--model_dir`: 原始模型目录，默认从 `config.yaml` 的 `modelscope_repo` 推导为 `./Fun-CosyVoice3-0.5B-2512`
+- `--model_name`: 输出模型名前缀，默认 `cosyvoice3`
+- `--model_size`: 输出模型规格，默认 `0.5b-2512`
+- `--context_length`: 最大序列长度，默认从 `config.yaml` 读取为 `2k`
+- `--input_sequence_length`: 输入序列长度，默认 `256`
+- `--quant_type`: 量化类型，默认 `w8a16h1_sefp`
 
 默认产物目录为 `output/$HOUMO_TARGET/hmquant`，其中会包含多子目录与文件（示例）：
 
@@ -115,21 +126,23 @@ output/xh2/hmquant
 
 ```bash
 cd models/tts/cosyvoice3
-python3 build.py
+python3 build.py --model_name cosyvoice3 --model_size 0.5b-2512
 ```
 
-编译产物默认位于 `output/$HOUMO_TARGET/`, `demo.py` 默认会从该目录加载以下文件（可通过参数覆盖）：
+编译产物默认位于 `output/$HOUMO_TARGET/` 目录下，包含多个 `.hmm` 文件。
 
-- `cosyvoice3_campplus.hmm`
-- `cosyvoice3_speech_tokenizer.hmm`
-- `cosyvoice3_llm_qwen2_prefill.hmm`
-- `cosyvoice3_llm_qwen2_decode.hmm`
-- `cosyvoice3_llm_decoder.hmm`
-- `cosyvoice3_flow_spk.hmm`
-- `cosyvoice3_flow_encoder.hmm`
-- `cosyvoice3_flow_decoder.hmm`
-- `cosyvoice3_hift_part1.hmm`
-- `cosyvoice3_hift_part2.hmm`
+默认 HMM 命名统一使用 `${model_name}-${model_size}` 前缀，例如：
+
+- `cosyvoice3-0.5b-2512_campplus.hmm`
+- `cosyvoice3-0.5b-2512_speech_tokenizer.hmm`
+- `cosyvoice3-0.5b-2512_llm_qwen2_prefill.hmm`
+- `cosyvoice3-0.5b-2512_llm_qwen2_decode.hmm`
+- `cosyvoice3-0.5b-2512_llm_decoder.hmm`
+- `cosyvoice3-0.5b-2512_flow_encoder.hmm`
+- `cosyvoice3-0.5b-2512_flow_spk.hmm`
+- `cosyvoice3-0.5b-2512_flow_decoder.hmm`
+- `cosyvoice3-0.5b-2512_hift_part1.hmm`
+- `cosyvoice3-0.5b-2512_hift_part2.hmm`
 
 说明：本仓库的 `build.py` 内部包含多个子模块的编译入口；如仅跑演示，优先使用 `get_model.py --type hmm` 获取已编译模型。
 
@@ -139,8 +152,10 @@ python3 build.py
 
 ```bash
 cd models/tts/cosyvoice3
-python3 demo.py
+python3 demo.py --model_name cosyvoice3 --model_size 0.5b-2512
 ```
+
+demo 默认会从 `config.yaml` 和 `${model_name}-${model_size}` 推导 tokenizer 与各子模型路径。
 
 更多参数：
 
@@ -152,18 +167,58 @@ python3 demo.py -h
 
 ### 2.6 一键执行
 
-一键下载并运行演示（使用预编译模型）：
+以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
 ```bash
-cd models/tts/cosyvoice3
+# 默认执行 demo，会先下载预编译模型
 bash test.sh
+
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+bash test.sh -s all
 ```
 
-一键执行“下载原始模型 → 量化 → 编译 → 演示”（需要 GPU 和工具链依赖）：
+当前脚本内部固定使用以下默认值：
+
+- `MODEL_NAME=cosyvoice3`
+- `MODEL_SIZE=0.5b-2512`
+
+对应执行行为如下：
+
+- `quant`：如未传 `--skip_download`，先下载 raw 模型，再执行 `python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"`
+- `build`：执行 `python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"`
+- `demo`：如未传 `--skip_download`，先下载预编译模型，再执行 `python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"`
+- `demo`：随后会继续构建 `cpp/` 示例、转换 embedding，并执行 `./bin/cosyvoice3-demo`
+
+test.sh 支持以下参数：
 
 ```bash
-cd models/tts/cosyvoice3
-bash test.sh -t compile
+Usage: test.sh [options]
+Options:
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  -size, --model_size     Model size.
+  -name, --model_name     Model name.
+  --skip_download         Skip model download steps.
+  -h, --help              Show this help message.
+```
+
+示例：
+
+```bash
+# 仅运行 quant，会先下载 raw 模型并使用脚本内默认的 cosyvoice3-0.5b-2512 参数量化
+bash test.sh -s quant
+
+# 仅运行 build，要求当前目录下已经有量化输出
+bash test.sh -s build
+
+# 仅运行 demo，会先下载预编译模型，然后继续跑 python + cpp 两套演示
+bash test.sh -s demo
+
+# 完整流程（下载原始模型、量化、编译、演示）
+bash test.sh -s all
+
+# 跳过模型下载，使用当前目录下已有的模型文件执行 demo
+bash test.sh -s demo --skip_download
 ```
 
 ## 3 参考结果

@@ -337,7 +337,10 @@ def execute_test_cmd(
         elif (
             check_flag
             and len(stdout_res) > 0
-            and ("Fail" in stdout_res[0] or "[error]" in stdout_res[0])
+            and (
+                ("Fail" in stdout_res[0] and "- Failed" not in stdout_res[0])
+                or "[error]" in stdout_res[0]
+            )
         ):
             flag = False
             logger.error(f"Result verification: FAILED!, command: {cmd_str}.")

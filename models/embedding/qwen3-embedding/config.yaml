@@ -1,0 +1,15 @@
+default_model_name: "qwen3-embedding"
+default_model_size: "8b"
+
+model_configs:
+  qwen3-embedding:
+    "8b":
+      modelscope_repo: ["qwen/qwen3-embedding-8b"]
+      model_name: "qwen3-embedding"
+      model_size: "8b"
+      ncore: 2
+      quant_type: "w4a8_ssfp"
+      context_length: "8k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256

@@ -36,6 +36,9 @@ from pathlib import Path
 from loguru import logger
 from onnx import helper, TensorProto, shape_inference, numpy_helper
 
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import first_not_none, get_model_configs, parse_context_length
+
 # convert hmonnx
 from xhquant.api import (
     Config,
@@ -63,24 +66,48 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
+
+def get_default_model_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "cosyvoice3")
+    model_size = model_config.get("model_size", "0.5b-2512")
+    return f"{model_name}-{model_size}"
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
         "--model_dir",
         dest="model_dir",
         type=str,
-        default="./Fun-CosyVoice3-0.5B-2512",
+        default=None,
         help="input hf model path",
     )
     parser.add_argument(
         "--model_name",
         dest="model_name",
         type=str,
-        default="cosyvoice3",
+        default=None,
         help="output hmonnx model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
     )
     parser.add_argument(
         "--output_dir",
@@ -100,21 +127,21 @@ def get_args() -> argparse.Namespace:
         "--context_length",
         dest="context_length",
         type=int,
-        default=2048,
+        default=None,
         help="max sequence length",
     )
     parser.add_argument(
         "--input_sequence_length",
         dest="input_sequence_length",
         type=int,
-        default=256,
+        default=None,
         help="input sequence length",
     )
     parser.add_argument(
         "--quant_type",
         dest="quant_type",
         type=str,
-        default="w8a16h1_sefp",
+        default=None,
         help="quant type, default is w8a16h1_sefp",
     )
     parser.add_argument(
@@ -126,6 +153,23 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=1024)
     parser.add_argument("--valid", action="store_true", help="validate the model")
     args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.model_dir = first_not_none(args.model_dir, get_default_model_dir(model_config))
+    args.context_length = first_not_none(
+        args.context_length,
+        parse_context_length(model_config.get("context_length", "2k")),
+    )
+    args.input_sequence_length = first_not_none(
+        args.input_sequence_length, model_config.get("prefill_length", 256)
+    )
+    args.quant_type = first_not_none(
+        args.quant_type, model_config.get("quant_type", "w8a16h1_sefp")
+    )
     return args
 
 
@@ -1476,7 +1520,10 @@ def move_embeddings(output_dir):
             logger.info(f"Copied {file_path} to {dst}")
 
 
-def main(args):
+if __name__ == "__main__":
+    args = get_args()
+    logger.info(f"Arguments: {args}")
+
     model_dir = args.model_dir
     model_name = args.model_name
     work_dir = args.work_dir
@@ -1488,70 +1535,68 @@ def main(args):
     os.makedirs(work_dir, exist_ok=True)
     os.makedirs(output_dir, exist_ok=True)
 
-    quantize_campplus(
-        model_name,
-        model_dir,
-        work_dir,
-        output_dir,
-        quant_type=quant_type,
-    )
-    quantize_speech_tokenizer(
-        model_name,
-        model_dir,
-        work_dir,
-        output_dir,
-        quant_type=quant_type,
-    )
-    quantize_llm_qwen2(
-        model_name,
-        model_dir,
-        work_dir,
-        output_dir,
-        quant_type=quant_type,
-        context_length=context_length,
-        input_sequence_length=input_sequence_length,
-        debug=args.debug,
-        seed=args.seed,
-        valid=args.valid,
-    )
-    quantize_llm_decoder(
-        model_name,
-        work_dir,
-        output_dir,
-        quant_type=quant_type,
-    )
-    quantize_flow_spk_embed_affine_layer(
-        model_name,
-        work_dir,
-        output_dir,
-        quant_type=quant_type,
-    )
-    quantize_flow_encoder(
-        model_name,
-        work_dir,
-        output_dir,
-        quant_type=quant_type,
-    )
-    quantize_flow_decoder(
-        model_name,
-        model_dir,
-        work_dir,
-        output_dir,
-        quant_type=quant_type,
-    )
-    quantize_hift(
-        model_name,
-        work_dir,
-        output_dir,
-        quant_type=quant_type,
-    )
-    move_embeddings(output_dir)
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
+        quantize_campplus(
+            model_name,
+            model_dir,
+            work_dir,
+            output_dir,
+            quant_type=quant_type,
+        )
+        quantize_speech_tokenizer(
+            model_name,
+            model_dir,
+            work_dir,
+            output_dir,
+            quant_type=quant_type,
+        )
+        quantize_llm_qwen2(
+            model_name,
+            model_dir,
+            work_dir,
+            output_dir,
+            quant_type=quant_type,
+            context_length=context_length,
+            input_sequence_length=input_sequence_length,
+            debug=args.debug,
+            seed=args.seed,
+            valid=args.valid,
+        )
+        quantize_llm_decoder(
+            model_name,
+            work_dir,
+            output_dir,
+            quant_type=quant_type,
+        )
+        quantize_flow_spk_embed_affine_layer(
+            model_name,
+            work_dir,
+            output_dir,
+            quant_type=quant_type,
+        )
+        quantize_flow_encoder(
+            model_name,
+            work_dir,
+            output_dir,
+            quant_type=quant_type,
+        )
+        quantize_flow_decoder(
+            model_name,
+            model_dir,
+            work_dir,
+            output_dir,
+            quant_type=quant_type,
+        )
+        quantize_hift(
+            model_name,
+            work_dir,
+            output_dir,
+            quant_type=quant_type,
+        )
+        move_embeddings(output_dir)
 
-    shutil.rmtree(work_dir, ignore_errors=True)
+        shutil.rmtree(work_dir, ignore_errors=True)
 
-
-if __name__ == "__main__":
-    args = get_args()
-    logger.info(f"Arguments: {args}")
-
-    main(args)
+    print(
+        f"\n=== All quantization steps completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

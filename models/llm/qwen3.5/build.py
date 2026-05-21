@@ -401,6 +401,7 @@ if __name__ == "__main__":
                 ncore=ncore,
                 enable_common_subgraph=args.enable_common_subgraph,
                 enable_xh2_stable_output=args.enable_xh2_stable_output,
+                cpp_backend="v2",
                 llm_opt=True,
                 parallel_jobs=j,
             )
@@ -416,6 +417,7 @@ if __name__ == "__main__":
                 ncore=ncore,
                 enable_common_subgraph=args.enable_common_subgraph,
                 enable_xh2_stable_output=args.enable_xh2_stable_output,
+                cpp_backend="v2",
                 llm_opt=True,
                 parallel_jobs=j,
             )

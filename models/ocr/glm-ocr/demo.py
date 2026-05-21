@@ -37,9 +37,21 @@ import itertools
 
 import tcim_lite as tcim
 from hmatc.python.get_hm_devices import get_hm_devices
+from hmatc.utils.utils import first_not_none, get_model_configs
 
 TARGET_TYPE = torch.float16
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
+
+def get_default_tokenizer_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "glm-ocr")
+    model_size = model_config.get("model_size", "0.9b")
+    return f"{model_name}-{model_size}"
 
 
 def build_messages(image_path: str, prompt: str) -> List[Dict[str, Any]]:
@@ -343,10 +355,31 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="glm-ocr",
+        default=None,
         help="tokenizer dir",
     )
     parser.add_argument(
@@ -360,46 +393,87 @@ def get_args() -> argparse.Namespace:
         "--vit_path",
         dest="vit_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "glm-ocr_visual.hmm"),
+        default=None,
         help="houmo visual model path",
     )
     parser.add_argument(
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "glm-ocr_prefill.hmm"),
+        default=None,
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "glm-ocr_decode.hmm"),
+        default=None,
         help="houmo decode model path",
     )
     parser.add_argument(
         "--image_size",
         dest="image_size",
-        type=list,
-        default=[672, 672],
+        type=int,
+        nargs=2,
+        default=None,
         help="size of the input image",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
-        choices=[1, 2],
+        default=None,
         help="device number, only xh2 support",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    if args.tokenizer_dir is None:
+        args.tokenizer_dir = get_default_tokenizer_dir(model_config)
+
+    image_size_w = model_config.get("image_size_w", 672)
+    image_size_h = model_config.get("image_size_h", 672)
+    max_size_t = model_config.get("max_size_t", 2)
+    args.image_size = list(
+        first_not_none(args.image_size, [image_size_w, image_size_h])
+    )
+
+    model_prefix = f"{args.model_name}-{args.model_size}"
+    if args.vit_path is None:
+        args.vit_path = os.path.join(
+            "output",
+            HOUMO_TARGET,
+            f"{model_prefix}_visual_{image_size_w}x{image_size_h}x{max_size_t}.hmm",
+        )
+    if args.prefill_path is None:
+        args.prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm"
+        )
+    if args.decode_path is None:
+        args.decode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_decode.hmm"
+        )
+    if args.ndevice > 1:
+        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+
+    return args
 
 
 class HmGLM_OCR:
 
     def __init__(self, args):
         self.ndevice = args.ndevice
-        dev_manager = tcim.runtime.DevManager(get_hm_devices(self.ndevice), "Xh2HalBackend")
+        dev_manager = tcim.runtime.DevManager(
+            get_hm_devices(self.ndevice), "Xh2HalBackend"
+        )
         weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)

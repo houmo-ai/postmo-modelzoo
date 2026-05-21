@@ -28,39 +28,51 @@
             "download_dir": ["cached_models", "cached_models"],
             "extract_dir": [null, "cached_models/hmm_xh2_8k"],
             "source_type": [null, null],
-            "context_length": [null, null],
+            "model_name": ["qwen3-reranker", "qwen3-reranker"],
+            "model_size": ["8b", "8b"],
+            "context_length": [null, "8k"],
             "batch": [null, null],
-            "ndevice": [null, null]
+            "ndevice": [null, null],
+            "ncore": [null, null],
+            "prefill_length": [null, null]
         }
     },
     "quant_params": {
         "xh2": {
             "model": ["cached_models/qwen3-reranker-8b"],
+            "model-name": ["qwen3-reranker"],
+            "model-size": ["8b"],
             "out-dir": ["cached_results/hmquant_xh2_2k"],
             "context-length": ["2048"],
             "input-sequence-length": ["256"],
-            "mix_search": [null],
-            "datasets-dir": [null]
+            "quant-type": [null]
         }
     },
     "compile_params": {
         "xh2": {
             "model_dir": ["cached_results/hmquant_xh2_2k"],
-            "stage": ["build"],
-            "j": ["24"],
+            "model_name": ["qwen3-reranker"],
+            "model_size": ["8b"],
+            "batch": [null],
+            "ncore": ["2"],
             "context_length": ["8192"],
+            "ndevice": ["1"],
+            "stage": ["build"],
+            "output_dir": ["cached_results/hmm_xh2_8k"],
             "prefill_length": ["256"],
-            "output_dir": ["cached_results/hmm_xh2_8k"]
+            "j": ["24"]
         }
     },
     "demo_params": {
         "xh2": {
+            "model_name": ["qwen3-reranker"],
+            "model_size": ["8b"],
             "tokenizer_dir": ["cached_models/qwen3-reranker-8b"],
             "embedding_path": [
                 "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_8k/qwen3-reranker_prefill.hmm"
+                "cached_results/hmm_xh2_8k/qwen3-reranker-8b_prefill.hmm"
             ],
             "ndevice": ["1"]
         }

@@ -25,8 +25,10 @@
                 "cached_models/hmm_xh2"
             ],
             "source_type": [null, "modelscope", null],
-            "batch": [null, null, null],
-            "context_length": [null, null, null],
+            "model_name": ["bge", "bge", "bge"],
+            "model_size": ["0.5b", "0.5b", "0.5b"],
+            "batch": ["10", "10", "10"],
+            "context_length": ["0.5k", "0.5k", "0.5k"],
             "ndevice": [null, null, null]
         }
     },
@@ -40,10 +42,10 @@
     "compile_params": {
         "xh2": {
             "model_dir": ["cached_results/hmquant_xh2"],
-            "model_name": [null],
-            "batch": [null],
-            "ncore": [null],
-            "ndevice": [null],
+            "model_name": ["bge"],
+            "model_size": ["0.5b"],
+            "ncore": ["2"],
+            "ndevice": ["1"],
             "stage": ["build"],
             "j": ["24"],
             "output_dir": ["cached_results/hmm_xh2"]
@@ -51,10 +53,14 @@
     },
     "demo_params": {
         "xh2": {
+            "model_name": ["bge"],
+            "model_size": ["0.5b"],
             "embedding_tokenizer_dir": ["cached_models/bge-m3"],
             "reranker_tokenizer_dir": ["cached_models/bge-reranker-v2-m3"],
-            "embedding_path": ["cached_results/hmm_xh2/bge-m3.hmm"],
-            "reranker_path": ["cached_results/hmm_xh2/bge-reranker-v2-m3.hmm"],
+            "embedding_path": ["cached_results/hmm_xh2/bge-m3-0.5b.hmm"],
+            "reranker_path": [
+                "cached_results/hmm_xh2/bge-reranker-v2-m3-0.5b.hmm"
+            ],
             "mode": [null],
             "device_idx": [null],
             "model_type": ["houmo"]

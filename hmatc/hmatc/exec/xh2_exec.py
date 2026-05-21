@@ -1184,6 +1184,7 @@ class Xh2Exec(BaseExec):
         skip_mlir_compile=False,
         subgraph_repeat_hint=20,
         work_dir=None,
+        cpp_backend="v1",
         target="xh2",
         **kwargs,
     ):
@@ -1246,18 +1247,20 @@ class Xh2Exec(BaseExec):
             flash_attn = 0
 
         custom_msg = {
-            "opt_level": opt_level,
-            "ncore": ncore,
             "target": "xh2",
-            "llm_opt": llm_opt,
-            "enable_xh2_stable_output": enable_xh2_stable_output,
-            "skip_mlir_compile": skip_mlir_compile,
-            "enable_common_subgraph": enable_common_subgraph,
-            "subgraph_repeat_hint": subgraph_repeat_hint,
-            "flash_attention": flash_attn,
+            "ndevice": ndevice,
+            "ncore": ncore,
+            "batch": batch,
             "context_length": context_length,
             "prefill_length": prefill_length,
-            "ndevice": ndevice,
+            "flash_attention": flash_attn,
+            "llm_opt": llm_opt,
+            "enable_xh2_stable_output": enable_xh2_stable_output,
+            "enable_common_subgraph": enable_common_subgraph,
+            "subgraph_repeat_hint": subgraph_repeat_hint,
+            "skip_mlir_compile": skip_mlir_compile,
+            "cpp_backend": cpp_backend,
+            "opt_level": opt_level,
             "is_prefill": is_prefill,
         }
         tcim.build_from_hmonnx(
@@ -1277,6 +1280,7 @@ class Xh2Exec(BaseExec):
             enable_common_subgraph=enable_common_subgraph,
             subgraph_repeat_hint=subgraph_repeat_hint,
             flash_attention=flash_attn,
+            cpp_backend=cpp_backend,
             j=kwargs.get("parallel_jobs", psutil.cpu_count(logical=False)),
             custom_msg=json.dumps(custom_msg, ensure_ascii=False),
             **build_kwargs,

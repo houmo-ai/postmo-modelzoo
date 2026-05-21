@@ -245,7 +245,7 @@ struct CosyVoice3Config {
    */
   std::string GetModelPath(const std::string& model_name) const {
     if (!model_dir.empty()) {
-      return model_dir + "/cosyvoice3_" + model_name + ".hmm";
+      return model_dir + "/cosyvoice3-0.5b-2512_" + model_name + ".hmm";
     }
     return "";
   }

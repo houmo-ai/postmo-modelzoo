@@ -1,0 +1,17 @@
+default_model_name: "glm-ocr"
+default_model_size: "0.9b"
+
+model_configs:
+  glm-ocr:
+    "0.9b":
+      modelscope_repo: ["ZhipuAI/GLM-OCR"]
+      model_name: "glm-ocr"
+      model_size: "0.9b"
+      ncore: 2
+      context_length: "8k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      image_size_w: 672
+      image_size_h: 672
+      max_size_t: 2

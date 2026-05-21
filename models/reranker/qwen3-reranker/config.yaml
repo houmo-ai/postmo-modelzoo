@@ -1,0 +1,15 @@
+default_model_name: "qwen3-reranker"
+default_model_size: "8b"
+
+model_configs:
+  qwen3-reranker:
+    "8b":
+      modelscope_repo: ["qwen/qwen3-reranker-8b"]
+      model_name: "qwen3-reranker"
+      model_size: "8b"
+      ncore: 2
+      quant_type: "w4a8h0_ssfp"
+      context_length: "8k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256

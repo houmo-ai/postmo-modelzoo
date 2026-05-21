@@ -24,17 +24,21 @@ import numpy as np
 import time
 import argparse
 import multiprocessing
-import glob
-
-import logging
-
-logging.basicConfig(level="INFO")
+from hmatc.exec.xh2_exec import Xh2Exec
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import (
+    find_hmonnx_file,
+    first_not_none,
+    get_model_configs,
+    get_platform,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh2", "Only supported xh2!"
 
-HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
+HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def sanitize_name(name: str):
@@ -63,6 +67,13 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
         "--model_dir",
         dest="model_dir",
         type=str,
@@ -73,39 +84,29 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="bge",
+        default=None,
         help="output houmo model name",
     )
     parser.add_argument(
         "--ncore",
         dest="ncore",
         type=int,
-        default=HOUMO_CORE_NUM,
+        default=None,
         help="core number",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=0,
-        choices=[0, 1, 2],
+        default=None,
         help="device number",
     )
     parser.add_argument(
         "--model_size",
         dest="model_size",
         type=str,
-        default="0.5b",
-        choices=["0.5b"],
+        default=None,
         help="model size",
-    )
-    parser.add_argument(
-        "--batch",
-        dest="batch",
-        type=int,
-        default=10,
-        choices=[10],
-        help="batch number",
     )
     parser.add_argument(
         "--j",
@@ -128,44 +129,18 @@ def get_args() -> argparse.Namespace:
         default=os.path.join("output", HOUMO_TARGET),
         help="build output dir",
     )
-    parser.add_argument(
-        "--context_length",
-        dest="context_length",
-        type=int,
-        default=512,
-        help="context_length",
-    )
     args = parser.parse_args()
-    return args
 
-
-def build(model_name, model_dir, output_dir, profile, ncore, j, context_length):
-    import tcim
-    import json
-
-    kwargs = {}
-    custom_msg = {}
-    custom_msg["context_length"] = context_length
-    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
-
-    start = time.time()
-    print(f"\n===> {model_name} build start...")
-    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
-    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
-    tcim.build_from_hmonnx(
-        decode_model,
-        weights=os.path.join(model_dir, "weight.npy"),
-        output_name=model_name,
-        ncore=ncore,
-        target=HOUMO_TARGET,
-        output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim", model_name),
-        llm_opt=True,
-        j=j,
-        **kwargs,
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
     )
-    profile["build"] = time.time() - start
-    print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+
+    return args
 
 
 def test(model_name, model_dir, output_dir, profile, prefix=None):
@@ -266,56 +241,52 @@ def test(model_name, model_dir, output_dir, profile, prefix=None):
 if __name__ == "__main__":
     args = get_args()
     print(args)
-    curdir = os.getcwd()
     model_dir = args.model_dir
     model_name = args.model_name
     output_dir = args.output_dir
     ncore = args.ncore
-    ndevice = args.ndevice
     model_size = args.model_size
-    batch = args.batch
     j = args.j
-    context_length = args.context_length
     profile = {}
 
-    # build model
-    if args.stage == "build" or args.stage == "all":
-        import platform
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
+        if args.stage == "build" or args.stage == "all":
+            assert (
+                get_platform() == "x86_64"
+            ), "Only supported for compilation on the x86_64 platform."
 
-        arch = platform.machine()
-        if arch != "x86_64":
-            print(f"[error] tcim not support platform: {arch}")
-            exit(0)
-        build(
-            f"{model_name}-m3",
-            f"{model_dir}/bge-m3",
-            output_dir,
-            profile,
-            ncore,
-            j,
-            context_length=context_length,
-        )
-        build(
-            f"{model_name}-reranker-v2-m3",
-            f"{model_dir}/bge-reranker-v2-m3",
-            output_dir,
-            profile,
-            ncore,
-            j,
-            context_length=context_length,
-        )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "bge-m3")),
+                hmm_name=f"{model_name}-m3-{model_size}",
+                output=output_dir,
+                ncore=ncore,
+                llm_opt=True,
+                ndevice=args.ndevice,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "bge-reranker-v2-m3")),
+                hmm_name=f"{model_name}-reranker-v2-m3-{model_size}",
+                output=output_dir,
+                ncore=ncore,
+                llm_opt=True,
+                ndevice=args.ndevice,
+                parallel_jobs=j,
+            )
 
-    # test model
-    if args.stage == "test" or args.stage == "all":
-        test(
-            f"{model_name}-m3",
-            f"{model_dir}/bge-m3",
-            output_dir,
-            profile,
-        )
-        test(
-            f"{model_name}-reranker-v2-m3",
-            f"{model_dir}/bge-reranker-v2-m3",
-            output_dir,
-            profile,
-        )
+        if args.stage == "test" or args.stage == "all":
+            test(
+                f"{model_name}-m3-{model_size}",
+                f"{model_dir}/bge-m3",
+                output_dir,
+                profile,
+            )
+            test(
+                f"{model_name}-reranker-v2-m3-{model_size}",
+                f"{model_dir}/bge-reranker-v2-m3",
+                output_dir,
+                profile,
+            )
+    print(
+        f"\n=== Build/test completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

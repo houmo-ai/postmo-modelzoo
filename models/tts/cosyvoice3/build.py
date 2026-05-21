@@ -21,21 +21,26 @@
 import os
 import numpy as np
 import time
-import psutil
-import threading
 import multiprocessing
 import argparse
 import glob
-import logging
 from loguru import logger
-
-logging.basicConfig(level="INFO")
+from hmatc.exec.xh2_exec import Xh2Exec
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import (
+    find_hmonnx_file,
+    first_not_none,
+    get_model_configs,
+    get_platform,
+    parse_context_length,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
-HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
+HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
@@ -84,73 +89,16 @@ def cosine_distance(data1, data2):
     return cosine_dist
 
 
-class ProcessMemoryMonitor:
-    """
-    Monitors the memory usage of the current Python process in real-time using psutil.
-    """
-
-    def __init__(self, interval=2, log_file=None):
-        """
-        Initializes the monitor.
-        Args:
-            interval (int): Time between measurements in seconds.
-            log_file (str, optional): Path to a file to log results. If None, logger.infos to console.
-        """
-        self.process = psutil.Process(os.getpid())
-        self.interval = interval
-        self.log_file = log_file
-        self.is_monitoring = False
-        self.peak_memory_mb = 0
-
-    def get_memory_info(self):
-        """
-        Gets current memory usage information.
-        Returns:
-            dict: A dictionary containing memory usage data.
-        """
-        memory_info = self.process.memory_info()
-        rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
-        percent = self.process.memory_percent()  # Percentage of system memory
-        return {"rss_mb": rss_mb, "percent": percent}
-
-    def start(self):
-        """Starts the monitoring loop in a separate daemon thread."""
-        self.is_monitoring = True
-        self.peak_memory_mb = 0
-        self.monitor_thread = threading.Thread(target=self._monitor_loop)
-        self.monitor_thread.daemon = True  # Thread will exit when main program does
-        self.monitor_thread.start()
-        logger.info(f"Memory monitoring started (interval: {self.interval}s)")
-
-    def _monitor_loop(self):
-        """The internal loop that runs in the thread."""
-        while self.is_monitoring:
-            mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info["rss_mb"])
-
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
-
-            # Output to console or file
-            if self.log_file:
-                with open(self.log_file, "a") as f:
-                    f.write(log_message + "\n")
-
-            time.sleep(self.interval)
-
-    def stop(self):
-        """Stops the monitoring loop and logger.infos peak usage."""
-        self.is_monitoring = False
-        if hasattr(self, "monitor_thread"):
-            self.monitor_thread.join(
-                timeout=1
-            )  # Wait a moment for the thread to finish
-        logger.info(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
-
-
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
     parser.add_argument(
         "--model_dir",
         dest="model_dir",
@@ -162,14 +110,21 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="cosyvoice3",
+        default=None,
         help="output houmo model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
     )
     parser.add_argument(
         "--batch",
         dest="batch",
         type=int,
-        default=1,
+        default=None,
         help="batch size",
     )
     parser.add_argument(
@@ -183,21 +138,21 @@ def get_args() -> argparse.Namespace:
         "--ncore",
         dest="ncore",
         type=int,
-        default=HOUMO_CORE_NUM,
+        default=None,
         help="core number",
     )
     parser.add_argument(
         "--context_length",
         dest="context_length",
         type=int,
-        default=2048,
+        default=None,
         help="context_length",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=1,
+        default=None,
         help="device number",
     )
     parser.add_argument(
@@ -219,7 +174,7 @@ def get_args() -> argparse.Namespace:
         "--prefill_length",
         dest="prefill_length",
         type=int,
-        default=256,
+        default=None,
         help="prefill_length",
     )
     parser.add_argument(
@@ -241,115 +196,29 @@ def get_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    args.batch = first_not_none(args.batch, model_config.get("batch", 1))
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    args.prefill_length = first_not_none(
+        args.prefill_length, model_config.get("prefill_length", 256)
+    )
+    args.context_length = first_not_none(
+        args.context_length,
+        parse_context_length(model_config.get("context_length", "2k")),
+    )
     args.flash_attention = _validate_adjust_flash_attention(
         args.flash_attention, args.context_length
     )
     return args
 
 
-def build(
-    model_name,
-    model_dir,
-    output_dir,
-    profile,
-    ncore,
-    ndevice,
-    context_length,
-    j,
-    batch=None,
-    tso=False,
-    flash_attention=0,
-    prefill_length=0,
-):
-    import tcim
-    import json
-
-    kwargs = {}
-    custom_msg = {}
-    kwargs["modify_llm"] = {}
-    kwargs["enable_xh2_stable_output"] = tso
-    if prefill_length:
-        custom_msg["prefill_length"] = prefill_length
-        # kwargs["modify_llm"]["fill-length"] = prefill_length
-    if batch:
-        kwargs["modify_llm"]["batch"] = batch
-        custom_msg["batch"] = batch
-    if flash_attention:
-        kwargs["flash_attention"] = flash_attention
-        custom_msg["flash_attention"] = flash_attention
-    if ndevice:
-        kwargs["ndevice"] = ndevice
-    if context_length:
-        kwargs["modify_llm"]["context-length"] = context_length
-        custom_msg["context_length"] = context_length
-    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
-
-    start = time.time()
-    logger.info(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
-    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
-    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
-    tcim.build_from_hmonnx(
-        decode_model,
-        weights=os.path.join(model_dir, "weight.npy"),
-        output_name=model_name,
-        ncore=ncore,
-        target=HOUMO_TARGET,
-        output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim", model_name),
-        llm_opt=True,
-        j=j,
-        **kwargs,
-    )
-    profile["build"] = time.time() - start
-    logger.info(
-        f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True
-    )
-
-
-def build_others(
-    model_name,
-    model_dir,
-    output_dir,
-    profile,
-    ncore,
-    j,
-    tso=False,
-    flash_attention=0,
-    onnx_suffix="",
-):
-    import tcim
-
-    kwargs = {}
-    kwargs["enable_xh2_stable_output"] = tso
-    if flash_attention:
-        import json
-
-        custom_msg = {}
-        kwargs["flash_attention"] = flash_attention
-        custom_msg["flash_attention"] = flash_attention
-        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
-
-    start = time.time()
-    logger.info(f"\n===> {model_name} build start... \n kwargs:{kwargs}")
-    onnx_files = glob.glob(f"{model_dir}/hmquant_*{onnx_suffix}.onnx")
-    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
-    tcim.build_from_hmonnx(
-        decode_model,
-        output_name=model_name,
-        ncore=ncore,
-        target=HOUMO_TARGET,
-        output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim", model_name),
-        j=j,
-        **kwargs,
-    )
-    profile["build"] = time.time() - start
-    logger.info(
-        f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True
-    )
-
-
-def test(model_name, model_dir, output_dir, profile, batch=1):
+def test(model_name, model_dir, output_dir, batch=1):
     import tcim_lite
 
     logger.info(f"\n===> {model_name} test start...")
@@ -357,11 +226,11 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
     model_path = os.path.join(output_dir, f"{model_name}.hmm")
     start = time.time()
     module = tcim_lite.runtime.load(model_path)
-    profile["load"] = time.time() - start
-    logger.info(f'{model_name} load completed in {profile["load"]:.3f} s.', flush=True)
+    load_time = time.time() - start
+    logger.info(f"{model_name} load completed in {load_time:.3f} s.", flush=True)
 
     # set input
-    profile["set_input"] = 0
+    set_input_time = 0
     input_num = module.get_num_inputs()
     for idx in range(input_num):
         input_name = module.get_input_name(idx)
@@ -380,20 +249,20 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
         )
         start = time.time()
         module.set_input(input_name, input_data)
-        profile["set_input"] += time.time() - start
+        set_input_time += time.time() - start
     logger.info(
-        f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.'
+        f"{model_name} set {input_num} inputs completed in {set_input_time*1000:.3f} ms."
     )
 
     # infer model
     start = time.time()
     module.run()
     module.sync()
-    profile["infer"] = time.time() - start
-    logger.info(f'{model_name} infer completed in {profile["infer"]*1000:.3f} ms.')
+    infer_time = time.time() - start
+    logger.info(f"{model_name} infer completed in {infer_time*1000:.3f} ms.")
 
     # get output and compare with golden
-    profile["get_output"] = 0
+    get_output_time = 0
     result_check = True
     output_num = module.get_num_outputs()
     for idx in range(output_num):
@@ -404,7 +273,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
         )
         start = time.time()
         output_data = module.get_output(output_name).numpy()
-        profile["get_output"] += time.time() - start
+        get_output_time += time.time() - start
         logger.info(
             f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
         )
@@ -439,7 +308,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
                 f"[compare] golden output [{output_name}] shape not match {golden_output.shape} vs {output_data.shape}"
             )
     logger.info(
-        f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.'
+        f"{model_name} get {output_num} ouputs completed in {get_output_time*1000:.3f} ms."
     )
     if not result_check:
         logger.info("[error] result check failed.")
@@ -448,16 +317,12 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
 
 
 if __name__ == "__main__":
-    # Create and start the monitor
-    memory_monitor = ProcessMemoryMonitor(interval=2)
-    memory_monitor.start()
-
-    # parse args
     args = get_args()
     logger.info(args)
 
     model_dir = args.model_dir
     model_name = args.model_name
+    model_size = args.model_size
     output_dir = args.output_dir
     ncore = args.ncore
     batch = args.batch
@@ -467,141 +332,134 @@ if __name__ == "__main__":
     j = args.j
     llm_flash_attention, others_flash_attention = args.flash_attention
 
-    profile = {}
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
+        if args.stage == "build" or args.stage == "all":
+            assert (
+                get_platform() == "x86_64"
+            ), f"Only supported for compilation on the x86_64 platform."
 
-    # build model
-    if args.stage == "build" or args.stage == "all":
-        import platform
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "campplus")),
+                hmm_name=f"{model_name}-{model_size}_campplus",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=others_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "speech_tokenizer")),
+                hmm_name=f"{model_name}-{model_size}_speech_tokenizer",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=others_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "llm_decoder")),
+                hmm_name=f"{model_name}-{model_size}_llm_decoder",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=others_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                is_prefill=True,
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "llm_prefill")),
+                hmm_name=f"{model_name}-{model_size}_llm_qwen2_prefill",
+                output=output_dir,
+                ncore=ncore,
+                llm_opt=True,
+                flash_attn=llm_flash_attention,
+                context_length=context_length,
+                prefill_length=args.prefill_length,
+                ndevice=ndevice,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "llm_decode")),
+                hmm_name=f"{model_name}-{model_size}_llm_qwen2_decode",
+                output=output_dir,
+                ncore=ncore,
+                llm_opt=True,
+                batch=batch,
+                flash_attn=llm_flash_attention,
+                context_length=context_length,
+                ndevice=ndevice,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "flow_encoder")),
+                hmm_name=f"{model_name}-{model_size}_flow_encoder",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=others_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "flow_spk")),
+                hmm_name=f"{model_name}-{model_size}_flow_spk",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=others_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "flow_decoder")),
+                hmm_name=f"{model_name}-{model_size}_flow_decoder",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=others_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(
+                    os.path.join(model_dir, "hift"), pattern="hmquant_*part1.onnx"
+                ),
+                hmm_name=f"{model_name}-{model_size}_hift_part1",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=others_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(
+                    os.path.join(model_dir, "hift"), pattern="hmquant_*part2.onnx"
+                ),
+                hmm_name=f"{model_name}-{model_size}_hift_part2",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=others_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
 
-        arch = platform.machine()
-        if arch != "x86_64":
-            logger.info(f"[error] tcim not support platform: {arch}")
-            exit(0)
+        if args.stage == "test" or args.stage == "all":
+            part_dir = os.path.join(model_dir, "campplus")
+            test(f"{model_name}-{model_size}_campplus", part_dir, output_dir)
+            part_dir = os.path.join(model_dir, "speech_tokenizer")
+            test(f"{model_name}-{model_size}_speech_tokenizer", part_dir, output_dir)
+            part_dir = os.path.join(model_dir, "llm_decoder")
+            test(f"{model_name}-{model_size}_llm_decoder", part_dir, output_dir)
+            part_dir = os.path.join(model_dir, "llm_prefill")
+            test(f"{model_name}-{model_size}_llm_qwen2_prefill", part_dir, output_dir)
+            part_dir = os.path.join(model_dir, "llm_decode")
+            test(f"{model_name}-{model_size}_llm_qwen2_decode", part_dir, output_dir)
+            part_dir = os.path.join(model_dir, "flow_encoder")
+            test(f"{model_name}-{model_size}_flow_encoder", part_dir, output_dir)
+            part_dir = os.path.join(model_dir, "flow_spk")
+            test(f"{model_name}-{model_size}_flow_spk", part_dir, output_dir)
+            part_dir = os.path.join(model_dir, "flow_decoder")
+            test(f"{model_name}-{model_size}_flow_decoder", part_dir, output_dir)
 
-        build_others(
-            f"{model_name}_campplus",
-            os.path.join(model_dir, "campplus"),
-            output_dir,
-            profile,
-            ncore,
-            j,
-            tso=tso,
-            flash_attention=others_flash_attention,
-        )
-        build_others(
-            f"{model_name}_speech_tokenizer",
-            os.path.join(model_dir, "speech_tokenizer"),
-            output_dir,
-            profile,
-            ncore,
-            j,
-            tso=tso,
-            flash_attention=others_flash_attention,
-        )
-        build_others(
-            f"{model_name}_llm_decoder",
-            os.path.join(model_dir, "llm_decoder"),
-            output_dir,
-            profile,
-            ncore,
-            j,
-            tso=tso,
-            flash_attention=others_flash_attention,
-        )
-        build(
-            f"{model_name}_llm_qwen2_prefill",
-            os.path.join(model_dir, "llm_prefill"),
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            context_length,
-            j,
-            flash_attention=llm_flash_attention,
-            prefill_length=args.prefill_length,
-        )
-        build(
-            f"{model_name}_llm_qwen2_decode",
-            os.path.join(model_dir, "llm_decode"),
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            context_length,
-            j,
-            batch,
-            flash_attention=llm_flash_attention,
-        )
-        build_others(
-            f"{model_name}_flow_encoder",
-            os.path.join(model_dir, "flow_encoder"),
-            output_dir,
-            profile,
-            ncore,
-            j,
-            tso=tso,
-            flash_attention=others_flash_attention,
-        )
-        build_others(
-            f"{model_name}_flow_spk",
-            os.path.join(model_dir, "flow_spk"),
-            output_dir,
-            profile,
-            ncore,
-            j,
-            tso=tso,
-            flash_attention=others_flash_attention,
-        )
-        build_others(
-            f"{model_name}_flow_decoder",
-            os.path.join(model_dir, "flow_decoder"),
-            output_dir,
-            profile,
-            ncore,
-            j,
-            tso=tso,
-            flash_attention=others_flash_attention,
-        )
-        build_others(
-            f"{model_name}_hift_part1",
-            os.path.join(model_dir, "hift"),
-            output_dir,
-            profile,
-            ncore,
-            j,
-            tso=tso,
-            flash_attention=others_flash_attention,
-            onnx_suffix="part1",
-        )
-        build_others(
-            f"{model_name}_hift_part2",
-            os.path.join(model_dir, "hift"),
-            output_dir,
-            profile,
-            ncore,
-            j,
-            tso=tso,
-            flash_attention=others_flash_attention,
-            onnx_suffix="part2",
-        )
-
-    # test model
-    if args.stage == "test" or args.stage == "all":
-        part_dir = os.path.join(model_dir, "campplus")
-        test(f"{model_name}_campplus", part_dir, output_dir, profile)
-        part_dir = os.path.join(model_dir, "speech_tokenizer")
-        test(f"{model_name}_speech_tokenizer", part_dir, output_dir, profile)
-        part_dir = os.path.join(model_dir, "llm_decoder")
-        test(f"{model_name}_llm_decoder", part_dir, output_dir, profile)
-        part_dir = os.path.join(model_dir, "llm_prefill")
-        test(f"{model_name}_llm_qwen2_prefill", part_dir, output_dir, profile)
-        part_dir = os.path.join(model_dir, "llm_decode")
-        test(f"{model_name}_llm_qwen2_decode", part_dir, output_dir, profile)
-        part_dir = os.path.join(model_dir, "flow_encoder")
-        test(f"{model_name}_flow_encoder", part_dir, output_dir, profile)
-        part_dir = os.path.join(model_dir, "flow_spk")
-        test(f"{model_name}_flow_spk", part_dir, output_dir, profile)
-        part_dir = os.path.join(model_dir, "flow_decoder")
-        test(f"{model_name}_flow_decoder", part_dir, output_dir, profile)
-
-    memory_monitor.stop()
+    print(
+        f"\n=== All builds completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

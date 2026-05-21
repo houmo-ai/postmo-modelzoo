@@ -1,0 +1,15 @@
+default_model_name: "cosyvoice3"
+default_model_size: "0.5b-2512"
+
+model_configs:
+  cosyvoice3:
+    "0.5b-2512":
+      modelscope_repo: ["FunAudioLLM/Fun-CosyVoice3-0.5B-2512"]
+      model_name: "cosyvoice3"
+      model_size: "0.5b-2512"
+      ncore: 2
+      context_length: "2k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      quant_type: "w8a16h1_sefp"
