@@ -54,6 +54,15 @@ def get_default_tokenizer_dir(model_config: dict) -> str:
     return f"{model_name}-{model_size}"
 
 
+def parse_visual_size_from_path(path: str) -> Optional[Tuple[int, int, int]]:
+    match = re.search(
+        r"_visual_(\d+)x(\d+)x(\d+)\.(?:hmm|hmms)$", os.path.basename(path)
+    )
+    if match is None:
+        return None
+    return tuple(int(item) for item in match.groups())
+
+
 def build_messages(image_path: str, prompt: str) -> List[Dict[str, Any]]:
     return [
         {
@@ -393,8 +402,9 @@ def get_args() -> argparse.Namespace:
         "--vit_path",
         dest="vit_path",
         type=str,
+        nargs="+",
         default=None,
-        help="houmo visual model path",
+        help="houmo visual model path(s)",
     )
     parser.add_argument(
         "--prefill_path",
@@ -441,17 +451,20 @@ def get_args() -> argparse.Namespace:
     image_size_w = model_config.get("image_size_w", 672)
     image_size_h = model_config.get("image_size_h", 672)
     max_size_t = model_config.get("max_size_t", 2)
+    args.max_size_t = max_size_t
     args.image_size = list(
         first_not_none(args.image_size, [image_size_w, image_size_h])
     )
 
     model_prefix = f"{args.model_name}-{args.model_size}"
     if args.vit_path is None:
-        args.vit_path = os.path.join(
-            "output",
-            HOUMO_TARGET,
-            f"{model_prefix}_visual_{image_size_w}x{image_size_h}x{max_size_t}.hmm",
-        )
+        args.vit_path = [
+            os.path.join(
+                "output",
+                HOUMO_TARGET,
+                f"{model_prefix}_visual_{image_size_w}x{image_size_h}x{max_size_t}.hmm",
+            )
+        ]
     if args.prefill_path is None:
         args.prefill_path = os.path.join(
             "output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm"
@@ -475,11 +488,16 @@ class HmGLM_OCR:
             get_hm_devices(self.ndevice), "Xh2HalBackend"
         )
         weight_manager = tcim.runtime.WeightManager(dev_manager)
-        option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)
         option3 = tcim.runtime.Option(weight_manager)
-        self.vit_model = tcim.runtime.load(args.vit_path, option=option1)
-        logger.info("vit model loaded")
+        self.visual_specs = self._load_visual_specs(
+            args.vit_path,
+            args.image_size,
+            args.max_size_t,
+            weight_manager,
+        )
+        self.vit_model = self.visual_specs[0]["model"]
+        logger.info(f"{len(self.visual_specs)} vit model(s) loaded")
         self.prefill = tcim.runtime.load(args.prefill_path, option=option2)
         logger.info("prefill model loaded")
         self.nblocks = self._get_nblocks()
@@ -538,6 +556,73 @@ class HmGLM_OCR:
         self.vit_time = 0
         self.prefill_time = 0
         self.decode_time = 0
+
+    def _load_visual_specs(
+        self,
+        vit_paths: Union[str, List[str]],
+        image_size: List[int],
+        max_size_t: int,
+        weight_manager,
+    ) -> List[Dict[str, Any]]:
+        if isinstance(vit_paths, str):
+            vit_paths = [vit_paths]
+
+        visual_specs = []
+        multi_visual = len(vit_paths) > 1
+        for path in vit_paths:
+            parsed_size = parse_visual_size_from_path(path)
+            if parsed_size is None:
+                if multi_visual:
+                    raise ValueError(
+                        f"Cannot parse visual size from '{path}'. "
+                        "Multi visual mode requires filenames like '*_visual_336x336x2.hmm'."
+                    )
+                width, height = image_size
+                temporal_size = max_size_t
+            else:
+                width, height, temporal_size = parsed_size
+            if width <= 0 or height <= 0 or temporal_size <= 0:
+                raise ValueError(
+                    f"Invalid visual size for '{path}': {width}x{height}x{temporal_size}"
+                )
+
+            option = tcim.runtime.Option(weight_manager)
+            model = tcim.runtime.load(path, option=option)
+            visual_specs.append(
+                {
+                    "path": path,
+                    "width": int(width),
+                    "height": int(height),
+                    "max_size_t": int(temporal_size),
+                    "model": model,
+                }
+            )
+            logger.info(
+                f"vit model loaded: path={path}, size={width}x{height}x{temporal_size}"
+            )
+        return visual_specs
+
+    def _select_visual_spec(self, orig_w: int, orig_h: int) -> Dict[str, Any]:
+        candidates = [
+            spec
+            for spec in self.visual_specs
+            if spec["width"] >= orig_w and spec["height"] >= orig_h
+        ]
+        if candidates:
+            return min(
+                candidates,
+                key=lambda spec: (
+                    spec["width"] * spec["height"],
+                    max(spec["width"], spec["height"]),
+                ),
+            )
+        return max(
+            self.visual_specs,
+            key=lambda spec: (
+                spec["width"] * spec["height"],
+                -max(spec["width"], spec["height"]),
+            ),
+        )
 
     def _get_nblocks(self):
         input_names = []
@@ -660,17 +745,17 @@ class HmGLM_OCR:
             torch.tensor([seq_length], dtype=torch.int32),
         )
 
-    def _run_visual(self, inputs: torch.Tensor) -> torch.Tensor:
-        self.vit_model.set_input(
-            self.vit_model.get_input_name(0),
+    def _run_visual(self, inputs: torch.Tensor, vit_model) -> torch.Tensor:
+        vit_model.set_input(
+            vit_model.get_input_name(0),
             inputs.numpy().astype(np.float16),
         )
         start_time = time.time()
-        self.vit_model.run()
-        self.vit_model.sync()
+        vit_model.run()
+        vit_model.sync()
         self.vit_time += time.time() - start_time
-        vit_model_output = self.vit_model.get_output(
-            self.vit_model.get_output_name(0)
+        vit_model_output = vit_model.get_output(
+            vit_model.get_output_name(0)
         ).numpy()
 
         return torch.tensor(vit_model_output)
@@ -738,8 +823,14 @@ class HmGLM_OCR:
         start_time = time.time()
         image = Image.open(image_path).convert("RGB")
         orig_w, orig_h = image.size
-        target_w = int(self.image_size_w)
-        target_h = int(self.image_size_h)
+        visual_spec = self._select_visual_spec(orig_w, orig_h)
+        target_w = int(visual_spec["width"])
+        target_h = int(visual_spec["height"])
+        logger.info(
+            f"selected vit model: path={visual_spec['path']}, "
+            f"size={target_w}x{target_h}x{visual_spec['max_size_t']}, "
+            f"image={orig_w}x{orig_h}"
+        )
         if (orig_w, orig_h) != (target_w, target_h):
             scale = min(target_w / orig_w, target_h / orig_h)
             new_w = int(orig_w * scale)
@@ -758,7 +849,7 @@ class HmGLM_OCR:
         pixel_values = inputs["pixel_values"]
         image_grid_thw = inputs["image_grid_thw"]
 
-        image_features = self._run_visual(pixel_values)
+        image_features = self._run_visual(pixel_values, visual_spec["model"])
         data_prefill = {
             "input_ids": input_ids,
             "image_embeds": image_features,
