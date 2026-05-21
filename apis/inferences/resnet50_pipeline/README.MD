@@ -53,10 +53,10 @@ cd ..
 
 ```bash
 I20260414 09:09:26.819265 499071 resnet50_pipeline.cc:152] ===> resnet50_pipeline c++ example start...
-I20260414 09:09:26.820042 499071 resnet50_pipeline.cc:172] Found .hmm file: ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm
-I20260414 09:09:26.820061 499071 resnet50_pipeline.cc:181] Find resnet50 model file ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm
-I20260414 09:09:26.820063 499071 resnet50_pipeline.cc:187] model: ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm, samples: 10
-I20260414 09:09:27.262700 499071 resnet50_pipeline.cc:203] model ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm loaded.
+I20260414 09:09:26.820042 499071 resnet50_pipeline.cc:172] Found .hmm file: ./resnet50_xh2_b1_1roi_1core_O2.hmm
+I20260414 09:09:26.820061 499071 resnet50_pipeline.cc:181] Find resnet50 model file ./resnet50_xh2_b1_1roi_1core_O2.hmm
+I20260414 09:09:26.820063 499071 resnet50_pipeline.cc:187] model: ./resnet50_xh2_b1_1roi_1core_O2.hmm, samples: 10
+I20260414 09:09:27.262700 499071 resnet50_pipeline.cc:203] model ./resnet50_xh2_b1_1roi_1core_O2.hmm loaded.
 I20260414 09:09:27.262731 499071 resnet50_pipeline.cc:216] Count of Input: 2
 I20260414 09:09:27.262782 499071 resnet50_pipeline.cc:221] Input[input.1] info: TensorInfo: shape: [1,3,512,512], stride: [262144,512,1,131072,512,2,1,262144], dtype: UINT8, format: YUV420SP, size: 393216, memsize: 393216
 I20260414 09:09:27.262812 499071 resnet50_pipeline.cc:221] Input[resizer_crop_input.1] info: TensorInfo: shape: [1,10], stride: [40,4], dtype: INT32, format: ND, size: 40, memsize: 40

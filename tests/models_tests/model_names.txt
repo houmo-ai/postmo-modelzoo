@@ -39,7 +39,6 @@ gpt_oss
 sensevoice
 cosyvoice3
 glm_asr
-whisper_turbo
 qwen3_embedding
 glm_ocr
 qwen3_reranker

@@ -50,7 +50,7 @@ python3 get_model.py --type hmm
 python3 get_model.py --type hmm --model_size 1.7b
 
 # Qwen3-ForcedAligner-0.6B
-python3 get_model.py --type hmm --model_name qwen3_forcealigner
+python3 get_model.py --type hmm --model_name qwen3-forcealigner
 ```
 
 如果需要自行编译模型，可以下载原始模式，下载方式如下：
@@ -63,7 +63,7 @@ python3 get_model.py --type raw
 python3 get_model.py --type raw --model_size 1.7b
 
 # Qwen3-ForcedAligner-0.6B
-python3 get_model.py --type raw --model_name qwen3_forcealigner
+python3 get_model.py --type raw --model_name qwen3-forcealigner
 ```
 
 ### 2.3 量化
@@ -84,11 +84,13 @@ cd models/asr/qwen3-asr
 python3 ptq.py
 
 # Qwen3-ASR-1.7B
-python3 ptq.py --model Qwen3-ASR-1.7B
+python3 ptq.py --model_size 1.7b --model Qwen3-ASR-1.7B
 
 # Qwen3-ForcedAligner-0.6B
-python3 ptq.py --model Qwen3-ForcedAligner-0.6B --model_name qwen3_forcealigner
+python3 ptq.py --model_name qwen3-forcealigner --model_size 0.6b --model Qwen3-ForcedAligner-0.6B
 ```
+
+`config.yaml` 中的 `context_length` 使用字符串形式维护，例如 `2k`、`1k`、`0.5k`。`build.py` 会统一通过公共解析函数把它转换为实际整数。
 
 ### 2.4 编译
 
@@ -98,18 +100,21 @@ python3 ptq.py --model Qwen3-ForcedAligner-0.6B --model_name qwen3_forcealigner
 # Qwen3-ASR-0.6B / Qwen3-ASR-1.7B (默认)
 python3 build.py
 
+# Qwen3-ASR-1.7B
+python3 build.py --model_name qwen3-asr --model_size 1.7b --context_length 2k
+
 # Qwen3-ForcedAligner-0.6B
-python3 build.py --model_name qwen3_forcealigner
+python3 build.py --model_name qwen3-forcealigner --model_size 0.6b --context_length 2k
 ```
 
 编译好的模型存放在当前目录，包括3个文件：
-- qwen3_asr_encode.hmm
-- qwen3_asr_decode.hmm
-- qwen3_asr_prefill.hmm
+- qwen3-asr-0.6b_encode.hmm
+- qwen3-asr-0.6b_decode.hmm
+- qwen3-asr-0.6b_prefill.hmm
 
 或（Qwen3-ForcedAligner-0.6B）：
-- qwen3_forcealigner_encode.hmm
-- qwen3_forcealigner_prefill.hmm
+- qwen3-forcealigner-0.6b_encode.hmm
+- qwen3-forcealigner-0.6b_prefill.hmm
 
 ### 2.5 演示
 
@@ -120,30 +125,32 @@ Qwen3-ASR模型使用python API进行演示。
 python3 demo_asr.py
 
 # Qwen3-ASR-1.7B
-python3 demo_asr.py --processor_dir Qwen3-ASR-1.7B
+python3 demo_asr.py --model_name qwen3-asr --model_size 1.7b
 
 # Qwen3-ForcedAligner-0.6B
-python3 demo_forcealigner.py
+python3 demo_forcealigner.py --model_name qwen3-forcealigner --model_size 0.6b
 ```
+
+两个 demo 都会默认从 `config.yaml` 读取 `model_name`、`model_size`、`ndevice`，并自动推导 `processor_dir` 与 HMM 路径；只有在需要覆盖默认值时才需要手工传参。
 
 推理完成将输出性能结果。
 
 ### 2.6 一键评估
 
-以上步骤可以通过test.sh脚本执行。默认执行demo步骤，默认模型为 qwen3_asr 0.6b。
+以上步骤可以通过test.sh脚本执行。默认执行demo步骤，默认模型为 qwen3-asr 0.6b。
 
 ```bash
 # Qwen3-ASR-0.6B，默认执行 demo
 bash test.sh
 
 # Qwen3-ASR-1.7B，执行 demo
-bash test.sh -name qwen3_asr -size 1.7b
+bash test.sh -name qwen3-asr -size 1.7b
 
 # Qwen3-ForcedAligner-0.6B，执行 demo
-bash test.sh -name qwen3_forcealigner -size 0.6b
+bash test.sh -name qwen3-forcealigner -size 0.6b
 
 # 完整流程：下载原始模型 + 量化 + 编译 + 演示
-bash test.sh -s all -name qwen3_asr -size 1.7b
+bash test.sh -s all -name qwen3-asr -size 1.7b
 ```
 
 test.sh支持以下参数：
@@ -151,35 +158,36 @@ test.sh支持以下参数：
 ```bash
 Usage: test.sh [options]
   -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
-  -skip, --skip_download  Skip model download steps.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
   -size, --model_size     Model size.
   -name, --model_name     Model name.
+  --skip_download         Skip model download steps.
   -h, --help              Show this help message.
 ```
 
 其中支持的模型组合为：
 
-- `qwen3_asr` + `0.6b`
-- `qwen3_asr` + `1.7b`
-- `qwen3_forcealigner` + `0.6b`
+- `qwen3-asr` + `0.6b`
+- `qwen3-asr` + `1.7b`
+- `qwen3-forcealigner` + `0.6b`
 
 示例：
 
 ```bash
 # 仅运行 quant，会先下载原始模型再量化
-bash test.sh -s quant -name qwen3_asr -size 1.7b
+bash test.sh -s quant -name qwen3-asr -size 1.7b
 
 # 仅运行 build，要求当前目录下已经有量化输出
-bash test.sh -s build -name qwen3_forcealigner -size 0.6b
+bash test.sh -s build -name qwen3-forcealigner -size 0.6b
 
 # 仅运行 demo，会先下载预编译模型
-bash test.sh -s demo -name qwen3_asr -size 1.7b
+bash test.sh -s demo -name qwen3-asr -size 1.7b
 
 # 完整流程（下载原始模型、量化、编译、演示）
-bash test.sh -s all -name qwen3_forcealigner -size 0.6b
+bash test.sh -s all -name qwen3-forcealigner -size 0.6b
 
 # 跳过模型下载，使用当前目录下已有的预编译模型进行演示
-bash test.sh -s demo -skip -name qwen3_asr -size 0.6b
+bash test.sh -s demo --skip_download -name qwen3-asr -size 0.6b
 ```
 
 ## 3 参考结果

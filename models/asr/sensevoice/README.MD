@@ -45,15 +45,15 @@ python3 get_model.py --type raw
 量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上，空闲内存需要达到100GB以上。参考命令：
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu20.04-py39-x86.64 /bin/bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64 /bin/bash
 ```
 
-进入docker后source环境变量，并进入`models/asr/sensevoice`目录，执行ptq.py脚本。默认的量化方式为w8a8_sefp。
+进入docker后source环境变量，并进入`models/asr/sensevoice`目录，执行ptq.py脚本。默认的量化方式为 `w8a8h1_sefp`。
 
 ```bash
 source env.sh
 cd models/asr/sensevoice
-python3 ptq.py
+python3 ptq.py --model-name sensevoice --model-size small
 ```
 
 ### 2.4 编译
@@ -61,29 +61,76 @@ python3 ptq.py
 将量化模型编译为在芯片上运行的模型。执行脚本：
 
 ```bash
-python3 build.py
+python3 build.py --model_name sensevoice --model_size small
 ```
 
-编译好的模型存放在当前目录的output/xh2目录下，包括1个文件：
-sensevoice_small.hmm
+默认输出文件位于 `output/xh2/sensevoice-small.hmm`。
 
 ### 2.5 演示
 
-SenseVoiceSmall模型使用python API进行演示
-
-2. 执行脚本，推理完成将输出性能结果。
+SenseVoiceSmall 模型使用 python API 进行演示。`demo.py` 默认会从 `config.yaml` 读取 `model_name`、`model_size`、`ndevice`，并自动推导 `assets_dir` 与 `model_path`。
 
 ```bash
 python3 demo.py
 python3 demo.py --raw_result #输出原始结果
+python3 demo.py --model_name sensevoice --model_size small
+```
+
+如果需要显式覆盖默认路径，可手工指定：
+
+```bash
+python3 demo.py \
+  --model_name sensevoice \
+  --model_size small \
+  --model_path output/xh2/sensevoice-small.hmm \
+  --assets-dir SenseVoiceSmall
 ```
 
 ### 2.6 一键评估
 
-以上步骤可以通过test.sh脚本一键执行：
+以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
 ```bash
+# 默认执行 demo，会先下载预编译模型
 bash test.sh
+
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+bash test.sh -s all
+```
+
+test.sh 支持以下参数：
+
+```bash
+Usage: test.sh [options]
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  -size, --model_size     Model size.
+  -name, --model_name     Model name.
+  --skip_download         Skip model download steps.
+  -h, --help              Show this help message.
+```
+
+  当前支持的模型组合为：
+
+  - `sensevoice` + `small`
+
+示例：
+
+```bash
+# 仅运行 quant，会先下载原始模型再量化
+  bash test.sh -s quant -name sensevoice -size small
+
+# 仅运行 build，要求当前目录下已经有量化输出
+  bash test.sh -s build -name sensevoice -size small
+
+# 仅运行 demo，会先下载预编译模型
+  bash test.sh -s demo -name sensevoice -size small
+
+# 完整流程（下载原始模型、量化、编译、演示）
+  bash test.sh -s all -name sensevoice -size small
+
+# 跳过模型下载，使用当前目录下已有的预编译模型进行演示
+  bash test.sh -s demo --skip_download -name sensevoice -size small
 ```
 
 ## 3 参考结果
@@ -94,7 +141,7 @@ bash test.sh
 Loading tokens from SenseVoiceSmall/tokens.json
 [2026-01-30 07:01:26.709] [tid 440] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
 [2026-01-30 07:01:26.709] [tid 440] [warning] Empty backend name, use Xh2HalBackend instead.
-Loading model from output/xh2/sensevoice_small.hmm
+Loading model from output/xh2/sensevoice-small.hmm
 2026-01-30 07:01:34.333 | INFO     | __main__:run_inference:296 - ==================== Process SenseVoiceSmall/example/zh.mp3 ====================
 2026-01-30 07:01:35.329 | INFO     | __main__:run_inference:349 - Clean Text: 开饭时间早上九点至下午五点
 2026-01-30 07:01:35.330 | INFO     | __main__:run_inference:350 - ==================== Process SenseVoiceSmall/example/zh.mp3 take time 94.55108642578125 ms ====================

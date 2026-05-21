@@ -583,7 +583,6 @@ def test_asr_glm_asr_quant(setup_logging) -> None:
     _quant_func(model_name, setup_logging)
 
 
-
 @pytest.mark.yolo26m
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -644,8 +643,25 @@ def test_vlm_gemma4_quant(setup_logging) -> None:
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.quant
-@pytest.mark.dependency(name='test_vlm_qwen3_vl_quant', depends_on=['test_get_models.py::test_vlm_qwen3_vl_get_model'])
+@pytest.mark.dependency(
+    name="test_vlm_qwen3_vl_quant",
+    depends_on=["test_get_models.py::test_vlm_qwen3_vl_get_model"],
+)
 def test_vlm_qwen3_vl_quant(setup_logging) -> None:
     """test_vlm_qwen3_vl_quant"""
-    model_name = 'qwen3-vl'
+    model_name = "qwen3-vl"
+    _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.whisper
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_asr_whisper_quant",
+    depends_on=["test_get_models.py::test_asr_whisper_get_model"],
+)
+def test_asr_whisper_quant(setup_logging) -> None:
+    """test_asr_whisper_quant"""
+    model_name = "whisper"
     _quant_func(model_name, setup_logging)

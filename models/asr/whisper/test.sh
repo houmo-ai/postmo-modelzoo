@@ -48,12 +48,12 @@ if should_run_step "quant"; then
         python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Start model quantization (${MODEL_NAME}-${MODEL_SIZE})."
-    python3 ptq.py --model_name "${MODEL_NAME}" --model "${MODEL_NAME}-${MODEL_SIZE}"
+    python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 fi
 
 if should_run_step "build"; then
     echo "Start model compilation (${MODEL_NAME}-${MODEL_SIZE})."
-    python3 build.py --model_name "${MODEL_NAME}-${MODEL_SIZE}"
+    python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 fi
 
 if should_run_step "demo"; then
@@ -63,6 +63,7 @@ if should_run_step "demo"; then
     fi
     echo "Execute python demo (${MODEL_NAME}-${MODEL_SIZE})."
     python3 demo.py --audio audio.mp3 --tokenizer_path "${MODEL_NAME}-${MODEL_SIZE}" --language "auto"
+
     echo "Execute cpp demo (${MODEL_NAME}-${MODEL_SIZE})."
     cd cpp && ./build.sh && cd ..
     export LD_LIBRARY_PATH=$PWD/bin:$LD_LIBRARY_PATH

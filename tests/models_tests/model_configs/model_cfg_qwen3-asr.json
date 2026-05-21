@@ -40,7 +40,7 @@
             ],
             "source_type": [null, null, null, null],
             "model_size": ["0.6b", "0.6b", "1.7b", "1.7b"],
-            "model_name": ["qwen3_asr", "qwen3_asr", "qwen3_asr", "qwen3_asr"],
+            "model_name": ["qwen3-asr", "qwen3-asr", "qwen3-asr", "qwen3-asr"],
             "ndevice": [null, null, null, null]
         }
     },
@@ -50,7 +50,8 @@
                 "cached_models/Qwen3-ASR-0.6B",
                 "cached_models/Qwen3-ASR-1.7B"
             ],
-            "model_name": ["qwen3_asr", "qwen3_asr"],
+            "model_name": ["qwen3-asr", "qwen3-asr"],
+            "model_size": ["0.6b", "1.7b"],
             "out-dir": [
                 "cached_results/hmquant_xh2_asr_0.6b",
                 "cached_results/hmquant_xh2_asr_1.7b"
@@ -66,7 +67,8 @@
                 "cached_results/hmquant_xh2_asr_0.6b",
                 "cached_results/hmquant_xh2_asr_1.7b"
             ],
-            "model_name": ["qwen3_asr", "qwen3_asr"],
+            "model_name": ["qwen3-asr", "qwen3-asr"],
+            "model_size": ["0.6b", "1.7b"],
             "j": ["24", "24"],
             "ncore": [null, null],
             "stage": ["build", "build"],
@@ -74,7 +76,7 @@
                 "cached_results/hmm_xh2_asr_0.6b",
                 "cached_results/hmm_xh2_asr_1.7b"
             ],
-            "context_length": ["2048", "2048"]
+            "context_length": ["2k", "2k"]
         }
     },
     "demo_params": {
@@ -85,16 +87,16 @@
                 "cached_models/Qwen3-ASR-1.7B"
             ],
             "encode_path": [
-                "cached_results/hmm_xh2_asr_0.6b/qwen3_asr_encode.hmm",
-                "cached_results/hmm_xh2_asr_1.7b/qwen3_asr_encode.hmm"
+                "cached_results/hmm_xh2_asr_0.6b/qwen3-asr-0.6b_encode.hmm",
+                "cached_results/hmm_xh2_asr_1.7b/qwen3-asr-1.7b_encode.hmm"
             ],
             "decode_path": [
-                "cached_results/hmm_xh2_asr_0.6b/qwen3_asr_decode.hmm",
-                "cached_results/hmm_xh2_asr_1.7b/qwen3_asr_decode.hmm"
+                "cached_results/hmm_xh2_asr_0.6b/qwen3-asr-0.6b_decode.hmm",
+                "cached_results/hmm_xh2_asr_1.7b/qwen3-asr-1.7b_decode.hmm"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_asr_0.6b/qwen3_asr_prefill.hmm",
-                "cached_results/hmm_xh2_asr_1.7b/qwen3_asr_prefill.hmm"
+                "cached_results/hmm_xh2_asr_0.6b/qwen3-asr-0.6b_prefill.hmm",
+                "cached_results/hmm_xh2_asr_1.7b/qwen3-asr-1.7b_prefill.hmm"
             ],
             "embedding_path": [
                 "cached_results/hmm_xh2_asr_0.6b/hmquant/quant_embedding.pt",

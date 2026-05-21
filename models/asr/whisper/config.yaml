@@ -1,0 +1,19 @@
+default_model_name: "whisper"
+default_model_size: "medium"
+
+model_configs:
+  whisper:
+    "medium":
+      modelscope_repo: ["openai-mirror/whisper-medium"]
+      model_name: "whisper"
+      model_size: "medium"
+      ncore: 2
+      ndevice: 1
+      quant_type: "w8a8_sefp"
+    "large-v3-turbo":
+      modelscope_repo: ["openai-mirror/whisper-large-v3-turbo"]
+      model_name: "whisper"
+      model_size: "large-v3-turbo"
+      ncore: 2
+      ndevice: 1
+      quant_type: "w8a8_sefp"

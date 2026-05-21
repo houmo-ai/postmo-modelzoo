@@ -28,12 +28,15 @@ import numpy as np
 import tcim_lite as tcim
 from loguru import logger
 import librosa
-from typing import List, Tuple, Optional
+from typing import List, Optional
 from transformers import WhisperForConditionalGeneration, WhisperProcessor
 from hmatc.python.get_hm_devices import get_hm_devices
+from hmatc.utils.utils import first_not_none, get_model_configs
 
 MAX_GEN_LEN = 448
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+FILE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_CONFIG_PATH = os.path.join(FILE_DIR, "config.yaml")
 
 lang_to_id = [
     50327,
@@ -136,6 +139,15 @@ lang_to_id = [
     50325,
     50260,
 ]
+
+
+def get_default_tokenizer_path(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "whisper")
+    model_size = model_config.get("model_size", "medium")
+    return f"{model_name}-{model_size}"
 
 
 class SamplingManager:
@@ -284,9 +296,9 @@ class SamplingManager:
 
 
 class HmWhisper:
-    def __init__(self, encode_path, decode_path, prefill_path):
+    def __init__(self, encode_path, decode_path, prefill_path, ndevice=1):
         super().__init__()
-        dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(ndevice), "Xh2HalBackend")
         weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         self.encode = tcim.runtime.load(encode_path, option=option1)
@@ -300,8 +312,12 @@ class HmWhisper:
         self.encode_time = 0.0
         self.decode_time = 0.0
         self.prefill_time = 0.0
-        self.num_head = self.prefill.get_input_info(self.prefill.get_input_name(4)).shape[1]
-        self.cache_max_len = self.prefill.get_input_info(self.prefill.get_input_name(4)).shape[3]
+        self.num_head = self.prefill.get_input_info(
+            self.prefill.get_input_name(4)
+        ).shape[1]
+        self.cache_max_len = self.prefill.get_input_info(
+            self.prefill.get_input_name(4)
+        ).shape[3]
         self.num_decode_layers, self.base_idx = self.get_num_decode_layers()
 
     def get_num_decode_layers(self):
@@ -338,9 +354,7 @@ class HmWhisper:
         self.decode.sync()
         self.decode_time += time.time() - start_time
         outputs = [
-            torch.tensor(
-                self.decode.get_output(self.decode.get_output_name(0)).numpy()
-            )
+            torch.tensor(self.decode.get_output(self.decode.get_output_name(0)).numpy())
         ]
         return outputs
 
@@ -430,8 +444,8 @@ def asr(whisper, processor, audio_array, language="auto"):
         for i in range(2 * num_decode_layers):
             cache_name = dec_names[base_idx + i]
             cache_shape = whisper.decode.get_input_info(cache_name).shape
-            detect_inputs[cache_name] = (
-                torch.ones(cache_shape, dtype=torch.float16) * (-65504.0)
+            detect_inputs[cache_name] = torch.ones(cache_shape, dtype=torch.float16) * (
+                -65504.0
             )
 
         for l in range(num_decode_layers):
@@ -505,8 +519,12 @@ def asr(whisper, processor, audio_array, language="auto"):
 
     # run Prefill
     for i in range(2 * num_decode_layers):
-        cache = whisper.decode.get_dev_input(whisper.decode.get_input_name(i + whisper.base_idx))
-        whisper.prefill.set_dev_input(whisper.prefill.get_input_name(i + whisper.base_idx), cache)
+        cache = whisper.decode.get_dev_input(
+            whisper.decode.get_input_name(i + whisper.base_idx)
+        )
+        whisper.prefill.set_dev_input(
+            whisper.prefill.get_input_name(i + whisper.base_idx), cache
+        )
     out = whisper.run_prefill(inputs)
 
     logits = out[0]
@@ -515,12 +533,19 @@ def asr(whisper, processor, audio_array, language="auto"):
 
     for i in range(2 * num_decode_layers):
         cache = whisper.prefill.get_dev_output(whisper.prefill.get_output_name(i + 1))
-        whisper.decode.set_dev_input(whisper.decode.get_input_name(i + whisper.base_idx), cache)
+        whisper.decode.set_dev_input(
+            whisper.decode.get_input_name(i + whisper.base_idx), cache
+        )
         whisper.decode.set_dev_output(whisper.decode.get_output_name(i + 1), cache)
 
     for i in range(2 * num_decode_layers):
-        enc_out_kv = whisper.prefill.get_dev_input(whisper.prefill.get_input_name(base_idx + 2 * num_decode_layers + i))
-        whisper.decode.set_dev_input(whisper.decode.get_input_name(base_idx + 2 * num_decode_layers + i), enc_out_kv)
+        enc_out_kv = whisper.prefill.get_dev_input(
+            whisper.prefill.get_input_name(base_idx + 2 * num_decode_layers + i)
+        )
+        whisper.decode.set_dev_input(
+            whisper.decode.get_input_name(base_idx + 2 * num_decode_layers + i),
+            enc_out_kv,
+        )
 
     # === step 2: Decode ===
     next_token = torch.argmax(logits[:, -1, :], dim=-1).item()
@@ -539,7 +564,7 @@ def asr(whisper, processor, audio_array, language="auto"):
         # 增量解码：只解码滑动窗口内的 token
         decode_response = processor.decode(
             generated_token_ids[0][-(slide_len + 1) - skip_tokens :]
-        )[len(last_response):]
+        )[len(last_response) :]
 
         # 只有当解码结果不为空且最后一个字符是有效字符时才打印
         if (
@@ -589,7 +614,33 @@ def asr(whisper, processor, audio_array, language="auto"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tokenizer_path", type=str, default="whisper-medium", help="Whisper tokenizer path")
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
+        "--tokenizer_path",
+        type=str,
+        default=None,
+        help="Whisper tokenizer path",
+    )
     parser.add_argument(
         "--encode_path",
         dest="encode_path",
@@ -628,20 +679,47 @@ if __name__ == "__main__":
         default="auto",
         help="language code (e.g. 'zh', 'en') or 'auto' for language detection",
     )
+    parser.add_argument(
+        "--ndevice",
+        dest="ndevice",
+        type=int,
+        default=None,
+        help="device number",
+    )
     args = parser.parse_args()
 
     if args.chunk_size <= 0 or args.chunk_size > 30:
         parser.error("--chunk_size must be greater than 0 and less than or equal to 30")
+    if args.ndevice is not None and args.ndevice != 1:
+        parser.error("Only supports ndevice=1.")
 
-    houmo_target_val = HOUMO_TARGET if HOUMO_TARGET else "xh2"
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    args.tokenizer_path = first_not_none(
+        args.tokenizer_path, get_default_tokenizer_path(model_config)
+    )
+    model_prefix = f"{args.model_name}-{args.model_size}"
     if args.encode_path is None:
-        args.encode_path = os.path.join("output", houmo_target_val, f"{args.tokenizer_path}_encode.hmm")
+        args.encode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_encode.hmm"
+        )
     if args.decode_path is None:
-        args.decode_path = os.path.join("output", houmo_target_val, f"{args.tokenizer_path}_decode.hmm")
+        args.decode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_decode.hmm"
+        )
     if args.prefill_path is None:
-        args.prefill_path = os.path.join("output", houmo_target_val, f"{args.tokenizer_path}_prefill.hmm")
+        args.prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm"
+        )
 
-    whisper = HmWhisper(args.encode_path, args.decode_path, args.prefill_path)
+    whisper = HmWhisper(
+        args.encode_path, args.decode_path, args.prefill_path, args.ndevice
+    )
     processor = WhisperProcessor.from_pretrained(args.tokenizer_path)
     results = ""
     output_tokens = 0

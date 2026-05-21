@@ -19,23 +19,25 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 import os
+import sys
 import numpy as np
 import time
 import onnx
-import psutil
-import threading
 import multiprocessing
 import argparse
 import glob
-import logging
 from pathlib import Path
 
-logging.basicConfig(level="INFO")
+HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
+sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
+from hmatc.exec.xh2_exec import Xh2Exec
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import get_platform
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
-HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
+HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
 
 
@@ -71,70 +73,6 @@ def cosine_distance(data1, data2) -> float:
     return cosine_dist
 
 
-class ProcessMemoryMonitor:
-    """
-    Monitors the memory usage of the current Python process in real-time using psutil.
-    """
-
-    def __init__(self, interval=2, log_file=None):
-        """
-        Initializes the monitor.
-        Args:
-            interval (int): Time between measurements in seconds.
-            log_file (str, optional): Path to a file to log results. If None, prints to console.
-        """
-        self.process = psutil.Process(os.getpid())
-        self.interval = interval
-        self.log_file = log_file
-        self.is_monitoring = False
-        self.peak_memory_mb = 0
-
-    def get_memory_info(self):
-        """
-        Gets current memory usage information.
-        Returns:
-            dict: A dictionary containing memory usage data.
-        """
-        memory_info = self.process.memory_info()
-        rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
-        percent = self.process.memory_percent()  # Percentage of system memory
-        return {"rss_mb": rss_mb, "percent": percent}
-
-    def start(self):
-        """Starts the monitoring loop in a separate daemon thread."""
-        self.is_monitoring = True
-        self.peak_memory_mb = 0
-        self.monitor_thread = threading.Thread(target=self._monitor_loop)
-        self.monitor_thread.daemon = True  # Thread will exit when main program does
-        self.monitor_thread.start()
-        print(f"Memory monitoring started (interval: {self.interval}s)")
-
-    def _monitor_loop(self):
-        """The internal loop that runs in the thread."""
-        while self.is_monitoring:
-            mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info["rss_mb"])
-
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
-
-            # Output to console or file
-            if self.log_file:
-                with open(self.log_file, "a") as f:
-                    f.write(log_message + "\n")
-
-            time.sleep(self.interval)
-
-    def stop(self):
-        """Stops the monitoring loop and prints peak usage."""
-        self.is_monitoring = False
-        if hasattr(self, "monitor_thread"):
-            self.monitor_thread.join(
-                timeout=1
-            )  # Wait a moment for the thread to finish
-        print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
-
-
 def get_args() -> argparse.Namespace:
     """Parse command line arguments for the multi-device pipeline builder."""
     parser = argparse.ArgumentParser()
@@ -149,8 +87,15 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="qwen3",
+        default="qwen3-pipeline",
         help="output houmo model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default="8b",
+        help="output houmo model size",
     )
     parser.add_argument(
         "--ncore",
@@ -209,11 +154,16 @@ def get_args() -> argparse.Namespace:
         choices=[0, 1, 2],
         help="flash attention optimization",
     )
+    parser.add_argument(
+        "--enable_xh2_stable_output",
+        dest="enable_xh2_stable_output",
+        action="store_true",
+        help="enable xh2 stable output",
+    )
 
     args = parser.parse_args()
     if args.context_length < 2048:
         args.flash_attention = 0
-    args = parser.parse_args()
     return args
 
 
@@ -322,66 +272,13 @@ def clip(raw_path, split_paths, ndevice, model_name):
         print(f"save clip model part{i} to {extract_file_path}.")
 
 
-def build(
-    model_name,
-    model_dir,
-    model_path,
-    output_dir,
-    profile,
-    ncore,
-    ndevice,
-    context_length,
-    j,
-    batch=None,
-    tso=False,
-    flash_attention=0,
-    prefill_length=256,
-):
-    import tcim
-    import json
-
-    kwargs = dict()
-    kwargs["modify_llm"] = dict()
-    custom_msg = dict()
-    custom_msg["prefill_length"] = prefill_length
-    if batch:
-        kwargs["modify_llm"]["batch"] = batch
-        custom_msg["batch"] = batch
-    if HOUMO_TARGET == "xh2":
-        kwargs["enable_xh2_stable_output"] = tso
-        kwargs["flash_attention"] = flash_attention
-        custom_msg["flash_attention"] = flash_attention
-        if ndevice:
-            kwargs["ndevice"] = ndevice
-        if context_length:
-            kwargs["modify_llm"]["context-length"] = context_length
-            custom_msg["context_length"] = context_length
-    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
-
-    start = time.time()
-    print(f"\n===> {model_name} build start...")
-    decode_model = os.path.join(model_dir, model_path)
-    tcim.build_from_hmonnx(
-        decode_model,
-        weights=os.path.join(model_dir, "weight.npy"),
-        output_name=model_name,
-        ncore=ncore,
-        target=HOUMO_TARGET,
-        output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim", model_name),
-        llm_opt=True,
-        j=j,
-        **kwargs,
-    )
-    profile["build"] = time.time() - start
-    print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
-
-
 if __name__ == "__main__":
     args = get_args()
-    curdir = os.getcwd()
+    print(args)
+
     model_dir = args.model_dir
     model_name = args.model_name
+    model_size = args.model_size
     output_dir = args.output_dir
     ncore = args.ncore
     batch = args.batch
@@ -402,6 +299,8 @@ if __name__ == "__main__":
 
     # clip model to 2 parts
     onnx_files = glob.glob(f"{prefill_dir}/hmquant_*.onnx")
+    # 移除包含'part'的onnx文件
+    onnx_files = [f for f in onnx_files if "_part" not in f]
     prefill_raw_path = os.path.abspath(onnx_files[0]) if onnx_files else ""
     if not prefill_raw_path or not os.path.exists(prefill_raw_path):
         raise FileNotFoundError(
@@ -414,6 +313,7 @@ if __name__ == "__main__":
     clip(prefill_raw_path, prefill_split_paths, ndevice, model_name)
 
     onnx_files = glob.glob(f"{decode_dir}/hmquant_*.onnx")
+    onnx_files = [f for f in onnx_files if "_part" not in f]
     decode_raw_path = os.path.abspath(onnx_files[0]) if onnx_files else ""
     if not decode_raw_path or not os.path.exists(decode_raw_path):
         raise FileNotFoundError(
@@ -425,51 +325,61 @@ if __name__ == "__main__":
     ]
     clip(decode_raw_path, decode_split_paths, ndevice, model_name)
 
-    # build model
-    for i in range(ndevice):
-        model_path = f"hmquant_{model_name}_part{i}_with_act.onnx"
-        build(
-            f"{model_name}_prefill_part{i}",
-            prefill_dir,
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-            1,
-            args.context_length,
-            args.j,
-            batch,
-            flash_attention=args.flash_attention,
-            prefill_length=args.prefill_length,
-        )
-        model_path = f"hmquant_{model_name}_part{i}_with_act.onnx"
-        build(
-            f"{model_name}_decode_part{i}",
-            decode_dir,
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-            1,
-            args.context_length,
-            args.j,
-            batch,
-            flash_attention=args.flash_attention,
-            prefill_length=args.prefill_length,
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
+        assert (
+            get_platform() == "x86_64"
+        ), "Only supported for compilation on the x86_64 platform."
+
+        for i in range(ndevice):
+            model_path = os.path.join(
+                prefill_dir, f"hmquant_{model_name}_part{i}_with_act.onnx"
+            )
+            Xh2Exec.build_from_hmonnx(
+                is_prefill=True,
+                hmonnx=model_path,
+                hmm_name=f"{model_name}-{model_size}_prefill_part{i}",
+                output=output_dir,
+                ncore=ncore,
+                llm_opt=True,
+                flash_attn=args.flash_attention,
+                context_length=args.context_length,
+                prefill_length=args.prefill_length,
+                ndevice=1,
+                enable_xh2_stable_output=args.enable_xh2_stable_output,
+                parallel_jobs=args.j,
+            )
+
+            model_path = os.path.join(
+                decode_dir, f"hmquant_{model_name}_part{i}_with_act.onnx"
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=model_path,
+                hmm_name=f"{model_name}-{model_size}_decode_part{i}",
+                output=output_dir,
+                ncore=ncore,
+                llm_opt=True,
+                batch=batch,
+                flash_attn=args.flash_attention,
+                context_length=args.context_length,
+                ndevice=1,
+                enable_xh2_stable_output=args.enable_xh2_stable_output,
+                parallel_jobs=args.j,
+            )
+
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=decode_raw_path,
+            hmm_name=f"{model_name}-{model_size}_decode",
+            output=output_dir,
+            ncore=ncore,
+            llm_opt=True,
+            batch=batch,
+            flash_attn=args.flash_attention,
+            context_length=args.context_length,
+            ndevice=ndevice,
+            enable_xh2_stable_output=args.enable_xh2_stable_output,
+            parallel_jobs=args.j,
         )
 
-    model_path = os.path.basename(decode_raw_path)
-    build(
-        f"{model_name}_decode",
-        decode_dir,
-        model_path,
-        output_dir,
-        profile,
-        ncore,
-        ndevice,
-        args.context_length,
-        args.j,
-        batch,
-        flash_attention=args.flash_attention,
-        prefill_length=args.prefill_length,
+    print(
+        f"\n=== All builds completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
     )

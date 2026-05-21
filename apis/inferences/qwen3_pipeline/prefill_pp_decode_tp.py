@@ -39,6 +39,7 @@ from loguru import logger
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def is_valid_char(cp):
@@ -278,9 +279,11 @@ class SamplingManager:
 def gen_prefill_params(device_id: int, args):
     model_path = args.model_path
     prefill_path = os.path.join(
-        model_path, f"qwen3_pipeline_prefill_part{device_id}.hmm"
+        model_path, f"qwen3-pipeline-8b_prefill_part{device_id}.hmm"
     )
-    decode_path = os.path.join(model_path, f"qwen3_pipeline_decode_part{device_id}.hmm")
+    decode_path = os.path.join(
+        model_path, f"qwen3-pipeline-8b_decode_part{device_id}.hmm"
+    )
     return {
         "device_id": device_id,
         "prefill_path": prefill_path,
@@ -294,7 +297,7 @@ def gen_prefill_params(device_id: int, args):
 
 
 def gen_decode_params(args):
-    decode_path = os.path.join(args.model_path, "qwen3_pipeline_decode.hmms")
+    decode_path = os.path.join(args.model_path, "qwen3-pipeline-8b_decode.hmms")
     return {
         "device_id": [k for k in range(args.ndevice)],
         "decode_path": decode_path,
@@ -506,7 +509,7 @@ def prefill_consumer(
             input_name = prefill_model.get_input_name(0)
             valid_length_name = prefill_model.get_input_name(1)
             current_length_name = prefill_model.get_input_name(2)
-            (output_data, valid_length_data, current_length_data, t0, _) = data
+            output_data, valid_length_data, current_length_data, t0, _ = data
             prefill_model.set_input(input_name, output_data)
             prefill_model.set_input(valid_length_name, valid_length_data)
             prefill_model.set_input(current_length_name, current_length_data)

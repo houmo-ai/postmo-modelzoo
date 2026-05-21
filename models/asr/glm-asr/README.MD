@@ -63,10 +63,8 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 ```bash
 source env.sh
 cd models/asr/glm-asr
-python3 ptq.py --model glm-asr-nano-2512
+python3 ptq.py --model-name glm-asr --model-size nano-2512
 ```
-
-注意：当前 ptq.py 默认引用 config/llm/glm_asr_decode_xh2a.py。如果目录下没有该配置文件，需要在执行前补齐对应配置，或通过 --config 显式传入可用配置文件。
 
 ### 2.4 编译
 
@@ -76,11 +74,11 @@ python3 ptq.py --model glm-asr-nano-2512
 python3 build.py
 ```
 
-编译好的模型默认输出到 output/xh2 目录，包括 3 个文件：
+默认输出文件位于 `output/xh2/`：
 
-- glm-asr_encode.hmm
-- glm-asr_decode.hmm
-- glm-asr_prefill.hmm
+- `glm-asr-nano-2512_encode.hmm`
+- `glm-asr-nano-2512_prefill.hmm`
+- `glm-asr-nano-2512_decode.hmm`
 
 ### 2.5 演示
 
@@ -90,43 +88,73 @@ python3 build.py
 python3 demo.py
 ```
 
-如果使用 build.py 自行编译得到的模型，建议显式传入模型路径：
+`demo.py` 默认会从 `config.yaml` 读取 `model_name`、`model_size`、`ndevice`，并自动推导 `processor_path` 与 HMM 路径；也可以显式覆盖：
+
+```bash
+python3 demo.py --model_name glm-asr --model_size nano-2512
+```
+
+如果使用 build.py 自行编译得到的模型，也可以直接使用默认路径；`demo.py` 默认查找的就是 build.py 生成的这组产物：
+
+```bash
+python3 demo.py --model_name glm-asr --model_size nano-2512
+```
+
+如需显式传入模型路径，命令如下：
 
 ```bash
 python3 demo.py \
-  --encoder_path output/xh2/glm-asr_encode.hmm \
-  --prefill_path output/xh2/glm-asr_prefill.hmm \
-  --decode_path output/xh2/glm-asr_decode.hmm \
+  --encoder_path output/xh2/glm-asr-nano-2512_encode.hmm \
+  --prefill_path output/xh2/glm-asr-nano-2512_prefill.hmm \
+  --decode_path output/xh2/glm-asr-nano-2512_decode.hmm \
+  --processor_path glm-asr-nano-2512 \
   --audio ../../../data/audio/audio.mp3
 ```
 
 ### 2.6 一键评估
 
-以上步骤可以通过 test.sh 一键执行：
+以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
 ```bash
+# 默认执行 demo，会先下载预编译模型
 bash test.sh
-```
 
-test.sh 默认使用预编译模型，适合快速验证 demo。
-
-如果要走下载原始模型、量化、编译流程，可执行：
-
-```bash
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
 bash test.sh -s all
 ```
 
-注意：compile 模式依赖有效的量化配置文件和可用的 embedding 权重文件。若这两项未准备好，建议先分别执行下载、量化、编译命令排查环境。
-
-## 3 输出说明
-
-本 README 生成时未在当前环境实际执行模型推理，因此这里不附带固定参考数值。运行 demo.py 后，终端会输出两类信息：
-
-- 识别文本结果
+test.sh 支持以下参数：
 
 ```bash
-后膜芯片算法部的小伙伴，你们好啊，我是哆啦A梦，你们好厉害啊，好像你们拥有装满各种神奇道具的口袋，你们真棒。新的一年，祝你们身体健康，事业顺利，发大财。
+Usage: test.sh [options]
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  --skip_download         Skip model download steps.
+  -size, --model_size     Model size.
+  -name, --model_name     Model name.
+  -h, --help              Show this help message.
 ```
+
+示例：
+
+```bash
+# 仅运行 quant，会先下载原始模型再量化
+bash test.sh -s quant -name glm-asr -size nano-2512
+
+# 仅运行 build，要求当前目录下已经有量化输出
+bash test.sh -s build -name glm-asr -size nano-2512
+
+# 仅运行 demo，会先下载预编译模型
+bash test.sh -s demo -name glm-asr -size nano-2512
+
+# 完整流程（下载原始模型、量化、编译、演示）
+bash test.sh -s all -name glm-asr -size nano-2512
+
+# 跳过模型下载，使用当前目录下已有的预编译模型进行演示
+bash test.sh -s demo --skip_download -name glm-asr -size nano-2512
+```
+
+## 3 输出说明
 
 - 性能统计，包括 Encoder Time、Prefill Cost、Decode Cost、TTFT、TPOT 和 E2E Latency
 
@@ -137,6 +165,8 @@ Decode Cost: 755.838 ms
 Output 48 tokens, Decode Speed: 63.51 tokens/s
 TTFT (Time to First Token): 65.472 ms
 TPOT (Time Per Output Token): 15.747 ms/token
+```
+
 ## 4 免责声明
 
 本示例依赖的模型与相关资源由第三方提供并维护。使用这些模型、数据或其他外部资源时，请遵循对应的许可证、使用条款和隐私政策，并自行评估由此带来的合规性与使用风险。

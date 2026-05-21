@@ -34,14 +34,24 @@ from qwen_asr.core.transformers_backend import (
     Qwen3ASRProcessor,
 )
 from hmatc.python.get_hm_devices import get_hm_devices
-
+from hmatc.utils.utils import first_not_none, get_model_configs
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 ASR_TEXT_PATTERN = re.compile(r"(?<=<asr_text>)[\s\S]*")
-
-
 # Common punctuation characters to preserve in output
 PUNCTUATION_CHARS = set("，。！？；：" "''（）【】《》、·…—" ",.!?;:\"'()[]<>-" " ")
+
+
+def get_default_processor_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "qwen3-asr")
+    model_size = model_config.get("model_size", "0.6b")
+    return f"{model_name}-{model_size}"
 
 
 def is_valid_char(cp):
@@ -150,10 +160,31 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
         "--processor_dir",
         dest="processor_dir",
         type=str,
-        default="Qwen3-ASR-0.6B",
+        default=None,
         help="processor dir",
     )
     parser.add_argument(
@@ -165,21 +196,21 @@ def get_args() -> argparse.Namespace:
         "--encode_path",
         dest="encode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_asr_encode.hmm"),
+        default=None,
         help="houmo encode model path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_asr_decode.hmm"),
+        default=None,
         help="houmo decode model path",
     )
     parser.add_argument(
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_asr_prefill.hmm"),
+        default=None,
         help="houmo prefill model path",
     )
     parser.add_argument(
@@ -189,15 +220,61 @@ def get_args() -> argparse.Namespace:
         default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="houmo embedding weight path",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--ndevice",
+        dest="ndevice",
+        type=int,
+        default=None,
+        help="device number, only xh2 support",
+    )
+    args = parser.parse_args()
+
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    if args.processor_dir is None:
+        args.processor_dir = get_default_processor_dir(model_config)
+    model_prefix = f"{args.model_name}-{args.model_size}"
+    if args.encode_path is None:
+        args.encode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_encode.hmm"
+        )
+    if args.decode_path is None:
+        args.decode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_decode.hmm"
+        )
+    if args.prefill_path is None:
+        args.prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm"
+        )
+    if args.ndevice > 1:
+        if args.decode_path.endswith(".hmm"):
+            args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+    return args
 
 
 class Qwen3Asr:
     def __init__(
-        self, encode_path, decode_path, prefill_path, processor_dir, embedding_path
+        self,
+        encode_path,
+        decode_path,
+        prefill_path,
+        processor_dir,
+        embedding_path,
+        ndevice=1,
     ):
         self.device = torch.device("cpu")
-        dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
+        self.ndevice = ndevice
+        dev_manager = tcim.runtime.DevManager(
+            get_hm_devices(self.ndevice), "Xh2HalBackend"
+        )
         weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         self.encode = tcim.runtime.load(encode_path, option=option1)
@@ -642,15 +719,12 @@ class Qwen3Asr:
 if __name__ == "__main__":
     args = get_args()
 
-    if HOUMO_TARGET == "xh2":
-        qwen3asr = Qwen3Asr(
-            args.encode_path,
-            args.decode_path,
-            args.prefill_path,
-            args.processor_dir,
-            args.embedding_path,
-        )
-    else:
-        raise ValueError("Unsupported houmo target!")
-
+    qwen3asr = Qwen3Asr(
+        args.encode_path,
+        args.decode_path,
+        args.prefill_path,
+        args.processor_dir,
+        args.embedding_path,
+        args.ndevice,
+    )
     qwen3asr.run(args.audio)

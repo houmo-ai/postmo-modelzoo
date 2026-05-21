@@ -19,21 +19,22 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 import os
+import sys
 import numpy as np
-import time
-import psutil
-import threading
 import multiprocessing
 import argparse
 import glob
-import logging
 
-logging.basicConfig(level="INFO")
+HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
+sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
+from hmatc.exec.xh2_exec import Xh2Exec
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import find_hmonnx_file, get_platform
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
-HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
+HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
 
 
@@ -59,70 +60,6 @@ def cosine_distance(data1, data2):
     return cosine_dist
 
 
-class ProcessMemoryMonitor:
-    """
-    Monitors the memory usage of the current Python process in real-time using psutil.
-    """
-
-    def __init__(self, interval=2, log_file=None):
-        """
-        Initializes the monitor.
-        Args:
-            interval (int): Time between measurements in seconds.
-            log_file (str, optional): Path to a file to log results. If None, prints to console.
-        """
-        self.process = psutil.Process(os.getpid())
-        self.interval = interval
-        self.log_file = log_file
-        self.is_monitoring = False
-        self.peak_memory_mb = 0
-
-    def get_memory_info(self):
-        """
-        Gets current memory usage information.
-        Returns:
-            dict: A dictionary containing memory usage data.
-        """
-        memory_info = self.process.memory_info()
-        rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
-        percent = self.process.memory_percent()  # Percentage of system memory
-        return {"rss_mb": rss_mb, "percent": percent}
-
-    def start(self):
-        """Starts the monitoring loop in a separate daemon thread."""
-        self.is_monitoring = True
-        self.peak_memory_mb = 0
-        self.monitor_thread = threading.Thread(target=self._monitor_loop)
-        self.monitor_thread.daemon = True  # Thread will exit when main program does
-        self.monitor_thread.start()
-        print(f"Memory monitoring started (interval: {self.interval}s)")
-
-    def _monitor_loop(self):
-        """The internal loop that runs in the thread."""
-        while self.is_monitoring:
-            mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info["rss_mb"])
-
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
-
-            # Output to console or file
-            if self.log_file:
-                with open(self.log_file, "a") as f:
-                    f.write(log_message + "\n")
-
-            time.sleep(self.interval)
-
-    def stop(self):
-        """Stops the monitoring loop and prints peak usage."""
-        self.is_monitoring = False
-        if hasattr(self, "monitor_thread"):
-            self.monitor_thread.join(
-                timeout=1
-            )  # Wait a moment for the thread to finish
-        print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
-
-
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -144,8 +81,22 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="qwen3_speculative",
+        default="qwen3-speculative",
         help="output houmo model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default="14b",
+        help="output houmo model size",
+    )
+    parser.add_argument(
+        "--draft_model_size",
+        dest="draft_model_size",
+        type=str,
+        default="0.6b",
+        help="output houmo draft model size",
     )
     parser.add_argument(
         "--batch",
@@ -172,7 +123,7 @@ def get_args() -> argparse.Namespace:
         "--context_length",
         dest="context_length",
         type=int,
-        default=2048,
+        default=32768,
         help="context_length",
     )
     parser.add_argument(
@@ -181,14 +132,6 @@ def get_args() -> argparse.Namespace:
         type=int,
         default=1,
         help="device number",
-    )
-    parser.add_argument(
-        "--stage",
-        dest="stage",
-        type=str,
-        default="build",
-        choices=["build", "test", "all"],
-        help="build stage",
     )
     parser.add_argument(
         "--output_dir",
@@ -219,165 +162,6 @@ def get_args() -> argparse.Namespace:
     return args
 
 
-def build(
-    model_name,
-    model_dir,
-    output_dir,
-    profile,
-    ncore,
-    ndevice,
-    context_length,
-    j,
-    batch=None,
-    tso=False,
-    flash_attention=0,
-    prefill_length=0,
-    all_logits=False,
-):
-    import tcim
-    import json
-
-    kwargs = {}
-    custom_msg = {}
-    kwargs["modify_llm"] = {}
-    kwargs["enable_xh2_stable_output"] = tso
-    if flash_attention:
-        kwargs["flash_attention"] = flash_attention
-        custom_msg["flash_attention"] = flash_attention
-    if ndevice:
-        kwargs["ndevice"] = ndevice
-    if batch:
-        kwargs["modify_llm"]["batch"] = batch
-        custom_msg["batch"] = batch
-    if context_length:
-        kwargs["modify_llm"]["context-length"] = context_length
-        custom_msg["context_length"] = context_length
-    if all_logits is True:
-        kwargs["modify_llm"]["all-logits"] = all_logits
-        custom_msg["all_logits"] = all_logits
-    if prefill_length:
-        kwargs["modify_llm"]["fill-length"] = prefill_length
-        custom_msg["prefill_length"] = prefill_length
-    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
-
-    start = time.time()
-    print(f"\n===> {model_name} build start... \n kwargs: {kwargs}")
-    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
-    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
-    tcim.build_from_hmonnx(
-        decode_model,
-        weights=os.path.join(model_dir, "weight.npy"),
-        output_name=model_name,
-        ncore=ncore,
-        target=HOUMO_TARGET,
-        output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim", model_name),
-        llm_opt=True,
-        j=j,
-        **kwargs,
-    )
-    profile["build"] = time.time() - start
-    print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
-
-
-def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
-    import tcim_lite
-
-    print(f"\n===> {model_name} test start...")
-    # load model
-    model_path = os.path.join(output_dir, f"{model_name}.hmm")
-    start = time.time()
-    module = tcim_lite.runtime.load(model_path)
-    profile["load"] = time.time() - start
-    print(f'{model_name} load completed in {profile["load"]:.3f} s.', flush=True)
-
-    # set input
-    profile["set_input"] = 0
-    if prefix is None:
-        prefix = model_name
-    input_num = module.get_num_inputs()
-    for id in range(input_num):
-        input_name = module.get_input_name(id)
-        input_info = module.get_input_info(input_name)
-        print(
-            f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
-        )
-        input_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy"
-        )
-        input_data = np.load(input_data_path).astype(input_info.dtype)
-        input_data = np.concatenate([input_data for i in range(batch)], axis=0)
-        print(
-            f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}"
-        )
-        start = time.time()
-        module.set_input(input_name, input_data)
-        profile["set_input"] += time.time() - start
-    print(
-        f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.'
-    )
-
-    # infer model
-    start = time.time()
-    module.run()
-    module.sync()
-    profile["infer"] = time.time() - start
-    print(f'{model_name} infer completed in {profile["infer"]*1000:.3f} ms.')
-
-    # get output and compare with golden
-    profile["get_output"] = 0
-    result_check = True
-    output_num = module.get_num_outputs()
-    for id in range(output_num):
-        output_name = module.get_output_name(id)
-        output_info = module.get_output_info(output_name)
-        print(
-            f"output_info[{output_name}] shape = {output_info.shape}, dtype = {output_info.dtype}, format = {output_info.format.name}"
-        )
-        start = time.time()
-        output_data = module.get_output(output_name).numpy()
-        profile["get_output"] += time.time() - start
-        print(
-            f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
-        )
-        output_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy"
-        )
-        if os.path.exists(output_data_path):
-            golden_output = np.load(output_data_path)
-            golden_output = np.concatenate(
-                [golden_output for i in range(batch)], axis=0
-            )
-        else:
-            result_check = False
-            print(
-                f"[warning] compare canceled while golden data not found -> {output_data_path}"
-            )
-            continue
-        if golden_output.shape == output_data.shape:
-            cosine_dist = cosine_distance(golden_output, output_data)
-            is_match = (golden_output == output_data).all()
-            print(
-                f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}"
-            )
-            if is_match:
-                continue
-            if cosine_dist < GOLDEN_THRESH:
-                result_check = False
-        else:
-            result_check = False
-            print(
-                f"[compare] golden output [{output_name}] shape not match {golden_output.shape} vs {output_data.shape}"
-            )
-    print(
-        f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.'
-    )
-    if not result_check:
-        print("[error] result check failed.")
-        exit(-1)
-    print(f"<=== {model_name} test success.")
-
-
 def _get_decode_dir(model_dir):
     decode_dirs = sorted(
         path
@@ -405,14 +189,8 @@ def _copy_embedding_if_exists(source_model_dir, target_model_dir, copied_name):
 
 
 if __name__ == "__main__":
-    # Create and start the monitor
-    memory_monitor = ProcessMemoryMonitor(interval=2)
-    memory_monitor.start()
-
-    # parse args
     args = get_args()
     print(args)
-    curdir = os.getcwd()
 
     target_model_dir = args.model_dir
     draft_model_dir = args.draft_model_dir
@@ -423,68 +201,66 @@ if __name__ == "__main__":
     ndevice = args.ndevice
     j = args.j
     context_length = args.context_length
-    profile = {}
 
     target_prefill_dir = os.path.join(target_model_dir, "prefill")
     draft_decode_dir = _get_decode_dir(draft_model_dir)
     draft_prefill_dir = os.path.join(draft_model_dir, "prefill")
 
-    # build model
-    if args.stage == "build" or args.stage == "all":
-        import platform
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
+        assert (
+            get_platform() == "x86_64"
+        ), "Only supported for compilation on the x86_64 platform."
 
-        arch = platform.machine()
-        if arch != "x86_64":
-            print(f"[error] tcim not support platform: {arch}")
-            exit(0)
-        build(
-            f"{model_name}_prefill_draft",
-            draft_prefill_dir,
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            context_length,
-            j,
-            batch,
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(draft_prefill_dir),
+            hmm_name=f"{model_name}-{args.draft_model_size}_prefill_draft",
+            output=output_dir,
+            ncore=ncore,
+            llm_opt=True,
             flash_attention=args.flash_attention,
+            context_length=context_length,
+            ndevice=ndevice,
+            is_prefill=True,
+            parallel_jobs=j,
         )
-        build(
-            f"{model_name}_decode_draft",
-            draft_decode_dir,
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            context_length,
-            j,
-            batch,
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(draft_decode_dir),
+            hmm_name=f"{model_name}-{args.draft_model_size}_decode_draft",
+            output=output_dir,
+            ncore=ncore,
+            llm_opt=True,
+            batch=batch,
             flash_attention=args.flash_attention,
+            context_length=context_length,
+            ndevice=ndevice,
+            parallel_jobs=j,
         )
-        build(
-            f"{model_name}_prefill",
-            target_prefill_dir,
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            context_length,
-            j,
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(target_prefill_dir),
+            hmm_name=f"{model_name}-{args.model_size}_prefill",
+            output=output_dir,
+            ncore=ncore,
+            llm_opt=True,
             flash_attention=args.flash_attention,
+            context_length=context_length,
+            ndevice=ndevice,
+            is_prefill=True,
+            parallel_jobs=j,
         )
-        build(
-            f"{model_name}_verify",
-            target_prefill_dir,
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            context_length,
-            j,
-            batch,
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(target_prefill_dir),
+            hmm_name=f"{model_name}-{args.model_size}_verify",
+            output=output_dir,
+            ncore=ncore,
+            llm_opt=True,
+            batch=batch,
             flash_attention=args.flash_attention,
+            context_length=context_length,
             prefill_length=args.verify_length,
             all_logits=True,
+            ndevice=ndevice,
+            is_prefill=True,
+            parallel_jobs=j,
         )
         _copy_embedding_if_exists(
             target_model_dir, target_model_dir, "quant_embedding_target.pt"
@@ -493,28 +269,6 @@ if __name__ == "__main__":
             draft_model_dir, target_model_dir, "quant_embedding_draft.pt"
         )
 
-    # test model
-    if args.stage == "test" or args.stage == "all":
-        test(
-            f"{model_name}_prefill_draft",
-            draft_prefill_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-        test(
-            f"{model_name}_decode_draft",
-            draft_decode_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-        test(
-            f"{model_name}_prefill",
-            target_prefill_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-
-    memory_monitor.stop()
+    print(
+        f"\n=== All builds completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

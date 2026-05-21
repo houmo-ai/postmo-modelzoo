@@ -1,0 +1,33 @@
+default_model_name: "qwen3-asr"
+default_model_size: "0.6b"
+
+model_configs:
+  qwen3-asr:
+    "0.6b":
+      modelscope_repo: ["Qwen/Qwen3-ASR-0.6B"]
+      model_name: "qwen3-asr"
+      model_size: "0.6b"
+      ncore: 2
+      ndevice: 1
+      context_length: "2k"
+      max_audio_length: 1500
+      quant_type: "w8a8_sefp"
+    "1.7b":
+      modelscope_repo: ["Qwen/Qwen3-ASR-1.7B"]
+      model_name: "qwen3-asr"
+      model_size: "1.7b"
+      ncore: 2
+      ndevice: 1
+      context_length: "2k"
+      max_audio_length: 1500
+      quant_type: "w8a8_sefp"
+  qwen3-forcealigner:
+    "0.6b":
+      modelscope_repo: ["Qwen/Qwen3-ForcedAligner-0.6B"]
+      model_name: "qwen3-forcealigner"
+      model_size: "0.6b"
+      ncore: 2
+      ndevice: 1
+      context_length: "2k"
+      max_audio_length: 1500
+      quant_type: "w8a8_sefp"

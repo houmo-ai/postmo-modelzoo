@@ -1,6 +1,6 @@
 # MiniCPM-o_2.6
 
-本示例展示如何把MiniCPMO中的各个模型量化和编译，部署到后摩M50芯片的设备上。
+本示例展示如何把 MiniCPMO 中的各个子模型量化和编译，部署到后摩 M50 芯片设备上。
 
 ## 特别事项
 
@@ -17,7 +17,7 @@
 
 ## 1 模型说明
 
-本例使用的 MiniCPMO 各模块模型实现来源于[https://modelscope.cn/openbmb/MiniCPM-o-2_6](https://modelscope.cn/openbmb/MiniCPM-o-2_6)。
+本例使用的 MiniCPMO 各模块模型实现来源于 [https://modelscope.cn/openbmb/MiniCPM-o-2_6](https://modelscope.cn/openbmb/MiniCPM-o-2_6)。默认模型由 `config.yaml` 统一维护，当前默认组合为 `minicpmo` + `7b`。
 
 ## 2 快速开始
 
@@ -33,7 +33,7 @@ pip3 install -r requirements.txt
 
 ### 2.2 获取模型和数据
 
-通过get_model脚本下载模型，支持量化后模型编译和直接运行编译后芯片模型
+通过 get_model 脚本下载模型，支持获取原始模型或直接运行的预编译模型：
 
 ```bash
 # 直接获取可直接运行的芯片模型
@@ -41,6 +41,9 @@ python3 get_model.py --type hmm
 
 # 原始模型，需要量化+编译器编译后才能运行
 python3 get_model.py --type raw
+
+# 显式指定默认模型
+python3 get_model.py --type raw --model_name minicpmo --model_size 7b
 ```
 
 ### 2.3 量化
@@ -52,34 +55,33 @@ python3 get_model.py --type raw
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64.** /bin/bash
 ```
 
-进入docker后source环境变量，并进入`models/llm/minicpmo`目录，执行ptq.py脚本。默认的大语言模型模块prefill和decode上下文长度分别为256和4096。
+进入 docker 后 source 环境变量，并进入 `models/omni/minicpmo` 目录执行 `ptq.py`。默认的大语言模型模块 `prefill_length=256`、`context_length=4k`，统一来自 `config.yaml`。
 
 ```bash
 source env.sh
-cd models/llm/minicpmo
+cd models/omni/minicpmo
 ```
 
 ```bash
 python3 ptq.py
+python3 ptq.py --model-name minicpmo --model-size 7b
 ```
-量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录
+量化完成的模型存放在 `output/$HOUMO_TARGET/hmquant` 目录。
 
 ### 2.4 编译
 
 ```bash
 python3 build.py
+python3 build.py --model_name minicpmo --model_size 7b
 ```
 
 ### 2.5 演示
 
-MiniCPMO模型使用python API进行演示
-
-1. 将编译好的模型放在当前目录
-
-2. 执行脚本，推理完成将输出性能结果。
+MiniCPMO 使用 python API 进行演示。`demo.py` 默认会从 `config.yaml` 读取 `model_name` 与 `model_size`，并自动推导 `tokenizer_dir` 与各个 HMM 路径。
 
 ```bash
 python3 demo.py
+python3 demo.py --model_name minicpmo --model_size 7b
 #默认为omni模式，如需体验llm
 python3 demo.py --example_idx 1
 #如需体验vlm
@@ -102,10 +104,49 @@ python3 demo.py --example_idx 9
 
 ### 2.6 一键评估
 
-以上步骤可以通过test.sh脚本一键执行：
+以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
 ```bash
+# 默认执行 demo，会先下载预编译模型
 bash test.sh
+
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+bash test.sh -s all
+```
+
+test.sh 支持以下参数：
+
+```bash
+Usage: test.sh [options]
+  -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
+                          Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  -size, --model_size     Model size.
+  -name, --model_name     Model name.
+  --skip_download         Skip model download steps.
+  -h, --help              Show this help message.
+```
+
+当前支持的模型组合为：
+
+- `minicpmo` + `7b`
+
+示例：
+
+```bash
+# 仅运行 quant，会先下载原始模型再量化
+bash test.sh -s quant -name minicpmo -size 7b
+
+# 仅运行 build，要求当前目录下已经有量化输出
+bash test.sh -s build -name minicpmo -size 7b
+
+# 仅运行 demo，会先下载预编译模型
+bash test.sh -s demo -name minicpmo -size 7b
+
+# 完整流程（下载原始模型、量化、编译、演示）
+bash test.sh -s all -name minicpmo -size 7b
+
+# 跳过模型下载，使用当前目录下已有的预编译模型进行演示
+bash test.sh -s demo --skip_download -name minicpmo -size 7b
 ```
 
 ## 3 参考结果

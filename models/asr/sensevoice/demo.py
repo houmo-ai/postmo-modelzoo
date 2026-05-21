@@ -35,15 +35,27 @@ import yaml
 import librosa
 
 import tcim_lite as tcim
-import math
 import time
 from loguru import logger
 from hmatc.python.get_hm_devices import get_hm_devices
+from hmatc.utils.utils import first_not_none, get_model_configs
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+FILE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_CONFIG_PATH = os.path.join(FILE_DIR, "config.yaml")
+
 
 # --- Constants ---
-LANGUAGE_MAP: Dict[str, int] = {"auto": 0, "zh": 3, "en": 4, "yue": 7, "ja": 11, "ko": 12, "nospeech": 13}
+LANGUAGE_MAP: Dict[str, int] = {
+    "auto": 0,
+    "zh": 3,
+    "en": 4,
+    "yue": 7,
+    "ja": 11,
+    "ko": 12,
+    "nospeech": 13,
+}
 TEXTNORM_MAP: Dict[str, int] = {"withitn": 14, "woitn": 15}
 
 # Overlap frames to maintain context between chunks
@@ -51,9 +63,39 @@ DEFAULT_OVERLAP_FRAMES = 10  # frames of overlap
 DEFAULT_CONTEXT_FRAMES = 20  # extra context frames to pad on both sides
 
 
+def get_default_assets_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "sensevoice")
+    model_size = model_config.get("model_size", "small")
+    return f"{model_name}-{model_size}"
+
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
     parser.add_argument(
         "--audio_files",
         nargs="+",
@@ -64,15 +106,22 @@ def get_args() -> argparse.Namespace:
         "--model_path",
         dest="model_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "sensevoice_small.hmm"),
+        default=None,
         help="houmo model path",
     )
     parser.add_argument(
         "--assets-dir",
         dest="assets_dir",
         type=str,
-        default="SenseVoiceSmall",
+        default=None,
         help="Dir with config.yaml/am.mvn/tokens.json",
+    )
+    parser.add_argument(
+        "--ndevice",
+        dest="ndevice",
+        type=int,
+        default=None,
+        help="device number",
     )
     parser.add_argument(
         "--language",
@@ -86,7 +135,7 @@ def get_args() -> argparse.Namespace:
         dest="textnorm",
         type=str,
         default="woitn",
-        choices=TEXTNORM_MAP.keys()
+        choices=TEXTNORM_MAP.keys(),
     )
     parser.add_argument(
         "--overlap_frames",
@@ -102,18 +151,30 @@ def get_args() -> argparse.Namespace:
         default=DEFAULT_CONTEXT_FRAMES,
         help="Extra context frames to pad on both sides of each chunk",
     )
+    parser.add_argument("--raw_result", action="store_true", help="Show Raw Result")
     parser.add_argument(
-        "--raw_result",
-        action="store_true",
-        help="Show Raw Result"
-    )
-    parser.add_argument(
-        "--device_monitor",
-        action="store_true",
-        help="Device Monitor During Demo"
+        "--device_monitor", action="store_true", help="Device Monitor During Demo"
     )
 
     args = parser.parse_args()
+
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    if args.assets_dir is None:
+        args.assets_dir = get_default_assets_dir(model_config)
+    if args.model_path is None:
+        args.model_path = os.path.join(
+            "output",
+            HOUMO_TARGET,
+            f"{args.model_name}-{args.model_size}.hmm",
+        )
+
     return args
 
 
@@ -197,7 +258,9 @@ class SenseVoiceFrontend:
         model_dir = Path(model_dir).expanduser().resolve()
         cfg_path = model_dir / "config.yaml"
         if not cfg_path.exists():
-            print(f"Warning: {cfg_path} not found. Using default config but CMVN might fail.")
+            print(
+                f"Warning: {cfg_path} not found. Using default config but CMVN might fail."
+            )
             cfg_obj = FrontendConfig(cmvn_file=str(model_dir / "am.mvn"))
         else:
             cfg = _read_yaml(cfg_path)
@@ -275,12 +338,19 @@ def resolve_tag(v: str, mapping: Dict[str, int]) -> int:
     return int(mapping[key])
 
 
-def make_inputs_for_sample(feat: Any, feat_len: int, language: str, textnorm: str) -> Dict[str, Any]:
+def make_inputs_for_sample(
+    feat: Any, feat_len: int, language: str, textnorm: str
+) -> Dict[str, Any]:
     speech = feat[None, :, :].astype("float32")
     speech_lengths = np.array([feat_len], dtype="int32")
     lang = np.array([resolve_tag(language, LANGUAGE_MAP)], dtype="int32")
     norm = np.array([resolve_tag(textnorm, TEXTNORM_MAP)], dtype="int32")
-    return {"speech": speech, "speech_lengths": speech_lengths, "language": lang, "textnorm": norm}
+    return {
+        "speech": speech,
+        "speech_lengths": speech_lengths,
+        "language": lang,
+        "textnorm": norm,
+    }
 
 
 def ctc_greedy_decode(logits: Any, out_len: int, blank_id: int = 0) -> List[int]:
@@ -317,18 +387,21 @@ class SenseVoiceSmallFeature:
     4. Smarter padding (edge-padding vs zero-padding)
     5. Better handling of boundary frames
     """
+
     def __init__(
         self,
         model_path: str,
         assets_dir: str,
         language: str,
         textnorm: str,
+        ndevice: int = 1,
         overlap_frames: int = DEFAULT_OVERLAP_FRAMES,
         context_frames: int = DEFAULT_CONTEXT_FRAMES,
         **kwargs,
     ):
         self.model_file = model_path
         self.assets_dir = assets_dir
+        self.ndevice = ndevice
         self.overlap_frames = overlap_frames
         self.context_frames = context_frames
 
@@ -341,14 +414,18 @@ class SenseVoiceSmallFeature:
         if self.token_list is None:
             print("Warning: Failed to load tokens. Output will be token IDs.")
 
-        dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
+        dev_manager = tcim.runtime.DevManager(
+            get_hm_devices(self.ndevice), "Xh2HalBackend"
+        )
         weight_manager = tcim.runtime.WeightManager(dev_manager)
         option = tcim.runtime.Option(weight_manager)
         print("Loading model from", self.model_file)
         self.sess = tcim.runtime.load(self.model_file, option=option)
 
         # Get model max feature length
-        self.max_feat_len = self.sess.get_input_info(self.sess.get_input_name(0)).shape[1]
+        self.max_feat_len = self.sess.get_input_info(self.sess.get_input_name(0)).shape[
+            1
+        ]
         print(f"Model max feature length: {self.max_feat_len}")
 
         # Reserve space for context padding (max 10 frames per side)
@@ -357,11 +434,15 @@ class SenseVoiceSmallFeature:
         # Effective chunk size considering overlap
         self.effective_chunk_size = self.max_feat_len - overlap_frames
         if self.effective_chunk_size <= 0:
-            logger.warning(f"Overlap frames {overlap_frames} >= max_feat_len {self.max_feat_len}. Disabling overlap.")
+            logger.warning(
+                f"Overlap frames {overlap_frames} >= max_feat_len {self.max_feat_len}. Disabling overlap."
+            )
             self.effective_chunk_size = self.max_feat_len
             self.overlap_frames = 0
 
-        print(f"Effective chunk size: {self.effective_chunk_size} (max_len={self.max_feat_len}, overlap={self.overlap_frames}, max_context_per_side={self.max_context_per_side})")
+        print(
+            f"Effective chunk size: {self.effective_chunk_size} (max_len={self.max_feat_len}, overlap={self.overlap_frames}, max_context_per_side={self.max_context_per_side})"
+        )
 
         self.language = language
         self.textnorm = textnorm
@@ -407,17 +488,21 @@ class SenseVoiceSmallFeature:
 
             # Extract features
             feat, feat_len = self.frontend.extract(waveform)
-            logger.info(f"Audio duration: {audio_duration:.2f}s, Feature frames: {feat_len}")
+            logger.info(
+                f"Audio duration: {audio_duration:.2f}s, Feature frames: {feat_len}"
+            )
 
             # Calculate chunk boundaries
             boundaries = self.calculate_chunk_boundaries(feat_len)
-            logger.info(f"Split into {len(boundaries)} feature chunks "
-                       f"(max_len={self.max_feat_len}, overlap={self.overlap_frames})")
+            logger.info(
+                f"Split into {len(boundaries)} feature chunks "
+                f"(max_len={self.max_feat_len}, overlap={self.overlap_frames})"
+            )
 
             # Process each chunk with sliding window
             confirmed_text = ""  # Confirmed text
-            pending_text = ""    # Unconfirmed text (sliding window)
-            slide_len = 10       # Sliding window length
+            pending_text = ""  # Unconfirmed text (sliding window)
+            slide_len = 10  # Sliding window length
             total_infer_time = 0.0
 
             for i, (start, end) in enumerate(boundaries):
@@ -440,9 +525,11 @@ class SenseVoiceSmallFeature:
                 context_start = start - left_context
                 context_end = end + right_context
 
-                logger.info(f"Chunk {i+1}/{len(boundaries)}: content={content_len} frames, "
-                           f"context=[{left_context}, {right_context}], "
-                           f"total={content_len + left_context + right_context} frames")
+                logger.info(
+                    f"Chunk {i+1}/{len(boundaries)}: content={content_len} frames, "
+                    f"context=[{left_context}, {right_context}], "
+                    f"total={content_len + left_context + right_context} frames"
+                )
 
                 # Extract chunk with context
                 chunk_feat = feat[context_start:context_end, :]
@@ -455,7 +542,9 @@ class SenseVoiceSmallFeature:
                     pad_feats = np.tile(last_frame, (pad_width, 1))
                     chunk_feat = np.vstack([chunk_feat, pad_feats])
 
-                inputs = make_inputs_for_sample(chunk_feat, chunk_len, self.language, self.textnorm)
+                inputs = make_inputs_for_sample(
+                    chunk_feat, chunk_len, self.language, self.textnorm
+                )
 
                 # Run inference
                 for k, v in inputs.items():
@@ -478,7 +567,12 @@ class SenseVoiceSmallFeature:
 
                 # Handle overlap with previous chunk
                 if i > 0:
-                    overlap_logits = int(content_len * ctc_ratio * self.overlap_frames / self.max_feat_len)
+                    overlap_logits = int(
+                        content_len
+                        * ctc_ratio
+                        * self.overlap_frames
+                        / self.max_feat_len
+                    )
                     if overlap_logits > 0:
                         end_idx -= overlap_logits
 
@@ -552,20 +646,19 @@ if __name__ == "__main__":
     smi_monitor = None
     if args.device_monitor:
         import hmatc.python.smi as smi
+
         smi_monitor = smi.DeviceMonitor(0, 100)
         smi_monitor.start()
-    if HOUMO_TARGET == "xh2":
-        sensevoice = SenseVoiceSmallFeature(
-            args.model_path,
-            args.assets_dir,
-            args.language,
-            args.textnorm,
-            overlap_frames=args.overlap_frames,
-            context_frames=args.context_frames,
-        )
-    else:
-        raise ValueError("Unsupported houmo target!")
 
+    sensevoice = SenseVoiceSmallFeature(
+        args.model_path,
+        args.assets_dir,
+        args.language,
+        args.textnorm,
+        ndevice=args.ndevice,
+        overlap_frames=args.overlap_frames,
+        context_frames=args.context_frames,
+    )
     sensevoice.run_inference(args.audio_files, args.raw_result)
 
     if args.device_monitor:

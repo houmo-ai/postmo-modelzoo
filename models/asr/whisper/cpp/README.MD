@@ -104,9 +104,9 @@
 
 # 手动指定模型路径（覆盖--model的默认路径）
 ./whisper-demo --audio_path audio.mp3 \
-    --encode_path models/whisper_encode.hmm \
-    --decode_path models/whisper_decode.hmm \
-    --prefill_path models/whisper_prefill.hmm
+    --encode_path models/whisper-medium_encode.hmm \
+    --decode_path models/whisper-medium_decode.hmm \
+    --prefill_path models/whisper-medium_prefill.hmm
 
 # 自定义分块大小
 ./whisper-demo --audio_path audio.mp3 --chunk_size 10

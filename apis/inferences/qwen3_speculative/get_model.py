@@ -21,7 +21,6 @@
 import os
 import sys
 import argparse
-from modelscope import snapshot_download
 
 HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
 sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
@@ -60,7 +59,7 @@ def get_args() -> argparse.Namespace:
         "--context_length",
         dest="context_length",
         type=str,
-        default="2k",
+        default="32k",
         help="context length",
     )
     parser.add_argument(
@@ -88,9 +87,9 @@ if __name__ == "__main__":
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": "qwen3_speculative",
+        "model_name": "qwen3-speculative",
         "model_info": {
-            "model_size": "8b",
+            "model_size": "14b",
             "ncore": args.ncore,
             "ndevice": args.ndevice,
             "context_len": args.context_length,
@@ -98,8 +97,8 @@ if __name__ == "__main__":
             "batch": 1,
         },
         "modelscope_repo": {
-            "repo_ids": ["qwen/qwen3-8b"],
-            "local_dirs": ["./qwen3-8b"],
+            "repo_ids": ["qwen/qwen3-14b"],
+            "local_dirs": ["./qwen3-14b"],
         },
     }
 

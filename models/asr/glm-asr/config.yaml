@@ -1,0 +1,12 @@
+default_model_name: "glm-asr"
+default_model_size: "nano-2512"
+
+model_configs:
+  glm-asr:
+    "nano-2512":
+      modelscope_repo: ["ZhipuAI/GLM-ASR-Nano-2512"]
+      model_name: "glm-asr"
+      model_size: "nano-2512"
+      ncore: 2
+      ndevice: 1
+      quant_type: "w8a8_sefp"

@@ -21,21 +21,24 @@
 import os
 import numpy as np
 import time
-import psutil
-import threading
 import multiprocessing
 import argparse
-import glob
 
-import logging
-
-logging.basicConfig(level="INFO")
+from hmatc.exec.xh2_exec import Xh2Exec
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import (
+    find_hmonnx_file,
+    first_not_none,
+    get_model_configs,
+    get_platform,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
-HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
+HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def sanitize_name(name: str):
@@ -58,69 +61,6 @@ def cosine_distance(data1, data2):
     if np.isnan(cosine_dist):
         return -1
     return cosine_dist
-
-
-class ProcessMemoryMonitor:
-    """
-    Monitors the memory usage of the current Python process in real-time using psutil.
-    """
-
-    def __init__(self, interval=2, log_file=None):
-        """
-        Initializes the monitor.
-        Args:
-            interval (int): Time between measurements in seconds.
-            log_file (str, optional): Path to a file to log results. If None, prints to console.
-        """
-        self.process = psutil.Process(os.getpid())
-        self.interval = interval
-        self.log_file = log_file
-        self.is_monitoring = False
-        self.peak_memory_mb = 0
-
-    def get_memory_info(self):
-        """
-        Gets current memory usage information.
-        Returns:
-            dict: A dictionary containing memory usage data.
-        """
-        memory_info = self.process.memory_info()
-        rss_mb = memory_info.rss / (1024 * 1024)  # Resident Set Size in MB
-        percent = self.process.memory_percent()  # Percentage of system memory
-        return {"rss_mb": rss_mb, "percent": percent}
-
-    def start(self):
-        """Starts the monitoring loop in a separate daemon thread."""
-        self.is_monitoring = True
-        self.peak_memory_mb = 0
-        self.monitor_thread = threading.Thread(target=self._monitor_loop)
-        self.monitor_thread.daemon = True  # Thread will exit when main program does
-        self.monitor_thread.start()
-        print(f"Memory monitoring started (interval: {self.interval}s)")
-
-    def _monitor_loop(self):
-        """The internal loop that runs in the thread."""
-        while self.is_monitoring:
-            mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info["rss_mb"])
-
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
-
-            # Output to console or file
-            if self.log_file:
-                with open(self.log_file, "a") as f:
-                    f.write(log_message + "\n")
-
-            time.sleep(self.interval)
-
-    def stop(self):
-        """Stops the monitoring loop and prints peak usage."""
-        self.is_monitoring = False
-        if hasattr(self, "monitor_thread"):
-            # Wait a moment for the thread to finish
-            self.monitor_thread.join(timeout=1)
-        print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
 
 
 def _validate_flash_attention(flash_vals: tuple) -> None:
@@ -146,6 +86,13 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
         "--model_dir",
         dest="model_dir",
         type=str,
@@ -156,8 +103,15 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="whisper-medium",
+        default=None,
         help="output houmo model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
     )
     parser.add_argument(
         "--j",
@@ -170,7 +124,7 @@ def get_args() -> argparse.Namespace:
         "--ncore",
         dest="ncore",
         type=int,
-        default=HOUMO_CORE_NUM,
+        default=None,
         help="core number",
     )
     parser.add_argument(
@@ -201,41 +155,15 @@ def get_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     _validate_flash_attention(args.flash_attention)
     return args
-
-
-def build_whisper(
-    model_name, model_dir, output_dir, profile, ncore, j, flash_attention=0
-):
-    import tcim
-
-    kwargs = {}
-    if flash_attention:
-        import json
-
-        kwargs["flash_attention"] = flash_attention
-        custom_msg = {}
-        custom_msg["flash_attention"] = flash_attention
-        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
-
-    start = time.time()
-    print(f"\n===> {model_name} build start...")
-    onnx_files = glob.glob(f"{model_dir}/hmquant_*.onnx")
-    decode_model = os.path.abspath(onnx_files[0]) if onnx_files else ""
-    tcim.build_from_hmonnx(
-        decode_model,
-        weights=os.path.join(model_dir, "weight.npy"),
-        output_name=model_name,
-        ncore=ncore,
-        target=HOUMO_TARGET,
-        output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim", model_name),
-        j=j,
-        **kwargs,
-    )
-    profile["build"] = time.time() - start
-    print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 
 def test(model_name, model_dir, output_dir, profile, batch=1):
@@ -339,65 +267,41 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
 
 
 if __name__ == "__main__":
-    # Create and start the monitor
-    memory_monitor = ProcessMemoryMonitor(interval=2)
-    memory_monitor.start()
-
-    # parse args
     args = get_args()
     print(args)
-    curdir = os.getcwd()
-    model_dir = args.model_dir
-    model_name = args.model_name
-    output_dir = args.output_dir
-    ncore = args.ncore
-    j = args.j
     llm_flash_attention, encoder_flash_attention = args.flash_attention
     profile = {}
 
-    # build model
-    if args.stage == "build" or args.stage == "all":
-        import platform
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
+        if args.stage == "build" or args.stage == "all":
+            assert (
+                get_platform() == "x86_64"
+            ), "Only supported for compilation on the x86_64 platform."
 
-        arch = platform.machine()
-        if arch != "x86_64":
-            print(f"[error] tcim not support platform: {arch}")
-            exit(0)
-        build_whisper(
-            f"{model_name}_encode",
-            os.path.join(model_dir, "encode"),
-            output_dir,
-            profile,
-            ncore,
-            j,
-            flash_attention=encoder_flash_attention,
-        )
-        build_whisper(
-            f"{model_name}_decode",
-            os.path.join(model_dir, "decode"),
-            output_dir,
-            profile,
-            ncore,
-            j,
-            flash_attention=llm_flash_attention,
-        )
-        build_whisper(
-            f"{model_name}_prefill",
-            os.path.join(model_dir, "prefill"),
-            output_dir,
-            profile,
-            ncore,
-            j,
-            flash_attention=llm_flash_attention,
-        )
+            base_name = f"{args.model_name}-{args.model_size}"
+            for suffix, subdir, flash_attention in (
+                ("encode", "encode", encoder_flash_attention),
+                ("decode", "decode", llm_flash_attention),
+                ("prefill", "prefill", llm_flash_attention),
+            ):
+                Xh2Exec.build_from_hmonnx(
+                    hmonnx=find_hmonnx_file(os.path.join(args.model_dir, subdir)),
+                    hmm_name=f"{base_name}_{suffix}",
+                    output=args.output_dir,
+                    ncore=args.ncore,
+                    flash_attn=flash_attention,
+                    parallel_jobs=args.j,
+                )
 
-    # test model
-    if args.stage == "test" or args.stage == "all":
-        part_dir = os.path.join(model_dir, "encode")
-        test(f"{model_name}_encode", part_dir, output_dir, profile)
-        part_dir = os.path.join(model_dir, "decode")
-        test(f"{model_name}_decode", part_dir, output_dir, profile)
-        part_dir = os.path.join(model_dir, "prefill")
-        test(f"{model_name}_prefill", part_dir, output_dir, profile)
-
-    memory_monitor.stop()
+        if args.stage == "test" or args.stage == "all":
+            base_name = f"{args.model_name}-{args.model_size}"
+            for suffix in ("encode", "decode", "prefill"):
+                test(
+                    f"{base_name}_{suffix}",
+                    os.path.join(args.model_dir, suffix),
+                    args.output_dir,
+                    profile,
+                )
+    print(
+        f"\n=== Build/test completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

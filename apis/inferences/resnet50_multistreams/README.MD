@@ -53,17 +53,17 @@ python3 resnet50_multistreams.py -n 2
 
 ```bash
 2026-04-14 07:38:37.533 | INFO     | __main__:<module>:77 - ===> resnet50_multistreams python example start...
-2026-04-14 07:38:37.534 | INFO     | __main__:<module>:92 - Found model file: ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm
+2026-04-14 07:38:37.534 | INFO     | __main__:<module>:92 - Found model file: ./resnet50_xh2_b1_1roi_1core_O2.hmm
 2026-04-14 07:38:37.534 | INFO     | __main__:<module>:103 - devices: 1
 2026-04-14 07:38:37.534 | INFO     | __main__:<module>:104 - threads: 4
 2026-04-14 07:38:37.534 | INFO     | __main__:<module>:105 - samples: 10
-2026-04-14 07:38:37.534 | INFO     | __main__:<module>:106 - model: ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm
+2026-04-14 07:38:37.534 | INFO     | __main__:<module>:106 - model: ./resnet50_xh2_b1_1roi_1core_O2.hmm
 [2026-04-14 07:38:37.534] [tid 407783] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
 [2026-04-14 07:38:37.534] [tid 407783] [warning] Empty backend name, use Xh2HalBackend instead.
-2026-04-14 07:38:38.245 | INFO     | __main__:<module>:223 - thread 0 on device 0 load model ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm.
-2026-04-14 07:38:38.247 | INFO     | __main__:<module>:223 - thread 1 on device 0 load model ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm.
-2026-04-14 07:38:38.248 | INFO     | __main__:<module>:223 - thread 2 on device 0 load model ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm.
-2026-04-14 07:38:38.248 | INFO     | __main__:<module>:223 - thread 3 on device 0 load model ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm.
+2026-04-14 07:38:38.245 | INFO     | __main__:<module>:223 - thread 0 on device 0 load model ./resnet50_xh2_b1_1roi_1core_O2.hmm.
+2026-04-14 07:38:38.247 | INFO     | __main__:<module>:223 - thread 1 on device 0 load model ./resnet50_xh2_b1_1roi_1core_O2.hmm.
+2026-04-14 07:38:38.248 | INFO     | __main__:<module>:223 - thread 2 on device 0 load model ./resnet50_xh2_b1_1roi_1core_O2.hmm.
+2026-04-14 07:38:38.248 | INFO     | __main__:<module>:223 - thread 3 on device 0 load model ./resnet50_xh2_b1_1roi_1core_O2.hmm.
 2026-04-14 07:38:38.248 | INFO     | __main__:<module>:234 - Reference model input info:
 2026-04-14 07:38:38.248 | INFO     | __main__:<module>:239 -   Input[input.1] shape = [1, 3, 512, 512], dtype = <class 'numpy.uint8'>, mem_size = 393216, stride = [393216, 512, 1, 393216, 512, 2, 1, 262144], format = YUV420SP
 2026-04-14 07:38:38.248 | INFO     | __main__:<module>:239 -   Input[resizer_crop_input.1] shape = [1, 10], dtype = <class 'numpy.int32'>, mem_size = 40, stride = [40, 4], format = ND
@@ -140,15 +140,15 @@ I20260414 08:09:22.643092 435374 resnet50_multistreams.cc:229] ===> resnet50_mul
 I20260414 08:09:22.643729 435374 resnet50_multistreams.cc:239] houmo target: xh2, tcim version: v1.2.0
 - Git Commit: clean
 - Build Time: 2026-03-31 16:53:07 Mar 31 2026
-I20260414 08:09:22.651982 435374 resnet50_multistreams.cc:250] Found .hmm file: ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm
-I20260414 08:09:22.651996 435374 resnet50_multistreams.cc:259] Find resnet50 model file ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm
-I20260414 08:09:22.652001 435374 resnet50_multistreams.cc:274] model: ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm, devices: 1, threads: 4, samples: 10
+I20260414 08:09:22.651982 435374 resnet50_multistreams.cc:250] Found .hmm file: ./resnet50_xh2_b1_1roi_1core_O2.hmm
+I20260414 08:09:22.651996 435374 resnet50_multistreams.cc:259] Find resnet50 model file ./resnet50_xh2_b1_1roi_1core_O2.hmm
+I20260414 08:09:22.652001 435374 resnet50_multistreams.cc:274] model: ./resnet50_xh2_b1_1roi_1core_O2.hmm, devices: 1, threads: 4, samples: 10
 [2026-04-14 08:09:22.652] [tid 435374] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
 [2026-04-14 08:09:22.652] [tid 435374] [warning] Empty backend name, use Xh2HalBackend instead.
-I20260414 08:09:23.087505 435374 resnet50_multistreams.cc:389] thread 0 on device 0 model ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm.
-I20260414 08:09:23.089695 435374 resnet50_multistreams.cc:389] thread 1 on device 0 model ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm.
-I20260414 08:09:23.090968 435374 resnet50_multistreams.cc:389] thread 2 on device 0 model ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm.
-I20260414 08:09:23.092092 435374 resnet50_multistreams.cc:389] thread 3 on device 0 model ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm.
+I20260414 08:09:23.087505 435374 resnet50_multistreams.cc:389] thread 0 on device 0 model ./resnet50_xh2_b1_1roi_1core_O2.hmm.
+I20260414 08:09:23.089695 435374 resnet50_multistreams.cc:389] thread 1 on device 0 model ./resnet50_xh2_b1_1roi_1core_O2.hmm.
+I20260414 08:09:23.090968 435374 resnet50_multistreams.cc:389] thread 2 on device 0 model ./resnet50_xh2_b1_1roi_1core_O2.hmm.
+I20260414 08:09:23.092092 435374 resnet50_multistreams.cc:389] thread 3 on device 0 model ./resnet50_xh2_b1_1roi_1core_O2.hmm.
 I20260414 08:09:23.092104 435374 resnet50_multistreams.cc:403] Reference model input info:
 I20260414 08:09:23.092141 435374 resnet50_multistreams.cc:409]   Input[input.1] info: TensorInfo: shape: [1,3,512,512], stride: [393216,512,1,393216,512,2,1,262144], dtype: UINT8, format: YUV420SP, size: 393216, memsize: 393216
 I20260414 08:09:23.092155 435374 resnet50_multistreams.cc:409]   Input[resizer_crop_input.1] info: TensorInfo: shape: [1,10], stride: [40,4], dtype: INT32, format: ND, size: 40, memsize: 40

@@ -21,14 +21,20 @@
             "download_dir": ["cached_models", "cached_models", "cached_models"],
             "extract_dir": [null, null, "cached_models/hmm_xh2"],
             "source_type": [null, null, null],
+            "model_name": ["minicpmo", "minicpmo", "minicpmo"],
+            "model_size": ["7b", "7b", "7b"],
             "batch": [null, null, null],
             "context_length": [null, null, null],
-            "ndevice": [null, null, null]
+            "prefill_length": [null, null, null],
+            "ndevice": [null, null, null],
+            "ncore": [null, null, null]
         }
     },
     "quant_params": {
         "xh2": {
             "model": ["cached_models/MiniCPM-o-2_6"],
+            "model-name": ["minicpmo"],
+            "model-size": ["7b"],
             "out-dir": ["cached_results/hmquant_xh2"],
             "context-length": ["4096"]
         }
@@ -36,36 +42,42 @@
     "compile_params": {
         "xh2": {
             "model_dir": ["cached_results/hmquant_xh2"],
-            "model_name": [null],
+            "model_name": ["minicpmo"],
+            "model_size": ["7b"],
             "batch": [null],
             "ncore": [null],
+            "context_length": ["4096"],
             "ndevice": [null],
             "stage": ["build"],
+            "prefill_length": [null],
+            "enable_xh2_stable_output": [null],
             "j": ["24"],
             "output_dir": ["cached_results/hmm_xh2"]
         }
     },
     "demo_params": {
         "xh2": {
+            "model_name": ["minicpmo"],
+            "model_size": ["7b"],
             "tokenizer_dir": ["cached_models/MiniCPM-o-2_6"],
-            "embedding_path": ["cached_results/hmm_xh2/hmquant"],
-            "vit_path": ["cached_results/hmm_xh2/minicpmo_visual.hmm"],
-            "audio_path": ["cached_results/hmm_xh2/minicpmo_audio.hmm"],
+            "embedding_path": ["cached_results/hmquant_xh2/hmquant"],
+            "vit_path": ["cached_results/hmm_xh2/minicpmo-7b_visual.hmm"],
+            "audio_path": ["cached_results/hmm_xh2/minicpmo-7b_audio.hmm"],
             "llm_prefill_path": [
-                "cached_results/hmm_xh2/minicpmo_llm_prefill.hmm"
+                "cached_results/hmm_xh2/minicpmo-7b_llm_prefill.hmm"
             ],
             "llm_decode_path": [
-                "cached_results/hmm_xh2/minicpmo_llm_decode.hmm"
+                "cached_results/hmm_xh2/minicpmo-7b_llm_decode.hmm"
             ],
             "tts_prefill_path": [
-                "cached_results/hmm_xh2/minicpmo_tts_prefill.hmm"
+                "cached_results/hmm_xh2/minicpmo-7b_tts_prefill.hmm"
             ],
             "tts_decode_path": [
-                "cached_results/hmm_xh2/minicpmo_tts_decode.hmm"
+                "cached_results/hmm_xh2/minicpmo-7b_tts_decode.hmm"
             ],
             "tts_dvae_path": ["cached_results/hmm_xh2"],
-            "tts_vocos_path": ["cached_results/hmm_xh2/minicpmo_vocos.hmm"],
-            "device_idx": [null],
+            "tts_vocos_path": ["cached_results/hmm_xh2/minicpmo-7b_vocos.hmm"],
+            "device_id": [null],
             "example_idx": [null]
         }
     },

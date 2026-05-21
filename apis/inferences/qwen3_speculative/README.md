@@ -27,10 +27,10 @@ qwen3/
     │       ├── decoder/           # Target 模型的 decode 文件
     │       ├── prefill/           # Target 模型的 prefill 文件
     │       └── quant_embedding.pt # Target 模型的量化嵌入文件
-    ├── qwen3_decode_draft.hmm     # Draft 模型的解码文件
-    ├── qwen3_prefill_draft.hmm    # Draft 模型的 prefill 文件
-    ├── qwen3_prefill.hmm          # Target 模型的 prefill 文件
-    └── qwen3_verify.hmm           # verify 文件
+    ├── qwen3-speculative-0.6b_decode_draft.hmm     # Draft 模型的解码文件
+    ├── qwen3-speculative-0.6b_prefill_draft.hmm    # Draft 模型的 prefill 文件
+    ├── qwen3-speculative-14b_prefill.hmm           # Target 模型的 prefill 文件
+    └── qwen3-speculative-14b_verify.hmm            # verify 文件
 ```
 
 ### 1.2 执行模型推理

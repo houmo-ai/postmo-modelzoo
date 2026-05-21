@@ -20,18 +20,24 @@
             "type": ["raw", "hmm"],
             "download_dir": ["cached_models", "cached_models"],
             "extract_dir": [null, "cached_models/hmm_xh2"],
-            "source_type": [null, null]
+            "source_type": [null, null],
+            "model_name": ["glm-asr", "glm-asr"],
+            "model_size": ["nano-2512", "nano-2512"]
         }
     },
     "quant_params": {
         "xh2": {
-            "model": ["cached_models/glm-asr-nano-2512"],
+            "model": ["cached_models/GLM-ASR-Nano-2512"],
+            "model-name": ["glm-asr"],
+            "model-size": ["nano-2512"],
             "out-dir": ["cached_results/hmquant_xh2"]
         }
     },
     "compile_params": {
         "xh2": {
             "model_dir": ["cached_results/hmquant_xh2"],
+            "model_name": ["glm-asr"],
+            "model_size": ["nano-2512"],
             "stage": ["build"],
             "j": ["24"],
             "output_dir": ["cached_results/hmm_xh2"]
@@ -39,10 +45,18 @@
     },
     "demo_params": {
         "xh2": {
-            "processor_path": ["cached_models/glm-asr-nano-2512"],
-            "encoder_path": ["cached_results/hmm_xh2/glm-asr_encode.hmm"],
-            "prefill_path": ["cached_results/hmm_xh2/glm-asr_prefill.hmm"],
-            "decode_path": ["cached_results/hmm_xh2/glm-asr_decode.hmm"],
+            "processor_path": ["cached_models/GLM-ASR-Nano-2512"],
+            "model_name": ["glm-asr"],
+            "model_size": ["nano-2512"],
+            "encoder_path": [
+                "cached_results/hmm_xh2/glm-asr-nano-2512_encode.hmm"
+            ],
+            "prefill_path": [
+                "cached_results/hmm_xh2/glm-asr-nano-2512_prefill.hmm"
+            ],
+            "decode_path": [
+                "cached_results/hmm_xh2/glm-asr-nano-2512_decode.hmm"
+            ],
             "embedding_path": [
                 "cached_results/hmm_xh2/hmquant/quant_embedding.pt"
             ],

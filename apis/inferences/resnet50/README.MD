@@ -43,7 +43,7 @@ python3 resnet50.py
 ```bash
 2026-04-14 06:49:19.504 | INFO     | __main__:<module>:41 - ===> resnet50 python example start...
 2026-04-14 06:49:19.507 | INFO     | __main__:<module>:58 - input image shape: (375, 500, 3)
-2026-04-14 06:49:19.507 | INFO     | __main__:<module>:62 - Found model file: ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm
+2026-04-14 06:49:19.507 | INFO     | __main__:<module>:62 - Found model file: ./resnet50_xh2_b1_1roi_1core_O2.hmm
 2026-04-14 06:49:19.944 | INFO     | __main__:<module>:71 - Model input info:
 2026-04-14 06:49:19.945 | INFO     | __main__:<module>:76 -   Input[input.1] shape = [1, 3, 512, 512], dtype = <class 'numpy.uint8'>, mem_size = 393216, stride = [393216, 512, 1, 393216, 512, 2, 1, 262144], format = YUV420SP
 2026-04-14 06:49:19.945 | INFO     | __main__:<module>:76 -   Input[resizer_crop_input.1] shape = [1, 10], dtype = <class 'numpy.int32'>, mem_size = 40, stride = [40, 4], format = ND
@@ -76,10 +76,10 @@ cd ..
 
 ```bash
 I20260414 08:32:55.240370 462441 resnet50.cc:63] ===> resnet50 c++ example start...
-I20260414 08:32:55.241035 462441 resnet50.cc:82] Found .hmm file: ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm
+I20260414 08:32:55.241035 462441 resnet50.cc:82] Found .hmm file: ./resnet50_xh2_b1_1roi_1core_O2.hmm
 I20260414 08:32:55.244415 462441 resnet50.cc:104] input image shape: [375 x 500 x 3]
-I20260414 08:32:55.244419 462441 resnet50.cc:108] Load resnet50 model from file ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm
-I20260414 08:32:55.685303 462441 resnet50.cc:114] Model ./resnet50_xh2_b1_1roi_1core_O2_dynamic.hmm loaded.
+I20260414 08:32:55.244419 462441 resnet50.cc:108] Load resnet50 model from file ./resnet50_xh2_b1_1roi_1core_O2.hmm
+I20260414 08:32:55.685303 462441 resnet50.cc:114] Model ./resnet50_xh2_b1_1roi_1core_O2.hmm loaded.
 I20260414 08:32:55.685339 462441 resnet50.cc:125] Model input info:
 I20260414 08:32:55.685402 462441 resnet50.cc:130]   Input[input.1] info: TensorInfo: shape: [1,3,512,512], stride: [393216,512,1,393216,512,2,1,262144], dtype: UINT8, format: YUV420SP, size: 393216, memsize: 393216
 I20260414 08:32:55.685428 462441 resnet50.cc:130]   Input[resizer_crop_input.1] info: TensorInfo: shape: [1,10], stride: [40,4], dtype: INT32, format: ND, size: 40, memsize: 40

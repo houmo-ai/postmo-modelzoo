@@ -1183,6 +1183,7 @@ class Xh2Exec(BaseExec):
         enable_common_subgraph=False,
         skip_mlir_compile=False,
         subgraph_repeat_hint=20,
+        all_logits=False,
         work_dir=None,
         cpp_backend="v1",
         target="xh2",
@@ -1236,6 +1237,8 @@ class Xh2Exec(BaseExec):
                 build_kwargs["modify_llm"]["batch"] = batch
                 if context_length is not None:
                     build_kwargs["modify_llm"]["context-length"] = context_length
+            if all_logits:
+                build_kwargs["modify_llm"]["all-logits"] = all_logits
 
         # Multi-device
         if ndevice > 1:
@@ -1253,6 +1256,7 @@ class Xh2Exec(BaseExec):
             "batch": batch,
             "context_length": context_length,
             "prefill_length": prefill_length,
+            "all_logits": all_logits,
             "flash_attention": flash_attn,
             "llm_opt": llm_opt,
             "enable_xh2_stable_output": enable_xh2_stable_output,
@@ -1263,6 +1267,20 @@ class Xh2Exec(BaseExec):
             "opt_level": opt_level,
             "is_prefill": is_prefill,
         }
+
+        # Merge kwargs with build_kwargs
+        merged_kwargs = dict(kwargs or {})
+        parallel_jobs = merged_kwargs.pop(
+            "parallel_jobs", psutil.cpu_count(logical=False)
+        )
+        input_modify_llm = merged_kwargs.get("modify_llm") or {}
+        build_modify_llm = build_kwargs.get("modify_llm") or {}
+        merged_modify_llm = {**input_modify_llm, **build_modify_llm}
+        merged_kwargs.update(build_kwargs)
+        if merged_modify_llm:
+            merged_kwargs["modify_llm"] = merged_modify_llm
+        logger.info(f"kwargs for build_from_hmonnx: {merged_kwargs}")
+
         tcim.build_from_hmonnx(
             hmonnx,
             output_name=hmm_name,
@@ -1281,9 +1299,9 @@ class Xh2Exec(BaseExec):
             subgraph_repeat_hint=subgraph_repeat_hint,
             flash_attention=flash_attn,
             cpp_backend=cpp_backend,
-            j=kwargs.get("parallel_jobs", psutil.cpu_count(logical=False)),
+            j=parallel_jobs,
             custom_msg=json.dumps(custom_msg, ensure_ascii=False),
-            **build_kwargs,
+            **merged_kwargs,
         )
 
         return os.path.join(output_dir, f"{hmm_name}.hmm")

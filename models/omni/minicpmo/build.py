@@ -25,14 +25,22 @@ import time
 import argparse
 import multiprocessing
 
-import logging
-
-logging.basicConfig(level="INFO")
+from hmatc.exec.xh2_exec import Xh2Exec
+from hmatc.utils.monitor import ProcessMemoryMonitor
+from hmatc.utils.utils import (
+    find_hmonnx_file,
+    first_not_none,
+    get_model_configs,
+    get_platform,
+    parse_context_length,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", "Only supported xh2!"
-HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def sanitize_name(name: str):
@@ -85,6 +93,13 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
         "--model_dir",
         dest="model_dir",
         type=str,
@@ -95,44 +110,42 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="minicpmo",
+        default=None,
         help="output houmo model name",
     )
     parser.add_argument(
         "--batch",
         dest="batch",
         type=int,
-        default=1,
+        default=None,
         help="batch size",
     )
     parser.add_argument(
         "--ncore",
         dest="ncore",
         type=int,
-        default=HOUMO_CORE_NUM,
+        default=None,
         help="core number",
     )
     parser.add_argument(
         "--context_length",
         dest="context_length",
-        type=int,
-        default=4096,
+        type=str,
+        default=None,
         help="context_length",
     )
     parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
-        default=0,
-        choices=[0, 1, 2],
+        default=None,
         help="device number",
     )
     parser.add_argument(
         "--model_size",
         dest="model_size",
         type=str,
-        default="7b",
-        choices=["7b"],
+        default=None,
         help="model size",
     )
     parser.add_argument(
@@ -161,8 +174,14 @@ def get_args() -> argparse.Namespace:
         "--prefill_length",
         dest="prefill_length",
         type=int,
-        default=256,
+        default=None,
         help="prefill_length",
+    )
+    parser.add_argument(
+        "--enable_xh2_stable_output",
+        dest="enable_xh2_stable_output",
+        action="store_true",
+        help="enable xh2 stable output",
     )
     parser.add_argument(
         "--flash_attention",
@@ -177,100 +196,25 @@ def get_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.batch = first_not_none(args.batch, model_config.get("batch", 1))
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    args.context_length = parse_context_length(
+        first_not_none(args.context_length, model_config.get("context_length", "4k"))
+    )
+    args.prefill_length = first_not_none(
+        args.prefill_length, model_config.get("prefill_length", 256)
+    )
     args.flash_attention = _validate_adjust_flash_attention(
         args.flash_attention, args.context_length
     )
     return args
-
-
-def build_llm_tts(
-    model_name,
-    model_dir,
-    model_path,
-    output_dir,
-    profile,
-    ncore,
-    ndevice,
-    context_length,
-    j,
-    batch=None,
-    tso=False,
-    flash_attention=0,
-    prefill_length=0,
-):
-    import tcim
-    import json
-
-    kwargs = {}
-    custom_msg = {}
-
-    kwargs["modify_llm"] = {}
-    kwargs["enable_xh2_stable_output"] = tso
-    if prefill_length:
-        kwargs["modify_llm"]["fill-length"] = prefill_length
-        custom_msg["prefill_length"] = prefill_length
-    if flash_attention:
-        kwargs["flash_attention"] = flash_attention
-        custom_msg["flash_attention"] = flash_attention
-    if ndevice:
-        kwargs["ndevice"] = ndevice
-    if batch:
-        kwargs["modify_llm"]["batch"] = batch
-        custom_msg["batch"] = batch
-    if context_length:
-        kwargs["modify_llm"]["context-length"] = context_length
-        custom_msg["context_length"] = context_length
-    kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
-
-    start = time.time()
-    print(f"\n===> {model_name} build start...\n kwargs:{kwargs}")
-    decode_model = os.path.join(model_dir, model_path)
-    tcim.build_from_hmonnx(
-        decode_model,
-        weights=os.path.join(model_dir, "weight.npy"),
-        output_name=model_name,
-        ncore=ncore,
-        target=HOUMO_TARGET,
-        output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim"),
-        llm_opt=True,
-        j=j,
-        **kwargs,
-    )
-    profile["build"] = time.time() - start
-    print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
-
-
-def build_other_all(
-    model_name, model_dir, model_path, output_dir, profile, ncore, j, flash_attention=0
-):
-    import tcim
-
-    kwargs = {}
-    if HOUMO_TARGET == "xh2" and flash_attention:
-        import json
-
-        kwargs["flash_attention"] = flash_attention
-        custom_msg = {}
-        custom_msg["flash_attention"] = flash_attention
-        kwargs["custom_msg"] = json.dumps(custom_msg, ensure_ascii=False)
-
-    start = time.time()
-    print(f"\n===> {model_name} build start... \n kwargs:{kwargs}")
-    decode_model = os.path.join(model_dir, model_path)
-    tcim.build_from_hmonnx(
-        decode_model,
-        weights=os.path.join(model_dir, "weight.npy"),
-        output_name=model_name,
-        ncore=ncore,
-        target=HOUMO_TARGET,
-        output_dir=output_dir,
-        work_dir=os.path.join(output_dir, "tcim"),
-        j=j,
-        **kwargs,
-    )
-    profile["build"] = time.time() - start
-    print(f'{model_name} build completed in {profile["build"]:.3f} s.', flush=True)
 
 
 def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
@@ -375,7 +319,6 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
 if __name__ == "__main__":
     args = get_args()
     print(args)
-    curdir = os.getcwd()
     model_dir = args.model_dir
     model_name = args.model_name
     output_dir = args.output_dir
@@ -385,186 +328,189 @@ if __name__ == "__main__":
     context_length = args.context_length
     model_size = args.model_size
     j = args.j
+    tso = args.enable_xh2_stable_output
     llm_flash_attention, other_flash_attention = args.flash_attention
 
-    nblocks = 28
     profile = {}
 
-    # build model
-    if args.stage == "build" or args.stage == "all":
-        import platform
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
+        if args.stage == "build" or args.stage == "all":
+            assert (
+                get_platform() == "x86_64"
+            ), "Only supported for compilation on the x86_64 platform."
 
-        arch = platform.machine()
-        if arch != "x86_64":
-            print(f"[error] tcim not support platform: {arch}")
-            exit(0)
-        model_path = f"hmquant_{model_name}_with_act.onnx"
-        build_llm_tts(
-            "minicpmo_llm_prefill",
-            os.path.join(model_dir, "prefill"),
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            context_length,
-            j,
-            flash_attention=llm_flash_attention,
-            prefill_length=args.prefill_length,
-        )
-        build_llm_tts(
-            "minicpmo_llm_decode",
-            os.path.join(model_dir, "decoder"),
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            context_length,
-            j,
-            flash_attention=llm_flash_attention,
-        )
-        build_llm_tts(
-            "minicpmo_tts_prefill",
-            os.path.join(model_dir, "tts_prefill"),
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            2048,
-            j,
-        )
-        build_llm_tts(
-            "minicpmo_tts_decode",
-            os.path.join(model_dir, "tts_decoder"),
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-            ndevice,
-            2048,
-            j,
-        )
-        build_other_all(
-            "minicpmo_visual",
-            os.path.join(model_dir, "visual"),
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-            j,
-        )
-        build_other_all(
-            "minicpmo_audio",
-            os.path.join(model_dir, "audio"),
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-            j,
-        )
-        model_path = "hmquant_dvae_part1_with_act.onnx"
-        build_other_all(
-            "minicpmo_dvae_part1",
-            os.path.join(model_dir, "dvae"),
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-            j,
-        )
-        model_path = "hmquant_dvae_part2_with_act.onnx"
-        build_other_all(
-            "minicpmo_dvae_part2",
-            os.path.join(model_dir, "dvae"),
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-            j,
-        )
-        model_path = "hmquant_vocos_with_act.onnx"
-        build_other_all(
-            "minicpmo_vocos",
-            os.path.join(model_dir, "vocos"),
-            model_path,
-            output_dir,
-            profile,
-            ncore,
-            j,
-        )
+            Xh2Exec.build_from_hmonnx(
+                is_prefill=True,
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "prefill")),
+                hmm_name=f"{model_name}-{model_size}_llm_prefill",
+                output=output_dir,
+                ncore=ncore,
+                llm_opt=True,
+                flash_attn=llm_flash_attention,
+                context_length=context_length,
+                prefill_length=args.prefill_length,
+                ndevice=ndevice,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "decoder")),
+                hmm_name=f"{model_name}-{model_size}_llm_decode",
+                output=output_dir,
+                ncore=ncore,
+                llm_opt=True,
+                flash_attn=llm_flash_attention,
+                context_length=context_length,
+                ndevice=ndevice,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                is_prefill=True,
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "tts_prefill")),
+                hmm_name=f"{model_name}-{model_size}_tts_prefill",
+                output=output_dir,
+                ncore=ncore,
+                llm_opt=True,
+                context_length=2048,
+                ndevice=ndevice,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "tts_decoder")),
+                hmm_name=f"{model_name}-{model_size}_tts_decode",
+                output=output_dir,
+                ncore=ncore,
+                llm_opt=True,
+                context_length=2048,
+                ndevice=ndevice,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "visual")),
+                hmm_name=f"{model_name}-{model_size}_visual",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=other_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "audio")),
+                hmm_name=f"{model_name}-{model_size}_audio",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=other_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(
+                    os.path.join(model_dir, "dvae"), pattern="hmquant_*part1*.onnx"
+                ),
+                hmm_name=f"{model_name}-{model_size}_dvae_part1",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=other_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(
+                    os.path.join(model_dir, "dvae"), pattern="hmquant_*part2*.onnx"
+                ),
+                hmm_name=f"{model_name}-{model_size}_dvae_part2",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=other_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "vocos")),
+                hmm_name=f"{model_name}-{model_size}_vocos",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=other_flash_attention,
+                enable_xh2_stable_output=tso,
+                parallel_jobs=j,
+            )
 
-    # test model
-    if args.stage == "test" or args.stage == "all":
-        part_dir = os.path.join(model_dir, "prefill")
-        test(
-            "minicpmo_llm_prefill",
-            part_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-        part_dir = os.path.join(model_dir, "decoder")
-        test(
-            "minicpmo_llm_decode",
-            part_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-        part_dir = os.path.join(model_dir, "visual")
-        test(
-            "minicpmo_visual",
-            part_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-        part_dir = os.path.join(model_dir, "audio")
-        test(
-            "minicpmo_audio",
-            part_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-        part_dir = os.path.join(model_dir, "tts_prefill")
-        test(
-            "minicpmo_tts_prefill",
-            part_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-        part_dir = os.path.join(model_dir, "tts_decoder")
-        test(
-            "minicpmo_tts_decode",
-            part_dir,
-            output_dir,
-            profile,
-            prefix=model_name,
-        )
-        part_dir = os.path.join(model_dir, "vocos")
-        test(
-            "minicpmo_vocos",
-            part_dir,
-            output_dir,
-            profile,
-            prefix="vocos",
-        )
-        part_dir = os.path.join(model_dir, "dvae")
-        test(
-            "minicpmo_dvae_part1",
-            part_dir,
-            output_dir,
-            profile,
-            prefix="dvae_part1",
-        )
-        test(
-            "minicpmo_dvae_part2",
-            part_dir,
-            output_dir,
-            profile,
-            prefix="dvae_part2",
-        )
+        if args.stage == "test" or args.stage == "all":
+            part_dir = os.path.join(model_dir, "prefill")
+            test(
+                f"{model_name}-{model_size}_llm_prefill",
+                part_dir,
+                output_dir,
+                profile,
+                prefix=model_name,
+            )
+            part_dir = os.path.join(model_dir, "decoder")
+            test(
+                f"{model_name}-{model_size}_llm_decode",
+                part_dir,
+                output_dir,
+                profile,
+                prefix=model_name,
+            )
+            part_dir = os.path.join(model_dir, "visual")
+            test(
+                f"{model_name}-{model_size}_visual",
+                part_dir,
+                output_dir,
+                profile,
+                prefix=model_name,
+            )
+            part_dir = os.path.join(model_dir, "audio")
+            test(
+                f"{model_name}-{model_size}_audio",
+                part_dir,
+                output_dir,
+                profile,
+                prefix=model_name,
+            )
+            part_dir = os.path.join(model_dir, "tts_prefill")
+            test(
+                f"{model_name}-{model_size}_tts_prefill",
+                part_dir,
+                output_dir,
+                profile,
+                prefix=model_name,
+            )
+            part_dir = os.path.join(model_dir, "tts_decoder")
+            test(
+                f"{model_name}-{model_size}_tts_decode",
+                part_dir,
+                output_dir,
+                profile,
+                prefix=model_name,
+            )
+            part_dir = os.path.join(model_dir, "vocos")
+            test(
+                f"{model_name}-{model_size}_vocos",
+                part_dir,
+                output_dir,
+                profile,
+                prefix="vocos",
+            )
+            part_dir = os.path.join(model_dir, "dvae")
+            test(
+                f"{model_name}-{model_size}_dvae_part1",
+                part_dir,
+                output_dir,
+                profile,
+                prefix="dvae_part1",
+            )
+            test(
+                f"{model_name}-{model_size}_dvae_part2",
+                part_dir,
+                output_dir,
+                profile,
+                prefix="dvae_part2",
+            )
+
+    print(
+        f"\n=== All builds completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

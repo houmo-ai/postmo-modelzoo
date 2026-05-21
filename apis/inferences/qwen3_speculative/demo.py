@@ -32,9 +32,9 @@ from transformers import AutoTokenizer
 from loguru import logger
 
 import tcim_lite as tcim
-from hmatc.python.get_hm_devices import get_hm_devices
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def is_valid_char(cp):
@@ -62,7 +62,7 @@ def get_args() -> argparse.Namespace:
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="qwen3-8b",
+        default="qwen3-14b",
         help="tokenizer dir",
     )
     parser.add_argument(
@@ -88,7 +88,7 @@ def get_args() -> argparse.Namespace:
         dest="draft_prefill_path",
         type=str,
         default=os.path.join(
-            "output", HOUMO_TARGET, "qwen3_speculative_prefill_draft.hmm"
+            "output", HOUMO_TARGET, "qwen3-speculative-0.6b_prefill_draft.hmm"
         ),
         help="houmo draft prefill model path",
     )
@@ -97,7 +97,7 @@ def get_args() -> argparse.Namespace:
         dest="draft_decode_path",
         type=str,
         default=os.path.join(
-            "output", HOUMO_TARGET, "qwen3_speculative_decode_draft.hmm"
+            "output", HOUMO_TARGET, "qwen3-speculative-0.6b_decode_draft.hmm"
         ),
         help="houmo draft decode model path",
     )
@@ -105,14 +105,18 @@ def get_args() -> argparse.Namespace:
         "--verify_path",
         dest="verify_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_speculative_verify.hmm"),
+        default=os.path.join(
+            "output", HOUMO_TARGET, "qwen3-speculative-14b_verify.hmm"
+        ),
         help="houmo verify model path",
     )
     parser.add_argument(
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_speculative_prefill.hmm"),
+        default=os.path.join(
+            "output", HOUMO_TARGET, "qwen3-speculative-14b_prefill.hmm"
+        ),
         help="houmo prefill model path",
     )
     parser.add_argument(
@@ -127,8 +131,7 @@ def get_args() -> argparse.Namespace:
         dest="ndevice",
         type=int,
         default=1,
-        choices=[1, 2],
-        help="device number, only xh2 support",
+        help="device number",
     )
     parser.add_argument(
         "--it",
@@ -144,10 +147,14 @@ def get_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
     if args.ndevice > 1:
-        args.draft_prefill_path = args.draft_prefill_path.replace(".hmm", ".hmms")
-        args.draft_decode_path = args.draft_decode_path.replace(".hmm", ".hmms")
-        args.verify_path = args.verify_path.replace(".hmm", ".hmms")
-        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        if args.draft_prefill_path.endswith(".hmm"):
+            args.draft_prefill_path = args.draft_prefill_path.replace(".hmm", ".hmms")
+        if args.draft_decode_path.endswith(".hmm"):
+            args.draft_decode_path = args.draft_decode_path.replace(".hmm", ".hmms")
+        if args.verify_path.endswith(".hmm"):
+            args.verify_path = args.verify_path.replace(".hmm", ".hmms")
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
     return args
 
 
@@ -270,7 +277,9 @@ class HmQwen:
     def __init__(self, args):
         # init weight manager
         self.ndevice = args.ndevice
-        dev_manager = tcim.runtime.DevManager(get_hm_devices(self.ndevice), "Xh2HalBackend")
+        dev_manager = tcim.runtime.DevManager(
+            list(range(self.ndevice)), "Xh2HalBackend"
+        )
         weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         option2 = tcim.runtime.Option(weight_manager)

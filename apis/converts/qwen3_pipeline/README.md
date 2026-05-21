@@ -140,15 +140,15 @@ python build.py
 
 ```bash
 output/xh2/
-├── qwen3_pipeline_prefill_part0.hmm     # 预填充部分 0 的编译模型
-├── qwen3_pipeline_prefill_part1.hmm     # 预填充部分 1 的编译模型
-├── qwen3_pipeline_decode_part0.hmm      # 解码部分 0 的编译模型
-├── qwen3_pipeline_decode_part1.hmm      # 解码部分 1 的编译模型
+├── qwen3-pipeline-8b_prefill_part0.hmm     # 预填充部分 0 的编译模型
+├── qwen3-pipeline-8b_prefill_part1.hmm     # 预填充部分 1 的编译模型
+├── qwen3-pipeline-8b_decode_part0.hmm      # 解码部分 0 的编译模型
+├── qwen3-pipeline-8b_decode_part1.hmm      # 解码部分 1 的编译模型
 └── tcim/                       # 编译中间文件
-    ├── qwen3_pipeline_prefill_part0/
-    ├── qwen3_pipeline_prefill_part1/
-    ├── qwen3_pipeline_decode_part0/
-    ├── qwen3_pipeline_decode_part1/
+    ├── qwen3-pipeline-8b_prefill_part0/
+    ├── qwen3-pipeline-8b_prefill_part1/
+    ├── qwen3-pipeline-8b_decode_part0/
+    ├── qwen3-pipeline-8b_decode_part1/
 ```
 
 ---

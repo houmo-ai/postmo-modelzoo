@@ -39,6 +39,7 @@ from loguru import logger
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 
 def is_valid_char(cp):
@@ -278,9 +279,11 @@ class SamplingManager:
 def gen_params(device_id: int, args):
     model_path = args.model_path
     prefill_path = os.path.join(
-        model_path, f"qwen3_pipeline_prefill_part{device_id}.hmm"
+        model_path, f"qwen3-pipeline-8b_prefill_part{device_id}.hmm"
     )
-    decode_path = os.path.join(model_path, f"qwen3_pipeline_decode_part{device_id}.hmm")
+    decode_path = os.path.join(
+        model_path, f"qwen3-pipeline-8b_decode_part{device_id}.hmm"
+    )
     return {
         "device_id": device_id,
         "prefill_path": prefill_path,
@@ -472,7 +475,7 @@ def producer(
             input_name = decode_model.get_input_name(0)
             valid_length_name = decode_model.get_input_name(1)
             current_length_name = decode_model.get_input_name(2)
-            (output_data, valid_length_data, current_length_data, _, _) = data
+            output_data, valid_length_data, current_length_data, _, _ = data
 
             decode_model.set_input(input_name, output_data)
             decode_model.set_input(valid_length_name, valid_length_data)
@@ -541,7 +544,7 @@ def consumer(
             input_name = prefill_model.get_input_name(0)
             valid_length_name = prefill_model.get_input_name(1)
             current_length_name = prefill_model.get_input_name(2)
-            (output_data, valid_length_data, current_length_data, t0, _) = data
+            output_data, valid_length_data, current_length_data, t0, _ = data
             prefill_model.set_input(input_name, output_data)
             prefill_model.set_input(valid_length_name, valid_length_data)
             prefill_model.set_input(current_length_name, current_length_data)
@@ -591,7 +594,7 @@ def consumer(
             input_name = decode_model.get_input_name(0)
             valid_length_name = decode_model.get_input_name(1)
             current_length_name = decode_model.get_input_name(2)
-            (output_data, valid_length_data, current_length_data, t0, _) = data
+            output_data, valid_length_data, current_length_data, t0, _ = data
             decode_model.set_input(input_name, output_data)
             decode_model.set_input(valid_length_name, valid_length_data)
             decode_model.set_input(current_length_name, current_length_data)
@@ -715,7 +718,7 @@ def result_shower(
         )
 
         decode_data = in_queue.get()
-        (output_data, valid_length_data, current_length_data, t0, t2) = decode_data
+        output_data, valid_length_data, current_length_data, t0, t2 = decode_data
         if start_time == 0:
             start_time = t0
         # Get next token id (sampling from logits)

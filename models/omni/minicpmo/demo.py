@@ -48,13 +48,14 @@ from copy import deepcopy
 import librosa
 import soundfile as sf
 import importlib.util
-from typing import Any, Optional, Tuple, Union, List
+from typing import Optional, List
 from vocos.spectral_ops import IMDCT, ISTFT
 from moviepy import VideoFileClip
 
 import tcim_lite
 
 import sys
+from hmatc.utils.utils import first_not_none, get_model_configs
 
 SCRIP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(SCRIP_DIR)
@@ -70,30 +71,62 @@ warnings.filterwarnings("ignore", category=SyntaxWarning)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
 SUPPORTED_MODEL_TYPES = ["onnx", "houmo"]
 EXAMPLES_MODE = {
-    0: "omni",      ## vision + audio + llm + tts
-    1: "llm",       ## llm only
-    2: "vlm",       ## vision + llm
-    3: "mvlm",      ## multi-vision + llm
-    4: "vclone",    ## audio + llm + tts, voice clone
-    5: "wotts",     ## only tts, woman voice
-    6: "motts",     ## only tts, man voice
-    7: "chunkotts", ## only tts, split text
-    8: "I2S",       ## Instruction to Speech
-    9: "CONV",      ## Speech Conversation
+    0: "omni",  ## vision + audio + llm + tts
+    1: "llm",  ## llm only
+    2: "vlm",  ## vision + llm
+    3: "mvlm",  ## multi-vision + llm
+    4: "vclone",  ## audio + llm + tts, voice clone
+    5: "wotts",  ## only tts, woman voice
+    6: "motts",  ## only tts, man voice
+    7: "chunkotts",  ## only tts, split text
+    8: "I2S",  ## Instruction to Speech
+    9: "CONV",  ## Speech Conversation
 }
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_CONFIG_PATH = os.path.join(SCRIPT_DIR, "config.yaml")
+
+
+def get_default_tokenizer_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "minicpmo")
+    model_size = model_config.get("model_size", "7b")
+    return f"{model_name}-{model_size}"
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
-        default="MiniCPM-o-2_6",
+        default=None,
         help="tokenizer dir",
     )
     parser.add_argument(
@@ -107,56 +140,56 @@ def get_args() -> argparse.Namespace:
         "--vit_path",
         dest="vit_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "minicpmo_visual.hmm"),
+        default=None,
         help="houmo visual model path",
     )
     parser.add_argument(
         "--audio_path",
         dest="audio_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "minicpmo_audio.hmm"),
+        default=None,
         help="houmo audio model path",
     )
     parser.add_argument(
         "--llm_prefill_path",
         dest="llm_prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "minicpmo_llm_prefill.hmm"),
+        default=None,
         help="houmo llm prefill model path",
     )
     parser.add_argument(
         "--llm_decode_path",
         dest="llm_decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "minicpmo_llm_decode.hmm"),
+        default=None,
         help="houmo llm decode model path",
     )
     parser.add_argument(
         "--tts_prefill_path",
         dest="tts_prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "minicpmo_tts_prefill.hmm"),
+        default=None,
         help="houmo tts Llama prefill model path",
     )
     parser.add_argument(
         "--tts_decode_path",
         dest="tts_decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "minicpmo_tts_decode.hmm"),
+        default=None,
         help="houmo tts Llama decode model path",
     )
     parser.add_argument(
         "--tts_dvae_path",
         dest="tts_dvae_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET),
+        default=None,
         help="houmo tts dvae model path",
     )
     parser.add_argument(
         "--tts_vocos_path",
         dest="tts_vocos_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "minicpmo_vocos.hmm"),
+        default=None,
         help="houmo tts vocos model path",
     )
     parser.add_argument(
@@ -174,6 +207,49 @@ def get_args() -> argparse.Namespace:
         help="example mode index, support 0(omni), 1(llm), 2(vlm), 3(mvlm), 4(vclone), 5(wotts), 6(motts), 7(chunkotts), 8(I2S), 9(CONV)",
     )
     args = parser.parse_args()
+
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+
+    if args.tokenizer_dir is None:
+        args.tokenizer_dir = get_default_tokenizer_dir(model_config)
+
+    model_prefix = f"{args.model_name}-{args.model_size}"
+    if args.vit_path is None:
+        args.vit_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_visual.hmm"
+        )
+    if args.audio_path is None:
+        args.audio_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_audio.hmm"
+        )
+    if args.llm_prefill_path is None:
+        args.llm_prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_llm_prefill.hmm"
+        )
+    if args.llm_decode_path is None:
+        args.llm_decode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_llm_decode.hmm"
+        )
+    if args.tts_prefill_path is None:
+        args.tts_prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_tts_prefill.hmm"
+        )
+    if args.tts_decode_path is None:
+        args.tts_decode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_tts_decode.hmm"
+        )
+    if args.tts_dvae_path is None:
+        args.tts_dvae_path = os.path.join("output", HOUMO_TARGET)
+    if args.tts_vocos_path is None:
+        args.tts_vocos_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_vocos.hmm"
+        )
+
     return args
 
 
@@ -873,7 +949,8 @@ class HMMiniCPMO(object):
 
             option_dvae_part1 = tcim_lite.runtime.Option(wt_manager)
             tts_dvae_part1_path = os.path.join(
-                args.tts_dvae_path, "minicpmo_dvae_part1.hmm"
+                args.tts_dvae_path,
+                f"{args.model_name}-{args.model_size}_dvae_part1.hmm",
             )
             self.dvae_part1_engine = tcim_lite.runtime.load(
                 tts_dvae_part1_path, option_dvae_part1
@@ -882,7 +959,8 @@ class HMMiniCPMO(object):
             self.dvae_part1_output_infos = get_output_infos(self.dvae_part1_engine)
             option_dvae_part2 = tcim_lite.runtime.Option(wt_manager)
             tts_dvae_part2_path = os.path.join(
-                args.tts_dvae_path, "minicpmo_dvae_part2.hmm"
+                args.tts_dvae_path,
+                f"{args.model_name}-{args.model_size}_dvae_part2.hmm",
             )
             self.dvae_part2_engine = tcim_lite.runtime.load(
                 tts_dvae_part2_path, option_dvae_part2
@@ -3164,6 +3242,5 @@ def xh2_demo(args):
 
 
 if __name__ == "__main__":
-
     args = get_args()
     xh2_demo(args)

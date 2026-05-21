@@ -38,16 +38,16 @@ pip3 install -r requirements.txt
 
 ```bash
 # 下载 whisper-medium 芯片模型
-python3 get_model.py --type hmm --model whisper-medium
+python3 get_model.py --type hmm --model_size medium
 
 # 下载 whisper-large-v3-turbo 芯片模型
-python3 get_model.py --type hmm --model whisper-large-v3-turbo
+python3 get_model.py --type hmm --model_size large-v3-turbo
 ```
 
 如果需要自行编译模型，可以下载原始模型：
 ```bash
-python3 get_model.py --type raw --model whisper-medium
-python3 get_model.py --type raw --model whisper-large-v3-turbo
+python3 get_model.py --type raw --model_size medium
+python3 get_model.py --type raw --model_size large-v3-turbo
 ```
 
 ### 2.3 量化
@@ -65,10 +65,10 @@ source env.sh
 cd models/asr/whisper
 
 # 量化 whisper-medium
-python3 ptq.py --model whisper-medium
+python3 ptq.py --model_size medium --model whisper-medium
 
 # 量化 whisper-large-v3-turbo
-python3 ptq.py --model whisper-large-v3-turbo
+python3 ptq.py --model_size large-v3-turbo --model whisper-large-v3-turbo
 ```
 
 ### 2.4 编译
@@ -77,10 +77,10 @@ python3 ptq.py --model whisper-large-v3-turbo
 
 ```bash
 # 编译 whisper-medium
-python3 build.py --model whisper-medium
+python3 build.py --model_name whisper --model_size medium
 
 # 编译 whisper-large-v3-turbo
-python3 build.py --model whisper-large-v3-turbo
+python3 build.py --model_name whisper --model_size large-v3-turbo
 ```
 
 编译好的模型存放在 `output/xh2/` 目录，包括3个文件：

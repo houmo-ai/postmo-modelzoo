@@ -37,19 +37,52 @@ from qwen_asr.core.transformers_backend import (
 )
 from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForceAlignProcessor
 from hmatc.python.get_hm_devices import get_hm_devices
+from hmatc.utils.utils import first_not_none, get_model_configs
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
+
+def get_default_processor_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "qwen3-forcealigner")
+    model_size = model_config.get("model_size", "0.6b")
+    return f"{model_name}-{model_size}"
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default="qwen3-forcealigner",
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
         "--processor_dir",
         dest="processor_dir",
         type=str,
-        default="Qwen3-ForcedAligner-0.6B",
+        default=None,
         help="processor dir",
     )
     parser.add_argument(
@@ -61,7 +94,7 @@ def get_args() -> argparse.Namespace:
         "--encode_path",
         dest="encode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_forcealigner_encode.hmm"),
+        default=None,
         help="houmo encode model path",
     )
     parser.add_argument(
@@ -74,7 +107,7 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "qwen3_forcealigner_prefill.hmm"),
+        default=None,
         help="houmo prefill model path",
     )
     parser.add_argument(
@@ -91,13 +124,58 @@ def get_args() -> argparse.Namespace:
         default="Chinese",
         help="language of the text",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--ndevice",
+        dest="ndevice",
+        type=int,
+        default=None,
+        help="device number, only xh2 support",
+    )
+    args = parser.parse_args()
+
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    if args.model_size is None:
+        if args.model_name == default_model_name:
+            args.model_size = default_model_size
+        else:
+            args.model_size = next(
+                iter(model_configs.get(args.model_name, {})), default_model_size
+            )
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    if args.processor_dir is None:
+        args.processor_dir = get_default_processor_dir(model_config)
+    model_prefix = f"{args.model_name}-{args.model_size}"
+    if args.encode_path is None:
+        args.encode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_encode.hmm"
+        )
+    if args.prefill_path is None:
+        args.prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm"
+        )
+    if args.ndevice > 1:
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        if args.encode_path.endswith(".hmm"):
+            args.encode_path = args.encode_path.replace(".hmm", ".hmms")
+
+    return args
 
 
 class Qwen3ForceAligner:
-    def __init__(self, encode_path, prefill_path, processor_dir, embedding_path):
+    def __init__(
+        self, encode_path, prefill_path, processor_dir, embedding_path, ndevice=1
+    ):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        dev_manager = tcim.runtime.DevManager(get_hm_devices(), "Xh2HalBackend")
+        self.ndevice = ndevice
+        dev_manager = tcim.runtime.DevManager(
+            get_hm_devices(self.ndevice), "Xh2HalBackend"
+        )
         weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         self.encode = tcim.runtime.load(encode_path, option=option1)
@@ -113,7 +191,9 @@ class Qwen3ForceAligner:
             self.prefill.get_input_name(0)
         ).shape[1]
 
-        self.processor = Qwen3ASRProcessor.from_pretrained(processor_dir, fix_mistral_regex=True)
+        self.processor = Qwen3ASRProcessor.from_pretrained(
+            processor_dir, fix_mistral_regex=True
+        )
         self.config = AutoConfig.from_pretrained(processor_dir, trust_remote_code=True)
 
         self.embedding_weight = torch.load(embedding_path, map_location=self.device)
@@ -123,6 +203,7 @@ class Qwen3ForceAligner:
         self.aligner_processor = Qwen3ForceAlignProcessor()
         self.sample_rate = 16000
         self.max_audio_len = 3000
+
     def run_encode(self, inputs):
         input_features = inputs["input_features"]
         feature_attention_mask = inputs["feature_attention_mask"]
@@ -132,15 +213,16 @@ class Qwen3ForceAligner:
         pad_width = (0, self.max_audio_len - input_features.shape[2])
 
         input_features = torch.nn.functional.pad(
-            input_features,
-            pad_width,
-            mode="constant",
-            value=0.0
+            input_features, pad_width, mode="constant", value=0.0
         )
 
-        self.encode.set_input(self.encode.get_input_name(0), input_features.to(torch.float16).numpy())
-        self.encode.set_input(self.encode.get_input_name(1), origin_feature_lens.numpy())
-        
+        self.encode.set_input(
+            self.encode.get_input_name(0), input_features.to(torch.float16).numpy()
+        )
+        self.encode.set_input(
+            self.encode.get_input_name(1), origin_feature_lens.numpy()
+        )
+
         self.encode.run()
         self.encode.sync()
 
@@ -154,13 +236,15 @@ class Qwen3ForceAligner:
         T_out = self._get_feat_extract_output_lengths(origin_feature_lens).item()
         audio_embeds = audio_embeds[:, :T_out, :]
 
-        text_input_ids = inputs['input_ids']
+        text_input_ids = inputs["input_ids"]
         text_embeds = F.embedding(text_input_ids, self.embedding_weight)
         tokenizer = self.processor.tokenizer
         if "<|audio_pad|>" in tokenizer.get_vocab():
             audio_pad_id = tokenizer.convert_tokens_to_ids("<|audio_pad|>")
         else:
-            audio_pad_id = tokenizer.encode("<|audio_pad|>", add_special_tokens=False)[0]
+            audio_pad_id = tokenizer.encode("<|audio_pad|>", add_special_tokens=False)[
+                0
+            ]
 
         pad_indices = (text_input_ids == audio_pad_id).nonzero(as_tuple=True)[1]
 
@@ -168,14 +252,10 @@ class Qwen3ForceAligner:
         end_idx = pad_indices[-1].item()
 
         assert audio_embeds.shape[1] == (end_idx - start_idx + 1)
-        
+
         inputs_embeds = torch.cat(
-            [
-                text_embeds[:, :start_idx],
-                audio_embeds,
-                text_embeds[:, end_idx + 1 :]
-            ],
-            dim=1
+            [text_embeds[:, :start_idx], audio_embeds, text_embeds[:, end_idx + 1 :]],
+            dim=1,
         )
 
         text_config = self.config.thinker_config.text_config
@@ -185,15 +265,17 @@ class Qwen3ForceAligner:
         head_dim = text_config.head_dim
         hidden_size = text_config.hidden_size
 
-
         if len(pad_indices) > 0:
             start_idx = pad_indices[0].item()
             end_idx = pad_indices[-1].item()
-            final_inputs_embeds = torch.cat([
-                text_embeds[:, :start_idx, :],
-                audio_embeds,
-                text_embeds[:, end_idx+1:, :]
-            ], dim=1)
+            final_inputs_embeds = torch.cat(
+                [
+                    text_embeds[:, :start_idx, :],
+                    audio_embeds,
+                    text_embeds[:, end_idx + 1 :, :],
+                ],
+                dim=1,
+            )
         else:
             final_inputs_embeds = text_embeds
 
@@ -207,8 +289,12 @@ class Qwen3ForceAligner:
         seq_len = final_inputs_embeds.shape[1]
         L = min(seq_len, self.max_prefill)
 
-        prefill_embeds = torch.zeros((1, self.max_prefill, hidden_size), dtype=torch.float16, device=self.device)
-        prefill_embeds[:, :L, :] = final_inputs_embeds[:, :L, :].to(torch.float16).to(self.device)
+        prefill_embeds = torch.zeros(
+            (1, self.max_prefill, hidden_size), dtype=torch.float16, device=self.device
+        )
+        prefill_embeds[:, :L, :] = (
+            final_inputs_embeds[:, :L, :].to(torch.float16).to(self.device)
+        )
 
         valid_length_np = np.array([0], dtype=np.int32)
         current_length_np = np.array([L], dtype=np.int32)
@@ -224,15 +310,17 @@ class Qwen3ForceAligner:
         self.prefill.run()
         self.prefill.sync()
 
-        prefill_outputs = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
+        prefill_outputs = self.prefill.get_output(
+            self.prefill.get_output_name(0)
+        ).numpy()
         return prefill_outputs, text_input_ids
+
     def _get_feat_extract_output_lengths(self, input_lengths):
         input_lengths_leave = input_lengths % 100
         feat_lengths = (input_lengths_leave - 1) // 2 + 1
 
         output_lengths = (
-            ((feat_lengths - 1) // 2 + 1 - 1) // 2 + 1
-            + (input_lengths // 100) * 13
+            ((feat_lengths - 1) // 2 + 1 - 1) // 2 + 1 + (input_lengths // 100) * 13
         )
 
         return output_lengths
@@ -241,6 +329,7 @@ class Qwen3ForceAligner:
         if isinstance(x, np.ndarray):
             return torch.from_numpy(x).to(self.device)
         return x.to(self.device)
+
     def load_audio(self, path):
 
         audio, sr = librosa.load(path, sr=None, mono=False)
@@ -258,6 +347,7 @@ class Qwen3ForceAligner:
             audio = audio / peak
 
         return audio
+
     def run(self, audio_path, text, language):
         total_start = time.perf_counter()
 
@@ -274,15 +364,11 @@ class Qwen3ForceAligner:
         # Prepare inputs
         prep_start = time.perf_counter()
         word_list, aligner_input_text = self.aligner_processor.encode_timestamp(
-            text,
-            language
+            text, language
         )
 
         inputs = self.processor(
-            text=[aligner_input_text],
-            audio=[audio],
-            return_tensors="pt",
-            padding=True
+            text=[aligner_input_text], audio=[audio], return_tensors="pt", padding=True
         )
 
         inputs = inputs.to(self.device)
@@ -296,11 +382,13 @@ class Qwen3ForceAligner:
 
         if isinstance(audio_embeds, np.ndarray):
             audio_embeds = torch.from_numpy(audio_embeds)
-        
+
         audio_embeds = audio_embeds.to(self.device).to(torch.float16)
         # Run prefill
         prefill_start = time.perf_counter()
-        prefill_outputs, input_ids = self.run_prefill(origin_feature_lens, inputs, audio_embeds)
+        prefill_outputs, input_ids = self.run_prefill(
+            origin_feature_lens, inputs, audio_embeds
+        )
         prefill_time = time.perf_counter() - prefill_start
 
         for i, out in enumerate(prefill_outputs):
@@ -317,14 +405,16 @@ class Qwen3ForceAligner:
             if t.ndim == 2:
                 logits = t.unsqueeze(0)
                 break
-        
+
         if logits is None:
             raise RuntimeError("No suitable logits found from prefill outputs.")
 
-        output_ids = logits.argmax(dim=-1)     # [1, T]
+        output_ids = logits.argmax(dim=-1)  # [1, T]
 
         if input_ids.shape[1] != output_ids.shape[1]:
-            print(f"WARNING: input_ids len={input_ids.shape[1]} != output_ids len={output_ids.shape[1]}")
+            print(
+                f"WARNING: input_ids len={input_ids.shape[1]} != output_ids len={output_ids.shape[1]}"
+            )
             T = min(input_ids.shape[1], output_ids.shape[1])
             input_ids_cut = input_ids[:, :T]
             output_ids_cut = output_ids[:, :T]
@@ -337,14 +427,18 @@ class Qwen3ForceAligner:
         masked_output_id = output_ids_cut[input_ids_cut == timestamp_token_id]
         timestamp_ms = (masked_output_id * timestamp_segment_time).cpu().numpy()
 
-        timestamp_output = self.aligner_processor.parse_timestamp(word_list, timestamp_ms)
+        timestamp_output = self.aligner_processor.parse_timestamp(
+            word_list, timestamp_ms
+        )
         for it in timestamp_output:
             it["start_time"] = round(it["start_time"] / 1000.0, 3)
             it["end_time"] = round(it["end_time"] / 1000.0, 3)
 
         logger.success("\n输出:")
         for w in timestamp_output:
-            logger.success(f"{w['text']:10s} {w['start_time']:6.3f}  {w['end_time']:6.3f}")
+            logger.success(
+                f"{w['text']:10s} {w['start_time']:6.3f}  {w['end_time']:6.3f}"
+            )
 
         total_time = time.perf_counter() - total_start
 
@@ -352,7 +446,9 @@ class Qwen3ForceAligner:
         logger.success("=" * 60)
         logger.success("Performance Statistics:")
         logger.success("=" * 60)
-        logger.success(f"Audio duration: {audio_duration * 1000:.2f} ms ({audio_duration:.2f} s)")
+        logger.success(
+            f"Audio duration: {audio_duration * 1000:.2f} ms ({audio_duration:.2f} s)"
+        )
         logger.success(f"Audio loading time: {audio_load_time * 1000:.3f} ms")
         logger.success(f"Input preparation time: {prep_time * 1000:.3f} ms")
         logger.success(f"Encode time: {encode_time * 1000:.3f} ms")
@@ -365,14 +461,11 @@ class Qwen3ForceAligner:
 if __name__ == "__main__":
     args = get_args()
 
-    if HOUMO_TARGET == "xh2":
-        qwen3forcealigner = Qwen3ForceAligner(
-            args.encode_path,
-            args.prefill_path,
-            args.processor_dir,
-            args.embedding_path
-        )
-    else:
-        raise ValueError("Unsupported houmo target!")
-
+    qwen3forcealigner = Qwen3ForceAligner(
+        args.encode_path,
+        args.prefill_path,
+        args.processor_dir,
+        args.embedding_path,
+        args.ndevice,
+    )
     qwen3forcealigner.run(args.audio, args.text, args.language)

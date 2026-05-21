@@ -7,8 +7,8 @@
 ## 1. 获取量化模型
 
 在 `models` 目录下提供了量化脚本，可分别对以下模型进行量化：
-- **Draft 模型**（如 Qwen3-4b 等）
-- **Target 模型**（如 Qwen3-14b 等）
+- **Draft 模型**（如 Qwen3-0.6B 等）
+- **Target 模型**（如 Qwen3-14B 等）
 
 量化完成后，将生成的文件用于后续步骤。
 
@@ -66,10 +66,10 @@ qwen3/
     │       ├── decoder/          # Target 模型的decode文件
     │       ├── prefill/          # Target 模型的prefill文件
     │       └── quant_embedding.pt # Target 模型的量化嵌入文件
-    ├── qwen3_decode_draft.hmm    # Draft 模型的解码文件
-    ├── qwen3_prefill_draft.hmm   # Draft 模型的prefill文件
-    ├── qwen3_prefill.hmm         # Target 模型的prefill文件
-    └── qwen3_verify.hmm          # verify文件
+    ├── qwen3-speculative-0.6b_decode_draft.hmm    # Draft 模型的解码文件
+    ├── qwen3-speculative-0.6b_prefill_draft.hmm   # Draft 模型的prefill文件
+    ├── qwen3-speculative-14b_prefill.hmm         # Target 模型的prefill文件
+    └── qwen3-speculative-14b_verify.hmm          # verify文件
 ```
 
 ---

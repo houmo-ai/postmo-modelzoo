@@ -120,11 +120,11 @@ def main():
     check_parser = subparsers.add_parser("check", parents=[parent_target, parent_layers, parent_device_id, parent_log], help="Check model golden")
     gen_parser = subparsers.add_parser("gen", parents=[parent_target, parent_log], help="Generate default config.yaml")
     golden_parser = subparsers.add_parser("golden", parents=[parent_target, parent_layers, parent_cuda, parent_log], help="Generate golden data")
-    
+
     # quant
     quant_parser.add_argument("--quant_type", type=str, default="w8a8h1_sefp", help=argparse.SUPPRESS)
     quant_parser.add_argument("--enable_layernorm2rmsnorm", action="store_true", help=argparse.SUPPRESS)
-    
+
     # build
     build_parser.add_argument("--profile", action="store_true", required=False, help="Enable profile")
     build_exclusive_group = build_parser.add_mutually_exclusive_group(required=True)
@@ -140,6 +140,7 @@ def main():
     build_parser.add_argument("--ndevice", type=int, default=1, choices=[1, 2, 4], help="number of devices for multi-device inference")
     build_parser.add_argument("--is_prefill", action="store_true", help="build prefill model for LLM")
     build_parser.add_argument("--enable_common_subgraph", action="store_true", help="enable common subgraph")
+    build_parser.add_argument("--cpp_backend", type=str, default="v1", help="cpp backend")
     build_parser.add_argument("--skip_mlir_compile", action="store_true", help="skip mlir compile")
     build_parser.add_argument("--subgraph_repeat_hint", type=int, default=20, help="A hint for number of repeat blocks in the model")
     build_parser.add_argument("--upload_dir_name", type=str, help=argparse.SUPPRESS)
@@ -147,10 +148,10 @@ def main():
     build_parser.add_argument("--skip_check", action="store_true", help="Skip check golden after build")
     build_parser.add_argument("--upload", action="store_true", help=argparse.SUPPRESS)
     build_parser.add_argument("--jobs", "-j", type=int, default=psutil.cpu_count(logical=False), help="Specify number of parallel jobs")
-        
+
     # compare
     compare_parser.add_argument("--data_path", "-d", type=str, required=True, help="Specify a data path, image or npz")
-    
+
     # perf
     perf_exclusive_group = perf_parser.add_mutually_exclusive_group(required=True)
     perf_exclusive_group.add_argument("--config", "-c", type=str, help="Specify config file path")
@@ -166,11 +167,11 @@ def main():
     check_exclusive_group.add_argument("--config", "-c", type=str, help="Specify config file path")
     check_exclusive_group.add_argument("--hmm", type=str, help="Specify hmm file path")
     check_parser.add_argument("--golden", type=str, required="--hmm" in sys.argv, help="Specify golden data path")
-    
+
     # gen default config.yaml
     gen_parser.add_argument("--onnx", type=str, required=True, help="Specify a onnx")
     gen_parser.add_argument("--output", type=str, required=False, default="config.yml", help="Specify a config.yml")
-    
+
     # gen golden
     golden_parser.add_argument("--hmonnx", type=str, required=True, help="Specify a hmonnx file")
     golden_parser.add_argument("--output", type=str, required=True, help="Specify a output")
@@ -268,6 +269,7 @@ def main():
             enable_common_subgraph=args.enable_common_subgraph,
             skip_mlir_compile=args.skip_mlir_compile,
             subgraph_repeat_hint=args.subgraph_repeat_hint,
+            cpp_backend=args.cpp_backend,
             parallel_jobs=args.jobs,
         )
         return

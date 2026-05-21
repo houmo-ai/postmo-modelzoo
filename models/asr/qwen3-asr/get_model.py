@@ -21,17 +21,31 @@
 import os
 import shutil
 import argparse
-from hmatc.utils.utils import hmatc_get_file, get_houmo_version
-
+from hmatc.utils.utils import (
+    first_not_none,
+    get_houmo_version,
+    get_model_configs,
+    hmatc_get_file,
+)
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
 HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH")
+HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_path",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
     parser.add_argument(
         "--type",
         dest="file_type",
@@ -70,6 +84,13 @@ def get_args() -> argparse.Namespace:
         help="device number",
     )
     parser.add_argument(
+        "--ncore",
+        dest="ncore",
+        type=int,
+        default=None,
+        help="number of cores",
+    )
+    parser.add_argument(
         "--model_size",
         dest="model_size",
         type=str,
@@ -80,9 +101,16 @@ def get_args() -> argparse.Namespace:
         "--model_name",
         dest="model_name",
         type=str,
-        default="qwen3_asr",
-        choices=["qwen3_asr", "qwen3_forcealigner"],
+        default="qwen3-asr",
+        choices=["qwen3-asr", "qwen3-forcealigner"],
         help="device number",
+    )
+    parser.add_argument(
+        "--context_length",
+        dest="context_length",
+        type=str,
+        default=None,
+        help="context length",
     )
     args = parser.parse_args()
     return args
@@ -90,6 +118,18 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = get_args()
+
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    model_name = first_not_none(args.model_name, default_model_name)
+    model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(model_name, {}).get(model_size, {})
+    ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    context_length = first_not_none(
+        args.context_length, model_config.get("context_length", "2k")
+    )
 
     shutil.copy2(
         os.path.join(HOUMO_EXAMPLES_PATH, "data", "audio", "audio.mp3"), "./audio.mp3"
@@ -99,23 +139,18 @@ if __name__ == "__main__":
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": args.model_name,
+        "model_name": model_name,
         "model_info": {
-            "model_size": args.model_size,
-            "ncore": 2,
-            "ndevice": args.ndevice,
+            "model_size": model_config.get("model_size", model_size),
+            "ncore": ncore,
+            "ndevice": ndevice,
+            "context_len": context_length,
         },
         "modelscope_repo": {
-            "repo_ids": ["Qwen/Qwen3-ASR-0.6B"],
+            "repo_ids": model_config.get("modelscope_repo", []),
             "ignore_patterns": ["*.bin", "*.h5", "*.msgpack", "*.safetensors"],
         },
     }
-
-    if args.model_name == "qwen3_asr" and args.model_size == "1.7b":
-        model_cfgs["modelscope_repo"]["repo_ids"][0] = "Qwen/Qwen3-ASR-1.7B"
-
-    if args.model_name == "qwen3_forcealigner":
-        model_cfgs["modelscope_repo"]["repo_ids"][0] = "Qwen/Qwen3-ForcedAligner-0.6B"
 
     _, ret_dict = hmatc_get_file(
         model_cfgs,

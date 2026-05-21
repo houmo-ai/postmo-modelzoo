@@ -23,18 +23,31 @@ import os
 import re
 import argparse
 import time
-from typing import List, Tuple, Optional, Union, Dict, Any
+from typing import List, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
-from transformers import AutoTokenizer, AutoProcessor, AutoConfig
+from transformers import AutoProcessor, AutoConfig
 from loguru import logger
 import tcim_lite as tcim
 from hmatc.python.get_hm_devices import get_hm_devices
+from hmatc.utils.utils import first_not_none, get_model_configs
+
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 TARGET_TYPE = torch.float16
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
 FILE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_CONFIG_PATH = os.path.join(FILE_DIR, "config.yaml")
+
+
+def get_default_processor_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "glm-asr")
+    model_size = model_config.get("model_size", "nano-2512")
+    return f"{model_name}-{model_size}"
 
 
 def is_valid_stream_char(cp: int) -> bool:
@@ -86,27 +99,48 @@ def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser(description="GLM-ASR Tcim Inference Demo")
     parser.add_argument(
+        "--config",
+        dest="config_path",
+        type=str,
+        default=DEFAULT_CONFIG_PATH,
+        help="path to config.yaml",
+    )
+    parser.add_argument(
+        "--model_name",
+        dest="model_name",
+        type=str,
+        default=None,
+        help="model name",
+    )
+    parser.add_argument(
+        "--model_size",
+        dest="model_size",
+        type=str,
+        default=None,
+        help="model size",
+    )
+    parser.add_argument(
         "--processor_path",
         type=str,
-        default="glm-asr-nano-2512",
+        default=None,
         help="Processor/config path or Hub ID for loading processor/config",
     )
     parser.add_argument(
         "--encoder_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "glm-asr_encode.hmm"),
+        default=None,
         help="houmo encoder model path",
     )
     parser.add_argument(
         "--prefill_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "glm-asr_prefill.hmm"),
+        default=None,
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--decode_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "glm-asr_decode.hmm"),
+        default=None,
         help="houmo decode model path",
     )
     parser.add_argument(
@@ -118,9 +152,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--ndevice",
         type=int,
-        default=1,
-        choices=[1, 2],
-        help="device number, only xh2 support",
+        default=None,
+        help="device number",
     )
     parser.add_argument(
         "--audio",
@@ -134,7 +167,39 @@ def get_args() -> argparse.Namespace:
         default=2048,
         help="Maximum number of new tokens to generate",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+
+    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
+    if args.processor_path is None:
+        args.processor_path = get_default_processor_dir(model_config)
+
+    model_prefix = f"{args.model_name}-{args.model_size}"
+    if args.encoder_path is None:
+        args.encoder_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_encode.hmm"
+        )
+    if args.prefill_path is None:
+        args.prefill_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm"
+        )
+    if args.decode_path is None:
+        args.decode_path = os.path.join(
+            "output", HOUMO_TARGET, f"{model_prefix}_decode.hmm"
+        )
+    if args.ndevice > 1:
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        if args.decode_path.endswith(".hmm"):
+            args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+
+    return args
 
 
 class HmGLM_ASR:
@@ -142,7 +207,9 @@ class HmGLM_ASR:
 
     def __init__(self, args):
         self.ndevice = args.ndevice
-        dev_manager = tcim.runtime.DevManager(get_hm_devices(self.ndevice), "Xh2HalBackend")
+        dev_manager = tcim.runtime.DevManager(
+            get_hm_devices(self.ndevice), "Xh2HalBackend"
+        )
         weight_manager = tcim.runtime.WeightManager(dev_manager)
 
         option1 = tcim.runtime.Option(weight_manager)

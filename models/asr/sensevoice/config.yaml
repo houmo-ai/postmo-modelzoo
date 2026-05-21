@@ -1,0 +1,12 @@
+default_model_name: "sensevoice"
+default_model_size: "small"
+
+model_configs:
+  sensevoice:
+    "small":
+      modelscope_repo: ["iic/SenseVoiceSmall"]
+      model_name: "sensevoice"
+      model_size: "small"
+      ncore: 2
+      ndevice: 1
+      quant_type: "w8a8h1_sefp"

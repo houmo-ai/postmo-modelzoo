@@ -58,6 +58,6 @@ if __name__ == "__main__":
     opt_level = "O2"
     version = get_houmo_version()
     target = HOUMO_TARGET
-    hmm_path = f"models/{target.lower()}-{version}/{model_name}_api/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_dynamic_{version}.tar.xz"
+    hmm_path = f"models/{target.lower()}-{version}/{model_name}_api/{model_name}_{target}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
 
     get_file_from_jfrog(hmm_path, model_dir, "./")

@@ -104,7 +104,7 @@ if __name__ == "__main__":
         "target": HOUMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
-        "model_name": "qwen3_pipeline",
+        "model_name": "qwen3-pipeline",
         "model_info": {
             "model_size": "8b",
             "ncore": args.ncore,
