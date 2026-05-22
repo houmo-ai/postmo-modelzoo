@@ -53,7 +53,11 @@ if should_run_step "quant"; then
 
     if ! should_skip_download; then
         echo "Download raw model (${MODEL_NAME}-${MODEL_SIZE})."
-        python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        GET_MODEL_ARGS=(--type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}")
+        if [ -n "${QUANT_TYPE}" ]; then
+            GET_MODEL_ARGS+=(--quant_type "${QUANT_TYPE}")
+        fi
+        python3 get_model.py "${GET_MODEL_ARGS[@]}"
     fi
     echo "Start model quantization (${MODEL_NAME}-${MODEL_SIZE})."
     python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}"
@@ -74,6 +78,9 @@ if should_run_step "demo"; then
         GET_MODEL_ARGS=(--type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}")
         if [ "${MTP}" = "true" ]; then
             GET_MODEL_ARGS+=(--mtp)
+        fi
+        if [ -n "${QUANT_TYPE}" ]; then
+            GET_MODEL_ARGS+=(--quant_type "${QUANT_TYPE}")
         fi
         python3 get_model.py "${GET_MODEL_ARGS[@]}"
     fi
