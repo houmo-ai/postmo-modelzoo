@@ -79,8 +79,8 @@ python3 demo_multibatch.py --forbid_flush
 | --- | --- | --- |
 | --tokenizer_dir | qwen3-8b | tokenizer 路径 |
 | --embedding_path | output/{target}/hmquant/quant_embedding.pt | embedding 权重路径 |
-| --prefill_path | output/{target}/qwen3_prefill.hmm | prefill 模型路径 |
-| --decode_path | output/{target}/qwen3_decode.hmm | decode 模型路径 |
+| --prefill_path | output/{target}/qwen3-8b_prefill.hmm | prefill 模型路径 |
+| --decode_path | output/{target}/qwen3-8b_decode.hmm | decode 模型路径 |
 | --forbid_flush | False | 禁止终端刷屏展示 |
 
 ### 4.3 run.sh

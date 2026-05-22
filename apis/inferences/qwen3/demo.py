@@ -72,14 +72,14 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default="qwen3_prefill.hmm",
+        default="qwen3-8b_prefill.hmm",
         help="houmo prefill model path",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default="qwen3_decode.hmm",
+        default="qwen3-8b_decode.hmm",
         help="houmo decode model path",
     )
     parser.add_argument(
@@ -127,8 +127,10 @@ def get_args() -> argparse.Namespace:
 
     args = parser.parse_args()
     if args.ndevice > 1:
-        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
-        args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        if args.decode_path.endswith(".hmm"):
+            args.decode_path = args.decode_path.replace(".hmm", ".hmms")
     return args
 
 
@@ -384,9 +386,10 @@ if __name__ == "__main__":
     if enable_power_opt:
         import gc
         import tcim_lite
+
         hw = tcim_lite.dev_ctrl
 
-        def pre_reset(device_id:int):
+        def pre_reset(device_id: int):
             global hmqwen
             if hmqwen is not None:
                 hmqwen = None
@@ -394,13 +397,18 @@ if __name__ == "__main__":
                 # Running twice is a defensive memory cleanup practice, not redundant logic.
                 gc.collect()
 
-        def post_reset(device_id:int):
+        def post_reset(device_id: int):
             global hmqwen
             hmqwen = HmQwenXh2(
-                args.prefill_path, args.decode_path, args.embedding_path,
-                args.tokenizer_dir, args.ndevice,
+                args.prefill_path,
+                args.decode_path,
+                args.embedding_path,
+                args.tokenizer_dir,
+                args.ndevice,
                 repetition_penalty=args.repetition_penalty,
-                topk=args.topk, topp=args.topp, temperature=args.temperature,
+                topk=args.topk,
+                topp=args.topp,
+                temperature=args.temperature,
             )
 
         dev = hw.HalDeviceFactory.create("Xh2aHalBackend")
@@ -420,12 +428,11 @@ if __name__ == "__main__":
             total_time,
         )
 
-
         if enable_power_opt:
             # Set DVFS mode to ON_DEMAND for power optimization and log device statistics
             status, mode = dev.get_dvfs_mode(0)
             if status == 0:
-                status  = dev.set_dvfs_mode(0, hw.DvfsMode.ON_DEMAND)
+                status = dev.set_dvfs_mode(0, hw.DvfsMode.ON_DEMAND)
                 if status != 0:
                     logger.error(f"Failed to set DVFS mode, status: {status}")
             else:
@@ -434,10 +441,11 @@ if __name__ == "__main__":
             # Log IPU frequency, memory info, and utilization for power demonstration
             status, freq = dev.get_ipu_frequency(0)
             status, mem_info = dev.get_mem_info(0)
-            status,util = dev.get_ipu_util_rate(0)
+            status, util = dev.get_ipu_util_rate(0)
 
-
-            print(f"IPU frequency: {freq} MHz,mem_total: {mem_info.mem_total},    mem_avail: {mem_info.mem_avail},mem_used: {mem_info.mem_used},IPU utilization: {util} %")
+            print(
+                f"IPU frequency: {freq} MHz,mem_total: {mem_info.mem_total},    mem_avail: {mem_info.mem_avail},mem_used: {mem_info.mem_used},IPU utilization: {util} %"
+            )
             dev.ipu_reset(0)
 
     except Exception as e:

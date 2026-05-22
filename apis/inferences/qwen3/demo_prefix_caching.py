@@ -37,7 +37,6 @@ from qwen_base import HmQwenBase
 from sampling_manager import SamplingManager
 from qwen_demo_utils import show_statistics, is_valid_char
 
-
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
@@ -63,14 +62,14 @@ def get_args() -> argparse.Namespace:
         "--prefill_path",
         dest="prefill_path",
         type=str,
-        default="qwen3_prefill.hmm",
+        default="qwen3-8b_prefill.hmm",
         help="Path to houmo prefill model",
     )
     parser.add_argument(
         "--decode_path",
         dest="decode_path",
         type=str,
-        default="qwen3_decode.hmm",
+        default="qwen3-8b_decode.hmm",
         help="Path to houmo decode model",
     )
     parser.add_argument(
@@ -112,8 +111,10 @@ def get_args() -> argparse.Namespace:
 
     args = parser.parse_args()
     if args.ndevice > 1:
-        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
-        args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        if args.decode_path.endswith(".hmm"):
+            args.decode_path = args.decode_path.replace(".hmm", ".hmms")
 
     return args
 

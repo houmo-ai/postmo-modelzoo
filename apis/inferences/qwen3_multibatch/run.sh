@@ -18,13 +18,13 @@ fi
 echo "Download qwen3-8b-16k 4batch model"
 python3 get_model.py
 
-if [[ ! -f "output/${houmo_target}/qwen3_prefill.hmm" ]]; then
-    echo "Missing file: qwen3_prefill.hmm" >&2
+if [[ ! -f "output/${houmo_target}/qwen3-8b_prefill.hmm" ]]; then
+    echo "Missing file: qwen3-8b_prefill.hmm" >&2
     exit 1
 fi
 
-if [[ ! -f "output/${houmo_target}/qwen3_decode.hmm" ]]; then
-    echo "Missing file: qwen3_decode.hmm" >&2
+if [[ ! -f "output/${houmo_target}/qwen3-8b_decode.hmm" ]]; then
+    echo "Missing file: qwen3-8b_decode.hmm" >&2
     exit 1
 fi
 
