@@ -32,7 +32,6 @@ from datetime import datetime
 from ..utils import logger
 from ..utils.utils import get_onnx_inputs_info
 
-
 QUANTIZATION_RANGES = {
     "int8": (-128, 127),  # 8-bit signed integer
     "uint8": (0, 255),  # 8-bit unsigned integer
@@ -583,6 +582,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         loop_num=1,
         thread_num=1,
         stream_num=0,
+        batch=1,
+        infer_only=False,
         devices=[0],
     ):
         """Run model performance test.
@@ -594,6 +595,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             loop_num (int): Number of loops to run.
             thread_num (int): Number of threads to use.
             stream_num (int): Number of streams to use.
+            batch (int): Batch size for inference.
+            infer_only (bool): Whether to only perform inference.
             devices (list): List of device IDs to use.
 
         Returns:
@@ -610,6 +613,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             thread_num,
             stream_num=stream_num,
             check_output=False,
+            batch=batch,
+            infer_only=infer_only,
             devices=devices,
         )
         res_info = {

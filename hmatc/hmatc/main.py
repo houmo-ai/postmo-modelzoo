@@ -93,8 +93,8 @@ def main():
     parent_log.add_argument("--log_level", type=str, required=False, default="INFO", choices=("DEBUG", "INFO", "WARN", "ERROR", "FATAL"), help="Specify log level")
 
     # model config
-    parent_model_cfg.add_argument("--batch", type=int, required=False, default=1, help="Specify a build batch")
-    parent_model_cfg.add_argument("--ncore", type=int, required=False, default=1, choices=(1, 2), help="Specify a ncore")
+    parent_model_cfg.add_argument("--batch", "-b", type=int, required=False, default=1, help="Specify a build batch")
+    parent_model_cfg.add_argument("--ncore", "-nc", type=int, required=False, default=1, choices=(1, 2), help="Specify a ncore")
     parent_model_cfg.add_argument("--opt_level", type=int, required=False, default=2, choices=(0, 1, 2), help="Specify a opt_level")
     parent_model_cfg.add_argument("--roi_num", type=int, required=False, default=1, help="Specify a roi_num")
 
@@ -161,6 +161,7 @@ def main():
     perf_parser.add_argument("--loop_num", "-ln", type=int, required=False, default=1, help="Specify loop num")
     perf_parser.add_argument("--thread", "-tn", type=int, required=False, default=1, help="Specify thread num")
     perf_parser.add_argument("--stream", type=int, required=False, default=0, help="Specify stream num")
+    perf_parser.add_argument("--infer-only", action="store_true", default=False, help="Only perform inference, without data IO")
 
     # check golden
     check_exclusive_group = check_parser.add_mutually_exclusive_group(required=True)
@@ -222,6 +223,8 @@ def main():
             args.loop_num,
             args.thread,
             args.stream,
+            args.batch,
+            args.infer_only,
             devices=[args.device_id],
         )
         # Save result to model directory
@@ -389,6 +392,8 @@ def main():
             args.loop_num,
             args.thread,
             args.stream,
+            args.batch,
+            args.infer_only,
             devices=[args.device_id],
         )
     elif current_command == "demo":

@@ -206,7 +206,7 @@ static float calculate_percentile(const std::vector<float> &latencies, float per
  * @param perfInfo Output performance information structure
  */
 static void PrintStatsInfo(const std::vector<StatsInfo_t> &statsInfos,
-                           int32_t samples, int32_t rounds, PerfInfo_t &perfInfo) {
+                           int32_t samples, int32_t rounds, PerfInfo_t &perfInfo, int32_t batch) {
     int64_t min_timestamp = std::numeric_limits<int64_t>::max();
     int64_t max_timestamp = std::numeric_limits<int64_t>::min();
     float infer_avg_time = 0.0f;
@@ -274,7 +274,7 @@ static void PrintStatsInfo(const std::vector<StatsInfo_t> &statsInfos,
     const float end2end_time_tp999 = calculate_percentile(total_end2end_times, 0.999f);
 
     const float avg_cost = total_time / total_repeat;
-    const float QPS = total_repeat / total_time * 1000;
+    const float QPS = total_repeat * batch / total_time * 1000;
 
     printf("%s[Latency] Inference  avg: %7.3f ms, max: %7.3f ms, min: %7.3f ms, tp99: %7.3f ms, tp999: %7.3f ms%s\n",
            COLOR_CYAN, infer_avg_time, infer_max_time, infer_min_time, infer_time_tp99, infer_time_tp999, COLOR_RESET);
@@ -488,7 +488,7 @@ static int32_t SetInputData(tcim::Module &module, std::map<std::string, tcim::Te
  * @param option Module option reference
  * @param check_output Whether to check output consistency
  */
-static void Infer(int32_t tid, const std::string &model_path, int32_t warmup, int32_t rounds,
+static void Infer(int32_t tid, const std::string &model_path, int32_t warmup, int32_t rounds, bool infer_only,
                   StatsInfo_t &stats, tcim::Stream &stream, tcim::Module::Option &option,
                   bool check_output) {
     printf("[INFO] Infer %d started, warmup: %d, rounds: %d, repeat: %d\n",
@@ -533,9 +533,11 @@ static void Infer(int32_t tid, const std::string &model_path, int32_t warmup, in
         }
 
         const auto t0 = high_resolution_clock::now();
-        for (int32_t k = 0; k < module.GetInputNum(); ++k) {
-            const std::string name = module.GetInputName(k);
-            module.SetInput(name, inputs[name]);
+        if (!infer_only) {
+            for (int32_t k = 0; k < module.GetInputNum(); ++k) {
+                const std::string name = module.GetInputName(k);
+                module.SetInput(name, inputs[name]);
+            }
         }
         const auto t1 = high_resolution_clock::now();
 
@@ -552,20 +554,21 @@ static void Infer(int32_t tid, const std::string &model_path, int32_t warmup, in
             continue;
         }
         const auto t2 = high_resolution_clock::now();
+        if (!infer_only) {
+            for (int32_t k = 0; k < module.GetOutputNum(); ++k) {
+                const std::string name = module.GetOutputName(k);
+                std::memset(outputs[name].Data(), 0, outputs[name].MemSize());
+                module.GetOutput(name, outputs[name]);
 
-        for (int32_t k = 0; k < module.GetOutputNum(); ++k) {
-            const std::string name = module.GetOutputName(k);
-            std::memset(outputs[name].Data(), 0, outputs[name].MemSize());
-            module.GetOutput(name, outputs[name]);
-
-            if (check_output) {
-                if (i == warmup - 1) {
-                    outputs[name].CopyTo(outputs_ref[name]);
-                } else if (i >= warmup) {
-                    if (std::memcmp(outputs[name].Data(), outputs_ref[name].Data(),
-                                    outputs[name].MemSize()) != 0) {
-                        printf("%s[ERROR] PID: %d, Iter: %5d, Output %s mismatch%s\n",
-                               COLOR_RED, tid, i - warmup, name.c_str(), COLOR_RESET);
+                if (check_output) {
+                    if (i == warmup - 1) {
+                        outputs[name].CopyTo(outputs_ref[name]);
+                    } else if (i >= warmup) {
+                        if (std::memcmp(outputs[name].Data(), outputs_ref[name].Data(),
+                                        outputs[name].MemSize()) != 0) {
+                            printf("%s[ERROR] PID: %d, Iter: %5d, Output %s mismatch%s\n",
+                                   COLOR_RED, tid, i - warmup, name.c_str(), COLOR_RESET);
+                        }
                     }
                 }
             }
@@ -612,7 +615,7 @@ static void Infer(int32_t tid, const std::string &model_path, int32_t warmup, in
  * @return 0 on success, -1 on failure
  */
 int32_t Run(const std::string &model_path, int32_t thread_num, int32_t stream_num,
-            int32_t warmup, int32_t samples, int32_t rounds,
+            int32_t warmup, int32_t samples, int32_t rounds, int32_t batch, bool infer_only,
             const std::vector<int32_t> &devices, bool check_output, PerfInfo_t &perf_info) {
     printf("[INFO] %s\n", "TCIM Performance Test");
     printf("[INFO] TCIM Runtime Version: %s\n", tcim::GetVersion().c_str());
@@ -645,6 +648,7 @@ int32_t Run(const std::string &model_path, int32_t thread_num, int32_t stream_nu
     printf("[INFO] Warmup: %d\n", warmup);
     printf("[INFO] Rounds: %d\n", rounds);
     printf("[INFO] Repeat: %d\n", samples);
+    printf("[INFO] Batch: %d\n", batch);
     printf("[INFO] Thread number: %d\n", thread_num);
     printf("[INFO] Stream number: %d\n", stream_num);
 
@@ -691,9 +695,9 @@ int32_t Run(const std::string &model_path, int32_t thread_num, int32_t stream_nu
     // Create threads and stats
     std::vector<std::thread> threads;
     if (samples < thread_num) {
-        printf("%s[WARNING] samples(%d) < thread_num(%d), adjust thread_num to %d%s\n",
-               COLOR_YELLOW, samples, thread_num, samples, COLOR_RESET);
-        thread_num = samples;
+        printf("%s[WARNING] samples(%d) < thread_num(%d), adjust samples to %d%s\n",
+               COLOR_YELLOW, samples, thread_num, thread_num, COLOR_RESET);
+        samples = thread_num;
     }
 
     std::vector<StatsInfo_t> statsInfos(thread_num);
@@ -706,7 +710,7 @@ int32_t Run(const std::string &model_path, int32_t thread_num, int32_t stream_nu
         if (i < remainder) {
             statsInfos[i].repeat += 1;
         }
-        threads.emplace_back(Infer, i, model_path, warmup, rounds,
+        threads.emplace_back(Infer, i, model_path, warmup, rounds, infer_only,
                              std::ref(statsInfos[i]), std::ref(streams[i % stream_num]),
                              std::ref(option), check_output);
     }
@@ -715,7 +719,7 @@ int32_t Run(const std::string &model_path, int32_t thread_num, int32_t stream_nu
         t.join();
     }
 
-    PrintStatsInfo(statsInfos, samples, rounds, perf_info);
+    PrintStatsInfo(statsInfos, samples, rounds, perf_info, batch);
     return 0;
 }
 
@@ -738,12 +742,13 @@ PerfInfo_t ModelRunner(
     int32_t loop_num,
     int32_t thread_num,
     int32_t stream_num = 0,
+    int32_t batch = 1,
+    bool infer_only = false,
     bool check_output = false,
     std::vector<int32_t> devices = {0}) {
 
     PerfInfo_t perfInfo;
-    if (Run(model_path, thread_num, stream_num, warmup_num, sample_num, loop_num,
-            devices, check_output, perfInfo) != 0) {
+    if (Run(model_path, thread_num, stream_num, warmup_num, sample_num, loop_num, batch, infer_only, devices, check_output, perfInfo) != 0) {
         throw std::runtime_error("Failed to run model");
     }
     return perfInfo;
@@ -786,6 +791,8 @@ PYBIND11_MODULE(perf, m) {
           py::arg("loop_num"),
           py::arg("thread_num"),
           py::arg("stream_num") = 0,
+          py::arg("batch") = 1,
+          py::arg("infer_only") = false,
           py::arg("check_output") = false,
           py::arg("devices") = std::vector<int32_t>{0});
 }
