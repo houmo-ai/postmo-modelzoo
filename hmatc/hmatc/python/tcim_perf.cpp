@@ -690,6 +690,12 @@ int32_t Run(const std::string &model_path, int32_t thread_num, int32_t stream_nu
 
     // Create threads and stats
     std::vector<std::thread> threads;
+    if (samples < thread_num) {
+        printf("%s[WARNING] samples(%d) < thread_num(%d), adjust thread_num to %d%s\n",
+               COLOR_YELLOW, samples, thread_num, samples, COLOR_RESET);
+        thread_num = samples;
+    }
+
     std::vector<StatsInfo_t> statsInfos(thread_num);
     const int32_t base_repeat = samples / thread_num;
     const int32_t remainder = samples % thread_num;
