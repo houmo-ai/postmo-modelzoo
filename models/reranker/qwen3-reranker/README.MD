@@ -1,35 +1,20 @@
-# Qwen3(通义千问3)
+# Qwen3-Reranker
 
 本示例展示如何把Qwen3-Reranker模型量化和编译，部署到后摩芯片的设备上。
-
-## 预训练模型
-
-本项目使用从 ModelScope 下载的预训练模型：
-
-- 模型名称: Qwen3-Reranker-8B
-- 来源: https://modelscope.cn/models/Qwen/Qwen3-Reranker-8B
-- 许可: Apache License 2.0 （https://www.apache.org/licenses/LICENSE-2.0）
-
-预训练模型在运行时下载，工程发布**不包含**该模型。
-
-## 用于校准的数据集
-
-本项目引用 T2Reranking 数据集仅用于**研究和评估目的**。
-
-- 数据集许可: Apache License 2.0
-- 来源: https://modelscope.cn/datasets/C-MTEB/T2Reranking
-
-⚠️ 重要提示:
-- 本数据集**不作为本仓库的一部分进行分发**。
-- 本数据集**不受本项目 Apache License 2.0 许可的约束**。
-- 任何对数据集的使用都必须遵守其原始许可 (CC BY-NC 4.0)，包括**非商业用途限制**。
-- 用户有责任确保在使用本数据集时遵守相关规定。
 
 [TOC]
 
 ## 1 模型说明
 
-本例使用的模型实现来源于[https://modelscope.cn/models/Qwen/Qwen3-Reranker-8B](https://modelscope.cn/models/Qwen/Qwen3-Reranker-8B)。
+本例使用的模型实现来源于 ModelScope 的预训练模型：
+
+- 模型名称: Qwen3-Reranker-8B
+- 来源: https://www.modelscope.cn/models/Qwen/Qwen3-Reranker-8B
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
+预训练模型在运行时下载，工程发布**不包含**该模型。
+
+本例只适用于xh2。
 
 当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
 
@@ -38,6 +23,21 @@
 - `context_length=8k`
 - `prefill_length=256`
 - `ndevice=1`
+
+### 用于校准的数据集
+
+本项目引用 T2Reranking 数据集仅用于**研究和评估目的**。
+
+- 数据集名称: T2Reranking
+- 数据集许可: Apache License 2.0
+- 来源: https://www.modelscope.cn/datasets/C-MTEB/T2Reranking
+
+⚠️ 重要提示:
+
+- 本数据集**不作为本仓库的一部分进行分发**。
+- 本数据集**不受本项目 Apache License 2.0 许可的约束**。
+- 任何对数据集的使用都必须遵守其原始许可 (Apache License 2.0)。
+- 用户有责任确保在使用本数据集时遵守相关规定。
 
 ## 2 快速开始
 
@@ -69,10 +69,10 @@ python3 get_model.py --type hmm
 
 ### 2.3 量化
 
-量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上，空闲内存需要达到100GB以上。参考命令：
+量化需要使用GPU，并在宿主机安装与CUDA12.8兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上，空闲内存需要达到100GB以上。参考命令：
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64 /bin/bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
 ```
 
 进入 docker 后 source 环境变量，并进入 `models/reranker/qwen3-reranker` 目录，执行 `ptq.py` 脚本。默认的 `input_sequence_length` 和 `context_length` 分别来自 `config.yaml`，当前默认值是 `256` 和 `8k`。
@@ -114,7 +114,7 @@ Qwen3-Reranker 模型使用 python API 进行演示。
 python3 demo.py
 ```
 
-### 2.6 一键评估
+## 3 一键评估
 
 以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
@@ -165,26 +165,26 @@ bash test.sh -s quant,build
 bash test.sh -s demo --skip_download
 ```
 
-## 3 参考结果
+## 4 参考结果
 
-### 3.1 演示结果
+### 4.1 演示结果
 
 ```bash
 queries =  "Explain gravity"
 documents = "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun."
 
 scores:
-[0.990234375]
-
-
-### 3.2 性能结果
-
-```bash
-Total Input: 104 tokens, Prefill Cost 140.316 ms
-Prefill Speed: 741.19 tokens/s
-E2E Latency (End-to-End Latency): 0.144 seconds
+[0.9892578125]
 ```
 
-## 4 免责声明
+### 4.2 性能结果
+
+```bash
+Total Input: 104 tokens, Prefill Cost 120.508 ms
+Prefill Speed: 863.02 tokens/s
+E2E Latency (End-to-End Latency): 0.123 seconds
+```
+
+## 5 免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。

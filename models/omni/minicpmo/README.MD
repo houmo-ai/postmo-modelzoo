@@ -1,23 +1,29 @@
-# MiniCPM-o_2.6
+# MiniCPM-o-2.6
 
 本示例展示如何把 MiniCPMO 中的各个子模型量化和编译，部署到后摩 M50 芯片设备上。
-
-## 特别事项
-
-本项目使用从 ModelScope 下载的预训练模型、配置文件和脚本：
-
-- 模型名称: MiniCPM-o-2_6
-- 来源: https://modelscope.cn/openbmb/MiniCPM-o-2_6
-- 许可: Apache License 2.0 （https://www.apache.org/licenses/LICENSE-2.0）
-
-预训练模型、配置文件和脚本在运行时下载，工程发布**不包含**该下载包。
-同时，原有的预处理代码image_processing_minicpmv.py和preocessing_minicpmo.py已进行适配性修改，并包含在项目提交文件中。特此声明。
 
 [TOC]
 
 ## 1 模型说明
 
-本例使用的 MiniCPMO 各模块模型实现来源于 [https://modelscope.cn/openbmb/MiniCPM-o-2_6](https://modelscope.cn/openbmb/MiniCPM-o-2_6)。默认模型由 `config.yaml` 统一维护，当前默认组合为 `minicpmo` + `7b`。
+本例使用的模型实现来源于 ModelScope 的预训练模型：
+
+- 模型名称: MiniCPM-o-2_6
+- 来源: https://www.modelscope.cn/models/OpenBMB/MiniCPM-o-2_6
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
+预训练模型、配置文件和脚本在运行时下载，工程发布**不包含**该下载包。
+同时，原有的预处理代码 `image_processing_minicpmv.py` 和 `processing_minicpmo.py` 已进行适配性修改，并包含在项目提交文件中。特此声明。
+
+本例只适用于xh2。
+
+当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
+
+- `model_name=minicpmo`
+- `model_size=7b`
+- `prefill_length=256`
+- `context_length=4k`
+- `ndevice=1`
 
 ## 2 快速开始
 
@@ -49,10 +55,10 @@ python3 get_model.py --type raw --model_name minicpmo --model_size 7b
 ### 2.3 量化
 
 当前仅支持w8a8基础量化，暂未提供其它高阶量化方案。
-量化需要使用GPU，并在宿主机安装与CUDA12.2兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到48GB，主机空闲内存需要达到48GB以上。参考命令：
+量化需要使用GPU，并在宿主机安装与CUDA12.8兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到48GB，主机空闲内存需要达到48GB以上。参考命令：
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64.** /bin/bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
 ```
 
 进入 docker 后 source 环境变量，并进入 `models/omni/minicpmo` 目录执行 `ptq.py`。默认的大语言模型模块 `prefill_length=256`、`context_length=4k`，统一来自 `config.yaml`。
@@ -69,6 +75,8 @@ python3 ptq.py --model-name minicpmo --model-size 7b
 量化完成的模型存放在 `output/$HOUMO_TARGET/hmquant` 目录。
 
 ### 2.4 编译
+
+将量化模型编译为在芯片上运行的模型。执行脚本：
 
 ```bash
 python3 build.py
@@ -102,7 +110,7 @@ python3 demo.py --example_idx 8
 python3 demo.py --example_idx 9
 ```
 
-### 2.6 一键评估
+## 3 一键评估
 
 以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
@@ -149,16 +157,16 @@ bash test.sh -s all -name minicpmo -size 7b
 bash test.sh -s demo --skip_download -name minicpmo -size 7b
 ```
 
-## 3 参考结果
+## 4 参考结果
 
-### 3.1 演示结果
+### 4.1 演示结果
 
 ```bash
 Audio saved to output_omni.wav
 画面中有一个穿着红色夹克和黑色裤子的人，他正在一个被雪覆盖的山地地形上滑雪。他正沿着一条清晰的滑雪道滑行，周围是高耸的雪山和多云的天空。
 ```
 
-### 3.2 性能结果
+### 4.2 性能结果
 
 ```bash
 Total Cost 18230.092 ms
@@ -180,7 +188,7 @@ TTS Generate Speed: 1.96 x real-time
 E2E Latency (End-to-End Latency): 18.230 seconds
 ```
 
-### 3.3 备注
+### 4.3 备注
 
 ```bash
 1. 由于tts对长文本容易产生异常（原算法即存在的现象），我们提供了一种文本拆分的方法。只需将chat()或chat_otts()调用时给定text_split=True，即可触发。同时，为控制多段语音中间自然过渡，可选择打开insert_silence来自动在多段之间插入静音间隔；
@@ -188,6 +196,6 @@ E2E Latency (End-to-End Latency): 18.230 seconds
 3. tts生成语音，后处理默认是没有打开后采样的，如需更丰富的回答可以选择打开后采样。打开方式：定义HMMiniCPMO时将tts_sample设为True即可。同时，后采样也能避免一些较长无效尾音、杂音、语音异常的问题（原始模型只有后采样方案，也是为了避免此类情况）。
 ```
 
-## 4 免责声明
+## 5 免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。

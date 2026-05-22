@@ -1,6 +1,6 @@
 # GLM-ASR
 
-本示例展示如何把 GLM-ASR-Nano-2512 模型下载、量化、编译，并部署到后摩芯片设备上。
+本示例展示如何把 GLM-ASR-Nano-2512 模型量化和编译，部署到后摩芯片的设备上。
 
 [TOC]
 
@@ -9,14 +9,23 @@
 本例使用的模型实现来源于：
 
 - 模型名称: GLM-ASR-Nano-2512
-- 来源: https://modelscope.cn/models/ZhipuAI/GLM-ASR-Nano-2512
+- 来源: https://www.modelscope.cn/models/ZhipuAI/GLM-ASR-Nano-2512
 - 参考仓库: https://github.com/zai-org/GLM-ASR
+- 许可: Apache License 2.0 (https://github.com/zai-org/GLM-ASR/blob/main/LICENSE)
 
-预训练模型在运行时下载，工程发布不包含该模型，本例只适用于 xh2。
+预训练模型在运行时下载，工程发布**不包含**该模型。
+
+本例只适用于xh2。
+
+当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
+
+- `model_name=glm-asr`
+- `model_size=nano-2512`
+- `ndevice=1`
 
 ## 2 快速开始
 
-目前 GLM-ASR 模型提供 python 脚本编译方式。芯片模型只能在 Linux 环境下量化和编译。
+目前 GLM-ASR 模型提供 python 脚本编译方式。芯片模型只能在 linux 环境下量化和编译。
 
 ### 2.1 环境准备
 
@@ -55,7 +64,7 @@ python3 get_model.py --type raw
 量化需要使用 GPU，并在宿主机安装与 CUDA 12.2 兼容的 CUDA 和驱动。启动 docker 时将 GPU 映射到 docker 内，并指定可用的 GPU ID。参考命令：
 
 ```bash
-docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:vx.y.z-ubuntu24.04-x86.64 /bin/bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
 ```
 
 进入 docker 后 source 环境变量，并进入 models/asr/glm-asr 目录执行 ptq.py：
@@ -63,7 +72,7 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 ```bash
 source env.sh
 cd models/asr/glm-asr
-python3 ptq.py --model-name glm-asr --model-size nano-2512
+python3 ptq.py --model_name glm-asr --model_size nano-2512
 ```
 
 ### 2.4 编译
@@ -74,7 +83,7 @@ python3 ptq.py --model-name glm-asr --model-size nano-2512
 python3 build.py
 ```
 
-默认输出文件位于 `output/xh2/`：
+默认输出名称分别为：
 
 - `glm-asr-nano-2512_encode.hmm`
 - `glm-asr-nano-2512_prefill.hmm`
@@ -82,19 +91,17 @@ python3 build.py
 
 ### 2.5 演示
 
-如果使用 get_model.py 下载的预编译模型，可直接执行：
+GLM-ASR 模型使用 python API 进行演示。
+
+1. `demo.py` 默认从 `config.yaml` 读取 `model_name`、`model_size`、`ndevice`，并自动推导 `processor_path` 与 HMM 路径。
+
+2. 执行脚本，推理完成将输出性能结果。
 
 ```bash
 python3 demo.py
 ```
 
-`demo.py` 默认会从 `config.yaml` 读取 `model_name`、`model_size`、`ndevice`，并自动推导 `processor_path` 与 HMM 路径；也可以显式覆盖：
-
-```bash
-python3 demo.py --model_name glm-asr --model_size nano-2512
-```
-
-如果使用 build.py 自行编译得到的模型，也可以直接使用默认路径；`demo.py` 默认查找的就是 build.py 生成的这组产物：
+如需显式覆盖默认参数，命令如下：
 
 ```bash
 python3 demo.py --model_name glm-asr --model_size nano-2512
@@ -111,7 +118,7 @@ python3 demo.py \
   --audio ../../../data/audio/audio.mp3
 ```
 
-### 2.6 一键评估
+## 3 一键评估
 
 以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
@@ -129,11 +136,13 @@ test.sh 支持以下参数：
 Usage: test.sh [options]
   -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
                           Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
+  -size, --model_size     Model size. Default: nano-2512.
+  -name, --model_name     Model name. Default: glm-asr.
   --skip_download         Skip model download steps.
-  -size, --model_size     Model size.
-  -name, --model_name     Model name.
   -h, --help              Show this help message.
 ```
+
+当前脚本会把 `model_name` 和 `model_size` 透传给 `get_model.py`、`ptq.py`、`build.py`、`demo.py`。默认值分别是 `glm-asr` 和 `nano-2512`。
 
 示例：
 
@@ -154,19 +163,37 @@ bash test.sh -s all -name glm-asr -size nano-2512
 bash test.sh -s demo --skip_download -name glm-asr -size nano-2512
 ```
 
-## 3 输出说明
+## 4 参考结果
 
-- 性能统计，包括 Encoder Time、Prefill Cost、Decode Cost、TTFT、TPOT 和 E2E Latency
+### 4.1 演示结果
 
 ```bash
-Encoder Time: 581.081 ms
-Prefill Cost: 61.433 ms
-Decode Cost: 755.838 ms
-Output 48 tokens, Decode Speed: 63.51 tokens/s
-TTFT (Time to First Token): 65.472 ms
-TPOT (Time Per Output Token): 15.747 ms/token
+Initializing GLM-ASR Inference via Tcim...
+Loading encoder from: output/xh2/glm-asr-nano-2512_encode.hmm
+encoder model loaded
+Loading prefill from: output/xh2/glm-asr-nano-2512_prefill.hmm
+prefill model loaded
+Loading decode from: output/xh2/glm-asr-nano-2512_decode.hmm
+decode model loaded
+Loading processor and tokenizer from: GLM-ASR-Nano-2512
+Loading token embedding from: output/xh2/hmquant/quant_embedding.pt
+Processing Chunk 1/1 (2.4s)
+Running Encoder...
+Running Llm...
+Encoder Time: 5329.015 ms
+Prefill Cost: 45.320 ms
+Decode Cost: 86.718 ms
+============================================================
+Transcription Result:
+============================================================
+每一天都要快乐哦
+============================================================
+Output 5 tokens, Decode Speed: 57.66 tokens/s
+TTFT (Time to First Token): 50.196 ms
+TPOT (Time Per Output Token): 17.344 ms/token
+E2E Latency: 0.137 seconds
 ```
 
-## 4 免责声明
+## 5 免责声明
 
-本示例依赖的模型与相关资源由第三方提供并维护。使用这些模型、数据或其他外部资源时，请遵循对应的许可证、使用条款和隐私政策，并自行评估由此带来的合规性与使用风险。
+您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。

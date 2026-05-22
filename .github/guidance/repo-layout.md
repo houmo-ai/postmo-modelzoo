@@ -1,0 +1,60 @@
+# iModelzoo Repo Layout (Navigation)
+
+- `.github/`: Repo guidance, Copilot instructions, prompts, and reusable skills.
+- `apis/`: HAL/runtime API demos and API-side sample assets.
+  - `common/`: Shared API utilities and wrappers.
+  - `converts/`: Model conversion API examples.
+  - `inferences/`: Model inference API examples.
+  - `data/`: API demo data assets.
+  - `models/`: Sample models and third-party runtime assets used by API examples.
+- `config/`: Shared example configuration entrypoints, including `imodelExampleConfig.yaml`.
+- `data/`: Evaluation datasets, media samples, and dataset readmes.
+- `hmatc/`: CLI and Python package for quantization, build, inference helpers, and evaluation utilities.
+- `hmodel/`: Large-model related code and external subprojects.
+- `models/`: Model get/quant/build/demo/eval examples.
+  - `asr/`: Automatic speech recognition models.
+  - `autodrive/`: Autonomous driving models.
+  - `backbone/`: Backbone models such as ResNet, EfficientNet, and ViT.
+  - `detection/`: Object detection models.
+  - `embedding/`: Embedding models.
+  - `estimation/`: Pose and related estimation models.
+  - `llm/`: Large language models.
+  - `ocr/`: Optical character recognition models.
+  - `omni/`: Multimodal omni models.
+  - `reranker/`: Reranking models.
+  - `segmentation/`: Image segmentation models.
+  - `tts/`: Text-to-speech models.
+  - `vlm/`: Vision-language models.
+- `tests/`: Pytest-based unit and integration tests.
+  - `apis_tests/`: API tests.
+  - `hmatc_tests/`: `hmatc` tool tests.
+  - `models_tests/`: Model flow tests for get/quant/build/demo/eval/perf/compare.
+  - `tools_tests/`: Tool-level tests.
+  - `tests_utils/`: Shared test utilities and fixtures.
+  - `conftest.py`: Shared pytest configuration.
+- `tools/`: Performance, evaluation, and environment utilities.
+  - `bandwidth_perf/`: Bandwidth performance testing tools.
+  - `bin/`: Helper executables and wrapper scripts.
+  - `common/`: Shared tool utilities.
+  - `computing_perf/`: Compute performance testing tools.
+  - `hm_check/`: Environment checking tools.
+  - `hmeval/`: Evaluation CLI and examples.
+  - `llm_perf/`: LLM performance testing tools.
+  - `tcim_perf/`: TCIM performance testing tools.
+  - `win_envs/`: Windows environment setup guides and scripts.
+- `env.sh` / `env.bat` / `env_dev.sh`: Environment setup scripts.
+- `enter_docker.sh`: Docker entry helper.
+- `imodelzoo.yaml` / `imodelzoo_xh2.yaml`: Top-level model/example aggregation configs.
+- `run_all.py`: Batch runner for repo examples/tests.
+- `README.md`: Repo overview and instructions.
+- `requirements.txt`: Python dependencies.
+- `LICENSE`: License file.
+- `NOTICE`: License and attribution information.
+- `THIRD_PARTY_NOTICES`: Third-party notices and licensing summary.
+
+## Skill Files
+
+- `SKILL.md` must live under `.github/`, preferably at `.github/skills/<skill-name>/SKILL.md`.
+- Do not place `SKILL.md` in the repository root.
+- If a root-level `SKILL.md` ever exists, move it under `.github/skills/` and remove the old file to avoid duplicate versions.
+- Related skill templates, references, and helper scripts should also be kept under `.github/skills/<skill-name>/` when possible.

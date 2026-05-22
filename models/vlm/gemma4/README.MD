@@ -2,25 +2,26 @@
 
 本示例展示如何把Gemma4模型量化和编译，部署到后摩芯片的设备上。
 
-## 预训练模型
-
-本项目使用从 ModelScope 下载的预训练模型：
-
-- 模型名称: gemma-4-26B-A4B-it
-- 来源: https://www.modelscope.cn/models/google/gemma-4-26B-A4B-it
-- 许可: Apache License 2.0 （https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md）
-
-预训练模型在运行时下载，工程发布**不包含**该模型。
-
-## 数据集使用声明
-
-本项目使用公开数据集进行量化校准。数据集采用Apache License 2.0开源协议授权。
-
 [TOC]
 
 ## 1 模型说明
 
-本例使用的模型实现来源于[https://www.modelscope.cn/models/google/gemma-4-26B-A4B-it](https://www.modelscope.cn/models/google/gemma-4-26B-A4B-it)。
+本例使用的模型实现来源于 ModelScope 的预训练模型：
+
+- 模型名称: gemma-4-26B-A4B-it
+- 来源: https://www.modelscope.cn/models/google/gemma-4-26B-A4B-it
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
+预训练模型在运行时下载，工程发布**不包含**该模型。
+
+本例只适用于xh2。
+
+当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
+
+- `model_name=gemma4`
+- `model_size=26b-a4b`
+- `context_length=2k`
+- `ndevice=1`
 
 ## 2 快速开始
 
@@ -51,9 +52,17 @@ python3 get_model.py --type hmm --model_name gemma4 --model_size 26b-a4b
 
 ### 2.3 量化
 
-量化下载的原始模型。在当前目录下，执行脚本：
+量化需要使用GPU，并在宿主机安装与CUDA12.8兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID。参考命令：
 
 ```bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
+```
+
+进入 docker 后 source 环境变量，并进入 `models/vlm/gemma4` 目录，执行 `ptq.py` 脚本：
+
+```bash
+source env.sh
+cd models/vlm/gemma4
 python3 ptq.py --model-name gemma4 --model-size 26b-a4b
 ```
 
@@ -79,10 +88,11 @@ python3 ptq.py --model-name gemma4 --model-size 26b-a4b
 python3 build.py --model_name gemma4 --model_size 26b-a4b
 ```
 
-编译好的模型存放在output目录，包括3个文件：
-- gemma4-26b-a4b_prefill.hmm
-- gemma4-26b-a4b_decode.hmm
-- gemma4-26b-a4b_visual_448x448.hmm
+默认输出名称分别为：
+
+- `gemma4-26b-a4b_prefill.hmm`
+- `gemma4-26b-a4b_decode.hmm`
+- `gemma4-26b-a4b_visual_448x448.hmm`
 
 ### 2.5 演示
 
@@ -115,7 +125,7 @@ python3 demo.py --model_name gemma4 --model_size 26b-a4b --image ../../../data/p
 - `--image`: 图片路径
 - `--max-new-tokens`: 最大生成token数
 
-### 2.6 一键评估
+## 3 一键评估
 
 以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
@@ -173,9 +183,9 @@ bash test.sh -s all
 bash test.sh -s demo --skip_download
 ```
 
-## 3 参考结果
+## 4 参考结果
 
-### 3.1 演示结果
+### 4.1 演示结果
 
 ```bash
 question: 你好，请介绍一下你自己。
@@ -202,39 +212,43 @@ response: 你好！我是 **Gemma 4**，是由 Google DeepMind 开发的大型�
 * “（上传一张图片）请描述一下这张图片里的内容。”
 
 请问今天有什么我可以帮你的吗
-
-2026-05-10 08:35:45.315 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:316 - ====================================================================================================
-2026-05-10 08:35:45.315 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:317 -                     Model Inference Performance Summary Report
-2026-05-10 08:35:45.316 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:318 - ====================================================================================================
-2026-05-10 08:35:45.316 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:321 - Configuration Details:
-2026-05-10 08:35:45.316 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:322 -   Batch Size:      1
-2026-05-10 08:35:45.316 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:323 -   Input Length per Sample:     20 tokens
-2026-05-10 08:35:45.316 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:324 -   Output Length per Sample:    336 tokens
-2026-05-10 08:35:45.316 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:329 -   Prefill Model Load Time: 120483.64ms
-2026-05-10 08:35:45.316 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:331 -   Decode Model Load Time:  809.74ms
-2026-05-10 08:35:45.316 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:333 -   Vision Model Load Time: 6244.74ms
-2026-05-10 08:35:45.316 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:346 - Prefill Stage Performance:
-2026-05-10 08:35:45.316 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:347 -   Total Time:  261.68ms | Speed:   76.43 tokens/s
-2026-05-10 08:35:45.316 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:349 -   Tokenization Time:   71.45ms
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:352 -   Embedding Time:    0.35ms
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:353 -   API SetInput Time:  64.78ms
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:354 -   API Inference Time: 121.58ms | Prefill Speed:  164.50 tokens/s
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:355 -   API GetOutput Time:  2.62ms
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:358 - Decode Stage Performance:
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:359 -   Total Time: 13198.44ms | Speed:   25.38 tokens/s
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:363 -   Tokenization Time: Skipped (No operation)
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:364 -   Embedding Time:   66.12ms
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:365 -   API SetInput Time:   1.19ms
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:366 -   API Inference Time: 35.20ms | Decode Speed:   28.41 tokens/s
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:367 -   API GetOutput Time:  2.33ms
-2026-05-10 08:35:45.317 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:370 - Overall Performance Metrics:
-2026-05-10 08:35:45.318 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:371 -   TTFT (Time To First Token):  261.68 ms
-2026-05-10 08:35:45.318 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:372 -   TPOT (Time Per Output Token): 39.40 ms/token
-2026-05-10 08:35:45.318 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:373 -   E2E Latency (End-to-End):     13.50 seconds
-2026-05-10 08:35:45.318 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:374 -   E2E TPS (Throughput):         24.89 tokens/s
-2026-05-10 08:35:45.318 | SUCCESS  | hmatc.utils.perf_infomations:show_summary:376 - ====================================================================================================
 ```
 
-## 4 免责声明
+### 4.2 性能结果
+
+```bash
+====================================================================================================
+                    Model Inference Performance Summary Report
+====================================================================================================
+Configuration Details:
+  Batch Size:      1
+  Input Length per Sample:     20 tokens
+  Output Length per Sample:    336 tokens
+  Prefill Model Load Time: 120483.64ms
+  Decode Model Load Time:  809.74ms
+  Vision Model Load Time: 6244.74ms
+Prefill Stage Performance:
+  Total Time:  261.68ms | Speed:   76.43 tokens/s
+  Tokenization Time:   71.45ms
+  Embedding Time:    0.35ms
+  API SetInput Time:  64.78ms
+  API Inference Time: 121.58ms | Prefill Speed:  164.50 tokens/s
+  API GetOutput Time:  2.62ms
+Decode Stage Performance:
+  Total Time: 13198.44ms | Speed:   25.38 tokens/s
+  Tokenization Time: Skipped (No operation)
+  Embedding Time:   66.12ms
+  API SetInput Time:   1.19ms
+  API Inference Time: 35.20ms | Decode Speed:   28.41 tokens/s
+  API GetOutput Time:  2.33ms
+Overall Performance Metrics:
+  TTFT (Time To First Token):  261.68 ms
+  TPOT (Time Per Output Token): 39.40 ms/token
+  E2E Latency (End-to-End):     13.50 seconds
+  E2E TPS (Throughput):         24.89 tokens/s
+====================================================================================================
+```
+
+## 5 免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。

@@ -1,19 +1,20 @@
-# CosyVoice3
+# Fun-CosyVoice3-0.5B-2512
 
 本示例展示如何将 **Fun-CosyVoice3-0.5B-2512** 模型进行量化与编译，并在后摩 **XH2** 设备上进行推理演示。
-
-## 预训练模型
-
-本项目使用的预训练模型为：
-
-- 模型名称: Fun-CosyVoice3-0.5B-2512
-- 上游项目/模型仓: FunAudioLLM/Fun-CosyVoice3-0.5B-2512（ModelScope）
-
-预训练模型在运行时下载，工程发布 **不包含** 该模型文件。
 
 [TOC]
 
 ## 1 模型说明
+
+本例使用的模型实现来源于 ModelScope 的预训练模型：
+
+- 模型名称: Fun-CosyVoice3-0.5B-2512
+- 来源: https://www.modelscope.cn/models/FunAudioLLM/Fun-CosyVoice3-0.5B-2512
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
+预训练模型在运行时下载，工程发布 **不包含** 该模型文件。
+
+本例只适用于xh2。
 
 `cosyvoice3` 目录包含以下流程脚本：
 
@@ -23,14 +24,19 @@
 - `demo.py`: 在 XH2 上执行端到端 cosyvoice3 推理示例
 - `test.sh`: 一键下载/量化/编译/演示
 
-默认参数统一由 `config.yaml` 提供，当前默认模型为 `cosyvoice3-0.5b-2512`。
+默认参数统一由 `config.yaml` 提供，当前默认模型为：
+
+- `model_name=cosyvoice3`
+- `model_size=0.5b-2512`
+- `context_length=2k`
+- `input_sequence_length=256`
+- `ndevice=1`
 
 ## 2 快速开始
 
 说明：
 
-- 仅支持 `HOUMO_TARGET=xh2`
-- **量化需要 GPU 环境**（`test.sh -t compile` 会检查 `nvidia-smi`）
+- **量化需要 GPU 环境**
 
 ### 2.1 环境准备
 
@@ -82,11 +88,18 @@ python3 get_model.py --type raw --model_name cosyvoice3 --model_size 0.5b-2512
 python3 get_model.py -h
 ```
 
-### 2.3 量化（PTQ）
+### 2.3 量化
 
-在已准备好工具链环境后，执行：
+量化需要使用GPU，并在宿主机安装与CUDA12.8兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID。参考命令：
 
 ```bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
+```
+
+进入 docker 后 source 环境变量，并进入 `models/tts/cosyvoice3` 目录，执行 `ptq.py` 脚本：
+
+```bash
+source env.sh
 cd models/tts/cosyvoice3
 python3 ptq.py --model_name cosyvoice3 --model_size 0.5b-2512
 ```
@@ -131,7 +144,7 @@ python3 build.py --model_name cosyvoice3 --model_size 0.5b-2512
 
 编译产物默认位于 `output/$HOUMO_TARGET/` 目录下，包含多个 `.hmm` 文件。
 
-默认 HMM 命名统一使用 `${model_name}-${model_size}` 前缀，例如：
+默认输出名称分别为：
 
 - `cosyvoice3-0.5b-2512_campplus.hmm`
 - `cosyvoice3-0.5b-2512_speech_tokenizer.hmm`
@@ -165,7 +178,7 @@ python3 demo.py -h
 
 **提供c++示例，详细介绍参考cpp/README.MD。**
 
-### 2.6 一键执行
+## 3 一键评估
 
 以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
@@ -221,30 +234,32 @@ bash test.sh -s all
 bash test.sh -s demo --skip_download
 ```
 
-## 3 参考结果
+## 4 参考结果
 
-### 3.1 演示结果
+### 4.1 演示结果
 
 ```bash
-2026-03-13 09:52:43.109 | INFO     | __main__:inference_zero_shot:1952 - Start inference zero shot, zero_shot_spk_id: , speed: 1.0, text_frontend: True
+Start inference zero shot, zero_shot_spk_id: , speed: 1.0, text_frontend: True
   0%|                       | 0/1 [00:00<?, ?it/s]
-2026-03-13 09:52:43.331 | INFO     | __main__:inference_zero_shot:1980 - synthesis text 下面为您朗诵一段绕口令，希望您[j][ǐ]予好评，朗诵开始:八百标兵奔北坡，北坡炮兵并排跑，炮兵怕把标兵碰，标兵怕碰炮兵炮。
-2026-03-13 09:53:17.101 | INFO     | __main__:tts:1828 - tts, uuid: 617dc7a9-1ec2-11f1-9ab6-4dff60635bb1, release resources.
-2026-03-13 09:53:17.101 | SUCCESS  | __main__:inference_zero_shot:1982 - generate tts speech successfully.
+synthesis text 下面为您朗诵一段绕口令，希望您[j][ǐ]予好评，朗诵开始:八百标兵奔北坡，北坡炮兵并排跑，炮兵怕把标兵碰，标兵怕碰炮兵炮。
+tts, uuid: 617dc7a9-1ec2-11f1-9ab6-4dff60635bb1, release resources.
+generate tts speech successfully.
 100%|████████████████████████| 1/1 [00:34<00:00, 34.02s/it]
+
   0%|                        | 0/1 [00:00<?, ?it/s]
-2026-03-13 09:53:17.340 | INFO     | __main__:inference_cross_lingual:2004 - synthesis text You are a helpful assistant.<|endofprompt|>[breath]因为他们那一辈人[breath]在乡里面住的要习惯一点，[breath]邻居都很活络，[breath]嗯，都很熟悉。[breath]
-2026-03-13 09:53:49.480 | INFO     | __main__:tts:1828 - tts, uuid: 75c30f6b-1ec2-11f1-b204-4dff60635bb1, release resources.
-2026-03-13 09:53:49.480 | SUCCESS  | __main__:inference_cross_lingual:2006 - Generate tts speech successfully.
+synthesis text You are a helpful assistant.<|endofprompt|>[breath]因为他们那一辈人[breath]在乡里面住的要习惯一点，[breath]邻居都很活络，[breath]嗯，都很熟悉。[breath]
+tts, uuid: 75c30f6b-1ec2-11f1-b204-4dff60635bb1, release resources.
+generate tts speech successfully.
 100%|████████████████████████| 1/1 [00:32<00:00, 32.38s/it]
+
   0%|                        | 0/1 [00:00<?, ?it/s]
-2026-03-13 09:53:49.703 | INFO     | __main__:inference_instruct2:2028 - synthesis text 好少咯，一般系放嗰啲国庆啊，中秋嗰啲可能会咯。
-2026-03-13 09:54:20.955 | INFO     | __main__:tts:1828 - tts, uuid: 890d3c59-1ec2-11f1-abc6-4dff60635bb1, release resources.
-2026-03-13 09:54:20.956 | SUCCESS  | __main__:inference_instruct2:2030 - generate tts speech successfully.
+synthesis text 好少咯，一般系放嗰啲国庆啊，中秋嗰啲可能会咯。
+tts, uuid: 890d3c59-1ec2-11f1-abc6-4dff60635bb1, release resources.
+generate tts speech successfully.
 100%|████████████████████████| 1/1 [00:31<00:00, 31.47s/it]
 ```
 
-### 3.2 性能结果
+### 4.2 性能结果
 
 #### 性能评估指标
 
@@ -263,7 +278,6 @@ bash test.sh -s demo --skip_download
 
 #### M50 2core
 ```bash
-2026-03-13 10:10:54.364 | INFO     | __main__:print_perf_summary:1925 -
 [Perf #0]
 LLM Total Cost 4830.223 ms
 LLM Prefill Speed: 2998.75 tokens/s
@@ -273,7 +287,7 @@ TTS Total Cost: 29395.319 ms
 TTS Real-Time Factor(RTF): 2.222735
 TTS Generate Speed: 0.45 x real-time
 E2E Latency (End-to-End Latency): 34.230 s
-2026-03-13 10:10:54.364 | INFO     | __main__:print_perf_summary:1925 -
+
 [Perf #1]
 LLM Total Cost 2773.767 ms
 LLM Prefill Speed: 884.67 tokens/s
@@ -283,7 +297,7 @@ TTS Total Cost: 29388.707 ms
 TTS Real-Time Factor(RTF): 3.216384
 TTS Generate Speed: 0.31 x real-time
 E2E Latency (End-to-End Latency): 32.164 s
-2026-03-13 10:10:54.364 | INFO     | __main__:print_perf_summary:1925 -
+
 [Perf #2]
 LLM Total Cost 1599.579 ms
 LLM Prefill Speed: 838.54 tokens/s
@@ -295,6 +309,6 @@ TTS Generate Speed: 0.17 x real-time
 E2E Latency (End-to-End Latency): 31.000 s
 ```
 
-## 4 免责声明
+## 5 免责声明
 
-您明确了解并同意，上游模型/数据由第三方提供并负责维护。文档中出现的任何第三方名称、商标、标识、产品或服务并不构成明示或暗示的背书、担保或推荐行为。使用任何第三方软件、数据或模型应遵守其各自的使用条款、许可协议与隐私政策；相关风险由您自行承担。
+您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。

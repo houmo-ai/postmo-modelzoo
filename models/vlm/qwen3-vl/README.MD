@@ -1,56 +1,54 @@
-# Qwen3-VL(通义千问3-VL)
+# Qwen3-VL-4B-Instruct 和 Qwen3-VL-8B-Instruct
 
-本示例展示如何把Qwen3VL模型量化和编译，部署到后摩芯片的设备上。
-
-## 预训练模型
-
-本项目使用从 ModelScope 下载的预训练模型：
-
-- 模型名称: Qwen3-VL-4B-Instruct / Qwen3-VL-8B-Instruct
-- 来源:
-  - https://www.modelscope.cn/models/Qwen/Qwen3-VL-4B-Instruct
-  - https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct
-- 许可: Apache License 2.0 （https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md）
-
-预训练模型在运行时下载，工程发布**不包含**该模型。
-同时，原有的预处理代码 image_processing_qwen2_vl.py 和 processing_qwen3_vl.py 已进行专门的改编和修改，并包含在项目提交文件中。特此声明。
-
-## 数据集使用声明
-
-本项目使用了由LAION提供的"220k-GPT4Vision-captions-from-LIVIS"数据集。该数据集包含22万条通过GPT-4 Vision生成的图像描述文本，源自LIVIS数据集。
-- 数据集获取方式：
-
-    数据集可通过Hugging Face平台公开获取：
-
-    https://huggingface.co/datasets/laion/220k-GPT4Vision-captions-from-LIVIS
-
-- 许可信息： 本数据集采用Apache License 2.0开源协议授权。根据该许可条款，使用者可以自由地：
-
-    使用、复制和分发数据集
-
-    修改和创建衍生作品
-
-    将数据集用于商业用途
-
-    同时需遵守协议中规定的署名要求和责任限制条款。
-- 合规性说明：
-
-  本项目的使用方式完全符合Apache License 2.0的规定要求，特此声明。
+本示例展示如何把 Qwen3-VL 模型量化和编译，部署到后摩芯片的设备上。
 
 [TOC]
 
 ## 1 模型说明
 
-本例支持以下模型实现来源：
+本例使用的模型实现来源于 ModelScope 的预训练模型：
 
-- [https://www.modelscope.cn/models/Qwen/Qwen3-VL-4B-Instruct](https://www.modelscope.cn/models/Qwen/Qwen3-VL-4B-Instruct)
-- [https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct](https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct)
+- 模型名称: Qwen3-VL-4B-Instruct
+- 来源: https://www.modelscope.cn/models/Qwen/Qwen3-VL-4B-Instruct
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
 
-当前脚本默认值统一由同目录下的 `config.yaml` 提供，默认模型为 `qwen3-vl` + `8b`，同时支持 `qwen3-vl` + `4b`；视觉产物命名统一为 `${model_name}-${model_size}_visual_448x448x2.hmm`。
+- 模型名称: Qwen3-VL-8B-Instruct
+- 来源: https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
+预训练模型在运行时下载，工程发布**不包含**该模型。
+同时，原有的预处理代码 `image_processing_qwen2_vl.py` 和 `processing_qwen3_vl.py` 已进行专门的改编和修改，并包含在项目提交文件中。特此声明。
+
+本例只适用于xh2。
+
+当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
+
+- `model_name=qwen3-vl`
+- `model_size=8b`（可选 `4b`）
+- `context_length=32k`
+- `prefill_length=256`
+- `ndevice=1`
+
+视觉产物命名统一为 `${model_name}-${model_size}_visual_448x448x2.hmm`。
+
+### 用于校准的数据集
+
+本项目引用 LAION 220k-GPT4Vision-captions-from-LVIS 数据集仅用于**研究和评估目的**。
+
+- 数据集名称: 220k-GPT4Vision-captions-from-LVIS
+- 数据集许可: Apache License 2.0
+- 来源: https://huggingface.co/datasets/laion/220k-GPT4Vision-captions-from-LIVIS
+
+⚠️ 重要提示:
+
+- 本数据集**不作为本仓库的一部分进行分发**，由 `ptq.py` 在量化时默认通过 HuggingFace 接口按需下载。
+- 本数据集**不受本项目 Apache License 2.0 许可的约束**。
+- 任何对数据集的使用都必须遵守其原始许可 (Apache License 2.0)。
+- 用户有责任确保在使用本数据集时遵守相关规定。
 
 ## 2 快速开始
 
-目前Qwen3VL模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
+目前 Qwen3-VL 模型仅提供 python 脚本编译方式。芯片模型只能在 Linux 环境下量化和编译。
 
 ### 2.1 环境准备
 
@@ -62,7 +60,7 @@ pip3 install -r requirements.txt
 
 ### 2.2 获取模型和数据
 
-通过get_model脚本下载模型，可通过参数选择下载原始模型或芯片模型。
+通过 `get_model.py` 下载模型，可通过参数选择下载原始模型或芯片模型。
 
 ```bash
 # 下载原始模型用于量化
@@ -83,16 +81,25 @@ python3 get_model.py --type hmm --model_name qwen3-vl --model_size 4b
 
 ### 2.3 量化
 
+量化需要使用 GPU，并在宿主机安装与 CUDA 12.8 兼容的 CUDA 和驱动。启动 docker 时需要将 GPU 映射到容器内，例如：
+
+```bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
+```
+
+进入 docker 后，在仓库根目录执行 `source env.sh`，再进入当前目录运行 `ptq.py`。
+
 #### 2.3.1 自定义数据集量化
 
-下载自定义数据集到当前目录下
+下载自定义数据集到当前目录下：
+
 ```bash
 python3 get_model.py --type raw
 mkdir -p data/calib_data/LMUData
 ln -s ../../../data/datasets/LMUData/* data/calib_data/LMUData
 ```
 
-量化下载的原始模型。在当前目录下，执行脚本：
+量化下载的原始模型。在当前目录下执行脚本：
 
 ```bash
 # 量化依赖transformers==4.57.3
@@ -100,9 +107,9 @@ pip3 install transformers==4.57.3
 python3 ptq.py --model-name qwen3-vl --model-size 8b --data_files ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_CMMMU_VAL_20250923102519_struct.json  ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_COCO_VAL_20250923104643_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_DocVQA_VAL_20250923102720_struct.json ../../../hmodel/xh2/data/calib_data/Qwen2.5-VL-7B-Instruct_MMMU_DEV_VAL_20250923102615_struct.json --calib-samples 64 --calib_dataset vllm_custom_data
 ```
 
-#### 2.3.2 默认公开数据集数据集量化
+#### 2.3.2 默认公开数据集量化
 
-量化下载的原始模型。在当前目录下，执行脚本：
+量化下载的原始模型。在当前目录下执行脚本：
 
 ```bash
 # 量化依赖transformers==4.57.3
@@ -124,21 +131,27 @@ python3 build.py --model_name qwen3-vl --model_size 8b
 python3 build.py --model_name qwen3-vl --model_size 4b
 ```
 
-编译输出默认位于：
+默认输出名称分别为：
 
-- `output/${HOUMO_TARGET}/qwen3-vl-8b_prefill.hmm`
-- `output/${HOUMO_TARGET}/qwen3-vl-8b_decode.hmm`
-- `output/${HOUMO_TARGET}/qwen3-vl-8b_visual_448x448x2.hmm`
+对于 Qwen3-VL-8B-Instruct：
+- `qwen3-vl-8b_prefill.hmm`
+- `qwen3-vl-8b_decode.hmm`
+- `qwen3-vl-8b_visual_448x448x2.hmm`
+
+对于 Qwen3-VL-4B-Instruct：
+- `qwen3-vl-4b_prefill.hmm`
+- `qwen3-vl-4b_decode.hmm`
+- `qwen3-vl-4b_visual_448x448x2.hmm`
 
 ### 2.5 演示
 
-Qwen3-vl模型使用python API和c++示例进行演示，c++模型示例的详细介绍见cpp/README.MD文件。
+Qwen3-VL 模型使用 Python API 和 C++ 示例进行演示，C++ 模型示例的详细介绍见 `cpp/README.MD`。
 
-1. 将编译好的模型放在当前目录，同时将对应量化模型的 `quant_embedding.pt` 文件放在量化模型目录下
+1. 将编译好的模型放在当前目录，同时将对应量化模型的 `quant_embedding.pt` 文件放在量化模型目录下。
 
 2. 执行脚本，推理完成将输出性能结果。
 
-注意：由于ubuntu18.04下qwen_vl_utils无法正常安装，导致无法正常运行。
+注意：由于 Ubuntu 18.04 下 `qwen_vl_utils` 无法正常安装，示例无法正常运行。
 
 `demo.py` 现在支持显式指定输入模式：
 
@@ -169,7 +182,7 @@ python3 demo.py --model_name qwen3-vl --model_size 8b --media_type video --image
 
 若未显式传 `tokenizer_dir`、`vit_path`、`prefill_path`、`decode_path`，脚本会按 `config.yaml` 和 `${model_name}-${model_size}` 自动推导默认值；当 `ndevice > 1` 时，`prefill` / `decode` 默认后缀会切换为 `.hmms`。
 
-### 2.6 一键评估
+## 3 一键评估
 
 以上步骤可以通过 `test.sh` 脚本执行。脚本默认使用：
 
@@ -188,6 +201,8 @@ bash test.sh -s all
 ```
 
 运行前请确保 `HOUMO_EXAMPLES_PATH` 指向当前仓库根目录；`quant`、`cpp demo` 和 `llm_perf` 流程都会用到该路径。
+
+当前脚本会把 `model_name`、`model_size` 和 `ndevice` 透传给 `get_model.py`、`ptq.py`、`build.py`、`demo.py`。默认值分别为 `qwen3-vl`、`8b` 和 `1`。
 
 `test.sh` 支持以下常用参数：
 
@@ -237,64 +252,61 @@ bash test.sh -s demo --skip_download
 - `demo`：下载预编译模型后，先执行 Python demo，再执行 C++ demo。
 - 若环境中存在 `llm_perf`，`demo` 流程末尾还会自动执行性能测试。
 
-## 3 参考结果
+## 4 参考结果
 
-### 3.1 演示结果
+### 4.1 演示结果
 
 ```bash
-2026-04-13 04:31:19.416] [tid 200602] [warning] Using TCIM_BACKEND = Xh2HalBackend as default backend
-[2026-04-13 04:31:19.416] [tid 200602] [warning] Empty backend name, use Xh2HalBackend instead.
-2026-04-13 04:31:20.181 | INFO     | __main__:__init__:338 - vit model loaded
-2026-04-13 04:31:23.454 | INFO     | __main__:__init__:342 - prefill model loaded
-2026-04-13 04:31:23.626 | INFO     | __main__:__init__:352 - decode model loaded
-2026-04-13 04:31:25.937 | SUCCESS  | __main__:<module>:1327 - question:
-请分析输入内容并简洁作答。
-2026-04-13 04:31:26.238 | SUCCESS  | __main__:chat_vit_prefill:1181 - response:
-图片中，一位女士坐在沙滩上，与一只戴着蓝色牵引带的金毛犬互动。背景是日落时分的海面，光线温暖柔和，营造出宁静温馨的氛围。
+question:
+描述图片内容
+response:
+这是一张充满温馨与宁静氛围的海滩日落照片。
+画面中，一位年轻女子和一只金毛犬正坐在沙滩上。女子身穿蓝白格子衬衫，侧身面向狗狗，面带微笑，似乎正在与它互动。她的一只手轻轻抬起，可能是在与狗狗玩耍或进行训练。金毛犬戴着一个蓝色的胸背带，正专注地望着女子，前爪抬起，姿态温顺可爱。
+背景是广阔的海洋，海浪在远处轻轻拍打着岸边。天空被夕阳染成温暖的橙黄色，光线柔和地洒在沙滩和人物身上，营造出一种温暖、放松的感觉。整个场景捕捉了人与宠物之间亲密无间的美好时刻，充满了爱与陪伴的气息。
 ```
 
-### 3.2 性能结果
-#### M50 2core
+### 4.2 性能结果
+
 ```bash
-2026-04-13 04:31:28.931 | SUCCESS  | perf_infomations:show_summary:316 - ====================================================================================================
-2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:317 -                     Model Inference Performance Summary Report
-2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:318 - ====================================================================================================
-2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:321 - Configuration Details:
-2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:322 -   Batch Size:      1
-2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:323 -   Input Length per Sample:    215 tokens
-2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:324 -   Output Length per Sample:     44 tokens
-2026-04-13 04:31:28.932 | SUCCESS  | perf_infomations:show_summary:326 -   Number of Images:      1 images
-2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:329 -   Prefill Model Load Time: 3272.80ms
-2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:331 -   Decode Model Load Time:  171.68ms
-2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:333 -   Vision Model Load Time:  765.13ms
-2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:338 - Vision Stage Performance:
-2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:339 -   Total Time:  128.28ms | Speed:    7.80 images/s
-2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:340 -   Preprocessing Time: 27.25ms | Speed:   36.70 images/s
-2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:341 -   API SetInput Time:   1.30ms
-2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:342 -   API Inference Time: 90.72ms | Speed:   11.02 images/s
-2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:343 -   API GetOutput Time:  6.99ms
-2026-04-13 04:31:28.933 | SUCCESS  | perf_infomations:show_summary:346 - Prefill Stage Performance:
-2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:347 -   Total Time:  150.32ms | Speed: 1430.27 tokens/s
-2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:349 -   Tokenization Time:   22.49ms
-2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:352 -   Embedding Time:    0.00ms
-2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:353 -   API SetInput Time:   4.56ms
-2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:354 -   API Inference Time: 121.20ms | Prefill Speed: 1773.90 tokens/s
-2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:355 -   API GetOutput Time:  0.49ms
-2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:358 - Decode Stage Performance:
-2026-04-13 04:31:28.934 | SUCCESS  | perf_infomations:show_summary:359 -   Total Time: 2683.29ms | Speed:   16.03 tokens/s
-2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:361 -   Tokenization Time:    9.42ms
-2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:364 -   Embedding Time:    0.15ms
-2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:365 -   API SetInput Time:   2.63ms
-2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:366 -   API Inference Time: 51.37ms | Decode Speed:   19.47 tokens/s
-2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:367 -   API GetOutput Time:  0.44ms
-2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:370 - Overall Performance Metrics:
-2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:371 -   TTFT (Time To First Token):  278.60 ms
-2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:372 -   TPOT (Time Per Output Token): 62.40 ms/token
-2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:373 -   E2E Latency (End-to-End):      2.99 seconds
-2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:374 -   E2E TPS (Throughput):         14.69 tokens/s
-2026-04-13 04:31:28.935 | SUCCESS  | perf_infomations:show_summary:376 - ====================================================================================================
+====================================================================================================
+                     Model Inference Performance Summary Report
+====================================================================================================
+Configuration Details:
+  Batch Size:      1
+  Input Length per Sample:    209 tokens
+  Output Length per Sample:    159 tokens
+  Number of Images:      1 images
+  Prefill Model Load Time: 1777.62ms
+  Decode Model Load Time:  150.99ms
+  Vision Model Load Time:  379.54ms
+Vision Stage Performance:
+  Total Time:  125.42ms | Speed:    7.97 images/s
+  Preprocessing Time: 24.92ms | Speed:   40.13 images/s
+  API SetInput Time:   1.17ms
+  API Inference Time: 90.97ms | Speed:   10.99 images/s
+  API GetOutput Time:  6.97ms
+Prefill Stage Performance:
+  Total Time:  177.68ms | Speed: 1176.28 tokens/s
+  Tokenization Time:   23.31ms
+  Embedding Time:    0.01ms
+  API SetInput Time:  11.67ms
+  API Inference Time: 122.99ms | Prefill Speed: 1699.33 tokens/s
+  API GetOutput Time:  0.58ms
+Decode Stage Performance:
+  Total Time: 9301.73ms | Speed:   16.99 tokens/s
+  Tokenization Time:   56.17ms
+  Embedding Time:    0.45ms
+  API SetInput Time:   2.98ms
+  API Inference Time: 47.01ms | Decode Speed:   21.27 tokens/s
+  API GetOutput Time:  0.53ms
+Overall Performance Metrics:
+  TTFT (Time To First Token):  303.10 ms
+  TPOT (Time Per Output Token): 58.87 ms/token
+  E2E Latency (End-to-End):      9.67 seconds
+  E2E TPS (Throughput):         16.45 tokens/s
+====================================================================================================
 ```
 
-## 4 免责声明
+## 5 免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。

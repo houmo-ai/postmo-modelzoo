@@ -1,23 +1,26 @@
-# Bge embedder和reranker
+# BGE-M3 和 BGE-Reranker-V2-M3
 
-本示例展示如何把bge系列模型量化和编译，部署到后摩M50芯片的设备上。
-
-## 特别事项
-
-本项目使用从 ModelScope 下载的配置文件：
-
-- 模型名称: [bge-m3, bge-reranker-m3-v2]
-- 来源: [https://modelscope.cn/models/BAAI/bge-m3, https://modelscope.cn/models/BAAI/bge-reranker-v2-m3]
-- 许可: Apache License 2.0 （https://www.apache.org/licenses/LICENSE-2.0）
-
-所需配置文件在运行时下载，工程发布**不包含**该下载包。
+本示例展示如何把BGE系列模型量化和编译，部署到后摩芯片的设备上。
 
 [TOC]
 
 ## 1 模型说明
 
-本例使用的 bge-reranker 实现来源于[https://modelscope.cn/BAAI/bge-reranker-v2-m3](https://modelscope.cn/BAAI/bge-reranker-v2-m3)。
-本例使用的 bge-m3 实现来源于[https://modelscope.cn/BAAI/bge-m3](https://modelscope.cn/BAAI/bge-m3)。
+本例使用的模型实现来源于 ModelScope 的预训练模型：
+
+**bge-m3:**
+- 模型名称: bge-m3
+- 来源: https://www.modelscope.cn/models/BAAI/bge-m3
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
+**bge-reranker-v2-m3:**
+- 模型名称: bge-reranker-v2-m3
+- 来源: https://www.modelscope.cn/models/BAAI/bge-reranker-v2-m3
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
+预训练模型在运行时下载，工程发布**不包含**该模型。
+
+本例只适用于xh2。
 
 当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
 
@@ -41,31 +44,41 @@ pip3 install -r requirements.txt
 
 ### 2.2 获取模型和数据
 
-通过 `get_model.py` 下载模型，如果不需要量化和编译，则只需下载编译好的 hmm 模型。
+通过 get_model.py 下载模型，可通过参数选择下载原始模型、量化模型或芯片模型。
 
-```bash
-python3 get_model.py --type hmm
-```
-
-也可以直接下载以上所有模型和数据集（注意相同模型会覆盖，请自行保存）,量化和编译所需的原始onnx浮点模型：
+如果需要自己量化，可选择下载原始模型，原始模型默认下载到 `./onnx` 目录：
 
 ```bash
 python3 get_model.py --type raw
 ```
 
-### 2.3 量化
-
-当前 `ptq.py` 默认读取 `./onnx` 下的 `bge-m3` 与 `bge-reranker-v2-m3` ONNX 子目录，量化精度默认来自 `config.yaml`，当前默认值为 `w8a8_sefp`。
+如果仅查看演示结果，可选择下载芯片模型，下载后的模型存放在当前目录（注意相同模型会覆盖，请自行保存）：
 
 ```bash
-# 仅量化
+python3 get_model.py --type hmm
+```
+
+### 2.3 量化
+
+量化需要使用GPU，并在宿主机安装与CUDA12.8兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，参考命令：
+
+```bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
+```
+
+进入 docker 后 source 环境变量，并进入 `models/embedding/bge` 目录，执行 `ptq.py` 脚本。量化精度默认来自 `config.yaml`，当前默认值为 `w8a8_sefp`。
+
+```bash
+source env.sh
+cd models/embedding/bge
 python3 ptq.py
 ```
 
 ### 2.4 编译
 
+将量化模型编译为在芯片上运行的模型，执行脚本：
+
 ```bash
-# 量化+编译
 python3 build.py
 ```
 
@@ -89,7 +102,7 @@ bge模型使用python API进行演示
 python3 demo.py
 ```
 
-### 2.6 一键评估
+## 3 一键评估
 
 以上步骤可以通过 test.sh 脚本执行。默认执行 demo 步骤：
 
@@ -140,9 +153,9 @@ bash test.sh -s quant,build
 bash test.sh -s demo --skip_download
 ```
 
-## 3 参考结果
+## 4 参考结果
 
-### 3.1 演示结果
+### 4.1 演示结果
 
 ```bash
 对corpus编码，查询符合query的资料：
@@ -158,24 +171,24 @@ bash test.sh -s demo --skip_download
     query = "北京哪里有好吃的牛肉面"
 结果:
 ==== 粗召回结果 (bge-m3) ====
-北京海淀区有一家西北牛肉面馆非常好吃。 score:0.971890
-上海是中国的金融中心。 score:0.523505
-故宫是北京著名的旅游景点。 score:0.503346
+北京有很多著名的牛肉面馆。 score:0.853029
+北京海淀区有一家西北牛肉面馆非常好吃。 score:0.789496
+兰州牛肉面是非常有名的中国美食。 score:0.618708
 
 ==== 精排结果 (bge-reranker-v2-m3) ====
-doc: 北京海淀区有一家西北牛肉面馆非常好吃。  →  score: -1.9336
-doc: 故宫是北京著名的旅游景点。  →  score: -4.0898
-doc: 上海是中国的金融中心。  →  score: -5.6172
+doc: 北京海淀区有一家西北牛肉面馆非常好吃。  →  score: 6.1680
+doc: 北京有很多著名的牛肉面馆。  →  score: 3.6777
+doc: 兰州牛肉面是非常有名的中国美食。  →  score: -0.8184
 ```
 
-### 3.2 性能结果
+### 4.2 性能结果
 
 ```bash
-bge-m3资料库编码耗时：441.012144ms
-bge-m3查询值编码耗时: 439.535618ms
-bge-reranker-v2-m3精排编码耗时: 430.264235ms
+bge-m3资料库编码耗时：410.374403ms
+bge-m3查询值编码耗时: 405.096054ms
+bge-reranker-v2-m3精排编码耗时: 393.520594ms
 ```
 
-## 4 免责声明
+## 5 免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。
