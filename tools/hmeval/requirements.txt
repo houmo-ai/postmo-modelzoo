@@ -1,0 +1,9 @@
+# hmeval runtime dependencies (tool only)
+#
+# This file intentionally includes only dependencies required by the CLI tool itself.
+# Do NOT add example-model dependencies here (e.g. torch/transformers/tcim variants),
+# because each custom example may require different versions.
+
+# Core evaluation engine used by hmeval CLI (`run_task`, `TaskConfig`)
+evalscope==1.5.2
+pydantic==2.12.5

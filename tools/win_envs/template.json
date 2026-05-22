@@ -1,0 +1,107 @@
+{
+    "__comment__": "Supported example directory",
+    "example_dir": "apis/inferences",
+    "__comment__1": "Supported platform",
+    "support_target": "xh2",
+    "__comment__2": "Supported example folders",
+    "support_demos": {
+        "qwen3": [
+            "python",
+            "c++"
+        ],
+        "resnet50": [
+            "python",
+            "c++"
+        ],
+        "resnet50_multistreams": [
+            "python",
+            "c++"
+        ],
+        "resnet50_pipeline": [
+            "python",
+            "c++"
+        ],
+        "yolov5s": [
+            "python",
+            "c++"
+        ]
+    },
+    "__comment__3": "Whether to use internal network download links",
+    "develop_url": false,
+    "__comment__4": "All environment variables that env.bat will set",
+    "all_environments": {
+        "HOUMO_MODELZOO_URL": "",
+        "HDPL_PLATFORM": "",
+        "HOUMO_TARGET": "",
+        "TCIM_BACKEND": "",
+        "HOUMO_EXAMPLES_PATH": "",
+        "PYTHON_DIR": "",
+        "TCIM_RUNTIME_PATH": "",
+        "CMAKE_PATH": "",
+        "HOUMO_PATH": "",
+        "HOUMO_SDK_PATH": "",
+        "OPENCV_PATH": "",
+        "HOUMO_VERSION": "",
+        "PATH": ""
+    },
+    "__comment__5": "Environment variables required by get_model script",
+    "get_model_environments": [
+        "PYTHON_DIR",
+        "HOUMO_MODELZOO_URL",
+        "HOUMO_TARGET",
+        "HOUMO_VERSION",
+        "HDPL_PLATFORM",
+        "HOUMO_EXAMPLES_PATH"
+    ],
+    "__comment__6": "Python example environment variables = get_model script required environment variables + current settings",
+    "py_example_environments": {
+        "qwen3": [
+            "TCIM_BACKEND",
+            "TCIM_RUNTIME_PATH",
+            "HOUMO_SDK_PATH"
+        ],
+        "resnet50": [
+            "TCIM_BACKEND",
+            "TCIM_RUNTIME_PATH",
+            "HOUMO_SDK_PATH"
+        ],
+        "resnet50_multistreams": [
+            "TCIM_BACKEND",
+            "TCIM_RUNTIME_PATH",
+            "HOUMO_SDK_PATH"
+        ],
+        "resnet50_pipeline": [
+            "TCIM_BACKEND",
+            "TCIM_RUNTIME_PATH",
+            "HOUMO_SDK_PATH"
+        ],
+        "yolov5s": [
+            "TCIM_BACKEND",
+            "TCIM_RUNTIME_PATH",
+            "HOUMO_SDK_PATH"
+        ]
+    },
+    "__comment__7": "C++ example environment variables = Python example environment variables + current settings",
+    "cpp_example_environments": {
+        "qwen3": [
+            "CMAKE_PATH",
+            "HOUMO_PATH"
+        ],
+        "resnet50": [
+            "CMAKE_PATH",
+            "OPENCV_PATH"
+        ],
+        "resnet50_multistreams": [
+            "CMAKE_PATH",
+            "OPENCV_PATH"
+        ],
+        "resnet50_pipeline": [
+            "CMAKE_PATH",
+            "OPENCV_PATH"
+        ],
+        "yolov5s": [
+            "CMAKE_PATH",
+            "OPENCV_PATH"
+        ]
+    }
+}

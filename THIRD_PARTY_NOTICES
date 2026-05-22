@@ -1,0 +1,1467 @@
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+
+This project references, or depends on the following
+third-party software, models, datasets, or tools.
+
+Each component is licensed under its own respective license.
+
+This declaration only addresses third-party components that
+require special attention, are not runtime dependencies, and
+are not included in the project, and advises users to strictly
+adhere to the terms of the license agreements specified for
+those third-party dependencies.
+
+DISCLAIMER
+
+The authors and contributors of this project make no representation
+or warranty regarding third-party software, models, or datasets.
+
+Use of such components is at the user's own risk.
+
+1. Third-party open source libraries
+----------------------------------------------------------------------
+half (half-precision floating-point library)
+----------------------------------------------------------------------
+
+Component Name: half
+
+Version: 2.2.1
+Author / Copyright Holder: Christian Rau <rauy@users.sourceforge.net>
+Copyright Statement: Copyright (c) 2012-2025 Christian Rau <rauy@users.sourceforge.net>
+
+License:
+MIT License
+
+License Text:
+https://opensource.org/licenses/MIT
+
+Usage in this project:
+The "half" library is used at the following path:
+    apis/common/half/include/half.hpp
+
+The "half" library is licensed under the MIT License, which allows use,
+copying, modification, merging, publishing, distribution, sublicensing,
+and/or selling copies of the library, subject to the following condition:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the software.
+
+This project may use the "half" library as a dependency. Any modifications
+to the "half" library must still retain the original copyright notice and
+license.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying the "half" library.
+
+----------------------------------------------------------------------
+Eigen3 (Linear Algebra Library)
+----------------------------------------------------------------------
+
+Component Name: Eigen3 (Eigen Linear Algebra Library)
+Version: 3.4.0
+Author / Copyright Holder: Eigen Team (Gaël Guennebaud, Benoit Jacob, et al.)
+Copyright Statement: Copyright (c) 2008-2024 Gaël Guennebaud, Benoit Jacob and others
+
+License:
+Mozilla Public License Version 2.0 (MPL 2.0)
+
+License Text:
+https://www.mozilla.org/en-US/MPL/2.0/
+
+Usage in this project:
+The following paths are automatically downloaded, associated, and included in the compilation process:
+    apis/inferences/qwen3/
+    tools/llm_perf
+
+Only MPL 2.0-licensed modules are used. The preprocessor symbol
+EIGEN_MPL2_ONLY is defined to exclude LGPL-licensed code.
+
+The Eigen3 library is licensed under the Mozilla Public License 2.0 (MPL 2.0),
+which allows use, modification, and distribution of the library under
+the terms of the license.
+
+Any modifications to MPL 2.0-licensed Eigen3 files must retain the
+original copyright notice and license text in accordance with MPL 2.0.
+
+Users are responsible for complying with the MPL 2.0 license when using,
+redistributing, or modifying the Eigen3 library.
+
+----------------------------------------------------------------------
+OpenCV (Open Source Computer Vision Library)
+----------------------------------------------------------------------
+
+Component Name: OpenCV
+
+Version:
+4.x
+
+Author / Copyright Holder:
+OpenCV Team and OpenCV contributors
+
+Copyright Statement:
+Copyright (C) 2000-2025, OpenCV Team, all rights reserved.
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://github.com/opencv/opencv/blob/4.x/LICENSE
+
+Usage in this project:
+OpenCV is used for image loading and preprocessing in the Qwen3-VL C++ example.
+Relevant paths include:
+    models/vlm/qwen3-vl/cpp/include/HmImageProcessor.h
+    models/vlm/qwen3-vl/cpp/src/HmImageProcessor.cc
+    models/vlm/qwen3-vl/cpp/CMakeLists.txt
+
+The OpenCV library is licensed under the Apache License, Version 2.0,
+which allows use, modification, and distribution in source and binary
+forms subject to the terms of that license.
+
+Any redistribution or modification of OpenCV must retain the original
+copyright notice, license text, and NOTICE information as required by
+the Apache License, Version 2.0.
+
+Users are responsible for complying with the Apache License, Version 2.0,
+when using, redistributing, or modifying OpenCV.
+
+----------------------------------------------------------------------
+tokenizers-cpp
+----------------------------------------------------------------------
+
+Component Name: tokenizers-cpp
+Source:
+https://github.com/mlc-ai/tokenizers-cpp
+
+Copyright Statement:
+Copyright (c) the tokenizers-cpp contributors
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://github.com/mlc-ai/tokenizers-cpp/blob/main/LICENSE
+
+Usage in this project:
+The following paths are automatically downloaded static lib, associated,
+and included in the compilation process:
+    apis/inferences/qwen3/
+    tools/llm_perf
+
+The tokenizers-cpp library is licensed under the Apache License, Version 2.0,
+which allows use, modification, and distribution of the software in source
+and binary forms, with or without modification, subject to the terms of the
+license.
+
+----------------------------------------------------------------------
+JSON for Modern C++ (nlohmann/json)
+----------------------------------------------------------------------
+
+Component Name: JSON for Modern C++ (nlohmann/json)
+Version: 3.12.0
+Author / Copyright Holder: Niels Lohmann
+Copyright Statement: Copyright (c) 2013-2025 Niels Lohmann
+https://nlohmann.me
+
+License:
+MIT License
+
+License Text:
+https://opensource.org/licenses/MIT
+
+Usage in this project:
+The "json" library is used at the following path:
+    apis/common/nlohmann/include/nlohmann/json.hpp
+    hmatc/3rdparty/nlohmann/include/nlohmann/json.hpp
+
+The JSON for Modern C++ library (also known as nlohmann/json) is licensed
+under the MIT License, which permits use, copying, modification, merging,
+publishing, distribution, sublicensing, and/or selling copies of the
+software, subject to the following condition:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the software.
+
+Any modifications to the JSON for Modern C++ library must retain the
+original copyright notice and license.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying this library.
+
+----------------------------------------------------------------------
+getopt.h (Command-line Option Parsing Header)
+----------------------------------------------------------------------
+
+Component Name:
+getopt.h (mingw-w64 / NetBSD implementation)
+
+Usage Location:
+tools/common/include/getopt.h
+
+Source:
+mingw-w64 project:
+https://sourceforge.net/projects/mingw-w64/
+
+NetBSD getopt implementation:
+https://github.com/NetBSD/src/tree/trunk/usr.bin/getopt
+
+Copyright Statement:
+Copyright (c) 2002 Todd C. Miller <Todd.Miller@courtesan.com>
+Copyright (c) 2000 The NetBSD Foundation, Inc.
+Contributors: Dieter Baron, Thomas Klausner
+
+License:
+ISC License (Todd C. Miller portions)
+BSD 2-Clause License (NetBSD portions)
+
+License Texts:
+ISC License:
+https://opensource.org/licenses/ISC
+
+BSD 2-Clause License:
+https://opensource.org/licenses/BSD-2-Clause
+
+This project includes a copy or derivative of getopt.h originating from
+the mingw-w64 project and NetBSD. The file contains portions licensed
+under the ISC License and portions licensed under the BSD 2-Clause
+License.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the above copyright notices
+and this license notice are retained in accordance with the applicable
+license terms.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.
+
+----------------------------------------------------------------------
+unistd.h (POSIX Compatibility Header)
+----------------------------------------------------------------------
+
+Component Name:
+unistd.h (Mingw32 / mingw-w64 implementation)
+
+Usage Location:
+tools/common/include/unistd.h
+
+Source:
+MinGW32 official project:
+https://sourceforge.net/projects/mingw/
+
+mingw-w64 mirror:
+https://github.com/mirror/mingw-w64
+
+Copyright Statement:
+Copyright (c) 1997-2024 The MinGW Project
+Copyright (c) Various Contributors to the MinGW Project
+
+License:
+BSD 3-Clause License
+
+License Text:
+https://opensource.org/licenses/BSD-3-Clause
+
+This project includes a copy or derivative of unistd.h originating from
+the MinGW32 project and its mingw-w64 mirror. The file is licensed under
+the BSD 3-Clause License.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the above copyright notices,
+this list of conditions, and the following disclaimer are retained in
+accordance with the BSD 3-Clause License.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.
+
+----------------------------------------------------------------------
+npy.hpp (Numpy File I/O for C++)
+----------------------------------------------------------------------
+
+Component Name:
+npy.hpp (libnpy)
+
+Usage Location:
+tools/common/npy.hpp
+
+Source:
+https://github.com/llohse/libnpy
+
+Copyright Statement:
+Copyright 2017-2023 Leon Merten Lohse
+
+License:
+MIT License
+
+License Text:
+https://opensource.org/licenses/MIT
+
+The npy.hpp header file from libnpy provides C++ support for reading and
+writing Numpy .npy files. It is licensed under the MIT License, which
+permits use, copying, modification, merging, publishing, distribution,
+sublicensing, and/or selling copies of the software, subject to the
+following condition:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the software.
+
+This project may reference or use npy.hpp as a third-party component.
+Any modifications to npy.hpp must retain the original copyright notice
+and license text.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying npy.hpp.
+
+----------------------------------------------------------------------
+spdlog (Fast C++ Logging Library)
+----------------------------------------------------------------------
+
+Component Name:
+spdlog
+
+Usage Location:
+tools/common/spdlog (entire spdlog source directory)
+apis/common/hpp/spdlog (entire spdlog source directory)
+
+Source:
+https://github.com/gabime/spdlog
+
+Copyright Statement:
+Copyright (c) 2016-present, Gabi Melman <gmelman1@gmail.com>
+Copyright (c) All spdlog contributors
+(https://github.com/gabime/spdlog/graphs/contributors)
+
+License:
+MIT License
+
+License Text:
+https://opensource.org/licenses/MIT
+
+The spdlog library is licensed under the MIT License, which permits use,
+copying, modification, merging, publishing, distribution, sublicensing,
+and/or selling copies of the software, subject to the following condition:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the software.
+
+This project may reference or use spdlog as a third-party component.
+Any modifications to spdlog must retain the original copyright notice
+and license text.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying spdlog.
+
+----------------------------------------------------------------------
+argparse.hpp (Modern C++ Argument Parser)
+----------------------------------------------------------------------
+
+Component Name:
+argparse (argparse.hpp)
+
+Usage Location:
+tools/hm_check/argparse.hpp
+
+Source:
+https://github.com/p-ranav/argparse
+
+Copyright Statement:
+Copyright (c) 2019-2022 Pranav Srinivas Kumar <pranav.srinivas.kumar@gmail.com>
+Copyright (c) All other contributors to the argparse project
+
+License:
+MIT License
+
+License Text:
+https://opensource.org/licenses/MIT
+
+The argparse.hpp header file from the argparse project provides modern C++
+support for parsing command-line arguments. It is licensed under the MIT License,
+which permits use, copying, modification, merging, publishing, distribution,
+sublicensing, and/or selling copies of the software, subject to the following
+condition:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the software.
+
+This project may reference or use argparse.hpp as a third-party component.
+Any modifications to argparse.hpp must retain the original copyright notice
+and license text.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying argparse.hpp.
+
+----------------------------------------------------------------------
+onnx-tool (ONNX Model Analysis and Manipulation Tool)
+----------------------------------------------------------------------
+
+Component Name:
+onnx-tool
+
+Usage Location:
+hmatc/hmatc/onnx_tool
+
+Source:
+https://github.com/ThanatosShinji/onnx-tool
+
+Copyright Statement:
+Copyright (c) ThanatosShinji and onnx-tool contributors
+
+License:
+MIT License
+
+License Text:
+https://github.com/ThanatosShinji/onnx-tool/blob/main/LICENSE
+
+The onnx-tool project is licensed under the MIT License. The MIT License
+permits use, copying, modification, merging, publishing, distribution,
+sublicensing, and/or selling copies of the software, subject to the
+following condition:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+This project may reference or use onnx-tool as a third-party component.
+Any redistribution or modification of onnx-tool must retain the original
+copyright notice and license text in accordance with the MIT License.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying onnx-tool.
+
+----------------------------------------------------------------------
+yaml-cpp (YAML Parser/Emitter for C++)
+----------------------------------------------------------------------
+
+Component Name:
+yaml-cpp
+
+Usage Location:
+tools/llm_perf
+
+Source:
+https://github.com/jbeder/yaml-cpp
+
+Copyright Statement:
+Copyright (c) 2008-2015 Jesse Beder
+
+License:
+MIT License
+
+License Text:
+https://github.com/jbeder/yaml-cpp/blob/master/LICENSE
+
+The yaml-cpp library is licensed under the MIT License. The MIT License
+permits use, copying, modification, merging, publishing, distribution,
+sublicensing, and/or selling copies of the software, subject to the
+following condition:
+
+Copyright (c) 2008-2015 Jesse Beder
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+This project may reference or use yaml-cpp as a third-party component.
+Any redistribution or modification of yaml-cpp must retain the original
+copyright notice and license text in accordance with the MIT License.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying yaml-cpp.
+
+----------------------------------------------------------------------
+miniaudio
+----------------------------------------------------------------------
+
+Component Name:
+miniaudio
+
+Usage Location:
+models/asr/whisper/cpp/include/miniaudio.h
+models/asr/whisper/cpp/src/miniaudio_impl.cc
+
+Source:
+https://github.com/mackron/miniaudio
+
+Copyright Statement:
+Copyright (c) David Reid
+
+License:
+MIT No Attribution (MIT-0) or Public Domain dedication
+
+License Text:
+See the embedded license statements in:
+models/asr/whisper/cpp/include/miniaudio.h
+
+The Whisper C++ demo vendors miniaudio for audio decoding. The bundled
+header states that miniaudio may be used under MIT-0 terms or under a
+public-domain dedication, at the user's option.
+
+Any redistribution or modification of miniaudio should preserve the
+upstream copyright notice and the selected license text where applicable.
+
+Users are responsible for complying with the applicable upstream terms
+when using, redistributing, or modifying miniaudio.
+
+----------------------------------------------------------------------
+LibrosaCpp (Mel Spectrogram Computation)
+----------------------------------------------------------------------
+
+Component Name:
+LibrosaCpp
+
+Usage Location:
+models/tts/cosyvoice3/cpp/
+
+Source:
+https://github.com/GangLi-Blind/LibrosaCpp
+
+Copyright Statement:
+Copyright (c) Gang Li
+
+License:
+Apache License 2.0
+
+License Text:
+https://github.com/GangLi-Blind/LibrosaCpp/blob/main/LICENSE
+
+LibrosaCpp provides C++ implementations of mel spectrogram computation,
+including STFT and mel filterbank operations. It is licensed under the
+Apache License 2.0, which permits use, reproduction, modification,
+distribution, and sublicensing, subject to the terms of the license.
+
+Any redistribution or modification of LibrosaCpp must retain the original
+copyright notice and license text in accordance with the Apache License 2.0.
+
+Users are responsible for complying with the Apache License 2.0 when using,
+redistributing, or modifying LibrosaCpp.
+
+----------------------------------------------------------------------
+kaldi-native-fbank (FBANK Feature Extraction)
+----------------------------------------------------------------------
+
+Component Name:
+kaldi-native-fbank
+
+Usage Location:
+models/tts/cosyvoice3/cpp/
+
+Source:
+https://github.com/csukuangfj/kaldi-native-fbank
+
+Copyright Statement:
+Copyright (c) kaldi-native-fbank authors
+
+License:
+Apache License 2.0
+
+License Text:
+https://github.com/csukuangfj/kaldi-native-fbank/blob/main/LICENSE
+
+kaldi-native-fbank provides FBANK feature extraction for speaker embedding.
+It is licensed under the Apache License 2.0, which permits use, reproduction,
+modification, distribution, and sublicensing, subject to the terms of the license.
+
+Any redistribution or modification of kaldi-native-fbank must retain the
+original copyright notice and license text in accordance with the Apache
+License 2.0.
+
+Users are responsible for complying with the Apache License 2.0 when using,
+redistributing, or modifying kaldi-native-fbank.
+
+----------------------------------------------------------------------
+libsamplerate (Audio Resampling Library)
+----------------------------------------------------------------------
+
+Component Name:
+libsamplerate
+
+Usage Location:
+models/tts/cosyvoice3/cpp/
+
+Source:
+https://github.com/libsndfile/libsamplerate
+
+Copyright Statement:
+Copyright (c) Erik de Castro Lopo <erikd@mega-nerd.com>
+
+License:
+BSD 2-Clause License
+
+License Text:
+https://github.com/libsndfile/libsamplerate/blob/master/COPYING
+
+libsamplerate provides audio resampling capabilities. It is licensed under
+the BSD 2-Clause License, which permits use, copying, modification,
+distribution, and sublicensing, subject to the following conditions:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.
+
+Users are responsible for complying with the BSD 2-Clause License when using,
+redistributing, or modifying libsamplerate.
+
+----------------------------------------------------------------------
+libsndfile (Audio File I/O Library)
+----------------------------------------------------------------------
+
+Component Name:
+libsndfile
+
+Usage Location:
+models/tts/cosyvoice3/cpp/
+
+Source:
+https://github.com/libsndfile/libsndfile
+
+Copyright Statement:
+Copyright (c) Erik de Castro Lopo
+
+License:
+GNU Lesser General Public License version 2.1 or later (LGPL-2.1-or-later)
+
+License Text:
+https://github.com/libsndfile/libsndfile/blob/master/COPYING.LGPL
+
+libsndfile provides audio file I/O capabilities, including WAV file reading.
+It is licensed under the GNU Lesser General Public License version 2.1 or
+later (LGPL-2.1-or-later).
+
+This library is free software; you can redistribute it and/or modify it
+under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at
+your option) any later version.
+
+This library is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+License for more details.
+
+Users are responsible for complying with the LGPL-2.1-or-later license
+when using, redistributing, or modifying libsndfile. For dynamic linking
+to the library, the LGPL terms allow the application to be licensed under
+any license, but modifications to the library itself must remain LGPL.
+
+----------------------------------------------------------------------
+transformers (Preprocessing is for part of the algorithm)
+----------------------------------------------------------------------
+
+Component Name:
+transformers
+
+Usage Location:
+models/llm/CoPaw-Flash
+models/llm/qwen3.5
+
+Source:
+https://github.com/huggingface/transformers
+
+Copyright Statement:
+Copyright (c) 2008-2015 Jesse Beder
+
+License:
+Apache License 2.0
+
+License Text:
+https://github.com/huggingface/transformers/blob/main/LICENSE
+
+The Transformers library is licensed under the Apache License, Version 2.0 (the "License").
+You may not use these files except in compliance with the License. You may obtain a copy
+of the License at: http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the
+License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+either express or implied. See the License for the specific language governing permissions
+and limitations under the License.
+
+Modifications:
+This project contains modified versions of the following scripts extracted from Transformers:
+
+CoPaw-Flash/image_processing_copawflash.py (Original source: src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py)
+qwen3.5/image_processing_qwen3_5.py (Original source: src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py)
+
+The modifications include, but are not limited to:
+
+    [1：example：Adapted for specific hardware backend (xh2).]
+
+    [2：example：Added hm_pixel_values processing.]
+
+This project references and uses portions of Transformers as a third-party component.
+Any redistribution or modification of these scripts must retain the original copyright
+notice and provide a prominent notice stating that the files have been changed, in
+accordance with Section 4(b) of the Apache License 2.0.
+
+Users are responsible for complying with the Apache License 2.0 when using, redistributing,
+or modifying these components.
+
+----------------------------------------------------------------------
+qwen_vl_utils (Process vision info is for part of the algorithm)
+----------------------------------------------------------------------
+
+Component Name:
+qwen_vl_utils
+
+Usage Location:
+models/llm/CoPaw-Flash
+models/llm/qwen3.5
+
+Source:
+https://github.com/QwenLM/Qwen3-VL/tree/main/qwen-vl-utils
+
+Copyright Statement:
+Copyright (c) 2008-2015 Jesse Beder
+
+License:
+Apache License 2.0
+
+License Text:
+https://github.com/QwenLM/Qwen3-VL/blob/main/LICENSE
+
+The qwen_vl_utils library is licensed under the Apache License, Version 2.0 (the "License").
+You may not use these files except in compliance with the License. You may obtain a copy
+of the License at: http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the
+License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+either express or implied. See the License for the specific language governing permissions
+and limitations under the License.
+
+Modifications:
+This project contains modified versions of the following scripts extracted from qwen_vl_utils:
+
+CoPaw-Flash/vision_process_copawflash.py (Original source: src/qwen_vl_utils/vision_process.py)
+qwen3.5/vision_process_qwen3_5.py (Original source: src/qwen_vl_utils/vision_process.py)
+
+The modifications include, but are not limited to:
+
+    [1：example：Adapted for specific hardware backend (xh2).]
+
+    [2：example：Some parameters and processing methods have been reduced.]
+
+This project references and uses portions of Transformers as a third-party component.
+Any redistribution or modification of these scripts must retain the original copyright
+notice and provide a prominent notice stating that the files have been changed, in
+accordance with Section 4(b) of the Apache License 2.0.
+
+Users are responsible for complying with the Apache License 2.0 when using, redistributing,
+or modifying these components.
+
+2. Datasets
+----------------------------------------------------------------------
+COCO Dataset (Common Objects in Context)
+----------------------------------------------------------------------
+
+Copyright © Microsoft Corporation
+
+License:
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+License Text:
+https://creativecommons.org/licenses/by/4.0/
+Dataset Link:
+https://cocodataset.org/#termsofuse
+
+The COCO dataset is licensed under CC BY 4.0, allowing use, sharing,
+adaptation, distribution, and reproduction in any medium or format,
+including commercial use, as long as proper attribution is provided.
+
+This project does NOT redistribute the COCO dataset itself.
+Any references to the COCO dataset in this project are limited to
+documentation, configuration examples, scripts, or evaluation guidance.
+
+Users must obtain the dataset directly from the official COCO website
+and provide appropriate credit in accordance with the CC BY 4.0 license.
+
+COCO is a trademark or registered trademark of Microsoft Corporation.
+
+----------------------------------------------------------------------
+ImageNet Dataset (ILSVRC 2012)
+----------------------------------------------------------------------
+
+Copyright © ImageNet Organization
+
+License / Terms of Use:
+ImageNet Terms of Use
+https://www.image-net.org/download?
+
+The ImageNet dataset is made available by the ImageNet organization
+under specific Terms of Use. Access to the dataset requires user
+registration and agreement to the applicable terms.
+
+The ImageNet dataset is provided for non-commercial research and
+educational purposes only.
+
+This project does NOT redistribute the ImageNet dataset or any portion
+thereof. Any references to ImageNet in this project are limited to
+documentation, configuration examples, scripts, or evaluation guidance.
+
+Users must obtain the ImageNet dataset directly from the official
+ImageNet website and are solely responsible for complying with the
+ImageNet Terms of Use and any applicable restrictions.
+
+ImageNet is a trademark or registered trademark of the ImageNet
+organization.
+
+----------------------------------------------------------------------
+BDD100K Dataset (Berkeley DeepDrive 100K)
+----------------------------------------------------------------------
+
+Copyright © Berkeley DeepDrive
+
+License:
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+(CC BY-NC-SA 4.0)
+
+License Text:
+https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+The BDD100K dataset is made available by Berkeley DeepDrive under the
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+license (CC BY-NC-SA 4.0).
+
+The dataset is provided for non-commercial research and educational
+purposes only. Commercial use of the dataset or any derivative data is
+not permitted under the license.
+
+This project does NOT redistribute the BDD100K dataset or any portion
+thereof. Any references to the BDD100K dataset in this project are
+limited to documentation, configuration examples, scripts, or
+evaluation guidance.
+
+Users must obtain the BDD100K dataset directly from the official
+BDD100K website and are solely responsible for complying with the
+applicable license terms and attribution requirements.
+
+BDD100K and Berkeley DeepDrive are trademarks or registered trademarks
+of their respective owners.
+
+----------------------------------------------------------------------
+nuScenes Dataset
+----------------------------------------------------------------------
+
+Copyright © nuScenes contributors
+
+License:
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+(CC BY-NC-SA 4.0)
+
+License Text:
+https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+The nuScenes dataset is made available under the Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0 International license
+(CC BY-NC-SA 4.0).
+
+The dataset is provided for non-commercial research and educational
+purposes only. Commercial use of the dataset or any derivative data is
+not permitted under the license.
+
+This project does NOT redistribute the nuScenes dataset or any portion
+thereof. Any references to the nuScenes dataset in this project are
+limited to documentation, configuration examples, scripts, or
+evaluation guidance.
+
+Users must obtain the nuScenes dataset directly from the official
+nuScenes website and are solely responsible for complying with the
+applicable license terms, including attribution and share-alike
+requirements.
+
+nuScenes is a trademark or registered trademark of its respective
+owners.
+
+----------------------------------------------------------------------
+WIDER FACE Dataset
+----------------------------------------------------------------------
+
+Copyright © WIDER FACE contributors
+
+License:
+Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International
+(CC BY-NC-ND 4.0)
+
+License Text:
+https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode
+
+The WIDER FACE dataset is made available under the Creative Commons
+Attribution-NonCommercial-NoDerivatives 4.0 International license
+(CC BY-NC-ND 4.0).
+
+The dataset is provided for non-commercial research and educational
+purposes only. Commercial use of the dataset is not permitted under the
+license.
+
+No derivatives or modified versions of the dataset may be distributed
+under the CC BY-NC-ND 4.0 license.
+
+This project does NOT redistribute the WIDER FACE dataset or any
+portion thereof. Any references to the WIDER FACE dataset in this
+project are limited to documentation, configuration examples, scripts,
+or evaluation guidance.
+
+Users must obtain the WIDER FACE dataset directly from the official
+source and are solely responsible for complying with the applicable
+license terms, including attribution and non-commercial restrictions.
+
+WIDER FACE is a trademark or registered trademark of its respective
+owners.
+
+----------------------------------------------------------------------
+CCPD Dataset (Chinese City Parking Dataset)
+----------------------------------------------------------------------
+
+Copyright © CCPD contributors
+
+License:
+MIT License
+
+License Text:
+https://github.com/detectRecog/CCPD/blob/master/LICENSE
+
+The CCPD dataset is made available under the MIT License.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of the dataset and associated documentation files (the "Dataset"),
+to deal in the Dataset without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Dataset, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Dataset.
+
+THE DATASET IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE DATASET OR THE USE OR
+OTHER DEALINGS IN THE DATASET.
+
+This project does NOT redistribute the CCPD dataset itself.
+Any references to the CCPD dataset in this project are limited to
+documentation, configuration examples, scripts, or evaluation guidance.
+
+Users must obtain the CCPD dataset directly from the official repository
+and are solely responsible for complying with the applicable license terms.
+
+----------------------------------------------------------------------
+PASCAL VOC 2012 Dataset
+----------------------------------------------------------------------
+
+Copyright © Visual Object Classes Challenge (VOC) contributors
+
+License:
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+License Text:
+https://creativecommons.org/licenses/by/4.0/
+Dataset Link:
+https://public.roboflow.com/object-detection/pascal-voc-2012
+
+The PASCAL VOC 2012 dataset provided via Roboflow is licensed under
+CC BY 4.0. This license allows use, sharing, adaptation, distribution,
+and reproduction in any medium or format, including for commercial use,
+as long as proper attribution is given.
+
+This project does NOT redistribute the VOC 2012 dataset or any portion
+thereof. Any references to the VOC 2012 dataset in this project are
+limited to documentation, configuration examples, scripts, or evaluation
+guidance.
+
+Users must obtain the VOC 2012 dataset directly from the official
+Roboflow page linked above and provide appropriate credit, in
+accordance with the CC BY 4.0 license requirements.
+
+VOC is a trademark or registered trademark of its respective owners.
+
+3. Algorithm (Not including only using pretrained models)
+----------------------------------------------------------------------
+Whisper (Automatic Speech Recognition System)
+----------------------------------------------------------------------
+
+Component Name: Whisper
+Source:
+https://github.com/openai/whisper
+
+Copyright Statement:
+Copyright (c) OpenAI
+
+License:
+MIT License
+
+License Text:
+https://github.com/openai/whisper/blob/main/LICENSE
+
+This alg is used at the following path:
+    models/asr/whisper/
+
+Whisper is licensed under the MIT License, which permits
+use, reproduction, modification, distribution, and sublicensing of the
+software, subject to the terms and conditions of the license.
+
+This project may reference or use Whisper as a third-party component.
+Any redistribution or modification of Whisper must retain the original
+copyright notice, license text, and any required NOTICE information in
+accordance with the MIT License.
+
+Users are responsible for complying with the MIT License
+when using, redistributing, or modifying Whisper.
+
+----------------------------------------------------------------------
+CosyVoice3 (Text-to-Speech System)
+----------------------------------------------------------------------
+
+Component Name: CosyVoice3
+
+Usage Location:
+models/tts/cosyvoice3/
+
+Source:
+https://github.com/FunAudioLLM/CosyVoice
+
+Copyright Statement:
+Copyright (c) FunAudioLLM contributors
+
+License:
+Model License (check original repository)
+
+License Text:
+https://github.com/FunAudioLLM/CosyVoice
+
+CosyVoice3 is a text-to-speech synthesis system. This project references
+the CosyVoice3 model and implementation for TTS pipeline design. Users
+should check the original repository for the specific model license terms
+and usage restrictions.
+
+This project does NOT redistribute the CosyVoice3 model weights.
+Any references to CosyVoice3 in this project are limited to documentation,
+configuration examples, scripts, or C++ demo implementations.
+
+Users must obtain the model and comply with the original license terms.
+CosyVoice3 may have specific usage restrictions, including potential
+limitations on commercial use or redistribution of synthesized audio.
+
+----------------------------------------------------------------------
+bge-m3 and bge-reranker-m3-v2 (Embedding and Reranker Model from FlagEmbedding)
+----------------------------------------------------------------------
+
+Component Name: bge-m3 and bge-reranker-m3-v2
+Source:
+https://github.com/FlagOpen/FlagEmbedding
+
+Copyright Statement:
+Copyright (c) FlagOpen contributors
+
+License:
+MIT License
+
+License Text:
+https://github.com/FlagOpen/FlagEmbedding/blob/master/LICENSE
+
+The FlagEmbedding project, including the bge-m3 embedding and
+bge-reranker-m3-v2 reranker model, is licensed under the MIT License.
+The MIT License permits use, copying, modification, merging, publishing,
+distribution, sublicensing, and/or selling copies of the software and
+associated files, subject to the following condition:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the software.
+
+THE SOFTWARE AND MODELS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+This project may reference or use the bge-m3&bge-reranker-m3-v2 model and/or other components
+from the FlagEmbedding project as third-party components. Any redistribution
+or modification must retain the original copyright notice and license text
+in accordance with the MIT License.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying bge-m3 and related components.
+
+----------------------------------------------------------------------
+DeepSeek-R1-0528-Qwen3-8B (also known as deepseek-r1-qwen3-8b)
+----------------------------------------------------------------------
+
+Component Name: DeepSeek-R1-0528-Qwen3-8B
+Source:
+https://modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
+
+Copyright Statement:
+Copyright (c) DeepSeek contributors
+
+License:
+MIT License
+
+License Text:
+https://modelscope.cn/models/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B/file/view/master/LICENSE?status=0
+
+This alg is used at the following path:
+    models/llm/deepseek-r1-qwen3-8b/
+
+The DeepSeek-R1-0528-Qwen3-8B model is licensed under the MIT License.
+The MIT License permits use, copying, modification, merging, publishing,
+distribution, sublicensing, and/or selling copies of the model and
+associated files, subject to the following condition:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the model or associated files.
+
+THE MODEL IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE MODEL OR THE USE OR OTHER DEALINGS
+IN THE MODEL.
+
+This project may reference or use the DeepSeek-R1-0528-Qwen3-8B model as a
+third-party component. Any redistribution or modification of the model
+must retain the original copyright notice and license text in accordance
+with the MIT License.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying the model.
+
+----------------------------------------------------------------------
+gpt-oss-20b (Open-Source Large Language Model)
+----------------------------------------------------------------------
+
+Component Name: gpt-oss-20b
+Source:
+https://modelscope.cn/models/openai-mirror/gpt-oss-20b
+
+Copyright Statement:
+Copyright (c) OpenAI and gpt-oss contributors
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://modelscope.cn/models/openai-mirror/gpt-oss-20b/file/view/master/LICENSE?status=0
+
+This alg is used at the following path:
+    models/llm/gpt-oss/
+
+The gpt-oss-20b model is licensed under the Apache License, Version 2.0.
+The Apache License, Version 2.0 permits use, reproduction, modification,
+distribution, and sublicensing of the model and associated files, subject
+to the terms and conditions of the license.
+
+Any redistribution of the model or derivative works must retain the
+original copyright notice, license text, and any required NOTICE
+information in accordance with the Apache License, Version 2.0.
+
+The model is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+OF ANY KIND, either express or implied. See the License for the specific
+language governing permissions and limitations under the License.
+
+This project may reference or use gpt-oss-20b as a third-party component.
+Users are responsible for complying with the Apache License, Version 2.0
+when using, redistributing, or modifying the model.
+
+----------------------------------------------------------------------
+Qwen3-8B (Large Language Model)
+----------------------------------------------------------------------
+
+Component Name: Qwen3-8B
+Source:
+https://modelscope.cn/models/Qwen/Qwen3-8B
+
+Copyright Statement:
+Copyright (c) Alibaba Cloud and Qwen contributors
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://modelscope.cn/models/Qwen/Qwen3-8B/file/view/master/LICENSE?status=0
+
+This alg is used at the following path:
+    models/llm/qwen3-8b/
+
+The Qwen3-8B model is licensed under the Apache License, Version 2.0.
+The Apache License, Version 2.0 permits use, reproduction, modification,
+distribution, and sublicensing of the model and associated files, subject
+to the terms and conditions of the license.
+
+Any redistribution of the model or derivative works must retain the
+original copyright notice, this license text, and any applicable NOTICE
+information in accordance with the Apache License, Version 2.0.
+
+The model is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+OF ANY KIND, either express or implied. See the License for the specific
+language governing permissions and limitations under the License.
+
+This project may reference or use Qwen3-8B as a third-party component.
+Users are responsible for complying with the Apache License, Version 2.0
+when using, redistributing, or modifying the model.
+
+----------------------------------------------------------------------
+Qwen3-14B (Large Language Model)
+----------------------------------------------------------------------
+
+Component Name: Qwen3-14B
+Source:
+https://modelscope.cn/models/Qwen/Qwen3-14B
+
+Copyright Statement:
+Copyright (c) Alibaba Cloud and Qwen contributors
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://modelscope.cn/models/Qwen/Qwen3-14B/file/view/master/LICENSE?status=0
+
+This alg is used at the following path:
+    models/llm/qwen3-14b/
+
+The Qwen3-14B model is licensed under the Apache License, Version 2.0.
+The Apache License, Version 2.0 permits use, reproduction, modification,
+distribution, and sublicensing of the model and associated files, subject
+to the terms and conditions of the license.
+
+Any redistribution of the model or derivative works must retain the
+original copyright notice, this license text, and any applicable NOTICE
+information in accordance with the Apache License, Version 2.0.
+
+The model is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+OF ANY KIND, either express or implied. See the License for the specific
+language governing permissions and limitations under the License.
+
+This project may reference or use Qwen3-14B as a third-party component.
+Users are responsible for complying with the Apache License, Version 2.0
+when using, redistributing, or modifying the model.
+
+----------------------------------------------------------------------
+Qwen3-30B-A3B (Large Language Model)
+----------------------------------------------------------------------
+
+Component Name: Qwen3-30B-A3B
+Also Known As: qwen3-a3b-30b
+Source:
+https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B
+
+Copyright Statement:
+Copyright (c) Alibaba Cloud and Qwen contributors
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://www.modelscope.cn/models/Qwen/Qwen3-30B-A3B/file/view/master/LICENSE?status=0
+
+This alg is used at the following path:
+    models/llm/qwen3-30b-a3b/
+
+The Qwen3-30B-A3B model is licensed under the Apache License, Version 2.0.
+The Apache License, Version 2.0 permits use, reproduction, modification,
+distribution, and sublicensing of the model and associated files, subject
+to the terms and conditions of the license.
+
+Any redistribution of the model or derivative works must retain the
+original copyright notice, this license text, and any applicable NOTICE
+information in accordance with the Apache License, Version 2.0.
+
+The model is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+OF ANY KIND, either express or implied. See the License for the specific
+language governing permissions and limitations under the License.
+
+This project may reference or use Qwen3-30B-A3B as a third-party component.
+Users are responsible for complying with the Apache License, Version 2.0
+when using, redistributing, or modifying the model.
+
+----------------------------------------------------------------------
+Qwen2.5-VL (Vision-Language Model, 7B)
+----------------------------------------------------------------------
+
+Component Name: Qwen2.5-VL
+Source:
+https://modelscope.cn/models/Qwen/Qwen2.5-VL-7B-Instruct
+
+Copyright Statement:
+Copyright (c) Alibaba Cloud and Qwen contributors
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md
+
+This alg is used at the following path:
+    models/vlm/qwen2.5-vl/
+
+The Qwen2.5-VL model is licensed under the Apache License, Version 2.0.
+The Apache License, Version 2.0 permits use, reproduction, modification,
+distribution, and sublicensing of the model and associated files, subject
+to the terms and conditions of the license.
+
+Any redistribution of the model or derivative works must retain the
+original copyright notice, this license text, and any applicable NOTICE
+information in accordance with the Apache License, Version 2.0.
+
+The model is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+OF ANY KIND, either express or implied. See the License for the specific
+language governing permissions and limitations under the License.
+
+This project may reference or use Qwen2.5-VL as a third-party component.
+Users are responsible for complying with the Apache License, Version 2.0
+when using, redistributing, or modifying the model.
+
+----------------------------------------------------------------------
+Qwen3-VL (Vision-Language Model, 8B)
+----------------------------------------------------------------------
+
+Component Name: Qwen3-VL
+Source:
+https://www.modelscope.cn/models/Qwen/Qwen3-VL-8B-Instruct
+
+Copyright Statement:
+Copyright (c) Alibaba Cloud and Qwen contributors
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md
+
+This alg is used at the following path:
+    models/vlm/qwen3-vl/
+
+The Qwen3-VL model is licensed under the Apache License, Version 2.0.
+The Apache License, Version 2.0 permits use, reproduction, modification,
+distribution, and sublicensing of the model and associated files, subject
+to the terms and conditions of the license.
+
+Any redistribution of the model or derivative works must retain the
+original copyright notice, this license text, and any applicable NOTICE
+information in accordance with the Apache License, Version 2.0.
+
+The model is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+OF ANY KIND, either express or implied. See the License for the specific
+language governing permissions and limitations under the License.
+
+This project may reference or use Qwen3-VL as a third-party component.
+Users are responsible for complying with the Apache License, Version 2.0
+when using, redistributing, or modifying the model.
+
+----------------------------------------------------------------------
+MiniCPM-O-2.6 (Multimodal Large Language Model)
+----------------------------------------------------------------------
+
+Component Name: MiniCPM-O-2.6
+Also Known As: minicpm-o-2_6
+Source:
+https://github.com/OpenBMB/MiniCPM-V
+https://www.modelscope.cn/models/OpenBMB/MiniCPM-o-2_6
+
+Copyright Statement:
+Copyright (c) OpenBMB contributors
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://github.com/OpenBMB/MiniCPM-V/blob/main/LICENSE
+
+This alg is used at the following path:
+    models/omni/minicpmo/
+
+The MiniCPM-O-2.6 model is licensed under the Apache License, Version 2.0.
+The Apache License, Version 2.0 permits use, reproduction, modification,
+distribution, and sublicensing of the model and associated files, subject
+to the terms and conditions of the license.
+
+Any redistribution of the model or derivative works must retain the
+original copyright notice, this license text, and any applicable NOTICE
+information in accordance with the Apache License, Version 2.0.
+
+The model is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+OF ANY KIND, either express or implied. See the License for the specific
+language governing permissions and limitations under the License.
+
+This project may reference or use MiniCPM-O-2.6 as a third-party component.
+Users are responsible for complying with the Apache License, Version 2.0
+when using, redistributing, or modifying the model.
+
+----------------------------------------------------------------------
+CoPaw-Flash-9B (Multimodal Large Language Model)
+----------------------------------------------------------------------
+
+Component Name: CoPaw-Flash-9B
+Also Known As: copaw-flash-9b
+Source:
+https://www.modelscope.cn/models/AgentScope/CoPaw-Flash-9B
+
+Copyright Statement:
+Copyright (c) OpenBMB contributors
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://www.apache.org/licenses/LICENSE-2.0
+
+This alg is used at the following path:
+    models/llm/CoPaw-Flash/
+
+The CoPaw-Flash-9B model is licensed under the Apache License, Version 2.0.
+The Apache License, Version 2.0 permits use, reproduction, modification,
+distribution, and sublicensing of the model and associated files, subject
+to the terms and conditions of the license.
+
+Any redistribution of the model or derivative works must retain the
+original copyright notice, this license text, and any applicable NOTICE
+information in accordance with the Apache License, Version 2.0.
+
+The model is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+OF ANY KIND, either express or implied. See the License for the specific
+language governing permissions and limitations under the License.
+
+This project may reference or use CoPaw-Flash-9B as a third-party component.
+Users are responsible for complying with the Apache License, Version 2.0
+when using, redistributing, or modifying the model.
+
+
+DISCLAIMER AGAIN
+
+The authors and contributors of this project make no representation
+or warranty regarding third-party software, models, or datasets.
+
+Use of such components is at the user's own risk.

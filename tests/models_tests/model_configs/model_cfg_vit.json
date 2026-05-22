@@ -1,0 +1,161 @@
+{
+    "obsolete": false,
+    "model_dir": "models/backbone/ViT-B-16",
+    "model_type": "cv",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh1": [1],
+        "xh2": [1]
+    },
+    "support_flow": {
+        "xh1": [
+            "get_model",
+            "quant",
+            "compile",
+            "demo",
+            "compare",
+            "perf",
+            "eval"
+        ],
+        "xh2": [
+            "get_model",
+            "quant",
+            "compile",
+            "demo",
+            "compare",
+            "perf",
+            "eval"
+        ]
+    },
+    "support_hmatc": {
+        "xh1": [
+            "hmquant",
+            "hmbuild",
+            "hmdemo",
+            "hmeval",
+            "hmperf",
+            "hmcompare"
+        ],
+        "xh2": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf", "hmcompare"]
+    },
+    "perf_metrics": {
+        "xh1": {
+            "x86_64": 83.995
+        },
+        "xh2": {
+            "x86_64": 814.352
+        }
+    },
+    "eval_threshold": {
+        "top1_acc": 0.8
+    },
+    "get_model_params": {
+        "xh1": {
+            "type": ["raw", "hmm"],
+            "model_dir": ["cached_models", "cached_models"]
+        },
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "model_dir": ["cached_models", "cached_models"]
+        }
+    },
+    "hmquant_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"]
+            },
+            "optional": {
+                "target": [null],
+                "result_path": [null]
+            }
+        }
+    },
+    "hmbuild_params": {
+        "xh1": {
+            "required": {
+                "config": [
+                    "./config.yml",
+                    "./config.yml",
+                    "./config.yml",
+                    "./config.yml"
+                ]
+            },
+            "optional": {
+                "batch": [null, "1", "2", "4"],
+                "ncore": [null, "1", "2", "4"],
+                "opt_level": [null, "0", "1", "2"],
+                "roi_num": [null, null, null, null]
+            }
+        },
+        "xh2": {
+            "required": {
+                "config": ["./config.yml", "./config.yml", "./config.yml"]
+            },
+            "optional": {
+                "batch": [null, "1", "1"],
+                "ncore": [null, "1", "2"],
+                "opt_level": ["0", "1", "2"],
+                "roi_num": [null, null, null]
+            }
+        }
+    },
+    "hmdemo_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"]
+            },
+            "optional": {
+                "target": [null],
+                "result_path": [null],
+                "onnx": [null]
+            }
+        }
+    },
+    "hmperf_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml", "./config.yml", "./config.yml"],
+                "warmup": ["1", "10", "10"],
+                "sample": ["1", "1000", "1000"]
+            },
+            "optional": {
+                "target": [null, null, null],
+                "result_path": [null, null, null],
+                "loop_num": [null, null, null],
+                "thread": ["1", "4", "8"],
+                "device": [null, null, null]
+            }
+        }
+    },
+    "hmeval_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"]
+            },
+            "optional": {
+                "target": [null],
+                "result_path": [null],
+                "onnx": [null]
+            }
+        }
+    },
+    "hmcompare_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"],
+                "data_path": [
+                    "./imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG"
+                ]
+            },
+            "optional": {
+                "target": [null],
+                "result_path": [null]
+            }
+        }
+    }
+}

@@ -1,0 +1,18 @@
+# opencv-python-headless
+wheel
+numpy
+prettytable
+onnx
+onnxsim
+onnxruntime
+pycocotools
+pandas
+pillow
+pyyaml
+psutil
+pybind11
+tabulate
+xlsxwriter
+openpyxl
+torch>=2.4.0
+torchvision>=0.19.0

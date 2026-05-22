@@ -1,0 +1,106 @@
+{
+    "obsolete": false,
+    "model_dir": "models/tts/cosyvoice3",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models", "cached_models"],
+            "extract_dir": [null, null, "cached_models/hmm_xh2_2k"],
+            "source_type": [null, "modelscope", null],
+            "context_length": [null, null, "2k"],
+            "ndevice": [null, null, null],
+            "prefill_length": [null, null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model_dir": ["cached_models/Fun-CosyVoice3-0.5B-2512"],
+            "output_dir": ["cached_results/hmquant_xh2_2k"],
+            "context_length": ["2048"],
+            "input_sequence_length": [null]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_2k"],
+            "model_name": [null],
+            "batch": [null],
+            "j": ["24"],
+            "ncore": [null],
+            "context_length": ["2048"],
+            "ndevice": [null],
+            "stage": ["build"],
+            "output_dir": ["cached_results/hmm_xh2_2k"],
+            "prefill_length": [null]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "tokenizer_dir": ["cached_models/Fun-CosyVoice3-0.5B-2512"],
+            "prompt_wav_path": [
+                "cached_models/hmm_xh2_2k/zero_shot_prompt.wav"
+            ],
+            "ndevice": [null],
+            "campplus_path": [
+                "cached_results/hmm_xh2_2k/cosyvoice3_campplus.hmm"
+            ],
+            "speech_tokenizer_path": [
+                "cached_results/hmm_xh2_2k/cosyvoice3_speech_tokenizer.hmm"
+            ],
+            "sos_emb_path": [
+                "cached_results/hmm_xh2_2k/hmquant/llm_sos_embedding.pt"
+            ],
+            "task_id_emb_path": [
+                "cached_results/hmm_xh2_2k/hmquant/llm_task_id_embedding.pt"
+            ],
+            "speech_embedding_path": [
+                "cached_results/hmm_xh2_2k/hmquant/llm_speech_embedding.pt"
+            ],
+            "token_embedding_path": [
+                "cached_results/hmm_xh2_2k/hmquant/quant_embedding.pt"
+            ],
+            "prefill_model_path": [
+                "cached_results/hmm_xh2_2k/cosyvoice3_llm_qwen2_prefill.hmm"
+            ],
+            "decode_model_path": [
+                "cached_results/hmm_xh2_2k/cosyvoice3_llm_qwen2_decode.hmm"
+            ],
+            "llm_decoder_path": [
+                "cached_results/hmm_xh2_2k/cosyvoice3_llm_decoder.hmm"
+            ],
+            "input_embedding": [
+                "cached_results/hmm_xh2_2k/hmquant/flow_input_embedding.pt"
+            ],
+            "spk_embed_affine_layer": [
+                "cached_results/hmm_xh2_2k/cosyvoice3_flow_spk.hmm"
+            ],
+            "pre_lookahead_layer": [
+                "cached_results/hmm_xh2_2k/cosyvoice3_flow_encoder.hmm"
+            ],
+            "flow_decoder_path": [
+                "cached_results/hmm_xh2_2k/cosyvoice3_flow_decoder.hmm"
+            ],
+            "hift_part1_path": [
+                "cached_results/hmm_xh2_2k/cosyvoice3_hift_part1.hmm"
+            ],
+            "hift_part2_path": [
+                "cached_results/hmm_xh2_2k/cosyvoice3_hift_part2.hmm"
+            ],
+            "output_dir": ["cached_results/demo_results"]
+        }
+    }
+}

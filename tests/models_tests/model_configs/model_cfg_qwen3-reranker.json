@@ -1,0 +1,69 @@
+{
+    "obsolete": false,
+    "model_dir": "models/reranker/qwen3-reranker",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
+    },
+    "support_hmatc": null,
+    "perf_metrics": {
+        "xh2": {
+            "x86_64": {
+                "prefill": 741.19
+            }
+        }
+    },
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_8k"],
+            "source_type": [null, null],
+            "context_length": [null, null],
+            "batch": [null, null],
+            "ndevice": [null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": ["cached_models/qwen3-reranker-8b"],
+            "out-dir": ["cached_results/hmquant_xh2_2k"],
+            "context-length": ["2048"],
+            "input-sequence-length": ["256"],
+            "mix_search": [null],
+            "datasets-dir": [null]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_2k"],
+            "stage": ["build"],
+            "j": ["24"],
+            "context_length": ["8192"],
+            "prefill_length": ["256"],
+            "output_dir": ["cached_results/hmm_xh2_8k"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "tokenizer_dir": ["cached_models/qwen3-reranker-8b"],
+            "embedding_path": [
+                "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
+            ],
+            "prefill_path": [
+                "cached_results/hmm_xh2_8k/qwen3-reranker_prefill.hmm"
+            ],
+            "ndevice": ["1"]
+        }
+    },
+    "perf_params": "demo"
+}

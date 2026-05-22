@@ -1,0 +1,19 @@
+model:
+  name: yolov5s
+  save_dir: output
+  model_path: ../../models/yolov5s_640x640_clip.onnx
+  inputs:
+    images:
+      shape: [1, 3, 640, 640] # NCHW
+      data_format: RGB
+      mean: [0.0, 0.0, 0.0]
+      std: [255.0, 255.0, 255.0]
+      resize_type: 0
+
+quant:
+  calib_data: coco2017/val2017
+  calib_num: 32
+
+build:
+  ncore: 1
+  opt_level: 2

@@ -1,0 +1,21 @@
+name: imodelzoo
+version_path: imodelzoo/version.cfg
+path: modules/imodelzoo
+is_real_path: true
+is_structure: false
+os_type:
+  ubuntu_20.04:
+    examples:
+      - hmatc
+      - apis
+      - models
+      - data
+      - hmodel
+      - tools
+      - env.sh
+      - env.bat
+      - requirements.txt
+      - README.md
+  ubuntu_18.04:
+    examples:
+      - examples/

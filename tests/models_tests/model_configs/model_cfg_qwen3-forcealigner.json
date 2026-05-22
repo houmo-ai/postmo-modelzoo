@@ -1,0 +1,68 @@
+{
+    "obsolete": false,
+    "model_dir": "models/asr/qwen3-asr",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_forcealigner_0.6b"],
+            "source_type": [null, null],
+            "model_size": ["0.6b", "0.6b"],
+            "model_name": ["qwen3_forcealigner", "qwen3_forcealigner"],
+            "ndevice": [null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": ["cached_models/Qwen3-ForcedAligner-0.6B"],
+            "model_name": ["qwen3_forcealigner"],
+            "out-dir": ["cached_results/hmquant_xh2_forcealigner_0.6b"],
+            "quant-type": [null],
+            "config": [null],
+            "max_audio_length": [null]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_forcealigner_0.6b"],
+            "model_name": ["qwen3_forcealigner"],
+            "j": ["24"],
+            "ncore": [null],
+            "stage": ["build"],
+            "output_dir": ["cached_results/hmm_xh2_forcealigner_0.6b"],
+            "context_length": ["2048"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "script": ["demo_forcealigner.py"],
+            "processor_dir": ["cached_models/Qwen3-ForcedAligner-0.6B"],
+            "audio": [null],
+            "encode_path": [
+                "cached_results/hmm_xh2_forcealigner_0.6b/qwen3_forcealigner_encode.hmm"
+            ],
+            "text": [null],
+            "prefill_path": [
+                "cached_results/hmm_xh2_forcealigner_0.6b/qwen3_forcealigner_prefill.hmm"
+            ],
+            "embedding_path": [
+                "cached_results/hmm_xh2_forcealigner_0.6b/hmquant/quant_embedding.pt"
+            ],
+            "language": [null]
+        }
+    }
+}

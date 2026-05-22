@@ -1,0 +1,772 @@
+###### modelzoo ######
+# args: all, quant, compile, demo, compare, eval, perf
+backbone_resnet50:
+  include:
+    - models/backbone/resnet50
+  exclude:
+    - models/backbone/resnet50/README.MD
+  example_case:
+    - backbone_resnet50_test:
+        test_type: models_tests
+        script: resnet50
+        args: all
+  test:
+    - backbone_resnet50_test
+backbone_efficientnet:
+  include:
+    - models/backbone/efficientnet
+  exclude:
+    - models/backbone/efficientnet/README.MD
+  example_case:
+    - backbone_efficientnet_test:
+        test_type: models_tests
+        script: efficientnet
+        args: all
+  test:
+    - backbone_efficientnet_test
+backbone_mobilenetv2:
+  include:
+    - models/backbone/mobilenetv2
+  exclude:
+    - models/backbone/mobilenetv2/README.MD
+  example_case:
+    - backbone_mobilenetv2_test:
+        test_type: models_tests
+        script: mobilenetv2
+        args: all
+  test:
+    - backbone_mobilenetv2_test
+backbone_ViT-B-16:
+  include:
+    - models/backbone/ViT-B-16
+  exclude:
+    - models/backbone/ViT-B-16/README.MD
+  example_case:
+    - backbone_ViT-B-16_test:
+        test_type: models_tests
+        script: vit
+        args: all
+  test:
+    - backbone_ViT-B-16_test
+autodrive_yolop:
+  include:
+    - models/autodrive/yolop
+  exclude:
+    - models/autodrive/yolop/README.MD
+  example_case:
+    - autodrive_yolop_test:
+        test_type: models_tests
+        script: yolop
+        args: all
+  test:
+    - autodrive_yolop_test
+detection_yolov3:
+  include:
+    - models/detection/yolov3
+  exclude:
+    - models/detection/yolov3/README.MD
+  example_case:
+    - detection_yolov3_test:
+        test_type: models_tests
+        script: yolov3
+        args: all
+  test:
+    - detection_yolov3_test
+detection_yolov5s:
+  include:
+    - models/detection/yolov5s
+  exclude:
+    - models/detection/yolov5s/README.MD
+  example_case:
+    - detection_yolov5s_test:
+        test_type: models_tests
+        script: yolov5s
+        args: all
+  test:
+    - detection_yolov5s_test
+detection_yolov5s_feature:
+  include:
+    - models/detection/yolov5s_feature
+  exclude:
+    - models/detection/yolov5s_feature/README.MD
+  example_case:
+    - detection_yolov5s_feature_test:
+        test_type: models_tests
+        script: yolov5s_feature
+        args: all
+  test:
+    - detection_yolov5s_feature_test
+detection_yolov5m_face:
+  include:
+    - models/detection/yolov5m_face
+  exclude:
+    - models/detection/yolov5m_face/README.MD
+  example_case:
+    - detection_yolov5m_face_test:
+        test_type: models_tests
+        script: yolov5m_face
+        args: all
+  test:
+    - detection_yolov5m_face_test
+detection_yolov8m:
+  include:
+    - models/detection/yolov8m
+  exclude:
+    - models/detection/yolov8m/README.MD
+  example_case:
+    - detection_yolov8m_test:
+        test_type: models_tests
+        script: yolov8m
+        args: all
+  test:
+    - detection_yolov8m_test
+detection_yolov7:
+  include:
+    - models/detection/yolov7
+  exclude:
+    - models/detection/yolov7/README.MD
+  example_case:
+    - detection_yolov7_test:
+        test_type: models_tests
+        script: yolov7
+        args: all
+  test:
+    - detection_yolov7_test
+detection_yolov9m:
+  include:
+    - models/detection/yolov9m
+  exclude:
+    - models/detection/yolov9m/README.MD
+  example_case:
+    - detection_yolov9m_test:
+        test_type: models_tests
+        script: yolov9m
+        args: all
+  test:
+    - detection_yolov9m_test
+detection_yolo11m:
+  include:
+    - models/detection/yolo11m
+  exclude:
+    - models/detection/yolo11m/README.MD
+  example_case:
+    - detection_yolo11m_test:
+        test_type: models_tests
+        script: yolo11m
+        args: all
+  test:
+    - detection_yolo11m_test
+detection_yolov10m:
+  include:
+    - models/detection/yolov10m
+  exclude:
+    - models/detection/yolov10m/README.MD
+  example_case:
+    - detection_yolov10m_test:
+        test_type: models_tests
+        script: yolov10m
+        args: all
+  test:
+    - detection_yolov10m_test
+detection_yolox:
+  include:
+    - models/detection/yolox
+  exclude:
+    - models/detection/yolox/README.MD
+  example_case:
+    - detection_yolox_test:
+        test_type: models_tests
+        script: yolox
+        args: all
+  test:
+    - detection_yolox_test
+detection_yolo26m:
+  include:
+    - models/detection/yolo26m
+  exclude:
+    - models/detection/yolo26m/README.MD
+  example_case:
+    - detection_yolo26m_test:
+        test_type: models_tests
+        script: yolo26m
+        args: all
+  test:
+    - detection_yolo26m_test
+detection_yolov8m-cls:
+  include:
+    - models/backbone/yolov8m-cls
+  exclude:
+    - models/backbone/yolov8m-cls/README.MD
+  example_case:
+    - detection_yolov8m-cls_test:
+        test_type: models_tests
+        script: yolov8m_cls
+        args: all
+  test:
+    - detection_yolov8m-cls_test
+detection_yolo12m:
+  include:
+    - models/detection/yolo12m
+  exclude:
+    - models/detection/yolo12m/README.MD
+  example_case:
+    - detection_yolo12m_test:
+        test_type: models_tests
+        script: yolo12m
+        args: all
+  test:
+    - detection_yolo12m_test
+estimation_yolov8m_pose:
+  include:
+    - models/estimation/yolov8m-pose
+  exclude:
+    - models/estimation/yolov8m-pose/README.MD
+  example_case:
+    - estimation_yolov8m_pose_test:
+        test_type: models_tests
+        script: yolov8m_pose
+        args: all
+  test:
+    - estimation_yolov8m_pose_test
+segmentation_yolov8m_seg:
+  include:
+    - models/segmentation/yolov8m-seg
+  exclude:
+    - models/segmentation/yolov8m-seg/README.MD
+  example_case:
+    - segmentation_yolov8m_seg_test:
+        test_type: models_tests
+        script: yolov8m_seg
+        args: all
+  test:
+    - segmentation_yolov8m_seg_test
+ocr_lprnet:
+  include:
+    - models/ocr/lprnet
+  exclude:
+    - models/ocr/lprnet/README.MD
+  example_case:
+    - ocr_lprnet_test:
+        test_type: models_tests
+        script: lprnet
+        args: all
+  test:
+    - ocr_lprnet_test
+ocr_ppocrv3_det:
+  include:
+    - models/ocr/PPOCRv3/det
+  exclude:
+    - models/ocr/PPOCRv3/det/README.MD
+  example_case:
+    - ocr_ppocrv3_det_test:
+        test_type: models_tests
+        script: ppocrv3_det
+        args: all
+  test:
+    - ocr_ppocrv3_det_test
+ocr_ppocrv3_rec:
+  include:
+    - models/ocr/PPOCRv3/rec
+  exclude:
+    - models/ocr/PPOCRv3/rec/README.MD
+  example_case:
+    - ocr_ppocrv3_rec_test:
+        test_type: models_tests
+        script: ppocrv3_rec
+        args: all
+  test:
+    - ocr_ppocrv3_rec_test
+ocr_glm-ocr:
+  include:
+    - models/ocr/glm-ocr
+  exclude:
+    - models/ocr/glm-ocr/README.MD
+  example_case:
+    - ocr_glm-ocr_test:
+        test_type: models_tests
+        script: glm_ocr
+        args: all
+  test:
+    - ocr_glm-ocr_test
+reranker_qwen3-reranker:
+  include:
+    - models/reranker/qwen3-reranker
+  exclude:
+    - models/reranker/qwen3-reranker/README.MD
+  example_case:
+    - reranker_qwen3-reranker_test:
+        test_type: models_tests
+        script: qwen3_reranker
+        args: all
+  test:
+    - reranker_qwen3-reranker_test
+llm_qwen3:
+  include:
+    - models/llm/qwen3
+  exclude:
+    - models/llm/qwen3/README.MD
+  example_case:
+    - llm_qwen3_test:
+        test_type: models_tests
+        script: qwen3
+        args: all
+  test:
+    - llm_qwen3_test
+llm_qwen3.5:
+  include:
+    - models/llm/qwen3.5
+  exclude:
+    - models/llm/qwen3.5/README.MD
+  example_case:
+    - llm_qwen3.5_test:
+        test_type: models_tests
+        script: qwen3dot5
+        args: all
+  test:
+    - llm_qwen3.5_test
+llm_qwen2.5:
+  include:
+    - models/llm/qwen2.5
+  exclude:
+    - models/llm/qwen2.5/README.MD
+  example_case:
+    - llm_qwen2.5_test:
+        test_type: models_tests
+        script: qwen2dot5
+        args: all
+  test:
+    - llm_qwen2.5_test
+llm_qwen3_30b_a3b:
+  include:
+    - models/llm/qwen3-30b-a3b
+  exclude:
+    - models/llm/qwen3-30b-a3b/README.MD
+  example_case:
+    - llm_qwen3_30b_a3b_test:
+        test_type: models_tests
+        script: qwen3_30b_a3b
+        args: all
+  test:
+    - llm_qwen3_30b_a3b_test
+llm_deepseek_r1_qwen3_8b:
+  include:
+    - models/llm/deepseek-r1-qwen3-8b
+  exclude:
+    - models/llm/deepseek-r1-qwen3-8b/README.MD
+  example_case:
+    - llm_deepseek_r1_qwen3_8b_test:
+        test_type: models_tests
+        script: deepseek_r1_qwen3_8b
+        args: all
+  test:
+    - llm_deepseek_r1_qwen3_8b_test
+llm_gpt-oss:
+  include:
+    - models/llm/gpt-oss
+  exclude:
+    - models/llm/gpt-oss/README.MD
+  example_case:
+    - llm_gpt-oss_test:
+        test_type: models_tests
+        script: gpt_oss
+        args: all
+  test:
+    - llm_gpt-oss_test
+vlm_qwen2.5-vl:
+  include:
+    - models/vlm/qwen2.5-vl
+  exclude:
+    - models/vlm/qwen2.5-vl/README.MD
+  example_case:
+    - vlm_qwen2.5-vl_test:
+        test_type: models_tests
+        script: qwen2dot5_vl
+        args: all
+  test:
+    - vlm_qwen2.5-vl_test
+vlm_qwen3-vl:
+  include:
+    - models/vlm/qwen3-vl
+  exclude:
+    - models/vlm/qwen3-vl/README.MD
+  example_case:
+    - vlm_qwen3-vl_test:
+        test_type: models_tests
+        script: qwen3_vl
+        args: all
+  test:
+    - vlm_qwen3-vl_test
+vlm_gemma4:
+  include:
+    - models/vlm/gemma4
+  exclude:
+    - models/vlm/gemma4/README.MD
+  example_case:
+    - vlm_gemma4_test:
+        test_type: models_tests
+        script: gemma4
+        args: all
+  test:
+    - vlm_gemma4_test
+llm_bge:
+  include:
+    - models/embedding/bge
+  exclude:
+    - models/embedding/bge/README.MD
+  example_case:
+    - llm_bge_test:
+        test_type: models_tests
+        script: bge
+        args: all
+  test:
+    - llm_bge_test
+llm_sensevoice:
+  include:
+    - models/asr/sensevoice
+  exclude:
+    - models/asr/sensevoice/README.MD
+  example_case:
+    - llm_sensevoice_test:
+        test_type: models_tests
+        script: sensevoice
+        args: all
+  test:
+    - llm_sensevoice_test
+llm_glm-asr:
+  include:
+    - models/asr/glm-asr
+  exclude:
+    - models/asr/glm-asr/README.MD
+  example_case:
+    - llm_glm-asr_test:
+        test_type: models_tests
+        script: glm_asr
+        args: all
+  test:
+    - llm_glm-asr_test
+llm_whisper-turbo:
+  include:
+    - models/asr/whisper-turbo
+  exclude:
+    - models/asr/whisper-turbo/README.MD
+  example_case:
+    - llm_whisper-turbo_test:
+        test_type: models_tests
+        script: whisper_turbo
+        args: all
+  test:
+    - llm_whisper-turbo_test
+asr_qwen3-asr:
+  include:
+    - models/asr/qwen3-asr
+  exclude:
+    - models/asr/qwen3-asr/README.MD
+  example_case:
+    - asr_qwen3-asr_test:
+        test_type: models_tests
+        script: 'qwen3_asr or qwen3_forcealigner'
+        args: all
+  test:
+    - asr_qwen3-asr_test
+llm_perf:
+  include:
+    - tools/llm_perf
+  exclude:
+    - tools/llm_perf/README.MD
+  example_case:
+    - tools_llm_perf_test:
+        script: ../tests/tools_tests/test_llm_perf.sh
+  test:
+    - tools_llm_perf_test
+llm_minicpmo:
+  include:
+    - models/omni/minicpmo
+  exclude:
+    - models/omni/minicpmo/README.MD
+  example_case:
+    - llm_minicpmo_test:
+        test_type: models_tests
+        script: minicpmo
+        args: all
+  test:
+    - llm_minicpmo_test
+llm_gte:
+  include:
+    - models/embedding/gte
+  exclude:
+    - models/embedding/gte/README.MD
+  example_case:
+    - llm_gte_test:
+        test_type: models_tests
+        script: gte
+        args: all
+  test:
+    - llm_gte_test
+llm_qwen3-embedding:
+  include:
+    - models/embedding/qwen3-embedding
+  exclude:
+    - models/embedding/qwen3-embedding/README.MD
+  example_case:
+    - llm_qwen3-embedding_test:
+        test_type: models_tests
+        script: qwen3_embedding
+        args: all
+  test:
+    - llm_qwen3-embedding_test
+tts_cosyvoice3:
+  include:
+    - models/tts/cosyvoice3
+  exclude:
+    - models/tts/cosyvoice3/README.MD
+  example_case:
+    - tts_cosyvoice3_test:
+        test_type: models_tests
+        script: cosyvoice3
+        args: all
+  test:
+    - tts_cosyvoice3_test
+utils:
+  include:
+    - utils
+    - release.cmake
+    # - env.sh
+  exclude: null
+  example_case: null
+  test:
+    - backbone_resnet50_test
+    - detection_yolov5s_test
+    - autodrive_yolop_test
+
+###### hmatc ######
+hmatc:
+  include:
+    - hmatc
+  exclude:
+    - hmatc/README.MD
+    - hmatc/.clang-format
+  example_case: null
+  test:
+    # test models
+    - backbone_resnet50_test
+    - detection_yolov5s_test
+
+###### apis ######
+inferences_resnet50:
+  include:
+    - apis/inferences/resnet50
+  exclude:
+    - apis/inferences/resnet50/README.MD
+  example_case:
+    - inferences_resnet50_test:
+        test_type: apis_tests
+        script: resnet50 and inference
+        args: all
+  test:
+    - inferences_resnet50_test
+inferences_yolov5s:
+  include:
+    - apis/inferences/yolov5s
+  exclude:
+    - apis/inferences/yolov5s/README.MD
+  example_case:
+    - inferences_yolov5s_test:
+        test_type: apis_tests
+        script: yolov5s and inference
+        args: all
+  test:
+    - inferences_yolov5s_test
+inferences_resnet50_multistreams:
+  include:
+    - apis/inferences/resnet50_multistreams
+  exclude:
+    - apis/inferences/resnet50_multistreams/README.MD
+  example_case:
+    - inferences_resnet50_multistreams_test:
+        test_type: apis_tests
+        script: resnet50 and multistreams
+        args: all
+  test:
+    - inferences_resnet50_multistreams_test
+inferences_resnet50_pipeline:
+  include:
+    - apis/inferences/resnet50_pipeline
+  exclude:
+    - apis/inferences/resnet50_pipeline/README.MD
+  example_case:
+    - inferences_resnet50_pipeline_test:
+        test_type: apis_tests
+        script: resnet50 and pipeline
+        args: all
+  test:
+    - inferences_resnet50_pipeline_test
+inferences_qwen3:
+  include:
+    - apis/inferences/qwen3
+  exclude:
+    - apis/inferences/qwen3/README.MD
+  example_case:
+    - inferences_qwen3_test:
+        test_type: apis_tests
+        script: qwen3 and inference
+        args: all
+  test:
+    - inferences_qwen3_test
+inferences_qwen3_multibatch:
+  include:
+    - apis/inferences/qwen3_multibatch
+  exclude:
+    - apis/inferences/qwen3_multibatch/README.MD
+  example_case:
+    - inferences_qwen3_multibatch_test:
+        test_type: apis_tests
+        script: qwen3_multibatch
+        args: all
+  test:
+    - inferences_qwen3_multibatch_test
+inferences_qwen3_speculative:
+  include:
+    - apis/inferences/qwen3_speculative
+  exclude:
+    - apis/inferences/qwen3_speculative/README.MD
+  example_case:
+    - inferences_qwen3_speculative_test:
+        test_type: apis_tests
+        script: qwen3_speculative
+        args: all
+  test:
+    - inferences_qwen3_speculative_test
+apis_common:
+  include:
+    - apis/common
+  exclude: null
+  example_case: null
+  test:
+    - inferences_resnet50_test
+    - inferences_yolov5s_test
+    - inferences_resnet50_multistreams_test
+    - inferences_resnet50_pipeline_test
+    - inferences_qwen3_test
+
+###### tools ######
+# tools_tcim_perf:
+#   include:
+#     - tools/tcim_perf
+#   exclude:
+#     - tools/tcim_perf/README.MD
+#   example_case:
+#     - tools_tcim_perf_test:
+#         script: ../tools/tcim_perf/build.sh
+#   test:
+#     - tools_tcim_perf_test
+tools_computing_perf:
+  include:
+    - tools/computing_perf
+  exclude:
+    - tools/computing_perf/README.MD
+  example_case:
+    - tools_computing_perf_test:
+        script: ../tools/computing_perf/run.sh
+  test:
+    - tools_computing_perf_test
+tools_bandwidth_perf:
+  include:
+    - tools/bandwidth_perf
+  exclude:
+    - tools/bandwidth_perf/README.MD
+  example_case:
+    - tools_bandwidth_perf_test:
+        script: ../tools/bandwidth_perf/run.sh
+  test:
+    - tools_bandwidth_perf_test
+
+hmeval_examples_llm:
+  include:
+    - hmeval
+  exclude:
+    - hmeval/README_zh.md
+    - hmeval/README.md
+    - hmeval/requirements.txt
+    - hmeval/.gitignore
+  example_case:
+    - hmeval_examples_llm_test:
+        script: ../hmeval/examples/qwen3/test.sh
+  test:
+    - hmeval_examples_llm_test
+
+hmeval_examples_vlm:
+  include:
+    - hmeval
+  exclude:
+    - hmeval/README_zh.md
+    - hmeval/README.md
+    - hmeval/requirements.txt
+    - hmeval/.gitignore
+  example_case:
+    - hmeval_examples_vlm_test:
+        script: ../hmeval/examples/qwen3-vl/test.sh
+  test:
+    - hmeval_examples_vlm_test
+
+###### tests ######
+models_tests:
+  include:
+    - tests/models_tests
+  exclude:
+    - tests/models_tests/README.md
+    - tests/models_tests/__init__.py
+    - tests/models_tests/model_names.txt
+    - tests/models_tests/model_configs/
+    - tests/hmatc_tests/hmatc_configs/
+    - tests/models_tests/test_get_models.py
+    - tests/models_tests/test_quant_models.py
+    - tests/models_tests/test_compile_models.py
+    - tests/models_tests/test_demo_models.py
+    - tests/models_tests/test_perf_models.py
+    - tests/models_tests/test_eval_models.py
+    - tests/models_tests/test_compare_models.py
+    - tests/models_tests/update_test_py.py
+  example_case: null
+  test:
+    - backbone_resnet50_test
+    - detection_yolov5s_test
+    - inferences_resnet50_test
+    - llm_qwen3_test
+    - vlm_qwen3-vl_test
+
+apis_tests:
+  include:
+    - tests/apis_tests
+  exclude:
+    - tests/apis_tests/__init__.py
+  example_case: null
+  test:
+    - inferences_yolov5s_test
+    - inferences_resnet50_pipeline_test
+
+###### all ######
+all:
+  include:
+    - run_all.py
+  exclude: null
+  example_case: null
+  test:
+    # - autodrive_yolop_test
+    - backbone_resnet50_test
+    # - backbone_efficientnet_test
+    # - backbone_mobilenetv2_test
+    # - backbone_ViT-B-16_test
+    - detection_yolov5s_test
+    # - detection_yolov3_test
+    # - detection_yolov8m_test
+    # - detection_yolo12m_test
+    # - detection_yolov5s_feature
+    - segmentation_yolov8m_seg_test
+    - llm_qwen3_test
+    - vlm_qwen3-vl_test
+    - llm_gpt-oss_test
+    - llm_qwen3_30b_a3b_test
+    - inferences_resnet50_test
+    - inferences_yolov5s_test
+    - inferences_resnet50_pipeline_test
+    - inferences_resnet50_multistreams_test

@@ -1,0 +1,36 @@
+model:
+  name: yolov5s
+  save_dir: output
+  model_path: yolov5s.onnx
+  inputs:
+    images:
+      shape: [1, 3, 640, 640]  # NCHW
+      data_format: RGB
+      mean: [0.0, 0.0, 0.0]
+      std: [255.0, 255.0, 255.0]
+      resize_type: 0
+  model_impl_module: model_impl
+  model_impl_cls: YoloV5
+
+quant:
+  calib_data: coco2017/val2017
+  calib_num: 50
+  config:
+    mix_attn_outs:
+      - "/model.24/Sigmoid"
+      - "/model.24/Sigmoid_1"
+      - "/model.24/Sigmoid_2"
+
+build:
+  ncore: 2
+  opt_level: 2
+
+demo:
+  data_dir: coco2017/val2017
+  num: 10
+
+eval:
+  data_dir: coco2017
+  num: 0
+  dataset_module: dataset
+  dataset_cls: Dataset

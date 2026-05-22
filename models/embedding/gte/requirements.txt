@@ -1,0 +1,5 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+transformers==4.57.0
+sentence-transformers
+tokenizers==0.22.0
+shapely

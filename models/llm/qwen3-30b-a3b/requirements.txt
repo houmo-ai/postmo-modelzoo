@@ -1,0 +1,3 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+transformers==4.57.3
+optimum

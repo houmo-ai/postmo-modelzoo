@@ -1,0 +1,52 @@
+{
+    "obsolete": false,
+    "model_dir": "models/asr/glm-asr",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2"],
+            "source_type": [null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": ["cached_models/glm-asr-nano-2512"],
+            "out-dir": ["cached_results/hmquant_xh2"]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2"],
+            "stage": ["build"],
+            "j": ["24"],
+            "output_dir": ["cached_results/hmm_xh2"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "processor_path": ["cached_models/glm-asr-nano-2512"],
+            "encoder_path": ["cached_results/hmm_xh2/glm-asr_encode.hmm"],
+            "prefill_path": ["cached_results/hmm_xh2/glm-asr_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2/glm-asr_decode.hmm"],
+            "embedding_path": [
+                "cached_results/hmm_xh2/hmquant/quant_embedding.pt"
+            ],
+            "ndevice": [null]
+        }
+    }
+}

@@ -1,0 +1,44 @@
+model:
+  name: ppocrv3_rec
+  save_dir: output
+  model_path: paddleocr_rec-sim.onnx
+  inputs:
+    generated_tensor_239:
+      shape: [1, 3, 48, 320]  # NCHW, H=48固定, W=320
+      data_format: BGR
+      mean: [127.5, 127.5, 127.5]
+      std: [127.5, 127.5, 127.5]
+      resize_type: 2          # 固定高度等比例宽度+右侧padding (OCR识别)
+      padding_values: [128, 128, 128]  # 对齐onnx_preprocess: normalize后padding=0
+  model_impl_module: model_impl
+  model_impl_cls: OCRRec
+
+quant:
+  quant_type: w8a8h1_sefp
+  calib_data: CCPD2020/quant_data/rec
+  mix_search:
+    topk: 0.1
+    weight_bits:
+      - 8
+      - 16
+    act_bits:
+      - 8
+      - 16
+    policy: topk
+    task: cv_cls
+    metric: l1
+    key_name: loss
+
+build:
+  ncore: 1
+  opt_level: 2
+
+demo:
+  data_dir: CCPD2020/PPOCR/val/crop_imgs
+  num: 10
+
+eval:
+  data_dir: CCPD2020
+  num: 0
+  dataset_module: ccpd2020_dataset
+  dataset_cls: CCPD2020DataSet

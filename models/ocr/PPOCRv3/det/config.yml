@@ -1,0 +1,34 @@
+model:
+  name: ppocrv3_det
+  save_dir: output
+  model_path: paddleocr_det-sim.onnx
+  inputs:
+    generated_tensor_301:
+      shape: [1, 3, 1184, 736]  # NCHW
+      data_format: BGR
+      mean: [123.675, 116.28, 103.53]
+      std: [58.395, 57.12, 57.375]
+      resize_type: 0
+      resizer:
+        toYUV_format: YUV420SP
+  model_impl_module: model
+  model_impl_cls: OCRDet
+
+quant:
+  calib_data: CCPD2020/quant_data/det
+  calib_num: 50
+
+build:
+  ncore: 1
+  opt_level: 2
+
+demo:
+  data_dir: CCPD2020/ccpd_green/val
+  num: 10
+
+eval:
+  data_dir: CCPD2020
+  num: 0
+  dataset_module: dataset
+  dataset_cls: CCPD2020DataSet
+

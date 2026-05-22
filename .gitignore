@@ -1,0 +1,116 @@
+# Build & install directories
+build/
+build_ndk/
+bin/
+output/
+out/
+__pycache__/
+hir_log/
+reports/
+customized/
+tmp_*/
+data/
+toolchains/
+3rdparty/
+work_dirs/
+
+# media files
+*.jpg
+*.png
+*.jpeg
+*.JPEG
+*.bmp
+*.h264
+*.svg
+
+# Data files
+*.npy
+*.log
+*.hir
+*.dot
+*.bin
+*.json
+
+# Compressed files
+*.zip
+*.7z
+*.rar
+*.gz
+*.tgz
+*.bz
+*.tar
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+*.ko
+*.hu
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+*.whl
+*.run
+*.deb
+
+# Model files
+*.onnx
+*.pt
+*.pth
+*.hmm
+*.safetensors*
+*.torchscript*
+
+# vim temporary files
+*.swp
+*.swo
+
+# Visual Studio Code / Cursor
+.vscode
+.cursor/
+
+# Python type checking
+.mypy_cache/
+.pyre/
+
+# temp file
+*~
+results_*
+result.yml
+vis*
+pred*
+*.npz
+*.tar.xz
+*.tar.gz
+*.zip
+*.skills
+output*
+wiki*
+.msc
+.mv
+tmp
+*_version.py
+3rdparty
+benchmark
+demo
+tests
+CCPD*
+datasets

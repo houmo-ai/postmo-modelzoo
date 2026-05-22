@@ -1,0 +1,30 @@
+Streams:
+  - ModelName: Qwen2.5-7B
+    prefill: output/xh2/qwen2.5_prefill.hmm
+    decode: output/xh2/qwen2.5_decode.hmm
+    embedding: output/xh2/hmquant/quant_embedding.bin
+    input: 256
+    output: 256
+    loop: 1
+    batch: 1
+    no_warm_up: ''
+  - ModelName: Qwen2.5-7B
+    prefill: output/xh2/qwen2.5_prefill.hmm
+    decode: output/xh2/qwen2.5_decode.hmm
+    embedding: output/xh2/hmquant/quant_embedding.bin
+    input: 1024
+    output: 256
+    loop: 1
+    batch: 1
+    no_warm_up: ''
+  - ModelName: Qwen2.5-7B
+    prefill: output/xh2/qwen2.5_prefill.hmm
+    decode: output/xh2/qwen2.5_decode.hmm
+    embedding: output/xh2/hmquant/quant_embedding.bin
+    input: 2048
+    output: 256
+    loop: 1
+    batch: 1
+    no_warm_up: ''
+
+dump_file: perf_result.yaml

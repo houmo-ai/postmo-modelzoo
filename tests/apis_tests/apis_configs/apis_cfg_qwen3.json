@@ -1,0 +1,30 @@
+{
+    "obsolete": false,
+    "example_dir": "apis/inferences/qwen3",
+    "support_platform": ["x86_64", "aarch64"],
+    "support_backend": {
+        "xh1": ["python"],
+        "xh2": ["python", "cpp"]
+    },
+    "support_core_num": {
+        "xh1": [2, 4],
+        "xh2": [2]
+    },
+    "get_model_params": {
+        "xh1": {
+            "ncore": ["default", "2", "4"]
+        },
+        "xh2": null
+    },
+    "py_example_params": {
+        "name": ["demo.py", "demo_prefix_caching.py"],
+        "tokenizer_dir": [null, null],
+        "embedding_path": [null, null],
+        "prefill_path": [null, null],
+        "decode_path": [null, null],
+        "ndevice": [null, null]
+    },
+    "cpp_example_params": {
+        "name": ["example_cxx_qwen3"]
+    }
+}

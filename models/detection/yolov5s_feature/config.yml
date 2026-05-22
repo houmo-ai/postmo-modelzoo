@@ -1,0 +1,34 @@
+model:
+  name: yolov5s
+  save_dir: output
+  model_path: yolov5s.onnx
+  inputs:
+    images:
+      shape: [1, 3, 640, 640]
+      data_format: RGB
+      mean: [0.0, 0.0, 0.0]
+      std: [255.0, 255.0, 255.0]
+      resize_type: 1
+      padding_mode: 1
+      padding_values: [114, 114, 114]
+  model_impl_module: model_impl
+  model_impl_cls: YoloV5
+  
+quant:
+  calib_data: coco2017/val2017
+  calib_num: 32
+
+build:
+  ncore: 1
+  opt_level: 2
+
+
+demo:
+  data_dir: coco2017/val2017
+  num: 10
+
+eval:
+  data_dir: coco2017
+  num: 0
+  dataset_module: dataset
+  dataset_cls: Dataset

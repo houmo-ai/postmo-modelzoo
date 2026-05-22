@@ -1,0 +1,24 @@
+model:
+  name: resnet50
+  save_dir: output
+  model_path: ../../../models/resnet50.onnx
+  inputs:
+    input.1:
+      shape: [1, 3, 224, 224]  # NCHW
+      data_format: RGB
+      mean: [123.675, 116.28, 103.53]
+      std: [58.395, 57.12, 57.375]
+      resize_type: 0
+      resizer:
+        toYUV_format: YUV420SP
+        max_input_size: [512, 512]
+        enable_static_resizer: false
+
+quant:
+  calib_data: ./imagenet/ILSVRC2012_img_val
+  calib_num: 32
+
+build:
+  ncore: 1
+  opt_level: 2
+

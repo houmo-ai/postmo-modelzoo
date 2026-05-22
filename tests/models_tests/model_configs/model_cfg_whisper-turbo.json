@@ -1,0 +1,57 @@
+{
+    "obsolete": false,
+    "model_dir": "models/asr/whisper-turbo",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
+    },
+    "support_hmatc": null,
+    "perf_metrics": {
+        "xh2": {
+            "x86_64": {
+                "decode": 151.06,
+                "end2end": 63.34
+            }
+        }
+    },
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2"],
+            "source_type": [null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": ["cached_models/whisper-large-v3-turbo"],
+            "out-dir": ["cached_results/hmquant_xh2"]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2"],
+            "stage": ["build"],
+            "j": ["24"],
+            "output_dir": ["cached_results/hmm_xh2"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "tokenizer_path": ["cached_models/whisper-large-v3-turbo"],
+            "encoder_path": ["cached_results/hmm_xh2/whisper_encoder.hmm"],
+            "decoder_path": ["cached_results/hmm_xh2/whisper_decoder.hmm"],
+            "prefill_path": ["cached_results/hmm_xh2/whisper_prefill.hmm"]
+        }
+    },
+    "perf_params": "demo"
+}

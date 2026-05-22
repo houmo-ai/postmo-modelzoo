@@ -1,0 +1,9 @@
+models
+build
+dist
+*.egg-info
+*.pyc
+*.so
+__pycache__
+3rdparty/spdlog
+*_version.py

@@ -1,0 +1,35 @@
+--extra-index-url https://pypi.ngc.nvidia.com
+onnx_graphsurgeon
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+typing-extensions
+numpy
+opencv-python
+prettytable
+torch
+torchvision
+onnx
+onnxruntime
+tqdm
+pyyaml
+xlsxwriter
+requests
+pycocotools
+ultralytics
+transformers
+jinja2
+loguru
+modelscope
+gitpython
+
+# xh_model_zoo
+compressed_tensors
+
+# asr
+torchaudio
+openai-whisper
+langid
+librosa
+
+# diffusion
+diffusers
+peft

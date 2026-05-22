@@ -1,0 +1,6 @@
+[submodule "hmodel/xh2"]
+	path = hmodel/xh2
+	url = ssh://gerrit.houmo.ai:29418/houmoquantization/xh2modelzoo
+[submodule "hmodel/gptqmodel"]
+	path = hmodel/gptqmodel
+	url = ssh://gerrit.houmo.ai:29418/houmoquantization/gptqmodel
