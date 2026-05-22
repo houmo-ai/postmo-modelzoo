@@ -265,6 +265,8 @@ setup_python_venv() {
     local current_python_version=
     local venv_python_version=
     local recreate_venv=0
+    local requirements_ptq_file=
+    local has_quant_step=0
 
     TEST_VENV_ACTIVE=0
     TEST_VENV_DIR="${venv_dir}"
@@ -278,6 +280,13 @@ setup_python_venv() {
         echo "Error: python3 not found." >&2
         return 1
     fi
+
+    # Check if quant step is included
+    if should_run_step "quant"; then
+        has_quant_step=1
+    fi
+    # Check for requirements_ptq.txt in the same directory as requirements_file
+    requirements_ptq_file="$(dirname "${requirements_file}")/requirements_ptq.txt"
 
     echo "⚠ Create python3 venv for ${venv_label}."
     system_site_packages=$("${python_exe}" -c "import site; print(site.getsitepackages()[0])")
@@ -337,6 +346,12 @@ setup_python_venv() {
     fi
 
     source "${venv_dir}/bin/activate"
+
+    # If quant step is included and requirements_ptq.txt exists, install it too
+    if [[ "${has_quant_step}" -eq 1 ]] && [[ -f "${requirements_ptq_file}" ]]; then
+        echo "Installing additional PTQ requirements from ${requirements_ptq_file}"
+        pip3 install -r "${requirements_ptq_file}"
+    fi
     pip3 install -r "${requirements_file}"
 
     TEST_VENV_ACTIVE=1

@@ -1,0 +1,20 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+transformers==4.57.3
+torch==2.8.0
+torchaudio==2.8.0
+onnx
+onnxsim
+onnxruntime
+numpy
+loguru
+compressed_tensors
+### export hift onnx
+# hyperpyyaml
+# omegaconf
+# conformer
+# hydra-core
+# lightning
+# gdown
+# wget
+# x_transformers
+# pyworld
