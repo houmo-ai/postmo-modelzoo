@@ -12,7 +12,7 @@
         "xh2": [2]
     },
     "support_flow": {
-        "xh2": ["get_model", "quant", "compile"]
+        "xh2": ["get_model", "quant", "compile", "demo"]
     },
     "support_hmatc": null,
     "perf_metrics": {
@@ -26,62 +26,84 @@
     },
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "hmm"],
-            "download_dir": ["cached_models", "cached_models"],
-            "extract_dir": [null, "cached_models/hmm_xh2_26b-a4b_128k"],
-            "model_name": ["gemma4", "gemma4"],
-            "model_size": ["26b-a4b", "26b-a4b"],
-            "context_length": [null, "128k"],
-            "ndevice": ["1", "1"],
-            "prefill_length": [null, null],
-            "batch": [null, null],
-            "source_type": [null, null]
+            "type": ["raw", "hmm", "hmm", "hmm"],
+            "download_dir": ["cached_models", "cached_models",  "cached_models",  "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_26b-a4b_2k", "cached_models/hmm_xh2_e2b_256k", "cached_models/hmm_xh2_e4b_256k"],
+            "model_name": ["gemma4", "gemma4", "gemma4", "gemma4"],
+            "model_size": ["26b-a4b", "26b-a4b", "e2b", "e4b"],
+            "context_length": [null, "2k", "256k", "256k"],
+            "ndevice": ["1", "1", "1", "1"],
+            "prefill_length": [null, null, null, null],
+            "batch": [null, null, null, null],
+            "source_type": [null, null, null, null]
         }
     },
     "quant_params": {
         "xh2": {
-            "model": ["cached_models/gemma-4-26B-A4B-it"],
-            "model-name": ["gemma4"],
-            "model-size": ["26b-a4b"],
-            "out-dir": ["cached_results/hmquant_xh2_26b-a4b_2k"],
-            "context-length": ["2048"]
+            "model": ["cached_models/gemma-4-26B-A4B-it", "cached_models/gemma-4-E2B-it", "cached_models/gemma-4-E4B-it"],
+            "model-name": ["gemma4", "gemma4", "gemma4"],
+            "model-size": ["26b-a4b", "e2b", "e4b"],
+            "out-dir": ["cached_results/hmquant_xh2_26b-a4b_2k", "cached_results/hmquant_xh2_e2b_2k", "cached_results/hmquant_xh2_e4b_2k"],
+            "context-length": ["2048", "2048", "2048"]
         }
     },
     "compile_params": {
         "xh2": {
-            "model_dir": ["cached_results/hmquant_xh2_26b-a4b_2k/hmquant"],
-            "model_name": ["gemma4"],
-            "model_size": ["26b-a4b"],
-            "ncore": [null],
-            "batch": [null],
-            "ndevice": ["1"],
-            "context_length": ["131072"],
-            "prefill_length": [null],
-            "max_size_w": ["448"],
-            "max_size_h": ["448"],
-            "output_dir": ["cached_results/hmm_xh2_26b-a4b_128k"]
+            "model_dir": ["cached_results/hmquant_xh2_26b-a4b_2k/hmquant", "cached_results/hmquant_xh2_e2b_256k/hmquant", "cached_results/hmquant_xh2_e4b_256k/hmquant"],
+            "model_name": ["gemma4", "gemma4", "gemma4"],
+            "model_size": ["26b-a4b", "e2b", "e4b"],
+            "ncore": [null, null, null],
+            "batch": [null, null, null],
+            "ndevice": ["1", "1", "1"],
+            "context_length": ["131072", "262144", "262144"],
+            "prefill_length": [null, null, null],
+            "max_size_w": ["448", "448", "448"],
+            "max_size_h": ["448", "448", "448"],
+            "output_dir": ["cached_results/hmm_xh2_26b-a4b_128k", "cached_results/hmm_xh2_e2b_256k", "cached_results/hmm_xh2_e4b_256k"]
         }
     },
     "demo_params": {
         "xh2": {
-            "tokenizer_dir": ["cached_models/gemma-4-26B-A4B-it"],
+            "tokenizer_dir": [
+                "cached_models/gemma-4-26B-A4B-it", 
+                "cached_models/gemma-4-E2B-it", 
+                "cached_models/gemma-4-E4B-it"
+            ],
             "embedding_path": [
-                "cached_results/hmm_xh2_26b-a4b_128k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_26b-a4b_2k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_e2b_256k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_e4b_256k/hmquant/quant_embedding.pt"
             ],
             "vit_path": [
-                "cached_results/hmm_xh2_26b-a4b_128k/gemma4-26b-a4b_visual_448x448.hmm"
+                "cached_results/hmm_xh2_26b-a4b_2k/gemma4-26b-a4b_visual_448x448.hmm",
+                "cached_results/hmm_xh2_e2b_256k/gemma4-e2b_visual_448x448.hmm",
+                "cached_results/hmm_xh2_e4b_256k/gemma4-e4b_visual_448x448.hmm"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_26b-a4b_128k/gemma4-26b-a4b_prefill.hmm"
+                "cached_results/hmm_xh2_26b-a4b_2k/gemma4-26b-a4b_prefill.hmm",
+                "cached_results/hmm_xh2_e2b_256k/gemma4-e2b_prefill.hmm",
+                "cached_results/hmm_xh2_e4b_256k/gemma4-e4b_prefill.hmm"
             ],
             "decode_path": [
-                "cached_results/hmm_xh2_26b-a4b_128k/gemma4-26b-a4b_decode.hmm"
+                "cached_results/hmm_xh2_26b-a4b_2k/gemma4-26b-a4b_decode.hmm",
+                "cached_results/hmm_xh2_e2b_256k/gemma4-e2b_decode.hmm",
+                "cached_results/hmm_xh2_e4b_256k/gemma4-e4b_decode.hmm"
             ],
-            "model_name": ["gemma4"],
-            "model_size": ["26b-a4b"],
-            "ndevice": ["1"],
-            "max_size_w": ["448"],
-            "max_size_h": ["448"]
+            "audio_path": [
+                null,
+                "cached_results/hmm_xh2_e2b_256k/gemma4-e2b_audio.hmm",
+                "cached_results/hmm_xh2_e4b_256k/gemma4-e4b_audio.hmm"
+            ],
+            "per_layer_input_builder_path": [
+                null,
+                "cached_results/hmm_xh2_e2b_256k/hmquant/per_layer_input_builder.pt",
+                "cached_results/hmm_xh2_e4b_256k/hmquant/per_layer_input_builder.pt"
+            ],
+            "model_name": ["gemma4", "gemma4", "gemma4"],
+            "model_size": ["26b-a4b", "e2b", "e4b"],
+            "ndevice": ["1", "1", "1"],
+            "max_size_w": ["448", "448", "448"],
+            "max_size_h": ["448", "448", "448"]
         }
     },
     "perf_params": "demo"

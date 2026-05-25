@@ -45,15 +45,38 @@ class ProcessMemoryMonitor:
         return self._thread is not None and self._thread.is_alive()
 
     def get_memory_info(self) -> Dict[str, float]:
-        """Returns current memory usage: {'rss_mb': float, 'percent': float}."""
+        """Returns current memory usage including all child processes.
+
+        Returns:
+            {'rss_mb': float, 'percent': float, 'main_rss_mb': float, 'children_rss_mb': float}
+        """
         try:
-            mem = self._process.memory_info()
+            main_mem = self._process.memory_info()
+            main_rss = main_mem.rss
+            main_percent = self._process.memory_percent()
+            children_rss = 0.0
+
+            # Recursively get memory of all child processes
+            for child in self._process.children(recursive=True):
+                try:
+                    children_rss += child.memory_info().rss
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+
+            total_rss = main_rss + children_rss
             return {
-                "rss_mb": mem.rss / (1024 * 1024),
-                "percent": self._process.memory_percent(),
+                "rss_mb": total_rss / (1024 * 1024),
+                "percent": main_percent,  # System percent for main process only
+                "main_rss_mb": main_rss / (1024 * 1024),
+                "children_rss_mb": children_rss / (1024 * 1024),
             }
         except psutil.NoSuchProcess:
-            return {"rss_mb": 0.0, "percent": 0.0}
+            return {
+                "rss_mb": 0.0,
+                "percent": 0.0,
+                "main_rss_mb": 0.0,
+                "children_rss_mb": 0.0,
+            }
 
     def start(self) -> "ProcessMemoryMonitor":
         """Starts monitoring in a daemon thread."""
@@ -104,7 +127,13 @@ class ProcessMemoryMonitor:
             self._peak_rss_mb = max(self._peak_rss_mb, mem_info["rss_mb"])
 
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            msg = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System: {mem_info['percent']:.2f}%"
+            # Show breakdown: main + children
+            msg = (
+                f"{timestamp} - Total RSS: {mem_info['rss_mb']:.2f} MB "
+                f"(main: {mem_info['main_rss_mb']:.2f} MB, "
+                f"children: {mem_info['children_rss_mb']:.2f} MB), "
+                f"System: {mem_info['percent']:.2f}%"
+            )
 
             if self._file_handle:
                 self._file_handle.write(msg + "\n")

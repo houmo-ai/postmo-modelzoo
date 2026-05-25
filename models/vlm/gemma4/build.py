@@ -21,11 +21,12 @@
 import os
 import argparse
 import multiprocessing
-import glob
+import psutil
 
 from hmatc.exec.xh2_exec import Xh2Exec
 from hmatc.utils.monitor import ProcessMemoryMonitor
 from hmatc.utils.utils import (
+    logger,
     find_hmonnx_file,
     first_not_none,
     get_model_configs,
@@ -60,171 +61,47 @@ def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> 
 
 
 def get_args() -> argparse.Namespace:
+    # fmt: off
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        dest="config_path",
-        type=str,
-        default=DEFAULT_CONFIG_PATH,
-        help="path to config.yaml",
-    )
-    parser.add_argument(
-        "--model_dir",
-        dest="model_dir",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
-        help="path to the model directory",
-    )
-    parser.add_argument(
-        "--model_name",
-        dest="model_name",
-        type=str,
-        default=None,
-        help="output houmo model name",
-    )
-    parser.add_argument(
-        "--model_size",
-        dest="model_size",
-        type=str,
-        default=None,
-        help="output houmo model size",
-    )
-    parser.add_argument(
-        "--output_dir",
-        dest="output_dir",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET),
-        help="output directory for built models",
-    )
-    parser.add_argument(
-        "--ncore",
-        dest="ncore",
-        type=int,
-        default=None,
-        help="core number",
-    )
-    parser.add_argument(
-        "--j",
-        dest="parallel_jobs",
-        type=int,
-        default=multiprocessing.cpu_count(),
-        help="build parallel jobs",
-    )
-    parser.add_argument(
-        "--context_length",
-        dest="context_length",
-        type=int,
-        default=None,
-        help="context length for llm models",
-    )
-    parser.add_argument(
-        "--prefill_length",
-        dest="prefill_length",
-        type=int,
-        default=None,
-        help="prefill length for prefill model",
-    )
-    parser.add_argument(
-        "--batch",
-        dest="batch",
-        type=int,
-        default=None,
-        help="batch size for decode model",
-    )
-    parser.add_argument(
-        "--ndevice",
-        dest="ndevice",
-        type=int,
-        default=None,
-        help="device number for multi-device",
-    )
-    parser.add_argument(
-        "--stage",
-        dest="stage",
-        type=str,
-        default="build",
-        choices=["build", "test", "all"],
-        help="build stage",
-    )
-    parser.add_argument(
-        "--max_size_w",
-        dest="max_size_w",
-        type=int,
-        default=None,
-        help="max image width for visual model name suffix",
-    )
-    parser.add_argument(
-        "--max_size_h",
-        dest="max_size_h",
-        type=int,
-        default=None,
-        help="max image height for visual model name suffix",
-    )
-    parser.add_argument(
-        "--flash_attention",
-        dest="flash_attention",
-        nargs=2,
-        type=int,
-        default=(2, 1),
-        help="FlashAttention optimization switches: "
-        "1st int = prefill/decode model switch (0=off, 1/2=on), "
-        "2nd int = ViT model switch (0=off, 1=on); "
-        "e.g., --flash_attention 2 1 (prefill&decode=2, ViT=1)",
-    )
-    parser.add_argument(
-        "--enable_common_subgraph",
-        dest="enable_common_subgraph",
-        action="store_true",
-        default=False,
-        help="enable common subgraph optimization",
-    )
-    parser.add_argument(
-        "--enable_xh2_stable_output",
-        dest="enable_xh2_stable_output",
-        action="store_true",
-        default=False,
-        help="enable stable output",
-    )
-    parser.add_argument(
-        "--monitor_interval",
-        dest="monitor_interval",
-        type=float,
-        default=1.0,
-        help="memory monitor interval in seconds",
-    )
-
+    parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
+    parser.add_argument("--model_dir", dest="model_dir", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant"), help="path to the model directory")
+    parser.add_argument("--model_name", dest="model_name", type=str, default=None, help="output houmo model name")
+    parser.add_argument("--model_size", dest="model_size", type=str, default=None, help="output houmo model size")
+    parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", HOUMO_TARGET), help="output directory for built models")
+    parser.add_argument("--ncore", dest="ncore", type=int, default=None, help="core number")
+    parser.add_argument("--j", dest="parallel_jobs", type=int, default=psutil.cpu_count(logical=False), help="build parallel jobs")
+    parser.add_argument("--context_length", dest="context_length", type=int, default=None, help="context length for llm models")
+    parser.add_argument("--prefill_length", dest="prefill_length", type=int, default=None, help="prefill length for prefill model")
+    parser.add_argument("--batch", dest="batch", type=int, default=None, help="batch size for decode model")
+    parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number for multi-device")
+    parser.add_argument("--stage", dest="stage", type=str, default="build", choices=["build", "test", "all"], help="build stage")
+    parser.add_argument("--max_size_w", dest="max_size_w", type=int, default=None, help="max image width for visual model name suffix")
+    parser.add_argument("--max_size_h", dest="max_size_h", type=int, default=None, help="max image height for visual model name suffix")
+    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 1), help="FlashAttention switches: 1st=llm(0/1/2), 2nd=vit(0/1); e.g. --flash_attention 2 1")
+    parser.add_argument("--enable_common_subgraph", dest="enable_common_subgraph", action="store_true", default=False, help="enable common subgraph optimization")
+    parser.add_argument("--enable_xh2_stable_output", dest="enable_xh2_stable_output", action="store_true", default=False, help="enable stable output")
+    parser.add_argument("--mtp", dest="mtp", action="store_true", default=False, help="enable mtp optimization")
+   
     args = parser.parse_args()
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     args.batch = first_not_none(args.batch, model_config.get("batch", 1))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    args.prefill_length = first_not_none(
-        args.prefill_length, model_config.get("prefill_length", 256)
-    )
+    args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
     if args.context_length is None:
-        args.context_length = parse_context_length(
-            model_config.get("context_length", "128k")
-        )
-    args.max_size_w = first_not_none(
-        args.max_size_w, model_config.get("max_size_w", 448)
-    )
-    args.max_size_h = first_not_none(
-        args.max_size_h, model_config.get("max_size_h", 448)
-    )
-    args.flash_attention = _validate_adjust_flash_attention(
-        args.flash_attention, args.context_length
-    )
+        args.context_length = parse_context_length(model_config.get("context_length", "128k"))
+    args.max_size_w = first_not_none(args.max_size_w, model_config.get("max_size_w", 448))
+    args.max_size_h = first_not_none(args.max_size_h, model_config.get("max_size_h", 448))
+    args.flash_attention = _validate_adjust_flash_attention(args.flash_attention, args.context_length)
+    # fmt: on
     return args
 
 
 if __name__ == "__main__":
     args = get_args()
-    print(args)
 
     model_dir = args.model_dir
     model_name = args.model_name
@@ -233,22 +110,75 @@ if __name__ == "__main__":
     ncore = args.ncore
     ndevice = args.ndevice
     parallel_jobs = args.parallel_jobs
-    flash_attn, visual_flash_attn = args.flash_attention
+    llm_flash_attn, flash_attn = args.flash_attention
 
-    with ProcessMemoryMonitor(interval=args.monitor_interval, quiet=True) as monitor:
-        if args.stage in ["build", "all"]:
-            assert (
-                get_platform() == "x86_64"
-            ), "Only supported for compilation on the x86_64 platform."
+    if args.mtp and model_size not in ["26b-a4b"]:
+        logger.fatal("MTP optimization is only supported for 26b-a4b model size.")
 
+    if args.stage in ["build", "all"]:
+        assert (
+            get_platform() == "x86_64"
+        ), "Only supported for compilation on the x86_64 platform."
+        Xh2Exec.build_from_hmonnx(
+            is_prefill=True,
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "prefill")),
+            hmm_name=f"{model_name}-{model_size}_prefill",
+            output=output_dir,
+            ncore=ncore,
+            llm_batch=1,
+            flash_attn=llm_flash_attn,
+            llm_opt=True,
+            context_length=args.context_length,
+            prefill_length=args.prefill_length,
+            ndevice=ndevice,
+            enable_common_subgraph=args.enable_common_subgraph,
+            enable_xh2_stable_output=args.enable_xh2_stable_output,
+            parallel_jobs=parallel_jobs,
+        )
+        if not args.mtp:
             Xh2Exec.build_from_hmonnx(
-                is_prefill=True,
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "prefill")),
-                hmm_name=f"{model_name}-{model_size}_prefill",
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "decode")),
+                hmm_name=f"{model_name}-{model_size}_decode",
                 output=output_dir,
                 ncore=ncore,
-                batch=1,
+                llm_batch=args.batch,
+                flash_attn=llm_flash_attn,
+                llm_opt=True,
+                context_length=args.context_length,
+                ndevice=ndevice,
+                enable_common_subgraph=args.enable_common_subgraph,
+                enable_xh2_stable_output=args.enable_xh2_stable_output,
+                parallel_jobs=parallel_jobs,
+            )
+            visual_model_name = (
+                f"{model_name}-{model_size}_visual_{args.max_size_w}x{args.max_size_h}"
+            )
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "visual")),
+                hmm_name=visual_model_name,
+                output=output_dir,
+                ncore=ncore,
                 flash_attn=flash_attn,
+                parallel_jobs=parallel_jobs,
+            )
+        if model_size in ["e2b", "e4b"] and not args.mtp:
+            audio_model_name = f"{model_name}-{model_size}_audio"
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "audio")),
+                hmm_name=audio_model_name,
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=flash_attn,
+                parallel_jobs=parallel_jobs,
+            )
+
+        if args.mtp:
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "verify")),
+                hmm_name=f"{model_name}-{model_size}_verify",
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=llm_flash_attn,
                 llm_opt=True,
                 context_length=args.context_length,
                 prefill_length=args.prefill_length,
@@ -259,12 +189,12 @@ if __name__ == "__main__":
             )
 
             Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "decode")),
-                hmm_name=f"{model_name}-{model_size}_decode",
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "draft_onnx")),
+                hmm_name=f"{model_name}-{model_size}_draft",
                 output=output_dir,
                 ncore=ncore,
-                batch=args.batch,
-                flash_attn=flash_attn,
+                llm_batch=args.batch,
+                flash_attn=llm_flash_attn,
                 llm_opt=True,
                 context_length=args.context_length,
                 ndevice=ndevice,
@@ -272,17 +202,3 @@ if __name__ == "__main__":
                 enable_xh2_stable_output=args.enable_xh2_stable_output,
                 parallel_jobs=parallel_jobs,
             )
-
-            visual_model_name = (
-                f"{model_name}-{model_size}_visual_{args.max_size_w}x{args.max_size_h}"
-            )
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "visual")),
-                hmm_name=visual_model_name,
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=visual_flash_attn,
-                parallel_jobs=parallel_jobs,
-            )
-
-    print(f"\n=== Build completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ===")

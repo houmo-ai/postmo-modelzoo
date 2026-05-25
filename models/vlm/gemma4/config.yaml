@@ -1,5 +1,5 @@
 default_model_name: "gemma4"
-default_model_size: "26b-a4b"
+default_model_size: "e2b"
 
 model_configs:
   gemma4:
@@ -9,6 +9,30 @@ model_configs:
       model_size: "26b-a4b"
       ncore: 2
       context_length: "128k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      max_size_w: 448
+      max_size_h: 448
+
+    "e2b":
+      modelscope_repo: ["google/gemma-4-E2B-it"]
+      model_name: "gemma4"
+      model_size: "e2b"
+      ncore: 2
+      context_length: "256k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      max_size_w: 448
+      max_size_h: 448
+
+    "e4b":
+      modelscope_repo: ["google/gemma-4-E4B-it"]
+      model_name: "gemma4"
+      model_size: "e4b"
+      ncore: 2
+      context_length: "256k"
       ndevice: 1
       batch: 1
       prefill_length: 256

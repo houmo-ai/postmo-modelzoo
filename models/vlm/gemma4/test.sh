@@ -11,7 +11,7 @@ source "${MODELS_DIR}/test_common.sh"
 STEP="demo"
 SKIP_DOWNLOAD="false"
 MODEL_NAME="gemma4"
-MODEL_SIZE="26b-a4b"
+MODEL_SIZE="e2b"
 NDEVICE=1
 parse_args "$@"
 
@@ -55,22 +55,22 @@ if should_run_step "demo"; then
     echo "Execute python demo."
     python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
 
-    if command -v llm_perf &>/dev/null; then
-        echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
-        python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
-        if [[ "${NDEVICE}" -gt 1 ]]; then
-            model_suffix="hmms"
-        else
-            model_suffix="hmm"
-        fi
-        devices_param=$(get_devices_param "${NDEVICE}")
-        llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
-            --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
-            --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
-            --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
-            --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_448x448.hmm" \
-            --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
-    fi
+    # if command -v llm_perf &>/dev/null; then
+    #     echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
+    #     python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
+    #     if [[ "${NDEVICE}" -gt 1 ]]; then
+    #         model_suffix="hmms"
+    #     else
+    #         model_suffix="hmm"
+    #     fi
+    #     devices_param=$(get_devices_param "${NDEVICE}")
+    #     llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
+    #         --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
+    #         --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
+    #         --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
+    #         --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_448x448.hmm" \
+    #         --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
+    # fi
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

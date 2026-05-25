@@ -35,13 +35,7 @@ DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        dest="config_path",
-        type=str,
-        default=DEFAULT_CONFIG_PATH,
-        help="path to config.yaml",
-    )
+    parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
     parser.add_argument("--type", dest="file_type", type=str, default="hmm", choices=["raw", "hmm"], help="which resource to get, choice in [raw, hmm]")
     parser.add_argument("--download_dir", dest="download_dir", type=str, default=".", help="where to save downloaded model")
     parser.add_argument("--extract_dir", dest="extract_dir", type=str, default=None, help="where to save extracted files")
@@ -51,29 +45,24 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--batch", dest="batch", type=int, default=None)
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number")
     parser.add_argument("--prefill_length", dest="prefill_length", type=int, default=None, help="prefill length")
-    parser.add_argument("--model_size", dest="model_size", type=str, default=None, choices=["26b-a4b"])
+    parser.add_argument("--model_size", dest="model_size", type=str, default=None, choices=["26b-a4b", "e2b", "e4b"])
     args = parser.parse_args()
     return args
 # fmt: on
 
 
 if __name__ == "__main__":
+    # fmt: off
     args = get_args()
-
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     model_name = first_not_none(args.model_name, default_model_name)
     model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(model_name, {}).get(model_size, {})
     ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
     batch = first_not_none(args.batch, model_config.get("batch", 1))
-    prefill_length = first_not_none(
-        args.prefill_length, model_config.get("prefill_length", 256)
-    )
-    context_length = first_not_none(
-        args.context_length, model_config.get("context_length", "128k")
-    )
+    prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
+    context_length = first_not_none(args.context_length, model_config.get("context_length", "128k"))
+    # fmt: off
 
     model_cfgs = {
         "target": HOUMO_TARGET,
