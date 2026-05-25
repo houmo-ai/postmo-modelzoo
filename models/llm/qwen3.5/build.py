@@ -410,7 +410,7 @@ if __name__ == "__main__":
                 hmonnx=find_hmonnx_file(decode_dir),
                 hmm_name=f"{model_name}-{model_size}_decode",
                 output=output_dir,
-                batch=args.batch,
+                llm_batch=args.batch,
                 flash_attn=llm_flash_attention,
                 context_length=args.context_length,
                 ndevice=ndevice,

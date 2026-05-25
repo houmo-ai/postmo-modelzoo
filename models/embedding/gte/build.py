@@ -31,6 +31,7 @@ from hmatc.utils.utils import (
     first_not_none,
     get_model_configs,
     get_platform,
+    parse_context_length,
 )
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -123,6 +124,13 @@ def get_args() -> argparse.Namespace:
         help="build stage",
     )
     parser.add_argument(
+        "--context_length",
+        dest="context_length",
+        type=int,
+        default=None,
+        help="context length",
+    )
+    parser.add_argument(
         "--batch",
         dest="batch",
         type=int,
@@ -147,6 +155,10 @@ def get_args() -> argparse.Namespace:
     args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
     args.batch = first_not_none(args.batch, model_config.get("batch", 1))
+    if args.context_length is None:
+        args.context_length = parse_context_length(
+            model_config.get("context_length", "2k")
+        )
     return args
 
 
@@ -261,7 +273,6 @@ if __name__ == "__main__":
                 output=args.output_dir,
                 ncore=args.ncore,
                 ndevice=args.ndevice,
-                batch=args.batch,
                 parallel_jobs=args.j,
             )
 
@@ -271,7 +282,6 @@ if __name__ == "__main__":
                 os.path.join(args.model_dir, "prefill"),
                 args.output_dir,
                 profile,
-                batch=args.batch,
                 prefix=args.model_name,
             )
     print(

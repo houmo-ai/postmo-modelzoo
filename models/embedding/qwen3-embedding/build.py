@@ -299,7 +299,7 @@ if __name__ == "__main__":
                 ncore=args.ncore,
                 llm_opt=True,
                 is_prefill=True,
-                batch=args.batch,
+                llm_batch=args.batch,
                 flash_attn=args.flash_attention,
                 context_length=args.context_length,
                 prefill_length=args.prefill_length,

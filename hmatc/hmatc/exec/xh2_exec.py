@@ -1171,6 +1171,7 @@ class Xh2Exec(BaseExec):
         ncore=1,
         opt_level=2,
         batch=1,
+        llm_batch=1,
         enable_profile=False,
         roi_num=1,
         flash_attn=0,
@@ -1216,29 +1217,29 @@ class Xh2Exec(BaseExec):
         build_kwargs = {}
 
         # LLM modification parameters
-        if llm_opt:
-            build_kwargs["modify_llm"] = {}
-            if is_prefill:
-                if batch > 1:
-                    logger.warning(
-                        "batch is ignored for prefill model. "
-                        "Prefill model uses fill-length instead of batch."
-                    )
-                if prefill_length is not None:
-                    build_kwargs["modify_llm"]["fill-length"] = prefill_length
-                if context_length is not None:
-                    build_kwargs["modify_llm"]["context-length"] = context_length
-            else:
-                if prefill_length is not None:
-                    logger.warning(
-                        "prefill_length is ignored for decode model. "
-                        "Decode model uses batch instead of fill-length."
-                    )
-                build_kwargs["modify_llm"]["batch"] = batch
-                if context_length is not None:
-                    build_kwargs["modify_llm"]["context-length"] = context_length
-            if all_logits:
-                build_kwargs["modify_llm"]["all-logits"] = all_logits
+        build_kwargs["modify_llm"] = {}
+        if is_prefill:
+            if llm_batch > 1:
+                logger.warning(
+                    "batch is ignored for prefill model. "
+                    "Prefill model uses fill-length instead of batch."
+                )
+            if prefill_length is not None:
+                build_kwargs["modify_llm"]["fill-length"] = prefill_length
+            if context_length is not None:
+                build_kwargs["modify_llm"]["context-length"] = context_length
+        else:
+            if prefill_length is not None:
+                logger.warning(
+                    "prefill_length is ignored for decode model. "
+                    "Decode model uses batch instead of fill-length."
+                )
+            if llm_batch > 1:
+                build_kwargs["modify_llm"]["batch"] = llm_batch
+            if context_length is not None:
+                build_kwargs["modify_llm"]["context-length"] = context_length
+        if all_logits:
+            build_kwargs["modify_llm"]["all-logits"] = all_logits
 
         # Multi-device
         if ndevice > 1:
@@ -1254,6 +1255,7 @@ class Xh2Exec(BaseExec):
             "ndevice": ndevice,
             "ncore": ncore,
             "batch": batch,
+            "llm_batch": llm_batch,
             "context_length": context_length,
             "prefill_length": prefill_length,
             "all_logits": all_logits,
@@ -1279,7 +1281,7 @@ class Xh2Exec(BaseExec):
         merged_kwargs.update(build_kwargs)
         if merged_modify_llm:
             merged_kwargs["modify_llm"] = merged_modify_llm
-        logger.info(f"kwargs for build_from_hmonnx: {merged_kwargs}")
+        logger.info(f"==> {hmm_name} build start, kwargs: {merged_kwargs}")
 
         tcim.build_from_hmonnx(
             hmonnx,

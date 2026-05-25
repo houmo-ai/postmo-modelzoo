@@ -385,7 +385,7 @@ if __name__ == "__main__":
                 output=output_dir,
                 ncore=ncore,
                 llm_opt=True,
-                batch=batch,
+                llm_batch=batch,
                 flash_attn=llm_flash_attention,
                 context_length=context_length,
                 ndevice=ndevice,

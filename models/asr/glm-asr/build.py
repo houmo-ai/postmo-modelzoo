@@ -177,7 +177,6 @@ def get_args() -> argparse.Namespace:
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
-    args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
     _validate_flash_attention(args.flash_attention)
     return args
 
@@ -304,7 +303,6 @@ if __name__ == "__main__":
                     hmm_name=f"{args.model_name}-{args.model_size}_{suffix}",
                     output=args.output_dir,
                     ncore=args.ncore,
-                    ndevice=args.ndevice,
                     enable_common_subgraph=args.enable_common_subgraph,
                     enable_stable_output=args.enable_xh2_stable_output,
                     flash_attn=flash_attention,

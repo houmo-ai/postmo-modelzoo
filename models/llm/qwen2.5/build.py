@@ -327,7 +327,7 @@ if __name__ == "__main__":
                 ndevice=ndevice,
                 flash_attn=args.flash_attention,
                 context_length=args.context_length,
-                batch=args.batch,
+                llm_batch=args.batch,
                 llm_opt=True,
                 parallel_jobs=j,
             )

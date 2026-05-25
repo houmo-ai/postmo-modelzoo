@@ -135,6 +135,7 @@ def main():
     build_parser.add_argument("--flash_attn", type=int, default=0, choices=[0, 1, 2], help="flash attention optimization: 0=off, 1=graph level, 2=operator level")
     build_parser.add_argument("--llm_opt", action="store_true", help="enable llm optimization")
     build_parser.add_argument("--enable_xh2_stable_output", action="store_true", help="enable xh2 stable output (prefill faster, decode slower)")
+    build_parser.add_argument("--llm_batch", type=int, default=1, help="Specify LLM batch size, cannot be set together with --batch (only for --hmonnx mode)")
     build_parser.add_argument("--context_length", type=int, default=None, help="maximum context length for LLM")
     build_parser.add_argument("--prefill_length", type=int, default=None, help="prefill input sequence length (LLM prefill mode)")
     build_parser.add_argument("--ndevice", type=int, default=1, choices=[1, 2, 4], help="number of devices for multi-device inference")
@@ -260,6 +261,7 @@ def main():
             ncore=args.ncore,
             opt_level=args.opt_level,
             batch=args.batch,
+            llm_batch=args.llm_batch,
             enable_profile=args.profile,
             roi_num=args.roi_num,
             flash_attn=args.flash_attn,

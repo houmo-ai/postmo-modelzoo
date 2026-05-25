@@ -45,6 +45,7 @@ HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
+
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
 
@@ -249,6 +250,7 @@ def get_args() -> argparse.Namespace:
     )
     return args
 
+
 def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     import tcim_lite
 
@@ -364,11 +366,12 @@ if __name__ == "__main__":
     decode_dir = os.path.join(model_dir, "decode")
     visual_dir = os.path.join(model_dir, "visual")
     visual_model_name = (
-        f"{model_name}-{model_size}_visual_"
-        f"{args.max_size_w}x{args.max_size_h}"
+        f"{model_name}-{model_size}_visual_" f"{args.max_size_w}x{args.max_size_h}"
     )
 
-    with ChildProcessMemoryMonitor(interval=2, quiet=True, include_children=True) as monitor:
+    with ChildProcessMemoryMonitor(
+        interval=2, quiet=True, include_children=True
+    ) as monitor:
         if args.stage == "build" or args.stage == "all":
             assert (
                 get_platform() == "x86_64"
@@ -403,7 +406,7 @@ if __name__ == "__main__":
                 ndevice=ndevice,
                 flash_attn=llm_flash_attention,
                 context_length=args.context_length,
-                batch=args.batch,
+                llm_batch=args.batch,
                 llm_opt=True,
                 parallel_jobs=j,
             )

@@ -44,6 +44,7 @@ HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
+
 class ChildProcessMemoryMonitor(ProcessMemoryMonitor):
     """Process memory monitor that optionally includes child processes."""
 
@@ -75,6 +76,7 @@ class ChildProcessMemoryMonitor(ProcessMemoryMonitor):
             return {"rss_mb": rss_mb, "percent": percent}
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             return {"rss_mb": 0.0, "percent": 0.0}
+
 
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
@@ -369,7 +371,9 @@ if __name__ == "__main__":
         f"{args.max_size_w}x{args.max_size_h}x{args.max_size_t}"
     )
 
-    with ChildProcessMemoryMonitor(interval=2, quiet=True, include_children=True) as monitor:
+    with ChildProcessMemoryMonitor(
+        interval=2, quiet=True, include_children=True
+    ) as monitor:
         if args.stage == "build" or args.stage == "all":
             assert (
                 get_platform() == "x86_64"
@@ -404,7 +408,7 @@ if __name__ == "__main__":
                 ndevice=ndevice,
                 flash_attn=llm_flash_attention,
                 context_length=args.context_length,
-                batch=args.batch,
+                llm_batch=args.batch,
                 llm_opt=True,
                 parallel_jobs=j,
             )

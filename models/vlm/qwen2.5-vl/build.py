@@ -405,7 +405,7 @@ if __name__ == "__main__":
                 hmm_name=f"{model_name}-{model_size}_decode",
                 output=output_dir,
                 context_length=args.context_length,
-                batch=args.batch,
+                llm_batch=args.batch,
                 ndevice=ndevice,
                 ncore=ncore,
                 flash_attn=llm_flash_attention,
