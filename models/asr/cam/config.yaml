@@ -1,0 +1,15 @@
+default_model_name: "campplus"
+default_model_size: "standard"
+
+model_configs:
+  campplus:
+    "standard":
+      modelscope_repo: ["iic/speech_campplus_sv_zh-cn_16k-common"]
+      model_name: "campplus"
+      model_size: "standard"
+      ncore: 2
+      ndevice: 1
+      quant_type: "w8a8_sefp"
+      fixed_frames: 529
+      feat_dim: 80
+      threshold: 0.31

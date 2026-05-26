@@ -1,0 +1,8 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+torch
+torchaudio
+numpy
+modelscope
+tcim_lite
+hmatc
+loguru

@@ -1,0 +1,11 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+torch
+torchaudio
+numpy
+onnx
+onnxruntime
+onnxsim
+modelscope
+xhquant
+hmatc
+loguru
