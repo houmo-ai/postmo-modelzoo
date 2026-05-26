@@ -32,6 +32,15 @@ case "${MODEL_NAME}:${MODEL_SIZE}" in
         ;;
 esac
 
+LOAD_MODE=""
+case "${MODEL_SIZE}" in
+    35b-a3b)
+        LOAD_MODE="--LazyMode"
+        ;;
+    *)
+        ;;
+esac
+
 cd "${SCRIPT_DIR}"
 
 TEST_VENV_ACTIVE=0
@@ -100,7 +109,7 @@ if should_run_step "demo"; then
                 model_suffix="hmm"
             fi
             llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
-                --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
+                --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 ${LOAD_MODE} \
                 --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
                 --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
                 --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_896x896x2.hmm" \

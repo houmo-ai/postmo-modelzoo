@@ -14,7 +14,11 @@ fi
 IMAGE_NAME="harbor.houmo.ai/toolchain/release:Dadao-xh2-${VERSION}-ubuntu24.04-x86.64"
 CONTAINER_NAME="$(whoami).HoumoDadao_xh2_${VERSION}"
 CONTAINER_HOME="/container/$(whoami)"
-USER_CONFIG="-v /develop02:/develop02 -v /data:/data"
+# 自适应挂载：检查宿主路径是否存在，存在则映射
+USER_CONFIG=""
+for path in /develop02 /data /data02; do
+  [ -d "$path" ] && USER_CONFIG="$USER_CONFIG -v ${path}:${path}"
+done
 
 RUN_IN_DOCKER() { docker exec -it $CONTAINER_NAME bash -c "$@"; }
 ENTER_DOCKER() {
