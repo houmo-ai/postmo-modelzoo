@@ -110,7 +110,7 @@ def houmo_export_llm(args, component="vision"):
         llm_quant_scheme = QuantScheme(
             target_device=DeviceType.XH2a, 
             quant_type=quant_type, 
-            ops=dict(Normalize=dict(force_fp16=True)))
+            ops=dict(Normalize=dict(force_fp32=True)))
         config = MinicpmoLLMConvertConfig(
             quant_scheme=llm_quant_scheme,
             video=video_path,
