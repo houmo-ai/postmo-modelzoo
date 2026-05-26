@@ -92,6 +92,7 @@ class DeviceMonitor {
   std::unordered_map<int, DeviceStats> getDeviceStats();
   std::unordered_map<int, DeviceStats> getFinalDeviceStats();
   float getMaxTemperature();
+  float getCurrentTemperature();
 };
 
 #endif  // DEVICE_MONITOR_H

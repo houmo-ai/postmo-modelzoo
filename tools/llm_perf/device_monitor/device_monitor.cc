@@ -28,10 +28,12 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <condition_variable>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <mutex>
 #include <sstream>
 
@@ -366,16 +368,44 @@ float DeviceMonitor::getMaxTemperature() {
     return -1.0f;  // Return -1 to indicate no device data
   }
 
-  float max_temp = 0.0f;
-  bool first = true;
+  float max_temp = std::numeric_limits<float>::lowest();
+  bool found_valid_temp = false;
 
   for (const auto& pair : device_stats_map_) {
     const DeviceStats& stats = pair.second;
-    if (first || stats.temperature_max > max_temp) {
+    if (stats.times == 0 || !std::isfinite(stats.temperature_max)) {
+      continue;
+    }
+
+    if (!found_valid_temp || stats.temperature_max > max_temp) {
       max_temp = stats.temperature_max;
-      first = false;
+      found_valid_temp = true;
     }
   }
 
-  return max_temp;
+  return found_valid_temp ? max_temp : -1.0f;
+}
+
+float DeviceMonitor::getCurrentTemperature() {
+  std::lock_guard<std::mutex> lock(mtx_);
+  if (device_stats_map_.empty()) {
+    return -1.0f;  // Return -1 to indicate no device data
+  }
+
+  float max_temp = std::numeric_limits<float>::lowest();
+  bool found_valid_temp = false;
+
+  for (const auto& pair : device_stats_map_) {
+    const DeviceStats& stats = pair.second;
+    if (stats.times == 0 || !std::isfinite(stats.temperature)) {
+      continue;
+    }
+
+    if (!found_valid_temp || stats.temperature > max_temp) {
+      max_temp = stats.temperature;
+      found_valid_temp = true;
+    }
+  }
+
+  return found_valid_temp ? max_temp : -1.0f;
 }

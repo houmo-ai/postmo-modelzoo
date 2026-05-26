@@ -309,7 +309,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
                   << std::string(30, '=') << "(v)LLM Perf WarmUp: input "
                   << settings.warm_up_input << ", output "
                   << settings.warm_up_output << std::string(30, '=') << "\n ";
-        float current_temperature = device_monitor->getMaxTemperature();
+        float current_temperature = device_monitor->getCurrentTemperature();
         std::cout << "Device temperature: " << current_temperature << " °C"
                   << std::endl;
         if (current_temperature > ALARM_TEMPERATURE_THRESHOLD &&
@@ -362,7 +362,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
                     << current_settings.perf_case_index << "/"
                     << current_settings.perf_case_total << std::string(24, '=')
                     << "\n ";
-          float current_temperature = device_monitor->getMaxTemperature();
+          float current_temperature = device_monitor->getCurrentTemperature();
           std::cout << "Device temperature: " << current_temperature << " °C"
                     << std::endl;
           if (current_temperature > ALARM_TEMPERATURE_THRESHOLD &&
