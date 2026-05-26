@@ -81,77 +81,20 @@ def get_default_model_dir(model_config: dict) -> str:
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        dest="config_path",
-        type=str,
-        default=DEFAULT_CONFIG_PATH,
-        help="path to config.yaml",
-    )
-    parser.add_argument(
-        "--model_dir",
-        dest="model_dir",
-        type=str,
-        default=None,
-        help="input hf model path",
-    )
-    parser.add_argument(
-        "--model_name",
-        dest="model_name",
-        type=str,
-        default=None,
-        help="output hmonnx model name",
-    )
-    parser.add_argument(
-        "--model_size",
-        dest="model_size",
-        type=str,
-        default=None,
-        help="model size",
-    )
-    parser.add_argument(
-        "--output_dir",
-        dest="output_dir",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
-        help="output directory",
-    )
-    parser.add_argument(
-        "--work_dir",
-        dest="work_dir",
-        type=str,
-        default="./work_dirs",
-        help="working directory",
-    )
-    parser.add_argument(
-        "--context_length",
-        dest="context_length",
-        type=int,
-        default=None,
-        help="max sequence length",
-    )
-    parser.add_argument(
-        "--input_sequence_length",
-        dest="input_sequence_length",
-        type=int,
-        default=None,
-        help="input sequence length",
-    )
-    parser.add_argument(
-        "--quant_type",
-        dest="quant_type",
-        type=str,
-        default=None,
-        help="quant type, default is w8a16h1_sefp",
-    )
-    parser.add_argument(
-        "--debug",
-        dest="debug",
-        action="store_true",
-        help="debug mode",
-    )
+    # fmt: off
+    parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
+    parser.add_argument("--model_dir", dest="model_dir", type=str, default=None, help="input hf model path")
+    parser.add_argument("--model_name", dest="model_name", type=str, default=None, help="output hmonnx model name")
+    parser.add_argument("--model_size", dest="model_size", type=str, default=None, help="model size")
+    parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant"), help="output directory")
+    parser.add_argument("--work_dir", dest="work_dir", type=str, default="./work_dirs", help="working directory")
+    parser.add_argument("--context_length", dest="context_length", type=int, default=None, help="max sequence length")
+    parser.add_argument("--input_sequence_length", dest="input_sequence_length", type=int, default=None, help="input sequence length")
+    parser.add_argument("--quant_type", dest="quant_type", type=str, default=None, help="quant type, default is w8a16h1_sefp")
+    parser.add_argument("--debug", dest="debug", action="store_true", help="debug mode")
     parser.add_argument("--seed", type=int, default=1024)
     parser.add_argument("--valid", action="store_true", help="validate the model")
+    # fmt: on
     args = parser.parse_args()
     default_model_size, default_model_name, model_configs = get_model_configs(
         args.config_path

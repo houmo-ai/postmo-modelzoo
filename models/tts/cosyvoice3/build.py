@@ -26,7 +26,6 @@ import argparse
 import glob
 from loguru import logger
 from hmatc.exec.xh2_exec import Xh2Exec
-from hmatc.utils.monitor import ProcessMemoryMonitor
 from hmatc.utils.utils import (
     find_hmonnx_file,
     first_not_none,
@@ -332,134 +331,131 @@ if __name__ == "__main__":
     j = args.j
     llm_flash_attention, others_flash_attention = args.flash_attention
 
-    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
-        if args.stage == "build" or args.stage == "all":
-            assert (
-                get_platform() == "x86_64"
-            ), f"Only supported for compilation on the x86_64 platform."
+    if args.stage == "build" or args.stage == "all":
+        assert (
+            get_platform() == "x86_64"
+        ), f"Only supported for compilation on the x86_64 platform."
 
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "campplus")),
-                hmm_name=f"{model_name}-{model_size}_campplus",
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=others_flash_attention,
-                enable_xh2_stable_output=tso,
-                parallel_jobs=j,
-            )
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "speech_tokenizer")),
-                hmm_name=f"{model_name}-{model_size}_speech_tokenizer",
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=others_flash_attention,
-                enable_xh2_stable_output=tso,
-                parallel_jobs=j,
-            )
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "llm_decoder")),
-                hmm_name=f"{model_name}-{model_size}_llm_decoder",
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=others_flash_attention,
-                enable_xh2_stable_output=tso,
-                parallel_jobs=j,
-            )
-            Xh2Exec.build_from_hmonnx(
-                is_prefill=True,
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "llm_prefill")),
-                hmm_name=f"{model_name}-{model_size}_llm_qwen2_prefill",
-                output=output_dir,
-                ncore=ncore,
-                llm_opt=True,
-                flash_attn=llm_flash_attention,
-                context_length=context_length,
-                prefill_length=args.prefill_length,
-                ndevice=ndevice,
-                enable_xh2_stable_output=tso,
-                parallel_jobs=j,
-            )
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "llm_decode")),
-                hmm_name=f"{model_name}-{model_size}_llm_qwen2_decode",
-                output=output_dir,
-                ncore=ncore,
-                llm_opt=True,
-                llm_batch=batch,
-                flash_attn=llm_flash_attention,
-                context_length=context_length,
-                ndevice=ndevice,
-                enable_xh2_stable_output=tso,
-                parallel_jobs=j,
-            )
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "flow_encoder")),
-                hmm_name=f"{model_name}-{model_size}_flow_encoder",
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=others_flash_attention,
-                enable_xh2_stable_output=tso,
-                parallel_jobs=j,
-            )
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "flow_spk")),
-                hmm_name=f"{model_name}-{model_size}_flow_spk",
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=others_flash_attention,
-                enable_xh2_stable_output=tso,
-                parallel_jobs=j,
-            )
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "flow_decoder")),
-                hmm_name=f"{model_name}-{model_size}_flow_decoder",
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=others_flash_attention,
-                enable_xh2_stable_output=tso,
-                parallel_jobs=j,
-            )
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(
-                    os.path.join(model_dir, "hift"), pattern="hmquant_*part1.onnx"
-                ),
-                hmm_name=f"{model_name}-{model_size}_hift_part1",
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=others_flash_attention,
-                enable_xh2_stable_output=tso,
-                parallel_jobs=j,
-            )
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(
-                    os.path.join(model_dir, "hift"), pattern="hmquant_*part2.onnx"
-                ),
-                hmm_name=f"{model_name}-{model_size}_hift_part2",
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=others_flash_attention,
-                enable_xh2_stable_output=tso,
-                parallel_jobs=j,
-            )
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "campplus")),
+            hmm_name=f"{model_name}-{model_size}_campplus",
+            output=output_dir,
+            ncore=ncore,
+            flash_attn=others_flash_attention,
+            enable_xh2_stable_output=tso,
+            parallel_jobs=j,
+        )
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "speech_tokenizer")),
+            hmm_name=f"{model_name}-{model_size}_speech_tokenizer",
+            output=output_dir,
+            ncore=ncore,
+            flash_attn=others_flash_attention,
+            enable_xh2_stable_output=tso,
+            parallel_jobs=j,
+        )
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "llm_decoder")),
+            hmm_name=f"{model_name}-{model_size}_llm_decoder",
+            output=output_dir,
+            ncore=ncore,
+            flash_attn=others_flash_attention,
+            enable_xh2_stable_output=tso,
+            parallel_jobs=j,
+        )
+        Xh2Exec.build_from_hmonnx(
+            is_prefill=True,
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "llm_prefill")),
+            hmm_name=f"{model_name}-{model_size}_llm_qwen2_prefill",
+            output=output_dir,
+            ncore=ncore,
+            llm_opt=True,
+            flash_attn=llm_flash_attention,
+            context_length=context_length,
+            prefill_length=args.prefill_length,
+            ndevice=ndevice,
+            enable_xh2_stable_output=tso,
+            parallel_jobs=j,
+        )
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "llm_decode")),
+            hmm_name=f"{model_name}-{model_size}_llm_qwen2_decode",
+            output=output_dir,
+            ncore=ncore,
+            llm_opt=True,
+            llm_batch=batch,
+            flash_attn=llm_flash_attention,
+            context_length=context_length,
+            ndevice=ndevice,
+            enable_xh2_stable_output=tso,
+            parallel_jobs=j,
+        )
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "flow_encoder")),
+            hmm_name=f"{model_name}-{model_size}_flow_encoder",
+            output=output_dir,
+            ncore=ncore,
+            flash_attn=others_flash_attention,
+            enable_xh2_stable_output=tso,
+            parallel_jobs=j,
+        )
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "flow_spk")),
+            hmm_name=f"{model_name}-{model_size}_flow_spk",
+            output=output_dir,
+            ncore=ncore,
+            flash_attn=others_flash_attention,
+            enable_xh2_stable_output=tso,
+            parallel_jobs=j,
+        )
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "flow_decoder")),
+            hmm_name=f"{model_name}-{model_size}_flow_decoder",
+            output=output_dir,
+            ncore=ncore,
+            flash_attn=others_flash_attention,
+            enable_xh2_stable_output=tso,
+            parallel_jobs=j,
+        )
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(
+                os.path.join(model_dir, "hift"), pattern="hmquant_*part1.onnx"
+            ),
+            hmm_name=f"{model_name}-{model_size}_hift_part1",
+            output=output_dir,
+            ncore=ncore,
+            flash_attn=others_flash_attention,
+            enable_xh2_stable_output=tso,
+            parallel_jobs=j,
+        )
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(
+                os.path.join(model_dir, "hift"), pattern="hmquant_*part2.onnx"
+            ),
+            hmm_name=f"{model_name}-{model_size}_hift_part2",
+            output=output_dir,
+            ncore=ncore,
+            flash_attn=others_flash_attention,
+            enable_xh2_stable_output=tso,
+            parallel_jobs=j,
+        )
 
-        if args.stage == "test" or args.stage == "all":
-            part_dir = os.path.join(model_dir, "campplus")
-            test(f"{model_name}-{model_size}_campplus", part_dir, output_dir)
-            part_dir = os.path.join(model_dir, "speech_tokenizer")
-            test(f"{model_name}-{model_size}_speech_tokenizer", part_dir, output_dir)
-            part_dir = os.path.join(model_dir, "llm_decoder")
-            test(f"{model_name}-{model_size}_llm_decoder", part_dir, output_dir)
-            part_dir = os.path.join(model_dir, "llm_prefill")
-            test(f"{model_name}-{model_size}_llm_qwen2_prefill", part_dir, output_dir)
-            part_dir = os.path.join(model_dir, "llm_decode")
-            test(f"{model_name}-{model_size}_llm_qwen2_decode", part_dir, output_dir)
-            part_dir = os.path.join(model_dir, "flow_encoder")
-            test(f"{model_name}-{model_size}_flow_encoder", part_dir, output_dir)
-            part_dir = os.path.join(model_dir, "flow_spk")
-            test(f"{model_name}-{model_size}_flow_spk", part_dir, output_dir)
-            part_dir = os.path.join(model_dir, "flow_decoder")
-            test(f"{model_name}-{model_size}_flow_decoder", part_dir, output_dir)
+    if args.stage == "test" or args.stage == "all":
+        part_dir = os.path.join(model_dir, "campplus")
+        test(f"{model_name}-{model_size}_campplus", part_dir, output_dir)
+        part_dir = os.path.join(model_dir, "speech_tokenizer")
+        test(f"{model_name}-{model_size}_speech_tokenizer", part_dir, output_dir)
+        part_dir = os.path.join(model_dir, "llm_decoder")
+        test(f"{model_name}-{model_size}_llm_decoder", part_dir, output_dir)
+        part_dir = os.path.join(model_dir, "llm_prefill")
+        test(f"{model_name}-{model_size}_llm_qwen2_prefill", part_dir, output_dir)
+        part_dir = os.path.join(model_dir, "llm_decode")
+        test(f"{model_name}-{model_size}_llm_qwen2_decode", part_dir, output_dir)
+        part_dir = os.path.join(model_dir, "flow_encoder")
+        test(f"{model_name}-{model_size}_flow_encoder", part_dir, output_dir)
+        part_dir = os.path.join(model_dir, "flow_spk")
+        test(f"{model_name}-{model_size}_flow_spk", part_dir, output_dir)
+        part_dir = os.path.join(model_dir, "flow_decoder")
+        test(f"{model_name}-{model_size}_flow_decoder", part_dir, output_dir)
 
-    print(
-        f"\n=== All builds completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
-    )
+    print("\n=== All builds completed. ===")

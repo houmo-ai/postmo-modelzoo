@@ -1206,8 +1206,12 @@ class Xh2Exec(BaseExec):
         if hmm_name is None:
             hmm_name = os.path.splitext(os.path.basename(hmonnx))[0]
         if (batch > 1 and roi_num > 1) or batch < 0 or roi_num < 0:
-            logger.fatal(f"Invalid combination of batch{batch} and roi_num{roi_num }")
-        # output_dir = os.path.join(output, target)
+            logger.fatal(f"Invalid combination of batch{batch} and roi_num{roi_num}")
+        if batch > 1 and llm_batch > 1:
+            logger.fatal(
+                f"Configuring both batch{batch} and llm_batch{llm_batch} greater than 1 is not supported."
+            )
+
         output_dir = output
         work_dir = (
             os.path.join(output_dir, "tcim", hmm_name) if work_dir is None else work_dir

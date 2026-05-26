@@ -26,7 +26,6 @@ import argparse
 import glob
 
 from hmatc.exec.xh2_exec import Xh2Exec
-from hmatc.utils.monitor import ProcessMemoryMonitor
 from hmatc.utils.utils import (
     find_hmonnx_file,
     first_not_none,
@@ -287,37 +286,34 @@ if __name__ == "__main__":
     profile = {}
     llm_flash_attention, encoder_flash_attention = args.flash_attention
 
-    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
-        if args.stage == "build" or args.stage == "all":
-            assert (
-                get_platform() == "x86_64"
-            ), "Only supported for compilation on the x86_64 platform."
+    if args.stage == "build" or args.stage == "all":
+        assert (
+            get_platform() == "x86_64"
+        ), "Only supported for compilation on the x86_64 platform."
 
-            for suffix, subdir, flash_attention in (
-                ("prefill", "prefill", llm_flash_attention),
-                ("decode", "decode", llm_flash_attention),
-                ("encode", "encode", encoder_flash_attention),
-            ):
-                Xh2Exec.build_from_hmonnx(
-                    hmonnx=find_hmonnx_file(os.path.join(args.model_dir, subdir)),
-                    hmm_name=f"{args.model_name}-{args.model_size}_{suffix}",
-                    output=args.output_dir,
-                    ncore=args.ncore,
-                    enable_common_subgraph=args.enable_common_subgraph,
-                    enable_stable_output=args.enable_xh2_stable_output,
-                    flash_attn=flash_attention,
-                    parallel_jobs=args.j,
-                )
+        for suffix, subdir, flash_attention in (
+            ("prefill", "prefill", llm_flash_attention),
+            ("decode", "decode", llm_flash_attention),
+            ("encode", "encode", encoder_flash_attention),
+        ):
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(os.path.join(args.model_dir, subdir)),
+                hmm_name=f"{args.model_name}-{args.model_size}_{suffix}",
+                output=args.output_dir,
+                ncore=args.ncore,
+                enable_common_subgraph=args.enable_common_subgraph,
+                enable_xh2_stable_output=args.enable_xh2_stable_output,
+                flash_attn=flash_attention,
+                parallel_jobs=args.j,
+            )
 
-        if args.stage == "test" or args.stage == "all":
-            for suffix in ("encode", "decode", "prefill"):
-                part_dir = os.path.join(args.model_dir, suffix)
-                test(
-                    f"{args.model_name}-{args.model_size}_{suffix}",
-                    part_dir,
-                    args.output_dir,
-                    profile,
-                )
-    print(
-        f"\n=== Build/test completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
-    )
+    if args.stage == "test" or args.stage == "all":
+        for suffix in ("encode", "decode", "prefill"):
+            part_dir = os.path.join(args.model_dir, suffix)
+            test(
+                f"{args.model_name}-{args.model_size}_{suffix}",
+                part_dir,
+                args.output_dir,
+                profile,
+            )
+    print("\n=== Build/test completed. ===")

@@ -70,172 +70,37 @@ def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument(
-        "--config",
-        dest="config_path",
-        type=str,
-        default=DEFAULT_CONFIG_PATH,
-        help="path to config.yaml",
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        help="HF checkpoint directory (Qwen3.5 VL instruct)",
-    )
-    parser.add_argument(
-        "--model-name",
-        type=str,
-        default=None,
-        help=(
-            "HMONNX / layout name (vision --model_name, output folders). "
-            "Default: last path component of --model (e.g. .../Qwen3.5-9B → Qwen3.5-9B)"
-        ),
-    )
-    parser.add_argument(
-        "--model-size",
-        type=str,
-        default=None,
-        help="model size",
-    )
-    parser.add_argument(
-        "--work-dir",
-        type=str,
-        default="./work_dirs",
-        help="step1–2 outputs: <model-name>_rotated_fp and <model-name>_gptq_4bit under this root",
-    )
-    parser.add_argument(
-        "--cleanup-work-dir",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help=(
-            "after move_llm finishes, remove the entire --work-dir directory tree "
-            "(default: on; --no-cleanup-work-dir to keep checkpoints)"
-        ),
-    )
-    parser.add_argument(
-        "--out-dir",
-        type=str,
-        default="./output",
-        help="step3–4 outputs: <model-name>/vision_export/... + <model-name>_llm_export/",
-    )
-    parser.add_argument(
-        "--move-only",
-        action="store_true",
-        help=(
-            "only run move_llm: layout $HOUMO_TARGET/hmquant (default segment xh2 if unset) "
-            "under --out-dir; needs --out-dir; uses effective --model-name (or --model stem); "
-            "skips quant, export, GPU check"
-        ),
-    )
+    # fmt: off
+    parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
+    parser.add_argument("--model", type=str, default=None, help="HF checkpoint directory (Qwen3.5 VL instruct)")
+    parser.add_argument("--model-name", type=str, default=None, help="HMONNX / layout name (vision --model_name, output folders). Default: last path component of --model (e.g. .../Qwen3.5-9B → Qwen3.5-9B)")
+    parser.add_argument("--model-size", type=str, default=None, help="model size")
+    parser.add_argument("--work-dir", type=str, default="./work_dirs", help="step1–2 outputs: <model-name>_rotated_fp and <model-name>_gptq_4bit under this root")
+    parser.add_argument("--cleanup-work-dir", action=argparse.BooleanOptionalAction, default=False, help="after move_llm finishes, remove the entire --work-dir directory tree (default: on; --no-cleanup-work-dir to keep checkpoints)")
+    parser.add_argument("--out-dir", type=str, default="./output", help="step3–4 outputs: <model-name>/vision_export/... + <model-name>_llm_export/")
+    parser.add_argument("--move-only", action="store_true", help="only run move_llm: layout $HOUMO_TARGET/hmquant (default segment xh2 if unset) under --out-dir; needs --out-dir; uses effective --model-name (or --model stem); skips quant, export, GPU check")
     parser.add_argument("--seed", type=int, default=1024)
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help=(
-            "skip rotate/GPTQ subprocesses when the expected HF dirs already exist "
-            "(under --work-dir, or paths from --rotated-model-dir / --gptq-model-dir)"
-        ),
-    )
-    parser.add_argument(
-        "--export-only",
-        action="store_true",
-        help="do not run quantization; only run export (requires existing rotated + GPTQ checkpoints)",
-    )
-    parser.add_argument(
-        "--rotated-model-dir",
-        type=str,
-        default=None,
-        help="HF dir for rotated fp weights (vision export); default: <work-dir>/<model-name>_rotated_fp",
-    )
-    parser.add_argument(
-        "--gptq-model-dir",
-        type=str,
-        default=None,
-        help="HF dir for GPTQ weights (LLM export); default: <work-dir>/<model-name>_gptq_4bit",
-    )
-    parser.add_argument(
-        "--debug", action="store_true", help="forward --debug to export scripts"
-    )
-    parser.add_argument(
-        "--context-length",
-        type=int,
-        default=None,
-        help="LLM export context length",
-    )
-    parser.add_argument(
-        "--max-pe-length",
-        type=int,
-        default=None,
-        help="LLM export rotary cache max_pe_length, default follows context_length",
-    )
-    parser.add_argument(
-        "--llm-export-full-output-valid",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="run full-output comparison during LLM export validation; disabled by default to reduce VRAM",
-    )
-    parser.add_argument(
-        "--input-sequence-length",
-        type=int,
-        default=None,
-        help="MoE LLM export --input-sequence-length",
-    )
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="cuda",
-        help="CUDA device string for rotate / GPTQ subprocesses",
-    )
-    parser.add_argument(
-        "--trust-remote-code",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="HF trust_remote_code for rotate + dense scripts",
-    )
-    parser.add_argument(
-        "--calib_data",
-        type=str,
-        default=None,
-        help="optional JSONL calibration for GPTQ (maps to --calibration-jsonl)",
-    )
-    parser.add_argument(
-        "--self-attn-bits",
-        type=int,
-        default=4,
-        choices=[2, 3, 4, 5, 8],
-        help="MoE GPTQ self-attn q/k/v/o projection bit width",
-    )
+    parser.add_argument("--resume", action="store_true", help="skip rotate/GPTQ subprocesses when the expected HF dirs already exist (under --work-dir, or paths from --rotated-model-dir / --gptq-model-dir)")
+    parser.add_argument("--export-only", action="store_true", help="do not run quantization; only run export (requires existing rotated + GPTQ checkpoints)")
+    parser.add_argument("--rotated-model-dir", type=str, default=None, help="HF dir for rotated fp weights (vision export); default: <work-dir>/<model-name>_rotated_fp")
+    parser.add_argument("--gptq-model-dir", type=str, default=None, help="HF dir for GPTQ weights (LLM export); default: <work-dir>/<model-name>_gptq_4bit")
+    parser.add_argument("--debug", action="store_true", help="forward --debug to export scripts")
+    parser.add_argument("--context-length", type=int, default=None, help="LLM export context length")
+    parser.add_argument("--max-pe-length", type=int, default=None, help="LLM export rotary cache max_pe_length, default follows context_length")
+    parser.add_argument("--llm-export-full-output-valid", action=argparse.BooleanOptionalAction, default=False, help="run full-output comparison during LLM export validation; disabled by default to reduce VRAM")
+    parser.add_argument("--input-sequence-length", type=int, default=None, help="MoE LLM export --input-sequence-length")
+    parser.add_argument("--device", type=str, default="cuda", help="CUDA device string for rotate / GPTQ subprocesses")
+    parser.add_argument("--trust-remote-code", action=argparse.BooleanOptionalAction, default=True, help="HF trust_remote_code for rotate + dense scripts")
+    parser.add_argument("--calib_data", type=str, default=None, help="optional JSONL calibration for GPTQ (maps to --calibration-jsonl)")
+    parser.add_argument("--self-attn-bits", type=int, default=4, choices=[2, 3, 4, 5, 8], help="MoE GPTQ self-attn q/k/v/o projection bit width")
     parser.add_argument("--skip-export-vision", action="store_true")
     parser.add_argument("--skip-export-llm", action="store_true")
     parser.add_argument("--datasets-dir", type=str, default="../../../data/datasets")
-    parser.add_argument(
-        "--vision-image-path",
-        type=str,
-        default="../../../data/pic/beach.jpeg",
-        help="sample image for vision export (--image_path); required if src/images/qwen2_vl_demo.jpeg is absent",
-    )
-    parser.add_argument(
-        "--max_size_w",
-        type=int,
-        nargs="+",
-        default=None,
-        help="vision export max input width in pixels (multiple values allowed)",
-    )
-    parser.add_argument(
-        "--max_size_h",
-        type=int,
-        nargs="+",
-        default=None,
-        help="vision export max input height in pixels (multiple values allowed)",
-    )
-    parser.add_argument(
-        "--max_size_t",
-        type=int,
-        nargs="+",
-        default=None,
-        help="vision export max temporal size in frames (multiple values allowed)",
-    )
+    parser.add_argument("--vision-image-path", type=str, default="../../../data/pic/beach.jpeg", help="sample image for vision export (--image_path); required if src/images/qwen2_vl_demo.jpeg is absent")
+    parser.add_argument("--max_size_w", type=int, nargs="+", default=None, help="vision export max input width in pixels (multiple values allowed)")
+    parser.add_argument("--max_size_h", type=int, nargs="+", default=None, help="vision export max input height in pixels (multiple values allowed)")
+    parser.add_argument("--max_size_t", type=int, nargs="+", default=None, help="vision export max temporal size in frames (multiple values allowed)")
+    # fmt: on
     args = parser.parse_args()
     default_model_size, default_model_name, model_configs = get_model_configs(
         args.config_path

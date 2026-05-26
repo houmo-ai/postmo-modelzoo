@@ -25,7 +25,6 @@ import multiprocessing
 import argparse
 import glob
 from hmatc.exec.xh2_exec import Xh2Exec
-from hmatc.utils.monitor import ProcessMemoryMonitor
 from hmatc.utils.utils import (
     find_hmonnx_file,
     first_not_none,
@@ -201,13 +200,6 @@ def get_args() -> argparse.Namespace:
         default=False,
         help="enable stable output",
     )
-    parser.add_argument(
-        "--monitor_interval",
-        dest="monitor_interval",
-        type=float,
-        default=1.0,
-        help="memory monitor interval in seconds",
-    )
 
     args = parser.parse_args()
     default_model_size, default_model_name, model_configs = get_model_configs(
@@ -364,93 +356,73 @@ if __name__ == "__main__":
         and any(key in os.path.basename(folder_path) for key in ["vision", "visual"])
     ]
 
-    with ProcessMemoryMonitor(interval=args.monitor_interval, quiet=True) as monitor:
-        # build model
-        if args.stage == "build" or args.stage == "all":
-            assert (
-                get_platform() == "x86_64"
-            ), f"Only supported for compilation on the x86_64 platform."
+    if args.stage == "build" or args.stage == "all":
+        assert (
+            get_platform() == "x86_64"
+        ), f"Only supported for compilation on the x86_64 platform."
 
-            # Build all visual models with resolution suffix
-            for visual_dir in visual_dirs:
-                folder_name = os.path.basename(visual_dir)
-                # Extract resolution suffix from folder name like "visual_448x448x2"
-                if "_" in folder_name:
-                    suffix = folder_name.split("_", 1)[1]
-                    vit_model_name = f"{model_name}-{model_size}_visual_{suffix}"
-                else:
-                    vit_model_name = f"{model_name}-{model_size}_visual"
-                Xh2Exec.build_from_hmonnx(
-                    hmonnx=find_hmonnx_file(visual_dir),
-                    hmm_name=vit_model_name,
-                    output=output_dir,
-                    ncore=ncore,
-                    flash_attn=vit_flash_attention,
-                    parallel_jobs=j,
-                )
-
+        # Build all visual models with resolution suffix
+        for visual_dir in visual_dirs:
+            folder_name = os.path.basename(visual_dir)
+            # Extract resolution suffix from folder name like "visual_448x448x2"
+            if "_" in folder_name:
+                suffix = folder_name.split("_", 1)[1]
+                vit_model_name = f"{model_name}-{model_size}_visual_{suffix}"
+            else:
+                vit_model_name = f"{model_name}-{model_size}_visual"
             Xh2Exec.build_from_hmonnx(
-                is_prefill=True,
-                hmonnx=find_hmonnx_file(prefill_dir),
-                hmm_name=f"{model_name}-{model_size}_prefill",
+                hmonnx=find_hmonnx_file(visual_dir),
+                hmm_name=vit_model_name,
                 output=output_dir,
-                flash_attn=llm_flash_attention,
-                context_length=args.context_length,
-                prefill_length=args.prefill_length,
-                ndevice=ndevice,
                 ncore=ncore,
-                enable_common_subgraph=args.enable_common_subgraph,
-                enable_xh2_stable_output=args.enable_xh2_stable_output,
-                cpp_backend="v2",
-                llm_opt=True,
+                flash_attn=vit_flash_attention,
                 parallel_jobs=j,
             )
 
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(decode_dir),
-                hmm_name=f"{model_name}-{model_size}_decode",
-                output=output_dir,
-                llm_batch=args.batch,
-                flash_attn=llm_flash_attention,
-                context_length=args.context_length,
-                ndevice=ndevice,
-                ncore=ncore,
-                enable_common_subgraph=args.enable_common_subgraph,
-                enable_xh2_stable_output=args.enable_xh2_stable_output,
-                cpp_backend="v2",
-                llm_opt=True,
-                parallel_jobs=j,
-            )
+        Xh2Exec.build_from_hmonnx(
+            is_prefill=True,
+            hmonnx=find_hmonnx_file(prefill_dir),
+            hmm_name=f"{model_name}-{model_size}_prefill",
+            output=output_dir,
+            flash_attn=llm_flash_attention,
+            context_length=args.context_length,
+            prefill_length=args.prefill_length,
+            ndevice=ndevice,
+            ncore=ncore,
+            enable_common_subgraph=args.enable_common_subgraph,
+            enable_xh2_stable_output=args.enable_xh2_stable_output,
+            cpp_backend="v2",
+            llm_opt=True,
+            parallel_jobs=j,
+        )
 
-        # test model
-        if args.stage == "test" or args.stage == "all":
-            test(
-                f"{model_name}-{model_size}_prefill",
-                prefill_dir,
-                output_dir,
-                profile,
-            )
-            test(
-                f"{model_name}-{model_size}_decode",
-                decode_dir,
-                output_dir,
-                profile,
-            )
-            # Test all visual models
-            for visual_dir in visual_dirs:
-                folder_name = os.path.basename(visual_dir)
-                if "_" in folder_name:
-                    suffix = folder_name.split("_", 1)[1]
-                    vit_model_name = f"{model_name}-{model_size}_visual_{suffix}"
-                else:
-                    vit_model_name = f"{model_name}-{model_size}_visual"
-                test(
-                    vit_model_name,
-                    visual_dir,
-                    output_dir,
-                    profile,
-                )
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(decode_dir),
+            hmm_name=f"{model_name}-{model_size}_decode",
+            output=output_dir,
+            llm_batch=args.batch,
+            flash_attn=llm_flash_attention,
+            context_length=args.context_length,
+            ndevice=ndevice,
+            ncore=ncore,
+            enable_common_subgraph=args.enable_common_subgraph,
+            enable_xh2_stable_output=args.enable_xh2_stable_output,
+            cpp_backend="v2",
+            llm_opt=True,
+            parallel_jobs=j,
+        )
 
-    print(
-        f"\n=== Build flow finished. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
-    )
+    if args.stage == "test" or args.stage == "all":
+        test(f"{model_name}-{model_size}_prefill", prefill_dir, output_dir, profile)
+        test(f"{model_name}-{model_size}_decode", decode_dir, output_dir, profile)
+        # Test all visual models
+        for visual_dir in visual_dirs:
+            folder_name = os.path.basename(visual_dir)
+            if "_" in folder_name:
+                suffix = folder_name.split("_", 1)[1]
+                vit_model_name = f"{model_name}-{model_size}_visual_{suffix}"
+            else:
+                vit_model_name = f"{model_name}-{model_size}_visual"
+            test(vit_model_name, visual_dir, output_dir, profile)
+
+    print("\n=== Build flow finished. ===")

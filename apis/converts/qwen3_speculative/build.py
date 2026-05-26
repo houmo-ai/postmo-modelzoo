@@ -28,7 +28,6 @@ import glob
 HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
 sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
 from hmatc.exec.xh2_exec import Xh2Exec
-from hmatc.utils.monitor import ProcessMemoryMonitor
 from hmatc.utils.utils import find_hmonnx_file, get_platform
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -206,68 +205,65 @@ if __name__ == "__main__":
     draft_decode_dir = _get_decode_dir(draft_model_dir)
     draft_prefill_dir = os.path.join(draft_model_dir, "prefill")
 
-    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
-        assert (
-            get_platform() == "x86_64"
-        ), "Only supported for compilation on the x86_64 platform."
+    assert (
+        get_platform() == "x86_64"
+    ), "Only supported for compilation on the x86_64 platform."
 
-        Xh2Exec.build_from_hmonnx(
-            hmonnx=find_hmonnx_file(draft_prefill_dir),
-            hmm_name=f"{model_name}-{args.draft_model_size}_prefill_draft",
-            output=output_dir,
-            ncore=ncore,
-            llm_opt=True,
-            flash_attention=args.flash_attention,
-            context_length=context_length,
-            ndevice=ndevice,
-            is_prefill=True,
-            parallel_jobs=j,
-        )
-        Xh2Exec.build_from_hmonnx(
-            hmonnx=find_hmonnx_file(draft_decode_dir),
-            hmm_name=f"{model_name}-{args.draft_model_size}_decode_draft",
-            output=output_dir,
-            ncore=ncore,
-            llm_opt=True,
-            llm_batch=batch,
-            flash_attention=args.flash_attention,
-            context_length=context_length,
-            ndevice=ndevice,
-            parallel_jobs=j,
-        )
-        Xh2Exec.build_from_hmonnx(
-            hmonnx=find_hmonnx_file(target_prefill_dir),
-            hmm_name=f"{model_name}-{args.model_size}_prefill",
-            output=output_dir,
-            ncore=ncore,
-            llm_opt=True,
-            flash_attention=args.flash_attention,
-            context_length=context_length,
-            ndevice=ndevice,
-            is_prefill=True,
-            parallel_jobs=j,
-        )
-        Xh2Exec.build_from_hmonnx(
-            hmonnx=find_hmonnx_file(target_prefill_dir),
-            hmm_name=f"{model_name}-{args.model_size}_verify",
-            output=output_dir,
-            ncore=ncore,
-            llm_opt=True,
-            flash_attention=args.flash_attention,
-            context_length=context_length,
-            prefill_length=args.verify_length,
-            all_logits=True,
-            ndevice=ndevice,
-            is_prefill=True,
-            parallel_jobs=j,
-        )
-        _copy_embedding_if_exists(
-            target_model_dir, target_model_dir, "quant_embedding_target.pt"
-        )
-        _copy_embedding_if_exists(
-            draft_model_dir, target_model_dir, "quant_embedding_draft.pt"
-        )
-
-    print(
-        f"\n=== All builds completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    Xh2Exec.build_from_hmonnx(
+        hmonnx=find_hmonnx_file(draft_prefill_dir),
+        hmm_name=f"{model_name}-{args.draft_model_size}_prefill_draft",
+        output=output_dir,
+        ncore=ncore,
+        llm_opt=True,
+        flash_attn=args.flash_attention,
+        context_length=context_length,
+        ndevice=ndevice,
+        is_prefill=True,
+        parallel_jobs=j,
     )
+    Xh2Exec.build_from_hmonnx(
+        hmonnx=find_hmonnx_file(draft_decode_dir),
+        hmm_name=f"{model_name}-{args.draft_model_size}_decode_draft",
+        output=output_dir,
+        ncore=ncore,
+        llm_opt=True,
+        llm_batch=batch,
+        flash_attn=args.flash_attention,
+        context_length=context_length,
+        ndevice=ndevice,
+        parallel_jobs=j,
+    )
+    Xh2Exec.build_from_hmonnx(
+        hmonnx=find_hmonnx_file(target_prefill_dir),
+        hmm_name=f"{model_name}-{args.model_size}_prefill",
+        output=output_dir,
+        ncore=ncore,
+        llm_opt=True,
+        flash_attn=args.flash_attention,
+        context_length=context_length,
+        ndevice=ndevice,
+        is_prefill=True,
+        parallel_jobs=j,
+    )
+    Xh2Exec.build_from_hmonnx(
+        hmonnx=find_hmonnx_file(target_prefill_dir),
+        hmm_name=f"{model_name}-{args.model_size}_verify",
+        output=output_dir,
+        ncore=ncore,
+        llm_opt=True,
+        flash_attn=args.flash_attention,
+        context_length=context_length,
+        prefill_length=args.verify_length,
+        all_logits=True,
+        ndevice=ndevice,
+        is_prefill=True,
+        parallel_jobs=j,
+    )
+    _copy_embedding_if_exists(
+        target_model_dir, target_model_dir, "quant_embedding_target.pt"
+    )
+    _copy_embedding_if_exists(
+        draft_model_dir, target_model_dir, "quant_embedding_draft.pt"
+    )
+
+    print("\n=== All builds completed. ===")
