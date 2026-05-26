@@ -434,21 +434,21 @@ std::string SanitizeName(const std::string &name) {
 }
 
 template <typename T>
-void LoadNpyFile(const std::string &data_file, std::vector<size_t> &shape,
-                 tcim::Tensor &tensor) {
+void LoadNpyFile(const std::string &data_file,
+                 std::vector<unsigned long> &shape, tcim::Tensor &tensor) {
   std::vector<T> data;
 #ifdef _MSC_VER
   std::vector<npy::ndarray_len_t> npy_shape;
   // When calling LoadArrayFromNumpy, pass npy_shape
-  // (instead of the original size_t type
+  // (instead of the original unsigned long type
   // shape)
   npy::LoadArrayFromNumpy(data_file, npy_shape, data);
-  // Convert npy_shape back to size_t type shape (to meet function
+  // Convert npy_shape back to unsigned long type shape (to meet function
   // output requirements)
   shape.clear();
   for (auto dim : npy_shape) {
     // Safe conversion (ndarray_len_t is typically int64_t/size_t)
-    shape.emplace_back(static_cast<size_t>(dim));
+    shape.emplace_back(static_cast<unsigned long>(dim));
   }
   memcpy(tensor.Data(), data.data(), tensor.Info().MemSize());
 #else
@@ -467,7 +467,7 @@ int LoadNpy2Tensor(const std::string &hm_target, const std::string &data_file,
   }
 
   std::string kv_cache_str = "cache";
-  std::vector<size_t> shape;
+  std::vector<unsigned long> shape;
   switch (data_type) {
     case 0:  // tcim::DataType::INT8
       if (data_file.find(kv_cache_str) != std::string::npos) {
