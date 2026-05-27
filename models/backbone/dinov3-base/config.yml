@@ -1,0 +1,34 @@
+model:
+  name: dinov3-base
+  save_dir: output
+  model_path: ./dinov3_vitb16-sim.onnx
+  inputs:
+    input:
+      shape: [1, 3, 224, 224]  # NCHW
+      data_format: RGB
+      mean: [123.675, 116.28, 103.53]
+      std: [58.395, 57.12, 57.375]
+      resize_type: 0
+      resizer:
+        toYUV_format: YUV420SP
+  model_impl_module: model_impl
+  model_impl_cls: DinoV3
+  
+quant:
+  calib_data: ./imagenet/ILSVRC2012_img_val
+  calib_num: 16
+
+build:
+  ncore: 1
+  opt_level: 2
+
+demo:
+  data_dir: ./imagenet/ILSVRC2012_img_val
+  num: 10
+
+eval:
+  data_dir: ./imagenet/
+  num: 10000
+  dataset_module: dataset
+  dataset_cls: Dataset
+
