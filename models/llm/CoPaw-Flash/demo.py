@@ -152,6 +152,13 @@ def get_args() -> argparse.Namespace:
         help="device number, only xh2 support",
     )
     parser.add_argument(
+        "--question",
+        dest="question",
+        type=str,
+        default="请介绍一下存算一体技术的优势",
+        help="question to ask",
+    )
+    parser.add_argument(
         "--repetition_penalty",
         dest="repetition_penalty",
         type=float,
@@ -1373,7 +1380,7 @@ if __name__ == "__main__":
                 if is_vision:
                     question = build_default_vision_prompt(current_image_paths)
                 else:
-                    question = "请介绍一下存算一体技术的优势"
+                    question = args.question
             start_time = time.time()
             try:
                 response, input_tokens, output_tokens = hm_copaw_flash.chat(

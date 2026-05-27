@@ -341,10 +341,7 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "--config",
-        type=str,
-        default=DEFAULT_CONFIG_PATH,
-        help="path to config.yaml",
+        "--config", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml"
     )
     parser.add_argument("--model", type=str, default=None)
     parser.add_argument(
@@ -352,10 +349,7 @@ def parse_args():
     )
     parser.add_argument("--model-size", type=str, default=None, help="model size")
     parser.add_argument(
-        "--calib_data",
-        type=str,
-        default=None,
-        help="calibration dataset choose",
+        "--calib_data", type=str, default=None, help="calibration dataset choose"
     )
     parser.add_argument("--work-dir", type=str, default="work_dirs/")
     parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
@@ -363,18 +357,13 @@ def parse_args():
     parser.add_argument("--w-bits", type=int, default=4)
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument(
-        "--context-length", type=int, default=None, help="max sequence length"
+        "--context-length", type=int, default=2048, help="max sequence length"
     )
     parser.add_argument(
-        "--input-sequence-length",
-        type=int,
-        default=None,
-        help="input sequence length",
+        "--input-sequence-length", type=int, default=None, help="input sequence length"
     )
     parser.add_argument(
-        "--quant-type",
-        default=None,
-        help="quant type, default is w4a8_ssfp",
+        "--quant-type", default=None, help="quant type, default is w4a8_ssfp"
     )
     parser.add_argument(
         "--gptqmodel", action="store_true", help="use gptqmodel to quant"
@@ -387,10 +376,6 @@ def parse_args():
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.model = first_not_none(args.model, get_default_model_dir(model_config))
-    args.context_length = first_not_none(
-        args.context_length,
-        parse_context_length(model_config.get("context_length", "32k")),
-    )
     args.input_sequence_length = first_not_none(
         args.input_sequence_length, model_config.get("prefill_length", 256)
     )

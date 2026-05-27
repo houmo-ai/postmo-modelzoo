@@ -91,7 +91,7 @@ def parse_args():
     )
     parser.add_argument("--batch-size", type=int, default=1, help="batch size")
     parser.add_argument(
-        "--context-length", type=int, default=None, help="max sequence length"
+        "--context-length", type=int, default=2048, help="max sequence length"
     )
     parser.add_argument(
         "--quant-type", default=None, help="quant type, default is w4a8h1_ssfp"
@@ -109,7 +109,7 @@ def parse_args():
         help="if image, temporal max size is 2, if video, temporal max size is fps",
     )
     parser.add_argument(
-        "--max_pe_length", type=int, default=262144, help="max pe length"
+        "--max_pe_length", type=int, default=32768, help="max pe length"
     )
     parser.add_argument("--patch_size", type=int, default=14, help="patch size")
     parser.add_argument(
@@ -132,10 +132,6 @@ def parse_args():
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.model = first_not_none(args.model, get_default_model_dir(model_config))
-    args.context_length = first_not_none(
-        args.context_length,
-        parse_context_length(model_config.get("context_length", "8k")),
-    )
     args.quant_type = first_not_none(
         args.quant_type, model_config.get("quant_type", "w4a8h1_ssfp")
     )

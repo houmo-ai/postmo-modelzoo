@@ -81,7 +81,7 @@ def parse_args():
     parser.add_argument("--resume", action="store_true", help="resume from the cache")
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument(
-        "--context-length", type=int, default=None, help="max sequence length"
+        "--context-length", type=int, default=2048, help="max sequence length"
     )
     parser.add_argument(
         "--input-sequence-length", type=int, default=None, help="input sequence length"
@@ -105,10 +105,6 @@ def parse_args():
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.model = first_not_none(args.model, get_default_model_dir(model_config))
-    args.context_length = first_not_none(
-        args.context_length,
-        parse_context_length(model_config.get("context_length", "32k")),
-    )
     args.input_sequence_length = first_not_none(
         args.input_sequence_length, model_config.get("prefill_length", 256)
     )

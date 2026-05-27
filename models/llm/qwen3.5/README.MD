@@ -238,7 +238,7 @@ bash test.sh -s demo --skip_download --model_name qwen3.6 --model_size 35b-a3b
 
 ### 4.1 演示结果
 
-此结果为 qwen3.6-35b-a3b 的演示输出，包含模型回答和性能测试结果。
+#### Qwen3.6-35B-A3B 演示结果
 
 ```bash
 prefill model loaded
@@ -314,6 +314,93 @@ Overall Performance Metrics:
   TPOT (Time Per Output Token): 46.86 ms/token
   E2E Latency (End-to-End):     22.98 seconds
   E2E TPS (Throughput):         18.84 tokens/s
+====================================================================================================
+```
+
+#### Qwen3.5-9B MTP 演示结果
+
+```bash
+prefill and prefill_mtp models loaded
+decode_verify and decode_mtp models loaded
+question:
+请介绍一下存算一体技术的优势
+response:
+**存算一体**（Processing-in-Memory, PIM）是一种突破性的计算机架构技术，旨在解决传统冯·诺依曼架构中存在的核心瓶颈。
+
+在传统的冯·诺依曼架构中，处理器（CPU/GPU）负责计算，而内存（DRAM/SSD）负责存储数据。两者通过总线进行通信。这种分离导致了著名的"**存储墙**"（Memory Wall）问题。存算一体技术通过将计算单元直接嵌入到存储单元中，让数据在存储位置直接进行计算，从而彻底改变了这一局面。
+
+以下是存算一体技术的主要优势：
+
+### 1. 突破“存储墙”，大幅提升能效比
+这是存算一体最核心的优势。
+*   **消除数据搬运能耗**：在传统架构中，移动数据（从内存到 CPU 再写回内存）所消耗的电能往往占据了总能耗的 60%~80%。存算一体让数据“原地计算”，几乎消除了长距离的数据传输能耗。
+*   **降低功耗**：由于大幅减少了数据移动，存算一体芯片的功耗显著低于传统芯片，特别是在处理大量数据读取和写入的场景下。这使得它在**边缘计算**、**物联网**（IoT）和**移动设备**等对电池寿命敏感的场景中具有巨大潜力。
+
+### 2. 显著降低延迟，提高计算速度
+*   **减少通信延迟**：数据无需经过复杂的片外总线或片上缓存层级，直接在存储阵列内部完成运算，极大地缩短了数据访问和处理的等待时间。
+*   **缓解带宽瓶颈**：传统架构中，内存带宽往往是限制系统整体速度的瓶颈。存算一体通过并行处理多个存储单元的数据，有效利用了存储带宽，使得系统整体吞吐量大幅提升。
+
+### 3. 天然适合人工智能（AI）和大数据负载
+现代 AI 应用（如深度学习、大语言模型）具有“数据密集”和“计算密集”的特点，且往往涉及大量的矩阵乘法运算。
+*   **匹配 AI 负载特征**：AI 训练和推理过程中，数据在内存和处理器之间频繁往返。存算一体架构完美契合这种模式，能够高效处理大规模矩阵运算。
+*   **支持稀疏计算**：许多存算一体架构（特别是基于 SRAM 或 ReRAM 的）能够利用存储单元的非线性特性，直接进行稀疏矩阵运算，这对于优化后的神经网络模型非常高效。
+
+### 4. 简化系统架构，降低设计复杂度
+*   **减少互联复杂度**：传统高性能计算需要极其复杂的片上网络（NoC）和片外互联来连接成千上万个核心和内存模块。存算一体将计算和存储集成在一起，简化了芯片内部的布线设计。
+*   **降低封装成本**：由于减少了对外部高速内存接口（如 HBM 或 GDDR）的依赖，芯片封装和系统集成的成本有望降低。
+
+### 5. 克服摩尔定律放缓带来的挑战
+随着晶体管尺寸逼近物理极限，单纯依靠缩小晶体管来提升 CPU 频率和性能（摩尔定律）已难以为继，且功耗急剧上升。存算一体提供了一种**架构层面的创新路径**，在不依赖晶体管微缩的情况下，通过改变数据流动方式来继续提升性能并控制功耗。
+
+---
+
+### 总结与展望
+
+| 特性 | 传统冯·诺依曼架构 | 存算一体架构 (PIM) |
+| :--- | :--- | :--- |
+| **数据流向** | 内存 $\leftrightarrow$ 处理器 (长距离) | 存储单元内部直接计算 (零距离) |
+| **主要瓶颈** | 内存带宽与延迟 | 计算单元密度与互连 |
+| **能耗分布** | 大部分能耗用于数据搬运 | 大部分能耗用于计算本身 |
+| **适用场景** | 通用计算、逻辑控制 | AI 推理、大数据分析、边缘计算 |
+
+**潜在挑战**：
+尽管优势明显，存算一体目前也面临一些挑战，例如：
+*   **编程模型复杂**：传统的软件（如 C/C++）难以直接利用 PIM 特性，需要新的编程模型和编译器支持。
+*   **数据一致性**：在多线程或多核环境下，保证数据的一致性（Cache Coherence）比传统架构更复杂。
+*   **制造良率**：新型存储材料（如 ReRAM, MRAM）与逻辑电路的集成工艺尚需成熟。
+
+总体而言，存算一体被视为后摩尔时代解决算力与能耗矛盾的关键技术之一，特别是在人工智能和大数据爆发的当下，其应用前景非常广阔。
+
+[SpecDecode] mode=mtp rounds=399 total_tokens=970 draft_tokens=1596 accepted=572 avg_accepted_per_round=1.43 acceptance_rate=35.84% mtp_prefill_tokens=29 drafts_per_round=4 elapsed_s=53.7641
+
+====================================================================================================
+                     Model Inference Performance Summary Report
+====================================================================================================
+Configuration Details:
+  Batch Size:      1
+  Input Length per Sample:     30 tokens
+  Output Length per Sample:    970 tokens
+  Prefill Model Load Time: 9817.03ms
+  Decode Model Load Time:  435.12ms
+Prefill Stage Performance:
+  Total Time:  326.92ms | Speed:   91.77 tokens/s
+  Tokenization Time:   18.20ms
+  Embedding Time:    2.60ms
+  API SetInput Time:   9.26ms
+  API Inference Time: 192.97ms | Prefill Speed:  155.47 tokens/s
+  API GetOutput Time: 76.16ms
+Decode Stage Performance:
+  Total Time: 53761.95ms | Speed:   18.02 tokens/s
+  Tokenization Time:  981.17ms
+  Embedding Time:  257.02ms
+  API SetInput Time:   2.79ms
+  API Inference Time: 40.65ms | Decode Speed:   24.60 tokens/s
+  API GetOutput Time:  7.11ms
+Overall Performance Metrics:
+  TTFT (Time To First Token):  326.92 ms
+  TPOT (Time Per Output Token): 55.48 ms/token
+  E2E Latency (End-to-End):     54.13 seconds
+  E2E TPS (Throughput):         17.92 tokens/s
 ====================================================================================================
 ```
 

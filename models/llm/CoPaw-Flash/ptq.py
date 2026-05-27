@@ -986,10 +986,6 @@ def parse_args():
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.model = first_not_none(args.model, get_default_model_dir(model_config))
-    args.context_length = first_not_none(
-        args.context_length,
-        parse_context_length(model_config.get("context_length", "8k")),
-    )
     args.input_sequence_length = first_not_none(
         args.input_sequence_length, model_config.get("prefill_length", 256)
     )
@@ -1004,7 +1000,9 @@ if __name__ == "__main__":
 
     args = parse_args()
     set_seed(42)
-    with ChildProcessMemoryMonitor(interval=2, log_file="./cpu_memory.log", include_children=True) as monitor:
+    with ChildProcessMemoryMonitor(
+        interval=2, log_file="./cpu_memory.log", include_children=True
+    ) as monitor:
         if args.gptqmodel:
             run_step_in_fresh_process("rotate_fp_vl", args)
             run_step_in_fresh_process("gptq_quant_llm", args)

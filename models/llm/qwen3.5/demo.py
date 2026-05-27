@@ -153,6 +153,13 @@ def get_args() -> argparse.Namespace:
         help="device number",
     )
     parser.add_argument(
+        "--question",
+        dest="question",
+        type=str,
+        default="请介绍一下存算一体技术的优势",
+        help="question to ask",
+    )
+    parser.add_argument(
         "--repetition_penalty",
         dest="repetition_penalty",
         type=float,
@@ -1485,7 +1492,7 @@ if __name__ == "__main__":
                 if is_vision:
                     question = "描述这些图片"
                 else:
-                    question = "请介绍一下存算一体技术的优势"
+                    question = args.question
 
             start_time = time.time()
             try:

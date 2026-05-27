@@ -133,6 +133,13 @@ def get_args() -> argparse.Namespace:
         help="device number",
     )
     parser.add_argument(
+        "--prompt",
+        dest="prompt",
+        type=str,
+        default="请描述图片内容。",
+        help="user prompt",
+    )
+    parser.add_argument(
         "--max_size_w",
         dest="max_size_w",
         type=int,
@@ -936,7 +943,7 @@ if __name__ == "__main__":
 
     image_num = 0 if not image_dir else len(image_dir)
 
-    prompt = "请描述图片内容。"
+    prompt = args.prompt
     logger.success("question:")
     print("\033[1;95m{}\033[0m".format(prompt))
     input_tokens = qwen25vl.chat_vit_prefill(image_dir, prompt=prompt)

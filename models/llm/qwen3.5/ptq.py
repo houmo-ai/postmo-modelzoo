@@ -85,8 +85,8 @@ def parse_args():
     parser.add_argument("--rotated-model-dir", type=str, default=None, help="HF dir for rotated fp weights (vision export); default: <work-dir>/<model-name>_rotated_fp")
     parser.add_argument("--gptq-model-dir", type=str, default=None, help="HF dir for GPTQ weights (LLM export); default: <work-dir>/<model-name>_gptq_4bit")
     parser.add_argument("--debug", action="store_true", help="forward --debug to export scripts")
-    parser.add_argument("--context-length", type=int, default=None, help="LLM export context length")
-    parser.add_argument("--max-pe-length", type=int, default=None, help="LLM export rotary cache max_pe_length, default follows context_length")
+    parser.add_argument("--context-length", type=int, default=2048, help="LLM export context length")
+    parser.add_argument("--max-pe-length", type=int, default=262144, help="LLM export rotary cache max_pe_length, default follows context_length")
     parser.add_argument("--llm-export-full-output-valid", action=argparse.BooleanOptionalAction, default=False, help="run full-output comparison during LLM export validation; disabled by default to reduce VRAM")
     parser.add_argument("--input-sequence-length", type=int, default=None, help="MoE LLM export --input-sequence-length")
     parser.add_argument("--device", type=str, default="cuda", help="CUDA device string for rotate / GPTQ subprocesses")
@@ -109,11 +109,6 @@ def parse_args():
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.model = first_not_none(args.model, get_default_model_dir(model_config))
-    args.context_length = first_not_none(
-        args.context_length,
-        parse_context_length(model_config.get("context_length", "256k")),
-    )
-    args.max_pe_length = first_not_none(args.max_pe_length, args.context_length)
     args.input_sequence_length = first_not_none(
         args.input_sequence_length, model_config.get("prefill_length", 256)
     )
