@@ -706,3 +706,31 @@ def test_vlm_gemma4_compile(setup_logging) -> None:
     """test_vlm_gemma4_compile"""
     model_name = "gemma4"
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.copaw_flash
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_llm_copaw_flash_compile",
+    depends_on=["test_quant_models.py::test_llm_copaw_flash_quant"],
+)
+def test_llm_copaw_flash_compile(setup_logging) -> None:
+    """test_llm_copaw_flash_compile"""
+    model_name = "copaw-flash"
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.paddleocr_vl
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_ocr_paddleocr_vl_compile",
+    depends_on=["test_quant_models.py::test_ocr_paddleocr_vl_quant"],
+)
+def test_ocr_paddleocr_vl_compile(setup_logging) -> None:
+    """test_ocr_paddleocr_vl_compile"""
+    model_name = "paddleocr-vl"
+    _compile_func(model_name, setup_logging)

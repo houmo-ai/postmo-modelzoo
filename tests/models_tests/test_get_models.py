@@ -400,6 +400,17 @@ def test_llm_copaw_flash_get_model(setup_logging) -> None:
     _get_model_func(model_name, setup_logging)
 
 
+@pytest.mark.paddleocr_vl
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_ocr_paddleocr_vl_get_model")
+def test_ocr_paddleocr_vl_get_model(setup_logging) -> None:
+    """test_ocr_paddleocr_vl_get_model"""
+    model_name = "paddleocr-vl"
+    _get_model_func(model_name, setup_logging)
+
+
 @pytest.mark.qwen3_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

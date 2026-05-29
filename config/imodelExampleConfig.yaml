@@ -288,6 +288,18 @@ ocr_glm-ocr:
         args: all
   test:
     - ocr_glm-ocr_test
+ocr_paddleocr-vl:
+  include:
+    - models/ocr/paddleocr-vl
+  exclude:
+    - models/ocr/paddleocr-vl/README.MD
+  example_case:
+    - ocr_paddleocr-vl_test:
+        test_type: models_tests
+        script: paddleocr_vl
+        args: all
+  test:
+    - ocr_paddleocr-vl_test
 reranker_qwen3-reranker:
   include:
     - models/reranker/qwen3-reranker

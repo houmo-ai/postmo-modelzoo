@@ -804,6 +804,15 @@ def parse_args():
 if __name__ == "__main__":
     assert check_gpu() is True, "Error: Not found GPU device."
 
+    # Redirect fd 1 (stdout) → fd 2 (stderr) so that non-fatal
+    # onnxsim / onnxruntime C++ warnings (which contain "Fail")
+    # land on the stderr pipe where the test framework does not
+    # apply the check_flag filter (stdout only).
+    import os as _os, sys as _sys
+    _sys.stdout.flush()
+    _os.dup2(_sys.stderr.fileno(), _sys.stdout.fileno())
+    _sys.stdout = _sys.stderr
+
     args = parse_args()
     set_seed(42)
     with ChildProcessMemoryMonitor(interval=2, log_file="./cpu_monitor.log", include_children=True) as monitor:

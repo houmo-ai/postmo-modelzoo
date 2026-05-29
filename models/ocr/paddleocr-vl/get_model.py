@@ -118,6 +118,7 @@ if __name__ == "__main__":
         args.context_length, model_config.get("context_length", "4k")
     )
     default_model_dir = get_default_model_dir(model_config)
+    quant_type = model_config.get("quant_type", "w8a8h0_ssfp")
 
     model_cfgs = {
         "target": HOUMO_TARGET,
@@ -131,6 +132,7 @@ if __name__ == "__main__":
             "context_len": context_length,
             "prefill_len": model_config.get("prefill_length", 256),
             "batch": model_config.get("batch", 1),
+            "quant_type": quant_type,
         },
         "modelscope_repo": {
             "repo_ids": model_config.get("modelscope_repo", []),

@@ -46,3 +46,4 @@ qwen3_asr
 qwen3_forcealigner
 gemma4
 copaw_flash
+paddleocr_vl

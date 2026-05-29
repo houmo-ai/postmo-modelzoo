@@ -493,3 +493,23 @@ def test_vlm_gemma4_demo(setup_logging) -> None:
     """test_vlm_gemma4_demo"""
     model_name = "gemma4"
     _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.copaw_flash
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_llm_copaw_flash_demo(setup_logging) -> None:
+    """test_llm_copaw_flash_demo"""
+    model_name = "copaw-flash"
+    _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.paddleocr_vl
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_ocr_paddleocr_vl_demo(setup_logging) -> None:
+    """test_ocr_paddleocr_vl_demo"""
+    model_name = "paddleocr-vl"
+    _demo_func(model_name, setup_logging)
