@@ -47,8 +47,6 @@ fi
 
 # paths for xh2 modelzoo
 export PYTHONPATH=$HOUMO_EXAMPLES_PATH/apis/common/python:$HOUMO_EXAMPLES_PATH/hmodel/xh2:$HOUMO_EXAMPLES_PATH/hmodel/gptqmodel:$PYTHONPATH
-export HF_ENDPOINT=https://hf-mirror.com
-export HF_TOKEN=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
 
 # use asic if detected
 if [[ -z $HDPL_PLATFORM ]]; then
