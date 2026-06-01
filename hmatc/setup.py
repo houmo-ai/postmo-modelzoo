@@ -46,7 +46,7 @@ def get_version():
     Returns:
         str: Version string from HOUMO_VERSION environment variable
     """
-    return os.environ.get("HOUMO_VERSION", "1.3.0.dev")
+    return os.environ.get("HOUMO_VERSION", "1.4.0.dev")
 
 
 def get_build_time():

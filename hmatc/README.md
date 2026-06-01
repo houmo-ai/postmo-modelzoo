@@ -163,6 +163,7 @@ build:
   batch: 1                  # [可选] 编译batch（最终batch = 模型batch * 编译batch）
   roi_num: 1                # [可选] ROI数量，仅动态resizer模式有效，需batch=1
   parallel_jobs: 4          # [可选] 并行编译任务数，默认CPU物理核心数
+  cpp_backend: v1           # [可选] 算子实现的版本，可选v1, v2
 
 # 演示配置
 demo:

@@ -595,6 +595,7 @@ class Xh2Exec(BaseExec):
             work_dir=self.build_output_dir,
             one_img_multi_roi=self.roi_num > 1,
             j=self.build_parallel_jobs,
+            cpp_backend=self.cpp_backend,
             custom_msg=json.dumps(self.custom_msg, ensure_ascii=False),
         )
 
