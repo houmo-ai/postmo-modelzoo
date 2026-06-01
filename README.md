@@ -75,6 +75,10 @@ python 依赖可通过 requirements.txt 安装：
 pip install -r requirements.txt
 ```
 
+如果需要对大模型进行量化，同时是在github等开源平台下载的代码，需要自行下载以下几个仓库：
+- [houmo-xh2modelzoo](https://github.com/houmo-ai/houmo-xh2modelzoo)，安装或者重命名为hmodel/xh2目录
+- [houmo-gptqmodel](https://github.com/houmo-ai/houmo-gptqmodel)，安装或者重命名为hmodel/gptqmodel目录
+
 此外，示例运行需要依赖`houmo-tcim-runtime`以及`houmo-drv`中的推理库，参考后摩大道软件平台快速入门安装推理所需的软件包。
 linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/win_envs 目录的 README.MD 进行环境变量的设置。
 

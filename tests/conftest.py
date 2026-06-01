@@ -42,9 +42,6 @@ os.environ["PYTHONPATH"] = (
     f"{ori_pythonpath}:{append_pythonpath}" if ori_pythonpath else append_pythonpath
 )
 
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["HF_TOKEN"] = "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"
-
 # Set up dataset path
 os.environ["HOUMO_DATASETS_PATH"] = f"{script_dir}/../data/datasets/"
 if os.getenv("HOUMO_EXAMPLES_PATH", None) is None or not os.getenv(
