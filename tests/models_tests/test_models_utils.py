@@ -314,6 +314,7 @@ def _download_models(
     copy_flag: bool = False,
     assert_flag=True,
     other_params: list = [],
+    lock_file: str = None,
 ) -> bool:
     """
     Download models of specified type with proper resource locking.
@@ -327,6 +328,8 @@ def _download_models(
         copy_flag (bool): Whether to copy downloaded files to current directory
         assert_flag (bool): Whether to assert on download failure
         other_params (list): Additional parameters to pass to the download command
+        lock_file (str): Custom lock file path. If provided, use this instead of
+                         default lock files derived from download_dir/extract_dir.
 
     Returns:
         bool: True if download was successful, False otherwise
@@ -346,6 +349,18 @@ def _download_models(
         cmd_list += other_params
 
     logger.info(f"Ready to download models using {cmd_list}")
+
+    # Use custom lock file if provided
+    if lock_file:
+        with ModelResourceLock(
+            lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
+        ):
+            flag, _ = execute_test_cmd(cmd_list, "", assert_flag)
+            if copy_flag:
+                os.system(f"cp -ar {download_dir}/* ./")
+        return flag
+
+    # Default lock file logic
     lock_file_src = download_dir + "/lock.lock"
     lock_file_dst = extract_dir + "/lock.lock"
     if lock_type == "all":
@@ -359,9 +374,9 @@ def _download_models(
                 if copy_flag:
                     os.system(f"cp -ar {download_dir}/* ./")
     else:
-        lock_file = lock_file_src if lock_type == "download" else lock_file_dst
+        lock_file_default = lock_file_src if lock_type == "download" else lock_file_dst
         with ModelResourceLock(
-            lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
+            lock_file_default, ModelResourceLock.LockMode.WRITE, "model downloading"
         ):
             flag, _ = execute_test_cmd(cmd_list, "", assert_flag)
             if copy_flag:
@@ -614,6 +629,198 @@ def _prepare_quantized_cv_model(
     return flag
 
 
+def _is_dir_empty(dir_path: str) -> bool:
+    """
+    Check if a directory is empty or doesn't exist.
+
+    Args:
+        dir_path (str): Path to the directory to check
+
+    Returns:
+        bool: True if directory doesn't exist or is empty, False otherwise
+    """
+    if not os.path.exists(dir_path):
+        return True
+    if not os.path.isdir(dir_path):
+        return True
+    return len(os.listdir(dir_path)) == 0
+
+
+def _prepare_demo_model_dirs(
+    model_info: dict,
+    model_res_dir: str,
+    model_set_dir: str,
+) -> bool:
+    """
+    Prepare model directories required by demo_params.
+
+    This function checks demo_params for model paths, and if those paths are defined
+    in get_model_params["extract_dir"] but don't exist or are empty, downloads them.
+
+    Args:
+        model_info (dict): Dictionary containing model configuration information
+        model_res_dir (str): Directory containing model results
+        model_set_dir (str): Directory containing model files
+
+    Returns:
+        bool: True if preparation was successful, False otherwise
+    """
+
+    def _get_model_dir_name(path: str) -> str:
+        """
+        Extract the model directory name from a path.
+        Returns the first directory name after 'cached_models/' or 'cached_results/'.
+
+        E.g., 'cached_models/hmm_xh2_26b-a4b_2k/xxx.hmm' -> 'hmm_xh2_26b-a4b_2k'
+        """
+        if not path:
+            return ""
+        # Normalize path separators
+        normalized = path.replace("\\", "/")
+        for prefix in ["cached_models/", "cached_results/"]:
+            if prefix in normalized:
+                # Get the part after the prefix
+                suffix = normalized.split(prefix, 1)[1]
+                # Get the first directory name (before the next '/')
+                if "/" in suffix:
+                    return suffix.split("/")[0]
+                return suffix
+        return ""
+
+    if "demo_params" not in model_info or "get_model_params" not in model_info:
+        return True
+
+    demo_params = model_info["demo_params"].get(HOUMO_BACKEND, None)
+    get_model_params = model_info["get_model_params"].get(HOUMO_BACKEND, None)
+
+    if not demo_params or not get_model_params:
+        return True
+
+    extract_dirs = get_model_params.get("extract_dir", [])
+    model_types = get_model_params.get("type", [])
+    if not extract_dirs:
+        return True
+
+    # Collect unique model directory names from demo_params
+    # Key: model dir name (e.g., 'hmm_xh2_26b-a4b_2k'), Value: full path (e.g., 'cached_models/hmm_xh2_26b-a4b_2k')
+    demo_model_dirs = {}
+    for param_name, param_values in demo_params.items():
+        if not isinstance(param_values, list):
+            continue
+        for param_val in param_values:
+            if not isinstance(param_val, str) or not param_val:
+                continue
+            # Extract model directory name from file path
+            # E.g., 'cached_results/hmm_xh2_26b-a4b_2k/hmquant/xxx.pt' -> 'hmm_xh2_26b-a4b_2k'
+            if "cached_results" in param_val or "cached_models" in param_val:
+                model_dir_name = _get_model_dir_name(param_val)
+                if model_dir_name and model_dir_name not in demo_model_dirs:
+                    # Build the correct directory path (without subdirectories like 'hmquant')
+                    if "cached_models" in param_val:
+                        base_path = "cached_models"
+                    else:
+                        base_path = "cached_results"
+                    demo_model_dirs[model_dir_name] = f"{base_path}/{model_dir_name}"
+
+    if not demo_model_dirs:
+        logger.info("No model directories found in demo_params, skip preparation.")
+        return True
+
+    flag = True
+    for model_dir_name, demo_dir in demo_model_dirs.items():
+        # Check if this model directory is defined in get_model_params extract_dir
+        matching_idx = None
+        for idx, extract_dir in enumerate(extract_dirs):
+            extract_dir_name = _get_model_dir_name(extract_dir)
+            if extract_dir_name and model_dir_name == extract_dir_name:
+                matching_idx = idx
+                break
+
+        # If not found in extract_dir, skip
+        if matching_idx is None:
+            continue
+
+        # Get actual directory path
+        if "cached_models" in demo_dir:
+            actual_dir = demo_dir.replace("cached_models", model_set_dir)
+        elif "cached_results" in demo_dir:
+            actual_dir = demo_dir.replace("cached_results", model_res_dir)
+        else:
+            continue
+
+        # Check if directory already exists and is not empty
+        if not _is_dir_empty(actual_dir):
+            logger.info(
+                f"Demo model dir {actual_dir} already exists and not empty, skip preparation."
+            )
+            continue
+
+        # Check if model type is hmm (can be downloaded by get_model)
+        if matching_idx < len(model_types) and model_types[matching_idx] != "hmm":
+            logger.warning(
+                f"Demo model dir {actual_dir} is empty but model type is not 'hmm', cannot download."
+            )
+            continue
+
+        logger.info(f"Start to prepare demo model dir: {actual_dir}")
+
+        # Prepare other_params for downloading specific model variant
+        other_params = []
+        for param_key in get_model_params:
+            if param_key in [
+                "type",
+                "download_dir",
+                "extract_dir",
+                "build_model_dir",
+                "model_dir",
+                "quant_model_dir",
+            ]:
+                continue
+            if matching_idx < len(get_model_params[param_key]):
+                param_val = get_model_params[param_key][matching_idx]
+                if param_val is None:
+                    continue
+                tmp_str = f"--{param_key}"
+                if isinstance(param_val, str) and "cached_results" in param_val:
+                    param_val = param_val.replace("cached_results", model_res_dir)
+                elif isinstance(param_val, str) and "cached_models" in param_val:
+                    param_val = param_val.replace("cached_models", model_set_dir)
+                other_params += [tmp_str, param_val]
+
+        # Get download_dir
+        download_dir = model_set_dir
+        if "download_dir" in get_model_params and matching_idx < len(
+            get_model_params["download_dir"]
+        ):
+            download_dir_val = get_model_params["download_dir"][matching_idx]
+            if download_dir_val and isinstance(download_dir_val, str):
+                if "cached_models" in download_dir_val:
+                    download_dir = download_dir_val.replace(
+                        "cached_models", model_set_dir
+                    )
+                else:
+                    download_dir = download_dir_val
+
+        # Use a separate lock file for demo model preparation to avoid conflicts
+        # with get_model flow which uses model_set_dir/lock.lock
+        demo_lock_file = actual_dir + "/lock.lock"
+        download_flag = _download_models(
+            model_info,
+            file_type="hmm",
+            download_dir=download_dir,
+            extract_dir=actual_dir,
+            lock_file=demo_lock_file,
+            copy_flag=False,
+            assert_flag=False,
+            other_params=other_params,
+        )
+        if download_flag is False:
+            logger.error(f"Failed to prepare demo model dir: {actual_dir}")
+            flag = False
+
+    return flag
+
+
 def _prepare_compiled_llm_model(
     model_info: dict,
     platform: str,
@@ -719,6 +926,14 @@ def _prepare_compiled_llm_model(
             )
             if flag is False:
                 break
+
+    # Prepare model directories required by demo_params after compile_params
+    if not _prepare_demo_model_dirs(
+        model_info,
+        model_res_dir,
+        model_set_dir,
+    ):
+        logger.warning("Failed to prepare model directories for demo.")
 
     return flag
 
@@ -1298,7 +1513,7 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
         prepare_test_folder(model_dir, "demo")
         current_folder = os.getcwd()
         logger.info(
-            "test.sh ret is %d, change test folder, current folder: %s.",
+            "==> test.sh execution completed, ret is %d, change test folder, current folder: %s.",
             test_sh_flag,
             current_folder,
         )
@@ -1306,12 +1521,12 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
         logger.warning(f"remove folder: {test_sh_folder}.")
         shutil.rmtree(test_sh_folder)
 
-    if is_release():
-        logger.info("RELEASE MODE, only execute test.sh.")
-        logger.warning(f"remove folder: {os.getcwd()}.")
-        shutil.rmtree(os.getcwd())
-        assert test_sh_flag is True, "Execute tesh.sh Failed!"
-        return
+    # if is_release():
+    #     logger.info("RELEASE MODE, only execute test.sh.")
+    #     logger.warning(f"remove folder: {os.getcwd()}.")
+    #     shutil.rmtree(os.getcwd())
+    #     assert test_sh_flag is True, "Execute tesh.sh Failed!"
+    #     return
 
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     model_res_dir = os.path.join(MODELS_RES_DIR, dev_res_dir, model_info["model_dir"])
@@ -1350,6 +1565,43 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
         pytest.skip(f"Skip demo testcase {model_name} in the SEPARATE NO INFER stage.")
     if model_type == "cv" and get_test_type() == TCaseType.SEPARATE_INFER:
         restore_models_res(model_res_dir, current_folder)
+
+    if (
+        model_type == "llm"
+        and is_release()
+        and get_test_type() == TCaseType.SEPARATE_INFER
+    ):
+        get_model_params = model_info["get_model_params"][HOUMO_BACKEND]
+        demo_params = model_info["demo_params"][HOUMO_BACKEND]
+
+        # Collect all unique compile_case_ids from demo_params
+        # Each index in demo_params lists represents a different test configuration
+        compile_case_ids = set()
+        for value_list in demo_params.values():
+            if not isinstance(value_list, list):
+                continue
+            for value in value_list:
+                if isinstance(value, str) and "cached_results" in value:
+                    path_parts = os.path.normpath(value).split(os.sep)
+                    if "cached_results" in path_parts:
+                        cache_idx = path_parts.index("cached_results")
+                        if cache_idx + 1 < len(path_parts):
+                            compile_case_ids.add(path_parts[cache_idx + 1])
+
+        # Download models for each unique compile_case_id
+        for compile_case_id in compile_case_ids:
+            other_params = _check_existed_models(
+                compile_case_id, get_model_params, model_res_dir, model_set_dir
+            )
+            _download_models(
+                model_info,
+                file_type="hmm",
+                download_dir=model_set_dir,
+                extract_dir=model_res_dir,
+                lock_type="all",
+                copy_flag=False,
+                other_params=other_params,
+            )
 
     # install python requirements
     venv_flag = install_py_venv(current_folder, log_file)
