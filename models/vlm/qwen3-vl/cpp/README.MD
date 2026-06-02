@@ -39,7 +39,6 @@
 | CMakeLists.txt        | CMake编译配置文件                                 |
 | build.sh              | Linux平台编译脚本                                 |
 | build_ndk.sh          | Android平台编译脚本                               |
-| build_win.bat         | Windows11平台编译脚本                             |
 | tcim_runtime.cmake    | TCIM Runtime库查找配置                            |
 
 功能支持度说明：
@@ -156,10 +155,9 @@ source env.sh
 
 **本示例依赖opencv库进行图像预处理，请提前安装或者从官网下载对应平台的Release版本。**
 ``` bash
-#Linux   : sudo apt install -y libopencv-dev 
+#Linux   : sudo apt install -y libopencv-dev
 #Android : 1. 下载源码，自行使用ndk交叉编译，安装到3rdparty/opencv/Android_xh2目录下，
 #          2. 或者使用get_3rdparty.py下载预编译的Android版opencv。
-#Win11   : 下载windows11的Release版本，参考${HOUMO_EXAMPLES_PATH}/tools/win_envs/README.MD完成环境变量设置。
 ```
 
 **Linux平台编译：**
@@ -183,17 +181,6 @@ export TCIM_RUNTIME_PATH=/path/to/houmo-tcim-runtime-xh2
 ```
 
 编译生成的可执行文件在 `../android` 目录下。
-
-**Windows11平台编译：**
-
-```bash
-# 下载win11平台opencv的Release版本
-# 参考${HOUMO_EXAMPLES_PATH}/tools/win_envs目录下的README.MD设置win11环境变量。
-
-./build_win.bat
-```
-
-编译生成的可执行文件在 `../bin` 目录下。
 
 ### 2.3 运行
 
@@ -226,48 +213,51 @@ Initializing Qwen3-VL inference engine...
 Visual model loaded
 Prefill model loaded
 Decode model loaded
-VIT input shape: 1 3 2 448 448 
+VIT input shape: 1 3 2 448 448
 Image dimensions: 448x448
 Question: 请分析输入内容并简洁作答。
-Images: ../../../data/pic/beach.jpeg 
-Response: 图片中，一位女士坐在沙滩上，与一只戴着蓝色背带的金毛犬互动。两人在夕阳下相视而笑，氛围温馨。背景是海浪和金色的落日，画面充满宁静与幸福。
-
+Images: ../../../data/pic/beach.jpeg
+Response:
+这是一张充满温馨与宁静氛围的海滩日落照片。
+画面中，一位年轻女子和一只金毛犬正坐在沙滩上。女子身穿蓝白格子衬衫，侧身坐着，面带微笑，温柔地注视着身旁的狗狗。她的一只手轻轻抬起，似乎在与狗狗互动或抚摸它。
+金毛犬戴着一个蓝色的胸背带，安静地坐在女子旁边，前爪抬起，正与女子的手进行互动，显得十分温顺可爱。
+他们身处一片被夕阳染成暖金色的沙滩上，背景是平静的海面和柔和的天空。阳光从画面右侧洒下，在沙地上投下长长的影子，营造出温暖、柔和的光影效果。整个场景洋溢着人与宠物之间亲密无间的和谐感，传递出一种放松、幸福和宁静的美好情绪。
 [SUCCESS] ====================================================================================================
 [SUCCESS]                     Model Inference Performance Summary Report
 [SUCCESS] ====================================================================================================
 [SUCCESS] Configuration Details:
 [SUCCESS]   Batch Size:      1
-[SUCCESS]   Input Length per Sample:    215 tokens
-[SUCCESS]   Output Length per Sample:     50 tokens
+[SUCCESS]   Input Length per Sample:    209 tokens
+[SUCCESS]   Output Length per Sample:     179 tokens
 [SUCCESS]   Number of Images:      1 images
-[SUCCESS]   Prefill Model Load Time: 3236.99ms
-[SUCCESS]   Decode Model Load Time:  174.08ms
-[SUCCESS]   Vision Model Load Time:  758.74ms
+[SUCCESS]   Prefill Model Load Time:    24546.42ms
+[SUCCESS]   Decode Model Load Time:  788.19ms
+[SUCCESS]   Vision Model Load Time:  4231.40ms
 [SUCCESS] Vision Stage Performance:
-[SUCCESS]   Total Time:  118.09ms | Speed:   8.47 images/s
-[SUCCESS]   Preprocessing Time: 15.36ms | Speed:  65.10 images/s
-[SUCCESS]   API SetInput Time:   1.41ms
-[SUCCESS]   API Inference Time: 90.86ms | Speed:  11.01 images/s
-[SUCCESS]   API GetOutput Time:  7.11ms
+[SUCCESS]   Total Time:  122.73ms | Speed:   8.15 images/s
+[SUCCESS]   Preprocessing Time: 16.13ms | Speed:  61.99 images/s
+[SUCCESS]   API SetInput Time:   1.14ms
+[SUCCESS]   API Inference Time: 93.57ms | Speed:  10.69 images/s
+[SUCCESS]   API GetOutput Time:  8.48ms
 [SUCCESS] Prefill Stage Performance:
-[SUCCESS]   Total Time:  136.08ms | Speed: 1579.96 tokens/s
-[SUCCESS]   Tokenization Time:   0.20ms
+[SUCCESS]   Total Time:  129.08ms | Speed: 1619.13 tokens/s
+[SUCCESS]   Tokenization Time:   0.12ms
 [SUCCESS]   Embedding Time:    0.55ms
-[SUCCESS]   API SetInput Time:   8.70ms
-[SUCCESS]   API Inference Time: 124.84ms | Prefill Speed: 1722.27 tokens/s
-[SUCCESS]   API GetOutput Time:  1.55ms
+[SUCCESS]   API SetInput Time:   7.84ms
+[SUCCESS]   API Inference Time: 116.92ms | Prefill Speed: 1787.59 tokens/s
+[SUCCESS]   API GetOutput Time:  1.51ms
 [SUCCESS] Decode Stage Performance:
-[SUCCESS]   Total Time: 2750.47ms | Speed:   18.18 tokens/s
-[SUCCESS]   Tokenization Time:    1.31ms
-[SUCCESS]   Embedding Time:    0.11ms
-[SUCCESS]   API SetInput Time:   1.28ms/token
-[SUCCESS]   API Inference Time: 52.60ms/token | Decode Speed:   19.40 tokens/s
-[SUCCESS]   API GetOutput Time:  2.17ms/token
+[SUCCESS]   Total Time: 8833.68ms | Speed:   20.26 tokens/s
+[SUCCESS]   Tokenization Time:    5.79ms
+[SUCCESS]   Embedding Time:    0.39ms
+[SUCCESS]   API SetInput Time:   1.02ms/token
+[SUCCESS]   API Inference Time: 46.67ms/token | Decode Speed:   21.55 tokens/s
+[SUCCESS]   API GetOutput Time:  1.81ms/token
 [SUCCESS] Overall Performance Metrics:
-[SUCCESS]   TTFT (Time To First Token):  254.166 ms
-[SUCCESS]   TPOT (Time Per Output Token): 55.009 ms/token
-[SUCCESS]   E2E Latency (End-to-End):      3.012 seconds
-[SUCCESS]   E2E TPS (Throughput):         16.60 tokens/s
+[SUCCESS]   TTFT (Time To First Token):  251.816 ms
+[SUCCESS]   TPOT (Time Per Output Token): 49.350 ms/token
+[SUCCESS]   E2E Latency (End-to-End):      9.092 seconds
+[SUCCESS]   E2E TPS (Throughput):         19.69 tokens/s
 [SUCCESS] ====================================================================================================
 ```
 
@@ -282,7 +272,7 @@ Initializing Qwen3-VL inference engine...
 Visual model loaded
 Prefill model loaded
 Decode model loaded
-VIT input shape: 1 3 2 448 448 
+VIT input shape: 1 3 2 448 448
 Image dimensions: 448x448
 Context max length: 32768
 Input your instruction here (or image paths):../../../data/pic/lane.jpg -- 简单介绍下这个图片
@@ -304,7 +294,7 @@ Initializing Qwen3-VL inference engine...
 Visual model loaded
 Prefill model loaded
 Decode model loaded
-VIT input shape: 1 3 2 448 448 
+VIT input shape: 1 3 2 448 448
 Image dimensions: 448x448
 Context max length: 32768
 Input your instruction here (or image paths): ../../../data/pic/lane.jpg -- 简单介绍下这个图片
@@ -315,14 +305,14 @@ Response: 这张图片是从一辆汽车的驾驶座视角拍摄的城市街道�
 主要特点：
 
 - **道路与交通**：画面中央是双向车道，中间有两条黄色实线。前方有一辆深色轿车正在行驶（可能是SUV或旅行车），右侧是一排停靠在路边、等待通行或者缓慢移动车辆。
-  
+
   - 左侧可见几辆车并行停放着；
     右边则有多台机动车沿街排列；
 
    轿车上可以看到部分车牌号码和尾灯亮起的状态表明可能处于夜间或是黄昏时分光线较暗的情况下进行行车活动，
 
-   
-  
+
+
 
 ---
 
@@ -342,13 +332,13 @@ Response: 好的，我来为您详细介绍这张图片：
 
 **画面主体：**
 - 一位女士和一只金毛犬正坐在柔软湿润的沙滩上。
-  
+
     - **女子**: 她穿着一件蓝白格子衬衫（或类似图案），盘腿坐着。她面带微笑地看着狗狗，并伸出一只手似乎在进行互动游戏——可能是“握手”或者训练动作；
 
       狗狗戴着一个蓝色花纹项圈/背心式牵引装置；
-      
+
      它也抬起前爪回应主人的动作，
-     
+
    整个场景洋溢着人宠之间亲密无间的温情氛围！
 
 ---
@@ -386,16 +376,16 @@ Response: 这是一个很有趣的问题！其实，我作为AI助手没有个�
 
 **第一幅图（城市街道）：**
 - **风格**: 现实、纪实感强。
-  
+
   - 它捕捉的是日常交通场景中的一个瞬间 —— 可能是通勤路上的拥堵或是傍晚下班时分的城市节奏。
 
     虽然画面略显模糊和昏暗，并非精心构图的艺术作品，
-    
+
   但它真实地反映了现代都市生活的常态与压力，
 
      同样也蕴含着一种平凡生活的真实美感！
 
-  
+
 
 —
 
@@ -412,7 +402,7 @@ Response: 这是一个很有趣的问题！其实，我作为AI助手没有个�
 **
 
 第二幅图 (海滩日落)：
-   
+
 * 飘逸浪漫, 感情浓烈
 *
 *
@@ -444,7 +434,7 @@ Response: 这是一个很有趣的问题！其实，我作为AI助手没有个�
 
 则第一个更有意义 👉🚗🌆 .
 
-最终的选择权在你自己手中 😊 
+最终的选择权在你自己手中 😊
 
 希望我的解读对你有所帮助~
 

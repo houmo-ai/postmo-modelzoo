@@ -69,7 +69,11 @@ class HmQwenVLTokenizer {
   std::string ApplyChatTemplate(const std::string &text,
                                 const std::vector<std::string> &image_paths,
                                 bool add_generation_prompt = true);
-
+  std::string ApplyChatTemplate(const std::string &role,
+                                const std::string &role_text,
+                                const std::vector<std::string> &image_paths,
+                                const std::string system_prompt,
+                                bool add_generation_prompt = true);
   /**
    * @brief Encode text to token IDs
    * @param text Text to encode

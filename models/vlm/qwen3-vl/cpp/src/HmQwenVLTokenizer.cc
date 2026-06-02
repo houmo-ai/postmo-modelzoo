@@ -53,6 +53,37 @@ HmQwenVLTokenizer::~HmQwenVLTokenizer() {
 }
 
 std::string HmQwenVLTokenizer::ApplyChatTemplate(
+    const std::string &role, const std::string &role_text,
+    const std::vector<std::string> &image_paths,
+    const std::string system_prompt, bool add_generation_prompt) {
+  std::stringstream ss;
+
+  if (!system_prompt.empty()) {
+    // Python format: <|im_start|>system\n{content}<|im_end|>\n
+    // No extra newline before <|im_end|>
+    ss << "<|im_start|>system\n" << system_prompt << "<|im_end|>\n";
+  }
+  // User message with vision
+  ss << "<|im_start|>" << role << "\n";
+
+  // Add vision tokens for each image using <|image_pad|> placeholder
+  for (size_t i = 0; i < image_paths.size(); i++) {
+    ss << "<|vision_start|><|image_pad|><|vision_end|>";
+  }
+
+  // Add user text
+  ss << role_text;
+  ss << "<|im_end|>\n";
+
+  // Add assistant prompt
+  if (add_generation_prompt) {
+    ss << "<|im_start|>assistant\n";
+  }
+
+  return ss.str();
+}
+
+std::string HmQwenVLTokenizer::ApplyChatTemplate(
     const std::string &text, const std::vector<std::string> &image_paths,
     bool add_generation_prompt) {
   std::stringstream ss;

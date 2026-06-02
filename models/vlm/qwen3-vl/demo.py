@@ -26,7 +26,7 @@ import sys
 import time
 import logging
 import argparse
-from typing import List, Optional, Tuple, Union
+from typing import Any, List, Optional, Sequence, Tuple, Union
 from loguru import logger
 
 logging.basicConfig(level=logging.ERROR)
@@ -207,14 +207,14 @@ def get_args() -> argparse.Namespace:
         "--repetition_penalty",
         dest="repetition_penalty",
         type=float,
-        default=0.0,
+        default=1.0,
         help="sampling repetition_penalty",
     )
     parser.add_argument(
         "--topk",
         dest="topk",
         type=int,
-        default=None,
+        default=1,
         help="sampling top-k",
     )
     parser.add_argument(
@@ -223,6 +223,13 @@ def get_args() -> argparse.Namespace:
         type=float,
         default=1.0,
         help="sampling top-p",
+    )
+    parser.add_argument(
+        "--presence_penalty",
+        dest="presence_penalty",
+        type=float,
+        default=1.5,
+        help="sampling presence_penalty",
     )
     parser.add_argument(
         "--temperature",
@@ -289,12 +296,14 @@ class SamplingManager:
         temperature: float = 1.0,
         top_k: Optional[int] = None,
         top_p: float = 1.0,
+        presence_penalty: float = 0.0,
         repetition_penalty: float = 1.0,
         min_tokens_to_keep: int = 1,
     ):
         self.temperature = temperature
         self.top_k = top_k
         self.top_p = top_p
+        self.presence_penalty = presence_penalty
         self.repetition_penalty = repetition_penalty
         self.min_tokens_to_keep = min_tokens_to_keep
 
@@ -308,14 +317,31 @@ class SamplingManager:
 
         return logits / self.temperature
 
+    @staticmethod
+    def iter_token_ids(tokens: Optional[Sequence[Any]] = None) -> List[int]:
+        if tokens is None:
+            return []
+
+        token_ids = []
+        for token in tokens:
+            if isinstance(token, torch.Tensor):
+                token_ids.extend(int(item) for item in token.detach().cpu().reshape(-1))
+            elif isinstance(token, np.ndarray):
+                token_ids.extend(int(item) for item in token.reshape(-1))
+            elif isinstance(token, (list, tuple)):
+                token_ids.extend(SamplingManager.iter_token_ids(token))
+            else:
+                token_ids.append(int(token))
+        return token_ids
+
     def apply_repetition_penalty(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+        self, logits: np.ndarray, previous_tokens: Optional[Sequence[Any]] = None
     ) -> np.ndarray:
         if self.repetition_penalty == 1.0 or not previous_tokens:
             return logits
 
-        adjusted_logits = logits
-        for token_id in set(previous_tokens):
+        adjusted_logits = logits.copy()
+        for token_id in set(self.iter_token_ids(previous_tokens)):
             if 0 <= token_id < len(logits):
                 if logits[token_id] < 0:
                     adjusted_logits[token_id] = (
@@ -328,16 +354,16 @@ class SamplingManager:
 
         return adjusted_logits
 
-    def apply_presence_repetition_penalty(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    def apply_presence_penalty(
+        self, logits: np.ndarray, previous_tokens: Optional[Sequence[Any]] = None
     ) -> np.ndarray:
-        if self.repetition_penalty == 0.0 or not previous_tokens:
+        if self.presence_penalty == 0.0 or not previous_tokens:
             return logits
 
         adjusted_logits = logits.copy()
-        for token_id in set(previous_tokens):
+        for token_id in set(self.iter_token_ids(previous_tokens)):
             if 0 <= token_id < len(logits):
-                adjusted_logits[token_id] = logits[token_id] - self.repetition_penalty
+                adjusted_logits[token_id] = logits[token_id] - self.presence_penalty
         return adjusted_logits
 
     def apply_top_k(self, probs: np.ndarray) -> np.ndarray:
@@ -396,44 +422,65 @@ class SamplingManager:
         return normalized_probs
 
     def process_logits(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+        self, logits: np.ndarray, previous_tokens: Optional[Sequence[Any]] = None
     ) -> np.ndarray:
         processed_logits = logits.copy()
         # 1. apply repetition penalty
-        processed_logits = self.apply_presence_repetition_penalty(
+        processed_logits = self.apply_repetition_penalty(
             processed_logits, previous_tokens
         )
 
-        # 2. apply softmax
-        # not using softmax in case of long time cost
-        probs = processed_logits
-        # probs = self.softmax(processed_logits)
+        # 2. apply presence penalty
+        processed_logits = self.apply_presence_penalty(
+            processed_logits, previous_tokens
+        )
 
-        # 3. apply top-k
+        # 3. apply temperature on logits
+        if self.temperature != 1.0:
+            processed_logits = self.apply_temperature(processed_logits)
+
+        # 4. convert logits to probabilities
+        probs = self.softmax(processed_logits)
+
+        # 5. apply top-k
         probs = self.apply_top_k(probs)
 
-        # 4. apply top-p
+        # 6. apply top-p
         probs = self.apply_top_p(probs)
 
-        # 5. apply temperature
-        probs = self.apply_temperature(probs)
         return probs
 
     def sample(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+        self, logits: np.ndarray, previous_tokens: Optional[Sequence[Any]] = None
     ) -> int:
         logits = logits[0][0]
+
+        # Greedy sampling fast-path
+        if self.top_k == 1:
+            processed_logits = logits.copy()
+            processed_logits = self.apply_repetition_penalty(processed_logits, previous_tokens)
+            processed_logits = self.apply_presence_penalty(processed_logits, previous_tokens)
+            sampled_index = int(np.argmax(processed_logits))
+            return np.array([[sampled_index]])
+
         probs = self.process_logits(logits, previous_tokens)
-        if np.all(probs == 0):
+
+        # Normalize sum to 1 to avoid numpy errors
+        sum_probs = np.sum(probs)
+        if sum_probs > 0:
+            probs = probs / sum_probs
+        else:
             probs = np.ones_like(probs) / len(probs)
 
-        # sampled_index = np.random.choice(len(probs), p=probs)
-        sampled_index = probs.argmax(-1)
+        try:
+            sampled_index = np.random.choice(len(probs), p=probs)
+        except ValueError:
+            sampled_index = int(np.argmax(probs))
 
         return np.array([[sampled_index]])
 
     def get_processed_probs(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+        self, logits: np.ndarray, previous_tokens: Optional[Sequence[Any]] = None
     ) -> np.ndarray:
         return self.process_logits(logits, previous_tokens)
 
@@ -482,15 +529,15 @@ class Qwen3VL:
         ).shape[:2]
         self.prefill_shape = torch.Size(prefill_shape)
         self.prefill_len = self.prefill_shape.numel()
-        self.pad_token_id = 0
-        self.image_token_id = 151655
-        self.video_token_id = 151656
-        self.vision_start_token_id = 151652
-        self.vision_end_token_id = 151653
-        self.vision_token_id = 151654
-        self.eos_token_id = [151645, 151643]
-        self.spatial_merge_size = 2
-        self.patch_size = 16
+        self.pad_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|endoftext|>") if "<|endoftext|>" in self.processor.tokenizer.get_vocab() else 151643
+        self.image_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|image_pad|>") if "<|image_pad|>" in self.processor.tokenizer.get_vocab() else 151655
+        self.video_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|video_pad|>") if "<|video_pad|>" in self.processor.tokenizer.get_vocab() else 151656
+        self.vision_start_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|vision_start|>") if "<|vision_start|>" in self.processor.tokenizer.get_vocab() else 151652
+        self.vision_end_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|vision_end|>") if "<|vision_end|>" in self.processor.tokenizer.get_vocab() else 151653
+        self.vision_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|vision_pad|>") if "<|vision_pad|>" in self.processor.tokenizer.get_vocab() else 151654
+        self.eos_token_id = [self.pad_token_id, self.processor.tokenizer.convert_tokens_to_ids("<|im_end|>") if "<|im_end|>" in self.processor.tokenizer.get_vocab() else 151645]
+        self.spatial_merge_size = self.processor.image_processor.merge_size if hasattr(self.processor.image_processor, "merge_size") else 2
+        self.patch_size = self.processor.image_processor.patch_size if hasattr(self.processor.image_processor, "patch_size") else 16
         self.max_size_t = self.vit_model.get_input_info(
             self.vit_model.get_input_name(0)
         ).shape[2]
@@ -499,8 +546,6 @@ class Qwen3VL:
         self.batch_size = 1
         self.resize_v1 = True
         self.multi_image_video_fps = args.multi_image_video_fps
-        # set mode
-        self.rgb2yuv = QRawToYuv(input_color_type="RGB", toYUV_format="YUV444")
 
         self.embedding_len = self.prefill.get_input_info(
             self.prefill.get_input_name(0)
@@ -531,6 +576,7 @@ class Qwen3VL:
             temperature=args.temperature,
             top_k=args.topk,
             top_p=args.topp,
+            presence_penalty=args.presence_penalty,
             repetition_penalty=repetition_penalty,
         )
 
@@ -723,6 +769,7 @@ class Qwen3VL:
         text = processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
+        print(text)
         if media_input is not None and media_type == "video":
             if isinstance(media_input, dict) and "clips" in media_input:
                 image_inputs = None

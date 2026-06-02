@@ -93,10 +93,16 @@ class HmQwenVLInfer {
 
   void SetKeepHistory(bool keep_history) { keep_history_ = keep_history; }
   bool GetKeepHistory() const { return keep_history_; }
-  void SetMaxNewTokens(int max_new_tokens) {
-    max_new_tokens_ = max_new_tokens > 0 ? max_new_tokens : 1;
+
+  // N-gram repetition blocking control
+  void SetNoRepeatNgramSize(int size) {
+    sampling_manager_.setNoRepeatNgramSize(size);
   }
-  int GetMaxNewTokens() const { return max_new_tokens_; }
+  void SetRepeatNgramParams(int ngram_size, int threshold) {
+    sampling_manager_.setRepeatNgramSize(ngram_size);
+    sampling_manager_.setRepeatCountThreshold(threshold);
+  }
+
   void ResetConversationState() {
     context_length = 0;
     past_seq_len_ = 0;
@@ -104,6 +110,7 @@ class HmQwenVLInfer {
     generated_ids_.clear();
     skip_tokens_ = 0;
     last_response_.clear();
+    sampling_manager_.resetNgramState();
   }
   void SetEnablePerfReport(bool enable_perf_report) {
     enable_perf_report_ = enable_perf_report;
@@ -137,6 +144,7 @@ class HmQwenVLInfer {
   int argmax_dim_len_ = 0;
   int attn_idx_start_ = 0;
   int vision_input_nums_ = 0;
+  int pad_token_id = 0;
 
   // Model modules
   tcim::Module::WeightManager weight_manager_;
@@ -208,7 +216,6 @@ class HmQwenVLInfer {
   int DecodeGetOutputDatas();
   int context_length = 0;
   bool keep_history_ = true;
-  int max_new_tokens_ = 256;
   bool enable_perf_report_ = true;
   // Utility
   bool IsValidChar(char32_t cp);

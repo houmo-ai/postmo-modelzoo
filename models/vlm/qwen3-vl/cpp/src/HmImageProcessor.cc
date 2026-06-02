@@ -25,7 +25,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <iostream>
+#include <limits>
 
 HmImageProcessor::HmImageProcessor(int target_width, int target_height,
                                    bool use_v1)
@@ -83,6 +85,7 @@ std::vector<half_float::half> HmImageProcessor::ToHalfTensor(
               const_cast<uint8_t *>(image.data.data()));
 
   // Convert to float (no YUV conversion, no 1.0/255.0 normalization)
+  // This matches Python's _hm_preprocess which keeps raw RGB values
   cv::Mat img_float;
   img.convertTo(img_float, CV_32F);
 
@@ -126,8 +129,13 @@ ProcessedImage HmImageProcessor::ResizeAndPadV1(const ProcessedImage &image) {
 
   // Resize image
   cv::Mat resized;
-  cv::resize(img, resized, cv::Size(new_width, new_height), 0, 0,
-             cv::INTER_LINEAR);
+  if (scale < 1.0f) {
+    cv::resize(img, resized, cv::Size(new_width, new_height), 0, 0,
+               cv::INTER_CUBIC);
+  } else {
+    cv::resize(img, resized, cv::Size(new_width, new_height), 0, 0,
+               cv::INTER_AREA);
+  }
 
   // Create padded image with gray background
   cv::Mat padded(target_height_, target_width_, CV_8UC3,
@@ -154,8 +162,13 @@ ProcessedImage HmImageProcessor::ResizeV2(const ProcessedImage &image) {
 
   // Directly resize to target size
   cv::Mat resized;
-  cv::resize(img, resized, cv::Size(target_width_, target_height_), 0, 0,
-             cv::INTER_LINEAR);
+  if (image.width > target_width_ || image.height > target_height_) {
+    cv::resize(img, resized, cv::Size(target_width_, target_height_), 0, 0,
+               cv::INTER_CUBIC);
+  } else {
+    cv::resize(img, resized, cv::Size(target_width_, target_height_), 0, 0,
+               cv::INTER_AREA);
+  }
 
   ProcessedImage result;
   result.width = target_width_;

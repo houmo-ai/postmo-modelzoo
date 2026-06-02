@@ -32,10 +32,6 @@
 #include "SamplingManager.h"
 #include "tcim/tcim_runtime.h"
 
-#ifdef _MSC_VER
-#include <Windows.h>
-#endif
-
 const std::string DEFAULT_IMAGE_PROMPT = "描述图片内容";
 
 // Helper function to trim whitespace
@@ -76,11 +72,6 @@ void ParseInteractiveInput(const std::string &user_input,
 }
 
 void printUsage(const char *program_name) {
-#ifdef _MSC_VER
-  SetConsoleOutputCP(
-      CP_UTF8);           // Set console output code page to UTF-8 for Windows
-  SetConsoleCP(CP_UTF8);  // Set console input code page to UTF-8 for Windows
-#endif
   std::cout << "Usage:" << std::endl;
   std::cout << "  " << program_name << " [options]" << std::endl;
   std::cout << std::endl;
@@ -106,18 +97,23 @@ void printUsage(const char *program_name) {
   std::cout << "  --embedding <path>       Path to embedding weights (default: "
                "output/xh2/hmquant/quant_embedding.bin)"
             << std::endl;
-  std::cout << "  --repetition-penalty <f> Repetition penalty (default: 1.5)"
+  std::cout << "  --repetition-penalty <f> Repetition penalty (default: 1.0)\n"
             << std::endl;
-  std::cout << "  --temperature <f>        Sampling temperature (default: 1.0)"
+  std::cout << "  --presence-penalty <f>   Presence penalty (default: 1.5)\n"
             << std::endl;
   std::cout
-      << "  --top-k <n>              Top-k sampling (default: -1, disabled)"
+      << "  --temperature <f>        Sampling temperature (default: 1.0)\n"
       << std::endl;
+  std::cout << "  --top-k <n>              Top-k sampling (default: 1) \n"
+            << std::endl;
   std::cout << "  --top-p <f>              Top-p sampling (default: 1.0)"
             << std::endl;
   std::cout << "  --it                     Enable interactive chat mode"
             << std::endl;
   std::cout << "  --history                Keep chat history across messages"
+            << std::endl;
+  std::cout << "  --ngram                  Enable N-gram repetition blocking "
+               "(default params: size=8, window=128, threshold=3)"
             << std::endl;
   std::cout << "  -h, --help               Show this help message" << std::endl;
   std::cout << std::endl;
@@ -130,11 +126,6 @@ void printUsage(const char *program_name) {
 }
 
 int main(int argc, char *argv[]) {
-#ifdef _MSC_VER
-  SetConsoleOutputCP(CP_UTF8);
-  SetConsoleCP(CP_UTF8);
-#endif
-
   // Default paths
   std::string visual_model_path = "output/xh2/qwen3-vl-8b_visual_448x448x2.hmm";
   std::string prefill_model_path = "output/xh2/qwen3-vl-8b_prefill.hmm";
@@ -142,13 +133,15 @@ int main(int argc, char *argv[]) {
   std::string tokenizer_path = "Qwen3-VL-8B-Instruct/tokenizer.json";
   std::string embedding_path = "output/xh2/hmquant/quant_embedding.bin";
   std::string prompt = DEFAULT_IMAGE_PROMPT;
-  std::vector<std::string> image_paths;
-  float repetition_penalty = 1.5f;
+  std::vector<std::string> image_paths = {"../../../data/pic/beach.jpeg"};
+  float repetition_penalty = 1.0f;
   float temperature = 1.0f;
-  int top_k = -1;
+  int top_k = 1;
   float top_p = 1.0f;
+  float presence_penalty = 1.5f;
   bool interactive_mode = false;
   bool keep_history = false;  // Default: do NOT keep history (same as Python)
+  bool enable_ngram = false;  // N-gram repetition blocking
 
   // Parse command line arguments
   // Support both: --image path1 path2 ... (multiple paths after --image)
@@ -160,6 +153,10 @@ int main(int argc, char *argv[]) {
       printUsage(argv[0]);
       return 0;
     } else if (arg == "--image") {
+      // Clear default values when --image is explicitly provided
+      if (i == 1 || (i > 1 && std::string(argv[i - 1]) != "--image")) {
+        image_paths.clear();
+      }
       // Collect all paths after --image until next option or end
       while (i + 1 < argc && argv[i + 1][0] != '-') {
         image_paths.push_back(argv[++i]);
@@ -178,6 +175,8 @@ int main(int argc, char *argv[]) {
       embedding_path = argv[++i];
     } else if (arg == "--repetition-penalty" && i + 1 < argc) {
       repetition_penalty = std::stof(argv[++i]);
+    } else if (arg == "--presence-penalty" && i + 1 < argc) {
+      presence_penalty = std::stof(argv[++i]);
     } else if (arg == "--temperature" && i + 1 < argc) {
       temperature = std::stof(argv[++i]);
     } else if (arg == "--top-k" && i + 1 < argc) {
@@ -188,6 +187,8 @@ int main(int argc, char *argv[]) {
       interactive_mode = true;
     } else if (arg == "--history") {
       keep_history = true;
+    } else if (arg == "--ngram") {
+      enable_ngram = true;
     } else {
       std::cerr << "Unknown option: " << arg << std::endl;
       printUsage(argv[0]);
@@ -232,7 +233,16 @@ int main(int argc, char *argv[]) {
 
   // Create sampling manager
   SamplingManager sampling_manager(temperature, top_k, top_p,
-                                   repetition_penalty);
+                                   repetition_penalty, presence_penalty);
+
+  // Configure N-gram repetition blocking if enabled
+  if (enable_ngram) {
+    sampling_manager.setNoRepeatNgramSize(8);     // Block N-grams of size 8
+    sampling_manager.setRepeatNgramSize(8);       // Detect repeats with N=8
+    sampling_manager.setRepeatCountThreshold(3);  // Trigger after 3 repeats
+    std::cout << "N-gram repetition blocking enabled: ngram_size=8, threshold=3"
+              << std::endl;
+  }
 
   try {
     // Initialize inference engine
