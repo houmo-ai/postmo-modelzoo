@@ -62,19 +62,19 @@ class Xh2Exec(BaseExec):
     Executor class for XH2 target platform.
     Handles quantization, building, checking golden data, and comparison for XH2 hardware.
 
-    XH2 Resizer Constraints (1.3.0):
+    XH2 Resizer Constraints:
         Common constraints:
-        - H/W方向的输入图片/crop_size/crop_start/输出 都要是2的倍数
-        - 输出H最大4096，输出W最大1024
+        - W方向: max 4096, >2048时32对齐, <=2048时2对齐
+        - H方向: max 4096, 2对齐
+        - crop: 4参数(y, x, h, w), 全部2对齐
+        - pad: 4参数(top, left, bottom, right), 全部2对齐
+        - pad可支持任意规格，不限制仅上下或左右单方向
 
         STATIC mode (resizer_mode=3):
-        - 输入W最大1024
         - 缩放倍数范围 [1/32, 16]
 
         DYNAMIC_V2 mode (resizer_mode=1):
-        - 输入W最大4096
         - 放大倍数最大16，H缩小倍数最大32，W缩小倍数最大8(YUV444最大4)
-        - Padding支持H或W单方向，pad大小需是偶数且不超过16
         - 不支持one image multi roi (roi_num必须为1)
     """
 

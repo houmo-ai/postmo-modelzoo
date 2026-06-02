@@ -330,46 +330,63 @@ def _check_resizer_cfg(input_name, resizer_cfg, data_format, H, W):
         logger.fatal(f"{prefix}.resizer_mode=2 (DYNAMIC_V1) is not supported by compiler")
 
     # ========== 输出尺寸检查（模型输入即 resizer 输出）==========
-    # 输出H/W都必须是偶数【硬件限制】
+    # 输出H: 2对齐, 最大4096
     if H % 2 != 0:
         logger.fatal(f"{prefix}: Output H ({H}) must be even (hardware constraint)")
-    if W % 2 != 0:
-        logger.fatal(f"{prefix}: Output W ({W}) must be even (hardware constraint)")
-    # 输出H最大4096，输出W最大1024【算子限制】
     if H > 4096:
         logger.fatal(f"{prefix}: Output H ({H}) must be <= 4096 (operator constraint)")
-    if W > 1024:
-        logger.fatal(f"{prefix}: Output W ({W}) must be <= 1024 (operator constraint)")
+    # 输出W: max 4096, >2048时32对齐, <=2048时2对齐
+    if W > 4096:
+        logger.fatal(f"{prefix}: Output W ({W}) must be <= 4096 (operator constraint)")
+    elif W > 2048:
+        if W % 32 != 0:
+            logger.fatal(f"{prefix}: Output W ({W}) > 2048, must be 32-aligned (hardware constraint)")
+    else:
+        if W % 2 != 0:
+            logger.fatal(f"{prefix}: Output W ({W}) must be even (hardware constraint)")
 
     # ========== resizer_input_size（输入尺寸）==========
     resizer_input_size = resizer_cfg.get("resizer_input_size", [H, W])
     if not isinstance(resizer_input_size, list) or len(resizer_input_size) != 2:
         logger.fatal(f"{prefix}.resizer_input_size must be [H, W]")
-    for v in resizer_input_size:
-        if v % 2 != 0:
-            logger.fatal(f"{prefix}.resizer_input_size must be even numbers")
     resizer_input_h, resizer_input_w = resizer_input_size
-
-    # 输入尺寸限制：静态模式 W <= 1024，动态模式 W <= 4096
+    # 输入H: 2对齐, max 4096
+    if resizer_input_h % 2 != 0:
+        logger.fatal(
+            f"{prefix}.resizer_input_size H must be even, got {resizer_input_h}"
+        )
     if resizer_input_h > 4096:
         logger.fatal(
             f"{prefix}.resizer_input_size H must be <= 4096, got {resizer_input_h}"
         )
-    max_input_w = 4096 if resizer_mode == 1 else 1024
-    if resizer_input_w > max_input_w:
+    # 输入W: max 4096, >2048时32对齐, <=2048时2对齐
+    if resizer_input_w > 4096:
         logger.fatal(
-            f"{prefix}.resizer_input_size W must be <= {max_input_w} ({'DYNAMIC' if resizer_mode == 1 else 'STATIC'} mode), got {resizer_input_w}"
+            f"{prefix}.resizer_input_size W must be <= 4096, got {resizer_input_w}"
         )
+    elif resizer_input_w > 2048:
+        if resizer_input_w % 32 != 0:
+            logger.fatal(
+                f"{prefix}.resizer_input_size W ({resizer_input_w}) > 2048, must be 32-aligned"
+            )
+    else:
+        if resizer_input_w % 2 != 0:
+            logger.fatal(
+                f"{prefix}.resizer_input_size W must be even, got {resizer_input_w}"
+            )
     if resizer_input_h < H or resizer_input_w < W:
         logger.warning(
             f"{prefix}.resizer_input_size [{resizer_input_h}, {resizer_input_w}] < model input [{H}, {W}]"
         )
 
-    # DYNAMIC_V2 mode: padding constraint warning
-    if resizer_mode == 1:
-        logger.warning(
-            f"{prefix}: DYNAMIC_V2 mode padding supports H or W single direction only, max 16 pixels per side, must be even"
-        )
+    # ========== resizer_pad ==========
+    if "resizer_pad" in resizer_cfg:
+        resizer_pad = resizer_cfg["resizer_pad"]
+        if not isinstance(resizer_pad, list) or len(resizer_pad) != 4:
+            logger.fatal(f"{prefix}.resizer_pad must be [top, left, bottom, right]")
+        for v in resizer_pad:
+            if v % 2 != 0:
+                logger.fatal(f"{prefix}.resizer_pad must be even numbers, got {resizer_pad}")
 
     # ========== resizer_crop (only valid for STATIC mode) ==========
     if resizer_mode != 3:
