@@ -16,6 +16,10 @@
 - 来源: https://www.modelscope.cn/models/Qwen/Qwen3-1.7B
 - 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
 
+- 模型名称: Qwen3-4B
+- 来源: https://www.modelscope.cn/models/Qwen/Qwen3-4B
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
 - 模型名称: Qwen3-8B
 - 来源: https://www.modelscope.cn/models/Qwen/Qwen3-8B
 - 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
@@ -36,7 +40,7 @@
 - `prefill_length=256`
 - `ndevice=1`
 
-其中 `0.6b`、`1.7b`、`8b` 默认 `context_length=32k`，`14b` 默认 `context_length=16k`。
+其中 `0.6b`、`1.7b`、`4b`、`8b` 默认 `context_length=32k`，`14b` 默认 `context_length=16k`。
 
 编译产物命名统一为：
 
@@ -162,7 +166,7 @@ bash test.sh -s all
 Usage: test.sh [options]
   -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
                           Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
-  -size, --model_size     Model size. Choices: 0.6b, 1.7b, 8b, 14b.
+  -size, --model_size     Model size. Choices: 0.6b, 1.7b, 4b, 8b, 14b.
   --ndevice               Number of devices. Default: 1.
   --skip_download         Skip model download steps.
   -h, --help              Show this help message.

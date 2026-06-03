@@ -100,14 +100,14 @@ def parse_args() -> argparse.Namespace:
         dest="model_size",
         type=str,
         default=None,
-        help="model size: 0.6b, 1.7b, 8b or 14b",
+        help="model size: 0.6b, 1.7b, 4b, 8b or 14b",
     )
     parser.add_argument(
         "--tokenizer_dir",
         dest="tokenizer_dir",
         type=str,
         default=None,
-        help="tokenizer dir (default: qwen3-0.6b, qwen3-1.7b, qwen3-8b or qwen3-14b based on model_size)",
+        help="tokenizer dir (default: qwen3-0.6b, qwen3-1.7b, qwen3-4b, qwen3-8b or qwen3-14b based on model_size)",
     )
     parser.add_argument(
         "--embedding_path",

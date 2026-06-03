@@ -769,7 +769,7 @@ class Qwen3VL:
         text = processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
-        print(text)
+
         if media_input is not None and media_type == "video":
             if isinstance(media_input, dict) and "clips" in media_input:
                 image_inputs = None

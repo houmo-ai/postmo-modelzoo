@@ -86,7 +86,7 @@ def parse_args() -> argparse.Namespace:
         dest="model_size",
         type=str,
         default=None,
-        help="model size: 0.6b, 1.7b, 8b or 14b",
+        help="model size: 0.6b, 1.7b, 4b, 8b or 14b",
     )
     parser.add_argument(
         "--model_name",
