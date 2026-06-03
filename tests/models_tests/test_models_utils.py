@@ -1480,7 +1480,7 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
         pytest.skip(f"This testcase is not support on {platform}.")
     # aarch64 test need compiled hmm models
     if (
-        HDPL_PLATFORM == "ASIC"
+        is_asic_platform()
         and platform == "aarch64"
         and (
             "demo_params" not in model_info
@@ -1502,7 +1502,7 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
 
     # execute test.sh
     test_sh_flag = True
-    if HDPL_PLATFORM == "ASIC" and os.path.exists(f"{current_folder}/test.sh"):
+    if is_asic_platform() and os.path.exists(f"{current_folder}/test.sh"):
         logger.info("Ready to execute test.sh in folder: %s.", current_folder)
         check_flag = False if model_name == "qwen2.5-vl" else True
         test_sh_flag, _ = execute_test_cmd(

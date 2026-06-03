@@ -43,7 +43,6 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 HOUMO_BACKEND = os.getenv("HOUMO_TARGET", "xh2")
 # ON: quant&compile, OFF:inference
 SEPARATE_TEST = os.getenv("SKIP_INFER", None)
-HDPL_PLATFORM = os.getenv("HDPL_PLATFORM", "")
 MODELS_PATH = os.path.abspath(
     os.getenv("IMODELZOO_MODELS_PATH", f"{script_dir}/../models_{HOUMO_BACKEND}/")
 )
@@ -56,6 +55,44 @@ NDEVICE_MARKER = "ndevice"
 DEVICE_MEM_MARKER = "dev_mem"
 
 logger = logging.getLogger(__name__)
+
+
+def is_asic_platform() -> bool:
+    """
+    Determine if the current platform is ASIC based on hostname or device check.
+
+    Detection logic:
+    1. Check hostname:
+       - If hostname contains "smoke", it's considered ASIC
+       - If hostname contains "nj-gpu01", it's considered non-ASIC
+    2. If hostname check is inconclusive, check for xh2a device in /dev:
+       - If xh2a device exists, it's considered ASIC
+
+    :return: True if running on ASIC platform, False otherwise
+    """
+    # First, check hostname
+    try:
+        hostname = (
+            subprocess.check_output(["hostname"], stderr=subprocess.DEVNULL)
+            .decode()
+            .strip()
+        )
+        if "smoke" in hostname:
+            return True
+        if "nj-gpu01" in hostname:
+            return False
+    except Exception as e:
+        logger.warning(f"Failed to get hostname: {e}")
+
+    # Second, check for xh2a device in /dev
+    try:
+        result = subprocess.run(["ls", "/dev"], capture_output=True, text=True)
+        if "xh2a_" in result.stdout:
+            return True
+    except Exception as e:
+        logger.warning(f"Failed to check /dev for xh2a device: {e}")
+
+    return False
 
 
 @unique
@@ -558,7 +595,8 @@ def get_test_type():
     :return: Test case type as defined in TCaseType enum
     """
     if is_separate():
-        if HDPL_PLATFORM == "ISIM":
+        if not is_asic_platform():
+            # ISIM platform (non-ASIC)
             return TCaseType.SEPARATE_NO_INFER
         else:
             return TCaseType.SEPARATE_INFER

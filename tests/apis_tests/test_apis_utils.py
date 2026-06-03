@@ -28,7 +28,6 @@ import shutil
 from ..tests_utils.tests_common_utils import *
 from ..tests_utils.tests_pyvenv_utils import install_py_venv, VENV_NAME
 
-
 logger = logging.getLogger(__name__)
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -205,7 +204,7 @@ def execute_apis_examples(example_name: str, setup_logging):
         logger.warning(f"Not support {example_name} testing on {platform}.")
         pytest.skip(f"This testcase is not support on {platform}.")
     if (
-        HDPL_PLATFORM == "ASIC"
+        is_asic_platform()
         and platform == "aarch64"
         and not check_device_info(
             example_info["support_core_num"].get(HOUMO_BACKEND, None)
@@ -217,7 +216,7 @@ def execute_apis_examples(example_name: str, setup_logging):
     if (
         example_info.get("dependency", None) is not None
         and "vpu" in example_info["dependency"]
-        and (HDPL_PLATFORM == "ISIM" or check_vpu_status() is False)
+        and (not is_asic_platform() or check_vpu_status() is False)
     ):
         logger.warning(f"{example_name} testcase needs vpu driver.")
         pytest.skip("This testcase needs vpu driver.")
@@ -230,7 +229,7 @@ def execute_apis_examples(example_name: str, setup_logging):
     logger.info("current folder: %s.", current_folder)
 
     run_sh_flag = True
-    if HDPL_PLATFORM == "ASIC" and os.path.exists(f"{current_folder}/run.sh"):
+    if is_asic_platform() and os.path.exists(f"{current_folder}/run.sh"):
         logger.info("Ready to execute run.sh in folder: %s.", current_folder)
 
         run_sh_flag, _ = execute_test_cmd(["bash", "run.sh"], log_file, False, True)
