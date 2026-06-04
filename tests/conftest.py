@@ -49,16 +49,6 @@ if os.getenv("HOUMO_EXAMPLES_PATH", None) is None or not os.getenv(
 ):
     os.environ["HOUMO_EXAMPLES_PATH"] = os.path.abspath(f"{script_dir}/../")
 
-# Set default HOUMO version if not already set or is 1.3.0
-houmo_version = os.getenv("HOUMO_VERSION", None)
-if houmo_version is None or houmo_version == "1.3.0":
-    os.environ["HOUMO_VERSION"] = "1.4.0"
-# os.environ["IMODELZOO_MODELS_PATH"] = f"{script_dir}/../../modelzoo/"
-# os.environ["IMODELZOO_MODELS_PATH"] = f"/develop02/modelzoo/"
-
-# Create models directory if it doesn't exist
-# os.makedirs(f"{script_dir}/models/", exist_ok=True)
-
 
 def pytest_configure(config):
     """
