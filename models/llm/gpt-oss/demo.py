@@ -680,16 +680,15 @@ class HmGpt:
 
 
 if __name__ == "__main__":
-
     args = get_args()
-    if HOUMO_TARGET == "xh2":
-        hmqwen = HmGpt(
-            args.prefill_path,
-            args.decode_path,
-            args.embedding_path,
-            args.tokenizer_dir,
-            args.ndevice,
-        )
+
+    hmqwen = HmGpt(
+        args.prefill_path,
+        args.decode_path,
+        args.embedding_path,
+        args.tokenizer_dir,
+        args.ndevice,
+    )
     if args.it:
         from prompt_toolkit import prompt
     try:

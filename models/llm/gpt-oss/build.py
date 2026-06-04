@@ -133,6 +133,13 @@ def get_args() -> argparse.Namespace:
         help="prefill_length",
     )
     parser.add_argument(
+        "--cpp_backend",
+        dest="cpp_backend",
+        type=str,
+        default="v2",
+        help="cpp backend version",
+    )
+    parser.add_argument(
         "--flash_attention",
         dest="flash_attention",
         type=int,
@@ -300,6 +307,7 @@ if __name__ == "__main__":
                 flash_attn=args.flash_attention,
                 context_length=args.context_length,
                 prefill_length=args.prefill_length,
+                cpp_backend=args.cpp_backend,
                 llm_opt=True,
                 parallel_jobs=j,
                 is_prefill=True,
@@ -312,6 +320,7 @@ if __name__ == "__main__":
                 ndevice=ndevice,
                 flash_attn=args.flash_attention,
                 context_length=args.context_length,
+                cpp_backend=args.cpp_backend,
                 llm_batch=args.batch,
                 llm_opt=True,
                 parallel_jobs=j,

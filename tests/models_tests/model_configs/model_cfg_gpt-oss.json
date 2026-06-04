@@ -26,14 +26,18 @@
     },
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "hmm"],
-            "download_dir": ["cached_models", "cached_models"],
-            "extract_dir": [null, "cached_models/hmm_xh2_32k"],
-            "source_type": [null, null],
-            "model_name": [null, null],
-            "model_size": [null, null],
-            "context_length": [null, "32k"],
-            "ndevice": [null, null]
+            "type": ["raw", "hmm", "hmm"],
+            "download_dir": ["cached_models", "cached_models", "cached_models"],
+            "extract_dir": [
+                null,
+                "cached_models/hmm_xh2_32k",
+                "cached_models/hmm_xh2_120b_128k"
+            ],
+            "source_type": [null, null, null],
+            "model_name": [null, null, "gpt-oss"],
+            "model_size": [null, null, "120b"],
+            "context_length": [null, "32k", "128k"],
+            "ndevice": [null, null, "2"]
         }
     },
     "compile_params": {

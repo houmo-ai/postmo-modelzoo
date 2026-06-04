@@ -12,9 +12,17 @@
 - 来源: https://www.modelscope.cn/models/openai-mirror/gpt-oss-20b
 - 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
 
+- 模型名称: gpt-oss-120b
+- 来源: https://www.modelscope.cn/models/openai-mirror/gpt-oss-120b
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
 预训练模型在运行时下载，工程发布**不包含**该模型。
 
 本例只适用于xh2。
+
+**硬件要求：**
+- `gpt-oss-20b`: 单卡24GB即可运行
+- `gpt-oss-120b`: 需要在后摩 2chips x 30GB 以上的卡才能运行
 
 当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
 
