@@ -94,10 +94,20 @@
                 "cached_results/hmm_xh2_e2b_256k/gemma4-e2b_audio.hmm",
                 "cached_results/hmm_xh2_e4b_256k/gemma4-e4b_audio.hmm"
             ],
-            "per_layer_input_builder_path": [
+            "plib_embedding_path": [
                 null,
-                "cached_results/hmm_xh2_e2b_256k/hmquant/per_layer_input_builder.pt",
-                "cached_results/hmm_xh2_e4b_256k/hmquant/per_layer_input_builder.pt"
+                "cached_results/hmm_xh2_e2b_256k/hmquant/embed_tokens_per_layer.pt",
+                "cached_results/hmm_xh2_e4b_256k/hmquant/embed_tokens_per_layer.pt"
+            ],
+            "plib_prefill_path": [
+                null,
+                "cached_results/hmm_xh2_e2b_256k/gemma4-e2b_plib_prefill.hmm",
+                "cached_results/hmm_xh2_e4b_256k/gemma4-e4b_plib_prefill.hmm"
+            ],
+            "plib_decode_path": [
+                null,
+                "cached_results/hmm_xh2_e2b_256k/gemma4-e2b_plib_decode.hmm",
+                "cached_results/hmm_xh2_e4b_256k/gemma4-e4b_plib_decode.hmm"
             ],
             "model_name": ["gemma4", "gemma4", "gemma4"],
             "model_size": ["26b-a4b", "e2b", "e4b"],

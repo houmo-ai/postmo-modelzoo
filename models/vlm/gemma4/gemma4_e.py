@@ -19,92 +19,17 @@
 # SPDX-License-Identifier: Apache-2.0
 # fmt: off
 import os
-from dataclasses import dataclass
 import numpy as np
 import torch
 import torch.nn as nn
 from loguru import logger
 import tcim_lite as tcim
 from hmatc.utils.perf_infomations import PERFTYPE
-from gemma4_base import Gemma4Base
-
-
-@dataclass
-class TextConfig:
-    vocab_size_per_layer_input = 262144
-    num_hidden_layers = 35
-    hidden_size = 1536
-    hidden_size_per_layer_input = 256
-    pad_token_id = 0
-    rms_norm_eps = 1e-6
-
-
-class PerLayerInputRMSNorm(nn.Module):
-    def __init__(self, hidden_size: int, eps: float = 1e-6):
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
-        self.eps = eps
-
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        normed = hidden_states * torch.rsqrt(hidden_states.pow(2).mean(dim=-1, keepdim=True) + self.eps)
-        return normed * self.weight
-
-
-class PerLayerInputBuilder(nn.Module):
-    def __init__(
-        self,
-        num_hidden_layers=35,
-        hidden_size=1536,
-        hidden_size_per_layer_input=256,
-        vocab_size_per_layer_input=262144,
-        pad_token_id=0,
-        rms_norm_eps=1e-6,
-    ):
-        super().__init__()
-        self.num_hidden_layers = num_hidden_layers
-        self.hidden_size_per_layer_input = hidden_size_per_layer_input
-        self.embed_scale = hidden_size_per_layer_input**0.5
-        self.per_layer_input_scale = 2.0**-0.5
-        self.per_layer_model_projection_scale = hidden_size**-0.5
-        self.embed_tokens_per_layer = nn.Embedding(vocab_size_per_layer_input, num_hidden_layers * hidden_size_per_layer_input, pad_token_id)
-        self.per_layer_model_projection = nn.Linear(hidden_size, num_hidden_layers * hidden_size_per_layer_input, bias=False)
-        self.per_layer_projection_norm = PerLayerInputRMSNorm(hidden_size_per_layer_input, eps=rms_norm_eps)
-
-    @classmethod
-    def from_artifact(cls, artifact_path: str, text_config: TextConfig = None):
-        if text_config is None:
-            text_config = TextConfig()
-        saved = torch.load(artifact_path, map_location="cpu", weights_only=False)
-        state_dict = saved.get("state_dict", saved)
-        builder = cls(
-            num_hidden_layers=text_config.num_hidden_layers,
-            hidden_size=text_config.hidden_size,
-            hidden_size_per_layer_input=text_config.hidden_size_per_layer_input,
-            vocab_size_per_layer_input=text_config.vocab_size_per_layer_input,
-            pad_token_id=text_config.pad_token_id,
-            rms_norm_eps=text_config.rms_norm_eps,
-        )
-        builder.load_state_dict(state_dict)
-        builder.to(dtype=next(iter(state_dict.values())).dtype)
-        return builder.eval()
-
-    def forward(self, input_ids: torch.Tensor, inputs_embeds: torch.Tensor) -> torch.Tensor:
-        b, s = input_ids.shape
-        dtype = self.per_layer_model_projection.weight.dtype
-        pli: torch.Tensor = self.embed_tokens_per_layer(input_ids).to(dtype) * self.embed_scale
-        pli = pli.reshape(b, s, self.num_hidden_layers, self.hidden_size_per_layer_input).permute(0, 2, 1, 3).contiguous()
-        proj = self.per_layer_model_projection(inputs_embeds.to(dtype)) * self.per_layer_model_projection_scale
-        proj = proj.reshape(b, s, self.num_hidden_layers, self.hidden_size_per_layer_input).permute(0, 2, 1, 3).contiguous()
-        proj = self.per_layer_projection_norm(proj)
-        return ((proj + pli) * self.per_layer_input_scale).to(inputs_embeds.dtype)
+from gemma4_base import Gemma4Base, MAX_SOFT_TOKENS
 
 
 class Gemma4E(Gemma4Base):
     """Gemma4-E2B inference with PerLayerInputBuilder, Vision and Audio."""
-
-    sliding_window = 512
-    audio_enabled = True
-
     def __init__(
         self,
         prefill_path,
@@ -112,53 +37,121 @@ class Gemma4E(Gemma4Base):
         vit_path=None,
         audio_path=None,
         embedding_path=None,
-        per_layer_input_builder_path=None,
+        plib_embedding_path=None,
+        plib_prefill_path=None,
+        plib_decode_path=None,
         tokenizer_dir=None,
         devices=0,
         max_new_tokens=2048,
+        max_size_w=448,
+        max_size_h=448,
         enable_thinking=False,
     ):
+        if isinstance(devices, int):
+            devices = [devices]
+        self.devices = devices
+
         self.enable_thinking = enable_thinking
         self.max_new_tokens = max_new_tokens
         self.audio_token_id = 258881
-        self._init_common(devices)
+        self.image_token_id = 258880
+        self.pad_token_id = 0
+        self.sliding_window = 512
+        self.target_image_size = [max_size_w, max_size_h]
 
         backend_name = "Xh2HalBackend"
         self.tokenizer, self.processor = self._load_tokenizer(tokenizer_dir)
 
-        # Vision (with perf tracking)
+        # vision
         if vit_path and os.path.isfile(vit_path):
+            dmv = tcim.runtime.DevManager(devices, backend_name)
+            wmv = tcim.runtime.WeightManager(dmv)
             self.perf_tracker.perf_start(PERFTYPE.VISION_LOAD_TIME)
-        self._load_vision(vit_path, self.devices, backend_name)
-        if self.vit is not None:
+            self.vit = tcim.runtime.load(vit_path, option=tcim.runtime.Option(wmv))
             self.perf_tracker.perf_end(PERFTYPE.VISION_LOAD_TIME)
+            self._log_model_io(self.vit, "vit")
+            vit_in_shape = self.vit.get_input_info(self.vit.get_input_name(0)).shape
+            vit_out_shape = self.vit.get_output_info(self.vit.get_output_name(0)).shape
+            self.vit_num_patches = vit_in_shape[1]
+            self.vit_num_tokens = vit_out_shape[1] if len(vit_out_shape) == 3 else vit_out_shape[0]
+            self.vit_patch_dim = vit_in_shape[2]
+            self.upsample_token = self.vit_num_tokens != self.vit_num_patches
+            pool_size = 3 if self.upsample_token else 1
+            self.processor.image_processor.max_soft_tokens = MAX_SOFT_TOKENS
+            self.processor.image_processor.pooling_kernel_size = pool_size
+            self.processor.image_seq_length = MAX_SOFT_TOKENS if self.upsample_token else self.vit_num_patches
+            max_patches = MAX_SOFT_TOKENS * pool_size * pool_size
+            self.valid_mask = torch.tensor([True] * self.vit_num_patches + [False] * (max_patches - self.vit_num_patches))
+            logger.info(f"Vision: patches={self.vit_num_patches}, tokens={self.vit_num_tokens}, upsample={self.upsample_token}")
+        else:
+            self.vit = None
+            self.vit_num_patches = 0
+            self.vit_num_tokens = 0
+            self.vit_patch_dim = 0
+            self.target_image_size = None
+            self.upsample_token = False
+            self.valid_mask = None
+            logger.warning("Vision model not loaded, text-only mode")
 
-        # LLM (with perf tracking)
-        self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)
-        self._load_llm(prefill_path, decode_path, self.devices, backend_name)
-        self.perf_tracker.perf_end(PERFTYPE.PREFILL_LOAD_TIME)
-        self.decode.set_input(self.decode.get_input_name(4), np.array([1], dtype="int32"))
-
-        # Audio (optional, with perf tracking)
+        # audio
         if audio_path and os.path.isfile(audio_path):
-            self.perf_tracker.perf_start(PERFTYPE.AUDIO_LOAD_TIME)
-            dma = tcim.runtime.DevManager(self.devices, backend_name)
+            dma = tcim.runtime.DevManager(devices, backend_name)
             wma = tcim.runtime.WeightManager(dma)
-            self.audio_model = tcim.runtime.load(audio_path, option=tcim.runtime.Option(wma))
-            self.audio_feature_length = self.audio_model.get_input_info(self.audio_model.get_input_name(1)).shape[1]
-            self.audio_feature_size = self.audio_model.get_input_info(self.audio_model.get_input_name(0)).shape[2]
+            self.perf_tracker.perf_start(PERFTYPE.AUDIO_LOAD_TIME)
+            self.audio = tcim.runtime.load(audio_path, option=tcim.runtime.Option(wma))
             self.perf_tracker.perf_end(PERFTYPE.AUDIO_LOAD_TIME)
+            self._log_model_io(self.audio, "audio")
+            self.audio_feature_length = self.audio.get_input_info(self.audio.get_input_name(1)).shape[1]
+            self.audio_feature_size = self.audio.get_input_info(self.audio.get_input_name(0)).shape[2]
             logger.info(f"Audio loaded: feature_length={self.audio_feature_length}")
         else:
-            self.audio_model = None
+            self.audio = None
             logger.warning("Audio model not loaded, audio disabled")
-            
-        # PerLayerInputBuilder
-        text_config = TextConfig()
-        text_config.num_hidden_layers = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[1]
-        text_config.hidden_size = self.prefill.get_input_info(self.prefill.get_input_name(1)).shape[2]
-        self.per_layer_input_builder = PerLayerInputBuilder.from_artifact(per_layer_input_builder_path, text_config=text_config)
-        logger.info(f"Loaded per_layer_input_builder: layers={self.per_layer_input_builder.num_hidden_layers}")
+        
+        # plib - PerLayerInputBuilder
+        dmp = tcim.runtime.DevManager(devices, backend_name)
+        wmp = tcim.runtime.WeightManager(dmp)
+        self.plib_prefill = tcim.runtime.load(plib_prefill_path, option=tcim.runtime.Option(wmp))
+        self._log_model_io(self.plib_prefill, "plib_prefill")
+        self.plib_decode = tcim.runtime.load(plib_decode_path, option=tcim.runtime.Option(wmp))
+        self._log_model_io(self.plib_decode, "plib_decode")
+
+        # llm
+        dm = tcim.runtime.DevManager(devices, backend_name)
+        wm = tcim.runtime.WeightManager(dm)
+        opt0 = tcim.runtime.Option(wm)
+        opt0.set_dummy_tensors(["per_layer_inputs"])
+        logger.info(f"Loading prefill model from {prefill_path}")
+        self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)
+        self.prefill = tcim.runtime.load(prefill_path, option=opt0)
+        self.perf_tracker.perf_end(PERFTYPE.PREFILL_LOAD_TIME)
+        self._log_model_io(self.prefill, "prefill")
+        assert self.prefill.get_input_name(0) == "per_layer_inputs"
+        self.prefill_len = self.prefill.get_input_info(self.prefill.get_input_name(1)).shape[1]
+        self.embed_dim = self.prefill.get_input_info(self.prefill.get_input_name(1)).shape[2]
+        self.prefill_local_w = self.prefill.get_input_info(self.prefill.get_input_name(5)).shape[3]
+        self.global_mask_w = self.prefill.get_input_info(self.prefill.get_input_name(6)).shape[3]
+        self.context_max_length = self.global_mask_w
+        logger.info(f"Prefill loaded: len={self.prefill_len}, embed_dim={self.embed_dim}, context_max_length={self.context_max_length}")
+        self.prefill.set_input(self.prefill.get_input_name(0), self.plib_prefill.get_dev_output(self.plib_prefill.get_output_name(0)))
+
+        cache_names = [self.prefill.get_input_name(i) for i in range(self.prefill.get_num_inputs()) if "cache" in self.prefill.get_input_name(i).lower()]
+        opt1 = tcim.runtime.Option(wm)
+        opt1.set_dummy_tensors(cache_names)
+        logger.info(f"Loading decode model from {decode_path}")
+        self.perf_tracker.perf_start(PERFTYPE.DECODE_LOAD_TIME)
+        self.decode = tcim.runtime.load(decode_path, option=opt1)
+        self.perf_tracker.perf_end(PERFTYPE.DECODE_LOAD_TIME)
+        self._log_model_io(self.decode, "decode")
+        self.decode_len = self.decode.get_input_info(self.decode.get_input_name(1)).shape[1]
+        self.decode_local_w = self.decode.get_input_info(self.decode.get_input_name(5)).shape[3]
+        logger.info(f"Decode loaded: len={self.decode_len}")
+        for name in cache_names:
+            self.decode.set_input(name, self.prefill.get_dev_input(name))
+        self.decode.set_input(self.decode.get_input_name(0), self.plib_decode.get_dev_output(self.plib_decode.get_output_name(0)))
+
+        # pinned
+        self.decode.set_input(self.decode.get_input_name(4), np.array([1], dtype="int32"))
         
         # Embedding (nn.Embedding + scale)
         saved = torch.load(embedding_path, map_location="cpu", weights_only=True)
@@ -171,19 +164,16 @@ class Gemma4E(Gemma4Base):
         self.embedding.load_state_dict(saved)
         self.embed_scale = self.embed_dim**0.5
 
+        # PerLayerInputBuilder Embedding
+        saved = torch.load(plib_embedding_path, map_location="cpu", weights_only=True)
+        self.plib_embedding = nn.Embedding(
+            saved["weight"].shape[0],
+            saved["weight"].shape[1],
+            padding_idx=self.pad_token_id,
+            dtype=torch.float16,
+        )
+        self.plib_embedding.load_state_dict(saved)
         self.perf_tracker.reset_perf_time()
-
-    def _read_prefill_info(self):
-        self.prefill_len = self.prefill.get_input_info(self.prefill.get_input_name(1)).shape[1]
-        self.embed_dim = self.prefill.get_input_info(self.prefill.get_input_name(1)).shape[2]
-        self.prefill_local_w = self.prefill.get_input_info(self.prefill.get_input_name(5)).shape[3]
-        self.global_mask_w = self.prefill.get_input_info(self.prefill.get_input_name(6)).shape[3]
-
-    def _read_decode_info(self):
-        self.decode_len = self.decode.get_input_info(self.decode.get_input_name(1)).shape[1]
-        self.decode_local_w = self.decode.get_input_info(self.decode.get_input_name(5)).shape[3]
-
-    # ---- Audio ----
 
     @staticmethod
     def _sscp_subsample(num_frames: int) -> int:
@@ -198,20 +188,20 @@ class Gemma4E(Gemma4Base):
         expected_tokens = self._sscp_subsample(valid_frames)
 
         self.perf_tracker.perf_start(PERFTYPE.AUDIO_INPUT_TIME)
-        self.audio_model.set_input(self.audio_model.get_input_name(0), chunk_f.numpy().astype(np.float32))
-        self.audio_model.set_input(self.audio_model.get_input_name(1), chunk_m.long().numpy().astype(np.int32))
+        self.audio.set_input(self.audio.get_input_name(0), chunk_f.numpy().astype(np.float32))
+        self.audio.set_input(self.audio.get_input_name(1), chunk_m.long().numpy().astype(np.int32))
         self.perf_tracker.perf_end(PERFTYPE.AUDIO_INPUT_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.AUDIO_INFER_TIME)
-        self.audio_model.run()
-        self.audio_model.sync()
+        self.audio.run()
+        self.audio.sync()
         self.perf_tracker.perf_end(PERFTYPE.AUDIO_INFER_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.AUDIO_OUTPUT_TIME)
-        audio_embeds = torch.from_numpy(self.audio_model.get_output(self.audio_model.get_output_name(0)).numpy())
-        num_outputs = self.audio_model.get_num_outputs()
+        audio_embeds = torch.from_numpy(self.audio.get_output(self.audio.get_output_name(0)).numpy())
+        num_outputs = self.audio.get_num_outputs()
         if num_outputs > 1:
-            audio_embeds_mask = torch.from_numpy(self.audio_model.get_output(self.audio_model.get_output_name(1)).numpy())
+            audio_embeds_mask = torch.from_numpy(self.audio.get_output(self.audio.get_output_name(1)).numpy())
             mask_bool = audio_embeds_mask[0].to(torch.bool)
             chunk_out = audio_embeds[0][mask_bool]
         else:
@@ -220,7 +210,7 @@ class Gemma4E(Gemma4Base):
         return chunk_out
 
     def _run_audio(self, input_features, input_features_mask):
-        if self.audio_model is None:
+        if self.audio is None:
             raise RuntimeError("Audio model not loaded")
 
         total_len = input_features.shape[1]
@@ -272,8 +262,6 @@ class Gemma4E(Gemma4Base):
         logger.info(f"Audio output: {result.shape} (chunks={chunk_idx}, total_len={total_len}, overlap={overlap}, trim_tokens={trim_tokens})")
         return result
 
-    # ---- Embedding ----
-
     def _build_embeddings(self, input_ids, inputs):
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_EMBED_TIME)
         img_mask = input_ids == self.image_token_id
@@ -304,7 +292,7 @@ class Gemma4E(Gemma4Base):
             logger.info(f"Vision output: {img_emb.shape}")
             embeds = embeds.masked_scatter(img_mask.unsqueeze(-1).expand_as(embeds), img_emb)
 
-        if audio_mask.any() and self.audio_model is not None and inputs.get("input_features") is not None:
+        if audio_mask.any() and self.audio is not None and inputs.get("input_features") is not None:
             self.perf_tracker.perf_start(PERFTYPE.AUDIO_TOTAL_TIME)
             audio_emb = self._run_audio(inputs["input_features"], inputs["input_features_mask"])
             self.perf_tracker.perf_end(PERFTYPE.AUDIO_TOTAL_TIME)
@@ -313,14 +301,13 @@ class Gemma4E(Gemma4Base):
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_EMBED_TIME)
         return embeds, llm_ids
 
-    # ---- Prefill ----
-
     def _prefill(self, embeds, input_len, llm_ids=None, mm_types=None):
         import math
 
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
         steps = math.ceil(input_len / self.prefill_len)
         for s in range(steps):
+            self.perf_tracker.perf_start(PERFTYPE.PREFILL_EMBED_TIME)
             start, end = s * self.prefill_len, min((s + 1) * self.prefill_len, input_len)
             cur_len = end - start
 
@@ -340,17 +327,22 @@ class Gemma4E(Gemma4Base):
                 chunk_mm = torch.cat([chunk_mm, pad_mm], dim=1)
 
             position_ids = torch.arange(self.prefill_len).unsqueeze(0) + start
-            per_layer_inputs = self.per_layer_input_builder(sub_llm_ids.long(), sub_embeds)
+            pli: torch.Tensor = self.plib_embedding(sub_llm_ids)
+            sub_embeds = sub_embeds.detach().numpy().astype(np.float16)
+            self.plib_prefill.set_input(self.plib_prefill.get_input_name(0), pli.detach().numpy().astype(np.float16))
+            self.plib_prefill.set_input(self.plib_prefill.get_input_name(1), sub_embeds)
+            self.plib_prefill.run()
+            self.plib_prefill.sync()
             g_mask, l_mask = self._build_masks(cur_len, start, self.prefill_len, chunk_mm)
+            self.perf_tracker.perf_end(PERFTYPE.PREFILL_EMBED_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_INPUT_TIME)
-            self.prefill.set_input(self.prefill.get_input_name(0), per_layer_inputs.detach().numpy().astype(np.float16))
-            self.prefill.set_input(self.prefill.get_input_name(1), sub_embeds.detach().numpy().astype(np.float16))
+            self.prefill.set_input(self.prefill.get_input_name(1), sub_embeds)
             self.prefill.set_input(self.prefill.get_input_name(2), position_ids.numpy().astype(np.int32))
             self.prefill.set_input(self.prefill.get_input_name(3), np.array([start], dtype="int32"))
             self.prefill.set_input(self.prefill.get_input_name(4), np.array([cur_len], dtype="int32"))
-            self.prefill.set_input(self.prefill.get_input_name(5), l_mask.astype(np.float16))
-            self.prefill.set_input(self.prefill.get_input_name(6), g_mask.astype(np.float16))
+            self.prefill.set_input(self.prefill.get_input_name(5), np.ascontiguousarray(l_mask.astype(np.float16)))
+            self.prefill.set_input(self.prefill.get_input_name(6), np.ascontiguousarray(g_mask.astype(np.float16)))
             self.perf_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_INFER_TIME)
@@ -364,25 +356,26 @@ class Gemma4E(Gemma4Base):
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOTAL_TIME)
         return next_id
 
-    # ---- Decode ----
-
     def _decode_step(self, tok_id, past_len):
         self.perf_tracker.perf_start(PERFTYPE.DECODE_EMBED_TIME)
         tok = torch.tensor([[tok_id]], dtype=torch.long)
         dec_emb = self.embedding(tok).reshape(1, 1, -1).to(torch.float16) * self.embed_scale
-        per_layer_inputs = self.per_layer_input_builder(tok, dec_emb)
+        dec_emb = dec_emb.detach().numpy().astype(np.float16)
+        pli: torch.Tensor = self.plib_embedding(tok)
+        self.plib_decode.set_input(self.plib_decode.get_input_name(0), pli.detach().numpy().astype(np.float16))
+        self.plib_decode.set_input(self.plib_decode.get_input_name(1), dec_emb)
+        self.plib_decode.run()
+        self.plib_decode.sync()
+        g_mask, l_mask = self._build_masks(1, past_len, self.decode_len)
         self.perf_tracker.perf_end(PERFTYPE.DECODE_EMBED_TIME)
 
-        g_mask, l_mask = self._build_masks(1, past_len, self.decode_len)
-
         self.perf_tracker.perf_start(PERFTYPE.DECODE_INPUT_TIME)
-        self.decode.set_input(self.decode.get_input_name(0), per_layer_inputs.detach().numpy().astype(np.float16))
-        self.decode.set_input(self.decode.get_input_name(1), dec_emb.detach().numpy().astype(np.float16))
+        self.decode.set_input(self.decode.get_input_name(1), dec_emb)
         self.decode.set_input(self.decode.get_input_name(2), np.array([[past_len]], dtype="int32"))
         self.decode.set_input(self.decode.get_input_name(3), np.array([past_len], dtype="int32"))
         self.decode.set_input(self.decode.get_input_name(4), np.array([1], dtype="int32"))
-        self.decode.set_input(self.decode.get_input_name(5), l_mask.astype(np.float16))
-        self.decode.set_input(self.decode.get_input_name(6), g_mask.astype(np.float16))
+        self.decode.set_input(self.decode.get_input_name(5), np.ascontiguousarray(l_mask.astype(np.float16)))
+        self.decode.set_input(self.decode.get_input_name(6), np.ascontiguousarray(g_mask.astype(np.float16)))
         self.perf_tracker.perf_end(PERFTYPE.DECODE_INPUT_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.DECODE_INFER_TIME)
@@ -409,7 +402,7 @@ class Gemma4E(Gemma4Base):
         logger.success(f"question: {q_text}")
 
         has_image = image_path and self.vit is not None
-        has_audio = audio_path and self.audio_model is not None
+        has_audio = audio_path and self.audio is not None
 
         content = []
         if has_image:
@@ -434,7 +427,6 @@ class Gemma4E(Gemma4Base):
 
         content.append({"type": "text", "text": q_text})
 
-        self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
         inputs = self.processor.apply_chat_template(
             [{"role": "user", "content": content}],
             add_generation_prompt=True,
@@ -443,7 +435,6 @@ class Gemma4E(Gemma4Base):
             return_tensors="pt",
             enable_thinking=self.enable_thinking,
         )
-        self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
 
         input_ids = inputs["input_ids"]
         input_len = input_ids.shape[-1]

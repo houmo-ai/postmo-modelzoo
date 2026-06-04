@@ -56,7 +56,9 @@ def get_args():
     parser.add_argument("--audio", default="data/audio/0.wav", help="only supported for e2b/e4b")
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument("--enable-thinking", action="store_true", default=False)
-    parser.add_argument("--per_layer_input_builder_path", type=str, default=f"output/{HOUMO_TARGET}/hmquant/per_layer_input_builder.pt")
+    parser.add_argument("--plib_embedding_path", type=str, default=f"output/{HOUMO_TARGET}/hmquant/embed_tokens_per_layer.pt")
+    parser.add_argument("--plib_prefill_path", type=str, default=None)
+    parser.add_argument("--plib_decode_path", type=str, default=None)
     args = parser.parse_args()
 
     default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
@@ -76,6 +78,10 @@ def get_args():
         args.vit_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_visual_{args.max_size_w}x{args.max_size_h}.hmm"
     if args.audio_path is None:
         args.audio_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_audio.hmm"
+    if args.plib_prefill_path is None:
+        args.plib_prefill_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_plib_prefill.hmm"
+    if args.plib_decode_path is None:
+        args.plib_decode_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_plib_decode.hmm"
     if args.ndevice > 1:
         args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
         args.decode_path = args.decode_path.replace(".hmm", ".hmms")
@@ -97,6 +103,23 @@ if __name__ == "__main__":
             args.tokenizer_dir,
             list(range(args.ndevice)),
             args.max_new_tokens,
+            args.max_size_w,
+            args.max_size_h,
+            enable_thinking=args.enable_thinking,
+        )
+    elif args.model_size in ["31b"]:
+        from gemma4 import Gemma4
+
+        model = Gemma4(
+            args.prefill_path,
+            args.decode_path,
+            args.vit_path,
+            args.embedding_path,
+            args.tokenizer_dir,
+            list(range(args.ndevice)),
+            args.max_new_tokens,
+            args.max_size_w,
+            args.max_size_h,
             enable_thinking=args.enable_thinking,
         )
     elif args.model_size in ["e2b", "e4b"]:
@@ -108,10 +131,14 @@ if __name__ == "__main__":
             vit_path=args.vit_path,
             audio_path=args.audio_path,
             embedding_path=args.embedding_path,
-            per_layer_input_builder_path=args.per_layer_input_builder_path,
+            plib_embedding_path=args.plib_embedding_path,
+            plib_prefill_path=args.plib_prefill_path,
+            plib_decode_path=args.plib_decode_path,
             tokenizer_dir=args.tokenizer_dir,
             devices=list(range(args.ndevice)),
             max_new_tokens=args.max_new_tokens,
+            max_size_w=args.max_size_w,
+            max_size_h=args.max_size_h,
             enable_thinking=args.enable_thinking,
         )
     else:
@@ -134,7 +161,7 @@ if __name__ == "__main__":
             if not os.path.isfile(audio_path):
                 logger.warning(f"Audio not found: {audio_path}, running without audio")
                 audio_path = None
-        if audio_path and getattr(model, "audio_model", None) is None:
+        if audio_path and getattr(model, "audio", None) is None:
             logger.warning(
                 "Audio provided but audio model not loaded, running without audio"
             )

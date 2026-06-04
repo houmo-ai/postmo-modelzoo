@@ -43,6 +43,8 @@ class Gemma4MoE(Gemma4Base):
         tokenizer_dir=None,
         devices=0,
         max_new_tokens=2048,
+        max_size_w=448,
+        max_size_h=448,
         enable_thinking=False,
     ):
         self.enable_thinking = enable_thinking
@@ -55,6 +57,7 @@ class Gemma4MoE(Gemma4Base):
         # Vision (with perf tracking)
         if vit_path and os.path.isfile(vit_path):
             self.perf_tracker.perf_start(PERFTYPE.VISION_LOAD_TIME)
+        self.target_image_size = [max_size_w, max_size_h]
         self._load_vision(vit_path, self.devices, backend_name)
         if self.vit is not None:
             self.perf_tracker.perf_end(PERFTYPE.VISION_LOAD_TIME)

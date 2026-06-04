@@ -20,7 +20,6 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
 import argparse
-import multiprocessing
 import psutil
 
 from hmatc.exec.xh2_exec import Xh2Exec
@@ -166,6 +165,31 @@ if __name__ == "__main__":
             Xh2Exec.build_from_hmonnx(
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, "audio")),
                 hmm_name=audio_model_name,
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=flash_attn,
+                parallel_jobs=parallel_jobs,
+            )
+
+        if model_size in ["e2b", "e4b"]:
+            plib_prefill_name = f"{model_name}-{model_size}_plib_prefill"
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(
+                    os.path.join(model_dir, "plib"), pattern="hmquant_*_prefill.onnx"
+                ),
+                hmm_name=plib_prefill_name,
+                output=output_dir,
+                ncore=ncore,
+                flash_attn=flash_attn,
+                parallel_jobs=parallel_jobs,
+            )
+
+            plib_decode_name = f"{model_name}-{model_size}_plib_decode"
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(
+                    os.path.join(model_dir, "plib"), pattern="hmquant_*_decode.onnx"
+                ),
+                hmm_name=plib_decode_name,
                 output=output_dir,
                 ncore=ncore,
                 flash_attn=flash_attn,

@@ -38,3 +38,15 @@ model_configs:
       prefill_length: 256
       max_size_w: 448
       max_size_h: 448
+
+    "31b":
+      modelscope_repo: ["google/gemma-4-31B-it"]
+      model_name: "gemma4"
+      model_size: "31b"
+      ncore: 2
+      context_length: "8k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      max_size_w: 448
+      max_size_h: 448
