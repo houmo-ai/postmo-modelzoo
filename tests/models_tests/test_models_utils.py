@@ -1398,7 +1398,7 @@ def execute_compile_flow(model_name: str, setup_logging) -> None:
             exec_flag, opt_str = execute_test_cmd(tmp_cmd_list, log_file)
             if exec_flag is False:
                 final_flag = False
-            else:
+            elif is_asic_platform():
                 benchmark_val = (
                     0.76 if model_name in ["ppocrv3_det", "ppocrv3_rec"] else 0
                 )
