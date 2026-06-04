@@ -32,6 +32,47 @@ assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+LAYOUT_REPO_ID = "PaddlePaddle/PP-DocLayoutV3_safetensors"
+LAYOUT_MODEL_DIR = os.path.join(
+    os.path.dirname(__file__), "PP-DocLayoutV3_safetensors"
+)
+LAYOUT_REQUIRED_FILES = ["config.json", "preprocessor_config.json", "model.safetensors"]
+
+
+def _layout_model_files_exist(model_dir: str) -> bool:
+    return all(
+        os.path.isfile(os.path.join(model_dir, name))
+        for name in LAYOUT_REQUIRED_FILES
+    )
+
+
+def download_layout_model() -> None:
+    if _layout_model_files_exist(LAYOUT_MODEL_DIR):
+        print(f"PP-DocLayoutV3 model files already exist: {LAYOUT_MODEL_DIR}")
+        return
+
+    print(
+        "Download PP-DocLayoutV3 raw model from ModelScope: "
+        f"{LAYOUT_REPO_ID} -> {LAYOUT_MODEL_DIR}",
+        flush=True,
+    )
+    from modelscope import snapshot_download
+
+    os.makedirs(LAYOUT_MODEL_DIR, exist_ok=True)
+    snapshot_download(
+        LAYOUT_REPO_ID,
+        local_dir=LAYOUT_MODEL_DIR,
+        allow_patterns=LAYOUT_REQUIRED_FILES,
+    )
+    if not _layout_model_files_exist(LAYOUT_MODEL_DIR):
+        missing = [
+            name
+            for name in LAYOUT_REQUIRED_FILES
+            if not os.path.isfile(os.path.join(LAYOUT_MODEL_DIR, name))
+        ]
+        raise FileNotFoundError(
+            f"PP-DocLayoutV3 download finished but files are missing: {missing}"
+        )
 
 
 def get_args() -> argparse.Namespace:
@@ -170,3 +211,5 @@ if __name__ == "__main__":
     )
     if ret_dict.get("ret", False) is False:
         exit(1)
+    if args.file_type == "raw":
+        download_layout_model()

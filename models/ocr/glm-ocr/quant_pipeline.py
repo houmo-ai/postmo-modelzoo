@@ -19,11 +19,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 import gc
 import json
 import shutil
 import time
 import os
+import sys
 
 import tempfile
 import time
@@ -35,7 +38,12 @@ import onnxruntime as ort
 import torch
 import torch.nn as nn
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Tuple
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+XH_MODEL_ZOO_ROOT = REPO_ROOT / "hmodel" / "xh2"
+if XH_MODEL_ZOO_ROOT.is_dir() and str(XH_MODEL_ZOO_ROOT) not in sys.path:
+    sys.path.insert(0, str(XH_MODEL_ZOO_ROOT))
 
 import torch
 import xhquant.utils.suppress_printing
@@ -51,21 +59,47 @@ from xhquant.api import (
 from PIL import Image, ImageOps
 from common import decode_next_token, xhquant_llm_init, get_root_logger
 from common import xhquant_llm_init, get_root_logger
-from xh_model_zoo.xh_llm.models.builder import MODELS
-from xh_model_zoo.xh_llm.models.glm_ocr import XHGlmOcrVisionModel, GlmOcrProcessor
-from xh_model_zoo.xh_llm.models.glm_ocr.utils import build_inputs, build_messages
 from xh_model_zoo.utils.memory_tracker import MemoryTracker
 from xh_model_zoo.utils.time_profiler import TimeProfiler
-from xh_model_zoo.xh_llm.models.builder import MODELS
-from xh_model_zoo.xh_llm.models.base_llm_model import LLMBaseModel
-from xh_model_zoo.xh_llm.models.eval_model_type import EvalModelType
-from xh_model_zoo.xh_llm.models.glm_ocr import (
-    GlmOcrHFCompatible,
-    XHGlmOcrLLMModel,
-)
 from torch import Tensor
 from transformers import AutoModelForImageTextToText
 from transformers.modeling_outputs import BaseModelOutputWithPooling
+
+try:
+    from xh_model_zoo.xh_llm.models.builder import MODELS
+    from xh_model_zoo.xh_llm.models.base_llm_model import LLMBaseModel
+    from xh_model_zoo.xh_llm.models.eval_model_type import EvalModelType
+    from xh_model_zoo.xh_llm.models.glm_ocr import (
+        GlmOcrHFCompatible,
+        GlmOcrProcessor,
+        XHGlmOcrLLMModel,
+        XHGlmOcrVisionModel,
+    )
+    from xh_model_zoo.xh_llm.models.glm_ocr.utils import build_inputs, build_messages
+except ImportError as _xh_model_zoo_import_error:
+    MODELS = None
+    LLMBaseModel = object
+    EvalModelType = None
+    GlmOcrHFCompatible = None
+    GlmOcrProcessor = None
+    XHGlmOcrLLMModel = object
+    XHGlmOcrVisionModel = object
+    build_inputs = None
+    build_messages = None
+
+
+def _ensure_glm_ocr_ptq_deps():
+    if MODELS is not None and GlmOcrProcessor is not None:
+        return
+    raise ImportError(
+        "GLM-OCR LLM/Vision PTQ dependencies are unavailable in this environment. "
+        "The PP-DocLayoutV3 layout export path does not require them."
+    ) from _xh_model_zoo_import_error
+
+LAYOUT_REPO_ID = "PaddlePaddle/PP-DocLayoutV3_safetensors"
+LAYOUT_OUTPUT_NAMES = ["logits", "pred_boxes", "order_logits", "out_masks"]
+LAYOUT_MODEL_DIR = Path(__file__).resolve().parent / "PP-DocLayoutV3_safetensors"
+LAYOUT_CALIB_IMAGE = Path(__file__).resolve().parents[3] / "data" / "pic" / "ocr.jpeg"
 
 
 def _copy_hf_configs(src_dir: Path, dst_dir: Path, logger):
@@ -694,6 +728,7 @@ def _export_impl(cfg, args):
 
 
 def export_llm(args):
+    _ensure_glm_ocr_ptq_deps()
     from types import SimpleNamespace
 
     work_dir = args.work_dir
@@ -786,6 +821,192 @@ def load_and_process_image(image_path: str, target_w: int, target_h: int):
             image, border=(0, 0, pad_w, pad_h), fill=(114, 114, 114)
         )
     return image
+
+
+def _layout_required_model_files_exist(model_dir: Path) -> bool:
+    required = ["config.json", "preprocessor_config.json", "model.safetensors"]
+    return all((model_dir / name).is_file() for name in required)
+
+
+def _prepare_layout_inputs(
+    processor, image_path: Path, batch_size: int
+) -> Dict[str, Tensor]:
+    image = Image.open(image_path).convert("RGB")
+    inputs = processor(images=[image], return_tensors="pt")
+    if batch_size > 1:
+        inputs["pixel_values"] = inputs["pixel_values"].repeat(batch_size, 1, 1, 1)
+    return inputs
+
+
+def _build_layout_export_wrapper(hf_model):
+    class PPDocLayoutV3ExportWrapper(nn.Module):
+        def __init__(self, model):
+            super().__init__()
+            self.model = model
+
+        def forward(
+            self, pixel_values: Tensor
+        ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+            outputs = self.model(pixel_values=pixel_values, return_dict=True)
+            return (
+                outputs.logits,
+                outputs.pred_boxes,
+                outputs.order_logits,
+                outputs.out_masks,
+            )
+
+    return PPDocLayoutV3ExportWrapper(hf_model)
+
+
+def _export_layout_onnx(model, pixel_values: Tensor, onnx_file: Path, logger) -> None:
+    if onnx_file.exists():
+        logger.info(f"PP-DocLayoutV3 ONNX already exists: {onnx_file}")
+        return
+
+    onnx_file.parent.mkdir(parents=True, exist_ok=True)
+    model.float().eval().cpu()
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_onnx = Path(tmp_dir) / "ppdoclayoutv3.onnx"
+        logger.info(f"Exporting PP-DocLayoutV3 ONNX to {tmp_onnx}")
+        torch.onnx.export(
+            model,
+            (pixel_values.float().cpu(),),
+            str(tmp_onnx),
+            export_params=True,
+            opset_version=18,
+            do_constant_folding=True,
+            input_names=["pixel_values"],
+            output_names=LAYOUT_OUTPUT_NAMES,
+            dynamic_axes=None,
+            verbose=False,
+        )
+        onnx_model = onnx.load(str(tmp_onnx), load_external_data=True)
+
+    onnx.save_model(
+        onnx_model,
+        str(onnx_file),
+        save_as_external_data=True,
+        all_tensors_to_one_file=True,
+        location=f"{onnx_file.stem}_external_data",
+        size_threshold=1024,
+    )
+    logger.info(f"Saved PP-DocLayoutV3 ONNX to {onnx_file}")
+
+
+def _layout_device_type(name: str):
+    from xhquant.api import DeviceType
+
+    if name == "XH2a":
+        return DeviceType.XH2a
+    raise ValueError(f"Unsupported layout device type: {name}")
+
+
+def _convert_layout_hmonnx(
+    onnx_file: Path,
+    pixel_values: Tensor,
+    hmonnx_file: Path,
+    logger,
+) -> None:
+    if hmonnx_file.exists():
+        logger.info(f"PP-DocLayoutV3 HMONNX already exists: {hmonnx_file}")
+        return
+
+    from xhquant.api import QuantScheme, convert_onnx_to_hmonnx, create_quant_config
+
+    hmonnx_file.parent.mkdir(parents=True, exist_ok=True)
+    target_device = _layout_device_type("XH2a")
+    quant_scheme = QuantScheme(target_device=target_device, quant_type="w16a16_sefp")
+    quant_config = create_quant_config(quant_scheme)
+    convert_onnx_to_hmonnx(
+        str(onnx_file),
+        [pixel_values.float().cpu()],
+        target_device,
+        str(hmonnx_file),
+        quant_config=quant_config,
+        input_names=["pixel_values"],
+        output_names=LAYOUT_OUTPUT_NAMES,
+    )
+    logger.info(f"Convert PP-DocLayoutV3 ONNX to HMONNX success: {hmonnx_file}")
+
+
+def export_layout(args):
+    try:
+        from transformers import PPDocLayoutV3ForObjectDetection, PPDocLayoutV3ImageProcessor
+    except ImportError:
+        from transformers.models.pp_doclayout_v3.image_processing_pp_doclayout_v3_fast import (
+            PPDocLayoutV3ImageProcessorFast as PPDocLayoutV3ImageProcessor,
+        )
+        from transformers.models.pp_doclayout_v3.modeling_pp_doclayout_v3 import (
+            PPDocLayoutV3ForObjectDetection,
+        )
+
+    work_dir = Path(args.work_dir)
+    layout_model_dir = LAYOUT_MODEL_DIR.resolve()
+    calib_image = LAYOUT_CALIB_IMAGE.resolve()
+    output_dir = Path(args.output_dir)
+    layout_onnx_file = work_dir / "layout_onnx" / "ppdoclayoutv3.onnx"
+    layout_hmonnx_file = (
+        output_dir / "layout" / "ppdoclayoutv3_w16a16_sefp_XH2a.onnx"
+    )
+
+    log_file = work_dir / "ppdoclayoutv3_xh2a_export_hmonnx_debug.log"
+    work_dir.mkdir(exist_ok=True, parents=True)
+    from xhquant.api import get_root_logger as get_xhquant_root_logger, xhquant_init
+
+    xhquant_init(str(log_file), debug=args.debug)
+    logger = get_xhquant_root_logger()
+    xhquant.utils.suppress_printing.disable_printing = True
+
+    if not _layout_required_model_files_exist(layout_model_dir):
+        raise FileNotFoundError(
+            "PP-DocLayoutV3 raw model is missing. Run "
+            "`python3 get_model.py --type raw` first. Expected directory: "
+            f"{layout_model_dir}"
+        )
+    if not calib_image.is_file():
+        raise FileNotFoundError(
+            f"PP-DocLayoutV3 calibration image not found: {calib_image}"
+        )
+
+    logger.info(f"PP-DocLayoutV3 model_dir: {layout_model_dir}")
+    logger.info(f"PP-DocLayoutV3 calibration image: {calib_image}")
+    logger.info(f"PP-DocLayoutV3 target HMONNX: {layout_hmonnx_file}")
+
+    processor = PPDocLayoutV3ImageProcessor.from_pretrained(str(layout_model_dir))
+    inputs = _prepare_layout_inputs(processor, calib_image, batch_size=1)
+    pixel_values = inputs["pixel_values"]
+    logger.info(
+        f"PP-DocLayoutV3 calibration pixel_values shape={tuple(pixel_values.shape)} "
+        f"dtype={pixel_values.dtype}"
+    )
+
+    hf_model = PPDocLayoutV3ForObjectDetection.from_pretrained(
+        str(layout_model_dir)
+    ).eval()
+    wrapper = _build_layout_export_wrapper(hf_model)
+    _export_layout_onnx(wrapper, pixel_values, layout_onnx_file, logger)
+    _convert_layout_hmonnx(layout_onnx_file, pixel_values, layout_hmonnx_file, logger)
+
+    meta = {
+        "repo_id": LAYOUT_REPO_ID,
+        "model_dir": str(layout_model_dir),
+        "calib_image": str(calib_image),
+        "onnx_file": str(layout_onnx_file),
+        "hmonnx_file": str(layout_hmonnx_file),
+        "quant_type": "w16a16_sefp",
+        "device_type": "XH2a",
+        "input_shape": list(pixel_values.shape),
+        "output_names": LAYOUT_OUTPUT_NAMES,
+    }
+    meta_file = work_dir / "ppdoclayoutv3_export_meta_info.json"
+    meta_file.write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    logger.info(f"Saved PP-DocLayoutV3 meta info to {meta_file}")
+
+    del hf_model, wrapper, pixel_values
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def _export_vision_impl(
@@ -964,6 +1185,7 @@ def _export_vision_impl(
 
 
 def export_vision(args):
+    _ensure_glm_ocr_ptq_deps()
     work_dir = args.work_dir
     cfg_name = "glm_ocr_vision_xh2a_export_hmonnx"
 

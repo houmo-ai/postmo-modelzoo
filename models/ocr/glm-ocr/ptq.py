@@ -20,7 +20,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import argparse, os
-from quant_pipeline import export_llm, export_vision, move_llm
+from quant_pipeline import export_layout, export_llm, export_vision, move_llm
 from hmatc.utils.monitor import ProcessMemoryMonitor
 from hmatc.utils.utils import (
     check_gpu,
@@ -160,6 +160,7 @@ if __name__ == "__main__":
     with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
         export_llm(args)
         export_vision(args)
+        export_layout(args)
         move_llm(args)
     print(
         f"\n=== Quantization completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
