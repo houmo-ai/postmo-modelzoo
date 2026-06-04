@@ -996,6 +996,7 @@ def _prepare_compiled_cv_model(
             [
                 "hmatc",
                 "build",
+                "--skip_check",
                 "--target",
                 HOUMO_BACKEND,
                 "--config",
@@ -1386,6 +1387,8 @@ def execute_compile_flow(model_name: str, setup_logging) -> None:
         required_params = model_info["hmbuild_params"][HOUMO_BACKEND]["required"]
         optional_params = model_info["hmbuild_params"][HOUMO_BACKEND]["optional"]
         cmd_header = ["hmatc", "build", "--target", HOUMO_BACKEND]
+        if not is_asic_platform():
+            cmd_header += ["--skip_check"]
 
         skipped_vals = dict()
         if HOUMO_BACKEND == "xh2":
