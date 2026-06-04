@@ -151,6 +151,14 @@ def get_args() -> argparse.Namespace:
         help="build stage",
     )
     parser.add_argument(
+        "--build_target",
+        dest="build_target",
+        type=str,
+        default="all",
+        choices=["all", "ocr", "layout"],
+        help="model target to build; layout uses model_dir/layout/*.onnx",
+    )
+    parser.add_argument(
         "--output_dir",
         dest="output_dir",
         type=str,
@@ -323,6 +331,53 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
     print(f"<=== {model_name} test success.")
 
 
+def build_ocr_models(args, model_dir, output_dir, visual_model_name):
+    llm_flash_attention, vit_flash_attention = args.flash_attention
+    Xh2Exec.build_from_hmonnx(
+        hmonnx=find_hmonnx_file(os.path.join(model_dir, "visual")),
+        hmm_name=visual_model_name,
+        output=output_dir,
+        ncore=args.ncore,
+        flash_attn=vit_flash_attention,
+        parallel_jobs=args.j,
+    )
+    Xh2Exec.build_from_hmonnx(
+        is_prefill=True,
+        hmonnx=find_hmonnx_file(os.path.join(model_dir, "prefill")),
+        hmm_name=f"{args.model_name}-{args.model_size}_prefill",
+        output=output_dir,
+        context_length=args.context_length,
+        prefill_length=args.prefill_length,
+        ndevice=args.ndevice,
+        ncore=args.ncore,
+        flash_attn=llm_flash_attention,
+        llm_opt=True,
+        parallel_jobs=args.j,
+    )
+    Xh2Exec.build_from_hmonnx(
+        hmonnx=find_hmonnx_file(os.path.join(model_dir, "decode")),
+        hmm_name=f"{args.model_name}-{args.model_size}_decode",
+        output=output_dir,
+        context_length=args.context_length,
+        llm_batch=args.batch,
+        ndevice=args.ndevice,
+        ncore=args.ncore,
+        flash_attn=llm_flash_attention,
+        llm_opt=True,
+        parallel_jobs=args.j,
+    )
+
+
+def build_layout_model(args, model_dir, output_dir):
+    Xh2Exec.build_from_hmonnx(
+        hmonnx=find_hmonnx_file(os.path.join(model_dir, "layout")),
+        hmm_name="ppdoclayoutv3",
+        output=output_dir,
+        ncore=args.ncore,
+        parallel_jobs=args.j,
+    )
+
+
 if __name__ == "__main__":
     args = get_args()
     print(args)
@@ -332,7 +387,6 @@ if __name__ == "__main__":
     model_size = args.model_size
     output_dir = args.output_dir
     profile = {}
-    llm_flash_attention, vit_flash_attention = args.flash_attention
     visual_model_name = (
         f"{model_name}-{model_size}_visual_"
         f"{args.image_size_w}x{args.image_size_h}x{args.max_size_t}"
@@ -343,41 +397,15 @@ if __name__ == "__main__":
             assert (
                 get_platform() == "x86_64"
             ), "Only supported for compilation on the x86_64 platform."
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "visual")),
-                hmm_name=visual_model_name,
-                output=output_dir,
-                ncore=args.ncore,
-                flash_attn=vit_flash_attention,
-                parallel_jobs=args.j,
-            )
-            Xh2Exec.build_from_hmonnx(
-                is_prefill=True,
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "prefill")),
-                hmm_name=f"{model_name}-{model_size}_prefill",
-                output=output_dir,
-                context_length=args.context_length,
-                prefill_length=args.prefill_length,
-                ndevice=args.ndevice,
-                ncore=args.ncore,
-                flash_attn=llm_flash_attention,
-                llm_opt=True,
-                parallel_jobs=args.j,
-            )
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "decode")),
-                hmm_name=f"{model_name}-{model_size}_decode",
-                output=output_dir,
-                context_length=args.context_length,
-                llm_batch=args.batch,
-                ndevice=args.ndevice,
-                ncore=args.ncore,
-                flash_attn=llm_flash_attention,
-                llm_opt=True,
-                parallel_jobs=args.j,
-            )
+            if args.build_target in ["all", "ocr"]:
+                build_ocr_models(args, model_dir, output_dir, visual_model_name)
+            if args.build_target in ["all", "layout"]:
+                build_layout_model(args, model_dir, output_dir)
 
-        if args.stage == "test" or args.stage == "all":
+        if (args.stage == "test" or args.stage == "all") and args.build_target in [
+            "all",
+            "ocr",
+        ]:
             test(
                 f"{model_name}-{model_size}_prefill",
                 os.path.join(model_dir, "prefill"),
