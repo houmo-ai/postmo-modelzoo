@@ -45,6 +45,50 @@ assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
+def find_glmocr_sdk_root() -> Optional[str]:
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "GLM-OCR"),
+        os.path.join(
+            os.path.dirname(__file__),
+            os.pardir,
+            "examples",
+            "llm",
+            "glm_ocr",
+            "GLM-OCR",
+        ),
+        os.path.join(os.getcwd(), "examples", "llm", "glm_ocr", "GLM-OCR"),
+    ]
+    for candidate in candidates:
+        candidate = os.path.abspath(candidate)
+        if os.path.isdir(candidate):
+            return candidate
+    return None
+
+
+SDK_ROOT = find_glmocr_sdk_root()
+if SDK_ROOT is not None and SDK_ROOT not in sys.path:
+    sys.path.insert(0, SDK_ROOT)
+
+
+def resolve_path(path: Optional[str], base_dir: Optional[str] = None) -> Optional[str]:
+    if path is None:
+        return None
+    path = os.path.expanduser(path)
+    if os.path.isabs(path):
+        return path
+
+    candidates = [os.path.abspath(path)]
+    if base_dir is not None:
+        candidates.append(os.path.abspath(os.path.join(base_dir, path)))
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    candidates.append(os.path.abspath(os.path.join(repo_root, path)))
+
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return candidates[-1]
+
+
 def get_default_tokenizer_dir(model_config: dict) -> str:
     repo_ids = model_config.get("modelscope_repo", [])
     if repo_ids:
@@ -421,6 +465,94 @@ def get_args() -> argparse.Namespace:
         help="houmo decode model path",
     )
     parser.add_argument(
+        "--layout_path",
+        dest="layout_path",
+        type=str,
+        default=os.path.join(
+            os.path.dirname(__file__), "output", HOUMO_TARGET, "ppdoclayoutv3.hmm"
+        ),
+        help="houmo PP-DocLayoutV3 model path",
+    )
+    parser.add_argument(
+        "--layout_batch_size",
+        dest="layout_batch_size",
+        type=int,
+        default=1,
+        help="PP-DocLayoutV3 layout batch size",
+    )
+    parser.add_argument(
+        "--layout_threshold",
+        dest="layout_threshold",
+        type=float,
+        default=0.3,
+        help="PP-DocLayoutV3 post-process threshold",
+    )
+    parser.add_argument(
+        "--layout_use_polygon",
+        dest="layout_use_polygon",
+        action="store_true",
+        help="use PP-DocLayoutV3 polygons for crop/visualization",
+    )
+    parser.add_argument(
+        "--image",
+        dest="image",
+        type=str,
+        default="../../../data/pic/ocr.jpeg",
+        help="image input path",
+    )
+    parser.add_argument(
+        "--pdf",
+        dest="pdf",
+        type=str,
+        default=None,
+        help="PDF input path; full pipeline renders pages before layout OCR",
+    )
+    parser.add_argument(
+        "--pdf_dpi",
+        dest="pdf_dpi",
+        type=int,
+        default=200,
+        help="DPI for full-pipeline PDF rendering",
+    )
+    parser.add_argument(
+        "--pdf_max_pages",
+        dest="pdf_max_pages",
+        type=int,
+        default=None,
+        help="maximum PDF pages for full pipeline",
+    )
+    parser.add_argument(
+        "--prompt",
+        dest="prompt",
+        type=str,
+        default="Text Recognition:",
+        help="OCR prompt used for each layout region",
+    )
+    parser.add_argument(
+        "--output_dir",
+        dest="output_dir",
+        type=str,
+        default=os.path.join(
+            os.path.dirname(__file__),
+            "work_dirs",
+            "glm_ocr_npu_full_pipeline_demo",
+        ),
+        help="full-pipeline output directory",
+    )
+    parser.add_argument(
+        "--max_new_tokens",
+        dest="max_new_tokens",
+        type=int,
+        default=256,
+        help="maximum decode tokens for each OCR region",
+    )
+    parser.add_argument(
+        "--no_full_pipeline",
+        dest="full_pipeline",
+        action="store_false",
+        help="disable layout full pipeline and run the legacy single-image flow",
+    )
+    parser.add_argument(
         "--image_size",
         dest="image_size",
         type=int,
@@ -435,6 +567,7 @@ def get_args() -> argparse.Namespace:
         default=None,
         help="device number, only xh2 support",
     )
+    parser.set_defaults(full_pipeline=True)
     args = parser.parse_args()
 
     default_model_size, default_model_name, model_configs = get_model_configs(
@@ -480,21 +613,44 @@ def get_args() -> argparse.Namespace:
     return args
 
 
+def should_fallback_to_legacy_ocr(args, base_dir: str) -> bool:
+    if not args.full_pipeline:
+        return True
+
+    layout_path = resolve_path(args.layout_path, base_dir)
+    if layout_path is not None and os.path.exists(layout_path):
+        args.layout_path = layout_path
+        return False
+
+    message = (
+        f"PP-DocLayoutV3 HMM not found: {layout_path}. "
+        "Fallback to legacy single-image OCR."
+    )
+    if args.pdf is not None:
+        raise FileNotFoundError(
+            f"PP-DocLayoutV3 HMM not found: {layout_path}. "
+            "Legacy OCR fallback only supports image input; please provide "
+            "--image or a valid --layout_path for PDF input."
+        )
+    logger.warning(message)
+    return True
+
+
 class HmGLM_OCR:
 
     def __init__(self, args):
         self.ndevice = args.ndevice
-        dev_manager = tcim.runtime.DevManager(
+        self.dev_manager = tcim.runtime.DevManager(
             get_hm_devices(self.ndevice), "Xh2HalBackend"
         )
-        weight_manager = tcim.runtime.WeightManager(dev_manager)
-        option2 = tcim.runtime.Option(weight_manager)
-        option3 = tcim.runtime.Option(weight_manager)
+        self.weight_manager = tcim.runtime.WeightManager(self.dev_manager)
+        option2 = tcim.runtime.Option(self.weight_manager)
+        option3 = tcim.runtime.Option(self.weight_manager)
         self.visual_specs = self._load_visual_specs(
             args.vit_path,
             args.image_size,
             args.max_size_t,
-            weight_manager,
+            self.weight_manager,
         )
         self.vit_model = self.visual_specs[0]["model"]
         logger.info(f"{len(self.visual_specs)} vit model(s) loaded")
@@ -818,8 +974,10 @@ class HmGLM_OCR:
         self,
         image_path: str,
         prompt: str,
+        stream: bool = True,
     ) -> str:
         self.ttft_time = 0
+        self.generated_ids = []
         start_time = time.time()
         image = Image.open(image_path).convert("RGB")
         orig_w, orig_h = image.size
@@ -857,10 +1015,16 @@ class HmGLM_OCR:
             "image_grid_thw": image_grid_thw,
         }
         self.next_id, valid_length, current_length = self._run_prefill(data_prefill)
-        next_str = self.processor.tokenizer.decode(torch.tensor(self.next_id.item()))
+        next_token_id = int(np.asarray(self.next_id).reshape(-1)[0])
+        next_str = (
+            ""
+            if next_token_id in self.stop_token_ids
+            else self.processor.tokenizer.decode(torch.tensor(next_token_id))
+        )
         self.ttft_time += time.time() - start_time
-        logger.success("response:")
-        print("\033[1;95m{}".format(next_str), end="", flush=True)
+        if stream:
+            logger.success("response:")
+            print("\033[1;95m{}".format(next_str), end="", flush=True)
         self.context_length = valid_length + current_length + 1
         return input_ids.shape[1]
 
@@ -911,18 +1075,59 @@ class HmGLM_OCR:
         self.context_length += 1
         return next_str
 
+    def generate(
+        self,
+        image_path: str,
+        prompt: str = "Text Recognition:",
+        max_new_tokens: Optional[int] = None,
+        stream: bool = False,
+    ) -> str:
+        input_tokens = self.chat_vit_prefill(image_path, prompt=prompt, stream=stream)
+        del input_tokens
+
+        text_parts = []
+        first_token_id = int(np.asarray(self.next_id).reshape(-1)[0])
+        if first_token_id in self.stop_token_ids:
+            return ""
+        text_parts.append(self.processor.tokenizer.decode(first_token_id))
+
+        decode_count = 0
+        while max_new_tokens is None or decode_count < max(0, max_new_tokens - 1):
+            next_str = self.chat_decoder()
+            decode_count += 1
+            if next_str is None:
+                break
+            text_parts.append(next_str)
+            if stream:
+                print(next_str, end="", flush=True)
+
+        return "".join(text_parts)
+
 
 if __name__ == "__main__":
     args = get_args()
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    legacy_ocr = should_fallback_to_legacy_ocr(args, base_dir)
     hmglm_ocr = HmGLM_OCR(args)
-    image_dir = "../../../data/pic/ocr.jpeg"
-    prompt = "Text Recognition:"
+    if not legacy_ocr:
+        from glm_ocr_npu_full_pipeline import run_npu_full_pipeline
+
+        run_npu_full_pipeline(
+            args,
+            hmglm_ocr,
+            logger,
+            base_dir=base_dir,
+        )
+        sys.exit(0)
+
+    image_dir = resolve_path(args.image, base_dir)
+    prompt = args.prompt
     logger.success("question:")
     print("\033[1;95m{}\033[0m".format(prompt))
-    input_tokens = hmglm_ocr.chat_vit_prefill(image_dir, prompt=prompt)
+    input_tokens = hmglm_ocr.chat_vit_prefill(image_dir, prompt=prompt, stream=True)
 
     decode_count = 0
-    while True:
+    while decode_count < max(0, args.max_new_tokens - 1):
         next_str = hmglm_ocr.chat_decoder()
         decode_count += 1
         if next_str is None:
