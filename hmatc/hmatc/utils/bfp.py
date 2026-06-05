@@ -89,6 +89,7 @@ def cast_unpacked_man_exp_to_fp_data(
 
 def _round_to_even_at_bit(value, bit_position):
     """Round-to-even (banker's rounding) at the given bit position.
+
     Returns 1 if rounding up, 0 otherwise. Operates on a 16-bit integer
     range matching the C++ roundToEvenAtBit<int16_t> implementation.
     """
@@ -113,23 +114,28 @@ def cast_fp_data_to_act_hmfp_data(
     out_dtype=np.int8,
 ):
     """Convert floating-point data to HMFP (block floating point) packed format.
+
     Faithfully replicates the C++ convertFPToG32E8 / fillIntParts / fillSharedExpPart
     algorithm for bit-exact results.
+
     NOTE: The output pack_axis dimension is padded to 64-element alignment
     (hardware block size). Callers should account for this when comparing
     with unpadded data.
     """
     if pack_format not in ("g32e8",):
         raise ValueError(f"this format {pack_format} is not supported currently")
+
     fp_data_moved = np.moveaxis(fp_data, pack_axis, -1)
     original_shape = fp_data_moved.shape
     length_of_packed = fp_data_moved.shape[-1]
     num_per_pack = 32
     block_size = 64  # hardware block size (Xh2Target::getBFPBlockSize)
+
     if length_of_packed % num_per_pack != 0:
         raise ValueError(
             f"axis size {length_of_packed} does not match num per pack {num_per_pack}"
         )
+
     # Pad pack axis to block_size alignment (matching C++ outputPackSize requirement)
     padded_length = ((length_of_packed + block_size - 1) // block_size) * block_size
     if padded_length != length_of_packed:
@@ -140,6 +146,7 @@ def cast_fp_data_to_act_hmfp_data(
             fp_data_moved, pad_width, mode="constant", constant_values=0.0
         )
     padded_shape = fp_data_moved.shape
+
     if out_dtype == np.int8:
         indices = [16, 18, 20, 22, 24, 26, 28, 30]
         unsigned_dtype = np.uint8
@@ -152,20 +159,26 @@ def cast_fp_data_to_act_hmfp_data(
         exp_position_bitmap = 0xFF000000FF000000
     else:
         raise ValueError(f"output dtype {out_dtype} is not supported")
+
     # Pre-compute per-element exp-position flags for a 64-element block
     exp_pos_flags = [bool((exp_position_bitmap >> i) & 1) for i in range(block_size)]
+
     out_bits = np.iinfo(out_dtype).bits  # 8 or 16
     man_bits = 10  # fp16 mantissa bits
     fp16_exp_offset = 15
     fp32_exp_offset = 127
     extra_bits = (man_bits + 1) - (out_bits - 1)  # int8: 4, int16: -4
     int_digits = out_bits - 1  # int8: 7, int16: 15
+
     reshaped_fp = fp_data_moved.reshape(-1, padded_length).astype(np.float16)
     output = np.zeros(reshaped_fp.shape, dtype=out_dtype)
+
     for idx_outer in range(reshaped_fp.shape[0]):
         row = reshaped_fp[idx_outer]
+
         for blk_start in range(0, padded_length, block_size):
             block_fp16 = row[blk_start : blk_start + block_size].copy()
+
             # Sanitize inf/nan (matching C++ convertFPToG32E8)
             for i in range(block_size):
                 bits = int(block_fp16[i].view(np.uint16))
@@ -178,11 +191,13 @@ def cast_fp_data_to_act_hmfp_data(
                         block_fp16[i] = np.finfo(np.float16).min
                     else:
                         block_fp16[i] = np.finfo(np.float16).max
+
             # getMaxExp<64>: find max biased fp16 exponent across the 64-element block
             target_exp = 0
             for i in range(block_size):
                 e = int((block_fp16[i].view(np.uint16) >> 10) & 0x1F)
                 target_exp = max(target_exp, e)
+
             # fillIntParts<64>: quantize each element using bit-level algorithm
             int_block = np.zeros(block_size, dtype=np.int32)
             for i in range(block_size):
@@ -190,34 +205,43 @@ def cast_fp_data_to_act_hmfp_data(
                 sign = (bits >> 15) & 1
                 e = (bits >> 10) & 0x1F
                 man = bits & 0x3FF
+
                 v = man + ((1 << man_bits) if e != 0 else 0)
                 v_c = -v if sign else v
+
                 exp_shift = target_exp - (
                     (e + 1) if (e == 0 and target_exp != 0) else e
                 )
                 is_exp = exp_pos_flags[i]
+
                 rnd = _round_to_even_at_bit(
                     v_c, extra_bits + exp_shift + (1 if is_exp else 0)
                 )
+
                 if extra_bits > 0:
                     v_c >>= extra_bits
                 else:
                     v_c <<= -extra_bits
                 v_c >>= exp_shift
+
                 # Overflow guard threshold: max abs value representable in
                 # the output integer, accounting for the LSB reserved for
                 # shared-exponent encoding at exp positions (C++ fillIntParts).
                 thr = 0x7F if out_bits == 8 else (0x1FF if is_exp else 0xFF)
                 if (v_c & thr) < thr or v_c == -1:
                     v_c += rnd
+
                 int_block[i] = v_c
+
             # Clip and convert to output dtype
             info = np.iinfo(out_dtype)
             clipped = np.clip(int_block, info.min, info.max).astype(out_dtype)
+
             # Compute e8 exponent (matching C++ fillIntParts return + FP32_EXP_OFFSET)
             exp_offset = fp16_exp_offset - 1 if target_exp == 0 else fp16_exp_offset
             e8 = int(target_exp - exp_offset - (int_digits - 1) + fp32_exp_offset)
             e8_uint8 = e8 & 0xFF
+
             # fillSharedExpPart: encode e8 into LSBs of designated elements per 32-block
             for sub_start in range(0, block_size, num_per_pack):
                 man_u = (
@@ -233,6 +257,7 @@ def cast_fp_data_to_act_hmfp_data(
                     idx_outer,
                     blk_start + sub_start : blk_start + sub_start + num_per_pack,
                 ] = man_u.view(out_dtype)
+
     result_moved = output.reshape(padded_shape)
     result = np.moveaxis(result_moved, -1, pack_axis)
     return result

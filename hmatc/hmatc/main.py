@@ -144,6 +144,7 @@ def main():
     build_parser.add_argument("--cpp_backend", type=str, default="v1", help="cpp backend")
     build_parser.add_argument("--skip_mlir_compile", action="store_true", help="skip mlir compile")
     build_parser.add_argument("--subgraph_repeat_hint", type=int, default=20, help="A hint for number of repeat blocks in the model")
+    build_parser.add_argument("--dump_compiled_mlir", action="store_true", default=False, help="Dump compiled MLIR")
     build_parser.add_argument("--upload_dir_name", type=str, help=argparse.SUPPRESS)
     build_parser.add_argument("--file_prefix", type=str, help=argparse.SUPPRESS)
     build_parser.add_argument("--skip_check", action="store_true", help="Skip check golden after build")
@@ -275,6 +276,7 @@ def main():
             skip_mlir_compile=args.skip_mlir_compile,
             subgraph_repeat_hint=args.subgraph_repeat_hint,
             cpp_backend=args.cpp_backend,
+            dump_compiled_mlir=args.dump_compiled_mlir,
             parallel_jobs=args.jobs,
         )
         return

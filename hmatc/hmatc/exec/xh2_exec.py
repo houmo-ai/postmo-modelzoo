@@ -18,6 +18,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 import os
+import re
 import shutil
 import time
 import cv2
@@ -34,6 +35,7 @@ from ..infer.xh2_infer import Xh2Infer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
+from ..utils.bfp import cast_fp_data_to_act_hmfp_data
 from ..utils.preprocess import (
     calc_padding_size,
     convert_bgr_to_yuv,
@@ -578,12 +580,12 @@ class Xh2Exec(BaseExec):
             os.makedirs(self.build_output_dir)
 
         try:
-            import tcim
+            from tcim.builder.api import build_from_hmonnx
         except ImportError:
             logger.fatal("Not found tcim module, please install tcim first!")
 
         logger.info("Building HMM model...")
-        tcim.build_from_hmonnx(
+        build_from_hmonnx(
             self.quant_onnx_model_path,
             output_name=self.hmm_name,
             ncore=self.build_ncore,
@@ -597,6 +599,7 @@ class Xh2Exec(BaseExec):
             j=self.build_parallel_jobs,
             cpp_backend=self.cpp_backend,
             custom_msg=json.dumps(self.custom_msg, ensure_ascii=False),
+            dump_compiled_mlir=self.dump_compiled_mlir,
         )
 
         span = time.time() - t_start
@@ -783,6 +786,8 @@ class Xh2Exec(BaseExec):
 
         for output_name in outputs:
             new_name = output_name.replace("/", "_")
+            if new_name in ["auto_profile_data.bin", "primitive_profile_data.bin"]:
+                continue
             golden_dir = (
                 f"hmquant_{self.model_name}_with_act"
                 if enable_layers
@@ -1047,6 +1052,37 @@ class Xh2Exec(BaseExec):
                     data = np.load(paths[0])
                     hmm_batch = xh2.inputs_batch[name]
                     data = np.repeat(data, repeats=hmm_batch // data.shape[0], axis=0)
+
+                    # Convert fp16 golden data to hmfp format when kvcache
+                    # input expects int8 (hmfp-packed) data.
+                    # kcache: name contains both k/key and cache
+                    # vcache: name contains both v/value and cache
+                    name_lower = name.lower()
+                    has_k = bool(re.search(r"(?:^|_|\.)k(?:ey)?(?:$|_|\.)", name_lower))
+                    has_v = bool(
+                        re.search(r"(?:^|_|\.)v(?:alue)?(?:$|_|\.)", name_lower)
+                    )
+                    has_cache = bool(re.search(r"cache", name_lower))
+                    is_kcache = has_k and has_cache
+                    is_vcache = has_v and has_cache
+                    if (
+                        (is_kcache or is_vcache)
+                        and hasattr(xh2, "inputs_info")
+                        and name in xh2.inputs_info
+                    ):
+                        input_dtype = np.dtype(xh2.inputs_info[name].dtype).name
+                        if input_dtype == "int8":
+                            # kcache: pack along last axis
+                            # vcache: pack along context-length axis (second-to-last)
+                            pack_axis = -2 if is_vcache else -1
+                            logger.info(
+                                f"Converting {name} from fp16 to hmfp "
+                                f"(pack_axis={pack_axis}, expected_dtype={input_dtype})"
+                            )
+                            data = cast_fp_data_to_act_hmfp_data(
+                                data, "g32e8", pack_axis
+                            )
+
                     input_data[name] = data
                     logger.info(
                         f"Loaded input: {name}, shape={data.shape}, from={paths[0]}"
@@ -1203,10 +1239,9 @@ class Xh2Exec(BaseExec):
     ):
         """Build HMM model from hmonnx."""
         try:
-            import tcim
+            from tcim.builder.api import build_from_hmonnx
         except ImportError:
-            logger.error("Not found tcim module, please install tcim first!")
-            return
+            logger.fatal("Not found tcim module, please install tcim first!")
 
         if not hmonnx or not os.path.exists(hmonnx):
             logger.warning(
@@ -1298,7 +1333,7 @@ class Xh2Exec(BaseExec):
             merged_kwargs["modify_llm"] = merged_modify_llm
         logger.info(f"==> {hmm_name} build start, kwargs: {merged_kwargs}")
 
-        tcim.build_from_hmonnx(
+        build_from_hmonnx(
             hmonnx,
             output_name=hmm_name,
             ncore=ncore,
