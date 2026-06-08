@@ -1263,6 +1263,23 @@ class Xh2Exec(BaseExec):
             os.path.join(output_dir, "tcim", hmm_name) if work_dir is None else work_dir
         )
 
+        # Check for reuse of compile results
+        reuse_compile_results = os.environ.get("REUSE_COMPILE_RESULTS", "")
+        if reuse_compile_results.strip().lower() in {"on", "true"} and os.path.isdir(
+            output_dir
+        ):
+            candidate_files = sorted(
+                os.path.join(output_dir, file_name)
+                for file_name in os.listdir(output_dir)
+                if os.path.isfile(os.path.join(output_dir, file_name))
+                and os.path.splitext(file_name)[0] == hmm_name
+            )
+            if candidate_files:
+                logger.info(
+                    f"Reuse compile results, result file is: {candidate_files[0]}"
+                )
+                return candidate_files[0]
+
         # Build kwargs for tcim
         build_kwargs = {}
 
