@@ -69,16 +69,9 @@ python3 ptq.py --model-name gemma4 --model-size 26b-a4b
 量化参数说明：
 - `--model`: 模型目录路径，默认 `./gemma-4-26B-A4B-it`
 - `--model-name`: 输出模型名，默认 `gemma4`
-- `--model-size`: 输出模型规格，默认 `26b-a4b`
+- `--model-size`: 输出模型规格，默认 `e2b`
 - `--context-length`: 最大序列长度，默认 `2048`
-- `--max_size_w`: visual 模型最大图像宽度，默认从 `config.yaml` 读取，为 `448`
-- `--max_size_h`: visual 模型最大图像高度，默认从 `config.yaml` 读取，为 `448`
-- `--nsamples`: 校准样本数，默认 512
-- `--seqlen`: 校准序列长度，默认 1024
-- `--mse`: MSE阈值，默认 2.4
-- `--bits`: 量化位数，默认 4
-- `--group-size`: 量化分组大小，默认 64
-- `--calibration-jsonl`: 校准数据集路径，默认 `./calib_EBSS.jsonl`
+- `--prefill-chunk-length`: 最大序列长度，默认 `256`
 
 ### 2.4 编译
 
@@ -92,7 +85,7 @@ python3 build.py --model_name gemma4 --model_size 26b-a4b
 
 - `gemma4-26b-a4b_prefill.hmm`
 - `gemma4-26b-a4b_decode.hmm`
-- `gemma4-26b-a4b_visual_448x448.hmm`
+- `gemma4-26b-a4b_visual.hmm`
 
 ### 2.5 演示
 
@@ -119,8 +112,6 @@ python3 demo.py --model_name gemma4 --model_size 26b-a4b --image ../../../data/p
 - `--model_name`: 模型名，默认 `gemma4`
 - `--model_size`: 模型规格，默认 `26b-a4b`
 - `--ndevice`: 设备数量，默认 `1`
-- `--max_size_w`: visual 模型最大图像宽度，默认从 `config.yaml` 读取，为 `448`
-- `--max_size_h`: visual 模型最大图像高度，默认从 `config.yaml` 读取，为 `448`
 - `--question`: 输入问题
 - `--image`: 图片路径
 - `--max-new-tokens`: 最大生成token数
@@ -212,41 +203,6 @@ response: 你好！我是 **Gemma 4**，是由 Google DeepMind 开发的大型�
 * “（上传一张图片）请描述一下这张图片里的内容。”
 
 请问今天有什么我可以帮你的吗
-```
-
-### 4.2 性能结果
-
-```bash
-====================================================================================================
-                    Model Inference Performance Summary Report
-====================================================================================================
-Configuration Details:
-  Batch Size:      1
-  Input Length per Sample:     20 tokens
-  Output Length per Sample:    336 tokens
-  Prefill Model Load Time: 120483.64ms
-  Decode Model Load Time:  809.74ms
-  Vision Model Load Time: 6244.74ms
-Prefill Stage Performance:
-  Total Time:  261.68ms | Speed:   76.43 tokens/s
-  Tokenization Time:   71.45ms
-  Embedding Time:    0.35ms
-  API SetInput Time:  64.78ms
-  API Inference Time: 121.58ms | Prefill Speed:  164.50 tokens/s
-  API GetOutput Time:  2.62ms
-Decode Stage Performance:
-  Total Time: 13198.44ms | Speed:   25.38 tokens/s
-  Tokenization Time: Skipped (No operation)
-  Embedding Time:   66.12ms
-  API SetInput Time:   1.19ms
-  API Inference Time: 35.20ms | Decode Speed:   28.41 tokens/s
-  API GetOutput Time:  2.33ms
-Overall Performance Metrics:
-  TTFT (Time To First Token):  261.68 ms
-  TPOT (Time Per Output Token): 39.40 ms/token
-  E2E Latency (End-to-End):     13.50 seconds
-  E2E TPS (Throughput):         24.89 tokens/s
-====================================================================================================
 ```
 
 ## 5 免责声明

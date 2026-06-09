@@ -18,13 +18,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 import os
+import re
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-import random
+import shutil
 import argparse
 import torch
-from xhquant.api import xhquant_init
-from hmatc.utils.utils import first_not_none, get_model_configs, logger
+from xhquant.api import get_root_logger
+from hmatc.utils.utils import first_not_none, get_model_configs
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -41,6 +42,50 @@ def get_default_model_dir(model_config: dict) -> str:
     return f"{model_name}-{model_size}"
 
 
+def is_quantized_model(model_dir: str) -> bool:
+    quantize_config = os.path.join(model_dir, "quantize_config.json")
+    return os.path.exists(quantize_config)
+
+
+def remove_path(path: str) -> None:
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path)
+    elif os.path.exists(path):
+        os.remove(path)
+
+
+def flatten_exported_hmquant_dir(export_output_dir: str, hmquant_dir: str) -> None:
+    if not os.path.isdir(export_output_dir):
+        raise FileNotFoundError(
+            f"Export output directory not found: {export_output_dir}"
+        )
+
+    pattern = re.compile(r"^hmquant_xh2.*_\d{8}$")
+    candidates = [
+        entry
+        for entry in os.listdir(export_output_dir)
+        if os.path.isdir(os.path.join(export_output_dir, entry))
+        and pattern.match(entry)
+    ]
+    if not candidates:
+        raise FileNotFoundError(
+            f"No hmquant_xh2*_YYYYMMDD directory found under {export_output_dir}"
+        )
+
+    exported_hmquant_dir = os.path.join(export_output_dir, sorted(candidates)[-1])
+    if os.path.exists(hmquant_dir) and not os.path.isdir(hmquant_dir):
+        remove_path(hmquant_dir)
+    os.makedirs(hmquant_dir, exist_ok=True)
+
+    for name in os.listdir(exported_hmquant_dir):
+        src = os.path.join(exported_hmquant_dir, name)
+        dst = os.path.join(hmquant_dir, name)
+        remove_path(dst)
+        shutil.move(src, dst)
+
+    shutil.rmtree(export_output_dir)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # fmt: off
@@ -49,22 +94,10 @@ if __name__ == "__main__":
     parser.add_argument("--model-name", type=str, default=None, help="model name for output files")
     parser.add_argument("--model-size", type=str, default=None, help="model size identifier for output files")
     parser.add_argument("--out-dir", type=str, default=f"./output/{HOUMO_TARGET}", help="output directory")
-    parser.add_argument("--max_size_w", type=int, default=None, help="max image width for visual model")
-    parser.add_argument("--max_size_h", type=int, default=None, help="max image height for visual model")
     parser.add_argument("--context-length", type=int, default=2048, help="max sequence length")
     parser.add_argument("--prefill-chunk-length", type=int, default=256, help="prefill chunk length")
-    parser.add_argument("--nsamples", type=int, default=512, help="number of calibration samples")
-    parser.add_argument("--seqlen", type=int, default=1024, help="sequence length for calibration")
-    parser.add_argument("--mse", type=float, default=2.4, help="MSE threshold for quantization")
-    parser.add_argument("--bits", type=int, default=4, choices=[4], help="quantization bits")
-    parser.add_argument("--group-size", type=int, default=64, help="group size for quantization")
-    parser.add_argument("--hessian-mse", action=argparse.BooleanOptionalAction, default=True, help="enable Hessian MSE assisted optimization")
-    parser.add_argument("--calibration-jsonl", type=str, default="./calib_EBSS.jsonl", help="path to calibration dataset in jsonl format")
-    parser.add_argument("--calibration-text-key", type=str, default="text", help="key for text field in calibration jsonl")
     parser.add_argument("--seed", type=int, default=42, help="random seed for reproducibility")
-    parser.add_argument("--audio-sampling-rate", type=int, default=16000, help="audio sampling rate")
-    parser.add_argument("--assistant-model", type=str, default=None, help="path to assistant model directory")
-
+    parser.add_argument("--debug", action="store_true", help="enable debug mode")
     args = parser.parse_args()
 
     default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
@@ -72,38 +105,75 @@ if __name__ == "__main__":
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.model = first_not_none(args.model, get_default_model_dir(model_config))
-    args.max_size_w = first_not_none(args.max_size_w, model_config.get("max_size_w", 448))
-    args.max_size_h = first_not_none(args.max_size_h, model_config.get("max_size_h", 448))
     # fmt: on
 
-    random.seed(args.seed)
-    torch.manual_seed(args.seed)
-
-    xhquant_init(logger=logger)
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float16
-    logger.info(f"device={device} dtype={dtype}")
 
     if args.model_size in ["26b-a4b"]:
-        from ptq_moe import quant_moe, run_gptqmodel
-
-        # gptq 4bit
-        gptqmodel_path = f"{args.model}-gptq-4bit"
-        if not os.path.exists(gptqmodel_path):
-            run_gptqmodel(args, device, dtype)
-        else:
-            logger.warning(f"Using existing GPTQ model => {gptqmodel_path}.")
-
-        if args.assistant_model is not None:
-            from ptq_mtp import quant_mtp
-
-            quant_mtp(args, device)
-        else:
-            quant_moe(args, device, dtype)
-    elif args.model_size in ["e2b", "e4b"]:
-        from ptq_e import quant_e
-
-        quant_e(args, device, dtype)
+        quant_config_path = "configs/gemma4_26b_a4b_full.yaml"
+    elif args.model_size in ["e2b"]:
+        quant_config_path = "configs/gemma4_e2b_full.yaml"
+    elif args.model_size in ["e4b"]:
+        quant_config_path = "configs/gemma4_e4b_full.yaml"
+    elif args.model_size in ["31b"]:
+        quant_config_path = "configs/gemma4_31b_full.yaml"
     else:
         raise ValueError(f"Unsupported model size: {args.model_size}")
+
+    from xhmodel_merak.xh_llm.workflows import AutoLLMWorkflow
+
+    workflow = AutoLLMWorkflow.from_config(
+        hf_model_dir=args.model,
+        config_path=quant_config_path,
+        seed=args.seed,
+        debug=args.debug,
+    )
+
+    logger = get_root_logger()
+
+    quant_output_dir = os.path.join(args.out_dir, "hmquant", "quantized_model")
+    if not is_quantized_model(args.model) and os.path.exists(quant_output_dir):
+        logger.warning(
+            f"Output directory already exists: {quant_output_dir}, removing it."
+        )
+        shutil.rmtree(quant_output_dir)
+
+    config_overrides = None
+    if is_quantized_model(args.model):
+        config_overrides = dict(
+            quant=dict(
+                algorithm="existing_hf",
+                artifact_format="gptqmodel_hf",
+                output_format="gptqmodel_hf",
+                existing_hf_model_dir=args.model,
+            )
+        )
+
+    quant_result = workflow.quant(
+        output_dir=quant_output_dir,
+        device=device,
+        config_overrides=config_overrides,
+    )
+
+    export_output_dir = os.path.join(args.out_dir, "hmquant", "exported_model")
+    if os.path.exists(export_output_dir):
+        logger.warning(
+            f"Output directory already exists: {export_output_dir}, removing it."
+        )
+        shutil.rmtree(export_output_dir)
+
+    config_overrides = {
+        "export.model.context_max_length": args.context_length,
+        "export.model.prefill_chunk_length": args.prefill_chunk_length,
+    }
+
+    export_result = workflow.export(
+        quant_result=quant_result,
+        output_dir=str(export_output_dir),
+        device=device,
+        config_overrides=config_overrides,
+    )
+    flatten_exported_hmquant_dir(
+        export_output_dir=export_output_dir,
+        hmquant_dir=os.path.join(args.out_dir, "hmquant"),
+    )

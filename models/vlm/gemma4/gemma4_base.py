@@ -27,10 +27,11 @@ import torch
 from PIL import Image
 from loguru import logger
 try:
-    from transformers import GemmaTokenizer, Gemma4Processor
+    from transformers import GemmaTokenizer
 except ImportError as e:
     logger.error(f"Transformers not available: {e}, Please install transformers >= 5.5.0")
     exit(-1)
+from gemma4_processor import XHGemma4Processor
 import tcim_lite as tcim
 from hmatc.utils.perf_infomations import InferencePerformanceTracker, PERFTYPE
 
@@ -86,23 +87,9 @@ class Gemma4Base:
             self.vit_num_patches = vit_in_shape[1]
             self.vit_num_tokens = vit_out_shape[1] if len(vit_out_shape) == 3 else vit_out_shape[0]
             self.vit_patch_dim = vit_in_shape[2]
-            self.upsample_token = self.vit_num_tokens != self.vit_num_patches
-            # Configure processor
-            pool_size = 3 if self.upsample_token else 1
-            self.processor.image_processor.max_soft_tokens = MAX_SOFT_TOKENS
-            self.processor.image_processor.pooling_kernel_size = pool_size
-            self.processor.image_seq_length = MAX_SOFT_TOKENS if self.upsample_token else self.vit_num_patches
-            max_patches = MAX_SOFT_TOKENS * pool_size * pool_size
-            self.valid_mask = torch.tensor([True] * self.vit_num_patches + [False] * (max_patches - self.vit_num_patches))
-            logger.info(f"Vision: patches={self.vit_num_patches}, tokens={self.vit_num_tokens}, upsample={self.upsample_token}")
+            logger.info(f"Vision: patches={self.vit_num_patches}, tokens={self.vit_num_tokens}")
         else:
             self.vit = None
-            self.vit_num_patches = 0
-            self.vit_num_tokens = 0
-            self.vit_patch_dim = 0
-            self.target_image_size = None
-            self.upsample_token = False
-            self.valid_mask = None
             logger.warning("Vision model not loaded, text-only mode")
 
     def _load_llm(self, prefill_path, decode_path, devices, backend_name):
@@ -115,8 +102,6 @@ class Gemma4Base:
         self._log_model_io(self.prefill, "prefill")
         # Subclass reads specific input indices for prefill_len, embed_dim, etc.
         self._read_prefill_info()
-        self.context_max_length = self.global_mask_w
-        logger.info(f"Prefill loaded: len={self.prefill_len}, embed_dim={self.embed_dim}, context_max_length={self.context_max_length}")
 
         # Decode (share KV caches with prefill)
         cache_names = [self.prefill.get_input_name(i) for i in range(self.prefill.get_num_inputs()) if "cache" in self.prefill.get_input_name(i).lower()]
@@ -130,12 +115,15 @@ class Gemma4Base:
         self._read_decode_info()
         logger.info(f"Decode loaded: len={self.decode_len}")
 
+        self.context_max_length = self.prefill.get_input_info(cache_names[-1]).shape[2]
+        logger.info(f"Prefill loaded: len={self.prefill_len}, embed_dim={self.embed_dim}, context_max_length={self.context_max_length}")
+
         for name in cache_names:
             self.decode.set_input(name, self.prefill.get_dev_input(name))
 
     def _load_tokenizer(self, tokenizer_dir):
         tokenizer = GemmaTokenizer.from_pretrained(tokenizer_dir, trust_remote_code=True)
-        processor = Gemma4Processor.from_pretrained(tokenizer_dir, trust_remote_code=True)
+        processor = XHGemma4Processor.from_pretrained(tokenizer_dir, trust_remote_code=True)
         return tokenizer, processor
 
     # Subclasses override to read model-specific input layout
@@ -159,6 +147,8 @@ class Gemma4Base:
         for q in range(q_len):
             if q < cur_len:
                 global_mask[0, 0, q, : min(valid_k, past_len + q + 1)] = 0
+            else:
+                global_mask[0, 0, q, 0] = 0
 
         sw = self.sliding_window
         slide_ctx = global_ctx if sw is None else min(global_ctx, self._aligned(sw + q_len - 1, 16))
@@ -169,6 +159,8 @@ class Gemma4Base:
                 causal_end = min(slide_ctx, clamped_past + q + 1)
                 sw_start = max(0, clamped_past + q - sw + 1) if sw is not None else 0
                 local_mask[0, 0, q, sw_start:causal_end] = 0
+            else:
+                local_mask[0, 0, q, 0] = 0
 
         if mm_types is not None and mm_types.numel() > 0:
             mm = mm_types[0, :cur_len] if mm_types.dim() == 2 else mm_types[:cur_len]
@@ -192,28 +184,86 @@ class Gemma4Base:
 
         return global_mask.numpy(), local_mask.numpy()
 
-    def _run_vision(self, pixel_values: torch.Tensor) -> torch.Tensor:
+    def _fit_model_input(self, model, value: torch.Tensor, name: str) -> np.ndarray:
+        info = model.get_input_info(name)
+        expected_shape = tuple(info.shape)
+        arr = value.detach().cpu().numpy().astype(np.dtype(info.dtype))
+        if arr.shape == expected_shape:
+            return arr
+
+        fitted = np.zeros(expected_shape, dtype=arr.dtype)
+        slices = tuple(slice(0, min(src, dst)) for src, dst in zip(arr.shape, expected_shape))
+        fitted[slices] = arr[slices]
+        return fitted
+
+    def _run_vision(self, inputs: dict) -> torch.Tensor:
         if self.vit is None:
             raise RuntimeError("Vision model not loaded")
-        pv = pixel_values[:, self.valid_mask].half()
-        if pv.shape[1] < self.vit_num_patches:
-            pv = torch.cat([pv, torch.zeros(1, self.vit_num_patches - pv.shape[1], pv.shape[2])], dim=1)
-        # VISION_INPUT_TIME
+        if inputs.get("pixel_values") is None:
+            raise RuntimeError("pixel_values not found in processor inputs")
+
+        vit_input_aliases = {"attention_mask": "visual_attention_mask"}
+
         self.perf_tracker.perf_start(PERFTYPE.VISION_INPUT_TIME)
-        self.vit.set_input(self.vit.get_input_name(0), pv[:, : self.vit_num_patches].numpy())
+        for i in range(self.vit.get_num_inputs()):
+            name = self.vit.get_input_name(i)
+            bare_name = name.removesuffix(".hmcc.format")
+            input_key = bare_name if bare_name in inputs else vit_input_aliases.get(bare_name)
+            if input_key not in inputs:
+                raise KeyError(f"VIT input {name!r} is not found in processor inputs")
+            value = inputs[input_key]
+            if not isinstance(value, torch.Tensor):
+                value = torch.as_tensor(value)
+            if bare_name == "pixel_values":
+                value = value.half()
+            self.vit.set_input(name, self._fit_model_input(self.vit, value, name))
         self.perf_tracker.perf_end(PERFTYPE.VISION_INPUT_TIME)
 
-        # VISION_INFER_TIME
         self.perf_tracker.perf_start(PERFTYPE.VISION_INFER_TIME)
         self.vit.run()
         self.vit.sync()
         self.perf_tracker.perf_end(PERFTYPE.VISION_INFER_TIME)
 
-        # VISION_OUTPUT_TIME
         self.perf_tracker.perf_start(PERFTYPE.VISION_OUTPUT_TIME)
-        out = torch.from_numpy(self.vit.get_output(self.vit.get_output_name(0)).numpy()).squeeze(0)
+        out = torch.from_numpy(self.vit.get_output(self.vit.get_output_name(0)).numpy())
+        image_soft_token_count = inputs.get("image_soft_token_count")
+        if image_soft_token_count is not None:
+            counts = torch.as_tensor(image_soft_token_count, dtype=torch.long).flatten().tolist()
+            if out.dim() == 3:
+                out = torch.cat([out[i, : int(count), :] for i, count in enumerate(counts)], dim=0)
+            elif out.dim() == 2 and len(counts) == 1:
+                out = out[: int(counts[0]), :]
+            else:
+                out = out.squeeze(0)
+        else:
+            out = out.squeeze(0)
         self.perf_tracker.perf_end(PERFTYPE.VISION_OUTPUT_TIME)
         return out
+
+    @staticmethod
+    def _flatten_features(features: torch.Tensor) -> torch.Tensor:
+        if features.ndim == 2:
+            return features
+        return features.reshape(-1, features.shape[-1])
+
+    def _scatter_features(self, embeds: torch.Tensor, input_ids: torch.Tensor, token_id: int, features: torch.Tensor, feature_name: str) -> torch.Tensor:
+        flat_features = self._flatten_features(features).to(embeds.device, embeds.dtype)
+        token_positions = (input_ids == token_id).nonzero(as_tuple=False)
+        if token_positions.numel() == 0:
+            if flat_features.shape[0] != 0:
+                raise ValueError(
+                    f"Received {feature_name} features for token id {token_id}, but prompt does not contain that token."
+                )
+            return embeds
+        if token_positions.shape[0] != flat_features.shape[0]:
+            raise ValueError(
+                f"{feature_name} features and token count do not match: "
+                f"tokens={token_positions.shape[0]}, features={flat_features.shape[0]}"
+            )
+
+        updated = embeds.clone()
+        updated[token_positions[:, 0], token_positions[:, 1]] = flat_features
+        return updated
 
     def _decode_loop(self, first_token_id, input_ids, input_len):
         eos_ids = {self.tokenizer.eos_token_id} if isinstance(self.tokenizer.eos_token_id, int) else set(self.tokenizer.eos_token_id)

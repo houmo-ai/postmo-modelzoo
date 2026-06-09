@@ -12,41 +12,33 @@ model_configs:
       ndevice: 1
       batch: 1
       prefill_length: 256
-      max_size_w: 448
-      max_size_h: 448
 
     "e2b":
       modelscope_repo: ["google/gemma-4-E2B-it"]
       model_name: "gemma4"
       model_size: "e2b"
       ncore: 2
-      context_length: "256k"
+      context_length: "128k"
       ndevice: 1
       batch: 1
       prefill_length: 256
-      max_size_w: 448
-      max_size_h: 448
 
     "e4b":
       modelscope_repo: ["google/gemma-4-E4B-it"]
       model_name: "gemma4"
       model_size: "e4b"
       ncore: 2
-      context_length: "256k"
+      context_length: "128k"
       ndevice: 1
       batch: 1
       prefill_length: 256
-      max_size_w: 448
-      max_size_h: 448
 
     "31b":
       modelscope_repo: ["google/gemma-4-31B-it"]
       model_name: "gemma4"
       model_size: "31b"
       ncore: 2
-      context_length: "8k"
+      context_length: "32k"
       ndevice: 1
       batch: 1
       prefill_length: 256
-      max_size_w: 448
-      max_size_h: 448

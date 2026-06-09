@@ -61,13 +61,10 @@ def _compute_rotary_cache(
 
 
 def _convert_gemma4_rmsnorm(hf_norm: nn.Module) -> XHRMSNorm:
-    """Convert a HF ``Gemma4RMSNorm`` (which scales by ``1 + weight``) into an
-    ``xhquant.nn.RMSNorm`` whose graph fuses to a single RMSNorm op. The
-    ``(1 + weight)`` factor is baked into the new weight so we drop the extra
-    ``Add`` / ``Mul`` from the exported graph.
+    """Convert a HF ``Gemma4RMSNorm`` (which computes ``norm(x) * weight``)
+    into an ``xhquant.nn.RMSNorm`` whose graph fuses to a single RMSNorm op.
     """
     if not isinstance(hf_norm, Gemma4RMSNorm):
-        # Already converted or a custom op — return as-is.
         if isinstance(hf_norm, XHRMSNorm):
             return hf_norm
         raise TypeError(f"Expected Gemma4RMSNorm, got {type(hf_norm).__name__}")
@@ -76,7 +73,7 @@ def _convert_gemma4_rmsnorm(hf_norm: nn.Module) -> XHRMSNorm:
     new_norm = XHRMSNorm(hidden_size, eps)
     with torch.no_grad():
         new_norm.weight.data.copy_(
-            hf_norm.weight.data.detach().to(new_norm.weight.dtype) + 1.0
+            hf_norm.weight.data.detach().to(new_norm.weight.dtype)
         )
     new_norm.weight.requires_grad_(False)
     return new_norm
@@ -266,6 +263,19 @@ class Gemma4AssistantBackbone(nn.Module):
             cos, sin = _compute_rotary_cache(
                 inv_freq, attention_scaling, max_position_embeddings
             )
+            # Fix: for layers with partial_rotary_factor < 1.0, the companion dims
+            # (head_dim//2 to head_dim//2+rotary_dim) in the cos/sin cache inherit
+            # non-trivial rotation values from the cat(freqs, freqs) pattern, but
+            # the HF Gemma4TextRotaryEmbedding.forward sets these to cos=1/sin=0
+            # (pass-through).  Without this correction the full_attention layer of
+            # the assistant produces corrupted Q, collapsing draft accept rates.
+            rope_params = text_model.config.rope_parameters.get(layer_type, {})
+            prf = rope_params.get("partial_rotary_factor", 1.0)
+            if prf < 1.0:
+                head_dim = int(cos.shape[-1])
+                rotary_dim = int(head_dim * prf)
+                cos[:, head_dim // 2 : head_dim // 2 + rotary_dim] = 1.0
+                sin[:, head_dim // 2 : head_dim // 2 + rotary_dim] = 0.0
             # Store caches as ``(1, 1, max_seq, head_dim)`` so DynamicSlice can
             # slice along axis=2 and the result broadcasts directly with the
             # transposed Q of shape ``(B, num_heads, T, head_dim)``.
