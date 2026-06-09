@@ -45,7 +45,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--batch", dest="batch", type=int, default=None)
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number")
     parser.add_argument("--prefill_length", dest="prefill_length", type=int, default=None, help="prefill length")
-    parser.add_argument("--model_size", dest="model_size", type=str, default=None, choices=["26b-a4b", "e2b", "e4b"])
+    parser.add_argument("--model_size", dest="model_size", type=str, default=None, choices=["26b-a4b", "e2b", "e4b", "31b"])
     args = parser.parse_args()
     return args
 # fmt: on
@@ -76,10 +76,11 @@ if __name__ == "__main__":
             "context_len": context_length,
             "prefill_len": prefill_length,
             "batch": batch,
-        },
-        "modelscope_repo": {"repo_ids": model_config.get("modelscope_repo", [])},
+        }
     }
-
+    if args.file_type in ["raw"]:
+        model_cfgs["modelscope_repo"] = {"repo_ids": model_config.get("modelscope_repo", [])}
+        
     _, ret_dict = hmatc_get_file(
         model_cfgs,
         args.file_type,

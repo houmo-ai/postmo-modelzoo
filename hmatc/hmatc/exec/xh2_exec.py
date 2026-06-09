@@ -1374,6 +1374,7 @@ class Xh2Exec(BaseExec):
             cpp_backend=cpp_backend,
             j=parallel_jobs,
             custom_msg=json.dumps(custom_msg, ensure_ascii=False),
+            skip_check=True,
             **merged_kwargs,
         )
 

@@ -74,11 +74,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--batch", dest="batch", type=int, default=None, help="batch size for decode model")
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number for multi-device")
     parser.add_argument("--stage", dest="stage", type=str, default="build", choices=["build", "test", "all"], help="build stage")
-    parser.add_argument("--max_size_w", dest="max_size_w", type=int, default=None, help="max image width for visual model name suffix")
-    parser.add_argument("--max_size_h", dest="max_size_h", type=int, default=None, help="max image height for visual model name suffix")
     parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 1), help="FlashAttention switches: 1st=llm(0/1/2), 2nd=vit(0/1); e.g. --flash_attention 2 1")
     parser.add_argument("--enable_common_subgraph", dest="enable_common_subgraph", action="store_true", default=False, help="enable common subgraph optimization")
-    parser.add_argument("--enable_xh2_stable_output", dest="enable_xh2_stable_output", action="store_true", default=False, help="enable stable output")
     parser.add_argument("--mtp", dest="mtp", action="store_true", default=False, help="enable mtp optimization")
    
     args = parser.parse_args()
@@ -92,8 +89,6 @@ def get_args() -> argparse.Namespace:
     args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
     if args.context_length is None:
         args.context_length = parse_context_length(model_config.get("context_length", "128k"))
-    args.max_size_w = first_not_none(args.max_size_w, model_config.get("max_size_w", 448))
-    args.max_size_h = first_not_none(args.max_size_h, model_config.get("max_size_h", 448))
     args.flash_attention = _validate_adjust_flash_attention(args.flash_attention, args.context_length)
     # fmt: on
     return args
@@ -128,10 +123,8 @@ if __name__ == "__main__":
             flash_attn=llm_flash_attn,
             llm_opt=True,
             context_length=args.context_length,
-            prefill_length=args.prefill_length,
             ndevice=ndevice,
             enable_common_subgraph=args.enable_common_subgraph,
-            enable_xh2_stable_output=args.enable_xh2_stable_output,
             parallel_jobs=parallel_jobs,
         )
         if not args.mtp:
@@ -145,12 +138,10 @@ if __name__ == "__main__":
                 llm_opt=True,
                 context_length=args.context_length,
                 ndevice=ndevice,
-                enable_xh2_stable_output=args.enable_xh2_stable_output,
+                enable_common_subgraph=args.enable_common_subgraph,
                 parallel_jobs=parallel_jobs,
             )
-            visual_model_name = (
-                f"{model_name}-{model_size}_visual_{args.max_size_w}x{args.max_size_h}"
-            )
+            visual_model_name = f"{model_name}-{model_size}_visual"
             Xh2Exec.build_from_hmonnx(
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, "visual")),
                 hmm_name=visual_model_name,
@@ -158,6 +149,7 @@ if __name__ == "__main__":
                 ncore=ncore,
                 flash_attn=flash_attn,
                 parallel_jobs=parallel_jobs,
+                enable_common_subgraph=args.enable_common_subgraph,
             )
         if model_size in ["e2b", "e4b"] and not args.mtp:
             audio_model_name = f"{model_name}-{model_size}_audio"
@@ -168,31 +160,7 @@ if __name__ == "__main__":
                 ncore=ncore,
                 flash_attn=flash_attn,
                 parallel_jobs=parallel_jobs,
-            )
-
-        if model_size in ["e2b", "e4b"]:
-            plib_prefill_name = f"{model_name}-{model_size}_plib_prefill"
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(
-                    os.path.join(model_dir, "plib"), pattern="hmquant_*_prefill.onnx"
-                ),
-                hmm_name=plib_prefill_name,
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=flash_attn,
-                parallel_jobs=parallel_jobs,
-            )
-
-            plib_decode_name = f"{model_name}-{model_size}_plib_decode"
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(
-                    os.path.join(model_dir, "plib"), pattern="hmquant_*_decode.onnx"
-                ),
-                hmm_name=plib_decode_name,
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=flash_attn,
-                parallel_jobs=parallel_jobs,
+                enable_common_subgraph=args.enable_common_subgraph,
             )
 
         if args.mtp:
@@ -207,12 +175,13 @@ if __name__ == "__main__":
                 prefill_length=args.prefill_length,
                 ndevice=ndevice,
                 enable_common_subgraph=args.enable_common_subgraph,
-                enable_xh2_stable_output=args.enable_xh2_stable_output,
                 parallel_jobs=parallel_jobs,
             )
 
             Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "draft_onnx")),
+                hmonnx=os.path.join(
+                    model_dir, "draft_onnx", "gemma4_assistant_decode.onnx"
+                ),
                 hmm_name=f"{model_name}-{model_size}_draft",
                 output=output_dir,
                 ncore=ncore,
@@ -221,6 +190,5 @@ if __name__ == "__main__":
                 llm_opt=True,
                 context_length=args.context_length,
                 ndevice=ndevice,
-                enable_xh2_stable_output=args.enable_xh2_stable_output,
                 parallel_jobs=parallel_jobs,
             )

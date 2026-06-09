@@ -1,8 +1,8 @@
 # Copyright 2025 HOUMO AI
 #
-# File: gemma4_moe.py
+# File: gemma4_dense.py
 # Description:
-#   Gemma4-MoE Model for MoE Inference
+#   Gemma4-Dense Model for Dense Inference
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,8 +29,8 @@ from hmatc.utils.perf_infomations import PERFTYPE
 from gemma4_base import Gemma4Base
 
 
-class Gemma4MoE(Gemma4Base):
-    """Gemma4-MoE inference (no PerLayerInputBuilder, index-based embedding)."""
+class Gemma4(Gemma4Base):
+    """Gemma4-Dense inference (no sliding-window attention, index-based embedding)."""
 
     sliding_window = 1024
     audio_enabled = False
@@ -56,7 +56,6 @@ class Gemma4MoE(Gemma4Base):
         # Vision (with perf tracking)
         if vit_path and os.path.isfile(vit_path):
             self.perf_tracker.perf_start(PERFTYPE.VISION_LOAD_TIME)
-
         self._load_vision(vit_path, self.devices, backend_name)
         if self.vit is not None:
             self.perf_tracker.perf_end(PERFTYPE.VISION_LOAD_TIME)
@@ -66,10 +65,10 @@ class Gemma4MoE(Gemma4Base):
         self._load_llm(prefill_path, decode_path, self.devices, backend_name)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_LOAD_TIME)
 
-        # Decode: set is_decode flag
+        # Decode: current_input_length is always 1
         self.decode.set_input(self.decode.get_input_name(2), np.array([1], dtype="int32"))
 
-        # Embedding (index-based, scale already baked in)
+        # Embedding (index-based, scale baked into weights)
         saved = torch.load(embedding_path, map_location="cpu", weights_only=True)
         self.embedding = nn.Embedding(
             saved["weight"].shape[0],
@@ -78,13 +77,11 @@ class Gemma4MoE(Gemma4Base):
             dtype=torch.float16,
         )
         self.embedding.load_state_dict(saved, strict=False)
-
         self.perf_tracker.reset_perf_time()
 
     def _read_prefill_info(self):
         self.prefill_len = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[1]
         self.embed_dim = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[2]
-        self.global_mask_w = self.prefill.get_input_info(self.prefill.get_input_name(3)).shape[3]
         self.prefill_local_w = self.prefill.get_input_info(self.prefill.get_input_name(4)).shape[3]
 
     def _read_decode_info(self):
@@ -108,24 +105,24 @@ class Gemma4MoE(Gemma4Base):
 
         return embeds
 
-    # ---- Prefill ----
-
     def _prefill(self, embeds, input_len, mm_types=None):
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
         steps = math.ceil(input_len / self.prefill_len)
+        cur_len = 0
         for s in range(steps):
             start, end = s * self.prefill_len, min((s + 1) * self.prefill_len, input_len)
+            cur_len = end - start
             sub_emb = embeds[:, start:end]
             if sub_emb.shape[1] < self.prefill_len:
                 sub_emb = torch.cat([sub_emb, torch.zeros(1, self.prefill_len - sub_emb.shape[1], sub_emb.shape[2])], dim=1)
 
             chunk_mm = mm_types[:, start:end][0] if mm_types is not None else None
-            g_mask, l_mask = self._build_masks(end - start, start, self.prefill_len, chunk_mm)
+            g_mask, l_mask = self._build_masks(cur_len, start, self.prefill_len, chunk_mm)
 
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_INPUT_TIME)
-            self.prefill.set_input(self.prefill.get_input_name(0), sub_emb.contiguous().detach().cpu().numpy().astype(np.float16))
+            self.prefill.set_input(self.prefill.get_input_name(0), sub_emb.detach().numpy().astype(np.float16))
             self.prefill.set_input(self.prefill.get_input_name(1), np.array([start], dtype="int32"))
-            self.prefill.set_input(self.prefill.get_input_name(2), np.array([end - start], dtype="int32"))
+            self.prefill.set_input(self.prefill.get_input_name(2), np.array([cur_len], dtype="int32"))
             self.prefill.set_input(self.prefill.get_input_name(3), g_mask.astype(np.float16))
             self.prefill.set_input(self.prefill.get_input_name(4), l_mask.astype(np.float16))
             self.perf_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
@@ -136,7 +133,13 @@ class Gemma4MoE(Gemma4Base):
             self.perf_tracker.perf_end(PERFTYPE.PREFILL_INFER_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_OUTPUT_TIME)
-        next_id = self.prefill.get_output(self.prefill.get_output_name(0)).numpy().argmax(-1)
+        logits = self.prefill.get_output(self.prefill.get_output_name(0)).numpy().astype(np.float32) # [bs, seq_len, vocab_size]
+        out_seq_len = logits.shape[1]
+        if out_seq_len >= cur_len:
+            vaild_len = cur_len
+        else:
+            vaild_len = out_seq_len
+        next_id = logits[0:1, vaild_len - 1:vaild_len, :].argmax(-1)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_OUTPUT_TIME)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOTAL_TIME)
         return next_id
@@ -153,7 +156,7 @@ class Gemma4MoE(Gemma4Base):
         _, l_mask = self._build_masks(1, past_len, self.decode_len)
 
         self.perf_tracker.perf_start(PERFTYPE.DECODE_INPUT_TIME)
-        self.decode.set_input(self.decode.get_input_name(0), dec_emb.contiguous().detach().cpu().numpy().astype(np.float16))
+        self.decode.set_input(self.decode.get_input_name(0), dec_emb.detach().numpy().astype(np.float16))
         self.decode.set_input(self.decode.get_input_name(1), np.array([past_len], dtype="int32"))
         self.decode.set_input(self.decode.get_input_name(3), l_mask.astype(np.float16))
         self.perf_tracker.perf_end(PERFTYPE.DECODE_INPUT_TIME)

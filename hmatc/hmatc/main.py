@@ -280,7 +280,6 @@ def main():
             parallel_jobs=(
                 psutil.cpu_count(logical=False) if args.jobs is None else args.jobs
             ),
-            skip_check=True,
         )
         return
     # Check golden
