@@ -502,6 +502,16 @@ llm_perf:
         script: ../tests/tools_tests/test_llm_perf.sh
   test:
     - tools_llm_perf_test
+llm_engine:
+  include:
+    - tools/common/houmo-llm-engine
+  exclude:
+    - tools/common/houmo-llm-engine/README.MD
+  example_case:
+    - tools_llm_engine_test:
+        script: ../tools/common/houmo-llm-engine/test.sh
+  test:
+    - tools_llm_engine_test
 llm_minicpmo:
   include:
     - models/omni/minicpmo
