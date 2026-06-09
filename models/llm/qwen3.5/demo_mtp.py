@@ -211,10 +211,14 @@ def get_args() -> argparse.Namespace:
             "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
         )
     if args.ndevice > 1:
-        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
-        args.prefill_mtp_path = args.prefill_mtp_path.replace(".hmm", ".hmms")
-        args.decode_mtp_path = args.decode_mtp_path.replace(".hmm", ".hmms")
-        args.decode_verify_path = args.decode_verify_path.replace(".hmm", ".hmms")
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        if args.prefill_mtp_path.endswith(".hmm"):
+            args.prefill_mtp_path = args.prefill_mtp_path.replace(".hmm", ".hmms")
+        if args.decode_mtp_path.endswith(".hmm"):
+            args.decode_mtp_path = args.decode_mtp_path.replace(".hmm", ".hmms")
+        if args.decode_verify_path.endswith(".hmm"):
+            args.decode_verify_path = args.decode_verify_path.replace(".hmm", ".hmms")
     return args
 
 

@@ -409,7 +409,6 @@ if __name__ == "__main__":
                 ndevice=ndevice,
                 ncore=ncore,
                 flash_attn=llm_flash_attention,
-                enable_common_subgraph=args.enable_common_subgraph,
                 enable_xh2_stable_output=args.enable_xh2_stable_output,
                 llm_opt=True,
                 parallel_jobs=j,

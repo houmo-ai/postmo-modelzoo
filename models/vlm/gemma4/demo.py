@@ -83,8 +83,10 @@ def get_args():
     if args.plib_decode_path is None:
         args.plib_decode_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_plib_decode.hmm"
     if args.ndevice > 1:
-        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
-        args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        if args.decode_path.endswith(".hmm"):
+            args.decode_path = args.decode_path.replace(".hmm", ".hmms")
     # fmt: on
     return args
 

@@ -289,8 +289,10 @@ def get_args() -> argparse.Namespace:
             f"{args.model_name}-{args.model_size}_visual_{args.max_size_w}x{args.max_size_h}x{args.max_size_t}.hmm",
         )
     if args.ndevice > 1:
-        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
-        args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        if args.decode_path.endswith(".hmm"):
+            args.decode_path = args.decode_path.replace(".hmm", ".hmms")
     args.image_path = normalize_image_inputs(args.image_path)
     return args
 

@@ -273,8 +273,10 @@ def get_args() -> argparse.Namespace:
         )
     args.image_path = first_not_none(args.image_path, get_default_image_inputs())
     if args.ndevice > 1:
-        args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
-        args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        if args.decode_path.endswith(".hmm"):
+            args.decode_path = args.decode_path.replace(".hmm", ".hmms")
     args.image_path = normalize_image_inputs(args.image_path)
     return args
 

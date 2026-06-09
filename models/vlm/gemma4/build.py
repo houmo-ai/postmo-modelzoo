@@ -145,7 +145,6 @@ if __name__ == "__main__":
                 llm_opt=True,
                 context_length=args.context_length,
                 ndevice=ndevice,
-                enable_common_subgraph=args.enable_common_subgraph,
                 enable_xh2_stable_output=args.enable_xh2_stable_output,
                 parallel_jobs=parallel_jobs,
             )
@@ -222,7 +221,6 @@ if __name__ == "__main__":
                 llm_opt=True,
                 context_length=args.context_length,
                 ndevice=ndevice,
-                enable_common_subgraph=args.enable_common_subgraph,
                 enable_xh2_stable_output=args.enable_xh2_stable_output,
                 parallel_jobs=parallel_jobs,
             )

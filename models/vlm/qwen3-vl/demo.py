@@ -277,16 +277,10 @@ def get_args() -> argparse.Namespace:
             "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
         )
     if args.ndevice > 1:
-        args.prefill_path = (
-            args.prefill_path.replace(".hmm", ".hmms")
-            if args.prefill_path.endswith(".hmm")
-            else args.prefill_path
-        )
-        args.decode_path = (
-            args.decode_path.replace(".hmm", ".hmms")
-            if args.decode_path.endswith(".hmm")
-            else args.decode_path
-        )
+        if args.prefill_path.endswith(".hmm"):
+            args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
+        if args.decode_path.endswith(".hmm"):
+            args.decode_path = args.decode_path.replace(".hmm", ".hmms")
     return args
 
 
@@ -458,8 +452,12 @@ class SamplingManager:
         # Greedy sampling fast-path
         if self.top_k == 1:
             processed_logits = logits.copy()
-            processed_logits = self.apply_repetition_penalty(processed_logits, previous_tokens)
-            processed_logits = self.apply_presence_penalty(processed_logits, previous_tokens)
+            processed_logits = self.apply_repetition_penalty(
+                processed_logits, previous_tokens
+            )
+            processed_logits = self.apply_presence_penalty(
+                processed_logits, previous_tokens
+            )
             sampled_index = int(np.argmax(processed_logits))
             return np.array([[sampled_index]])
 
@@ -529,15 +527,54 @@ class Qwen3VL:
         ).shape[:2]
         self.prefill_shape = torch.Size(prefill_shape)
         self.prefill_len = self.prefill_shape.numel()
-        self.pad_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|endoftext|>") if "<|endoftext|>" in self.processor.tokenizer.get_vocab() else 151643
-        self.image_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|image_pad|>") if "<|image_pad|>" in self.processor.tokenizer.get_vocab() else 151655
-        self.video_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|video_pad|>") if "<|video_pad|>" in self.processor.tokenizer.get_vocab() else 151656
-        self.vision_start_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|vision_start|>") if "<|vision_start|>" in self.processor.tokenizer.get_vocab() else 151652
-        self.vision_end_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|vision_end|>") if "<|vision_end|>" in self.processor.tokenizer.get_vocab() else 151653
-        self.vision_token_id = self.processor.tokenizer.convert_tokens_to_ids("<|vision_pad|>") if "<|vision_pad|>" in self.processor.tokenizer.get_vocab() else 151654
-        self.eos_token_id = [self.pad_token_id, self.processor.tokenizer.convert_tokens_to_ids("<|im_end|>") if "<|im_end|>" in self.processor.tokenizer.get_vocab() else 151645]
-        self.spatial_merge_size = self.processor.image_processor.merge_size if hasattr(self.processor.image_processor, "merge_size") else 2
-        self.patch_size = self.processor.image_processor.patch_size if hasattr(self.processor.image_processor, "patch_size") else 16
+        self.pad_token_id = (
+            self.processor.tokenizer.convert_tokens_to_ids("<|endoftext|>")
+            if "<|endoftext|>" in self.processor.tokenizer.get_vocab()
+            else 151643
+        )
+        self.image_token_id = (
+            self.processor.tokenizer.convert_tokens_to_ids("<|image_pad|>")
+            if "<|image_pad|>" in self.processor.tokenizer.get_vocab()
+            else 151655
+        )
+        self.video_token_id = (
+            self.processor.tokenizer.convert_tokens_to_ids("<|video_pad|>")
+            if "<|video_pad|>" in self.processor.tokenizer.get_vocab()
+            else 151656
+        )
+        self.vision_start_token_id = (
+            self.processor.tokenizer.convert_tokens_to_ids("<|vision_start|>")
+            if "<|vision_start|>" in self.processor.tokenizer.get_vocab()
+            else 151652
+        )
+        self.vision_end_token_id = (
+            self.processor.tokenizer.convert_tokens_to_ids("<|vision_end|>")
+            if "<|vision_end|>" in self.processor.tokenizer.get_vocab()
+            else 151653
+        )
+        self.vision_token_id = (
+            self.processor.tokenizer.convert_tokens_to_ids("<|vision_pad|>")
+            if "<|vision_pad|>" in self.processor.tokenizer.get_vocab()
+            else 151654
+        )
+        self.eos_token_id = [
+            self.pad_token_id,
+            (
+                self.processor.tokenizer.convert_tokens_to_ids("<|im_end|>")
+                if "<|im_end|>" in self.processor.tokenizer.get_vocab()
+                else 151645
+            ),
+        ]
+        self.spatial_merge_size = (
+            self.processor.image_processor.merge_size
+            if hasattr(self.processor.image_processor, "merge_size")
+            else 2
+        )
+        self.patch_size = (
+            self.processor.image_processor.patch_size
+            if hasattr(self.processor.image_processor, "patch_size")
+            else 16
+        )
         self.max_size_t = self.vit_model.get_input_info(
             self.vit_model.get_input_name(0)
         ).shape[2]

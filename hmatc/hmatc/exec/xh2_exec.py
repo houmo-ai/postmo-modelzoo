@@ -1230,7 +1230,7 @@ class Xh2Exec(BaseExec):
         is_prefill=False,
         enable_common_subgraph=False,
         skip_mlir_compile=False,
-        subgraph_repeat_hint=20,
+        subgraph_repeat_hint=None,
         all_logits=False,
         work_dir=None,
         cpp_backend="v1",
@@ -1311,6 +1311,10 @@ class Xh2Exec(BaseExec):
         # Multi-device
         if ndevice > 1:
             build_kwargs["ndevice"] = ndevice
+        if subgraph_repeat_hint is not None:
+            build_kwargs["subgraph_repeat_hint"] = subgraph_repeat_hint
+        if skip_mlir_compile is True:
+            build_kwargs["skip_mlir_compile"] = skip_mlir_compile
 
         # Flash attention with context_length check
         if flash_attn > 0 and context_length is not None and context_length < 2048:
@@ -1363,9 +1367,7 @@ class Xh2Exec(BaseExec):
             one_img_multi_roi=roi_num > 1,
             llm_opt=llm_opt,
             enable_xh2_stable_output=enable_xh2_stable_output,
-            skip_mlir_compile=skip_mlir_compile,
             enable_common_subgraph=enable_common_subgraph,
-            subgraph_repeat_hint=subgraph_repeat_hint,
             flash_attention=flash_attn,
             cpp_backend=cpp_backend,
             j=parallel_jobs,
