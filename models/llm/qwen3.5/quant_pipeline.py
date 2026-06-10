@@ -116,7 +116,7 @@ def quant_llm(args) -> None:
             "--out",
             str(gptq_dir),
             "--bits",
-            "4",
+            str(args.bits),
             "--group-size",
             "64",
             # "--rotation",

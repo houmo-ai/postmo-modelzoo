@@ -92,6 +92,7 @@ def parse_args():
     parser.add_argument("--device", type=str, default="cuda", help="CUDA device string for rotate / GPTQ subprocesses")
     parser.add_argument("--trust-remote-code", action=argparse.BooleanOptionalAction, default=True, help="HF trust_remote_code for rotate + dense scripts")
     parser.add_argument("--calib_data", type=str, default=None, help="optional JSONL calibration for GPTQ (maps to --calibration-jsonl)")
+    parser.add_argument("--bits", type=int, default=8, choices=[4, 5, 8], help="nn.Linear bit width")
     parser.add_argument("--self-attn-bits", type=int, default=4, choices=[2, 3, 4, 5, 8], help="MoE GPTQ self-attn q/k/v/o projection bit width")
     parser.add_argument("--skip-export-vision", action="store_true")
     parser.add_argument("--skip-export-llm", action="store_true")
