@@ -432,6 +432,10 @@ check_gpu() {
     return 1
 }
 
+is_asic() {
+    ls /dev/xh2a* 2>/dev/null | grep -q .
+}
+
 require_python_package() {
     local package_pattern="$1"
     local step_name="$2"
