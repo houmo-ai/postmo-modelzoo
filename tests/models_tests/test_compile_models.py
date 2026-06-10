@@ -734,3 +734,28 @@ def test_ocr_paddleocr_vl_compile(setup_logging) -> None:
     """test_ocr_paddleocr_vl_compile"""
     model_name = "paddleocr-vl"
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.dinov3_base
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.compile
+@pytest.mark.dependency(name='test_backbone_dinov3_base_compile', depends_on=['test_quant_models.py::test_backbone_dinov3_base_quant'])
+def test_backbone_dinov3_base_compile(setup_logging) -> None:
+    """test_backbone_dinov3_base_compile"""
+    model_name = 'dinov3-base'
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_next
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_24g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_llm_qwen3_next_compile",
+    depends_on=["test_get_models.py::test_llm_qwen3_next_get_model"],
+)
+def test_llm_qwen3_next_compile(setup_logging) -> None:
+    """test_llm_qwen3_next_compile"""
+    model_name = "qwen3-next"
+    _compile_func(model_name, setup_logging)

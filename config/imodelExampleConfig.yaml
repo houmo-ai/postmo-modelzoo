@@ -48,6 +48,18 @@ backbone_ViT-B-16:
         args: all
   test:
     - backbone_ViT-B-16_test
+backbone_dinov3-base:
+  include:
+    - models/backbone/dinov3-base
+  exclude:
+    - models/backbone/dinov3-base/README.md
+  example_case:
+    - backbone_dinov3-base_test:
+        test_type: models_tests
+        script: dinov3_base
+        args: all
+  test:
+    - backbone_dinov3-base_test
 autodrive_yolop:
   include:
     - models/autodrive/yolop
@@ -384,6 +396,18 @@ llm_gpt-oss:
         args: all
   test:
     - llm_gpt-oss_test
+llm_qwen3-next:
+  include:
+    - models/llm/qwen3-next
+  exclude:
+    - models/llm/qwen3-next/README.MD
+  example_case:
+    - llm_qwen3-next_test:
+        test_type: models_tests
+        script: qwen3_next
+        args: all
+  test:
+    - llm_qwen3-next_test
 llm_copaw-flash:
   include:
     - models/llm/CoPaw-Flash

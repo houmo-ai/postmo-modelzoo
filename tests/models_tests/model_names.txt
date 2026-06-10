@@ -47,3 +47,5 @@ qwen3_forcealigner
 gemma4
 copaw_flash
 paddleocr_vl
+dinov3_base
+qwen3_next

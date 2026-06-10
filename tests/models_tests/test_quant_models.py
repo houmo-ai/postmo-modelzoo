@@ -693,3 +693,14 @@ def test_ocr_paddleocr_vl_quant(setup_logging) -> None:
     """test_ocr_paddleocr_vl_quant"""
     model_name = "paddleocr-vl"
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.dinov3_base
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(name='test_backbone_dinov3_base_quant', depends_on=['test_get_models.py::test_backbone_dinov3_base_get_model'])
+def test_backbone_dinov3_base_quant(setup_logging) -> None:
+    """test_backbone_dinov3_base_quant"""
+    model_name = 'dinov3-base'
+    _quant_func(model_name, setup_logging)

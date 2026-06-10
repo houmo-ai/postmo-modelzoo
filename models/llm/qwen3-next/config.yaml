@@ -1,0 +1,15 @@
+default_model_name: "qwen3-next"
+default_model_size: "80b-a3b"
+
+model_configs:
+  qwen3-next:
+    "80b-a3b":
+      modelscope_repo: ["Qwen/Qwen3-Next-80B-A3B-Instruct"]
+      model_name: "qwen3-next"
+      model_size: "80b-a3b"
+      ncore: 2
+      quant_type: "w4a8h0_ssfp"
+      context_length: "8k"
+      ndevice: 2
+      batch: 1
+      prefill_length: 256

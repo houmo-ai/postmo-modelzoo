@@ -129,6 +129,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | resnet50                | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
 | ViT-B-16                | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
 | yolov8m-cls             | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
+| dinov3-base             | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
 | yolo11m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
 | yolo12m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
 | yolo26m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |

@@ -1,0 +1,119 @@
+{
+    "obsolete": false,
+    "model_dir": "models/backbone/dinov3-base",
+    "model_type": "cv",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [1]
+    },
+    "support_flow": {
+        "xh2": [
+            "get_model",
+            "quant",
+            "compile",
+            "demo",
+            "perf",
+            "eval"
+        ]
+    },
+    "support_hmatc": {
+        "xh2": ["hmquant", "hmbuild", "hmdemo", "hmeval", "hmperf"]
+    },
+    "perf_metrics": {
+        "xh2": {
+            "x86_64": 97.252
+        }
+    },
+    "eval_threshold": {
+        "top1_acc": 0.95
+    },
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "model_dir": ["cached_models", "cached_models"]
+        }
+    },
+    "hmquant_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"]
+            },
+            "optional": {
+                "target": [null],
+                "result_path": [null]
+            }
+        }
+    },
+    "hmbuild_params": {
+        "xh2": {
+            "required": {
+                "config": ["./config.yml", "./config.yml", "./config.yml"]
+            },
+            "optional": {
+                "batch": [null, "1", "1"],
+                "ncore": [null, "1", "2"],
+                "opt_level": ["0", "1", "2"],
+                "roi_num": [null, null, null]
+            }
+        }
+    },
+    "hmdemo_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"]
+            },
+            "optional": {
+                "target": [null],
+                "result_path": [null],
+                "onnx": [null]
+            }
+        }
+    },
+    "hmperf_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml", "./config.yml", "./config.yml"],
+                "warmup": ["1", "10", "10"],
+                "sample": ["1", "1000", "1000"]
+            },
+            "optional": {
+                "target": [null, null, null],
+                "result_path": [null, null, null],
+                "loop_num": [null, null, null],
+                "thread": ["1", "4", "8"],
+                "device": [null, null, null]
+            }
+        }
+    },
+    "hmeval_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"]
+            },
+            "optional": {
+                "target": [null],
+                "result_path": [null],
+                "onnx": [null]
+            }
+        }
+    },
+    "hmcompare_params": {
+        "params": {
+            "required": {
+                "config": ["./config.yml"],
+                "data_path": [
+                    "./imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000006.JPEG"
+                ]
+            },
+            "optional": {
+                "target": [null],
+                "result_path": [null]
+            }
+        }
+    }
+}

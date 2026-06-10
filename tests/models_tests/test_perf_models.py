@@ -433,3 +433,23 @@ def test_llm_copaw_flash_perf(setup_logging) -> None:
     """test_llm_copaw_flash_perf"""
     model_name = "copaw-flash"
     _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.dinov3_base
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.perf
+def test_backbone_dinov3_base_perf(setup_logging) -> None:
+    """test_backbone_dinov3_base_perf"""
+    model_name = 'dinov3-base'
+    _perf_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_next
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_24g
+@pytest.mark.perf
+def test_llm_qwen3_next_perf(setup_logging) -> None:
+    """test_llm_qwen3_next_perf"""
+    model_name = "qwen3-next"
+    _perf_func(model_name, setup_logging)
