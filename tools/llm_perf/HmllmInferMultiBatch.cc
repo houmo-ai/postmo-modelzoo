@@ -125,7 +125,15 @@ HmllmInferMultiBatch::HmllmInferMultiBatch(
         tensor.Buffer().CopyFromHost(&decode_current_length, memSize));
     CHECK_TCIM_RET_STATUS(decode_module->SetInput(input_name, tensor));
     auto input_info = decode_module->GetInputInfo(input_name);
-    total_mem_size += input_info.MemSize();
+  }
+
+  for (int idx = 0; idx < decode_module->GetInputNum(); ++idx) {
+    auto input_name = decode_module->GetInputName(idx);
+    if (input_name.find("kcache_input") != std::string::npos ||
+        input_name.find("vcache_input") != std::string::npos) {
+      auto input_info = decode_module->GetInputInfo(input_name);
+      total_mem_size += input_info.MemSize();
+    }
   }
   double kvcache_mem_size =
       static_cast<double>(total_mem_size) / (1024.0 * 1024.0);

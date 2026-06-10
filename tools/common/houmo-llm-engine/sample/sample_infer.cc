@@ -83,15 +83,6 @@ static void printSeparator(const char* title) {
   std::cout << "\n========== " << title << " ==========\n";
 }
 
-// Get base path (from environment variable or current directory)
-static std::string getBasePath() {
-  const char* env_path = std::getenv("HM_ENGINE_PATH");
-  if (env_path && env_path[0] != '\0') {
-    return std::string(env_path);
-  }
-  return "..";
-}
-
 // Message struct
 struct Message {
   std::string role;
@@ -132,13 +123,14 @@ static std::string ApplyChatTemplate(const std::vector<Message>& msgs,
 // Basic inference
 static void exampleBasicInference(houmo::LLMModel& model,
                                   const std::string& prompt,
-                                  const houmo::SamplingParams& params) {
+                                  const houmo::SamplingParams& params,
+                                  bool enable_thinking) {
   printSeparator("基本推理");
 
   auto ctx = model.create_context();
 
   std::vector<Message> msgs = {{"user", prompt}};
-  std::string rendered = ApplyChatTemplate(msgs, true, false);
+  std::string rendered = ApplyChatTemplate(msgs, true, enable_thinking);
   auto tokens = model.tokenize(rendered, false, false);
 
   std::cout << "提示: " << prompt << "\n";
@@ -161,7 +153,8 @@ static void exampleBasicInference(houmo::LLMModel& model,
 // Multi-turn dialogue
 static void exampleMultiTurn(houmo::LLMModel& model,
                              const std::string& initial_prompt,
-                             const houmo::SamplingParams& params) {
+                             const houmo::SamplingParams& params,
+                             bool enable_thinking) {
   printSeparator("多轮对话");
 
   auto ctx = model.create_context();
@@ -178,7 +171,7 @@ static void exampleMultiTurn(houmo::LLMModel& model,
   }
   content += initial_prompt;
   std::vector<Message> msgs1 = {{"user", content}};
-  std::string prompt1 = ApplyChatTemplate(msgs1, true, false);
+  std::string prompt1 = ApplyChatTemplate(msgs1, true, enable_thinking);
   auto tokens1 = model.tokenize(prompt1, false, false);
 
   std::cout << "用户: " << initial_prompt << "\n";
@@ -203,7 +196,7 @@ static void exampleMultiTurn(houmo::LLMModel& model,
   // Round 2 - continue dialogue
   std::string follow_up = "那 2 + 2 等于多少？";
   std::vector<Message> msgs2 = {{"user", follow_up}};
-  std::string prompt2 = ApplyChatTemplate(msgs2, true, false);
+  std::string prompt2 = ApplyChatTemplate(msgs2, true, enable_thinking);
   auto tokens2 = model.tokenize(prompt2, false, false);
 
   std::cout << "\n用户: " << follow_up << "\n";
@@ -235,7 +228,7 @@ static void exampleMultiTurn(houmo::LLMModel& model,
   }
   content3 += follow_up3;
   std::vector<Message> msgs3 = {{"user", content3}};
-  std::string prompt3 = ApplyChatTemplate(msgs3, true, false);
+  std::string prompt3 = ApplyChatTemplate(msgs3, true, enable_thinking);
   auto tokens3 = model.tokenize(prompt3, false, false);
 
   decoder.reset();
@@ -258,7 +251,8 @@ static void exampleMultiTurn(houmo::LLMModel& model,
 static void exampleImageUnderstanding(houmo::LLMModel& model,
                                       const std::vector<std::string>& images,
                                       const std::string& prompt,
-                                      const houmo::SamplingParams& params) {
+                                      const houmo::SamplingParams& params,
+                                      bool enable_thinking) {
   printSeparator("图像理解");
 
   // Check if VLM is supported
@@ -298,7 +292,7 @@ static void exampleImageUnderstanding(houmo::LLMModel& model,
   content += prompt;
 
   std::vector<Message> msgs = {{"user", content}};
-  std::string rendered = ApplyChatTemplate(msgs, true, false);
+  std::string rendered = ApplyChatTemplate(msgs, true, enable_thinking);
   auto tokens = model.tokenize(rendered, false, false);
 
   std::cout << "提示: " << prompt << "\n";
@@ -355,8 +349,6 @@ static void printModelInfo(houmo::LLMModel& model) {
 // ============================================================================
 
 int main(int argc, char* argv[]) {
-  std::string base_path = getBasePath();
-
   // Default parameters
   std::string model_series = "auto";  // auto, qwen3_llm, qwen35_mllm, qwen3_vlm
   std::string prompt = "你好，介绍下图片中的内容。";
@@ -417,19 +409,6 @@ int main(int argc, char* argv[]) {
   // Set default paths based on model series
   houmo::ModelSeries series = houmo::StringToModelSeries(model_series);
 
-  if (vision_path.empty() && (series == houmo::ModelSeries::kQwen35MLLM ||
-                              series == houmo::ModelSeries::kQwen3VLM)) {
-    if (series == houmo::ModelSeries::kQwen35MLLM) {
-      vision_path = base_path +
-                    "/output/xh2/qwen3.5-2b/"
-                    "qwen3.5-2b_visual_448x448x2.hmm";
-    } else if (series == houmo::ModelSeries::kQwen3VLM) {
-      vision_path = base_path +
-                    "/output/xh2/qwen3-vl-4b/"
-                    "qwen3-vl-4b_visual_448x448x2.hmm";
-    }
-  }
-
   // Check if model files exist
   if (!fs::exists(prefill_path)) {
     std::cerr << "Prefill 模型未找到: " << prefill_path << "\n";
@@ -488,6 +467,9 @@ int main(int argc, char* argv[]) {
     params.temperature = temperature;
     params.top_k = top_k;
 
+    // Enable thinking mode for qwen3_vlm
+    bool enable_thinking = (model_series == "qwen3_vlm");
+
     // Show model information
     if (show_info) {
       printModelInfo(*model);
@@ -503,13 +485,14 @@ int main(int argc, char* argv[]) {
           return -2;
         }
       }
-      exampleImageUnderstanding(*model, images, prompt, params);
+      exampleImageUnderstanding(*model, images, prompt, params,
+                                enable_thinking);
     } else if (multi_turn) {
       // Multi-turn dialogue
-      exampleMultiTurn(*model, prompt, params);
+      exampleMultiTurn(*model, prompt, params, enable_thinking);
     } else {
       // Basic inference
-      exampleBasicInference(*model, prompt, params);
+      exampleBasicInference(*model, prompt, params, enable_thinking);
     }
 
     std::cout << "\n完成!\n";

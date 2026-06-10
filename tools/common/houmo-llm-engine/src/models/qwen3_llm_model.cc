@@ -75,7 +75,9 @@ void Qwen3Context::generate(const std::vector<Token>& prompt,
 
   // Start E2E timing
   p.start("generate");
-  p.set_input_tokens(static_cast<int>(prompt.size()));
+  // Note: input_tokens will be updated after prefill for consistency with VLM
+  // models
+  int initial_context_length = context_length_;
 
   // Set sampler (created once)
   set_sampler(params);
@@ -86,6 +88,9 @@ void Qwen3Context::generate(const std::vector<Token>& prompt,
     auto t = p.scope("generate.prefill");
     token = prefill(prompt);
   }
+
+  // Update input_tokens with actual processed tokens
+  p.set_input_tokens(context_length_ - initial_context_length);
 
   // Record TTFT
   p.record_ttft();
