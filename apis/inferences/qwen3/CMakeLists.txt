@@ -48,10 +48,7 @@ set(INCLUDE_DIRS
   $ENV{HOUMO_SDK_PATH}/hal/include
   $ENV{HOUMO_PATH}/include
   ${EIGEN_PATH}
-  
-
-  
-  )
+)
 
 link_directories($ENV{HOUMO_PATH}/lib
   ${TOKENZIER_CPP_PATH}/${LIB_PATH}/lib)
@@ -70,12 +67,7 @@ endif()
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC tcim_runtime_lite)
-find_library(TCIM_DEV_CTRL_LIBRARY
-  NAMES tcim_dev_ctrl
-  PATHS
-    $ENV{TCIM_RUNTIME_PATH}/lib
-    $ENV{HOUMO_PATH}/lib
-)
+set(TCIM_DEV_CTRL_LIBRARY tcim_dev_ctrl)
 
 if(TCIM_DEV_CTRL_LIBRARY)
   message(STATUS "Found tcim_dev_ctrl: ${TCIM_DEV_CTRL_LIBRARY}")
