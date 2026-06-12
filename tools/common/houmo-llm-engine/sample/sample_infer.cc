@@ -83,6 +83,15 @@ static void printSeparator(const char* title) {
   std::cout << "\n========== " << title << " ==========\n";
 }
 
+// Get base path (from environment variable or current directory)
+static std::string getBasePath() {
+  const char* env_path = std::getenv("HM_ENGINE_PATH");
+  if (env_path && env_path[0] != '\0') {
+    return std::string(env_path);
+  }
+  return "..";
+}
+
 // Message struct
 struct Message {
   std::string role;
@@ -335,7 +344,7 @@ static void printModelInfo(houmo::LLMModel& model) {
   std::cout << "embedding_dim:     " << model.embedding_dim() << "\n";
 
   // Show registered model types
-  auto types = houmo::ModelFactory::ListRegisteredTypes();
+  auto types = houmo::ModelFactory<houmo::LLMModel>::ListRegisteredTypes();
   std::cout << "----------------------------------------\n";
   std::cout << "已注册模型类型: ";
   for (const auto& t : types) {
@@ -349,6 +358,8 @@ static void printModelInfo(houmo::LLMModel& model) {
 // ============================================================================
 
 int main(int argc, char* argv[]) {
+  std::string base_path = getBasePath();
+
   // Default parameters
   std::string model_series = "auto";  // auto, qwen3_llm, qwen35_mllm, qwen3_vlm
   std::string prompt = "你好，介绍下图片中的内容。";
@@ -409,6 +420,19 @@ int main(int argc, char* argv[]) {
   // Set default paths based on model series
   houmo::ModelSeries series = houmo::StringToModelSeries(model_series);
 
+  if (vision_path.empty() && (series == houmo::ModelSeries::kQwen35MLLM ||
+                              series == houmo::ModelSeries::kQwen3VLM)) {
+    if (series == houmo::ModelSeries::kQwen35MLLM) {
+      vision_path = base_path +
+                    "/output/xh2/qwen3.5-2b/"
+                    "qwen3.5-2b_visual_448x448x2.hmm";
+    } else if (series == houmo::ModelSeries::kQwen3VLM) {
+      vision_path = base_path +
+                    "/output/xh2/qwen3-vl-4b/"
+                    "qwen3-vl-4b_visual_448x448x2.hmm";
+    }
+  }
+
   // Check if model files exist
   if (!fs::exists(prefill_path)) {
     std::cerr << "Prefill 模型未找到: " << prefill_path << "\n";
@@ -444,7 +468,7 @@ int main(int argc, char* argv[]) {
     if (model_series == "auto") {
       std::cerr << "错误: 必须使用 --model 指定模型类型\n";
       std::cerr << "可用类型: ";
-      auto types = houmo::ModelFactory::ListRegisteredTypes();
+      auto types = houmo::ModelFactory<houmo::LLMModel>::ListRegisteredTypes();
       for (const auto& t : types) {
         std::cerr << t << " ";
       }
@@ -452,7 +476,7 @@ int main(int argc, char* argv[]) {
       return -3;
     }
 
-    model = houmo::ModelFactory::Create(model_series, config);
+    model = houmo::ModelFactory<houmo::LLMModel>::Create(model_series, config);
 
     if (!model) {
       std::cerr << "错误: 无法创建模型\n";
@@ -485,8 +509,7 @@ int main(int argc, char* argv[]) {
           return -2;
         }
       }
-      exampleImageUnderstanding(*model, images, prompt, params,
-                                enable_thinking);
+      exampleImageUnderstanding(*model, images, prompt, params, enable_thinking);
     } else if (multi_turn) {
       // Multi-turn dialogue
       exampleMultiTurn(*model, prompt, params, enable_thinking);

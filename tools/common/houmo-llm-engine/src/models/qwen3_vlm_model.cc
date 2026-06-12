@@ -858,7 +858,7 @@ void Qwen3VLMModel::load() {
   weight_manager_ = std::make_unique<tcim::Module::WeightManager>(
       tcim::Module::WeightManager::CreateWeightManager(*dev_manager_));
 
-  // 2. Load visual encoder
+  // 2. Load visual encode
   std::cout << "Loading visual model from " << config_.vision_path << std::endl;
   vision_module_ = std::make_shared<tcim::Module>();
   auto option_visual = tcim::Module::Option(*weight_manager_);
@@ -1080,8 +1080,8 @@ void Qwen3VLMModel::ClearKVCache() {
 // ============================================================================
 
 // Static registration for Qwen3 VLM model
-REGISTER_LLM_MODEL(
-    qwen3_vlm, ModelSeries::kQwen3VLM,
+REGISTER_MODEL(
+    LLMModel, qwen3_vlm, ModelSeries::kQwen3VLM,
     [](const ModelConfig& c) { return std::make_unique<Qwen3VLMModel>(c); },
     "Qwen3-VL vision-language model");
 

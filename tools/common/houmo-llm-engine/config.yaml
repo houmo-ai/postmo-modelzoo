@@ -36,3 +36,39 @@ model_configs:
       ndevice: 1
       batch: 1
       prefill_length: 256
+  glm-asr:
+    "nano-2512":
+      modelscope_repo: ["ZhipuAI/GLM-ASR-Nano-2512"]
+      tokenizer_dir: ["tokenizers/glm-asr-nano-2512"]
+      model_name: "glm-asr"
+      model_size: "nano-2512"
+      ncore: 2
+      ndevice: 1
+      context_length: ""
+      prefill_length: ""
+  qwen3-asr:
+    "1.7b":
+      modelscope_repo: ["Qwen/Qwen3-ASR-1.7B"]
+      tokenizer_dir: ["tokenizers/qwen3-asr-1.7b"]
+      model_name: "qwen3-asr"
+      model_size: "1.7b"
+      ncore: 2
+      ndevice: 1
+      context_length: "2k"
+      max_audio_length: 1500
+  whisper:
+    "medium":
+      modelscope_repo: ["openai-mirror/whisper-medium"]
+      tokenizer_dir: ["tokenizers/whisper-medium"]
+      model_name: "whisper"
+      model_size: "medium"
+      ncore: 2
+      ndevice: 1
+  whisper:
+    "large-v3-turbo":
+      modelscope_repo: ["openai-mirror/whisper-large-v3-turbo"]
+      tokenizer_dir: ["tokenizers/whisper-large-v3-turbo"]
+      model_name: "whisper"
+      model_size: "large-v3-turbo"
+      ncore: 2
+      ndevice: 1

@@ -101,6 +101,11 @@ endif()
 
 set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
 
+# Audio 3rdparty (miniaudio, libsamplerate, kaldi-native-fbank)
+set(AUDIO_3RDPARTY_PATH ${CMAKE_SOURCE_DIR}/3rdparty/audio)
+set(AUDIO_3RDPARTY_INCLUDE_DIR ${AUDIO_3RDPARTY_PATH}/3rdparty_build/include)
+set(AUDIO_3RDPARTY_LIBRARY_DIR ${AUDIO_3RDPARTY_PATH}/3rdparty_build/lib)
+
 # tokenizers_cpp (HuggingFace tokenizers C++, local 3rdparty)
 set(TOKENIZERS_CPP_PATH ${CMAKE_SOURCE_DIR}/3rdparty/tokenizers-cpp)
 
@@ -141,6 +146,7 @@ set(CORE_SOURCES
 
 # Module sources
 set(MODULE_SOURCES
+  src/modules/audio_processor.cc
   src/modules/tokenizer.cc
   src/modules/embedding.cc
   src/modules/sampler.cc
@@ -160,6 +166,10 @@ set(MODEL_SOURCES
   src/models/qwen3_llm_model.cc
   src/models/qwen35_mllm_model.cc
   src/models/qwen3_vlm_model.cc
+  src/models/asr_model.cc
+  src/models/whisper_model.cc
+  src/models/glm_asr_model.cc
+  src/models/qwen3_asr_model.cc
 )
 
 # Sample sources
@@ -184,17 +194,22 @@ target_include_directories(houmo_infer PUBLIC
   ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/include
   ${EIGEN_PATH}
   ${OpenCV_INCLUDE_DIRS}
+  ${AUDIO_3RDPARTY_INCLUDE_DIR}
+  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/audio/include
 )
 
 target_link_directories(houmo_infer PUBLIC
   ${TCIM_RUNTIME_PATH}/lib
   ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/lib
+  ${AUDIO_3RDPARTY_LIBRARY_DIR}
 )
 
 target_link_libraries(houmo_infer PUBLIC
   tcim_runtime_lite
   tokenizers_cpp
   tokenizers_c
+  kaldi-native-fbank-core
+  samplerate
   ${CMAKE_DL_LIBS}
 )
 
@@ -225,6 +240,45 @@ target_include_directories(sample_infer PRIVATE
   ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/include
   ${EIGEN_PATH}
   ${OpenCV_INCLUDE_DIRS}
+)
+
+# Whisper ASR sample
+add_executable(sample_whisper_asr sample/sample_whisper_asr.cc)
+target_link_libraries(sample_whisper_asr PRIVATE
+  -Wl,--whole-archive houmo_infer -Wl,--no-whole-archive
+)
+target_include_directories(sample_whisper_asr PRIVATE
+  ${HALF_INCLUDE_PATH}
+  ${CMAKE_SOURCE_DIR}/include
+  ${TCIM_RUNTIME_INCLUDE}
+  ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/include
+  ${EIGEN_PATH}
+)
+
+# GLM-ASR sample
+add_executable(sample_glm_asr sample/sample_glm_asr.cc)
+target_link_libraries(sample_glm_asr PRIVATE
+  -Wl,--whole-archive houmo_infer -Wl,--no-whole-archive
+)
+target_include_directories(sample_glm_asr PRIVATE
+  ${HALF_INCLUDE_PATH}
+  ${CMAKE_SOURCE_DIR}/include
+  ${TCIM_RUNTIME_INCLUDE}
+  ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/include
+  ${EIGEN_PATH}
+)
+
+# Qwen3-ASR sample
+add_executable(sample_qwen3_asr sample/sample_qwen3_asr.cc)
+target_link_libraries(sample_qwen3_asr PRIVATE
+  -Wl,--whole-archive houmo_infer -Wl,--no-whole-archive
+)
+target_include_directories(sample_qwen3_asr PRIVATE
+  ${HALF_INCLUDE_PATH}
+  ${CMAKE_SOURCE_DIR}/include
+  ${TCIM_RUNTIME_INCLUDE}
+  ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/include
+  ${EIGEN_PATH}
 )
 
 # -----------------------------------------------------------------------------
@@ -276,6 +330,23 @@ if(BUILD_TESTS)
   target_link_libraries(perf_profiler_test PRIVATE houmo_infer GTest::gtest_main)
   add_test(NAME PerfProfilerTest COMMAND perf_profiler_test)
 
+  # AudioProcessor test
+  add_executable(audio_processor_test tests/audio_processor_test.cc)
+  target_include_directories(audio_processor_test PRIVATE ${TEST_INCLUDE_DIR})
+  target_link_libraries(audio_processor_test PRIVATE houmo_infer GTest::gtest_main)
+  add_test(NAME AudioProcessorTest COMMAND audio_processor_test)
+
+  # AudioProcessor 128 mel test (for whisper-large-v3-turbo validation)
+  add_executable(audio_processor_128_test tests/audio_processor_128_test.cc)
+  target_include_directories(audio_processor_128_test PRIVATE ${TEST_INCLUDE_DIR})
+  target_link_libraries(audio_processor_128_test PRIVATE houmo_infer)
+  add_test(NAME AudioProcessor128Test COMMAND audio_processor_128_test)
+
+  add_executable(whisper_test tests/whisper_test.cc)
+  target_include_directories(whisper_test PRIVATE ${TEST_INCLUDE_DIR})
+  target_link_libraries(whisper_test PRIVATE houmo_infer GTest::gtest_main)
+  add_test(NAME WhisperTest COMMAND whisper_test)
+
 endif()
 
 # -----------------------------------------------------------------------------
@@ -283,6 +354,9 @@ endif()
 # -----------------------------------------------------------------------------
 install(TARGETS houmo_infer DESTINATION .)
 install(TARGETS sample_infer DESTINATION .)
+install(TARGETS sample_whisper_asr DESTINATION .)
+install(TARGETS sample_glm_asr DESTINATION .)
+install(TARGETS sample_qwen3_asr DESTINATION .)
 install(FILES ${CMAKE_SOURCE_DIR}/convert_embed.py
         DESTINATION .
         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE

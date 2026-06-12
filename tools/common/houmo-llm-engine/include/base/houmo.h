@@ -186,6 +186,10 @@ struct SamplingParams {
   // Tokenize options
   bool add_bos = false;
   bool add_eos = false;
+
+  // asr specific
+  std::string language = "auto";  // "auto" for detection, or specific language
+                                  // code (e.g., "zh", "en")
 };
 
 // ============================================================================

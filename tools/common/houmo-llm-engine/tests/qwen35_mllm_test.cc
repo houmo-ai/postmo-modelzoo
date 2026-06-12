@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 HOUMO AI
+ * Copyright (c) 2025 HOUMO AI
  *
  * File: qwen35_mllm_test.cc
  * Description:
@@ -34,10 +34,10 @@ class Qwen35MLLMModelTest : public ::testing::Test {
  protected:
   void SetUp() override {
     // Use environment variable path
-    prefill_path_ = "../models/qwen3.5-0.8b/qwen3.5-0.8b_prefill.hmm";
-    decode_path_ = "../models/qwen3.5-0.8b/qwen3.5-0.8b_decode.hmm";
-    embedding_path_ = "../models/qwen3.5-0.8b/hmquant/quant_embedding.bin";
-    tokenizer_path_ = "../tokenizers/qwen3.5-0.8b/tokenizer.json";
+    prefill_path_ = "../models/qwen3.5-2b/qwen3.5-2b_prefill.hmm";
+    decode_path_ = "../models/qwen3.5-2b/qwen3.5-2b_decode.hmm";
+    embedding_path_ = "../models/qwen3.5-2b/hmquant/quant_embedding.bin";
+    tokenizer_path_ = "../tokenizers/qwen3.5-2b/tokenizer.json";
   }
 
   bool CheckModelFiles() {

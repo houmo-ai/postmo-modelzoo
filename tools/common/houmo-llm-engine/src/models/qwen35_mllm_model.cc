@@ -78,8 +78,7 @@ void Qwen35MLLMContext::generate(const std::vector<Token>& prompt,
 
   // Start E2E timing
   p.start("generate");
-  // Note: input_tokens will be updated after prefill to include expanded image
-  // tokens
+  // Note: input_tokens will be updated after prefill to include expanded image tokens
   int initial_context_length = context_length_;
 
   set_sampler(params);
@@ -90,8 +89,7 @@ void Qwen35MLLMContext::generate(const std::vector<Token>& prompt,
     token = prefill(prompt);
   }
 
-  // Update input_tokens with actual processed tokens (including expanded image
-  // tokens)
+  // Update input_tokens with actual processed tokens (including expanded image tokens)
   p.set_input_tokens(context_length_ - initial_context_length);
 
   p.record_ttft();
@@ -291,8 +289,7 @@ void Qwen35MLLMContext::scatter_image_embeds(
 
   // 2. Compute boundaries for each image
   // image_grid_thw_ contains (t, h, w) for each image
-  // Each image's grid_size = t * (h/SPATIAL_MERGE_SIZE) *
-  // (w/SPATIAL_MERGE_SIZE)
+  // Each image's grid_size = t * (h/SPATIAL_MERGE_SIZE) * (w/SPATIAL_MERGE_SIZE)
   std::vector<size_t> image_boundaries;
   size_t current_boundary = 0;
   for (const auto& [t, h, w] : image_grid_thw_) {
@@ -416,8 +413,7 @@ Qwen35MLLMContext::get_rope_index(
     // Update start_index: max position across three dimensions + 1
     // Python: start_index = llm_pos_ids_list[-1].max() + 1
     // Image portion max position = max(t, h, w) + text_len + start_index
-    // So start_index should increase max(llm_grid_t, llm_grid_h, llm_grid_w) -
-    // 1 + 1
+    // So start_index should increase max(llm_grid_t, llm_grid_h, llm_grid_w) - 1 + 1
     int max_dim = std::max({llm_grid_t, llm_grid_h, llm_grid_w});
     start_index += max_dim;
     start = end + grid_size;
@@ -997,8 +993,7 @@ void Qwen35MLLMModel::load() {
 // ============================================================================
 
 // Static registration for Qwen35 MLLM model
-REGISTER_LLM_MODEL(
-    qwen35_mllm, ModelSeries::kQwen35MLLM,
+REGISTER_MODEL(LLMModel, qwen35_mllm, ModelSeries::kQwen35MLLM,
     [](const ModelConfig& c) { return std::make_unique<Qwen35MLLMModel>(c); },
     "Qwen3.5 multimodal MLLM");
 

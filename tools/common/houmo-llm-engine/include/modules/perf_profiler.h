@@ -71,6 +71,11 @@ class PerfProfiler {
   std::vector<std::string> get_children(const std::string& path) const;
   bool has_stage(const std::string& path) const;
 
+  // ========== Stage configuration ==========
+
+  void set_root_stage(const std::string& stage) { root_stage_ = stage; }
+  const std::string& root_stage() const { return root_stage_; }
+
   // ========== Token statistics ==========
 
   void set_input_tokens(int n);
@@ -125,6 +130,7 @@ class PerfProfiler {
   };
 
   Node root_;
+  std::string root_stage_ = "generate";
   int input_tokens_ = 0;
   int output_tokens_ = 0;
   double e2e_start_time_ = 0;
@@ -169,6 +175,9 @@ class PerfProfiler {
 
   std::vector<std::string> get_children(const std::string&) const { return {}; }
   bool has_stage(const std::string&) const { return false; }
+
+  void set_root_stage(const std::string&) {}
+  std::string root_stage() const { return "generate"; }
 
   void set_input_tokens(int) {}
   void add_output_token() {}

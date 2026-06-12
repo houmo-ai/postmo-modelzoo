@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 HOUMO AI
+ * Copyright (c) 2025 HOUMO AI
  *
  * File: qwen3_vlm_test.cc
  * Description:
@@ -141,7 +141,7 @@ TEST_F(Qwen3VLMModelTest, ImageProcessor) {
   });
 }
 
-// Test vision encoder
+// Test vision encode
 TEST_F(Qwen3VLMModelTest, VisionEncoder) {
   if (!std::filesystem::exists(test_image_path_)) {
     GTEST_SKIP() << "Test image not found: " << test_image_path_;

@@ -23,6 +23,13 @@ if [ ! -e 3rdparty ];then
   mkdir 3rdparty
   python get_model.py
 fi
+if [[ ! -e 3rdparty/audio/3rdparty_build/lib/libkaldi-native-fbank-core.so || \
+  ! -e 3rdparty/audio/3rdparty_build/lib/libsamplerate.so ]]; then
+  cd 3rdparty/audio
+  chmod +x build_3rdparty.sh
+  ./build_3rdparty.sh > /dev/null 2>&1
+  cd ../..
+fi
 if [ ! -e 3rdparty/eigen3 ];then
   cd 3rdparty
   wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip

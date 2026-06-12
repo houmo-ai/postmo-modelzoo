@@ -114,6 +114,13 @@ class HfTokenizer {
    */
   int vocab_size() const { return vocab_size_; }
 
+  /**
+   * @brief Get token ID for a token string
+   * @param token Token string (e.g., "<|endoftext|>")
+   * @return Token ID, or -1 if not found
+   */
+  int token_to_id(const std::string& token) const;
+
  private:
   std::unique_ptr<tokenizers::Tokenizer> tokenizer_;
   Token bos_token_id_ = -1;

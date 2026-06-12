@@ -4,7 +4,7 @@
  * File: qwen3_vlm_model.h
  * Description:
  *   Qwen3-VL (Vision Language Model) implementation. Inherits VLMModel
- *   and implements vision encoder, M-RoPE, and Deepstack architecture.
+ *   and implements vision encode, M-RoPE, and Deepstack architecture.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ using ImageGridTHW = std::tuple<int, int, int>;
  * @brief Qwen3-VL inference context
  *
  * Implements Qwen3-VL inference logic including:
- * - Vision encoder inference
+ * - Vision encode inference
  * - M-RoPE position IDs computation
  * - Image embedding replacement
  * - Prefill/Decode inference
@@ -161,16 +161,17 @@ class Qwen3VLMContext : public Context {
   // ========== VLM helper methods ==========
 
   /**
-   * @brief Run vision encoder
+   * @brief Run vision encode
    * @param pixel_values Image pixel data (NCHW YUV format)
-   * @return Vision features (image_features, deepstack_0, deepstack_1, deepstack_2)
+   * @return Vision features (image_features, deepstack_0, deepstack_1,
+   * deepstack_2)
    */
   std::tuple<std::vector<float16>, std::vector<float16>, std::vector<float16>,
              std::vector<float16>>
   run_vision(const std::vector<float16>& pixel_values);
 
   /**
-   * @brief Run vision encoder for all images
+   * @brief Run vision encode for all images
    * Populates flat_image_embeds_ and image_grid_thw_
    */
   void run_vision();
@@ -272,7 +273,7 @@ class Qwen3VLMContext : public Context {
  * Inherits VLMModel, implements complete loading and inference workflow.
  *
  * Model files:
- *   - *_visual_*.hmm: Vision encoder
+ *   - *_visual_*.hmm: Vision encode
  *   - *_prefill.hmm: Prefill module
  *   - *_decode.hmm: Decode module
  *   - quant_embedding.bin: Embedding table
@@ -287,7 +288,7 @@ class Qwen3VLMModel : public VLMModel {
    *   - prefill_path: Prefill module path
    *   - decode_path: Decode module path
    *   - embedding_path: Embedding table path
-   *   - vision_path: Vision encoder path
+   *   - vision_path: Vision encode path
    *   - tokenizer_path: Tokenizer path
    */
   explicit Qwen3VLMModel(const ModelConfig& config);
@@ -307,7 +308,8 @@ class Qwen3VLMModel : public VLMModel {
   /**
    * @brief Encode image
    * @param pixel_values Image pixel data (NCHW YUV format)
-   * @return Vision features (image_features, deepstack_0, deepstack_1, deepstack_2)
+   * @return Vision features (image_features, deepstack_0, deepstack_1,
+   * deepstack_2)
    */
   std::tuple<std::vector<float16>, std::vector<float16>, std::vector<float16>,
              std::vector<float16>>
@@ -341,7 +343,7 @@ class Qwen3VLMModel : public VLMModel {
   void load();
 
   /**
-   * @brief Initialize vision encoder inputs
+   * @brief Initialize vision encode inputs
    */
   void init_vision_inputs();
 

@@ -21,6 +21,7 @@
  */
 
 #include "core/vlm_model.h"
+
 #include "base/houmo.h"
 
 namespace houmo {
@@ -30,22 +31,22 @@ namespace houmo {
 // ============================================================================
 
 VLMModel::VLMModel(const ModelConfig& config) : LLMModel(config) {
-  // TODO: Initialize vision encoder parameters
+  // TODO: Initialize vision encode parameters
 }
 
 std::vector<float16> VLMModel::encode_image(const uint8_t* image_data,
-                                            int width,
-                                            int height,
+                                            int width, int height,
                                             int channels) {
   // TODO: Implement image encoding
   // 1. Image preprocessing (resize, normalize)
-  // 2. Run vision encoder
+  // 2. Run vision encode
   // 3. Return vision embeddings
   throw Exception("VLMModel::encode_image() not implemented in base class");
 }
 
 std::unique_ptr<Context> VLMModel::create_context(int n_ctx) {
-  // Base class does not support creating Context; subclasses must override this method
+  // Base class does not support creating Context; subclasses must override this
+  // method
   throw Exception("VLMModel::create_context() must be overridden by subclass");
 }
 

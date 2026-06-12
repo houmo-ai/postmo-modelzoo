@@ -115,8 +115,7 @@ void PerfProfiler::start(const std::string& path) {
   double now = now_ms();
   node->start_time = now;
 
-  // If in generate stage, record E2E start time
-  if (path == "generate") {
+  if (path == root_stage_) {
     e2e_start_time_ = now;
   }
 }
@@ -198,18 +197,18 @@ int PerfProfiler::output_tokens() const { return output_tokens_; }
 
 void PerfProfiler::record_ttft() { ttft_time_ = now_ms() - e2e_start_time_; }
 
-double PerfProfiler::e2e_ms() const { return get_time_ms("generate"); }
+double PerfProfiler::e2e_ms() const { return get_time_ms(root_stage_); }
 
 double PerfProfiler::ttft_ms() const { return ttft_time_; }
 
 double PerfProfiler::prefill_tps() const {
-  double prefill_time = get_time_ms("generate.prefill");
+  double prefill_time = get_time_ms(root_stage_ + ".prefill");
   if (prefill_time <= 0) return 0;
   return input_tokens_ / (prefill_time / 1000.0);
 }
 
 double PerfProfiler::decode_tps() const {
-  double decode_time = get_time_ms("generate.decode");
+  double decode_time = get_time_ms(root_stage_ + ".decode");
   if (decode_time <= 0 || output_tokens_ <= 0) return 0;
   return output_tokens_ / (decode_time / 1000.0);
 }
@@ -221,13 +220,14 @@ double PerfProfiler::overall_tps() const {
 }
 
 double PerfProfiler::avg_decode_latency_ms() const {
-  int decode_count = get_count("generate.decode");
+  int decode_count = get_count(root_stage_ + ".decode.inference");
   if (decode_count <= 0) return 0;
-  return get_time_ms("generate.decode") / decode_count;
+  return get_time_ms(root_stage_ + ".decode") / decode_count;
 }
 
 void PerfProfiler::reset() {
   root_ = Node{};
+  root_stage_ = "generate";
   input_tokens_ = 0;
   output_tokens_ = 0;
   e2e_start_time_ = 0;
@@ -330,7 +330,7 @@ void PerfProfiler::print_table() const {
 }
 
 void PerfProfiler::print_compact() const {
-  std::cout << "[Perf] generate: " << std::fixed << std::setprecision(2)
+  std::cout << "[Perf] " << root_stage_ << ": " << std::fixed << std::setprecision(2)
             << e2e_ms() << "ms\n";
 
   for (const auto& pair : root_.children) {
@@ -349,12 +349,12 @@ void PerfProfiler::print_compact() const {
 
 PerfStats PerfProfiler::to_perf_stats() const {
   PerfStats stats;
-  stats.prefill_time_ms = get_time_ms("generate.prefill");
-  stats.decode_time_ms = get_time_ms("generate.decode");
+  stats.prefill_time_ms = get_time_ms(root_stage_ + ".prefill");
+  stats.decode_time_ms = get_time_ms(root_stage_ + ".decode");
   stats.total_time_ms = e2e_ms();
   stats.ttft_ms = ttft_ms();
   stats.tps = overall_tps();
-  stats.embedding_time_ms = get_time_ms("generate.vision");
+  stats.embedding_time_ms = get_time_ms(root_stage_ + ".vision");
   stats.n_input_tokens = input_tokens_;
   stats.n_output_tokens = output_tokens_;
   return stats;
@@ -367,9 +367,9 @@ void PerfProfiler::print_summary(OutputFormat format) const {
       std::cout << "───────────────────────────────────────────────────────────"
                    "──────────────────────\n";
       {
-        auto it = root_.children.find("generate");
+        auto it = root_.children.find(root_stage_);
         if (it != root_.children.end()) {
-          print_tree(node_to_print_view(it->second, "generate"), "");
+          print_tree(node_to_print_view(it->second, root_stage_), "");
         }
       }
       std::cout << "───────────────────────────────────────────────────────────"

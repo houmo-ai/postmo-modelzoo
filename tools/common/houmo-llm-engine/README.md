@@ -1,14 +1,16 @@
 # Houmo Inference Framework
 
-A pure C++ inference framework for LLM and VLM models, optimized for Houmo NPU using TCIM Runtime.
+A pure C++ inference framework for LLM, VLM and ASR models, optimized for Houmo NPU using TCIM Runtime.
 
 ## Features
 
-- **Multi-model support**: Qwen3, Qwen3.5, Qwen3-VL, Qwen2.5, DeepSeek, etc.
+- **Multi-model support**: LLM (Qwen3, Qwen2.5, DeepSeek), VLM (Qwen3.5, Qwen3-VL), ASR (Whisper, Qwen3-ASR, GLM-ASR)
 - **Streaming generation**: Token-level callback mode for real-time output
 - **Multi-turn dialogue**: Context-level history management
 - **Vision understanding**: VLM models support image input and understanding
-- **Performance profiling**: Built-in hierarchical performance analyzer
+- **Speech recognition**: ASR models with encode-decoder architecture and RTF metrics
+- **Performance profiling**: Built-in hierarchical performance analyzer with RTF/throughput metrics
+- **Template method pattern**: ASR profiling hooks — new models get profiling automatically
 - **Factory pattern**: Runtime dynamic model instance creation
 
 ## Supported Models
@@ -22,8 +24,11 @@ A pure C++ inference framework for LLM and VLM models, optimized for Houmo NPU u
 | Qwen3.6-27B | VLM | Qwen3.6 multimodal model |
 | Qwen2.5-7B | LLM | Qwen2.5 pure-text model |
 | Qwen2.5-VL-7B | VLM | Qwen2.5 vision-language model |
-| DeepSeek-8B | LLM | DeepSeek model ||
+| DeepSeek-8B | LLM | DeepSeek model |
 | CoPaw-Flash-9B | VLM | CoPaw-Flash model |
+| Whisper-large-v3-turbo | ASR | Whisper ASR with language detection |
+| Qwen3-ASR-1.7B | ASR | Qwen3-ASR with per-loop encoding |
+| GLM-ASR-nano | ASR | GLM-ASR with PCM chunking |
 
 ## Quick Start
 
@@ -100,6 +105,29 @@ export TCIM_RUNTIME_PATH=/opt/venv/houmo/lib/python3.12/site-packages/tcim_lite
 # Multi-turn dialogue
 ./sample_infer --model qwen3_llm --multi-turn --prompt "你好"
 
+# Whisper ASR
+./sample_whisper_asr --audio audio.mp3 \
+  --encode models/whisper-large-v3-turbo/whisper_encode.hmm \
+  --prefill models/whisper-large-v3-turbo/whisper_prefill.hmm \
+  --decode models/whisper-large-v3-turbo/whisper_decode.hmm \
+  --tokenizer tokenizers/whisper-large-v3-turbo/tokenizer.json
+
+# Qwen3-ASR
+./sample_qwen3_asr --audio audio.mp3 \
+  --encode models/qwen3-asr-1.7b/qwen3-asr-1.7b_encode.hmm \
+  --prefill models/qwen3-asr-1.7b/qwen3-asr-1.7b_prefill.hmm \
+  --decode models/qwen3-asr-1.7b/qwen3-asr-1.7b_decode.hmm \
+  --tokenizer tokenizers/qwen3-asr-1.7b/tokenizer.json \
+  --embedding models/qwen3-asr-1.7b/hmquant/quant_embedding.bin
+
+# GLM-ASR
+./sample_glm_asr --audio audio.mp3 \
+  --encode models/glm-asr-nano-2512/glm-asr-nano-2512_encode.hmm \
+  --prefill models/glm-asr-nano-2512/glm-asr-nano-2512_prefill.hmm \
+  --decode models/glm-asr-nano-2512/glm-asr-nano-2512_decode.hmm \
+  --tokenizer tokenizers/glm-asr-nano-2512/tokenizer.json \
+  --embedding models/glm-asr-nano-2512/hmquant/quant_embedding.bin
+
 # Show model info
 ./sample_infer --model qwen3_llm --info
 ```
@@ -116,10 +144,10 @@ int main() {
     // 1. Configure model
     houmo::ModelConfig config;
     config.devices = {0};
-    config.prefill_path = "models/qwen3-4b/qwen3-4b_prefill.hmm";
-    config.decode_path = "models/qwen3-4b/qwen3-4b_decode.hmm";
-    config.embedding_path = "models/qwen3-4b/quant_embedding.bin";
-    config.tokenizer_path = "models/tokenizers/Qwen3-4B/tokenizer.json";
+    config.prefill = "models/qwen3-4b/qwen3-4b_prefill.hmm";
+    config.decode = "models/qwen3-4b/qwen3-4b_decode.hmm";
+    config.embedding = "models/qwen3-4b/quant_embedding.bin";
+    config.tokenizer = "models/tokenizers/Qwen3-4B/tokenizer.json";
 
     // 2. Create model (factory pattern)
     auto model = houmo::ModelFactory::Create("qwen3_llm", config);
@@ -173,6 +201,43 @@ auto tokens = model->tokenize("描述这张图片", false, false);
 ctx->generate(tokens, params, callback);
 ```
 
+### ASR Speech Recognition
+
+```cpp
+#include "core/model_factory.h"
+#include "models/whisper_model.h"
+
+houmo::ModelConfig config;
+config.devices = {0};
+config.prefill = "models/whisper/whisper_prefill.hmm";
+config.decode = "models/whisper/whisper_decode.hmm";
+config.tokenizer = "tokenizers/whisper/tokenizer.json";
+config.extra_params["encode"] = "models/whisper/whisper_encode.hmm";
+
+auto model = houmo::ModelFactory<houmo::ASRModel>::Create(
+    houmo::ModelSeries::kWhisperASR, config);
+auto ctx = model->create_context();
+auto* whisper_ctx = dynamic_cast<houmo::WhisperContext*>(ctx.get());
+whisper_ctx->set_audio_processor(16000, 30, 30);
+
+std::vector<houmo::Token> all_tokens;
+houmo::SamplingParams params;
+whisper_ctx->Transcribe("audio.mp3", params,
+    [&all_tokens](houmo::Token token) {
+        all_tokens.push_back(token);
+        return true;
+    });
+
+std::cout << static_cast<houmo::WhisperModel*>(model.get())
+             ->tokenizer()->decode(all_tokens);
+
+// Performance output
+ctx->profiler().print_summary();
+const auto& info = ctx->perf_info();
+std::cout << "Overall RTF: " << info.overall_rtf
+          << ", Inference RTF: " << info.inference_rtf << "\n";
+```
+
 ### Performance Profiling
 
 ```cpp
@@ -191,13 +256,15 @@ std::cout << "TPS: " << stats.tps << " tokens/s\n";
 ```
 ┌───────────────────────────────────────────────┐
 │              User Code Layer                   │
-│         sample_infer.cc / User App             │
+│  sample_infer.cc / sample_*_asr.cc / User App │
 ├───────────────────────────────────────────────┤
 │              C++ API Layer                     │
-│    LLMModel / VLMModel / Context / Sampler     │
+│  LLMModel / VLMModel / ASRModel / Context     │
+│  PerfProfiler (hierarchical performance)      │
 ├───────────────────────────────────────────────┤
 │              Module Layer                      │
-│    Tokenizer / Embedding / ImageProcessor      │
+│  Tokenizer / Embedding / AudioProcessor        │
+│  ImageProcessor / StreamingDecoder / Sampler  │
 ├───────────────────────────────────────────────┤
 │              Backend Layer                     │
 │           TCIM Runtime (NPU)                   │
@@ -213,10 +280,19 @@ LLMModel (base)
         ├── Qwen35MLLMModel
         └── Qwen3VLMModel
 
+ASRModel (ASR base)
+  ├── WhisperModel
+  ├── Qwen3AsrModel
+  └── GlmAsrModel
+
 Context (base)
-  ├── Qwen3Context
-  ├── Qwen35MLLMContext
-  └── Qwen3VLMContext
+  ├── Qwen3Context (LLM)
+  ├── Qwen35MLLMContext (VLM)
+  ├── Qwen3VLMContext (VLM)
+  └── ASRContext (ASR base — template method profiling)
+        ├── WhisperContext
+        ├── Qwen3AsrContext
+        └── GlmAsrContext
 ```
 
 ## Project Structure
@@ -242,8 +318,9 @@ Models use `.hmm` (Houmo Model) format:
 |------|-------------|
 | `*_prefill.hmm` | Prefill model (processes prompt) |
 | `*_decode.hmm` | Decode model (autoregressive generation) |
+| `*_encode.hmm` | Encoder model (ASR audio encoding) |
 | `embedding.bin` | Embedding weight table |
-| `vision.hmm` | Vision encoder (VLM only) |
+| `vision.hmm` | Vision encode (VLM only) |
 | `tokenizer.json` | Tokenizer vocabulary |
 
 ## Testing
@@ -255,6 +332,8 @@ ctest --output-on-failure
 # Run specific test
 ./qwen3_llm_test
 ./qwen3_vlm_test
+./whisper_test
+./perf_profiler_test
 ```
 
 ## Documentation
@@ -262,6 +341,7 @@ ctest --output-on-failure
 - [API Reference](docs/api_reference.md) - API signatures and usage
 - [Inference Pipeline](docs/inference_pipeline.md) - Pipeline flow details
 - [New Model Adaptation Guide](docs/new_model_adaptation_guide.md) - How to add new models
+- [Whisper Implementation Plan](docs/whisper_implementation_plan.md) - Whisper ASR implementation
 
 ## License
 

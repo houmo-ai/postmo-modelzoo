@@ -75,8 +75,7 @@ void Qwen3Context::generate(const std::vector<Token>& prompt,
 
   // Start E2E timing
   p.start("generate");
-  // Note: input_tokens will be updated after prefill for consistency with VLM
-  // models
+  // Note: input_tokens will be updated after prefill for consistency with VLM models
   int initial_context_length = context_length_;
 
   // Set sampler (created once)
@@ -540,8 +539,7 @@ void Qwen3LLMModel::load() {
 // ============================================================================
 
 // Static registration for Qwen3 LLM model
-REGISTER_LLM_MODEL(
-    qwen3_llm, ModelSeries::kQwen3LLM,
+REGISTER_MODEL(LLMModel, qwen3_llm, ModelSeries::kQwen3LLM,
     [](const ModelConfig& c) { return std::make_unique<Qwen3LLMModel>(c); },
     "Qwen3 text-only LLM");
 

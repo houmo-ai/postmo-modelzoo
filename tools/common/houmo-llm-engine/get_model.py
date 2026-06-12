@@ -130,21 +130,18 @@ if __name__ == "__main__":
     model_config = model_configs.get(model_name, {}).get(model_size, {})
     ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
     prefill_length = first_not_none(
-        args.prefill_length, model_config.get("prefill_length", 256)
+        args.prefill_length, model_config.get("prefill_length")
     )
     context_length = first_not_none(
-        args.context_length, model_config.get("context_length", "32k")
+        args.context_length, model_config.get("context_length")
     )
     quant_type = first_not_none(
-        args.quant_type, model_config.get("quant_type", "")
+        args.quant_type, model_config.get("quant_type")
     )
-
-    model_cfgs = {
-        "target": HOUMO_TARGET,
-        "version": get_houmo_version(),
-        "model_type": "llm",
-        "model_name": model_name,
-        "model_info": {
+    batch = model_config.get("batch")
+    print(batch)
+    if batch is not None:
+        model_info =  {
             "model_size": model_size,
             "ncore": model_config.get("ncore", 2),
             "ndevice": ndevice,
@@ -152,9 +149,26 @@ if __name__ == "__main__":
             "prefill_len": prefill_length,
             "batch": model_config.get("batch", 1),
             "quant_type": quant_type,
-        },
+        }
+    else:
+        model_info =  {
+            "model_size": model_size,
+            "ncore": model_config.get("ncore", 2),
+            "ndevice": ndevice,
+            "context_len": context_length,
+            "prefill_len": prefill_length,
+            "quant_type": quant_type,
+        }
+
+    model_cfgs = {
+        "target": HOUMO_TARGET,
+        "version": get_houmo_version(),
+        "model_type": "llm",
+        "model_name": model_name,
+        "model_info": model_info,
         "modelscope_repo": {"repo_ids": model_config.get("modelscope_repo", []),
-                             "local_dirs": model_config.get("tokenizer_dir", [])},
+                             "local_dirs": model_config.get("tokenizer_dir", []),
+                             "ignore_patterns": ["*.bin", "*.pt", "*.safetensors", "*.h5", "*.msgpack"]},
     }
 
     _, ret_dict = hmatc_get_file(
@@ -186,3 +200,14 @@ if __name__ == "__main__":
     target_dir = "./tests"
     save_path = get_file_from_jfrog(ctest_data, target_dir, target_dir)
     print(f"CTest data downloaded to {save_path} and extracted to: {target_dir}")
+
+    audio_3rdparty_path = "3rdparty/audio_cpp_3rdparty.zip"
+    target_dir = "./3rdparty"
+    save_path = get_file_from_jfrog(audio_3rdparty_path, target_dir, target_dir)
+    print(f"Audio 3rdparty downloaded to {save_path} and extracted to: {target_dir}")
+
+    if os.path.exists("tokenizers/qwen3-asr-1.7b"):
+        if "tokenizer.json" not in os.listdir("tokenizers/qwen3-asr-1.7b"):
+            from transformers import AutoTokenizer
+            tokenizer = AutoTokenizer.from_pretrained("tokenizers/qwen3-asr-1.7b")
+            tokenizer.save_pretrained("tokenizers/qwen3-asr-1.7b")

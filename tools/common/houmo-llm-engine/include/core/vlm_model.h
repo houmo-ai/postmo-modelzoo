@@ -4,7 +4,7 @@
  * File: vlm_model.h
  * Description:
  *   VLM (Vision-Language Model) base class. Inherits from LLMModel and
- *   adds vision encoder support.
+ *   adds vision encode support.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ namespace houmo {
 /**
  * @brief VLM model base class
  *
- * Inherits LLMModel, adds vision encoder (Vision Encoder) support.
+ * Inherits LLMModel, adds vision encode (Vision Encoder) support.
  */
 class VLMModel : public LLMModel {
  public:
@@ -54,7 +54,7 @@ class VLMModel : public LLMModel {
   // ========== Vision interface ==========
 
   /**
-   * @brief Get vision encoder module
+   * @brief Get vision encode module
    */
   std::shared_ptr<tcim::Module> vision_module() const { return vision_module_; }
 
@@ -86,21 +86,21 @@ class VLMModel : public LLMModel {
   using LLMModel::prefill_input_map;
 
   /**
-   * @brief Get vision encoder input map
+   * @brief Get vision encode input map
    */
   std::map<std::string, tcim::Tensor>& vision_input_map() const {
     return const_cast<std::map<std::string, tcim::Tensor>&>(vision_input_map_);
   }
 
  protected:
-  // Vision encoder
+  // Vision encode
   std::shared_ptr<tcim::Module> vision_module_;
   std::map<std::string, tcim::Tensor> vision_input_map_;
 
-  // Vision encoder parameters
+  // Vision encode parameters
   int vision_image_size_ = 448;  // Default image size
   int vision_patch_size_ = 16;   // Patch size
-  int vision_hidden_size_ = 0;   // Vision encoder hidden dimension
+  int vision_hidden_size_ = 0;   // Vision encode hidden dimension
 };
 
 }  // namespace houmo

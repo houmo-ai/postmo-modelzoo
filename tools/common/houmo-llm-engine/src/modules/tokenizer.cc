@@ -59,6 +59,7 @@ HfTokenizer::HfTokenizer(const std::string& tokenizer_json_path) {
   pad_token_id_ = bos_token_id_;
   // 获取词表大小
   vocab_size_ = static_cast<int>(tokenizer_->GetVocabSize());
+  std::cout << "Tokenizer loaded. Vocab size: " << vocab_size_ << std::endl;
 }
 
 HfTokenizer::~HfTokenizer() { tokenizer_.reset(); }
@@ -110,6 +111,10 @@ void HfTokenizer::set_bos_token_id(std::string text) {
 }
 void HfTokenizer::set_eos_token_id(std::string text) {
   eos_token_id_ = tokenizer_->Encode(text)[0];
+}
+
+int HfTokenizer::token_to_id(const std::string& token) const {
+  return tokenizer_->TokenToId(token);
 }
 
 }  // namespace houmo
