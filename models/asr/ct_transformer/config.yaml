@@ -1,0 +1,12 @@
+default_model_name: "ct_transformer"
+default_model_size: "large"
+
+model_configs:
+  ct_transformer:
+    "large":
+      modelscope_repo: ["iic/punc_ct-transformer_cn-en-common-vocab471067-large"]
+      model_name: "ct_transformer"
+      model_size: "large"
+      ncore: 2
+      ndevice: 1
+      quant_type: "w8a8_sefp"
