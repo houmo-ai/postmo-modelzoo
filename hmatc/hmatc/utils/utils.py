@@ -814,7 +814,9 @@ def _download_from_modelscope(
                 "invalid token",
                 "does not exist",
                 "exist",
+                "not exists",
                 "has no revision",
+                "404",
             ]
             print(
                 f"Warning:Failed to download models from modelscope, retry, error msg:{e}"
