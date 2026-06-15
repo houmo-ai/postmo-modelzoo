@@ -20,6 +20,11 @@
   - [3.免责声明](#3免责声明)
 
 ## 变更日志
+- [20260615]
+  - 新增ASR(Automatic Speech Recognition)语音识别功能支持
+  - 新增--encode/--prefill/--decode/--tokenizer/--audio等ASR相关参数
+  - 新增ENABLE_ASR编译选项，Windows平台默认关闭，Linux/Android平台默认开启
+  - 支持Whisper、GlmAsr、Qwen3Asr三种ASR模型
 - [20260424]
   - 修改--ndevices参数为--devices，由指定设备数量改为指定设备ID
   - --devices不设置时优先从HOUMO_VISIBLE_DEVICES读取，环境变量未设置则默认--devices 0
@@ -37,6 +42,7 @@
 | HmllmInfer.cc           | 主文件，实现llm模型单batch具体推理流程              |
 | HmvllmInfer.cc          | 主文件，实现vlm模型单batch具体推理流程             |
 | HmllmInferMultiBatch.cc | 主文件，实现llm多batch具体推理流程，仅支持xh2       |
+| HmAsrInfer.cc           | 主文件，实现ASR语音识别推理流程                     |
 | convert_embed.py        | 将embedding的pt模型转换为bin文件方便工具读取权重    |
 | device_monitor          | 监控设备温度、功率、IPU频率的类实现                 |
 | perf_tracker            | 性能采集类功能实现                                  |
@@ -107,7 +113,34 @@
   | E2E Latency (End-to-End Latency)        | 端到端总时间，单位（s）                                             |
   | E2E TPS (End-to-End Tokens Per Second)  | 端到端每秒输出的token数，单位（tokens/s）                           |
 
-相关指标可以对照表一、表二、表三、表四的指标含义。
+- 表五：ASR语音识别指标（需要ENABLE_ASR编译选项开启）
+  | ASR Stage 指标                          | 说明                                                                |
+  | --------------------------------------- | ------------------------------------------------------------------- |
+  | audio_load                              | 音频加载耗时，单位（ms）                                            |
+  | encode preprocess                       | encode预处理耗时，单位（ms）                                        |
+  | encode inference                        | encode推理耗时，单位（ms）                                          |
+  | encode postprocess                      | encode后处理耗时，单位（ms）                                        |
+  | prefill preprocess                      | Prefill预处理耗时，单位（ms）                                       |
+  | prefill inference                       | Prefill推理耗时，单位（ms）                                         |
+  | prefill postprocess                     | Prefill后处理耗时，单位（ms）                                       |
+  | decode preprocess                       | Decode预处理耗时，单位（ms），括号内为调用次数和平均耗时             |
+  | decode inference                        | Decode推理耗时，单位（ms），括号内为调用次数和平均耗时               |
+  | decode postprocess                      | Decode后处理耗时，单位（ms），括号内为调用次数和平均耗时             |
+  | transcribe total                        | ASR转录总耗时，单位（ms）                                           |
+  | E2E                                     | 端到端总耗时，单位（ms）                                            |
+  | TTFT                                    | 首个token耗时，单位（ms）                                           |
+  | Prefill TPS                             | Prefill阶段吞吐量，单位（tokens/s），括号内为token数量               |
+  | Decode TPS                              | Decode阶段吞吐量，单位（tokens/s），括号内为token数量                |
+  | Overall TPS                             | 整体吞吐量，单位（tokens/s）                                        |
+  | Avg Decode Latency                      | 平均Decode延迟，单位（ms/token）                                    |
+  | Audio Duration                          | 音频时长，单位（s）                                                 |
+  | Overall RTF                             | 整体实时因子（Real-Time Factor），小于1表示快于实时                  |
+  | Inference RTF                           | 推理实时因子                                                        |
+  | Encode Per Chunk                        | 每个chunk的encode阶段平均耗时，单位（s）                            |
+  | Prefill Per Chunk                       | 每个chunk的prefill阶段平均耗时，单位（s）                           |
+  | Decode Per Chunk                        | 每个chunk的decode阶段平均耗时，单位（s）                            |
+
+相关指标可以对照表一、表二、表三、表四、表五的指标含义。
 
 ### 1.3 参数说明
 1. 命令行llm_perf以指定参数启动
@@ -129,9 +162,19 @@
 - --skip_perf       : 默认执行性能评估，配置后会跳过性能评估。
 - --dump_file       : 默认关闭dump性能数据到yaml文件，配置后会将性能数据保存到yaml文件中。
 - --help, -h        : 打印帮助信息
-2. 命令行llm_perf以配置文件启动
+
+2. ASR语音识别相关参数（需要ENABLE_ASR编译选项开启）
+- --encode           : 指定ASR编码器模型路径，支持相对/绝对路径。设置此参数将触发ASR推理流程。
+- --prefill          : ASR模式下指定prefill模型路径。
+- --decode           : ASR模式下指定decode模型路径。
+- --tokenizer        : 指定tokenizer模型路径。
+- --audio            : 指定音频文件路径，支持单个或逗号分隔的多个文件路径。
+- --embedding        ：指定embedding模型路径，需要转换成bin文件，支持相对/绝对路径。 (GLM/Qwen3 ASR需要).
+
+3. 命令行llm_perf以配置文件启动
 - --config, -c      : 使用配置文件启动perf程序，需要提前准备好配置文件，配置文件模板参考1.4节。
-3. 目前支持通过DEBUG_DEV_INPUT宏开启SetInput输入的Debug模式，须在CMakeLists.txt添加如下编译选项：target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG_DEV_INPUT)。
+4. 目前支持通过DEBUG_DEV_INPUT宏开启SetInput输入的Debug模式，须在CMakeLists.txt添加如下编译选项：target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG_DEV_INPUT)。
+5. ASR功能编译说明：在CMakeLists.txt中可通过-DENABLE_ASR=ON/OFF控制是否编译ASR功能，Windows平台默认关闭，Linux/Android平台默认开启。
 
 
 ### 1.4 用法说明
@@ -156,6 +199,16 @@ HOUMO_VISIBLE_DEVICES=1 ./llm_perf --prefill prefill_model.hmm --decode decode_m
 ./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --devices 0 --loop 2 --batch 1 --dump_file model.yaml
 # 多组input/output，按组依次测试并分别dump到yaml文件中
 ./llm_perf --model_name qwen3_8b --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 256,512 --output 100,200 --loop 2 --dump_file model.yaml
+```
+
+ASR语音识别使用示例（需要ENABLE_ASR编译选项开启）：
+``` shell
+# Whisper模型ASR推理
+./llm_perf --encode whisper_encode.hmm --prefill whisper_prefill.hmm --decode whisper_decode.hmm --tokenizer tokenizer.json --audio audio1.wav,audio2.wav --devices 0
+# GlmAsr模型ASR推理
+./llm_perf --encode glm_encode.hmm --prefill glm_prefill.hmm --decode glm_decode.hmm --tokenizer tokenizer.json --audio audio.wav --embedding quant_embedding.bin --devices 0
+# Qwen3Asr模型ASR推理
+./llm_perf --encode qwen3-asr_encode.hmm --prefill qwen3-asr_prefill.hmm --decode qwen3-asr_decode.hmm --tokenizer tokenizer.json --embedding quant_embedding.bin --audio audio.wav --devices 0
 ```
 
 #### 1.4.3 配置文件启动
@@ -232,6 +285,15 @@ Streams:
     output: 100
     devices: 0,1
     loop: 1
+  # ASR configuration example (requires ENABLE_ASR compilation option)
+  - ModelName: whisper_asr
+    encode: whisper/whisper_encode.hmm
+    prefill: whisper/whisper_prefill.hmm
+    decode: whisper/whisper_decode.hmm
+    tokenizer: whisper/tokenizer.json
+    audio: audio1.wav,audio2.wav
+    devices: 0
+    interval: 500
 
 # Global output file for all performance results
 # Note: This has higher priority than individual dump_file settings in Streams

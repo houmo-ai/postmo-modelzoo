@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: HmvllmInfer.h
  * Description:
@@ -31,9 +31,9 @@
 #include <regex>
 #include <sstream>
 
-#include "HmEmbedding.h"
-#include "tcim_runtime_utils.h"
-#include "utils.h"
+#include "utils/HmEmbedding.h"
+#include "utils/tcim_runtime_utils.h"
+#include "utils/utils.h"
 
 /**
  * @brief Vision-Language Large Language Model Inference class

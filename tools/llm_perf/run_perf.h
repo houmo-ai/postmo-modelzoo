@@ -26,20 +26,24 @@
 #include <filesystem>
 #include <iostream>
 #include <locale>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "HmllmInfer.h"
-#include "HmllmInferMultiBatch.h"
-#include "HmvllmInfer.h"
-#include "device_monitor/device_monitor.h"
-#include "perf_dumper/perf_dumper.h"
+#include "llm/HmllmInfer.h"
+#include "llm/HmllmInferMultiBatch.h"
+#include "vlm/HmvllmInfer.h"
+#ifdef ENABLE_ASR
+#include "run_asr.h"
+#endif
+#include "utils/device_monitor/device_monitor.h"
+#include "utils/perf_dumper/perf_dumper.h"
 #include "tcim/tcim_runtime.h"
-#include "utils.h"
+#include "utils/utils.h"
 #if defined(__linux__)
-#include "host_monitor/host_monitor.h"
+#include "utils/host_monitor/host_monitor.h"
 #endif
 
 #ifdef _MSC_VER
@@ -249,6 +253,12 @@ PerfSettings ParsePerfRunSetting(
 }
 
 int RunPerf(std::unordered_map<std::string, std::string> args) {
+#ifdef ENABLE_ASR
+  if (args.count("encode")) {
+    return RunAsr(args);
+  }
+#endif
+
   int interval =
       args.count("interval") ? validate_setting(args, "interval") : 500;
   interval = std::min(std::max(interval, 300), 60000);
@@ -503,7 +513,15 @@ int RunPerfConfig(int argc, char* argv[]) {
       args[key] = value;
     }
 
-    RunPerf(args);
+    if (stream["encode"]) {
+#ifdef ENABLE_ASR
+      RunAsr(args);
+#else
+      throw std::invalid_argument("ASR is not supported in this build");
+#endif
+    } else {
+      RunPerf(args);
+    }
 
     std::cout << COLOR_GREEN << std::string(45, '#') << " End of Task "
               << (curTaskId + 1) << ", All Task:" << n_tasks

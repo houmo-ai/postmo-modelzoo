@@ -19,7 +19,7 @@ case "${MODEL_SIZE}" in
     0.6b|1.7b|4b|8b|14b)
         ;;
     *)
-        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 0.6b, 1.7b, 8b, 14b." >&2
+        echo "Error: Unsupported model size '${MODEL_SIZE}', support: 0.6b, 1.7b, 4b, 8b, 14b." >&2
         exit 1
         ;;
 esac

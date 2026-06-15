@@ -20,7 +20,21 @@
 # SPDX-License-Identifier: Apache-2.0
 if [ ! -e 3rdparty ];then
   mkdir 3rdparty
-  python get_model.py
+  python get_3rdparty.py
+fi
+if [[ ! -e 3rdparty/audio/3rdparty_build/lib/libkaldi-native-fbank-core.so || \
+  ! -e 3rdparty/audio/3rdparty_build/lib/libsamplerate.so ]]; then
+  cd 3rdparty/audio
+  chmod +x build_3rdparty_android.sh
+  ./build_3rdparty_android.sh > /dev/null 2>&1
+  cd ../..
+else
+  echo "3rdparty audio build already exists, rebuilding..."
+  rm -rf 3rdparty/audio/3rdparty_build
+  cd 3rdparty/audio
+  chmod +x build_3rdparty_android.sh
+  ./build_3rdparty_android.sh > /dev/null 2>&1
+  cd ../..
 fi
 if [ ! -e 3rdparty/eigen3 ];then
   cd 3rdparty

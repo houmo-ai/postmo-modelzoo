@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: HmllmInferMultiBatch.cc
  * Description:
@@ -20,7 +20,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include "HmllmInferMultiBatch.h"
+#include "llm/HmllmInferMultiBatch.h"
 
 HmllmInferMultiBatch::HmllmInferMultiBatch(
     const std::string &prefillModelPath, const std::string &decodeModelPath,
@@ -283,8 +283,8 @@ void HmllmInferMultiBatch::PrefillGetOutputDatas(std::vector<int32_t> &ids) {
   perf_tracker->perfEnd(PerfType::PREFILL_OUTPUT_TIME);
 
   void *prefill_outData = host_output_tensor.Buffer().Data();
-  ids.emplace_back(eigen_argmax<tensor_type>(
-      static_cast<tensor_type *>(prefill_outData), argmax_dim_len));
+  ids.emplace_back(eigen_argmax<float16>(
+      static_cast<float16 *>(prefill_outData), argmax_dim_len));
 }
 
 void HmllmInferMultiBatch::DebugDecodeInput() {
@@ -314,13 +314,13 @@ void HmllmInferMultiBatch::DecodeGetOutputDatas() {
   auto host_output_tensor = dev_output_tensor.ToHost(true);
   perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
 
-  tensor_type *decode_outData =
-      reinterpret_cast<tensor_type *>(host_output_tensor.Buffer().Data());
+  float16 *decode_outData =
+      reinterpret_cast<float16 *>(host_output_tensor.Buffer().Data());
   next_ids.clear();
   next_ids.resize(this->batch);
   for (int b = 0; b < this->batch; ++b) {
     std::vector<int> ids;
-    ids.emplace_back(eigen_argmax<tensor_type>(
+    ids.emplace_back(eigen_argmax<float16>(
         decode_outData + b * argmax_dim_len, argmax_dim_len));
     next_ids[b] = ids;
   }
@@ -359,7 +359,7 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
       std::ceil((float)input_tokens_len / (float)prefill_length);
 
   int32_t valid_length = 0, current_length = 0;
-  tensor_type *prefill_input_data = nullptr;
+  float16 *prefill_input_data = nullptr;
 
   for (int round = 0; round < prefill_loop_round; ++round) {
     valid_length = round * this->prefill_length;
@@ -400,7 +400,7 @@ PerfSingleBatchInfo HmllmInferMultiBatch::run_prefill(
 }
 
 PerfSingleBatchInfo HmllmInferMultiBatch::run_decode(
-    tensor_type *input_datas, const std::vector<int> context_length) {
+    float16 *input_datas, const std::vector<int> context_length) {
   PerfSingleBatchInfo ret;
 
   auto input_name = decode_module->GetInputName(0);
@@ -441,12 +441,12 @@ void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
                              std::to_string(context_max_length) +
                              ", please shorten it !");
   }
-  std::unique_ptr<tensor_type[]> input_datas =
-      std::make_unique<tensor_type[]>(this->batch * this->embedding_length);
+  std::unique_ptr<float16[]> input_datas =
+      std::make_unique<float16[]>(this->batch * this->embedding_length);
 
   std::fill(input_datas.get(),
             input_datas.get() + this->batch * this->embedding_length,
-            tensor_type(0));
+            float16(0));
   PerfInfos llm_perf_datas;
   memset(&llm_perf_datas, 0, sizeof(PerfInfos));
 
@@ -472,7 +472,7 @@ void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
     llm_perf_datas.input_tokens += retInfo.input_tokens;
 
     perf_tracker->perfStart(PerfType::DECODE_EMBED_TIME);
-    tensor_type *input_data = embedding->EmbeddingTokens(next_ids[b]);
+    float16 *input_data = embedding->EmbeddingTokens(next_ids[b]);
     std::copy(input_data, input_data + embedding_length,
               input_datas.get() + b * embedding_length);
     perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);
@@ -491,7 +491,7 @@ void HmllmInferMultiBatch::perf_llm(const uint32_t input_tokens_len,
     for (int b = 0; b < this->batch; ++b) {
       context_length[b] += 1;
       perf_tracker->perfStart(PerfType::DECODE_EMBED_TIME);
-      tensor_type *input_data = embedding->EmbeddingTokens(next_ids[b]);
+      float16 *input_data = embedding->EmbeddingTokens(next_ids[b]);
       std::copy(input_data, input_data + embedding_length,
                 input_datas.get() + b * embedding_length);
       perf_tracker->perfEnd(PerfType::DECODE_EMBED_TIME);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: qwen3_vlm_test.cc
  * Description:
@@ -206,7 +206,7 @@ TEST_F(Qwen3VLMModelTest, PrefillWithImage) {
   qwen_ctx->set_image(test_image_path_);
 
   ASSERT_NO_THROW({
-    auto tokens = model.tokenize("描述这张图片", true, false);
+    auto tokens = model.tokenize("Describe this image", true, false);
     Token token = ctx->prefill(tokens);
 
     EXPECT_GE(token, 0);

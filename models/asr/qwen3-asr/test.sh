@@ -91,6 +91,23 @@ if should_run_step "demo"; then
     echo "Execute demo ${DEMO_SCRIPT}"
     if [ "$DEMO_SCRIPT" = "demo_asr.py" ]; then
         python3 demo_asr.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
+        if command -v llm_perf &>/dev/null; then
+            echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
+            cd "${SCRIPT_DIR}"
+            devices_param=$(get_devices_param "${NDEVICE}")
+            if [ "$MODEL_SIZE" = "0.6b" ]; then
+                tokenizer_path="Qwen3-ASR-0.6B/tokenizer.json"
+            elif [ "$MODEL_SIZE" = "1.7b" ]; then
+                tokenizer_path="Qwen3-ASR-1.7B/tokenizer.json"
+            fi
+            llm_perf --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
+                --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
+                --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
+                --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin" \
+                --tokenizer "${tokenizer_path}" \
+                --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
+        fi
     else
         python3 demo_forcealigner.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi

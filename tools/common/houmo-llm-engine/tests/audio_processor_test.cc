@@ -34,7 +34,7 @@ namespace houmo {
 class AudioProcessorTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    audio_path_ = "../tests/data/audio.mp3";  // 相对于 build 目录
+    audio_path_ = "../tests/data/audio.mp3";  // Relative to build directory
     processor_ = std::make_unique<AudioProcessor>();
   }
 
@@ -101,7 +101,7 @@ TEST_F(AudioProcessorTest, ExtractFeatures) {
 }
 
 TEST_F(AudioProcessorTest, ChunkPCM) {
-  // 创建 60 秒的虚拟音频数据
+  // Create 60 seconds of dummy audio data
   AudioData audio;
   audio.pcm.resize(16000 * 60, 0.5f);
   audio.sample_rate = 16000;
@@ -109,14 +109,14 @@ TEST_F(AudioProcessorTest, ChunkPCM) {
 
   std::vector<AudioData> chunks = processor_->ChunkPCM(audio);
 
-  // 默认 30 秒一块，60 秒应该分成 2 块
+  // Default 30 seconds per chunk, 60 seconds should be split into 2 chunks
   EXPECT_EQ(chunks.size(), 2);
   EXPECT_EQ(chunks[0].pcm.size(), static_cast<size_t>(16000 * 30));
   EXPECT_EQ(chunks[1].pcm.size(), static_cast<size_t>(16000 * 30));
 }
 
 TEST_F(AudioProcessorTest, ChunkPCMWithPadding) {
-  // 创建 45 秒的虚拟音频数据
+  // Create 45 seconds of dummy audio data
   AudioData audio;
   audio.pcm.resize(16000 * 45, 0.5f);
   audio.sample_rate = 16000;
@@ -124,7 +124,7 @@ TEST_F(AudioProcessorTest, ChunkPCMWithPadding) {
 
   std::vector<AudioData> chunks = processor_->ChunkPCM(audio);
 
-  // 45 秒应该分成 2 块：30秒 + 15秒（最后一块不填充，保持实际长度）
+  // 45 seconds should be split into 2 chunks: 30s + 15s (last chunk not padded, keeps actual length)
   EXPECT_EQ(chunks.size(), 2);
   EXPECT_EQ(chunks[0].pcm.size(), static_cast<size_t>(16000 * 30));
   EXPECT_EQ(chunks[1].pcm.size(), static_cast<size_t>(16000 * 15));

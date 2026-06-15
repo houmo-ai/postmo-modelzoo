@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: HmllmInfer.h
  * Description:
@@ -30,9 +30,9 @@
 #include <regex>
 #include <sstream>
 
-#include "HmEmbedding.h"
-#include "perf_tracker/inference_perf_tracker.h"
-#include "tcim_runtime_utils.h"
+#include "utils/HmEmbedding.h"
+#include "utils/perf_tracker/inference_perf_tracker.h"
+#include "utils/tcim_runtime_utils.h"
 
 class HmllmInfer : public HmllmInferBase {
  public:

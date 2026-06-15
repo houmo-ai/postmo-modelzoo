@@ -28,7 +28,7 @@
 #include "modules/audio_processor.h"
 
 int main() {
-    // 使用 128 mel bins (与 whisper-large-v3-turbo 对齐)
+    // Use 128 mel bins (aligned with whisper-large-v3-turbo)
     houmo::AudioProcessorConfig config;
     config.n_mels = 128;
     config.chunk_seconds = 30;
@@ -48,14 +48,14 @@ int main() {
     std::cout << "Features: dim=" << features.feature_dim << ", frames=" << features.num_frames << std::endl;
     std::cout << "Features size: " << features.data.size() << std::endl;
 
-    // 打印前 10 个值
+    // Print first 10 values
     std::cout << "C++ first 10 values: ";
     for (int i = 0; i < 10 && i < static_cast<int>(features.data.size()); ++i) {
         std::cout << static_cast<float>(features.data[i]) << " ";
     }
     std::cout << std::endl;
 
-    // 打印最后 10 个值
+    // Print last 10 values
     std::cout << "C++ last 10 values: ";
     int start = features.data.size() - 10;
     for (int i = start; i < static_cast<int>(features.data.size()); ++i) {
@@ -63,7 +63,7 @@ int main() {
     }
     std::cout << std::endl;
 
-    // 计算统计信息
+    // Calculate statistics
     float min_val = 1e10, max_val = -1e10, sum = 0;
     for (auto& v : features.data) {
         float val = static_cast<float>(v);

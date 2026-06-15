@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: utils.h
  * Description:
@@ -31,6 +31,7 @@
 #include <eigen3/unsupported/Eigen/CXX11/Tensor>
 #include <filesystem>
 #include <fstream>
+#include <half.hpp>
 #include <iomanip>
 #include <iostream>
 #include <locale>
@@ -44,9 +45,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "perf_tracker/inference_perf_tracker.h"
+#include "utils/perf_tracker/inference_perf_tracker.h"
 
-#define TOKEN_ID_MAX 150000
+using float16 = half_float::half;
 
 #define COLOR_RED "\x1b[91;20m"
 #define COLOR_GREEN "\x1b[92;20m"
@@ -61,13 +62,13 @@ namespace fs = std::filesystem;
 typedef enum { PERFCMD = 0, PERFYAML, PERFINVAILD } PerfConfigType;
 
 static void HelpUsage(char* argv[]) {
-  std::cout << "llm_perf - A tool for LLM and VLM performance tests with "
+  std::cout << "llm_perf - A tool for LLM, VLM, and ASR performance tests with "
                "flexible configuration options.\n\n";
   std::cout << "Release Time : " << __DATE__ << " " << __TIME__ << "\n\n";
   std::cout
       << "Usage: " << argv[0]
       << " --key value [options...]\n\n"
-         "Options:\n"
+         "LLM/VLM Options:\n"
          "  -c, --config      FILE      use yaml file to start llm_perf, "
          "cat template perf_config.yaml for more message\n"
          "Or:\n"
@@ -103,6 +104,14 @@ static void HelpUsage(char* argv[]) {
          "  --skip_perf                 skip prefill and decode performance "
          "test\n"
          "  --dump_file       FILE      Dump perf result to file (optional).\n"
+         "\nASR Options (detected automatically when --encode is present):\n"
+         "  --encode          FILE      Encoder model file (required).\n"
+         "  --prefill         FILE      Prefill model file (required).\n"
+         "  --decode          FILE      Decode model file (required).\n"
+         "  --tokenizer       FILE      Tokenizer file .json (required).\n"
+         "  --embedding       FILE      Embedding weight file (GLM/Qwen3 ASR, optional).\n"
+         "  --audio           FILE[,FILE...]  Audio files to transcribe.\n"
+         "  --devices         NUM[,NUM...]      Device ids.\n"
          "  -h, --help                  Show this help message.\n\n"
          "Examples:\n"
          "  "
@@ -111,9 +120,8 @@ static void HelpUsage(char* argv[]) {
          "--input 256 --output 100\n"
          "  "
       << argv[0]
-      << " --model_name qwen3_8b --prefill prefill.hmm --decode decode.hmm "
-         "--embedding embed.bin "
-         "--input 256,512 --output 100,200\n"
+      << " --encode encode.hmm --prefill prefill.hmm --decode decode.hmm "
+         "--audio test.wav --loop 3\n"
          "  "
       << argv[0] << " -c perf_config.yaml\n";
 }
@@ -307,8 +315,7 @@ struct PerfInfos {
  * @param max_value Maximum value for the random integers (exclusive)
  * @return Vector of random integers in the range [0, max_value)
  */
-static std::vector<int> generateRandomVector(
-    int len, const int max_value = TOKEN_ID_MAX) {
+static std::vector<int> generateRandomVector(int len, const int max_value) {
   std::vector<int> result;
   if (len <= 0) {
     return result;  // Handle invalid length (return empty vector)

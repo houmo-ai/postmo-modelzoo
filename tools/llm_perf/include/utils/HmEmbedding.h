@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: HmEmbedding.h
  * Description:
@@ -36,10 +36,9 @@
 #include <vector>
 
 #include "half.hpp"
-#include "utils.h"
+#include "utils/utils.h"
 
-// Define tensor_type as half precision floating point
-using tensor_type = half_float::half;
+// float16 defined in utils.h
 
 /**
  * Reads embedding weight file
@@ -98,12 +97,12 @@ class HmEmbedding {
    * @param ids Vector of token IDs to be converted
    * @return Pointer to the resulting embedding vectors
    */
-  tensor_type *EmbeddingTokens(const std::vector<int> &ids);
+  float16 *EmbeddingTokens(const std::vector<int> &ids);
   uint32_t get_vocab_size() const { return vocab_size; }
 
  private:
-  std::unique_ptr<tensor_type[]> embed_w;
-  std::unique_ptr<tensor_type[]> ptr;
+  std::unique_ptr<float16[]> embed_w;
+  std::unique_ptr<float16[]> ptr;
 
   uint32_t vocab_size = 0;
   int prefill_length = 0;

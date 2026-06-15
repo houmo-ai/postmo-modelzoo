@@ -26,6 +26,7 @@ import time
 import argparse
 import numpy as np
 import librosa
+from typing import List, Optional
 from loguru import logger
 import tcim_lite as tcim
 import torch
@@ -83,6 +84,118 @@ def is_valid_char(cp):
 def filter_valid_chars(text: str) -> str:
     """Filter text to keep only valid Chinese, English characters and common punctuation."""
     return "".join(c for c in text if is_valid_char(ord(c)))
+
+
+class SamplingManager:
+    def __init__(
+        self,
+        temperature: float = 1.0,
+        top_k: Optional[int] = None,
+        top_p: float = 1.0,
+        repetition_penalty: float = 1.0,
+        min_tokens_to_keep: int = 1,
+    ):
+        self.temperature = temperature
+        self.top_k = top_k
+        self.top_p = top_p
+        self.repetition_penalty = repetition_penalty
+        self.min_tokens_to_keep = min_tokens_to_keep
+
+    def apply_temperature(self, logits: np.ndarray) -> np.ndarray:
+        if self.temperature <= 0:
+            raise ValueError("Temperature must larger than 0")
+
+        return logits / self.temperature
+
+    def apply_repetition_penalty(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        if self.repetition_penalty == 1.0 or not previous_tokens:
+            return logits
+
+        adjusted_logits = logits.copy()
+        for token_id in set(previous_tokens):
+            if 0 <= token_id < len(logits):
+                if logits[token_id] < 0:
+                    adjusted_logits[token_id] = (
+                        logits[token_id] * self.repetition_penalty
+                    )
+                else:
+                    adjusted_logits[token_id] = (
+                        logits[token_id] / self.repetition_penalty
+                    )
+
+        return adjusted_logits
+
+    def apply_top_k(self, probs: np.ndarray) -> np.ndarray:
+        if self.top_k is None or self.top_k <= 0:
+            return probs
+
+        top_k = min(self.top_k, len(probs))
+        if top_k <= 0:
+            return probs
+
+        top_k_indices = np.argpartition(probs, -top_k)[-top_k:]
+
+        mask = np.ones_like(probs, dtype=bool)
+        mask[top_k_indices] = False
+        filtered_probs = probs.copy()
+        filtered_probs[mask] = 0
+
+        if np.sum(filtered_probs) > 0:
+            return filtered_probs / np.sum(filtered_probs)
+
+        return np.ones_like(probs) / len(probs)
+
+    def apply_top_p(self, probs: np.ndarray) -> np.ndarray:
+        if self.top_p >= 1.0:
+            return probs
+
+        sorted_indices = np.argsort(probs)[::-1]
+        sorted_probs = probs[sorted_indices]
+        cumulative_probs = np.cumsum(sorted_probs)
+        cutoff_indices = np.where(cumulative_probs >= self.top_p)[0]
+
+        if len(cutoff_indices) > 0:
+            cutoff_index = max(cutoff_indices[0], self.min_tokens_to_keep - 1)
+            selected_indices = sorted_indices[: cutoff_index + 1]
+        else:
+            selected_indices = sorted_indices
+
+        mask = np.ones_like(probs, dtype=bool)
+        mask[selected_indices] = False
+        filtered_probs = probs.copy()
+        filtered_probs[mask] = 0
+
+        if np.sum(filtered_probs) > 0:
+            return filtered_probs / np.sum(filtered_probs)
+
+        return np.ones_like(probs) / len(probs)
+
+    def process_logits(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> np.ndarray:
+        processed_logits = logits.astype(np.float32, copy=True)
+        processed_logits = self.apply_repetition_penalty(
+            processed_logits, previous_tokens
+        )
+        probs = self.apply_top_k(processed_logits)
+        probs = self.apply_top_p(probs)
+        probs = self.apply_temperature(probs)
+        return probs
+
+    def sample(
+        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
+    ) -> int:
+        probs = np.asarray(logits)
+        while probs.ndim > 1:
+            probs = probs[0]
+
+        probs = self.process_logits(probs, previous_tokens)
+        if np.all(probs == 0):
+            probs = np.ones_like(probs) / len(probs)
+
+        return int(np.argmax(probs))
 
 
 class StreamingOutput:
@@ -335,14 +448,17 @@ class Qwen3Asr:
 
         # Link KV caches between prefill and decode
         for i in range(3, 2 * self.nblocks + 3):
-            cache = self.prefill.get_input(self.prefill.get_input_name(i))
-            self.decode.set_input(self.decode.get_input_name(i), cache)
+            cache = self.prefill.get_dev_input(self.prefill.get_input_name(i))
+            self.decode.set_dev_input(self.decode.get_input_name(i), cache)
 
         self.all_features_len = 0
         self.max_feature_one_loop = self.encode.get_input_info(
             self.encode.get_input_name(0)
         ).shape[2]
         self.loop_count = 0
+        self.sampling_manager = SamplingManager(
+            top_k=None, top_p=1.0, repetition_penalty=2.0
+        )
 
     def run_encode(self, inputs):
         encode_prep_start = time.perf_counter()
@@ -423,7 +539,7 @@ class Qwen3Asr:
             decode_outputs = self.decode.get_output(self.decode.get_output_name(0))
             if hasattr(decode_outputs, "numpy"):
                 decode_outputs = decode_outputs.numpy()
-            next_id = int(np.argmax(decode_outputs, axis=-1).item())
+            next_id = self.sampling_manager.sample(decode_outputs, generated_ids)
             generated_ids.append(next_id)
 
             # Update lengths
@@ -618,7 +734,7 @@ class Qwen3Asr:
                 prefill_output_time,
             ) = self.run_prefill(origin_feature_lens, inputs, audio_embeds)
 
-            next_token_id = int(np.argmax(last_hidden_state, axis=-1).item())
+            next_token_id = self.sampling_manager.sample(last_hidden_state)
             (
                 result,
                 tokens_generated,

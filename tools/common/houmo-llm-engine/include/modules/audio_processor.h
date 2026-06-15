@@ -32,67 +32,68 @@
 namespace houmo {
 
 /**
- * @brief 音频数据
+ * @brief Audio data
  *
- * 存储 PCM 音频数据和相关元信息。
+ * Stores PCM audio data and related metadata.
  */
 struct AudioData {
-  std::vector<float> pcm;   ///< PCM 数据 (float32, 16kHz, mono)
-  int sample_rate = 16000;  ///< 采样率 (Hz)
-  float duration = 0.0f;    ///< 时长 (秒)
+  std::vector<float> pcm;   ///< PCM data (float32, 16kHz, mono)
+  int sample_rate = 16000;  ///< Sample rate (Hz)
+  float duration = 0.0f;    ///< Duration (seconds)
 };
 
 /**
- * @brief 音频特征
+ * @brief Audio features
  *
- * 存储音频特征数据和维度信息。
+ * Stores audio feature data and dimension information.
  */
 struct MelFeatures {
-  std::vector<float16> data;  ///< 特征数据 (FP16)
-  int feature_dim = 0;        ///< 特征维度 (80 or 128 for Mel Spectrogram)
-  int num_frames = 0;         ///< 帧数
+  std::vector<float16> data;  ///< Feature data (FP16)
+  int feature_dim = 0;        ///< Feature dimension (80 or 128 for Mel Spectrogram)
+  int num_frames = 0;         ///< Number of frames
+  float duration = 0.0f;      ///< Actual audio duration (seconds), excluding padding
 };
 
 /**
- * @brief 音频处理器配置
+ * @brief Audio processor configuration
  *
- * 通过配置支持不同的 ASR 模型:
+ * Supports different ASR models through configuration:
  * - Whisper, GLM-ASR, Qwen3-ASR: Mel Spectrogram
  */
 struct AudioProcessorConfig {
-  // ========== 基础参数 ==========
+  // ========== Basic parameters ==========
 
-  int sample_rate = 16000;  ///< 目标采样率 (Hz), 默认 16kHz
+  int sample_rate = 16000;  ///< Target sample rate (Hz), default 16kHz
 
-  // ========== Mel Spectrogram 参数 (Whisper/GLM-ASR/Qwen3-ASR) ==========
+  // ========== Mel Spectrogram parameters (Whisper/GLM-ASR/Qwen3-ASR) ==========
 
-  int n_mels = 80;            ///< Mel bins 数量 (80 or 128 for whisper-large-v3-turbo)
-  int chunk_seconds = 30;     ///< PCM 分块大小 (秒), 用于音频分段
-  int encoder_window_seconds = 30;  ///< Encoder 输入窗口大小 (秒), Whisper 固定 30 秒
+  int n_mels = 80;            ///< Number of Mel bins (80 or 128 for whisper-large-v3-turbo)
+  int chunk_seconds = 30;     ///< PCM chunk size (seconds), used for audio segmentation
+  int encoder_window_seconds = 30;  ///< Encoder input window size (seconds), Whisper fixed at 30 seconds
 
-  // ========== 高级参数 (可选) ==========
+  // ========== Advanced parameters (optional) ==========
 
-  int fft_size = 400;         ///< FFT 大小 (25ms at 16kHz)
-  int hop_length = 160;       ///< 步长 (10ms at 16kHz)
-  int win_length = 400;       ///< 窗长 (25ms at 16kHz)
-  float mel_fmin = 0.0f;      ///< Mel 滤波器最小频率
-  float mel_fmax = 8000.0f;   ///< Mel 滤波器最大频率
+  int fft_size = 400;         ///< FFT size (25ms at 16kHz)
+  int hop_length = 160;       ///< Hop length (10ms at 16kHz)
+  int win_length = 400;       ///< Window length (25ms at 16kHz)
+  float mel_fmin = 0.0f;      ///< Mel filter minimum frequency
+  float mel_fmax = 8000.0f;   ///< Mel filter maximum frequency
 };
 
 /**
- * @brief 音频处理器
+ * @brief Audio processor
  *
- * 支持 ASR 模型的音频预处理:
+ * Supports audio preprocessing for ASR models:
  * - Whisper (Mel Spectrogram)
  * - GLM-ASR (Mel Spectrogram)
  * - Qwen3-ASR (Mel Spectrogram)
  *
- * 典型流程:
- * 1. LoadAudio() 加载音频文件
- * 2. ChunkPCM() PCM 级别分块 (30秒)
- * 3. ExtractFeatures() 提取特征
+ * Typical workflow:
+ * 1. LoadAudio() - Load audio file
+ * 2. ChunkPCM() - PCM level chunking (30 seconds)
+ * 3. ExtractFeatures() - Extract features
  *
- * 或使用 Process() 一站式处理。
+ * Or use Process() for one-stop processing.
  *
  * Reference:
  * - Whisper: /hmdd/imodelzoo/models/asr/whisper/demo.py
@@ -102,13 +103,13 @@ struct AudioProcessorConfig {
 class AudioProcessor {
  public:
   /**
-   * @brief 默认构造函数 (Mel Spectrogram 模式)
+   * @brief Default constructor (Mel Spectrogram mode)
    */
   AudioProcessor();
 
   /**
-   * @brief 配置构造函数
-   * @param config 处理器配置
+   * @brief Configuration constructor
+   * @param config Processor configuration
    */
   explicit AudioProcessor(const AudioProcessorConfig& config);
 
@@ -122,96 +123,90 @@ class AudioProcessor {
 
   ~AudioProcessor();
 
-  // ========== 音频加载 ==========
+  // ========== Audio loading ==========
 
   /**
-   * @brief 加载音频文件
-   * @param path 音频文件路径 (支持 wav, mp3, flac 等)
-   * @return AudioData PCM 数据
+   * @brief Load audio file
+   * @param path Audio file path (supports wav, mp3, flac, etc.)
+   * @return AudioData PCM data
    *
-   * 内部流程:
-   * - 使用 miniaudio 读取音频文件
-   * - 自动重采样到 16kHz
-   * - 转换为单声道
-   * - 归一化到 [-1, 1] 范围
-   *
-   * TODO: 实现音频加载逻辑
+   * Internal workflow:
+   * - Use miniaudio to read audio file
+   * - Automatic resampling to 16kHz
+   * - Convert to mono
+   * - Normalize to [-1, 1] range
    */
   AudioData LoadAudio(const std::string& path);
 
-  // ========== 特征提取 ==========
+  // ========== Feature extraction ==========
 
   /**
-   * @brief 提取音频特征
-   * @param audio 输入音频
-   * @return MelFeatures 音频特征
+   * @brief Extract audio features
+   * @param audio Input audio
+   * @return MelFeatures Audio features
    *
-   * Mel Spectrogram 模式 (Whisper/GLM-ASR/Qwen3-ASR):
-   * - STFT (短时傅里叶变换)
+   * Mel Spectrogram mode (Whisper/GLM-ASR/Qwen3-ASR):
+   * - STFT (Short-Time Fourier Transform)
    * - Mel Filter Bank
-   * - Log 压缩
-   * - 输出维度: [n_mels, n_frames]
+   * - Log compression
+   * - Output dimension: [n_mels, n_frames]
    */
   MelFeatures ExtractFeatures(const AudioData& audio);
 
-  // ========== 分块处理 ==========
+  // ========== Chunk processing ==========
 
   /**
-   * @brief PCM 级别分块
-   * @param audio 输入音频
-   * @return 音频块列表
+   * @brief PCM level chunking
+   * @param audio Input audio
+   * @return List of audio chunks
    *
-   * 将长音频分割为固定长度 (默认 30 秒) 的块:
-   * - 不足 30 秒的块用零填充
-   * - 返回的每个块都是独立的 AudioData
-   *
-   * TODO: 实现分块逻辑
+   * Split long audio into fixed-length chunks (default 30 seconds):
+   * - Chunks shorter than 30 seconds are zero-padded
+   * - Each returned chunk is an independent AudioData
    */
   std::vector<AudioData> ChunkPCM(const AudioData& audio);
 
-  // ========== 一站式处理 ==========
+  // ========== One-stop processing ==========
 
   /**
-   * @brief 加载音频并提取特征 (支持自动分块)
-   * @param path 音频文件路径
-   * @return 特征块列表
+   * @brief Load audio and extract features (supports automatic chunking)
+   * @param path Audio file path
+   * @return List of feature chunks
    *
-   * 完整流程:
+   * Complete workflow:
    * 1. LoadAudio(path)
    * 2. ChunkPCM(audio)
    * 3. ExtractFeatures(chunk) for each chunk
-   *
-   * TODO: 实现一站式处理逻辑
    */
   std::vector<MelFeatures> Process(const std::string& path);
 
-  // ========== 信息获取 ==========
+  // ========== Information retrieval ==========
 
   /**
-   * @brief 获取特征维度
-   * @return 特征维度 (80 or 128 for Mel Spectrogram)
+   * @brief Get feature dimension
+   * @return Feature dimension (80 or 128 for Mel Spectrogram)
    */
   int feature_dim() const;
 
   /**
-   * @brief 获取采样率
+   * @brief Get sample rate
    */
   int sample_rate() const { return config_.sample_rate; }
 
   /**
-   * @brief 获取 Mel bins 数量
+   * @brief Get number of Mel bins
    */
   int n_mels() const { return config_.n_mels; }
 
   /**
-   * @brief 获取配置
+   * @brief Get configuration
    */
   const AudioProcessorConfig& config() const { return config_; }
 
  private:
   AudioProcessorConfig config_;
 
-  // ========== 辅助方法 ==========
+  // ========== Helper methods ==========
 
   void DownmixToMono(const std::vector<float>& interleaved, int channels,
                      std::vector<float>* mono);

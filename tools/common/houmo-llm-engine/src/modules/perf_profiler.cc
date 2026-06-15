@@ -238,7 +238,8 @@ void PerfProfiler::reset() {
 // Export implementation
 // ============================================================================
 
-PerfProfiler::PrintView PerfProfiler::node_to_print_view(const Node& node, const std::string& name) const {
+PerfProfiler::PrintView PerfProfiler::node_to_print_view(
+    const Node& node, const std::string& name) const {
   PrintView view;
   view.name = name;
   view.time_ms = node.total_time_ms;
@@ -253,7 +254,8 @@ PerfProfiler::PrintView PerfProfiler::node_to_print_view(const Node& node, const
   return view;
 }
 
-void PerfProfiler::print_tree(const PrintView& view, const std::string& prefix) const {
+void PerfProfiler::print_tree(const PrintView& view,
+                              const std::string& prefix) const {
   // Time numbers start at character position 30
   std::cout << prefix << view.name;
 
@@ -267,8 +269,9 @@ void PerfProfiler::print_tree(const PrintView& view, const std::string& prefix) 
     if (view.count > 0) {
       std::cout << std::fixed << std::setprecision(2) << view.time_ms << " ms";
       if (view.count > 1) {
-        std::cout << " (" << view.count << " calls, avg " << std::setprecision(2)
-                  << (view.time_ms / view.count) << " ms)";
+        std::cout << " (" << view.count << " calls, avg "
+                  << std::setprecision(2) << (view.time_ms / view.count)
+                  << " ms)";
       }
     }
   }
@@ -282,7 +285,8 @@ void PerfProfiler::print_tree(const PrintView& view, const std::string& prefix) 
   // If has child nodes, print total line
   if (!view.children.empty() && view.count > 0) {
     std::cout << prefix << "  total:";
-    int current_pos = static_cast<int>(prefix.size()) + 8;  // "  total:" = 8 chars
+    int current_pos =
+        static_cast<int>(prefix.size()) + 8;  // "  total:" = 8 chars
     int padding = 30 - current_pos;
     if (padding > 0) {
       std::cout << std::string(padding, ' ');
@@ -330,8 +334,8 @@ void PerfProfiler::print_table() const {
 }
 
 void PerfProfiler::print_compact() const {
-  std::cout << "[Perf] " << root_stage_ << ": " << std::fixed << std::setprecision(2)
-            << e2e_ms() << "ms\n";
+  std::cout << "[Perf] " << root_stage_ << ": " << std::fixed
+            << std::setprecision(2) << e2e_ms() << "ms\n";
 
   for (const auto& pair : root_.children) {
     const Node& child = pair.second;
@@ -363,7 +367,6 @@ PerfStats PerfProfiler::to_perf_stats() const {
 void PerfProfiler::print_summary(OutputFormat format) const {
   switch (format) {
     case OutputFormat::Tree:
-      std::cout << "=== Performance Summary ===\n";
       std::cout << "───────────────────────────────────────────────────────────"
                    "──────────────────────\n";
       {

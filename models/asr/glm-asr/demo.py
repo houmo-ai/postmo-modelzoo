@@ -285,6 +285,7 @@ class HmGLM_ASR:
         self.prefill_time = 0
         self.decode_time = 0
         self.ttft_time = 0
+        self.ttft_start = time.time()
 
     def _get_nblocks(self):
         input_names = []
@@ -447,9 +448,8 @@ class HmGLM_ASR:
         L = min(seq_len, self.max_prefill)
 
         logger.info("Running Llm...")
-        ttft_start = time.time()
         next_token_id = self._run_prefill(final_inputs_embeds, L)
-        self.ttft_time += time.time() - ttft_start
+        self.ttft_time += time.time() - self.ttft_start
         generated_ids = [next_token_id]
 
         slide_len = 10
@@ -493,8 +493,15 @@ class HmGLM_ASR:
         print("\033[0m")
         return result_text, valid_length - L
 
-    def transcribe(self, audio_input, max_new_tokens: int = 2048) -> Tuple[str, int]:
+    def transcribe(self, audio_input, max_new_tokens: int = 2048) -> Tuple[str, int, float]:
         import librosa
+
+        # Reset all timing metrics for this transcription
+        self.encoder_time = 0
+        self.prefill_time = 0
+        self.decode_time = 0
+        self.ttft_time = 0
+        self.ttft_start = time.time()
 
         if isinstance(audio_input, str):
             audio_array, _ = librosa.load(
@@ -506,8 +513,9 @@ class HmGLM_ASR:
             audio_array = audio_input
 
         sr = self.processor.feature_extractor.sampling_rate
-        chunk_size = int(sr * 30.0)
         n_samples = len(audio_array)
+        audio_duration = n_samples / sr
+        chunk_size = int(sr * 30.0)
         n_chunks = max(1, (n_samples + chunk_size - 1) // chunk_size)
 
         total_tokens = 0
@@ -521,10 +529,10 @@ class HmGLM_ASR:
             results.append(res_str)
             total_tokens += tokens
 
-        return " ".join(filter(None, results)), total_tokens
+        return " ".join(filter(None, results)), total_tokens, audio_duration
 
 
-def show_statictic_info(inference: HmGLM_ASR, output_tokens: int):
+def show_statictic_info(inference: HmGLM_ASR, output_tokens: int, audio_duration: float):
     logger.success(f"Encoder Time: {inference.encoder_time * 1000:.3f} ms")
     logger.success(f"Prefill Cost: {inference.prefill_time * 1000:.3f} ms")
     logger.success(f"Decode Cost: {inference.decode_time * 1000:.3f} ms")
@@ -535,16 +543,17 @@ def show_statictic_info(inference: HmGLM_ASR, output_tokens: int):
     logger.success(
         f"TPOT (Time Per Output Token): {inference.decode_time * 1000 / max(output_tokens, 1):.3f} ms/token"
     )
-    logger.success(
-        f"E2E Latency: {(inference.ttft_time + inference.decode_time):.3f} seconds"
-    )
+    e2e_latency = inference.ttft_time + inference.decode_time
+    logger.success(f"E2E Latency: {e2e_latency:.3f} seconds")
+    rtf = e2e_latency / max(audio_duration, 1e-5)
+    logger.success(f"RTF (Real-Time Factor): {rtf:.3f}")
 
 
 def main(args):
     logger.info("Initializing GLM-ASR Inference via Tcim...")
     inference = HmGLM_ASR(args)
 
-    result, out_tokens = inference.transcribe(
+    result, out_tokens, audio_duration = inference.transcribe(
         args.audio, max_new_tokens=args.max_new_tokens
     )
 
@@ -558,7 +567,7 @@ def main(args):
     print(result)
     print("=" * 60)
 
-    show_statictic_info(inference, out_tokens)
+    show_statictic_info(inference, out_tokens, audio_duration)
 
 
 if __name__ == "__main__":

@@ -74,7 +74,6 @@ void GlmAsrModel::load() {
     encoder_module_ = std::make_shared<tcim::Module>();
     CHECK_TCIM_RET_STATUS(
         encoder_module_->LoadModel(encoder_path, encoder_option));
-    std::cout << "Encoder model loaded: " << encoder_path << std::endl;
 
     auto input0_shape =
         encoder_module_->GetInputInfo(encoder_module_->GetInputName(0)).Shape();
@@ -164,7 +163,6 @@ void GlmAsrModel::load() {
   {
     if (fs::exists(config_.tokenizer_path)) {
       tokenizer_ = std::make_shared<HfTokenizer>(config_.tokenizer_path);
-      std::cout << "Tokenizer loaded" << std::endl;
     }
   }
 
@@ -576,9 +574,10 @@ void GlmAsrContext::Transcribe(const std::string& audio_path,
     reset();
 
     Token first_token = do_prefill(prompt);
-    p.record_ttft();
-    p.set_input_tokens(static_cast<int>(prompt.size()));
-    p.add_output_token();
+    p.set_input_tokens(p.input_tokens() + static_cast<int>(prompt.size()));
+    if (chunk_idx == 0) {
+      p.record_ttft();
+    }
 
     if (callback) callback(first_token);
 

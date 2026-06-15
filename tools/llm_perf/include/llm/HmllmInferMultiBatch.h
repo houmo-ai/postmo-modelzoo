@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: HmllmInferMultiBatch.h
  * Description:
@@ -30,8 +30,8 @@
 #include <regex>
 #include <sstream>
 
-#include "HmEmbedding.h"
-#include "tcim_runtime_utils.h"
+#include "utils/HmEmbedding.h"
+#include "utils/tcim_runtime_utils.h"
 
 /**
  * @brief Structure to hold performance information for a single batch
@@ -176,7 +176,7 @@ class HmllmInferMultiBatch : public HmllmInferBase {
    * @param context_length Context lengths for each batch
    * @return Performance information for the single batch
    */
-  PerfSingleBatchInfo run_decode(tensor_type *input_datas,
+  PerfSingleBatchInfo run_decode(float16 *input_datas,
                                  const std::vector<int> context_length);
 
   void DebugDecodeInput();

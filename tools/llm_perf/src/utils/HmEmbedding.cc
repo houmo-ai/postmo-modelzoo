@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: HmEmbedding.cc
  * Description:
@@ -20,7 +20,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include "HmEmbedding.h"
+#include "utils/HmEmbedding.h"
 
 HmEmbedding::HmEmbedding(const std::string& embeddingWeightPath,
                          const int& embedding_len, const int& prefill_len)
@@ -29,20 +29,20 @@ HmEmbedding::HmEmbedding(const std::string& embeddingWeightPath,
   // corresponding address of embed_w when decoding
   try {
     uint32_t n_bytes = 0;
-    embed_w = readEmbeddingWeight<tensor_type>(
+    embed_w = readEmbeddingWeight<float16>(
         embeddingWeightPath, n_bytes, prefill_length * embedding_length);
-    vocab_size = n_bytes / (sizeof(tensor_type) * embedding_length);
+    vocab_size = n_bytes / (sizeof(float16) * embedding_length);
     std::cout << "[INFO] vocab_size: " << vocab_size
               << ", embedding_length: " << embedding_length
               << ", prefill_length: " << prefill_length << "\n";
     if (vocab_size <= 0 ||
-        (vocab_size * embedding_length * sizeof(tensor_type) > n_bytes)) {
+        (vocab_size * embedding_length * sizeof(float16) > n_bytes)) {
       throw std::runtime_error(
           "Invalid embedding weight file: vocab size must be positive and file "
           "size mismatch.");
     }
 
-    if (vocab_size * embedding_length * sizeof(tensor_type) < n_bytes) {
+    if (vocab_size * embedding_length * sizeof(float16) < n_bytes) {
       std::cout << "[Warning] embedding weight file size is not a multiple of "
                    "embedding vector size. Some data may be ignored.\n";
     }
@@ -50,7 +50,7 @@ HmEmbedding::HmEmbedding(const std::string& embeddingWeightPath,
     throw std::runtime_error("readEmbeddingWeight Error:" +
                              std::string(e.what()));
   }
-  ptr = std::make_unique<tensor_type[]>(prefill_length * embedding_length);
+  ptr = std::make_unique<float16[]>(prefill_length * embedding_length);
 }
 
 HmEmbedding::~HmEmbedding() {
@@ -58,7 +58,7 @@ HmEmbedding::~HmEmbedding() {
   ptr.reset();
 }
 
-tensor_type* HmEmbedding::EmbeddingTokens(const std::vector<int>& ids) {
+float16* HmEmbedding::EmbeddingTokens(const std::vector<int>& ids) {
   if (ids.empty()) {
     return nullptr;
   }
@@ -71,7 +71,7 @@ tensor_type* HmEmbedding::EmbeddingTokens(const std::vector<int>& ids) {
   }
 
   std::fill(ptr.get(), ptr.get() + prefill_length * embedding_length,
-            tensor_type(0));
+            float16(0));
   for (uint32_t index = 0; index < ids.size(); index++) {
     const int token_id = ids[index];
     const uint64_t src_offset =

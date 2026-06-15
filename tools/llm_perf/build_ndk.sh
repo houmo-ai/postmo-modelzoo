@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
-if [ ! -e 3rdparty ];then
-  mkdir 3rdparty
+export HOUMO_ENGINE_DIR="$HOUMO_EXAMPLES_PATH/tools/common/houmo-llm-engine"
+export CURRENT_DIR=$(pwd)
+cd $HOUMO_ENGINE_DIR
+if [ -e build_ndk ]; then
+  rm -rf build_ndk
 fi
-if [ ! -e 3rdparty/eigen3 ];then
-  cd 3rdparty
-  wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
-  unzip eigen-3.4.0.zip
-  mv eigen-3.4.0 eigen3
-  rm -rf eigen-3.4.0.zip
-  cd ..
-fi
+./build_ndk.sh
+cd $CURRENT_DIR
 set -e
 if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
   WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

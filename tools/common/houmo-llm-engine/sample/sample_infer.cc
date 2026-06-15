@@ -47,36 +47,36 @@ namespace fs = std::filesystem;
 // ============================================================================
 
 static void printUsage(const char* program_name) {
-  std::cout << "Houmo Inference Framework - 统一推理示例\n\n";
-  std::cout << "用法: " << program_name << " [选项]\n\n";
-  std::cout << "选项:\n";
-  std::cout << "  --model <series>      模型系列: qwen3_llm, qwen35_mllm, "
+  std::cout << "Houmo Inference Framework - Unified Inference Example\n\n";
+  std::cout << "Usage: " << program_name << " [options]\n\n";
+  std::cout << "Options:\n";
+  std::cout << "  --model <series>      Model series: qwen3_llm, qwen35_mllm, "
                "qwen3_vlm\n";
-  std::cout << "  --prompt <text>       用户提示词 (默认: \"你好\")\n";
-  std::cout << "  --image <path>        图片路径 (VLM 模型，可多次指定)\n";
-  std::cout << "  --multi-turn          启用多轮对话模式\n";
-  std::cout << "  --max-tokens <n>      最大生成 token 数 (默认: 256)\n";
-  std::cout << "  --temperature <f>     采样温度 (默认: 1.0)\n";
-  std::cout << "  --top-k <n>           Top-k 采样 (默认: 1, greedy)\n";
-  std::cout << "  --prefill <path>      Prefill 模型路径\n";
-  std::cout << "  --decode <path>       Decode 模型路径\n";
-  std::cout << "  --vision <path>       Vision 模型路径 (VLM)\n";
-  std::cout << "  --tokenizer <path>    Tokenizer 路径\n";
-  std::cout << "  --embedding <path>    Embedding 路径\n";
-  std::cout << "  --info                显示模型信息后退出\n";
-  std::cout << "  -h, --help            显示帮助信息\n";
+  std::cout << "  --prompt <text>       User prompt (default: \"Hello\")\n";
+  std::cout << "  --image <path>        Image path (VLM model, can specify multiple)\n";
+  std::cout << "  --multi-turn          Enable multi-turn dialogue mode\n";
+  std::cout << "  --max-tokens <n>      Max tokens to generate (default: 256)\n";
+  std::cout << "  --temperature <f>     Sampling temperature (default: 1.0)\n";
+  std::cout << "  --top-k <n>           Top-k sampling (default: 1, greedy)\n";
+  std::cout << "  --prefill <path>      Prefill model path\n";
+  std::cout << "  --decode <path>       Decode model path\n";
+  std::cout << "  --vision <path>       Vision model path (VLM)\n";
+  std::cout << "  --tokenizer <path>    Tokenizer path\n";
+  std::cout << "  --embedding <path>    Embedding path\n";
+  std::cout << "  --info                Show model info and exit\n";
+  std::cout << "  -h, --help            Show help message\n";
   std::cout << "\n";
-  std::cout << "示例:\n";
-  std::cout << "  # LLM 推理 (自动检测)\n";
-  std::cout << "  " << program_name << " --prompt \"介绍一下你自己\"\n";
+  std::cout << "Examples:\n";
+  std::cout << "  # LLM inference (auto detect)\n";
+  std::cout << "  " << program_name << " --prompt \"Introduce yourself\"\n";
   std::cout << "\n";
-  std::cout << "  # VLM 图像理解\n";
+  std::cout << "  # VLM image understanding\n";
   std::cout
       << "  " << program_name
-      << " --model qwen35_mllm --image test.jpg --prompt \"描述这张图片\"\n";
+      << " --model qwen35_mllm --image test.jpg --prompt \"Describe this image\"\n";
   std::cout << "\n";
-  std::cout << "  # 多轮对话\n";
-  std::cout << "  " << program_name << " --multi-turn --prompt \"你好\"\n";
+  std::cout << "  # Multi-turn dialogue\n";
+  std::cout << "  " << program_name << " --multi-turn --prompt \"Hello\"\n";
 }
 
 static void printSeparator(const char* title) {
@@ -134,7 +134,7 @@ static void exampleBasicInference(houmo::LLMModel& model,
                                   const std::string& prompt,
                                   const houmo::SamplingParams& params,
                                   bool enable_thinking) {
-  printSeparator("基本推理");
+  printSeparator("Basic Inference");
 
   auto ctx = model.create_context();
 
@@ -142,8 +142,8 @@ static void exampleBasicInference(houmo::LLMModel& model,
   std::string rendered = ApplyChatTemplate(msgs, true, enable_thinking);
   auto tokens = model.tokenize(rendered, false, false);
 
-  std::cout << "提示: " << prompt << "\n";
-  std::cout << "输出: ";
+  std::cout << "Prompt: " << prompt << "\n";
+  std::cout << "Output: ";
 
   houmo::StreamingDecoder decoder(model.tokenizer());
   ctx->generate(tokens, params, [&decoder](houmo::Token token) {
@@ -164,7 +164,7 @@ static void exampleMultiTurn(houmo::LLMModel& model,
                              const std::string& initial_prompt,
                              const houmo::SamplingParams& params,
                              bool enable_thinking) {
-  printSeparator("多轮对话");
+  printSeparator("Multi-turn Dialogue");
 
   auto ctx = model.create_context();
   houmo::StreamingDecoder decoder(model.tokenizer());
@@ -183,8 +183,8 @@ static void exampleMultiTurn(houmo::LLMModel& model,
   std::string prompt1 = ApplyChatTemplate(msgs1, true, enable_thinking);
   auto tokens1 = model.tokenize(prompt1, false, false);
 
-  std::cout << "用户: " << initial_prompt << "\n";
-  std::cout << "助手: ";
+  std::cout << "User: " << initial_prompt << "\n";
+  std::cout << "Assistant: ";
 
   std::string response1;
   ctx->generate(tokens1, params, [&](houmo::Token token) {
@@ -203,13 +203,13 @@ static void exampleMultiTurn(houmo::LLMModel& model,
   ctx->profiler().print_summary();
 
   // Round 2 - continue dialogue
-  std::string follow_up = "那 2 + 2 等于多少？";
+  std::string follow_up = "What is 2 + 2?";
   std::vector<Message> msgs2 = {{"user", follow_up}};
   std::string prompt2 = ApplyChatTemplate(msgs2, true, enable_thinking);
   auto tokens2 = model.tokenize(prompt2, false, false);
 
-  std::cout << "\n用户: " << follow_up << "\n";
-  std::cout << "助手: ";
+  std::cout << "\nUser: " << follow_up << "\n";
+  std::cout << "Assistant: ";
 
   decoder.reset();
   ctx->generate(tokens2, params, [&](houmo::Token token) {
@@ -227,7 +227,7 @@ static void exampleMultiTurn(houmo::LLMModel& model,
   ctx->profiler().print_summary();
 
   // Round 3 - dialogue again
-  std::string follow_up3 = "先介绍下图片内容，然后详细总结下历史对话";
+  std::string follow_up3 = "First introduce the image content, then summarize the conversation in detail";
 
   std::vector<std::string> images3 = {"tests/data/b.jpg"};
   std::string content3;
@@ -262,11 +262,11 @@ static void exampleImageUnderstanding(houmo::LLMModel& model,
                                       const std::string& prompt,
                                       const houmo::SamplingParams& params,
                                       bool enable_thinking) {
-  printSeparator("图像理解");
+  printSeparator("Image Understanding");
 
   // Check if VLM is supported
   if (model.type() != houmo::ModelType::VLM) {
-    std::cerr << "错误: 当前模型不支持图像输入\n";
+    std::cerr << "Error: Current model does not support image input\n";
     return;
   }
 
@@ -278,18 +278,18 @@ static void exampleImageUnderstanding(houmo::LLMModel& model,
     for (const auto& img : images) {
       ctx->set_image(img);
     }
-    std::cout << "已加载 " << images.size() << " 张图片 (Qwen35MLLM)\n";
+    std::cout << "Loaded " << images.size() << " images (Qwen35MLLM)\n";
   }
 
   // Try Qwen3VLM
   auto* qwen3vl_ctx = dynamic_cast<houmo::Qwen3VLMContext*>(ctx.get());
   if (qwen3vl_ctx) {
     qwen3vl_ctx->set_images(images);
-    std::cout << "已加载 " << images.size() << " 张图片 (Qwen3VLM)\n";
+    std::cout << "Loaded " << images.size() << " images (Qwen3VLM)\n";
   }
 
   if (!qwen35_ctx && !qwen3vl_ctx) {
-    std::cerr << "警告: 无法识别的 VLM Context 类型\n";
+    std::cerr << "Warning: Unrecognized VLM Context type\n";
     return;
   }
 
@@ -304,8 +304,8 @@ static void exampleImageUnderstanding(houmo::LLMModel& model,
   std::string rendered = ApplyChatTemplate(msgs, true, enable_thinking);
   auto tokens = model.tokenize(rendered, false, false);
 
-  std::cout << "提示: " << prompt << "\n";
-  std::cout << "输出: ";
+  std::cout << "Prompt: " << prompt << "\n";
+  std::cout << "Output: ";
 
   houmo::StreamingDecoder decoder(model.tokenizer());
   ctx->generate(tokens, params, [&decoder](houmo::Token token) {
@@ -323,11 +323,11 @@ static void exampleImageUnderstanding(houmo::LLMModel& model,
 
 // Model information
 static void printModelInfo(houmo::LLMModel& model) {
-  printSeparator("模型信息");
+  printSeparator("Model Information");
 
   auto info = model.model_info();
-  std::cout << "模型名称:     " << info.model_name << "\n";
-  std::cout << "模型类型:     "
+  std::cout << "Model Name:     " << info.model_name << "\n";
+  std::cout << "Model Type:     "
             << (info.type == houmo::ModelType::LLM ? "LLM" : "VLM") << "\n";
   std::cout << "----------------------------------------\n";
   std::cout << "n_batch:       " << info.n_batch << "\n";
@@ -338,7 +338,7 @@ static void printModelInfo(houmo::LLMModel& model) {
   std::cout << "prefill_length: " << info.prefill_length << "\n";
   std::cout << "kv_cache_layers: " << info.kv_cache_layers << "\n";
   std::cout << "----------------------------------------\n";
-  std::cout << "运行时信息:\n";
+  std::cout << "Runtime Info:\n";
   std::cout << "max_ctx_available: " << model.max_ctx_available() << "\n";
   std::cout << "vocab_size:        " << model.vocab_size() << "\n";
   std::cout << "embedding_dim:     " << model.embedding_dim() << "\n";
@@ -346,7 +346,7 @@ static void printModelInfo(houmo::LLMModel& model) {
   // Show registered model types
   auto types = houmo::ModelFactory<houmo::LLMModel>::ListRegisteredTypes();
   std::cout << "----------------------------------------\n";
-  std::cout << "已注册模型类型: ";
+  std::cout << "Registered Model Types: ";
   for (const auto& t : types) {
     std::cout << t << " ";
   }
@@ -362,7 +362,7 @@ int main(int argc, char* argv[]) {
 
   // Default parameters
   std::string model_series = "auto";  // auto, qwen3_llm, qwen35_mllm, qwen3_vlm
-  std::string prompt = "你好，介绍下图片中的内容。";
+  std::string prompt = "Hello, introduce the content in the image.";
   std::vector<std::string> images;
   int max_tokens = 0;
   float temperature = 1.0f;
@@ -411,7 +411,7 @@ int main(int argc, char* argv[]) {
     } else if (arg == "--info") {
       show_info = true;
     } else {
-      std::cerr << "未知选项: " << arg << "\n";
+      std::cerr << "Unknown option: " << arg << "\n";
       printUsage(argv[0]);
       return -1;
     }
@@ -435,16 +435,16 @@ int main(int argc, char* argv[]) {
 
   // Check if model files exist
   if (!fs::exists(prefill_path)) {
-    std::cerr << "Prefill 模型未找到: " << prefill_path << "\n";
-    std::cerr << "请设置 HM_ENGINE_PATH 环境变量或使用 --prefill 参数\n";
+    std::cerr << "Prefill model not found: " << prefill_path << "\n";
+    std::cerr << "Please set HM_ENGINE_PATH environment variable or use --prefill parameter\n";
     return -2;
   }
   if (!fs::exists(decode_path)) {
-    std::cerr << "Decode 模型未找到: " << decode_path << "\n";
+    std::cerr << "Decode model not found: " << decode_path << "\n";
     return -2;
   }
   if (!fs::exists(embedding_path)) {
-    std::cerr << "Embedding 未找到: " << embedding_path << "\n";
+    std::cerr << "Embedding not found: " << embedding_path << "\n";
     return -2;
   }
 
@@ -466,8 +466,8 @@ int main(int argc, char* argv[]) {
     std::unique_ptr<houmo::LLMModel> model;
 
     if (model_series == "auto") {
-      std::cerr << "错误: 必须使用 --model 指定模型类型\n";
-      std::cerr << "可用类型: ";
+      std::cerr << "Error: Must use --model to specify model type\n";
+      std::cerr << "Available types: ";
       auto types = houmo::ModelFactory<houmo::LLMModel>::ListRegisteredTypes();
       for (const auto& t : types) {
         std::cerr << t << " ";
@@ -479,11 +479,11 @@ int main(int argc, char* argv[]) {
     model = houmo::ModelFactory<houmo::LLMModel>::Create(model_series, config);
 
     if (!model) {
-      std::cerr << "错误: 无法创建模型\n";
+      std::cerr << "Error: Failed to create model\n";
       return -3;
     }
 
-    std::cout << "模型加载成功!\n";
+    std::cout << "Model loaded successfully!\n";
 
     // Sampling parameters
     houmo::SamplingParams params;
@@ -505,7 +505,7 @@ int main(int argc, char* argv[]) {
       // Image understanding
       for (const auto& img : images) {
         if (!fs::exists(img)) {
-          std::cerr << "图片未找到: " << img << "\n";
+          std::cerr << "Image not found: " << img << "\n";
           return -2;
         }
       }
@@ -518,13 +518,13 @@ int main(int argc, char* argv[]) {
       exampleBasicInference(*model, prompt, params, enable_thinking);
     }
 
-    std::cout << "\n完成!\n";
+    std::cout << "\nDone!\n";
 
   } catch (const houmo::Exception& e) {
-    std::cerr << "Houmo 错误: " << e.what() << "\n";
+    std::cerr << "Houmo Error: " << e.what() << "\n";
     return -3;
   } catch (const std::exception& e) {
-    std::cerr << "标准错误: " << e.what() << "\n";
+    std::cerr << "Standard Error: " << e.what() << "\n";
     return -3;
   }
 

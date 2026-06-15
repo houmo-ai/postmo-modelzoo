@@ -171,7 +171,7 @@ class Qwen3ForceAligner:
     def __init__(
         self, encode_path, prefill_path, processor_dir, embedding_path, ndevice=1
     ):
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = "cpu"
         self.ndevice = ndevice
         dev_manager = tcim.runtime.DevManager(
             get_hm_devices(self.ndevice), "Xh2HalBackend"

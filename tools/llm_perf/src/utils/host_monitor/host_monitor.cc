@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: host_monitor.cc
  * Description:
@@ -21,7 +21,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #if defined(__linux__)
-#include "host_monitor.h"
+#include "utils/host_monitor/host_monitor.h"
 
 // ========== Memory Monitor Thread ==========
 class HostMonitor::HostMonitorImpl {

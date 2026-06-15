@@ -52,12 +52,12 @@ AudioProcessor::AudioProcessor(const AudioProcessorConfig& config)
 
 AudioProcessor::~AudioProcessor() = default;
 
-// ========== 音频加载 ==========
+// ========== Audio loading ==========
 
 AudioData AudioProcessor::LoadAudio(const std::string& path) {
   AudioData audio;
 
-  // 1. 使用 miniaudio 打开音频文件
+  // 1. Open audio file using miniaudio
   ma_decoder_config decoder_config =
       ma_decoder_config_init(ma_format_f32, 0, 0);
   ma_decoder decoder;
@@ -69,7 +69,7 @@ AudioData AudioProcessor::LoadAudio(const std::string& path) {
     return audio;
   }
 
-  // 2. 获取音频元信息
+  // 2. Get audio metadata
   ma_format format;
   ma_uint32 channels = 0;
   ma_uint32 sample_rate = 0;
@@ -82,7 +82,7 @@ AudioData AudioProcessor::LoadAudio(const std::string& path) {
     return audio;
   }
 
-  // 3. 读取 PCM 数据
+  // 3. Read PCM data
   std::vector<float> interleaved_pcm;
   ma_uint64 total_frames = 0;
   result = ma_decoder_get_length_in_pcm_frames(&decoder, &total_frames);
@@ -99,7 +99,7 @@ AudioData AudioProcessor::LoadAudio(const std::string& path) {
     }
     interleaved_pcm.resize(static_cast<size_t>(frames_read) * channels);
   } else {
-    // 流式读取（未知长度）
+    // Stream reading (unknown length)
     constexpr ma_uint64 kFramesPerRead = 4096;
     std::vector<float> chunk(static_cast<size_t>(kFramesPerRead) * channels);
     while (true) {
@@ -126,11 +126,11 @@ AudioData AudioProcessor::LoadAudio(const std::string& path) {
     return audio;
   }
 
-  // 4. 转单声道
+  // 4. Convert to mono
   std::vector<float> mono_pcm;
   DownmixToMono(interleaved_pcm, static_cast<int>(channels), &mono_pcm);
 
-  // 5. 重采样到目标采样率
+  // 5. Resample to target sample rate
   if (sample_rate == static_cast<ma_uint32>(config_.sample_rate)) {
     audio.pcm = std::move(mono_pcm);
   } else {
@@ -153,13 +153,13 @@ AudioData AudioProcessor::LoadAudio(const std::string& path) {
   return audio;
 }
 
-// ========== 特征提取 ==========
+// ========== Feature extraction ==========
 
 MelFeatures AudioProcessor::ExtractFeatures(const AudioData& audio) {
   return ComputeMelSpectrogram(audio);
 }
 
-// ========== 分块处理 ==========
+// ========== Chunk processing ==========
 
 std::vector<AudioData> AudioProcessor::ChunkPCM(const AudioData& audio) {
   std::vector<AudioData> chunks;
@@ -172,11 +172,6 @@ std::vector<AudioData> AudioProcessor::ChunkPCM(const AudioData& audio) {
   int total_samples = static_cast<int>(audio.pcm.size());
   int num_chunks = (total_samples + chunk_samples - 1) / chunk_samples;
 
-  std::cout << "ChunkPCM: total_samples=" << total_samples
-            << ", chunk_seconds=" << config_.chunk_seconds
-            << ", chunk_samples=" << chunk_samples
-            << ", num_chunks=" << num_chunks << std::endl;
-
   for (int i = 0; i < num_chunks; ++i) {
     AudioData chunk;
     chunk.sample_rate = audio.sample_rate;
@@ -188,9 +183,6 @@ std::vector<AudioData> AudioProcessor::ChunkPCM(const AudioData& audio) {
     chunk.pcm.assign(audio.pcm.begin() + start, audio.pcm.begin() + end);
     chunk.duration = static_cast<float>(chunk_len) / audio.sample_rate;
 
-    std::cout << "  Chunk " << i << ": samples=" << chunk_len
-              << ", duration=" << chunk.duration << "s" << std::endl;
-
     // Note: No padding here - ComputeMelSpectrogram will pad to
     // encoder_window_seconds This allows chunk_seconds and
     // encoder_window_seconds to be different
@@ -201,7 +193,7 @@ std::vector<AudioData> AudioProcessor::ChunkPCM(const AudioData& audio) {
   return chunks;
 }
 
-// ========== 一站式处理 ==========
+// ========== One-stop processing ==========
 
 std::vector<MelFeatures> AudioProcessor::Process(const std::string& path) {
   std::vector<MelFeatures> results;
@@ -221,11 +213,11 @@ std::vector<MelFeatures> AudioProcessor::Process(const std::string& path) {
   return results;
 }
 
-// ========== 信息获取 ==========
+// ========== Information retrieval ==========
 
 int AudioProcessor::feature_dim() const { return config_.n_mels; }
 
-// ========== 辅助方法 ==========
+// ========== Helper methods ==========
 
 void AudioProcessor::DownmixToMono(const std::vector<float>& interleaved,
                                    int channels, std::vector<float>* mono) {
@@ -287,19 +279,20 @@ bool AudioProcessor::ResampleAudio(const std::vector<float>& input,
   return true;
 }
 
-// ========== Mel Spectrogram (WhisperFeatureExtractor 风格) ==========
-// 适配 Whisper, GLM-ASR, Qwen3-ASR 等使用 WhisperFeatureExtractor 的模型
+// ========== Mel Spectrogram (WhisperFeatureExtractor style) ==========
+// Compatible with models using WhisperFeatureExtractor: Whisper, GLM-ASR, Qwen3-ASR
 
 MelFeatures AudioProcessor::ComputeMelSpectrogram(const AudioData& audio) {
   MelFeatures features;
   features.feature_dim = config_.n_mels;
+  features.duration = audio.duration;  // Save actual audio duration
 
   if (audio.pcm.empty()) {
     return features;
   }
 
-  // 1. 根据 encoder_window_seconds 配置窗口大小 (padding/truncate)
-  // 这是 encode 输入要求的窗口大小，与 chunk_seconds 分段逻辑独立
+  // 1. Configure window size based on encoder_window_seconds (padding/truncate)
+  // This is the window size required by encode input, independent of chunk_seconds segmentation logic
   std::vector<float> processed_pcm = audio.pcm;
   size_t window_samples =
       static_cast<size_t>(config_.sample_rate) * config_.encoder_window_seconds;
@@ -310,7 +303,7 @@ MelFeatures AudioProcessor::ComputeMelSpectrogram(const AudioData& audio) {
     processed_pcm.resize(window_samples);  // Truncate
   }
 
-  // 2. 配置特征提取器 (WhisperFeatureExtractor 风格)
+  // 2. Configure feature extractor (WhisperFeatureExtractor style)
   knf::WhisperFeatureOptions whisper_opts;
   whisper_opts.dim = config_.n_mels;
 
@@ -319,7 +312,7 @@ MelFeatures AudioProcessor::ComputeMelSpectrogram(const AudioData& audio) {
                                processed_pcm.data(), processed_pcm.size());
   whisper_fbank.InputFinished();
 
-  // 3. 提取特征
+  // 3. Extract features
   features.num_frames = whisper_fbank.NumFramesReady();
   if (features.num_frames <= 0) {
     return features;
@@ -339,8 +332,8 @@ MelFeatures AudioProcessor::ComputeMelSpectrogram(const AudioData& audio) {
     }
   }
 
-  // 4. 归一化并转为 FP16
-  // Whisper 归一化: clamp to [max_log_spec - 8, max_log_spec], then (val + 4)
+  // 4. Normalize and convert to FP16
+  // Whisper normalization: clamp to [max_log_spec - 8, max_log_spec], then (val + 4)
   // / 4
   features.data.resize(tmp_data.size());
   for (size_t i = 0; i < tmp_data.size(); ++i) {

@@ -99,7 +99,6 @@ void WhisperModel::load() {
     encoder_module_ = std::make_shared<tcim::Module>();
     CHECK_TCIM_RET_STATUS(
         encoder_module_->LoadModel(encoder_path, encoder_option));
-    std::cout << "Encoder model loaded: " << encoder_path << std::endl;
 
     // Get n_mels from encode input shape [1, n_mels, 3000]
     auto input0_shape =
@@ -108,9 +107,6 @@ void WhisperModel::load() {
       n_mels_ = input0_shape[1];
       n_frames_ = input0_shape[2];
     }
-    std::cout << "Detected n_mels from encode input: " << n_mels_ << std::endl;
-    std::cout << "Detected n_frames from encode input: " << n_frames_
-              << std::endl;
   }
 
   // Step 3 - Load prefill model
@@ -291,16 +287,6 @@ void WhisperModel::load() {
     }
 
     default_lang_token_id_ = tokenizer_->token_to_id("<|zh|>");
-
-    std::cout << "Token IDs initialized:" << std::endl;
-    std::cout << "  sot_token_id: " << sot_token_id_ << std::endl;
-    std::cout << "  transcribe_token_id: " << transcribe_token_id_ << std::endl;
-    std::cout << "  notimestamps_token_id: " << notimestamps_token_id_
-              << std::endl;
-    std::cout << "  eos_token_id: " << eos_token_id_ << std::endl;
-    std::cout << "  default_lang_token_id: " << default_lang_token_id_
-              << std::endl;
-    std::cout << "  language count: " << lang_token_map_.size() << std::endl;
   }
 }
 
@@ -329,10 +315,7 @@ WhisperContext::WhisperContext(ASRModel* model, int n_ctx)
           AudioProcessorConfig{.sample_rate = 16000,
                                .n_mels = model->n_mels(),
                                .chunk_seconds = 30,
-                               .encoder_window_seconds = 30})) {
-  std::cout << "WhisperContext created with n_ctx=" << n_ctx
-            << ", n_mels=" << model->n_mels() << std::endl;
-}
+                               .encoder_window_seconds = 30})) {}
 
 MelFeatures WhisperContext::LoadAudio(const std::string& audio_path) {
   auto audio = audio_processor_->LoadAudio(audio_path);
@@ -750,8 +733,6 @@ void WhisperContext::Transcribe(const std::string& audio_path,
   float total_duration = 0.0f;
   {
     auto t = p.scope("transcribe.audio_load");
-    auto audio = audio_processor_->LoadAudio(audio_path);
-    total_duration = static_cast<float>(audio.duration);
     features_list = audio_processor_->Process(audio_path);
   }
   if (features_list.empty()) {
@@ -788,9 +769,12 @@ void WhisperContext::Transcribe(const std::string& audio_path,
     reset();
 
     Token first_token = do_prefill(prompt);
-    p.record_ttft();
-    p.set_input_tokens(static_cast<int>(prompt.size()));
-    p.add_output_token();
+    // Bugfix: count prefill input tokens cumulatively across chunks
+    p.set_input_tokens(p.input_tokens() + static_cast<int>(prompt.size()));
+    // Bugfix: only record TTFT on first chunk
+    if (chunk_idx == 0) {
+      p.record_ttft();
+    }
 
     if (callback) callback(first_token);
 
@@ -810,6 +794,8 @@ void WhisperContext::Transcribe(const std::string& audio_path,
   }
 
   p.stop("transcribe");
+  total_duration = 0.0f;
+  for (const auto& f : features_list) total_duration += f.duration;
   fill_perf_info(total_duration);
 }
 

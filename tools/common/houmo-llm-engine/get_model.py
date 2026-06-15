@@ -181,31 +181,6 @@ if __name__ == "__main__":
     if ret_dict.get("ret", False) is False:
         exit(1)
 
-    tokenizer_path = "3rdparty/qwen3-tokenizers-cpp.zip"
-    target_dir = "./3rdparty"
-    save_path = get_file_from_jfrog(tokenizer_path, target_dir, target_dir)
-    print(f"Tokenizer downloaded to {save_path} and extracted to: {target_dir}")
-
-    opencv_path = "3rdparty/qwen3vl-opencv-cpp.zip"
-    target_dir = "./3rdparty"
-    save_path = get_file_from_jfrog(opencv_path, target_dir, target_dir)
-    print(f"OpenCV downloaded to {save_path} and extracted to: {target_dir}")
-
-    googletest_path = "3rdparty/googletest.zip"
-    target_dir = "./3rdparty"
-    save_path = get_file_from_jfrog(googletest_path, target_dir, target_dir)
-    print(f"GoogleTest downloaded to {save_path} and extracted to: {target_dir}")
-
-    ctest_data = "3rdparty/ctest_data.zip"
-    target_dir = "./tests"
-    save_path = get_file_from_jfrog(ctest_data, target_dir, target_dir)
-    print(f"CTest data downloaded to {save_path} and extracted to: {target_dir}")
-
-    audio_3rdparty_path = "3rdparty/audio_cpp_3rdparty.zip"
-    target_dir = "./3rdparty"
-    save_path = get_file_from_jfrog(audio_3rdparty_path, target_dir, target_dir)
-    print(f"Audio 3rdparty downloaded to {save_path} and extracted to: {target_dir}")
-
     if os.path.exists("tokenizers/qwen3-asr-1.7b"):
         if "tokenizer.json" not in os.listdir("tokenizers/qwen3-asr-1.7b"):
             from transformers import AutoTokenizer

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: inference_perf_tracker.cc
  * Description:
@@ -19,7 +19,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include "inference_perf_tracker.h"
+#include "utils/perf_tracker/inference_perf_tracker.h"
 
 #include <cmath>
 #include <iomanip>

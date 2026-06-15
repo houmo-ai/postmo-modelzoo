@@ -68,6 +68,17 @@ if should_run_step "demo"; then
     cd cpp && ./build.sh && cd ..
     export LD_LIBRARY_PATH=$PWD/bin:$LD_LIBRARY_PATH
     ./bin/whisper-demo --audio_path audio.mp3 --model "${MODEL_NAME}-${MODEL_SIZE}"
+
+    if command -v llm_perf &>/dev/null; then
+        echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
+        cd "${SCRIPT_DIR}"
+        devices_param=$(get_devices_param "${NDEVICE}")
+        llm_perf --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
+            --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
+            --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
+            --tokenizer "${MODEL_NAME}-${MODEL_SIZE}/tokenizer.json" \
+            --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
+    fi
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

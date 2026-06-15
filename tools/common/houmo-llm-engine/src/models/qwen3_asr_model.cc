@@ -137,7 +137,6 @@ void Qwen3AsrModel::load() {
   {
     if (fs::exists(config_.tokenizer_path)) {
       tokenizer_ = std::make_shared<HfTokenizer>(config_.tokenizer_path);
-      std::cout << "Tokenizer loaded" << std::endl;
     }
   }
 
@@ -550,9 +549,10 @@ void Qwen3AsrContext::Transcribe(const std::string& audio_path,
     reset();
 
     Token first_token = do_prefill(prompt);
-    p.record_ttft();
-    p.set_input_tokens(static_cast<int>(prompt.size()));
-    p.add_output_token();
+    p.set_input_tokens(p.input_tokens() + static_cast<int>(prompt.size()));
+    if (loop_idx == 0) {
+      p.record_ttft();
+    }
 
     if (callback) callback(first_token);
 

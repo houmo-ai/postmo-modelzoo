@@ -161,3 +161,9 @@ if __name__ == "__main__":
     )
     if ret_dict.get("ret", False) is False:
         exit(1)
+
+    from transformers import AutoTokenizer
+    tokenizer_path = f"Qwen3-ASR-{model_size.upper()}"
+    if os.path.exists(tokenizer_path):
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+        tokenizer.save_pretrained(tokenizer_path)

@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
 # c++ example
-if [ ! -e 3rdparty ];then
-  mkdir 3rdparty
+export HOUMO_ENGINE_DIR="$HOUMO_EXAMPLES_PATH/tools/common/houmo-llm-engine"
+export CURRENT_DIR=$(pwd)
+cd $HOUMO_ENGINE_DIR
+if [ -e build ]; then
+  rm -rf build
 fi
-if [ ! -e 3rdparty/eigen3 ];then
-  cd 3rdparty
-  wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
-  unzip eigen-3.4.0.zip
-  mv eigen-3.4.0 eigen3
-  rm -rf eigen-3.4.0.zip
-  cd ..
-fi
+./build_linux.sh
+cd $CURRENT_DIR
 if [ $(uname -s) = "Linux" ] &&  ([ $(uname -m) = "x86_64" ] || [ $(uname -m) = "aarch64" ]); then
   if [ "$HOUMO_TARGET" = "xh2" ]; then
     set -e
@@ -30,3 +27,4 @@ if [ $(uname -s) = "Linux" ] &&  ([ $(uname -m) = "x86_64" ] || [ $(uname -m) = 
 else
   echo "UnSupport PlatForm!"
 fi
+echo "Build successfully!"

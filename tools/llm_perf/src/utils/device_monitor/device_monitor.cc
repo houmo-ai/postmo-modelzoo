@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 HOUMO AI
+ * Copyright (c) 2026 HOUMO AI
  *
  * File: device_monitor.cc
  * Description:
@@ -21,7 +21,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "device_monitor.h"
+#include "utils/device_monitor/device_monitor.h"
 
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
