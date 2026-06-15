@@ -16,6 +16,9 @@ os_type:
       - env.bat
       - requirements.txt
       - README.md
+      - LICENSE
+      - NOTICE
+      - licenses
   ubuntu_18.04:
     examples:
       - examples/
