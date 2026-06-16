@@ -152,13 +152,15 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | qwen3                   | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
 | qwen3-30b-a3b           | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
 | qwen3.5                 | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
+| qwen3-next              | llm          | xh2    | x     | yes   | yes  | yes  | x    |
 | CoPaw-Flash-9B          | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
 | glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |
 | lprnet                  | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  |
 | PPOCRv3                 | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  |
 | glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |
 | PaddleOCR-VL            | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |
-| minicpmo                | omni         | xh2    | x     | yes   | yes  | yes  | x    |
+| minicpmo                | omni         | xh2    | yes   | yes   | yes  | yes  | x    |
+| qwen3-omni              | omni         | xh2    | yes   | yes   | yes  | yes  | x    |
 | qwen3-reranker          | reranker     | xh2    | yes   | yes   | yes  | yes  | x    |
 | yolov8m-seg             | segmentation | xh2    | yes   | yes   | yes  | yes  | yes  |
 | cosyvoice3              | tts          | xh2    | yes   | yes   | yes  | yes  | x    |

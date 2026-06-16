@@ -684,6 +684,7 @@ transformers
 Usage Location:
 models/llm/CoPaw-Flash
 models/llm/qwen3.5
+models/omni/qwen3-omni
 
 Source:
 https://github.com/huggingface/transformers
@@ -711,6 +712,8 @@ This project contains modified versions of the following scripts extracted from 
 
 CoPaw-Flash/image_processing_copawflash.py (Original source: src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py)
 qwen3.5/image_processing_qwen3_5.py (Original source: src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py)
+qwen3-omni/local_processor/image_processing_qwen2_vl.py (Original source: src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py)
+qwen3-omni/local_processor/processing_qwen3_omni_moe.py (Original source: src/transformers/models/qwen3_omni_moe/processing_qwen3_omni_moe.py)
 
 The modifications include, but are not limited to:
 
