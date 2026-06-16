@@ -759,3 +759,14 @@ def test_llm_qwen3_next_compile(setup_logging) -> None:
     """test_llm_qwen3_next_compile"""
     model_name = "qwen3-next"
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.mineru2dot5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.compile
+@pytest.mark.dependency(name='test_vlm_mineru2dot5_compile', depends_on=['test_quant_models.py::test_vlm_mineru2dot5_quant'])
+def test_vlm_mineru2dot5_compile(setup_logging) -> None:
+    """test_vlm_mineru2dot5_compile"""
+    model_name = 'mineru2.5'
+    _compile_func(model_name, setup_logging)

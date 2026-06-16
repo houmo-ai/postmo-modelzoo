@@ -456,6 +456,19 @@ vlm_gemma4:
         args: all
   test:
     - vlm_gemma4_test
+ocr_mineru2.5:
+  include:
+    - models/ocr/mineru2.5
+  exclude:
+    - models/ocr/mineru2.5/README.MD
+    - models/ocr/mineru2.5/data
+  example_case:
+    - ocr_mineru2.5_test:
+        test_type: models_tests
+        script: mineru2dot5
+        args: all
+  test:
+    - ocr_mineru2.5_test
 llm_bge:
   include:
     - models/embedding/bge

@@ -574,3 +574,14 @@ def test_llm_qwen3_next_get_model(setup_logging) -> None:
     """test_llm_qwen3_next_get_model"""
     model_name = "qwen3-next"
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.mineru2dot5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_vlm_mineru2dot5_get_model')
+def test_vlm_mineru2dot5_get_model(setup_logging) -> None:
+    """test_vlm_mineru2dot5_get_model"""
+    model_name = 'mineru2.5'
+    _get_model_func(model_name, setup_logging)

@@ -704,3 +704,14 @@ def test_backbone_dinov3_base_quant(setup_logging) -> None:
     """test_backbone_dinov3_base_quant"""
     model_name = 'dinov3-base'
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.mineru2dot5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.quant
+@pytest.mark.dependency(name='test_vlm_mineru2dot5_quant', depends_on=['test_get_models.py::test_vlm_mineru2dot5_get_model'])
+def test_vlm_mineru2dot5_quant(setup_logging) -> None:
+    """test_vlm_mineru2dot5_quant"""
+    model_name = 'mineru2.5'
+    _quant_func(model_name, setup_logging)
