@@ -106,7 +106,8 @@
 ./whisper-demo --audio_path audio.mp3 \
     --encode_path models/whisper-medium_encode.hmm \
     --decode_path models/whisper-medium_decode.hmm \
-    --prefill_path models/whisper-medium_prefill.hmm
+    --prefill_path models/whisper-medium_prefill.hmm \
+    --tokenizer_path tokenizer.json
 
 # 自定义分块大小
 ./whisper-demo --audio_path audio.mp3 --chunk_size 10
