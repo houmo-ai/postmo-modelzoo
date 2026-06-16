@@ -18,11 +18,6 @@ check_houmo_target "xh2"
 
 cd "${SCRIPT_DIR}"
 
-cd ../../../hmatc
-pip uninstall -y hmatc
-./install.sh --enable_smi_support
-cd "${SCRIPT_DIR}"
-
 TEST_VENV_ACTIVE=0
 dir_path="sensevoice_venv"
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
@@ -51,7 +46,7 @@ if should_run_step "demo"; then
         python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Execute demo."
-    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --device_monitor
+    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

@@ -145,7 +145,11 @@ def _generate_py_cmds(
                 param_val = param_list[idx].replace("cached_models", model_dir)
             if res_dir and "cached_results" in param_list[idx]:
                 param_val = param_list[idx].replace("cached_results", res_dir)
-            tmp_cmd_list += [params_str, param_val]
+
+            if param_name in ["script"]:
+                tmp_cmd_list += [param_val]
+            else:
+                tmp_cmd_list += [params_str, param_val]
             flag = True
         if tmp_cmd_list:
             tmp_cmd_list = cmd_header + tmp_cmd_list
@@ -1403,7 +1407,9 @@ def execute_compile_flow(model_name: str, setup_logging) -> None:
                 final_flag = False
             elif is_asic_platform():
                 benchmark_val = (
-                    0.76 if model_name in ["ppocrv3_det", "ppocrv3_rec", "dinov3_base"] else 0
+                    0.76
+                    if model_name in ["ppocrv3_det", "ppocrv3_rec", "dinov3_base"]
+                    else 0
                 )
                 final_flag = _check_compile_result(opt_str, benchmark_val)
                 if final_flag is False:
