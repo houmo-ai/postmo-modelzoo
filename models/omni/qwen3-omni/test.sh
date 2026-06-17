@@ -53,7 +53,7 @@ fi
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
         echo "Download pre-compiled model."
-        #python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Execute demo."
     python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --run_device_num 2

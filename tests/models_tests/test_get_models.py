@@ -585,3 +585,14 @@ def test_vlm_mineru2dot5_get_model(setup_logging) -> None:
     """test_vlm_mineru2dot5_get_model"""
     model_name = 'mineru2.5'
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_omni
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_24g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_omni_qwen3_omni_get_model")
+def test_omni_qwen3_omni_get_model(setup_logging) -> None:
+    """test_omni_qwen3_omni_get_model"""
+    model_name = "qwen3-omni"
+    _get_model_func(model_name, setup_logging)

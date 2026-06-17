@@ -1415,7 +1415,25 @@ def gptq_quant_text(args):
         else:
             raise ValueError(f"Unsupported calibration data format: {args.calib_data}")
     else:
-        calibration_dataset = get_wikitext2(nsamples=256, seqlen=1024)
+        # Auto-detect local wikitext zip downloaded by get_model.py --type raw
+        local_zip = os.path.join(os.path.dirname(args.model), "wikitext-2-raw-v1.zip")
+        if os.path.exists(local_zip):
+            # Extract to a fixed cache dir under work_dir (only once)
+            calib_dir = os.path.join(args.work_dir, "_calib_data", "wikitext-2-raw-v1")
+            if not os.path.isdir(calib_dir):
+                import zipfile
+                logger.info(f"Extracting calibration data from {local_zip} to {calib_dir}")
+                os.makedirs(calib_dir, exist_ok=True)
+                with zipfile.ZipFile(local_zip, 'r') as zf:
+                    zf.extractall(os.path.join(args.work_dir, "_calib_data"))
+                # zip wraps content in "wikitext-2-raw-v1/" subdir, already matches calib_dir
+            tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+            calibration_dataset = get_wikitext2(
+                nsamples=256, seqlen=1024, local_dir=calib_dir, tokenizer=tokenizer,
+            )
+        else:
+            logger.warning(f"Local wikitext zip not found at {local_zip}, falling back to HF download.")
+            calibration_dataset = get_wikitext2(nsamples=256, seqlen=1024)
 
     patch_qwen3_omni_config_bridge()
 
@@ -1796,8 +1814,8 @@ def parse_args():
                         help="fixed square input resolution for the vision encoder export; "
                                 "must be a multiple of patch_size*merge_size (32). "
                                 "448 -> 196 vision tokens, 224 -> 49")
-    parser.add_argument("--gptqmodel", action="store_true", help="use gptqmodel to quant, only text llm part supported.")
-    parser.add_argument("--calib_data", type=str, default="wikitext-2-raw-v1", help="calibration dataset choose",)
+    parser.add_argument("--gptqmodel", nargs="?", const=True, default=False, type=str2bool, help="use gptqmodel to quant, only text llm part supported.")
+    parser.add_argument("--calib_data", type=str, default=None, help="calibration dataset path (default None -> auto-detect local wikitext-2-raw-v1.zip next to model dir)",)
     args = parser.parse_args()
 
     default_model_size, default_model_name, model_configs = get_model_configs(

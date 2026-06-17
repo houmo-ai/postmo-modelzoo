@@ -543,3 +543,13 @@ def test_vlm_mineru2dot5_demo(setup_logging) -> None:
     """test_vlm_mineru2dot5_demo"""
     model_name = 'mineru2.5'
     _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_omni
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_24g
+@pytest.mark.demo
+def test_omni_qwen3_omni_demo(setup_logging) -> None:
+    """test_omni_qwen3_omni_demo"""
+    model_name = "qwen3-omni"
+    _demo_func(model_name, setup_logging)

@@ -1,0 +1,78 @@
+{
+    "obsolete": false,
+    "model_dir": "models/omni/qwen3-omni",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [2],
+        "dev_mem": ["24g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_4k"],
+            "source_type": [null, null],
+            "model_name": ["qwen3-omni", "qwen3-omni"],
+            "model_size": ["30b-a3b", "30b-a3b"],
+            "context_length": [null, "4k"],
+            "prefill_length": [null, null],
+            "batch": [null, null],
+            "ndevice": [null, null],
+            "ncore": [null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": ["cached_models/Qwen3-Omni-30B-A3B-Instruct"],
+            "model-name": ["qwen3-omni"],
+            "model-size": ["30b-a3b"],
+            "out-dir": ["cached_results/hmquant_xh2_4k"],
+            "context-length": ["4096"],
+            "input-sequence-length": ["256"],
+            "gptqmodel": ["true"]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_4k"],
+            "model_name": ["qwen3-omni"],
+            "model_size": ["30b-a3b"],
+            "batch": [null],
+            "ncore": [null],
+            "ndevice": [null],
+            "stage": ["build"],
+            "context_length": ["4096"],
+            "j": ["24"],
+            "output_dir": ["cached_results/hmm_xh2_4k"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "model_name": ["qwen3-omni"],
+            "model_size": ["30b-a3b"],
+            "model_dir": ["cached_models/Qwen3-Omni-30B-A3B-Instruct"],
+            "embedding_path": ["cached_results/hmm_xh2_4k/hmquant"],
+            "visual_path": ["cached_results/hmm_xh2_4k/qwen3-omni_visual.hmm"],
+            "audio_path": ["cached_results/hmm_xh2_4k/qwen3-omni_audio.hmm"],
+            "prefill_path": ["cached_results/hmm_xh2_4k/qwen3-omni_prefill.hmm"],
+            "decode_path": ["cached_results/hmm_xh2_4k/qwen3-omni_decode.hmm"],
+            "talker_prefill_path": ["cached_results/hmm_xh2_4k/qwen3-omni_talker_prefill.hmm"],
+            "talker_decode_path": ["cached_results/hmm_xh2_4k/qwen3-omni_talker_decode.hmm"],
+            "talker_prediction_prefill_path": ["cached_results/hmm_xh2_4k/qwen3-omni_talker_prediction_prefill.hmm"],
+            "talker_prediction_decode_path": ["cached_results/hmm_xh2_4k/qwen3-omni_talker_prediction_decode.hmm"],
+            "text_projection_path": ["cached_results/hmm_xh2_4k/qwen3-omni_text_projection.hmm"],
+            "code2wav_path": ["cached_results/hmm_xh2_4k/qwen3-omni_code2wav.hmm"],
+            "run_device_num": ["2"],
+            "example_idx": [null]
+        }
+    }
+}

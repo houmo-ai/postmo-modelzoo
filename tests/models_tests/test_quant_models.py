@@ -715,3 +715,17 @@ def test_vlm_mineru2dot5_quant(setup_logging) -> None:
     """test_vlm_mineru2dot5_quant"""
     model_name = 'mineru2.5'
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_omni
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_omni_qwen3_omni_quant",
+    depends_on=["test_get_models.py::test_omni_qwen3_omni_get_model"],
+)
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_24g
+def test_omni_qwen3_omni_quant(setup_logging) -> None:
+    """test_omni_qwen3_omni_quant"""
+    model_name = "qwen3-omni"
+    _quant_func(model_name, setup_logging)

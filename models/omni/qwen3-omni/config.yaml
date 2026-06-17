@@ -1,0 +1,19 @@
+default_model_name: "qwen3-omni"
+default_model_size: "30b-a3b"
+
+model_configs:
+  qwen3-omni:
+    "30b-a3b":
+      modelscope_repo: ["Qwen/Qwen3-Omni-30B-A3B-Instruct"]
+      model_name: "qwen3-omni"
+      model_size: "30b-a3b"
+      ncore: 2
+      ndevice: 1
+      context_length: "4k"
+      prefill_length: 256
+      batch: 1
+      quant_type: 
+        - llm: "w4a8h0_ssfp"
+        - projection: "w16a16h1_sefp"
+        - other: "w8a8h0_sefp"
+      vision_size: 448

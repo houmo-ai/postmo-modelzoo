@@ -50,3 +50,4 @@ paddleocr_vl
 dinov3_base
 qwen3_next
 mineru2dot5
+qwen3_omni
