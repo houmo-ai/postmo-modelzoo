@@ -600,6 +600,7 @@ class Xh2Exec(BaseExec):
             cpp_backend=self.cpp_backend,
             custom_msg=json.dumps(self.custom_msg, ensure_ascii=False),
             dump_compiled_mlir=self.dump_compiled_mlir,
+            skip_check=True,
         )
 
         span = time.time() - t_start

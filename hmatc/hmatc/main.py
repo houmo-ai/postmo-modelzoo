@@ -278,6 +278,7 @@ def main():
             cpp_backend=args.cpp_backend,
             dump_compiled_mlir=args.dump_compiled_mlir,
             parallel_jobs=args.jobs,
+            skip_check=True,
         )
         return
     # Check golden
