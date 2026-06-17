@@ -21,7 +21,7 @@
 # c++ example
 if [ ! -e 3rdparty ];then
   mkdir 3rdparty
-  python get_3rdparty.py
+  python3 get_3rdparty.py
 fi
 if [[ ! -e 3rdparty/audio/3rdparty_build/lib/libkaldi-native-fbank-core.so || \
   ! -e 3rdparty/audio/3rdparty_build/lib/libsamplerate.so ]]; then
@@ -55,7 +55,7 @@ if [ $(uname -s) = "Linux" ] &&  ([ $(uname -m) = "x86_64" ] || [ $(uname -m) = 
     cd build || exit 1
 
     cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH/bin -DCMAKE_BUILD_TYPE=Release ..
-    make
+    make -j$(nproc)
     make install
   else
     echo "UnSupport Backend!"

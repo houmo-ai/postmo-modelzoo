@@ -20,7 +20,7 @@
 # SPDX-License-Identifier: Apache-2.0
 if [ ! -e 3rdparty ];then
   mkdir 3rdparty
-  python get_3rdparty.py
+  python3 get_3rdparty.py
 fi
 if [[ ! -e 3rdparty/audio/3rdparty_build/lib/libkaldi-native-fbank-core.so || \
   ! -e 3rdparty/audio/3rdparty_build/lib/libsamplerate.so ]]; then

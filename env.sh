@@ -31,7 +31,7 @@ fi
 export PATH=$HOUMO_EXAMPLES_PATH/tools/bin:$HOUMO_PATH/bin:$PATH
 
 # paths for runtime
-export LD_LIBRARY_PATH=$TCIM_RUNTIME_PATH/lib:$HOUMO_PATH/lib:$HOUMO_SDK_PATH/hal/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$HOUMO_EXAMPLES_PATH/tools/bin:$TCIM_RUNTIME_PATH/lib:$HOUMO_PATH/lib:$HOUMO_SDK_PATH/hal/lib:$LD_LIBRARY_PATH
 
 # data and model path
 if [[ -z $HOUMO_DATASETS_PATH ]]; then
@@ -56,7 +56,7 @@ _remove_duplicate_paths() {
   local -A seen
   local result=""
   local IFS=":"
-  
+
   for path in $var_value; do
     if [[ -n "$path" ]] && [[ -z "${seen[$path]}" ]]; then
       if [[ -z "$result" ]]; then
@@ -67,7 +67,7 @@ _remove_duplicate_paths() {
       seen[$path]=1
     fi
   done
-  
+
   echo "$result"
 }
 

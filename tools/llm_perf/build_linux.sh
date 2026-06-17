@@ -19,7 +19,7 @@ if [ $(uname -s) = "Linux" ] &&  ([ $(uname -m) = "x86_64" ] || [ $(uname -m) = 
     cd build || exit 1
 
     cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH/../bin -DCMAKE_BUILD_TYPE=Release ..
-    make
+    make -j$(nproc)
     make install
   else
     echo "UnSupport Backend!"

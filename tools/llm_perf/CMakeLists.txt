@@ -193,7 +193,7 @@ if(ENABLE_ASR)
   else()
     foreach(lib ${AUDIO_LIB_DIRS})
       install(DIRECTORY ${lib}/
-              DESTINATION "$ENV{HOUMO_PATH}/lib"
+              DESTINATION "$ENV{HOUMO_EXAMPLES_PATH}/tools/bin"
               FILES_MATCHING PATTERN "*.so" PATTERN "*.a")
     endforeach()
   endif()
