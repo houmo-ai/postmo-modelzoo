@@ -352,7 +352,7 @@ if __name__ == "__main__":
             Xh2Exec.build_from_hmonnx(
                 is_prefill=True,
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, "prefill")),
-                hmm_name="qwen3-omni_prefill",
+                hmm_name=f"{model_name}-{model_size}_prefill",
                 output=output_dir,
                 ncore=ncore,
                 llm_opt=True,
@@ -366,7 +366,7 @@ if __name__ == "__main__":
             )
             Xh2Exec.build_from_hmonnx(
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, "decode")),
-                hmm_name="qwen3-omni_decode",
+                hmm_name=f"{model_name}-{model_size}_decode",
                 output=output_dir,
                 ncore=ncore,
                 llm_opt=True,
@@ -381,7 +381,7 @@ if __name__ == "__main__":
             Xh2Exec.build_from_hmonnx(
                 is_prefill=True,
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, "talker_prefill")),
-                hmm_name="qwen3-omni_talker_prefill",
+                hmm_name=f"{model_name}-{model_size}_talker_prefill",
                 output=output_dir,
                 ncore=ncore,
                 llm_opt=True,
@@ -394,7 +394,7 @@ if __name__ == "__main__":
             )
             Xh2Exec.build_from_hmonnx(
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, "talker_decode")),
-                hmm_name="qwen3-omni_talker_decode",
+                hmm_name=f"{model_name}-{model_size}_talker_decode",
                 output=output_dir,
                 ncore=ncore,
                 llm_opt=True,
@@ -409,7 +409,7 @@ if __name__ == "__main__":
                 hmonnx=find_hmonnx_file(
                     os.path.join(model_dir, "talker_prediction_prefill")
                 ),
-                hmm_name="qwen3-omni_talker_prediction_prefill",
+                hmm_name=f"{model_name}-{model_size}_talker_prediction_prefill",
                 output=output_dir,
                 ncore=ncore,
                 llm_opt=True,
@@ -424,7 +424,7 @@ if __name__ == "__main__":
                 hmonnx=find_hmonnx_file(
                     os.path.join(model_dir, "talker_prediction_decode")
                 ),
-                hmm_name="qwen3-omni_talker_prediction_decode",
+                hmm_name=f"{model_name}-{model_size}_talker_prediction_decode",
                 output=output_dir,
                 ncore=ncore,
                 llm_opt=True,
@@ -436,7 +436,7 @@ if __name__ == "__main__":
             )
             Xh2Exec.build_from_hmonnx(
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, "text_projection")),
-                hmm_name="qwen3-omni_text_projection",
+                hmm_name=f"{model_name}-{model_size}_text_projection",
                 output=output_dir,
                 ncore=ncore,
                 enable_xh2_stable_output=tso,
@@ -444,7 +444,7 @@ if __name__ == "__main__":
             )
             Xh2Exec.build_from_hmonnx(
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, "visual")),
-                hmm_name="qwen3-omni_visual",
+                hmm_name=f"{model_name}-{model_size}_visual",
                 output=output_dir,
                 ncore=ncore,
                 flash_attn=other_flash_attention,
@@ -453,7 +453,7 @@ if __name__ == "__main__":
             )
             Xh2Exec.build_from_hmonnx(
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, "audio")),
-                hmm_name="qwen3-omni_audio",
+                hmm_name=f"{model_name}-{model_size}_audio",
                 output=output_dir,
                 ncore=ncore,
                 flash_attn=other_flash_attention,
@@ -462,7 +462,7 @@ if __name__ == "__main__":
             )
             Xh2Exec.build_from_hmonnx(
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, "code2wav")),
-                hmm_name="qwen3-omni_code2wav",
+                hmm_name=f"{model_name}-{model_size}_code2wav",
                 output=output_dir,
                 ncore=ncore,
                 enable_xh2_stable_output=tso,
@@ -473,7 +473,7 @@ if __name__ == "__main__":
         if args.stage == "test" or args.stage == "all":
             part_dir = os.path.join(model_dir, "prefill")
             test(
-                "qwen3-omni_prefill",
+                f"{model_name}-{model_size}_prefill",
                 part_dir,
                 output_dir,
                 profile,
@@ -482,7 +482,7 @@ if __name__ == "__main__":
             )
             part_dir = os.path.join(model_dir, "decode")
             test(
-                "qwen3-omni_decode",
+                f"{model_name}-{model_size}_decode",
                 part_dir,
                 output_dir,
                 profile,
@@ -491,7 +491,7 @@ if __name__ == "__main__":
             )
             part_dir = os.path.join(model_dir, "visual")
             test(
-                "qwen3-omni_visual",
+                f"{model_name}-{model_size}_visual",
                 part_dir,
                 output_dir,
                 profile,
@@ -499,7 +499,7 @@ if __name__ == "__main__":
             )
             part_dir = os.path.join(model_dir, "audio")
             test(
-                "qwen3-omni_audio",
+                f"{model_name}-{model_size}_audio",
                 part_dir,
                 output_dir,
                 profile,
@@ -507,7 +507,7 @@ if __name__ == "__main__":
             )
             part_dir = os.path.join(model_dir, "talker_prefill")
             test(
-                "qwen3-omni_talker_prefill",
+                f"{model_name}-{model_size}_talker_prefill",
                 part_dir,
                 output_dir,
                 profile,
@@ -515,7 +515,7 @@ if __name__ == "__main__":
             )
             part_dir = os.path.join(model_dir, "talker_decode")
             test(
-                "qwen3-omni_talker_decode",
+                f"{model_name}-{model_size}_talker_decode",
                 part_dir,
                 output_dir,
                 profile,
@@ -523,7 +523,7 @@ if __name__ == "__main__":
             )
             part_dir = os.path.join(model_dir, "talker_prediction_prefill")
             test(
-                "qwen3-omni_talker_prediction_prefill",
+                f"{model_name}-{model_size}_talker_prediction_prefill",
                 part_dir,
                 output_dir,
                 profile,
@@ -531,7 +531,7 @@ if __name__ == "__main__":
             )
             part_dir = os.path.join(model_dir, "talker_prediction_decode")
             test(
-                "qwen3-omni_talker_prediction_decode",
+                f"{model_name}-{model_size}_talker_prediction_decode",
                 part_dir,
                 output_dir,
                 profile,
@@ -539,7 +539,7 @@ if __name__ == "__main__":
             )
             part_dir = os.path.join(model_dir, "code2wav")
             test(
-                "qwen3-omni_code2wav",
+                f"{model_name}-{model_size}_code2wav",
                 part_dir,
                 output_dir,
                 profile,

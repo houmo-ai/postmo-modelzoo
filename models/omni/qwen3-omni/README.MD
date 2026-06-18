@@ -20,7 +20,7 @@
 当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
 
 - `model_name=qwen3-omni`
-- `model_size=30b`
+- `model_size=30b-a3b`
 - `context_length=4k`
 - `prefill_length=256`
 - `ndevice=1`
@@ -79,7 +79,7 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 ```bash
 source env.sh
 cd models/omni/qwen3-omni
-python3 ptq.py --model-name qwen3-omni --model-size 30b --gptqmodel
+python3 ptq.py --model-name qwen3-omni --model-size 30b-a3b --gptqmodel
 ```
 
 量化完成的模型存放在 `output/$HOUMO_TARGET/hmquant` 目录。
@@ -89,21 +89,21 @@ python3 ptq.py --model-name qwen3-omni --model-size 30b --gptqmodel
 将量化模型编译为在芯片上运行的模型。执行脚本：
 
 ```bash
-python3 build.py --model_name qwen3-omni --model_size 30b
+python3 build.py --model_name qwen3-omni --model_size 30b-a3b
 ```
 
 默认输出名称分别为：
 
-- `qwen3-omni_prefill.hmm`
-- `qwen3-omni_decode.hmm`
-- `qwen3-omni_visual.hmm`
-- `qwen3-omni_audio.hmm`
-- `qwen3-omni_talker_prefill.hmm`
-- `qwen3-omni_talker_decode.hmm`
-- `qwen3-omni_talker_prediction_prefill.hmm`
-- `qwen3-omni_talker_prediction_decode.hmm`
-- `qwen3-omni_text_projection.hmm`
-- `qwen3-omni_code2wav.hmm`
+- `qwen3-omni-30b-a3b_prefill.hmm`
+- `qwen3-omni-30b-a3b_decode.hmm`
+- `qwen3-omni-30b-a3b_visual.hmm`
+- `qwen3-omni-30b-a3b_audio.hmm`
+- `qwen3-omni-30b-a3b_talker_prefill.hmm`
+- `qwen3-omni-30b-a3b_talker_decode.hmm`
+- `qwen3-omni-30b-a3b_talker_prediction_prefill.hmm`
+- `qwen3-omni-30b-a3b_talker_prediction_decode.hmm`
+- `qwen3-omni-30b-a3b_text_projection.hmm`
+- `qwen3-omni-30b-a3b_code2wav.hmm`
 
 ### 2.5 演示
 
@@ -111,22 +111,22 @@ Qwen3-Omni 模型使用 python API 进行演示。`demo.py` 默认从 `config.ya
 
 ```bash
 # 默认为 omni 模式（图像 + 音频 + 文本 -> 文本 + 语音）
-python3 demo.py --model_name qwen3-omni --model_size 30b
+python3 demo.py --model_name qwen3-omni --model_size 30b-a3b
 
 # 如需多轮语音对话
-python3 demo.py --model_name qwen3-omni --model_size 30b --example_idx 1
+python3 demo.py --model_name qwen3-omni --model_size 30b-a3b --example_idx 1
 
 # 如需图文描述（vlm）
-python3 demo.py --model_name qwen3-omni --model_size 30b --example_idx 2
+python3 demo.py --model_name qwen3-omni --model_size 30b-a3b --example_idx 2
 
 # 如需乐曲赏析（music）
-python3 demo.py --model_name qwen3-omni --model_size 30b --example_idx 3
+python3 demo.py --model_name qwen3-omni --model_size 30b-a3b --example_idx 3
 
 # 如需语音识别（asr）
-python3 demo.py --model_name qwen3-omni --model_size 30b --example_idx 4
+python3 demo.py --model_name qwen3-omni --model_size 30b-a3b --example_idx 4
 
 # 如需语音翻译（英译中）
-python3 demo.py --model_name qwen3-omni --model_size 30b --example_idx 5
+python3 demo.py --model_name qwen3-omni --model_size 30b-a3b --example_idx 5
 ```
 
 当前 `demo.py` 支持以下 `example_idx` 模式：
@@ -162,14 +162,14 @@ Usage: test.sh [options]
   -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
                           Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
   -name, --model_name     Model name. Default: qwen3-omni.
-  -size, --model_size     Model size. Default: 30b.
+  -size, --model_size     Model size. Default: 30b-a3b.
   --skip_download         Skip model download steps.
   -h, --help              Show this help message.
 ```
 
 当前支持的模型组合为：
 
-- `qwen3-omni` + `30b`
+- `qwen3-omni` + `30b-a3b`
 
 示例：
 
