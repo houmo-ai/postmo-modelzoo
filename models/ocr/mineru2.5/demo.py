@@ -450,22 +450,29 @@ class MinerU:
     #  Bucket selection
     # -------------------------------------------------------------------
 
-    def _select_bucket(self, native_h: int, native_w: int) -> tuple[int, int]:
+    def _select_bucket(
+        self,
+        native_h: int,
+        native_w: int,
+        candidate_buckets: list[tuple[int, int]] | None = None,
+    ) -> tuple[int, int]:
         """Pick the best static visual bucket for a native image size."""
+        buckets = candidate_buckets or self.buckets
         scored = [
             (self._bucket_score(native_h, native_w, bucket), bucket)
-            for bucket in self.buckets
+            for bucket in buckets
         ]
         score, bucket = min(
             scored, key=lambda item: (item[0], item[1][0] * item[1][1], item[1])
         )
         logger.debug(
-            "[MinerU2.5] Bucket  selected {}x{} for native {}x{} (score={:.4f})",
+            "[MinerU2.5] Bucket  selected {}x{} for native {}x{} (score={:.4f}, candidates={})",
             bucket[0],
             bucket[1],
             native_h,
             native_w,
             score,
+            len(buckets),
         )
         return bucket
 
@@ -504,7 +511,12 @@ class MinerU:
 
     # -- preprocessing --------------------------------------------------------
 
-    def preprocess(self, image: Image.Image, text: str):
+    def preprocess(
+        self,
+        image: Image.Image,
+        text: str,
+        candidate_buckets: list[tuple[int, int]] | None = None,
+    ):
         """Preprocess image + text: bucket-select, letterbox, tokenize."""
         # 1. Smart resize to native dimensions (aligned to patch_factor)
         image_rgb = image.convert("RGB")
@@ -513,7 +525,7 @@ class MinerU:
         )
 
         # 2. Select best bucket
-        bucket = self._select_bucket(native_h, native_w)
+        bucket = self._select_bucket(native_h, native_w, candidate_buckets)
 
         # 3. Resize to native + letterbox to bucket
         native_resized = image_rgb.resize(
@@ -610,8 +622,18 @@ class MinerU:
         return block_images, blocks, indices
 
     def text_recognition(self, block_image: Image.Image):
+        recognition_buckets = [
+            bucket for bucket in self.buckets if bucket != self.fallback_bucket
+        ]
+        if not recognition_buckets:
+            recognition_buckets = [self.fallback_bucket]
+            logger.warning(
+                "[MinerU2.5] Text recognition bucket pool is empty after excluding {}x{}; fallback is used.",
+                self.fallback_bucket[0],
+                self.fallback_bucket[1],
+            )
         input_ids, _, pixel_values, image_grid_thw, bucket, _ = self.preprocess(
-            block_image, "\nText Recognition:"
+            block_image, "\nText Recognition:", candidate_buckets=recognition_buckets
         )
         generated_ids = self._run(pixel_values, input_ids, image_grid_thw, bucket)
         texts = self.processor.batch_decode(
@@ -985,7 +1007,7 @@ def get_args():
     parser.add_argument("--ndevice", type=int, default=None, help="device number")
     parser.add_argument("--max_size_w", type=int, default=None)
     parser.add_argument("--max_size_h", type=int, default=None)
-    parser.add_argument("--image", default="./data/0002.png")
+    parser.add_argument("--image", default="./data/0001.png")
     parser.add_argument("--visual_buckets_manifest", type=str, default=None,
                         help="path to mineru_visual_buckets.json (enables multi-bucket mode)")
     args = parser.parse_args()
