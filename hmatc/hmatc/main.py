@@ -93,10 +93,10 @@ def main():
     parent_log.add_argument("--log_level", type=str, required=False, default="INFO", choices=("DEBUG", "INFO", "WARN", "ERROR", "FATAL"), help="Specify log level")
 
     # model config
-    parent_model_cfg.add_argument("--batch", "-b", type=int, required=False, default=1, help="Specify a build batch")
-    parent_model_cfg.add_argument("--ncore", "-nc", type=int, required=False, default=1, choices=(1, 2), help="Specify a ncore")
-    parent_model_cfg.add_argument("--opt_level", type=int, required=False, default=2, choices=(0, 1, 2), help="Specify a opt_level")
-    parent_model_cfg.add_argument("--roi_num", type=int, required=False, default=1, help="Specify a roi_num")
+    parent_model_cfg.add_argument("--batch", "-b", type=int, required=False, default=None, help="Specify a build batch")
+    parent_model_cfg.add_argument("--ncore", "-nc", type=int, required=False, default=None, choices=(1, 2), help="Specify a ncore")
+    parent_model_cfg.add_argument("--opt_level", type=int, required=False, default=None, choices=(0, 1, 2), help="Specify a opt_level")
+    parent_model_cfg.add_argument("--roi_num", type=int, required=False, default=None, help="Specify a roi_num")
 
     parent_config.add_argument("--config", "-c", type=str, required=True, help="config file path")
     parent_target.add_argument("--target", "-t", type=str, required=target != "xh2", choices=("xh2",), default=target, help="Specify a chip target")
@@ -149,7 +149,7 @@ def main():
     build_parser.add_argument("--file_prefix", type=str, help=argparse.SUPPRESS)
     build_parser.add_argument("--skip_check", action="store_true", help="Skip check golden after build")
     build_parser.add_argument("--upload", action="store_true", help=argparse.SUPPRESS)
-    build_parser.add_argument("--jobs", "-j", type=int, default=psutil.cpu_count(logical=False), help="Specify number of parallel jobs")
+    build_parser.add_argument("--jobs", "-j", type=int, default=None, help="Specify number of parallel jobs")
 
     # compare
     compare_parser.add_argument("--data_path", "-d", type=str, required=True, help="Specify a data path, image or npz")
@@ -225,7 +225,7 @@ def main():
             args.loop_num,
             args.thread,
             args.stream,
-            args.batch,
+            1 if args.batch is None else args.batch,
             args.infer_only,
             devices=[args.device_id],
         )
@@ -259,12 +259,12 @@ def main():
             hmonnx=args.hmonnx,
             hmm_name=str(args.hmm_name).lower(),
             output=args.output,
-            ncore=args.ncore,
-            opt_level=args.opt_level,
-            batch=args.batch,
+            ncore=1 if args.ncore is None else args.ncore,
+            opt_level=2 if args.opt_level is None else args.opt_level,
+            batch=1 if args.batch is None else args.batch,
             llm_batch=args.llm_batch,
             enable_profile=args.profile,
-            roi_num=args.roi_num,
+            roi_num=1 if args.roi_num is None else args.roi_num,
             flash_attn=args.flash_attn,
             llm_opt=args.llm_opt,
             enable_xh2_stable_output=args.enable_xh2_stable_output,
@@ -277,7 +277,9 @@ def main():
             subgraph_repeat_hint=args.subgraph_repeat_hint,
             cpp_backend=args.cpp_backend,
             dump_compiled_mlir=args.dump_compiled_mlir,
-            parallel_jobs=args.jobs,
+            parallel_jobs=(
+                psutil.cpu_count(logical=False) if args.jobs is None else args.jobs
+            ),
             skip_check=True,
         )
         return
@@ -319,21 +321,24 @@ def main():
         ncore = args.ncore
         opt_level = args.opt_level
         roi_num = args.roi_num
-        if batch < 1:
-            logger.fatal("Batch must be greater than 0")
-        if batch > 1:
-            if roi_num != 1:
+        if batch is not None:
+            if batch < 1:
+                logger.fatal("Batch must be greater than 0")
+            elif batch > 1 and roi_num != 1:
                 logger.fatal("batch > 1, roi_num must be == 1")
             cfg["build"]["batch"] = batch
-        elif roi_num < 1:
-            logger.fatal("roi_num must be >= 1")
-        elif roi_num > 1:
+        batch = cfg["build"].get("batch", 1)
+        if roi_num is not None:
+            if roi_num < 1:
+                logger.fatal("roi_num must be >= 1")
+            elif roi_num > 1 and batch != 1:
+                logger.fatal("roi_num > 1, batch must be == 1")
             cfg["build"]["roi_num"] = roi_num
         if opt_level is not None:
             cfg["build"]["opt_level"] = opt_level
         if ncore is not None:
             cfg["build"]["ncore"] = ncore
-        if hasattr(args, "jobs"):
+        if hasattr(args, "jobs") and args.jobs is not None:
             cfg["build"]["parallel_jobs"] = args.jobs
         # Add upload_dir_name for upload directory
         if hasattr(args, "upload_dir_name") and args.upload_dir_name is not None:
@@ -397,7 +402,7 @@ def main():
             args.loop_num,
             args.thread,
             args.stream,
-            args.batch,
+            hm_exec.build_batch,
             args.infer_only,
             devices=[args.device_id],
         )

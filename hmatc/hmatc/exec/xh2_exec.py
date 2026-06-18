@@ -601,6 +601,7 @@ class Xh2Exec(BaseExec):
             custom_msg=json.dumps(self.custom_msg, ensure_ascii=False),
             dump_compiled_mlir=self.dump_compiled_mlir,
             skip_check=True,
+            flash_attention=self.flash_attention,
         )
 
         span = time.time() - t_start
