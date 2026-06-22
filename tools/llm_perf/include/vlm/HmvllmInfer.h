@@ -98,7 +98,7 @@ class HmvllmInfer : public HmllmInferBase {
   // Configuration parameters
   int prefill_length = 0;
   int embedding_length = 0;
-  int context_max_length = 0;
+  long int context_max_length = 0;
   int batch = 0;
   int argmax_dim_len = 0;  // Dimension length for argmax operation
 
