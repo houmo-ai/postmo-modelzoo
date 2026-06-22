@@ -85,9 +85,15 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
       prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
   this->embedding_length =
       prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[2];
-  this->context_max_length =
-      prefill_module->GetInputInfo(prefill_module->GetInputName(attn_idx_start))
-          .Shape()[2];
+  auto get_context_length = [this](int input_idx) {
+    return prefill_module->GetInputInfo(prefill_module->GetInputName(input_idx))
+        .Shape()[2];
+  };
+  this->context_max_length = get_context_length(attn_idx_start);
+  if (attn_idx_start + 1 < prefill_module->GetInputNum()) {
+    this->context_max_length = std::max(this->context_max_length,
+                                        get_context_length(attn_idx_start + 1));
+  }
   this->batch =
       decode_module->GetInputInfo(decode_module->GetInputName(0)).Shape()[0];
   this->argmax_dim_len =
@@ -366,8 +372,8 @@ void HmllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids) {
   perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
 
   void *decode_outData = host_output_tensor.Buffer().Data();
-  ids.emplace_back(eigen_argmax<float16>(
-      static_cast<float16 *>(decode_outData), argmax_dim_len));
+  ids.emplace_back(eigen_argmax<float16>(static_cast<float16 *>(decode_outData),
+                                         argmax_dim_len));
 }
 
 void HmllmInfer::perf_llm(const uint32_t input_tokens_len,

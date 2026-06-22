@@ -23,6 +23,7 @@
 #ifndef __LLMINFER_H__
 #define __LLMINFER_H__
 
+#include <algorithm>
 #include <chrono>
 #include <iomanip>
 #include <map>
