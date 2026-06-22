@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import os
-import re
 import sys
 import math
 import time
@@ -347,14 +346,8 @@ class HmGpt:
         option2 = tcim.runtime.Option(weight_manager)
         self.prefill = tcim.runtime.load(prefill_path, option=option1)
         logger.info("prefill model loaded")
-        self.nblocks = self.get_nblocks()
-        dummy_tensor_names = [
-            f"model_layers_{i}_self_attn_kcache_input" for i in range(self.nblocks)
-        ]
-        dummy_tensor_names += [
-            f"model_layers_{i}_self_attn_vcache_input" for i in range(self.nblocks)
-        ]
-        option2.set_dummy_tensors(dummy_tensor_names)
+        self.kvcache_input_names = self.get_kvcache_input_names()
+        option2.set_dummy_tensors(self.kvcache_input_names)
         self.decode = tcim.runtime.load(decode_path, option=option2)
         logger.info("decode model loaded")
         self.samplingmanager = SamplingManager(
@@ -373,9 +366,9 @@ class HmGpt:
             self.decode.get_input_name(5)
         ).shape[2]
 
-        for i in range(5, 2 * self.nblocks + 5):
-            cache = self.prefill.get_input(self.prefill.get_input_name(i))
-            self.decode.set_input(self.decode.get_input_name(i), cache)
+        for input_name in self.kvcache_input_names:
+            cache = self.prefill.get_dev_input(input_name)
+            self.decode.set_dev_input(input_name, cache)
         # set decode input
         current_length_input_1 = np.array([1]).astype("int32")
         decode_current_length_name = self.decode.get_input_name(2)
@@ -429,36 +422,20 @@ class HmGpt:
 
         return mask
 
-    def create_global_mask(
-        self,
-        fill_length: int,
-        old_cache_length: int,
-        new_cache_length: int,
-        context_length: int,
-    ) -> np.ndarray:
-        assert context_length > 0, "context_length must be > 0 for global mask"
-        assert fill_length > 0, "fill_length must be > 0 for global mask"
-        assert old_cache_length >= 0, "old_cache_length must be > 0 for global mask"
-        assert new_cache_length > 0, "new_cache_length must be > 0 for global mask"
-        assert (
-            new_cache_length <= fill_length
-        ), f"new_cache_length({new_cache_length}) must be <= fill_length({fill_length}) for global mask"
-        assert (
-            context_length >= fill_length
-        ), f"context_length({context_length}) must be >= fill_length({fill_length}) for global mask"
+    @staticmethod
+    def is_cache_input_name(input_name: str) -> bool:
+        return input_name.startswith("model_layers_") and (
+            input_name.endswith("_self_attn_kcache_input")
+            or input_name.endswith("_self_attn_vcache_input")
+        )
 
-        mask = np.full((1, 1, fill_length, context_length), -65504.0, dtype=np.float16)
-        for i in range(new_cache_length):
-            mask[0, 0, i, : old_cache_length + i + 1] = 0.0
-        return mask
-
-    def get_nblocks(self):
+    def get_kvcache_input_names(self):
         input_names = []
         for i in range(self.prefill.get_num_inputs()):
-            input_names.append(self.prefill.get_input_name(i))
-        pattern = r"^model_layers_(\d+)_self_attn_kcache_input$"
-        count = sum(1 for item in input_names if re.match(pattern, item))
-        return count
+            input_name = self.prefill.get_input_name(i)
+            if self.is_cache_input_name(input_name):
+                input_names.append(input_name)
+        return input_names
 
     def chat(self, question):
         self.generated_ids = []
@@ -496,19 +473,21 @@ class HmGpt:
         valid_length_name = self.prefill.get_input_name(1)
         current_length_name = self.prefill.get_input_name(2)
         local_attention_mask_name = self.prefill.get_input_name(3)
-        global_attention_mask_name = self.prefill.get_input_name(4)
         prefill_loop_round = math.ceil(input_echo_len / self.prefill_length)
-        for round in range(prefill_loop_round):
-            valid_length = round * self.prefill_length + self.context_length
-            if round == prefill_loop_round - 1:
-                current_length = input_echo_len - round * self.prefill_length
+        for round_idx in range(prefill_loop_round):
+            valid_length = round_idx * self.prefill_length + self.context_length
+            if round_idx == prefill_loop_round - 1:
+                current_length = input_echo_len - round_idx * self.prefill_length
                 input_ids = all_input_ids[
-                    :, round * self.prefill_length : input_echo_len
+                    :, round_idx * self.prefill_length : input_echo_len
                 ]
             else:
                 current_length = self.prefill_length
                 input_ids = all_input_ids[
-                    :, round * self.prefill_length : (round + 1) * self.prefill_length
+                    :,
+                    round_idx
+                    * self.prefill_length : (round_idx + 1)
+                    * self.prefill_length,
                 ]
 
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_EMBED_TIME)
@@ -521,8 +500,10 @@ class HmGpt:
                 dtype=inputs_embeds.dtype,
                 device=inputs_embeds.device,
             )
-            input_data = torch.cat([inputs_embeds, _pad_embeds], dim=1).reshape(
-                1, self.prefill_length, self.embedding_len
+            input_data = (
+                torch.cat([inputs_embeds, _pad_embeds], dim=1)
+                .reshape(1, self.prefill_length, self.embedding_len)
+                .to(torch.float16)
             )
             self.perf_tracker.perf_end(PERFTYPE.PREFILL_EMBED_TIME)
 
@@ -531,21 +512,12 @@ class HmGpt:
             local_attention_mask_data = self.create_window_mask(
                 self.prefill_length, valid_length, effective_length, self.window_size
             )
-            global_attention_mask_data = self.create_global_mask(
-                self.prefill_length,
-                valid_length,
-                effective_length,
-                self.context_max_length,
-            )
 
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_INPUT_TIME)
             self.prefill.set_input(input_name, input_data.numpy())
             self.prefill.set_input(valid_length_name, valid_length_data)
             self.prefill.set_input(current_length_name, current_length_data)
             self.prefill.set_input(local_attention_mask_name, local_attention_mask_data)
-            self.prefill.set_input(
-                global_attention_mask_name, global_attention_mask_data
-            )
             self.perf_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_INFER_TIME)
@@ -578,7 +550,6 @@ class HmGpt:
         input_name = self.decode.get_input_name(0)
         valid_length_name = self.decode.get_input_name(1)
         local_attention_mask_name = self.decode.get_input_name(3)
-        global_attention_mask_name = self.decode.get_input_name(4)
 
         # Decode loop for generating subsequent tokens
         while True:
@@ -592,9 +563,11 @@ class HmGpt:
             self.perf_tracker.perf_start(PERFTYPE.DECODE_TOTAL_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.DECODE_EMBED_TIME)
-            input_data = F.embedding(
-                next_id.unsqueeze(0), self.embedding_weight
-            ).reshape(1, 1, -1)
+            input_data = (
+                F.embedding(next_id.unsqueeze(0), self.embedding_weight)
+                .reshape(1, 1, -1)
+                .to(torch.float16)
+            )
             self.perf_tracker.perf_end(PERFTYPE.DECODE_EMBED_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.DECODE_INPUT_TIME)
@@ -604,13 +577,7 @@ class HmGpt:
             local_attention_mask_data = self.create_window_mask(
                 1, self.context_length, 1, self.window_size
             )
-            global_attention_mask_data = self.create_global_mask(
-                1, self.context_length, 1, self.context_max_length
-            )
             self.decode.set_input(local_attention_mask_name, local_attention_mask_data)
-            self.decode.set_input(
-                global_attention_mask_name, global_attention_mask_data
-            )
             self.perf_tracker.perf_end(PERFTYPE.DECODE_INPUT_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.DECODE_INFER_TIME)

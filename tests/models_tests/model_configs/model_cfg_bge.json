@@ -17,19 +17,15 @@
     "support_hmatc": null,
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "hmm", "hmm"],
-            "download_dir": ["cached_models", "cached_models", "cached_models"],
-            "extract_dir": [
-                null,
-                "cached_models/hmm_xh2_ms",
-                "cached_models/hmm_xh2"
-            ],
-            "source_type": [null, "modelscope", null],
-            "model_name": ["bge", "bge", "bge"],
-            "model_size": ["0.5b", "0.5b", "0.5b"],
-            "batch": ["10", "10", "10"],
-            "context_length": ["0.5k", "0.5k", "0.5k"],
-            "ndevice": [null, null, null]
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2"],
+            "source_type": [null, null],
+            "model_name": ["bge", "bge"],
+            "model_size": ["0.5b", "0.5b"],
+            "batch": ["10", "10"],
+            "context_length": ["0.5k", "0.5k"],
+            "ndevice": [null, null]
         }
     },
     "quant_params": {

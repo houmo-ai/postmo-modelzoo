@@ -46,7 +46,7 @@
             "ncore": [null],
             "stage": ["build"],
             "output_dir": ["cached_results/hmm_xh2_forcealigner_0.6b"],
-            "context_length": ["2k"]
+            "context_length": ["2048"]
         }
     },
     "demo_params": {

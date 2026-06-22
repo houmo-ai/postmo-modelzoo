@@ -122,66 +122,53 @@ Usage: test.sh [options]
 
 ## 4 参考结果
 
+下述所示为 gpt-oss-20b 的参考结果
+
 ### 4.1 演示结果
 
 ```bash
 question:
 请介绍一下存算一体技术的优势
 response:
-<|channel|>analysis<|message|>We need to answer in Chinese. The user asks: "请介绍一下存算一体技术的优势" meaning "Please introduce the advantages of integrated storage and computing technology." They want an explanation of the advantages of "存算一体技术" (storage-computing integration technology). We should explain what it is, its benefits: reducing latency, improving performance, energy efficiency, cost, data locality, etc. Also mention use cases: AI, big data, edge computing, etc. Provide a concise but thorough explanation. Use Chinese. Probably mention that it reduces data movement, improves throughput, reduces power consumption, simplifies architecture, etc. Also mention that it can be used in data centers, HPC, AI training, etc. Provide bullet points or paragraphs. Let's produce a good answer.<|end|><|start|>assistant<|channel|>final<|message|>
-**存算一体技术（Integrated Storage‑Compute）** 是指将存储（如SSD、NAND、内存等）与计算单元（CPU、GPU、FPGA、ASIC等）在同一芯片或同一封装内实现高度集成的技术。相比传统的“存储‑计算分离”架构，存算一体技术在多方面具有显著优势：
+<|channel|>analysis<|message|>The user asks in Chinese: "请介绍一下存算一体技术的优势" meaning "Please introduce the advantages of integrated storage and computing technology." They want an explanation of the advantages of "存算一体技术" (storage-computing integration). We should respond in Chinese, explaining the advantages: improved performance, lower latency, reduced data movement, energy efficiency, cost savings, better scalability, etc. Also mention specific use cases: AI, big data, HPC, etc. Provide a concise but thorough answer.<|end|><|start|>assistant<|channel|>final<|message|>**存算一体技术（Storage‑to‑Compute Integration）**
+是指将存储与计算资源在同一硬件平台或同一系统内实现紧密耦合、共享资源、协同调度的一种架构。相比传统的“存‑算‑网络”三层分离模式，存算一体技术在性能、能耗、成本和管理效率等方面具有显著优势。下面从几个关键维度进行阐述：
 
-| 维度 | 传统架构 | 存算一体技术 | 主要优势 |
-|------|----------|--------------|----------|
-| **数据访问延迟** | 存储与计算分离，数据需跨总线/网络传输 | 计算单元直接与存储介质相连 | 延迟降低 10‑100×，适合低时延应用（如实时AI、金融交易） |
-| **带宽与吞吐** | 受总线/网络带宽限制 | 采用片上或近距离互连，带宽可达数 TB/s | 处理大规模数据时不再受限于外部总线 |
-| **能耗** | 数据搬运耗电量高 | 省去搬运，能耗下降 30‑70% | 适合边缘/移动设备、数据中心节能 |
-| **系统成本** | 需要额外的网络、缓存、IO 控制器 | 统一封装，硬件件数减少 | 维护成本与采购成本降低 |
-| **可靠性** | 存储与计算分离导致多点故障 | 统一管理，故障定位更精准 | 故障恢复更快，系统稳定性提升 |
-| **安全性** | 数据在网络中传输易被截获 | 数据在芯片内部流动，攻击面缩小 | 数据泄露风险降低 |
-| **可扩展性** | 需要多块卡/模块叠加 | 通过多芯片堆叠或多核集成实现 | 规模化更灵活，易于升级 |
-| **应用场景** | 传统服务器、云存储 | AI/ML 训练、图像/视频处理、边缘计算、IoT、工业控制 | 适用性更广，满足多样化需求 |
-
-### 关键技术实现
-
-1. **片上存储（On‑Chip Flash / 3D NAND）**  
-   - 将闪存直接集成在CPU/GPU芯片内部，减少外部接口。  
-   - 通过 3D NAND 结构实现高密度、低功耗的存储。
-
-2. **近场互连（Near‑Field Interconnect）**  
-   - 采用高速互连（如 HBM、HBM2、HBM3、Infinity Fabric）将存储与计算单元紧密连接。  
-   - 通过多通道并行访问，提升带宽。
-
-3. **混合内存层次（Hybrid Memory Hierarchy）**  
-   - 在同一芯片内同时集成 SRAM、DRAM、NVM 等多种存储介质，形成多级缓存与持久化存储。  
-   - 通过软件/硬件协同，动态调度数据在不同层级间迁移。
-
-4. **专用加速器（ASIC/FPGA）**  
-   - 在存算一体芯片中嵌入专用加速器，针对 AI 推理、加密、压缩等任务进行硬件加速。  
-   - 与存储直接配合，进一步降低数据搬运成本。
-
-### 典型应用案例
-
-| 行业 | 典型需求 | 存算一体技术解决方案 |
-|------|----------|----------------------|
-| **人工智能** | 大规模模型训练与推理 | 通过 GPU/TPU 与高带宽存储集成，显著提升训练速度 |
-| **视频处理** | 4K/8K 视频编码/解码 | 低延迟存取 + 近场加速器，支持实时流媒体 |
-| **边缘计算** | IoT 设备、工业控制 | 低功耗、紧凑尺寸，满足设备端实时处理 |
-| **金融交易** | 高频交易、风险评估 | 低延迟、可预测的性能，满足秒级决策 |
-| **科研 HPC** | 大规模数值模拟 | 高带宽、低功耗，提升能效比 |
-
-### 未来趋势
-
-- **3D 堆叠技术**：将存储层与计算层垂直堆叠，进一步提升集成度与带宽。  
-- **持久化内存（Persistent Memory）**：将 NVM 与 DRAM 混合，提供持久化存储与高速访问。  
-- **AI 专用芯片**：将 AI 推理/训练加速器与存储集成，形成“一体化 AI 芯片”。  
-- **系统级协同**：通过统一的编程模型（如统一内存地址空间）简化开发。
+| 维度 | 传统模式的痛点 | 存算一体技术的优势 |
+|------|----------------|--------------------|
+| **数据访问延迟** | 计算节点需要频繁通过网络或磁盘I/O访问存储，导致高延迟 | 计算单元与存储共享同一芯片或同一机架，数据可直接在本地高速缓存或内存中访问，延迟降低至毫秒级甚至微秒级 |
+| **带宽瓶颈** | 存储I/O带宽受限于磁盘、SSD或网络链路 | 通过在同一平台上集成NVMe‑SSD、HBM、或专用高速总线，带宽可达数百GB/s，满足大规模并行计算需求 |
+| **能耗与成本** | 需要额外的网络设备、磁盘阵列、冷却系统，能耗高 | 统一硬件平台减少冗余，能耗下降30%–50%，同时硬件采购、运维成本下降 |
+| **数据一致性与安全** | 需要复杂的分布式一致性协议，易出现数据不一致 | 本地存储与计算共享同一内存空间，天然实现一致性；可在芯片级实现加密、访问控制 |
+| **开发与运维** | 需要多层软件栈（OS、文件系统、数据库、应用） | 通过统一的API或统一的管理平台，开发者可直接调用存储资源，运维人员只需管理单一系统 |
+| **可扩展性** | 需要水平扩展存储与计算节点，网络拓扑复杂 | 通过模块化的存算一体节点（如NVMe‑to‑CPU、GPU+SSD一体化）可“一键”水平扩展，保持低延迟 |
+| **适用场景** | 传统数据库、文件系统、云存储 | AI/ML训练、边缘计算、实时大数据分析、数据库加速、FPGA/ASIC加速等 |
 
 ---
 
-**总结**
+### 典型应用场景
 
-存算一体技术通过将存储与计算紧密集成，显著降低数据搬运延迟、提升带宽、降低能耗与成本，并提升系统可靠性与安全性。它已成为 AI、边缘计算、云计算等领域的关键技术方向，未来将进一步推动高性能、低功耗计算平台的发展。
+| 场景 | 需求 | 存算一体技术的价值 |
+|------|------|--------------------|
+| **AI/ML 训练** | 需要频繁读取/写入海量训练数据 | 通过本地SSD+GPU共享内存，显著降低I/O瓶颈，提升训练速度 |
+| **实时大数据分析** | 低延迟查询、实时聚合 | 计算节点可直接访问本地存储，查询响应时间从秒级降到毫秒级 |
+| **边缘计算** | 资源受限、网络不稳定 | 本地存算一体可在离线环境下完成完整的计算与存储，减少对云端的依赖 |
+| **高性能计算 (HPC)** | 需要高带宽、低延迟的数据共享 | 通过统一的高速总线和共享内存，MPI通信与磁盘I/O无缝集成 |
+| **数据库加速** | 需要高并发事务、低延迟访问 | 本地存算一体可将数据库引擎与存储层合并，减少磁盘访问次数 |
+
+---
+
+### 未来趋势
+
+1. **芯片级集成**：CPU+SSD+GPU+AI加速器在同一芯片或同一模块上实现，进一步降低延迟。
+2. **软件定义存算**：统一的资源管理平台（如Kubernetes + CSI）支持动态调度存算资源。
+3. **边缘与云的无缝衔接**：边缘节点采用存算一体技术，云端通过统一API实现弹性扩展。
+4. **安全与隐私**：在芯片级实现硬件加密、可信执行环境，满足合规性要求。
+
+---
+
+### 小结
+
+存算一体技术通过打破传统的“存‑算‑网络”三层分离，实现在同一硬件平台上高效协同的数据存储与计算。它在降低延迟、提升带宽、节能降本、简化运维、增强安全等方面具有显著优势，已成为 AI/ML、边缘计算、实时分析、HPC 等多领域的关键技术之一。随着芯片技术和软件生态的进一步成熟，存算一体将成为未来数据中心与边缘计算的标准架构。
 ```
 
 ### 4.2 性能结果
@@ -193,26 +180,26 @@ response:
 Configuration Details:
    Batch Size:      1
    Input Length per Sample:     90 tokens
-   Output Length per Sample:   1351 tokens
+   Output Length per Sample:   1192 tokens
 Prefill Stage Performance:
-   Total Time:  215.32ms | Speed:  417.98 tokens/s
-   Tokenization Time:   24.77ms
-   Embedding Time:   22.97ms
-   API SetInput Time:   9.66ms
-   API Inference Time: 149.15ms | Prefill Speed:  603.43 tokens/s
-   API GetOutput Time:  0.58ms
+  Total Time:  169.55ms | Speed:  530.83 tokens/s
+  Tokenization Time:   22.82ms
+  Embedding Time:    1.00ms
+  API SetInput Time:   0.77ms
+  API Inference Time: 140.00ms | Prefill Speed:  642.86 tokens/s
+  API GetOutput Time:  0.58ms
 Decode Stage Performance:
-   Total Time: 54897.34ms | Speed:   24.59 tokens/s
-   Tokenization Time:  564.31ms
-   Embedding Time:  206.36ms
-   API SetInput Time:   1.35ms
-   API Inference Time: 30.85ms | Decode Speed:   32.42 tokens/s
-   API GetOutput Time:  0.53ms
+  Total Time: 43412.42ms | Speed:   27.43 tokens/s
+  Tokenization Time:  384.41ms
+  Embedding Time:  201.77ms
+  API SetInput Time:   0.86ms
+  API Inference Time: 28.41ms | Decode Speed:   35.20 tokens/s
+  API GetOutput Time:  0.50ms
 Overall Performance Metrics:
-   TTFT (Time To First Token):  215.32 ms
-   TPOT (Time Per Output Token): 40.66 ms/token
-   E2E Latency (End-to-End):     55.27 seconds
-   E2E TPS (Throughput):         24.45 tokens/s
+  TTFT (Time To First Token):  169.55 ms
+  TPOT (Time Per Output Token): 36.45 ms/token
+  E2E Latency (End-to-End):     43.70 seconds
+  E2E TPS (Throughput):         27.28 tokens/s
 ====================================================================================================
 ```
 

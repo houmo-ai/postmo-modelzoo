@@ -306,7 +306,6 @@ if __name__ == "__main__":
                 ndevice=ndevice,
                 flash_attn=args.flash_attention,
                 context_length=args.context_length,
-                prefill_length=args.prefill_length,
                 cpp_backend=args.cpp_backend,
                 llm_opt=True,
                 parallel_jobs=j,

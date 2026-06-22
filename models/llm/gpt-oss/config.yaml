@@ -8,7 +8,7 @@ model_configs:
       model_name: "gpt-oss"
       model_size: "20b"
       ncore: 2
-      context_length: "32k"
+      context_length: "256k"
       ndevice: 1
       batch: 1
       prefill_length: 256

@@ -76,7 +76,7 @@
                 "cached_results/hmm_xh2_asr_0.6b",
                 "cached_results/hmm_xh2_asr_1.7b"
             ],
-            "context_length": ["2k", "2k"]
+            "context_length": ["2048", "2048"]
         }
     },
     "demo_params": {

@@ -18,9 +18,9 @@
     "perf_metrics": {
         "xh2": {
             "x86_64": {
-                "prefill": 336.53,
-                "decode": 31.0,
-                "end2end": 24.19
+                "prefill": 642.17,
+                "decode": 34.95,
+                "end2end": 26.62
             }
         }
     },
@@ -30,13 +30,13 @@
             "download_dir": ["cached_models", "cached_models", "cached_models"],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2_32k",
+                "cached_models/hmm_xh2_256k",
                 "cached_models/hmm_xh2_120b_128k"
             ],
             "source_type": [null, null, null],
             "model_name": [null, null, "gpt-oss"],
             "model_size": [null, null, "120b"],
-            "context_length": [null, "32k", "128k"],
+            "context_length": [null, "256k", "128k"],
             "ndevice": [null, null, "2"]
         }
     },
@@ -49,9 +49,9 @@
             "ncore": [null],
             "ndevice": [null],
             "stage": ["build"],
-            "context_length": ["32768"],
+            "context_length": ["262144"],
             "j": ["24"],
-            "output_dir": ["cached_results/hmm_xh2_32k"]
+            "output_dir": ["cached_results/hmm_xh2_256k"]
         }
     },
     "demo_params": {
@@ -60,13 +60,13 @@
             "model_size": ["20b"],
             "tokenizer_dir": ["cached_models/gpt-oss-20b"],
             "embedding_path": [
-                "cached_results/hmm_xh2_32k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_256k/hmquant/quant_embedding.pt"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_32k/gpt-oss-20b_prefill.hmm"
+                "cached_results/hmm_xh2_256k/gpt-oss-20b_prefill.hmm"
             ],
             "decode_path": [
-                "cached_results/hmm_xh2_32k/gpt-oss-20b_decode.hmm"
+                "cached_results/hmm_xh2_256k/gpt-oss-20b_decode.hmm"
             ],
             "ndevice": ["1"]
         }

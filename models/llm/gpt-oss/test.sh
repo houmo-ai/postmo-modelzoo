@@ -21,16 +21,16 @@ check_step_python_packages || exit 1
 
 if should_run_step "build"; then
     echo "Start model compilation."
-    python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
         echo "Download pre-compiled model."
-        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
     fi
     echo "Execute demo."
-    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
 
     if command -v llm_perf &>/dev/null; then
         echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
@@ -42,7 +42,7 @@ if should_run_step "demo"; then
             model_suffix="hmm"
         fi
         llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
-            --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
+            --input 256 --output 256 --loop 1 --batch 1 \
             --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
             --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
             --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
