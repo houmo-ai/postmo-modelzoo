@@ -117,9 +117,12 @@ def download_raw_from_modelscope(repo_id: str, download_dir: str = "."):
     print(f"Downloading {repo_id} from ModelScope...")
     subprocess.run(
         [
-            "modelscope", "download",
-            "--model", repo_id,
-            "--local_dir", local_dir,
+            "modelscope",
+            "download",
+            "--model",
+            repo_id,
+            "--local_dir",
+            local_dir,
         ],
         check=True,
     )
@@ -147,11 +150,10 @@ if __name__ == "__main__":
         for repo_id in repo_ids:
             download_raw_from_modelscope(repo_id, args.download_dir)
     else:
-        # Download hmm model via hmatc (jfrog)
         model_cfgs = {
             "target": HOUMO_TARGET,
             "version": get_houmo_version(),
-            "model_type": "cv",
+            "model_type": "llm",
             "model_name": model_name,
             "model_info": {
                 "model_size": model_config.get("model_size", model_size),
@@ -162,12 +164,6 @@ if __name__ == "__main__":
             },
             "modelscope_repo": {
                 "repo_ids": model_config.get("modelscope_repo", []),
-            },
-            "hmm_files": {
-                "hmm_path": (
-                    "models/xh2-{version}/cam/"
-                    "hmm_xh2_campplus_w8a8_sefp_F529_b1_1chip_2cores_{version}.zip"
-                ).format(version=get_houmo_version()),
             },
         }
 
