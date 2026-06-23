@@ -26,7 +26,7 @@ from hmatc.utils.utils import *
 
 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 logger.info("Compressing hmmodel...")
-hmcc_version = get_package_version(f"houmo-tcim-xh2")
+hmcc_version = get_package_version(f"houmo_tcim_xh2")
 runtime_version = get_package_version(f"houmo_tcim_runtime_xh2")
 with open(os.path.join("output", "xh2", "VERSION.txt"), "w") as f:
     f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")
@@ -44,9 +44,7 @@ compress_files_to_tar_xz_with_progress(
     [hmm_path, os.path.join("output", "xh2", "VERSION.txt")],
     compress_hmm_path,
 )
-logger.info(
-    f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}"
-)
+logger.info(f"MD5: {get_file_md5(compress_hmm_path)}, save path: {compress_hmm_path}")
 upload_file_to_artifactory(
     compress_hmm_path,
     f"models/xh2-{get_houmo_version()}/ppocrv3_det/{filename}",

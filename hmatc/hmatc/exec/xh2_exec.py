@@ -651,7 +651,7 @@ class Xh2Exec(BaseExec):
 
         logger.info("Compressing hmmodel...")
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        hmcc_version = get_package_version("houmo-tcim-xh2")
+        hmcc_version = get_package_version("houmo_tcim_xh2")
         runtime_version = get_package_version("houmo_tcim_runtime_xh2")
         with open(os.path.join(self.save_dir, "xh2", "VERSION.txt"), "w") as f:
             f.write(f"hmquant_version: {get_hmquant_xh2_version()}\n")

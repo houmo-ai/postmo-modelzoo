@@ -358,7 +358,7 @@ def run_benchmark(
 
     # Get versions
     hmquant_version = get_hmquant_xh2_version()
-    hmcc_version = get_package_version("houmo-tcim-xh2")
+    hmcc_version = get_package_version("houmo_tcim_xh2")
     runtime_version = get_package_version("houmo_tcim_runtime_xh2")
 
     if runtime_version == "N/A":
