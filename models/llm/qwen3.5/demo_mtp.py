@@ -340,6 +340,8 @@ class SamplingManager:
 
 
 class PrefillNames:
+    _CONV_KIND_ORDER = {"q": 0, "k": 1, "v": 2, "": 3}
+
     def __init__(self, model):
         in_names = [
             model.get_input_name(index) for index in range(model.get_num_inputs())
@@ -360,36 +362,67 @@ class PrefillNames:
             for name in in_names
             if "_attn_kcache_input" in name or "_attn_vcache_input" in name
         )
-        conv_cache_in = self._indexed_names(in_names, r"past_conv_cache_(\d+)$")
+        conv_cache_in = self._conv_cache_names(in_names, "past_conv_cache")
         rec_state_in = self._indexed_names(in_names, r"past_recurrent_state_(\d+)$")
-        conv_cache_out = self._indexed_names(out_names, r"conv_cache_out_(\d+)$")
+        conv_cache_out = self._conv_cache_names(out_names, "conv_cache_out")
         rec_state_out = self._indexed_names(out_names, r"recurrent_state_out_(\d+)$")
 
         if not conv_cache_in:
             raise RuntimeError("missing recurrent conv cache inputs")
-        self.layer_indices = [layer_idx for layer_idx, _ in conv_cache_in]
+        self.layer_indices = sorted({layer_idx for layer_idx, _, _ in conv_cache_in})
         self._require_same_indices(
             "past_recurrent_state", self.layer_indices, rec_state_in
         )
-        if conv_cache_out:
-            self._require_same_indices(
-                "conv_cache_out", self.layer_indices, conv_cache_out
-            )
         if rec_state_out:
             self._require_same_indices(
                 "recurrent_state_out", self.layer_indices, rec_state_out
             )
 
-        self.conv_cache_in = [name for _, name in conv_cache_in]
+        self.conv_cache_keys_by_input = {
+            name: (layer_idx, kind) for layer_idx, kind, name in conv_cache_in
+        }
+        self.conv_cache_in = [name for _, _, name in conv_cache_in]
         self.rec_state_in = [name for _, name in rec_state_in]
-        self.conv_cache_out = [name for _, name in conv_cache_out]
+        self.conv_cache_out_by_key = {
+            (layer_idx, kind): name for layer_idx, kind, name in conv_cache_out
+        }
+        self.conv_cache_out_by_input = {
+            name: self.conv_cache_out_by_key[key]
+            for name, key in self.conv_cache_keys_by_input.items()
+            if key in self.conv_cache_out_by_key
+        }
+        self.conv_cache_out = [
+            self.conv_cache_out_by_input[name]
+            for name in self.conv_cache_in
+            if name in self.conv_cache_out_by_input
+        ]
+        self.rec_state_keys_by_input = {name: layer_idx for layer_idx, name in rec_state_in}
+        self.rec_state_out_by_layer = {layer_idx: name for layer_idx, name in rec_state_out}
+        self.rec_state_out_by_input = {
+            name: self.rec_state_out_by_layer[layer_idx]
+            for name, layer_idx in self.rec_state_keys_by_input.items()
+            if layer_idx in self.rec_state_out_by_layer
+        }
         self.rec_state_out = [name for _, name in rec_state_out]
+        self.split_conv_cache_out_by_key = self._split_conv_outputs(
+            out_names, "conv_cache_out"
+        )
+        self.split_conv_cache_out_by_input = {
+            name: self.split_conv_cache_out_by_key[key]
+            for name, key in self.conv_cache_keys_by_input.items()
+            if key in self.split_conv_cache_out_by_key
+        }
         self.split_conv_cache_out = self._split_outputs(
             out_names, r"conv_cache_out_(\d+)_(\d+)$"
         )
         self.split_rec_state_out = self._split_outputs(
             out_names, r"recurrent_state_out_(\d+)_(\d+)$"
         )
+        self.split_rec_state_out_by_input = {
+            name: self.split_rec_state_out[layer_idx]
+            for name, layer_idx in self.rec_state_keys_by_input.items()
+            if layer_idx in self.split_rec_state_out
+        }
         self.logits_out = self._pick(out_names, "logits")
         self.hidden_out = self._pick_any(
             out_names, ("hidden_states", "post_norm_hidden", "pre_norm_hidden")
@@ -434,6 +467,28 @@ class PrefillNames:
                 matched.append((int(match.group(1)), name))
         return sorted(matched, key=lambda item: item[0])
 
+    @classmethod
+    def _conv_cache_names(
+        cls, names: Sequence[str], prefix: str
+    ) -> List[Tuple[int, str, str]]:
+        compiled = re.compile(rf"{re.escape(prefix)}(?:_([A-Za-z]+))?_(\d+)$")
+        matched = []
+        for name in names:
+            match = compiled.match(cls._bare(name))
+            if not match:
+                continue
+            kind = match.group(1) or ""
+            layer_idx = int(match.group(2))
+            matched.append((layer_idx, kind, name))
+        return sorted(
+            matched,
+            key=lambda item: (
+                item[0],
+                cls._CONV_KIND_ORDER.get(item[1], 100),
+                item[1],
+            ),
+        )
+
     @staticmethod
     def _require_same_indices(
         label: str,
@@ -463,6 +518,25 @@ class PrefillNames:
                 name for _, name in sorted(step_items, key=lambda item: item[0])
             ]
             for layer_idx, step_items in outputs.items()
+        }
+
+    @classmethod
+    def _split_conv_outputs(
+        cls, names: Sequence[str], prefix: str
+    ) -> Dict[Tuple[int, str], List[str]]:
+        compiled = re.compile(rf"{re.escape(prefix)}(?:_([A-Za-z]+))?_(\d+)_(\d+)$")
+        outputs: Dict[Tuple[int, str], List[Tuple[int, str]]] = {}
+        for name in names:
+            match = compiled.match(cls._bare(name))
+            if not match:
+                continue
+            kind = match.group(1) or ""
+            layer_idx = int(match.group(2))
+            step_idx = int(match.group(3))
+            outputs.setdefault((layer_idx, kind), []).append((step_idx, name))
+        return {
+            key: [name for _, name in sorted(step_items, key=lambda item: item[0])]
+            for key, step_items in outputs.items()
         }
 
 
@@ -664,7 +738,7 @@ class HmQwenMTP:
         self.context_max_length = max(
             int(dim) for dim in self.prefill.get_dev_input(self.pn.kv_in[0]).info.shape
         )
-        self.num_recurrent_layers = len(self.pn.conv_cache_in)
+        self.num_recurrent_layers = len(self.pn.rec_state_in)
         self.context_length = 0
 
         self._ensure_mtp_cache_compatible()
@@ -744,34 +818,31 @@ class HmQwenMTP:
     def _bare_name(name: str) -> str:
         return name.removesuffix(SUFFIX)
 
-    def _find_verify_split_recurrent_outputs(self, layer_idx: int) -> List[str]:
-        return self.vn.split_rec_state_out.get(layer_idx, [])
+    def _find_verify_split_recurrent_outputs(self, input_name: str) -> List[str]:
+        return self.vn.split_rec_state_out_by_input.get(input_name, [])
 
-    def _find_verify_split_conv_outputs(self, layer_idx: int) -> List[str]:
-        return self.vn.split_conv_cache_out.get(layer_idx, [])
+    def _find_verify_split_conv_outputs(self, input_name: str) -> List[str]:
+        return self.vn.split_conv_cache_out_by_input.get(input_name, [])
 
     def _cross_propagate_rec_to_verify(self) -> None:
-        if len(self.pn.conv_cache_out) != len(self.vn.conv_cache_in) or len(
-            self.pn.rec_state_out
-        ) != len(self.vn.rec_state_in):
-            raise RuntimeError(
-                "prefill recurrent outputs and verify recurrent inputs count differ: "
-                f"conv {len(self.pn.conv_cache_out)} vs {len(self.vn.conv_cache_in)}, "
-                f"recurrent {len(self.pn.rec_state_out)} vs {len(self.vn.rec_state_in)}"
-            )
-        for conv_in, rec_in, conv_out, rec_out in zip(
-            self.vn.conv_cache_in,
-            self.vn.rec_state_in,
-            self.pn.conv_cache_out,
-            self.pn.rec_state_out,
-        ):
+        for conv_in in self.vn.conv_cache_in:
+            key = self.vn.conv_cache_keys_by_input[conv_in]
+            conv_out = self.pn.conv_cache_out_by_key.get(key)
+            if conv_out is None:
+                raise RuntimeError(
+                    f"missing prefill conv output for verify input {conv_in}"
+                )
+            self.verify.set_input(conv_in, self.prefill.get_dev_output(conv_out))
+
+        for rec_in in self.vn.rec_state_in:
+            layer_idx = self.vn.rec_state_keys_by_input[rec_in]
+            rec_out = self.pn.rec_state_out_by_layer.get(layer_idx)
+            if rec_out is None:
+                raise RuntimeError(
+                    f"missing prefill recurrent output for verify input {rec_in}"
+                )
             self.verify.set_input(
-                conv_in,
-                self.prefill.get_dev_output(conv_out),
-            )
-            self.verify.set_input(
-                rec_in,
-                self.prefill.get_dev_output(rec_out),
+                rec_in, self.prefill.get_dev_output(rec_out)
             )
 
     def get_model_input_shape(self, runtime_model, input_name: str) -> tuple[int, ...]:
@@ -838,24 +909,20 @@ class HmQwenMTP:
         self._link_decode_mtp_cache_to_prefill_mtp()
 
     def _propagate_recurrent_in_prefill(self) -> None:
-        if len(self.pn.rec_state_out) != len(self.pn.rec_state_in):
-            raise RuntimeError(
-                "prefill recurrent outputs and inputs count differ: "
-                f"{len(self.pn.rec_state_out)} vs {len(self.pn.rec_state_in)}"
-            )
-        for conv_in, rec_in, conv_out, rec_out in zip(
-            self.pn.conv_cache_in,
-            self.pn.rec_state_in,
-            self.pn.conv_cache_out,
-            self.pn.rec_state_out,
-        ):
+        for conv_in in self.pn.conv_cache_in:
+            conv_out = self.pn.conv_cache_out_by_input.get(conv_in)
+            if conv_out is None:
+                raise RuntimeError(f"missing prefill conv output for input {conv_in}")
+            self.prefill.set_input(conv_in, self.prefill.get_dev_output(conv_out))
+
+        for rec_in in self.pn.rec_state_in:
+            rec_out = self.pn.rec_state_out_by_input.get(rec_in)
+            if rec_out is None:
+                raise RuntimeError(
+                    f"missing prefill recurrent output for input {rec_in}"
+                )
             self.prefill.set_input(
-                conv_in,
-                self.prefill.get_dev_output(conv_out),
-            )
-            self.prefill.set_input(
-                rec_in,
-                self.prefill.get_dev_output(rec_out),
+                rec_in, self.prefill.get_dev_output(rec_out)
             )
 
     def _create_linear_attn_mask(
@@ -1056,12 +1123,8 @@ class HmQwenMTP:
 
     def _commit_verify_linear_cache(self, accepted_steps: int) -> None:
         accept_pos = accepted_steps - 1
-        for layer_idx, conv_in, rec_in in zip(
-            self.vn.layer_indices,
-            self.vn.conv_cache_in,
-            self.vn.rec_state_in,
-        ):
-            split_conv_outputs = self._find_verify_split_conv_outputs(layer_idx)
+        for conv_in in self.vn.conv_cache_in:
+            split_conv_outputs = self._find_verify_split_conv_outputs(conv_in)
             if split_conv_outputs:
                 conv_out_name = split_conv_outputs[
                     min(accept_pos, len(split_conv_outputs) - 1)
@@ -1070,12 +1133,13 @@ class HmQwenMTP:
                     conv_in, self.verify.get_dev_output(conv_out_name)
                 )
             else:
-                if layer_idx >= len(self.vn.conv_cache_out):
+                conv_out_name = self.vn.conv_cache_out_by_input.get(conv_in)
+                if conv_out_name is None:
                     raise RuntimeError(
-                        f"missing verify conv output for layer {layer_idx}"
+                        f"missing verify conv output for input {conv_in}"
                     )
                 conv_out_array = _to_numpy(
-                    self.verify.get_output(self.vn.conv_cache_out[layer_idx])
+                    self.verify.get_output(conv_out_name)
                 )
                 conv_kernel = int(self.verify.get_dev_input(conv_in).info.shape[-1])
                 if conv_out_array.shape[-1] > conv_kernel:
@@ -1087,15 +1151,16 @@ class HmQwenMTP:
                     conv_slice = conv_out_array.copy()
                 self.verify.set_input(conv_in, conv_slice)
 
-            rec_outputs = self._find_verify_split_recurrent_outputs(layer_idx)
+        for rec_in in self.vn.rec_state_in:
+            rec_outputs = self._find_verify_split_recurrent_outputs(rec_in)
             if rec_outputs:
                 rec_out_name = rec_outputs[min(accept_pos, len(rec_outputs) - 1)]
             else:
-                if layer_idx >= len(self.vn.rec_state_out):
+                rec_out_name = self.vn.rec_state_out_by_input.get(rec_in)
+                if rec_out_name is None:
                     raise RuntimeError(
-                        f"missing verify recurrent output for layer {layer_idx}"
+                        f"missing verify recurrent output for input {rec_in}"
                     )
-                rec_out_name = self.vn.rec_state_out[layer_idx]
             self.verify.set_input(rec_in, self.verify.get_dev_output(rec_out_name))
 
     def _do_prefill(self, input_ids: np.ndarray) -> Tuple[int, int, np.ndarray, int]:

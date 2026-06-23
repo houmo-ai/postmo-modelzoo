@@ -148,55 +148,49 @@
                 "qwen3.5",
                 "qwen3.5",
                 "qwen3.5",
-                "qwen3.5",
-                "qwen3.6"
+                "qwen3.5"
             ],
-            "model_size": ["35b-a3b", "0.8b", "2b", "4b", "9b", "27b"],
+            "model_size": ["35b-a3b", "0.8b", "2b", "4b", "9b"],
             "tokenizer_dir": [
                 "cached_models/Qwen3.6-35B-A3B",
                 "cached_models/Qwen3.5-0.8B",
                 "cached_models/Qwen3.5-2B",
                 "cached_models/Qwen3.5-4B",
-                "cached_models/Qwen3.5-9B",
-                "cached_models/Qwen3.6-27B"
+                "cached_models/Qwen3.5-9B"
             ],
             "embedding_path": [
                 "cached_results/hmm_xh2_3.6_35b_a3b_256k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_0.8b_256k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_2b_256k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_4b_256k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_9b_256k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_3.6_27b_128k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_9b_256k/hmquant/quant_embedding.pt"
             ],
             "prefill_path": [
                 "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6-35b-a3b_prefill.hmm",
                 "cached_results/hmm_xh2_0.8b_256k/qwen3.5-0.8b_prefill.hmm",
                 "cached_results/hmm_xh2_2b_256k/qwen3.5-2b_prefill.hmm",
                 "cached_results/hmm_xh2_4b_256k/qwen3.5-4b_prefill.hmm",
-                "cached_results/hmm_xh2_9b_256k/qwen3.5-9b_prefill.hmm",
-                "cached_results/hmm_xh2_3.6_27b_128k/qwen3.6-27b_prefill.hmm"
+                "cached_results/hmm_xh2_9b_256k/qwen3.5-9b_prefill.hmm"
             ],
             "decode_path": [
                 "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6-35b-a3b_decode.hmm",
                 "cached_results/hmm_xh2_0.8b_256k/qwen3.5-0.8b_decode.hmm",
                 "cached_results/hmm_xh2_2b_256k/qwen3.5-2b_decode.hmm",
                 "cached_results/hmm_xh2_4b_256k/qwen3.5-4b_decode.hmm",
-                "cached_results/hmm_xh2_9b_256k/qwen3.5-9b_decode.hmm",
-                "cached_results/hmm_xh2_3.6_27b_128k/qwen3.6-27b_decode.hmm"
+                "cached_results/hmm_xh2_9b_256k/qwen3.5-9b_decode.hmm"
             ],
             "vision_path": [
                 "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6-35b-a3b_visual_896x896x2.hmm",
                 "cached_results/hmm_xh2_0.8b_256k/qwen3.5-0.8b_visual_896x896x2.hmm",
                 "cached_results/hmm_xh2_2b_256k/qwen3.5-2b_visual_896x896x2.hmm",
                 "cached_results/hmm_xh2_4b_256k/qwen3.5-4b_visual_896x896x2.hmm",
-                "cached_results/hmm_xh2_9b_256k/qwen3.5-9b_visual_896x896x2.hmm",
-                "cached_results/hmm_xh2_3.6_27b_128k/qwen3.6-27b_visual_896x896x2.hmm"
+                "cached_results/hmm_xh2_9b_256k/qwen3.5-9b_visual_896x896x2.hmm"
             ],
-            "ndevice": ["1", "1", "1", "1", "1", "1"],
-            "max_size_w": ["896", "896", "896", "896", "896", "896"],
-            "max_size_h": ["896", "896", "896", "896", "896", "896"],
-            "max_size_t": ["2", "2", "2", "2", "2", "2"],
-            "patch_size": [null, null, null, null, null, null]
+            "ndevice": ["1", "1", "1", "1", "1"],
+            "max_size_w": ["896", "896", "896", "896", "896"],
+            "max_size_h": ["896", "896", "896", "896", "896"],
+            "max_size_t": ["2", "2", "2", "2", "2"],
+            "patch_size": [null, null, null, null, null]
         }
     },
     "perf_params": "demo"
