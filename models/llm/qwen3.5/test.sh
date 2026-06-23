@@ -2,9 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
-# Optional: JPEG/PNG for vision HMONNX export if src/images/qwen2_vl_demo.jpeg is missing.
-# export VISION_IMAGE=/path/to/sample.jpg
-
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 MODELS_DIR="${SCRIPT_DIR}"
 while [[ ! -f "${MODELS_DIR}/test_common.sh" && "${MODELS_DIR}" != "/" ]]; do
@@ -22,7 +19,29 @@ MTP="false"
 parse_args "$@"
 
 case "${MODEL_NAME}:${MODEL_SIZE}" in
-    qwen3.5:0.8b|qwen3.5:2b|qwen3.5:4b|qwen3.5:9b|qwen3.6:27b|qwen3.6:35b-a3b)
+    qwen3.5:0.8b)
+        WORKFLOW_MODEL_DIR="Qwen3.5-0.8B"
+        WORKFLOW_CONFIG_PATH="configs/qwen3.5/0.8b/qwen3.5-0.8b_w8a8.yaml"
+        ;;
+    qwen3.5:2b)
+        WORKFLOW_MODEL_DIR="Qwen3.5-2B"
+        WORKFLOW_CONFIG_PATH="configs/qwen3.5/2b/qwen3.5-2b_w8a8.yaml"
+        ;;
+    qwen3.5:4b)
+        WORKFLOW_MODEL_DIR="Qwen3.5-4B"
+        WORKFLOW_CONFIG_PATH="configs/qwen3.5/4b/qwen3.5-4b_w4a8.yaml"
+        ;;
+    qwen3.5:9b)
+        WORKFLOW_MODEL_DIR="Qwen3.5-9B"
+        WORKFLOW_CONFIG_PATH="configs/qwen3.5/9b/qwen3.5-9b_w4a8.yaml"
+        ;;
+    qwen3.6:27b)
+        WORKFLOW_MODEL_DIR="Qwen3.6-27B"
+        WORKFLOW_CONFIG_PATH="configs/qwen3.6/27b/qwen3.6-27b_w4a8.yaml"
+        ;;
+    qwen3.6:35b-a3b)
+        WORKFLOW_MODEL_DIR="Qwen3.6-35B-A3B"
+        WORKFLOW_CONFIG_PATH="configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8.yaml"
         ;;
     *)
         echo "Error: Unsupported model combination '${MODEL_NAME}-${MODEL_SIZE}'." >&2
@@ -60,6 +79,14 @@ if should_run_step "quant"; then
         exit 1
     fi
 
+    if [ "${MTP}" = "true" ]; then
+        WORKFLOW_CONFIG_PATH="${WORKFLOW_CONFIG_PATH%.yaml}_mtp.yaml"
+    fi
+    if [ ! -f "${WORKFLOW_CONFIG_PATH}" ]; then
+        echo "Error: workflow config '${WORKFLOW_CONFIG_PATH}' does not exist." >&2
+        exit 1
+    fi
+
     if ! should_skip_download; then
         echo "Download raw model (${MODEL_NAME}-${MODEL_SIZE})."
         GET_MODEL_ARGS=(--type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}")
@@ -69,7 +96,7 @@ if should_run_step "quant"; then
         python3 get_model.py "${GET_MODEL_ARGS[@]}"
     fi
     echo "Start model quantization (${MODEL_NAME}-${MODEL_SIZE})."
-    python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}"
+    python3 ptq.py --model-dir "${WORKFLOW_MODEL_DIR}" --config-path "${WORKFLOW_CONFIG_PATH}"
 fi
 
 if should_run_step "build"; then

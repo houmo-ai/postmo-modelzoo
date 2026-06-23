@@ -36,7 +36,9 @@
 
 本例只适用于xh2。
 
-当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
+当前目录使用 `config.yaml` 管理 `get_model.py`、`build.py`、`build_mtp.py`、`demo.py`
+和 `demo_mtp.py` 的默认值；`ptq.py` 的量化导出参数由
+`configs/` 目录下的 workflow yaml 管理。当前默认模型为：
 
 - `model_name=qwen3.6`
 - `model_size=35b-a3b`
@@ -122,12 +124,59 @@ cd models/llm/qwen3.5
 推荐先通过 `get_model.py --type raw` 下载原始模型，再执行：
 
 ```bash
-python3 ptq.py --model ./Qwen3.6-35B-A3B
+python3 ptq.py \
+  --model-dir ./Qwen3.6-35B-A3B \
+  --config-path configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8.yaml
 ```
 
-如果当前目录下已经存在与配置匹配的模型目录，也可以直接运行 `python3 ptq.py`，脚本会按 `config.yaml` 推导默认模型目录名。
+`--model-dir` 指向 Hugging Face / ModelScope 原始模型目录，`--config-path` 指向
+`configs/` 下的 workflow yaml。脚本会执行 quant 和 export，并把 export 生成的
+`hmquant*` 目录移动为 `output/${HOUMO_TARGET}/hmquant`，供后续 `build.py` 或
+`build_mtp.py` 使用。
 
-量化输出位于 `output/${HOUMO_TARGET}/hmquant`。
+常用可选参数：
+
+```bash
+# 覆盖 workflow yaml 中的量化 bit
+python3 ptq.py \
+  --model-dir ./Qwen3.6-35B-A3B \
+  --config-path configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8.yaml \
+  --bits 8
+
+# 覆盖视觉导出分辨率
+python3 ptq.py \
+  --model-dir ./Qwen3.6-35B-A3B \
+  --config-path configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8.yaml \
+  --max-size-w 896 \
+  --max-size-h 896
+
+# 导出 MTP 产物
+python3 ptq.py \
+  --model-dir ./Qwen3.6-35B-A3B \
+  --config-path configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8_mtp.yaml
+
+# 导出 DFlash 产物
+python3 ptq.py \
+  --model-dir ./Qwen3.6-35B-A3B \
+  --config-path configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8_dflash.yaml
+```
+
+workflow yaml 命名规则如下：
+
+- `qwen3.5-9b_w4a8.yaml`：标准流程，权重量化 bit 为 4，激活为 8。
+- `qwen3.5-9b_w4a8_mtp.yaml`：MTP 流程。
+- `qwen3.5-9b_w4a8_dflash.yaml`：DFlash 流程。
+
+当前提供的配置文件包括：
+
+- `qwen3.5/0.8b`: `w8a8`、`w8a8_mtp`、`w8a8_dflash`
+- `qwen3.5/2b`: `w8a8`、`w8a8_mtp`、`w8a8_dflash`
+- `qwen3.5/4b`: `w4a8`、`w4a8_mtp`、`w4a8_dflash`
+- `qwen3.5/9b`: `w4a8`、`w4a8_mtp`、`w4a8_dflash`
+- `qwen3.6/27b`: `w4a8`、`w4a8_mtp`、`w4a8_dflash`
+- `qwen3.6/35b-a3b`: `w4a8`、`w5a8`、`w8a8` 及对应的 `_mtp`、`_dflash` 配置
+
+量化导出输出位于 `output/${HOUMO_TARGET}/hmquant`。
 
 ### 2.4 编译
 
@@ -182,7 +231,7 @@ python3 demo_mtp.py --model_name qwen3.6 --model_size 35b-a3b
 # 默认执行 demo，会先下载预编译模型
 bash test.sh
 
-# 完整流程：下载原始模型 + 量化 + 编译 + 演示
+# 完整流程：下载原始模型 + workflow 量化导出 + 编译 + 演示
 bash test.sh -s all
 ```
 
@@ -208,7 +257,7 @@ Usage: test.sh [options]
 # 指定模型为 Qwen3.5-9B
 bash test.sh --model_name qwen3.5 --model_size 9b
 
-# 仅运行 quant，会先下载原始模型再量化
+# 仅运行 quant，会先下载原始模型，再调用 ptq.py 量化导出
 bash test.sh -s quant --model_name qwen3.6 --model_size 35b-a3b
 
 # 仅运行 build，要求当前目录下已经有量化输出
@@ -220,8 +269,11 @@ bash test.sh -s demo --model_name qwen3.6 --model_size 35b-a3b
 # 完整流程
 bash test.sh -s all --model_name qwen3.6 --model_size 35b-a3b
 
-# MTP 演示或编译
-bash test.sh --mtp --model_name qwen3.6 --model_size 35b-a3b
+# 验证 Qwen3.5-0.8B 完整流程
+bash test.sh -s all --model_name qwen3.5 --model_size 0.8b
+
+# MTP 完整流程
+bash test.sh -s all --mtp --model_name qwen3.6 --model_size 35b-a3b
 
 # 跳过下载，直接使用当前目录已有模型
 bash test.sh -s demo --skip_download --model_name qwen3.6 --model_size 35b-a3b
@@ -229,7 +281,7 @@ bash test.sh -s demo --skip_download --model_name qwen3.6 --model_size 35b-a3b
 
 当前脚本行为说明：
 
-- `quant`：下载原始模型并调用 `ptq.py` 执行量化。
+- `quant`：下载原始模型并调用 `ptq.py` 执行量化导出。
 - `build`：默认调用 `build.py`；当 `--mtp` 启用时改为调用 `build_mtp.py`。
 - `demo`：下载预编译模型后执行 `demo.py`；当 `--mtp` 启用时执行 `demo_mtp.py`。
 - 非 MTP `demo` 流程若环境中存在 `llm_perf`，末尾还会自动执行性能测试。
