@@ -112,61 +112,62 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 
 模型示例主要依赖 hmatc 工具完成评估功能，可通过每个模型示例下的 test.sh 脚本一键执行，也可参考脚本中的命令分步执行，相关参数在 config.yml 配置。
 
-模型示例列表如下，type 列为模型类型，target 列为支持的芯片平台，quant 表示提供量化示例，build 表示提供编译示例，perf 表示提供性能评估，demo 表示提供 python 端到端 demo，eval 表示提供精度评估。
+模型示例列表如下，type 列为模型类型，target 列为支持的芯片平台，quant 表示提供量化示例，build 表示提供编译示例，perf 表示提供性能评估，demo 表示提供 python 端到端 demo，eval 表示提供精度评估，support 表示当前版本是否支持，如果该项是版本号表示支持的最后一个版本。
 
 量化和编译功能仅支持在量化工具和编译器支持的平台上运行，其中大模型量化需要使用 GPU。涉及到模型推理相关的功能（如 perf/demo/eval 等）需要使用后摩芯片平台运行，运行时需要关注其他限制，如固件类型（如大模型只能在非 VPU 固件上运行），硬件规格（如 2 核芯片只能运行 2 核以下编译的模型）。
 
-| models                  | path         | target | quant | build | perf | demo | eval |
-| ----------------------- | ------------ | ------ | ----- | ----- | ---- | ---- | ---- |
-| qwen3-asr               | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
-| glm-asr-nano-2512       | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
-| sensevoice              | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
-| whisper                 | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
-| whisper-turbo           | asr          | xh2    | yes   | yes   | yes  | yes  | x    |
-| yolop                   | autodrive    | xh2    | yes   | yes   | yes  | yes  | x    |
-| efficientnet            | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
-| mobilenetv2             | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
-| resnet50                | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
-| ViT-B-16                | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolov8m-cls             | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
-| dinov3-base             | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolo11m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolo12m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolo26m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolov3                  | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolov5m_face            | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolov5s                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolov5s_feature         | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolov7                  | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolov8m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolov9m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolov10m                | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| yolox                   | detection    | xh2    | yes   | yes   | yes  | yes  | yes  |
-| bge                     | embedding    | xh2    | yes   | yes   | yes  | yes  | x    |
-| gte                     | embedding    | xh2    | x     | x     | yes  | yes  | x    |
-| qwen3-embedding         | embedding    | xh2    | yes   | yes   | yes  | yes  | x    |
-| yolov8m-pose            | estimation   | xh2    | yes   | yes   | yes  | yes  | yes  |
-| deepseek-r1-qwen3-8b    | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
-| gpt-oss                 | llm          | xh2    | x     | yes   | yes  | yes  | x    |
-| qwen2.5                 | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
-| qwen3                   | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
-| qwen3-30b-a3b           | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
-| qwen3.5                 | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
-| qwen3-next              | llm          | xh2    | x     | yes   | yes  | yes  | x    |
-| CoPaw-Flash-9B          | llm          | xh2    | yes   | yes   | yes  | yes  | x    |
-| glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |
-| lprnet                  | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  |
-| PPOCRv3                 | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  |
-| glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |
-| PaddleOCR-VL            | ocr          | xh2    | yes   | yes   | yes  | yes  | x    |
-| minicpmo                | omni         | xh2    | yes   | yes   | yes  | yes  | x    |
-| qwen3-omni              | omni         | xh2    | yes   | yes   | yes  | yes  | x    |
-| qwen3-reranker          | reranker     | xh2    | yes   | yes   | yes  | yes  | x    |
-| yolov8m-seg             | segmentation | xh2    | yes   | yes   | yes  | yes  | yes  |
-| cosyvoice3              | tts          | xh2    | yes   | yes   | yes  | yes  | x    |
-| qwen2.5-vl              | vlm          | xh2    | yes   | yes   | yes  | yes  | x    |
-| qwen3-vl                | vlm          | xh2    | yes   | yes   | yes  | yes  | x    |
-| gemma4                  | vlm          | xh2    | yes   | yes   | yes  | yes  | x    |
+
+| models                  | path         | target | quant | build | perf | demo | eval | support |
+| ----------------------- | ------------ | ------ | ----- | ----- | ---- | ---- | ---- | ------- |
+| qwen3-asr               | asr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| glm-asr-nano-2512       | asr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| sensevoice              | asr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| whisper                 | asr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| whisper-turbo           | asr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| yolop                   | autodrive    | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| efficientnet            | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| mobilenetv2             | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| resnet50                | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| ViT-B-16                | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolov8m-cls             | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| dinov3-base             | backbone     | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolo11m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolo12m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolo26m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolov3                  | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolov5m_face            | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolov5s                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolov5s_feature         | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolov7                  | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolov8m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolov9m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolov10m                | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| yolox                   | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| bge                     | embedding    | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| gte                     | embedding    | xh2    | x     | x     | yes  | yes  | x    | yes     |
+| qwen3-embedding         | embedding    | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| yolov8m-pose            | estimation   | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| deepseek-r1-qwen3-8b    | llm          | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
+| gpt-oss                 | llm          | xh2    | x     | yes   | yes  | yes  | x    | yes     |
+| qwen2.5                 | llm          | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
+| qwen3                   | llm          | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
+| qwen3-30b-a3b           | llm          | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
+| qwen3-next              | llm          | xh2    | x     | yes   | yes  | yes  | x    | yes     |
+| qwen3.5                 | llm          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| CoPaw-Flash-9B          | llm          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| lprnet                  | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| PPOCRv3                 | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| PaddleOCR-VL            | ocr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| minicpmo                | omni         | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
+| qwen3-omni              | omni         | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| qwen3-reranker          | reranker     | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| yolov8m-seg             | segmentation | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| cosyvoice3              | tts          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| qwen2.5-vl              | vlm          | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
+| qwen3-vl                | vlm          | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
+| gemma4                  | vlm          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 
 ## API 示例
 
