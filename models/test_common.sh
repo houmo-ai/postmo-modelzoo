@@ -465,7 +465,7 @@ check_step_python_packages() {
     fi
 
     if should_run_step "build"; then
-        require_python_package "houmo-tcim" "build" || return 1
+        require_python_package "houmo_tcim" "build" || return 1
     fi
 
     if should_run_step "demo"; then
