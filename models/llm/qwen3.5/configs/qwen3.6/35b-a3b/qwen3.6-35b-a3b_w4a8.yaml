@@ -1,0 +1,54 @@
+quant:
+  algorithm: autoround
+  output_format: gptqmodel_hf
+  artifact_format: gptqmodel_hf
+  bits: 4
+  group_size: 64
+  calibration:
+    dataset: NeelNanda/pile-10k
+    nsamples: 128
+    seqlen: 2048
+  runtime:
+    batch_size: 8
+    trust_remote_code: true
+    device_map: balanced
+    low_gpu_mem_usage: true
+  seed: 42
+  quant_nontext_module: false
+  sym: true
+  iters: 200
+  autoround_format: auto_round:gptqmodel
+  moe:
+    attn_bits: 8
+    shared_expert_bits: 8
+export:
+  model:
+    chip_arch: XH2a
+    model_type: Qwen3_5MoeForConditionalGeneration
+    hf_model: weights/Qwen3.6-35B-A3B
+    model_name: xh2_Qwen3.6-35B-A3B_full_256_2k
+    context_max_length: 2048
+    prefill_chunk_length: 256
+    max_pe_length: 262144
+    support_long_context_over_fp16_limit: true
+    use_cache: true
+    num_logits_to_keep: 1
+    linear_attention_mode: auto
+    linear_chunk_size: 64
+    split_conv_cache: true
+    normalize_force_fp32: false
+    use_manual_depthwise_conv1d: false
+    fuse_gdr_ops: false
+    quant_scheme:
+      quant_type: w8a8h1_sefp
+      nodes:
+        lm_head:
+          quant_type: w8a8h1_sefp
+      ops: {}
+    visual_config:
+      max_size_w: 896
+      max_size_h: 896
+      quant_scheme:
+        quant_type: w8a8h1_sefp
+        ops: {}
+    only_first_block: false

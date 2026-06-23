@@ -1,0 +1,73 @@
+quant:
+  algorithm: autoround
+  output_format: gptqmodel_hf
+  artifact_format: gptqmodel_hf
+  bits: 8
+  group_size: 64
+  calibration:
+    dataset: NeelNanda/pile-10k
+    nsamples: 128
+    seqlen: 2048
+  runtime:
+    batch_size: 8
+    trust_remote_code: true
+  seed: 42
+  quant_nontext_module: false
+  sym: true
+  iters: 200
+  autoround_format: auto_gptq
+export:
+  model:
+    chip_arch: XH2a
+    model_type: Qwen3_5ForConditionalGeneration
+    hf_model: weights/Qwen3.5-9B
+    model_name: xh2_Qwen3.5-0.8B_full_dflash_256_2k
+    context_max_length: 2048
+    prefill_chunk_length: 256
+    max_pe_length: 262144
+    support_long_context_over_fp16_limit: true
+    use_cache: true
+    num_logits_to_keep: 1
+    linear_attention_mode: auto
+    linear_chunk_size: 64
+    split_conv_cache: true
+    normalize_force_fp32: false
+    use_manual_depthwise_conv1d: false
+    fuse_gdr_ops: false
+    quant_scheme:
+      quant_type: w8a8h1_sefp
+      nodes:
+        lm_head:
+          quant_type: w8a8h1_sefp
+      ops: {}
+    visual_config:
+      max_size_w: 896
+      max_size_h: 896
+      quant_scheme:
+        quant_type: w8a8h1_sefp
+        ops: {}
+    only_first_block: false
+    spec_decode_mode: dflash
+    num_draft_tokens: 9
+    spec_draft_head_weight_bits: 4
+    output_hidden_state_indices:
+    - 1
+    - 8
+    - 15
+    - 22
+    - 29
+    dflash_config:
+      hf_model: weights/Qwen3.5-9B-DFlash
+      target_model_dir: null
+      mode: context
+      hidden_size: 4096
+      num_attention_heads: 32
+      num_key_value_heads: 8
+      head_dim: 128
+      num_hidden_layers: 5
+      num_target_layers: 5
+      block_size: 16
+      batch_size: 1
+      input_sequence_length: 256
+      max_sequence_length: 2048
+      max_pe_length: 262144

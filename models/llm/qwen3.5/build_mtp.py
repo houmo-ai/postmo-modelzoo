@@ -168,6 +168,16 @@ def get_args() -> argparse.Namespace:
     return args
 
 
+def _first_existing_dir(model_dir: str, names: list[str]) -> str:
+    for name in names:
+        path = os.path.join(model_dir, name)
+        if os.path.isdir(path):
+            return path
+    raise FileNotFoundError(
+        f"Directory not found under {model_dir}: {' or '.join(names)}"
+    )
+
+
 if __name__ == "__main__":
     args = get_args()
     print(args)
@@ -179,14 +189,14 @@ if __name__ == "__main__":
     model_name = args.model_name
     model_size = args.model_size
     model_dir = os.path.abspath(args.model_dir)
-    prefill_dir = os.path.join(model_dir, "prefill")
-    decode_dir = os.path.join(model_dir, "decode")
-    draft_prefill_dir = os.path.join(model_dir, "draft_prefill")
-    draft_decode_dir = os.path.join(model_dir, "draft_decode")
-
-    for required_dir in [prefill_dir, decode_dir, draft_prefill_dir, draft_decode_dir]:
-        if not os.path.isdir(required_dir):
-            raise FileNotFoundError(f"Directory not found: {required_dir}")
+    prefill_dir = _first_existing_dir(model_dir, ["prefill"])
+    decode_dir = _first_existing_dir(model_dir, ["decode"])
+    draft_prefill_dir = _first_existing_dir(
+        model_dir, ["mtp_draft_prefill", "draft_prefill"]
+    )
+    draft_decode_dir = _first_existing_dir(
+        model_dir, ["mtp_draft_decode", "draft_decode"]
+    )
 
     with ProcessMemoryMonitor(interval=args.monitor_interval, quiet=True) as monitor:
         if args.stage == "build" or args.stage == "all":
