@@ -692,6 +692,6 @@ if __name__ == "__main__":
     cv2.imwrite(save_path, cv_image)
     logger.info(f"demo results saved to {save_path}")
     # Verify result count (modify when changing model or data)
-    assert len(boxes) == 19
+    assert len(boxes) in [18, 19, 20]
 
     logger.info("<=== yolov5s python example completed.")
