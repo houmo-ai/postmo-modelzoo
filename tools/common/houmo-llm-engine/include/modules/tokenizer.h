@@ -3,7 +3,7 @@
  *
  * File: tokenizer.h
  * Description:
- *   HuggingFace Tokenizer wrapper. Wraps the tokenizers_cpp library to
+ *   HuggingFace Tokenizer wrapper. Wraps the tokenizer.cpp library to
  *   provide text-to-token and token-to-text conversion.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,14 +25,10 @@
 
 #include <memory>
 #include <string>
+#include <tokenizer.hpp>
 #include <vector>
 
 #include "base/houmo.h"
-
-// Forward declaration for tokenizers_cpp
-namespace tokenizers {
-class Tokenizer;
-}
 
 namespace houmo {
 
@@ -46,9 +42,9 @@ class HfTokenizer {
  public:
   /**
    * @brief Constructor
-   * @param tokenizer_json_path Path to tokenizer.json file
+   * @param tokenizer_path Path to download raw hugging-face model path.
    */
-  explicit HfTokenizer(const std::string& tokenizer_json_path);
+  explicit HfTokenizer(const std::string& tokenizer_path);
 
   /**
    * @brief Destructor
@@ -71,21 +67,23 @@ class HfTokenizer {
    * @return List of token IDs
    */
   std::vector<Token> encode(const std::string& text, bool add_bos = true,
-                            bool add_eos = false);
+                            bool add_eos = false,
+                            bool add_special_tokens = false);
 
   /**
    * @brief Decode a single token
    * @param token Token ID
    * @return Decoded string
    */
-  std::string decode(Token token);
+  std::string decode(Token token, bool skip_special_tokens = false);
 
   /**
    * @brief Decode a sequence of tokens
    * @param tokens List of token IDs
    * @return Decoded string
    */
-  std::string decode(const std::vector<Token>& tokens);
+  std::string decode(const std::vector<Token>& tokens,
+                     bool skip_special_tokens = false);
 
   /**
    * @brief Get BOS token ID
@@ -105,15 +103,6 @@ class HfTokenizer {
    */
   Token pad_token_id() const { return pad_token_id_; }
 
-  void set_pad_token_id(std::string text);
-  void set_bos_token_id(std::string text);
-  void set_eos_token_id(std::string text);
-
-  /**
-   * @brief Get vocabulary size
-   */
-  int vocab_size() const { return vocab_size_; }
-
   /**
    * @brief Get token ID for a token string
    * @param token Token string (e.g., "<|endoftext|>")
@@ -122,11 +111,10 @@ class HfTokenizer {
   int token_to_id(const std::string& token) const;
 
  private:
-  std::unique_ptr<tokenizers::Tokenizer> tokenizer_;
+  std::shared_ptr<tokenizer::PreTrainedTokenizer> tokenizer_;
   Token bos_token_id_ = -1;
   Token eos_token_id_ = -1;
   Token pad_token_id_ = -1;
-  int vocab_size_ = 0;
 };
 
 }  // namespace houmo

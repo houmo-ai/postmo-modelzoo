@@ -29,7 +29,8 @@
 namespace houmo {
 
 // ============================================================================
-// LLMModel - Base class implementation (provides default behavior, subclasses can override)
+// LLMModel - Base class implementation (provides default behavior, subclasses
+// can override)
 // ============================================================================
 
 std::vector<Token> LLMModel::tokenize(const std::string& text, bool add_bos,
@@ -96,7 +97,8 @@ std::unique_ptr<Context> LLMModel::create_context(int n_ctx) {
   if (n_ctx <= 0) {
     n_ctx = info_.n_ctx;
   }
-  // Create base Context; subclasses can override this method to create custom Context
+  // Create base Context; subclasses can override this method to create custom
+  // Context
   return std::make_unique<Context>(this, n_ctx);
 }
 

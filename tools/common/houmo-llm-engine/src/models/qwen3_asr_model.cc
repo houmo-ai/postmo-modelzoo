@@ -288,15 +288,14 @@ void Qwen3AsrContext::encode_postprocess_impl() {
   auto* model = static_cast<Qwen3AsrModel*>(asr_model());
   auto* enc = model->encoder_module().get();
 
-  std::string out_name = enc->GetOutputName(0);
-  auto out_info = enc->GetOutputInfo(out_name).AsContiguous();
-  tcim::Tensor out_tensor = tcim::Tensor::CreateHostTensor(out_info);
-  enc->GetOutput(out_name).CastTo(out_tensor);
+  auto out_name = enc->GetOutputName(0);
+  auto dev_output = enc->GetDevOutput(out_name);
+  auto host_output = dev_output.ToHost(true);
+  const float16* raw = static_cast<const float16*>(host_output.Buffer().Data());
 
   int T_out = compute_feat_extract_output_lengths(encode_n_frames_);
   int hidden = model->hidden_size();
   int total = T_out * hidden;
-  float16* raw = static_cast<float16*>(out_tensor.Buffer().Data());
 
   audio_embeds_.assign(raw, raw + total);
 }
@@ -367,38 +366,15 @@ Token Qwen3AsrContext::prefill_postprocess_impl() {
     dec->SetDevInput(name, prefill_module->GetDevInput(name));
   }
 
-  std::string out_name = prefill_module->GetOutputName(0);
-  auto out_info = prefill_module->GetOutputInfo(out_name).AsContiguous();
-  tcim::Tensor out_tensor = tcim::Tensor::CreateHostTensor(out_info);
-  prefill_module->GetOutput(out_name).CastTo(out_tensor);
+  auto out_name = prefill_module->GetOutputName(0);
+  auto dev_output = prefill_module->GetDevOutput(out_name);
+  auto host_output = dev_output.ToHost(true);
+  const float16* logits =
+      static_cast<const float16*>(host_output.Buffer().Data());
+  int vocab_size = prefill_module->GetOutputInfo(out_name).Shape()[1];
 
-  size_t out_bytes = out_tensor.MemSize();
-  Token first_token = 0;
-  float max_val = -std::numeric_limits<float>::infinity();
-  int vocab = tokenizer->vocab_size();
-
-  if (out_bytes == static_cast<size_t>(vocab) * sizeof(float)) {
-    int count = static_cast<int>(out_bytes / sizeof(float));
-    float* logits32 = static_cast<float*>(out_tensor.Buffer().Data());
-    for (int i = 0; i < count; ++i) {
-      float val = logits32[i];
-      if (val > max_val) {
-        max_val = val;
-        first_token = static_cast<Token>(i);
-      }
-    }
-  } else {
-    int count = static_cast<int>(out_bytes / sizeof(float16));
-    float16* logits16 = static_cast<float16*>(out_tensor.Buffer().Data());
-    for (int i = 0; i < count; ++i) {
-      float val = static_cast<float>(logits16[i]);
-      if (val > max_val) {
-        max_val = val;
-        first_token = static_cast<Token>(i);
-      }
-    }
-  }
-
+  Token first_token =
+      static_cast<Token>(houmo::eigen_argmax<float16>(logits, vocab_size));
   generated_ids_.push_back(first_token);
   decode_position_ = prefill_seq_len_;
   context_length_ = prefill_seq_len_;
@@ -444,37 +420,14 @@ Token Qwen3AsrContext::decode_postprocess_impl() {
   auto* dec = model->decode_module().get();
   auto tokenizer = model->tokenizer();
 
-  std::string out_name = dec->GetOutputName(0);
-  auto out_info = dec->GetOutputInfo(out_name).AsContiguous();
-  tcim::Tensor out_tensor = tcim::Tensor::CreateHostTensor(out_info);
-  dec->GetOutput(out_name).CastTo(out_tensor);
-
-  size_t out_bytes = out_tensor.MemSize();
-  Token next_token = 0;
-  float max_val = -std::numeric_limits<float>::infinity();
-  int vocab = tokenizer->vocab_size();
-
-  if (out_bytes == static_cast<size_t>(vocab) * sizeof(float)) {
-    int count = static_cast<int>(out_bytes / sizeof(float));
-    float* logits32 = static_cast<float*>(out_tensor.Buffer().Data());
-    for (int i = 0; i < count; ++i) {
-      float val = logits32[i];
-      if (val > max_val) {
-        max_val = val;
-        next_token = static_cast<Token>(i);
-      }
-    }
-  } else {
-    int count = static_cast<int>(out_bytes / sizeof(float16));
-    float16* logits16 = static_cast<float16*>(out_tensor.Buffer().Data());
-    for (int i = 0; i < count; ++i) {
-      float val = static_cast<float>(logits16[i]);
-      if (val > max_val) {
-        max_val = val;
-        next_token = static_cast<Token>(i);
-      }
-    }
-  }
+  auto out_name = dec->GetOutputName(0);
+  auto dev_output = dec->GetDevOutput(out_name);
+  auto host_output = dev_output.ToHost(true);
+  const float16* logits =
+      static_cast<const float16*>(host_output.Buffer().Data());
+  int vocab_size = dec->GetOutputInfo(out_name).Shape()[1];
+  Token next_token =
+      static_cast<Token>(houmo::eigen_argmax<float16>(logits, vocab_size));
 
   generated_ids_.push_back(next_token);
   decode_position_++;

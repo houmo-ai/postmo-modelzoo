@@ -26,6 +26,7 @@
 #include "core/model_factory.h"
 #include "models/whisper_model.h"
 #include "modules/audio_processor.h"
+#include "modules/streaming_decoder.h"
 
 namespace fs = std::filesystem;
 
@@ -141,15 +142,17 @@ int main(int argc, char* argv[]) {
     whisper_ctx->set_audio_processor(sample_rate, chunk_seconds,
                                      encoder_window_seconds);
 
-    std::vector<houmo::Token> all_tokens;
+    houmo::StreamingDecoder decoder(whisper_model->tokenizer());
     houmo::SamplingParams params;
+    params.repetition_penalty = 1.1f;
     whisper_ctx->Transcribe(audio_path, params,
-                            [&all_tokens](houmo::Token token) {
-                              all_tokens.push_back(token);
+                            [&decoder](houmo::Token token) {
+                              std::string text = decoder.decode(token);
+                              if (!text.empty()) {
+                                std::cout << text << std::flush;
+                              }
                               return true;
                             });
-
-    std::cout << whisper_model->tokenizer()->decode(all_tokens);
     std::cout << std::endl;
 
     std::cout << "\n";

@@ -965,7 +965,7 @@ void Qwen3VLMModel::load() {
   std::cout << "Qwen3VLMModel loaded successfully" << std::endl;
 
   // 13. Set model info
-  info_.n_vocab = tokenizer_->vocab_size();
+  info_.n_vocab = argmax_dim_len_;
   info_.n_embd = embedding_length_;
   info_.n_ctx = context_max_length_;
 }

@@ -264,7 +264,6 @@ void WhisperModel::load() {
     transcribe_token_id_ = tokenizer_->token_to_id("<|transcribe|>");
     notimestamps_token_id_ = tokenizer_->token_to_id("<|notimestamps|>");
     eos_token_id_ = tokenizer_->token_to_id("<|endoftext|>");
-
     // Build language token mapping
     // Format: "zh" -> <|zh|> token ID
     const std::vector<std::string> languages = {
@@ -498,31 +497,31 @@ Token WhisperContext::detect_lang_postprocess_impl() {
   auto* model = static_cast<WhisperModel*>(asr_model());
   auto* decode_module = model->decode_module().get();
   auto tokenizer = model->tokenizer();
-
-  std::string out_name = decode_module->GetOutputName(0);
-  auto out_info = decode_module->GetOutputInfo(out_name).AsContiguous();
-  tcim::Tensor out_tensor = tcim::Tensor::CreateHostTensor(out_info);
-  decode_module->GetOutput(out_name).CastTo(out_tensor);
-
-  float16* logits = static_cast<float16*>(out_tensor.Buffer().Data());
-  int vocab_size = tokenizer->vocab_size();
+  auto out_name = decode_module->GetOutputName(0);
+  auto dev_output = decode_module->GetDevOutput(out_name);
+  auto host_output = dev_output.ToHost(true);
+  const float16* logits =
+      static_cast<const float16*>(host_output.Buffer().Data());
+  int vocab_size = decode_module->GetOutputInfo(out_name).Shape()[2];
 
   const auto& lang_ids = model->lang_to_id();
-  std::vector<bool> non_lang(vocab_size, true);
-  for (Token id : lang_ids) {
-    if (static_cast<int>(id) < vocab_size) non_lang[id] = false;
-  }
 
-  float max_logit = -std::numeric_limits<float>::infinity();
+  std::vector<float16> masked_logits(logits, logits + vocab_size);
   for (int i = 0; i < vocab_size; ++i) {
-    if (non_lang[i]) continue;
-    float val = static_cast<float>(logits[i]);
-    if (val > max_logit) {
-      max_logit = val;
-      detected_lang_id_ = static_cast<Token>(i);
+    bool is_non_lang = true;
+    for (Token id : lang_ids) {
+      if (static_cast<int>(id) == i) {
+        is_non_lang = false;
+        break;
+      }
+    }
+    if (is_non_lang) {
+      masked_logits[i] = static_cast<float16>(-65504.0f);
     }
   }
 
+  detected_lang_id_ = static_cast<Token>(
+      houmo::eigen_argmax<float16>(masked_logits.data(), vocab_size));
   if (detected_lang_id_ == 0) {
     detected_lang_id_ = model->lang_token_id("zh");
   }
@@ -620,17 +619,17 @@ Token WhisperContext::prefill_postprocess_impl() {
         enc_kv);
   }
 
-  std::string out_name = prefill_module->GetOutputName(0);
-  auto out_info = prefill_module->GetOutputInfo(out_name).AsContiguous();
-  tcim::Tensor out_tensor = tcim::Tensor::CreateHostTensor(out_info);
-  prefill_module->GetOutput(out_name).CastTo(out_tensor);
+  auto out_name = prefill_module->GetOutputName(0);
+  auto dev_output = prefill_module->GetDevOutput(out_name);
+  auto host_output = dev_output.ToHost(true);
+  const float16* logits =
+      static_cast<const float16*>(host_output.Buffer().Data());
 
-  int vocab_size = tokenizer->vocab_size();
-  float16* logits = static_cast<float16*>(out_tensor.Buffer().Data()) +
-                    (prompt_len - 1) * vocab_size;
+  int vocab_size = prefill_module->GetOutputInfo(out_name).Shape()[2];
 
   if (!sampler()) set_sampler(SamplingParams{});
-  Token first_token = sampler()->sample(logits, vocab_size);
+  Token first_token =
+      sampler()->sample(logits + (prompt_len - 1) * vocab_size, vocab_size);
   generated_ids_.push_back(first_token);
   decode_position_ = prompt_len;
   context_length_ = prompt_len;
@@ -692,14 +691,15 @@ Token WhisperContext::decode_postprocess_impl() {
   auto* model = static_cast<WhisperModel*>(asr_model());
   auto* decode_module = model->decode_module().get();
   auto tokenizer = model->tokenizer();
-  int vocab_size = tokenizer->vocab_size();
 
-  std::string out_name = decode_module->GetOutputName(0);
-  auto out_info = decode_module->GetOutputInfo(out_name).AsContiguous();
-  tcim::Tensor out_tensor = tcim::Tensor::CreateHostTensor(out_info);
-  decode_module->GetOutput(out_name).CastTo(out_tensor);
+  auto out_name = decode_module->GetOutputName(0);
+  auto dev_output = decode_module->GetDevOutput(out_name);
+  auto host_output = dev_output.ToHost(true);
+  const float16* logits =
+      static_cast<const float16*>(host_output.Buffer().Data());
 
-  float16* logits = static_cast<float16*>(out_tensor.Buffer().Data());
+  int vocab_size = decode_module->GetOutputInfo(out_name).Shape()[2];
+
   Token next_token = sampler()->sample(logits, vocab_size, generated_ids_);
   generated_ids_.push_back(next_token);
   decode_position_++;

@@ -35,16 +35,15 @@ namespace houmo {
 /**
  * @brief Streaming decoder
  *
- * Converts token stream to string stream output. Uses sliding window
- * mechanism to handle UTF-8 multi-byte character boundaries.
+ * Converts token stream to string stream output. Buffers pending tokens
+ * and decodes them together to handle UTF-8 multi-byte character boundaries
+ * where a single character (e.g. emoji or rare CJK) may span multiple tokens.
  *
- * Usage:
- *   StreamingDecoder decoder(model.tokenizer());
- *   ctx->generate(tokens, params, [&](Token token) {
- *       std::cout << decoder.decode(token);
- *       std::cout.flush();
- *       return true;
- *   });
+ * On each new token:
+ *   1. Add to pending buffer
+ *   2. Decode the entire buffer
+ *   3. If result is valid UTF-8 with a valid trailing character -> output and clear buffer
+ *   4. If result is incomplete (invalid UTF-8 or trailing replacement char) -> keep buffering
  */
 class StreamingDecoder {
  public:
@@ -69,8 +68,8 @@ class StreamingDecoder {
    * @param token Newly generated token
    * @return Newly decoded string portion (may be empty)
    *
-   * Uses sliding window to ensure complete UTF-8 multi-byte character output.
-   * Returns empty string and caches when encountering incomplete UTF-8
+   * Buffers tokens until a complete, valid UTF-8 string can be produced.
+   * Returns empty string when the buffer contains incomplete multi-byte
    * characters, outputting them after subsequent tokens complete them.
    */
   std::string decode(Token token);
@@ -80,7 +79,7 @@ class StreamingDecoder {
    * @param tokens Prompt tokens
    *
    * In manual Prefill+Decode mode, call this before decode() to
-   * initialize the sliding window baseline.
+   * initialize the token counter.
    */
   void init(const std::vector<Token>& tokens);
 
@@ -97,16 +96,13 @@ class StreamingDecoder {
   size_t token_count() const { return generated_ids_.size(); }
 
  private:
-  /**
-   * @brief Check if Unicode code point is a valid character (CJK, ASCII letter or digit)
-   */
+  static bool is_valid_utf8(const std::string& s);
   static bool is_valid_char(char32_t cp);
+  static char32_t last_codepoint(const std::string& s);
 
   std::shared_ptr<HfTokenizer> tokenizer_;
   std::vector<Token> generated_ids_;
-  std::string last_response_;
-  int skip_tokens_ = 0;
-  static constexpr int kSlideLen = 10;  // Sliding window length
+  std::vector<Token> pending_ids_;
 };
 
 }  // namespace houmo

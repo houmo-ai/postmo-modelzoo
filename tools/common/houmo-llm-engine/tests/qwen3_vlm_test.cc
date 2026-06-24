@@ -36,7 +36,7 @@ class Qwen3VLMModelTest : public ::testing::Test {
     vision_path_ = "../models/qwen3-vl-4b/qwen3-vl-4b_visual_448x448x2.hmm";
     prefill_path_ = "../models/qwen3-vl-4b/qwen3-vl-4b_prefill.hmm";
     decode_path_ = "../models/qwen3-vl-4b/qwen3-vl-4b_decode.hmm";
-    tokenizer_path_ = "../tokenizers/qwen3-vl-4b/tokenizer.json";
+    tokenizer_path_ = "../tokenizers/qwen3-vl-4b";
     embedding_path_ = "../models/qwen3-vl-4b/hmquant/quant_embedding.bin";
     test_image_path_ = "../tests/data/a.png";
 

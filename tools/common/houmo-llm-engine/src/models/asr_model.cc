@@ -134,21 +134,18 @@ void ASRContext::fill_perf_info(float audio_duration) {
   perf_info_.audio_duration = audio_duration;
 
   if (audio_duration > 0.0f) {
-    perf_info_.overall_rtf =
-        (perf_info_.total_time / 1000.0f) / audio_duration;
+    perf_info_.overall_rtf = (perf_info_.total_time / 1000.0f) / audio_duration;
     perf_info_.inference_rtf =
         ((perf_info_.total_time - perf_info_.audio_load_time) / 1000.0f) /
         audio_duration;
   }
   if (perf_info_.decode_time > 0.0f) {
-    perf_info_.decode_tps =
-        static_cast<float>(perf_info_.output_tokens) /
-        (perf_info_.decode_time / 1000.0f);
+    perf_info_.decode_tps = static_cast<float>(perf_info_.output_tokens) /
+                            (perf_info_.decode_time / 1000.0f);
   }
   if (perf_info_.total_time > 0.0f) {
-    perf_info_.overall_tps =
-        static_cast<float>(perf_info_.output_tokens) /
-        (perf_info_.total_time / 1000.0f);
+    perf_info_.overall_tps = static_cast<float>(perf_info_.output_tokens) /
+                             (perf_info_.total_time / 1000.0f);
   }
 }
 

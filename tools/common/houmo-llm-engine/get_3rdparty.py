@@ -50,11 +50,6 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = get_args()
-    tokenizer_path = "3rdparty/qwen3-tokenizers-cpp.zip"
-    target_dir = "./3rdparty"
-    save_path = get_file_from_jfrog(tokenizer_path, target_dir, target_dir)
-    print(f"Tokenizer downloaded to {save_path} and extracted to: {target_dir}")
-
     opencv_path = "3rdparty/qwen3vl-opencv-cpp.zip"
     target_dir = "./3rdparty"
     save_path = get_file_from_jfrog(opencv_path, target_dir, target_dir)

@@ -31,9 +31,9 @@ namespace houmo {
 class TokenizerTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    tokenizer_path_ = "../tokenizers/qwen3-0.6b/tokenizer.json";
+    tokenizer_path_ = "../tokenizers/qwen3-0.6b";
     if (!std::filesystem::exists(tokenizer_path_)) {
-      GTEST_SKIP() << "Test tokenizer.json not found at: " << tokenizer_path_;
+      GTEST_SKIP() << "Test tokenizer not found at: " << tokenizer_path_;
     }
   }
 
@@ -83,14 +83,6 @@ TEST_F(TokenizerTest, EncodeWithBosEos) {
   EXPECT_EQ(tokens_with_eos.size(), tokens_no_special.size() + 1);
   // With both should have two more tokens
   EXPECT_EQ(tokens_with_both.size(), tokens_no_special.size() + 2);
-}
-
-TEST_F(TokenizerTest, VocabSize) {
-  HfTokenizer tokenizer(tokenizer_path_);
-  int vocab_size = tokenizer.vocab_size();
-  EXPECT_GT(vocab_size, 0) << "Vocab size should be positive";
-  // Qwen series typically has 151936 or 152064 tokens
-  EXPECT_GT(vocab_size, 100000) << "Vocab size should be large for LLM";
 }
 
 TEST_F(TokenizerTest, SpecialTokens) {

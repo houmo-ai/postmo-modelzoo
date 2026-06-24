@@ -22,24 +22,46 @@
 
 #include "modules/streaming_decoder.h"
 
-#include <algorithm>
-#include <codecvt>
-#include <locale>
+#include <utf8proc/utf8proc.h>
 
 namespace houmo {
 
-// UTF-8 helper functions
-static std::u32string utf8_to_u32(const std::string& u8) {
-  std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-  return conv.from_bytes(u8);
+// ============================================================================
+// UTF-8 helpers
+// ============================================================================
+
+bool StreamingDecoder::is_valid_utf8(const std::string& s) {
+  const uint8_t* ptr = reinterpret_cast<const uint8_t*>(s.data());
+  const uint8_t* end = ptr + s.size();
+  while (ptr < end) {
+    int32_t cp = 0;
+    utf8proc_ssize_t len = utf8proc_iterate(ptr, end - ptr, &cp);
+    if (len < 0) return false;
+    ptr += len;
+  }
+  return true;
 }
 
-static std::string u32_to_utf8(const std::u32string& u32) {
-  std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-  return conv.to_bytes(u32);
+bool StreamingDecoder::is_valid_char(char32_t cp) {
+  if (cp >= 0xD800u && cp <= 0xDFFFu) return false;
+  if (cp == 0xFFFDu) return false;
+  if (cp >= 0xFDD0u && cp <= 0xFDEFu) return false;
+  return true;
 }
 
-static size_t utf8_len(const std::string& u8) { return utf8_to_u32(u8).size(); }
+char32_t StreamingDecoder::last_codepoint(const std::string& s) {
+  const uint8_t* ptr = reinterpret_cast<const uint8_t*>(s.data());
+  const uint8_t* end = ptr + s.size();
+  int32_t cp = 0;
+  while (ptr < end) {
+    int32_t cur = 0;
+    utf8proc_ssize_t len = utf8proc_iterate(ptr, end - ptr, &cur);
+    if (len < 0) break;
+    cp = cur;
+    ptr += len;
+  }
+  return static_cast<char32_t>(cp);
+}
 
 // ============================================================================
 // StreamingDecoder implementation
@@ -53,95 +75,32 @@ std::string StreamingDecoder::decode(Token token) {
     return "";
   }
 
-  // Add new token to history
   generated_ids_.push_back(token);
+  pending_ids_.push_back(token);
 
-  // Calculate decode window: last slide_len + skip_tokens + 1 tokens
-  int window_size = kSlideLen + skip_tokens_ + 1;
-  int start_idx =
-      std::max(0, static_cast<int>(generated_ids_.size()) - window_size);
+  std::string decoded = tokenizer_->decode(pending_ids_);
 
-  std::vector<Token> decode_window(generated_ids_.begin() + start_idx,
-                                   generated_ids_.end());
-
-  // Decode window
-  std::string decoded = tokenizer_->decode(decode_window);
-
-  // Calculate UTF-8 character count of last_response_ as start position
-  int substart = utf8_len(last_response_);
-
-  // Convert to UTF-32 and extract incremental part
-  std::u32string u32_decoded = utf8_to_u32(decoded);
-
-  // Boundary check: if substart exceeds decoded string length, skip this token
-  if (substart > static_cast<int>(u32_decoded.size())) {
-    skip_tokens_++;
+  if (!is_valid_utf8(decoded)) {
     return "";
   }
 
-  std::u32string u32_incremental = u32_decoded.substr(substart);
-  std::string incremental = u32_to_utf8(u32_incremental);
-
-  // Check if valid: non-empty and last character is valid CJK/ASCII letter/digit
-  if (!incremental.empty() && is_valid_char(u32_incremental.back())) {
-    // Valid: update last_response_ (decode last slide_len tokens)
-    int resp_start =
-        std::max(0, static_cast<int>(generated_ids_.size()) - kSlideLen);
-    std::vector<Token> resp_window(generated_ids_.begin() + resp_start,
-                                   generated_ids_.end());
-    last_response_ = tokenizer_->decode(resp_window);
-    skip_tokens_ = 0;
-    return incremental;
-  } else {
-    // Invalid: skip, accumulate for next time
-    skip_tokens_++;
+  char32_t last_cp = last_codepoint(decoded);
+  if (!is_valid_char(last_cp)) {
     return "";
   }
+
+  pending_ids_.clear();
+  return decoded;
 }
 
 void StreamingDecoder::reset() {
   generated_ids_.clear();
-  last_response_.clear();
-  skip_tokens_ = 0;
+  pending_ids_.clear();
 }
 
 void StreamingDecoder::init(const std::vector<Token>& tokens) {
   generated_ids_ = tokens;
-  // Initialize last_response_ by decoding the last kSlideLen prompt tokens
-  int init_start = std::max(0, static_cast<int>(tokens.size()) - kSlideLen);
-  std::vector<Token> init_window(tokens.begin() + init_start, tokens.end());
-  last_response_ = tokenizer_->decode(init_window);
-  skip_tokens_ = 0;
-}
-
-bool StreamingDecoder::is_valid_char(char32_t cp) {
-  return
-      // CJK Unified Ideographs
-      (cp >= 0x4E00u && cp <= 0x9FFFu) ||
-      (cp >= 0x3400u && cp <= 0x4DBFu) ||
-      (cp >= 0x20000u && cp <= 0x2A6DFu) ||
-      (cp >= 0x2A700u && cp <= 0x2B73Fu) ||
-      (cp >= 0x2B740u && cp <= 0x2B81Fu) ||
-      (cp >= 0x2B820u && cp <= 0x2CEAFu) ||
-      // CJK Compatibility Ideographs
-      (cp >= 0xF900u && cp <= 0xFAFFu) ||
-      (cp >= 0x2F800u && cp <= 0x2FA1Fu) ||
-      // CJK Symbols and Punctuation (U+3000-U+303F)
-      (cp >= 0x3000u && cp <= 0x303Fu) ||
-      // Halfwidth and Fullwidth Forms (contains fullwidth punctuation like ？，。)
-      (cp >= 0xFF00u && cp <= 0xFFEFu) ||
-      // Enclosed Digits (①②③④⑤⑥⑦⑧⑨⑩ etc.)
-      (cp >= 0x2460u && cp <= 0x24FFu) ||
-      // ASCII Letters
-      (cp >= 0x0041u && cp <= 0x005Au) ||  // A-Z
-      (cp >= 0x0061u && cp <= 0x007Au) ||  // a-z
-      // ASCII Digits
-      (cp >= 0x0030u && cp <= 0x0039u) ||  // 0-9
-      // ASCII Punctuation & Mathematical Symbols
-      (cp >= 0x0020u && cp <= 0x002Fu) ||  // Space ! " # $ % & ' ( ) * + , - . /
-      (cp >= 0x003Au && cp <= 0x003Fu) ||  // : ; < = > ?
-      (cp >= 0x005Bu && cp <= 0x005Eu) ||  // [ \ ] ^
-      cp == 0x007Eu;                        // ~ (tilde)
+  pending_ids_.clear();
 }
 
 }  // namespace houmo

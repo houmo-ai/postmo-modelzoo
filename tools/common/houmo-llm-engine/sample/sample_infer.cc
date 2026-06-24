@@ -53,9 +53,11 @@ static void printUsage(const char* program_name) {
   std::cout << "  --model <series>      Model series: qwen3_llm, qwen35_mllm, "
                "qwen3_vlm\n";
   std::cout << "  --prompt <text>       User prompt (default: \"Hello\")\n";
-  std::cout << "  --image <path>        Image path (VLM model, can specify multiple)\n";
+  std::cout << "  --image <path>        Image path (VLM model, can specify "
+               "multiple)\n";
   std::cout << "  --multi-turn          Enable multi-turn dialogue mode\n";
-  std::cout << "  --max-tokens <n>      Max tokens to generate (default: 256)\n";
+  std::cout
+      << "  --max-tokens <n>      Max tokens to generate (default: 256)\n";
   std::cout << "  --temperature <f>     Sampling temperature (default: 1.0)\n";
   std::cout << "  --top-k <n>           Top-k sampling (default: 1, greedy)\n";
   std::cout << "  --prefill <path>      Prefill model path\n";
@@ -71,9 +73,9 @@ static void printUsage(const char* program_name) {
   std::cout << "  " << program_name << " --prompt \"Introduce yourself\"\n";
   std::cout << "\n";
   std::cout << "  # VLM image understanding\n";
-  std::cout
-      << "  " << program_name
-      << " --model qwen35_mllm --image test.jpg --prompt \"Describe this image\"\n";
+  std::cout << "  " << program_name
+            << " --model qwen35_mllm --image test.jpg --prompt \"Describe this "
+               "image\"\n";
   std::cout << "\n";
   std::cout << "  # Multi-turn dialogue\n";
   std::cout << "  " << program_name << " --multi-turn --prompt \"Hello\"\n";
@@ -227,7 +229,9 @@ static void exampleMultiTurn(houmo::LLMModel& model,
   ctx->profiler().print_summary();
 
   // Round 3 - dialogue again
-  std::string follow_up3 = "First introduce the image content, then summarize the conversation in detail";
+  std::string follow_up3 =
+      "First introduce the image content, then summarize the conversation in "
+      "detail";
 
   std::vector<std::string> images3 = {"tests/data/b.jpg"};
   std::string content3;
@@ -436,7 +440,8 @@ int main(int argc, char* argv[]) {
   // Check if model files exist
   if (!fs::exists(prefill_path)) {
     std::cerr << "Prefill model not found: " << prefill_path << "\n";
-    std::cerr << "Please set HM_ENGINE_PATH environment variable or use --prefill parameter\n";
+    std::cerr << "Please set HM_ENGINE_PATH environment variable or use "
+                 "--prefill parameter\n";
     return -2;
   }
   if (!fs::exists(decode_path)) {
@@ -509,7 +514,8 @@ int main(int argc, char* argv[]) {
           return -2;
         }
       }
-      exampleImageUnderstanding(*model, images, prompt, params, enable_thinking);
+      exampleImageUnderstanding(*model, images, prompt, params,
+                                enable_thinking);
     } else if (multi_turn) {
       // Multi-turn dialogue
       exampleMultiTurn(*model, prompt, params, enable_thinking);

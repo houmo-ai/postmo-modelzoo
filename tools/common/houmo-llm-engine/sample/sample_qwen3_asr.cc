@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
                          std::string text = decoder.decode(token);
                          if (!text.empty()) {
                            // need to rfind <asr_text> to remove the prefix
-                           std::cout << text;
+                           if (text != "<asr_text>") std::cout << text;
                            std::cout.flush();
                          }
                          return true;

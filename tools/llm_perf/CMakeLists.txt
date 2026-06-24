@@ -56,7 +56,7 @@ set(HOUMO_ENGINE_DIR ${CMAKE_SOURCE_DIR}/../common/houmo-llm-engine)
 if(ANDROID_ABI)
   set(_LIB_SUFFIX "Android_xh2")
   set(ENGINE_BUILD_DIR ${HOUMO_ENGINE_DIR}/build_ndk/release)
-  set(TOKENIZERS_DIR ${HOUMO_ENGINE_DIR}/3rdparty/tokenizers-cpp/${_LIB_SUFFIX})
+  set(TOKENIZERS_DIR $ENV{HOUMO_EXAMPLES_PATH}/apis/common/tokenizer.cpp)
   set(AUDIO_3RDPARTY_DIR ${HOUMO_ENGINE_DIR}/3rdparty/audio/build_android)
   set(AUDIO_INC_DIRS
     ${AUDIO_3RDPARTY_DIR}/kaldi-native-fbank/include
@@ -70,7 +70,7 @@ else()
   execute_process(COMMAND uname -m OUTPUT_VARIABLE _ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
   set(_LIB_SUFFIX "Linux_${_ARCH}_$ENV{HOUMO_TARGET}")
   set(ENGINE_BUILD_DIR ${HOUMO_ENGINE_DIR}/build)
-  set(TOKENIZERS_DIR ${HOUMO_ENGINE_DIR}/3rdparty/tokenizers-cpp/${_LIB_SUFFIX})
+  set(TOKENIZERS_DIR $ENV{HOUMO_EXAMPLES_PATH}/apis/common/tokenizer.cpp)
   set(AUDIO_3RDPARTY_DIR ${HOUMO_ENGINE_DIR}/3rdparty/audio/3rdparty_build)
   set(AUDIO_INC_DIRS ${AUDIO_3RDPARTY_DIR}/include)
   set(AUDIO_LIB_DIRS ${AUDIO_3RDPARTY_DIR}/lib)
@@ -138,10 +138,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
 add_custom_target(houmo_engine_rebuild ALL
   COMMAND cmake --build ${ENGINE_BUILD_DIR} -j$$(nproc)
   WORKING_DIRECTORY ${HOUMO_ENGINE_DIR}
-  COMMENT "Rebuilding houmo-llm-engine libhoumo_infer.a"
+  COMMENT "Rebuilding houmo-llm-engine libhoumo_infer.so"
 )
-add_library(houmo_infer STATIC IMPORTED)
-set_target_properties(houmo_infer PROPERTIES IMPORTED_LOCATION ${ENGINE_BUILD_DIR}/libhoumo_infer.a)
+add_library(houmo_infer SHARED IMPORTED)
+set_target_properties(houmo_infer PROPERTIES IMPORTED_LOCATION ${ENGINE_BUILD_DIR}/libhoumo_infer.so)
 add_dependencies(houmo_infer houmo_engine_rebuild)
 if(MSVC)
   add_definitions(-DYAML_CPP_STATIC_DEFINE)
@@ -159,8 +159,7 @@ else()
     endif()
     target_link_libraries(${PROJECT_NAME} PRIVATE
       ${TCIM_LIBRARY} hal_xh2a dl yaml-cpp
-      -Wl,--whole-archive houmo_infer -Wl,--no-whole-archive
-      tokenizers_cpp tokenizers_c
+      houmo_infer
       ${ASR_LIBRARIES}
       ${OPENCV_DIR}/lib/libopencv_core.so
       ${OPENCV_DIR}/lib/libopencv_imgproc.so
@@ -174,8 +173,7 @@ else()
     endif()
     target_link_libraries(${PROJECT_NAME} PRIVATE
       ${TCIM_LIBRARY} pthread hal_xh2a ${CMAKE_DL_LIBS} yaml-cpp
-      -Wl,--whole-archive houmo_infer -Wl,--no-whole-archive
-      tokenizers_cpp tokenizers_c
+      houmo_infer
       ${ASR_LIBRARIES}
       opencv_core opencv_imgproc opencv_imgcodecs)
     target_compile_definitions(${PROJECT_NAME} PRIVATE)
@@ -190,11 +188,5 @@ install(FILES ${CMAKE_SOURCE_DIR}/convert_embed.py
 if(ENABLE_ASR)
   if(ANDROID_ABI)
     message("you should manually copy the following ASR libraries to Aandroid device!")
-  else()
-    foreach(lib ${AUDIO_LIB_DIRS})
-      install(DIRECTORY ${lib}/
-              DESTINATION "$ENV{HOUMO_EXAMPLES_PATH}/tools/bin"
-              FILES_MATCHING PATTERN "*.so" PATTERN "*.a")
-    endforeach()
   endif()
 endif()

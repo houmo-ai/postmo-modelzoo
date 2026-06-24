@@ -22,58 +22,41 @@
 
 #include "modules/tokenizer.h"
 
-#include <tokenizers_cpp.h>
-
 #include <fstream>
 #include <iostream>
 
 namespace houmo {
 
-// Helper function: load file content
-static std::string loadBytesFromFile(const std::string& path) {
-  std::ifstream fs(path, std::ios::in | std::ios::binary);
-  if (fs.fail()) {
-    throw Exception("Cannot open tokenizer file: " + path);
-  }
-  std::string data;
-  fs.seekg(0, std::ios::end);
-  size_t size = static_cast<size_t>(fs.tellg());
-  fs.seekg(0, std::ios::beg);
-  data.resize(size);
-  fs.read(data.data(), size);
-  return data;
-}
-
-HfTokenizer::HfTokenizer(const std::string& tokenizer_json_path) {
-  // Load tokenizer.json
-  auto blob = loadBytesFromFile(tokenizer_json_path);
-  tokenizer_ = tokenizers::Tokenizer::FromBlobJSON(blob);
+HfTokenizer::HfTokenizer(const std::string& tokenizer_path) {
+  // Load tokenizer
+  tokenizer_ = tokenizer::AutoTokenizer::from_pretrained(tokenizer_path);
 
   // Get special token IDs
-  // Note: Different models may have different special tokens
-  // Qwen series: BOS usually not needed, EOS used for ending
-  bos_token_id_ = tokenizer_->Encode("<|endoftext|>")[0];
-  eos_token_id_ = tokenizer_->Encode("<|im_end|>")[0];
+  bos_token_id_ = tokenizer_->bos_token_id();
+  eos_token_id_ = tokenizer_->eos_token_id();
 
   // PAD token ID equals BOS token ID (Qwen series)
-  pad_token_id_ = bos_token_id_;
-  // Get vocabulary size
-  vocab_size_ = static_cast<int>(tokenizer_->GetVocabSize());
-  std::cout << "Tokenizer loaded. Vocab size: " << vocab_size_ << std::endl;
+  pad_token_id_ = tokenizer_->pad_token_id();
+
+  if (bos_token_id_ < 0) {
+    bos_token_id_ = tokenizer_->token_to_id("<|endoftext|>");
+  }
+  if (pad_token_id_ < 0) {
+    pad_token_id_ = bos_token_id_;
+  }
 }
 
 HfTokenizer::~HfTokenizer() { tokenizer_.reset(); }
 
 std::vector<Token> HfTokenizer::encode(const std::string& text, bool add_bos,
-                                       bool add_eos) {
+                                       bool add_eos, bool add_special_tokens) {
   std::vector<Token> ids;
 
   // Encode text
-  auto encoded = tokenizer_->Encode(text);
+  auto encoded = tokenizer_->encode(text, add_special_tokens);
 
   // Convert to std::vector<Token>
   ids.reserve(encoded.size() + (add_bos ? 1 : 0) + (add_eos ? 1 : 0));
-
   if (add_bos && bos_token_id_ >= 0) {
     ids.push_back(bos_token_id_);
   }
@@ -89,32 +72,23 @@ std::vector<Token> HfTokenizer::encode(const std::string& text, bool add_bos,
   return ids;
 }
 
-std::string HfTokenizer::decode(Token token) {
+std::string HfTokenizer::decode(Token token, bool skip_special_tokens) {
   std::vector<int32_t> ids = {static_cast<int32_t>(token)};
-  return tokenizer_->Decode(ids);
+  return tokenizer_->decode(ids, skip_special_tokens);
 }
 
-std::string HfTokenizer::decode(const std::vector<Token>& tokens) {
+std::string HfTokenizer::decode(const std::vector<Token>& tokens,
+                                bool skip_special_tokens) {
   std::vector<int32_t> ids;
   ids.reserve(tokens.size());
   for (const auto& token : tokens) {
     ids.push_back(static_cast<int32_t>(token));
   }
-  return tokenizer_->Decode(ids);
-}
-
-void HfTokenizer::set_pad_token_id(std::string text) {
-  pad_token_id_ = tokenizer_->Encode(text)[0];
-}
-void HfTokenizer::set_bos_token_id(std::string text) {
-  bos_token_id_ = tokenizer_->Encode(text)[0];
-}
-void HfTokenizer::set_eos_token_id(std::string text) {
-  eos_token_id_ = tokenizer_->Encode(text)[0];
+  return tokenizer_->decode(ids, skip_special_tokens);
 }
 
 int HfTokenizer::token_to_id(const std::string& token) const {
-  return tokenizer_->TokenToId(token);
+  return tokenizer_->token_to_id(token);
 }
 
 }  // namespace houmo

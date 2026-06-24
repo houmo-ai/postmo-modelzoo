@@ -38,7 +38,7 @@ class Qwen3LLMModelTest : public ::testing::Test {
     prefill_path_ = "../models/qwen3-0.6b/qwen3-0.6b_prefill.hmm";
     decode_path_ = "../models/qwen3-0.6b/qwen3-0.6b_decode.hmm";
     embedding_path_ = "../models/qwen3-0.6b/hmquant/quant_embedding.bin";
-    tokenizer_path_ = "../tokenizers/qwen3-0.6b/tokenizer.json";
+    tokenizer_path_ = "../tokenizers/qwen3-0.6b";
   }
 
   bool CheckModelFiles() {

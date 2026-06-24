@@ -46,9 +46,7 @@ if should_run_step "demo"; then
     done
     ./build_linux.sh > /dev/null 2>&1
     cd ${SCRIPT_DIR}
-    export LD_LIBRARY_PATH="${PWD}/3rdparty/audio/3rdparty_build/lib:$LD_LIBRARY_PATH"
-    echo ld_library_path: $LD_LIBRARY_PATH
-    ctest --test-dir build --output-on-failure -V
+    ctest --test-dir build --output-on-failure
     for config in "${MODEL_CONFIGS[@]}"; do
         MODEL_NAME="${config%%:*}"
         MODEL_SIZE="${config##*:}"
@@ -58,7 +56,7 @@ if should_run_step "demo"; then
             --prefill "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
             --decode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
             --embedding "models/${MODEL_NAME}-${MODEL_SIZE}/hmquant/quant_embedding.bin" \
-            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}/tokenizer.json" \
+            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}" \
             --prompt "介绍下你自己"
         fi
         if [[ $config == "qwen3.5:2b" ]]; then
@@ -67,7 +65,7 @@ if should_run_step "demo"; then
             --decode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
             --vision "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_visual_448x448x2.hmm" \
             --embedding "models/${MODEL_NAME}-${MODEL_SIZE}/hmquant/quant_embedding.bin" \
-            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}/tokenizer.json" \
+            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}" \
             --prompt "介绍下图片" \
             --image "tests/data/a.png"
             ./bin/sample_infer --model qwen35_mllm \
@@ -75,7 +73,7 @@ if should_run_step "demo"; then
             --decode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
             --vision "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_visual_896x896x2.hmm" \
             --embedding "models/${MODEL_NAME}-${MODEL_SIZE}/hmquant/quant_embedding.bin" \
-            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}/tokenizer.json" \
+            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}" \
             --prompt "介绍下图片" \
             --image "tests/data/b.jpg"
         fi
@@ -85,7 +83,7 @@ if should_run_step "demo"; then
             --decode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
             --vision "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_visual_448x448x2.hmm" \
             --embedding "models/${MODEL_NAME}-${MODEL_SIZE}/hmquant/quant_embedding.bin" \
-            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}/tokenizer.json" \
+            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}" \
             --prompt "分别介绍下两个图片" \
             --image "tests/data/a.png" --image "tests/data/b.jpg"
         fi
@@ -95,7 +93,7 @@ if should_run_step "demo"; then
             --prefill "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
             --decode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
             --embedding "models/${MODEL_NAME}-${MODEL_SIZE}/hmquant/quant_embedding.bin" \
-            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}/tokenizer.json" \
+            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}" \
             --audio "tests/data/long_audio.mp3"
         fi
         if [[ $config == "qwen3-asr:1.7b" ]]; then
@@ -104,7 +102,7 @@ if should_run_step "demo"; then
             --prefill "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
             --decode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
             --embedding "models/${MODEL_NAME}-${MODEL_SIZE}/hmquant/quant_embedding.bin" \
-            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}/tokenizer.json" \
+            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}" \
             --audio "tests/data/long_audio.mp3"
         fi
         if [[ $config == "whisper:large-v3-turbo" ]]; then
@@ -112,7 +110,7 @@ if should_run_step "demo"; then
             --encode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
             --prefill "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
             --decode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}/tokenizer.json" \
+            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}" \
             --audio "tests/data/long_audio.mp3"
         fi
     done

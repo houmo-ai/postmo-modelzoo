@@ -106,35 +106,18 @@ set(AUDIO_3RDPARTY_PATH ${CMAKE_SOURCE_DIR}/3rdparty/audio)
 set(AUDIO_3RDPARTY_INCLUDE_DIR ${AUDIO_3RDPARTY_PATH}/3rdparty_build/include)
 set(AUDIO_3RDPARTY_LIBRARY_DIR ${AUDIO_3RDPARTY_PATH}/3rdparty_build/lib)
 
-# tokenizers_cpp (HuggingFace tokenizers C++, local 3rdparty)
-set(TOKENIZERS_CPP_PATH ${CMAKE_SOURCE_DIR}/3rdparty/tokenizers-cpp)
-
-# Determine platform-specific lib path
-if(NOT ANDROID_ABI)
-  set(SYS_NAME "Linux")
-  execute_process(
-    COMMAND uname -m
-    OUTPUT_VARIABLE ARCH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-  set(HOUMO_TARGET "$ENV{HOUMO_TARGET}")
-  set(LIB_PATH "${SYS_NAME}_${ARCH}_${HOUMO_TARGET}")
+# tokenizer.cpp (HuggingFace tokenizer c++ 3rdparty)
+if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
+  set(TOKENIZER_CPP_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/tokenizer.cpp)
+  set(HALF_INCLUDE_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include)
 else()
-  set(LIB_PATH "Android_xh2")
+  message(FATAL_ERROR "Environment variable HOUMO_EXAMPLES_PATH is not set!...")
 endif()
+add_subdirectory(${TOKENIZER_CPP_PATH} tokenizer_cpp)
 
 # -----------------------------------------------------------------------------
 # Paths and sources
 # -----------------------------------------------------------------------------
-
-# Half precision floating point
-if(DEFINED ENV{HALF_INCLUDE_PATH})
-  set(HALF_INCLUDE_PATH $ENV{HALF_INCLUDE_PATH})
-elseif(DEFINED ENV{HOUMO_EXAMPLES_PATH})
-  set(HALF_INCLUDE_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include)
-else()
-  set(HALF_INCLUDE_PATH /usr/include/half)
-endif()
 
 # Core sources
 set(CORE_SOURCES
@@ -180,7 +163,7 @@ set(SAMPLE_SOURCES
 # -----------------------------------------------------------------------------
 # Library target
 # -----------------------------------------------------------------------------
-add_library(houmo_infer STATIC
+add_library(houmo_infer SHARED
   ${CORE_SOURCES}
   ${MODULE_SOURCES}
   ${BACKEND_SOURCES}
@@ -191,7 +174,8 @@ target_include_directories(houmo_infer PUBLIC
   ${HALF_INCLUDE_PATH}
   ${CMAKE_SOURCE_DIR}/include
   ${TCIM_RUNTIME_INCLUDE}
-  ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/include
+  ${TOKENIZER_CPP_PATH}/include
+  ${TOKENIZER_CPP_PATH}/third_party
   ${EIGEN_PATH}
   ${OpenCV_INCLUDE_DIRS}
   ${AUDIO_3RDPARTY_INCLUDE_DIR}
@@ -200,14 +184,12 @@ target_include_directories(houmo_infer PUBLIC
 
 target_link_directories(houmo_infer PUBLIC
   ${TCIM_RUNTIME_PATH}/lib
-  ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/lib
   ${AUDIO_3RDPARTY_LIBRARY_DIR}
 )
 
 target_link_libraries(houmo_infer PUBLIC
   tcim_runtime_lite
-  tokenizers_cpp
-  tokenizers_c
+  tokenizer_lib
   kaldi-native-fbank-core
   samplerate
   ${CMAKE_DL_LIBS}
@@ -237,7 +219,7 @@ target_include_directories(sample_infer PRIVATE
   ${HALF_INCLUDE_PATH}
   ${CMAKE_SOURCE_DIR}/include
   ${TCIM_RUNTIME_INCLUDE}
-  ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/include
+  ${TOKENIZERS_CPP_PATH}/include
   ${EIGEN_PATH}
   ${OpenCV_INCLUDE_DIRS}
 )
@@ -251,7 +233,7 @@ target_include_directories(sample_whisper_asr PRIVATE
   ${HALF_INCLUDE_PATH}
   ${CMAKE_SOURCE_DIR}/include
   ${TCIM_RUNTIME_INCLUDE}
-  ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/include
+  ${TOKENIZERS_CPP_PATH}/include
   ${EIGEN_PATH}
 )
 
@@ -264,7 +246,7 @@ target_include_directories(sample_glm_asr PRIVATE
   ${HALF_INCLUDE_PATH}
   ${CMAKE_SOURCE_DIR}/include
   ${TCIM_RUNTIME_INCLUDE}
-  ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/include
+  ${TOKENIZERS_CPP_PATH}/include
   ${EIGEN_PATH}
 )
 
@@ -277,7 +259,7 @@ target_include_directories(sample_qwen3_asr PRIVATE
   ${HALF_INCLUDE_PATH}
   ${CMAKE_SOURCE_DIR}/include
   ${TCIM_RUNTIME_INCLUDE}
-  ${TOKENIZERS_CPP_PATH}/${LIB_PATH}/include
+  ${TOKENIZERS_CPP_PATH}/include
   ${EIGEN_PATH}
 )
 
@@ -291,7 +273,7 @@ if(BUILD_TESTS)
   # Tokenizer test
   add_executable(tokenizer_test tests/tokenizer_test.cc)
   target_include_directories(tokenizer_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(tokenizer_test PRIVATE houmo_infer GTest::gtest_main tokenizers_cpp tokenizers_c)
+  target_link_libraries(tokenizer_test PRIVATE houmo_infer GTest::gtest_main tokenizer_lib)
   add_test(NAME TokenizerTest COMMAND tokenizer_test)
 
   # Embedding test
@@ -352,11 +334,22 @@ endif()
 # -----------------------------------------------------------------------------
 # Install
 # -----------------------------------------------------------------------------
-install(TARGETS houmo_infer DESTINATION .)
+set(LIB_INSTALL_PATH $ENV{HOUMO_EXAMPLES_PATH}/tools/common/lib)
+install(TARGETS houmo_infer DESTINATION ${LIB_INSTALL_PATH})
 install(TARGETS sample_infer DESTINATION .)
 install(TARGETS sample_whisper_asr DESTINATION .)
 install(TARGETS sample_glm_asr DESTINATION .)
 install(TARGETS sample_qwen3_asr DESTINATION .)
+if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
+  install(TARGETS
+    tokenizer_lib
+    LIBRARY DESTINATION ${LIB_INSTALL_PATH}
+  )
+  install(DIRECTORY ${AUDIO_3RDPARTY_LIBRARY_DIR}/
+    DESTINATION ${LIB_INSTALL_PATH}
+    FILES_MATCHING PATTERN "*.so*"
+  )
+endif()
 install(FILES ${CMAKE_SOURCE_DIR}/convert_embed.py
         DESTINATION .
         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
