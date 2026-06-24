@@ -38,7 +38,7 @@ model_configs:
       model_name: "gemma4"
       model_size: "31b"
       ncore: 2
-      context_length: "32k"
-      ndevice: 1
+      context_length: "256k"
+      ndevice: 2
       batch: 1
       prefill_length: 256

@@ -88,8 +88,6 @@ class Gemma4(Gemma4Base):
         self.decode_len = self.decode.get_input_info(self.decode.get_input_name(0)).shape[1]
         self.decode_local_w = self.decode.get_input_info(self.decode.get_input_name(3)).shape[3]
 
-    # ---- Embedding ----
-
     def _build_embeddings(self, input_ids, inputs):
         img_mask = input_ids == self.image_token_id
         llm_ids = input_ids.clone()
@@ -100,7 +98,6 @@ class Gemma4(Gemma4Base):
             self.perf_tracker.perf_start(PERFTYPE.VISION_TOTAL_TIME)
             img_emb = self._run_vision(inputs)
             self.perf_tracker.perf_end(PERFTYPE.VISION_TOTAL_TIME)
-            logger.info(f"Vision output: {img_emb.shape}")
             embeds = self._scatter_features(embeds, input_ids, self.image_token_id, img_emb, "Image")
 
         return embeds
@@ -185,16 +182,10 @@ class Gemma4(Gemma4Base):
         else:
             content = []
         content.append({"type": "text", "text": q_text})
-
+        messages = [{"role": "user", "content": content}]
+        
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
-        inputs = self.processor.apply_chat_template(
-            [{"role": "user", "content": content}],
-            add_generation_prompt=True,
-            tokenize=True,
-            return_dict=True,
-            return_tensors="pt",
-            enable_thinking=self.enable_thinking,
-        )
+        inputs = self.processor.apply_chat_template(messages, enable_thinking=self.enable_thinking)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
 
         input_ids = inputs["input_ids"]
@@ -218,3 +209,14 @@ class Gemma4(Gemma4Base):
         output_len = self._decode_loop(next_id, input_ids, input_len)
         self.perf_tracker.perf_end(PERFTYPE.DECODE_TOTAL_TIME)
         self.perf_tracker.set_basic_info(1, input_len, output_len, num_images=1 if image_path else 0)
+
+class Gemma4MoE(Gemma4):
+    """Gemma4-MoE inference.
+
+    MoE and dense Gemma4 share the same HMM runtime input/output contract:
+    embedding input, global/local masks, and decode output shape [B, 1, V].
+    Keep this class as a compatibility wrapper for existing imports while
+    reusing the dense runtime implementation.
+    """
+
+    pass

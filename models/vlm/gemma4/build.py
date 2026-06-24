@@ -124,7 +124,6 @@ if __name__ == "__main__":
             llm_opt=True,
             context_length=args.context_length,
             ndevice=ndevice,
-            enable_common_subgraph=args.enable_common_subgraph,
             parallel_jobs=parallel_jobs,
         )
         if not args.mtp:
@@ -138,7 +137,6 @@ if __name__ == "__main__":
                 llm_opt=True,
                 context_length=args.context_length,
                 ndevice=ndevice,
-                enable_common_subgraph=args.enable_common_subgraph,
                 parallel_jobs=parallel_jobs,
             )
             visual_model_name = f"{model_name}-{model_size}_visual"
@@ -160,7 +158,6 @@ if __name__ == "__main__":
                 ncore=ncore,
                 flash_attn=flash_attn,
                 parallel_jobs=parallel_jobs,
-                enable_common_subgraph=args.enable_common_subgraph,
             )
 
         if args.mtp:
@@ -174,10 +171,8 @@ if __name__ == "__main__":
                 context_length=args.context_length,
                 prefill_length=args.prefill_length,
                 ndevice=ndevice,
-                enable_common_subgraph=args.enable_common_subgraph,
                 parallel_jobs=parallel_jobs,
             )
-
             Xh2Exec.build_from_hmonnx(
                 hmonnx=os.path.join(
                     model_dir, "draft_onnx", "gemma4_assistant_decode.onnx"

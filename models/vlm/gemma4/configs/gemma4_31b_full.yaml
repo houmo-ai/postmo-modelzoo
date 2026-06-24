@@ -27,11 +27,15 @@ quant:
     check_quant_video_demo: false
     check_quant_audio_demo: false
 export:
+  naming:
+    family: gemma4
+    variant: 31b
+    profile: full
   model:
     chip_arch: XH2a
     model_type: Gemma4ForConditionalGeneration
     hf_model: null
-    model_name: xh2_gemma4_31b_full_256_2k
+    model_name: auto
     context_max_length: 2048
     prefill_chunk_length: 256
     use_cache: true

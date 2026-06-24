@@ -666,6 +666,7 @@ def test_asr_glm_asr_compile(setup_logging) -> None:
     model_name = "glm-asr"
     _compile_func(model_name, setup_logging)
 
+
 @pytest.mark.qwen3_reranker
 @pytest.mark.compile
 @pytest.mark.dependency(
@@ -695,8 +696,8 @@ def test_detection_yolo26m_compile(setup_logging) -> None:
 
 
 @pytest.mark.gemma4
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_24g
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_48g
 @pytest.mark.compile
 @pytest.mark.dependency(
     name="test_vlm_gemma4_compile",
@@ -740,10 +741,13 @@ def test_ocr_paddleocr_vl_compile(setup_logging) -> None:
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.compile
-@pytest.mark.dependency(name='test_backbone_dinov3_base_compile', depends_on=['test_quant_models.py::test_backbone_dinov3_base_quant'])
+@pytest.mark.dependency(
+    name="test_backbone_dinov3_base_compile",
+    depends_on=["test_quant_models.py::test_backbone_dinov3_base_quant"],
+)
 def test_backbone_dinov3_base_compile(setup_logging) -> None:
     """test_backbone_dinov3_base_compile"""
-    model_name = 'dinov3-base'
+    model_name = "dinov3-base"
     _compile_func(model_name, setup_logging)
 
 
@@ -761,17 +765,6 @@ def test_llm_qwen3_next_compile(setup_logging) -> None:
     _compile_func(model_name, setup_logging)
 
 
-@pytest.mark.mineru2dot5
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_24g
-@pytest.mark.compile
-@pytest.mark.dependency(name='test_vlm_mineru2dot5_compile', depends_on=['test_quant_models.py::test_vlm_mineru2dot5_quant'])
-def test_vlm_mineru2dot5_compile(setup_logging) -> None:
-    """test_vlm_mineru2dot5_compile"""
-    model_name = 'mineru2.5'
-    _compile_func(model_name, setup_logging)
-
-
 @pytest.mark.qwen3_omni
 @pytest.mark.ndevice_2
 @pytest.mark.dev_mem_24g
@@ -783,6 +776,20 @@ def test_vlm_mineru2dot5_compile(setup_logging) -> None:
 def test_omni_qwen3_omni_compile(setup_logging) -> None:
     """test_omni_qwen3_omni_compile"""
     model_name = "qwen3-omni"
+    _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.mineru2dot5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_ocr_mineru2dot5_compile",
+    depends_on=["test_quant_models.py::test_ocr_mineru2dot5_quant"],
+)
+def test_ocr_mineru2dot5_compile(setup_logging) -> None:
+    """test_ocr_mineru2dot5_compile"""
+    model_name = "mineru2.5"
     _compile_func(model_name, setup_logging)
 
 

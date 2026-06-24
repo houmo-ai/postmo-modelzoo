@@ -406,8 +406,8 @@ def test_reranker_qwen3_reranker_perf(setup_logging) -> None:
 
 
 @pytest.mark.gemma4
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_24g
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_48g
 @pytest.mark.perf
 def test_vlm_gemma4_perf(setup_logging) -> None:
     """test_vlm_gemma4_perf"""
@@ -441,7 +441,7 @@ def test_llm_copaw_flash_perf(setup_logging) -> None:
 @pytest.mark.perf
 def test_backbone_dinov3_base_perf(setup_logging) -> None:
     """test_backbone_dinov3_base_perf"""
-    model_name = 'dinov3-base'
+    model_name = "dinov3-base"
     _perf_func(model_name, setup_logging)
 
 

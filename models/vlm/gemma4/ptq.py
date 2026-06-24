@@ -112,7 +112,7 @@ if __name__ == "__main__":
     if args.model_size in ["26b-a4b"]:
         quant_config_path = "configs/gemma4_26b_a4b_full.yaml"
     elif args.model_size in ["e2b"]:
-        quant_config_path = "configs/gemma4_e2b_full.yaml"
+        quant_config_path = "configs/gemma4_e2b_autoround.yaml"
     elif args.model_size in ["e4b"]:
         quant_config_path = "configs/gemma4_e4b_full.yaml"
     elif args.model_size in ["31b"]:
