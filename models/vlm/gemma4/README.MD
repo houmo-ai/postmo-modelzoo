@@ -6,22 +6,35 @@
 
 ## 1 模型说明
 
-本例使用的模型实现来源于 ModelScope 的预训练模型：
+本例支持 Gemma4 系列以下规格：
 
-- 模型名称: gemma-4-26B-A4B-it
-- 来源: https://www.modelscope.cn/models/google/gemma-4-26B-A4B-it
-- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+- `26b-a4b`: MoE 图文模型，使用 `Gemma4MoE` 运行时。
+- `31b`: Dense 图文模型，使用 `Gemma4` 运行时。
+- `e2b` / `e4b`: E 系列图文音频模型，使用 `Gemma4E` 运行时。
+
+模型实现来源于 ModelScope 的预训练模型：
+
+| model_size | ModelScope 模型 |
+|---|---|
+| `26b-a4b` | https://www.modelscope.cn/models/google/gemma-4-26B-A4B-it |
+| `31b` | https://www.modelscope.cn/models/google/gemma-4-31B-it |
+| `e2b` | https://www.modelscope.cn/models/google/gemma-4-E2B-it |
+| `e4b` | https://www.modelscope.cn/models/google/gemma-4-E4B-it |
+
+许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
 
 预训练模型在运行时下载，工程发布**不包含**该模型。
 
 本例只适用于xh2。
 
-当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
+当前目录使用 `config.yaml` 作为默认值来源。当前默认模型为：
 
 - `model_name=gemma4`
-- `model_size=26b-a4b`
-- `context_length=2k`
+- `model_size=e2b`
+- `context_length=128k`
 - `ndevice=1`
+
+可通过 `--model-name` / `--model-size` 覆盖默认值。`model_size` 支持 `26b-a4b`、`31b`、`e2b`、`e4b`。
 
 ## 2 快速开始
 
@@ -67,11 +80,27 @@ python3 ptq.py --model-name gemma4 --model-size 26b-a4b
 ```
 
 量化参数说明：
-- `--model`: 模型目录路径，默认 `./gemma-4-26B-A4B-it`
-- `--model-name`: 输出模型名，默认 `gemma4`
-- `--model-size`: 输出模型规格，默认 `e2b`
-- `--context-length`: 最大序列长度，默认 `2048`
-- `--prefill-chunk-length`: 最大序列长度，默认 `256`
+- `--config`: 配置文件路径，默认当前目录下的 `config.yaml`
+- `--model`: HF / ModelScope 模型目录路径；如果目录下存在 `quantize_config.json`，脚本会按已量化 GPTQModel HF 模型处理，跳过重新量化并直接进入导出流程
+- `--model-name`: 输出模型名，默认来自 `config.yaml`，当前为 `gemma4`
+- `--model-size`: 输出模型规格，默认来自 `config.yaml`，当前为 `e2b`；支持 `26b-a4b`、`31b`、`e2b`、`e4b`
+- `--out-dir`: 输出目录，默认 `./output/${HOUMO_TARGET}`
+- `--context-length`: 导出 HMONNX 使用的最大序列长度，默认 `2048`
+- `--prefill-chunk-length`: prefill HMONNX 的 chunk 长度，默认 `256`
+- `--seed`: 随机种子，默认 `42`
+- `--debug`: 开启 workflow debug 模式
+
+`ptq.py` 的主要流程：
+
+1. 根据 `--model-size` 选择 xh2modelzoo workflow 配置：
+   - `26b-a4b` → `configs/gemma4_26b_a4b_full.yaml`
+   - `31b` → `configs/gemma4_31b_full.yaml`
+   - `e2b` → `configs/gemma4_e2b_autoround.yaml`
+   - `e4b` → `configs/gemma4_e4b_full.yaml`
+2. 创建 `AutoLLMWorkflow`。
+3. 如果 `--model` 已经是量化模型目录（存在 `quantize_config.json`），使用 `algorithm=existing_hf` 的配置直接导出；否则先执行量化。
+4. 导出 HMONNX 到临时目录 `output/${HOUMO_TARGET}/hmquant/exported_model`。
+5. 在临时导出目录下查找 `hmquant_xh2*_YYYYMMDD` 目录，并将其中内容移动到 `output/${HOUMO_TARGET}/hmquant`，最后删除临时导出目录。移动时如果目标文件或目录已存在，会先删除再覆盖。
 
 ### 2.4 编译
 
@@ -81,11 +110,42 @@ python3 ptq.py --model-name gemma4 --model-size 26b-a4b
 python3 build.py --model_name gemma4 --model_size 26b-a4b
 ```
 
-默认输出名称分别为：
+默认输出名称按模型规格生成，例如 `26b-a4b` 为：
 
 - `gemma4-26b-a4b_prefill.hmm`
 - `gemma4-26b-a4b_decode.hmm`
 - `gemma4-26b-a4b_visual.hmm`
+
+`e2b` / `e4b` 会额外编译 audio HMM：
+
+- `gemma4-e2b_audio.hmm`
+- `gemma4-e4b_audio.hmm`
+
+`31b` 默认 `ndevice=2`，当设备数大于 1 时，LLM prefill/decode 输出后缀会从 `.hmm` 变为 `.hmms`。
+
+编译参数说明：
+- `--model_dir`: HMONNX / 量化产物目录，默认 `output/${HOUMO_TARGET}/hmquant`
+- `--model_name`: 输出模型名，默认来自 `config.yaml`
+- `--model_size`: 输出模型规格，默认来自 `config.yaml`
+- `--output_dir`: HMM 输出目录，默认 `output/${HOUMO_TARGET}`
+- `--ncore`: 编译核数，默认来自 `config.yaml` 或环境变量 `HOUMO_CORE_NUM`
+- `--j`: 并行编译任务数，默认物理 CPU 核数
+- `--context_length`: LLM context length，默认来自 `config.yaml`
+- `--prefill_length`: prefill chunk 长度，默认来自 `config.yaml`
+- `--batch`: decode batch，默认来自 `config.yaml`
+- `--ndevice`: 多设备数量，默认来自 `config.yaml`
+- `--stage`: `build`、`test`、`all`，默认 `build`
+- `--flash_attention`: 两个整数，分别控制 LLM 和 ViT FlashAttention，默认 `2 1`
+- `--enable_common_subgraph`: 开启 common subgraph 优化
+- `--mtp`: 仅 `26b-a4b` 支持，编译 verify/draft MTP 模型
+
+`build.py` 的主要流程：
+
+1. 从 `output/${HOUMO_TARGET}/hmquant` 查找 `prefill`、`decode`、`visual` 子目录下的 HMONNX 文件。
+2. 编译 LLM prefill HMM。
+3. 非 MTP 模式下编译 LLM decode HMM 和 visual HMM。
+4. `e2b` / `e4b` 非 MTP 模式下额外编译 audio HMM。
+5. MTP 模式仅支持 `26b-a4b`，会编译 verify HMM 和 draft HMM。
 
 ### 2.5 演示
 
@@ -97,24 +157,35 @@ Gemma4模型使用python API进行演示。
 
 ```bash
 # 文本模式
-python3 demo.py --model_name gemma4 --model_size 26b-a4b --question "你好，请介绍一下你自己。"
+python3 demo.py --model_name gemma4 --model_size e2b --question "你好，请介绍一下你自己。" --image "" --audio ""
 
 # 图片模式
 python3 demo.py --model_name gemma4 --model_size 26b-a4b --image ../../../data/pic/beach.jpeg --question "描述这张图片的内容"
+
+# 音频模式，仅 e2b/e4b 支持
+python3 demo.py --model_name gemma4 --model_size e2b --audio ../../../data/audio/0.wav --image "" --question "请描述这个音频的内容"
 ```
 
 演示参数说明：
-- `--tokenizer_dir`: tokenizer目录路径
-- `--embedding_path`: embedding权重路径
-- `--prefill_path`: prefill模型路径
-- `--decode_path`: decode模型路径
-- `--vit_path`: visual模型路径
-- `--model_name`: 模型名，默认 `gemma4`
-- `--model_size`: 模型规格，默认 `26b-a4b`
-- `--ndevice`: 设备数量，默认 `1`
+- `--config`: 配置文件路径，默认 `config.yaml`
+- `--tokenizer_dir`: tokenizer / processor 配置目录，默认 `output/${HOUMO_TARGET}/hmquant/hf_config`
+- `--embedding_path`: LLM embedding 权重路径，默认 `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `--plib_embedding_path`: E 系列 per-layer input embedding 权重路径，默认 `output/${HOUMO_TARGET}/hmquant/per_layer_input_embedding.pt`
+- `--prefill_path`: prefill HMM 路径，默认 `output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill.hmm`
+- `--decode_path`: decode HMM 路径，默认 `output/${HOUMO_TARGET}/${model_name}-${model_size}_decode.hmm`
+- `--vit_path`: visual HMM 路径，默认 `output/${HOUMO_TARGET}/${model_name}-${model_size}_visual.hmm`
+- `--audio_path`: audio HMM 路径，仅 `e2b` / `e4b` 使用，默认 `output/${HOUMO_TARGET}/${model_name}-${model_size}_audio.hmm`
+- `--model_name`: 模型名，默认来自 `config.yaml`
+- `--model_size`: 模型规格，默认来自 `config.yaml`
+- `--ndevice`: 设备数量，默认来自 `config.yaml`
 - `--question`: 输入问题
-- `--image`: 图片路径
-- `--max-new-tokens`: 最大生成token数
+- `--image`: 图片路径；文件不存在时自动退化为文本模式
+- `--audio`: 音频文件路径，仅 `e2b` / `e4b` 使用；文件不存在或 audio HMM 未加载时自动忽略音频
+- `--max-new-tokens`: 最大生成 token 数，默认 `2048`
+- `--enable-thinking`: 在 chat template 渲染阶段启用 thinking 模式
+- `--mtp`: `26b-a4b` 使用 MTP runtime
+- `--verify_path`: MTP verify HMM 路径
+- `--draft_path`: MTP draft HMM 路径
 
 ## 3 一键评估
 
@@ -128,18 +199,17 @@ bash test.sh
 bash test.sh -s all
 ```
 
-当前脚本内部固定使用以下默认值：
+当前 `test.sh` 内部默认使用以下值：
 - `MODEL_NAME=gemma4`
-- `MODEL_SIZE=26b-a4b`
+- `MODEL_SIZE=e2b`
 - `NDEVICE=1`
 
 对应执行行为如下：
 - `quant`：如未传 `--skip_download`，先下载 raw 模型，再执行 `python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}"`
 - `build`：执行 `python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"`
 - `demo`：如未传 `--skip_download`，先下载预编译模型，再执行 `python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"`
-- `demo`：如果环境中存在 `llm_perf`，会继续自动执行一组性能测试，默认使用 `output/${HOUMO_TARGET}/gemma4-26b-a4b_visual_448x448.hmm`
 
-如果需要修改模型规格、设备数或 visual 尺寸，需要同步调整 `test.sh` 中的默认值，以及 `ptq.py`、`build.py`、`demo.py` 的相关参数。
+如果需要修改模型规格或设备数，可通过 `test.sh` 参数传入，无需修改脚本源码。
 
 test.sh 支持以下参数：
 
@@ -158,7 +228,7 @@ Options:
 示例：
 
 ```bash
-# 仅运行 quant，会先下载 raw 模型并使用脚本内默认的 gemma4-26b-a4b 参数量化
+# 仅运行 quant，会先下载 raw 模型并使用脚本内默认的 gemma4-e2b 参数量化
 bash test.sh -s quant
 
 # 仅运行 build，要求当前目录下已经有量化输出
@@ -174,9 +244,36 @@ bash test.sh -s all
 bash test.sh -s demo --skip_download
 ```
 
-## 4 参考结果
+## 4 HMM 内存占用参考
 
-### 4.1 演示结果
+可使用 `readhmm` 查看编译后 HMM 的内存占用：
+
+```bash
+readhmm "output/${HOUMO_TARGET}/gemma4-e2b_prefill.hmm" --mem_usage
+```
+
+以下数据基于 `output/xh2` 下的一组已编译 HMM 统计，单位为二进制单位 GiB / MiB。`InOut(no KV)` 为 `mem_usage.inout` 中去除 KV cache 后的输入/输出占用，`Shared KV Cache` 为 LLM prefill/decode HMM 共享的 KV cache 输入占用；同一模型的 prefill 和 decode 使用同一份 KV cache，不需要把两行重复累加。`Workspace` 为 `mem_usage.workspace` 列表求和。`.hmms` 多设备模型的内存占用按单设备子模型统计。
+
+| HMM | Context Length | ndevice | Total | Weights | Kernel | InOut(no KV) | Shared KV Cache | Workspace | Core | Args |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `gemma4-26b-a4b_decode.hmm` | 131072 | 1 | 15.128 GiB | 13.647 GiB | 48.011 MiB | 188.008 MiB | 1.250 GiB | 0.182 MiB | 2 | 66 |
+| `gemma4-26b-a4b_prefill.hmm` | 131072 | 1 | 17.718 GiB | 13.647 GiB | 192.284 MiB | 190.000 MiB | 1.312 GiB | 2.385 GiB | 2 | 67 |
+| `gemma4-26b-a4b_visual.hmm` | - | 1 | 1.108 GiB | 580.271 MiB | 369.423 MiB | 6.570 MiB | 0.000 MiB | 178.454 MiB | 2 | 6 |
+| `gemma4-31b_decode.hmms` | 262144 | 2 | 13.904 GiB | 8.503 GiB | 33.859 MiB | 375.263 MiB | 5.000 GiB | 0.613 MiB | 2 | 126 |
+| `gemma4-31b_prefill.hmms` | 262144 | 2 | 24.204 GiB | 8.504 GiB | 689.624 MiB | 378.500 MiB | 5.125 GiB | 9.532 GiB | 2 | 127 |
+| `gemma4-31b_visual.hmm` | - | 1 | 2.406 GiB | 583.018 MiB | 1.669 GiB | 7.937 MiB | 0.000 MiB | 163.735 MiB | 2 | 6 |
+| `gemma4-e2b_audio.hmm` | - | 1 | 473.248 MiB | 380.184 MiB | 78.550 MiB | 2.972 MiB | 0.000 MiB | 11.543 MiB | 2 | 6 |
+| `gemma4-e2b_decode.hmm` | 131072 | 1 | 1.964 GiB | 1.543 GiB | 39.768 MiB | 7.271 MiB | 384.000 MiB | 0.380 MiB | 2 | 37 |
+| `gemma4-e2b_prefill.hmm` | 131072 | 1 | 2.020 GiB | 1.543 GiB | 80.391 MiB | 12.750 MiB | 384.000 MiB | 10.938 MiB | 2 | 37 |
+| `gemma4-e2b_visual.hmm` | - | 1 | 416.669 MiB | 179.658 MiB | 64.887 MiB | 5.886 MiB | 0.000 MiB | 166.238 MiB | 2 | 6 |
+| `gemma4-e4b_audio.hmm` | - | 1 | 476.259 MiB | 381.708 MiB | 78.571 MiB | 4.437 MiB | 0.000 MiB | 11.543 MiB | 2 | 6 |
+| `gemma4-e4b_decode.hmm` | 131072 | 1 | 4.239 GiB | 2.883 GiB | 84.944 MiB | 23.027 MiB | 1.000 GiB | 256.693 MiB | 2 | 55 |
+| `gemma4-e4b_prefill.hmm` | 131072 | 1 | 4.303 GiB | 2.883 GiB | 134.347 MiB | 29.875 MiB | 1.000 GiB | 265.750 MiB | 2 | 55 |
+| `gemma4-e4b_visual.hmm` | - | 1 | 418.003 MiB | 180.422 MiB | 64.910 MiB | 6.433 MiB | 0.000 MiB | 166.238 MiB | 2 | 6 |
+
+## 5 参考结果
+
+### 5.1 演示结果
 
 ```bash
 question: 你好，请介绍一下你自己。
@@ -205,6 +302,6 @@ response: 你好！我是 **Gemma 4**，是由 Google DeepMind 开发的大型�
 请问今天有什么我可以帮你的吗
 ```
 
-## 5 免责声明
+## 6 免责声明
 
 您明确了解并同意，以下链接中的软件、数据或者模型由第三方提供并负责维护。在以下链接中出现的任何第三方的名称、商标、标识、产品或服务并不构成明示或暗示与该第三方或其软件、数据或模型的相关背书、担保或推荐行为。您进一步了解并同意，使用任何第三方软件、数据或者模型，包括您提供的任何信息或个人数据（不论是有意或无意地），应受相关使用条款、许可协议、隐私政策或其他此类协议的约束。因此，使用链接中的软件、数据或者模型可能导致的所有风险将由您自行承担。

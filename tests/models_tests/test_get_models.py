@@ -544,8 +544,8 @@ def test_reranker_qwen3_reranker_get_model(setup_logging) -> None:
 
 
 @pytest.mark.gemma4
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_24g
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_48g
 @pytest.mark.get_model
 @pytest.mark.dependency(name="test_vlm_gemma4_get_model")
 def test_vlm_gemma4_get_model(setup_logging) -> None:
@@ -558,10 +558,10 @@ def test_vlm_gemma4_get_model(setup_logging) -> None:
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
 @pytest.mark.get_model
-@pytest.mark.dependency(name='test_backbone_dinov3_base_get_model')
+@pytest.mark.dependency(name="test_backbone_dinov3_base_get_model")
 def test_backbone_dinov3_base_get_model(setup_logging) -> None:
     """test_backbone_dinov3_base_get_model"""
-    model_name = 'dinov3-base'
+    model_name = "dinov3-base"
     _get_model_func(model_name, setup_logging)
 
 
@@ -576,17 +576,6 @@ def test_llm_qwen3_next_get_model(setup_logging) -> None:
     _get_model_func(model_name, setup_logging)
 
 
-@pytest.mark.mineru2dot5
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_24g
-@pytest.mark.get_model
-@pytest.mark.dependency(name='test_vlm_mineru2dot5_get_model')
-def test_vlm_mineru2dot5_get_model(setup_logging) -> None:
-    """test_vlm_mineru2dot5_get_model"""
-    model_name = 'mineru2.5'
-    _get_model_func(model_name, setup_logging)
-
-
 @pytest.mark.qwen3_omni
 @pytest.mark.ndevice_2
 @pytest.mark.dev_mem_24g
@@ -595,4 +584,26 @@ def test_vlm_mineru2dot5_get_model(setup_logging) -> None:
 def test_omni_qwen3_omni_get_model(setup_logging) -> None:
     """test_omni_qwen3_omni_get_model"""
     model_name = "qwen3-omni"
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.mineru2dot5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_ocr_mineru2dot5_get_model")
+def test_ocr_mineru2dot5_get_model(setup_logging) -> None:
+    """test_ocr_mineru2dot5_get_model"""
+    model_name = "mineru2.5"
+    _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_vl_embedding
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_embedding_qwen3_vl_embedding_get_model")
+def test_embedding_qwen3_vl_embedding_get_model(setup_logging) -> None:
+    """test_embedding_qwen3_vl_embedding_get_model"""
+    model_name = "qwen3-vl-embedding"
     _get_model_func(model_name, setup_logging)

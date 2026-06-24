@@ -19,12 +19,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # fmt: off
 import os
-import sys
-import math
 import time
 import numpy as np
 import torch
-from PIL import Image
 from loguru import logger
 try:
     from transformers import GemmaTokenizer
@@ -34,8 +31,6 @@ except ImportError as e:
 from gemma4_processor import XHGemma4Processor
 import tcim_lite as tcim
 from hmatc.utils.perf_infomations import InferencePerformanceTracker, PERFTYPE
-
-MAX_SOFT_TOKENS = 280
 
 
 def is_valid_char(cp):

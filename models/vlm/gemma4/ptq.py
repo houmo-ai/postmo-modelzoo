@@ -109,14 +109,38 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", "")
+    if not os.path.exists(HOUMO_EXAMPLES_PATH):
+        raise FileNotFoundError(f"Examples directory not found: {HOUMO_EXAMPLES_PATH}")
+
     if args.model_size in ["26b-a4b"]:
-        quant_config_path = "configs/gemma4_26b_a4b_full.yaml"
+        quant_config_path = os.path.join(
+            HOUMO_EXAMPLES_PATH,
+            "hmodel",
+            f"{HOUMO_TARGET}",
+            "configs_merak/workflows/xh2a/llm_models/gemma4_series/26b_a4b/gemma4_26b_a4b_full.yaml",
+        )
     elif args.model_size in ["e2b"]:
-        quant_config_path = "configs/gemma4_e2b_full.yaml"
+        quant_config_path = os.path.join(
+            HOUMO_EXAMPLES_PATH,
+            "hmodel",
+            f"{HOUMO_TARGET}",
+            "configs_merak/workflows/xh2a/llm_models/gemma4_series/e2b/gemma4_e2b_autoround.yaml",
+        )
     elif args.model_size in ["e4b"]:
-        quant_config_path = "configs/gemma4_e4b_full.yaml"
+        quant_config_path = os.path.join(
+            HOUMO_EXAMPLES_PATH,
+            "hmodel",
+            f"{HOUMO_TARGET}",
+            "configs_merak/workflows/xh2a/llm_models/gemma4_series/e4b/gemma4_e4b_full.yaml",
+        )
     elif args.model_size in ["31b"]:
-        quant_config_path = "configs/gemma4_31b_full.yaml"
+        quant_config_path = os.path.join(
+            HOUMO_EXAMPLES_PATH,
+            "hmodel",
+            f"{HOUMO_TARGET}",
+            "configs_merak/workflows/xh2a/llm_models/gemma4_series/31b/gemma4_31b_full.yaml",
+        )
     else:
         raise ValueError(f"Unsupported model size: {args.model_size}")
 

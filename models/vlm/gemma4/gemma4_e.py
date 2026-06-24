@@ -25,7 +25,7 @@ import torch.nn as nn
 from loguru import logger
 import tcim_lite as tcim
 from hmatc.utils.perf_infomations import PERFTYPE
-from gemma4_base import Gemma4Base, MAX_SOFT_TOKENS
+from gemma4_base import Gemma4Base
 
 
 class Gemma4E(Gemma4Base):
@@ -64,7 +64,7 @@ class Gemma4E(Gemma4Base):
             self.perf_tracker.perf_start(PERFTYPE.VISION_LOAD_TIME)
             self.vit = tcim.runtime.load(vit_path, option=tcim.runtime.Option(wmv))
             self.perf_tracker.perf_end(PERFTYPE.VISION_LOAD_TIME)
-            self._log_model_io(self.vit, "vit")
+            self._log_model_io(self.vit, "ViT")
             vit_in_shape = self.vit.get_input_info(self.vit.get_input_name(0)).shape
             vit_out_shape = self.vit.get_output_info(self.vit.get_output_name(0)).shape
             self.vit_num_patches = vit_in_shape[1]
@@ -82,7 +82,7 @@ class Gemma4E(Gemma4Base):
             self.perf_tracker.perf_start(PERFTYPE.AUDIO_LOAD_TIME)
             self.audio = tcim.runtime.load(audio_path, option=tcim.runtime.Option(wma))
             self.perf_tracker.perf_end(PERFTYPE.AUDIO_LOAD_TIME)
-            self._log_model_io(self.audio, "audio")
+            self._log_model_io(self.audio, "Audio")
             self.audio_feature_length = self.audio.get_input_info(self.audio.get_input_name(1)).shape[1]
             self.audio_feature_size = self.audio.get_input_info(self.audio.get_input_name(0)).shape[2]
             logger.info(f"Audio loaded: feature_length={self.audio_feature_length}")
@@ -99,7 +99,7 @@ class Gemma4E(Gemma4Base):
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)
         self.prefill = tcim.runtime.load(prefill_path, option=opt0)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_LOAD_TIME)
-        self._log_model_io(self.prefill, "prefill")
+        self._log_model_io(self.prefill, "Prefill")
         assert self.prefill.get_input_name(4) == "per_layer_inputs"
         self.prefill_len = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[1]
         self.embed_dim = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[2]
@@ -118,7 +118,7 @@ class Gemma4E(Gemma4Base):
         self.perf_tracker.perf_start(PERFTYPE.DECODE_LOAD_TIME)
         self.decode = tcim.runtime.load(decode_path, option=opt1)
         self.perf_tracker.perf_end(PERFTYPE.DECODE_LOAD_TIME)
-        self._log_model_io(self.decode, "decode")
+        self._log_model_io(self.decode, "Decode")
         self.decode_len = self.decode.get_input_info(self.decode.get_input_name(0)).shape[1]
         self.decode_local_w = self.decode.get_input_info(self.decode.get_input_name(3)).shape[3]
         logger.info(f"Decode loaded: len={self.decode_len}")
@@ -153,13 +153,6 @@ class Gemma4E(Gemma4Base):
         self.plib_embedding.weight.data.copy_(weight)
         self.perf_tracker.reset_perf_time()
 
-    @staticmethod
-    def _sscp_subsample(num_frames: int) -> int:
-        tokens = num_frames
-        for _ in range(2):
-            tokens = (tokens + 2 - 3) // 2 + 1
-        return tokens
-
     def _run_audio(self, inputs: dict):
         if self.audio is None:
             raise RuntimeError("Audio model not loaded")
@@ -170,7 +163,6 @@ class Gemma4E(Gemma4Base):
         if not isinstance(input_features_mask, torch.Tensor):
             input_features_mask = torch.as_tensor(input_features_mask)
         valid_frames = int(input_features_mask[0].sum().item()) if input_features_mask.dim() == 2 else int(input_features_mask.sum().item())
-        expected_tokens = self._sscp_subsample(valid_frames)
 
         audio_input_aliases = {"attention_mask": "audio_attention_mask"}
 
@@ -194,17 +186,11 @@ class Gemma4E(Gemma4Base):
 
         self.perf_tracker.perf_start(PERFTYPE.AUDIO_OUTPUT_TIME)
         audio_embeds = torch.from_numpy(self.audio.get_output(self.audio.get_output_name(0)).numpy())
-        num_outputs = self.audio.get_num_outputs()
-        if num_outputs > 1:
-            audio_embeds_mask = torch.from_numpy(self.audio.get_output(self.audio.get_output_name(1)).numpy())
-            mask_bool = audio_embeds_mask[0].to(torch.bool)
-            audio_out = audio_embeds[0][mask_bool]
-        elif audio_embeds.dim() == 3:
-            audio_out = audio_embeds[0, :expected_tokens, :]
-        else:
-            audio_out = audio_embeds[:expected_tokens, :]
+        audio_embeds_mask = torch.from_numpy(self.audio.get_output(self.audio.get_output_name(1)).numpy())
+        mask_bool = audio_embeds_mask[0].to(torch.bool)
+        audio_out = audio_embeds[0][mask_bool]
         self.perf_tracker.perf_end(PERFTYPE.AUDIO_OUTPUT_TIME)
-        logger.info(f"Audio output: {audio_out.shape} (valid_frames={valid_frames}, expected_tokens={expected_tokens})")
+        logger.info(f"Audio output: {audio_out.shape} (valid_frames={valid_frames})")
         return audio_out
 
     def _build_embeddings(self, input_ids, inputs):
@@ -353,15 +339,9 @@ class Gemma4E(Gemma4Base):
             content.append({"type": "audio", "audio": waveform.numpy(), "sampling_rate": 16000})
 
         content.append({"type": "text", "text": q_text})
-
-        inputs = self.processor.apply_chat_template(
-            [{"role": "user", "content": content}],
-            add_generation_prompt=True,
-            tokenize=True,
-            return_dict=True,
-            return_tensors="pt",
-            enable_thinking=self.enable_thinking,
-        )
+        messages = [{"role": "user", "content": content}]
+        
+        inputs = self.processor.apply_chat_template(messages, enable_thinking=self.enable_thinking)
 
         input_ids = inputs["input_ids"]
         input_len = input_ids.shape[-1]

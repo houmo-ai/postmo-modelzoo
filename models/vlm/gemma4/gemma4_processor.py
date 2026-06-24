@@ -30,7 +30,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
-from transformers import AutoProcessor
+from transformers import Gemma4Processor
 from transformers.models.gemma4.processing_gemma4 import Gemma4Processor
 
 DEFAULT_VISUAL_MAX_SOFT_TOKENS = 280
@@ -72,7 +72,7 @@ class XHGemma4Processor(Gemma4Processor):
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path: str, trust_remote_code: bool = True, **kwargs):
-        processor = AutoProcessor.from_pretrained(
+        processor = Gemma4Processor.from_pretrained(
             pretrained_model_name_or_path,
             trust_remote_code=trust_remote_code,
             **kwargs,
@@ -488,6 +488,7 @@ class XHGemma4Processor(Gemma4Processor):
         self,
         messages: list[dict[str, Any]],
         add_generation_prompt: bool,
+        enable_thinking: bool = False,
     ) -> tuple[str, list, list, list, int]:
         images: list[Any] = []
         videos: list[Any] = []
@@ -507,19 +508,26 @@ class XHGemma4Processor(Gemma4Processor):
                         audios.append(item.get("audio"))
                         sampling_rate = int(item.get("sampling_rate", sampling_rate))
         if getattr(self, "chat_template", None):
-            rendered = super().apply_chat_template(messages, add_generation_prompt=add_generation_prompt, tokenize=False)
+            rendered = super().apply_chat_template(
+                messages,
+                add_generation_prompt=add_generation_prompt,
+                tokenize=False,
+                enable_thinking=enable_thinking,
+            )
         else:
             rendered = self._render_messages_fallback(messages, add_generation_prompt)
         return rendered, images, videos, audios, sampling_rate
 
     def apply_chat_template(self, messages: list[dict[str, Any]], add_generation_prompt: bool = True, **kwargs):
         messages = self._normalize_local_wav_audio(messages)
-        text, images, videos, audios, sampling_rate = self._render_messages(messages, add_generation_prompt)
+        enable_thinking = kwargs.pop("enable_thinking", False)
+        text, images, videos, audios, sampling_rate = self._render_messages(
+            messages, add_generation_prompt, enable_thinking=enable_thinking,
+        )
 
         nested_processor_kwargs = kwargs.pop("processor_kwargs", None)
         kwargs.pop("tokenize", None)
         kwargs.pop("return_dict", None)
-        kwargs.pop("enable_thinking", None)
         processor_kwargs = {
             "text": text,
             "padding": True,
@@ -536,34 +544,3 @@ class XHGemma4Processor(Gemma4Processor):
             processor_kwargs["audio"] = audios[0] if len(audios) == 1 else audios
             processor_kwargs["sampling_rate"] = sampling_rate
         return self(**processor_kwargs)
-
-
-def configure_gemma4_visual_processor(
-    processor: XHGemma4Processor,
-    *,
-    export_mode: str,
-    max_size_w: int,
-    max_size_h: int,
-    patch_size: int,
-    image_seq_length: int,
-) -> XHGemma4Processor:
-    processor.config.max_size_h = max_size_h
-    processor.config.max_size_w = max_size_w
-    processor.config.patch_size = patch_size
-    processor.config.export_mode = export_mode
-    processor.config.enforce_fixed_image_size = True
-    processor.image_processor.max_soft_tokens = DEFAULT_VISUAL_MAX_SOFT_TOKENS
-    processor.image_processor.pooling_kernel_size = (
-        COMPACT_VISUAL_POOLING_KERNEL_SIZE if export_mode == "compact" else FULL_VISUAL_POOLING_KERNEL_SIZE
-    )
-    processor.image_seq_length = image_seq_length
-    return processor
-
-
-Gemma4ProcessorConfig = Gemma4ProcessorConfig
-
-__all__ = [
-    "Gemma4ProcessorConfig",
-    "XHGemma4Processor",
-    "configure_gemma4_visual_processor",
-]

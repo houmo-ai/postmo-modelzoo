@@ -98,7 +98,7 @@ if __name__ == "__main__":
                 enable_thinking=args.enable_thinking,
             )
         else:
-            from gemma4_moe import Gemma4MoE
+            from gemma4 import Gemma4MoE
 
             model = Gemma4MoE(
                 args.prefill_path,
