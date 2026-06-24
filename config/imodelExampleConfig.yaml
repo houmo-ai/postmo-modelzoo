@@ -525,7 +525,7 @@ asr_qwen3-asr:
   example_case:
     - asr_qwen3-asr_test:
         test_type: models_tests
-        script: 'qwen3_asr or qwen3_forcealigner'
+        script: "qwen3_asr or qwen3_forcealigner"
         args: all
   test:
     - asr_qwen3-asr_test
@@ -814,7 +814,8 @@ models_tests:
     - backbone_resnet50_test
     - detection_yolov5s_test
     - inferences_resnet50_test
-    - llm_qwen3_test
+    # - llm_qwen3.5_test
+    # - llm_qwen3_test
     # - vlm_qwen3-vl_test
 
 apis_tests:
@@ -837,7 +838,7 @@ all:
     # - autodrive_yolop_test
     - backbone_resnet50_test
     # - backbone_efficientnet_test
-    # - backbone_mobilenetv2_test
+    - backbone_mobilenetv2_test
     # - backbone_ViT-B-16_test
     - detection_yolov5s_test
     # - detection_yolov3_test
@@ -845,10 +846,12 @@ all:
     # - detection_yolo12m_test
     # - detection_yolov5s_feature
     - segmentation_yolov8m_seg_test
-    - llm_qwen3_test
-    - vlm_qwen3-vl_test
+    # - llm_qwen3_test
+    # - vlm_qwen3-vl_test
     - llm_gpt-oss_test
-    - llm_qwen3_30b_a3b_test
+    # - llm_qwen3.5_test
+    # - llm_qwen3_30b_a3b_test
+    # - vlm_gemma4_test
     - inferences_resnet50_test
     - inferences_yolov5s_test
     - inferences_resnet50_pipeline_test

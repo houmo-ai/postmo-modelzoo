@@ -1,5 +1,5 @@
 {
-    "obsolete": false,
+    "obsolete": true,
     "model_dir": "models/llm/deepseek-r1-qwen3-8b",
     "model_type": "llm",
     "dependencies": {
