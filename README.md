@@ -157,6 +157,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | CoPaw-Flash-9B          | llm          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | lprnet                  | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| MinerU2.5               | ocr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | PPOCRv3                 | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
 | glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | PaddleOCR-VL            | ocr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
@@ -168,7 +169,6 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | qwen2.5-vl              | vlm          | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
 | qwen3-vl                | vlm          | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
 | gemma4                  | vlm          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
-| MinerU2.5               | ocr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 
 ## API 示例
 

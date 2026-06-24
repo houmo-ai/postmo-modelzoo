@@ -124,7 +124,6 @@ if __name__ == "__main__":
             context_length=args.context_length,
             prefill_length=args.prefill_length,
             ndevice=ndevice,
-            enable_common_subgraph=args.enable_common_subgraph,
             parallel_jobs=parallel_jobs,
             skip_check=True,
         )
@@ -138,7 +137,6 @@ if __name__ == "__main__":
             llm_opt=True,
             context_length=args.context_length,
             ndevice=ndevice,
-            enable_common_subgraph=args.enable_common_subgraph,
             parallel_jobs=parallel_jobs,
             skip_check=True,
         )
