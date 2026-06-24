@@ -1,5 +1,5 @@
 {
-    "obsolete": false,
+    "obsolete": true,
     "model_dir": "models/llm/qwen3-30b-a3b",
     "model_type": "llm",
     "dependencies": {

@@ -1,5 +1,5 @@
 {
-    "obsolete": false,
+    "obsolete": true,
     "model_dir": "models/omni/minicpmo",
     "model_type": "llm",
     "dependencies": {

@@ -2,6 +2,7 @@ import os
 import argparse
 import subprocess
 import logging
+import sys
 import yaml
 
 logging.basicConfig(
@@ -12,6 +13,18 @@ logging.basicConfig(
 logger = logging.getLogger("run_all.py")
 HOUMO_TARGET = os.getenv("HOUMO_TARGET", "houmo")
 script_dir = os.path.dirname(os.path.abspath(__file__))
+
+
+def run_command(cmd, cwd=None, timeout=None, capture_output=False):
+    logger.info(f"[command] run: {cmd}, cwd: {cwd or os.getcwd()}")
+    return subprocess.run(
+        cmd,
+        cwd=cwd,
+        timeout=timeout,
+        check=True,
+        text=True,
+        capture_output=capture_output,
+    )
 
 
 def parseArgs():
@@ -196,22 +209,24 @@ def runCase(allUnitDict):
             ]
 
         logger.info(f"---> test {caseName} start, test cmd: {cmd_list}")
-        process = subprocess.Popen(
-            cmd_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        stdout, stderr = process.communicate(timeout=7200)  # timeout: 2h
-        if process.returncode == 0 and ".sh" in script:
-            logger.info(f"<--- test {caseName} success")
-        elif process.returncode == 0:
-            addCiMarker(test_type, stdout)
-            logger.info(f"<--- test {test_type}/{caseName} success")
-        else:
-            if ".sh" in script:
-                logger.info(f"[testcase log] stdout:\n {stdout}")
-                logger.info(f"[testcase log] stderr:\n {stderr}")
+        try:
+            result = run_command(
+                cmd_list, timeout=3600, capture_output=True
+            )  # timeout: 1h
+        except subprocess.CalledProcessError as e:
+            if e.stdout:
+                logger.info(f"[testcase log] stdout:\n {e.stdout}")
+            if e.stderr:
+                logger.info(f"[testcase log] stderr:\n {e.stderr}")
             raise RuntimeError(
-                f"<--- test {caseName} fail, error code: {process.returncode}"
-            )
+                f"<--- test {caseName} fail, error code: {e.returncode}"
+            ) from e
+
+        if ".sh" in script:
+            logger.info(f"<--- test {caseName} success")
+        else:
+            addCiMarker(test_type, result.stdout)
+            logger.info(f"<--- test {test_type}/{caseName} success")
 
 
 def runWithDiff(allArgs):
@@ -229,7 +244,7 @@ def runWithDiff(allArgs):
     for testUnit in allTestUnits:
         unitDict = getUnitDict(testUnit, yamlData)
         allUnitDict.update(unitDict)
-    os.system("pip3 install -r requirements.txt")
+    run_command([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
     logger.info(f"test modules: {allTestModules}")
     logger.info(f"test units: {allTestUnits}")
     logger.info(f"test cases: {allUnitDict}")
@@ -239,8 +254,7 @@ def runWithDiff(allArgs):
     os.chdir(pytest_folder)
     logger.info(f"[execution log] test imodelzoo cases...")
     # "pytest --log-cli-level=INFO -s -m imodelzoo"
-    result = os.system("pytest --collect-only -s -m imodelzoo")
-    # logger.info(f"[execution log] ret: {result}")
+    run_command(["pytest", "--collect-only", "-s", "-m", "imodelzoo"])
 
 
 def main(allArgs=None):
@@ -252,19 +266,44 @@ def main(allArgs=None):
         raise Exception("script type is not recognition, begin exit")
 
 
+def setup_environment():
+    HOUMO_EXAMPLES_PATH = os.path.abspath(os.getenv("HOUMO_EXAMPLES_PATH", "."))
+    hmatc_dir = os.path.join(script_dir, "hmatc")
+    llm_perf_dir = os.path.join(HOUMO_EXAMPLES_PATH, "tools", "llm_perf")
+    llm_perf_bin = os.path.join(HOUMO_EXAMPLES_PATH, "tools", "bin", "llm_perf")
+    hmeval_install = os.path.join(
+        HOUMO_EXAMPLES_PATH, "tools", "hmeval", "scripts", "install.sh"
+    )
+
+    # install hmatc
+    run_command(["chmod", "+x", "install.sh"], cwd=hmatc_dir)
+    run_command(["./install.sh"], cwd=hmatc_dir)
+    # install llm_perf
+    run_command(["bash", "build_linux.sh"], cwd=llm_perf_dir)
+    run_command(["cp", llm_perf_bin, os.path.join(HOUMO_PATH, "bin")])
+    # install hmeval
+    run_command([hmeval_install])
+
+    # install pytest in release docker
+    run_command([sys.executable, "-m", "pip", "install", "pytest"])
+    run_command([sys.executable, "-m", "pip", "install", "pytest-xdist"])
+    run_command([sys.executable, "-m", "pip", "install", "pytest-dependency"])
+
+
 if __name__ == "__main__":
     os.environ["HOUMO_MODEL_PATH"] = "/data02/modelzoo_ci/models"
     HOUMO_PATH = os.getenv("HOUMO_PATH", "/usr/local/houmo")
-    HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", ".")
-    os.system("cd hmatc && chmod +x install.sh && ./install.sh")
-    os.system(
-        f"cd {HOUMO_EXAMPLES_PATH}/tools/llm_perf && bash build_linux.sh && cp {HOUMO_EXAMPLES_PATH}/tools/bin/llm_perf {HOUMO_PATH}/bin"
-    )
-    os.system(f"{HOUMO_EXAMPLES_PATH}/hmeval/scripts/install.sh")
     os.environ["SKIP_INFER"] = "ON"
-    # install pytest in release docker
-    os.system("pip3 install pytest")
-    os.system("pip3 install pytest-xdist")
-    os.system("pip3 install pytest-dependency")
 
-    main()
+    try:
+        setup_environment()
+        sys.exit(main() or 0)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"[command] failed: {e.cmd}, return code: {e.returncode}")
+        sys.exit(e.returncode)
+    except subprocess.TimeoutExpired as e:
+        logger.error(f"[command] timeout: {e.cmd}, timeout: {e.timeout}s")
+        sys.exit(1)
+    except OSError as e:
+        logger.error(f"[command] execute failed: {e}")
+        sys.exit(1)
