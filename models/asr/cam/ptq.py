@@ -278,8 +278,8 @@ if __name__ == "__main__":
         quant_scheme = QuantScheme(target_device=target_device, quant_type=args.quant_type)
         quant_config = create_quant_config(quant_scheme)
         onnx_name = Path(onnx_path).stem
-        # Output to output/xh2/hmquant/prefill/ to match build.py default model_dir
-        hmonnx_dir = Path(DEFAULT_OUT_DIR) / "prefill"
+        # Output to output/xh2/hmquant/ to match build.py default model_dir
+        hmonnx_dir = Path(DEFAULT_OUT_DIR)
         hmonnx_dir.mkdir(parents=True, exist_ok=True)
         hmonnx_path = hmonnx_dir / f"{onnx_name}_{target_device}_{args.quant_type}.onnx"
 

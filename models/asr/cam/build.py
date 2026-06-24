@@ -263,7 +263,7 @@ if __name__ == "__main__":
             ), "Only supported for compilation on the x86_64 platform."
 
             Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(args.model_dir, "prefill")),
+                hmonnx=find_hmonnx_file(args.model_dir),
                 hmm_name="cam_embedding",
                 output=args.output_dir,
                 ncore=args.ncore,
@@ -275,7 +275,7 @@ if __name__ == "__main__":
         if args.stage == "test" or args.stage == "all":
             test(
                 "cam_embedding",
-                os.path.join(args.model_dir, "prefill"),
+                args.model_dir,
                 args.output_dir,
                 profile,
                 prefix="cam_embedding",
