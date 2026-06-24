@@ -159,6 +159,9 @@ python3 demo.py --model_name campplus --model_size standard
 # 仅演示（默认，下载预编译模型）
 bash test.sh
 
+# 仅演示（跳过下载，使用已有模型）
+bash test.sh --skip_download
+
 # 仅量化
 bash test.sh -s quant
 
