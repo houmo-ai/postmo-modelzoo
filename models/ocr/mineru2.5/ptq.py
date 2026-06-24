@@ -26,16 +26,29 @@ from pathlib import Path
 import torch
 import copy
 from hmatc.utils import logger
+from hmatc.utils.utils import first_not_none, get_model_configs
 from qwen_vl_utils.vision_process import SPATIAL_MERGE_SIZE
 from xhquant.api import Config, xhquant_init
 from xhmodel_merak.xh_llm import AutoLLMConfig, AutoLLMModel, format_model_name
 from xhmodel_merak.xh_llm.models.qwen2_vl import XHQwen2VLModel, XHQwen2VLModelConfig
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
+HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
 MINERU_VISUAL_BUCKETS_MANIFEST = "mineru_visual_buckets.json"
 _HMQUANT_DIR_RE = re.compile(r"^hmquant_xh2_.+_\d{8}$")
 MODEL_NAME = "mineru2_5_pro_1_2b"
+
+
+def get_default_model_dir(model_config: dict) -> str:
+    repo_ids = model_config.get("modelscope_repo", [])
+    if repo_ids:
+        return repo_ids[0].rsplit("/", maxsplit=1)[-1]
+    model_name = model_config.get("model_name", "mineru2.5-pro")
+    model_size = model_config.get("model_size", "2604-1.2b")
+    return f"{model_name}-{model_size}"
 
 
 def _build_cfg_from_model(args) -> Config:
@@ -335,17 +348,25 @@ def quant_mineru2_5(args, device, dtype):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
     # fmt: off
-    parser.add_argument("--model", type=str, default="models/MinerU2.5-Pro-2604-1.2B", help="path to the model directory")
-    parser.add_argument("--chip-arch", type=str, default="XH2a", choices=["XH2a", "YueHui"])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str, default=None, help="path to the model directory")
+    parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
+    parser.add_argument("--model_name", type=str, default=None, help="model name for output files")
+    parser.add_argument("--model_size", type=str, default=None, help="model size identifier for output files")
     parser.add_argument("--out-dir", type=str, default=f"./output/{HOUMO_TARGET}", help="output directory")
+    parser.add_argument("--chip-arch", type=str, default="XH2a", choices=["XH2a", "YueHui"])
     parser.add_argument("--context-length", type=int, default=4096, help="max sequence length")
     parser.add_argument("--prefill-chunk-length", type=int, default=256, help="prefill chunk length")
     parser.add_argument("--seed", type=int, default=1024, help="random seed for reproducibility")
-    # fmt: on
-
     args = parser.parse_args()
+
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
+    args.model_name = first_not_none(args.model_name, default_model_name)
+    args.model_size = first_not_none(args.model_size, default_model_size)
+    model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    args.model = first_not_none(args.model, get_default_model_dir(model_config))
+    # fmt: on
 
     torch.manual_seed(args.seed)
 

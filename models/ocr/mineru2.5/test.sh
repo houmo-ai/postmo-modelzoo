@@ -10,8 +10,8 @@ source "${MODELS_DIR}/test_common.sh"
 
 STEP="demo"
 SKIP_DOWNLOAD="false"
-MODEL_NAME="mineru2.5-pro"
-MODEL_SIZE="2604-1.2b"
+MODEL_NAME="mineru2.5-pro-2604"
+MODEL_SIZE="1.2b"
 NDEVICE=1
 parse_args "$@"
 

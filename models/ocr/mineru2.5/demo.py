@@ -1008,8 +1008,7 @@ def get_args():
     parser.add_argument("--max_size_w", type=int, default=None)
     parser.add_argument("--max_size_h", type=int, default=None)
     parser.add_argument("--image", default="./data/0001.png")
-    parser.add_argument("--visual_buckets_manifest", type=str, default=None,
-                        help="path to mineru_visual_buckets.json (enables multi-bucket mode)")
+    parser.add_argument("--visual_buckets_manifest", type=str, default=None, help="path to mineru_visual_buckets.json (enables multi-bucket mode)")
     args = parser.parse_args()
 
     default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
