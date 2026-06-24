@@ -3,6 +3,4 @@ torch
 torchaudio
 numpy
 modelscope
-tcim_lite
-hmatc
 loguru

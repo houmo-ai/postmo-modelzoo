@@ -20,7 +20,8 @@ cd "${SCRIPT_DIR}"
 
 TEST_VENV_ACTIVE=0
 dir_path="cam_venv"
-if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
+# Only use venv for demo-only runs; quant/build need xhquant from system
+if [[ "$STEP" == "demo" ]] && [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
 fi
 
@@ -54,5 +55,4 @@ fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then
     cleanup_python_venv "${dir_path}"
-fi
 fi
