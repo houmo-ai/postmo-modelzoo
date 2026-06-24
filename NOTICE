@@ -84,6 +84,7 @@ CosyVoice3 - https://github.com/FunAudioLLM/CosyVoice
 PaddleOCR-VL - https://www.modelscope.cn/models/PaddlePaddle/PaddleOCR-VL
 Qwen3-next-30b-a3b - https://www.modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Instruct
 Qwen3-omni - https://www.modelscope.cn/models/Qwen/Qwen3-Omni-30B-A3B-Instruct
+Qwen3-VL-Embedding - https://github.com/QwenLM/Qwen3-VL-Embedding
 
 For detailed third-party citation notices, licenses, and precautions, please refer to THIRD_PARTY_NOTICES.
 

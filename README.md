@@ -146,6 +146,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | bge                     | embedding    | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | gte                     | embedding    | xh2    | x     | x     | yes  | yes  | x    | yes     |
 | qwen3-embedding         | embedding    | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| qwen3-vl-embedding      | embedding    | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | yolov8m-pose            | estimation   | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
 | deepseek-r1-qwen3-8b    | llm          | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
 | gpt-oss                 | llm          | xh2    | x     | yes   | yes  | yes  | x    | yes     |

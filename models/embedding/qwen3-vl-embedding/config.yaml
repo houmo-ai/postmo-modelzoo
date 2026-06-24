@@ -1,0 +1,31 @@
+default_model_name: "qwen3-vl-embedding"
+default_model_size: "8b"
+
+model_configs:
+  qwen3-vl-embedding:
+    "2b":
+      modelscope_repo: ["Qwen/Qwen3-VL-Embedding-2B"]
+      model_name: "qwen3-vl-embedding"
+      model_size: "2b"
+      ncore: 2
+      quant_type: "w8a8h1_sefp"
+      context_length: "8k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      max_size_w: 896
+      max_size_h: 896
+      max_size_t: 2
+    "8b":
+      modelscope_repo: ["Qwen/Qwen3-VL-Embedding-8B"]
+      model_name: "qwen3-vl-embedding"
+      model_size: "8b"
+      ncore: 2
+      quant_type: "w8a8h1_sefp"
+      context_length: "8k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      max_size_w: 896
+      max_size_h: 896
+      max_size_t: 2
