@@ -18,6 +18,10 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
+if [ -e build_ndk ];then
+  rm -rf build_ndk
+  mkdir build_ndk
+fi
 if [ ! -e 3rdparty ];then
   mkdir 3rdparty
   python3 get_3rdparty.py

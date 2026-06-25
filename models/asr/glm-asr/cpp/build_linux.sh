@@ -23,31 +23,6 @@ if [ -e build ];then
   rm -rf build
   mkdir build
 fi
-if [ ! -e 3rdparty ];then
-  mkdir 3rdparty
-  python3 get_3rdparty.py
-fi
-if [[ ! -e 3rdparty/audio/3rdparty_build/lib/libkaldi-native-fbank-core.so || \
-  ! -e 3rdparty/audio/3rdparty_build/lib/libsamplerate.so ]]; then
-  cd 3rdparty/audio
-  chmod +x build_3rdparty.sh
-  ./build_3rdparty.sh > /dev/null 2>&1
-  cd ../..
-else
-  rm -rf 3rdparty/audio/3rdparty_build
-  cd 3rdparty/audio
-  chmod +x build_3rdparty.sh
-  ./build_3rdparty.sh > /dev/null 2>&1
-  cd ../..
-fi
-if [ ! -e 3rdparty/eigen3 ];then
-  cd 3rdparty
-  wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
-  unzip eigen-3.4.0.zip
-  mv eigen-3.4.0 eigen3
-  rm -rf eigen-3.4.0.zip
-  cd ..
-fi
 if [ $(uname -s) = "Linux" ] &&  ([ $(uname -m) = "x86_64" ] || [ $(uname -m) = "aarch64" ]); then
   if [ "$HOUMO_TARGET" = "xh2" ]; then
     set -e
@@ -58,7 +33,7 @@ if [ $(uname -s) = "Linux" ] &&  ([ $(uname -m) = "x86_64" ] || [ $(uname -m) = 
     mkdir -p build
     cd build || exit 1
 
-    cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH/bin -DCMAKE_BUILD_TYPE=Release ..
+    cmake -DCMAKE_INSTALL_PREFIX=$WORK_PATH/../bin -DCMAKE_BUILD_TYPE=Release ..
     make -j$(nproc)
     make install
   else

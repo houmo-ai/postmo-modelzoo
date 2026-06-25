@@ -49,6 +49,10 @@ if should_run_step "demo"; then
     python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 
     python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
+
+    echo "Execute cpp demo."
+    cd cpp && ./build_linux.sh && cd ..
+    ./bin/sample_glm_asr --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
     if command -v llm_perf &>/dev/null; then
         echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
         cd "${SCRIPT_DIR}"
@@ -57,7 +61,7 @@ if should_run_step "demo"; then
             --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
             --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
             --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin" \
-            --tokenizer "GLM-ASR-Nano-2512/tokenizer.json" \
+            --tokenizer "GLM-ASR-Nano-2512" \
             --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
     fi
 fi

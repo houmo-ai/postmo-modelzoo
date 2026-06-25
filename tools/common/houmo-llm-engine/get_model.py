@@ -180,9 +180,3 @@ if __name__ == "__main__":
     )
     if ret_dict.get("ret", False) is False:
         exit(1)
-
-    if os.path.exists("tokenizers/qwen3-asr-1.7b"):
-        if "tokenizer.json" not in os.listdir("tokenizers/qwen3-asr-1.7b"):
-            from transformers import AutoTokenizer
-            tokenizer = AutoTokenizer.from_pretrained("tokenizers/qwen3-asr-1.7b")
-            tokenizer.save_pretrained("tokenizers/qwen3-asr-1.7b")

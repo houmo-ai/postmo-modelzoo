@@ -26,17 +26,6 @@ if(MSVC)
   set(CMAKE_CXX_FLAGS ${ORIGINAL_CXX_FLAGS})
 endif()
 
-FetchContent_Declare(
-  yaml-cpp
-  GIT_REPOSITORY https://gitee.com/mirrors/yaml-cpp.git
-  GIT_TAG yaml-cpp-0.9.0
-)
-set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "Disable yaml-cpp tests" FORCE)
-set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "Disable yaml-cpp tools" FORCE)
-set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "Disable yaml-cpp contrib" FORCE)
-set(YAML_CPP_BUILD_SHARED_LIBS OFF CACHE BOOL "Build static library" FORCE)
-set(YAML_CPP_INSTALL OFF CACHE BOOL "Disable yaml-cpp install" FORCE)
-FetchContent_MakeAvailable(yaml-cpp)
 include(CheckCXXCompilerFlag)
 if(MSVC)
   option(ENABLE_ASR "Enable ASR support" OFF)
@@ -53,6 +42,12 @@ include(${CMAKE_SOURCE_DIR}/tcim_runtime.cmake)
 
 # houmo-llm-engine paths
 set(HOUMO_ENGINE_DIR ${CMAKE_SOURCE_DIR}/../common/houmo-llm-engine)
+
+# ASR model directories (sources moved out of houmo-llm-engine)
+set(ASR_MODEL_GLM_DIR    ${CMAKE_SOURCE_DIR}/../../models/asr/glm-asr/cpp)
+set(ASR_MODEL_WHISPER_DIR ${CMAKE_SOURCE_DIR}/../../models/asr/whisper/cpp)
+set(ASR_MODEL_QWEN3_DIR  ${CMAKE_SOURCE_DIR}/../../models/asr/qwen3-asr/cpp)
+
 if(ANDROID_ABI)
   set(_LIB_SUFFIX "Android_xh2")
   set(ENGINE_BUILD_DIR ${HOUMO_ENGINE_DIR}/build_ndk/release)
@@ -90,6 +85,9 @@ include_directories(
 )
 if(ENABLE_ASR)
   include_directories(${AUDIO_INC_DIRS})
+  include_directories(${ASR_MODEL_GLM_DIR}/include)
+  include_directories(${ASR_MODEL_WHISPER_DIR}/include)
+  include_directories(${ASR_MODEL_QWEN3_DIR}/include)
 endif()
 link_directories(
   $ENV{HOUMO_SDK_PATH}/hal/lib
@@ -114,6 +112,11 @@ set(SOURCE_FILES
 )
 if(ENABLE_ASR)
   list(APPEND SOURCE_FILES src/asr/HmAsrInfer.cc)
+  list(APPEND SOURCE_FILES
+    ${ASR_MODEL_WHISPER_DIR}/src/whisper_model.cc
+    ${ASR_MODEL_GLM_DIR}/src/glm_asr_model.cc
+    ${ASR_MODEL_QWEN3_DIR}/src/qwen3_asr_model.cc
+  )
 endif()
 
 set(INCLUDE_DIRS

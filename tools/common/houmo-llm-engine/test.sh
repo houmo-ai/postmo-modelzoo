@@ -10,7 +10,7 @@ source "${MODELS_DIR}/test_common.sh"
 
 STEP="demo"
 SKIP_DOWNLOAD="false"
-MODEL_CONFIGS=("qwen3:0.6b" "qwen3.5:2b" "qwen3-vl:4b" "glm-asr:nano-2512" "qwen3-asr:1.7b" "whisper:large-v3-turbo")
+MODEL_CONFIGS=("qwen3:0.6b" "qwen3.5:2b" "qwen3-vl:4b")
 NDEVICE=1
 parse_args "$@"
 
@@ -86,32 +86,6 @@ if should_run_step "demo"; then
             --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}" \
             --prompt "分别介绍下两个图片" \
             --image "tests/data/a.png" --image "tests/data/b.jpg"
-        fi
-        if [[ $config == "glm-asr:nano-2512" ]]; then
-            ./bin/sample_glm_asr \
-            --encode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
-            --prefill "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
-            --decode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-            --embedding "models/${MODEL_NAME}-${MODEL_SIZE}/hmquant/quant_embedding.bin" \
-            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}" \
-            --audio "tests/data/long_audio.mp3"
-        fi
-        if [[ $config == "qwen3-asr:1.7b" ]]; then
-            ./bin/sample_qwen3_asr \
-            --encode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
-            --prefill "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
-            --decode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-            --embedding "models/${MODEL_NAME}-${MODEL_SIZE}/hmquant/quant_embedding.bin" \
-            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}" \
-            --audio "tests/data/long_audio.mp3"
-        fi
-        if [[ $config == "whisper:large-v3-turbo" ]]; then
-            ./bin/sample_whisper_asr \
-            --encode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
-            --prefill "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
-            --decode "models/${MODEL_NAME}-${MODEL_SIZE}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-            --tokenizer "tokenizers/${MODEL_NAME}-${MODEL_SIZE}" \
-            --audio "tests/data/long_audio.mp3"
         fi
     done
 fi

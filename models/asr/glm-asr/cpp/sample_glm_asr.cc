@@ -17,23 +17,41 @@
 #include <vector>
 
 #include "core/model_factory.h"
-#include "models/glm_asr_model.h"
+#include "glm_asr_model.h"
 #include "modules/audio_processor.h"
 #include "modules/streaming_decoder.h"
 
 namespace fs = std::filesystem;
 
+static void print_help(const char* prog) {
+  std::cout << "Usage: " << prog << " [OPTIONS]\n\n"
+            << "GLM-ASR inference demo.\n\n"
+            << "Options:\n"
+            << "  --audio <path>       Path to audio file (.wav, .mp3, etc.) "
+               "[required]\n"
+            << "  --encode <path>      Path to encoder model (.hmm)\n"
+            << "  --prefill <path>     Path to prefill model (.hmm)\n"
+            << "  --decode <path>      Path to decode model (.hmm)\n"
+            << "  --tokenizer <path>   Path to tokenizer directory\n"
+            << "  --embedding <path>   Path to embedding file (.bin) using "
+               "tools/llm_perf/convert_embed.py to convert\n"
+            << "  -h, --help           Show this help message\n";
+}
+
 int main(int argc, char* argv[]) {
   std::string audio_path;
-  std::string encoder_path;
-  std::string prefill_path;
-  std::string decode_path;
-  std::string tokenizer_path;
-  std::string embedding_path;
+  std::string encoder_path = "output/xh2/glm-asr-nano-2512_encode.hmm";
+  std::string prefill_path = "output/xh2/glm-asr-nano-2512_prefill.hmm";
+  std::string decode_path = "output/xh2/glm-asr-nano-2512_decode.hmm";
+  std::string tokenizer_path = "GLM-ASR-Nano-2512";
+  std::string embedding_path = "output/xh2/hmquant/quant_embedding.bin";
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
-    if (arg == "--audio" && i + 1 < argc)
+    if (arg == "--help" || arg == "-h") {
+      print_help(argv[0]);
+      return 0;
+    } else if (arg == "--audio" && i + 1 < argc)
       audio_path = argv[++i];
     else if (arg == "--encode" && i + 1 < argc)
       encoder_path = argv[++i];
@@ -48,7 +66,8 @@ int main(int argc, char* argv[]) {
   }
 
   if (audio_path.empty() || !fs::exists(audio_path)) {
-    std::cerr << "Error: --audio required" << std::endl;
+    std::cerr << "Error: --audio required\n\n";
+    print_help(argv[0]);
     return 1;
   }
 

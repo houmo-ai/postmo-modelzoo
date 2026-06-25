@@ -537,7 +537,7 @@ Usage Location:
 models/tts/cosyvoice3/cpp/
 
 Source:
-https://github.com/GangLi-Blind/LibrosaCpp
+https://github.com/ewan-xu/LibrosaCpp
 
 Copyright Statement:
 Copyright (c) Gang Li
@@ -546,7 +546,7 @@ License:
 Apache License 2.0
 
 License Text:
-https://github.com/GangLi-Blind/LibrosaCpp/blob/main/LICENSE
+https://github.com/ewan-xu/LibrosaCpp/blob/main/LICENSE
 
 LibrosaCpp provides C++ implementations of mel spectrogram computation,
 including STFT and mel filterbank operations. It is licensed under the
@@ -691,7 +691,7 @@ Source:
 https://github.com/huggingface/transformers
 
 Copyright Statement:
-Copyright (c) 2008-2015 Jesse Beder
+Copyright (c) 2018 The Hugging Face team
 
 License:
 Apache License 2.0
@@ -746,7 +746,7 @@ Source:
 https://github.com/QwenLM/Qwen3-VL/tree/main/qwen-vl-utils
 
 Copyright Statement:
-Copyright (c) 2008-2015 Jesse Beder
+Copyright (c) Alibaba Cloud and Qwen contributors
 
 License:
 Apache License 2.0
@@ -782,6 +782,235 @@ accordance with Section 4(b) of the Apache License 2.0.
 
 Users are responsible for complying with the Apache License 2.0 when using, redistributing,
 or modifying these components.
+
+----------------------------------------------------------------------
+jinja.hpp (Jinja2 Template Engine for C++)
+----------------------------------------------------------------------
+
+Component Name: jinja.hpp (jinja.cpp)
+
+Version: 0.0.1
+Author / Copyright Holder: Wang Zhaode
+Copyright Statement: Copyright (c) 2025 Wang Zhaode
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://www.apache.org/licenses/LICENSE-2.0
+
+Usage in this project:
+The jinja.hpp single-header file is used at the following path:
+    apis/common/tokenizer.cpp/third_party/jinja.hpp
+
+The jinja.hpp library provides a C++11 Jinja2 template engine for
+rendering HuggingFace-style chat templates. It is licensed under the
+Apache License, Version 2.0, which permits use, reproduction, modification,
+distribution, and sublicensing, subject to the terms of the license.
+
+Any redistribution or modification of jinja.hpp must retain the original
+copyright notice and license text in accordance with the Apache License 2.0.
+
+Users are responsible for complying with the Apache License 2.0 when using,
+redistributing, or modifying jinja.hpp.
+
+----------------------------------------------------------------------
+RapidJSON (Fast C++ JSON Parser/Generator)
+----------------------------------------------------------------------
+
+Component Name: RapidJSON
+
+Author / Copyright Holder: Tencent and Milo Yip
+Copyright Statement: Copyright (c) 2015 THL A29 Limited, a Tencent company,
+                     and Milo Yip. All rights reserved.
+
+License:
+MIT License (main library)
+BSD 3-Clause License (msinttypes components)
+
+License Text:
+Main license: https://github.com/Tencent/rapidjson/blob/master/license.txt
+
+Usage in this project:
+RapidJSON headers are vendored at the following path:
+    apis/common/tokenizer.cpp/third_party/rapidjson/
+
+RapidJSON is an optional JSON backend for the ujson wrapper (activated via
+the UJSON_USE_RAPIDJSON CMake option). It is provided as a vendored copy
+under the MIT License, which permits use, copying, modification, merging,
+publishing, distribution, sublicensing, and/or selling copies of the software,
+subject to the following condition:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+Any redistribution or modification of RapidJSON must retain the original
+copyright notices and license text in accordance with the MIT License.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying RapidJSON.
+
+----------------------------------------------------------------------
+Oniguruma (Regular Expression Library)
+----------------------------------------------------------------------
+
+Component Name: Oniguruma
+
+Version: 6.9.10
+Author / Copyright Holder: K.Kosako
+Copyright Statement: Copyright (c) 2002-2024 K.Kosako <kosako@sofnec.co.jp>
+
+License:
+BSD 2-Clause License
+
+License Text:
+https://github.com/kkos/oniguruma/blob/master/COPYING
+
+Usage in this project:
+Oniguruma source files are vendored and built at the following path:
+    apis/common/tokenizer.cpp/third_party/oniguruma/
+
+Oniguruma is built as a static library (UTF-8 support only) and linked into
+the tokenizer library for regex-based token splitting. It is licensed under
+the BSD 2-Clause License, which permits use, copying, modification, and
+distribution, subject to the following conditions:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.
+
+Any redistribution or modification of Oniguruma must retain the original
+copyright notice and license text in accordance with the BSD 2-Clause License.
+
+Users are responsible for complying with the BSD 2-Clause License when using,
+redistributing, or modifying Oniguruma.
+
+----------------------------------------------------------------------
+utf8proc (Unicode Normalization Library)
+----------------------------------------------------------------------
+
+Component Name: utf8proc
+
+Author / Copyright Holder: Steven G. Johnson and JuliaLang contributors
+Copyright Statement: Copyright (c) 2014-2025 Steven G. Johnson,
+                     Jiahao Chen, Tony Kelman, Jonas Fonseca, and other
+                     contributors (JuliaLang).
+
+License:
+MIT License (also known as "Unicode License")
+
+License Text:
+See the embedded license statement in:
+    apis/common/tokenizer.cpp/third_party/utf8proc/utf8proc.h
+
+Usage in this project:
+utf8proc source files are compiled directly into the tokenizer library at:
+    apis/common/tokenizer.cpp/third_party/utf8proc/
+
+utf8proc provides Unicode normalization (NFKC), case-folding, character
+iteration, category checks, and grapheme boundary detection for the tokenizer.
+It is licensed under the MIT License, which permits use, copying, modification,
+merging, publishing, distribution, sublicensing, and/or selling copies of the
+Software, subject to the following condition:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+Any redistribution or modification of utf8proc must retain the original
+copyright notice and license text in accordance with the MIT License.
+
+Users are responsible for complying with the MIT License when using,
+redistributing, or modifying utf8proc.
+
+----------------------------------------------------------------------
+Tokenizer C++ Module (HuggingFace Tokenizers Reimplementation)
+----------------------------------------------------------------------
+
+Component Name: Tokenizer C++ (tokenizer.cpp)
+
+Author / Copyright Holder: Wang Zhaode
+Copyright Statement: Copyright (c) 2025 Wang Zhaode
+
+License:
+Apache License, Version 2.0
+
+License Text:
+apis/common/tokenizer.cpp/LICENSE
+
+Usage in this project:
+The tokenizer module source files are located at:
+    apis/common/tokenizer.cpp/
+
+This module is a C++11 reimplementation of HuggingFace tokenizers, providing
+BPE, WordPiece, and Unigram model support, alongside Jinja2 chat template
+rendering. It is licensed under the Apache License, Version 2.0, which permits
+use, reproduction, modification, distribution, and sublicensing, subject to
+the terms of the license.
+
+Any redistribution or modification of the Tokenizer C++ module must retain
+the original copyright notice and license text in accordance with the Apache
+License 2.0.
+
+Users are responsible for complying with the Apache License 2.0 when using,
+redistributing, or modifying this module.
+
+----------------------------------------------------------------------
+Google Test (C++ Testing Framework)
+----------------------------------------------------------------------
+
+Component Name: Google Test (googletest)
+
+Version: 1.16.0
+Author / Copyright Holder: Google Inc.
+Copyright Statement: Copyright 2008, Google Inc. All rights reserved.
+
+License:
+BSD 3-Clause License
+
+License Text:
+https://github.com/google/googletest/blob/main/LICENSE
+
+Usage in this project:
+Google Test is vendored and used for unit testing at the following path:
+    tools/common/houmo-llm-engine/3rdparty/googletest/
+
+Ten test executables (tokenizer_test, embedding_test, sampler_test,
+qwen3_llm_test, qwen35_mllm_test, qwen3_vlm_test, perf_profiler_test,
+audio_processor_test, whisper_test, etc.) link against GTest::gtest_main.
+
+Google Test is licensed under the BSD 3-Clause ("New BSD") License, which
+permits use, modification, and redistribution in source and binary forms,
+subject to the following conditions:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of Google Inc. nor the names of its contributors may be
+   used to endorse or promote products derived from this software without
+   specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.
+
+Any redistribution or modification of Google Test must retain the original
+copyright notice and license text in accordance with the BSD 3-Clause License.
+
+Users are responsible for complying with the BSD 3-Clause License when using,
+redistributing, or modifying Google Test.
 
 2. Datasets
 ----------------------------------------------------------------------

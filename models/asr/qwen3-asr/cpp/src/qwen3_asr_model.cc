@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "models/qwen3_asr_model.h"
+#include "qwen3_asr_model.h"
 
 #include <filesystem>
 #include <iostream>

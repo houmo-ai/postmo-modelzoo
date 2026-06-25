@@ -20,7 +20,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "models/glm_asr_model.h"
+#include "glm_asr_model.h"
 
 #include <algorithm>
 #include <filesystem>

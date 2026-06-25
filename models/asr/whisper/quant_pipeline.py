@@ -132,8 +132,8 @@ def process_encoder(args):
     hmonnx_file = work_dir / f"hmquant_{args.model_name}_with_act.onnx"
     golden_path = work_dir / "golden"
 
-    input_features = torch.randn(1, 80, 3000)
-
+    T = 80 if args.model_size != "large-v3-turbo" else 128
+    input_features = torch.randn(1, T, 3000)
 
     meta_info["encode"] = str(hmonnx_file.relative_to(work_dir))
     # input_features = torch.randn(1, 80, 3000)

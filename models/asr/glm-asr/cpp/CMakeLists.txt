@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16.3)
-project(sample_whisper_asr)
+project(sample_glm_asr)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,14 +26,14 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/hm_engine.cmake)
 # ---------------------------------------------------------------------
 # Sample target
 # ---------------------------------------------------------------------
-add_executable(sample_whisper_asr
-  sample_whisper_asr.cc
-  src/whisper_model.cc
+add_executable(sample_glm_asr
+  sample_glm_asr.cc
+  src/glm_asr_model.cc
 )
 
-target_include_directories(sample_whisper_asr PRIVATE
+target_include_directories(sample_glm_asr PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(sample_whisper_asr PRIVATE hm_engine)
-install(TARGETS sample_whisper_asr DESTINATION .)
+target_link_libraries(sample_glm_asr PRIVATE hm_engine)
+install(TARGETS sample_glm_asr DESTINATION .)

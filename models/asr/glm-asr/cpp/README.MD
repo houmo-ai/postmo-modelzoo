@@ -1,6 +1,6 @@
-# Whisper ASR C++ 推理示例
+# GLM-ASR C++ 推理示例
 
-本示例展示如何使用 C++ 在后摩系列芯片（XH2）上运行 Whisper 自动语音识别模型推理。支持 Linux 和 Android Native 环境。
+本示例展示如何使用 C++ 在后摩系列芯片（XH2）上运行 GLM-ASR 自动语音识别模型推理。支持 Linux 和 Android Native 环境。
 
 ## 目录
 
@@ -14,9 +14,9 @@
 
 | 文件 | 说明 |
 |------|------|
-| `sample_whisper_asr.cc` | 主程序入口，Whisper ASR 推理 demo |
-| `src/whisper_model.cc` | Whisper 模型实现 |
-| `include/whisper_model.h` | Whisper 模型头文件 |
+| `sample_glm_asr.cc` | 主程序入口，GLM-ASR 推理 demo |
+| `src/glm_asr_model.cc` | GLM-ASR 模型实现 |
+| `include/glm_asr_model.h` | GLM-ASR 模型头文件 |
 | `hm_engine.cmake` | houmo-llm-engine 依赖配置模块（可复用） |
 | `CMakeLists.txt` | CMake 编译配置 |
 | `build_linux.sh` | Linux 编译脚本 |
@@ -25,20 +25,19 @@
 功能支持：
 - 芯片型号：xh2
 - 大道软件版本要求：xh2 ≥ v1.0.0
-- 模型：whisper-medium（80 mel bins）、whisper-large-v3-turbo（128 mel bins）
-- 支持长音频分块处理
-- 支持多语言自动识别（`--language auto`）
+- 模型：glm-asr-nano-2512
+- 支持长音频分块处理（默认 30s）
 - 仅支持 16kHz 采样率音频输入
 
 ## 2. 流程说明
 
 1. 解析命令行参数，加载模型配置
 2. 加载 Encoder / Prefill / Decode 三个 `.hmm` 模型
-3. 加载 Tokenizer
+3. 加载 Embedding 和 Tokenizer
 4. 加载音频文件，分块提取 Mel 频谱特征
-5. Encoder 处理音频特征
-6. 语言检测（DetectLanguage）
-7. Prefill 处理初始 token 序列
+5. Encoder 处理音频特征，生成 audio embedding
+6. 构造 Prompt（融合 audio embedding 和 text token）
+7. Prefill 处理 prompt 序列，得到第一个输出 token
 8. Decode 循环生成 token，直到命中 eos token
 9. StreamingDecoder 实时解码输出文本
 
@@ -62,20 +61,20 @@
 | `--encode <path>` | Encoder 模型路径（.hmm） |
 | `--prefill <path>` | Prefill 模型路径（.hmm） |
 | `--decode <path>` | Decode 模型路径（.hmm） |
-| `--tokenizer <path>` | Tokenizer 配置文件路径（.json） |
-| `--language <code>` | 语言代码（zh/en/auto），默认 auto |
+| `--tokenizer <path>` | Tokenizer 目录路径 |
+| `--embedding <path>` | Embedding 文件路径（.bin 或 .pt） |
 | `-h, --help` | 打印帮助信息 |
 
 用法示例：
 
 ```bash
-./sample_whisper_asr \
+./sample_glm_asr \
     --audio audio.wav \
-    --encode ../output/xh2/whisper-medium_encode.hmm \
-    --prefill ../output/xh2/whisper-medium_prefill.hmm \
-    --decode ../output/xh2/whisper-medium_decode.hmm \
-    --tokenizer ../whisper-medium/tokenizer.json \
-    --language auto
+    --encode ../output/xh2/glm-asr-nano-2512_encode.hmm \
+    --prefill ../output/xh2/glm-asr-nano-2512_prefill.hmm \
+    --decode ../output/xh2/glm-asr-nano-2512_decode.hmm \
+    --tokenizer ../GLM-ASR-Nano-2512 \
+    --embedding ../output/xh2/hmquant/quant_embedding.bin
 ```
 
 ## 4. 快速开始
@@ -101,7 +100,7 @@ export HOUMO_SDK_PATH=/path/to/houmo-drv-xh2
 **Linux：**
 
 ```bash
-cd /hmdd/imodelzoo/models/asr/whisper/cpp
+cd /hmdd/imodelzoo/models/asr/glm-asr/cpp
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j$(nproc)
@@ -119,7 +118,7 @@ bash build_linux.sh
 bash build_ndk.sh
 ```
 
-编译产物位于 `build/sample_whisper_asr`。
+编译产物位于 `build/sample_glm_asr`。
 
 **CMakeLists.txt 依赖说明：**
 
@@ -135,20 +134,20 @@ target_link_libraries(your_target PRIVATE hm_engine)
 ### 4.3 运行
 
 确保模型文件已准备：
-- `../output/xh2/whisper_{model}_encode.hmm`
-- `../output/xh2/whisper_{model}_prefill.hmm`
-- `../output/xh2/whisper_{model}_decode.hmm`
-- `../whisper-medium/tokenizer.json`
-
-支持的模型：`whisper-medium`（80 mel bins）、`whisper-large-v3-turbo`（128 mel bins）
+- `../output/xh2/glm-asr-nano-2512_encode.hmm`
+- `../output/xh2/glm-asr-nano-2512_prefill.hmm`
+- `../output/xh2/glm-asr-nano-2512_decode.hmm`
+- `../GLM-ASR-Nano-2512/`（tokenizer 目录）
+- `../output/xh2/hmquant/quant_embedding.bin`
 
 ```bash
-./build/sample_whisper_asr \
+./build/sample_glm_asr \
     --audio audio.wav \
-    --encode ../output/xh2/whisper-medium_encode.hmm \
-    --prefill ../output/xh2/whisper-medium_prefill.hmm \
-    --decode ../output/xh2/whisper-medium_decode.hmm \
-    --tokenizer ../whisper-medium/tokenizer.json
+    --encode ../output/xh2/glm-asr-nano-2512_encode.hmm \
+    --prefill ../output/xh2/glm-asr-nano-2512_prefill.hmm \
+    --decode ../output/xh2/glm-asr-nano-2512_decode.hmm \
+    --tokenizer ../GLM-ASR-Nano-2512 \
+    --embedding ../output/xh2/hmquant/quant_embedding.bin
 ```
 
 ## 5. 免责声明

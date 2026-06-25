@@ -87,9 +87,24 @@ if(NOT OpenCV_INCLUDE_DIRS OR NOT OPENCV_LIBS)
   set(OPENCV_CONFIG_MODE "find_package(OpenCV)")
 endif()
 
+# Derive OPENCV_LIB_DIR for Linux (already set for Android above)
+if(NOT OPENCV_LIB_DIR AND OpenCV_FOUND)
+  get_target_property(_ocv_loc opencv_core IMPORTED_LOCATION)
+  if(NOT _ocv_loc)
+    get_target_property(_ocv_loc opencv_core IMPORTED_LOCATION_RELEASE)
+  endif()
+  if(NOT _ocv_loc)
+    get_target_property(_ocv_loc opencv_core IMPORTED_LOCATION_NOCONFIG)
+  endif()
+  if(_ocv_loc)
+    get_filename_component(OPENCV_LIB_DIR "${_ocv_loc}" DIRECTORY)
+  endif()
+endif()
+
 message(STATUS "OpenCV config mode: ${OPENCV_CONFIG_MODE}")
 message(STATUS "OpenCV include: ${OpenCV_INCLUDE_DIRS}")
 message(STATUS "OpenCV libs: ${OPENCV_LIBS}")
+message(STATUS "OpenCV lib dir: ${OPENCV_LIB_DIR}")
 
 # GTest for unit testing (local 3rdparty)
 option(BUILD_TESTS "Build unit tests" ON)
@@ -138,11 +153,6 @@ set(MODULE_SOURCES
   src/modules/perf_profiler.cc
 )
 
-# Backend sources
-set(BACKEND_SOURCES
-  # src/backends/tcim_backend.cc  # TODO: implement later
-)
-
 # Model sources
 set(MODEL_SOURCES
   src/models/llm_model.cc
@@ -150,9 +160,6 @@ set(MODEL_SOURCES
   src/models/qwen35_mllm_model.cc
   src/models/qwen3_vlm_model.cc
   src/models/asr_model.cc
-  src/models/whisper_model.cc
-  src/models/glm_asr_model.cc
-  src/models/qwen3_asr_model.cc
 )
 
 # Sample sources
@@ -166,7 +173,6 @@ set(SAMPLE_SOURCES
 add_library(houmo_infer SHARED
   ${CORE_SOURCES}
   ${MODULE_SOURCES}
-  ${BACKEND_SOURCES}
   ${MODEL_SOURCES}
 )
 
@@ -222,45 +228,6 @@ target_include_directories(sample_infer PRIVATE
   ${TOKENIZERS_CPP_PATH}/include
   ${EIGEN_PATH}
   ${OpenCV_INCLUDE_DIRS}
-)
-
-# Whisper ASR sample
-add_executable(sample_whisper_asr sample/sample_whisper_asr.cc)
-target_link_libraries(sample_whisper_asr PRIVATE
-  -Wl,--whole-archive houmo_infer -Wl,--no-whole-archive
-)
-target_include_directories(sample_whisper_asr PRIVATE
-  ${HALF_INCLUDE_PATH}
-  ${CMAKE_SOURCE_DIR}/include
-  ${TCIM_RUNTIME_INCLUDE}
-  ${TOKENIZERS_CPP_PATH}/include
-  ${EIGEN_PATH}
-)
-
-# GLM-ASR sample
-add_executable(sample_glm_asr sample/sample_glm_asr.cc)
-target_link_libraries(sample_glm_asr PRIVATE
-  -Wl,--whole-archive houmo_infer -Wl,--no-whole-archive
-)
-target_include_directories(sample_glm_asr PRIVATE
-  ${HALF_INCLUDE_PATH}
-  ${CMAKE_SOURCE_DIR}/include
-  ${TCIM_RUNTIME_INCLUDE}
-  ${TOKENIZERS_CPP_PATH}/include
-  ${EIGEN_PATH}
-)
-
-# Qwen3-ASR sample
-add_executable(sample_qwen3_asr sample/sample_qwen3_asr.cc)
-target_link_libraries(sample_qwen3_asr PRIVATE
-  -Wl,--whole-archive houmo_infer -Wl,--no-whole-archive
-)
-target_include_directories(sample_qwen3_asr PRIVATE
-  ${HALF_INCLUDE_PATH}
-  ${CMAKE_SOURCE_DIR}/include
-  ${TCIM_RUNTIME_INCLUDE}
-  ${TOKENIZERS_CPP_PATH}/include
-  ${EIGEN_PATH}
 )
 
 # -----------------------------------------------------------------------------
@@ -324,22 +291,18 @@ if(BUILD_TESTS)
   target_link_libraries(audio_processor_128_test PRIVATE houmo_infer)
   add_test(NAME AudioProcessor128Test COMMAND audio_processor_128_test)
 
-  add_executable(whisper_test tests/whisper_test.cc)
-  target_include_directories(whisper_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(whisper_test PRIVATE houmo_infer GTest::gtest_main)
-  add_test(NAME WhisperTest COMMAND whisper_test)
-
 endif()
 
 # -----------------------------------------------------------------------------
 # Install
 # -----------------------------------------------------------------------------
-set(LIB_INSTALL_PATH $ENV{HOUMO_EXAMPLES_PATH}/tools/common/lib)
+if(ANDROID_ABI)
+  set(LIB_INSTALL_PATH $ENV{HOUMO_EXAMPLES_PATH}/tools/common/android)
+else()
+  set(LIB_INSTALL_PATH $ENV{HOUMO_EXAMPLES_PATH}/tools/common/lib)
+endif()
 install(TARGETS houmo_infer DESTINATION ${LIB_INSTALL_PATH})
 install(TARGETS sample_infer DESTINATION .)
-install(TARGETS sample_whisper_asr DESTINATION .)
-install(TARGETS sample_glm_asr DESTINATION .)
-install(TARGETS sample_qwen3_asr DESTINATION .)
 if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
   install(TARGETS
     tokenizer_lib
@@ -349,6 +312,15 @@ if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
     DESTINATION ${LIB_INSTALL_PATH}
     FILES_MATCHING PATTERN "*.so*"
   )
+  if(OpenCV_FOUND AND NOT OPENCV_LIB_DIR STREQUAL "")
+    file(GLOB _opencv_files
+      ${OPENCV_LIB_DIR}/libopencv_core.so*
+      ${OPENCV_LIB_DIR}/libopencv_imgproc.so*
+      ${OPENCV_LIB_DIR}/libopencv_imgcodecs.so*
+    )
+    list(FILTER _opencv_files EXCLUDE REGEX "\\.a$")
+    install(FILES ${_opencv_files} DESTINATION ${LIB_INSTALL_PATH})
+  endif()
 endif()
 install(FILES ${CMAKE_SOURCE_DIR}/convert_embed.py
         DESTINATION .

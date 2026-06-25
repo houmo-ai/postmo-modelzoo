@@ -24,9 +24,9 @@
 #include <vector>
 
 #include "core/model_factory.h"
-#include "models/whisper_model.h"
 #include "modules/audio_processor.h"
 #include "modules/streaming_decoder.h"
+#include "whisper_model.h"
 
 namespace fs = std::filesystem;
 
@@ -54,10 +54,10 @@ static void PrintUsage(const char* program_name) {
 
 int main(int argc, char* argv[]) {
   std::string audio_path;
-  std::string encoder_path;
-  std::string prefill_path;
-  std::string decode_path;
-  std::string tokenizer_path;
+  std::string encoder_path = "output/xh2/whisper-medium_encode.hmm";
+  std::string prefill_path = "output/xh2/whisper-medium_prefill.hmm";
+  std::string decode_path = "output/xh2/whisper-medium_decode.hmm";
+  std::string tokenizer_path = "whisper-medium";
   std::string language = "auto";
 
   for (int i = 1; i < argc; i++) {
@@ -145,14 +145,13 @@ int main(int argc, char* argv[]) {
     houmo::StreamingDecoder decoder(whisper_model->tokenizer());
     houmo::SamplingParams params;
     params.repetition_penalty = 1.1f;
-    whisper_ctx->Transcribe(audio_path, params,
-                            [&decoder](houmo::Token token) {
-                              std::string text = decoder.decode(token);
-                              if (!text.empty()) {
-                                std::cout << text << std::flush;
-                              }
-                              return true;
-                            });
+    whisper_ctx->Transcribe(audio_path, params, [&decoder](houmo::Token token) {
+      std::string text = decoder.decode(token);
+      if (!text.empty()) {
+        std::cout << text << std::flush;
+      }
+      return true;
+    });
     std::cout << std::endl;
 
     std::cout << "\n";

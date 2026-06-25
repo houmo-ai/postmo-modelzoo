@@ -8,16 +8,37 @@
 #include <string>
 
 #include "core/model_factory.h"
-#include "models/qwen3_asr_model.h"
 #include "modules/streaming_decoder.h"
+#include "qwen3_asr_model.h"
+
+static void print_help(const char* prog) {
+  std::cout << "Usage: " << prog << " [OPTIONS]\n\n"
+            << "Qwen3-ASR inference demo.\n\n"
+            << "Options:\n"
+            << "  --audio <path>       Path to audio file (.wav, .mp3, etc.) "
+               "[required]\n"
+            << "  --encode <path>      Path to encoder model (.hmm)\n"
+            << "  --prefill <path>     Path to prefill model (.hmm)\n"
+            << "  --decode <path>      Path to decode model (.hmm)\n"
+            << "  --tokenizer <path>   Path to tokenizer directory\n"
+            << "  --embedding <path>   Path to embedding file (.bin or .pt)\n"
+            << "  -h, --help           Show this help message\n";
+}
 
 int main(int argc, char* argv[]) {
-  std::string audio_path, encoder_path, prefill_path, decode_path;
-  std::string tokenizer_path, embedding_path;
+  std::string audio_path;
+  std::string encoder_path = "output/xh2/qwen3-asr-0.6b_encode.hmm";
+  std::string prefill_path = "output/xh2/qwen3-asr-0.6b_prefill.hmm";
+  std::string decode_path = "output/xh2/qwen3-asr-0.6b_decode.hmm";
+  std::string tokenizer_path = "Qwen3-ASR-0.6B";
+  std::string embedding_path = "output/xh2/hmquant/quant_embedding.bin";
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
-    if (arg == "--audio" && i + 1 < argc)
+    if (arg == "--help" || arg == "-h") {
+      print_help(argv[0]);
+      return 0;
+    } else if (arg == "--audio" && i + 1 < argc)
       audio_path = argv[++i];
     else if (arg == "--encode" && i + 1 < argc)
       encoder_path = argv[++i];
@@ -32,7 +53,8 @@ int main(int argc, char* argv[]) {
   }
 
   if (audio_path.empty()) {
-    std::cerr << "--audio_path required\n";
+    std::cerr << "Error: --audio required\n\n";
+    print_help(argv[0]);
     return 1;
   }
 

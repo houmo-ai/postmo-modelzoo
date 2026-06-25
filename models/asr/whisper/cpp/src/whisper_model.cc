@@ -20,7 +20,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "models/whisper_model.h"
+#include "whisper_model.h"
 
 #include <filesystem>
 #include <fstream>

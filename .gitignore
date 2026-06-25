@@ -115,3 +115,5 @@ demo
 tests
 CCPD*
 datasets
+lib
+hmonnx*

@@ -80,6 +80,16 @@ def _validate_flash_attention(flash_vals: tuple) -> None:
             f"Encoder FlashAttention values only support 0/1, current value:{encoder_val}"
         )
 
+def resolve_subdir(model_dir, primary, alternate):
+    """Try primary subdir name, fallback to alternate if not found."""
+    path = os.path.join(model_dir, primary)
+    if os.path.isdir(path):
+        return primary
+    path = os.path.join(model_dir, alternate)
+    if os.path.isdir(path):
+        return alternate
+    return primary
+
 
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
@@ -283,8 +293,9 @@ if __name__ == "__main__":
             ("decode", "decoder", llm_flash_attention),
             ("prefill", "prefill", llm_flash_attention),
         ):
+            resolved = resolve_subdir(args.model_dir, subdir, suffix)
             Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(args.model_dir, subdir)),
+                hmonnx=find_hmonnx_file(os.path.join(args.model_dir, resolved)),
                 hmm_name=f"{base_name}_{suffix}",
                 output=args.output_dir,
                 ncore=args.ncore,
@@ -294,10 +305,15 @@ if __name__ == "__main__":
 
     if args.stage == "test" or args.stage == "all":
         base_name = f"{args.model_name}-{args.model_size}"
-        for suffix in ("encode", "decode", "prefill"):
+        for suffix, alt_subdir in (
+            ("encode", "encoder"),
+            ("decode", "decoder"),
+            ("prefill", "prefill"),
+        ):
+            resolved = resolve_subdir(args.model_dir, suffix, alt_subdir)
             test(
                 f"{base_name}_{suffix}",
-                os.path.join(args.model_dir, suffix),
+                os.path.join(args.model_dir, resolved),
                 args.output_dir,
                 profile,
             )

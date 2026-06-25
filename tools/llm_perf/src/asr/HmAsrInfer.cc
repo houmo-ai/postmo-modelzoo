@@ -15,9 +15,9 @@
 #include <iomanip>
 #include <iostream>
 
-#include "models/whisper_model.h"
-#include "models/glm_asr_model.h"
-#include "models/qwen3_asr_model.h"
+#include "whisper_model.h"
+#include "glm_asr_model.h"
+#include "qwen3_asr_model.h"
 #include "tcim/tcim_runtime.h"
 
 AsrModelType HmAsrInfer::DetectModelType(const std::string& prefill_path,
