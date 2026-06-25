@@ -2339,7 +2339,7 @@ def main():
         # turns on sentence-segmented synthesis by flipping args.talker_segment,
         # which synthesizes the reply segment-by-segment (codec cache resets per
         # segment) and lets it stream out incrementally.
-        audio = str(DEFAULT_SAMPLE_DIR / "音乐风格-调性.mp3")
+        audio = str(DEFAULT_SAMPLE_DIR / "music.mp3")
         prompt = "描述这首乐曲的风格、节奏、力度和情感表达。指出所使用的乐器，并推测这首乐曲可能的创作背景。用尽量简洁的语言来描述。"
         result = pipeline.run(audio=audio, prompt=prompt, speaker=DEFAULT_SPEAKER)
         _save_and_report(result, args.output_dir, "music_output.wav")

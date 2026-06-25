@@ -43,9 +43,39 @@ import onnx
 from typing import Any, cast
 from tqdm import tqdm
 
+
+script_dir = osp.dirname(osp.abspath(__file__))
+DEFAULT_SAMPLE_DIR = f"{script_dir}/sample_data"
+
+
+def _ensure_xh_model_zoo_on_path():
+    """Called on ImportError to locate hmodel/xh2 when env.sh was not sourced."""
+    import sys as _sys
+    _root = os.environ.get("HOUMO_EXAMPLES_PATH")
+    if not _root:
+        _c = Path(script_dir).resolve()
+        for _p in (_c, *_c.parents):
+            if (_p / "env.sh").is_file() and (_p / "hmodel" / "xh2").is_dir():
+                _root = str(_p)
+                os.environ["HOUMO_EXAMPLES_PATH"] = _root
+                break
+    if not _root:
+        raise RuntimeError(
+            "HOUMO_EXAMPLES_PATH is not set and cannot be inferred "
+            "from script location. Source env.sh before running ptq.py."
+        )
+    _xh2 = osp.join(_root, "hmodel", "xh2")
+    if osp.isdir(_xh2) and _xh2 not in _sys.path:
+        _sys.path.insert(0, _xh2)
+
+
 from base_utils import parse_quant_types
 
-from xh_model_zoo.xh_llm import LLMConverter
+try:
+    from xh_model_zoo.xh_llm import LLMConverter
+except ImportError:
+    _ensure_xh_model_zoo_on_path()
+    from xh_model_zoo.xh_llm import LLMConverter
 
 from xhquant.api import (
     CacheTensor,
@@ -93,7 +123,6 @@ OPTIONAL_TEXT_ASSET_FILES = (
 )
 STATIC_TALKER_SEQ_LEN = 256
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
 
 imodelzoo_models_path = os.getenv("IMODELZOO_MODELS_PATH")
 MODEL_FOLDER = (
@@ -102,6 +131,44 @@ MODEL_FOLDER = (
     else "."
 )
 print(MODEL_FOLDER)
+
+
+def _find_examples_root_from_script(start_dir: str) -> str | None:
+    current = Path(start_dir).resolve()
+    for candidate in (current, *current.parents):
+        if (candidate / "env.sh").is_file() and (candidate / "hmodel" / "gptqmodel").is_dir():
+            return str(candidate)
+    return None
+
+
+def _resolve_gptqmodel_repo_path() -> str:
+    examples_path = os.environ.get("HOUMO_EXAMPLES_PATH")
+    candidates = []
+    if examples_path:
+        candidates.append(Path(examples_path).resolve())
+
+    inferred_examples_path = _find_examples_root_from_script(script_dir)
+    if inferred_examples_path:
+        inferred_path = Path(inferred_examples_path).resolve()
+        if inferred_path not in candidates:
+            candidates.append(inferred_path)
+
+    for candidate in candidates:
+        gptq_path = candidate / "hmodel" / "gptqmodel"
+        if gptq_path.is_dir() and any(gptq_path.iterdir()):
+            if not examples_path:
+                os.environ["HOUMO_EXAMPLES_PATH"] = str(candidate)
+                logger.warning(
+                    "HOUMO_EXAMPLES_PATH is not set; falling back to inferred repo root: {}",
+                    candidate,
+                )
+            return str(gptq_path)
+
+    searched = ", ".join(str(path) for path in candidates) or script_dir
+    raise RuntimeError(
+        "Unable to locate a valid in-repo gptqmodel directory. "
+        f"Searched from: {searched}. Check HOUMO_EXAMPLES_PATH / env.sh."
+    )
 
 
 def resolve_accept_hidden_layer(model_dir: str):
@@ -1338,13 +1405,7 @@ def gptq_quant_text(args):
     import sys
     import importlib
 
-    examples_path = os.environ.get("HOUMO_EXAMPLES_PATH")
-    if not examples_path:
-        raise RuntimeError(
-            "HOUMO_EXAMPLES_PATH is not set; source env.sh before running ptq.")
-    gptq_path = osp.join(examples_path, "hmodel", "gptqmodel")
-    if not osp.isdir(gptq_path):
-        raise RuntimeError(f"in-repo gptqmodel not found at {gptq_path}")
+    gptq_path = _resolve_gptqmodel_repo_path()
     if sys.path[0] != gptq_path:
         sys.path.insert(0, gptq_path)
     # Drop any gptqmodel already imported from the wrong location.
@@ -1671,33 +1732,33 @@ def move_hmonnx(args):
     model_name = args.model_name
     hm_model_name = "hmquant_{}_with_act.onnx".format(args.model_name)
     START_MOVE_MSG = "Start move from {} to {}"
-    # ### visual ###
-    # hmm_model_dir = "{}-vision-{}".format(
-    #     model_name, args.quant_type
-    # )
-    # logger.info(
-    #     msg_output_format(START_MOVE_MSG).format(
-    #         work_dir / hmm_model_dir, dest_dir
-    #     )
-    # )
-    # visual_dst_dir = dest_dir / "hmquant/visual"
-    # visual_dst_dir.mkdir(parents=True, exist_ok=True)
-    # os.system("mv {}/* {}".format(str(work_dir / hmm_model_dir / "hmonnx"), str(visual_dst_dir)))
-    # move_models(dest_dir, "visual", "vision", target_name=hm_model_name)
+    ### visual ###
+    hmm_model_dir = "{}-vision-{}".format(
+        model_name, args.quant_type
+    )
+    logger.info(
+        msg_output_format(START_MOVE_MSG).format(
+            work_dir / hmm_model_dir, dest_dir
+        )
+    )
+    visual_dst_dir = dest_dir / "hmquant/visual"
+    visual_dst_dir.mkdir(parents=True, exist_ok=True)
+    os.system("mv {}/* {}".format(str(work_dir / hmm_model_dir / "hmonnx"), str(visual_dst_dir)))
+    move_models(dest_dir, "visual", "vision", target_name=hm_model_name)
  
-    # ### audio ###
-    # hmm_model_dir = "{}-audio-{}".format(
-    #     model_name, args.quant_type
-    # )
-    # logger.info(
-    #     msg_output_format(START_MOVE_MSG).format(
-    #         work_dir / hmm_model_dir, dest_dir
-    #     )
-    # )
-    # audio_dst_dir = dest_dir / "hmquant/audio"
-    # audio_dst_dir.mkdir(parents=True, exist_ok=True)
-    # os.system("mv {}/* {}".format(str(work_dir / hmm_model_dir / "hmonnx"), str(audio_dst_dir)))
-    # move_models(dest_dir, "audio", "audio", target_name=hm_model_name)
+    ### audio ###
+    hmm_model_dir = "{}-audio-{}".format(
+        model_name, args.quant_type
+    )
+    logger.info(
+        msg_output_format(START_MOVE_MSG).format(
+            work_dir / hmm_model_dir, dest_dir
+        )
+    )
+    audio_dst_dir = dest_dir / "hmquant/audio"
+    audio_dst_dir.mkdir(parents=True, exist_ok=True)
+    os.system("mv {}/* {}".format(str(work_dir / hmm_model_dir / "hmonnx"), str(audio_dst_dir)))
+    move_models(dest_dir, "audio", "audio", target_name=hm_model_name)
 
     ### text llm ###
     hmm_model_dir = "{}-text_llm-{}".format(
@@ -1803,7 +1864,7 @@ def parse_args():
     parser.add_argument("--model-size", type=str, default=None, help="model size")
     parser.add_argument("--work-dir", type=str, default="work_dirs")
     parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
-    parser.add_argument("--sample-path", type=str, default="sample_data", help="sample data path for capture")
+    parser.add_argument("--sample-path", type=str, default=DEFAULT_SAMPLE_DIR, help="sample data path for capture")
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument("--context-length", type=str, default=None, help="max sequence length")
     parser.add_argument("--input-sequence-length", type=int, default=None, help="input sequence length")
