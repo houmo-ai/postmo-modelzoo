@@ -802,3 +802,14 @@ def test_asr_emotion2vec_quant(setup_logging) -> None:
     """test_asr_emotion2vec_quant"""
     model_name = 'emotion2vec'
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.sam2
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(name='test_segmentation_sam2_quant', depends_on=['test_get_models.py::test_segmentation_sam2_get_model'])
+def test_segmentation_sam2_quant(setup_logging) -> None:
+    """test_segmentation_sam2_quant"""
+    model_name = 'sam2'
+    _quant_func(model_name, setup_logging)

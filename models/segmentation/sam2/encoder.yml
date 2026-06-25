@@ -1,0 +1,22 @@
+model:
+  name: sam2.1s_encoder
+  save_dir: output
+  model_path: sam2.1s_encoder.onnx
+  inputs:
+    image:
+      shape: [1, 3, 640, 640]
+      data_format: RGB
+      mean: [123.675, 116.28, 103.53]
+      std: [58.395, 57.12, 57.375]
+      resize_type: 0
+quant:
+  calib_data: null
+  calib_num: 32
+  config:
+    global_wise_cfg:
+      output_quantize:
+        dtype: int8
+        calib_method: minmax
+build:
+  ncore: 1
+  opt_level: 2

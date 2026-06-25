@@ -57,3 +57,4 @@ qwen3_tts
 ct_transformer
 siglip2
 emotion2vec
+sam2

@@ -1,0 +1,33 @@
+model:
+  name: sam2.1s_decoder
+  save_dir: output
+  model_path: sam2.1s_decoder.onnx
+  inputs:
+    image_embed:
+      shape: [1, 256, 40, 40]
+      data_format: null
+    high0:
+      shape: [1, 32, 160, 160]
+      data_format: null
+    high1:
+      shape: [1, 64, 80, 80]
+      data_format: null
+    point_coords:
+      shape: [1, 3, 2]
+      data_format: null
+    point_labels:
+      shape: [1, 3]
+      data_format: null
+quant:
+  calib_data: null
+  calib_num: 100
+  config:
+    global_wise_cfg:
+      weight_quantize:
+        dtype: int8
+      output_quantize:
+        dtype: int8
+        calib_method: minmax
+build:
+  ncore: 1
+  opt_level: 2

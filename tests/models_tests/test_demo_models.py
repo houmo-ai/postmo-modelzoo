@@ -603,3 +603,13 @@ def test_asr_emotion2vec_demo(setup_logging) -> None:
     """test_asr_emotion2vec_demo"""
     model_name = 'emotion2vec'
     _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.sam2
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_segmentation_sam2_demo(setup_logging) -> None:
+    """test_segmentation_sam2_demo"""
+    model_name = 'sam2'
+    _demo_func(model_name, setup_logging)

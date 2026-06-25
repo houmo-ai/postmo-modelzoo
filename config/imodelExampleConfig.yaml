@@ -252,6 +252,16 @@ segmentation_yolov8m_seg:
         args: all
   test:
     - segmentation_yolov8m_seg_test
+segmentation_sam2:
+  include:
+    - models/segmentation/sam2
+  exclude:
+    - models/segmentation/sam2/README.MD
+  example_case:
+    - segmentation_sam2_test:
+        script: ../models/segmentation/sam2/test.sh
+  test:
+    - segmentation_sam2_test
 ocr_lprnet:
   include:
     - models/ocr/lprnet

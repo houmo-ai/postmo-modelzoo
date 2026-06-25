@@ -662,3 +662,14 @@ def test_asr_emotion2vec_get_model(setup_logging) -> None:
     """test_asr_emotion2vec_get_model"""
     model_name = 'emotion2vec'
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.sam2
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_segmentation_sam2_get_model')
+def test_segmentation_sam2_get_model(setup_logging) -> None:
+    """test_segmentation_sam2_get_model"""
+    model_name = 'sam2'
+    _get_model_func(model_name, setup_logging)

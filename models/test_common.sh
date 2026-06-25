@@ -23,7 +23,8 @@ show_help() {
     echo "  --prefill_length        Model prefill length."
     echo "  --image_sizes           Image sizes (width,height), e.g. 448,448 896,896. Can be specified multiple times."
     echo "  --quant_type            Quantization type, e.g. w4a8, w8a8, w8a16."
-    echo "  --demo_mode             Demo mode."
+    echo "  --demo_mode             Demo mode. Model-specific meaning."
+    echo "  --backend               Demo backend. Model-specific meaning."
     echo "  --skip_download         If specified, all dependencies must have been fully downloaded previously without this flag. Already downloaded dependencies won't be re-downloaded regardless of this parameter."
     echo "  --system_prompt         System prompt passed through to demos that support it."
     echo "  -h, --help              Show this help message."
@@ -50,6 +51,7 @@ parse_args() {
     SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
     QUANT_TYPE="${QUANT_TYPE:-}"
     DEMO_MODE="${DEMO_MODE:-}"
+    BACKEND="${BACKEND:-}"
     SYSTEM_PROMPT_ARGS=()
 
     while [[ $# -gt 0 ]]; do
@@ -170,6 +172,14 @@ parse_args() {
                     show_help
                 fi
                 DEMO_MODE="$2"
+                shift 2
+                ;;
+            --backend)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: Missing value for parameter '$1'" >&2
+                    show_help
+                fi
+                BACKEND="$2"
                 shift 2
                 ;;
             *)

@@ -858,3 +858,14 @@ def test_asr_emotion2vec_compile(setup_logging) -> None:
     """test_asr_emotion2vec_compile"""
     model_name = 'emotion2vec'
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.sam2
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.compile
+@pytest.mark.dependency(name='test_segmentation_sam2_compile', depends_on=['test_quant_models.py::test_segmentation_sam2_quant'])
+def test_segmentation_sam2_compile(setup_logging) -> None:
+    """test_segmentation_sam2_compile"""
+    model_name = 'sam2'
+    _compile_func(model_name, setup_logging)
