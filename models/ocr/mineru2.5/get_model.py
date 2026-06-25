@@ -29,6 +29,7 @@ from hmatc.utils.utils import (
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 # fmt: off
@@ -45,7 +46,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--batch", dest="batch", type=int, default=None)
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number")
     parser.add_argument("--prefill_length", dest="prefill_length", type=int, default=None, help="prefill length")
-    parser.add_argument("--model_size", dest="model_size", type=str, default=None, choices=["2604-1.2b"])
+    parser.add_argument("--model_size", dest="model_size", type=str, default=None, choices=["1.2b"])
     args = parser.parse_args()
     return args
 # fmt: on

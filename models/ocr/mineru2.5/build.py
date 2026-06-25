@@ -125,7 +125,6 @@ if __name__ == "__main__":
             prefill_length=args.prefill_length,
             ndevice=ndevice,
             parallel_jobs=parallel_jobs,
-            skip_check=True,
         )
         Xh2Exec.build_from_hmonnx(
             hmonnx=find_hmonnx_file(os.path.join(model_dir, "decode")),
@@ -138,7 +137,6 @@ if __name__ == "__main__":
             context_length=args.context_length,
             ndevice=ndevice,
             parallel_jobs=parallel_jobs,
-            skip_check=True,
         )
         visual_model_name = (
             f"{model_name}-{model_size}_visual_{args.max_size_w}x{args.max_size_h}"
@@ -153,7 +151,6 @@ if __name__ == "__main__":
             flash_attn=flash_attn,
             parallel_jobs=parallel_jobs,
             enable_common_subgraph=args.enable_common_subgraph,
-            skip_check=True,
         )
         visual_buckets = os.path.join(model_dir, "visual_buckets")
         if not os.path.exists(visual_buckets):
@@ -169,7 +166,6 @@ if __name__ == "__main__":
                     ncore=ncore,
                     flash_attn=flash_attn,
                     parallel_jobs=parallel_jobs,
-                    skip_check=True,
                     enable_common_subgraph=args.enable_common_subgraph,
                 )
             except Exception as e:

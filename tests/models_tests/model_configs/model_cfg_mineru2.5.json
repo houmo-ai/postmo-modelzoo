@@ -29,8 +29,8 @@
             "type": ["raw", "hmm"],
             "download_dir": ["cached_models", "cached_models"],
             "extract_dir": [null, "cached_models/hmm_xh2_2604-1.2b_32k"],
-            "model_name": ["mineru2.5-pro", "mineru2.5-pro"],
-            "model_size": ["2604-1.2b", "2604-1.2b"],
+            "model_name": ["mineru2.5-pro-2604", "mineru2.5-pro-2604"],
+            "model_size": ["1.2b", "1.2b"],
             "context_length": [null, "32k"],
             "ndevice": ["1", "1"],
             "prefill_length": [null, null],
@@ -41,8 +41,8 @@
     "quant_params": {
         "xh2": {
             "model": ["cached_models/MinerU2.5-Pro-2604-1.2B"],
-            "model-name": ["mineru2.5-pro"],
-            "model-size": ["2604-1.2b"],
+            "model-name": ["mineru2.5-pro-2604"],
+            "model-size": ["1.2b"],
             "out-dir": ["cached_results/hmquant_xh2_2604-1.2b_4k"],
             "context-length": ["4096"]
         }
@@ -50,8 +50,8 @@
     "compile_params": {
         "xh2": {
             "model_dir": ["cached_results/hmquant_xh2_2604-1.2b_4k/hmquant"],
-            "model_name": ["mineru2.5-pro"],
-            "model_size": ["2604-1.2b"],
+            "model_name": ["mineru2.5-pro-2604"],
+            "model_size": ["1.2b"],
             "ncore": [null],
             "batch": [null],
             "ndevice": ["1"],
@@ -82,8 +82,8 @@
             "visual_buckets_manifest": [
                 "cached_results/hmm_xh2_2604-1.2b_32k/hmquant/mineru_visual_buckets.json"
             ],
-            "model_name": ["mineru2.5-pro"],
-            "model_size": ["2604-1.2b"],
+            "model_name": ["mineru2.5-pro-2604"],
+            "model_size": ["1.2b"],
             "ndevice": ["1"],
             "max_size_w": ["1036"],
             "max_size_h": ["1036"]
