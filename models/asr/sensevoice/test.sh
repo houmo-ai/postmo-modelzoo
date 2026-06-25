@@ -32,6 +32,7 @@ if should_run_step "quant"; then
         python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Start model quantization."
+    unset HF_TOKEN
     python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}"
 fi
 
