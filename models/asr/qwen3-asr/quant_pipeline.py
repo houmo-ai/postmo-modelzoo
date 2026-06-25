@@ -671,12 +671,20 @@ def quant_forcealigner_encode(args):
             output_names=output_names,
         )
 
-        change_onnx_initializer_type(
-            input_model_path=hmonnx_file,
-            output_model_path=hmonnx_file,
-            target_initializer_name="_constant_48_output_0_",
-            new_data_type=TensorProto.FLOAT16,
+        target_inits = find_less_int32_initializers_to_fp16(
+            str(hmonnx_file),
+            node_name_hint="node_less_2",
         )
+        if len(target_inits) == 0:
+            print("no node_less_2/Less INT32 initializer find, skip fix dtype!")
+        else:
+            for init_name in target_inits:
+                change_onnx_initializer_type(
+                    input_model_path=hmonnx_file,
+                    output_model_path=hmonnx_file,
+                    target_initializer_name=init_name,
+                    new_data_type=TensorProto.FLOAT16,
+                )
 
     # Generate golden
     if args.gen_golden:
