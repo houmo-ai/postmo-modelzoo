@@ -49,9 +49,9 @@ def parse_args():
     )
     parser.add_argument("--model", type=str, default=None)
     parser.add_argument(
-        "--model-name", type=str, default=None, help="output hmonnx model name"
+        "--model_name", type=str, default=None, help="output hmonnx model name"
     )
-    parser.add_argument("--model-size", type=str, default=None, help="model size")
+    parser.add_argument("--model_size", type=str, default=None, help="model size")
     parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument(
