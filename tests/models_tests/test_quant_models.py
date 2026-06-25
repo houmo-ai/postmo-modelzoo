@@ -729,3 +729,17 @@ def test_omni_qwen3_omni_quant(setup_logging) -> None:
     """test_omni_qwen3_omni_quant"""
     model_name = "qwen3-omni"
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_vl_embedding
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_embedding_qwen3_vl_embedding_quant",
+    depends_on=["test_get_models.py::test_embedding_qwen3_vl_embedding_get_model"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+def test_embedding_qwen3_vl_embedding_quant(setup_logging) -> None:
+    """test_embedding_qwen3_vl_embedding_quant"""
+    model_name = "qwen3-vl-embedding"
+    _quant_func(model_name, setup_logging)

@@ -1,0 +1,76 @@
+{
+    "obsolete": false,
+    "model_dir": "models/embedding/qwen3-vl-embedding",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_8k"],
+            "source_type": [null, null],
+            "model_name": ["qwen3-vl-embedding", "qwen3-vl-embedding"],
+            "model_size": ["8b", "8b"],
+            "context_length": [null, "8k"],
+            "batch": [null, null],
+            "ndevice": [null, null],
+            "ncore": [null, null],
+            "prefill_length": [null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": ["cached_models/Qwen3-VL-Embedding-8B"],
+            "model-name": ["qwen3-vl-embedding"],
+            "model-size": ["8b"],
+            "out-dir": ["cached_results/hmquant_xh2_2k"],
+            "context-length": ["2048"],
+            "input-sequence-length": ["256"],
+            "quant-type": [null]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_2k"],
+            "model_name": ["qwen3-vl-embedding"],
+            "model_size": ["8b"],
+            "batch": ["1"],
+            "ncore": ["2"],
+            "context_length": ["8192"],
+            "ndevice": ["1"],
+            "stage": ["build"],
+            "output_dir": ["cached_results/hmm_xh2_8k"],
+            "prefill_length": ["256"],
+            "j": ["24"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "model_name": ["qwen3-vl-embedding"],
+            "model_size": ["8b"],
+            "tokenizer_dir": ["cached_models/Qwen3-VL-Embedding-8B"],
+            "embedding_path": [
+                "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
+            ],
+            "vit_path": [
+                "cached_results/hmm_xh2_8k/qwen3-vl-embedding-8b_visual_896x896x2.hmm"
+            ],
+            "prefill_path": [
+                "cached_results/hmm_xh2_8k/qwen3-vl-embedding-8b_prefill.hmm"
+            ],
+            "ndevice": ["1"]
+        }
+    }
+}

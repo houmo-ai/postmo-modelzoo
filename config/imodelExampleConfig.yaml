@@ -597,6 +597,18 @@ llm_qwen3-embedding:
         args: all
   test:
     - llm_qwen3-embedding_test
+llm_qwen3-vl-embedding:
+  include:
+    - models/embedding/qwen3-vl-embedding
+  exclude:
+    - models/embedding/qwen3-vl-embedding/README.MD
+  example_case:
+    - llm_qwen3-vl-embedding_test:
+        test_type: models_tests
+        script: qwen3_vl_embedding
+        args: all
+  test:
+    - llm_qwen3-vl-embedding_test
 tts_cosyvoice3:
   include:
     - models/tts/cosyvoice3

@@ -596,3 +596,14 @@ def test_omni_qwen3_omni_get_model(setup_logging) -> None:
     """test_omni_qwen3_omni_get_model"""
     model_name = "qwen3-omni"
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_vl_embedding
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_embedding_qwen3_vl_embedding_get_model")
+def test_embedding_qwen3_vl_embedding_get_model(setup_logging) -> None:
+    """test_embedding_qwen3_vl_embedding_get_model"""
+    model_name = "qwen3-vl-embedding"
+    _get_model_func(model_name, setup_logging)

@@ -553,3 +553,13 @@ def test_omni_qwen3_omni_demo(setup_logging) -> None:
     """test_omni_qwen3_omni_demo"""
     model_name = "qwen3-omni"
     _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_vl_embedding
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_embedding_qwen3_vl_embedding_demo(setup_logging) -> None:
+    """test_embedding_qwen3_vl_embedding_demo"""
+    model_name = "qwen3-vl-embedding"
+    _demo_func(model_name, setup_logging)
