@@ -82,7 +82,7 @@ def parse_args():
     parser.add_argument(
         "--calibration-dataset",
         type=str,
-        default=None,
+        default="wikitext-2-raw-v1",
         help="customized calibrate dataset, should be a json file",
     )
     parser.add_argument(
