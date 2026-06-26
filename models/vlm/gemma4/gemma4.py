@@ -34,6 +34,7 @@ class Gemma4(Gemma4Base):
 
     sliding_window = 1024
     audio_enabled = False
+    visual_bidirectional_attention = True
 
     def __init__(
         self,
