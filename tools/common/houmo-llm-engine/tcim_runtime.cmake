@@ -2,7 +2,7 @@ if(DEFINED ENV{TCIM_RUNTIME_PATH})
     set(TCIM_RUNTIME_PATH $ENV{TCIM_RUNTIME_PATH})
 else()
     # Default path for TCIM Runtime
-    set(TCIM_RUNTIME_PATH "/opt/venv/houmo/lib/python3.12/site-packages/tcim_lite")
+    set(TCIM_RUNTIME_PATH "$ENV{DADAO_VENV}/lib/python3.12/site-packages/tcim_lite")
 endif()
 
 message(STATUS "TCIM_RUNTIME_PATH: ${TCIM_RUNTIME_PATH}")

@@ -476,7 +476,7 @@ enum class ModelType {
 ### 环境变量
 
 ```bash
-export TCIM_RUNTIME_PATH=/opt/venv/houmo/lib/python3.12/site-packages/tcim_lite
+export TCIM_RUNTIME_PATH=$DADAO_VENV/lib/python3.12/site-packages/tcim_lite
 ```
 
 ### 构建命令

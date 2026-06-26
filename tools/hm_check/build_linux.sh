@@ -31,9 +31,9 @@ Options:
   -h                Show this help
 
 Example:
-  $0 -b build -c Release -j 8 --tcim /opt/venv/houmo/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk
-  $0 -b build -c Release -j 8 --tcim /opt/venv/houmo/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk --install /opt/hmcheck
-  $0 -b build -c Release -j 8 --tcim /opt/venv/houmo/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk --no-install
+  $0 -b build -c Release -j 8 --tcim $DADAO_VENV/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk
+  $0 -b build -c Release -j 8 --tcim $DADAO_VENV/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk --install /opt/hmcheck
+  $0 -b build -c Release -j 8 --tcim $DADAO_VENV/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk --no-install
 
 Notes:
   By default the script will read [TCIM_RUNTIME_PATH](file:///data/weiguo.xing/repo/imodelzoo/hmatc/setup.py#L29-L29) and `HOUMO_SDK_PATH` from environment.
@@ -84,7 +84,7 @@ fi
 
 # If environment vars are not set, try to auto-detect common installation paths
 if [[ -z "${TCIM_RUNTIME_PATH:-}" ]]; then
-  candidates=("/opt/venv/houmo/lib/python3.12/site-packages/tcim_lite")
+  candidates=("$DADAO_VENV/lib/python3.12/site-packages/tcim_lite")
   for p in "${candidates[@]}"; do
     if [[ -d "$p" && ( -d "$p/include" || -d "$p/inc" ) ]]; then
       export TCIM_RUNTIME_PATH="$p"
@@ -95,7 +95,7 @@ if [[ -z "${TCIM_RUNTIME_PATH:-}" ]]; then
 fi
 if [[ -z "${TCIM_RUNTIME_PATH:-}" ]]; then
   echo "Environment variable TCIM_RUNTIME_PATH is not set and auto-detection failed.
-Please set TCIM_RUNTIME_PATH (e.g. export TCIM_RUNTIME_PATH=/opt/venv/houmo/lib/python3.12/site-packages/tcim_lite) or pass --tcim /path." >&2
+Please set TCIM_RUNTIME_PATH (e.g. export TCIM_RUNTIME_PATH=$DADAO_VENV/lib/python3.12/site-packages/tcim_lite) or pass --tcim /path." >&2
   exit 1
 fi
 

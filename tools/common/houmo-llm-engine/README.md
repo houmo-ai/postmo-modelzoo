@@ -90,7 +90,7 @@ ctest --output-on-failure
 export HM_ENGINE_PATH=/path/to/houmo-llm-engine
 
 # Set TCIM Runtime path
-export TCIM_RUNTIME_PATH=/opt/venv/houmo/lib/python3.12/site-packages/tcim_lite
+export TCIM_RUNTIME_PATH=$DADAO_VENV/lib/python3.12/site-packages/tcim_lite
 ```
 
 ### Run Inference
