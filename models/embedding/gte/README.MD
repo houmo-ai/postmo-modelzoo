@@ -78,7 +78,7 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 ```bash
 source env.sh
 cd models/embedding/gte
-python3 ptq.py
+python3 ptq.py --skip-quarot --skip-gptq
 ```
 
 ### 2.4 编译
