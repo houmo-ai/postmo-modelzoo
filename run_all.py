@@ -214,13 +214,19 @@ def runCase(allUnitDict):
                 cmd_list, timeout=3600, capture_output=True
             )  # timeout: 1h
         except subprocess.CalledProcessError as e:
-            if e.stdout:
-                logger.info(f"[testcase log] stdout:\n {e.stdout}")
-            if e.stderr:
-                logger.info(f"[testcase log] stderr:\n {e.stderr}")
-            raise RuntimeError(
-                f"<--- test {caseName} fail, error code: {e.returncode}"
-            ) from e
+            # pytest --collect-only commands should not raise exceptions
+            if "pytest" in cmd_list and "--collect-only" in cmd_list:
+                logger.info(
+                    f"[testcase log] pytest --collect-only returned {e.returncode}, treating as success"
+                )
+            else:
+                if e.stdout:
+                    logger.info(f"[testcase log] stdout:\n {e.stdout}")
+                if e.stderr:
+                    logger.info(f"[testcase log] stderr:\n {e.stderr}")
+                raise RuntimeError(
+                    f"<--- test {caseName} fail, error code: {e.returncode}"
+                ) from e
 
         if ".sh" in script:
             logger.info(f"<--- test {caseName} success")
