@@ -21,7 +21,7 @@ quant:
 build:
   ncore: 1
   opt_level: 2
-  cpp_backend: v1
+  cpp_backend: v2
 
 demo:
   data_dir: ./imagenet/ILSVRC2012_img_val
