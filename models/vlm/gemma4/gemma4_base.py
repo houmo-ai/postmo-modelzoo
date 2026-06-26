@@ -43,6 +43,7 @@ class Gemma4Base:
     # Subclasses override these
     sliding_window = 512
     audio_enabled = False
+    visual_bidirectional_attention = False
     perf_tracker = InferencePerformanceTracker()
 
     def _init_common(self, devices):
@@ -157,11 +158,9 @@ class Gemma4Base:
             else:
                 local_mask[0, 0, q, 0] = 0
 
-        if mm_types is not None and mm_types.numel() > 0:
+        if self.visual_bidirectional_attention and mm_types is not None and mm_types.numel() > 0:
             mm = mm_types[0, :cur_len] if mm_types.dim() == 2 else mm_types[:cur_len]
             is_mm = (mm == 1) | (mm == 2)
-            if self.audio_enabled:
-                is_mm = is_mm | (mm == 3)
             cache_offset = max(0, past_len - clamped_past)
             group_start = None
             for idx in range(cur_len):
