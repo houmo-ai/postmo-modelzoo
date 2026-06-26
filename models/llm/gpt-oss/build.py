@@ -136,7 +136,7 @@ def get_args() -> argparse.Namespace:
         "--cpp_backend",
         dest="cpp_backend",
         type=str,
-        default="v2",
+        default=None,
         help="cpp backend version",
     )
     parser.add_argument(
@@ -159,6 +159,9 @@ def get_args() -> argparse.Namespace:
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
     args.prefill_length = first_not_none(
         args.prefill_length, model_config.get("prefill_length", 256)
+    )
+    args.cpp_backend = first_not_none(
+        args.cpp_backend, model_config.get("cpp_backend", "v2")
     )
     if args.context_length is None:
         args.context_length = parse_context_length(
