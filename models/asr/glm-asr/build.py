@@ -305,6 +305,7 @@ if __name__ == "__main__":
                 enable_xh2_stable_output=args.enable_xh2_stable_output,
                 flash_attn=flash_attention,
                 parallel_jobs=args.j,
+                cpp_backend="v2",
             )
 
     if args.stage == "test" or args.stage == "all":

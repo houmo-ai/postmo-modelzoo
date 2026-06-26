@@ -306,7 +306,7 @@ def process_encoder(args):
     num_mel_bins = model.config.audio_config.num_mel_bins
 
     # Fixed at T=3000 seq_lens
-    model = model.to(torch.float32)
+    model = model.to(torch.float16)
     input_features = torch.randn(1, num_mel_bins, 3000).to(model.device).to(model.dtype)
 
     # Build combined module: audio_tower + reshape + multi_modal_projector
