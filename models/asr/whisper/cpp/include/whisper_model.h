@@ -152,7 +152,7 @@ class WhisperContext : public ASRContext {
 
   // Temp prefill tokens (set before do_prefill)
   std::vector<Token> prefill_tokens_;
-  int prefill_prompt_len_ = 0;
+  int prefill_seq_len_ = 0;
 };
 
 /**

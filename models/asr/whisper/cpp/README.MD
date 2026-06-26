@@ -14,7 +14,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| `sample_whisper_asr.cc` | 主程序入口，Whisper ASR 推理 demo |
+| `demo.cc` | 主程序入口，Whisper ASR 推理 demo |
 | `src/whisper_model.cc` | Whisper 模型实现 |
 | `include/whisper_model.h` | Whisper 模型头文件 |
 | `hm_engine.cmake` | houmo-llm-engine 依赖配置模块（可复用） |
@@ -69,7 +69,7 @@
 用法示例：
 
 ```bash
-./sample_whisper_asr \
+./demo \
     --audio audio.wav \
     --encode ../output/xh2/whisper-medium_encode.hmm \
     --prefill ../output/xh2/whisper-medium_prefill.hmm \
@@ -119,7 +119,7 @@ bash build_linux.sh
 bash build_ndk.sh
 ```
 
-编译产物位于 `build/sample_whisper_asr`。
+编译产物位于 `build/demo`。
 
 **CMakeLists.txt 依赖说明：**
 
@@ -143,7 +143,7 @@ target_link_libraries(your_target PRIVATE hm_engine)
 支持的模型：`whisper-medium`（80 mel bins）、`whisper-large-v3-turbo`（128 mel bins）
 
 ```bash
-./build/sample_whisper_asr \
+./build/demo \
     --audio audio.wav \
     --encode ../output/xh2/whisper-medium_encode.hmm \
     --prefill ../output/xh2/whisper-medium_prefill.hmm \

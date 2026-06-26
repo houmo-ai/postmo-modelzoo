@@ -52,7 +52,7 @@ if should_run_step "demo"; then
 
     echo "Execute cpp demo."
     cd cpp && ./build_linux.sh && cd ..
-    ./bin/sample_glm_asr --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
+    ./bin/demo --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
     if command -v llm_perf &>/dev/null; then
         echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
         cd "${SCRIPT_DIR}"
@@ -60,9 +60,9 @@ if should_run_step "demo"; then
         llm_perf --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
             --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
             --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-            --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin" \
-            --tokenizer "GLM-ASR-Nano-2512" \
-            --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
+            --audio_len 300 \
+            --token_per_second 3 \
+            --no_warm_up
     fi
 fi
 

@@ -14,7 +14,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| `sample_glm_asr.cc` | 主程序入口，GLM-ASR 推理 demo |
+| `demo.cc` | 主程序入口，GLM-ASR 推理 demo |
 | `src/glm_asr_model.cc` | GLM-ASR 模型实现 |
 | `include/glm_asr_model.h` | GLM-ASR 模型头文件 |
 | `hm_engine.cmake` | houmo-llm-engine 依赖配置模块（可复用） |
@@ -68,7 +68,7 @@
 用法示例：
 
 ```bash
-./sample_glm_asr \
+./demo \
     --audio audio.wav \
     --encode ../output/xh2/glm-asr-nano-2512_encode.hmm \
     --prefill ../output/xh2/glm-asr-nano-2512_prefill.hmm \
@@ -118,7 +118,7 @@ bash build_linux.sh
 bash build_ndk.sh
 ```
 
-编译产物位于 `build/sample_glm_asr`。
+编译产物位于 `build/demo`。
 
 **CMakeLists.txt 依赖说明：**
 
@@ -141,7 +141,7 @@ target_link_libraries(your_target PRIVATE hm_engine)
 - `../output/xh2/hmquant/quant_embedding.bin`
 
 ```bash
-./build/sample_glm_asr \
+./build/demo \
     --audio audio.wav \
     --encode ../output/xh2/glm-asr-nano-2512_encode.hmm \
     --prefill ../output/xh2/glm-asr-nano-2512_prefill.hmm \

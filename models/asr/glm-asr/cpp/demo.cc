@@ -1,19 +1,42 @@
 /*
  * Copyright (c) 2026 HOUMO AI
+ *
+ * File: sample_glm_asr.cc
+ * Description:
+ *   GLM-ASR inference demo using Houmo framework.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "core/model_factory.h"
+#include "glm_asr_model.h"
+#include "modules/audio_processor.h"
 #include "modules/streaming_decoder.h"
-#include "qwen3_asr_model.h"
+
+namespace fs = std::filesystem;
 
 static void print_help(const char* prog) {
   std::cout << "Usage: " << prog << " [OPTIONS]\n\n"
-            << "Qwen3-ASR inference demo.\n\n"
+            << "GLM-ASR inference demo.\n\n"
             << "Options:\n"
             << "  --audio <path>       Path to audio file (.wav, .mp3, etc.) "
                "[required]\n"
@@ -21,16 +44,17 @@ static void print_help(const char* prog) {
             << "  --prefill <path>     Path to prefill model (.hmm)\n"
             << "  --decode <path>      Path to decode model (.hmm)\n"
             << "  --tokenizer <path>   Path to tokenizer directory\n"
-            << "  --embedding <path>   Path to embedding file (.bin or .pt)\n"
+            << "  --embedding <path>   Path to embedding file (.bin) using "
+               "tools/llm_perf/convert_embed.py to convert\n"
             << "  -h, --help           Show this help message\n";
 }
 
 int main(int argc, char* argv[]) {
   std::string audio_path;
-  std::string encoder_path = "output/xh2/qwen3-asr-0.6b_encode.hmm";
-  std::string prefill_path = "output/xh2/qwen3-asr-0.6b_prefill.hmm";
-  std::string decode_path = "output/xh2/qwen3-asr-0.6b_decode.hmm";
-  std::string tokenizer_path = "Qwen3-ASR-0.6B";
+  std::string encoder_path = "output/xh2/glm-asr-nano-2512_encode.hmm";
+  std::string prefill_path = "output/xh2/glm-asr-nano-2512_prefill.hmm";
+  std::string decode_path = "output/xh2/glm-asr-nano-2512_decode.hmm";
+  std::string tokenizer_path = "GLM-ASR-Nano-2512";
   std::string embedding_path = "output/xh2/hmquant/quant_embedding.bin";
 
   for (int i = 1; i < argc; i++) {
@@ -52,11 +76,13 @@ int main(int argc, char* argv[]) {
       embedding_path = argv[++i];
   }
 
-  if (audio_path.empty()) {
+  if (audio_path.empty() || !fs::exists(audio_path)) {
     std::cerr << "Error: --audio required\n\n";
     print_help(argv[0]);
     return 1;
   }
+
+  std::cout << "Loading GLM-ASR model...\n";
 
   houmo::ModelConfig config;
   config.devices = {0};
@@ -67,35 +93,28 @@ int main(int argc, char* argv[]) {
   config.embedding_path = embedding_path;
 
   auto model = houmo::ModelFactory<houmo::ASRModel>::Create(
-      houmo::ModelSeries::kQwen3Asr, config);
+      houmo::ModelSeries::kGlmAsr, config);
+  std::cout << "Model loaded!\n";
 
   auto ctx = model->create_context();
-  auto qwen_ctx = dynamic_cast<houmo::Qwen3AsrContext*>(ctx.get());
-  auto qwen_model = dynamic_cast<houmo::Qwen3AsrModel*>(model.get());
-  constexpr int sample_rate = 16000;
-  constexpr int stft_frames_per_second = 100;
-  int encoder_window_seconds =
-      qwen_model->max_feature_per_loop() / stft_frames_per_second;
-  qwen_ctx->set_audio_processor(sample_rate, encoder_window_seconds,
-                                encoder_window_seconds);
+  auto glm_ctx = dynamic_cast<houmo::GlmAsrContext*>(ctx.get());
+  auto glm_model = dynamic_cast<houmo::GlmAsrModel*>(model.get());
+  glm_ctx->set_audio_processor(16000, 30, 30);
 
-  houmo::StreamingDecoder decoder(qwen_model->tokenizer());
+  houmo::StreamingDecoder decoder(glm_model->tokenizer());
   houmo::SamplingParams params;
-  qwen_ctx->Transcribe(audio_path, params,
-                       [&decoder, qwen_ctx](houmo::Token token) {
-                         std::string text = decoder.decode(token);
-                         if (!text.empty()) {
-                           // need to rfind <asr_text> to remove the prefix
-                           if (text != "<asr_text>") std::cout << text;
-                           std::cout.flush();
-                         }
-                         return true;
-                       });
+  glm_ctx->Transcribe(audio_path, params, [&decoder](houmo::Token token) {
+    std::string text = decoder.decode(token);
+    if (!text.empty()) {
+      std::cout << text << std::flush;
+    }
+    return true;
+  });
   std::cout << std::endl;
 
   std::cout << "\n";
   ctx->profiler().print_summary();
-  const auto& info = qwen_ctx->perf_info();
+  const auto& info = glm_ctx->perf_info();
   std::cout << "\n=== ASR RTF Metrics ===\n"
             << "Audio Duration:       " << info.audio_duration << "s\n"
             << "Chunks:               " << info.n_chunks << "\n"

@@ -14,7 +14,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| `sample_qwen3_asr.cc` | 主程序入口，Qwen3-ASR 推理 demo |
+| `demo.cc` | 主程序入口，Qwen3-ASR 推理 demo |
 | `src/qwen3_asr_model.cc` | Qwen3-ASR 模型实现 |
 | `include/qwen3_asr_model.h` | Qwen3-ASR 模型头文件 |
 | `hm_engine.cmake` | houmo-llm-engine 依赖配置模块（可复用） |
@@ -69,7 +69,7 @@
 用法示例：
 
 ```bash
-./sample_qwen3_asr \
+./demo \
     --audio audio.wav \
     --encode ../output/xh2/qwen3-asr-1.7b_encode.hmm \
     --prefill ../output/xh2/qwen3-asr-1.7b_prefill.hmm \
@@ -119,7 +119,7 @@ bash build_linux.sh
 bash build_ndk.sh
 ```
 
-编译产物位于 `build/sample_qwen3_asr`。
+编译产物位于 `build/demo`。
 
 **CMakeLists.txt 依赖说明：**
 
@@ -142,7 +142,7 @@ target_link_libraries(your_target PRIVATE hm_engine)
 - `../output/xh2/hmquant/quant_embedding.bin`
 
 ```bash
-./build/sample_qwen3_asr \
+./build/demo \
     --audio audio.wav \
     --encode ../output/xh2/qwen3-asr-1.7b_encode.hmm \
     --prefill ../output/xh2/qwen3-asr-1.7b_prefill.hmm \

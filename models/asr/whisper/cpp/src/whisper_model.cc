@@ -537,7 +537,7 @@ void WhisperContext::prefill_preprocess_impl(const std::vector<Token>& tokens) {
   int num_decode_layers = model->num_decode_layers();
   int base_idx = model->base_idx();
   int prompt_len = static_cast<int>(tokens.size());
-  prefill_prompt_len_ = prompt_len;
+  prefill_seq_len_ = prompt_len;
   prefill_tokens_ = tokens;
 
   for (int i = 0; i < base_idx; ++i) {
@@ -602,7 +602,7 @@ Token WhisperContext::prefill_postprocess_impl() {
   auto tokenizer = model->tokenizer();
   int num_decode_layers = model->num_decode_layers();
   int base_idx = model->base_idx();
-  int prompt_len = prefill_prompt_len_;
+  int prompt_len = prefill_seq_len_;
 
   for (int i = 0; i < 2 * num_decode_layers; ++i) {
     auto out_name = prefill_module->GetOutputName(i + 1);
@@ -770,7 +770,7 @@ void WhisperContext::Transcribe(const std::string& audio_path,
 
     Token first_token = do_prefill(prompt);
     // Bugfix: count prefill input tokens cumulatively across chunks
-    p.set_input_tokens(p.input_tokens() + static_cast<int>(prompt.size()));
+    p.set_input_tokens(p.input_tokens() + prefill_seq_len_);
     // Bugfix: only record TTFT on first chunk
     if (chunk_idx == 0) {
       p.record_ttft();

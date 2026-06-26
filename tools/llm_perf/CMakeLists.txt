@@ -43,32 +43,16 @@ include(${CMAKE_SOURCE_DIR}/tcim_runtime.cmake)
 # houmo-llm-engine paths
 set(HOUMO_ENGINE_DIR ${CMAKE_SOURCE_DIR}/../common/houmo-llm-engine)
 
-# ASR model directories (sources moved out of houmo-llm-engine)
-set(ASR_MODEL_GLM_DIR    ${CMAKE_SOURCE_DIR}/../../models/asr/glm-asr/cpp)
-set(ASR_MODEL_WHISPER_DIR ${CMAKE_SOURCE_DIR}/../../models/asr/whisper/cpp)
-set(ASR_MODEL_QWEN3_DIR  ${CMAKE_SOURCE_DIR}/../../models/asr/qwen3-asr/cpp)
-
 if(ANDROID_ABI)
   set(_LIB_SUFFIX "Android_xh2")
   set(ENGINE_BUILD_DIR ${HOUMO_ENGINE_DIR}/build_ndk/release)
   set(TOKENIZERS_DIR $ENV{HOUMO_EXAMPLES_PATH}/apis/common/tokenizer.cpp)
-  set(AUDIO_3RDPARTY_DIR ${HOUMO_ENGINE_DIR}/3rdparty/audio/build_android)
-  set(AUDIO_INC_DIRS
-    ${AUDIO_3RDPARTY_DIR}/kaldi-native-fbank/include
-  )
-  set(AUDIO_LIB_DIRS
-    ${AUDIO_3RDPARTY_DIR}/kaldi-native-fbank/lib
-    ${AUDIO_3RDPARTY_DIR}/libsamplerate/src
-  )
   set(OPENCV_DIR ${HOUMO_ENGINE_DIR}/3rdparty/opencv/${_LIB_SUFFIX})
 else()
   execute_process(COMMAND uname -m OUTPUT_VARIABLE _ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
   set(_LIB_SUFFIX "Linux_${_ARCH}_$ENV{HOUMO_TARGET}")
   set(ENGINE_BUILD_DIR ${HOUMO_ENGINE_DIR}/build)
   set(TOKENIZERS_DIR $ENV{HOUMO_EXAMPLES_PATH}/apis/common/tokenizer.cpp)
-  set(AUDIO_3RDPARTY_DIR ${HOUMO_ENGINE_DIR}/3rdparty/audio/3rdparty_build)
-  set(AUDIO_INC_DIRS ${AUDIO_3RDPARTY_DIR}/include)
-  set(AUDIO_LIB_DIRS ${AUDIO_3RDPARTY_DIR}/lib)
   set(OPENCV_DIR "")
 endif()
 
@@ -83,20 +67,11 @@ include_directories(
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/audio/include
   ${CMAKE_SOURCE_DIR}/include
 )
-if(ENABLE_ASR)
-  include_directories(${AUDIO_INC_DIRS})
-  include_directories(${ASR_MODEL_GLM_DIR}/include)
-  include_directories(${ASR_MODEL_WHISPER_DIR}/include)
-  include_directories(${ASR_MODEL_QWEN3_DIR}/include)
-endif()
 link_directories(
   $ENV{HOUMO_SDK_PATH}/hal/lib
   ${ENGINE_BUILD_DIR}
   ${TOKENIZERS_DIR}/lib
 )
-if(ENABLE_ASR)
-  link_directories(${AUDIO_LIB_DIRS})
-endif()
 set(EIGEN_PATH ${HOUMO_ENGINE_DIR}/3rdparty)
 
 set(SOURCE_FILES
@@ -111,12 +86,7 @@ set(SOURCE_FILES
   llm_perf.cc
 )
 if(ENABLE_ASR)
-  list(APPEND SOURCE_FILES src/asr/HmAsrInfer.cc)
-  list(APPEND SOURCE_FILES
-    ${ASR_MODEL_WHISPER_DIR}/src/whisper_model.cc
-    ${ASR_MODEL_GLM_DIR}/src/glm_asr_model.cc
-    ${ASR_MODEL_QWEN3_DIR}/src/qwen3_asr_model.cc
-  )
+  list(APPEND SOURCE_FILES src/asr/PerfAsr.cc)
 endif()
 
 set(INCLUDE_DIRS
@@ -138,14 +108,13 @@ endif()
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
 
-add_custom_target(houmo_engine_rebuild ALL
+add_custom_target(houmo_engine_rebuild
   COMMAND cmake --build ${ENGINE_BUILD_DIR} -j$$(nproc)
   WORKING_DIRECTORY ${HOUMO_ENGINE_DIR}
   COMMENT "Rebuilding houmo-llm-engine libhoumo_infer.so"
 )
 add_library(houmo_infer SHARED IMPORTED)
 set_target_properties(houmo_infer PROPERTIES IMPORTED_LOCATION ${ENGINE_BUILD_DIR}/libhoumo_infer.so)
-add_dependencies(houmo_infer houmo_engine_rebuild)
 if(MSVC)
   add_definitions(-DYAML_CPP_STATIC_DEFINE)
   if(ENABLE_ASR)
@@ -154,30 +123,22 @@ if(MSVC)
   target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} yaml-cpp  ${CMAKE_DL_LIBS} ws2_32 Userenv ntdll Bcrypt kernel32)
 else()
   if(ANDROID_ABI)
-    set(ASR_LIBRARIES kaldi-native-fbank-core samplerate)
     if(ENABLE_ASR)
       add_definitions(-DENABLE_ASR)
-    else()
-      set(ASR_LIBRARIES "")
     endif()
     target_link_libraries(${PROJECT_NAME} PRIVATE
       ${TCIM_LIBRARY} hal_xh2a dl yaml-cpp
       houmo_infer
-      ${ASR_LIBRARIES}
       ${OPENCV_DIR}/lib/libopencv_core.so
       ${OPENCV_DIR}/lib/libopencv_imgproc.so
       ${OPENCV_DIR}/lib/libopencv_imgcodecs.so)
   else()
-    set(ASR_LIBRARIES kaldi-native-fbank-core samplerate)
     if(ENABLE_ASR)
       add_definitions(-DENABLE_ASR)
-    else()
-      set(ASR_LIBRARIES "")
     endif()
     target_link_libraries(${PROJECT_NAME} PRIVATE
       ${TCIM_LIBRARY} pthread hal_xh2a ${CMAKE_DL_LIBS} yaml-cpp
       houmo_infer
-      ${ASR_LIBRARIES}
       opencv_core opencv_imgproc opencv_imgcodecs)
     target_compile_definitions(${PROJECT_NAME} PRIVATE)
   endif()
@@ -188,8 +149,3 @@ install(FILES ${CMAKE_SOURCE_DIR}/convert_embed.py
         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
                     GROUP_READ GROUP_EXECUTE
                     WORLD_READ WORLD_EXECUTE)
-if(ENABLE_ASR)
-  if(ANDROID_ABI)
-    message("you should manually copy the following ASR libraries to Aandroid device!")
-  endif()
-endif()

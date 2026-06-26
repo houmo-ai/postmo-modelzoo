@@ -20,6 +20,13 @@
   - [3.免责声明](#3免责声明)
 
 ## 变更日志
+- [20260626]
+  - ASR性能测试改为模拟数据模式（PerfAsr），不再依赖真实音频、Tokenizer、Embedding
+  - 新增--audio_len/--token_per_second参数，用于模拟指定音频时长的ASR性能测试
+  - 移除--audio/--tokenizer/--embedding等ASR真实推理参数
+  - 移除Whisper ASR性能测试支持
+  - 新增Decode进度条显示
+  - 自动推断GLM-ASR/Qwen3-ASR模型差异（encoder输入dtype、input_lengths等），零model_type分支
 - [20260615]
   - 新增ASR(Automatic Speech Recognition)语音识别功能支持
   - 新增--encode/--prefill/--decode/--tokenizer/--audio等ASR相关参数
@@ -42,7 +49,7 @@
 | HmllmInfer.cc           | 主文件，实现llm模型单batch具体推理流程              |
 | HmvllmInfer.cc          | 主文件，实现vlm模型单batch具体推理流程             |
 | HmllmInferMultiBatch.cc | 主文件，实现llm多batch具体推理流程，仅支持xh2       |
-| HmAsrInfer.cc           | 主文件，实现ASR语音识别推理流程                     |
+| HmAsrInfer.cc           | 主文件，实现ASR模拟性能测试（PerfAsr）流程          |
 | convert_embed.py        | 将embedding的pt模型转换为bin文件方便工具读取权重    |
 | device_monitor          | 监控设备温度、功率、IPU频率的类实现                 |
 | perf_tracker            | 性能采集类功能实现                                  |
@@ -113,10 +120,9 @@
   | E2E Latency (End-to-End Latency)        | 端到端总时间，单位（s）                                             |
   | E2E TPS (End-to-End Tokens Per Second)  | 端到端每秒输出的token数，单位（tokens/s）                           |
 
-- 表五：ASR语音识别指标（需要ENABLE_ASR编译选项开启）
+- 表五：ASR模拟性能测试指标（需要ENABLE_ASR编译选项开启）
   | ASR Stage 指标                          | 说明                                                                |
   | --------------------------------------- | ------------------------------------------------------------------- |
-  | audio_load                              | 音频加载耗时，单位（ms）                                            |
   | encode preprocess                       | encode预处理耗时，单位（ms）                                        |
   | encode inference                        | encode推理耗时，单位（ms）                                          |
   | encode postprocess                      | encode后处理耗时，单位（ms）                                        |
@@ -129,11 +135,13 @@
   | transcribe total                        | ASR转录总耗时，单位（ms）                                           |
   | E2E                                     | 端到端总耗时，单位（ms）                                            |
   | TTFT                                    | 首个token耗时，单位（ms）                                           |
-  | Prefill TPS                             | Prefill阶段吞吐量，单位（tokens/s），括号内为token数量               |
-  | Decode TPS                              | Decode阶段吞吐量，单位（tokens/s），括号内为token数量                |
+  | Prefill TPS                             | Prefill阶段吞吐量，单位（tokens/s）                                 |
+  | Decode TPS                              | Decode阶段吞吐量，单位（tokens/s）                                  |
   | Overall TPS                             | 整体吞吐量，单位（tokens/s）                                        |
   | Avg Decode Latency                      | 平均Decode延迟，单位（ms/token）                                    |
-  | Audio Duration                          | 音频时长，单位（s）                                                 |
+  | Simulated Audio                         | 模拟音频时长，单位（s）                                             |
+  | Chunks                                  | 分块数量（=ceil(audio_len/encoder_window)）                         |
+  | Output Tokens                           | 输出token总数（=Σ每chunk的decode轮数）                              |
   | Overall RTF                             | 整体实时因子（Real-Time Factor），小于1表示快于实时                  |
   | Inference RTF                           | 推理实时因子                                                        |
   | Encode Per Chunk                        | 每个chunk的encode阶段平均耗时，单位（s）                            |
@@ -163,13 +171,19 @@
 - --dump_file       : 默认关闭dump性能数据到yaml文件，配置后会将性能数据保存到yaml文件中。
 - --help, -h        : 打印帮助信息
 
-2. ASR语音识别相关参数（需要ENABLE_ASR编译选项开启）
-- --encode           : 指定ASR编码器模型路径，支持相对/绝对路径。设置此参数将触发ASR推理流程。
+2. ASR模拟性能测试相关参数（需要ENABLE_ASR编译选项开启）
+- --encode           : 指定ASR编码器模型路径，支持相对/绝对路径。设置此参数将触发ASR性能测试流程。
 - --prefill          : ASR模式下指定prefill模型路径。
 - --decode           : ASR模式下指定decode模型路径。
-- --tokenizer        : 指定tokenizer模型路径。
-- --audio            : 指定音频文件路径，支持单个或逗号分隔的多个文件路径。
-- --embedding        ：指定embedding模型路径，需要转换成bin文件，支持相对/绝对路径。 (GLM/Qwen3 ASR需要).
+- --audio_len        : 模拟音频时长，单位秒，默认30。程序根据此值计算分块数和每块decode轮数。
+- --token_per_second : 模拟每秒decode token数，默认20。每个chunk的decode轮数=该chunk音频时长×token_per_second。
+- --devices          : 指定模型使用的device_id，不指定时优先从HOUMO_VISIBLE_DEVICES环境变量读取，如果环境变量未设置默认为0。
+- --loop             : 指定循环执行次数，不指定默认为1。
+- --no_warm_up       : 默认执行warm_up，配置后会跳过warm_up流程。
+- --interval         : 配置DeviceMonitor监控线程的采样间隔时间，单位毫秒(ms)，默认为500ms。
+- --model_name       : 可选，指定模型名称，用于日志展示。
+
+说明：ASR性能测试使用模拟数据（随机mel特征+随机embedding），无需真实音频文件、Tokenizer和Embedding。自动支持GLM-ASR和Qwen3-ASR模型，根据模型元数据动态推断差异（encoder输入dtype、是否有input_lengths等），无需手动指定模型类型。
 
 3. 命令行llm_perf以配置文件启动
 - --config, -c      : 使用配置文件启动perf程序，需要提前准备好配置文件，配置文件模板参考1.4节。
@@ -201,14 +215,14 @@ HOUMO_VISIBLE_DEVICES=1 ./llm_perf --prefill prefill_model.hmm --decode decode_m
 ./llm_perf --model_name qwen3_8b --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 256,512 --output 100,200 --loop 2 --dump_file model.yaml
 ```
 
-ASR语音识别使用示例（需要ENABLE_ASR编译选项开启）：
+ASR模拟性能测试使用示例（需要ENABLE_ASR编译选项开启）：
 ``` shell
-# Whisper模型ASR推理
-./llm_perf --encode whisper_encode.hmm --prefill whisper_prefill.hmm --decode whisper_decode.hmm --tokenizer tokenizer.json --audio audio1.wav,audio2.wav --devices 0
-# GlmAsr模型ASR推理
-./llm_perf --encode glm_encode.hmm --prefill glm_prefill.hmm --decode glm_decode.hmm --tokenizer tokenizer.json --audio audio.wav --embedding quant_embedding.bin --devices 0
-# Qwen3Asr模型ASR推理
-./llm_perf --encode qwen3-asr_encode.hmm --prefill qwen3-asr_prefill.hmm --decode qwen3-asr_decode.hmm --tokenizer tokenizer.json --embedding quant_embedding.bin --audio audio.wav --devices 0
+# GLM-ASR模型性能测试（模拟30s音频）
+./llm_perf --encode glm_encode.hmm --prefill glm_prefill.hmm --decode glm_decode.hmm --audio_len 30 --token_per_second 20 --devices 0
+# Qwen3-ASR模型性能测试（模拟300s长音频）
+./llm_perf --encode qwen3-asr_encode.hmm --prefill qwen3-asr_prefill.hmm --decode qwen3-asr_decode.hmm --audio_len 300 --token_per_second 4 --devices 0 --loop 3
+# 指定短音频测试（5s）
+./llm_perf --encode glm_encode.hmm --prefill glm_prefill.hmm --decode glm_decode.hmm --audio_len 5 --token_per_second 10 --devices 0 --no_warm_up
 ```
 
 #### 1.4.3 配置文件启动
@@ -285,15 +299,23 @@ Streams:
     output: 100
     devices: 0,1
     loop: 1
-  # ASR configuration example (requires ENABLE_ASR compilation option)
-  - ModelName: whisper_asr
-    encode: whisper/whisper_encode.hmm
-    prefill: whisper/whisper_prefill.hmm
-    decode: whisper/whisper_decode.hmm
-    tokenizer: whisper/tokenizer.json
-    audio: audio1.wav,audio2.wav
-    devices: 0
-    interval: 500
+  # ASR模拟性能测试配置示例（requires ENABLE_ASR compilation option）
+  - ModelName: glm_asr_perf
+    encode: glm-asr/glm-asr_encode.hmm
+    prefill: glm-asr/glm-asr_prefill.hmm
+    decode: glm-asr/glm-asr_decode.hmm
+    audio_len: 30
+    token_per_second: 20
+    devices: "0"
+    loop: 3
+  - ModelName: qwen3_asr_perf
+    encode: qwen3-asr/qwen3-asr_encode.hmm
+    prefill: qwen3-asr/qwen3-asr_prefill.hmm
+    decode: qwen3-asr/qwen3-asr_decode.hmm
+    audio_len: 300
+    token_per_second: 4
+    devices: "0"
+    loop: 1
 
 # Global output file for all performance results
 # Note: This has higher priority than individual dump_file settings in Streams

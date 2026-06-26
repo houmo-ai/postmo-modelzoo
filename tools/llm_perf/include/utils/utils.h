@@ -104,15 +104,16 @@ static void HelpUsage(char* argv[]) {
          "  --skip_perf                 skip prefill and decode performance "
          "test\n"
          "  --dump_file       FILE      Dump perf result to file (optional).\n"
-         "\nASR Options (detected automatically when --encode is present):\n"
+         "\nASR Options (simulated perf, detected when --encode is present):\n"
          "  --encode          FILE      Encoder model file (required).\n"
          "  --prefill         FILE      Prefill model file (required).\n"
          "  --decode          FILE      Decode model file (required).\n"
-         "  --tokenizer       FILE      Tokenizer dif path (required).\n"
-         "  --embedding       FILE      Embedding weight file (GLM/Qwen3 ASR, "
-         "optional).\n"
-         "  --audio           FILE[,FILE...]  Audio files to transcribe.\n"
+         "  --audio_len       NUM       Simulated audio length in seconds (default: 30).\n"
+         "  --token_per_second NUM      Simulated decode tokens per second (default: 20).\n"
          "  --devices         NUM[,NUM...]      Device ids.\n"
+         "  --loop            NUM       Loop test rounds (range: 1-1000000).\n"
+         "  --no_warm_up                Disable warm-up.\n"
+         "  --interval        NUM       Sampling interval in ms for monitoring.\n"
          "  -h, --help                  Show this help message.\n\n"
          "Examples:\n"
          "  "
@@ -121,8 +122,8 @@ static void HelpUsage(char* argv[]) {
          "--input 256 --output 100\n"
          "  "
       << argv[0]
-      << " --encode encode.hmm --prefill prefill.hmm --decode decode.hmm "
-         "--audio test.wav --loop 3\n"
+       << " --encode encode.hmm --prefill prefill.hmm --decode decode.hmm "
+         "--audio_len 30 --token_per_second 20 --loop 3\n"
          "  "
       << argv[0] << " -c perf_config.yaml\n";
 }
@@ -396,6 +397,21 @@ typedef struct perf_settings {
   int perf_case_index = 1;
   int perf_case_total = 1;
 } PerfSettings;
+
+typedef struct asr_perf_settings {
+  std::string model_name;
+  std::string encode_path;
+  std::string prefill_path;
+  std::string decode_path;
+  std::vector<int> devices;
+  float audio_len_seconds = 30.0f;
+  int token_per_second = 20;
+  int loop_count = 1;
+  bool warm_up = true;
+  uint32_t interval_ms = 500;
+  int perf_case_index = 1;
+  int perf_case_total = 1;
+} AsrPerfSettings;
 
 // host memory struct
 struct HostMemoryInfo {

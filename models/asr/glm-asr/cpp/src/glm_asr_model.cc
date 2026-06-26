@@ -524,11 +524,11 @@ void GlmAsrContext::Transcribe(const std::string& audio_path,
     do_encode(std::vector<float>(features.data.begin(), features.data.end()),
               features.feature_dim, actual_frames);
 
-    auto prompt = BuildPrompt(0);
     reset();
+    auto prompt = BuildPrompt(0);
 
     Token first_token = do_prefill(prompt);
-    p.set_input_tokens(p.input_tokens() + static_cast<int>(prompt.size()));
+    p.set_input_tokens(p.input_tokens() + prefill_seq_len_);
     if (chunk_idx == 0) {
       p.record_ttft();
     }

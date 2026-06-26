@@ -67,23 +67,12 @@ if should_run_step "demo"; then
 
     echo "Execute cpp demo (${MODEL_NAME}-${MODEL_SIZE})."
     cd cpp && ./build_linux.sh && cd ..
-    ./bin/sample_whisper_asr \
+    ./bin/demo \
     --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
     --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
     --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
     --tokenizer "${MODEL_NAME}-${MODEL_SIZE}" \
     --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
-
-    if command -v llm_perf &>/dev/null; then
-        echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
-        cd "${SCRIPT_DIR}"
-        devices_param=$(get_devices_param "${NDEVICE}")
-        llm_perf --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
-            --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
-            --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-            --tokenizer "${MODEL_NAME}-${MODEL_SIZE}" \
-            --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
-    fi
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

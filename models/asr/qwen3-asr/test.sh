@@ -99,7 +99,7 @@ if should_run_step "demo"; then
         elif [ "$MODEL_SIZE" = "1.7b" ]; then
             tokenizer_path="Qwen3-ASR-1.7B"
         fi
-        ./bin/sample_qwen3_asr \
+        ./bin/demo \
         --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
         --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
         --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
@@ -113,9 +113,9 @@ if should_run_step "demo"; then
             llm_perf --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
                 --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
                 --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-                --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin" \
-                --tokenizer "${tokenizer_path}" \
-                --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
+                --audio_len 300 \
+                --token_per_second 3 \
+                --no_warm_up
         fi
     else
         python3 demo_forcealigner.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
