@@ -49,6 +49,54 @@ def msg_output_format(title):
     return title
 
 
+def _patch_wikitext2_if_local(calib_data: str | None, datasets_dir: str | None, model_name: str):
+    """Monkey-patch datasets.load_dataset to use a local wikitext-2-raw-v1 copy.
+
+    Search priority: calib_data > datasets_dir/wikitext-2-raw-v1 > ./wikitext-2-raw-v1.
+    Falls back silently to the original HuggingFace Hub download if not found.
+    """
+    import datasets as _ds
+    from datasets import load_from_disk
+
+    candidates = []
+    if calib_data:
+        candidates.append(Path(calib_data))
+    if datasets_dir:
+        candidates.append(Path(datasets_dir) / "wikitext-2-raw-v1")
+    candidates.append(Path("wikitext-2-raw-v1"))
+
+    local_wikitext_path = None
+    for cand in candidates:
+        cand = cand.resolve()
+        # May point directly to wikitext-2-raw-v1/ or to its parent
+        if (cand / "dataset_dict.json").is_file():
+            local_wikitext_path = cand
+            break
+        if (cand / "wikitext-2-raw-v1" / "dataset_dict.json").is_file():
+            local_wikitext_path = cand / "wikitext-2-raw-v1"
+            break
+
+    if local_wikitext_path is None:
+        return  # No local data found, fall through to original HuggingFace Hub download
+
+    logger.info(f"Found local wikitext-2-raw-v1 at {local_wikitext_path}, monkey-patching datasets.load_dataset")
+
+    _original_load = _ds.load_dataset
+
+    def _hijacked_load_dataset(path, name=None, **kwargs):
+        if path == "wikitext" and name == "wikitext-2-raw-v1":
+            full = load_from_disk(str(local_wikitext_path))
+            split = kwargs.get("split", None)
+            if split == "train":
+                return full["train"]
+            elif split == "test":
+                return full["test"]
+            return full
+        return _original_load(path, name, **kwargs)
+
+    _ds.load_dataset = _hijacked_load_dataset
+
+
 def quant_llm(args):
     out_dir = Path(args.work_dir)
     hf_model_dir = args.model
@@ -125,6 +173,9 @@ def quant_llm(args):
         logger.info(f"GPU memory cost for export {consumption}{unit}")
 
     if not args.skip_gptq:
+        # 尝试使用本地 wikitext-2-raw-v1 数据集（若存在），避免从 HuggingFace Hub 下载
+        _patch_wikitext2_if_local(args.calib_data, args.datasets_dir, hf_model_dir)
+
         from xh_model_zoo.xh_llm.quarot.quantizer_utils import gptq
 
         gptq_config = dict(

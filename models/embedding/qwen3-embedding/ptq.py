@@ -83,6 +83,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--num_logits_to_keep", type=int, default=1, help="not for test ppl"
     )
+    parser.add_argument("--calib_data", type=str, default="wikitext-2-raw-v1",
+                        help="local calibration dataset path (wikitext-2-raw-v1 directory or parent)")
     parser.add_argument("--datasets-dir", type=str, default="../../../data/datasets")
     args = parser.parse_args()
 
