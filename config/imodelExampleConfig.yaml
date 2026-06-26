@@ -860,7 +860,7 @@ all:
     - segmentation_yolov8m_seg_test
     # - llm_qwen3_test
     # - vlm_qwen3-vl_test
-    - llm_gpt-oss_test
+    # - llm_gpt-oss_test
     # - llm_qwen3.5_test
     # - llm_qwen3_30b_a3b_test
     # - vlm_gemma4_test
