@@ -53,6 +53,14 @@ class Gemma4Base:
         self.image_token_id = 258880
         self.pad_token_id = 0
 
+    def _get_weight_manager(self, devices, backend_name):
+        key = (tuple(devices), backend_name)
+        if getattr(self, "_weight_manager_key", None) != key:
+            self._dev_manager = tcim.runtime.DevManager(devices, backend_name)
+            self._weight_manager = tcim.runtime.WeightManager(self._dev_manager)
+            self._weight_manager_key = key
+        return self._weight_manager
+
     @staticmethod
     def _log_model_io(model, model_name):
         """Log input/output info for a model, marking KV-cache inputs."""
@@ -71,31 +79,25 @@ class Gemma4Base:
             logger.info(f"  out[{i}]: {name} shape={info.shape} dtype={np.dtype(info.dtype).name}")
 
     def _load_vision(self, vit_path, devices, backend_name):
-        if vit_path and os.path.isfile(vit_path):
-            dmv = tcim.runtime.DevManager(devices, backend_name)
-            wmv = tcim.runtime.WeightManager(dmv)
-            self.perf_tracker.perf_start(PERFTYPE.VISION_LOAD_TIME)
-            self.vit = tcim.runtime.load(vit_path, option=tcim.runtime.Option(wmv))
-            self.perf_tracker.perf_end(PERFTYPE.VISION_LOAD_TIME)
-            self._log_model_io(self.vit, "vit")
-            vit_in_shape = self.vit.get_input_info(self.vit.get_input_name(0)).shape
-            vit_out_shape = self.vit.get_output_info(self.vit.get_output_name(0)).shape
-            self.vit_num_patches = vit_in_shape[1]
-            self.vit_num_tokens = vit_out_shape[1] if len(vit_out_shape) == 3 else vit_out_shape[0]
-            self.vit_patch_dim = vit_in_shape[2]
-            logger.info(f"Vision: patches={self.vit_num_patches}, tokens={self.vit_num_tokens}")
-        else:
-            self.vit = None
-            logger.warning("Vision model not loaded, text-only mode")
+        wm = self._get_weight_manager(devices, backend_name)
+        self.perf_tracker.perf_start(PERFTYPE.VISION_LOAD_TIME)
+        self.vit = tcim.runtime.load(vit_path, option=tcim.runtime.Option(wm))
+        self.perf_tracker.perf_end(PERFTYPE.VISION_LOAD_TIME)
+        self._log_model_io(self.vit, "ViT")
+        vit_in_shape = self.vit.get_input_info(self.vit.get_input_name(0)).shape
+        vit_out_shape = self.vit.get_output_info(self.vit.get_output_name(0)).shape
+        self.vit_num_patches = vit_in_shape[1]
+        self.vit_num_tokens = vit_out_shape[1] if len(vit_out_shape) == 3 else vit_out_shape[0]
+        self.vit_patch_dim = vit_in_shape[2]
+        logger.info(f"Vision: patches={self.vit_num_patches}, tokens={self.vit_num_tokens}")
 
     def _load_llm(self, prefill_path, decode_path, devices, backend_name):
-        dm = tcim.runtime.DevManager(devices, backend_name)
-        wm = tcim.runtime.WeightManager(dm)
+        wm = self._get_weight_manager(devices, backend_name)
         logger.info(f"Loading prefill model from {prefill_path}")
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)
         self.prefill = tcim.runtime.load(prefill_path, option=tcim.runtime.Option(wm))
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_LOAD_TIME)
-        self._log_model_io(self.prefill, "prefill")
+        self._log_model_io(self.prefill, "Prefill")
         # Subclass reads specific input indices for prefill_len, embed_dim, etc.
         self._read_prefill_info()
 
@@ -107,7 +109,7 @@ class Gemma4Base:
         self.perf_tracker.perf_start(PERFTYPE.DECODE_LOAD_TIME)
         self.decode = tcim.runtime.load(decode_path, option=opt)
         self.perf_tracker.perf_end(PERFTYPE.DECODE_LOAD_TIME)
-        self._log_model_io(self.decode, "decode")
+        self._log_model_io(self.decode, "Decode")
         self._read_decode_info()
         logger.info(f"Decode loaded: len={self.decode_len}")
 
@@ -115,13 +117,52 @@ class Gemma4Base:
         logger.info(f"Prefill loaded: len={self.prefill_len}, embed_dim={self.embed_dim}, context_max_length={self.context_max_length}")
 
         for name in cache_names:
+            info = self.prefill.get_input_info(name)
+            self.prefill.set_input(name, np.zeros(info.shape, dtype=np.dtype(info.dtype)))
             self.decode.set_input(name, self.prefill.get_dev_input(name))
+
+        # Only for MTP
+        self.accepted_count_name = None
+        for idx in range(self.decode.get_num_inputs()):
+            name = self.decode.get_input_name(idx)
+            if name == "accepted_count" or name.startswith("accepted_count."):
+                self.accepted_count_name = name
+                logger.info(f"Decode accepted_count input enabled: {name}")
+                break
+
+    def _load_assistant(self, assistant_path, devices, backend_name):
+        wm = self._get_weight_manager(devices, backend_name)
+        last_cache_names = self._get_last_cache_names()
+        # Bind
+        assistant_dummy_tensors = [
+            "shared_key_cache_sliding", 
+            "shared_value_cache_sliding",
+            "shared_key_cache_full", 
+            "shared_value_cache_full", 
+        ]
+        assistant_opt = tcim.runtime.Option(wm)
+        assistant_opt.set_dummy_tensors(assistant_dummy_tensors)
+        logger.info(f"Loading MTP draft model from {assistant_path}")
+        self.assistant = tcim.runtime.load(assistant_path, option=assistant_opt)
+        self._log_model_io(self.assistant, "Assistant")
+        for idx, name in enumerate(assistant_dummy_tensors):
+            logger.info(f"Bind {last_cache_names[idx]} ==> {name}")
+            self.assistant.set_input(name, self.prefill.get_dev_input(last_cache_names[idx]))
+        self.num_draft_tokens = self.decode_len - 1
+        self.sliding_cache_valid_length = 0
 
     def _load_tokenizer(self, tokenizer_dir):
         tokenizer = GemmaTokenizer.from_pretrained(tokenizer_dir, trust_remote_code=True)
         processor = XHGemma4Processor.from_pretrained(tokenizer_dir, trust_remote_code=True)
         return tokenizer, processor
 
+    def _get_last_cache_names(self):
+        kcache_names = [self.prefill.get_input_name(i) for i in range(self.prefill.get_num_inputs()) if "kcache" in self.prefill.get_input_name(i).lower()]
+        vcache_names = [self.prefill.get_input_name(i) for i in range(self.prefill.get_num_inputs()) if "vcache" in self.prefill.get_input_name(i).lower()]
+        last_kcache_local, last_kcache_global = kcache_names[-2], kcache_names[-1]
+        last_vcache_local, last_vcache_global = vcache_names[-2], vcache_names[-1]
+        return [last_kcache_local, last_vcache_local, last_kcache_global, last_vcache_global]
+    
     # Subclasses override to read model-specific input layout
     def _read_prefill_info(self):
         raise NotImplementedError
@@ -177,6 +218,20 @@ class Gemma4Base:
                     group_start = None
 
         return global_mask.numpy(), local_mask.numpy()
+
+    def _build_draft_masks(self, past_len):
+        width = self.assistant.get_dev_input(self.assistant.get_input_name(4)).info.shape[-1]
+        g_mask = np.full((1, 1, 1, width), -65504.0, dtype=np.float16)
+        g_mask[0, 0, 0, : min(width, max(1, int(past_len)))] = 0.0
+
+        width = self.assistant.get_dev_input(self.assistant.get_input_name(3)).info.shape[-1]
+        l_mask = np.full((1, 1, 1, width), -65504.0, dtype=np.float16)
+        valid = min(width, max(1, int(self.sliding_cache_valid_length or past_len)))
+        end = valid
+        start = max(0, end - self.sliding_window)
+        l_mask[0, 0, 0, start:end] = 0.0
+        
+        return g_mask, l_mask
 
     def _fit_model_input(self, model, value: torch.Tensor, name: str) -> np.ndarray:
         info = model.get_input_info(name)
@@ -258,14 +313,30 @@ class Gemma4Base:
         updated = embeds.clone()
         updated[token_positions[:, 0], token_positions[:, 1]] = flat_features
         return updated
+    
+    def _assistant_step(self, tok_id: int, past_len: int, pos_idx: int, hidden_states: np.ndarray):
+        embeds = self.embedding(torch.from_numpy(np.array([[tok_id]])))
+        embeds = torch.cat([embeds, torch.from_numpy(hidden_states)], dim=2)
+        g_mask, l_mask = self._build_draft_masks(past_len)
+        self.assistant.set_input(self.assistant.get_input_name(0), embeds.detach().cpu().numpy())
+        self.assistant.set_input(self.assistant.get_input_name(1), np.array([pos_idx], dtype=np.int32))
+        self.assistant.set_input(self.assistant.get_input_name(2), np.array([1], dtype=np.int32))  
+        self.assistant.set_input(self.assistant.get_input_name(3), l_mask.astype(np.float16))
+        self.assistant.set_input(self.assistant.get_input_name(4), g_mask.astype(np.float16))
+        self.assistant.run()
+        self.assistant.sync()
+        logits: np.ndarray = self.assistant.get_output(self.assistant.get_output_name(0)).numpy().astype(np.float32)
+        hidden_states = self.assistant.get_output(self.assistant.get_output_name(1)).numpy()
+        next_ids = logits.argmax(-1)
+        return int(next_ids[0][0]), hidden_states
 
-    def _decode_loop(self, first_token_id, input_ids, input_len):
+    def _decode_loop(self, next_ids: np.ndarray, input_ids, input_len, hidden_states=None):
         eos_ids = {self.tokenizer.eos_token_id} if isinstance(self.tokenizer.eos_token_id, int) else set(self.tokenizer.eos_token_id)
         eos_ids.add(106)
         logger.success("response:")
-        print(f"\033[1;95m{self.tokenizer.decode(first_token_id[0])}", end="", flush=True)
+        print(f"\033[1;95m{self.tokenizer.decode(next_ids[0])}", end="", flush=True)
 
-        history = input_ids[0].tolist() + [first_token_id[0][0]]
+        history = input_ids[0].tolist() + [next_ids[0][0]]
         past_len = input_len
         step = 0
         slide = 10
@@ -273,28 +344,78 @@ class Gemma4Base:
         last_resp = self.tokenizer.decode(history[-slide:])
         t0 = time.time()
 
-        while past_len < self.context_max_length and step < self.max_new_tokens:
-            tok_id = first_token_id[0][0]
-            first_token_id = self._decode_step(tok_id, past_len)
-            tok_id = first_token_id[0][0]
-            if tok_id in eos_ids:
-                break
-            history.append(tok_id)
-            resp = self.tokenizer.decode(history[-(slide + 1) - skip :])[len(last_resp) :]
-            if resp and is_valid_char(ord(resp[-1])):
-                print(resp, end="", flush=True)
-                last_resp = self.tokenizer.decode(history[-slide:])
-                skip = 0
+        tok_id = next_ids[0][0]
+        total_verify_rounds = 0
+        total_draft_tokens = 0
+        last_committed_tokens = 0
+        total_committed_tokens = 0
+        total_accepted_count = 0
+        stop_decode = False
+        while past_len < self.context_max_length and step < self.max_new_tokens and not stop_decode:
+            tok_ids = [next_ids[0].tolist()[-1]]
+            draft_tokens = list()
+            if self.assistant is not None:
+                for draft_step in range(self.num_draft_tokens):
+                    tok_id, hidden_states = self._assistant_step(tok_id, past_len, past_len + draft_step, hidden_states)
+                    draft_tokens.append(tok_id)
+                    if tok_id in eos_ids:
+                        break
+                tok_ids.extend(draft_tokens)
+            logits, hidden_states = self._decode_step(tok_ids, past_len, last_committed_tokens)
+            
+            if self.assistant is None:
+                valid_len = min(logits.shape[1], len(tok_ids))
+                logits = logits[:, valid_len - 1:valid_len, :]
+                next_ids = logits.argmax(-1)
             else:
-                skip += 1
-            past_len += 1
-            step += 1
+                accepted_count = 0
+                for draft_idx, draft_token in enumerate(draft_tokens):
+                    target_token = int(logits[0, draft_idx, :].argmax(-1))
+                    if target_token != int(draft_token):
+                        break
+                    accepted_count += 1
+                next_token = int(logits[0, accepted_count, :].argmax(-1))
+                next_ids = np.array([draft_tokens[:accepted_count] + [next_token]], dtype=np.int64)
+                hidden_states = hidden_states[:, accepted_count:accepted_count + 1, :]
+
+                total_verify_rounds += 1
+                total_draft_tokens += len(draft_tokens)
+                total_accepted_count += accepted_count
+                last_committed_tokens = accepted_count + 1
+                total_committed_tokens += last_committed_tokens
+
+                self.sliding_cache_valid_length = min(self.decode_local_w, self.sliding_cache_valid_length + last_committed_tokens)
+
+            tok_ids = next_ids[0].tolist()
+            for tok_id in tok_ids:
+                if tok_id in eos_ids:
+                    stop_decode = True
+                    break
+                history.append(tok_id)
+                resp = self.tokenizer.decode(history[-(slide + 1) - skip :])[len(last_resp) :]
+                if resp and is_valid_char(ord(resp[-1])):
+                    print(resp, end="", flush=True)
+                    last_resp = self.tokenizer.decode(history[-slide:])
+                    skip = 0
+                else:
+                    skip += 1
+                past_len += 1
+                step += 1
 
         print(f"\033[0m")
         logger.info(f"Decode: {step} tokens in {time.time() - t0:.2f}s")
+        if self.assistant is not None and total_draft_tokens > 0:
+            acceptance_rate = total_accepted_count / total_draft_tokens
+            logger.info(
+                "MTP stats: "
+                f"rounds={total_verify_rounds}, "
+                f"accepted={total_accepted_count}/{total_draft_tokens}, "
+                f"acceptance_rate={acceptance_rate:.3f}, "
+                f"committed_tokens={total_committed_tokens}"
+            )
         return step
 
-    def _decode_step(self, tok_id, past_len):
+    def _decode_step(self, tok_ids, past_len, accepted_count=0):
         raise NotImplementedError
 
     def _build_embeddings(self, input_ids, inputs):

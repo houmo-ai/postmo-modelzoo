@@ -46,6 +46,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number")
     parser.add_argument("--prefill_length", dest="prefill_length", type=int, default=None, help="prefill length")
     parser.add_argument("--model_size", dest="model_size", type=str, default=None, choices=["26b-a4b", "e2b", "e4b", "31b"])
+    parser.add_argument("--mtp", action="store_true", default=False, help="use mtp")
     args = parser.parse_args()
     return args
 # fmt: on
@@ -70,7 +71,7 @@ if __name__ == "__main__":
         "model_type": "llm",
         "model_name": model_name,
         "model_info": {
-            "model_size": model_size,
+            "model_size": f"{model_size}-mtp" if args.mtp else model_size,
             "ncore": model_config.get("ncore", 2),
             "ndevice": ndevice,
             "context_len": context_length,
@@ -79,7 +80,10 @@ if __name__ == "__main__":
         }
     }
     if args.file_type in ["raw"]:
-        model_cfgs["modelscope_repo"] = {"repo_ids": model_config.get("modelscope_repo", [])}
+        repo_ids: list =  model_config.get("modelscope_repo", [])
+        if args.mtp:
+            repo_ids = [f"{repo_ids[0]}-assistant", repo_ids[0]]
+        model_cfgs["modelscope_repo"] = {"repo_ids": repo_ids}
         
     _, ret_dict = hmatc_get_file(
         model_cfgs,

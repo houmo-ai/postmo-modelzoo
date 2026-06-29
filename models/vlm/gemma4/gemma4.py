@@ -46,6 +46,7 @@ class Gemma4(Gemma4Base):
         devices=0,
         max_new_tokens=2048,
         enable_thinking=False,
+        assistant_path=None,
     ):
         self.enable_thinking = enable_thinking
         self.max_new_tokens = max_new_tokens
@@ -55,19 +56,21 @@ class Gemma4(Gemma4Base):
         self.tokenizer, self.processor = self._load_tokenizer(tokenizer_dir)
 
         # Vision (with perf tracking)
+        self.vit = None
         if vit_path and os.path.isfile(vit_path):
             self.perf_tracker.perf_start(PERFTYPE.VISION_LOAD_TIME)
-        self._load_vision(vit_path, self.devices, backend_name)
-        if self.vit is not None:
+            self._load_vision(vit_path, self.devices, backend_name)
             self.perf_tracker.perf_end(PERFTYPE.VISION_LOAD_TIME)
 
         # LLM (with perf tracking)
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_LOAD_TIME)
         self._load_llm(prefill_path, decode_path, self.devices, backend_name)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_LOAD_TIME)
-
-        # Decode: current_input_length is always 1
-        self.decode.set_input(self.decode.get_input_name(2), np.array([1], dtype="int32"))
+        
+        # Assistant model
+        self.assistant = None
+        if assistant_path and os.path.isfile(assistant_path):
+            self._load_assistant(assistant_path, self.devices, backend_name)
 
         # Embedding (index-based, scale baked into weights)
         saved = torch.load(embedding_path, map_location="cpu", weights_only=True)
@@ -79,7 +82,7 @@ class Gemma4(Gemma4Base):
         )
         self.embedding.load_state_dict(saved, strict=False)
         self.perf_tracker.reset_perf_time()
-
+    
     def _read_prefill_info(self):
         self.prefill_len = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[1]
         self.embed_dim = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[2]
@@ -132,31 +135,37 @@ class Gemma4(Gemma4Base):
 
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_OUTPUT_TIME)
         logits = self.prefill.get_output(self.prefill.get_output_name(0)).numpy().astype(np.float32) # [bs, seq_len, vocab_size]
-        out_seq_len = logits.shape[1]
-        if out_seq_len >= cur_len:
-            vaild_len = cur_len
-        else:
-            vaild_len = out_seq_len
-        next_id = logits[0:1, vaild_len - 1:vaild_len, :].argmax(-1)
+        valid_len = min(logits.shape[1], cur_len)
+        next_ids = logits[0:1, valid_len - 1:valid_len, :].argmax(-1)
+        hidden_states = None
+        if self.assistant is not None:
+            hidden_states = self.prefill.get_output(self.prefill.get_output_name(1)).numpy()
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_OUTPUT_TIME)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOTAL_TIME)
-        return next_id
+        if self.assistant is not None:
+            self.sliding_cache_valid_length = min(self.decode_local_w, input_len)
+        return next_ids, hidden_states
 
-    def _decode_step(self, tok_id, past_len):
+    def _decode_step(self, tok_ids: list, past_len, accepted_count=0):
+        cur_len = len(tok_ids)
+        padded_ids = list(map(int, tok_ids))
+        if cur_len < self.decode_len:
+            padded_ids += [self.pad_token_id] * (self.decode_len - cur_len)
+
         self.perf_tracker.perf_start(PERFTYPE.DECODE_EMBED_TIME)
-        tok = torch.from_numpy(np.array([[tok_id]]))
-        dec_emb = self.embedding(tok)
-        dec_emb = dec_emb.reshape(1, 1, -1).to(torch.float16)
-        if self.decode_len > 1:
-            dec_emb = torch.cat([dec_emb, torch.zeros(1, self.decode_len - 1, self.embed_dim, dtype=torch.float16)], dim=1)
+        tok_ids = torch.from_numpy(np.array([padded_ids]))
+        dec_emb: torch.Tensor = self.embedding(tok_ids)
         self.perf_tracker.perf_end(PERFTYPE.DECODE_EMBED_TIME)
 
-        _, l_mask = self._build_masks(1, past_len, self.decode_len)
+        _, l_mask = self._build_masks(cur_len, past_len, self.decode_len)
 
         self.perf_tracker.perf_start(PERFTYPE.DECODE_INPUT_TIME)
         self.decode.set_input(self.decode.get_input_name(0), dec_emb.detach().numpy().astype(np.float16))
         self.decode.set_input(self.decode.get_input_name(1), np.array([past_len], dtype="int32"))
+        self.decode.set_input(self.decode.get_input_name(2), np.array([cur_len], dtype="int32"))
         self.decode.set_input(self.decode.get_input_name(3), l_mask.astype(np.float16))
+        if self.accepted_count_name is not None:
+            self.decode.set_input(self.accepted_count_name, np.array([accepted_count], dtype="int32"))
         self.perf_tracker.perf_end(PERFTYPE.DECODE_INPUT_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.DECODE_INFER_TIME)
@@ -165,9 +174,12 @@ class Gemma4(Gemma4Base):
         self.perf_tracker.perf_end(PERFTYPE.DECODE_INFER_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.DECODE_OUTPUT_TIME)
-        next_id = self.decode.get_output(self.decode.get_output_name(0)).numpy().astype(np.float32).argmax(-1)
+        logits: np.ndarray = self.decode.get_output(self.decode.get_output_name(0)).numpy().astype(np.float32)
+        hidden_states = None
+        if self.assistant is not None:
+            hidden_states = self.decode.get_output(self.decode.get_output_name(1)).numpy()
         self.perf_tracker.perf_end(PERFTYPE.DECODE_OUTPUT_TIME)
-        return next_id
+        return logits, hidden_states
 
     def chat(self, question="", image_path=None, audio_path=None):
         q_text = question or ("请详细描述这张图片的内容。" if image_path else "你好，请介绍一下你自己。")
@@ -203,11 +215,11 @@ class Gemma4(Gemma4Base):
         embeds = self._build_embeddings(input_ids, inputs)
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_EMBED_TIME)
 
-        next_id = self._prefill(embeds, input_len, mm_types=mm_types)
-        logger.info(f"Prefill done, first token: {self.tokenizer.decode(next_id[0])}")
+        next_ids, hidden_states = self._prefill(embeds, input_len, mm_types=mm_types)  # [bs, num_tokens]
+        logger.info(f"Prefill done, first token: {self.tokenizer.decode(next_ids[0])}")
 
         self.perf_tracker.perf_start(PERFTYPE.DECODE_TOTAL_TIME)
-        output_len = self._decode_loop(next_id, input_ids, input_len)
+        output_len = self._decode_loop(next_ids, input_ids, input_len, hidden_states)
         self.perf_tracker.perf_end(PERFTYPE.DECODE_TOTAL_TIME)
         self.perf_tracker.set_basic_info(1, input_len, output_len, num_images=1 if image_path else 0)
 
