@@ -48,6 +48,9 @@ class Gemma4ProcessorConfig:
         self.audio_attention_chunk_size: int = 12
         self.audio_attention_context_left: int = 13
         self.audio_attention_context_right: int = 0
+        self.audio_chunking_enabled: bool = True
+        self.audio_chunk_stride: int | None = None
+        self.audio_chunk_overlap: int | None = None
         self.export_mode: str = "full"
         self.enforce_fixed_image_size: bool = False
 
@@ -115,22 +118,77 @@ class XHGemma4Processor(Gemma4Processor):
         prepared["images"] = _resize_recursive(images)
         return prepared
 
-    def __call__(self, *args, **kwargs):
-        kwargs = self._prepare_vision_kwargs(kwargs)
-        model_inputs = super().__call__(*args, **kwargs)
-        model_inputs = self._trim_compact_image_patches_if_needed(model_inputs)
-        model_inputs = self._add_padded_visual_inputs(model_inputs)
+    def _resolve_audio_chunk_stride(self, chunk_length: int) -> int:
+        if chunk_length <= 0:
+            raise ValueError(f"audio_feature_length must be positive, got {chunk_length}")
+        if self.config.audio_chunk_overlap is not None:
+            overlap = int(self.config.audio_chunk_overlap)
+            stride = chunk_length - overlap
+        elif self.config.audio_chunk_stride is not None:
+            stride = int(self.config.audio_chunk_stride)
+        else:
+            stride = max(1, chunk_length // 2)
+        if stride <= 0 or stride > chunk_length:
+            raise ValueError(
+                f"audio chunk stride must be in [1, {chunk_length}], got {stride}. "
+                "Check audio_chunk_stride/audio_chunk_overlap."
+            )
+        return stride
 
+    @staticmethod
+    def _build_audio_chunk_slices(total_frames: int, chunk_length: int, stride: int) -> list[tuple[int, int]]:
+        if total_frames <= 0:
+            return [(0, chunk_length)]
+        slices: list[tuple[int, int]] = []
+        start = 0
+        while start < total_frames:
+            end = min(start + chunk_length, total_frames)
+            slices.append((start, end))
+            if end >= total_frames:
+                break
+            start += stride
+        return slices
+
+    def _feature_frame_to_audio_token_index(self, frame_index: int) -> int:
+        return self._compute_audio_soft_token_count_from_feature_frames(frame_index)
+
+    def _build_audio_chunk_keep_ranges(
+        self,
+        slices: list[tuple[int, int]],
+        total_frames: int,
+    ) -> list[tuple[int, int]]:
+        keep_ranges: list[tuple[int, int]] = []
+        for idx, (chunk_start, chunk_end) in enumerate(slices):
+            if idx == 0:
+                keep_start_frame = 0
+            else:
+                prev_end = slices[idx - 1][1]
+                keep_start_frame = (chunk_start + prev_end) // 2
+
+            if idx == len(slices) - 1:
+                keep_end_frame = total_frames
+            else:
+                next_start = slices[idx + 1][0]
+                keep_end_frame = (chunk_end + next_start) // 2
+
+            keep_start_frame = max(chunk_start, min(keep_start_frame, chunk_end))
+            keep_end_frame = max(keep_start_frame, min(keep_end_frame, chunk_end))
+            local_start = self._feature_frame_to_audio_token_index(keep_start_frame - chunk_start)
+            local_end = self._feature_frame_to_audio_token_index(keep_end_frame - chunk_start)
+            keep_ranges.append((local_start, local_end))
+        return keep_ranges
+
+    def _chunk_long_audio_inputs(self, model_inputs):
         feature_length = self.config.audio_feature_length
-        if (
-            feature_length is not None
-            and feature_length > 0
-            and "input_features" in model_inputs
-            and "input_features_mask" in model_inputs
-        ):
-            input_features = model_inputs["input_features"]
-            input_features_mask = model_inputs["input_features_mask"]
-            current_length = input_features.shape[1]
+        if feature_length is None or feature_length <= 0:
+            return model_inputs
+        if "input_features" not in model_inputs or "input_features_mask" not in model_inputs:
+            return model_inputs
+
+        input_features = model_inputs["input_features"]
+        input_features_mask = model_inputs["input_features_mask"]
+        current_length = input_features.shape[1]
+        if current_length <= feature_length or not self.config.audio_chunking_enabled:
             if current_length > feature_length:
                 model_inputs["input_features"] = input_features[:, :feature_length, :]
                 model_inputs["input_features_mask"] = input_features_mask[:, :feature_length]
@@ -148,6 +206,83 @@ class XHGemma4Processor(Gemma4Processor):
                 )
                 model_inputs["input_features"] = torch.cat([input_features, feature_pad], dim=1)
                 model_inputs["input_features_mask"] = torch.cat([input_features_mask, mask_pad], dim=1)
+            return model_inputs
+
+        if input_features.shape[0] != 1:
+            raise ValueError("Long-audio chunking currently supports one audio input per prompt")
+
+        total_frames = int(input_features_mask[0].to(torch.int64).sum().item())
+        stride = self._resolve_audio_chunk_stride(feature_length)
+        slices = self._build_audio_chunk_slices(total_frames, feature_length, stride)
+        keep_ranges = self._build_audio_chunk_keep_ranges(slices, total_frames)
+        chunk_features = []
+        chunk_masks = []
+        for start, end in slices:
+            feature_chunk = input_features[0, start:end, :]
+            mask_chunk = input_features_mask[0, start:end]
+            if feature_chunk.shape[0] < feature_length:
+                pad_length = feature_length - feature_chunk.shape[0]
+                feature_chunk = torch.cat(
+                    [
+                        feature_chunk,
+                        torch.zeros(
+                            (pad_length, input_features.shape[2]),
+                            dtype=input_features.dtype,
+                            device=input_features.device,
+                        ),
+                    ],
+                    dim=0,
+                )
+                mask_chunk = torch.cat(
+                    [
+                        mask_chunk,
+                        torch.zeros(
+                            (pad_length,),
+                            dtype=input_features_mask.dtype,
+                            device=input_features_mask.device,
+                        ),
+                    ],
+                    dim=0,
+                )
+            chunk_features.append(feature_chunk)
+            chunk_masks.append(mask_chunk)
+
+        model_inputs["input_features"] = torch.stack(chunk_features, dim=0)
+        model_inputs["input_features_mask"] = torch.stack(chunk_masks, dim=0)
+        model_inputs["audio_chunk_output_ranges"] = torch.tensor(keep_ranges, dtype=torch.int32)
+        model_inputs["audio_chunk_feature_ranges"] = torch.tensor(slices, dtype=torch.int32)
+        model_inputs["audio_chunk_stride"] = torch.tensor([stride], dtype=torch.int32)
+        model_inputs["audio_chunk_overlap"] = torch.tensor([feature_length - stride], dtype=torch.int32)
+        return model_inputs
+
+    def _prepare_audio_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        if "audio" not in kwargs or kwargs["audio"] is None:
+            return kwargs
+        if not self.config.audio_chunking_enabled or not self.config.audio_feature_length:
+            return kwargs
+
+        prepared = dict(kwargs)
+        audio_kwargs = dict(prepared.get("audio_kwargs") or {})
+        audio_kwargs.setdefault("max_length", None)
+        audio_kwargs.setdefault("truncation", False)
+        prepared["audio_kwargs"] = audio_kwargs
+        return prepared
+
+    def __call__(self, *args, **kwargs):
+        kwargs = self._prepare_vision_kwargs(kwargs)
+        kwargs = self._prepare_audio_kwargs(kwargs)
+        model_inputs = super().__call__(*args, **kwargs)
+        model_inputs = self._trim_compact_image_patches_if_needed(model_inputs)
+        model_inputs = self._add_padded_visual_inputs(model_inputs)
+
+        feature_length = self.config.audio_feature_length
+        if (
+            feature_length is not None
+            and feature_length > 0
+            and "input_features" in model_inputs
+            and "input_features_mask" in model_inputs
+        ):
+            model_inputs = self._chunk_long_audio_inputs(model_inputs)
             model_inputs = self._retokenize_audio_placeholders_if_needed(model_inputs, kwargs)
         model_inputs = self._add_audio_attention_mask(model_inputs)
         return model_inputs
@@ -355,10 +490,15 @@ class XHGemma4Processor(Gemma4Processor):
             return model_inputs
 
         feature_masks = [input_features_mask] if input_features_mask.ndim == 1 else list(input_features_mask)
-        expected_counts = [
-            self._compute_audio_soft_token_count_from_feature_frames(int(feature_mask.to(torch.int64).sum().item()))
-            for feature_mask in feature_masks
-        ]
+        audio_chunk_output_ranges = model_inputs.get("audio_chunk_output_ranges")
+        if audio_chunk_output_ranges is not None:
+            ranges = torch.as_tensor(audio_chunk_output_ranges, dtype=torch.long)
+            expected_counts = [int((ranges[:, 1] - ranges[:, 0]).sum().item())]
+        else:
+            expected_counts = [
+                self._compute_audio_soft_token_count_from_feature_frames(int(feature_mask.to(torch.int64).sum().item()))
+                for feature_mask in feature_masks
+            ]
         actual_audio_token_count = int((input_ids == audio_token_id).sum().item())
         if actual_audio_token_count == sum(expected_counts):
             return model_inputs
@@ -536,6 +676,11 @@ class XHGemma4Processor(Gemma4Processor):
         if isinstance(nested_processor_kwargs, dict):
             processor_kwargs.update(nested_processor_kwargs)
         processor_kwargs.update(kwargs)
+        if audios:
+            audio_kwargs = dict(processor_kwargs.get("audio_kwargs") or {})
+            audio_kwargs.setdefault("max_length", None)
+            audio_kwargs.setdefault("truncation", False)
+            processor_kwargs["audio_kwargs"] = audio_kwargs
         if images:
             processor_kwargs["images"] = images[0] if len(images) == 1 else images
         if videos:

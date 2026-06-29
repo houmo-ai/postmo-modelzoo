@@ -48,9 +48,9 @@ def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> 
             f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
         )
 
-    if vit_val not in [0, 1]:
+    if vit_val not in [0, 1, 2]:
         raise ValueError(
-            f"ViT FlashAttention values only support 0/1, current value:{vit_val}"
+            f"ViT FlashAttention values only support 0/1/2, current value:{vit_val}"
         )
 
     if context_length < 2048:
@@ -74,8 +74,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--batch", dest="batch", type=int, default=None, help="batch size for decode model")
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number for multi-device")
     parser.add_argument("--stage", dest="stage", type=str, default="build", choices=["build", "test", "all"], help="build stage")
-    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 1), help="FlashAttention switches: 1st=llm(0/1/2), 2nd=vit(0/1); e.g. --flash_attention 2 1")
-    parser.add_argument("--enable_common_subgraph", dest="enable_common_subgraph", action="store_true", default=False, help="enable common subgraph optimization")
+    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 2), help="FlashAttention switches: 1st=llm(0/1/2), 2nd=vit(0/1/2); e.g. --flash_attention 2 2")
     parser.add_argument("--mtp", dest="mtp", action="store_true", default=False, help="enable mtp optimization")
    
     args = parser.parse_args()
@@ -106,13 +105,36 @@ if __name__ == "__main__":
     parallel_jobs = args.parallel_jobs
     llm_flash_attn, flash_attn = args.flash_attention
 
-    if args.mtp and model_size not in ["26b-a4b"]:
-        logger.fatal("MTP optimization is only supported for 26b-a4b model size.")
-
     if args.stage in ["build", "all"]:
         assert (
             get_platform() == "x86_64"
         ), "Only supported for compilation on the x86_64 platform."
+
+        if args.mtp:
+            if args.model_size in ["e2b", "e4b", "31b"]:
+                raise NotImplementedError(
+                    "MTP optimization is not implemented for this model size."
+                )
+            assistant_hmonnx = find_hmonnx_file(
+                os.path.join(model_dir, "mtp_draft_decode"), pattern="gemma4_*.onnx"
+            )
+            if not assistant_hmonnx:
+                raise FileNotFoundError("Assistant model not found.")
+            Xh2Exec.build_from_hmonnx(
+                hmonnx=find_hmonnx_file(
+                    os.path.join(model_dir, "mtp_draft_decode"), pattern="gemma4_*.onnx"
+                ),
+                hmm_name=f"{model_name}-{model_size}_assistant",
+                output=output_dir,
+                ncore=ncore,
+                llm_batch=args.batch,
+                flash_attn=llm_flash_attn,
+                llm_opt=True,
+                context_length=args.context_length,
+                ndevice=ndevice,
+                parallel_jobs=parallel_jobs,
+            )
+
         Xh2Exec.build_from_hmonnx(
             is_prefill=True,
             hmonnx=find_hmonnx_file(os.path.join(model_dir, "prefill")),
@@ -126,64 +148,36 @@ if __name__ == "__main__":
             ndevice=ndevice,
             parallel_jobs=parallel_jobs,
         )
-        if not args.mtp:
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "decode")),
-                hmm_name=f"{model_name}-{model_size}_decode",
-                output=output_dir,
-                ncore=ncore,
-                llm_batch=args.batch,
-                flash_attn=llm_flash_attn,
-                llm_opt=True,
-                context_length=args.context_length,
-                ndevice=ndevice,
-                parallel_jobs=parallel_jobs,
-            )
-            visual_model_name = f"{model_name}-{model_size}_visual"
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "visual")),
-                hmm_name=visual_model_name,
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=flash_attn,
-                parallel_jobs=parallel_jobs,
-                enable_common_subgraph=args.enable_common_subgraph,
-            )
-        if model_size in ["e2b", "e4b"] and not args.mtp:
-            audio_model_name = f"{model_name}-{model_size}_audio"
+
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "decode")),
+            hmm_name=f"{model_name}-{model_size}_decode",
+            output=output_dir,
+            ncore=ncore,
+            llm_batch=args.batch,
+            flash_attn=llm_flash_attn,
+            llm_opt=True,
+            context_length=args.context_length,
+            ndevice=ndevice,
+            parallel_jobs=parallel_jobs,
+        )
+
+        Xh2Exec.build_from_hmonnx(
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "visual")),
+            hmm_name=f"{model_name}-{model_size}_visual",
+            output=output_dir,
+            ncore=ncore,
+            flash_attn=flash_attn,
+            parallel_jobs=parallel_jobs,
+            enable_common_subgraph=True,
+        )
+
+        if model_size in ["e2b", "e4b"]:
             Xh2Exec.build_from_hmonnx(
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, "audio")),
-                hmm_name=audio_model_name,
+                hmm_name=f"{model_name}-{model_size}_audio",
                 output=output_dir,
                 ncore=ncore,
                 flash_attn=flash_attn,
-                parallel_jobs=parallel_jobs,
-            )
-
-        if args.mtp:
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(os.path.join(model_dir, "verify")),
-                hmm_name=f"{model_name}-{model_size}_verify",
-                output=output_dir,
-                ncore=ncore,
-                flash_attn=llm_flash_attn,
-                llm_opt=True,
-                context_length=args.context_length,
-                prefill_length=args.prefill_length,
-                ndevice=ndevice,
-                parallel_jobs=parallel_jobs,
-            )
-            Xh2Exec.build_from_hmonnx(
-                hmonnx=os.path.join(
-                    model_dir, "draft_onnx", "gemma4_assistant_decode.onnx"
-                ),
-                hmm_name=f"{model_name}-{model_size}_draft",
-                output=output_dir,
-                ncore=ncore,
-                llm_batch=args.batch,
-                flash_attn=llm_flash_attn,
-                llm_opt=True,
-                context_length=args.context_length,
-                ndevice=ndevice,
                 parallel_jobs=parallel_jobs,
             )

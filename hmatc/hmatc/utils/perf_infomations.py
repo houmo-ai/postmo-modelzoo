@@ -125,6 +125,7 @@ class InferenceMetrics:
     output_seq_length: int = 0
     num_images: int = 0  # Number of images processed in vision stage
     num_audios: int = 0  # Number of audio clips processed in audio stage
+    num_audio_chunks: int = 0  # Number of audio chunks processed by audio model
 
     # Performance info
     prefill_perf_infos: PerfInformations = field(default_factory=PerfInformations)
@@ -585,7 +586,8 @@ class InferencePerformanceTracker:
                 metrics.vision_perf_infos.vision_total_time / 1000
             )
 
-        # 4. Calculate Audio stage speeds (clips/s)
+        # 4. Calculate Audio stage speeds (clips/s and chunks/s)
+        audio_chunks = metrics.num_audio_chunks or metrics.num_audios
         if (
             metrics.audio_perf_infos.audio_preprocess_time > 0
             and metrics.num_audios > 0
@@ -593,12 +595,12 @@ class InferencePerformanceTracker:
             metrics.audio_perf_infos.audio_preprocess_speed = metrics.num_audios / (
                 metrics.audio_perf_infos.audio_preprocess_time / 1000
             )
-        if metrics.audio_perf_infos.infer_time > 0 and metrics.num_audios > 0:
-            metrics.audio_perf_infos.audio_infer_speed = metrics.num_audios / (
+        if metrics.audio_perf_infos.infer_time > 0 and audio_chunks > 0:
+            metrics.audio_perf_infos.audio_infer_speed = audio_chunks / (
                 metrics.audio_perf_infos.infer_time / 1000
             )
-        if metrics.audio_perf_infos.audio_total_time > 0 and metrics.num_audios > 0:
-            metrics.audio_perf_infos.audio_total_speed = metrics.num_audios / (
+        if metrics.audio_perf_infos.audio_total_time > 0 and audio_chunks > 0:
+            metrics.audio_perf_infos.audio_total_speed = audio_chunks / (
                 metrics.audio_perf_infos.audio_total_time / 1000
             )
 
@@ -626,6 +628,7 @@ class InferencePerformanceTracker:
         output_seq_length: int,
         num_images: int = 0,
         num_audios: int = 0,
+        num_audio_chunks: int = 0,
     ):
         """Set basic inference configuration"""
         self.current_metrics.batch_size = batch_size
@@ -633,6 +636,7 @@ class InferencePerformanceTracker:
         self.current_metrics.output_seq_length = output_seq_length
         self.current_metrics.num_images = num_images
         self.current_metrics.num_audios = num_audios
+        self.current_metrics.num_audio_chunks = num_audio_chunks
         self.current_metrics.e2e_time = time.time() - self.current_metrics.e2e_time
 
     def reset_perf_time(self):
@@ -680,6 +684,13 @@ class InferencePerformanceTracker:
             )
         if metrics.num_audios > 0:
             logger.success(f"  Number of Audios: {metrics.num_audios:>6} clips")
+        if (
+            metrics.num_audio_chunks > 0
+            and metrics.num_audio_chunks != metrics.num_audios
+        ):
+            logger.success(
+                f"  Number of Audio Chunks: {metrics.num_audio_chunks:>6} chunks"
+            )
 
         # Vision Stage Performance (if applicable)
         if metrics.num_images > 0 and (
@@ -704,13 +715,14 @@ class InferencePerformanceTracker:
             )
 
         # Audio Stage Performance (if applicable)
-        if metrics.num_audios > 0 and (
+        audio_chunks = metrics.num_audio_chunks or metrics.num_audios
+        if audio_chunks > 0 and (
             metrics.audio_perf_infos.audio_total_time > 0
             or metrics.audio_perf_infos.audio_preprocess_time > 0
         ):
             logger.success(f"Audio Stage Performance:")
             logger.success(
-                f"  Total Time: {metrics.audio_perf_infos.audio_total_time:>7.2f}ms | Speed: {metrics.audio_perf_infos.audio_total_speed:>7.2f} clips/s"
+                f"  Total Time: {metrics.audio_perf_infos.audio_total_time:>7.2f}ms | Speed: {metrics.audio_perf_infos.audio_total_speed:>7.2f} chunks/s"
             )
             logger.success(
                 f"  Preprocessing Time: {metrics.audio_perf_infos.audio_preprocess_time:>5.2f}ms | Speed: {metrics.audio_perf_infos.audio_preprocess_speed:>7.2f} clips/s"
@@ -719,7 +731,7 @@ class InferencePerformanceTracker:
                 f"  API SetInput Time: {metrics.audio_perf_infos.setinput_time:>6.2f}ms"
             )
             logger.success(
-                f"  API Inference Time: {metrics.audio_perf_infos.infer_time:>5.2f}ms | Speed: {metrics.audio_perf_infos.audio_infer_speed:>7.2f} clips/s"
+                f"  API Inference Time: {metrics.audio_perf_infos.infer_time:>5.2f}ms | Speed: {metrics.audio_perf_infos.audio_infer_speed:>7.2f} chunks/s"
             )
             logger.success(
                 f"  API GetOutput Time: {metrics.audio_perf_infos.getoutput_time:>5.2f}ms"
