@@ -1,4 +1,14 @@
-Copyright (c) {{ year }} {{ organization }}
+Copyright (c) 2012-2025 Christian Rau
+Copyright (c) 2013-2025 Niels Lohmann
+Copyright (c) 2017-2023 Leon Merten Lohse
+Copyright (c) 2016-present Gabi Melman and spdlog contributors
+Copyright (c) 2019-2022 Pranav Srinivas Kumar and argparse contributors
+Copyright (c) 2022-2025 ThanatosShinji and onnx-tool contributors
+Copyright (c) 2008-2015 Jesse Beder
+Copyright (c) 2022-2025 OpenAI
+Copyright (c) 2023-2025 FlagOpen contributors
+Copyright (c) 2024-2025 DeepSeek contributors
+Copyright (c) 2019-2025 CCPD contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
