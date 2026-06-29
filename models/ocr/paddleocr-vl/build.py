@@ -67,40 +67,6 @@ def cosine_distance(data1, data2):
         return -1
     return cosine_dist
 
-
-class ChildProcessMemoryMonitor(ProcessMemoryMonitor):
-    """Process memory monitor that optionally includes child processes."""
-
-    def __init__(self, *args, include_children: bool = True, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.include_children = include_children
-
-    @property
-    def process(self):
-        return self._process
-
-    def get_memory_info(self) -> Dict[str, float]:
-        """Gets current memory usage information."""
-        try:
-            rss = self.process.memory_info().rss
-            if self.include_children:
-                for child in self.process.children(recursive=True):
-                    try:
-                        rss += child.memory_info().rss
-                    except (
-                        psutil.NoSuchProcess,
-                        psutil.AccessDenied,
-                        psutil.ZombieProcess,
-                    ):
-                        continue
-
-            rss_mb = rss / (1024 * 1024)
-            percent = self.process.memory_percent()
-            return {"rss_mb": rss_mb, "percent": percent}
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            return {"rss_mb": 0.0, "percent": 0.0}
-
-
 def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
     """Validates and adjusts FlashAttention parameter values."""
     llm_val, vit_val = flash_vals
@@ -369,9 +335,7 @@ if __name__ == "__main__":
         f"{model_name}-{model_size}_visual_" f"{args.max_size_w}x{args.max_size_h}"
     )
 
-    with ChildProcessMemoryMonitor(
-        interval=2, quiet=True, include_children=True
-    ) as monitor:
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
         if args.stage == "build" or args.stage == "all":
             assert (
                 get_platform() == "x86_64"

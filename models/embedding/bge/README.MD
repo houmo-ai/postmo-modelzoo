@@ -74,6 +74,14 @@ cd models/embedding/bge
 python3 ptq.py
 ```
 
+如果需要导出长上下文搭配多batch，比如10x8192，对cpu内存是个巨大考验，通常需要1T空闲内存（由于full attention的计算开销），此时可开启avoid_mem_export分步导出。
+```bash
+source env.sh
+cd models/embedding/bge
+python3 ptq.py --avoid_mem_export
+```
+
+
 ### 2.4 编译
 
 将量化模型编译为在芯片上运行的模型，执行脚本：

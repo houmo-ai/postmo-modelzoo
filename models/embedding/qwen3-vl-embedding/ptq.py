@@ -24,20 +24,14 @@ import os
 import shutil
 import os.path as osp
 from pathlib import Path
-import time
 import psutil
 import random
 import numpy as np
-from typing import Any, Dict
+from typing import Dict
 
 import torch
-import json
-import types
-import huggingface_hub.dataclasses as hf_dataclasses
-from PIL import Image
 import gc
 from loguru import logger
-from tqdm import tqdm
 
 from xhquant.api import (
     DeviceType,
@@ -82,56 +76,12 @@ def get_default_model_dir(model_config: dict) -> str:
     model_size = model_config.get("model_size", "8b").upper()
     return f"{model_name}-{model_size}"
 
-class ChildProcessMemoryMonitor(ProcessMemoryMonitor):
-    """Process memory monitor that optionally includes child processes."""
-
-    def __init__(self, *args, include_children: bool = True, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.include_children = include_children
-
-    @property
-    def process(self):
-        return self._process
-
-    def get_memory_info(self) -> Dict[str, float]:
-        """Gets current memory usage information."""
-        try:
-            rss = self.process.memory_info().rss
-            if self.include_children:
-                for child in self.process.children(recursive=True):
-                    try:
-                        rss += child.memory_info().rss
-                    except (
-                        psutil.NoSuchProcess,
-                        psutil.AccessDenied,
-                        psutil.ZombieProcess,
-                    ):
-                        continue
-
-            rss_mb = rss / (1024 * 1024)
-            percent = self.process.memory_percent()
-            return {"rss_mb": rss_mb, "percent": percent}
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            return {"rss_mb": 0.0, "percent": 0.0}
-
-
 def set_seed(seed: int):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1", ""):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected.")
-
 
 def msg_output_format(title):
     padding_str = "*" * 10
@@ -342,7 +292,9 @@ if __name__ == "__main__":
 
     args = parse_args()
     set_seed(42)
-    with ChildProcessMemoryMonitor(interval=2, log_file="./cpu_monitor.log", include_children=True) as monitor:
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
         houmo_export_llm(args)
         move_llm(args)
-    print(f"Peak memory usage: {monitor.peak_memory_mb:.2f} MB")
+    print(
+        f"\n=== All quantization steps completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )

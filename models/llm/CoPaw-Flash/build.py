@@ -45,39 +45,6 @@ GOLDEN_THRESH = 0.98
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
-class ChildProcessMemoryMonitor(ProcessMemoryMonitor):
-    """Process memory monitor that optionally includes child processes."""
-
-    def __init__(self, *args, include_children: bool = True, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.include_children = include_children
-
-    @property
-    def process(self):
-        return self._process
-
-    def get_memory_info(self) -> Dict[str, float]:
-        """Gets current memory usage information."""
-        try:
-            rss = self.process.memory_info().rss
-            if self.include_children:
-                for child in self.process.children(recursive=True):
-                    try:
-                        rss += child.memory_info().rss
-                    except (
-                        psutil.NoSuchProcess,
-                        psutil.AccessDenied,
-                        psutil.ZombieProcess,
-                    ):
-                        continue
-
-            rss_mb = rss / (1024 * 1024)
-            percent = self.process.memory_percent()
-            return {"rss_mb": rss_mb, "percent": percent}
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            return {"rss_mb": 0.0, "percent": 0.0}
-
-
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
 
@@ -371,9 +338,7 @@ if __name__ == "__main__":
         f"{args.max_size_w}x{args.max_size_h}x{args.max_size_t}"
     )
 
-    with ChildProcessMemoryMonitor(
-        interval=2, quiet=True, include_children=True
-    ) as monitor:
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
         if args.stage == "build" or args.stage == "all":
             assert (
                 get_platform() == "x86_64"

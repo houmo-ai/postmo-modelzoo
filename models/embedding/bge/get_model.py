@@ -149,7 +149,6 @@ if __name__ == "__main__":
             "context_len": context_length,
             "batch": batch,
         },
-        "raw_files": {"raw_path": "models/raw/onnx/onnx_bge_10x512.zip"},
         "modelscope_repo": {
             "repo_ids": model_config.get("modelscope_repo", []),
             "ignore_patterns": ["*.safetensors", "*.bin", "onnx/*"],

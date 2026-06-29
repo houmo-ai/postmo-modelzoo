@@ -96,7 +96,9 @@ from xh_model_zoo.utils.time_profiler import TimeProfiler  # isort:skip
 from xh_model_zoo.xh_llm.models.builder import wrap_llm_model
 from xh_model_zoo.xh_llm.models.base_converter import BaseConverter
 
+from hmatc.utils.monitor import ProcessMemoryMonitor
 from hmatc.utils.utils import (
+    check_gpu,
     first_not_none,
     get_model_configs,
     parse_context_length,
@@ -242,93 +244,6 @@ def get_wikitext2(nsamples, seqlen, local_dir=None, tokenizer=None):
                 }
             )
         return train_samples
-
-class ProcessMemoryMonitor:
-    """
-    Monitors the memory usage of the current Python process in real-time using psutil.
-    """
-    def __init__(self, interval=2, log_file=None):
-        """
-        Initializes the monitor.
-        Args:
-            interval (int): Time between measurements in seconds.
-            log_file (str, optional): Path to a file to log results. If None, prints to console.
-        """
-        self.process = psutil.Process(os.getpid())
-        self.interval = interval
-        self.log_file = log_file
-        self.is_monitoring = False
-        self.peak_memory_mb = 0
-        self.include_children = True
-
-    def get_memory_info(self):
-        """
-        Gets current memory usage information.
-        Returns:
-            dict: A dictionary containing memory usage data.
-        """
-        rss = self.process.memory_info().rss
-        if self.include_children:
-            for child in self.process.children(recursive=True):
-                try:
-                    rss += child.memory_info().rss
-                except psutil.NoSuchProcess:
-                    continue
-        rss_mb = rss / (1024 * 1024)  # Resident Set Size in MB
-        percent = self.process.memory_percent()   # Percentage of system memory
-        return {'rss_mb': rss_mb, 'percent': percent}
-
-    def start(self):
-        """Starts the monitoring loop in a separate daemon thread."""
-        self.is_monitoring = True
-        self.peak_memory_mb = 0
-        self.monitor_thread = threading.Thread(target=self._monitor_loop)
-        self.monitor_thread.daemon = True  # Thread will exit when main program does
-        self.monitor_thread.start()
-        print(f"Memory monitoring started (interval: {self.interval}s)")
-
-    def _monitor_loop(self):
-        """The internal loop that runs in the thread."""
-        while self.is_monitoring:
-            mem_info = self.get_memory_info()
-            self.peak_memory_mb = max(self.peak_memory_mb, mem_info['rss_mb'])
-
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            log_message = f"{timestamp} - RSS: {mem_info['rss_mb']:.2f} MB, System%: {mem_info['percent']:.2f}%"
-            # Output to console or file
-            if self.log_file:
-                with open(self.log_file, 'a') as f:
-                    f.write(log_message + '\n')
-
-            time.sleep(self.interval)
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        logger.info(f"{timestamp} - Max RSS: {self.peak_memory_mb:.2f} MB, System%: {self.process.memory_percent():.2f}%")
-
-    def stop(self):
-        """Stops the monitoring loop and prints peak usage."""
-        self.is_monitoring = False
-        if hasattr(self, 'monitor_thread'):
-            self.monitor_thread.join(timeout=1) # Wait a moment for the thread to finish
-        print(f"[Monitoring stopped. Peak RSS: {self.peak_memory_mb:.2f} MB]")
-
-def check_gpu():
-    import subprocess
-
-    try:
-        result = subprocess.run(
-            "nvidia-smi --query-gpu=count --format=csv,noheader,nounits | wc -l",
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            text=True
-        )
-        if result.returncode == 0 and int(result.stdout.strip()) > 0:
-            return True
-        return False
-    except Exception as e:
-        print(f"Not install GPU driver, error msg: {e}")
-        return False
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -1912,22 +1827,19 @@ def parse_args():
     )
     return args
 
-def main():
-    args = parse_args()
-    if args.gptqmodel:
-        logger.warning("GPTQ quantization is enabled, but it is currently only supported for the text LLM part. "
-                        "The exported talker model will still use the default quantization method.")
-        gptq_quant_text(args)
-    houmo_export_text_llm(args)
-    houmo_export_other(args)
-    houmo_export_talker(args)
-    move_hmonnx(args)
-
 if __name__ == "__main__":
-    if not check_gpu():
-        print("Error: Not found GPU device.")
-        exit(-1)
-    memory_monitor = ProcessMemoryMonitor(interval=2, log_file="./cpu_memory.log")
-    memory_monitor.start()
-    main()
-    memory_monitor.stop()
+    assert check_gpu() is True, "Error: Not found GPU device."
+
+    args = parse_args()
+    with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
+        if args.gptqmodel:
+            logger.warning("GPTQ quantization is enabled, but it is currently only supported for the text LLM part. "
+                            "The exported talker model will still use the default quantization method.")
+            gptq_quant_text(args)
+        houmo_export_text_llm(args)
+        houmo_export_other(args)
+        houmo_export_talker(args)
+        move_hmonnx(args)
+    print(
+        f"\n=== Quantization completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
+    )
