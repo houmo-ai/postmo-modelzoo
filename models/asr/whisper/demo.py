@@ -397,7 +397,7 @@ def is_valid_char(cp):
     return cp != 0xFFFD and cp > 0x001F
 
 
-def asr(whisper, processor, audio_array, language="auto"):
+def asr(whisper, processor, audio_array, language="auto", language_id=None):
 
     # 1. prepare config
     num_heads = whisper.num_head
@@ -461,7 +461,9 @@ def asr(whisper, processor, audio_array, language="auto"):
             return default_lang_id
         return int(lang_logits.argmax(-1).item())
 
-    if language == "auto" or language is None:
+    if language_id is not None:
+        lang_id = language_id
+    elif language == "auto" or language is None:
         lang_id = detect_language_id()
         logger.info(f"Detected language id: {lang_id}")
     else:
@@ -609,7 +611,7 @@ def asr(whisper, processor, audio_array, language="auto"):
         )
         step += 1
     decoded_text = processor.decode(generated_token_ids[0], skip_special_tokens=True)
-    return len(decoded_text), ttft_time, decoded_text
+    return len(decoded_text), ttft_time, decoded_text, lang_id
 
 
 if __name__ == "__main__":
@@ -741,9 +743,10 @@ if __name__ == "__main__":
     chunks_array = np.array(chunks)
 
     logger.success("transcription:")
+    language_id = None
     for i, chunk in enumerate(chunks):
-        output_token, current_ttft, decoded_text = asr(
-            whisper, processor, chunk, language=args.language
+        output_token, current_ttft, decoded_text, language_id = asr(
+            whisper, processor, chunk, language=args.language, language_id=language_id
         )
         results += decoded_text
         output_tokens += output_token
