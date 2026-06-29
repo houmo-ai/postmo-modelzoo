@@ -805,3 +805,17 @@ def test_embedding_qwen3_vl_embedding_compile(setup_logging) -> None:
     """test_embedding_qwen3_vl_embedding_compile"""
     model_name = "qwen3-vl-embedding"
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.z_image_turbo
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_diffusion_z_image_turbo_compile",
+    depends_on=["test_quant_models.py::test_diffusion_z_image_turbo_quant"],
+)
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+def test_diffusion_z_image_turbo_compile(setup_logging) -> None:
+    """test_diffusion_z_image_turbo_compile"""
+    model_name = "z-image-turbo"
+    _compile_func(model_name, setup_logging)

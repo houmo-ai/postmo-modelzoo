@@ -1,0 +1,65 @@
+{
+    "obsolete": false,
+    "model_dir": "models/diffusion/z-image",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["24g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_4k"],
+            "source_type": [null, null],
+            "context_length": [null, "4k"],
+            "ndevice": [null, null],
+            "ncore": [null, null],
+            "quant_type": [null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": ["cached_models/Z-Image-Turbo"],
+            "out_dir": ["cached_results/hmquant_xh2_2k"],
+            "context_length": ["2048"],
+            "input_sequence_length": ["256"]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_2k"],
+            "j": ["24"],
+            "ncore": [null],
+            "context_length": ["4096"],
+            "ndevice": [null],
+            "stage": ["build"],
+            "output_dir": ["cached_results/hmm_xh2_4k"],
+            "prefill_length": ["256"],
+            "enable_common_subgraph": [true]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "encoder_path": [
+                "cached_results/hmm_xh2_4k/z-image-turbo-6b_encoder.hmm"
+            ],
+            "dit_path": ["cached_results/hmm_xh2_4k/z-image-turbo-6b_dit.hmm"],
+            "vae_path": ["cached_results/hmm_xh2_4k/z-image-turbo-6b_vae.hmm"],
+            "deps_dir": ["cached_results/hmm_xh2_4k/hmquant/hf_config"],
+            "embedding_path": [
+                "cached_results/hmm_xh2_4k/hmquant/quant_embedding.pt"
+            ],
+            "ndevice": ["1"]
+        }
+    }
+}

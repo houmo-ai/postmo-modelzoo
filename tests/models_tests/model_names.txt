@@ -52,3 +52,4 @@ qwen3_next
 mineru2dot5
 qwen3_omni
 qwen3_vl_embedding
+z_image_turbo
