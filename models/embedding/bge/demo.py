@@ -456,7 +456,7 @@ class HmBGEM3(nn.Module):
         self.max_length = self.input_infos["input_ids"].shape[1]
         self.pooling_method = "cls"
         self.normalize_embeddings = True
-        self.get_token_types_ids(f"{SCRIPT_PATH}/bge-m3/config.json")
+        self.get_token_types_ids(f"{tokenizer_dir}/config.json")
 
     def get_token_types_ids(self, config_file):
         if not os.path.exists(config_file):
