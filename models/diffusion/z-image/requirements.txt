@@ -1,0 +1,7 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+transformers==4.57.3
+diffusers==0.37.1
+safetensors
+torchao==0.16.0
+accelerate
+prettytable

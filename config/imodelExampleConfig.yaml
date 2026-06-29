@@ -609,6 +609,18 @@ tts_cosyvoice3:
         args: all
   test:
     - tts_cosyvoice3_test
+diffusion_z_image_turbo:
+  include:
+    - models/diffusion/z-image
+  exclude:
+    - models/diffusion/z-image/README.MD
+  example_case:
+    - diffusion_z_image_turbo_test:
+        test_type: models_tests
+        script: z_image_turbo
+        args: all
+  test:
+    - diffusion_z_image_turbo_test
 utils:
   include:
     - utils

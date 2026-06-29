@@ -143,6 +143,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | yolov9m                 | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
 | yolov10m                | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
 | yolox                   | detection    | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
+| z-image                 | diffusion    | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | bge                     | embedding    | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | gte                     | embedding    | xh2    | x     | x     | yes  | yes  | x    | yes     |
 | qwen3-embedding         | embedding    | xh2    | yes   | yes   | yes  | yes  | x    | yes     |

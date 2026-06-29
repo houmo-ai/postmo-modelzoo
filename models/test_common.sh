@@ -20,7 +20,7 @@ show_help() {
     echo "  --context_length        Model context length."
     echo "  --prefill_length        Model prefill length."
     echo "  --image_sizes           Image sizes (width,height), e.g. 448,448 896,896. Can be specified multiple times."
-    echo "  --quant_type            Quantization type, e.g. w8a8, w8a8, w4a16."
+    echo "  --quant_type            Quantization type, e.g. w4a8, w8a8, w8a16."
     echo "  --skip_download         Skip model download steps."
     echo "  -h, --help              Show this help message."
     exit 0
