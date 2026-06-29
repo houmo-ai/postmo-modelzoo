@@ -47,8 +47,7 @@ def get_args():
     parser.add_argument("--enable-thinking", action="store_true", default=False)
     parser.add_argument("--plib_embedding_path", type=str, default=f"output/{HOUMO_TARGET}/hmquant/per_layer_input_embedding.pt")
     parser.add_argument("--mtp", action="store_true", default=False)
-    parser.add_argument("--verify_path", type=str, default=None)
-    parser.add_argument("--draft_path", type=str, default=None)
+    parser.add_argument("--assistant_path", type=str, default=None)
     args = parser.parse_args()
 
     default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
@@ -66,10 +65,11 @@ def get_args():
         args.vit_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_visual.hmm"
     if args.audio_path is None:
         args.audio_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_audio.hmm"
-    if args.verify_path is None:
-        args.verify_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_verify.hmm"
-    if args.draft_path is None:
-        args.draft_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_draft.hmm"
+    if args.mtp:
+        args.assistant_path = args.assistant_path or f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_assistant.hmm"
+    elif args.assistant_path is not None:
+        logger.warning("--assistant_path is ignored because --mtp is disabled")
+        args.assistant_path = None
 
     if args.ndevice > 1:
         if args.prefill_path.endswith(".hmm"):
@@ -84,32 +84,19 @@ if __name__ == "__main__":
     args = get_args()
 
     if args.model_size in ["26b-a4b"]:
-        if args.mtp:
-            from gemma4_moe_mtp import Gemma4MoEMTP
+        from gemma4 import Gemma4MoE
 
-            model = Gemma4MoEMTP(
-                args.prefill_path,
-                args.verify_path,
-                args.draft_path,
-                args.embedding_path,
-                args.tokenizer_dir,
-                list(range(args.ndevice)),
-                args.max_new_tokens,
-                enable_thinking=args.enable_thinking,
-            )
-        else:
-            from gemma4 import Gemma4MoE
-
-            model = Gemma4MoE(
-                args.prefill_path,
-                args.decode_path,
-                args.vit_path,
-                args.embedding_path,
-                args.tokenizer_dir,
-                list(range(args.ndevice)),
-                args.max_new_tokens,
-                enable_thinking=args.enable_thinking,
-            )
+        model = Gemma4MoE(
+            args.prefill_path,
+            args.decode_path,
+            args.vit_path,
+            args.embedding_path,
+            args.tokenizer_dir,
+            list(range(args.ndevice)),
+            args.max_new_tokens,
+            enable_thinking=args.enable_thinking,
+            assistant_path=args.assistant_path,
+        )
     elif args.model_size in ["31b"]:
         from gemma4 import Gemma4
 
@@ -122,6 +109,7 @@ if __name__ == "__main__":
             list(range(args.ndevice)),
             args.max_new_tokens,
             enable_thinking=args.enable_thinking,
+            assistant_path=args.assistant_path,
         )
     elif args.model_size in ["e2b", "e4b"]:
         from gemma4_e import Gemma4E
@@ -137,6 +125,7 @@ if __name__ == "__main__":
             devices=list(range(args.ndevice)),
             max_new_tokens=args.max_new_tokens,
             enable_thinking=args.enable_thinking,
+            assistant_path=args.assistant_path,
         )
     else:
         raise ValueError(f"Unsupported model size: {args.model_size}")

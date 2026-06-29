@@ -19,18 +19,36 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
 import re
+import importlib.util
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 import shutil
 import argparse
 import torch
 from xhquant.api import get_root_logger
+from xhmodel_merak.xh_llm.workflows import AutoLLMWorkflow
 from hmatc.utils.utils import first_not_none, get_model_configs
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
+
+def find_configs_merak_dir() -> str:
+    spec = importlib.util.find_spec("xhmodel_merak")
+    if spec is None or not spec.submodule_search_locations:
+        raise FileNotFoundError("Python package xhmodel_merak not found")
+
+    xhmodel_merak_dir = next(iter(spec.submodule_search_locations))
+    configs_merak_dir = os.path.join(
+        os.path.dirname(xhmodel_merak_dir), "configs_merak"
+    )
+    if not os.path.isdir(configs_merak_dir):
+        raise FileNotFoundError(
+            f"configs_merak directory not found next to xhmodel_merak: {configs_merak_dir}"
+        )
+    return configs_merak_dir
 
 
 def get_default_model_dir(model_config: dict) -> str:
@@ -40,6 +58,16 @@ def get_default_model_dir(model_config: dict) -> str:
     model_name = model_config.get("model_name", "gemma4")
     model_size = model_config.get("model_size", "26b-a4b")
     return f"{model_name}-{model_size}"
+
+
+def build_mtp_overrides(args: argparse.Namespace) -> dict | None:
+    if not args.assistant_model:
+        return None
+    return {
+        "export.model.spec_decode_mode": "mtp",
+        "export.model.mtp_config.assistant_hf_model": args.assistant_model,
+        "export.model.mtp_config.target_hf_model": args.model,
+    }
 
 
 def is_quantized_model(model_dir: str) -> bool:
@@ -98,6 +126,7 @@ if __name__ == "__main__":
     parser.add_argument("--prefill-chunk-length", type=int, default=256, help="prefill chunk length")
     parser.add_argument("--seed", type=int, default=42, help="random seed for reproducibility")
     parser.add_argument("--debug", action="store_true", help="enable debug mode")
+    parser.add_argument("--assistant-model", type=str, default=None, help="path to the Gemma4 assistant/draft HF model directory")
     args = parser.parse_args()
 
     default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
@@ -105,46 +134,28 @@ if __name__ == "__main__":
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.model = first_not_none(args.model, get_default_model_dir(model_config))
-    # fmt: on
+    enable_mtp = args.assistant_model is not None
+    if enable_mtp:
+        if args.model_size != "26b-a4b":
+            raise ValueError("--assistant-model is only supported when --model-size=26b-a4b")
+        if not os.path.isdir(args.assistant_model):
+            raise FileNotFoundError(f"Assistant model directory not found: {args.assistant_model}")
+    logger = get_root_logger()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", "")
-    if not os.path.exists(HOUMO_EXAMPLES_PATH):
-        raise FileNotFoundError(f"Examples directory not found: {HOUMO_EXAMPLES_PATH}")
-
-    if args.model_size in ["26b-a4b"]:
-        quant_config_path = os.path.join(
-            HOUMO_EXAMPLES_PATH,
-            "hmodel",
-            f"{HOUMO_TARGET}",
-            "configs_merak/workflows/xh2a/llm_models/gemma4_series/26b_a4b/gemma4_26b_a4b_full.yaml",
-        )
-    elif args.model_size in ["e2b"]:
-        quant_config_path = os.path.join(
-            HOUMO_EXAMPLES_PATH,
-            "hmodel",
-            f"{HOUMO_TARGET}",
-            "configs_merak/workflows/xh2a/llm_models/gemma4_series/e2b/gemma4_e2b_autoround.yaml",
-        )
-    elif args.model_size in ["e4b"]:
-        quant_config_path = os.path.join(
-            HOUMO_EXAMPLES_PATH,
-            "hmodel",
-            f"{HOUMO_TARGET}",
-            "configs_merak/workflows/xh2a/llm_models/gemma4_series/e4b/gemma4_e4b_full.yaml",
-        )
-    elif args.model_size in ["31b"]:
-        quant_config_path = os.path.join(
-            HOUMO_EXAMPLES_PATH,
-            "hmodel",
-            f"{HOUMO_TARGET}",
-            "configs_merak/workflows/xh2a/llm_models/gemma4_series/31b/gemma4_31b_full.yaml",
-        )
-    else:
-        raise ValueError(f"Unsupported model size: {args.model_size}")
-
-    from xhmodel_merak.xh_llm.workflows import AutoLLMWorkflow
+    configs_merak_dir = find_configs_merak_dir()
+    quant_config_relpaths = {
+        "26b-a4b": "workflows/xh2a/llm_models/gemma4_series/26b_a4b/gemma4_26b_a4b_full_mtp.yaml" if enable_mtp else "workflows/xh2a/llm_models/gemma4_series/26b_a4b/gemma4_26b_a4b_full.yaml",
+        "e2b": "workflows/xh2a/llm_models/gemma4_series/e2b/gemma4_e2b_autoround_mtp.yaml" if enable_mtp else "workflows/xh2a/llm_models/gemma4_series/e2b/gemma4_e2b_autoround.yaml",
+        "e4b": "workflows/xh2a/llm_models/gemma4_series/e4b/gemma4_e4b_full_mtp.yaml" if enable_mtp else "workflows/xh2a/llm_models/gemma4_series/e4b/gemma4_e4b_full.yaml",
+        "31b": "workflows/xh2a/llm_models/gemma4_series/31b/gemma4_31b_full_mtp.yaml" if enable_mtp else "workflows/xh2a/llm_models/gemma4_series/31b/gemma4_31b_full.yaml",
+    }
+    quant_config_path = os.path.join(
+        configs_merak_dir, quant_config_relpaths[args.model_size]
+    )
+    if not os.path.isfile(quant_config_path):
+        raise FileNotFoundError(f"Workflow config not found: {quant_config_path}")
 
     workflow = AutoLLMWorkflow.from_config(
         hf_model_dir=args.model,
@@ -153,8 +164,6 @@ if __name__ == "__main__":
         debug=args.debug,
     )
 
-    logger = get_root_logger()
-
     quant_output_dir = os.path.join(args.out_dir, "hmquant", "quantized_model")
     if not is_quantized_model(args.model) and os.path.exists(quant_output_dir):
         logger.warning(
@@ -162,9 +171,9 @@ if __name__ == "__main__":
         )
         shutil.rmtree(quant_output_dir)
 
-    config_overrides = None
+    config_overrides = dict()
     if is_quantized_model(args.model):
-        config_overrides = dict(
+        config_overrides.update(
             quant=dict(
                 algorithm="existing_hf",
                 artifact_format="gptqmodel_hf",
@@ -191,6 +200,9 @@ if __name__ == "__main__":
         "export.model.prefill_chunk_length": args.prefill_chunk_length,
     }
 
+    if enable_mtp:
+        config_overrides.update(build_mtp_overrides(args))
+        
     export_result = workflow.export(
         quant_result=quant_result,
         output_dir=str(export_output_dir),

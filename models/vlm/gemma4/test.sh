@@ -13,6 +13,13 @@ SKIP_DOWNLOAD="false"
 MODEL_NAME="gemma4"
 MODEL_SIZE="e2b"
 NDEVICE=1
+MTP="false"
+for arg in "$@"; do
+    if [ "$arg" = "--mtp" ]; then
+        MTP="true"
+        break
+    fi
+done
 parse_args "$@"
 
 cd "${SCRIPT_DIR}"
@@ -36,41 +43,46 @@ if should_run_step "quant"; then
 
     if ! should_skip_download; then
         echo "Download raw model."
-        python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        if [ "${MTP}" = "true" ]; then
+            python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --mtp
+        else
+            python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        fi
     fi
-    echo "Start model quantization."
-    python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}"
+    if [ "${MTP}" = "true" ]; then
+        echo "Start model quantization with MTP."
+        ASSISTANT_SIZE=$(echo "${MODEL_SIZE}" | tr '[:lower:]' '[:upper:]')
+        python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}" --assistant-model "${SCRIPT_DIR}/gemma-4-${ASSISTANT_SIZE}-it-assistant"
+    else
+        echo "Start model quantization."
+        python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}"
+    fi
 fi
 
 if should_run_step "build"; then
     echo "Start model compilation."
-    python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
+    if [ "${MTP}" = "true" ]; then
+        python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}" --mtp
+    else
+        python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
+    fi
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
         echo "Download pre-compiled model."
-        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        if [ "${MTP}" = "true" ]; then
+            python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --mtp
+        else
+            python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        fi
     fi
     echo "Execute python demo."
-    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
-
-    # if command -v llm_perf &>/dev/null; then
-    #     echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
-    #     python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
-    #     if [[ "${NDEVICE}" -gt 1 ]]; then
-    #         model_suffix="hmms"
-    #     else
-    #         model_suffix="hmm"
-    #     fi
-    #     devices_param=$(get_devices_param "${NDEVICE}")
-    #     llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
-    #         --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
-    #         --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
-    #         --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
-    #         --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_448x448.hmm" \
-    #         --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
-    # fi
+    if [ "${MTP}" = "true" ]; then
+        python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}" --mtp
+    else
+        python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
+    fi
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

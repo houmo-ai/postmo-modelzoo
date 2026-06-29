@@ -8,18 +8,22 @@
 
 本例支持 Gemma4 系列以下规格：
 
+> 注意：Gemma4 原模型具备视频理解能力，但当前示例仅覆盖文本、图片和音频输入，暂未提供视频处理支持。
+
 - `26b-a4b`: MoE 图文模型，使用 `Gemma4MoE` 运行时。
 - `31b`: Dense 图文模型，使用 `Gemma4` 运行时。
 - `e2b` / `e4b`: E 系列图文音频模型，使用 `Gemma4E` 运行时。
 
 模型实现来源于 ModelScope 的预训练模型：
 
-| model_size | ModelScope 模型 |
-|---|---|
-| `26b-a4b` | https://www.modelscope.cn/models/google/gemma-4-26B-A4B-it |
-| `31b` | https://www.modelscope.cn/models/google/gemma-4-31B-it |
-| `e2b` | https://www.modelscope.cn/models/google/gemma-4-E2B-it |
-| `e4b` | https://www.modelscope.cn/models/google/gemma-4-E4B-it |
+| model_size | ModelScope 模型 | MTP assistant 模型 |
+|---|---|---|
+| `26b-a4b` | https://www.modelscope.cn/models/google/gemma-4-26B-A4B-it | https://www.modelscope.cn/models/google/gemma-4-26B-A4B-it-assistant |
+| `31b` | https://www.modelscope.cn/models/google/gemma-4-31B-it | https://www.modelscope.cn/models/google/gemma-4-31B-it-assistant |
+| `e2b` | https://www.modelscope.cn/models/google/gemma-4-E2B-it | https://www.modelscope.cn/models/google/gemma-4-E2B-it-assistant |
+| `e4b` | https://www.modelscope.cn/models/google/gemma-4-E4B-it | https://www.modelscope.cn/models/google/gemma-4-E4B-it-assistant |
+
+> 当前 runtime 的 MTP 仅支持 `26b-a4b`，因此实际使用 `--assistant-model` 时请指定 `26b-a4b` 对应的 assistant 模型目录；其他 assistant 链接仅作为模型来源说明。
 
 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
 
@@ -63,6 +67,21 @@ python3 get_model.py --type raw --model_name gemma4 --model_size 26b-a4b
 python3 get_model.py --type hmm --model_name gemma4 --model_size 26b-a4b
 ```
 
+MTP assistant 辅助模型可通过 `get_model.py --mtp` 一并下载：
+
+```bash
+# 下载原始模型 + MTP assistant 辅助模型
+python3 get_model.py --type raw --model_name gemma4 --model_size 26b-a4b --mtp
+```
+
+也可通过 `modelscope` 命令单独下载 assistant 模型：
+
+```bash
+modelscope download --model google/gemma-4-26B-A4B-it-assistant --local_dir gemma-4-26B-A4B-it-assistant
+```
+
+下载完成后，可在量化导出 MTP 时通过 `--assistant-model` 指定该目录。
+
 ### 2.3 量化
 
 量化需要使用GPU，并在宿主机安装与CUDA12.8兼容的CUDA和驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID。参考命令：
@@ -77,6 +96,9 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 source env.sh
 cd models/vlm/gemma4
 python3 ptq.py --model-name gemma4 --model-size 26b-a4b
+
+# 如需导出 MTP assistant 相关模型，目前仅 26b-a4b 支持，需要额外指定 assistant/draft HF 模型目录
+python3 ptq.py --model-name gemma4 --model-size 26b-a4b --assistant-model /path/to/gemma4-assistant-model
 ```
 
 量化参数说明：
@@ -89,6 +111,7 @@ python3 ptq.py --model-name gemma4 --model-size 26b-a4b
 - `--prefill-chunk-length`: prefill HMONNX 的 chunk 长度，默认 `256`
 - `--seed`: 随机种子，默认 `42`
 - `--debug`: 开启 workflow debug 模式
+- `--assistant-model`: Gemma4 MTP assistant/draft HF 模型目录。指定该参数会开启 MTP 导出流程，目前仅支持 `--model-size 26b-a4b`；导出时会在量化目标模型的基础上额外导出 assistant 相关 HMONNX 产物，供后续 `build.py --mtp` 编译 assistant HMM 使用
 
 `ptq.py` 的主要流程：
 
@@ -108,6 +131,9 @@ python3 ptq.py --model-name gemma4 --model-size 26b-a4b
 
 ```bash
 python3 build.py --model_name gemma4 --model_size 26b-a4b
+
+# 编译 MTP 模型，目前仅 26b-a4b 支持
+python3 build.py --model_name gemma4 --model_size 26b-a4b --mtp
 ```
 
 默认输出名称按模型规格生成，例如 `26b-a4b` 为：
@@ -137,7 +163,7 @@ python3 build.py --model_name gemma4 --model_size 26b-a4b
 - `--stage`: `build`、`test`、`all`，默认 `build`
 - `--flash_attention`: 两个整数，分别控制 LLM 和 ViT FlashAttention，默认 `2 1`
 - `--enable_common_subgraph`: 开启 common subgraph 优化
-- `--mtp`: 仅 `26b-a4b` 支持，编译 verify/draft MTP 模型
+- `--mtp`: 仅 `26b-a4b` 支持，开启 MTP 编译。开启后仍会编译 LLM decode HMM，但该 decode HMM 在 MTP runtime 中作为 target verify 使用；同时会额外编译 assistant draft HMM。其他模型规格暂不支持 MTP。
 
 `build.py` 的主要流程：
 
@@ -145,7 +171,7 @@ python3 build.py --model_name gemma4 --model_size 26b-a4b
 2. 编译 LLM prefill HMM。
 3. 非 MTP 模式下编译 LLM decode HMM 和 visual HMM。
 4. `e2b` / `e4b` 非 MTP 模式下额外编译 audio HMM。
-5. MTP 模式仅支持 `26b-a4b`，会编译 verify HMM 和 draft HMM。
+5. MTP 模式仅支持 `26b-a4b`。开启 `--mtp` 后，LLM decode HMM 仍会编译，但在 MTP runtime 中作为 target verify 使用；同时会额外编译 assistant draft HMM。
 
 ### 2.5 演示
 
@@ -164,6 +190,9 @@ python3 demo.py --model_name gemma4 --model_size 26b-a4b --image ../../../data/p
 
 # 音频模式，仅 e2b/e4b 支持
 python3 demo.py --model_name gemma4 --model_size e2b --audio ../../../data/audio/0.wav --image "" --question "请描述这个音频的内容"
+
+# MTP 文本模式，目前仅 26b-a4b 支持
+python3 demo.py --model_name gemma4 --model_size 26b-a4b --mtp --question "你好，请介绍一下你自己。" --image "" --audio ""
 ```
 
 演示参数说明：
@@ -183,9 +212,8 @@ python3 demo.py --model_name gemma4 --model_size e2b --audio ../../../data/audio
 - `--audio`: 音频文件路径，仅 `e2b` / `e4b` 使用；文件不存在或 audio HMM 未加载时自动忽略音频
 - `--max-new-tokens`: 最大生成 token 数，默认 `2048`
 - `--enable-thinking`: 在 chat template 渲染阶段启用 thinking 模式
-- `--mtp`: `26b-a4b` 使用 MTP runtime
-- `--verify_path`: MTP verify HMM 路径
-- `--draft_path`: MTP draft HMM 路径
+- `--mtp`: 启用 MTP speculative decoding，目前仅 `26b-a4b` 支持。该模式使用 decode HMM 作为 target verify，并加载 assistant HMM 生成候选 token；当前 runtime 按 no KV rollback 模式运行，即 partial reject 后不做 KV restore/replay。
+- `--assistant_path`: MTP assistant HMM 路径，默认 `output/${HOUMO_TARGET}/${model_name}-${model_size}_assistant.hmm`，仅 `--mtp` 开启时生效
 
 ## 3 一键评估
 
