@@ -607,3 +607,14 @@ def test_embedding_qwen3_vl_embedding_get_model(setup_logging) -> None:
     """test_embedding_qwen3_vl_embedding_get_model"""
     model_name = "qwen3-vl-embedding"
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.z_image_turbo
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_diffusion_z_image_turbo_get_model")
+def test_diffusion_z_image_turbo_get_model(setup_logging) -> None:
+    """test_diffusion_z_image_turbo_get_model"""
+    model_name = "z-image-turbo"
+    _get_model_func(model_name, setup_logging)

@@ -1,0 +1,15 @@
+default_model_name: "z-image-turbo"
+default_model_size: "6b"
+
+model_configs:
+  z-image-turbo:
+    "6b":
+      modelscope_repo: ["Tongyi-MAI/Z-Image-Turbo"]
+      model_name: "z-image-turbo"
+      model_size: "6b"
+      ncore: 2
+      ndevice: 1
+      prefill_length: 256
+      context_length: "4k"
+      quant_type: "w8a8h1_sefp"
+      cpp_backend: "v2"

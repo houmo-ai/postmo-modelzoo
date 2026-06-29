@@ -141,10 +141,23 @@ def _generate_py_cmds(
             ):
                 continue
             param_val = param_list[idx]
-            if model_dir and "cached_models" in param_list[idx]:
-                param_val = param_list[idx].replace("cached_models", model_dir)
-            if res_dir and "cached_results" in param_list[idx]:
-                param_val = param_list[idx].replace("cached_results", res_dir)
+            if isinstance(param_val, bool):
+                if param_val is True:
+                    tmp_cmd_list += [params_str]
+                    flag = True
+                continue
+            if (
+                isinstance(param_val, str)
+                and model_dir
+                and "cached_models" in param_val
+            ):
+                param_val = param_val.replace("cached_models", model_dir)
+            if (
+                isinstance(param_val, str)
+                and res_dir
+                and "cached_results" in param_val
+            ):
+                param_val = param_val.replace("cached_results", res_dir)
 
             if param_name in ["script"]:
                 tmp_cmd_list += [param_val]
@@ -892,6 +905,10 @@ def _prepare_compiled_llm_model(
                 if param_val is None:
                     continue
                 tmp_str = f"--{param_key}"
+                if isinstance(param_val, bool):
+                    if param_val is True:
+                        cmd_list += [tmp_str]
+                    continue
                 if isinstance(param_val, str) and "cached_results" in param_val:
                     param_val = param_val.replace("cached_results", model_res_dir)
                 elif isinstance(param_val, str) and "cached_models" in param_val:
