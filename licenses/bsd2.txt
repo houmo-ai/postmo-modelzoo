@@ -1,4 +1,5 @@
-Copyright (c) {{ year }}, {{ organization }}
+Copyright (c) 2000 The NetBSD Foundation, Inc.
+Copyright (c) 2008-2025 Erik de Castro Lopo
 
 All rights reserved.
 
