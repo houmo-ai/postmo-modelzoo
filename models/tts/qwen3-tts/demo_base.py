@@ -88,6 +88,8 @@ from qwen3_tts_runtime import (
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+
+HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", os.path.abspath("../../../"))
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -1519,7 +1521,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--output_wav", type=str, default="./output_voice_clone.wav", help="输出 wav 文件路径")
     parser.add_argument("--text", type=str, default="基于先进的存算一体技术和存储工艺，后摩智能致力于突破芯片的性能与功耗瓶颈，加速人工智能技术的普惠落地。", help="待合成的文本，若不指定则使用默认文本")
     parser.add_argument("--language", type=str, default="Chinese", choices=["auto", "Chinese", "English", "Japanese", "Korean", "French", "German", "Spanish", "Italian", "Portuguese", "Russian"], help="语言，默认为 Chinese")
-    parser.add_argument("--ref_audio", type=str, default="./clone_1.wav", help="参考音频文件路径（用于 Base 模型 voice clone）")
+    parser.add_argument("--ref_audio", type=str, default=f"{HOUMO_EXAMPLES_PATH}/data/audio/clone_1.wav", help="参考音频文件路径（用于 Base 模型 voice clone）")
     parser.add_argument("--ref_text", type=str, default="甚至出现交易几乎停滞的情况。", help="参考音频对应的文本内容")
     parser.add_argument("--seed", type=int, default=1024, help="随机种子")
     parser.add_argument("--mode", type=str, default="oneshot", choices=["oneshot", "streaming"], help="推理模式: oneshot=全量生成; streaming=流式生成")

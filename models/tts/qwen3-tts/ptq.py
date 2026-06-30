@@ -74,8 +74,9 @@ from hmatc.utils.utils import get_model_configs, first_not_none
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
-DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 script_dir = os.path.dirname(os.path.abspath(__file__))
+HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", os.path.abspath("../../../"))
+DEFAULT_CONFIG_PATH = os.path.join(script_dir, "config.yaml")
 
 SUPPORTED_MODELS = [
     "talker",
@@ -2143,7 +2144,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--frontend_mel_frames", type=int, default=400, help="speaker_encoder export mel frames")
     parser.add_argument("--frontend_mel_dim", type=int, default=128, help="speaker_encoder export mel dim")
     parser.add_argument("--frontend_opset", type=int, default=18, help="ONNX opset for base-only frontend models")
-    parser.add_argument("--ref_audio", type=str, default=os.path.join(script_dir, "clone_1.wav"), help="Reference audio for base model voice clone")
+    parser.add_argument("--ref_audio", type=str, default=f"{HOUMO_EXAMPLES_PATH}/data/audio/clone_1.wav", help="Reference audio for base model voice clone")
     parser.add_argument("--ref_text", type=str, default="甚至出现交易几乎停滞的情况。", help="Reference text for base model voice clone")
     parser.add_argument("--models", type=str, default="all",
                         help=f"指定要量化的模型，支持逗号分隔的多个模型名称: {SUPPORTED_MODELS}，或 'all' 表示全部模型")

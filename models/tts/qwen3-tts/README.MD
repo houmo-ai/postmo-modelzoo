@@ -297,7 +297,7 @@ python3 demo.py \
 
 #### 2.5.2 Base 演示
 
-`Base` 模型用于 voice clone，使用 `demo_base.py` 运行。脚本默认参考音频为 `./clone_1.wav`，参考文本为 `甚至出现交易几乎停滞的情况。`，也可以通过 `--ref_audio` 和 `--ref_text` 显式指定。
+`Base` 模型用于 voice clone，使用 `demo_base.py` 运行。示例参考音频为 `${HOUMO_EXAMPLES_PATH}/data/audio/clone_1.wav`，参考文本为 `甚至出现交易几乎停滞的情况。`，可以通过 `--ref_audio` 和 `--ref_text` 显式指定。
 
 `demo_base.py` 默认根据 `--model_name` / `--model_size` 从 `output/${HOUMO_TARGET}` 推导 HMM 路径，具体编译产物见 2.4。Base voice clone 除 Talker、CodePredictor、TextProjection 和音频解码器外，还需要 `speech_tokenizer_encoder_hmm` 和 `speaker_encoder_hmm`。
 
@@ -307,8 +307,6 @@ python3 demo_base.py \
   --model_name qwen3-tts \
   --model_size 0.6b-base \
   --mode oneshot \
-  --ref_audio ./clone_1.wav \
-  --ref_text "甚至出现交易几乎停滞的情况。" \
   --output_wav output_voice_clone.wav
 ```
 
@@ -318,8 +316,6 @@ python3 demo_base.py \
   --model_name qwen3-tts \
   --model_size 0.6b-base \
   --mode streaming \
-  --ref_audio ./clone_1.wav \
-  --ref_text "甚至出现交易几乎停滞的情况。" \
   --output_wav output_voice_clone_streaming.wav
 ```
 
@@ -354,7 +350,6 @@ Usage: test.sh [options]
   -name, --model_name     Model name. Default: qwen3-tts.
   -size, --model_size     Model size. Default: 0.6b-customvoice. Choices: 0.6b-customvoice, 0.6b-base.
   --demo_mode             Demo mode. Default: oneshot. Choices: oneshot, streaming.
-  --skip_download         Skip model download steps.
   -h, --help              Show this help message.
 ```
 
@@ -365,9 +360,6 @@ bash test.sh -s quant
 
 # 量化 + 编译
 bash test.sh -s quant,build
-
-# 跳过下载，直接运行 demo（需已有芯片模型）
-bash test.sh -s demo --skip_download
 
 # 运行 CustomVoice 流式 demo
 bash test.sh -s demo --model_size 0.6b-customvoice --demo_mode streaming
@@ -478,7 +470,7 @@ SpeechTokenizerEncoder loaded
 SpeakerEncoder loaded
 Qwen3TTSInference initialized successfully
 Starting voice clone generation for text: 基于先进的存算一体技术和存储工艺，后摩智能致力于突破芯片的性能与功耗瓶颈，加速人工智能技术的普惠落地
-Reference audio frontend input: path=./clone_1.wav, samples=100895, sr=24000, duration=4.2040s, peak=0.052004, tail_0p5s_rms=0.001986
+Reference audio frontend input: path=../../../data/audio/clone_1.wav, samples=100895, sr=24000, duration=4.2040s, peak=0.052004, tail_0p5s_rms=0.001986
 Using non-streaming mode for talker input embedding
 Reached EOS token at step 177
 Audio saved to output_voice_clone.wav | duration: 14.16s | inference: 11.65s | RTF: 0.8229
@@ -523,7 +515,7 @@ SpeakerEncoder loaded
 Qwen3TTSInference initialized successfully
 StatefulDecoder loaded: chunk_size=12
 Starting streaming voice clone generation for text: 基于先进的存算一体技术和存储工艺，后摩智能致力于突破芯片的性能与功耗瓶颈，加速人工智能技术的普惠落地
-Reference audio frontend input: path=./clone_1.wav, samples=100895, sr=24000, duration=4.2040s, peak=0.052004, tail_0p5s_rms=0.001986
+Reference audio frontend input: path=../../../data/audio/clone_1.wav, samples=100895, sr=24000, duration=4.2040s, peak=0.052004, tail_0p5s_rms=0.001986
 Using streaming mode for talker input embedding
 First audio chunk latency: 813.0ms
   Chunk 1: 23040 samples (960ms audio)
