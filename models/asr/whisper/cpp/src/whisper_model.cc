@@ -729,13 +729,20 @@ void WhisperContext::Transcribe(const std::string& audio_path,
 
   p.start("transcribe");
 
-  std::vector<MelFeatures> features_list;
+  std::vector<AudioData> chunks;
   float total_duration = 0.0f;
   {
     auto t = p.scope("transcribe.audio_load");
-    features_list = audio_processor_->Process(audio_path);
+    auto audio = audio_processor_->LoadAudio(audio_path);
+    if (audio.pcm.empty()) {
+      std::cerr << "No audio loaded" << std::endl;
+      p.stop("transcribe");
+      return;
+    }
+    total_duration = static_cast<float>(audio.duration);
+    chunks = audio_processor_->ChunkPCM(audio);
   }
-  if (features_list.empty()) {
+  if (chunks.empty()) {
     std::cerr << "No audio chunks extracted" << std::endl;
     p.stop("transcribe");
     return;
@@ -745,8 +752,13 @@ void WhisperContext::Transcribe(const std::string& audio_path,
   int max_tokens = params.max_tokens > 0 ? params.max_tokens : 448;
   Token eos_id = model->eos_token_ids()[0];
 
-  for (size_t chunk_idx = 0; chunk_idx < features_list.size(); ++chunk_idx) {
-    const auto& features = features_list[chunk_idx];
+  for (size_t chunk_idx = 0; chunk_idx < chunks.size(); ++chunk_idx) {
+    MelFeatures features;
+    {
+      auto t = p.scope("transcribe.feature_extract");
+      features = audio_processor_->ExtractFeatures(chunks[chunk_idx]);
+    }
+    if (features.data.empty()) break;
 
     std::vector<float> mel_f(features.data.size());
     for (size_t i = 0; i < features.data.size(); ++i)
@@ -794,8 +806,6 @@ void WhisperContext::Transcribe(const std::string& audio_path,
   }
 
   p.stop("transcribe");
-  total_duration = 0.0f;
-  for (const auto& f : features_list) total_duration += f.duration;
   fill_perf_info(total_duration);
 }
 

@@ -32,6 +32,7 @@ if should_run_step "quant"; then
         python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Start model quantization."
+    unset HF_TOKEN
     python3 ptq.py --model-name "${MODEL_NAME}" --model-size "${MODEL_SIZE}"
 fi
 
@@ -46,7 +47,7 @@ if should_run_step "demo"; then
         python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Execute demo."
-    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

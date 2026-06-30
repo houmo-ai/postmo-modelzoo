@@ -449,7 +449,8 @@ class HmGLM_ASR:
 
         logger.info("Running Llm...")
         next_token_id = self._run_prefill(final_inputs_embeds, L)
-        self.ttft_time += time.time() - self.ttft_start
+        if self.ttft_time == 0:  # Only first chunk's TTFT
+            self.ttft_time = time.time() - self.ttft_chunk_start
         generated_ids = [next_token_id]
 
         slide_len = 10
@@ -494,21 +495,29 @@ class HmGLM_ASR:
         return result_text, valid_length - L
 
     def transcribe(self, audio_input, max_new_tokens: int = 2048) -> Tuple[str, int, float]:
-        import librosa
+        import torchaudio
 
         # Reset all timing metrics for this transcription
         self.encoder_time = 0
         self.prefill_time = 0
         self.decode_time = 0
         self.ttft_time = 0
-        self.ttft_start = time.time()
+        self.e2e_start = time.time()
 
         if isinstance(audio_input, str):
-            audio_array, _ = librosa.load(
-                audio_input,
-                sr=self.processor.feature_extractor.sampling_rate,
-                mono=True,
-            )
+            if os.path.exists(audio_input):
+                waveform, orig_sr = torchaudio.load(audio_input)
+                if waveform.shape[0] > 1:
+                    waveform = waveform.mean(dim=0)
+                else:
+                    waveform = waveform.squeeze(0)
+                if orig_sr != 16000:
+                    waveform = torchaudio.functional.resample(waveform, orig_freq=orig_sr, new_freq=16000)
+                audio_array = waveform.numpy()
+                sr = 16000
+            else:
+                logger.error(f"Audio file {audio_input} does not exist.")
+                return
         else:
             audio_array = audio_input
 
@@ -523,12 +532,15 @@ class HmGLM_ASR:
         for i in range(n_chunks):
             chunk = audio_array[i * chunk_size : (i + 1) * chunk_size]
             logger.info(f"Processing Chunk {i + 1}/{n_chunks} ({len(chunk) / sr:.1f}s)")
+            if i == 0:
+                self.ttft_chunk_start = self.e2e_start
             inputs = self.processor.apply_transcription_request(chunk)
 
             res_str, tokens = self._run_inference(inputs, max_new_tokens)
             results.append(res_str)
             total_tokens += tokens
 
+        self.e2e_time = time.time() - self.e2e_start
         return " ".join(filter(None, results)), total_tokens, audio_duration
 
 
@@ -540,10 +552,7 @@ def show_statictic_info(inference: HmGLM_ASR, output_tokens: int, audio_duration
         f"Output {output_tokens} tokens, Decode Speed: {output_tokens / max(inference.decode_time, 1e-5):.2f} tokens/s"
     )
     logger.success(f"TTFT (Time to First Token): {inference.ttft_time * 1000:.3f} ms")
-    logger.success(
-        f"TPOT (Time Per Output Token): {inference.decode_time * 1000 / max(output_tokens, 1):.3f} ms/token"
-    )
-    e2e_latency = inference.ttft_time + inference.decode_time
+    e2e_latency = inference.e2e_time
     logger.success(f"E2E Latency: {e2e_latency:.3f} seconds")
     rtf = e2e_latency / max(audio_duration, 1e-5)
     logger.success(f"RTF (Real-Time Factor): {rtf:.3f}")

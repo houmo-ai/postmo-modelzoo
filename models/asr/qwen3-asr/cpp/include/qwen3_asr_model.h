@@ -147,7 +147,7 @@ class Qwen3AsrModel : public ASRModel {
   int max_new_tokens_ = 2048;
   int max_feature_one_loop_ = 0;
 
-  Token audio_pad_id_ = 151676;
+  Token audio_pad_id_ = 0;
   Token eos_token_id_ = 0;
 
   std::unordered_map<std::string, tcim::Tensor> encoder_input_map_;

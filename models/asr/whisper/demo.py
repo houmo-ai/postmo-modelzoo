@@ -24,6 +24,7 @@ import argparse
 import os
 import time
 import torch
+import torchaudio
 import numpy as np
 import tcim_lite as tcim
 from loguru import logger
@@ -452,7 +453,13 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
             detect_inputs[dec_names[base_idx + 2 * num_decode_layers + l]] = k_list[l]
             detect_inputs[dec_names[base_idx + 3 * num_decode_layers + l]] = v_list[l]
 
-        detect_logits = whisper.run_decode(detect_inputs)[0][:, -1, :].to(torch.float32)
+        for input_name, input_data in detect_inputs.items():
+            whisper.decode.set_input(input_name, input_data.numpy())
+        whisper.decode.run()
+        whisper.decode.sync()
+        detect_logits = torch.tensor(
+            whisper.decode.get_output(whisper.decode.get_output_name(0)).numpy()
+        )[:, -1, :].to(torch.float32)
         lang_logits = detect_logits.clone()
         non_lang_mask = torch.ones_like(lang_logits, dtype=torch.bool)
         non_lang_mask[0, lang_to_id] = False
@@ -611,7 +618,7 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
         )
         step += 1
     decoded_text = processor.decode(generated_token_ids[0], skip_special_tokens=True)
-    return len(decoded_text), ttft_time, decoded_text, lang_id
+    return max(len(generated_ids) - 1, 0), ttft_time, decoded_text, lang_id
 
 
 if __name__ == "__main__":
@@ -725,11 +732,19 @@ if __name__ == "__main__":
     processor = WhisperProcessor.from_pretrained(args.tokenizer_path)
     results = ""
     output_tokens = 0
-    audio_array, sr = librosa.load(args.audio, sr=None, mono=True)
+    total_start = time.time()
+    audio_load_start = time.time()
+    waveform, sr = torchaudio.load(args.audio)
+    if waveform.shape[0] > 1:
+        waveform = waveform.mean(dim=0)
+    else:
+        waveform = waveform.squeeze(0)
     if sr != 16000:
-        audio_array = librosa.resample(audio_array, orig_sr=sr, target_sr=16000)
+        waveform = torchaudio.functional.resample(waveform, orig_freq=sr, new_freq=16000)
         logger.info(f"Resampled audio from {sr}Hz to 16000Hz")
         sr = 16000
+    audio_array = waveform.numpy()
+    audio_load_time = time.time() - audio_load_start
     chunk_size = int(args.chunk_size * sr)
     total_samples = len(audio_array)
     chunks = []
@@ -750,28 +765,47 @@ if __name__ == "__main__":
         )
         results += decoded_text
         output_tokens += output_token
-        ttft_time = current_ttft if i == 0 else ttft_time
+        ttft_time = current_ttft + audio_load_time if i == 0 else ttft_time
 
     # reset color and print newline
     print("\033[0m")
 
-    logger.success(
-        f"Output {output_tokens} tokens, Decode Cost {whisper.decode_time*1000:.3f} ms"
-    )
-    logger.success(f"Decode Speed: { output_tokens/ whisper.decode_time:.2f} tokens/s")
-    logger.success(f"TTFT (Time to First Token): {ttft_time * 1000:.3f} ms")
-    logger.success(
-        f"TPOT (Time Per Output Token): {whisper.decode_time * 1000 / output_tokens:.3f} ms/token"
-    )
-    logger.success(
-        f"E2E Latency (End-to-End Latency): {(ttft_time + whisper.decode_time):.3f} seconds"
-    )
-    logger.success(
-        f"E2E TPS (End-to-End Tokens Per Second): {output_tokens / (ttft_time + whisper.decode_time):.2f} tokens/s"
-    )
-    e2e_time = ttft_time + whisper.decode_time
+    e2e_time = time.time() - total_start
     total_audio_duration = len(audio_array) / sr
+
+    logger.success("=" * 60)
+    logger.success("Performance Statistics:")
+    logger.success("=" * 60)
     logger.success(
-        f"RTF (Real-Time Factor): {e2e_time / total_audio_duration:.4f} (lower is better, <1 means real-time)"
+        f"Audio duration: {total_audio_duration * 1000:.2f} ms ({total_audio_duration:.2f} s)"
     )
+    logger.success(f"Loop count: {len(chunks)}")
+    logger.success("-" * 60)
+    logger.success(
+        f"Total Encode time: {whisper.encode_time * 1000:.3f} ms"
+    )
+    logger.success("-" * 60)
+    logger.success(
+        f"Total Prefill time: {whisper.prefill_time * 1000:.3f} ms"
+    )
+    logger.success("-" * 60)
+    logger.success(
+        f"Output {output_tokens} tokens"
+    )
+    logger.success(
+        f"Total Decode time: {whisper.decode_time * 1000:.3f} ms"
+    )
+    if whisper.decode_time > 0:
+        logger.success(
+            f"Decode Speed: {output_tokens / whisper.decode_time:.2f} tokens/s"
+        )
+    logger.success("-" * 60)
+    logger.success(f"TTFT (Time to First Token): {ttft_time * 1000:.3f} ms")
+    logger.success(f"E2E Latency (End-to-End Latency): {e2e_time:.3f} seconds")
+    if e2e_time > 0:
+        logger.success(
+            f"E2E TPS (End-to-End Tokens Per Second): {output_tokens / e2e_time:.2f} tokens/s"
+        )
+    logger.success(f"RTF (Real-Time Factor): {e2e_time / total_audio_duration:.2f}")
+    logger.success("=" * 60)
     whisper.clear_time()

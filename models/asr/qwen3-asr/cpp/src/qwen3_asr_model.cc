@@ -23,6 +23,7 @@
 #include "qwen3_asr_model.h"
 
 #include <filesystem>
+#include <cmath>
 #include <iostream>
 #include <limits>
 
@@ -36,8 +37,12 @@ namespace houmo {
 namespace {
 
 static int compute_feat_extract_output_lengths(int input_lengths) {
-  int feat_len = ((input_lengths % 100) - 1) / 2 + 1;
-  int out = ((feat_len - 1) / 2 + 1 - 1) / 2 + 1 + (input_lengths / 100) * 13;
+  auto floor_div = [](int value, int divisor) {
+    return static_cast<int>(std::floor(static_cast<double>(value) / divisor));
+  };
+  int feat_len = floor_div((input_lengths % 100) - 1, 2) + 1;
+  int out = floor_div(floor_div(feat_len - 1, 2) + 1 - 1, 2) + 1 +
+            (input_lengths / 100) * 13;
   return out;
 }
 
@@ -153,7 +158,7 @@ void Qwen3AsrModel::load() {
 
   // Init token IDs
   {
-    audio_pad_id_ = 151676;
+    audio_pad_id_ = tokenizer_->token_to_id("<|audio_pad|>");
     eos_token_id_ = tokenizer_->eos_token_id();
     std::cout << "Token IDs: audio_pad=" << audio_pad_id_
               << " eos=" << eos_token_id_ << std::endl;
@@ -224,11 +229,12 @@ std::vector<Token> Qwen3AsrContext::BuildPrompt(Token language_token) {
   auto user_start = tokenizer->encode("<|im_start|>user\n", false, false);
   tokens.insert(tokens.end(), user_start.begin(), user_start.end());
 
-  tokens.push_back(static_cast<Token>(151669));
+  tokens.push_back(
+      static_cast<Token>(tokenizer->token_to_id("<|audio_start|>")));
 
   tokens.push_back(model->audio_pad_id());
 
-  tokens.push_back(static_cast<Token>(151670));
+  tokens.push_back(static_cast<Token>(tokenizer->token_to_id("<|audio_end|>")));
 
   auto user_end = tokenizer->encode("<|im_end|>\n", false, false);
   tokens.insert(tokens.end(), user_end.begin(), user_end.end());
@@ -464,8 +470,8 @@ void Qwen3AsrContext::Transcribe(const std::string& audio_path,
   p.start("transcribe");
 
   AudioData audio;
-  MelFeatures features;
   float total_duration = 0.0f;
+  std::vector<AudioData> chunks;
   {
     auto t = p.scope("transcribe.audio_load");
     audio = audio_processor_->LoadAudio(audio_path);
@@ -474,41 +480,34 @@ void Qwen3AsrContext::Transcribe(const std::string& audio_path,
       return;
     }
     total_duration = static_cast<float>(audio.duration);
-    int full_duration = static_cast<int>(audio.duration) + 1;
-    auto full_cfg = audio_processor_->config();
-    full_cfg.encoder_window_seconds = full_duration;
-    full_cfg.chunk_seconds = full_duration;
-    AudioProcessor full_proc(full_cfg);
-    features = full_proc.ExtractFeatures(audio);
-    if (features.data.empty()) {
+    chunks = audio_processor_->ChunkPCM(audio);
+    if (chunks.empty()) {
       p.stop("transcribe");
       return;
     }
   }
 
-  int all_frames = features.num_frames;
-  int max_loop = model->max_feature_per_loop();
-  int loop_count = (all_frames / max_loop) + 1;
   Token eos_id = model->eos_token_ids()[0];
 
   auto prompt = BuildPrompt(0);
 
-  for (int loop_idx = 0; loop_idx < loop_count; ++loop_idx) {
-    int start = loop_idx * max_loop;
-    int end = std::min(start + max_loop, all_frames);
-    int loop_frames = end - start;
-    if (loop_frames <= 0) break;
-
-    int n_mels = features.feature_dim;
-    std::vector<float> sub_features(loop_frames * n_mels);
-    for (int m = 0; m < n_mels; ++m) {
-      for (int f = 0; f < loop_frames; ++f) {
-        sub_features[m * loop_frames + f] =
-            static_cast<float>(features.data[m * all_frames + (start + f)]);
-      }
+  for (size_t loop_idx = 0; loop_idx < chunks.size(); ++loop_idx) {
+    MelFeatures features;
+    {
+      auto t = p.scope("transcribe.feature_extract");
+      features = audio_processor_->ExtractFeatures(chunks[loop_idx]);
+      if (features.data.empty()) break;
     }
 
-    do_encode(sub_features, n_mels, loop_frames);
+    int loop_frames = std::min(features.num_frames, model->max_feature_per_loop());
+    if (loop_frames <= 0) break;
+
+    std::vector<float> input_features(features.data.size());
+    for (size_t i = 0; i < features.data.size(); ++i) {
+      input_features[i] = static_cast<float>(features.data[i]);
+    }
+
+    do_encode(input_features, features.feature_dim, loop_frames);
 
     reset();
 

@@ -32,7 +32,6 @@ import numpy as np
 import torch
 import torchaudio
 import yaml
-import librosa
 
 import tcim_lite as tcim
 import time
@@ -320,13 +319,15 @@ def load_tokens(tokens_path: Path) -> Optional[List[str]]:
 
 def load_audio(audio_path: str, fs: int = 16000) -> np.ndarray:
     """Load audio file and return waveform."""
-    sample, orig_sr = librosa.load(audio_path)
-    if orig_sr != fs:
-        waveform = librosa.resample(sample, orig_sr=orig_sr, target_sr=fs)
-        logger.info(f"Resampled audio from {orig_sr}Hz to 16000Hz")
+    waveform, orig_sr = torchaudio.load(audio_path)
+    if waveform.shape[0] > 1:
+        waveform = waveform.mean(dim=0)
     else:
-        waveform, _ = librosa.load(audio_path, sr=fs)
-    return waveform
+        waveform = waveform.squeeze(0)
+    if orig_sr != fs:
+        waveform = torchaudio.functional.resample(waveform, orig_freq=orig_sr, new_freq=fs)
+        logger.info(f"Resampled audio from {orig_sr}Hz to {fs}Hz")
+    return waveform.numpy()
 
 
 def resolve_tag(v: str, mapping: Dict[str, int]) -> int:

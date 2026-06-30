@@ -283,11 +283,12 @@ void GlmAsrContext::encode_preprocess_impl(const std::vector<float>& mel,
   int max_frames = model->n_frames();
   int data_frames = static_cast<int>(mel.size()) / n_mels;
 
-  std::vector<float> padded(max_frames * n_mels, 0.0f);
   int copy_frames = std::min(n_frames, max_frames);
+  int total_elems = max_frames * n_mels;
+  std::vector<float16> padded_f16(total_elems, float16(0.0f));
   for (int m = 0; m < n_mels; ++m) {
     for (int f = 0; f < copy_frames; ++f) {
-      padded[m * max_frames + f] = mel[m * data_frames + f];
+      padded_f16[m * max_frames + f] = float16(mel[m * data_frames + f]);
     }
   }
 
@@ -295,7 +296,7 @@ void GlmAsrContext::encode_preprocess_impl(const std::vector<float>& mel,
   std::string input_name = model->encoder_module()->GetInputName(0);
   auto& tensor = encoder_input_map[input_name];
   CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
-      padded.data(), padded.size() * sizeof(float)));
+      padded_f16.data(), padded_f16.size() * sizeof(float16)));
   model->encoder_module()->SetInput(input_name, tensor);
 }
 

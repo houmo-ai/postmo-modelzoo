@@ -665,20 +665,25 @@ class Qwen3Asr:
 
     def run(self, audio_path):
         # Load audio
+        import torchaudio
+
+        total_start = time.perf_counter()
         audio_load_start = time.perf_counter()
         if os.path.exists(audio_path):
-            sample, orig_sr = librosa.load(audio_path, mono=True)
-            if orig_sr != 16000:
-                audio = librosa.resample(sample, orig_sr=orig_sr, target_sr=16000)
+            waveform, orig_sr = torchaudio.load(audio_path)
+            if waveform.shape[0] > 1:
+                waveform = waveform.mean(dim=0)
             else:
-                audio = sample
+                waveform = waveform.squeeze(0)
+            if orig_sr != 16000:
+                waveform = torchaudio.functional.resample(waveform, orig_freq=orig_sr, new_freq=16000)
+            audio = waveform.numpy()
             sr = 16000
         else:
             logger.error(f"Audio file {audio_path} does not exist.")
             return
         audio_duration = len(audio) / sr  # audio duration in seconds
         audio_load_time = time.perf_counter() - audio_load_start
-        total_start = time.perf_counter()
         # Prepare inputs
         prep_start = time.perf_counter()
         messages = [
@@ -694,7 +699,7 @@ class Qwen3Asr:
         all_inputs = all_inputs.to(self.device)
 
         self.all_features_lens = all_inputs["input_features"].shape[2]
-        self.loop_count = (self.all_features_lens // self.max_feature_one_loop) + 1
+        self.loop_count = (self.all_features_lens + self.max_feature_one_loop - 1) // self.max_feature_one_loop
 
         prep_time = time.perf_counter() - prep_start
 
@@ -708,6 +713,7 @@ class Qwen3Asr:
         total_decode_time = 0.0
         total_decode_infer_time = 0.0
         total_tokens_generated = 0
+        ttft_time = 0.0
 
         # Run encode
         for loop_idx in range(self.loop_count):
@@ -735,6 +741,9 @@ class Qwen3Asr:
             ) = self.run_prefill(origin_feature_lens, inputs, audio_embeds)
 
             next_token_id = self.sampling_manager.sample(last_hidden_state)
+            if loop_idx == 0:
+                ttft_time = time.perf_counter() - total_start
+
             (
                 result,
                 tokens_generated,
@@ -781,46 +790,29 @@ class Qwen3Asr:
         logger.success(f"Loop count: {self.loop_count}")
         logger.success("-" * 60)
         logger.success(
-            f"Total Encode time: {(total_encode_prep_time + total_encode_infer_time + total_encode_output_time) * 1000:.3f} ms"
+            f"Total Encode time: {total_encode_infer_time * 1000:.3f} ms"
         )
-        logger.success(f"  - Encode prep time: {total_encode_prep_time * 1000:.3f} ms")
         logger.success(
             f"  - Encode infer time: {total_encode_infer_time * 1000:.3f} ms"
         )
-        logger.success(
-            f"  - Encode output time: {total_encode_output_time * 1000:.3f} ms"
-        )
         logger.success("-" * 60)
         logger.success(
-            f"Total Prefill time: {(total_prefill_prep_time + total_prefill_infer_time + total_prefill_output_time) * 1000:.3f} ms"
-        )
-        logger.success(
-            f"  - Prefill prep time: {total_prefill_prep_time * 1000:.3f} ms"
+            f"Total Prefill time: {total_prefill_infer_time * 1000:.3f} ms"
         )
         logger.success(
             f"  - Prefill infer time: {total_prefill_infer_time * 1000:.3f} ms"
         )
-        logger.success(
-            f"  - Prefill output time: {total_prefill_output_time * 1000:.3f} ms"
-        )
         logger.success("-" * 60)
         logger.success(f"Output {total_tokens_generated} tokens")
         logger.success(
-            f"Total Decode time(infer + embedding): {total_decode_time * 1000:.3f} ms"
+            f"Total Decode time: {total_decode_infer_time * 1000:.3f} ms"
         )
-        logger.success(
-            f"  - Decode infer total time: {total_decode_infer_time * 1000:.3f} ms"
-        )
-        logger.success(f"  - Decode infer avg time: {avg_decode_time * 1000:.3f} ms")
-        if total_decode_time > 0:
+        if total_decode_infer_time > 0:
             logger.success(
-                f"Decode Speed: {total_tokens_generated / total_decode_time:.2f} tokens/s"
-            )
-        if total_tokens_generated > 0:
-            logger.success(
-                f"TPOT (Time Per Output Token): {total_decode_time * 1000 / total_tokens_generated:.3f} ms/token"
+                f"Decode Speed: {total_tokens_generated / total_decode_infer_time:.2f} tokens/s"
             )
         logger.success("-" * 60)
+        logger.success(f"TTFT (Time to First Token): {ttft_time * 1000:.3f} ms")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")
         if total_time > 0:
             logger.success(

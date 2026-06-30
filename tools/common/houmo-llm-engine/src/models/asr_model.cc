@@ -120,13 +120,13 @@ void ASRContext::fill_perf_info(float audio_duration) {
   perf_info_.audio_load_time =
       static_cast<float>(profiler_.get_time_ms("transcribe.audio_load"));
   perf_info_.encode_time =
-      static_cast<float>(profiler_.get_time_ms("transcribe.encode"));
+      static_cast<float>(profiler_.get_time_ms("transcribe.encode.inference"));
   perf_info_.detect_lang_time =
       static_cast<float>(profiler_.get_time_ms("transcribe.detect_lang"));
   perf_info_.prefill_time =
-      static_cast<float>(profiler_.get_time_ms("transcribe.prefill"));
+      static_cast<float>(profiler_.get_time_ms("transcribe.prefill.inference"));
   perf_info_.decode_time =
-      static_cast<float>(profiler_.get_time_ms("transcribe.decode"));
+      static_cast<float>(profiler_.get_time_ms("transcribe.decode.inference"));
   perf_info_.total_time = static_cast<float>(profiler_.e2e_ms());
   perf_info_.ttft_time = static_cast<float>(profiler_.ttft_ms());
   perf_info_.output_tokens = profiler_.output_tokens();
@@ -136,7 +136,9 @@ void ASRContext::fill_perf_info(float audio_duration) {
   if (audio_duration > 0.0f) {
     perf_info_.overall_rtf = (perf_info_.total_time / 1000.0f) / audio_duration;
     perf_info_.inference_rtf =
-        ((perf_info_.total_time - perf_info_.audio_load_time) / 1000.0f) /
+        ((perf_info_.encode_time + perf_info_.prefill_time +
+          perf_info_.decode_time) /
+         1000.0f) /
         audio_duration;
   }
   if (perf_info_.decode_time > 0.0f) {

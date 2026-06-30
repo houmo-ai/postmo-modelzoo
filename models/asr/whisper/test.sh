@@ -62,7 +62,7 @@ if should_run_step "demo"; then
         python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Execute python demo (${MODEL_NAME}-${MODEL_SIZE})."
-    python3 demo.py --audio audio.mp3 --tokenizer_path "${MODEL_NAME}-${MODEL_SIZE}" --language "auto" \
+    python3 demo.py --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3" --tokenizer_path "${MODEL_NAME}-${MODEL_SIZE}" --language "auto" \
     --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 
     echo "Execute cpp demo (${MODEL_NAME}-${MODEL_SIZE})."

@@ -155,7 +155,11 @@ int main(int argc, char* argv[]) {
 
     houmo::StreamingDecoder decoder(whisper_model->tokenizer());
     houmo::SamplingParams params;
+    params.top_k = 0;
+    params.top_p = 1.0f;
     params.repetition_penalty = 1.1f;
+    params.presence_penalty = 0.0f;
+    whisper_ctx->set_language(language);
     whisper_ctx->Transcribe(audio_path, params, [&decoder](houmo::Token token) {
       std::string text = decoder.decode(token);
       if (!text.empty()) {
