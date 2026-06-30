@@ -85,16 +85,16 @@ def parse_args():
         "--config", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml"
     )
     parser.add_argument(
-        "--embedder_model", type=str, default="/mnt/data/nan.xu/project/xh2_modelzoo/houmo-examples/xh2_v1.4.0/houmo-examples-xh2/models/embedding/bge/bge-m3", help="path of embedder hf model"
+        "--embedder_model", type=str, default=None, help="path of embedder hf model"
     )
     parser.add_argument(
-        "--reranker_model", type=str, default="/mnt/data/nan.xu/project/xh2_modelzoo/houmo-examples/xh2_v1.4.0/houmo-examples-xh2/models/embedding/bge/bge-reranker-v2-m3", help="path of reranker hf model"
+        "--reranker_model", type=str, default=None, help="path of reranker hf model"
     )
     parser.add_argument(
-        "--work_dir", type=str, default="/mnt/data/nan.xu/project/xh2_modelzoo/houmo-examples/xh2_v1.4.0/houmo-examples-xh2/models/embedding/bge/work_dir", help="path of onnx model"
+        "--work_dir", type=str, default="work_dir", help="path of onnx model"
     )
     parser.add_argument(
-        "--out_dir", type=str, default="/mnt/data/nan.xu/project/xh2_modelzoo/houmo-examples/xh2_v1.4.0/houmo-examples-xh2/models/embedding/bge/output/{}".format(HOUMO_TARGET), help="output save path"
+        "--out_dir", type=str, default="output/{}".format(HOUMO_TARGET), help="output save path"
     )
     parser.add_argument(
         "--model_name", type=str, default=None, help="output hmonnx model name"
