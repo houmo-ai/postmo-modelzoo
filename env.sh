@@ -46,7 +46,7 @@ if [[ -z $HOUMO_MODEL_PATH ]]; then
 fi
 
 # paths for xh2 modelzoo
-export PYTHONPATH=$HOUMO_EXAMPLES_PATH/apis/common/python:$HOUMO_EXAMPLES_PATH/hmodel/xh2:$HOUMO_EXAMPLES_PATH/hmodel/gptqmodel:$PYTHONPATH
+export PYTHONPATH=$HOUMO_EXAMPLES_PATH/apis/common/python:$HOUMO_EXAMPLES_PATH/hmodel/xh2:$HOUMO_EXAMPLES_PATH/hmodel/gptqmodel:$HOUMO_EXAMPLES_PATH/hmodel/gptqmodel/third_party/auto-round:$PYTHONPATH
 
 
 # 清理环境变量中的重复路径
