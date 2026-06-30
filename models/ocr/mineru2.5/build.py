@@ -47,9 +47,9 @@ def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> 
             f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
         )
 
-    if vit_val not in [0, 1]:
+    if vit_val not in [0, 1, 2]:
         raise ValueError(
-            f"ViT FlashAttention values only support 0/1, current value:{vit_val}"
+            f"ViT FlashAttention values only support 0/1/2, current value:{vit_val}"
         )
 
     if context_length < 2048:
@@ -75,9 +75,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--max_size_h", type=int, default=None)
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number for multi-device")
     parser.add_argument("--stage", dest="stage", type=str, default="build", choices=["build", "test", "all"], help="build stage")
-    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 1), help="FlashAttention switches: 1st=llm(0/1/2), 2nd=vit(0/1); e.g. --flash_attention 2 1")
-    parser.add_argument("--enable_common_subgraph", dest="enable_common_subgraph", action="store_true", default=False, help="enable common subgraph optimization")
-
+    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 2), help="FlashAttention switches: 1st=llm(0/1/2), 2nd=vit(0/1/2); e.g. --flash_attention 2 2")
+    
     args = parser.parse_args()
     default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
@@ -150,7 +149,7 @@ if __name__ == "__main__":
             ncore=ncore,
             flash_attn=flash_attn,
             parallel_jobs=parallel_jobs,
-            enable_common_subgraph=args.enable_common_subgraph,
+            enable_common_subgraph=True,
         )
         visual_buckets = os.path.join(model_dir, "visual_buckets")
         if not os.path.exists(visual_buckets):
@@ -166,7 +165,7 @@ if __name__ == "__main__":
                     ncore=ncore,
                     flash_attn=flash_attn,
                     parallel_jobs=parallel_jobs,
-                    enable_common_subgraph=args.enable_common_subgraph,
+                    enable_common_subgraph=True,
                 )
             except Exception as e:
                 print(f"Error occurred while processing bucket {bucket}: {e}")
