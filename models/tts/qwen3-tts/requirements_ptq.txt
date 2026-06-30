@@ -1,0 +1,6 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+onnx==1.16.2
+onnx-ir==0.1.10
+onnxruntime-gpu==1.19.0
+onnxsim==0.4.36
+onnxscript==0.4.0

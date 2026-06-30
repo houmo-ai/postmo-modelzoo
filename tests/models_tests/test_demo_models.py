@@ -573,3 +573,13 @@ def test_diffusion_z_image_turbo_demo(setup_logging) -> None:
     """test_diffusion_z_image_turbo_demo"""
     model_name = "z-image-turbo"
     _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_tts
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_tts_qwen3_tts_demo(setup_logging) -> None:
+    """test_tts_qwen3_tts_demo"""
+    model_name = "qwen3-tts"
+    _demo_func(model_name, setup_logging)
