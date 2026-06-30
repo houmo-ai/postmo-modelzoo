@@ -125,6 +125,15 @@ def save_json(file_path: Path, data: Dict[str, Any]):
         json.dump(data, file_obj, indent=4, ensure_ascii=False)
 
 
+def ensure_qwen3_5_wrap_cfg_compat(cfg):
+    # xh_model_zoo qwen3_5 enables split conv cache in the wrapped
+    # GatedDeltaNet by default. Keep XHQwen3_5Model.prepare_linear_cache()
+    # on the same path so it reads conv1d_q/conv1d_k/conv1d_v instead of the
+    # deleted legacy conv1d module.
+    cfg.model.wrap_cfg.split_conv_cache = True
+    cfg.model.wrap_cfg.use_manual_depthwise_conv1d = False
+
+
 def _unwrap_model_output(output):
     if isinstance(output, torch.Tensor):
         return output
@@ -503,6 +512,7 @@ def houmo_export_llm(args):
     cfg.model.type = "XHQwen3_5Model"
     cfg.model.wrap_cfg.max_sequence_length = args.context_length
     cfg.model.wrap_cfg.input_sequence_length = args.input_sequence_length
+    ensure_qwen3_5_wrap_cfg_compat(cfg)
 
     input_ids, embed_file, kv_cache_shape, num_hidden_layers, hidden_size = (
         get_prepare_context(cfg, work_dir)
