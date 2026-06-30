@@ -168,6 +168,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | qwen3-reranker          | reranker     | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | yolov8m-seg             | segmentation | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
 | cosyvoice3              | tts          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
+| qwen3-tts               | tts          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | qwen2.5-vl              | vlm          | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
 | qwen3-vl                | vlm          | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
 | gemma4                  | vlm          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |

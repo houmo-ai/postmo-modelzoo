@@ -1,0 +1,27 @@
+default_model_name: "qwen3-tts"
+default_model_size: "0.6b-customvoice"
+
+model_configs:
+  qwen3-tts:
+    "0.6b-customvoice":
+      modelscope_repo: ["Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"]
+      model_name: "qwen3-tts"
+      model_size: "0.6b-customvoice"
+      ncore: 2
+      context_length: "2k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      quant_type: "w8a16h1_sefp"
+      cpp_backend: "v2"
+    "0.6b-base":
+      modelscope_repo: ["Qwen/Qwen3-TTS-12Hz-0.6B-Base"]
+      model_name: "qwen3-tts"
+      model_size: "0.6b-base"
+      ncore: 2
+      context_length: "2k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      quant_type: "w8a16h1_sefp"
+      cpp_backend: "v2"

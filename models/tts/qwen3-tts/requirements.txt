@@ -1,0 +1,9 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+transformers==4.57.3
+torch==2.8.0
+torchaudio==2.8.0
+soundfile==0.13.1
+loguru==0.7.3
+tqdm==4.67.3
+numpy==2.2.6
+qwen_tts

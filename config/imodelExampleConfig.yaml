@@ -621,6 +621,18 @@ tts_cosyvoice3:
         args: all
   test:
     - tts_cosyvoice3_test
+tts_qwen3_tts:
+  include:
+    - models/tts/qwen3-tts
+  exclude:
+    - models/tts/qwen3-tts/README.MD
+  example_case:
+    - tts_qwen3_tts_test:
+        test_type: models_tests
+        script: qwen3_tts
+        args: all
+  test:
+    - tts_qwen3_tts_test
 diffusion_z_image_turbo:
   include:
     - models/diffusion/z-image

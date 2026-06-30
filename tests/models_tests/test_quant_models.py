@@ -763,3 +763,17 @@ def test_diffusion_z_image_turbo_quant(setup_logging) -> None:
     """test_diffusion_z_image_turbo_quant"""
     model_name = "z-image-turbo"
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.qwen3_tts
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_tts_qwen3_tts_quant",
+    depends_on=["test_get_models.py::test_tts_qwen3_tts_get_model"],
+)
+def test_tts_qwen3_tts_quant(setup_logging) -> None:
+    """test_tts_qwen3_tts_quant"""
+    model_name = "qwen3-tts"
+    _quant_func(model_name, setup_logging)
