@@ -35,7 +35,7 @@ if should_run_step "quant"; then
 
     if ! should_skip_download; then
         echo "Download raw model (${MODEL_NAME}-${MODEL_SIZE})."
-        python3 get_model.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
 
     echo "Start model quantization (${MODEL_NAME}-${MODEL_SIZE})."
