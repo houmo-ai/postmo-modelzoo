@@ -15,13 +15,13 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET", "houmo")
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-def run_command(cmd, cwd=None, timeout=None, capture_output=False):
+def run_command(cmd, cwd=None, timeout=None, capture_output=False, check=True):
     logger.info(f"[command] run: {cmd}, cwd: {cwd or os.getcwd()}")
     return subprocess.run(
         cmd,
         cwd=cwd,
         timeout=timeout,
-        check=True,
+        check=check,
         text=True,
         capture_output=capture_output,
     )
@@ -195,6 +195,9 @@ def runCase(allUnitDict):
 
         if ".sh" in script:
             cmd_list = ["bash", script]
+            logger.info(f"---> test {caseName} start, test cmd: {cmd_list}")
+            run_command(cmd_list, timeout=3600, capture_output=True)  # timeout: 1h
+            logger.info(f"<--- test {caseName} success")
         else:
             if test_type is None or args is None or args not in valid_args:
                 logger.info(f"<=== case {caseName} is not execute, {caseName} end")
@@ -207,30 +210,11 @@ def runCase(allUnitDict):
                 "-m",
                 script,
             ]
-
-        logger.info(f"---> test {caseName} start, test cmd: {cmd_list}")
-        try:
+            logger.info(f"---> test {caseName} start, test cmd: {cmd_list}")
+            # pytest --collect-only 返回码非零也继续执行
             result = run_command(
-                cmd_list, timeout=3600, capture_output=True
+                cmd_list, timeout=3600, capture_output=True, check=False
             )  # timeout: 1h
-        except subprocess.CalledProcessError as e:
-            # pytest --collect-only commands should not raise exceptions
-            if "pytest" in cmd_list and "--collect-only" in cmd_list:
-                logger.info(
-                    f"[testcase log] pytest --collect-only returned {e.returncode}, treating as success"
-                )
-            else:
-                if e.stdout:
-                    logger.info(f"[testcase log] stdout:\n {e.stdout}")
-                if e.stderr:
-                    logger.info(f"[testcase log] stderr:\n {e.stderr}")
-                raise RuntimeError(
-                    f"<--- test {caseName} fail, error code: {e.returncode}"
-                ) from e
-
-        if ".sh" in script:
-            logger.info(f"<--- test {caseName} success")
-        else:
             addCiMarker(test_type, result.stdout)
             logger.info(f"<--- test {test_type}/{caseName} success")
 
@@ -260,7 +244,7 @@ def runWithDiff(allArgs):
     os.chdir(pytest_folder)
     logger.info(f"[execution log] test imodelzoo cases...")
     # "pytest --log-cli-level=INFO -s -m imodelzoo"
-    run_command(["pytest", "--collect-only", "-s", "-m", "imodelzoo"])
+    run_command(["pytest", "--collect-only", "-s", "-m", "imodelzoo"], check=False)
 
 
 def main(allArgs=None):
