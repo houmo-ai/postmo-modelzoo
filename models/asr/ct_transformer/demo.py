@@ -9,7 +9,29 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent / "config.yaml"
 DEFAULT_HMM_DIR = Path(__file__).resolve().parent / "output" / HOUMO_TARGET
 DEFAULT_MODEL_NAME = "ct_transformer"
-DEFAULT_INPUT = Path(__file__).resolve().parent / "ct_transformer/example/punc_example.txt"
+DEFAULT_INPUT = Path(__file__).resolve().parent / "ct_transformer" / "example" / "punc_example.txt"
+
+
+def _resolve_input(input_arg: str, model_dir: Path | str) -> Path:
+    """Resolve input file path. Falls back to modelscope cache if default doesn't exist."""
+    input_path = Path(input_arg)
+    if input_path.exists():
+        return input_path
+
+    # Fallback: derive from model_dir if it's a local path
+    if isinstance(model_dir, Path) and model_dir.exists():
+        candidate = model_dir / "example" / "punc_example.txt"
+        if candidate.exists():
+            return candidate
+
+    # Fallback: modelscope cache (repo ID like iic/punc_ct-transformer_cn-en-common-vocab471067-large)
+    model_dir_str = str(model_dir)
+    if "/" in model_dir_str and not Path(model_dir_str).exists():
+        cache_candidate = Path.home() / ".cache" / "modelscope" / "hub" / "models" / model_dir_str / "example" / "punc_example.txt"
+        if cache_candidate.exists():
+            return cache_candidate
+
+    return input_path
 
 
 def first_not_none(*args):
@@ -237,7 +259,8 @@ def main():
         return
 
     t_load1 = time.time()
-    text_items = load_text_items(Path(args.input))
+    input_path = _resolve_input(args.input, args.model_dir)
+    text_items = load_text_items(input_path)
     
     results = []
     

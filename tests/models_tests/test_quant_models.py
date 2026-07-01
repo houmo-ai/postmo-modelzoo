@@ -777,3 +777,17 @@ def test_tts_qwen3_tts_quant(setup_logging) -> None:
     """test_tts_qwen3_tts_quant"""
     model_name = "qwen3-tts"
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.ct_transformer
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_asr_ct_transformer_quant",
+    depends_on=["test_get_models.py::test_asr_ct_transformer_get_model"],
+)
+def test_asr_ct_transformer_quant(setup_logging) -> None:
+    """test_asr_ct_transformer_quant"""
+    model_name = "ct_transformer"
+    _quant_func(model_name, setup_logging)

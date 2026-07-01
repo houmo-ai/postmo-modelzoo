@@ -529,6 +529,18 @@ asr_qwen3-asr:
         args: all
   test:
     - asr_qwen3-asr_test
+asr_ct_transformer:
+  include:
+    - models/asr/ct_transformer
+  exclude:
+    - models/asr/ct_transformer/README.MD
+  example_case:
+    - asr_ct_transformer_test:
+        test_type: models_tests
+        script: ct_transformer
+        args: all
+  test:
+    - asr_ct_transformer_test
 llm_perf:
   include:
     - tools/llm_perf
