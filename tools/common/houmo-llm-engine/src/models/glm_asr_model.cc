@@ -283,11 +283,12 @@ void GlmAsrContext::encode_preprocess_impl(const std::vector<float>& mel,
   int max_frames = model->n_frames();
   int data_frames = static_cast<int>(mel.size()) / n_mels;
 
-  std::vector<float> padded(max_frames * n_mels, 0.0f);
   int copy_frames = std::min(n_frames, max_frames);
+  int total_elems = max_frames * n_mels;
+  std::vector<float16> padded_f16(total_elems, float16(0.0f));
   for (int m = 0; m < n_mels; ++m) {
     for (int f = 0; f < copy_frames; ++f) {
-      padded[m * max_frames + f] = mel[m * data_frames + f];
+      padded_f16[m * max_frames + f] = float16(mel[m * data_frames + f]);
     }
   }
 
@@ -295,7 +296,7 @@ void GlmAsrContext::encode_preprocess_impl(const std::vector<float>& mel,
   std::string input_name = model->encoder_module()->GetInputName(0);
   auto& tensor = encoder_input_map[input_name];
   CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
-      padded.data(), padded.size() * sizeof(float)));
+      padded_f16.data(), padded_f16.size() * sizeof(float16)));
   model->encoder_module()->SetInput(input_name, tensor);
 }
 
@@ -412,37 +413,14 @@ Token GlmAsrContext::prefill_postprocess_impl() {
     decode_module->SetDevInput(name, dev_cache);
   }
 
-  std::string out_name = prefill_module->GetOutputName(0);
-  auto out_info = prefill_module->GetOutputInfo(out_name).AsContiguous();
-  tcim::Tensor out_tensor = tcim::Tensor::CreateHostTensor(out_info);
-  prefill_module->GetOutput(out_name).CastTo(out_tensor);
-
-  size_t out_bytes = out_tensor.MemSize();
-  Token first_token = 0;
-  float max_val = -std::numeric_limits<float>::infinity();
-  int vocab = tokenizer->vocab_size();
-
-  if (out_bytes == static_cast<size_t>(vocab) * sizeof(float)) {
-    int count = static_cast<int>(out_bytes / sizeof(float));
-    float* logits32 = static_cast<float*>(out_tensor.Buffer().Data());
-    for (int i = 0; i < count; ++i) {
-      float val = logits32[i];
-      if (val > max_val) {
-        max_val = val;
-        first_token = static_cast<Token>(i);
-      }
-    }
-  } else {
-    int count = static_cast<int>(out_bytes / sizeof(float16));
-    float16* logits16 = static_cast<float16*>(out_tensor.Buffer().Data());
-    for (int i = 0; i < count; ++i) {
-      float val = static_cast<float>(logits16[i]);
-      if (val > max_val) {
-        max_val = val;
-        first_token = static_cast<Token>(i);
-      }
-    }
-  }
+  auto out_name = prefill_module->GetOutputName(0);
+  auto dev_output = prefill_module->GetDevOutput(out_name);
+  auto host_output = dev_output.ToHost(true);
+  const float16* logits =
+      static_cast<const float16*>(host_output.Buffer().Data());
+  int vocab_size = prefill_module->GetOutputInfo(out_name).Shape()[1];
+  Token first_token =
+      static_cast<Token>(houmo::eigen_argmax<float16>(logits, vocab_size));
 
   generated_ids_.push_back(first_token);
   decode_position_ = prefill_seq_len_;
@@ -491,37 +469,14 @@ Token GlmAsrContext::decode_postprocess_impl() {
   auto* decode_module = model->decode_module().get();
   auto tokenizer = model->tokenizer();
 
-  std::string out_name = decode_module->GetOutputName(0);
-  auto out_info = decode_module->GetOutputInfo(out_name).AsContiguous();
-  tcim::Tensor out_tensor = tcim::Tensor::CreateHostTensor(out_info);
-  decode_module->GetOutput(out_name).CastTo(out_tensor);
-
-  size_t out_bytes = out_tensor.MemSize();
-  Token next_token = 0;
-  float max_val = -std::numeric_limits<float>::infinity();
-  int vocab = tokenizer->vocab_size();
-
-  if (out_bytes == static_cast<size_t>(vocab) * sizeof(float)) {
-    int count = static_cast<int>(out_bytes / sizeof(float));
-    float* logits32 = static_cast<float*>(out_tensor.Buffer().Data());
-    for (int i = 0; i < count; ++i) {
-      float val = logits32[i];
-      if (val > max_val) {
-        max_val = val;
-        next_token = static_cast<Token>(i);
-      }
-    }
-  } else {
-    int count = static_cast<int>(out_bytes / sizeof(float16));
-    float16* logits16 = static_cast<float16*>(out_tensor.Buffer().Data());
-    for (int i = 0; i < count; ++i) {
-      float val = static_cast<float>(logits16[i]);
-      if (val > max_val) {
-        max_val = val;
-        next_token = static_cast<Token>(i);
-      }
-    }
-  }
+  auto out_name = decode_module->GetOutputName(0);
+  auto dev_output = decode_module->GetDevOutput(out_name);
+  auto host_output = dev_output.ToHost(true);
+  const float16* logits =
+      static_cast<const float16*>(host_output.Buffer().Data());
+  int vocab_size = decode_module->GetOutputInfo(out_name).Shape()[1];
+  Token next_token =
+      static_cast<Token>(houmo::eigen_argmax<float16>(logits, vocab_size));
 
   generated_ids_.push_back(next_token);
   decode_position_++;
@@ -570,11 +525,11 @@ void GlmAsrContext::Transcribe(const std::string& audio_path,
     do_encode(std::vector<float>(features.data.begin(), features.data.end()),
               features.feature_dim, actual_frames);
 
-    auto prompt = BuildPrompt(0);
     reset();
+    auto prompt = BuildPrompt(0);
 
     Token first_token = do_prefill(prompt);
-    p.set_input_tokens(p.input_tokens() + static_cast<int>(prompt.size()));
+    p.set_input_tokens(p.input_tokens() + prefill_seq_len_);
     if (chunk_idx == 0) {
       p.record_ttft();
     }
