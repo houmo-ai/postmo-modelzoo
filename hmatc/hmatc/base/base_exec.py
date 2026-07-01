@@ -161,7 +161,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.build_ncore = self.build_cfg.get("ncore", 1)
         self.build_opt_level = self.build_cfg.get("opt_level", 2)
         self.build_opt_level = f"O{self.build_opt_level}"
-        self.cpp_backend = self.build_cfg.get("cpp_backend", "v1")
+        self.cpp_backend = self.build_cfg.get("cpp_backend", "v2")
         self.flash_attention = self.build_cfg.get("flash_attention", 0)
         self.dump_compiled_mlir = self.build_cfg.get("dump_compiled_mlir", False)
         # Override upload_dir_name if provided via command line
