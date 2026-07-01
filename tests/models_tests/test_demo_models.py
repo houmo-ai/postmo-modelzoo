@@ -583,3 +583,13 @@ def test_tts_qwen3_tts_demo(setup_logging) -> None:
     """test_tts_qwen3_tts_demo"""
     model_name = "qwen3-tts"
     _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.ct_transformer
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_asr_ct_transformer_demo(setup_logging) -> None:
+    """test_asr_ct_transformer_demo"""
+    model_name = "ct_transformer"
+    _demo_func(model_name, setup_logging)
