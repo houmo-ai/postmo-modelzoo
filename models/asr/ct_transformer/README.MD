@@ -133,39 +133,57 @@ python3 demo.py --model_name ct_transformer --model_size large
 
 ### 2.7 一键评估
 
-以上步骤可以通过test.sh脚本一键执行：
+使用 `test.sh` 一键执行完整流程：
 
 ```bash
+# 仅演示（默认，下载预编译模型）
 bash test.sh
-```
 
-test.sh支持以下参数：
+# 仅演示（跳过下载，使用已有模型）
+bash test.sh --skip_download
 
-```bash
-Usage: test.sh [options]
-  -s, --step         execution step, default is demo, support: all, demo, build, quant.
-  -size, --model_size    model size, default is large.
-  -name, --model_name    model name, default is ct_transformer.
-  --quant_type           quantization type, e.g. w8a8_sefp.
-  --skip_download        skip model download steps.
-  -h, --help             help information
-```
+# 仅量化
+bash test.sh -s quant
 
-示例：
+# 仅编译
+bash test.sh -s build
 
-```bash
-# 仅运行demo（使用预编译模型）
-bash test.sh -s demo
-
-# 完整流程（下载原始模型、量化、编译、演示）
+# 量化+编译+演示
 bash test.sh -s all
-
-# 量化+编译（跳过demo）
-bash test.sh -s quant,build
 
 # 指定量化类型
 bash test.sh -s all --quant_type w8a8_sefp
 ```
+
+### 2.8 GPU/NPU 分开测试
+
+由于量化和编译需要 GPU，而推理需要 NPU（xh2 芯片），开发时通常在**不同服务器**上分步执行：
+
+**在 GPU 服务器上（量化 + 编译）：**
+
+```bash
+# 下载原始模型
+python3 get_model.py --type raw --model_name ct_transformer --model_size large
+
+# 分步量化
+bash test.sh -s quant --model_size large
+
+# 分步编译
+bash test.sh -s build --model_size large
+```
+
+产物在 `output/xh2/` 目录下，主要是 `ct_transformer.hmm`。
+
+**在 NPU 服务器上（演示）：**
+
+将 GPU 服务器上 `output/xh2/` 目录完整拷贝到 NPU 服务器的相同路径下，然后执行：
+
+```bash
+# 仅运行 demo（使用编译好的 .hmm 模型，跳过下载）
+bash test.sh -s demo --model_size large --skip_download
+```
+
+> **注意**：test.sh 在 `-s demo` 时仅创建独立 venv 安装依赖，不影响系统的 xhquant/tcim 环境；而 `-s quant` 或 `-s build` 直接使用系统环境中的 xhquant 工具链。
 
 ## 3 config.yaml 配置说明
 

@@ -21,7 +21,8 @@ cd "${SCRIPT_DIR}"
 
 TEST_VENV_ACTIVE=0
 dir_path="ct_transformer_venv"
-if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
+# Only use venv for demo-only runs; quant/build need xhquant from system
+if [[ "$STEP" == "demo" ]] && [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
 fi
 
@@ -41,12 +42,11 @@ if should_run_step "quant"; then
         echo "Download raw model."
         python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
-    echo "Start model quantization."
-    QUANT_TYPE_ARG=""
-    if [[ -n "${QUANT_TYPE}" ]]; then
-        QUANT_TYPE_ARG="--quant-type ${QUANT_TYPE}"
+    if [[ -z "${QUANT_TYPE}" ]]; then
+        QUANT_TYPE="w8a8_sefp"
     fi
-    python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" ${QUANT_TYPE_ARG}
+    echo "Start model quantization."
+    python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --quant-type "${QUANT_TYPE}"
 fi
 
 if should_run_step "build"; then

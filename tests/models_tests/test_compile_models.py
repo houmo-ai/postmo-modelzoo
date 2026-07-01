@@ -833,3 +833,17 @@ def test_tts_qwen3_tts_compile(setup_logging) -> None:
     """test_tts_qwen3_tts_compile"""
     model_name = "qwen3-tts"
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.ct_transformer
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_asr_ct_transformer_compile",
+    depends_on=["test_quant_models.py::test_asr_ct_transformer_quant"],
+)
+def test_asr_ct_transformer_compile(setup_logging) -> None:
+    """test_asr_ct_transformer_compile"""
+    model_name = "ct_transformer"
+    _compile_func(model_name, setup_logging)
