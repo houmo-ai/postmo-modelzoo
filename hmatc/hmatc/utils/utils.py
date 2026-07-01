@@ -884,6 +884,17 @@ def _download_raw_quant(
     return True
 
 
+def _normalize_hmm_quant_type(quant_type: str) -> str:
+    """Normalize quant_type for generated HMM package paths."""
+    if not quant_type:
+        return ""
+
+    match = re.match(r"^(w\d+(?:w\d+)*a\d+(?:a\d+)*)", str(quant_type))
+    if match:
+        return match.group(1)
+    return quant_type
+
+
 def _generate_hmm_path(model_cfgs, source_type, model_type, target) -> str:
     # auto generate hmm path
     repo_id = ""
@@ -896,7 +907,9 @@ def _generate_hmm_path(model_cfgs, source_type, model_type, target) -> str:
     ndevice_val = model_cfgs["model_info"].get("ndevice", 0)
     opt_level = model_cfgs["model_info"].get("opt_level", "NA")
     model_size = model_cfgs["model_info"].get("model_size", "NA")
-    quant_type = model_cfgs["model_info"].get("quant_type", "")
+    quant_type = _normalize_hmm_quant_type(
+        model_cfgs["model_info"].get("quant_type", "")
+    )
     prefill_len = model_cfgs["model_info"].get("prefill_len", "")
     context_len = model_cfgs["model_info"].get("context_len", "")
     # convert val to str
