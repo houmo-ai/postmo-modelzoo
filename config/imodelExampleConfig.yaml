@@ -859,6 +859,7 @@ all:
   exclude: null
   example_case: null
   test:
+    - asr_qwen3-asr_test
     # - autodrive_yolop_test
     - backbone_resnet50_test
     # - backbone_efficientnet_test
@@ -869,10 +870,12 @@ all:
     # - detection_yolov8m_test
     # - detection_yolo12m_test
     # - detection_yolov5s_feature
-    - segmentation_yolov8m_seg_test
+    - detection_yolov5m_face_test
+    - diffusion_z_image_turbo_test
+    # - segmentation_yolov8m_seg_test
     # - llm_qwen3_test
     # - vlm_qwen3-vl_test
-    # - llm_gpt-oss_test
+    - llm_gpt-oss_test
     # - llm_qwen3.5_test
     # - llm_qwen3_30b_a3b_test
     # - vlm_gemma4_test
