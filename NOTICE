@@ -53,6 +53,8 @@ Fast C++ Logging Library spdlog - https://github.com/gabime/spdlog
 Modern C++ Argument Parser argparse - https://github.com/p-ranav/argparse
 A YAML parser and emitter in C++ (MIT) - https://github.com/jbeder/yaml-cpp
 miniaudio (MIT-0 / Public Domain) - https://github.com/mackron/miniaudio
+llama.cpp audio preprocessing code portions (MIT) - https://github.com/ggml-org/llama.cpp
+whisper.cpp audio preprocessing code portions via llama.cpp (MIT) - https://github.com/ggml-org/whisper.cpp
 LibrosaCpp (Apache-2.0) - https://github.com/ewan-xu/LibrosaCpp
 kaldi-native-fbank (Apache-2.0) - https://github.com/csukuangfj/kaldi-native-fbank
 libsamplerate (BSD-2-Clause) - https://github.com/libsndfile/libsamplerate

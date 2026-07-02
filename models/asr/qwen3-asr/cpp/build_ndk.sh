@@ -18,7 +18,7 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
-if [ ! -e build_ndk ];then
+if [ -e build_ndk ];then
   rm -rf build_ndk
   mkdir build_ndk
 fi

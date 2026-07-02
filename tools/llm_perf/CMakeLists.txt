@@ -40,19 +40,21 @@ endif()
 
 include(${CMAKE_SOURCE_DIR}/tcim_runtime.cmake)
 
-# houmo-llm-engine paths
-set(HOUMO_ENGINE_DIR ${CMAKE_SOURCE_DIR}/../common/houmo-llm-engine)
+# houmo-llm-engine is used by Linux/Android builds. Keep MSVC unchanged.
+if(MSVC)
+  set(HOUMO_ENGINE_DIR ${CMAKE_SOURCE_DIR}/../common/houmo-llm-engine)
+  set(ENGINE_BUILD_DIR ${HOUMO_ENGINE_DIR}/build)
+  set(TOKENIZERS_DIR $ENV{HOUMO_EXAMPLES_PATH}/apis/common/tokenizer.cpp)
+  set(EIGEN_PATH ${HOUMO_ENGINE_DIR}/3rdparty)
+else()
+  include(${CMAKE_SOURCE_DIR}/hm_engine.cmake)
+  set(EIGEN_PATH ${HM_EIGEN_INC})
+endif()
 
 if(ANDROID_ABI)
   set(_LIB_SUFFIX "Android_xh2")
-  set(ENGINE_BUILD_DIR ${HOUMO_ENGINE_DIR}/build_ndk/release)
-  set(TOKENIZERS_DIR $ENV{HOUMO_EXAMPLES_PATH}/apis/common/tokenizer.cpp)
-  set(OPENCV_DIR ${HOUMO_ENGINE_DIR}/3rdparty/opencv/${_LIB_SUFFIX})
+  set(OPENCV_DIR ${HM_LLM_ENGINE_DIR}/3rdparty/opencv/${_LIB_SUFFIX})
 else()
-  execute_process(COMMAND uname -m OUTPUT_VARIABLE _ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
-  set(_LIB_SUFFIX "Linux_${_ARCH}_$ENV{HOUMO_TARGET}")
-  set(ENGINE_BUILD_DIR ${HOUMO_ENGINE_DIR}/build)
-  set(TOKENIZERS_DIR $ENV{HOUMO_EXAMPLES_PATH}/apis/common/tokenizer.cpp)
   set(OPENCV_DIR "")
 endif()
 
@@ -62,17 +64,24 @@ include_directories(
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp
   $ENV{HOUMO_SDK_PATH}/hal/export/include
   $ENV{HOUMO_SDK_PATH}/hal/include
-  ${HOUMO_ENGINE_DIR}/include
-  ${TOKENIZERS_DIR}/include
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/audio/include
   ${CMAKE_SOURCE_DIR}/include
 )
+if(MSVC)
+  include_directories(
+    ${HOUMO_ENGINE_DIR}/include
+    ${TOKENIZERS_DIR}/include
+  )
+endif()
 link_directories(
   $ENV{HOUMO_SDK_PATH}/hal/lib
-  ${ENGINE_BUILD_DIR}
-  ${TOKENIZERS_DIR}/lib
 )
-set(EIGEN_PATH ${HOUMO_ENGINE_DIR}/3rdparty)
+if(MSVC)
+  link_directories(
+    ${ENGINE_BUILD_DIR}
+    ${TOKENIZERS_DIR}/lib
+  )
+endif()
 
 set(SOURCE_FILES
   src/utils/perf_dumper/perf_dumper.cc
@@ -108,13 +117,16 @@ endif()
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
 
-add_custom_target(houmo_engine_rebuild
-  COMMAND cmake --build ${ENGINE_BUILD_DIR} -j$$(nproc)
-  WORKING_DIRECTORY ${HOUMO_ENGINE_DIR}
-  COMMENT "Rebuilding houmo-llm-engine libhoumo_infer.so"
-)
-add_library(houmo_infer SHARED IMPORTED)
-set_target_properties(houmo_infer PROPERTIES IMPORTED_LOCATION ${ENGINE_BUILD_DIR}/libhoumo_infer.so)
+if(MSVC)
+  add_custom_target(houmo_engine_rebuild
+    COMMAND cmake --build ${ENGINE_BUILD_DIR} -j$$(nproc)
+    WORKING_DIRECTORY ${HOUMO_ENGINE_DIR}
+    COMMENT "Rebuilding houmo-llm-engine libhoumo_infer.so"
+  )
+  add_library(houmo_infer SHARED IMPORTED)
+  set_target_properties(houmo_infer PROPERTIES IMPORTED_LOCATION ${ENGINE_BUILD_DIR}/libhoumo_infer.so)
+endif()
+
 if(MSVC)
   add_definitions(-DYAML_CPP_STATIC_DEFINE)
   if(ENABLE_ASR)
@@ -128,17 +140,14 @@ else()
     endif()
     target_link_libraries(${PROJECT_NAME} PRIVATE
       ${TCIM_LIBRARY} hal_xh2a dl yaml-cpp
-      houmo_infer
-      ${OPENCV_DIR}/lib/libopencv_core.so
-      ${OPENCV_DIR}/lib/libopencv_imgproc.so
-      ${OPENCV_DIR}/lib/libopencv_imgcodecs.so)
+      hm_engine)
   else()
     if(ENABLE_ASR)
       add_definitions(-DENABLE_ASR)
     endif()
     target_link_libraries(${PROJECT_NAME} PRIVATE
       ${TCIM_LIBRARY} pthread hal_xh2a ${CMAKE_DL_LIBS} yaml-cpp
-      houmo_infer
+      hm_engine
       opencv_core opencv_imgproc opencv_imgcodecs)
     target_compile_definitions(${PROJECT_NAME} PRIVATE)
   endif()

@@ -139,7 +139,6 @@ if __name__ == "__main__":
         args.quant_type, model_config.get("quant_type")
     )
     batch = model_config.get("batch")
-    print(batch)
     if batch is not None:
         model_info =  {
             "model_size": model_size,

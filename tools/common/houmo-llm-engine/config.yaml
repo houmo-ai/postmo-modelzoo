@@ -31,7 +31,7 @@ model_configs:
       model_name: "qwen3.5"
       model_size: "2b"
       ncore: 2
-      quant_type: "w4a8h0_ssfp"
+      quant_type: "w8a16"
       context_length: "256k"
       ndevice: 1
       batch: 1

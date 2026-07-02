@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-export HOUMO_ENGINE_DIR="$HOUMO_EXAMPLES_PATH/tools/common/houmo-llm-engine"
-export CURRENT_DIR=$(pwd)
-cd $HOUMO_ENGINE_DIR
-if [ -e build_ndk ]; then
-  rm -rf build_ndk
-fi
-./build_ndk.sh
-cd $CURRENT_DIR
 set -e
+if [ -e build_ndk ];then
+  rm -rf build_ndk
+  mkdir build_ndk
+fi
 if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
   WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   cd "${WORK_PATH}" || exit 1

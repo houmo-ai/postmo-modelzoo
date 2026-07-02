@@ -5,6 +5,16 @@
  * Description:
  *   Audio processor implementation for ASR models
  *
+ * Portions of the mel spectrogram implementation are adapted from llama.cpp:
+ *   https://github.com/ggml-org/llama.cpp
+ *
+ * The adapted llama.cpp audio preprocessing code notes that some portions are
+ * copied from whisper.cpp:
+ *   https://github.com/ggml-org/whisper.cpp
+ *
+ * llama.cpp and whisper.cpp are licensed under the MIT License:
+ *   Copyright (c) 2023-2026 The ggml authors
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,7 +27,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0 AND MIT
  */
 
 // miniaudio implementation entry point (must be in exactly one translation
@@ -31,15 +41,364 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstring>
-#include <fstream>
 #include <iostream>
+#include <thread>
 
-#include "kaldi-native-fbank/csrc/online-feature.h"
 #include "miniaudio.h"
-#include "samplerate.h"
 
 namespace houmo {
+
+namespace {
+
+struct LlamaMelFilters {
+  int64_t n_mel = 0;
+  int64_t n_fft = 0;
+  std::vector<float> data;
+};
+
+struct LlamaMelCache {
+  std::vector<float> sin_vals;
+  std::vector<float> cos_vals;
+  std::vector<float> hann_window;
+  LlamaMelFilters filters;
+};
+
+struct LlamaMelResult {
+  int64_t n_len = 0;
+  int64_t n_len_org = 0;
+  int64_t n_mel = 0;
+  std::vector<float> data;
+};
+
+struct FilterParams {
+  int64_t n_mel = 128;
+  int64_t n_fft_bins = 201;
+  int32_t hann_window_size = 400;
+  int32_t hop_length = 160;
+  int32_t sample_rate = 16000;
+  bool center_padding = true;
+  bool use_natural_log = false;
+  float mel_floor = 5.960464477539063e-08f;
+};
+
+void fill_sin_cos_table(LlamaMelCache& cache, uint32_t n) {
+  cache.sin_vals.resize(n);
+  cache.cos_vals.resize(n);
+  for (uint32_t i = 0; i < n; i++) {
+    double theta = (2.0 * M_PI * i) / n;
+    cache.sin_vals[i] = std::sin(theta);
+    cache.cos_vals[i] = std::cos(theta);
+  }
+}
+
+void fill_hann_window(LlamaMelCache& cache, uint32_t length) {
+  cache.hann_window.resize(length);
+  for (uint32_t i = 0; i < length; i++) {
+    cache.hann_window[i] = 0.5f * (1.0f - std::cos((2.0 * M_PI * i) / length));
+  }
+}
+
+void fill_mel_filterbank_matrix(LlamaMelCache& cache, int64_t n_mel,
+                                int64_t n_fft, int sample_rate) {
+  auto hz_to_mel = [](double f_hz) -> double {
+    const double min_log_hz = 1000.0;
+    const double lin_slope = 3.0 / 200.0;
+    const double min_log_mel = min_log_hz * lin_slope;
+    const double log_step = std::log(6.4) / 27.0;
+    return f_hz < min_log_hz
+               ? f_hz * lin_slope
+               : min_log_mel + std::log(f_hz / min_log_hz) / log_step;
+  };
+  auto mel_to_hz = [](double m) -> double {
+    const double min_log_hz = 1000.0;
+    const double lin_slope = 3.0 / 200.0;
+    const double min_log_mel = min_log_hz * lin_slope;
+    const double log_step = std::log(6.4) / 27.0;
+    return m < min_log_mel
+               ? m / lin_slope
+               : min_log_hz * std::exp((m - min_log_mel) * log_step);
+  };
+
+  const double fmax = 0.5 * sample_rate;
+  const double m_lo = hz_to_mel(0.0);
+  const double m_hi = hz_to_mel(fmax);
+
+  std::vector<double> hz_pts(n_mel + 2);
+  for (int i = 0; i < n_mel + 2; ++i) {
+    double mel = m_lo + (m_hi - m_lo) * (double(i) / (n_mel + 1));
+    hz_pts[i] = mel_to_hz(mel);
+  }
+
+  const int64_t n_fft_bins = n_fft / 2 + 1;
+  std::vector<float> out((size_t)n_mel * (size_t)n_fft_bins, 0.0f);
+  const double bin_hz_step = double(sample_rate) / double(n_fft);
+
+  for (int64_t m = 0; m < n_mel; ++m) {
+    const double f_left = hz_pts[m];
+    const double f_center = hz_pts[m + 1];
+    const double f_right = hz_pts[m + 2];
+    const double denom_l = std::max(1e-30, f_center - f_left);
+    const double denom_r = std::max(1e-30, f_right - f_center);
+    const double enorm = 2.0 / std::max(1e-30, f_right - f_left);
+
+    for (int k = 0; k < n_fft_bins; ++k) {
+      const double f = k * bin_hz_step;
+      double w = 0.0;
+      if (f >= f_left && f <= f_center) {
+        w = (f - f_left) / denom_l;
+      } else if (f > f_center && f <= f_right) {
+        w = (f_right - f) / denom_r;
+      }
+      out[(size_t)m * (size_t)n_fft_bins + (size_t)k] = float(w * enorm);
+    }
+  }
+
+  cache.filters.n_mel = n_mel;
+  cache.filters.n_fft = n_fft;
+  cache.filters.data = std::move(out);
+}
+
+template <bool Inverse, bool RealInput>
+void dft_impl(const LlamaMelCache& cache, const float* in, int n, float* out) {
+  const int n_sin_cos_vals = cache.sin_vals.size();
+  const int sin_cos_step = n_sin_cos_vals / n;
+  constexpr float sign = Inverse ? 1.0f : -1.0f;
+  const float scale = Inverse ? (1.0f / n) : 1.0f;
+
+  for (int k = 0; k < n; k++) {
+    float re = 0.0f;
+    float im = 0.0f;
+    for (int i = 0; i < n; i++) {
+      int idx = (k * i * sin_cos_step) % n_sin_cos_vals;
+      float cos_val = cache.cos_vals[idx];
+      float sin_val = cache.sin_vals[idx];
+      if constexpr (RealInput) {
+        float in_re = in[i];
+        re += in_re * cos_val;
+        im += sign * in_re * sin_val;
+      } else {
+        float in_re = in[i * 2 + 0];
+        float in_im = in[i * 2 + 1];
+        re += in_re * cos_val - sign * in_im * sin_val;
+        im += sign * in_re * sin_val + in_im * cos_val;
+      }
+    }
+    out[k * 2 + 0] = re * scale;
+    out[k * 2 + 1] = im * scale;
+  }
+}
+
+template <bool Inverse, bool RealInput>
+void fft_impl(const LlamaMelCache& cache, float* in, int n, float* out) {
+  if (n == 1) {
+    out[0] = in[0];
+    out[1] = RealInput ? 0.0f : in[1];
+    return;
+  }
+
+  const int half_n = n / 2;
+  if (n - half_n * 2 == 1) {
+    dft_impl<Inverse, RealInput>(cache, in, n, out);
+    return;
+  }
+
+  if constexpr (RealInput) {
+    float* even = in + n;
+    for (int i = 0; i < half_n; ++i) even[i] = in[2 * i];
+    float* even_fft = out + 2 * n;
+    fft_impl<Inverse, true>(cache, even, half_n, even_fft);
+
+    float* odd = even;
+    for (int i = 0; i < half_n; ++i) odd[i] = in[2 * i + 1];
+    float* odd_fft = even_fft + n;
+    fft_impl<Inverse, true>(cache, odd, half_n, odd_fft);
+  } else {
+    float* even = in + n * 2;
+    for (int i = 0; i < half_n; ++i) {
+      even[i * 2 + 0] = in[2 * i * 2 + 0];
+      even[i * 2 + 1] = in[2 * i * 2 + 1];
+    }
+    float* even_fft = out + 2 * n;
+    fft_impl<Inverse, false>(cache, even, half_n, even_fft);
+
+    float* odd = even;
+    for (int i = 0; i < half_n; ++i) {
+      odd[i * 2 + 0] = in[(2 * i + 1) * 2 + 0];
+      odd[i * 2 + 1] = in[(2 * i + 1) * 2 + 1];
+    }
+    float* odd_fft = even_fft + n;
+    fft_impl<Inverse, false>(cache, odd, half_n, odd_fft);
+  }
+
+  float* even_fft = out + 2 * n;
+  float* odd_fft = even_fft + n;
+  const int sin_cos_step = cache.sin_vals.size() / n;
+  constexpr float sign = Inverse ? 1.0f : -1.0f;
+  constexpr float scale = Inverse ? 0.5f : 1.0f;
+
+  for (int k = 0; k < half_n; k++) {
+    int idx = k * sin_cos_step;
+    float re = cache.cos_vals[idx];
+    float im = sign * cache.sin_vals[idx];
+    float re_odd = odd_fft[2 * k + 0];
+    float im_odd = odd_fft[2 * k + 1];
+
+    out[2 * k + 0] = scale * (even_fft[2 * k + 0] + re * re_odd - im * im_odd);
+    out[2 * k + 1] = scale * (even_fft[2 * k + 1] + re * im_odd + im * re_odd);
+    out[2 * (k + half_n) + 0] =
+        scale * (even_fft[2 * k + 0] - re * re_odd + im * im_odd);
+    out[2 * (k + half_n) + 1] =
+        scale * (even_fft[2 * k + 1] - re * im_odd - im * re_odd);
+  }
+}
+
+void fft(const LlamaMelCache& cache, float* in, int n, float* out) {
+  fft_impl<false, true>(cache, in, n, out);
+}
+
+void mel_worker(int ith, const float* hann, const std::vector<float>& samples,
+                int n_samples, int frame_size, int frame_step, int n_threads,
+                const FilterParams& params, const LlamaMelCache& cache,
+                LlamaMelResult& out) {
+  std::vector<float> fft_in(frame_size * 2, 0.0f);
+  std::vector<float> fft_out(frame_size * 2 * 2 * 2, 0.0f);
+  int64_t n_fft_bins = params.n_fft_bins;
+  const auto& filters = cache.filters;
+
+  for (int64_t i = ith;
+       i < std::min((int64_t)(n_samples / frame_step + 1), out.n_len);
+       i += n_threads) {
+    const int64_t offset = i * frame_step;
+    const int valid_len =
+        std::min(frame_size, std::max(0, n_samples - (int)offset));
+    for (int j = 0; j < valid_len; j++) {
+      fft_in[j] = hann[j] * samples[offset + j];
+    }
+    if (valid_len < frame_size) {
+      std::fill(fft_in.begin() + valid_len, fft_in.end(), 0.0f);
+    }
+
+    fft(cache, fft_in.data(), frame_size, fft_out.data());
+
+    for (int j = 0; j < n_fft_bins; j++) {
+      float re = fft_out[2 * j + 0];
+      float im = fft_out[2 * j + 1];
+      fft_out[j] = re * re + im * im;
+    }
+
+    for (int64_t j = 0; j < out.n_mel; j++) {
+      double sum = 0.0;
+      int k = 0;
+      for (; k < n_fft_bins - 3; k += 4) {
+        size_t idx = (size_t)j * (size_t)n_fft_bins + (size_t)k;
+        sum += fft_out[k + 0] * filters.data[idx + 0] +
+               fft_out[k + 1] * filters.data[idx + 1] +
+               fft_out[k + 2] * filters.data[idx + 2] +
+               fft_out[k + 3] * filters.data[idx + 3];
+      }
+      for (; k < n_fft_bins; k++) {
+        sum += fft_out[k] *
+               filters.data[(size_t)j * (size_t)n_fft_bins + (size_t)k];
+      }
+      sum = std::max(sum, (double)params.mel_floor);
+      out.data[(size_t)j * out.n_len + (size_t)i] =
+          params.use_natural_log ? std::log(sum) : std::log10(sum);
+    }
+  }
+
+  double sum = params.use_natural_log ? std::log(1e-10) : std::log10(1e-10);
+  for (int64_t i = ith; i < out.n_len; i += n_threads) {
+    if (i < std::min((int64_t)(n_samples / frame_step + 1), out.n_len))
+      continue;
+    for (int64_t j = 0; j < out.n_mel; j++) {
+      out.data[(size_t)j * out.n_len + (size_t)i] = sum;
+    }
+  }
+}
+
+bool log_mel_spectrogram(const float* samples, int n_samples_in, int n_threads,
+                         const FilterParams& params, const LlamaMelCache& cache,
+                         LlamaMelResult& out) {
+  out.n_len_org = n_samples_in;
+  const int frame_size = (params.n_fft_bins - 1) * 2;
+  const int frame_step = params.hop_length;
+  const int pad = frame_size / 2;
+
+  std::vector<float> padded;
+  if (params.center_padding) {
+    padded.assign(n_samples_in + 2 * pad, 0.0f);
+    for (int i = 0; i < pad; i++) {
+      int src = pad - i;
+      padded[i] = src < n_samples_in ? samples[src] : 0.0f;
+    }
+    std::copy(samples, samples + n_samples_in, padded.begin() + pad);
+    for (int i = 0; i < pad; i++) {
+      int src = n_samples_in - 2 - i;
+      padded[n_samples_in + pad + i] = src >= 0 ? samples[src] : 0.0f;
+    }
+  } else {
+    const int64_t stage_1_pad = params.sample_rate * 30;
+    padded.assign(n_samples_in + stage_1_pad + pad * 2, 0.0f);
+    std::copy(samples, samples + n_samples_in, padded.begin() + pad);
+    if (n_samples_in < pad + 1) return false;
+    std::reverse_copy(samples + 1, samples + 1 + pad, padded.begin());
+  }
+
+  out.n_mel = params.n_mel;
+  out.n_len = ((int)padded.size() - frame_size) / frame_step + 1;
+  if (out.n_mel <= 0 || out.n_len <= 0) return false;
+  out.data.assign((size_t)out.n_mel * (size_t)out.n_len, 0.0f);
+
+  std::vector<std::thread> workers(std::max(0, n_threads - 1));
+  for (int i = 0; i < n_threads - 1; ++i) {
+    workers[i] = std::thread(mel_worker, i + 1, cache.hann_window.data(),
+                             std::cref(padded), (int)padded.size(), frame_size,
+                             frame_step, n_threads, std::cref(params),
+                             std::cref(cache), std::ref(out));
+  }
+  mel_worker(0, cache.hann_window.data(), padded, (int)padded.size(),
+             frame_size, frame_step, n_threads, params, cache, out);
+  for (auto& worker : workers) worker.join();
+
+  double mmax = -1e20;
+  for (float value : out.data) {
+    if (value > mmax) mmax = value;
+  }
+  mmax -= 8.0;
+  for (float& value : out.data) {
+    value = (std::max((double)value, mmax) + 4.0) / 4.0;
+  }
+  return true;
+}
+
+LlamaMelCache make_cache(const AudioProcessorConfig& config) {
+  LlamaMelCache cache;
+  fill_sin_cos_table(cache, config.fft_size);
+  fill_hann_window(cache, config.win_length);
+  fill_mel_filterbank_matrix(cache, config.n_mels, config.fft_size,
+                             config.sample_rate);
+  return cache;
+}
+
+LlamaMelResult ComputeLlamaMelSpectrogram(const std::vector<float>& pcm,
+                                          const AudioProcessorConfig& config) {
+  LlamaMelCache cache = make_cache(config);
+  FilterParams params;
+  params.n_mel = config.n_mels;
+  params.n_fft_bins = 1 + (config.fft_size / 2);
+  params.hann_window_size = config.win_length;
+  params.hop_length = config.hop_length;
+  params.center_padding = config.feature_mode == AudioFeatureMode::kCenterPad;
+
+  LlamaMelResult mel;
+  if (!log_mel_spectrogram(pcm.data(), static_cast<int>(pcm.size()),
+                           config.feature_threads, params, cache, mel)) {
+    return {};
+  }
+  return mel;
+}
+
+}  // namespace
 
 // ============================================================================
 // AudioProcessor
@@ -57,9 +416,9 @@ AudioProcessor::~AudioProcessor() = default;
 AudioData AudioProcessor::LoadAudio(const std::string& path) {
   AudioData audio;
 
-  // 1. Open audio file using miniaudio
-  ma_decoder_config decoder_config =
-      ma_decoder_config_init(ma_format_f32, 0, 0);
+  // 1. Open audio file using miniaudio, decoding directly to target PCM layout
+  ma_decoder_config decoder_config = ma_decoder_config_init(
+      ma_format_f32, 1, static_cast<ma_uint32>(config_.sample_rate));
   ma_decoder decoder;
   ma_result result =
       ma_decoder_init_file(path.c_str(), &decoder_config, &decoder);
@@ -126,21 +485,8 @@ AudioData AudioProcessor::LoadAudio(const std::string& path) {
     return audio;
   }
 
-  // 4. Convert to mono
-  std::vector<float> mono_pcm;
-  DownmixToMono(interleaved_pcm, static_cast<int>(channels), &mono_pcm);
-
-  // 5. Resample to target sample rate
-  if (sample_rate == static_cast<ma_uint32>(config_.sample_rate)) {
-    audio.pcm = std::move(mono_pcm);
-  } else {
-    if (!ResampleAudio(mono_pcm, static_cast<uint32_t>(sample_rate),
-                       &audio.pcm)) {
-      std::cerr << "Error: Failed to resample audio from " << sample_rate
-                << " Hz to " << config_.sample_rate << " Hz: " << path << "\n";
-      return audio;
-    }
-  }
+  // 4. Store decoded mono PCM at target sample rate
+  audio.pcm = std::move(interleaved_pcm);
 
   audio.sample_rate = config_.sample_rate;
   audio.duration = static_cast<float>(audio.pcm.size()) / config_.sample_rate;
@@ -217,132 +563,51 @@ std::vector<MelFeatures> AudioProcessor::Process(const std::string& path) {
 
 int AudioProcessor::feature_dim() const { return config_.n_mels; }
 
-// ========== Helper methods ==========
-
-void AudioProcessor::DownmixToMono(const std::vector<float>& interleaved,
-                                   int channels, std::vector<float>* mono) {
-  if (mono == nullptr || channels <= 0) return;
-
-  if (channels == 1) {
-    *mono = interleaved;
-    return;
-  }
-
-  const size_t num_frames = interleaved.size() / channels;
-  mono->assign(num_frames, 0.0f);
-
-  const float scale = 1.0f / static_cast<float>(channels);
-  for (size_t frame = 0; frame < num_frames; ++frame) {
-    float mixed_sample = 0.0f;
-    const size_t base_index = frame * channels;
-    for (int channel = 0; channel < channels; ++channel) {
-      mixed_sample += interleaved[base_index + channel];
-    }
-    (*mono)[frame] = mixed_sample * scale;
-  }
-}
-
-bool AudioProcessor::ResampleAudio(const std::vector<float>& input,
-                                   uint32_t input_sr,
-                                   std::vector<float>* output) {
-  if (output == nullptr || input.empty() || input_sr == 0) return false;
-
-  if (input_sr == static_cast<uint32_t>(config_.sample_rate)) {
-    *output = input;
-    return true;
-  }
-
-  const double ratio = static_cast<double>(config_.sample_rate) / input_sr;
-  const size_t output_capacity =
-      static_cast<size_t>(std::ceil(input.size() * ratio)) + 1;
-
-  output->assign(output_capacity, 0.0f);
-
-  SRC_DATA src_data;
-  std::memset(&src_data, 0, sizeof(src_data));
-  src_data.data_in = input.data();
-  src_data.input_frames = static_cast<long>(input.size());
-  src_data.data_out = output->data();
-  src_data.output_frames = static_cast<long>(output->size());
-  src_data.src_ratio = ratio;
-  src_data.end_of_input = 1;
-
-  const int result = src_simple(&src_data, SRC_SINC_FASTEST, 1);
-  if (result != 0) {
-    std::cerr << "Error: libsamplerate resampling failed: "
-              << src_strerror(result) << "\n";
-    output->clear();
-    return false;
-  }
-
-  output->resize(static_cast<size_t>(src_data.output_frames_gen));
-  return true;
-}
-
 // ========== Mel Spectrogram (WhisperFeatureExtractor style) ==========
-// Compatible with models using WhisperFeatureExtractor: Whisper, GLM-ASR, Qwen3-ASR
+// Compatible with models using WhisperFeatureExtractor: Whisper, GLM-ASR,
+// Qwen3-ASR
 
 MelFeatures AudioProcessor::ComputeMelSpectrogram(const AudioData& audio) {
   MelFeatures features;
   features.feature_dim = config_.n_mels;
-  features.duration = audio.duration;  // Save actual audio duration
+  features.duration = audio.duration;
 
   if (audio.pcm.empty()) {
     return features;
   }
 
-  // 1. Configure window size based on encoder_window_seconds (padding/truncate)
-  // This is the window size required by encode input, independent of chunk_seconds segmentation logic
   std::vector<float> processed_pcm = audio.pcm;
   size_t window_samples =
       static_cast<size_t>(config_.sample_rate) * config_.encoder_window_seconds;
 
   if (processed_pcm.size() < window_samples) {
-    processed_pcm.resize(window_samples, 0.0f);  // Padding with zeros
+    processed_pcm.resize(window_samples, 0.0f);
   } else if (processed_pcm.size() > window_samples) {
-    processed_pcm.resize(window_samples);  // Truncate
+    processed_pcm.resize(window_samples);
   }
 
-  // 2. Configure feature extractor (WhisperFeatureExtractor style)
-  knf::WhisperFeatureOptions whisper_opts;
-  whisper_opts.dim = config_.n_mels;
-
-  knf::OnlineWhisperFbank whisper_fbank(whisper_opts);
-  whisper_fbank.AcceptWaveform(static_cast<float>(config_.sample_rate),
-                               processed_pcm.data(), processed_pcm.size());
-  whisper_fbank.InputFinished();
-
-  // 3. Extract features
-  features.num_frames = whisper_fbank.NumFramesReady();
-  if (features.num_frames <= 0) {
+  LlamaMelResult mel = ComputeLlamaMelSpectrogram(processed_pcm, config_);
+  if (mel.data.empty() || mel.n_mel <= 0 || mel.n_len <= 0) {
     return features;
   }
 
-  std::vector<float> tmp_data(features.feature_dim * features.num_frames, 0.0f);
-  float max_log_spec = -1e20f;
-
-  for (int t = 0; t < features.num_frames; ++t) {
-    const float* frame = whisper_fbank.GetFrame(t);
-    for (int m = 0; m < features.feature_dim; ++m) {
-      float log_spec = std::log10(std::max(frame[m], 1e-10f));
-      tmp_data[m * features.num_frames + t] = log_spec;
-      if (log_spec > max_log_spec) {
-        max_log_spec = log_spec;
-      }
-    }
+  features.feature_dim = static_cast<int>(mel.n_mel);
+  features.num_frames = static_cast<int>(mel.n_len);
+  if (config_.feature_mode == AudioFeatureMode::kWhisper) {
+    features.num_frames = std::min(
+        features.num_frames,
+        config_.encoder_window_seconds * config_.sample_rate / config_.hop_length);
   }
 
-  // 4. Normalize and convert to FP16
-  // Whisper normalization: clamp to [max_log_spec - 8, max_log_spec], then (val + 4)
-  // / 4
-  features.data.resize(tmp_data.size());
-  for (size_t i = 0; i < tmp_data.size(); ++i) {
-    float val = tmp_data[i];
-    // Clamp to [max_log_spec - 8, max_log_spec]
-    val = std::max(val, max_log_spec - 8.0f);
-    // Normalize: (val + 4) / 4
-    val = (val + 4.0f) / 4.0f;
-    features.data[i] = static_cast<float16>(val);
+  features.data.resize(static_cast<size_t>(features.feature_dim) *
+                       static_cast<size_t>(features.num_frames));
+  for (int m = 0; m < features.feature_dim; ++m) {
+    const size_t src_offset = static_cast<size_t>(m) * static_cast<size_t>(mel.n_len);
+    const size_t dst_offset = static_cast<size_t>(m) * static_cast<size_t>(features.num_frames);
+    for (int t = 0; t < features.num_frames; ++t) {
+      features.data[dst_offset + static_cast<size_t>(t)] =
+          static_cast<float16>(mel.data[src_offset + static_cast<size_t>(t)]);
+    }
   }
 
   return features;

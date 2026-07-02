@@ -59,7 +59,7 @@ set(HM_LINK_LIBS
 # ---- auto-build houmo_infer (optional) ----
 if(ANDROID_ABI)
   set(_HM_BUILD_SCRIPT  "${HM_LLM_ENGINE_DIR}/build_ndk.sh")
-  option(HM_ENGINE_AUTO_BUILD "Auto-build houmo_infer when sources change" OFF)
+  option(HM_ENGINE_AUTO_BUILD "Auto-build houmo_infer when sources change" ON)
 else()
   set(_HM_BUILD_SCRIPT  "${HM_LLM_ENGINE_DIR}/build_linux.sh")
   option(HM_ENGINE_AUTO_BUILD "Auto-build houmo_infer when sources change" ON)

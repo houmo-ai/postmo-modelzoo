@@ -23,6 +23,7 @@
 #ifndef HOUMO_AUDIO_PROCESSOR_H
 #define HOUMO_AUDIO_PROCESSOR_H
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -49,9 +50,15 @@ struct AudioData {
  */
 struct MelFeatures {
   std::vector<float16> data;  ///< Feature data (FP16)
-  int feature_dim = 0;        ///< Feature dimension (80 or 128 for Mel Spectrogram)
-  int num_frames = 0;         ///< Number of frames
-  float duration = 0.0f;      ///< Actual audio duration (seconds), excluding padding
+  int feature_dim = 0;  ///< Feature dimension (80 or 128 for Mel Spectrogram)
+  int num_frames = 0;   ///< Number of frames
+  float duration =
+      0.0f;  ///< Actual audio duration (seconds), excluding padding
+};
+
+enum class AudioFeatureMode {
+  kCenterPad,
+  kWhisper,
 };
 
 /**
@@ -65,19 +72,25 @@ struct AudioProcessorConfig {
 
   int sample_rate = 16000;  ///< Target sample rate (Hz), default 16kHz
 
-  // ========== Mel Spectrogram parameters (Whisper/GLM-ASR/Qwen3-ASR) ==========
+  // ========== Mel Spectrogram parameters (Whisper/GLM-ASR/Qwen3-ASR)
+  // ==========
 
-  int n_mels = 80;            ///< Number of Mel bins (80 or 128 for whisper-large-v3-turbo)
-  int chunk_seconds = 30;     ///< PCM chunk size (seconds), used for audio segmentation
-  int encoder_window_seconds = 30;  ///< Encoder input window size (seconds), Whisper fixed at 30 seconds
+  int n_mels =
+      80;  ///< Number of Mel bins (80 or 128 for whisper-large-v3-turbo)
+  int chunk_seconds =
+      30;  ///< PCM chunk size (seconds), used for audio segmentation
+  int encoder_window_seconds =
+      30;  ///< Encoder input window size (seconds), Whisper fixed at 30 seconds
 
   // ========== Advanced parameters (optional) ==========
 
-  int fft_size = 400;         ///< FFT size (25ms at 16kHz)
-  int hop_length = 160;       ///< Hop length (10ms at 16kHz)
-  int win_length = 400;       ///< Window length (25ms at 16kHz)
-  float mel_fmin = 0.0f;      ///< Mel filter minimum frequency
-  float mel_fmax = 8000.0f;   ///< Mel filter maximum frequency
+  int fft_size = 400;        ///< FFT size (25ms at 16kHz)
+  int hop_length = 160;      ///< Hop length (10ms at 16kHz)
+  int win_length = 400;      ///< Window length (25ms at 16kHz)
+  int feature_threads = 4;   ///< Worker threads for Mel feature extraction
+  AudioFeatureMode feature_mode = AudioFeatureMode::kCenterPad;
+  float mel_fmin = 0.0f;     ///< Mel filter minimum frequency
+  float mel_fmax = 8000.0f;  ///< Mel filter maximum frequency
 };
 
 /**
@@ -205,14 +218,6 @@ class AudioProcessor {
 
  private:
   AudioProcessorConfig config_;
-
-  // ========== Helper methods ==========
-
-  void DownmixToMono(const std::vector<float>& interleaved, int channels,
-                     std::vector<float>* mono);
-
-  bool ResampleAudio(const std::vector<float>& input, uint32_t input_sr,
-                     std::vector<float>* output);
 
   MelFeatures ComputeMelSpectrogram(const AudioData& audio);
 };

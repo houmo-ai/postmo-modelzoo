@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
 # c++ example
-export HOUMO_ENGINE_DIR="$HOUMO_EXAMPLES_PATH/tools/common/houmo-llm-engine"
-export CURRENT_DIR=$(pwd)
-cd $HOUMO_ENGINE_DIR
-if [ -e build ]; then
+if [ -e build ];then
   rm -rf build
+  mkdir build
 fi
-./build_linux.sh
-cd $CURRENT_DIR
 if [ $(uname -s) = "Linux" ] &&  ([ $(uname -m) = "x86_64" ] || [ $(uname -m) = "aarch64" ]); then
   if [ "$HOUMO_TARGET" = "xh2" ]; then
     set -e
