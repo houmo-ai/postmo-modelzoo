@@ -22,6 +22,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import argparse
+from dataclasses import dataclass, field
 import json
 import math
 import os
@@ -70,6 +71,302 @@ def to_numpy(value):
     if isinstance(value, np.ndarray):
         return value
     return np.asarray(value)
+
+
+@dataclass
+class StageMetric:
+    elapsed: float = 0.0
+    count: int = 0
+
+    def add(self, elapsed: float, count: int = 1):
+        self.elapsed += elapsed
+        self.count += count
+
+    def set(self, elapsed: float, count: Optional[int] = None):
+        self.elapsed = elapsed
+        if count is not None:
+            self.count = count
+
+
+@dataclass
+class ZImagePerf:
+    metrics: Dict[str, StageMetric] = field(default_factory=dict)
+    _active: Dict[str, float] = field(default_factory=dict)
+    batch_size: int = 0
+    total_images: int = 0
+    num_inference_steps: int = 0
+
+    DEFAULT_STAGES = (
+        "text_encode",
+        "prepare_latents",
+        "denoise",
+        "dit",
+        "dit_preprocess",
+        "dit_runtime",
+        "dit_postprocess",
+        "scheduler",
+        "vae_decode",
+        "postprocess",
+        "total",
+    )
+
+    def __post_init__(self):
+        for name in self.DEFAULT_STAGES:
+            self.metrics.setdefault(name, StageMetric())
+
+    def metric(self, name: str) -> StageMetric:
+        return self.metrics.setdefault(name, StageMetric())
+
+    def add(self, name: str, elapsed: float, count: int = 1):
+        self.metric(name).add(elapsed, count)
+
+    def set(self, name: str, elapsed: float, count: Optional[int] = None):
+        self.metric(name).set(elapsed, count)
+
+    def start(self, name: str):
+        if name in self._active:
+            raise RuntimeError(f"Generation perf event already started: {name}")
+        self._active[name] = time.perf_counter()
+
+    def stop(self, name: str, count: int = 1) -> float:
+        start_time = self._active.pop(name, None)
+        if start_time is None:
+            raise RuntimeError(f"Generation perf event was not started: {name}")
+        elapsed = time.perf_counter() - start_time
+        self.add(name, elapsed, count=count)
+        return elapsed
+
+    def snapshot(self):
+        if self._active:
+            raise RuntimeError(f"Unclosed generation perf events: {list(self._active)}")
+        return (
+            {name: metric.elapsed for name, metric in self.metrics.items()},
+            {name: metric.count for name, metric in self.metrics.items()},
+        )
+
+    def elapsed(self, name: str) -> float:
+        return self.metric(name).elapsed
+
+    def count(self, name: str) -> int:
+        return self.metric(name).count
+
+    def set_generation_shape(
+        self,
+        *,
+        batch_size: int,
+        total_images: int,
+        num_inference_steps: int,
+    ):
+        self.batch_size = batch_size
+        self.total_images = total_images
+        self.num_inference_steps = num_inference_steps
+
+    def get_generation_rows(self):
+        total_time = self.elapsed("total")
+        total_images = self.total_images
+        num_inference_steps = self.num_inference_steps
+        dit_count = self.count("dit")
+        return [
+            {
+                "name": "generation_end_to_end",
+                "time": total_time,
+                "count": total_images,
+                "total": total_time,
+                "notes": "generate_image total",
+            },
+            {
+                "name": "  text_encode",
+                "time": self.elapsed("text_encode"),
+                "count": self.batch_size,
+                "total": total_time,
+                "notes": "prompt encoder",
+            },
+            {
+                "name": "  prepare_latents",
+                "time": self.elapsed("prepare_latents"),
+                "count": total_images,
+                "total": total_time,
+                "notes": "latent init",
+            },
+            {
+                "name": "  denoise_total",
+                "time": self.elapsed("denoise"),
+                "count": num_inference_steps,
+                "total": total_time,
+                "notes": "all denoising steps",
+            },
+            {
+                "name": "    dit_total",
+                "time": self.elapsed("dit"),
+                "count": dit_count,
+                "total": self.elapsed("denoise"),
+                "notes": "share of denoising",
+            },
+            {
+                "name": "      dit_preprocess",
+                "time": self.elapsed("dit_preprocess"),
+                "count": self.count("dit_preprocess"),
+                "total": self.elapsed("dit"),
+                "notes": "t_embedder/patchify/masks",
+            },
+            {
+                "name": "      dit_runtime",
+                "time": self.elapsed("dit_runtime"),
+                "count": self.count("dit_runtime"),
+                "total": self.elapsed("dit"),
+                "notes": "HMM runtime",
+            },
+            {
+                "name": "      dit_postprocess",
+                "time": self.elapsed("dit_postprocess"),
+                "count": self.count("dit_postprocess"),
+                "total": self.elapsed("dit"),
+                "notes": "crop/unpatchify",
+            },
+            {
+                "name": "    scheduler_total",
+                "time": self.elapsed("scheduler"),
+                "count": self.count("scheduler"),
+                "total": self.elapsed("denoise"),
+                "notes": "share of denoising",
+            },
+            {
+                "name": "  vae_decode",
+                "time": self.elapsed("vae_decode"),
+                "count": self.count("vae_decode"),
+                "total": total_time,
+                "notes": "latent to image tensor",
+            },
+            {
+                "name": "  postprocess",
+                "time": self.elapsed("postprocess"),
+                "count": 1,
+                "total": total_time,
+                "notes": "image processor",
+            },
+        ]
+
+    def log_generation_notes(self, width: int, height: int):
+        total_images = self.total_images
+        num_inference_steps = self.num_inference_steps
+        total_time = self.elapsed("total")
+        logger.info(
+            f"Generation config: resolution={width}x{height}, "
+            f"prompts={self.batch_size}, "
+            f"images={total_images}, steps={num_inference_steps}"
+        )
+        if num_inference_steps > 0:
+            logger.info(
+                f"Generation average: denoise_per_step="
+                f"{self.elapsed('denoise') / num_inference_steps:.3f} s, "
+                f"dit_per_step={self.elapsed('dit') / num_inference_steps:.3f} s"
+            )
+        if total_images > 0 and total_time > 0:
+            logger.info(
+                f"Generation throughput: latency_per_image="
+                f"{total_time / total_images:.3f} s, "
+                f"throughput={total_images / total_time:.3f} images/s"
+            )
+
+    @staticmethod
+    def get_init_rows(profile: Dict[str, Union[float, "ZImagePerf"]]):
+        init_total = profile["init_total"]
+        runtime_total = profile["load_runtime_models"]
+        return [
+            {
+                "name": "init_total",
+                "time": init_total,
+                "total": init_total,
+                "notes": "model setup end-to-end",
+            },
+            {
+                "name": "  load_demo_dependencies",
+                "time": profile["load_demo_dependencies"],
+                "total": init_total,
+                "notes": "tokenizer/scheduler/config",
+            },
+            {
+                "name": "  load_runtime_models",
+                "time": runtime_total,
+                "total": init_total,
+                "notes": "all HMM runtimes",
+            },
+            {
+                "name": "    load_encoder_runtime",
+                "time": profile["load_encoder_runtime"],
+                "total": runtime_total,
+                "notes": "share of runtime loading",
+            },
+            {
+                "name": "    load_dit_runtime",
+                "time": profile["load_dit_runtime"],
+                "total": runtime_total,
+                "notes": "share of runtime loading",
+            },
+            {
+                "name": "    load_vae_runtime",
+                "time": profile["load_vae_runtime"],
+                "total": runtime_total,
+                "notes": "share of runtime loading",
+            },
+        ]
+
+    @staticmethod
+    def log_table(title: str, rows: List[Dict[str, Union[str, float]]]):
+        # 将初始化和生成阶段的 profile 数据统一格式化，便于定位瓶颈是在
+        # host 侧预处理、HMM runtime，还是 scheduler/VAE 后处理。
+        table = PrettyTable()
+        table.field_names = [
+            "Stage",
+            "Count",
+            "Time(s)",
+            "Avg(s)",
+            "Percent",
+            "Notes",
+        ]
+        table.align["Stage"] = "l"
+        table.align["Count"] = "r"
+        table.align["Time(s)"] = "r"
+        table.align["Avg(s)"] = "r"
+        table.align["Percent"] = "r"
+        table.align["Notes"] = "l"
+
+        for row in rows:
+            name = str(row["name"])
+            elapsed = float(row["time"])
+            count = int(row.get("count", 1))
+            average = elapsed / count if count > 0 else 0.0
+            total = float(row.get("total", elapsed))
+            percent = elapsed / total * 100 if total > 0 else 0.0
+            notes = str(row.get("notes", ""))
+            table.add_row(
+                [
+                    name,
+                    count,
+                    f"{elapsed:.3f}",
+                    f"{average:.3f}",
+                    f"{percent:.1f}%",
+                    notes,
+                ]
+            )
+
+        logger.info(f"{title}\n{table}")
+
+    @classmethod
+    def log_summary(
+        cls,
+        profile: Dict[str, Union[float, "ZImagePerf"]],
+        width: int,
+        height: int,
+    ):
+        logger.info("=" * 80)
+        rows = cls.get_init_rows(profile)
+        generation_perf = profile.get("generation")
+        if isinstance(generation_perf, cls):
+            rows.extend(generation_perf.get_generation_rows())
+        cls.log_table("Performance summary:", rows)
+        if isinstance(generation_perf, cls):
+            generation_perf.log_generation_notes(width, height)
 
 
 class TcimRuntimeModel:
@@ -396,6 +693,7 @@ class HmZImage:
         # profile 用于贯穿初始化和生成阶段的耗时统计，最后由
         # log_performance_summary 统一打印。
         self.profile = {}
+        self.perf: Optional[ZImagePerf] = None
         self._past_seq_length = 0
         self.deps_dir = args.deps_dir
 
@@ -516,200 +814,24 @@ class HmZImage:
 
         return text_encoder_model, dit_model, vae_model
 
-    @staticmethod
-    def _log_performance_table(title: str, rows: List[Dict[str, Union[str, float]]]):
-        # 将初始化和生成阶段的 profile 数据统一格式化，便于定位瓶颈是在
-        # host 侧预处理、HMM runtime，还是 scheduler/VAE 后处理。
-        table = PrettyTable()
-        table.field_names = ["Stage", "Count", "Time(s)", "Avg(s)", "Percent", "Notes"]
-        table.align["Stage"] = "l"
-        table.align["Count"] = "r"
-        table.align["Time(s)"] = "r"
-        table.align["Avg(s)"] = "r"
-        table.align["Percent"] = "r"
-        table.align["Notes"] = "l"
-
-        for row in rows:
-            name = str(row["name"])
-            elapsed = float(row["time"])
-            count = int(row.get("count", 1))
-            average = elapsed / count if count > 0 else 0.0
-            total = float(row.get("total", elapsed))
-            percent = elapsed / total * 100 if total > 0 else 0.0
-            notes = str(row.get("notes", ""))
-            table.add_row(
-                [
-                    name,
-                    count,
-                    f"{elapsed:.3f}",
-                    f"{average:.3f}",
-                    f"{percent:.1f}%",
-                    notes,
-                ]
-            )
-
-        logger.info(f"{title}\n{table}")
-
-    def _get_init_performance_rows(self):
-        init_total = self.profile["init_total"]
-        runtime_total = self.profile["load_runtime_models"]
-        return [
-            {
-                "name": "init_total",
-                "time": init_total,
-                "total": init_total,
-                "notes": "model setup end-to-end",
-            },
-            {
-                "name": "  load_demo_dependencies",
-                "time": self.profile["load_demo_dependencies"],
-                "total": init_total,
-                "notes": "tokenizer/scheduler/config",
-            },
-            {
-                "name": "  load_runtime_models",
-                "time": runtime_total,
-                "total": init_total,
-                "notes": "all HMM runtimes",
-            },
-            {
-                "name": "    load_encoder_runtime",
-                "time": self.profile["load_encoder_runtime"],
-                "total": runtime_total,
-                "notes": "share of runtime loading",
-            },
-            {
-                "name": "    load_dit_runtime",
-                "time": self.profile["load_dit_runtime"],
-                "total": runtime_total,
-                "notes": "share of runtime loading",
-            },
-            {
-                "name": "    load_vae_runtime",
-                "time": self.profile["load_vae_runtime"],
-                "total": runtime_total,
-                "notes": "share of runtime loading",
-            },
-        ]
-
-    def _get_generation_performance_rows(self, stats: Dict[str, float]):
-        total_time = stats["total"]
-        total_images = int(stats["total_images"])
-        num_inference_steps = int(stats["num_inference_steps"])
-        dit_count = int(stats["dit_count"])
-        return [
-            {
-                "name": "generation_end_to_end",
-                "time": total_time,
-                "count": total_images,
-                "total": total_time,
-                "notes": "generate_image total",
-            },
-            {
-                "name": "  text_encode",
-                "time": stats["text_encode"],
-                "count": int(stats["batch_size"]),
-                "total": total_time,
-                "notes": "prompt encoder",
-            },
-            {
-                "name": "  prepare_latents",
-                "time": stats["prepare_latents"],
-                "count": total_images,
-                "total": total_time,
-                "notes": "latent init",
-            },
-            {
-                "name": "  denoise_total",
-                "time": stats["denoise"],
-                "count": num_inference_steps,
-                "total": total_time,
-                "notes": "all denoising steps",
-            },
-            {
-                "name": "    dit_total",
-                "time": stats["dit"],
-                "count": dit_count,
-                "total": stats["denoise"],
-                "notes": "share of denoising",
-            },
-            {
-                "name": "      dit_preprocess",
-                "time": stats["dit_preprocess"],
-                "count": int(stats["dit_preprocess_count"]),
-                "total": stats["dit"],
-                "notes": "t_embedder/patchify/masks",
-            },
-            {
-                "name": "      dit_runtime",
-                "time": stats["dit_runtime"],
-                "count": int(stats["dit_runtime_count"]),
-                "total": stats["dit"],
-                "notes": "HMM runtime",
-            },
-            {
-                "name": "      dit_postprocess",
-                "time": stats["dit_postprocess"],
-                "count": int(stats["dit_postprocess_count"]),
-                "total": stats["dit"],
-                "notes": "crop/unpatchify",
-            },
-            {
-                "name": "    scheduler_total",
-                "time": stats["scheduler"],
-                "count": int(stats["scheduler_count"]),
-                "total": stats["denoise"],
-                "notes": "share of denoising",
-            },
-            {
-                "name": "  vae_decode",
-                "time": stats["vae_decode"],
-                "count": int(stats["vae_decode_count"]),
-                "total": total_time,
-                "notes": "latent to image tensor",
-            },
-            {
-                "name": "  postprocess",
-                "time": stats["postprocess"],
-                "count": 1,
-                "total": total_time,
-                "notes": "image processor",
-            },
-        ]
-
-    def _log_generation_performance_notes(self, stats: Dict[str, float]):
-        total_images = int(stats["total_images"])
-        num_inference_steps = int(stats["num_inference_steps"])
-        total_time = stats["total"]
-        logger.info(
-            f"Generation config: resolution={self.width}x{self.height}, "
-            f"prompts={int(stats['batch_size'])}, "
-            f"images={total_images}, steps={num_inference_steps}"
-        )
-        if num_inference_steps > 0:
-            logger.info(
-                f"Generation average: denoise_per_step="
-                f"{stats['denoise'] / num_inference_steps:.3f} s, "
-                f"dit_per_step={stats['dit'] / num_inference_steps:.3f} s"
-            )
-        if total_images > 0 and total_time > 0:
-            logger.info(
-                f"Generation throughput: latency_per_image="
-                f"{total_time / total_images:.3f} s, "
-                f"throughput={total_images / total_time:.3f} images/s"
-            )
-
     def log_performance_summary(self):
         # 生成阶段是可选的：如果只初始化模型但未调用 generate_image，
         # 这里仍然可以打印初始化耗时。
-        logger.info("=" * 80)
-        rows = self._get_init_performance_rows()
-        generation_stats = self.profile.get("generation")
-        if generation_stats is not None:
-            rows.extend(self._get_generation_performance_rows(generation_stats))
-        self._log_performance_table("Performance summary:", rows)
-        if generation_stats is not None:
-            self._log_generation_performance_notes(generation_stats)
+        ZImagePerf.log_summary(self.profile, self.width, self.height)
+
+    def _perf_start(self, key: str):
+        if self.perf is not None:
+            self.perf.start(key)
+
+    def _perf_stop(self, key: str, count: int = 1):
+        if self.perf is not None:
+            self.perf.stop(key, count=count)
+
+    def _finish_generation_perf(self, total_start: float, total_images: int):
+        if self.perf is None:
+            return
+        self.perf.set("total", time.perf_counter() - total_start, count=total_images)
+        self.profile["generation"] = self.perf
 
     def _infer_image_size_from_vae(self):
         # VAE HMM 输入是 latent N/C/H/W。最终图像尺寸由 latent H/W 乘以
@@ -889,7 +1011,6 @@ class HmZImage:
         latent_model_input_list,
         timestep_model_input,
         prompt_embeds_model_input,
-        perf_stats: Optional[Dict[str, float]] = None,
     ):
         # DiT HMM 的实际调用入口。输入是当前 timestep 的 latent batch 和 prompt
         # hidden states，输出是 scheduler.step 需要的噪声预测 latent。
@@ -906,7 +1027,7 @@ class HmZImage:
             for batch_index, (latent_input, prompt_embeds) in enumerate(
                 zip(latent_model_input_list, prompt_embeds_model_input)
             ):
-                start = time.perf_counter()
+                self._perf_start("dit_preprocess")
                 current_timestep = timestep_model_input[batch_index : batch_index + 1]
                 # 准备 DiT HMM 之外的输入：timestep AdaLN embedding、latent patch
                 # tokens 和 prompt 条件 mask。
@@ -952,11 +1073,9 @@ class HmZImage:
                     cap_pad_mask,
                     valid_len,
                 )
-                if perf_stats is not None:
-                    perf_stats["dit_preprocess"] += time.perf_counter() - start
-                    perf_stats["dit_preprocess_count"] += 1
+                self._perf_stop("dit_preprocess")
 
-                start = time.perf_counter()
+                self._perf_start("dit_runtime")
                 # 一次 DiT HMM 调用会预测当前 scheduler timestep 下单张图的噪声残差。
                 output = self.dit(
                     x[0],
@@ -967,11 +1086,9 @@ class HmZImage:
                     cap_pad_mask,
                     n_cap_pad_mask,
                 )
-                if perf_stats is not None:
-                    perf_stats["dit_runtime"] += time.perf_counter() - start
-                    perf_stats["dit_runtime_count"] += 1
+                self._perf_stop("dit_runtime")
 
-                start = time.perf_counter()
+                self._perf_start("dit_postprocess")
                 # 裁掉多余 token，并将预测出的 patch token 还原成 scheduler 需要的 latent 布局。
                 output = output[:, : image_token_len + valid_len]
 
@@ -980,9 +1097,7 @@ class HmZImage:
                 )
 
                 batch_outputs.extend(unpatchify_res)
-                if perf_stats is not None:
-                    perf_stats["dit_postprocess"] += time.perf_counter() - start
-                    perf_stats["dit_postprocess_count"] += 1
+                self._perf_stop("dit_postprocess")
 
         return batch_outputs
 
@@ -1038,8 +1153,8 @@ class HmZImage:
 
     def generate_image(
         self,
-        prompt: Optional[Union[str, List[str]]] = None,
-        num_inference_steps: Optional[int] = None,
+        prompt: Union[str, List[str]],
+        num_inference_steps: int,
         seed: int = 42,
         sigmas: Optional[List[float]] = None,
         num_images_per_prompt: int = 1,
@@ -1051,31 +1166,9 @@ class HmZImage:
         # 返回最终 latent，便于调试 DiT/scheduler 而跳过 VAE 解码。
         logger.info(f"Generating image with prompt: {prompt}")
         total_start = time.perf_counter()
-        perf_stats = {
-            "text_encode": 0.0,
-            "prepare_latents": 0.0,
-            "denoise": 0.0,
-            "dit": 0.0,
-            "dit_count": 0,
-            "dit_preprocess": 0.0,
-            "dit_preprocess_count": 0,
-            "dit_runtime": 0.0,
-            "dit_runtime_count": 0,
-            "dit_postprocess": 0.0,
-            "dit_postprocess_count": 0,
-            "scheduler": 0.0,
-            "scheduler_count": 0,
-            "vae_decode": 0.0,
-            "vae_decode_count": 0,
-            "postprocess": 0.0,
-        }
+        self.perf = ZImagePerf()
 
         generator = torch.Generator("cpu").manual_seed(seed)
-        num_inference_steps = (
-            self.args.num_inference_steps
-            if num_inference_steps is None
-            else num_inference_steps
-        )
 
         if prompt is not None:
             batch_size = 1 if isinstance(prompt, str) else len(prompt)
@@ -1085,18 +1178,18 @@ class HmZImage:
             raise ValueError("Either prompt or prompt_embeds must be provided.")
 
         if prompt_embeds is None:
-            start = time.perf_counter()
             # 1. Prompt -> token ids -> host embedding lookup -> text encoder HMM
             # hidden states。该结果会在所有去噪 step 中复用。
+            self._perf_start("text_encode")
             prompt_embeds = self._encode_prompt(
                 prompt=prompt,
                 prompt_embeds=prompt_embeds,
             )
-            perf_stats["text_encode"] = time.perf_counter() - start
+            self._perf_stop("text_encode", count=batch_size)
 
-        start = time.perf_counter()
         # 2. 创建初始 latent 噪声。每个 prompt 生成多张图时，先扩展 latent batch，
         # 再在下方复制 prompt embeddings。
+        self._perf_start("prepare_latents")
         latents = self._prepare_latents(
             batch_size * num_images_per_prompt,
             self.transformer.in_channels,
@@ -1105,7 +1198,10 @@ class HmZImage:
             generator,
             latents,
         )
-        perf_stats["prepare_latents"] = time.perf_counter() - start
+        self._perf_stop(
+            "prepare_latents",
+            count=batch_size * num_images_per_prompt,
+        )
 
         if num_images_per_prompt > 1:
             prompt_embeds = [
@@ -1121,6 +1217,7 @@ class HmZImage:
             self.scheduler.config.get("max_shift", 1.15),
         )
         self.scheduler.sigma_min = 0.0
+
         # 3. 构建 scheduler timesteps。Z-Image 的 shift 与分辨率相关，因此
         # calculate_shift 依赖 latent token 数量。
         timesteps, num_inference_steps = retrieve_timesteps(
@@ -1135,7 +1232,7 @@ class HmZImage:
             0,
         )
 
-        denoise_start = time.perf_counter()
+        self._perf_start("denoise")
         with tqdm(total=num_inference_steps) as progress_bar:
             for index, timestep_value in enumerate(timesteps):
                 # 4. 去噪循环：DiT 在 latent 空间预测噪声，scheduler 再更新 latents
@@ -1150,30 +1247,27 @@ class HmZImage:
 
                 latent_model_input = latent_model_input.unsqueeze(2)
 
-                start = time.perf_counter()
+                self._perf_start("dit")
                 model_out_list = self._transformer_infer(
                     list(latent_model_input.unbind(dim=0)),
                     timestep_model_input,
                     prompt_embeds_model_input,
-                    perf_stats,
                 )
-                perf_stats["dit"] += time.perf_counter() - start
-                perf_stats["dit_count"] += len(model_out_list)
+                self._perf_stop("dit", count=len(prompt_embeds_model_input))
 
                 noise_pred = torch.stack(
                     [tensor.float() for tensor in model_out_list],
                     dim=0,
                 )
                 noise_pred = -noise_pred.squeeze(2)
-                start = time.perf_counter()
+                self._perf_start("scheduler")
                 latents = self.scheduler.step(
                     noise_pred.to(torch.float32),
                     timestep_value,
                     latents,
                     return_dict=False,
                 )[0]
-                perf_stats["scheduler"] += time.perf_counter() - start
-                perf_stats["scheduler_count"] += 1
+                self._perf_stop("scheduler")
 
                 if index == len(timesteps) - 1 or (
                     (index + 1) > num_warmup_steps
@@ -1181,28 +1275,28 @@ class HmZImage:
                 ):
                     progress_bar.update()
 
-        perf_stats["denoise"] = time.perf_counter() - denoise_start
-        perf_stats["batch_size"] = batch_size
-        perf_stats["total_images"] = latents.shape[0]
-        perf_stats["num_inference_steps"] = num_inference_steps
+        self._perf_stop("denoise", count=num_inference_steps)
+        if self.perf is not None:
+            self.perf.set_generation_shape(
+                batch_size=batch_size,
+                total_images=latents.shape[0],
+                num_inference_steps=num_inference_steps,
+            )
 
         if output_type == "latent":
-            perf_stats["total"] = time.perf_counter() - total_start
-            self.profile["generation"] = perf_stats
+            self._finish_generation_perf(total_start, latents.shape[0])
             return latents
 
         # 5. 将最终 latents 从模型缩放还原到 VAE 输入分布，然后解码并后处理成 PIL 图像。
         latents = (latents.to(torch.float16) / 0.3611) + 0.1159
-        start = time.perf_counter()
+        self._perf_start("vae_decode")
         image = self._vae_decode(latents)
-        perf_stats["vae_decode"] = time.perf_counter() - start
-        perf_stats["vae_decode_count"] = latents.shape[0]
+        self._perf_stop("vae_decode", count=latents.shape[0])
 
-        start = time.perf_counter()
+        self._perf_start("postprocess")
         image = self.image_processor.postprocess(image, output_type=output_type)
-        perf_stats["postprocess"] = time.perf_counter() - start
-        perf_stats["total"] = time.perf_counter() - total_start
-        self.profile["generation"] = perf_stats
+        self._perf_stop("postprocess")
+        self._finish_generation_perf(total_start, latents.shape[0])
 
         return image
 
@@ -1237,7 +1331,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--output", type=str, default="output_turbo_xh2a.png", help="output image path")
     parser.add_argument("--prompt", type=str, nargs="+", action="append", default=None, help="positive prompt. Pass one prompt, multiple quoted prompts, or repeat --prompt.")
     parser.add_argument("--num_images_per_prompt", type=int, default=1, help="number of images to generate per prompt")
-    parser.add_argument("--num_inference_steps", type=int, default=9, help="number of inference steps")
+    parser.add_argument("--num_inference_steps", type=int, default=8, help="number of inference steps")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
     # fmt: on
@@ -1267,13 +1361,11 @@ def get_args() -> argparse.Namespace:
 
     if args.ndevice > 1:
         if args.encoder_path.endswith(".hmm"):
-            args.encoder_path = args.encoder_path.replace(
-                ".hmm", f"_nd{args.ndevice}.hmm"
-            )
+            args.encoder_path = args.encoder_path.replace(".hmm", ".hmms")
         if args.dit_path.endswith(".hmm"):
-            args.dit_path = args.dit_path.replace(".hmm", f"_nd{args.ndevice}.hmm")
+            args.dit_path = args.dit_path.replace(".hmm", ".hmms")
         if args.vae_path.endswith(".hmm"):
-            args.vae_path = args.vae_path.replace(".hmm", f"_nd{args.ndevice}.hmm")
+            args.vae_path = args.vae_path.replace(".hmm", ".hmms")
 
     return args
 

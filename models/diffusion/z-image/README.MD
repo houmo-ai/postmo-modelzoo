@@ -181,7 +181,7 @@ Z-Image-Turbo 模型使用 python API 进行演示。
 
 2. `demo.py` 会从 VAE HMM 输入 shape 推导生成图像的 `height` 和 `width`，并从 DIT HMM 输入 shape 推导图像 token 长度和文本 token 长度，不需要用户手动传入分辨率。
 
-3. 执行脚本，推理完成默认输出图像到 `output_turbo_xh2a.png`：
+3. 执行脚本，推理完成默认输出图像到 `output_turbo_xh2a.png`。
 
 ```bash
 python3 demo.py
@@ -244,9 +244,6 @@ bash test.sh -s demo
 # 完整流程（执行下载步骤、量化、编译、演示）
 bash test.sh -s all
 
-# 显式指定模型名和模型规格（当前默认就是 z-image-turbo 6b）
-bash test.sh -s demo -name z-image-turbo -size 6b
-
 # 组合执行多个步骤
 bash test.sh -s quant,build
 
@@ -256,11 +253,7 @@ bash test.sh -s demo --skip_download
 
 ## 4 参考结果
 
-以下为单 prompt 演示输出参考：
-
-```bash
-python3 demo.py --prompt "一只长得像蝴蝶一样缤纷绚丽的奇异花朵，开在丛林中，散发着柔和的光芒"
-```
+以下为当前默认 prompt 的单图演示输出参考
 
 ### 4.1 演示结果
 
@@ -271,8 +264,7 @@ python3 demo.py --prompt "一只长得像蝴蝶一样缤纷绚丽的奇异花朵
 ```bash
 Model: z-image-turbo-6b
 Loading demo dependencies from output/xh2/hmquant/hf_config...
-Inference steps: 9
-Guidance scale: 0.0
+Inference steps: 8
 Number of images per prompt: 1
 Tokenizer directory: output/xh2/hmquant/hf_config/tokenizer
 Scheduler config path: output/xh2/hmquant/hf_config/scheduler/scheduler_config.json
@@ -285,13 +277,13 @@ Inferred image size from VAE input shape [1, 16, 128, 128]: 1024x1024
 Inferred DIT input lengths from HMM: image_token_len=4096, text_token_len=256
 Demo initialized with model z-image-turbo-6b.
 Generating image with prompt: 一只长得像蝴蝶一样缤纷绚丽的奇异花朵，开在丛林中，散发着柔和的光芒
-100%|███████████████████████████████| 9/9 [00:32<00:00,  3.63s/it]
+100%|███████████████████████████████| 8/8 [00:29<00:00,  3.63s/it]
 Image 0 generated with shape: (1024, 1024), saving image to output_turbo_xh2a.png...
 ```
 
 ### 4.2 性能结果
 
-`demo.py` 会在图片保存完成后输出性能统计。性能统计使用一张 `Performance summary` 总表展示初始化和生成阶段的层级耗时。表格字段含义如下：
+`demo.py` 会在图片保存完成后输出性能统计。当前性能统计由 `ZImagePerf` 集中维护，生成阶段采样点通过 `_perf_start(key)` / `_perf_stop(key)` 记录，避免在各函数之间透传性能字典。最终使用一张 `Performance summary` 总表展示初始化和生成阶段的层级耗时。表格字段含义如下：
 
 - `Stage`: 当前统计项。缩进表示层级关系，例如 `load_runtime_models` 下包含各 HMM runtime 加载耗时，`denoise_total` 下包含 DIT 和 scheduler 耗时。
 - `Count`: 当前统计项执行的次数。
@@ -341,27 +333,27 @@ Performance summary:
 +--------------------------+-------+---------+---------+---------+----------------------------+
 | Stage                    | Count | Time(s) |  Avg(s) | Percent | Notes                      |
 +--------------------------+-------+---------+---------+---------+----------------------------+
-| init_total               |     1 | 108.282 | 108.282 |  100.0% | model setup end-to-end     |
-|   load_demo_dependencies |     1 |   0.405 |   0.405 |    0.4% | tokenizer/scheduler/config |
-|   load_runtime_models    |     1 |  98.441 |  98.441 |   90.9% | all HMM runtimes           |
-|     load_encoder_runtime |     1 |  32.968 |  32.968 |   33.5% | share of runtime loading   |
-|     load_dit_runtime     |     1 |  60.269 |  60.269 |   61.2% | share of runtime loading   |
-|     load_vae_runtime     |     1 |   4.627 |   4.627 |    4.7% | share of runtime loading   |
-| generation_end_to_end    |     1 |  35.174 |  35.174 |  100.0% | generate_image total       |
-|   text_encode            |     1 |   1.112 |   1.112 |    3.2% | prompt encoder             |
-|   prepare_latents        |     1 |   0.002 |   0.002 |    0.0% | latent init                |
-|   denoise_total          |     9 |  32.658 |   3.629 |   92.8% | all denoising steps        |
-|     dit_total            |     9 |  32.649 |   3.628 |  100.0% | share of denoising         |
-|       dit_preprocess     |     9 |   0.018 |   0.002 |    0.1% | t_embedder/patchify/masks  |
-|       dit_runtime        |     9 |  32.625 |   3.625 |   99.9% | HMM runtime                |
-|       dit_postprocess    |     9 |   0.004 |   0.000 |    0.0% | crop/unpatchify            |
-|     scheduler_total      |     9 |   0.002 |   0.000 |    0.0% | share of denoising         |
-|   vae_decode             |     1 |   1.370 |   1.370 |    3.9% | latent to image tensor     |
-|   postprocess            |     1 |   0.032 |   0.032 |    0.1% | image processor            |
+| init_total               |     1 | 113.233 | 113.233 |  100.0% | model setup end-to-end     |
+|   load_demo_dependencies |     1 |   0.446 |   0.446 |    0.4% | tokenizer/scheduler/config |
+|   load_runtime_models    |     1 | 109.613 | 109.613 |   96.8% | all HMM runtimes           |
+|     load_encoder_runtime |     1 |  37.435 |  37.435 |   34.2% | share of runtime loading   |
+|     load_dit_runtime     |     1 |  67.702 |  67.702 |   61.8% | share of runtime loading   |
+|     load_vae_runtime     |     1 |   3.896 |   3.896 |    3.6% | share of runtime loading   |
+| generation_end_to_end    |     1 |  31.152 |  31.152 |  100.0% | generate_image total       |
+|   text_encode            |     1 |   0.836 |   0.836 |    2.7% | prompt encoder             |
+|   prepare_latents        |     1 |   0.003 |   0.003 |    0.0% | latent init                |
+|   denoise_total          |     8 |  28.973 |   3.622 |   93.0% | all denoising steps        |
+|     dit_total            |     8 |  28.965 |   3.621 |  100.0% | share of denoising         |
+|       dit_preprocess     |     8 |   0.022 |   0.003 |    0.1% | t_embedder/patchify/masks  |
+|       dit_runtime        |     8 |  28.939 |   3.617 |   99.9% | HMM runtime                |
+|       dit_postprocess    |     8 |   0.004 |   0.000 |    0.0% | crop/unpatchify            |
+|     scheduler_total      |     8 |   0.001 |   0.000 |    0.0% | share of denoising         |
+|   vae_decode             |     1 |   1.302 |   1.302 |    4.2% | latent to image tensor     |
+|   postprocess            |     1 |   0.037 |   0.037 |    0.1% | image processor            |
 +--------------------------+-------+---------+---------+---------+----------------------------+
-Generation config: resolution=1024x1024, prompts=1, images=1, steps=9
-Generation average: denoise_per_step=3.629 s, dit_per_step=3.628 s
-Generation throughput: latency_per_image=35.174 s, throughput=0.028 images/s
+Generation config: resolution=1024x1024, prompts=1, images=1, steps=8
+Generation average: denoise_per_step=3.622 s, dit_per_step=3.621 s
+Generation throughput: latency_per_image=31.152 s, throughput=0.032 images/s
 ```
 
 ## 5 免责声明
@@ -395,7 +387,9 @@ Prompt
 
 [扩散去噪]
 随机 latent 噪声 + prompt hidden states
-  -> host: scheduler 生成 timesteps
+  -> host: 根据 latent token 数计算 mu
+  -> host: 设置 scheduler.sigma_min = 0.0
+  -> host: retrieve_timesteps 生成 timesteps
   -> 循环 num_inference_steps 次:
        host: timestep embedding
        host: latent patchify + position ids + mask/padding
@@ -474,9 +468,11 @@ latents = torch.randn(batch_size, latent_channels, latent_height, latent_width)
 
 ### 5. Scheduler 时间步
 
-Z-Image-Turbo 使用 `FlowMatchEulerDiscreteScheduler`。去噪前，demo 会根据 latent token 数量调用 `calculate_shift`，得到与分辨率相关的 `mu`，再调用 `retrieve_timesteps` 生成实际推理时间步。
+Z-Image-Turbo 使用 `FlowMatchEulerDiscreteScheduler`。去噪前，demo 会根据 latent token 数量调用 `calculate_shift`，得到与分辨率相关的 `mu`。
 
-这一阶段的作用是确定 DiT 要执行多少个 denoising step，以及每一步对应的 timestep。默认 `--num_inference_steps` 为 9。
+当前 demo 的默认采样设置为 `--num_inference_steps=8`。去噪前，demo 会将 `scheduler.sigma_min` 设置为 `0.0`，然后调用 `retrieve_timesteps`。当调用方没有显式传入 `sigmas` 时，`sigmas=None` 会直接传给 `retrieve_timesteps`，由 `FlowMatchEulerDiscreteScheduler` 按当前 scheduler 配置和 `num_inference_steps` 生成 timesteps。
+
+因此当前默认单图流程中，denoising loop 执行 8 轮，对应 8 次 DiT HMM forward 和 8 次 scheduler update。
 
 ### 6. DiT 去噪循环
 
@@ -501,7 +497,7 @@ Z-Image-Turbo 使用 `FlowMatchEulerDiscreteScheduler`。去噪前，demo 会根
 - `unpatchify`: 将 DiT 输出的 patch token 还原成 latent 的 `C/F/H/W` 布局。
 - `t_embedder`: 根据当前 timestep 生成 DiT 需要的 AdaLN 条件输入。
 
-DiT HMM 的输出会被转换成 `noise_pred`，再交给 scheduler 更新 latent。这个过程重复 `num_inference_steps` 次。
+DiT HMM 的输出会被转换成 `noise_pred`，再交给 scheduler 更新 latent。这个过程重复 `num_inference_steps` 次；当前默认值为 8，因此单张图默认调用 8 次 DiT HMM。
 
 ### 7. VAE 解码和图像保存
 
