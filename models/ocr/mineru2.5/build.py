@@ -75,7 +75,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--max_size_h", type=int, default=None)
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number for multi-device")
     parser.add_argument("--stage", dest="stage", type=str, default="build", choices=["build", "test", "all"], help="build stage")
-    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 2), help="FlashAttention switches: 1st=llm(0/1/2), 2nd=vit(0/1/2); e.g. --flash_attention 2 2")
+    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 1), help="FlashAttention switches: 1st=llm(0/1/2), 2nd=vit(0/1/2); e.g. --flash_attention 2 2")
     
     args = parser.parse_args()
     default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
