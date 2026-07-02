@@ -18,8 +18,8 @@
 
 当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
 
-- `model_name=mineru2.5-pro`
-- `model_size=2604-1.2b`
+- `model_name=mineru2.5-pro-2604`
+- `model_size=1.2b`
 - `context_length=32k`
 - `prefill_length=256`
 - `ndevice=1`
@@ -76,10 +76,10 @@ pip3 install -r requirements.txt
 
 ```bash
 # 下载原始模型用于量化
-python3 get_model.py --type raw --model_name mineru2.5-pro --model_size 2604-1.2b
+python3 get_model.py --type raw --model_name mineru2.5-pro-2604 --model_size 1.2b
 
 # 下载预编译模型用于演示
-python3 get_model.py --type hmm --model_name mineru2.5-pro --model_size 2604-1.2b
+python3 get_model.py --type hmm --model_name mineru2.5-pro-2604 --model_size 1.2b
 ```
 
 ### 2.3 量化
@@ -118,7 +118,7 @@ python3 ptq.py --model <模型路径> --chip-arch XH2a --context-length 4096 --p
 将量化模型编译为在芯片上运行的模型。执行脚本：
 
 ```bash
-python3 build.py --model_name mineru2.5-pro --model_size 2604-1.2b --enable_common_subgraph
+python3 build.py --model_name mineru2.5-pro-2604 --model_size 1.2b
 ```
 
 默认输出名称分别为：
@@ -128,10 +128,10 @@ python3 build.py --model_name mineru2.5-pro --model_size 2604-1.2b --enable_comm
 - `mineru2.5-pro-2604-1.2b_visual_1036x1036.hmm`
 - `mineru2.5-pro-2604-1.2b_visual_<h>x<w>.hmm`（各静态分桶）
 
-`build.py` 支持以下常用参数：
+`build.py` 支持以下常用参数:
 
 ```bash
-python3 build.py --model_name mineru2.5-pro --model_size 2604-1.2b --flash_attention 2 1 --enable_common_subgraph
+python3 build.py --model_name mineru2.5-pro-2604 --model_size 1.2b --flash_attention 2 1
 ```
 
 其中 `--flash_attention` 接受两个参数：第一个为 LLM FlashAttention 开关（0/1/2），第二个为 ViT FlashAttention 开关（0/1）。
@@ -141,7 +141,7 @@ python3 build.py --model_name mineru2.5-pro --model_size 2604-1.2b --flash_atten
 MinerU2.5 模型使用 python API 进行演示，支持文档版面检测和文字识别两阶段提取。
 
 ```bash
-python3 demo.py --model_name mineru2.5-pro --model_size 2604-1.2b
+python3 demo.py --model_name mineru2.5-pro-2604 --model_size 1.2b
 ```
 
 若未显式传 `tokenizer_dir`、`prefill_path`、`decode_path`、`vit_path`，脚本会按 `config.yaml` 和 `${model_name}-${model_size}` 自动推导默认值；当 `ndevice > 1` 时，`prefill` / `decode` 默认后缀会切换为 `.hmms`。
@@ -149,7 +149,7 @@ python3 demo.py --model_name mineru2.5-pro --model_size 2604-1.2b
 可通过 `--image` 指定输入图像：
 
 ```bash
-python3 demo.py --model_name mineru2.5-pro --model_size 2604-1.2b --image ./data/0002.png
+python3 demo.py --model_name mineru2.5-pro-2604 --model_size 1.2b --image ./data/0002.png
 ```
 
 演示脚本会输出：
@@ -161,8 +161,8 @@ python3 demo.py --model_name mineru2.5-pro --model_size 2604-1.2b --image ./data
 
 以上步骤可以通过 `test.sh` 脚本执行。脚本默认使用：
 
-- `MODEL_NAME=mineru2.5-pro`
-- `MODEL_SIZE=2604-1.2b`
+- `MODEL_NAME=mineru2.5-pro-2604`
+- `MODEL_SIZE=1.2b`
 - `NDEVICE=1`
 
 默认执行 `demo` 步骤：
@@ -183,7 +183,7 @@ bash test.sh -s all
 Usage: test.sh [options]
   -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
                           Supports comma-separated values or repeated flags, e.g. -s quant,build or -s quant -s build.
-  -size, --model_size     Model size. Choices: 2604-1.2b.
+  -size, --model_size     Model size. Choices: 1.2b.
   --ndevice               Number of devices. Default: 1.
   --skip_download         Skip model download steps.
   -h, --help              Show this help message.
