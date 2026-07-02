@@ -192,16 +192,7 @@ APPENDIX: How to apply the Apache License to your work
     on the same "printed page" as the copyright notice for easier
     identification within third-party archives.
 
-        Copyright 2000-2025 OpenCV Team
-        Copyright 2023-2025 the tokenizers-cpp contributors
-        Copyright 2023-2025 Gang Li
-        Copyright 2022-2025 kaldi-native-fbank authors
-        Copyright 2018-2025 Hugging Face
-        Copyright 2023-2025 QwenLM
-        Copyright 2024-2025 OpenAI and gpt-oss contributors
-        Copyright 2023-2025 Alibaba Cloud and Qwen contributors
-        Copyright 2024-2025 OpenBMB contributors
-        Copyright 2023-2025 PaddlePaddle
+        Copyright {{ year }} {{ organization }}
 
         Licensed under the Apache License, Version 2.0 (the "License");
         you may not use this file except in compliance with the License.
