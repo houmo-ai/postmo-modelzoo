@@ -35,17 +35,31 @@ export:
     use_manual_depthwise_conv1d: false
     fuse_gdr_ops: false
     quant_scheme:
-      quant_type: w8a8h1_sefp
+      quant_type: w8a16h1_sefp
       nodes:
         lm_head:
-          quant_type: w8a8h1_sefp
-      ops: {}
+          quant_type: w8a16h1_sefp
+      ops:
+        MatMul:
+          act_scheme:
+            bits: 16
+            fp_mode: sefp
+          act_schema_2:
+            bits: 16
+            fp_mode: sefp
     visual_config:
       max_size_w: 896
       max_size_h: 896
       quant_scheme:
-        quant_type: w8a8h1_sefp
-        ops: {}
+        quant_type: w8a16h1_sefp
+        ops:
+          MatMul:
+            act_scheme:
+              bits: 16
+              fp_mode: sefp
+            act_schema_2:
+              bits: 16
+              fp_mode: sefp
     only_first_block: false
     spec_decode_mode: dflash
     num_draft_tokens: 9
