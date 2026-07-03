@@ -85,9 +85,10 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
       prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
   this->embedding_length =
       prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[2];
-  auto get_context_length = [this](int input_idx) {
-    return prefill_module->GetInputInfo(prefill_module->GetInputName(input_idx))
-        .Shape()[2];
+  auto get_context_length = [this](int input_idx) -> long int {
+    return static_cast<long int>(
+        prefill_module->GetInputInfo(prefill_module->GetInputName(input_idx))
+            .Shape()[2]);
   };
   this->context_max_length = get_context_length(attn_idx_start);
   if (attn_idx_start + 1 < prefill_module->GetInputNum()) {

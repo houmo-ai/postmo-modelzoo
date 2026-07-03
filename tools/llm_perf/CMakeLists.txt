@@ -26,20 +26,9 @@ if(MSVC)
   set(CMAKE_CXX_FLAGS ${ORIGINAL_CXX_FLAGS})
 endif()
 
-FetchContent_Declare(
-  yaml-cpp
-  GIT_REPOSITORY https://gitee.com/mirrors/yaml-cpp.git
-  GIT_TAG yaml-cpp-0.9.0
-)
-set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "Disable yaml-cpp tests" FORCE)
-set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "Disable yaml-cpp tools" FORCE)
-set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "Disable yaml-cpp contrib" FORCE)
-set(YAML_CPP_BUILD_SHARED_LIBS OFF CACHE BOOL "Build static library" FORCE)
-set(YAML_CPP_INSTALL OFF CACHE BOOL "Disable yaml-cpp install" FORCE)
-FetchContent_MakeAvailable(yaml-cpp)
 include(CheckCXXCompilerFlag)
 if(MSVC)
-  option(ENABLE_ASR "Enable ASR support" OFF)
+  set(ENABLE_ASR OFF CACHE BOOL "Enable ASR support" FORCE)
   check_cxx_compiler_flag("/std:c++17" SUPPORT_CXX17)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DEIGEN_MPL2_ONLY /DNOMINMAX")
   set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /QUIET")
@@ -53,6 +42,10 @@ include(${CMAKE_SOURCE_DIR}/tcim_runtime.cmake)
 
 # houmo-llm-engine paths
 set(HOUMO_ENGINE_DIR ${CMAKE_SOURCE_DIR}/../common/houmo-llm-engine)
+set(USE_HOUMO_ENGINE ON)
+if(MSVC AND NOT ENABLE_ASR)
+  set(USE_HOUMO_ENGINE OFF)
+endif()
 if(ANDROID_ABI)
   set(_LIB_SUFFIX "Android_xh2")
   set(ENGINE_BUILD_DIR ${HOUMO_ENGINE_DIR}/build_ndk/release)
@@ -66,6 +59,14 @@ if(ANDROID_ABI)
     ${AUDIO_3RDPARTY_DIR}/libsamplerate/src
   )
   set(OPENCV_DIR ${HOUMO_ENGINE_DIR}/3rdparty/opencv/${_LIB_SUFFIX})
+elseif(MSVC)
+  set(_LIB_SUFFIX "Windows_x64")
+  set(ENGINE_BUILD_DIR ${HOUMO_ENGINE_DIR}/build)
+  set(TOKENIZERS_DIR "")
+  set(AUDIO_3RDPARTY_DIR "")
+  set(AUDIO_INC_DIRS "")
+  set(AUDIO_LIB_DIRS "")
+  set(OPENCV_DIR "")
 else()
   execute_process(COMMAND uname -m OUTPUT_VARIABLE _ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
   set(_LIB_SUFFIX "Linux_${_ARCH}_$ENV{HOUMO_TARGET}")
@@ -77,29 +78,42 @@ else()
   set(OPENCV_DIR "")
 endif()
 
-include_directories(
+set(COMMON_INCLUDE_DIRS
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/nlohmann/include
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp
   $ENV{HOUMO_SDK_PATH}/hal/export/include
   $ENV{HOUMO_SDK_PATH}/hal/include
-  ${HOUMO_ENGINE_DIR}/include
-  ${TOKENIZERS_DIR}/include
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/audio/include
   ${CMAKE_SOURCE_DIR}/include
 )
+if(USE_HOUMO_ENGINE)
+  list(APPEND COMMON_INCLUDE_DIRS
+    ${HOUMO_ENGINE_DIR}/include
+    ${TOKENIZERS_DIR}/include
+  )
+endif()
+include_directories(${COMMON_INCLUDE_DIRS})
 if(ENABLE_ASR)
   include_directories(${AUDIO_INC_DIRS})
 endif()
 link_directories(
   $ENV{HOUMO_SDK_PATH}/hal/lib
-  ${ENGINE_BUILD_DIR}
-  ${TOKENIZERS_DIR}/lib
 )
+if(USE_HOUMO_ENGINE)
+  link_directories(
+    ${ENGINE_BUILD_DIR}
+    ${TOKENIZERS_DIR}/lib
+  )
+endif()
 if(ENABLE_ASR)
   link_directories(${AUDIO_LIB_DIRS})
 endif()
-set(EIGEN_PATH ${HOUMO_ENGINE_DIR}/3rdparty)
+if(MSVC AND NOT ENABLE_ASR)
+  set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
+else()
+  set(EIGEN_PATH ${HOUMO_ENGINE_DIR}/3rdparty)
+endif()
 
 set(SOURCE_FILES
   src/utils/perf_dumper/perf_dumper.cc
@@ -135,20 +149,29 @@ endif()
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
 
-add_custom_target(houmo_engine_rebuild ALL
-  COMMAND cmake --build ${ENGINE_BUILD_DIR} -j$$(nproc)
-  WORKING_DIRECTORY ${HOUMO_ENGINE_DIR}
-  COMMENT "Rebuilding houmo-llm-engine libhoumo_infer.a"
-)
-add_library(houmo_infer STATIC IMPORTED)
-set_target_properties(houmo_infer PROPERTIES IMPORTED_LOCATION ${ENGINE_BUILD_DIR}/libhoumo_infer.a)
-add_dependencies(houmo_infer houmo_engine_rebuild)
+if(USE_HOUMO_ENGINE)
+  if(MSVC)
+    set(HOUMO_ENGINE_BUILD_COMMAND
+      ${CMAKE_COMMAND} --build ${ENGINE_BUILD_DIR} --config $<CONFIG>)
+  else()
+    set(HOUMO_ENGINE_BUILD_COMMAND
+      ${CMAKE_COMMAND} --build ${ENGINE_BUILD_DIR} --parallel)
+  endif()
+  add_custom_target(houmo_engine_rebuild ALL
+    COMMAND ${HOUMO_ENGINE_BUILD_COMMAND}
+    WORKING_DIRECTORY ${HOUMO_ENGINE_DIR}
+    COMMENT "Rebuilding houmo-llm-engine libhoumo_infer.a"
+  )
+  add_library(houmo_infer STATIC IMPORTED)
+  set_target_properties(houmo_infer PROPERTIES IMPORTED_LOCATION ${ENGINE_BUILD_DIR}/libhoumo_infer.a)
+  add_dependencies(houmo_infer houmo_engine_rebuild)
+endif()
 if(MSVC)
   add_definitions(-DYAML_CPP_STATIC_DEFINE)
   if(ENABLE_ASR)
     add_definitions(-DENABLE_ASR)
   endif()
-  target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} yaml-cpp  ${CMAKE_DL_LIBS} ws2_32 Userenv ntdll Bcrypt kernel32)
+  target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} yaml-cpp ${CMAKE_DL_LIBS} ws2_32 Userenv ntdll Bcrypt kernel32 libhal_xh2a)
 else()
   if(ANDROID_ABI)
     set(ASR_LIBRARIES kaldi-native-fbank-core samplerate)
