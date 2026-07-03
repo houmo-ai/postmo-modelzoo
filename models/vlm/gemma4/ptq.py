@@ -27,7 +27,7 @@ import argparse
 import torch
 from xhquant.api import get_root_logger
 from xhmodel_merak.xh_llm.workflows import AutoLLMWorkflow
-from hmatc.utils.utils import first_not_none, get_model_configs
+from hmatc.utils.utils import first_not_none, get_model_configs, parse_context_length
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -129,10 +129,15 @@ if __name__ == "__main__":
     parser.add_argument("--assistant-model", type=str, default=None, help="path to the Gemma4 assistant/draft HF model directory")
     args = parser.parse_args()
 
+    logger = get_root_logger()
+
     default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
+    if args.assistant_model is not None:
+        args.context_length = parse_context_length(model_config.get("context_length", "2k"))
+        logger.info(f"MTP context length set to {args.context_length}")
     args.model = first_not_none(args.model, get_default_model_dir(model_config))
     enable_mtp = args.assistant_model is not None
     if enable_mtp:
@@ -140,7 +145,6 @@ if __name__ == "__main__":
             raise ValueError("--assistant-model is only supported when --model-size=26b-a4b")
         if not os.path.isdir(args.assistant_model):
             raise FileNotFoundError(f"Assistant model directory not found: {args.assistant_model}")
-    logger = get_root_logger()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

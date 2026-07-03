@@ -130,7 +130,7 @@ if __name__ == "__main__":
                 llm_batch=args.batch,
                 flash_attn=llm_flash_attn,
                 llm_opt=True,
-                context_length=args.context_length,
+                context_length=args.context_length if not args.mtp else None,
                 ndevice=ndevice,
                 parallel_jobs=parallel_jobs,
             )
@@ -157,7 +157,7 @@ if __name__ == "__main__":
             llm_batch=args.batch,
             flash_attn=llm_flash_attn,
             llm_opt=True,
-            context_length=args.context_length,
+            context_length=args.context_length if not args.mtp else None,
             ndevice=ndevice,
             parallel_jobs=parallel_jobs,
         )
