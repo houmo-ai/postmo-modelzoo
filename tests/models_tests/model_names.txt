@@ -55,4 +55,3 @@ qwen3_vl_embedding
 z_image_turbo
 qwen3_tts
 ct_transformer
-qwen3_tts

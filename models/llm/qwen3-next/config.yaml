@@ -9,7 +9,7 @@ model_configs:
       model_size: "80b-a3b"
       ncore: 2
       quant_type: "w4a8h0_ssfp"
-      context_length: "8k"
+      context_length: "256k"
       ndevice: 2
       batch: 1
       prefill_length: 256

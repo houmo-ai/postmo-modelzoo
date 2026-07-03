@@ -4,7 +4,7 @@
     "model_type": "llm",
     "dependencies": {
         "ndevice": [2],
-        "dev_mem": ["24g"]
+        "dev_mem": ["48g"]
     },
     "support_platform": ["x86_64"],
     "support_backend": ["xh2"],
@@ -29,22 +29,22 @@
         "xh2": {
             "type": ["hmm"],
             "download_dir": ["cached_models"],
-            "extract_dir": ["cached_models/hmm_xh2_8k"],
+            "extract_dir": ["cached_models/hmm_xh2_256k"],
             "source_type": [null],
             "model_name": ["qwen3-next"],
             "model_size": ["80b-a3b"],
-            "context_length": ["8k"]
+            "context_length": ["256k"]
         }
     },
     "compile_params": {
         "xh2": {
-            "model_dir": ["cached_results/hmquant_xh2_8k"],
+            "model_dir": ["cached_results/hmquant_xh2_256k"],
             "model_name": ["qwen3-next"],
             "model_size": ["80b-a3b"],
             "stage": ["build"],
             "context_length": ["8192"],
             "j": ["24"],
-            "output_dir": ["cached_results/hmm_xh2_8k"]
+            "output_dir": ["cached_results/hmm_xh2_256k"]
         }
     },
     "demo_params": {
@@ -53,13 +53,13 @@
             "model_size": ["80b-a3b"],
             "tokenizer_dir": ["cached_models/Qwen3-Next-80B-A3B-Instruct"],
             "embedding_path": [
-                "cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_256k/hmquant/quant_embedding.pt"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_8k/qwen3-next-80b-a3b_prefill.hmm"
+                "cached_results/hmm_xh2_256k/qwen3-next-80b-a3b_prefill.hmm"
             ],
             "decode_path": [
-                "cached_results/hmm_xh2_8k/qwen3-next-80b-a3b_decode.hmm"
+                "cached_results/hmm_xh2_256k/qwen3-next-80b-a3b_decode.hmm"
             ]
         }
     },

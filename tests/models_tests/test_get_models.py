@@ -567,7 +567,7 @@ def test_backbone_dinov3_base_get_model(setup_logging) -> None:
 
 @pytest.mark.qwen3_next
 @pytest.mark.ndevice_2
-@pytest.mark.dev_mem_24g
+@pytest.mark.dev_mem_48g
 @pytest.mark.get_model
 @pytest.mark.dependency(name="test_llm_qwen3_next_get_model")
 def test_llm_qwen3_next_get_model(setup_logging) -> None:

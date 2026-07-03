@@ -177,7 +177,7 @@ def get_args() -> argparse.Namespace:
     )
     if args.context_length is None:
         args.context_length = parse_context_length(
-            model_config.get("context_length", "8k")
+            model_config.get("context_length", "256k")
         )
     if args.context_length < 2048:
         args.flash_attention = 0
