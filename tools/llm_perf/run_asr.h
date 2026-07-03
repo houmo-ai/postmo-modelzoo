@@ -38,6 +38,7 @@
 
 #include "asr/PerfAsr.h"
 #include "utils/device_monitor/device_monitor.h"
+#include "utils/perf_dumper/perf_dumper.h"
 #include "utils/utils.h"
 #if defined(__linux__)
 #include "utils/host_monitor/host_monitor.h"
@@ -78,13 +79,15 @@ static void PrintAsrMetrics(const AsrTranscribeResult& result, int n_chunks) {
             << "=================\n";
 }
 
-static int RunAsrCore(const AsrPerfSettings& settings) {
+static int RunAsrCore(const AsrPerfSettings& settings,
+                      PerfDumper& perf_dumper) {
   auto device_monitor = std::make_unique<DeviceMonitor>(settings.interval_ms);
   device_monitor->start();
 #if defined(__linux__)
   auto host_mem_monitor = std::make_unique<HostMonitor>(settings.interval_ms);
   host_mem_monitor->start();
 #endif
+  HostMemoryInfo host_mem_info{}, max_host_mem_info{};
 
   houmo::ModelConfig config;
   config.devices = settings.devices;
@@ -95,6 +98,11 @@ static int RunAsrCore(const AsrPerfSettings& settings) {
   auto model = std::make_unique<PerfAsrModel>(config);
   auto ctx = model->create_context();
   auto* perf_ctx = static_cast<PerfAsrContext*>(ctx.get());
+  std::unordered_map<int, DeviceStats> post_init_dev_stats =
+      device_monitor->getDeviceStats();
+#if defined(__linux__)
+  host_mem_info = host_mem_monitor->getCurrentMemoryInfo();
+#endif
 
   int encoder_window = model->encoder_window();
   int n_frames = static_cast<int>(settings.audio_len_seconds * 16000 / 160);
@@ -135,23 +143,38 @@ static int RunAsrCore(const AsrPerfSettings& settings) {
           "Device temperature beyond 100.0 C, Shutdown the demo!");
     }
 
-    auto result = perf_ctx->PerfRun(settings.audio_len_seconds, settings.token_per_second);
+    auto result =
+        perf_ctx->PerfRun(settings.audio_len_seconds, settings.token_per_second);
     PrintAsrMetrics(result, n_chunks);
     perf_ctx->profiler().print_summary();
+#if defined(__linux__)
+    max_host_mem_info = host_mem_monitor->getMaxMemoryInfo();
+#endif
+    std::unordered_map<int, DeviceStats> current_dev_stats =
+        device_monitor->getDeviceStats();
+    perf_dumper.dumpAsrPerf(settings, result, n_chunks, host_mem_info,
+                            max_host_mem_info, post_init_dev_stats,
+                            current_dev_stats);
     std::cout << std::string(82, '=') << "\n";
   }
 
   ctx.reset();
   model.reset();
   device_monitor->stop();
+  std::unordered_map<int, DeviceStats> end_dev_stats =
+      device_monitor->getFinalDeviceStats();
 #if defined(__linux__)
   host_mem_monitor->stop();
+  max_host_mem_info = host_mem_monitor->getFinalMemoryInfo();
 #endif
+  perf_dumper.generateYamlFile();
 
   return 0;
 }
 
-static int RunAsr(std::unordered_map<std::string, std::string> args) {
+static int RunAsr(std::unordered_map<std::string, std::string> args,
+                  PerfDumper& perf_dumper,
+                  bool run_perf_by_yaml) {
   try {
     AsrPerfSettings settings;
 
@@ -198,6 +221,10 @@ static int RunAsr(std::unordered_map<std::string, std::string> args) {
     settings.interval_ms =
         args.count("interval") ? validate_setting(args, "interval") : 500;
 
+    if (args.count("dump_file") == 1) {
+      perf_dumper.setYamlFile(args["dump_file"], run_perf_by_yaml);
+    }
+
     std::cout << COLOR_YELLOW << std::string(25, '=')
               << " ASR Perf Settings " << std::string(25, '=') << "\n"
               << "model: " << settings.model_name << "\n"
@@ -212,14 +239,14 @@ static int RunAsr(std::unordered_map<std::string, std::string> args) {
               << "\n"
               << std::string(65, '=') << COLOR_RESET << std::endl;
 
-    return RunAsrCore(settings);
+    return RunAsrCore(settings, perf_dumper);
   } catch (const std::exception& e) {
     std::cerr << "ASR Perf Error: " << e.what() << std::endl;
     return 1;
   }
 }
 
-static int RunAsrConfig(int argc, char* argv[]) {
+static int RunAsrConfig(int argc, char* argv[], PerfDumper& perf_dumper) {
   const std::string yamlfile = argv[2];
   fs::path path = fs::u8path(yamlfile);
   if (!fs::exists(path)) {
@@ -240,6 +267,12 @@ static int RunAsrConfig(int argc, char* argv[]) {
 
   size_t n_tasks = config["Streams"].size();
   size_t curTaskId = 0;
+
+  if (config["dump_file"]) {
+    std::string dump_file = config["dump_file"].as<std::string>();
+    perf_dumper.setYamlFile(dump_file, true);
+    std::cout << COLOR_GREEN << "Dump perf to file: " << dump_file << "\n";
+  }
 
   for (const auto& stream : config["Streams"]) {
     std::string model_name = stream["ModelName"]
@@ -279,7 +312,13 @@ static int RunAsrConfig(int argc, char* argv[]) {
     settings.interval_ms =
         stream["interval"] ? stream["interval"].as<int>() : 500;
 
-    RunAsrCore(settings);
+    if (!config["dump_file"] && stream["dump_file"]) {
+      std::string dump_file = stream["dump_file"].as<std::string>();
+      perf_dumper.setYamlFile(dump_file, false);
+      std::cout << COLOR_GREEN << "Dump perf to file: " << dump_file << "\n";
+    }
+
+    RunAsrCore(settings, perf_dumper);
 
     std::cout << COLOR_GREEN << std::string(45, '#') << " End of Task "
               << (curTaskId + 1) << ", All Task:" << n_tasks

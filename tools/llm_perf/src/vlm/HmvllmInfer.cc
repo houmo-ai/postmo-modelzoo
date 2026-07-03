@@ -68,8 +68,8 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
   option_prefill.EnableIOLazyMode(true);
   option_decode.EnableIOLazyMode(true);
   option_vision.EnableIOLazyMode(true);
-  std::cout << "Vision model devices : "
-            << format_int_list(vision_devices) << std::endl;
+  std::cout << "Vision model devices : " << format_int_list(vision_devices)
+            << std::endl;
   // init module
   prefill_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::PREFILL_LOAD_TIME);
@@ -89,6 +89,9 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
     ss << "model_layers_" << i << "_self_attn_vcache_input";
     dummy_names.emplace_back(ss.str());
   }
+
+  // Set dummy tensors for the decode module.
+  option_decode.SetDummyTensors(dummy_names);
 
   decode_module = std::make_shared<tcim::Module>();
   perf_tracker->perfStart(PerfType::DECODE_LOAD_TIME);
@@ -185,7 +188,8 @@ void HmvllmInfer::prefill_input_init() {
     prefill_input_map.insert(
         std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
     if (input_name.find("position_ids") != std::string::npos ||
-        input_name.find("_embed") != std::string::npos) {
+        input_name.find("_embed") != std::string::npos ||
+        input_name.find("attention_mask") != std::string::npos) {
       prefill_input_datas.insert(
           std::pair<std::string, std::unique_ptr<char[]>>(
               input_name, std::make_unique<char[]>(memSize)));
@@ -222,7 +226,8 @@ void HmvllmInfer::decode_input_init() {
     decode_input_map.insert(
         std::pair<std::string, tcim::Tensor>(input_name, input_tensor));
     if (input_name.find("position_ids") != std::string::npos ||
-        input_name.find("_embed") != std::string::npos) {
+        input_name.find("_embed") != std::string::npos ||
+        input_name.find("attention_mask") != std::string::npos) {
       decode_input_datas.insert(std::pair<std::string, std::unique_ptr<char[]>>(
           input_name, std::make_unique<char[]>(memSize)));
       std::fill(decode_input_datas.at(input_name).get(),
@@ -309,7 +314,6 @@ void HmvllmInfer::PrefillSetInputDatas(void *data, int current_length) {
     auto name = prefill_module->GetInputName(idx);
     auto tensor = prefill_input_map.at(name);
     size_t memSize = tensor.MemSize();
-
     if (name.find("input_1") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(data, memSize));
     } else if (name.find("position_ids") != std::string::npos) {
@@ -333,6 +337,11 @@ void HmvllmInfer::PrefillSetInputDatas(void *data, int current_length) {
           attn_mask.emplace_back(static_cast<float16>(0.0f));
         }
       }
+      CHECK_TCIM_RET_STATUS(
+          tensor.Buffer().CopyFromHost(attn_mask.data(), memSize));
+    } else if (name.find("attention_mask") != std::string::npos) {
+      CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
+          prefill_input_datas.at(name).get(), memSize));
     } else {
       continue;
     }
@@ -386,9 +395,11 @@ void HmvllmInfer::DecodeSetInputDatas(void *data, int valid_length) {
     } else if (name.find("attn_mask") != std::string::npos) {
       float16 mask_value = static_cast<float16>(1.0f);
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(&mask_value, memSize));
-    } else {
+    } else if (name.find("attention_mask") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
           decode_input_datas.at(name).get(), memSize));
+    } else {
+      continue;
     }
     perf_tracker->perfStart(PerfType::DECODE_INPUT_TIME);
     CHECK_TCIM_RET_STATUS(decode_module->SetInput(name, tensor));
@@ -418,8 +429,8 @@ void HmvllmInfer::DecodeGetOutputDatas(std::vector<int32_t> &ids) {
   perf_tracker->perfEnd(PerfType::DECODE_OUTPUT_TIME);
 
   void *decode_outData = host_output_tensor.Buffer().Data();
-  ids.emplace_back(eigen_argmax<float16>(
-      static_cast<float16 *>(decode_outData), argmax_dim_len));
+  ids.emplace_back(eigen_argmax<float16>(static_cast<float16 *>(decode_outData),
+                                         argmax_dim_len));
 }
 
 void HmvllmInfer::VisionSetInput() {

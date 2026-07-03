@@ -208,6 +208,117 @@ void PerfDumper::dumpPerf(
   perf_metrics_node.push_back(model_metrics);
 }
 
+#ifdef ENABLE_ASR
+void PerfDumper::dumpAsrPerf(
+    const AsrPerfSettings &perf_settings,
+    const AsrTranscribeResult &results,
+    int n_chunks,
+    const HostMemoryInfo &host_mem_info,
+    const HostMemoryInfo &max_host_mem_info,
+    const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
+    const std::unordered_map<int, DeviceStats> &end_device_stats) {
+  if (dump_file.empty()) return;
+  if (init_yaml) {
+    root.reset();
+    root["PerfMetrics"] = YAML::Node(YAML::NodeType::Sequence);
+    init_yaml = false;
+  } else if (!root["PerfMetrics"] || !root["PerfMetrics"].IsSequence()) {
+    root["PerfMetrics"] = YAML::Node(YAML::NodeType::Sequence);
+  }
+
+  YAML::Node perf_metrics_node = root["PerfMetrics"];
+
+  YAML::Node model_metrics;
+  YAML::Node model_perf_settings = model_metrics["PerfSettings"];
+  model_perf_settings["ModelName"] = perf_settings.model_name;
+  model_perf_settings["encode"] = perf_settings.encode_path;
+  model_perf_settings["prefill"] = perf_settings.prefill_path;
+  model_perf_settings["decode"] = perf_settings.decode_path;
+  model_perf_settings["audio_len"] = perf_settings.audio_len_seconds;
+  model_perf_settings["token_per_second"] = perf_settings.token_per_second;
+  YAML::Node devices_node;
+  for (int d : perf_settings.devices) {
+    devices_node.push_back(d);
+  }
+  model_perf_settings["devices"] = devices_node;
+  model_perf_settings["loop"] = perf_settings.loop_count;
+  model_perf_settings["warm_up"] = perf_settings.warm_up;
+  model_perf_settings["monitor_interval"] = perf_settings.interval_ms;
+  model_perf_settings["perf_case_index"] = perf_settings.perf_case_index;
+  model_perf_settings["perf_case_total"] = perf_settings.perf_case_total;
+
+  YAML::Node model_perf_results = model_metrics["PerfResults"];
+  model_perf_results["audio_duration_s"] = results.audio_duration_s;
+  model_perf_results["chunks"] = n_chunks;
+  model_perf_results["output_tokens"] = results.output_tokens;
+  model_perf_results["encode_time"] = format_double(results.encode_time_ms);
+  model_perf_results["prefill_time"] = format_double(results.prefill_time_ms);
+  model_perf_results["decode_time"] = format_double(results.decode_time_ms);
+  model_perf_results["total_time"] = format_double(results.total_time_ms);
+  model_perf_results["TTFT"] = format_double(results.ttft_ms);
+  model_perf_results["overall_rtf"] = format_double(results.overall_rtf, 4);
+  model_perf_results["inference_rtf"] = format_double(results.inference_rtf, 4);
+  model_perf_results["decode_tps"] = format_double(results.decode_tps);
+  model_perf_results["overall_tps"] = format_double(results.overall_tps);
+
+#if defined(__linux__)
+  YAML::Node host_metrics = model_metrics["HostMonitor"];
+  host_metrics["physical_memory"] =
+      formatHostMemorySize(host_mem_info.physical_memory);
+  host_metrics["virtual_memory"] =
+      formatHostMemorySize(host_mem_info.virtual_memory);
+  host_metrics["max_physical_memory"] =
+      formatHostMemorySize(max_host_mem_info.physical_memory);
+  host_metrics["max_virtual_memory"] =
+      formatHostMemorySize(max_host_mem_info.virtual_memory);
+#endif
+
+  YAML::Node device_metrics = model_metrics["DeviceMonitor"];
+  for (auto &[dev_id, device_stats] : end_device_stats) {
+    YAML::Node device_metrics_node = device_metrics[std::to_string(dev_id)];
+    device_metrics_node["ipu_freq_max"] =
+        format_double(device_stats.ipu_freq_max) + " MHz";
+    device_metrics_node["ipu_freq_min"] =
+        format_double(device_stats.ipu_freq_min) + " MHz";
+    device_metrics_node["ipu_freq_avg"] =
+        format_double(device_stats.ipu_freq_avg) + " MHz";
+    device_metrics_node["temperature_max"] =
+        format_double(device_stats.temperature_max) + " °C";
+    device_metrics_node["temperature_min"] =
+        format_double(device_stats.temperature_min) + " °C";
+    device_metrics_node["temperature_avg"] =
+        format_double(device_stats.temperature_avg) + " °C";
+    device_metrics_node["power_max"] =
+        format_double(device_stats.power_max) + " W";
+    device_metrics_node["power_min"] =
+        format_double(device_stats.power_min) + " W";
+    device_metrics_node["power_avg"] =
+        format_double(device_stats.power_avg) + " W";
+    device_metrics_node["mem_total"] =
+        format_device_memory(device_stats.mem_info.mem_total);
+    device_metrics_node["mem_used"] =
+        format_device_memory(device_stats.mem_info.mem_used);
+    device_metrics_node["mem_used_max"] =
+        format_device_memory(device_stats.mem_used_max);
+    device_metrics_node["mem_used_min"] =
+        format_device_memory(device_stats.mem_used_min);
+    device_metrics_node["mem_used_avg"] = format_device_memory(
+        format_device_memory_avg_as_int(device_stats.mem_used_avg));
+  }
+
+  YAML::Node model_load_metrics = model_metrics["ModelLoadMemory"];
+  for (const auto &[dev_id, init_end_stats] : post_init_dev_stats) {
+    YAML::Node model_load_metrics_node =
+        model_load_metrics[std::to_string(dev_id)];
+    model_load_metrics_node["mem_total"] =
+        format_device_memory(init_end_stats.mem_info.mem_total);
+    model_load_metrics_node["mem_used"] =
+        format_device_memory(init_end_stats.mem_info.mem_used);
+  }
+  perf_metrics_node.push_back(model_metrics);
+}
+#endif
+
 void PerfDumper::showPerfBrief(
     const PerfSettings &perf_settings,
     const InferenceMetricsWithLoadTime &results,

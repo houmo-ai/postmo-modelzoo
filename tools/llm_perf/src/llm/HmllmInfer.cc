@@ -85,9 +85,10 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
       prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
   this->embedding_length =
       prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[2];
-  auto get_context_length = [this](int input_idx) {
-    return prefill_module->GetInputInfo(prefill_module->GetInputName(input_idx))
-        .Shape()[2];
+  auto get_context_length = [this](int input_idx) -> long int {
+    return static_cast<long int>(
+        prefill_module->GetInputInfo(prefill_module->GetInputName(input_idx))
+            .Shape()[2]);
   };
   this->context_max_length = get_context_length(attn_idx_start);
   if (attn_idx_start + 1 < prefill_module->GetInputNum()) {
@@ -173,7 +174,8 @@ void HmllmInfer::prefill_input_init() {
   for (int idx = attn_idx_start; idx < prefill_module->GetInputNum(); idx++) {
     auto input_name = prefill_module->GetInputName(idx);
     if (input_name.find("conv_cache") != std::string::npos ||
-        input_name.find("recurrent_state") != std::string::npos) {
+        input_name.find("recurrent_state") != std::string::npos ||
+        input_name.find("attention_mask") != std::string::npos) {
       auto input_info = prefill_module->GetInputInfo(input_name).AsContiguous();
       tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info);
       prefill_input_map.insert(
@@ -286,6 +288,9 @@ void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length,
       }
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(attn_mask.data(), memSize));
+    } else if (input_name.find("attention_mask") != std::string::npos) {
+      CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
+          prefill_input_map.at(input_name).Buffer().Data(), memSize));
     } else {
       continue;
     }
@@ -341,6 +346,9 @@ void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length) {
     } else if (input_name.find("attn_mask") != std::string::npos) {
       float16 mask_value = static_cast<float16>(1.0f);
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(&mask_value, memSize));
+    } else if (input_name.find("attention_mask") != std::string::npos) {
+      CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
+          decode_input_map.at(input_name).Buffer().Data(), memSize));
     } else {
       continue;
     }

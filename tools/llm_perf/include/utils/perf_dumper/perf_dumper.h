@@ -39,6 +39,9 @@
 #include "utils/device_monitor/device_monitor.h"
 #include "utils/host_monitor/host_monitor.h"
 #include "utils/utils.h"
+#ifdef ENABLE_ASR
+#include "asr/PerfAsr.h"
+#endif
 
 class PerfDumper {
  public:
@@ -56,6 +59,17 @@ class PerfDumper {
                 const HostMemoryInfo &max_host_mem_info,
                 const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
                 const std::unordered_map<int, DeviceStats> &end_device_stats);
+
+#ifdef ENABLE_ASR
+  void dumpAsrPerf(
+      const AsrPerfSettings &perf_settings,
+      const AsrTranscribeResult &results,
+      int n_chunks,
+      const HostMemoryInfo &host_mem_info,
+      const HostMemoryInfo &max_host_mem_info,
+      const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
+      const std::unordered_map<int, DeviceStats> &end_device_stats);
+#endif
 
   void showPerfBrief(
       const PerfSettings &perf_settings,

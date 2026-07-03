@@ -35,15 +35,15 @@
 #include "llm/HmllmInfer.h"
 #include "llm/HmllmInferMultiBatch.h"
 #include "vlm/HmvllmInfer.h"
-#ifdef ENABLE_ASR
-#include "run_asr.h"
-#endif
 #include "utils/device_monitor/device_monitor.h"
 #include "utils/perf_dumper/perf_dumper.h"
 #include "tcim/tcim_runtime.h"
 #include "utils/utils.h"
 #if defined(__linux__)
 #include "utils/host_monitor/host_monitor.h"
+#endif
+#ifdef ENABLE_ASR
+#include "run_asr.h"
 #endif
 
 #ifdef _MSC_VER
@@ -255,7 +255,7 @@ PerfSettings ParsePerfRunSetting(
 int RunPerf(std::unordered_map<std::string, std::string> args) {
 #ifdef ENABLE_ASR
   if (args.count("encode")) {
-    return RunAsr(args);
+    return RunAsr(args, perf_dumper, run_perf_by_yaml);
   }
 #endif
 
@@ -515,7 +515,7 @@ int RunPerfConfig(int argc, char* argv[]) {
 
     if (stream["encode"]) {
 #ifdef ENABLE_ASR
-      RunAsr(args);
+      RunAsr(args, perf_dumper, run_perf_by_yaml);
 #else
       throw std::invalid_argument("ASR is not supported in this build");
 #endif
