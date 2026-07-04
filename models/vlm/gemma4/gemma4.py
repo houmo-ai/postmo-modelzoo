@@ -86,7 +86,6 @@ class Gemma4(Gemma4Base):
     def _read_prefill_info(self):
         self.prefill_len = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[1]
         self.embed_dim = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[2]
-        self.prefill_local_w = self.prefill.get_input_info(self.prefill.get_input_name(4)).shape[3]
 
     def _read_decode_info(self):
         self.decode_len = self.decode.get_input_info(self.decode.get_input_name(0)).shape[1]
@@ -118,14 +117,13 @@ class Gemma4(Gemma4Base):
                 sub_emb = torch.cat([sub_emb, torch.zeros(1, self.prefill_len - sub_emb.shape[1], sub_emb.shape[2])], dim=1)
 
             chunk_mm = mm_types[:, start:end][0] if mm_types is not None else None
-            g_mask, l_mask = self._build_masks(cur_len, start, self.prefill_len, chunk_mm)
+            _, l_mask = self._build_masks(cur_len, start, self.prefill_len, chunk_mm)
 
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_INPUT_TIME)
             self.prefill.set_input(self.prefill.get_input_name(0), sub_emb.detach().numpy().astype(np.float16))
             self.prefill.set_input(self.prefill.get_input_name(1), np.array([start], dtype="int32"))
             self.prefill.set_input(self.prefill.get_input_name(2), np.array([cur_len], dtype="int32"))
-            self.prefill.set_input(self.prefill.get_input_name(3), g_mask.astype(np.float16))
-            self.prefill.set_input(self.prefill.get_input_name(4), l_mask.astype(np.float16))
+            self.prefill.set_input(self.prefill.get_input_name(3), l_mask.astype(np.float16))
             self.perf_tracker.perf_end(PERFTYPE.PREFILL_INPUT_TIME)
 
             self.perf_tracker.perf_start(PERFTYPE.PREFILL_INFER_TIME)
