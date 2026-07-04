@@ -111,10 +111,6 @@ if __name__ == "__main__":
         ), "Only supported for compilation on the x86_64 platform."
 
         if args.mtp:
-            if args.model_size in ["e2b", "e4b", "31b"]:
-                raise NotImplementedError(
-                    "MTP optimization is not implemented for this model size."
-                )
             assistant_hmonnx = find_hmonnx_file(
                 os.path.join(model_dir, "mtp_draft_decode"), pattern="gemma4_*.onnx"
             )
