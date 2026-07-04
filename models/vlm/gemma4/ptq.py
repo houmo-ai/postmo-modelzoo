@@ -141,8 +141,6 @@ if __name__ == "__main__":
     args.model = first_not_none(args.model, get_default_model_dir(model_config))
     enable_mtp = args.assistant_model is not None
     if enable_mtp:
-        if args.model_size != "26b-a4b":
-            raise ValueError("--assistant-model is only supported when --model-size=26b-a4b")
         if not os.path.isdir(args.assistant_model):
             raise FileNotFoundError(f"Assistant model directory not found: {args.assistant_model}")
 
@@ -201,7 +199,7 @@ if __name__ == "__main__":
 
     config_overrides = {
         "export.model.context_max_length": args.context_length,
-        "export.model.prefill_chunk_length": args.prefill_chunk_length,
+        "export.model.prefill_chunk_length": 320 if args.model_size in ["26b-a4b", "31b"] else args.prefill_chunk_length,
     }
 
     if enable_mtp:
