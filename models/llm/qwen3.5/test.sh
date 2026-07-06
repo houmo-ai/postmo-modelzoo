@@ -125,10 +125,20 @@ if should_run_step "demo"; then
         python3 demo_mtp.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     else
         python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
 
+        echo "Execute cpp demo."
+        cd cpp && ./build_linux.sh && cd ..
+        if [[ "${NDEVICE}" -eq 1 ]]; then
+            ./bin/demo --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
+                --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
+                --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_896x896x2.hmm" \
+                --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin" \
+                --prompt "介绍下图片" --image "${HOUMO_EXAMPLES_PATH}/data/pic/beach.jpeg" \
+                --tokenizer "${WORKFLOW_MODEL_DIR}"
+        fi
         if command -v llm_perf &>/dev/null; then
             echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
-            python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
             devices_param=$(get_devices_param "${NDEVICE}")
             if [[ "${NDEVICE}" -gt 1 ]]; then
                 model_suffix="hmms"

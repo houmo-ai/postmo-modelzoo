@@ -1,434 +1,309 @@
 # 推理 Pipeline 文档
 
-本文档描述四个模型类的推理执行流程。
+本文档描述 Houmo Inference Framework 中生成类模型（LLM/VLM）与语音识别模型（ASR）的通用推理流程。具体模型的输入张量名称、位置编码、cache 结构和预处理细节由各模型实现决定。
 
 ## 目录
 
-- [Qwen3Context (LLM)](#qwen3context-llm)
-- [Qwen35MLLMContext (VLM)](#qwen35mllmcontext-vlm)
-- [Qwen3VLMContext (VLM)](#qwen3vlmcontext-vlm)
-- [WhisperContext (ASR)](#whispercontext-asr)
-- [对比总结](#对比总结)
+- [生成类模型通用流程](#生成类模型通用流程)
+- [LLM Prefill / Decode](#llm-prefill--decode)
+- [VLM 扩展点](#vlm-扩展点)
+- [ASR 转写流程](#asr-转写流程)
+- [ASR 模板方法打点](#asr-模板方法打点)
+- [性能指标](#性能指标)
+- [文件位置](#文件位置)
 
 ---
 
-## Qwen3Context (LLM)
+## 生成类模型通用流程
 
-纯文本语言模型，无视觉处理。
+生成类模型通过 `Context::generate(prompt, params, callback)` 提供 token 级流式输出。模型子类通常在 `generate()` 中组织 `prefill()` 和循环 `decode()`，并用 `PerfProfiler` 记录阶段耗时。
 
-### Prefill Pipeline
-
-```
-prefill(tokens)
+```text
+generate(prompt, params, callback)
     │
-    ├─► set_sampler()          // 设置采样器
-    ├─► generated_ids_.clear()
+    ├─► profiler_.reset()
+    ├─► profiler_.start("generate")
+    ├─► profiler_.set_input_tokens(prompt.size())
+    ├─► set_sampler(params)
     │
-    └─► do_prefill_inference(tokens, sampler)
-            │
-            ├─► 计算 seq_length, prefill_loop_chunk
-            │
-            └─► for chunk in [0, prefill_loop_chunk):
-                    │
-                    ├─► prefill_preprocess_chunk(chunk, tokens, ...)
-                    │       │
-                    │       ├─► 提取当前 chunk tokens
-                    │       ├─► Padding 到 prefill_length
-                    │       ├─► 获取 embedding
-                    │       └─► 设置 prefill 输入 tensors
-                    │
-                    └─► prefill_inference_chunk()
-                            │
-                            └─► prefill_module->Run() + Sync()
-                │
-                └─► prefill_postprocess(sampler, seq_length)
-                        │
-                        ├─► 获取输出 logits
-                        ├─► sampler->sample() 采样
-                        ├─► context_length_ += seq_length
-                        └─► return sampled_token
+    ├─► prefill(prompt)
+    │       ├─► do_prefill_inference(prompt, sampler)
+    │       └─► profiler_.record_ttft()
+    │
+    ├─► callback(first_token)
+    │
+    └─► while 未达到停止条件:
+            ├─► decode(prev_token)
+            │       └─► do_decode_inference(prev_token, sampler)
+            ├─► profiler_.add_output_token()
+            └─► callback(token)
 ```
 
-### Decode Pipeline
+停止条件通常包括：
 
-```
-decode(prev_token)
-    │
-    └─► do_decode_inference(prev_token, sampler)
-            │
-            ├─► decode_preprocess(prev_token)
-            │       │
-            │       ├─► 获取 prev_token embedding
-            │       └─► 设置 decode 输入 tensors
-            │
-            ├─► decode_inference()
-            │       │
-            │       └─► decode_module->Run() + Sync()
-            │
-            └─► decode_postprocess(sampler)
-                    │
-                    ├─► 获取输出 logits
-                    ├─► sampler->sample() 采样
-                    ├─► context_length_++
-                    └─► return sampled_token
-```
+- 生成 EOS/BOS 等模型定义的停止 token
+- 达到 `SamplingParams::max_tokens`
+- `Context::context_length_` 达到模型可用上下文上限
+- callback 返回 `false`
 
 ---
 
-## Qwen35MLLMContext (VLM)
+## LLM Prefill / Decode
 
-视觉语言模型，支持多图输入，使用 M-RoPE。
+### Prefill
 
-### Prefill Pipeline
+Prefill 负责处理 prompt tokens，完成 embedding lookup、prefill module 输入设置和首 token 采样。
 
-```
+```text
 prefill(tokens)
     │
-    ├─► use_vlm_ = false
     ├─► set_sampler()
     ├─► generated_ids_.clear()
     │
     └─► do_prefill_inference(tokens, sampler)
             │
-            ├─► padded_tokens = pad_visual_token(tokens)  // 扩展 image tokens
+            ├─► 计算 seq_length
+            ├─► 计算 prefill_loop_chunk
             │
-            ├─► run_vision()                              // ★ 视觉处理
-            │       │
-            │       ├─► vision_preprocess(image_idx)
-            │       │       ├─► 加载并预处理图像
-            │       │       ├─► 计算 image_grid_thw
-            │       │       └─► 设置 vision 输入
-            │       │
-            │       ├─► vision_inference()
-            │       │       └─► vision_module->Run() + Sync()
-            │       │
-            │       └─► vision_postprocess(image_idx)
-            │               └─► 拼接 flat_image_embeds_
-            │
-            ├─► prefill_common_setup(padded_tokens)      // ★ 通用设置 (一次)
-            │       │
-            │       ├─► image_embed_offset_ = 0
-            │       ├─► use_vlm_ = !flat_image_embeds_.empty()
-            │       ├─► get_rope_index() → position_ids_3d, rope_deltas_
-            │       └─► 计算 seq_length, prefill_loop_chunk
-            │
-            └─► for chunk in [0, prefill_loop_chunk):
+            └─► for chunk in chunks:
                     │
-                    ├─► prefill_preprocess_chunk(chunk, padded_tokens, ...)
-                    │       │
+                    ├─► prefill_preprocess_chunk()
                     │       ├─► 提取当前 chunk tokens
-                    │       ├─► Padding 到 prefill_length
-                    │       ├─► 获取 embedding
-                    │       ├─► scatter_image_embeds()  // 替换 image embedding
-                    │       └─► 设置 prefill 输入 (含 3D position_ids)
+                    │       ├─► 不足 prefill_length 时 padding
+                    │       ├─► embedding lookup
+                    │       └─► 设置 prefill input tensors
                     │
-                    └─► prefill_inference_chunk()
-                            └─► prefill_module->Run() + Sync()
-                │
-                └─► prefill_postprocess(sampler, seq_length)
-                        │
-                        ├─► 获取输出 logits
-                        ├─► sampler->sample() 采样
-                        ├─► flat_image_embeds_.clear()
-                        ├─► image_paths_.clear()        // 清空，防止下轮误执行
-                        ├─► context_length_ += seq_length
-                        └─► return sampled_token
+                    ├─► prefill_inference_chunk()
+                    │       └─► prefill_module()->Run() + Sync()
+                    │
+                    └─► prefill_postprocess()
+                            ├─► 获取 logits
+                            ├─► sampler->sample()
+                            ├─► 更新 context_length_
+                            └─► return sampled_token
 ```
 
-### Decode Pipeline
+### Decode
 
-```
+Decode 每次处理一个 token，复用模型维护的 KV cache 或其他增量状态。
+
+```text
 decode(prev_token)
     │
     └─► do_decode_inference(prev_token, sampler)
             │
             ├─► decode_preprocess(prev_token)
-            │       │
-            │       ├─► 获取 prev_token embedding
-            │       ├─► 计算 position (含 rope_deltas_ 调整)
-            │       └─► 设置 decode 输入 (含 3D position_ids)
+            │       ├─► embedding lookup
+            │       ├─► 计算当前位置
+            │       └─► 设置 decode input tensors
             │
             ├─► decode_inference()
-            │       └─► decode_module->Run() + Sync()
+            │       └─► decode_module()->Run() + Sync()
             │
             └─► decode_postprocess(sampler)
-                    │
-                    ├─► 获取输出 logits
-                    ├─► sampler->sample() 采样
+                    ├─► 获取 logits
+                    ├─► sampler->sample()
                     ├─► context_length_++
                     └─► return sampled_token
 ```
 
 ---
 
-## Qwen3VLMContext (VLM)
+## VLM 扩展点
 
-视觉语言模型，支持 Deepstack 架构，使用 M-RoPE。
+`VLMModel` 继承 `LLMModel`，增加 `vision_module_`、`vision_input_map_` 和 `encode_image()` 接口。VLM 子类通常在 Prefill 前或 Prefill 通用设置阶段插入视觉处理。
 
-### Prefill Pipeline
-
-```
-prefill(tokens)
+```text
+VLM prefill(tokens)
     │
-    ├─► use_vlm_ = !image_paths_.empty()
-    ├─► set_sampler()
-    ├─► generated_ids_.clear()
+    ├─► 可选：读取 image_paths_
+    ├─► vision_preprocess()
+    │       ├─► HmImageProcessor::LoadAndProcess()
+    │       └─► 设置 vision input tensors
     │
-    └─► do_prefill_inference(tokens, sampler)
-            │
-            ├─► run_vision()                              // ★ 视觉处理 (如有)
-            │       │
-            │       ├─► vision_preprocess(image_idx)
-            │       │       ├─► 加载并预处理图像
-            │       │       └─► 设置 vision 输入
-            │       │
-            │       ├─► vision_inference()
-            │       │       └─► vision_module->Run() + Sync()
-            │       │
-            │       └─► vision_postprocess(image_idx)
-            │               ├─► 拼接 flat_image_embeds_
-            │               ├─► 拼接 deepstack_0/1/2_
-            │               └─► 计算 image_grid_thw
-            │
-            ├─► prefill_common_setup(tokens)              // ★ 通用设置 (一次)
-            │       │
-            │       ├─► input_ids = expand_image_tokens(tokens)
-            │       ├─► 计算 3D position_ids (第一轮) 或 1D (多轮)
-            │       ├─► Padding 到 prefill_length
-            │       ├─► 获取整个序列 embedding → chunk_embeds_
-            │       ├─► scatter_image_embeds()            // 替换 image embedding
-            │       ├─► 扩展 position_ids
-            │       └─► 准备 deepstack (scatter 到整个序列)
-            │
-            └─► for chunk in [0, prefill_loop_chunk):
-                    │
-                    ├─► prefill_preprocess_chunk(chunk, seq_length, ...)
-                    │       │
-                    │       ├─► 从 chunk_embeds_ 提取当前 chunk
-                    │       ├─► 从 position_ids_3d 提取当前 chunk
-                    │       ├─► 从 deepstack_0/1/2_ 提取当前 chunk
-                    │       └─► 设置 prefill 输入
-                    │
-                    └─► prefill_inference_chunk()
-                            └─► prefill_module->Run() + Sync()
-                │
-                └─► prefill_postprocess(sampler, seq_length)
-                        │
-                        ├─► 获取输出 logits
-                        ├─► sampler->sample() 采样
-                        ├─► context_length_ += seq_length
-                        ├─► past_seq_len_ = context_length_
-                        ├─► image_paths_.clear()        // 清空，防止下轮误执行
-                        └─► return sampled_token
+    ├─► vision_inference()
+    │       └─► vision_module()->Run() + Sync()
+    │
+    ├─► vision_postprocess()
+    │       └─► 得到 image embeddings
+    │
+    └─► LLM prefill path
+            ├─► token embedding lookup
+            ├─► 注入 image embeddings
+            ├─► 设置 position ids / multimodal metadata
+            └─► prefill module inference
 ```
 
-### Decode Pipeline
+VLM 的通用约束：
 
-```
-decode(prev_token)
-    │
-    └─► do_decode_inference(prev_token, sampler)
-            │
-            ├─► decode_preprocess(prev_token)
-            │       │
-            │       ├─► 获取 prev_token embedding
-            │       ├─► 计算 position (含 rope_deltas_ 调整)
-            │       ├─► 准备 deepstack zeros
-            │       └─► 设置 decode 输入
-            │
-            ├─► decode_inference()
-            │       └─► decode_module->Run() + Sync()
-            │
-            └─► decode_postprocess(sampler)
-                    │
-                    ├─► 获取输出 logits
-                    ├─► sampler->sample() 采样
-                    ├─► context_length_++
-                    ├─► past_seq_len_++
-                    └─► return sampled_token
-```
+- 视觉输入路径和图像状态应属于请求级 `Context`，不要放入全局状态。
+- 视觉特征注入应在 prefill 阶段完成，decode 阶段只处理自回归 token。
+- 多轮对话中需明确清理或保留图像状态，避免下一轮误复用。
+- 视觉阶段建议使用 `generate.vision`、`generate.vision.preprocess`、`generate.vision.inference`、`generate.vision.postprocess` 等 profiler path。
 
 ---
 
-## WhisperContext (ASR)
+## ASR 转写流程
 
-语音识别模型，Encoder-Decoder 架构。使用 `ASRContext` 基类的模板方法模式实现自动性能打点。
+ASR 使用 `ASRModel` / `ASRContext`。与生成类模型不同，ASR 的入口是 `ASRContext::Transcribe(audio_path, params, callback)`，内部先处理音频，再执行 encoder、语言检测、decoder prefill 和 decoder decode。
 
-### 完整转录 Pipeline（带性能打点）
-
-```
+```text
 Transcribe(audio_path, params, callback)
     │
-    │  profiler_.reset() + set_root_stage("transcribe")
-    │  p.start("transcribe")   ← E2E 计时开始
+    ├─► profiler_.reset()
+    ├─► profiler_.set_root_stage("transcribe")
+    ├─► profiler_.start("transcribe")
     │
-    ├─► audio_processor_->Process()/LoadAudio()   // ★ 音频加载+特征提取
-    │       scope("transcribe.audio_load")
+    ├─► AudioProcessor::Process(audio_path)
+    │       ├─► LoadAudio(path)
+    │       │       ├─► 读取 wav/mp3/flac 等格式
+    │       │       ├─► 重采样到 16kHz
+    │       │       ├─► 转单声道
+    │       │       └─► 归一化到 [-1, 1]
+    │       │
+    │       ├─► ChunkPCM(audio)
+    │       │       ├─► 按 chunk_seconds 切分
+    │       │       └─► 短 chunk 补零
+    │       │
+    │       └─► ExtractFeatures(chunk)
+    │               ├─► STFT
+    │               ├─► Mel Filter Bank
+    │               ├─► Log compression
+    │               └─► FP16 MelFeatures
     │
-    ├─► for each chunk:
-    │   │
-    │   ├─► do_encode(mel, n_mels, n_frames)      // ★ Encoder 推理
-    │   │       ├── scope("transcribe.encode.preprocess")
-    │   │       ├── scope("transcribe.encode.inference")
-    │   │       └── scope("transcribe.encode.postprocess")
-    │   │
-    │   ├─► do_detect_language()                   // ★ 语言检测（首次，仅 Whisper）
-    │   │       ├── scope("transcribe.detect_lang.preprocess")
-    │   │       ├── scope("transcribe.detect_lang.inference")
-    │   │       └── scope("transcribe.detect_lang.postprocess")
-    │   │
-    │   ├─► BuildPrompt(lang_id) → [sot, lang, transcribe, notimestamps]
-    │   │
-    │   ├─► do_prefill(prompt)                     // ★ Prefill 推理
-    │   │       ├── scope("transcribe.prefill.preprocess")
-    │   │       ├── scope("transcribe.prefill.inference")
-    │   │       └── scope("transcribe.prefill.postprocess")
-    │   │       record_ttft()
-    │   │
-    │   └─► while not eos:
-    │           ├─► do_decode(prev_token)           // ★ 自回归 Decode
-    │           │       ├── scope("transcribe.decode.preprocess")
-    │           │       ├── scope("transcribe.decode.inference")
-    │           │       └── scope("transcribe.decode.postprocess")
-    │           ├─► add_output_token()
-    │           └─► callback(token)
+    ├─► for each feature chunk:
+    │       │
+    │       ├─► do_encode(mel, n_mels, n_frames)
+    │       │       ├─► encode_preprocess_impl()
+    │       │       ├─► encode_inference_impl()
+    │       │       └─► encode_postprocess_impl()
+    │       │
+    │       ├─► language_token = do_detect_language()
+    │       │       ├─► detect_lang_preprocess_impl()
+    │       │       ├─► detect_lang_inference_impl()
+    │       │       └─► detect_lang_postprocess_impl()
+    │       │
+    │       ├─► prompt = BuildPrompt(language_token)
+    │       │
+    │       ├─► token = do_prefill(prompt)
+    │       │       ├─► prefill_preprocess_impl()
+    │       │       ├─► prefill_inference_impl()
+    │       │       └─► prefill_postprocess_impl()
+    │       │
+    │       ├─► profiler_.record_ttft()
+    │       ├─► callback(token)
+    │       │
+    │       └─► while token not in eos_token_ids():
+    │               ├─► token = do_decode(token)
+    │               │       ├─► decode_preprocess_impl()
+    │               │       ├─► decode_inference_impl()
+    │               │       └─► decode_postprocess_impl()
+    │               ├─► profiler_.add_output_token()
+    │               └─► callback(token)
     │
-    ├─► p.stop("transcribe")    ← E2E 计时结束
-    ├─► fill_perf_info(audio_duration)  → RTF/吞吐计算
-    └─► profiler().print_summary()      → 树形性能报告
+    ├─► profiler_.stop("transcribe")
+    └─► fill_perf_info(audio_duration)
 ```
 
-### 性能打点架构（模板方法模式）
+ASR 子类负责决定：
 
-打点代码全部在 `ASRContext` 基类中，子类（Whisper/Qwen3Asr/GlmAsr）只需实现 `_impl` 虚钩子，自动获得性能计时：
-
-```
-ASRContext::do_encode()           ← 基类模板方法（含打点 scope）
-  ├── encode_preprocess_impl()     ← 子类虚钩子（具体逻辑）
-  ├── encode_inference_impl()      ← 子类虚钩子
-  └── encode_postprocess_impl()    ← 子类虚钩子
-
-ASRContext::do_prefill()          ← 基类模板方法
-  ├── prefill_preprocess_impl()
-  ├── prefill_inference_impl()
-  └── prefill_postprocess_impl()
-
-ASRContext::do_decode()           ← 基类模板方法
-  ├── decode_preprocess_impl()
-  ├── decode_inference_impl()
-  └── decode_postprocess_impl()
-
-ASRContext::do_detect_language()  ← 基类模板方法（默认空实现）
-ASRContext::fill_perf_info()      ← RTF/吞吐指标计算
-```
-
-### 性能指标
-
-| 指标 | 说明 |
-|------|------|
-| `audio_load_time` | 音频加载+特征提取耗时 |
-| `encode_time` | Encoder 推理总耗时 |
-| `detect_lang_time` | 语言检测耗时（Whisper 独有） |
-| `prefill_time` | Prefill 推理总耗时 |
-| `decode_time` | Decode 推理总耗时 |
-| `total_time` | 端到端总耗时 |
-| `ttft_time` | Time-to-First-Token |
-| `overall_rtf` | 整体实时率：total_time / audio_duration |
-| `inference_rtf` | 纯推理实时率：(total_time - audio_load_time) / audio_duration |
-| `decode_tps` | Decode 吞吐量（tokens/s） |
-| `overall_tps` | 整体吞吐量（tokens/s） |
+- encode 模型路径如何从 `ModelConfig` 或 `extra_params` 获取
+- encoder 输出如何保存并供 prefill/decode 使用
+- 是否支持语言检测
+- prompt token 的组成方式
+- EOS token 集合
+- 多 chunk 音频之间是否复用 decoder 状态
 
 ---
 
-## 对比总结
+## ASR 模板方法打点
 
-### 函数调用对比
+`ASRContext` 将 ASR 关键阶段封装为模板方法，子类只实现 `_impl` 钩子，基类负责统一 profiler path。
 
-| 阶段 | Qwen3Context (LLM) | Qwen35MLLMContext (VLM) | Qwen3VLMContext (VLM) | WhisperContext (ASR) | Qwen3AsrContext (ASR) | GlmAsrContext (ASR) |
-|------|-------------------|------------------------|----------------------|---------------------|----------------------|---------------------|
-| **视觉/音频处理** | - | `run_vision()` | `run_vision()` | `do_encode()` | `do_encode()` | `do_encode()` |
-| **语言检测** | - | - | - | `do_detect_language()` | - | - |
-| **通用设置** | - | `prefill_common_setup()` | `prefill_common_setup()` | - | - | - |
-| **分块预处理** | `prefill_preprocess_chunk()` | `prefill_preprocess_chunk()` | `prefill_preprocess_chunk()` | - | - | - |
-| **分块推理** | `prefill_inference_chunk()` | `prefill_inference_chunk()` | `prefill_inference_chunk()` | - | - | - |
-| **后处理** | `prefill_postprocess()` | `prefill_postprocess()` | `prefill_postprocess()` | - | - | - |
+```text
+ASRContext::do_encode()
+    ├─► transcribe.encode.preprocess  -> encode_preprocess_impl()
+    ├─► transcribe.encode.inference   -> encode_inference_impl()
+    └─► transcribe.encode.postprocess -> encode_postprocess_impl()
 
-### 关键差异
+ASRContext::do_detect_language()
+    ├─► transcribe.detect_lang.preprocess  -> detect_lang_preprocess_impl()
+    ├─► transcribe.detect_lang.inference   -> detect_lang_inference_impl()
+    └─► transcribe.detect_lang.postprocess -> detect_lang_postprocess_impl()
 
-| 特性 | Qwen3Context | Qwen35MLLMContext | Qwen3VLMContext | WhisperContext | Qwen3AsrContext | GlmAsrContext |
-|------|-------------|-------------------|-----------------|----------------|-----------------|---------------|
-| **模型架构** | Decoder-only | Decoder-only | Decoder-only | Encoder-Decoder | Encoder-Decoder | Encoder-Decoder |
-| **视觉编码** | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **音频编码** | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **语言检测** | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| **M-RoPE** | ❌ | ✅ (3D position) | ✅ (3D position) | ❌ | ❌ | ❌ |
-| **Deepstack** | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| **分块处理** | ✅ | ✅ | ✅ | ✅ (固定 30s) | ✅ (per-loop) | ✅ (PCM chunks) |
-| **特殊 tokens** | BOS/EOS | BOS/EOS | BOS/EOS | SOT/Lang/Transcribe | audio_pad/audio_start | audio_token |
-| **性能打点** | 手动 do_* | 手动 do_* | 手动 do_* | ASRContext 自动 | ASRContext 自动 | ASRContext 自动 |
+ASRContext::do_prefill()
+    ├─► transcribe.prefill.preprocess  -> prefill_preprocess_impl()
+    ├─► transcribe.prefill.inference   -> prefill_inference_impl()
+    └─► transcribe.prefill.postprocess -> prefill_postprocess_impl()
 
-### Pipeline 结构
-
+ASRContext::do_decode()
+    ├─► transcribe.decode.preprocess  -> decode_preprocess_impl()
+    ├─► transcribe.decode.inference   -> decode_inference_impl()
+    └─► transcribe.decode.postprocess -> decode_postprocess_impl()
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Prefill Pipeline                           │
-├─────────────────────────────────────────────────────────────────┤
-│  LLM:  do_prefill_inference()                                   │
-│          └─► [循环] prefill_preprocess → prefill_inference      │
-│                                                                 │
-│  VLM:  do_prefill_inference()                                   │
-│          ├─► run_vision()                    ★ 视觉处理         │
-│          ├─► prefill_common_setup()          ★ 通用设置 (一次)  │
-│          └─► [循环] prefill_preprocess → prefill_inference      │
-│                                                                 │
-│  ASR:  Encode() + prefill()                    ★ 音频编码       │
-│          ├─► Encode(mel_features)             ★ Encoder 前向    │
-│          ├─► DetectLanguage()                 ★ 语言检测        │
-│          └─► prefill(prompt_tokens)           ★ Decoder prefill │
-└─────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────┐
-│                      Decode Pipeline                            │
-├─────────────────────────────────────────────────────────────────┤
-│  All:  do_decode_inference()                                    │
-│          ├─► decode_preprocess()                                │
-│          ├─► decode_inference()                                 │
-│          └─► decode_postprocess()                               │
-└─────────────────────────────────────────────────────────────────┘
-```
+`fill_perf_info(audio_duration)` 从 profiler 中汇总 `ASRPerfInfo`：
+
+- `audio_load_time`：音频加载和特征提取耗时
+- `encode_time`：encoder 推理耗时
+- `detect_lang_time`：语言检测耗时
+- `prefill_time`：decoder prefill 推理耗时
+- `decode_time`：decoder decode 推理耗时
+- `total_time`：端到端耗时
+- `ttft_time`：首 token 延迟
+- `n_chunks`：encoder 推理次数
+- `overall_rtf`：`total_time / audio_duration`
+- `inference_rtf`：`(encode + prefill + decode) / audio_duration`
+- `decode_tps` / `overall_tps`：token 吞吐
+
+---
+
+## 性能指标
+
+### 生成类模型建议路径
+
+| 阶段 | 说明 |
+|------|------|
+| `generate` | 端到端生成耗时 |
+| `generate.vision` | 视觉处理耗时，VLM 使用 |
+| `generate.prefill` | Prefill 总耗时 |
+| `generate.prefill.preprocess_chunk` | 分块预处理 |
+| `generate.prefill.inference_chunk` | 分块推理 |
+| `generate.prefill.postprocess` | 后处理与采样 |
+| `generate.decode` | Decode 总耗时 |
+| `generate.decode.preprocess` | Decode 预处理 |
+| `generate.decode.inference` | Decode 推理 |
+| `generate.decode.postprocess` | Decode 后处理 |
+
+### ASR 建议路径
+
+| 阶段 | 说明 |
+|------|------|
+| `transcribe` | 端到端转写耗时 |
+| `transcribe.audio_load` | 音频加载、切分、特征提取 |
+| `transcribe.encode.preprocess` | Encoder 输入准备 |
+| `transcribe.encode.inference` | Encoder 推理 |
+| `transcribe.encode.postprocess` | Encoder 输出整理 |
+| `transcribe.detect_lang.*` | 语言检测，模型支持时使用 |
+| `transcribe.prefill.*` | Decoder prefill |
+| `transcribe.decode.*` | Decoder 自回归 decode |
 
 ---
 
 ## 文件位置
 
-| 模型 | 头文件 | 源文件 |
+| 组件 | 头文件 | 源文件 |
 |------|--------|--------|
-| Qwen3Context | `include/models/qwen3_llm_model.h` | `src/models/qwen3_llm_model.cc` |
-| Qwen35MLLMContext | `include/models/qwen35_mllm_model.h` | `src/models/qwen35_mllm_model.cc` |
-| Qwen3VLMContext | `include/models/qwen3_vlm_model.h` | `src/models/qwen3_vlm_model.cc` |
-| WhisperContext | `include/models/whisper_model.h` | `src/models/whisper_model.cc` |
-| Qwen3AsrContext | `include/models/qwen3_asr_model.h` | `src/models/qwen3_asr_model.cc` |
-| GlmAsrContext | `include/models/glm_asr_model.h` | `src/models/glm_asr_model.cc` |
-| ASRContext (基类) | `include/core/asr_model.h` | `src/models/asr_model.cc` |
-
----
-
-## ASR 模型继承关系
-
-```
-ASRContext (ASR 基类，继承 Context)
-  ├── WhisperContext     (Whisper 实现)
-  ├── Qwen3AsrContext     (Qwen3-ASR 实现)
-  └── GlmAsrContext       (GLM-ASR 实现)
-
-ASRModel (ASR 模型基类)
-  ├── WhisperModel        (Whisper 实现)
-  ├── Qwen3AsrModel       (Qwen3-ASR 实现)
-  └── GlmAsrModel         (GLM-ASR 实现)
-```
-
-**设计原理：**
-- ASRModel 独立于 LLMModel，通过 ModelFactory\<ASRModel\> 工厂创建
-- ASRContext 继承 Context，提供模板方法模式的性能打点框架
-- 子类只需实现 10-13 个 `_impl` 虚钩子，打点由基类自动完成
-- 后续新增 ASR 模型只需实现钩子，零打点代码
+| 基础类型 | `include/base/houmo.h` | - |
+| Context 基类 | `include/core/context.h` | `src/core/context.cc` |
+| LLMModel 基类 | `include/core/llm_model.h` | `src/core/llm_model.cc` |
+| VLMModel 基类 | `include/core/vlm_model.h` | `src/core/vlm_model.cc` |
+| ASRModel / ASRContext | `include/core/asr_model.h` | `src/core/asr_model.cc` |
+| ModelFactory | `include/core/model_factory.h` | `src/core/model_factory.cc` |
+| AudioProcessor | `include/modules/audio_processor.h` | `src/modules/audio_processor.cc` |
+| ImageProcessor | `include/modules/image_processor.h` | `src/modules/image_processor.cc` |
+| Tokenizer | `include/modules/tokenizer.h` | `src/modules/tokenizer.cc` |
+| Embedding | `include/modules/embedding.h` | `src/modules/embedding.cc` |
+| Sampler | `include/modules/sampler.h` | `src/modules/sampler.cc` |
+| StreamingDecoder | `include/modules/streaming_decoder.h` | `src/modules/streaming_decoder.cc` |
+| PerfProfiler | `include/modules/perf_profiler.h` | `src/modules/perf_profiler.cc` |

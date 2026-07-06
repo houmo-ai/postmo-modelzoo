@@ -7,483 +7,538 @@
 
 ## 文件结构
 
-```
+```text
 include/
 ├── base/
-│   └── houmo.h              # 基础类型定义 (Token, ModelType, Exception)
+│   ├── houmo.h              # Token、配置、模型信息、采样参数、性能结构
+│   └── tcim_utils.h         # TCIM 辅助工具
 ├── core/
-│   ├── model_factory.h      # ModelFactory 工厂类
-│   ├── llm_model.h          # LLMModel 基类
-│   ├── vlm_model.h          # VLMModel 基类
-│   └── context.h            # Context 基类
-├── modules/
-│   ├── tokenizer.h          # HfTokenizer
-│   ├── embedding.h          # Embedding
-│   ├── sampler.h            # Sampler
-│   ├── streaming_decoder.h  # StreamingDecoder
-│   └── image_processor.h    # ImageProcessor
-└── models/
-    ├── qwen3_llm_model.h    # Qwen3 LLM
-    ├── qwen35_mllm_model.h  # Qwen3.5 MLLM
-    └── qwen3_vlm_model.h    # Qwen3-VL
-```
-
-**常用引用：**
-
-```cpp
-// 使用工厂创建模型
-#include "core/model_factory.h"
-
-// 直接使用模型类
-#include "core/llm_model.h"
-#include "core/context.h"
-#include "modules/sampler.h"
-#include "modules/streaming_decoder.h"
+│   ├── context.h            # Context 请求级推理状态基类
+│   ├── llm_model.h          # LLMModel 生成类模型基类
+│   ├── vlm_model.h          # VLMModel 视觉语言模型基类
+│   ├── asr_model.h          # ASRModel / ASRContext 语音识别基类
+│   └── model_factory.h      # ModelFactory 模板工厂
+└── modules/
+    ├── tokenizer.h          # HfTokenizer
+    ├── embedding.h          # Embedding
+    ├── sampler.h            # Sampler
+    ├── streaming_decoder.h  # StreamingDecoder
+    ├── image_processor.h    # HmImageProcessor
+    ├── audio_processor.h    # AudioProcessor
+    └── perf_profiler.h      # PerfProfiler
 ```
 
 ---
 
-## 快速开始
+## 基础数据结构
 
-### 最小示例
-
-```cpp
-#include "core/model_factory.h"
-#include "modules/streaming_decoder.h"
-#include <iostream>
-
-int main() {
-    // 1. 配置模型
-    houmo::ModelConfig config;
-    config.devices = {0};
-    config.prefill_path = "models/qwen3-4b/qwen3-4b_prefill.hmm";
-    config.decode_path = "models/qwen3-4b/qwen3-4b_decode.hmm";
-    config.embedding_path = "models/qwen3-4b/hmquant/quant_embedding.bin";
-    config.tokenizer_path = "models/tokenizers/Qwen3-4B/tokenizer.json";
-
-    // 2. 创建模型
-    auto model = houmo::ModelFactory::Create("qwen3_llm", config);
-    auto ctx = model->create_context();
-
-    // 3. 流式生成
-    auto tokens = model->tokenize("你好，请介绍一下自己。", false, false);
-    houmo::SamplingParams params;
-    params.max_tokens = 256;
-
-    houmo::StreamingDecoder decoder(model->tokenizer());
-    ctx->generate(tokens, params, [&decoder](houmo::Token token) {
-        std::cout << decoder.decode(token) << std::flush;
-        return true;
-    });
-
-    return 0;
-}
-```
-
----
-
-## 核心类参考
-
-### ModelFactory
-
-模型工厂，支持静态注册和运行时创建模型。
-
-```cpp
-#include "core/model_factory.h"
-```
-
-#### ModelSeries 枚举
-
-```cpp
-enum class ModelSeries {
-    kUnknown,      // 未知类型
-    kQwen3LLM,     // Qwen3 纯文本 LLM
-    kQwen35MLLM,   // Qwen3.5 多模态 MLLM
-    kQwen3VLM,     // Qwen3-VL 视觉语言
-};
-```
-
-#### 方法
-
-| 方法 | 返回类型 | 说明 |
-|------|----------|------|
-| `Create(series, config)` | `std::unique_ptr<LLMModel>` | 根据系列创建模型 |
-| `Create(name, config)` | `std::unique_ptr<LLMModel>` | 根据名称创建模型 |
-| `ListRegisteredTypes()` | `std::vector<std::string>` | 列出已注册模型 |
-| `GetRegisteredModels()` | `std::vector<RegistryEntry>` | 获取注册详情 |
-| `IsRegistered(series)` | `bool` | 检查系列是否已注册 |
-
-#### REGISTER_LLM_MODEL 宏
-
-```cpp
-REGISTER_LLM_MODEL(your_model_llm, ModelSeries::kYourModelLLM,
-                   [](const ModelConfig& c) {
-                     return std::make_unique<YourModelLLMModel>(c);
-                   },
-                   "YourModel 纯文本 LLM");
-```
-
-**重要**: 静态注册需要 `--whole-archive` 链接：
-
-```cmake
-target_link_libraries(sample_infer PRIVATE
-  -Wl,--whole-archive houmo_infer -Wl,--no-whole-archive
-)
-```
-
----
-
-### LLMModel
-
-纯文本大语言模型类。
-
-```cpp
-#include "core/llm_model.h"
-```
-
-#### 构造函数
-
-```cpp
-explicit LLMModel(const ModelConfig& config);
-```
-
-#### 方法
-
-| 方法 | 返回类型 | 说明 |
-|------|----------|------|
-| `type()` | `ModelType` | 返回 `ModelType::LLM` |
-| `model_info()` | `ModelInfo` | 获取模型元数据信息 |
-| `vocab_size()` | `int` | 词表大小 |
-| `embedding_dim()` | `int` | Embedding 维度 |
-| `max_ctx_available()` | `int` | 最大可用上下文长度 |
-| `prefill_length()` | `int` | Prefill 序列长度 |
-| `create_context(n_ctx)` | `std::unique_ptr<Context>` | 创建推理上下文 |
-| `tokenize(text, add_bos, add_eos)` | `std::vector<Token>` | 文本转 Token |
-| `token_to_str(token)` | `std::string` | Token 转字符串 |
-| `tokenizer()` | `std::shared_ptr<HfTokenizer>` | 获取 Tokenizer |
-| `eos_token_id()` | `Token` | EOS token ID |
-| `bos_token_id()` | `Token` | BOS token ID |
-
----
-
-### VLMModel
-
-视觉语言模型类。
-
-```cpp
-#include "core/vlm_model.h"
-```
-
-#### 构造函数
-
-```cpp
-explicit VLMModel(const ModelConfig& config);
-```
-
-#### 方法
-
-| 方法 | 返回类型 | 说明 |
-|------|----------|------|
-| `type()` | `ModelType` | 返回 `ModelType::VLM` |
-| `model_info()` | `ModelInfo` | 获取模型元数据信息 |
-| `vocab_size()` | `int` | 词表大小 |
-| `embedding_dim()` | `int` | Embedding 维度 |
-| `max_ctx_available()` | `int` | 最大可用上下文长度 |
-| `create_context()` | `std::unique_ptr<Context>` | 创建推理上下文 |
-| `tokenize(text, add_bos, add_eos)` | `std::vector<Token>` | 文本转 Token |
-| `token_to_str(token)` | `std::string` | Token 转字符串 |
-| `tokens_to_str(tokens)` | `std::string` | Token 序列转字符串 |
-
----
-
-### Context
-
-推理上下文，管理单次推理的状态 (KV Cache、输入缓存、性能统计)。
-
-```cpp
-#include "core/context.h"
-```
-
-#### 方法
-
-| 方法 | 返回类型 | 说明 |
-|------|----------|------|
-| `prefill(tokens)` | `Token` | Prefill 阶段：处理 prompt tokens，返回第一个生成 token |
-| `decode(prev_token)` | `Token` | Decode 阶段：生成下一个 token |
-| `generate(prompt, params, callback)` | `void` | 流式生成 (回调模式) |
-| `context_length()` | `int` | 当前上下文长度 |
-| `reset()` | `void` | 重置状态 |
-| `perf_stats()` | `PerfStats` | 获取性能统计 |
-| `reset_perf_stats()` | `void` | 重置性能统计 |
-
-#### 流式生成示例
-
-```cpp
-// Token 回调模式
-houmo::SamplingParams params;
-params.max_tokens = 100;
-
-ctx->generate(tokens, params, [&](houmo::Token token) {
-    std::cout << model.token_to_str(token);
-    std::cout.flush();
-    return true;  // 返回 false 可中断生成
-});
-
-// 使用 StreamingDecoder 处理 UTF-8 多字节字符
-houmo::StreamingDecoder decoder(model.tokenizer());
-ctx->generate(tokens, params, [&decoder](houmo::Token token) {
-    std::string chunk = decoder.decode(token);
-    if (!chunk.empty()) {
-        std::cout << chunk << std::flush;
-    }
-    return true;
-});
-```
-
----
-
-### Sampler
-
-Token 采样器，实现多种采样策略。
-
-```cpp
-#include "modules/sampler.h"
-```
-
-#### 构造函数
-
-```cpp
-explicit Sampler(const SamplingParams& params);
-```
-
-#### 方法
-
-| 方法 | 返回类型 | 说明 |
-|------|----------|------|
-| `sample(logits, size)` | `Token` | 从 logits 采样一个 token |
-| `sample(logits, size, previous_tokens)` | `Token` | 带重复惩罚的采样 |
-| `set_params(params)` | `void` | 更新采样参数 |
-| `params()` | `const SamplingParams&` | 获取当前采样参数 |
-
-#### 采样流程
-
-```
-logits → repetition_penalty → presence_penalty → top_k → top_p → min_p → temperature → argmax
-```
-
----
-
-### HfTokenizer
-
-HuggingFace Tokenizer 包装类。
-
-```cpp
-#include "modules/tokenizer.h"
-```
-
-#### 构造函数
-
-```cpp
-explicit HfTokenizer(const std::string& tokenizer_json_path);
-```
-
-#### 方法
-
-| 方法 | 返回类型 | 说明 |
-|------|----------|------|
-| `encode(text, add_bos, add_eos)` | `std::vector<Token>` | 编码文本为 Token ID |
-| `decode(token)` | `std::string` | 解码单个 Token |
-| `decode(tokens)` | `std::string` | 解码 Token 序列 |
-| `bos_token_id()` | `Token` | 获取 BOS token ID |
-| `eos_token_id()` | `Token` | 获取 EOS token ID |
-| `pad_token_id()` | `Token` | 获取 PAD token ID |
-| `vocab_size()` | `int` | 获取词表大小 |
-
----
-
-### Embedding
-
-Embedding 查找表，支持 Token ID 到 embedding 向量的转换。
-
-```cpp
-#include "modules/embedding.h"
-```
-
-#### 构造函数
-
-```cpp
-Embedding(const std::string& path, int hidden_dim, int max_seq_len);
-```
-
-#### 方法
-
-| 方法 | 返回类型 | 说明 |
-|------|----------|------|
-| `lookup(token)` | `const float*` | 查找单个 token 的 embedding |
-| `lookup(tokens, output)` | `void` | 批量查找 |
-| `vocab_size()` | `int` | 词表大小 |
-| `hidden_dim()` | `int` | Embedding 维度 |
-
-#### 特性
-
-- **Zero-copy 优化**: 单 token 查找直接返回指针，无拷贝
-- **自动计算 vocab_size**: 根据文件大小和 hidden_dim 自动计算
-- **Half 精度**: 支持 float16 格式的 embedding 权重
-
----
-
-### StreamingDecoder
-
-UTF-8 流式解码器，处理多字节字符的滑动窗口解码。
-
-```cpp
-#include "modules/streaming_decoder.h"
-```
-
-#### 方法
-
-| 方法 | 返回类型 | 说明 |
-|------|----------|------|
-| `decode(token)` | `std::string` | 解码 token，返回完整字符（可能为空） |
-
----
-
-## 数据结构
-
-### ModelInfo
-
-模型元数据结构体。
-
-```cpp
-struct ModelInfo {
-    ModelType type;              // 模型类型 (LLM/VLM)
-    std::string model_name;      // 模型名称
-    int n_batch = 0;             // Batch 大小
-    int n_vocab = 0;             // 词表大小
-    int n_embd = 0;              // Embedding 维度
-    int n_layer = 0;             // Transformer 层数
-    int n_ctx = 0;               // 上下文长度
-    int prefill_length = 0;      // Prefill 序列长度
-    int kv_cache_layers = 0;     // KV Cache 层数
-    int n_logits = 0;            // Logits 维度
-};
-```
-
-#### 支持的模型
-
-| 模型名称 | 类型 | 说明 |
-|----------|------|------|
-| `qwen3-4b` | LLM | Qwen3 纯文本模型 |
-| `qwen3.5-0.8b` | LLM/VLM | Qwen3.5 多模态模型 |
-| `qwen3.5-2b` | LLM/VLM | Qwen3.5 多模态模型 |
-| `qwen3.5-4b` | LLM/VLM | Qwen3.5 多模态模型 |
-| `qwen3.6-27b` | LLM/VLM | Qwen3.6 多模态模型 |
-| `qwen2.5-7b` | LLM | Qwen2.5 纯文本模型 |
-| `qwen3-vl-4b` | VLM | Qwen3-VL 视觉语言模型 |
-| `qwen3-vl-8b` | VLM | Qwen3-VL 视觉语言模型 |
-| `qwen2.5-vl-7b` | VLM | Qwen2.5-VL 视觉语言模型 |
-| `deepseek-8b` | LLM | DeepSeek 模型 |
-| `gemma4-26b-a4b` | VLM | Gemma4 视觉语言模型 |
-| `copaw-flash-9b` | VLM | CoPaw-Flash 模型 |
-
----
-
-### ModelConfig
-
-模型配置结构体。
-
-```cpp
-struct ModelConfig {
-    // 运行时参数
-    std::vector<int> devices = {0};  // 设备 ID 列表
-    int batch_size = 1;              // Batch 大小
-    bool lazy_mode = false;          // 延迟加载模式
-
-    // 模型路径
-    std::string prefill_path;        // Prefill 模型路径 (.hmm)
-    std::string decode_path;         // Decode 模型路径 (.hmm)
-    std::string embedding_path;      // Embedding 权重路径 (.bin)
-    std::string tokenizer_path;      // Tokenizer 词汇表路径 (.json)
-    std::string vision_path;         // Vision 模型路径 (.hmm)，VLM 专用
-
-    // 扩展参数
-    std::map<std::string, std::string> extra_params;
-};
-```
-
----
-
-### SamplingParams
-
-采样参数结构体。
-
-```cpp
-struct SamplingParams {
-    float temperature = 1.0f;        // 温度参数
-    float top_p = 1.0f;              // Top-P 采样
-    int top_k = 1;                   // Top-K 采样 (1 = greedy)
-    float repetition_penalty = 1.0f; // 重复惩罚
-    int penalty_last_n = 64;         // 惩罚窗口
-    int max_tokens = 0;              // 最大生成 token 数 (0 = 无限制)
-    std::vector<Token> stop_tokens;  // 停止 token
-    float frequency_penalty = 0.0f;  // 频率惩罚
-    float presence_penalty = 1.5f;   // 存在惩罚
-    float min_p = 0.0f;              // Min-P 采样
-    bool greedy = false;             // 贪心采样
-
-    // Tokenize 选项
-    bool add_bos = false;
-    bool add_eos = false;
-};
-```
-
----
-
-### 基础类型
+### Token 与异常
 
 ```cpp
 namespace houmo {
 
 using Token = int32_t;
 
-constexpr Token TokenNull = -1;   // 空 Token
-constexpr Token TokenBos = -2;    // 序列开始 Token
-constexpr Token TokenEos = -3;    // 序列结束 Token
+constexpr Token TokenNull = -1;
+constexpr Token TokenBos = -2;
+constexpr Token TokenEos = -3;
 
-enum class ModelType {
-    LLM,    // 纯文本大语言模型
-    VLM,    // 视觉语言模型
-    ASR,    // 语音识别模型
-    TTS,    // 语音合成模型
+class Exception : public std::runtime_error {
+ public:
+  explicit Exception(const std::string& msg);
 };
 
 }
 ```
 
+### ModelType / ModelKind
+
+```cpp
+enum class ModelType {
+  LLM,
+  VLM,
+  ASR,
+  TTS,
+};
+
+enum class ModelKind {
+  LLM,
+  VLM,
+  ASR,
+  TTS,
+};
+```
+
+### ModelConfig
+
+模型配置承载运行参数、模型文件路径和扩展参数。
+
+```cpp
+struct ModelConfig {
+  std::vector<int> devices = {0};
+  int batch_size = 1;
+  bool lazy_mode = false;
+
+  std::string prefill_path;
+  std::string decode_path;
+  std::string embedding_path;
+  std::string tokenizer_path;
+  std::string vision_path;
+
+  std::map<std::string, std::string> extra_params;
+};
+```
+
+| 字段 | 说明 |
+|------|------|
+| `devices` | TCIM Runtime 使用的设备 ID 列表 |
+| `batch_size` | 推理 batch 大小 |
+| `lazy_mode` | 是否启用延迟加载 |
+| `prefill_path` | Prefill `.hmm` 路径 |
+| `decode_path` | Decode `.hmm` 路径 |
+| `embedding_path` | Embedding 权重 `.bin` 路径 |
+| `tokenizer_path` | Tokenizer JSON 路径，可按模型需要使用 |
+| `vision_path` | Vision `.hmm` 路径，VLM 使用 |
+| `extra_params` | 子类扩展参数，例如 ASR encode 路径、语言配置等 |
+
+### ModelInfo
+
+```cpp
+struct ModelInfo {
+  ModelType type;
+  std::string model_name;
+  int n_batch = 0;
+  int n_vocab = 0;
+  int n_embd = 0;
+  int n_layer = 0;
+  int n_ctx = 0;
+  int prefill_length = 0;
+  int kv_cache_layers = 0;
+  int n_logits = 0;
+};
+```
+
+### SamplingParams
+
+```cpp
+struct SamplingParams {
+  float temperature = 1.0f;
+  float top_p = 1.0f;
+  int top_k = 1;
+  float repetition_penalty = 1.0f;
+  int penalty_last_n = 64;
+  int max_tokens = 0;
+  std::vector<Token> stop_tokens;
+  float frequency_penalty = 0.0f;
+  float presence_penalty = 1.5f;
+  float min_p = 0.0f;
+  bool greedy = false;
+
+  bool add_bos = false;
+  bool add_eos = false;
+
+  std::string language = "auto";
+};
+```
+
+`language` 是 ASR 专用选项：`"auto"` 表示尝试语言检测，或传入具体语言代码。
+
+### PerfStats
+
+生成类推理的通用性能指标。
+
+```cpp
+struct PerfStats {
+  double prefill_time_ms = 0;
+  double decode_time_ms = 0;
+  double total_time_ms = 0;
+  double ttft_ms = 0;
+  double tpot_ms = 0;
+  double tps = 0;
+  double embedding_time_ms = 0;
+
+  int n_input_tokens = 0;
+  int n_output_tokens = 0;
+
+  size_t cpu_memory_used = 0;
+  size_t npu_memory_used = 0;
+  size_t kv_cache_size = 0;
+};
+```
+
 ---
 
-## 构建依赖
+## ModelFactory
 
-### 依赖项
+`ModelFactory<ModelT>` 是模板化模型工厂。每种模型基类拥有独立注册表，例如 `ModelFactory<LLMModel>` 和 `ModelFactory<ASRModel>` 互不混用。
 
-- C++17 编译器
-- CMake >= 3.16
-- TCIM Runtime (tcim_lite)
-- tokenizers_cpp (HuggingFace tokenizers C++)
-- half.hpp (半精度浮点数)
-- GTest (单元测试)
-
-### 环境变量
-
-```bash
-export TCIM_RUNTIME_PATH=$DADAO_VENV/lib/python3.12/site-packages/tcim_lite
+```cpp
+#include "core/model_factory.h"
 ```
 
-### 构建命令
+### ModelSeries
 
-```bash
-mkdir build && cd build
-cmake .. -DBUILD_TESTS=ON
-make -j$(nproc)
-ctest --output-on-failure
+`ModelSeries` 是框架内部的模型系列枚举，包含生成类和 ASR 类模型系列。实际可创建的模型取决于当前链接进最终程序的注册对象。
+
+```cpp
+enum class ModelSeries {
+  kUnknown,
+  kYourLLM,
+  kYourVLM,
+  kYourASR,
+};
 ```
+
+上面的 `kYour*` 只表示新增模型系列的占位写法；实际枚举值以当前源码和各模型目录注册为准。
+
+### 字符串转换
+
+```cpp
+std::string ModelSeriesToString(ModelSeries series);
+ModelSeries StringToModelSeries(const std::string& str);
+```
+
+### 工厂方法
+
+| 方法 | 返回类型 | 说明 |
+|------|----------|------|
+| `Register(name, series, creator, description)` | `void` | 注册模型创建函数 |
+| `Create(series, config)` | `std::unique_ptr<ModelT>` | 按模型系列创建实例 |
+| `Create(name, config)` | `std::unique_ptr<ModelT>` | 按注册名创建实例 |
+| `ListRegisteredTypes()` | `std::vector<std::string>` | 返回已注册名称 |
+| `GetRegisteredModels()` | `std::vector<RegistryEntry>` | 返回注册详情 |
+| `IsRegistered(series)` | `bool` | 判断系列是否已注册 |
+| `IsRegistered(name)` | `bool` | 判断名称是否已注册 |
+
+### 注册宏
+
+```cpp
+REGISTER_MODEL(BaseType, model_key, ModelSeries::kYourSeries,
+               [](const ModelConfig& c) {
+                 return std::make_unique<YourModel>(c);
+               },
+               "description");
+```
+
+注册宏使用静态对象在程序启动时注册模型。最终可执行文件链接静态注册对象时，需要确保目标文件不被链接器裁剪。
+
+---
+
+## LLMModel
+
+`LLMModel` 是生成类模型基类，保存配置、Tokenizer、Embedding、TCIM prefill/decode module、输入 tensor map 和模型元信息。它不规定具体加载流程，子类负责加载 TCIM 模块和初始化输入。
+
+```cpp
+#include "core/llm_model.h"
+```
+
+| 方法 | 返回类型 | 说明 |
+|------|----------|------|
+| `type()` | `ModelType` | 默认返回 `ModelType::LLM` |
+| `tokenize(text, add_bos, add_eos)` | `std::vector<Token>` | 通过 tokenizer 编码文本 |
+| `token_to_str(token)` | `std::string` | 单 token 解码 |
+| `tokens_to_str(tokens)` | `std::string` | token 序列解码 |
+| `vocab_size()` | `int` | 词表大小 |
+| `embedding_dim()` | `int` | Embedding 维度 |
+| `max_ctx_available()` | `int` | 最大上下文长度 |
+| `model_info()` | `ModelInfo` | 返回模型元信息 |
+| `create_context(n_ctx)` | `std::unique_ptr<Context>` | 创建请求上下文，默认需子类覆盖 |
+| `has_tokenizer()` | `bool` | tokenizer 是否已加载 |
+| `bos_token_id()` | `Token` | BOS token |
+| `eos_token_id()` | `Token` | EOS token |
+| `tokenizer()` | `std::shared_ptr<HfTokenizer>` | 返回 tokenizer |
+| `prefill_module()` | `std::shared_ptr<tcim::Module>` | 返回 prefill module |
+| `decode_module()` | `std::shared_ptr<tcim::Module>` | 返回 decode module |
+| `embedding()` | `std::shared_ptr<Embedding>` | 返回 embedding |
+| `prefill_input_map()` | `std::map<std::string, tcim::Tensor>&` | Prefill 输入 tensor map |
+| `decode_input_map()` | `std::map<std::string, tcim::Tensor>&` | Decode 输入 tensor map |
+| `prefill_length()` | `int` | Prefill 长度 |
+| `attn_idx_start()` | `int` | Attention 输入起始索引 |
+
+---
+
+## VLMModel
+
+`VLMModel` 继承 `LLMModel`，增加 vision encode module 和视觉输入管理。
+
+```cpp
+#include "core/vlm_model.h"
+```
+
+| 方法 | 返回类型 | 说明 |
+|------|----------|------|
+| `type()` | `ModelType` | 返回 `ModelType::VLM` |
+| `vision_module()` | `std::shared_ptr<tcim::Module>` | Vision encode module |
+| `encode_image(image_data, width, height, channels)` | `std::vector<float16>` | 图像编码接口，默认由子类覆盖 |
+| `create_context(n_ctx)` | `std::unique_ptr<Context>` | 创建 VLM 上下文，默认由子类覆盖 |
+| `vision_input_map()` | `std::map<std::string, tcim::Tensor>&` | Vision 输入 tensor map |
+
+---
+
+## Context
+
+`Context` 是生成类模型的请求级状态基类。
+
+```cpp
+#include "core/context.h"
+```
+
+| 方法 | 返回类型 | 说明 |
+|------|----------|------|
+| `prefill(tokens)` | `Token` | Prefill 阶段，默认返回 `TokenNull` |
+| `decode(prev_token)` | `Token` | Decode 阶段，默认返回 `TokenNull` |
+| `set_image(image_path)` | `void` | 单图输入接口，默认空实现 |
+| `generate(prompt, params, callback)` | `void` | token 级流式生成，默认空实现 |
+| `set_keep_history(keep)` | `void` | 设置是否保留多轮上下文 |
+| `keep_history()` | `bool` | 返回历史保留状态 |
+| `context_length()` | `int` | 当前上下文长度 |
+| `reset()` | `void` | 重置上下文长度和已生成 token |
+| `set_sampler(params)` | `void` | 创建采样器 |
+| `sampler()` | `Sampler*` | 返回当前采样器 |
+| `perf_stats()` | `PerfStats` | 返回性能统计 |
+| `reset_perf_stats()` | `void` | 清空性能统计 |
+| `profiler()` | `PerfProfiler&` | 返回层级性能统计器 |
+
+---
+
+## ASRModel / ASRContext
+
+### ASRPerfInfo
+
+ASR 专用性能指标，包含音频时长、RTF 和 decode TPS。
+
+```cpp
+struct ASRPerfInfo {
+  float audio_load_time = 0.0f;
+  float encode_time = 0.0f;
+  float detect_lang_time = 0.0f;
+  float prefill_time = 0.0f;
+  float decode_time = 0.0f;
+  float total_time = 0.0f;
+  float ttft_time = 0.0f;
+  int output_tokens = 0;
+  int n_chunks = 0;
+  float audio_duration = 0.0f;
+  float overall_rtf = 0.0f;
+  float inference_rtf = 0.0f;
+  float decode_tps = 0.0f;
+  float overall_tps = 0.0f;
+};
+```
+
+### ASRModel
+
+```cpp
+#include "core/asr_model.h"
+```
+
+| 方法 | 返回类型 | 说明 |
+|------|----------|------|
+| `create_context(n_ctx)` | `std::unique_ptr<Context>` | 创建 ASR 上下文 |
+| `sot_token_id()` | `Token` | Start-of-transcript token |
+| `lang_token_id(language)` | `Token` | 语言 token |
+| `transcribe_token_id()` | `Token` | 转写任务 token |
+| `notimestamps_token_id()` | `Token` | 不输出时间戳 token |
+| `eos_token_ids()` | `std::vector<Token>` | EOS token 集合 |
+| `supports_language_detection()` | `bool` | 是否支持语言检测 |
+| `n_mels()` | `int` | Mel bin 数 |
+| `n_frames()` | `int` | Encoder 帧数 |
+| `num_heads()` | `int` | Attention head 数 |
+| `cache_max_len()` | `int` | KV cache 最大长度 |
+| `num_decode_layers()` | `int` | Decoder 层数 |
+
+### ASRContext
+
+`ASRContext` 继承 `Context`，提供完整 ASR 转写接口和模板方法式性能打点。
+
+| 方法 | 返回类型 | 说明 |
+|------|----------|------|
+| `Encode(mel_features, n_mels, n_frames)` | `std::vector<float16>` | Encoder 前向接口 |
+| `DetectLanguage()` | `Token` | 语言检测 |
+| `BuildPrompt(language_token)` | `std::vector<Token>` | 构造转写 prompt |
+| `Transcribe(audio_path, params, callback)` | `void` | 从音频文件完整转写 |
+| `set_language(language)` | `void` | 设置语言，支持 `auto` 或具体语言码 |
+| `perf_info()` | `const ASRPerfInfo&` | 获取 ASR 性能统计 |
+| `asr_model()` | `ASRModel*` | 返回 ASR model 指针 |
+
+子类实现以下钩子，基类自动包裹 profiler scope：
+
+| 钩子 | 对应阶段 |
+|------|----------|
+| `encode_preprocess_impl()` | `transcribe.encode.preprocess` |
+| `encode_inference_impl()` | `transcribe.encode.inference` |
+| `encode_postprocess_impl()` | `transcribe.encode.postprocess` |
+| `detect_lang_preprocess_impl()` | `transcribe.detect_lang.preprocess` |
+| `detect_lang_inference_impl()` | `transcribe.detect_lang.inference` |
+| `detect_lang_postprocess_impl()` | `transcribe.detect_lang.postprocess` |
+| `prefill_preprocess_impl()` | `transcribe.prefill.preprocess` |
+| `prefill_inference_impl()` | `transcribe.prefill.inference` |
+| `prefill_postprocess_impl()` | `transcribe.prefill.postprocess` |
+| `decode_preprocess_impl()` | `transcribe.decode.preprocess` |
+| `decode_inference_impl()` | `transcribe.decode.inference` |
+| `decode_postprocess_impl()` | `transcribe.decode.postprocess` |
+
+---
+
+## AudioProcessor
+
+`AudioProcessor` 为 ASR 模型提供音频前处理。
+
+```cpp
+#include "modules/audio_processor.h"
+```
+
+### 数据结构
+
+```cpp
+struct AudioData {
+  std::vector<float> pcm;
+  int sample_rate = 16000;
+  float duration = 0.0f;
+};
+
+struct MelFeatures {
+  std::vector<float16> data;
+  int feature_dim = 0;
+  int num_frames = 0;
+  float duration = 0.0f;
+};
+
+enum class AudioFeatureMode {
+  kCenterPad,
+  kWhisper,
+};
+
+struct AudioProcessorConfig {
+  int sample_rate = 16000;
+  int n_mels = 80;
+  int chunk_seconds = 30;
+  int encoder_window_seconds = 30;
+  int fft_size = 400;
+  int hop_length = 160;
+  int win_length = 400;
+  int feature_threads = 4;
+  AudioFeatureMode feature_mode = AudioFeatureMode::kCenterPad;
+  float mel_fmin = 0.0f;
+  float mel_fmax = 8000.0f;
+};
+```
+
+### 方法
+
+| 方法 | 返回类型 | 说明 |
+|------|----------|------|
+| `LoadAudio(path)` | `AudioData` | 读取 wav/mp3/flac 等音频，重采样到 16kHz，转单声道并归一化 |
+| `ExtractFeatures(audio)` | `MelFeatures` | 计算 Mel Spectrogram，输出 FP16 特征 |
+| `ChunkPCM(audio)` | `std::vector<AudioData>` | 按 `chunk_seconds` 切分 PCM，短块补零 |
+| `Process(path)` | `std::vector<MelFeatures>` | 加载、切分、提取特征的一站式接口 |
+| `feature_dim()` | `int` | 返回特征维度 |
+| `sample_rate()` | `int` | 返回采样率 |
+| `n_mels()` | `int` | 返回 Mel bin 数 |
+| `config()` | `const AudioProcessorConfig&` | 返回配置 |
+
+---
+
+## 图像、Embedding、Tokenizer、采样和解码模块
+
+### HmImageProcessor
+
+`HmImageProcessor` 负责加载图像、resize/pad、归一化并输出模型所需像素数据。
+
+```cpp
+#include "modules/image_processor.h"
+```
+
+核心结构包括 `ImageDims` 和 `ProcessedImage`，核心接口为 `LoadAndProcess(image_path)`。
+
+### Embedding
+
+```cpp
+#include "modules/embedding.h"
+```
+
+| 方法 | 说明 |
+|------|------|
+| `lookup(token)` | 单 token 查表，返回 embedding 指针 |
+| `lookup(tokens, output)` | 批量查表写入输出 buffer |
+| `vocab_size()` | 词表大小 |
+| `hidden_dim()` | hidden 维度 |
+
+### HfTokenizer
+
+```cpp
+#include "modules/tokenizer.h"
+```
+
+| 方法 | 说明 |
+|------|------|
+| `encode(text, add_bos, add_eos)` | 文本编码为 token |
+| `decode(token)` | 单 token 解码 |
+| `decode(tokens)` | token 序列解码 |
+| `bos_token_id()` / `eos_token_id()` / `pad_token_id()` | 特殊 token |
+
+### Sampler
+
+```cpp
+#include "modules/sampler.h"
+```
+
+`Sampler` 根据 `SamplingParams` 执行 greedy、top-k、top-p、min-p、temperature、frequency/presence penalty 和 repetition penalty 等采样逻辑。
+
+### StreamingDecoder
+
+```cpp
+#include "modules/streaming_decoder.h"
+```
+
+`StreamingDecoder` 用滑动窗口处理 UTF-8 多字节字符，适合 token callback 流式输出。
+
+---
+
+## PerfProfiler
+
+`PerfProfiler` 是层级性能统计器。
+
+```cpp
+#include "modules/perf_profiler.h"
+```
+
+| 方法 | 说明 |
+|------|------|
+| `start(path)` / `stop(path)` | 手动开始/结束阶段计时 |
+| `scope(path)` | 返回 RAII 计时器 |
+| `get_time_ms(path)` | 查询累计耗时 |
+| `get_count(path)` | 查询阶段执行次数 |
+| `get_avg_time_ms(path)` | 查询平均耗时 |
+| `get_children(path)` | 查询子阶段 |
+| `has_stage(path)` | 判断阶段是否存在 |
+| `set_root_stage(stage)` | 设置根阶段，生成默认是 `generate`，ASR 可设为 `transcribe` |
+| `set_input_tokens(n)` / `add_output_token()` | token 统计 |
+| `record_ttft()` | 记录首 token 延迟 |
+| `e2e_ms()` / `ttft_ms()` | 端到端和 TTFT 查询 |
+| `prefill_tps()` / `decode_tps()` / `overall_tps()` | 吞吐指标 |
+| `avg_decode_latency_ms()` | 平均 decode 延迟 |
+| `to_perf_stats()` | 导出 `PerfStats` |
+| `print_summary(format)` | 输出 Tree/Table/Compact 汇总 |
+| `reset()` | 清空统计 |
+
+---
+
+## 构建与测试入口
+
+`CMakeLists.txt` 构建共享库 `houmo_infer`，包含：
+
+- Core sources：`context.cc`、`llm_model.cc`、`vlm_model.cc`、`asr_model.cc`、`model_factory.cc`、`version.cc`
+- Module sources：`audio_processor.cc`、`tokenizer.cc`、`embedding.cc`、`sampler.cc`、`streaming_decoder.cc`、`image_processor.cc`、`perf_profiler.cc`
+- 依赖：TCIM Runtime、tokenizer.cpp、OpenCV、kaldi-native-fbank、libsamplerate、pthread、GTest
+
+当前 CTest 目标包括：
+
+| 测试 | 覆盖内容 |
+|------|----------|
+| `TokenizerTest` | tokenizer 编解码 |
+| `EmbeddingTest` | embedding 加载和查表 |
+| `SamplerTest` | 采样策略 |
+| `PerfProfilerTest` | 层级计时、TTFT、TPS、导出统计 |
+| `AudioProcessorTest` | 音频加载、PCM 分块、Mel 特征 |
+| `AudioProcessor128Test` | 128 mel 特征配置 |

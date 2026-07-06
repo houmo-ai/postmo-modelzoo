@@ -1,347 +1,156 @@
 # Houmo Inference Framework
 
-A pure C++ inference framework for LLM, VLM and ASR models, optimized for Houmo NPU using TCIM Runtime.
+Houmo Inference Framework 是面向 Houmo NPU 的 C++ 推理框架，基于 TCIM Runtime 提供模型加载、上下文管理、推理执行、采样解码、Embedding 读取、多模态预处理和性能统计等通用能力。
 
-## Features
+本目录承载框架源码、公共头文件、模块实现、测试和开发文档。具体模型能力由各模型目录中的实现和构建配置决定，本文档只描述框架能力，不维护具体模型支持列表。
 
-- **Multi-model support**: LLM (Qwen3, Qwen2.5, DeepSeek), VLM (Qwen3.5, Qwen3-VL), ASR (Whisper, Qwen3-ASR, GLM-ASR)
-- **Streaming generation**: Token-level callback mode for real-time output
-- **Multi-turn dialogue**: Context-level history management
-- **Vision understanding**: VLM models support image input and understanding
-- **Speech recognition**: ASR models with encode-decoder architecture and RTF metrics
-- **Performance profiling**: Built-in hierarchical performance analyzer with RTF/throughput metrics
-- **Template method pattern**: ASR profiling hooks — new models get profiling automatically
-- **Factory pattern**: Runtime dynamic model instance creation
+## 核心能力
 
-## Supported Models
+- **统一基础类型**：`Token`、`ModelConfig`、`ModelInfo`、`SamplingParams`、`PerfStats` 等定义在 `include/base/houmo.h`。
+- **模型抽象**：`LLMModel`、`VLMModel`、`ASRModel` 分别覆盖文本生成、视觉语言和语音识别模型的公共接口。
+- **上下文抽象**：`Context` 管理单次推理状态、采样器、生成历史、性能统计；`ASRContext` 扩展转写流程和 ASR 专用性能指标。
+- **模型工厂**：`ModelFactory<T>` 提供类型安全的静态注册和运行时创建能力，LLM/VLM/ASR 可分别注册到对应工厂实例。
+- **通用模块**：Tokenizer、Embedding、Sampler、StreamingDecoder、ImageProcessor、AudioProcessor、PerfProfiler 等模块可被不同模型复用。
+- **性能统计**：`PerfProfiler` 支持层级 stage、RAII scope、TTFT、TPS、平均延迟和树形/表格输出。
+- **ASR 支持**：提供音频加载、重采样、单声道转换、PCM 分块、Mel 特征提取、转写模板方法和 RTF/TPS 指标计算。
 
-| Model | Type | Description |
-|-------|------|-------------|
-| Qwen3-0.6B / 4B | LLM | Qwen3 pure-text models |
-| Qwen3.5-0.8B / 2B / 4B | VLM | Qwen3.5 multimodal models |
-| Qwen3-VL-4B / 8B | VLM | Qwen3-VL vision-language models |
-| Qwen3-VL-MoE | VLM | Qwen3-VL MoE model |
-| Qwen3.6-27B | VLM | Qwen3.6 multimodal model |
-| Qwen2.5-7B | LLM | Qwen2.5 pure-text model |
-| Qwen2.5-VL-7B | VLM | Qwen2.5 vision-language model |
-| DeepSeek-8B | LLM | DeepSeek model |
-| CoPaw-Flash-9B | VLM | CoPaw-Flash model |
-| Whisper-large-v3-turbo | ASR | Whisper ASR with language detection |
-| Qwen3-ASR-1.7B | ASR | Qwen3-ASR with per-loop encoding |
-| GLM-ASR-nano | ASR | GLM-ASR with PCM chunking |
+## 目录结构
 
-## Quick Start
+```text
+├── include/
+│   ├── base/           # 基础类型、配置、异常和 TCIM 工具
+│   ├── core/           # LLM/VLM/ASR 模型基类、Context、Factory
+│   └── modules/        # Tokenizer、Embedding、Sampler、Audio/Image、Profiler
+├── src/
+│   ├── core/           # 核心抽象实现
+│   └── modules/        # 通用模块实现
+├── tests/              # GTest 单元测试和测试数据
+├── docs/               # API、Pipeline 和模型适配说明
+├── CMakeLists.txt      # CMake 构建入口
+├── build_linux.sh      # Linux 构建脚本
+├── build_ndk.sh        # Android NDK 构建脚本
+└── test.sh             # 测试脚本
+```
 
-### Prerequisites
+## 主要组件
 
-- C++17 compiler
+### 基础类型
+
+`include/base/houmo.h` 定义框架公共数据结构：
+
+- `ModelConfig`：运行设备、batch、lazy mode、prefill/decode/embedding/tokenizer/vision 路径和扩展参数。
+- `ModelInfo`：模型类型、名称、batch、词表、hidden size、layer、context、prefill 长度和 logits 信息。
+- `SamplingParams`：temperature、top-p、top-k、重复惩罚、停止 token、最大生成长度和 ASR language 选项。
+- `PerfStats`：生成类推理的 prefill/decode/total/TTFT/TPS 和 token 数指标。
+
+### LLM/VLM 抽象
+
+`LLMModel` 保存模型配置、Tokenizer、Embedding、TCIM prefill/decode module、输入 tensor map 和模型元信息。子类负责具体加载流程和推理细节。
+
+`VLMModel` 继承 `LLMModel`，增加 vision module、vision input map 和 `encode_image()` 接口，用于视觉语言模型扩展。
+
+`Context` 是生成类模型的请求级状态对象，提供：
+
+- `prefill()`、`decode()`、`generate()` 推理接口
+- `set_keep_history()`、`reset()` 状态管理
+- `set_sampler()` 采样器管理
+- `perf_stats()` 和 `profiler()` 性能统计访问
+
+### ASR 抽象
+
+`ASRModel` 是语音识别模型基类，保存 ASR 配置和公共模型参数，并要求子类实现：
+
+- `create_context()` 创建 ASR 上下文
+- `sot_token_id()`、`lang_token_id()`、`transcribe_token_id()`、`notimestamps_token_id()`、`eos_token_ids()` 等转写 token 接口
+- `supports_language_detection()` 语言检测能力声明
+
+`ASRContext` 继承 `Context`，管理 ASR 请求级状态，提供：
+
+- `Encode()` 音频特征编码
+- `DetectLanguage()` 语言检测
+- `BuildPrompt()` 构造转写 prompt
+- `Transcribe()` 完整音频转写
+- `set_language()` 设置语言
+- `perf_info()` 获取 `ASRPerfInfo`
+
+ASRContext 内部使用模板方法封装打点：子类只实现 `encode_*_impl`、`detect_lang_*_impl`、`prefill_*_impl`、`decode_*_impl` 钩子，基类自动记录 `transcribe.encode.*`、`transcribe.prefill.*`、`transcribe.decode.*` 等阶段耗时。
+
+### 音频处理
+
+`AudioProcessor` 提供 ASR 前处理：
+
+1. `LoadAudio(path)`：读取音频，重采样到 16kHz，转单声道，归一化到 `[-1, 1]`。
+2. `ChunkPCM(audio)`：按固定秒数切分 PCM，短块自动补零。
+3. `ExtractFeatures(audio)`：计算 Mel Spectrogram，输出 FP16 特征。
+4. `Process(path)`：一站式完成加载、切分和特征提取。
+
+`AudioProcessorConfig` 控制 sample rate、mel bins、chunk 秒数、encoder window、FFT、hop length、window length、feature threads、feature mode 和 mel 频率范围。
+
+### 性能统计
+
+`PerfProfiler` 支持：
+
+- `start(path)` / `stop(path)` 手动打点
+- `scope(path)` RAII 自动打点
+- `get_time_ms()`、`get_count()`、`get_avg_time_ms()` 查询耗时
+- `set_input_tokens()`、`add_output_token()` 记录 token 数
+- `record_ttft()`、`overall_tps()`、`decode_tps()` 等吞吐指标
+- `print_summary()` 输出 Tree/Table/Compact 视图
+
+## 构建
+
+### 环境依赖
+
+- C++17 编译器
 - CMake >= 3.16
-- TCIM Runtime (NPU backend)
-- OpenCV (optional, for image processing)
+- TCIM Runtime (`tcim_lite`)
+- OpenCV（图像处理）
+- tokenizer.cpp 和 half.hpp
+- 音频依赖：miniaudio、libsamplerate、kaldi-native-fbank
+- GTest（单元测试）
 
-### Build
+需要设置 `HOUMO_EXAMPLES_PATH`，并确保 `TCIM_RUNTIME_PATH` 可由 `tcim_runtime.cmake` 找到。
 
-#### Linux 编译
+### Linux
 
 ```bash
-cd tools/common/houmo-llm-engine/
 ./build_linux.sh
 ```
 
-编译生成的可执行文件在 `bin/` 目录下。
-
-#### Android 编译
-
-需要先准备以下环境：
-
-1. 下载 [Android NDK](https://developer.android.google.cn/ndk/downloads/index.html?hl=ro)（推荐 r28c 版本），解压到 toolchains 目录下
-2. 下载 Android 版本 houmo-tcim-runtime-xh2
-
-设置环境变量后执行编译：
+### Android
 
 ```bash
-# 设置 NDK 路径
-export NDK_PATH=/path/to/android-ndk-r28c
-
-# 设置 TCIM Runtime 路径（Android 版本）
-export TCIM_RUNTIME_PATH=/path/to/houmo-tcim-runtime-xh2
-
-# 执行编译
+export NDK_PATH=/path/to/android-ndk
+export TCIM_RUNTIME_PATH=/path/to/tcim_runtime
 ./build_ndk.sh
 ```
 
-编译生成的可执行文件在 `android/` 目录下。
-
-#### 手动 CMake 编译
+### 手动 CMake
 
 ```bash
-mkdir -p build && cd build
-cmake .. -DBUILD_TESTS=ON
-make -j$(nproc)
-
-# Run tests
-ctest --output-on-failure
+cmake -S . -B build -DBUILD_TESTS=ON
+cmake --build build -j$(nproc)
 ```
 
-### Environment Setup
+## 测试
 
 ```bash
-# Set model path
-export HM_ENGINE_PATH=/path/to/houmo-llm-engine
-
-# Set TCIM Runtime path
-export TCIM_RUNTIME_PATH=$DADAO_VENV/lib/python3.12/site-packages/tcim_lite
+./test.sh
 ```
 
-### Run Inference
+或手动执行：
 
 ```bash
-# LLM inference
-./sample_infer --model qwen3_llm --prompt "介绍一下端侧AI"
-
-# VLM image understanding
-./sample_infer --model qwen3_vlm --image test.jpg --prompt "描述这张图片"
-
-# Multi-turn dialogue
-./sample_infer --model qwen3_llm --multi-turn --prompt "你好"
-
-# Whisper ASR
-./sample_whisper_asr --audio audio.mp3 \
-  --encode models/whisper-large-v3-turbo/whisper_encode.hmm \
-  --prefill models/whisper-large-v3-turbo/whisper_prefill.hmm \
-  --decode models/whisper-large-v3-turbo/whisper_decode.hmm \
-  --tokenizer tokenizers/whisper-large-v3-turbo/tokenizer.json
-
-# Qwen3-ASR
-./sample_qwen3_asr --audio audio.mp3 \
-  --encode models/qwen3-asr-1.7b/qwen3-asr-1.7b_encode.hmm \
-  --prefill models/qwen3-asr-1.7b/qwen3-asr-1.7b_prefill.hmm \
-  --decode models/qwen3-asr-1.7b/qwen3-asr-1.7b_decode.hmm \
-  --tokenizer tokenizers/qwen3-asr-1.7b/tokenizer.json \
-  --embedding models/qwen3-asr-1.7b/hmquant/quant_embedding.bin
-
-# GLM-ASR
-./sample_glm_asr --audio audio.mp3 \
-  --encode models/glm-asr-nano-2512/glm-asr-nano-2512_encode.hmm \
-  --prefill models/glm-asr-nano-2512/glm-asr-nano-2512_prefill.hmm \
-  --decode models/glm-asr-nano-2512/glm-asr-nano-2512_decode.hmm \
-  --tokenizer tokenizers/glm-asr-nano-2512/tokenizer.json \
-  --embedding models/glm-asr-nano-2512/hmquant/quant_embedding.bin
-
-# Show model info
-./sample_infer --model qwen3_llm --info
+ctest --test-dir build --output-on-failure
 ```
 
-## Usage
+当前测试覆盖 Tokenizer、Embedding、Sampler、PerfProfiler、AudioProcessor 和 128 mel 音频特征流程。
 
-### Basic Usage (C++ API)
+## 开发文档
 
-```cpp
-#include "core/model_factory.h"
-#include "modules/streaming_decoder.h"
-
-int main() {
-    // 1. Configure model
-    houmo::ModelConfig config;
-    config.devices = {0};
-    config.prefill = "models/qwen3-4b/qwen3-4b_prefill.hmm";
-    config.decode = "models/qwen3-4b/qwen3-4b_decode.hmm";
-    config.embedding = "models/qwen3-4b/quant_embedding.bin";
-    config.tokenizer = "models/tokenizers/Qwen3-4B/tokenizer.json";
-
-    // 2. Create model (factory pattern)
-    auto model = houmo::ModelFactory::Create("qwen3_llm", config);
-    auto ctx = model->create_context();
-
-    // 3. Streaming generation
-    auto tokens = model->tokenize("你好", false, false);
-    houmo::SamplingParams params;
-    params.max_tokens = 256;
-
-    houmo::StreamingDecoder decoder(model->tokenizer());
-    ctx->generate(tokens, params, [&](houmo::Token token) {
-        std::cout << decoder.decode(token) << std::flush;
-        return true;
-    });
-
-    return 0;
-}
-```
-
-### Multi-turn Dialogue
-
-```cpp
-ctx->set_keep_history(true);
-
-// Round 1
-auto tokens1 = model->tokenize("1 + 1 = ?", false, false);
-ctx->generate(tokens1, params, callback);
-
-// Round 2 (auto-retains context)
-auto tokens2 = model->tokenize("2 + 2 = ?", false, false);
-ctx->generate(tokens2, params, callback);
-
-// Reset
-ctx->reset();
-```
-
-### VLM Image Understanding
-
-```cpp
-#include "models/qwen3_vlm_model.h"
-
-auto ctx = model->create_context();
-
-// Set image
-auto* vlm_ctx = dynamic_cast<houmo::Qwen3VLMContext*>(ctx.get());
-vlm_ctx->set_image("test.jpg");
-
-// Generate
-auto tokens = model->tokenize("描述这张图片", false, false);
-ctx->generate(tokens, params, callback);
-```
-
-### ASR Speech Recognition
-
-```cpp
-#include "core/model_factory.h"
-#include "models/whisper_model.h"
-
-houmo::ModelConfig config;
-config.devices = {0};
-config.prefill = "models/whisper/whisper_prefill.hmm";
-config.decode = "models/whisper/whisper_decode.hmm";
-config.tokenizer = "tokenizers/whisper/tokenizer.json";
-config.extra_params["encode"] = "models/whisper/whisper_encode.hmm";
-
-auto model = houmo::ModelFactory<houmo::ASRModel>::Create(
-    houmo::ModelSeries::kWhisperASR, config);
-auto ctx = model->create_context();
-auto* whisper_ctx = dynamic_cast<houmo::WhisperContext*>(ctx.get());
-whisper_ctx->set_audio_processor(16000, 30, 30);
-
-std::vector<houmo::Token> all_tokens;
-houmo::SamplingParams params;
-whisper_ctx->Transcribe("audio.mp3", params,
-    [&all_tokens](houmo::Token token) {
-        all_tokens.push_back(token);
-        return true;
-    });
-
-std::cout << static_cast<houmo::WhisperModel*>(model.get())
-             ->tokenizer()->decode(all_tokens);
-
-// Performance output
-ctx->profiler().print_summary();
-const auto& info = ctx->perf_info();
-std::cout << "Overall RTF: " << info.overall_rtf
-          << ", Inference RTF: " << info.inference_rtf << "\n";
-```
-
-### Performance Profiling
-
-```cpp
-// Print formatted report
-ctx->profiler().print_summary();
-
-// Programmatic access
-houmo::PerfStats stats = ctx->profiler().to_perf_stats();
-std::cout << "Prefill: " << stats.prefill_time_ms << " ms\n";
-std::cout << "TTFT: " << stats.ttft_ms << " ms\n";
-std::cout << "TPS: " << stats.tps << " tokens/s\n";
-```
-
-## Architecture
-
-```
-┌───────────────────────────────────────────────┐
-│              User Code Layer                   │
-│  sample_infer.cc / sample_*_asr.cc / User App │
-├───────────────────────────────────────────────┤
-│              C++ API Layer                     │
-│  LLMModel / VLMModel / ASRModel / Context     │
-│  PerfProfiler (hierarchical performance)      │
-├───────────────────────────────────────────────┤
-│              Module Layer                      │
-│  Tokenizer / Embedding / AudioProcessor        │
-│  ImageProcessor / StreamingDecoder / Sampler  │
-├───────────────────────────────────────────────┤
-│              Backend Layer                     │
-│           TCIM Runtime (NPU)                   │
-└───────────────────────────────────────────────┘
-```
-
-### Class Hierarchy
-
-```
-LLMModel (base)
-  ├── Qwen3LLMModel
-  └── VLMModel (VLM base)
-        ├── Qwen35MLLMModel
-        └── Qwen3VLMModel
-
-ASRModel (ASR base)
-  ├── WhisperModel
-  ├── Qwen3AsrModel
-  └── GlmAsrModel
-
-Context (base)
-  ├── Qwen3Context (LLM)
-  ├── Qwen35MLLMContext (VLM)
-  ├── Qwen3VLMContext (VLM)
-  └── ASRContext (ASR base — template method profiling)
-        ├── WhisperContext
-        ├── Qwen3AsrContext
-        └── GlmAsrContext
-```
-
-## Project Structure
-
-```
-├── include/
-│   ├── base/           # Core types (Token, ModelConfig, etc.)
-│   ├── core/           # Base classes (LLMModel, VLMModel, Context)
-│   ├── modules/        # Modules (Tokenizer, Embedding, Sampler, etc.)
-│   └── models/         # Model implementations
-├── src/                # Source files
-├── tests/              # GTest unit tests
-├── sample/             # Example programs
-├── models/             # Model files (.hmm, .bin, .json)
-└── 3rdparty/           # Third-party dependencies
-```
-
-## Model Files
-
-Models use `.hmm` (Houmo Model) format:
-
-| File | Description |
-|------|-------------|
-| `*_prefill.hmm` | Prefill model (processes prompt) |
-| `*_decode.hmm` | Decode model (autoregressive generation) |
-| `*_encode.hmm` | Encoder model (ASR audio encoding) |
-| `embedding.bin` | Embedding weight table |
-| `vision.hmm` | Vision encode (VLM only) |
-| `tokenizer.json` | Tokenizer vocabulary |
-
-## Testing
-
-```bash
-cd build
-ctest --output-on-failure
-
-# Run specific test
-./qwen3_llm_test
-./qwen3_vlm_test
-./whisper_test
-./perf_profiler_test
-```
-
-## Documentation
-
-- [API Reference](docs/api_reference.md) - API signatures and usage
-- [Inference Pipeline](docs/inference_pipeline.md) - Pipeline flow details
-- [New Model Adaptation Guide](docs/new_model_adaptation_guide.md) - How to add new models
-- [Whisper Implementation Plan](docs/whisper_implementation_plan.md) - Whisper ASR implementation
+- [API Reference](docs/api_reference.md) - 核心 API、数据结构和模块接口
+- [Inference Pipeline](docs/inference_pipeline.md) - LLM/VLM/ASR 推理流程和性能打点
+- [New Model Adaptation Guide](docs/new_model_adaptation_guide.md) - 新模型适配规范
 
 ## License
 

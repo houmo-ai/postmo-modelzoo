@@ -1,85 +1,99 @@
 # 新模型适配指南
 
-本文档描述如何基于 Houmo Inference Framework 适配新模型（LLM / VLM）。
+本文档说明如何基于 Houmo Inference Framework 适配新的生成类模型（LLM/VLM）或语音识别模型（ASR）。文档只描述框架要求和通用步骤，不维护具体模型支持列表。
 
 ---
 
-## 1. 文件结构
+## 1. 适配前先确认模型类型
 
-```
-include/models/
-├── your_model_model.h         # 头文件
-src/models/
-├── your_model_model.cc        # 实现 + 注册
-tests/
-├── your_model_test.cc         # GTest 测试
-```
+| 模型类型 | Model 基类 | Context 基类 | 典型入口 | 说明 |
+|----------|------------|--------------|----------|------|
+| LLM | `LLMModel` | `Context` | `generate()` | 文本 token 自回归生成 |
+| VLM | `VLMModel` | `Context` | `generate()` | 在 LLM 基础上增加视觉编码和图像 embedding 注入 |
+| ASR | `ASRModel` | `ASRContext` | `Transcribe()` | 音频特征编码 + decoder 转写 |
+
+选择规则：
+
+- 纯文本生成模型继承 `LLMModel`。
+- 视觉语言模型继承 `VLMModel`，不要直接继承 `LLMModel` 后自行复制 vision 成员。
+- 语音识别模型继承 `ASRModel`，上下文继承 `ASRContext`，复用 ASR 模板方法打点。
+- 不要在子类中重新声明基类已有状态，例如 `config_`、`tokenizer_`、`embedding_`、`prefill_module_`、`decode_module_`、`context_length_`、`profiler_`。
 
 ---
 
-## 2. 继承规则
+## 2. 通用文件组织
 
-### 2.1 继承层级
+模型实现通常放在模型自己的 cpp 目录中，框架基类位于当前工程：
 
+```text
+include/
+├── base/              # 基础类型、配置、异常
+├── core/              # LLM/VLM/ASR 基类、Context、Factory
+└── modules/           # 通用模块
+
+src/
+├── core/              # 基类实现
+└── modules/           # 通用模块实现
 ```
-LLMModel (基类)
-  ├── YourModelLLMModel        # 纯文本 LLM
-  └── VLMModel (VLM 基类)
-        ├── YourModelVLMModel  # 视觉语言模型
-        └── ...
 
-Context (基类)
-  ├── YourModelLLMContext      # LLM 上下文
-  └── YourModelVLMContext      # VLM 上下文
+新模型的文件建议与模型目录放在一起：
+
+```text
+include/<model_name>_model.h
+src/<model_name>_model.cc
+tests/<model_name>_test.cc
 ```
 
-### 2.2 选择继承基类
+如果所在模型目录已有固定组织方式，优先遵循该目录现有结构。
 
-| 模型类型 | Model 基类 | Context 基类 | 说明 |
-|----------|-----------|-------------|------|
-| 纯文本 LLM | `LLMModel` | `Context` | 无视觉处理 |
-| 视觉语言 VLM | `VLMModel` | `Context` | 继承 `LLMModel` + 视觉编码器 |
+---
 
-**规则**：
-- VLM 模型**必须**继承 `VLMModel`，**禁止**直接继承 `LLMModel`
-- Context 类**必须**通过 `LLMModel*` 指针访问模型（多态）
-- **禁止**在 Context 中重新声明基类已有的成员变量或虚方法（如 `keep_history_`、`context_length_`）
+## 3. ModelConfig 使用规范
 
-### 2.3 禁止遮蔽基类成员
+所有模型都通过 `ModelConfig` 传入运行参数和文件路径。
 
 ```cpp
-// ❌ 错误：遮蔽基类 keep_history_
-class YourContext : public Context {
-  bool keep_history_ = true;                    // 遮蔽 Context::keep_history_
-  void set_keep_history(bool keep) { ... }      // 遮蔽 Context::set_keep_history()
-};
-
-// ✅ 正确：直接使用继承的成员
-class YourContext : public Context {
-  // 不声明 keep_history_，使用 Context 的
-};
+houmo::ModelConfig config;
+config.devices = {0};
+config.batch_size = 1;
+config.lazy_mode = false;
+config.prefill_path = "path/to/prefill.hmm";
+config.decode_path = "path/to/decode.hmm";
+config.embedding_path = "path/to/embedding.bin";
+config.tokenizer_path = "path/to/tokenizer.json";
+config.vision_path = "path/to/vision.hmm";
+config.extra_params["encode_path"] = "path/to/encode.hmm";
 ```
+
+字段使用建议：
+
+| 字段 | LLM | VLM | ASR | 说明 |
+|------|-----|-----|-----|------|
+| `devices` | 必需 | 必需 | 必需 | 不要在模型实现中硬编码设备号 |
+| `prefill_path` | 必需 | 必需 | 通常必需 | decoder prefill 模型 |
+| `decode_path` | 必需 | 必需 | 通常必需 | decoder decode 模型 |
+| `embedding_path` | 按需 | 按需 | 按需 | token embedding 权重 |
+| `tokenizer_path` | 按需 | 按需 | 按需 | tokenizer JSON |
+| `vision_path` | 不使用 | 必需 | 不使用 | vision encoder 模型 |
+| `extra_params` | 按需 | 按需 | 常用 | ASR encode 路径、语言等扩展参数 |
 
 ---
 
-## 3. Model 类实现规范
+## 4. LLM 适配
 
-### 3.1 头文件模板
+### 4.1 头文件模板
 
 ```cpp
-#ifndef HOUMO_YOUR_MODEL_MODEL_H
-#define HOUMO_YOUR_MODEL_MODEL_H
+#pragma once
 
 #include "core/context.h"
-// LLM: #include "core/llm_model.h"
-// VLM: #include "core/vlm_model.h"
+#include "core/llm_model.h"
 
 namespace houmo {
 
-class YourModelContext : public Context {
+class YourLLMContext : public Context {
  public:
-  explicit YourModelContext(LLMModel* model, int n_ctx);
-  ~YourModelContext() override = default;
+  explicit YourLLMContext(LLMModel* model, int n_ctx);
 
   Token prefill(const std::vector<Token>& tokens) override;
   Token decode(Token prev_token) override;
@@ -89,464 +103,437 @@ class YourModelContext : public Context {
   void reset() override;
 
  private:
-  // ========== Prefill 拆分方法 ==========
-  void prefill_preprocess_chunk(int chunk, ...);
-  void prefill_inference_chunk();
-  Token prefill_postprocess(Sampler* sampler, int32_t seq_length);
-
-  // ========== Decode 拆分方法 ==========
-  void decode_preprocess(Token prev_token);
-  void decode_inference();
-  Token decode_postprocess(Sampler* sampler);
-
-  // ========== 内部推理方法 ==========
   Token do_prefill_inference(const std::vector<Token>& tokens, Sampler* sampler);
   Token do_decode_inference(Token prev_token, Sampler* sampler);
 
-  // ========== 模型特有成员 ==========
-  // ...
+  void prefill_preprocess_chunk(int chunk,
+                                const std::vector<Token>& tokens,
+                                int32_t seq_length,
+                                int prefill_length);
+  void prefill_inference_chunk();
+  Token prefill_postprocess(Sampler* sampler, int32_t seq_length);
+
+  void decode_preprocess(Token prev_token);
+  void decode_inference();
+  Token decode_postprocess(Sampler* sampler);
 };
 
-// LLM 模型
-class YourModelLLMModel : public LLMModel {
+class YourLLMModel : public LLMModel {
  public:
-  explicit YourModelLLMModel(const ModelConfig& config);
-  ~YourModelLLMModel() override = default;
+  explicit YourLLMModel(const ModelConfig& config);
 
   std::unique_ptr<Context> create_context(int n_ctx = 0) override;
   void ClearKVCache();
 
  private:
   void load();
-  int n_blocks_ = 0;
-  int batch_ = 0;
-  int embedding_length_ = 0;
-  int context_max_length_ = 0;
+  void init_prefill_inputs();
+  void init_decode_inputs();
 };
 
-// VLM 模型 (如需要)
-// class YourModelVLMModel : public VLMModel { ... };
-
 }  // namespace houmo
-#endif
 ```
 
-### 3.2 Model::load() 规范
+### 4.2 load() 要求
+
+`load()` 由模型子类实现，至少完成：
+
+1. 使用 `config_.devices` 创建 `tcim::DevManager`。
+2. 使用 `*dev_manager_` 创建 `tcim::Module::WeightManager`。
+3. 加载 prefill module。
+4. 加载 decode module。
+5. 按模型需要共享或初始化 KV Cache。
+6. 加载 embedding。
+7. 加载 tokenizer。
+8. 填充 `info_`、`prefill_length_`、`attn_idx_start_` 等基类成员。
+9. 初始化 `prefill_input_map_` 和 `decode_input_map_`。
+
+不要在子类中重新声明 `dev_manager_`、`weight_manager_`、`prefill_module_`、`decode_module_`。
+
+### 4.3 generate() 要求
+
+`generate()` 应包含完整性能统计：
 
 ```cpp
-void YourModelLLMModel::load() {
-  // 步骤1 - 初始化设备管理器（必须使用 config_.devices，禁止硬编码设备号）
-  dev_manager_ = std::make_unique<tcim::DevManager>(
-      tcim::DevManager::Create(config_.devices));
-  weight_manager_ = std::make_unique<tcim::Module::WeightManager>(
-      tcim::Module::WeightManager::CreateWeightManager(*dev_manager_));
-
-  // 步骤2 - 加载 prefill 模型
-  // 步骤3 - 加载 decode 模型
-  // 步骤4 - 共享 KV Cache
-  // 步骤5 - 加载 Embedding
-  // 步骤6 - 初始化输入 tensors
-  // 步骤7 - 填充模型信息
-  // 步骤8 - 加载 Tokenizer
-  // 步骤9 - 初始化 KV Cache（调用 ClearKVCache()）
-}
-```
-
-**规则**：
-- `dev_manager_` 和 `weight_manager_` **必须**使用基类的 protected 成员（禁止在子类中重新声明）
-- `CreateWeightManager` **必须**使用 `*dev_manager_`（禁止 `CreateWeightManager(0)` 硬编码设备号）
-
-### 3.3 Model::ClearKVCache() 规范
-
-```cpp
-void YourModelLLMModel::ClearKVCache() {
-  if (!prefill_module_ || !decode_module_) return;
-
-  // 遍历需要清零的 cache 类型
-  for (int idx = 0; idx < prefill_module_->GetInputNum(); idx++) {
-    const auto input_name = prefill_module_->GetInputName(idx);
-    // 根据模型 cache 类型过滤（conv_cache / recurrent_state / kcache / vcache）
-    if (input_name.find("your_cache_pattern") == std::string::npos) continue;
-
-    auto info = prefill_module_->GetInputInfo(input_name).AsContiguous();
-    auto tensor = tcim::Tensor::CreateHostTensor(info);
-    std::vector<uint8_t> zeros(tensor.MemSize(), 0);
-    tensor.Buffer().CopyFromHost(zeros.data(), zeros.size());
-    prefill_module_->SetInput(input_name, tensor);
-  }
-}
-```
-
----
-
-## 4. 推理 Pipeline 规范
-
-### 4.1 Context 方法拆分规则
-
-每个 Context 类**必须**将推理逻辑拆分为以下方法，便于性能采集和调试：
-
-```
-prefill(tokens)
-  └─► do_prefill_inference(tokens, sampler)
-        ├─► [VLM] run_vision()                    // 视觉处理
-        ├─► [VLM] prefill_common_setup(tokens)    // 通用设置（一次性）
-        ├─► [循环] prefill_preprocess_chunk()      // 分块预处理
-        │         prefill_inference_chunk()        // 分块推理
-        └─► prefill_postprocess(sampler, seq_len)  // 后处理 + 采样
-
-decode(prev_token)
-  └─► do_decode_inference(prev_token, sampler)
-        ├─► decode_preprocess(prev_token)          // 预处理
-        ├─► decode_inference()                     // 推理
-        └─► decode_postprocess(sampler)            // 后处理 + 采样
-```
-
-### 4.2 Prefill 分块处理
-
-```cpp
-Token YourModelContext::do_prefill_inference(const std::vector<Token>& tokens,
-                                             Sampler* sampler) {
-  auto* model = static_cast<LLMModel*>(model_);
-  const int32_t seq_length = static_cast<int32_t>(tokens.size());
-  const int prefill_length = model->prefill_length();
-  const int prefill_loop_chunk =
-      (seq_length + prefill_length - 1) / prefill_length;
-
-  for (int chunk = 0; chunk < prefill_loop_chunk; chunk++) {
-    prefill_preprocess_chunk(chunk, tokens, seq_length, prefill_length);
-    prefill_inference_chunk();
-  }
-
-  Token sampled_token = prefill_postprocess(sampler, seq_length);
-  return sampled_token;
-}
-```
-
-### 4.3 Prefill Padding 规范
-
-最后一个 chunk 如果输入 tokens 不足 `prefill_length`，**必须**使用 `pad_token_id` 填充：
-
-```cpp
-Token pad_token_id = model->tokenizer()->pad_token_id();
-if (input_ids.size() < static_cast<size_t>(prefill_length)) {
-    input_ids.resize(prefill_length, pad_token_id);
-}
-```
-
-### 4.4 Generate 流式生成规范
-
-`generate()` **必须**包含完整的性能采集逻辑（见第 5 节）：
-
-```cpp
-void YourModelContext::generate(const std::vector<Token>& prompt,
-                                const SamplingParams& params,
-                                std::function<bool(Token)> callback) {
+void YourLLMContext::generate(const std::vector<Token>& prompt,
+                              const SamplingParams& params,
+                              std::function<bool(Token)> callback) {
   profiler_.reset();
-  auto& p = profiler_;
-
-  p.start("generate");
-  p.set_input_tokens(static_cast<int>(prompt.size()));
+  profiler_.start("generate");
+  profiler_.set_input_tokens(static_cast<int>(prompt.size()));
 
   set_sampler(params);
 
-  // Prefill
   Token token;
-  { auto t = p.scope("generate.prefill"); token = prefill(prompt); }
-
-  p.record_ttft();
-
-  if (token == model_->eos_token_id() || token == model_->bos_token_id()) {
-    p.stop("generate"); perf_stats_ = p.to_perf_stats(); return;
+  {
+    auto t = profiler_.scope("generate.prefill");
+    token = prefill(prompt);
   }
+
+  profiler_.record_ttft();
+
   if (!callback(token)) {
-    p.stop("generate"); perf_stats_ = p.to_perf_stats(); return;
+    profiler_.stop("generate");
+    perf_stats_ = profiler_.to_perf_stats();
+    return;
   }
 
-  // Decode
-  while (true) {
-    if (context_length_ >= model_->max_ctx_available()) break;
-    if (params.max_tokens > 0 &&
-        generated_ids_.size() >= static_cast<size_t>(params.max_tokens)) break;
+  while (params.max_tokens <= 0 ||
+         generated_ids_.size() < static_cast<size_t>(params.max_tokens)) {
+    {
+      auto t = profiler_.scope("generate.decode");
+      token = decode(token);
+    }
+    profiler_.add_output_token();
 
-    { auto t = p.scope("generate.decode"); token = decode(token); }
-    p.add_output_token();
-
-    if (token == model_->eos_token_id() || token == model_->bos_token_id()) break;
     if (!callback(token)) break;
   }
 
-  p.stop("generate");
-  perf_stats_ = p.to_perf_stats();
+  profiler_.stop("generate");
+  perf_stats_ = profiler_.to_perf_stats();
 }
 ```
 
-### 4.5 Reset 规范
-
-```cpp
-void YourModelContext::reset() {
-  Context::reset();  // 必须调用基类 reset
-  auto* model = static_cast<YourModelLLMModel*>(model_);
-  model->ClearKVCache();  // 清空 KV Cache
-}
-```
+模型应根据自身 EOS/BOS/stop token 和 context 上限补充停止条件。
 
 ---
 
-## 5. 性能采集规范
+## 5. VLM 适配
 
-### 5.1 计时层级结构
+VLM 继承 `VLMModel`，复用 `LLMModel` 的 prefill/decode 基础成员，并增加视觉编码。
 
-所有 Context 类**必须**使用 `profiler_`（基类成员）进行性能采集。计时路径**必须**遵循以下层级结构：
-
-```
-generate                              // E2E 总时间
-├── generate.vision                   // [VLM] 视觉处理
-│   ├── generate.vision.preprocess    // [VLM] 视觉预处理
-│   ├── generate.vision.inference     // [VLM] 视觉推理
-│   └── generate.vision.postprocess   // [VLM] 视觉后处理
-├── generate.prefill                  // Prefill 阶段
-│   ├── generate.prefill.common_setup // [VLM] 通用设置（一次性）
-│   ├── generate.prefill.preprocess_chunk  // 分块预处理
-│   ├── generate.prefill.inference_chunk   // 分块推理
-│   └── generate.prefill.postprocess       // 后处理 + 采样
-└── generate.decode                   // Decode 阶段
-    ├── generate.decode.preprocess    // 预处理
-    ├── generate.decode.inference     // 推理
-    └── generate.decode.postprocess   // 后处理 + 采样
-```
-
-### 5.2 计时方法
+### 5.1 头文件差异
 
 ```cpp
-// 方式1: ScopedTimer（推荐，自动 stop）
-{
-  auto t = profiler_.scope("generate.prefill.inference_chunk");
-  prefill_inference_chunk();
-}  // 析构时自动 stop
+#include "core/vlm_model.h"
 
-// 方式2: 手动 start/stop
-profiler_.start("generate");
-// ... 工作 ...
-profiler_.stop("generate");
-```
-
-### 5.3 必须采集的指标
-
-| 指标路径 | 说明 | 必须 |
-|----------|------|------|
-| `generate` | E2E 总时间 | ✅ |
-| `generate.prefill` | Prefill 阶段总时间 | ✅ |
-| `generate.decode` | 单次 Decode 时间（循环内） | ✅ |
-| `generate.vision` | 视觉处理总时间 | VLM 必须 |
-| `generate.prefill.preprocess_chunk` | 分块预处理 | ✅ |
-| `generate.prefill.inference_chunk` | 分块推理 | ✅ |
-| `generate.prefill.postprocess` | 后处理 + 采样 | ✅ |
-
-### 5.4 Token 统计
-
-```cpp
-// generate() 开始时
-p.set_input_tokens(static_cast<int>(prompt.size()));
-
-// prefill 完成后
-p.record_ttft();
-
-// 每次 decode 后
-p.add_output_token();
-
-// generate() 结束时
-p.stop("generate");
-perf_stats_ = p.to_perf_stats();
-```
-
-### 5.5 采集结果导出
-
-```cpp
-// 用户通过 ctx->perf_stats() 获取
-PerfStats stats = ctx->perf_stats();
-// stats 包含: prefill_time_ms, decode_time_ms, ttft_ms, tps 等
-```
-
----
-
-## 6. VLM 特有规范
-
-### 6.1 VLM Context 额外方法
-
-```cpp
-class YourModelVLMContext : public Context {
+class YourVLMModel : public VLMModel {
  public:
-  // 图像接口
-  void set_image(const std::string& image_path);
-  void set_images(const std::vector<std::string>& image_paths);
-  bool has_image() const;
+  explicit YourVLMModel(const ModelConfig& config);
+
+  std::unique_ptr<Context> create_context(int n_ctx = 0) override;
+  std::vector<float16> encode_image(const uint8_t* image_data,
+                                    int width,
+                                    int height,
+                                    int channels) override;
 
  private:
-  // Vision 处理
+  void load();
+  void init_vision_inputs();
+  void init_prefill_inputs();
+  void init_decode_inputs();
+};
+```
+
+### 5.2 VLM Context 额外状态
+
+```cpp
+class YourVLMContext : public Context {
+ public:
+  void set_image(const std::string& image_path) override;
+  void set_images(const std::vector<std::string>& image_paths);
+
+ private:
   void run_vision();
   void vision_preprocess(int image_idx);
   void vision_inference();
   void vision_postprocess(int image_idx);
 
-  // Embedding 处理
-  void scatter_image_embeds(...);
-  std::vector<Token> expand_image_tokens(const std::vector<Token>& tokens);
-
-  // M-RoPE
-  std::pair<std::vector<std::vector<int32_t>>, int32_t> get_rope_index(...);
-
-  // 图像相关成员
   std::vector<std::string> image_paths_;
   std::vector<float16> flat_image_embeds_;
-  std::vector<ImageGridTHW> image_grid_thw_;
   bool use_vlm_ = false;
 };
 ```
 
-### 6.2 VLM Prefill 流程
+### 5.3 VLM Prefill 插入点
 
-```cpp
-Token YourModelVLMContext::do_prefill_inference(const std::vector<Token>& tokens,
-                                                 Sampler* sampler) {
-  auto& p = profiler_;
+VLM 通常在 prefill 的 token embedding 之前完成：
 
-  // 1. 视觉处理
-  if (use_vlm_ && !image_paths_.empty()) {
-    auto t = p.scope("generate.vision");
-    run_vision();
-  }
+1. `HmImageProcessor::LoadAndProcess()` 读取和预处理图像。
+2. 设置 `vision_input_map_`。
+3. 执行 `vision_module_->Run()` 和同步。
+4. 从 vision 输出中取出 image embeddings。
+5. 扩展或替换 prompt 中的 image token embedding。
+6. 设置多模态 position ids 或其他模型特有输入。
 
-  // 2. 通用设置（一次性）
-  auto [position_ids, seq_length, chunk_count] = [&]() {
-    auto t = p.scope("generate.prefill.common_setup");
-    return prefill_common_setup(tokens);
-  }();
+建议打点路径：
 
-  // 3. 分块执行
-  for (int chunk = 0; chunk < chunk_count; chunk++) {
-    { auto t = p.scope("generate.prefill.preprocess_chunk"); ... }
-    { auto t = p.scope("generate.prefill.inference_chunk"); ... }
-  }
-
-  // 4. 后处理
-  Token sampled_token;
-  { auto t = p.scope("generate.prefill.postprocess"); ... }
-
-  return sampled_token;
-}
-```
-
-### 6.3 VLM Model 额外接口
-
-```cpp
-class YourModelVLMModel : public VLMModel {
- public:
-  // 视觉编码
-  std::vector<float16> encode_image(const std::vector<float16>& pixel_values);
-
-  // Vision 模块（使用基类的 vision_module_，不要重新声明）
-  // vision_input_map_ 同上
-
-  void ClearKVCache();
-
- private:
-  void load();
-  void init_vision_inputs();
-};
+```text
+generate.vision
+generate.vision.preprocess
+generate.vision.inference
+generate.vision.postprocess
+generate.prefill.common_setup
+generate.prefill.preprocess_chunk
+generate.prefill.inference_chunk
+generate.prefill.postprocess
 ```
 
 ---
 
-## 7. 测试规范
+## 6. ASR 适配
 
-### 7.1 测试文件模板
+ASR 模型必须继承 `ASRModel`，上下文必须继承 `ASRContext`。这样可以复用音频处理、转写接口和模板方法打点。
+
+### 6.1 头文件模板
 
 ```cpp
-#include <gtest/gtest.h>
-#include <filesystem>
+#pragma once
 
-#include "models/your_model_model.h"
-#include "modules/sampler.h"
-#include "test_utils.h"
+#include "core/asr_model.h"
 
 namespace houmo {
-namespace fs = std::filesystem;
 
-class YourModelTest : public ::testing::Test {
- protected:
-  void SetUp() override {
-    std::string base_path = test::GetBasePath();
-    prefill_path_ = base_path + "/models/.../prefill.hmm";
-    decode_path_ = base_path + "/models/.../decode.hmm";
-    embedding_path_ = base_path + "/models/.../quant_embedding.bin";
-    tokenizer_path_ = base_path + "/models/tokenizers/.../tokenizer.json";
-  }
+class YourASRModel : public ASRModel {
+ public:
+  explicit YourASRModel(const ModelConfig& config);
 
-  ModelConfig GetConfig() {
-    ModelConfig config;
-    config.prefill_path = prefill_path_;
-    config.decode_path = decode_path_;
-    config.embedding_path = embedding_path_;
-    config.tokenizer_path = tokenizer_path_;
-    config.devices = {0};
-    config.lazy_mode = false;
-    return config;
-  }
+  std::unique_ptr<Context> create_context(int n_ctx = 0) override;
 
-  bool CheckModelFiles() {
-    return fs::exists(prefill_path_) && fs::exists(decode_path_) &&
-           fs::exists(embedding_path_) && fs::exists(tokenizer_path_);
-  }
+  Token sot_token_id() const override;
+  Token lang_token_id(const std::string& language) const override;
+  Token transcribe_token_id() const override;
+  Token notimestamps_token_id() const override;
+  std::vector<Token> eos_token_ids() const override;
+  bool supports_language_detection() const override;
 
-  std::string prefill_path_;
-  std::string decode_path_;
-  std::string embedding_path_;
-  std::string tokenizer_path_;
+ private:
+  void load();
+  void init_encode_inputs();
+  void init_prefill_inputs();
+  void init_decode_inputs();
 };
+
+class YourASRContext : public ASRContext {
+ public:
+  explicit YourASRContext(ASRModel* model, int n_ctx);
+
+  std::vector<float16> Encode(const std::vector<float>& mel_features,
+                              int n_mels,
+                              int n_frames) override;
+  Token DetectLanguage() override;
+  std::vector<Token> BuildPrompt(Token language_token) override;
+  void Transcribe(const std::string& audio_path,
+                  const SamplingParams& params,
+                  ASRTokenCallback callback) override;
+  void set_language(const std::string& language) override;
+
+ private:
+  void encode_preprocess_impl(const std::vector<float>& mel,
+                              int n_mels,
+                              int n_frames) override;
+  void encode_inference_impl() override;
+  void encode_postprocess_impl() override;
+
+  void detect_lang_preprocess_impl() override;
+  void detect_lang_inference_impl() override;
+  Token detect_lang_postprocess_impl() override;
+
+  void prefill_preprocess_impl(const std::vector<Token>& tokens) override;
+  void prefill_inference_impl() override;
+  Token prefill_postprocess_impl() override;
+
+  void decode_preprocess_impl(Token prev_token) override;
+  void decode_inference_impl() override;
+  Token decode_postprocess_impl() override;
+};
+
+}  // namespace houmo
 ```
 
-### 7.2 必须包含的测试用例
+### 6.2 ASRModel::load() 要求
 
-| 测试名 | 说明 | 必须 |
-|--------|------|------|
-| `LoadModel` | 模型加载 + 基本属性检查 | ✅ |
-| `Tokenize` | 编解码一致性 | ✅ |
-| `CreateContext` | Context 创建 | ✅ |
-| `PrefillAndDecode` | Prefill + Decode 一轮 | ✅ |
-| `Generate` | 流式生成 | ✅ |
-| `ResetContext` | Context 重置 | ✅ |
-| `ImageProcessor` | 图像处理 | VLM |
-| `VisionEncoder` | 视觉编码器 | VLM |
-| `PrefillWithImage` | 带图像的 Prefill | VLM |
+ASR 模型通常需要加载三类 TCIM 模块：
 
-### 7.3 测试规则
+1. encode module：处理 Mel 特征，路径可通过 `extra_params` 传入。
+2. prefill module：decoder prefill。
+3. decode module：decoder 自回归 decode。
 
-1. **所有测试必须使用 `ASSERT_NO_THROW` 包裹测试体**（防止模型加载失败导致崩溃）
-2. **`CheckModelFiles()` 必须检查所有 4 个路径**（prefill、decode、embedding、tokenizer）
-3. **`ModelConfig` 必须设置 `devices` 和 `lazy_mode`**
-4. **VLM 测试中 `dynamic_cast` 后必须 `ASSERT_NE(ptr, nullptr)`**
+同时需要：
+
+- 设置 `n_mels_`、`n_frames_`、`num_heads_`、`cache_max_len_`、`num_decode_layers_`。
+- 加载 tokenizer 和可选 embedding。
+- 初始化 encoder、prefill、decode 输入 tensor map。
+- 初始化 decoder cache。
+
+### 6.3 Transcribe() 推荐结构
 
 ```cpp
-TEST_F(YourModelTest, PrefillWithImage) {
-  if (!CheckModelFiles()) GTEST_SKIP() << "Model files not found";
+void YourASRContext::Transcribe(const std::string& audio_path,
+                                const SamplingParams& params,
+                                ASRTokenCallback callback) {
+  profiler_.reset();
+  profiler_.set_root_stage("transcribe");
+  profiler_.start("transcribe");
 
-  auto config = GetConfig();
-  ASSERT_NO_THROW({
-    YourModelVLMModel model(config);
-    auto ctx = model.create_context();
+  set_language(params.language);
 
-    auto* vlm_ctx = dynamic_cast<YourModelVLMContext*>(ctx.get());
-    ASSERT_NE(vlm_ctx, nullptr) << "Failed to cast to VLMContext";
-    vlm_ctx->set_image(test_image_path_);
+  std::vector<MelFeatures> features;
+  float audio_duration = 0.0f;
+  {
+    auto t = profiler_.scope("transcribe.audio_load");
+    AudioProcessor processor;
+    features = processor.Process(audio_path);
+    for (const auto& f : features) audio_duration += f.duration;
+  }
 
-    auto tokens = model.tokenize("描述这张图片", true, false);
-    Token token = ctx->prefill(tokens);
-    EXPECT_GE(token, 0);
-  });
+  for (const auto& feature : features) {
+    do_encode(/* mel float data */, feature.feature_dim, feature.num_frames);
+
+    Token language_token = do_detect_language();
+    auto prompt = BuildPrompt(language_token);
+
+    Token token = do_prefill(prompt);
+    profiler_.record_ttft();
+
+    if (!callback(token)) break;
+
+    while (true) {
+      token = do_decode(token);
+      profiler_.add_output_token();
+
+      // 子类应检查 eos_token_ids()、max_tokens 和 callback 返回值。
+      if (!callback(token)) break;
+    }
+  }
+
+  profiler_.stop("transcribe");
+  fill_perf_info(audio_duration);
 }
 ```
 
-### 7.4 CMakeLists.txt 注册
+注意：`do_encode()` 当前接收 `std::vector<float>`，如果 `AudioProcessor::Process()` 返回 FP16 MelFeatures，子类需要按模型实现决定是否保留 FP16、转换为 float，或在 `Transcribe()` 中直接调用自定义特征路径。
+
+### 6.4 ASR 打点规范
+
+ASR 子类不要手写重复计时逻辑，优先调用基类模板方法：
+
+```text
+do_encode()
+  ├── transcribe.encode.preprocess
+  ├── transcribe.encode.inference
+  └── transcribe.encode.postprocess
+
+do_detect_language()
+  ├── transcribe.detect_lang.preprocess
+  ├── transcribe.detect_lang.inference
+  └── transcribe.detect_lang.postprocess
+
+do_prefill()
+  ├── transcribe.prefill.preprocess
+  ├── transcribe.prefill.inference
+  └── transcribe.prefill.postprocess
+
+do_decode()
+  ├── transcribe.decode.preprocess
+  ├── transcribe.decode.inference
+  └── transcribe.decode.postprocess
+```
+
+`fill_perf_info(audio_duration)` 会计算 `ASRPerfInfo`，包括 `overall_rtf`、`inference_rtf`、`decode_tps`、`overall_tps`。
+
+### 6.5 AudioProcessor 使用
+
+```cpp
+AudioProcessorConfig audio_config;
+audio_config.sample_rate = 16000;
+audio_config.n_mels = 80;
+audio_config.chunk_seconds = 30;
+audio_config.encoder_window_seconds = 30;
+
+auto processor = AudioProcessor(audio_config);
+auto features = processor.Process(audio_path);
+```
+
+需要 128 mel 或特定 padding 方式时，调整 `n_mels` 和 `feature_mode`。
+
+---
+
+## 7. 模型注册
+
+模型实现文件末尾使用 `REGISTER_MODEL` 注册。
+
+### LLM/VLM 注册
+
+```cpp
+#include "core/model_factory.h"
+
+REGISTER_MODEL(LLMModel, your_llm_key, ModelSeries::kYourLLM,
+               [](const ModelConfig& c) {
+                 return std::make_unique<YourLLMModel>(c);
+               },
+               "Your LLM model");
+```
+
+VLM 仍注册到 `ModelFactory<LLMModel>`，因为 `VLMModel` 继承 `LLMModel`。
+
+### ASR 注册
+
+```cpp
+#include "core/model_factory.h"
+
+REGISTER_MODEL(ASRModel, your_asr_key, ModelSeries::kYourASR,
+               [](const ModelConfig& c) {
+                 return std::make_unique<YourASRModel>(c);
+               },
+               "Your ASR model");
+```
+
+如果新增模型系列，需要同步更新：
+
+1. `ModelSeries` 枚举。
+2. `ModelSeriesToString()`。
+3. `StringToModelSeries()`。
+4. 对应模型实现文件中的 `REGISTER_MODEL`。
+5. CMake 源文件列表和测试目标。
+
+---
+
+## 8. 测试规范
+
+### 8.1 通用测试原则
+
+- 测试文件放在 `tests/` 或模型目录约定位置。
+- 缺少真实模型文件时使用 `GTEST_SKIP()`，不要让测试崩溃。
+- 模型加载和推理路径使用 `ASSERT_NO_THROW` 包裹。
+- 路径检查函数必须覆盖测试依赖的所有文件。
+- `ModelConfig` 必须显式设置 `devices` 和 `lazy_mode`。
+
+### 8.2 LLM/VLM 测试项
+
+| 测试名 | 说明 |
+|--------|------|
+| `LoadModel` | 模型加载和基础属性 |
+| `Tokenize` | tokenizer 编解码 |
+| `CreateContext` | context 创建 |
+| `PrefillAndDecode` | prefill + decode 一轮 |
+| `Generate` | token callback 生成 |
+| `ResetContext` | reset 后状态清理 |
+| `ImageProcessor` | VLM 图像预处理 |
+| `VisionEncoder` | VLM 视觉编码 |
+| `PrefillWithImage` | VLM 带图 prefill |
+
+### 8.3 ASR 测试项
+
+| 测试名 | 说明 |
+|--------|------|
+| `LoadModel` | ASR 模型加载和参数检查 |
+| `CreateContext` | ASRContext 创建和类型转换 |
+| `AudioProcessor` | 音频加载、切分、Mel 特征 |
+| `Encode` | Encoder 前向 |
+| `BuildPrompt` | 语言 token 和 prompt 构造 |
+| `PrefillAndDecode` | Decoder prefill + decode |
+| `Transcribe` | 完整音频转写入口 |
+| `PerfInfo` | `ASRPerfInfo` RTF/TPS 指标填充 |
+
+ASR 测试应额外检查：
+
+- `SamplingParams::language` 为 `auto` 和具体语言时的行为。
+- `eos_token_ids()` 中任一 token 触发停止。
+- 多 chunk 音频的 `n_chunks` 和 `audio_duration` 统计。
+- `profiler().has_stage("transcribe.encode.inference")` 等关键阶段存在。
+
+### 8.4 CMake 注册测试
 
 ```cmake
 if(BUILD_TESTS)
@@ -559,92 +546,63 @@ endif()
 
 ---
 
-## 8. 模型注册
+## 9. 性能采集检查清单
 
-### 8.1 静态注册
+### 生成类模型
 
-```cpp
-// 在 .cc 文件末尾
-#include "core/model_factory.h"
+- [ ] `generate` E2E 计时
+- [ ] `set_input_tokens()` 设置输入 token 数
+- [ ] prefill 后调用 `record_ttft()`
+- [ ] 每次 decode 后调用 `add_output_token()`
+- [ ] `generate.prefill` 和 `generate.decode` 阶段存在
+- [ ] 结束时 `perf_stats_ = profiler_.to_perf_stats()`
 
-REGISTER_LLM_MODEL(your_model, ModelSeries::kYourModel,
-                   [](const ModelConfig& c) {
-                     return std::make_unique<YourModelLLMModel>(c);
-                   },
-                   "YourModel 模型");
-```
+### ASR 模型
 
-### 8.2 枚举注册
-
-在 `include/base/houmo.h` 的 `ModelSeries` 枚举中添加：
-
-```cpp
-enum class ModelSeries {
-  // ... 现有
-  kYourModel,  // 新增
-};
-```
+- [ ] `set_root_stage("transcribe")`
+- [ ] `transcribe.audio_load` 覆盖音频加载和特征提取
+- [ ] 使用 `do_encode()` 而非直接调用 encode 钩子
+- [ ] 使用 `do_detect_language()` 或明确处理不支持语言检测的模型
+- [ ] 使用 `do_prefill()` 和 `do_decode()`
+- [ ] prefill 后调用 `record_ttft()`
+- [ ] decode token 后调用 `add_output_token()`
+- [ ] 结束时调用 `fill_perf_info(audio_duration)`
+- [ ] `ASRPerfInfo` 中 `overall_rtf`、`inference_rtf`、`decode_tps` 合理
 
 ---
 
-## 9. 模型差异处理清单
-
-适配新模型时，确认以下差异点：
-
-| 项目 | 需确认 | 说明 |
-|------|--------|------|
-| Padding 位置 | 后置/前置 | 不足 prefill_length 时填充位置 |
-| Pad Token | `pad_token_id` 值 | Qwen 系列等于 `bos_token_id` |
-| position_ids | 是否需要 | Decode 阶段是否需要 position_ids |
-| M-RoPE | 是否需要 | 多模态 3D 位置编码 |
-| Deepstack | 是否需要 | 视觉特征注入方式 |
-| Cache 类型 | kcache/vcache/conv_cache/recurrent_state | KV Cache 清零策略 |
-
-### 常见输入名称
-
-```
-input_1 / inputs_embeds       - Embedding 输入
-valid_length                   - 已处理序列长度
-current_length                 - 当前处理的长度
-position_ids                   - 位置编码
-time_position / height_position / width_position  - M-RoPE 3D 位置
-deepstack_image_embed_0/1/2   - Deepstack 视觉特征
-linear_attn_mask              - 线性注意力掩码
-model_layers_*_self_attn_kcache_input  - KV Cache (key)
-model_layers_*_self_attn_vcache_input  - KV Cache (value)
-```
-
----
-
-## 10. 检查清单
+## 10. 适配完成检查清单
 
 ### 代码
-- [ ] 头文件创建 (`include/models/your_model_model.h`)
-- [ ] 实现文件创建 (`src/models/your_model_model.cc`)
-- [ ] Model 继承正确的基类（LLM → `LLMModel`，VLM → `VLMModel`）
-- [ ] `load()` 使用 `config_.devices`，不硬编码设备号
-- [ ] `weight_manager_` 使用基类成员，不重新声明
-- [ ] Context 不遮蔽基类成员（`keep_history_`、`context_length_` 等）
 
-### 推理 Pipeline
-- [ ] `prefill` 拆分为 `preprocess_chunk` / `inference_chunk` / `postprocess`
-- [ ] `decode` 拆分为 `preprocess` / `inference` / `postprocess`
-- [ ] `generate` 包含完整的性能采集逻辑
-- [ ] `reset()` 调用基类 `Context::reset()` + `ClearKVCache()`
+- [ ] 选择了正确的基类：LLM、VLM 或 ASR。
+- [ ] 没有遮蔽基类已有成员。
+- [ ] `load()` 使用 `config_.devices`，没有硬编码设备号。
+- [ ] `weight_manager_` 使用 `*dev_manager_` 创建。
+- [ ] 所有 TCIM 输入 tensor map 在加载后初始化。
+- [ ] `ModelInfo` 或 ASR 参数字段填充完整。
+- [ ] tokenizer、embedding 按模型需要加载。
 
-### 性能采集
-- [ ] `generate` E2E 计时
-- [ ] `generate.prefill` Prefill 计时
-- [ ] `generate.decode` Decode 计时（循环内）
-- [ ] `generate.vision` Vision 计时（VLM）
-- [ ] `set_input_tokens()` / `record_ttft()` / `add_output_token()` 调用正确
-- [ ] `perf_stats_ = profiler_.to_perf_stats()` 在 generate 结束时赋值
+### 注册和构建
+
+- [ ] `ModelSeries` 和字符串转换已更新。
+- [ ] `REGISTER_MODEL` 使用正确的基类工厂。
+- [ ] CMake 源文件列表包含新模型实现。
+- [ ] CMake 测试目标已添加。
+- [ ] whole-archive 链接策略能保留静态注册对象。
+
+### 推理
+
+- [ ] Prefill padding 和 position 逻辑符合模型要求。
+- [ ] Decode 正确维护 context length 和 cache。
+- [ ] Stop token、max tokens、callback 中断都能停止。
+- [ ] VLM 清理或保留图像状态的策略明确。
+- [ ] ASR 多 chunk、语言设置、EOS 集合和音频时长统计正确。
 
 ### 测试
-- [ ] GTest 测试创建 (`tests/your_model_test.cc`)
-- [ ] CMakeLists.txt 更新
-- [ ] `CheckModelFiles()` 检查 4 个路径
-- [ ] 所有测试使用 `ASSERT_NO_THROW`
-- [ ] `ModelConfig` 设置 `devices` 和 `lazy_mode`
-- [ ] VLM 测试 `dynamic_cast` 后检查 `nullptr`
-- [ ] 测试通过 (`ctest --output-on-failure`)
+
+- [ ] 缺少模型文件时测试 skip。
+- [ ] 单元测试覆盖 tokenizer/embedding/sampler/profiler 或模型对应模块。
+- [ ] LLM/VLM 覆盖 load、context、prefill/decode、generate。
+- [ ] ASR 覆盖 audio processor、encode、prompt、transcribe、perf info。
+- [ ] `ctest --output-on-failure` 通过，或失败原因与缺少外部模型文件明确相关。

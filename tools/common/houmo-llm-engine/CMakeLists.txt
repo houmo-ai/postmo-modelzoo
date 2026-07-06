@@ -140,6 +140,8 @@ set(CORE_SOURCES
   src/core/context.cc
   src/core/vlm_model.cc
   src/core/model_factory.cc
+  src/core/llm_model.cc
+  src/core/asr_model.cc
 )
 
 # Module sources
@@ -153,27 +155,12 @@ set(MODULE_SOURCES
   src/modules/perf_profiler.cc
 )
 
-# Model sources
-set(MODEL_SOURCES
-  src/models/llm_model.cc
-  src/models/qwen3_llm_model.cc
-  src/models/qwen35_mllm_model.cc
-  src/models/qwen3_vlm_model.cc
-  src/models/asr_model.cc
-)
-
-# Sample sources
-set(SAMPLE_SOURCES
-  sample/sample_infer.cc
-)
-
 # -----------------------------------------------------------------------------
 # Library target
 # -----------------------------------------------------------------------------
 add_library(houmo_infer SHARED
   ${CORE_SOURCES}
   ${MODULE_SOURCES}
-  ${MODEL_SOURCES}
 )
 
 target_include_directories(houmo_infer PUBLIC
@@ -212,25 +199,6 @@ if(OpenCV_FOUND)
 endif()
 
 # -----------------------------------------------------------------------------
-# Sample targets
-# -----------------------------------------------------------------------------
-
-
-add_executable(sample_infer sample/sample_infer.cc)
-# whole-archive makes sure all symbols in houmo_infer are exported for dynamic loading in sample_infer
-target_link_libraries(sample_infer PRIVATE
-  -Wl,--whole-archive houmo_infer -Wl,--no-whole-archive
-)
-target_include_directories(sample_infer PRIVATE
-  ${HALF_INCLUDE_PATH}
-  ${CMAKE_SOURCE_DIR}/include
-  ${TCIM_RUNTIME_INCLUDE}
-  ${TOKENIZERS_CPP_PATH}/include
-  ${EIGEN_PATH}
-  ${OpenCV_INCLUDE_DIRS}
-)
-
-# -----------------------------------------------------------------------------
 # Unit tests
 # -----------------------------------------------------------------------------
 if(BUILD_TESTS)
@@ -254,24 +222,6 @@ if(BUILD_TESTS)
   target_include_directories(sampler_test PRIVATE ${TEST_INCLUDE_DIR})
   target_link_libraries(sampler_test PRIVATE houmo_infer GTest::gtest_main)
   add_test(NAME SamplerTest COMMAND sampler_test)
-
-  # Qwen3 LLM test
-  add_executable(qwen3_llm_test tests/qwen3_llm_test.cc)
-  target_include_directories(qwen3_llm_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(qwen3_llm_test PRIVATE houmo_infer GTest::gtest_main)
-  add_test(NAME Qwen3LLMTest COMMAND qwen3_llm_test)
-
-  # Qwen3.5 MLLM test
-  add_executable(qwen35_mllm_test tests/qwen35_mllm_test.cc)
-  target_include_directories(qwen35_mllm_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(qwen35_mllm_test PRIVATE houmo_infer GTest::gtest_main)
-  add_test(NAME Qwen35MLLMTest COMMAND qwen35_mllm_test)
-
-  # Qwen3-VLM test
-  add_executable(qwen3_vlm_test tests/qwen3_vlm_test.cc)
-  target_include_directories(qwen3_vlm_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(qwen3_vlm_test PRIVATE houmo_infer GTest::gtest_main)
-  add_test(NAME Qwen3VLMTest COMMAND qwen3_vlm_test)
 
   # PerfProfiler test
   add_executable(perf_profiler_test tests/perf_profiler_test.cc)
@@ -302,7 +252,6 @@ else()
   set(LIB_INSTALL_PATH $ENV{HOUMO_EXAMPLES_PATH}/tools/common/lib)
 endif()
 install(TARGETS houmo_infer DESTINATION ${LIB_INSTALL_PATH})
-install(TARGETS sample_infer DESTINATION .)
 if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
   install(TARGETS
     tokenizer_lib

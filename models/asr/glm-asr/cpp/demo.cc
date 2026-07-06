@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 HOUMO AI
  *
- * File: sample_glm_asr.cc
+ * File: demo.cc
  * Description:
  *   GLM-ASR inference demo using Houmo framework.
  *

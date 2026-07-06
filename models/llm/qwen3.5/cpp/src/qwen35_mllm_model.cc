@@ -20,7 +20,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "models/qwen35_mllm_model.h"
+#include "qwen35_mllm_model.h"
 
 #include <algorithm>
 #include <cmath>
