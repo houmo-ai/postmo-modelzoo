@@ -111,7 +111,7 @@ def flatten_exported_hmquant_dir(export_output_dir: str, hmquant_dir: str) -> No
         remove_path(dst)
         shutil.move(src, dst)
 
-    shutil.rmtree(export_output_dir)
+    shutil.rmtree(export_output_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     parser.add_argument("--model-size", type=str, default=None, help="model size identifier for output files")
     parser.add_argument("--out-dir", type=str, default=f"./output/{HOUMO_TARGET}", help="output directory")
     parser.add_argument("--context-length", type=int, default=2048, help="max sequence length")
-    parser.add_argument("--prefill-chunk-length", type=int, default=256, help="prefill chunk length")
+    # parser.add_argument("--prefill-chunk-length", type=int, default=256, help="prefill chunk length")
     parser.add_argument("--seed", type=int, default=42, help="random seed for reproducibility")
     parser.add_argument("--debug", action="store_true", help="enable debug mode")
     parser.add_argument("--assistant-model", type=str, default=None, help="path to the Gemma4 assistant/draft HF model directory")
@@ -171,7 +171,7 @@ if __name__ == "__main__":
         logger.warning(
             f"Output directory already exists: {quant_output_dir}, removing it."
         )
-        shutil.rmtree(quant_output_dir)
+        shutil.rmtree(quant_output_dir, ignore_errors=True)
 
     config_overrides = dict()
     if is_quantized_model(args.model):
@@ -195,11 +195,11 @@ if __name__ == "__main__":
         logger.warning(
             f"Output directory already exists: {export_output_dir}, removing it."
         )
-        shutil.rmtree(export_output_dir)
+        shutil.rmtree(export_output_dir, ignore_errors=True)
 
     config_overrides = {
         "export.model.context_max_length": args.context_length,
-        "export.model.prefill_chunk_length": 320 if args.model_size in ["26b-a4b", "31b"] else args.prefill_chunk_length,
+        "export.model.prefill_chunk_length": 320,
     }
 
     if enable_mtp:
