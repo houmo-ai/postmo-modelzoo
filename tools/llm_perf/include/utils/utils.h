@@ -399,10 +399,16 @@ typedef struct perf_settings {
 } PerfSettings;
 
 typedef struct asr_perf_settings {
+  struct AsrPerfCase {
+    float audio_len_seconds;
+    int token_per_second;
+  };
+
   std::string model_name;
   std::string encode_path;
   std::string prefill_path;
   std::string decode_path;
+  std::vector<AsrPerfCase> perf_cases;
   std::vector<int> devices;
   float audio_len_seconds = 30.0f;
   int token_per_second = 20;

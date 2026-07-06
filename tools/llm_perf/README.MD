@@ -24,7 +24,7 @@
   - ASR性能测试改为模拟数据模式（PerfAsr），不再依赖真实音频、Tokenizer、Embedding
   - 新增--audio_len/--token_per_second参数，用于模拟指定音频时长的ASR性能测试
   - 移除--audio/--tokenizer/--embedding等ASR真实推理参数
-  - 移除Whisper ASR性能测试支持
+  - 移除Whisper ASR性能测试支持, 目前仅支持llm类型的asr模型(glm-asr和qwen3-asr)
   - 新增Decode进度条显示
   - 自动推断GLM-ASR/Qwen3-ASR模型差异（encoder输入dtype、input_lengths等），零model_type分支
 - [20260615]

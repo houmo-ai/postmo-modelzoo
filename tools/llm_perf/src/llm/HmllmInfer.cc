@@ -175,7 +175,8 @@ void HmllmInfer::prefill_input_init() {
     auto input_name = prefill_module->GetInputName(idx);
     if (input_name.find("conv_cache") != std::string::npos ||
         input_name.find("recurrent_state") != std::string::npos ||
-        input_name.find("attention_mask") != std::string::npos) {
+        input_name.find("attention_mask") != std::string::npos ||
+        input_name.find("per_layer_inputs") != std::string::npos) {
       auto input_info = prefill_module->GetInputInfo(input_name).AsContiguous();
       tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info);
       prefill_input_map.insert(
@@ -291,6 +292,9 @@ void HmllmInfer::PrefillSetInputDatas(void *data, int32_t valid_length,
     } else if (input_name.find("attention_mask") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
           prefill_input_map.at(input_name).Buffer().Data(), memSize));
+    } else if (input_name.find("per_layer_inputs") != std::string::npos) {
+      CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
+          prefill_input_map.at(input_name).Buffer().Data(), memSize));
     } else {
       continue;
     }
@@ -347,6 +351,9 @@ void HmllmInfer::DecodeSetInputDatas(void *data, int32_t context_length) {
       float16 mask_value = static_cast<float16>(1.0f);
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(&mask_value, memSize));
     } else if (input_name.find("attention_mask") != std::string::npos) {
+      CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
+          decode_input_map.at(input_name).Buffer().Data(), memSize));
+    } else if (input_name.find("per_layer_inputs") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
           decode_input_map.at(input_name).Buffer().Data(), memSize));
     } else {

@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -48,6 +49,42 @@ namespace fs = std::filesystem;
 
 #define ALARM_TEMPERATURE_THRESHOLD 80
 #define SHUTDOWN_TEMPERATURE_THRESHOLD 100
+
+static AsrPerfSettings BuildAsrPerfCaseSettings(
+    const AsrPerfSettings& settings,
+    const AsrPerfSettings::AsrPerfCase& perf_case,
+    size_t perf_case_index) {
+  AsrPerfSettings current_settings = settings;
+  current_settings.audio_len_seconds = perf_case.audio_len_seconds;
+  current_settings.token_per_second = perf_case.token_per_second;
+  current_settings.perf_case_index = static_cast<int>(perf_case_index + 1);
+  current_settings.perf_case_total =
+      static_cast<int>(settings.perf_cases.size());
+  return current_settings;
+}
+
+static std::vector<float> parse_float_list(const std::string& value,
+                                           const std::string& arg_name) {
+  std::vector<float> values;
+  std::stringstream ss(value);
+  std::string item;
+  while (std::getline(ss, item, ',')) {
+    item.erase(std::remove_if(item.begin(), item.end(),
+                              [](unsigned char c) { return std::isspace(c); }),
+               item.end());
+    if (item.empty()) {
+      throw std::invalid_argument("Invalid " + arg_name +
+                                  " value, empty item in comma-separated list.");
+    }
+    float parsed = std::stof(item);
+    if (parsed <= 0.0f) {
+      throw std::invalid_argument("Invalid " + arg_name +
+                                  " value (must be positive).");
+    }
+    values.push_back(parsed);
+  }
+  return values;
+}
 
 static void PrintAsrMetrics(const AsrTranscribeResult& result, int n_chunks) {
   double enc_chunk_s =
@@ -105,57 +142,73 @@ static int RunAsrCore(const AsrPerfSettings& settings,
 #endif
 
   int encoder_window = model->encoder_window();
-  int n_frames = static_cast<int>(settings.audio_len_seconds * 16000 / 160);
-  if (n_frames < 1) n_frames = 1;
-  int n_chunks = (n_frames + encoder_window - 1) / encoder_window;
+  for (size_t perf_case_index = 0;
+       perf_case_index < settings.perf_cases.size(); ++perf_case_index) {
+    AsrPerfSettings current_settings = BuildAsrPerfCaseSettings(
+        settings, settings.perf_cases[perf_case_index], perf_case_index);
+    int n_frames = static_cast<int>(current_settings.audio_len_seconds * 16000 / 160);
+    if (n_frames < 1) n_frames = 1;
+    int n_chunks = (n_frames + encoder_window - 1) / encoder_window;
 
-  if (settings.warm_up) {
-    std::cout << "\n"
-              << std::string(30, '=') << "ASR Perf WarmUp: audio_len="
-              << settings.audio_len_seconds
-              << "s token_per_second=" << settings.token_per_second
-              << std::string(30, '=') << "\n";
-    float temp = device_monitor->getCurrentTemperature();
-    std::cout << "Device temperature: " << temp << " C" << std::endl;
-    perf_ctx->PerfRun(settings.audio_len_seconds, settings.token_per_second);
-    perf_ctx->profiler().print_summary();
-    std::cout << std::string(82, '=') << "\n";
-  }
-
-  for (int i = 0; i < settings.loop_count; ++i) {
     std::cout << COLOR_BLUE << "\n"
-              << std::string(24, '=') << "ASR Perf Loop: " << (i + 1) << "/"
-              << settings.loop_count
-              << " | audio_len=" << settings.audio_len_seconds
-              << "s | token_per_second=" << settings.token_per_second
+              << std::string(24, '=') << "ASR Perf Case: "
+              << current_settings.perf_case_index << "/"
+              << current_settings.perf_case_total << " | audio_len="
+              << current_settings.audio_len_seconds
+              << "s | token_per_second=" << current_settings.token_per_second
               << std::string(24, '=') << "\n";
 
-    float temp = device_monitor->getCurrentTemperature();
-    std::cout << "Device temperature: " << temp << " C" << std::endl;
-    if (temp > ALARM_TEMPERATURE_THRESHOLD &&
-        temp < SHUTDOWN_TEMPERATURE_THRESHOLD) {
-      std::cout << COLOR_YELLOW
-                << "Device temperature beyond 80.0 C, Temperature Warning!"
-                << COLOR_RESET << std::endl;
-    }
-    if (temp >= SHUTDOWN_TEMPERATURE_THRESHOLD) {
-      throw std::runtime_error(
-          "Device temperature beyond 100.0 C, Shutdown the demo!");
+    if (current_settings.warm_up) {
+      std::cout << "\n"
+                << std::string(30, '=') << "ASR Perf WarmUp: audio_len="
+                << current_settings.audio_len_seconds
+                << "s token_per_second=" << current_settings.token_per_second
+                << std::string(30, '=') << "\n";
+      float temp = device_monitor->getCurrentTemperature();
+      std::cout << "Device temperature: " << temp << " C" << std::endl;
+      perf_ctx->PerfRun(current_settings.audio_len_seconds,
+                        current_settings.token_per_second);
+      perf_ctx->profiler().print_summary();
+      std::cout << std::string(82, '=') << "\n";
     }
 
-    auto result =
-        perf_ctx->PerfRun(settings.audio_len_seconds, settings.token_per_second);
-    PrintAsrMetrics(result, n_chunks);
-    perf_ctx->profiler().print_summary();
+    for (int i = 0; i < current_settings.loop_count; ++i) {
+      std::cout << COLOR_BLUE << "\n"
+                << std::string(24, '=') << "ASR Perf Loop: " << (i + 1)
+                << "/" << current_settings.loop_count
+                << " | case=" << current_settings.perf_case_index << "/"
+                << current_settings.perf_case_total
+                << " | audio_len=" << current_settings.audio_len_seconds
+                << "s | token_per_second=" << current_settings.token_per_second
+                << std::string(24, '=') << "\n";
+
+      float temp = device_monitor->getCurrentTemperature();
+      std::cout << "Device temperature: " << temp << " C" << std::endl;
+      if (temp > ALARM_TEMPERATURE_THRESHOLD &&
+          temp < SHUTDOWN_TEMPERATURE_THRESHOLD) {
+        std::cout << COLOR_YELLOW
+                  << "Device temperature beyond 80.0 C, Temperature Warning!"
+                  << COLOR_RESET << std::endl;
+      }
+      if (temp >= SHUTDOWN_TEMPERATURE_THRESHOLD) {
+        throw std::runtime_error(
+            "Device temperature beyond 100.0 C, Shutdown the demo!");
+      }
+
+      auto result = perf_ctx->PerfRun(current_settings.audio_len_seconds,
+                                      current_settings.token_per_second);
+      PrintAsrMetrics(result, n_chunks);
+      perf_ctx->profiler().print_summary();
 #if defined(__linux__)
-    max_host_mem_info = host_mem_monitor->getMaxMemoryInfo();
+      max_host_mem_info = host_mem_monitor->getMaxMemoryInfo();
 #endif
-    std::unordered_map<int, DeviceStats> current_dev_stats =
-        device_monitor->getDeviceStats();
-    perf_dumper.dumpAsrPerf(settings, result, n_chunks, host_mem_info,
-                            max_host_mem_info, post_init_dev_stats,
-                            current_dev_stats);
-    std::cout << std::string(82, '=') << "\n";
+      std::unordered_map<int, DeviceStats> current_dev_stats =
+          device_monitor->getDeviceStats();
+      perf_dumper.dumpAsrPerf(current_settings, result, n_chunks, host_mem_info,
+                              max_host_mem_info, post_init_dev_stats,
+                              current_dev_stats);
+      std::cout << std::string(82, '=') << "\n";
+    }
   }
 
   ctx.reset();
@@ -203,13 +256,28 @@ static int RunAsr(std::unordered_map<std::string, std::string> args,
       settings.devices = {0};
     }
 
-    settings.audio_len_seconds =
-        args.count("audio_len") ? std::stof(args["audio_len"]) : 30.0f;
-
-    settings.token_per_second =
-        args.count("token_per_second")
-            ? validate_setting(args, "token_per_second")
-            : 20;
+    std::vector<float> audio_len_list =
+        args.count("audio_len") ? parse_float_list(args["audio_len"], "audio_len")
+                                : std::vector<float>{30.0f};
+    std::vector<int> token_per_second_list;
+    if (args.count("token_per_second")) {
+      std::unordered_map<std::string, std::string> tmp;
+      tmp["token_per_second"] = args["token_per_second"];
+      token_per_second_list = validate_multi_setting(tmp, "token_per_second");
+    } else {
+      token_per_second_list = {20};
+    }
+    if (audio_len_list.size() != token_per_second_list.size()) {
+      throw std::invalid_argument(
+          "audio_len and token_per_second must have the same number of "
+          "comma-separated values");
+    }
+    for (size_t i = 0; i < audio_len_list.size(); ++i) {
+      settings.perf_cases.push_back({audio_len_list[i], token_per_second_list[i]});
+    }
+    settings.audio_len_seconds = audio_len_list.front();
+    settings.token_per_second = token_per_second_list.front();
+    settings.perf_case_total = static_cast<int>(settings.perf_cases.size());
 
     settings.loop_count =
         args.count("loop") ? validate_setting(args, "loop") : 1;
@@ -289,12 +357,29 @@ static int RunAsrConfig(int argc, char* argv[], PerfDumper& perf_dumper) {
     settings.encode_path = stream["encode"].as<std::string>();
     settings.prefill_path = stream["prefill"].as<std::string>();
     settings.decode_path = stream["decode"].as<std::string>();
-    settings.audio_len_seconds =
-        stream["audio_len"] ? stream["audio_len"].as<float>() : 30.0f;
-    settings.token_per_second =
-        stream["token_per_second"]
-            ? stream["token_per_second"].as<int>()
-            : 20;
+    std::vector<float> audio_len_list =
+        stream["audio_len"]
+            ? parse_float_list(stream["audio_len"].as<std::string>(), "audio_len")
+            : std::vector<float>{30.0f};
+    std::vector<int> token_per_second_list;
+    if (stream["token_per_second"]) {
+      std::unordered_map<std::string, std::string> tmp;
+      tmp["token_per_second"] = stream["token_per_second"].as<std::string>();
+      token_per_second_list = validate_multi_setting(tmp, "token_per_second");
+    } else {
+      token_per_second_list = {20};
+    }
+    if (audio_len_list.size() != token_per_second_list.size()) {
+      throw std::invalid_argument(
+          "audio_len and token_per_second must have the same number of "
+          "comma-separated values");
+    }
+    for (size_t i = 0; i < audio_len_list.size(); ++i) {
+      settings.perf_cases.push_back({audio_len_list[i], token_per_second_list[i]});
+    }
+    settings.audio_len_seconds = audio_len_list.front();
+    settings.token_per_second = token_per_second_list.front();
+    settings.perf_case_total = static_cast<int>(settings.perf_cases.size());
 
     if (stream["devices"]) {
       std::string dev_str = stream["devices"].as<std::string>();
