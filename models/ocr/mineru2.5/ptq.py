@@ -160,51 +160,43 @@ def _build_visual_cfg_from_model(args: Path) -> Path | None:
     return Config(cfg)
 
 
-def move_hmquant_files(output_dir, model_name=None):
-    """Move files from hmquant_xh2_{model}_{quant}_{seq}_{context}_{date} to hmquant/."""
+def move_hmquant_files(output_dir, model_name):
+    """Move files from hmquant_xh2_{model}_{quant}_{seq}_{context}_{date} to parent directory."""
     output_path = Path(output_dir) / "hmquant"
-    if not output_path.exists():
-        logger.warning(f"Output directory not found: {output_path}")
+    model_dir = output_path / model_name
+    if not model_dir.exists():
+        logger.warning(f"Output directory not found: {model_dir}")
         return
 
-    hmquant_dirs = sorted(
+    hmquant_dirs = [
         item
-        for item in output_path.iterdir()
+        for item in model_dir.iterdir()
         if item.is_dir() and _HMQUANT_DIR_RE.match(item.name)
-    )
-    if model_name is not None:
-        matching_dirs = [item for item in hmquant_dirs if model_name in item.name]
-        if matching_dirs:
-            hmquant_dirs = matching_dirs
-
+    ]
     if not hmquant_dirs:
-        logger.info(f"No hmquant directory found in {output_path}")
+        logger.info(f"No hmquant directory found in {model_dir}")
         return
-    if len(hmquant_dirs) > 1:
-        logger.warning(
-            "Multiple hmquant directories found, using latest: "
-            + ", ".join(item.name for item in hmquant_dirs)
-        )
 
-    hmquant_dir = hmquant_dirs[-1]
+    hmquant_dir = hmquant_dirs[0]
     logger.info(f"Moving files from {hmquant_dir.name} to {output_path.name}/")
-
-    for item in output_path.iterdir():
-        if item == hmquant_dir:
-            continue
-        if item.is_dir():
-            logger.info(f"  Removing existing directory: {item.name}/")
-            shutil.rmtree(item)
-        else:
-            logger.info(f"  Removing existing file: {item.name}")
-            item.unlink()
 
     for item in hmquant_dir.iterdir():
         target = output_path / item.name
-        shutil.move(str(item), str(target))
-        logger.info(f"  Moved: {item.name}{'/' if target.is_dir() else ''}")
 
-    hmquant_dir.rmdir()
+        if item.is_dir():
+            if target.exists():
+                logger.warning(f"Overwriting existing directory: {target}")
+                shutil.rmtree(target, ignore_errors=True)
+            shutil.move(str(item), str(target))
+            logger.info(f"  Moved: {item.name}/")
+        else:
+            if target.exists():
+                logger.warning(f"Overwriting existing file: {target}")
+                target.unlink()
+            shutil.move(str(item), str(target))
+            logger.info(f"  Moved: {item.name}")
+
+    shutil.rmtree(str(model_dir), ignore_errors=True)
     logger.info(f"Cleanup completed, removed: {hmquant_dir.name}")
 
 
