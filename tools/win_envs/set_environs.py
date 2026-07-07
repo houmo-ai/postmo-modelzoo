@@ -156,6 +156,7 @@ class WinEnvironsGenerater:
             exit()
 
         tcim_dll_path = os.path.join(self.all_environments["TCIM_RUNTIME_PATH"], "bin")
+        common_lib_path = os.path.join(self.all_environments["HOUMO_EXAMPLES_PATH"], "tools", "common", "lib")
         xh2a_dll_path = os.path.join(self.all_environments["HOUMO_SDK_PATH"], "hal\\lib")
         env_paths = self.env_manager.get_user_path()
         for env in env_paths:
@@ -167,6 +168,9 @@ class WinEnvironsGenerater:
 
         if self.all_environments["CMAKE_PATH"] not in self.all_environments["PATH"] and self.all_environments["CMAKE_PATH"] != "":
             self.all_environments["PATH"] = f'{self.all_environments["CMAKE_PATH"]};' + self.all_environments["PATH"]
+
+        if common_lib_path not in self.all_environments["PATH"] and common_lib_path != "":
+            self.all_environments["PATH"] = f'{common_lib_path};' + self.all_environments["PATH"]
 
         if xh2a_dll_path not in self.all_environments["PATH"] and xh2a_dll_path != "":
             self.all_environments["PATH"] = f'{xh2a_dll_path};' + self.all_environments["PATH"]

@@ -32,6 +32,9 @@
 
 // miniaudio implementation entry point (must be in exactly one translation
 // unit)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #define MA_NO_DEVICE_IO
 #define MA_NO_THREADING
 #define MA_NO_ENCODING
@@ -43,6 +46,10 @@
 #include <cmath>
 #include <iostream>
 #include <thread>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 #include "miniaudio.h"
 

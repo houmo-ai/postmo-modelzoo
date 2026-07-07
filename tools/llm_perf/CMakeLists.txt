@@ -1,7 +1,63 @@
-
 cmake_minimum_required(VERSION 3.16.3)
 project(llm_perf)
+
 include(FetchContent)
+include(CheckCXXCompilerFlag)
+
+set(HOUMO_ENGINE_DIR $ENV{HOUMO_EXAMPLES_PATH}/tools/common/houmo-llm-engine)
+set(HOUMO_PLATFORM_ANDROID FALSE)
+set(HOUMO_PLATFORM_WINDOWS FALSE)
+set(HOUMO_PLATFORM_LINUX FALSE)
+set(HOUMO_PLATFORM_NAME "unknown")
+set(HOUMO_NEED_PTHREAD FALSE)
+set(OPENCV_CONFIG_MODE "find_package(OpenCV)")
+set(OPENCV_LIB_DIR "")
+set(OPENCV_BIN_DIR "")
+set(OPENCV_LIBS "")
+
+if(ANDROID_ABI)
+  set(HOUMO_PLATFORM_ANDROID TRUE)
+  include(${HOUMO_ENGINE_DIR}/cmake/platforms/android.cmake)
+elseif(MSVC)
+  set(HOUMO_PLATFORM_WINDOWS TRUE)
+  include(${HOUMO_ENGINE_DIR}/cmake/platforms/windows.cmake)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(HOUMO_PLATFORM_LINUX TRUE)
+  include(${HOUMO_ENGINE_DIR}/cmake/platforms/linux.cmake)
+else()
+  message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
+endif()
+
+message(STATUS "HOUMO platform: ${HOUMO_PLATFORM_NAME}")
+message(STATUS "OpenCV config mode: ${OPENCV_CONFIG_MODE}")
+message(STATUS "OpenCV include: ${OpenCV_INCLUDE_DIRS}")
+message(STATUS "OpenCV libs: ${OPENCV_LIBS}")
+
+check_cxx_compiler_flag("${HOUMO_CXX17_FLAG}" SUPPORT_CXX17)
+if(NOT SUPPORT_CXX17)
+  message(FATAL_ERROR "C++17 is required to build ${PROJECT_NAME}")
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_compile_options(${HOUMO_COMPILE_OPTIONS})
+if(MSVC)
+  add_compile_options(/DNOMINMAX /DEIGEN_MPL2_ONLY)
+else()
+  add_compile_options(-DEIGEN_MPL2_ONLY)
+endif()
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+if(HOUMO_RELEASE_FLAGS)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${HOUMO_RELEASE_FLAGS}")
+endif()
+if(HOUMO_DEBUG_FLAGS)
+  set(CMAKE_CXX_FLAGS_DEBUG "${HOUMO_DEBUG_FLAGS}")
+endif()
 
 FetchContent_Declare(
   yaml-cpp
@@ -19,44 +75,17 @@ if(MSVC)
   set(ORIGINAL_CXX_FLAGS ${CMAKE_CXX_FLAGS})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4267 /wd4244")
 endif()
-
 FetchContent_MakeAvailable(yaml-cpp)
-
 if(MSVC)
   set(CMAKE_CXX_FLAGS ${ORIGINAL_CXX_FLAGS})
 endif()
 
-include(CheckCXXCompilerFlag)
-if(MSVC)
-  option(ENABLE_ASR "Enable ASR support" OFF)
-  check_cxx_compiler_flag("/std:c++17" SUPPORT_CXX17)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DEIGEN_MPL2_ONLY /DNOMINMAX")
-  set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /QUIET")
-else()
-  option(ENABLE_ASR "Enable ASR support" ON)
-  check_cxx_compiler_flag("-std=c++17" SUPPORT_CXX17)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -DEIGEN_MPL2_ONLY")
-endif()
-
 include(${CMAKE_SOURCE_DIR}/tcim_runtime.cmake)
+include(${CMAKE_SOURCE_DIR}/hm_engine.cmake)
+set(EIGEN_PATH ${HM_EIGEN_INC})
 
-# houmo-llm-engine is used by Linux/Android builds. Keep MSVC unchanged.
-if(MSVC)
-  set(HOUMO_ENGINE_DIR ${CMAKE_SOURCE_DIR}/../common/houmo-llm-engine)
-  set(ENGINE_BUILD_DIR ${HOUMO_ENGINE_DIR}/build)
-  set(TOKENIZERS_DIR $ENV{HOUMO_EXAMPLES_PATH}/apis/common/tokenizer.cpp)
-  set(EIGEN_PATH ${HOUMO_ENGINE_DIR}/3rdparty)
-else()
-  include(${CMAKE_SOURCE_DIR}/hm_engine.cmake)
-  set(EIGEN_PATH ${HM_EIGEN_INC})
-endif()
-
-if(ANDROID_ABI)
-  set(_LIB_SUFFIX "Android_xh2")
-  set(OPENCV_DIR ${HM_LLM_ENGINE_DIR}/3rdparty/opencv/${_LIB_SUFFIX})
-else()
-  set(OPENCV_DIR "")
-endif()
+option(ENABLE_ASR "Enable ASR support" ON)
+message(STATUS "ENABLE_ASR: ${ENABLE_ASR}")
 
 include_directories(
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include
@@ -66,22 +95,12 @@ include_directories(
   $ENV{HOUMO_SDK_PATH}/hal/include
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/audio/include
   ${CMAKE_SOURCE_DIR}/include
+  ${OpenCV_INCLUDE_DIRS}
 )
-if(MSVC)
-  include_directories(
-    ${HOUMO_ENGINE_DIR}/include
-    ${TOKENIZERS_DIR}/include
-  )
-endif()
+
 link_directories(
   $ENV{HOUMO_SDK_PATH}/hal/lib
 )
-if(MSVC)
-  link_directories(
-    ${ENGINE_BUILD_DIR}
-    ${TOKENIZERS_DIR}/lib
-  )
-endif()
 
 set(SOURCE_FILES
   src/utils/perf_dumper/perf_dumper.cc
@@ -103,55 +122,38 @@ set(INCLUDE_DIRS
   ${EIGEN_PATH}
 )
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
-endif()
-
-if(MSVC)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /DNDEBUG")
-else()
-  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
-  set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -ggdb")
-endif()
-
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
 
-if(MSVC)
-  add_custom_target(houmo_engine_rebuild
-    COMMAND cmake --build ${ENGINE_BUILD_DIR} -j$$(nproc)
-    WORKING_DIRECTORY ${HOUMO_ENGINE_DIR}
-    COMMENT "Rebuilding houmo-llm-engine libhoumo_infer.so"
-  )
-  add_library(houmo_infer SHARED IMPORTED)
-  set_target_properties(houmo_infer PROPERTIES IMPORTED_LOCATION ${ENGINE_BUILD_DIR}/libhoumo_infer.so)
+if(ENABLE_ASR)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_ASR)
+endif()
+
+set(LLM_PERF_LIBS
+  ${TCIM_LIBRARY}
+  yaml-cpp
+  hm_engine
+)
+
+if(HOUMO_NEED_PTHREAD)
+  list(APPEND LLM_PERF_LIBS pthread)
+endif()
+
+if(NOT MSVC)
+  list(APPEND LLM_PERF_LIBS hal_xh2a ${CMAKE_DL_LIBS})
 endif()
 
 if(MSVC)
-  add_definitions(-DYAML_CPP_STATIC_DEFINE)
-  if(ENABLE_ASR)
-    add_definitions(-DENABLE_ASR)
-  endif()
-  target_link_libraries(${PROJECT_NAME} PRIVATE ${TCIM_LIBRARY} yaml-cpp  ${CMAKE_DL_LIBS} ws2_32 Userenv ntdll Bcrypt kernel32)
-else()
-  if(ANDROID_ABI)
-    if(ENABLE_ASR)
-      add_definitions(-DENABLE_ASR)
-    endif()
-    target_link_libraries(${PROJECT_NAME} PRIVATE
-      ${TCIM_LIBRARY} hal_xh2a dl yaml-cpp
-      hm_engine)
-  else()
-    if(ENABLE_ASR)
-      add_definitions(-DENABLE_ASR)
-    endif()
-    target_link_libraries(${PROJECT_NAME} PRIVATE
-      ${TCIM_LIBRARY} pthread hal_xh2a ${CMAKE_DL_LIBS} yaml-cpp
-      hm_engine
-      opencv_core opencv_imgproc opencv_imgcodecs)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE)
-  endif()
+  target_compile_definitions(${PROJECT_NAME} PRIVATE YAML_CPP_STATIC_DEFINE)
+  list(APPEND LLM_PERF_LIBS libhal_xh2a ws2_32 Userenv ntdll Bcrypt kernel32)
 endif()
+
+if(OPENCV_LIBS)
+  list(APPEND LLM_PERF_LIBS ${OPENCV_LIBS})
+endif()
+
+target_link_libraries(${PROJECT_NAME} PRIVATE ${LLM_PERF_LIBS})
+
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
 install(FILES ${CMAKE_SOURCE_DIR}/convert_embed.py
         DESTINATION .

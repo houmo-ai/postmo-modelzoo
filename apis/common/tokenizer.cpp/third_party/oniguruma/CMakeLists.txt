@@ -1,5 +1,5 @@
 # Minimal CMakeLists.txt for oniguruma library (UTF-8 only)
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.14)
 project(oniguruma VERSION 6.9.10 LANGUAGES C)
 
 # Check headers for config.h generation

@@ -23,17 +23,29 @@
 
 ## 2. 通用文件组织
 
-模型实现通常放在模型自己的 cpp 目录中，框架基类位于当前工程：
+模型实现通常放在模型自己的 `cpp/` 目录中，框架基类位于当前工程。当前 `houmo-llm-engine` 目录结构如下：
 
 ```text
-include/
-├── base/              # 基础类型、配置、异常
-├── core/              # LLM/VLM/ASR 基类、Context、Factory
-└── modules/           # 通用模块
-
-src/
-├── core/              # 基类实现
-└── modules/           # 通用模块实现
+houmo-llm-engine/
+├── include/
+│   ├── base/              # 基础类型、配置、异常和 TCIM 工具
+│   ├── core/              # LLM/VLM/ASR 基类、Context、Factory
+│   └── modules/           # Tokenizer、Embedding、Sampler、Audio/Image、Profiler
+├── src/
+│   ├── core/              # 基类实现
+│   └── modules/           # 通用模块实现
+├── cmake/
+│   └── platforms/         # Windows/Linux/Android 平台专用 CMake 配置
+├── tests/                 # GTest 单元测试和测试数据
+├── docs/                  # API、Pipeline 和模型适配说明
+├── CMakeLists.txt         # CMake 构建入口
+├── tcim_runtime.cmake     # TCIM Runtime 依赖配置
+├── build_linux.sh         # Linux 构建脚本
+├── build_ndk.sh           # Android NDK 构建脚本
+├── build_win.bat          # Windows / Visual Studio 构建脚本
+├── test.sh                # 测试入口
+├── get_3rdparty.py        # 第三方依赖准备脚本
+└── convert_embed.py       # embedding 转换工具
 ```
 
 新模型的文件建议与模型目录放在一起：

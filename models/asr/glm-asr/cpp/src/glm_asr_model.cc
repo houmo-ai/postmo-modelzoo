@@ -195,12 +195,13 @@ const float16* GlmAsrModel::get_embedding(
 // ============================================================================
 
 GlmAsrContext::GlmAsrContext(ASRModel* model, int n_ctx)
-    : ASRContext(model, n_ctx),
-      audio_processor_(std::make_shared<AudioProcessor>(
-          AudioProcessorConfig{.sample_rate = 16000,
-                               .n_mels = model->n_mels(),
-                               .chunk_seconds = 30,
-                               .encoder_window_seconds = 30})) {
+    : ASRContext(model, n_ctx) {
+  AudioProcessorConfig config;
+  config.sample_rate = 16000;
+  config.n_mels = model->n_mels();
+  config.chunk_seconds = 30;
+  config.encoder_window_seconds = 30;
+  audio_processor_ = std::make_shared<AudioProcessor>(config);
   std::cout << "GlmAsrContext created, n_mels=" << model->n_mels() << std::endl;
 }
 

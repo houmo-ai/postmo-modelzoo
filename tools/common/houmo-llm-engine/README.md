@@ -26,9 +26,12 @@ Houmo Inference Framework 是面向 Houmo NPU 的 C++ 推理框架，基于 TCIM
 │   └── modules/        # 通用模块实现
 ├── tests/              # GTest 单元测试和测试数据
 ├── docs/               # API、Pipeline 和模型适配说明
+├── cmake/
+│   └── platforms/      # Windows/Linux/Android 平台专用 CMake 配置
 ├── CMakeLists.txt      # CMake 构建入口
 ├── build_linux.sh      # Linux 构建脚本
 ├── build_ndk.sh        # Android NDK 构建脚本
+├── build_win.bat       # Windows 构建脚本
 └── test.sh             # 测试脚本
 ```
 
@@ -109,7 +112,7 @@ ASRContext 内部使用模板方法封装打点：子类只实现 `encode_*_impl
 - 音频依赖：miniaudio、libsamplerate、kaldi-native-fbank
 - GTest（单元测试）
 
-需要设置 `HOUMO_EXAMPLES_PATH`，并确保 `TCIM_RUNTIME_PATH` 可由 `tcim_runtime.cmake` 找到。
+需要设置 `HOUMO_EXAMPLES_PATH`，并确保 `TCIM_RUNTIME_PATH` 可由 `tcim_runtime.cmake` 找到。Windows平台建议参考根目录 [env.bat](../../../env.bat) 和 [tools/win_envs](../../win_envs/) 正确设置环境变量。
 
 ### Linux
 
@@ -124,6 +127,24 @@ export NDK_PATH=/path/to/android-ndk
 export TCIM_RUNTIME_PATH=/path/to/tcim_runtime
 ./build_ndk.sh
 ```
+
+### Windows
+
+Windows平台建议先在仓库根目录执行：
+
+```bat
+env.bat --set
+```
+
+该脚本会调用 [tools/win_envs/set_environs.py](../../win_envs/set_environs.py)，并根据 [tools/win_envs/env.json](../../win_envs/env.json) 设置 `HOUMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH`、`OPENCV_PATH`、`PATH` 等变量。执行完成后需要重新打开cmd窗口，使环境变量生效。
+
+确认环境变量生效后，在当前目录执行：
+
+```bat
+build_win.bat
+```
+
+Windows构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 进行并行编译。构建和安装产物会输出到 `$HOUMO_EXAMPLES_PATH/tools/common/lib`，该目录应已由 `env.bat --set` 加入 `PATH`，以便运行依赖 `houmo_infer.dll`、`tokenizer_lib.dll`、`kaldi-native-fbank-core.dll`、`samplerate.dll` 等动态库的工具。
 
 ### 手动 CMake
 
@@ -142,6 +163,12 @@ cmake --build build -j$(nproc)
 
 ```bash
 ctest --test-dir build --output-on-failure
+```
+
+Windows 使用 Visual Studio multi-config 生成器，手动执行 CTest 时需要指定配置：
+
+```bat
+ctest --test-dir build -C Release --output-on-failure
 ```
 
 当前测试覆盖 Tokenizer、Embedding、Sampler、PerfProfiler、AudioProcessor 和 128 mel 音频特征流程。

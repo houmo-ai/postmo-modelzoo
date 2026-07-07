@@ -1,0 +1,32 @@
+# Android platform configuration for houmo_infer.
+
+set(HOUMO_PLATFORM_NAME "android")
+set(HOUMO_NEED_PTHREAD FALSE)
+set(HOUMO_CXX17_FLAG "-std=c++17")
+set(HOUMO_COMPILE_OPTIONS -Wno-deprecated-declarations)
+set(HOUMO_RELEASE_FLAGS "-O3 -DNDEBUG -DEIGEN_MPL2_ONLY")
+set(HOUMO_DEBUG_FLAGS "-g -O0 -ggdb")
+set(HOUMO_EXPORT_ALL_SYMBOLS FALSE)
+set(HOUMO_TARGET_LINK_OPTIONS "")
+set(LIB_PATH Android_xh2)
+
+if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
+  file(TO_CMAKE_PATH "$ENV{HOUMO_EXAMPLES_PATH}" HOUMO_EXAMPLES_ROOT)
+  set(LIB_INSTALL_PATH "${HOUMO_EXAMPLES_ROOT}/tools/common/android")
+endif()
+
+set(OPENCV_PATH "${CMAKE_SOURCE_DIR}/3rdparty/opencv")
+set(OpenCV_INCLUDE_DIRS "${OPENCV_PATH}/${LIB_PATH}/include")
+set(OPENCV_LIB_DIR "${OPENCV_PATH}/${LIB_PATH}/lib")
+set(OPENCV_LIBS
+  "${OPENCV_LIB_DIR}/libopencv_core.so"
+  "${OPENCV_LIB_DIR}/libopencv_imgproc.so"
+  "${OPENCV_LIB_DIR}/libopencv_imgcodecs.so"
+)
+set(OPENCV_CONFIG_MODE "Android prebuilt OpenCV")
+set(OpenCV_FOUND TRUE)
+
+set(HOUMO_INSTALL_AUDIO_DLLS FALSE)
+set(HOUMO_INSTALL_AUDIO_SOS TRUE)
+set(HOUMO_INSTALL_OPENCV_DLLS FALSE)
+set(HOUMO_INSTALL_OPENCV_SOS TRUE)

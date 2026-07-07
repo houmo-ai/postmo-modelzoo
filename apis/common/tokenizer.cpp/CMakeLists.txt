@@ -37,6 +37,9 @@ set(SOURCES
 
 # Library
 add_library(tokenizer_lib SHARED ${SOURCES})
+if(MSVC)
+    set_target_properties(tokenizer_lib PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
 target_include_directories(tokenizer_lib PUBLIC include third_party ${CMAKE_CURRENT_SOURCE_DIR}/../nlohmann/include)
 target_link_libraries(tokenizer_lib onig)
 target_compile_definitions(tokenizer_lib PUBLIC UTF8PROC_STATIC)

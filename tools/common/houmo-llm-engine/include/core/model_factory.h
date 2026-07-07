@@ -317,9 +317,15 @@ class ModelRegistrar {
  *     "Whisper ASR model");
  * ```
  */
+#if defined(_MSC_VER)
+#define HOUMO_USED_ATTR
+#else
+#define HOUMO_USED_ATTR __attribute__((used))
+#endif
+
 #define REGISTER_MODEL(ModelT, name, series, creator, description)            \
   namespace {                                                                \
-  __attribute__((used))                                                      \
+  HOUMO_USED_ATTR                                                            \
   ::houmo::ModelRegistrar<::houmo::ModelT> registrar_##name(#name, series,   \
                                                             creator,         \
                                                             description);    \

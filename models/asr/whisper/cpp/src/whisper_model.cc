@@ -310,12 +310,15 @@ Token WhisperModel::lang_token_id(const std::string& language) const {
 
 WhisperContext::WhisperContext(ASRModel* model, int n_ctx)
     : ASRContext(model, n_ctx),
-      audio_processor_(std::make_shared<AudioProcessor>(
-          AudioProcessorConfig{.sample_rate = 16000,
-                               .n_mels = model->n_mels(),
-                               .chunk_seconds = 30,
-                               .encoder_window_seconds = 30,
-                               .feature_mode = AudioFeatureMode::kWhisper})) {}
+      audio_processor_(std::make_shared<AudioProcessor>([model]() {
+        AudioProcessorConfig config;
+        config.sample_rate = 16000;
+        config.n_mels = model->n_mels();
+        config.chunk_seconds = 30;
+        config.encoder_window_seconds = 30;
+        config.feature_mode = AudioFeatureMode::kWhisper;
+        return config;
+      }())) {}
 
 MelFeatures WhisperContext::LoadAudio(const std::string& audio_path) {
   auto audio = audio_processor_->LoadAudio(audio_path);

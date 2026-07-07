@@ -8,24 +8,58 @@
 ## 文件结构
 
 ```text
-include/
-├── base/
-│   ├── houmo.h              # Token、配置、模型信息、采样参数、性能结构
-│   └── tcim_utils.h         # TCIM 辅助工具
-├── core/
-│   ├── context.h            # Context 请求级推理状态基类
-│   ├── llm_model.h          # LLMModel 生成类模型基类
-│   ├── vlm_model.h          # VLMModel 视觉语言模型基类
-│   ├── asr_model.h          # ASRModel / ASRContext 语音识别基类
-│   └── model_factory.h      # ModelFactory 模板工厂
-└── modules/
-    ├── tokenizer.h          # HfTokenizer
-    ├── embedding.h          # Embedding
-    ├── sampler.h            # Sampler
-    ├── streaming_decoder.h  # StreamingDecoder
-    ├── image_processor.h    # HmImageProcessor
-    ├── audio_processor.h    # AudioProcessor
-    └── perf_profiler.h      # PerfProfiler
+houmo-llm-engine/
+├── include/
+│   ├── base/
+│   │   ├── houmo.h              # Token、配置、模型信息、采样参数、性能结构
+│   │   └── tcim_utils.h         # TCIM 辅助工具
+│   ├── core/
+│   │   ├── context.h            # Context 请求级推理状态基类
+│   │   ├── llm_model.h          # LLMModel 生成类模型基类
+│   │   ├── vlm_model.h          # VLMModel 视觉语言模型基类
+│   │   ├── asr_model.h          # ASRModel / ASRContext 语音识别基类
+│   │   └── model_factory.h      # ModelFactory 模板工厂
+│   └── modules/
+│       ├── tokenizer.h          # HfTokenizer
+│       ├── embedding.h          # Embedding
+│       ├── sampler.h            # Sampler
+│       ├── streaming_decoder.h  # StreamingDecoder
+│       ├── image_processor.h    # HmImageProcessor
+│       ├── audio_processor.h    # AudioProcessor
+│       └── perf_profiler.h      # PerfProfiler
+├── src/
+│   ├── core/
+│   │   ├── context.cc
+│   │   ├── llm_model.cc
+│   │   ├── vlm_model.cc
+│   │   ├── asr_model.cc
+│   │   ├── model_factory.cc
+│   │   └── version.cc
+│   └── modules/
+│       ├── audio_processor.cc
+│       ├── tokenizer.cc
+│       ├── embedding.cc
+│       ├── sampler.cc
+│       ├── streaming_decoder.cc
+│       ├── image_processor.cc
+│       └── perf_profiler.cc
+├── cmake/
+│   └── platforms/
+│       ├── windows.cmake        # Windows/MSVC 平台配置
+│       ├── linux.cmake          # Linux 平台配置
+│       └── android.cmake        # Android NDK 平台配置
+├── tests/
+│   ├── *_test.cc                # GTest 单元测试
+│   └── data/                    # 测试图片、音频和 logits 数据
+├── docs/                        # API、Pipeline 和模型适配文档
+├── CMakeLists.txt               # CMake 构建入口
+├── tcim_runtime.cmake           # TCIM Runtime 依赖配置
+├── build_linux.sh               # Linux 构建脚本
+├── build_ndk.sh                 # Android NDK 构建脚本
+├── build_win.bat                # Windows / Visual Studio 构建脚本
+├── test.sh                      # Linux 测试入口
+├── get_3rdparty.py              # 第三方依赖准备脚本
+└── convert_embed.py             # embedding 转换工具，安装到输出目录
 ```
 
 ---
@@ -526,11 +560,33 @@ struct AudioProcessorConfig {
 
 ## 构建与测试入口
 
-`CMakeLists.txt` 构建共享库 `houmo_infer`，包含：
+`CMakeLists.txt` 构建共享库 `houmo_infer`，平台差异拆分在 `cmake/platforms/` 下：
 
-- Core sources：`context.cc`、`llm_model.cc`、`vlm_model.cc`、`asr_model.cc`、`model_factory.cc`、`version.cc`
+| 文件 | 说明 |
+|------|------|
+| `cmake/platforms/windows.cmake` | MSVC 编译选项、Windows OpenCV 预编译库、DLL 安装开关 |
+| `cmake/platforms/linux.cmake` | Linux 编译选项、OpenCV so 安装开关、pthread 配置 |
+| `cmake/platforms/android.cmake` | Android NDK、目标 lib 路径和交叉编译配置 |
+
+主要源码列表：
+
+- Core sources：`version.cc`、`context.cc`、`vlm_model.cc`、`model_factory.cc`、`llm_model.cc`、`asr_model.cc`
 - Module sources：`audio_processor.cc`、`tokenizer.cc`、`embedding.cc`、`sampler.cc`、`streaming_decoder.cc`、`image_processor.cc`、`perf_profiler.cc`
-- 依赖：TCIM Runtime、tokenizer.cpp、OpenCV、kaldi-native-fbank、libsamplerate、pthread、GTest
+- 依赖：TCIM Runtime、tokenizer.cpp、OpenCV、kaldi-native-fbank、libsamplerate、GTest
+
+构建/辅助入口：
+
+| 文件 | 说明 |
+|------|------|
+| `build_linux.sh` | Linux 构建入口 |
+| `build_ndk.sh` | Android NDK 构建入口 |
+| `build_win.bat` | Windows / Visual Studio 构建入口，并准备音频 3rdparty 依赖 |
+| `test.sh` | Linux 测试入口 |
+| `get_3rdparty.py` | 准备第三方依赖 |
+| `tcim_runtime.cmake` | TCIM Runtime include/lib 配置 |
+| `convert_embed.py` | embedding 转换工具，随 install 输出到目标目录 |
+
+安装规则会输出 `houmo_infer`、`tokenizer_lib`、音频依赖库、OpenCV 运行库（按平台开关）和 `convert_embed.py`。
 
 当前 CTest 目标包括：
 
