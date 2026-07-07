@@ -1217,6 +1217,7 @@ class HmCoPawFlash:
             self.perf_tracker.perf_end(PERFTYPE.PREFILL_INFER_TIME)
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_OUTPUT_TIME)
         input_data = self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
+        input_data = input_data[0:1, 0:1, :].copy()
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_OUTPUT_TIME)
         next_id = input_data.argmax(-1)[0]
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOTAL_TIME)
