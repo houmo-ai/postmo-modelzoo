@@ -8,7 +8,13 @@ model:
       data_format: RGB
       mean: [0.0, 0.0, 0.0]
       std: [255.0, 255.0, 255.0]
-      resize_type: 0
+      resize_type: 1
+      padding_mode: 1
+      padding_values: [114, 114, 114]
+      resizer:
+        toYUV_format: YUV420SP
+        resizer_input_size: [1080, 1920]
+        resizer_mode: 1
 
 quant:
   calib_data: coco2017/val2017

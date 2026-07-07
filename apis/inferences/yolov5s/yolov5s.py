@@ -24,6 +24,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+import sys
 import numpy as np
 import time
 import argparse
@@ -32,6 +33,12 @@ from loguru import logger
 import cv2
 import torch
 import torchvision
+
+HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
+sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/apis/common/python")
+sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
+from format_converter import BGR2YUV
+
 import tcim_lite as tcim
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
@@ -364,7 +371,7 @@ class YoloV5:
         anchors = anchors.view(3, 3, 2)
         anchors = anchors / self.stride
 
-        yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)])
+        yv, xv = torch.meshgrid(torch.arange(ny), torch.arange(nx), indexing="ij")
         grid = torch.stack((xv, yv), 2).expand((1, 3, ny, nx, 2)).float()
         anchor_grid = (
             (anchors[i] * self.stride[i])
@@ -590,7 +597,7 @@ if __name__ == "__main__":
         f"houmo target: {HOUMO_TARGET}, enable ort: {args.enable_ort}, tcim runtime version: {tcim.runtime.get_version()}"
     )
 
-    # 1. Load model from file
+    # Discover the local model files in the example directory.
     current_dir = os.path.dirname(os.path.abspath(__file__))
     hmm_files = [
         os.path.join(current_dir, name)
@@ -599,38 +606,151 @@ if __name__ == "__main__":
     ]
     assert hmm_files, f"No .hmm file found in {current_dir}"
 
+    # Load model
     model_path = hmm_files[0]
     logger.info(f"Found model file: {model_path}")
-
     module = tcim.runtime.load(model_path)
 
-    # 2. Preprocess input image
+    # Load the sample input image.
     yolov5 = YoloV5()
     img_path = "../../data/000000000139.jpg"
-    cv_image = cv2.imread(img_path)
+    image_data = cv2.imread(img_path)
+    cv_image = image_data.copy()
+    img_height, img_width = image_data.shape[:2]
+    logger.info(f"input image shape: {image_data.shape}")
 
-    input_data, _, _ = letterbox(cv_image, (640, 640), stride=64, auto=False)
-    input_data = cv2.cvtColor(input_data, cv2.COLOR_BGR2RGB)
-    # Define normalization parameters
-    mean_arr = np.array([0.0, 0.0, 0.0])
-    std_arr = np.array([255.0, 255.0, 255.0])
-    # Normalize the image
-    input_data = (input_data - mean_arr) / std_arr
-    input_data = np.transpose(input_data, (2, 0, 1))  # CHW float32
-    # Add batch dimension to create NCHW format
-    input_data = np.expand_dims(input_data, axis=0)
-    input_data = input_data.astype(np.float16)
-
-    # 3. Set input tensors to the model
+    resizer_crop_str = "resizer_crop"
+    target_height, target_width = 640, 640
+    max_img_height, max_img_width = 0, 0
+    input_names = []
     input_num = module.get_num_inputs()
+    logger.info("Model input info:")
     for idx in range(0, input_num):
         input_name = module.get_input_name(idx)
         input_info = module.get_input_info(input_name).ascontiguous()
+        input_names.append(input_name)
         logger.info(
-            f"input[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}."
+            f"  Input[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, mem_size = {input_info.mem_size}, stride = {input_info.stride}, format = {input_info.format.name}"
         )
-        # Set the preprocessed input data to the model
-        module.set_input(input_name, input_data)
+        # The non-resizer input is the raw image canvas consumed by the hardware
+        # resizer. Its H/W define the maximum image size we can upload.
+        if resizer_crop_str not in input_name:
+            max_img_height, max_img_width = input_info.shape[2], input_info.shape[3]
+
+    # 2. Preprocess image
+    # Keep the valid image region as crop info for the resizer input. When the
+    # uploaded canvas is padded, only this crop region is resized by the model.
+    crop_height, crop_width = max_img_height, max_img_width
+    if img_height < max_img_height and img_width <= max_img_width:
+        # Pad smaller images to the upload canvas. The gray value matches the
+        # YOLOv5 letterbox padding color, while crop_height/crop_width preserve
+        # the original valid image area.
+        pad_bottom = max_img_height - img_height
+        pad_right = max_img_width - img_width
+        image_data = cv2.copyMakeBorder(
+            image_data,
+            0,
+            pad_bottom,
+            0,
+            pad_right,
+            cv2.BORDER_CONSTANT,
+            value=(114, 114, 114),
+        )
+        crop_height = img_height
+        crop_width = img_width
+        logger.info(
+            f"pad input image to {image_data.shape} height = {max_img_height}, width = {max_img_width}"
+        )
+    else:
+        # If the image is larger than the upload canvas, resize it first and let
+        # dyn_info describe the full resized canvas as the crop region.
+        image_data = cv2.resize(image_data, (max_img_width, max_img_height))
+        logger.info(
+            f"resize input image to height = {max_img_height}, width = {max_img_width}"
+        )
+
+    # Convert HWC BGR input to CHW float32 before color space conversion.
+    image_data = np.transpose(image_data, (2, 0, 1))  # CHW uint8
+    input_data = torch.tensor(image_data.astype(np.float32))  # CHW float32
+
+    # Convert BGR input to YUV420 as required by the runtime input format.
+    bgr2yuv_func = BGR2YUV(fmt="YUV420")
+    input_data = torch.unsqueeze(bgr2yuv_func(input_data), 0).numpy()  # NCHW float32
+    input_data = input_data.astype(np.uint8)  # NCHW uint8
+
+    # The hardware resizer consumes YUV420 input, so crop dimensions must be
+    # even. Match the C++ helper's TO_EVEN behavior by rounding down.
+    crop_height = crop_height - (crop_height % 2)
+    crop_width = crop_width - (crop_width % 2)
+    assert (
+        crop_height % 2 == 0
+        and crop_width % 2 == 0
+        and crop_height > 0
+        and crop_width > 2
+    ), f"crop_height and crop_width must be even, got {crop_height} and {crop_width}"
+
+    assert (
+        target_height > 0
+        and target_width > 0
+        and target_height % 2 == 0
+        and target_width % 2 == 0
+    ), f"target_height and target_width must be positive even values, got {target_height} and {target_width}"
+
+    # YOLOv5 uses letterbox preprocessing: resize the crop region with one
+    # shared scale, then pad the remaining area to the fixed 640x640 canvas.
+    scale = min(target_height / crop_height, target_width / crop_width)
+    assert 1 / 32 <= scale <= 16, f"resize scale must be in [1/32, 16], got {scale}"
+
+    # The resizer requires even output sizes. Rounding down after round() keeps
+    # the size close to the ideal scaled value while satisfying that constraint.
+    resizer_height = int(round(crop_height * scale)) & ~1
+    resizer_width = int(round(crop_width * scale)) & ~1
+    resizer_height = min(resizer_height, target_height)
+    resizer_width = min(resizer_width, target_width)
+    assert (
+        resizer_height > 0 and resizer_width > 0
+    ), f"resizer_height and resizer_width must be positive, got {resizer_height} and {resizer_width}"
+
+    pad_height = target_height - resizer_height
+    pad_width = target_width - resizer_width
+    pad_h_top = (pad_height // 2) & ~1
+    pad_w_left = (pad_width // 2) & ~1
+    pad_h_bottom = pad_height - pad_h_top
+    pad_w_right = pad_width - pad_w_left
+
+    # dyn_info layout:
+    # [crop_offset_h, crop_offset_w, crop_h, crop_w,
+    #  resize_h, resize_w, pad_top, pad_left, pad_bottom, pad_right]
+    # Nonzero padding tells the runtime to use proportional resize + padding
+    # instead of stretching directly to target_height x target_width.
+    dyn_info = np.array(
+        [
+            0,
+            0,
+            crop_height,
+            crop_width,
+            resizer_height,
+            resizer_width,
+            pad_h_top,
+            pad_w_left,
+            pad_h_bottom,
+            pad_w_right,
+        ],
+        dtype=np.int32,
+    )
+    dyn_info = np.expand_dims(dyn_info, 0)
+    logger.info(
+        f"input_data shape: {input_data.shape}, dtype: {input_data.dtype}, dyn_info: {dyn_info}"
+    )
+
+    # 3. Feed image data and dynamic crop information into the model inputs.
+    for input_name in input_names:
+        # The compiled model has two input kinds: the YUV image canvas and the
+        # int32 dynamic crop/resize/pad tensor used by the hardware resizer.
+        if resizer_crop_str in input_name:
+            module.set_input(input_name, dyn_info)
+        else:
+            module.set_input(input_name, input_data)
 
     # 4. Run inference and synchronize
     module.run()
@@ -692,6 +812,6 @@ if __name__ == "__main__":
     cv2.imwrite(save_path, cv_image)
     logger.info(f"demo results saved to {save_path}")
     # Verify result count (modify when changing model or data)
-    assert len(boxes) in [18, 19, 20]
+    assert len(boxes) in [18, 19, 20, 21]
 
     logger.info("<=== yolov5s python example completed.")
