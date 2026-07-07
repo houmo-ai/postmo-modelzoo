@@ -85,15 +85,17 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
       prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[1];
   this->embedding_length =
       prefill_module->GetInputInfo(prefill_module->GetInputName(0)).Shape()[2];
-  auto get_context_length = [this](int input_idx) -> long int {
-    return static_cast<long int>(
+  auto get_context_length = [this](int input_idx) -> int64_t {
+    return static_cast<int64_t>(
         prefill_module->GetInputInfo(prefill_module->GetInputName(input_idx))
             .Shape()[2]);
   };
-  this->context_max_length = get_context_length(attn_idx_start);
-  if (attn_idx_start + 1 < prefill_module->GetInputNum()) {
-    this->context_max_length = std::max(this->context_max_length,
-                                        get_context_length(attn_idx_start + 1));
+  auto context_length_idx =
+      (n_blocks > 0) ? (attn_idx_start + 2 * n_blocks - 1) : attn_idx_start;
+  this->context_max_length = get_context_length(context_length_idx);
+  if (attn_idx_start < prefill_module->GetInputNum()) {
+    this->context_max_length =
+        std::max(this->context_max_length, get_context_length(attn_idx_start));
   }
   this->batch =
       decode_module->GetInputInfo(decode_module->GetInputName(0)).Shape()[0];

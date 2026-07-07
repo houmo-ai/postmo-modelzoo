@@ -86,7 +86,7 @@ class HmllmInfer : public HmllmInferBase {
   // Configuration parameters - Model properties
   int prefill_length = 0;
   int embedding_length = 0;
-  long int context_max_length = 0;
+  int64_t context_max_length = 0;
   int batch = 0;
   int argmax_dim_len = 0;
   int32_t decode_current_length = 1;
