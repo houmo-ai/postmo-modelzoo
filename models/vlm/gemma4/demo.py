@@ -76,6 +76,8 @@ def get_args():
             args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
         if args.decode_path.endswith(".hmm"):
             args.decode_path = args.decode_path.replace(".hmm", ".hmms")
+        if args.assistant_path.endswith(".hmm"):
+            args.assistant_path = args.assistant_path.replace(".hmm", ".hmms")
     # fmt: on
     return args
 
@@ -83,49 +85,33 @@ def get_args():
 if __name__ == "__main__":
     args = get_args()
 
-    if args.model_size in ["26b-a4b"]:
-        from gemma4 import Gemma4MoE
-
-        model = Gemma4MoE(
-            args.prefill_path,
-            args.decode_path,
-            args.vit_path,
-            args.embedding_path,
-            args.tokenizer_dir,
-            list(range(args.ndevice)),
-            args.max_new_tokens,
-            enable_thinking=args.enable_thinking,
-            assistant_path=args.assistant_path,
-        )
-    elif args.model_size in ["31b"]:
+    if args.model_size in ["26b-a4b", "31b"]:
         from gemma4 import Gemma4
 
         model = Gemma4(
-            args.prefill_path,
-            args.decode_path,
-            args.vit_path,
-            args.embedding_path,
-            args.tokenizer_dir,
-            list(range(args.ndevice)),
-            args.max_new_tokens,
-            enable_thinking=args.enable_thinking,
+            prefill_path=args.prefill_path,
+            decode_path=args.decode_path,
+            embedding_path=args.embedding_path,
+            tokenizer_dir=args.tokenizer_dir,
+            vit_path=args.vit_path,
             assistant_path=args.assistant_path,
+            max_new_tokens=args.max_new_tokens,
+            devices=list(range(args.ndevice)),
         )
     elif args.model_size in ["e2b", "e4b"]:
-        from gemma4_e import Gemma4E
+        from gemma4 import Gemma4E
 
         model = Gemma4E(
             prefill_path=args.prefill_path,
             decode_path=args.decode_path,
+            embedding_path=args.embedding_path,
+            tokenizer_dir=args.tokenizer_dir,
+            PLE_path=args.plib_embedding_path,
             vit_path=args.vit_path,
             audio_path=args.audio_path,
-            embedding_path=args.embedding_path,
-            plib_embedding_path=args.plib_embedding_path,
-            tokenizer_dir=args.tokenizer_dir,
-            devices=list(range(args.ndevice)),
-            max_new_tokens=args.max_new_tokens,
-            enable_thinking=args.enable_thinking,
             assistant_path=args.assistant_path,
+            max_new_tokens=args.max_new_tokens,
+            devices=list(range(args.ndevice)),
         )
     else:
         raise ValueError(f"Unsupported model size: {args.model_size}")
@@ -156,4 +142,3 @@ if __name__ == "__main__":
         audio_path = None
 
     model.chat(args.question, image_path, audio_path)
-    model.perf_tracker.show_summary()
