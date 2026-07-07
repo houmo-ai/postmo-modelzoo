@@ -123,7 +123,7 @@ if __name__ == "__main__":
     parser.add_argument("--model-size", type=str, default=None, help="model size identifier for output files")
     parser.add_argument("--out-dir", type=str, default=f"./output/{HOUMO_TARGET}", help="output directory")
     parser.add_argument("--context-length", type=int, default=2048, help="max sequence length")
-    # parser.add_argument("--prefill-chunk-length", type=int, default=256, help="prefill chunk length")
+    parser.add_argument("--prefill-chunk-length", type=int, default=None, help="prefill chunk length")
     parser.add_argument("--seed", type=int, default=42, help="random seed for reproducibility")
     parser.add_argument("--debug", action="store_true", help="enable debug mode")
     parser.add_argument("--assistant-model", type=str, default=None, help="path to the Gemma4 assistant/draft HF model directory")
@@ -138,11 +138,13 @@ if __name__ == "__main__":
     if args.assistant_model is not None:
         args.context_length = parse_context_length(model_config.get("context_length", "2k"))
         logger.info(f"MTP context length set to {args.context_length}")
-    args.model = first_not_none(args.model, get_default_model_dir(model_config))
+    args.model = os.path.abspath(first_not_none(args.model, get_default_model_dir(model_config)))
+    args.prefill_chunk_length = first_not_none(args.prefill_chunk_length, model_config.get("prefill_length", 320))
     enable_mtp = args.assistant_model is not None
     if enable_mtp:
         if not os.path.isdir(args.assistant_model):
             raise FileNotFoundError(f"Assistant model directory not found: {args.assistant_model}")
+        args.assistant_model = os.path.abspath(args.assistant_model)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -199,7 +201,7 @@ if __name__ == "__main__":
 
     config_overrides = {
         "export.model.context_max_length": args.context_length,
-        "export.model.prefill_chunk_length": 320,
+        "export.model.prefill_chunk_length": args.prefill_chunk_length,
     }
 
     if enable_mtp:

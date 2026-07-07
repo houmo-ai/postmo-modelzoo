@@ -35,13 +35,13 @@
             ],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2_26b-a4b_128k",
+                "cached_models/hmm_xh2_26b-a4b_256k",
                 "cached_models/hmm_xh2_e2b_128k",
                 "cached_models/hmm_xh2_e4b_128k"
             ],
             "model_name": ["gemma4", "gemma4", "gemma4", "gemma4"],
             "model_size": ["26b-a4b", "26b-a4b", "e2b", "e4b"],
-            "context_length": [null, "128k", "128k", "128k"],
+            "context_length": [null, "256k", "128k", "128k"],
             "ndevice": ["1", "1", "1", "1"],
             "prefill_length": [null, null, null, null],
             "batch": [null, null, null, null],
@@ -77,10 +77,10 @@
             "ncore": [null, null, null],
             "batch": [null, null, null],
             "ndevice": ["1", "1", "1"],
-            "context_length": ["131072", "131072", "131072"],
+            "context_length": ["262144", "131072", "131072"],
             "prefill_length": [null, null, null],
             "output_dir": [
-                "cached_results/hmm_xh2_26b-a4b_128k",
+                "cached_results/hmm_xh2_26b-a4b_256k",
                 "cached_results/hmm_xh2_e2b_128k",
                 "cached_results/hmm_xh2_e4b_128k"
             ]
@@ -89,27 +89,27 @@
     "demo_params": {
         "xh2": {
             "tokenizer_dir": [
-                "cached_results/hmm_xh2_26b-a4b_128k/hmquant/hf_config",
+                "cached_results/hmm_xh2_26b-a4b_256k/hmquant/hf_config",
                 "cached_results/hmm_xh2_e2b_128k/hmquant/hf_config",
                 "cached_results/hmm_xh2_e4b_128k/hmquant/hf_config"
             ],
             "embedding_path": [
-                "cached_results/hmm_xh2_26b-a4b_128k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_26b-a4b_256k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_e2b_128k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_e4b_128k/hmquant/quant_embedding.pt"
             ],
             "vit_path": [
-                "cached_results/hmm_xh2_26b-a4b_128k/gemma4-26b-a4b_visual.hmm",
+                "cached_results/hmm_xh2_26b-a4b_256k/gemma4-26b-a4b_visual.hmm",
                 "cached_results/hmm_xh2_e2b_128k/gemma4-e2b_visual.hmm",
                 "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_visual.hmm"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_26b-a4b_128k/gemma4-26b-a4b_prefill.hmm",
+                "cached_results/hmm_xh2_26b-a4b_256k/gemma4-26b-a4b_prefill.hmm",
                 "cached_results/hmm_xh2_e2b_128k/gemma4-e2b_prefill.hmm",
                 "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_prefill.hmm"
             ],
             "decode_path": [
-                "cached_results/hmm_xh2_26b-a4b_128k/gemma4-26b-a4b_decode.hmm",
+                "cached_results/hmm_xh2_26b-a4b_256k/gemma4-26b-a4b_decode.hmm",
                 "cached_results/hmm_xh2_e2b_128k/gemma4-e2b_decode.hmm",
                 "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_decode.hmm"
             ],
