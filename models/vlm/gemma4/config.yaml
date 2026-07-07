@@ -8,10 +8,10 @@ model_configs:
       model_name: "gemma4"
       model_size: "26b-a4b"
       ncore: 2
-      context_length: "128k"
+      context_length: "256k"
       ndevice: 1
       batch: 1
-      prefill_length: 256
+      prefill_length: 320
 
     "e2b":
       modelscope_repo: ["google/gemma-4-E2B-it"]
@@ -21,7 +21,7 @@ model_configs:
       context_length: "128k"
       ndevice: 1
       batch: 1
-      prefill_length: 256
+      prefill_length: 320
 
     "e4b":
       modelscope_repo: ["google/gemma-4-E4B-it"]
@@ -31,7 +31,7 @@ model_configs:
       context_length: "128k"
       ndevice: 1
       batch: 1
-      prefill_length: 256
+      prefill_length: 320
 
     "31b":
       modelscope_repo: ["google/gemma-4-31B-it"]
@@ -41,4 +41,4 @@ model_configs:
       context_length: "256k"
       ndevice: 2
       batch: 1
-      prefill_length: 256
+      prefill_length: 320
