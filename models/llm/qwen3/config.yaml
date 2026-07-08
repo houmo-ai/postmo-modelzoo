@@ -8,7 +8,7 @@ model_configs:
       model_name: "qwen3"
       model_size: "0.6b"
       ncore: 2
-      quant_type: "w4a8h0_ssfp"
+      quant_type: "w8a16h0_ssfp"
       context_length: "32k"
       ndevice: 1
       batch: 1
@@ -18,7 +18,7 @@ model_configs:
       model_name: "qwen3"
       model_size: "1.7b"
       ncore: 2
-      quant_type: "w4a8h0_ssfp"
+      quant_type: "w8a16h0_ssfp"
       context_length: "32k"
       ndevice: 1
       batch: 1

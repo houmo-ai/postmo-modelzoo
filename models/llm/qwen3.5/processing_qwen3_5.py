@@ -42,6 +42,32 @@ except ImportError:
 logger = logging.get_logger(__name__)
 
 
+def _to_plain_config(value):
+    if value.__class__.__name__ == "SizeDict":
+        return {
+            field: getattr(value, field)
+            for field in getattr(value, "__dataclass_fields__", {})
+            if getattr(value, field) is not None
+        }
+    if isinstance(value, dict):
+        return {key: _to_plain_config(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_to_plain_config(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_to_plain_config(item) for item in value)
+    return value
+
+
+def _image_processor_kwargs(image_processor):
+    if hasattr(image_processor, "to_dict"):
+        kwargs = image_processor.to_dict()
+    else:
+        kwargs = vars(image_processor).copy()
+    kwargs.pop("_valid_processor_keys", None)
+    kwargs.pop("_valid_kwargs_names", None)
+    return _to_plain_config(kwargs)
+
+
 class _Qwen3_5VideosKwargs(VideosKwargs, total=False):
     pass
 
@@ -103,7 +129,8 @@ class Qwen3_5Processor(ProcessorMixin):
             if getattr(tokenizer, "vision_end_token_id", None)
             else tokenizer.convert_tokens_to_ids(self.vision_end_token)
         )
-        self.image_processor = Qwen3_5ImageProcessor(**vars(self.image_processor))
+        if not isinstance(self.image_processor, Qwen3_5ImageProcessor):
+            self.image_processor = Qwen3_5ImageProcessor(**_image_processor_kwargs(self.image_processor))
 
     def __call__(
         self,

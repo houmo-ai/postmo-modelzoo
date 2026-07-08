@@ -46,13 +46,30 @@ from transformers.utils import TensorType, logging
 logger = logging.get_logger(__name__)
 
 
+def _plain_size_dict(value):
+    if value.__class__.__name__ == "SizeDict":
+        return {
+            field: getattr(value, field)
+            for field in getattr(value, "__dataclass_fields__", {})
+            if getattr(value, field) is not None
+        }
+    return value
+
+
 class Qwen3_5ImageProcessor(Qwen2VLImageProcessor):
     """Extended image processor that also produces hm_pixel_values."""
 
     def __init__(self, *args, **kwargs):
+        min_pixels = kwargs.get("min_pixels")
+        max_pixels = kwargs.get("max_pixels")
+        if "size" in kwargs:
+            kwargs["size"] = _plain_size_dict(kwargs["size"])
+            if isinstance(kwargs["size"], dict):
+                min_pixels = min_pixels if min_pixels is not None else kwargs["size"].get("shortest_edge")
+                max_pixels = max_pixels if max_pixels is not None else kwargs["size"].get("longest_edge")
         super().__init__(*args, **kwargs)
-        self.min_pixels = 65536
-        self.max_pixels = 16777216
+        self.min_pixels = min_pixels if min_pixels is not None else 65536
+        self.max_pixels = max_pixels if max_pixels is not None else 16777216
 
     def _hm_preprocess(
         self,
@@ -60,9 +77,13 @@ class Qwen3_5ImageProcessor(Qwen2VLImageProcessor):
         do_resize=None,
         resample=None,
         do_convert_rgb=None,
+        min_pixels=None,
+        max_pixels=None,
         data_format: Optional[ChannelDimension] = ChannelDimension.FIRST,
         input_data_format: Optional[Union[str, ChannelDimension]] = None,
     ):
+        min_pixels = min_pixels if min_pixels is not None else self.min_pixels
+        max_pixels = max_pixels if max_pixels is not None else self.max_pixels
         images = make_list_of_images(images)
 
         if do_convert_rgb:
@@ -79,8 +100,8 @@ class Qwen3_5ImageProcessor(Qwen2VLImageProcessor):
                     height,
                     width,
                     factor=self.patch_size * self.merge_size,
-                    min_pixels=self.min_pixels,
-                    max_pixels=self.max_pixels,
+                    min_pixels=min_pixels,
+                    max_pixels=max_pixels,
                 )
                 image = resize(
                     image,
@@ -125,6 +146,7 @@ class Qwen3_5ImageProcessor(Qwen2VLImageProcessor):
             if "shortest_edge" not in size or "longest_edge" not in size:
                 raise ValueError("size must contain 'shortest_edge' and 'longest_edge' keys.")
             min_pixels = size["shortest_edge"]
+            max_pixels = size["longest_edge"]
         elif min_pixels is not None and max_pixels is not None:
             size = {"shortest_edge": min_pixels, "longest_edge": max_pixels}
         else:
@@ -164,47 +186,42 @@ class Qwen3_5ImageProcessor(Qwen2VLImageProcessor):
 
         data = {}
         if images is not None:
-            pixel_values, vision_grid_thws, hm_pixel_values = [], [], []
+            image_inputs = super().preprocess(
+                images=images,
+                do_resize=do_resize,
+                size=size,
+                resample=resample,
+                do_rescale=do_rescale,
+                rescale_factor=rescale_factor,
+                do_normalize=do_normalize,
+                image_mean=image_mean,
+                image_std=image_std,
+                patch_size=patch_size,
+                temporal_patch_size=temporal_patch_size,
+                merge_size=merge_size,
+                do_convert_rgb=do_convert_rgb,
+                return_tensors=return_tensors,
+                data_format=data_format,
+                input_data_format=input_data_format,
+            )
+
+            hm_pixel_values = []
             for image in images:
-                patches, image_grid_thw = self._preprocess(
-                    image,
-                    do_resize=do_resize,
-                    size=size,
-                    resample=resample,
-                    do_rescale=do_rescale,
-                    rescale_factor=rescale_factor,
-                    do_normalize=do_normalize,
-                    image_mean=image_mean,
-                    image_std=image_std,
-                    patch_size=patch_size,
-                    temporal_patch_size=temporal_patch_size,
-                    merge_size=merge_size,
-                    data_format=data_format,
-                    do_convert_rgb=do_convert_rgb,
-                    input_data_format=input_data_format,
-                )
                 hm_patches = self._hm_preprocess(
                     image,
                     do_resize=do_resize,
                     resample=resample,
                     do_convert_rgb=do_convert_rgb,
+                    min_pixels=min_pixels,
+                    max_pixels=max_pixels,
                     data_format=data_format,
                     input_data_format=input_data_format,
                 )
                 hm_pixel_values.append(
                     torch.from_numpy(hm_patches).unsqueeze(2).repeat(1, 1, self.temporal_patch_size, 1, 1)
                 )
-                pixel_values.extend(patches)
-                vision_grid_thws.append(image_grid_thw)
-            pixel_values = torch.from_numpy(np.array(pixel_values))
-            vision_grid_thws = torch.from_numpy(np.array(vision_grid_thws))
-            data.update(
-                {
-                    "pixel_values": pixel_values,
-                    "image_grid_thw": vision_grid_thws,
-                    "hm_pixel_values": hm_pixel_values,
-                }
-            )
+            data.update(image_inputs)
+            data["hm_pixel_values"] = hm_pixel_values
 
         if videos is not None:
             logger.warning("`Qwen3_5ImageProcessor` works only with image inputs and doesn't process videos anymore.")
