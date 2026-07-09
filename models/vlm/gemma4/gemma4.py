@@ -494,12 +494,6 @@ class Gemma4(object):
 
     def _build_draft_masks(self, past_len) -> tuple[torch.Tensor, torch.Tensor]:
         width = self.assistant.get_dev_input(
-            self.assistant.get_input_name(4)
-        ).info.shape[-1]
-        g_mask = np.full((1, 1, 1, width), np.finfo(np.float16).min, dtype=np.float16)
-        g_mask[0, 0, 0, : min(width, max(1, int(past_len)))] = 0.0
-
-        width = self.assistant.get_dev_input(
             self.assistant.get_input_name(3)
         ).info.shape[-1]
         l_mask = np.full((1, 1, 1, width), np.finfo(np.float16).min, dtype=np.float16)
@@ -507,8 +501,7 @@ class Gemma4(object):
         end = valid
         start = max(0, end - self.sliding_window)
         l_mask[0, 0, 0, start:end] = 0.0
-
-        return g_mask, l_mask
+        return l_mask
 
     def _run_vision(self, inputs):
         pixel_values: torch.Tensor = inputs["pixel_values"]
@@ -702,21 +695,20 @@ class Gemma4(object):
         with self.perf.track("assistant.embed"):
             embeds = self.embedding(torch.from_numpy(np.array([[next_id]])))
             embeds = torch.cat([embeds, torch.from_numpy(hidden_states)], dim=2)
-            g_mask, l_mask = self._build_draft_masks(past_len)
+            l_mask = self._build_draft_masks(past_len)
             embeds_np = embeds.detach().cpu().numpy().astype(np.float16)
             l_mask_np = l_mask.astype(np.float16)
-            g_mask_np = g_mask.astype(np.float16)
 
         with self.perf.track("assistant.h2d"):
             self.assistant.set_input(self.assistant.get_input_name(0), embeds_np)
             self.assistant.set_input(
-                self.assistant.get_input_name(1), np.array([pos_idx], dtype=np.int32)
+                self.assistant.get_input_name(1),
+                np.array([pos_idx - 1], dtype=np.int32),
             )
             self.assistant.set_input(
                 self.assistant.get_input_name(2), np.array([1], dtype=np.int32)
             )
             self.assistant.set_input(self.assistant.get_input_name(3), l_mask_np)
-            self.assistant.set_input(self.assistant.get_input_name(4), g_mask_np)
 
         with self.perf.track("assistant.infer"):
             self.assistant.run()
