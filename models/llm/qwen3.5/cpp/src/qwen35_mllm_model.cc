@@ -84,10 +84,10 @@ void Qwen35MLLMContext::generate(const std::vector<Token>& prompt,
   set_sampler(params);
 
   Token token;
-  {
-    auto t = p.scope("generate.prefill");
-    token = prefill(prompt);
-  }
+  // Do not wrap prefill/decode with outer scopes: leaf stages already
+  // roll up into generate.prefill / generate.decode. Nested start+stop on
+  // the same parent path double-counts total_time in PerfProfiler.
+  token = prefill(prompt);
 
   // Update input_tokens with actual processed tokens (including expanded image tokens)
   p.set_input_tokens(context_length_ - initial_context_length);
@@ -117,10 +117,7 @@ void Qwen35MLLMContext::generate(const std::vector<Token>& prompt,
       break;
     }
 
-    {
-      auto t = p.scope("generate.decode");
-      token = decode(token);
-    }
+    token = decode(token);
     p.add_output_token();
 
     if (token == model_->eos_token_id() || token == model_->bos_token_id()) {
@@ -564,11 +561,9 @@ Token Qwen35MLLMContext::do_prefill_inference(const std::vector<Token>& tokens,
   // 1. Expand image tokens
   std::vector<Token> padded_tokens = pad_visual_token(tokens);
 
-  // 2. Vision processing
-  {
-    auto t = p.scope("generate.vision");
-    run_vision();
-  }
+  // 2. Vision processing — leaf stages only (generate.vision.*) so parent
+  // totals are pure rollups and not double-counted by PerfProfiler.
+  run_vision();
 
   // 3. Prefill common setup (execute once)
   auto [position_ids_3d, seq_length, prefill_loop_chunk] = [&]() {

@@ -240,7 +240,7 @@ int main(int argc, char* argv[]) {
   std::string tokenizer_path;
   std::string prompt = "你好，请介绍一下自己。";
   std::vector<std::string> image_paths;
-  int max_tokens = 256;
+  int max_tokens = 0;
   int device_id = 0;
 
   for (int i = 1; i < argc; i++) {
