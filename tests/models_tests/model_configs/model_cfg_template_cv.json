@@ -106,6 +106,10 @@
             }
         }
     },
+    "test_sh_params": [
+        []
+    ],
+    "enable_demo_test": true,
     "hmdemo_params": {
         "params": {
             "required": {

@@ -1,6 +1,6 @@
 ---
 name: generate-model-pytest-cases
-description: 为 imodelzoo 中指定模型生成 `tests/models_tests` 风格的 pytest 测例，包括模型配置 JSON、pytest 入口、marker 注册、`imodelExampleConfig.yaml` 聚合配置。适用于新增模型测例、补齐 get_model/quant/compile/demo/perf/eval/compare 流程。
+description: 为 imodelzoo 中指定模型生成 `tests/models_tests` 风格的 pytest 测例，包括模型配置 JSON、test.sh 参数组与 Python demo 开关、pytest 入口、marker 注册、`imodelExampleConfig.yaml` 聚合配置。适用于新增模型测例、补齐 get_model/quant/compile/demo/perf/eval/compare 流程。
 ---
 
 # 为指定模型生成 pytest 测例
@@ -80,6 +80,7 @@ description: 为 imodelzoo 中指定模型生成 `tests/models_tests` 风格的 
 - `ptq.py` -> `quant`
 - `build.py` -> `compile`
 - `demo.py` -> `demo`
+- `test.sh` -> 在 ASIC 环境的 `demo` flow 中优先执行；根据脚本接口生成 `test_sh_params`
 - `demo_multibatch.py` -> 在 `support_flow` 中额外加入 `demo_multibatch`，并补 `demo_multibatch_params`；它作为 `demo` flow 的附加执行步骤，不新增独立 `test_*.py`
 - `demo.py` 中带 perf 输出，且测试框架可解析 perf 输出日志 -> `perf`
 - `hmatc` compare/eval 配置 -> `compare` / `eval`
@@ -257,6 +258,91 @@ tests/models_tests/model_configs/model_cfg_cosyvoice3.json
 ```
 
 `perf_params: "demo"` 时，perf 默认复用 `demo_params` 中的 `script`。`demo_multibatch.py` 也支持通过 `demo_multibatch_params` 中的 `script` 覆盖脚本名。
+
+### 6. `test.sh` 与 Python demo 配置规则
+
+如果模型目录存在 `test.sh`，检查其参数接口和 README 中的典型调用方式，并按需生成 `test_sh_params`。该字段只在 ASIC 环境且模型临时工作目录存在 `test.sh` 时生效。
+
+使用参数数组表示多次执行，每个内层数组对应一次 `test.sh`：
+
+```json
+"test_sh_params": [
+    ["--model_size", "0.8b"],
+    ["--model_size", "27b", "--model_name", "qwen3.6"]
+]
+```
+
+以上配置依次执行：
+
+```bash
+bash test.sh --model_size 0.8b
+bash test.sh --model_size 27b --model_name qwen3.6
+```
+
+需要同时覆盖默认参数和其他参数时，把空数组作为一组测试参数，并按期望执行顺序放置：
+
+```json
+"test_sh_params": [
+    [],
+    ["--model_size", "0.8b"],
+    ["--model_size", "27b", "--model_name", "qwen3.6"]
+]
+```
+
+以上配置依次执行：
+
+```bash
+bash test.sh
+bash test.sh --model_size 0.8b
+bash test.sh --model_size 27b --model_name qwen3.6
+```
+
+需要按 backend 区分时，在 backend 下分别配置参数数组：
+
+```json
+"test_sh_params": {
+    "xh1": [
+        [],
+        ["--model_size", "7b"]
+    ],
+    "xh2": [
+        [],
+        ["--model_size", "7b"],
+        ["--model_size", "14b"]
+    ]
+}
+```
+
+也可使用与其他参数矩阵一致的按参数列格式，但该格式不适合表达“默认参数组 + 其他参数组”；有默认参数组时必须优先使用参数数组：
+
+```json
+"test_sh_params": {
+    "xh2": {
+        "model_size": ["7b", "14b"],
+        "use_cache": [true, false]
+    }
+}
+```
+
+未配置 `test_sh_params` 或配置为空数组时，执行一次默认命令 `bash test.sh`。所有参数组都会执行，任意一组失败都会使 demo 测例失败。
+
+使用 `enable_demo_test` 控制 `test.sh` 后是否继续执行 Python demo 测试。该字段缺省为 `true`：
+
+```json
+"enable_demo_test": true
+```
+
+如果只验证默认参数及其他参数的 `test.sh`，不执行 `demo.py`、`demo_multibatch.py`、模型准备和 Python 虚拟环境安装，配置：
+
+```json
+"test_sh_params": [
+    [],
+    ["--model_size", "7b"]
+],
+"enable_demo_test": false
+```
+
+即使设置 `enable_demo_test: false`，也要在 `support_flow.<backend>` 中保留 `demo`，并生成 `test_demo_models.py` 的 pytest 入口；`test.sh` 由 `execute_demo_flow()` 内部执行，不要在 `imodelExampleConfig.yaml` 中改回直接运行脚本。
 
 ## 第三步：注册 marker
 
@@ -468,6 +554,11 @@ pytest tests/models_tests/test_get_models.py \
 - [ ] 缓存目录名已反映 `2k` / `8k` / `16k` 等信息
 - [ ] `compile_params.context_length` 与目标 hmm 上下文一致
 - [ ] `demo_params` / `perf` 读取路径已跟随 `compile_params.output_dir` 同步
+- [ ] 如模型存在 `test.sh`，已核对是否需要生成多组 `test_sh_params`
+- [ ] 如需覆盖默认命令和带参数命令，`test_sh_params` 已使用 `[]` 表示默认参数组
+- [ ] `test_sh_params` 未使用对象数组或字符串参数组
+- [ ] 已根据是否继续运行 Python demo 正确设置 `enable_demo_test`；未配置时确认默认开启符合预期
+- [ ] 即使 `enable_demo_test` 为 `false`，`support_flow` 和 pytest 入口仍保留 `demo`
 - [ ] `model_names.txt` 已追加 marker
 - [ ] 对应 `test_*.py` 已补 pytest 入口
 - [ ] `imodelExampleConfig.yaml` 已改为 `models_tests` 风格

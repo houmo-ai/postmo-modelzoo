@@ -863,7 +863,8 @@ models_tests:
     - backbone_resnet50_test
     - detection_yolov5s_test
     - inferences_resnet50_test
-    # - llm_qwen3.5_test
+    - llm_qwen3.5_test
+    - tts_qwen3_tts_test
     # - llm_qwen3_test
     # - vlm_qwen3-vl_test
 

@@ -88,6 +88,13 @@
             "enable_common_subgraph": [true, true, true]
         }
     },
+    "test_sh_params": [
+        [],
+        ["--model_size", "0.6b-base"],
+        ["--model_size", "1.7b-customvoice"],
+        ["--demo_mode", "streaming"]
+    ],
+    "enable_demo_test": true,
     "demo_params": {
         "xh2": {
             "script": [

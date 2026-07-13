@@ -152,11 +152,7 @@ def _generate_py_cmds(
                 and "cached_models" in param_val
             ):
                 param_val = param_val.replace("cached_models", model_dir)
-            if (
-                isinstance(param_val, str)
-                and res_dir
-                and "cached_results" in param_val
-            ):
+            if isinstance(param_val, str) and res_dir and "cached_results" in param_val:
                 param_val = param_val.replace("cached_results", res_dir)
 
             if param_name in ["script"]:
@@ -170,6 +166,68 @@ def _generate_py_cmds(
         idx += 1
 
     return cmd_list
+
+
+def _generate_test_sh_cmds(test_sh_params, backend: str) -> list:
+    """Build ``test.sh`` commands from the optional model configuration.
+
+    ``test_sh_params`` may be a list of argument lists or a column-oriented,
+    optionally backend-keyed dictionary. Keeping the default command here
+    preserves the old behaviour for every existing model configuration.
+    """
+    if test_sh_params is None:
+        return [["bash", "test.sh"]]
+
+    if isinstance(test_sh_params, dict) and backend in test_sh_params:
+        test_sh_params = test_sh_params[backend]
+
+    # Also accept the column-oriented format used by the other parameter
+    # sections in model_cfg_*.json, for example:
+    # {"model_size": ["7b", "14b"], "use_cache": [true, false]}.
+    if isinstance(test_sh_params, dict):
+        values = list(test_sh_params.values())
+        if any(isinstance(value, list) for value in values):
+            case_count = max(
+                (len(value) for value in values if isinstance(value, list)),
+                default=0,
+            )
+            argument_groups = []
+            for index in range(case_count):
+                args = []
+                for name, values in test_sh_params.items():
+                    value = (
+                        values[index]
+                        if isinstance(values, list) and index < len(values)
+                        else values
+                    )
+                    option = name if name.startswith("-") else f"--{name}"
+                    if isinstance(value, bool):
+                        if value:
+                            args.append(option)
+                    elif value is not None:
+                        args.extend([option, str(value)])
+                argument_groups.append(args)
+            test_sh_params = argument_groups
+        else:
+            raise ValueError("test_sh_params dictionary values must be parameter lists")
+
+    if not isinstance(test_sh_params, list):
+        raise ValueError("test_sh_params must be a list or a backend-keyed dictionary")
+
+    # An empty configuration has the same meaning as an omitted configuration:
+    # execute test.sh once without extra arguments.
+    if not test_sh_params:
+        return [["bash", "test.sh"]]
+
+    commands = []
+    for params in test_sh_params:
+        if isinstance(params, list):
+            args = [str(arg) for arg in params]
+        else:
+            raise ValueError("each test_sh_params item must be an argument list")
+        commands.append(["bash", "test.sh", *args])
+
+    return commands
 
 
 def _check_compile_result(res_str: str, benchmark_val: float) -> bool:
@@ -1531,9 +1589,13 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
     if is_asic_platform() and os.path.exists(f"{current_folder}/test.sh"):
         logger.info("Ready to execute test.sh in folder: %s.", current_folder)
         check_flag = False if model_name == "qwen2.5-vl" else True
-        test_sh_flag, _ = execute_test_cmd(
-            ["bash", "test.sh"], log_file, False, check_flag
+        test_sh_cmds = _generate_test_sh_cmds(
+            model_info.get("test_sh_params"), HOUMO_BACKEND
         )
+        logger.info("test.sh command list: %s", test_sh_cmds)
+        for test_sh_cmd in test_sh_cmds:
+            exec_flag, _ = execute_test_cmd(test_sh_cmd, log_file, False, check_flag)
+            test_sh_flag = test_sh_flag and exec_flag
         test_sh_folder = current_folder
 
         prepare_test_folder(model_dir, "demo")
@@ -1547,12 +1609,13 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
         logger.warning(f"remove folder: {test_sh_folder}.")
         shutil.rmtree(test_sh_folder)
 
-    # if is_release():
-    #     logger.info("RELEASE MODE, only execute test.sh.")
-    #     logger.warning(f"remove folder: {os.getcwd()}.")
-    #     shutil.rmtree(os.getcwd())
-    #     assert test_sh_flag is True, "Execute tesh.sh Failed!"
-    #     return
+    if is_release() and not model_info.get("enable_demo_test", True):
+        logger.info("demo.py testing is disabled by model configuration.")
+        logger.warning(f"remove folder: {os.getcwd()}.")
+        shutil.rmtree(os.getcwd())
+        assert test_sh_flag is True, "Execute test.sh Failed!"
+        logger.info("test.sh testing completed; demo.py testing was skipped.")
+        return
 
     model_set_dir = os.path.join(MODELS_PATH, model_info["model_dir"])
     model_res_dir = os.path.join(MODELS_RES_DIR, dev_res_dir, model_info["model_dir"])
@@ -1674,7 +1737,7 @@ def execute_demo_flow(model_name: str, setup_logging) -> None:
 
     logger.warning(f"remove folder: {os.getcwd()}.")
     shutil.rmtree(os.getcwd())
-    assert test_sh_flag is True, "Execute tesh.sh Failed!"
+    assert test_sh_flag is True, "Execute test.sh Failed!"
     assert final_flag is True, "Demo Test Failed!"
     logger.info("Demo Test Success!")
 

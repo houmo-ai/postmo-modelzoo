@@ -215,7 +215,7 @@ pytest -m "deepseek_r1_qwen3_8b"
 
 - `get_model` 对 LLM 会跳过 `raw` 下载分支
 - `quant` / `compile` 的部分 LLM 测试会直接跳过
-- `demo` 在 release 模式下，如果模型目录存在 `test.sh`，优先只执行 `test.sh`
+- `demo` 在 ASIC 环境下，如果模型目录存在 `test.sh`，会优先执行 `test.sh`
 
 因此 release 模式更适合“验证已交付模型是否可运行”，而不是完整开发流程回归。
 
@@ -226,7 +226,93 @@ pytest -m "deepseek_r1_qwen3_8b"
 - `HDPL_PLATFORM == "ASIC"`
 - 当前模型目录存在 `test.sh`
 
-框架会先执行 `test.sh`。如果同时又不是 release 模式，后续还会继续走框架标准的 `demo` / `demo_multibatch` 逻辑。
+框架会先执行 `test.sh`，然后根据 `enable_demo_test` 决定是否继续执行框架标准的 Python demo 测试。
+
+#### 4.5.1 为 `test.sh` 配置多组参数
+
+模型配置可通过 `test_sh_params` 指定多组参数。每组参数会独立执行一次 `test.sh`；所有执行结果会聚合，任意一次执行失败都会使当前 demo 测试失败。
+
+推荐直接使用参数数组：
+
+```json
+"test_sh_params": [
+  ["--model_size", "7b"],
+  ["--model_size", "14b", "--ndevice", "1"]
+]
+```
+
+以上配置会依次执行：
+
+```bash
+bash test.sh --model_size 7b
+bash test.sh --model_size 14b --ndevice 1
+```
+
+也可以按 backend 分别配置：
+
+```json
+"test_sh_params": {
+  "xh1": [
+    ["--model_size", "7b"]
+  ],
+  "xh2": [
+    ["--model_size", "7b"],
+    ["--model_size", "14b"]
+  ]
+}
+```
+
+此外，还支持与其他模型参数一致的按参数列配置方式：
+
+```json
+"test_sh_params": {
+  "xh2": {
+    "model_size": ["7b", "14b"],
+    "use_cache": [true, false],
+    "ndevice": ["0", "1"]
+  }
+}
+```
+
+该配置同样按数组索引组合参数，对应执行：
+
+```bash
+bash test.sh --model_size 7b --ndevice 0
+bash test.sh --model_size 14b --ndevice 1
+```
+
+按参数列配置时：
+
+- 普通值生成 `--参数名 参数值`
+- `true` 生成不带值的布尔开关 `--参数名`
+- `false` 或 `null` 跳过该参数
+- 已经以 `-` 开头的参数名会直接使用，不再自动添加 `--`
+
+未配置 `test_sh_params`，或者将其配置为空数组时，保持原有行为，只执行一次默认命令：
+
+```bash
+bash test.sh
+```
+
+#### 4.5.2 控制是否执行 Python demo 测试
+
+`enable_demo_test` 用于控制 `test.sh` 完成后是否继续执行 Python demo 测试，默认值为 `true`：
+
+```json
+"enable_demo_test": true
+```
+
+如只需执行一组或多组 `test.sh`，可配置：
+
+```json
+"test_sh_params": [
+  ["--model_size", "7b"],
+  ["--model_size", "14b"]
+],
+"enable_demo_test": false
+```
+
+设置为 `false` 后，框架执行完所有 `test.sh` 并检查结果，随后清理临时目录并结束当前 flow，不再准备编译模型、安装 Python 虚拟环境或执行 `demo.py` / `demo_multibatch.py` 等后续 Python demo 测试。
 
 ## 5. 环境与前置要求
 
@@ -373,6 +459,8 @@ HOUMO_TARGET=xh2 HDPL_PLATFORM=ASIC SKIP_INFER=ON pytest -s -v models_tests/
 | `compile_params` | Python 编译脚本 `build.py` 的参数矩阵 |
 | `demo_params` | `demo.py` 的参数矩阵 |
 | `demo_multibatch_params` | `demo_multibatch.py` 的参数矩阵；在 `demo` flow 内部顺带执行 |
+| `test_sh_params` | ASIC 环境下 `test.sh` 的参数组；支持参数数组、按 backend 配置或按参数列配置；缺省时执行一次无额外参数的 `test.sh` |
+| `enable_demo_test` | CI环境中，`test.sh` 后是否继续执行 Python demo 测试，默认为 `true`；设为 `false` 时仅检查 `test.sh` 并结束当前 flow |
 | `perf_params` | Python 侧性能测试参数；部分 LLM 会复用 `demo` |
 
 ### 8.3 `hmatc` 类字段

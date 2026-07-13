@@ -141,6 +141,12 @@
             "j": ["24", "24", "24", "24", "24"]
         }
     },
+    "test_sh_params": [
+        [],
+        ["--model_name", "qwen3.6", "--model_size", "27b"],
+        ["--model_name", "qwen3.5", "--model_size", "0.8b"]
+    ],
+    "enable_demo_test": true,
     "demo_params": {
         "xh2": {
             "model_name": [
