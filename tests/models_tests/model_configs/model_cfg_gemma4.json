@@ -3,8 +3,8 @@
     "model_dir": "models/vlm/gemma4",
     "model_type": "llm",
     "dependencies": {
-        "ndevice": [1],
-        "dev_mem": ["24g"]
+        "ndevice": [2],
+        "dev_mem": ["48g"]
     },
     "support_platform": ["x86_64", "aarch64"],
     "support_backend": ["xh2"],
@@ -26,8 +26,9 @@
     },
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "hmm", "hmm", "hmm"],
+            "type": ["raw", "hmm", "hmm", "hmm", "hmm"],
             "download_dir": [
+                "cached_models",
                 "cached_models",
                 "cached_models",
                 "cached_models",
@@ -37,15 +38,16 @@
                 null,
                 "cached_models/hmm_xh2_26b-a4b_256k",
                 "cached_models/hmm_xh2_e2b_128k",
-                "cached_models/hmm_xh2_e4b_128k"
+                "cached_models/hmm_xh2_e4b_128k",
+                "cached_models/hmm_xh2_31b_256k"
             ],
-            "model_name": ["gemma4", "gemma4", "gemma4", "gemma4"],
-            "model_size": ["26b-a4b", "26b-a4b", "e2b", "e4b"],
-            "context_length": [null, "256k", "128k", "128k"],
-            "ndevice": ["1", "1", "1", "1"],
-            "prefill_length": [null, null, null, null],
-            "batch": [null, null, null, null],
-            "source_type": [null, null, null, null]
+            "model_name": ["gemma4", "gemma4", "gemma4", "gemma4", "gemma4"],
+            "model_size": ["26b-a4b", "26b-a4b", "e2b", "e4b", "31b"],
+            "context_length": [null, "256k", "128k", "128k", "256k"],
+            "ndevice": ["1", "1", "1", "1", "2"],
+            "prefill_length": [null, null, null, null, null],
+            "batch": [null, null, null, null, null],
+            "source_type": [null, null, null, null, null]
         }
     },
     "quant_params": {
@@ -53,16 +55,18 @@
             "model": [
                 "cached_models/gemma-4-26B-A4B-it",
                 "cached_models/gemma-4-e2b-it",
-                "cached_models/gemma-4-e4b-it"
+                "cached_models/gemma-4-e4b-it",
+                "cached_models/gemma-4-31B-it"
             ],
-            "model-name": ["gemma4", "gemma4", "gemma4"],
-            "model-size": ["26b-a4b", "e2b", "e4b"],
+            "model-name": ["gemma4", "gemma4", "gemma4", "gemma4"],
+            "model-size": ["26b-a4b", "e2b", "e4b", "31b"],
             "out-dir": [
                 "cached_results/hmquant_xh2_26b-a4b_2k",
                 "cached_results/hmquant_xh2_e2b_2k",
-                "cached_results/hmquant_xh2_e4b_2k"
+                "cached_results/hmquant_xh2_e4b_2k",
+                "cached_results/hmquant_xh2_31b_2k"
             ],
-            "context-length": ["2048", "2048", "2048"]
+            "context-length": ["2048", "2048", "2048", "2048"]
         }
     },
     "compile_params": {
@@ -70,19 +74,21 @@
             "model_dir": [
                 "cached_results/hmquant_xh2_26b-a4b_2k",
                 "cached_results/hmquant_xh2_e2b_2k",
-                "cached_results/hmquant_xh2_e4b_2k"
+                "cached_results/hmquant_xh2_e4b_2k",
+                "cached_results/hmquant_xh2_31b_2k"
             ],
-            "model_name": ["gemma4", "gemma4", "gemma4"],
-            "model_size": ["26b-a4b", "e2b", "e4b"],
-            "ncore": [null, null, null],
-            "batch": [null, null, null],
-            "ndevice": ["1", "1", "1"],
-            "context_length": ["262144", "131072", "131072"],
-            "prefill_length": [null, null, null],
+            "model_name": ["gemma4", "gemma4", "gemma4", "gemma4"],
+            "model_size": ["26b-a4b", "e2b", "e4b", "31b"],
+            "ncore": [null, null, null, null],
+            "batch": [null, null, null, null],
+            "ndevice": ["1", "1", "1", "2"],
+            "context_length": ["262144", "131072", "131072", "262144"],
+            "prefill_length": [null, null, null, null],
             "output_dir": [
                 "cached_results/hmm_xh2_26b-a4b_256k",
                 "cached_results/hmm_xh2_e2b_128k",
-                "cached_results/hmm_xh2_e4b_128k"
+                "cached_results/hmm_xh2_e4b_128k",
+                "cached_results/hmm_xh2_31b_256k"
             ]
         }
     },
@@ -91,41 +97,48 @@
             "tokenizer_dir": [
                 "cached_results/hmm_xh2_26b-a4b_256k/hmquant/hf_config",
                 "cached_results/hmm_xh2_e2b_128k/hmquant/hf_config",
-                "cached_results/hmm_xh2_e4b_128k/hmquant/hf_config"
+                "cached_results/hmm_xh2_e4b_128k/hmquant/hf_config",
+                "cached_results/hmm_xh2_31b_256k/hmquant/hf_config"
             ],
             "embedding_path": [
                 "cached_results/hmm_xh2_26b-a4b_256k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_e2b_128k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_e4b_128k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_e4b_128k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_31b_256k/hmquant/quant_embedding.pt"
             ],
             "vit_path": [
                 "cached_results/hmm_xh2_26b-a4b_256k/gemma4-26b-a4b_visual.hmm",
                 "cached_results/hmm_xh2_e2b_128k/gemma4-e2b_visual.hmm",
-                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_visual.hmm"
+                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_visual.hmm",
+                "cached_results/hmm_xh2_31b_256k/gemma4-31b_visual.hmm"
             ],
             "prefill_path": [
                 "cached_results/hmm_xh2_26b-a4b_256k/gemma4-26b-a4b_prefill.hmm",
                 "cached_results/hmm_xh2_e2b_128k/gemma4-e2b_prefill.hmm",
-                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_prefill.hmm"
+                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_prefill.hmm",
+                "cached_results/hmm_xh2_31b_256k/gemma4-31b_prefill.hmm"
             ],
             "decode_path": [
                 "cached_results/hmm_xh2_26b-a4b_256k/gemma4-26b-a4b_decode.hmm",
                 "cached_results/hmm_xh2_e2b_128k/gemma4-e2b_decode.hmm",
-                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_decode.hmm"
+                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_decode.hmm",
+                "cached_results/hmm_xh2_31b_256k/gemma4-31b_decode.hmm"
             ],
             "audio_path": [
                 null,
                 "cached_results/hmm_xh2_e2b_128k/gemma4-e2b_audio.hmm",
-                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_audio.hmm"
+                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_audio.hmm",
+                null
             ],
             "plib_embedding_path": [
                 null,
                 "cached_results/hmm_xh2_e2b_128k/hmquant/per_layer_input_embedding.pt",
-                "cached_results/hmm_xh2_e4b_128k/hmquant/per_layer_input_embedding.pt"
+                "cached_results/hmm_xh2_e4b_128k/hmquant/per_layer_input_embedding.pt",
+                null
             ],
-            "model_name": ["gemma4", "gemma4", "gemma4"],
-            "model_size": ["26b-a4b", "e2b", "e4b"],
-            "ndevice": ["1", "1", "1"]
+            "model_name": ["gemma4", "gemma4", "gemma4", "gemma4"],
+            "model_size": ["26b-a4b", "e2b", "e4b", "31b"],
+            "ndevice": ["1", "1", "1", "2"]
         }
     },
     "perf_params": "demo"

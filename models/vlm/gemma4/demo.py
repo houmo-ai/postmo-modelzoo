@@ -76,7 +76,7 @@ def get_args():
             args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
         if args.decode_path.endswith(".hmm"):
             args.decode_path = args.decode_path.replace(".hmm", ".hmms")
-        if args.assistant_path.endswith(".hmm"):
+        if args.mtp and args.assistant_path.endswith(".hmm"):
             args.assistant_path = args.assistant_path.replace(".hmm", ".hmms")
     # fmt: on
     return args
