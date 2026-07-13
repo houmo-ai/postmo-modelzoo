@@ -22,7 +22,6 @@ import os
 import argparse
 from hmatc.utils.utils import get_file_from_jfrog
 
-
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 
@@ -50,10 +49,6 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = get_args()
-    opencv_path = "3rdparty/qwen3vl-opencv-cpp.zip"
-    target_dir = "./3rdparty"
-    save_path = get_file_from_jfrog(opencv_path, target_dir, target_dir)
-    print(f"OpenCV downloaded to {save_path} and extracted to: {target_dir}")
 
     googletest_path = "3rdparty/googletest.zip"
     target_dir = "./3rdparty"
@@ -64,8 +59,3 @@ if __name__ == "__main__":
     target_dir = "./tests"
     save_path = get_file_from_jfrog(ctest_data, target_dir, target_dir)
     print(f"CTest data downloaded to {save_path} and extracted to: {target_dir}")
-
-    audio_3rdparty_path = "3rdparty/audio_cpp_3rdparty.zip"
-    target_dir = "./3rdparty"
-    save_path = get_file_from_jfrog(audio_3rdparty_path, target_dir, target_dir)
-    print(f"Audio 3rdparty downloaded to {save_path} and extracted to: {target_dir}")

@@ -234,6 +234,7 @@ void PerfDumper::dumpAsrPerf(
   model_perf_settings["encode"] = perf_settings.encode_path;
   model_perf_settings["prefill"] = perf_settings.prefill_path;
   model_perf_settings["decode"] = perf_settings.decode_path;
+  model_perf_settings["chunk"] = perf_settings.chunk;
   model_perf_settings["audio_len"] = perf_settings.audio_len_seconds;
   model_perf_settings["token_per_second"] = perf_settings.token_per_second;
   YAML::Node devices_node;

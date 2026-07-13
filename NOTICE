@@ -46,6 +46,7 @@ half IEEE 754-based half-precision floating-point library (MIT) - https://github
 tokenizers-cpp (Apache-2.0) - https://github.com/mlc-ai/tokenizers-cpp
 Eigen3 (MPL-2.0) - https://gitlab.com/libeigen/eigen
 OpenCV (Apache-2.0) - https://opencv.org/
+stb_image (Public Domain / MIT-0) - https://github.com/nothings/stb
 JSON for Modern C++ (MIT) - https://github.com/nlohmann/json
 mingw-w64 getopt.h (ISC & BSD-2-Clause) - https://sourceforge.net/projects/mingw-w64
 Numpy File I/O for C++ npy.hpp - https://github.com/llohse/libnpy
@@ -53,7 +54,7 @@ Fast C++ Logging Library spdlog - https://github.com/gabime/spdlog
 Modern C++ Argument Parser argparse - https://github.com/p-ranav/argparse
 A YAML parser and emitter in C++ (MIT) - https://github.com/jbeder/yaml-cpp
 miniaudio (MIT-0 / Public Domain) - https://github.com/mackron/miniaudio
-llama.cpp audio preprocessing code portions (MIT) - https://github.com/ggml-org/llama.cpp
+llama.cpp audio and image preprocessing code portions (MIT) - https://github.com/ggml-org/llama.cpp
 whisper.cpp audio preprocessing code portions via llama.cpp (MIT) - https://github.com/ggml-org/whisper.cpp
 LibrosaCpp (Apache-2.0) - https://github.com/ewan-xu/LibrosaCpp
 kaldi-native-fbank (Apache-2.0) - https://github.com/csukuangfj/kaldi-native-fbank

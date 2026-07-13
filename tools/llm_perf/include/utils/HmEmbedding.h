@@ -35,7 +35,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "half.hpp"
+#include "half/half.hpp"
 #include "utils/utils.h"
 
 // float16 defined in utils.h

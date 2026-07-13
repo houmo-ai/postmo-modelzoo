@@ -16,15 +16,7 @@ set(HOUMO_PLATFORM_LINUX FALSE)
 set(HOUMO_PLATFORM_NAME "unknown")
 set(HOUMO_NEED_PTHREAD FALSE)
 set(LIB_PATH "")
-set(OPENCV_CONFIG_MODE "find_package(OpenCV)")
-set(OPENCV_LIB_DIR "")
-set(OPENCV_BIN_DIR "")
-set(OPENCV_LIBS "")
 set(HOUMO_TARGET_LINK_OPTIONS "")
-set(HOUMO_INSTALL_AUDIO_DLLS FALSE)
-set(HOUMO_INSTALL_AUDIO_SOS FALSE)
-set(HOUMO_INSTALL_OPENCV_DLLS FALSE)
-set(HOUMO_INSTALL_OPENCV_SOS FALSE)
 
 if(ANDROID_ABI)
   set(HOUMO_PLATFORM_ANDROID TRUE)
@@ -72,32 +64,8 @@ endif()
 # -----------------------------------------------------------------------------
 # Dependencies
 # -----------------------------------------------------------------------------
-set(OPENCV_REQUIRED_MODULES core imgproc imgcodecs)
-
-if(NOT OpenCV_FOUND OR NOT OpenCV_INCLUDE_DIRS OR NOT OPENCV_LIBS)
-  find_package(OpenCV REQUIRED COMPONENTS ${OPENCV_REQUIRED_MODULES})
-  set(OPENCV_LIBS ${OpenCV_LIBS})
-  set(OPENCV_CONFIG_MODE "find_package(OpenCV)")
-endif()
-
-if(NOT OPENCV_LIB_DIR AND OpenCV_FOUND)
-  get_target_property(_ocv_loc opencv_core IMPORTED_LOCATION)
-  if(NOT _ocv_loc)
-    get_target_property(_ocv_loc opencv_core IMPORTED_LOCATION_RELEASE)
-  endif()
-  if(NOT _ocv_loc)
-    get_target_property(_ocv_loc opencv_core IMPORTED_LOCATION_NOCONFIG)
-  endif()
-  if(_ocv_loc)
-    get_filename_component(OPENCV_LIB_DIR "${_ocv_loc}" DIRECTORY)
-  endif()
-endif()
-
-message(STATUS "OpenCV config mode: ${OPENCV_CONFIG_MODE}")
-message(STATUS "OpenCV include: ${OpenCV_INCLUDE_DIRS}")
-message(STATUS "OpenCV libs: ${OPENCV_LIBS}")
-message(STATUS "OpenCV lib dir: ${OPENCV_LIB_DIR}")
-message(STATUS "OpenCV bin dir: ${OPENCV_BIN_DIR}")
+# Image: stb_image + pure C++ resize (header-only under apis/common/hpp).
+# Audio: miniaudio (header-only under apis/common/hpp/audio) + pure C++ mel.
 
 # GTest for unit testing (local 3rdparty)
 option(BUILD_TESTS "Build unit tests" ON)
@@ -109,21 +77,29 @@ endif()
 
 set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
 
-# Audio 3rdparty (miniaudio, libsamplerate, kaldi-native-fbank)
-set(AUDIO_3RDPARTY_PATH ${CMAKE_SOURCE_DIR}/3rdparty/audio)
-set(AUDIO_3RDPARTY_INCLUDE_DIR ${AUDIO_3RDPARTY_PATH}/3rdparty_build/include)
-set(AUDIO_3RDPARTY_LIBRARY_DIR ${AUDIO_3RDPARTY_PATH}/3rdparty_build/lib)
-set(AUDIO_3RDPARTY_RUNTIME_DIR ${AUDIO_3RDPARTY_PATH}/3rdparty_build/bin)
-
-# tokenizer.cpp (HuggingFace tokenizer c++ 3rdparty)
+# tokenizer.cpp / header-only deps under HOUMO_EXAMPLES_PATH
 if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
   message(STATUS "Raw env: [$ENV{HOUMO_EXAMPLES_PATH}]")
-  set(TOKENIZER_CPP_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/tokenizer.cpp)
-  set(HALF_INCLUDE_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include)
+  file(TO_CMAKE_PATH "$ENV{HOUMO_EXAMPLES_PATH}" HOUMO_EXAMPLES_ROOT)
+  set(TOKENIZER_CPP_PATH ${HOUMO_EXAMPLES_ROOT}/apis/common/tokenizer.cpp)
+  # half:  apis/common/hpp/half/half.hpp
+  # stb:   apis/common/hpp/stb/stb_image.h
+  # audio: apis/common/hpp/audio/miniaudio.h
+  set(COMMON_HPP_PATH ${HOUMO_EXAMPLES_ROOT}/apis/common/hpp)
 else()
   message(FATAL_ERROR "Environment variable HOUMO_EXAMPLES_PATH is not set!...")
 endif()
+if(NOT EXISTS "${COMMON_HPP_PATH}/stb/stb_image.h")
+  message(FATAL_ERROR "stb_image.h not found at ${COMMON_HPP_PATH}/stb/stb_image.h")
+endif()
+if(NOT EXISTS "${COMMON_HPP_PATH}/audio/miniaudio.h")
+  message(FATAL_ERROR "miniaudio.h not found at ${COMMON_HPP_PATH}/audio/miniaudio.h")
+endif()
+if(NOT EXISTS "${COMMON_HPP_PATH}/half/half.hpp")
+  message(FATAL_ERROR "half.hpp not found at ${COMMON_HPP_PATH}/half/half.hpp")
+endif()
 message("TOKENIZER_CPP_PATH: ${TOKENIZER_CPP_PATH}")
+message(STATUS "COMMON_HPP_PATH: ${COMMON_HPP_PATH}")
 add_subdirectory(${TOKENIZER_CPP_PATH} tokenizer_cpp)
 
 # -----------------------------------------------------------------------------
@@ -164,34 +140,24 @@ if(HOUMO_TARGET_LINK_OPTIONS)
 endif()
 
 target_include_directories(houmo_infer PUBLIC
-  ${HALF_INCLUDE_PATH}
   ${CMAKE_SOURCE_DIR}/include
   ${TCIM_RUNTIME_INCLUDE}
   ${TOKENIZER_CPP_PATH}/include
   ${TOKENIZER_CPP_PATH}/third_party
   ${EIGEN_PATH}
-  ${OpenCV_INCLUDE_DIRS}
-  ${AUDIO_3RDPARTY_INCLUDE_DIR}
-  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/audio/include
+  ${COMMON_HPP_PATH}
+  ${COMMON_HPP_PATH}/audio
 )
 
 target_link_directories(houmo_infer PUBLIC
   ${TCIM_RUNTIME_PATH}/lib
-  ${AUDIO_3RDPARTY_LIBRARY_DIR}
 )
 
 set(HOUMO_INFER_LIBS
   tcim_runtime_lite
   tokenizer_lib
-  kaldi-native-fbank-core
-  samplerate
   ${CMAKE_DL_LIBS}
 )
-
-if(OpenCV_FOUND)
-  list(APPEND HOUMO_INFER_LIBS ${OPENCV_LIBS})
-  target_compile_definitions(houmo_infer PUBLIC HOUOMO_USE_OPENCV=1)
-endif()
 
 if(HOUMO_NEED_PTHREAD)
   list(APPEND HOUMO_INFER_LIBS pthread)
@@ -234,6 +200,11 @@ if(BUILD_TESTS)
   target_include_directories(audio_processor_128_test PRIVATE ${TEST_INCLUDE_DIR})
   target_link_libraries(audio_processor_128_test PRIVATE houmo_infer)
   add_test(NAME AudioProcessor128Test COMMAND audio_processor_128_test)
+
+  add_executable(image_processor_test tests/image_processor_test.cc)
+  target_include_directories(image_processor_test PRIVATE ${TEST_INCLUDE_DIR})
+  target_link_libraries(image_processor_test PRIVATE houmo_infer GTest::gtest_main)
+  add_test(NAME ImageProcessorTest COMMAND image_processor_test)
 endif()
 
 # -----------------------------------------------------------------------------
@@ -250,40 +221,6 @@ install(TARGETS tokenizer_lib
   LIBRARY DESTINATION ${LIB_INSTALL_PATH}
   ARCHIVE DESTINATION ${LIB_INSTALL_PATH}
 )
-
-if(HOUMO_INSTALL_AUDIO_DLLS)
-  install(DIRECTORY ${AUDIO_3RDPARTY_LIBRARY_DIR}/
-    DESTINATION ${LIB_INSTALL_PATH}
-    FILES_MATCHING PATTERN "*.dll"
-  )
-  install(DIRECTORY ${AUDIO_3RDPARTY_RUNTIME_DIR}/
-    DESTINATION ${LIB_INSTALL_PATH}
-    FILES_MATCHING PATTERN "*.dll"
-  )
-endif()
-
-if(HOUMO_INSTALL_AUDIO_SOS)
-  install(DIRECTORY ${AUDIO_3RDPARTY_LIBRARY_DIR}/
-    DESTINATION ${LIB_INSTALL_PATH}
-    FILES_MATCHING PATTERN "*.so*"
-  )
-endif()
-
-if(HOUMO_INSTALL_OPENCV_DLLS AND OPENCV_BIN_DIR)
-  file(GLOB _opencv_runtime_files "${OPENCV_BIN_DIR}/opencv_world*.dll")
-  list(FILTER _opencv_runtime_files EXCLUDE REGEX "d\\.dll$")
-  install(FILES ${_opencv_runtime_files} DESTINATION ${LIB_INSTALL_PATH})
-endif()
-
-if(HOUMO_INSTALL_OPENCV_SOS AND OpenCV_FOUND AND NOT OPENCV_LIB_DIR STREQUAL "")
-  file(GLOB _opencv_files
-    ${OPENCV_LIB_DIR}/libopencv_core.so*
-    ${OPENCV_LIB_DIR}/libopencv_imgproc.so*
-    ${OPENCV_LIB_DIR}/libopencv_imgcodecs.so*
-  )
-  list(FILTER _opencv_files EXCLUDE REGEX "\\.a$")
-  install(FILES ${_opencv_files} DESTINATION ${LIB_INSTALL_PATH})
-endif()
 
 install(FILES ${CMAKE_SOURCE_DIR}/convert_embed.py
         DESTINATION .

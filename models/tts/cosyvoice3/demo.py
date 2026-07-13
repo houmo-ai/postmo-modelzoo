@@ -2203,7 +2203,10 @@ if __name__ == "__main__":
     if not os.path.exists(prompt_wav):
         prompt_wav_matches = glob.glob(os.path.join(".", "*_prompt.wav"))
         if not prompt_wav_matches:
-            raise FileNotFoundError("prompt wav not found in current directory")
+            raise FileNotFoundError(
+                f"prompt wav not found: {args.prompt_wav_path} "
+                f"(also no *_prompt.wav in cwd)"
+            )
         prompt_wav = prompt_wav_matches[0]
 
     cosyvoice = CosyVoice3(args)

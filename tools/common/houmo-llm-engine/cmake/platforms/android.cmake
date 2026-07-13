@@ -14,19 +14,3 @@ if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
   file(TO_CMAKE_PATH "$ENV{HOUMO_EXAMPLES_PATH}" HOUMO_EXAMPLES_ROOT)
   set(LIB_INSTALL_PATH "${HOUMO_EXAMPLES_ROOT}/tools/common/android")
 endif()
-
-set(OPENCV_PATH "${CMAKE_SOURCE_DIR}/3rdparty/opencv")
-set(OpenCV_INCLUDE_DIRS "${OPENCV_PATH}/${LIB_PATH}/include")
-set(OPENCV_LIB_DIR "${OPENCV_PATH}/${LIB_PATH}/lib")
-set(OPENCV_LIBS
-  "${OPENCV_LIB_DIR}/libopencv_core.so"
-  "${OPENCV_LIB_DIR}/libopencv_imgproc.so"
-  "${OPENCV_LIB_DIR}/libopencv_imgcodecs.so"
-)
-set(OPENCV_CONFIG_MODE "Android prebuilt OpenCV")
-set(OpenCV_FOUND TRUE)
-
-set(HOUMO_INSTALL_AUDIO_DLLS FALSE)
-set(HOUMO_INSTALL_AUDIO_SOS TRUE)
-set(HOUMO_INSTALL_OPENCV_DLLS FALSE)
-set(HOUMO_INSTALL_OPENCV_SOS TRUE)

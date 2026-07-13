@@ -107,9 +107,9 @@ ASRContext 内部使用模板方法封装打点：子类只实现 `encode_*_impl
 - C++17 编译器
 - CMake >= 3.16
 - TCIM Runtime (`tcim_lite`)
-- OpenCV（图像处理）
+- 图像处理：**stb_image + 纯 C++ resize**（header-only，无 OpenCV）；头文件在 `$HOUMO_EXAMPLES_PATH/apis/common/hpp/stb/`
 - tokenizer.cpp 和 half.hpp
-- 音频依赖：miniaudio、libsamplerate、kaldi-native-fbank
+- 音频依赖：header-only **miniaudio**（`$HOUMO_EXAMPLES_PATH/apis/common/hpp/audio/miniaudio.h`），Mel 特征为纯 C++（llama.cpp/whisper 风格），不依赖 libsamplerate / kaldi-native-fbank / librosa
 - GTest（单元测试）
 
 需要设置 `HOUMO_EXAMPLES_PATH`，并确保 `TCIM_RUNTIME_PATH` 可由 `tcim_runtime.cmake` 找到。Windows平台建议参考根目录 [env.bat](../../../env.bat) 和 [tools/win_envs](../../win_envs/) 正确设置环境变量。
@@ -126,6 +126,8 @@ ASRContext 内部使用模板方法封装打点：子类只实现 `encode_*_impl
 export NDK_PATH=/path/to/android-ndk
 export TCIM_RUNTIME_PATH=/path/to/tcim_runtime
 ./build_ndk.sh
+./build_ndk.sh release
+# 也支持: ./build_ndk.sh debug -DBUILD_TESTS=OFF
 ```
 
 ### Windows
@@ -136,7 +138,7 @@ Windows平台建议先在仓库根目录执行：
 env.bat --set
 ```
 
-该脚本会调用 [tools/win_envs/set_environs.py](../../win_envs/set_environs.py)，并根据 [tools/win_envs/env.json](../../win_envs/env.json) 设置 `HOUMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH`、`OPENCV_PATH`、`PATH` 等变量。执行完成后需要重新打开cmd窗口，使环境变量生效。
+该脚本会调用 [tools/win_envs/set_environs.py](../../win_envs/set_environs.py)，并根据 [tools/win_envs/env.json](../../win_envs/env.json) 设置 `HOUMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH`、`PATH` 等变量。执行完成后需要重新打开cmd窗口，使环境变量生效。
 
 确认环境变量生效后，在当前目录执行：
 
@@ -144,7 +146,7 @@ env.bat --set
 build_win.bat
 ```
 
-Windows构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 进行并行编译。构建和安装产物会输出到 `$HOUMO_EXAMPLES_PATH/tools/common/lib`，该目录应已由 `env.bat --set` 加入 `PATH`，以便运行依赖 `houmo_infer.dll`、`tokenizer_lib.dll`、`kaldi-native-fbank-core.dll`、`samplerate.dll` 等动态库的工具。
+Windows构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 进行并行编译。构建和安装产物会输出到 `$HOUMO_EXAMPLES_PATH/tools/common/lib`，该目录应已由 `env.bat --set` 加入 `PATH`，以便运行依赖 `houmo_infer.dll`、`tokenizer_lib.dll` 等动态库的工具。
 
 ### 手动 CMake
 

@@ -52,14 +52,14 @@
         "xh2": {
             "tokenizer_dir": ["cached_models/Fun-CosyVoice3-0.5B-2512"],
             "prompt_wav_path": [
-                "cached_models/hmm_xh2_2k/zero_shot_prompt.wav"
+                "cached_results/zero_shot_prompt.wav"
             ],
             "ndevice": [null],
             "campplus_path": [
-                "cached_results/hmm_xh2_2k/cosyvoice3_campplus.hmm"
+                "cached_results/hmm_xh2_2k/cosyvoice3-0.5b-2512_campplus.hmm"
             ],
             "speech_tokenizer_path": [
-                "cached_results/hmm_xh2_2k/cosyvoice3_speech_tokenizer.hmm"
+                "cached_results/hmm_xh2_2k/cosyvoice3-0.5b-2512_speech_tokenizer.hmm"
             ],
             "sos_emb_path": [
                 "cached_results/hmm_xh2_2k/hmquant/llm_sos_embedding.pt"
@@ -74,31 +74,31 @@
                 "cached_results/hmm_xh2_2k/hmquant/quant_embedding.pt"
             ],
             "prefill_model_path": [
-                "cached_results/hmm_xh2_2k/cosyvoice3_llm_qwen2_prefill.hmm"
+                "cached_results/hmm_xh2_2k/cosyvoice3-0.5b-2512_llm_qwen2_prefill.hmm"
             ],
             "decode_model_path": [
-                "cached_results/hmm_xh2_2k/cosyvoice3_llm_qwen2_decode.hmm"
+                "cached_results/hmm_xh2_2k/cosyvoice3-0.5b-2512_llm_qwen2_decode.hmm"
             ],
             "llm_decoder_path": [
-                "cached_results/hmm_xh2_2k/cosyvoice3_llm_decoder.hmm"
+                "cached_results/hmm_xh2_2k/cosyvoice3-0.5b-2512_llm_decoder.hmm"
             ],
             "input_embedding": [
                 "cached_results/hmm_xh2_2k/hmquant/flow_input_embedding.pt"
             ],
             "spk_embed_affine_layer": [
-                "cached_results/hmm_xh2_2k/cosyvoice3_flow_spk.hmm"
+                "cached_results/hmm_xh2_2k/cosyvoice3-0.5b-2512_flow_spk.hmm"
             ],
             "pre_lookahead_layer": [
-                "cached_results/hmm_xh2_2k/cosyvoice3_flow_encoder.hmm"
+                "cached_results/hmm_xh2_2k/cosyvoice3-0.5b-2512_flow_encoder.hmm"
             ],
             "flow_decoder_path": [
-                "cached_results/hmm_xh2_2k/cosyvoice3_flow_decoder.hmm"
+                "cached_results/hmm_xh2_2k/cosyvoice3-0.5b-2512_flow_decoder.hmm"
             ],
             "hift_part1_path": [
-                "cached_results/hmm_xh2_2k/cosyvoice3_hift_part1.hmm"
+                "cached_results/hmm_xh2_2k/cosyvoice3-0.5b-2512_hift_part1.hmm"
             ],
             "hift_part2_path": [
-                "cached_results/hmm_xh2_2k/cosyvoice3_hift_part2.hmm"
+                "cached_results/hmm_xh2_2k/cosyvoice3-0.5b-2512_hift_part2.hmm"
             ],
             "output_dir": ["cached_results/demo_results"]
         }

@@ -31,11 +31,12 @@
 #include <cstring>
 #include <eigen3/unsupported/Eigen/CXX11/Tensor>
 #include <fstream>
-#include <half.hpp>
 #include <iostream>
 #include <locale>
 #include <string>
 #include <vector>
+
+#include "half/half.hpp"
 
 using half_float::half;
 

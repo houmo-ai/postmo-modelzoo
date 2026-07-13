@@ -20,6 +20,9 @@
   - [3.免责声明](#3免责声明)
 
 ## 变更日志
+- [20260713]
+  - ASR模拟性能测试入参由 `--audio_len` 改为 `--chunk`，默认1；程序加载模型后根据 `encoder_window` 自行计算 `audio_len`
+  - `--token_per_second` 默认值统一为3
 - [20260707]
   - Windows平台支持ASR模拟性能测试，`ENABLE_ASR` 默认开启
   - Windows编译复用 `houmo-llm-engine` 产物，`build_win.bat` 会自动触发 `houmo-llm-engine` Windows构建
@@ -146,7 +149,7 @@
   | Overall TPS                             | 整体吞吐量，单位（tokens/s）                                        |
   | Avg Decode Latency                      | 平均Decode延迟，单位（ms/token）                                    |
   | Simulated Audio                         | 模拟音频时长，单位（s）                                             |
-  | Chunks                                  | 分块数量（=ceil(audio_len/encoder_window)）                         |
+  | Chunks                                  | 分块数量（由 `--chunk` 指定，audio_len=chunk×encoder_window×0.01s） |
   | Output Tokens                           | 输出token总数（=Σ每chunk的decode轮数）                              |
   | Overall RTF                             | 整体实时因子（Real-Time Factor），小于1表示快于实时                  |
   | Inference RTF                           | 推理实时因子                                                        |
@@ -181,8 +184,8 @@
 - --encode           : 指定ASR编码器模型路径，支持相对/绝对路径。设置此参数将触发ASR性能测试流程。
 - --prefill          : ASR模式下指定prefill模型路径。
 - --decode           : ASR模式下指定decode模型路径。
-- --audio_len        : 模拟音频时长，单位秒，默认30。程序根据此值计算分块数和每块decode轮数。
-- --token_per_second : 模拟每秒decode token数，默认20。每个chunk的decode轮数=该chunk音频时长×token_per_second。
+- --chunk            : 模拟encoder分块数，默认1。程序加载模型后根据encoder_window计算audio_len（audio_len=chunk×encoder_window×0.01s）。
+- --token_per_second : 模拟每秒decode token数，默认3。每个chunk的decode轮数=该chunk音频时长×token_per_second。
 - --devices          : 指定模型使用的device_id，不指定时优先从HOUMO_VISIBLE_DEVICES环境变量读取，如果环境变量未设置默认为0。
 - --loop             : 指定循环执行次数，不指定默认为1。
 - --no_warm_up       : 默认执行warm_up，配置后会跳过warm_up流程。
@@ -190,6 +193,21 @@
 - --model_name       : 可选，指定模型名称，用于日志展示。
 
 说明：ASR性能测试使用模拟数据（随机mel特征+随机embedding），无需真实音频文件、Tokenizer和Embedding。自动支持GLM-ASR和Qwen3-ASR模型，根据模型元数据动态推断差异（encoder输入dtype、是否有input_lengths等），无需手动指定模型类型。
+
+> **关于 `token_per_second` 参数的说明**：该参数指的是**文本文字 token**（语音转文字后，ASR 输出文字 token），而不是音频声学 token（语音编码）。
+>
+> **人类正常说话语速基准：**
+> - 中文日常闲聊：180~220 字/分钟 = 3~3.6 汉字/秒
+> - 中文正式演讲：240~280 字/分钟 = 4~4.7 汉字/秒
+> - 英文日常：130~160 单词/分钟 ≈ 2~2.7 词/秒
+>
+> **换算成文本 token（通用分词规则）：**
+> - 中文：1 token ≈ 1.5 个汉字 → 闲聊 ≈ 2 token/s，演讲快语速 ≈ 3.1 token/s
+> - 英文：1 token ≈ 0.75 单词 → 日常英文 ≈ 3.6 token/s
+>
+> **综合结论（含自然停顿）：**
+> - 正常普通人对话（含停顿换气）：2～3 文本 token/秒
+> - 无停顿快速朗读：3～4 token/s
 
 3. 命令行llm_perf以配置文件启动
 - --config, -c      : 使用配置文件启动perf程序，需要提前准备好配置文件，配置文件模板参考1.4节。
@@ -223,12 +241,12 @@ HOUMO_VISIBLE_DEVICES=1 ./llm_perf --prefill prefill_model.hmm --decode decode_m
 
 ASR模拟性能测试使用示例（需要ENABLE_ASR编译选项开启）：
 ``` shell
-# GLM-ASR模型性能测试（模拟30s音频）
-./llm_perf --encode glm_encode.hmm --prefill glm_prefill.hmm --decode glm_decode.hmm --audio_len 30 --token_per_second 20 --devices 0
-# Qwen3-ASR模型性能测试（模拟300s长音频）
-./llm_perf --encode qwen3-asr_encode.hmm --prefill qwen3-asr_prefill.hmm --decode qwen3-asr_decode.hmm --audio_len 300 --token_per_second 4 --devices 0 --loop 3
-# 指定短音频测试（5s）
-./llm_perf --encode glm_encode.hmm --prefill glm_prefill.hmm --decode glm_decode.hmm --audio_len 5 --token_per_second 10 --devices 0 --no_warm_up
+# GLM-ASR模型性能测试（默认1个chunk，audio_len由encoder_window推导）
+./llm_perf --encode glm_encode.hmm --prefill glm_prefill.hmm --decode glm_decode.hmm --chunk 1 --token_per_second 3 --devices 0
+# Qwen3-ASR模型性能测试（多个chunk模拟更长音频）
+./llm_perf --encode qwen3-asr_encode.hmm --prefill qwen3-asr_prefill.hmm --decode qwen3-asr_decode.hmm --chunk 10 --token_per_second 4 --devices 0 --loop 3
+# 跳过warm_up的短测
+./llm_perf --encode glm_encode.hmm --prefill glm_prefill.hmm --decode glm_decode.hmm --chunk 1 --token_per_second 3 --devices 0 --no_warm_up
 ```
 
 #### 1.4.3 配置文件启动
@@ -310,15 +328,15 @@ Streams:
     encode: glm-asr/glm-asr_encode.hmm
     prefill: glm-asr/glm-asr_prefill.hmm
     decode: glm-asr/glm-asr_decode.hmm
-    audio_len: 30
-    token_per_second: 20
+    chunk: 1
+    token_per_second: 3
     devices: "0"
     loop: 3
   - ModelName: qwen3_asr_perf
     encode: qwen3-asr/qwen3-asr_encode.hmm
     prefill: qwen3-asr/qwen3-asr_prefill.hmm
     decode: qwen3-asr/qwen3-asr_decode.hmm
-    audio_len: 300
+    chunk: 10
     token_per_second: 4
     devices: "0"
     loop: 1

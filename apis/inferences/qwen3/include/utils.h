@@ -23,13 +23,13 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
+#include "half/half.hpp"
 #include <cassert>
 #include <chrono>
 #include <codecvt>
 #include <cstring>
 #include <eigen3/unsupported/Eigen/CXX11/Tensor>
 #include <fstream>
-#include <half.hpp>
 #include <iostream>
 #include <locale>
 #include <string>

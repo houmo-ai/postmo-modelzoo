@@ -41,7 +41,7 @@ set(SOURCE_FILES
 if(DEFINED ENV{HALF_INCLUDE_PATH})
   set(HALF_INCLUDE_PATH $ENV{HALF_INCLUDE_PATH})
 elseif(DEFINED ENV{HOUMO_EXAMPLES_PATH})
-  set(HALF_INCLUDE_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include)
+  set(HALF_INCLUDE_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp)
 else()
   message(WARNING "HALF_INCLUDE_PATH not set, using default path")
   set(HALF_INCLUDE_PATH /usr/include/half)

@@ -32,7 +32,7 @@
 #include <string>
 #include <vector>
 
-#include "half.hpp"
+#include "half/half.hpp"
 
 namespace houmo {
 

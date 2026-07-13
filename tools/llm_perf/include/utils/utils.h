@@ -31,7 +31,6 @@
 #include <eigen3/unsupported/Eigen/CXX11/Tensor>
 #include <filesystem>
 #include <fstream>
-#include <half.hpp>
 #include <iomanip>
 #include <iostream>
 #include <locale>
@@ -45,6 +44,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "half/half.hpp"
 #include "utils/perf_tracker/inference_perf_tracker.h"
 
 using float16 = half_float::half;
@@ -108,12 +108,15 @@ static void HelpUsage(char* argv[]) {
          "  --encode          FILE      Encoder model file (required).\n"
          "  --prefill         FILE      Prefill model file (required).\n"
          "  --decode          FILE      Decode model file (required).\n"
-         "  --audio_len       NUM       Simulated audio length in seconds (default: 30).\n"
-         "  --token_per_second NUM      Simulated decode tokens per second (default: 20).\n"
+         "  --chunk           NUM       Number of encoder chunks "
+         "(default: 1; audio_len is derived from encoder_window).\n"
+         "  --token_per_second NUM      Simulated decode tokens per second "
+         "(default: 3).\n"
          "  --devices         NUM[,NUM...]      Device ids.\n"
          "  --loop            NUM       Loop test rounds (range: 1-1000000).\n"
          "  --no_warm_up                Disable warm-up.\n"
-         "  --interval        NUM       Sampling interval in ms for monitoring.\n"
+         "  --interval        NUM       Sampling interval in ms for "
+         "monitoring.\n"
          "  -h, --help                  Show this help message.\n\n"
          "Examples:\n"
          "  "
@@ -122,8 +125,8 @@ static void HelpUsage(char* argv[]) {
          "--input 256 --output 100\n"
          "  "
       << argv[0]
-       << " --encode encode.hmm --prefill prefill.hmm --decode decode.hmm "
-         "--audio_len 30 --token_per_second 20 --loop 3\n"
+      << " --encode encode.hmm --prefill prefill.hmm --decode decode.hmm "
+         "--chunk 1 --token_per_second 3 --loop 3\n"
          "  "
       << argv[0] << " -c perf_config.yaml\n";
 }
@@ -400,7 +403,7 @@ typedef struct perf_settings {
 
 typedef struct asr_perf_settings {
   struct AsrPerfCase {
-    float audio_len_seconds;
+    int chunk;
     int token_per_second;
   };
 
@@ -410,8 +413,9 @@ typedef struct asr_perf_settings {
   std::string decode_path;
   std::vector<AsrPerfCase> perf_cases;
   std::vector<int> devices;
-  float audio_len_seconds = 30.0f;
-  int token_per_second = 20;
+  int chunk = 1;
+  float audio_len_seconds = 0.0f;
+  int token_per_second = 3;
   int loop_count = 1;
   bool warm_up = true;
   uint32_t interval_ms = 500;

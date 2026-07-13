@@ -26,8 +26,8 @@
 #include <yaml-cpp/yaml.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cctype>
+#include <chrono>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -50,40 +50,34 @@ namespace fs = std::filesystem;
 #define ALARM_TEMPERATURE_THRESHOLD 80
 #define SHUTDOWN_TEMPERATURE_THRESHOLD 100
 
+// One encoder chunk covers encoder_window mel frames.
+// Frame hop is 160 samples at 16 kHz => each frame is 0.01s.
+// audio_len_seconds = chunk * encoder_window * 0.01
+static float ComputeAudioLenSeconds(int chunk, int encoder_window,
+                                    int sample_rate = 16000) {
+  if (chunk < 1) {
+    throw std::invalid_argument("chunk must be >= 1");
+  }
+  if (encoder_window < 1) {
+    throw std::invalid_argument("encoder_window must be >= 1");
+  }
+  return static_cast<float>(chunk) * static_cast<float>(encoder_window) * 160.0f /
+         static_cast<float>(sample_rate);
+}
+
 static AsrPerfSettings BuildAsrPerfCaseSettings(
     const AsrPerfSettings& settings,
-    const AsrPerfSettings::AsrPerfCase& perf_case,
-    size_t perf_case_index) {
+    const AsrPerfSettings::AsrPerfCase& perf_case, size_t perf_case_index,
+    int encoder_window) {
   AsrPerfSettings current_settings = settings;
-  current_settings.audio_len_seconds = perf_case.audio_len_seconds;
+  current_settings.chunk = perf_case.chunk;
   current_settings.token_per_second = perf_case.token_per_second;
+  current_settings.audio_len_seconds =
+      ComputeAudioLenSeconds(perf_case.chunk, encoder_window);
   current_settings.perf_case_index = static_cast<int>(perf_case_index + 1);
   current_settings.perf_case_total =
       static_cast<int>(settings.perf_cases.size());
   return current_settings;
-}
-
-static std::vector<float> parse_float_list(const std::string& value,
-                                           const std::string& arg_name) {
-  std::vector<float> values;
-  std::stringstream ss(value);
-  std::string item;
-  while (std::getline(ss, item, ',')) {
-    item.erase(std::remove_if(item.begin(), item.end(),
-                              [](unsigned char c) { return std::isspace(c); }),
-               item.end());
-    if (item.empty()) {
-      throw std::invalid_argument("Invalid " + arg_name +
-                                  " value, empty item in comma-separated list.");
-    }
-    float parsed = std::stof(item);
-    if (parsed <= 0.0f) {
-      throw std::invalid_argument("Invalid " + arg_name +
-                                  " value (must be positive).");
-    }
-    values.push_back(parsed);
-  }
-  return values;
 }
 
 static void PrintAsrMetrics(const AsrTranscribeResult& result, int n_chunks) {
@@ -94,26 +88,27 @@ static void PrintAsrMetrics(const AsrTranscribeResult& result, int n_chunks) {
   double dec_chunk_s =
       (n_chunks > 0) ? result.decode_time_ms / 1000.0 / n_chunks : 0;
 
-  std::cout << "\n================================ ASR RTF Metrics "
-            << "================================\n"
-            << "Simulated Audio:      " << result.audio_duration_s << "s\n"
-            << "Chunks:               " << n_chunks << "\n"
-            << "Output Tokens:        " << result.output_tokens << "\n"
-            << "Overall RTF:          " << std::fixed << std::setprecision(4)
-            << result.overall_rtf
-            << (result.overall_rtf < 1.0f ? " (< real-time)" : "") << "\n"
-            << "Inference RTF:        " << result.inference_rtf << "\n"
-            << "Encode Per Chunk:     " << std::fixed << std::setprecision(2)
-            << enc_chunk_s << "s\n"
-            << "Prefill Per Chunk:    " << pref_chunk_s << "s\n"
-            << "Decode Per Chunk:     " << dec_chunk_s << "s\n"
-            << "Decode TPS:           " << std::fixed << std::setprecision(2)
-            << result.decode_tps << " tok/s\n"
-            << "Overall TPS:          " << result.overall_tps << " tok/s\n"
-            << "TTFT:                 " << std::fixed << std::setprecision(2)
-            << result.ttft_ms << " ms\n"
-            << "================================================================="
-            << "=================\n";
+  std::cout
+      << "\n================================ ASR RTF Metrics "
+      << "================================\n"
+      << "Simulated Audio:      " << result.audio_duration_s << "s\n"
+      << "Chunks:               " << n_chunks << "\n"
+      << "Output Tokens:        " << result.output_tokens << "\n"
+      << "Overall RTF:          " << std::fixed << std::setprecision(4)
+      << result.overall_rtf
+      << (result.overall_rtf < 1.0f ? " (< real-time)" : "") << "\n"
+      << "Inference RTF:        " << result.inference_rtf << "\n"
+      << "Encode Per Chunk:     " << std::fixed << std::setprecision(2)
+      << enc_chunk_s << "s\n"
+      << "Prefill Per Chunk:    " << pref_chunk_s << "s\n"
+      << "Decode Per Chunk:     " << dec_chunk_s << "s\n"
+      << "Decode TPS:           " << std::fixed << std::setprecision(2)
+      << result.decode_tps << " tok/s\n"
+      << "Overall TPS:          " << result.overall_tps << " tok/s\n"
+      << "TTFT:                 " << std::fixed << std::setprecision(2)
+      << result.ttft_ms << " ms\n"
+      << "================================================================="
+      << "=================\n";
 }
 
 static int RunAsrCore(const AsrPerfSettings& settings,
@@ -142,26 +137,30 @@ static int RunAsrCore(const AsrPerfSettings& settings,
 #endif
 
   int encoder_window = model->encoder_window();
-  for (size_t perf_case_index = 0;
-       perf_case_index < settings.perf_cases.size(); ++perf_case_index) {
+  if (encoder_window < 1) {
+    throw std::runtime_error("Invalid encoder_window from model metadata");
+  }
+  for (size_t perf_case_index = 0; perf_case_index < settings.perf_cases.size();
+       ++perf_case_index) {
     AsrPerfSettings current_settings = BuildAsrPerfCaseSettings(
-        settings, settings.perf_cases[perf_case_index], perf_case_index);
-    int n_frames = static_cast<int>(current_settings.audio_len_seconds * 16000 / 160);
-    if (n_frames < 1) n_frames = 1;
-    int n_chunks = (n_frames + encoder_window - 1) / encoder_window;
+        settings, settings.perf_cases[perf_case_index], perf_case_index,
+        encoder_window);
+    int n_chunks = current_settings.chunk;
 
     std::cout << COLOR_BLUE << "\n"
-              << std::string(24, '=') << "ASR Perf Case: "
-              << current_settings.perf_case_index << "/"
-              << current_settings.perf_case_total << " | audio_len="
-              << current_settings.audio_len_seconds
+              << std::string(24, '=')
+              << "ASR Perf Case: " << current_settings.perf_case_index << "/"
+              << current_settings.perf_case_total
+              << " | chunk=" << current_settings.chunk
+              << " | audio_len=" << current_settings.audio_len_seconds
               << "s | token_per_second=" << current_settings.token_per_second
               << std::string(24, '=') << "\n";
 
     if (current_settings.warm_up) {
       std::cout << "\n"
-                << std::string(30, '=') << "ASR Perf WarmUp: audio_len="
-                << current_settings.audio_len_seconds
+                << std::string(30, '=')
+                << "ASR Perf WarmUp: chunk=" << current_settings.chunk
+                << " audio_len=" << current_settings.audio_len_seconds
                 << "s token_per_second=" << current_settings.token_per_second
                 << std::string(30, '=') << "\n";
       float temp = device_monitor->getCurrentTemperature();
@@ -174,10 +173,11 @@ static int RunAsrCore(const AsrPerfSettings& settings,
 
     for (int i = 0; i < current_settings.loop_count; ++i) {
       std::cout << COLOR_BLUE << "\n"
-                << std::string(24, '=') << "ASR Perf Loop: " << (i + 1)
-                << "/" << current_settings.loop_count
+                << std::string(24, '=') << "ASR Perf Loop: " << (i + 1) << "/"
+                << current_settings.loop_count
                 << " | case=" << current_settings.perf_case_index << "/"
                 << current_settings.perf_case_total
+                << " | chunk=" << current_settings.chunk
                 << " | audio_len=" << current_settings.audio_len_seconds
                 << "s | token_per_second=" << current_settings.token_per_second
                 << std::string(24, '=') << "\n";
@@ -226,8 +226,7 @@ static int RunAsrCore(const AsrPerfSettings& settings,
 }
 
 static int RunAsr(std::unordered_map<std::string, std::string> args,
-                  PerfDumper& perf_dumper,
-                  bool run_perf_by_yaml) {
+                  PerfDumper& perf_dumper, bool run_perf_by_yaml) {
   try {
     AsrPerfSettings settings;
 
@@ -256,33 +255,37 @@ static int RunAsr(std::unordered_map<std::string, std::string> args,
       settings.devices = {0};
     }
 
-    std::vector<float> audio_len_list =
-        args.count("audio_len") ? parse_float_list(args["audio_len"], "audio_len")
-                                : std::vector<float>{30.0f};
+    std::vector<int> chunk_list;
+    if (args.count("chunk")) {
+      std::unordered_map<std::string, std::string> tmp;
+      tmp["chunk"] = args["chunk"];
+      chunk_list = validate_multi_setting(tmp, "chunk");
+    } else {
+      chunk_list = {1};
+    }
     std::vector<int> token_per_second_list;
     if (args.count("token_per_second")) {
       std::unordered_map<std::string, std::string> tmp;
       tmp["token_per_second"] = args["token_per_second"];
       token_per_second_list = validate_multi_setting(tmp, "token_per_second");
     } else {
-      token_per_second_list = {20};
+      token_per_second_list = {3};
     }
-    if (audio_len_list.size() != token_per_second_list.size()) {
+    if (chunk_list.size() != token_per_second_list.size()) {
       throw std::invalid_argument(
-          "audio_len and token_per_second must have the same number of "
+          "chunk and token_per_second must have the same number of "
           "comma-separated values");
     }
-    for (size_t i = 0; i < audio_len_list.size(); ++i) {
-      settings.perf_cases.push_back({audio_len_list[i], token_per_second_list[i]});
+    for (size_t i = 0; i < chunk_list.size(); ++i) {
+      settings.perf_cases.push_back({chunk_list[i], token_per_second_list[i]});
     }
-    settings.audio_len_seconds = audio_len_list.front();
+    settings.chunk = chunk_list.front();
     settings.token_per_second = token_per_second_list.front();
     settings.perf_case_total = static_cast<int>(settings.perf_cases.size());
 
     settings.loop_count =
         args.count("loop") ? validate_setting(args, "loop") : 1;
-    settings.loop_count =
-        std::min(std::max(settings.loop_count, 1), 1000000);
+    settings.loop_count = std::min(std::max(settings.loop_count, 1), 1000000);
 
     settings.warm_up = !args.count("no_warm_up");
 
@@ -293,13 +296,14 @@ static int RunAsr(std::unordered_map<std::string, std::string> args,
       perf_dumper.setYamlFile(args["dump_file"], run_perf_by_yaml);
     }
 
-    std::cout << COLOR_YELLOW << std::string(25, '=')
-              << " ASR Perf Settings " << std::string(25, '=') << "\n"
+    std::cout << COLOR_YELLOW << std::string(25, '=') << " ASR Perf Settings "
+              << std::string(25, '=') << "\n"
               << "model: " << settings.model_name << "\n"
               << "encode: " << settings.encode_path << "\n"
               << "prefill: " << settings.prefill_path << "\n"
               << "decode: " << settings.decode_path << "\n"
-              << "audio_len: " << settings.audio_len_seconds << "s\n"
+              << "chunk: " << settings.chunk
+              << " (audio_len derived from encoder_window after model load)\n"
               << "token_per_second: " << settings.token_per_second << "\n"
               << "devices: " << format_int_list(settings.devices) << "\n"
               << "loop: " << settings.loop_count << "\n"
@@ -318,8 +322,8 @@ static int RunAsrConfig(int argc, char* argv[], PerfDumper& perf_dumper) {
   const std::string yamlfile = argv[2];
   fs::path path = fs::u8path(yamlfile);
   if (!fs::exists(path)) {
-    throw std::invalid_argument(
-        "config path does not exist: " + path.u8string());
+    throw std::invalid_argument("config path does not exist: " +
+                                path.u8string());
   }
 
   std::ifstream file(yamlfile);
@@ -329,8 +333,7 @@ static int RunAsrConfig(int argc, char* argv[], PerfDumper& perf_dumper) {
 
   YAML::Node config = YAML::Load(yaml_content);
   if (!config["Streams"]) {
-    throw std::invalid_argument(
-        "config file does not contain perf Streams!");
+    throw std::invalid_argument("config file does not contain perf Streams!");
   }
 
   size_t n_tasks = config["Streams"].size();
@@ -343,41 +346,44 @@ static int RunAsrConfig(int argc, char* argv[], PerfDumper& perf_dumper) {
   }
 
   for (const auto& stream : config["Streams"]) {
-    std::string model_name = stream["ModelName"]
-                                 ? stream["ModelName"].as<std::string>()
-                                 : "unknown";
+    std::string model_name =
+        stream["ModelName"] ? stream["ModelName"].as<std::string>() : "unknown";
 
     std::cout << COLOR_GREEN << std::string(45, '#') << "Start of Task "
               << (curTaskId + 1) << ", All Task:" << n_tasks
-              << ", ModelName:" << model_name << "."
-              << std::string(45, '#') << "\n";
+              << ", ModelName:" << model_name << "." << std::string(45, '#')
+              << "\n";
 
     AsrPerfSettings settings;
     settings.model_name = model_name;
     settings.encode_path = stream["encode"].as<std::string>();
     settings.prefill_path = stream["prefill"].as<std::string>();
     settings.decode_path = stream["decode"].as<std::string>();
-    std::vector<float> audio_len_list =
-        stream["audio_len"]
-            ? parse_float_list(stream["audio_len"].as<std::string>(), "audio_len")
-            : std::vector<float>{30.0f};
+    std::vector<int> chunk_list;
+    if (stream["chunk"]) {
+      std::unordered_map<std::string, std::string> tmp;
+      tmp["chunk"] = stream["chunk"].as<std::string>();
+      chunk_list = validate_multi_setting(tmp, "chunk");
+    } else {
+      chunk_list = {1};
+    }
     std::vector<int> token_per_second_list;
     if (stream["token_per_second"]) {
       std::unordered_map<std::string, std::string> tmp;
       tmp["token_per_second"] = stream["token_per_second"].as<std::string>();
       token_per_second_list = validate_multi_setting(tmp, "token_per_second");
     } else {
-      token_per_second_list = {20};
+      token_per_second_list = {3};
     }
-    if (audio_len_list.size() != token_per_second_list.size()) {
+    if (chunk_list.size() != token_per_second_list.size()) {
       throw std::invalid_argument(
-          "audio_len and token_per_second must have the same number of "
+          "chunk and token_per_second must have the same number of "
           "comma-separated values");
     }
-    for (size_t i = 0; i < audio_len_list.size(); ++i) {
-      settings.perf_cases.push_back({audio_len_list[i], token_per_second_list[i]});
+    for (size_t i = 0; i < chunk_list.size(); ++i) {
+      settings.perf_cases.push_back({chunk_list[i], token_per_second_list[i]});
     }
-    settings.audio_len_seconds = audio_len_list.front();
+    settings.chunk = chunk_list.front();
     settings.token_per_second = token_per_second_list.front();
     settings.perf_case_total = static_cast<int>(settings.perf_cases.size());
 
@@ -390,10 +396,8 @@ static int RunAsrConfig(int argc, char* argv[], PerfDumper& perf_dumper) {
       settings.devices = {0};
     }
 
-    settings.loop_count =
-        stream["loop"] ? stream["loop"].as<int>() : 1;
-    settings.warm_up =
-        stream["no_warm_up"] ? false : true;
+    settings.loop_count = stream["loop"] ? stream["loop"].as<int>() : 1;
+    settings.warm_up = stream["no_warm_up"] ? false : true;
     settings.interval_ms =
         stream["interval"] ? stream["interval"].as<int>() : 500;
 
@@ -407,8 +411,8 @@ static int RunAsrConfig(int argc, char* argv[], PerfDumper& perf_dumper) {
 
     std::cout << COLOR_GREEN << std::string(45, '#') << " End of Task "
               << (curTaskId + 1) << ", All Task:" << n_tasks
-              << ",  ModelName:" << model_name << "."
-              << std::string(45, '#') << "\n\n\n";
+              << ",  ModelName:" << model_name << "." << std::string(45, '#')
+              << "\n\n\n";
     curTaskId++;
   }
 

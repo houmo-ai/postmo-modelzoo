@@ -35,7 +35,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "half.hpp"
+#include "half/half.hpp"
 
 // Define TensorType as half precision floating point
 using TensorType = half_float::half;

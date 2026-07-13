@@ -88,12 +88,10 @@ option(ENABLE_ASR "Enable ASR support" ON)
 message(STATUS "ENABLE_ASR: ${ENABLE_ASR}")
 
 include_directories(
-  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/nlohmann/include
-  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp
   $ENV{HOUMO_SDK_PATH}/hal/export/include
   $ENV{HOUMO_SDK_PATH}/hal/include
-  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/audio/include
+  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp
   ${CMAKE_SOURCE_DIR}/include
   ${OpenCV_INCLUDE_DIRS}
 )

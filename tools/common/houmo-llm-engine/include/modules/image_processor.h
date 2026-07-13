@@ -4,7 +4,7 @@
  * File: HmImageProcessor.h
  * Description:
  *   Image processing interface for Qwen3-VL model.
- *   Handles image loading, resizing, padding, and YUV conversion.
+ *   Handles image loading, resizing, and padding.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
 
@@ -60,7 +59,8 @@ struct ProcessedImage {
  * 1. Loading images from file paths
  * 2. Resizing with aspect ratio preservation (v1) or direct resize (v2)
  * 3. Padding to target dimensions
- * 4. RGB to YUV conversion
+ *
+ * Image loading uses stb_image; resize is pure C++ (area/bicubic).
  */
 class HmImageProcessor {
  public:
@@ -96,10 +96,10 @@ class HmImageProcessor {
       const std::vector<std::string> &image_paths);
 
   /**
-   * @brief Convert processed image to float16 precision tensor (NCHW format,
-   * YUV color space)
+   * @brief Convert processed image to float16 tensor in [C=3, T=2, H, W] layout
+   * (raw RGB values 0..255, temporal frames duplicated)
    * @param image Processed image
-   * @return Vector of float16 values in NCHW format (YUV444)
+   * @return Vector of float16 values
    */
   std::vector<float16> ToFP16Tensor(const ProcessedImage &image);
 

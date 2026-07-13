@@ -41,7 +41,7 @@ endif()
 
 set(SOURCE_FILES Hmtokenizer.cc HmQwenInfer.cc qwen3.cc)
 set(INCLUDE_DIRS
-  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include
+  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp
   ${TOKENZIER_CPP_PATH}/${LIB_PATH}/include
   ${CMAKE_SOURCE_DIR}/include
   $ENV{TCIM_RUNTIME_PATH}/include

@@ -25,12 +25,13 @@
 
 #include <cstdint>
 #include <eigen3/unsupported/Eigen/CXX11/Tensor>
-#include <half.hpp>
 #include <map>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include "half/half.hpp"
 
 using float16 = half_float::half;
 

@@ -1,8 +1,12 @@
 @echo off
-chcp 65001 > nul
+chcp 65001 > /dev/null
 set VSLANG=1033
 setlocal enabledelayedexpansion
 set PROJECT_DIR=%cd%
+
+rem Usage:
+rem   build_win.bat
+
 :: remove build directory if exists
 if exist "build" (
     rmdir /s /q build
@@ -14,7 +18,9 @@ mkdir "build"
 if not exist "3rdparty" (
     mkdir "3rdparty"
     echo Created directory: 3rdparty
-    set PROJECT_DIR=%cd%
+)
+
+if not exist "3rdparty\googletest" (
     "%PYTHON_DIR%\python.exe" get_3rdparty.py
 )
 
@@ -37,19 +43,7 @@ if not exist "3rdparty\eigen3" (
     echo Eigen3 setup completed
 )
 
-if not exist "3rdparty\audio\3rdparty_build\lib\kaldi-native-fbank-core.lib" (
-    cd /d "3rdparty\audio"
-    call build_win.bat
-    if errorlevel 1 exit /b 1
-    cd /d "%PROJECT_DIR%"
-) else if not exist "3rdparty\audio\3rdparty_build\lib\samplerate.lib" (
-    cd /d "3rdparty\audio"
-    call build_win.bat
-    if errorlevel 1 exit /b 1
-    cd /d "%PROJECT_DIR%"
-) else (
-    echo Audio 3rdparty dependencies are ready
-)
+rem Image/audio: header-only under %HOUMO_EXAMPLES_PATH%\apis\common\hpp\
 
 echo All dependencies are ready
 

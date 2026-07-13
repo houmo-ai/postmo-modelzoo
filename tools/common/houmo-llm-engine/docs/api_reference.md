@@ -564,15 +564,15 @@ struct AudioProcessorConfig {
 
 | 文件 | 说明 |
 |------|------|
-| `cmake/platforms/windows.cmake` | MSVC 编译选项、Windows OpenCV 预编译库、DLL 安装开关 |
-| `cmake/platforms/linux.cmake` | Linux 编译选项、OpenCV so 安装开关、pthread 配置 |
+| `cmake/platforms/windows.cmake` | MSVC 编译选项、DLL 安装路径 |
+| `cmake/platforms/linux.cmake` | Linux 编译选项、pthread 配置 |
 | `cmake/platforms/android.cmake` | Android NDK、目标 lib 路径和交叉编译配置 |
 
 主要源码列表：
 
 - Core sources：`version.cc`、`context.cc`、`vlm_model.cc`、`model_factory.cc`、`llm_model.cc`、`asr_model.cc`
 - Module sources：`audio_processor.cc`、`tokenizer.cc`、`embedding.cc`、`sampler.cc`、`streaming_decoder.cc`、`image_processor.cc`、`perf_profiler.cc`
-- 依赖：TCIM Runtime、tokenizer.cpp、OpenCV、kaldi-native-fbank、libsamplerate、GTest
+- 依赖：TCIM Runtime、tokenizer.cpp、header-only miniaudio/stb/half（`apis/common/hpp`）、GTest
 
 构建/辅助入口：
 
@@ -580,13 +580,13 @@ struct AudioProcessorConfig {
 |------|------|
 | `build_linux.sh` | Linux 构建入口 |
 | `build_ndk.sh` | Android NDK 构建入口 |
-| `build_win.bat` | Windows / Visual Studio 构建入口，并准备音频 3rdparty 依赖 |
+| `build_win.bat` | Windows / Visual Studio 构建入口 |
 | `test.sh` | Linux 测试入口 |
 | `get_3rdparty.py` | 准备第三方依赖 |
 | `tcim_runtime.cmake` | TCIM Runtime include/lib 配置 |
 | `convert_embed.py` | embedding 转换工具，随 install 输出到目标目录 |
 
-安装规则会输出 `houmo_infer`、`tokenizer_lib`、音频依赖库、OpenCV 运行库（按平台开关）和 `convert_embed.py`。
+安装规则会输出 `houmo_infer`、`tokenizer_lib` 和 `convert_embed.py`。
 
 当前 CTest 目标包括：
 

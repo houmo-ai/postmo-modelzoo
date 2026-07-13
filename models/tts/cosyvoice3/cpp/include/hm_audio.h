@@ -32,9 +32,9 @@
 #include <string>
 #include <vector>
 
-#include "half.hpp"
+#include "audio/miniaudio.h"
+#include "half/half.hpp"
 #include "kaldi-native-fbank/csrc/online-feature.h"
-#include "miniaudio.h"
 
 namespace houmo {
 

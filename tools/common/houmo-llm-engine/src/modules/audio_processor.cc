@@ -51,7 +51,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#include "miniaudio.h"
+#include "audio/miniaudio.h"
 
 namespace houmo {
 
@@ -602,15 +602,17 @@ MelFeatures AudioProcessor::ComputeMelSpectrogram(const AudioData& audio) {
   features.num_frames = static_cast<int>(mel.n_len);
   if (config_.feature_mode == AudioFeatureMode::kWhisper) {
     features.num_frames = std::min(
-        features.num_frames,
-        config_.encoder_window_seconds * config_.sample_rate / config_.hop_length);
+        features.num_frames, config_.encoder_window_seconds *
+                                 config_.sample_rate / config_.hop_length);
   }
 
   features.data.resize(static_cast<size_t>(features.feature_dim) *
                        static_cast<size_t>(features.num_frames));
   for (int m = 0; m < features.feature_dim; ++m) {
-    const size_t src_offset = static_cast<size_t>(m) * static_cast<size_t>(mel.n_len);
-    const size_t dst_offset = static_cast<size_t>(m) * static_cast<size_t>(features.num_frames);
+    const size_t src_offset =
+        static_cast<size_t>(m) * static_cast<size_t>(mel.n_len);
+    const size_t dst_offset =
+        static_cast<size_t>(m) * static_cast<size_t>(features.num_frames);
     for (int t = 0; t < features.num_frames; ++t) {
       features.data[dst_offset + static_cast<size_t>(t)] =
           static_cast<float16>(mel.data[src_offset + static_cast<size_t>(t)]);

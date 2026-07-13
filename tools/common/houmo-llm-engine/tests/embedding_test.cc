@@ -27,7 +27,8 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
-#include <half.hpp>
+
+#include "half/half.hpp"
 
 namespace houmo {
 

@@ -37,8 +37,8 @@ endif()
 
 # Third-party paths
 set(TOKENIZER_CPP_PATH ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/tokenizers-cpp)
-set(AUDIO_HEADER_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/audio/include)
-set(HALF_INCLUDE_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/half/include)
+set(AUDIO_HEADER_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp)
+set(HALF_INCLUDE_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp)
 
 # Audio libraries configuration
 if(BUILD_AUDIO_FROM_SOURCE)

@@ -32,7 +32,7 @@ else()
 endif()
 
 set(HM_TOKENIZER_INC "${HM_EXAMPLES_ROOT}/apis/common/tokenizer.cpp/include")
-set(HM_HALF_INC "${HM_EXAMPLES_ROOT}/apis/common/half/include")
+set(HM_HALF_INC "${HM_EXAMPLES_ROOT}/apis/common/hpp")
 set(HM_TCIM_INC "${HM_TCIM_RUNTIME_ROOT}/include")
 set(HM_TCIM_LIB_DIR "${HM_TCIM_RUNTIME_ROOT}/lib")
 set(HM_EIGEN_INC "${HM_LLM_ENGINE_DIR}/3rdparty")
@@ -44,10 +44,6 @@ set(HM_INCLUDE_DIRS
   ${HM_TCIM_INC}
   ${HM_EIGEN_INC}
 )
-
-if(OpenCV_FOUND AND OpenCV_INCLUDE_DIRS)
-  list(APPEND HM_INCLUDE_DIRS ${OpenCV_INCLUDE_DIRS})
-endif()
 
 set(HM_LINK_DIRS
   ${HM_LIB_DIR}
