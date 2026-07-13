@@ -1,35 +1,24 @@
 # Qwen3-TTS
 
-本目录展示如何将 Qwen3-TTS 0.6B 系列模型量化、编译并部署到后摩芯片设备上。当前覆盖两个 12Hz 模型：
-
-- `Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice`
-- `Qwen/Qwen3-TTS-12Hz-0.6B-Base`
+本目录展示如何将 Qwen3-TTS 12Hz 系列模型量化、编译并部署到后摩芯片设备上。当前覆盖的模型规格见第 1 节。
 
 [TOC]
 
 ## 1 模型说明
 
-本例使用的模型实现来源于 ModelScope 的预训练模型：
+本例使用的模型实现来源于 ModelScope 的预训练模型，当前支持情况如下：
 
-- `Qwen3-TTS-12Hz-0.6B-CustomVoice`
-  - 来源: [https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice](https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice)
-  - 用途: 使用预置 speaker 进行语音合成
-- `Qwen3-TTS-12Hz-0.6B-Base`
-  - 来源: [https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-0.6B-Base](https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-0.6B-Base)
-  - 用途: 基于参考音频和参考文本进行 voice clone
+| 模型 | `model_size` | 来源 | 推理入口 | 主要用途 | 支持模式 |
+|------|--------------|------|----------|----------|----------|
+| `Qwen3-TTS-12Hz-0.6B-CustomVoice` | `0.6b-customvoice` | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice) | `demo.py` | 预置 speaker 语音合成 | `oneshot` / `streaming` |
+| `Qwen3-TTS-12Hz-0.6B-Base` | `0.6b-base` | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-0.6B-Base) | `demo_base.py` | 基于参考音频和文本的 voice clone | `oneshot` / `streaming` |
+| `Qwen3-TTS-12Hz-1.7B-CustomVoice` | `1.7b-customvoice` | [ModelScope](https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) | `demo.py` | 预置 speaker 语音合成 | `oneshot` / `streaming` |
 
 - 许可: Apache License 2.0 (https://huggingface.co/Qwen/Qwen3-TTS/blob/main/LICENSE)
 
 预训练模型在运行时下载，工程发布**不包含**该模型。
 
 本例只适用于xh2。
-
-当前支持情况如下：
-
-| 模型 | 推理入口 | 主要用途 | 当前支持状态 |
-|------|----------|----------|--------------|
-| `Qwen3-TTS-12Hz-0.6B-CustomVoice` | `demo.py` | 预置 speaker 合成 | 已支持非流式 `oneshot` 和流式 `streaming` 两种模式 |
-| `Qwen3-TTS-12Hz-0.6B-Base` | `demo_base.py` | voice clone | 已支持非流式 `oneshot` 和流式 `streaming` 两种模式 |
 
 ### 默认配置
 
@@ -43,27 +32,25 @@
 - `ndevice=1`
 - `quant_type=w8a16h1_sefp`
 
-当前示例支持的模型规格为：
-
-- `0.6b-customvoice`
-- `0.6b-base`
-
 ### 资源要求
 
 **后摩设备运行要求：**
 
-- `qwen3-tts-0.6b-customvoice`: 单卡12GB可运行
-- `qwen3-tts-0.6b-base`: 单卡12GB可运行
+- `qwen3-tts-0.6b-customvoice`: 单卡 12 GB可运行
+- `qwen3-tts-0.6b-base`: 单卡 12 GB可运行
+- `qwen3-tts-1.7b-customvoice`: 单卡 12 GB可运行
 
 **量化硬件要求：**
 
-- `qwen3-tts-0.6b-customvoice`: 需要 GPU，显存最小 24GB
-- `qwen3-tts-0.6b-base`: 需要 GPU，显存最小 24GB
+- `qwen3-tts-0.6b-customvoice`: 需要 GPU，显存最小 24 GB
+- `qwen3-tts-0.6b-base`: 需要 GPU，显存最小 24 GB
+- `qwen3-tts-1.7b-customvoice`: 需要 GPU，显存最小 26 GB
 
 **编译时 host 内存要求：**
 
-- `qwen3-tts-0.6b-customvoice`: 需要空闲 host 内存最小 18GB
-- `qwen3-tts-0.6b-base`: 需要空闲 host 内存最小 18GB
+- `qwen3-tts-0.6b-customvoice`: 需要空闲 host 内存最小 18 GB
+- `qwen3-tts-0.6b-base`: 需要空闲 host 内存最小 18 GB
+- `qwen3-tts-1.7b-customvoice`: 需要空闲 host 内存最小 18 GB
 
 ## 2 快速开始
 
@@ -78,7 +65,7 @@
 | `get_model.py` | 根据 `config.yaml` 下载原始模型或预编译芯片模型 |
 | `ptq.py` | 将原始模型导出并量化为 HMONNX / 量化辅助文件 |
 | `build.py` | 将 HMONNX 编译为后摩芯片可运行的 HMM |
-| `demo.py` | 运行 `0.6b-customvoice` 的 oneshot / streaming 推理 |
+| `demo.py` | 运行 `0.6b-customvoice` 或 `1.7b-customvoice` 的 oneshot / streaming 推理 |
 | `demo_base.py` | 运行 `0.6b-base` 的 oneshot / streaming voice clone 推理 |
 | `qwen3_tts_runtime.py` | 两个 demo 共用的 HMM wrapper、路径推导、chunk buffer、流式 gap 统计等运行时工具 |
 | `perf_utils.py` | 两个 demo 共用的性能统计 key、计时器和表格日志 |
@@ -113,33 +100,14 @@ sudo apt install sox libsox-dev -y
 
 ### 2.2 获取模型和数据
 
-通过 `get_model.py` 下载模型，可通过参数选择下载原始模型或芯片模型。`config.yaml` 中当前支持的 `model_size` 为：
+通过 `get_model.py` 下载模型。`--model_size` 的支持值见第 1 节模型表。需要自行量化时下载原始模型；如果希望跳过量化和编译、直接运行演示，则下载预编译芯片模型：
 
-- `0.6b-customvoice`
-- `0.6b-base`
-
-如果需要自己量化，可下载原始模型。
-
-下载 `CustomVoice` 原始模型：
 ```bash
-python3 get_model.py --type raw --model_name qwen3-tts --model_size 0.6b-customvoice
-```
+# 下载原始模型
+python3 get_model.py --type raw --model_name qwen3-tts --model_size <model_size>
 
-下载 `Base` 原始模型：
-```bash
-python3 get_model.py --type raw --model_name qwen3-tts --model_size 0.6b-base
-```
-
-如果仅查看演示结果，可下载芯片模型。
-
-下载 `CustomVoice` 芯片模型：
-```bash
-python3 get_model.py --type hmm --model_name qwen3-tts --model_size 0.6b-customvoice
-```
-
-下载 `Base` 芯片模型：
-```bash
-python3 get_model.py --type hmm --model_name qwen3-tts --model_size 0.6b-base
+# 下载预编译芯片模型
+python3 get_model.py --type hmm --model_name qwen3-tts --model_size <model_size>
 ```
 
 常用参数：
@@ -147,6 +115,7 @@ python3 get_model.py --type hmm --model_name qwen3-tts --model_size 0.6b-base
 - `--type`：下载类型，`raw` 为原始 ModelScope/HF 模型，`hmm` 为预编译芯片模型；
 - `--download_dir`：下载文件保存目录，默认当前目录；
 - `--extract_dir`：解压目录，默认由下载工具决定；
+- `--source_type`：下载源，可选 `jfrog` 或 `modelscope`，默认 `jfrog`；
 - `--config`：配置文件路径，默认 `config.yaml`；
 - `--model_name` / `--model_size`：模型名称和规格，未指定时使用 `config.yaml` 默认值；
 - `--ndevice` / `--ncore` / `--context_length` / `--quant_type`：覆盖配置中用于匹配芯片模型包的参数。
@@ -158,11 +127,11 @@ python3 get_model.py --type hmm --model_name qwen3-tts --model_size 0.6b-base
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
 ```
 
-进入 docker 后 source 环境变量，并进入模型目录，执行 `ptq.py` 脚本进行量化：
+进入 docker 后 source 环境变量，并进入模型目录，执行 `ptq.py` 脚本进行量化。`<model_size>` 的支持值见第 1 节模型表：
 ```bash
 source env.sh
 cd models/tts/qwen3-tts
-python3 ptq.py --model_name qwen3-tts --model_size 0.6b-customvoice
+python3 ptq.py --model_name qwen3-tts --model_size <model_size>
 ```
 
 `ptq.py` 将依次导出以下子模型到 HMONNX 格式：
@@ -174,17 +143,15 @@ python3 ptq.py --model_name qwen3-tts --model_size 0.6b-customvoice
 - speaker_encoder（仅 Base）
 - speech_tokenizer_encoder（仅 Base）
 
-量化 `Base` 模型时，示例命令如下：
-```bash
-python3 ptq.py --model_name qwen3-tts --model_size 0.6b-base
-```
-
 可通过 `--models` 参数指定要量化的子模型（逗号分隔），例如：
 ```bash
 python3 ptq.py --model_name qwen3-tts --model_size 0.6b-base --models talker,code_predictor
 ```
 
-`ptq.py --models all` 是默认行为。对于 `0.6b-customvoice`，`all` 会自动跳过 `speaker_encoder` 和 `speech_tokenizer_encoder`；这两个子模型仅适用于 `0.6b-base`。如果显式指定 Base-only 子模型给 CustomVoice，会报错。
+`ptq.py --models all` 是默认行为。对于 `0.6b-customvoice` 和
+`1.7b-customvoice`，`all` 会自动跳过 `speaker_encoder` 和
+`speech_tokenizer_encoder`；这两个子模型仅适用于 `0.6b-base`。如果显式指定
+Base-only 子模型给 CustomVoice，会报错。
 
 常用参数：
 
@@ -204,12 +171,12 @@ python3 ptq.py --model_name qwen3-tts --model_size 0.6b-base --models talker,cod
 
 ### 2.4 编译
 
-将量化模型编译为在芯片上运行的模型。执行脚本：
+将量化模型编译为在芯片上运行的模型。`<model_size>` 的支持值见第 1 节模型表：
 ```bash
-python3 build.py --model_name qwen3-tts --model_size 0.6b-customvoice
+python3 build.py --model_name qwen3-tts --model_size <model_size>
 ```
 
-`CustomVoice` 默认输出名称包括：
+`0.6B CustomVoice` 默认输出名称包括：
 - `qwen3-tts-0.6b-customvoice_text_projection.hmm`
 - `qwen3-tts-0.6b-customvoice_code_predictor_prefill.hmm`
 - `qwen3-tts-0.6b-customvoice_code_predictor_decode.hmm`
@@ -218,10 +185,7 @@ python3 build.py --model_name qwen3-tts --model_size 0.6b-customvoice
 - `qwen3-tts-0.6b-customvoice_speech_tokenizer.hmm`
 - `qwen3-tts-0.6b-customvoice_stateful_decoder.hmm`
 
-编译 `Base` 模型时，示例命令如下：
-```bash
-python3 build.py --model_name qwen3-tts --model_size 0.6b-base
-```
+`1.7B CustomVoice` 的子模型组成相同，文件名前缀替换为 `qwen3-tts-1.7b-customvoice_`。
 
 `Base` 默认输出名称包括：
 - `qwen3-tts-0.6b-base_text_projection.hmm`
@@ -252,19 +216,19 @@ python3 build.py --model_name qwen3-tts --model_size 0.6b-base --models talker_p
 
 ### 2.5 演示
 
-Qwen3-TTS 模型使用 Python API 进行演示。`CustomVoice` 和 `Base` 两种模型均支持两种音频输出路径：
+Qwen3-TTS 模型使用 Python API 进行演示。`CustomVoice` 和 `Base` 两类模型均支持两种音频输出路径：
 
 - `oneshot`：先完整生成 codec frames，再通过 `SpeechTokenizer` 一次性解码为 wav；
 - `streaming`：边生成 codec frames 边通过 `StatefulDecoder` 按 chunk 输出音频。
 
-两个模型的入口不同：
+两类模型的入口不同：
 
-- `demo.py`：用于 `0.6b-customvoice`，输入为 `text + speaker + language`；
+- `demo.py`：用于 `0.6b-customvoice` 和 `1.7b-customvoice`，输入为 `text + speaker + language`；
 - `demo_base.py`：用于 `0.6b-base`，输入为 `text + language + ref_audio + ref_text`，用于 voice clone。
 
 #### 2.5.1 CustomVoice 演示
 
-`demo.py` 默认根据 `--model_name` / `--model_size` 从 `output/${HOUMO_TARGET}` 推导 HMM 路径，具体编译产物见 2.4。oneshot 模式需要 Talker、CodePredictor、TextProjection 和 SpeechTokenizer；streaming 模式会额外使用 `stateful_decoder_hmm`。
+`demo.py` 支持 `0.6b-customvoice` 和 `1.7b-customvoice`。脚本默认根据 `--model_name` / `--model_size` 从 `output/${HOUMO_TARGET}` 推导 HMM 路径，具体编译产物见 2.4。oneshot 模式需要 Talker、CodePredictor、TextProjection 和 SpeechTokenizer；streaming 模式会额外使用 `stateful_decoder_hmm`。
 
 非流式执行示例：
 ```bash
@@ -294,6 +258,8 @@ python3 demo.py \
 - `--chunk_size`：流式模式下每个解码块的 codec 帧数，默认 `12`
 - `--stateful_decoder_hmm`：流式模式使用的 Stateful Decoder HMM 路径，默认根据 `--model_name` / `--model_size` 推导
 - `--ndevice`：使用的设备数量，默认 `1`
+- `--seed`：随机种子，默认 `1024`
+- `--no_progress`：关闭 tqdm 生成进度条，便于采集性能日志
 
 #### 2.5.2 Base 演示
 
@@ -330,6 +296,8 @@ python3 demo_base.py \
 - `--chunk_size`：流式模式下每个解码块的 codec 帧数，默认 `12`
 - `--stateful_decoder_hmm`：流式模式使用的 Stateful Decoder HMM 路径，默认根据 `--model_name` / `--model_size` 推导
 - `--ndevice`：使用的设备数量，默认 `1`
+- `--seed`：随机种子，默认 `1024`
+- `--no_progress`：关闭 tqdm 生成进度条，便于采集性能日志
 
 ## 3 一键评估
 
@@ -348,7 +316,7 @@ Usage: test.sh [options]
   -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
                           Supports comma-separated values or repeated flags.
   -name, --model_name     Model name. Default: qwen3-tts.
-  -size, --model_size     Model size. Default: 0.6b-customvoice. Choices: 0.6b-customvoice, 0.6b-base.
+  -size, --model_size     Model size. Default: 0.6b-customvoice. Choices: 0.6b-customvoice, 0.6b-base, 1.7b-customvoice.
   --demo_mode             Demo mode. Default: oneshot. Choices: oneshot, streaming.
   -h, --help              Show this help message.
 ```
@@ -361,23 +329,27 @@ bash test.sh -s quant
 # 量化 + 编译
 bash test.sh -s quant,build
 
-# 运行 CustomVoice 流式 demo
+# 运行 0.6B CustomVoice 流式 demo
 bash test.sh -s demo --model_size 0.6b-customvoice --demo_mode streaming
 
-# 运行 Base 非流式 voice clone demo
+# 运行 1.7B CustomVoice 非流式 demo
+bash test.sh -s demo --model_size 1.7b-customvoice --demo_mode oneshot
+
+# 运行 0.6B Base 非流式 voice clone demo
 bash test.sh -s demo --model_size 0.6b-base --demo_mode oneshot
 
-# 运行 Base 流式 voice clone demo
+# 运行 0.6B Base 流式 voice clone demo
 bash test.sh -s demo --model_size 0.6b-base --demo_mode streaming
 ```
 
 ## 4 参考结果
 
-### 4.1 CustomVoice 演示结果
+### 4.1 0.6B CustomVoice 演示结果
 
 #### Oneshot 模式
 
 ```bash
+Running Qwen3-TTS oneshot demo: model_name=qwen3-tts, model_size=0.6b-customvoice, hf_model_dir=./Qwen3-TTS-12Hz-0.6B-CustomVoice
 TextProjection loaded
 CodePredictor loaded: prefill_length=2
 Talker loaded, context_length=2048
@@ -385,141 +357,152 @@ Qwen3TTSCodecGenerator initialized successfully
 SpeechTokenizer loaded: input_seq_len=300
 Starting TTS generation for text: 基于先进的存算一体技术和存储工艺，后摩智能致力于突破芯片的性能与功耗瓶颈，加速人工智能技术的普惠落地...
 Using non-streaming mode for talker input embedding
-Reached EOS token at step 137
-Audio saved to output_custom_voice.wav | duration: 10.96s | inference: 9.26s | RTF: 0.8446
-========================================================================
-Performance Breakdown:
-  Component                      Time(s)    Pct  Count  Avg(ms)
-  --------------------------------------------------------------
-  embedding_prep                    0.02   0.2%
-  talker                            1.66  17.9%
-    prefill                         0.08   0.8%      1    77.78
-    decode                          1.37  14.8%    137     9.98
-    sampling                        0.21   2.3%    138     1.53
-  frame_prepare                     0.02   0.2%
-  code_predictor                    6.13  66.2%
-    prepare                         0.11   1.2%
-    prefill                         0.43   4.6%    137     3.13
-    decode                          4.52  48.8%   1918     2.35
-    sampling                        1.07  11.6%   2055     0.52
-  postprocess                       0.00   0.0%
-  speech_tokenizer                  1.32  14.2%      1  1316.77
-  other                             0.11   1.2%
-  --------------------------------------------------------------
-  total                             9.26 100.0%
-========================================================================
+Generating tokens:   7%|████████                                              | 136/2008 [00:07<01:48, 17.22it/s]Reached EOS token at step 137
+Audio saved to output_custom_voice.wav | duration: 10.96s | inference: 9.29s | RTF: 0.8476
++----------------------------------------------------------------------------------------------------------+
+|                                          Performance Breakdown:                                          |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
+| Component          | Time(s) |    Pct | Count | Avg(ms) | Description                                    |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
+|   embedding_prep   |    0.02 |   0.2% |       |         | Prepare model input embeddings                 |
+|   talker           |    1.65 |  17.7% |       |         | All Talker model computation                   |
+|     prefill        |    0.08 |   0.8% |     1 |   76.44 | Run the initial Talker forward pass            |
+|     decode         |    1.37 |  14.8% |   137 |   10.01 | Generate codec-group-0 tokens autoregressively |
+|     sampling       |    0.20 |   2.1% |   138 |    1.44 | Sample tokens from Talker logits               |
+|   frame_prepare    |    0.02 |   0.2% |       |         | Prepare per-frame generation inputs            |
+|   code_predictor   |    6.18 |  66.5% |       |         | All Code Predictor computation                 |
+|     prepare        |    0.12 |   1.3% |       |         | Prepare Code Predictor inputs                  |
+|     prefill        |    0.43 |   4.6% |   137 |    3.15 | Run Code Predictor prefill                     |
+|     decode         |    4.54 |  48.9% |  1918 |    2.37 | Generate remaining codec groups                |
+|     sampling       |    1.08 |  11.7% |  2055 |    0.53 | Sample tokens from Code Predictor logits       |
+|   postprocess      |    0.00 |   0.0% |       |         | Assemble generated codec frames                |
+|   speech_tokenizer |    1.31 |  14.1% |     1 | 1309.39 | Decode codec frames into a waveform            |
+|   other            |    0.12 |   1.3% |       |         | Time outside individually tracked metrics      |
+|   total            |    9.29 | 100.0% |       |         | End-to-end inference time                      |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
 ```
 
 #### Streaming 模式
 
 ```bash
-TextProjection loaded
-CodePredictor loaded: prefill_length=2
-Talker loaded, context_length=2048
-Qwen3TTSCodecGenerator initialized successfully
-StatefulDecoder loaded: chunk_size=12
-Starting streaming TTS for text: 基于先进的存算一体技术和存储工艺，后摩智能致力于突破芯片的性能与功耗瓶颈，加速人工智能技术的普惠落地...
-Using streaming mode for talker input embedding
-First audio chunk latency: 835.0ms
-  Chunk 1: 15360 samples (640ms audio)
-  Chunk 2: 23040 samples (960ms audio) | playback_gap: 62.8ms
-  Chunk 3: 23040 samples (960ms audio) | playback_gap: 0.0ms
-  Chunk 4: 23040 samples (960ms audio) | playback_gap: 0.0ms
-  Chunk 5: 23040 samples (960ms audio) | playback_gap: 0.0ms
-  Chunk 6: 23040 samples (960ms audio) | playback_gap: 0.0ms
-  Chunk 7: 23040 samples (960ms audio) | playback_gap: 0.0ms
-  Chunk 8: 23040 samples (960ms audio) | playback_gap: 0.0ms
-  Chunk 9: 23040 samples (960ms audio) | playback_gap: 0.0ms
-  Chunk 10: 23040 samples (960ms audio) | playback_gap: 0.0ms
-  Chunk 11: 23040 samples (960ms audio) | playback_gap: 0.0ms
-Reached EOS token at step 137
-  Chunk 12: 17280 samples (720ms audio) | playback_gap: 0.0ms
-Audio saved to output_custom_voice.wav | duration: 10.96s | inference: 8.54s | RTF: 0.7791 | chunks: 12 | first_chunk_latency: 835.0ms | playback_gap_chunks: 1 | max_playback_gap: 62.8ms | total_playback_gap: 62.8ms
-========================================================================
-Streaming Performance Breakdown:
-  Component                      Time(s)    Pct  Count  Avg(ms)
-  --------------------------------------------------------------
-  embedding_prep                    0.02   0.2%
-  talker                            1.63  19.1%
-    prefill                         0.07   0.9%      1    74.23
-    decode                          1.36  15.9%    137     9.93
-    sampling                        0.19   2.3%    138     1.41
-  frame_prepare                     0.02   0.2%
-  code_predictor                    6.09  71.3%
-    prepare                         0.11   1.3%
-    prefill                         0.43   5.0%    137     3.12
-    decode                          4.49  52.6%   1918     2.34
-    sampling                        1.06  12.5%   2055     0.52
-  stateful_decoder                  0.68   7.9%     12    56.43
-  other                             0.10   1.2%
-  --------------------------------------------------------------
-  total                             8.54 100.0%
-========================================================================
+2026-07-13 02:23:08.450 | INFO     | __main__:main:962 - Running Qwen3-TTS streaming demo: model_name=qwen3-tts, model_size=0.6b-customvoice, hf_model_dir=./Qwen3-TTS-12Hz-0.6B-CustomVoice
+W20260713 02:23:10.478791 1166112 __init__.py:108] Skipping import of cpp extensions due to incompatible torch version 2.8.0+cu128 for torchao version 0.16.0             Please see https://github.com/pytorch/ao/issues/2919 for more info
+Device 0 -> Group 0, Chip 3
+2026-07-13 02:23:13.673 | INFO     | qwen3_tts_runtime:__init__:149 - TextProjection loaded
+Device 0 -> Group 0, Chip 3
+2026-07-13 02:23:15.541 | INFO     | qwen3_tts_runtime:__init__:221 - CodePredictor loaded: prefill_length=2
+Device 0 -> Group 0, Chip 3
+2026-07-13 02:23:24.243 | INFO     | qwen3_tts_runtime:__init__:341 - Talker loaded, context_length=2048
+2026-07-13 02:23:24.246 | INFO     | __main__:__init__:136 - Qwen3TTSCodecGenerator initialized successfully
+Device 0 -> Group 0, Chip 3
+2026-07-13 02:23:24.714 | INFO     | qwen3_tts_runtime:__init__:611 - StatefulDecoder loaded: chunk_size=12
+2026-07-13 02:23:24.724 | INFO     | __main__:generate_streaming:876 - Starting streaming TTS for text: 基于先进的存算一体技术和存储工艺，后摩智能致力于突破芯片的性能与功耗瓶颈，加速人工智能技术的普惠落地...
+2026-07-13 02:23:24.735 | INFO     | __main__:_generate_codec_frames:622 - Using streaming mode for talker input embedding
+2026-07-13 02:23:25.543 | INFO     | __main__:main:1028 - First audio chunk latency: 815.3ms
+2026-07-13 02:23:25.543 | INFO     | __main__:main:1042 -   Chunk 1: 15360 samples (640ms audio)
+2026-07-13 02:23:26.287 | INFO     | __main__:main:1047 -   Chunk 2: 23040 samples (960ms audio) | playback_gap: 104.0ms
+2026-07-13 02:23:27.037 | INFO     | __main__:main:1047 -   Chunk 3: 23040 samples (960ms audio) | playback_gap: 0.0ms
+2026-07-13 02:23:27.795 | INFO     | __main__:main:1047 -   Chunk 4: 23040 samples (960ms audio) | playback_gap: 0.0ms
+2026-07-13 02:23:28.562 | INFO     | __main__:main:1047 -   Chunk 5: 23040 samples (960ms audio) | playback_gap: 0.0ms
+2026-07-13 02:23:29.326 | INFO     | __main__:main:1047 -   Chunk 6: 23040 samples (960ms audio) | playback_gap: 0.0ms
+2026-07-13 02:23:30.072 | INFO     | __main__:main:1047 -   Chunk 7: 23040 samples (960ms audio) | playback_gap: 0.0ms
+2026-07-13 02:23:30.817 | INFO     | __main__:main:1047 -   Chunk 8: 23040 samples (960ms audio) | playback_gap: 0.0ms
+2026-07-13 02:23:31.551 | INFO     | __main__:main:1047 -   Chunk 9: 23040 samples (960ms audio) | playback_gap: 0.0ms
+2026-07-13 02:23:32.299 | INFO     | __main__:main:1047 -   Chunk 10: 23040 samples (960ms audio) | playback_gap: 0.0ms
+2026-07-13 02:23:33.023 | INFO     | __main__:main:1047 -   Chunk 11: 23040 samples (960ms audio) | playback_gap: 0.0ms
+2026-07-13 02:23:33.153 | INFO     | __main__:_generate_codec_frames:763 - Reached EOS token at step 134
+2026-07-13 02:23:33.210 | INFO     | __main__:main:1047 -   Chunk 12: 11520 samples (480ms audio) | playback_gap: 0.0ms
+2026-07-13 02:23:33.255 | INFO     | __main__:main:1063 - Audio saved to output_custom_voice.wav | duration: 10.72s | inference: 8.49s | RTF: 0.7915 | chunks: 12 | first_chunk_latency: 815.3ms | playback_gap_chunks: 1 | max_playback_gap: 104.0ms | total_playback_gap: 104.0ms
+2026-07-13 02:23:33.271 | INFO     | perf_utils:_log_footer:221 -
++----------------------------------------------------------------------------------------------------------+
+|                                     Streaming Performance Breakdown:                                     |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
+| Component          | Time(s) |    Pct | Count | Avg(ms) | Description                                    |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
+|   embedding_prep   |    0.03 |   0.3% |       |         | Prepare model input embeddings                 |
+|   talker           |    1.60 |  18.9% |       |         | All Talker model computation                   |
+|     prefill        |    0.07 |   0.8% |     1 |   71.84 | Run the initial Talker forward pass            |
+|     decode         |    1.33 |  15.7% |   134 |    9.92 | Generate codec-group-0 tokens autoregressively |
+|     sampling       |    0.20 |   2.4% |   135 |    1.50 | Sample tokens from Talker logits               |
+|   frame_prepare    |    0.02 |   0.2% |       |         | Prepare per-frame generation inputs            |
+|   code_predictor   |    6.05 |  71.3% |       |         | All Code Predictor computation                 |
+|     prepare        |    0.11 |   1.3% |       |         | Prepare Code Predictor inputs                  |
+|     prefill        |    0.42 |   5.0% |   134 |    3.14 | Run Code Predictor prefill                     |
+|     decode         |    4.43 |  52.3% |  1876 |    2.36 | Generate remaining codec groups                |
+|     sampling       |    1.08 |  12.8% |  2010 |    0.54 | Sample tokens from Code Predictor logits       |
+|   stateful_decoder |    0.68 |   8.0% |    12 |   56.34 | Decode generated codec chunks into waveforms   |
+|   other            |    0.11 |   1.3% |       |         | Time outside individually tracked metrics      |
+|   total            |    8.49 | 100.0% |       |         | End-to-end inference time                      |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
 ```
 
-### 4.2 Base 演示结果
+### 4.2 0.6B Base 演示结果
+
+> **注：**Base streaming 的 `first_chunk_latency` 从参考音频处理和 StatefulDecoder 预热完成后开始计时，不是完整的端到端首音延时，也不能与 CustomVoice 的数值直接比较。详细说明见 4.4。
 
 #### Oneshot 模式
 
 ```bash
+Running Qwen3-TTS oneshot demo: model_name=qwen3-tts, model_size=0.6b-base, hf_model_dir=./Qwen3-TTS-12Hz-0.6B-Base
 TextProjection loaded
 CodePredictor loaded: prefill_length=2
 Talker loaded, context_length=2048
 SpeechTokenizer loaded: input_seq_len=300
 SpeechTokenizerEncoder loaded
-SpeakerEncoder loaded
+SpeakerEncoder loaded: input_names=['mels'], output_names=['speaker_embedding'], input_frames=400, num_mels=128, input_dtype=<class 'numpy.float16'>
 Qwen3TTSInference initialized successfully
 Starting voice clone generation for text: 基于先进的存算一体技术和存储工艺，后摩智能致力于突破芯片的性能与功耗瓶颈，加速人工智能技术的普惠落地
-Reference audio frontend input: path=../../../data/audio/clone_1.wav, samples=100895, sr=24000, duration=4.2040s, peak=0.052004, tail_0p5s_rms=0.001986
+Reference audio frontend input: path=/data/wanyu.li/imodelzoo/data/audio/clone_1.wav, samples=100895, sr=24000, duration=4.2040s, peak=0.052004, tail_0p5s_rms=0.001986
 Using non-streaming mode for talker input embedding
-Reached EOS token at step 177
-Audio saved to output_voice_clone.wav | duration: 14.16s | inference: 11.65s | RTF: 0.8229
-========================================================================
-Performance Breakdown:
-  Component                      Time(s)    Pct  Count  Avg(ms)
-  --------------------------------------------------------------
-  preparation                       0.08   0.6%
-    logits_processor                0.00   0.0%
-    reference_audio                 0.05   0.4%
-      audio_load                    0.02   0.2%      1    19.94
-      speech_tokenizer_encode       0.02   0.2%      1    22.67
-      speaker_embed                 0.01   0.1%      1     7.27
-    prompt_prepare                  0.02   0.2%      7     3.56
-  talker                            2.09  17.9%
-    prefill                         0.07   0.6%      1    74.73
-    decode                          1.77  15.2%    177     9.98
-    sampling                        0.25   2.1%    178     1.39
-  code_predictor                    7.70  66.1%
-    prefill                         0.56   4.8%    177     3.14
-    decode                          5.84  50.1%   2478     2.36
-    sampling                        1.31  11.2%   2655     0.49
-  audio_decoder                     1.32  11.3%
-    speech_tokenizer                1.32  11.3%      1  1321.74
-    stateful_ref_prime              0.00   0.0%      0     0.00
-    stateful_generated              0.00   0.0%      0     0.00
-  other                             0.46   4.0%
-  --------------------------------------------------------------
-  total                            11.65 100.0%
-========================================================================
+Generating tokens:   9%|███████                                         | 182/1947 [00:10<01:42, 17.29it/s]2026-07-13 Reached EOS token at step 183
+Audio saved to output_voice_clone.wav | duration: 14.64s | inference: 11.88s | RTF: 0.8111
++----------------------------------------------------------------------------------------------------------------------+
+|                                                Performance Breakdown:                                                |
++-------------------------------+---------+--------+-------+---------+-------------------------------------------------+
+| Component                     | Time(s) |    Pct | Count | Avg(ms) | Description                                     |
++-------------------------------+---------+--------+-------+---------+-------------------------------------------------+
+|   preparation                 |    0.08 |   0.6% |       |         | All input and prompt preparation                |
+|     logits_processor          |    0.00 |   0.0% |       |         | Initialize sampling and logits processors       |
+|     reference_audio           |    0.05 |   0.4% |       |         | All reference audio processing                  |
+|       audio_load              |    0.02 |   0.2% |     1 |   18.52 | Load and preprocess reference audio             |
+|       speech_tokenizer_encode |    0.02 |   0.2% |     1 |   23.01 | Encode reference audio into codec frames        |
+|       speaker_embed           |    0.01 |   0.1% |     1 |    9.72 | Extract the reference speaker embedding         |
+|     prompt_prepare            |    0.02 |   0.2% |     7 |    3.40 | All text and prompt embedding preparation       |
+|   talker                      |    2.14 |  18.0% |       |         | All Talker model computation                    |
+|     prefill                   |    0.07 |   0.6% |     1 |   72.68 | Run the initial Talker forward pass             |
+|     decode                    |    1.83 |  15.4% |   183 |   10.00 | Generate codec-group-0 tokens autoregressively  |
+|     sampling                  |    0.24 |   2.0% |   184 |    1.28 | Sample tokens from Talker logits                |
+|   code_predictor              |    7.89 |  66.4% |       |         | All Code Predictor computation                  |
+|     prefill                   |    0.58 |   4.9% |   183 |    3.16 | Run Code Predictor prefill                      |
+|     decode                    |    6.03 |  50.8% |  2562 |    2.35 | Generate remaining codec groups                 |
+|     sampling                  |    1.28 |  10.8% |  2745 |    0.47 | Sample tokens from Code Predictor logits        |
+|   audio_decoder               |    1.31 |  11.0% |       |         | All waveform decoding                           |
+|     speech_tokenizer          |    1.31 |  11.0% |     1 | 1309.68 | Decode codec frames into a waveform             |
+|     stateful_ref_prime        |    0.00 |   0.0% |     0 |    0.00 | Prime decoder state with reference codec frames |
+|     stateful_generated        |    0.00 |   0.0% |     0 |    0.00 | Decode generated codec chunks into waveforms    |
+|   other                       |    0.46 |   3.9% |       |         | Time outside individually tracked metrics       |
+|   total                       |   11.88 | 100.0% |       |         | End-to-end inference time                       |
++-------------------------------+---------+--------+-------+---------+-------------------------------------------------+
 ```
 
 #### Streaming 模式
 
 ```bash
+Running Qwen3-TTS streaming demo: model_name=qwen3-tts, model_size=0.6b-base, hf_model_dir=./Qwen3-TTS-12Hz-0.6B-Base
 TextProjection loaded
 CodePredictor loaded: prefill_length=2
 Talker loaded, context_length=2048
 SpeechTokenizer loaded: input_seq_len=300
 SpeechTokenizerEncoder loaded
-SpeakerEncoder loaded
+SpeakerEncoder loaded: input_names=['mels'], output_names=['speaker_embedding'], input_frames=400, num_mels=128, input_dtype=<class 'numpy.float16'>
 Qwen3TTSInference initialized successfully
 StatefulDecoder loaded: chunk_size=12
 Starting streaming voice clone generation for text: 基于先进的存算一体技术和存储工艺，后摩智能致力于突破芯片的性能与功耗瓶颈，加速人工智能技术的普惠落地
-Reference audio frontend input: path=../../../data/audio/clone_1.wav, samples=100895, sr=24000, duration=4.2040s, peak=0.052004, tail_0p5s_rms=0.001986
+Reference audio frontend input: path=/data/wanyu.li/imodelzoo/data/audio/clone_1.wav, samples=100895, sr=24000, duration=4.2040s, peak=0.052004, tail_0p5s_rms=0.001986
 Using streaming mode for talker input embedding
-First audio chunk latency: 813.0ms
-  Chunk 1: 23040 samples (960ms audio)
-  Chunk 2: 23040 samples (960ms audio) | playback_gap: 0.0ms
+First audio chunk latency: 812.3ms
+  Chunk 1: 15360 samples (640ms audio)
+  Chunk 2: 23040 samples (960ms audio) | playback_gap: 91.3ms
   Chunk 3: 23040 samples (960ms audio) | playback_gap: 0.0ms
   Chunk 4: 23040 samples (960ms audio) | playback_gap: 0.0ms
   Chunk 5: 23040 samples (960ms audio) | playback_gap: 0.0ms
@@ -532,55 +515,150 @@ First audio chunk latency: 813.0ms
   Chunk 12: 23040 samples (960ms audio) | playback_gap: 0.0ms
   Chunk 13: 23040 samples (960ms audio) | playback_gap: 0.0ms
   Chunk 14: 23040 samples (960ms audio) | playback_gap: 0.0ms
-Reached EOS token at step 176
-  Chunk 15: 23040 samples (960ms audio) | playback_gap: 0.0ms
-Audio saved to output_voice_clone.wav | duration: 14.40s | inference: 11.27s | RTF: 0.7824 | chunks: 15 | first_chunk_latency: 813.0ms | playback_gap_chunks: 0 | max_playback_gap: 0.0ms | total_playback_gap: 0.0ms
-========================================================================
-Streaming Performance Breakdown:
-  Component                      Time(s)    Pct  Count  Avg(ms)
-  --------------------------------------------------------------
-  preparation                       0.07   0.6%
-    logits_processor                0.00   0.0%
-    reference_audio                 0.05   0.4%
-      audio_load                    0.01   0.1%      1    13.61
-      speech_tokenizer_encode       0.02   0.2%      1    22.79
-      speaker_embed                 0.01   0.1%      1     8.98
-    prompt_prepare                  0.03   0.2%      7     3.83
-  talker                            2.06  18.3%
-    prefill                         0.08   0.7%      1    78.43
-    decode                          1.74  15.5%    176     9.90
-    sampling                        0.24   2.1%    177     1.35
-  code_predictor                    7.57  67.2%
-    prefill                         0.55   4.9%    176     3.14
-    decode                          5.77  51.2%   2464     2.34
-    sampling                        1.25  11.1%   2640     0.47
-  audio_decoder                     1.13  10.0%
-    speech_tokenizer                0.00   0.0%      0     0.00
-    stateful_ref_prime              0.28   2.5%      5    56.63
-    stateful_generated              0.85   7.5%     15    56.55
-  other                             0.43   3.8%
-  --------------------------------------------------------------
-  total                            11.27 100.0%
-========================================================================
+Reached EOS token at step 177
+  Chunk 15: 24960 samples (1040ms audio) | playback_gap: 0.0ms
+Audio saved to output_voice_clone.wav | duration: 14.16s | inference: 11.36s | RTF: 0.8020 | chunks: 15 | first_chunk_latency: 812.3ms | playback_gap_chunks: 1 | max_playback_gap: 91.3ms | total_playback_gap: 91.3ms
++----------------------------------------------------------------------------------------------------------------------+
+|                                           Streaming Performance Breakdown:                                           |
++-------------------------------+---------+--------+-------+---------+-------------------------------------------------+
+| Component                     | Time(s) |    Pct | Count | Avg(ms) | Description                                     |
++-------------------------------+---------+--------+-------+---------+-------------------------------------------------+
+|   preparation                 |    0.07 |   0.6% |       |         | All input and prompt preparation                |
+|     logits_processor          |    0.00 |   0.0% |       |         | Initialize sampling and logits processors       |
+|     reference_audio           |    0.04 |   0.4% |       |         | All reference audio processing                  |
+|       audio_load              |    0.01 |   0.1% |     1 |   12.32 | Load and preprocess reference audio             |
+|       speech_tokenizer_encode |    0.02 |   0.2% |     1 |   22.97 | Encode reference audio into codec frames        |
+|       speaker_embed           |    0.01 |   0.1% |     1 |    9.35 | Extract the reference speaker embedding         |
+|     prompt_prepare            |    0.03 |   0.2% |     7 |    3.68 | All text and prompt embedding preparation       |
+|   talker                      |    2.09 |  18.4% |       |         | All Talker model computation                    |
+|     prefill                   |    0.07 |   0.7% |     1 |   74.93 | Run the initial Talker forward pass             |
+|     decode                    |    1.75 |  15.4% |   177 |    9.91 | Generate codec-group-0 tokens autoregressively  |
+|     sampling                  |    0.26 |   2.3% |   178 |    1.45 | Sample tokens from Talker logits                |
+|   code_predictor              |    7.63 |  67.2% |       |         | All Code Predictor computation                  |
+|     prefill                   |    0.56 |   4.9% |   177 |    3.16 | Run Code Predictor prefill                      |
+|     decode                    |    5.82 |  51.2% |  2478 |    2.35 | Generate remaining codec groups                 |
+|     sampling                  |    1.25 |  11.0% |  2655 |    0.47 | Sample tokens from Code Predictor logits        |
+|   audio_decoder               |    1.13 |  10.0% |       |         | All waveform decoding                           |
+|     speech_tokenizer          |    0.00 |   0.0% |     0 |    0.00 | Decode codec frames into a waveform             |
+|     stateful_ref_prime        |    0.28 |   2.5% |     5 |   56.39 | Prime decoder state with reference codec frames |
+|     stateful_generated        |    0.85 |   7.5% |    15 |   56.54 | Decode generated codec chunks into waveforms    |
+|   other                       |    0.44 |   3.9% |       |         | Time outside individually tracked metrics       |
+|   total                       |   11.36 | 100.0% |       |         | End-to-end inference time                       |
++-------------------------------+---------+--------+-------+---------+-------------------------------------------------+
 ```
 
-### 4.3 性能指标说明
+### 4.3 1.7B CustomVoice 演示结果
 
-#### Streaming 首音延时统计口径
+#### Oneshot 模式
 
-4.1 和 4.2 中的 streaming 结果里，Base 的 `first_chunk_latency` 低于 CustomVoice，主要原因是两种 demo 的首音延时统计起点不同，不能简单理解为 Base 的端到端首音链路一定更短。
+```bash
+Running Qwen3-TTS oneshot demo: model_name=qwen3-tts, model_size=1.7b-customvoice, hf_model_dir=./Qwen3-TTS-12Hz-1.7B-CustomVoice
+TextProjection loaded
+CodePredictor loaded: prefill_length=2
+Talker loaded, context_length=2048
+Qwen3TTSCodecGenerator initialized successfully
+SpeechTokenizer loaded: input_seq_len=300
+Starting TTS generation for text: 基于先进的存算一体技术和存储工艺，后摩智能致力于突破芯片的性能与功耗瓶颈，加速人工智能技术的普惠落地...
+Using non-streaming mode for talker input embedding
+Generating tokens:   7%|███████                                                       | 146/2008 [00:09<02:00, 15.44it/s]
+Reached EOS token at step 146
+Audio saved to output_custom_voice.wav | duration: 11.68s | inference: 10.98s | RTF: 0.9398
++----------------------------------------------------------------------------------------------------------+
+|                                          Performance Breakdown:                                          |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
+| Component          | Time(s) |    Pct | Count | Avg(ms) | Description                                    |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
+|   embedding_prep   |    0.02 |   0.2% |       |         | Prepare model input embeddings                 |
+|   talker           |    2.88 |  26.2% |       |         | All Talker model computation                   |
+|     prefill        |    0.09 |   0.8% |     1 |   85.49 | Run the initial Talker forward pass            |
+|     decode         |    2.56 |  23.3% |   146 |   17.55 | Generate codec-group-0 tokens autoregressively |
+|     sampling       |    0.23 |   2.1% |   147 |    1.55 | Sample tokens from Talker logits               |
+|   frame_prepare    |    0.02 |   0.2% |       |         | Prepare per-frame generation inputs            |
+|   code_predictor   |    6.63 |  60.4% |       |         | All Code Predictor computation                 |
+|     prepare        |    0.14 |   1.3% |       |         | Prepare Code Predictor inputs                  |
+|     prefill        |    0.47 |   4.3% |   146 |    3.20 | Run Code Predictor prefill                     |
+|     decode         |    4.87 |  44.4% |  2044 |    2.38 | Generate remaining codec groups                |
+|     sampling       |    1.15 |  10.5% |  2190 |    0.53 | Sample tokens from Code Predictor logits       |
+|   postprocess      |    0.00 |   0.0% |       |         | Assemble generated codec frames                |
+|   speech_tokenizer |    1.30 |  11.9% |     1 | 1304.85 | Decode codec frames into a waveform            |
+|   other            |    0.13 |   1.1% |       |         | Time outside individually tracked metrics      |
+|   total            |   10.98 | 100.0% |       |         | End-to-end inference time                      |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
+```
+
+#### Streaming 模式
+
+```bash
+Running Qwen3-TTS streaming demo: model_name=qwen3-tts, model_size=1.7b-customvoice, hf_model_dir=./Qwen3-TTS-12Hz-1.7B-CustomVoice
+TextProjection loaded
+CodePredictor loaded: prefill_length=2
+Talker loaded, context_length=2048
+Qwen3TTSCodecGenerator initialized successfully
+StatefulDecoder loaded: chunk_size=12
+Starting streaming TTS for text: 基于先进的存算一体技术和存储工艺，后摩智能致力于突破芯片的性能与功耗瓶颈，加速人工智能技术的普惠落地...
+Using streaming mode for talker input embedding
+First audio chunk latency: 951.3ms
+  Chunk 1: 15360 samples (640ms audio)
+  Chunk 2: 23040 samples (960ms audio) | playback_gap: 193.1ms
+  Chunk 3: 23040 samples (960ms audio) | playback_gap: 0.0ms
+  Chunk 4: 23040 samples (960ms audio) | playback_gap: 0.0ms
+  Chunk 5: 23040 samples (960ms audio) | playback_gap: 0.0ms
+  Chunk 6: 23040 samples (960ms audio) | playback_gap: 0.0ms
+  Chunk 7: 23040 samples (960ms audio) | playback_gap: 0.0ms
+  Chunk 8: 23040 samples (960ms audio) | playback_gap: 0.0ms
+  Chunk 9: 23040 samples (960ms audio) | playback_gap: 0.0ms
+  Chunk 10: 23040 samples (960ms audio) | playback_gap: 0.0ms
+  Chunk 11: 23040 samples (960ms audio) | playback_gap: 0.0ms
+  Chunk 12: 23040 samples (960ms audio) | playback_gap: 0.0ms
+  Chunk 13: 23040 samples (960ms audio) | playback_gap: 0.0ms
+Reached EOS token at step 157
+  Chunk 14: 9600 samples (400ms audio) | playback_gap: 0.0ms
+Audio saved to output_custom_voice.wav | duration: 12.56s | inference: 11.15s | RTF: 0.8879 | chunks: 14 | first_chunk_latency: 951.3ms | playback_gap_chunks: 1 | max_playback_gap: 193.1ms | total_playback_gap: 193.1ms
++----------------------------------------------------------------------------------------------------------+
+|                                     Streaming Performance Breakdown:                                     |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
+| Component          | Time(s) |    Pct | Count | Avg(ms) | Description                                    |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
+|   embedding_prep   |    0.02 |   0.2% |       |         | Prepare model input embeddings                 |
+|   talker           |    3.07 |  27.5% |       |         | All Talker model computation                   |
+|     prefill        |    0.09 |   0.8% |     1 |   89.08 | Run the initial Talker forward pass            |
+|     decode         |    2.75 |  24.7% |   157 |   17.51 | Generate codec-group-0 tokens autoregressively |
+|     sampling       |    0.23 |   2.1% |   158 |    1.47 | Sample tokens from Talker logits               |
+|   frame_prepare    |    0.03 |   0.2% |       |         | Prepare per-frame generation inputs            |
+|   code_predictor   |    7.11 |  63.8% |       |         | All Code Predictor computation                 |
+|     prepare        |    0.13 |   1.2% |       |         | Prepare Code Predictor inputs                  |
+|     prefill        |    0.50 |   4.5% |   157 |    3.19 | Run Code Predictor prefill                     |
+|     decode         |    5.23 |  46.9% |  2198 |    2.38 | Generate remaining codec groups                |
+|     sampling       |    1.25 |  11.2% |  2355 |    0.53 | Sample tokens from Code Predictor logits       |
+|   stateful_decoder |    0.79 |   7.1% |    14 |   56.68 | Decode generated codec chunks into waveforms   |
+|   other            |    0.13 |   1.1% |       |         | Time outside individually tracked metrics      |
+|   total            |   11.15 | 100.0% |       |         | End-to-end inference time                      |
++--------------------+---------+--------+-------+---------+------------------------------------------------+
+```
+
+### 4.4 性能指标说明
+
+#### Streaming 首音延时统计说明
 
 - CustomVoice `demo.py`：`first_chunk_latency` 从 `stateful_decoder.create_state()` 完成后开始计时，到第一次 `yield` 非空 audio chunk 结束。该指标包含 CustomVoice streaming 模式下的 embedding 准备、Talker prefill、若干帧 Talker / CodePredictor 自回归生成、首个 StatefulDecoder chunk 解码，以及中间 Python 调度开销。
-- Base `demo_base.py`：`first_chunk_latency` 从参考音频处理、Base ICL prompt 构造、`stateful_decoder.create_state()`、以及 `_prime_stateful_decoder_with_ref_code()` 参考音频 codec 预热全部完成后开始计时，到第一次 `yield` 非空目标 audio chunk 结束。该指标不包含 `prep_logits_processor`、`reference_audio`、`prompt_prepare` 和 `stateful_ref_prime`，这些耗时会体现在总 `inference` 和性能表中。
 
-因此，Base streaming 的首音延时数字更小，主要是因为 Base 当前统计的是“目标音频生成阶段开始后到首个目标音频 chunk 输出”的延迟。比较端到端体验时，应同时查看 `inference`、`preparation.reference_audio`、`prompt_prepare`、`audio_decoder.stateful_ref_prime` 和 `first_chunk_latency`。
+- Base `demo_base.py`：先完成 logits processor 构造、参考音频处理、Base ICL prompt 构造、`stateful_decoder.create_state()`，以及使用参考音频 `ref_code` 预热 StatefulDecoder state；之后才开始 `first_chunk_latency` 计时，直到第一次 `yield` 非空目标 audio chunk。因此该指标不包含 `prep_logits_processor`、`reference_audio`、`prompt_prepare` 和 `stateful_ref_prime`；这些耗时会计入总 `inference` 并在性能表中单独展示。
+
+因此，Base streaming 的 `first_chunk_latency` 表示“参考音频和 decoder 预热完成后，到首个目标音频 chunk 输出”的延迟。比较端到端体验时，应同时查看 `inference`、`preparation.reference_audio`、`prompt_prepare`、`audio_decoder.stateful_ref_prime` 和 `first_chunk_latency`。
+
+#### 当前结果解读
+
+- 三组演示的 oneshot 和 streaming `RTF` 均小于 1，表明当前配置下整体生成速度快于实时播放。本次单次结果中，streaming RTF 为 `0.7915`（0.6B CustomVoice）、`0.8020`（0.6B Base）和 `0.8879`（1.7B CustomVoice）。
+- 三组 streaming 结果都只在第 2 个 chunk 出现 1 次正向播放空挡，分别为 `104.0ms`、`91.3ms` 和 `193.1ms`；后续 chunk 的 `playback_gap` 均为 `0.0ms`。这说明首包后的稳态产出基本可以跟上播放，但从首个较短 chunk 切换到后续 chunk 时仍可能出现一次短暂空挡。
+- `CodePredictor` 是当前主要耗时阶段，占总推理时间约 `60.4%`–`71.3%`；其中逐 codebook 的 `decode` 占比最高。`1.7B CustomVoice` 的 Talker decode 平均约 `17.5ms`，高于 0.6B 模型的约 `10.0ms`，是其首音延时和 RTF 更高的主要原因之一。
+- 不同运行生成的 codec 帧数、音频时长和 chunk 数并不完全相同，因此不宜只比较 `inference` 总时间。评估子模型性能时，建议结合 `Count`、`Avg(ms)` 和 `Pct` 查看；比较用户体验时，建议同时查看 `RTF`、`first_chunk_latency` 和播放空挡指标。
 
 #### 指标含义
 
 - `duration`：生成音频的实际时长，单位为秒。
-- `inference`：端到端推理耗时，单位为秒。包含文本/参考音频准备、Talker、CodePredictor、音频解码器以及 Python 调度等开销，不包含最后统一 `sf.write()` 写 wav 的耗时。
+- `inference`：单次请求的端到端生成耗时，单位为秒。包含文本/参考音频准备、Talker、CodePredictor、音频解码器以及 Python 调度等开销，不包含 HMM 加载与初始化，也不包含最后统一调用 `sf.write()` 写入 wav 文件的耗时。
 - `RTF`：Real-Time Factor，计算方式为 `inference / duration`。RTF 小于 1 表示推理速度快于实时播放。
-- `first_chunk_latency`：流式模式首个非空音频 chunk 的延迟，CustomVoice 和 Base 的具体统计起点见本节“Streaming 首音延时统计口径”。
+- `first_chunk_latency`：流式模式首个非空音频 chunk 的延迟，CustomVoice 和 Base 的具体统计起点见本节“Streaming 首音延时统计说明”。
 - `chunks`：流式模式输出的音频 chunk 数。
 - `playback_gap`：从第二个 chunk 开始统计的播放空挡。如果从第一个 chunk 到达后立即播放，上一个 chunk 播放结束时当前 chunk 仍未到达，则该差值为正；`0.0ms` 表示当前 chunk 可以无缝接上。
 - `playback_gap_chunks`：出现正向 `playback_gap` 的 chunk 数量。
@@ -615,8 +693,8 @@ Streaming Performance Breakdown:
 - `speech_tokenizer`：oneshot 模式下将完整 audio codes 解码为 waveform 的耗时。
 - `stateful_decoder`：CustomVoice streaming 模式下按 chunk 将 audio codes 解码为 waveform 的耗时。
 - `audio_decoder`：Base 模型音频解码总耗时。oneshot 使用 `speech_tokenizer`；streaming 包括 `stateful_ref_prime` 和 `stateful_generated`：
-  - `stateful_ref_prime`：Base streaming 用参考音频 codec 预热 StatefulDecoder state，并丢弃参考音频输出的耗时；
-  - `stateful_generated`：Base streaming 解码生成音频 chunk 的耗时。
+  - `stateful_ref_prime`：使用参考音频 codec 预热 StatefulDecoder state，并丢弃该阶段解码音频的耗时；
+  - `stateful_generated`：使用预热后的 state 解码目标文本生成的音频 chunk 的耗时。
 - `other`：端到端总耗时中未被上述阶段单独统计的剩余部分，主要包括 Python 循环调度、generator/list 迭代、少量 tensor/numpy 转换、计时和日志等开销。
 - `total`：端到端推理总耗时，对应上方 `inference`。
 
@@ -627,11 +705,12 @@ Streaming Performance Breakdown:
 
 - Qwen3-TTS-12Hz-0.6B-CustomVoice: [https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice](https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice)
 - Qwen3-TTS-12Hz-0.6B-Base: [https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-0.6B-Base](https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-0.6B-Base)
+- Qwen3-TTS-12Hz-1.7B-CustomVoice: [https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice](https://www.modelscope.cn/models/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice)
 
 
 ## 附录一：CustomVoice demo.py 推理流程说明
 
-本附录用于说明当前 `demo.py` 如何在后摩芯片上完成 `Qwen3-TTS-12Hz-0.6B-CustomVoice` 的端到端推理。`demo.py` 只负责 CustomVoice 模型；`Base` 模型的 voice clone 推理入口为 `demo_base.py`，运行方式见 2.5.2 和 4.2。
+本附录用于说明当前 `demo.py` 如何在后摩芯片上完成 Qwen3-TTS CustomVoice 的端到端推理。
 
 ### 1. 整体数据流
 
@@ -873,7 +952,7 @@ streaming 模式下，`main()` 创建 `Qwen3TTSStatefulDecoderInference`，并�
 
 当前 `demo.py` 的 oneshot 和 streaming 都在 `main()` 中统一写出 wav，推理计时不包含最终 `sf.write()` 文件 I/O。Streaming 模式下，`main()` 会收集所有音频 chunk 后再 `np.concatenate()` 写文件。
 
-`demo.py` 使用 `PerfTracker` 和统一的 `PerfKey` 管理性能统计。首音延时、播放空挡和各性能指标含义统一见 4.3。
+`demo.py` 使用 `PerfTracker` 和统一的 `PerfKey` 管理性能统计。首音延时、播放空挡和各性能指标含义统一见 4.4。
 
 
 ## 附录二：Base demo_base.py 推理流程说明
@@ -938,15 +1017,15 @@ Talker Prefill HMM 初始化生成上下文和 KV cache
 Base voice clone 的参考音频处理入口是 `encode_reference_audio(ref_audio)`：
 
 1. 检查 `ref_audio` 文件是否存在。
-2. `_load_reference_audio()` 读取音频并统一到 24kHz 单声道。
-3. `speech_tokenizer_encoder.encode(wav, sr)` 将参考音频编码为 `ref_code`。
-4. `extract_speaker_embedding(wav, sr)` 调用 `speaker_encoder` 提取 `speaker_embedding`。
+2. `_load_reference_audio()` 通过 `torchaudio.load()` 读取音频，多声道时取均值，并重采样到 24kHz；日志会记录样本数、时长、峰值和末尾 0.5 秒 RMS。
+3. `speech_tokenizer_encoder.encode(wav, sr)` 将参考音频补零到 HMM 的静态输入长度，同时构造 `padding_mask`，输出 `[T, num_code_groups]` 形式的 `ref_code`。
+4. `extract_speaker_embedding(wav, sr)` 先计算 128 维 mel spectrogram，再补齐或裁剪到 SpeakerEncoder HMM 的静态帧数，最后输出 float32 `speaker_embedding`。
 5. 将参考音频相关耗时写入 `PerfTracker`，包括：
    - `load`
    - `speech_tokenizer_encode`
    - `speaker_embed`
 
-其中 `speech_tokenizer_encoder` 的 HMM 输入长度是静态的。如果参考音频超过模型输入长度，当前实现会截断到 `net_input_samples` 后再编码；如果编码后没有有效帧，则直接报错。
+其中 `speech_tokenizer_encoder` 的 HMM 输入长度是静态的。如果参考音频超过模型输入长度，当前实现会打印 warning，并截断到 `net_input_samples` 后再编码；如果音频为空或编码后没有有效帧，则直接报错。
 
 ### 4. Base ICL Prompt 构造
 
@@ -963,18 +1042,20 @@ Prompt 构造主要包括：
 
 1. 使用 `build_assistant_text(text)` 构造目标文本 prompt。
 2. 使用 `build_ref_text(ref_text)` 构造参考文本 prompt。
-3. 根据 `language` 查找 codec language token。
-4. 计算 `tts_bos_embed`、`tts_eos_embed`、`tts_pad_embed`。
-5. 将 language token、speaker embedding、codec pad / bos token 组织成 codec prompt embedding。
-6. 调用 `_generate_icl_prompt()` 拼接参考文本 hidden、目标文本 hidden 和参考音频 codec embedding。
-7. 将 role embedding 与 ICL prompt embedding 拼接，形成最终 `talker_input_embed`。
+3. 根据 `language` 查找 codec language token；`auto` 不显式放入 language token。
+4. 将 TTS bos / eos / pad token 依次送入文本 embedding 和 TextProjection，得到 `tts_bos_embed`、`tts_eos_embed`、`tts_pad_embed`。
+5. 根据是否显式指定语言，组织 think/no-think token、language token、speaker embedding、codec pad / bos token，得到 codec prompt embedding。
+6. 将目标文本 assistant role 开头的 3 个 token 送入文本 embedding 和 TextProjection，并与 codec prompt embedding 拼成起始上下文。
+7. `_generate_icl_prompt()` 先将参考文本 token 和目标文本 token 在文本侧拼接，经 TextProjection 投影后追加 `tts_eos_embed`。
+8. 参考音频的第 1 组 codebook 使用 Talker token embedding，其余 codebook 使用 CodePredictor token embedding；同一帧各组 embedding 求和，并在序列前加入 `codec_bos_id`。
+9. 按 `non_streaming_mode` 组织文本 hidden 和参考 codec embedding，再与起始上下文拼接，形成最终 `talker_input_embed`。如果 prompt 长度已达 Talker context 上限，则直接报错。
 
 ### 5. Talker 输入 embedding 模式
 
 `_generate_icl_prompt()` 支持两种 Talker input embedding 组织方式：
 
-- `non_streaming_mode=True`：一次性把参考文本和目标文本 hidden 都放入 Talker prefill，再拼接参考音频 codec embedding。该模式适合 oneshot，文本条件完整，但 prefill 更长。
-- `non_streaming_mode=False`：将文本 hidden 与参考音频 codec embedding 尽量对齐，未放入 prefill 的剩余文本 hidden 写入 `trailing_text_hidden`，后续在 Talker decode 时逐步叠加。该模式适合 streaming，可以缩短首包路径。
+- `non_streaming_mode=True`：完整文本 hidden 先与 codec pad embedding 相加，再拼接“参考 codec embedding + `tts_pad_embed`”。返回的 `trailing_text_hidden` 为 `tts_pad_embed`，后续 Talker decode 不再逐步注入剩余文本 hidden。
+- `non_streaming_mode=False`：文本 hidden 与参考 codec embedding 从头部对齐后相加。如果文本更长，未放入 prefill 的剩余 hidden 写入 `trailing_text_hidden`；如果 codec 更长，文本侧使用 `tts_pad_embed` 补齐。
 
 当前 `demo_base.py` 中：
 
@@ -1034,7 +1115,7 @@ oneshot 模式入口是 `generate_voice_clone()`，`main()` 在 `args.mode == "o
    ```
 
 7. 调用 `speech_tokenizer.decode()` 一次性解码完整 waveform。
-8. 根据参考 codec 帧占总 codec 帧的比例，裁掉 waveform 前半段参考音频对应的部分，只保留目标文本生成音频。
+8. 按 `ref_len / total_len` 计算 waveform 的裁剪位置，移除参考 codec 对应的前缀音频，只保留目标文本生成音频。
 9. 返回 `wavs, sr, perf_dict, perf_count`。
 
 这里先拼接 `ref_code` 再裁掉参考音频，是为了让 oneshot SpeechTokenizer 解码时拥有与 prompt 一致的参考音频上下文，减少目标音频开头的衔接问题。
@@ -1057,8 +1138,9 @@ Base streaming 相比 CustomVoice 多了一个关键步骤：用参考音频 `re
 
 4. 丢弃参考音频解码输出，只保留新的 `decoder_state`。
 5. 对不足一个 chunk 的残余参考 codec，使用最后一帧补齐到 `chunk_size` 后继续预热。
+6. 预热完成后，将 `decoder_state.skip_samples` 重置为 StatefulDecoder 的初始输出裁剪量，使该裁剪规则从目标音频开始生效。
 
-预热完成后才开始生成目标音频 codec。Base streaming 首音延时的具体统计口径见 4.3。
+预热完成后才开始生成目标音频 codec。Base streaming 首音延时的具体统计说明见 4.4。
 
 目标音频生成阶段与 CustomVoice streaming 一致：
 
@@ -1066,10 +1148,15 @@ Base streaming 相比 CustomVoice 多了一个关键步骤：用参考音频 `re
 2. `CodeChunkBuffer` 攒够 `chunk_size` 后调用 `stateful_decoder.decode(..., is_final=False)`。
 3. 若 decoder 返回非空音频，则 `yield (audio, 24000)`。
 4. 生成结束后，对残余帧执行 final decode；如果没有残余帧，则发送 0 帧 final decode flush latent audio。
-5. `main()` 收集所有 audio chunks，最后 `np.concatenate()` 后统一写 wav。
+5. 第一个非空 audio chunk 产生时，记录从参考 codec 预热完成到该 chunk 输出的 `first_chunk_latency`。
+6. `main()` 收集所有 audio chunks，记录 chunk 数量和 `playback_gap`，最后 `np.concatenate()` 后统一写 wav。
 
 ### 9. 输出与性能统计
 
-当前 `demo_base.py` 的 oneshot 和 streaming 都在 `main()` 中统一写出 wav，推理计时不包含最终 `sf.write()` 文件 I/O。Streaming 模式下，`main()` 会收集所有音频 chunk 后再 `np.concatenate()` 写文件。
+当前 `demo_base.py` 的 oneshot 和 streaming 都在 `main()` 中统一写出 wav，请求推理计时都从进入生成接口前开始，因此包含 logits processor、参考音频、prompt、codec 生成和音频解码开销，但不包含模型初始化和最终 `sf.write()` 文件 I/O。
 
-`demo_base.py` 和 `demo.py` 共用 `PerfTracker` / `PerfKey` 管理性能统计。Base 的首音延时、播放空挡和各性能指标含义统一见 4.3。
+Streaming 的 `first_chunk_latency` 使用生成器内部的单独计时起点：它从参考音频 prompt 构造和 StatefulDecoder 预热完成后开始，到第一个非空目标音频 chunk 产生为止。因此该数值不包含参考音频处理、prompt 构造和 `stateful_ref_prime`；完整说明见 4.4。
+
+Streaming 模式下，`main()` 会收集所有音频 chunk，校验采样率始终一致，并通过 `StreamingPlaybackGapTracker` 统计播放空挡；推理结束后再使用 `np.concatenate()` 拼接和写入文件。
+
+`demo_base.py` 和 `demo.py` 共用 `PerfTracker` / `PerfKey` 管理性能统计。Base 的首音延时、播放空挡和各性能指标含义统一见 4.4。

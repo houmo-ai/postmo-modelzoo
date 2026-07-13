@@ -2,7 +2,7 @@
 #
 # File: demo.py
 # Description:
-#   Qwen3-TTS-0.6B-CustomVoice tcim_lite inference demo.
+#   Qwen3-TTS CustomVoice tcim_lite inference demo.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -959,6 +959,12 @@ def main(args: argparse.Namespace) -> None:
 
     # 构建 HMM 模型配置
     hf_model_dir = args.hf_model_dir
+    logger.info(
+        f"Running Qwen3-TTS {args.mode} demo: "
+        f"model_name={args.model_name}, "
+        f"model_size={args.model_size}, "
+        f"hf_model_dir={hf_model_dir}"
+    )
 
     # 创建 Qwen3TTSCodecGenerator 实例
     codec_generator = Qwen3TTSCodecGenerator(

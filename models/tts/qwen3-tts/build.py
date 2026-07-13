@@ -2,7 +2,7 @@
 #
 # File: build.py
 # Description:
-#  Qwen3-TTS-0.6B-CustomVoice Model Build and Test Tool.
+#  Qwen3-TTS Model Build and Test Tool.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

@@ -20,9 +20,15 @@
 
 import time
 from collections import defaultdict
+from contextvars import ContextVar
 from typing import Dict, Iterable, Tuple
 
 from loguru import logger
+from prettytable import PrettyTable
+
+_PERF_TABLE: ContextVar[PrettyTable | None] = ContextVar(
+    "qwen3_tts_perf_table", default=None
+)
 
 
 class PerfKey:
@@ -93,6 +99,46 @@ BASE_AUDIO_DECODER_KEYS = [
 ]
 
 
+PERF_DESCRIPTIONS = {
+    PerfKey.PREP_LOGITS_PROCESSOR: "Initialize sampling and logits processors",
+    PerfKey.PREP_REF_AUDIO_LOAD: "Load and preprocess reference audio",
+    PerfKey.PREP_REF_SPEECH_TOKENIZER_ENCODE: "Encode reference audio into codec frames",
+    PerfKey.PREP_REF_SPEAKER_EMBED: "Extract the reference speaker embedding",
+    PerfKey.PREP_TEXT_TOKENIZE: "Tokenize input and reference text",
+    PerfKey.PREP_SPECIAL_TOKEN_EMBED: "Build special-token embeddings",
+    PerfKey.PREP_CODEC_PROMPT_EMBED: "Build reference codec prompt embeddings",
+    PerfKey.PREP_TALKER_ROLE_EMBED: "Build the Talker role embedding",
+    PerfKey.PREP_ICL_PROMPT_EMBED: "Build the in-context learning prompt",
+    PerfKey.PREP_CONCAT: "Concatenate prompt input embeddings",
+    PerfKey.EMBEDDING_PREP: "Prepare model input embeddings",
+    PerfKey.FRAME_PREPARE: "Prepare inputs for each generated frame",
+    PerfKey.TALKER_PREFILL: "Run the initial Talker forward pass",
+    PerfKey.TALKER_DECODE: "Generate codec-group-0 tokens autoregressively",
+    PerfKey.TALKER_SAMPLING: "Sample tokens from Talker logits",
+    PerfKey.CODE_PREDICTOR_PREPARE: "Prepare Code Predictor inputs",
+    PerfKey.CODE_PREDICTOR_PREFILL: "Run Code Predictor prefill",
+    PerfKey.CODE_PREDICTOR_DECODE: "Generate remaining codec groups",
+    PerfKey.CODE_PREDICTOR_SAMPLING: "Sample tokens from Code Predictor logits",
+    PerfKey.POSTPROCESS: "Assemble generated codec frames",
+    PerfKey.SPEECH_TOKENIZER: "Decode codec frames into a waveform",
+    PerfKey.STATEFUL_DECODER_REF_PRIME: "Prime decoder state with reference codec frames",
+    PerfKey.STATEFUL_DECODER: "Decode generated codec chunks into waveforms",
+}
+
+ROW_DESCRIPTIONS = {
+    "preparation": "All input and prompt preparation",
+    "reference_audio": "All reference audio processing",
+    "prompt_prepare": "All text and prompt embedding preparation",
+    "embedding_prep": "Prepare model input embeddings",
+    "frame_prepare": "Prepare per-frame generation inputs",
+    "talker": "All Talker model computation",
+    "code_predictor": "All Code Predictor computation",
+    "audio_decoder": "All waveform decoding",
+    "other": "Time outside individually tracked metrics",
+    "total": "End-to-end inference time",
+}
+
+
 class PerfTracker:
     """Small helper for named performance timing and counters."""
 
@@ -138,18 +184,41 @@ def _sum_perf(perf: dict, keys: Iterable[str]) -> float:
 
 
 def _log_header(title: str) -> None:
-    logger.info("=" * 72)
-    logger.info(title)
-    logger.info(
-        f"  {'Component':<28} {'Time(s)':>9} {'Pct':>6} {'Count':>6} {'Avg(ms)':>8}"
-    )
-    logger.info(f"  {'-' * 62}")
+    table = PrettyTable()
+    table.title = title
+    table.field_names = [
+        "Component",
+        "Time(s)",
+        "Pct",
+        "Count",
+        "Avg(ms)",
+        "Description",
+    ]
+    table.align["Component"] = "l"
+    for field in ["Time(s)", "Pct", "Count", "Avg(ms)"]:
+        table.align[field] = "r"
+    table.align["Description"] = "l"
+    _PERF_TABLE.set(table)
 
 
 def _log_footer(inference_time: float) -> None:
-    logger.info(f"  {'-' * 62}")
-    logger.info(f"  {'total':<28} {inference_time:>9.2f} 100.0%")
-    logger.info("=" * 72)
+    table = _PERF_TABLE.get()
+    if table is None:
+        raise RuntimeError("Performance table was not initialized")
+    table.add_row(
+        [
+            "  total",
+            f"{inference_time:.2f}",
+            "100.0%",
+            "",
+            "",
+            ROW_DESCRIPTIONS["total"],
+        ]
+    )
+    # Emit the complete rendered table with one logging call so unrelated
+    # asynchronous log messages cannot be inserted between table rows.
+    logger.info("\n{}", table.get_string())
+    _PERF_TABLE.set(None)
 
 
 def _log_row(
@@ -158,19 +227,34 @@ def _log_row(
     inference_time: float,
     count: int | None = None,
     indent: int = 2,
+    description: str = "",
 ) -> None:
+    table = _PERF_TABLE.get()
+    if table is None:
+        raise RuntimeError("Performance table was not initialized")
     prefix = " " * indent
-    name_width = 30 - indent
+    description = description or ROW_DESCRIPTIONS.get(label, "")
     if count is None:
-        logger.info(
-            f"{prefix}{label:<{name_width}} {seconds:>9.2f} "
-            f"{_pct(seconds, inference_time):>5.1f}%"
+        table.add_row(
+            [
+                f"{prefix}{label}",
+                f"{seconds:.2f}",
+                f"{_pct(seconds, inference_time):.1f}%",
+                "",
+                "",
+                description,
+            ]
         )
         return
-    logger.info(
-        f"{prefix}{label:<{name_width}} {seconds:>9.2f} "
-        f"{_pct(seconds, inference_time):>5.1f}% {count:>6} "
-        f"{_avg_ms(seconds, count):>8.2f}"
+    table.add_row(
+        [
+            f"{prefix}{label}",
+            f"{seconds:.2f}",
+            f"{_pct(seconds, inference_time):.1f}%",
+            count,
+            f"{_avg_ms(seconds, count):.2f}",
+            description,
+        ]
     )
 
 
@@ -190,6 +274,7 @@ def _log_key_row(
         inference_time,
         count=count,
         indent=indent,
+        description=PERF_DESCRIPTIONS.get(key, ""),
     )
 
 
@@ -217,7 +302,9 @@ def _log_code_predictor(
     inference_time: float,
     include_prepare: bool,
 ) -> None:
-    keys = CUSTOMVOICE_CODE_PREDICTOR_KEYS if include_prepare else BASE_CODE_PREDICTOR_KEYS
+    keys = (
+        CUSTOMVOICE_CODE_PREDICTOR_KEYS if include_prepare else BASE_CODE_PREDICTOR_KEYS
+    )
     _log_group("code_predictor", _sum_perf(perf, keys), inference_time)
     rows = []
     if include_prepare:
@@ -248,14 +335,18 @@ def _log_customvoice_perf(
     streaming: bool,
 ) -> None:
     _log_header(title)
-    logger.info(
-        f"  {'embedding_prep':<28} {perf.get(PerfKey.EMBEDDING_PREP, 0.0):>9.2f} "
-        f"{_pct(perf.get(PerfKey.EMBEDDING_PREP, 0.0), inference_time):>5.1f}%"
+    _log_row(
+        "embedding_prep",
+        perf.get(PerfKey.EMBEDDING_PREP, 0.0),
+        inference_time,
+        indent=2,
     )
     _log_talker(perf, perf_count, inference_time)
-    logger.info(
-        f"  {'frame_prepare':<28} {perf.get(PerfKey.FRAME_PREPARE, 0.0):>9.2f} "
-        f"{_pct(perf.get(PerfKey.FRAME_PREPARE, 0.0), inference_time):>5.1f}%"
+    _log_row(
+        "frame_prepare",
+        perf.get(PerfKey.FRAME_PREPARE, 0.0),
+        inference_time,
+        indent=2,
     )
     _log_code_predictor(perf, perf_count, inference_time, include_prepare=True)
     if streaming:
@@ -352,7 +443,9 @@ def _log_base_perf(
     )
     _log_talker(perf, perf_count, inference_time)
     _log_code_predictor(perf, perf_count, inference_time, include_prepare=False)
-    _log_group("audio_decoder", _sum_perf(perf, BASE_AUDIO_DECODER_KEYS), inference_time)
+    _log_group(
+        "audio_decoder", _sum_perf(perf, BASE_AUDIO_DECODER_KEYS), inference_time
+    )
     _log_key_row(
         perf,
         perf_count,
@@ -369,9 +462,7 @@ def _log_base_perf(
     _log_footer(inference_time)
 
 
-def log_base_oneshot_perf(
-    perf: dict, perf_count: dict, inference_time: float
-) -> None:
+def log_base_oneshot_perf(perf: dict, perf_count: dict, inference_time: float) -> None:
     """打印 Base oneshot 模式性能分析"""
     _log_base_perf("Performance Breakdown:", perf, perf_count, inference_time)
 
@@ -380,6 +471,4 @@ def log_base_streaming_perf(
     perf: dict, perf_count: dict, inference_time: float
 ) -> None:
     """打印 Base streaming 模式性能分析"""
-    _log_base_perf(
-        "Streaming Performance Breakdown:", perf, perf_count, inference_time
-    )
+    _log_base_perf("Streaming Performance Breakdown:", perf, perf_count, inference_time)

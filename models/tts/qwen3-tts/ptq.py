@@ -2,7 +2,7 @@
 #
 # File: ptq.py
 # Description:
-#   Qwen3-TTS-0.6B PTQ quantization and model export tool.
+#   Qwen3-TTS PTQ quantization and model export tool.
 #   Supports both CustomVoice and Base models via model_name/model_size.
 #   Exports sub-models (talker, code_predictor, text_projection,
 #   speech_tokenizer, stateful_decoder) and base-only frontend models

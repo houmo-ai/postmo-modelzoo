@@ -1282,6 +1282,10 @@ class Qwen3TTSInference:
             chunk_size=chunk_size,
             perf=perf,
         )
+        decoder_state.skip_samples = (
+            stateful_decoder.INITIAL_OUTPUT_SKIP_FRAMES
+            * stateful_decoder.SAMPLES_PER_FRAME
+        )
 
         # Base streaming 的首包延迟从 ref_code 预热完成后开始统计；
         # 参考音频处理和 decoder 预热耗时会进入总 inference / perf table。
@@ -1353,6 +1357,13 @@ class Qwen3TTSInference:
 
 
 def main(args: argparse.Namespace) -> None:
+    logger.info(
+        f"Running Qwen3-TTS {args.mode} demo: "
+        f"model_name={args.model_name}, "
+        f"model_size={args.model_size}, "
+        f"hf_model_dir={args.hf_model_dir}"
+    )
+
     torch.manual_seed(args.seed)
 
     xh_model = Qwen3TTSInference(

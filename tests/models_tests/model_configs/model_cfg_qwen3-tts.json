@@ -17,8 +17,10 @@
     "support_hmatc": null,
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "raw", "hmm", "hmm"],
+            "type": ["raw", "raw", "raw", "hmm", "hmm", "hmm"],
             "download_dir": [
+                "cached_models",
+                "cached_models",
                 "cached_models",
                 "cached_models",
                 "cached_models",
@@ -27,162 +29,222 @@
             "extract_dir": [
                 null,
                 null,
+                null,
                 "cached_models/hmm_xh2_customvoice_2k",
-                "cached_models/hmm_xh2_base_2k"
+                "cached_models/hmm_xh2_base_2k",
+                "cached_models/hmm_xh2_1.7b_customvoice_2k"
             ],
-            "model_name": [null, null, null, null],
+            "model_name": [null, null, null, null, null, null],
             "model_size": [
                 "0.6b-customvoice",
                 "0.6b-base",
+                "1.7b-customvoice",
                 "0.6b-customvoice",
-                "0.6b-base"
+                "0.6b-base",
+                "1.7b-customvoice"
             ],
-            "context_length": [null, null, "2k", "2k"],
-            "ndevice": [null, null, null, null],
-            "ncore": [null, null, null, null],
-            "quant_type": [null, null, null, null]
+            "context_length": [null, null, null, "2k", "2k", "2k"],
+            "ndevice": [null, null, null, null, null, null],
+            "ncore": [null, null, null, null, null, null],
+            "quant_type": [null, null, null, null, null, null]
         }
     },
     "quant_params": {
         "xh2": {
             "model_dir": [
                 "cached_models/Qwen3-TTS-12Hz-0.6B-CustomVoice",
-                "cached_models/Qwen3-TTS-12Hz-0.6B-Base"
+                "cached_models/Qwen3-TTS-12Hz-0.6B-Base",
+                "cached_models/Qwen3-TTS-12Hz-1.7B-CustomVoice"
             ],
             "output_dir": [
                 "cached_results/hmquant_xh2_customvoice_2k",
-                "cached_results/hmquant_xh2_base_2k"
+                "cached_results/hmquant_xh2_base_2k",
+                "cached_results/hmquant_xh2_1.7b_customvoice_2k"
             ],
-            "model_name": [null, null],
-            "model_size": ["0.6b-customvoice", "0.6b-base"],
-            "max_sequence_length": ["2048", "2048"],
-            "input_sequence_length": [null, null]
+            "model_name": [null, null, null],
+            "model_size": ["0.6b-customvoice", "0.6b-base", "1.7b-customvoice"],
+            "max_sequence_length": ["2048", "2048", "2048"],
+            "input_sequence_length": [null, null, null]
         }
     },
     "compile_params": {
         "xh2": {
             "model_dir": [
                 "cached_results/hmquant_xh2_customvoice_2k",
-                "cached_results/hmquant_xh2_base_2k"
+                "cached_results/hmquant_xh2_base_2k",
+                "cached_results/hmquant_xh2_1.7b_customvoice_2k"
             ],
             "output_dir": [
                 "cached_results/hmm_xh2_customvoice_2k",
-                "cached_results/hmm_xh2_base_2k"
+                "cached_results/hmm_xh2_base_2k",
+                "cached_models/hmm_xh2_1.7b_customvoice_2k"
             ],
-            "model_name": ["qwen3-tts", "qwen3-tts"],
-            "model_size": ["0.6b-customvoice", "0.6b-base"],
-            "context_length": ["2048", "2048"],
-            "prefill_length": ["256", "256"],
-            "ncore": [null, null],
-            "ndevice": [null, null],
-            "enable_common_subgraph": [true, true]
+            "model_name": ["qwen3-tts", "qwen3-tts", "qwen3-tts"],
+            "model_size": ["0.6b-customvoice", "0.6b-base", "1.7b-customvoice"],
+            "context_length": ["2048", "2048", "2048"],
+            "prefill_length": ["256", "256", "256"],
+            "ncore": [null, null, null],
+            "ndevice": [null, null, null],
+            "enable_common_subgraph": [true, true, true]
         }
     },
     "demo_params": {
         "xh2": {
-            "script": ["demo.py", "demo_base.py", "demo.py", "demo_base.py"],
-            "model_name": ["qwen3-tts", "qwen3-tts", "qwen3-tts", "qwen3-tts"],
+            "script": [
+                "demo.py",
+                "demo_base.py",
+                "demo.py",
+                "demo.py",
+                "demo_base.py",
+                "demo.py"
+            ],
+            "model_name": [
+                "qwen3-tts",
+                "qwen3-tts",
+                "qwen3-tts",
+                "qwen3-tts",
+                "qwen3-tts",
+                "qwen3-tts"
+            ],
             "model_size": [
                 "0.6b-customvoice",
                 "0.6b-base",
+                "1.7b-customvoice",
                 "0.6b-customvoice",
-                "0.6b-base"
+                "0.6b-base",
+                "1.7b-customvoice"
             ],
             "hf_model_dir": [
                 "cached_models/Qwen3-TTS-12Hz-0.6B-CustomVoice",
                 "cached_models/Qwen3-TTS-12Hz-0.6B-Base",
+                "cached_models/Qwen3-TTS-12Hz-1.7B-CustomVoice",
                 "cached_models/Qwen3-TTS-12Hz-0.6B-CustomVoice",
-                "cached_models/Qwen3-TTS-12Hz-0.6B-Base"
+                "cached_models/Qwen3-TTS-12Hz-0.6B-Base",
+                "cached_models/Qwen3-TTS-12Hz-1.7B-CustomVoice"
             ],
             "text_projection_hmm": [
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_text_projection.hmm",
                 "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_text_projection.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_text_projection.hmm",
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_text_projection.hmm",
-                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_text_projection.hmm"
+                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_text_projection.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_text_projection.hmm"
             ],
             "code_predictor_prefill_hmm": [
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_code_predictor_prefill.hmm",
                 "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_code_predictor_prefill.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_code_predictor_prefill.hmm",
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_code_predictor_prefill.hmm",
-                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_code_predictor_prefill.hmm"
+                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_code_predictor_prefill.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_code_predictor_prefill.hmm"
             ],
             "code_predictor_decode_hmm": [
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_code_predictor_decode.hmm",
                 "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_code_predictor_decode.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_code_predictor_decode.hmm",
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_code_predictor_decode.hmm",
-                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_code_predictor_decode.hmm"
+                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_code_predictor_decode.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_code_predictor_decode.hmm"
             ],
             "code_predictor_token_embedding": [
                 "cached_results/hmm_xh2_customvoice_2k/hmquant/quant_embedding_code_predictor.pt",
                 "cached_results/hmm_xh2_base_2k/hmquant/quant_embedding_code_predictor.pt",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/hmquant/quant_embedding_code_predictor.pt",
                 "cached_results/hmm_xh2_customvoice_2k/hmquant/quant_embedding_code_predictor.pt",
-                "cached_results/hmm_xh2_base_2k/hmquant/quant_embedding_code_predictor.pt"
+                "cached_results/hmm_xh2_base_2k/hmquant/quant_embedding_code_predictor.pt",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/hmquant/quant_embedding_code_predictor.pt"
             ],
             "talker_prefill_hmm": [
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_talker_prefill.hmm",
                 "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_talker_prefill.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_talker_prefill.hmm",
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_talker_prefill.hmm",
-                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_talker_prefill.hmm"
+                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_talker_prefill.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_talker_prefill.hmm"
             ],
             "talker_decode_hmm": [
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_talker_decode.hmm",
                 "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_talker_decode.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_talker_decode.hmm",
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_talker_decode.hmm",
-                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_talker_decode.hmm"
+                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_talker_decode.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_talker_decode.hmm"
             ],
             "talker_token_embedding": [
                 "cached_results/hmm_xh2_customvoice_2k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_base_2k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_customvoice_2k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_base_2k/hmquant/quant_embedding.pt"
+                "cached_results/hmm_xh2_base_2k/hmquant/quant_embedding.pt",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/hmquant/quant_embedding.pt"
             ],
             "talker_text_embedding": [
                 "cached_results/hmm_xh2_customvoice_2k/hmquant/text_embedding.pt",
                 "cached_results/hmm_xh2_base_2k/hmquant/text_embedding.pt",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/hmquant/text_embedding.pt",
                 "cached_results/hmm_xh2_customvoice_2k/hmquant/text_embedding.pt",
-                "cached_results/hmm_xh2_base_2k/hmquant/text_embedding.pt"
+                "cached_results/hmm_xh2_base_2k/hmquant/text_embedding.pt",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/hmquant/text_embedding.pt"
             ],
             "speech_tokenizer_hmm": [
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_speech_tokenizer.hmm",
                 "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_speech_tokenizer.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_speech_tokenizer.hmm",
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_speech_tokenizer.hmm",
-                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_speech_tokenizer.hmm"
+                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_speech_tokenizer.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_speech_tokenizer.hmm"
             ],
             "speech_tokenizer_decode_padding_shapes": [
                 "cached_results/hmm_xh2_customvoice_2k/hmquant/decode_padding_shapes.json",
                 "cached_results/hmm_xh2_base_2k/hmquant/decode_padding_shapes.json",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/hmquant/decode_padding_shapes.json",
                 "cached_results/hmm_xh2_customvoice_2k/hmquant/decode_padding_shapes.json",
                 "cached_results/hmm_xh2_base_2k/hmquant/decode_padding_shapes.json"
             ],
             "stateful_decoder_hmm": [
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_stateful_decoder.hmm",
                 "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_stateful_decoder.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_stateful_decoder.hmm",
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_stateful_decoder.hmm",
-                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_stateful_decoder.hmm"
+                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_stateful_decoder.hmm",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/qwen3-tts-1.7b-customvoice_stateful_decoder.hmm"
             ],
             "speech_tokenizer_encoder_hmm": [
                 null,
                 "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_speech_tokenizer_encoder.hmm",
                 null,
-                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_speech_tokenizer_encoder.hmm"
+                null,
+                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_speech_tokenizer_encoder.hmm",
+                null
             ],
             "speaker_encoder_hmm": [
                 null,
                 "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_speaker_encoder.hmm",
                 null,
-                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_speaker_encoder.hmm"
+                null,
+                "cached_results/hmm_xh2_base_2k/qwen3-tts-0.6b-base_speaker_encoder.hmm",
+                null
             ],
-            "ndevice": ["1", "1", "1", "1"],
+            "ndevice": ["1", "1", "1", "1", "1", "1"],
             "output_wav": [
                 "qwen3_tts_customvoice_oneshot.wav",
                 "qwen3_tts_base_oneshot.wav",
+                "qwen3_tts_1.7b_customvoice_oneshot.wav",
                 "qwen3_tts_customvoice_streaming.wav",
-                "qwen3_tts_base_streaming.wav"
+                "qwen3_tts_base_streaming.wav",
+                "qwen3_tts_1.7b_customvoice_streaming.wav"
             ],
-            "text": [null, null, null, null],
-            "speaker": ["vivian", null, "vivian", null],
-            "mode": ["oneshot", "oneshot", "streaming", "streaming"],
-            "chunk_size": [null, null, null, null]
+            "text": [null, null, null, null, null, null],
+            "speaker": ["vivian", null, "vivian", "vivian", null, "vivian"],
+            "mode": [
+                "oneshot",
+                "oneshot",
+                "oneshot",
+                "streaming",
+                "streaming",
+                "streaming"
+            ],
+            "chunk_size": [null, null, null, null, null, null]
         }
     }
 }

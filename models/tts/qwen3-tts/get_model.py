@@ -2,7 +2,7 @@
 #
 # File: get_model.py
 # Description:
-#   Download Qwen3-TTS-12Hz-0.6B-CustomVoice model from ModelScope or Jfrog.
+#   Download Qwen3-TTS model from ModelScope or Jfrog.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

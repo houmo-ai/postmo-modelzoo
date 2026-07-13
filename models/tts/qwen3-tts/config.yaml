@@ -25,3 +25,14 @@ model_configs:
       prefill_length: 256
       quant_type: "w8a16h1_sefp"
       cpp_backend: "v2"
+    "1.7b-customvoice":
+      modelscope_repo: ["Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"]
+      model_name: "qwen3-tts"
+      model_size: "1.7b-customvoice"
+      ncore: 2
+      context_length: "2k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      quant_type: "w8a16h1_sefp"
+      cpp_backend: "v2"
