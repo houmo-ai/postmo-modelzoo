@@ -80,6 +80,38 @@ static AsrPerfSettings BuildAsrPerfCaseSettings(
   return current_settings;
 }
 
+static AsrTranscribeResult AverageAsrResults(
+    const AsrTranscribeResult& total, int count) {
+  AsrTranscribeResult average = total;
+  average.encode_time_ms /= count;
+  average.prefill_time_ms /= count;
+  average.decode_time_ms /= count;
+  average.total_time_ms /= count;
+  average.ttft_ms /= count;
+  average.audio_duration_s /= count;
+  average.overall_rtf /= count;
+  average.inference_rtf /= count;
+  average.decode_tps /= count;
+  average.overall_tps /= count;
+  average.output_tokens /= count;
+  return average;
+}
+
+static void AccumulateAsrResult(AsrTranscribeResult& total,
+                                const AsrTranscribeResult& result) {
+  total.encode_time_ms += result.encode_time_ms;
+  total.prefill_time_ms += result.prefill_time_ms;
+  total.decode_time_ms += result.decode_time_ms;
+  total.total_time_ms += result.total_time_ms;
+  total.ttft_ms += result.ttft_ms;
+  total.audio_duration_s += result.audio_duration_s;
+  total.overall_rtf += result.overall_rtf;
+  total.inference_rtf += result.inference_rtf;
+  total.decode_tps += result.decode_tps;
+  total.overall_tps += result.overall_tps;
+  total.output_tokens += result.output_tokens;
+}
+
 static void PrintAsrMetrics(const AsrTranscribeResult& result, int n_chunks) {
   double enc_chunk_s =
       (n_chunks > 0) ? result.encode_time_ms / 1000.0 / n_chunks : 0;
@@ -171,6 +203,8 @@ static int RunAsrCore(const AsrPerfSettings& settings,
       std::cout << std::string(82, '=') << "\n";
     }
 
+    AsrTranscribeResult total_result;
+    std::unordered_map<int, DeviceStats> current_dev_stats;
     for (int i = 0; i < current_settings.loop_count; ++i) {
       std::cout << COLOR_BLUE << "\n"
                 << std::string(24, '=') << "ASR Perf Loop: " << (i + 1) << "/"
@@ -197,18 +231,21 @@ static int RunAsrCore(const AsrPerfSettings& settings,
 
       auto result = perf_ctx->PerfRun(current_settings.audio_len_seconds,
                                       current_settings.token_per_second);
+      AccumulateAsrResult(total_result, result);
       PrintAsrMetrics(result, n_chunks);
       perf_ctx->profiler().print_summary();
 #if defined(__linux__)
       max_host_mem_info = host_mem_monitor->getMaxMemoryInfo();
 #endif
-      std::unordered_map<int, DeviceStats> current_dev_stats =
-          device_monitor->getDeviceStats();
-      perf_dumper.dumpAsrPerf(current_settings, result, n_chunks, host_mem_info,
-                              max_host_mem_info, post_init_dev_stats,
-                              current_dev_stats);
+      current_dev_stats = device_monitor->getDeviceStats();
       std::cout << std::string(82, '=') << "\n";
     }
+
+    AsrTranscribeResult average_result =
+        AverageAsrResults(total_result, current_settings.loop_count);
+    perf_dumper.dumpAsrPerf(current_settings, average_result, n_chunks,
+                            host_mem_info, max_host_mem_info,
+                            post_init_dev_stats, current_dev_stats);
   }
 
   ctx.reset();
