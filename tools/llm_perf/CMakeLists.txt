@@ -10,10 +10,6 @@ set(HOUMO_PLATFORM_WINDOWS FALSE)
 set(HOUMO_PLATFORM_LINUX FALSE)
 set(HOUMO_PLATFORM_NAME "unknown")
 set(HOUMO_NEED_PTHREAD FALSE)
-set(OPENCV_CONFIG_MODE "find_package(OpenCV)")
-set(OPENCV_LIB_DIR "")
-set(OPENCV_BIN_DIR "")
-set(OPENCV_LIBS "")
 
 if(ANDROID_ABI)
   set(HOUMO_PLATFORM_ANDROID TRUE)
@@ -29,9 +25,6 @@ else()
 endif()
 
 message(STATUS "HOUMO platform: ${HOUMO_PLATFORM_NAME}")
-message(STATUS "OpenCV config mode: ${OPENCV_CONFIG_MODE}")
-message(STATUS "OpenCV include: ${OpenCV_INCLUDE_DIRS}")
-message(STATUS "OpenCV libs: ${OPENCV_LIBS}")
 
 check_cxx_compiler_flag("${HOUMO_CXX17_FLAG}" SUPPORT_CXX17)
 if(NOT SUPPORT_CXX17)
@@ -93,7 +86,6 @@ include_directories(
   $ENV{HOUMO_SDK_PATH}/hal/include
   $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp
   ${CMAKE_SOURCE_DIR}/include
-  ${OpenCV_INCLUDE_DIRS}
 )
 
 link_directories(
@@ -146,9 +138,6 @@ if(MSVC)
   list(APPEND LLM_PERF_LIBS libhal_xh2a ws2_32 Userenv ntdll Bcrypt kernel32)
 endif()
 
-if(OPENCV_LIBS)
-  list(APPEND LLM_PERF_LIBS ${OPENCV_LIBS})
-endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${LLM_PERF_LIBS})
 

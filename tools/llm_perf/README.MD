@@ -405,7 +405,7 @@ build_win.bat
 1. 推荐在根目录执行 `env.bat --set`，该脚本会调用 `tools/win_envs/set_environs.py` 根据 `tools/win_envs/env.json` 配置环境变量。
 2. 执行完成后需要重新打开cmd窗口，使新的环境变量生效。
 3. 确认 `PATH` 中包含 `%HOUMO_EXAMPLES_PATH%\tools\common\lib`，该目录保存 `houmo_infer.dll`、`tokenizer_lib.dll`、`kaldi-native-fbank-core.dll`、`samplerate.dll` 等运行时依赖。
-4. 确认 `HOUMO_TARGET=xh2`、`TCIM_BACKEND=Xh2HalBackend`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH`、`OPENCV_PATH` 等变量已按 `tools/win_envs/env.json` 正确设置。
+4. 确认 `HOUMO_TARGET=xh2`、`TCIM_BACKEND=Xh2HalBackend`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH` 等变量已按 `tools/win_envs/env.json` 正确设置。
 5. C++样例依赖 `libhal_xh2a.dll` 和 `tcim_runtime_lite.dll`，可通过 `env.bat --set` 加入PATH，或和 `llm_perf.exe` 放在同一目录。
 6. Windows平台当前默认开启ASR模拟性能测试；如需关闭，可在CMake配置时添加 `-DENABLE_ASR=OFF`。
 
