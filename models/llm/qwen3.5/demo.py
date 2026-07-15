@@ -288,6 +288,13 @@ def get_args() -> argparse.Namespace:
             HOUMO_TARGET,
             f"{args.model_name}-{args.model_size}_visual_{args.max_size_w}x{args.max_size_h}x{args.max_size_t}.hmm",
         )
+        fallback_vision_path = os.path.join(
+            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_visual.hmm"
+        )
+        if not os.path.exists(args.vision_path) and os.path.exists(
+            fallback_vision_path
+        ):
+            args.vision_path = fallback_vision_path
     if args.ndevice > 1:
         if args.prefill_path.endswith(".hmm"):
             args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
