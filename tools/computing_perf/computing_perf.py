@@ -369,6 +369,11 @@ if __name__ == "__main__":
         required=False,
         help="the compute mode to run the test, default is bfp16.",
     )
+    parser.add_argument(
+        "--no-load-store",
+        action="store_true",
+        help="only emit xh2.te ops when building the model.",
+    )
     args = parser.parse_args()
 
     target = os.getenv("HOUMO_TARGET")
@@ -384,6 +389,10 @@ if __name__ == "__main__":
         enable_xh2_sparse_feature = True
         os.environ["RUN_ON_SUBTARGET"] = "2"
         MODEL_NAME = f"{MODEL_NAME}_int8"
+    mode_name = args.compute_mode
+    if args.no_load_store:
+        mode_name = f"{mode_name}_no_load_store"
+        MODEL_NAME = f"{MODEL_NAME}_no_load_store"
 
     print("#########################################")
     print("##  AI core compute performance test   ##")
@@ -393,12 +402,12 @@ if __name__ == "__main__":
     platform_name = platform.machine().lower()
 
     output_dir = os.path.join(args.work_dir, target)
-    build_tmp_dir = os.path.join(output_dir, "tcim_temp")
+    build_tmp_dir = os.path.join(output_dir, "tcim_temp", mode_name)
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(build_tmp_dir, exist_ok=True)
 
     hmm_path = os.path.join(output_dir, f"{MODEL_NAME}.hmm")
-    json_path = os.path.join(output_dir, "model.json")
+    json_path = os.path.join(output_dir, f"{MODEL_NAME}_model.json")
 
     not_found_tcim = False
     try:
@@ -424,12 +433,14 @@ if __name__ == "__main__":
                 "http://artifactory.houmo.ai/artifactory/Dadao"
             )
         if target == "xh2":
+            suffix = ""
+            if args.no_load_store:
+                suffix = "no_load_store_"
             if args.compute_mode == "int8":
-                zipped_hmm_path = "models/tools/computing_perf/hmm_xh2_conv_int8_1core_20260225.tar.xz"
+                zipped_hmm_path = f"models/tools/computing_perf/hmm_xh2_conv_int8_1core_{suffix}20260715.zip"
             elif args.compute_mode == "bfp16":
-                zipped_hmm_path = (
-                    "models/tools/computing_perf/hmm_xh2_conv_1core_20250916.tar.xz"
-                )
+                zipped_hmm_path = f"models/tools/computing_perf/hmm_xh2_conv_1core_{suffix}20260715.zip"
+
         get_file_from_jfrog(zipped_hmm_path, "./", "./")
 
     if not args.skip_build:
@@ -451,20 +462,23 @@ if __name__ == "__main__":
             f.write(json.dumps(model_tops_info, indent=4))
         print("=========================================")
         print(f"Building model with tcim in output dir: {output_dir}")
+        print(f"Using tcim work dir: {build_tmp_dir}")
         import tcim
 
-        tcim.build_from_hmonnx(
-            hmonnx_model,
-            output_name=MODEL_NAME,
-            output_dir=output_dir,
-            work_dir=build_tmp_dir,
-            target=target,
-            ncore=1,
-            opt_level="O2",
-            io_layout="any",
-            enable_xh2_sparse_feature=enable_xh2_sparse_feature,
-            skip_check=True,
-        )
+        build_kwargs = {
+            "output_name": MODEL_NAME,
+            "output_dir": output_dir,
+            "work_dir": build_tmp_dir,
+            "target": target,
+            "ncore": 1,
+            "opt_level": "O2",
+            "io_layout": "any",
+            "enable_xh2_sparse_feature": enable_xh2_sparse_feature,
+            "skip_check": True,
+        }
+        if args.no_load_store:
+            build_kwargs["emit_cpp_extra_args"] = "only-emit-op-list=xh2.te"
+        tcim.build_from_hmonnx(hmonnx_model, **build_kwargs)
         shutil.copyfile(os.path.join(build_tmp_dir, "model.json"), json_path)
         print("Model built successfully.")
 
