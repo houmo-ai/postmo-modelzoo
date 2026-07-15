@@ -593,3 +593,13 @@ def test_asr_ct_transformer_demo(setup_logging) -> None:
     """test_asr_ct_transformer_demo"""
     model_name = "ct_transformer"
     _demo_func(model_name, setup_logging)
+
+
+@pytest.mark.siglip2
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.demo
+def test_embedding_siglip2_demo(setup_logging) -> None:
+    """test_embedding_siglip2_demo"""
+    model_name = "siglip2"
+    _demo_func(model_name, setup_logging)

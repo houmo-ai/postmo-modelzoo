@@ -1,0 +1,11 @@
+default_model_name: "siglip2"
+default_model_size: "large-patch16-256"
+
+model_configs:
+  siglip2:
+    "large-patch16-256":
+      modelscope_repo: ["google/siglip2-large-patch16-256"]
+      model_name: "siglip2"
+      model_size: "large-patch16-256"
+      ncore: 1
+      ndevice: 1

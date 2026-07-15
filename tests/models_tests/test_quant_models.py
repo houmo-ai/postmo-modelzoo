@@ -791,3 +791,17 @@ def test_asr_ct_transformer_quant(setup_logging) -> None:
     """test_asr_ct_transformer_quant"""
     model_name = "ct_transformer"
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.siglip2
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_embedding_siglip2_quant",
+    depends_on=["test_get_models.py::test_embedding_siglip2_get_model"],
+)
+def test_embedding_siglip2_quant(setup_logging) -> None:
+    """test_embedding_siglip2_quant"""
+    model_name = "siglip2"
+    _quant_func(model_name, setup_logging)

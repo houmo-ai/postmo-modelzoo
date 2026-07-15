@@ -847,3 +847,17 @@ def test_asr_ct_transformer_compile(setup_logging) -> None:
     """test_asr_ct_transformer_compile"""
     model_name = "ct_transformer"
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.siglip2
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_embedding_siglip2_compile",
+    depends_on=["test_quant_models.py::test_embedding_siglip2_quant"],
+)
+def test_embedding_siglip2_compile(setup_logging) -> None:
+    """test_embedding_siglip2_compile"""
+    model_name = "siglip2"
+    _compile_func(model_name, setup_logging)

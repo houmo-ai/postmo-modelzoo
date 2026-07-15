@@ -640,3 +640,14 @@ def test_asr_ct_transformer_get_model(setup_logging) -> None:
     """test_asr_ct_transformer_get_model"""
     model_name = "ct_transformer"
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.siglip2
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_embedding_siglip2_get_model")
+def test_embedding_siglip2_get_model(setup_logging) -> None:
+    """test_embedding_siglip2_get_model"""
+    model_name = "siglip2"
+    _get_model_func(model_name, setup_logging)

@@ -469,6 +469,20 @@ ocr_mineru2.5:
         args: all
   test:
     - ocr_mineru2.5_test
+
+embedding_siglip2:
+  include:
+    - models/embedding/siglip2
+  exclude:
+    - models/embedding/siglip2/README.MD
+  example_case:
+    - embedding_siglip2_test:
+        test_type: models_tests
+        script: siglip2
+        args: all
+  test:
+    - embedding_siglip2_test
+
 llm_bge:
   include:
     - models/embedding/bge
