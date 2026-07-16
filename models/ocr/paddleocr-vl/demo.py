@@ -730,6 +730,16 @@ class HmPaddleOCRVL:
         if last_dim == self.embedding_len:
             self.vision_output_layout = "token_major"
             return
+        total_elems = 1
+        for d in vision_output_shape:
+            total_elems *= int(d)
+        if last_dim % self.embedding_len == 0 and total_elems % self.embedding_len == 0:
+            # Higher-resolution exports pack multiple tokens along the hidden
+            # axis, e.g. 896x896 emits (1, 256, 4096) instead of the
+            # token-major (1024, 1024). The buffer is contiguous token-major,
+            # so run_vision flattens it back to (num_tokens, embedding_len).
+            self.vision_output_layout = "packed"
+            return
         self.vision_output_layout = None
         raise ValueError(
             "Vision model output hidden size mismatch: "
@@ -765,8 +775,10 @@ class HmPaddleOCRVL:
             image_embeds = self.vision.get_output(self.vision.get_output_name(0)).numpy()
             self.perf_tracker.perf_end(PERFTYPE.VISION_OUTPUT_TIME)
             image_embeds = torch.from_numpy(image_embeds).float()
-            if image_embeds.dim() == 3 and image_embeds.shape[0] == 1:
-                image_embeds = image_embeds.squeeze(0)
+            # Normalize to token-major (num_tokens, embedding_len). Packed
+            # exports (e.g. 896x896 -> (1, 256, 4096)) are contiguous
+            # token-major buffers, so a plain reshape recovers per-token rows.
+            image_embeds = image_embeds.reshape(-1, self.embedding_len)
             image_embeds_list.append(image_embeds)
         return torch.cat(image_embeds_list, dim=0)
 
