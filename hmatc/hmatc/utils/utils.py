@@ -62,7 +62,14 @@ def read_yaml_to_dict(file_path: str) -> dict:
 
 def save_dict_to_yaml(dict_value: dict, yaml_path: str):
     with open(yaml_path, "w") as f:
-        f.write(yaml.dump(dict_value, allow_unicode=True, default_flow_style=False))
+        f.write(
+            yaml.dump(
+                dict_value,
+                allow_unicode=True,
+                default_flow_style=False,
+                sort_keys=False,
+            )
+        )
 
 
 def read_json_to_dict(file_path: str) -> dict:
