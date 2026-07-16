@@ -24,6 +24,10 @@
 - 来源: https://www.modelscope.cn/models/Qwen/Qwen3.5-9B
 - 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
 
+- 模型名称: Qwen3.5-122B-A10B
+- 来源: https://www.modelscope.cn/models/Qwen/Qwen3.5-122B-A10B
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
 - 模型名称: Qwen3.6-27B
 - 来源: https://www.modelscope.cn/models/Qwen/Qwen3.6-27B
 - 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
@@ -48,7 +52,7 @@
 
 支持的模型组合为：
 
-- `qwen3.5`: `0.8b`、`2b`、`4b`、`9b`
+- `qwen3.5`: `0.8b`、`2b`、`4b`、`9b`、`122b-a10b`
 - `qwen3.6`: `27b`、`35b-a3b`
 
 标准流程编译产物命名统一为：
@@ -175,6 +179,7 @@ workflow yaml 命名规则如下：
 - `qwen3.5/9b`: `w4a8`、`w4a8_mtp`、`w4a8_dflash`
 - `qwen3.6/27b`: `w4a8`、`w4a8_mtp`、`w4a8_dflash`
 - `qwen3.6/35b-a3b`: `w4a8`、`w5a8`、`w8a8` 及对应的 `_mtp`、`_dflash` 配置
+- `qwen3.5/122b-a10b`: 暂不提供量化功能
 
 量化导出输出位于 `output/${HOUMO_TARGET}/hmquant`。
 

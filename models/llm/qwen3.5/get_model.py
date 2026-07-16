@@ -105,7 +105,7 @@ def get_args() -> argparse.Namespace:
         dest="model_size",
         type=str,
         default=None,
-        help="model size: 0.8b, 2b, 4b, 9b, 27b, 35b-a3b",
+        help="model size: 0.8b, 2b, 4b, 9b, 27b, 35b-a3b, 122b-a10b",
     )
     parser.add_argument(
         "--quant_type",

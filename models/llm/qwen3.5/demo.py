@@ -801,7 +801,21 @@ class HmQwen:
         self.perf_tracker.reset_perf_time()
 
         if vision_path and os.path.exists(vision_path):
-            option_v = tcim.runtime.Option(weight_manager)
+            vision_suffix = Path(vision_path).suffix.lower()
+            if vision_suffix == ".hmms":
+                vision_devices = get_hm_devices(self.ndevice)
+            elif vision_suffix == ".hmm":
+                vision_devices = [0]
+            else:
+                raise ValueError(
+                    f"Unsupported vision model suffix '{vision_suffix}': "
+                    "expected .hmm for a single-device model or .hmms for a "
+                    "multi-device model."
+                )
+
+            dev_manager_v = tcim.runtime.DevManager(vision_devices, "Xh2HalBackend")
+            weight_manager_v = tcim.runtime.WeightManager(dev_manager_v)
+            option_v = tcim.runtime.Option(weight_manager_v)
             self.perf_tracker.perf_start(PERFTYPE.VISION_LOAD_TIME)
             self.vision = tcim.runtime.load(vision_path, option=option_v)
             self.perf_tracker.perf_end(PERFTYPE.VISION_LOAD_TIME)
