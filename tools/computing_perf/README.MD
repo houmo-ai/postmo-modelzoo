@@ -24,9 +24,18 @@ python3 computing_perf.py
 python3 computing_perf.py --compute-mode int8
 ```
 
+如需测试不包含 load/store 开销的时间，可以添加 `--no-load-store` 参数。该参数在模型编译时仅生成 `xh2.te` 算子列表，用于构建不包含 load/store 的测试模型；脚本会在输出文件名和临时目录中追加 `no_load_store` 后缀。
+
+```bash
+# bFP16，不包含 load/store 开销
+python3 computing_perf.py --no-load-store
+# INT8，不包含 load/store 开销
+python3 computing_perf.py --compute-mode int8 --no-load-store
+```
+
 ## 3. XH2 测试结果
 
-- 基于`Linux x86_64`平台的`bFP16`算力测试执行结果
+- 基于`Linux x86_64` `1.4G` M50 平台的`bFP16`算力测试执行结果
 
     ```bash
     Model run successfully on device 0, elapsed time: 1.99 seconds.
@@ -49,7 +58,7 @@ python3 computing_perf.py --compute-mode int8
     ============================================================
     ```
 
-- 基于`Linux x86_64`平台的`INT8`算力测试执行结果
+- 基于`Linux x86_64` `1.4G` M50 平台的`INT8`算力测试执行结果
 
     ```shell
     Model run successfully on device 0, elapsed time: 6.67 seconds.
@@ -69,5 +78,90 @@ python3 computing_perf.py --compute-mode int8
     Computing amount          |          1.2370 TOPs/sample
     Test time                 |          6.6712 seconds
     PERFORMANCE               |           94.93 TOPS@INT8
+    ============================================================
+    ```
+
+- 基于`Linux x86_64` `1.3G` M50平台的`bFP16`、`no-load-store`算力测试执行结果
+
+    ```shell
+    ============================================================
+           Performance Test Summary
+    ============================================================
+    Model Parameter           |           Value
+    ------------------------------------------------------------
+    Number of Conv2d Layers   |              64
+    Batch Size                |               1
+    Input Channels            |             256
+    Output Channels           |             256
+    Feature Map Size          |        [64, 64]
+    Kernel Shape              |          [3, 3]
+    ------------------------------------------------------------
+    Computing amount          |          0.3092 TFLOPs/sample
+    Test time                 |          1.7482 seconds
+    PERFORMANCE               |           90.57 TFLOPS@bFP16
+    ============================================================
+    ```
+
+- 基于`Linux x86_64` `1.3G` M50平台的`INT8`、`no-load-store`算力测试执行结果
+
+    ```shell
+    ============================================================
+               Performance Test Summary
+    ============================================================
+    Model Parameter           |           Value
+    ------------------------------------------------------------
+    Number of Conv2d Layers   |              64
+    Batch Size                |               1
+    Input Channels            |             256
+    Output Channels           |             256
+    Feature Map Size          |      [128, 128]
+    Kernel Shape              |          [3, 3]
+    ------------------------------------------------------------
+    Computing amount          |          1.2370 TOPs/sample
+    Test time                 |          6.4797 seconds
+    PERFORMANCE               |           97.74 TOPS@INT8
+    ============================================================
+    ```
+
+
+- 基于`Linux x86_64` `1.7G` M50平台的`bFP16`、`no-load-store`算力测试执行结果
+
+    ```shell
+    ============================================================
+               Performance Test Summary
+    ============================================================
+    Model Parameter           |           Value
+    ------------------------------------------------------------
+    Number of Conv2d Layers   |              64
+    Batch Size                |               1
+    Input Channels            |             256
+    Output Channels           |             256
+    Feature Map Size          |        [64, 64]
+    Kernel Shape              |          [3, 3]
+    ------------------------------------------------------------
+    Computing amount          |          0.3092 TFLOPs/sample
+    Test time                 |          1.3238 seconds
+    PERFORMANCE               |          119.60 TFLOPS@bFP16
+    ============================================================
+    ```
+
+- 基于`Linux x86_64` `1.7G` M50平台的`INT8`、`no-load-store`算力测试执行结果
+
+    ```shell
+    ============================================================
+               Performance Test Summary
+    ============================================================
+    Model Parameter           |           Value
+    ------------------------------------------------------------
+    Number of Conv2d Layers   |              64
+    Batch Size                |               1
+    Input Channels            |             256
+    Output Channels           |             256
+    Feature Map Size          |      [128, 128]
+    Kernel Shape              |          [3, 3]
+    ------------------------------------------------------------
+    Computing amount          |          1.2370 TOPs/sample
+    Test time                 |          4.9401 seconds
+    PERFORMANCE               |          128.20 TOPS@INT8
     ============================================================
     ```
