@@ -75,6 +75,13 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument("--ndevice", type=int, default=None, help="device number")
     parser.add_argument("--ncore", type=int, default=None, help="core number")
+    parser.add_argument(
+        "--quant_type",
+        dest="quant_type",
+        type=str,
+        default=None,
+        help="quantization type",
+    )
     return parser.parse_args()
 
 
@@ -88,6 +95,9 @@ def main():
     model_config = model_configs.get(model_name, {}).get(model_size, {})
     ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
     ncore = first_not_none(args.ncore, model_config.get("ncore", 1))
+    quant_type = first_not_none(
+        args.quant_type, model_config.get("quant_type", "wmix_amix")
+    )
 
     model_cfgs = {
         "target": HOUMO_TARGET,
@@ -98,6 +108,7 @@ def main():
             "model_size": model_size,
             "ncore": ncore,
             "ndevice": ndevice,
+            "quant_type": quant_type,
         },
     }
     if args.file_type == "raw":

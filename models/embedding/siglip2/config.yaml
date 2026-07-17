@@ -9,3 +9,4 @@ model_configs:
       model_size: "large-patch16-256"
       ncore: 1
       ndevice: 1
+      quant_type: "w8a8_sefp"

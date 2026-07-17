@@ -49,6 +49,8 @@ if os.getenv("HOUMO_EXAMPLES_PATH", None) is None or not os.getenv(
 ):
     os.environ["HOUMO_EXAMPLES_PATH"] = os.path.abspath(f"{script_dir}/../")
 
+os.environ["HOUMO_VERSION"] = "1.5.0"
+
 
 def pytest_configure(config):
     """

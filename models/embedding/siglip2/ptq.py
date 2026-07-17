@@ -78,7 +78,7 @@ def parse_args():
         default=f"output/{HOUMO_TARGET}/hmquant",
         help="directory for tokenizer, ONNX, and hmonnx artifacts",
     )
-    parser.add_argument("--quant_type", default="w8a8_sefp", help="xhquant quant type")
+    parser.add_argument("--quant_type", default=None, help="xhquant quant type")
     parser.add_argument("--image_size", type=int, default=IMAGE_SIZE)
     parser.add_argument("--seq_len", type=int, default=SEQ_LEN)
     parser.add_argument(
@@ -563,6 +563,9 @@ def main():
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.model_dir = os.path.abspath(
         first_not_none(args.model_dir, get_default_model_dir(model_config))
+    )
+    args.quant_type = first_not_none(
+        args.quant_type, model_config.get("quant_type", "w8a8_sefp")
     )
 
     model_dir = Path(args.model_dir).expanduser().resolve()
