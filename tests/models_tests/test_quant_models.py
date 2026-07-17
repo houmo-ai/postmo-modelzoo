@@ -805,3 +805,14 @@ def test_embedding_siglip2_quant(setup_logging) -> None:
     """test_embedding_siglip2_quant"""
     model_name = "siglip2"
     _quant_func(model_name, setup_logging)
+
+
+@pytest.mark.emotion2vec
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(name='test_asr_emotion2vec_quant', depends_on=['test_get_models.py::test_asr_emotion2vec_get_model'])
+def test_asr_emotion2vec_quant(setup_logging) -> None:
+    """test_asr_emotion2vec_quant"""
+    model_name = 'emotion2vec'
+    _quant_func(model_name, setup_logging)

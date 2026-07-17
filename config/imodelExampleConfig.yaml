@@ -495,6 +495,18 @@ llm_bge:
         args: all
   test:
     - llm_bge_test
+llm_emotion2vec:
+  include:
+    - models/asr/emotion2vec
+  exclude:
+    - models/asr/emotion2vec/README.MD
+  example_case:
+    - llm_emotion2vec_test:
+        test_type: models_tests
+        script: emotion2vec
+        args: all
+  test:
+    - llm_emotion2vec_test
 llm_sensevoice:
   include:
     - models/asr/sensevoice

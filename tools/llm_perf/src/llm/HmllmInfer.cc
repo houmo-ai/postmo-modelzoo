@@ -22,6 +22,8 @@
  */
 #include "llm/HmllmInfer.h"
 
+#include <nlohmann/json.hpp>
+
 HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
                        const std::string &decodeModelPath,
                        const std::string &embeddingWeightPath,
@@ -105,6 +107,67 @@ HmllmInfer::HmllmInfer(const std::string &prefillModelPath,
   if (this->batch != batches) {
     throw std::runtime_error("Model Batch Not match args batch!");
   }
+
+  std::string prefill_model_info =
+      prefill_module->LoadModelInfo(prefillModelPath);
+  const auto model_info_json = nlohmann::json::parse(prefill_model_info);
+  std::vector<std::pair<std::string, uint64_t>> device_kvcache_mem;
+
+  auto collect_mem_usage = [&](const auto &self, const nlohmann::json &node,
+                               const std::string &name) -> void {
+    if (node.is_object()) {
+      const auto mem_usage_it = node.find("mem_usage");
+      if (mem_usage_it != node.end() && mem_usage_it->is_object()) {
+        const auto &mem_usage = *mem_usage_it;
+        const uint64_t total_mem = mem_usage.value("total", uint64_t{0});
+        const uint64_t kernel_mem = mem_usage.value("kernel", uint64_t{0});
+        const uint64_t weights_mem = mem_usage.value("weights", uint64_t{0});
+        uint64_t workspace_mem = 0;
+
+        const auto workspace_it = mem_usage.find("workspace");
+        if (workspace_it != mem_usage.end()) {
+          if (workspace_it->is_array()) {
+            for (const auto &workspace : *workspace_it) {
+              workspace_mem += workspace.get<uint64_t>();
+            }
+          } else if (workspace_it->is_number()) {
+            workspace_mem = workspace_it->get<uint64_t>();
+          }
+        }
+
+        const uint64_t used_mem = kernel_mem + weights_mem + workspace_mem;
+        if (total_mem < used_mem) {
+          throw std::runtime_error("Invalid mem_usage for " + name);
+        }
+        device_kvcache_mem.emplace_back(name, (total_mem - used_mem) >> 20);
+      }
+
+      for (auto it = node.begin(); it != node.end(); ++it) {
+        if (it.key() != "mem_usage") {
+          self(self, it.value(), it.key());
+        }
+      }
+    } else if (node.is_array()) {
+      for (size_t index = 0; index < node.size(); ++index) {
+        self(self, node[index], name + "[" + std::to_string(index) + "]");
+      }
+    }
+  };
+  collect_mem_usage(collect_mem_usage, model_info_json, "model");
+
+  if (device_kvcache_mem.empty()) {
+    throw std::runtime_error("No mem_usage found in model info");
+  }
+
+  uint64_t max_kvcache_mem = 0;
+  for (const auto &device_mem : device_kvcache_mem) {
+    std::cout << device_mem.first
+              << " kv_cache hmm result : " << device_mem.second << "MB."
+              << std::endl;
+    max_kvcache_mem = std::max(max_kvcache_mem, device_mem.second);
+  }
+  std::cout << "max kv_cache hmm result : " << max_kvcache_mem << "MB."
+            << std::endl;
 
   // Configure decode module's other inputs (KV cache)
   size_t total_mem_size = 0;

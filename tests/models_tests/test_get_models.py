@@ -651,3 +651,14 @@ def test_embedding_siglip2_get_model(setup_logging) -> None:
     """test_embedding_siglip2_get_model"""
     model_name = "siglip2"
     _get_model_func(model_name, setup_logging)
+
+
+@pytest.mark.emotion2vec
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name='test_asr_emotion2vec_get_model')
+def test_asr_emotion2vec_get_model(setup_logging) -> None:
+    """test_asr_emotion2vec_get_model"""
+    model_name = 'emotion2vec'
+    _get_model_func(model_name, setup_logging)

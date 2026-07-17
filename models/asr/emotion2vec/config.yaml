@@ -1,0 +1,13 @@
+default_model_name: "emotion2vec"
+default_model_size: "plus_large"
+
+model_configs:
+  emotion2vec:
+    "plus_large":
+      modelscope_repo: ["iic/emotion2vec_plus_large"]
+      model_name: "emotion2vec"
+      model_size: "plus_large"
+      ncore: 2
+      ndevice: 1
+      quant_type: "w8a8h1_sefp"
+      workflow_config: "workflows/xh2a/audio_models/emotion2vec/emotion2vec_plus_large_xh2a_w8a8_16s.yaml"

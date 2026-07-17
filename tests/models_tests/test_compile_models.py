@@ -861,3 +861,14 @@ def test_embedding_siglip2_compile(setup_logging) -> None:
     """test_embedding_siglip2_compile"""
     model_name = "siglip2"
     _compile_func(model_name, setup_logging)
+
+
+@pytest.mark.emotion2vec
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.compile
+@pytest.mark.dependency(name='test_asr_emotion2vec_compile', depends_on=['test_quant_models.py::test_asr_emotion2vec_quant'])
+def test_asr_emotion2vec_compile(setup_logging) -> None:
+    """test_asr_emotion2vec_compile"""
+    model_name = 'emotion2vec'
+    _compile_func(model_name, setup_logging)

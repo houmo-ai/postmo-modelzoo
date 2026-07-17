@@ -1,0 +1,60 @@
+{
+    "obsolete": false,
+    "model_dir": "models/asr/emotion2vec",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2"],
+            "source_type": [null, null],
+            "model_name": ["emotion2vec", "emotion2vec"],
+            "model_size": ["plus_large", "plus_large"],
+            "ndevice": [null, null],
+            "ncore": [null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model-dir": ["cached_models/emotion2vec_plus_large"],
+            "model-name": ["emotion2vec"],
+            "model-size": ["plus_large"],
+            "output_dir": ["cached_results/hmquant_xh2"],
+            "device": ["cuda"]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2"],
+            "model_name": ["emotion2vec"],
+            "model_size": ["plus_large"],
+            "ncore": [null],
+            "ndevice": [null],
+            "j": ["24"],
+            "output_dir": ["cached_results/hmm_xh2"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "hmm": ["cached_results/hmm_xh2/emotion2vec-plus_large.hmm"],
+            "classifier": ["cached_results/hmm_xh2/hmquant/classifier.npz"],
+            "model-dir": ["cached_models/emotion2vec_plus_large"],
+            "output-dir": ["cached_results/demo_results"],
+            "top-k": ["3"],
+            "chunk_size": ["16"]
+        }
+    }
+}
