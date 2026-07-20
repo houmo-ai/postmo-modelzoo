@@ -191,7 +191,6 @@ if __name__ == "__main__":
                 {
                     "name": "speech_tokenizer_encoder",
                     "flash_attn": others_flash_attention,
-                    "cpp_backend": "v1",
                 },
             ]
 

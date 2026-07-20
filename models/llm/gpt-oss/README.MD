@@ -215,81 +215,85 @@ Overall Performance Metrics:
 question:
 请介绍一下存算一体技术的优势
 response:
-<|channel|>analysis<|message|>The user asks: "请介绍一下存算一体技术的优势".They want an introduction of the advantages of "存算一体技术". This is Chinese. "存算一体技术" likely refers to "compute-in-memory" (CIM) or "memory-compute integration", i.e., integrating storage and computation, like in-memory computing, processing-in-memory (PIM), or "存算一体" which is Chinese for "storage and computing integrated". They want a description of its advantages. Should be in Chinese. Provide a thorough explanation: what it is, its advantages: reduced data movement, lower latency, energy efficiency, higher bandwidth, better scalability, better performance for AI, edge computing, etc. Also mention challenges and future prospects. Provide bullet points. Should be concise but thorough.<|end|><|start|>assistant<|channel|>final<|message|>## 什么是“存算一体”技术？
+<|channel|>analysis<|message|>The user asks: "请介绍一下存算一体技术的优势".They want an introduction about the advantages of "存算一体技术". This is a Chinese term: "存算一体技术" likely refers to "compute-in-memory" (CIM) or "in-memory computing" where storage and computation are integrated, also known as "processing-in-memory" (PIM). They ask to introduce its advantages. So we need to provide a comprehensive answer in Chinese, describing the technology, its advantages, maybe categories, applications, challenges, etc. Should be helpful. No disallowed content. Provide a clear, structured answer.<|end|><|start|>assistant<|channel|>final<|message|>## 什么是“存算一体”技术？
 
-“存算一体”（Compute‑In‑Memory，CIM）指的是把 **存储（Memory）** 与 **计算（Compute）** 功能深度融合在同一芯片或同一模块中，使数据在存储单元内部即可完成算术、逻辑或矩阵运算，而不必先搬运到传统的CPU/GPU 进行处理。常见实现方式包括：
-
-- **基于 SRAM/DRAM 的位并行算术**（如 XNOR‑Net、Bit‑Serial 计算）
-- **基于新型存储器的逻辑功能**（如 ReRAM、PCM、MRAM 的逻辑门）
-- **片上微型算子阵列**（如 3D‑Stacked PIM、HBM‑PIM）
-- **片上 AI 加速器**（如 HBM‑AI、HBM‑PIM）
+**存算一体（Compute‑in‑Memory，CIM）**，又称 **Processing‑in‑Memory（PIM）**，是一类把 **存储单元（SR）与计算单元（ALU）深度融合**的新型芯片架构。传统计算机体系结构（冯·诺依曼架构）中，**CPU 与 DRAM 之间需要频繁的数据搬运**（即“存储-计算分离”），导致 **带宽瓶颈、能耗高、延迟大**。CIM 通过在存储单元内部直接完成算术、逻辑、矩阵乘等运算，**在“读‑写”的同一硬件单元里完成计算**，从而实现 **“存储‑计算合一”**。
 
 ---
 
 ## 存算一体的核心优势
 
-| 序号 | 关键优势 | 具体表现 | 受益场景 |
+| 序号 | 关键优势 | 具体表现 | 价值意义 |
 |------|----------|----------|----------|
-| **1** | **显著降低数据搬迁（Data Movement）** | - 数据在同一存储阵列内部完成计算，只需把结果搬出 <br>- 典型系统中 DRam↔CPU 之间的带宽瓶颈可削减 80% 以上 |大规模 AI 推理、图像/视频处理、数据库查询 |
-| **2** | **能耗大幅下降** | - 只激活少量位/列，单次算子能耗可低至 0.1 fJ/operation <br>- 与 CPU/GPU 对比，整体功耗降低 5‑10× |边缘设备、物联网、移动终端 |
-|**3**|**极高的并行度与吞吐量**|- 每个存储单元（bit/列）都可以并行执行相同算子（SIMD）<br>- 适合矩阵乘法、卷积等大规模并行计算 |深度学习推理、推荐系统、基因测序、金融风险模型 |
-|**4**|**带宽与延迟优势**|- 内部算子完成后直接返回结果，单次延迟可在 **ns‑µs** 级 <br>- 传统系统受限于 DRAM 带宽（≈ 100 GB/s），CIM 可实现 **TB/s** 级等效带宽 |实时视频分析、自动驾驶感知、AR/VR 渲染 |
-|**5**|**硬件资源利用率提升**|- 存储阵列本身的面积/功耗已经被利用为计算单元，整体芯片面积利用率提升 30‑50% |高密度数据中心、云端 AI 加速器 |
-|**6**|**可扩展性与模块化**|- 通过 3D‑Stack 或 Chip‑on‑Chip 方式叠加，可轻松实现数十至上百层的计算层 <br>- 与现有 CPU/GPU 通过标准总线（PCIe、CCIX、CXL）协同工作 |异构计算平台、可插拔 AI 加速卡 |
-|**7**|**降低系统复杂度**|- 省去大量的缓存层、总线桥、DMA 控制器等中间硬件，系统设计更简洁、可靠性更高 |嵌入式系统、航空航天、工业控制 |
-|**8**|**适配新型模型**|- 天然支持二值/低位宽网络（BinaryNet、XNOR‑Net）<br>- 可直接实现稀疏矩阵乘、向量‑点积等新型算子 |边缘 AI、压缩模型、神经网络加速 |
-|**9**|**成本潜在下降**|- 当存储成本继续下降（DDR5/LP‑DDR、HBM）时，同价位的芯片即可提供计算功能，整体系统成本下降 10‑30% |大规模部署的 AI 推理服务器、智能摄像头 |
+|1|**显著降低数据搬运（Data Movement）**|- 计算在存储阵列内部完成，几乎不需要把数据搬到CPU/GPU缓存<br>- 只需把指令或激活信号送到存储阵列 |降低总线带宽需求，减轻系统总线/IO压力 |
+|2|**能耗大幅下降**|- 传统体系结构：一次存取 + 一次计算 → 2×能耗<br>- CIM：一次存取即完成计算 → **≈30%~90%**的能耗下降（取决于工艺与工作负载）|在移动设备、边缘AI、数据中心等对功耗敏感的场景中，可显著延长续航或降低散热 |
+|3|**带宽瓶颈得到突破**|- 传统CPU/GPU 受限于 DRAM 带宽（≈100–200 GB/s）<br>- CIM 通过 **内部并行存储阵列**（上万至上百万位并行）实现 **TB/s 级内部带宽** |在大模型推理、图像/视频处理、搜索等带宽密集型任务中，系统吞�率提升 2–10× |
+|4|**极高的并行度**|- 每个存储单元（如 SRAM、RR、ReRAM、FeFET）都可以并行执行算子<br>- 可实现 **数十万至数百万并行算子** |天然适配 **矩阵乘、卷积、向量点积**等深度学习核心算子，实现 **算子级加速** |
+|5|**面积（Silicon Area）利用率提升**|- 传统 CPU/GU 需要独立的算术单元、寄存器、缓存等，占用大量硅片面积<br>- CIM 将存储阵列直接复用为计算单元，**存储单元本身即算子单元** |在同等硅片面积下，可实现 **更高的算力密度**（TOPs/mm²）|
+|6|**延迟（Latency）显著降低**|- 传统体系结构：存取 → 传输 → 计算 → 写回（多级流水）<br>- CIM：**一次存取即完成计算**，单次操作延迟可从 **µs 级**降至 **ns 级** |对实时推理、边缘感知、自动驾驶等对时延极度敏感的场景尤为关键 |
+|7|**可扩展性与模块化**|- 通过堆叠或二维/三维封装（HBM、3D‑TSV、Chip‑on‑Wafer）实现 **垂直/水平扩展**<br>- 兼容现有标准接口（e.g., LPMS, OpenCAPI, CXL） |可在服务器、边缘盒子、甚至嵌入式芯片中灵活部署 |
+|8|**多功能融合**|- 除算术（加、减、乘、逻辑）外，还可实现 **模拟计算、矩阵乘、卷积、稀�稀矩阵乘、搜索/匹配、加密/解密**等 |在 AI、数据库、密码学、信号处理等多领域提供“一体化”解决方案 |
+|9|**安全与隐私**|- 数据在存储单元内部完成计算，**不必在总线上暴露**，降低侧信道攻击风险 |对隐私敏感的金融、医疗、军工等行业尤重要 |
+|10|**生态与软件堆栈**|- 越来越多的 **编译器、库（如 TVM、ONNX Runtime、OpenCL‑CIM）** 正在适配 CIM 硬件 |降低开发门檻，促进快速落地 |
 
 ---
 
-## 为什么这些优势在实际场景中如此重要？
+## 典型应用场景
 
-| 场景 | 关键痛点 | 存算一体带来的突破 |
-|------|----------|------------------------|
-| **AI 推理服务器** | 计算与内存带宽不匹配导致功耗飙升、延迟受限 |在同一芯片内部完成卷积/矩阵乘，显著降低功耗、提升吞吐，同等功耗下可部署更多模型实例 |
-| **边缘/IoT** | 电池容量、散热、体积受限 |极低功耗、极小延迟的 PIM �块直接嵌入传感器或摄像头，几毫瓦即可完成推理 |
-| **大数据分析** | 数据库查询需要频繁读取、过滤、聚合 |在存储阵列内部完成过滤、计数、聚合，只把最终结果返回，I/O 流量下降 90% 以上 |
-| **高性能计算 (HPC)** | 传统 CPU/GPU 受限于内存带宽，导致“内存墙” |CIM 把算子搬到内存内部，突破内存墙，实现更高的 FLOPS/Watt |
-| **实时视频/AR** | 超低延迟是关键 |内部算子完成卷积/特征提取后直接输出特征图，端到端延迟可压缩到 10 µs 以内 |
-
----
-
-## 典型实现案例（截至 2024‑2025）
-
-| 公司/项目 | 技术路线 | 关键指标 | 适用领域 |
-|-----------|----------|----------|----------|
-| **Microsoft & Intel** | 3D‑Stacked DRAM + 逻辑层（CIM） |>10 TOPS/W，延迟 < 100 ns|云端 AI 推理、搜索引擎 |
-| **Samsung** | HBM‑PIM（基于 SRAM 逻辑）|>1 TB/s 等效带宽，功耗 0.5 pJ/bit|高性能计算、AI 训练加速 |
-| **IBM** | ReRAM‑PIM（非易失性存储）|>0.1 fJ/operation，支持 8‑bit 乘加|边缘 AI、低功耗传感器 |
-| **Cambridge Quantum** | 量子位存算一体（NV‑PIM）|>10⁶ OPS/µJ|密码学、量子机器学习 |
-| **华为** |昇腾+存算一体（昇腾 PIM）|>5 TOPS/W，兼容 Ascend AI �架|边缘计算、智能摄像头 |
+| 场景 | 关键需求 | CIM 能带来的价值 |
+|------|----------|-------------------|
+|**边缘 AI（智能摄像头、IoT、AR/VR）**|低功耗、低延迟、实时推理|功耗下降 50%+、响应时间从 ms 降到 < 10 µs|
+|**数据中心加速器*|大模型推理、搜索/推荐、向量检索|带宽瓶颈解除，算力密度提升 3–5×，能耗降低 30%|
+|**存�算一体的存储系统*|高吞�率、低能耗的数据库|在 **向量搜索、相似度计算** 中直接在存储阵列完成点积，查询延迟下降 10×|
+|**密码学/同态加密*|安全计算、数据不离芯片|在存储单元内部完成同态运算，防止数据泄露|
+|**模拟信号处理*|高带宽、低噪声|利用 **RR/FeFET 的模拟特性**实现乘加运算，降低模拟前端功耗|
+|**高性能计算（HPC）*|大规模矩阵乘、稀疏运算|在 3D‑堆叠 CIM 中实现 **TB/s 级内部带宽**，显著提升 FLOPS/W|
 
 ---
 
-## 发展趋势与挑战
+## 技术实现路径（常见实现方式）
 
-| 趋势 | 说明 |
-|------|------|
-| **工艺融合** | 3D‑TSV、微凸点（micro‑bump）技术让存储层与逻辑层的互连更紧凑，带宽提升 10‑20× |
-| **低位宽算子** | 越来越多的 AI 模型采用 4‑bit、2‑bit甚至二值化算子，CIM 与这些模型天然匹配 |
-| **标准化接口** | CXL、CCIX 等高速互连标准正在加入对 PIM 的原生支持，生态逐步统一 |
+| 技术 | 典型器件 | 计算方式 | 备注 |
+|------|----------|----------|------|
+|**SRAM‑CIM**|6T/8T SRAM 单元|数字加法、位并行乘法|成熟工艺、速度快、功耗相对较高|
+|**RR（Resistive RAM）**|ReRAM、PCM|电导变化实现乘累（Ohm‑Law）|适合模拟乘加、低功耗|
+|**FeFET / 2‑T1R**|Ferroeroelectric FET|电荷存储 + 逻辑门|兼具非易失性与高速|
+|**光学存算**|光学相位阵列|光学乘法（光场相乘）|适用于大规模矩阵乘、光学 AI|
+|**混合型（CPU+CIM）**|CIM 加速卡、PCIe / CXL 插件|CPU 负责控制流、CIM 负责数据密集算|兼容现有软件生态|
 
-| 关键挑战 | 可能的解决路径 |
-|-----------|----------------|
-| **热管理** |采用高效散热微通道、热导管或液冷；在算法层面采用稀疏/低位宽模型降低功耗 |
-| **编程模型** |发展专用编译器（如 TVM、MLIR）和抽象层（PIM‑API、CIM SDK），让开发者无需关注硬件细节 |
-| **可靠性/容错** |在存储层加入 ECC、行/列冗余；采用自校准的自适应算子 |
-| **成本** |随着 DRAM/LPDDR/HBm 成本下降，CIM 采用的门槛将进一步降低 |
+---
+
+## 与传统加速器（GPU/TPU）对比
+
+| 对比维度 | GPU/TPU | CIM |
+|----------|----------|------|
+|**功耗**|高（数百瓦）|低（10–30 W）|
+|**带宽瓶颈**|受限于外部 DRAM 带宽|内部存算带宽可达 TB/s|
+|**面积/密度**|算力密度受限于缓存层级|算力密度提升 3–5×|
+|**延迟**|受限于数据搬运流水线|单次运算延迟可在 ns 级|
+|**可扩展性**|需要大量显存、PCIe 带宽|通过 3D‑TSV/堆��层轻松扩展|
+|**成本**|高功耗导致散热、供电成本高|低功耗、低散热降低系统整体成本|
+
+---
+
+## 发展趋势与前景
+
+1. **工艺成熟化**：随着 **FinFin、FD‑SOI、FD‑SOI** 以及 **极紫外（EUV）** 制程的成熟，CIM 单元的 **面积、功耗、可靠性** 正在快速提升。
+2. **标准化接口**：**CXL 2.0/3.0**、**OpenCAPI**、**PCIe 6.0** 正在加入对 **存算一体**的原生支持，促进生态统一。
+3. **软件��栈**：**编译器（LLVM‑CIM）**、**中间表示（MLIR）**、**高层框架（TensorFlow、PyTorch、ONNX）** 正在加入 **CIM 后端**，降低开发门槛。
+4. **跨领域融合**：**光学‑CIM**、**量子‑CIM**、**神经形态‑CIM** 等前沿方向正在探索，可能实现 **光‑电‑磁‑量子** 多模计算。
+5. **安全加速**：在 **同态加密、隐私计算**场景中，CIM 的“数据不离芯片」特性将成为 **硬件根信任** 的关键。
 
 ---
 
 ## 小结
 
-- **存算一体** 把“数据在存储里就能算”变成现实，根本上解决了 **“内存墙”** 与 **“数据搬迁能耗”** 两大瓶颈。
-- 其 **低功耗、低延迟、高并行** 特性，使其在 **AI 推理、边缘计算、数据库加速、实时视频处理** 等场景中拥有显著优势。
-- 随着 **3D‑Stack、低位宽算子、标准化互连** 的成熟，存算一体正从实验室走向大规模商用，预计在 **2025‑2027 年**会成为数据中心与边缘设备的重要计算加速器。
+- **存算一体技术通过把存储与计算深度融合，实现“一次存取即完成计算”。**
+- 其 **优势**体现在 **带宽突破、能耗下降、延迟降低、并行度提升、面积利用率提升**等方面。
+- **适用于边缘 AI、数据中心、数据库、密码学、模拟信号处理等多种场景**，并且 **与现有 CPU/GPU 生态兼容**，具备 **可扩展性、模块化和安全优势**。
+- 随着工艺、标准、软件生态的同步进化，**存算一体**有望在 **AI、云计算、边缘计算、5G/6G、物联网**等领域成为 **下一代计算加速器**的核心技术。
 
-如果您想了解更具体的实现细例、编程模型或选型建议，欢迎进一步提问！
+如果您对某一具体实现（如 SRAM‑CIM、ReRAM‑CIM）或想了解 **如何在现有系统中部署**（如 PCIe 卡、CXL 模块），欢迎进一步提问！
 ```
 
 #### 4.2.2 性能结果
@@ -301,26 +305,26 @@ response:
 Configuration Details:
   Batch Size:      1
   Input Length per Sample:     90 tokens
-  Output Length per Sample:   2199 tokens
+  Output Length per Sample:   2542 tokens
 Prefill Stage Performance:
-    Total Time:  310.18ms | Speed:  290.16 tokens/s
-    Tokenization Time:   24.39ms
-    Embedding Time:    3.28ms
-    API SetInput Time:   0.25ms
-    API Inference Time: 278.86ms | Prefill Speed:  322.74 tokens/s
-    API GetOutput Time:  0.27ms
+    Total Time:  320.23ms | Speed:  281.05 tokens/s
+    Tokenization Time:   22.55ms
+    Embedding Time:    3.80ms
+    API SetInput Time:   0.32ms
+    API Inference Time: 288.39ms | Prefill Speed:  312.08 tokens/s
+    API GetOutput Time:  0.26ms
 Decode Stage Performance:
-    Total Time: 94480.25ms | Speed:   23.26 tokens/s
-    Tokenization Time:  879.83ms
-    Embedding Time:  430.31ms
-    API SetInput Time:   0.26ms
-    API Inference Time: 34.52ms | Decode Speed:   28.97 tokens/s
-    API GetOutput Time:  0.25ms
+    Total Time: 118306.92ms | Speed:   21.48 tokens/s
+    Tokenization Time: 1179.10ms
+    Embedding Time:  557.72ms
+    API SetInput Time:   0.28ms
+    API Inference Time: 37.09ms | Decode Speed:   26.96 tokens/s
+    API GetOutput Time:  0.26ms
 Overall Performance Metrics:
-    TTFT (Time To First Token):  310.18 ms
-    TPOT (Time Per Output Token): 42.98 ms/token
-    E2E Latency (End-to-End):     95.04 seconds
-    E2E TPS (Throughput):         23.14 tokens/s
+    TTFT (Time To First Token):  320.23 ms
+    TPOT (Time Per Output Token): 46.56 ms/token
+    E2E Latency (End-to-End):    118.97 seconds
+    E2E TPS (Throughput):         21.37 tokens/s
 ====================================================================================================
 ```
 

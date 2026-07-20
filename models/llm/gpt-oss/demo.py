@@ -113,7 +113,7 @@ def get_args() -> argparse.Namespace:
         dest="ndevice",
         type=int,
         default=None,
-        choices=[1, 2],
+        choices=[1, 2, 4],
         help="device number, only xh2 support",
     )
     parser.add_argument(

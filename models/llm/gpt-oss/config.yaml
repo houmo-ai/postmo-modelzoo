@@ -22,4 +22,4 @@ model_configs:
       ndevice: 2
       batch: 1
       prefill_length: 256
-      cpp_backend: "v1"
+      cpp_backend: "v2"

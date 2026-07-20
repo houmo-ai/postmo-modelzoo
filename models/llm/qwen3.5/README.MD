@@ -40,7 +40,7 @@
 
 本例只适用于xh2。
 
-当前目录使用 `config.yaml` 管理 `get_model.py`、`build.py`、`build_mtp.py`、`demo.py`
+当前目录使用 `config.yaml` 管理 `get_model.py`、`build.py`、`demo.py`
 和 `demo_mtp.py` 的默认值；`ptq.py` 的量化导出参数由
 `configs/` 目录下的 workflow yaml 管理。当前默认模型为：
 
@@ -135,8 +135,7 @@ python3 ptq.py \
 
 `--model-dir` 指向 Hugging Face / ModelScope 原始模型目录，`--config-path` 指向
 `configs/` 下的 workflow yaml。脚本会执行 quant 和 export，并把 export 生成的
-`hmquant*` 目录移动为 `output/${HOUMO_TARGET}/hmquant`，供后续 `build.py` 或
-`build_mtp.py` 使用。
+`hmquant*` 目录移动为 `output/${HOUMO_TARGET}/hmquant`，供后续 `build.py` 使用。
 
 常用可选参数：
 
@@ -194,7 +193,7 @@ python3 build.py --model_name qwen3.6 --model_size 35b-a3b
 MTP 编译：
 
 ```bash
-python3 build_mtp.py --model_name qwen3.6 --model_size 35b-a3b
+python3 build.py --model_name qwen3.6 --model_size 35b-a3b --mtp
 ```
 
 默认输出名称分别为：
@@ -287,7 +286,7 @@ bash test.sh -s demo --skip_download --model_name qwen3.6 --model_size 35b-a3b
 当前脚本行为说明：
 
 - `quant`：下载原始模型并调用 `ptq.py` 执行量化导出。
-- `build`：默认调用 `build.py`；当 `--mtp` 启用时改为调用 `build_mtp.py`。
+- `build`：默认调用 `build.py`；当 `--mtp` 启用时调用 `build.py` 并配置参数 `--mtp`。
 - `demo`：下载预编译模型后执行 `demo.py`；当 `--mtp` 启用时执行 `demo_mtp.py`。
 - 非 MTP `demo` 流程若环境中存在 `llm_perf`，末尾还会自动执行性能测试。
 

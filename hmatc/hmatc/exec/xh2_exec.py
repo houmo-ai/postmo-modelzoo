@@ -1235,7 +1235,7 @@ class Xh2Exec(BaseExec):
         subgraph_repeat_hint=None,
         all_logits=False,
         work_dir=None,
-        cpp_backend="v1",
+        cpp_backend="v2",
         target="xh2",
         **kwargs,
     ):

@@ -106,7 +106,7 @@ fi
 if should_run_step "build"; then
     echo "Start model compilation (${MODEL_NAME}-${MODEL_SIZE})."
     if [ "${MTP}" = "true" ]; then
-        python3 build_mtp.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --mtp
     else
         python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
