@@ -13,7 +13,7 @@ model:
         toYUV_format: YUV420SP
   model_impl_module: model_impl
   model_impl_cls: MobileNetV2
-  
+
 quant:
   calib_data: ./imagenet/ILSVRC2012_img_val
   calib_num: 32
@@ -32,4 +32,3 @@ eval:
   num: 0
   dataset_module: dataset
   dataset_cls: Dataset
-

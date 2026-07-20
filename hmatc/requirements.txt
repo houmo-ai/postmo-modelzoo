@@ -16,3 +16,5 @@ xlsxwriter
 openpyxl
 torch>=2.4.0
 torchvision>=0.19.0
+evalscope==1.5.2
+pydantic==2.12.5

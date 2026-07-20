@@ -1,6 +1,7 @@
 import hmatc.python.smi as smi
 import os
 
+
 def get_hm_devices(ndevices=1) -> list:
     """
     Get a list of HM devices available on the system.
@@ -15,7 +16,9 @@ def get_hm_devices(ndevices=1) -> list:
 
     env_devices = os.getenv("HOUMO_VISIBLE_DEVICES").split(",")
     env_devices = [int(dev.strip()) for dev in env_devices]
-    assert len(env_devices) >= ndevices, f"Not enough devices specified in HOUMO_VISIBLE_DEVICES. Required: {ndevices}, Provided: {len(env_devices)}"
+    assert (
+        len(env_devices) >= ndevices
+    ), f"Not enough devices specified in HOUMO_VISIBLE_DEVICES. Required: {ndevices}, Provided: {len(env_devices)}"
 
     dev_start_idx = sorted(env_devices)[0]
 

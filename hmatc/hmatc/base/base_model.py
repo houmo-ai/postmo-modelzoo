@@ -20,12 +20,11 @@
 import os
 import abc
 import time
-import torch
 import numpy as np
 from typing import Dict, Any
 from ..utils import logger
 from ..utils.utils import SUPPORT_BACKEND
-from ..utils.preprocess import resizer_preprocess
+from ..dataloaders.loaders import validate_sample
 from ..infer.xh2_infer import Xh2Infer
 from ..infer.onnx_infer import OnnxInfer
 from ..infer.xhquant_infer import Xh2HmQuantInfer
@@ -54,41 +53,19 @@ COLORS = [
 
 
 class BaseModel(object, metaclass=abc.ABCMeta):
-    """Base model class for model inference and processing operations.
-
-    This abstract class provides a unified interface for model inference across different
-    backends (ONNX, XH2), handling preprocessing, inference execution, and postprocessing
-    with support for various input formats and resizer modes.
-    """
+    """Base model class for DataLoader-driven inference."""
 
     def __init__(self, **kwargs):
-        """Initialize the model instance with configuration parameters.
-
-        Args:
-            **kwargs: Keyword arguments including:
-                - inputs_cfg (dict): Configuration for model inputs
-                - is_image_single_input (bool): Whether input is single image
-                - resizer_modes (dict): Per-input resizer modes (default: {})
-                - roi_num (int): Number of regions of interest (default: 1)
-                - backend (str): Backend type (onnx/xh2/hmonnx)
-        """
-        self.time_span = 0  # Total time span for inference operations
-        self.total = 0  # Total number of inference operations performed
-        self.engine = None  # Inference engine instance
-        self.inputs_cfg = kwargs["inputs_cfg"]  # Configuration for model inputs
-        self.inputs_name = list(self.inputs_cfg.keys())  # List of input names
-        self.is_image_single_input = kwargs[
-            "is_image_single_input"
-        ]  # Whether input is single image
-        # Support both resizer_modes (new) and resizer_mode (legacy)
+        """Initialize the model instance with configuration parameters."""
+        self.time_span = 0
+        self.total = 0
+        self.engine = None
+        self.inputs_cfg = kwargs["inputs_cfg"]
+        self.inputs_name = list(self.inputs_cfg.keys())
         self.resizer_modes = kwargs.get("resizer_modes", {})
-        # For now, only single-input models are supported for demo/eval
-        if not self.is_image_single_input:
-            logger.fatal("Multi-input models are not supported for demo/eval yet")
+        self.roi_num = kwargs.get("roi_num", 1)
 
-        self.roi_num = kwargs.get("roi_num", 1)  # Number of regions of interest
-
-        self.backend = kwargs["backend"]  # Backend type: onnx/xh2
+        self.backend = kwargs["backend"]
         if self.backend not in SUPPORT_BACKEND:
             logger.fatal(f"backend not in {SUPPORT_BACKEND}")
         if self.backend == "onnx":
@@ -101,12 +78,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             logger.fatal(f"Not support backend: {self.backend}")
 
     def load(self, model_path: str, device_id=0):
-        """Load the model for inference.
-
-        Args:
-            model_path (str): Path to the model file to be loaded.
-            device_id (int): Device ID to load the model on (default: 0).
-        """
+        """Load the model for inference."""
         model_name = os.path.basename(model_path)
         _, ext = os.path.splitext(model_name)
         if ext != self.engine.model_ext:
@@ -114,138 +86,135 @@ class BaseModel(object, metaclass=abc.ABCMeta):
 
         self.engine.load(model_path, device_id=device_id)
 
-    def preprocess(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-        """Preprocess input data for the model.
+    def run(self, sample: Dict[str, Any]) -> Dict[str, np.ndarray]:
+        """Execute model inference with one standard DataLoader sample."""
+        sample = validate_sample(sample, self.inputs_cfg)
+        runtime_inputs = self._build_runtime_inputs(sample)
+        runtime_inputs = self._repeat_runtime_inputs(runtime_inputs)
 
-        Args:
-            in_datas (dict): Dictionary containing input data arrays.
-
-        Returns:
-            dict: Dictionary containing preprocessed input data arrays.
-        """
-        if not self.is_image_single_input:
-            # Single input non-image or multi-input, input data is preprocessed externally
-            if self.backend == "onnx":
-                return in_datas
-            else:
-                logger.fatal(f"Not support backend: {self.backend}")
-        else:
-            new_datas = dict()
-            # Single input image, can be supported by internal preprocessing
-            input_name = self.inputs_name[0]
-            cv_image = in_datas[input_name]
-            input_cfg = self.inputs_cfg[input_name]
-            resizer_mode = self.resizer_modes[input_name]
-            input_shape = input_cfg["shape"]
-            data_format = input_cfg["data_format"]
-            resize_type = input_cfg["resize_type"]
-            padding_mode = input_cfg.get("padding_mode")
-            padding_values = input_cfg.get("padding_values")
-            N, C, H, W = input_shape
-            resizer_cfg = input_cfg.get("resizer")
-            if resizer_cfg is None:
-                resizer_cfg = dict()
-            toYUV_format = resizer_cfg.get("toYUV_format", "YUV420SP")
-            resizer_input_size = resizer_cfg.get("resizer_input_size", (H, W))
-            resizer_input_h, resizer_input_w = resizer_input_size
-            resizer_crop = resizer_cfg.get(
-                "resizer_crop", [0, 0, resizer_input_h, resizer_input_w]
-            )
-            im: torch.Tensor
-            im, dyn_info = resizer_preprocess(
-                cv_image,
-                input_shape,
-                resizer_input_size,
-                resizer_crop,
-                resizer_mode=resizer_mode,
-                mean=input_cfg["mean"],
-                std=input_cfg["std"],
-                use_resize=resizer_mode in [0, 3] or self.backend == "onnx",
-                use_norm=resizer_mode == 0 or self.backend == "onnx",
-                use_rgb=data_format == "RGB"
-                and (resizer_mode == 0 or self.backend == "onnx"),
-                resize_type=resize_type,
-                padding_mode=padding_mode,
-                padding_values=padding_values,
-                is_onnx=resizer_mode == 0
-                or self.backend
-                == "onnx",  # Static resizer, need to convert to YUV in non-quantization stage, cannot set is_onnx=True
-                to_YUV=resizer_mode in [1, 2, 3],
-                fmt=toYUV_format,
-            )
-            if self.backend == "onnx":
-                new_datas[input_name] = im.detach().cpu().numpy()
-            elif self.backend in ["xh2", "hmonnx"] and resizer_mode == 0:
-                new_datas[input_name] = im.detach().cpu().numpy().astype(np.float16)
-            elif self.backend == "hmonnx" and resizer_mode in [1, 2, 3]:
-                new_datas[input_name] = im.detach().cpu().contiguous().numpy()
-            elif resizer_mode in [1, 2, 3]:
-                yuv_pad = im.detach().cpu().numpy().flatten()
-                if toYUV_format == "YUV420SP":
-                    valid_len = yuv_pad.size // 2
-                elif toYUV_format == "YUV422SP":
-                    valid_len = yuv_pad.size * 2 // 3
-                elif toYUV_format in ["YUV444SP", "YUV400"]:
-                    valid_len = yuv_pad.size
-                yuv = yuv_pad[:valid_len].copy().reshape(1, -1)
-                new_datas[input_name] = np.ascontiguousarray(yuv)
-            if resizer_mode in [1, 2] and self.backend in ["xh2", "hmonnx"]:
-                dyn_info = dyn_info.detach().cpu().numpy()
-                new_datas[f"resizer_crop_{input_name}"] = dyn_info
-            return new_datas
-
-    def run(self, in_datas: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-        """Execute model inference.
-
-        Args:
-            in_datas (dict): Dictionary containing input data arrays.
-
-        Returns:
-            dict: Dictionary containing output data arrays after inference.
-        """
-        preprocessed_in_datas = self.preprocess(in_datas)
-        # For multi-batch, directly duplicate data, and subsequent resizer information duplication
-        for name in preprocessed_in_datas:
-            in_data = preprocessed_in_datas[name]
-            if (
-                name.startswith("resizer_crop_")
-                and self.roi_num > 1
-                and self.backend in ["xh2"]
-            ):
-                preprocessed_in_datas[name] = np.repeat(
-                    in_data, repeats=self.roi_num, axis=0
-                )
-                continue
-            batch = self.engine.get_input_batch_size(name)
-            preprocessed_in_datas[name] = np.repeat(in_data, repeats=batch, axis=0)
         t = time.time()
-        # Inference
-        outs = self.engine.run(preprocessed_in_datas)
+        outs = self.engine.run(runtime_inputs)
         self.time_span += time.time() - t
-        # outputs both quantized and dequantized results, only take the dequantized one
+
+        # xh2 returns (quantized, dequantized); model postprocess uses dequantized data.
         if isinstance(outs, tuple):
             outs = outs[1]
-        # Before postprocessing, only take batch 0
+
         for name in outs:
-            out = outs[name][0:1, ...]
-            outs[name] = out.copy()
-        outs = self.postprocess(outs, in_datas)
+            outs[name] = outs[name][0:1, ...].copy()
+
+        outs = self.postprocess(outs, self._get_postprocess_inputs(sample))
         self.total += 1
         return outs
 
+    def _build_runtime_inputs(self, sample):
+        if self.backend == "onnx":
+            return {name: sample["inputs"][name] for name in self.inputs_name}
+        if self.backend == "hmonnx":
+            return self._build_hmonnx_inputs(sample)
+        if self.backend == "xh2":
+            return self._build_xh2_inputs(sample)
+        logger.fatal(f"Not support backend: {self.backend}")
+
+    def _build_hmonnx_inputs(self, sample):
+        inputs = {}
+        hmonnx_inputs = sample["hmonnx_inputs"]
+        dyn_info = sample.get("meta", {}).get("dyn_info", {}) or {}
+
+        for input_name in self.inputs_name:
+            data = hmonnx_inputs[input_name]
+            if self.resizer_modes.get(input_name, 0) == 0:
+                data = self._cast_runtime_input(data)
+            elif data.dtype == np.float32:
+                data = data.astype(np.float16)
+            inputs[input_name] = np.ascontiguousarray(data)
+
+            if input_name in dyn_info:
+                inputs[f"resizer_crop_{input_name}"] = np.ascontiguousarray(
+                    dyn_info[input_name].astype(np.int32)
+                )
+
+        return inputs
+
+    def _build_xh2_inputs(self, sample):
+        inputs = {}
+        hmonnx_inputs = sample["hmonnx_inputs"]
+        dyn_info = sample.get("meta", {}).get("dyn_info", {}) or {}
+
+        for input_name in self.inputs_name:
+            resizer_mode = self.resizer_modes.get(input_name, 0)
+            data = hmonnx_inputs[input_name]
+            if resizer_mode == 0:
+                inputs[input_name] = np.ascontiguousarray(self._cast_runtime_input(data))
+                continue
+
+            fmt = self._get_yuv_format(input_name)
+            yuv = data.astype(np.float16).flatten()
+            valid_len = self._get_yuv_valid_len(yuv.size, fmt)
+            inputs[input_name] = np.ascontiguousarray(yuv[:valid_len].reshape(1, -1))
+
+            if resizer_mode in [1, 2]:
+                if input_name not in dyn_info:
+                    logger.fatal(f"Missing dynamic resizer params for input: {input_name}")
+                inputs[f"resizer_crop_{input_name}"] = np.ascontiguousarray(
+                    dyn_info[input_name].astype(np.int32)
+                )
+
+        return inputs
+
+    def _get_postprocess_inputs(self, sample):
+        meta = sample.get("meta", {}) or {}
+        if isinstance(meta.get("raw_inputs"), dict):
+            return meta["raw_inputs"]
+        if "image" in meta and len(self.inputs_name) == 1:
+            return {self.inputs_name[0]: meta["image"]}
+        return sample
+
+    def _repeat_runtime_inputs(self, runtime_inputs):
+        repeated = {}
+        for name, data in runtime_inputs.items():
+            if name.startswith("resizer_crop_") and self.backend == "xh2" and self.roi_num > 1:
+                repeated[name] = np.repeat(data, repeats=self.roi_num, axis=0)
+                continue
+
+            batch = self.engine.get_input_batch_size(name)
+            if data.shape[0] == batch:
+                repeated[name] = data
+                continue
+            if batch % data.shape[0] != 0:
+                logger.fatal(
+                    f"Input '{name}' batch mismatch: data batch {data.shape[0]}, model batch {batch}"
+                )
+            repeated[name] = np.repeat(data, repeats=batch // data.shape[0], axis=0)
+        return repeated
+
+    def _get_yuv_format(self, input_name):
+        resizer_cfg = self.inputs_cfg[input_name].get("resizer") or {}
+        return resizer_cfg.get("toYUV_format", "YUV420SP")
+
+    @staticmethod
+    def _get_yuv_valid_len(size, fmt):
+        if fmt == "YUV420SP":
+            return size // 2
+        if fmt == "YUV422SP":
+            return size * 2 // 3
+        if fmt in ["YUV444SP", "YUV400"]:
+            return size
+        logger.fatal(f"Unsupported YUV format: {fmt}")
+
+    @staticmethod
+    def _cast_runtime_input(data):
+        if data.dtype == np.int64:
+            return data.astype(np.int32)
+        if data.dtype == np.float32:
+            return data.astype(np.float16)
+        return data
+
     @abc.abstractmethod
     def postprocess(
-        self, outs: Dict[str, np.ndarray], in_datas: Dict[str, np.ndarray]
+        self, outs: Dict[str, np.ndarray], in_datas: Dict[str, Any]
     ) -> Any:
-        """Postprocess model outputs.
-
-        Args:
-            outs (dict): Dictionary containing raw output data arrays.
-            in_datas (dict): Dictionary containing original input data arrays.
-
-        Returns:
-            Processed output results based on the specific implementation.
-        """
+        """Postprocess model outputs."""
         pass
 
     def unload(self):
@@ -253,25 +222,13 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def demo(self, filepaths: list):
-        """Run model demonstration.
-
-        Args:
-            filepaths (list): List of file paths for the demo.
-        """
+    def demo(self, dataloader):
+        """Run model demonstration with a DataLoader."""
         pass
 
     @abc.abstractmethod
-    def evaluate(self, dataset, num=0):
-        """Evaluate the model performance.
-
-        Args:
-            dataset: Dataset object for evaluation.
-            num (int): Number of samples to evaluate (default: 0, meaning all).
-
-        Returns:
-            Evaluation results based on the specific implementation.
-        """
+    def evaluate(self, dataloader, num=0):
+        """Evaluate model performance with a DataLoader."""
         pass
 
     @property

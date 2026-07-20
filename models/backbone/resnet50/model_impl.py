@@ -17,17 +17,13 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
-import cv2
 import numpy as np
-from tqdm import tqdm
 from typing import Dict, Any
-from hmatc.utils import logger
 from hmatc.utils.postprocess import softmax
-from hmatc.base.base_model import BaseModel
-from hmatc.datasets.imagenet import ILSVRC2012_LABELS
+from hmatc.base.task_models import ClassificationModel
 
 
-class ResNet50(BaseModel):
+class ResNet50(ClassificationModel):
     """
     ResNet50 model implementation for image classification tasks.
     Inherits from BaseModel and provides postprocessing, demo and evaluation functionality.
@@ -69,68 +65,3 @@ class ResNet50(BaseModel):
             max_score = out[i][max_idx]
             res.append((max_idx, max_score))  # (cls_idx, score)
         return res
-
-    def demo(self, filepaths: list):
-        """
-        Run demo inference on a list of image file paths.
-
-        Loads each image, runs inference through the model, and prints the predicted
-        class index, name, and confidence score for each image.
-
-        Args:
-            filepaths: List of image file paths to run inference on
-        """
-        in_datas = dict()
-        for idx, filepath in enumerate(filepaths):
-            cv_image = cv2.imread(filepath)
-            if cv_image is None:
-                logger.warning(f"{filepath} not exists or decode failed")
-                continue
-            in_datas[self.input_name] = cv_image
-            logger.info(f"[{idx}] {filepath}")
-            outs = self.run(in_datas)
-            # Only take batch 0
-            out = outs[0]
-            cls_idx = str(out[0])
-            score = out[1]
-            cls_name = ILSVRC2012_LABELS[cls_idx][0]
-            logger.info(f"score: {score:.3f}, cls_idx: {cls_idx}, cls_name: {cls_name}")
-
-    def evaluate(self, dataset, num=0):
-        """
-        Evaluate the model performance on a given dataset.
-
-        Runs inference on all images in the dataset and calculates top-1 accuracy
-        by comparing predictions with ground truth labels.
-
-        Args:
-            dataset: Dataset object containing images and labels for evaluation
-            num: Number of samples to evaluate (0 means all samples)
-
-        Returns:
-            Dictionary containing evaluation metrics including input size, dataset name,
-            number of samples, top-1 accuracy and latency
-        """
-        img_paths, labels = dataset.get_datas(num)
-        in_datas = dict()
-        top1_acc = 0
-        for idx, img_path in enumerate(tqdm(img_paths)):
-            cv_image = cv2.imread(img_path)
-            if cv_image is None:
-                logger.warning(f"{img_path} not exists or decode failed")
-                continue
-            in_datas[self.input_name] = cv_image
-            logger.debug(f"[{idx}] {img_path}")
-            outs = self.run(in_datas)
-            out = outs[0]
-            cls_idx = str(out[0])
-            gt_idx = str(labels[idx])
-            if cls_idx == gt_idx:
-                top1_acc += 1
-        return {
-            "input_size": self.inputs_cfg[self.input_name]["shape"],
-            "dataset": dataset.dataset_name,
-            "num": len(img_paths),
-            "top1_acc": f"{top1_acc / len(img_paths):.6f}",
-            "latency_ms": f"{self.ave_latency_ms:.6f}",
-        }

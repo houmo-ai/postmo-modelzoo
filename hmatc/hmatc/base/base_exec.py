@@ -29,6 +29,8 @@ import torch
 from onnx import StringStringEntryProto
 from pathlib import Path
 from datetime import datetime
+from ..dataloaders.factory import create_dataloader
+from ..datasets.factory import create_eval_dataset
 from ..utils import logger
 from ..utils.utils import get_onnx_inputs_info
 
@@ -60,6 +62,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.target = cfg["target"]
         self.enable_upload = False
+        self.config_dir = cfg.get("_config_dir", os.getcwd())
 
         # Model parameters
         self.model_cfg = cfg.get("model")
@@ -354,27 +357,43 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             backend=backend,
         )
 
-    def get_dataset(self, data_dir):
-        """Get dataset instance.
+    def get_stage_dataloader(self, data_dir, stage, num=0, dataset=None):
+        return create_dataloader(
+            self.model_cfg,
+            data_dir=data_dir,
+            stage=stage,
+            num=num,
+            dataset=dataset,
+        )
 
-        Args:
-            data_dir (str): Directory containing the dataset.
+    def get_eval_dataset(self, data_dir, num=0):
+        return create_eval_dataset(
+            self.eval_cfg,
+            data_dir=data_dir,
+            num=num,
+            config_dir=self.config_dir,
+        )
 
-        Returns:
-            object: Dataset instance or None if failed.
-        """
-        dataset_module = self.eval_cfg.get("dataset_module")
-        dataset_cls = self.eval_cfg.get("dataset_cls")
-        if dataset_module is None or dataset_cls is None:
-            logger.error("dataset_module or dataset_cls is None")
-            return None
-        module_path = f"{dataset_module}.py"
-        if not os.path.exists(module_path):
-            logger.error(f"dataset_module not exists -> {dataset_module}")
-            return None
-        Dataset = self.import_py_module_from_file(module_path, dataset_cls)
-        logger.info(f"from {dataset_module} import {dataset_cls} successfully")
-        return Dataset(root_path=data_dir)
+    @staticmethod
+    def resolve_data_path(data_dir, stage):
+        HOUMO_DATASETS_PATH = os.environ.get("HOUMO_DATASETS_PATH", "")
+        houmo_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
+        if os.path.exists(data_dir):
+            return data_dir
+        if os.path.exists(houmo_data_dir):
+            return houmo_data_dir
+        logger.error(f"[{stage}] data_dir not found: {data_dir}")
+        return None
+
+    @staticmethod
+    def check_num(num, stage):
+        if not isinstance(num, int):
+            logger.error(f"{stage} num must be int -> {num}")
+            return False
+        if num < 0:
+            logger.error(f"{stage} num must >= 0 -> {num}")
+            return False
+        return True
 
     def demo(self, backend, device_id=0):
         """Demo entry point.
@@ -395,11 +414,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                     "error": "demo config not found",
                 }
             }
-        data_dir = self.demo_cfg.get("data_dir", "")
-        HOUMO_DATASETS_PATH = os.environ.get("HOUMO_DATASETS_PATH", "")
-        HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
-        if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
-            logger.error("data_dir must be a exist directory")
+        data_dir = self.resolve_data_path(self.demo_cfg.get("data_dir", ""), "demo")
+        if data_dir is None:
             return {
                 "demo": {
                     "success": False,
@@ -407,28 +423,18 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                     "error": "data_dir not found",
                 }
             }
-        if not os.path.isdir(data_dir):
-            data_dir = HM_data_dir
         logger.info(f"[demo] data_dir: {data_dir}")
         test_num = self.demo_cfg.get("num", 0)
-        if not isinstance(test_num, int):
-            logger.error(f"test_num must be int -> {test_num}")
+        if not self.check_num(test_num, "demo"):
             return {
                 "demo": {
                     "success": False,
                     "backend": backend,
-                    "error": "test_num must be int",
+                    "error": "num must be int and >= 0",
                 }
             }
-        if test_num < 0:
-            logger.error(f"test_num must >= 0 -> {test_num}")
-            return {
-                "demo": {
-                    "success": False,
-                    "backend": backend,
-                    "error": "test_num must >= 0",
-                }
-            }
+        demo_data = self.get_stage_dataloader(data_dir, "demo", test_num)
+        demo_num = len(demo_data)
         model = self.get_model(backend)
         if model is None:
             logger.error("Failed to get model")
@@ -439,19 +445,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                     "error": "failed to get model",
                 }
             }
-        filenames = os.listdir(data_dir)
-        data_num = len(filenames)
-        if test_num > 0 and test_num < data_num:
-            filenames = filenames[:test_num]
-        filepaths = list()
-        for filename in filenames:
-            filepath = os.path.join(data_dir, filename)
-            if not os.path.exists(filepath):
-                logger.warning(f"filepath not exists -> {filepath}")
-                continue
-            filepaths.append(filepath)
         model.load(self.get_model_path(backend), device_id)
-        model.demo(filepaths)
+        model.demo(demo_data)
         model.unload()
 
         return {
@@ -459,7 +454,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 "success": True,
                 "backend": backend,
                 "data_dir": data_dir,
-                "num": len(filepaths),
+                "num": demo_num,
             }
         }
 
@@ -483,11 +478,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                     }
                 }
             }
-        data_dir = self.eval_cfg.get("data_dir", "")
-        HOUMO_DATASETS_PATH = os.environ.get("HOUMO_DATASETS_PATH", "")
-        HM_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
-        if not os.path.isdir(data_dir) and not os.path.isdir(HM_data_dir):
-            logger.error("data_dir must be a exist directory")
+        data_dir = self.resolve_data_path(self.eval_cfg.get("data_dir", ""), "eval")
+        if data_dir is None:
             return {
                 "eval": {
                     backend: {
@@ -496,39 +488,26 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                     }
                 }
             }
-        if not os.path.isdir(data_dir):
-            data_dir = HM_data_dir
         logger.info(f"[eval] data_dir: {data_dir}")
         num = self.eval_cfg.get("num", 0)
-        if not isinstance(num, int):
-            logger.error(f"eval test_num must be int -> {num}")
+        if not self.check_num(num, "eval"):
             return {
                 "eval": {
                     backend: {
                         "success": False,
-                        "error": "num must be int",
+                        "error": "num must be int and >= 0",
                     }
                 }
             }
-        if num < 0:
-            logger.error(f"eval test_num must >= 0 -> {num}")
+        dataset = self.get_eval_dataset(data_dir, num)
+        eval_data = self.get_stage_dataloader(data_dir, "eval", num, dataset=dataset)
+        if eval_data is None:
+            logger.error("get dataloader failed")
             return {
                 "eval": {
                     backend: {
                         "success": False,
-                        "error": "num must >= 0",
-                    }
-                }
-            }
-        # Get dataset
-        dataset = self.get_dataset(data_dir)
-        if dataset is None:
-            logger.error("get_dataset failed")
-            return {
-                "eval": {
-                    backend: {
-                        "success": False,
-                        "error": "failed to get dataset",
+                        "error": "failed to get dataloader",
                     }
                 }
             }
@@ -545,7 +524,7 @@ class BaseExec(object, metaclass=abc.ABCMeta):
                 }
             }
         model.load(self.get_model_path(backend), device_id)
-        res = model.evaluate(dataset, num)
+        res = model.evaluate(eval_data, num)
         model.unload()
         logger.info(f"{res}")
 

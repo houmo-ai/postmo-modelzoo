@@ -87,6 +87,27 @@ hmatc eval -c config.yml         # 芯片评估
 hmatc eval -c config.yml --onnx  # ONNX评估
 ```
 
+### 大模型评测
+
+大模型评测沿用 `hmatc eval` 命令，但不使用 `-c/--config`。`--model-dir` 表示大模型产物目录，只传给 EvalScope 的 `TaskConfig.model` 和 `model_args["model_dir"]`，不会复用配置文件中的 `model.model_path`，避免和小模型 ONNX 路径混淆。
+
+```bash
+hmatc eval \
+  --model examples/qwen3/hm_xh2_qwen3.py \
+  --model-dir examples/qwen3/models/hmm_xh2_qwen3_8b_256_8k_b1_1chip_2cores_v1.1.0/ \
+  --dataset gsm8k \
+  --limit 2 \
+  --model-args tokenizer_dir=examples/qwen3/models/tokenizers
+```
+
+参数说明：
+- `--model`：自定义大模型评测脚本路径或 Python 模块名，脚本需定义 `API_NAME` 并通过 EvalScope 注册模型 API。
+- `--model-dir`：大模型权重/产物目录，独立于小模型配置里的 ONNX 路径。
+- `--dataset`：一个或多个 EvalScope 数据集名称或路径。
+- `--limit`：最多评测样本数，`0` 表示全量。
+- `--output`：评测输出目录，默认 `./outputs`。
+- `--model-args KEY=VALUE`：透传给模型 API 的额外参数，可重复指定。
+
 ## 配置文件
 
 ```yaml
@@ -132,6 +153,10 @@ model:
         # - 动态模式下配置会报错
         resizer_crop: [0, 0, 640, 640]
 
+  # [可选] DataLoader实现模块（多输入原始数据、非图像原始数据、复杂前处理时填写）
+  dataloader_module:         # 模块文件名（与yml同级目录）
+  dataloader_cls:            # 类名
+
   # [可选] 模型实现模块（demo/eval功能需填写）
   model_impl_module:        # 模块文件名（与yml同级目录）
   model_impl_cls:           # 类名
@@ -174,13 +199,83 @@ demo:
 eval:
   data_dir:                 # [必填] 数据集目录
   num: 0                    # [可选] 评估数量，0表示全部
-  dataset_module:           # [必填] 数据集模块（与yml同级目录）
-  dataset_cls:              # [必填] 数据集类名
+  dataset_module:           # [必填] Eval Dataset模块，支持相对config目录或当前目录
+  dataset_cls:              # [必填] Eval Dataset类名
 ```
 
 ## 数据格式
 
-校准数据、Golden数据、比较数据均为预处理后的NPZ格式：
+hmatc 内置三类 DataLoader：
+
+- 单输入图像模型：读取图片并根据 `model.inputs` 中的 `data_format`、`mean`、`std`、`resize_type` 等配置完成前处理。
+- `.npz` 输入：作为已预处理模型输入容器，支持单输入、多输入和非图像输入；key 必须与 ONNX 输入名一致。
+- 随机输入：`quant.calib_data` 为空时用于快速量化，支持任意输入。
+
+多输入原始数据、非图像原始数据、复杂前处理或复杂 demo/eval 元信息，请在 `model` 下配置自定义 DataLoader：
+
+```yaml
+model:
+  dataloader_module: my_dataloader
+  dataloader_cls: MyDataLoader
+```
+
+接口约定：
+
+```python
+class MyDataLoader:
+    def __init__(self, data_dir, model_cfg=None, inputs_cfg=None, stage=None, num=0):
+        ...
+
+    def __len__(self):
+        ...
+
+    def __getitem__(self, index):
+        return {
+            "inputs": {
+                "input_name": array,
+            },
+            "meta": {},
+        }
+```
+
+`data_dir` 来自当前阶段配置：`quant.calib_data`、`demo.data_dir` 或 `eval.data_dir`；`num=0` 表示不截断。
+
+### Eval Dataset 与 DataLoader 分工
+
+`eval` 保留独立的 Dataset 配置，用于明确评估使用的数据集：
+
+```yaml
+eval:
+  data_dir: ./coco2017
+  num: 0
+  dataset_module: dataset
+  dataset_cls: Dataset
+```
+
+- `Dataset` 负责数据集加载、标注解析、样本列表、切片和数据集元信息。
+- `DataLoader` 负责读取样本数据、前处理、Resizer 输入生成，并返回模型可直接推理的 `inputs` / `hmonnx_inputs` / `meta`。
+- `dataset_module` 支持 `.py` 文件名或不带后缀的模块名；相对路径优先相对配置文件所在目录解析，其次相对当前运行目录解析。
+- `model.dataloader_module` / `model.dataloader_cls` 仍用于多输入、非图像或复杂前处理等模型输入处理场景。
+
+推荐 Dataset 接口：
+
+```python
+class Dataset:
+    def __init__(self, data_dir=None, num=0):
+        ...
+
+    def __len__(self):
+        ...
+
+    def __getitem__(self, index):
+        return {
+            "path": "image.jpg",
+            "image_id": 1,
+            "label": 0,
+        }
+```
+
+校准数据、Golden数据、比较数据的 NPZ 格式：
 
 ```python
 import numpy as np

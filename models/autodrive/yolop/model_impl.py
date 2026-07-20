@@ -17,19 +17,16 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
-import os
 import cv2
 import torch
 import numpy as np
-from tqdm import tqdm
 from typing import Dict, Any
-from hmatc.utils import logger
-from hmatc.base.base_model import BaseModel
+from hmatc.base.task_models import YoloPDemoModel
 from hmatc.utils.preprocess import calc_padding_size
 from hmatc.utils.postprocess import non_max_suppression, scale_coords
 
 
-class YoloP(BaseModel):
+class YoloP(YoloPDemoModel):
     """
     YoloP model implementation for autonomous driving tasks.
 
@@ -159,60 +156,4 @@ class YoloP(BaseModel):
         mask[ll_seg_mask == 1] = [255, 0, 0]  # 1: lane line
         return det_out, mask
 
-    def demo(self, filepaths: list):
-        """
-        Run inference on input images and save visualized results.
 
-        Performs multi-task inference on the input images, draws bounding boxes
-        for detected objects and overlays segmentation masks for drivable areas
-        and lane lines, then saves the results.
-
-        Args:
-            filepaths: List of paths to input images for inference
-        """
-        in_datas = dict()
-        save_dir = f"vis_{self.backend}"
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        for idx, filepath in enumerate(filepaths):
-            basename, _ = os.path.splitext(os.path.basename(filepath))
-            save_path = os.path.join(save_dir, f"{basename}.jpg")
-            cv_image = cv2.imread(filepath)
-            if cv_image is None:
-                logger.warning(f"{filepath} not exists or decode failed")
-                continue
-            in_datas[self.input_name] = cv_image
-            logger.info(f"Image[{idx}] {filepath}")
-            det_outs, mask = self.run(in_datas)
-            for idx, detection in enumerate(det_outs):
-                x1, y1, x2, y2, score, cls_idx = detection
-                x1 = int(x1) if x1 > 0 else 0
-                y1 = int(y1) if y1 > 0 else 0
-                x2 = int(x2) if x2 < cv_image.shape[1] else cv_image.shape[1]
-                y2 = int(y2) if y2 < cv_image.shape[0] else cv_image.shape[0]
-                cls_idx = int(cls_idx)
-                logger.info(
-                    f"Detection[{idx:2}] x1: {x1:4}, y1: {y1:4}, x2: {x2:4}, y2: {y2:4}, score: {score:.3f}, cls: {cls_idx:2}"
-                )
-                cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            cv_image = np.where(
-                mask == 255, cv_image * 0.5 + mask * 0.5, cv_image
-            ).astype(np.uint8)
-            cv2.imwrite(save_path, cv_image)
-            logger.info(f"Save result to {save_path}")
-
-    def evaluate(self, dataset, num=0):
-        """
-        Evaluate the model performance on a given dataset.
-
-        Currently not implemented for YoloP model as it performs multiple tasks
-        that require different evaluation metrics.
-
-        Args:
-            dataset: Dataset object containing evaluation data
-            num: Number of samples to evaluate (0 means all samples)
-
-        Raises:
-            NotImplementedError: Evaluation is not implemented for YoloP model
-        """
-        raise NotImplementedError("Evaluation is not implemented for YoloP model.")

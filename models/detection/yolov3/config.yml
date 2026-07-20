@@ -23,7 +23,7 @@ quant:
 build:
   ncore: 1
   opt_level: 2
-  
+
 demo:
   data_dir: coco2017/val2017
   num: 10
@@ -33,4 +33,3 @@ eval:
   num: 0
   dataset_module: dataset
   dataset_cls: Dataset
-

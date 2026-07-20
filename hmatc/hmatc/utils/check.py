@@ -53,6 +53,18 @@ def check_cfg(cfg):
     if save_dir is None:
         logger.fatal("[model.save_dir] not found")
 
+    dataloader_module = model_cfg.get("dataloader_module")
+    dataloader_cls = model_cfg.get("dataloader_cls")
+    if (dataloader_module is None) != (dataloader_cls is None):
+        logger.fatal(
+            "[model.dataloader_module] and [model.dataloader_cls] must be configured together"
+        )
+    if dataloader_module is not None:
+        if not isinstance(dataloader_module, str) or not dataloader_module:
+            logger.fatal("[model.dataloader_module] must be a non-empty string")
+        if not isinstance(dataloader_cls, str) or not dataloader_cls:
+            logger.fatal("[model.dataloader_cls] must be a non-empty string")
+
     inputs_cfg = model_cfg.get("inputs", dict())
     if len(inputs_cfg) == 0:
         logger.fatal("[model.inputs] not found or empty")
