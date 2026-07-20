@@ -363,26 +363,25 @@ class OCRRec(BaseModel):
         norm_edit_dis = 1 - self.norm_edit_dis / (self.all_num + self.eps)
         return {"acc": acc, "norm_edit_dis": norm_edit_dis}
 
-    def demo(self, filepaths: list):
+    def demo(self, dataloader):
         """Run model demonstration."""
         save_path = f"./vis_{self.backend}"
         if not os.path.exists(save_path):
             os.makedirs(save_path)
-        in_datas = dict()
-        for idx, filepath in enumerate(filepaths):
+        for idx in range(len(dataloader)):
+            sample = dataloader[idx]
+            meta = sample.get("meta", {})
+            filepath = meta.get("path", "")
             file_name = os.path.basename(filepath)
-            cv_image = cv2.imread(filepath)
+            cv_image = meta.get("image")
             if cv_image is None:
-                logger.warning(f"{filepath} not exists or decode failed")
-                continue
-            in_datas[self.input_name] = cv_image
+                logger.fatal("OCRRec demo requires sample['meta']['image']")
             logger.info(f"Image[{idx}] {filepath}")
 
-            preds = self.run(in_datas)
+            preds = self.run(sample)
             plate_strs_list = [[pred, conf] for pred, conf in preds]
             logger.info(f"image => {file_name} recognition result: {plate_strs_list}")
 
-            # Draw result on image
             text = preds[0][0] if preds else ""
             cv2.putText(
                 cv_image, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2
@@ -391,39 +390,28 @@ class OCRRec(BaseModel):
             cv2.imwrite(save_dir, cv_image)
             logger.info(f"Save results to {save_dir}.")
 
-    def evaluate(self, dataset, num=0):
-        """Evaluate the model on dataset."""
-        img_path_list = dataset.get_datas(num)
-        # Use actual number of samples from data_lines, not glob scan result
-        actual_num = len(dataset.data_lines)
-        pbar = tqdm(total=actual_num, desc="eval:", position=0, leave=True)
+    def evaluate(self, dataloader, num=0):
+        """Evaluate the model with DataLoader samples."""
+        total = len(dataloader) if num == 0 else min(num, len(dataloader))
+        pbar = tqdm(total=total, desc="eval:", position=0, leave=True)
         efficient_num = 0
-        for data_line in dataset.data_lines:
-            data_line = data_line.decode("utf-8")
-            substr = data_line.strip("\n").split("\t")
-            file_name = substr[0]
-            label = substr[1]
-            img_path = os.path.join(dataset.img_dir, file_name)
-            if img_path not in img_path_list:
-                continue
-            cv_image = cv2.imread(img_path)
-            if cv_image is None:
-                logger.warning(f"{img_path} not exists or decode failed")
-                continue
-            in_datas = {self.input_name: cv_image}
+        for idx in range(total):
+            sample = dataloader[idx]
+            label = sample.get("meta", {}).get("label")
+            if label is None:
+                logger.fatal("OCRRec eval requires sample['meta']['label']")
 
             label_data = self.process_label(label)
             if label_data is None:
                 continue
 
-            preds = self.run(in_datas)
+            preds = self.run(sample)
             gts = self.ctc_decode.decode(label_data)
 
             self.rec_metric(preds, gts)
             pbar.update(1)
             efficient_num += 1
 
-        # ave_latency_ms is a computed property from time_span and total
         metric = self.get_metric()
         pbar.close()
 
@@ -432,7 +420,7 @@ class OCRRec(BaseModel):
             logger.info(f"{k}:{v}")
         return {
             "input_size": [1, 3] + list(self.input_size),
-            "dataset": dataset.dataset_name,
+            "dataset": getattr(dataloader, "dataset_name", dataloader.__class__.__name__),
             "num": efficient_num,
             "acc": f"{metric['acc']:.6f}",
             "norm_edit_dis": f"{metric['norm_edit_dis']:.6f}",

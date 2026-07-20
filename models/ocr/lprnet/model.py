@@ -138,22 +138,19 @@ class LPRNet(BaseModel):
             preb_labels.append(no_repeat_blank_label)
         return preb_labels
 
-    def demo(self, filepaths: list):
-        in_datas = dict()
-        for idx, filepath in enumerate(filepaths):
+    def demo(self, dataloader):
+        for idx in range(len(dataloader)):
+            sample = dataloader[idx]
+            meta = sample.get("meta", {})
+            filepath = meta.get("path", "")
             file_name = os.path.basename(filepath)
-            cv_image = cv2.imread(filepath)
-            if cv_image is None:
-                logger.warning(f"{filepath} not exists or decode failed")
-                continue
-            in_datas[self.input_name] = cv_image
             logger.info(f"Image[{idx}] {filepath}")
 
-            preds = self.run(in_datas)
+            preds = self.run(sample)
 
             plate_strs_list = []
             dump_str = ""
-            for i, pred in enumerate(preds):
+            for pred in preds:
                 plate_str = ""
                 for p in pred:
                     plate_str += self.CHARS[p]
@@ -163,24 +160,20 @@ class LPRNet(BaseModel):
                 f"image => {file_name} have {len(plate_strs_list)} license plates, numbers: {dump_str}"
             )
 
-    def evaluate(self, dataset, num=0):
-        img_path_list = dataset.get_datas(num)
+    def evaluate(self, dataloader, num=0):
+        total = len(dataloader) if num == 0 else min(num, len(dataloader))
         Tp = 0
         Tn_1 = 0
         Tn_2 = 0
         t1 = time.time()
-        pbar = tqdm(total=len(img_path_list), desc="eval:", position=0, leave=True)
-        in_datas = dict()
-        for idx, img_file in enumerate(img_path_list):
+        pbar = tqdm(total=total, desc="eval:", position=0, leave=True)
+        for idx in range(total):
+            sample = dataloader[idx]
+            img_file = sample.get("meta", {}).get("path", "")
             labels, lengths = self.get_label(img_file)
-            cv_image = cv2.imread(img_file)
-            if cv_image is None:
-                logger.warning(f"{img_file} not exists or decode failed")
-                continue
-            in_datas[self.input_name] = cv_image
             logger.debug(f"Image[{idx}] {img_file}")
 
-            preb_labels = self.run(in_datas)
+            preb_labels = self.run(sample)
 
             start = 0
             targets = []
@@ -203,12 +196,10 @@ class LPRNet(BaseModel):
         Acc = Tp * 1.0 / (Tp + Tn_1 + Tn_2)
         logger.info(f"Test Accuracy: {Acc} [{Tp}:{Tn_1}:{Tn_2}:{Tp+Tn_1+Tn_2}]")
         t2 = time.time()
-        logger.info(
-            f"Test Speed: {(t2 - t1) / len(img_path_list)}s 1/{len(img_path_list)}"
-        )
+        logger.info(f"Test Speed: {(t2 - t1) / total}s 1/{total}")
         return {
             "input_size": self.inputs_cfg[self.input_name]["shape"],
-            "dataset": dataset.dataset_name,
+            "dataset": getattr(dataloader, "dataset_name", dataloader.__class__.__name__),
             "num": Tp + Tn_1 + Tn_2,
             "acc": f"{Acc:.6f}",
             "latency": f"{self.ave_latency_ms:.6f}",

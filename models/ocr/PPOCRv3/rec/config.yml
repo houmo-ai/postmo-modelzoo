@@ -40,5 +40,3 @@ demo:
 eval:
   data_dir: CCPD2020
   num: 0
-  dataset_module: ccpd2020_dataset
-  dataset_cls: CCPD2020DataSet

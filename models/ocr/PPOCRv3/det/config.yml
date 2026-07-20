@@ -31,4 +31,3 @@ eval:
   num: 0
   dataset_module: dataset
   dataset_cls: CCPD2020DataSet
-
