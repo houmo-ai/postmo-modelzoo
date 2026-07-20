@@ -80,6 +80,10 @@
             ]
         }
     },
+    "test_sh_params": [
+        [],
+        ["--model_name", "whisper", "--model_size", "large-v3-turbo"]
+    ],
     "demo_params": {
         "xh2": {
             "tokenizer_path": [

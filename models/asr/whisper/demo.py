@@ -4,7 +4,7 @@
 #
 # File: demo.py
 # Description:
-#   Whisper-Turbo ASR Inference Demo - Python script for running Whisper
+#   Whisper ASR Inference Demo - Python script for running Whisper
 # automatic speech recognition on HOUMO AI device.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -176,9 +176,7 @@ class SamplingManager:
 
         return logits / self.temperature
 
-    def apply_repetition_penalty(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
-    ) -> np.ndarray:
+    def apply_repetition_penalty(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> np.ndarray:
         if self.repetition_penalty == 1.0 or not previous_tokens:
             return logits
 
@@ -186,13 +184,9 @@ class SamplingManager:
         for token_id in set(previous_tokens):
             if 0 <= token_id < len(logits):
                 if logits[token_id] < 0:
-                    adjusted_logits[token_id] = (
-                        logits[token_id] * self.repetition_penalty
-                    )
+                    adjusted_logits[token_id] = logits[token_id] * self.repetition_penalty
                 else:
-                    adjusted_logits[token_id] = (
-                        logits[token_id] / self.repetition_penalty
-                    )
+                    adjusted_logits[token_id] = logits[token_id] / self.repetition_penalty
 
         return adjusted_logits
 
@@ -251,14 +245,10 @@ class SamplingManager:
 
         return normalized_probs
 
-    def process_logits(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
-    ) -> np.ndarray:
+    def process_logits(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> np.ndarray:
         processed_logits = logits.copy()
         # 1. apply repetition penalty
-        processed_logits = self.apply_repetition_penalty(
-            processed_logits, previous_tokens
-        )
+        processed_logits = self.apply_repetition_penalty(processed_logits, previous_tokens)
 
         # 2. apply softmax
         # not using softmax in case of long time cost
@@ -275,9 +265,7 @@ class SamplingManager:
         probs = self.apply_temperature(probs)
         return probs
 
-    def sample(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
-    ) -> int:
+    def sample(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> int:
         logits = logits[0].numpy()
         if HOUMO_TARGET == "xh2":
             logits = logits[0]
@@ -290,9 +278,7 @@ class SamplingManager:
 
         return np.array([[sampled_index]])
 
-    def get_processed_probs(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
-    ) -> np.ndarray:
+    def get_processed_probs(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> np.ndarray:
         return self.process_logits(logits, previous_tokens)
 
 
@@ -313,12 +299,8 @@ class HmWhisper:
         self.encode_time = 0.0
         self.decode_time = 0.0
         self.prefill_time = 0.0
-        self.num_head = self.prefill.get_input_info(
-            self.prefill.get_input_name(4)
-        ).shape[1]
-        self.cache_max_len = self.prefill.get_input_info(
-            self.prefill.get_input_name(4)
-        ).shape[3]
+        self.num_head = self.prefill.get_input_info(self.prefill.get_input_name(4)).shape[1]
+        self.cache_max_len = self.prefill.get_input_info(self.prefill.get_input_name(4)).shape[3]
         self.num_decode_layers, self.base_idx = self.get_num_decode_layers()
 
     def get_num_decode_layers(self):
@@ -354,9 +336,7 @@ class HmWhisper:
         self.decode.run()
         self.decode.sync()
         self.decode_time += time.time() - start_time
-        outputs = [
-            torch.tensor(self.decode.get_output(self.decode.get_output_name(0)).numpy())
-        ]
+        outputs = [torch.tensor(self.decode.get_output(self.decode.get_output_name(0)).numpy())]
         return outputs
 
     def run_prefill(
@@ -369,11 +349,7 @@ class HmWhisper:
         self.prefill.run()
         self.prefill.sync()
         self.prefill_time += time.time() - start_time
-        outputs = [
-            torch.tensor(
-                self.prefill.get_output(self.prefill.get_output_name(0)).numpy()
-            )
-        ]
+        outputs = [torch.tensor(self.prefill.get_output(self.prefill.get_output_name(0)).numpy())]
         return outputs
 
     def get_input_names(self, model_type):
@@ -414,9 +390,7 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
     notime_id = processor.tokenizer.convert_tokens_to_ids("<|notimestamps|>")
     eos_id = processor.tokenizer.convert_tokens_to_ids("<|endoftext|>")
 
-    input_features = processor(
-        audio_array, sampling_rate=16000, return_tensors="pt"
-    ).input_features.half()
+    input_features = processor(audio_array, sampling_rate=16000, return_tensors="pt").input_features.half()
     enc_out = whisper.run_encode(input_features)
 
     # Dynamically obtain sequence length
@@ -436,18 +410,14 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
             dec_names[1]: torch.tensor([[0]], dtype=torch.int32),
             dec_names[2]: torch.tensor([0], dtype=torch.int32),
             dec_names[3]: torch.tensor([1], dtype=torch.int32),
-            dec_names[4]: torch.zeros(
-                (1, num_heads, 1, whisper.cache_max_len), dtype=torch.float16
-            ),
+            dec_names[4]: torch.zeros((1, num_heads, 1, whisper.cache_max_len), dtype=torch.float16),
             dec_names[5]: encode_attention_mask,
         }
 
         for i in range(2 * num_decode_layers):
             cache_name = dec_names[base_idx + i]
             cache_shape = whisper.decode.get_input_info(cache_name).shape
-            detect_inputs[cache_name] = torch.ones(cache_shape, dtype=torch.float16) * (
-                -65504.0
-            )
+            detect_inputs[cache_name] = torch.ones(cache_shape, dtype=torch.float16) * (-65504.0)
 
         for l in range(num_decode_layers):
             detect_inputs[dec_names[base_idx + 2 * num_decode_layers + l]] = k_list[l]
@@ -457,9 +427,9 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
             whisper.decode.set_input(input_name, input_data.numpy())
         whisper.decode.run()
         whisper.decode.sync()
-        detect_logits = torch.tensor(
-            whisper.decode.get_output(whisper.decode.get_output_name(0)).numpy()
-        )[:, -1, :].to(torch.float32)
+        detect_logits = torch.tensor(whisper.decode.get_output(whisper.decode.get_output_name(0)).numpy())[:, -1, :].to(
+            torch.float32
+        )
         lang_logits = detect_logits.clone()
         non_lang_mask = torch.ones_like(lang_logits, dtype=torch.bool)
         non_lang_mask[0, lang_to_id] = False
@@ -477,9 +447,7 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
         token_str = f"<|{language.lower()}|>"
         lang_id = processor.tokenizer.convert_tokens_to_ids(token_str)
         if lang_id is None or lang_id == processor.tokenizer.unk_token_id:
-            logger.warning(
-                f"Unknown language code '{language}', falling back to auto detection."
-            )
+            logger.warning(f"Unknown language code '{language}', falling back to auto detection.")
             lang_id = detect_language_id()
             logger.info(f"Detected language id: {lang_id}")
         else:
@@ -498,9 +466,7 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
     # 2. Position IDs: [1, 4] -> [[0, 1, 2, 3]]
     position_ids = torch.arange(prompt_len, dtype=torch.int32).unsqueeze(0)
     # build self-attention Mask
-    mask_atten = torch.full(
-        (1, num_heads, prompt_len, whisper.cache_max_len), -65504.0, dtype=torch.float16
-    )
+    mask_atten = torch.full((1, num_heads, prompt_len, whisper.cache_max_len), -65504.0, dtype=torch.float16)
 
     # add mask
     for i in range(prompt_len):
@@ -512,12 +478,8 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
     inputs = {
         dec_names[0]: input_ids,
         dec_names[1]: position_ids,
-        dec_names[2]: torch.tensor(
-            [0], dtype=torch.int32
-        ),  # past_key_values_length = 0
-        dec_names[3]: torch.tensor(
-            [prompt_len], dtype=torch.int32
-        ),  # current_sequence_length = 4
+        dec_names[2]: torch.tensor([0], dtype=torch.int32),  # past_key_values_length = 0
+        dec_names[3]: torch.tensor([prompt_len], dtype=torch.int32),  # current_sequence_length = 4
         dec_names[4]: mask_atten,
         dec_names[5]: encode_attention_mask,
     }
@@ -528,12 +490,8 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
 
     # run Prefill
     for i in range(2 * num_decode_layers):
-        cache = whisper.decode.get_dev_input(
-            whisper.decode.get_input_name(i + whisper.base_idx)
-        )
-        whisper.prefill.set_dev_input(
-            whisper.prefill.get_input_name(i + whisper.base_idx), cache
-        )
+        cache = whisper.decode.get_dev_input(whisper.decode.get_input_name(i + whisper.base_idx))
+        whisper.prefill.set_dev_input(whisper.prefill.get_input_name(i + whisper.base_idx), cache)
     out = whisper.run_prefill(inputs)
 
     logits = out[0]
@@ -542,15 +500,11 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
 
     for i in range(2 * num_decode_layers):
         cache = whisper.prefill.get_dev_output(whisper.prefill.get_output_name(i + 1))
-        whisper.decode.set_dev_input(
-            whisper.decode.get_input_name(i + whisper.base_idx), cache
-        )
+        whisper.decode.set_dev_input(whisper.decode.get_input_name(i + whisper.base_idx), cache)
         whisper.decode.set_dev_output(whisper.decode.get_output_name(i + 1), cache)
 
     for i in range(2 * num_decode_layers):
-        enc_out_kv = whisper.prefill.get_dev_input(
-            whisper.prefill.get_input_name(base_idx + 2 * num_decode_layers + i)
-        )
+        enc_out_kv = whisper.prefill.get_dev_input(whisper.prefill.get_input_name(base_idx + 2 * num_decode_layers + i))
         whisper.decode.set_dev_input(
             whisper.decode.get_input_name(base_idx + 2 * num_decode_layers + i),
             enc_out_kv,
@@ -571,16 +525,12 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
 
     while step < MAX_GEN_LEN:
         # 增量解码：只解码滑动窗口内的 token
-        decode_response = processor.decode(
-            generated_token_ids[0][-(slide_len + 1) - skip_tokens :]
-        )[len(last_response) :]
+        decode_response = processor.decode(generated_token_ids[0][-(slide_len + 1) - skip_tokens :])[
+            len(last_response) :
+        ]
 
         # 只有当解码结果不为空且最后一个字符是有效字符时才打印
-        if (
-            decode_response != ""
-            and is_valid_char(ord(decode_response[-1]))
-            and next_token != eos_id
-        ):
+        if decode_response != "" and is_valid_char(ord(decode_response[-1])) and next_token != eos_id:
             print(decode_response, end="", flush=True)
             last_response = processor.decode(generated_token_ids[0][-slide_len:])
             skip_tokens = 0
@@ -592,9 +542,7 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
 
         input_ids = torch.tensor([[next_token]], dtype=torch.int32)
 
-        mask_atten = torch.zeros(
-            (1, num_heads, 1, whisper.cache_max_len), dtype=torch.float16
-        )
+        mask_atten = torch.zeros((1, num_heads, 1, whisper.cache_max_len), dtype=torch.float16)
         if step + 1 < whisper.cache_max_len:
             mask_atten[:, :, :, step + 1 :] = -65504
 
@@ -613,9 +561,7 @@ def asr(whisper, processor, audio_array, language="auto", language_id=None):
         next_token_arr = sampling_manager.sample(logits, generated_ids)
         next_token = int(next_token_arr[0, 0])
         generated_ids.append(next_token)
-        generated_token_ids = torch.cat(
-            [generated_token_ids, torch.tensor([[next_token]])], dim=-1
-        )
+        generated_token_ids = torch.cat([generated_token_ids, torch.tensor([[next_token]])], dim=-1)
         step += 1
     decoded_text = processor.decode(generated_token_ids[0], skip_special_tokens=True)
     return max(len(generated_ids) - 1, 0), ttft_time, decoded_text, lang_id
@@ -702,33 +648,21 @@ if __name__ == "__main__":
     if args.ndevice is not None and args.ndevice != 1:
         parser.error("Only supports ndevice=1.")
 
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    args.tokenizer_path = first_not_none(
-        args.tokenizer_path, get_default_tokenizer_path(model_config)
-    )
+    args.tokenizer_path = first_not_none(args.tokenizer_path, get_default_tokenizer_path(model_config))
     model_prefix = f"{args.model_name}-{args.model_size}"
     if args.encode_path is None:
-        args.encode_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_encode.hmm"
-        )
+        args.encode_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_encode.hmm")
     if args.decode_path is None:
-        args.decode_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_decode.hmm"
-        )
+        args.decode_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_decode.hmm")
     if args.prefill_path is None:
-        args.prefill_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm"
-        )
+        args.prefill_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm")
 
-    whisper = HmWhisper(
-        args.encode_path, args.decode_path, args.prefill_path, args.ndevice
-    )
+    whisper = HmWhisper(args.encode_path, args.decode_path, args.prefill_path, args.ndevice)
     processor = WhisperProcessor.from_pretrained(args.tokenizer_path)
     results = ""
     output_tokens = 0
@@ -776,36 +710,22 @@ if __name__ == "__main__":
     logger.success("=" * 60)
     logger.success("Performance Statistics:")
     logger.success("=" * 60)
-    logger.success(
-        f"Audio duration: {total_audio_duration * 1000:.2f} ms ({total_audio_duration:.2f} s)"
-    )
+    logger.success(f"Audio duration: {total_audio_duration * 1000:.2f} ms ({total_audio_duration:.2f} s)")
     logger.success(f"Loop count: {len(chunks)}")
     logger.success("-" * 60)
-    logger.success(
-        f"Total Encode time: {whisper.encode_time * 1000:.3f} ms"
-    )
+    logger.success(f"Total Encode time: {whisper.encode_time * 1000:.3f} ms")
     logger.success("-" * 60)
-    logger.success(
-        f"Total Prefill time: {whisper.prefill_time * 1000:.3f} ms"
-    )
+    logger.success(f"Total Prefill time: {whisper.prefill_time * 1000:.3f} ms")
     logger.success("-" * 60)
-    logger.success(
-        f"Output {output_tokens} tokens"
-    )
-    logger.success(
-        f"Total Decode time: {whisper.decode_time * 1000:.3f} ms"
-    )
+    logger.success(f"Output {output_tokens} tokens")
+    logger.success(f"Total Decode time: {whisper.decode_time * 1000:.3f} ms")
     if whisper.decode_time > 0:
-        logger.success(
-            f"Decode Speed: {output_tokens / whisper.decode_time:.2f} tokens/s"
-        )
+        logger.success(f"Decode Speed: {output_tokens / whisper.decode_time:.2f} tokens/s")
     logger.success("-" * 60)
     logger.success(f"TTFT (Time to First Token): {ttft_time * 1000:.3f} ms")
     logger.success(f"E2E Latency (End-to-End Latency): {e2e_time:.3f} seconds")
     if e2e_time > 0:
-        logger.success(
-            f"E2E TPS (End-to-End Tokens Per Second): {output_tokens / e2e_time:.2f} tokens/s"
-        )
+        logger.success(f"E2E TPS (End-to-End Tokens Per Second): {output_tokens / e2e_time:.2f} tokens/s")
     logger.success(f"RTF (Real-Time Factor): {e2e_time / total_audio_duration:.2f}")
     logger.success("=" * 60)
     whisper.clear_time()

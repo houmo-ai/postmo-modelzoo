@@ -4,9 +4,8 @@
 #
 # File: demo_asr.py
 # Description:
-#   Optimized Qwen3 ASR Inference Demo - Minimized tensor conversions,
-#   removed unused variables, and enabled performance statistics.
-#
+#   Optimized Qwen3 ASR Inference Demo - Python script for running qwen3-asr
+# model on HOUMO AI device.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -107,9 +106,7 @@ class SamplingManager:
 
         return logits / self.temperature
 
-    def apply_repetition_penalty(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
-    ) -> np.ndarray:
+    def apply_repetition_penalty(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> np.ndarray:
         if self.repetition_penalty == 1.0 or not previous_tokens:
             return logits
 
@@ -117,13 +114,9 @@ class SamplingManager:
         for token_id in set(previous_tokens):
             if 0 <= token_id < len(logits):
                 if logits[token_id] < 0:
-                    adjusted_logits[token_id] = (
-                        logits[token_id] * self.repetition_penalty
-                    )
+                    adjusted_logits[token_id] = logits[token_id] * self.repetition_penalty
                 else:
-                    adjusted_logits[token_id] = (
-                        logits[token_id] / self.repetition_penalty
-                    )
+                    adjusted_logits[token_id] = logits[token_id] / self.repetition_penalty
 
         return adjusted_logits
 
@@ -172,21 +165,15 @@ class SamplingManager:
 
         return np.ones_like(probs) / len(probs)
 
-    def process_logits(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
-    ) -> np.ndarray:
+    def process_logits(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> np.ndarray:
         processed_logits = logits.astype(np.float32, copy=True)
-        processed_logits = self.apply_repetition_penalty(
-            processed_logits, previous_tokens
-        )
+        processed_logits = self.apply_repetition_penalty(processed_logits, previous_tokens)
         probs = self.apply_top_k(processed_logits)
         probs = self.apply_top_p(probs)
         probs = self.apply_temperature(probs)
         return probs
 
-    def sample(
-        self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None
-    ) -> int:
+    def sample(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> int:
         probs = np.asarray(logits)
         while probs.ndim > 1:
             probs = probs[0]
@@ -342,9 +329,7 @@ def get_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
 
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
@@ -354,17 +339,11 @@ def get_args() -> argparse.Namespace:
         args.processor_dir = get_default_processor_dir(model_config)
     model_prefix = f"{args.model_name}-{args.model_size}"
     if args.encode_path is None:
-        args.encode_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_encode.hmm"
-        )
+        args.encode_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_encode.hmm")
     if args.decode_path is None:
-        args.decode_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_decode.hmm"
-        )
+        args.decode_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_decode.hmm")
     if args.prefill_path is None:
-        args.prefill_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm"
-        )
+        args.prefill_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm")
     if args.ndevice > 1:
         if args.decode_path.endswith(".hmm"):
             args.decode_path = args.decode_path.replace(".hmm", ".hmms")
@@ -385,9 +364,7 @@ class Qwen3Asr:
     ):
         self.device = torch.device("cpu")
         self.ndevice = ndevice
-        dev_manager = tcim.runtime.DevManager(
-            get_hm_devices(self.ndevice), "Xh2HalBackend"
-        )
+        dev_manager = tcim.runtime.DevManager(get_hm_devices(self.ndevice), "Xh2HalBackend")
         weight_manager = tcim.runtime.WeightManager(dev_manager)
         option1 = tcim.runtime.Option(weight_manager)
         self.encode = tcim.runtime.load(encode_path, option=option1)
@@ -398,26 +375,16 @@ class Qwen3Asr:
 
         option3 = tcim.runtime.Option(weight_manager)
         self.nblocks = self.get_nblocks()
-        dummy_tensor_names = [
-            f"model_layers_{i}_self_attn_kcache_input" for i in range(self.nblocks)
-        ]
-        dummy_tensor_names += [
-            f"model_layers_{i}_self_attn_vcache_input" for i in range(self.nblocks)
-        ]
+        dummy_tensor_names = [f"model_layers_{i}_self_attn_kcache_input" for i in range(self.nblocks)]
+        dummy_tensor_names += [f"model_layers_{i}_self_attn_vcache_input" for i in range(self.nblocks)]
         option3.set_dummy_tensors(dummy_tensor_names)
         self.decode = tcim.runtime.load(decode_path, option=option3)
         logger.info("decode model loaded")
 
-        self.max_new_tokens = self.prefill.get_input_info(
-            self.prefill.get_input_name(3)
-        ).shape[2]
-        self.max_prefill = self.prefill.get_input_info(
-            self.prefill.get_input_name(0)
-        ).shape[1]
+        self.max_new_tokens = self.prefill.get_input_info(self.prefill.get_input_name(3)).shape[2]
+        self.max_prefill = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape[1]
 
-        self.processor = Qwen3ASRProcessor.from_pretrained(
-            processor_dir, fix_mistral_regex=True
-        )
+        self.processor = Qwen3ASRProcessor.from_pretrained(processor_dir, fix_mistral_regex=True)
         self.tokenizer = self.processor.tokenizer
         self.config = AutoConfig.from_pretrained(processor_dir, trust_remote_code=True)
         self.hidden_size = self.config.thinker_config.text_config.hidden_size
@@ -425,9 +392,7 @@ class Qwen3Asr:
         if "<|audio_pad|>" in self.tokenizer.get_vocab():
             self.audio_pad_id = self.tokenizer.convert_tokens_to_ids("<|audio_pad|>")
         else:
-            self.audio_pad_id = self.tokenizer.encode(
-                "<|audio_pad|>", add_special_tokens=False
-            )[0]
+            self.audio_pad_id = self.tokenizer.encode("<|audio_pad|>", add_special_tokens=False)[0]
 
         embedding_tensor = torch.load(embedding_path, map_location=self.device)
         if HOUMO_TARGET == "xh2":
@@ -438,9 +403,7 @@ class Qwen3Asr:
         self.embedding_weight = np.ascontiguousarray(embedding_tensor.cpu().numpy())
 
         # Reuse hot-path buffers to reduce per-loop allocations.
-        self.prefill_embeds = np.zeros(
-            (1, self.max_prefill, self.hidden_size), dtype=np.float16
-        )
+        self.prefill_embeds = np.zeros((1, self.max_prefill, self.hidden_size), dtype=np.float16)
         self.prefill_valid_length_np = np.array([0], dtype=np.int32)
         self.prefill_current_length_np = np.array([0], dtype=np.int32)
         self.decode_valid_length_np = np.array([0], dtype=np.int32)
@@ -452,13 +415,9 @@ class Qwen3Asr:
             self.decode.set_dev_input(self.decode.get_input_name(i), cache)
 
         self.all_features_len = 0
-        self.max_feature_one_loop = self.encode.get_input_info(
-            self.encode.get_input_name(0)
-        ).shape[2]
+        self.max_feature_one_loop = self.encode.get_input_info(self.encode.get_input_name(0)).shape[2]
         self.loop_count = 0
-        self.sampling_manager = SamplingManager(
-            top_k=None, top_p=1.0, repetition_penalty=2.0
-        )
+        self.sampling_manager = SamplingManager(top_k=None, top_p=1.0, repetition_penalty=2.0)
 
     def run_encode(self, inputs):
         encode_prep_start = time.perf_counter()
@@ -592,9 +551,7 @@ class Qwen3Asr:
             if remain > 0:
                 audio_len = min(audio_embeds.shape[1], remain)
                 if audio_len > 0:
-                    prefill_embeds[:, cursor : cursor + audio_len, :] = audio_embeds[
-                        :, :audio_len, :
-                    ]
+                    prefill_embeds[:, cursor : cursor + audio_len, :] = audio_embeds[:, :audio_len, :]
                     cursor += audio_len
 
             remain = self.max_prefill - cursor
@@ -616,12 +573,8 @@ class Qwen3Asr:
         self.prefill_current_length_np[0] = L
 
         self.prefill.set_input(self.prefill.get_input_name(0), prefill_embeds)
-        self.prefill.set_input(
-            self.prefill.get_input_name(1), self.prefill_valid_length_np
-        )
-        self.prefill.set_input(
-            self.prefill.get_input_name(2), self.prefill_current_length_np
-        )
+        self.prefill.set_input(self.prefill.get_input_name(1), self.prefill_valid_length_np)
+        self.prefill.set_input(self.prefill.get_input_name(2), self.prefill_current_length_np)
         prefill_prep_time = time.perf_counter() - prefill_prep_start
 
         prefill_infer_start = time.perf_counter()
@@ -658,9 +611,7 @@ class Qwen3Asr:
         """
         input_lengths_leave = input_lengths % 100
         feat_lengths = (input_lengths_leave - 1) // 2 + 1
-        output_lengths = (
-            ((feat_lengths - 1) // 2 + 1 - 1) // 2 + 1 + (input_lengths // 100) * 13
-        )
+        output_lengths = ((feat_lengths - 1) // 2 + 1 - 1) // 2 + 1 + (input_lengths // 100) * 13
         return int(output_lengths)
 
     def run(self, audio_path):
@@ -690,12 +641,8 @@ class Qwen3Asr:
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": [{"type": "audio", "audio": "placeholder"}]},
         ]
-        prompt = self.processor.apply_chat_template(
-            messages, add_generation_prompt=True, tokenize=False
-        )
-        all_inputs = self.processor(
-            text=prompt, audio=audio, return_tensors="pt", padding=True
-        )
+        prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+        all_inputs = self.processor(text=prompt, audio=audio, return_tensors="pt", padding=True)
         all_inputs = all_inputs.to(self.device)
 
         self.all_features_lens = all_inputs["input_features"].shape[2]
@@ -772,45 +719,27 @@ class Qwen3Asr:
         rtf = infer_time / audio_duration
 
         # Calculate average decode time per token
-        avg_decode_time = (
-            total_decode_infer_time / total_tokens_generated
-            if total_tokens_generated > 0
-            else 0
-        )
+        avg_decode_time = total_decode_infer_time / total_tokens_generated if total_tokens_generated > 0 else 0
 
         # Performance statistics
         logger.success("=" * 60)
         logger.success("Performance Statistics:")
         logger.success("=" * 60)
-        logger.success(
-            f"Audio duration: {audio_duration * 1000:.2f} ms ({audio_duration:.2f} s)"
-        )
+        logger.success(f"Audio duration: {audio_duration * 1000:.2f} ms ({audio_duration:.2f} s)")
         logger.success(f"Audio loading time: {audio_load_time * 1000:.3f} ms")
         logger.success(f"Input preparation time: {prep_time * 1000:.3f} ms")
         logger.success(f"Loop count: {self.loop_count}")
         logger.success("-" * 60)
-        logger.success(
-            f"Total Encode time: {total_encode_infer_time * 1000:.3f} ms"
-        )
-        logger.success(
-            f"  - Encode infer time: {total_encode_infer_time * 1000:.3f} ms"
-        )
+        logger.success(f"Total Encode time: {total_encode_infer_time * 1000:.3f} ms")
+        logger.success(f"  - Encode infer time: {total_encode_infer_time * 1000:.3f} ms")
         logger.success("-" * 60)
-        logger.success(
-            f"Total Prefill time: {total_prefill_infer_time * 1000:.3f} ms"
-        )
-        logger.success(
-            f"  - Prefill infer time: {total_prefill_infer_time * 1000:.3f} ms"
-        )
+        logger.success(f"Total Prefill time: {total_prefill_infer_time * 1000:.3f} ms")
+        logger.success(f"  - Prefill infer time: {total_prefill_infer_time * 1000:.3f} ms")
         logger.success("-" * 60)
         logger.success(f"Output {total_tokens_generated} tokens")
-        logger.success(
-            f"Total Decode time: {total_decode_infer_time * 1000:.3f} ms"
-        )
+        logger.success(f"Total Decode time: {total_decode_infer_time * 1000:.3f} ms")
         if total_decode_infer_time > 0:
-            logger.success(
-                f"Decode Speed: {total_tokens_generated / total_decode_infer_time:.2f} tokens/s"
-            )
+            logger.success(f"Decode Speed: {total_tokens_generated / total_decode_infer_time:.2f} tokens/s")
         logger.success("-" * 60)
         logger.success(f"TTFT (Time to First Token): {ttft_time * 1000:.3f} ms")
         logger.success(f"E2E Latency (End-to-End Latency): {total_time:.3f} seconds")

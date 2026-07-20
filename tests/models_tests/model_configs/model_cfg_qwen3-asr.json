@@ -79,6 +79,11 @@
             "context_length": ["2048", "2048"]
         }
     },
+    "test_sh_params": [
+        [],
+        ["--model_name", "qwen3-asr", "--model_size", "1.7b"],
+        ["--model_name", "qwen3-forcealigner", "--model_size", "0.6b"]
+    ],
     "demo_params": {
         "xh2": {
             "script": ["demo_asr.py", "demo_asr.py"],
