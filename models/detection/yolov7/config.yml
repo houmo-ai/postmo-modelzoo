@@ -15,7 +15,7 @@ model:
         toYUV_format: YUV420SP
   model_impl_module: model_impl
   model_impl_cls: YoloV7
-  
+
 quant:
   calib_data: coco2017/val2017
   calib_num: 32
