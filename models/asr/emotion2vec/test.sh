@@ -24,8 +24,6 @@ if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
 fi
 
-export PYTHONPATH="/hmdd/3rdparty/xh2modelzoo${PYTHONPATH:+:${PYTHONPATH}}"
-
 check_step_python_packages || exit 1
 
 if should_run_step "quant"; then
@@ -53,9 +51,9 @@ if should_run_step "demo"; then
     fi
     echo "Execute python demo (${MODEL_NAME}-${MODEL_SIZE})."
     python3 demo.py \
-        --hmm "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}.hmm" \
-        --classifier "output/${HOUMO_TARGET}/hmquant/classifier.npz" \
-        --model-dir "${SCRIPT_DIR}/emotion2vec_plus_large" \
+        --model_path "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}.hmm" \
+        --quant-embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt" \
+        --tokenizer_dir "${SCRIPT_DIR}/emotion2vec_plus_large" \
         --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3" \
         --output-dir "${SCRIPT_DIR}/results"
 fi

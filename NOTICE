@@ -32,7 +32,7 @@ Such third-party components are NOT covered by the Apache License 2.0
 of this project. Their usage is subject to their original license terms.
 
 For third-party components requiring special emphasis,
-please refer to the relevant information in THIRD_PARTY_NOTICE.
+please refer to the relevant information in THIRD_PARTY_NOTICES.
 
 Users are solely responsible for ensuring compliance with all applicable
 third-party licenses, usage restrictions, and legal requirements,
@@ -53,6 +53,7 @@ Numpy File I/O for C++ npy.hpp - https://github.com/llohse/libnpy
 Fast C++ Logging Library spdlog - https://github.com/gabime/spdlog
 Modern C++ Argument Parser argparse - https://github.com/p-ranav/argparse
 A YAML parser and emitter in C++ (MIT) - https://github.com/jbeder/yaml-cpp
+Dragonbox floating-point conversion code included by yaml-cpp (MIT) - https://github.com/jk-jeon/dragonbox
 miniaudio (MIT-0 / Public Domain) - https://github.com/mackron/miniaudio
 llama.cpp audio and image preprocessing code portions (MIT) - https://github.com/ggml-org/llama.cpp
 whisper.cpp audio preprocessing code portions via llama.cpp (MIT) - https://github.com/ggml-org/whisper.cpp
@@ -96,4 +97,3 @@ Qwen3-omni - https://www.modelscope.cn/models/Qwen/Qwen3-Omni-30B-A3B-Instruct
 Qwen3-VL-Embedding - https://github.com/QwenLM/Qwen3-VL-Embedding
 
 For detailed third-party citation notices, licenses, and precautions, please refer to THIRD_PARTY_NOTICES.
-

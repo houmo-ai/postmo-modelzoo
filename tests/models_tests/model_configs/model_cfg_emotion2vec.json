@@ -49,12 +49,10 @@
     },
     "demo_params": {
         "xh2": {
-            "hmm": ["cached_results/hmm_xh2/emotion2vec-plus_large.hmm"],
-            "classifier": ["cached_results/hmm_xh2/hmquant/classifier.npz"],
-            "model-dir": ["cached_models/emotion2vec_plus_large"],
-            "output-dir": ["cached_results/demo_results"],
-            "top-k": ["3"],
-            "chunk_size": ["16"]
+            "model_path": ["cached_results/hmm_xh2/emotion2vec-plus_large.hmm"],
+            "quant-embedding": ["cached_results/hmm_xh2/hmquant/quant_embedding.pt"],
+            "tokenizer_dir": ["cached_models/emotion2vec_plus_large"],
+            "output-dir": ["cached_results/demo_results"]
         }
     }
 }

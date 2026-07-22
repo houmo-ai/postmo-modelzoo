@@ -1,6 +1,6 @@
 # Emotion2vec+
 
-本示例展示如何把 Emotion2vec+ 语音情感识别模型量化和编译，部署到后摩芯片的设备上，并完成九分类情感识别、句级 embedding 和帧级 embedding 提取。
+本示例展示如何把 Emotion2vec+ 语音情感识别模型量化和编译，部署到后摩芯片的设备上，并完成九分类情感识别、句级特征和帧级特征提取。
 
 [TOC]
 
@@ -42,16 +42,18 @@
 量化和编译后的模型使用固定 16 kHz 单声道输入。单次 HMM 输入窗口为 16 秒：
 
 - `waveform`: `FLOAT16 [1, 256000]`
-- `valid_samples`: `INT32 [1]`
+- `valid_frames`: `INT32 [1]`
 
 HMM 输出为：
 
 - `frame_features`: `FLOAT16 [1, 799, 1024]`
 - `frame_padding_mask`: `INT8 [1, 799]`
+- `utterance_feature`: `FLOAT16 [1, 1024]`
+- `probabilities`: `FLOAT16 [1, 9]`
 
-长音频由 `demo.py` 分块推理。`--chunk_size` 的单位为秒，默认值为 16，可配置范围为 `0 < chunk_size <= 16`；每个分块都会补齐到 HMM 的固定输入长度，并根据 `valid_samples` 去除补齐部分对应的无效帧。九分类由 `classifier.npz` 中的官方分类头在 CPU 上完成。
+长音频由 `demo.py` 分块推理。`--chunk_size` 的单位为秒，默认值为 16，可配置范围为 `0 < chunk_size <= 16`；每个分块都会补齐到 HMM 的固定输入长度，并通过 `valid_frames` 和 `frame_padding_mask` 去除补齐部分对应的无效帧。
 
-每个 chunk 都会独立生成帧级 embedding、句级 embedding 和分类摘要。整段音频的句级 embedding 由所有有效帧取平均得到，并用于输出整段音频的九分类结果。
+每个 chunk 都会独立生成帧级特征、句级特征、分类概率和分类摘要。整段音频的分类结果由所有 chunk 的句级特征通过 `quant_embedding.pt` 中的官方分类头计算得到。
 
 ### 资源要求
 
@@ -112,10 +114,10 @@ python3 get_model.py --type hmm
 `--type hmm` 会下载并解压以下运行所需产物：
 
 - `output/xh2/emotion2vec-plus_large.hmm`
-- `output/xh2/hmquant/classifier.npz`
+- `output/xh2/hmquant/quant_embedding.pt`
 - ModelScope 模型仓库中的配置、标签和示例文件，忽略 `*.pt` 原始权重
 
-因此仅运行 HMM 演示时不需要完整的 `model.pt`。`classifier.npz` 只包含官方分类头的 `weight`、`bias` 和 9 个标签。
+因此仅运行 HMM 演示时不需要完整的 `model.pt`。`quant_embedding.pt` 包含整段音频分类所需的官方分类头权重，标签从 `tokens.txt` 读取。
 
 ### 2.3 量化
 
@@ -138,15 +140,15 @@ python3 ptq.py
 
 ```text
 output/xh2/hmquant/
-|-- classifier.npz
 |-- emotion2vec_meta.json
 |-- emotion2vec_plus_large_xh2a_w8a8_16s.yaml
 |-- export_hmonnx.log
 |-- hmquant_emotion2vec_plus_large_external_data
-`-- hmquant_emotion2vec_plus_large_with_act.onnx
+|-- hmquant_emotion2vec_plus_large_with_act.onnx
+`-- quant_embedding.pt
 ```
 
-其中 `classifier.npz` 由 `ptq.py` 从官方 checkpoint 中提取，大小远小于完整 `model.pt`，供 HMM 演示执行九分类。
+其中 `quant_embedding.pt` 由 `ptq.py` 导出，包含整段音频九分类所需的官方分类头权重。
 
 ### 2.4 编译
 
@@ -167,7 +169,8 @@ python3 build.py
 Emotion2vec+ 模型使用 python API 进行演示。`demo.py` 默认读取：
 
 - `output/${HOUMO_TARGET}/emotion2vec-plus_large.hmm`
-- `output/${HOUMO_TARGET}/hmquant/classifier.npz`
+- `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `emotion2vec_plus_large/tokens.txt`
 - `../../../data/audio/audio.mp3`
 
 执行：
@@ -179,11 +182,12 @@ python3 demo.py
 演示提供以下输出：
 
 1. 整段音频和每个 chunk 的九分类语音情感识别结果。
-2. 全部标签和对应分数，以及 Top-K 情感结果，默认 Top-3。
-3. 每个 chunk 的句级 embedding，形状为 `[1024]`，dtype 为 `float32`。
-4. 每个 chunk 的帧级 embedding，形状为 `[T, 1024]`，dtype 为 `float16`。
-5. 每个 chunk 的独立 JSON 摘要，包含时间范围、分类结果和 embedding 路径。
-6. 整段音频的分类、所有 chunk 信息和性能数据汇总。
+2. Top-K 情感结果，默认 Top-3。
+3. 每个 chunk 的句级特征，形状为 `[1024]`，dtype 为 `float16`。
+4. 每个 chunk 的帧级特征，形状为 `[T, 1024]`，dtype 为 `float16`。
+5. 每个 chunk 的九分类概率，形状为 `[9]`，dtype 为 `float16`。
+6. 每个 chunk 的独立 JSON 摘要，包含时间范围、分类结果和各输出路径。
+7. 整段音频的分类、所有 chunk 信息和性能数据汇总。
 
 默认输出目录结构如下：
 
@@ -195,6 +199,9 @@ results/
 |-- utterance/
 |   |-- audio.chunk_0001.npy
 |   `-- ...
+|-- probabilities/
+|   |-- audio.chunk_0001.npy
+|   `-- ...
 |-- summary/
 |   |-- audio.chunk_0001.json
 |   `-- ...
@@ -203,9 +210,10 @@ results/
 
 其中：
 
-- `frame/<audio>.chunk_NNNN.npy`: 对应 chunk 的帧级 embedding。
-- `utterance/<audio>.chunk_NNNN.npy`: 对应 chunk 内所有有效帧的均值。
-- `summary/<audio>.chunk_NNNN.json`: 对应 chunk 的起止时间、情感分类和 embedding 元数据。
+- `frame/<audio>.chunk_NNNN.npy`: 对应 chunk 的帧级特征。
+- `utterance/<audio>.chunk_NNNN.npy`: 对应 chunk 的句级特征。
+- `probabilities/<audio>.chunk_NNNN.npy`: 对应 chunk 的九分类概率。
+- `summary/<audio>.chunk_NNNN.json`: 对应 chunk 的起止时间、情感分类和输出元数据。
 - `Summary.json`: 所有输入音频的整段分类、chunk 列表、模型加载耗时、HMM 推理耗时、端到端耗时和 RTF。
 
 终端使用 `logger.info` 输出 chunk 处理进度和整段音频分类，使用 `logger.success` 输出性能统计与 `Summary.json` 路径。每个 chunk 的详细分类不在终端重复打印，可从对应 JSON 文件获取。
@@ -225,29 +233,31 @@ python3 demo.py \
 常用演示参数如下：
 
 ```text
---hmm          HMM 模型路径
---classifier   classifier.npz 路径
---model-dir    classifier.npz 缺失时，包含 model.pt 和 tokens.txt 的回退目录
---audio        一个或多个本地音频文件
---output-dir   embedding 和 JSON 摘要输出目录，默认 results
---top-k        输出的 Top-K 情感数量，默认 3
---chunk_size   音频分块时长，单位为秒，默认 16
+--model_path       HMM 模型路径
+--quant-embedding  quant_embedding.pt 分类头权重路径
+--tokenizer_dir    包含 tokens.txt 的目录
+--audio            一个或多个本地音频文件
+--output-dir       模型输出和 JSON 摘要目录，默认 results
+--top-k            输出的 Top-K 情感数量，默认 3
+--chunk_size       音频分块时长，单位为秒，默认 16
 ```
 
-一次处理多个音频：
+可以显式指定模型、分类头权重和标签目录：
 
 ```bash
-python3 demo.py --audio first.wav second.wav
+python3 demo.py \
+    --model_path output/xh2/emotion2vec-plus_large.hmm \
+    --quant-embedding output/xh2/hmquant/quant_embedding.pt \
+    --tokenizer_dir emotion2vec_plus_large \
+    --audio first.wav second.wav
 ```
-
-如果 `classifier.npz` 不存在，`demo.py` 会尝试从 `--model-dir` 指定目录中的 `model.pt` 和 `tokens.txt` 加载分类头。正常的预编译模型演示不需要使用该回退路径。
 
 ## 3 一键评估
 
 以上步骤可以通过 `test.sh` 执行。默认模型为 `emotion2vec plus_large`，默认执行 demo 步骤：
 
 ```bash
-# 默认执行 demo，会先下载预编译 HMM、classifier.npz 和非权重模型资源
+# 默认执行 demo，会先下载预编译 HMM、quant_embedding.pt 和非权重模型资源
 bash test.sh
 
 # 完整流程：下载原始模型 + 量化 + 编译 + 演示
@@ -275,7 +285,7 @@ bash test.sh -s quant
 # 仅运行 build，要求 output/xh2/hmquant 中已有量化产物
 bash test.sh -s build
 
-# 仅运行 demo，会先下载预编译模型和 classifier.npz
+# 仅运行 demo，会先下载预编译模型、quant_embedding.pt 和标签文件
 bash test.sh -s demo
 
 # 跳过下载，使用当前目录中的已有产物

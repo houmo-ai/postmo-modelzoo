@@ -1,5 +1,9 @@
 # Copyright (c) 2025 HOUMO AI
 #
+# File: get_model.py
+# Description:
+#   emotion2vec model resource download tool.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -23,7 +27,6 @@ from hmatc.utils.utils import (
     get_model_configs,
     hmatc_get_file,
 )
-
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -72,12 +75,8 @@ def get_args() -> argparse.Namespace:
         choices=["jfrog", "modelscope"],
         help="download the model from which source",
     )
-    parser.add_argument(
-        "--ndevice", dest="ndevice", type=int, default=None, help="device number"
-    )
-    parser.add_argument(
-        "--ncore", dest="ncore", type=int, default=None, help="number of cores"
-    )
+    parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number")
+    parser.add_argument("--ncore", dest="ncore", type=int, default=None, help="number of cores")
     parser.add_argument(
         "--model_size",
         dest="model_size",
@@ -99,9 +98,7 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
 
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     model_name = first_not_none(args.model_name, default_model_name)
     model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(model_name, {}).get(model_size, {})

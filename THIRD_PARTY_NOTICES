@@ -486,8 +486,12 @@ yaml-cpp (YAML Parser/Emitter for C++)
 Component Name:
 yaml-cpp
 
+Version:
+0.9.0
+
 Usage Location:
-tools/llm_perf
+    apis/common/yaml-cpp
+    tools/llm_perf
 
 Source:
 https://github.com/jbeder/yaml-cpp
@@ -499,7 +503,8 @@ License:
 MIT License
 
 License Text:
-https://github.com/jbeder/yaml-cpp/blob/master/LICENSE
+    apis/common/yaml-cpp/LICENSE
+    https://github.com/jbeder/yaml-cpp/blob/yaml-cpp-0.9.0/LICENSE
 
 The yaml-cpp library is licensed under the MIT License. The MIT License
 permits use, copying, modification, merging, publishing, distribution,
@@ -526,12 +531,31 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-This project may reference or use yaml-cpp as a third-party component.
-Any redistribution or modification of yaml-cpp must retain the original
-copyright notice and license text in accordance with the MIT License.
+This project includes a modified source subset of yaml-cpp for tools/llm_perf.
+Tests, documentation, tools, repository metadata, packaging files, and unused
+contrib sources were removed. Any redistribution or modification of the
+retained yaml-cpp source must retain the original copyright notice and license
+text in accordance with the MIT License.
 
 Users are responsible for complying with the MIT License when using,
 redistributing, or modifying yaml-cpp.
+
+Bundled subcomponent:
+yaml-cpp's floating-point formatter includes an adjusted copy of Dragonbox in:
+    apis/common/yaml-cpp/src/contrib/dragonbox.h
+
+Dragonbox source:
+https://github.com/jk-jeon/dragonbox
+
+Dragonbox copyright statement:
+Copyright (c) 2020-2024 Junekey Jeon
+
+The retained file identifies the applicable licenses as Apache-2.0 WITH
+LLVM-exception, BSL-1.0, and MIT, and states that Junekey Jeon explicitly
+agreed to MIT licensing for its use in yaml-cpp. The upstream SPDX copyright
+and license notices are retained in the file. This distribution uses the MIT
+option; its license text is retained in:
+    apis/common/yaml-cpp/DRAGONBOX_LICENSE
 
 ----------------------------------------------------------------------
 miniaudio

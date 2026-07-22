@@ -1,3 +1,23 @@
+# Copyright (c) 2025 HOUMO AI
+#
+# File: ptq.py
+# Description:
+#   emotion2vec model post-training quantization tool.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 from __future__ import annotations
 
 import argparse
@@ -40,38 +60,6 @@ def get_workflow_config_path(config_path: str, model_name: str, model_size: str)
     if not workflow_config_path.is_file():
         raise FileNotFoundError(f"Workflow config not found: {workflow_config_path}")
     return workflow_config_path
-
-
-def export_classifier(model_dir: str, output_dir: str) -> Path:
-    model_path = Path(model_dir) / "model.pt"
-    tokens_path = Path(model_dir) / "tokens.txt"
-    if not model_path.is_file():
-        raise FileNotFoundError(f"Official checkpoint not found: {model_path}")
-    if not tokens_path.is_file():
-        raise FileNotFoundError(f"Emotion labels not found: {tokens_path}")
-
-    checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
-    state_dict = checkpoint.get("model", checkpoint)
-    weight = state_dict["proj.weight"].detach().float().cpu().numpy()
-    bias = state_dict["proj.bias"].detach().float().cpu().numpy()
-    labels = np.asarray(
-        [
-            line.strip()
-            for line in tokens_path.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
-    )
-    if weight.shape != (len(labels), 1024) or bias.shape != (len(labels),):
-        raise ValueError(
-            f"Classifier and labels do not match: weight={weight.shape}, "
-            f"bias={bias.shape}, labels={len(labels)}"
-        )
-
-    output_path = Path(output_dir) / "classifier.npz"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(output_path, weight=weight, bias=bias, labels=labels)
-    print(f"Exported classifier: {output_path}")
-    return output_path
 
 
 def export_hmonnx(
@@ -130,7 +118,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--golden-audio",
-        default="data/models/emotion2vec_plus_large/example/test.wav",
+        default="emotion2vec_plus_large/example/test.wav",
         help="Audio used by workflow.dump_golden().",
     )
     return parser
@@ -147,7 +135,6 @@ def main() -> None:
         overwrite=args.overwrite,
         golden_audio=args.golden_audio if args.dump_golden else None,
     )
-    export_classifier(args.model_dir, args.output_dir)
     print(meta_path)
 
 
