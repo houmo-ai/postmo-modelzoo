@@ -1,6 +1,6 @@
 # Qwen3.5 MLLM C++ 推理示例
 
-本目录展示如何在 Linux、Windows 11 和 Android Native 环境中使用 C++ 调用当前目录 `include/` 和 `src/` 下的 Qwen3.5 MLLM 子类实现，并通过 `hm_engine.cmake` 复用 `houmo-llm-engine` 的基础框架能力。
+本目录展示如何在 Linux、Windows 11 和 Android Native 环境中注册当前目录 `include/` 和 `src/` 下的 Qwen3.5 MLLM 子类实现，并通过 `ModelFactory` 和 `hm_engine.cmake` 复用 `houmo-llm-engine` 的基础框架能力。
 
 示例支持：
 
@@ -24,20 +24,22 @@
 
 ## 调用关系
 
-`demo.cc` 直接包含本目录头文件：
+`src/qwen35_mllm_model.cc` 使用 `REGISTER_MODEL` 在程序启动时注册模型：
 
 ```cpp
-#include "qwen35_mllm_model.h"
+REGISTER_MODEL(LLMModel, qwen35_mllm, ModelSeries::kQwen35MLLM,
+    [](const ModelConfig& c) { return std::make_unique<Qwen35MLLMModel>(c); },
+    "Qwen3.5 multimodal MLLM");
 ```
 
 核心调用流程：
 
 1. 解析 `--prefill`、`--decode`、`--vision`、`--embedding`、`--tokenizer`、`--prompt`、`--image` 等参数。
 2. 构造 `houmo::ModelConfig`。
-3. 创建 `houmo::Qwen35MLLMModel model(config)`。
-4. 调用 `model.create_context()` 并转换为 `houmo::Qwen35MLLMContext`。
+3. 调用 `ModelFactory<LLMModel>::Create(ModelSeries::kQwen35MLLM, config)`，通过注册表创建模型。
+4. 通过返回的 `LLMModel` 基类指针调用 `model->create_context()`；图像输入时再转换为 `houmo::Qwen35MLLMContext`。
 5. 如传入图片，调用 `qwen_ctx->set_images(image_paths)`。
-6. 使用 `model.tokenize(prompt, false, false)` 编码 prompt。
+6. 使用 `model->tokenize(prompt, false, false)` 编码 prompt。
 7. 调用 `qwen_ctx->generate(tokens, params, callback)` 流式生成。
 8. 输出 profiler 和 `PerfStats` 指标。
 

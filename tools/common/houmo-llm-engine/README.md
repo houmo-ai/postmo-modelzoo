@@ -1,185 +1,144 @@
 # Houmo Inference Framework
 
-Houmo Inference Framework 是面向 Houmo NPU 的 C++ 推理框架，基于 TCIM Runtime 提供模型加载、上下文管理、推理执行、采样解码、Embedding 读取、多模态预处理和性能统计等通用能力。
+Houmo Inference Framework 是面向 Houmo NPU 的 C++17 推理基础库。当前目录提供模型抽象、请求上下文、TCIM Runtime 接入、Tokenizer、Embedding、采样、流式解码、图像/音频预处理和性能统计等公共能力；具体模型的加载、张量绑定和推理循环由各模型目录实现。
 
-本目录承载框架源码、公共头文件、模块实现、测试和开发文档。具体模型能力由各模型目录中的实现和构建配置决定，本文档只描述框架能力，不维护具体模型支持列表。
+当前源码版本为 `0.1.0`，可通过 `houmo::version()` 或 `houmo::build_info()` 查询。
 
-## 核心能力
+## 当前能力
 
-- **统一基础类型**：`Token`、`ModelConfig`、`ModelInfo`、`SamplingParams`、`PerfStats` 等定义在 `include/base/houmo.h`。
-- **模型抽象**：`LLMModel`、`VLMModel`、`ASRModel` 分别覆盖文本生成、视觉语言和语音识别模型的公共接口。
-- **上下文抽象**：`Context` 管理单次推理状态、采样器、生成历史、性能统计；`ASRContext` 扩展转写流程和 ASR 专用性能指标。
-- **模型工厂**：`ModelFactory<T>` 提供类型安全的静态注册和运行时创建能力，LLM/VLM/ASR 可分别注册到对应工厂实例。
-- **通用模块**：Tokenizer、Embedding、Sampler、StreamingDecoder、ImageProcessor、AudioProcessor、PerfProfiler 等模块可被不同模型复用。
-- **性能统计**：`PerfProfiler` 支持层级 stage、RAII scope、TTFT、TPS、平均延迟和树形/表格输出。
-- **ASR 支持**：提供音频加载、重采样、单声道转换、PCM 分块、Mel 特征提取、转写模板方法和 RTF/TPS 指标计算。
+- `LLMModel`：保存 LLM 公共配置、Tokenizer、Embedding、prefill/decode module 和输入 tensor map。
+- `VLMModel`：在 `LLMModel` 基础上增加 vision module、vision input map 和 `encode_image()` 扩展点。
+- `ASRModel` / `ASRContext`：定义 ASR 参数、转写接口，以及 encode、语言检测、prefill、decode 的统一性能打点模板。
+- `Context`：保存请求级上下文长度、历史 token、Sampler 和性能统计；实际 `prefill()`、`decode()`、`generate()` 由模型子类覆盖。
+- `ModelFactory<T>`：按基类类型维护独立注册表，支持静态注册和按名称或 `ModelSeries` 创建模型。
+- `AudioProcessor`：使用 miniaudio 解码为目标采样率单声道 PCM，完成分块和 FP16 log-Mel 特征提取。
+- `HmImageProcessor`：使用 stb_image 解码，支持等比缩放后右下补边或直接 resize，并可输出 `[C=3, T=2, H, W]` FP16 tensor。
+- `PerfProfiler`：支持层级 stage、RAII 计时、TTFT、TPS 和 Tree/Table/Compact 输出。
 
 ## 目录结构
 
 ```text
 ├── include/
-│   ├── base/           # 基础类型、配置、异常和 TCIM 工具
-│   ├── core/           # LLM/VLM/ASR 模型基类、Context、Factory
-│   └── modules/        # Tokenizer、Embedding、Sampler、Audio/Image、Profiler
+│   ├── base/           # 公共类型、版本接口和 TCIM 工具
+│   ├── core/           # Context、LLM/VLM/ASR 基类和 ModelFactory
+│   └── modules/        # Tokenizer、Embedding、Sampler、图像/音频、Profiler
 ├── src/
 │   ├── core/           # 核心抽象实现
-│   └── modules/        # 通用模块实现
-├── tests/              # GTest 单元测试和测试数据
-├── docs/               # API、Pipeline 和模型适配说明
-├── cmake/
-│   └── platforms/      # Windows/Linux/Android 平台专用 CMake 配置
-├── CMakeLists.txt      # CMake 构建入口
-├── build_linux.sh      # Linux 构建脚本
-├── build_ndk.sh        # Android NDK 构建脚本
-├── build_win.bat       # Windows 构建脚本
-└── test.sh             # 测试脚本
+│   └── modules/        # 公共模块实现
+├── docs/               # API、推理流程和模型适配文档
+├── cmake/platforms/    # Linux、Android、Windows 平台配置
+├── CMakeLists.txt
+├── tcim_runtime.cmake
+├── build_linux.sh
+├── build_ndk.sh
+├── build_win.bat
+└── convert_embed.py
 ```
 
-## 主要组件
+当前目录没有内置测试目标，也不包含具体模型实现。
 
-### 基础类型
+## 依赖
 
-`include/base/houmo.h` 定义框架公共数据结构：
+- CMake >= 3.16.3
+- C++17 编译器
+- TCIM Runtime (`tcim_runtime_lite`)
+- `$HOUMO_EXAMPLES_PATH/apis/common/tokenizer.cpp`
+- `$HOUMO_EXAMPLES_PATH/apis/common/hpp/half/half.hpp`
+- `$HOUMO_EXAMPLES_PATH/apis/common/hpp/stb/stb_image.h`
+- `$HOUMO_EXAMPLES_PATH/apis/common/hpp/audio/miniaudio.h`
+- Eigen 头文件，当前从 `$HOUMO_EXAMPLES_PATH/apis/common` 引入
 
-- `ModelConfig`：运行设备、batch、lazy mode、prefill/decode/embedding/tokenizer/vision 路径和扩展参数。
-- `ModelInfo`：模型类型、名称、batch、词表、hidden size、layer、context、prefill 长度和 logits 信息。
-- `SamplingParams`：temperature、top-p、top-k、重复惩罚、停止 token、最大生成长度和 ASR language 选项。
-- `PerfStats`：生成类推理的 prefill/decode/total/TTFT/TPS 和 token 数指标。
+必须设置 `HOUMO_EXAMPLES_PATH`。`TCIM_RUNTIME_PATH` 未设置时，CMake 会回退到：
 
-### LLM/VLM 抽象
-
-`LLMModel` 保存模型配置、Tokenizer、Embedding、TCIM prefill/decode module、输入 tensor map 和模型元信息。子类负责具体加载流程和推理细节。
-
-`VLMModel` 继承 `LLMModel`，增加 vision module、vision input map 和 `encode_image()` 接口，用于视觉语言模型扩展。
-
-`Context` 是生成类模型的请求级状态对象，提供：
-
-- `prefill()`、`decode()`、`generate()` 推理接口
-- `set_keep_history()`、`reset()` 状态管理
-- `set_sampler()` 采样器管理
-- `perf_stats()` 和 `profiler()` 性能统计访问
-
-### ASR 抽象
-
-`ASRModel` 是语音识别模型基类，保存 ASR 配置和公共模型参数，并要求子类实现：
-
-- `create_context()` 创建 ASR 上下文
-- `sot_token_id()`、`lang_token_id()`、`transcribe_token_id()`、`notimestamps_token_id()`、`eos_token_ids()` 等转写 token 接口
-- `supports_language_detection()` 语言检测能力声明
-
-`ASRContext` 继承 `Context`，管理 ASR 请求级状态，提供：
-
-- `Encode()` 音频特征编码
-- `DetectLanguage()` 语言检测
-- `BuildPrompt()` 构造转写 prompt
-- `Transcribe()` 完整音频转写
-- `set_language()` 设置语言
-- `perf_info()` 获取 `ASRPerfInfo`
-
-ASRContext 内部使用模板方法封装打点：子类只实现 `encode_*_impl`、`detect_lang_*_impl`、`prefill_*_impl`、`decode_*_impl` 钩子，基类自动记录 `transcribe.encode.*`、`transcribe.prefill.*`、`transcribe.decode.*` 等阶段耗时。
-
-### 音频处理
-
-`AudioProcessor` 提供 ASR 前处理：
-
-1. `LoadAudio(path)`：读取音频，重采样到 16kHz，转单声道，归一化到 `[-1, 1]`。
-2. `ChunkPCM(audio)`：按固定秒数切分 PCM，短块自动补零。
-3. `ExtractFeatures(audio)`：计算 Mel Spectrogram，输出 FP16 特征。
-4. `Process(path)`：一站式完成加载、切分和特征提取。
-
-`AudioProcessorConfig` 控制 sample rate、mel bins、chunk 秒数、encoder window、FFT、hop length、window length、feature threads、feature mode 和 mel 频率范围。
-
-### 性能统计
-
-`PerfProfiler` 支持：
-
-- `start(path)` / `stop(path)` 手动打点
-- `scope(path)` RAII 自动打点
-- `get_time_ms()`、`get_count()`、`get_avg_time_ms()` 查询耗时
-- `set_input_tokens()`、`add_output_token()` 记录 token 数
-- `record_ttft()`、`overall_tps()`、`decode_tps()` 等吞吐指标
-- `print_summary()` 输出 Tree/Table/Compact 视图
+```text
+$DADAO_VENV/lib/python3.12/site-packages/tcim_lite
+```
 
 ## 构建
 
-### 环境依赖
-
-- C++17 编译器
-- CMake >= 3.16
-- TCIM Runtime (`tcim_lite`)
-- 图像处理：**stb_image + 纯 C++ resize**（header-only，无 OpenCV）；头文件在 `$HOUMO_EXAMPLES_PATH/apis/common/hpp/stb/`
-- tokenizer.cpp 和 half.hpp
-- 音频依赖：header-only **miniaudio**（`$HOUMO_EXAMPLES_PATH/apis/common/hpp/audio/miniaudio.h`），Mel 特征为纯 C++（llama.cpp/whisper 风格），不依赖 libsamplerate / kaldi-native-fbank / librosa
-- GTest（单元测试）
-
-需要设置 `HOUMO_EXAMPLES_PATH`，并确保 `TCIM_RUNTIME_PATH` 可由 `tcim_runtime.cmake` 找到。Windows平台建议参考根目录 [env.bat](../../../env.bat) 和 [tools/win_envs](../../win_envs/) 正确设置环境变量。
-
 ### Linux
 
+脚本只接受 Linux `x86_64` / `aarch64`，且当前仅支持 `HOUMO_TARGET=xh2`：
+
 ```bash
+export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export TCIM_RUNTIME_PATH=/path/to/tcim_lite
+export HOUMO_TARGET=xh2
 ./build_linux.sh
 ```
 
+Linux 平台的安装规则将 `houmo_infer` 和 `tokenizer_lib` 安装到：
+
+```text
+$HOUMO_EXAMPLES_PATH/tools/common/lib
+```
+
+`convert_embed.py` 安装到 CMake install prefix 的根目录。需要注意，平台文件为库目标设置了绝对安装目录，因此 `-DCMAKE_INSTALL_PREFIX` 不会改变库的安装位置。
+
 ### Android
 
+Android 脚本要求 Linux `x86_64` 和 Android NDK r28c，固定使用 `arm64-v8a`、`android-35` 和 Ninja：
+
 ```bash
-export NDK_PATH=/path/to/android-ndk
-export TCIM_RUNTIME_PATH=/path/to/tcim_runtime
-./build_ndk.sh
+export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export TCIM_RUNTIME_PATH=/path/to/android/tcim_lite
+export NDK_PATH=/path/to/android-ndk-r28c
 ./build_ndk.sh release
-# 也支持: ./build_ndk.sh debug -DBUILD_TESTS=OFF
 ```
+
+也可传入 `debug` 和额外 CMake 参数：
+
+```bash
+./build_ndk.sh debug -DCMAKE_VERBOSE_MAKEFILE=ON
+```
+
+Android 库安装到 `$HOUMO_EXAMPLES_PATH/tools/common/android`，`convert_embed.py` 安装到当前目录下的 `android/` install prefix。
 
 ### Windows
 
-Windows平台建议先在仓库根目录执行：
-
-```bat
-env.bat --set
-```
-
-该脚本会调用 [tools/win_envs/set_environs.py](../../win_envs/set_environs.py)，并根据 [tools/win_envs/env.json](../../win_envs/env.json) 设置 `HOUMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH`、`PATH` 等变量。执行完成后需要重新打开cmd窗口，使环境变量生效。
-
-确认环境变量生效后，在当前目录执行：
+先配置 `HOUMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH` 及运行时 DLL 搜索路径，再执行：
 
 ```bat
 build_win.bat
 ```
 
-Windows构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 进行并行编译。构建和安装产物会输出到 `$HOUMO_EXAMPLES_PATH/tools/common/lib`，该目录应已由 `env.bat --set` 加入 `PATH`，以便运行依赖 `houmo_infer.dll`、`tokenizer_lib.dll` 等动态库的工具。
+脚本使用 Visual Studio 2022 x64 和 `Release` 配置。DLL/LIB 安装到 `%HOUMO_EXAMPLES_PATH%\tools\common\lib`，`convert_embed.py` 安装到当前目录的 `bin\` install prefix。
 
 ### 手动 CMake
 
 ```bash
-cmake -S . -B build -DBUILD_TESTS=ON
-cmake --build build -j$(nproc)
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+cmake --install build
 ```
 
-## 测试
+当前 `CMakeLists.txt` 不提供 `BUILD_TESTS` 选项或 CTest 目标。
+
+## Embedding 转换
+
+`convert_embed.py` 将 PyTorch `.pt` embedding 权重导出为同名 FP16/原始 dtype `.bin` 文件。当前脚本要求 `HOUMO_TARGET=xh2` 且依赖 PyTorch：
 
 ```bash
-./test.sh
+export HOUMO_TARGET=xh2
+python convert_embed.py --path /path/to/embedding.pt
 ```
 
-或手动执行：
+脚本可读取 tensor、包含 `weight` 的字典、仅含一个 tensor 的字典、常见 `*.weight` state dict，或带 `.weight` 属性的对象。BF16 权重会先转换为 FP16。
 
-```bash
-ctest --test-dir build --output-on-failure
-```
+## 重要实现约束
 
-Windows 使用 Visual Studio multi-config 生成器，手动执行 CTest 时需要指定配置：
+- 基类不负责加载模型。模型子类需要创建 `DevManager`、`WeightManager`、TCIM modules、Tokenizer、Embedding 和输入 tensor map。
+- `Context::generate()`、`ASRContext::Transcribe()` 是扩展接口，基础库没有默认推理循环。
+- `SamplingParams` 中部分字段是预留配置。当前 `Sampler` 实际处理 repetition penalty、presence penalty、top-k、temperature 和 top-p，但最终使用 `argmax`，不是随机抽样；`frequency_penalty`、`min_p` 和 `greedy` 当前未参与实现。
+- `HmImageProcessor::LoadAndProcess()` 加载失败时返回填充值为 `114` 的目标尺寸 RGB 图像，而不是抛出异常。
+- `AudioProcessor::ChunkPCM()` 不补零；固定 encoder window 的补零或截断发生在 `ExtractFeatures()` 内部。
+- 性能统计默认启用。编译时定义 `HOUOMO_ENABLE_PROFILING=0` 可切换到 no-op `PerfProfiler`。
 
-```bat
-ctest --test-dir build -C Release --output-on-failure
-```
+## 文档
 
-当前测试覆盖 Tokenizer、Embedding、Sampler、PerfProfiler、AudioProcessor 和 128 mel 音频特征流程。
-
-## 开发文档
-
-- [API Reference](docs/api_reference.md) - 核心 API、数据结构和模块接口
-- [Inference Pipeline](docs/inference_pipeline.md) - LLM/VLM/ASR 推理流程和性能打点
-- [New Model Adaptation Guide](docs/new_model_adaptation_guide.md) - 新模型适配规范
+- [API Reference](docs/api_reference.md)
+- [Inference Pipeline](docs/inference_pipeline.md)
+- [New Model Adaptation Guide](docs/new_model_adaptation_guide.md)
 
 ## License
 

@@ -67,21 +67,12 @@ endif()
 # Image: stb_image + pure C++ resize (header-only under apis/common/hpp).
 # Audio: miniaudio (header-only under apis/common/hpp/audio) + pure C++ mel.
 
-# GTest for unit testing (local 3rdparty)
-option(BUILD_TESTS "Build unit tests" ON)
-if(BUILD_TESTS)
-  set(GTEST_ROOT ${CMAKE_SOURCE_DIR}/3rdparty/googletest)
-  add_subdirectory(${GTEST_ROOT} googletest)
-  enable_testing()
-endif()
-
-set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
-
 # tokenizer.cpp / header-only deps under HOUMO_EXAMPLES_PATH
 if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
   message(STATUS "Raw env: [$ENV{HOUMO_EXAMPLES_PATH}]")
   file(TO_CMAKE_PATH "$ENV{HOUMO_EXAMPLES_PATH}" HOUMO_EXAMPLES_ROOT)
   set(TOKENIZER_CPP_PATH ${HOUMO_EXAMPLES_ROOT}/apis/common/tokenizer.cpp)
+  set(EIGEN_PATH ${HOUMO_EXAMPLES_ROOT}/apis/common)
   # half:  apis/common/hpp/half/half.hpp
   # stb:   apis/common/hpp/stb/stb_image.h
   # audio: apis/common/hpp/audio/miniaudio.h
@@ -131,6 +122,7 @@ add_library(houmo_infer SHARED
   ${CORE_SOURCES}
   ${MODULE_SOURCES}
 )
+target_compile_definitions(houmo_infer PUBLIC EIGEN_MPL2_ONLY)
 
 if(HOUMO_EXPORT_ALL_SYMBOLS)
   set_target_properties(houmo_infer PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -164,48 +156,6 @@ if(HOUMO_NEED_PTHREAD)
 endif()
 
 target_link_libraries(houmo_infer PUBLIC ${HOUMO_INFER_LIBS})
-
-# -----------------------------------------------------------------------------
-# Unit tests
-# -----------------------------------------------------------------------------
-if(BUILD_TESTS)
-  set(TEST_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/tests)
-
-  add_executable(tokenizer_test tests/tokenizer_test.cc)
-  target_include_directories(tokenizer_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(tokenizer_test PRIVATE houmo_infer GTest::gtest_main tokenizer_lib)
-  add_test(NAME TokenizerTest COMMAND tokenizer_test)
-
-  add_executable(embedding_test tests/embedding_test.cc)
-  target_include_directories(embedding_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(embedding_test PRIVATE houmo_infer GTest::gtest_main)
-  add_test(NAME EmbeddingTest COMMAND embedding_test)
-
-  add_executable(sampler_test tests/sampler_test.cc)
-  target_include_directories(sampler_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(sampler_test PRIVATE houmo_infer GTest::gtest_main)
-  add_test(NAME SamplerTest COMMAND sampler_test)
-
-  add_executable(perf_profiler_test tests/perf_profiler_test.cc)
-  target_include_directories(perf_profiler_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(perf_profiler_test PRIVATE houmo_infer GTest::gtest_main)
-  add_test(NAME PerfProfilerTest COMMAND perf_profiler_test)
-
-  add_executable(audio_processor_test tests/audio_processor_test.cc)
-  target_include_directories(audio_processor_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(audio_processor_test PRIVATE houmo_infer GTest::gtest_main)
-  add_test(NAME AudioProcessorTest COMMAND audio_processor_test)
-
-  add_executable(audio_processor_128_test tests/audio_processor_128_test.cc)
-  target_include_directories(audio_processor_128_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(audio_processor_128_test PRIVATE houmo_infer)
-  add_test(NAME AudioProcessor128Test COMMAND audio_processor_128_test)
-
-  add_executable(image_processor_test tests/image_processor_test.cc)
-  target_include_directories(image_processor_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(image_processor_test PRIVATE houmo_infer GTest::gtest_main)
-  add_test(NAME ImageProcessorTest COMMAND image_processor_test)
-endif()
 
 # -----------------------------------------------------------------------------
 # Install

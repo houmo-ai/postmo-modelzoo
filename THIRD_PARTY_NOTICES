@@ -64,28 +64,42 @@ Author / Copyright Holder: Eigen Team (Gaël Guennebaud, Benoit Jacob, et al.)
 Copyright Statement: Copyright (c) 2008-2024 Gaël Guennebaud, Benoit Jacob and others
 
 License:
-Mozilla Public License Version 2.0 (MPL 2.0)
+Primarily Mozilla Public License Version 2.0 (MPL 2.0), with retained files
+under Apache License 2.0 and BSD-compatible terms.
 
 License Text:
-https://www.mozilla.org/en-US/MPL/2.0/
+    apis/common/eigen3/COPYING.README
+    apis/common/eigen3/COPYING.MPL2
+    apis/common/eigen3/COPYING.APACHE
+    apis/common/eigen3/COPYING.BSD
+    https://www.mozilla.org/en-US/MPL/2.0/
 
 Usage in this project:
-The following paths are automatically downloaded, associated, and included in the compilation process:
-    apis/inferences/qwen3/
+This project includes a modified source subset at:
+    apis/common/eigen3
+
+The subset is used by:
     tools/llm_perf
+    tools/common/houmo-llm-engine
 
-Only MPL 2.0-licensed modules are used. The preprocessor symbol
-EIGEN_MPL2_ONLY is defined to exclude LGPL-licensed code.
+Only the headers required by unsupported/Eigen/CXX11/Tensor are retained.
+Tests, benchmarks, documentation, build and packaging files, unrelated
+unsupported modules, and Eigen modules not reachable from Eigen/Core were
+removed. The preprocessor symbol EIGEN_MPL2_ONLY is defined to reject
+inclusion of non-MPL2-compatible Eigen code.
 
-The Eigen3 library is licensed under the Mozilla Public License 2.0 (MPL 2.0),
-which allows use, modification, and distribution of the library under
-the terms of the license.
+Some retained Core files contain Apache-2.0 or BSD-compatible code, including
+code copyrighted by the TensorFlow Authors, Intel Corporation, and Fabian
+Giesen. The SpecialFunctions implementation contains portions based on the
+Cephes Math Library, Copyright 1984, 1987, 1992, 2000 by Stephen L. Moshier,
+incorporated into Eigen with permission from the author. The relevant notices
+remain embedded in those source files.
 
-Any modifications to MPL 2.0-licensed Eigen3 files must retain the
-original copyright notice and license text in accordance with MPL 2.0.
+Any modifications to retained Eigen3 files must preserve their original
+copyright and license notices and comply with the applicable file-level terms.
 
-Users are responsible for complying with the MPL 2.0 license when using,
-redistributing, or modifying the Eigen3 library.
+Users are responsible for complying with all applicable file-level licenses
+when using, redistributing, or modifying the retained Eigen3 source subset.
 
 ----------------------------------------------------------------------
 OpenCV (Open Source Computer Vision Library)
@@ -1105,54 +1119,6 @@ Users are responsible for complying with the Apache License 2.0 when using,
 redistributing, or modifying this module.
 
 ----------------------------------------------------------------------
-Google Test (C++ Testing Framework)
-----------------------------------------------------------------------
-
-Component Name: Google Test (googletest)
-
-Version: 1.16.0
-Author / Copyright Holder: Google Inc.
-Copyright Statement: Copyright 2008, Google Inc. All rights reserved.
-
-License:
-BSD 3-Clause License
-
-License Text:
-https://github.com/google/googletest/blob/main/LICENSE
-
-Usage in this project:
-Google Test is vendored and used for unit testing at the following path:
-    tools/common/houmo-llm-engine/3rdparty/googletest/
-
-Ten test executables (tokenizer_test, embedding_test, sampler_test,
-qwen3_llm_test, qwen35_mllm_test, qwen3_vlm_test, perf_profiler_test,
-audio_processor_test, whisper_test, etc.) link against GTest::gtest_main.
-
-Google Test is licensed under the BSD 3-Clause ("New BSD") License, which
-permits use, modification, and redistribution in source and binary forms,
-subject to the following conditions:
-
-1. Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-3. Neither the name of Google Inc. nor the names of its contributors may be
-   used to endorse or promote products derived from this software without
-   specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED.
-
-Any redistribution or modification of Google Test must retain the original
-copyright notice and license text in accordance with the BSD 3-Clause License.
-
-Users are responsible for complying with the BSD 3-Clause License when using,
-redistributing, or modifying Google Test.
 
 2. Datasets
 ----------------------------------------------------------------------

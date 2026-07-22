@@ -1,68 +1,18 @@
 # 新模型适配指南
 
-本文档说明如何基于 Houmo Inference Framework 适配新的生成类模型（LLM/VLM）或语音识别模型（ASR）。文档只描述框架要求和通用步骤，不维护具体模型支持列表。
+本文档基于当前 `0.1.0` 实现，说明如何在模型目录中复用 Houmo Inference Framework。基础库不包含具体模型，也不会自动加载模型文件。
 
----
+## 1. 选择基类
 
-## 1. 适配前先确认模型类型
+| 类型 | Model 基类 | Context 基类 | 说明 |
+|------|------------|--------------|------|
+| 文本生成 | `houmo::LLMModel` | `houmo::Context` | 实现 prefill、decode、generate |
+| 视觉语言 | `houmo::VLMModel` | `houmo::Context` | 额外实现 vision encode 和图像状态 |
+| 语音识别 | `houmo::ASRModel` | `houmo::ASRContext` | 实现 Transcribe 和 ASR 模板 hook |
 
-| 模型类型 | Model 基类 | Context 基类 | 典型入口 | 说明 |
-|----------|------------|--------------|----------|------|
-| LLM | `LLMModel` | `Context` | `generate()` | 文本 token 自回归生成 |
-| VLM | `VLMModel` | `Context` | `generate()` | 在 LLM 基础上增加视觉编码和图像 embedding 注入 |
-| ASR | `ASRModel` | `ASRContext` | `Transcribe()` | 音频特征编码 + decoder 转写 |
+不要在子类中重复声明基类已有成员，例如 `config_`、`tokenizer_`、`embedding_`、TCIM modules、input maps、`context_length_`、`generated_ids_` 和 `profiler_`。
 
-选择规则：
-
-- 纯文本生成模型继承 `LLMModel`。
-- 视觉语言模型继承 `VLMModel`，不要直接继承 `LLMModel` 后自行复制 vision 成员。
-- 语音识别模型继承 `ASRModel`，上下文继承 `ASRContext`，复用 ASR 模板方法打点。
-- 不要在子类中重新声明基类已有状态，例如 `config_`、`tokenizer_`、`embedding_`、`prefill_module_`、`decode_module_`、`context_length_`、`profiler_`。
-
----
-
-## 2. 通用文件组织
-
-模型实现通常放在模型自己的 `cpp/` 目录中，框架基类位于当前工程。当前 `houmo-llm-engine` 目录结构如下：
-
-```text
-houmo-llm-engine/
-├── include/
-│   ├── base/              # 基础类型、配置、异常和 TCIM 工具
-│   ├── core/              # LLM/VLM/ASR 基类、Context、Factory
-│   └── modules/           # Tokenizer、Embedding、Sampler、Audio/Image、Profiler
-├── src/
-│   ├── core/              # 基类实现
-│   └── modules/           # 通用模块实现
-├── cmake/
-│   └── platforms/         # Windows/Linux/Android 平台专用 CMake 配置
-├── tests/                 # GTest 单元测试和测试数据
-├── docs/                  # API、Pipeline 和模型适配说明
-├── CMakeLists.txt         # CMake 构建入口
-├── tcim_runtime.cmake     # TCIM Runtime 依赖配置
-├── build_linux.sh         # Linux 构建脚本
-├── build_ndk.sh           # Android NDK 构建脚本
-├── build_win.bat          # Windows / Visual Studio 构建脚本
-├── test.sh                # 测试入口
-├── get_3rdparty.py        # 第三方依赖准备脚本
-└── convert_embed.py       # embedding 转换工具
-```
-
-新模型的文件建议与模型目录放在一起：
-
-```text
-include/<model_name>_model.h
-src/<model_name>_model.cc
-tests/<model_name>_test.cc
-```
-
-如果所在模型目录已有固定组织方式，优先遵循该目录现有结构。
-
----
-
-## 3. ModelConfig 使用规范
-
-所有模型都通过 `ModelConfig` 传入运行参数和文件路径。
+## 2. 配置约定
 
 ```cpp
 houmo::ModelConfig config;
@@ -72,133 +22,107 @@ config.lazy_mode = false;
 config.prefill_path = "path/to/prefill.hmm";
 config.decode_path = "path/to/decode.hmm";
 config.embedding_path = "path/to/embedding.bin";
-config.tokenizer_path = "path/to/tokenizer.json";
+config.tokenizer_path = "path/to/tokenizer";
 config.vision_path = "path/to/vision.hmm";
-config.extra_params["encode_path"] = "path/to/encode.hmm";
+config.extra_params["encode_path"] = "path/to/encoder.hmm";
 ```
 
-字段使用建议：
+`ModelConfig` 没有内置校验。模型构造或 `load()` 应检查必需路径、设备列表、batch 和扩展参数，并给出明确错误。
 
-| 字段 | LLM | VLM | ASR | 说明 |
-|------|-----|-----|-----|------|
-| `devices` | 必需 | 必需 | 必需 | 不要在模型实现中硬编码设备号 |
-| `prefill_path` | 必需 | 必需 | 通常必需 | decoder prefill 模型 |
-| `decode_path` | 必需 | 必需 | 通常必需 | decoder decode 模型 |
-| `embedding_path` | 按需 | 按需 | 按需 | token embedding 权重 |
-| `tokenizer_path` | 按需 | 按需 | 按需 | tokenizer JSON |
-| `vision_path` | 不使用 | 必需 | 不使用 | vision encoder 模型 |
-| `extra_params` | 按需 | 按需 | 常用 | ASR encode 路径、语言等扩展参数 |
+## 3. LLM 适配
 
----
-
-## 4. LLM 适配
-
-### 4.1 头文件模板
+### Model 骨架
 
 ```cpp
-#pragma once
-
-#include "core/context.h"
 #include "core/llm_model.h"
 
-namespace houmo {
-
-class YourLLMContext : public Context {
+class YourModel final : public houmo::LLMModel {
  public:
-  explicit YourLLMContext(LLMModel* model, int n_ctx);
+  explicit YourModel(const houmo::ModelConfig& config)
+      : LLMModel(config) {
+    load();
+  }
 
-  Token prefill(const std::vector<Token>& tokens) override;
-  Token decode(Token prev_token) override;
-  void generate(const std::vector<Token>& prompt,
-                const SamplingParams& params,
-                std::function<bool(Token)> callback) override;
-  void reset() override;
-
- private:
-  Token do_prefill_inference(const std::vector<Token>& tokens, Sampler* sampler);
-  Token do_decode_inference(Token prev_token, Sampler* sampler);
-
-  void prefill_preprocess_chunk(int chunk,
-                                const std::vector<Token>& tokens,
-                                int32_t seq_length,
-                                int prefill_length);
-  void prefill_inference_chunk();
-  Token prefill_postprocess(Sampler* sampler, int32_t seq_length);
-
-  void decode_preprocess(Token prev_token);
-  void decode_inference();
-  Token decode_postprocess(Sampler* sampler);
-};
-
-class YourLLMModel : public LLMModel {
- public:
-  explicit YourLLMModel(const ModelConfig& config);
-
-  std::unique_ptr<Context> create_context(int n_ctx = 0) override;
-  void ClearKVCache();
+  std::unique_ptr<houmo::Context> create_context(int n_ctx = 0) override;
 
  private:
   void load();
   void init_prefill_inputs();
   void init_decode_inputs();
 };
-
-}  // namespace houmo
 ```
 
-### 4.2 load() 要求
+### load() 职责
 
-`load()` 由模型子类实现，至少完成：
+当前基类构造函数只保存配置，子类通常需要完成：
 
-1. 使用 `config_.devices` 创建 `tcim::DevManager`。
-2. 使用 `*dev_manager_` 创建 `tcim::Module::WeightManager`。
-3. 加载 prefill module。
-4. 加载 decode module。
-5. 按模型需要共享或初始化 KV Cache。
-6. 加载 embedding。
-7. 加载 tokenizer。
-8. 填充 `info_`、`prefill_length_`、`attn_idx_start_` 等基类成员。
+1. 根据 `config_.devices` 创建 `tcim::DevManager`。
+2. 创建 `tcim::Module::WeightManager`。
+3. 加载 `prefill_module_` 和 `decode_module_`。
+4. 按模型要求建立或共享 KV cache。
+5. 创建 `Embedding(config_.embedding_path, hidden_dim, prefill_length)`。
+6. 创建 `HfTokenizer(config_.tokenizer_path)`。
+7. 填充 `info_`，尤其是 `type`、`n_vocab`、`n_embd`、`n_ctx` 和 `prefill_length`。
+8. 设置 `prefill_length_` 和 `attn_idx_start_`。
 9. 初始化 `prefill_input_map_` 和 `decode_input_map_`。
 
-不要在子类中重新声明 `dev_manager_`、`weight_manager_`、`prefill_module_`、`decode_module_`。
+`Embedding` 的 `hidden_dim` 必须大于 0。批量 lookup 还要求构造时提供足够的 `max_seq_len`。
 
-### 4.3 generate() 要求
-
-`generate()` 应包含完整性能统计：
+### Context 骨架
 
 ```cpp
-void YourLLMContext::generate(const std::vector<Token>& prompt,
-                              const SamplingParams& params,
-                              std::function<bool(Token)> callback) {
+#include "core/context.h"
+
+class YourContext final : public houmo::Context {
+ public:
+  YourContext(YourModel* model, int n_ctx)
+      : Context(model, n_ctx), model_(model) {}
+
+  houmo::Token prefill(const std::vector<houmo::Token>& tokens) override;
+  houmo::Token decode(houmo::Token prev_token) override;
+  void generate(const std::vector<houmo::Token>& prompt,
+                const houmo::SamplingParams& params,
+                std::function<bool(houmo::Token)> callback) override;
+  void reset() override;
+
+ private:
+  YourModel* model_;
+};
+```
+
+`Context` 持有非 owning model 指针，必须保证 model 生命周期覆盖 context。
+
+### generate() 要求
+
+基础类没有默认循环。建议至少保证：
+
+```cpp
+void YourContext::generate(
+    const std::vector<houmo::Token>& prompt,
+    const houmo::SamplingParams& params,
+    std::function<bool(houmo::Token)> callback) {
   profiler_.reset();
+  profiler_.set_root_stage("generate");
   profiler_.start("generate");
   profiler_.set_input_tokens(static_cast<int>(prompt.size()));
-
   set_sampler(params);
 
-  Token token;
+  houmo::Token token;
   {
-    auto t = profiler_.scope("generate.prefill");
+    auto timer = profiler_.scope("generate.prefill");
     token = prefill(prompt);
   }
-
   profiler_.record_ttft();
+  profiler_.add_output_token();
 
-  if (!callback(token)) {
-    profiler_.stop("generate");
-    perf_stats_ = profiler_.to_perf_stats();
-    return;
-  }
-
-  while (params.max_tokens <= 0 ||
-         generated_ids_.size() < static_cast<size_t>(params.max_tokens)) {
+  bool keep_going = callback(token);
+  while (keep_going && !should_stop(token, params)) {
     {
-      auto t = profiler_.scope("generate.decode");
+      auto timer = profiler_.scope("generate.decode");
       token = decode(token);
     }
     profiler_.add_output_token();
-
-    if (!callback(token)) break;
+    keep_going = callback(token);
   }
 
   profiler_.stop("generate");
@@ -206,128 +130,124 @@ void YourLLMContext::generate(const std::vector<Token>& prompt,
 }
 ```
 
-模型应根据自身 EOS/BOS/stop token 和 context 上限补充停止条件。
+`should_stop()` 是示意逻辑，需要由适配层实现。停止条件应覆盖 EOS、`stop_tokens`、`max_tokens`、context 上限和 callback 中断。
 
----
+当前 `Sampler` 最终使用 `argmax`，不是随机采样。不要仅凭 `temperature` 或 `top_p` 假设输出具有随机性。
 
-## 5. VLM 适配
+### reset() 要求
 
-VLM 继承 `VLMModel`，复用 `LLMModel` 的 prefill/decode 基础成员，并增加视觉编码。
+先调用 `Context::reset()`，再清理模型相关状态：
 
-### 5.1 头文件差异
+- KV cache
+- position/cache index
+- 本轮临时 tensor
+- VLM 图像状态
+- 需要时重置 profiler 和 sampler
+
+## 4. VLM 适配
+
+### Model 骨架
 
 ```cpp
 #include "core/vlm_model.h"
 
-class YourVLMModel : public VLMModel {
+class YourVLM final : public houmo::VLMModel {
  public:
-  explicit YourVLMModel(const ModelConfig& config);
+  explicit YourVLM(const houmo::ModelConfig& config)
+      : VLMModel(config) {
+    load();
+  }
 
-  std::unique_ptr<Context> create_context(int n_ctx = 0) override;
-  std::vector<float16> encode_image(const uint8_t* image_data,
+  std::unique_ptr<houmo::Context> create_context(int n_ctx = 0) override;
+  std::vector<float16> encode_image(const uint8_t* data,
                                     int width,
                                     int height,
                                     int channels) override;
 
  private:
   void load();
-  void init_vision_inputs();
-  void init_prefill_inputs();
-  void init_decode_inputs();
 };
 ```
 
-### 5.2 VLM Context 额外状态
+基类 `encode_image()` 和 `create_context()` 都只是占位实现，必须覆盖。
+
+### 请求级图像状态
+
+图片路径、图片 embedding 和是否启用视觉输入应放在 Context 中，而不是 Model 全局状态中。这样才能避免并发请求和多轮对话互相污染。
 
 ```cpp
-class YourVLMContext : public Context {
+class YourVLMContext final : public houmo::Context {
  public:
-  void set_image(const std::string& image_path) override;
-  void set_images(const std::vector<std::string>& image_paths);
+  void set_image(const std::string& image_path) override {
+    image_path_ = image_path;
+  }
 
  private:
-  void run_vision();
-  void vision_preprocess(int image_idx);
-  void vision_inference();
-  void vision_postprocess(int image_idx);
-
-  std::vector<std::string> image_paths_;
-  std::vector<float16> flat_image_embeds_;
-  bool use_vlm_ = false;
+  std::string image_path_;
+  std::vector<float16> image_embeddings_;
 };
 ```
 
-### 5.3 VLM Prefill 插入点
+### HmImageProcessor 注意事项
 
-VLM 通常在 prefill 的 token embedding 之前完成：
-
-1. `HmImageProcessor::LoadAndProcess()` 读取和预处理图像。
-2. 设置 `vision_input_map_`。
-3. 执行 `vision_module_->Run()` 和同步。
-4. 从 vision 输出中取出 image embeddings。
-5. 扩展或替换 prompt 中的 image token embedding。
-6. 设置多模态 position ids 或其他模型特有输入。
-
-建议打点路径：
-
-```text
-generate.vision
-generate.vision.preprocess
-generate.vision.inference
-generate.vision.postprocess
-generate.prefill.common_setup
-generate.prefill.preprocess_chunk
-generate.prefill.inference_chunk
-generate.prefill.postprocess
-```
-
----
-
-## 6. ASR 适配
-
-ASR 模型必须继承 `ASRModel`，上下文必须继承 `ASRContext`。这样可以复用音频处理、转写接口和模板方法打点。
-
-### 6.1 头文件模板
+`HmImageProcessor` 当前位于全局命名空间：
 
 ```cpp
-#pragma once
+HmImageProcessor processor(448, 448, true);
+ProcessedImage image = processor.LoadAndProcess(path);
+std::vector<float16> input = processor.ToFP16Tensor(image);
+```
 
+`ToFP16Tensor()` 输出 `[3, 2, H, W]` 原始 0..255 数据。模型需要的 mean/std normalization、layout 转换和 patch merge 需由适配层完成。
+
+加载失败不会抛异常，而会返回 fallback 图像。若模型不允许静默 fallback，应在调用前检查路径或在适配层增加错误策略。
+
+## 5. ASR 适配
+
+### Model 骨架
+
+```cpp
 #include "core/asr_model.h"
 
-namespace houmo {
-
-class YourASRModel : public ASRModel {
+class YourASRModel final : public houmo::ASRModel {
  public:
-  explicit YourASRModel(const ModelConfig& config);
+  explicit YourASRModel(const houmo::ModelConfig& config)
+      : ASRModel(config) {
+    load();
+  }
 
-  std::unique_ptr<Context> create_context(int n_ctx = 0) override;
-
-  Token sot_token_id() const override;
-  Token lang_token_id(const std::string& language) const override;
-  Token transcribe_token_id() const override;
-  Token notimestamps_token_id() const override;
-  std::vector<Token> eos_token_ids() const override;
+  std::unique_ptr<houmo::Context> create_context(int n_ctx = 0) override;
+  houmo::Token sot_token_id() const override;
+  houmo::Token lang_token_id(const std::string& language) const override;
+  houmo::Token transcribe_token_id() const override;
+  houmo::Token notimestamps_token_id() const override;
+  std::vector<houmo::Token> eos_token_ids() const override;
   bool supports_language_detection() const override;
 
  private:
   void load();
-  void init_encode_inputs();
-  void init_prefill_inputs();
-  void init_decode_inputs();
 };
+```
 
-class YourASRContext : public ASRContext {
+在 `load()` 中设置 `n_mels_`、`n_frames_`、`num_heads_`、`cache_max_len_` 和 `num_decode_layers_`，并在模型子类中保存 encoder/decoder modules、Tokenizer、Embedding 和 tensor maps。`ASRModel` 不继承 `LLMModel`，这些资源不会由基类提供。
+
+### Context 骨架
+
+```cpp
+class YourASRContext final : public houmo::ASRContext {
  public:
-  explicit YourASRContext(ASRModel* model, int n_ctx);
+  YourASRContext(YourASRModel* model, int n_ctx)
+      : ASRContext(model, n_ctx), model_(model) {}
 
-  std::vector<float16> Encode(const std::vector<float>& mel_features,
+  std::vector<float16> Encode(const std::vector<float>& mel,
                               int n_mels,
                               int n_frames) override;
-  Token DetectLanguage() override;
-  std::vector<Token> BuildPrompt(Token language_token) override;
-  void Transcribe(const std::string& audio_path,
-                  const SamplingParams& params,
-                  ASRTokenCallback callback) override;
+  houmo::Token DetectLanguage() override;
+  std::vector<houmo::Token> BuildPrompt(
+      houmo::Token language_token) override;
+  void Transcribe(const std::string& path,
+                  const houmo::SamplingParams& params,
+                  houmo::ASRTokenCallback callback) override;
   void set_language(const std::string& language) override;
 
  private:
@@ -336,285 +256,154 @@ class YourASRContext : public ASRContext {
                               int n_frames) override;
   void encode_inference_impl() override;
   void encode_postprocess_impl() override;
-
-  void detect_lang_preprocess_impl() override;
-  void detect_lang_inference_impl() override;
-  Token detect_lang_postprocess_impl() override;
-
-  void prefill_preprocess_impl(const std::vector<Token>& tokens) override;
+  void prefill_preprocess_impl(
+      const std::vector<houmo::Token>& tokens) override;
   void prefill_inference_impl() override;
-  Token prefill_postprocess_impl() override;
-
-  void decode_preprocess_impl(Token prev_token) override;
+  houmo::Token prefill_postprocess_impl() override;
+  void decode_preprocess_impl(houmo::Token token) override;
   void decode_inference_impl() override;
-  Token decode_postprocess_impl() override;
-};
+  houmo::Token decode_postprocess_impl() override;
 
-}  // namespace houmo
+  YourASRModel* model_;
+};
 ```
 
-### 6.2 ASRModel::load() 要求
+只有支持语言检测的模型需要覆盖三个 `detect_lang_*_impl()` hook。默认实现不执行推理并返回 `0`。
 
-ASR 模型通常需要加载三类 TCIM 模块：
+### Transcribe() 结构
 
-1. encode module：处理 Mel 特征，路径可通过 `extra_params` 传入。
-2. prefill module：decoder prefill。
-3. decode module：decoder 自回归 decode。
-
-同时需要：
-
-- 设置 `n_mels_`、`n_frames_`、`num_heads_`、`cache_max_len_`、`num_decode_layers_`。
-- 加载 tokenizer 和可选 embedding。
-- 初始化 encoder、prefill、decode 输入 tensor map。
-- 初始化 decoder cache。
-
-### 6.3 Transcribe() 推荐结构
+模型应通过 `do_*()` 调用 hook，不要直接调用 `_impl()`，否则不会生成统一性能数据：
 
 ```cpp
-void YourASRContext::Transcribe(const std::string& audio_path,
-                                const SamplingParams& params,
-                                ASRTokenCallback callback) {
+void YourASRContext::Transcribe(
+    const std::string& path,
+    const houmo::SamplingParams& params,
+    houmo::ASRTokenCallback callback) {
   profiler_.reset();
   profiler_.set_root_stage("transcribe");
   profiler_.start("transcribe");
-
   set_language(params.language);
 
-  std::vector<MelFeatures> features;
-  float audio_duration = 0.0f;
+  houmo::AudioProcessorConfig audio_config;
+  audio_config.n_mels = model_->n_mels();
+  houmo::AudioProcessor processor(audio_config);
+
+  std::vector<houmo::MelFeatures> chunks;
+  float duration = 0.0f;
   {
-    auto t = profiler_.scope("transcribe.audio_load");
-    AudioProcessor processor;
-    features = processor.Process(audio_path);
-    for (const auto& f : features) audio_duration += f.duration;
+    auto timer = profiler_.scope("transcribe.audio_load");
+    chunks = processor.Process(path);
+    for (const auto& chunk : chunks) {
+      duration += chunk.duration;
+    }
   }
 
-  for (const auto& feature : features) {
-    do_encode(/* mel float data */, feature.feature_dim, feature.num_frames);
+  for (const auto& chunk : chunks) {
+    std::vector<float> mel(chunk.data.begin(), chunk.data.end());
+    do_encode(mel, chunk.feature_dim, chunk.num_frames);
 
-    Token language_token = do_detect_language();
+    houmo::Token language_token = supports_detection()
+        ? do_detect_language()
+        : model_->lang_token_id(language_);
     auto prompt = BuildPrompt(language_token);
 
-    Token token = do_prefill(prompt);
+    houmo::Token token = do_prefill(prompt);
     profiler_.record_ttft();
-
+    profiler_.add_output_token();
     if (!callback(token)) break;
 
-    while (true) {
+    while (!is_eos(token) && !reached_limit(params)) {
       token = do_decode(token);
       profiler_.add_output_token();
-
-      // 子类应检查 eos_token_ids()、max_tokens 和 callback 返回值。
       if (!callback(token)) break;
     }
   }
 
   profiler_.stop("transcribe");
-  fill_perf_info(audio_duration);
+  fill_perf_info(duration);
 }
 ```
 
-注意：`do_encode()` 当前接收 `std::vector<float>`，如果 `AudioProcessor::Process()` 返回 FP16 MelFeatures，子类需要按模型实现决定是否保留 FP16、转换为 float，或在 `Transcribe()` 中直接调用自定义特征路径。
+`supports_detection()`、`is_eos()` 和 `reached_limit()` 是适配层示意函数，不属于基础库。
 
-### 6.4 ASR 打点规范
+`AudioProcessor` 输出 FP16，而 ASR hook 接收 float，示例进行了显式转换。高性能实现可复用转换 buffer，避免每个 chunk 重复分配。
 
-ASR 子类不要手写重复计时逻辑，优先调用基类模板方法：
+## 6. 模型注册
 
-```text
-do_encode()
-  ├── transcribe.encode.preprocess
-  ├── transcribe.encode.inference
-  └── transcribe.encode.postprocess
+当前 `ModelSeries` 已定义 Qwen3 LLM、Qwen3.5 MLLM、Qwen3 VLM、Whisper、GLM-ASR 和 Qwen3-ASR。新增系列时需要更新枚举和两个字符串转换函数。
 
-do_detect_language()
-  ├── transcribe.detect_lang.preprocess
-  ├── transcribe.detect_lang.inference
-  └── transcribe.detect_lang.postprocess
-
-do_prefill()
-  ├── transcribe.prefill.preprocess
-  ├── transcribe.prefill.inference
-  └── transcribe.prefill.postprocess
-
-do_decode()
-  ├── transcribe.decode.preprocess
-  ├── transcribe.decode.inference
-  └── transcribe.decode.postprocess
-```
-
-`fill_perf_info(audio_duration)` 会计算 `ASRPerfInfo`，包括 `overall_rtf`、`inference_rtf`、`decode_tps`、`overall_tps`。
-
-### 6.5 AudioProcessor 使用
-
-```cpp
-AudioProcessorConfig audio_config;
-audio_config.sample_rate = 16000;
-audio_config.n_mels = 80;
-audio_config.chunk_seconds = 30;
-audio_config.encoder_window_seconds = 30;
-
-auto processor = AudioProcessor(audio_config);
-auto features = processor.Process(audio_path);
-```
-
-需要 128 mel 或特定 padding 方式时，调整 `n_mels` 和 `feature_mode`。
-
----
-
-## 7. 模型注册
-
-模型实现文件末尾使用 `REGISTER_MODEL` 注册。
-
-### LLM/VLM 注册
+LLM/VLM 注册到 `ModelFactory<LLMModel>`：
 
 ```cpp
 #include "core/model_factory.h"
 
-REGISTER_MODEL(LLMModel, your_llm_key, ModelSeries::kYourLLM,
-               [](const ModelConfig& c) {
-                 return std::make_unique<YourLLMModel>(c);
+REGISTER_MODEL(LLMModel, your_model, houmo::ModelSeries::kQwen3LLM,
+               [](const houmo::ModelConfig& config) {
+                 return std::make_unique<YourModel>(config);
                },
-               "Your LLM model");
+               "Your model");
 ```
 
-VLM 仍注册到 `ModelFactory<LLMModel>`，因为 `VLMModel` 继承 `LLMModel`。
-
-### ASR 注册
+ASR 注册到 `ModelFactory<ASRModel>`：
 
 ```cpp
-#include "core/model_factory.h"
-
-REGISTER_MODEL(ASRModel, your_asr_key, ModelSeries::kYourASR,
-               [](const ModelConfig& c) {
-                 return std::make_unique<YourASRModel>(c);
+REGISTER_MODEL(ASRModel, your_asr, houmo::ModelSeries::kWhisperASR,
+               [](const houmo::ModelConfig& config) {
+                 return std::make_unique<YourASRModel>(config);
                },
                "Your ASR model");
 ```
 
-如果新增模型系列，需要同步更新：
+`REGISTER_MODEL` 宏定义在 `houmo` 命名空间内，但宏参数 `series` 直接进入表达式。根据调用位置，可使用 `houmo::ModelSeries::...` 或处于 `namespace houmo` 内时使用 `ModelSeries::...`。
 
-1. `ModelSeries` 枚举。
-2. `ModelSeriesToString()`。
-3. `StringToModelSeries()`。
-4. 对应模型实现文件中的 `REGISTER_MODEL`。
-5. CMake 源文件列表和测试目标。
+静态注册对象必须被最终链接保留。如果模型实现在静态库中，最终应用需要采用 whole-archive 或等效链接策略。
 
----
+## 7. CMake 集成
 
-## 8. 测试规范
-
-### 8.1 通用测试原则
-
-- 测试文件放在 `tests/` 或模型目录约定位置。
-- 缺少真实模型文件时使用 `GTEST_SKIP()`，不要让测试崩溃。
-- 模型加载和推理路径使用 `ASSERT_NO_THROW` 包裹。
-- 路径检查函数必须覆盖测试依赖的所有文件。
-- `ModelConfig` 必须显式设置 `devices` 和 `lazy_mode`。
-
-### 8.2 LLM/VLM 测试项
-
-| 测试名 | 说明 |
-|--------|------|
-| `LoadModel` | 模型加载和基础属性 |
-| `Tokenize` | tokenizer 编解码 |
-| `CreateContext` | context 创建 |
-| `PrefillAndDecode` | prefill + decode 一轮 |
-| `Generate` | token callback 生成 |
-| `ResetContext` | reset 后状态清理 |
-| `ImageProcessor` | VLM 图像预处理 |
-| `VisionEncoder` | VLM 视觉编码 |
-| `PrefillWithImage` | VLM 带图 prefill |
-
-### 8.3 ASR 测试项
-
-| 测试名 | 说明 |
-|--------|------|
-| `LoadModel` | ASR 模型加载和参数检查 |
-| `CreateContext` | ASRContext 创建和类型转换 |
-| `AudioProcessor` | 音频加载、切分、Mel 特征 |
-| `Encode` | Encoder 前向 |
-| `BuildPrompt` | 语言 token 和 prompt 构造 |
-| `PrefillAndDecode` | Decoder prefill + decode |
-| `Transcribe` | 完整音频转写入口 |
-| `PerfInfo` | `ASRPerfInfo` RTF/TPS 指标填充 |
-
-ASR 测试应额外检查：
-
-- `SamplingParams::language` 为 `auto` 和具体语言时的行为。
-- `eos_token_ids()` 中任一 token 触发停止。
-- 多 chunk 音频的 `n_chunks` 和 `audio_duration` 统计。
-- `profiler().has_stage("transcribe.encode.inference")` 等关键阶段存在。
-
-### 8.4 CMake 注册测试
+基础工程只构建 `houmo_infer` 共享库，没有模型源码自动发现机制。模型目录需要显式链接：
 
 ```cmake
-if(BUILD_TESTS)
-  add_executable(your_model_test tests/your_model_test.cc)
-  target_include_directories(your_model_test PRIVATE ${TEST_INCLUDE_DIR})
-  target_link_libraries(your_model_test PRIVATE houmo_infer GTest::gtest_main)
-  add_test(NAME YourModelTest COMMAND your_model_test)
-endif()
+target_link_libraries(your_model_target PRIVATE houmo_infer)
+target_include_directories(your_model_target PRIVATE
+  /path/to/houmo-llm-engine/include
+)
 ```
 
----
+若直接向基础工程添加通用源码，需要更新 `CORE_SOURCES` 或 `MODULE_SOURCES`。具体模型源码通常应留在模型自身 target 中，避免基础库绑定具体模型。
 
-## 9. 性能采集检查清单
+## 8. 验证清单
 
-### 生成类模型
+### 加载
 
-- [ ] `generate` E2E 计时
-- [ ] `set_input_tokens()` 设置输入 token 数
-- [ ] prefill 后调用 `record_ttft()`
-- [ ] 每次 decode 后调用 `add_output_token()`
-- [ ] `generate.prefill` 和 `generate.decode` 阶段存在
-- [ ] 结束时 `perf_stats_ = profiler_.to_perf_stats()`
-
-### ASR 模型
-
-- [ ] `set_root_stage("transcribe")`
-- [ ] `transcribe.audio_load` 覆盖音频加载和特征提取
-- [ ] 使用 `do_encode()` 而非直接调用 encode 钩子
-- [ ] 使用 `do_detect_language()` 或明确处理不支持语言检测的模型
-- [ ] 使用 `do_prefill()` 和 `do_decode()`
-- [ ] prefill 后调用 `record_ttft()`
-- [ ] decode token 后调用 `add_output_token()`
-- [ ] 结束时调用 `fill_perf_info(audio_duration)`
-- [ ] `ASRPerfInfo` 中 `overall_rtf`、`inference_rtf`、`decode_tps` 合理
-
----
-
-## 10. 适配完成检查清单
-
-### 代码
-
-- [ ] 选择了正确的基类：LLM、VLM 或 ASR。
-- [ ] 没有遮蔽基类已有成员。
-- [ ] `load()` 使用 `config_.devices`，没有硬编码设备号。
-- [ ] `weight_manager_` 使用 `*dev_manager_` 创建。
-- [ ] 所有 TCIM 输入 tensor map 在加载后初始化。
-- [ ] `ModelInfo` 或 ASR 参数字段填充完整。
-- [ ] tokenizer、embedding 按模型需要加载。
-
-### 注册和构建
-
-- [ ] `ModelSeries` 和字符串转换已更新。
-- [ ] `REGISTER_MODEL` 使用正确的基类工厂。
-- [ ] CMake 源文件列表包含新模型实现。
-- [ ] CMake 测试目标已添加。
-- [ ] whole-archive 链接策略能保留静态注册对象。
+- [ ] 所有必需路径在加载前检查。
+- [ ] `config_.devices` 被实际使用，没有硬编码设备 ID。
+- [ ] `DevManager` 生命周期覆盖所有 TCIM modules。
+- [ ] `WeightManager` 和共享 cache 的所有权清晰。
+- [ ] `ModelInfo::type` 和其他字段完整初始化。
+- [ ] Embedding hidden dimension 和 max sequence length 正确。
 
 ### 推理
 
-- [ ] Prefill padding 和 position 逻辑符合模型要求。
-- [ ] Decode 正确维护 context length 和 cache。
-- [ ] Stop token、max tokens、callback 中断都能停止。
-- [ ] VLM 清理或保留图像状态的策略明确。
-- [ ] ASR 多 chunk、语言设置、EOS 集合和音频时长统计正确。
+- [ ] prefill padding、position 和 logits 索引与模型一致。
+- [ ] decode 正确更新 position、context length 和 KV cache。
+- [ ] EOS、`stop_tokens`、`max_tokens`、context 上限和 callback 均可终止循环。
+- [ ] `generated_ids_` 包含 Sampler penalty 所需的正确历史。
+- [ ] `reset()` 清理了基础状态和模型特有状态。
+- [ ] VLM 图像状态属于 Context，且多轮保留策略明确。
+- [ ] ASR 多 chunk 之间的 cache 重置/复用策略明确。
 
-### 测试
+### 性能
 
-- [ ] 缺少模型文件时测试 skip。
-- [ ] 单元测试覆盖 tokenizer/embedding/sampler/profiler 或模型对应模块。
-- [ ] LLM/VLM 覆盖 load、context、prefill/decode、generate。
-- [ ] ASR 覆盖 audio processor、encode、prompt、transcribe、perf info。
-- [ ] `ctest --output-on-failure` 通过，或失败原因与缺少外部模型文件明确相关。
+- [ ] 根 stage 使用 `generate` 或 `transcribe`。
+- [ ] prefill 后调用 `record_ttft()`。
+- [ ] 每个实际输出 token 调用一次 `add_output_token()`。
+- [ ] LLM/VLM 结束时更新 `perf_stats_`。
+- [ ] ASR 结束时调用 `fill_perf_info(actual_audio_duration)`。
+- [ ] 禁用 `HOUOMO_ENABLE_PROFILING` 后业务逻辑仍可运行。
+
+### 错误处理
+
+- [ ] `ModelFactory::Create()` 返回 `nullptr` 时调用方有处理。
+- [ ] AudioProcessor 返回空结果时停止转写并报告错误。
+- [ ] 图像加载 fallback 是否符合产品需求已经确认。
+- [ ] Tokenizer 或 Embedding 未加载时不会调用对应 getter。

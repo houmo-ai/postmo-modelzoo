@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+#include "core/model_factory.h"
 #include "modules/streaming_decoder.h"
 #include "qwen35_mllm_model.h"
 
@@ -117,7 +118,7 @@ static std::string ApplyChatTemplate(const std::vector<Message>& msgs,
   return out;
 }
 
-static void printModelInfo(houmo::Qwen35MLLMModel& model) {
+static void printModelInfo(houmo::LLMModel& model) {
   printSeparator("Model Information");
 
   auto info = model.model_info();
@@ -163,7 +164,7 @@ static void printGenerationMetrics(houmo::Context& ctx) {
 // Example features
 // ============================================================================
 
-static void exampleBasicInference(houmo::Qwen35MLLMModel& model,
+static void exampleBasicInference(houmo::LLMModel& model,
                                   const std::string& prompt,
                                   const houmo::SamplingParams& params,
                                   bool enable_thinking) {
@@ -190,7 +191,7 @@ static void exampleBasicInference(houmo::Qwen35MLLMModel& model,
   printGenerationMetrics(*ctx);
 }
 
-static void exampleImageUnderstanding(houmo::Qwen35MLLMModel& model,
+static void exampleImageUnderstanding(houmo::LLMModel& model,
                                       const std::vector<std::string>& images,
                                       const std::string& prompt,
                                       const houmo::SamplingParams& params,
@@ -306,21 +307,29 @@ int main(int argc, char* argv[]) {
     std::cout << "  Houmo Inference Framework v" << houmo::version() << "\n";
     std::cout << "========================================\n\n";
 
-    std::cout << "Loading Qwen3.5 MLLM model...\n";
-    houmo::Qwen35MLLMModel model(config);
+    const auto model_series = houmo::ModelSeries::kQwen35MLLM;
+    std::cout << "Loading registered model: "
+              << houmo::ModelSeriesToString(model_series) << "...\n";
+    auto model =
+        houmo::ModelFactory<houmo::LLMModel>::Create(model_series, config);
+    if (!model) {
+      std::cerr << "Error: model is not registered: "
+                << houmo::ModelSeriesToString(model_series) << "\n";
+      return 2;
+    }
     std::cout << "Model loaded successfully!\n";
 
-    printModelInfo(model);
+    printModelInfo(*model);
 
     houmo::SamplingParams params;
     params.max_tokens = max_tokens;
 
     bool enable_thinking = false;
     if (!image_paths.empty()) {
-      exampleImageUnderstanding(model, image_paths, prompt, params,
+      exampleImageUnderstanding(*model, image_paths, prompt, params,
                                 enable_thinking);
     } else {
-      exampleBasicInference(model, prompt, params, enable_thinking);
+      exampleBasicInference(*model, prompt, params, enable_thinking);
     }
 
     std::cout << "\nDone!\n";

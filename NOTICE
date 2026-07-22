@@ -44,7 +44,8 @@ Third-Party Software, Algorithm and Data Notices:
 # Software libraries
 half IEEE 754-based half-precision floating-point library (MIT) - https://github.com/suruoxi/half
 tokenizers-cpp (Apache-2.0) - https://github.com/mlc-ai/tokenizers-cpp
-Eigen3 (MPL-2.0) - https://gitlab.com/libeigen/eigen
+Eigen3 Tensor source subset (MPL-2.0 / Apache-2.0 / BSD) - https://gitlab.com/libeigen/eigen
+Cephes Math Library portions included by Eigen SpecialFunctions - https://netlib.org/cephes/
 OpenCV (Apache-2.0) - https://opencv.org/
 stb_image (Public Domain / MIT-0) - https://github.com/nothings/stb
 JSON for Modern C++ (MIT) - https://github.com/nlohmann/json
@@ -69,7 +70,6 @@ RapidJSON (MIT) - https://github.com/Tencent/rapidjson
 Oniguruma (BSD-2-Clause) - https://github.com/kkos/oniguruma
 utf8proc (MIT) - https://github.com/JuliaStrings/utf8proc
 Tokenizer C++ (Apache-2.0) - C++ reimplementation of HuggingFace tokenizers (by Wang Zhaode) https://github.com/wangzhaode/tokenizer.cpp
-Google Test (BSD-3-Clause) - https://github.com/google/googletest
 # Datasets
 CCPD Dataset (MIT) - https://github.com/detectRecog/CCPD
 VOC2012 Dataset (CC BY 4.0) - https://public.roboflow.com/object-detection/pascal-voc-2012

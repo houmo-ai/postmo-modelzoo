@@ -10,31 +10,6 @@ set BUILD_JOBS=%NUMBER_OF_PROCESSORS%
 set BUILD_DIR=build_vs2022
 set HDPL_PLATFORM=ASIC
 
-:: Check and create 3rdparty directory if not exists
-if not exist "3rdparty" (
-    mkdir "3rdparty"
-    echo Created directory: 3rdparty
-)
-
-:: Download and setup eigen3 if not exists
-if not exist "3rdparty\eigen3" (
-    cd /d "3rdparty"
-    echo Downloading eigen-3.4.0.zip...
-    powershell -Command "(New-Object System.Net.WebClient).DownloadFile('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip', 'eigen-3.4.0.zip')"
-
-    echo Extracting eigen-3.4.0.zip...
-    powershell -Command "Expand-Archive -Path 'eigen-3.4.0.zip' -DestinationPath '.' -Force"
-
-    echo Renaming directory...
-    ren "eigen-3.4.0" "eigen3"
-
-    echo Cleaning up...
-    del /f /q "eigen-3.4.0.zip"
-
-    cd /d "%PROJECT_DIR%"
-    echo Eigen3 setup completed
-)
-
 echo All dependencies are ready
 
 rem c++ example

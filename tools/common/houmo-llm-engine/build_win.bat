@@ -14,36 +14,7 @@ if exist "build" (
 )
 mkdir "build"
 
-:: Check and create 3rdparty directory if not exists
-if not exist "3rdparty" (
-    mkdir "3rdparty"
-    echo Created directory: 3rdparty
-)
-
-if not exist "3rdparty\googletest" (
-    "%PYTHON_DIR%\python.exe" get_3rdparty.py
-)
-
-:: Download and setup eigen3 if not exists
-if not exist "3rdparty\eigen3" (
-    cd /d "3rdparty"
-    echo Downloading eigen-3.4.0.zip...
-    powershell -Command "(New-Object System.Net.WebClient).DownloadFile('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip', 'eigen-3.4.0.zip')"
-
-    echo Extracting eigen-3.4.0.zip...
-    powershell -Command "Expand-Archive -Path 'eigen-3.4.0.zip' -DestinationPath '.' -Force"
-
-    echo Renaming directory...
-    ren "eigen-3.4.0" "eigen3"
-
-    echo Cleaning up...
-    del /f /q "eigen-3.4.0.zip"
-
-    cd /d ..
-    echo Eigen3 setup completed
-)
-
-rem Image/audio: header-only under %HOUMO_EXAMPLES_PATH%\apis\common\hpp\
+rem Image/audio/Eigen headers are under %HOUMO_EXAMPLES_PATH%\apis\common\
 
 echo All dependencies are ready
 
