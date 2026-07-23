@@ -127,8 +127,10 @@ if should_run_step "demo"; then
     echo "Execute demo."
     if [ "${MTP}" = "true" ]; then
         python3 demo_mtp.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        python3 python/demo_mtp.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     else
         python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        python3 python/demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
         python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
 
         echo "Execute cpp demo."

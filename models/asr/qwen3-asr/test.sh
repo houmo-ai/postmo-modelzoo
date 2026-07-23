@@ -91,6 +91,7 @@ if should_run_step "demo"; then
     echo "Execute demo ${DEMO_SCRIPT}"
     if [ "$DEMO_SCRIPT" = "demo_asr.py" ]; then
         python3 demo_asr.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        python3 python/demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
         python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
         echo "Execute cpp demo."
         cd cpp && ./build_linux.sh && cd ..
