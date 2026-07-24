@@ -3,3 +3,4 @@
 @../.github/copilot-instructions.md
 @../.github/guidance/repo-layout.md
 @../.github/guidance/coding-style.md
+@../.github/guidance/review-guidelines.md

@@ -23,11 +23,8 @@ Primary languages: C++ and Python.
 - No git remote/history changes: `git pull`, `git fetch`, `git push`, `git reset`, `git rebase`
 - No network/install/escalation: `curl`, `wget`, `apt`, `pip`, `brew`, `sudo`, `docker`
 
-## Required repository guidance
-
-Before modifying repository files, read and follow the applicable guidance:
+## References (read-only)
 
 - Repository layout: `.github/guidance/repo-layout.md`
 - Coding style: `.github/guidance/coding-style.md`
-
-Treat these documents as mandatory repository instructions. Do not modify them unless explicitly requested.
+- Review: `.github/guidance/review-guidelines.md`

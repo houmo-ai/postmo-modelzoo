@@ -1,0 +1,112 @@
+---
+name: imodelzoo-model-review
+description: "Review end-to-end model example changes in iModelzoo. Use for changes under models/**, related tests/models_tests/** configurations and pytest entries, config/imodelExampleConfig.yaml, model aggregation manifests, large-model config.yaml/get_model.py/ptq.py/build.py/demo.py workflows, CV config.yml/model_impl.py/dataset.py HMATC workflows, test.sh, or model README files."
+---
+
+# iModelzoo Model Review
+
+## 基础规则与评审单元
+
+先加载 `imodelzoo-code-review`，使用其中的 severity、finding 格式、验证策略和仓库边界。本 skill 只补充模型示例专项规则。
+
+先应用 `.github/guidance/review-guidelines.md` 的全局 `Review Exclusions`。被排除的路径不进入 model review unit，也不因与模型工作流相关而重新纳入。
+
+评审文件命名、参数解析、产物名、`test.sh` 或测试 JSON 时，必须读取 [`references/model-example-conventions.md`](references/model-example-conventions.md)。先根据目录结构和实际执行入口区分“大模型脚本体系”与“CV/HMATC 体系”，再应用对应规则。
+
+评审模型目录主 README 时，必须读取 [`references/model-readme-conventions.md`](references/model-readme-conventions.md)，区分“大模型与生成式模型 README”和“CV/HMATC 模型 README”。涉及 LLM、TTS、VLM、Diffusion 等大模型体系 README 时，同时使用 `large-model-readme-generation`；不要把该结构机械套到 Detection、Backbone 等 CV 示例。
+
+不要把一套体系的要求机械套到另一套体系：大模型通常使用 `config.yaml` 和独立阶段脚本；CV 通常使用 `config.yml`、`model_impl.py`、`dataset.py` 和 HMATC 公共命令。混合或迁移中的示例按实际调用链检查。
+
+不要孤立评审 `models/<category>/<model>/` 中的单个文件。将以下直接耦合内容视为同一个评审单元：
+
+- `models/<category>/<model>/**`
+- `tests/models_tests/model_configs/model_cfg_<model>.json`
+- `tests/models_tests/test_*.py`、marker 和共享测试入口
+- `config/imodelExampleConfig.yaml`
+- 直接相关的 `imodelzoo.yaml`、`imodelzoo_xh2.yaml` 或顶层模型清单
+- 模型 README、示例命令和测试参数
+
+只检查本次变更影响的文件，不要求每个模型具备所有阶段。
+
+## 沿模型工作流评审
+
+按模型实际支持的阶段追踪数据、配置和产物：
+
+```text
+config / CLI
+    -> get_model / convert
+    -> ptq / quant
+    -> build / compile
+    -> demo / inference
+    -> compare / eval / perf
+    -> tests / README / aggregate config
+```
+
+确认每个阶段消费上游实际生成的模型、tokenizer/processor、校准数据和中间产物。检查失败后是否可能继续使用旧产物并产生假成功。
+
+## 配置和命名一致性
+
+- 先按 reference 识别 `config.yaml` 大模型体系或 `config.yml` CV/HMATC 体系，确认对应配置源承担单一真值职责。
+- 对齐模型目录名、模型 ID、revision、tokenizer/processor 路径和本地缓存目录。
+- 对齐 FP、W8A8、W4A16 等精度名称以及 ONNX/HMONNX/HMM 等产物名。
+- 对齐 batch、sequence/context/prefill length、dynamic shape、device/core 数和目标平台。
+- 检查 `test.sh`、Python CLI、C++ CLI、测试 JSON 和 README 的默认值及 flag 拼写。
+- 检查大模型的显式 CLI > `config.yaml` > 安全默认值优先级，或 CV 的显式 HMATC CLI override > `config.yml` 优先级没有被反转。
+- 确认 CLI override 以正确类型和值传递到量化、编译或推理调用点。
+- 检查不同 backend 或模型变体不会覆盖、误读或混用同一输出目录中的产物。
+
+## 获取、量化和编译
+
+- 检查下载来源、文件选择、缓存复用和离线/本地路径行为是否与文档一致。
+- 检查导出或转换时的 input name、output name、opset、shape、dtype 和动态维度。
+- 检查校准数据、预处理、样本数量和量化排除项是否适合目标模型。
+- 检查量化配置是否真正传入 Houmo Quantization Tool，而非只停留在 CLI 或 YAML 层。
+- 检查 build 阶段消费正确的 HMONNX/ONNX，且输出 HMM 名称与 Demo、测试和 README 一致。
+- 只评审 iModelzoo 对量化/编译公开 API 的调用；不要推测下层 Pass、lowering 或 Kernel 内部实现。
+
+## Demo 与模型语义
+
+所有模型均检查：
+
+- 输入/输出 tensor 的名称、顺序、shape、dtype、layout 和语义。
+- 预处理、padding/batching、后处理和输出解码是否与参考模型一致。
+- 设备初始化、资源生命周期、同步、warm-up、异常退出和输出落盘。
+- ONNX/HMONNX/HMM 等运行模式是否使用等价输入，并按合理 tolerance 比较。
+
+按模型类型补充检查：
+
+- LLM/VLM/Omni：prompt template、prefill/decode、KV cache、mask、position、stop token、sampling、最大长度和多设备切分。
+- VLM/OCR：图像 resize/normalize、视觉 placeholder、视觉 token、坐标和文本输出。
+- ASR/音频：采样率、channel、feature extractor、chunk/streaming、时间戳和文本归一化。
+- TTS：文本前处理、speaker/reference audio、codec/vocoder、采样率和音频写出。
+- Embedding/Reranker：pooling、normalization、batching、sequence 截断和 score 语义。
+- CV/Diffusion：图像 shape/layout、颜色空间、后处理、随机种子和输出尺寸。
+
+## Compare、Eval 与 Perf
+
+- 确认 compare 比较语义等价的输出，并使用适合 dtype 和任务的指标/阈值。
+- 检查 eval 的 dataset、split、prompt/template、prediction/reference 配对和 metric 聚合。
+- 避免将失败、空输出或跳过样本静默计入成功结果。
+- 区分 warm-up 与正式测量，并在设备计时边界正确同步。
+- 对齐 latency、throughput、TTFT、TPOT、token 数、batch 和显存等指标定义。
+- 不接受没有可复现命令、环境和输入说明的精度或性能结论。
+
+## 测试和文档耦合
+
+- 按 reference 检查大模型 `test_common.sh` 阶段参数协议，或 CV 完整 HMATC workflow 的固定执行顺序。
+- 按 README reference 检查两套章节结构、命令、配置、产物、结果指标和免责声明，不要跨体系复制模板。
+- 检查模型配置 JSON 是否覆盖变更涉及的 get/quant/compile/demo/compare/eval/perf 阶段。
+- 检查 `test_sh_params`、Python Demo 参数组、backend 分支、prerequisite 和 skip 条件是否与实现一致。
+- 检查 pytest marker、model name、device 数和显存要求是否正确注册。
+- 检查 `config/imodelExampleConfig.yaml` 和聚合模型清单是否需要同步。
+- 确认测试执行了变更路径并验证产物或结果，而不只是进程成功退出。
+- 检查 README 命令、执行目录、环境变量、模型路径、产物名和阶段顺序。
+- 检查复制内容是否残留其他模型的名称、shape、命令、指标或免责声明。
+
+涉及新增/重构模型 pytest 接入时，同时使用 `generate-model-pytest-cases`。
+
+## 验证与报告
+
+优先运行与变更阶段对应的最小测试；缺少模型、数据集、量化环境、编译环境或设备时，将其列为 validation gap。不要因为无法运行端到端模型就制造 finding，但要根据静态数据流和配置证据报告可确定的问题。
+
+按 `imodelzoo-code-review` 输出 findings。每条 finding 明确指出失败发生在哪个阶段，以及它如何影响下游 Demo、测试、评测或用户命令。

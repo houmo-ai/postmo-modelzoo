@@ -1,6 +1,6 @@
 ---
 name: large-model-readme-generation
-description: 用于生成、修改、重构和检查 imodelzoo 大模型示例 README，统一结构、命名、章节顺序、示例命令和免责声明格式。适用于 LLM、VLM、ASR、TTS、Embedding、Reranker、OCR、Omni 等大模型示例目录。
+description: 用于生成、修改、重构和检查 imodelzoo 大模型示例 README，统一结构、命名、章节顺序、示例命令和免责声明格式。适用于 LLM、VLM、ASR、TTS、Diffusion、Embedding、Reranker、OCR、Omni 等大模型与生成式模型示例目录。
 ---
 
 # 大模型示例 README 生成规范
@@ -13,6 +13,7 @@ description: 用于生成、修改、重构和检查 imodelzoo 大模型示例 R
 - `models/vlm/**/README.MD`
 - `models/asr/**/README.MD`
 - `models/tts/**/README.MD`
+- `models/diffusion/**/README.MD`
 - `models/embedding/**/README.MD`
 - `models/reranker/**/README.MD`
 - `models/ocr/glm-ocr/README.MD`
@@ -30,32 +31,14 @@ description: 用于生成、修改、重构和检查 imodelzoo 大模型示例 R
 - `models/ocr/PPOCRv3/**`
 - 其他以传统 CV / 通用推理模型为主的目录
 
-典型触发词：
-
-- "为大模型示例生成 README"
-- "参考其他 README 调整格式"
-- "同步 README 和脚本真实行为"
-- "补齐 README 的标准章节"
-- "统一免责声明/ModelScope 链接格式"
-- "检查 README 是否缺少性能结果章节"
-
 ## 目标
 
-确保大模型示例（LLM、VLM、ASR、TTS、Embedding、Reranker、OCR、Omni 等）的 README 在结构、命名、内容上保持一致，并满足以下约束：
+确保大模型与生成式模型示例（LLM、VLM、ASR、TTS、Diffusion、Embedding、Reranker、OCR、Omni 等）的 README 在结构、命名、内容上保持一致，并满足以下约束：
 
 1. README 结构清晰，章节顺序与仓库主流模型保持一致。
 2. README 中的默认模型、默认路径、输出文件名与脚本真实行为一致。
 3. README 中的命令示例、`test.sh` 参数说明、性能结果章节完整且可维护。
 4. ModelScope 链接、免责声明、平台限制说明等关键文案风格统一。
-
-## 典型场景
-
-- 新增大模型示例时，参考现有格式生成 README
-- 为已有大模型示例补齐 README 的标准章节
-- 根据脚本真实行为生成或重写 README
-- 修改现有 README，使其与脚本真实行为保持一致
-- 重构现有 README 的章节结构、命名或示例命令
-- 检查 README 是否缺少章节、参数说明、结果章节或免责声明
 
 ## 开始前先读
 
@@ -377,6 +360,7 @@ E2E Latency (End-to-End Latency): 0.430 seconds
 - VLM 模型：`models/vlm/qwen3-vl/README.MD`
 - ASR 模型：`models/asr/qwen3-asr/README.MD`
 - TTS 模型：`models/tts/cosyvoice3/README.MD`
+- Diffusion 模型：`models/diffusion/z-image/README.MD`
 - Reranker 模型：`models/reranker/qwen3-reranker/README.MD`
 - OCR 模型：`models/ocr/glm-ocr/README.MD`
 - Omni 模型：`models/omni/minicpmo/README.MD`
@@ -500,7 +484,8 @@ ls -la models/xxx/*/README.MD
 ### 不同模型类型的适配
 - **LLM**: 通常有 prefill/decoder 等输出，量化需要 wikitext
 - **VLM**: 可能有 visual 相关的额外输出和步骤
-- **TTS**: 可能有不同的输入输出格式
+- **TTS**: 需要说明多子模型、speaker/reference audio、采样率、流式/非流式模式和音频输出
+- **Diffusion**: 需要说明 text encoder/DiT/VAE 等子模型、prompt、分辨率、采样步数、随机种子或 scheduler、图片输出名，以及 image latency/throughput 等性能口径
 - **Embedding**: 通常只有 embedding/prefill，部分有 reranker
 - 根据不同模型类型调整具体内容描述，但保持整体结构一致
 
