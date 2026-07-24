@@ -1,5 +1,7 @@
 # Resnet50 Pipeline Example
 
+当前支持Linux、Android、OpenHarmony (OHOS) 平台。
+
 ## 目录
 
 [TOC]
@@ -46,6 +48,18 @@ cmake -DCMAKE_INSTALL_PREFIX=../ ..
 make -j
 make install
 cd ..
+./example_resnet50_pipeline
+```
+
+**OpenHarmony (OHOS) 平台交叉编译：**
+
+```bash
+export OHOS_SDK=/path/to/OpenHarmony/release/6.0-Release/linux/native
+export HOUMO_TARGET=xh2
+export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export TCIM_RUNTIME_PATH=/path/to/houmo-sdk
+./build_OHOS.sh
+cd bin
 ./example_resnet50_pipeline
 ```
 

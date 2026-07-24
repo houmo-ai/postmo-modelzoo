@@ -22,14 +22,20 @@ else()
     set(SYS_NAME "")
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
       set(SYS_NAME "Linux")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+      set(SYS_NAME "OHOS")
     else()
       message(WARNING "Current System is ${CMAKE_SYSTEM_NAME}, Unsupported System!")
     endif()
-    execute_process(
-      COMMAND uname -m
-      OUTPUT_VARIABLE ARCH
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
+    if(DEFINED CMAKE_SYSTEM_PROCESSOR AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "")
+      set(ARCH ${CMAKE_SYSTEM_PROCESSOR})
+    else()
+      execute_process(
+        COMMAND uname -m
+        OUTPUT_VARIABLE ARCH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+    endif()
     set(HOUMO_TARGET "$ENV{HOUMO_TARGET}")
     set(LIB_PATH "${SYS_NAME}_${ARCH}_${HOUMO_TARGET}")
     message(STATUS "LIB_PATH: ${LIB_PATH}")
@@ -90,6 +96,12 @@ else()
     else()
       target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c ${TCIM_LIBRARY} dl)
     endif()
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    if(TCIM_DEV_CTRL_LIBRARY)
+      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c tcim_runtime_lite ${TCIM_DEV_CTRL_LIBRARY} pthread ${CMAKE_DL_LIBS} c++ c++abi)
+    else()
+      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c tcim_runtime_lite pthread ${CMAKE_DL_LIBS} c++ c++abi)
+    endif()
   else()
     if(TCIM_DEV_CTRL_LIBRARY)
       target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c tcim_runtime_lite ${TCIM_DEV_CTRL_LIBRARY} pthread ${CMAKE_DL_LIBS})
@@ -100,3 +112,11 @@ else()
 endif()
 
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
+
+# Install dependent .so files for runtime loading
+if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+  set(TCIM_RUNTIME_LIB "$ENV{HOUMO_PATH}/lib")
+  install(FILES "${TCIM_RUNTIME_LIB}/libtcim_runtime_lite.so"
+                "${TCIM_RUNTIME_LIB}/libtcim_dev_ctrl.so"
+          DESTINATION .)
+endif()

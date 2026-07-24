@@ -218,6 +218,7 @@ E2E TPS (End-to-End Tokens Per Second): 16.29 tokens/s
 
 -   Linux xh2 x86_64 (cmake 3.28.3 gcc/g++ 13.3.0)
 -   Android xh2 arm64-v8a (cmake 3.28.3 clang/clang++ 19.0.1)
+-   OHOS xh2 aarch64 (cmake 3.28.3 clang/clang++ 15.0.4)
 -   Windows11 xh2 x64 (cmake 4.1.1 Visual Studio 17 2022)
 
 ### 4.1 依赖三方库环境
@@ -272,6 +273,18 @@ Qwen3 的 C++推理样例依赖以下三方库：
         # export TCIM_RUNTIME_PATH={the_path_of_android}/houmo-tcim-runtime-xh2
         ./build_ndk.sh
         ```
+-   build_OHOS.sh 支持一键编译如下平台的 C++样例:
+    1. OHOS_aarch64_xh2
+        ```bash
+        # 1. 需要下载 OpenHarmony SDK，并设置 OHOS_SDK。
+        # 2. 需要下载 OHOS 版本 runtime-sdk，设置 TCIM_RUNTIME_PATH 为当前 OHOS 版本路径。
+        # 3. 需要设置 HOUMO_PATH 和 HOUMO_SDK_PATH。
+        # 示例如下：
+        # export OHOS_SDK={the_path_of_ohos}/release/6.0-Release/linux/native
+        # export HOUMO_PATH={the_path_of_ohos}/houmo
+        # export TCIM_RUNTIME_PATH={the_path_of_ohos}/houmo
+        ./build_OHOS.sh
+        ```
 
 ### 4.4 C++样例相关文件说明
 
@@ -287,7 +300,8 @@ Qwen3 的 C++推理样例依赖以下三方库：
 ├── Hmtokenizer.cc              qwen3 tokenizer功能实现封装
 ├── qwen3.cc                    qwen3 样例主函数实现
 ├── run.bat                     win11编译和运行脚本
-└── build_ndk.sh                安卓编译脚本
+├── build_ndk.sh                安卓编译脚本
+└── build_OHOS.sh              OHOS交叉编译脚本
 ```
 
 ### 4.5 C++演示结果

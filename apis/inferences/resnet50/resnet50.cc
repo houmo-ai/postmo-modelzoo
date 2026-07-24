@@ -31,12 +31,12 @@
 #include <string>
 #include <vector>
 
-#if (__GNUC__ < 8 && !defined(_MSC_VER))
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#else
+#if defined(__clang__) || __GNUC__ >= 8 || defined(_MSC_VER)
 #include <filesystem>
 namespace fs = std::filesystem;
+#else
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
 #endif
 
 #include <opencv2/imgcodecs.hpp>

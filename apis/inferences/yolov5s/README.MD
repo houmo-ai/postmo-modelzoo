@@ -1,5 +1,7 @@
 # Yolov5s Example
 
+当前支持Linux、Android、OpenHarmony (OHOS) 平台。
+
 ## 目录
 
 [TOC]
@@ -70,6 +72,18 @@ WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export LD_LIBRARY_PATH=$WORK_PATH/../../models/3rdparty/onnxruntime/lib:$LD_LIBRARY_PATH
 # 执行C++示例
 ./example_yolov5s --enable_ort
+```
+
+**OpenHarmony (OHOS) 平台交叉编译：**
+
+```bash
+export OHOS_SDK=/path/to/OpenHarmony/release/6.0-Release/linux/native
+export HOUMO_TARGET=xh2
+export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export TCIM_RUNTIME_PATH=/path/to/houmo-sdk
+./build_OHOS.sh
+cd bin
+./example_yolov5s
 ```
 
 ## 参考结果
