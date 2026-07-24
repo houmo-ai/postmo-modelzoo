@@ -116,6 +116,8 @@ python3 get_model.py --type hmm --model_name qwen3.6 --model_size 35b-a3b
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
 ```
 
+注意：qwen3.5-122b-a10b 模型的量化需要单个 GPU 显存不少于 80 G
+
 进入 docker 后，在仓库根目录执行 `source env.sh`，再进入当前目录运行 `ptq.py`。
 
 ```bash

@@ -13,7 +13,11 @@ data/
 toolchains/
 3rdparty/
 work_dirs/
+
+# agent directories
 .github/
+.claude/
+.codex/
 
 # media files
 *.jpg
