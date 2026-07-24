@@ -131,6 +131,7 @@ if should_run_step "demo"; then
     else
         python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
         python3 python/demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        python3 python/demo_prefix_caching.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 
         VISUAL_MODEL_PATH="$(find_visual_model_path)"
         python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
