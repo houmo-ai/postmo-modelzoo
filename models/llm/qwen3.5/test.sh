@@ -15,52 +15,39 @@ MODEL_NAME="qwen3.6"
 MODEL_SIZE="35b-a3b"
 NDEVICE=1
 MTP="false"
+LOAD_MODE=""
 
 parse_args "$@"
 
 case "${MODEL_NAME}:${MODEL_SIZE}" in
     qwen3.5:0.8b)
         WORKFLOW_MODEL_DIR="Qwen3.5-0.8B"
-        WORKFLOW_CONFIG_PATH="configs/qwen3.5/0.8b/qwen3.5-0.8b_w8a8.yaml"
         ;;
     qwen3.5:2b)
         WORKFLOW_MODEL_DIR="Qwen3.5-2B"
-        WORKFLOW_CONFIG_PATH="configs/qwen3.5/2b/qwen3.5-2b_w8a8.yaml"
         ;;
     qwen3.5:4b)
         WORKFLOW_MODEL_DIR="Qwen3.5-4B"
-        WORKFLOW_CONFIG_PATH="configs/qwen3.5/4b/qwen3.5-4b_w4a8.yaml"
         ;;
     qwen3.5:9b)
         WORKFLOW_MODEL_DIR="Qwen3.5-9B"
-        WORKFLOW_CONFIG_PATH="configs/qwen3.5/9b/qwen3.5-9b_w4a8.yaml"
         ;;
     qwen3.5:122b-a10b)
         WORKFLOW_MODEL_DIR="Qwen3.5-122B-A10B"
-        WORKFLOW_CONFIG_PATH=""
+        LOAD_MODE="--LazyMode"
         ;;
     qwen3.6:27b)
         WORKFLOW_MODEL_DIR="Qwen3.6-27B"
-        WORKFLOW_CONFIG_PATH="configs/qwen3.6/27b/qwen3.6-27b_w4a8.yaml"
         ;;
     qwen3.6:35b-a3b)
         WORKFLOW_MODEL_DIR="Qwen3.6-35B-A3B"
-        WORKFLOW_CONFIG_PATH="configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8.yaml"
+        LOAD_MODE="--LazyMode"
         ;;
     *)
         echo "Error: Unsupported model combination '${MODEL_NAME}-${MODEL_SIZE}'." >&2
         echo "       qwen3.5 supports: 0.8b, 2b, 4b, 9b, 122b-a10b" >&2
         echo "       qwen3.6 supports: 27b, 35b-a3b" >&2
         exit 1
-        ;;
-esac
-
-LOAD_MODE=""
-case "${MODEL_SIZE}" in
-    35b-a3b)
-        LOAD_MODE="--LazyMode"
-        ;;
-    *)
         ;;
 esac
 
@@ -83,14 +70,6 @@ if should_run_step "quant"; then
         exit 1
     fi
 
-    if [ "${MTP}" = "true" ]; then
-        WORKFLOW_CONFIG_PATH="${WORKFLOW_CONFIG_PATH%.yaml}_mtp.yaml"
-    fi
-    if [ ! -f "${WORKFLOW_CONFIG_PATH}" ]; then
-        echo "Error: workflow config '${WORKFLOW_CONFIG_PATH}' does not exist." >&2
-        exit 1
-    fi
-
     if ! should_skip_download; then
         echo "Download raw model (${MODEL_NAME}-${MODEL_SIZE})."
         GET_MODEL_ARGS=(--type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}")
@@ -100,7 +79,11 @@ if should_run_step "quant"; then
         python3 get_model.py "${GET_MODEL_ARGS[@]}"
     fi
     echo "Start model quantization (${MODEL_NAME}-${MODEL_SIZE})."
-    python3 ptq.py --model-dir "${WORKFLOW_MODEL_DIR}" --config-path "${WORKFLOW_CONFIG_PATH}"
+    if [ "${MTP}" = "true" ]; then
+        python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --mtp
+    else
+        python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    fi
 fi
 
 if should_run_step "build"; then
@@ -124,6 +107,23 @@ if should_run_step "demo"; then
         fi
         python3 get_model.py "${GET_MODEL_ARGS[@]}"
     fi
+
+    find_visual_model_path() {
+        local visual_prefix="output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual"
+        local candidate
+        for candidate in \
+            "${visual_prefix}_896x896x2.hmm" \
+            "${visual_prefix}_448x448x2.hmm" \
+            "${visual_prefix}.hmm"; do
+            if [ -f "${candidate}" ]; then
+                echo "${candidate}"
+                return 0
+            fi
+        done
+        echo "Error: No visual model found for '${MODEL_NAME}-${MODEL_SIZE}'." >&2
+        return 1
+    }
+
     echo "Execute demo."
     if [ "${MTP}" = "true" ]; then
         python3 demo_mtp.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
@@ -131,14 +131,15 @@ if should_run_step "demo"; then
     else
         python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
         python3 python/demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
-        python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
 
+        VISUAL_MODEL_PATH="$(find_visual_model_path)"
+        python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
         echo "Execute cpp demo."
         cd cpp && ./build_linux.sh && cd ..
         if [[ "${NDEVICE}" -eq 1 ]]; then
             ./bin/demo --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
                 --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-                --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_896x896x2.hmm" \
+                --visual "${VISUAL_MODEL_PATH}" \
                 --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin" \
                 --prompt "介绍下图片" --image "${HOUMO_EXAMPLES_PATH}/data/pic/beach.jpeg" \
                 --tokenizer "${WORKFLOW_MODEL_DIR}"
@@ -155,7 +156,7 @@ if should_run_step "demo"; then
                 --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 ${LOAD_MODE} \
                 --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
                 --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
-                --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_896x896x2.hmm" \
+                --visual "${VISUAL_MODEL_PATH}" \
                 --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
         fi
     fi

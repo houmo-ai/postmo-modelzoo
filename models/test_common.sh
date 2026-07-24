@@ -16,11 +16,14 @@ show_help() {
     echo "  -b, --batch             Batch size (requires model supports multi_batch feature)."
     echo "  --multi_batch           Enable multi-batch mode (Enable this parameter when the batch count supported by the model is unknown)."
     echo "  --mtp                   Enable mtp mode."
+    echo "  --lora                  Enable lora mode."
+    echo "  --dflash                Enable dflash mode."
     echo "  --ndevice               Number of devices."
     echo "  --context_length        Model context length."
     echo "  --prefill_length        Model prefill length."
     echo "  --image_sizes           Image sizes (width,height), e.g. 448,448 896,896. Can be specified multiple times."
     echo "  --quant_type            Quantization type, e.g. w4a8, w8a8, w8a16."
+    echo "  --demo_mode             Demo mode."
     echo "  --skip_download         If specified, all dependencies must have been fully downloaded previously without this flag. Already downloaded dependencies won't be re-downloaded regardless of this parameter."
     echo "  -h, --help              Show this help message."
     exit 0
@@ -32,17 +35,20 @@ parse_args() {
     local raw_step=
 
     STEP="${STEP:-demo}"
+    MODEL_SIZE="${MODEL_SIZE:-}"
+    MODEL_NAME="${MODEL_NAME:-}"
     MULTI_BATCH="${MULTI_BATCH:-false}"
     BATCH="${BATCH:-}"
     MTP="${MTP:-false}"
+    LORA="${LORA:-false}"
+    DFLASH="${DFLASH:-false}"
     NDEVICE="${NDEVICE:-}"
     CONTEXT_LENGTH="${CONTEXT_LENGTH:-}"
     PREFILL_LENGTH="${PREFILL_LENGTH:-}"
     IMAGE_SIZES=()
     SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
-    MODEL_SIZE="${MODEL_SIZE:-}"
-    MODEL_NAME="${MODEL_NAME:-}"
     QUANT_TYPE="${QUANT_TYPE:-}"
+    DEMO_MODE="${DEMO_MODE:-}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -71,6 +77,14 @@ parse_args() {
                 ;;
             --mtp)
                 MTP="true"
+                shift
+                ;;
+            --lora)
+                LORA="true"
+                shift
+                ;;
+            --dflash)
+                DFLASH="true"
                 shift
                 ;;
             -b|--batch)
@@ -138,6 +152,14 @@ parse_args() {
                     show_help
                 fi
                 QUANT_TYPE="$2"
+                shift 2
+                ;;
+            --demo_mode)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: Missing value for parameter '$1'" >&2
+                    show_help
+                fi
+                DEMO_MODE="$2"
                 shift 2
                 ;;
             *)
@@ -317,7 +339,7 @@ setup_python_venv() {
             distutils_src="${system_site_packages}/setuptools/_distutils"
             distutils_dst="${venv_site_packages}/distutils"
             if [[ -d "${distutils_src}" && ! -e "${distutils_dst}" ]]; then
-                ln -s "${distutils_src}" "${distutils_dst}"
+                ln -sf "${distutils_src}" "${distutils_dst}"
             fi
         fi
     elif [[ "${python_exe}" == */opt/venv* ]]; then
@@ -337,7 +359,7 @@ setup_python_venv() {
         distutils_src="${system_site_packages}/setuptools/_distutils"
         distutils_dst="${venv_site_packages}/distutils"
         if [[ -d "${distutils_src}" && ! -e "${distutils_dst}" ]]; then
-            ln -s "${distutils_src}" "${distutils_dst}"
+            ln -sf "${distutils_src}" "${distutils_dst}"
         fi
     else
         virtualenv --python="${python_exe}" --system-site-packages "${venv_dir}"

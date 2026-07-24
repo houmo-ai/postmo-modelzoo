@@ -40,9 +40,7 @@
 
 本例只适用于xh2。
 
-当前目录使用 `config.yaml` 管理 `get_model.py`、`build.py`、`demo.py`
-和 `demo_mtp.py` 的默认值；`ptq.py` 的量化导出参数由
-`configs/` 目录下的 workflow yaml 管理。当前默认模型为：
+当前目录使用 `config.yaml` 管理 `get_model.py`、`ptq.py`、`build.py`、`demo.py` 和 `demo_mtp.py` 的模型默认值。每个 `model_name` / `model_size` 节点通过 `workflow_config` 指定 `configs_merak` 中的量化导出配置。当前默认模型为：
 
 - `model_name=qwen3.6`
 - `model_size=35b-a3b`
@@ -125,60 +123,76 @@ source env.sh
 cd models/llm/qwen3.5
 ```
 
-推荐先通过 `get_model.py --type raw` 下载原始模型，再执行：
+推荐先通过 `get_model.py --type raw` 下载原始模型，再通过模型名称和尺寸执行量化：
 
 ```bash
 python3 ptq.py \
-  --model-dir ./Qwen3.6-35B-A3B \
-  --config-path configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8.yaml
+  --model_name qwen3.6 \
+  --model_size 35b-a3b
 ```
-
-`--model-dir` 指向 Hugging Face / ModelScope 原始模型目录，`--config-path` 指向
-`configs/` 下的 workflow yaml。脚本会执行 quant 和 export，并把 export 生成的
-`hmquant*` 目录移动为 `output/${HOUMO_TARGET}/hmquant`，供后续 `build.py` 使用。
 
 常用可选参数：
 
 ```bash
+# 显式指定原始模型目录
+python3 ptq.py \
+  --model_name qwen3.6 \
+  --model_size 35b-a3b \
+  --model_dir /path/to/Qwen3.6-35B-A3B
+
 # 覆盖 workflow yaml 中的量化 bit
 python3 ptq.py \
-  --model-dir ./Qwen3.6-35B-A3B \
-  --config-path configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8.yaml \
+  --model_name qwen3.6 \
+  --model_size 35b-a3b \
   --bits 8
 
 # 覆盖视觉导出分辨率
 python3 ptq.py \
-  --model-dir ./Qwen3.6-35B-A3B \
-  --config-path configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8.yaml \
-  --max-size-w 896 \
-  --max-size-h 896
+  --model_name qwen3.6 \
+  --model_size 35b-a3b \
+  --max_size_w 896 \
+  --max_size_h 896
 
-# 导出 MTP 产物
+# 自动选择对应的 MTP workflow
 python3 ptq.py \
-  --model-dir ./Qwen3.6-35B-A3B \
-  --config-path configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8_mtp.yaml
+  --model_name qwen3.6 \
+  --model_size 35b-a3b \
+  --mtp
 
-# 导出 DFlash 产物
+# 显式覆盖 workflow 配置，例如使用 DFlash workflow
 python3 ptq.py \
-  --model-dir ./Qwen3.6-35B-A3B \
-  --config-path configs/qwen3.6/35b-a3b/qwen3.6-35b-a3b_w4a8_dflash.yaml
+  --model_name qwen3.6 \
+  --model_size 35b-a3b \
+  --quant_config_path /path/to/configs_merak/workflows/xh2a/llm_models/qwen3_5_moe/35b_a3b/qwen3_6_35b_a3b_full_dflash.yaml
 ```
 
-workflow yaml 命名规则如下：
+主要入参如下：
 
-- `qwen3.5-9b_w4a8.yaml`：标准流程，权重量化 bit 为 4，激活为 8。
-- `qwen3.5-9b_w4a8_mtp.yaml`：MTP 流程。
-- `qwen3.5-9b_w4a8_dflash.yaml`：DFlash 流程。
+- `--config_path`：模型索引配置，默认为当前目录的 `config.yaml`。
+- `--model_name`、`--model_size`：选择 `config.yaml` 中的模型节点。
+- `--model_dir`：原始模型目录；不传时根据 `modelscope_repo` 自动生成。
+- `--quant_config_path`：显式 workflow yaml；不传时根据 `workflow_config` 自动生成。
+- `--mtp`：使用自动生成的 `_mtp.yaml` workflow。
+- `--output_dir`：最终 hmquant 产物输出目录，默认 `./output/${HOUMO_TARGET}/hmquant`。
+- `--work_dir`：quant/export 中间输出目录，默认 `./work_dirs`。
+- `--device`：quant、export、golden 和 quick test 使用的设备，默认 `cuda`。
+- `--overwrite`：export 前删除已有的 export 输出目录。
+- `--export-from-quanted-model`：输入已经量化的 HF 模型时跳过量化阶段。
+- `--bits`：覆盖 workflow 中的 `quant.bits`。
+- `--max_size_w`、`--max_size_h`：覆盖视觉模型导出尺寸。
+- `--dump-golden`：导出后生成 golden 数据。
+- `--quick-test`：导出后运行快速 HMONNX 测试。
 
-当前提供的配置文件包括：
+`config.yaml` 当前为全部支持的模型组合配置了标准 `workflow_config`。仓库中另外提供
+以下 MTP workflow：
 
-- `qwen3.5/0.8b`: `w8a8`、`w8a8_mtp`、`w8a8_dflash`
-- `qwen3.5/2b`: `w8a8`、`w8a8_mtp`、`w8a8_dflash`
-- `qwen3.5/4b`: `w4a8`、`w4a8_mtp`、`w4a8_dflash`
-- `qwen3.5/9b`: `w4a8`、`w4a8_mtp`、`w4a8_dflash`
-- `qwen3.6/27b`: `w4a8`、`w4a8_mtp`、`w4a8_dflash`
-- `qwen3.6/35b-a3b`: `w4a8`、`w5a8`、`w8a8` 及对应的 `_mtp`、`_dflash` 配置
-- `qwen3.5/122b-a10b`: 暂不提供量化功能
+- `qwen3.5/9b`
+- `qwen3.6/27b`
+- `qwen3.6/35b-a3b`
+
+对没有对应 `_mtp.yaml` 文件的模型使用 `--mtp` 时，`ptq.py` 会在最终工作流文件检查
+阶段报 `Workflow config not found`。DFlash、GPTQ 或其他变体可通过
+`--quant_config_path` 显式指定对应的 workflow yaml。
 
 量化导出输出位于 `output/${HOUMO_TARGET}/hmquant`。
 
@@ -196,13 +210,16 @@ MTP 编译：
 python3 build.py --model_name qwen3.6 --model_size 35b-a3b --mtp
 ```
 
-默认输出名称分别为：
+标准输出名称为：
 
-- `qwen3.6-35b-a3b_prefill.hmm`
-- `qwen3.6-35b-a3b_decode.hmm`
-- `qwen3.6-35b-a3b_visual_896x896x2.hmm`
-- `qwen3.6-35b-a3b_prefill_mtp.hmm`
-- `qwen3.6-35b-a3b_decode_mtp.hmm`
+- `${model_name}-${model_size}_prefill.hmm`
+- `${model_name}-${model_size}_decode.hmm`
+- `${model_name}-${model_size}_visual_${max_size_w}x${max_size_h}x${max_size_t}.hmm`
+
+视觉模型文件名中的尺寸来自 `config.yaml` 或量化导出的实际 visual bucket。例如大多数模型使用 `visual_896x896x2.hmm`，`qwen3.5/122b-a10b` 默认使用 `visual_448x448x2.hmm`。MTP 编译还会生成：
+
+- `${model_name}-${model_size}_prefill_mtp.hmm`
+- `${model_name}-${model_size}_decode_mtp.hmm`
 
 ### 2.5 演示
 
@@ -285,10 +302,11 @@ bash test.sh -s demo --skip_download --model_name qwen3.6 --model_size 35b-a3b
 
 当前脚本行为说明：
 
-- `quant`：下载原始模型并调用 `ptq.py` 执行量化导出。
+- `quant`：下载原始模型并调用 `ptq.py` 执行量化导出；启用 `--mtp` 时会把 `--mtp` 同步传给 `ptq.py`，由 `ptq.py` 自动选择 `_mtp.yaml` workflow。
 - `build`：默认调用 `build.py`；当 `--mtp` 启用时调用 `build.py` 并配置参数 `--mtp`。
 - `demo`：下载预编译模型后执行 `demo.py`；当 `--mtp` 启用时执行 `demo_mtp.py`。
-- 非 MTP `demo` 流程若环境中存在 `llm_perf`，末尾还会自动执行性能测试。
+- 非 MTP `demo`：先执行 Python demo，再生成 C++ demo 使用的 embedding 文件并编译 C++ demo；单设备时执行 C++ demo，环境中存在 `llm_perf` 时继续执行性能测试。
+- C++ demo 和 `llm_perf` 会按以下顺序选择第一个存在的 visual HMM：`visual_896x896x2.hmm`、`visual_448x448x2.hmm`、`visual.hmm`。如果同时存在多个文件，优先使用排序更靠前的文件；如果三个文件都不存在，脚本会报错退出。
 
 ## 4 参考结果
 
