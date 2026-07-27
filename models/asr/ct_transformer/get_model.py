@@ -140,7 +140,9 @@ if __name__ == "__main__":
     model_config = model_configs.get(model_name, {}).get(model_size, {})
     ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    quant_type = first_not_none(args.quant_type, model_config.get("quant_type", "w8a8_sefp"))
+    quant_type = first_not_none(
+        args.quant_type, model_config.get("quant_type", "w8a8_sefp")
+    )
 
     model_cfgs = {
         "target": HOUMO_TARGET,
@@ -156,6 +158,7 @@ if __name__ == "__main__":
         },
         "modelscope_repo": {
             "repo_ids": model_config.get("modelscope_repo", []),
+            "local_dirs": [f"{args.download_dir}/ct_transformer"],
             "ignore_patterns": ["*.pt"],
         },
     }
@@ -169,15 +172,3 @@ if __name__ == "__main__":
     )
     if ret_dict.get("ret", False) is False:
         exit(1)
-
-    # Rename raw model dir to canonical name
-    if args.file_type == "raw":
-        repo_ids = model_config.get("modelscope_repo", [])
-        if repo_ids:
-            raw_dir = os.path.join(args.download_dir, repo_ids[0].rsplit("/", maxsplit=1)[-1])
-            target_dir = os.path.join(args.download_dir, "ct_transformer")
-            if os.path.exists(raw_dir):
-                if os.path.exists(target_dir):
-                    shutil.rmtree(target_dir)
-                os.rename(raw_dir, target_dir)
-                print(f"Renamed {raw_dir} -> {target_dir}")
