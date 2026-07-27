@@ -27,8 +27,8 @@
   - Windows平台支持ASR模拟性能测试，`ENABLE_ASR` 默认开启
   - Windows编译复用 `houmo-llm-engine` 产物，`build_win.bat` 会自动触发 `houmo-llm-engine` Windows构建
   - Windows编译支持多核心并行构建，默认使用 `%NUMBER_OF_PROCESSORS%`
-  - Windows运行时依赖统一安装到 `$HOUMO_EXAMPLES_PATH/tools/common/lib`，请确保该目录已加入 `PATH`
-  - CMake平台配置复用 `tools/common/houmo-llm-engine/cmake/platforms`，便于后续按平台维护
+  - Windows运行时依赖统一安装到 `$HOUMO_EXAMPLES_PATH/utils/lib`，请确保该目录已加入 `PATH`
+  - CMake平台配置复用 `utils/cpp/houmo_engine/cmake/platforms`，便于后续按平台维护
 - [20260626]
   - ASR性能测试改为模拟数据模式（PerfAsr），不再依赖真实音频、Tokenizer、Embedding
   - 新增--audio_len/--token_per_second参数，用于模拟指定音频时长的ASR性能测试
@@ -397,14 +397,14 @@ cd tools/llm_perf/
 如果是windows11版本请执行：
 
 ```bat
-rem 首次构建会自动构建并安装 houmo-llm-engine Windows 产物到 tools/common/lib
+rem 首次构建会自动构建并安装 houmo-llm-engine Windows 产物到 utils/lib
 build_win.bat
 ```
 
 **编译生成的llm_perf可执行文件在tools/bin目录下，在win11运行llm_perf.exe前需要参考 `tools/win_envs` 正确设置Windows环境变量：**
 1. 推荐在根目录执行 `env.bat --set`，该脚本会调用 `tools/win_envs/set_environs.py` 根据 `tools/win_envs/env.json` 配置环境变量。
 2. 执行完成后需要重新打开cmd窗口，使新的环境变量生效。
-3. 确认 `PATH` 中包含 `%HOUMO_EXAMPLES_PATH%\tools\common\lib`，该目录保存 `houmo_infer.dll`、`tokenizer_lib.dll`、`kaldi-native-fbank-core.dll`、`samplerate.dll` 等运行时依赖。
+3. 确认 `PATH` 中包含 `%HOUMO_EXAMPLES_PATH%\utils\lib`，该目录保存 `houmo_infer.dll`、`tokenizer_lib.dll`、`kaldi-native-fbank-core.dll`、`samplerate.dll` 等运行时依赖。
 4. 确认 `HOUMO_TARGET=xh2`、`TCIM_BACKEND=Xh2HalBackend`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH` 等变量已按 `tools/win_envs/env.json` 正确设置。
 5. C++样例依赖 `libhal_xh2a.dll` 和 `tcim_runtime_lite.dll`，可通过 `env.bat --set` 加入PATH，或和 `llm_perf.exe` 放在同一目录。
 6. Windows平台当前默认开启ASR模拟性能测试；如需关闭，可在CMake配置时添加 `-DENABLE_ASR=OFF`。

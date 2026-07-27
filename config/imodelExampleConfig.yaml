@@ -785,7 +785,9 @@ inferences_qwen3_speculative:
     - inferences_qwen3_speculative_test
 apis_common:
   include:
-    - apis/common
+    - utils/cpp/include
+    - utils/python/image
+    - 3rdparty
   exclude: null
   example_case: null
   test:
@@ -829,7 +831,7 @@ tools_bandwidth_perf:
 
 llm_engine:
   include:
-    - tools/common/houmo-llm-engine
+    - utils/cpp/houmo_engine
   exclude: null
   example_case: null
   test:

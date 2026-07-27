@@ -1,7 +1,7 @@
 # Audio libraries source build configuration
 # Build audio libraries (libsamplerate, libsndfile, kaldi-native-fbank) from source
 
-set(AUDIO_THIRDPARTY_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/3rdparty)
+set(AUDIO_THIRDPARTY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/audio_source)
 
 # Set install directories to root (not lib/ and include/)
 set(CMAKE_INSTALL_LIBDIR "." CACHE STRING "Library install directory" FORCE)

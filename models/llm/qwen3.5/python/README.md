@@ -1,6 +1,6 @@
 # Qwen3.5 / Qwen3.6 Python Engine 示例
 
-本目录提供三个基于 `common/python/houmo_engine` 的 Python 推理示例，分别用于标准生成、Qwen3.6 MTP 推测生成以及文本/视觉前缀缓存。
+本目录提供三个基于 `utils/python/houmo_engine` 的 Python 推理示例，分别用于标准生成、Qwen3.6 MTP 推测生成以及文本/视觉前缀缓存。
 
 [TOC]
 
@@ -12,7 +12,7 @@
 | `demo_mtp.py` | MTP 推测生成 | 文本 | Qwen3.6 | 使用 draft/verify 流程加速生成，并输出 MTP 统计信息 |
 | `demo_prefix_caching.py` | 文本/视觉前缀缓存 | 文本，或图片和多个问题 | Qwen3.5、Qwen3.6 | 文本和图片请求均可复用公共 prompt 前缀；相同图片还可复用视觉特征 |
 
-三个示例均通过源码方式使用 Houmo Python Engine，不需要安装额外的 Python package。脚本会把仓库中的 `common/python` 加入当前进程的 `sys.path`。
+三个示例均通过源码方式使用 Houmo Python Engine，不需要安装额外的 Python package。脚本会把仓库中的 `utils/python` 加入当前进程的 `sys.path`。
 
 当前示例仅支持 `batch=1`，并仅适用于 xh2。
 

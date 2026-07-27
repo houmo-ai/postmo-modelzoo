@@ -1,1 +1,2 @@
+--extra-index-url https://mirrors.ustc.edu.cn/pypi/simple/
 funasr

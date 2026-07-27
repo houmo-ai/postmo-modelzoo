@@ -28,7 +28,7 @@
 #include <complex>
 #include <iostream>
 
-#include "audio/librosa.h"
+#include "librosacpp/librosa.h"
 
 namespace {
 

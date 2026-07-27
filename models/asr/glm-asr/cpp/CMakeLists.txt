@@ -19,9 +19,9 @@ else()
 endif()
 
 # ---------------------------------------------------------------------
-# Load houmo-llm-engine config (hm_engine INTERFACE library)
+# Load houmo_engine config (houmo_engine INTERFACE library)
 # ---------------------------------------------------------------------
-include(${CMAKE_CURRENT_SOURCE_DIR}/hm_engine.cmake)
+include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
 
 # ---------------------------------------------------------------------
 # Sample target
@@ -35,5 +35,5 @@ target_include_directories(demo PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(demo PRIVATE hm_engine)
+target_link_libraries(demo PRIVATE houmo_engine)
 install(TARGETS demo DESTINATION .)

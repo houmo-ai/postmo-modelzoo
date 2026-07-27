@@ -129,7 +129,7 @@ HMATC 是公共工具。评审其 CLI、配置或执行行为变化时，必须�
 
 以下未被排除的变更默认只使用 `imodelzoo-code-review`，并读取最近的组件文档：
 
-- `common/**`
+- `utils/**`
 - `tools/**`
 - `tests/tools_tests/**`
 - 顶层环境、CI、许可证和仓库维护文件

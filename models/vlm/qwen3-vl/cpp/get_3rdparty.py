@@ -21,9 +21,13 @@
 import os
 from hmatc.utils.utils import get_file_from_jfrog
 
-
 if __name__ == "__main__":
-    tokenizer_path = "3rdparty/qwen3vl-opencv-cpp.zip"
+    opencv_path = "3rdparty/qwen3vl-opencv-cpp.zip"
+    target_dir = "./3rdparty"
+    save_path = get_file_from_jfrog(opencv_path, target_dir, target_dir)
+    print(f"opencv downloaded to {save_path} and extracted to: {target_dir}")
+
+    tokenizer_path = "3rdparty/qwen3-tokenizers-cpp.zip"
     target_dir = "./3rdparty"
     save_path = get_file_from_jfrog(tokenizer_path, target_dir, target_dir)
     print(f"Tokenizer downloaded to {save_path} and extracted to: {target_dir}")

@@ -18,7 +18,7 @@ else()
   set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -ggdb")
 endif()
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/hm_engine.cmake)
+include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
 
 add_executable(demo
   demo.cc
@@ -29,5 +29,5 @@ target_include_directories(demo PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(demo PRIVATE hm_engine)
+target_link_libraries(demo PRIVATE houmo_engine)
 install(TARGETS demo DESTINATION .)

@@ -28,7 +28,7 @@
 
 #include <cstring>
 
-#include "audio/librosa.h"
+#include "librosacpp/librosa.h"
 
 namespace houmo {
 

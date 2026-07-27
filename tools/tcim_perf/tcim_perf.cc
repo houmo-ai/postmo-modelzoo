@@ -60,9 +60,9 @@ extern "C" {
 #endif
 #endif
 
-#include "../common/module_pool.hpp"
-#include "../common/npy.hpp"
-#include "../common/stream_engine.hpp"
+#include "module_pool.hpp"
+#include "npy.hpp"
+#include "stream_engine.hpp"
 #include "tcim/tcim_runtime.h"
 
 #define COLOR_RED "\x1b[91;20m"
@@ -144,12 +144,6 @@ typedef struct {
 bool IsFileExists(std::string file_path) {
   std::ifstream f(file_path.c_str());
   return f.good();
-}
-
-std::string TensorInfo2Str(const tcim::TensorInfo &tensor_info) {
-  std::stringstream ss;
-  ss << tensor_info;
-  return ss.str();
 }
 
 /**

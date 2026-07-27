@@ -28,7 +28,7 @@ from pathlib import Path
 MODEL_DIR = Path(__file__).resolve().parents[1]
 IMODELZOO_ROOT = Path(__file__).resolve().parents[4]
 HOUMO_EXAMPLES_PATH = Path(os.getenv("HOUMO_EXAMPLES_PATH", str(IMODELZOO_ROOT)))
-ENGINE_SRC = HOUMO_EXAMPLES_PATH / "common" / "python"
+ENGINE_SRC = HOUMO_EXAMPLES_PATH / "utils" / "python"
 sys.path.insert(0, str(ENGINE_SRC))
 
 from houmo_engine.sampling import GreedySamplingParams

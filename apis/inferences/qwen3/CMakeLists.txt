@@ -11,9 +11,8 @@ else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -DEIGEN_MPL2_ONLY")
 endif()
 
-include(${CMAKE_SOURCE_DIR}/tcim_runtime.cmake)
+include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
 set(TOKENZIER_CPP_PATH ${CMAKE_SOURCE_DIR}/3rdparty/tokenizers-cpp)
-set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
 
 if(MSVC)
   set(LIB_PATH "win11_x64")
@@ -47,13 +46,11 @@ endif()
 
 set(SOURCE_FILES Hmtokenizer.cc HmQwenInfer.cc qwen3.cc)
 set(INCLUDE_DIRS
-  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp
+  $ENV{HOUMO_EXAMPLES_PATH}/3rdparty
   ${TOKENZIER_CPP_PATH}/${LIB_PATH}/include
   ${CMAKE_SOURCE_DIR}/include
-  $ENV{TCIM_RUNTIME_PATH}/include
   $ENV{HOUMO_SDK_PATH}/hal/include
   $ENV{HOUMO_PATH}/include
-  ${EIGEN_PATH}
 )
 
 link_directories($ENV{HOUMO_PATH}/lib
@@ -72,7 +69,7 @@ endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} PUBLIC tcim_runtime_lite)
+target_link_libraries(${PROJECT_NAME} PUBLIC ${TCIM_LIBRARY})
 set(TCIM_DEV_CTRL_LIBRARY tcim_dev_ctrl)
 
 if(TCIM_DEV_CTRL_LIBRARY)
@@ -98,15 +95,15 @@ else()
     endif()
   elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
     if(TCIM_DEV_CTRL_LIBRARY)
-      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c tcim_runtime_lite ${TCIM_DEV_CTRL_LIBRARY} pthread ${CMAKE_DL_LIBS} c++ c++abi)
+      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c ${TCIM_LIBRARY} ${TCIM_DEV_CTRL_LIBRARY} pthread ${CMAKE_DL_LIBS} c++ c++abi)
     else()
-      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c tcim_runtime_lite pthread ${CMAKE_DL_LIBS} c++ c++abi)
+      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c ${TCIM_LIBRARY} pthread ${CMAKE_DL_LIBS} c++ c++abi)
     endif()
   else()
     if(TCIM_DEV_CTRL_LIBRARY)
-      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c tcim_runtime_lite ${TCIM_DEV_CTRL_LIBRARY} pthread ${CMAKE_DL_LIBS})
+      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c ${TCIM_LIBRARY} ${TCIM_DEV_CTRL_LIBRARY} pthread ${CMAKE_DL_LIBS})
     else()
-      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c tcim_runtime_lite pthread ${CMAKE_DL_LIBS})
+      target_link_libraries(${PROJECT_NAME} PRIVATE tokenizers_cpp tokenizers_c ${TCIM_LIBRARY} pthread ${CMAKE_DL_LIBS})
     endif()
   endif()
 endif()

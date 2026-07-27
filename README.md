@@ -15,7 +15,6 @@ houmo-examples 目录结构如下，其中 README.md 为本说明文件：
 ```bash
 .
 ├── apis
-    ├── common
     ├── converts
     ├── inferences
 ├── data
@@ -36,6 +35,7 @@ houmo-examples 目录结构如下，其中 README.md 为本说明文件：
     ├── vlm
     └── benchmark.yml
 ├── tools
+├── utils
 ├── env.sh
 ├── env.bat
 ├── README.md
@@ -52,6 +52,7 @@ houmo-examples 目录结构如下，其中 README.md 为本说明文件：
 | hmodel           | 量化模型配置和工具，主要用于大模型和 QAT 训练 |
 | models           | 模型示例，展示模型的转换和评估过程            |
 | tools            | 应用层工具源码，如算力测试工具等              |
+| utils            | 模型和 API 共用的 C++、Python 代码及运行库    |
 | env.sh/env.bat   | 环境配置脚本                                  |
 | requirements.txt | python 三方依赖                               |
 

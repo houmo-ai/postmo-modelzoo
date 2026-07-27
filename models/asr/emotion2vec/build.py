@@ -136,9 +136,10 @@ def main() -> None:
     if get_platform() != "x86_64":
         raise RuntimeError("Only supported for compilation on the x86_64 platform.")
 
-    hmonnx = find_hmonnx_file(args.model_dir)
+    hmonnx_path = os.path.join(args.model_dir, "model")
+    hmonnx = find_hmonnx_file(hmonnx_path)
     if not hmonnx:
-        raise FileNotFoundError(f"HMONNX model not found under {args.model_dir}")
+        raise FileNotFoundError(f"HMONNX model not found under {hmonnx_path}")
 
     hmm_name = f"{args.model_name}-{args.model_size}"
     with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
@@ -157,11 +158,13 @@ def main() -> None:
     if not os.path.isfile(hmm_path):
         raise RuntimeError(f"Build did not produce the expected HMM: {hmm_path}")
 
-    classifier_src = os.path.join(args.model_dir, "classifier.npz")
+    classifier_src = os.path.join(args.model_dir, "quant_embedding.pt")
     if os.path.isfile(classifier_src):
         classifier_dir = os.path.join(args.output_dir, "hmquant")
         os.makedirs(classifier_dir, exist_ok=True)
-        shutil.copy2(classifier_src, os.path.join(classifier_dir, "classifier.npz"))
+        classifier_dst = os.path.join(classifier_dir, "quant_embedding.pt")
+        if not os.path.exists(classifier_dst) or not os.path.samefile(classifier_src, classifier_dst):
+            shutil.copy2(classifier_src, classifier_dst)
 
     print(f"Built HMM: {hmm_path}")
     print(f"Peak memory: {monitor.peak_memory_mb:.2f} MB")

@@ -1,11 +1,17 @@
 cmake_minimum_required(VERSION 3.8)
 project(tcim_perf)
 
-include($ENV{HOUMO_EXAMPLES_PATH}/tools/tcim_runtime.cmake)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
 include_directories(
   $ENV{HOUMO_SDK_PATH}/hal/export/include
   $ENV{HOUMO_SDK_PATH}/hal/include
-  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/nlohmann/include
+  $ENV{HOUMO_EXAMPLES_PATH}/3rdparty
+  $ENV{HOUMO_EXAMPLES_PATH}/3rdparty/libnpy
+  $ENV{HOUMO_EXAMPLES_PATH}/utils/cpp/include
 )
 link_directories(
   $ENV{HOUMO_SDK_PATH}/hal/lib

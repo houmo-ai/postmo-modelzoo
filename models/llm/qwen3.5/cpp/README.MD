@@ -78,7 +78,7 @@ env.bat --set
 
 `env.bat --set` 会根据 `tools/win_envs/env.json` 设置 `HOUMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH`、`OPENCV_PATH`、`PATH` 等变量。执行完成后需要重新打开 cmd 窗口，使环境变量生效。
 
-请确认 `PATH` 中包含 `%HOUMO_EXAMPLES_PATH%\tools\common\lib`，该目录保存 `houmo_infer.dll`、`tokenizer_lib.dll` 等运行时依赖。
+请确认 `PATH` 中包含 `%HOUMO_EXAMPLES_PATH%\utils\lib`，该目录保存 `houmo_infer.dll`、`tokenizer_lib.dll` 等运行时依赖。
 
 Android 交叉编译还需要：
 
@@ -114,7 +114,7 @@ bash build_ndk.sh
 build_win.bat
 ```
 
-Windows 构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 并行编译。首次构建时，如果 `$HOUMO_EXAMPLES_PATH/tools/common/lib` 下缺少 `houmo_infer` 相关产物，`hm_engine.cmake` 会自动触发 `tools/common/houmo-llm-engine/build_win.bat` 构建依赖。
+Windows 构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 并行编译。首次构建时，如果 `$HOUMO_EXAMPLES_PATH/utils/lib` 下缺少 `houmo_infer` 相关产物，`hm_engine.cmake` 会自动触发 `utils/cpp/houmo_engine/build_win.bat` 构建依赖。
 
 Linux 编译产物位于：
 
@@ -205,7 +205,7 @@ demo 推理结束后会输出：
 - 只要传入 `--image`，就必须同时传入有效的 `--vision`。
 - `--tokenizer` 需要与模型编译时使用的 tokenizer 保持一致。
 - `--embedding` 需要使用框架要求的量化 embedding 格式。
-- `hm_engine.cmake` 会链接 `houmo_infer`、`tcim_runtime_lite`，并复用 `houmo-llm-engine` 的 include 和 lib 配置；Windows 平台下还会导入 `tokenizer_lib.lib/.dll`，并在依赖缺失时自动调用 `tools/common/houmo-llm-engine/build_win.bat` 构建。
+- `hm_engine.cmake` 会链接 `houmo_infer`、`tcim_runtime_lite`，并复用 `houmo-llm-engine` 的 include 和 lib 配置；Windows 平台下还会导入 `tokenizer_lib.lib/.dll`，并在依赖缺失时自动调用 `utils/cpp/houmo_engine/build_win.bat` 构建。
 
 ## 免责声明
 

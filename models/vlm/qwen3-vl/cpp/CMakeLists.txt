@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16.3)
 project(example_cxx_qwen3_vl)
 
 include(CheckCXXCompilerFlag)
-include(${CMAKE_SOURCE_DIR}/tcim_runtime.cmake)
+include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
 
 # -----------------------------------------------------------------------------
 # Build options
@@ -28,7 +28,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -ggdb")
 # Paths and sources
 # -----------------------------------------------------------------------------
 set(TOKENIZER_CPP_PATH ${CMAKE_SOURCE_DIR}/3rdparty/tokenizers-cpp)
-set(EIGEN_PATH ${CMAKE_SOURCE_DIR}/3rdparty)
+set(EIGEN_PATH $ENV{HOUMO_EXAMPLES_PATH}/3rdparty)
 
 set(SOURCE_FILES
   src/HmImageProcessor.cc
@@ -41,7 +41,7 @@ set(SOURCE_FILES
 if(DEFINED ENV{HALF_INCLUDE_PATH})
   set(HALF_INCLUDE_PATH $ENV{HALF_INCLUDE_PATH})
 elseif(DEFINED ENV{HOUMO_EXAMPLES_PATH})
-  set(HALF_INCLUDE_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp)
+  set(HALF_INCLUDE_PATH $ENV{HOUMO_EXAMPLES_PATH}/3rdparty)
 else()
   message(WARNING "HALF_INCLUDE_PATH not set, using default path")
   set(HALF_INCLUDE_PATH /usr/include/half)
@@ -133,7 +133,7 @@ if(ANDROID_ABI)
   )
 else()
   list(APPEND PROJECT_LINK_LIBS
-    tcim_runtime_lite
+    ${TCIM_LIBRARY}
     pthread
     ${CMAKE_DL_LIBS}
   )

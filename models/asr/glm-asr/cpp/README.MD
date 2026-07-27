@@ -98,7 +98,7 @@ env.bat --set
 
 `env.bat --set` 会根据 `tools/win_envs/env.json` 设置 `HOUMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH`、`OPENCV_PATH`、`PATH` 等变量。执行完成后需要重新打开 cmd 窗口，使环境变量生效。
 
-请确认 `PATH` 中包含 `%HOUMO_EXAMPLES_PATH%\tools\common\lib`，该目录保存 `houmo_infer.dll`、`tokenizer_lib.dll`、`kaldi-native-fbank-core.dll`、`samplerate.dll` 等运行时依赖。
+请确认 `PATH` 中包含 `%HOUMO_EXAMPLES_PATH%\utils\lib`，该目录保存 `houmo_infer.dll`、`tokenizer_lib.dll`、`kaldi-native-fbank-core.dll`、`samplerate.dll` 等运行时依赖。
 
 Android 交叉编译还需：
 
@@ -136,13 +136,13 @@ bash build_ndk.sh
 build_win.bat
 ```
 
-Windows 构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 并行编译。首次构建时，如果 `$HOUMO_EXAMPLES_PATH/tools/common/lib` 下缺少 `houmo_infer` 相关产物，`hm_engine.cmake` 会自动触发 `tools/common/houmo-llm-engine/build_win.bat` 构建依赖。
+Windows 构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 并行编译。首次构建时，如果 `$HOUMO_EXAMPLES_PATH/utils/lib` 下缺少 `houmo_infer` 相关产物，`hm_engine.cmake` 会自动触发 `utils/cpp/houmo_engine/build_win.bat` 构建依赖。
 
 编译产物位于 `build/Release/demo.exe`，安装产物位于 `../bin/demo.exe`。
 
 **CMakeLists.txt 依赖说明：**
 
-当前 CMakeLists.txt 通过 `hm_engine.cmake` 模块自动管理 `houmo_infer` 依赖。Linux/Android平台下，`hm_engine.cmake` 会在首次构建或源文件变更时自动调用 houmo-llm-engine 的 `build_linux.sh`/`build_ndk.sh` 编译依赖 so 库。Windows平台下，`hm_engine.cmake` 会复用 `$HOUMO_EXAMPLES_PATH/tools/common/lib` 中的 `houmo_infer.lib/.dll`、`tokenizer_lib.lib/.dll`；如缺少这些产物，会自动调用 houmo-llm-engine 的 `build_win.bat` 构建依赖。
+当前 CMakeLists.txt 通过 `hm_engine.cmake` 模块自动管理 `houmo_infer` 依赖。Linux/Android平台下，`hm_engine.cmake` 会在首次构建或源文件变更时自动调用 houmo-llm-engine 的 `build_linux.sh`/`build_ndk.sh` 编译依赖 so 库。Windows平台下，`hm_engine.cmake` 会复用 `$HOUMO_EXAMPLES_PATH/utils/lib` 中的 `houmo_infer.lib/.dll`、`tokenizer_lib.lib/.dll`；如缺少这些产物，会自动调用 houmo-llm-engine 的 `build_win.bat` 构建依赖。
 
 `hm_engine.cmake` 也可被其他工程复用：
 

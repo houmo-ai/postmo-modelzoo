@@ -96,9 +96,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--valid", action="store_true", help="validate the model")
     # fmt: on
     args = parser.parse_args()
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
@@ -107,12 +105,8 @@ def get_args() -> argparse.Namespace:
         args.context_length,
         parse_context_length(model_config.get("context_length", "2k")),
     )
-    args.input_sequence_length = first_not_none(
-        args.input_sequence_length, model_config.get("prefill_length", 256)
-    )
-    args.quant_type = first_not_none(
-        args.quant_type, model_config.get("quant_type", "w8a16h1_sefp")
-    )
+    args.input_sequence_length = first_not_none(args.input_sequence_length, model_config.get("prefill_length", 256))
+    args.quant_type = first_not_none(args.quant_type, model_config.get("quant_type", "w8a16h1_sefp"))
     return args
 
 
@@ -132,21 +126,14 @@ def onnx_fix_shape(fixed_dims, model_path, output_path=""):
     session = ort.InferenceSession(model_path, providers=providers)
     logger.info("Model input nodes:")
     for input_node in session.get_inputs():
-        logger.info(
-            f"  {input_node.name}: {input_node.type}, shape: {input_node.shape}"
-        )
+        logger.info(f"  {input_node.name}: {input_node.type}, shape: {input_node.shape}")
     logger.info("Model output nodes:")
     for output_node in session.get_outputs():
-        logger.info(
-            f"  {output_node.name}: {output_node.type}, shape: {output_node.shape}"
-        )
+        logger.info(f"  {output_node.name}: {output_node.type}, shape: {output_node.shape}")
 
     # change input shape according to fixed_dims
     for input_node in model.graph.input:
-        dims = [
-            d.dim_value if d.dim_value != 0 else d.dim_param
-            for d in input_node.type.tensor_type.shape.dim
-        ]
+        dims = [d.dim_value if d.dim_value != 0 else d.dim_param for d in input_node.type.tensor_type.shape.dim]
         # replace symbolic dims with fixed values from fixed_dims dict
         new_dims = []
         for dim in dims:
@@ -215,9 +202,7 @@ def quantize_campplus(
     model = onnx_fix_shape(fixed_dims, campplus_onnx, simplified_campplus)
 
     hmonnx_name = f"hmquant_{HOUMO_TARGET}_{model_name}_{quant_type}_{batch_size}x{sequence_length}_campplus.onnx"
-    model_input = torch.randn(
-        fixed_dims["batch_size"], fixed_dims["sequence_length"], 80
-    )
+    model_input = torch.randn(fixed_dims["batch_size"], fixed_dims["sequence_length"], 80)
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
     quant_config = create_quant_config(quant_scheme)
     hmonnx_path = os.path.join(output_dir, hmonnx_name)
@@ -235,9 +220,7 @@ def quantize_campplus(
     move_golden_data(golden_dir, output_dir)
 
 
-def convert_speech_tokenizer(
-    speech_tokenizer_onnx, work_dir, fixed_feat_length, mask_shape, mask1_shape
-):
+def convert_speech_tokenizer(speech_tokenizer_onnx, work_dir, fixed_feat_length, mask_shape, mask1_shape):
     output_onnx = f"{work_dir}/speech_tokenizer_v3_{fixed_feat_length}_1.onnx"
     output_onnx_mask = f"{work_dir}/speech_tokenizer_v3_{fixed_feat_length}_mask.onnx"
     converted_onnx = f"{work_dir}/speech_tokenizer_v3_{fixed_feat_length}.onnx"
@@ -275,14 +258,10 @@ def convert_speech_tokenizer(
     graph.node.insert(0, const_node)
 
     # simplify model
-    simplified_model, check = onnxsim.simplify(
-        model, check_n=0, skip_fuse_bn=False, dynamic_input_shape=False
-    )
+    simplified_model, check = onnxsim.simplify(model, check_n=0, skip_fuse_bn=False, dynamic_input_shape=False)
     assert check, "Simplified model is invalid!"
     onnx.save(simplified_model, output_onnx)
-    logger.success(
-        "✅ Finished fixing input shapes and replacing feat_length with constant."
-    )
+    logger.success("✅ Finished fixing input shapes and replacing feat_length with constant.")
 
     # ---------------------- step 3: add mask input and insert Add nodes ----------------------
     def add_mask_input(model, shape):
@@ -400,9 +379,7 @@ def convert_speech_tokenizer(
                 node.attribute.remove(axes_attr)
                 logger.info(f"Fixed ReduceMean '{node.name}': axes attr -> input")
 
-    def process_model_final(
-        model_in, output_path, block_ids, mask1_input_name, mask1_shape, mask1_dtype
-    ):
+    def process_model_final(model_in, output_path, block_ids, mask1_input_name, mask1_shape, mask1_dtype):
         model = model_in
         graph = model.graph
         add_mask_input_if_missing(graph, mask1_input_name, mask1_dtype, mask1_shape)
@@ -416,9 +393,7 @@ def convert_speech_tokenizer(
         logger.info(f"Total Mul nodes inserted: {total_inserted}")
 
         opset_imports = [helper.make_operatorsetid("", 18)]
-        tmp_model = helper.make_model(
-            graph, producer_name="mask_inserter", opset_imports=opset_imports
-        )
+        tmp_model = helper.make_model(graph, producer_name="mask_inserter", opset_imports=opset_imports)
         tmp_model.ir_version = model.ir_version
         inferred_model = shape_inference.infer_shapes(tmp_model)
         fix_reducemean_axes_to_input(inferred_model.graph)
@@ -428,9 +403,7 @@ def convert_speech_tokenizer(
         except Exception as e:
             tmp_path = output_path.replace(".onnx", ".pre_simplify.onnx")
             onnx.save(inferred_model, tmp_path)
-            logger.error(
-                f"onnx-simplify error: {e}, saved pre-simplify model to {tmp_path}"
-            )
+            logger.error(f"onnx-simplify error: {e}, saved pre-simplify model to {tmp_path}")
             raise
         if not check:
             failed_path = output_path.replace(".onnx", ".simplify_failed.onnx")
@@ -603,9 +576,7 @@ def xhmodel_export_onnx(
             exported_logits = exported_logits.squeeze(1)
             next_tokens = torch.argmax(exported_logits, dim=-1)
             next_tokens = next_tokens.unsqueeze(0)
-            next_token_str = tokenizer.batch_decode(
-                next_tokens, skip_special_tokens=True
-            )[0]
+            next_token_str = tokenizer.batch_decode(next_tokens, skip_special_tokens=True)[0]
         logger.info(f"Exported model next token: {next_tokens} {next_token_str}")
 
     xh_model.to("cpu")  # switch to CPU for model export
@@ -656,9 +627,7 @@ def quantize_llm_qwen2(
         if key not in cfg:
             cfg[key] = False
     if cfg.quarot or cfg.gptq:
-        assert (
-            cfg.resume_from and Path(cfg.resume_from).exists()
-        ), "resume_from must be valid path"
+        assert cfg.resume_from and Path(cfg.resume_from).exists(), "resume_from must be valid path"
     cfg.model.wrap_cfg.max_sequence_length = context_length
     cfg.model.wrap_cfg.input_sequence_length = input_sequence_length
 
@@ -713,9 +682,7 @@ def quantize_llm_qwen2(
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "你多大了？用中文回答。"},
     ]
-    text = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
+    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     input_ids = tokenizer([text], return_tensors="pt").input_ids.to(device)
 
     # load model weights
@@ -786,15 +753,9 @@ def quantize_llm_qwen2(
             quant_logger.info(f"QUANTED_ALIGNED: {t():.04f}")
             quanted_aligned_logits = outs.logits.detach()
 
-        prefill_next_token_id, prefill_next_token_text = decode_next_token(
-            tokenizer, quanted_aligned_logits
-        )
-        quant_logger.info(
-            f"Prefill Quanted Model next token: {prefill_next_token_id} {prefill_next_token_text}"
-        )
-        xh_model.quanted_model.dump_quant_info_to_onnx(
-            f"{cfg.work_dir}/{hmonnx_prefix}_quant_info.onnx"
-        )
+        prefill_next_token_id, prefill_next_token_text = decode_next_token(tokenizer, quanted_aligned_logits)
+        quant_logger.info(f"Prefill Quanted Model next token: {prefill_next_token_id} {prefill_next_token_text}")
+        xh_model.quanted_model.dump_quant_info_to_onnx(f"{cfg.work_dir}/{hmonnx_prefix}_quant_info.onnx")
     else:
         prefill_next_token_id = None
 
@@ -849,9 +810,7 @@ def quantize_llm_qwen2(
             outs = xh_model.test_step(data_batch)
             decode_logits = outs.logits.detach()
         decode_token_id, decode_token_text = decode_next_token(tokenizer, decode_logits)
-        logger.info(
-            f"Decode on Quanted Model next token: {decode_token_id} {decode_token_text}"
-        )
+        logger.info(f"Decode on Quanted Model next token: {decode_token_id} {decode_token_text}")
 
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -889,9 +848,7 @@ def quantize_llm_decoder(
     quant_type,
     llm_input_size=896,
 ):
-    model_path = os.path.join(
-        script_dir, "cosyvoice3_raw_files", "onnx", "llm_decoder.onnx"
-    )
+    model_path = os.path.join(script_dir, "cosyvoice3_raw_files", "onnx", "llm_decoder.onnx")
     golden_dir = os.path.join(root_work_dir, "llm_decoder", "step_0")
     output_dir = os.path.join(root_output_dir, "llm_decoder")
     os.makedirs(output_dir, exist_ok=True)
@@ -923,9 +880,7 @@ def quantize_flow_spk_embed_affine_layer(
     quant_type,
     spk_embed_dim=192,
 ):
-    model_path = os.path.join(
-        script_dir, "cosyvoice3_raw_files", "onnx", "spk_embed_affine_layer.onnx"
-    )
+    model_path = os.path.join(script_dir, "cosyvoice3_raw_files", "onnx", "spk_embed_affine_layer.onnx")
     output_dir = os.path.join(root_output_dir, "flow_spk")
     golden_dir = os.path.join(root_work_dir, "flow_spk", "step_0")
     os.makedirs(output_dir, exist_ok=True)
@@ -967,9 +922,7 @@ def quantize_flow_encoder(
         in_channels: The number of input channels for the flow encoder.
         channels: The number of channels for the flow encoder.
     """
-    model_path = os.path.join(
-        script_dir, "cosyvoice3_raw_files", "onnx", "pre_lookahead_layer.onnx"
-    )
+    model_path = os.path.join(script_dir, "cosyvoice3_raw_files", "onnx", "pre_lookahead_layer.onnx")
     output_dir = os.path.join(root_output_dir, "flow_encoder")
     golden_dir = os.path.join(root_work_dir, "flow_encoder", "step_0")
     os.makedirs(output_dir, exist_ok=True)
@@ -1014,20 +967,12 @@ def quantize_flow_decoder(
 
     def get_dummy_input(batch_size, seq_len, out_channels):
         device = "cpu"
-        x = torch.rand(
-            (batch_size, out_channels, seq_len), dtype=torch.float32, device=device
-        )
+        x = torch.rand((batch_size, out_channels, seq_len), dtype=torch.float32, device=device)
         mask = torch.ones((batch_size, 1, seq_len), dtype=torch.float32, device=device)
-        mu = torch.rand(
-            (batch_size, out_channels, seq_len), dtype=torch.float32, device=device
-        )
+        mu = torch.rand((batch_size, out_channels, seq_len), dtype=torch.float32, device=device)
         t = torch.rand((batch_size), dtype=torch.float32, device=device)
-        spks = torch.rand(
-            (batch_size, out_channels), dtype=torch.float32, device=device
-        )
-        cond = torch.rand(
-            (batch_size, out_channels, seq_len), dtype=torch.float32, device=device
-        )
+        spks = torch.rand((batch_size, out_channels), dtype=torch.float32, device=device)
+        cond = torch.rand((batch_size, out_channels, seq_len), dtype=torch.float32, device=device)
         return x, mask, mu, t, spks, cond
 
     # fix shape
@@ -1037,7 +982,9 @@ def quantize_flow_decoder(
 
     model = onnx_fix_shape(fixed_dims, model_path, model_path_simplify)
 
-    hmonnx_name = f"hmquant_{HOUMO_TARGET}_{model_name}_{quant_type}_{batch_size}x{seq_len}x{out_channels}_flow_decoder.onnx"
+    hmonnx_name = (
+        f"hmquant_{HOUMO_TARGET}_{model_name}_{quant_type}_{batch_size}x{seq_len}x{out_channels}_flow_decoder.onnx"
+    )
     x, mask, mu, t, spks, cond = get_dummy_input(batch_size, seq_len, out_channels)
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
     quant_config = create_quant_config(quant_scheme)
@@ -1079,9 +1026,7 @@ def quantize_hift(
     os.makedirs(golden_dir, exist_ok=True)
 
     model_path_simplify = os.path.join(work_dir, "hift_simplify.onnx")
-    reflect_constant_path = os.path.join(
-        work_dir, "hift_simplify_reflect_replaced_constant.onnx"
-    )
+    reflect_constant_path = os.path.join(work_dir, "hift_simplify_reflect_replaced_constant.onnx")
     final_onnx_path = os.path.join(work_dir, "hift_simplify_final.onnx")
     final_onnx_scatter_path = os.path.join(work_dir, "hift_simplify_final_1.onnx")
 
@@ -1116,9 +1061,7 @@ def quantize_hift(
         graph = model.graph
         K = win // hop
 
-        const_map = {
-            init.name: numpy_helper.to_array(init) for init in graph.initializer
-        }
+        const_map = {init.name: numpy_helper.to_array(init) for init in graph.initializer}
 
         new_graph_nodes = []
         transform_count = 0
@@ -1151,9 +1094,7 @@ def quantize_hift(
                         indices = const_map[indices_name]
                         is_indices_const = True
                     else:
-                        logger.warning(
-                            "indices is not constant, attempting to trace..."
-                        )
+                        logger.warning("indices is not constant, attempting to trace...")
                         # if indices is not constant, we cannot decompose this node
                         new_graph_nodes.append(node)
                         continue
@@ -1178,24 +1119,16 @@ def quantize_hift(
                     zero_tensor = f"{output}_zero"
                     shape_name = f"{output}_shape"
 
-                    new_graph_nodes.append(
-                        helper.make_node(
-                            "Shape", [data], [shape_name], f"{output}_Shape"
-                        )
-                    )
+                    new_graph_nodes.append(helper.make_node("Shape", [data], [shape_name], f"{output}_Shape"))
 
-                    zero_value = numpy_helper.from_array(
-                        np.array([0.0], dtype=np.float32)
-                    )
+                    zero_value = numpy_helper.from_array(np.array([0.0], dtype=np.float32))
                     const_of_shape_node = helper.make_node(
                         "ConstantOfShape",
                         [shape_name],
                         [zero_tensor],
                         f"{output}_ConstShape",
                     )
-                    const_of_shape_node.attribute.append(
-                        helper.make_attribute("value", zero_value)
-                    )
+                    const_of_shape_node.attribute.append(helper.make_attribute("value", zero_value))
                     new_graph_nodes.append(const_of_shape_node)
 
                     # Process in groups by q
@@ -1215,9 +1148,7 @@ def quantize_hift(
                         # Keep the same dimensions as the original indices (2D)
                         indices_q = indices_q.reshape(1, -1)
                         indices_q_name = f"{output}_indices_q{q}"
-                        graph.initializer.append(
-                            numpy_helper.from_array(indices_q, name=indices_q_name)
-                        )
+                        graph.initializer.append(numpy_helper.from_array(indices_q, name=indices_q_name))
 
                         updates_q_name = f"{output}_updates_q{q}"
 
@@ -1231,9 +1162,7 @@ def quantize_hift(
                         reshape_shape = f"{output}_reshape_shape_q{q}"
 
                         graph.initializer.append(
-                            helper.make_tensor(
-                                reshape_shape, TensorProto.INT64, [2], [num_frames, win]
-                            )
+                            helper.make_tensor(reshape_shape, TensorProto.INT64, [2], [num_frames, win])
                         )
 
                         new_graph_nodes.append(
@@ -1260,9 +1189,7 @@ def quantize_hift(
                                     [2],
                                     [num_frames, (q + 1) * hop],
                                 ),
-                                helper.make_tensor(
-                                    f"{output}_a{q}_0", TensorProto.INT64, [2], [0, 1]
-                                ),
+                                helper.make_tensor(f"{output}_a{q}_0", TensorProto.INT64, [2], [0, 1]),
                             ]
                         )
 
@@ -1281,11 +1208,7 @@ def quantize_hift(
                         )
 
                         shape_flat_name = f"{output}_shape_flat_q{q}"
-                        graph.initializer.append(
-                            helper.make_tensor(
-                                shape_flat_name, TensorProto.INT64, [2], [1, -1]
-                            )
-                        )
+                        graph.initializer.append(helper.make_tensor(shape_flat_name, TensorProto.INT64, [2], [1, -1]))
 
                         new_graph_nodes.append(
                             helper.make_node(
@@ -1304,21 +1227,15 @@ def quantize_hift(
                             f"{output}_Sct_q{q}",
                             axis=axis,
                         )
-                        scatter.attribute.append(
-                            helper.make_attribute("reduction", "none")
-                        )
+                        scatter.attribute.append(helper.make_attribute("reduction", "none"))
                         new_graph_nodes.append(scatter)
                         outs.append(out_q_name)
 
                     # === Accumulate all groups ===
                     if K == 1:
-                        new_graph_nodes.append(
-                            helper.make_node("Identity", outs, [output], f"{output}_Id")
-                        )
+                        new_graph_nodes.append(helper.make_node("Identity", outs, [output], f"{output}_Id"))
                     elif K == 2:
-                        new_graph_nodes.append(
-                            helper.make_node("Add", outs, [output], f"{output}_Add")
-                        )
+                        new_graph_nodes.append(helper.make_node("Add", outs, [output], f"{output}_Add"))
                     else:
                         current = outs[0]
                         for i in range(1, len(outs)):
@@ -1450,9 +1367,7 @@ def move_embeddings(output_dir):
 
     pt_files = glob.glob(f"{embedding_dir}/*.pt")
     if not pt_files:
-        logger.warning(
-            f"No embedding files found in embedding directory: {embedding_dir}"
-        )
+        logger.warning(f"No embedding files found in embedding directory: {embedding_dir}")
         return
 
     for file_path in pt_files:
@@ -1540,6 +1455,4 @@ if __name__ == "__main__":
 
         shutil.rmtree(work_dir, ignore_errors=True)
 
-    print(
-        f"\n=== All quantization steps completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
-    )
+    print(f"\n=== All quantization steps completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ===")

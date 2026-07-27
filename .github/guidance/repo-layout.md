@@ -6,12 +6,11 @@ This document is a navigation guide for the current repository. It describes sta
 
 - `apis/`: HAL and runtime API examples plus API-side assets.
   - `3rdparty/`: Third-party dependencies used by API examples.
-  - `common/`: Shared API headers, wrappers, runtime helpers, and vendored libraries. Check ownership before editing because this directory mixes first-party and third-party code.
   - `converts/`: Model conversion and compilation API examples.
   - `inferences/`: Runtime inference API examples.
   - `data/`: API demonstration data.
   - `models/`: Sample models and assets used by API examples.
-- `common/`: Repository-wide first-party shared code.
+- `utils/`: Repository-wide first-party shared code and runtime libraries.
   - `python/houmo_engine/`: Shared Python Demo/Engine/Process/Module framework and model-specific engine components.
 - `config/`: Shared configuration entrypoints.
   - `imodelExampleConfig.yaml`: Aggregated example and test configuration.
@@ -71,14 +70,13 @@ When changing a model workflow, check both the model directory and the correspon
 
 - `tools/bandwidth_perf/`: Memory-bandwidth performance tools.
 - `tools/bin/`: Helper executables and wrapper scripts.
-- `tools/common/`: Shared tool code and dependencies. This directory contains both first-party components and vendored libraries; follow `coding-style.md` when determining whether a path is editable.
 - `tools/computing_perf/`: Compute-performance tools.
 - `tools/hm_check/`: Hardware and environment checking tools.
 - `tools/hmeval/`: Evaluation CLI and examples.
 - `tools/llm_perf/`: Large-language-model performance tools.
 - `tools/tcim_perf/`: TCIM model performance tools.
 - `tools/win_envs/`: Windows environment setup documentation and utilities.
-- `tools/tcim_runtime.cmake`: Shared TCIM runtime CMake integration.
+- `cmake/tcim_runtime.cmake`: Shared TCIM runtime CMake integration.
 
 ## Top-level entrypoints and metadata
 
@@ -95,7 +93,7 @@ When changing a model workflow, check both the model directory and the correspon
 ## Navigation and change boundaries
 
 - Start model-specific work in `models/<category>/<model-name>/`, then check the related tests, aggregate configuration, and README.
-- Put reusable Python engine behavior in `common/python/houmo_engine/` only when it is shared across model examples; keep model-specific logic with the model when reuse is not established.
+- Put reusable Python engine behavior in `utils/python/houmo_engine/` only when it is shared across model examples; keep model-specific logic with the model when reuse is not established.
 - Use `hmatc/` for shared quantization, build, validation, demo, evaluation, and CLI behavior rather than duplicating HMATC logic in individual examples.
 - Use `tools/` for reusable standalone utilities and performance tooling.
 - Respect nested project instructions and local formatter or build configuration, especially under `hmodel/xh2/`, `hmodel/gptqmodel/`, `apis/`, and `hmatc/`.

@@ -21,15 +21,13 @@
 import os
 from hmatc.utils.utils import get_file_from_jfrog
 
-
 if __name__ == "__main__":
     tokenizer_path = "3rdparty/cosyvoice-audio-cpp.zip"
     target_dir = "./3rdparty"
     save_path = get_file_from_jfrog(tokenizer_path, target_dir, target_dir)
     print(f"Audio third-party dependencies downloaded to {save_path} and extracted to: {target_dir}")
 
-
     tokenizer_path = "3rdparty/cpp_3rdparty_source.zip"
-    target_dir = os.path.join(os.getenv("HOUMO_EXAMPLES_PATH"), "apis/3rdparty")
+    target_dir = "3rdparty/audio_source"
     save_path = get_file_from_jfrog(tokenizer_path, target_dir, target_dir)
     print(f"Audio third-party dependencies downloaded to {save_path} and extracted to: {target_dir}")

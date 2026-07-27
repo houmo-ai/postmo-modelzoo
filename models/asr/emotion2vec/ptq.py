@@ -136,6 +136,13 @@ def main() -> None:
         golden_audio=args.golden_audio if args.dump_golden else None,
     )
     print(meta_path)
+    hmonnx_path = os.path.join(args.output_dir, "model")
+    os.makedirs(hmonnx_path, exist_ok=True)
+    for artifact_name in (
+        f"hmquant_{args.model_name}_{args.model_size}_with_act.onnx",
+        f"hmquant_{args.model_name}_{args.model_size}_external_data",
+    ):
+        shutil.copy2(os.path.join(args.output_dir, artifact_name), hmonnx_path)
 
 
 if __name__ == "__main__":

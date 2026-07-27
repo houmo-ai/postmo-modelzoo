@@ -31,14 +31,6 @@ if [ ! -e 3rdparty/audio_3rdparty ];then
   echo "Download precompiled audio libraries."
   python3 scripts/get_3rdparty.py
 fi
-if [ ! -e 3rdparty/eigen3 ];then
-  cd 3rdparty
-  wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
-  unzip -q eigen-3.4.0.zip
-  mv eigen-3.4.0 eigen3
-  rm -rf eigen-3.4.0.zip
-  cd ..
-fi
 python3 scripts/convert_embeddings.py
 if [ $(uname -s) = "Linux" ]; then
   if [ "$HOUMO_TARGET" = "xh2" ]; then

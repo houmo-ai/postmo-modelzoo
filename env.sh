@@ -31,7 +31,7 @@ fi
 export PATH=$HOUMO_EXAMPLES_PATH/tools/bin:$HOUMO_PATH/bin:$PATH
 
 # paths for runtime
-export LD_LIBRARY_PATH=$HOUMO_EXAMPLES_PATH/tools/common/lib:$TCIM_RUNTIME_PATH/lib:$HOUMO_PATH/lib:$HOUMO_SDK_PATH/hal/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$HOUMO_EXAMPLES_PATH/utils/lib:$TCIM_RUNTIME_PATH/lib:$HOUMO_PATH/lib:$HOUMO_SDK_PATH/hal/lib:$LD_LIBRARY_PATH
 
 # data and model path
 if [[ -z $HOUMO_DATASETS_PATH ]]; then
@@ -46,7 +46,7 @@ if [[ -z $HOUMO_MODEL_PATH ]]; then
 fi
 
 # paths for xh2 modelzoo
-export PYTHONPATH=$HOUMO_EXAMPLES_PATH/apis/common/python:$HOUMO_EXAMPLES_PATH/hmodel/xh2:$HOUMO_EXAMPLES_PATH/hmodel/gptqmodel:$HOUMO_EXAMPLES_PATH/hmodel/gptqmodel/third_party/auto-round:$PYTHONPATH
+export PYTHONPATH=$HOUMO_EXAMPLES_PATH/utils/python:$HOUMO_EXAMPLES_PATH/hmodel/xh2:$HOUMO_EXAMPLES_PATH/hmodel/gptqmodel:$HOUMO_EXAMPLES_PATH/hmodel/gptqmodel/third_party/auto-round:$PYTHONPATH
 
 
 # 清理环境变量中的重复路径

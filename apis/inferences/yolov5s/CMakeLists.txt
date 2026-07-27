@@ -13,7 +13,8 @@ set(TCIM_RUNTIME_PATH $ENV{TCIM_RUNTIME_PATH})
 set(HOUMO_EXAMPLES_PATH $ENV{HOUMO_EXAMPLES_PATH})
 
 include_directories(${TCIM_RUNTIME_PATH}/include)
-include_directories(${HOUMO_EXAMPLES_PATH}/apis/common/hpp)
+include_directories(${HOUMO_EXAMPLES_PATH}/3rdparty)
+include_directories(${HOUMO_EXAMPLES_PATH}/utils/cpp/include)
 link_directories(${TCIM_RUNTIME_PATH}/lib)
 
 # OpenCV configuration

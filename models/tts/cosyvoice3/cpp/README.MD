@@ -41,7 +41,6 @@
 | miniaudio_impl.cc | miniaudio库实现入口 |
 | CMakeLists.txt | CMake编译配置文件 |
 | build.sh | Linux平台编译脚本 |
-| tcim_runtime.cmake | TCIM Runtime库配置 |
 
 功能支持度说明：
 - 支持的芯片型号为：xh2
@@ -127,7 +126,7 @@ source env.sh
 需要设置的环境变量：
 - `HOUMO_TARGET`: 目标芯片类型，设置为 `xh2`
 - `HOUMO_PATH`: Houmo SDK路径，包含include和lib目录
-- `TCIM_RUNTIME_PATH`: TCIM Runtime库路径（可选，默认使用相对路径）
+- `TCIM_RUNTIME_PATH`: TCIM Runtime库路径（必需）
 
 对于Android平台交叉编译，还需设置：
 - `NDK_PATH`: Android NDK路径
@@ -166,7 +165,7 @@ export TCIM_RUNTIME_PATH=/path/to/houmo-tcim-runtime-xh2
 在cosyvoice3目录下执行：
 
 ```bash
-cd /hmdd/lyz_codes/c-vllm/houmo-examples-xh2/models/tts/cosyvoice3
+cd ${HOUMO_EXAMPLES_PATH}/models/tts/cosyvoice3
 
 # 设置环境变量
 export HOUMO_TARGET=xh2
@@ -293,7 +292,6 @@ Saved audio files to: ./results-cpp/
 - tokenizers-cpp：HuggingFace分词器C++绑定
 - kaldi-native-fbank：Kaldi FBANK特征提取C++实现
 - LibrosaCpp：Librosa风格mel频谱图计算C++实现
-- Eigen3：线性代数库
 - miniaudio：音频文件读取库
 - libsamplerate：音频重采样库
 - libsndfile：音频文件I/O库

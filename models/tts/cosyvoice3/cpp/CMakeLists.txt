@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Include TCIM runtime configuration
-include(${CMAKE_CURRENT_SOURCE_DIR}/tcim_runtime.cmake)
+include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
 
 # Determine platform-specific library path
 if(ANDROID_ABI)
@@ -37,8 +37,7 @@ endif()
 
 # Third-party paths
 set(TOKENIZER_CPP_PATH ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/tokenizers-cpp)
-set(AUDIO_HEADER_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp)
-set(HALF_INCLUDE_PATH $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp)
+set(THIRDPARTY_PATH $ENV{HOUMO_EXAMPLES_PATH}/3rdparty)
 
 # Audio libraries configuration
 if(BUILD_AUDIO_FROM_SOURCE)
@@ -70,16 +69,13 @@ set(DEMO_SOURCES
 set(INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
-    $ENV{TCIM_RUNTIME_PATH}/include
     ${TOKENIZER_CPP_PATH}/${LIB_PATH}/include
-    ${HALF_INCLUDE_PATH}
-    ${AUDIO_HEADER_PATH}
+    ${THIRDPARTY_PATH}
     ${AUDIO_INCLUDE_DIRS}
 )
 
 # Library directories
 link_directories(
-    $ENV{TCIM_RUNTIME_PATH}/lib
     ${TOKENIZER_CPP_PATH}/${LIB_PATH}/lib
 )
 
@@ -104,7 +100,7 @@ else()
     target_link_libraries(cosyvoice3-demo PRIVATE
         tokenizers_cpp
         tokenizers_c
-        tcim_runtime_lite
+        ${TCIM_LIBRARY}
         pthread
         ${CMAKE_DL_LIBS}
         m
@@ -124,11 +120,6 @@ if(BUILD_AUDIO_FROM_SOURCE)
             "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so.1"
             "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so.1.0.37"
             DESTINATION .)
-    install(FILES "$ENV{HOUMO_EXAMPLES_PATH}/apis/3rdparty/libsamplerate/include/samplerate.h"
-            DESTINATION include)
-    install(FILES "$ENV{HOUMO_EXAMPLES_PATH}/apis/3rdparty/libsndfile/include/sndfile.h"
-                  "$ENV{HOUMO_EXAMPLES_PATH}/apis/3rdparty/libsndfile/include/sndfile.hh"
-            DESTINATION include)
 else()
     install(FILES ${AUDIO_LIB_FILES} DESTINATION .)
 endif()
@@ -148,7 +139,7 @@ endif()
 message(STATUS "")
 message(STATUS "CosyVoice3 TTS Demo Configuration:")
 message(STATUS "  HOUMO_TARGET: $ENV{HOUMO_TARGET}")
-message(STATUS "  TCIM_RUNTIME_PATH: $ENV{TCIM_RUNTIME_PATH}")
+message(STATUS "  TCIM_RUNTIME_PATH: ${TCIM_RUNTIME_PATH}")
 message(STATUS "  Platform lib path: ${LIB_PATH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  BUILD_AUDIO_FROM_SOURCE: ${BUILD_AUDIO_FROM_SOURCE}")

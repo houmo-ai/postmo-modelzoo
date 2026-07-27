@@ -115,19 +115,13 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
 
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     model_name = first_not_none(args.model_name, default_model_name)
     model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(model_name, {}).get(model_size, {})
     ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    prefill_length = first_not_none(
-        args.prefill_length, model_config.get("prefill_length", 256)
-    )
-    context_length = first_not_none(
-        args.context_length, model_config.get("context_length", "32k")
-    )
+    prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
+    context_length = first_not_none(args.context_length, model_config.get("context_length", "32k"))
 
     model_cfgs = {
         "target": HOUMO_TARGET,
@@ -155,8 +149,3 @@ if __name__ == "__main__":
     )
     if ret_dict.get("ret", False) is False:
         exit(1)
-
-    tokenizer_path = "3rdparty/qwen3-tokenizers-cpp.zip"
-    target_dir = "./cpp/3rdparty"
-    save_path = get_file_from_jfrog(tokenizer_path, target_dir, target_dir)
-    print(f"Tokenizer downloaded to {save_path} and extracted to: {target_dir}")

@@ -50,9 +50,7 @@ def get_args() -> argparse.Namespace:
     Returns:
         argparse.Namespace: Parsed command line arguments
     """
-    parser = argparse.ArgumentParser(
-        description="Model Download and Quantization Script"
-    )
+    parser = argparse.ArgumentParser(description="Model Download and Quantization Script")
 
     parser.add_argument(
         "--download_dir",
@@ -136,9 +134,7 @@ if __name__ == "__main__":
     embedding_path = "hmquant/quant_embedding.pt"
     if os.path.exists(embedding_path):
         # Load embedding weights
-        embedding_weight = torch.load(
-            embedding_path, map_location="cpu", weights_only=True
-        )["weight"]
+        embedding_weight = torch.load(embedding_path, map_location="cpu", weights_only=True)["weight"]
 
         # Convert bfloat16 to float16 if necessary
         if embedding_weight.dtype == torch.bfloat16:
@@ -151,16 +147,3 @@ if __name__ == "__main__":
         tokenizer_path = "3rdparty/qwen3-tokenizers-cpp.zip"
         target_dir = "./3rdparty"
         get_file_from_jfrog(tokenizer_path, target_dir, target_dir)
-        download_file(
-            "https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip",
-            "3rdparty/eigen-3.4.0.zip",
-        )
-
-        _extract_files("3rdparty/eigen-3.4.0.zip", target_dir)
-        eigne3_dir = "3rdparty/eigen3"
-        if os.path.exists(eigne3_dir):
-            shutil.rmtree(eigne3_dir, ignore_errors=True)
-        os.rename("3rdparty/eigen-3.4.0", eigne3_dir)
-        for file in os.listdir(target_dir):
-            if file.endswith(".zip"):
-                os.remove(os.path.join(target_dir, file))

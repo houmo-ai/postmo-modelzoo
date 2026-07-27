@@ -26,9 +26,9 @@ from loguru import logger
 import torch
 
 HOUMO_EXAMPLES_PATH = os.environ.get("HOUMO_EXAMPLES_PATH", "../../..")
-sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/apis/common/python")
+sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/utils/python")
 sys.path.insert(0, f"{HOUMO_EXAMPLES_PATH}/hmatc")
-from format_converter import BGR2YUV
+from image.format_converter import BGR2YUV
 from hmatc.utils.postprocess import softmax
 
 import tcim_lite as tcim

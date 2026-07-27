@@ -39,7 +39,6 @@
 | CMakeLists.txt        | CMake编译配置文件                                 |
 | build.sh              | Linux平台编译脚本                                 |
 | build_ndk.sh          | Android平台编译脚本                               |
-| tcim_runtime.cmake    | TCIM Runtime库查找配置                            |
 
 功能支持度说明：
 - 支持的芯片型号为：xh2。
@@ -144,7 +143,7 @@ source env.sh
 需要设置的环境变量：
 - `HOUMO_TARGET`: 目标芯片类型，设置为 `xh2`
 - `HOUMO_PATH`: Houmo SDK路径，包含include和lib目录
-- `TCIM_RUNTIME_PATH`: TCIM Runtime库路径（可选，默认使用相对路径）
+- `TCIM_RUNTIME_PATH`: TCIM Runtime库路径（必需）
 
 对于Android平台交叉编译，还需设置：
 - `NDK_PATH`: Android NDK路径
@@ -163,7 +162,7 @@ source env.sh
 **Linux平台编译：**
 
 ```bash
-cd /hmdd/imodelzoo/models/vlm/qwen3-vl/cpp
+cd ${HOUMO_EXAMPLES_PATH}/models/vlm/qwen3-vl/cpp
 ./build.sh
 ```
 

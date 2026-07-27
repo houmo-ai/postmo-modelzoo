@@ -80,7 +80,7 @@ This project includes a modified source subset at:
 
 The subset is used by:
     tools/llm_perf
-    tools/common/houmo-llm-engine
+    utils/cpp/houmo_engine
 
 Only the headers required by unsupported/Eigen/CXX11/Tensor are retained.
 Tests, benchmarks, documentation, build and packaging files, unrelated
@@ -170,8 +170,8 @@ https://github.com/nothings/stb/blob/master/stb_image.h
 
 Usage in this project:
 stb_image is used for image decoding (load RGB) in houmo-llm-engine:
-    tools/common/houmo-llm-engine/src/modules/image_processor.cc
-    tools/common/houmo-llm-engine/include/modules/image_processor.h
+    utils/cpp/houmo_engine/src/modules/image_processor.cc
+    utils/cpp/houmo_engine/include/modules/image_processor.h
 
 The header is included from the shared common path:
     apis/common/hpp/stb/stb_image.h
@@ -251,7 +251,7 @@ Component Name:
 getopt.h (mingw-w64 / NetBSD implementation)
 
 Usage Location:
-tools/common/include/getopt.h
+This header was used from the legacy path tools/common/include/getopt.h.
 
 Source:
 mingw-w64 project:
@@ -299,7 +299,7 @@ Component Name:
 unistd.h (Mingw32 / mingw-w64 implementation)
 
 Usage Location:
-tools/common/include/unistd.h
+3rdparty/mingw/include/unistd.h
 
 Source:
 MinGW32 official project:
@@ -340,7 +340,7 @@ Component Name:
 npy.hpp (libnpy)
 
 Usage Location:
-tools/common/npy.hpp
+3rdparty/libnpy/npy.hpp
 
 Source:
 https://github.com/llohse/libnpy
@@ -378,7 +378,7 @@ Component Name:
 spdlog
 
 Usage Location:
-tools/common/spdlog (entire spdlog source directory)
+3rdparty/spdlog (entire spdlog source directory)
 apis/common/hpp/spdlog (entire spdlog source directory)
 
 Source:
@@ -580,7 +580,7 @@ miniaudio
 
 Usage Location:
     apis/common/hpp/audio/miniaudio.h
-    tools/common/houmo-llm-engine/src/modules/audio_processor.cc
+    utils/cpp/houmo_engine/src/modules/audio_processor.cc
     models/asr/whisper/cpp/ (legacy/demo copies may also reference miniaudio)
 
 Source:
@@ -615,8 +615,8 @@ Component Name:
 llama.cpp
 
 Usage Location:
-    tools/common/houmo-llm-engine/src/modules/audio_processor.cc
-    tools/common/houmo-llm-engine/src/modules/image_processor.cc
+    utils/cpp/houmo_engine/src/modules/audio_processor.cc
+    utils/cpp/houmo_engine/src/modules/image_processor.cc
 
 iModelzoo adapts portions of llama.cpp for houmo-llm-engine preprocessing:
 

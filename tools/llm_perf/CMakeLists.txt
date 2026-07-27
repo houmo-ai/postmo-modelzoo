@@ -3,22 +3,23 @@ project(llm_perf)
 
 include(CheckCXXCompilerFlag)
 
-set(HOUMO_ENGINE_DIR $ENV{HOUMO_EXAMPLES_PATH}/tools/common/houmo-llm-engine)
+set(HOUMO_ENGINE_DIR $ENV{HOUMO_EXAMPLES_PATH}/utils/cpp/houmo_engine)
 set(HOUMO_PLATFORM_ANDROID FALSE)
 set(HOUMO_PLATFORM_WINDOWS FALSE)
 set(HOUMO_PLATFORM_LINUX FALSE)
 set(HOUMO_PLATFORM_NAME "unknown")
 set(HOUMO_NEED_PTHREAD FALSE)
+set(THIRDPARTY_PATH $ENV{HOUMO_EXAMPLES_PATH}/3rdparty)
 
 if(ANDROID_ABI)
   set(HOUMO_PLATFORM_ANDROID TRUE)
-  include(${HOUMO_ENGINE_DIR}/cmake/platforms/android.cmake)
+  include($ENV{HOUMO_EXAMPLES_PATH}/cmake/platforms/android.cmake)
 elseif(MSVC)
   set(HOUMO_PLATFORM_WINDOWS TRUE)
-  include(${HOUMO_ENGINE_DIR}/cmake/platforms/windows.cmake)
+  include($ENV{HOUMO_EXAMPLES_PATH}/cmake/platforms/windows.cmake)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(HOUMO_PLATFORM_LINUX TRUE)
-  include(${HOUMO_ENGINE_DIR}/cmake/platforms/linux.cmake)
+  include($ENV{HOUMO_EXAMPLES_PATH}/cmake/platforms/linux.cmake)
 else()
   message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
 endif()
@@ -55,28 +56,22 @@ if(MSVC)
   set(ORIGINAL_CXX_FLAGS ${CMAKE_CXX_FLAGS})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4267 /wd4244")
 endif()
-add_subdirectory(
-  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/yaml-cpp
-  ${CMAKE_BINARY_DIR}/yaml-cpp
-  EXCLUDE_FROM_ALL
-)
+include($ENV{HOUMO_EXAMPLES_PATH}/cmake/yaml-cpp.cmake)
 if(MSVC)
   set(CMAKE_CXX_FLAGS ${ORIGINAL_CXX_FLAGS})
 endif()
 
-include(${CMAKE_SOURCE_DIR}/tcim_runtime.cmake)
-include(${CMAKE_SOURCE_DIR}/hm_engine.cmake)
-set(EIGEN_PATH ${HM_EIGEN_INC})
+include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
+include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
 
 option(ENABLE_ASR "Enable ASR support" ON)
 message(STATUS "ENABLE_ASR: ${ENABLE_ASR}")
 
 include_directories(
-  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/nlohmann/include
   $ENV{HOUMO_SDK_PATH}/hal/export/include
   $ENV{HOUMO_SDK_PATH}/hal/include
-  $ENV{HOUMO_EXAMPLES_PATH}/apis/common/hpp
   ${CMAKE_SOURCE_DIR}/include
+  ${THIRDPARTY_PATH}
 )
 
 link_directories(
@@ -100,7 +95,6 @@ endif()
 
 set(INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR}/include
-  ${EIGEN_PATH}
 )
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
@@ -113,7 +107,7 @@ endif()
 set(LLM_PERF_LIBS
   ${TCIM_LIBRARY}
   yaml-cpp
-  hm_engine
+  houmo_engine
 )
 
 if(HOUMO_NEED_PTHREAD)
@@ -125,7 +119,6 @@ if(NOT MSVC)
 endif()
 
 if(MSVC)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE YAML_CPP_STATIC_DEFINE)
   list(APPEND LLM_PERF_LIBS libhal_xh2a ws2_32 Userenv ntdll Bcrypt kernel32)
 endif()
 

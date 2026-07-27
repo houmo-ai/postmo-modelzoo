@@ -11,7 +11,6 @@ customized/
 tmp_*/
 data/
 toolchains/
-3rdparty/
 work_dirs/
 
 # agent directories
@@ -120,3 +119,4 @@ CCPD*
 datasets
 lib
 hmonnx*
+!/3rdparty/

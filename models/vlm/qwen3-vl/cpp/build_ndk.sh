@@ -3,22 +3,11 @@ if [ ! -e 3rdparty ];then
   mkdir 3rdparty
 fi
 if [ ! -e 3rdparty/tokenizers-cpp ];then
-  cd ..
-  echo "Download precompiled model."
-  python3 get_model.py --type hmm
-  cd cpp
+  python3 get_3rdparty.py
 fi
 if [ ! -e 3rdparty/opencv ];then
   echo "Download precompiled model."
   python3 get_3rdparty.py
-fi
-if [ ! -e 3rdparty/eigen3 ];then
-  cd 3rdparty
-  wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
-  unzip eigen-3.4.0.zip
-  mv eigen-3.4.0 eigen3
-  rm -rf eigen-3.4.0.zip
-  cd ..
 fi
 set -e
 if [ $(uname -s) = "Linux" ] && [ $(uname -m) = "x86_64" ]; then
