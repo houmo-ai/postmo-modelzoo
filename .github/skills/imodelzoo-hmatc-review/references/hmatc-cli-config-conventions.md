@@ -138,7 +138,7 @@ HOUMO_EXAMPLES_PATH
 - 生成文件包含当前最小必需 schema，并使用与 `check_cfg()` 相同的默认值；
 - 输出已存在时的覆盖行为明确，失败时不留下看似有效的半文件；
 - schema 新增、删除或重命名后同步生成器、校验、README、模型配置和测试；
-- 对生成文件至少执行一次 load + validation 的无设备测试。
+- 测试定义至少覆盖一次生成文件的 load + validation 无设备路径，并断言生成 schema 可被当前 loader 接受。
 
 ## 5. HMATC ONNX Optimizer
 
@@ -153,7 +153,7 @@ HOUMO_EXAMPLES_PATH
 - 删除节点后引用完整，图保持拓扑有序并通过 ONNX checker；
 - dynamic shape、多输出、共享 initializer 和 external data model 得到正确处理；
 - shape inference 或 ONNX Runtime validation 的失败真正阻止输出被当作成功；
-- 必要时使用代表性输入比较优化前后的数值结果和容差；
+- 代码或测试定义在必要时使用代表性输入比较优化前后的数值结果和容差；
 - 优化重复执行保持幂等，失败时不会覆盖原始模型或遗留半成品；
 - `model.app_onnx_opt` 配置、manager/registry 和实际优化实现保持一致；
 - 新增模型专有优化优先通过既有扩展点接入，不把单模型假设扩散到通用 optimizer。
@@ -235,11 +235,11 @@ HOUMO_EXAMPLES_PATH
 - 不用真实量化、编译或设备即可验证公共契约；
 - 测试结果、产物或错误语义，不只断言 import 或进程退出。
 
-### 7.3 设备集成 test
+### 7.3 设备集成 test 设计
 
-- 选择最小代表模型验证受影响的 quant/build/demo/compare/check/eval/perf 链路；
+- 选择最小代表模型覆盖受影响的 quant/build/demo/compare/check/eval/perf 链路；
 - platform、backend、device/core marker 和 skip 条件能触发声明路径；
-- 设备、模型、数据或 SDK 不可用时记录 validation gap，不伪造通过结论。
+- Reviewer 只检查测试定义、marker、参数和断言是否能覆盖声明路径，不执行设备流程，也不报告设备、模型、数据或 SDK 缺失。
 
 ### 7.4 清理安全
 
@@ -274,7 +274,7 @@ HOUMO_EXAMPLES_PATH
 - config/direct-artifact、small/large eval 和 ONNX/HMONNX/chip backend 的边界清晰；
 - resizer、ROI、batch/core、mix search、plugin 和路径规则与实现一致；
 - 命令从声明的目录可执行，不依赖个人绝对路径或未说明环境变量；
-- 性能、精度和平台支持只陈述已验证范围。
+- 性能、精度和平台支持声明必须有仓库上下文中的结果、配置或其他已有证据支撑。
 
 ### 9.2 下游调用方
 

@@ -9,6 +9,7 @@
 - [CV 与 HMATC 体系](#cv-与-hmatc-体系)
 - [test.sh 评审规则](#testsh-评审规则)
 - [测试配置耦合](#测试配置耦合)
+  - [CLI 入参变更与测试 JSON 同步](#cli-入参变更与测试-json-同步)
 - [跨体系与迁移规则](#跨体系与迁移规则)
 
 ## 分类原则
@@ -273,12 +274,40 @@ hmeval_params
 
 评审时检查：
 
-- JSON key 与实际 argparse/HMATC option 名一致；连字符和下划线按 runner 生成规则精确匹配。
+- JSON key 与实际 Python/C++/HMATC option 名一致；连字符和下划线按 runner 生成规则精确匹配。
 - column-oriented 参数数组长度表达正确用例组合，不能因长度错位把不同模型变体的参数拼在一起。
 - `null`、`default`、boolean 和 script 字段符合测试 runner 的跳过/生成语义。
 - `test_sh_params` 中每组参数都能被目标 `test.sh` 消费，并覆盖默认和重要非默认分支。
 - `support_flow`、`support_hmatc`、backend、platform、core/device/memory marker 与真实能力一致。
 - 生产阶段输出路径与后续 Demo/Compare/Eval 配置中的 `cached_results` 路径一致。
+
+### CLI 入参变更与测试 JSON 同步
+
+只要本次变更修改 Python 脚本或 C++ 程序的 CLI contract，就必须检查对应模型测试 JSON，不能只检查源码、`test.sh` 和 README。CLI contract 变化包括：
+
+- option 新增、删除或重命名；
+- `--foo-bar` 与 `--foo_bar` 之间切换，或 alias 被移除；
+- Python `argparse` 的 `dest`、required、default、type、choices 或 boolean action 变化；
+- C++ parser 的长短 option、位置参数、取值类型、必选条件或 boolean 语义变化；
+- 脚本文件名、子命令或参数所属阶段变化。
+
+按实际调用链执行以下静态检查：
+
+1. 定位对应的 `tests/models_tests/model_configs/model_cfg_<model>.json`，并确定修改入口由哪个配置段驱动：
+   - `get_model.py` 通常对应 `get_model_params`；
+   - `ptq.py` 通常对应 `quant_params`；
+   - `build.py` 通常对应 `compile_params`；
+   - `demo.py`、`demo_multibatch.py` 和专项 Demo 通常对应 `demo_params`、`demo_multibatch_params` 或 `<demo_name>_params`；
+   - 性能入口通常对应 `perf_params`；
+   - `test.sh` 的原始参数组合对应 `test_sh_params`；
+   - CV/HMATC 流程对应 `hmquant_params`、`hmbuild_params`、`hmdemo_params`、`hmcompare_params`、`hmperf_params` 和 `hmeval_params`。
+2. 阅读当前测试 runner 如何消费该配置段。对使用 `render_case_options()` 的参数矩阵，普通 JSON key 会原样渲染成 `--<key>`，不会自动在下划线和连字符之间转换。例如 `quant_type` 生成 `--quant_type`，`out-dir` 生成 `--out-dir`。
+3. 区分真正生成 CLI option 的字段与 runner 控制字段。`script`、`prerequisites`、`target`、部分 `onnx` 等字段可能被 runner 单独消费、跳过或用于选择入口；先检查对应 flow 的 `skipped_keys`、`ignored_keys`、位置参数和特殊处理，再决定是否需要改名。
+4. 检查所有 backend 和同一入口的全部 case，不能只核对第一列或默认 case。参数矩阵是按相同 index 组合列值，重命名时还要保持各列长度和 case 语义一致。
+5. 如果旧 option 仍由兼容 alias 接受，确认 JSON 生成的实际 option 确实命中该 alias；如果 alias 被删除或 JSON key 生成的新命令不再被 parser 接受，要求在同一变更中同步更新 JSON。
+6. 对 C++ 入参变更，沿模型测试 runner、`test.sh`、包装脚本或配置到最终 executable 的调用链检查；不要因为 JSON 中没有显式 `cpp` 字样就假设测试不受影响。
+
+如果变更后的 parser 与测试 JSON 不一致，finding 应定位到引入 CLI contract 变化的代码行，并说明受影响的 JSON 配置段、runner 最终生成的错误命令及测试/用户流程后果。若该不一致同时使标准 `test.sh`、README Quick Start 或主入口确定性失败，按通用 severity 规则定为 P0。
 
 ## 跨体系与迁移规则
 

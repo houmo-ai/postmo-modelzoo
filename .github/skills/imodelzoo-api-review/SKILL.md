@@ -1,13 +1,13 @@
 ---
 name: imodelzoo-api-review
-description: "Review iModelzoo model conversion, compilation, deployment, inference, and scene API examples. Use for changes under apis/converts/**, apis/inferences/**, apis/scenes/**, editable first-party API helpers explicitly in scope, tests/apis_tests/**, API example configurations, CMake/build/run scripts, Python or C++ demos, and their README files."
+description: "Perform static semantic review of iModelzoo model conversion, compilation, deployment, inference, and scene API examples. Use for changes under apis/converts/**, apis/inferences/**, apis/scenes/**, editable first-party API helpers explicitly in scope, tests/apis_tests/**, API example configurations, CMake/build/run scripts, Python or C++ demos, and their README files."
 ---
 
 # iModelzoo API Review
 
 ## 基础规则与评审单元
 
-先加载 `imodelzoo-code-review`，使用其中的 severity、finding 格式、验证策略和仓库边界。本 skill 只补充 API 示例专项规则。
+先加载 `imodelzoo-code-review`，使用其中的 severity、finding 格式、静态语义评审策略和仓库边界。本 skill 只补充 API 示例专项规则。
 
 评审 `apis/converts/**`、`apis/inferences/**`、`apis/scenes/**` 或 `tests/apis_tests/**` 时，必须读取 `references/api-example-conventions.md`，按变更涉及的章节检查 conversion 产物契约、测试配置协议、平台脚本和 API README。
 
@@ -53,6 +53,9 @@ description: "Review iModelzoo model conversion, compilation, deployment, infere
 - 检查对象所有权、RAII/cleanup、指针/size 计算和错误码，避免泄漏、越界或 use-after-free。
 - 检查 include、library、CMake target、install path 和 `tcim_runtime.cmake` 的使用是否与仓库约定一致。
 - 检查 Linux `run.sh`、Windows `run.bat`、Android/NDK 脚本的参数和产物名是否同步。
+- 对本次变更涉及的 Python/C/C++、Bash 和 CMake 文件，静态检查语言语法与条件分支配对；新增 first-party 源文件同时检查 HOUMO AI Apache-2.0 文件头、`File:`、`Description:` 和 SPDX 字段。Reviewer 不执行语法检查或编译。
+- 对声明支持 Windows 的示例应用 [`static-source-review-rules.md`](../imodelzoo-code-review/references/static-source-review-rules.md) 中的 MSVC 清单；对声明支持 Android 的示例应用 Android NDK 清单，静态确认源码、CMake、目标库、ABI/API level 和脚本没有确定性编译冲突。
+- 如果主 `run.sh`、`run.bat`、README Quick Start 或其直接调用的 CLI 因 option、subcommand、入口或产物契约不一致而确定性失败，按 `imodelzoo-code-review` 定为 P0。
 - 检查环境变量、动态库路径和工作目录是否在 README 中说明，避免依赖个人机器状态。
 - 保留公开 CLI、CMake option、输出格式和示例目录结构，除非任务明确要求兼容性变化。
 
@@ -79,8 +82,12 @@ API 示例是用户可能直接复制的参考实现，因此额外检查：
 - `run.sh` 非交互、可重复执行并传播失败；其默认值和产物与 pytest 后续的模型准备、Python demo、C++ build/demo 一致。
 - 对本次新增或修改的二进制、模型、build 目录或生成产物，只判断是否误提交，不逐行评审排除内容；历史已存在且本次未触碰的产物不作为本次 finding。
 
-## 验证与报告
+## 静态评审与报告
 
-优先验证参数解析、CMake 配置、Python syntax 和配套 pytest。只有环境具备所需 SDK、runtime、模型和设备时才执行完整 C++ build 或推理。将缺失条件列为 validation gap，不要把未执行当作代码缺陷。
+Reviewer 不执行参数解析命令、CMake、Python syntax、pytest、C++ build 或推理，也不访问 SDK、runtime、模型和设备。不要枚举缺失工具或环境，不要将未执行项写成 validation gap。
+
+根据 diff 和直接上下文静态检查 parser、CMake、平台脚本、Python/C++ API 调用、测试配置和 README 的契约是否一致。检查测试设计是否能够覆盖目标 backend、platform、core、并发或 scene 组合，但不要声称这些测试已经运行。
+
+外部 SDK/runtime contract 只有在评审上下文中有明确依据时才能支撑 finding；没有依据时不要推测其内部行为。只有某个缺失 contract 会影响候选 finding 是否成立时，才在 Questions / Assumptions 中精确说明。
 
 按 `imodelzoo-code-review` 输出 findings。每条 finding 指明违反的 API contract、触发平台/参数，以及用户复制该示例后会观察到的具体后果。

@@ -37,6 +37,15 @@ This document defines repository-wide coding and day-to-day engineering conventi
 - Use the nearest applicable formatter, linter, build configuration, and component documentation.
 - Do not install tools or dependencies merely to run validation unless explicitly approved.
 
+## First-party source file headers
+
+- New first-party Python and C/C++ source/header files must include the repository-standard HOUMO AI Apache-2.0 file header before the first code, import, include, pragma or header guard.
+- Required fields are `Copyright (c) <creation-year> HOUMO AI`, `File: <basename>`, a non-empty accurate `Description:`, the Apache License 2.0 notice, and `SPDX-License-Identifier: Apache-2.0`.
+- Python may place a shebang and encoding declaration before the file header. C/C++ uses the surrounding first-party `/* ... */` header style.
+- Keep the original creation year during ordinary edits. Do not rewrite existing copyright years merely because a file is modified.
+- Preserve third-party and vendored copyright/license text; never replace it with the HOUMO AI header. Generated files and excluded build outputs follow their source or generator policy.
+- For pre-existing first-party files without a header, avoid unrelated header-only churn unless the task requires normalization. Code review should report newly added/copied files, removal or corruption of an existing header, wrong `File:` basename, or stale/copied `Description:` introduced by the change.
+
 ## C++ style
 
 ### Readability and control flow
@@ -101,9 +110,12 @@ This document defines repository-wide coding and day-to-day engineering conventi
 - When a compatibility-affecting change is requested, update directly related tests, examples, and documentation.
 - Do not silently change model paths, batch sizes, sequence lengths, device counts, or performance-reporting semantics.
 - Preserve benchmark methodology, warm-up behavior, timing boundaries, and reported metrics unless changing them is part of the task.
+- For components that declare Windows/MSVC support, guard POSIX/GCC-only headers, APIs, compiler flags and link libraries, and keep MSVC CMake options, DLL/import-library handling, install paths and `run.bat` behavior consistent.
+- For components that declare Android/NDK support, keep the NDK toolchain file, ABI, API level, target SDK/runtime libraries, architecture guards, install/push paths and README commands consistent; never mix host libraries or host executables into target artifacts.
 
 ## Validation
 
+- This section applies to implementation agents or developers that have command execution. A pure AI code reviewer follows `imodelzoo-code-review`'s static-only boundary: do not execute commands, do not claim checks ran, and do not report missing tools or environments as gaps.
 - Validate changes in proportion to their scope and risk.
 - Prefer the narrowest relevant checks for the files and components changed.
 - Run formatters and linters only on touched files unless broader validation is explicitly requested.

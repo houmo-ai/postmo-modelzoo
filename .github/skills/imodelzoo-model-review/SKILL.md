@@ -1,13 +1,13 @@
 ---
 name: imodelzoo-model-review
-description: "Review end-to-end model example changes in iModelzoo. Use for changes under models/**, related tests/models_tests/** configurations and pytest entries, config/imodelExampleConfig.yaml, model aggregation manifests, large-model config.yaml/get_model.py/ptq.py/build.py/demo.py workflows, CV config.yml/model_impl.py/dataset.py HMATC workflows, test.sh, or model README files."
+description: "Perform static semantic review of end-to-end model example changes in iModelzoo. Use for changes under models/**, related tests/models_tests/** configurations and pytest entries, config/imodelExampleConfig.yaml, model aggregation manifests, large-model config.yaml/get_model.py/ptq.py/build.py/demo.py workflows, CV config.yml/model_impl.py/dataset.py HMATC workflows, test.sh, or model README files."
 ---
 
 # iModelzoo Model Review
 
 ## 基础规则与评审单元
 
-先加载 `imodelzoo-code-review`，使用其中的 severity、finding 格式、验证策略和仓库边界。本 skill 只补充模型示例专项规则。
+先加载 `imodelzoo-code-review`，使用其中的 severity、finding 格式、静态语义评审策略和仓库边界。本 skill 只补充模型示例专项规则。
 
 先应用 `.github/guidance/review-guidelines.md` 的全局 `Review Exclusions`。被排除的路径不进入 model review unit，也不因与模型工作流相关而重新纳入。
 
@@ -51,6 +51,8 @@ config / CLI
 - 对齐 FP、W8A8、W4A16 等精度名称以及 ONNX/HMONNX/HMM 等产物名。
 - 对齐 batch、sequence/context/prefill length、dynamic shape、device/core 数和目标平台。
 - 检查 `test.sh`、Python CLI、C++ CLI、测试 JSON 和 README 的默认值及 flag 拼写。
+- 如果本次修改 Python 脚本或 C++ 程序的 CLI 入参名称、alias、`dest`、位置参数、required/default/类型或 boolean 语义，必须沿测试 runner 的命令生成逻辑检查对应 `tests/models_tests/model_configs/model_cfg_<model>.json`。确认受影响的 `get_model_params`、`quant_params`、`compile_params`、`demo_params`、`demo_multibatch_params`、`perf_params`、`test_sh_params` 或 HMATC 参数段是否仍生成目标 parser 接受的参数；有影响时要求在同一变更中同步更新 JSON。
+- 如果 `test.sh` 在任一声明支持的阶段调用了 parser 不再接受的 option、错误入口或不存在的产物，使该阶段确定性失败，按 `imodelzoo-code-review` 定为 P0；不要因为默认 `STEP` 是其他阶段、修复只需统一 flag，或用户可以手工改命令而降级。
 - 检查大模型的显式 CLI > `config.yaml` > 安全默认值优先级，或 CV 的显式 HMATC CLI override > `config.yml` 优先级没有被反转。
 - 确认 CLI override 以正确类型和值传递到量化、编译或推理调用点。
 - 检查不同 backend 或模型变体不会覆盖、误读或混用同一输出目录中的产物。
@@ -96,6 +98,7 @@ config / CLI
 - 按 reference 检查大模型 `test_common.sh` 阶段参数协议，或 CV 完整 HMATC workflow 的固定执行顺序。
 - 按 README reference 检查两套章节结构、命令、配置、产物、结果指标和免责声明，不要跨体系复制模板。
 - 检查模型配置 JSON 是否覆盖变更涉及的 get/quant/compile/demo/compare/eval/perf 阶段。
+- 对所有 Python/C++ CLI 入参变更，检查模型 JSON 中直接生成 CLI option 的 key、`test_sh_params` 中的原始参数以及 runner 特殊消费字段是否需要同步；不能只检查 `test.sh` 和 README。
 - 检查 `test_sh_params`、Python Demo 参数组、backend 分支、prerequisite 和 skip 条件是否与实现一致。
 - 检查 pytest marker、model name、device 数和显存要求是否正确注册。
 - 检查 `config/imodelExampleConfig.yaml` 和聚合模型清单是否需要同步。
@@ -105,8 +108,18 @@ config / CLI
 
 涉及新增/重构模型 pytest 接入时，同时使用 `generate-model-pytest-cases`。
 
-## 验证与报告
+## 静态评审与报告
 
-优先运行与变更阶段对应的最小测试；缺少模型、数据集、量化环境、编译环境或设备时，将其列为 validation gap。不要因为无法运行端到端模型就制造 finding，但要根据静态数据流和配置证据报告可确定的问题。
+Reviewer 不执行模型获取、Python 导入、pytest、量化、编译、推理、评测或性能测试。不要把 Python、FunASR、TCIM、Houmo SDK、模型、数据集、GPU 或 XH2 设备不可用写成 validation gap；这些属于 reviewer 的固定能力边界。
+
+沿模型工作流静态追踪配置、参数、模型资源和产物，检查每个阶段是否消费上游代码实际定义的输出，以及测试定义和 README 是否与实现一致。检查测试是否按设计覆盖变更路径，但不要声称测试已经运行。
+
+对模型目录中本次变更涉及的 Python、C/C++、Bash 或 CMake 文件，必须执行（仅基于 diff 和上下文的）静态语法检查：检查括号/字符串/注释、缩进与 block、条件编译、宏续行、Shell 方言与 heredoc、CMake command/block 配对，以及声明/定义的直接结构一致性。不要把缺少运行时依赖或未执行工具写成语法验证缺口。
+
+如果模型或其构建脚本、README、测试配置声明支持 Windows/MSVC 或 Android/NDK，必须静态检查对应平台可移植性：POSIX/GCC-only API 和编译/链接选项是否受 guard 限制，MSVC 的 CMake/DLL 产物是否一致，Android toolchain、ABI/API level、架构 intrinsic、目标库及 install/push 路径是否指向目标产物。只有从代码和仓库契约可确定的必然失败才报告，不要求 reviewer 实际交叉编译。
+
+对新增或复制到 first-party 路径的 Python、C/C++ 源文件和头文件，检查仓库规定的 HOUMO AI Apache-2.0 文件头、`File:` basename、准确非空 `Description:` 和 SPDX 标识；既有历史缺失文件头不因本次普通修改单独报错，third-party/vendored 文件保留其原始许可。
+
+只有存在具体静态代码证据时才报告 finding。对于评审上下文未提供的模型 metadata、外部 API 行为或设备能力，不要猜测；只有它会影响候选 finding 是否成立时，才在 Questions / Assumptions 中说明具体 contract。
 
 按 `imodelzoo-code-review` 输出 findings。每条 finding 明确指出失败发生在哪个阶段，以及它如何影响下游 Demo、测试、评测或用户命令。

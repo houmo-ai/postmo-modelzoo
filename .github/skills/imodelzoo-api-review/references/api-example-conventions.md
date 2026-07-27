@@ -160,8 +160,11 @@ Python demo、C++ build 和 C++ demo。评审时检查：
 
 ## 5. CMake、C++ 与资源生命周期
 
+- 同时应用 [`static-source-review-rules.md`](../../imodelzoo-code-review/references/static-source-review-rules.md) 的语言语法、MSVC、Android NDK 和 first-party 文件头规则。
 - CMake target、install prefix、README 中的 executable 路径和测试配置的 `name` 一致；
 - include/library 搜索路径不依赖作者机器上的绝对路径；
+- Windows/MSVC 分支不包含未保护的 POSIX/GCC-only header、API、flag 或 link library，`.lib`/DLL、compile standard、install/copy 目录和 `run.bat` 保持一致；
+- Android/NDK 分支使用目标 toolchain、ABI、API level 和目标架构 SDK/runtime library，不链接 host/x86_64 产物，build/install/push/run 路径保持一致；
 - backend、core 数、dynamic shape 和自定义算子选项在编译与运行时一致；
 - runtime、stream、model、device memory 和 host memory 在所有退出路径上释放；
 - 异步执行在读取输出或释放资源前完成必要同步；

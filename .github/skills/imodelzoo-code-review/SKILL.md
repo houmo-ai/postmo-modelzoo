@@ -1,6 +1,6 @@
 ---
 name: imodelzoo-code-review
-description: "Review non-excluded iModelzoo application-layer changes, including model demos, model acquisition/conversion, quantization, compilation, inference, evaluation, performance, tests, configurations, shell workflows, and README examples. Use for code review or review summaries after applying the exclusions declared in .github/guidance/review-guidelines.md."
+description: "Perform static semantic review of non-excluded iModelzoo application-layer changes, including model demos, model acquisition/conversion, quantization, compilation, inference, evaluation, performance, tests, configurations, shell workflows, and README examples. Use for AI code review or review summaries based on the supplied diff and repository context after applying the exclusions declared in .github/guidance/review-guidelines.md."
 ---
 
 # iModelzoo Code Review
@@ -23,7 +23,7 @@ iModelzoo 位于编译器、量化工具和运行时之上，主要提供可执�
 先应用 `.github/guidance/review-guidelines.md` 中的 `Review Exclusions`：
 
 - 所有 changed paths 都被排除时，停止专项 review 并输出 `No review required: all changed files match review exclusions.`。
-- mixed diff 只评审未排除路径，并在 Validation 或 Summary 中记录被排除的路径组。
+- mixed diff 只评审未排除路径，并在 Review Basis 或 Summary 中记录被排除的路径组。
 - 排除文件可作为理解其他源码的只读上下文，但不要对其内容产生 finding。
 - 用户明确要求评审某个排除路径时，以用户要求为准，但不将例外扩展到其他排除路径。
 
@@ -34,10 +34,11 @@ iModelzoo 位于编译器、量化工具和运行时之上，主要提供可执�
 1. 读取 `.github/guidance/repo-layout.md` 和 `.github/guidance/coding-style.md`。
 2. 读取 `.github/guidance/review-guidelines.md`，先应用 `Review Exclusions`。
 3. 如果所有 changed paths 都被排除，按全排除模板结束；否则读取 [`references/review-detail-rules.md`](references/review-detail-rules.md)。
-4. 按未排除的变更路径应用 review 路由：命中时加载对应专项 skill，未命中时仅使用本 skill；detail rules 在两种情况下都适用。
-5. 检查未排除的完整 diff，并打开与变更直接耦合的配置、脚本、测试和 README。
-6. 优先参考同模型族或同类示例中已工作的相邻实现和仓库现有约定。
-7. 若存在适用于该模型或任务的辅助 skill，同时加载并遵循它。
+4. 变更包含 Python、C/C++、Bash、CMake、Windows/MSVC、Android/NDK 或新增 first-party 源文件时，读取 [`references/static-source-review-rules.md`](references/static-source-review-rules.md)。
+5. 按未排除的变更路径应用 review 路由：命中时加载对应专项 skill，未命中时仅使用本 skill；detail rules 在两种情况下都适用。
+6. 检查未排除的完整 diff，并打开与变更直接耦合的配置、脚本、测试和 README。
+7. 优先参考同模型族或同类示例中已工作的相邻实现和仓库现有约定。
+8. 若存在适用于该模型或任务的辅助 skill，同时加载并遵循它。
 
 ## 评审方法
 
@@ -68,21 +69,34 @@ iModelzoo 位于编译器、量化工具和运行时之上，主要提供可执�
 
 ### P0（必须修复）
 
-会导致数据破坏、敏感信息泄露、广泛安全/稳定性问题，或使核心默认流程普遍不可用。P0 在 iModelzoo 中应很少出现。
+会导致数据破坏、敏感信息泄露、广泛安全/稳定性问题，或使仓库提供的标准用户入口确定性不可用。
 
-示例：默认命令覆盖非目标目录中的用户数据；提交或打印凭据；公共入口在正常使用中破坏共享模型产物。
+以下入口视为标准用户入口：
 
-### P1（必须修复）
+- 模型目录的 `test.sh`，包括其声明支持的 `demo`、`quant`、`build`、`all` 等阶段。
+- API 示例的主 `run.sh`、`run.bat` 或等价一键入口。
+- README Quick Start 或默认端到端流程给出的主命令。
+- 被上述脚本和文档直接调用的公共 CLI、Python/C++ 入口。
 
-会使受支持的主要流程失败、产生根本错误的模型结果或指标，且没有合理绕过方式。
+只要本次变更造成这些入口在其声明支持的参数或默认配置下必然因参数不兼容、入口缺失、产物契约断裂或直接调用错误而失败，就定为 P0。用户可以手工修改脚本、改写参数或绕开仓库入口不算合理绕过方式。
 
 示例：
 
-- 默认 Demo 因参数、依赖或产物名不一致而无法启动。
+- `ptq.py` 删除或改名某个 option，但 `test.sh` 仍传入旧 option，导致 `bash test.sh -s quant` 在参数解析阶段失败。
+- `test.sh`、主 `run.sh` 或 README Quick Start 调用不存在的脚本、subcommand、option 或产物。
+- 默认 Demo 因参数或必需产物名不一致而无法启动。
+- 默认命令覆盖非目标目录中的用户数据；提交或打印凭据；公共入口在正常使用中破坏共享模型产物。
+
+### P1（必须修复）
+
+会使受支持的主要流程失败、产生根本错误的模型结果或指标，且影响不满足上述标准入口 P0 升级条件。
+
+示例：
+
 - 量化或编译实际处理了错误模型、错误配置或错误产物。
 - tensor、KV cache、shape、dtype、mask、position 或输出解析错误，导致推理结果无效。
 - 评测逻辑产生明显错误的指标但仍报告成功。
-- 文档中的默认端到端流程稳定失败。
+- 非主入口的受支持工作流稳定失败，或文档中的专项命令错误但不阻断 Quick Start/标准一键入口。
 
 ### P2（应该修复）
 
@@ -90,9 +104,9 @@ iModelzoo 位于编译器、量化工具和运行时之上，主要提供可执�
 
 示例：
 
-- 非默认但已支持或已文档化的参数被忽略或错误透传。
+- 非默认但已支持或已文档化的参数被忽略或错误透传，但不会导致标准用户入口失败。
 - 特定 batch、sequence length、动态 shape、精度或多卡配置失败。
-- `config.yaml`、`test.sh`、Python/C++ Demo、测试和 README 默认值不一致。
+- `config.yaml`、`test.sh`、Python/C++ Demo、测试和 README 存在不阻断流程的默认值漂移。
 - 子进程失败被吞掉，流程继续使用旧产物。
 - 行为改动缺少可在现有测试框架中实现的聚焦回归用例。
 
@@ -160,19 +174,50 @@ iModelzoo 位于编译器、量化工具和运行时之上，主要提供可执�
 - 不修改 vendored dependency、生成文件或 build output。
 - 不无故新增依赖、全局开关、重复配置或公共 API/ABI 变化。
 - 检查 import/include、错误处理、资源释放和直接耦合调用方是否同步。
+- 对变更的 Python、C/C++、Bash 和 CMake 应用静态语法检查；对声明支持 Windows/MSVC 或 Android/NDK 的 C/C++ 组件应用平台可移植性检查。
+- 检查新增 first-party Python/C/C++ 源文件是否具有符合仓库规范的版权、文件名、Description、Apache-2.0 和 SPDX 文件头。
 - 若改动影响其他 skill 的路径、命令、source anchor 或权威来源，指出并同步检查 skill 是否失效。
 
-## 测试与验证策略
+## AI reviewer 能力边界
 
-按风险选择最小有效验证集：
+本 skill 面向仅由 AI 大模型承担的 reviewer。Reviewer 只基于评审系统提供的 changed paths、diff、仓库源码上下文、配置、测试定义和文档进行静态语义分析，不执行仓库命令，也不假设能够访问终端、Git 工作区、Python/C++ 环境、依赖、SDK、模型、数据或设备。
 
-1. 检查 diff 及直接耦合文件。
-2. 对变更文件运行语法、静态检查或格式检查。
-3. 运行最相关的 unit/pytest 用例。
-4. 在不需要模型和硬件时检查 `--help`、参数解析和配置合并。
-5. 仅在环境、模型、数据和设备可用且成本合理时运行量化、编译、推理、评测或性能流程。
+以下限制是 reviewer 的固定能力边界，不是某次变更特有的 validation gap：
 
-不要声称未执行的硬件相关行为已验证。缺少模型、数据集、授权资产、设备或内部服务时，将其记录为 validation gap；只有存在具体代码证据时才将其写成 finding。
+- 不能运行 Shell、Python、C++、Git、formatter、linter、pytest、构建或编译命令。
+- 不能安装或导入 FunASR、TCIM、Houmo SDK 或其他依赖。
+- 不能下载或加载模型、数据集、ONNX/HMONNX/HMM 等产物。
+- 不能执行量化、编译、推理、评测、性能测试或访问 GPU/XH2 设备。
+
+不要在评审结果中枚举上述缺失条件，不要逐项列出未运行的检查，也不要输出类似内容：
+
+- `当前环境缺少 python3、git。`
+- `缺少 FunASR、TCIM、模型资源和 XH2 设备。`
+- `未运行语法检查、pytest、量化、编译或推理。`
+- `由于环境限制，无法验证本次修改。`
+
+不要声称已经执行、通过或失败了任何命令、测试、编译、模型流程或设备验证。评审结论只表示：在提供的 diff 和仓库上下文中，是否发现了具有明确静态证据的可操作问题。
+
+## 静态语义评审策略
+
+1. 检查完整的未排除 diff，并打开与变更直接耦合的源码、配置、测试定义和 README 上下文。
+2. 沿用户实际执行路径追踪参数、配置、控制流、数据流和产物契约。
+3. 比较生产者与消费者之间的名称、类型、shape、dtype、layout、路径、默认值和错误语义。
+4. 检查 CLI、Shell、配置、Python/C++ 入口、测试配置和 README 是否一致。
+5. 根据源码检查边界条件、异常处理、失败传播、资源生命周期、并发状态和兼容性。
+6. 检查测试设计是否覆盖变更分支并断言真实结果；不要声称测试已经运行。
+7. 只根据评审上下文中的具体代码证据形成 finding，不用运行时猜测填补证据空白。
+
+可以直接形成 finding 的静态证据包括：
+
+- parser、调用方、配置、测试或 README 使用不兼容的 option、默认值或类型。
+- 上游产物名、路径或格式与下游消费者不一致。
+- tensor、shape、dtype、layout、buffer size 或处理顺序在相邻阶段矛盾。
+- 合法的 `False`、`0`、空字符串、空列表或 `None` 被错误覆盖。
+- 明确的不可达分支、空值解包、越界、资源泄漏、错误码吞掉或失败后复用旧产物。
+- 测试参数、marker 或 skip 条件无法触发其声称覆盖的代码路径。
+
+依赖未提供外部 contract 的问题，例如 HMM 真实 tensor metadata、某个 TCIM 版本的未展示 API 行为或设备对特定 dtype 的支持，不能靠猜测形成 finding。只有该 contract 会实质影响候选 finding 是否成立时，才在 Questions / Assumptions 中写出最具体的条件；不要添加“假设依赖已安装”“假设存在设备”等通用运行前提。
 
 ## Finding 写法
 
@@ -195,11 +240,11 @@ iModelzoo 位于编译器、量化工具和运行时之上，主要提供可执�
 - [P1] 标题 — `path/to/file.py:123`
   说明触发条件、用户影响和最小修复方向。
 
-## Validation
+## Review Basis
 
-- 已执行的检查及结果。
-- 未执行的检查及具体环境/资产限制。
-- 被排除的路径组（例如 `Excluded from review: data/**, hmodel/**.`）。
+- 说明已审阅的未排除 diff 和直接耦合的源码、配置、测试定义与文档上下文。
+- 被排除的路径组（例如 `Excluded from review: data/**, hmodel/**.`）；没有则写 `None`。
+- 不列出 reviewer 不具备的工具、环境、依赖、模型或设备，不声称执行了任何命令、测试或运行时验证。
 
 ## Questions / Assumptions
 
@@ -219,7 +264,7 @@ iModelzoo 位于编译器、量化工具和运行时之上，主要提供可执�
 
 No review required: all changed files match review exclusions.
 
-## Validation
+## Review Basis
 
 - Scope classification only; code content was not reviewed.
 - Excluded paths: `...`.

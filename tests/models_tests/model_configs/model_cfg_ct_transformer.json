@@ -31,9 +31,9 @@
         "xh2": {
             "model_name": ["ct_transformer"],
             "model_size": ["large"],
-            "model-dir": ["cached_models/ct_transformer"],
+            "model_dir": ["cached_models/ct_transformer"],
             "out-dir": ["cached_results/hmquant_xh2"],
-            "quant-type": [null]
+            "quant_type": [null]
         }
     },
     "compile_params": {
@@ -51,8 +51,8 @@
         "xh2": {
             "model_name": ["ct_transformer"],
             "model_size": ["large"],
-            "model-dir": ["cached_models/ct_transformer"],
-            "model-path": ["cached_results/hmm_xh2/ct_transformer.hmm"]
+            "model_dir": ["cached_models/ct_transformer"],
+            "model_path": ["cached_results/hmm_xh2/ct_transformer.hmm"]
         }
     }
 }

@@ -2,6 +2,12 @@
 
 本文件是 iModelzoo code review 的路由入口。它先确定无需评审的路径，再为其余变更选择适用的 review skill。严重程度、通用检查项、finding 写法和输出模板统一由 `imodelzoo-code-review` 定义。
 
+## AI Reviewer 能力边界
+
+iModelzoo code review 由纯 AI 大模型 reviewer 基于评审系统提供的 changed paths、diff 和仓库上下文完成。Reviewer 不执行命令、测试、编译、模型流程或设备验证，也不访问 Git 工作区、Python/C++ 环境、依赖、SDK、模型、数据或硬件。
+
+这些限制是 review 的固定边界，不是每次变更的 validation gap。不要在输出中枚举缺少的工具、依赖、模型或设备，不要逐项列出未运行的检查，也不要声称已经执行任何验证。Review 只根据静态语义、控制流、数据流、配置和跨文件 contract 报告具有明确证据的 finding。
+
 ## Review Exclusions
 
 在选择 review skill 前，先按以下分组过滤 changed paths。排除规则仅控制 code review 范围，不代表这些文件可以被任意修改；实现任务仍须遵守用户指令、所有权和仓库安全规则。
@@ -43,6 +49,7 @@
 
 默认不评审以下目录的实现内容：
 
+- `3rdparty/**`
 - `apis/3rdparty/**`
 - `hmatc/3rdparty/**`
 - `apis/common/eigen3/**`
@@ -57,7 +64,7 @@
 
 - 如果所有 changed paths 都属于排除范围，停止专项 review，并输出 `No review required: all changed files match review exclusions.`。
 - 如果 diff 同时包含排除路径和可评审路径，只过滤排除部分，继续评审其余文件。
-- 在 Validation 或 Summary 中列出被排除的路径组，不要把排除项写成 finding。
+- 在 Review Basis 或 Summary 中列出被排除的路径组，不要把排除项写成 finding。
 - 排除文件可以用于理解可评审代码，但 finding 不应定位到排除文件的行。
 - 文件从排除路径移动到可评审路径时，按目标路径评审；从可评审路径移动到排除路径时，检查非排除侧产生的直接影响。
 - 用户明确要求评审某个排除路径时，以用户要求为准；不要将这一例外扩展到其他排除路径。
@@ -136,8 +143,8 @@ HMATC 是公共工具。评审其 CLI、配置或执行行为变化时，必须�
 2. 分别应用对应专项 skill，同时共享 `imodelzoo-code-review` 的 severity 和输出规则。
 3. 检查跨子系统的 CLI、配置 schema、模型产物和公共 API contract。
 4. 合并 findings，并按 severity、文件和行号排序。
-5. 在 Validation 或 Summary 中记录被排除的路径组。
-6. 不要用一个笼统结论掩盖尚未验证的可评审子系统。
+5. 在 Review Basis 或 Summary 中记录被排除的路径组。
+6. 不要用一个笼统结论掩盖尚未完成静态语义审查的可评审子系统。
 
 典型组合：
 
@@ -148,4 +155,4 @@ HMATC 是公共工具。评审其 CLI、配置或执行行为变化时，必须�
 
 ## Review 与实施边界
 
-普通 code review 只报告 findings、验证结果和假设，不修改代码、不发布评论。只有用户明确要求修复或发布时，才进入对应实施或 Gerrit 发布流程。
+普通 code review 只报告 findings、Review Basis 和必要假设，不修改代码、不发布评论。只有用户明确要求修复或发布时，才进入对应实施或 Gerrit 发布流程。

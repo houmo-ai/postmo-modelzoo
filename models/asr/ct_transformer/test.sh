@@ -46,7 +46,7 @@ if should_run_step "quant"; then
         QUANT_TYPE="w8a8_sefp"
     fi
     echo "Start model quantization."
-    python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --quant-type "${QUANT_TYPE}"
+    python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --quant_type "${QUANT_TYPE}"
 fi
 
 if should_run_step "build"; then

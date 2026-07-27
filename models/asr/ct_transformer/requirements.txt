@@ -1,10 +1,10 @@
 --extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
 modelscope[audio] -f https://modelscope.oss-cn-beijing.aliyuncs.com/releases/repo.html
-torch
-numpy
-onnx
-onnxruntime
-onnxsim
+torch==2.8.0
+numpy==2.2.6
+onnx==1.18.0
+onnxruntime==1.19.2
+onnxsim==0.4.36
 # modelscope
-funasr
+funasr==1.3.29
 psutil

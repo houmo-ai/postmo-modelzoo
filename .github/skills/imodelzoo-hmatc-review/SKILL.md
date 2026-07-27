@@ -1,13 +1,13 @@
 ---
 name: imodelzoo-hmatc-review
-description: "Review HMATC public CLI and mode resolution, configuration generation and loading, first-party ONNX optimization, quantization, compilation, inference, comparison, evaluation, performance, benchmark, golden/check workflows, packaging, native extensions, and tests in iModelzoo. Use for changes under hmatc/hmatc/**, hmatc/setup.py and editable package entrypoints, tests/hmatc_tests/**, HMATC configuration files, or model/API changes that depend on modified HMATC behavior."
+description: "Perform static semantic review of HMATC public CLI and mode resolution, configuration generation and loading, first-party ONNX optimization, quantization, compilation, inference, comparison, evaluation, performance, benchmark, golden/check workflows, packaging, native extensions, and tests in iModelzoo. Use for changes under hmatc/hmatc/**, hmatc/setup.py and editable package entrypoints, tests/hmatc_tests/**, HMATC configuration files, or model/API changes that depend on modified HMATC behavior."
 ---
 
 # iModelzoo HMATC Review
 
 ## 基础规则与影响范围
 
-先加载 `imodelzoo-code-review`，使用其中的 severity、finding 格式、验证策略和仓库边界。本 skill 只补充 HMATC 专项规则。
+先加载 `imodelzoo-code-review`，使用其中的 severity、finding 格式、静态语义评审策略和仓库边界。本 skill 只补充 HMATC 专项规则。
 
 评审 HMATC CLI、配置、optimizer、benchmark、packaging 或 `tests/hmatc_tests/**` 时，必须读取 `references/hmatc-cli-config-conventions.md`，按变更涉及的章节检查命令模式、路径解析、结果状态和测试覆盖。
 
@@ -46,6 +46,7 @@ parser
 - 检查 Python import surface、entry point、公开 class/function 和配置 schema 的调用方。
 - 检查新增 mode 是否与旧 config-driven mode、直接 artifact mode 和 ONNX/chip backend 清晰区分。
 - 检查 deprecated/hidden option 是否仍满足现有模型脚本，避免“CLI 可解析但行为已失效”。
+- 如果 HMATC 公共 CLI 变化使仓库自带的模型 `test.sh`、API 主 `run.sh`、README Quick Start 或其他标准入口确定性失败，按 `imodelzoo-code-review` 定为 P0；局部兼容别名或调用方同步即可修复不构成降级理由。
 - 检查一处公共默认值变化对多个模型类别、backend、device/core 数和 CI 命令的影响。
 - 不无故在 HMATC 添加只服务单个模型的硬编码；模型特有逻辑应留在模型目录或通过既有扩展点接入。
 
@@ -84,24 +85,30 @@ parser
 - 对 benchmark 检查 child process/queue/timeout、cwd 恢复、产物复用、失败汇总和 Excel report。
 - 对齐 latency、throughput、TTFT、TPOT、token 数和分布式指标，避免更改统计口径却不更新调用方。
 
-## Tests 与下游验证
+## Tests 与下游契约
 
 - 检查 `tests/hmatc_tests/**` 是否覆盖发生变化的 subcommand、mode resolution、config override 和错误路径；现有设备流程主要覆盖 quant/build/demo/compare/eval/perf，不要假设 gen/golden/check/benchmark 和 direct-artifact mode 已有同等保护。
-- 优先添加不依赖设备的 parser/resolver/config/unit 测试，再补必要的设备集成测试。
+- 检查变更是否优先由不依赖设备的 parser/resolver/config/unit 测试保护，并在必要时定义设备集成测试。
 - 确认测试断言真实结果、产物或错误，而非只断言命令成功退出。
 - 检查 model-specific HMATC 配置、backend、platform 和 skip 条件是否仍有效。
 - 搜索受影响的 `hmatc ...` 命令、Python import 和配置字段，检查模型 Demo、API 示例和 README。
-- 公共行为变化至少选择一个代表性小模型进行端到端验证；若设备或模型不可用，明确记录未验证范围。
+- 公共行为变化应在测试设计中至少覆盖一个代表性小模型的端到端链路；Reviewer 只检查该覆盖是否存在且能够触发目标路径，不声称执行了该链路。
 
 ## Packaging 与依赖
 
 - 检查 `setup.py`、entry point、package data、版本和 native extension 的直接耦合变化。
+- 对 native C/C++、CMake、Windows/MSVC 和 Android/NDK 变更应用 [`static-source-review-rules.md`](../imodelzoo-code-review/references/static-source-review-rules.md)，检查语言结构、平台 guard、compiler/link option、目标库和新增 first-party 文件头。
+- 对 HMATC 目录中本次变更涉及的 Python、C/C++、Bash 和 CMake 文件，静态检查括号/字符串/注释、缩进与 block、条件编译、Shell 方言、CMake command 配对等确定性语法问题；新增 first-party 文件必须有准确的 HOUMO AI Apache-2.0 文件头。Reviewer 不执行 parser、编译器或交叉编译工具。
 - 对本次新增或修改的 `build/`、`dist/`、wheel、`.so`、`.pyd`、DLL 和 cache，只判断是否误提交，不逐行评审生成内容；历史未触碰的产物不作为本次 finding。
 - 不新增依赖或改变安装方式，除非用户明确批准；检查 import 是否会让未使用的子命令也强制依赖可选组件。
 - 检查 Linux/Windows、Python 版本和目标平台条件分支，避免在 import 阶段破坏不相关功能。
 
-## 验证与报告
+## 静态评审与报告
 
-优先运行 parser/resolver/config/gen 和 `tests/hmatc_tests` 的聚焦测试，再根据风险运行代表性 quant/build/golden/check/demo/eval/benchmark/perf 流程。缺少 SDK、量化环境、编译环境、数据集或设备时，将其列为 validation gap。
+Reviewer 不执行 parser/resolver/config/gen、`tests/hmatc_tests`、quant/build/golden/check/demo/eval/benchmark/perf 或 native extension 构建，也不访问 SDK、量化/编译环境、数据集和设备。不要枚举缺失条件，不要将未执行项写成 validation gap。
+
+根据 diff 和直接上下文静态检查 CLI、resolver、config、dispatcher、执行对象、测试定义、下游模型/API 调用方和 README 的公共契约。检查测试是否覆盖变更的 mode、override、错误路径和代表性调用方，但不要声称测试已经运行。
+
+只有评审上下文中存在明确 API、schema、控制流或数据流证据时才报告 finding。对于下层编译器、runtime、native extension 或设备行为，不要根据经验猜测；只有某个外部 contract 会影响候选 finding 是否成立时，才在 Questions / Assumptions 中精确说明。
 
 按 `imodelzoo-code-review` 输出 findings。公共行为问题要说明受影响的 subcommand、调用方和模型范围；不要只描述 HMATC 内部实现细节。

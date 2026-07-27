@@ -44,12 +44,13 @@ def get_model_configs(config_path: str):
 
 def get_default_model_dir(model_config: dict) -> str:
     """Get the model identifier - use modelscope repo ID so funasr can find cached model."""
+    local_dir = Path(__file__).resolve().parent / "ct_transformer"
+    if local_dir.exists():
+        return str(local_dir)
+
     repo_ids = model_config.get("modelscope_repo", [])
     if repo_ids:
         return repo_ids[0]
-    local_dir = THIS_DIR / "ct_transformer"
-    if local_dir.exists():
-        return str(local_dir)
     return "ct_transformer"
 
 
@@ -332,7 +333,7 @@ def main():
     parser.add_argument(
         "--config", type=str, default=str(DEFAULT_CONFIG_PATH), help="path to config.yaml"
     )
-    parser.add_argument("--model-dir", type=Path, default=None)
+    parser.add_argument("--model_dir", type=Path, default=None)
     parser.add_argument("--model-revision", type=str, default="v2.0.4")
     parser.add_argument("--model_name", type=str, default=None, help="model name")
     parser.add_argument("--model_size", type=str, default=None, help="model size")
@@ -340,7 +341,7 @@ def main():
     parser.add_argument("--onnx-path", type=Path, default=None)
     parser.add_argument("--simplified-onnx-path", type=Path, default=None)
     parser.add_argument("--out-dir", type=Path, default=None)
-    parser.add_argument("--quant-type", type=str, default=None)
+    parser.add_argument("--quant_type", type=str, default=None)
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--split-size", type=int, default=20)
     parser.add_argument("--save-golden", action="store_true")
