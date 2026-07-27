@@ -90,8 +90,13 @@ if should_run_step "demo"; then
     fi
     echo "Execute demo ${DEMO_SCRIPT}"
     if [ "$DEMO_SCRIPT" = "demo_asr.py" ]; then
-        python3 demo_asr.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
-        python3 python/demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        demo_args=(
+            --model_name "${MODEL_NAME}"
+            --model_size "${MODEL_SIZE}"
+        )
+        demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
+        python3 demo_asr.py "${demo_args[@]}"
+        python3 python/demo.py "${demo_args[@]}"
         python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
         echo "Execute cpp demo."
         cd cpp && ./build_linux.sh && cd ..
@@ -114,8 +119,6 @@ if should_run_step "demo"; then
             llm_perf --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
                 --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
                 --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-                --audio_len 300 \
-                --token_per_second 3 \
                 --no_warm_up
         fi
     else

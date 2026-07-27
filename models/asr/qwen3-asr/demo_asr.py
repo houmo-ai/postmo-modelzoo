@@ -293,6 +293,13 @@ def get_args() -> argparse.Namespace:
         default="../../../data/audio/audio.mp3",
     )
     parser.add_argument(
+        "--system_prompt",
+        dest="system_prompt",
+        type=str,
+        default=None,
+        help="system prompt to control assistant behavior",
+    )
+    parser.add_argument(
         "--encode_path",
         dest="encode_path",
         type=str,
@@ -614,7 +621,7 @@ class Qwen3Asr:
         output_lengths = ((feat_lengths - 1) // 2 + 1 - 1) // 2 + 1 + (input_lengths // 100) * 13
         return int(output_lengths)
 
-    def run(self, audio_path):
+    def run(self, audio_path, system_prompt=None):
         # Load audio
         import torchaudio
 
@@ -637,10 +644,11 @@ class Qwen3Asr:
         audio_load_time = time.perf_counter() - audio_load_start
         # Prepare inputs
         prep_start = time.perf_counter()
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": [{"type": "audio", "audio": "placeholder"}]},
-        ]
+        effective_system_prompt = "You are a helpful assistant." if system_prompt is None else system_prompt
+        messages = []
+        if effective_system_prompt:
+            messages.append({"role": "system", "content": effective_system_prompt})
+        messages.append({"role": "user", "content": [{"type": "audio", "audio": "placeholder"}]})
         prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
         all_inputs = self.processor(text=prompt, audio=audio, return_tensors="pt", padding=True)
         all_inputs = all_inputs.to(self.device)
@@ -764,4 +772,4 @@ if __name__ == "__main__":
         args.embedding_path,
         args.ndevice,
     )
-    qwen3asr.run(args.audio)
+    qwen3asr.run(args.audio, system_prompt=args.system_prompt)

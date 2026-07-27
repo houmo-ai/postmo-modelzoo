@@ -60,8 +60,6 @@ if should_run_step "demo"; then
         llm_perf --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
             --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
             --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-            --audio_len 300 \
-            --token_per_second 3 \
             --no_warm_up
     fi
 fi

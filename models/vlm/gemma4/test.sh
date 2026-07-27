@@ -79,9 +79,22 @@ if should_run_step "demo"; then
     fi
     echo "Execute python demo."
     if [ "${MTP}" = "true" ]; then
-        python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}" --mtp
+        demo_args=(
+            --model_name "${MODEL_NAME}"
+            --model_size "${MODEL_SIZE}"
+            --ndevice "${NDEVICE}"
+            --mtp
+        )
+        demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
+        python3 demo.py "${demo_args[@]}"
     else
-        python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
+        demo_args=(
+            --model_name "${MODEL_NAME}"
+            --model_size "${MODEL_SIZE}"
+            --ndevice "${NDEVICE}"
+        )
+        demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
+        python3 demo.py "${demo_args[@]}"
     fi
 fi
 

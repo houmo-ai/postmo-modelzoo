@@ -151,6 +151,13 @@ def get_args() -> argparse.Namespace:
         help="device number",
     )
     parser.add_argument(
+        "--system_prompt",
+        dest="system_prompt",
+        type=str,
+        default=None,
+        help="system prompt to control assistant behavior",
+    )
+    parser.add_argument(
         "--repetition_penalty",
         dest="repetition_penalty",
         type=float,
@@ -1073,9 +1080,10 @@ class HmQwenMTP:
         next_token = int(np.argmax(last_logits[:, -1:, :], axis=-1).reshape(-1)[-1])
         return past_seq_len, next_token, last_hidden, mtp_prefill_seq_len
 
-    def _build_text_input_ids(self, question: str) -> np.ndarray:
-        if not self.messages:
-            self.messages.append({"role": "system", "content": "You are a helpful assistant."})
+    def _build_text_input_ids(self, question: str, system_prompt: Optional[str] = None) -> np.ndarray:
+        effective_system_prompt = "You are a helpful assistant." if system_prompt is None else system_prompt
+        if not self.messages and effective_system_prompt:
+            self.messages.append({"role": "system", "content": effective_system_prompt})
         self.messages.append({"role": "user", "content": question})
         text = self.tokenizer.apply_chat_template(
             self.messages,
@@ -1255,7 +1263,7 @@ class HmQwenMTP:
         )
         return output, int(input_ids.size), len(generated_ids)
 
-    def chat(self, question) -> Tuple[str, int, int]:
+    def chat(self, question, system_prompt=None) -> Tuple[str, int, int]:
         self.generated_ids = []
         if not args.history:
             self.context_length = 0
@@ -1266,8 +1274,10 @@ class HmQwenMTP:
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
         token_start = time.time()
-        input_ids = self._build_text_input_ids(question)
-        self.ttft_debug_extra_timings["Prompt Build"] = (time.time() - token_start) * 1000
+        input_ids = self._build_text_input_ids(question, system_prompt=system_prompt)
+        self.ttft_debug_extra_timings["Prompt Build"] = (
+            time.time() - token_start
+        ) * 1000
         self.perf_tracker.perf_end(PERFTYPE.PREFILL_TOKEN_TIME)
 
         if input_ids.size >= self.context_max_length:
@@ -1334,7 +1344,7 @@ if __name__ == "__main__":
 
                 start_time = time.time()
                 try:
-                    hmqwen.chat(question)
+                    hmqwen.chat(question, system_prompt=args.system_prompt)
                     _ = time.time() - start_time
                     if args.debug:
                         show_ttft_breakdown(

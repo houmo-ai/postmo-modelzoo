@@ -839,7 +839,7 @@ class Gemma4(object):
             print(f"{CYAN}{'─' * 60}{RESET}")
         return decode_count
 
-    def chat(self, question, image_path=None, audio_path=None, enable_thinking=False):
+    def chat(self, question, image_path=None, audio_path=None, enable_thinking=False, system_prompt=None):
         chat_start = time.perf_counter()
 
         if image_path and audio_path:
@@ -881,7 +881,11 @@ class Gemma4(object):
             )
 
         content.append({"type": "text", "text": q_text})
-        messages = [{"role": "user", "content": content}]
+        effective_system_prompt = system_prompt
+        messages = []
+        if effective_system_prompt:
+            messages.append({"role": "system", "content": effective_system_prompt})
+        messages.append({"role": "user", "content": content})
 
         with self.perf.track("processor"):
             inputs = self.processor.apply_chat_template(

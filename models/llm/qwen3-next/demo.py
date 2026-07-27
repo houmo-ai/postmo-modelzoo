@@ -198,6 +198,13 @@ def get_args() -> argparse.Namespace:
         action="store_true",
         help="enable debug logs including TTFT breakdown",
     )
+    parser.add_argument(
+        "--system_prompt",
+        dest="system_prompt",
+        type=str,
+        default=None,
+        help="system prompt to control assistant behavior",
+    )
     args = parser.parse_args()
     default_model_size, default_model_name, model_configs = get_model_configs(
         args.config_path
@@ -627,7 +634,7 @@ class HmQwen:
                 self.set_model_input(self.prefill, input_name, zeros)
                 self.set_model_input(self.decode, input_name, zeros)
 
-    def chat(self, question):
+    def chat(self, question, system_prompt=None):
         self.generated_ids = []
         if not args.history:
             self.context_length = 0
@@ -644,10 +651,11 @@ class HmQwen:
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
         start_time = time.time()
 
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": question},
-        ]
+        effective_system_prompt = "You are a helpful assistant." if system_prompt is None else system_prompt
+        messages = []
+        if effective_system_prompt:
+            messages.append({"role": "system", "content": effective_system_prompt})
+        messages.append({"role": "user", "content": question})
         text = self.tokenizer.apply_chat_template(
             messages,
             tokenize=False,
@@ -866,7 +874,7 @@ if __name__ == "__main__":
 
             start_time = time.time()
             try:
-                response, input_tokens, output_tokens = hmqwen.chat(question)
+                response, input_tokens, output_tokens = hmqwen.chat(question, system_prompt=args.system_prompt)
                 total_time = time.time() - start_time
                 if args.debug:
                     show_ttft_breakdown(

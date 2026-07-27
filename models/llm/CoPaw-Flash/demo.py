@@ -159,6 +159,13 @@ def get_args() -> argparse.Namespace:
         help="question to ask",
     )
     parser.add_argument(
+        "--system_prompt",
+        dest="system_prompt",
+        type=str,
+        default=None,
+        help="system prompt to control assistant behavior",
+    )
+    parser.add_argument(
         "--repetition_penalty",
         dest="repetition_penalty",
         type=float,
@@ -320,9 +327,10 @@ def build_messages(
     max_size_w: int,
     system_prompt: str = "",
 ):
+    effective_system_prompt = "You are a helpful assistant." if system_prompt is None else system_prompt
     messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
+    if effective_system_prompt:
+        messages.append({"role": "system", "content": effective_system_prompt})
     content = [
         {
             "type": "image",
@@ -988,7 +996,7 @@ class HmCoPawFlash:
         )
         return position_ids, deltas
 
-    def chat(self, question, image_paths=None):
+    def chat(self, question, image_paths=None, system_prompt=None):
         use_vision = image_paths is not None
         if use_vision and self.vision is None:
             raise RuntimeError("Vision model not loaded. Provide --vision_path.")
@@ -1020,6 +1028,7 @@ class HmCoPawFlash:
                 image_paths=image_paths,
                 max_size_h=args.max_size_h,
                 max_size_w=args.max_size_w,
+                system_prompt=system_prompt,
             )
             text = self.processor.apply_chat_template(
                 messages,
@@ -1092,10 +1101,11 @@ class HmCoPawFlash:
                 len(video_inputs) if video_inputs is not None else 0
             )
         else:
-            messages = [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": question},
-            ]
+            messages = []
+            effective_system_prompt = "You are a helpful assistant." if system_prompt is None else system_prompt
+            if effective_system_prompt:
+                messages.append({"role": "system", "content": effective_system_prompt})
+            messages.append({"role": "user", "content": question})
             text = self.tokenizer.apply_chat_template(
                 messages,
                 tokenize=False,
@@ -1345,8 +1355,8 @@ class HmCoPawFlash:
         )
         return all_response, input_echo_len, decode_count + 1
 
-    def chat_vision(self, question, image_paths):
-        return self.chat(question, image_paths=image_paths)
+    def chat_vision(self, question, image_paths, system_prompt=None):
+        return self.chat(question, image_paths=image_paths, system_prompt=system_prompt)
 
 
 if __name__ == "__main__":
@@ -1389,6 +1399,7 @@ if __name__ == "__main__":
                 response, input_tokens, output_tokens = hm_copaw_flash.chat(
                     question,
                     image_paths=current_image_paths,
+                    system_prompt=args.system_prompt,
                 )
                 total_time = time.time() - start_time
                 if args.debug:

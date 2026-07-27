@@ -25,6 +25,7 @@ show_help() {
     echo "  --quant_type            Quantization type, e.g. w4a8, w8a8, w8a16."
     echo "  --demo_mode             Demo mode."
     echo "  --skip_download         If specified, all dependencies must have been fully downloaded previously without this flag. Already downloaded dependencies won't be re-downloaded regardless of this parameter."
+    echo "  --system_prompt         System prompt passed through to demos that support it."
     echo "  -h, --help              Show this help message."
     exit 0
 }
@@ -49,6 +50,7 @@ parse_args() {
     SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-false}"
     QUANT_TYPE="${QUANT_TYPE:-}"
     DEMO_MODE="${DEMO_MODE:-}"
+    SYSTEM_PROMPT_ARGS=()
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -129,6 +131,14 @@ parse_args() {
             --skip_download)
                 SKIP_DOWNLOAD="true"
                 shift
+                ;;
+            --system_prompt|--system-prompt)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: Missing value for parameter '$1'" >&2
+                    show_help
+                fi
+                SYSTEM_PROMPT_ARGS=(--system_prompt "$2")
+                shift 2
                 ;;
             -size|--model_size)
                 if [[ $# -lt 2 ]]; then

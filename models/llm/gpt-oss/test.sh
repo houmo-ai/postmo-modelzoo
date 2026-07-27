@@ -30,7 +30,13 @@ if should_run_step "demo"; then
         python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
     fi
     echo "Execute demo."
-    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
+    demo_args=(
+        --model_name "${MODEL_NAME}"
+        --model_size "${MODEL_SIZE}"
+        --ndevice "${NDEVICE}"
+    )
+    demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
+    python3 demo.py "${demo_args[@]}"
 
     if command -v llm_perf &>/dev/null; then
         echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."

@@ -1108,7 +1108,7 @@ class HmZImage:
             decoded_images.append(self.vae(latents[batch_index : batch_index + 1]))
         return torch.cat(decoded_images, dim=0)
 
-    def _encode_single_prompt(self, prompt: Union[str, List[str]]):
+    def _encode_single_prompt(self, prompt: Union[str, List[str]], system_prompt: Optional[str] = None):
         # 将用户输入 prompt 规范化为 tokenizer 可处理的 chat 文本，再调用
         # text encoder HMM 得到每条 prompt 的 hidden states。
         if isinstance(prompt, str):
@@ -1118,7 +1118,11 @@ class HmZImage:
         for prompt_item in prompt:
             # tokenization 前套用原始 Z-Image-Turbo text encoder 使用的 Qwen 风格
             # chat template。
-            messages = [{"role": "user", "content": prompt_item}]
+            effective_system_prompt = system_prompt
+            messages = []
+            if effective_system_prompt:
+                messages.append({"role": "system", "content": effective_system_prompt})
+            messages.append({"role": "user", "content": prompt_item})
             normalized_prompts.append(
                 self.tokenizer.apply_chat_template(
                     messages,
@@ -1145,10 +1149,11 @@ class HmZImage:
         self,
         prompt: Union[str, List[str]],
         prompt_embeds: Optional[List[torch.FloatTensor]] = None,
+        system_prompt: Optional[str] = None,
     ):
         # 允许调用方直接传入 prompt_embeds，便于复用文本编码结果或做外部调试。
         if prompt_embeds is None:
-            prompt_embeds = self._encode_single_prompt(prompt)
+            prompt_embeds = self._encode_single_prompt(prompt, system_prompt=system_prompt)
         return prompt_embeds
 
     def generate_image(
@@ -1161,6 +1166,7 @@ class HmZImage:
         latents: Optional[torch.FloatTensor] = None,
         prompt_embeds: Optional[List[torch.FloatTensor]] = None,
         output_type: str = "pil",
+        system_prompt: Optional[str] = None,
     ):
         # 对外的完整生成接口。默认返回 PIL 图像；output_type="latent" 时提前
         # 返回最终 latent，便于调试 DiT/scheduler 而跳过 VAE 解码。
@@ -1184,6 +1190,7 @@ class HmZImage:
             prompt_embeds = self._encode_prompt(
                 prompt=prompt,
                 prompt_embeds=prompt_embeds,
+                system_prompt=system_prompt,
             )
             self._perf_stop("text_encode", count=batch_size)
 
@@ -1330,6 +1337,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--ndevice", type=int, default=1, help="device number")
     parser.add_argument("--output", type=str, default="output_turbo_xh2a.png", help="output image path")
     parser.add_argument("--prompt", type=str, nargs="+", action="append", default=None, help="positive prompt. Pass one prompt, multiple quoted prompts, or repeat --prompt.")
+    parser.add_argument("--system_prompt", type=str, default=None, help="system prompt to control prompt encoding")
     parser.add_argument("--num_images_per_prompt", type=int, default=1, help="number of images to generate per prompt")
     parser.add_argument("--num_inference_steps", type=int, default=8, help="number of inference steps")
     parser.add_argument("--seed", type=int, default=42)
@@ -1381,6 +1389,7 @@ def main():
         num_inference_steps=args.num_inference_steps,
         seed=args.seed,
         num_images_per_prompt=args.num_images_per_prompt,
+        system_prompt=args.system_prompt,
     )
 
     for i, image in enumerate(images):

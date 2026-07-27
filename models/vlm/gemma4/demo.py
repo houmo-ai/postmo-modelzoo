@@ -41,6 +41,7 @@ def get_args():
     parser.add_argument("--audio_path", type=str, default=None)
     parser.add_argument("--ndevice", type=int, default=None, help="device number")
     parser.add_argument("--question", default=None)
+    parser.add_argument("--system_prompt", default=None, help="system prompt to control assistant behavior")
     parser.add_argument("--image", default="data/pic/beach.jpeg")
     parser.add_argument("--audio", default="data/audio/0.wav", help="only supported for e2b/e4b")
     parser.add_argument("--max-new-tokens", type=int, default=2048)
@@ -141,4 +142,4 @@ if __name__ == "__main__":
     else:
         audio_path = None
 
-    model.chat(args.question, image_path, audio_path)
+    model.chat(args.question, image_path, audio_path, system_prompt=args.system_prompt)

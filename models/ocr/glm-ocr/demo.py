@@ -107,8 +107,12 @@ def parse_visual_size_from_path(path: str) -> Optional[Tuple[int, int, int]]:
     return tuple(int(item) for item in match.groups())
 
 
-def build_messages(image_path: str, prompt: str) -> List[Dict[str, Any]]:
-    return [
+def build_messages(image_path: str, prompt: str, system_prompt: Optional[str] = None) -> List[Dict[str, Any]]:
+    effective_system_prompt = system_prompt
+    messages = []
+    if effective_system_prompt:
+        messages.append({"role": "system", "content": effective_system_prompt})
+    messages.append(
         {
             "role": "user",
             "content": [
@@ -116,7 +120,8 @@ def build_messages(image_path: str, prompt: str) -> List[Dict[str, Any]]:
                 {"type": "text", "text": prompt},
             ],
         }
-    ]
+    )
+    return messages
 
 
 def build_inputs(
@@ -527,6 +532,13 @@ def get_args() -> argparse.Namespace:
         type=str,
         default="Text Recognition:",
         help="OCR prompt used for each layout region",
+    )
+    parser.add_argument(
+        "--system_prompt",
+        dest="system_prompt",
+        type=str,
+        default=None,
+        help="system prompt to control OCR assistant behavior",
     )
     parser.add_argument(
         "--output_dir",
@@ -975,6 +987,7 @@ class HmGLM_OCR:
         image_path: str,
         prompt: str,
         stream: bool = True,
+        system_prompt=None,
     ) -> str:
         self.ttft_time = 0
         self.generated_ids = []
@@ -1000,7 +1013,7 @@ class HmGLM_OCR:
                 image, border=(0, 0, pad_w, pad_h), fill=(114, 114, 114)
             )
 
-        messages = build_messages(image, prompt)
+        messages = build_messages(image, prompt, system_prompt=system_prompt)
         inputs = build_inputs(self.processor, messages)
 
         input_ids = inputs["input_ids"]
@@ -1124,7 +1137,7 @@ if __name__ == "__main__":
     prompt = args.prompt
     logger.success("question:")
     print("\033[1;95m{}\033[0m".format(prompt))
-    input_tokens = hmglm_ocr.chat_vit_prefill(image_dir, prompt=prompt, stream=True)
+    input_tokens = hmglm_ocr.chat_vit_prefill(image_dir, prompt=prompt, stream=True, system_prompt=args.system_prompt)
 
     decode_count = 0
     while decode_count < max(0, args.max_new_tokens - 1):

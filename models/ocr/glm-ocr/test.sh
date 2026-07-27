@@ -48,7 +48,12 @@ if should_run_step "demo"; then
         python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Execute demo."
-    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    demo_args=(
+        --model_name "${MODEL_NAME}"
+        --model_size "${MODEL_SIZE}"
+    )
+    demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
+    python3 demo.py "${demo_args[@]}"
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

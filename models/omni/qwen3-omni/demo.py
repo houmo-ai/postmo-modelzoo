@@ -1845,6 +1845,7 @@ class Qwen3OmniHmmPipeline:
         prompt=None,
         speaker=DEFAULT_SPEAKER,
         generate_audio=None,
+        system_prompt=None,
     ):
         """Single-turn convenience wrapper: assemble a one-user-turn conversation
         from optional image/audio/text and delegate to run_conversation. Any
@@ -1864,7 +1865,16 @@ class Qwen3OmniHmmPipeline:
             content.append({"type": "audio", "audio": str(audio_path)})
         if prompt is not None:
             content.append({"type": "text", "text": prompt})
-        conversation = [{"role": "user", "content": content}]
+        conversation = []
+        effective_system_prompt = (
+            "你是一个智能助手，可以接受语音和文本输入并输出语音和文本。"
+            "请用自然、口语化的方式回答用户的问题，保持对话的连贯性。如果是创作类问题，只需创作即可，不需要额外说明。"
+            if system_prompt is None
+            else system_prompt
+        )
+        if effective_system_prompt:
+            conversation.append({"role": "system", "content": [{"type": "text", "text": effective_system_prompt}]})
+        conversation.append({"role": "user", "content": content})
         return self.run_conversation(
             conversation, speaker=speaker, generate_audio=generate_audio
         )
@@ -2161,6 +2171,8 @@ def get_args():
                    help="example mode index: 0(omni), 1(conv, multi-turn speech "
                         "dialogue), 2(vlm), 3(music, talker_segment on), 4(asr), "
                         "5(translate)")
+    p.add_argument("--system_prompt", dest="system_prompt", type=str, default=None,
+                   help="system prompt to control assistant behavior")
     # ── Post-processing / generation config ──
     p.add_argument("--max_new_tokens", dest="max_new_tokens", type=int, default=512,
                    help="thinker text decode cap")
@@ -2271,7 +2283,7 @@ def main():
         audio = str(DEFAULT_SAMPLE_DIR / "cough.wav")
         prompt = "结合图像和音频内容，用一句话简述你看到和听到了什么？"
         result = pipeline.run(
-            image=image, audio=audio, prompt=prompt, speaker=DEFAULT_SPEAKER
+            image=image, audio=audio, prompt=prompt, speaker=DEFAULT_SPEAKER, system_prompt=args.system_prompt
         )
         _save_and_report(result, args.output_dir, "omni_output.wav")
 
@@ -2281,13 +2293,16 @@ def main():
         # appended to the conversation as history so the second user turn
         # (comment1.wav) is answered with full context — mirrors minicpmo's CONV
         # example, where history is carried turn-to-turn for coherence.
+        effective_system_prompt = args.system_prompt if args.system_prompt is not None else (
+            "你是一个智能助手，可以接受语音和文本输入并输出语音和文本。"
+            "请用自然、口语化的方式回答用户的问题，保持对话的连贯性。如果是创作类问题，只需创作即可，不需要额外说明。"
+        )
         sys_msg = {
             "role": "system",
             "content": [
                 {
                     "type": "text",
-                    "text": "你是一个智能助手，可以接受语音和文本输入并输出语音和文本。"
-                    "请用自然、口语化的方式回答用户的问题，保持对话的连贯性。如果是创作类问题，只需创作即可，不需要额外说明。",
+                    "text": effective_system_prompt,
                 }
             ],
         }
@@ -2330,7 +2345,7 @@ def main():
         # is both described in text and spoken.
         image = str(DEFAULT_SAMPLE_DIR / "2233.jpg")
         prompt = "请描述一下这张图片的内容。"
-        result = pipeline.run(image=image, prompt=prompt, speaker=DEFAULT_SPEAKER)
+        result = pipeline.run(image=image, prompt=prompt, speaker=DEFAULT_SPEAKER, system_prompt=args.system_prompt)
         _save_and_report(result, args.output_dir, "vlm_output.wav")
 
     elif example_mode == "music":
@@ -2341,21 +2356,21 @@ def main():
         # segment) and lets it stream out incrementally.
         audio = str(DEFAULT_SAMPLE_DIR / "music.mp3")
         prompt = "描述这首乐曲的风格、节奏、力度和情感表达。指出所使用的乐器，并推测这首乐曲可能的创作背景。用尽量简洁的语言来描述。"
-        result = pipeline.run(audio=audio, prompt=prompt, speaker=DEFAULT_SPEAKER)
+        result = pipeline.run(audio=audio, prompt=prompt, speaker=DEFAULT_SPEAKER, system_prompt=args.system_prompt)
         _save_and_report(result, args.output_dir, "music_output.wav")
 
     elif example_mode == "asr":
         # Speech recognition: speech audio -> text only (no speech output).
         audio = str(DEFAULT_SAMPLE_DIR / "asr_zh.wav")
         prompt = "请将这段中文语音转换为纯文本。"
-        result = pipeline.run(audio=audio, prompt=prompt, generate_audio=False)
+        result = pipeline.run(audio=audio, prompt=prompt, generate_audio=False, system_prompt=args.system_prompt)
         _save_and_report(result, args.output_dir, "asr_output.wav")
 
     elif example_mode == "translate":
         # Speech translation: English speech audio -> Chinese text (no speech out).
         audio = str(DEFAULT_SAMPLE_DIR / "asr_en.wav")
         prompt = "请听这段英文语音，并将其内容翻译成中文。"
-        result = pipeline.run(audio=audio, prompt=prompt, generate_audio=False)
+        result = pipeline.run(audio=audio, prompt=prompt, generate_audio=False, system_prompt=args.system_prompt)
         _save_and_report(result, args.output_dir, "translate_output.wav")
 
     else:

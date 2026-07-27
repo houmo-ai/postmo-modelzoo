@@ -126,11 +126,21 @@ if should_run_step "demo"; then
 
     echo "Execute demo."
     if [ "${MTP}" = "true" ]; then
-        python3 demo_mtp.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
-        python3 python/demo_mtp.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        demo_args=(
+            --model_name "${MODEL_NAME}"
+            --model_size "${MODEL_SIZE}"
+        )
+        demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
+        python3 demo_mtp.py "${demo_args[@]}"
+        python3 python/demo_mtp.py "${demo_args[@]}"
     else
-        python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
-        python3 python/demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        demo_args=(
+            --model_name "${MODEL_NAME}"
+            --model_size "${MODEL_SIZE}"
+        )
+        demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
+        python3 demo.py "${demo_args[@]}"
+        python3 python/demo.py "${demo_args[@]}"
         python3 python/demo_prefix_caching.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 
         VISUAL_MODEL_PATH="$(find_visual_model_path)"

@@ -124,6 +124,13 @@ def get_args() -> argparse.Namespace:
         help="question to ask",
     )
     parser.add_argument(
+        "--system_prompt",
+        dest="system_prompt",
+        type=str,
+        default=None,
+        help="system prompt to control assistant behavior",
+    )
+    parser.add_argument(
         "--repetition_penalty",
         dest="repetition_penalty",
         type=float,
@@ -437,7 +444,7 @@ class HmGpt:
                 input_names.append(input_name)
         return input_names
 
-    def chat(self, question):
+    def chat(self, question, system_prompt=None):
         self.generated_ids = []
         if not args.history:
             self.context_length = 0
@@ -448,13 +455,11 @@ class HmGpt:
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOTAL_TIME)
 
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {
-                "role": "user",
-                "content": question,
-            },
-        ]
+        effective_system_prompt = "You are a helpful assistant." if system_prompt is None else system_prompt
+        messages = []
+        if effective_system_prompt:
+            messages.append({"role": "system", "content": effective_system_prompt})
+        messages.append({"role": "user", "content": question})
         text = self.tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
         )
@@ -669,7 +674,7 @@ if __name__ == "__main__":
                 question = args.question
 
             try:
-                hmqwen.chat(question)
+                hmqwen.chat(question, system_prompt=args.system_prompt)
                 hmqwen.perf_tracker.show_summary()
             except Exception as e:
                 print(f"聊天过程中出错: {e}")
