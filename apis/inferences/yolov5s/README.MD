@@ -61,6 +61,10 @@ cd ..
 
 ```bash
 # 后处理实现为方法2 (仅支持Linux)
+if [ -z "${HOUMO_EXAMPLES_PATH}" ]; then
+    echo "HOUMO_EXAMPLES_PATH is not set."
+    exit 1
+fi
 mkdir build
 cd build
 cmake -DENABLE_ORT=ON -DCMAKE_INSTALL_PREFIX=../
@@ -68,8 +72,7 @@ make -j
 make install
 cd ..
 # 将onnxruntime的动态库路径加入LD_LIBRARY_PATH，执行C++用例时需要依赖
-WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-export LD_LIBRARY_PATH=$WORK_PATH/../../models/3rdparty/onnxruntime/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH="${HOUMO_EXAMPLES_PATH}/3rdparty/onnxruntime/lib:${LD_LIBRARY_PATH}"
 # 执行C++示例
 ./example_yolov5s --enable_ort
 ```

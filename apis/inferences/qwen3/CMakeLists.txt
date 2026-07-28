@@ -4,8 +4,8 @@ project(example_cxx_qwen3)
 
 include(CheckCXXCompilerFlag)
 if(MSVC)
-check_cxx_compiler_flag("/std:c++17" SUPPORT_CXX17)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17 /DEIGEN_MPL2_ONLY")
+  check_cxx_compiler_flag("/std:c++17" SUPPORT_CXX17)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17 /utf-8 /wd4819 /DEIGEN_MPL2_ONLY")
 else()
   check_cxx_compiler_flag("-std=c++17" SUPPORT_CXX17)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -DEIGEN_MPL2_ONLY")
@@ -53,6 +53,10 @@ set(INCLUDE_DIRS
   $ENV{HOUMO_PATH}/include
 )
 
+if(MSVC)
+  include_directories($ENV{HOUMO_EXAMPLES_PATH}/3rdparty/mingw/include)
+endif()
+
 link_directories($ENV{HOUMO_PATH}/lib
   ${TOKENZIER_CPP_PATH}/${LIB_PATH}/lib)
 
@@ -68,7 +72,7 @@ endif()
 
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS} )
 target_link_libraries(${PROJECT_NAME} PUBLIC ${TCIM_LIBRARY})
 set(TCIM_DEV_CTRL_LIBRARY tcim_dev_ctrl)
 

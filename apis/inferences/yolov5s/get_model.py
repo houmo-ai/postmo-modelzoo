@@ -66,9 +66,7 @@ def execute_cmd(cmd, shell=False):
     import subprocess
 
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True, shell=shell
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, shell=shell)
         return result.stdout
     except Exception as e:
         print(f"Error occured: {e}")
@@ -99,11 +97,7 @@ if __name__ == "__main__":
     args = get_args()
 
     # Determine the model directory to save the downloaded model
-    model_dir = (
-        os.path.join(HOUMO_EXAMPLES_PATH, "apis/models")
-        if not args.model_dir
-        else args.model_dir
-    )
+    model_dir = os.path.join(HOUMO_EXAMPLES_PATH, "apis/models") if not args.model_dir else args.model_dir
     # Path to the YOLOv5s HMM model in the repository
     model_name = "yolov5s"
     ncore = 1
@@ -127,12 +121,10 @@ if __name__ == "__main__":
         elif platform_name == "aarch64":
             ort_env_str = "aarch64"
         else:
-            print(
-                f"Current platform is {platform_name} and does not support onnxruntime c++ env."
-            )
+            print(f"Current platform is {platform_name} and does not support onnxruntime c++ env.")
             exit(0)
 
-        third_party_dir = os.path.join(HOUMO_EXAMPLES_PATH, "apis/models/3rdparty")
+        third_party_dir = os.path.join(HOUMO_EXAMPLES_PATH, "3rdparty")
         ort_pkg_name = "onnxruntime-linux-" + ort_env_str + "-1.22.0"
         ort_pkg_path = "3rdparty/" + ort_pkg_name + ".tgz"
         get_file_from_jfrog(ort_pkg_path, third_party_dir, third_party_dir)

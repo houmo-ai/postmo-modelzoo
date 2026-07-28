@@ -27,7 +27,11 @@ endif()
 add_library(yaml-cpp SHARED ${YAML_CPP_SOURCES})
 add_library(yaml-cpp::yaml-cpp ALIAS yaml-cpp)
 
-set(YAML_CPP_OUTPUT_DIR "${HOUMO_EXAMPLES_PATH_CMAKE}/utils/lib")
+if(ANDROID_ABI)
+  set(YAML_CPP_OUTPUT_DIR "${HOUMO_EXAMPLES_PATH_CMAKE}/utils/android")
+else()
+  set(YAML_CPP_OUTPUT_DIR "${HOUMO_EXAMPLES_PATH_CMAKE}/utils/lib")
+endif()
 
 set_target_properties(yaml-cpp PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "$<1:${YAML_CPP_OUTPUT_DIR}>"
@@ -50,3 +54,15 @@ target_compile_definitions(yaml-cpp
 if(MSVC)
   target_compile_options(yaml-cpp PRIVATE /W3 /wd4127 /wd4355)
 endif()
+
+if(DEFINED LIB_INSTALL_PATH AND NOT "${LIB_INSTALL_PATH}" STREQUAL "")
+  set(YAML_CPP_INSTALL_DIR "${LIB_INSTALL_PATH}")
+else()
+  set(YAML_CPP_INSTALL_DIR "${YAML_CPP_OUTPUT_DIR}")
+endif()
+
+install(TARGETS yaml-cpp
+  RUNTIME DESTINATION "${YAML_CPP_INSTALL_DIR}"
+  LIBRARY DESTINATION "${YAML_CPP_INSTALL_DIR}"
+  ARCHIVE DESTINATION "${YAML_CPP_INSTALL_DIR}"
+)

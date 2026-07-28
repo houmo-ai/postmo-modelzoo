@@ -13,11 +13,16 @@ include_directories(
   $ENV{HOUMO_EXAMPLES_PATH}/3rdparty/libnpy
   $ENV{HOUMO_EXAMPLES_PATH}/utils/cpp/include
 )
+
+if(MSVC)
+  include_directories($ENV{HOUMO_EXAMPLES_PATH}/3rdparty/mingw/include)
+endif()
+
 link_directories(
   $ENV{HOUMO_SDK_PATH}/hal/lib
 )
 if(MSVC)
-    add_compile_options("/std:c++17" "/utf-8")
+    add_compile_options("/std:c++17" "/utf-8" "/w")
 endif()
 add_executable(${CMAKE_PROJECT_NAME} tcim_perf.cc)
 if(MSVC)

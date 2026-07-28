@@ -32,21 +32,17 @@ os.environ["HOUMO_MODELZOO_URL"] = "http://artifactory.houmo.ai/artifactory/Dada
 
 # Set up library paths
 ori_ld = os.getenv("LD_LIBRARY_PATH", "")
-append_ld = f"/opt/venv/houmo/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/opt/venv/houmo/lib/python3.12/site-packages/torch/lib:{script_dir}/../apis/models/3rdparty/onnxruntime/lib:"
+append_ld = f"/opt/venv/houmo/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/opt/venv/houmo/lib/python3.12/site-packages/torch/lib:{script_dir}/../3rdparty/onnxruntime/lib:"
 os.environ["LD_LIBRARY_PATH"] = f"{ori_ld}:{append_ld}" if ori_ld else append_ld
 
 # Append to PYTHONPATH
 ori_pythonpath = os.getenv("PYTHONPATH", "")
 append_pythonpath = f"{script_dir}/hmodel/xh2"
-os.environ["PYTHONPATH"] = (
-    f"{ori_pythonpath}:{append_pythonpath}" if ori_pythonpath else append_pythonpath
-)
+os.environ["PYTHONPATH"] = f"{ori_pythonpath}:{append_pythonpath}" if ori_pythonpath else append_pythonpath
 
 # Set up dataset path
 os.environ["HOUMO_DATASETS_PATH"] = f"{script_dir}/../data/datasets/"
-if os.getenv("HOUMO_EXAMPLES_PATH", None) is None or not os.getenv(
-    "HOUMO_EXAMPLES_PATH"
-):
+if os.getenv("HOUMO_EXAMPLES_PATH", None) is None or not os.getenv("HOUMO_EXAMPLES_PATH"):
     os.environ["HOUMO_EXAMPLES_PATH"] = os.path.abspath(f"{script_dir}/../")
 
 os.environ["HOUMO_VERSION"] = "1.5.0"
@@ -100,9 +96,7 @@ def setup_logging(request):
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     file_handler = logging.FileHandler(log_file)
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
 
     # Clear existing handlers and add the new one

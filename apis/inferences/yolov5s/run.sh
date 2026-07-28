@@ -7,6 +7,12 @@ if [ -z "$houmo_target" ] || [ "$houmo_target" != "xh2" ]; then
     exit 1
 fi
 
+houmo_examples_path="${HOUMO_EXAMPLES_PATH}"
+if [ -z "$houmo_examples_path" ]; then
+    echo "HOUMO_EXAMPLES_PATH is not set."
+    exit 1
+fi
+
 WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${WORK_PATH}" || exit 1
 
@@ -39,7 +45,7 @@ make install
 
 cd $WORK_PATH
 if [ "$ORT_SWITCH" = "ON" ]; then
-    export LD_LIBRARY_PATH=$WORK_PATH/../../models/3rdparty/onnxruntime/lib:$LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH="${HOUMO_EXAMPLES_PATH}/3rdparty/onnxruntime/lib:${LD_LIBRARY_PATH}"
     ./example_yolov5s --enable_ort
 else
     ./example_yolov5s

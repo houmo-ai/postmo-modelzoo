@@ -37,7 +37,7 @@ from pathlib import Path
 imodelzoo_root = Path(__file__).resolve().parents[4]
 engine_src = (
     imodelzoo_root
-    / "common"
+    / "utils"
     / "python"
 )
 sys.path.insert(0, str(engine_src))

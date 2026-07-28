@@ -1,6 +1,6 @@
 # Qwen3.5 MLLM C++ 推理示例
 
-本目录展示如何在 Linux、Windows 11 和 Android Native 环境中注册当前目录 `include/` 和 `src/` 下的 Qwen3.5 MLLM 子类实现，并通过 `ModelFactory` 和 `hm_engine.cmake` 复用 `houmo-llm-engine` 的基础框架能力。
+本目录展示如何在 Linux、Windows 11 和 Android Native 环境中注册当前目录 `include/` 和 `src/` 下的 Qwen3.5 MLLM 子类实现，并通过 `ModelFactory` 和 `$HOUMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` 复用 `houmo_engine` 的基础框架能力。
 
 示例支持：
 
@@ -16,7 +16,7 @@
 | `demo.cc` | Qwen3.5 MLLM 推理 demo 主程序 |
 | `include/qwen35_mllm_model.h` | `Qwen35MLLMModel` / `Qwen35MLLMContext` 声明 |
 | `src/qwen35_mllm_model.cc` | Qwen3.5 MLLM 子类实现和静态注册 |
-| `hm_engine.cmake` | houmo-llm-engine 依赖配置模块 |
+| `$HOUMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` | houmo_engine 依赖配置模块 |
 | `CMakeLists.txt` | demo 编译配置 |
 | `build_linux.sh` | Linux 编译脚本 |
 | `build_win.bat` | Windows 11 编译脚本 |
@@ -55,7 +55,7 @@ target_include_directories(demo PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(demo PRIVATE hm_engine)
+target_link_libraries(demo PRIVATE houmo_engine)
 ```
 
 ## 环境准备
@@ -114,7 +114,7 @@ bash build_ndk.sh
 build_win.bat
 ```
 
-Windows 构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 并行编译。首次构建时，如果 `$HOUMO_EXAMPLES_PATH/utils/lib` 下缺少 `houmo_infer` 相关产物，`hm_engine.cmake` 会自动触发 `utils/cpp/houmo_engine/build_win.bat` 构建依赖。
+Windows 构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 并行编译。首次构建时，如果 `$HOUMO_EXAMPLES_PATH/utils/lib` 下缺少 `houmo_infer` 相关产物，`$HOUMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` 会自动触发 `utils/cpp/houmo_engine/build_win.bat` 构建依赖。
 
 Linux 编译产物位于：
 
@@ -205,7 +205,7 @@ demo 推理结束后会输出：
 - 只要传入 `--image`，就必须同时传入有效的 `--vision`。
 - `--tokenizer` 需要与模型编译时使用的 tokenizer 保持一致。
 - `--embedding` 需要使用框架要求的量化 embedding 格式。
-- `hm_engine.cmake` 会链接 `houmo_infer`、`tcim_runtime_lite`，并复用 `houmo-llm-engine` 的 include 和 lib 配置；Windows 平台下还会导入 `tokenizer_lib.lib/.dll`，并在依赖缺失时自动调用 `utils/cpp/houmo_engine/build_win.bat` 构建。
+- `$HOUMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` 会链接 `houmo_infer`、`tcim_runtime_lite`，并复用 `houmo_engine` 的 include 和 lib 配置；Windows 平台下还会导入 `tokenizer_lib.lib/.dll`，并在依赖缺失时自动调用 `utils/cpp/houmo_engine/build_win.bat` 构建。
 
 ## 免责声明
 
