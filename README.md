@@ -15,46 +15,61 @@ houmo-examples 目录结构如下，其中 README.md 为本说明文件：
 ```bash
 .
 ├── apis
-    ├── converts
-    ├── inferences
+│   ├── converts
+│   ├── data
+│   ├── inferences
+│   └── models
+├── cmake
 ├── data
+├── 3rdparty
 ├── hmatc
 ├── hmodel
+├── licenses
 ├── models
-    ├── asr
-    ├── autodrive
-    ├── backbone
-    ├── detection
-    ├── embedding
-    ├── estimation
-    ├── llm
-    ├── ocr
-    ├── omni
-    ├── segmentation
-    ├── tts
-    ├── vlm
-    └── benchmark.yml
+│   ├── asr
+│   ├── autodrive
+│   ├── backbone
+│   ├── detection
+│   ├── diffusion
+│   ├── embedding
+│   ├── estimation
+│   ├── llm
+│   ├── ocr
+│   ├── omni
+│   ├── reranker
+│   ├── segmentation
+│   ├── tts
+│   ├── vlm
+│   └── benchmark.yml
 ├── tools
 ├── utils
 ├── env.sh
 ├── env.bat
+├── LICENSE
+├── NOTICE
 ├── README.md
 └── requirements.txt
 ```
 
 主要目录和文件说明如下：
 
-| 目录             | 说明                                          |
-| ---------------- | --------------------------------------------- |
-| apis             | API 示例，展示 hal 和 runtime 接口的调用过程  |
-| data             | 评估使用的数据文件，如数据集等                |
-| hmatc            | hmatc 工具源码，通过配置文件进行一键评估      |
-| hmodel           | 量化模型配置和工具，主要用于大模型和 QAT 训练 |
-| models           | 模型示例，展示模型的转换和评估过程            |
-| tools            | 应用层工具源码，如算力测试工具等              |
-| utils            | 模型和 API 共用的 C++、Python 代码及运行库    |
-| env.sh/env.bat   | 环境配置脚本                                  |
-| requirements.txt | python 三方依赖                               |
+| 目录或文件                          | 说明                                                    |
+| ----------------------------------- | ------------------------------------------------------- |
+| 3rdparty                            | 仓库内使用的 C/C++ 第三方源码                           |
+| apis                                | API 示例，展示 HAL 和 Runtime 接口的调用过程            |
+| cmake                               | C/C++ 示例共用的 CMake 配置                             |
+| data                                | 评估和示例使用的数据文件                                |
+| hmatc                               | HMATC 工具源码，通过配置文件进行一键评估                |
+| hmodel                              | 量化模型配置和工具，主要用于大模型和 QAT 训练           |
+| licenses                            | 仓库资产和示例引用的许可证文本                          |
+| models                              | 模型示例，展示模型的转换、量化、编译、推理和评估流程    |
+| tools                               | 应用层工具源码，如算力测试和性能评估工具                |
+| utils                               | 模型和 API 共用的 C++、Python 代码及运行库              |
+| env.sh/env.bat                      | Linux 和 Windows 环境配置脚本                           |
+| LICENSE/NOTICE                      | 项目许可证和第三方组件摘要                              |
+| requirements.txt                    | Python 第三方依赖                                       |
+
+本项目采用 Apache License 2.0。项目许可证见 [LICENSE](LICENSE)，项目和第三方组件摘要见 [NOTICE](NOTICE)。第三方组件不受本项目 Apache License 2.0 的统一许可约束，使用和分发时应遵守各组件自身的许可证条款。
 
 ## 软件依赖
 
@@ -163,7 +178,6 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | lprnet                  | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
 | MinerU2.5               | ocr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | PPOCRv3                 | ocr          | xh2    | yes   | yes   | yes  | yes  | yes  | yes     |
-| glm-ocr                 | ocr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | PaddleOCR-VL            | ocr          | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
 | minicpmo                | omni         | xh2    | yes   | yes   | yes  | yes  | x    | v1.3.0  |
 | qwen3-omni              | omni         | xh2    | yes   | yes   | yes  | yes  | x    | yes     |
@@ -188,7 +202,9 @@ windows 的示例运行前请参照 tools/win_envs 目录的 README.MD 进行环
 | qwen3_pipeline        | converts   | qwen3 流水并行模型分隔编译示例    | python     | xh2    | x64         | linux     |
 | qwen3_speculative     | converts   | qwen3 投机解码模型编译示例        | python     | xh2    | x64         | linux     |
 | resnet50              | converts   | resnet50 量化编译示例             | python     | xh2    | x64         | linux     |
+| yolov5s               | converts   | yolov5s 模型转换编译示例          | python     | xh2    | x64         | linux     |
 | qwen3                 | inferences | qwen3 大语言模型推理示例          | python     | xh2    | x64/aarch64 | win/linux |
+| qwen3_multibatch      | inferences | qwen3 多 batch 推理示例           | python     | xh2    | x64/aarch64 | linux     |
 | qwen3_pipeline        | inferences | qwen3 流水并行示例                | python     | xh2    | x64/aarch64 | linux     |
 | qwen3_speculative     | inferences | qwen3 投机解码示例                | python     | xh2    | x64/aarch64 | linux     |
 | resnet50              | inferences | resnet50 单线程推理示例           | python/c++ | xh2    | x64/aarch64 | win/linux |

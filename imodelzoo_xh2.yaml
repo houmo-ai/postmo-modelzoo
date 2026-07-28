@@ -7,7 +7,9 @@ os_type:
   ubuntu_20.04:
     examples:
       - hmatc
+      - 3rdparty
       - apis
+      - cmake
       - models
       - data
       - hmodel
@@ -19,6 +21,7 @@ os_type:
       - LICENSE
       - NOTICE
       - licenses
+      - utils
   ubuntu_18.04:
     examples:
       - examples/

@@ -37,8 +37,7 @@ https://opensource.org/licenses/MIT
 
 Usage in this project:
 The "half" library is used at the following path:
-    apis/common/hpp/half/half.hpp
-    (legacy path may also appear as apis/common/half/include/half.hpp)
+    3rdparty/half/half.hpp
 
 The "half" library is licensed under the MIT License, which allows use,
 copying, modification, merging, publishing, distribution, sublicensing,
@@ -68,15 +67,11 @@ Primarily Mozilla Public License Version 2.0 (MPL 2.0), with retained files
 under Apache License 2.0 and BSD-compatible terms.
 
 License Text:
-    apis/common/eigen3/COPYING.README
-    apis/common/eigen3/COPYING.MPL2
-    apis/common/eigen3/COPYING.APACHE
-    apis/common/eigen3/COPYING.BSD
     https://www.mozilla.org/en-US/MPL/2.0/
 
 Usage in this project:
 This project includes a modified source subset at:
-    apis/common/eigen3
+    3rdparty/eigen3
 
 The subset is used by:
     tools/llm_perf
@@ -159,7 +154,7 @@ Sean Barrett and stb contributors
 Source:
 https://github.com/nothings/stb
 Header used in this project:
-    apis/common/hpp/stb/stb_image.h
+    3rdparty/stb/stb_image.h
 
 License:
 Public Domain (unlicense.org) or MIT No Attribution (MIT-0), at the user's option.
@@ -174,8 +169,8 @@ stb_image is used for image decoding (load RGB) in houmo-llm-engine:
     utils/cpp/houmo_engine/include/modules/image_processor.h
 
 The header is included from the shared common path:
-    apis/common/hpp/stb/stb_image.h
-via HOUMO_EXAMPLES_PATH / apis/common/hpp.
+    3rdparty/stb/stb_image.h
+via HOUMO_EXAMPLES_PATH / 3rdparty.
 
 Users are responsible for complying with the stb_image license terms when using,
 redistributing, or modifying stb_image.
@@ -226,8 +221,7 @@ https://opensource.org/licenses/MIT
 
 Usage in this project:
 The "json" library is used at the following path:
-    apis/common/nlohmann/include/nlohmann/json.hpp
-    hmatc/3rdparty/nlohmann/include/nlohmann/json.hpp
+    3rdparty/nlohmann/json.hpp
 
 The JSON for Modern C++ library (also known as nlohmann/json) is licensed
 under the MIT License, which permits use, copying, modification, merging,
@@ -251,7 +245,7 @@ Component Name:
 getopt.h (mingw-w64 / NetBSD implementation)
 
 Usage Location:
-This header was used from the legacy path tools/common/include/getopt.h.
+No copy of this legacy header is currently included in the repository.
 
 Source:
 mingw-w64 project:
@@ -379,7 +373,6 @@ spdlog
 
 Usage Location:
 3rdparty/spdlog (entire spdlog source directory)
-apis/common/hpp/spdlog (entire spdlog source directory)
 
 Source:
 https://github.com/gabime/spdlog
@@ -504,7 +497,7 @@ Version:
 0.9.0
 
 Usage Location:
-    apis/common/yaml-cpp
+    3rdparty/yaml-cpp
     tools/llm_perf
 
 Source:
@@ -517,7 +510,6 @@ License:
 MIT License
 
 License Text:
-    apis/common/yaml-cpp/LICENSE
     https://github.com/jbeder/yaml-cpp/blob/yaml-cpp-0.9.0/LICENSE
 
 The yaml-cpp library is licensed under the MIT License. The MIT License
@@ -556,7 +548,7 @@ redistributing, or modifying yaml-cpp.
 
 Bundled subcomponent:
 yaml-cpp's floating-point formatter includes an adjusted copy of Dragonbox in:
-    apis/common/yaml-cpp/src/contrib/dragonbox.h
+    3rdparty/yaml-cpp/src/contrib/dragonbox.h
 
 Dragonbox source:
 https://github.com/jk-jeon/dragonbox
@@ -568,8 +560,8 @@ The retained file identifies the applicable licenses as Apache-2.0 WITH
 LLVM-exception, BSL-1.0, and MIT, and states that Junekey Jeon explicitly
 agreed to MIT licensing for its use in yaml-cpp. The upstream SPDX copyright
 and license notices are retained in the file. This distribution uses the MIT
-option; its license text is retained in:
-    apis/common/yaml-cpp/DRAGONBOX_LICENSE
+option; the applicable copyright and license notices are retained in the
+source file above.
 
 ----------------------------------------------------------------------
 miniaudio
@@ -579,7 +571,7 @@ Component Name:
 miniaudio
 
 Usage Location:
-    apis/common/hpp/audio/miniaudio.h
+    3rdparty/miniaudio/miniaudio.h
     utils/cpp/houmo_engine/src/modules/audio_processor.cc
     models/asr/whisper/cpp/ (legacy/demo copies may also reference miniaudio)
 
@@ -594,7 +586,7 @@ MIT No Attribution (MIT-0) or Public Domain dedication
 
 License Text:
 See the embedded license statements in:
-    apis/common/hpp/audio/miniaudio.h
+    3rdparty/miniaudio/miniaudio.h
 
 miniaudio is used as a header-only audio decoder/resampler for ASR preprocessing
 in houmo-llm-engine and related demos. The bundled header states that miniaudio
@@ -957,7 +949,7 @@ https://www.apache.org/licenses/LICENSE-2.0
 
 Usage in this project:
 The jinja.hpp single-header file is used at the following path:
-    apis/common/tokenizer.cpp/third_party/jinja.hpp
+    3rdparty/tokenizer.cpp/third_party/jinja.hpp
 
 The jinja.hpp library provides a C++11 Jinja2 template engine for
 rendering HuggingFace-style chat templates. It is licensed under the
@@ -989,7 +981,7 @@ Main license: https://github.com/Tencent/rapidjson/blob/master/license.txt
 
 Usage in this project:
 RapidJSON headers are vendored at the following path:
-    apis/common/tokenizer.cpp/third_party/rapidjson/
+    3rdparty/tokenizer.cpp/third_party/rapidjson/
 
 RapidJSON is an optional JSON backend for the ujson wrapper (activated via
 the UJSON_USE_RAPIDJSON CMake option). It is provided as a vendored copy
@@ -1024,7 +1016,7 @@ https://github.com/kkos/oniguruma/blob/master/COPYING
 
 Usage in this project:
 Oniguruma source files are vendored and built at the following path:
-    apis/common/tokenizer.cpp/third_party/oniguruma/
+    3rdparty/tokenizer.cpp/third_party/oniguruma/
 
 Oniguruma is built as a static library (UTF-8 support only) and linked into
 the tokenizer library for regex-based token splitting. It is licensed under
@@ -1065,11 +1057,11 @@ MIT License (also known as "Unicode License")
 
 License Text:
 See the embedded license statement in:
-    apis/common/tokenizer.cpp/third_party/utf8proc/utf8proc.h
+    3rdparty/tokenizer.cpp/third_party/utf8proc/utf8proc.h
 
 Usage in this project:
 utf8proc source files are compiled directly into the tokenizer library at:
-    apis/common/tokenizer.cpp/third_party/utf8proc/
+    3rdparty/tokenizer.cpp/third_party/utf8proc/
 
 utf8proc provides Unicode normalization (NFKC), case-folding, character
 iteration, category checks, and grapheme boundary detection for the tokenizer.
@@ -1099,11 +1091,11 @@ License:
 Apache License, Version 2.0
 
 License Text:
-apis/common/tokenizer.cpp/LICENSE
+https://github.com/wangzhaode/tokenizer.cpp/blob/main/LICENSE
 
 Usage in this project:
 The tokenizer module source files are located at:
-    apis/common/tokenizer.cpp/
+    3rdparty/tokenizer.cpp/
 
 This module is a C++11 reimplementation of HuggingFace tokenizers, providing
 BPE, WordPiece, and Unigram model support, alongside Jinja2 chat template
