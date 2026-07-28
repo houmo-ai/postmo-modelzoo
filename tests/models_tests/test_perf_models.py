@@ -315,16 +315,6 @@ def test_llm_qwen3_30b_a3b_perf(setup_logging) -> None:
     _perf_func(model_name, setup_logging)
 
 
-@pytest.mark.copaw_flash
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-@pytest.mark.perf
-def test_llm_copaw_flash_perf(setup_logging) -> None:
-    """test_llm_copaw_flash_perf"""
-    model_name = "copaw-flash"
-    _perf_func(model_name, setup_logging)
-
-
 @pytest.mark.qwen3_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

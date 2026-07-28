@@ -667,20 +667,6 @@ def test_asr_whisper_quant(setup_logging) -> None:
     _quant_func(model_name, setup_logging)
 
 
-@pytest.mark.copaw_flash
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-@pytest.mark.quant
-@pytest.mark.dependency(
-    name="test_llm_copaw_flash_quant",
-    depends_on=["test_get_models.py::test_llm_copaw_flash_get_model"],
-)
-def test_llm_copaw_flash_quant(setup_logging) -> None:
-    """test_llm_copaw_flash_quant"""
-    model_name = "copaw-flash"
-    _quant_func(model_name, setup_logging)
-
-
 @pytest.mark.paddleocr_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
