@@ -278,10 +278,10 @@ Qwen3 的 C++推理样例依赖以下三方库：
         ```bash
         # 1. 需要下载 OpenHarmony SDK，并设置 OHOS_SDK。
         # 2. 需要下载 OHOS 版本 runtime-sdk，设置 TCIM_RUNTIME_PATH 为当前 OHOS 版本路径。
-        # 3. 需要设置 HOUMO_PATH 和 HOUMO_SDK_PATH。
+        # 3. 需要设置 HOUMO_SDK_PATH。
         # 示例如下：
         # export OHOS_SDK={the_path_of_ohos}/release/6.0-Release/linux/native
-        # export HOUMO_PATH={the_path_of_ohos}/houmo
+        # export HOUMO_SDK_PATH={the_path_of_ohos}/houmo-sdk
         # export TCIM_RUNTIME_PATH={the_path_of_ohos}/houmo
         ./build_OHOS.sh
         ```

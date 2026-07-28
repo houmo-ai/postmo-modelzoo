@@ -1,0 +1,31 @@
+# OpenHarmony (OHOS) platform configuration for houmo_infer.
+
+set(HOUMO_PLATFORM_NAME "ohos")
+set(HOUMO_NEED_PTHREAD TRUE)
+set(HOUMO_CXX17_FLAG "-std=c++17")
+set(HOUMO_COMPILE_OPTIONS -Wno-deprecated-declarations)
+set(HOUMO_RELEASE_FLAGS "-O3 -DNDEBUG -DEIGEN_MPL2_ONLY")
+set(HOUMO_DEBUG_FLAGS "-g -O0 -ggdb")
+set(HOUMO_EXPORT_ALL_SYMBOLS FALSE)
+set(HOUMO_TARGET_LINK_OPTIONS "")
+
+# Use CMAKE_SYSTEM_PROCESSOR from cross-compile toolchain (aarch64 for OHOS)
+if(DEFINED CMAKE_SYSTEM_PROCESSOR AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "")
+  set(ARCH ${CMAKE_SYSTEM_PROCESSOR})
+else()
+  execute_process(
+    COMMAND uname -m
+    OUTPUT_VARIABLE ARCH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+endif()
+set(HOUMO_TARGET "$ENV{HOUMO_TARGET}")
+set(LIB_PATH "OHOS_${ARCH}_${HOUMO_TARGET}")
+
+if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
+  file(TO_CMAKE_PATH "$ENV{HOUMO_EXAMPLES_PATH}" HOUMO_EXAMPLES_ROOT)
+  set(LIB_INSTALL_PATH "${HOUMO_EXAMPLES_ROOT}/tools/common/ohos")
+endif()
+
+# OHOS/musl libc needs explicit c++ and c++abi linkage
+set(HOUMO_EXTRA_LIBS c++ c++abi)

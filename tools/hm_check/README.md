@@ -1,6 +1,6 @@
 # 环境检测工具
 
-检测当前环境是否满足运行要求。
+检测当前环境是否满足运行要求。当前支持 Linux、Android 和 OpenHarmony (OHOS) 平台。
 
 ## 检测项：
 
@@ -77,6 +77,20 @@
   > - 脚本会尝试自动查找 NDK（`NDK_PATH`、`$HOME/Android/Sdk/ndk-bundle` 等），但推荐显式提供 `--ndk` 或 `NDK_PATH`；
   > - 确保 `TCIM_RUNTIME_PATH` 和 `HOUMO_SDK_PATH` 指向为目标 ABI（Android）编译好的头文件与库；
   > - 若 CMakeLists 中使用到平台特定工具（例如 `objcopy`、`ld`），交叉编译环境下可能需要调整这些工具的路径或用法。
+
+- OpenHarmony (OHOS) 平台交叉编译：
+
+  仓库包含 `build_OHOS.sh`，用于交叉编译 `hm-check` 到 OHOS ABI（aarch64-linux-ohos）。脚本需要设置环境变量 `OHOS_SDK`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH`。
+
+  示例（在 tools/hm_check 目录下）：
+
+  ```bash
+  # 推荐先在 shell 中设置：
+  export OHOS_SDK=/path/to/OpenHarmony/release/6.0-Release/linux/native
+  export TCIM_RUNTIME_PATH=/path/to/houmo-sdk
+  export HOUMO_SDK_PATH=/path/to/houmo-sdk
+  ./build_OHOS.sh
+  ```
 
 ## 检查说明：
 

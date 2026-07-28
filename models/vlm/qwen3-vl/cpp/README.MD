@@ -1,6 +1,6 @@
 # Qwen3-VL C++ 推理示例
 
-本示例展示如何使用C++在后摩系列芯片（XH2）的设备上运行Qwen3-VL视觉语言模型推理。当前支持Linux和Android Native环境。
+本示例展示如何使用C++在后摩系列芯片（XH2）的设备上运行Qwen3-VL视觉语言模型推理。当前支持Linux、Android Native 和 OpenHarmony (OHOS) 环境。
 
 ## 目录
 
@@ -142,7 +142,6 @@ source env.sh
 
 需要设置的环境变量：
 - `HOUMO_TARGET`: 目标芯片类型，设置为 `xh2`
-- `HOUMO_PATH`: Houmo SDK路径，包含include和lib目录
 - `TCIM_RUNTIME_PATH`: TCIM Runtime库路径（必需）
 
 对于Android平台交叉编译，还需设置：

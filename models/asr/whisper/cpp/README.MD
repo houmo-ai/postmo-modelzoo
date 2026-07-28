@@ -1,6 +1,6 @@
 # Whisper ASR C++ 推理示例
 
-本示例展示如何使用 C++ 在后摩系列芯片（XH2）上运行 Whisper 自动语音识别模型推理。支持 Linux、Windows 11 和 Android Native 环境。
+本示例展示如何使用 C++ 在后摩系列芯片（XH2）上运行 Whisper 自动语音识别模型推理。支持 Linux、Windows 11、Android Native 和 OpenHarmony (OHOS) 环境。
 
 ## 目录
 
@@ -129,6 +129,16 @@ bash build_linux.sh
 
 ```bash
 bash build_ndk.sh
+```
+
+**OpenHarmony (OHOS)：**
+
+```bash
+export OHOS_SDK=/path/to/OpenHarmony/release/6.0-Release/linux/native
+export HOUMO_TARGET=xh2
+export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export TCIM_RUNTIME_PATH=/path/to/houmo-sdk
+bash build_OHOS.sh
 ```
 
 **Windows：**

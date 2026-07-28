@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16.3)
-project(cosyvoice3-demo VERSION 1.0.0 LANGUAGES CXX)
+project(cosyvoice3-demo VERSION 1.0.0 LANGUAGES C CXX)
 
 # Option to build audio libraries from source or use prebuilt
 option(BUILD_AUDIO_FROM_SOURCE "Build audio libraries from source instead of using prebuilt" OFF)
@@ -19,18 +19,24 @@ include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
 # Determine platform-specific library path
 if(ANDROID_ABI)
     set(LIB_PATH "Android_xh2")
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    execute_process(
-        COMMAND uname -m
-        OUTPUT_VARIABLE ARCH
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    # Use target architecture from command line, fallback to host arch
+    if(DEFINED CMAKE_SYSTEM_PROCESSOR AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "")
+        set(ARCH ${CMAKE_SYSTEM_PROCESSOR})
+    else()
+        execute_process(
+            COMMAND uname -m
+            OUTPUT_VARIABLE ARCH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+    endif()
     set(HOUMO_TARGET "$ENV{HOUMO_TARGET}")
     if(NOT HOUMO_TARGET)
         message(FATAL_ERROR "HOUMO_TARGET environment variable is not set")
     endif()
-    set(LIB_PATH "Linux_${ARCH}_${HOUMO_TARGET}")
-    message(STATUS "Platform: Linux_${ARCH}_${HOUMO_TARGET}")
+    set(SYS_NAME ${CMAKE_SYSTEM_NAME})
+    set(LIB_PATH "${SYS_NAME}_${ARCH}_${HOUMO_TARGET}")
+    message(STATUS "Platform: ${SYS_NAME}_${ARCH}_${HOUMO_TARGET}")
 else()
     message(WARNING "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
 endif()
@@ -96,6 +102,18 @@ if(ANDROID_ABI)
         m
         ${AUDIO_LIBS}
     )
+elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    target_link_libraries(cosyvoice3-demo PRIVATE
+        tokenizers_cpp
+        tokenizers_c
+        tcim_runtime_lite
+        pthread
+        ${CMAKE_DL_LIBS}
+        m
+        c++
+        c++abi
+        ${AUDIO_LIBS}
+    )
 else()
     target_link_libraries(cosyvoice3-demo PRIVATE
         tokenizers_cpp
@@ -111,15 +129,26 @@ endif()
 # Install targets
 install(TARGETS cosyvoice3-demo RUNTIME DESTINATION .)
 if(BUILD_AUDIO_FROM_SOURCE)
-    install(FILES
-            "${CMAKE_CURRENT_BINARY_DIR}/libsamplerate/src/libsamplerate.so"
-            "${CMAKE_CURRENT_BINARY_DIR}/libsamplerate/src/libsamplerate.so.0"
-            "${CMAKE_CURRENT_BINARY_DIR}/libsamplerate/src/libsamplerate.so.0.2.2"
-            "${CMAKE_CURRENT_BINARY_DIR}/lib/libkaldi-native-fbank-core.so"
-            "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so"
-            "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so.1"
-            "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so.1.0.37"
-            DESTINATION .)
+    if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+        # OHOS/musl does not generate versioned symlinks, only install actual .so
+        # Keep original build directory structure for RPATH resolution
+        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libsamplerate/src/libsamplerate.so"
+                DESTINATION libsamplerate/src)
+        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/lib/libkaldi-native-fbank-core.so"
+                DESTINATION lib)
+        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so"
+                DESTINATION libsndfile)
+    else()
+        install(FILES
+                "${CMAKE_CURRENT_BINARY_DIR}/libsamplerate/src/libsamplerate.so"
+                "${CMAKE_CURRENT_BINARY_DIR}/libsamplerate/src/libsamplerate.so.0"
+                "${CMAKE_CURRENT_BINARY_DIR}/libsamplerate/src/libsamplerate.so.0.2.2"
+                "${CMAKE_CURRENT_BINARY_DIR}/lib/libkaldi-native-fbank-core.so"
+                "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so"
+                "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so.1"
+                "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.so.1.0.37"
+                DESTINATION .)
+    endif()
 else()
     install(FILES ${AUDIO_LIB_FILES} DESTINATION .)
 endif()

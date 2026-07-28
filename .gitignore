@@ -1,6 +1,9 @@
 # Build & install directories
 build/
 build_ndk/
+build-ohos/
+build-test/
+build-check/
 bin/
 output/
 out/
@@ -119,5 +122,8 @@ CCPD*
 datasets
 lib
 hmonnx*
+<<<<<<< HEAD
 !/3rdparty/
 android
+=======
+>>>>>>> 4a691b7e... tools OHOS

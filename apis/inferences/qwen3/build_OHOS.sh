@@ -4,7 +4,6 @@
 # Prerequisites:
 #   export OHOS_SDK=/path/to/ohos-sdk
 #   export HOUMO_TARGET=xh2
-#   export HOUMO_PATH=/path/to/houmo-sdk
 #   export HOUMO_SDK_PATH=/path/to/houmo-sdk
 #   export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
 #   export TCIM_RUNTIME_PATH=/path/to/houmo-sdk
@@ -15,7 +14,6 @@
 set -e
 
 [ -z "$OHOS_SDK" ] && { echo "Error: OHOS_SDK not set"; exit 1; }
-[ -z "$HOUMO_PATH" ] && { echo "Error: HOUMO_PATH not set"; exit 1; }
 [ -z "$HOUMO_SDK_PATH" ] && { echo "Error: HOUMO_SDK_PATH not set"; exit 1; }
 [ -z "$HOUMO_EXAMPLES_PATH" ] && { echo "Error: HOUMO_EXAMPLES_PATH not set"; exit 1; }
 [ -z "$TCIM_RUNTIME_PATH" ] && { echo "Error: TCIM_RUNTIME_PATH not set"; exit 1; }

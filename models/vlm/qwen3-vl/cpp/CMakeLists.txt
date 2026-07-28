@@ -53,15 +53,21 @@ else()
   set(SYS_NAME "")
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(SYS_NAME Linux)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    set(SYS_NAME OHOS)
   else()
     message(WARNING "Current system is ${CMAKE_SYSTEM_NAME}, unsupported system")
   endif()
 
-  execute_process(
-    COMMAND uname -m
-    OUTPUT_VARIABLE ARCH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
+  if(DEFINED CMAKE_SYSTEM_PROCESSOR AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "")
+    set(ARCH ${CMAKE_SYSTEM_PROCESSOR})
+  else()
+    execute_process(
+      COMMAND uname -m
+      OUTPUT_VARIABLE ARCH
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+  endif()
 
   set(HOUMO_TARGET "$ENV{HOUMO_TARGET}")
   set(LIB_PATH "${SYS_NAME}_${ARCH}_${HOUMO_TARGET}")
@@ -92,6 +98,19 @@ if(ANDROID_ABI)
     )
     set(OPENCV_CONFIG_MODE "Android env vars")
   endif()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+  set(OPENCV_PATH ${CMAKE_SOURCE_DIR}/3rdparty/opencv)
+  set(OpenCV_INCLUDE_DIRS ${OPENCV_PATH}/${LIB_PATH}/include)
+  set(OPENCV_LIB_DIR ${OPENCV_PATH}/${LIB_PATH}/lib)
+
+  if(EXISTS ${OPENCV_LIB_DIR}/libopencv_core.so)
+    set(OPENCV_LIBS
+      ${OPENCV_LIB_DIR}/libopencv_core.so
+      ${OPENCV_LIB_DIR}/libopencv_imgproc.so
+      ${OPENCV_LIB_DIR}/libopencv_imgcodecs.so
+    )
+    set(OPENCV_CONFIG_MODE "OHOS prebuilt: ${OPENCV_LIB_DIR}")
+  endif()
 endif()
 
 if(NOT OpenCV_INCLUDE_DIRS OR NOT OPENCV_LIBS)
@@ -114,13 +133,13 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   ${HALF_INCLUDE_PATH}
   ${TOKENIZER_CPP_PATH}/${LIB_PATH}/include
   ${CMAKE_SOURCE_DIR}/include
-  $ENV{HOUMO_PATH}/include
+  $ENV{TCIM_RUNTIME_PATH}/include
   ${EIGEN_PATH}
   ${OpenCV_INCLUDE_DIRS}
 )
 
 target_link_directories(${PROJECT_NAME} PRIVATE
-  $ENV{HOUMO_PATH}/lib
+  $ENV{TCIM_RUNTIME_PATH}/lib
   ${TOKENIZER_CPP_PATH}/${LIB_PATH}/lib
 )
 
@@ -130,6 +149,14 @@ if(ANDROID_ABI)
   list(APPEND PROJECT_LINK_LIBS
     ${TCIM_LIBRARY}
     dl
+  )
+elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+  list(APPEND PROJECT_LINK_LIBS
+    tcim_runtime_lite
+    pthread
+    ${CMAKE_DL_LIBS}
+    c++
+    c++abi
   )
 else()
   list(APPEND PROJECT_LINK_LIBS

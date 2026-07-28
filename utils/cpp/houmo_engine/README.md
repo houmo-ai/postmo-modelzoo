@@ -26,10 +26,11 @@ Houmo Inference Framework 是面向 Houmo NPU 的 C++17 推理基础库。当前
 │   ├── core/           # 核心抽象实现
 │   └── modules/        # 公共模块实现
 ├── docs/               # API、推理流程和模型适配文档
-├── cmake/platforms/    # Linux、Android、Windows 平台配置
+├── cmake/platforms/    # Linux、Android、Windows、OHOS 平台配置
 ├── CMakeLists.txt
 ├── build_linux.sh
 ├── build_ndk.sh
+├── build_OHOS.sh
 ├── build_win.bat
 └── convert_embed.py
 ```
@@ -90,6 +91,20 @@ export NDK_PATH=/path/to/android-ndk-r28c
 ```
 
 Android 库安装到 `$HOUMO_EXAMPLES_PATH/utils/android`，`convert_embed.py` 安装到当前目录下的 `android/` install prefix。
+
+### OpenHarmony (OHOS)
+
+OHOS 脚本用于交叉编译，需要 OpenHarmony SDK 和 Houmo SDK：
+
+```bash
+export OHOS_SDK=/path/to/OpenHarmony/release/6.0-Release/linux/native
+export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export TCIM_RUNTIME_PATH=/path/to/ohos/houmo-sdk
+export HOUMO_TARGET=xh2
+./build_OHOS.sh
+```
+
+OHOS 库安装到 `$HOUMO_EXAMPLES_PATH/utils/ohos`，`convert_embed.py` 安装到当前目录下的 `bin/` install prefix。OHOS 使用 musl libc，额外链接 `c++` 和 `c++abi`。
 
 ### Windows
 

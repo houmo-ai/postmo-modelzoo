@@ -1,6 +1,6 @@
 # TCIM性能测试工具
 
-本代码用于在后摩系列芯片的设备上测试TCIM模型推理性能。当前支持linux和android native环境（使用adb运行）。
+本代码用于在后摩系列芯片的设备上测试TCIM模型推理性能。当前支持linux、android native 和 OpenHarmony (OHOS) 环境（使用adb运行）。
 
 ## 目录
 
@@ -166,6 +166,21 @@ cd houmo-examples-xh2/tools/tcim_perf/
 ```
 
 编译生成tcim_perf可执行文件在 houmo-examples-xh2/tools/android 目录下。
+
+### 2.2.4 OpenHarmony (OHOS) 环境
+
+`build_OHOS.sh` 脚本用于交叉编译，需要设置环境变量 `OHOS_SDK`、`HOUMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH`。
+
+```bash
+cd houmo-examples-xh2/tools/tcim_perf/
+export OHOS_SDK=/path/to/OpenHarmony/release/6.0-Release/linux/native
+export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export HOUMO_SDK_PATH=/path/to/houmo-sdk
+export TCIM_RUNTIME_PATH=/path/to/houmo-sdk
+./build_OHOS.sh
+```
+
+编译生成tcim_perf可执行文件在 houmo-examples-xh2/tools/bin 目录下。
 
 ### 2.3 一键运行
 

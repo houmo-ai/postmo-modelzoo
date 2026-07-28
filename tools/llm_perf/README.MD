@@ -67,6 +67,7 @@
 | build_linux.sh          | Linux平台llm_perf编译脚本                           |
 | build_ndk.sh            | Android平台llm_perf编译脚本                         |
 | build_win.bat           | Win11平台llm_perf编译脚本                           |
+| build_OHOS.sh          | OHOS平台llm_perf交叉编译脚本                      |
 
 功能支持度说明：
   - 具体支持的模型参考models目录下llm和vlm模型支持的平台。
@@ -393,6 +394,22 @@ cd tools/llm_perf/
 ```
 
 编译生成的llm_perf可执行文件在tools/android目录下。
+
+如果是OHOS版本请执行：
+
+```bash
+# 1. 需要下载 OpenHarmony SDK，并设置 OHOS_SDK。
+# 2. 需要下载 OHOS 版本 houmo-sdk，设置 HOUMO_SDK_PATH 为当前 OHOS 版本路径。
+# 3. 需要下载 OHOS 版本 runtime-sdk，设置 TCIM_RUNTIME_PATH 为当前 OHOS 版本路径。
+# 示例如下：
+# export OHOS_SDK={the_path_of_ohos}/release/6.0-Release/linux/native
+# export HOUMO_TARGET=xh2
+# export HOUMO_SDK_PATH={the_path_of_ohos}/houmo-sdk
+# export TCIM_RUNTIME_PATH={the_path_of_ohos}/houmo
+./build_OHOS.sh
+```
+
+编译生成的llm_perf可执行文件在tools/bin目录下。
 
 如果是windows11版本请执行：
 

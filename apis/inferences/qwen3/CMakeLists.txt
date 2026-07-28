@@ -50,14 +50,14 @@ set(INCLUDE_DIRS
   ${TOKENZIER_CPP_PATH}/${LIB_PATH}/include
   ${CMAKE_SOURCE_DIR}/include
   $ENV{HOUMO_SDK_PATH}/hal/include
-  $ENV{HOUMO_PATH}/include
+  $ENV{TCIM_RUNTIME_PATH}/include
 )
 
 if(MSVC)
   include_directories($ENV{HOUMO_EXAMPLES_PATH}/3rdparty/mingw/include)
 endif()
 
-link_directories($ENV{HOUMO_PATH}/lib
+link_directories($ENV{TCIM_RUNTIME_PATH}/lib
   ${TOKENZIER_CPP_PATH}/${LIB_PATH}/lib)
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -116,7 +116,7 @@ install(TARGETS ${PROJECT_NAME} DESTINATION .)
 
 # Install dependent .so files for runtime loading
 if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-  set(TCIM_RUNTIME_LIB "$ENV{HOUMO_PATH}/lib")
+  set(TCIM_RUNTIME_LIB "$ENV{TCIM_RUNTIME_PATH}/lib")
   install(FILES "${TCIM_RUNTIME_LIB}/libtcim_runtime_lite.so"
                 "${TCIM_RUNTIME_LIB}/libtcim_dev_ctrl.so"
           DESTINATION .)

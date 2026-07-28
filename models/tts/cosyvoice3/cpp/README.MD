@@ -1,6 +1,6 @@
 # CosyVoice3 TTS C++ 推理示例
 
-本示例展示如何使用C++在后摩系列芯片（XH2）的设备上运行CosyVoice3文本转语音（TTS）模型推理。当前支持Linux_x86_64 和Android Native环境，**Linux aarch64平台需要用户自行编译相关三方库**。
+本示例展示如何使用C++在后摩系列芯片（XH2）的设备上运行CosyVoice3文本转语音（TTS）模型推理。当前支持Linux_x86_64、Android Native 和 OpenHarmony (OHOS) 环境，**Linux aarch64平台需要用户自行编译相关三方库**。
 
 ## 目录
 
@@ -125,7 +125,6 @@ source env.sh
 
 需要设置的环境变量：
 - `HOUMO_TARGET`: 目标芯片类型，设置为 `xh2`
-- `HOUMO_PATH`: Houmo SDK路径，包含include和lib目录
 - `TCIM_RUNTIME_PATH`: TCIM Runtime库路径（必需）
 
 对于Android平台交叉编译，还需设置：
@@ -152,6 +151,33 @@ export TCIM_RUNTIME_PATH=/path/to/houmo-tcim-runtime-xh2
 
 # 编译
 ./build_ndk.sh
+```
+
+**OpenHarmony (OHOS) 平台交叉编译：**
+
+```bash
+# 设置 OHOS SDK 和相关环境变量
+export OHOS_SDK=/path/to/OpenHarmony/release/6.0-Release/linux/native
+export HOUMO_TARGET=xh2
+export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export TCIM_RUNTIME_PATH=/path/to/houmo-sdk
+
+# 方式一：使用预编译的三方音频库（需提前准备好 OHOS 版本的 .so 文件）
+./build_OHOS.sh
+
+# 方式二：从源码编译三方音频库（推荐，一步到位）
+./build_OHOS.sh --audio-source
+```
+
+编译生成的可执行文件及依赖库安装到 `../bin` 目录下，目录结构如下：
+
+```
+../bin/
+├── cosyvoice3-demo                     # 主程序
+├── libkaldi-native-fbank-core.so       # FBANK 特征提取库
+├── libsamplerate.so                    # 音频重采样库
+├── libsndfile.so                       # 音频文件 I/O 库
+├── libtcim_runtime_lite.so             # TCIM Runtime 库（需单独部署）
 ```
 
 ### 2.3 运行
