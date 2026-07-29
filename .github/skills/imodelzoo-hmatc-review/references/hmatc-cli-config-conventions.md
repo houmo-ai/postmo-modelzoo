@@ -85,7 +85,7 @@ parser
 - resizer mode、input size、crop、YUV format；
 - `model_impl_module/cls`、`dataloader_module/cls`；
 - `quant.calib_data`、`quant_type`、advanced config、`mix_search`；
-- `build.batch/ncore/opt_level/roi_num/parallel_jobs/cpp_backend`；
+- `build.batch/ncore/opt_level/roi_num/parallel_jobs`；
 - `demo`、`eval`、dataset module/class 和样本数量。
 
 高风险约束必须由校验和执行共同保证，例如：

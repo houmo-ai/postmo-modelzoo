@@ -172,7 +172,6 @@ def main():
             enable_common_subgraph=args.enable_common_subgraph,
             skip_mlir_compile=args.skip_mlir_compile,
             subgraph_repeat_hint=args.subgraph_repeat_hint,
-            cpp_backend=args.cpp_backend,
             dump_compiled_mlir=args.dump_compiled_mlir,
             parallel_jobs=(
                 psutil.cpu_count(logical=False) if args.jobs is None else args.jobs

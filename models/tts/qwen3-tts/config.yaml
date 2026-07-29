@@ -13,7 +13,6 @@ model_configs:
       batch: 1
       prefill_length: 256
       quant_type: "w8a16h1_sefp"
-      cpp_backend: "v2"
     "0.6b-base":
       modelscope_repo: ["Qwen/Qwen3-TTS-12Hz-0.6B-Base"]
       model_name: "qwen3-tts"
@@ -24,7 +23,6 @@ model_configs:
       batch: 1
       prefill_length: 256
       quant_type: "w8a16h1_sefp"
-      cpp_backend: "v2"
     "1.7b-customvoice":
       modelscope_repo: ["Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"]
       model_name: "qwen3-tts"
@@ -35,4 +33,3 @@ model_configs:
       batch: 1
       prefill_length: 256
       quant_type: "w8a16h1_sefp"
-      cpp_backend: "v2"

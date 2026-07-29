@@ -12,7 +12,6 @@ model_configs:
       ndevice: 1
       batch: 1
       prefill_length: 256
-      cpp_backend: "v2"
     "120b":
       modelscope_repo: ["openai-mirror/gpt-oss-120b"]
       model_name: "gpt-oss"
@@ -22,4 +21,3 @@ model_configs:
       ndevice: 2
       batch: 1
       prefill_length: 256
-      cpp_backend: "v2"

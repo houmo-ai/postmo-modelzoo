@@ -75,7 +75,6 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number")
     parser.add_argument("--stage", dest="stage", type=str, default="build", choices=["build", "test", "all"], help="build stage")
     parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", HOUMO_TARGET), help="build output dir")
-    parser.add_argument("--cpp_backend", dest="cpp_backend", type=str, default=None, help="cpp_backend")
     parser.add_argument("--enable_stable_opt", dest="enable_stable_opt", action="store_true", default=False, help="enable stable output")
     parser.add_argument("--enable_common_subgraph", dest="enable_common_subgraph", action="store_true", default=False, help="enable common subgraph optimization")
     parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 1), help="FlashAttention optimization switches: 1st=LLM prefill/decode (0/1/2), 2nd=non-LLM (0/1)")
@@ -98,9 +97,6 @@ def get_args() -> argparse.Namespace:
     args.context_length = first_not_none(
         args.context_length,
         parse_context_length(model_config.get("context_length", "2k")),
-    )
-    args.cpp_backend = first_not_none(
-        args.cpp_backend, model_config.get("cpp_backend", "v2")
     )
     args.flash_attention = _validate_adjust_flash_attention(
         args.flash_attention, args.context_length
@@ -199,14 +195,12 @@ if __name__ == "__main__":
             if args.models and name not in args.models:
                 logger.info(f"Skipping {name} (not in --models list)")
                 continue
-            cpp_backend = cfg.get("cpp_backend", args.cpp_backend)
-            kwargs = {k: v for k, v in cfg.items() if k not in ["name", "cpp_backend"]}
+            kwargs = {k: v for k, v in cfg.items() if k not in ["name"]}
             Xh2Exec.build_from_hmonnx(
                 hmonnx=find_hmonnx_file(os.path.join(model_dir, name)),
                 hmm_name=f"{model_name}-{model_size}_{name}",
                 output=output_dir,
                 ncore=ncore,
-                cpp_backend=cpp_backend,
                 enable_xh2_stable_output=tso,
                 parallel_jobs=j,
                 **kwargs,

@@ -4,13 +4,24 @@
 
 ## 目录
 
-- [分类原则](#分类原则)
-- [大模型脚本体系](#大模型脚本体系)
-- [CV 与 HMATC 体系](#cv-与-hmatc-体系)
-- [test.sh 评审规则](#testsh-评审规则)
-- [测试配置耦合](#测试配置耦合)
-  - [CLI 入参变更与测试 JSON 同步](#cli-入参变更与测试-json-同步)
-- [跨体系与迁移规则](#跨体系与迁移规则)
+- [Model Example Conventions](#model-example-conventions)
+  - [目录](#目录)
+  - [分类原则](#分类原则)
+  - [大模型脚本体系](#大模型脚本体系)
+    - [文件命名和职责](#文件命名和职责)
+    - [config.yaml 结构](#configyaml-结构)
+    - [Python 参数解析](#python-参数解析)
+    - [产物命名](#产物命名)
+  - [CV 与 HMATC 体系](#cv-与-hmatc-体系)
+    - [文件命名和职责](#文件命名和职责-1)
+    - [config.yml 结构](#configyml-结构)
+    - [参数解析和 get\_model.py](#参数解析和-get_modelpy)
+  - [test.sh 评审规则](#testsh-评审规则)
+    - [大模型 test.sh](#大模型-testsh)
+    - [CV test.sh](#cv-testsh)
+  - [测试配置耦合](#测试配置耦合)
+    - [CLI 入参变更与测试 JSON 同步](#cli-入参变更与测试-json-同步)
+  - [跨体系与迁移规则](#跨体系与迁移规则)
 
 ## 分类原则
 
@@ -69,7 +80,7 @@ model_configs:
       prefill_length: ...
 ```
 
-模型类型可增加 `max_size_w/max_size_h/max_size_t`、`cpp_backend`、子模型选项等字段。评审时检查：
+模型类型可增加 `max_size_w/max_size_h/max_size_t`、子模型选项等字段。评审时检查：
 
 - `default_model_name/default_model_size` 能在 `model_configs` 中定位到真实条目。
 - 条目内重复的 `model_name/model_size` 与外层 key 一致。

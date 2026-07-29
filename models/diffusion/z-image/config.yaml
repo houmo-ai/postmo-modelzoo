@@ -12,4 +12,3 @@ model_configs:
       prefill_length: 256
       context_length: "4k"
       quant_type: "w8a8h1_sefp"
-      cpp_backend: "v2"

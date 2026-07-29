@@ -120,7 +120,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     build_compile_group = build_cmd_parser.add_argument_group("Build execution options")
     build_compile_group.add_argument("--profile", action="store_true", required=False, help="Enable profile")
-    build_compile_group.add_argument("--cpp_backend", type=str, default="v1", help="CPP backend implementation version")
     build_compile_group.add_argument("--skip_mlir_compile", action="store_true", help="Skip MLIR compile")
     build_compile_group.add_argument("--dump_compiled_mlir", action="store_true", default=False, help="Dump compiled MLIR")
     build_compile_group.add_argument("--skip_check", action="store_true", help="Skip golden check after build")

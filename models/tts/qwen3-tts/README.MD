@@ -209,10 +209,7 @@ python3 build.py --model_name qwen3-tts --model_size 0.6b-base --models talker_p
 - `--output_dir`：HMM 输出目录，默认 `output/${HOUMO_TARGET}`；
 - `--stage`：编译阶段，默认 `build`；
 - `--context_length` / `--prefill_length` / `--ncore` / `--ndevice` / `--batch`：覆盖 `config.yaml` 中的编译配置；
-- `--cpp_backend`：默认从 `config.yaml` 读取，当前为 `v2`；
 - `--flash_attention`：两个整数，分别控制 LLM prefill/decode 和 non-LLM 子模型的 FlashAttention 开关，默认 `2 1`。
-
-对于 `0.6b-base`，`speech_tokenizer_encoder` 编译时会固定使用 `cpp_backend=v1`；其他子模型仍使用全局 `--cpp_backend` 或 `config.yaml` 中的默认值。
 
 ### 2.5 演示
 

@@ -133,13 +133,6 @@ def get_args() -> argparse.Namespace:
         help="prefill_length",
     )
     parser.add_argument(
-        "--cpp_backend",
-        dest="cpp_backend",
-        type=str,
-        default=None,
-        help="cpp backend version",
-    )
-    parser.add_argument(
         "--flash_attention",
         dest="flash_attention",
         type=int,
@@ -159,9 +152,6 @@ def get_args() -> argparse.Namespace:
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
     args.prefill_length = first_not_none(
         args.prefill_length, model_config.get("prefill_length", 256)
-    )
-    args.cpp_backend = first_not_none(
-        args.cpp_backend, model_config.get("cpp_backend", "v2")
     )
     if args.context_length is None:
         args.context_length = parse_context_length(
@@ -309,7 +299,6 @@ if __name__ == "__main__":
                 ndevice=ndevice,
                 flash_attn=args.flash_attention,
                 context_length=args.context_length,
-                cpp_backend=args.cpp_backend,
                 llm_opt=True,
                 parallel_jobs=j,
                 is_prefill=True,
@@ -322,7 +311,6 @@ if __name__ == "__main__":
                 ndevice=ndevice,
                 flash_attn=args.flash_attention,
                 context_length=args.context_length,
-                cpp_backend=args.cpp_backend,
                 llm_batch=args.batch,
                 llm_opt=True,
                 parallel_jobs=j,

@@ -106,7 +106,6 @@ def build_one(args, suffix):
         flash_attn=args.flash_attention,
         parallel_jobs=args.parallel_jobs,
         target=HOUMO_TARGET,
-        cpp_backend="v2",
     )
 
 

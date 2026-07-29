@@ -23,7 +23,6 @@ quant:
 build:
   ncore: 1
   opt_level: 2
-  cpp_backend: v2
 
 demo:
   data_dir: coco2017/val2017

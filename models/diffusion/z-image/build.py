@@ -102,7 +102,6 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", HOUMO_TARGET), help="build output dir")
     parser.add_argument("--context_length", dest="context_length", type=int, default=None, help="context length")
     parser.add_argument("--prefill_length", dest="prefill_length", type=int, default=None, help="prefill length")
-    parser.add_argument("--cpp_backend", dest="cpp_backend", type=str, default=None, help="cpp backend version")
     parser.add_argument("--enable_common_subgraph", dest="enable_common_subgraph", action="store_true", default=False, help="enable common subgraph optimization")
     parser.add_argument("--enable_xh2_stable_output", dest="enable_xh2_stable_output", action="store_true", default=False, help="enable stable output")
     parser.add_argument("--flash_attention", dest="flash_attention", type=int, nargs=2, default=(2, 1), metavar=("DIT_TEXT_ENCODER", "VAE"), help="flash attention optimization switches. First value is used by dit/text_encoder (0/1/2), second value is used by vae (0/1).")
@@ -123,9 +122,6 @@ def get_args() -> argparse.Namespace:
     )
     args.prefill_length = first_not_none(
         args.prefill_length, model_config.get("prefill_length", 256)
-    )
-    args.cpp_backend = first_not_none(
-        args.cpp_backend, model_config.get("cpp_backend", "v2")
     )
     args.flash_attention = validate_adjust_flash_attention(
         args.flash_attention, args.context_length
@@ -294,7 +290,6 @@ if __name__ == "__main__":
                 "ndevice": args.ndevice,
                 "enable_xh2_stable_output": args.enable_xh2_stable_output,
                 "flash_attn": spec["flash_attention"],
-                "cpp_backend": args.cpp_backend,
                 "parallel_jobs": args.j,
                 **spec["build_kwargs"],
             }

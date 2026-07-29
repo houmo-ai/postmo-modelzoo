@@ -43,7 +43,9 @@ DEFAULT_OUTPUT_DIR = os.path.join("output", HOUMO_TARGET)
 
 
 def get_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build the emotion2vec HMM from its quantized HMONNX model.")
+    parser = argparse.ArgumentParser(
+        description="Build the emotion2vec HMM from its quantized HMONNX model."
+    )
     parser.add_argument(
         "--config",
         dest="config_path",
@@ -108,23 +110,18 @@ def get_args() -> argparse.Namespace:
         choices=[0, 1, 2, 3],
         help="compiler optimization level",
     )
-    parser.add_argument(
-        "--cpp_backend",
-        dest="cpp_backend",
-        type=str,
-        default="v1",
-        choices=["v1", "v2"],
-        help="compiler C++ backend",
-    )
     args = parser.parse_args()
 
-    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
+    default_model_size, default_model_name, model_configs = get_model_configs(
+        args.config_path
+    )
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     if not model_config:
         raise ValueError(
-            f"Model configuration not found: {args.model_name}/{args.model_size} " f"in {args.config_path}"
+            f"Model configuration not found: {args.model_name}/{args.model_size} "
+            f"in {args.config_path}"
         )
     args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
@@ -152,7 +149,6 @@ def main() -> None:
             opt_level=args.opt_level,
             parallel_jobs=args.parallel_jobs,
             target=HOUMO_TARGET,
-            cpp_backend=args.cpp_backend,
         )
 
     if not os.path.isfile(hmm_path):
@@ -163,7 +159,9 @@ def main() -> None:
         classifier_dir = os.path.join(args.output_dir, "hmquant")
         os.makedirs(classifier_dir, exist_ok=True)
         classifier_dst = os.path.join(classifier_dir, "quant_embedding.pt")
-        if not os.path.exists(classifier_dst) or not os.path.samefile(classifier_src, classifier_dst):
+        if not os.path.exists(classifier_dst) or not os.path.samefile(
+            classifier_src, classifier_dst
+        ):
             shutil.copy2(classifier_src, classifier_dst)
 
     print(f"Built HMM: {hmm_path}")

@@ -361,7 +361,6 @@ if __name__ == "__main__":
                 prefill_length=args.prefill_length,
                 ndevice=ndevice if ndevice else 1,
                 enable_xh2_stable_output=tso,
-                cpp_backend="v2",
                 parallel_jobs=j,
             )
             Xh2Exec.build_from_hmonnx(
@@ -375,7 +374,6 @@ if __name__ == "__main__":
                 context_length=context_length,
                 ndevice=ndevice if ndevice else 1,
                 enable_xh2_stable_output=tso,
-                cpp_backend="v2",
                 parallel_jobs=j,
             )
             Xh2Exec.build_from_hmonnx(
@@ -389,7 +387,6 @@ if __name__ == "__main__":
                 prefill_length=args.prefill_length,
                 ndevice=ndevice if ndevice else 1,
                 enable_xh2_stable_output=tso,
-                cpp_backend="v2",
                 parallel_jobs=j,
             )
             Xh2Exec.build_from_hmonnx(
@@ -401,7 +398,6 @@ if __name__ == "__main__":
                 context_length=4096,
                 ndevice=ndevice if ndevice else 1,
                 enable_xh2_stable_output=tso,
-                cpp_backend="v2",
                 parallel_jobs=j,
             )
             Xh2Exec.build_from_hmonnx(
@@ -417,7 +413,6 @@ if __name__ == "__main__":
                 prefill_length=2,
                 ndevice=ndevice if ndevice else 1,
                 enable_xh2_stable_output=tso,
-                cpp_backend="v2",
                 parallel_jobs=j,
             )
             Xh2Exec.build_from_hmonnx(
@@ -431,7 +426,6 @@ if __name__ == "__main__":
                 context_length=4096,
                 ndevice=ndevice if ndevice else 1,
                 enable_xh2_stable_output=tso,
-                cpp_backend="v2",
                 parallel_jobs=j,
             )
             Xh2Exec.build_from_hmonnx(
