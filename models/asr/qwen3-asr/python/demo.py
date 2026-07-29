@@ -226,7 +226,7 @@ def get_args() -> argparse.ArgumentParser:
         "--repetition-penalty",
         dest="repetition_penalty",
         type=float,
-        default=2.0,
+        default=1.0,
         help="repetition penalty applied to generated tokens",
     )
     parser.add_argument(

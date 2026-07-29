@@ -77,9 +77,8 @@ import numpy as np
 GB = int(2**30)
 _LARGE_MODEL_SIZE_THRESHOLD = int(2**30 * 1.8)
 
-def generate_golden_data(
-    hmonnx_file: Path, golden_path: Path, hm_inputs: List[torch.Tensor]
-):
+
+def generate_golden_data(hmonnx_file: Path, golden_path: Path, hm_inputs: List[torch.Tensor]):
     session = HMONNXGoldenInference(hmonnx_file)
     session.to("cuda")
     session.save_golden = True
@@ -103,9 +102,7 @@ def get_audio_export_shape(model_cfg):
     num_mel_bins = getattr(audio_config, "num_mel_bins", None)
     max_source_positions = getattr(audio_config, "max_source_positions", None)
     if num_mel_bins is None or max_source_positions is None:
-        raise ValueError(
-            "audio_config must provide num_mel_bins and max_source_positions"
-        )
+        raise ValueError("audio_config must provide num_mel_bins and max_source_positions")
     return int(num_mel_bins), int(max_source_positions) * 2
 
 
@@ -115,9 +112,7 @@ def get_text_export_shape(xh_model, hf_model):
     if input_sequence_length is None:
         input_sequence_length = getattr(text_config, "max_position_embeddings", None)
     if input_sequence_length is None:
-        raise ValueError(
-            "Unable to resolve input_sequence_length from wrap_cfg or text_config"
-        )
+        raise ValueError("Unable to resolve input_sequence_length from wrap_cfg or text_config")
     return ConfigDict(
         dict(
             full_seq_len=int(input_sequence_length),
@@ -196,6 +191,7 @@ def quant_encode(args):
     max_source_positions = cfg.thinker_config.audio_config.max_source_positions
     # Manually specified fixed audio length, used to fix the Encoder input time dimension T during ONNX/HMONNX export
     max_audio_length = int(args.max_audio_length)
+    model.thinker.audio_tower.config.fixed_max_audio_length = max_audio_length
     num_mel_bins = model.config.thinker_config.audio_config.num_mel_bins
 
     meta_info = {}
@@ -226,9 +222,7 @@ def quant_encode(args):
     meta_info["encoder"] = str(hmonnx_file.relative_to(work_dir))
 
     # Use manually specified max_audio_length to fix the Encoder input time dimension T, using mel dimension from config
-    input_features = (
-        torch.randn(1, num_mel_bins, max_audio_length).to(model.device).to(model.dtype)
-    )
+    input_features = torch.randn(1, num_mel_bins, max_audio_length).to(model.device).to(model.dtype)
     # The corresponding length tensor must be consistent with T to ensure fixed graph input shape after export
     feature_lens = torch.tensor([max_audio_length], dtype=torch.int32).to(model.device)
 
@@ -363,14 +357,8 @@ def quant_forcealigner_encode(args):
     golden_path = work_dir / name
     meta_info["encoder"] = str(hmonnx_file.relative_to(work_dir))
 
-    input_features = (
-        torch.randn(1, num_mel_bins, encoder_input_length)
-        .to(model.device)
-        .to(model.dtype)
-    )
-    feature_lens = torch.tensor([encoder_input_length], dtype=torch.int32).to(
-        model.device
-    )
+    input_features = torch.randn(1, num_mel_bins, encoder_input_length).to(model.device).to(model.dtype)
+    feature_lens = torch.tensor([encoder_input_length], dtype=torch.int32).to(model.device)
 
     if not Path(onnx_file).exists():
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -459,9 +447,7 @@ def _get_feat_extract_output_lengths(input_lengths):
     # 8 = [100, ... 100]
     input_lengths_leave = input_lengths % 100  # [0, 0, ..., 0]
     feat_lengths = (input_lengths_leave - 1) // 2 + 1  # 0
-    output_lengths = (
-        ((feat_lengths - 1) // 2 + 1 - 1) // 2 + 1 + (input_lengths // 100) * 13
-    )
+    output_lengths = ((feat_lengths - 1) // 2 + 1 - 1) // 2 + 1 + (input_lengths // 100) * 13
     # output_lengths: tensor([13, 13, 13, 13, 13, 13, 13, 13], device='cuda:0')
     return output_lengths
 
@@ -498,9 +484,7 @@ def quant_model(args, stages: Tuple[str, ...] = ("prefill", "decode")):
     xh_model = MODELS.build(cfg.model)
 
     model = xh_model.get_hf_model()
-    assert isinstance(
-        xh_model, XHQwen3ASRLLMModel
-    ), f"Model must be XHQwen3ASRLLMModel, but got {type(xh_model)}"
+    assert isinstance(xh_model, XHQwen3ASRLLMModel), f"Model must be XHQwen3ASRLLMModel, but got {type(xh_model)}"
 
     xh_model.init_wrap_model(model.thinker.model)
 
@@ -571,9 +555,7 @@ def quant_model(args, stages: Tuple[str, ...] = ("prefill", "decode")):
     text_embed_lengths = embed_lengths + 21  # 21 is the text prompt length
 
     tokenizer = processor.tokenizer
-    final_inputs_embeds = torch.randn(
-        (1, text_embed_lengths, hidden_size), device=device, dtype=dtype
-    )
+    final_inputs_embeds = torch.randn((1, text_embed_lengths, hidden_size), device=device, dtype=dtype)
     print(f"final_inputs_embeds.shape: {final_inputs_embeds.shape}")
 
     seq_len = final_inputs_embeds.shape[1]
@@ -624,9 +606,7 @@ def quant_model(args, stages: Tuple[str, ...] = ("prefill", "decode")):
         else:
             new_args.append(arg)
     calib_data = new_args
-    ptq_quantize(
-        xh_model.quanted_model, [calib_data], PrecisionMode.ALIGNED, [exec_device]
-    )
+    ptq_quantize(xh_model.quanted_model, [calib_data], PrecisionMode.ALIGNED, [exec_device])
     logger.info("*************** Finished PTQ Quantize **************")
 
     xh_model.change_eval_type(EvalModelType.QUANTED_ALIGNED)
@@ -644,9 +624,7 @@ def quant_model(args, stages: Tuple[str, ...] = ("prefill", "decode")):
     key_names = [f"past_key_cache_{i}" for i in range(num_hidden_layers)]
     value_names = [f"past_value_cache_{i}" for i in range(num_hidden_layers)]
     input_names = base_inputs + key_names + value_names
-    xh_model.export_cfg = ConfigDict(
-        dict(input_names=input_names, output_names=["last_hidden_state"])
-    )
+    xh_model.export_cfg = ConfigDict(dict(input_names=input_names, output_names=["last_hidden_state"]))
 
     stage_batches = {
         "prefill": {
@@ -679,9 +657,7 @@ def quant_model(args, stages: Tuple[str, ...] = ("prefill", "decode")):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
             logger.info(f"past_seq_len: {stage_batches[stage]['past_seq_length'][0]}")
-            logger.info(
-                f"*************** Start exporting {stage} model ***************"
-            )
+            logger.info(f"*************** Start exporting {stage} model ***************")
 
         xh_model.set_input_sequence_length(stage_sequence_lengths[stage])
         xh_model = xh_model.to("cpu")
@@ -702,15 +678,11 @@ def quant_model(args, stages: Tuple[str, ...] = ("prefill", "decode")):
         )
 
         logger.info(f"save {stage} onnx model to {onnx_file}")
-        logger.info(
-            "*************** Finished exporting " + stage + " model ***************"
-        )
+        logger.info("*************** Finished exporting " + stage + " model ***************")
         meta_info[stage + "_onnx_file"] = str(Path(onnx_file).relative_to(cfg.work_dir))
 
         if args.gen_golden:
-            golden_inputs = flatten_model_inputs(
-                xh_model.prepare_inputs(stage_batches[stage])
-            )
+            golden_inputs = flatten_model_inputs(xh_model.prepare_inputs(stage_batches[stage]))
             generate_golden_data(onnx_file, onnx_dir, golden_inputs)
 
         xh_model.release_exported_model()
@@ -768,13 +740,9 @@ def quant_forcealigner(args):
     # =============== Key: Override wrap_cfg before init_wrap_model ===============
     full_seq_len = getattr(xh_model.wrap_cfg, "input_sequence_length", None)
     if full_seq_len is None:
-        full_seq_len = getattr(
-            model.config.thinker_config.text_config, "max_position_embeddings", None
-        )
+        full_seq_len = getattr(model.config.thinker_config.text_config, "max_position_embeddings", None)
     if full_seq_len is None:
-        raise ValueError(
-            "Unable to resolve input_sequence_length for forcealigner export"
-        )
+        raise ValueError("Unable to resolve input_sequence_length for forcealigner export")
     xh_model.wrap_cfg.num_logits_to_keep = 0
     xh_model.wrap_cfg.only_first_block = False
     xh_model.wrap_cfg.input_sequence_length = full_seq_len
@@ -836,9 +804,7 @@ def quant_forcealigner(args):
     meta_info.token_embedding_file = str(token_embedding_file.relative_to(cfg.work_dir))
 
     # ===== Construct prefill input =====
-    final_inputs_embeds = torch.randn(
-        (1, full_seq_len, hidden_size), device=device, dtype=torch.float16
-    )
+    final_inputs_embeds = torch.randn((1, full_seq_len, hidden_size), device=device, dtype=torch.float16)
 
     data_batch = {
         "input_embeds": final_inputs_embeds.half(),
@@ -874,9 +840,7 @@ def quant_forcealigner(args):
             new_args.extend(arg)
         else:
             new_args.append(arg)
-    ptq_quantize(
-        xh_model.quanted_model, [new_args], PrecisionMode.ALIGNED, [exec_device]
-    )
+    ptq_quantize(xh_model.quanted_model, [new_args], PrecisionMode.ALIGNED, [exec_device])
     logger.info("*************** Finished PTQ Quantize **************")
 
     xh_model.change_eval_type(EvalModelType.QUANTED_ALIGNED)

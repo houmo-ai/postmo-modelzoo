@@ -417,7 +417,7 @@ class Qwen3Asr:
         self.all_features_len = 0
         self.max_feature_one_loop = self.encode.get_input_info(self.encode.get_input_name(0)).shape[2]
         self.loop_count = 0
-        self.sampling_manager = SamplingManager(top_k=None, top_p=1.0, repetition_penalty=2.0)
+        self.sampling_manager = SamplingManager(top_k=None, top_p=1.0, repetition_penalty=1.0)
 
     def run_encode(self, inputs):
         encode_prep_start = time.perf_counter()

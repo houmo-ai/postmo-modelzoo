@@ -99,7 +99,7 @@ int main(int argc, char* argv[]) {
   houmo::StreamingDecoder decoder(qwen_model->tokenizer());
   houmo::SamplingParams params;
   params.top_k = 0;
-  params.repetition_penalty = 2.0f;
+  params.repetition_penalty = 1.0f;
   params.presence_penalty = 0.0f;
   qwen_ctx->set_sampler(params);
   qwen_ctx->Transcribe(audio_path, params,
