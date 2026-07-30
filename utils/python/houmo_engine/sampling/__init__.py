@@ -19,5 +19,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from .greedy import GreedySampler, GreedySamplingParams
+from .tts import Qwen3TtsSamplingParams
 
-__all__ = ["GreedySampler", "GreedySamplingParams"]
+__all__ = ["GreedySampler", "GreedySamplingParams", "Qwen3TtsSamplingParams"]

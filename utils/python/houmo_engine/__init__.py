@@ -33,6 +33,7 @@ __all__ = [
     "Qwen35Engine",
     "Qwen36MtpEngine",
     "Qwen3AsrEngine",
+    "Qwen3TtsEngine",
 ]
 
 
@@ -49,4 +50,8 @@ def __getattr__(name):
         from .engine.qwen3_asr import Qwen3AsrEngine
 
         return Qwen3AsrEngine
+    if name == "Qwen3TtsEngine":
+        from .engine.qwen3_tts import Qwen3TtsEngine
+
+        return Qwen3TtsEngine
     raise AttributeError(name)

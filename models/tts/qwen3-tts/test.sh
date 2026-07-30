@@ -84,6 +84,7 @@ if should_run_step "demo"; then
         python3 demo_base.py "${COMMON_MODEL_ARGS[@]}" "${COMMON_DEMO_ARGS[@]}"
     elif [[ "${MODEL_SIZE}" == "0.6b-customvoice" || "${MODEL_SIZE}" == "1.7b-customvoice" ]]; then
         python3 demo.py "${COMMON_MODEL_ARGS[@]}" "${COMMON_DEMO_ARGS[@]}"
+        python3 python/demo.py "${COMMON_MODEL_ARGS[@]}" "${COMMON_DEMO_ARGS[@]}"
     else
         echo "Unsupported MODEL_SIZE for demo step: ${MODEL_SIZE}" >&2
         echo "Supported values: 0.6b-base, 0.6b-customvoice, 1.7b-customvoice" >&2

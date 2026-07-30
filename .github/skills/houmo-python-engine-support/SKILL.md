@@ -1,6 +1,6 @@
 ---
 name: houmo-python-engine-support
-description: 将 imodelzoo 中已有的单文件 Python 推理 Demo 等价迁移到 `tools/common/houmo-python-engine` 的 Demo/Engine/Process/Module 新框架。Use when 用户要求迁移或重构现有 `demo.py`、`demo_mtp.py`、`demo_asr.py`，并需要保留原始 CLI、图执行顺序、Sampling、cache、流式输出和性能口径。
+description: 将 imodelzoo 中已有的单文件 Python 推理 Demo 等价迁移到 `utils/python/houmo_engine` 的 Demo/Engine/Process/Module 新框架。Use when 用户要求迁移或重构现有 `demo.py`、`demo_mtp.py`、`demo_asr.py`，并需要保留原始 CLI、图执行顺序、Sampling、cache、流式输出和性能口径。
 ---
 
 # 现有单文件 Demo 迁移到 Houmo Python Engine
@@ -46,8 +46,8 @@ description: 将 imodelzoo 中已有的单文件 Python 推理 Demo 等价迁移
 
 开始工作前必须阅读：
 
-1. `tools/common/houmo-python-engine/CLAUDE.md`
-2. `tools/common/houmo-python-engine/README.md`
+1. `utils/python/houmo_engine/CLAUDE.md`
+2. `utils/python/houmo_engine/README.md`
 3. 原始单文件 Demo
 4. 目标模型目录的 `config.yaml`、`test.sh`、`README.MD`
 5. 与目标任务最接近的标准实现
@@ -57,21 +57,21 @@ description: 将 imodelzoo 中已有的单文件 Python 推理 Demo 等价迁移
 ```text
 Qwen3.5 文本/图片
 ├── models/llm/qwen3.5/python/demo.py
-├── tools/common/houmo-python-engine/src/houmo_engine/engine/qwen3_5.py
-├── tools/common/houmo-python-engine/src/houmo_engine/process/qwen3_5/process.py
-└── tools/common/houmo-python-engine/src/houmo_engine/module/qwen3_5.py
+├── utils/python/houmo_engine/engine/qwen3_5.py
+├── utils/python/houmo_engine/process/qwen3_5/process.py
+└── utils/python/houmo_engine/module/qwen3_5.py
 
 Qwen3.6 MTP
 ├── models/llm/qwen3.5/python/demo_mtp.py
-├── tools/common/houmo-python-engine/src/houmo_engine/engine/qwen3_6_mtp.py
-├── tools/common/houmo-python-engine/src/houmo_engine/process/qwen3_6_mtp/process.py
-└── tools/common/houmo-python-engine/src/houmo_engine/module/qwen3_6_mtp.py
+├── utils/python/houmo_engine/engine/qwen3_6_mtp.py
+├── utils/python/houmo_engine/process/qwen3_6_mtp/process.py
+└── utils/python/houmo_engine/module/qwen3_6_mtp.py
 
 Qwen3-ASR
 ├── models/asr/qwen3-asr/python/demo.py
-├── tools/common/houmo-python-engine/src/houmo_engine/engine/qwen3_asr.py
-├── tools/common/houmo-python-engine/src/houmo_engine/process/qwen3_asr/process.py
-└── tools/common/houmo-python-engine/src/houmo_engine/module/qwen3_asr.py
+├── utils/python/houmo_engine/engine/qwen3_asr.py
+├── utils/python/houmo_engine/process/qwen3_asr/process.py
+└── utils/python/houmo_engine/module/qwen3_asr.py
 ```
 
 若本 Skill 与 `CLAUDE.md` 或当前源码不一致，以 `CLAUDE.md` 和当前源码为准。
@@ -258,10 +258,8 @@ MODEL_DIR = Path(__file__).resolve().parents[1]
 IMODELZOO_ROOT = Path(__file__).resolve().parents[4]
 ENGINE_SRC = (
     IMODELZOO_ROOT
-    / "tools"
-    / "common"
-    / "houmo-python-engine"
-    / "src"
+    / "utils"
+    / "python"
 )
 sys.path.insert(0, str(ENGINE_SRC))
 ```
@@ -342,7 +340,7 @@ Gate 2 完成标准：新 Demo 用户接口清晰，参数与原 Demo 对齐，`
 路径：
 
 ```text
-tools/common/houmo-python-engine/src/houmo_engine/process/<model_name>/
+utils/python/houmo_engine//process/<model_name>/
 ├── __init__.py
 └── process.py
 ```
@@ -416,7 +414,7 @@ Gate 3 完成标准：Process 纯 CPU、无 Runtime 依赖，并且给定相同�
 路径：
 
 ```text
-tools/common/houmo-python-engine/src/houmo_engine/module/<model_name>.py
+utils/python/houmo_engine/module/<model_name>.py
 ```
 
 ```python
@@ -489,7 +487,7 @@ Gate 4 完成标准：图签名、输入顺序、dtype、输出 shape、cache �
 路径：
 
 ```text
-tools/common/houmo-python-engine/src/houmo_engine/engine/<model_name>.py
+utils/python/houmo_engine/engine/<model_name>.py
 ```
 
 ```python
@@ -681,7 +679,7 @@ Generator 在 `yield` 时会暂停；如果 E2E 排除消费者等待，必须�
 ### 语法
 
 ```bash
-python -c 'from pathlib import Path; [compile(p.read_text(), str(p), "exec") for p in Path("tools/common/houmo-python-engine/src").rglob("*.py")]'
+python -c 'from pathlib import Path; [compile(p.read_text(), str(p), "exec") for p in Path("utils/python/houmo_engine").rglob("*.py")]'
 ```
 
 ### Demo help
@@ -806,7 +804,7 @@ cache 行为一致
 
 ## 文件和生成物
 
-公共引擎所有 `.py` 文件使用 2026 Apache-2.0 header。具体格式以 `tools/common/houmo-python-engine/CLAUDE.md` 为准。
+公共引擎所有 `.py` 文件使用 2026 Apache-2.0 header。具体格式以 `utils/python/houmo_engine/CLAUDE.md` 为准。
 
 不得提交：
 

@@ -31,6 +31,8 @@ class Stage(str, Enum):
     MTP_PREFILL = "mtp_prefill"
     DRAFT = "draft"
     VERIFY = "verify"
+    CODE_PREDICTOR_PREFILL = "code_predictor_prefill"
+    CODE_PREDICTOR_DECODE = "code_predictor_decode"
 
 
 @dataclass

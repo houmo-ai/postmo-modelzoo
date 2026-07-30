@@ -2,7 +2,7 @@
 #
 # File: __init__.py
 # Description:
-#   Houmo model Module exports.
+#   Qwen3-TTS Process exports.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,9 +18,16 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from .qwen3_5 import Qwen35Module
-from .qwen3_6_mtp import Qwen36MtpModule
-from .qwen3_asr import Qwen3AsrModule
-from .qwen3_tts import Qwen3TtsModule
+from .process import (
+    Qwen3TtsGenerationState,
+    Qwen3TtsPreparedRequest,
+    Qwen3TtsProcess,
+    build_assistant_text,
+)
 
-__all__ = ["Qwen35Module", "Qwen36MtpModule", "Qwen3AsrModule", "Qwen3TtsModule"]
+__all__ = [
+    "Qwen3TtsGenerationState",
+    "Qwen3TtsPreparedRequest",
+    "Qwen3TtsProcess",
+    "build_assistant_text",
+]
