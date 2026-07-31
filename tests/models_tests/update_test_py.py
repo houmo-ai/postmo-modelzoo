@@ -1,10 +1,8 @@
-# Copyright 2025 HOUMO AI
+# Copyright (c) 2025 HOUMO AI
 #
 # File: update_test_py.py
 # Description:
-#   Update test Python files with new model configurations.
-#   This script automatically generates test functions for new models based on their
-#   configuration files.
+#  Deterministic Pytest Entry-File Generator for Active Model Configurations.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,179 +18,364 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import os
-import json
-from glob import glob
+"""Deterministically generate model-flow pytest entry files from active configs."""
+
+from __future__ import annotations
+
+if __name__ == "__main__" and not __package__:
+    # Support direct execution (``python3 update_test_py.py``) despite the
+    # package-relative imports below: establish the package context and
+    # repository root on ``sys.path`` so they resolve.
+    # ``python3 -m tests.models_tests.update_test_py`` already sets
+    # ``__package__`` and skips this branch.
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    __package__ = "tests.models_tests"
+
+import argparse
+import difflib
+from dataclasses import dataclass
+from pathlib import Path
+
+from .model_workflow.flow_contracts import ModelFlow
+from .model_workflow.backend_flow_policies import FLOW_DEPENDENCY_RULES
+from .model_workflow.backend_flow_policies import FLOW_ORDER as FLOW_ORDER_POLICY
+from .model_workflow.model_config_repository import ModelConfig, ModelConfigRepository
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+CONFIG_REPOSITORY = ModelConfigRepository(SCRIPT_DIR / "model_configs")
+FLOW_ORDER = tuple(sorted(FLOW_ORDER_POLICY, key=FLOW_ORDER_POLICY.__getitem__))
+
+FLOW_DESCRIPTION = {
+    ModelFlow.GET_MODEL: ("downloading", "download"),
+    ModelFlow.QUANT: ("quantization", "quantize"),
+    ModelFlow.COMPILE: ("compilation", "compile"),
+    ModelFlow.DEMO: ("demo", "demo"),
+    ModelFlow.COMPARE: ("comparison", "compare"),
+    ModelFlow.EVAL: ("evaluation", "evaluate"),
+    ModelFlow.PERF: ("performance", "performance test"),
+}
 
 
-def _convert_model_name(model_name: str) -> str:
+@dataclass(frozen=True)
+class GeneratedCase:
+    """Immutable description of one pytest test function to be generated."""
+
+    config: ModelConfig
+    category: str
+    marker: str
+    function_name: str
+    flow: ModelFlow
+    supported_flows: frozenset[ModelFlow]
+
+
+def convert_model_name(model_name: str) -> str:
+    """Normalize a model name into a valid Python/pytest marker identifier."""
+    return model_name.replace("-", "_").replace(".", "dot")
+
+
+def flow_test_filename(flow: ModelFlow) -> str:
+    """Return the generated test-module filename for a flow.
+
+    ``GET_MODEL`` maps to ``test_get_models.py``; every other flow maps to
+    ``test_<flow>_models.py``.
     """
-    Convert model name to a valid Python identifier format.
+    if flow == ModelFlow.GET_MODEL:
+        return "test_get_models.py"
+    return f"test_{flow.value}_models.py"
 
-    Args:
-        model_name (str): Original model name that may contain special characters
 
-    Returns:
-        str: Converted model name suitable for use as a Python identifier
+def model_category(config: ModelConfig) -> str:
+    """Derive the model category (e.g. ``llm``, ``asr``) from its source directory."""
+    parts = config.model_dir.parts
+    if len(parts) < 2 or parts[0] != "models":
+        raise ValueError(f"Unexpected model_dir for {config.model_name}: {config.model_dir}")
+    return parts[1].lower()
+
+
+def supported_flows(config: ModelConfig) -> frozenset[ModelFlow]:
+    """Return the set of flows a model config declares across all its backends.
+
+    The synthetic ``demo_multibatch`` entry is excluded because it is a demo
+    variant, not a standalone flow. Unknown flow names (which can appear in
+    stale obsolete configs that skip active validation) are skipped rather than
+    raising, so one stale config cannot abort the whole generation.
     """
-    # example: deepseek-r1-qwen3-8b-->deepseek_r1_qwen3_8b
-    tmp_str = model_name.replace("-", "_")
-    res_str = tmp_str.replace(".", "dot")
-    return res_str
-
-
-def _append_model_to_txt(new_model: str) -> bool:
-    """
-    Append a new model name to the model_names.txt file.
-
-    Args:
-        new_model (str): New model name to add to the list
-
-    Returns:
-        bool: True if the model was successfully added or already existed, False otherwise
-    """
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = f"{script_dir}/model_names.txt"
-
-    if not os.path.exists(file_path):
-        print(f"Error: Not found {file_path}")
-        return False
-
-    existing_models = []
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            model = line.strip()
-            if model:
-                existing_models.append(model)
-
-    if new_model in existing_models:
-        print(f"✅ Model {new_model} already exists in {file_path}")
-        return True
-    else:
-        with open(file_path, "a+", encoding="utf-8") as f:
-            f.seek(0, 2)
-            if f.tell() > 0:
-                f.write("\n")
-            f.write(new_model)
-        print(f"✅ Model {new_model} has been successfully appended to {file_path}")
-        return True
-
-
-def _build_dependency_markers(model_info: dict) -> list[str]:
-    """
-    Build pytest markers from model dependencies field.
-
-    Rules:
-    - ndevice: use first element, e.g. [1, 4] -> pytest.mark.ndevice_1
-    - dev_mem: use first element, e.g. ["12g", "48g"] -> pytest.mark.dev_mem_12g
-    """
-    dependency_markers = []
-    dependencies = model_info.get("dependencies")
-    if not isinstance(dependencies, dict):
-        return dependency_markers
-
-    ndevice_values = dependencies.get("ndevice")
-    if isinstance(ndevice_values, list) and len(ndevice_values) > 0:
-        ndevice_value = str(ndevice_values[0]).strip()
-        if ndevice_value:
-            dependency_markers.append(f"ndevice_{ndevice_value}")
-
-    dev_mem_values = dependencies.get("dev_mem")
-    if isinstance(dev_mem_values, list) and len(dev_mem_values) > 0:
-        dev_mem_value = str(dev_mem_values[0]).strip().lower()
-        if dev_mem_value:
-            dependency_markers.append(f"dev_mem_{dev_mem_value}")
-
-    return dependency_markers
-
-
-def main():
-    """
-    Main function to scan model configurations and update test files.
-    """
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    model_cfg_dir = script_dir + "/model_configs"
-
-    # Python test file paths mapped to test flow types
-    py_path = {
-        "get_model": script_dir + "/test_get_models.py",
-        "quant": script_dir + "/test_quant_models.py",
-        "compile": script_dir + "/test_compile_models.py",
-        "demo": script_dir + "/test_demo_models.py",
-        "compare": script_dir + "/test_compare_models.py",
-        "eval": script_dir + "/test_eval_models.py",
-        "perf": script_dir + "/test_perf_models.py",
-    }
-
-    # Process each model configuration file
-    for file_path in glob(model_cfg_dir + "/*.json"):
-        if "template" in file_path:
-            continue
-        model_name = file_path.rsplit("/", 1)[-1][10:-5]
-
-        with open(file_path, "r", encoding="utf-8") as md_file:
-            model_info = json.load(md_file)
-
-        # Skip obsolete models
-        if model_info.get("obsolete"):
-            continue
-
-        # Get supported flows for both xh1 and xh2 backends
-        support_flow_xh1 = model_info["support_flow"].get("xh1", list())
-        support_flow_xh2 = model_info["support_flow"].get("xh2", list())
-        support_flow = list(set(support_flow_xh1 + support_flow_xh2))
-        model_type = model_info["model_dir"].split("/")[1]
-        model_name_new = _convert_model_name(model_name)
-        dependency_markers = _build_dependency_markers(model_info)
-
-        # Generate test functions for each supported flow
-        for flow_name in support_flow:
+    flows: set[ModelFlow] = set()
+    for backend in config.support_backend:
+        for flow_name in config.support_flow.get(backend, ()):
             if flow_name == "demo_multibatch":
                 continue
-
-            with open(py_path[flow_name], "r", encoding="utf-8") as file:
-                py_content = file.read()
-
-            func_name = "test_" + model_type + "_" + model_name_new + "_" + flow_name
-            if func_name in py_content:
+            try:
+                flows.add(ModelFlow(flow_name))
+            except ValueError:
+                # Stale/unknown flow name in an obsolete config; ignore it
+                # instead of crashing generation for every model.
                 continue
+    return frozenset(flows)
 
-            print(
-                f"Detect new model {model_name}-->{model_name_new}, support flow {support_flow}."
-            )
-            if not _append_model_to_txt(model_name_new):
-                print(f"Failed to add {model_name_new} into model_names.txt")
+
+def build_cases(
+    configs: tuple[ModelConfig, ...],
+) -> dict[ModelFlow, list[GeneratedCase]]:
+    """Build one :class:`GeneratedCase` per (model, supported flow) pair.
+
+    Returns a mapping from flow to the ordered list of cases for that flow.
+    Raises ``ValueError`` if two cases would produce the same function name.
+    """
+    result = {flow: [] for flow in FLOW_ORDER}
+    seen_names: set[str] = set()
+    for config in configs:
+        marker = convert_model_name(config.model_name)
+        try:
+            category = model_category(config)
+        except ValueError as error:
+            # Obsolete configs skip active validation, so a stale model_dir
+            # shape must not abort generation for every other model.
+            print(f"warning: skipping {config.model_name}: {error}")
+            continue
+        flows = supported_flows(config)
+        for flow in FLOW_ORDER:
+            if flow not in flows:
                 continue
+            function_name = f"test_{category}_{marker}_{flow.value}"
+            if function_name in seen_names:
+                raise ValueError(f"Duplicate generated test function: {function_name}")
+            seen_names.add(function_name)
+            result[flow].append(GeneratedCase(config, category, marker, function_name, flow, flows))
+    return result
 
-            print(f"Add {func_name} into {flow_name} python file")
-            with open(py_path[flow_name], "a", encoding="utf-8") as file:
-                if py_content and not py_content.endswith("\n"):
-                    file.write("\n")
 
-                file.write("\n\n")
-                file.write(f"@pytest.mark.{model_name_new}\n")
-                for dependency_marker in dependency_markers:
-                    file.write(f"@pytest.mark.{dependency_marker}\n")
-                file.write(f"@pytest.mark.{flow_name}\n")
-                if flow_name == "get_model":
-                    file.write(f"@pytest.mark.dependency(name='{func_name}')\n")
-                elif flow_name == "quant":
-                    file.write(
-                        f"@pytest.mark.dependency(name='{func_name}', depends_on=['test_get_models.py::test_{model_type}_{model_name_new}_get_model'])\n"
-                    )
-                elif flow_name == "compile" and "quant" in support_flow:
-                    file.write(
-                        f"@pytest.mark.dependency(name='{func_name}', depends_on=['test_quant_models.py::test_{model_type}_{model_name_new}_quant'])\n"
-                    )
-                elif flow_name == "compile" and "get_model" in support_flow:
-                    file.write(
-                        f"@pytest.mark.dependency(name='{func_name}', depends_on=['test_get_models.py::test_{model_type}_{model_name_new}_get_model'])\n"
-                    )
-                file.write(f"def {func_name}(setup_logging) -> None:\n")
-                file.write(f'    """{func_name}"""\n')
-                file.write(f"    model_name = '{model_name}'\n")
-                file.write(f"    _{flow_name}_func(model_name, setup_logging)\n")
+def render_header(flow: ModelFlow) -> str:
+    """Render the fixed header (license, imports, helper function) for a flow file."""
+    noun, verb = FLOW_DESCRIPTION[flow]
+    filename = flow_test_filename(flow)
+    helper = f"_{flow.value}_func"
+    executor = f"execute_{flow.value}_flow"
+    return f'''# Copyright (c) 2025 HOUMO AI
+#
+# File: {filename}
+# Description:
+#  Model {noun.title()} Tests Module.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Generated by update_test_py.py. Do not edit manually.
+
+import logging
+
+import pytest
+
+from .test_models_utils import {executor}
+
+
+logger = logging.getLogger(__name__)
+
+
+def {helper}(model_name: str, setup_logging) -> None:
+    """Execute model {noun} test for a specific model."""
+    logger.info("===> TEST START: test_%s_{flow.value}", model_name)
+    {executor}(model_name, setup_logging)
+'''
+
+
+def dependency_target(case: GeneratedCase) -> str | None:
+    """Return the ``file::function`` prerequisite this case should depend on, if any.
+
+    Picks the first declared prerequisite flow that the model actually supports.
+    """
+    for prerequisite in FLOW_DEPENDENCY_RULES[case.flow]:
+        if prerequisite not in case.supported_flows:
+            continue
+        function_name = f"test_{case.category}_{case.marker}_{prerequisite.value}"
+        return f"{flow_test_filename(prerequisite)}::{function_name}"
+    return None
+
+
+def dependency_name(case: GeneratedCase) -> str:
+    """Return the ``file::function`` identity used as this case's dependency name."""
+    return f"{flow_test_filename(case.flow)}::{case.function_name}"
+
+
+def render_case(case: GeneratedCase) -> str:
+    """Render a single test function (markers, signature, helper call) as text."""
+    markers = [f"@pytest.mark.{case.marker}"]
+    dependencies = case.config.dependencies
+    ndevice = dependencies.get("ndevice") if isinstance(dependencies, dict) else None
+    dev_mem = dependencies.get("dev_mem") if isinstance(dependencies, dict) else None
+    if isinstance(ndevice, list) and ndevice:
+        markers.append(f"@pytest.mark.ndevice_{ndevice[0]}")
+    if isinstance(dev_mem, list) and dev_mem:
+        markers.append(f"@pytest.mark.dev_mem_{str(dev_mem[0]).lower()}")
+    markers.append(f"@pytest.mark.{case.flow.value}")
+
+    target = dependency_target(case)
+    if case.flow == ModelFlow.GET_MODEL:
+        markers.append(f'@pytest.mark.dependency(name="{dependency_name(case)}")')
+    elif target is not None:
+        markers.append(
+            "@pytest.mark.dependency(\n" f'    name="{dependency_name(case)}",\n' f'    depends_on=["{target}"],\n' ")"
+        )
+
+    helper = f"_{case.flow.value}_func"
+    body = [
+        *markers,
+        f"def {case.function_name}(setup_logging) -> None:",
+        f'    """{case.function_name}"""',
+        f'    {helper}("{case.config.model_name}", setup_logging)',
+    ]
+    return "\n".join(body)
+
+
+def render_flow_file(flow: ModelFlow, cases: list[GeneratedCase]) -> str:
+    """Assemble the full text of one flow's test file from header and cases."""
+    sections = [render_header(flow).rstrip()]
+    sections.extend(render_case(case) for case in cases)
+    return "\n\n\n".join(sections) + "\n"
+
+
+def generated_outputs() -> dict[Path, str]:
+    """Generate the full set of output files and their expected contents.
+
+    Obsolete configs are included so toggling the obsolete flag does not rewrite
+    the test surface; runtime handlers turn obsolete cases into pytest skips.
+    """
+    all_configs = tuple(CONFIG_REPOSITORY.iter_configs(include_obsolete=True))
+    # Keep generated cases stable when a model is temporarily marked obsolete.
+    # Runtime handlers already turn obsolete cases into pytest skips; removing
+    # them here would make toggling the flag rewrite the test surface.
+    cases = build_cases(all_configs)
+    outputs = {SCRIPT_DIR / flow_test_filename(flow): render_flow_file(flow, cases[flow]) for flow in FLOW_ORDER}
+    # Keep obsolete model markers registered as well. Both the marker list and
+    # the generated cases are derived from the complete configuration set.
+    markers = sorted({convert_model_name(config.model_name) for config in all_configs})
+    outputs[SCRIPT_DIR / "model_names.txt"] = "\n".join(markers) + "\n"
+    return outputs
+
+
+def _test_function_names(text: str) -> set[str]:
+    """Extract the set of ``test_*`` function names defined in a file's text."""
+    import re
+
+    return set(re.findall(r"^def (test_\w+)\(", text, re.M))
+
+
+def _summarize_outdated(path: Path, actual: str, expected: str) -> dict:
+    """Summarize a single out-of-date generated file without dumping its diff."""
+    diff = list(
+        difflib.unified_diff(
+            actual.splitlines(),
+            expected.splitlines(),
+            fromfile=str(path),
+            tofile=f"{path} (generated)",
+            lineterm="",
+        )
+    )
+    hunks = sum(1 for line in diff if line.startswith("@@"))
+    added, removed = 0, 0
+    for line in diff:
+        if line.startswith("+") and not line.startswith("+++"):
+            added += 1
+        elif line.startswith("-") and not line.startswith("---"):
+            removed += 1
+
+    actual_names = _test_function_names(actual)
+    expected_names = _test_function_names(expected)
+    return {
+        "hunks": hunks,
+        "added_lines": added,
+        "removed_lines": removed,
+        "new_funcs": sorted(expected_names - actual_names),
+        "gone_funcs": sorted(actual_names - expected_names),
+    }
+
+
+def check_outputs(outputs: dict[Path, str]) -> bool:
+    """Compare generated outputs against files on disk and print a summary.
+
+    Returns ``True`` when every output matches its file. Prints a compact
+    per-file report (hunk counts, line deltas, added/removed test functions)
+    instead of a full unified diff.
+    """
+    up_to_date, outdated = _classify_outputs(outputs)
+    _print_output_summary(up_to_date, outdated)
+    return not outdated
+
+
+def _classify_outputs(outputs: dict[Path, str]):
+    """Split generated outputs into matching and stale files."""
+    up_to_date = []
+    outdated = []
+    for path, expected in outputs.items():
+        actual = path.read_text(encoding="utf-8") if path.exists() else ""
+        if _output_matches(actual, expected):
+            up_to_date.append(path)
+        else:
+            outdated.append((path, actual, expected))
+    return up_to_date, outdated
+
+
+def _print_output_summary(up_to_date, outdated) -> None:
+    """Print compact status information for generated outputs."""
+    if up_to_date:
+        print(f"up-to-date ({len(up_to_date)}):")
+        for path in up_to_date:
+            print(f"  = {path.name}")
+    if not outdated:
+        return
+    print(f"\nout-of-date ({len(outdated)}):")
+    for path, actual, expected in outdated:
+        _print_outdated_file(path, actual, expected)
+    print("\nRe-run without --check to apply the changes above.")
+
+
+def _print_outdated_file(path: Path, actual: str, expected: str) -> None:
+    """Print one stale generated file and its compact diff summary."""
+    info = _summarize_outdated(path, actual, expected)
+    print(f"  ~ {path.name}: {info['hunks']} hunks, " f"+{info['added_lines']}/-{info['removed_lines']} lines")
+    if info["new_funcs"]:
+        print(f"      to add: {', '.join(info['new_funcs'])}")
+    if info["gone_funcs"]:
+        print(f"      to remove: {', '.join(info['gone_funcs'])}")
+
+
+def _output_matches(actual: str, expected: str) -> bool:
+    """Return whether one generated file already contains expected content."""
+    return actual == expected
+
+
+def write_outputs(outputs: dict[Path, str]) -> None:
+    """Write every generated output to disk, logging each path written."""
+    for path, content in outputs.items():
+        path.write_text(content, encoding="utf-8")
+        print(f"generated {path}")
+
+
+def main() -> int:
+    """Entry point: ``--check`` verifies outputs are up to date, otherwise writes them."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--check", action="store_true", help="fail if generated files are out of date")
+    args = parser.parse_args()
+    outputs = generated_outputs()
+    if args.check:
+        return 0 if check_outputs(outputs) else 1
+    write_outputs(outputs)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

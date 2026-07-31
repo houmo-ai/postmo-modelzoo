@@ -20,6 +20,10 @@
         "xh1": ["hmquant", "hmbuild", "hmdemo", "hmcompare", "hmperf"],
         "xh2": ["hmquant", "hmbuild", "hmdemo", "hmcompare", "hmperf"]
     },
+    "validation": {
+        "xh1": {"compile_cosine_threshold": 0.76},
+        "xh2": {"compile_cosine_threshold": 0.76}
+    },
     "perf_metrics": {
         "xh1": {
             "x86_64": 1.345

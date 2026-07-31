@@ -26,19 +26,18 @@
     },
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "hmm", "hmm"],
-            "download_dir": ["cached_models", "cached_models", "cached_models"],
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2_32k",
-                "cached_models/hmm_xh2_32k_ms"
+                "cached_models/hmm_xh2_32k"
             ],
-            "source_type": [null, null, "modelscope"],
-            "model_name": ["qwen3", "qwen3", "qwen3"],
-            "model_size": ["30b-a3b", "30b-a3b", "30b-a3b"],
-            "batch": [null, null, null],
-            "context_length": [null, "32k", "32k"],
-            "ndevice": [null, null, null]
+            "source_type": [null, null],
+            "model_name": ["qwen3", "qwen3"],
+            "model_size": ["30b-a3b", "30b-a3b"],
+            "batch": [null, null],
+            "context_length": [null, "32k"],
+            "ndevice": [null, null]
         }
     },
     "quant_params": {

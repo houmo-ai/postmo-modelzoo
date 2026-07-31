@@ -2,10 +2,7 @@
 #
 # File: test_apis_utils.py
 # Description:
-#   APIs test utilities module.
-#   This module provides utility functions for executing API tests for different examples.
-#   It handles example configuration loading, command generation, model downloading,
-#   and execution of both Python and C++ demos with proper error handling and logging.
+#  API Example Orchestration Using Shared Runtime Infrastructure.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,29 +18,47 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import pytest
-import os
+from __future__ import annotations
+
+import json
 import logging
-import shutil
-from ..tests_utils.tests_common_utils import *
-from ..tests_utils.tests_pyvenv_utils import install_py_venv, VENV_NAME
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+
+from ..tests_utils.command_execution import (
+    CommandExecutionError,
+    CommandResult,
+    CommandRunner,
+    CommandSpec,
+    output_reports_failure,
+)
+from ..tests_utils.platform_device import (
+    check_device_info,
+    check_vpu_status,
+    get_platform,
+)
+from ..tests_utils.pytest_support import (
+    MarkerConfigurationError,
+    device_markers_from_request,
+)
+from ..tests_utils.python_environment import prepare_python_environment
+from ..tests_utils.resource_lock import ModelResourceLock
+from ..tests_utils.runtime_context import TCaseType, TestRuntimeContext
+from ..tests_utils.workspace import WorkspaceManager, WorkspaceOwnershipError
 
 logger = logging.getLogger(__name__)
-script_dir = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 
-def _load_example_cfg(example_name: str) -> dict:
-    """
-    Load example configuration from JSON file.
-
-    Args:
-        example_name (str): Name of the example whose configuration needs to be loaded
-
-    Returns:
-        dict: Configuration dictionary loaded from the JSON file, or None if file doesn't exist
-    """
-    example_cfg_path = script_dir + "/apis_configs/apis_cfg_" + example_name + ".json"
-    return load_json(example_cfg_path)
+def _load_example_cfg(example_name: str) -> dict | None:
+    """Load one API example configuration locally to the API suite."""
+    path = SCRIPT_DIR / "apis_configs" / f"apis_cfg_{example_name}.json"
+    if not path.is_file():
+        return None
+    with path.open("r", encoding="utf-8") as stream:
+        return json.load(stream)
 
 
 def _generate_cmds(
@@ -52,256 +67,352 @@ def _generate_cmds(
     max_core_num: int = 0,
     start_idx: int = 0,
     name_prefix: str = "",
-) -> list:
-    """
-    Generate command lists with different parameter combinations.
-
-    Args:
-        cmd_header (list): Base command elements (executable and common parameters)
-        params_dict (dict): Dictionary containing parameter names and their possible values
-        max_core_num (int): Maximum allowed core number (0 means no limit)
-
-    Returns:
-        list: List of command lists with different parameter combinations
-    """
+) -> list[list[str]]:
+    """Preserve the API suite's column-oriented parameter expansion."""
     cmd_list = [] if start_idx == 0 else [cmd_header]
-
     idx = start_idx
-    flag = True
-    while flag:
-        flag = False
-        tmp_cmd_list = []
-        for param_name, param_list in params_dict.items():
-            if (
-                param_name in ["defines", "envs"]
-                or len(param_list) <= idx
-                or param_list[idx] == "default"
-                or param_list[idx] is None
-            ):
-                continue
-            if (
-                max_core_num > 0
-                and param_name == "ncore"
-                and param_list[idx] != "default"
-                and param_list[idx] is not None
-                and int(param_list[idx]) > max_core_num
-            ):
-                continue
-            if param_name == "name":
-                name_val = (
-                    (name_prefix + param_list[idx]) if name_prefix else param_list[idx]
-                )
-                tmp_cmd_list += [name_val]
-            elif param_name.startswith("#"):
-                tmp_cmd_list += [param_list[idx]]
-            else:
-                params_str = "--" + param_name
-                if param_name.startswith("-"):
-                    params_str = param_name
-                if isinstance(param_list[idx], bool):
-                    if param_list[idx] is True:
-                        tmp_cmd_list += [params_str]
-                else:
-                    tmp_cmd_list += [params_str, param_list[idx]]
-            flag = True
-        if tmp_cmd_list or flag is True:
-            tmp_cmd_list = cmd_header + tmp_cmd_list
-            cmd_list.append(tmp_cmd_list)
+    active = True
+    while active:
+        options, active = _generate_case_options(params_dict, idx, max_core_num=max_core_num, name_prefix=name_prefix)
+        if options or active:
+            cmd_list.append([*cmd_header, *options])
         idx += 1
-
     return cmd_list
 
 
-def _compile_cpp_exec(example_dir: str, log_file: str, defines: list) -> None:
-    """
-    Compile C++ executable for the example.
+def _generate_case_options(
+    params_dict: dict,
+    index: int,
+    *,
+    max_core_num: int,
+    name_prefix: str,
+) -> tuple[list[str], bool]:
+    """Render one parameter column index and report whether it was active."""
+    options: list[str] = []
+    active = False
+    for param_name, param_list in params_dict.items():
+        value = _parameter_value(param_name, param_list, index, max_core_num)
+        if value is _MISSING:
+            continue
+        rendered = _render_api_value(param_name, value, name_prefix)
+        if rendered:
+            options.extend(rendered)
+            active = True
+    return options, active
 
-    Args:
-        example_dir (str): Directory containing the example source code
-        log_file (str): Path to the log file for compilation output
-        defines (list): List of CMake definitions to pass during compilation
-    """
-    os.makedirs("./build", exist_ok=True)
-    os.chdir(example_dir + "/build")
 
-    cmake_prefix = "-DCMAKE_INSTALL_PREFIX=" + example_dir
-    cmake_build_type = "-DCMAKE_BUILD_TYPE=Release"
-    cmake_cmd_list = (
-        ["cmake", "build", cmake_prefix, cmake_build_type] + defines + [".."]
+_MISSING = object()
+
+
+def _parameter_value(param_name: str, values, index: int, max_core_num: int):
+    """Return one active parameter value or the internal missing sentinel."""
+    if param_name in {"defines", "envs"} or len(values) <= index:
+        return _MISSING
+    value = values[index]
+    if value is None or value == "default":
+        return _MISSING
+    if max_core_num > 0 and param_name == "ncore" and int(value) > max_core_num:
+        return _MISSING
+    return value
+
+
+def _render_api_value(param_name: str, value, name_prefix: str) -> list[str]:
+    """Render one API parameter value as command-line tokens."""
+    if param_name == "name":
+        return [f"{name_prefix}{value}" if name_prefix else str(value)]
+    if param_name.startswith("#"):
+        return [str(value)]
+    option = param_name if param_name.startswith("-") else f"--{param_name}"
+    if isinstance(value, bool):
+        return [option] if value else []
+    return [option, str(value)]
+
+
+def _api_command(
+    name: str,
+    argv: list[str] | tuple[str, ...],
+    *,
+    cwd: Path,
+    log_file: Path | None,
+) -> CommandSpec:
+    return CommandSpec(
+        name,
+        tuple(str(value) for value in argv),
+        cwd=cwd,
+        allow_nonzero_exit=True,
+        log_file=log_file,
+        mirror_to_console=True,
+        timestamp_log_lines=True,
+        suppressed_display_substrings=("MB/s",),
     )
-    execute_test_cmd(cmake_cmd_list, log_file, True)
-    execute_test_cmd(["make", "-j"], log_file, True)
-    execute_test_cmd(["make", "install"], log_file, True)
 
-    os.chdir(example_dir)
+
+def _command_succeeded(result: CommandResult, *, check_output: bool = True) -> bool:
+    return result.succeeded and (not check_output or not output_reports_failure(result.combined_output))
+
+
+def _require_success(result: CommandResult, *, check_output: bool = True) -> None:
+    if _command_succeeded(result, check_output=check_output):
+        return
+    raise CommandExecutionError(
+        f"API command failed: {result.command.name}",
+        details={
+            "argv": result.command.argv,
+            "return_code": result.return_code,
+            "stdout_tail": result.stdout[-2000:],
+            "stderr_tail": result.stderr[-2000:],
+        },
+    )
+
+
+def _compile_cpp_exec(
+    workspace: Path,
+    runner: CommandRunner,
+    log_file: Path,
+    defines: list,
+) -> None:
+    """Compile one C++ example case without changing process cwd."""
+    build_dir = workspace / "build"
+    build_dir.mkdir(parents=True, exist_ok=True)
+    cmake = [
+        "cmake",
+        "build",
+        f"-DCMAKE_INSTALL_PREFIX={workspace}",
+        "-DCMAKE_BUILD_TYPE=Release",
+        *defines,
+        "..",
+    ]
+    for name, argv in (
+        ("api-cmake", cmake),
+        ("api-make", ["make", "-j"]),
+        ("api-make-install", ["make", "install"]),
+    ):
+        _require_success(runner.run(_api_command(name, argv, cwd=build_dir, log_file=log_file)))
 
 
 def _test_get_model(
-    example_info: dict, platform: str, log_file: str, model_set_dir: str
+    example_info: dict,
+    platform_name: str,
+    model_set_dir: Path,
+    *,
+    backend: str,
+    workspace: Path,
+    runner: CommandRunner,
 ) -> bool:
-    """
-    Download model for the example with proper resource locking.
-
-    Args:
-        example_info (dict): Dictionary containing example configuration information
-        platform (str): Target platform for the test
-        log_file (str): Path to the log file for download output
-
-    Returns:
-        bool: True if model download was successful, False otherwise
-    """
-    get_model_flag = True
-    max_core_num = 2 if platform == "aarch64" else 0
-    params_dict = example_info["get_model_params"][HOUMO_BACKEND]
-    cmd_header = ["python3", "get_model.py", "--model_dir", model_set_dir]
-    cmd_list = _generate_cmds(cmd_header, params_dict, max_core_num, start_idx=1)
-    logger.info(f"Get model cmds: {cmd_list}")
-
-    lock_file = model_set_dir + "/lock.lock"
+    """Run all parameterized API get-model cases under one resource lock."""
+    max_core_num = 2 if platform_name == "aarch64" else 0
+    params_dict = example_info["get_model_params"][backend]
+    commands = _generate_cmds(
+        ["python3", "get_model.py", "--model_dir", str(model_set_dir)],
+        params_dict,
+        max_core_num,
+        start_idx=1,
+    )
+    logger.info("Get model cmds: %s", commands)
+    succeeded = True
     with ModelResourceLock(
-        lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
+        model_set_dir / "lock.lock",
+        ModelResourceLock.LockMode.WRITE,
+        "model downloading",
     ):
-        for tmp_cmd_list in cmd_list:
-            exec_flag, _ = execute_test_cmd(tmp_cmd_list)
-            if exec_flag is False:
-                get_model_flag = False
-                logger.error(f"Get Model Test Failed, test cmd: {tmp_cmd_list}.")
+        for index, argv in enumerate(commands):
+            result = runner.run(_api_command(f"api-get-model[{index}]", argv, cwd=workspace, log_file=None))
+            if not _command_succeeded(result):
+                succeeded = False
+                logger.error("Get Model Test Failed, test cmd: %s", argv)
+    return succeeded
 
-    return get_model_flag
+
+def _execute_run_sh_if_present(
+    source_dir: Path,
+    *,
+    runtime: TestRuntimeContext,
+    runner: CommandRunner,
+    manager: WorkspaceManager,
+    log_file: Path,
+) -> None:
+    """Run the mutating run.sh stage in its own disposable workspace."""
+    if not runtime.is_asic or not (source_dir / "run.sh").is_file():
+        return
+    with manager.open(source_dir, phase="apis_run_sh") as workspace:
+        result = runner.run(
+            _api_command(
+                "api-run-sh",
+                ["bash", "run.sh"],
+                cwd=workspace,
+                log_file=log_file,
+            )
+        )
+        _require_success(result)
 
 
-def execute_apis_examples(example_name: str, setup_logging):
-    """
-    Execute API examples for the specified example name.
+def execute_apis_examples(example_name: str, setup_logging) -> None:
+    """Execute one API example with explicit runtime and owned workspaces."""
+    log_file_value, pytest_request = setup_logging
+    log_file = Path(log_file_value)
+    try:
+        markers = device_markers_from_request(pytest_request)
+    except MarkerConfigurationError as error:
+        pytest.skip(str(error))
 
-    Args:
-        example_name (str): Name of the example to execute
-        setup_logging: pytest fixture for setting up logging configuration
-
-    Raises:
-        AssertionError: If the example folder doesn't exist or if tests fail
-    """
-    log_file, pytest_request = setup_logging
-    marker_vals = check_device_markers(pytest_request)
-    dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
-    logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
+    runtime = TestRuntimeContext.from_environment()
+    runner = CommandRunner()
+    manager = WorkspaceManager()
+    logger.info(
+        "log_file: %s, dev_res_dir: %s",
+        log_file,
+        markers.result_directory_name,
+    )
 
     example_info = _load_example_cfg(example_name)
+    platform_name = _validate_example_support(example_name, example_info, runtime, runner)
+
+    source_dir = (SCRIPT_DIR / "../.." / example_info["example_dir"]).resolve()
+    if not source_dir.is_dir():
+        raise AssertionError(f"The {example_name} example folder doesn't exist.")
+
+    try:
+        _execute_run_sh_if_present(source_dir, runtime=runtime, runner=runner, manager=manager, log_file=log_file)
+        _execute_api_workspace(
+            example_name,
+            example_info,
+            platform_name,
+            runtime=runtime,
+            runner=runner,
+            manager=manager,
+            source_dir=source_dir,
+            log_file=log_file,
+        )
+    except (CommandExecutionError, WorkspaceOwnershipError) as error:
+        pytest.fail(error.format_diagnostic(), pytrace=False)
+
+    logger.info("Apis Example Test Success!")
+
+
+def _validate_example_support(example_name, example_info, runtime, runner):
+    """Validate config, platform, device, and dependency prerequisites."""
     if (
         example_info is None
         or example_info["obsolete"] is True
-        or HOUMO_BACKEND not in example_info["support_backend"]
-        or example_info["support_backend"][HOUMO_BACKEND] is None
+        or runtime.backend not in example_info["support_backend"]
+        or example_info["support_backend"][runtime.backend] is None
     ):
-        logger.warning("Not support %s testing.", example_name)
-        pytest.skip("This testcase is not support.")
-    if get_test_type() == TCaseType.SEPARATE_NO_INFER:
-        skip_msg = f"Skip apis testcase {example_name} in the SEPARATE NO INFER stage."
-        logger.warning(skip_msg)
-        pytest.skip(skip_msg)
-    platform = get_platform(example_info["support_platform"])
-    if platform is None:
-        logger.warning(f"Not support {example_name} testing on {platform}.")
-        pytest.skip(f"This testcase is not support on {platform}.")
+        pytest.skip("This testcase is not supported.")
+    if runtime.test_type == TCaseType.SEPARATE_NO_INFER:
+        pytest.skip(f"Skip apis testcase {example_name} in the SEPARATE NO INFER stage.")
+    platform_name = get_platform(example_info["support_platform"])
+    if platform_name is None:
+        pytest.skip("This testcase is not supported on the current platform.")
     if (
-        is_asic_platform()
-        and platform == "aarch64"
+        runtime.is_asic
+        and platform_name == "aarch64"
         and not check_device_info(
-            example_info["support_core_num"].get(HOUMO_BACKEND, None)
+            example_info["support_core_num"].get(runtime.backend),
+            backend=runtime.backend,
+            runner=runner,
         )
     ):
-        logger.warning(f"Not support {example_name} testing on 2cores device.")
-        pytest.skip("This testcase is not support on 2cores device.")
+        pytest.skip("This testcase is not supported on the current core count.")
+    dependencies = example_info.get("dependency") or ()
+    if isinstance(dependencies, str):
+        dependencies = (dependencies,)
+    if "vpu" in dependencies and (not runtime.is_asic or not check_vpu_status(backend=runtime.backend, runner=runner)):
+        pytest.skip("This testcase needs the VPU driver.")
+    return platform_name
 
-    if (
-        example_info.get("dependency", None) is not None
-        and "vpu" in example_info["dependency"]
-        and (not is_asic_platform() or check_vpu_status() is False)
-    ):
-        logger.warning(f"{example_name} testcase needs vpu driver.")
-        pytest.skip("This testcase needs vpu driver.")
 
-    example_dir = script_dir + "/../../" + example_info["example_dir"]
-    if not os.path.exists(example_dir):
-        assert False, f"The {example_name} example folder doesn't exist."
-    prepare_test_folder(example_dir, "apis")
-    current_folder = os.getcwd()
-    logger.info("current folder: %s.", current_folder)
-
-    run_sh_flag = True
-    if is_asic_platform() and os.path.exists(f"{current_folder}/run.sh"):
-        logger.info("Ready to execute run.sh in folder: %s.", current_folder)
-
-        run_sh_flag, _ = execute_test_cmd(["bash", "run.sh"], log_file, False, True)
-
-        logger.warning(f"remove folder: {current_folder}.")
-        shutil.rmtree(current_folder)
-        assert run_sh_flag is True, "Execute run.sh Failed!"
-
-        prepare_test_folder(example_dir, "apis")
-        current_folder = os.getcwd()
-        logger.info(
-            f"run.sh ret is {run_sh_flag}, change pytest folder, current folder: {current_folder}."
+def _execute_api_workspace(
+    example_name,
+    example_info,
+    platform_name,
+    *,
+    runtime,
+    runner,
+    manager,
+    source_dir,
+    log_file,
+) -> None:
+    """Run get-model and all configured API demo implementations."""
+    with manager.open(source_dir, phase="apis_example") as workspace:
+        logger.info("workspace: %s", workspace)
+        model_set_dir = runtime.models_path / example_info["example_dir"]
+        get_model_ok = _execute_api_get_model(
+            example_name, example_info, platform_name, runtime, runner, workspace, model_set_dir
         )
+        demo_types = example_info["support_backend"][runtime.backend]
+        py_ok = _execute_python_api_demo(example_info, runtime, runner, workspace, log_file, demo_types)
+        cpp_ok = _execute_cpp_api_demo(example_info, runtime, runner, workspace, log_file, demo_types)
+        assert get_model_ok and py_ok and cpp_ok, "Apis Example Test Failed!"
 
-    model_set_dir = os.path.join(MODELS_PATH, example_info["example_dir"])
-    if (
-        example_info.get("get_model_params", None) is None
-        or example_info["get_model_params"].get(HOUMO_BACKEND, None) is None
-    ):
-        cmd_list = ["python3", "get_model.py"]
-        if example_name not in ["qwen3", "qwen3_multibatch", "qwen3_speculative"]:
-            cmd_list += ["--model_dir", model_set_dir]
-        lock_file = model_set_dir + "/lock.lock"
-        with ModelResourceLock(
-            lock_file, ModelResourceLock.LockMode.WRITE, "model downloading"
-        ):
-            execute_test_cmd(cmd_list, "", True)
-    else:
-        get_model_flag = _test_get_model(
-            example_info, platform, log_file, model_set_dir=model_set_dir
+
+def _execute_api_get_model(
+    example_name,
+    example_info,
+    platform_name,
+    runtime,
+    runner,
+    workspace,
+    model_set_dir,
+) -> bool:
+    """Run the configured or default get-model stage."""
+    backend_params = (example_info.get("get_model_params") or {}).get(runtime.backend)
+    if backend_params is not None:
+        return _test_get_model(
+            example_info,
+            platform_name,
+            model_set_dir,
+            backend=runtime.backend,
+            workspace=workspace,
+            runner=runner,
         )
-        if get_model_flag is False:
-            logger.error(f"{example_name} Get model Failed!")
+    argv = ["python3", "get_model.py"]
+    if example_name not in {"qwen3", "qwen3_multibatch", "qwen3_speculative"}:
+        argv.extend(("--model_dir", str(model_set_dir)))
+    with ModelResourceLock(
+        model_set_dir / "lock.lock",
+        ModelResourceLock.LockMode.WRITE,
+        "model downloading",
+    ):
+        _require_success(runner.run(_api_command("api-get-model-default", argv, cwd=workspace, log_file=None)))
+    return True
 
-    demo_types = example_info["support_backend"][HOUMO_BACKEND]
-    # run python demo
-    py_flag = True
-    if "python" in demo_types:
-        # install python requirements
-        venv_flag = install_py_venv(current_folder, log_file)
-        python_exe = "python3"
-        if venv_flag:
-            python_exe = f"{VENV_NAME}/bin/python3"
 
-        params_dict = example_info["py_example_params"]
-        cmd_header = [python_exe]
-        cmd_list = _generate_cmds(cmd_header, params_dict)
-        logger.info(f"python exe cmd_list: {cmd_list}")
-        for tmp_cmd_list in cmd_list:
-            exec_flag, _ = execute_test_cmd(
-                tmp_cmd_list, log_file, pyvenv_flag=venv_flag
-            )
-            py_flag = False if exec_flag is False else py_flag
-        if py_flag is False:
-            logger.error("Python example execution failed!")
+def _execute_python_api_demo(example_info, runtime, runner, workspace, log_file, demo_types):
+    """Run all configured Python API demo cases."""
+    if "python" not in demo_types:
+        return True
+    python = prepare_python_environment(
+        workspace,
+        (workspace / "requirements.txt",),
+        base_environment=runtime.environment,
+        log_file=log_file,
+    )
+    commands = _generate_cmds([python.executable], example_info["py_example_params"])
+    logger.info("python exe cmd_list: %s", commands)
+    succeeded = True
+    for index, argv in enumerate(commands):
+        spec = replace(
+            _api_command(f"api-python[{index}]", argv, cwd=workspace, log_file=log_file),
+            environment=python.environment,
+        )
+        succeeded &= _command_succeeded(runner.run(spec))
+    return succeeded
 
-    # run c++ demo
-    cpp_flag = True
-    if "cpp" in demo_types:
-        params_dict = example_info["cpp_example_params"]
-        compile_defines = params_dict.get("defines", [])
-        cmd_header = []
-        cmd_list = _generate_cmds(cmd_header, params_dict, name_prefix="./")
-        logger.info(f"cpp exe cmd_list: {cmd_list}")
-        for idx, tmp_cmd_list in enumerate(cmd_list):
-            defines = compile_defines[idx] if len(compile_defines) > 0 else []
-            _compile_cpp_exec(current_folder, log_file, defines)
-            exec_flag, _ = execute_test_cmd(tmp_cmd_list, log_file)
-            cpp_flag = False if exec_flag is False else cpp_flag
-        if cpp_flag is False:
-            logger.error("C++ example execution failed!")
 
-    shutil.rmtree(os.getcwd())
-    assert py_flag is True and cpp_flag is True, "Apis Example Test Failed!"
-    logger.info("Apis Example Test Success!")
+def _execute_cpp_api_demo(example_info, runtime, runner, workspace, log_file, demo_types):
+    """Compile and run all configured C++ API demo cases."""
+    if "cpp" not in demo_types:
+        return True
+    params = example_info["cpp_example_params"]
+    defines = params.get("defines", [])
+    commands = _generate_cmds([], params, name_prefix="./")
+    logger.info("cpp exe cmd_list: %s", commands)
+    succeeded = True
+    for index, argv in enumerate(commands):
+        _compile_cpp_exec(workspace, runner, log_file, defines[index] if defines else [])
+        result = runner.run(_api_command(f"api-cpp[{index}]", argv, cwd=workspace, log_file=log_file))
+        succeeded &= _command_succeeded(result)
+    return succeeded
+
+
+__all__ = ["execute_apis_examples"]

@@ -21,7 +21,7 @@
 
 import pytest
 import logging
-from .test_hmatc_utils import *
+from .test_hmatc_utils import execute_hmatc_cmd
 
 logger = logging.getLogger(__name__)
 

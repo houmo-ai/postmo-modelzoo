@@ -24,21 +24,20 @@
     },
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "hmm", "hmm"],
-            "download_dir": ["cached_models", "cached_models", "cached_models"],
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2",
-                "cached_models/hmm_xh2_ms"
+                "cached_models/hmm_xh2"
             ],
-            "source_type": [null, null, "modelscope"],
-            "model_name": ["gte", "gte", "gte"],
-            "model_size": ["1.5b", "1.5b", "1.5b"],
-            "context_length": [null, "2k", "2k"],
-            "batch": [null, null, null],
-            "ndevice": [null, null, null],
-            "ncore": [null, null, null],
-            "prefill_length": [null, null, null]
+            "source_type": [null, null],
+            "model_name": ["gte", "gte"],
+            "model_size": ["1.5b", "1.5b"],
+            "context_length": [null, "2k"],
+            "batch": [null, null],
+            "ndevice": [null, null],
+            "ncore": [null, null],
+            "prefill_length": [null, null]
         }
     },
     "quant_params": {

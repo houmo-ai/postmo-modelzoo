@@ -54,6 +54,5 @@
             "calib_data_path": [null],
             "infer_mode": [null]
         }
-    },
-    "perf_params": "demo"
+    }
 }

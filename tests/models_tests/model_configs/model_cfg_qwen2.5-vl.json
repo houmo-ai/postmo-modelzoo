@@ -56,20 +56,19 @@
             "source_type": [null, null, null, null, null, null]
         },
         "xh2": {
-            "type": ["raw", "hmm", "hmm"],
-            "download_dir": ["cached_models", "cached_models", "cached_models"],
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2_7b_8k",
-                "cached_models/hmm_xh2_7b_8k_ms"
+                "cached_models/hmm_xh2_7b_8k"
             ],
-            "model_name": ["qwen2.5-vl", "qwen2.5-vl", "qwen2.5-vl"],
-            "model_size": ["7b", "7b", "7b"],
-            "context_length": [null, "8k", "8k"],
-            "ndevice": ["1", "1", "1"],
-            "prefill_length": [null, null, null],
-            "batch": [null, null, null],
-            "source_type": [null, null, "modelscope"]
+            "model_name": ["qwen2.5-vl", "qwen2.5-vl"],
+            "model_size": ["7b", "7b"],
+            "context_length": [null, "8k"],
+            "ndevice": ["1", "1"],
+            "prefill_length": [null, null],
+            "batch": [null, null],
+            "source_type": [null, null]
         }
     },
     "quant_params": {

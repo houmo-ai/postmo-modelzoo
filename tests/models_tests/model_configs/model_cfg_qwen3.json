@@ -42,9 +42,8 @@
             "source_type": [null, null]
         },
         "xh2": {
-            "type": ["raw", "hmm", "hmm", "hmm", "hmm", "hmm", "hmm", "hmm"],
+            "type": ["raw", "hmm", "hmm", "hmm", "hmm", "hmm", "hmm"],
             "download_dir": [
-                "cached_models",
                 "cached_models",
                 "cached_models",
                 "cached_models",
@@ -56,36 +55,17 @@
             "extract_dir": [
                 null,
                 "cached_models/hmm_xh2_8b_32k",
-                "cached_models/hmm_xh2_8b_32k_ms",
                 "cached_models/hmm_xh2_8b_16k_b4",
                 "cached_models/hmm_xh2_14b_16k",
                 "cached_models/hmm_xh2_14b_32k_d2",
                 "cached_models/hmm_xh2_0.6b_32k",
                 "cached_models/hmm_xh2_1.7b_32k"
             ],
-            "source_type": [
-                null,
-                null,
-                "modelscope",
-                null,
-                null,
-                null,
-                null,
-                null
-            ],
-            "context_length": [
-                null,
-                null,
-                null,
-                "16k",
-                "16k",
-                "32k",
-                "32k",
-                "32k"
-            ],
-            "batch": [null, null, null, "4", null, null, null, null],
-            "ndevice": [null, null, null, null, null, "2", null, null],
-            "model_size": ["8b", "8b", "8b", "8b", "14b", "14b", "0.6b", "1.7b"]
+            "source_type": [null, null, null, null, null, null, null],
+            "context_length": [null, null, "16k", "16k", "32k", "32k", "32k"],
+            "batch": [null, null, "4", null, null, null, null],
+            "ndevice": [null, null, null, null, "2", null, null],
+            "model_size": ["8b", "8b", "8b", "14b", "14b", "0.6b", "1.7b"]
         }
     },
     "quant_params": {

@@ -1,5 +1,91 @@
 ###### modelzoo ######
 # args: all, quant, compile, demo, compare, eval, perf
+autodrive_yolop:
+  include:
+    - models/autodrive/yolop
+  exclude:
+    - models/autodrive/yolop/README.MD
+  example_case:
+    - autodrive_yolop_test:
+        test_type: models_tests
+        script: yolop
+        args: all
+  test:
+    - autodrive_yolop_test
+
+asr_emotion2vec:
+  include:
+    - models/asr/emotion2vec
+  exclude:
+    - models/asr/emotion2vec/README.MD
+  example_case:
+    - asr_emotion2vec_test:
+        test_type: models_tests
+        script: emotion2vec
+        args: all
+  test:
+    - asr_emotion2vec_test
+asr_sensevoice:
+  include:
+    - models/asr/sensevoice
+  exclude:
+    - models/asr/sensevoice/README.MD
+  example_case:
+    - asr_sensevoice_test:
+        test_type: models_tests
+        script: sensevoice
+        args: all
+  test:
+    - asr_sensevoice_test
+asr_glm-asr:
+  include:
+    - models/asr/glm-asr
+  exclude:
+    - models/asr/glm-asr/README.MD
+  example_case:
+    - asr_glm-asr_test:
+        test_type: models_tests
+        script: glm_asr
+        args: all
+  test:
+    - asr_glm-asr_test
+asr_whisper:
+  include:
+    - models/asr/whisper
+  exclude:
+    - models/asr/whisper/README.MD
+  example_case:
+    - asr_whisper_test:
+        test_type: models_tests
+        script: whisper
+        args: all
+  test:
+    - asr_whisper_test
+asr_qwen3-asr:
+  include:
+    - models/asr/qwen3-asr
+  exclude:
+    - models/asr/qwen3-asr/README.MD
+  example_case:
+    - asr_qwen3-asr_test:
+        test_type: models_tests
+        script: "qwen3_asr or qwen3_forcealigner"
+        args: all
+  test:
+    - asr_qwen3-asr_test
+asr_ct_transformer:
+  include:
+    - models/asr/ct_transformer
+  exclude:
+    - models/asr/ct_transformer/README.MD
+  example_case:
+    - asr_ct_transformer_test:
+        test_type: models_tests
+        script: ct_transformer
+        args: all
+  test:
+    - asr_ct_transformer_test
+
 backbone_resnet50:
   include:
     - models/backbone/resnet50
@@ -60,18 +146,7 @@ backbone_dinov3-base:
         args: all
   test:
     - backbone_dinov3-base_test
-autodrive_yolop:
-  include:
-    - models/autodrive/yolop
-  exclude:
-    - models/autodrive/yolop/README.MD
-  example_case:
-    - autodrive_yolop_test:
-        test_type: models_tests
-        script: yolop
-        args: all
-  test:
-    - autodrive_yolop_test
+
 detection_yolov3:
   include:
     - models/detection/yolov3
@@ -228,6 +303,7 @@ detection_yolo12m:
         args: all
   test:
     - detection_yolo12m_test
+
 estimation_yolov8m_pose:
   include:
     - models/estimation/yolov8m-pose
@@ -240,6 +316,7 @@ estimation_yolov8m_pose:
         args: all
   test:
     - estimation_yolov8m_pose_test
+
 segmentation_yolov8m_seg:
   include:
     - models/segmentation/yolov8m-seg
@@ -262,6 +339,7 @@ segmentation_sam2:
         script: ../models/segmentation/sam2/test.sh
   test:
     - segmentation_sam2_test
+
 ocr_lprnet:
   include:
     - models/ocr/lprnet
@@ -322,6 +400,20 @@ ocr_paddleocr-vl:
         args: all
   test:
     - ocr_paddleocr-vl_test
+ocr_mineru2.5:
+  include:
+    - models/ocr/mineru2.5
+  exclude:
+    - models/ocr/mineru2.5/README.MD
+    - models/ocr/mineru2.5/data
+  example_case:
+    - ocr_mineru2.5_test:
+        test_type: models_tests
+        script: mineru2dot5
+        args: all
+  test:
+    - ocr_mineru2.5_test
+
 reranker_qwen3-reranker:
   include:
     - models/reranker/qwen3-reranker
@@ -334,6 +426,7 @@ reranker_qwen3-reranker:
         args: all
   test:
     - reranker_qwen3-reranker_test
+
 llm_qwen3:
   include:
     - models/llm/qwen3
@@ -430,6 +523,7 @@ llm_copaw-flash:
         args: all
   test:
     - llm_copaw-flash_test
+
 vlm_qwen2.5-vl:
   include:
     - models/vlm/qwen2.5-vl
@@ -466,19 +560,6 @@ vlm_gemma4:
         args: all
   test:
     - vlm_gemma4_test
-ocr_mineru2.5:
-  include:
-    - models/ocr/mineru2.5
-  exclude:
-    - models/ocr/mineru2.5/README.MD
-    - models/ocr/mineru2.5/data
-  example_case:
-    - ocr_mineru2.5_test:
-        test_type: models_tests
-        script: mineru2dot5
-        args: all
-  test:
-    - ocr_mineru2.5_test
 
 embedding_siglip2:
   include:
@@ -492,161 +573,80 @@ embedding_siglip2:
         args: all
   test:
     - embedding_siglip2_test
-
-llm_bge:
+embedding_bge:
   include:
     - models/embedding/bge
   exclude:
     - models/embedding/bge/README.MD
   example_case:
-    - llm_bge_test:
+    - embedding_bge_test:
         test_type: models_tests
         script: bge
         args: all
   test:
-    - llm_bge_test
-llm_emotion2vec:
-  include:
-    - models/asr/emotion2vec
-  exclude:
-    - models/asr/emotion2vec/README.MD
-  example_case:
-    - llm_emotion2vec_test:
-        test_type: models_tests
-        script: emotion2vec
-        args: all
-  test:
-    - llm_emotion2vec_test
-llm_sensevoice:
-  include:
-    - models/asr/sensevoice
-  exclude:
-    - models/asr/sensevoice/README.MD
-  example_case:
-    - llm_sensevoice_test:
-        test_type: models_tests
-        script: sensevoice
-        args: all
-  test:
-    - llm_sensevoice_test
-llm_glm-asr:
-  include:
-    - models/asr/glm-asr
-  exclude:
-    - models/asr/glm-asr/README.MD
-  example_case:
-    - llm_glm-asr_test:
-        test_type: models_tests
-        script: glm_asr
-        args: all
-  test:
-    - llm_glm-asr_test
-llm_whisper:
-  include:
-    - models/asr/whisper
-  exclude:
-    - models/asr/whisper/README.MD
-  example_case:
-    - llm_whisper_test:
-        test_type: models_tests
-        script: whisper
-        args: all
-  test:
-    - llm_whisper_test
-asr_qwen3-asr:
-  include:
-    - models/asr/qwen3-asr
-  exclude:
-    - models/asr/qwen3-asr/README.MD
-  example_case:
-    - asr_qwen3-asr_test:
-        test_type: models_tests
-        script: "qwen3_asr or qwen3_forcealigner"
-        args: all
-  test:
-    - asr_qwen3-asr_test
-asr_ct_transformer:
-  include:
-    - models/asr/ct_transformer
-  exclude:
-    - models/asr/ct_transformer/README.MD
-  example_case:
-    - asr_ct_transformer_test:
-        test_type: models_tests
-        script: ct_transformer
-        args: all
-  test:
-    - asr_ct_transformer_test
-llm_perf:
-  include:
-    - tools/llm_perf
-  exclude:
-    - tools/llm_perf/README.MD
-  example_case:
-    - tools_llm_perf_test:
-        script: ../tests/tools_tests/test_llm_perf.sh
-  test:
-    - tools_llm_perf_test
-llm_minicpmo:
-  include:
-    - models/omni/minicpmo
-  exclude:
-    - models/omni/minicpmo/README.MD
-  example_case:
-    - llm_minicpmo_test:
-        test_type: models_tests
-        script: minicpmo
-        args: all
-  test:
-    - llm_minicpmo_test
-llm_qwen3_omni:
-  include:
-    - models/omni/qwen3-omni
-  exclude:
-    - models/omni/qwen3-omni/README.MD
-  example_case:
-    - llm_qwen3_omni_test:
-        test_type: models_tests
-        script: qwen3_omni
-        args: all
-  test:
-    - llm_qwen3_omni_test
-llm_gte:
+    - embedding_bge_test
+embedding_gte:
   include:
     - models/embedding/gte
   exclude:
     - models/embedding/gte/README.MD
   example_case:
-    - llm_gte_test:
+    - embedding_gte_test:
         test_type: models_tests
         script: gte
         args: all
   test:
-    - llm_gte_test
-llm_qwen3-embedding:
+    - embedding_gte_test
+embedding_qwen3-embedding:
   include:
     - models/embedding/qwen3-embedding
   exclude:
     - models/embedding/qwen3-embedding/README.MD
   example_case:
-    - llm_qwen3-embedding_test:
+    - embedding_qwen3-embedding_test:
         test_type: models_tests
         script: qwen3_embedding
         args: all
   test:
-    - llm_qwen3-embedding_test
-llm_qwen3-vl-embedding:
+    - embedding_qwen3-embedding_test
+embedding_qwen3-vl-embedding:
   include:
     - models/embedding/qwen3-vl-embedding
   exclude:
     - models/embedding/qwen3-vl-embedding/README.MD
   example_case:
-    - llm_qwen3-vl-embedding_test:
+    - embedding_qwen3-vl-embedding_test:
         test_type: models_tests
         script: qwen3_vl_embedding
         args: all
   test:
-    - llm_qwen3-vl-embedding_test
+    - embedding_qwen3-vl-embedding_test
+
+omni_minicpmo:
+  include:
+    - models/omni/minicpmo
+  exclude:
+    - models/omni/minicpmo/README.MD
+  example_case:
+    - omni_minicpmo_test:
+        test_type: models_tests
+        script: minicpmo
+        args: all
+  test:
+    - omni_minicpmo_test
+omni_qwen3_omni:
+  include:
+    - models/omni/qwen3-omni
+  exclude:
+    - models/omni/qwen3-omni/README.MD
+  example_case:
+    - omni_qwen3_omni_test:
+        test_type: models_tests
+        script: qwen3_omni
+        args: all
+  test:
+    - omni_qwen3_omni_test
+
 tts_cosyvoice3:
   include:
     - models/tts/cosyvoice3
@@ -671,6 +671,7 @@ tts_qwen3_tts:
         args: all
   test:
     - tts_qwen3_tts_test
+
 diffusion_z_image_turbo:
   include:
     - models/diffusion/z-image
@@ -683,6 +684,8 @@ diffusion_z_image_turbo:
         args: all
   test:
     - diffusion_z_image_turbo_test
+
+###### utils ######
 utils:
   include:
     - utils
@@ -694,6 +697,16 @@ utils:
     - backbone_resnet50_test
     - detection_yolov5s_test
     - autodrive_yolop_test
+llm_engine:
+  include:
+    - utils/cpp/houmo_engine
+  exclude: null
+  example_case: null
+  test:
+    - asr_qwen3-asr_test
+    - asr_glm-asr_test
+    - asr_whisper_test
+    - llm_qwen3.5_test
 
 ###### hmatc ######
 hmatc:
@@ -838,18 +851,16 @@ tools_bandwidth_perf:
         script: ../tools/bandwidth_perf/run.sh
   test:
     - tools_bandwidth_perf_test
-
-llm_engine:
+llm_perf:
   include:
-    - utils/cpp/houmo_engine
-  exclude: null
-  example_case: null
+    - tools/llm_perf
+  exclude:
+    - tools/llm_perf/README.MD
+  example_case:
+    - tools_llm_perf_test:
+        script: ../tests/tools_tests/test_llm_perf.sh
   test:
-    - asr_qwen3-asr_test
-    - llm_glm-asr_test
-    - llm_whisper_test
-    - llm_qwen3.5_test
-
+    - tools_llm_perf_test
 hmeval_examples_llm:
   include:
     - hmeval
@@ -863,7 +874,6 @@ hmeval_examples_llm:
         script: ../hmeval/examples/qwen3/test.sh
   test:
     - hmeval_examples_llm_test
-
 hmeval_examples_vlm:
   include:
     - hmeval
@@ -898,11 +908,17 @@ models_tests:
     - tests/models_tests/update_test_py.py
   example_case: null
   test:
+    - asr_qwen3-asr_test
     - backbone_resnet50_test
+    - backbone_mobilenetv2_test
     - detection_yolov5s_test
-    - inferences_resnet50_test
+    - embedding_bge_test
     - llm_qwen3.5_test
     - tts_qwen3_tts_test
+    - vlm_gemma4_test
+    - diffusion_z_image_turbo_test
+    - ocr_glm-ocr_test
+    - inferences_resnet50_test
     # - llm_qwen3_test
     # - vlm_qwen3-vl_test
 

@@ -34,7 +34,7 @@
     },
     "quant_params": {
         "xh2": {
-            "model": [
+            "model_dir": [
                 "cached_models/siglip2-large-patch16-256"
             ],
             "model_name": ["siglip2"],

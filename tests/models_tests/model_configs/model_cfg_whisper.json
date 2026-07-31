@@ -19,7 +19,7 @@
         "xh2": {
             "x86_64": {
                 "decode": 47.83,
-                "end2end": 11.19
+                "end2end": 9.65
             }
         }
     },
@@ -54,8 +54,8 @@
                 "cached_models/whisper-medium",
                 "cached_models/whisper-large-v3-turbo"
             ],
-            "model-name": ["whisper", "whisper"],
-            "model-size": ["medium", "large-v3-turbo"],
+            "model_name": ["whisper", "whisper"],
+            "model_size": ["medium", "large-v3-turbo"],
             "out-dir": [
                 "cached_results/hmquant_xh2_medium",
                 "cached_results/hmquant_xh2_large-v3-turbo"

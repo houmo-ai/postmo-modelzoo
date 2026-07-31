@@ -2,10 +2,7 @@
 #
 # File: test_hmatc_utils.py
 # Description:
-#   HMATC test utilities module.
-#   This module provides utility functions for executing HMATC tests on different models.
-#   It handles model configuration, test execution across multiple test types (quant, build,
-#   demo, compare, eval, perf), and manages the complete test workflow from setup to cleanup.
+#  HMATC Test Orchestration Using Shared Runtime Infrastructure.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,150 +18,220 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import pytest
-import os
-import logging
-import shutil
-from glob import glob
-from ..tests_utils.tests_common_utils import *
+from __future__ import annotations
 
+import logging
+from glob import glob
+from pathlib import Path
+
+import pytest
+
+from ..tests_utils.command_execution import (
+    CommandExecutionError,
+    CommandResult,
+    CommandRunner,
+    CommandSpec,
+    output_reports_failure,
+)
+from ..tests_utils.pytest_support import (
+    MarkerConfigurationError,
+    device_markers_from_request,
+)
+from ..tests_utils.runtime_context import TCaseType, TestRuntimeContext
+from ..tests_utils.workspace import WorkspaceManager, WorkspaceOwnershipError
 
 logger = logging.getLogger(__name__)
-script_dir = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+
+def _hmatc_command(
+    name: str,
+    argv: tuple[str, ...],
+    *,
+    cwd: Path,
+    log_file: Path | None,
+) -> CommandSpec:
+    """Build a command retaining legacy HMATC console and log presentation."""
+    return CommandSpec(
+        name,
+        argv,
+        cwd=cwd,
+        allow_nonzero_exit=True,
+        log_file=log_file,
+        mirror_to_console=True,
+        timestamp_log_lines=True,
+        suppressed_display_substrings=("MB/s",),
+    )
+
+
+def _command_succeeded(result: CommandResult) -> bool:
+    """Preserve the legacy return-code plus stdout marker validation."""
+    return result.succeeded and not output_reports_failure(result.stdout)
 
 
 def _run_hmatc(
-    model_info: dict, config_yml: str, hmatc_type: str, log_file: str
+    runner: CommandRunner,
+    workspace: Path,
+    model_info: dict,
+    config_yml: str,
+    hmatc_type: str,
+    log_file: Path,
 ) -> bool:
-    """
-    Execute a specific HMATC test command for a given configuration.
-
-    Args:
-        model_info (dict): Dictionary containing model-specific information including data paths
-        config_yml (str): Path to the YAML configuration file for the test
-        hmatc_type (str): Type of HMATC test to run (quant, build, demo, compare, eval, perf)
-        log_file (str): Path to the log file for test output
-
-    Returns:
-        bool: True if the command executed successfully, False otherwise
-    """
-    cmds = ["hmatc", hmatc_type, "--config", config_yml]
+    argv = ["hmatc", hmatc_type, "--config", config_yml]
     if hmatc_type == "compare":
-        cmds += [
-            "--data_path",
-            model_info["data_path"],
-        ]
+        argv.extend(("--data_path", model_info["data_path"]))
     elif hmatc_type == "perf":
-        cmds += ["-wn", "10", "-sn", "500", "-tn", "8"]
-    flag, _ = execute_test_cmd(cmds, log_file)
-    if flag is False:
-        logger.error(f"Execute hmatc {hmatc_type} {config_yml} failed!")
+        argv.extend(("-wn", "10", "-sn", "500", "-tn", "8"))
+    result = runner.run(_hmatc_command(f"hmatc-{hmatc_type}", tuple(argv), cwd=workspace, log_file=log_file))
+    succeeded = _command_succeeded(result)
+    if not succeeded:
+        logger.error("Execute hmatc %s %s failed!", hmatc_type, config_yml)
+    return succeeded
 
-    return flag
 
-
-def _perf_models(config_yml: str, log_file: str) -> bool:
-    """
-    Execute performance test sequence for a given configuration.
-
-    Args:
-        config_yml (str): Path to the YAML configuration file for the test
-        log_file (str): Path to the log file for test output
-
-    Returns:
-        bool: True if all performance test steps executed successfully, False otherwise
-    """
-    # quant
-    cmds = ["hmatc", "quant", "--config", config_yml]
-    flag, _ = execute_test_cmd(cmds, log_file)
-    if flag is False:
-        logger.error(f"Perf test quant: {config_yml} failed!")
+def _perf_models(
+    runner: CommandRunner,
+    workspace: Path,
+    config_yml: str,
+    log_file: Path,
+    *,
+    backend: str,
+) -> bool:
+    quant = runner.run(
+        _hmatc_command(
+            "hmatc-perf-quant",
+            ("hmatc", "quant", "--config", config_yml),
+            cwd=workspace,
+            log_file=log_file,
+        )
+    )
+    if not _command_succeeded(quant):
+        logger.error("Perf test quant: %s failed!", config_yml)
         return False
-    # build
-    ncore = "2" if HOUMO_BACKEND == "xh2" else "4"
-    cmds = ["hmatc", "build", "--config", config_yml, "--ncore", ncore]
-    flag, _ = execute_test_cmd(cmds, log_file)
-    if flag is False:
-        logger.error(f"Perf test build: {config_yml} failed!")
+
+    ncore = "2" if backend == "xh2" else "4"
+    build = runner.run(
+        _hmatc_command(
+            "hmatc-perf-build",
+            ("hmatc", "build", "--config", config_yml, "--ncore", ncore),
+            cwd=workspace,
+            log_file=log_file,
+        )
+    )
+    if not _command_succeeded(build):
+        logger.error("Perf test build: %s failed!", config_yml)
         return False
-    # perf
-    cmds = [
-        "hmatc",
-        "perf",
-        "--config",
-        config_yml,
-        "-wn",
-        "10",
-        "-sn",
-        "1000",
-        "-tn",
-        "8",
-    ]
-    flag, _ = execute_test_cmd(cmds, log_file)
-    if flag is False:
-        logger.error(f"Perf test: {config_yml} failed!")
 
-    return flag
+    perf = runner.run(
+        _hmatc_command(
+            "hmatc-perf",
+            (
+                "hmatc",
+                "perf",
+                "--config",
+                config_yml,
+                "-wn",
+                "10",
+                "-sn",
+                "1000",
+                "-tn",
+                "8",
+            ),
+            cwd=workspace,
+            log_file=log_file,
+        )
+    )
+    succeeded = _command_succeeded(perf)
+    if not succeeded:
+        logger.error("Perf test: %s failed!", config_yml)
+    return succeeded
 
 
-def execute_hmatc_cmd(model_name: str, setup_logging):
-    """
-    Execute HMATC tests for the specified model.
+def execute_hmatc_cmd(model_name: str, setup_logging) -> None:
+    """Execute the complete HMATC matrix in one owned workspace."""
+    log_file_value, pytest_request = setup_logging
+    log_file = Path(log_file_value)
+    try:
+        markers = device_markers_from_request(pytest_request)
+    except MarkerConfigurationError as error:
+        pytest.skip(str(error))
 
-    Args:
-        model_name (str): Name of the model to test (e.g., resnet50, yolov5s)
-        setup_logging: pytest fixture for setting up logging configuration
-
-    Raises:
-        AssertionError: If any of the tests fail
-    """
-    log_file, pytest_request = setup_logging
-    marker_vals = check_device_markers(pytest_request)
-    dev_res_dir = f"{marker_vals[NDEVICE_MARKER]}_{marker_vals[DEVICE_MEM_MARKER]}"
-    logger.info(f"log_file: {log_file}, dev_res_dir: {dev_res_dir}")
-
-    if get_test_type() == TCaseType.SEPARATE_NO_INFER:
-        skip_msg = f"Skip hmatc testcase {model_name} in the SEPARATE NO INFER stage."
-        logger.warning(skip_msg)
-        pytest.skip(skip_msg)
+    runtime = TestRuntimeContext.from_environment()
+    logger.info(
+        "log_file: %s, dev_res_dir: %s",
+        log_file,
+        markers.result_directory_name,
+    )
+    if runtime.test_type == TCaseType.SEPARATE_NO_INFER:
+        pytest.skip(f"Skip hmatc testcase {model_name} in the SEPARATE NO INFER stage.")
 
     model_dict = {
         "resnet50": {
-            "model_dir": os.path.abspath(
-                f"{script_dir}/../../models/backbone/resnet50"
-            ),
+            "model_dir": (SCRIPT_DIR / "../../models/backbone/resnet50").resolve(),
             "data_path": "./imagenet/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG",
         },
         "yolov5s": {
-            "model_dir": os.path.abspath(
-                f"{script_dir}/../../models/detection/yolov5s"
-            ),
+            "model_dir": (SCRIPT_DIR / "../../models/detection/yolov5s").resolve(),
             "data_path": "./coco2017/val2017/000000000139.jpg",
         },
     }
-    prepare_test_folder(model_dict[model_name]["model_dir"], "hmatc")
-    current_folder = os.getcwd()
-    logger.info("current folder: %s.", current_folder)
+    runner = CommandRunner()
+    manager = WorkspaceManager()
 
-    execute_test_cmd(["python3", "get_model.py", "--type", "raw"], "", True)
+    try:
+        with manager.open(model_dict[model_name]["model_dir"], phase="hmatc") as workspace:
+            logger.info("workspace: %s", workspace)
+            get_model = runner.run(
+                _hmatc_command(
+                    "hmatc-get-model",
+                    ("python3", "get_model.py", "--type", "raw"),
+                    cwd=workspace,
+                    log_file=None,
+                )
+            )
+            if not _command_succeeded(get_model):
+                pytest.fail("HMATC get-model failed", pytrace=False)
+            final_flag = _run_hmatc_matrix(model_name, model_dict[model_name], runtime, runner, workspace, log_file)
+    except (CommandExecutionError, WorkspaceOwnershipError) as error:
+        pytest.fail(error.format_diagnostic(), pytrace=False)
 
-    test_configs = script_dir + f"/hmatc_configs/{model_name}"
-    hmatc_types = ["quant", "build", "demo", "compare", "eval", "perf"]
-    final_flag = True
-
-    # Run functional tests
-    for config_yml in glob(f"{test_configs}/func_test/*.yml"):
-        logger.info(f"test config file: {config_yml}")
-        for hmatc_type in hmatc_types:
-            if not _run_hmatc(model_dict[model_name], config_yml, hmatc_type, log_file):
-                final_flag = False
-
-    # Run performance tests
-    if HOUMO_BACKEND == "xh1":
-        for config_yml in glob(f"{test_configs}/perf_test/*.yml"):
-            if not _perf_models(config_yml, log_file):
-                final_flag = False
-
-    shutil.rmtree(os.getcwd())
     assert final_flag is True, "Hmatc Test Failed!"
     logger.info("Hmatc Test Success!")
+
+
+def _run_hmatc_matrix(model_name, model_info, runtime, runner, workspace, log_file) -> bool:
+    """Run functional HMATC cases and optional xh1 performance cases."""
+    test_configs = SCRIPT_DIR / "hmatc_configs" / model_name
+    hmatc_types = ("quant", "build", "demo", "compare", "eval", "perf")
+    passed = _run_hmatc_functional_cases(
+        runner,
+        workspace,
+        model_info,
+        test_configs,
+        hmatc_types,
+        log_file,
+    )
+    if runtime.backend == "xh1":
+        passed &= _run_hmatc_perf_cases(runner, workspace, test_configs, log_file, runtime.backend)
+    return passed
+
+
+def _run_hmatc_functional_cases(runner, workspace, model_info, test_configs, hmatc_types, log_file) -> bool:
+    """Run each functional config through all supported HMATC subcommands."""
+    passed = True
+    for config_yml in sorted(glob(str(test_configs / "func_test" / "*.yml"))):
+        logger.info("test config file: %s", config_yml)
+        for hmatc_type in hmatc_types:
+            passed &= _run_hmatc(runner, workspace, model_info, config_yml, hmatc_type, log_file)
+    return passed
+
+
+def _run_hmatc_perf_cases(runner, workspace, test_configs, log_file, backend) -> bool:
+    """Run optional xh1 performance configurations."""
+    passed = True
+    for config_yml in sorted(glob(str(test_configs / "perf_test" / "*.yml"))):
+        passed &= _perf_models(runner, workspace, config_yml, log_file, backend=backend)
+    return passed
+
+
+__all__ = ["execute_hmatc_cmd"]

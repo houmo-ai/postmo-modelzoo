@@ -19,7 +19,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import pytest
 import os
 
 script_dir = os.path.dirname(os.path.abspath(__file__))

@@ -17,13 +17,13 @@
     "support_hmatc": null,
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "raw", "hmm"],
-            "download_dir": ["cached_models", "cached_models", "cached_models"],
-            "extract_dir": [null, null, "cached_models/hmm_xh2_2k"],
-            "source_type": [null, "modelscope", null],
-            "context_length": [null, null, "2k"],
-            "ndevice": [null, null, null],
-            "prefill_length": [null, null, null]
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_2k"],
+            "source_type": [null, null],
+            "context_length": [null, "2k"],
+            "ndevice": [null, null],
+            "prefill_length": [null, null]
         }
     },
     "quant_params": {

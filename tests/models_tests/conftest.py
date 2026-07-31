@@ -1,10 +1,8 @@
-# Copyright 2025 HOUMO AI
+# Copyright (c) 2025 HOUMO AI
 #
 # File: conftest.py
 # Description:
-#   Configuration file for model tests using pytest framework.
-#   This file sets up the testing environment for model tests, including test markers
-#   definition and test execution ordering.
+#  Pytest Configuration and Execution Ordering for Model Tests.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +19,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import pytest
-import os
+from pathlib import Path
+
+# Historical snapshots retain their original ``test_*.py`` filenames for
+# comparison only and must not participate in the active pytest suite.
+collect_ignore = ["history_codes"]
 
 
 def pytest_configure(config):
@@ -42,16 +44,12 @@ def pytest_configure(config):
         "perf",
     ]
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    md_markers = []
-
-    # Read model names from the text file
-    with open(f"{script_dir}/model_names.txt", "r", encoding="utf-8") as f:
-        for line in f:
-            model_name = line.strip()
-            if model_name:
-                md_markers.append(model_name)
-    print("Supported model names:", md_markers)
+    names_file = Path(__file__).resolve().parent / "model_names.txt"
+    if not names_file.is_file():
+        raise pytest.UsageError(
+            f"{names_file.name} is missing; run " f"'python -m tests.models_tests.update_test_py' to regenerate it"
+        )
+    md_markers = [line.strip() for line in names_file.read_text(encoding="utf-8").splitlines() if line.strip()]
 
     for markers in test_flow_markers:
         config.addinivalue_line("markers", markers)
@@ -68,16 +66,22 @@ def pytest_collection_modifyitems(session, config, items):
         config: pytest configuration object
         items: List of collected test items to be modified in place
     """
-    # Define the preferred execution order for test files
-    file_order = [
-        "models_tests/test_get_models.py",
-        "models_tests/test_quant_models.py",
-        "models_tests/test_compile_models.py",
-        "models_tests/test_demo_models.py",
-        "models_tests/test_compare_models.py",
-        "models_tests/test_eval_models.py",
-        "models_tests/test_perf_models.py",
-    ]
+    worker_count = getattr(config.option, "numprocesses", None)
+    if worker_count not in (None, 0, 1, "0", "1"):
+        raise pytest.UsageError(
+            "models_tests has cross-flow artifact dependencies and currently runs "
+            "serially; pytest-xdist with more than one worker is not supported"
+        )
+
+    file_order = {
+        "test_get_models.py": 0,
+        "test_quant_models.py": 1,
+        "test_compile_models.py": 2,
+        "test_demo_models.py": 3,
+        "test_compare_models.py": 4,
+        "test_eval_models.py": 5,
+        "test_perf_models.py": 6,
+    }
 
     def get_sort_key(item):
         """
@@ -90,10 +94,10 @@ def pytest_collection_modifyitems(session, config, items):
             int: Index in the file_order list or length of list for files not in order
         """
         # Get the test file path from the item location
-        filename = item.location[0]
+        filename = Path(item.location[0]).name
         try:
-            return file_order.index(filename)
-        except ValueError:
+            return file_order[filename]
+        except KeyError:
             return len(file_order)
 
     # Sort the test items based on the defined order

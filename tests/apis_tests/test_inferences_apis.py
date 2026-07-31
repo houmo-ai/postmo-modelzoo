@@ -22,7 +22,7 @@
 
 import pytest
 import logging
-from .test_apis_utils import *
+from .test_apis_utils import execute_apis_examples
 
 logger = logging.getLogger(__name__)
 

@@ -108,3 +108,5 @@ def setup_logging(request):
 
     # Remove handler after test completion to prevent duplicate logs
     logger.removeHandler(file_handler)
+    file_handler.flush()
+    file_handler.close()

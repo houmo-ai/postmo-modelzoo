@@ -30,9 +30,10 @@
     },
     "quant_params": {
         "xh2": {
-            "model_path": ["cached_models/onnx"],
-            "output_path": ["cached_results/hmquant_xh2"],
-            "precision": [null]
+            "embedder_model": ["cached_models/bge-m3"],
+            "reranker_model": ["cached_models/bge-reranker-v2-m3"],
+            "out_dir": ["cached_results/hmquant_xh2"],
+            "quant_type": ["w8a8_sefp"]
         }
     },
     "compile_params": {

@@ -33,9 +33,8 @@
     },
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "hmm", "hmm", "hmm"],
+            "type": ["raw", "hmm", "hmm"],
             "download_dir": [
-                "cached_models",
                 "cached_models",
                 "cached_models",
                 "cached_models"
@@ -43,12 +42,11 @@
             "extract_dir": [
                 null,
                 "cached_models/hmm_xh2_32k",
-                "cached_models/hmm_xh2_32k_ms",
                 "cached_models/hmm_xh2_32k_b2"
             ],
-            "source_type": [null, null, "modelscope", null],
-            "context_length": [null, null, null, "32k"],
-            "batch": [null, null, null, "2"]
+            "source_type": [null, null, null],
+            "context_length": [null, null, "32k"],
+            "batch": [null, null, "2"]
         }
     },
     "quant_params": {

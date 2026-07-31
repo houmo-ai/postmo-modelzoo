@@ -32,6 +32,7 @@
             "model_name": ["ct_transformer"],
             "model_size": ["large"],
             "model_dir": ["cached_models/ct_transformer"],
+            "input": ["cached_models/ct_transformer/example/punc_example.txt"],
             "out-dir": ["cached_results/hmquant_xh2"],
             "quant_type": [null]
         }

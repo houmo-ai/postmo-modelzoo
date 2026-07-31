@@ -206,7 +206,8 @@
                 "cached_results/hmm_xh2_base_2k/hmquant/decode_padding_shapes.json",
                 "cached_results/hmm_xh2_1.7b_customvoice_2k/hmquant/decode_padding_shapes.json",
                 "cached_results/hmm_xh2_customvoice_2k/hmquant/decode_padding_shapes.json",
-                "cached_results/hmm_xh2_base_2k/hmquant/decode_padding_shapes.json"
+                "cached_results/hmm_xh2_base_2k/hmquant/decode_padding_shapes.json",
+                "cached_results/hmm_xh2_1.7b_customvoice_2k/hmquant/decode_padding_shapes.json"
             ],
             "stateful_decoder_hmm": [
                 "cached_results/hmm_xh2_customvoice_2k/qwen3-tts-0.6b-customvoice_stateful_decoder.hmm",

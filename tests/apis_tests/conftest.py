@@ -18,11 +18,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import pytest
 import os
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-os.environ["HOUMO_EXAMPLES_PATH"] = f"{script_dir}/../.."
+os.environ.setdefault("HOUMO_EXAMPLES_PATH", os.path.abspath(f"{script_dir}/../.."))
 
 
 def pytest_configure(config):

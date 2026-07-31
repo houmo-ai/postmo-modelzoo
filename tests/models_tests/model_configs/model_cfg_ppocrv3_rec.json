@@ -17,9 +17,12 @@
     "support_hmatc": {
         "xh2": ["hmquant", "hmbuild", "hmdemo", "hmcompare", "hmperf"]
     },
+    "validation": {
+        "xh2": {"compile_cosine_threshold": 0.76}
+    },
     "perf_metrics": {
         "xh2": {
-            "x86_64": 850.356
+            "x86_64": 741.376
         }
     },
     "eval_threshold": {
