@@ -7,9 +7,10 @@ Each component is licensed under its own respective license.
 
 This declaration only addresses third-party components that
 require special attention, are not runtime dependencies, and
-are not included in the project, and advises users to strictly
-adhere to the terms of the license agreements specified for
-those third-party dependencies.
+are generally not included in the project (except for a small
+COCO 2017 sample distributed under CC BY 4.0 with attribution),
+and advises users to strictly adhere to the terms of the license
+agreements specified for those third-party dependencies.
 
 DISCLAIMER
 
@@ -1114,6 +1115,15 @@ redistributing, or modifying this module.
 
 2. Datasets
 ----------------------------------------------------------------------
+
+Except for a small COCO 2017 sample (see the COCO entry below), this project
+does NOT distribute any of the datasets listed below. They are referenced for
+attribution only. Users must obtain each dataset from its official source and
+comply with its license and usage restrictions. Academic non-commercial
+datasets (such as BDD100K, nuScenes, and WIDER FACE) must not be used
+commercially or redistributed. See DATASET_NOTICE.md for a summary.
+
+----------------------------------------------------------------------
 COCO Dataset (Common Objects in Context)
 ----------------------------------------------------------------------
 
@@ -1131,12 +1141,16 @@ The COCO dataset is licensed under CC BY 4.0, allowing use, sharing,
 adaptation, distribution, and reproduction in any medium or format,
 including commercial use, as long as proper attribution is provided.
 
-This project does NOT redistribute the COCO dataset itself.
-Any references to the COCO dataset in this project are limited to
-documentation, configuration examples, scripts, or evaluation guidance.
+This project redistributes a small COCO 2017 sample under CC BY 4.0 with
+attribution: 10 val2017 images and the val2017 annotation files
+(instances_val2017.json, person_keypoints_val2017.json, coco.names), located
+under data/datasets/coco2017/. The COCO images originate from Flickr and remain
+under their original copyright; COCO provides the annotations only. This project
+does NOT redistribute the full COCO image set.
 
-Users must obtain the dataset directly from the official COCO website
-and provide appropriate credit in accordance with the CC BY 4.0 license.
+Users must obtain the full dataset directly from the official COCO website
+and provide appropriate credit in accordance with the CC BY 4.0 license. See
+DATASET_NOTICE.md section 3.5 for the included sample and attribution.
 
 COCO is a trademark or registered trademark of Microsoft Corporation.
 

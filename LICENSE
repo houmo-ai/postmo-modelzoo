@@ -200,3 +200,12 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+   Dataset Disclaimer:
+
+   Except for a small COCO 2017 sample distributed under CC BY 4.0 with
+   attribution, this software is distributed WITHOUT any third-party datasets.
+   Users are solely responsible for downloading and using any third-party
+   datasets in compliance with their respective license agreements. The authors
+   of this software shall not be liable for any legal responsibility arising
+   from dataset infringement. See DATASET_NOTICE.md for details.

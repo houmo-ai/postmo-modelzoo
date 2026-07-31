@@ -28,6 +28,12 @@ This repository contains:
 This project may reference or integrate third-party models, datasets,
 toolchains, SDKs, or runtime libraries that are licensed separately.
 
+Except for a small COCO 2017 sample distributed under CC BY 4.0 with
+attribution, this project does NOT distribute any third-party datasets. All
+other datasets are referenced for attribution only; users must obtain them from
+their official sources under the applicable licenses. See DATASET_NOTICE.md for
+details.
+
 Such third-party components are NOT covered by the Apache License 2.0
 of this project. Their usage is subject to their original license terms.
 
@@ -71,9 +77,16 @@ Oniguruma (BSD-2-Clause) - https://github.com/kkos/oniguruma
 utf8proc (MIT) - https://github.com/JuliaStrings/utf8proc
 Tokenizer C++ (Apache-2.0) - C++ reimplementation of HuggingFace tokenizers (by Wang Zhaode) https://github.com/wangzhaode/tokenizer.cpp
 # Datasets
+# Except for a small COCO 2017 sample (see below), the following datasets are
+# NOT distributed with this project. They are listed for reference and
+# attribution only. Users must obtain them from their official sources and
+# comply with their original licenses. See DATASET_NOTICE.md.
 CCPD Dataset (MIT) - https://github.com/detectRecog/CCPD
 VOC2012 Dataset (CC BY 4.0) - https://public.roboflow.com/object-detection/pascal-voc-2012
 COCO Dataset (CC BY 4.0) - https://cocodataset.org/#termsofuse
+# A small COCO 2017 sample (10 val2017 images and val2017 annotations) is
+# included under CC BY 4.0 with attribution. COCO images originate from Flickr
+# and remain under their original copyright. See DATASET_NOTICE.md section 3.5.
 ImageNet 2012 Dataset - https://www.image-net.org/download?
 BDD100K Dataset (CC BY-NC-SA 4.0) - https://bair.berkeley.edu/blog/2018/05/30/bdd/
 nuScenes Dataset (CC BY-NC-SA 4.0) - https://www.nuscenes.org/
