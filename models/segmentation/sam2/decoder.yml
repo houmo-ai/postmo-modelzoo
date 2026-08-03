@@ -18,16 +18,11 @@ model:
     point_labels:
       shape: [1, 3]
       data_format: null
+
 quant:
   calib_data: null
-  calib_num: 100
-  config:
-    global_wise_cfg:
-      weight_quantize:
-        dtype: int8
-      output_quantize:
-        dtype: int8
-        calib_method: minmax
+  calib_num: 1
+
 build:
   ncore: 1
   opt_level: 2
