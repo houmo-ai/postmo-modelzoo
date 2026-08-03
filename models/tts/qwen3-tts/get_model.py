@@ -20,12 +20,15 @@
 
 import os
 import argparse
+from pathlib import Path
 from hmatc.utils.utils import (
     first_not_none,
     hmatc_get_file,
     get_houmo_version,
     get_model_configs,
 )
+
+from convert_embedding import prepare_cpp_assets
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
@@ -121,21 +124,15 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
 
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     model_name = first_not_none(args.model_name, default_model_name)
     model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(model_name, {}).get(model_size, {})
 
-    context_length = first_not_none(
-        args.context_length, model_config.get("context_length", "2k")
-    )
+    context_length = first_not_none(args.context_length, model_config.get("context_length", "2k"))
     ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
     ncore = first_not_none(args.ncore, model_config.get("ncore", 2))
-    quant_type = first_not_none(
-        args.quant_type, model_config.get("quant_type", "w8a16h1_sefp")
-    )
+    quant_type = first_not_none(args.quant_type, model_config.get("quant_type", "w8a16h1_sefp"))
 
     model_cfgs = {
         "target": HOUMO_TARGET,
@@ -163,3 +160,23 @@ if __name__ == "__main__":
     )
     if ret_dict.get("ret", False) is False:
         exit(1)
+
+    if args.file_type == "hmm" and model_size.endswith("customvoice"):
+        repo_ids = model_config.get("modelscope_repo", [])
+        if not repo_ids:
+            raise ValueError(f"Missing ModelScope repository for {model_name}-{model_size}")
+
+        download_root = Path(args.download_dir).resolve()
+        model_dir = download_root / repo_ids[0].rsplit("/", maxsplit=1)[-1]
+        if args.extract_dir:
+            extract_root = Path(args.extract_dir).resolve()
+            hmquant_dir = extract_root / "hmquant"
+        else:
+            hmquant_dir = Path.cwd() / "output" / HOUMO_TARGET / "hmquant"
+
+        print(f"Prepare C++ assets for {model_name}-{model_size}.")
+        prepare_cpp_assets(
+            input_dir=str(hmquant_dir),
+            output_dir=str(hmquant_dir),
+            model_dir=str(model_dir),
+        )

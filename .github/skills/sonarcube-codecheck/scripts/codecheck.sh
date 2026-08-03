@@ -1,10 +1,10 @@
 #!/bin/bash
-# codecheck.sh - SonarQube scan of a repo's latest commit + report generation.
+# codecheck.sh - SonarQube baseline + incremental scan + report generation.
 #
 # Adapted from the CI codecheck scripts (codecheck.sh / imodelzoo_codecheck.sh /
-# logging.sh). Instead of a CI diff file it scans the source files changed in the
-# latest commit (HEAD), waits for the Compute Engine task, then writes a Markdown
-# report to <output-dir>/<full-commit-id>.md.
+# logging.sh). It scans the parent commit as a baseline, then scans the target
+# commit's changed source files, waits for both Compute Engine tasks, and writes
+# a Markdown report to <output-dir>/<full-commit-id>.md.
 #
 # Requirements on the machine running this script (the scanner host):
 #   - sonar-scanner in PATH
@@ -33,7 +33,9 @@
 #   --scope changed|all    Scan only files changed in the commit, or the whole
 #                          tree (default: changed)
 #   --quality-gate <name>  Select this quality gate for the project before scan
-#   --project-version <v>  sonar.projectVersion (default: 1.0)
+#   --project-version <v>  target sonar.projectVersion (default: 2.0)
+#   --baseline-version <v> baseline sonar.projectVersion (default: 1.0)
+#   --no-baseline          skip the parent-commit baseline scan
 #   --python-version <v>   sonar.python.version (default: 3.8)
 #   --extra "<args>"       Extra raw args appended to sonar-scanner
 #
@@ -54,7 +56,9 @@ output_dir=""
 commit="HEAD"
 scope="changed"
 quality_gate=""
-project_version="1.0"
+project_version="2.0"
+baseline_version="1.0"
+baseline_enabled=1
 python_version="3.8"
 extra_args=""
 
@@ -69,6 +73,8 @@ while (( $# )); do
     --scope)           scope="$2"; shift 2;;
     --quality-gate)    quality_gate="$2"; shift 2;;
     --project-version) project_version="$2"; shift 2;;
+    --baseline-version) baseline_version="$2"; shift 2;;
+    --no-baseline)      baseline_enabled=0; shift;;
     --python-version)  python_version="$2"; shift 2;;
     --extra)           extra_args="$2"; shift 2;;
     *) log_err "unknown arg: $1"; exit 2;;
@@ -245,39 +251,6 @@ if [[ -n "$quality_gate" ]]; then
     -d "projectKey=${project_key}&gateName=${quality_gate}" >/dev/null
 fi
 
-# ---------- run scanner ----------
-scan_log=$(mktemp /tmp/codecheck_scan.XXXXXX.log)
-log_info "Running sonar-scanner (projectKey=$project_key, scope=$scope)"
-pushd "$repo" >/dev/null || { log_err "cannot enter repo"; exit 1; }
-  # shellcheck disable=SC2086
-  sonar-scanner \
-    -Dsonar.projectKey="$project_key" \
-    -Dsonar.sources=. \
-    ${inclusions:+-Dsonar.inclusions="$inclusions"} \
-    ${branch:+-Dsonar.branch.name="$branch"} \
-    -Dsonar.exclusions="**.java,**3rdparty**" \
-    -Dsonar.scm.disabled=true \
-    -Dsonar.sourceEncoding=UTF-8 \
-    -Dsonar.python.version="$python_version" \
-    -Dsonar.projectVersion="$project_version" \
-    -Dsonar.host.url="$url" \
-    -Dsonar.token="$token" \
-    $extra_args 2>&1 | tee "$scan_log"
-  scan_rc=${PIPESTATUS[0]}
-popd >/dev/null || true
-
-if [[ $scan_rc -ne 0 ]]; then
-  log_err "sonar-scanner failed (rc=$scan_rc). See $scan_log"
-  exit 1
-fi
-
-task_id=$(grep -oP 'api/ce/task\?id=\K[^ ]+' "$scan_log" | head -1)
-if [[ -z "$task_id" ]]; then
-  log_err "Could not find CE task id in scanner output."
-  exit 1
-fi
-log_info "CE task id: $task_id"
-
 # ---------- wait for CE task ----------
 wait_ce() {
   local tid="$1" status="PENDING" attempt=0 max_attempts=90 resp
@@ -294,63 +267,132 @@ wait_ce() {
   CE_ERROR=$(echo "$resp" | python3 -c "import sys,json;print(json.load(sys.stdin)['task'].get('errorMessage',''))" 2>/dev/null)
 }
 
-wait_ce "$task_id"
-if [[ "$CE_STATUS" != "SUCCESS" ]]; then
-  log_err "CE task did not succeed (status=$CE_STATUS). ${CE_ERROR:+errorMessage: $CE_ERROR}"
-  # A brand-new project+branch sometimes fails transiently on the first
-  # analysis. Retry the scan once before giving up.
-  log_warn "Retrying the scan once (transient CE failures happen on a project's first analysis)."
-  pushd "$repo" >/dev/null || { log_err "cannot enter repo"; exit 1; }
+run_scan() {
+  local scan_dir="$1" scan_version="$2" scan_inclusions="$3" scan_log="$4"
+  local scan_rc
+  log_info "Running sonar-scanner (projectKey=$project_key, version=$scan_version)" >&2
+  pushd "$scan_dir" >/dev/null || return 1
     # shellcheck disable=SC2086
     sonar-scanner \
       -Dsonar.projectKey="$project_key" \
       -Dsonar.sources=. \
-      ${inclusions:+-Dsonar.inclusions="$inclusions"} \
+      ${scan_inclusions:+-Dsonar.inclusions="$scan_inclusions"} \
       ${branch:+-Dsonar.branch.name="$branch"} \
       -Dsonar.exclusions="**.java,**3rdparty**" \
       -Dsonar.scm.disabled=true \
       -Dsonar.sourceEncoding=UTF-8 \
       -Dsonar.python.version="$python_version" \
-      -Dsonar.projectVersion="$project_version" \
+      -Dsonar.projectVersion="$scan_version" \
       -Dsonar.host.url="$url" \
       -Dsonar.token="$token" \
-      $extra_args 2>&1 | tee "$scan_log"
+      $extra_args 2>&1 | tee "$scan_log" >&2
     scan_rc=${PIPESTATUS[0]}
   popd >/dev/null || true
-  [[ $scan_rc -ne 0 ]] && { log_err "retry scan failed (rc=$scan_rc)."; exit 1; }
-  task_id=$(grep -oP 'api/ce/task\?id=\K[^ ]+' "$scan_log" | head -1)
-  log_info "retry CE task id: $task_id"
-  wait_ce "$task_id"
-  if [[ "$CE_STATUS" != "SUCCESS" ]]; then
-    log_err "CE task failed again (status=$CE_STATUS). ${CE_ERROR:+errorMessage: $CE_ERROR}"
-    exit 1
+  [[ $scan_rc -ne 0 ]] && return "$scan_rc"
+  grep -oP 'api/ce/task\?id=\K[^ ]+' "$scan_log" | head -1
+}
+
+run_and_wait() {
+  local scan_dir="$1" scan_version="$2" scan_inclusions="$3" label="$4"
+  local scan_log task_id scan_rc attempt
+  for attempt in 1 2; do
+    scan_log=$(mktemp /tmp/codecheck_scan.XXXXXX.log)
+    task_id=$(run_scan "$scan_dir" "$scan_version" "$scan_inclusions" "$scan_log")
+    scan_rc=$?
+    if [[ $scan_rc -ne 0 || -z "$task_id" ]]; then
+      log_err "$label scan failed or did not return a CE task id. See $scan_log"
+      return 1
+    fi
+    log_info "$label CE task id: $task_id" >&2
+    wait_ce "$task_id" >&2
+    rm -f "$scan_log"
+    if [[ "$CE_STATUS" == "SUCCESS" ]]; then
+      log_info "$label CE task SUCCESS" >&2
+      printf '%s' "$task_id"
+      return 0
+    fi
+    log_err "$label CE task did not succeed (status=$CE_STATUS). ${CE_ERROR:+errorMessage: $CE_ERROR}"
+    if [[ $attempt -eq 1 ]]; then
+      log_warn "Retrying the $label scan once (transient CE failures happen on a project's first analysis)." >&2
+    fi
+  done
+  return 1
+}
+
+baseline_task_id=""
+parent_commit=""
+if [[ "$baseline_enabled" == "1" ]]; then
+  parent_commit=$(git -C "$repo" rev-parse "${commit_full}^" 2>/dev/null || true)
+  if [[ -z "$parent_commit" ]]; then
+    log_warn "No parent commit for $commit_full; skipping baseline scan."
+  else
+    baseline_dir=$(mktemp -d /tmp/codecheck_baseline.XXXXXX)
+    git -C "$repo" archive "$parent_commit" | tar -x -C "$baseline_dir"
+    baseline_inclusions=""
+    if [[ "$scope" == "changed" ]]; then
+      baseline_src=()
+      for f in "${src[@]}"; do
+        [[ -f "$baseline_dir/$f" ]] && baseline_src+=("$f")
+      done
+      baseline_inclusions=$(IFS=,; echo "${baseline_src[*]}")
+      if [[ -z "$baseline_inclusions" ]]; then
+        baseline_inclusions="__codecheck_no_baseline_sources__"
+      fi
+    fi
+    log_info "Scanning parent commit $parent_commit as baseline version $baseline_version"
+    baseline_task_id=$(run_and_wait "$baseline_dir" "$baseline_version" "$baseline_inclusions" "Baseline") || {
+      rm -rf "$baseline_dir"
+      exit 1
+    }
+    rm -rf "$baseline_dir"
   fi
 fi
-log_info "CE task SUCCESS"
+
+log_info "Scanning target commit $commit_full as version $project_version"
+target_dir=$(mktemp -d /tmp/codecheck_target.XXXXXX)
+git -C "$repo" archive "$commit_full" | tar -x -C "$target_dir"
+task_id=$(run_and_wait "$target_dir" "$project_version" "$inclusions" "Target") || {
+  rm -rf "$target_dir"
+  exit 1
+}
+rm -rf "$target_dir"
 
 # ---------- fetch results (branch-scoped when a branch was used) ----------
 bq=""; [[ -n "$branch" ]] && bq="&branch=$branch"
 qg_json=$(curl -s -u "$token:" "$url/api/qualitygates/project_status?projectKey=$project_key$bq")
-measures_json=$(curl -s -u "$token:" "$url/api/measures/component?component=$project_key$bq&metricKeys=bugs,vulnerabilities,code_smells,security_hotspots,coverage,duplicated_lines_density,ncloc,reliability_rating,security_rating,sqale_rating,sqale_index")
-issues_json=$(curl -s -u "$token:" "$url/api/issues/search?componentKeys=$project_key$bq&resolved=false&ps=500")
+measures_json=$(curl -s -u "$token:" "$url/api/measures/component?component=$project_key$bq&metricKeys=bugs,vulnerabilities,code_smells,security_hotspots,coverage,duplicated_lines_density,ncloc,reliability_rating,security_rating,sqale_rating,sqale_index,new_violations,new_bugs,new_code_smells,new_coverage,new_duplicated_lines_density")
+issues_json=$(curl -s -u "$token:" "$url/api/issues/search?componentKeys=$project_key$bq&resolved=false&inNewCodePeriod=true&ps=500")
+total_issues_json=$(curl -s -u "$token:" "$url/api/issues/search?componentKeys=$project_key$bq&resolved=false&ps=500")
 
 report="$output_dir/$commit_full.md"
 
 # ---------- render report via python3 ----------
-export CC_QG="$qg_json" CC_MEASURES="$measures_json" CC_ISSUES="$issues_json"
+report_data_dir=$(mktemp -d /tmp/codecheck_report.XXXXXX)
+printf '%s' "$qg_json" > "$report_data_dir/quality_gate.json"
+printf '%s' "$measures_json" > "$report_data_dir/measures.json"
+printf '%s' "$issues_json" > "$report_data_dir/issues.json"
+printf '%s' "$total_issues_json" > "$report_data_dir/total_issues.json"
+export CC_QG_FILE="$report_data_dir/quality_gate.json"
+export CC_MEASURES_FILE="$report_data_dir/measures.json"
+export CC_ISSUES_FILE="$report_data_dir/issues.json"
+export CC_TOTAL_ISSUES_FILE="$report_data_dir/total_issues.json"
 export CC_URL="$url" CC_PK="$project_key" CC_REPO="$repo" CC_TASK="$task_id"
 export CC_COMMIT="$commit_full" CC_BRANCH="$branch" CC_AUTHOR="$commit_author"
 export CC_DATE="$commit_date" CC_SUBJECT="$commit_subject" CC_INCL="$inclusions"
 export CC_REPORT="$report" CC_SHELLCHECK="$shellcheck_ok"
+export CC_BASELINE_TASK="$baseline_task_id" CC_BASELINE_COMMIT="$parent_commit"
 
 python3 - <<'PY'
 import os, json
 
-def j(env):
-    try: return json.loads(os.environ.get(env, "") or "{}")
+def j(path_env):
+    try:
+        with open(os.environ[path_env], encoding="utf-8") as stream:
+            return json.load(stream)
     except Exception: return {}
 
-qg = j("CC_QG"); measures = j("CC_MEASURES"); issues = j("CC_ISSUES")
+qg = j("CC_QG_FILE"); measures = j("CC_MEASURES_FILE"); issues = j("CC_ISSUES_FILE")
+total_issues = j("CC_TOTAL_ISSUES_FILE")
 url=os.environ["CC_URL"]; pk=os.environ["CC_PK"]
 
 RATING={"1.0":"A","2.0":"B","3.0":"C","4.0":"D","5.0":"E"}
@@ -375,6 +417,9 @@ lines.append(f"- SonarQube: {url}")
 lines.append(f"- Project Key: `{pk}`")
 lines.append(f"- Dashboard: {dash}")
 lines.append(f"- 分析任务 ID: `{os.environ['CC_TASK']}`")
+if os.environ.get("CC_BASELINE_TASK"):
+    lines.append(f"- 基线 Commit: `{os.environ.get('CC_BASELINE_COMMIT','')}`")
+    lines.append(f"- 基线分析任务 ID: `{os.environ['CC_BASELINE_TASK']}`")
 lines.append("")
 
 lines.append("## Quality Gate\n")
@@ -398,10 +443,12 @@ lines.append(f"| 技术债 (sqale_index) | {m.get('sqale_index','-')} min |")
 lines.append(f"| 重复率 | {m.get('duplicated_lines_density','-')}% |")
 lines.append(f"| 覆盖率 | {m.get('coverage','-')}% |")
 lines.append(f"| 有效代码行 (ncloc) | {m.get('ncloc','-')} |")
+lines.append(f"| 增量 Issues | {issues.get('total',len(issues.get('issues',[])))} |")
+lines.append(f"| 全量 Issues | {total_issues.get('total',len(total_issues.get('issues',[])))} |")
 lines.append("")
 
 lst=issues.get("issues",[])
-lines.append(f"## Issues (共 {issues.get('total',len(lst))})\n")
+lines.append(f"## 增量 Issues (共 {issues.get('total',len(lst))})\n")
 if lst:
     lines.append("| 严重度 | 类型 | 文件 | 行 | 说明 |")
     lines.append("| --- | --- | --- | --- | --- |")
@@ -437,6 +484,7 @@ print("REPORT_WRITTEN:"+os.environ["CC_REPORT"])
 PY
 
 rc=$?
+rm -rf "$report_data_dir"
 rm -f "$scan_log"
 if [[ $rc -ne 0 ]]; then
   log_err "report generation failed"
