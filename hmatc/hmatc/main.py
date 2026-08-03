@@ -90,7 +90,9 @@ def main():
     logger.setLevel(log_level)
 
     # print version info
-    logger.info(f"Hmatc version: {__version__}, commit: {__commit__}, build time: {__build_time__}")
+    logger.info(
+        f"Hmatc version: {__version__}, commit: {__commit__}, build time: {__build_time__}"
+    )
 
     # Set random seed
     set_random_seed(1234)
@@ -98,9 +100,9 @@ def main():
     current_command = args.command
     request = resolve_command_request(args, parser)
     if request.kind == "eval.llm":
-        from .llm_eval import run_llm_eval
+        from .lm_eval import run_lm_eval
 
-        return run_llm_eval(args)
+        return run_lm_eval(args)
 
     if current_command == "quant" and args.enable_layernorm2rmsnorm:
         logger.info("ENABLE_LAYERNORM2RMSNORM = 1")

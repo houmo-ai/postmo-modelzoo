@@ -89,26 +89,91 @@ hmatc eval -c config.yml --onnx  # ONNX评估
 
 ### 大模型评测
 
-大模型评测沿用 `hmatc eval` 命令，但不使用 `-c/--config`。`--model-dir` 表示大模型产物目录，只传给 EvalScope 的 `TaskConfig.model` 和 `model_args["model_dir"]`，不会复用配置文件中的 `model.model_path`，避免和小模型 ONNX 路径混淆。
+大模型评测沿用 `hmatc eval` 命令，但不使用 `-c/--config`。模型适配实现内置于 HMATC，由 `--model-name` 选择模型族，`--model-size` 选择具体规格，`--model` 指向模型产物根目录。数据集编排和指标计算仍由 EvalScope 完成。
 
 ```bash
 hmatc eval \
-  --model examples/qwen3/hm_xh2_qwen3.py \
-  --model-dir examples/qwen3/models/hmm_xh2_qwen3_8b_256_8k_b1_1chip_2cores_v1.1.0/ \
-  --dataset gsm8k \
-  --limit 2 \
-  --model-args tokenizer_dir=examples/qwen3/models/tokenizers
+  --model-name gemma4 \
+  --model-size e2b \
+  --model /path/to/gemma4-e2b \
+  --backend hmm \
+  --dataset cmmlu \
+  --limit 10 \
+  --model-args devices=0 \
+  --model-args max_new_tokens=2048
 ```
 
 参数说明：
-- `--model`：自定义大模型评测脚本路径或 Python 模块名，脚本需定义 `API_NAME` 并通过 EvalScope 注册模型 API。
-- `--model-dir`：大模型权重/产物目录，独立于小模型配置里的 ONNX 路径。
+- `--model-name`：HMATC 内置模型族名称；当前支持 `gemma4`。
+- `--model-size`：模型规格；Gemma4 支持 `26b-a4b`、`31b`、`e2b` 和 `e4b`。
+- `--model`：模型产物根目录，传给 EvalScope 的 `TaskConfig.model`。
+- `--backend`：后端类型，可选 `auto`、`raw`、`hmonnx` 或 `hmm`。`auto` 根据产物自动检测；Gemma4 当前仅实现 HMM 执行，`raw` 和 `hmonnx` 会返回明确的未实现错误。
 - `--dataset`：一个或多个 EvalScope 数据集名称或路径。
 - `--limit`：最多评测样本数，`0` 表示全量。
 - `--output`：评测输出目录，默认 `./outputs`。
-- `--model-args KEY=VALUE`：透传给模型 API 的额外参数，可重复指定。
+- `--model-args KEY=VALUE`：传给内置模型适配器的额外参数，可重复指定，例如 `devices=0,1`、`max_new_tokens=64` 或 `enable_thinking=true`；不能覆盖保留参数 `model_size` 和 `backend`。
 
-## 配置文件
+Gemma4 默认从产物根目录读取 `gemma4-<size>_prefill.hmm`、`gemma4-<size>_decode.hmm`、`hmquant/quant_embedding.pt` 和 `hmquant/hf_config/`。`e2b`、`e4b` 还需要 `hmquant/per_layer_input_embedding.pt`。多设备执行使用 `.hmms` 产物。可通过 `prefill_path`、`decode_path`、`embedding_path`、`tokenizer_dir` 和 `PLE_path` 等 `--model-args` 覆盖默认路径。
+
+## 大模型(LM) 配置文件
+
+```yaml
+version: 2
+target: xh2
+save_dir: 
+
+# 模型信息
+model:
+  model_name: gemma4
+  model_size: e2b
+  modelscope_repo: ["google/gemma-4-E2B"]
+  model_dir: 
+
+# 量化信息
+quant:
+  prefill_chunk_length: 256
+  context_length: 2048
+  bits: 4
+  method: gptq/autoround
+  skip_gptq: false
+  quant_type:
+    prefill: w8a8h1_sefp
+    decode: w8a8h1_sefp
+    visual: w8a8h1_sefp
+    audio: w8a8h1_sefp
+  only_visual: false  # 可选，默认false
+  only_audio: false # 可选，默认false
+  
+
+# 编译信息
+build:
+  # 对所有hmonnx生效
+  flash_attention: 2  # 可选, 默认2
+  llm_opt: true  # 可选，默认true
+  enable_common_subgraph: false  #可选，默认false
+  ncore: 2  # 可选，默认2
+  ndevice: 1  # 可选，默认1
+  cpp_backend: v2  # 可选，默认v2
+  all_logits: false   # 可选, 默认false
+  batch: 1   # 可选，默认1
+  device_kernel_split: 1  # 可选， 默认1
+  prefill_chunk_length: 320  # 可选，默认由hmonnx决定
+  context_length: 262144  # 可选，默认由hmonnx决定
+  # 子模型可复写
+  prefill:
+    is_llm_prefill: true  # 可选，默认true
+    prefill_chunk_length: 320  # 可选，默认由hmonnx决定
+    context_length: 262144  # 可选，默认由hmonnx决定
+  decode:
+    is_llm_decode: true  # 可选，默认true
+    batch: 1
+    context_length: 262144  # 可选，默认由hmonnx决定
+  visual:
+    batch: 1
+    ncore: 1
+```
+
+## ONNX 配置文件
 
 ```yaml
 # 模型信息

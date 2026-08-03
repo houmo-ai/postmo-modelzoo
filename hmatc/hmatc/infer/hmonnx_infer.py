@@ -1,8 +1,8 @@
 # Copyright 2025 HOUMO AI
 #
-# File: xhquant_infer.py
+# File: hmonnx_infer.py
 # Description:
-#   XH2 HmQuant inference script using xhquant backend.
+#   HMONNX inference script using xhquant backend.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,16 +27,23 @@ from ..base.base_infer import BaseInfer
 from ..utils import logger
 from ..utils.utils import torch_to_numpy_dtype, gen_random_data
 
+try:
+    from xhquant.api import xhquant_init
 
-class Xh2HmQuantInfer(BaseInfer, ABC):
+    xhquant_init(logger=logger)
+except ImportError:
+    logger.fatal("Please install xhquant first.")
+
+
+class HmonnxInfer(BaseInfer, ABC):
     """
-    Inference class for XH2 HmQuant models.
-    Handles loading, running and unloading of quantized models using the xhquant backend for XH2 hardware.
+    Inference class for HMONNX models.
+    Handles loading, running and unloading of quantized models using the xhquant backend for HMONNX hardware.
     """
 
     def __init__(self):
         """
-        Initialize the Xh2HmQuantInfer instance.
+        Initialize the HmonnxInfer instance.
         Sets up the backend, model extension, and initializes input/output tracking.
         Initializes the xhquant runtime.
         """
@@ -49,16 +56,10 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         self.outputs_info = dict()
         if torch.cuda.is_available():
             self.device = "cuda"
-        try:
-            from xhquant.api import xhquant_init
-
-            xhquant_init(logger=logger)
-        except ImportError:
-            logger.fatal("Please install xhquant first.")
 
     def load(self, model_path, device_id=0):
         """
-        Load the XH2 HmQuant model from the specified path.
+        Load the HMONNX model from the specified path.
 
         Args:
             model_path (str): Path to the HMONNX model file (.onnx)
@@ -75,12 +76,12 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         self.engine.to(torch.device(self.device))
         self.input_names = self.engine.get_input_names()
         self.output_names = self.engine.get_output_names()
-        logger.info("load Xh2Hmquant model successfully.")
+        logger.info("load HMONNX model successfully.")
 
         for idx, name in enumerate(self.input_names):
             info = self.engine.get_input(name)
             logger.info(
-                f"[Xh2Hmquant] input[{info.name}], shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
+                f"[HMONNX] input[{info.name}], shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
             )
             self.inputs_batch[name] = info.shape[0]
             self.inputs_info[name] = {"shape": info.shape, "dtype": info.dtype}
@@ -88,20 +89,21 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         for idx, name in enumerate(self.output_names):
             info = self.engine.get_output(name)
             logger.info(
-                f"[Xh2Hmquant] output[{info.name}], shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
+                f"[HMONNX] output[{info.name}], shape = {list(info.shape)}, dtype = {torch_to_numpy_dtype[info.dtype]}"
             )
             self.outputs_info[name] = {"shape": info.shape, "dtype": info.dtype}
             self.outputs_batch[name] = info.shape[0]
 
-    def run(self, in_datas: dict, dequant=True) -> Dict[str, np.ndarray]:
+    def run(self, in_datas: dict, dequant=True, to_numpy=True) -> Dict[str, np.ndarray]:
         """
-        Run inference on the loaded XH2 HmQuant model with the provided input data.
+        Run inference on the loaded HMONNX model with the provided input data.
 
         Args:
             in_datas (dict): Dictionary of input data where keys are input names
                 and values are torch tensors
 
             dequant (bool): Whether to dequantize the output data (default: True)
+            to_numpy (bool): Whether to convert the output data to numpy arrays (default: True)
 
         Returns:
             Dict[str, np.ndarray]: Dictionary of output data where keys are output names
@@ -116,17 +118,19 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
         outputs = self.engine.run(in_datas)
         self.time_span += (time.time() - t_start) * 1000
         if len(self.output_names) == 1:
-            np_data = outputs.detach().cpu().numpy()
             if dequant:
-                np_data = np_data.astype(np.float32)
-            outputs = {self.output_names[0]: np_data}
+                data = outputs.to(torch.float32)
+            if to_numpy:
+                data = data.detach().cpu().numpy()
+            outputs = {self.output_names[0]: data}
             return outputs
         out_datas = dict()
         for idx, name in enumerate(self.output_names):
-            np_data = outputs[idx].detach().cpu().numpy()
             if dequant:
-                np_data = np_data.astype(np.float32)
-            out_datas[name] = np_data
+                data = outputs[idx].to(torch.float32)
+            if to_numpy:
+                data = data.detach().cpu().numpy()
+            out_datas[name] = data
         return out_datas
 
     def unload(self):
@@ -162,3 +166,21 @@ class Xh2HmQuantInfer(BaseInfer, ABC):
             raise NotImplementedError("dynamic resizer input is not supported.")
         else:
             return gen_random_data(shape, torch_to_numpy_dtype[dtype])
+
+    def get_input_name(self, idx: int) -> str:
+        return self.input_names[idx]
+
+    def get_output_name(self, idx: int) -> str:
+        return self.output_names[idx]
+
+    def get_num_inputs(self):
+        return len(self.input_names)
+
+    def get_num_outputs(self):
+        return len(self.output_names)
+
+    def get_input_info(self, name: str):
+        return self.inputs_info[name]
+
+    def get_output_info(self, name: str):
+        return self.outputs_info[name]

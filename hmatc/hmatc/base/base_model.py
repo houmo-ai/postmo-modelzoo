@@ -27,8 +27,7 @@ from ..utils.utils import SUPPORT_BACKEND
 from ..dataloaders.loaders import validate_sample
 from ..infer.xh2_infer import Xh2Infer
 from ..infer.onnx_infer import OnnxInfer
-from ..infer.xhquant_infer import Xh2HmQuantInfer
-
+from ..infer.hmonnx_infer import HmonnxInfer
 
 COLORS = [
     (0, 0, 255),
@@ -73,7 +72,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         elif self.backend == "xh2":
             self.engine = Xh2Infer()
         elif self.backend == "hmonnx":
-            self.engine = Xh2HmQuantInfer()
+            self.engine = HmonnxInfer()
         else:
             logger.fatal(f"Not support backend: {self.backend}")
 
@@ -145,7 +144,9 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             resizer_mode = self.resizer_modes.get(input_name, 0)
             data = hmonnx_inputs[input_name]
             if resizer_mode == 0:
-                inputs[input_name] = np.ascontiguousarray(self._cast_runtime_input(data))
+                inputs[input_name] = np.ascontiguousarray(
+                    self._cast_runtime_input(data)
+                )
                 continue
 
             fmt = self._get_yuv_format(input_name)
@@ -155,7 +156,9 @@ class BaseModel(object, metaclass=abc.ABCMeta):
 
             if resizer_mode in [1, 2]:
                 if input_name not in dyn_info:
-                    logger.fatal(f"Missing dynamic resizer params for input: {input_name}")
+                    logger.fatal(
+                        f"Missing dynamic resizer params for input: {input_name}"
+                    )
                 inputs[f"resizer_crop_{input_name}"] = np.ascontiguousarray(
                     dyn_info[input_name].astype(np.int32)
                 )
@@ -173,7 +176,11 @@ class BaseModel(object, metaclass=abc.ABCMeta):
     def _repeat_runtime_inputs(self, runtime_inputs):
         repeated = {}
         for name, data in runtime_inputs.items():
-            if name.startswith("resizer_crop_") and self.backend == "xh2" and self.roi_num > 1:
+            if (
+                name.startswith("resizer_crop_")
+                and self.backend == "xh2"
+                and self.roi_num > 1
+            ):
                 repeated[name] = np.repeat(data, repeats=self.roi_num, axis=0)
                 continue
 
@@ -211,9 +218,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         return data
 
     @abc.abstractmethod
-    def postprocess(
-        self, outs: Dict[str, np.ndarray], in_datas: Dict[str, Any]
-    ) -> Any:
+    def postprocess(self, outs: Dict[str, np.ndarray], in_datas: Dict[str, Any]) -> Any:
         """Postprocess model outputs."""
         pass
 

@@ -121,9 +121,7 @@ demo
 CCPD*
 datasets
 lib
-hmonnx*
-<<<<<<< HEAD
+.claude
+sea-raft
 !/3rdparty/
 android
-=======
->>>>>>> 4a691b7e... tools OHOS

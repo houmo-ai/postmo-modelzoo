@@ -57,21 +57,21 @@ def resolve_command_request(args: Namespace, parser: ArgumentParser) -> CommandR
 
 
 def _resolve_eval_request(args: Namespace, parser: ArgumentParser) -> CommandRequest:
-    llm_values = [args.model, args.model_dir, args.dataset]
+    llm_values = [args.model_name, args.model_size, args.model, args.dataset]
     has_llm_arg = any(value is not None for value in llm_values)
     has_all_llm_args = all(value is not None for value in llm_values)
 
+    required_args = "--model-name, --model-size, --model, and --dataset"
     if args.config and has_llm_arg:
         parser.error(
             "hmatc eval uses either -c/--config for config-driven ONNX/small-model "
-            "evaluation or --model/--model-dir/--dataset for large-model evaluation, "
-            "but not both."
+            f"evaluation or {required_args} for large-model evaluation, but not both."
         )
 
     if has_llm_arg:
         if not has_all_llm_args:
             parser.error(
-                "hmatc eval without -c/--config requires --model, --model-dir, and --dataset"
+                f"hmatc eval without -c/--config requires {required_args}"
             )
         return CommandRequest("eval.llm", args)
 
@@ -79,5 +79,5 @@ def _resolve_eval_request(args: Namespace, parser: ArgumentParser) -> CommandReq
         return CommandRequest("eval.config", args)
 
     parser.error(
-        "hmatc eval requires either -c/--config or --model/--model-dir/--dataset"
+        f"hmatc eval requires either -c/--config or {required_args}"
     )

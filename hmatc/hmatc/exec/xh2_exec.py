@@ -33,7 +33,7 @@ from ..dataloaders.factory import create_dataloader
 from ..dataloaders.loaders import validate_sample
 from ..infer.onnx_infer import OnnxInfer
 from ..infer.xh2_infer import Xh2Infer
-from ..infer.xhquant_infer import Xh2HmQuantInfer
+from ..infer.hmonnx_infer import HmonnxInfer
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
 from ..utils.bfp import cast_fp_data_to_act_hmfp_data
@@ -605,7 +605,7 @@ class Xh2Exec(BaseExec):
         # Compare outputs
         logger.info("Loading golden outputs:")
         table = PrettyTable(["name", "cosine_dist"])
-        table.title = "xh2 vs hmquant"
+        table.title = "hmm vs hmonnx"
         outputs_result = {}
 
         for output_name in outputs:
@@ -666,13 +666,13 @@ class Xh2Exec(BaseExec):
         onnx_infer.load(self.model_path)
         logger.info(f"  onnx: {self.model_path}")
 
-        hmquant_infer = Xh2HmQuantInfer()
-        hmquant_infer.load(self.quant_onnx_model_path)
-        logger.info(f"  hmquant: {self.quant_onnx_model_path}")
+        hmonnx_infer = HmonnxInfer()
+        hmonnx_infer.load(self.quant_onnx_model_path)
+        logger.info(f"  hmonnx: {self.quant_onnx_model_path}")
 
         xh2_infer = Xh2Infer()
         xh2_infer.load(self.hmm_path)
-        logger.info(f"  xh2: {self.hmm_path}")
+        logger.info(f"  hmm: {self.hmm_path}")
 
         if not os.path.exists(data_path):
             logger.fatal(f"Not found data_path: {data_path}")
@@ -687,10 +687,10 @@ class Xh2Exec(BaseExec):
         if len(dataloader) == 0:
             logger.fatal("No compare data found")
         sample = validate_sample(dataloader[0], self.inputs_cfg)
-        onnx_in_datas, hmquant_in_datas, xh2_in_datas = self._sample_to_compare_inputs(
+        onnx_in_datas, hmonnx_in_datas, xh2_in_datas = self._sample_to_compare_inputs(
             sample,
             onnx_infer,
-            hmquant_infer,
+            hmonnx_infer,
             xh2_infer,
         )
 
@@ -698,9 +698,9 @@ class Xh2Exec(BaseExec):
         logger.info("Running inference:")
         logger.info("  ONNX inference...")
         onnx_outputs = onnx_infer.run(onnx_in_datas)
-        logger.info("  HmQuant inference...")
-        hmquant_outputs = hmquant_infer.run(hmquant_in_datas)
-        logger.info("  XH2 inference...")
+        logger.info("  Hmonnx inference...")
+        hmonnx_outputs = hmonnx_infer.run(hmonnx_in_datas)
+        logger.info("  Hmm inference...")
         xh2_outputs, xh2_outputs_dequanted = xh2_infer.run(xh2_in_datas)
         self.save_profile_data(xh2_outputs)
 
@@ -718,10 +718,10 @@ class Xh2Exec(BaseExec):
                 repeats=onnx_batch // onnx_outputs[output_name].shape[0],
                 axis=0,
             )
-            hmquant_batch = hmquant_infer.outputs_batch[output_name]
+            hmquant_batch = hmonnx_infer.outputs_batch[output_name]
             hmquant_out = np.repeat(
-                hmquant_outputs[output_name],
-                repeats=hmquant_batch // hmquant_outputs[output_name].shape[0],
+                hmonnx_outputs[output_name],
+                repeats=hmquant_batch // hmonnx_outputs[output_name].shape[0],
                 axis=0,
             )
             xh2_out = np.split(
@@ -763,11 +763,11 @@ class Xh2Exec(BaseExec):
         self,
         sample,
         onnx_infer,
-        hmquant_infer,
+        hmonnx_infer,
         xh2_infer,
     ):
         onnx_in_datas = {}
-        hmquant_in_datas = {}
+        hmonnx_in_datas = {}
         xh2_in_datas = {}
         inputs = sample["inputs"]
         hmonnx_inputs = sample["hmonnx_inputs"]
@@ -778,7 +778,7 @@ class Xh2Exec(BaseExec):
             onnx_data = inputs[input_name]
             hmonnx_data = hmonnx_inputs[input_name]
             onnx_batch = onnx_infer.inputs_batch[input_name]
-            hmonnx_batch = hmquant_infer.inputs_batch[input_name]
+            hmonnx_batch = hmonnx_infer.inputs_batch[input_name]
             hmm_batch = xh2_infer.inputs_batch[input_name]
 
             onnx_in_datas[input_name] = np.repeat(
@@ -795,7 +795,7 @@ class Xh2Exec(BaseExec):
                         f"and hmonnx: {hmonnx_batch}"
                     )
                 hmonnx_data = self._cast_runtime_input(hmonnx_data)
-                hmquant_in_datas[input_name] = torch.from_numpy(hmonnx_data.copy())
+                hmonnx_in_datas[input_name] = torch.from_numpy(hmonnx_data.copy())
                 xh2_in_datas[input_name] = np.repeat(
                     hmonnx_data,
                     repeats=hmm_batch // hmonnx_data.shape[0],
@@ -809,7 +809,7 @@ class Xh2Exec(BaseExec):
                     f"expected onnx: {onnx_batch}, got hmonnx: {hmonnx_batch}"
                 )
             hmonnx_tensor = torch.from_numpy(hmonnx_data).to(torch.float16)
-            hmquant_in_datas[input_name] = hmonnx_tensor.repeat_interleave(
+            hmonnx_in_datas[input_name] = hmonnx_tensor.repeat_interleave(
                 hmonnx_batch, dim=0
             ).contiguous()
 
@@ -827,16 +827,16 @@ class Xh2Exec(BaseExec):
                     )
                 resizer_name = f"resizer_crop_{input_name}"
                 dyn_tensor = torch.from_numpy(dyn_info[input_name])
-                hmonnx_dyn_batch = hmquant_infer.inputs_batch[resizer_name]
+                hmonnx_dyn_batch = hmonnx_infer.inputs_batch[resizer_name]
                 hmm_dyn_batch = xh2_infer.inputs_batch[resizer_name]
-                hmquant_in_datas[resizer_name] = dyn_tensor.repeat_interleave(
+                hmonnx_in_datas[resizer_name] = dyn_tensor.repeat_interleave(
                     hmonnx_dyn_batch, dim=0
                 )
                 xh2_in_datas[resizer_name] = dyn_tensor.repeat_interleave(
                     hmm_dyn_batch, dim=0
                 ).numpy()
 
-        return onnx_in_datas, hmquant_in_datas, xh2_in_datas
+        return onnx_in_datas, hmonnx_in_datas, xh2_in_datas
 
     @staticmethod
     def _cast_runtime_input(data):
@@ -1021,7 +1021,7 @@ class Xh2Exec(BaseExec):
             if enable_layers:
                 hmonnx = BaseExec.add_node_output_as_graph_output(hmonnx, target)
 
-            model = Xh2HmQuantInfer()
+            model = HmonnxInfer()
             model.load(hmonnx)
 
             if data_path is not None:

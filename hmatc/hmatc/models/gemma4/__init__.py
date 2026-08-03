@@ -2,7 +2,7 @@
 #
 # File: __init__.py
 # Description:
-#   This file is part of the hmatc.utils Python package.
+#   Initialization file for the Gemma4 models.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,22 +17,20 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
-"""
-hmatc.utils - Utility modules including logging configuration.
-"""
+from .gemma4 import (
+    API_NAME,
+    Gemma4Artifacts,
+    HmGemma4,
+    parse_devices,
+    resolve_gemma4_artifacts,
+    select_gemma4_class_name,
+)
 
-import sys
-import logging
-from .logging_format import LoggingFormatterWithColor, FatalExitHandler
-
-# Configure root logger with colored glog-style output
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setFormatter(LoggingFormatterWithColor())
-
-# FATAL level will exit the process
-fatal_handler = FatalExitHandler()
-
-logger = logging.getLogger()
-logger.addHandler(console_handler)
-logger.addHandler(fatal_handler)
-logger.setLevel(logging.INFO)
+__all__ = [
+    "API_NAME",
+    "Gemma4Artifacts",
+    "HmGemma4",
+    "parse_devices",
+    "resolve_gemma4_artifacts",
+    "select_gemma4_class_name",
+]

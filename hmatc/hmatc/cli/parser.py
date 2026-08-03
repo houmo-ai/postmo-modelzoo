@@ -18,6 +18,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 import argparse
+import json
 import os
 
 
@@ -81,8 +82,8 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Run model evaluation in one of two modes:\n"
             "  1. Config-driven small-model eval: hmatc eval -c config.yml [--onnx]\n"
-            "  2. Large-model EvalScope eval: hmatc eval --model MODEL --model-dir DIR --dataset DATASET [...]\n\n"
-            "The two modes are mutually exclusive. --model-dir is only used by the large-model EvalScope path."
+            "  2. Large-model EvalScope eval: hmatc eval --model-name NAME --model-size SIZE --model PATH --dataset DATASET [...]\n\n"
+            "The two modes are mutually exclusive. --model is the large-model artifact root."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -168,20 +169,41 @@ def build_parser() -> argparse.ArgumentParser:
     # large-model eval
     llm_eval_group = evaluate_parser.add_argument_group("Large-model EvalScope mode")
     llm_eval_group.add_argument(
-        "--model",
+        "--model-name",
         type=str,
-        help="Large-model implementation script (.py) or Python module name",
+        help="Built-in large-model implementation name, e.g. gemma4",
     )
     llm_eval_group.add_argument(
-        "--model-dir",
+        "--model-size",
         type=str,
-        help="Large-model artifact directory, isolated from config model.model_path",
+        help="Built-in model variant, e.g. e2b",
+    )
+    llm_eval_group.add_argument(
+        "--model",
+        type=str,
+        help="Large-model artifact root path",
+    )
+    llm_eval_group.add_argument(
+        "--backend",
+        type=str,
+        choices=("auto", "raw", "hmonnx", "hmm"),
+        default="auto",
+        help="Large-model artifact backend, default: auto",
     )
     llm_eval_group.add_argument(
         "--dataset",
         type=str,
         nargs="+",
         help="One or more EvalScope dataset names/paths, e.g. --dataset mmlu gsm8k",
+    )
+    llm_eval_group.add_argument(
+        "--dataset-args",
+        type=json.loads,
+        default={},
+        help=(
+            "EvalScope dataset arguments as a JSON object, e.g. "
+            "--dataset-args '{\"cmmlu\":{\"subset_list\":[\"agronomy\"]}}'"
+        ),
     )
     llm_eval_group.add_argument(
         "--output",

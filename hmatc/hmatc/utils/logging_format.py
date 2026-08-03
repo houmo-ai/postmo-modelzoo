@@ -20,6 +20,7 @@
 """
 Logging Format Utilities - Custom formatters for glog-style and colored output.
 """
+
 import sys
 import time
 import logging
@@ -124,7 +125,8 @@ class LoggingFormatterWithColor(BaseFormatter):
     RESET = "\x1b[0m"
     COLORS = {
         logging.DEBUG: "\x1b[98;20m",  # grey
-        logging.INFO: "\x1b[92;20m",  # green
+        # logging.INFO: "\x1b[92;20m",  # green
+        logging.INFO: "",  # white
         logging.WARN: "\x1b[93;20m",  # yellow
         logging.ERROR: "\x1b[91;1m",  # bold red
         logging.FATAL: "\x1b[91;1m",  # bold red
