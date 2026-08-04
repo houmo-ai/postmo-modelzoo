@@ -23,9 +23,12 @@
 import pytest
 import os
 import logging
+import re
 from datetime import datetime
+from pathlib import Path
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
+unit_tests_dir = Path(script_dir) / "unit_tests"
 
 # Download models from local server
 os.environ["HOUMO_MODELZOO_URL"] = "http://artifactory.houmo.ai/artifactory/Dadao"
@@ -48,6 +51,32 @@ if os.getenv("HOUMO_EXAMPLES_PATH", None) is None or not os.getenv("HOUMO_EXAMPL
 os.environ["HOUMO_VERSION"] = "1.5.0"
 
 
+def pytest_ignore_collect(collection_path, config):
+    """Skip implicit unit-test recursion while allowing explicit selection."""
+    if collection_path != unit_tests_dir and unit_tests_dir not in collection_path.parents:
+        return None
+    if _unit_tests_requested(config):
+        return None
+    return True
+
+
+def _unit_tests_requested(config):
+    """Return whether the CLI explicitly selects unit tests by marker or path."""
+    mark_expression = config.getoption("markexpr", default="").strip()
+    if re.search(r"(?<![\w.:-])unit(?![\w.:-])", mark_expression):
+        return True
+    invocation_dir = Path(config.invocation_params.dir)
+    for argument in config.args:
+        path_argument = str(argument).split("::", maxsplit=1)[0]
+        requested_path = Path(path_argument)
+        if not requested_path.is_absolute():
+            requested_path = invocation_dir / requested_path
+        requested_path = requested_path.resolve()
+        if requested_path == unit_tests_dir or unit_tests_dir in requested_path.parents:
+            return True
+    return False
+
+
 def pytest_configure(config):
     """
     Configure pytest with shared markers for all tests.
@@ -63,6 +92,7 @@ def pytest_configure(config):
         "dev_mem_12g",
         "dev_mem_24g",
         "dev_mem_48g",
+        "unit: test framework logic without device or model dependencies",
     ]
     for markers in shared_markers:
         config.addinivalue_line("markers", markers)

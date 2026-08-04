@@ -21,10 +21,6 @@
 import pytest
 from pathlib import Path
 
-# Historical snapshots retain their original ``test_*.py`` filenames for
-# comparison only and must not participate in the active pytest suite.
-collect_ignore = ["history_codes"]
-
 
 def pytest_configure(config):
     """

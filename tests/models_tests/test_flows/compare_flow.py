@@ -22,7 +22,10 @@
 
 from __future__ import annotations
 
+import logging
+import math
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from ...tests_utils.runtime_context import TCaseType
@@ -44,6 +47,18 @@ from .inference_flow_support import (
 from .hmatc_flow_support import persist_separate_workspace, run_hmatc_cases
 
 __all__ = ["CompareFlowHandler"]
+
+
+logger = logging.getLogger(__name__)
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+
+
+@dataclass(frozen=True)
+class _CompareTable:
+    """Hold one parsed HMATC Cosine Distance table."""
+
+    headers: tuple[str, ...]
+    rows: tuple[tuple[str, ...], ...]
 
 
 @dataclass(frozen=True)
@@ -98,19 +113,114 @@ class CompareFlowHandler:
 
 
 def _compare_output_passed(output: str, backend: str, threshold: float) -> bool:
-    """Return whether comparison output satisfies the backend threshold."""
-    if backend == "xh2":
-        pattern = re.compile(r"\|\s*([^|]+?)\s*\|\s*(\d+\.\d+)\s*\|\s*(\d+\.\d+)\s*\|\s*(\d+\.\d+)\s*\|$")
-    else:
-        pattern = re.compile(r"\|\s*([^|]+?)\s*\|\s*(\d+\.\d+)\s*\|\s*(\d+\.\d+)\s*\|\s*(\d+\.\d+)\s*\|\s*(\w+)\s*\|$")
-    header_seen = False
-    rows = []
-    for line in output.splitlines():
-        stripped = line.strip()
-        if "onnx vs hmquant" in stripped:
-            header_seen = True
+    """Return whether every comparison metric in the table passes."""
+    del backend  # Table structure, rather than backend-specific labels, selects the metric.
+    table = _parse_cosine_distance_table(output)
+    if table is None:
+        logger.error("HMATC compare output has no valid Cosine Distance table")
+        return False
+    metric_indexes = _comparison_column_indexes(table.headers)
+    if len(metric_indexes) < 2:
+        logger.error(
+            "HMATC compare table must contain at least two 'X vs Y' columns: headers=%s",
+            table.headers,
+        )
+        return False
+    for row in table.rows:
+        for metric_index in metric_indexes:
+            value = _parse_finite_float(row[metric_index])
+            if value is None:
+                logger.error(
+                    "HMATC compare metric is not numeric: output=%s header=%s value=%s",
+                    row[0],
+                    table.headers[metric_index],
+                    row[metric_index],
+                )
+                return False
+            if value < threshold:
+                logger.error(
+                    "HMATC compare metric is below threshold: output=%s header=%s actual=%s threshold=%s",
+                    row[0],
+                    table.headers[metric_index],
+                    value,
+                    threshold,
+                )
+                return False
+    return True
+
+
+def _parse_cosine_distance_table(output: str) -> _CompareTable | None:
+    """Parse the first populated ASCII table under the Cosine Distance title."""
+    table_lines = iter(_table_cells(line) for line in output.splitlines())
+    if not _advance_to_cosine_distance_section(table_lines):
+        return None
+    headers = _next_compare_header(table_lines)
+    if headers is None:
+        return None
+    rows = _collect_compare_rows(table_lines, len(headers))
+    return _CompareTable(headers, rows) if rows else None
+
+
+def _advance_to_cosine_distance_section(table_lines: Iterator[tuple[str, ...]]) -> bool:
+    """Consume table lines through the first Cosine Distance title."""
+    return any(len(cells) == 1 and cells[0].casefold() == "cosine distance" for cells in table_lines)
+
+
+def _next_compare_header(table_lines: Iterator[tuple[str, ...]]) -> tuple[str, ...] | None:
+    """Return the first valid compare header after the section title."""
+    return next(
+        (cells for cells in table_lines if len(cells) >= 2 and cells[0].casefold() == "name"),
+        None,
+    )
+
+
+def _collect_compare_rows(
+    table_lines: Iterator[tuple[str, ...]],
+    column_count: int,
+) -> tuple[tuple[str, ...], ...]:
+    """Collect contiguous data rows matching the compare header width."""
+    rows: list[tuple[str, ...]] = []
+    for cells in table_lines:
+        if len(cells) == column_count and _is_compare_data_row(cells):
+            rows.append(cells)
             continue
-        match = pattern.match(stripped)
-        if match and header_seen:
-            rows.append(match.groups())
-    return bool(rows) and all(float(row[3]) >= threshold for row in rows)
+        if rows and cells:
+            break
+    return tuple(rows)
+
+
+def _table_cells(line: str) -> tuple[str, ...]:
+    """Extract pipe-delimited cells while ignoring log prefixes and ANSI codes."""
+    clean = _ANSI_ESCAPE_RE.sub("", line)
+    start = clean.find("|")
+    end = clean.rfind("|")
+    if start < 0 or end <= start:
+        return ()
+    return tuple(cell.strip() for cell in clean[start + 1 : end].split("|"))
+
+
+def _is_compare_data_row(cells: tuple[str, ...]) -> bool:
+    """Return whether a table row has a name and at least one numeric metric."""
+    return bool(cells[0]) and any(_parse_finite_float(cell) is not None for cell in cells[1:])
+
+
+def _comparison_column_indexes(headers: tuple[str, ...]) -> tuple[int, ...]:
+    """Return all structurally identified ``X vs Y`` metric columns."""
+    return tuple(index for index, header in enumerate(headers[1:], start=1) if _comparison_pair(header) is not None)
+
+
+def _comparison_pair(header: str) -> tuple[str, str] | None:
+    """Normalize one comparison header into its two model-role labels."""
+    parts = re.split(r"\s+vs\s+", header.strip(), maxsplit=1, flags=re.IGNORECASE)
+    if len(parts) != 2 or not all(parts):
+        return None
+    return tuple(part.casefold() for part in parts)
+
+
+def _parse_finite_float(value: str) -> float | None:
+    """Parse one finite floating-point table cell."""
+    try:
+        parsed = float(value)
+    except ValueError:
+        return None
+    return parsed if math.isfinite(parsed) else None

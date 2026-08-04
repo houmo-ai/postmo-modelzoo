@@ -176,7 +176,6 @@ def _compile_cpp_exec(
     build_dir.mkdir(parents=True, exist_ok=True)
     cmake = [
         "cmake",
-        "build",
         f"-DCMAKE_INSTALL_PREFIX={workspace}",
         "-DCMAKE_BUILD_TYPE=Release",
         *defines,
