@@ -328,8 +328,12 @@ void HmvllmInfer::PrefillSetInputDatas(void *data, int current_length) {
     if (name.find("input_1") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(data, memSize));
     } else if (name.find("position_ids") != std::string::npos) {
-      CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(
-          prefill_input_datas.at(name).get(), memSize));
+      std::vector<int32_t> position_ids;
+      for (int i = past_seq_len; i < past_seq_len + this->prefill_length; ++i) {
+        position_ids.emplace_back(i);
+      }
+      CHECK_TCIM_RET_STATUS(
+          tensor.Buffer().CopyFromHost(position_ids.data(), memSize));
     } else if (name.find("valid_length") != std::string::npos) {
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&past_seq_len, memSize));
@@ -406,6 +410,10 @@ void HmvllmInfer::DecodeSetInputDatas(void *data, int valid_length) {
       int decode_current_length = 1;
       CHECK_TCIM_RET_STATUS(
           tensor.Buffer().CopyFromHost(&decode_current_length, memSize));
+    } else if (name.find("position_id") != std::string::npos) {
+      int32_t position_id = valid_length + 1;
+      CHECK_TCIM_RET_STATUS(
+          tensor.Buffer().CopyFromHost(&position_id, memSize));
     } else if (name.find("attn_mask") != std::string::npos) {
       float16 mask_value = static_cast<float16>(1.0f);
       CHECK_TCIM_RET_STATUS(tensor.Buffer().CopyFromHost(&mask_value, memSize));

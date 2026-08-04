@@ -20,6 +20,10 @@ work_dirs/
 .github/
 .claude/
 .codex/
+.scannerwork/
+.sonarcube/
+.omc/
+
 
 # media files
 *.jpg
