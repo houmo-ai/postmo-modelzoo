@@ -34,16 +34,19 @@
 
 #include "llm/HmllmInfer.h"
 #include "llm/HmllmInferMultiBatch.h"
-#include "vlm/HmvllmInfer.h"
+#include "tcim/tcim_runtime.h"
 #include "utils/device_monitor/device_monitor.h"
 #include "utils/perf_dumper/perf_dumper.h"
-#include "tcim/tcim_runtime.h"
 #include "utils/utils.h"
+#include "vlm/HmvllmInfer.h"
 #if defined(__linux__)
 #include "utils/host_monitor/host_monitor.h"
 #endif
 #ifdef ENABLE_ASR
 #include "run_asr.h"
+#endif
+#ifdef ENABLE_TTS
+#include "run_tts.h"
 #endif
 
 #ifdef _MSC_VER
@@ -253,11 +256,26 @@ PerfSettings ParsePerfRunSetting(
 }
 
 int RunPerf(std::unordered_map<std::string, std::string> args) {
+  if (args.count("encode") && args.count("tts_audio_length")) {
+    std::cerr << "Error: --encode and --tts_audio_length select different "
+                 "perf tasks"
+              << std::endl;
+    return 1;
+  }
 #ifdef ENABLE_ASR
   if (args.count("encode")) {
     return RunAsr(args, perf_dumper, run_perf_by_yaml);
   }
 #endif
+  if (args.count("tts_audio_length")) {
+#ifdef ENABLE_TTS
+    return RunTts(args, perf_dumper, run_perf_by_yaml);
+#else
+    std::cerr << "Error: TTS is not supported in this build (ENABLE_TTS=OFF)"
+              << std::endl;
+    return 1;
+#endif
+  }
 
   int interval =
       args.count("interval") ? validate_setting(args, "interval") : 500;
@@ -471,6 +489,47 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   return 0;
 }
 
+static std::unordered_map<std::string, std::string> ParseStreamArgs(
+    const YAML::Node& stream) {
+  std::unordered_map<std::string, std::string> args;
+  for (const auto& kv : stream) {
+    args[kv.first.as<std::string>()] = kv.second.as<std::string>();
+  }
+  return args;
+}
+
+static int RunPerfStream(const YAML::Node& stream,
+                         const YAML::Node& dump_file) {
+  std::unordered_map<std::string, std::string> args = ParseStreamArgs(stream);
+  if (stream["encode"] && stream["tts_audio_length"]) {
+    throw std::invalid_argument(
+        "encode and tts_audio_length select different perf tasks");
+  }
+
+  if (stream["encode"]) {
+#ifdef ENABLE_ASR
+    return RunAsr(args, perf_dumper, run_perf_by_yaml);
+#else
+    throw std::invalid_argument("ASR is not supported in this build");
+#endif
+  }
+
+  if (stream["tts_audio_length"]) {
+#ifdef ENABLE_TTS
+    if (dump_file) {
+      args["dump_file"] = dump_file.as<std::string>();
+      args["tts_global_dump_file"] = "1";
+    }
+    return RunTts(args, perf_dumper, true);
+#else
+    throw std::invalid_argument(
+        "TTS is not supported in this build (ENABLE_TTS=OFF)");
+#endif
+  }
+
+  return RunPerf(args);
+}
+
 int RunPerfConfig(int argc, char* argv[]) {
   const std::string yamlfile = argv[2];
   fs::path path = fs::u8path(yamlfile);
@@ -500,32 +559,20 @@ int RunPerfConfig(int argc, char* argv[]) {
   }
 
   for (const auto& stream : config["Streams"]) {
+    const std::string stream_model_name =
+        stream["ModelName"]
+            ? stream["ModelName"].as<std::string>()
+            : (stream["tts_audio_length"] ? "qwen3-tts" : "unknown");
     std::cout << COLOR_GREEN << std::string(45, '#') << "Start of Task "
               << (curTaskId + 1) << ", All Task:" << n_tasks
-              << ", ModelName:" << stream["ModelName"].as<std::string>() << "."
+              << ", ModelName:" << stream_model_name << "."
               << std::string(45, '#') << "\n";
 
-    // Convert YAML node to unordered_map<string, string>
-    std::unordered_map<std::string, std::string> args;
-    for (const auto& kv : stream) {
-      std::string key = kv.first.as<std::string>();
-      std::string value = kv.second.as<std::string>();
-      args[key] = value;
-    }
-
-    if (stream["encode"]) {
-#ifdef ENABLE_ASR
-      RunAsr(args, perf_dumper, run_perf_by_yaml);
-#else
-      throw std::invalid_argument("ASR is not supported in this build");
-#endif
-    } else {
-      RunPerf(args);
-    }
+    if (RunPerfStream(stream, config["dump_file"]) != 0) return 1;
 
     std::cout << COLOR_GREEN << std::string(45, '#') << " End of Task "
               << (curTaskId + 1) << ", All Task:" << n_tasks
-              << ",  ModelName:" << stream["ModelName"].as<std::string>() << "."
+              << ",  ModelName:" << stream_model_name << "."
               << std::string(45, '#') << "\n\n\n";
     curTaskId++;
   }

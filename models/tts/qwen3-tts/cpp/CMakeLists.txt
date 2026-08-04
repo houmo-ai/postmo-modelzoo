@@ -18,6 +18,7 @@ else()
 endif()
 
 include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/qwen3_tts_frontend.cmake")
 
 if(ANDROID_ABI)
   if(NOT ANDROID_ABI STREQUAL "arm64-v8a")
@@ -26,31 +27,8 @@ if(ANDROID_ABI)
   add_compile_definitions(QWEN3_TTS_ANDROID=1)
 endif()
 
-add_library(qwen3_tts_streaming_frontend STATIC
-  src/qwen3_tts_code_predictor.cc
-  src/qwen3_tts_code_predictor_embedding.cc
-  src/qwen3_tts_codec_embedding.cc
-  src/qwen3_tts_prefill_decode_runtime.cc
-  src/qwen3_tts_sampler.cc
-  src/qwen3_tts_streaming_prompt_builder.cc
-  src/qwen3_tts_streaming_generator.cc
-  src/qwen3_tts_talker.cc
-  src/qwen3_tts_stateful_decoder.cc
-  src/qwen3_tts_wav_writer.cc
-  src/qwen3_tts_text_embedding.cc
-  src/qwen3_tts_text_processor.cc
-  src/qwen3_tts_text_projection.cc
-)
-
-target_include_directories(qwen3_tts_streaming_frontend PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_link_libraries(qwen3_tts_streaming_frontend PUBLIC houmo_engine)
-
-if(ANDROID_ABI)
-  target_link_libraries(qwen3_tts_streaming_frontend PUBLIC dl m)
-endif()
+add_qwen3_tts_streaming_frontend(qwen3_tts_streaming_frontend
+                                 WITH_TEXT_PROCESSOR)
 
 add_executable(qwen3_tts_text_demo demo.cc)
 target_link_libraries(qwen3_tts_text_demo PRIVATE qwen3_tts_streaming_frontend)

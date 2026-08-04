@@ -35,5 +35,21 @@ Streams:
     batch: 1
     LazyMode: ''  # Optional, for specific models
     no_warm_up: ''
+  # Qwen3-TTS streaming fixed-frame performance test (ENABLE_TTS defaults to ON)
+  - ModelName: qwen3-tts
+    text_projection: output/xh2/text_projection.hmm
+    talker_prefill: output/xh2/talker_prefill.hmm
+    talker_decode: output/xh2/talker_decode.hmm
+    code_predictor_prefill: output/xh2/code_predictor_prefill.hmm
+    code_predictor_decode: output/xh2/code_predictor_decode.hmm
+    stateful_decoder: output/xh2/stateful_decoder.hmm
+    embedding: output/xh2/quant_embedding.bin
+    code_embedding: output/xh2/quant_embedding_code_predictor.bin
+    text_embedding: output/xh2/text_embedding.bin
+    tts_audio_length: 10.0  # Requested audio length in seconds
+    token_per_second: 3     # Optional, defaults to 3
+    devices: "0"            # TTS supports one device only
+    loop: 1
+    output_wav: output.wav  # Optional; remove this line to skip WAV output
 
 dump_file: perf_result.yaml

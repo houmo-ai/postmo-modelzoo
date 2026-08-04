@@ -1,6 +1,6 @@
 # llm_perf 性能测试工具
 
-本代码用于在后摩系列芯片（XH2）的设备上测试llm模型和vlm模型的单/多batch模型推理性能。当前支持linux、windows11和android native环境（使用adb运行）。
+本代码用于在后摩系列芯片（XH2）的设备上测试llm、vlm、asr和tts模型推理性能。当前支持linux、windows11和android native环境（使用adb运行）。
 
 ## 目录
 
@@ -11,7 +11,7 @@
     - [1.2 流程说明](#12-流程说明)
     - [1.3 参数说明](#13-参数说明)
     - [1.4 用法说明](#14-用法说明)
-      - [1.4.1 embedding模型准换](#141-embedding模型准换)
+      - [1.4.1 embedding模型转换](#141-embedding模型转换)
       - [1.4.2 指令启动](#142-指令启动)
       - [1.4.3 配置文件启动](#143-配置文件启动)
   - [2.快速开始](#2快速开始)
@@ -20,6 +20,11 @@
   - [3.免责声明](#3免责声明)
 
 ## 变更日志
+- [20260804]
+  - 新增Qwen3-TTS CustomVoice模拟性能测试，支持streaming fixed-frame完整推理链路
+  - 新增TTS E2E、RTF、TTFA、阶段耗时和Codec Frames/s指标
+  - 新增TTS命令行和yaml配置启动方式，支持可选WAV和性能结果落盘
+  - 新增ENABLE_TTS编译选项，默认开启
 - [20260713]
   - ASR模拟性能测试入参由 `--audio_len` 改为 `--chunk`，默认1；程序加载模型后根据 `encoder_window` 自行计算 `audio_len`
   - `--token_per_second` 默认值统一为3
@@ -59,7 +64,8 @@
 | HmvllmInfer.cc          | 主文件，实现vlm模型单batch具体推理流程             |
 | HmllmInferMultiBatch.cc | 主文件，实现llm多batch具体推理流程，仅支持xh2       |
 | HmAsrInfer.cc           | 主文件，实现ASR模拟性能测试（PerfAsr）流程          |
-| convert_embed.py        | 将embedding的pt模型转换为bin文件方便工具读取权重    |
+| PerfTts.cc              | 主文件，实现Qwen3-TTS模拟性能测试流程               |
+| convert_embed.py        | 将LLM/VLM/ASR单表embedding的pt模型转换为bin文件；暂不支持Qwen3-TTS |
 | device_monitor          | 监控设备温度、功率、IPU频率的类实现                 |
 | perf_tracker            | 性能采集类功能实现                                  |
 | perf_dumper             | 性能数据落盘及性能数据可视化类功能实现              |
@@ -77,6 +83,27 @@
   - 温度监控带告警功能，当温度大于80℃时，程序会打印警告信息，温度大于100℃时，程序会强制退出。
   - 主机侧的内存监控仅支持linux平台。
   - **修改配置文件启动方式为yaml文件，对之前版本的json文件启动兼容。**
+  - 支持Qwen3-TTS CustomVoice性能测试，TTS功能由CMake选项`ENABLE_TTS`控制，默认开启。
+  - TTS首版本固定为streaming fixed-frame模式，固定Chinese、vivian、seed 42和单device，不处理真实文本，不支持用户设置mode、language、speaker或seed。
+  - TTS使用随机正文token执行TextEmbedding、TextProjection、Talker、CodePredictor和StatefulDecoder完整链路；`token_per_second`默认3，`output_wav`可选。
+
+Qwen3-TTS支持度如下：
+
+| 项目 | 当前支持情况 |
+| --- | --- |
+| 模型类型 | 仅支持Qwen3-TTS CustomVoice；不支持Base voice clone |
+| 模型规格 | 支持CustomVoice模型的相同HMM接口，已验证`0.6b-customvoice`；`1.7b-customvoice`需使用对应规格的完整HMM和embedding资产 |
+| 推理模式 | 仅支持streaming fixed-frame，不支持oneshot和自然EOS停止 |
+| 输入 | 不接收真实文本和tokenizer；根据`tts_audio_length * token_per_second`生成固定seed的随机正文token |
+| 音频长度 | `ceil(tts_audio_length / 0.08)`得到目标codec frame数；实际nominal时长可能向上取整到0.08秒的整数倍 |
+| Prompt条件 | language固定Chinese，speaker固定vivian，seed固定42 |
+| 设备 | 仅支持单device；不支持TTS `.hmms`多device运行 |
+| 平台 | 当前TTS perf已在Linux XH2验证；llm_perf的其他平台构建不等同于TTS运行已验证 |
+| 模型链路 | TextEmbedding、TextProjection、Talker Prefill/Decode、CodePredictor Prefill/Decode、StatefulDecoder |
+| 指标 | E2E、RTF、TTFA、Codec Frames/s及各阶段总耗时/调用次数/平均耗时 |
+| 进度与日志 | Warmup和每个正式loop显示codec frame进度条；每个loop写入`perf_dumper.log`，终端和YAML展示Average结果 |
+| WAV输出 | `--output_wav`可选，仅保存最后一个正式loop，写盘耗时不计入E2E和RTF |
+| Embedding准备 | 不支持使用`tools/llm_perf/convert_embed.py`转换；必须使用Qwen3-TTS demo目录的`get_model.py`准备 |
 
 ### 1.2 流程说明
 
@@ -158,7 +185,47 @@
   | Prefill Per Chunk                       | 每个chunk的prefill阶段平均耗时，单位（s）                           |
   | Decode Per Chunk                        | 每个chunk的decode阶段平均耗时，单位（s）                            |
 
-相关指标可以对照表一、表二、表三、表四、表五的指标含义。
+- 表六：TTS模拟性能测试指标（需要ENABLE_TTS编译选项开启）
+  | TTS指标                                 | 说明                                                                |
+  | --------------------------------------- | ------------------------------------------------------------------- |
+  | E2E                                     | 本轮请求开始到完整waveform在host侧可用的端到端耗时，单位（ms）；YAML字段为`e2e_latency` |
+  | RTF                                     | 实时因子，`E2E_seconds / nominal_audio_length`，小于1表示快于实时    |
+  | TTFA                                    | 本轮请求开始到第一个非空waveform chunk在host侧可用的耗时，单位（ms）|
+  | Text Embedding                          | role、正文和TTS special token的embedding耗时，单位（ms）             |
+  | Text Projection                         | TextProjection总耗时，包含调用次数和平均耗时，单位（ms）             |
+  | Prompt Prepare                          | streaming prompt和codec prompt准备耗时，单位（ms）                   |
+  | Talker Prefill                          | Talker Prefill耗时，包含调用次数和平均耗时，单位（ms）               |
+  | Talker Decode                           | Talker Decode耗时，包含调用次数和平均耗时，单位（ms）                |
+  | Talker Sampling                         | Talker采样耗时，包含调用次数和平均耗时，单位（ms）                   |
+  | Codec Frame Prepare                     | codec frame组装耗时，单位（ms）                                     |
+  | CodePredictor Prepare                   | CodePredictor逐帧准备耗时，单位（ms）                               |
+  | CodePredictor Prefill                   | CodePredictor Prefill耗时，包含调用次数和平均耗时，单位（ms）        |
+  | CodePredictor Decode                    | CodePredictor Decode耗时，包含调用次数和平均耗时，单位（ms）         |
+  | CodePredictor Sampling                  | CodePredictor采样耗时，包含调用次数和平均耗时，单位（ms）            |
+  | StatefulDecoder                         | StatefulDecoder耗时，包含调用次数和平均耗时，单位（ms）              |
+  | Other                                   | E2E中未被上述阶段单独计量的耗时，单位（ms）                          |
+  | Codec Frames/s                          | codec生成速度，单位（frames/s）                                     |
+
+TTS使用以下固定换算和指标公式：
+
+```text
+body_text_tokens = max(1, ceil(tts_audio_length * token_per_second))
+text_projection_tokens = body_text_tokens + 6
+target_codec_frames = ceil(tts_audio_length / 0.08)
+nominal_audio_length = target_codec_frames * 0.08
+expected_audio_samples = target_codec_frames * 1920
+decoder_chunks = ceil(target_codec_frames / 12)
+RTF = E2E_seconds / nominal_audio_length
+codec_generation_seconds = Talker Prefill + Talker Decode + Talker Sampling
+                           + Codec Frame Prepare + CodePredictor Prepare
+                           + CodePredictor Prefill + CodePredictor Decode
+                           + CodePredictor Sampling
+codec_frames_per_second = target_codec_frames / codec_generation_seconds
+```
+
+其中采样率固定为24000 Hz，每个codec frame固定1920个采样点，即0.08秒。E2E包含TextEmbedding、TextProjection、prompt准备、Talker、CodePredictor、StatefulDecoder和必要host处理，不包含模型/embedding加载、监控线程启动、WAV写盘和性能结果yaml写盘。TTFA包含首批codec frame生成和第一次StatefulDecoder调用。
+
+相关指标可以对照表一、表二、表三、表四、表五、表六的指标含义。
 
 ### 1.3 参数说明
 1. 命令行llm_perf以指定参数启动
@@ -210,17 +277,107 @@
 > - 正常普通人对话（含停顿换气）：2～3 文本 token/秒
 > - 无停顿快速朗读：3～4 token/s
 
-3. 命令行llm_perf以配置文件启动
+3. TTS模拟性能测试相关参数（需要ENABLE_TTS编译选项开启）
+- --text_projection        : 指定TextProjection模型路径，必填。
+- --talker_prefill         : 指定Talker Prefill模型路径，必填。
+- --talker_decode          : 指定Talker Decode模型路径，必填。
+- --code_predictor_prefill : 指定CodePredictor Prefill模型路径，必填。
+- --code_predictor_decode  : 指定CodePredictor Decode模型路径，必填。
+- --stateful_decoder       : 指定StatefulDecoder模型路径，必填。
+- --embedding              : 指定Talker codec token embedding文件，即`quant_embedding.bin`，必填。
+- --code_embedding         : 指定CodePredictor 15组codebook embedding文件，即`quant_embedding_code_predictor.bin`，必填。
+- --text_embedding         : 指定文本token embedding文件，即`text_embedding.bin`，必填。
+- --tts_audio_length       : 请求音频时长，单位秒，必填，必须是有限且大于0的单值。设置此参数将触发TTS性能测试流程。
+- --token_per_second       : 每秒模拟正文token数，只支持正整数，默认3。
+- --devices                : 指定单个device_id，不指定时优先从HOUMO_VISIBLE_DEVICES读取，环境变量未设置时默认0。TTS不支持多device。
+- --loop                   : 指定正式性能测试轮数，默认1，范围1-1000000。
+- --no_warm_up             : 默认执行一次完整TTS warm_up，配置后跳过warm_up。
+- --interval               : 配置DeviceMonitor和HostMonitor采样间隔，单位毫秒(ms)，默认500ms。
+- --model_name             : 指定日志和性能结果中的模型名称，默认`qwen3-tts`。
+- --output_wav             : 可选，仅保存最后一个成功正式loop的waveform，采样率固定24000 Hz，写盘耗时不计入E2E和RTF。
+- --dump_file              : 可选，将TTS性能结果保存到yaml文件。
+
+TTS固定条件：仅支持streaming fixed-frame模式；language固定Chinese；speaker固定vivian；seed固定42；StatefulDecoder chunk固定12 frames；每个codec frame固定0.08秒；`token_per_second`默认3；仅支持单device；`output_wav`可选。正文token由固定seed随机生成，不依赖真实文本或tokenizer。TTS不支持`--mode`、`--input`、`--output`、`--text`、`--tokenizer`、`--language`、`--speaker`、`--seed`、`--chunk_size`、`--max_new_tokens`、`--max_frames`、`--greedy`、`--temperature`、`--top_k`和`--top_p`。
+
+TTS运行期间，Warmup和每个正式loop通过codec frame进度条显示当前生成进度。每个正式loop的E2E、RTF、TTFA、Codec Frames/s和阶段明细写入当前工作目录的`perf_dumper.log`；终端只展示所有正式loop的Average结果；`--dump_file`指定的YAML同样保存Average结果。
+
+4. 命令行llm_perf以配置文件启动
 - --config, -c      : 使用配置文件启动perf程序，需要提前准备好配置文件，配置文件模板参考1.4节。
-4. 目前支持通过DEBUG_DEV_INPUT宏开启SetInput输入的Debug模式，须在CMakeLists.txt添加如下编译选项：target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG_DEV_INPUT)。
-5. ASR功能编译说明：ASR功能由CMake选项`ENABLE_ASR`控制，当前Linux、Windows、Android平台默认开启；如需关闭可在配置CMake时添加`-DENABLE_ASR=OFF`。
+5. 目前支持通过DEBUG_DEV_INPUT宏开启SetInput输入的Debug模式，须在CMakeLists.txt添加如下编译选项：target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG_DEV_INPUT)。
+6. ASR功能编译说明：ASR功能由CMake选项`ENABLE_ASR`控制，当前Linux、Windows、Android平台默认开启；如需关闭可在配置CMake时添加`-DENABLE_ASR=OFF`。
+7. TTS功能编译说明：TTS功能由CMake选项`ENABLE_TTS`控制，默认开启；如需关闭可在配置CMake时添加`-DENABLE_TTS=OFF`。
 
 
 ### 1.4 用法说明
 
-#### 1.4.1 embedding模型准换
-提供了convert_embed.py对quant_embedding.pt进行准换，转换结果为quant_embedding.bin，可以方便llm_perf工具embedding时读取权重。
-使用方式如下：python convert_embed.py --path <embedding_weight_path>。
+#### 1.4.1 embedding模型转换
+
+对于普通LLM/VLM/ASR单表embedding，可以使用`tools/llm_perf/convert_embed.py`将一个`.pt`权重转换为同名`.bin`文件：
+
+```bash
+python convert_embed.py --path <embedding_weight_path>
+```
+
+当前llm_perf的ASR模拟性能测试直接使用随机输入，不要求通过命令行传入embedding；但ASR模型的其他推理或资产准备流程如果使用单表`.pt` embedding，仍可使用该脚本转换。
+
+> **Qwen3-TTS限制：**`tools/llm_perf/convert_embed.py`暂时不支持Qwen3-TTS。Qwen3-TTS perf同时依赖三类不同结构的embedding，其中CodePredictor权重包含15组按codebook排列的embedding，不能按普通单表embedding方式转换。
+
+Qwen3-TTS需要以下三个二进制文件：
+
+| llm_perf参数 | 文件 | 内容 |
+| --- | --- | --- |
+| `--embedding` | `quant_embedding.bin` | Talker codec token embedding |
+| `--code_embedding` | `quant_embedding_code_predictor.bin` | CodePredictor的15组codebook embedding |
+| `--text_embedding` | `text_embedding.bin` | 文本token embedding |
+
+请进入Qwen3-TTS demo目录，通过`get_model.py`下载预编译HMM并自动准备C++/llm_perf所需的embedding资产：
+
+```bash
+cd ${HOUMO_EXAMPLES_PATH}/models/tts/qwen3-tts
+
+python3 get_model.py \
+  --type hmm \
+  --model_name qwen3-tts \
+  --model_size 0.6b-customvoice
+```
+
+如需使用1.7B CustomVoice，将`--model_size`改为：
+
+```bash
+--model_size 1.7b-customvoice
+```
+
+对于CustomVoice，`get_model.py --type hmm`下载预编译模型后会调用demo目录的Qwen3-TTS专用转换逻辑，一次性生成三份`.bin`文件。默认产物位置为：
+
+```text
+models/tts/qwen3-tts/output/${HOUMO_TARGET}/
+  qwen3-tts-<model_size>_text_projection.hmm
+  qwen3-tts-<model_size>_talker_prefill.hmm
+  qwen3-tts-<model_size>_talker_decode.hmm
+  qwen3-tts-<model_size>_code_predictor_prefill.hmm
+  qwen3-tts-<model_size>_code_predictor_decode.hmm
+  qwen3-tts-<model_size>_stateful_decoder.hmm
+  hmquant/
+    quant_embedding.bin
+    quant_embedding_code_predictor.bin
+    text_embedding.bin
+```
+
+这些文件和llm_perf参数的对应关系如下：
+
+| llm_perf参数 | 默认产物 |
+| --- | --- |
+| `--text_projection` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_text_projection.hmm` |
+| `--talker_prefill` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_talker_prefill.hmm` |
+| `--talker_decode` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_talker_decode.hmm` |
+| `--code_predictor_prefill` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_code_predictor_prefill.hmm` |
+| `--code_predictor_decode` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_code_predictor_decode.hmm` |
+| `--stateful_decoder` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_stateful_decoder.hmm` |
+| `--embedding` | `output/${HOUMO_TARGET}/hmquant/quant_embedding.bin` |
+| `--code_embedding` | `output/${HOUMO_TARGET}/hmquant/quant_embedding_code_predictor.bin` |
+| `--text_embedding` | `output/${HOUMO_TARGET}/hmquant/text_embedding.bin` |
+
+TTS perf不使用SpeechTokenizer HMM、真实文本tokenizer或模型目录中的`tokenizer.json`。如果上述三个`.bin`文件缺失，不要使用通用`convert_embed.py`逐个转换，应重新执行Qwen3-TTS目录下的`get_model.py --type hmm`，确保CodePredictor embedding的15组权重顺序正确。
 
 #### 1.4.2 指令启动
 
@@ -248,6 +405,16 @@ ASR模拟性能测试使用示例（需要ENABLE_ASR编译选项开启）：
 ./llm_perf --encode qwen3-asr_encode.hmm --prefill qwen3-asr_prefill.hmm --decode qwen3-asr_decode.hmm --chunk 10 --token_per_second 4 --devices 0 --loop 3
 # 跳过warm_up的短测
 ./llm_perf --encode glm_encode.hmm --prefill glm_prefill.hmm --decode glm_decode.hmm --chunk 1 --token_per_second 3 --devices 0 --no_warm_up
+```
+
+TTS模拟性能测试使用示例（需要ENABLE_TTS编译选项开启）：
+``` shell
+# 首次运行前先在models/tts/qwen3-tts目录执行get_model.py --type hmm，
+# 准备六个HMM和quant_embedding.bin、quant_embedding_code_predictor.bin、text_embedding.bin。
+# 使用默认token_per_second=3、默认warm_up和单device 0，不保存WAV
+./llm_perf --model_name qwen3-tts --text_projection qwen3-tts/text_projection.hmm --talker_prefill qwen3-tts/talker_prefill.hmm --talker_decode qwen3-tts/talker_decode.hmm --code_predictor_prefill qwen3-tts/code_predictor_prefill.hmm --code_predictor_decode qwen3-tts/code_predictor_decode.hmm --stateful_decoder qwen3-tts/stateful_decoder.hmm --embedding qwen3-tts/quant_embedding.bin --code_embedding qwen3-tts/quant_embedding_code_predictor.bin --text_embedding qwen3-tts/text_embedding.bin --tts_audio_length 10.0
+# 保存最后一个正式loop的WAV并落盘性能结果
+./llm_perf --model_name qwen3-tts --text_projection qwen3-tts/text_projection.hmm --talker_prefill qwen3-tts/talker_prefill.hmm --talker_decode qwen3-tts/talker_decode.hmm --code_predictor_prefill qwen3-tts/code_predictor_prefill.hmm --code_predictor_decode qwen3-tts/code_predictor_decode.hmm --stateful_decoder qwen3-tts/stateful_decoder.hmm --embedding qwen3-tts/quant_embedding.bin --code_embedding qwen3-tts/quant_embedding_code_predictor.bin --text_embedding qwen3-tts/text_embedding.bin --tts_audio_length 10.0 --token_per_second 3 --devices 0 --loop 3 --output_wav qwen3-tts/output.wav --dump_file qwen3-tts/perf_result.yaml
 ```
 
 #### 1.4.3 配置文件启动
@@ -341,6 +508,22 @@ Streams:
     token_per_second: 4
     devices: "0"
     loop: 1
+  # Qwen3-TTS模拟性能测试配置示例（requires ENABLE_TTS compilation option）
+  - ModelName: qwen3-tts
+    text_projection: qwen3-tts/text_projection.hmm
+    talker_prefill: qwen3-tts/talker_prefill.hmm
+    talker_decode: qwen3-tts/talker_decode.hmm
+    code_predictor_prefill: qwen3-tts/code_predictor_prefill.hmm
+    code_predictor_decode: qwen3-tts/code_predictor_decode.hmm
+    stateful_decoder: qwen3-tts/stateful_decoder.hmm
+    embedding: qwen3-tts/quant_embedding.bin
+    code_embedding: qwen3-tts/quant_embedding_code_predictor.bin
+    text_embedding: qwen3-tts/text_embedding.bin
+    tts_audio_length: 10.0
+    token_per_second: 3
+    devices: "0"
+    loop: 3
+    output_wav: qwen3-tts/output.wav
 
 # Global output file for all performance results
 # Note: This has higher priority than individual dump_file settings in Streams

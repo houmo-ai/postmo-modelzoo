@@ -921,13 +921,12 @@ tools_bandwidth_perf:
 llm_perf:
   include:
     - tools/llm_perf
-  exclude:
-    - tools/llm_perf/README.MD
-  example_case:
-    - tools_llm_perf_test:
-        script: ../tests/tools_tests/test_llm_perf.sh
+  exclude: null
+  example_case: null
   test:
-    - tools_llm_perf_test
+    - asr_qwen3-asr_test
+    - tts_qwen3_tts_test
+    - llm_qwen3.5_test
 hmeval_examples_llm:
   include:
     - hmeval

@@ -26,8 +26,11 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <chrono>
+#include <cmath>
 #include <codecvt>
+#include <cstdlib>
 #include <eigen3/unsupported/Eigen/CXX11/Tensor>
 #include <filesystem>
 #include <fstream>
@@ -62,7 +65,8 @@ namespace fs = std::filesystem;
 typedef enum { PERFCMD = 0, PERFYAML, PERFINVAILD } PerfConfigType;
 
 static void HelpUsage(char* argv[]) {
-  std::cout << "llm_perf - A tool for LLM, VLM, and ASR performance tests with "
+  std::cout << "llm_perf - A tool for LLM, VLM, ASR, and TTS performance tests "
+               "with "
                "flexible configuration options.\n\n";
   std::cout << "Release Time : " << __DATE__ << " " << __TIME__ << "\n\n";
   std::cout
@@ -116,8 +120,46 @@ static void HelpUsage(char* argv[]) {
          "  --loop            NUM       Loop test rounds (range: 1-1000000).\n"
          "  --no_warm_up                Disable warm-up.\n"
          "  --interval        NUM       Sampling interval in ms for "
-         "monitoring.\n"
-         "  -h, --help                  Show this help message.\n\n"
+         "monitoring.\n";
+#ifdef ENABLE_TTS
+  std::cout
+      << "\nTTS Options (fixed-frame perf, detected when "
+         "--tts_audio_length is present):\n"
+         "  --text_projection FILE      TextProjection model file "
+         "(required).\n"
+         "  --talker_prefill FILE        Talker prefill model file "
+         "(required).\n"
+         "  --talker_decode FILE         Talker decode model file "
+         "(required).\n"
+         "  --code_predictor_prefill FILE CodePredictor prefill model file "
+         "(required).\n"
+         "  --code_predictor_decode FILE CodePredictor decode model file "
+         "(required).\n"
+         "  --stateful_decoder FILE      StatefulDecoder model file "
+         "(required).\n"
+         "  --embedding FILE             Talker codec embedding file "
+         "(required).\n"
+         "  --code_embedding FILE        CodePredictor embedding file "
+         "(required).\n"
+         "  --text_embedding FILE        Text token embedding file "
+         "(required).\n"
+         "  --tts_audio_length NUM       Requested audio length in seconds; "
+         "must be finite and > 0 (required).\n"
+         "  --token_per_second NUM       Simulated text tokens per second "
+         "(positive integer, default: 3).\n"
+         "  --devices NUM                Single device id (default: CLI, "
+         "HOUMO_VISIBLE_DEVICES, or 0).\n"
+         "  --loop NUM                   Loop test rounds (default: 1).\n"
+         "  --no_warm_up                 Disable warm-up.\n"
+         "  --interval NUM               Monitoring interval in ms "
+         "(default: 500).\n"
+         "  --model_name TEXT            Model name (default: qwen3-tts).\n"
+         "  --output_wav FILE            Save the final loop waveform.\n"
+         "  --dump_file FILE             Dump TTS performance results to "
+         "YAML.\n";
+#endif
+  std::cout
+      << "  -h, --help                  Show this help message.\n\n"
          "Examples:\n"
          "  "
       << argv[0]
@@ -126,9 +168,20 @@ static void HelpUsage(char* argv[]) {
          "  "
       << argv[0]
       << " --encode encode.hmm --prefill prefill.hmm --decode decode.hmm "
-         "--chunk 1 --token_per_second 3 --loop 3\n"
-         "  "
-      << argv[0] << " -c perf_config.yaml\n";
+         "--chunk 1 --token_per_second 3 --loop 3\n";
+#ifdef ENABLE_TTS
+  std::cout << "  " << argv[0]
+            << " --text_projection text_projection.hmm --talker_prefill "
+               "talker_prefill.hmm --talker_decode talker_decode.hmm "
+               "--code_predictor_prefill code_predictor_prefill.hmm "
+               "--code_predictor_decode code_predictor_decode.hmm "
+               "--stateful_decoder stateful_decoder.hmm --embedding "
+               "quant_embedding.bin --code_embedding "
+               "quant_embedding_code_predictor.bin --text_embedding "
+               "text_embedding.bin --tts_audio_length 10.0 --output_wav "
+               "output.wav\n";
+#endif
+  std::cout << "  " << argv[0] << " -c perf_config.yaml\n";
 }
 
 static PerfConfigType ParsePerfRunType(int argc, char* argv[]) {
@@ -250,6 +303,33 @@ static int validate_setting(std::unordered_map<std::string, std::string>& args,
   } else {
     throw std::invalid_argument("Missing arg : " + arg_name + ", (use --" +
                                 arg_name + " to set arg).");
+  }
+  return value;
+}
+
+static double validate_positive_double(
+    std::unordered_map<std::string, std::string>& args,
+    const std::string& arg_name) {
+  const auto it = args.find(arg_name);
+  if (it == args.end()) {
+    throw std::invalid_argument("Missing arg : " + arg_name + ", (use --" +
+                                arg_name + " to set arg).");
+  }
+  const std::string& text = it->second;
+  if (text.empty() ||
+      std::any_of(text.begin(), text.end(),
+                  [](unsigned char c) { return std::isspace(c) != 0; })) {
+    throw std::invalid_argument(arg_name +
+                                " must be a finite number greater than zero");
+  }
+
+  char* end = nullptr;
+  errno = 0;
+  const double value = std::strtod(text.c_str(), &end);
+  if (errno == ERANGE || end != text.c_str() + text.size() ||
+      !std::isfinite(value) || value <= 0.0) {
+    throw std::invalid_argument(arg_name +
+                                " must be a finite number greater than zero");
   }
   return value;
 }

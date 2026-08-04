@@ -94,6 +94,31 @@ if should_run_step "demo"; then
             "${COMMON_MODEL_ARGS[@]}" \
             --mode streaming \
             --output_wav "${SCRIPT_DIR}/output_custom_voice_cpp.wav"
+
+        if command -v llm_perf &>/dev/null && \
+            llm_perf --help 2>&1 | grep -q -- "--tts_audio_length"; then
+            echo "Run llm_perf TTS performance case (${MODEL_NAME}-${MODEL_SIZE})."
+            llm_perf \
+                --model_name "${MODEL_NAME}-${MODEL_SIZE}" \
+                --text_projection "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_text_projection.hmm" \
+                --talker_prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_talker_prefill.hmm" \
+                --talker_decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_talker_decode.hmm" \
+                --code_predictor_prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_code_predictor_prefill.hmm" \
+                --code_predictor_decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_code_predictor_decode.hmm" \
+                --stateful_decoder "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_stateful_decoder.hmm" \
+                --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin" \
+                --code_embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding_code_predictor.bin" \
+                --text_embedding "output/${HOUMO_TARGET}/hmquant/text_embedding.bin" \
+                --tts_audio_length 10.0 \
+                --devices 0 \
+                --loop 1 \
+                --no_warm_up \
+                --output_wav "${SCRIPT_DIR}/output_${MODEL_SIZE}_tts_perf.wav" \
+                --dump_file "${SCRIPT_DIR}/${MODEL_SIZE}_tts_perf.yaml"
+        elif command -v llm_perf &>/dev/null; then
+            echo "Skip llm_perf TTS performance case: installed llm_perf does not support TTS."
+        fi
+
     else
         echo "Unsupported MODEL_SIZE for demo step: ${MODEL_SIZE}" >&2
         echo "Supported values: 0.6b-base, 0.6b-customvoice, 1.7b-customvoice" >&2

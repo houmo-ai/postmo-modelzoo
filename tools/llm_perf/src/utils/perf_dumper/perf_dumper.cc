@@ -43,6 +43,12 @@ std::string format_device_memory(double value_mb) {
 int format_device_memory_avg_as_int(double value_mb) {
   return static_cast<int>(std::lround(value_mb));
 }
+
+std::shared_ptr<spdlog::logger> get_perf_logger(const std::string &log_file) {
+  static auto logger =
+      spdlog::rotating_logger_mt("perf_logger", log_file, 1024 * 1024 * 5, 3);
+  return logger;
+}
 }  // namespace
 
 PerfDumper::PerfDumper() : dump_file("") {}
@@ -210,10 +216,8 @@ void PerfDumper::dumpPerf(
 
 #ifdef ENABLE_ASR
 void PerfDumper::dumpAsrPerf(
-    const AsrPerfSettings &perf_settings,
-    const AsrTranscribeResult &results,
-    int n_chunks,
-    const HostMemoryInfo &host_mem_info,
+    const AsrPerfSettings &perf_settings, const AsrTranscribeResult &results,
+    int n_chunks, const HostMemoryInfo &host_mem_info,
     const HostMemoryInfo &max_host_mem_info,
     const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
     const std::unordered_map<int, DeviceStats> &end_device_stats) {
@@ -317,6 +321,216 @@ void PerfDumper::dumpAsrPerf(
         format_device_memory(init_end_stats.mem_info.mem_used);
   }
   perf_metrics_node.push_back(model_metrics);
+}
+#endif
+
+#ifdef ENABLE_TTS
+void PerfDumper::dumpTtsPerf(
+    const TtsPerfSettings &perf_settings, const TtsPerfResult &results,
+    const HostMemoryInfo &host_mem_info,
+    const HostMemoryInfo &max_host_mem_info,
+    const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
+    const std::unordered_map<int, DeviceStats> &end_device_stats) {
+  if (dump_file.empty()) return;
+  if (init_yaml) {
+    root.reset();
+    root["PerfMetrics"] = YAML::Node(YAML::NodeType::Sequence);
+    init_yaml = false;
+  } else if (!root["PerfMetrics"] || !root["PerfMetrics"].IsSequence()) {
+    root["PerfMetrics"] = YAML::Node(YAML::NodeType::Sequence);
+  }
+
+  YAML::Node perf_metrics_node = root["PerfMetrics"];
+  YAML::Node model_metrics;
+  YAML::Node model_perf_settings = model_metrics["PerfSettings"];
+  model_perf_settings["Task"] = "tts";
+  model_perf_settings["ModelName"] = perf_settings.model_name;
+  model_perf_settings["text_projection"] = perf_settings.text_projection_path;
+  model_perf_settings["talker_prefill"] = perf_settings.talker_prefill_path;
+  model_perf_settings["talker_decode"] = perf_settings.talker_decode_path;
+  model_perf_settings["code_predictor_prefill"] =
+      perf_settings.code_predictor_prefill_path;
+  model_perf_settings["code_predictor_decode"] =
+      perf_settings.code_predictor_decode_path;
+  model_perf_settings["stateful_decoder"] = perf_settings.stateful_decoder_path;
+  model_perf_settings["embedding"] = perf_settings.embedding_path;
+  model_perf_settings["code_embedding"] = perf_settings.code_embedding_path;
+  model_perf_settings["text_embedding"] = perf_settings.text_embedding_path;
+  model_perf_settings["mode"] = "streaming fixed-frame";
+  model_perf_settings["requested_audio_length_s"] =
+      perf_settings.requested_audio_length_s;
+  model_perf_settings["nominal_audio_length_s"] =
+      perf_settings.nominal_audio_length_s;
+  model_perf_settings["token_per_second"] = perf_settings.token_per_second;
+  model_perf_settings["body_text_tokens"] = perf_settings.body_text_tokens;
+  model_perf_settings["text_projection_tokens"] =
+      perf_settings.text_projection_tokens;
+  model_perf_settings["target_codec_frames"] =
+      perf_settings.target_codec_frames;
+  model_perf_settings["expected_audio_samples"] =
+      perf_settings.expected_audio_samples;
+  model_perf_settings["decoder_chunks"] = perf_settings.decoder_chunks;
+  model_perf_settings["device"] = perf_settings.device_id;
+  model_perf_settings["loop"] = perf_settings.loop;
+  model_perf_settings["warm_up"] = perf_settings.warm_up;
+  model_perf_settings["monitor_interval"] = perf_settings.interval_ms;
+  model_perf_settings["seed"] = perf_settings.seed;
+  model_perf_settings["output_wav"] = perf_settings.output_wav;
+
+  YAML::Node model_perf_results = model_metrics["PerfResults"];
+  model_perf_results["e2e_latency"] = format_double(results.e2e_ms);
+  model_perf_results["RTF"] = format_double(results.rtf, 4);
+  model_perf_results["TTFA"] = format_double(results.ttfa_ms);
+  model_perf_results["codec_generation_time"] =
+      format_double(results.codec_generation_ms);
+  model_perf_results["codec_frames_per_second"] =
+      format_double(results.codec_frames_per_second);
+  model_perf_results["generated_frames"] = results.generated_frames;
+  model_perf_results["audio_samples"] = results.audio_samples;
+  model_perf_results["audio_duration_s"] = results.audio_duration_s;
+  model_perf_results["decoder_chunks"] = results.decoder_chunks;
+
+  const auto &stage = results.stages;
+  const auto dump_stage = [&model_perf_results](const char *name,
+                                                double time_ms, size_t count) {
+    model_perf_results[std::string(name) + "_time"] = format_double(time_ms);
+    model_perf_results[std::string(name) + "_count"] = count;
+    model_perf_results[std::string(name) + "_avg_time"] =
+        format_double(count > 0 ? time_ms / count : 0.0);
+  };
+  dump_stage("text_embedding", stage.text_embedding_ms,
+             stage.text_embedding_count);
+  dump_stage("text_projection", stage.text_projection_ms,
+             stage.text_projection_count);
+  dump_stage("prompt_prepare", stage.prompt_prepare_ms,
+             stage.prompt_prepare_count);
+  dump_stage("talker_prefill", stage.talker_prefill_ms,
+             stage.talker_prefill_count);
+  dump_stage("talker_decode", stage.talker_decode_ms,
+             stage.talker_decode_count);
+  dump_stage("talker_sampling", stage.talker_sampling_ms,
+             stage.talker_sampling_count);
+  dump_stage("codec_frame_prepare", stage.codec_frame_prepare_ms, 0);
+  dump_stage("code_predictor_prepare", stage.code_predictor_prepare_ms, 0);
+  dump_stage("code_predictor_prefill", stage.code_predictor_prefill_ms,
+             stage.code_predictor_prefill_count);
+  dump_stage("code_predictor_decode", stage.code_predictor_decode_ms,
+             stage.code_predictor_decode_count);
+  dump_stage("code_predictor_sampling", stage.code_predictor_sampling_ms,
+             stage.code_predictor_sampling_count);
+  dump_stage("stateful_decoder", stage.stateful_decoder_ms,
+             stage.stateful_decoder_count);
+  dump_stage("other", stage.other_ms, 0);
+
+#if defined(__linux__)
+  YAML::Node host_metrics = model_metrics["HostMonitor"];
+  host_metrics["physical_memory"] =
+      formatHostMemorySize(host_mem_info.physical_memory);
+  host_metrics["virtual_memory"] =
+      formatHostMemorySize(host_mem_info.virtual_memory);
+  host_metrics["max_physical_memory"] =
+      formatHostMemorySize(max_host_mem_info.physical_memory);
+  host_metrics["max_virtual_memory"] =
+      formatHostMemorySize(max_host_mem_info.virtual_memory);
+#endif
+
+  YAML::Node device_metrics = model_metrics["DeviceMonitor"];
+  for (const auto &[dev_id, device_stats] : end_device_stats) {
+    YAML::Node device_metrics_node = device_metrics[std::to_string(dev_id)];
+    device_metrics_node["ipu_freq_max"] =
+        format_double(device_stats.ipu_freq_max) + " MHz";
+    device_metrics_node["ipu_freq_min"] =
+        format_double(device_stats.ipu_freq_min) + " MHz";
+    device_metrics_node["ipu_freq_avg"] =
+        format_double(device_stats.ipu_freq_avg) + " MHz";
+    device_metrics_node["temperature_max"] =
+        format_double(device_stats.temperature_max) + " °C";
+    device_metrics_node["temperature_min"] =
+        format_double(device_stats.temperature_min) + " °C";
+    device_metrics_node["temperature_avg"] =
+        format_double(device_stats.temperature_avg) + " °C";
+    device_metrics_node["power_max"] =
+        format_double(device_stats.power_max) + " W";
+    device_metrics_node["power_min"] =
+        format_double(device_stats.power_min) + " W";
+    device_metrics_node["power_avg"] =
+        format_double(device_stats.power_avg) + " W";
+    device_metrics_node["mem_total"] =
+        format_device_memory(device_stats.mem_info.mem_total);
+    device_metrics_node["mem_used"] =
+        format_device_memory(device_stats.mem_info.mem_used);
+    device_metrics_node["mem_used_max"] =
+        format_device_memory(device_stats.mem_used_max);
+    device_metrics_node["mem_used_min"] =
+        format_device_memory(device_stats.mem_used_min);
+    device_metrics_node["mem_used_avg"] = format_device_memory(
+        format_device_memory_avg_as_int(device_stats.mem_used_avg));
+  }
+
+  YAML::Node model_load_metrics = model_metrics["ModelLoadMemory"];
+  for (const auto &[dev_id, init_end_stats] : post_init_dev_stats) {
+    YAML::Node model_load_metrics_node =
+        model_load_metrics[std::to_string(dev_id)];
+    model_load_metrics_node["mem_total"] =
+        format_device_memory(init_end_stats.mem_info.mem_total);
+    model_load_metrics_node["mem_used"] =
+        format_device_memory(init_end_stats.mem_info.mem_used);
+  }
+  perf_metrics_node.push_back(model_metrics);
+}
+
+void PerfDumper::writeTtsPerfBrief(const TtsPerfSettings &perf_settings,
+                                   const TtsPerfResult &results,
+                                   int loop_index) {
+  auto logger = get_perf_logger(log_file);
+  const auto log_stage = [&logger](const char *name, double time_ms,
+                                   size_t count) {
+    const double average_ms = count > 0 ? time_ms / count : 0.0;
+    logger->info("  {:<28} | {:>10.2f} ms | count {:>6} | avg {:>8.2f} ms",
+                 name, time_ms, count, average_ms);
+  };
+
+  logger->info("TTS Perf Loop: {}/{}", loop_index, perf_settings.loop);
+  logger->info("  Model: {}", perf_settings.model_name);
+  logger->info("  Mode: streaming fixed-frame");
+  logger->info("  Requested Audio: {:.3f} s | Nominal Audio: {:.3f} s",
+               perf_settings.requested_audio_length_s,
+               perf_settings.nominal_audio_length_s);
+  logger->info("  Token/s: {} | Body Tokens: {} | Codec Frames: {}",
+               perf_settings.token_per_second, perf_settings.body_text_tokens,
+               results.generated_frames);
+  logger->info("  Audio Samples: {} | Decoder Chunks: {}",
+               results.audio_samples, results.decoder_chunks);
+  logger->info("  E2E: {:.2f} ms | RTF: {:.4f} | TTFA: {:.2f} ms",
+               results.e2e_ms, results.rtf, results.ttfa_ms);
+  logger->info("  Codec Generation: {:.2f} ms | Codec Frames/s: {:.2f}",
+               results.codec_generation_ms, results.codec_frames_per_second);
+  logger->info("  Stage Performance:");
+  const auto &stage = results.stages;
+  log_stage("text_embedding", stage.text_embedding_ms,
+            stage.text_embedding_count);
+  log_stage("text_projection", stage.text_projection_ms,
+            stage.text_projection_count);
+  log_stage("prompt_prepare", stage.prompt_prepare_ms,
+            stage.prompt_prepare_count);
+  log_stage("talker_prefill", stage.talker_prefill_ms,
+            stage.talker_prefill_count);
+  log_stage("talker_decode", stage.talker_decode_ms, stage.talker_decode_count);
+  log_stage("talker_sampling", stage.talker_sampling_ms,
+            stage.talker_sampling_count);
+  log_stage("codec_frame_prepare", stage.codec_frame_prepare_ms, 0);
+  log_stage("code_predictor_prepare", stage.code_predictor_prepare_ms, 0);
+  log_stage("code_predictor_prefill", stage.code_predictor_prefill_ms,
+            stage.code_predictor_prefill_count);
+  log_stage("code_predictor_decode", stage.code_predictor_decode_ms,
+            stage.code_predictor_decode_count);
+  log_stage("code_predictor_sampling", stage.code_predictor_sampling_ms,
+            stage.code_predictor_sampling_count);
+  log_stage("stateful_decoder", stage.stateful_decoder_ms,
+            stage.stateful_decoder_count);
+  log_stage("other", stage.other_ms, 0);
+  logger->info("{}", std::string(82, '='));
+  logger->flush();
 }
 #endif
 
@@ -585,8 +799,7 @@ void PerfDumper::writePerfBrief(
     std::string perf_intruduction) {
   auto metrics = results.metrics;
 
-  static auto logger =
-      spdlog::rotating_logger_mt("perf_logger", log_file, 1024 * 1024 * 5, 3);
+  auto logger = get_perf_logger(log_file);
   logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] %v");
 
   // Basic configuration
@@ -818,23 +1031,31 @@ void PerfDumper::generateYamlFile() {
 
       std::ofstream out(dump_file);
       if (!out.is_open()) {
-        std::cerr << "Error: Cannot open file " << dump_file << std::endl;
-        return;
+        throw std::runtime_error("Cannot open YAML output file: " + dump_file);
       }
 
       // Serialize the YAML node to a string and write to file
       out << this->root;
+      out.flush();
+      if (!out.good()) {
+        throw std::runtime_error("Failed while writing YAML output file: " +
+                                 dump_file);
+      }
       out.close();
+      if (out.fail()) {
+        throw std::runtime_error("Failed to close YAML output file: " +
+                                 dump_file);
+      }
 
       std::cout << COLOR_GREEN
                 << "Successfully wrote Perf Result to YAML file: " << dump_file
                 << COLOR_RESET << std::endl;
     } catch (const fs::filesystem_error &e) {
-      std::cerr << "Error: Failed to create directory - " << e.what()
-                << std::endl;
+      throw std::runtime_error(
+          std::string("Failed to create YAML directory: ") + e.what());
     } catch (const std::exception &e) {
-      std::cerr << "Error: Failed to write YAML file - " << e.what()
-                << std::endl;
+      throw std::runtime_error(std::string("Failed to write YAML file: ") +
+                               e.what());
     }
   }
   std::cout << COLOR_GREEN

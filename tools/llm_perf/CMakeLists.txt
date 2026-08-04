@@ -69,6 +69,13 @@ include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
 
 option(ENABLE_ASR "Enable ASR support" ON)
 message(STATUS "ENABLE_ASR: ${ENABLE_ASR}")
+option(ENABLE_TTS "Enable TTS support" ON)
+message(STATUS "ENABLE_TTS: ${ENABLE_TTS}")
+
+if(ENABLE_TTS)
+  include($ENV{HOUMO_EXAMPLES_PATH}/models/tts/qwen3-tts/cpp/cmake/qwen3_tts_frontend.cmake)
+  add_qwen3_tts_streaming_frontend(llm_perf_qwen3_tts_frontend)
+endif()
 
 include_directories(
   $ENV{HOUMO_SDK_PATH}/hal/export/include
@@ -95,6 +102,9 @@ set(SOURCE_FILES
 if(ENABLE_ASR)
   list(APPEND SOURCE_FILES src/asr/PerfAsr.cc)
 endif()
+if(ENABLE_TTS)
+  list(APPEND SOURCE_FILES src/tts/PerfTts.cc)
+endif()
 
 set(INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR}/include
@@ -106,12 +116,18 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIRS})
 if(ENABLE_ASR)
   target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_ASR)
 endif()
+if(ENABLE_TTS)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_TTS)
+endif()
 
 set(LLM_PERF_LIBS
   ${TCIM_LIBRARY}
   yaml-cpp
   houmo_engine
 )
+if(ENABLE_TTS)
+  list(APPEND LLM_PERF_LIBS llm_perf_qwen3_tts_frontend)
+endif()
 
 if(HOUMO_NEED_PTHREAD)
   list(APPEND LLM_PERF_LIBS pthread)

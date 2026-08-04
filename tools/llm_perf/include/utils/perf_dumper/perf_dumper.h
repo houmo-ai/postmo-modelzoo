@@ -42,6 +42,9 @@
 #ifdef ENABLE_ASR
 #include "asr/PerfAsr.h"
 #endif
+#ifdef ENABLE_TTS
+#include "tts/PerfTts.h"
+#endif
 
 class PerfDumper {
  public:
@@ -62,13 +65,23 @@ class PerfDumper {
 
 #ifdef ENABLE_ASR
   void dumpAsrPerf(
-      const AsrPerfSettings &perf_settings,
-      const AsrTranscribeResult &results,
-      int n_chunks,
+      const AsrPerfSettings &perf_settings, const AsrTranscribeResult &results,
+      int n_chunks, const HostMemoryInfo &host_mem_info,
+      const HostMemoryInfo &max_host_mem_info,
+      const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
+      const std::unordered_map<int, DeviceStats> &end_device_stats);
+#endif
+
+#ifdef ENABLE_TTS
+  void dumpTtsPerf(
+      const TtsPerfSettings &perf_settings, const TtsPerfResult &results,
       const HostMemoryInfo &host_mem_info,
       const HostMemoryInfo &max_host_mem_info,
       const std::unordered_map<int, DeviceStats> &post_init_dev_stats,
       const std::unordered_map<int, DeviceStats> &end_device_stats);
+
+  void writeTtsPerfBrief(const TtsPerfSettings &perf_settings,
+                         const TtsPerfResult &results, int loop_index);
 #endif
 
   void showPerfBrief(
